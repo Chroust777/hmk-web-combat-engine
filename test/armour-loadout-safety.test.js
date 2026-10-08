@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {auditArmourLoadout} from '../src/integration/armour-loadout-audit.js';
+const av={b:2,e:8,p:7,f:3};
+const piece=(id,locationProtection,slot='worn')=>({id,slot,quantity:1,snapshot:{name:id,category:'armor',properties:{material:'M',locationProtection}}});
+test('an unmapped worn piece marks even valid anatomical subtotal incomplete',()=>{const r=auditArmourLoadout([piece('mapped',{tx:av}),piece('unmapped',null)]);assert.equal(r.rows[0].protection.e,8);assert.equal(r.complete,false);assert.equal(r.skipped.length,1)});
+test('atomic rejection of a piece with both valid and invalid locations',()=>{const r=auditArmourLoadout([piece('partial',{tx:av,foo:av})]);assert.equal(r.rows.length,0);assert.equal(r.skipped.length,1)});
+test('invalid AV is not silently converted to zero',()=>{const r=auditArmourLoadout([piece('bad',{tx:{b:2,e:NaN,p:7,f:3}})]);assert.equal(r.rows.length,0);assert.equal(r.complete,false)});
+test('duplicate inventory ID cannot double protection',()=>{const r=auditArmourLoadout([piece('same',{tx:av}),piece('same',{tx:av})]);assert.equal(r.rows[0].protection.e,8);assert.equal(r.complete,false)});
+test('valid equipped article yields documented subtotal',()=>{const r=auditArmourLoadout([piece('ok',{tx:av})]);assert.equal(r.complete,true);assert.equal(r.authoritative,false)});
+test('unworn articles do not affect completeness',()=>{const r=auditArmourLoadout([piece('ok',{tx:av}),piece('unmapped',null,'none')]);assert.equal(r.complete,true)});

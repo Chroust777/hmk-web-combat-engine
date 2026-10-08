@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {auditArmourLoadout} from '../src/integration/armour-loadout-audit.js';
+const item=(id,loc,av,slot='worn',quantity=1)=>({id,slot,quantity,snapshot:{name:id,category:'armor',properties:{material:'M',locationProtection:{[loc]:av}}}});
+const av={b:2,e:8,p:7,f:3};
+test('combines only explicitly covered anatomical locations',()=>{const r=auditArmourLoadout([item('a','tx',av),item('b','tx',av),item('c','ha',av)]);assert.deepEqual(r.rows.find(x=>x.location==='tx').protection,{b:4,e:16,p:14,f:6});assert.equal(r.rows.find(x=>x.location==='ha').count,1);assert.equal(r.authoritative,false)});
+test('does not count carried articles',()=>assert.equal(auditArmourLoadout([item('a','tx',av,'none')]).rows.length,0));
+test('rejects ambiguous quantities',()=>{const r=auditArmourLoadout([item('a','tx',av,'worn',2)]);assert.equal(r.rows.length,0);assert.equal(r.skipped.length,1)});
+test('rejects incomplete protection instead of fabricating',()=>{const r=auditArmourLoadout([item('a','tx',{b:2})]);assert.equal(r.skipped.length,1)});
+test('flags excess layers without claiming complete legality check',()=>{const r=auditArmourLoadout(Array.from({length:6},(_,i)=>item(String(i),'tx',av)));assert.equal(r.warnings.length,1);assert.equal(r.authoritative,false)});
+test('never mutates inventory',()=>{const inv=[item('a','tx',av)];const original=JSON.stringify(inv);auditArmourLoadout(inv);assert.equal(JSON.stringify(inv),original)});

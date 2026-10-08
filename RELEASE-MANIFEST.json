@@ -1,0 +1,14 @@
+{
+  "version": "88",
+  "previousVersion": "87",
+  "changes": [
+    "Fail-closed armour-layer validation for null, scalar, and array article records",
+    "Reject unknown Bulk body-zone keys instead of silently ignoring them",
+    "Two new regression tests; no storage schema changes"
+  ],
+  "limitations": [
+    "Physical order not supplied by printed suits; not certified",
+    "No automatic equip or combat armour integration",
+    "p.119 exhaustive combinations not fully machine cross-checked"
+  ]
+}

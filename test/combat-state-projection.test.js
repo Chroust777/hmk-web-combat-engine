@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {projectCombatState} from '../src/integration/combat-state-projection.js';
+const p=[{id:'a',name:'A'},{id:'b',name:'B'}];
+const draft=(previousState,state,carryover,id='a')=>({target:{id},inputs:{previousState},shockResult:{state},carryover:{state:carryover}});
+const e=(d,round,id)=>({id, draft:d,chronology:{round}});
+test('empty projection is immutable',()=>{const before=JSON.stringify(p);const r=projectCombatState({participants:p});assert.equal(r.applied,0);assert.equal(JSON.stringify(p),before)});
+test('canonical STN escalation applies twice',()=>{const r=projectCombatState({participants:p,entries:[e(draft('NONE','STN','STN'),1,'1'),e(draft('STN','STN','INC'),1,'2')]});assert.equal(r.combatants[0].shockState,'INC');assert.equal(r.applied,2)});
+test('incorrect carryover stops future events for affected target',()=>{const r=projectCombatState({participants:p,entries:[e(draft('NONE','STN','INC'),1,'1'),e(draft('NONE','STN','STN'),2,'2')]});assert.equal(r.applied,0);assert.equal(r.combatants[0].confidence,'zablokováno')});
+test('replay failure blocks target but not other participants',()=>{const r=projectCombatState({participants:p,entries:[e(draft('NONE','STN','STN'),1,'1'),e(draft('NONE','STN','STN','b'),2,'2')],validateDraft:d=>({ok:d.target.id==='b'})});assert.equal(r.applied,1);assert.equal(r.combatants[1].shockState,'STN')});
+test('unknown target is reported',()=>{const r=projectCombatState({participants:p,entries:[e(draft('NONE','STN','STN','x'),1,'1')]});assert.equal(r.applied,0);assert.equal(r.issues.length,1)});
+test('global chronology rejects backwards event for another combatant',()=>{const r=projectCombatState({participants:p,entries:[e(draft('NONE','STN','STN'),3,'1'),e(draft('NONE','STN','STN','b'),2,'2')]});assert.equal(r.applied,1);assert.equal(r.combatants[1].confidence,'zablokováno')});
+test('missing recovery blocks rather than silently using draft state',()=>{const r=projectCombatState({participants:p,entries:[e(draft('NONE','STN','STN'),1,'1'),e(draft('NONE','INC','INC'),2,'2')]});assert.equal(r.applied,1);assert.equal(r.combatants[0].shockState,'STN')});
+test('non-NONE initial state requires explicit baseline',()=>{const r=projectCombatState({participants:p,entries:[e(draft('STN','STN','INC'),1,'1')]});assert.equal(r.applied,0)});
+test('duplicate event IDs cannot double apply',()=>{const r=projectCombatState({participants:p,entries:[e(draft('NONE','STN','STN'),1,'same'),e(draft('STN','STN','INC'),2,'same')]});assert.equal(r.applied,1)});
+test('invalid chronology blocks event',()=>{const r=projectCombatState({participants:p,entries:[e(draft('NONE','STN','STN'),0,'1')]});assert.equal(r.applied,0)});
+test('replay exceptions are contained',()=>{const r=projectCombatState({participants:p,entries:[e(draft('NONE','STN','STN'),1,'1')],validateDraft:()=>{throw Error('invalid')}});assert.equal(r.applied,0)});
+test('legacy events without chronology remain readable',()=>{const r=projectCombatState({participants:p,entries:[{draft:draft('NONE','STN','STN')}]});assert.equal(r.applied,1)});
