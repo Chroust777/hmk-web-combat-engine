@@ -21,3 +21,9 @@
 
 /* v12: non-blocking HMK data readiness review */
 .audit-list{margin:0;padding-left:1.5rem;line-height:1.65}.audit-list li{margin:.35rem 0;overflow-wrap:anywhere}
+
+/* v15: deliberate, accessible per-character permanent delete control */
+.character-card{position:relative;padding-right:3.5rem}
+.character-delete{position:absolute;top:.65rem;right:.65rem;display:grid;place-items:center;width:2.25rem;height:2.25rem;min-height:2.25rem;padding:0;border:1px solid #a16c62;border-radius:7px;background:#55302e;color:#fff0dc;font:700 1.65rem/1 Arial,sans-serif}
+.character-delete:hover{background:#843c37}
+.character-delete:focus-visible{outline:3px solid #dfbb78;outline-offset:2px}
