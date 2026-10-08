@@ -1,6 +1,6 @@
 import { Character as KernelCharacter, Skill as KernelSkill, WeaponDefinition, WeaponInstance, Shield, ArmourArticle, SCHEMA_VERSION } from './src/domain/contracts.js';
-// HMK Keeper's Ledger v26 — inventory provenance audit; v1 storage format retained.
-const APP_VERSION='26';
+// HMK Keeper's Ledger v30 — bounded nested catalogue data and verified release lineage; v1 storage retained.
+const APP_VERSION='30';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -14,9 +14,28 @@ const slotSelect=(name,value)=>`<label>Umístění / slot<select name="${name}">
 let storageReadOnly=false;
 let storageBaseline=null; // exact bytes last observed; prevents stale-tab overwrites
 let data=clean(),view='characters',selected=null,editItem=null,query='',category='weapon',notice='';
-let encounterSelection=new Set();
+// Encounter preparation is a per-tab draft, deliberately separate from the character database.
+// sessionStorage may be unavailable (privacy settings); the page still works in memory.
+const ENCOUNTER_DRAFT_KEY='hmk-keepers-ledger-encounter-draft-v1';
+function readEncounterDraft(){
+ try {const raw=sessionStorage.getItem(ENCOUNTER_DRAFT_KEY);if(!raw)return new Set();
+  const parsed=JSON.parse(raw);if(!Array.isArray(parsed)||parsed.length>10000)return new Set();
+  const validIds=new Set(data.characters.map(c=>c.id));
+  return new Set(parsed.filter(id=>typeof id==='string'&&validIds.has(id)));
+ }catch{return new Set()}
+}
+function persistEncounterDraft(){
+ try{const validIds=new Set(data.characters.map(c=>c.id));
+  encounterSelection=new Set([...encounterSelection].filter(id=>validIds.has(id)));
+  sessionStorage.setItem(ENCOUNTER_DRAFT_KEY,JSON.stringify([...encounterSelection]));
+ }catch{/* Private browsing or storage quota: in-memory selection remains usable. */}
+}
+let encounterSelection=new Set(); // Hydrate only after loading the character database.
 let catalogStatus='all'; // presentation-only; never persisted
 try{const saved=localStorage.getItem(STORAGE);if(saved)data=validate(JSON.parse(saved));storageBaseline=saved;}catch(e){storageReadOnly=true;notice='POZOR: Původní data se nepodařilo načíst. Zápisy jsou zablokovány, aby se nepřepsala. Zálohujte data prohlížeče a opravte úložiště.';console.error(e)}
+// Restore the encounter draft only after character IDs are available.
+// On unreadable database data, do not rehydrate potentially stale selections.
+if(!storageReadOnly)encounterSelection=readEncounterDraft();
 function validate(d){
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
@@ -166,7 +185,7 @@ function encounterView(){
  const count=selectedChars.length;
  const issues=selectedChars.reduce((sum,c)=>sum+readinessReport(c).length,0);
  return `<div class="topline"><h2>Příprava bojového střetnutí</h2></div>
- <div class="notice">Tato obrazovka připravuje výběr účastníků a jejich evidované HMK údaje. Neprovádí hody, útoky, obranu ani výpočty zranění. Výběr se ukládá pouze do otevřené relace stránky.</div>
+ <div class="notice">Tato obrazovka připravuje výběr účastníků a jejich evidované HMK údaje. Neprovádí hody, útoky, obranu ani výpočty zranění. Výběr se obnoví po obnovení stránky v této záložce; neukládá se do databáze postav ani do exportu zálohy.</div>
  <section class="panel"><h3>Účastníci (${count})</h3>
  ${chars.length?`<div class="encounter-roster">${chars.map(c=>{const warnings=readinessReport(c);return `<label class="encounter-entry"><input type="checkbox" data-encounter-character="${esc(c.id)}" ${encounterSelection.has(c.id)?'checked':''}><span><strong>${esc(c.name)}</strong><small>${esc(c.kind||'PC')} · ${warnings.length?warnings.length+' upozornění k údajům':'bez upozornění k úplnosti údajů'}</small></span></label>`}).join('')}</div>`:'<p class="muted">Nejprve vytvořte postavy v registru.</p>'}
  <div class="equipment-summary"><div><strong>Vybráno</strong><span>${count} postav</span></div><div><strong>Chybějící evidenční údaje</strong><span>${issues} upozornění</span></div></div>
@@ -180,8 +199,8 @@ function ask(msg){return window.confirm(msg)}
 
 document.addEventListener('click',e=>{const t=e.target.closest('[data-action],[data-nav],[data-open],[data-copy],[data-archive],[data-remove-inv],[data-delete-log],[data-edit-item],[data-copy-item],[data-delete-item],[data-restore],[data-purge],[data-delete-character],[data-export-character]');if(!t)return;
 if(t.dataset.exportCharacter){if(storageReadOnly)return alert('Nečitelná data: použijte nouzovou zálohu.');try{const pkg=characterPackage(t.dataset.exportCharacter);downloadJSON(pkg,'hmk-postava-'+safeFilename(pkg.character.name)+'.json')}catch(err){alert(err.message)}return}
-if(t.dataset.action==='encounter-all'){encounterSelection=new Set(data.characters.map(c=>c.id));render();return}
-if(t.dataset.action==='encounter-clear'){encounterSelection.clear();render();return}
+if(t.dataset.action==='encounter-all'){encounterSelection=new Set(data.characters.map(c=>c.id));persistEncounterDraft();render();return}
+if(t.dataset.action==='encounter-clear'){encounterSelection.clear();persistEncounterDraft();render();return}
 if(t.dataset.action==='encounter-export'){try{downloadJSON(encounterPayload(),'hmk-encounter-preparation.json')}catch(err){alert(err.message)}return}
 if(t.dataset.action==='export-inventory-audit'){if(storageReadOnly)return alert('Nečitelná data: audit inventáře není dostupný.');downloadJSON(inventoryProvenanceReport(),'hmk-audit-inventare-v26.json');return}
 if(t.dataset.action==='export-catalog-audit'){if(storageReadOnly)return alert('Nečitelná data: audit katalogu není dostupný.');downloadJSON(catalogAuditReport(),'hmk-audit-katalogu-v25.json');return}
@@ -240,7 +259,7 @@ document.addEventListener('change',async e=>{if(e.target.id==='category'){catego
   }catch(err){alert('Import katalogu selhal: '+err.message)}finally{e.target.value=''}
   return;
  }
- if(e.target.id==='import-file'){const f=e.target.files?.[0];if(!f)return;try{if(f.size>10*1024*1024)throw Error('Záloha přesahuje limit 10 MB');const baselineBeforeImport=storageBaseline;const imported=validate(JSON.parse(await f.text()));if(localStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');if(storageReadOnly)throw Error('Import je zablokován kvůli nečitelným původním datům.');if(!ask('Import nahradí všechna současná data. Máte uloženou aktuální JSON zálohu? Pokračovat?'))return;const old=data;data=imported;if(!save()){data=old;render();throw Error('Úložiště odmítlo zápis; původní data zůstala zachována')}selected=null;view='characters';notice='Import byl dokončen.';render()}catch(err){alert('Neplatný soubor zálohy: '+err.message)}}});
+ if(e.target.id==='import-file'){const f=e.target.files?.[0];if(!f)return;try{if(f.size>10*1024*1024)throw Error('Záloha přesahuje limit 10 MB');const baselineBeforeImport=storageBaseline;const imported=validate(JSON.parse(await f.text()));if(localStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');if(storageReadOnly)throw Error('Import je zablokován kvůli nečitelným původním datům.');if(!ask('Import nahradí všechna současná data. Máte uloženou aktuální JSON zálohu? Pokračovat?'))return;const old=data;data=imported;if(!save()){data=old;render();throw Error('Úložiště odmítlo zápis; původní data zůstala zachována')}selected=null;encounterSelection.clear();persistEncounterDraft();view='characters';notice='Import byl dokončen.';render()}catch(err){alert('Neplatný soubor zálohy: '+err.message)}}});
 render();
 
 
@@ -329,11 +348,18 @@ document.addEventListener('submit',e=>{const f=e.target;if(!['hmk-profile-form',
   try{props.locationProtection=parseLocationProtection(v.locationProtection)}catch(err){return alert(err.message)}
  }
  const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties:props};if(mutate(()=>{if(current)Object.assign(current,record);else data.items.push(record)})){overlay=null;render()}return}const c=character(selected);if(!c)return;const h=structuredClone(c.hmk||{});if(f.id==='hmk-profile-form'){const a={...(h.attributes||{})};for(const [k,val] of Object.entries(v)){if(k.startsWith('bio_'))h[k.slice(4)]=val;if(k.startsWith('attr_')){if(val==='')delete a[k.slice(5)];else{const n=Number(val);if(!Number.isSafeInteger(n)||n<0||n>999)return alert('Neplatná charakteristika');a[k.slice(5)]=n}}}mutate(()=>{c.hmk={...h,attributes:a}});return}if(f.id==='hmk-skill-form'){if(!String(v.name||'').trim())return alert('Zadejte název dovednosti');const skill={id:uuid(),group:v.group,name:v.name.trim(),sb:v.sb===''?null:Number(v.sb),ml:v.ml===''?null:Number(v.ml)};if([skill.sb,skill.ml].some(n=>n!==null&&(!Number.isSafeInteger(n)||n<0||n>999)))return alert('Neplatné SB/ML');mutate(()=>{c.hmk={...h,skills:[...(h.skills||[]),skill]}});return}if(f.id==='hmk-injury-form'){if(!String(v.location||'').trim())return alert('Zadejte lokalitu');mutate(()=>{c.hmk={...h,injuries:[...(h.injuries||[]),{id:uuid(),location:v.location,description:v.description||'',severity:v.severity||''}]}})}},true);
-document.addEventListener('change',e=>{const id=e.target?.dataset?.encounterCharacter;if(!id)return;if(!data.characters.some(c=>c.id===id))return;if(e.target.checked)encounterSelection.add(id);else encounterSelection.delete(id);render()});
+document.addEventListener('change',e=>{const id=e.target?.dataset?.encounterCharacter;if(!id)return;if(!data.characters.some(c=>c.id===id))return;if(e.target.checked)encounterSelection.add(id);else encounterSelection.delete(id);persistEncounterDraft();render()});
 document.addEventListener('click',e=>{const t=e.target.closest('[data-remove-skill],[data-remove-injury]');if(!t)return;const c=character(selected);if(!c||!window.confirm('Odstranit tento záznam?'))return;const key=t.dataset.removeSkill?'skills':'injuries';const id=t.dataset.removeSkill||t.dataset.removeInjury;mutate(()=>{c.hmk=c.hmk||{};c.hmk[key]=(c.hmk[key]||[]).filter(x=>x.id!==id)})});
 
 // v21: independent catalogue exchange. Never import character data or overwrite definitions.
-function catalogFingerprint(x){return JSON.stringify([x.category,x.name.trim().toLocaleLowerCase('cs'),x.description||'',x.source||'',x.properties]);}
+// Canonical fingerprint: JSON object key order does not change a definition's identity.
+// Array order is deliberately retained (weapon modes and layers may be ordered).
+function canonicalCatalogValue(value){
+ if(Array.isArray(value))return value.map(canonicalCatalogValue);
+ if(value!==null&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonicalCatalogValue(value[k])]));
+ return value;
+}
+function catalogFingerprint(x){return JSON.stringify(canonicalCatalogValue([x.category,x.name.trim().toLocaleLowerCase('cs'),x.description||'',x.source||'',x.properties]));}
 function catalogNameConflicts(pending,existing){
  const names=new Map();
  for(const x of existing){const key=x.category+'|'+x.name.trim().toLocaleLowerCase('cs');if(!names.has(key))names.set(key,new Set());names.get(key).add(catalogFingerprint(x));}
@@ -341,12 +367,39 @@ function catalogNameConflicts(pending,existing){
  for(const x of pending){const key=x.category+'|'+x.name.trim().toLocaleLowerCase('cs');const variants=names.get(key);if(variants&&!variants.has(catalogFingerprint(x)))conflicts.push(x.name+' ('+x.category+')');if(!variants)names.set(key,new Set([catalogFingerprint(x)]));else variants.add(catalogFingerprint(x));}
  return conflicts;
 }
+// Validate the entire imported parameter tree before cloning or persisting it.
+// The catalogue is data, never executable code. Reject excessive nesting and
+// prototype-sensitive keys even though JSON.parse itself does not execute them.
+function validateCatalogTree(value,depth=0,budget={nodes:0}){
+ if(++budget.nodes>20000)throw Error('Příliš složitá struktura parametrů katalogu');
+ if(depth>24)throw Error('Parametry katalogu jsou příliš hluboce vnořené');
+ if(value===null||typeof value==='string'||typeof value==='boolean')return;
+ if(typeof value==='number'&&Number.isFinite(value))return;
+ if(Array.isArray(value)){
+  if(value.length>10000)throw Error('Příliš dlouhý seznam v parametrech katalogu');
+  for(const entry of value)validateCatalogTree(entry,depth+1,budget);
+  return;
+ }
+ if(typeof value==='object'&&value!==null&&Object.getPrototypeOf(value)===Object.prototype){
+  const keys=Object.keys(value);
+  if(keys.length>2000)throw Error('Příliš mnoho polí v parametrech katalogu');
+  for(const key of keys){
+   if(['__proto__','constructor','prototype'].includes(key))throw Error('Nepovolený název pole v katalogu');
+   validateCatalogTree(value[key],depth+1,budget);
+  }
+  return;
+ }
+ throw Error('Nepovolená hodnota v parametrech katalogu');
+}
 function prepareCatalogImport(pkg,existing){
  if(!pkg||pkg.format!=='hmk-equipment-catalog-v1'||!Array.isArray(pkg.items))throw Error('Neplatný formát katalogu');
  if(pkg.items.length>10000)throw Error('Katalog obsahuje příliš mnoho položek');
  const fingerprints=new Set(existing.map(catalogFingerprint));const pending=[];
  for(const x of pkg.items){
   if(!x||typeof x.name!=='string'||!x.name.trim()||x.name.length>250||!['weapon','shield','armor','other'].includes(x.category)||typeof x.description!=='string'||typeof x.source!=='string'||!x.properties||typeof x.properties!=='object'||Array.isArray(x.properties))throw Error('Katalog obsahuje neplatnou definici');
+  // Reject unsafe/non-JSON nested values before touching the existing catalogue.
+  validateCatalogTree(x.properties);
+  if(JSON.stringify(x.properties).length>100000)throw Error('Parametry položky přesahují limit 100 kB');
   const fingerprint=catalogFingerprint(x);
   if(fingerprints.has(fingerprint))continue;
   fingerprints.add(fingerprint);
