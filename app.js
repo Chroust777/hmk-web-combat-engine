@@ -1,6 +1,6 @@
 import { Character as KernelCharacter, Skill as KernelSkill, WeaponDefinition, WeaponInstance, Shield, ArmourArticle, SCHEMA_VERSION } from './src/domain/contracts.js';
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='49';
+const APP_VERSION='55';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -61,7 +61,7 @@ function field(name,label,value='',type='text'){return `<label>${esc(label)}<inp
 function area(name,label,value=''){return `<label>${esc(label)}<textarea name="${name}">${esc(value)}</textarea></label>`}
 function character(id){return data.characters.find(c=>c.id===id)}
 function item(id){return findCatalogItem(id)}
-function main(){let body='';if(view==='characters')body=charactersView();if(view==='sheet')body=sheetView();if(view==='library')body=libraryView();if(view==='trash')body=trashView();if(view==='backup')body=backupView();if(view==='encounter')body=encounterView();return `<div class="shell"><header class="mast"><div class="mast-top"><div class="eyebrow">HÂRNMASTER · GAME MASTER CONSOLE</div><div class="release-marker" aria-label="Aktuální verze webové aplikace">VERZE ${APP_VERSION}</div></div><h1>The Keeper's Ledger <span class="app-version" aria-label="Verze aplikace">v${APP_VERSION}</span></h1><p>Registr postav · osobní deníky · knihovna vybavení</p></header><div class="layout"><nav class="nav" aria-label="Hlavní navigace">${[['characters','⚜ Postavy'],['library','⚔ Knihovna'],['trash','♻ Archiv'],['backup','▣ Zálohy'],['encounter','⚔ Příprava boje']].map(([v,l])=>`<button class="${view===v?'':'secondary'}" data-nav="${v}">${l}</button>`).join('')}</nav><main class="content">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div><footer class="footer">HMK UI v${APP_VERSION} · evidenční režim · pravidlové výpočty nejsou připojeny</footer></div>`}
+function main(){let body='';if(view==='characters')body=charactersView();if(view==='sheet')body=sheetView();if(view==='library')body=libraryView();if(view==='trash')body=trashView();if(view==='backup')body=backupView();if(view==='encounter')body=encounterView();return `<div class="shell"><header class="mast"><div class="mast-top"><div class="eyebrow">HÂRNMASTER · GAME MASTER CONSOLE</div><div class="release-marker" aria-label="Aktuální verze webové aplikace">VERZE ${APP_VERSION}</div></div><h1>The Keeper's Ledger <span class="app-version" aria-label="Verze aplikace">v${APP_VERSION}</span></h1><p>Registr postav · osobní deníky · knihovna vybavení</p></header><div class="layout"><nav class="nav" aria-label="Hlavní navigace">${[['characters','⚜ Postavy'],['library','⚔ Knihovna'],['trash','♻ Archiv'],['backup','▣ Zálohy'],['encounter','⚔ Příprava boje']].map(([v,l])=>`<button class="${view===v?'':'secondary'}" data-nav="${v}">${l}</button>`).join('')}</nav><main class="content">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div><footer class="footer">HMK UI v${APP_VERSION} · evidence + výpočet AV/Impact a klasifikace zranění · plný combat resolver není připojen</footer></div>`}
 function charactersView(){const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));return `<div class="topline"><h2>Registr postav (${data.characters.length})</h2>${button('+ Nová postava','new-character')}</div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards">${list.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><span class="pill">${esc(c.kind)}</span><h3>${esc(c.name)}</h3><div class="muted">${esc(c.occupation||'Bez povolání')}</div><div class="muted">${esc(c.description||'')}</div><div class="actions"><button data-open="${esc(c.id)}">Otevřít deník</button><button class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></article>`).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`}
 function sheetView(){const c=character(selected);if(!c){view='characters';return charactersView()}const inv=data.inventory.filter(x=>x.characterId===c.id);const logs=data.journal.filter(x=>x.characterId===c.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));return `<div class="topline"><h2>Osobní deník: ${esc(c.name)}</h2>${button('← Registr','go-characters')}${button('Export HMK profilu','export-kernel-character')}</div><div class="columns"><section class="panel"><h3>Identita</h3><form id="character-form">${field('name','Jméno',c.name)}${field('occupation','Povolání',c.occupation)}<label>Typ<select name="kind"><option ${c.kind==='PC'?'selected':''}>PC</option><option ${c.kind==='NPC'?'selected':''}>NPC</option></select></label>${field('portrait','URL portrétu (nepovinné)',c.portrait)}${area('description','Popis a historie',c.description)}<div class="actions"><button type="submit">Uložit postavu</button></div></form></section><section class="panel"><h3>Vybavení postavy</h3><div class="equipment-summary">${[['main_hand','Hlavní ruka'],['off_hand','Vedlejší ruka'],['worn','Nasazená zbroj']].map(([slot,label])=>`<div><strong>${label}</strong><span>${esc(inv.filter(x=>x.slot===slot).map(x=>x.snapshot.name).join(', ')||'—')}</span></div>`).join('')}</div>${inv.length?inv.map(x=>`<div class="list-row"><div><b>${esc(x.snapshot.name)}</b><div class="muted">${esc(x.snapshot.category)} · ${esc(x.condition||'Bez stavu')} · ${esc(x.quantity)} ks · ${esc(slotLabel(x.slot))}${x.currentWQ!==undefined&&x.currentWQ!==null?' · WQ '+esc(x.currentWQ):''}</div></div><div class="actions"><button class="secondary" data-edit-inv="${esc(x.id)}">Upravit</button><button class="danger" data-remove-inv="${esc(x.id)}">Odebrat</button></div></div>`).join(''):'<p class="muted">Zatím bez vybavení.</p>'}<form id="add-inventory"><label>Předmět z knihovny<select name="itemId" required><option value="">Vyberte…</option>${allCatalogItems().map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${field('condition','Stav / poznámka','')}${field('currentWQ','Aktuální WQ kusu (nepovinné)','', 'number')}${slotSelect('slot','none')}<button type="submit" ${allCatalogItems().length?'':'disabled'}>Přiřadit předmět</button></form><div class="notice tiny">Při přiřazení vzniká samostatná kopie parametrů. Úprava knihovny nezmění již přidělené předměty.</div></section>${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions"><button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button></div></div>`).join('')}</section></div>`}
 // Advisory-only catalog audit. Missing data are never silently fabricated or written to storage.
@@ -303,6 +303,50 @@ function encounterEquipmentPreflight(c){
  }
  return {characterId:c.id,characterName:c.name,issues,equipment:owned.map(x=>({id:x.id,name:x.snapshot?.name||'',category:x.snapshot?.category||'',slot:x.slot||'none',quantity:x.quantity,currentWQ:x.currentWQ??null}))};
 }
+// v50: Normalize primary and alternative attack modes into one read-only combat input.
+// No damage roll is made here. Original inventory snapshots remain authoritative.
+function combatStrikeModes(properties){
+ const p=properties&&typeof properties==='object'?properties:{};
+ const primary=Array.isArray(p.verifiedModes)?p.verifiedModes:[];
+ const alternate=Array.isArray(p.alternateStrikeModes)?p.alternateStrikeModes:[];
+ const issues=[];
+ const normalized=[];
+ for(const [kind,source] of [['primary',primary],['alternate',alternate]]){
+  source.forEach((raw,index)=>{
+   if(!raw||typeof raw!=='object'||Array.isArray(raw)){issues.push(`${kind} #${index+1}: neplatná definice režimu`);return}
+   const name=String(raw.name||'').trim();
+   const die=String(raw.impactDie||'').trim();
+   const aspect=String(raw.aspect||'').trim().toLowerCase();
+   const modifier=raw.impactModifier;
+   if(!name||!/^d(?:4|6|8|10|12|20|100)$/.test(die)||!['b','e','p','f'].includes(aspect)||!Number.isSafeInteger(modifier)){
+    issues.push(`${kind} #${index+1}: chybí název nebo je neplatná kostka, modifikátor či typ poškození`);return;
+   }
+   normalized.push({kind,name,impactDie:die,impactModifier:modifier,aspect,
+    zoneDie:raw.zoneDie??p.zoneDie??null,length:raw.length??p.length??null,
+    additionalProperties:Object.fromEntries(Object.entries(raw).filter(([k])=>!['name','impactDie','impactModifier','aspect','zoneDie','length'].includes(k)))});
+  });
+ }
+ return {modes:normalized,issues};
+}
+// v51: Shield inputs are validated independently from weapon strike modes.
+// The values below are *inputs*; no shield defence or deflection is calculated.
+function combatShieldInputs(properties){
+ const p=properties&&typeof properties==='object'&&!Array.isArray(properties)?properties:{};
+ const issues=[];
+ const numberField=(key,label)=>{
+  const v=p[key];
+  if(!Number.isSafeInteger(v)){issues.push(`chybí nebo je neplatný ${label}`);return null;}
+  return v;
+ };
+ const shieldModifier=numberField('shieldModifier','Shield Modifier');
+ const deflect=numberField('deflect','Deflect');
+ const quality=numberField('quality','základní WQ');
+ const heft=numberField('heft','Heft');
+ const strike=combatStrikeModes(p);
+ for(const issue of strike.issues)issues.push(`útok štítem: ${issue}`);
+ if(!strike.modes.some(m=>m.kind==='primary'))issues.push('chybí platný základní útok štítem');
+ return {shieldModifier,deflect,baseWQ:quality,heft,modes:strike.modes,issues};
+}
 // v46: combat input inspection; no HMK combat calculations or inventory mutation.
 function equippedCombatInputs(c){
  const entries=data.inventory.filter(x=>x.characterId===c.id&&['main_hand','off_hand'].includes(x.slot));
@@ -310,17 +354,19 @@ function equippedCombatInputs(c){
  const hands=entries.map(x=>{
   const p=x.snapshot?.properties||{};const name=x.snapshot?.name||'Nepojmenovaný předmět';
   const isWeapon=x.snapshot?.category==='weapon';const isShield=x.snapshot?.category==='shield';
-  const modes=isWeapon?verifiedModes(p):[];
+  const normalized=isWeapon?combatStrikeModes(p):isShield?combatShieldInputs(p):{modes:[],issues:[]};
+  const modes=normalized.modes;
+  for(const issue of normalized.issues)issues.push(`${name}: ${issue}`);
   const baseWQ=asNumber(p.quality),currentWQ=asNumber(x.currentWQ);
   const slot=x.slot;
   const drift=inventoryDefinitionDrift(x);if(drift)issues.push(`${name}: ${drift}; bojové vstupy používají uloženou kopii`);
   if(isWeapon&&!modes.length)issues.push(`${name}: chybí strukturované útočné režimy pro combat`);
-  if(isWeapon&&modes.some(m=>!m||typeof m!=='object'||!m.name||!m.impactDie||!m.aspect))issues.push(`${name}: některý útočný režim nemá jméno, kostku Impact nebo typ poškození`);
+  if(isWeapon&&!modes.some(m=>m.kind==='primary'))issues.push(`${name}: chybí platný základní útočný režim`);
   if((isWeapon||isShield)&&baseWQ===null)issues.push(`${name}: chybí základní WQ`);
   if((isWeapon||isShield)&&currentWQ===null)issues.push(`${name}: chybí aktuální WQ`);
-  if(isShield&&(p.shieldModifier===undefined||p.deflect===undefined))issues.push(`${name}: chybí Shield Modifier nebo Deflect`);
+  
   return {inventoryId:x.id,slot,name,category:x.snapshot?.category||'',definitionId:x.sourceItemId||x.snapshot?.id||null,baseWQ,currentWQ,
-   modes,shieldModifier:isShield?(p.shieldModifier??null):null,deflect:isShield?(p.deflect??null):null,
+   modes,shieldModifier:isShield?normalized.shieldModifier:null,deflect:isShield?normalized.deflect:null,heft:isShield?normalized.heft:null,
    definitionDrift:drift,definitionSource:drift?'inventory-snapshot-diverges':'inventory-snapshot',
    note:'Hodnoty jsou ze snapshotu inventáře; nejsou výpočtem combat resolveru.'};
  });
@@ -328,17 +374,93 @@ function equippedCombatInputs(c){
 }
 function equippedCombatInputsPanel(c){
  const r=equippedCombatInputs(c);
- return `<details class="encounter-details"><summary>Bojové vstupy · ${r.hands.length} předmětů v rukou · ${r.issues.length} upozornění</summary><p class="muted">Kontrola údajů pro budoucí combat. Zobrazuje uložené kopie konkrétních předmětů; pokud se liší od katalogu, zobrazí upozornění. Neprovádí útoky ani obranu.</p>${r.hands.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Ruka</th><th>Předmět</th><th>WQ základní / aktuální</th><th>Útočné režimy / štít</th></tr></thead><tbody>${r.hands.map(h=>`<tr><td>${h.slot==='main_hand'?'Hlavní':'Vedlejší'}</td><td>${esc(h.name)}</td><td>${esc(String(h.baseWQ??'—'))} / ${esc(String(h.currentWQ??'—'))}</td><td>${h.category==='weapon'?(h.modes.length?h.modes.map(m=>esc([m.name,m.impactDie,m.aspect].filter(Boolean).join(' · '))).join('<br>'):'Nejsou ověřené režimy'):h.category==='shield'?`Shield modifier: ${esc(String(h.shieldModifier??'—'))}; Deflect: ${esc(String(h.deflect??'—'))}`:'Nepodporovaná kategorie'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">V rukou nejsou evidovány žádné předměty.</p>'}${r.issues.length?`<ul class="audit-list">${r.issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</details>`;
+ return `<details class="encounter-details"><summary>Bojové vstupy · ${r.hands.length} předmětů v rukou · ${r.issues.length} upozornění</summary><p class="muted">Kontrola údajů pro budoucí combat. Zobrazuje uložené kopie konkrétních předmětů; pokud se liší od katalogu, zobrazí upozornění. Neprovádí útoky ani obranu.</p>${r.hands.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Ruka</th><th>Předmět</th><th>WQ základní / aktuální</th><th>Útočné režimy / štít</th></tr></thead><tbody>${r.hands.map(h=>`<tr><td>${h.slot==='main_hand'?'Hlavní':'Vedlejší'}</td><td>${esc(h.name)}</td><td>${esc(String(h.baseWQ??'—'))} / ${esc(String(h.currentWQ??'—'))}</td><td>${h.category==='weapon'?(h.modes.length?h.modes.map(m=>esc([m.kind==='alternate'?'Alternativní: '+m.name:m.name,m.impactDie+(m.impactModifier>=0?'+':'')+m.impactModifier,({b:'Blunt',e:'Edge',p:'Point',f:'Fire/Frost'})[m.aspect]].join(' · '))).join('<br>'):'Nejsou ověřené režimy'):h.category==='shield'?`Shield Modifier: ${esc(String(h.shieldModifier??'—'))}; Deflect: ${esc(String(h.deflect??'—'))}; Heft: ${esc(String(h.heft??'—'))}${h.modes.length?'<br>'+h.modes.map(m=>esc([m.name,m.impactDie+(m.impactModifier>=0?'+':'')+m.impactModifier,({b:'Blunt',e:'Edge',p:'Point',f:'Fire/Frost'})[m.aspect]].join(' · '))).join('<br>'):''}`:'Nepodporovaná kategorie'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">V rukou nejsou evidovány žádné předměty.</p>'}${r.issues.length?`<ul class="audit-list">${r.issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</details>`;
 }
-// Read-only armour coverage: show article contributions without adding AV across layers.
+// v52: Strict, read-only armour-input contract. No inferred AV and no layer summation.
+// Invalid location data must be reported, not silently treated as valid protection.
+function combatArmourInputs(properties){
+ const p=properties&&typeof properties==='object'&&!Array.isArray(properties)?properties:{};
+ const issues=[];const raw=p.locationProtection;
+ const validCode=/^(?:sk|fa|nk|sh|ua|el|fo|ha|tx|ab|hp|gr|th|kn|ca|ft)$/;
+ const protection={};
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))issues.push('chybí mapa ochrany anatomických lokací');
+ else for(const [location,av] of Object.entries(raw)){
+  if(!validCode.test(location)){issues.push(`neznámá anatomická lokace ${location}`);continue;}
+  if(!av||typeof av!=='object'||Array.isArray(av)||!['b','e','p','f'].every(k=>Number.isSafeInteger(av[k])&&av[k]>=0)){
+   issues.push(`lokace ${location}: chybí platné nezáporné celočíselné AV b/e/p/f`);continue;
+  }
+  protection[location]={b:av.b,e:av.e,p:av.p,f:av.f};
+ }
+ const claimed=Array.isArray(p.coveredLocations)?p.coveredLocations:null;
+ if(claimed){
+  for(const loc of claimed)if(typeof loc!=='string'||!validCode.test(loc)||!Object.hasOwn(protection,loc))issues.push(`deklarovaná lokace ${String(loc)} nemá platné AV`);
+  for(const loc of Object.keys(protection))if(!claimed.includes(loc))issues.push(`lokace ${loc} má AV, ale není uvedena v pokrytí`);
+ }
+ if(!Object.keys(protection).length)issues.push('žádná použitelná ochrana anatomických lokací');
+ return {protection,coveredLocations:Object.keys(protection),issues,rulesCalculated:false};
+}
+// HMK printed p.117: overlapping material AV is summed independently per aspect.
+// This is location AV only, not impact, glancing blow, rigid quality, Bulk or ENC.
+function sumArmourLocationAV(layers,invalid=false){
+ if(invalid||!Array.isArray(layers)||!layers.length)return {av:null,complete:false};
+ const av={b:0,e:0,p:0,f:0};
+ for(const layer of layers){
+  if(!layer||!['b','e','p','f'].every(k=>Number.isSafeInteger(layer[k])&&layer[k]>=0))return {av:null,complete:false};
+  for(const k of ['b','e','p','f']){av[k]+=layer[k];if(!Number.isSafeInteger(av[k]))return {av:null,complete:false};}
+ }
+ return {av,complete:true};
+}
+// HMK p.167: effective impact = strike impact minus aspect AV, never below zero.
+// This intentionally does NOT resolve rigid-armour glancing blows, injury, shock or traits.
+function previewEffectiveImpact(strikeImpact,aspect,locationResult,armourReduction=0){
+ if(!Number.isSafeInteger(strikeImpact)||strikeImpact<0||strikeImpact>100000)return {ok:false,reason:'Neplatný Impact zásahu'};
+ if(!['b','e','p','f'].includes(aspect))return {ok:false,reason:'Neznámý typ poškození'};
+ if(!Number.isSafeInteger(armourReduction)||armourReduction<0||armourReduction>100000)return {ok:false,reason:'Neplatné snížení ochrany'};
+ if(armourReduction>0&&aspect!=='p')return {ok:false,reason:'Armour Reduction z pravidel se vztahuje pouze na Point (p)'};
+ if(!locationResult||locationResult.complete!==true||!locationResult.av||!Number.isSafeInteger(locationResult.av[aspect]))return {ok:false,reason:'Pro lokaci chybí spolehlivá ochrana AV'};
+ const baseAV=locationResult.av[aspect];const effectiveAV=Math.max(0,baseAV-armourReduction);
+ const effectiveImpact=Math.max(0,strikeImpact-effectiveAV);
+ return {ok:true,baseAV,armourReduction,effectiveAV,strikeImpact,effectiveImpact,aspect,requiresGlancingReview:(aspect==='e'||aspect==='p')&&effectiveImpact>=1&&effectiveImpact<=4,
+  note:'Předběžný výpočet AV a efektivního Impact podle HMK str. 111, 167. Glancing Blow (str. 168) není automaticky rozhodnut: chybí ověřená rigid kvalita konkrétních vrstev.'};
+}
+// HMK printed p.168: injury threshold and rigid-armour glancing exception.
+// Rigid status is explicitly confirmed by the GM; it is not guessed from AV or material.
+function classifyImpactInjury(preview,rigidStatus){
+ if(!preview||preview.ok!==true)return {ok:false,reason:'Chybí platný výpočet efektivního Impact'};
+ if(!['yes','no','unknown'].includes(rigidStatus))return {ok:false,reason:'Neplatný stav Rigid Armour'};
+ const n=preview.effectiveImpact;
+ if(!Number.isSafeInteger(n)||n<0)return {ok:false,reason:'Neplatný efektivní Impact'};
+ if(n===0)return {ok:true,kind:'none',injury:null,injuryShock:0,shockRollBonus:0,needsRigidReview:false};
+ const possibleGlance=(preview.aspect==='e'||preview.aspect==='p')&&n>=1&&n<=4;
+ if(possibleGlance&&rigidStatus==='unknown')return {ok:true,kind:'undetermined',injury:null,injuryShock:null,shockRollBonus:null,needsRigidReview:true};
+ if(possibleGlance&&rigidStatus==='yes')return {ok:true,kind:'glancing',injury:null,injuryShock:1,shockRollBonus:10,needsRigidReview:false};
+ const injury=n>=20?'G5':n>=15?'G4':n>=10?'S3':n>=5?'S2':'M1';
+ return {ok:true,kind:'injury',injury,injuryShock:Number(injury.slice(1)),shockRollBonus:0,needsRigidReview:false};
+}
+// Pure, read-only pipeline for an already successful strike; no rolls, bleeding, or state changes.
+function previewInjurySequence(strikeImpact,aspect,locationResult,armourReduction,rigidStatus){
+ const impact=previewEffectiveImpact(strikeImpact,aspect,locationResult,armourReduction);
+ if(!impact.ok)return {ok:false,reason:impact.reason};
+ const injury=classifyImpactInjury(impact,rigidStatus);
+ if(!injury.ok)return injury;
+ return {ok:true,impact,injury,rulePages:[111,167,168],mutatesCharacter:false};
+}
+function encounterImpactPreviewPanel(chars){
+ if(!chars.length)return '';
+ return `<section class="panel"><h3>Ověření zásahu · AV, efektivní Impact a úroveň zranění</h3><p class="muted">Předběžný výpočet podle HMK str. 111 a 167. Zadejte již určený Impact zásahu, anatomickou lokaci a typ poškození. AR lze použít pouze pro bodný aspekt (p). Úroveň zranění a Glancing Blow se určí podle str. 168 pouze při potvrzeném stavu Rigid Armour. Neprovádí hody, krvácení, compound injury ani Shock test.</p><form id="impact-preview-form"><div class="field-grid"><label>Cíl<select name="characterId" required>${chars.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><label>Anatomická lokace<select name="location" required><option value="">Vyberte lokaci…</option>${[...new Set(chars.flatMap(c=>Object.keys(armourCoverageReport(c).locationAV)))].sort().map(loc=>`<option value="${esc(loc)}">${esc(loc)}</option>`).join('')}</select></label><label>Typ poškození<select name="aspect"><option value="b">Blunt (b)</option><option value="e">Edge (e)</option><option value="p">Point (p)</option><option value="f">Fire/Frost (f)</option></select></label>${field('strikeImpact','Impact zásahu',0,'number')}${field('armourReduction','Armour Reduction (p)',0,'number')}<label>Rigid Armour na zasažené lokaci<select name="rigidStatus"><option value="unknown">Neověřeno – nerozhodovat</option><option value="yes">Ano – potvrzeno podle pravidel</option><option value="no">Ne – potvrzeno podle pravidel</option></select></label></div><button type="submit">Vyhodnotit Impact a úroveň zranění</button></form><div id="impact-preview-result" class="notice" role="status" aria-live="polite">Výpočet je pouze orientační; nic nezapisuje do postavy ani inventáře.</div></section>`;
+}
+// Read-only armour coverage and rules-backed summed location AV (p.117).
+
 // Inventory snapshots remain authoritative for owned equipment, even if a built-in definition changes.
 function armourCoverageReport(c){
  const worn=data.inventory.filter(x=>x.characterId===c.id&&x.slot==='worn'&&x.snapshot?.category==='armor');
- const locations={};const warnings=[];let knownEnc=0,groupPieces=0,unknownEnc=0;
+ const locations={};const warnings=[];const invalidLocations=new Set();let knownEnc=0,groupPieces=0,unknownEnc=0;
  for(const item of worn){
-  const p=item.snapshot.properties||{};const protection=validatedProtection(p.locationProtection);
+  const p=item.snapshot.properties||{};const normalized=combatArmourInputs(p);const protection=normalized.protection;
+  for(const issue of normalized.issues)warnings.push(`${item.snapshot.name}: ${issue}`);
+  if(normalized.issues.length){for(const loc of (Array.isArray(p.coveredLocations)?p.coveredLocations:[]))if(typeof loc==='string')invalidLocations.add(loc);}
   const count=item.quantity;
-  if(count!==1)warnings.push(`${item.snapshot.name}: množství nasazeného kusu není 1`);
+  if(count!==1){warnings.push(`${item.snapshot.name}: množství nasazeného kusu není 1`);for(const loc of Object.keys(protection))invalidLocations.add(loc);}
   if(!Object.keys(protection).length)warnings.push(`${item.snapshot.name}: chybí ověřené anatomické pokrytí`);
   for(const [loc,av] of Object.entries(protection)){
    (locations[loc]??=[]).push({inventoryId:item.id,name:item.snapshot.name,b:av.b,e:av.e,p:av.p,f:av.f});
@@ -348,14 +470,16 @@ function armourCoverageReport(c){
   if(p.armArticleEncGroup===true)groupPieces++;
   if(Number.isFinite(p.perceptionPenalty)&&p.perceptionPenalty!==0)warnings.push(`${item.snapshot.name}: postih k vnímání ${p.perceptionPenalty}`);
  }
- if(groupPieces>=3)warnings.push('Tři nebo více označených plátových dílů paží: pravidlová podmínka ENC 5 (p. 118); není zahrnuta do součtu.');
+ const conditionalArmENC=groupPieces>=3?5:0;
+ if(conditionalArmENC)warnings.push('Tři nebo více označených plátových dílů paží: podmíněné ENC +5 (p. 118), oddělené od ostatních hodnot.');
  if(unknownEnc)warnings.push(`${unknownEnc} kusů nemá ověřenou hodnotu ENC; uvedený součet je neúplný.`);
- return {characterId:c.id,wornCount:worn.length,locations,knownArticleEnc:knownEnc,unknownEncCount:unknownEnc,markedArmArticles:groupPieces,warnings,
-  note:'Přehled jednotlivých vrstev, nikoli výsledná ochrana. AV se nesčítají; ENC je pouze součet explicitně evidovaných hodnot bez podmíněných pravidel a dalších modifikátorů.'};
+ const locationAV={};for(const [loc,layers] of Object.entries(locations))locationAV[loc]=sumArmourLocationAV(layers,invalidLocations.has(loc));
+ return {characterId:c.id,wornCount:worn.length,locations,locationAV,knownArticleEnc:knownEnc,unknownEncCount:unknownEnc,markedArmArticles:groupPieces,conditionalArmENC,knownENCIncludingArmCondition:knownEnc+conditionalArmENC,warnings,invalidProtectionCount:worn.reduce((n,item)=>n+combatArmourInputs(item.snapshot?.properties).issues.length,0),
+  note:'Součet AV vrstev pro jednotlivé lokace a aspekty dle HMK str. 117. Nejde o výpočet zásahu, rigid armour, glancing blow, Bulk ani celkového ENC. Neplatné či neúplné lokace nemají vypočtené AV.'};
 }
 function armourCoveragePanel(c){
  const r=armourCoverageReport(c);const codes=Object.keys(r.locations).sort();
- return `<details class="encounter-details"><summary>Zbroj · ${r.wornCount} nasazených kusů · ${codes.length} lokací</summary><p class="muted">Jednotlivé vrstvy (b/e/p/f). <strong>Nejde o vypočtenou ochranu.</strong> Vrstvení a Bulk nejsou implementovány.</p>${codes.length?`<div style="overflow-x:auto"><table style="width:100%;text-align:left"><thead><tr><th>Lokace</th><th>Kus zbroje</th><th>b/e/p/f</th></tr></thead><tbody>${codes.flatMap(loc=>r.locations[loc].map(a=>`<tr><td>${esc(loc)}</td><td>${esc(a.name)}</td><td>${[a.b,a.e,a.p,a.f].map(x=>esc(String(x))).join(' / ')}</td></tr>`)).join('')}</tbody></table></div>`:'<p class="muted">Žádná nasazená zbroj s evidovaným pokrytím.</p>'}<p class="tiny">Evidované nepodmíněné ENC: ${r.knownArticleEnc}${r.unknownEncCount?' (neúplné)':''}. Není to výsledné ENC postavy.</p>${r.warnings.length?`<ul class="audit-list">${r.warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</details>`;
+ return `<details class="encounter-details"><summary>Zbroj · ${r.wornCount} nasazených kusů · ${codes.length} lokací</summary><p class="muted">Vrstvy a <strong>součet ochrany AV pro každou lokaci (b/e/p/f)</strong> podle HMK str. 117. Nejde o vyhodnocení zásahu, rigid armour, Bulk ani celkového ENC. Neplatné nebo neúplné lokace se nesčítají.</p>${codes.length?`<div style="overflow-x:auto"><table style="width:100%;text-align:left"><thead><tr><th>Lokace</th><th>Kus zbroje</th><th>b/e/p/f</th></tr></thead><tbody>${codes.flatMap(loc=>[...r.locations[loc].map(a=>`<tr><td>${esc(loc)}</td><td>${esc(a.name)}</td><td>${[a.b,a.e,a.p,a.f].map(x=>esc(String(x))).join(' / ')}</td></tr>`),`<tr><td><strong>${esc(loc)}</strong></td><td><strong>Celkem AV</strong></td><td><strong>${r.locationAV[loc].complete?['b','e','p','f'].map(k=>r.locationAV[loc].av[k]).join(' / '):'Nelze spolehlivě určit'}</strong></td></tr>`]).join('')}</tbody></table></div>`:'<p class="muted">Žádná nasazená zbroj s evidovaným pokrytím.</p>'}<p class="tiny">Evidované ENC: ${r.knownArticleEnc} + podmíněné ENC paží ${r.conditionalArmENC} = ${r.knownENCIncludingArmCondition}${r.unknownEncCount?' (neúplné)':''}. Nezahrnuje Bulk ani další postihy; není to výsledné ENC postavy.</p>${r.warnings.length?`<ul class="audit-list">${r.warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</details>`;
 }
 function encounterView(){
  const chars=data.characters;
@@ -363,12 +487,12 @@ function encounterView(){
  const count=selectedChars.length;
  const issues=selectedChars.reduce((sum,c)=>sum+readinessReport(c).length+encounterEquipmentPreflight(c).issues.length+equippedCombatInputs(c).issues.length,0);
  return `<div class="topline"><h2>Příprava bojového střetnutí</h2></div>
- <div class="notice">Tato obrazovka připravuje výběr účastníků a jejich evidované HMK údaje. Neprovádí hody, útoky, obranu ani výpočty zranění. Výběr se obnoví po obnovení stránky v této záložce; neukládá se do databáze postav ani do exportu zálohy.</div>
+ <div class="notice">Tato obrazovka připravuje výběr účastníků a jejich evidované HMK údaje. Neprovádí hody, útoky ani obranu. Nabízí samostatný předběžný výpočet Impact a úrovně zranění, bez změn stavu postavy. Výběr se obnoví po obnovení stránky v této záložce; neukládá se do databáze postav ani do exportu zálohy.</div>
  <section class="panel"><h3>Účastníci (${count})</h3>
  ${chars.length?`<div class="encounter-roster">${chars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues,...equippedCombatInputs(c).issues];return `<label class="encounter-entry"><input type="checkbox" data-encounter-character="${esc(c.id)}" ${encounterSelection.has(c.id)?'checked':''}><span><strong>${esc(c.name)}</strong><small>${esc(c.kind||'PC')} · ${warnings.length?warnings.length+' upozornění k údajům':'bez upozornění k úplnosti údajů'}</small></span></label>`}).join('')}</div>`:'<p class="muted">Nejprve vytvořte postavy v registru.</p>'}
  <div class="equipment-summary"><div><strong>Vybráno</strong><span>${count} postav</span></div><div><strong>Chybějící evidenční údaje</strong><span>${issues} upozornění</span></div></div>
  <div class="actions"><button type="button" data-action="encounter-all" ${chars.length?'':'disabled'}>Vybrat všechny</button><button type="button" class="secondary" data-action="encounter-clear" ${count?'':'disabled'}>Zrušit výběr</button><button type="button" data-action="encounter-export" ${count?'':'disabled'}>Exportovat podklady JSON</button></div></section>
- ${selectedChars.length?`<section class="panel"><h3>Kontrola účastníků</h3>${selectedChars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues.map(x=>'Výbava: '+x),...equippedCombatInputs(c).issues.map(x=>'Combat: '+x)];return `<details class="encounter-details"><summary>${esc(c.name)} · ${warnings.length} upozornění</summary>${warnings.length?`<ul class="audit-list">${warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="muted">Evidenční kontrola bez upozornění; pravidlová správnost není potvrzena.</p>'}</details>${armourCoveragePanel(c)}${equippedCombatInputsPanel(c)}`}).join('')}</section>`:''}`;
+ ${selectedChars.length?`<section class="panel"><h3>Kontrola účastníků</h3>${selectedChars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues.map(x=>'Výbava: '+x),...equippedCombatInputs(c).issues.map(x=>'Combat: '+x)];return `<details class="encounter-details"><summary>${esc(c.name)} · ${warnings.length} upozornění</summary>${warnings.length?`<ul class="audit-list">${warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="muted">Evidenční kontrola bez upozornění; pravidlová správnost není potvrzena.</p>'}</details>${armourCoveragePanel(c)}${equippedCombatInputsPanel(c)}`}).join('')}</section>`:''}${encounterImpactPreviewPanel(selectedChars)}`;
 }
 function editor(title,obj,kind){return `<div class="panel"><h2>${esc(title)}</h2><form id="${kind}-editor">${field('name','Název / jméno',obj.name||'')}${kind==='character'?`${field('occupation','Povolání',obj.occupation||'')}<label>Typ<select name="kind"><option>PC</option><option>NPC</option></select></label>${area('description','Popis',obj.description||'')}`:`<label>Kategorie<select name="category">${[['weapon','Zbraň'],['shield','Štít'],['armor','Zbroj'],['other','Ostatní předmět']].map(([v,l])=>`<option value="${v}" ${obj.category===v?'selected':''}>${l}</option>`).join('')}</select></label>${area('description','Popis',obj.description||'')}${field('source','Odkaz na zdroj (např. kapitola/strana)',obj.source||'')}${area('properties','Vlastní parametry JSON',JSON.stringify(obj.properties||{},null,2))}`}<div class="actions"><button type="submit">Uložit</button>${button('Zrušit','cancel-editor')}</div></form></div>`}
 let overlay=null;
@@ -412,6 +536,21 @@ if(t.dataset.editItem){if(item(t.dataset.editItem)?.builtin)return alert('Vestav
 if(t.dataset.copyItem){const i=item(t.dataset.copyItem);if(i?.builtin)return alert('Vestavěné definice se nekopírují; vytvořte vlastní předmět.');mutate(()=>data.items.push({...structuredClone(i),id:uuid(),name:i.name+' (kopie)'}));return}
 if(t.dataset.deleteItem){if(item(t.dataset.deleteItem)?.builtin)return alert('Vestavěné pravidlové definice nelze odstranit.');if(ask('Odstranit předmět z knihovny? Existující inventáře zůstanou beze změny.'))mutate(()=>data.items=data.items.filter(x=>x.id!==t.dataset.deleteItem));return}
 const a=t.dataset.action;if(a==='new-character'){overlay=editor('Nová postava',{},'character');render()}if(a==='new-item'){editItem=null;overlay=equipmentEditor('Nový předmět',{category});render()}if(a==='cancel-editor'){overlay=null;render()}if(a==='go-characters'){view='characters';query='';render()}if(a==='export'){if(storageReadOnly){alert('Původní data se nepodařilo načíst. Použijte nouzovou kopii původního úložiště, nikoliv standardní zálohu.');return}const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`hmk-ledger-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),5000)}
+});
+document.addEventListener('submit',e=>{
+ if(e.target.id!=='impact-preview-form')return;
+ e.preventDefault();
+ const v=Object.fromEntries(new FormData(e.target));const target=selectedEncounterCharacters().find(c=>c.id===v.characterId);
+ const output=document.getElementById('impact-preview-result');if(!output)return;
+ if(!target){output.textContent='Zvolený účastník již není ve střetnutí.';return;}
+ const report=armourCoverageReport(target);
+ const rawImpact=String(v.strikeImpact??'');const rawAR=String(v.armourReduction??'');
+ if(!/^\d+$/.test(rawImpact)||!/^\d+$/.test(rawAR)){output.textContent='Impact i AR musí být nezáporná celá čísla.';return;}
+ const sequence=previewInjurySequence(Number(rawImpact),v.aspect,report.locationAV[v.location],Number(rawAR),v.rigidStatus);
+ if(!sequence.ok){output.textContent=sequence.reason;return;}
+ const result=sequence.impact;const injury=sequence.injury;
+ const outcome=injury.kind==='none'?'Žádné zranění (Impact 0).':injury.kind==='undetermined'?'Úroveň zranění nerozhodnuta: nejprve ověřte Rigid Armour na zasažené lokaci.':injury.kind==='glancing'?'GLANCING BLOW: žádné M1; Injury Shock 1; bonus +10 k Shock Roll.':`Zranění ${injury.injury} (${v.aspect}); Injury Shock ${injury.injuryShock}.`;
+ output.textContent=`${target.name} · ${v.location} · ${v.aspect}: Impact ${result.strikeImpact} − AV ${result.effectiveAV}${result.armourReduction?` (základ ${result.baseAV}, AR ${result.armourReduction})`:''} = efektivní Impact ${result.effectiveImpact}. ${outcome} Předběžné pravidlové vyhodnocení str. 167–168; bez zápisu do postavy, bez Compound Injury, Bleeding a Shock testu.`;
 });
 document.addEventListener('submit',e=>{const f=e.target;if(!['character-editor','item-editor','character-form','add-inventory','journal-form'].includes(f.id))return;e.preventDefault();const v=Object.fromEntries(new FormData(f));if(f.id==='character-editor'){if(!v.name.trim())return alert('Zadejte jméno');if(mutate(()=>data.characters.push({id:uuid(),name:v.name.trim(),occupation:v.occupation||'',kind:v.kind,description:v.description||'',portrait:''}))) {overlay=null;render()}return}if(f.id==='character-form'){if(!v.name.trim())return alert('Zadejte jméno');mutate(()=>Object.assign(character(selected),{name:v.name.trim(),occupation:v.occupation,kind:v.kind,description:v.description,portrait:v.portrait}));return}if(f.id==='item-editor'){if(editItem&&item(editItem)?.builtin)return alert('Vestavěné definice nelze upravit.');if(!v.name.trim())return alert('Zadejte název');let properties;try{properties=JSON.parse(v.properties||'{}');if(!properties||Array.isArray(properties)||typeof properties!=='object')throw Error()}catch{return alert('Parametry musí být platný JSON objekt')}if(mutate(()=>{const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties};if(editItem)Object.assign(item(editItem),record);else data.items.push(record)})){overlay=null;render()}return}if(f.id==='add-inventory'){const i=item(v.itemId);const quantity=Number(v.quantity);if(!i||!Number.isSafeInteger(quantity)||quantity<1||quantity>999999)return alert('Vyberte předmět a platný počet');if(!validSlotForCategory(v.slot,i.category))return alert('Tento slot neodpovídá kategorii předmětu');if(['main_hand','off_hand','worn'].includes(v.slot)&&quantity!==1)return alert('Vybavený předmět musí představovat jeden kus. Další kusy evidujte samostatně jako nesené.');if(!handSlotAvailable(selected,v.slot))return alert('Ruka je již obsazena. Nejprve přesuňte stávající předmět.');const currentWQ=v.currentWQ===''?null:Number(v.currentWQ);if(currentWQ!==null&&(!Number.isSafeInteger(currentWQ)||currentWQ<0||currentWQ>999))return alert('Neplatná aktuální WQ');mutate(()=>data.inventory.push({id:uuid(),currentWQ,characterId:selected,sourceItemId:i.id,snapshot:structuredClone(i),quantity,condition:v.condition||'',slot:v.slot||'none'}));return}if(f.id==='journal-form'){if(!v.title.trim()&&!v.body.trim())return;mutate(()=>data.journal.push({id:uuid(),characterId:selected,title:v.title.trim()||'Bez názvu',body:v.body,createdAt:stamp()}))}});
 document.addEventListener('input',e=>{if(e.target.id==='search'){query=e.target.value;const pos=e.target.selectionStart;render();const input=document.getElementById('search');input.focus();input.setSelectionRange(pos,pos)}});
