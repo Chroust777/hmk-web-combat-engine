@@ -47,3 +47,16 @@
 .catalog-readiness{padding:.55rem .65rem;border-radius:6px;border:1px solid #6a5942;overflow-wrap:anywhere;font-size:.88rem}
 .catalog-ready{color:#b8d7ba;border-color:#54745c;background:#24342a}
 .catalog-missing{color:#f1d5a3;border-color:#997a4e;background:#382f23}
+
+/* v44: inspectable read-only rule parameters */
+.catalog-parameters{margin:.7rem 0;border:1px solid var(--border,#645646);border-radius:8px;overflow:hidden}
+.catalog-parameters summary{cursor:pointer;padding:.65rem .8rem;font-weight:650}
+.catalog-parameters-inner{padding:.25rem .8rem .8rem}
+.catalog-spec{width:100%;border-collapse:collapse;font-size:.86rem;text-align:left}
+.catalog-spec th,.catalog-spec td{border-bottom:1px solid #ffffff20;padding:.4rem .5rem;vertical-align:top}
+.catalog-spec th{font-weight:650}
+.catalog-scroll{overflow-x:auto}
+.catalog-json{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.78rem;margin:0}
+
+/* v45: readable armour protection and structured properties */
+.catalog-parameters h4{margin:.9rem 0 .4rem}.catalog-complex{margin:.6rem 0}.catalog-complex strong{display:block;margin-bottom:.25rem}.catalog-spec td{overflow-wrap:anywhere}
