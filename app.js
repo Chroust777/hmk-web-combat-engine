@@ -1,6 +1,6 @@
 import { Character as KernelCharacter, Skill as KernelSkill, WeaponDefinition, WeaponInstance, Shield, ArmourArticle, SCHEMA_VERSION } from './src/domain/contracts.js';
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='47';
+const APP_VERSION='49';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -151,25 +151,45 @@ const HMK_ARMOUR_MATERIALS=Object.freeze([
  ['P','Plate',6,11,9,5]
 ].map(([code,name,b,e,p,f])=>Object.freeze({code,name,b,e,p,f})));
 function armourMaterialsPanel(){return `<section class="panel" aria-label="Referenční hodnoty materiálů zbroje"><h3>HMK · ochranné hodnoty materiálů zbroje</h3><p class="muted">Pevná referenční tabulka podle Armour Articles, tištěná strana 117. Hodnoty AV pro b (blunt), e (edge), p (point), f (fire/frost). Nejde o konkrétní kusy zbroje: jejich anatomické pokrytí, vrstvení a ENC se musí vyhodnotit zvlášť.</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left"><thead><tr><th>Materiál</th><th>Kód</th><th>b</th><th>e</th><th>p</th><th>f</th></tr></thead><tbody>${HMK_ARMOUR_MATERIALS.map(m=>`<tr><td>${esc(m.name)}</td><td>${m.code}</td><td>${m.b}</td><td>${m.e}</td><td>${m.p}</td><td>${m.f}</td></tr>`).join('')}</tbody></table></div><p class="tiny">Tyto hodnoty se nezapisují do localStorage a zatím se automaticky nepřičítají k ochraně postavy. U 21 vestavěných kusů zbroje je nově evidováno ENC podle tabulky str. 118 (včetně podmínky pro tři a více plátových dílů paží a postihu vnímání u Great Helm). Výpočet vrstvení, celkového ENC a Bulk není implementován.</p></section>`}
-// Read-only, visible HMK rule parameters. Never mutates catalog or inventory.
+// v49: Human-readable rule data; never expose raw JSON or internal object keys.
+// The source objects remain untouched for the future combat engine.
 function catalogParameters(item){
  const p=item.properties||{};
- const labels={quality:'Základní WQ',heft:'Heft',length:'Délka',zoneDie:'Kostka zóny',weightLb:'Hmotnost (lb)',pricePence:'Cena (d)',weaponClass:'Třída zbraně',defenceModifier:'Obranný modifikátor',impactTAModifier:'Impact TA modifikátor',shieldModifier:'Shield modifier',deflect:'Deflect',material:'Materiál',encumbrance:'ENC',perceptionPenalty:'Postih vnímání',armArticleEncGroup:'Skupina podmíněného ENC',coverage:'Pokryté lokace',protection:'Ochrana',baseRangeFt:'Základní dostřel (ft)',traits:'Vlastnosti',notes:'Poznámky',use:'Použití',value:'Hodnota',defense:'Obrana',attack:'Útok',impact:'Impact',layers:'Vrstvy'};
- const human=v=>v===null?'—':typeof v==='boolean'?(v?'Ano':'Ne'):String(v);
+ const labels={quality:'Základní WQ',heft:'Heft',length:'Délka',zoneDie:'Kostka zóny',weightLb:'Hmotnost (lb)',pricePence:'Cena (d)',weaponClass:'Třída zbraně',defenceModifier:'Obranný modifikátor',impactTAModifier:'Modifikátor Impact TA',shieldModifier:'Modifikátor štítu',deflect:'Odklonění (Deflect)',material:'Materiál',encumbrance:'ENC',perceptionPenalty:'Postih vnímání',armArticleEncGroup:'Skupina podmíněného ENC',coverage:'Pokryté lokace',protection:'Ochrana',baseRangeFt:'Základní dostřel (ft)',traits:'Vlastnosti',notes:'Poznámky',use:'Použití',value:'Hodnota',defense:'Obrana',attack:'Útok',impact:'Impact',layers:'Vrstvy',alternateStrikeModes:'Alternativní útoky',verifiedModes:'Útočné režimy',verifiedTraits:'Ověřené vlastnosti',armourReduction:'Snížení ochrany zbroje',armourReductionCondition:'Podmínka snížení ochrany',blockModifier:'Modifikátor blokování',opponentDefenceModifier:'Modifikátor obrany protivníka',shieldDamageImpactBonus:'Bonus Impact proti štítu',possibleFaeriecraftMeleeBonus:'Možný bonus Faeriecraft v boji',slowOneHand:'Pomalé použití jednou rukou',halfSwordNoSharpEdge:'Poloviční meč bez ostrého ostří',tripUsesWeaponLength:'Podražení využívá délku zbraně',coveredLocations:'Pokryté anatomické lokace',coverageNote:'Poznámka k pokrytí',variants:'Varianty',couched:'Založená kopí (couched)',entangle:'Zapletení / zachycení',slow:'Pomalá zbraň',removeTrait:'Odebraná vlastnost',locationProtection:'Ochrana anatomických lokací',b:'Blunt',e:'Edge',p:'Point',f:'Fire/Frost',B:'Blunt',E:'Edge',P:'Point',F:'Fire/Frost',impactDie:'Kostka Impact',impactModifier:'Modifikátor Impact',aspect:'Typ poškození',name:'Název',modifier:'Modifikátor'};
+ const human=v=>v===null||v===undefined?'—':typeof v==='boolean'?(v?'Ano':'Ne'):String(v);
+ const niceKey=k=>labels[k]||String(k).replace(/([a-z])([A-Z])/g,'$1 $2').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
  const table=(headers,rows)=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr>${headers.map(x=>`<th scope="col">${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(x=>`<td>${esc(human(x))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
- const simpleKeys=Object.keys(p).filter(k=>p[k]!==null&&p[k]!==undefined&&typeof p[k]!=='object');
- const scalar=simpleKeys.length?table(['Parametr','Hodnota'],simpleKeys.map(k=>[labels[k]||k,p[k]])):'';
- const modes=Array.isArray(p.verifiedModes)?p.verifiedModes:[];
- const modeTable=modes.length?`<h4>Útočné režimy</h4>${table(['Režim','Impact','Typ','Zóna','Délka'],modes.map(m=>[m.name||'—',String(m.impactDie||'—')+(Number.isFinite(m.impactModifier)?(m.impactModifier>=0?'+':'')+m.impactModifier:''),m.aspect||'—',m.zoneDie||'—',m.length||'—']))}`:'';
+ const modeText=m=>String(m.impactDie||'—')+(Number.isFinite(m.impactModifier)?(m.impactModifier>=0?'+':'')+m.impactModifier:'');
+ const primary=Array.isArray(p.verifiedModes)?p.verifiedModes:[];
+ const alternate=Array.isArray(p.alternateStrikeModes)?p.alternateStrikeModes:[];
+ const modes=[...primary.map(m=>({...m,displayName:m.name==='Primary'?'Základní útok':m.name||'Základní útok'})),...alternate.map(m=>({...m,displayName:m.name||'Alternativní útok'}))];
+ const modeTable=modes.length?`<h4>Útočné režimy</h4>${table(['Režim','Impact','Typ','Zóna','Délka','Další vlastnosti'],modes.map(m=>[m.displayName,modeText(m),({b:'Blunt',e:'Edge',p:'Point',f:'Fire/Frost'})[m.aspect]||m.aspect||'—',m.zoneDie||p.zoneDie||'—',m.length||p.length||'—',Object.entries(m).filter(([k])=>!['name','displayName','impactDie','impactModifier','aspect','zoneDie','length'].includes(k)).map(([k,v])=>niceKey(k)+': '+(v&&typeof v==='object'?'viz podrobnosti':human(v))).join('; ')||'—']))}`:'';
  const protection=p.locationProtection;
  const locRows=protection&&typeof protection==='object'&&!Array.isArray(protection)?Object.entries(protection).filter(([,v])=>v&&typeof v==='object'&&!Array.isArray(v)).map(([loc,v])=>[loc,v.b??v.B??'—',v.e??v.E??'—',v.p??v.P??'—',v.f??v.F??'—']):[];
  const locTable=locRows.length?`<h4>Ochrana anatomických lokací</h4>${table(['Lokace','Blunt','Edge','Point','Fire/Frost'],locRows)}`:'';
- const otherObjects=Object.entries(p).filter(([k,v])=>!['verifiedModes','locationProtection'].includes(k)&&v!==null&&typeof v==='object');
- const extras=otherObjects.length?`<h4>Další strukturované parametry</h4>${otherObjects.map(([k,v])=>`<div class="catalog-complex"><strong>${esc(labels[k]||k)}</strong><pre class="catalog-json">${esc(JSON.stringify(v,null,2))}</pre></div>`).join('')}`:'';
- const unstructuredProtection=protection!==undefined&&!locRows.length?`<div class="catalog-complex"><strong>Ochrana dle lokací (původní data)</strong><pre class="catalog-json">${esc(JSON.stringify(protection,null,2))}</pre></div>`:'';
+ const scalar=Object.entries(p).filter(([,v])=>v!==null&&v!==undefined&&typeof v!=='object');
+ const scalarTable=scalar.length?table(['Parametr','Hodnota'],scalar.map(([k,v])=>[niceKey(k),v])):'';
+ // Recursive structured-data renderer for custom equipment: text and tables only.
+ // Bound depth avoids infinite recursion for malformed user-provided objects.
+ const describe=(v,depth=0)=>{
+  if(depth>7)return '<span class="muted">Příliš hluboká struktura – podrobnosti nejsou zobrazeny.</span>';
+  if(v===null||typeof v!=='object')return `<span>${esc(human(v))}</span>`;
+  if(Array.isArray(v)){
+   if(!v.length)return '<span class="muted">Bez záznamů</span>';
+   return `<ol class="catalog-data-list">${v.map(x=>`<li>${describe(x,depth+1)}</li>`).join('')}</ol>`;
+  }
+  const entries=Object.entries(v);
+  if(!entries.length)return '<span class="muted">Bez údajů</span>';
+  if(entries.every(([,x])=>x===null||typeof x!=='object'))return table(['Parametr','Hodnota'],entries.map(([k,x])=>[niceKey(k),human(x)]));
+  return `<div class="catalog-data-nested">${entries.map(([k,x])=>`<div class="catalog-complex"><strong>${esc(niceKey(k))}</strong>${describe(x,depth+1)}</div>`).join('')}</div>`;
+ };
+ const skipped=new Set(['verifiedModes','alternateStrikeModes','locationProtection']);
+ const complex=Object.entries(p).filter(([k,v])=>!skipped.has(k)&&v!==null&&typeof v==='object');
+ const extras=complex.length?`<h4>Další vlastnosti a pravidla</h4>${complex.map(([k,v])=>`<div class="catalog-complex"><strong>${esc(niceKey(k))}</strong>${describe(v)}</div>`).join('')}`:'';
+ const remainingProtection=protection!==undefined&&!locRows.length?`<h4>Ochrana</h4>${describe(protection)}`:'';
  const categoryLabel={weapon:'Zbraň',shield:'Štít',armor:'Zbroj',other:'Ostatní předmět'}[item.category]||'Předmět';
  const noData=!Object.keys(p).length?'<p class="muted">U této položky zatím nejsou evidovány parametry.</p>':'';
- return `<details class="catalog-parameters"><summary>⚙ Zobrazit parametry · ${esc(categoryLabel)}</summary><div class="catalog-parameters-inner">${scalar}${modeTable}${locTable}${extras}${unstructuredProtection}${noData}<p class="tiny muted">Zobrazeny jsou pouze evidované údaje, nikoliv vypočtené výsledky boje. Chybějící hodnoty se nedoplňují odhadem.</p></div></details>`;
+ return `<details class="catalog-parameters"><summary>⚙ Zobrazit parametry · ${esc(categoryLabel)}</summary><div class="catalog-parameters-inner">${scalarTable}${modeTable}${locTable}${extras}${remainingProtection}${noData}<p class="tiny muted">Zobrazeny jsou pouze evidované údaje, nikoliv vypočtené výsledky boje. Chybějící hodnoty se nedoplňují odhadem.</p></div></details>`;
 }
 function libraryView(){
  const auditById=new Map(allCatalogItems().map(i=>[i.id,catalogAuditEntry(i)]));
@@ -249,6 +269,18 @@ function encounterPayload(){
   domainBridge:bridge,
   warnings:['Jde o evidenční podklady, nikoliv o výsledek bojového resolveru.',...bridge.warnings]};
 }
+// v48: Explicitly flag drift between a character-owned snapshot and its source definition.
+// Snapshots are never rewritten silently: custom modifications may be intentional.
+function inventoryDefinitionDrift(x){
+ if(!x.sourceItemId)return null;
+ const source=findCatalogItem(x.sourceItemId);
+ if(!source)return null; // Missing definitions have their own preflight warning.
+ const snap=x.snapshot||{};
+ if(source.category!==snap.category)return 'kategorie se liší od pravidlové knihovny';
+ if(source.name!==snap.name)return 'název se liší od pravidlové knihovny';
+ if(!sameCatalogProperties(source.properties||{},snap.properties||{}))return 'parametry kopie se liší od pravidlové knihovny';
+ return null;
+}
 // Read-only equipment preflight. These are inventory consistency checks, NOT HMK rules.
 function encounterEquipmentPreflight(c){
  const owned=data.inventory.filter(x=>x.characterId===c.id);
@@ -267,6 +299,7 @@ function encounterEquipmentPreflight(c){
   if(x.slot==='worn'&&snap.category!=='armor')issues.push(`${name}: neplatná kategorie nasazené zbroje`);
   if(['weapon','shield'].includes(snap.category)&&['main_hand','off_hand'].includes(x.slot)&&!Number.isInteger(x.currentWQ))issues.push(`${name}: nezadaná aktuální WQ`);
   if(x.sourceItemId&&!isKnownCatalogId(x.sourceItemId))issues.push(`${name}: původní definice není v knihovně`);
+  const drift=inventoryDefinitionDrift(x);if(drift)issues.push(`${name}: ${drift}; bojové podklady používají uloženou kopii, nikoli aktuální definici`);
  }
  return {characterId:c.id,characterName:c.name,issues,equipment:owned.map(x=>({id:x.id,name:x.snapshot?.name||'',category:x.snapshot?.category||'',slot:x.slot||'none',quantity:x.quantity,currentWQ:x.currentWQ??null}))};
 }
@@ -280,6 +313,7 @@ function equippedCombatInputs(c){
   const modes=isWeapon?verifiedModes(p):[];
   const baseWQ=asNumber(p.quality),currentWQ=asNumber(x.currentWQ);
   const slot=x.slot;
+  const drift=inventoryDefinitionDrift(x);if(drift)issues.push(`${name}: ${drift}; bojové vstupy používají uloženou kopii`);
   if(isWeapon&&!modes.length)issues.push(`${name}: chybí strukturované útočné režimy pro combat`);
   if(isWeapon&&modes.some(m=>!m||typeof m!=='object'||!m.name||!m.impactDie||!m.aspect))issues.push(`${name}: některý útočný režim nemá jméno, kostku Impact nebo typ poškození`);
   if((isWeapon||isShield)&&baseWQ===null)issues.push(`${name}: chybí základní WQ`);
@@ -287,13 +321,14 @@ function equippedCombatInputs(c){
   if(isShield&&(p.shieldModifier===undefined||p.deflect===undefined))issues.push(`${name}: chybí Shield Modifier nebo Deflect`);
   return {inventoryId:x.id,slot,name,category:x.snapshot?.category||'',definitionId:x.sourceItemId||x.snapshot?.id||null,baseWQ,currentWQ,
    modes,shieldModifier:isShield?(p.shieldModifier??null):null,deflect:isShield?(p.deflect??null):null,
+   definitionDrift:drift,definitionSource:drift?'inventory-snapshot-diverges':'inventory-snapshot',
    note:'Hodnoty jsou ze snapshotu inventáře; nejsou výpočtem combat resolveru.'};
  });
  return {characterId:c.id,hands,issues,rulesCalculated:false};
 }
 function equippedCombatInputsPanel(c){
  const r=equippedCombatInputs(c);
- return `<details class="encounter-details"><summary>Bojové vstupy · ${r.hands.length} předmětů v rukou · ${r.issues.length} upozornění</summary><p class="muted">Kontrola údajů pro budoucí combat. Zobrazuje snapshoty konkrétních předmětů, nikoliv živé definice katalogu; neprovádí útoky ani obranu.</p>${r.hands.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Ruka</th><th>Předmět</th><th>WQ základní / aktuální</th><th>Útočné režimy / štít</th></tr></thead><tbody>${r.hands.map(h=>`<tr><td>${h.slot==='main_hand'?'Hlavní':'Vedlejší'}</td><td>${esc(h.name)}</td><td>${esc(String(h.baseWQ??'—'))} / ${esc(String(h.currentWQ??'—'))}</td><td>${h.category==='weapon'?(h.modes.length?h.modes.map(m=>esc([m.name,m.impactDie,m.aspect].filter(Boolean).join(' · '))).join('<br>'):'Nejsou ověřené režimy'):h.category==='shield'?`Shield modifier: ${esc(String(h.shieldModifier??'—'))}; Deflect: ${esc(String(h.deflect??'—'))}`:'Nepodporovaná kategorie'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">V rukou nejsou evidovány žádné předměty.</p>'}${r.issues.length?`<ul class="audit-list">${r.issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</details>`;
+ return `<details class="encounter-details"><summary>Bojové vstupy · ${r.hands.length} předmětů v rukou · ${r.issues.length} upozornění</summary><p class="muted">Kontrola údajů pro budoucí combat. Zobrazuje uložené kopie konkrétních předmětů; pokud se liší od katalogu, zobrazí upozornění. Neprovádí útoky ani obranu.</p>${r.hands.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Ruka</th><th>Předmět</th><th>WQ základní / aktuální</th><th>Útočné režimy / štít</th></tr></thead><tbody>${r.hands.map(h=>`<tr><td>${h.slot==='main_hand'?'Hlavní':'Vedlejší'}</td><td>${esc(h.name)}</td><td>${esc(String(h.baseWQ??'—'))} / ${esc(String(h.currentWQ??'—'))}</td><td>${h.category==='weapon'?(h.modes.length?h.modes.map(m=>esc([m.name,m.impactDie,m.aspect].filter(Boolean).join(' · '))).join('<br>'):'Nejsou ověřené režimy'):h.category==='shield'?`Shield modifier: ${esc(String(h.shieldModifier??'—'))}; Deflect: ${esc(String(h.deflect??'—'))}`:'Nepodporovaná kategorie'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">V rukou nejsou evidovány žádné předměty.</p>'}${r.issues.length?`<ul class="audit-list">${r.issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</details>`;
 }
 // Read-only armour coverage: show article contributions without adding AV across layers.
 // Inventory snapshots remain authoritative for owned equipment, even if a built-in definition changes.

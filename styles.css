@@ -63,3 +63,6 @@
 
 /* v47: prominently identify the deployed application version. */
 .mast-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}.release-marker{font:700 .9rem/1.2 system-ui,sans-serif;color:#ffe4a6;background:#4a3925;border:2px solid #c59c5a;border-radius:7px;padding:.35rem .7rem;white-space:nowrap;letter-spacing:.06em}@media(max-width:760px){.release-marker{font-size:.8rem}}
+
+/* v49: Structured rule parameters in readable lists, never raw JSON. */
+.catalog-data-list{margin:.3rem 0 .65rem;padding-left:1.45rem}.catalog-data-list li{margin:.35rem 0}.catalog-data-nested{padding-left:.65rem;border-left:1px solid var(--border,#625c4b)}
