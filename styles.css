@@ -60,3 +60,6 @@
 
 /* v45: readable armour protection and structured properties */
 .catalog-parameters h4{margin:.9rem 0 .4rem}.catalog-complex{margin:.6rem 0}.catalog-complex strong{display:block;margin-bottom:.25rem}.catalog-spec td{overflow-wrap:anywhere}
+
+/* v47: prominently identify the deployed application version. */
+.mast-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}.release-marker{font:700 .9rem/1.2 system-ui,sans-serif;color:#ffe4a6;background:#4a3925;border:2px solid #c59c5a;border-radius:7px;padding:.35rem .7rem;white-space:nowrap;letter-spacing:.06em}@media(max-width:760px){.release-marker{font-size:.8rem}}
