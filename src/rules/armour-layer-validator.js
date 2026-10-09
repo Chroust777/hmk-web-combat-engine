@@ -3,6 +3,13 @@ import {ARMOUR_LAYER_COLUMNS} from './armour-layer-reference.js';
 import {validateLayerZoneMap,articleCoversZone,zoneLocations,articleCoversZoneLocation} from '../integration/armour-layer-zone-map.js';
 const CODE={cloth:'C',leather:'L',padded:'D',quilted:'Q',gambeson:'G',kurbul:'K',scale:'S',mail:'M',plate:'P'};
 const FAR_NAMES=new Set(['cloak','mantle','vest','surcoat','coat','robe','cuisse','cuisses']);
+/** HMK p.117: last over-column D/Q carries +5 ENC; this does not certify a layer arrangement. */
+export function outermostLayerEncSurcharge(article,slot){
+ if(slot!=='overFar')return 0;
+ if(!article||typeof article.name!=='string'||!CODE[article.material])throw new TypeError('Valid armour article required');
+ if(!FAR_NAMES.has(article.name.toLowerCase().trim()))throw new RangeError('Article not permitted in final over column');
+ return ['D','Q'].includes(CODE[article.material])?5:0;
+}
 const ZONES=['head','arms','torso','legs'];
 const LOCATIONS=new Set(['sk','fa','nk','sh','ua','el','fo','ha','tx','ab','pv','th','kn','ca','ft']);
 function options(token,article,zone){
@@ -38,9 +45,9 @@ export function validateArmourLayers(articles){
  for(const zone of ZONES){
   const group=articles.filter(a=>articleCoversZone(a,zone));
   if(!group.length)continue;
-  // HMK p.117: zone-level limits include non-overlapping articles.
-  if(group.length>5)errors.push(`${zone}: exceeds five articles in Body Zone`);
-  if(group.filter(a=>['D','Q'].includes(CODE[a.material])).length>1)warnings.push(`${zone}: multiple D/Q articles in Body Zone; review required`);
+  // Count restrictions at overlapping anatomical locations, never by total
+  // distinct articles assigned to a broad Body Zone.
+
   const locations=zoneLocations(group,zone);
   const locationResults={};
   for(const location of locations){

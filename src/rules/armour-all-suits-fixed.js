@@ -1,3 +1,4 @@
+import { PRINTED_SUIT_RIGID_BOXES } from './armour-suit-rigid-verified.js';
 /** Fixed printed HMK armour suit protection matrices, pp.113–116.
  * A printed dot is null, NOT zero. Rigid box outlines cannot be
  * established from text extraction and are deliberately not inferred.
@@ -1115,5 +1116,5 @@ export function printedSuitAV(suitName,location,aspect){
  const index={b:0,e:1,p:2,f:3}[aspect];
  if(!row||index===undefined)return {ok:false,reason:'Unknown suit/location/aspect'};
  const av=row[index];
- return av===null?{ok:true,covered:false,av:null,rigid:null}:{ok:true,covered:true,av,rigid:null};
+ return av===null?{ok:true,covered:false,av:null,rigid:false}:{ok:true,covered:true,av,rigid:PRINTED_SUIT_RIGID_BOXES[suitName][location][index]};
 }

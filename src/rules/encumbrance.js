@@ -11,8 +11,9 @@ export function strengthEncumbranceModifier(str,{mounted=false}={}){
 }
 export function gearEncumbrance(weightLb,{awkwardWeightLb=0}={}){
  if(!Number.isFinite(weightLb)||weightLb<0||!Number.isFinite(awkwardWeightLb)||awkwardWeightLb<0) throw new RangeError('Non-negative weights required');
- // awkward/poorly-stowed items count double; caller supplies that subset separately.
- const effective=weightLb+(2*awkwardWeightLb);
+ // weightLb includes the awkward subset exactly once; add it once more to double it.
+ if(awkwardWeightLb>weightLb) throw new RangeError('Awkward subset exceeds total weight');
+ const effective=weightLb+awkwardWeightLb;
  return Math.floor(effective/20)*5;
 }
 export function modifiedEncumbrance({armourENC=0,gearENC=0,str,mounted=false}={}){
