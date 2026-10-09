@@ -4,7 +4,7 @@ import { ARMOUR_LAYER_COLUMNS } from '../rules/armour-layer-reference.js';
 // explicitly supply an inner-to-outer order for each overlapping location.
 const ZONES={head:['sk','fa','nk'],arms:['sh','ua','el','fo','ha'],torso:['tx','ab','pv'],legs:['th','kn','ca','ft']};
 const CODE={cloth:'C',leather:'L',padded:'D',quilted:'Q',gambeson:'G',kurbul:'K',scale:'S',mail:'M',plate:'P'};
-const LAST_OVER=new Set(['cloak','mantle','vest','surcoat','coat','robe','cuisse','cuisses']);
+const LAST_OVER=new Set(['cloak','mantle','vest','surcoat','coat','robe','cuisse']);
 const layerSlots=['underFar','underNear','base','overNear','overFar'];
 const tokens=t=>t==='•'?[]:t.replace(/[\[\] ]/g,'').toUpperCase().split('');
 const byCode=new Map(ARMOUR_LAYER_COLUMNS.map(x=>[x.code,x]));

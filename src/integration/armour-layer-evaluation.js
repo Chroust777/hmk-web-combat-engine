@@ -6,7 +6,7 @@ import {ARMOUR_LAYER_COLUMNS} from '../rules/armour-layer-reference.js';
 const MATERIAL={cloth:'C',leather:'L',padded:'D',quilted:'Q',gambeson:'G',kurbul:'K',scale:'S',mail:'M',plate:'P'};
 const ZONES={head:['sk','fa','nk'],arms:['sh','ua','el','fo','ha'],torso:['tx','ab','pv'],legs:['th','kn','ca','ft']};
 const SLOTS=['underFar','underNear','base','overNear','overFar'];
-const LAST=new Set(['cloak','mantle','vest','surcoat','coat','robe','cuisse','cuisses']);
+const LAST=new Set(['cloak','mantle','vest','surcoat','coat','robe','cuisse']);
 const code=x=>MATERIAL[String(x||'').toLowerCase()];
 const normalizeName=x=>String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().split(',')[0];
 function tokenAllows(token,material,zone){
@@ -82,7 +82,7 @@ export function evaluateOrderedArmour(articles,{bulkExceptionByZone={},slotByArt
   let originalViolations=dqViolation;
   let candidateInViolation=dqViolation&&excluded.some(a=>a.code==='D');
   for(const loc of locs){
-   const full=prepared.filter(a=>a.coveredLocations.includes(loc));
+   const full=zoneArticles.filter(a=>a.coveredLocations.includes(loc));
    if(full.length>5){originalViolations=true;if(full.some(a=>a.id===candidate))candidateInViolation=true;}
    if(full.length&&full.every(a=>Number.isSafeInteger(a.layerOrder))&&new Set(full.map(a=>a.layerOrder)).size===full.length){
     if(!matchesFor([...full].sort((a,b)=>a.layerOrder-b.layerOrder),zone).length){
@@ -95,7 +95,7 @@ export function evaluateOrderedArmour(articles,{bulkExceptionByZone={},slotByArt
   const zoneErrors=[];
   if(dq.length>1)zoneErrors.push('More than one D/Q in Body Zone');
   for(const location of locs){
-   const all=prepared.filter(a=>a.coveredLocations.includes(location));
+   const all=zoneArticles.filter(a=>a.coveredLocations.includes(location));
    if(!all.length)continue;
    const normal=all.filter(a=>a.id!==candidate);
    if(all.length>5 && !(candidate&&normal.length<=5))zoneErrors.push(`${location}: exceeds five layers`);
