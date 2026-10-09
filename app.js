@@ -36,7 +36,8 @@ import { auditArmourLoadout } from './src/integration/armour-loadout-audit.js';
 import { projectCombatState } from './src/integration/combat-state-projection.js';
 import {resolveLiveCombatArmour} from './src/integration/live-combat-armour.js';
 import {resolveCombatantLoad,bulkForTest} from './src/integration/combatant-load.js';
-import {initialCombatState,validateCombatState,combatFatigueTotals,applyConfirmedHit,applyConfirmedBloodLoss,applyConfirmedBloodStoppage,applyConfirmedShockRecovery,applyConfirmedFatigue,dueBloodLoss,applyConfirmedWoundContext} from './src/integration/persistent-combat-state.js';
+import {createEncounterSequence,validateEncounterSequence,startEncounterTurn,finishEncounterTurn,nextEncounterRound,dueEncounterEvents,dueEndTurnEvents,currentEncounterActor,assertScheduledMeleeActor,resolveReadiedEncounterAction,cancelReadiedEncounterAction,completeReadiedEncounterAction,confirmAlertnessReaction,confirmConcentrationCompletion,abandonEncounterConcentration,ongoingEncounterConcentration,assertScheduledHitCanCommit,recordScheduledHitCommit,setEncounterTieOrder} from './src/integration/encounter-turn-sequence.js';
+import {initialCombatState,validateCombatState,combatFatigueTotals,applyConfirmedHit,applyConfirmedBloodLoss,applyConfirmedBloodStoppage,applyConfirmedShockRecovery,applyConfirmedFatigue,dueBloodLoss,applyConfirmedWoundContext,shockFollowupReadiness,applyExtendedShockCourse,applyComaCourse,dueInjuryMorale,unresolvedInjuryMishaps,specialActionReadiness,applyConfirmedInjuryMishap,applyConfirmedInjuryMorale,applyConfirmedSpecialAftermath,applyConfirmedMoraleReaction,applyConfirmedBraveExpiry,beginConfirmedEncounter} from './src/integration/persistent-combat-state.js';
 // v60: Bundled domain contract constructors; the 3-file deployment is self-contained.
 /** HMK domain contracts. Runtime objects are plain JSON-serialisable data. */
 const SCHEMA_VERSION = 1;
@@ -62,7 +63,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.79';
+const APP_VERSION='93.84';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -752,6 +753,28 @@ function readCombatClock(){
  catch{return {round:1,actorId:''}}
 }
 let combatClock=readCombatClock();
+const COMBAT_INITIATIVE_SEQUENCE_KEY='hmk-initiative-sequence-v1';
+function readInitiativeSequence(){try{const raw=sessionStorage.getItem(COMBAT_INITIATIVE_SEQUENCE_KEY);return raw?validateEncounterSequence(JSON.parse(raw)):null;}catch{return null;}}
+let combatInitiativeSequence=readInitiativeSequence();
+function combatSequenceStates(){return Object.fromEntries(selectedEncounterCharacters().map(c=>[c.id,persistentStateOf(c)]));}
+function verifyCombatSequenceRoster(s){
+ const ids=[...encounterSelection].sort();const roster=[...s.order].sort();
+ if(JSON.stringify(ids)!==JSON.stringify(roster))throw Error('Výběr účastníků se od zahájení Initiative změnil; nejprve dokončete nebo ukončete tuto sekvenci.');
+ if(s.timelineId!==combatInjuryTimelineId)throw Error('Časová osa Initiative neodpovídá potvrzené časové ose zranění.');
+}
+function persistInitiativeSequence(next){
+ if(next){next=validateEncounterSequence(next);verifyCombatSequenceRoster(next);}
+ const oldClock=structuredClone(combatClock);
+ const nextClock=next?{round:next.round,actorId:currentEncounterActor(next)||''}:combatClock;
+ validateCombatClock(nextClock,data.characters.map(c=>c.id));
+ // No character or inventory changes. On storage errors leave in-memory state untouched.
+ sessionStorage.setItem(COMBAT_INITIATIVE_SEQUENCE_KEY,next?JSON.stringify(next):'');
+ sessionStorage.setItem(COMBAT_CLOCK_KEY,JSON.stringify(nextClock));
+ combatInitiativeSequence=next;combatClock=nextClock;lastCombatEvent=null;
+ return {ok:true,previousClock:oldClock};
+}
+function liveInitiativeSequence(){if(!combatInitiativeSequence)return null;verifyCombatSequenceRoster(combatInitiativeSequence);return combatInitiativeSequence;}
+
 // In Close is an explicit GM-confirmed, pair-specific encounter state (not inferred from attacks).
 const IN_CLOSE_KEY='hmk-in-close-pairs-v1';
 function inClosePairKey(a,b){return [a,b].sort().join('::')}
@@ -791,15 +814,44 @@ function inClosePanel(chars){
 }
 
 function persistCombatClock(next){
+ if(combatInitiativeSequence)return {ok:false,reason:'Při aktivním Initiative pořadí nelze ručně přeskočit tah nebo kolo.'};
  try{const valid=validateCombatClock(next,data.characters.map(c=>c.id));sessionStorage.setItem(COMBAT_CLOCK_KEY,JSON.stringify(valid));if(valid.round<combatClock.round){combatInjuryTimelineId=uuid();sessionStorage.setItem(COMBAT_INJURY_TIMELINE_KEY,combatInjuryTimelineId);}combatClock=valid;lastCombatEvent=null;return {ok:true}}
  catch(e){return {ok:false,reason:e.message}}
 }
+function initiativeSequencePanel(chars){
+ const active=combatInitiativeSequence;
+ const row=active?.active?active.roster.find(x=>x.id===currentEncounterActor(active)):null;
+ let dues=[],endDues=[],statusError='';
+ if(active)try{verifyCombatSequenceRoster(active);dues=dueEncounterEvents(active,combatSequenceStates());endDues=dueEndTurnEvents(active,combatSequenceStates());}catch(e){statusError=e.message;}
+ const fieldFor=(c)=>{
+  const skills=c.hmk?.skills||[];
+  const mlFor=name=>{const matches=skills.filter(x=>String(x.name||'').toLowerCase()===name);return matches.length===1&&Number.isSafeInteger(Number(matches[0].ml))?Number(matches[0].ml):''};
+  return `<div class="field-grid"><strong>${esc(c.name)} (${esc(c.kind||'PC')})</strong><input type="hidden" name="participantId" value="${esc(c.id)}"><label>Initiative ML<input type="number" name="ir_${esc(c.id)}" min="0" max="200" step="1" value="${esc(mlFor('initiative'))}" required></label><label>Awareness EML (tiebreak)<input type="number" name="aw_${esc(c.id)}" min="0" max="200" step="1" value="${esc(mlFor('awareness'))}" required></label><label>GM/PC pořadí při úplné shodě IR<input type="number" name="tie_${esc(c.id)}" min="0" max="999" step="1" placeholder="jen při shodě"></label><label>Počáteční Alertness<select name="alert_${esc(c.id)}"><option value="aware">Aware</option><option value="confused">Confused</option><option value="unaware">Unaware</option></select></label></div>`;
+ };
+ return `<section class="panel" id="hmk-initiative-manager"><h3>Initiative · řízené tahy (HMK str. 158–162)</h3>
+ <p class="muted">Řazení podle Initiative <strong>ML</strong>, při shodě podle Awareness EML a přednosti PC. Poslední shodu rozhoduje hráč/GM. Pořadí běží v sessionStorage; potvrzené rány, Shock a krvácení zůstávají v datech postav. Žádné hody nejsou generovány.</p>
+ ${active?`<p><strong>Kolo ${active.round}</strong> · dokončené tahy ${active.cursor}/${active.order.length} · ${active.active?'Probíhá tah: '+esc(row?.name||''):'Tah ještě nezačal / předchozí skončil'}</p>
+ <p class="tiny">Pořadí: ${active.order.map((id,i)=>`${i+1}. ${esc(active.roster.find(x=>x.id===id)?.name||id)} (IR ${active.roster.find(x=>x.id===id)?.rank})`).join(' · ')}</p>
+ ${statusError?`<p class="notice error">${esc(statusError)}</p>`:''}
+ ${dues.length?`<div class="notice error"><strong>Splatné události:</strong> ${dues.map(x=>esc(x.type+' – '+(data.characters.find(c=>c.id===x.characterId)?.name||x.characterId)+(x.woundId?' / '+x.woundId:''))).join(' · ')}. Vyřešte je v potvrzovacích formulářích níže.</div>`:''}
+ ${endDues.length?`<div class="notice error">Povinné události na konci tahu (${esc(row?.name||'účastník')}): ${endDues.map(x=>esc(x.type)).join(' · ')}. Vyřešte je před ukončením tahu.</div>`:''}
+ <form id="combat-alertness-reaction-form"><h4>Reaction Roll · Alertness (HMK str.158–159)</h4><label>Postava<select name="actorId" required>${active.roster.filter(r=>['confused','unaware'].includes(r.alertness)).map(r=>`<option value="${esc(r.id)}">${esc(r.name)} · ${esc(r.alertness)}</option>`).join('')||'<option value="">Žádný nevyřešený Reaction</option>'}</select></label><label>Skutečný d100 na Initiative EML<input type="number" name="roll" min="1" max="100" step="1" required></label><label><input type="checkbox" name="immediateAlert" value="yes"> Unaware: skutečně upozorněna na hrozbu (okamžitý Reaction)</label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil okolnosti Reaction</label><button type="submit">Vyhodnotit a zaznamenat Reaction Roll</button></form>
+ 
+ <form id="combat-initiative-finish-form"><label>Dokončená akce<select name="action">${[['pass','Pass'],['attack','Attack'],['charge','Charge'],['evade','Evade'],['grope','Grope'],['incant','Incant'],['move','Move'],['ready','Připravit 1-turn akci'],['other','Jiná GM schválená akce'],['concentrate-start','Začít 1+ round akci'],['concentrate-hold','Pokračovat v koncentraci'],['concentrate-abandon','Opuštění koncentrace'],['incapacitated','Bez akce (INC/UNC/KIA/Coma)']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label><label>Připravená 1-turn akce<select name="readiedAction"><option value="">—</option><option value="attack">Attack</option><option value="grope">Grope</option><option value="move">Move (max. half Move)</option></select></label><label>1+ round: počet celých kol soustředění<input type="number" name="durationRounds" min="1" max="9999" step="1" placeholder="jen při zahájení"></label><div class="actions"><button type="button" data-action="initiative-start-turn" ${active.active||active.cursor>=active.order.length?'disabled':''}>Zahájit další tah</button><button type="submit" ${!active.active?'disabled':''}>GM: dokončit tah</button><button type="button" data-action="initiative-next-round" ${active.active||active.cursor<active.order.length?'disabled':''}>Uzavřít kolo / další kolo</button></div></form>
+ <details><summary>GM: upravit pořadí při shodě IR (platí pro další seřazení)</summary><form id="combat-initiative-tie-form"><label>Účastník<select name="actorId">${active.roster.map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select></label><label>Priorita ve shodě (nižší jedná dříve)<input type="number" name="tieOrder" min="0" max="999" step="1" required></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM / hráči rozhodli pořadí</label><button type="submit">Potvrdit prioritu shody</button></form></details>
+ ${active.order.filter(id=>ongoingEncounterConcentration(active,id)).map(id=>{const c=ongoingEncounterConcentration(active,id);return `<div class="notice">1+ round: ${esc(data.characters.find(x=>x.id===id)?.name||id)} · zahájeno kolo ${c.startRound}, dokončení před IR v kole ${c.completionRound}. ${active.order[active.cursor]===id&&!active.active&&active.round===c.completionRound?`<button type="button" data-action="initiative-complete-concentration" data-owner-id="${esc(id)}">GM: koncentrace dodržena, dokončit</button>`:''}<button type="button" data-action="initiative-abandon-concentration" data-owner-id="${esc(id)}">GM: opustit koncentraci</button></div>`}).join('')}
+ ${active.interruptActiveId?`<div class="notice">Přerušení cizího tahu: právě jedná ${esc(data.characters.find(c=>c.id===active.interruptActiveId)?.name||active.interruptActiveId)}. Po vyhodnocení připravené akce se vrátí původní aktér. <button type="button" data-action="initiative-finish-readied">GM: ukončit přerušující akci</button></div>`:''}
+ ${Object.entries(active.readied).filter(([,r])=>!r.resolved&&!r.triggered).map(([id,r])=>`<div class="notice">Připravená akce: ${esc(data.characters.find(c=>c.id===id)?.name||id)} (původní IR ${r.originalRank}). <form class="combat-readied-resolve-form"><input type="hidden" name="actorId" value="${esc(id)}"><label>IR skutečného přerušení<input type="number" name="interruptIR" min="0" max="200" required></label><label><input type="checkbox" name="moveHalfConfirmed" value="yes"> GM potvrdil nejvýše half Move (pro připravený Move)</label><button type="submit">GM: vyvolat připravenou akci</button><button type="button" data-action="initiative-cancel-readied" data-owner-id="${esc(id)}">GM: zrušit připravení</button></form></div>`).join('')}
+ <div class="actions"><button type="button" data-action="initiative-export">Exportovat historii tahů</button><button type="button" data-action="initiative-end-session">Ukončit tuto pracovní sekvenci (GM)</button></div>`:
+ `<form id="combat-initiative-setup-form">${chars.length?chars.map(fieldFor).join(''):'Nejprve vyberte účastníky.'}<label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil Initiative ML, Awareness EML a pořadí shod přímo podle HMK</label><button type="submit" ${!chars.length?'disabled':''}>Zahájit pravidlové pořadí tahů</button></form>`}
+ </section>`;
+}
 function combatClockPanel(chars){
  const actors=chars.filter(c=>encounterSelection.has(c.id));
- return `<section class="panel"><h3>Časová osa střetnutí · ruční řízení</h3><p class="muted">GM ručně nastavuje číslo kola a jednající postavu. Nejde o automatické pořadí iniciativy, časování Shock Reroll, krvácení ani regeneraci. Uložené návrhy dostanou pouze časovou značku kola a jednajícího účastníka.</p><form id="combat-clock-form"><div class="field-grid"><label>Kolo<input name="round" type="number" min="1" max="9999" step="1" required value="${combatClock.round}"></label><label>Jednající postava<select name="actorId"><option value="">Neurčeno</option>${actors.map(c=>`<option value="${esc(c.id)}" ${combatClock.actorId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label></div><div class="actions"><button type="submit">Nastavit kolo a účastníka</button><button type="button" class="secondary" data-action="combat-next-round">Další kolo (+1)</button><button type="button" class="secondary" data-action="combat-clock-export">Exportovat pracovní stav střetnutí</button></div></form><p class="tiny">Aktuální označení: kolo ${combatClock.round} · ${esc(actors.find(c=>c.id===combatClock.actorId)?.name||'jednající neurčen')}. Přepnutí kola nepřepisuje uložené návrhy.</p></section>`;
+ return `<section class="panel"><h3>Časová osa střetnutí · ${combatInitiativeSequence?'řízeno Initiative':'ruční řízení'}</h3><p class="muted">Bez aktivované Initiative sekvence GM ručně nastavuje kolo a účastníka. Při aktivní sekvenci je ruční přeskočení zakázáno a splatné události se ověřují před pokračováním. Uložené návrhy dostanou pouze časovou značku kola a jednajícího účastníka.</p><form id="combat-clock-form"><div class="field-grid"><label>Kolo<input name="round" type="number" min="1" max="9999" step="1" required value="${combatClock.round}"></label><label>Jednající postava<select name="actorId"><option value="">Neurčeno</option>${actors.map(c=>`<option value="${esc(c.id)}" ${combatClock.actorId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label></div><div class="actions"><button type="submit">Nastavit kolo a účastníka</button><button type="button" class="secondary" data-action="combat-next-round">Další kolo (+1)</button><button type="button" class="secondary" data-action="combat-clock-export">Exportovat pracovní stav střetnutí</button></div></form><p class="tiny">Aktuální označení: kolo ${combatClock.round} · ${esc(actors.find(c=>c.id===combatClock.actorId)?.name||'jednající neurčen')}. Přepnutí kola nepřepisuje uložené návrhy.</p></section>`;
 }
 function combatSessionExport(){
- return {format:'hmk-combat-session-preview-v1',status:'preview-only',mutatesCharacter:false,exportedAt:stamp(),clock:structuredClone(combatClock),participants:[...encounterSelection].filter(id=>data.characters.some(c=>c.id===id)),history:structuredClone(combatDraftHistory),limitations:['Manual round and actor only','No authoritative initiative or turn advancement','No character mutation or automated bleeding/shock recovery']};
+ return {format:'hmk-combat-session-preview-v1',status:'preview-only',mutatesCharacter:false,exportedAt:stamp(),clock:structuredClone(combatClock),participants:[...encounterSelection].filter(id=>data.characters.some(c=>c.id===id)),history:structuredClone(combatDraftHistory),initiativeSequence:combatInitiativeSequence?structuredClone(combatInitiativeSequence):null,limitations:['Dice and GM adjudications are manual','Scheduler controls turn timing, not action resolution','Long-term healing hours/days require independently confirmed time']};
 }
 // v66: deterministic replay of saved previews from their recorded AV snapshot.
 // A replay proves internal arithmetic consistency, NOT current equipment or PDF compliance.
@@ -876,6 +928,7 @@ function parseCombatSessionImport(pkg,knownIds){
  return {participants:[...pkg.participants],clock,history};
 }
 function restoreCombatSession(pkg){
+ if(combatInitiativeSequence)return {ok:false,reason:'Nejprve ukončete aktivní Initiative sekvenci.'};
  const parsed=parseCombatSessionImport(pkg,data.characters.map(c=>c.id));
  const old={selection:new Set(encounterSelection),clock:structuredClone(combatClock),history:structuredClone(combatDraftHistory)};
  const keys=[ENCOUNTER_DRAFT_KEY,COMBAT_CLOCK_KEY,COMBAT_DRAFT_HISTORY_KEY];
@@ -955,7 +1008,7 @@ function saveCombatDraftToHistory(draft){
 // Persistent source of truth: c.hmk.combatState in localStorage-backed character records.
 // Preview-only session history remains independent; never replay it as committed wounds.
 function persistentStateOf(c){return c?.hmk?.combatState??initialCombatState();}
-function combatInjurySignature(id){const c=character(id);if(!c)return null;const s=persistentStateOf(c);return JSON.stringify({wounds:s.wounds,shock:s.shock});}
+function combatInjurySignature(id){const c=character(id);if(!c)return null;const s=persistentStateOf(c);return JSON.stringify({wounds:s.wounds,shock:s.shock,morale:s.morale??null,mishaps:s.mishaps??[],posture:s.posture??null,extendedShock:s.extendedShock??null});}
 function synchronizeCombatInjuries(c,state){
  c.hmk=c.hmk||{};c.hmk.injuries=c.hmk.injuries||[];
  for(const wound of state.wounds){
@@ -980,17 +1033,26 @@ function combatPersistentStatePanel(chars){
  const rows=chars.map(c=>{
   const s=persistentStateOf(c);let valid=true;try{validateCombatState(s)}catch{valid=false;}
   if(!valid)return `<tr><td>${esc(c.name)}</td><td colspan="5">Neplatný bojový stav – zápisy blokovány</td></tr>`;
-  const fatigue=combatFatigueTotals(s),due=dueBloodLoss(s,combatClock.round);
+  const fatigue=combatFatigueTotals(s),due=dueBloodLoss(s,combatClock.round);const specialPending=unresolvedInjuryMishaps(s).length+dueInjuryMorale(s).length;
+  const recoveryNote=s.extendedShock?` · <strong>Extended Shock HR${s.extendedShock.hr}, další Course Roll za 4h (GM)</strong>`:s.coma?.active?` · <strong>Coma HR${s.coma.hr}, další Course za ${s.coma.nextCourseDays} dní</strong>`:s.shockFollowup?` · <strong>Shock ${s.shockFollowup.phase==='end-next-turn'?'konec dalšího tahu':'po 10 minutách'} (od kola ${s.shockFollowup.originRound})</strong>`:'';
   const move=projectInjuredMovement({state:s,round:combatClock.round,timelineId:combatInjuryTimelineId});const injurySummary=move.ready?(move.blocked?' · <strong>Move nepoužitelné</strong>':move.impairment?' · Move −'+move.impairment:''): ' · <strong>Impairment neúplné</strong>'; 
-  return `<tr><td>${esc(c.name)}</td><td>${s.shock}</td><td>${s.wounds.length} (${s.wounds.filter(w=>w.bleeding).length} krvácí)${injurySummary}</td><td>${s.bloodLoss.bp}/4</td><td>${fatigue.total}</td><td>${due.length?`<strong>${due.length} čeká na hod</strong>`:'—'}</td></tr>`;
+  return `<tr><td>${esc(c.name)}</td><td>${s.shock}${recoveryNote}</td><td>${s.wounds.length} (${s.wounds.filter(w=>w.bleeding).length} krvácí)${specialPending?' · <strong>'+specialPending+' speciální hod(y)</strong>':''}${s.posture?.prone?' · PRONE':''}${s.morale&&s.morale.state!=='steady'?' · Morale '+esc(s.morale.state):''}${injurySummary}</td><td>${s.bloodLoss.bp}/4</td><td>${fatigue.total}</td><td>${due.length?`<strong>${due.length} čeká na hod</strong>`:'—'}</td></tr>`;
  }).join('');
  const active=chars.flatMap(c=>persistentStateOf(c).wounds.filter(w=>w.bleeding).map(w=>`<option value="${esc(c.id+'::'+w.id)}">${esc(c.name)} · ${esc(w.location)}${w.staunchBonus?` · další Staunch +${w.staunchBonus}`:''} · ${esc(w.id)}</option>`)).join('');
- return `<section class="panel"><h3>Potvrzený bojový stav · trvale v postavách (HMK 168–169, 176–178)</h3><p class="muted">Odděleno od pracovní historie. Zásah se zapíše pouze po potvrzení GM; zranění a Shock se uloží do zálohovaných dat postavy. Fatigue potvrzeného bojového stavu se použije do dalšího Melee EML místo ručního pole Fatigue. Přepnutí kola automaticky nehází Blood Loss ani nezotavuje Shock. Special effects, časování a všechny potřebné hody zůstávají výslovnými rozhodnutími GM.</p><div class="table-scroll"><table><thead><tr><th>Postava</th><th>Shock</th><th>Rány</th><th>BP</th><th>Fatigue</th><th>Splatné Advance</th></tr></thead><tbody>${rows}</tbody></table></div>
- <form id="confirm-combat-hit-form"><h4>Potvrdit právě vypočtený zásah</h4><p class="muted">Vyžaduje aktuální náhled výše. GM před potvrzením rozhodne Compound Injury, Bleeding, případnou amputaci, přeměnu poranění kovovou zbrojí a další zvláštní účinky. Samotný náhled je neumí všechny rozhodnout.</p><div class="field-grid"><label>Bleeding podle Body Location / výsledku zvláštních testů<select name="bleeding" required><option value="">GM musí určit</option><option value="yes">Ano – aktivní Bleeder</option><option value="no">Ne – rána nekrvácí</option></select></label><label>Compound Injury d10 při opakování rány v lokaci (1–10)<input type="number" name="compoundD10" min="1" max="10" step="1" placeholder="Nevyplňovat, pokud není Compound"></label><label><input type="checkbox" name="compoundReviewed" value="yes"> GM ověřil výsledek Compound Injury; Injury Shock musí odpovídat hodu</label><label>Strana zasažené končetiny (paže nebo nohy)<select name="injuredSide"><option value="">Neurčeno / jiná zóna</option><option value="left">Levá</option><option value="right">Pravá</option></select></label><label><input type="checkbox" name="gmReviewed" value="yes" required> GM ověřil všechny zvláštní podmínky zranění podle HMK</label></div><button type="submit">Potvrdit zásah a trvale zapsat</button></form>
+ return `<section class="panel"><h3>Potvrzený bojový stav · trvale v postavách (HMK 168–169, 176–178)</h3><p class="muted">Odděleno od pracovní historie. Zásah se zapíše pouze po potvrzení GM; zranění a Shock se uloží do zálohovaných dat postavy. Fatigue potvrzeného bojového stavu se použije do dalšího Melee EML místo ručního pole Fatigue. Přepnutí kola automaticky nehází Blood Loss ani nezotavuje Shock. Splatnost Shock kontroluje známou časovou osu, konec tahu potvrzuje GM. Extended Shock a Coma používají potvrzené časové intervaly a skutečné hody; amputace, Morale a Mishap vyžadují doložené hody a potvrzení GM.</p><div class="table-scroll"><table><thead><tr><th>Postava</th><th>Shock</th><th>Rány</th><th>BP</th><th>Fatigue</th><th>Splatné Advance</th></tr></thead><tbody>${rows}</tbody></table></div>
+ <form id="combat-encounter-start-form"><h4>Nové střetnutí se stejnými postavami</h4><p class="muted">Výslovné potvrzení nového kola 1. Zranění, Weakness, Fatigue a Morale zůstávají u postav. Pokud některá stále krvácí, trvá Shock nebo čeká povinný Mishap či Morale, nový začátek se odmítne; skutečný čas mezi střetnutími se nikdy nedopočítává.</p><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil konec předchozího střetnutí a všechny nevyřízené následky</label><button type="submit">Zahájit nové střetnutí (kolo 1)</button></form>
+ <form id="confirm-combat-hit-form"><h4>Potvrdit právě vypočtený zásah</h4><p class="muted">Vyžaduje aktuální náhled výše. GM před potvrzením rozhodne Compound Injury, Bleeding, případnou amputaci, přeměnu poranění kovovou zbrojí a další zvláštní účinky. Samotný náhled je neumí všechny rozhodnout.</p><div class="field-grid"><label>Bleeding podle Body Location / výsledku zvláštních testů<select name="bleeding" required><option value="">GM musí určit</option><option value="yes">Ano – aktivní Bleeder</option><option value="no">Ne – rána nekrvácí</option></select></label><label>Compound Injury d10 při opakování rány v lokaci (1–10)<input type="number" name="compoundD10" min="1" max="10" step="1" placeholder="Nevyplňovat, pokud není Compound"></label><label><input type="checkbox" name="compoundReviewed" value="yes"> GM ověřil výsledek Compound Injury; Injury Shock musí odpovídat hodu</label><label>Strana zasažené končetiny (paže nebo nohy)<select name="injuredSide"><option value="">Neurčeno / jiná zóna</option><option value="left">Levá</option><option value="right">Pravá</option></select></label><label>Zásah šípem/kušovou šipkou (Impalement, str.170)<select name="arrowOrBolt"><option value="no">Ne</option><option value="yes">Ano</option></select></label><label>G5 Edge + trojúhelník: Strength ML (bez modifikátoru trojúhelníku)<input name="amputationStrengthML" type="number" min="0" max="200" step="1" placeholder="Jen pokud p167 vyžaduje"></label><label>Amputation: skutečný d100<input name="amputationRoll" type="number" min="1" max="100" step="1" placeholder="Jen G5 Edge + △"></label><label><input type="checkbox" name="amputationBeast" value="yes"> Nestandardní Strength u zvířete (ML70/50/30 podle △)</label><label>Amputation S: původní Shock ML<input name="shockML" type="number" min="0" max="200" step="1" placeholder="Ověření −20"></label><label>Amputation S: skutečný Shock d100<input name="shockRoll" type="number" min="1" max="100" step="1" placeholder="Ověření −20"></label><label><input type="checkbox" name="gmReviewed" value="yes" required> GM ověřil všechny zvláštní podmínky zranění podle HMK</label></div><button type="submit">Potvrdit zásah a trvale zapsat</button></form>
  <div class="field-grid"><form id="combat-blood-loss-form"><h4>Blood Loss Advance · každých 60 kol</h4><label>Aktivní rána<select name="wound" required>${active||'<option value="">Žádný Bleeder</option>'}</select></label><label>Výsledek Blood Loss Roll<select name="sl"><option>CS</option><option>S</option><option>F</option><option>CF</option></select></label><button type="submit" ${active?'':'disabled'}>Zapsat jeden splatný Advance</button></form>
  <form id="combat-blood-stoppage-form"><h4>Blood Stoppage · GM provede ošetření</h4><label>Aktivní rána<select name="wound" required>${active||'<option value="">Žádný Bleeder</option>'}</select></label><label>Blood Stoppage SL<select name="sl"><option>CS</option><option>S</option><option>F</option><option>CF</option></select></label><label>Navazující Blood Loss Roll (u CS není)<select name="advanceSL"><option value="">Bez dalšího hodu (pouze CS)</option><option>CS</option><option>S</option><option>F</option><option>CF</option></select></label><button type="submit" ${active?'':'disabled'}>Zapsat výsledek ošetření</button></form></div>
- <div class="field-grid"><form id="combat-recovery-persistent-form"><h4>Shock Recovery / Reroll</h4><label>Účastník<select name="characterId" required>${opts}</select></label><label>Skutečný Shock Roll SL<select name="sl"><option>CS</option><option>S</option><option>F</option><option>CF</option></select></label><label><input type="checkbox" name="timingConfirmed" value="yes" required> GM ověřil správný okamžik, EML a Fatigue</label><button type="submit">Trvale zapsat zotavení</button></form>
+ <div class="field-grid"><form id="combat-recovery-persistent-form"><h4>Shock Recovery / Reroll (HMK str. 169)</h4><label>Účastník<select name="characterId" required>${opts}</select></label><label>Shock ML postavy<input name="shockML" type="number" min="0" max="200" step="1" required></label><label>Skutečný d100<input name="roll" type="number" min="1" max="100" step="1" required></label><label>Kontrolní Shock Roll SL<select name="sl"><option>CS</option><option>S</option><option>F</option><option>CF</option></select></label><label><input type="checkbox" name="turnEnded" value="yes"> STN/INC: končí tah právě vybraného účastníka v hodinách střetnutí</label><label>UNC: GM potvrzené minuty od původního Shock Roll (min. 10)<input name="elapsedMinutes" type="number" min="10" max="100000" step="1" placeholder="Při prokazatelně souvislém střetnutí nemusí"></label><label>UNC + CF: Location Shock vyvolávajícího zranění<input name="comaLocationShock" type="number" min="0" max="15" step="1"></label><label>UNC + CF: Injury Level vyvolávajícího zranění<input name="comaInjuryLevel" type="number" min="1" max="5" step="1"></label><label>UNC + CF: d10 dní do prvního Coma Course<input name="initialComaD10" type="number" min="1" max="10" step="1"></label><label><input type="checkbox" name="timingConfirmed" value="yes" required> GM ověřil správný okamžik, EML a Fatigue</label><button type="submit">Trvale zapsat zotavení</button></form>
  <form id="combat-fatigue-persistent-form"><h4>Fatigue – potvrzená úprava</h4><label>Účastník<select name="characterId" required>${opts}</select></label><label>Typ<select name="kind"><option value="windedness">Windedness</option><option value="weariness">Weariness</option><option value="otherWeakness">Jiná Weakness (ne BP)</option></select></label><label>Změna bodů (+/−)<input type="number" name="delta" step="1" value="5" required></label><button type="submit">Trvale zapsat změnu Fatigue</button></form></div>
+ <div class="field-grid"><form id="combat-extended-course-form"><h4>Extended Shock · Course Roll každé 4 hodiny (HMK str.179)</h4><label>Účastník<select name="characterId" required>${opts}</select></label><label>Healing Base (HB)<input name="healingBase" type="number" min="1" max="100" step="1" required></label><label>d100 (skutečný hod)<input name="roll" type="number" min="1" max="100" step="1" required></label><label>Physician SV hvězdy (nejvyšší potvrzený výsledek)<input name="physicianStars" type="number" min="0" max="10" step="1" value="0" required></label><label>Uplynulé hodiny od vzniku Extended Shock (4, 8, 12, …)<input name="elapsedHoursSinceOnset" type="number" min="4" max="100000" step="4" required></label><label>Arcane Course bonus (pouze doložený)<input name="arcaneBonus" type="number" min="0" max="100" step="1" value="0" required></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje uplynutí 4 hodin od minulého Course Roll</label><button type="submit">Trvale zapsat Extended Shock Course</button></form>
+ <form id="combat-coma-course-form"><h4>Coma · Course Roll po d10 dnech (HMK str.179)</h4><label>Účastník<select name="characterId" required>${opts}</select></label><label>Healing Base<input name="healingBase" type="number" min="1" max="100" step="1" required></label><label>d100<input name="roll" type="number" min="1" max="100" step="1" required></label><label>Skutečně uplynulé dny od posledního Course<input name="daysElapsed" type="number" min="1" max="10" step="1" required></label><label>Nový hod d10 pro další interval<input name="periodD10" type="number" min="1" max="10" step="1" required></label><label>Zotavovací prostředí<select name="restfulShelter"><option value="yes">Klidné, chráněné</option><option value="no">Nechráněné (−20)</option></select></label><label>Arcane bonus (ověřený)<input name="arcaneBonus" type="number" min="0" max="100" step="1" value="0" required></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje interval a všechny podmínky</label><button type="submit">Trvale zapsat Coma Course</button></form></div>
+ <div class="field-grid"><form id="combat-injury-mishap-form"><h4>Injury Mishap (HMK str.161,170)</h4><label>Nevyřízený Mishap<select name="mishap" required>${chars.flatMap(c=>unresolvedInjuryMishaps(persistentStateOf(c)).map(m=>`<option value="${esc(c.id+'::'+m.id)}">${esc(c.name)} · ${esc(m.kind)} · ${esc(m.woundId)}</option>`)).join('')||'<option value="">Žádný pending Mishap</option>'}</select></label><label>Ověřené DEX/Legerdemain nebo AGL/Acrobatics ML<input name="baseML" type="number" min="0" max="200" step="1" placeholder="U automatic prázdné"></label><label>Skutečný d100<input name="roll" type="number" min="1" max="100" step="1" placeholder="U automatic prázdné"></label><label><input type="checkbox" name="hasDEX" value="yes" checked> Akce používá DEX (jinak Fumble → Stumble)</label><label><input type="checkbox" name="hasLegs" value="yes" checked> Postava má nohy (jinak po Stumble Pass)</label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil Mishap a příslušnou dovednost</label><button type="submit">Trvale vyhodnotit Mishap</button></form>
+ <form id="combat-injury-morale-form"><h4>Morale po Serious / Grievous (HMK str.162)</h4><label>Rána čekající na Morale<select name="wound" required>${chars.flatMap(c=>dueInjuryMorale(persistentStateOf(c)).map(w=>`<option value="${esc(c.id+'::'+w.woundId)}">${esc(c.name)} · ${esc(w.severity)} · ${esc(w.location)}</option>`)).join('')||'<option value="">Žádný splatný Morale</option>'}</select></label><label>Initiative ML (před Fatigue)<input name="initiativeML" type="number" min="0" max="200" step="1" required></label><label>Skutečný d100<input name="roll" type="number" min="1" max="100" step="1" required></label><label>Aberrance protivníka ABE<input name="aberrance" type="number" min="0" max="200" step="1" value="0" required></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil Initiative, ABE a čas Morale</label><button type="submit">Trvale vyhodnotit Morale</button></form></div>
+ <div class="field-grid"><form id="combat-morale-reaction-form"><h4>Morale Reaction Roll (HMK str.159/162)</h4><label>Účastník<select name="characterId" required>${opts}</select></label><label>Initiative ML (před Fatigue)<input name="initiativeML" type="number" min="0" max="200" step="1" required></label><label>Skutečný d100<input name="roll" type="number" min="1" max="100" step="1" required></label><label>Pro Routed: minuty v bezpečí mimo LOS<input name="elapsedSafeMinutes" type="number" min="1" max="100000" step="1"></label><label><input type="checkbox" name="safeOutOfLOS" value="yes"> Routed: bezpečí a mimo dohled nepřítele</label><label><input type="checkbox" name="unthreatened" value="yes"> Withdrawing: postava není ohrožována</label><label><input type="checkbox" name="turnEnded" value="yes"> Catatonic: skutečný konec tahu postavy</label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil příslušnou podmínku</label><button type="submit">Trvale zapsat Morale Reaction</button></form>
+ <form id="combat-brave-expiry-form"><h4>Brave bonus +20: konec 5 minut (HMK str.162)</h4><label>Účastník<select name="characterId" required>${opts}</select></label><label>Uplynulé minuty (při změně časové osy)<input name="elapsedMinutes" type="number" min="5" max="100000" step="1"></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil 5 minut od Brave</label><button type="submit">Ukončit Brave bonus</button></form></div>
+ <form id="combat-special-aftermath-form"><h4>Vyřešení následků Mishap</h4><label>Účastník<select name="characterId" required>${opts}</select></label><label>Akce<select name="kind"><option value="stand">Vstát (Move, příslušný náklad)</option><option value="retrieve-item">Zvednout upuštěný předmět (Grope)</option><option value="pass-next-turn">Pass v následujícím tahu</option></select></label><label><input type="checkbox" name="threatened" value="yes"> Grope při ohrožení – nutný Melee test</label><label>Grope: Melee ML<input name="meleeML" type="number" min="0" max="200" step="1"></label><label>Grope: skutečný d100<input name="meleeRoll" type="number" min="1" max="100" step="1"></label><label><input type="checkbox" name="actualEndOfTurn" value="yes"> Potvrzen konec příslušného tahu (Pass)</label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil cenu akce a případné Melee při Grope</label><button type="submit">Potvrdit odstranění následku</button></form>
  <form id="combat-wound-context-form"><h4>Starší potvrzená rána – doplnit stranu končetiny / Shock</h4><p class="muted">Pouze pro starší záznamy bez strany paže nebo výsledku původního Shock Roll. GM rozhodne podle herních záznamů; systém neodhaduje.</p><div class="field-grid"><label>Rána<select name="wound" required>${chars.flatMap(c=>persistentStateOf(c).wounds.map(w=>`<option value="${esc(c.id+'::'+w.id)}">${esc(c.name)} · ${esc(w.id)} · ${esc(w.location)}</option>`)).join('')}</select></label><label>Strana (pro paži)<select name="side"><option value="">Beze změny</option><option value="left">Levá</option><option value="right">Pravá</option></select></label><label>Původní Shock Roll SL (pro Minor)<select name="shockSL"><option value="">Beze změny</option><option>CS</option><option>S</option><option>F</option><option>CF</option></select></label><label><input type="checkbox" name="minorOnsetGM" value="yes"> GM potvrzuje, že od Minor uplynulo alespoň 10 minut (např. v jiné bitvě)</label><label><input type="checkbox" name="gmReviewed" value="yes" required> Ověřeno GM podle původního HMK a záznamu hodů</label></div><button type="submit">Zapsat chybějící kontext rány</button></form><button type="button" class="secondary" data-action="export-confirmed-combat">Exportovat potvrzené stavy JSON</button><p class="tiny">Při chybě pravidlové návaznosti se nic nezapíše. Trvalá historie událostí se ukládá s postavou a je součástí její zálohy. Nejde zatím o plně automatický systém vedení kol a všech léčebných pravidel.</p></section>`;
 }
 function combatDraftHistoryPanel(){
@@ -1095,7 +1157,7 @@ function encounterView(){
  ${chars.length?`<div class="encounter-roster">${chars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues,...equippedCombatInputs(c).issues];return `<label class="encounter-entry"><input type="checkbox" data-encounter-character="${esc(c.id)}" ${encounterSelection.has(c.id)?'checked':''}><span><strong>${esc(c.name)}</strong><small>${esc(c.kind||'PC')} · ${warnings.length?warnings.length+' upozornění k údajům':'bez upozornění k úplnosti údajů'}</small></span></label>`}).join('')}</div>`:'<p class="muted">Nejprve vytvořte postavy v registru.</p>'}
  <div class="equipment-summary"><div><strong>Vybráno</strong><span>${count} postav</span></div><div><strong>Chybějící evidenční údaje</strong><span>${issues} upozornění</span></div></div>
  <div class="actions"><button type="button" data-action="encounter-all" ${chars.length?'':'disabled'}>Vybrat všechny</button><button type="button" class="secondary" data-action="encounter-clear" ${count?'':'disabled'}>Zrušit výběr</button><button type="button" data-action="encounter-export" ${count?'':'disabled'}>Exportovat podklady JSON</button></div></section>
- ${selectedChars.length?`<section class="panel"><h3>Kontrola účastníků</h3>${selectedChars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues.map(x=>'Výbava: '+x),...equippedCombatInputs(c).issues.map(x=>'Combat: '+x)];return `<details class="encounter-details"><summary>${esc(c.name)} · ${warnings.length} upozornění</summary>${warnings.length?`<ul class="audit-list">${warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="muted">Evidenční kontrola bez upozornění; pravidlová správnost není potvrzena.</p>'}</details>${armourCoveragePanel(c)}${combatantLoadPanel(c)}${equippedCombatInputsPanel(c)}`}).join('')}</section>`:''}${combatClockPanel(selectedChars)}${taLedgerPanel(selectedChars)}${inClosePanel(selectedChars)}${specialStrikePreviewPanel(selectedChars)}${encounterImpactPreviewPanel(selectedChars)}${combatPersistentStatePanel(selectedChars)}${combatDraftHistoryPanel()}${combatContinuityPanel()}${combatReplayPanel()}${combatStateProjectionPanel()}${encounterShockFollowupPanel()}${encounterD100Panel()}${encounterShockMLPanel()}`;
+ ${selectedChars.length?`<section class="panel"><h3>Kontrola účastníků</h3>${selectedChars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues.map(x=>'Výbava: '+x),...equippedCombatInputs(c).issues.map(x=>'Combat: '+x)];return `<details class="encounter-details"><summary>${esc(c.name)} · ${warnings.length} upozornění</summary>${warnings.length?`<ul class="audit-list">${warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="muted">Evidenční kontrola bez upozornění; pravidlová správnost není potvrzena.</p>'}</details>${armourCoveragePanel(c)}${combatantLoadPanel(c)}${equippedCombatInputsPanel(c)}`}).join('')}</section>`:''}${initiativeSequencePanel(selectedChars)}${combatClockPanel(selectedChars)}${taLedgerPanel(selectedChars)}${inClosePanel(selectedChars)}${specialStrikePreviewPanel(selectedChars)}${encounterImpactPreviewPanel(selectedChars)}${combatPersistentStatePanel(selectedChars)}${combatDraftHistoryPanel()}${combatContinuityPanel()}${combatReplayPanel()}${combatStateProjectionPanel()}${encounterShockFollowupPanel()}${encounterD100Panel()}${encounterShockMLPanel()}`;
 }
 function editor(title,obj,kind){return `<div class="panel"><h2>${esc(title)}</h2><form id="${kind}-editor">${field('name','Název / jméno',obj.name||'')}${kind==='character'?`${field('occupation','Povolání',obj.occupation||'')}<label>Typ<select name="kind"><option>PC</option><option>NPC</option></select></label>${area('description','Popis',obj.description||'')}`:`<label>Kategorie<select name="category">${[['weapon','Zbraň'],['shield','Štít'],['armor','Zbroj'],['other','Ostatní předmět']].map(([v,l])=>`<option value="${v}" ${obj.category===v?'selected':''}>${l}</option>`).join('')}</select></label>${area('description','Popis',obj.description||'')}${field('source','Odkaz na zdroj (např. kapitola/strana)',obj.source||'')}${area('properties','Vlastní parametry JSON',JSON.stringify(obj.properties||{},null,2))}`}<div class="actions"><button type="submit">Uložit</button>${button('Zrušit','cancel-editor')}</div></form></div>`}
 let overlay=null;
@@ -1120,16 +1182,47 @@ document.addEventListener('click',e=>{
   persistTALedger(next);pendingMeleeTA=null;render();
  }catch(err){alert('TA: '+err.message)}
 });
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-action^="initiative-"]');if(!btn)return;
+ const action=btn.dataset.action;
+ try{
+  const seq=liveInitiativeSequence();
+  if(action==='initiative-start-turn')persistInitiativeSequence(startEncounterTurn(seq,combatSequenceStates()));
+  if(action==='initiative-next-round')persistInitiativeSequence(nextEncounterRound(seq,combatSequenceStates()));
+  if(action==='initiative-complete-concentration'){
+   if(!window.confirm('GM potvrdil nepřerušenou koncentraci po celý předepsaný čas?'))return;
+   persistInitiativeSequence(confirmConcentrationCompletion(seq,combatSequenceStates(),{actorId:btn.dataset.ownerId,gmConfirmed:true}));
+  }
+  if(action==='initiative-abandon-concentration'){
+   if(!window.confirm('GM potvrzuje přerušení/opuštění vícekolové akce?'))return;
+   persistInitiativeSequence(abandonEncounterConcentration(seq,{actorId:btn.dataset.ownerId,gmConfirmed:true}));
+  }
+  if(action==='initiative-finish-readied'){
+   if(!window.confirm('GM potvrzuje, že připravená akce opravdu proběhla a její výsledky byly vyhodnoceny?'))return;
+   persistInitiativeSequence(completeReadiedEncounterAction(seq,{gmConfirmed:true}));
+  }
+  if(action==='initiative-cancel-readied'){
+   if(!window.confirm('GM potvrzuje zrušení nevyužité připravené akce?'))return;
+   persistInitiativeSequence(cancelReadiedEncounterAction(seq,{actorId:btn.dataset.ownerId,gmConfirmed:true}));
+  }
+  if(action==='initiative-end-session'){
+   if(!window.confirm('Ukončit pouze pracovní pořadí tahů? Postavy a potvrzená zranění zůstanou zachována.'))return;
+   persistInitiativeSequence(null);
+  }
+  if(action==='initiative-export')downloadJSON({format:'hmk-initiative-session-v1',state:seq,confirmedCharacterStates:combatSequenceStates()},'hmk-initiative-turns.json');
+  render();
+ }catch(err){alert('Initiative: '+err.message)}
+});
 document.addEventListener('click',e=>{const t=e.target.closest('[data-action],[data-nav],[data-open],[data-copy],[data-archive],[data-remove-inv],[data-delete-log],[data-edit-item],[data-copy-item],[data-delete-item],[data-restore],[data-purge],[data-delete-character],[data-export-character]');if(!t)return;
 if(t.dataset.exportCharacter){if(storageReadOnly)return alert('Nečitelná data: použijte nouzovou zálohu.');try{const pkg=characterPackage(t.dataset.exportCharacter);downloadJSON(pkg,'hmk-postava-'+safeFilename(pkg.character.name)+'.json')}catch(err){alert(err.message)}return}
 if(t.dataset.action==='export-confirmed-combat'){downloadJSON({format:'hmk-confirmed-combat-export-v1',exportedAt:stamp(),participants:selectedEncounterCharacters().map(c=>({characterId:c.id,name:c.name,state:structuredClone(persistentStateOf(c))}))},'hmk-confirmed-combat-state.json');return}
-if(t.dataset.action==='combat-next-round'){const r=persistCombatClock({round:combatClock.round+1,actorId:''});if(!r.ok)return alert(r.reason);render();return}
+if(t.dataset.action==='combat-next-round'){if(combatInitiativeSequence)return alert('Nové kolo lze zahájit pouze přes řízené Initiative.');const r=persistCombatClock({round:combatClock.round+1,actorId:''});if(!r.ok)return alert(r.reason);render();return}
 if(t.dataset.action==='export-state-projection'){downloadJSON(combatStateProjectionReport(),'hmk-combat-state-projection-v68.json');return}
 if(t.dataset.action==='export-replay-audit'){downloadJSON(auditCombatReplay(combatDraftHistory),'hmk-combat-replay-audit.json');return}
 if(t.dataset.action==='export-continuity-audit'){downloadJSON(auditCombatContinuity(combatDraftHistory,data.characters.map(c=>c.id)),'hmk-combat-continuity-audit.json');return}
 if(t.dataset.action==='combat-clock-export'){downloadJSON(combatSessionExport(),'hmk-combat-session-preview.json');return}
-if(t.dataset.action==='encounter-all'){lastCombatEvent=null;encounterSelection=new Set(data.characters.map(c=>c.id));persistEncounterDraft();render();return}
-if(t.dataset.action==='encounter-clear'){lastCombatEvent=null;encounterSelection.clear();persistEncounterDraft();render();return}
+if(t.dataset.action==='encounter-all'){if(combatInitiativeSequence)return alert('Při aktivním Initiative nelze měnit sestavu účastníků.');lastCombatEvent=null;encounterSelection=new Set(data.characters.map(c=>c.id));persistEncounterDraft();render();return}
+if(t.dataset.action==='encounter-clear'){if(combatInitiativeSequence)return alert('Při aktivním Initiative nelze měnit sestavu účastníků.');lastCombatEvent=null;encounterSelection.clear();persistEncounterDraft();render();return}
 if(t.dataset.exportCombatHistoryEntry){const entry=combatDraftHistory.find(x=>x.id===t.dataset.exportCombatHistoryEntry);if(entry)downloadJSON(entry,'hmk-combat-event-'+safeFilename(entry.id)+'.json');return}
 if(t.dataset.action==='save-combat-draft'){
  if(!lastCombatEvent?.ok)return alert('Nejprve vyhodnoťte platný návrh události.');
@@ -1188,15 +1281,73 @@ document.addEventListener('submit',e=>{
 });
 document.addEventListener('submit',e=>{
  const f=e.target;
- if(!['confirm-combat-hit-form','combat-blood-loss-form','combat-blood-stoppage-form','combat-recovery-persistent-form','combat-fatigue-persistent-form','combat-wound-context-form'].includes(f.id))return;
+ if(!['combat-initiative-setup-form','combat-initiative-finish-form','combat-alertness-reaction-form','combat-initiative-tie-form'].includes(f.id)&&!f.classList?.contains('combat-readied-resolve-form'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const v=Object.fromEntries(new FormData(f));
+ try{
+  if(f.id==='combat-initiative-setup-form'){
+   if(v.gmConfirmed!=='yes')throw Error('GM nepotvrdil vstupy Initiative');
+   const chars=selectedEncounterCharacters();
+   const roster=chars.map(c=>({id:c.id,name:c.name,isPC:String(c.kind||'PC').toLowerCase()==='pc',initiativeML:v['ir_'+c.id]===''?null:Number(v['ir_'+c.id]),awarenessEML:v['aw_'+c.id]===''?null:Number(v['aw_'+c.id]),tieOrder:v['tie_'+c.id]===''?null:Number(v['tie_'+c.id]),alertness:v['alert_'+c.id]||'aware'}));
+   const seq=createEncounterSequence({roster,round:combatClock.round,timelineId:combatInjuryTimelineId});
+   if(!window.confirm('GM potvrzuje zahájení Initiative sekvence pro '+chars.length+' postav v kole '+seq.round+'?'))return;
+   persistInitiativeSequence(seq);
+  }else if(f.id==='combat-initiative-tie-form'){
+   const seq=liveInitiativeSequence();
+   persistInitiativeSequence(setEncounterTieOrder(seq,{actorId:v.actorId,tieOrder:Number(v.tieOrder),gmConfirmed:v.gmConfirmed==='yes'}));
+  }else if(f.id==='combat-alertness-reaction-form'){
+   const seq=liveInitiativeSequence();
+   if(v.gmConfirmed!=='yes')throw Error('GM nepotvrdil Reaction');
+   persistInitiativeSequence(confirmAlertnessReaction(seq,combatSequenceStates(),{actorId:v.actorId,roll:Number(v.roll),immediateAlert:v.immediateAlert==='yes',gmConfirmed:true}));
+  }else if(f.id==='combat-initiative-finish-form'){
+   const seq=liveInitiativeSequence();
+   if(!window.confirm('GM potvrzuje skutečný konec tahu '+(data.characters.find(c=>c.id===currentEncounterActor(seq))?.name||'')+'?'))return;
+   persistInitiativeSequence(finishEncounterTurn(seq,combatSequenceStates(),{action:v.action,durationRounds:v.durationRounds===''?null:Number(v.durationRounds),readiedAction:v.readiedAction||null,gmConfirmed:true}));
+  }else{
+   const seq=liveInitiativeSequence();
+   if(!window.confirm('GM potvrdil skutečný okamžik vyvolání připravené akce?'))return;
+   persistInitiativeSequence(resolveReadiedEncounterAction(seq,{actorId:v.actorId,interruptIR:Number(v.interruptIR),moveHalfConfirmed:v.moveHalfConfirmed==='yes',gmConfirmed:true}));
+  }
+  render();
+ }catch(err){alert('Initiative: '+err.message)}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;
+ if(!['combat-encounter-start-form','confirm-combat-hit-form','combat-blood-loss-form','combat-blood-stoppage-form','combat-recovery-persistent-form','combat-extended-course-form','combat-coma-course-form','combat-fatigue-persistent-form','combat-wound-context-form','combat-injury-mishap-form','combat-injury-morale-form','combat-special-aftermath-form','combat-morale-reaction-form','combat-brave-expiry-form'].includes(f.id))return;
  e.preventDefault();e.stopImmediatePropagation();
  const v=Object.fromEntries(new FormData(f)),round=combatClock.round,eventId=uuid();
+ if(f.id==='combat-encounter-start-form'){
+  try{
+   if(v.gmConfirmed!=='yes'||round!==1)throw Error('GM musí potvrdit začátek a ručně nastavit kolo 1');
+   const chars=selectedEncounterCharacters();if(!chars.length)throw Error('Vyberte účastníky nového střetnutí');
+   // Preflight the entire roster before writing even one participant.
+   const planned=chars.map(c=>({id:c.id,after:beginConfirmedEncounter({state:persistentStateOf(c),eventId:`encounter:${combatInjuryTimelineId}:${c.id}`,timelineId:combatInjuryTimelineId,gmConfirmed:true}).state}));
+   if(!window.confirm('Potvrdit nový boj pro '+chars.length+' postav? Staré rány a Fatigue zůstanou zachovány.'))return;
+   if(mutate(()=>{for(const x of planned){const actual=character(x.id);if(!actual)throw Error('Účastník zmizel před zápisem');synchronizeCombatInjuries(actual,x.after);}})){lastCombatEvent=null;if(combatInitiativeSequence)persistInitiativeSequence(null);}
+  }catch(err){alert('Nové střetnutí nebylo zahájeno: '+err.message)}
+  return;
+ }
  let c=null,transition=null;
  try{
   if(f.id==='confirm-combat-hit-form'){
    const draft=confirmableCombatDraft(lastCombatEvent);c=character(draft.target.id);
+   if(combatInitiativeSequence&&draft.schedulerActorId!==currentEncounterActor(liveInitiativeSequence()))throw Error('Zásah pochází z jiného tahu; je nutný nový výpočet');
+   if(combatInitiativeSequence)assertScheduledHitCanCommit(liveInitiativeSequence(),draft.schedulerActorId);
    transition=applyConfirmedHit({state:persistentStateOf(c),characterId:c.id,draft,round,eventId,
-    adjudication:{gmReviewed:v.gmReviewed==='yes',compoundReviewed:v.compoundReviewed==='yes',compoundD10:v.compoundD10===''?null:Number(v.compoundD10),bleeding:v.bleeding==='yes'?true:v.bleeding==='no'?false:null,side:v.injuredSide||null,timelineId:combatInjuryTimelineId}});
+    adjudication:{gmReviewed:v.gmReviewed==='yes',compoundReviewed:v.compoundReviewed==='yes',compoundD10:v.compoundD10===''?null:Number(v.compoundD10),bleeding:v.bleeding==='yes'?true:v.bleeding==='no'?false:null,side:v.injuredSide||null,timelineId:combatInjuryTimelineId,amputationStrengthML:v.amputationStrengthML===''?null:Number(v.amputationStrengthML),amputationRoll:v.amputationRoll===''?null:Number(v.amputationRoll),amputationIsFolk:v.amputationBeast!=='yes',shockML:v.shockML===''?null:Number(v.shockML),shockRoll:v.shockRoll===''?null:Number(v.shockRoll),arrowOrBolt:v.arrowOrBolt==='yes'}});
+  }else if(f.id==='combat-injury-mishap-form'||f.id==='combat-injury-morale-form'){
+   const raw=String(v.mishap||v.wound||''),separator=raw.indexOf('::');if(separator<1)throw Error('Neplatné ID speciální události');
+   c=character(raw.slice(0,separator));if(!c||!encounterSelection.has(c.id))throw Error('Postava není ve střetnutí');
+   const s=persistentStateOf(c),reference=raw.slice(separator+2);
+   transition=f.id==='combat-injury-mishap-form'?applyConfirmedInjuryMishap({state:s,round,eventId,mishapId:reference,baseML:v.baseML===''?null:Number(v.baseML),roll:v.roll===''?null:Number(v.roll),hasDEX:v.hasDEX==='yes',actionUsesDEX:v.hasDEX==='yes',hasLegs:v.hasLegs==='yes',gmConfirmed:v.gmConfirmed==='yes'}):
+    applyConfirmedInjuryMorale({state:s,round,eventId,woundId:reference,initiativeML:Number(v.initiativeML),roll:Number(v.roll),aberrance:Number(v.aberrance),timelineId:combatInjuryTimelineId,gmConfirmed:v.gmConfirmed==='yes'});
+  }else if(f.id==='combat-special-aftermath-form'){
+   c=character(v.characterId);if(!c||!encounterSelection.has(c.id))throw Error('Postava není ve střetnutí');
+   transition=applyConfirmedSpecialAftermath({state:persistentStateOf(c),round,eventId,kind:v.kind,gmConfirmed:v.gmConfirmed==='yes',actualEndOfTurn:v.actualEndOfTurn==='yes',threatened:v.threatened==='yes',meleeML:v.meleeML===''?null:Number(v.meleeML),meleeRoll:v.meleeRoll===''?null:Number(v.meleeRoll)});
+  }else if(f.id==='combat-morale-reaction-form'||f.id==='combat-brave-expiry-form'){
+   c=character(v.characterId);if(!c||!encounterSelection.has(c.id))throw Error('Postava není ve střetnutí');
+   transition=f.id==='combat-morale-reaction-form'?applyConfirmedMoraleReaction({state:persistentStateOf(c),round,eventId,characterId:c.id,actorId:combatClock.actorId,turnEnded:v.turnEnded==='yes',initiativeML:Number(v.initiativeML),roll:Number(v.roll),elapsedSafeMinutes:v.elapsedSafeMinutes===''?null:Number(v.elapsedSafeMinutes),safeOutOfLOS:v.safeOutOfLOS==='yes',unthreatened:v.unthreatened==='yes',timelineId:combatInjuryTimelineId,gmConfirmed:v.gmConfirmed==='yes'}):
+    applyConfirmedBraveExpiry({state:persistentStateOf(c),round,eventId,gmConfirmed:v.gmConfirmed==='yes',elapsedMinutes:v.elapsedMinutes===''?null:Number(v.elapsedMinutes),timelineId:combatInjuryTimelineId});
   }else if(f.id==='combat-wound-context-form'){
    const raw=String(v.wound||''),separator=raw.indexOf('::');if(separator<1)throw Error('Neplatné ID rány');
    c=character(raw.slice(0,separator));if(!c||!encounterSelection.has(c.id))throw Error('Postava není v tomto střetnutí');
@@ -1208,10 +1359,17 @@ document.addEventListener('submit',e=>{
    transition=f.id==='combat-blood-loss-form'?applyConfirmedBloodLoss({state:persistentStateOf(c),round,eventId,woundId,sl:v.sl}):applyConfirmedBloodStoppage({state:persistentStateOf(c),round,eventId,woundId,sl:v.sl,advanceSL:v.advanceSL||null});
   }else{
    c=character(v.characterId);if(!c||!encounterSelection.has(c.id))throw Error('Postava není účastníkem střetnutí');
-   transition=f.id==='combat-recovery-persistent-form'?applyConfirmedShockRecovery({state:persistentStateOf(c),round,eventId,sl:v.sl,timingConfirmed:v.timingConfirmed==='yes'}):applyConfirmedFatigue({state:persistentStateOf(c),round,eventId,kind:v.kind,delta:Number(v.delta)});
+   if(f.id==='combat-recovery-persistent-form'&&combatInitiativeSequence&&['STN','INC'].includes(persistentStateOf(c).shock)&&v.turnEnded==='yes'&&currentEncounterActor(liveInitiativeSequence())!==c.id)throw Error('Shock na konci tahu lze při Initiative potvrdit jen pro právě jednající postavu');
+   if(f.id==='combat-recovery-persistent-form')transition=applyConfirmedShockRecovery({state:persistentStateOf(c),round,eventId,sl:v.sl,timingConfirmed:v.timingConfirmed==='yes',characterId:c.id,actorId:combatClock.actorId,turnEnded:v.turnEnded==='yes',timelineId:combatInjuryTimelineId,elapsedMinutesSinceOriginal:v.elapsedMinutes===''?null:Number(v.elapsedMinutes),comaLocationShock:v.comaLocationShock===''?null:Number(v.comaLocationShock),comaInjuryLevel:v.comaInjuryLevel===''?null:Number(v.comaInjuryLevel),initialComaD10:v.initialComaD10===''?null:Number(v.initialComaD10),shockML:Number(v.shockML),roll:Number(v.roll)});
+   else if(f.id==='combat-extended-course-form')transition=applyExtendedShockCourse({state:persistentStateOf(c),round,eventId,healingBase:Number(v.healingBase),roll:Number(v.roll),physicianStars:Number(v.physicianStars),arcaneBonus:Number(v.arcaneBonus),elapsedHoursSinceOnset:Number(v.elapsedHoursSinceOnset),gmConfirmed:v.gmConfirmed==='yes'});
+   else if(f.id==='combat-coma-course-form')transition=applyComaCourse({state:persistentStateOf(c),round,eventId,healingBase:Number(v.healingBase),roll:Number(v.roll),periodD10:Number(v.periodD10),daysElapsed:Number(v.daysElapsed),restfulShelter:v.restfulShelter==='yes',arcaneBonus:Number(v.arcaneBonus),gmConfirmed:v.gmConfirmed==='yes'});
+   else transition=applyConfirmedFatigue({state:persistentStateOf(c),round,eventId,kind:v.kind,delta:Number(v.delta)});
   }
-  if(!window.confirm(`Opravdu trvale zapsat ${f.id==='confirm-combat-hit-form'?'zásah':f.id==='combat-blood-loss-form'?'ztrátu krve':f.id==='combat-blood-stoppage-form'?'ošetření':f.id==='combat-recovery-persistent-form'?'zotavení':'únavu'} postavě ${c.name} v kole ${round}?`))return;
-  if(mutate(()=>synchronizeCombatInjuries(c,transition.state)))lastCombatEvent=null;
+  if(!window.confirm(`Opravdu trvale zapsat ${f.id==='confirm-combat-hit-form'?'zásah':f.id==='combat-blood-loss-form'?'ztrátu krve':f.id==='combat-blood-stoppage-form'?'ošetření':f.id==='combat-recovery-persistent-form'?'zotavení':f.id==='combat-extended-course-form'?'Extended Shock Course':f.id==='combat-coma-course-form'?'Coma Course':'únavu'} postavě ${c.name} v kole ${round}?`))return;
+  if(mutate(()=>synchronizeCombatInjuries(c,transition.state))){
+   if(f.id==='confirm-combat-hit-form'&&combatInitiativeSequence)persistInitiativeSequence(recordScheduledHitCommit(liveInitiativeSequence(),{actorId:lastCombatEvent?.schedulerActorId,gmConfirmed:true}));
+   lastCombatEvent=null;
+  }
  }catch(err){alert('Bojový stav nebyl změněn: '+err.message)}
 },true);
 document.addEventListener('submit',e=>{
@@ -1258,14 +1416,26 @@ if(e.target.id==='shock-ml-form'){
  const v=Object.fromEntries(new FormData(e.target));let target=selectedEncounterCharacters().find(c=>c.id===v.characterId);
  const output=document.getElementById('impact-preview-result');if(!output)return;
  if(!target){output.textContent='Zvolený účastník již není ve střetnutí.';return;}
+ if(combatInitiativeSequence){try{const q=liveInitiativeSequence();assertScheduledMeleeActor(q,v.attackerId);assertScheduledHitCanCommit(q,v.attackerId);}catch(err){output.textContent='Initiative: '+err.message;return;}}
  if(target.hmk?.combatState&&v.previousState!==target.hmk.combatState.shock){output.textContent='Předchozí Shock musí odpovídat potvrzenému stavu '+target.hmk.combatState.shock+'. Přepněte volbu a proveďte nový výpočet.';return;}
  if(target.hmk?.combatState?.shock==='KIA'){output.textContent='Cíl již má potvrzený KIA stav.';return;}
  let weaponStrike=null;let meleeGate=null;let actualStriker=null;let originalDefenderId=target.id;let preparedSetupLedger=null;let attackerLoad=null;let defenderLoad=null;
  if(v.impactSource==='melee'){
   const attacker=selectedEncounterCharacters().find(c=>c.id===v.attackerId);
   if(!attacker||attacker.id===target.id){output.textContent='Vyberte odlišného útočníka ze střetnutí.';return;}
+  if(combatInitiativeSequence){try{assertScheduledMeleeActor(liveInitiativeSequence(),attacker.id)}catch(err){output.textContent='Initiative: '+err.message;return;}}
+  if(attacker.hmk?.combatState?.coma?.active){output.textContent='Útočník je v potvrzeném Coma a nesmí jednat (HMK str.179).';return;}
+  if(combatInitiativeSequence&&ongoingEncounterConcentration(liveInitiativeSequence(),attacker.id)){output.textContent='Útočník je ve vícekolové koncentraci; musí ji nejprve dokončit nebo opustit (HMK str.160).';return;}
+  if(combatInitiativeSequence&&v.defence!=='ignore'&&ongoingEncounterConcentration(liveInitiativeSequence(),target.id)){output.textContent='Obránce se soustředí na vícekolovou akci a musí Ignore, dokud ji výslovně neopustí (HMK str.160).';return;}
   if(['INC','UNC','KIA'].includes(attacker.hmk?.combatState?.shock)){output.textContent='Útočník je podle potvrzeného stavu '+attacker.hmk.combatState.shock+' a nemůže provést samostatnou Melee akci.';return;}
+  if(v.defence!=='ignore'&&target.hmk?.combatState?.coma?.active){output.textContent='Obránce je v Coma a nemůže zvolit aktivní obranu.';return;}
   if(v.defence!=='ignore'&&['INC','UNC','KIA'].includes(target.hmk?.combatState?.shock)){output.textContent='Obránce je podle potvrzeného stavu '+target.hmk.combatState.shock+' a nemůže provést aktivní obrannou akci. Zvolte odpovídající řešení podle HMK.';return;}
+  const attackerSpecial=specialActionReadiness(persistentStateOf(attacker),{role:'attacker'});
+  if(!attackerSpecial.ready){output.textContent='Útočník: '+attackerSpecial.reason;return;}
+  const defenderSpecial=specialActionReadiness(persistentStateOf(target),{role:'defender',defence:v.defence});
+  if(!defenderSpecial.ready){output.textContent='Obránce: '+defenderSpecial.reason;return;}
+  if(persistentStateOf(attacker).posture?.prone)v.attackerProne='yes';
+  if(persistentStateOf(target).posture?.prone)v.defenderProne='yes';
   attackerLoad=resolveCombatantLoad({character:attacker,inventory:data.inventory,mounted:v.attackerMounted==='yes',bulkConfirmation:parsePrintedBulkConfirmation(v.attackerBulkZones)});
   defenderLoad=resolveCombatantLoad({character:target,inventory:data.inventory,mounted:v.defenderMounted==='yes',bulkConfirmation:parsePrintedBulkConfirmation(v.defenderBulkZones)});
   if(!attackerLoad.ready||(v.defence!=='ignore'&&!defenderLoad.ready)){
@@ -1381,6 +1551,7 @@ if(e.target.id==='shock-ml-form'){
  const coverage={[v.location]:{complete:true,av:{[v.aspect]:resolved.armourValue}}};
  const draft=buildCombatEventDraft(target,v.location,v.aspect,Number(rawImpact),Number(rawAR),resolved.rigidStatus,
   Number(rawLocationShock),v.shockLevel,compoundRaw?Number(compoundRaw):null,v.previousState,coverage);
+ if(draft.ok&&combatInitiativeSequence)draft.schedulerActorId=currentEncounterActor(liveInitiativeSequence());
  if(draft.ok&&weaponStrike)draft.weaponStrike={...weaponStrike,inventoryId:v.weaponInventoryId};
  if(draft.ok&&meleeGate)draft.attackDefence={...meleeGate,attackerId:v.attackerId,defenderId:originalDefenderId,actualStrikerId:actualStriker.id,actualTargetId:target.id};
  if(draft.ok){
@@ -1448,7 +1619,7 @@ document.addEventListener('change',async e=>{if(e.target.closest?.('#impact-prev
   }catch(err){alert('Import katalogu selhal: '+err.message)}finally{e.target.value=''}
   return;
  }
- if(e.target.id==='import-file'){const f=e.target.files?.[0];if(!f)return;try{if(f.size>10*1024*1024)throw Error('Záloha přesahuje limit 10 MB');const baselineBeforeImport=storageBaseline;const imported=validate(JSON.parse(await f.text()));if(localStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');if(storageReadOnly)throw Error('Import je zablokován kvůli nečitelným původním datům.');if(!ask('Import nahradí všechna současná data. Máte uloženou aktuální JSON zálohu? Pokračovat?'))return;const old=data;data=imported;if(!save()){data=old;render();throw Error('Úložiště odmítlo zápis; původní data zůstala zachována')}selected=null;encounterSelection.clear();persistEncounterDraft();view='characters';notice='Import byl dokončen.';render()}catch(err){alert('Neplatný soubor zálohy: '+err.message)}}});
+ if(e.target.id==='import-file'){const f=e.target.files?.[0];if(!f)return;try{if(f.size>10*1024*1024)throw Error('Záloha přesahuje limit 10 MB');const baselineBeforeImport=storageBaseline;const imported=validate(JSON.parse(await f.text()));if(localStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');if(storageReadOnly)throw Error('Import je zablokován kvůli nečitelným původním datům.');if(!ask('Import nahradí všechna současná data. Máte uloženou aktuální JSON zálohu? Pokračovat?'))return;const old=data;data=imported;if(!save()){data=old;render();throw Error('Úložiště odmítlo zápis; původní data zůstala zachována')}selected=null;encounterSelection.clear();persistEncounterDraft();if(combatInitiativeSequence)persistInitiativeSequence(null);view='characters';notice='Import byl dokončen.';render()}catch(err){alert('Neplatný soubor zálohy: '+err.message)}}});
 render();
 
 
@@ -1559,7 +1730,7 @@ document.addEventListener('submit',e=>{const f=e.target;if(!['hmk-profile-form',
   try{props.locationProtection=parseLocationProtection(v.locationProtection)}catch(err){return alert(err.message)}
  }
  const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties:props};if(mutate(()=>{if(current)Object.assign(current,record);else data.items.push(record)})){overlay=null;render()}return}const c=character(selected);if(!c)return;const h=structuredClone(c.hmk||{});if(f.id==='hmk-profile-form'){const a={...(h.attributes||{})};for(const [k,val] of Object.entries(v)){if(k==='bio_creatureSizeReachModifier'){if(val==='')delete h.creatureSizeReachModifier;else if(!/^-?\d+$/.test(String(val))||!Number.isSafeInteger(Number(val)))return alert('Neplatný modifikátor Creature Size');else h.creatureSizeReachModifier=Number(val);}else if(k.startsWith('bio_'))h[k.slice(4)]=val;if(k.startsWith('attr_')){if(val==='')delete a[k.slice(5)];else{const n=Number(val);if(!Number.isSafeInteger(n)||n<0||n>999)return alert('Neplatná charakteristika');a[k.slice(5)]=n}}}mutate(()=>{c.hmk={...h,attributes:a}});return}if(f.id==='hmk-skill-form'){if(!String(v.name||'').trim())return alert('Zadejte název dovednosti');const skill={id:uuid(),group:v.group,name:v.name.trim(),sb:v.sb===''?null:Number(v.sb),ml:v.ml===''?null:Number(v.ml)};if([skill.sb,skill.ml].some(n=>n!==null&&(!Number.isSafeInteger(n)||n<0||n>999)))return alert('Neplatné SB/ML');mutate(()=>{c.hmk={...h,skills:[...(h.skills||[]),skill]}});return}if(f.id==='hmk-injury-form'){if(!String(v.location||'').trim())return alert('Zadejte lokalitu');mutate(()=>{c.hmk={...h,injuries:[...(h.injuries||[]),{id:uuid(),location:v.location,description:v.description||'',severity:v.severity||''}]}})}},true);
-document.addEventListener('change',e=>{const id=e.target?.dataset?.encounterCharacter;if(!id)return;if(!data.characters.some(c=>c.id===id))return;if(e.target.checked)encounterSelection.add(id);else encounterSelection.delete(id);persistEncounterDraft();render()});
+document.addEventListener('change',e=>{const id=e.target?.dataset?.encounterCharacter;if(!id)return;if(combatInitiativeSequence){e.target.checked=encounterSelection.has(id);return alert('Nejprve ukončete Initiative sekvenci; účastníky v jejím průběhu nelze tiše změnit.');}if(!data.characters.some(c=>c.id===id))return;if(e.target.checked)encounterSelection.add(id);else encounterSelection.delete(id);persistEncounterDraft();render()});
 document.addEventListener('click',e=>{const t=e.target.closest('[data-remove-skill],[data-remove-injury]');if(!t)return;const c=character(selected);if(!c||!window.confirm('Odstranit tento záznam?'))return;const key=t.dataset.removeSkill?'skills':'injuries';const id=t.dataset.removeSkill||t.dataset.removeInjury;if(key==='injuries'&&c.hmk?.combatState?.wounds?.some(w=>w.id===id))return alert('Potvrzenou bojovou ránu nelze vymazat mimo pravidlové zotavení.');mutate(()=>{c.hmk=c.hmk||{};c.hmk[key]=(c.hmk[key]||[]).filter(x=>x.id!==id)})});
 
 // v21: independent catalogue exchange. Never import character data or overwrite definitions.
