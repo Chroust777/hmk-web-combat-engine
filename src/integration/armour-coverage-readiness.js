@@ -16,6 +16,14 @@ export function validateArmourCoverage(article){
  }
  if(!Array.isArray(article.bodyZones)||!article.bodyZones.length)issues.push('missing body-zone classification');
  else if(article.bodyZones.some(x=>!['head','arms','torso','legs'].includes(x)))issues.push('invalid body zone');
+ if(!article.layerZoneByLocation||typeof article.layerZoneByLocation!=='object'||Array.isArray(article.layerZoneByLocation))issues.push('missing per-location layering zone map');
+ else if(Array.isArray(article.coveredLocations)){
+  const zoneMap=article.layerZoneByLocation;
+  const zoneKeys=Object.keys(zoneMap);
+  if(zoneKeys.length!==article.coveredLocations.length||zoneKeys.some(k=>!article.coveredLocations.includes(k)))issues.push('layering zone map does not match covered locations');
+  if(zoneKeys.some(k=>!['head','arms','torso','legs'].includes(zoneMap[k])))issues.push('invalid per-location layering zone');
+  if(Array.isArray(article.bodyZones)&&([...new Set(Object.values(zoneMap))].sort().join('|')!==[...new Set(article.bodyZones)].sort().join('|')))issues.push('per-location zones conflict with article body zones');
+ }
  if(!['none','front-only','rear-only','special'].includes(article.directionRestriction))issues.push('directional coverage not verified');
  if(typeof article.rigid!=='boolean')issues.push('rigid flag not verified');
  if(!article.coverageMarkers||typeof article.coverageMarkers!=='object'||Array.isArray(article.coverageMarkers))issues.push('missing per-location coverage markers');

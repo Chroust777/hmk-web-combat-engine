@@ -36,3 +36,17 @@ export function availableTACredits(ledger,{ownerId,round,ir,type}){
  validateTALedger(ledger);
  return ledger.credits.filter(c=>c.ownerId===ownerId&&c.type===type&&!c.used&&round>=c.round&&(type==='action'?round===c.round:round<c.round+1||(round===c.round+1&&ir>=c.ir)));
 }
+
+/** Prepare a Setup TA spend without mutating the ledger; commit only after test resolution. */
+export function prepareSetupSpend(ledger,{ids=[],ownerId,round,ir}={}){
+ validateTALedger(ledger);
+ if(!Array.isArray(ids)||ids.length>3||new Set(ids).size!==ids.length)throw new Error('Invalid Setup TA selection');
+ if(!Number.isSafeInteger(round)||round<1||!Number.isSafeInteger(ir)||ir<0||ir>100)throw new Error('Invalid combat clock');
+ let next=ledger;
+ for(const id of ids){
+  const c=next.credits.find(c=>c.id===id&&c.ownerId===ownerId);
+  if(!c||c.type!=='setup')throw new Error('Setup TA belongs to another character or is not Setup');
+  next=spendTACredit(next,{id,ownerId,round,ir,turnKey:'setup:'+id});
+ }
+ return {count:ids.length,next};
+}

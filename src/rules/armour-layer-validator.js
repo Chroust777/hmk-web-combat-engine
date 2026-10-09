@@ -1,5 +1,6 @@
 /** Conservative HMK p.117 layer diagnostics. An unordered inventory is never certified. */
 import {ARMOUR_LAYER_COLUMNS} from './armour-layer-reference.js';
+import {validateLayerZoneMap,articleCoversZone,zoneLocations,articleCoversZoneLocation} from '../integration/armour-layer-zone-map.js';
 const CODE={cloth:'C',leather:'L',padded:'D',quilted:'Q',gambeson:'G',kurbul:'K',scale:'S',mail:'M',plate:'P'};
 const FAR_NAMES=new Set(['cloak','mantle','vest','surcoat','coat','robe','cuisse','cuisses']);
 const ZONES=['head','arms','torso','legs'];
@@ -31,18 +32,19 @@ export function validateArmourLayers(articles){
   if(typeof a?.name!=='string'||!a.name.trim())errors.push(`Invalid armour article name ${a?.id??'unknown'}`);
   if(Array.isArray(a?.coveredLocations)&&new Set(a.coveredLocations).size!==a.coveredLocations.length)errors.push(`Duplicate anatomical location in ${a?.id??'unknown'}`);
   if(Array.isArray(a?.bodyZones)&&new Set(a.bodyZones).size!==a.bodyZones.length)errors.push(`Duplicate body zone in ${a?.id??'unknown'}`);
-  if(!CODE[a?.material]||!Array.isArray(a?.bodyZones)||!Array.isArray(a?.coveredLocations)||!a.coveredLocations.length||!a.bodyZones.length||a.bodyZones.some(z=>!ZONES.includes(z))||a.coveredLocations.some(l=>!LOCATIONS.has(l)))errors.push(`Invalid armour article ${a?.id??'unknown'}`);
+  if(!CODE[a?.material]||validateLayerZoneMap(a))errors.push(`Invalid armour article or layer-zone map ${a?.id??'unknown'}`);
  }
  if(errors.length)return {valid:false,errors,warnings,zoneResults,combatReady:false};
  for(const zone of ZONES){
-  const group=articles.filter(a=>a.bodyZones.includes(zone));
+  const group=articles.filter(a=>articleCoversZone(a,zone));
   if(!group.length)continue;
-  // The p.117 restriction applies separately to body zone AND location. Articles
-  // on distinct locations must not be forced into the same five layer stack.
-  const locations=[...new Set(group.flatMap(a=>a.coveredLocations))];
+  // HMK p.117: zone-level limits include non-overlapping articles.
+  if(group.length>5)errors.push(`${zone}: exceeds five articles in Body Zone`);
+  if(group.filter(a=>['D','Q'].includes(CODE[a.material])).length>1)warnings.push(`${zone}: multiple D/Q articles in Body Zone; review required`);
+  const locations=zoneLocations(group,zone);
   const locationResults={};
   for(const location of locations){
-   const stack=group.filter(a=>a.coveredLocations.includes(location));
+   const stack=group.filter(a=>articleCoversZoneLocation(a,zone,location));
    if(stack.length>5)errors.push(`${zone}/${location}: exceeds five layers`);
    if(stack.filter(a=>['D','Q'].includes(CODE[a.material])).length>1)warnings.push(`${zone}/${location}: multiple padded/quilted articles; review required`);
    const plausible=plausibleArrangement(stack,zone);
