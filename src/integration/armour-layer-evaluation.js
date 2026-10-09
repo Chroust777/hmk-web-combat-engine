@@ -69,6 +69,8 @@ export function evaluateOrderedArmour(articles,{bulkExceptionByZone={},slotByArt
  }
  if(errors.length)return {status:'invalid',errors,unresolved,zoneReports,locationReports,bulkPenalty:0,extraEnc:0,combatReady:false};
  let bulkPenalty=0,extraEnc=0;
+ const slotCandidatesByZone=new Map();
+ const matchSetsByZone=new Map();
  const extraEncIds=new Set();
  for(const [zone,locs] of Object.entries(ZONES)){
   const zoneArticles=prepared.filter(a=>relevantZones(a).includes(zone));
@@ -76,12 +78,17 @@ export function evaluateOrderedArmour(articles,{bulkExceptionByZone={},slotByArt
   if(candidate!==undefined && (typeof candidate!=='string'||!zoneArticles.some(a=>a.id===candidate&&['C','D'].includes(a.code))))errors.push(`Invalid Bulk exception in ${zone}`);
   const excluded=zoneArticles.filter(a=>a.id===candidate);
   const standard=zoneArticles.filter(a=>a.id!==candidate);
-  let originalViolations=zoneArticles.filter(a=>['D','Q'].includes(a.code)).length>1;
+  const dqViolation=zoneArticles.filter(a=>['D','Q'].includes(a.code)).length>1;
+  let originalViolations=dqViolation;
+  let candidateInViolation=dqViolation&&excluded.some(a=>a.code==='D');
   for(const loc of locs){
    const full=prepared.filter(a=>a.coveredLocations.includes(loc));
-   if(full.length>5)originalViolations=true;
+   if(full.length>5){originalViolations=true;if(full.some(a=>a.id===candidate))candidateInViolation=true;}
    if(full.length&&full.every(a=>Number.isSafeInteger(a.layerOrder))&&new Set(full.map(a=>a.layerOrder)).size===full.length){
-    if(!matchesFor([...full].sort((a,b)=>a.layerOrder-b.layerOrder),zone).length)originalViolations=true;
+    if(!matchesFor([...full].sort((a,b)=>a.layerOrder-b.layerOrder),zone).length){
+     originalViolations=true;
+     if(full.some(a=>a.id===candidate))candidateInViolation=true;
+    }
    }
   }
   const dq=standard.filter(a=>['D','Q'].includes(a.code));
@@ -100,18 +107,54 @@ export function evaluateOrderedArmour(articles,{bulkExceptionByZone={},slotByArt
    const matches=possible.filter(m=>m.every(entry=>slotByArticleId[entry.id]===undefined||slotByArticleId[entry.id]===entry.slot));
    if(!matches.length)zoneErrors.push(`${location}: forbidden material order or incompatible explicit slot`);
    else {
-    const minExtra=Math.min(...matches.map(m=>m.reduce((n,s)=>n+s.extraEnc,0)));
-    const encSignatures=new Set(matches.map(m=>m.filter(s=>s.extraEnc).map(s=>s.id).sort().join('|')));
-    if(encSignatures.size>1)unresolved.push(`${zone}/${location}: ambiguous ENC from last over column; supply slotByArticleId`);
-    else for(const item of matches[0])if(item.extraEnc)extraEncIds.add(item.id);
+    // A single physical article cannot occupy mutually exclusive table columns
+    // at two different anatomical locations within the same body zone.
+    const candidateMap=slotCandidatesByZone.get(zone)??new Map();
+    for(const a of ordered){
+     const available=new Set(matches.flatMap(m=>m.filter(x=>x.id===a.id).map(x=>x.slot)));
+     const prior=candidateMap.get(a.id);
+     candidateMap.set(a.id,prior?new Set([...prior].filter(x=>available.has(x))):available);
+    }
+    slotCandidatesByZone.set(zone,candidateMap);
+    const zoneMatches=matchSetsByZone.get(zone)??[];
+    zoneMatches.push({location,matches});
+    matchSetsByZone.set(zone,zoneMatches);
    }
    locationReports.push({zone,location,status:matches.length?'compatible':'violation',matches:matches.length,articleIds:ordered.map(a=>a.id)});
+  }
+  for(const [id,slots] of slotCandidatesByZone.get(zone)??[]){
+   if(!slots.size)zoneErrors.push(`Article ${id} has incompatible layer slots across locations`);
+  }
+  // A common slot per article is necessary but not sufficient: choices for
+  // different articles can be correlated within each location. Solve all
+  // location assignments together instead of accepting independent matches.
+  const matchSets=matchSetsByZone.get(zone)??[];
+  let states=[new Map()];
+  for(const {matches} of matchSets){
+   const next=[];
+   const unique=new Set();
+   for(const state of states)for(const match of matches){
+    if(match.some(x=>state.has(x.id)&&state.get(x.id)!==x.slot))continue;
+    const merged=new Map(state);
+    for(const entry of match)merged.set(entry.id,entry.slot);
+    const signature=[...merged].sort(([a],[b])=>a.localeCompare(b)).map(([id,slot])=>`${id}:${slot}`).join('|');
+    if(!unique.has(signature)){unique.add(signature);next.push(merged);}
+   }
+   states=next;
+   if(!states.length)break;
+  }
+  if(matchSets.length&&!states.length)zoneErrors.push('No globally consistent layer-slot assignment across locations');
+  if(states.length){
+   const signatures=new Set(states.map(state=>[...state].filter(([id,slot])=>slot==='overFar'&&standard.some(a=>a.id===id&&['D','Q'].includes(a.code))).map(([id])=>id).sort().join('|')));
+   if(signatures.size>1)unresolved.push(`${zone}: ambiguous ENC from last over column; supply slotByArticleId`);
+   else for(const id of (signatures.values().next().value||'').split('|').filter(Boolean))extraEncIds.add(id);
   }
   if(candidate!==undefined){
    // Exception may only be applied when the nominated C/D article actually violates
    // a printed restriction; a GM cannot arbitrarily declare a compliant piece bulky.
    if(zoneErrors.length)errors.push(`${zone}: selected Bulk exception does not repair remaining restrictions`);
    if(!originalViolations)errors.push(`${zone}: Bulk exception selected without a proven violation`);
+   if(!candidateInViolation)errors.push(`${zone}: Bulk article is not involved in any proven violation`);
    const affected=locs.some(l=>excluded.some(a=>a.coveredLocations.includes(l)));
    if(!affected)errors.push(`${zone}: Bulk article does not cover this zone`);
    if(affected)bulkPenalty-=5;

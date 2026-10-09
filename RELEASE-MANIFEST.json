@@ -1,14 +1,17 @@
 {
-  "version": "88",
-  "previousVersion": "87",
+  "version": "92",
+  "previousVersion": "91",
+  "releaseType": "reconstructed-checkpoint-plus-printed-matrices",
   "changes": [
-    "Fail-closed armour-layer validation for null, scalar, and array article records",
-    "Reject unknown Bulk body-zone keys instead of silently ignoring them",
-    "Two new regression tests; no storage schema changes"
+    "Rebuilt full source baseline from v88 and official incremental updates v89–v91",
+    "Added independent checkpoint assertions for 12 printed suits, crosswalk and ENC/Perception",
+    "Version marker updated to v92",
+    "Restored all 12 printed numerical B/E/P/F matrices (180 locations, 720 cells) from HMK pp.113–116; preserves printed dots and refuses to infer Rigid"
   ],
   "limitations": [
-    "Physical order not supplied by printed suits; not certified",
-    "No automatic equip or combat armour integration",
-    "p.119 exhaustive combinations not fully machine cross-checked"
-  ]
+    "Rigid graphic boxes not verified for all 12 suits",
+    "Fixed suit matrices not automatically connected to full combat resolver",
+    "Earlier described v92 WIP code was not recoverable; this update does not claim full 1:1 integration"
+  ],
+  "storageKey": "hmk-keepers-ledger-v1"
 }

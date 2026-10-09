@@ -48,3 +48,42 @@ test('unknown Bulk zone cannot silently pass',()=>{
  assert.equal(r.status,'invalid');
  assert.match(r.errors.join(' '),/Unknown Bulk zone/);
 });
+
+test('a shared article must have at least one common table slot across anatomical locations',()=>{
+ const shared={id:'shared',name:'Vest',material:'cloth',coveredLocations:['tx','ab'],layerOrder:1};
+ const under={id:'under',name:'Vest',material:'cloth',coveredLocations:['tx'],layerOrder:0};
+ const over={id:'over',name:'Vest',material:'cloth',coveredLocations:['ab'],layerOrder:2};
+ const result=evaluate([under,shared,over]);
+ assert.ok(['compatible','unresolved','violation'].includes(result.status));
+ assert.equal(result.combatReady,false);
+});
+
+test('explicit slot for shared article is enforced across both anatomical locations',()=>{
+ const shared={id:'shared',name:'Vest',material:'cloth',coveredLocations:['tx','ab'],layerOrder:0};
+ const other={id:'mail',name:'Hauberk',material:'mail',coveredLocations:['tx','ab'],layerOrder:1};
+ const r=evaluate([shared,other],{slotByArticleId:{shared:'underNear'}});
+ assert.equal(r.status,'compatible');
+ assert.equal(r.extraEnc,0);
+});
+test('incompatible explicitly requested shared slot is rejected',()=>{
+ const shared={id:'shared',name:'Vest',material:'cloth',coveredLocations:['tx','ab'],layerOrder:0};
+ const other={id:'mail',name:'Hauberk',material:'mail',coveredLocations:['tx','ab'],layerOrder:1};
+ assert.equal(evaluate([shared,other],{slotByArticleId:{shared:'overFar'}}).status,'violation');
+});
+
+// A Bulk exemption must target the offending article, not a compliant bystander.
+test('cloth bystander cannot waive a separate D/Q conflict',()=>{
+ const items=[part('cloth','cloth','sh',0),part('padded','padded','tx',0),part('quilted','quilted','ab',1)];
+ const r=evaluate(items,{bulkExceptionByZone:{torso:'cloth'}});
+ assert.equal(r.status,'violation');
+});
+test('cloth in same zone but separate location cannot waive D/Q conflict',()=>{
+ const items=[part('cloth','cloth','pv',0),part('padded','padded','tx',0),part('quilted','quilted','ab',1)];
+ const r=evaluate(items,{bulkExceptionByZone:{torso:'cloth'}});
+ assert.equal(r.status,'violation');
+ assert.match(r.errors.join(' '),/not involved/);
+});
+test('padded participant may resolve a D/Q conflict',()=>{
+ const items=[part('padded','padded','tx',0),part('quilted','quilted','ab',1)];
+ assert.equal(evaluate(items,{bulkExceptionByZone:{torso:'padded'}}).status,'compatible');
+});
