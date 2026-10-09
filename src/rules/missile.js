@@ -36,9 +36,14 @@ export function spoiledMissileResolution({finalAdjustedEML,disposition=null,eml0
   const cf=eml05Roll>5 && eml05Roll%5===0;
   return {spoiled:true,pending:null,attackOccurs:true,automaticFail:true,sl:cf?SL.CF:SL.F,mishap:cf?(eml05Roll%10===0?'fumble':'stumble'):null};
 }
-export function nearbyMissileStrike({targetCount,d20,d10}={}){
+export function nearbyMissileStrike({targetCount,d20,d10=null}={}){
+  if(!Number.isSafeInteger(targetCount)||targetCount<0) throw new RangeError('Target count must be a non-negative integer');
+  if(!Number.isInteger(d20)||d20<1||d20>20) throw new RangeError('Nearby strike target roll must be d20 (1..20)');
   const hit=targetCount>0&&d20<=targetCount;
-  return {hit,impactTA:hit&&(d10===5||d10===10)?1:0,zoneDie:hit?'d10-or-target-zones':null};
+  if(!hit) return {hit:false,impactTA:0,zoneDie:null};
+  if(d10==null) return {hit:true,complete:false,pending:{type:'impact-ta-d10'},zoneDie:'d10-or-target-zones'};
+  if(!Number.isInteger(d10)||d10<1||d10>10) throw new RangeError('Nearby strike Impact TA roll must be d10 (1..10)');
+  return {hit:true,complete:true,impactTA:(d10===5||d10===10)?1:0,zoneDie:'d10-or-target-zones'};
 }
 export function missileStrikeImpact({impactDieRoll,weaponImpactModifier=0,rangeImpactModifier=0,strengthImpactModifier=0,impactTACount=0,impactTAValue=0,bluntHead=false}={}){
   let total=impactDieRoll+weaponImpactModifier+rangeImpactModifier+strengthImpactModifier+(impactTACount*impactTAValue);
@@ -56,7 +61,7 @@ import { hardCoverStrike } from './positioning.js';
 export function resolveDirectMissileHit({
   location,aspect,impactDieRoll,weaponImpactModifier=0,rangeImpactModifier=0,strengthImpactModifier=0,
   impactTACount=0,impactTAValue=0,bluntHead=false,armourValue=0,armourReduction=0,
-  deflect=null,existingInjuries=[],compoundD10=null,amputationSL=null,shockSL=null,currentShockState,
+  deflect=null,rigidArmour=false,existingInjuries=[],compoundD10=null,amputationSL=null,shockSL=null,currentShockState,
   metalArmour=false,broadBleedingBonus=0,locationProtectedByHardCover=false
 }={}){
   const strikeImpact=missileStrikeImpact({impactDieRoll,weaponImpactModifier,rangeImpactModifier,strengthImpactModifier,impactTACount,impactTAValue,bluntHead});
@@ -68,7 +73,7 @@ export function resolveDirectMissileHit({
   if(cover.deflectedByCover) return {deflected:false,deflectedByHardCover:true,strikeImpact,targetImpact:0,injury:null};
   const av=armourAfterReduction(armourValue,armourReduction);
   const eff=effectiveImpact({strikeImpact,armourValue:av});
-  const injury=resolveInjurySequence({location,effectiveImpact:eff,aspect:bluntHead?'blunt':aspect,existingInjuries,compoundD10,amputationSL,shockSL,currentShockState,projectile:true,metalArmour,bleedingImpactBonus:broadBleedingBonus});
+  const injury=resolveInjurySequence({location,effectiveImpact:eff,aspect:bluntHead?'blunt':aspect,rigidArmour,existingInjuries,compoundD10,amputationSL,shockSL,currentShockState,projectile:true,metalArmour,bleedingImpactBonus:broadBleedingBonus});
   return {deflected:false,strikeImpact,armourValueAfterReduction:av,effectiveImpact:eff,injury};
 }
 
@@ -83,15 +88,26 @@ export function volleyMissileOutcome({sl,roll=null,eml=null}={}){
  * CS replaces d20 with one d10; each step beyond CS adds another d10.
  * impactD10 is always a separate roll: 5 or 10 grants one Impact TA.
  */
-export function volleyPotentialStrike({targetCount,targetRolls=[],volleyPrecisionDice=0,impactD10=null}={}){
-  if(targetCount<0) throw new RangeError('Target count cannot be negative');
-  const required=Math.max(1,volleyPrecisionDice||0);
-  if(targetRolls.length<required) return {complete:false,pending:{type:'target-count-dice',die:volleyPrecisionDice>0?'d10':'d20',count:required-targetRolls.length}};
+export function volleyPotentialStrike({targetCount,targetRolls=[],volleyPrecisionDice=0,impactD10=null,selectedTargetRollIndex=null}={}){
+  if(!Number.isSafeInteger(targetCount)||targetCount<0) throw new RangeError('Target count must be a non-negative integer');
+  if(!Number.isSafeInteger(volleyPrecisionDice)||volleyPrecisionDice<0) throw new RangeError('Volley precision dice must be non-negative integers');
+  if(!Array.isArray(targetRolls)) throw new TypeError('Target rolls must be an array');
+  const die=volleyPrecisionDice>0?10:20;
+  for(const roll of targetRolls){
+    if(!Number.isInteger(roll)||roll<1||roll>die) throw new RangeError(`Volley target roll must be d${die} (1..${die})`);
+  }
+  const required=Math.max(1,volleyPrecisionDice);
+  if(targetRolls.length<required) return {complete:false,pending:{type:'target-count-dice',die:`d${die}`,count:required-targetRolls.length}};
   const rolls=targetRolls.slice(0,required);
   const hits=rolls.map((roll,index)=>({index,roll,hit:targetCount>0&&roll<=targetCount})).filter(x=>x.hit);
   if(!hits.length) return {complete:true,hit:false,targetRoll:null,impactTA:0};
-  if(hits.length>1) return {complete:false,pending:{type:'target-roll-choice',choices:hits.map(x=>x.index)},hits,impactTA:impactD10===5||impactD10===10?1:0};
-  return {complete:true,hit:true,targetRoll:hits[0].roll,targetIndex:hits[0].index,impactTA:impactD10===5||impactD10===10?1:0};
+  if(hits.length>1&&selectedTargetRollIndex==null)
+    return {complete:false,pending:{type:'target-roll-choice',choices:hits.map(x=>x.index)},hits};
+  const selected=selectedTargetRollIndex==null?hits[0]:hits.find(x=>x.index===selectedTargetRollIndex);
+  if(!selected) throw new RangeError('Chosen volley target die must identify a real hit');
+  if(impactD10==null) return {complete:false,hit:true,pending:{type:'impact-ta-d10'},targetIndex:selected.index,targetRoll:selected.roll};
+  if(!Number.isInteger(impactD10)||impactD10<1||impactD10>10) throw new RangeError('Volley Impact TA roll must be d10 (1..10)');
+  return {complete:true,hit:true,targetRoll:selected.roll,targetIndex:selected.index,impactTA:(impactD10===5||impactD10===10)?1:0};
 }
 
 export function volleyZoneDieSize(targetZoneCount=10){

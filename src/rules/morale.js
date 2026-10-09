@@ -9,7 +9,10 @@ export function moraleResult({sl,roll}={}){
  throw new RangeError('Morale SL required');
 }
 const SEVERITY={[MORALE.STEADY]:0,[MORALE.BRAVE]:0,[MORALE.WITHDRAWING]:1,[MORALE.ROUTED]:2,[MORALE.CATATONIC]:3};
-export function combineMoraleState(current,incoming){return (SEVERITY[incoming]??0)>(SEVERITY[current]??0)?incoming:current;}
+export function combineMoraleState(current,incoming){
+ if(current===MORALE.STEADY&&incoming===MORALE.BRAVE)return MORALE.BRAVE;
+ return (SEVERITY[incoming]??0)>(SEVERITY[current]??0)?incoming:current;
+}
 export function moraleActionPolicy(state,{fleePossible=true,threatened=false}={}){
  if(state===MORALE.CATATONIC)return {action:'none',mayDefend:false,mayMove:false};
  if(state===MORALE.ROUTED)return fleePossible?{action:'move',rate:'full',direction:'flee'}:{action:'pass',surrender:threatened};
