@@ -117,7 +117,15 @@ export function evaluateOrderedArmour(articles,{bulkExceptionByZone={},slotByArt
    const ordered=[...normal].sort((a,b)=>a.layerOrder-b.layerOrder);
    const possible=matchesFor(ordered,zone);
    const localSlots=slotByZoneLocation?.[zone]?.[location]??{};
-   const matches=possible.filter(m=>m.every(entry=>(slotByArticleId[entry.id]===undefined||slotByArticleId[entry.id]===entry.slot)&&(localSlots[entry.id]===undefined||localSlots[entry.id]===entry.slot)));
+   // A long coat can occupy the pink overFar column above armour at the
+   // torso yet be the sole/base material at an otherwise uncovered forearm
+   // or thigh. A global overFar preference is not a requirement that an
+   // underlying article exist at every anatomical location (p.117 Obris).
+   const matches=possible.filter(m=>m.every(entry=>{
+    const nominated=slotByArticleId[entry.id];
+    const singleOuterAsBase=normal.length===1 && entry.slot==='base' && nominated==='overFar' && ['D','Q'].includes(ordered[0].code);
+    return (nominated===undefined||nominated===entry.slot||singleOuterAsBase)&&(localSlots[entry.id]===undefined||localSlots[entry.id]===entry.slot);
+   }));
    if(!matches.length)zoneErrors.push(`${location}: forbidden material order or incompatible explicit slot`);
    else {
     // A D/Q article incurs +5 ENC once if used in overFar at ANY location.

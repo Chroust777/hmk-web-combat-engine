@@ -17,5 +17,22 @@ export function mundaneFireImpact(fireSize,{shortExposure=false}={}){
  if(!Number.isInteger(fireSize)||fireSize<0||fireSize>4)throw new RangeError('FS 0–4 required');
  const fire=MUNDANE_FIRE_P121[fireSize];return Object.freeze({...fire,dice:'d4',flatImpact:2+fireSize-(shortExposure?3:0),shortExposure,sourcePage:121});
 }
-export function fireGrowthSteps(seconds){if(!Number.isFinite(seconds)||seconds<0)throw new RangeError('Non-negative seconds required');return Math.floor(seconds/30);}
+export function fireGrowthSteps(seconds,{sufficientDryFuel=true}={}){if(!Number.isFinite(seconds)||seconds<0)throw new RangeError('Non-negative seconds required');return sufficientDryFuel?Math.floor(seconds/30):0;}
 export const WATER_REFERENCE_P121=WATER_WEIGHT_P121;
+
+/** HMK p.121: enclosed fire smoke is resolved as Asphyxia, p.183. */
+export function fireSmokeHazard({enclosedArea=false,firePresent=false,smokePresent=false}={}){
+ const applies=!!enclosedArea&&!!firePresent&&!!smokePresent;
+ return Object.freeze({applies,rule:applies?'Asphyxia':null,sourcePages:[121,183],automaticDamage:false});
+}
+/** HMK p.121: touching flame may target Hand automatically; other targets follow Injury Sequence p.167. */
+export function mundaneFireTarget({fireSize,contactHand=false}={}){
+ if(!Number.isInteger(fireSize)||fireSize<0||fireSize>4)throw new RangeError('FS 0–4 required');
+ const area=fireSize>=3;
+ return Object.freeze({target:area?'Area':'Location',automaticLocation:!area&&contactHand?'Hand':null,injurySequencePage:167,sourcePage:121});
+}
+/** A full-round flame impact needs a maintained Grab and hold (p.106); otherwise reduce impact by 3. */
+export function flameContactImpact(fireSize,{fullRound=false,grabAndHold=false}={}){
+ if(fullRound&&!grabAndHold)throw new RangeError('Full-round flame contact requires Grab and hold');
+ return mundaneFireImpact(fireSize,{shortExposure:!fullRound});
+}

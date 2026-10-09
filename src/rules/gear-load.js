@@ -39,3 +39,13 @@ export function mountLoadENC(weightLb,{kind='horse'}={}){
  if(!step)throw new RangeError('Unsupported mount kind');
  return Math.floor(weightLb/step)*5;
 }
+
+/** HMK p.122: mount PF = 5 + 1/4 adjusted ENC, fractional part rounded down to nearest 0 or 5. */
+export function mountPersonalFatigue(adjustedENC){
+ if(!Number.isFinite(adjustedENC)||adjustedENC<0)throw new RangeError('Adjusted ENC must be nonnegative');
+ return 5+Math.floor((adjustedENC/4)/5)*5;
+}
+/** Source p.122: training rates in denari per Mastery Boost. */
+export const MOUNT_TRAINING_COST_PER_MB_P122=Object.freeze({dog:12,hawk:60,horse:80,camel:80,elephant:240});
+export const MOUNT_TACK_REQUIREMENTS_P122=Object.freeze({riding:['bit & bridle','horse blanket','saddle'],draft:['special harness'],pack:['special harness'],elephantTackWeightMultiplier:5,elephantTackPriceMultiplier:5});
+export const CONVEYANCE_NOTES_P122=Object.freeze({oxenInherentSlowMode:1,oxenTrekkingRoutineStep:4,elephantDomesticated:false,elephantPlatform:{weightLb:200,priceD:480,capacity:'drover and three archers'},packHarnessBodyWeightFraction:0.2,warSaddleUnseatingStumbleModifier:20,warSaddleMountAction:'Move',warSaddleMountRequiresControlTest:true,sledRate:'Cart over snow',sourcePages:[65,145,146,161,172,356]});
