@@ -1,3 +1,6 @@
+import {meleeTAAwardOptions,allocateMeleeTACredit} from './src/integration/melee-ta-awards.js';
+import {emptyTALedger,validateTALedger,awardTACredit,spendTACredit,availableTACredits} from './src/integration/tactical-advantage-ledger.js';
+import {validateInCloseTransition} from './src/integration/in-close-transition.js';
 import {resolveCharacterReachSizeModifier} from './src/integration/character-reach-size.js';
 import {validateStrikeReachSelection} from './src/integration/melee-reach-consistency.js';
 import {reachFromSelectedEquipment} from './src/integration/melee-auto-reach.js';
@@ -47,7 +50,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='92';
+const APP_VERSION='93.33';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -636,15 +639,31 @@ function validInClosePairs(pairs,ids){
 }
 function readInClosePairs(){try{return validInClosePairs(JSON.parse(sessionStorage.getItem(IN_CLOSE_KEY)||'[]'),data.characters.map(c=>c.id))}catch{return new Set()}}
 let inClosePairs=readInClosePairs();
-function saveInClosePair(a,b,active){
+const TA_LEDGER_KEY='hmk-ta-ledger-v1';
+function readTALedger(){try{return validateTALedger(JSON.parse(sessionStorage.getItem(TA_LEDGER_KEY)||'null'))}catch{return emptyTALedger()}}
+let taLedger=readTALedger();
+let pendingMeleeTA=null;
+function persistTALedger(next){validateTALedger(next);sessionStorage.setItem(TA_LEDGER_KEY,JSON.stringify(next));taLedger=next;}
+function taLedgerPanel(chars){
+ const options=chars.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+ return `<section class="panel"><h3>Tactical Advantages · evidence (HMK p.171)</h3><p class="muted">Pouze GM ověřené Action/Setup TA. Získání se zatím automaticky nepřenáší z výsledku hodu. Impact a Precision se neskladují.</p><form id="ta-award-form"><label>Postava<select name="ownerId">${options}</select></label><label>Typ<select name="type"><option value="action">Action</option><option value="setup">Setup</option></select></label>${field('round','Kolo získání',combatClock.round,'number')}${field('ir','Initiative Rank získání',0,'number')}<label>Zdroj Action TA<select name="weaponSlot"><option value="">Neurčeno</option><option value="main_hand">Hlavní zbraň</option><option value="off_hand">Vedlejší zbraň</option></select></label><label><input type="checkbox" name="verified" value="yes" required> GM ověřil získání TA z pravidlového výsledku</label><button type="submit">Zapsat získanou TA</button></form><p class="tiny">Po ověření Attack/Defence lze uložit Action/Setup TA z posledního výsledku: <button type="button" data-action="award-last-melee-ta">Vybrat TA z výsledku</button>. GM musí potvrdit volbu; Impact/Precision se do evidence neukládají.</p><p class="tiny">Aktivní záznamy: ${taLedger.credits.filter(c=>!c.used).map(c=>`${esc(chars.find(x=>x.id===c.ownerId)?.name||c.ownerId)}: ${esc(c.type)} (${c.round}/IR${c.ir}; ${esc(c.id)})`).join('; ')||'žádné'}</p></section>`;
+}
+
+function saveInClosePair(a,b,active,transition){
+ const check=validateInCloseTransition({active,...transition});if(!check.ok)return {ok:false,reason:check.reason};
  const allowed=new Set(selectedEncounterCharacters().map(c=>c.id));
  if(!allowed.has(a)||!allowed.has(b)||a===b)return {ok:false,reason:'Vyberte dvě různé postavy ze střetnutí.'};
+ let nextLedger=null;
+ if(active&&transition.reason==='action-ta'){
+  try{nextLedger=spendTACredit(taLedger,{id:transition.actionCreditId,ownerId:a,round:combatClock.round,ir:transition.currentIR,turnKey:transition.turnKey,weaponSlot:transition.weaponSlot});}
+  catch(err){return {ok:false,reason:'Action TA: '+err.message}}
+ }
  const next=new Set(inClosePairs),key=inClosePairKey(a,b);if(active)next.add(key);else next.delete(key);
- try{const pairs=[...next].map(key=>key.split('::'));validInClosePairs(pairs,data.characters.map(c=>c.id));sessionStorage.setItem(IN_CLOSE_KEY,JSON.stringify(pairs));inClosePairs=next;lastCombatEvent=null;return {ok:true}}
+ try{const pairs=[...next].map(key=>key.split('::'));validInClosePairs(pairs,data.characters.map(c=>c.id));if(nextLedger)persistTALedger(nextLedger);sessionStorage.setItem(IN_CLOSE_KEY,JSON.stringify(pairs));inClosePairs=next;lastCombatEvent=null;return {ok:true}}
  catch(e){return {ok:false,reason:'Nepodařilo se uložit In Close: '+e.message}}
 }
 function inClosePanel(chars){
- return `<section class="panel"><h3>In Close · potvrzené dvojice</h3><p class="muted">GM potvrzuje vznik nebo ukončení In Close mezi dvěma účastníky. Stav platí pro tuto dvojici, nikoli pro celou skupinu. Automaticky se použije při Reach Effect. Tento formulář sám nevyhodnocuje podmínky vzniku ani ukončení In Close podle HMK.</p><form id="in-close-pair-form"><div class="field-grid"><label>První postava<select name="first" required>${chars.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><label>Druhá postava<select name="second" required>${chars.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><label>Stav<select name="active"><option value="yes">In Close aktivní</option><option value="no">In Close ukončeno</option></select></label></div><button type="submit">Uložit stav dvojice</button></form><p class="tiny">Aktivní dvojice: ${[...inClosePairs].filter(key=>key.split('::').every(id=>chars.some(c=>c.id===id))).map(key=>key.split('::').map(id=>esc(chars.find(c=>c.id===id)?.name||id)).join(' ↔ ')).join('; ')||'žádné'}</p></section>`;
+ return `<section class="panel"><h3>In Close · potvrzené dvojice</h3><p class="muted">GM potvrzuje vznik nebo ukončení In Close mezi dvěma účastníky. Stav platí pro tuto dvojici, nikoli pro celou skupinu. Automaticky se použije při Reach Effect. Přechod stavu vyžaduje pravidlový důvod a GM potvrzené podmínky podle HMK str. 171; samotné hody Grab a získání TA neprovádí.</p><form id="in-close-pair-form"><div class="field-grid"><label>První postava<select name="first" required>${chars.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><label>Druhá postava<select name="second" required>${chars.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><label>Stav<select name="active"><option value="yes">In Close aktivní</option><option value="no">In Close ukončeno</option></select></label><label>Pravidlový důvod<select name="reason"><option value="free-condition">Volně: cíl je bezbranný / prone (do 5 stop)</option><option value="grab">Po úspěšném Grab</option><option value="action-ta">Action TA: Get In Close</option><option value="tight-quarters">Stísněný prostor (GM)</option><option value="separation">Ukončení: odstup alespoň 5 stop</option><option value="tight-quarters-ended">Ukončení stísněného prostoru (GM)</option></select></label><label>Stav cíle<select name="targetCondition"><option value="">Neuveden</option><option value="prone">Prone</option><option value="confused">Confused</option><option value="stunned">Stunned</option><option value="unaware">Unaware</option><option value="helpless">Helpless</option></select></label><label><input type="checkbox" name="withinFiveFeet" value="yes"> Do 5 stop</label><label><input type="checkbox" name="successfulGrab" value="yes"> Grab úspěšný (GM potvrzeno)</label><label>Action TA z evidence (při vstupu přes Action TA)<select name="actionCreditId"><option value="">Nevybrána</option>${taLedger.credits.filter(c=>c.type==='action'&&!c.used).map(c=>`<option value="${esc(c.id)}">${esc(chars.find(x=>x.id===c.ownerId)?.name||c.ownerId)} · kolo ${c.round} · ${esc(c.id)}</option>`).join('')}</select></label><label><input type="checkbox" name="actionTA" value="yes"> Action TA potvrzena GM (vyžaduje kredit)</label><label><input type="checkbox" name="gmTightQuarters" value="yes"> GM potvrzuje stísněný prostor / jeho konec</label>${field('currentIR','Aktuální IR pro použití Action TA',0,'number')}${field('turnKey','Identifikátor aktuálního tahu (např. 2:a:1)','')}<label>Slot použité zbraně<select name="weaponSlot"><option value="main_hand">Hlavní</option><option value="off_hand">Vedlejší</option></select></label><label>Odstup po pohybu (stopy)<input type="number" name="separationFeet" min="0" step="1" value="0"></label></div><button type="submit">Uložit stav dvojice</button></form><p class="tiny">Aktivní dvojice: ${[...inClosePairs].filter(key=>key.split('::').every(id=>chars.some(c=>c.id===id))).map(key=>key.split('::').map(id=>esc(chars.find(c=>c.id===id)?.name||id)).join(' ↔ ')).join('; ')||'žádné'}</p></section>`;
 }
 
 function persistCombatClock(next){
@@ -885,13 +904,31 @@ function encounterView(){
  ${chars.length?`<div class="encounter-roster">${chars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues,...equippedCombatInputs(c).issues];return `<label class="encounter-entry"><input type="checkbox" data-encounter-character="${esc(c.id)}" ${encounterSelection.has(c.id)?'checked':''}><span><strong>${esc(c.name)}</strong><small>${esc(c.kind||'PC')} · ${warnings.length?warnings.length+' upozornění k údajům':'bez upozornění k úplnosti údajů'}</small></span></label>`}).join('')}</div>`:'<p class="muted">Nejprve vytvořte postavy v registru.</p>'}
  <div class="equipment-summary"><div><strong>Vybráno</strong><span>${count} postav</span></div><div><strong>Chybějící evidenční údaje</strong><span>${issues} upozornění</span></div></div>
  <div class="actions"><button type="button" data-action="encounter-all" ${chars.length?'':'disabled'}>Vybrat všechny</button><button type="button" class="secondary" data-action="encounter-clear" ${count?'':'disabled'}>Zrušit výběr</button><button type="button" data-action="encounter-export" ${count?'':'disabled'}>Exportovat podklady JSON</button></div></section>
- ${selectedChars.length?`<section class="panel"><h3>Kontrola účastníků</h3>${selectedChars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues.map(x=>'Výbava: '+x),...equippedCombatInputs(c).issues.map(x=>'Combat: '+x)];return `<details class="encounter-details"><summary>${esc(c.name)} · ${warnings.length} upozornění</summary>${warnings.length?`<ul class="audit-list">${warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="muted">Evidenční kontrola bez upozornění; pravidlová správnost není potvrzena.</p>'}</details>${armourCoveragePanel(c)}${equippedCombatInputsPanel(c)}`}).join('')}</section>`:''}${combatClockPanel(selectedChars)}${inClosePanel(selectedChars)}${specialStrikePreviewPanel(selectedChars)}${encounterImpactPreviewPanel(selectedChars)}${combatDraftHistoryPanel()}${combatContinuityPanel()}${combatReplayPanel()}${combatStateProjectionPanel()}${encounterShockFollowupPanel()}${encounterD100Panel()}${encounterShockMLPanel()}`;
+ ${selectedChars.length?`<section class="panel"><h3>Kontrola účastníků</h3>${selectedChars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues.map(x=>'Výbava: '+x),...equippedCombatInputs(c).issues.map(x=>'Combat: '+x)];return `<details class="encounter-details"><summary>${esc(c.name)} · ${warnings.length} upozornění</summary>${warnings.length?`<ul class="audit-list">${warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="muted">Evidenční kontrola bez upozornění; pravidlová správnost není potvrzena.</p>'}</details>${armourCoveragePanel(c)}${equippedCombatInputsPanel(c)}`}).join('')}</section>`:''}${combatClockPanel(selectedChars)}${taLedgerPanel(selectedChars)}${inClosePanel(selectedChars)}${specialStrikePreviewPanel(selectedChars)}${encounterImpactPreviewPanel(selectedChars)}${combatDraftHistoryPanel()}${combatContinuityPanel()}${combatReplayPanel()}${combatStateProjectionPanel()}${encounterShockFollowupPanel()}${encounterD100Panel()}${encounterShockMLPanel()}`;
 }
 function editor(title,obj,kind){return `<div class="panel"><h2>${esc(title)}</h2><form id="${kind}-editor">${field('name','Název / jméno',obj.name||'')}${kind==='character'?`${field('occupation','Povolání',obj.occupation||'')}<label>Typ<select name="kind"><option>PC</option><option>NPC</option></select></label>${area('description','Popis',obj.description||'')}`:`<label>Kategorie<select name="category">${[['weapon','Zbraň'],['shield','Štít'],['armor','Zbroj'],['other','Ostatní předmět']].map(([v,l])=>`<option value="${v}" ${obj.category===v?'selected':''}>${l}</option>`).join('')}</select></label>${area('description','Popis',obj.description||'')}${field('source','Odkaz na zdroj (např. kapitola/strana)',obj.source||'')}${area('properties','Vlastní parametry JSON',JSON.stringify(obj.properties||{},null,2))}`}<div class="actions"><button type="submit">Uložit</button>${button('Zrušit','cancel-editor')}</div></form></div>`}
 let overlay=null;
 function render(){document.getElementById('app').innerHTML=main()+(overlay||'');}
 function ask(msg){return window.confirm(msg)}
 
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-action="award-last-melee-ta"]');if(!button)return;
+ if(!pendingMeleeTA?.ok||!pendingMeleeTA.ownerId||pendingMeleeTA.remaining<1){alert('Neexistuje ověřený výsledek s nevyužitou TA. Nejprve vyhodnoťte Attack/Defence.');return;}
+ const allowed=pendingMeleeTA.allowed.filter(t=>t==='action'||t==='setup');
+ if(!allowed.length){alert('Tento výsledek dovoluje jen Impact/Precision, nikoli uložitelnou Action/Setup TA.');return;}
+ const type=prompt('Typ TA ('+allowed.join(' / ')+'):',allowed[0]);if(type===null)return;
+ const countText=prompt('Počet TA (nejvýše '+pendingMeleeTA.remaining+'):','1');if(countText===null)return;
+ const irText=prompt('Initiative Rank získání (0–100):','0');if(irText===null)return;
+ const count=Number(countText),ir=Number(irText);
+ if(!/^\d+$/.test(countText)||!/^\d+$/.test(irText)||ir>100){alert('Počet a IR musí být platná celá čísla.');return;}
+ try{
+  const choice=allocateMeleeTACredit(pendingMeleeTA,{type,count});
+  if(!confirm('Uložit '+count+'× '+type+' TA pro '+(data.characters.find(c=>c.id===choice.ownerId)?.name||choice.ownerId)+'? Zbývající TA se tímto výběrem neuloží.'))return;
+  let next=taLedger;
+  for(let i=0;i<count;i++)next=awardTACredit(next,{id:crypto.randomUUID(),ownerId:choice.ownerId,type:choice.type,round:combatClock.round,ir,verified:true});
+  persistTALedger(next);pendingMeleeTA=null;render();
+ }catch(err){alert('TA: '+err.message)}
+});
 document.addEventListener('click',e=>{const t=e.target.closest('[data-action],[data-nav],[data-open],[data-copy],[data-archive],[data-remove-inv],[data-delete-log],[data-edit-item],[data-copy-item],[data-delete-item],[data-restore],[data-purge],[data-delete-character],[data-export-character]');if(!t)return;
 if(t.dataset.exportCharacter){if(storageReadOnly)return alert('Nečitelná data: použijte nouzovou zálohu.');try{const pkg=characterPackage(t.dataset.exportCharacter);downloadJSON(pkg,'hmk-postava-'+safeFilename(pkg.character.name)+'.json')}catch(err){alert(err.message)}return}
 if(t.dataset.action==='combat-next-round'){const r=persistCombatClock({round:combatClock.round+1,actorId:''});if(!r.ok)return alert(r.reason);render();return}
@@ -984,12 +1021,17 @@ if(e.target.id==='shock-ml-form'){
  e.preventDefault();const v=Object.fromEntries(new FormData(e.target));const r=previewShockRecovery(v.previous,v.level);
  document.getElementById('shock-recovery-result').textContent=r.ok?`Výsledek: ${r.state}. ${r.test}; ${r.timing==='after-ten-minutes'?'po 10 minutách':'na konci dalšího tahu'}. ${r.penalty?'Postih −20 a Fatigue. ':'Fatigue podle pravidel. '}${r.extendedShock?'Extended Shock '+r.extendedShock+'. ':''}${r.coma?'Coma při UNC a CF. ':''}Bez zápisu do postavy.`:r.reason;return;
  }
+ if(e.target.id==='ta-award-form'){
+ e.preventDefault();const v=Object.fromEntries(new FormData(e.target));
+ if(!selectedEncounterCharacters().some(c=>c.id===v.ownerId))return alert('Postava není ve střetnutí.');
+ try{const next=awardTACredit(taLedger,{id:crypto.randomUUID(),ownerId:v.ownerId,type:v.type,round:Number(v.round),ir:Number(v.ir),weaponSlot:v.weaponSlot||null,verified:v.verified==='yes'});persistTALedger(next);render();}catch(err){alert(err.message)}return;
+ }
  if(e.target.id==='in-close-pair-form'){
- e.preventDefault();const v=Object.fromEntries(new FormData(e.target));const r=saveInClosePair(v.first,v.second,v.active==='yes');if(!r.ok)return alert(r.reason);render();return;
+ e.preventDefault();const v=Object.fromEntries(new FormData(e.target));const r=saveInClosePair(v.first,v.second,v.active==='yes',{reason:v.reason,targetCondition:v.targetCondition,withinFiveFeet:v.withinFiveFeet==='yes',successfulGrab:v.successfulGrab==='yes',actionTA:v.actionTA==='yes',actionCreditId:v.actionCreditId,currentIR:Number(v.currentIR),turnKey:v.turnKey,weaponSlot:v.weaponSlot,gmTightQuarters:v.gmTightQuarters==='yes',separationFeet:Number(v.separationFeet)});if(!r.ok)return alert(r.reason);render();return;
  }
  if(e.target.id!=='impact-preview-form')return;
  e.preventDefault();
- lastCombatEvent=null;const oldExport=document.getElementById('export-combat-draft');if(oldExport)oldExport.disabled=true;const oldSave=document.getElementById('save-combat-draft');if(oldSave)oldSave.disabled=true;
+ lastCombatEvent=null;pendingMeleeTA=null;const oldExport=document.getElementById('export-combat-draft');if(oldExport)oldExport.disabled=true;const oldSave=document.getElementById('save-combat-draft');if(oldSave)oldSave.disabled=true;
  const v=Object.fromEntries(new FormData(e.target));let target=selectedEncounterCharacters().find(c=>c.id===v.characterId);
  const output=document.getElementById('impact-preview-result');if(!output)return;
  if(!target){output.textContent='Zvolený účastník již není ve střetnutí.';return;}
@@ -1042,6 +1084,7 @@ if(e.target.id==='shock-ml-form'){
   meleeGate=resolveMeleeAttackGate({defence:v.defence,attackerEML:attackEML.effectiveEML,attackerRoll:Number(v.attackerRoll),defenderEML:defendEML.ok?defendEML.effectiveEML:0,defenderRoll:Number(v.defenderRoll),impactTA:Number(v.impactTA),finalD10Attacker:v.finalD10Attacker===''?null:Number(v.finalD10Attacker),finalD10Defender:v.finalD10Defender===''?null:Number(v.finalD10Defender)});
   meleeGate.emlAudit={attacker:attackEML,defender:v.defence==='ignore'?null:defendEML};
   if(!meleeGate.ok){output.textContent='Attack/Defence: '+meleeGate.reason;return;}
+  pendingMeleeTA=meleeTAAwardOptions(meleeGate,{attackerId:attacker.id,defenderId:target.id});
   if(!meleeGate.attackerStrike&&!meleeGate.counterStrike){output.textContent='Attack/Defence neudělil zásah. '+meleeGate.summary+' Návrh zranění nevznikl.';return;}
   actualStriker=meleeGate.counterStrike?target:attacker;
   if(v.useReachEffect==='yes'&&v.autoReachFromEquipment==='yes'){
