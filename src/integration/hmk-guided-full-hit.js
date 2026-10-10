@@ -60,7 +60,7 @@ export function createGuidedFullHit({id,timelineId,round,attackerId,defenderId,k
   assert(outcome.striker===null||outcome.striker==='attacker'||outcome.striker==='defender','Neznámý původce zásahu');
   strike=outcome.attackerStrike===true||outcome.counterStrike===true;stars=outcome.stars??0;
   if(outcome.striker==='defender'){strikerId=defenderId;targetId=attackerId;}
-  assert(!outcome.attackerMishap&&!outcome.defenderMishap&&!outcome.weaponDamageCheck,
+  assert(!outcome.attackerMishap&&!outcome.defenderMishap&&(!outcome.weaponDamageCheck||outcome.weaponDamageResolved===true),
    'Před pokračováním musí být vyřešen okamžitý Melee Mishap nebo Weapon Damage');
   assert(impactTA<=Math.max(0,(outcome.extraTA??0)),'Impact TA nebyl získán');
   assert(precisionDice<=Math.max(0,(outcome.extraTA??0))-impactTA,'Precision TA nebyla získána');

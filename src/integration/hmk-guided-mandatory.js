@@ -14,6 +14,7 @@ import {validateCombatState,combatFatigueTotals,
  applyConfirmedBloodLoss,applyConfirmedInjuryMishap,applyConfirmedInjuryMorale,
  applyConfirmedShockRecovery} from './persistent-combat-state.js';
 import {createManualDiceQueue,recordManualDie,nextManualDie,completedManualDice} from './hmk-manual-dice-queue.js';
+import {projectLiveInjuries} from './live-injury-impairment.js';
 
 const assert=(x,msg)=>{if(!x)throw Error(msg)};
 const integer=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -50,9 +51,30 @@ const attrML=(character,key)=>{
  const v=character?.hmk?.attributes?.[key];
  return integer(v,1,40)?5*v:null;
 };
+/** No anonymous 'true' anatomy flags: identify human anatomy from the
+ * saved Folk or accept a verified creature-specific anatomy record. An
+ * active action supplies whether DEX was actually employed. */
+function verifiedMishapAnatomy(character,mishapContext={},state=null){
+ const h=character.hmk??{},a=h.anatomy??{},human=String(h.folk??'').trim().toLowerCase()==='human';
+ const flag=(name,derived)=>typeof mishapContext?.[name]==='boolean'?mishapContext[name]:
+  typeof a[name]==='boolean'?a[name]:derived;
+ const hasDEX=flag('hasDEX',human&&integer(h.attributes?.dex,1,40)?true:null);
+ const legAmputations=new Set((state?.wounds??[]).filter(w=>w.amputation?.severed===true&&
+  ['th','kn','ca','ft','thigh','knee','calf','foot'].includes(String(w.location).trim().toLowerCase())&&
+  ['left','right'].includes(w.side)).map(w=>w.side));
+ const hasLegs=legAmputations.size===2?false:flag('hasLegs',human?true:null);
+ const actionUsesDEX=flag('actionUsesDEX',null);
+ assert(typeof hasDEX==='boolean'&&typeof hasLegs==='boolean'&&typeof actionUsesDEX==='boolean',
+  'Mishap: chybí doložená anatomie (DEX/nohy) nebo potvrzení, zda konkrétní akce používá DEX');
+ return {hasDEX,hasLegs,actionUsesDEX,usedArms:mishapContext?.usedArms??null};
+}
+function mishapTestKind(mishap,profile){
+ if(!mishap?.kind)return null;
+ return mishap.kind.includes('fumble')&&profile.hasDEX&&profile.actionUsesDEX?'dexterity':'agility';
+}
 /** Resolve ML from the recorded character sheet, never from a GM rules guess.
  * A missing skill stays missing, except attribute tests (attribute x 5, p.60). */
-export function guidedMandatoryMastery({kind,character,mishapKind=null,abe=null,technique='attribute'}={}){
+export function guidedMandatoryMastery({kind,character,mishapKind=null,abe=null,technique='attribute',mishapProfile=null}={}){
  assert(character?.id&&character.hmk,'Chybí uložená postava HMK');
  let ml=null;
  if(kind==='blood-loss'){
@@ -69,8 +91,10 @@ export function guidedMandatoryMastery({kind,character,mishapKind=null,abe=null,
  }else if(kind==='injury-mishap'){
   if(mishapKind==='automatic-fumble'||mishapKind==='automatic-stumble')return {ml:null,rollRequired:false};
   assert(['fumble-roll','stumble-roll'].includes(mishapKind),'Neznámý Injury Mishap');
-  if(technique==='attribute')ml=attrML(character,mishapKind==='fumble-roll'?'dex':'agl');
-  else if(technique===(mishapKind==='fumble-roll'?'legerdemain':'acrobatics'))ml=skillML(character,technique);
+  const test=mishapTestKind({kind:mishapKind},mishapProfile);
+  assert(test,'Mishap: chybí ověřený typ testu');
+  if(technique==='attribute')ml=attrML(character,test==='dexterity'?'dex':'agl');
+  else if(technique===(test==='dexterity'?'legerdemain':'acrobatics'))ml=skillML(character,technique);
   else throw Error('Nelze nahradit požadovaný test jiným neověřeným testem');
   assert(integer(ml,0,200),'Mishap: chybí příslušný atribut nebo ověřená dovednost');
  }else throw Error('Tato událost nemá automatický resolver');
@@ -79,7 +103,7 @@ export function guidedMandatoryMastery({kind,character,mishapKind=null,abe=null,
 
 export function createGuidedMandatory({state,character,round,eventId,actorId=null,turnEnded=false,
  timelineId=null,elapsedMinutesSinceOriginal=null,kind=null,mishapTechnique='attribute',
- abe=null,comaLocationShock=null,comaInjuryLevel=null}={}){
+ abe=null,comaLocationShock=null,comaInjuryLevel=null,mishapContext=null}={}){
  validateCombatState(state);
  assert(integer(round,1,9999)&&round>=state.lastRound&&typeof eventId==='string'&&eventId.length>0,
   'Chybí skutečné kolo nebo ID události');
@@ -89,11 +113,18 @@ export function createGuidedMandatory({state,character,round,eventId,actorId=nul
  const event=events[0];
  assert(kind===null||event.kind===kind,'Dřívější povinnou událost nelze přeskočit');
  const mishap=event.kind==='injury-mishap'?(state.mishaps??[]).find(x=>x.id===event.id):null;
- const {ml,rollRequired}=guidedMandatoryMastery({kind:event.kind,character,mishapKind:mishap?.kind,abe,technique:mishapTechnique});
+ let profile=null,impaired=null;
  if(event.kind==='injury-mishap'){
-  assert(attrML(character,'agl')!==null,'Mishap: není doložena Agility; nelze zjistit zda tvor může upadnout');
-  if(mishap?.kind.includes('fumble'))assert(attrML(character,'dex')!==null,'Mishap: není doložena Dexterity; nelze ověřit účinek Fumble');
+  profile=verifiedMishapAnatomy(character,mishapContext??{},state);
+  const effectiveTest=mishapTestKind(mishap,profile);
+  const test=mishapTechnique==='attribute'?effectiveTest:mishapTechnique;
+  const wound=state.wounds.find(w=>w.id===mishap?.woundId);
+  const usedArms=profile.usedArms??(effectiveTest==='dexterity'&&['sh','ua','el','fo','ha','shoulder','upper arm','elbow','forearm','hand'].includes(String(wound?.location).toLowerCase())
+   &&['left','right'].includes(wound?.side)?[wound.side]:null);
+  impaired=projectLiveInjuries({state,round,test,usedArms,timelineId});
+  assert(impaired.ready,'Mishap: nelze doložit aktuální impairment: '+impaired.reason);
  }
+ const {ml,rollRequired}=guidedMandatoryMastery({kind:event.kind,character,mishapKind:mishap?.kind,abe,technique:mishapTechnique,mishapProfile:profile});
  if(event.kind==='shock-recovery'&&state.shock==='UNC'){
   assert(integer(comaLocationShock,0,15)&&integer(comaInjuryLevel,1,5)
    &&12-comaLocationShock-comaInjuryLevel>0,
@@ -105,8 +136,9 @@ export function createGuidedMandatory({state,character,round,eventId,actorId=nul
  const queue=rollRequired?createManualDiceQueue({id:proofId,source:event.source,round,
   actorId:character.id,requests:[{id:'resultD100',faces:100,label:`${event.label}: skutečný d100`}]}):null;
  return {format:'hmk-guided-mandatory-v1',event,characterId:character.id,round,eventId,actorId,turnEnded,
-  timelineId,elapsedMinutesSinceOriginal,context:{ml,abe,technique:mishapTechnique,comaLocationShock,comaInjuryLevel,fatigue},
-  stateWitness:stateSignature(state),queue,rolls:[],phase:queue?'waiting-die':'ready',outcome:null};
+  timelineId,elapsedMinutesSinceOriginal,context:{ml,abe,technique:mishapTechnique,comaLocationShock,comaInjuryLevel,fatigue,
+   mishapProfile:profile,injuryImpairment:impaired?.impairment??null,impairedTest:impaired?.test??null,usedArms:impaired?.usedArms??null},
+  stateWitness:stateSignature(state),characterWitness:stateSignature(character.hmk),queue,rolls:[],phase:queue?'waiting-die':'ready',outcome:null};
 }
 
 export function guidedMandatoryRequirement(session){
@@ -149,7 +181,9 @@ export function commitGuidedMandatory({session,state,character,round,actorId=nul
  assert(session?.format==='hmk-guided-mandatory-v1'&&session.phase==='ready','Hody ještě nejsou úplné');
  validateCombatState(state);
  assert(stateSignature(state)===session.stateWitness,'Stav postavy se změnil; před hodem je nutné obnovit pravidlový krok');
- assert(character?.id===session.characterId&&round===session.round&&actorId===session.actorId&&turnEnded===session.turnEnded&&
+ assert(character?.id===session.characterId&&stateSignature(character.hmk)===session.characterWitness,
+  'Atributy, dovednosti, Folk nebo anatomie postavy se změnily; před hodem je nutné obnovit pravidlový krok');
+ assert(round===session.round&&actorId===session.actorId&&turnEnded===session.turnEnded&&
   timelineId===session.timelineId&&elapsedMinutesSinceOriginal===session.elapsedMinutesSinceOriginal,
   'Změnil se tah, časová osa nebo účastník');
  const all=guidedMandatoryEvents({state,characterId:character.id,round,actorId,turnEnded,timelineId,elapsedMinutesSinceOriginal});
@@ -161,8 +195,9 @@ export function commitGuidedMandatory({session,state,character,round,actorId=nul
   transition=applyConfirmedBloodLoss({state,round,eventId:session.eventId,woundId:session.event.id,
    sl:nameSL(successLevel(roll,ctx.ml))});
  }else if(session.event.kind==='injury-mishap'){
+  assert(ctx.mishapProfile&&integer(ctx.injuryImpairment,0,9999),'Mishap: neověřená anatomie nebo impairment');
   transition=applyConfirmedInjuryMishap({state,round,eventId:session.eventId,mishapId:session.event.id,
-   baseML:ctx.ml,roll:roll??null,gmConfirmed:true,hasDEX:true,actionUsesDEX:true,hasLegs:true});
+   baseML:ctx.ml,roll:roll??null,gmConfirmed:true,...ctx.mishapProfile,injuryImpairment:ctx.injuryImpairment});
  }else if(session.event.kind==='injury-morale'){
   assert(integer(roll,1,100),'Morale vyžaduje skutečný d100');
   transition=applyConfirmedInjuryMorale({state,round,eventId:session.eventId,woundId:session.event.id,
@@ -185,9 +220,16 @@ export function commitGuidedMandatory({session,state,character,round,actorId=nul
  last.details.physicalDice={format:'hmk-manual-dice-proof-v1',source:session.event.source,
   rolls:session.rolls.map(x=>({...x}))};
  last.details.guidedResolution={kind:session.event.kind,ml:ctx.ml,abe:ctx.abe,derivedSL:roll==null?null:
-  nameSL(successLevel(roll,session.event.kind==='blood-loss'?ctx.ml:session.event.kind==='shock-recovery'?
+  nameSL(successLevel(roll,session.event.kind==='blood-loss'?ctx.ml:session.event.kind==='injury-mishap'?
+  ctx.ml-ctx.fatigue-ctx.injuryImpairment:session.event.kind==='shock-recovery'?
   ctx.ml-combatFatigueTotals(state).total-(state.shock==='STN'?0:20):session.event.kind==='injury-morale'?
   ctx.ml-5*ctx.abe-combatFatigueTotals(state).total+(state.morale?.state==='brave'?20:0):ctx.ml)),
   source:'HMK World of Kèthîra',ruleChoice:'automatic-verified-event'};
+ if(session.event.kind==='injury-mishap'){
+  last.details.guidedResolution.derivedSL=transition.result.slName;
+  last.details.guidedResolution.injuryImpairment=ctx.injuryImpairment;
+  last.details.guidedResolution.mishapTest=ctx.impairedTest;
+  last.details.guidedResolution.anatomy=ctx.mishapProfile;
+ }
  return {state:finished,transition,event:session.event,proof:last.details.physicalDice};
 }

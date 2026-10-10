@@ -152,8 +152,15 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
  if(['INC','UNC','KIA'].includes(s.entryShock)||s.entryMorale==='catatonic')
   requireValid(action==='incapacitated','Postava začala tah bezvládná či Catatonic; zotavení na konci tahu nedovoluje zpětně vykonat akci');
  if(s.entryForcedPass)requireValid(action==='pass','Mishap přikazuje v tomto tahu Pass, i když je následný efekt na konci tahu vyřešen');
+ if(!helpless&&p.grabHold?.active&&p.grabHold.targetId===id)
+  requireValid(action==='pass','HMK str.106: cíl Grab Hold musí Pass na svém následujícím tahu (bránit se smí)');
  if(!helpless&&p.morale?.state==='routed')requireValid(['move','pass'].includes(action),'Routed musí utíkat nebo Pass podle HMK str.162');
  if(!helpless&&p.morale?.state==='withdrawing')requireValid(['move','pass'].includes(action),'Withdrawing musí ustupovat nebo Pass');
+ for(const [otherId,otherState] of Object.entries(states)){
+  const hold=otherState?.grabHold;
+  if(otherId!==id&&!helpless&&hold?.active&&hold.grabberId===id&&hold.createdRound<s.round)
+   fail(`HMK str.106: před dokončením tahu musí ${id} opakovat Grab Hold d6+STR proti ${otherId}`);
+ }
  const row=s.roster.find(x=>x.id===id);
  if(!helpless&&s.entryAlertness==='confused')requireValid(action==='pass','Confused musí Pass; Reaction na konci tahu umožní akci až v dalším tahu');
  if(!helpless&&s.entryAlertness==='unaware')requireValid(action==='incapacitated','Unaware nesmí jednat, dokud není upozorněna na nebezpečí (HMK str.158)');

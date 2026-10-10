@@ -112,15 +112,17 @@ export function createLiveGuidedMelee({id,timelineId,round,attacker,defender,att
  must(reach.ok,'Nelze matematicky vyhodnotit Reach');
  // When In Close is not persisted, allow only equal RCH (no silent reach assumption).
  must(a.reach===d.reach,'Různý dosah vyžaduje doložený In Close stav; nelze jej odhadnout');
- const ae=eml(a,'attack',reach.attacker),de=eml(d,'block',reach.defender);
+ const ae=eml(a,'attack',reach.attacker),de=eml(d,'block',reach.defender),dc=eml(d,'attack',reach.defender);
  const shock=who=>{const matches=(who.person.hmk?.skills||[]).filter(s=>String(s.name).toLowerCase()==='shock');
   must(matches.length===1&&int(matches[0].ml,0,200),`${who.person.name}: chybí Shock ML`);
   return matches[0].ml;};
  const participants=Object.fromEntries([a,d].map(x=>[x.person.id,{state:x.state,shockML:shock(x),strengthML:x.person.hmk.attributes.str*5}]));
  const session=createGuidedAttackJourney({id,timelineId,round,attackerId:attacker.id,defenderId:defender.id,
   kind:'melee',sourceSignature,participants,inventory,direction,opponents,aimZN,
-  melee:{attackerEML:ae.effectiveEML,defenderEML:de.effectiveEML,allowedDefences:['ignore','block']},
-  weaponByActor:{[attacker.id]:a.weapon,[defender.id]:d.weapon}});
+  melee:{attackerEML:ae.effectiveEML,defenderEML:de.effectiveEML,
+   defenderEMLByDefence:{block:de.effectiveEML,counterstrike:dc.effectiveEML},allowedDefences:['ignore','block','counterstrike']},
+  weaponByActor:{[attacker.id]:a.weapon,[defender.id]:d.weapon},
+  weaponItemIds:{[attacker.id]:a.w.record.id,[defender.id]:d.w.record.id}});
  return {session,preflight:{attackerEML:ae,defenderEML:de,weaponByActor:{[attacker.id]:a.w.record.id,[defender.id]:d.w.record.id},
   source:'HMK pp.97,112,158–170; selected actual skills & equipped inventory',restrictions:['Primary Strike Mode only','Ignore or Block only','No unverified In Close, mounted context or situational TA']}};
 }
@@ -130,15 +132,27 @@ export function createLiveGuidedMelee({id,timelineId,round,attacker,defender,att
  * Missing projectile metadata cannot be repaired by typed-in arbitrary Impact. */
 export function createLiveGuidedMissile({id,timelineId,round,attacker,defender,weaponId,skillId,
  inventory,direction,opponents=1,aimZN=1,sourceSignature,distance,targetMovement='still',
- targetCount=0,nearbyTargetCount=0,windforce=0,crosswind=false,movingShooter=false}={}){
+ targetCount=0,nearbyTargetCount=0,windforce=0,crosswind=false,movingShooter=false,effectiveDodgeIndex=null,chargingThrow=false,chargeMovementFeet=null,attackerBulkConfirmation=null}={}){
  must(attacker?.id&&defender?.id&&attacker.id!==defender.id,'Chybí střelec a skutečný cíl');
  const shot=held(inventory,attacker.id,weaponId);
  const p=shot.record.snapshot.properties;
  const type=p.missileType??shot.mode.missileType;
  must(['bow','crossbow','sling','thrown'].includes(type),'Zdrojová data zbraně neurčují typ Missile/Thrown');
+ if(chargingThrow){must(type==='thrown'&&Number.isFinite(chargeMovementFeet)&&chargeMovementFeet>=20,
+  'Charging Throw bonus vyžaduje skutečnou vrhací zbraň a alespoň 20 stop Charge');}
+ if(chargeMovementFeet!==null)must(type==='thrown'&&Number.isFinite(chargeMovementFeet)&&chargeMovementFeet>0,
+  'Vzdálenost Charge musí být ověřená skutečná trasa');
  must(Number.isFinite(p.baseRange)&&p.baseRange>0,'Zdrojová data zbraně neobsahují ověřený Base Range');
  const s=skill(attacker,skillId),str=attacker.hmk?.attributes?.str;
  must(int(str,1,200),'Střelec nemá STR');
+ // HMK p.112: sensory headgear impairs PER-based Archery/Slings/Throwing.
+ // HMK p.170: all four body zones are relevant to these Impaired tests.
+ // Modified ENC affects AGL-based tests, NOT Archery/Slings/Throwing directly.
+ // Never infer a missing printed-suit Bulk assessment as zero.
+ const shooterLoad=resolveCombatantLoad({character:attacker,inventory,bulkConfirmation:attackerBulkConfirmation});
+ must(shooterLoad.ready&&Number.isSafeInteger(shooterLoad.perceptionPenalty)&&
+  Number.isSafeInteger(shooterLoad.meleeBulkPenalty),
+  `${attacker.name}: neověřené ENC/Bulk nebo postih vnímání střelce (${(shooterLoad.issues||[]).join('; ')||'chybí ověřené zóny Bulk tištěného kompletu'})`);
  const targetState=defender.hmk?.combatState??initialCombatState();
  const attackerState=attacker.hmk?.combatState??initialCombatState();
  must(attackerState.shock==='NONE','Shock střelce mění oprávnění ke střelbě');
@@ -152,7 +166,8 @@ export function createLiveGuidedMissile({id,timelineId,round,attacker,defender,w
  must(int(windforce,0,12)&&typeof crosswind==='boolean'&&typeof movingShooter==='boolean',
   'Chybí skutečné podmínky větru a pohybu střelce');
  must(['still','moving','evading'].includes(targetMovement),'Neznámý pohyb cíle');
- must(targetMovement!=='evading','Evading Target vyžaduje ověřený efektivní Dodge Index cíle; nelze jej nahradit nulou');
+ if(targetMovement==='evading')must(int(effectiveDodgeIndex,0,20),
+  'Evading Target vyžaduje doložený Effective Dodge Index z platné Evade akce');
  // No guessed injury/encumbrance EML: the resolver itself handles range, wind,
  // movement, draw strength and actual projectile Impact rolls.
  const fatigue=combatFatigueTotals(attackerState).total;
@@ -163,14 +178,16 @@ export function createLiveGuidedMissile({id,timelineId,round,attacker,defender,w
  const missile={weaponType:type,distance,baseRange:p.baseRange,ml:s.ml,impactDieSides:shot.impactDie,
   weaponImpactModifier:shot.mode.impactModifier+qualityImpactPenalty({baseWQ:p.quality,currentWQ:shot.record.currentWQ}),
   strengthImpactModifier:type==='thrown'?strengthImpactModifier(str)-1:0,
-  impactTAValue:ta.bonus,targetMovement,targetCount,nearbyTargetCount,windforce,crosswind,movingShooter,
-  traumaPenalty:fatigue,str,hft:p.heft??null};
+  impactTAValue:ta.bonus,targetMovement,effectiveDodgeIndex:targetMovement==='evading'?effectiveDodgeIndex:null,
+  targetCount,nearbyTargetCount,windforce,crosswind,movingShooter,chargingThrow,
+  // Missile EML resolver ADDS traumaPenalty; Fatigue must DECREASE EML.
+  traumaPenalty:-fatigue+shooterLoad.perceptionPenalty+shooterLoad.meleeBulkPenalty,str,hft:p.heft??null};
  const weaponByActor={ [attacker.id]:{impactDie:shot.impactDie,zoneDie:shot.zoneDie,aspect:shot.mode.aspect,
   modifier:missile.weaponImpactModifier,impactTABonus:ta.bonus,
   isArrowOrBolt:type==='bow'||type==='crossbow'}};
  return {session:createGuidedAttackJourney({id,timelineId,round,attackerId:attacker.id,
   defenderId:defender.id,kind:'missile',sourceSignature,missile,participants,inventory,
   direction,opponents,aimZN,weaponByActor}),
-  preflight:{source:'HMK pp163–164, actual missile skill and certified equipped weapon',
-   missileType:type,baseRange:p.baseRange,skillML:s.ml,restrictions:['Projectile must carry verified Base Range and missileType','Unknown context is not inferred']}};
+  preflight:{source:'HMK pp112,117–118,163–164,170; actual missile skill and certified equipped weapon',
+   missileType:type,baseRange:p.baseRange,skillML:s.ml,load:{source:shooterLoad.mode,gearENC:shooterLoad.gearENC,modifiedENC:shooterLoad.modifiedENC,bulkPenalty:shooterLoad.meleeBulkPenalty,perceptionPenalty:shooterLoad.perceptionPenalty,fatiguePenalty:-fatigue},restrictions:['Projectile must carry verified Base Range and missileType','Unknown context is not inferred']}};
 }

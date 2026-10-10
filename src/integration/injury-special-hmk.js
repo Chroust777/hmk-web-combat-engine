@@ -51,14 +51,20 @@ export function hmkMoraleTransition({initiativeML,fatigue=0,aberrance=0,brave=fa
  const sl=successLevel(roll,rawEML),result=moraleResult({sl,roll});
  return {rawEML,slName:Object.keys(SL).find(k=>SL[k]===sl),roll,result,state:combineMoraleState(current,result.state),actionPolicy:moraleActionPolicy(combineMoraleState(current,result.state))};
 }
-export function hmkMishapTransition({kind,roll=null,baseML=null,hasDEX=true,actionUsesDEX=true,hasLegs=true}={}){
+export function hmkMishapTransition({kind,roll=null,baseML=null,hasDEX=null,actionUsesDEX=null,hasLegs=null,
+ fatigue=0,injuryImpairment=0,stunned=false,forcedCF=false}={}){
  if(!['fumble-roll','stumble-roll','automatic-fumble','automatic-stumble'].includes(kind))throw Error('Neznámý Injury Mishap');
+ if(typeof hasDEX!=='boolean'||typeof actionUsesDEX!=='boolean'||typeof hasLegs!=='boolean')throw Error('Mishap: anatomie a použití DEX musí být doloženy, nikoliv předpokládány');
+ if(!Number.isSafeInteger(fatigue)||fatigue<0||!Number.isSafeInteger(injuryImpairment)||injuryImpairment<0||typeof stunned!=='boolean'||typeof forcedCF!=='boolean')throw Error('Mishap: neověřené modifikátory');
  const fumble=kind.includes('fumble')&&hasDEX&&actionUsesDEX;
  const type=fumble?'fumble':'stumble';
  const automatic=kind.startsWith('automatic-');
  if(!automatic&&(!Number.isSafeInteger(roll)||roll<1||roll>100||!Number.isSafeInteger(baseML)||baseML<0||baseML>200))throw Error('Injury Mishap vyžaduje ověřené ML a skutečný d100');
- const sl=automatic?SL.CF:successLevel(roll,baseML);
- const failed=automatic||sl===SL.CF||sl===SL.F;
- return {kind,type,automatic,failed,roll:automatic?null:roll,baseML:automatic?null:baseML,slName:automatic?'AUTO':Object.keys(SL).find(k=>SL[k]===sl),
+ const rawEML=automatic?null:baseML-fatigue-injuryImpairment;
+ const originalSL=automatic?SL.CF:forcedCF?SL.CF:successLevel(roll,rawEML);
+ const sl=automatic?SL.CF:stunned?Math.max(SL.CF,originalSL-1):originalSL;
+ const failed=sl===SL.CF||sl===SL.F;
+ return {kind,type,automatic,failed,roll:automatic?null:roll,baseML:automatic?null:baseML,
+  rawEML,fatigue,injuryImpairment,stunned,forcedCF,slName:automatic?'AUTO':Object.keys(SL).find(k=>SL[k]===sl),
   effect:failed?(type==='fumble'?'drop-item':hasLegs?'prone':'pass-next-turn'):'none'};
 }

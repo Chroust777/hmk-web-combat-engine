@@ -21,8 +21,10 @@ const sameArray=(a,b)=>Array.isArray(a)&&a.length===b.length&&[...a].sort().ever
 /** Strictly establish that an inventory snapshot still expresses the audited p118
  * article. We don't silently replace the owned snapshot with a newer definition.
  */
-export function resolveOwnedArmourArticle(item){
- if(!item||item.slot!=='worn'||item.quantity!==1||item.snapshot?.category!=='armor')return fail('Not a single worn armour article');
+export function resolveOwnedArmourArticle(item,{allowCarried=false}={}){
+ const rightSlot=allowCarried?item?.slot==='carried':item?.slot==='worn';
+ const rightQuantity=allowCarried?Number.isSafeInteger(item?.quantity)&&item.quantity>=1:item?.quantity===1;
+ if(!item||!rightSlot||!rightQuantity||item.snapshot?.category!=='armor')return fail('Invalid worn or carried armour article');
  const id=item.sourceItemId;
  if(typeof id!=='string'||item.snapshot.id!==id)return fail('Armour snapshot has no matching original definition ID');
  let source;
@@ -58,6 +60,9 @@ export function resolveOwnedArmourArticle(item){
  if(p.directionRestriction!==undefined&&p.directionRestriction!==source.directionRestriction)return fail('Snapshot directional rule differs from HMK p118');
  if(p.rigid!==undefined&&p.rigid!==source.rigid)return fail('Snapshot rigid status differs from HMK p118');
  if(p.layerZoneByLocation!==undefined&&stableValue(p.layerZoneByLocation)!==stableValue(source.layerZoneByLocation))return fail('Snapshot layering zones differ from HMK p118');
+ // When armour is stowed as gear, its REAL printed p.118 weight matters.
+ // Reject a stale/lightened inventory snapshot rather than granting free ENC.
+ if(allowCarried&&p.weightLb!==source.weightLb)return fail('Carried armour weight differs from verified HMK p118 source');
  return {ready:true,article:source};
 }
 

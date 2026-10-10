@@ -409,12 +409,18 @@ export function specialActionReadiness(state,{role='attacker',defence='block'}={
  if(role==='attacker'&&state.posture?.dropPending)return {ready:false,reason:'Fumble: upuštěný předmět – GM musí potvrdit stav vybavení před útokem'};
  return {ready:true,reason:null,posture:state.posture??null,morale};
 }
-export function applyConfirmedInjuryMishap({state,round,eventId,mishapId,baseML=null,roll=null,hasDEX=true,actionUsesDEX=true,hasLegs=true,gmConfirmed=false}={}){
+export function applyConfirmedInjuryMishap({state,round,eventId,mishapId,baseML=null,roll=null,hasDEX=null,actionUsesDEX=null,hasLegs=null,
+ injuryImpairment=null,usedArms=null,gmConfirmed=false}={}){
  const s=ready(state,round,eventId);requireCond(s.shock!=='KIA','KIA: postavě nelze přidat další bojovou akci');
  requireCond(gmConfirmed===true,'GM musí potvrdit vyhodnocení Injury Mishap');
  const m=(s.mishaps??[]).find(x=>x.id===mishapId);
  requireCond(m&&!m.resolved,'Mishap nenalezen nebo již vyhodnocen');
- const r=hmkMishapTransition({kind:m.kind,baseML,roll,hasDEX,actionUsesDEX,hasLegs});
+ // The immediate Mishap is an Impaired test (HMK pp.161,170), not an
+ // unmodified Attribute test. The guided runner must witness injury
+ // impairment; manual callers cannot bypass this by omitting it.
+ requireCond(whole(injuryImpairment,0,9999),'Mishap: chybí doložené impairment z aktuálních ran');
+ const r=hmkMishapTransition({kind:m.kind,baseML,roll,hasDEX,actionUsesDEX,hasLegs,
+  fatigue:fatigueTotalUnsafe(s),injuryImpairment,stunned:s.shock==='STN'});
  m.resolved=true;m.result=r;
  s.posture??={prone:false,dropPending:false,passNextTurn:false};
  if(r.effect==='prone')s.posture.prone=true;

@@ -85,11 +85,14 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
  }else if(articles.length===worn.length){
   const ordered=[];
   for(const {item,article} of articles){
-   if(!Number.isSafeInteger(item.layerOrder)||item.layerOrder<0){issues.push(`${item.id}: inner-to-outer layerOrder required`);continue;}
+   // With exactly one worn article its physical order is unique; requesting
+   // a GM-defined order would add no actual information (HMK p.117).
+   const effectiveOrder=item.layerOrder??(worn.length===1?0:null);
+   if(!Number.isSafeInteger(effectiveOrder)||effectiveOrder<0){issues.push(`${item.id}: inner-to-outer layerOrder required`);continue;}
    if(item.layerSlot!==undefined&&item.layerSlot!==null&&item.layerSlot!==''&&!SLOTS.has(item.layerSlot)){
     issues.push(`${item.id}: invalid layer slot`);continue;
    }
-   ordered.push({...article,layerOrder:item.layerOrder});
+   ordered.push({...article,layerOrder:effectiveOrder});
   }
   if(ordered.length===articles.length){
    const slots=Object.fromEntries(articles.filter(({item})=>item.layerSlot).map(({item,article})=>[article.id,item.layerSlot]));
@@ -128,11 +131,22 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
  for(const item of owned.filter(x=>MASS_SLOTS.has(x.slot))){
   if(!Number.isSafeInteger(item.quantity)||item.quantity<1){issues.push(`${item.id}: invalid carried quantity`);continue;}
   const p=item.snapshot?.properties;
-  if(!finiteMass(p?.weightLb)){issues.push(`${item.id}: unknown physical weight; cannot calculate Gear ENC`);continue;}
+  let physicalWeight=p?.weightLb;
+  if(item.snapshot?.category==='armor'&&typeof item.sourceItemId==='string'&&item.sourceItemId.startsWith('hmk:armour:p118:')){
+   const verified=resolveOwnedArmourArticle(item,{allowCarried:true});
+   if(!verified.ready){issues.push(`${item.id}: stowed HMK armour is not source-verified: ${verified.reason}`);continue;}
+   physicalWeight=verified.article.weightLb;
+  }
+  if(!finiteMass(physicalWeight)){issues.push(`${item.id}: unknown physical weight; cannot calculate Gear ENC`);continue;}
   const stowage=item.gearStowage??'normal';
   if(!['normal','awkward','backpack'].includes(stowage)) {issues.push(`${item.id}: invalid gear stowage`);continue;}
   if(stowage==='backpack'&&item.slot!=='carried') {issues.push(`${item.id}: only carried gear can be packed in backpack`);continue;}
-  gear.push({id:item.id,weightLb:p.weightLb,quantity:item.quantity,stowage});
+  // HMK p.120: only the CONTENTS of a backpack receive the half-weight
+  // reduction. The backpack itself must always contribute its full weight.
+  if(stowage==='backpack'&&/\bbackpack\b/i.test(item.snapshot?.name||'')){
+   issues.push(`${item.id}: a backpack cannot be packed into itself or receive its own half-weight allowance`);continue;
+  }
+  gear.push({id:item.id,weightLb:physicalWeight,quantity:item.quantity,stowage});
  }
  const backpackPacked=gear.some(x=>x.stowage==='backpack');
  if(backpackPacked&&!owned.some(x=>MASS_SLOTS.has(x.slot)&&/\bbackpack\b/i.test(x.snapshot?.name||'')))
@@ -141,10 +155,13 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
  if(!issues.some(x=>/weight|stowage|quantity|backpack|duplicate inventory|equipment slot/.test(x.toLowerCase()))){
   try{gearLoad=calculateGearLoad(gear);}catch(e){issues.push(`Gear load: ${e.message}`);}
  }
- // STR values >21 are not covered by the printed p112 table; do not extrapolate.
+ // HMK p.112 STR table explicitly continues with an ellipsis beyond 20–21;
+ // p.122 confirms the same progression at STR27 (−40 ENC). Do not reject
+ // valid stronger characters/creatures merely because the table is abbreviated.
  const str=character.hmk?.attributes?.str;
- if(!Number.isSafeInteger(str)||str<1||str>21)issues.push('Character STR 1–21 must be recorded; p112 modifier table not extrapolated');
- const encReady=Number.isSafeInteger(armourENC)&&gearLoad!==null&&Number.isSafeInteger(str)&&str>=1&&str<=21;
+ const validSTR=Number.isSafeInteger(str)&&str>=1&&str<=200;
+ if(!validSTR)issues.push('Character STR must be a recorded positive integer (1–200)');
+ const encReady=Number.isSafeInteger(armourENC)&&gearLoad!==null&&validSTR;
  const baseENC=encReady?armourENC+gearLoad.gearENC:null;
  const strengthModifier=encReady?strengthEncumbranceModifier(str,{mounted}):null;
  const modifiedENC=encReady?modifiedEncumbrance({armourENC,gearENC:gearLoad.gearENC,str,mounted}):null;

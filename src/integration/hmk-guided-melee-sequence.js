@@ -14,13 +14,14 @@ const check=(v,msg)=>{if(!v)throw new Error(msg)};
 const validId=v=>typeof v==='string'&&v.length>0&&v.length<161;
 
 export function createGuidedMeleeSequence({id,timelineId,round,attackerId,defenderId,
- attackerEML,defenderEML,allowedDefences,sourceSignature}={}){
+ attackerEML,defenderEML,defenderEMLByDefence=null,allowedDefences,sourceSignature}={}){
  check(validId(id)&&validId(timelineId)&&validId(sourceSignature),'Chybí ověřená bojová událost a podpis stavu');
  check(int(round,1,9999)&&validId(attackerId)&&validId(defenderId)&&attackerId!==defenderId,'Neplatní účastníci/kolo');
  check(int(attackerEML,0,100)&&int(defenderEML,0,100),'Chybí doložené EML účastníků');
  check(Array.isArray(allowedDefences)&&allowedDefences.length>0&&allowedDefences.every(x=>Object.values(DEFENCE).includes(x))
   &&new Set(allowedDefences).size===allowedDefences.length,'Chybí skutečně povolené volby obrany');
- return {format:'hmk-guided-melee-v1',id,timelineId,round,attackerId,defenderId,attackerEML,defenderEML,
+ if(defenderEMLByDefence!==null)check(Object.entries(defenderEMLByDefence).every(([k,v])=>Object.values(DEFENCE).includes(k)&&int(v,0,100)), 'Chybí ověřené EML podle druhu obrany');
+ return {format:'hmk-guided-melee-v1',id,timelineId,round,attackerId,defenderId,attackerEML,defenderEML,defenderEMLByDefence:structuredClone(defenderEMLByDefence),
   allowedDefences:[...allowedDefences],sourceSignature,phase:'choose-defence',defence:null,queue:null,
   witnessedRolls:[],gate:null};
 }
@@ -40,7 +41,7 @@ export function chooseGuidedMeleeDefence(session,defence){
  if(defence!==DEFENCE.IGNORE)requests.push({id:'defenderRoll',faces:100,label:`Melee ${defence} d100`});
  const queue=createManualDiceQueue({id:session.id+':melee-d100',source:'HMK World of Kèthîra p.166 Melee',
   round:session.round,actorId:session.attackerId,requests});
- return {...session,defence,phase:'rolling',queue};
+ return {...session,defence,defenderEML:session.defenderEMLByDefence?.[defence]??session.defenderEML,phase:'rolling',queue};
 }
 
 export function submitGuidedMeleeDie(session,value){

@@ -4,7 +4,7 @@
  * circumstances or replace unknown information with a false/zero default.
  * The witness comes from the verified Attack/Defence gate, NOT a GM checkbox.
  */
-import {normalFreePressEligible} from '../rules/melee.js';
+import {normalFreePressEligible,heldSlotInGrabZone} from '../rules/melee.js';
 import {SL} from '../rules/tests.js';
 import {applyConfirmedHMKManeuver,applyConfirmedGrabRetest,applyConfirmedGrabTakeTransfer} from './hmk-maneuver-persistence.js';
 
@@ -182,15 +182,17 @@ export function applyAutomaticGrabHoldRetest({state,round,eventId,grabberId,targ
  * physical inventory move is deterministic and needs no GM attestation.
  * Inventory changes are applied atomically by the caller along with state.
  */
-export function applyAutomaticGrabTake({state,inventory,round,eventId,grabberId,targetId,itemId}={}){
+export function applyAutomaticGrabTake({state,inventory,round,eventId,grabberId,targetId,itemId,targetHandedness}={}){
  ensure(state?.pendingGrabTake?.toActorId===grabberId&&state.pendingGrabTake?.fromActorId===targetId,
   'Neexistuje potvrzené Grab Take mezi zadanými postavami');
  ensure(integer(round,1,9999),'Neplatné kolo');
  ensure(Array.isArray(inventory),'Chybí aktuální inventář');
  const obj=inventory.find(x=>x.id===itemId&&x.characterId===targetId&&['main_hand','off_hand'].includes(x.slot));
  ensure(obj?.quantity===1,'Lze převzít pouze skutečně držený jednotlivý předmět');
+ ensure(obj.slot===heldSlotInGrabZone(state.pendingGrabTake.zone,targetHandedness),
+  'Grab Take: zasažená anatomická ruka musí odpovídat skutečnému slotu a doložené Handedness');
  const result=applyConfirmedGrabTakeTransfer({state,inventory,round,eventId,attackerId:grabberId,
-  targetId,itemId,gmConfirmed:true});
+  targetId,itemId,targetHandedness,gmConfirmed:true});
  const proof=freeze({source:'HMK World of Kèthîra p.106',grabberId,targetId,round,
   itemId,mode:'automatic-verified-held-inventory-transfer'});
  result.state.events.at(-1).details.ruleProof=proof;

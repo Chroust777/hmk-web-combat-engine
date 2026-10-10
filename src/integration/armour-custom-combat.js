@@ -34,11 +34,17 @@ export function resolveCustomArmour({pieces,location,aspect,direction,layerOptio
  // p.118: against multiple foes, rear-only protection succeeds on d10 TN5
  // and front-only on d10 TN7. Do not quietly assume one opponent when
  // the GM supplies a multiple-foe situation.
- const opponents=directionalContext.opponents??1;
- const d10=directionalContext.d10??null;
- if(!Number.isSafeInteger(opponents)||opponents<1||opponents>999)return fail('Invalid count of threatening foes');
  const candidates=articles.filter(a=>a.coveredLocations.includes(location));
  const directional=candidates.filter(a=>['front-only','rear-only'].includes(a.coverageMarkers[location]));
+ // The p.118 single-foe direction check and multiple-foe TN5/TN7 tests
+ // cannot be chosen without an observed number of threatening foes.
+ // A non-directional article needs no such external information.
+ const suppliedOpponents=directionalContext.opponents;
+ if(directional.length && !Number.isSafeInteger(suppliedOpponents))
+  return fail('HMK p118: number of threatening foes is required for directional armour');
+ const opponents=suppliedOpponents??1;
+ const d10=directionalContext.d10??null;
+ if(!Number.isSafeInteger(opponents)||opponents<1||opponents>999)return fail('Invalid count of threatening foes');
  if(opponents>1&&directional.length&&(!Number.isSafeInteger(d10)||d10<1||d10>10))return fail('HMK p118 directional d10 (1–10) required against multiple foes');
  const covered=candidates.filter(a=>{
   const marker=a.coverageMarkers[location];

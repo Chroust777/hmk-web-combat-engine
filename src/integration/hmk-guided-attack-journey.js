@@ -9,6 +9,7 @@ import {createGuidedMeleeSequence,guidedMeleeRequirement,chooseGuidedMeleeDefenc
 import {resolveHMKMissileAttack} from './hmk-missile-combat.js';
 import {createGuidedFullHit,guidedFullHitRequirement,chooseGuidedFullHit,submitGuidedFullHitDie,finalizeGuidedFullHit,advanceGuidedFullHit} from './hmk-guided-full-hit.js';
 import {readPhysicalDieValue} from './hmk-manual-dice-queue.js';
+import {createGuidedBlockWeaponDamage,guidedBlockWeaponDamageRequirement,submitGuidedBlockWeaponDamageDie,completeGuidedBlockWeaponDamage} from './hmk-guided-block-weapon-damage.js';
 import {successLevel,SL} from '../rules/tests.js';
 const assert=(x,message)=>{if(!x)throw Error(message)};
 const int=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -21,7 +22,7 @@ const signature=state=>JSON.stringify(state);
 export function createGuidedAttackJourney({id,timelineId,round,attackerId,defenderId,
  kind,sourceSignature,melee=null,missile=null,participants,inventory,
  direction,opponents=1,aimZN=1,armourReduction=0,impactTA=0,
- precisionDice=0,weaponByActor}={}){
+ precisionDice=0,weaponByActor,weaponItemIds=null}={}){
  assert(['melee','missile'].includes(kind)&&typeof sourceSignature==='string'&&sourceSignature,
   'Chybí potvrzený výběr útoku a jeho pravidlový podpis');
  assert(participants&&participants[attackerId]&&participants[defenderId]&&Array.isArray(inventory)&&weaponByActor,
@@ -34,7 +35,7 @@ export function createGuidedAttackJourney({id,timelineId,round,attackerId,defend
  if(kind==='melee'){
   assert(melee&&int(melee.attackerEML,0,100)&&int(melee.defenderEML,0,100),'Chybí doložené finální Melee EML');
   meleeSession=createGuidedMeleeSequence({id:id+':attack',timelineId,round,attackerId,defenderId,
-   attackerEML:melee.attackerEML,defenderEML:melee.defenderEML,allowedDefences:melee.allowedDefences,sourceSignature});
+   attackerEML:melee.attackerEML,defenderEML:melee.defenderEML,defenderEMLByDefence:melee.defenderEMLByDefence,allowedDefences:melee.allowedDefences,sourceSignature});
  }
  if(kind==='missile'){
   assert(missile&&['bow','crossbow','sling','thrown'].includes(missile.weaponType),'Chybí údaje skutečné střelné/vrhací zbraně');
@@ -48,7 +49,8 @@ export function createGuidedAttackJourney({id,timelineId,round,attackerId,defend
  return {format:'hmk-guided-attack-journey-v1',id,timelineId,round,attackerId,defenderId,kind,
   sourceSignature,meleeSession,missile:missile?copy(missile):null,
   participants:copy(participants),inventory:copy(inventory),direction,opponents,aimZN,armourReduction,
-  impactTA,precisionDice,weaponByActor:copy(weaponByActor),missileRoll:null,
+  impactTA,precisionDice,weaponByActor:copy(weaponByActor),weaponItemIds:weaponItemIds?copy(weaponItemIds):null,
+  weaponDamageSession:null,weaponDamageProof:null,missileRoll:null,
   missileImpactRoll:null,choiceImpactTA:null,nearbyD20:null,nearbyImpactD10:null,
   volleyRolls:[],volleyImpactD10:null,selectedTargetRollIndex:null,spoiledDisposition:null,spoiledD100:null,
   physicalDice:[],hitSession:null,finalAttack:null,phase:kind==='melee'?'melee':'missile'};
@@ -90,6 +92,7 @@ export function guidedAttackRequirement(s){
  assert(s?.format==='hmk-guided-attack-journey-v1','Neplatný HMK průvodce celým útokem');
  if(s.phase==='melee')return guidedMeleeRequirement(s.meleeSession);
  if(s.phase==='missile')return missileStep(s);
+ if(s.phase==='melee-weapon-damage')return guidedBlockWeaponDamageRequirement(s.weaponDamageSession);
  if(s.phase==='melee-ta'){
   const gate=s.finalAttack;const remaining=gate?.extraTA??0;
   const allowed=gate?.taTypes??[];
@@ -118,8 +121,9 @@ function transitionToHit(s,outcome,dice){
  // must follow the weapon that actually hit, never the initial attacker.
  const reduction=sourceWeapon?.armourReduction??s.armourReduction;
  assert(int(reduction,0,99),'Zbraň neobsahuje platný Armour Reduction');
+ const safeOutcome=s.weaponDamageProof?{...outcome,weaponDamageResolved:true}:outcome;
  const hit=createGuidedFullHit({id:s.id,timelineId:s.timelineId,round:s.round,
-  attackerId:s.attackerId,defenderId:s.defenderId,kind:s.kind,outcome,
+  attackerId:s.attackerId,defenderId:s.defenderId,kind:s.kind,outcome:safeOutcome,
   weapon:sourceWeapon,aimZN:s.aimZN,precisionDice:precision,impactTA:impact,
   armourReduction:reduction,direction:s.direction,opponents:s.opponents,
   inventory:s.inventory,targetState:entry.state,shockML:entry.shockML,strengthML:entry.strengthML,
@@ -134,6 +138,20 @@ export function submitGuidedAttackDie(s,value){
   if(guidedMeleeRequirement(m).kind==='resolved'){
    const finished=guidedMeleeResult(m);
    const gate=finished.gate;
+   if(gate.weaponDamageCheck){
+    assert(s.weaponItemIds?.[s.attackerId]&&s.weaponItemIds?.[s.defenderId],
+     'Poškození zbraně vyžaduje skutečně vybrané zbraně obou účastníků');
+    const rolls=finished.physicalDice;
+    const a=rolls.find(x=>x.id==='attackerRoll')?.value;
+    const d=rolls.find(x=>x.id==='defenderRoll')?.value;
+    const weaponDamageSession=createGuidedBlockWeaponDamage({id:s.id+':wq',timelineId:s.timelineId,round:s.round,
+     attackerId:s.attackerId,defenderId:s.defenderId,gate,attackerRoll:a,defenderRoll:d,
+     attackerEML:s.meleeSession.attackerEML,defenderEML:s.meleeSession.defenderEML,
+     inventory:s.inventory,attackerItemId:s.weaponItemIds[s.attackerId],
+     defenderItemId:s.weaponItemIds[s.defenderId],weaponByActor:s.weaponByActor,sourceSignature:s.sourceSignature});
+    return {...s,meleeSession:m,finalAttack:copy(gate),physicalDice:finished.physicalDice,
+     weaponDamageSession,phase:'melee-weapon-damage'};
+   }
    if((gate.attackerStrike||gate.counterStrike)&&gate.extraTA>0){
     return {...s,meleeSession:m,finalAttack:copy(gate),physicalDice:finished.physicalDice,phase:'melee-ta'};
    }
@@ -147,6 +165,12 @@ export function submitGuidedAttackDie(s,value){
   else next[req.id]=v;
   return advanceGuidedAttack(next);
  }
+ if(s.phase==='melee-weapon-damage'){
+  const next=submitGuidedBlockWeaponDamageDie(s.weaponDamageSession,v);
+  const pending={...s,weaponDamageSession:next};
+  return guidedBlockWeaponDamageRequirement(next).kind==='complete'
+   ?transitionToHit({...pending,weaponDamageProof:true},s.finalAttack,s.physicalDice):pending;
+ }
  if(s.phase==='hit')return {...s,hitSession:submitGuidedFullHitDie(s.hitSession,v)};
  throw Error('Nepovolený krok');
 }
@@ -157,6 +181,7 @@ export function chooseGuidedAttack(s,value){
   const m=chooseGuidedMeleeDefence(s.meleeSession,picked);
   return {...s,meleeSession:m};
  }
+ if(s.phase==='melee-weapon-damage')return guidedBlockWeaponDamageRequirement(s.weaponDamageSession);
  if(s.phase==='melee-ta'){
   const [impact,precision]=picked.split(':').map(Number);
   assert(int(impact,0,3)&&int(precision,0,4),'Neplatné využití TA');
@@ -182,7 +207,11 @@ export function advanceGuidedAttack(s){
  if(s.phase==='hit')return {...s,hitSession:advanceGuidedFullHit(s.hitSession)};
  return s;
 }
-export function completeGuidedAttack({session,currentState,sourceSignature}={}){
+export function completeGuidedAttack({session,currentState,sourceSignature,currentInventory=null}={}){
  assert(session?.phase==='hit'&&session.hitSession,'Původní útok ještě nebyl uzavřen');
- return finalizeGuidedFullHit({session:session.hitSession,currentState,sourceSignature});
+ const hit=finalizeGuidedFullHit({session:session.hitSession,currentState,sourceSignature});
+ if(!session.weaponDamageSession)return hit;
+ const wq=completeGuidedBlockWeaponDamage({session:session.weaponDamageSession,
+  currentInventory:currentInventory??session.inventory,sourceSignature});
+ return {...hit,weaponDamage:wq,inventory:wq.inventory};
 }
