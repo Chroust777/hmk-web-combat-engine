@@ -146,6 +146,8 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
  const p=persistentState(states,id);
  if(action==='evade')requireValid(s.entryShock!=='STN'&&p.shock!=='STN','Stunned postava nesmí vybrat Evade (HMK str.161)');
  const helpless=['INC','UNC','KIA'].includes(p.shock)||p.coma?.active||p.morale?.state==='catatonic';
+ if(action==='incapacitated')requireValid(helpless||['INC','UNC','KIA'].includes(s.entryShock)||s.entryMorale==='catatonic'||s.entryAlertness==='unaware',
+  'Schopná, Aware postava nemůže deklarovat technický stav Incapacitated jako akci');
  if(helpless)requireValid(action==='incapacitated','Bezvládná či mrtvá postava nemůže vykonat akci');
  if(['INC','UNC','KIA'].includes(s.entryShock)||s.entryMorale==='catatonic')
   requireValid(action==='incapacitated','Postava začala tah bezvládná či Catatonic; zotavení na konci tahu nedovoluje zpětně vykonat akci');

@@ -16,6 +16,10 @@ export function reachFromEquippedSnapshot(snapshot,{mode='primary',sizeReachModi
   if(!special.ok)return {ok:false,reason:special.reason};
   length=special.length;
  }else return {ok:false,reason:'unsupported-strike-mode'};
+ // The printed Weapon LNG column is commonly stored as a plain digit string.
+ // Composite lengths such as '6|5' or suffixed '7t' stay unsupported until
+ // the active strike mode disambiguates them; do not guess the alternative.
+ if(typeof length==='string'&&/^[0-9]$/.test(length))length=Number(length);
  if(!Number.isSafeInteger(length)||length<0||length>9)return {ok:false,reason:'missing-or-invalid-weapon-length'};
  const rch=length+sizeReachModifier;
  if(rch<0)return {ok:false,reason:'negative-reach-cannot-strike'};

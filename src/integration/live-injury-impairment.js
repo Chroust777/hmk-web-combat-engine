@@ -4,6 +4,7 @@
  */
 import {acuteInjuryEffect,injuryMishap,impairedTestZones} from '../rules/injury-effects.js';
 import {SL} from '../rules/tests.js';
+import {healingStageZoneEffect} from '../rules/healing.js';
 import {validateCombatState} from './persistent-combat-state.js';
 
 const LOCATION_ZONES=Object.freeze({sk:'head',skull:'head',fa:'head',face:'head',nk:'head',neck:'head',
@@ -20,13 +21,17 @@ function woundInfo(w,round,{needSide=true,needShock=true,timelineId=null}={}){
  if(zone==='arm'&&needSide&&!['left','right'].includes(w.side))return {ok:false,reason:`Chybí potvrzená strana paže rány ${w.id}`};
  const sameTimeline=typeof timelineId==='string'&&timelineId&&w.timelineId===timelineId;
  const elapsed=sameTimeline&&round>=w.recordedRound?round-w.recordedRound:null;
- if(w.severity==='M'&&needShock&&!w.minorOnsetGM&&!['F','CF'].includes(w.shockSL)){
+ if(!w.healed&&!w.healing?.treated&&w.severity==='M'&&needShock&&!w.minorOnsetGM&&!['F','CF'].includes(w.shockSL)){
   if(elapsed===null)return {ok:false,reason:`Minor ${w.id}: časová osa není prokazatelně souvislá; GM potvrdí 10 minut nebo obnoví správné střetnutí`};
   if(elapsed<120&&!(w.shockSL in SL_KEY))return {ok:false,reason:`Minor ${w.id}: chybí potvrzený původní Shock Roll SL (HMK str.170)`};
  }
- const effect=w.severity==='M'&&w.minorOnsetGM?{impairment:5,unusable:false}:
-  acuteInjuryEffect({severity:w.severity,shockSL:SL_KEY[w.shockSL]??null,minutesSinceInjury:elapsed===null?0:elapsed/12});
- const mishap=injuryMishap({severity:w.severity,zone:zone==='area'?'head':zone,location:normalizeLocation(w.location)==='pv'?'pelvis':null});
+ const healing=w.healing;
+ const effect=w.healed===true?{impairment:healing?.permanentImpairment??0,unusable:false}:
+  healing?.treated&&Number.isInteger(healing.healingRate)&&healing.healingRate>0?
+   (()=>{const e=healingStageZoneEffect({injuryLevel:w.level,healingRate:healing.healingRate,permanent:healing.permanentImpairment??0});return {impairment:e.effective,unusable:e.unusable};})():
+  w.severity==='M'&&w.minorOnsetGM?{impairment:5,unusable:false}:
+   acuteInjuryEffect({severity:w.severity,shockSL:SL_KEY[w.shockSL]??null,minutesSinceInjury:elapsed===null?0:elapsed/12});
+ const mishap=w.healed===true?[]:injuryMishap({severity:w.severity,zone:zone==='area'?'head':zone,location:normalizeLocation(w.location)==='pv'?'pelvis':null});
  return {ok:true,id:w.id,location:w.location,side:w.side??null,zone,level:w.level,severity:w.severity,impairment:effect.impairment,unusable:effect.unusable,recordedRound:w.recordedRound,elapsedRounds:elapsed,mishap};
 }
 /** Used arm(s) must be confirmed by the actor/GM for Melee, including weapon handling.
@@ -37,7 +42,7 @@ export function projectLiveInjuries({state,round,test='melee',usedArms=null,time
  if(!Number.isSafeInteger(round)||round<1)return {ready:false,reason:'Neplatné bojové kolo'};
  const zones=impairedTestZones(test);
  if(!zones.length)return {ready:false,reason:`Neověřený druh impaired testu: ${test}`};
- const affectedArms=state.wounds.some(w=>LOCATION_ZONES[normalizeLocation(w.location)]==='arm');
+ const affectedArms=state.wounds.some(w=>LOCATION_ZONES[normalizeLocation(w.location)]==='arm'&&(!w.healed||(w.healing?.permanentImpairment??0)>0));
  if(affectedArms&&zones.includes('arm')&&(!Array.isArray(usedArms)||usedArms.length===0||usedArms.some(s=>!['left','right','none'].includes(s))))return {ready:false,reason:'GM musí určit použitou paži: left/right/both nebo none'};
  const arms=usedArms?.includes('none')?[]:(usedArms??[]);
  const details=state.wounds.map(w=>{

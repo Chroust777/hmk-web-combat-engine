@@ -122,7 +122,7 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
  const limbLocations=['sh','ua','el','fo','ha','th','kn','ca','ft','shoulder','upper arm','elbow','forearm','hand','thigh','knee','calf','foot'];
  const isLimb=limbLocations.includes(String(draft.location).toLowerCase());
  if(inj.kind==='injury'&&isLimb)requireCond(['left','right'].includes(adjudication.side),'HMK str.167: zásah do končetiny vyžaduje potvrzení strany left/right');
- const sameLoc=s.wounds.filter(w=>w.location.toLowerCase()===String(draft.location).toLowerCase());
+ const sameLoc=s.wounds.filter(w=>!w.healed&&w.location.toLowerCase()===String(draft.location).toLowerCase());
  if(inj.kind==='injury'&&isLimb)requireCond(!sameLoc.some(w=>!['left','right'].includes(w.side)),'Před Compound Injury je nutné doplnit stranu starší rány stejné končetiny');
  const existing=sameLoc.filter(w=>!isLimb||w.side===adjudication.side);
  if(inj.kind==='none')requireCond(draft.shockResult.state==='NONE','Zásah bez účinku nemůže vyvolat nový Shock State');
@@ -164,7 +164,7 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
   const level=Number(inj.injury.slice(1)),severity=inj.injury[0];
   requireCond((level===1&&severity==='M')||([2,3].includes(level)&&severity==='S')||([4,5].includes(level)&&severity==='G'),'Nesouhlasí Severity a Injury Level');
   const fixedLevel=compound?.injury?.level??level;const fixedSeverity=compound?.injury?.severity??severity;
-  return {id:`wound:${eventId}`,location:draft.location,severity:fixedSeverity,level:fixedLevel,aspect:draft.aspect,bleeding:adjudication.bleeding,nextAdvanceRound:adjudication.bleeding?round+BLOOD_LOSS_PERIOD_ROUNDS:null,recordedRound:round,originEventId:eventId,compoundReviewed:!!adjudication.compoundReviewed,shockSL:draft.inputs?.shockLevel??null,side:adjudication.side??null,timelineId:adjudication.timelineId??null,amputation:amp&&!ampFromOld?{severed:amp.severed,triangleModifier:amp.triangleModifier,sl:amp.slName,roll:amp.roll,strengthML:amp.strengthML,shockTestModifier:amp.shockTestModifier}:null,moralePending:['S','G'].includes(fixedSeverity),impaled:projectileImpalement({projectile:adjudication.arrowOrBolt===true,severity:fixedSeverity,injuryLevel:fixedLevel})};
+  return {id:`wound:${eventId}`,location:draft.location,severity:fixedSeverity,level:fixedLevel,aspect:draft.aspect,bleeding:adjudication.bleeding,nextAdvanceRound:adjudication.bleeding?round+BLOOD_LOSS_PERIOD_ROUNDS:null,recordedRound:round,originEventId:eventId,compoundReviewed:!!adjudication.compoundReviewed,shockSL:draft.inputs?.shockLevel??null,side:adjudication.side??null,timelineId:adjudication.timelineId??null,amputation:amp&&!ampFromOld?{severed:amp.severed,triangleModifier:amp.triangleModifier,sl:amp.slName,roll:amp.roll,strengthML:amp.strengthML,shockTestModifier:amp.shockTestModifier}:null,moralePending:['S','G'].includes(fixedSeverity),projectileArrowOrBolt:adjudication.arrowOrBolt===true,impaled:projectileImpalement({projectile:adjudication.arrowOrBolt===true,severity:fixedSeverity,injuryLevel:fixedLevel})};
  })():null;
  if(wound)requireCond(!s.wounds.some(w=>w.id===wound.id),'Tato rána již byla potvrzena');
  if(compound?.compoundedExisting){
@@ -393,6 +393,10 @@ export function specialActionReadiness(state,{role='attacker',defence='block'}={
  if(state.shock==='KIA')return {ready:false,reason:'KIA: postava je mrtvá'};
  const pendingMishaps=unresolvedInjuryMishaps(state);
  const pendingMorale=dueInjuryMorale(state);
+ if(state.pendingManeuver)return {ready:false,reason:'Povinný Press Shock/Stumble před další akcí (HMK str.106/161)'};
+ if(state.pendingAutomaticGrab)return {ready:false,reason:'Trip 10+: volba automatického Grab Hold/Take nebo odmítnutí ještě nebyla vyřešena (HMK str.106)'};
+ if(role==='attacker'&&state.grabHold?.active)return {ready:false,reason:'Postava je držena Grab Hold: v dalším tahu musí Pass'};
+ if(state.pendingGrabTake)return {ready:false,reason:'Úspěšný Grab Take: GM musí potvrdit přesun předmětu v inventáři'};
  if(pendingMishaps.length)return {ready:false,reason:'Nejdříve vyhodnoťte bezprostřední Injury Mishap podle HMK str.170'};
  if(pendingMorale.length)return {ready:false,reason:'Po zotavení ze Shock je splatný povinný Morale Roll (HMK str.162)'};
  const morale=state.morale?.state??'steady';
