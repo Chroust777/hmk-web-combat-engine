@@ -8,6 +8,7 @@ import {validateInCloseTransition} from './src/integration/in-close-transition.j
 import {resolveCharacterReachSizeModifier} from './src/integration/character-reach-size.js';
 import {validateStrikeReachSelection} from './src/integration/melee-reach-consistency.js';
 import {reachFromSelectedEquipment} from './src/integration/melee-auto-reach.js';
+import {engagementZoneSpaces} from './src/rules/engagement.js';
 import {verifiedReachEMLModifiers} from './src/integration/melee-reach.js';
 import {outnumberedEMLModifier} from './src/integration/melee-outnumbered.js';
 import {proneMeleeEMLModifier} from './src/integration/melee-position-modifiers.js';
@@ -39,11 +40,20 @@ import {resolveCombatantLoad,bulkForTest} from './src/integration/combatant-load
 import {createEncounterSequence,validateEncounterSequence,startEncounterTurn,finishEncounterTurn,nextEncounterRound,dueEncounterEvents,dueEndTurnEvents,currentEncounterActor,assertScheduledMeleeActor,resolveReadiedEncounterAction,cancelReadiedEncounterAction,completeReadiedEncounterAction,confirmAlertnessReaction,confirmConcentrationCompletion,abandonEncounterConcentration,ongoingEncounterConcentration,assertScheduledHitCanCommit,recordScheduledHitCommit,setEncounterTieOrder} from './src/integration/encounter-turn-sequence.js';
 import {applyConfirmedTreatment,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock} from './src/integration/hmk-healing-persistence.js';
 import {resolveHMKMissileAttack} from './src/integration/hmk-missile-combat.js';
-import {applyConfirmedHMKManeuver,applyConfirmedGrabRetest,applyConfirmedManeuverConsequence,applyConfirmedGrabTakeTransfer} from './src/integration/hmk-maneuver-persistence.js';
+import {applyConfirmedHMKManeuver,applyConfirmedGrabRetest,applyConfirmedManeuverConsequence,verifiedManeuverConsequence,applyConfirmedGrabTakeTransfer} from './src/integration/hmk-maneuver-persistence.js';
 import {decideFreePress,applyAutomaticFreePress,decideDeclaredManeuver,applyAutomaticDeclaredManeuver,resolveTripAutomaticGrab,applyAutomaticGrabHoldRetest,applyAutomaticGrabTake} from './src/integration/hmk-automatic-decisions.js';
 import {createManualDiceQueue,collectPhysicalDice} from './src/integration/hmk-manual-dice-queue.js';
 import {guidedMandatoryEvents,createGuidedMandatory,guidedMandatoryRequirement,submitGuidedMandatoryDie,commitGuidedMandatory} from './src/integration/hmk-guided-mandatory.js';
 import {createGuidedAttackJourney,guidedAttackRequirement,submitGuidedAttackDie,chooseGuidedAttack,advanceGuidedAttack,completeGuidedAttack} from './src/integration/hmk-guided-attack-journey.js';
+import {createGuidedFreePress,guidedFreePressRequirement,chooseGuidedFreePress,submitGuidedFreePressDie,submitGuidedFreePressDisplacement,advanceGuidedFreePressForcedConsequence,completeGuidedFreePress} from './src/integration/hmk-guided-free-press-followup.js';
+import {createGuidedMountedControl,guidedMountedRequirement,submitGuidedMountedDie,chooseGuidedMounted,completeGuidedMounted} from './src/integration/hmk-guided-mounted-control.js';
+import {createGuidedTurnAction,guidedTurnRequirement,chooseGuidedTurnAction,enterGuidedTurnDuration,completeGuidedTurnAction} from './src/integration/hmk-guided-turn-action.js';
+import {guidedTurnChoices} from './src/integration/hmk-guided-turn-choices.js';
+import {createGuidedDeclaredManeuver,guidedDeclaredRequirement,chooseGuidedDeclared,submitGuidedDeclaredDie,submitGuidedDeclaredDisplacement,submitGuidedDeclaredFact,advanceGuidedDeclared,advanceGuidedDeclaredForcedConsequence,completeGuidedDeclaredManeuver} from './src/integration/hmk-guided-declared-maneuver.js';
+import {projectGuidedSpatialPath,commitGuidedSpatialTurn} from './src/integration/hmk-guided-spatial-actions.js';
+import {liveSpatialEvade} from './src/integration/hmk-spatial-evasion.js';
+import {baseMove} from './src/rules/movement.js';
+import {successLevel} from './src/rules/tests.js';
 import {createLiveGuidedMelee,createLiveGuidedMissile} from './src/integration/hmk-guided-live-attack-inputs.js';
 import {applyConfirmedWeaponWQ,applyConfirmedAreaStrike,applyConfirmedMountedControl,applyConfirmedMountedCharge} from './src/integration/hmk-combat-aftereffects.js';
 import {qualityImpactPenalty} from './src/rules/weapon-damage.js';
@@ -74,7 +84,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.89';
+const APP_VERSION='93.96';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1331,6 +1341,18 @@ let guidedAttackLastOutcome=null;
 let guidedAttackCandidate=null;
 let guidedAttackAftermath=null;
 let guidedAttackAftermathTechnique=null;
+let guidedAttackFreePressSession=null;
+let guidedAttackFreePressChecked=false;
+let guidedAttackFreePressResult=null;
+let guidedMountedSession=null;
+let guidedMountedWitness=null;
+let guidedTurnSession=null;
+let guidedTurnWitness=null;
+let guidedDeclaredSession=null;
+let guidedDeclaredWitness=null;
+let guidedSpatialSession=null;
+let guidedSpatialWitness=null;
+let guidedChargeContext=null;
 function guidedAttackImmediateEvents(){
  if(!guidedAttackCandidate?.strike)return [];
  const h=guidedAttackSession.hitSession;
@@ -1342,11 +1364,26 @@ function guidedAttackNextRequirement(){
  if(!guidedAttackCandidate)return guidedAttackRequirement(guidedAttackSession);
  if(guidedAttackAftermath)return guidedMandatoryRequirement(guidedAttackAftermath);
  const first=guidedAttackImmediateEvents()[0];
- if(!first)return {kind:'complete',id:'ready-final-atomic-commit'};
+ if(!first){
+  if(guidedAttackFreePressSession){
+   const press=guidedFreePressRequirement(guidedAttackFreePressSession);
+   return press.kind==='complete'?{kind:'automatic',id:'finish-guided-free-press'}:press;
+  }
+  if(!guidedAttackFreePressChecked&&guidedAttackSession?.kind==='melee'){
+   const decision=decideFreePress({gate:guidedAttackSession.finalAttack,attackerId:guidedAttackSession.attackerId,
+    defenderId:guidedAttackSession.defenderId,round:guidedAttackSession.round,timelineId:guidedAttackSession.timelineId,
+    sourceSignature:guidedAttackToken,meleeProofKey:guidedAttackSession.id});
+   if(decision.eligible)return {kind:'automatic',id:'begin-guided-free-press'};
+  }
+  return {kind:'complete',id:'ready-final-atomic-commit'};
+ }
  if(first.kind==='injury-mishap'){
   const c=character(guidedAttackSession.hitSession.targetId);
   const mishap=guidedAttackCandidate.state.mishaps.find(x=>x.id===first.id);
-  const alt=mishap?.kind==='fumble-roll'?'legerdemain':mishap?.kind==='stumble-roll'?'acrobatics':null;
+  const usesDex=guidedAttackSession.hitSession.targetId===guidedAttackSession.attackerId||
+   (guidedAttackSession.kind==='melee'&&['block','counterstrike'].includes(String(guidedAttackSession.meleeSession?.defence).toLowerCase()));
+  const alt=mishap?.kind==='fumble-roll'&&usesDex?'legerdemain':
+   ['fumble-roll','stumble-roll'].includes(mishap?.kind)?'acrobatics':null;
   const found=alt&&(c.hmk?.skills||[]).some(x=>String(x.name||'').toLowerCase()===alt&&Number.isSafeInteger(x.ml));
   if(found&&!guidedAttackAftermathTechnique)return {kind:'choice',id:'aftermath-technique',
    choices:[{value:'attribute',label:'Použít atribut DEX/AGL podle HMK'},
@@ -1361,34 +1398,306 @@ function guidedAttackLiveSignature(attackerId,defenderId){
   participants:[attackerId,defenderId].map(id=>structuredClone(character(id)||null)),
   inventory:data.inventory.filter(x=>[attackerId,defenderId].includes(x.characterId)).map(x=>structuredClone(x)).sort((a,b)=>a.id.localeCompare(b.id))});
 }
-function clearGuidedAttack(){guidedAttackSession=null;guidedAttackWitness=null;guidedAttackToken=null;guidedAttackAudit=null;guidedAttackCandidate=null;guidedAttackAftermath=null;guidedAttackAftermathTechnique=null;}
+function clearGuidedAttack(){guidedChargeContext=null;guidedAttackSession=null;guidedAttackWitness=null;guidedAttackToken=null;guidedAttackAudit=null;guidedAttackCandidate=null;guidedAttackAftermath=null;guidedAttackAftermathTechnique=null;guidedAttackFreePressSession=null;guidedAttackFreePressChecked=false;guidedAttackFreePressResult=null;}
+/** HMK p.106: the declared technique is chosen before the d100 Melee test. */
+function continueGuidedDeclared(){
+ if(!guidedDeclaredSession)return;
+ try{
+  const s=guidedDeclaredSession;
+  if(guidedAttackLiveSignature(s.attackerId,s.defenderId)!==guidedDeclaredWitness)
+   throw Error('Údaje postavy a vybavení se změnily před potvrzením manévru');
+  const request=guidedDeclaredRequirement(s);
+  // A deterministic continuation never asks the GM to resolve the maths.
+  // All hits, Mishaps and Weapon Damage remain staged until the final write.
+  const automatic=advanceGuidedDeclared(s);
+  if(automatic!==s){guidedDeclaredSession=automatic;continueGuidedDeclared();return;}
+  if(request.id==='maneuver-forced-cf'){
+   guidedDeclaredSession=advanceGuidedDeclaredForcedConsequence(s);continueGuidedDeclared();return;
+  }
+  if(request.kind==='complete'){
+   const attacker=character(s.attackerId),defender=character(s.defenderId);
+   const finished=completeGuidedDeclaredManeuver({session:s,currentState:persistentStateOf(defender),
+    currentInventory:data.inventory,sourceSignature:guidedAttackToken});
+   for(const c of [attacker,defender]){
+    if(JSON.stringify(persistentStateOf(c))!==JSON.stringify(finished.originalStates[c.id]))
+     throw Error('Bojový stav '+c.name+' se od deklarace změnil; trvalý zápis není bezpečný');
+   }
+   const seq=combatInitiativeSequence?liveInitiativeSequence():null;
+   if(seq)assertScheduledHitCanCommit(seq,attacker.id);
+   if(finished.displacement&&!seq)throw Error('Press/Trip vyžaduje aktivní Initiative s doloženými souřadnicemi');
+   let nextSeq=seq?recordScheduledHitCommit(seq,{actorId:attacker.id,gmConfirmed:true}):null;
+   if(finished.displacement){
+    const movement=finished.displacement,provided=movement.units;
+    if(seq.spatialUnits){
+     for(const u of seq.spatialUnits){const p=provided.find(x=>x.id===u.id);
+      if(!p||Math.hypot(u.x-p.x,u.y-p.y)>0.00001)throw Error('Zadaná poloha se liší od uložené mapy');}
+    }
+    const expected=new Set([...encounterSelection]);
+    if(expected.size!==provided.length||provided.some(p=>!expected.has(p.id)))
+     throw Error('Press/Trip vyžaduje skutečné polohy všech účastníků střetnutí');
+    nextSeq.spatialUnits=provided.map(u=>({id:u.id,x:u.id===defender.id?movement.to.x:u.x,
+     y:u.id===defender.id?movement.to.y:u.y}));
+    nextSeq.spatialEvents??=[];
+    if(nextSeq.spatialEvents.some(e=>e.id===s.id))throw Error('Duplicitní prostorový důkaz manévru');
+    nextSeq.spatialEvents.push({id:s.id,round:s.round,actorId:attacker.id,targetId:defender.id,
+     timelineId:s.timelineId,displacement:structuredClone(movement),kind:s.technique});
+    nextSeq=validateEncounterSequence(nextSeq);
+   }
+   const counter=finished.counterHit?.strike?` Counterstrike ${defender.name} → ${attacker.name}; Injury/ Shock ${finished.states[attacker.id].shock}.`:'';
+   const wq=finished.weaponDamage?` Weapon Damage ${finished.weaponDamage.sourceItemId} → ${finished.weaponDamage.targetItemId}; WQ ${finished.weaponDamage.result.before} → ${finished.weaponDamage.result.after}.`:'';
+   const mishaps=finished.meleeMishaps?.length?` Melee Mishaps: ${finished.meleeMishaps.map(m=>m.actorId+' '+m.result.effect).join(', ')}.`:'';
+   const summary=`${attacker.name} deklaruje ${s.technique} proti ${defender.name}. ${finished.margin===null||finished.margin<=0?'Bez úspěšného manévru.':`Rozdíl ${finished.margin}; ${finished.outcome||'vyhodnoceno'}.`}${counter}${wq}${mishaps} Hody: ${finished.physicalDice.map(r=>`d${r.faces}=${r.value}`).join(', ')||'žádné'}.`;
+   const oldSeq=seq?structuredClone(seq):null;
+   if(nextSeq)persistInitiativeSequence(nextSeq);
+   const saved=mutate(()=>{
+    for(const c of [attacker,defender]){
+     if(JSON.stringify(finished.states[c.id])!==JSON.stringify(finished.originalStates[c.id]))
+      synchronizeCombatInjuries(c,finished.states[c.id]);
+    }
+    data.inventory=finished.inventory;
+    for(const id of [attacker.id,defender.id])data.journal.push({id:uuid(),characterId:id,createdAt:stamp(),
+     title:`HMK manévr, kolo ${s.round}`,body:summary,
+     combatProof:{timelineId:s.timelineId,round:s.round,actorId:attacker.id,actionKind:s.technique,sourceEventId:s.id,displacement:finished.displacement??null,physicalDice:finished.physicalDice,weaponDamage:finished.weaponDamage?{sourceItemId:finished.weaponDamage.sourceItemId,targetItemId:finished.weaponDamage.targetItemId,result:finished.weaponDamage.result}:null,counterHit:finished.counterHit?{strike:finished.counterHit.strike,proof:finished.counterHit.proof}:null,meleeMishaps:finished.meleeMishaps}});
+   });
+   if(!saved){if(oldSeq)persistInitiativeSequence(oldSeq);throw Error('Uložení selhalo; manévr není potvrzen');}
+   guidedDeclaredSession=null;guidedDeclaredWitness=null;guidedAttackLastOutcome=summary;render();return;
+  }
+  if(request.kind==='blocked'){guidedAttackLastOutcome='Deklarovaný manévr pozastaven: '+request.reason;render();return;}
+  render();
+ }catch(err){guidedAttackLastOutcome='Deklarovaný manévr: '+err.message;render();}
+}
+/** Read exact, observed positions and explicitly chosen Threat status. They are
+ * facts of the battlefield, not a GM mechanical ruling or an invented map. */
+function observedSpatialBattlefield(v,actorId){
+ const seq=liveInitiativeSequence();if(!seq?.active||currentEncounterActor(seq)!==actorId)
+  throw Error('Prostorová akce je možná jen na aktivním tahu správné postavy');
+ const units=selectedEncounterCharacters().map(c=>{
+  const id=c.id, x=v[`map_${id}_x`],y=v[`map_${id}_y`];
+  if(x===''||y==='')throw Error(`Zadejte doloženou pozici ${c.name} ve stopách`);
+  const savedPosition=seq.spatialUnits?.find(p=>p.id===id);
+  if(savedPosition&&(Math.abs(Number(x)-savedPosition.x)>1e-7||Math.abs(Number(y)-savedPosition.y)>1e-7))
+   throw Error(`${c.name}: pozice se liší od uložené mapy; nelze přepsat bojové souřadnice bez doložené změny polohy`);
+  const foe=id!==actorId?v[`map_${id}_foe`]: 'no';
+  const threat=id!==actorId?v[`map_${id}_threat`]:'no';
+  const impeded=id!==actorId?v[`map_${id}_impeded`]:'no';
+  if(!['yes','no'].includes(foe)||!['yes','no'].includes(threat)||!['yes','no'].includes(impeded))
+   throw Error(`Neúplná pozorovaná situace EZ pro ${c.name} (faction/Threat/obstrukce)`);
+  const state=persistentStateOf(c),row=seq.roster.find(r=>r.id===id);
+  if(!row)throw Error('Chybí iniciativa účastníka');
+  const able=!['INC','UNC','KIA'].includes(state.shock)&&!state.coma?.active&&state.morale?.state!=='catatonic';
+  let reach=0;
+  const weapons=data.inventory.filter(i=>i.characterId===id&&i.snapshot?.category==='weapon'&&
+   ['main_hand','off_hand'].includes(i.slot));
+  if(weapons.length){
+   const size=resolveCharacterReachSizeModifier(c);
+   if(!size.ok)throw Error(`${c.name}: neověřený Creature Size Reach Modifier`);
+   const reaches=weapons.map(w=>reachFromSelectedEquipment(data.inventory,id,w.id,{sizeReachModifier:size.value}));
+   if(reaches.some(r=>!r.ok))throw Error(`${c.name}: neověřený Reach skutečně nasazené zbraně`);
+   reach=5*engagementZoneSpaces(Math.max(0,...reaches.map(r=>r.rch))); 
+  }
+  return {id,x:Number(x),y:Number(y),reachFt:reach,foe:foe==='yes',threatens:threat==='yes',
+   aware:row.alertness==='aware',helpless:!able,concentrating:seq.commitments?.[id]?.status==='in-progress',
+   reachImpeded:impeded==='yes'};
+ });
+ return {units};
+}
+function liveSpatialProfile(c){
+ const a=c.hmk?.attributes||{},folk=String(c.hmk?.folk||'').trim().toLowerCase();
+ if(!Number.isSafeInteger(a.agl)||!Number.isSafeInteger(a.str))
+  throw Error('Pro Move chybí přesné AGL a STR postavy');
+ const size=['kuzhai','kûzhai'].includes(folk)?'kuzhai':['human','human-sized','human sized','human folk'].includes(folk)?'human-sized':null;
+ if(!size)throw Error('Move podle HMK str.56 lze zatím odvodit pouze pro výslovně doložené Human-sized nebo Kûzhai; Folk nelze odhadnout');
+ const original=baseMove({agility:a.agl,strength:a.str,folk:size});
+ const load=resolveCombatantLoad({character:c,inventory:data.inventory});
+ if(!load.encReady)throw Error('Neověřené ENC: '+load.issues.join('; '));
+ const state=persistentStateOf(c),fatigue=combatFatigueTotals(state).total;
+ const injury=projectInjuredMovement({state,round:combatClock.round,timelineId:combatInjuryTimelineId});
+ if(!injury.ready||injury.blocked)throw Error(`Pohyb není použitelný: ${injury.reason||injury.unusableWoundIds?.join(', ')}`);
+ const effectiveMove=original.move-load.modifiedENC-fatigue-injury.impairment;
+ if(!Number.isSafeInteger(effectiveMove))throw Error('Neplatný efektivní Move');
+ // Dodge is a separate skill. Do not pretend that it equals Initiative or AGL.
+ const dodge=(c.hmk?.skills||[]).filter(s=>String(s.name||'').trim().toLowerCase()==='dodge');
+ const dodgeTrauma=projectLiveInjuries({state,round:combatClock.round,test:'dodge',usedArms:[],timelineId:combatInjuryTimelineId});
+ const dodgeIndex=dodge.length===1&&Number.isSafeInteger(dodge[0].ml)&&dodgeTrauma.ready&&!dodgeTrauma.unusable?
+  Math.floor(Math.min(95,Math.max(5,dodge[0].ml-load.modifiedENC-fatigue+dodgeTrauma.modifier))/10):null;
+ return {effectiveMove:Math.max(0,effectiveMove),dodgeIndex,baseMove:original.move,
+  fatigue,encumbrance:load.modifiedENC,impairment:injury.impairment};
+}
+function spatialLiveWitness(actorId){
+ // Any changed character/weapon/armour/position invalidates the projected route.
+ // In particular, changing STR, ENC or a readied weapon may change movement or EZ.
+ return JSON.stringify({sequence:liveInitiativeSequence(),states:combatSequenceStates(),
+  characters:selectedEncounterCharacters().map(c=>structuredClone(c)).sort((a,b)=>a.id.localeCompare(b.id)),
+  inventory:data.inventory.filter(i=>encounterSelection.has(i.characterId)).map(i=>structuredClone(i)).sort((a,b)=>a.id.localeCompare(b.id))});
+}
+function createLiveSpatialChoice(v){
+ const seq=liveInitiativeSequence(),states=combatSequenceStates();
+ const actorId=currentEncounterActor(seq),c=character(actorId);
+ if(!c)throw Error('Není právě jednající postava');
+ const options=guidedTurnChoices(seq,states);
+ if(options.kind!=='player-choice')throw Error('Před pohybem je nutné vyřešit povinné události nebo konec tahu');
+ const choices=options.choices.filter(x=>['move','evade','charge'].includes(x));
+ if(!choices.length)throw Error('Aktuální stav postavy nepovoluje žádnou prostorovou akci');
+ const battlefield=observedSpatialBattlefield(v,actorId);
+ return {format:'hmk-guided-spatial-turn-v1',id:uuid(),round:seq.round,timelineId:seq.timelineId,
+  actorId,battlefield,profile:liveSpatialProfile(c),choices,chargeInputs:{...v},chargeTargetId:v.defenderId,chargeAttack:null,phase:'choose-action',action:null,rate:null,
+  difficultSources:null,path:null,projection:null,stumbleRoll:null,stumbleSL:null,enduranceRoll:null,
+  actorState:structuredClone(states[actorId])};
+}
+function guidedSpatialRequirement(s){
+ if(s.phase==='choose-action')return {kind:'choice',id:'spatial-action',choices:s.choices.map(x=>({value:x,label:x==='move'?'Move':x==='evade'?'Evade':'Charge'}))};
+ if(s.phase==='charge-type')return {kind:'choice',id:'charge-attack',choices:[{value:'melee',label:'Charge → Melee Attack'},{value:'thrown',label:'Charge → Thrown Attack'}]};
+ if(s.phase==='choose-rate')return {kind:'choice',id:'move-rate',choices:['half','full','double'].map(value=>({value,label:`Move: ${value}`}))};
+ if(s.phase==='destination')return {kind:'point',id:'movement-path'};
+ if(s.phase==='stumble')return {kind:'die',id:'stumbleD100',faces:100,label:'Double Move – povinný Stumble (AGL d100)',actorId:s.actorId};
+ if(s.phase==='endurance')return {kind:'die',id:'doubleMoveEnduranceSR',faces:10,label:'Double Move – Endurance Secondary Roll d10 (HMK str.160, 62, 176)',actorId:s.actorId};
+ if(s.phase==='charge-attack-ready')return {kind:'charge-attack',id:'continue-same-turn-attack'};
+ if(s.phase==='complete')return {kind:'complete',id:'movement-confirmed'};
+ return {kind:'blocked',reason:'Nepodporovaný prostorový krok'};
+}
+function chooseLiveSpatial(s,value){
+ const r=guidedSpatialRequirement(s);
+ if(r.kind!=='choice'||!r.choices.some(x=>x.value===value))throw Error('Nepovolená prostorová volba');
+ if(s.phase==='choose-action')return {...s,action:value,phase:value==='move'?'choose-rate':value==='charge'?'charge-type':'destination',rate:value==='evade'||value==='charge'?'half':null};
+ if(s.phase==='choose-rate')return {...s,rate:value,phase:'destination'};
+ if(s.phase==='charge-type')return {...s,chargeAttack:value,phase:'destination'};
+ throw Error('Není splatná volba');
+}
+function setLiveSpatialPath(s,v){
+ if(s.phase!=='destination')throw Error('Právě se nezadává skutečná trasa');
+ if(!/^\d+$/.test(v.difficultSources||'')||Number(v.difficultSources)>8)throw Error('Počet doložených Difficult Movement zdrojů musí být 0–8');
+ const current=s.battlefield.units.find(u=>u.id===s.actorId);
+ const pattern=/^\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*$/;
+ const parts=String(v.route||'').split(';').map(x=>x.trim());
+ if(parts.length<1||parts.length>98||parts.some(x=>!pattern.test(x)))throw Error('Trasa: zadejte skutečné souřadnice x,y případně oddělené středníkem');
+ const path=[{x:current.x,y:current.y},...parts.map(x=>{const [px,py]=x.split(',').map(Number);return {x:px,y:py};})];
+ const projection=projectGuidedSpatialPath({actorId:s.actorId,battlefield:s.battlefield,path,action:s.action,
+  effectiveMove:s.profile.effectiveMove,dodgeIndex:s.profile.dodgeIndex,stunned:s.actorState.shock==='STN',
+  difficultSources:Number(v.difficultSources),moveRate:s.rate,chargeAttack:s.chargeAttack,chargeTargetId:s.chargeTargetId});
+ return {...s,path,projection,difficultSources:Number(v.difficultSources),phase:projection.requiresStumble?'stumble':s.action==='move'&&s.rate==='double'?'endurance':s.action==='charge'?'charge-attack-ready':'complete'};
+}
+function submitLiveSpatialDie(s,value){
+ if(!['stumble','endurance'].includes(s.phase))throw Error('Není splatný fyzický hod pohybu');
+ const faces=s.phase==='endurance'?10:100;
+ if(!/^\d+$/.test(String(value))||Number(value)<1||Number(value)>faces)throw Error(`Zadejte skutečný d${faces} v rozsahu 1–${faces}`);
+ const actor=character(s.actorId),a=actor?.hmk?.attributes??{};
+ if(s.phase==='endurance'){
+  if(!Number.isSafeInteger(a.end)||a.end<1||a.end>40)throw Error('Chybí ověřená END pro Secondary Roll');
+  const tn=Math.floor(a.end/2); // HMK pp.61–62: Attribute ML=score×5; Index=floor(ML/10).
+  return {...s,enduranceRoll:Number(value),enduranceTN:tn,phase:'complete'};
+ }
+ if(!Number.isSafeInteger(a.agl)||a.agl<1||a.agl>40)throw Error('Chybí ověřené AGL pro Stumble');
+ const injury=projectLiveInjuries({state:s.actorState,round:s.round,test:'agility',usedArms:[],timelineId:s.timelineId});
+ if(!injury.ready||injury.unusable)throw Error('Neznámé nebo zablokované Stumble AGL: '+(injury.reason||injury.unusableWoundIds?.join(',')));
+ const eml=a.agl*5-s.profile.encumbrance-s.profile.fatigue+injury.modifier;
+ const sl=successLevel(Number(value),eml);
+ return {...s,stumbleRoll:Number(value),stumbleEML:eml,stumbleSL:sl,
+  phase:s.action==='move'&&s.rate==='double'?'endurance':'complete'};
+}
+function continueGuidedSpatial(){
+ if(!guidedSpatialSession)return;
+ try{
+  const s=guidedSpatialSession;
+  if(spatialLiveWitness(s.actorId)!==guidedSpatialWitness)
+   throw Error('Stav postavy nebo pořadí tahů se od zahájení akce změnily');
+  const requirement=guidedSpatialRequirement(s);
+  if(requirement.kind==='charge-attack'){
+   const target=character(s.chargeTargetId),attacker=character(s.actorId),v=s.chargeInputs;
+   if(!target||!attacker||s.actorId!==v.attackerId||!encounterSelection.has(target.id)||target.id===attacker.id)
+    throw Error('Charge vyžaduje vybraného protivníka a jednající postavu');
+   const base={id:uuid(),timelineId:s.timelineId,round:s.round,attacker,defender:target,
+    inventory:data.inventory,sourceSignature:uuid(),direction:v.direction,opponents:Number(v.opponents),aimZN:Number(v.aimZN)};
+   const distanceToTarget=Math.hypot(s.projection.finalPosition.x-s.battlefield.units.find(u=>u.id===target.id).x,
+    s.projection.finalPosition.y-s.battlefield.units.find(u=>u.id===target.id).y);
+   const result=s.chargeAttack==='melee'?createLiveGuidedMelee({...base,
+    attackerWeaponId:v.attackerWeaponId,defenderWeaponId:v.defenderWeaponId,
+    attackerSkillId:v.attackerSkillId,defenderSkillId:v.defenderSkillId,
+    attackerUsedArms:v.attackerUsedArms,defenderUsedArms:v.defenderUsedArms,
+    attackerFoes:Number(v.attackerFoes),defenderFoes:Number(v.defenderFoes)}):
+    createLiveGuidedMissile({...base,weaponId:v.attackerWeaponId,skillId:v.attackerSkillId,
+     distance:distanceToTarget,targetMovement:v.targetMovement,
+     targetCount:Number(v.targetCount),nearbyTargetCount:Number(v.nearbyTargetCount),
+     windforce:Number(v.windforce),crosswind:v.crosswind==='yes',movingShooter:false,
+     chargeMovementFeet:s.projection.actualFt,chargingThrow:s.projection.actualFt>=20});
+   guidedChargeContext={projection:structuredClone(s.projection),battlefield:structuredClone(s.battlefield),
+    id:s.id,actorId:s.actorId,targetId:target.id,round:s.round,timelineId:s.timelineId};
+   guidedAttackSession=result.session;guidedAttackWitness=guidedAttackLiveSignature(attacker.id,target.id);
+   guidedAttackToken=base.sourceSignature;guidedAttackAudit=result.preflight;
+   guidedSpatialSession=null;guidedSpatialWitness=null;
+   guidedAttackLastOutcome=`Charge: skutečný přesun ${s.projection.actualFt.toFixed(1)} ft; pokračuje ${s.chargeAttack} útok v témže tahu.`;
+   continueGuidedAttack();return;
+  }
+  if(requirement.kind==='complete'){
+   const seq=liveInitiativeSequence(),states=combatSequenceStates();
+   const staged=commitGuidedSpatialTurn({id:s.id,sequence:seq,states,battlefield:s.battlefield,
+    projection:s.projection,stumbleRoll:s.stumbleRoll,stumbleEML:s.stumbleEML,
+    enduranceRoll:s.enduranceRoll,enduranceTN:s.enduranceTN,personalFatigue:Math.max(5,5+s.profile.encumbrance)});
+   const actor=character(s.actorId),name=actor.name;
+   const summary=`${name}: ${s.action}, ${s.projection.actualFt.toFixed(1)} stop; konec (${s.projection.finalPosition.x.toFixed(2)}, ${s.projection.finalPosition.y.toFixed(2)})${s.projection.contact?`, zastaveno EZ ${s.projection.contact.enemyId}`:''}.`;
+   staged.sequence.spatialUnits=staged.battlefield.units.map(u=>({id:u.id,x:u.x,y:u.y}));
+   const journalEntry={id:uuid(),characterId:actor.id,createdAt:stamp(),
+    title:`HMK pohyb, kolo ${s.round}`,body:summary,
+    combatProof:{timelineId:s.timelineId,round:s.round,actorId:actor.id,
+     actionKind:s.action,sourceEventId:s.id,spatial:structuredClone(s.projection),
+     dice:[...(s.stumbleRoll===null?[]:[{faces:100,value:s.stumbleRoll,source:'GM-entered-physical-die'}]),
+      ...(s.enduranceRoll===null?[]:[{faces:10,value:s.enduranceRoll,source:'GM-entered-physical-die'}])],
+     stumbleSL:s.stumbleSL,enduranceTN:s.enduranceTN??null,windednessAccrued:staged.fatigueAdded}};
+   // Commit the scheduler first; roll back the scheduler if persistent storage
+   // cannot save the character and journal (two separate browser storages).
+   const oldSeq=structuredClone(seq);
+   persistInitiativeSequence(staged.sequence);
+   const saved=mutate(()=>{
+    if(staged.actorState) synchronizeCombatInjuries(actor,staged.actorState);
+    data.journal.push(journalEntry);
+   });
+   if(!saved){
+    try{persistInitiativeSequence(oldSeq)}catch(e){console.error('Nepodařilo se vrátit Initiative po neúspěšném zápisu:',e)}
+    throw Error('Trvalý zápis pohybu selhal; další tah nelze spolehlivě potvrdit');
+   }
+   guidedSpatialSession=null;guidedSpatialWitness=null;guidedAttackLastOutcome=summary;render();return;
+  }
+  render();
+ }catch(err){guidedAttackLastOutcome='Prostorová akce: '+err.message;render();}
+}
+
 function guidedAttackPanel(chars){
  const selected=chars.filter(c=>c.id&&encounterSelection.has(c.id));
  const people=selected.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
  const weapons=data.inventory.filter(x=>selected.some(c=>c.id===x.characterId)&&x.snapshot?.category==='weapon'&&['main_hand','off_hand'].includes(x.slot));
  const weaponOptions=weapons.map(x=>`<option value="${esc(x.id)}">${esc(character(x.characterId)?.name||x.characterId)} · ${esc(x.snapshot.name)} (${esc(x.slot)})</option>`).join('');
  const skills=selected.flatMap(c=>(c.hmk?.skills||[]).filter(x=>Number.isSafeInteger(x.ml)).map(x=>`<option value="${esc(x.id)}">${esc(c.name)} · ${esc(x.name)} (ML ${x.ml})</option>`)).join('');
+ const priorPositions=combatInitiativeSequence?.spatialUnits||[];
+ const spatialFacts=selected.map(c=>{const prior=priorPositions.find(p=>p.id===c.id);return `<fieldset><legend>${esc(c.name)} – poloha a hráčské rozhodnutí Threat (jen pro Move/Evade)</legend>${field(`map_${c.id}_x`,'X (stopy)',prior?.x??'','number')}${field(`map_${c.id}_y`,'Y (stopy)',prior?.y??'','number')}${[['foe','Je protivníkem pohybujícího se?'],['threat','Volí Threat v dosahu?'],['impeded','Je Reach blokován překážkou?']].map(([key,title])=>`<label>${esc(title)}<select name="map_${esc(c.id)}_${key}"><option value="">Nezjištěno</option><option value="yes">Ano</option><option value="no">Ne</option></select></label>`).join('')}</fieldset>`;}).join('');
  let progress='';
- if(guidedAttackSession){
-  const req=guidedAttackNextRequirement();
+ if(guidedAttackSession||guidedMountedSession||guidedTurnSession||guidedDeclaredSession||guidedSpatialSession){
+  const mounted=!!guidedMountedSession,turn=!!guidedTurnSession,declared=!!guidedDeclaredSession,spatial=!!guidedSpatialSession;
+  const req=mounted?guidedMountedRequirement(guidedMountedSession):turn?guidedTurnRequirement(guidedTurnSession):declared?guidedDeclaredRequirement(guidedDeclaredSession):spatial?guidedSpatialRequirement(guidedSpatialSession):guidedAttackNextRequirement();
   const actor=req.actorId?character(req.actorId)?.name||req.actorId:(guidedAttackCandidate?character(guidedAttackSession.hitSession.targetId)?.name||'':'');
-  const title=`Kolo ${guidedAttackSession.round} · ${esc(character(guidedAttackSession.attackerId)?.name||'?')} → ${esc(character(guidedAttackSession.defenderId)?.name||'?')}`;
+  const title=mounted?`Kolo ${guidedMountedSession.round} · Control ${esc(character(guidedMountedSession.riderId)?.name||'?')}`:turn?`Kolo ${guidedTurnSession.round} · ${esc(character(guidedTurnSession.actorId)?.name||'?')} – akce v tahu`:declared?`Kolo ${guidedDeclaredSession.round} · deklarovaný ${guidedDeclaredSession.technique}`:spatial?`Kolo ${guidedSpatialSession.round} · ${guidedSpatialSession.action}`:`Kolo ${guidedAttackSession.round} · ${esc(character(guidedAttackSession.attackerId)?.name||'?')} → ${esc(character(guidedAttackSession.defenderId)?.name||'?')}`;
   if(req.kind==='die')progress=`<p><strong>${title}</strong></p><form id="hmk-guided-hit-die-form"><label>${esc(actor)}: ${esc(req.label||req.id)} · <strong>d${req.faces}</strong><input type="number" name="roll" required step="1" min="1" max="${req.faces}" placeholder="Výsledek skutečného hodu d${req.faces}"></label><button type="submit">Zadat skutečný d${req.faces} a pokračovat</button></form>`;
+  else if(req.kind==='input')progress=`<p><strong>${title}</strong></p><form id="hmk-guided-hit-duration-form"><label>${esc(req.label)}<input type="number" name="duration" required step="1" min="${req.min}" max="${req.max}" placeholder="Zadejte skutečnou hodnotu"></label><button type="submit">Potvrdit zadaný údaj</button></form>`;
   else if(req.kind==='choice')progress=`<p><strong>${title}</strong> – volba hráče</p><form id="hmk-guided-hit-choice-form"><label>${esc(req.id)}<select name="decision" required>${req.choices.map(x=>typeof x==='string'?`<option value="${esc(x)}">${esc(x)}</option>`:`<option value="${esc(x.value)}">${esc(x.label||x.value)}</option>`).join('')}</select></label><button type="submit">Vybrat a pokračovat</button></form>`;
+  else if(req.kind==='maneuver-position'){
+   const previous=liveInitiativeSequence()?.spatialUnits||[];
+   const facts=selected.map(c=>{const saved=previous.find(u=>u.id===c.id);return `<fieldset><legend>${esc(c.name)} – původní pozice</legend>${field(`displace_${c.id}_x`,'X (stopy)',saved?.x??'','number')}${field(`displace_${c.id}_y`,'Y (stopy)',saved?.y??'','number')}</fieldset>`;}).join('');
+   progress=`<p><strong>${title}</strong> – přesun cíle podle HMK str.106</p><form id="hmk-guided-hit-displacement-form">${facts}${field('displacementX','Cíl X po odhození','','number')}${field('displacementY','Cíl Y po odhození','','number')}<label>Je doložená skutečná dráha volná od překážek?<select name="clearPath" required><option value="">Nezjištěno</option><option value="yes">Ano – ověřeno podle situace na mapě</option><option value="no">Ne – dráha je blokována</option></select></label><button type="submit">Vyhodnotit přesnou vzdálenost a pokračovat</button></form>`;
+  }
+  else if(req.kind==='point')progress=`<p><strong>${title}</strong> – doložená trasa</p><form id="hmk-guided-hit-path-form">${field('route','Souřadnice cíle x,y; volitelně několik úseků oddělených ;','','text')}${field('difficultSources','Počet současných zdrojů Difficult Movement (0–8)','','number')}<p class="muted">Počáteční poloha a dosažitelný pohyb jsou převzaty ze skutečného stavu. EZ se vyhodnotí automaticky.</p><button type="submit">Vyhodnotit trasu</button></form>`;
   else if(req.kind==='blocked')progress=`<p class="notice error">${esc(req.reason)}</p>`;
   else progress=`<p>${esc(req.kind==='complete'?'Výsledek je připraven k automatickému zápisu.':'Pravidlová posloupnost automaticky pokračuje.')}</p>`;
   progress+=`<div class="actions">${button('Zrušit rozpracovaný útok','hmk-guided-attack-cancel')}</div>`;
  }
  return `<section class="panel wide"><h3>HMK · řízený celý zásah (Attack → Defence → Injury → Shock → zápis)</h3>
- <p class="muted">Pouze skutečné hody GM a volby hráčů; Success Levels, armour, zranění a Shock se počítají automaticky. Zatím bezpečně podporuje doložený základní Melee Strike proti Ignore/Block a Missile s úplným zdrojovým profilem. Neúplné nebo zvláštní akce systém odmítne — nic neodhaduje. Formát stránky zůstává prozatím beze změny.</p>
+ <p class="muted">Pouze skutečné hody GM a volby hráčů; Success Levels, armour, zranění a Shock se počítají automaticky. Systém podporuje základní Melee/Missile, deklarované Press/Trip/Grab a mapově ověřené Move/Evade/Charge. Charge pokračuje povinným útokem v témže tahu. Neúplné nebo zvláštní akce systém odmítne — nic neodhaduje. Formát stránky zůstává prozatím beze změny.</p>
  ${guidedAttackLastOutcome?`<div class="notice" role="status">${esc(guidedAttackLastOutcome)}</div>`:''}
- ${guidedAttackSession?progress:`<form id="hmk-guided-hit-start-form"><div class="field-grid">
- <label>Akce<select name="kind"><option value="melee">Melee Strike</option><option value="missile">Missile / Volley (vyžaduje ověřená data střelné zbraně)</option></select></label>
- <label>Útočník<select name="attackerId" required><option value="">Vyberte…</option>${people}</select></label>
- <label>Obránce / cíl<select name="defenderId" required><option value="">Vyberte…</option>${people}</select></label>
- <label>Zbraň útočníka<select name="attackerWeaponId" required><option value="">Vyberte…</option>${weaponOptions}</select></label>
+ ${guidedAttackSession||guidedMountedSession||guidedTurnSession||guidedDeclaredSession||guidedSpatialSession?progress:`<form id="hmk-guided-hit-start-form"><div class="field-grid">
+ <label>Akce<select name="kind"><option value="melee">Melee Strike</option><option value="press">Melee – Press (deklarovat před hodem)</option><option value="trip">Melee – Trip (deklarovat před hodem)</option><option value="grab">Melee – Grab (deklarovat před hodem)</option><option value="spatial">Move / Evade / Charge – prostorová akce</option><option value="missile">Missile / Volley (vyžaduje ověřená data střelné zbraně)</option><option value="mounted-control">Mounted Control (HMK str.172)</option><option value="turn-action">Akce v právě probíhajícím tahu (Pass, Ready, soustředění)</option></select></label>
+ <label>Útočník<select name="attackerId"><option value="">Vyberte…</option>${people}</select></label>
+ <label>Obránce / cíl<select name="defenderId"><option value="">Vyberte…</option>${people}</select></label>
+ <label>Jízdní zvíře (pouze Mounted Control)<select name="mountId"><option value="">Vyberte…</option>${people}</select></label>
+ <label>Zbraň útočníka<select name="attackerWeaponId"><option value="">Vyberte…</option>${weaponOptions}</select></label>
  <label>Zbraň obránce (Melee Block)<select name="defenderWeaponId"><option value="">Vyberte…</option>${weaponOptions}</select></label>
- <label>Útočná dovednost<select name="attackerSkillId" required><option value="">Vyberte…</option>${skills}</select></label>
+ <label>Útočná dovednost<select name="attackerSkillId"><option value="">Vyberte…</option>${skills}</select></label>
  <label>Dovednost obránce (Melee Block)<select name="defenderSkillId"><option value="">Vyberte…</option>${skills}</select></label>
  <label>Útočník použije paži<select name="attackerUsedArms"><option value="right">Pravou</option><option value="left">Levou</option><option value="both">Obě</option></select></label>
  <label>Obránce použije paži<select name="defenderUsedArms"><option value="right">Pravou</option><option value="left">Levou</option><option value="both">Obě</option></select></label>
@@ -1404,7 +1713,7 @@ function guidedAttackPanel(chars){
  ${field('windforce','Síla větru (Missile)',0,'number')}
  <label><input type="checkbox" name="crosswind" value="yes"> Příčný vítr</label>
  <label><input type="checkbox" name="movingShooter" value="yes"> Střelec se pohybuje</label>
- </div><button type="submit" ${selected.length>=2?'':'disabled'}>Zahájit pravidlovou posloupnost</button></form>`}
+ </div><details><summary>Prostorová fakta – pozice účastníků a Threat (povinné pouze pro Move/Evade)</summary>${spatialFacts}</details><button type="submit" ${selected.length>=1?'':'disabled'}>Zahájit pravidlovou posloupnost</button></form>`}
  </section>`;
 }
 /** Consume deterministic transitions; never invent an omitted die or choice. */
@@ -1417,15 +1726,46 @@ function continueGuidedAttack(){
   for(let i=0;i<60;i++){
    const req=guidedAttackNextRequirement();
    if(req.kind==='automatic'){
+    if(req.id==='free-press-forced-cf'){
+     guidedAttackFreePressSession=advanceGuidedFreePressForcedConsequence(guidedAttackFreePressSession);
+     continue;
+    }
+    if(req.id==='begin-guided-free-press'){
+     const decision=decideFreePress({gate:guidedAttackSession.finalAttack,
+      attackerId:guidedAttackSession.attackerId,defenderId:guidedAttackSession.defenderId,
+      round:guidedAttackSession.round,timelineId:guidedAttackSession.timelineId,
+      sourceSignature:guidedAttackToken,meleeProofKey:guidedAttackSession.id});
+     const winner=character(decision.ownerId),loser=character(decision.targetId);
+     const afterHit=guidedAttackCandidate.strike&&guidedAttackSession.hitSession.targetId===loser.id
+      ?guidedAttackCandidate.state:persistentStateOf(loser);
+     guidedAttackFreePressSession=createGuidedFreePress({gate:guidedAttackSession.finalAttack,
+      attackerId:guidedAttackSession.attackerId,defenderId:guidedAttackSession.defenderId,
+      round:guidedAttackSession.round,timelineId:guidedAttackSession.timelineId,
+      sourceSignature:guidedAttackToken,eventId:uuid(),actor:winner,target:loser,
+      targetState:afterHit,meleeProofKey:guidedAttackSession.id});
+     continue;
+    }
+    if(req.id==='finish-guided-free-press'){
+     const pressVictim=character(guidedAttackFreePressSession.targetId);
+     const baseState=guidedAttackCandidate.strike&&guidedAttackSession.hitSession.targetId===pressVictim.id
+      ?guidedAttackCandidate.state:persistentStateOf(pressVictim);
+     guidedAttackFreePressResult=completeGuidedFreePress({session:guidedAttackFreePressSession,currentState:baseState});
+     guidedAttackFreePressSession=null;guidedAttackFreePressChecked=true;
+     continue;
+    }
     if(guidedAttackCandidate){
      if(!guidedAttackAftermath){
       const target=character(guidedAttackSession.hitSession.targetId);
-      const attacked=character(guidedAttackSession.attackerId);
-      const abe=attacked?.hmk?.attributes?.aberrance??attacked?.hmk?.attributes?.abe??null;
+      // The Morale threat is the ACTUAL striker, including a successful
+      // Counterstrike. The initial attacker may be the injured defender.
+      const striker=character(guidedAttackSession.hitSession.strikerId);
+      const abe=striker?.hmk?.attributes?.aberrance??striker?.hmk?.attributes?.abe??null;
       guidedAttackAftermath=createGuidedMandatory({state:guidedAttackCandidate.state,character:target,
        round:guidedAttackSession.round,eventId:uuid(),actorId:combatClock.actorId,
        turnEnded:false,timelineId:combatInjuryTimelineId,abe,
-       mishapTechnique:guidedAttackAftermathTechnique||'attribute'});
+       mishapTechnique:guidedAttackAftermathTechnique||'attribute',
+       mishapContext:{actionUsesDEX:guidedAttackSession.hitSession.targetId===guidedAttackSession.attackerId||
+        (guidedAttackSession.kind==='melee'&&['block','counterstrike'].includes(String(guidedAttackSession.meleeSession?.defence).toLowerCase()))}});
       continue;
      }
      const target=character(guidedAttackSession.hitSession.targetId);
@@ -1443,7 +1783,8 @@ function continueGuidedAttack(){
    if(req.kind==='complete'){
     if(!guidedAttackCandidate){
      guidedAttackCandidate=completeGuidedAttack({session:guidedAttackSession,
-      currentState:persistentStateOf(character(guidedAttackSession.hitSession.targetId)),sourceSignature:guidedAttackToken});
+      currentState:persistentStateOf(character(guidedAttackSession.hitSession.targetId)),sourceSignature:guidedAttackToken,
+      currentInventory:data.inventory});
      continue;
     }
     const finished=guidedAttackCandidate;
@@ -1451,20 +1792,85 @@ function continueGuidedAttack(){
      weaponName=data.inventory.find(x=>x.id===guidedAttackAudit?.weaponByActor?.[guidedAttackSession.hitSession.strikerId])?.snapshot?.name||'zbraň';
     const seq=combatInitiativeSequence?liveInitiativeSequence():null;
     if(seq)assertScheduledHitCanCommit(seq,attacked.id);
-    const oldSession=guidedAttackSession,oldWitness=guidedAttackWitness,oldToken=guidedAttackToken,oldAudit=guidedAttackAudit,oldCandidate=guidedAttackCandidate;
+    const charge=guidedChargeContext;
+    if(charge&&(!seq||charge.actorId!==attacked.id||charge.targetId!==guidedAttackSession.defenderId||
+     charge.round!==seq.round||charge.timelineId!==seq.timelineId))
+     throw Error('Charge musí být součástí stejného aktivního tahu a útoku');
+    let nextSeq=seq?recordScheduledHitCommit(seq,{actorId:attacked.id,gmConfirmed:true}):null;
+    if(charge){
+     const states=combatSequenceStates();
+     // Mandatory end-turn states derive from the uncommitted Injury result, not
+     // the stale defender state present before the attached Charge strike.
+     const staged={...states};
+     if(finished.strike)staged[target.id]=finished.state;
+     if(guidedAttackFreePressResult?.used)staged[guidedAttackFreePressResult.targetId]=guidedAttackFreePressResult.state;
+     nextSeq=finishEncounterTurn(nextSeq,staged,{action:'charge',gmConfirmed:true});
+     const before=charge.battlefield.units;
+     for(const u of seq.spatialUnits||[]){const p=before.find(x=>x.id===u.id);
+      if(!p||Math.hypot(p.x-u.x,p.y-u.y)>0.00001)throw Error('Charge mapa se od zahájení akce změnila');}
+     nextSeq.spatialUnits=before.map(u=>({id:u.id,x:u.id===attacked.id?charge.projection.finalPosition.x:u.x,
+      y:u.id===attacked.id?charge.projection.finalPosition.y:u.y}));
+     nextSeq.spatialEvents??=[];
+     if(nextSeq.spatialEvents.some(e=>e.id===charge.id))throw Error('Duplicitní dokončený Charge');
+     nextSeq.spatialEvents.push({id:charge.id,round:charge.round,actorId:attacked.id,targetId:charge.targetId,
+      timelineId:charge.timelineId,projection:structuredClone(charge.projection),
+      attackSourceId:guidedAttackSession.id,attackPhysicalDice:structuredClone(guidedAttackSession.hitSession.physicalDice||[])});
+     nextSeq.log.push({round:seq.round,type:'spatial-action',actorId:attacked.id,
+      eventId:charge.id,action:'charge',actualFt:charge.projection.actualFt,
+      linkedAttack:guidedAttackSession.id});
+     nextSeq=validateEncounterSequence(nextSeq);
+    }
+    const freePressDisplacement=guidedAttackFreePressResult?.displacement??null;
+    if(freePressDisplacement){
+     if(!nextSeq)throw Error('Volný Press s odhozením vyžaduje aktivní Initiative a potvrzenou mapu');
+     const previousPositions=charge?charge.battlefield.units.map(u=>u.id===charge.actorId?{...u,...charge.projection.finalPosition}:u):(seq.spatialUnits||[]);
+     if(previousPositions.length){
+      for(const u of previousPositions){const p=freePressDisplacement.units.find(x=>x.id===u.id);
+       if(!p||Math.hypot(u.x-p.x,u.y-p.y)>0.00001)
+        throw Error('Původní mapa pro Free Press neodpovídá uloženým souřadnicím');}
+     }
+     const needed=new Set(encounterSelection);
+     if(needed.size!==freePressDisplacement.units.length||freePressDisplacement.units.some(u=>!needed.has(u.id)))
+      throw Error('Free Press vyžaduje přesnou polohu všech účastníků');
+     nextSeq.spatialUnits=freePressDisplacement.units.map(u=>({id:u.id,
+      x:u.id===freePressDisplacement.targetId?freePressDisplacement.to.x:
+       charge&&u.id===attacked.id?charge.projection.finalPosition.x:u.x,
+      y:u.id===freePressDisplacement.targetId?freePressDisplacement.to.y:
+       charge&&u.id===attacked.id?charge.projection.finalPosition.y:u.y}));
+     nextSeq.spatialEvents??=[];
+     const eId=guidedAttackFreePressResult.eventId??uuid();
+     nextSeq.spatialEvents.push({id:eId,round:seq.round,actorId:freePressDisplacement.actorId,
+      targetId:freePressDisplacement.targetId,displacement:structuredClone(freePressDisplacement),
+      linkedAttack:guidedAttackSession.id,timelineId:seq.timelineId});
+     nextSeq=validateEncounterSequence(nextSeq);
+    }
+    const oldSession=guidedAttackSession,oldWitness=guidedAttackWitness,oldToken=guidedAttackToken,oldAudit=guidedAttackAudit,oldCandidate=guidedAttackCandidate,oldPress=guidedAttackFreePressResult;
     const entry=finished.strike?`Zásah ${target.name}: ${oldSession.hitSession.location}, ${oldSession.hitSession.computed?.base?.injury?.severity||''}${oldSession.hitSession.computed?.base?.injury?.level||''}, Shock ${finished.state.shock}.`:
      `Útok bez zapsané rány. ${oldSession.hitSession.computed?.reason||''}`;
-    const summary=`${striker.name} → ${target.name} (${weaponName}), hvězdičky ${oldSession.finalAttack?.stars??0}: ${entry}`;
+    const damage=finished.weaponDamage;
+    const wqSuffix=damage?` Weapon Damage: ${damage.sourceItemId} → ${damage.targetItemId}; WQ ${damage.result.before} → ${damage.result.after}${damage.result.destroyed?' (zničeno)':''}.`:'';
+    const pressSuffix=guidedAttackFreePressResult?.used?` Free Press: rozdíl ${guidedAttackFreePressResult.margin}; ${JSON.stringify(guidedAttackFreePressResult.effect||'bez účinku')}.`:'';
+    const summary=`${charge?'Charge '+charge.projection.actualFt.toFixed(1)+' ft + ':''}${striker.name} → ${target.name} (${weaponName}), hvězdičky ${oldSession.finalAttack?.stars??0}: ${entry}${wqSuffix}${pressSuffix}`;
+    // First persist the scheduler. If the character journal save fails, restore
+    // the scheduler to the exact previous round/cursor and keep the live wizard.
+    const oldSeq=seq?structuredClone(seq):null;
+    if(nextSeq)persistInitiativeSequence(nextSeq);
     // Do not leave a successful-looking pending wizard in any persistent data.
     clearGuidedAttack();
     const ok=mutate(()=>{
-     if(finished.strike)synchronizeCombatInjuries(target,finished.state);
+     if(finished.strike)synchronizeCombatInjuries(target,oldPress?.used&&oldPress.targetId===target.id?oldPress.state:finished.state);
+     if(oldPress?.used&&oldPress.targetId!==target.id)synchronizeCombatInjuries(character(oldPress.targetId),oldPress.state);
+     if(finished.weaponDamage)data.inventory=finished.inventory;
      for(const id of new Set([attacked.id,target.id]))data.journal.push({id:uuid(),characterId:id,
-      createdAt:stamp(),title:`HMK boj, kolo ${oldSession.round}`,combatProof:{timelineId:combatInjuryTimelineId,round:oldSession.round,actorId:attacked.id,sourceEventId:oldSession.id},
-      body:summary+` Hody: ${oldSession.hitSession.physicalDice.map(r=>`d${r.faces}=${r.value}`).join(', ')}.`});
+      createdAt:stamp(),title:`HMK boj, kolo ${oldSession.round}`,combatProof:{timelineId:combatInjuryTimelineId,round:oldSession.round,actorId:attacked.id,sourceEventId:oldSession.id,actionKind:charge?'charge':'attack',chargeEventId:charge?.id??null,spatial:charge?.projection??null,freePressDisplacement:freePressDisplacement??null},
+      body:summary+` Hody: ${[...oldSession.hitSession.physicalDice,...(damage?.physicalDice??[]),...(oldPress?.physicalDice??[])].map(r=>`d${r.faces}=${r.value}`).join(', ')}.`});
     });
-    if(!ok){guidedAttackSession=oldSession;guidedAttackWitness=oldWitness;guidedAttackToken=oldToken;guidedAttackAudit=oldAudit;guidedAttackCandidate=oldCandidate;return;}
-    if(seq)persistInitiativeSequence(recordScheduledHitCommit(seq,{actorId:attacked.id,gmConfirmed:true}));
+    if(!ok){
+     if(oldSeq)persistInitiativeSequence(oldSeq);
+     guidedAttackSession=oldSession;guidedAttackWitness=oldWitness;guidedAttackToken=oldToken;
+     guidedAttackAudit=oldAudit;guidedAttackCandidate=oldCandidate;guidedAttackFreePressResult=oldPress;
+     guidedAttackFreePressChecked=!!oldPress;guidedChargeContext=charge;return;
+    }
     guidedAttackLastOutcome=summary;render();return;
    }
    if(req.kind==='blocked'){guidedAttackLastOutcome='Zastaveno: '+req.reason;render();return;}
@@ -1472,6 +1878,52 @@ function continueGuidedAttack(){
   }
   throw Error('Průvodce překročil bezpečný počet automatických kroků');
  }catch(error){guidedAttackLastOutcome='Nelze pokračovat: '+error.message;render();}
+}
+function continueGuidedTurn(){
+ if(!guidedTurnSession)return;
+ try{
+  const seq=liveInitiativeSequence(),states=combatSequenceStates();
+  if(JSON.stringify({seq,states})!==guidedTurnWitness)throw Error('Pořadí tahů či zdravotní stav se změnily. Zvolte akci znovu.');
+  const req=guidedTurnRequirement(guidedTurnSession);
+  if(req.kind!=='complete'){render();return;}
+  const result=completeGuidedTurnAction({session:guidedTurnSession,sequence:seq,states});
+  const name=character(result.actorId)?.name||result.actorId;
+  const message=`${name}: ${result.action}${result.readiedAction?' → '+result.readiedAction:''}${result.durationRounds?' na '+result.durationRounds+' kol':''}.`;
+  persistInitiativeSequence(result.sequence);
+  mutate(()=>data.journal.push({id:uuid(),characterId:result.actorId,createdAt:stamp(),
+   title:`HMK kolo ${result.round}: ${result.action}`,body:message,combatProof:result.proof}));
+  guidedTurnSession=null;guidedTurnWitness=null;guidedAttackLastOutcome=message;render();
+ }catch(error){guidedAttackLastOutcome='Guided Turn: '+error.message;render();}
+}
+function continueGuidedMounted(){
+ if(!guidedMountedSession)return;
+ try{
+  const s=guidedMountedSession;
+  if(guidedAttackLiveSignature(s.riderId,s.mountId)!==guidedMountedWitness)
+   throw Error('Bojový stav jezdce, zvířete, kolo nebo inventář se změnily');
+  const req=guidedMountedRequirement(s);
+  if(req.kind!=='complete'){render();return;}
+  const rider=character(s.riderId),mount=character(s.mountId);
+  const result=completeGuidedMounted({session:s,currentState:persistentStateOf(rider),sourceSignature:s.sourceSignature});
+  // A failed Control followed by the optional Grope retry consumes the rider's
+  // actual action. A successful Free Control must NOT consume the main action.
+  const seq=combatInitiativeSequence?liveInitiativeSequence():null;
+  const consumesTurn=result.result.riderActionAvailable===false;
+  let nextSeq=null;
+  if(seq&&consumesTurn){
+   if(currentEncounterActor(seq)!==rider.id)throw Error('Grope retest musí spotřebovat vlastní aktuální tah jezdce');
+   nextSeq=finishEncounterTurn(seq,combatSequenceStates(),{action:'grope',gmConfirmed:true});
+  }
+  const phrase=`${rider.name} → ${mount.name}: Mounted Control ${result.result.controlled?'úspěšný':'neúspěšný'}; ${result.physicalDice.map(x=>`d${x.faces}=${x.value}`).join(', ')}`;
+  if(!mutate(()=>{
+   synchronizeCombatInjuries(rider,result.state);
+   data.journal.push({id:uuid(),characterId:rider.id,createdAt:stamp(),
+    title:`HMK Mounted Control, kolo ${s.round}`,body:phrase,
+    combatProof:{timelineId:s.timelineId,round:s.round,actorId:rider.id,sourceEventId:s.id,actionKind:'mounted-control',consumesTurn,mountId:mount.id}});
+  }))return;
+  if(nextSeq)persistInitiativeSequence(nextSeq);
+  guidedMountedSession=null;guidedMountedWitness=null;guidedAttackLastOutcome=phrase;render();
+ }catch(error){guidedAttackLastOutcome='Mounted Control: '+error.message;render();}
 }
 function encounterView(){
  const chars=data.characters;
@@ -1670,8 +2122,30 @@ document.addEventListener('submit',e=>{
    const raw=String(v.mishap||v.wound||''),separator=raw.indexOf('::');if(separator<1)throw Error('Neplatné ID speciální události');
    c=character(raw.slice(0,separator));if(!c||!encounterSelection.has(c.id))throw Error('Postava není ve střetnutí');
    const s=persistentStateOf(c),reference=raw.slice(separator+2);
-   transition=f.id==='combat-injury-mishap-form'?applyConfirmedInjuryMishap({state:s,round,eventId,mishapId:reference,baseML:v.baseML===''?null:Number(v.baseML),roll:v.roll===''?null:Number(v.roll),hasDEX:v.hasDEX==='yes',actionUsesDEX:v.hasDEX==='yes',hasLegs:v.hasLegs==='yes',gmConfirmed:v.gmConfirmed==='yes'}):
-    applyConfirmedInjuryMorale({state:s,round,eventId,woundId:reference,initiativeML:Number(v.initiativeML),roll:Number(v.roll),aberrance:Number(v.aberrance),timelineId:combatInjuryTimelineId,gmConfirmed:v.gmConfirmed==='yes'});
+   if(f.id==='combat-injury-mishap-form'){
+    const m=s.mishaps?.find(x=>x.id===reference&&!x.resolved);
+    if(!m)throw Error('Nevyřízený Mishap neexistuje');
+    const usesDEX=v.hasDEX==='yes',hasLegs=v.hasLegs==='yes';
+    const attrs=c.hmk?.attributes??{},hasDEX=Number.isSafeInteger(attrs.dex)&&attrs.dex>0;
+    const dexTest=m.kind.includes('fumble')&&usesDEX&&hasDEX;
+    const relevantTest=dexTest?'dexterity':'agility';
+    const attributeML=(dexTest?attrs.dex:attrs.agl)*5;
+    const skillName=dexTest?'legerdemain':'acrobatics';
+    const skillML=c.hmk?.skills?.find(x=>String(x?.name??'').toLowerCase()===skillName)?.ml;
+    const supplied=v.baseML===''?null:Number(v.baseML);
+    let test=relevantTest;
+    if(!m.kind.startsWith('automatic-')&&supplied!==attributeML){
+     if(Number.isSafeInteger(skillML)&&supplied===skillML)test=skillName;
+     else throw Error('Mishap ML nesouhlasí s aktuálními atributy ani ověřenou dovedností');
+    }
+    const wound=s.wounds.find(w=>w.id===m.woundId);
+    const usedArms=dexTest&&wound&&['sh','ua','el','fo','ha','shoulder','upper arm','elbow','forearm','hand'].includes(String(wound.location).toLowerCase())&&['left','right'].includes(wound.side)?[wound.side]:null;
+    const injury=projectLiveInjuries({state:s,round,test,usedArms,timelineId:combatInjuryTimelineId});
+    if(!injury.ready)throw Error('Mishap Impairment: '+injury.reason);
+    transition=applyConfirmedInjuryMishap({state:s,round,eventId,mishapId:reference,baseML:supplied,
+     roll:v.roll===''?null:Number(v.roll),hasDEX,actionUsesDEX:usesDEX,hasLegs,
+     injuryImpairment:injury.impairment,gmConfirmed:v.gmConfirmed==='yes'});
+   }else transition=applyConfirmedInjuryMorale({state:s,round,eventId,woundId:reference,initiativeML:Number(v.initiativeML),roll:Number(v.roll),aberrance:Number(v.aberrance),timelineId:combatInjuryTimelineId,gmConfirmed:v.gmConfirmed==='yes'});
   }else if(f.id==='combat-special-aftermath-form'){
    c=character(v.characterId);if(!c||!encounterSelection.has(c.id))throw Error('Postava není ve střetnutí');
    transition=applyConfirmedSpecialAftermath({state:persistentStateOf(c),round,eventId,kind:v.kind,gmConfirmed:v.gmConfirmed==='yes',actualEndOfTurn:v.actualEndOfTurn==='yes',threatened:v.threatened==='yes',meleeML:v.meleeML===''?null:Number(v.meleeML),meleeRoll:v.meleeRoll===''?null:Number(v.meleeRoll)});
@@ -1728,7 +2202,36 @@ document.addEventListener('submit',e=>{
   const context={character:c,round:combatClock.round,actorId,turnEnded:atEndTurn,timelineId:combatInjuryTimelineId,
    elapsedMinutesSinceOriginal:null};
   const parseOptional=(key)=>v[key]===''?null:Number(v[key]);
+  let mishapContext=null,mishapTechnique='attribute';
+  const pending=guidedMandatoryEvents({state:persistentStateOf(c),characterId:c.id,
+   round:context.round,actorId,turnEnded:atEndTurn,timelineId:combatInjuryTimelineId})[0];
+  if(pending?.kind==='injury-mishap'){
+   const m=persistentStateOf(c).mishaps.find(x=>x.id===pending.id);
+   // Only actual missing rule inputs are requested; the game never assumes
+   // that an unfamiliar creature has DEX, legs, or uses DEX for this action.
+   const yesNo=(label)=>{
+    const answer=window.prompt(label+' (ano/ne; Zrušit = žádná změna)','');
+    if(answer===null)throw Error('Mishap zrušen; nic se nezapsalo');
+    const z=answer.trim().toLowerCase();
+    if(['ano','yes','a','y'].includes(z))return true;
+    if(['ne','no','n'].includes(z))return false;
+    throw Error('Zadejte výslovně ano nebo ne; údaj nelze odhadnout');
+   };
+   mishapContext={actionUsesDEX:m.kind.includes('fumble')?yesNo('Používala tato konkrétní akce Dexterity?'):false};
+   if(String(c.hmk?.folk??'').toLowerCase()!=='human'){
+    if(typeof c.hmk?.anatomy?.hasDEX!=='boolean')mishapContext.hasDEX=yesNo('Má tento tvor Dexterity (DEX)?');
+    if(typeof c.hmk?.anatomy?.hasLegs!=='boolean')mishapContext.hasLegs=yesNo('Má tvor nohy a může upadnout?');
+   }
+   const useDex=m.kind.includes('fumble')&&mishapContext.actionUsesDEX&&
+    (mishapContext.hasDEX??c.hmk?.anatomy?.hasDEX??Number.isSafeInteger(c.hmk?.attributes?.dex));
+   const alt=useDex?'legerdemain':'acrobatics';
+   const hasAlternative=(c.hmk?.skills??[]).some(x=>String(x.name??'').trim().toLowerCase()===alt&&Number.isSafeInteger(x.ml));
+   if(!m.kind.startsWith('automatic-')&&hasAlternative){
+    mishapTechnique=yesNo('Použít místo atributu ověřenou dovednost '+alt+'?')?alt:'attribute';
+   }
+  }
   let session=createGuidedMandatory({...context,state:persistentStateOf(c),eventId:uuid(),
+   mishapContext,mishapTechnique,
    abe:parseOptional('abe'),comaLocationShock:parseOptional('comaLocationShock'),comaInjuryLevel:parseOptional('comaInjuryLevel')});
   while(guidedMandatoryRequirement(session).kind==='die'){
    const req=guidedMandatoryRequirement(session);
@@ -1819,7 +2322,8 @@ document.addEventListener('submit',e=>{
   const grabber=character(pending.toActorId);
   if(!grabber||!encounterSelection.has(grabber.id))throw Error('Držící není ve střetnutí');
   const result=applyAutomaticGrabTake({state:persistentStateOf(victim),inventory:data.inventory,
-   round:combatClock.round,eventId:uuid(),grabberId:grabber.id,targetId:victim.id,itemId:v.itemId});
+   round:combatClock.round,eventId:uuid(),grabberId:grabber.id,targetId:victim.id,itemId:v.itemId,
+   targetHandedness:victim.hmk?.handedness});
   if(!mutate(()=>{synchronizeCombatInjuries(victim,result.state);data.inventory=result.inventory}))return;
   const out=document.getElementById('hmk-special-branches-result');
   if(out)out.textContent=`Grab Take: ověřený držený předmět převeden na ${grabber.name}; bez GM rozhodnutí.`;
@@ -1877,9 +2381,13 @@ document.addEventListener('submit',e=>{
     const attacker=character(v.attackerId);if(!attacker||attacker.id===target.id||!encounterSelection.has(attacker.id))throw Error('Neplatný vítěz Melee');
     if(combatInitiativeSequence)assertScheduledMeleeActor(liveInitiativeSequence(),attacker.id);
     r=applyConfirmedHMKManeuver({...a,kind:v.kind,attackerId:attacker.id,targetId:target.id,attackerSTR:n('attackerSTR'),targetSTR:n('targetSTR'),attackerD6:n('attackerD6'),targetD6:n('targetD6'),impactTA:n('impactTA'),charge:v.charge==='yes',oneHanded:v.oneHanded==='yes',offHanded:v.offHanded==='yes',grabAction:v.grabAction,zone:v.zone,confirmedMeleeVictory:v.confirmedMeleeVictory==='yes'});
-   }else if(f.id==='hmk-maneuver-consequence-form')r=applyConfirmedManeuverConsequence({...a,kind:v.kind,ml:n('ml'),roll:n('roll')});
+   }else if(f.id==='hmk-maneuver-consequence-form'){
+    const ctx=verifiedManeuverConsequence({state,character:target,round,timelineId:combatInjuryTimelineId});
+    if(ctx.forcedCF)throw Error('Nepotřebný fyzický d100: Stumble je automatické CF; použijte jednotného průvodce');
+    r=applyConfirmedManeuverConsequence({...a,kind:v.kind,ml:ctx.ml,roll:n('roll'),hasLegs:ctx.hasLegs});
+   }
    else if(f.id==='hmk-grab-retest-form')r=applyConfirmedGrabRetest({...a,attackerId:state.grabHold?.grabberId,attackerSTR:n('attackerSTR'),targetSTR:n('targetSTR'),attackerD6:n('attackerD6'),targetD6:n('targetD6'),impactTA:n('impactTA')});
-   else if(f.id==='hmk-grab-take-form')r=applyConfirmedGrabTakeTransfer({...a,inventory:data.inventory,attackerId:state.pendingGrabTake?.toActorId,targetId:target.id,itemId:v.itemId});
+   else if(f.id==='hmk-grab-take-form')r=applyConfirmedGrabTakeTransfer({...a,inventory:data.inventory,attackerId:state.pendingGrabTake?.toActorId,targetId:target.id,itemId:v.itemId,targetHandedness:target.hmk?.handedness});
    else if(f.id==='hmk-area-form')r=applyConfirmedAreaStrike({...a,aspect:v.aspect,strikeImpact:n('strikeImpact'),areaAV:n('areaAV'),dodgeML:n('dodgeML'),dodgeRoll:n('dodgeRoll'),shockML:n('shockML'),shockRoll:n('shockRoll'),compoundD10:n('compoundD10')});
    else if(f.id==='hmk-mount-control-form')r=applyConfirmedMountedControl({...a,ridingML:n('ridingML'),mountInitiativeML:n('mountInitiativeML'),roll:n('roll'),retestRoll:n('retestRoll')});
    else r=applyConfirmedMountedCharge({...a,mountRiderImpact:n('mountRiderImpact'),straightDistanceFt:n('straightDistanceFt')});
@@ -2352,7 +2860,7 @@ function asNumber(v){if(v===null||v===undefined||String(v).trim()==='')return nu
 function inventoryEditForm(x){return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-inv-title"><h2 id="edit-inv-title">Upravit vybavení: ${esc(x.snapshot.name)}</h2><p class="muted">${esc(x.snapshot.category)} · Změny se projeví až po uložení.</p><form id="inventory-edit-form"><input type="hidden" name="id" value="${esc(x.id)}">${numericField('quantity','Počet kusů',x.quantity)}${field('condition','Stav / poznámka',x.condition||'')}${numericField('currentWQ','Aktuální WQ (neznámá = prázdné)',x.currentWQ??'')}${slotSelect('slot',x.slot||'none')}<label>Způsob nesení (pro výbavu mimo zbroj na těle)<select name="gearStowage">${[['normal','Běžně'],['awkward','Nepohodlně (dvojnásobná hmotnost)'],['backpack','Uvnitř správně sbaleného batohu (poloviční hmotnost)']].map(([k,v])=>`<option value="${k}" ${x.gearStowage===k?'selected':''}>${v}</option>`).join('')}</select></label>${x.snapshot.category==='armor'?`${field('layerOrder','Pořadí vrstvy zevnitř ven (0–99, pouze pro vlastní sestavy)',x.layerOrder??'','number')}${field('bulkExceptionZones','GM Bulk výjimka: head,arms,torso,legs (pouze doložená výjimka HMK)',(x.bulkExceptionZones||[]).join(','))}<label>Sloupec vrstvy podle HMK p.117 (volitelný)<select name="layerSlot">${[['','Neurčen'],['underFar','Under far'],['underNear','Under near'],['base','Base'],['overNear','Over near'],['overFar','Over far']].map(([k,v])=>`<option value="${k}" ${x.layerSlot===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}<div class="actions"><button type="submit">Uložit změny</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`}
 
 document.addEventListener('click',e=>{const t=e.target.closest('[data-edit-inv]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();const x=data.inventory.find(x=>x.id===t.dataset.editInv&&x.characterId===selected);if(!x)return;overlay=inventoryEditForm(x);render()},true);
-document.addEventListener('submit',e=>{if(e.target.id!=='inventory-edit-form')return;e.preventDefault();e.stopImmediatePropagation();const v=Object.fromEntries(new FormData(e.target));const x=data.inventory.find(x=>x.id===v.id&&x.characterId===selected);if(!x)return alert('Předmět již neexistuje');const quantity=Number(v.quantity);const currentWQ=v.currentWQ.trim()===''?null:Number(v.currentWQ);if(!Number.isSafeInteger(quantity)||quantity<1||quantity>999999)return alert('Počet musí být celé číslo 1–999999');if(currentWQ!==null&&(!Number.isSafeInteger(currentWQ)||currentWQ<0||currentWQ>999))return alert('WQ musí být celé číslo 0–999');if(!validSlotForCategory(v.slot,x.snapshot.category))return alert('Neplatný slot pro tento typ předmětu');if(['main_hand','off_hand','worn'].includes(v.slot)&&quantity!==1)return alert('Nasazený předmět musí mít počet 1');if(!handSlotAvailable(x.characterId,v.slot,x.id))return alert('Ruka je již obsazena');const layerOrder=x.snapshot.category==='armor'&&String(v.layerOrder??'').trim()!==''?Number(v.layerOrder):null;const layerSlot=x.snapshot.category==='armor'?(v.layerSlot||null):null;const bulkExceptionZones=x.snapshot.category==='armor'&&String(v.bulkExceptionZones??'').trim()?String(v.bulkExceptionZones).split(',').map(z=>z.trim().toLowerCase()):[];if(new Set(bulkExceptionZones).size!==bulkExceptionZones.length||bulkExceptionZones.some(z=>!['head','arms','torso','legs'].includes(z)))return alert('Bulk: neplatné nebo opakované tělesné zóny');const gearStowage=v.gearStowage||'normal';if(!['normal','awkward','backpack'].includes(gearStowage))return alert('Neplatný způsob nesení');if(gearStowage==='backpack'&&v.slot!=='carried')return alert('Obsah batohu musí být ve slotu Neseno');if(layerOrder!==null&&(!Number.isSafeInteger(layerOrder)||layerOrder<0||layerOrder>99))return alert('Pořadí zbrojní vrstvy musí být celé číslo 0–99');if(mutate(()=>{const target=data.inventory.find(row=>row.id===v.id&&row.characterId===selected);if(!target)throw Error('Předmět již neexistuje');target.quantity=quantity;target.currentWQ=currentWQ;target.condition=v.condition;target.slot=v.slot;target.gearStowage=gearStowage;if(target.snapshot.category==='armor'){target.layerOrder=layerOrder;target.layerSlot=layerSlot;target.bulkExceptionZones=bulkExceptionZones}})){overlay=null;render()}},true);
+document.addEventListener('submit',e=>{if(e.target.id!=='inventory-edit-form')return;e.preventDefault();e.stopImmediatePropagation();const v=Object.fromEntries(new FormData(e.target));const x=data.inventory.find(x=>x.id===v.id&&x.characterId===selected);if(!x)return alert('Předmět již neexistuje');const quantity=Number(v.quantity);const currentWQ=v.currentWQ.trim()===''?null:Number(v.currentWQ);if(!Number.isSafeInteger(quantity)||quantity<1||quantity>999999)return alert('Počet musí být celé číslo 1–999999');if(currentWQ!==null&&(!Number.isSafeInteger(currentWQ)||currentWQ<0||currentWQ>999))return alert('WQ musí být celé číslo 0–999');if(!validSlotForCategory(v.slot,x.snapshot.category))return alert('Neplatný slot pro tento typ předmětu');if(['main_hand','off_hand','worn'].includes(v.slot)&&quantity!==1)return alert('Nasazený předmět musí mít počet 1');if(!handSlotAvailable(x.characterId,v.slot,x.id))return alert('Ruka je již obsazena');const layerOrder=x.snapshot.category==='armor'&&String(v.layerOrder??'').trim()!==''?Number(v.layerOrder):null;const layerSlot=x.snapshot.category==='armor'?(v.layerSlot||null):null;const bulkExceptionZones=x.snapshot.category==='armor'&&String(v.bulkExceptionZones??'').trim()?String(v.bulkExceptionZones).split(',').map(z=>z.trim().toLowerCase()):[];if(new Set(bulkExceptionZones).size!==bulkExceptionZones.length||bulkExceptionZones.some(z=>!['head','arms','torso','legs'].includes(z)))return alert('Bulk: neplatné nebo opakované tělesné zóny');const gearStowage=v.gearStowage||'normal';if(!['normal','awkward','backpack'].includes(gearStowage))return alert('Neplatný způsob nesení');if(gearStowage==='backpack'&&v.slot!=='carried')return alert('Obsah batohu musí být ve slotu Neseno');if(gearStowage==='backpack'&&/\bbackpack\b/i.test(x.snapshot.name))return alert('Samotný batoh nesmí být zabalen jako svůj vlastní obsah. HMK str. 120: poloviční hmotnost platí pouze pro obsah.');if(layerOrder!==null&&(!Number.isSafeInteger(layerOrder)||layerOrder<0||layerOrder>99))return alert('Pořadí zbrojní vrstvy musí být celé číslo 0–99');if(mutate(()=>{const target=data.inventory.find(row=>row.id===v.id&&row.characterId===selected);if(!target)throw Error('Předmět již neexistuje');target.quantity=quantity;target.currentWQ=currentWQ;target.condition=v.condition;target.slot=v.slot;target.gearStowage=gearStowage;if(target.snapshot.category==='armor'){target.layerOrder=layerOrder;target.layerSlot=layerSlot;target.bulkExceptionZones=bulkExceptionZones}})){overlay=null;render()}},true);
 
 // v11: Multi-line journal editor preserves timestamps and record identity.
 function journalEditForm(x){return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-log-title"><h2 id="edit-log-title">Upravit zápis deníku</h2><form id="journal-edit-form"><input type="hidden" name="id" value="${esc(x.id)}">${field('title','Nadpis',x.title||'')}${area('body','Text zápisu',x.body)}<div class="actions"><button type="submit">Uložit zápis</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`}
@@ -2439,12 +2947,41 @@ function prepareCatalogImport(pkg,existing){
 // v93.89: sequential, physical-dice-only Melee/Missile→wound guided interface.
 document.addEventListener('submit',e=>{
  const f=e.target;
- if(!['hmk-guided-hit-start-form','hmk-guided-hit-die-form','hmk-guided-hit-choice-form'].includes(f.id))return;
+ if(!['hmk-guided-hit-start-form','hmk-guided-hit-die-form','hmk-guided-hit-choice-form','hmk-guided-hit-duration-form','hmk-guided-hit-path-form','hmk-guided-hit-displacement-form'].includes(f.id))return;
  e.preventDefault();e.stopImmediatePropagation();
  try{
   const v=Object.fromEntries(new FormData(f));
   if(f.id==='hmk-guided-hit-start-form'){
-   if(guidedAttackSession)throw Error('Nejprve uzavřete rozpracovanou bojovou událost');
+   if(guidedAttackSession||guidedMountedSession||guidedTurnSession||guidedDeclaredSession||guidedSpatialSession)throw Error('Nejprve uzavřete rozpracovanou bojovou událost');
+   if(v.kind==='spatial'){
+    guidedSpatialSession=createLiveSpatialChoice(v);
+    guidedSpatialWitness=spatialLiveWitness(guidedSpatialSession.actorId);
+    guidedAttackLastOutcome='Prostorová akce: systém sám zkontroluje Engagement Zones a skutečný Move.';render();return;
+   }
+   if(v.kind==='turn-action'){
+    const seq=liveInitiativeSequence(),states=combatSequenceStates();
+    const witness=JSON.stringify({seq,states});
+    guidedTurnSession=createGuidedTurnAction({id:uuid(),sequence:seq,states});
+    guidedTurnWitness=witness;continueGuidedTurn();return;
+   }
+   if(v.kind==='mounted-control'){
+    const rider=character(v.attackerId),mount=character(v.mountId);
+    if(!rider||!mount||rider.id===mount.id||!encounterSelection.has(rider.id)||!encounterSelection.has(mount.id))
+     throw Error('Vyberte skutečného jezdce a odlišné jízdní zvíře ze střetnutí');
+    if(combatInitiativeSequence){
+     const active=liveInitiativeSequence();
+     if(currentEncounterActor(active)!==rider.id)throw Error('Control lze zahájit jen na tahu jezdce');
+     if(dueEncounterEvents(active,combatSequenceStates()).length)throw Error('Nejdříve vyřešte splatné události');
+    }
+    if(data.journal.some(j=>j.combatProof?.actionKind==='mounted-control'&&
+     j.combatProof?.timelineId===combatInjuryTimelineId&&j.combatProof?.round===combatClock.round&&
+     j.combatProof?.actorId===rider.id&&j.combatProof?.mountId===mount.id))
+     throw Error('Tento jezdec již vyhodnotil Control pro stejné zvíře v tomto kole');
+    const witness=guidedAttackLiveSignature(rider.id,mount.id),token=uuid();
+    guidedMountedSession=createGuidedMountedControl({id:uuid(),timelineId:combatInjuryTimelineId,
+     round:combatClock.round,rider,mount,state:persistentStateOf(rider),sourceSignature:token});
+    guidedMountedWitness=witness;continueGuidedMounted();return;
+   }
    const attacker=character(v.attackerId),defender=character(v.defenderId);
    if(!attacker||!defender||attacker.id===defender.id||!encounterSelection.has(attacker.id)||!encounterSelection.has(defender.id))throw Error('Vyberte dva různé účastníky střetnutí');
    if(combatInitiativeSequence){
@@ -2458,7 +2995,8 @@ document.addEventListener('submit',e=>{
     if(due.length)throw Error('Před útokem je splatná událost '+participant.name+': '+due[0].label);
    }
    if(data.journal.some(j=>j.combatProof?.timelineId===combatInjuryTimelineId&&
-    j.combatProof?.round===combatClock.round&&j.combatProof?.actorId===attacker.id))
+    j.combatProof?.round===combatClock.round&&j.combatProof?.actorId===attacker.id&&
+    (j.combatProof?.actionKind!=='mounted-control'||j.combatProof?.consumesTurn===true)))
     throw Error('Tato postava již v tomto kole provedla zaznamenaný útok');
    const signature=guidedAttackLiveSignature(attacker.id,defender.id);
    const token=uuid();
@@ -2466,25 +3004,79 @@ document.addEventListener('submit',e=>{
     attacker,defender,inventory:data.inventory,sourceSignature:token,direction:v.direction,
     opponents:Number(v.opponents),aimZN:Number(v.aimZN)};
    let result;
-   if(v.kind==='melee')result=createLiveGuidedMelee({...common,
+   if(['melee','press','trip','grab'].includes(v.kind))result=createLiveGuidedMelee({...common,
     attackerWeaponId:v.attackerWeaponId,defenderWeaponId:v.defenderWeaponId,
     attackerSkillId:v.attackerSkillId,defenderSkillId:v.defenderSkillId,
     attackerUsedArms:v.attackerUsedArms,defenderUsedArms:v.defenderUsedArms,
     attackerFoes:Number(v.attackerFoes),defenderFoes:Number(v.defenderFoes)});
-   else if(v.kind==='missile')result=createLiveGuidedMissile({...common,
+   else if(v.kind==='missile'){
+    const evasion=combatInitiativeSequence?liveSpatialEvade(liveInitiativeSequence(),
+     {targetId:defender.id,targetState:persistentStateOf(defender)}):{active:false};
+    if(v.targetMovement==='evading'&&!evasion.active)throw Error('Evade musí být doložená aktivní událostí cíle, nelze ji pouze vybrat');
+    result=createLiveGuidedMissile({...common,
     weaponId:v.attackerWeaponId,skillId:v.attackerSkillId,distance:Number(v.distance),
-    targetMovement:v.targetMovement,targetCount:Number(v.targetCount),nearbyTargetCount:Number(v.nearbyTargetCount),
+    targetMovement:evasion.active?'evading':v.targetMovement,effectiveDodgeIndex:evasion.active?evasion.index:null,
+    targetCount:Number(v.targetCount),nearbyTargetCount:Number(v.nearbyTargetCount),
     windforce:Number(v.windforce),crosswind:v.crosswind==='yes',movingShooter:v.movingShooter==='yes'});
-   else throw Error('Neznámý typ útoku');
-   guidedAttackSession=result.session;guidedAttackWitness=signature;guidedAttackToken=token;guidedAttackAudit=result.preflight;
+   }else throw Error('Neznámý typ útoku');
+   if(['press','trip','grab'].includes(v.kind)){
+    guidedDeclaredSession=createGuidedDeclaredManeuver({id:uuid(),sourceSession:result.session,technique:v.kind,
+     attacker,defender,inventory:data.inventory,targetState:persistentStateOf(defender),
+     sourceSignature:token,aimZN:Number(v.aimZN),attackerUsedArms:v.attackerUsedArms,defenderUsedArms:v.defenderUsedArms});guidedDeclaredWitness=signature;guidedAttackToken=token;guidedAttackAudit=result.preflight;
+   }else{guidedAttackSession=result.session;guidedAttackWitness=signature;guidedAttackToken=token;guidedAttackAudit=result.preflight;}
    guidedAttackLastOutcome='Ověřené podklady: '+JSON.stringify(result.preflight);
+   if(guidedDeclaredSession){continueGuidedDeclared();return;}
   }else{
+   if(guidedSpatialSession){
+    const seq=liveInitiativeSequence(),states=combatSequenceStates();
+    if(spatialLiveWitness(guidedSpatialSession.actorId)!==guidedSpatialWitness)throw Error('Stav, výbava, pořadí tahů nebo mapa se změnily');
+    guidedSpatialSession=f.id==='hmk-guided-hit-die-form'?submitLiveSpatialDie(guidedSpatialSession,v.roll):f.id==='hmk-guided-hit-path-form'?setLiveSpatialPath(guidedSpatialSession,v):chooseLiveSpatial(guidedSpatialSession,v.decision);
+    continueGuidedSpatial();return;
+   }
+   if(guidedDeclaredSession){
+    const a=guidedDeclaredSession;
+    if(guidedAttackLiveSignature(a.attackerId,a.defenderId)!==guidedDeclaredWitness)
+     throw Error('Účastníci nebo výbava se v průběhu deklarovaného manévru změnili');
+    if(f.id==='hmk-guided-hit-displacement-form'){
+     const units=selectedEncounterCharacters().map(c=>({id:c.id,
+      x:Number(v[`displace_${c.id}_x`]),y:Number(v[`displace_${c.id}_y`])}));
+     for(const c of selectedEncounterCharacters())if(v[`displace_${c.id}_x`]===''||v[`displace_${c.id}_y`]==='')
+      throw Error('Chybí přesná poloha '+c.name);
+     if(v.displacementX===''||v.displacementY==='')throw Error('Chybí přesná cílová poloha manévru');
+     guidedDeclaredSession=submitGuidedDeclaredDisplacement(a,{units,
+      destination:{x:Number(v.displacementX),y:Number(v.displacementY)},clearPath:v.clearPath==='yes'});
+    }else guidedDeclaredSession=f.id==='hmk-guided-hit-die-form'?submitGuidedDeclaredDie(a,v.roll):f.id==='hmk-guided-hit-duration-form'?submitGuidedDeclaredFact(a,v.duration):chooseGuidedDeclared(a,v.decision);
+    continueGuidedDeclared();return;
+   }
+   if(guidedTurnSession){
+    const seq=liveInitiativeSequence(),states=combatSequenceStates();
+    if(JSON.stringify({seq,states})!==guidedTurnWitness)throw Error('Stav tahu se během volby změnil');
+    guidedTurnSession=f.id==='hmk-guided-hit-duration-form'?enterGuidedTurnDuration(guidedTurnSession,v.duration):chooseGuidedTurnAction(guidedTurnSession,v.decision);
+    continueGuidedTurn();return;
+   }
+   if(guidedMountedSession){
+    const a=guidedMountedSession;
+    if(guidedAttackLiveSignature(a.riderId,a.mountId)!==guidedMountedWitness)
+     throw Error('Mounted Control už není aktuální');
+    guidedMountedSession=f.id==='hmk-guided-hit-die-form'?submitGuidedMountedDie(a,v.roll):chooseGuidedMounted(a,v.decision);
+    continueGuidedMounted();return;
+   }
    if(!guidedAttackSession)throw Error('Není rozpracovaný řízený útok');
    const a=guidedAttackSession;
    if(guidedAttackLiveSignature(a.attackerId,a.defenderId)!==guidedAttackWitness)throw Error('Údaje postavy nebo inventáře se změnily; výpočet je neaktuální');
    if(guidedAttackCandidate){
     const req=guidedAttackNextRequirement();
-    if(f.id==='hmk-guided-hit-choice-form'){
+    if(guidedAttackFreePressSession){
+     if(f.id==='hmk-guided-hit-choice-form')guidedAttackFreePressSession=chooseGuidedFreePress(guidedAttackFreePressSession,v.decision);
+     else if(f.id==='hmk-guided-hit-displacement-form'){
+      const units=selectedEncounterCharacters().map(c=>({id:c.id,x:Number(v[`displace_${c.id}_x`]),y:Number(v[`displace_${c.id}_y`])}));
+      for(const c of selectedEncounterCharacters())if(v[`displace_${c.id}_x`]===''||v[`displace_${c.id}_y`]==='')
+       throw Error('Chybí doložená poloha '+c.name);
+      if(v.displacementX===''||v.displacementY==='')throw Error('Chybí cílová poloha Free Press');
+      guidedAttackFreePressSession=submitGuidedFreePressDisplacement(guidedAttackFreePressSession,{units,
+       destination:{x:Number(v.displacementX),y:Number(v.displacementY)},clearPath:v.clearPath==='yes'});
+     }else guidedAttackFreePressSession=submitGuidedFreePressDie(guidedAttackFreePressSession,v.roll);
+    }else if(f.id==='hmk-guided-hit-choice-form'){
      if(req.kind!=='choice'||req.id!=='aftermath-technique'||!req.choices.some(x=>x.value===v.decision))throw Error('Nedovolená hráčská volba');
      guidedAttackAftermathTechnique=v.decision;
     }else{
@@ -2499,5 +3091,5 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-action="hmk-guided-attack-cancel"]');
  if(!button)return;
- e.preventDefault();clearGuidedAttack();guidedAttackLastOutcome='Rozpracovaný útok zrušen – žádný zápis neproběhl.';render();
+ e.preventDefault();clearGuidedAttack();guidedMountedSession=null;guidedMountedWitness=null;guidedTurnSession=null;guidedTurnWitness=null;guidedDeclaredSession=null;guidedDeclaredWitness=null;guidedSpatialSession=null;guidedSpatialWitness=null;guidedChargeContext=null;guidedAttackLastOutcome='Rozpracovaná bojová událost zrušena – žádný zápis neproběhl.';render();
 },true);
