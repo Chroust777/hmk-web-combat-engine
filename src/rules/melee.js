@@ -269,3 +269,12 @@ export function allocateMeleeTacticalAdvantages({outcome,choices=[]}={}){
   for(const choice of choices) tally[choice]++;
   return {...tally,total:choices.length,choices:[...choices]};
 }
+
+/** HMK p.106: Take affects an item physically held in the rolled arm zone.
+ * Main/off hand are dominance slots, not right/left anatomical slots. */
+export function heldSlotInGrabZone(zone,handedness){
+ if(!['right','left'].includes(handedness))return null;
+ if(zone==='right-arm')return handedness==='right'?'main_hand':'off_hand';
+ if(zone==='left-arm')return handedness==='left'?'main_hand':'off_hand';
+ return null;
+}
