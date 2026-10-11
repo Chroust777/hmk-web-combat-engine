@@ -14,14 +14,24 @@ const check=(v,msg)=>{if(!v)throw new Error(msg)};
 const validId=v=>typeof v==='string'&&v.length>0&&v.length<161;
 
 export function createGuidedMeleeSequence({id,timelineId,round,attackerId,defenderId,
- attackerEML,defenderEML,defenderEMLByDefence=null,allowedDefences,sourceSignature}={}){
+ attackerEML,defenderEML,attackerML=null,defenderML=null,defenderEMLByDefence=null,
+ defenderMLByDefence=null,allowedDefences,sourceSignature}={}){
  check(validId(id)&&validId(timelineId)&&validId(sourceSignature),'Chybí ověřená bojová událost a podpis stavu');
  check(int(round,1,9999)&&validId(attackerId)&&validId(defenderId)&&attackerId!==defenderId,'Neplatní účastníci/kolo');
  check(int(attackerEML,0,100)&&int(defenderEML,0,100),'Chybí doložené EML účastníků');
  check(Array.isArray(allowedDefences)&&allowedDefences.length>0&&allowedDefences.every(x=>Object.values(DEFENCE).includes(x))
   &&new Set(allowedDefences).size===allowedDefences.length,'Chybí skutečně povolené volby obrany');
  if(defenderEMLByDefence!==null)check(Object.entries(defenderEMLByDefence).every(([k,v])=>Object.values(DEFENCE).includes(k)&&int(v,0,100)), 'Chybí ověřené EML podle druhu obrany');
- return {format:'hmk-guided-melee-v1',id,timelineId,round,attackerId,defenderId,attackerEML,defenderEML,defenderEMLByDefence:structuredClone(defenderEMLByDefence),
+ check(attackerML===null||int(attackerML,0,200),'Neplatné původní útočné ML');
+ check(defenderML===null||int(defenderML,0,200),'Neplatné původní obranné ML');
+ if(defenderMLByDefence!==null)check(Object.entries(defenderMLByDefence).every(([k,v])=>Object.values(DEFENCE).includes(k)&&int(v,0,200)), 'Chybí ověřené původní ML podle druhu obrany');
+ // A Dodge tie may need original ML (p.61), which cannot be reconstructed
+ // from EML after penalties. Require it before requesting any physical dice.
+ if(allowedDefences.includes(DEFENCE.DODGE))check(int(attackerML,0,200)&&
+  int(defenderMLByDefence?.dodge??defenderML,0,200),
+  'Dodge: před fyzickým hodem je nutné znát původní ML obou testů pro rozhodovací remízu');
+ return {format:'hmk-guided-melee-v1',id,timelineId,round,attackerId,defenderId,attackerEML,defenderEML,attackerML,defenderML,defenderEMLByDefence:structuredClone(defenderEMLByDefence),
+  defenderMLByDefence:structuredClone(defenderMLByDefence),
   allowedDefences:[...allowedDefences],sourceSignature,phase:'choose-defence',defence:null,queue:null,
   witnessedRolls:[],gate:null};
 }
@@ -41,7 +51,8 @@ export function chooseGuidedMeleeDefence(session,defence){
  if(defence!==DEFENCE.IGNORE)requests.push({id:'defenderRoll',faces:100,label:`Melee ${defence} d100`});
  const queue=createManualDiceQueue({id:session.id+':melee-d100',source:'HMK World of Kèthîra p.166 Melee',
   round:session.round,actorId:session.attackerId,requests});
- return {...session,defence,defenderEML:session.defenderEMLByDefence?.[defence]??session.defenderEML,phase:'rolling',queue};
+ return {...session,defence,defenderEML:session.defenderEMLByDefence?.[defence]??session.defenderEML,
+  defenderML:session.defenderMLByDefence?.[defence]??session.defenderML,phase:'rolling',queue};
 }
 
 export function submitGuidedMeleeDie(session,value){
@@ -55,6 +66,7 @@ export function submitGuidedMeleeDie(session,value){
  next.witnessedRolls=[...next.witnessedRolls,...proof.rolls];
  if(request.faces===100){
   const gate=resolveMeleeAttackGate({defence:next.defence,attackerEML:next.attackerEML,defenderEML:next.defenderEML,
+   attackerML:next.attackerML??null,defenderML:next.defenderML??null,
    attackerRoll:values.attackerRoll,defenderRoll:next.defence===DEFENCE.IGNORE?null:values.defenderRoll});
   if(gate.reason==='final-d10-tiebreak-required'){
    // The p.166 equal-test fallback, only when the rules resolver explicitly requests it.
@@ -74,6 +86,7 @@ export function submitGuidedMeleeDie(session,value){
  const d=firstQueue.find(x=>x.id==='defenderRoll')?.value;
  check(int(a,1,100)&&int(d,1,100),'Chybí původní doložené výsledky Melee d100');
  const gate=resolveMeleeAttackGate({defence:next.defence,attackerEML:next.attackerEML,defenderEML:next.defenderEML,
+   attackerML:next.attackerML??null,defenderML:next.defenderML??null,
   attackerRoll:a,defenderRoll:d,finalD10Attacker:values.attackerFinalD10,finalD10Defender:values.defenderFinalD10});
  if(gate.reason==='final-d10-tiebreak-required'){
   // This does not select a winner: a new physical d10 pair is required.

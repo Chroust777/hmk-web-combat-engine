@@ -23,7 +23,7 @@ export function applyConfirmedWeaponWQ({inventory,targetInventoryId,strikeImpact
  const effective=weaponDamageImpact({strikeImpact,csTiebreak,targetIsShield,thrust,sourceNatural,targetArmed});
  const result=weaponDamageResult({impact:effective,currentWQ:item.currentWQ});
  const before=item.currentWQ;
- if(result.destroyed){item.condition='Destroyed (HMK Weapon Damage)';item.currentWQ=0;item.slot='none';}
+ if(result.destroyed){item.condition='Destroyed (HMK Weapon Damage)';item.currentWQ=0;item.destroyed=true;item.slot='none';}
  else if(result.wqLoss)item.currentWQ=Math.max(0,item.currentWQ-result.wqLoss);
  return {inventory:clone,itemId:item.id,effectiveImpact:effective,before,after:item.currentWQ,...result};
 }

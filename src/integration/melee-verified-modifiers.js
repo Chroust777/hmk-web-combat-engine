@@ -4,7 +4,21 @@ import {weaponTestModifier,slowPenalty,impactTABonus} from '../rules/weapon-trai
 export function verifiedMeleeModifiers(snapshot,{role='attack',defence='block',threateningFoeCount=0,twoHanded=false}={}){
  const m=snapshot?.properties?.verifiedModes?.[0];
  if(!m||typeof m!=='object')return {ok:false,reason:'unverified-weapon-mode'};
- const t=m.traits;
+ // HMK printed p.105: these two primary sword modes have no Melee, Block,
+ // Defence or Slow trait. Their other printed traits (thrust/Impact TA) are
+ // handled separately. Accept legacy catalog snapshots ONLY when every
+ // identifying printed primary-mode value matches, never by name alone.
+ const p=snapshot?.properties??{};
+ const legacyNoModifier={
+  Broadsword:{hft:10,weight:3,mod:3},
+  Scimitar:{hft:10,weight:3,mod:2}
+ }[snapshot?.name];
+ const legacyVerified=legacyNoModifier&&/printed page 105/i.test(snapshot?.description??'')&&
+  /printed p\. 105/i.test(snapshot?.source??'')&&
+  p.quality===12&&p.heft===legacyNoModifier.hft&&p.weightLb===legacyNoModifier.weight&&
+  m.impactDie==='d10'&&m.impactModifier===legacyNoModifier.mod&&m.aspect==='e'&&
+  (m.zoneDie==='d6'||m.zoneDie===6)&&String(m.length)==='5';
+ const t=m.traits??(legacyVerified?{}:null);
  if(!t||typeof t!=='object'||Array.isArray(t))return {ok:false,reason:'unverified-weapon-traits'};
  for(const k of ['melee','block','defence'])if(t[k]!==undefined&&(!Number.isSafeInteger(t[k])||Math.abs(t[k])>100))return {ok:false,reason:'invalid-trait-'+k};
  if(!Number.isSafeInteger(threateningFoeCount)||threateningFoeCount<0||threateningFoeCount>100)return {ok:false,reason:'invalid-foe-count'};

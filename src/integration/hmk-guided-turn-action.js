@@ -9,7 +9,8 @@
  * claimed supported by this adapter. They need independent world-state data.
  */
 import {guidedTurnChoices} from './hmk-guided-turn-choices.js';
-import {finishEncounterTurn,validateEncounterSequence,currentEncounterActor} from './encounter-turn-sequence.js';
+import {finishEncounterTurn,validateEncounterSequence,currentEncounterActor,dueEndTurnEvents} from './encounter-turn-sequence.js';
+import {applyConfirmedSpecialAftermath} from './persistent-combat-state.js';
 const assert=(ok,message)=>{if(!ok)throw Error(message)};
 const clone=structuredClone;
 const stamp=x=>JSON.stringify(x);
@@ -24,7 +25,8 @@ export function createGuidedTurnAction({id,sequence,states}={}){
  assert(offered.length,'Žádnou z těchto akcí nelze právě bezpečně vykonat');
  return {format:'hmk-guided-turn-action-v1',id,actorId:currentEncounterActor(s),round:s.round,
   timelineId:s.timelineId,sequenceWitness:stamp(s),statesWitness:stamp(states),
-  choices:offered,phase:'choose-action',action:null,readiedAction:null,durationRounds:null};
+  choices:offered,phase:choices.mandatoryPass?'ready':'choose-action',
+  action:choices.mandatoryPass?'pass':null,readiedAction:null,durationRounds:null};
 }
 export function guidedTurnRequirement(s){
  assert(s?.format==='hmk-guided-turn-action-v1','Neplatná posloupnost hráčské akce');
@@ -55,12 +57,35 @@ export function completeGuidedTurnAction({session,sequence,states}={}){
  assert(s.actorId===currentEncounterActor(sequence),'Jedná jiná postava');
  const decision=guidedTurnChoices(sequence,states);
  assert(decision.kind==='player-choice'&&decision.choices.includes(s.action),'Akce již není povolena');
- const next=finishEncounterTurn(sequence,states,{action:s.action,
+ // The actual player has chosen Pass. The mandatory post-Mishap obligation
+ // is consumed at the end of this very turn; both character state and
+ // Initiative must be written by the caller in ONE durable transaction.
+ const pending=dueEndTurnEvents(sequence,states);
+ let stagedStates=states,mandatoryAftermath=null;
+ if(pending.some(x=>x.type==='mishap-pass-end-turn')){
+  assert(s.action==='pass','Povinný Pass po Mishap nelze obejít');
+  // Mishap Pass is the action itself, not a competing dice obligation.
+  // A concurrent STN/Rally end-turn roll follows the completed Pass.
+  const actor=states[s.actorId];
+  assert(actor,'Chybí potvrzený stav účastníka');
+  const result=applyConfirmedSpecialAftermath({state:actor,round:s.round,
+   eventId:s.id+':mishap-pass',kind:'pass-next-turn',gmConfirmed:true,actualEndOfTurn:true});
+  stagedStates={...states,[s.actorId]:result.state};
+  mandatoryAftermath={kind:'pass-next-turn',eventId:s.id+':mishap-pass',
+   actorId:s.actorId,round:s.round};
+ }
+ const next=finishEncounterTurn(sequence,stagedStates,{action:s.action,
   readiedAction:s.readiedAction,durationRounds:s.durationRounds,gmConfirmed:true});
- const last=next.log.at(-1);assert(last.type==='turn-complete'&&last.actorId===s.actorId,'Nezapsané ukončení tahu');
- return {sequence:next,actorId:s.actorId,round:s.round,action:s.action,
+ const last=next.log.at(-1);
+ assert(['turn-complete','turn-action-resolved-before-shock-reroll',
+  'turn-action-resolved-before-confused-reaction','turn-action-resolved-before-rally-reaction'].includes(last.type)&&
+  last.actorId===s.actorId&&last.action===s.action,
+  'Není doloženo ukončení tahu ani jediná dokončená akce čekající na povinný test');
+ return {sequence:next,states:stagedStates,mandatoryAftermath,
+  actorId:s.actorId,round:s.round,action:s.action,
   readiedAction:s.readiedAction,durationRounds:s.durationRounds,
   proof:{format:'hmk-guided-player-choice-v1',id:s.id,source:'HMK World of Kèthîra pp.158–162',
    timelineId:s.timelineId,round:s.round,actorId:s.actorId,decision:s.action,
-   readiedAction:s.readiedAction,durationRounds:s.durationRounds,physicalDice:[]}};
+   readiedAction:s.readiedAction,durationRounds:s.durationRounds,
+   mandatoryAftermath,physicalDice:[]}};
 }

@@ -32,8 +32,9 @@ export function verifiedCombatMishap({kind,actor,state,round,timelineId,usesDEX=
   baseML:ml,skill:technique,alternative:learned?alternative:null,injuryImpairment:projection.impairment,
   fatigue,stunned:state.shock==='STN',forcedCF:projection.unusable,test};
 }
-export function applyGuidedCombatMishap({state,eventId,round,actorId,profile,roll=null}={}){
+export function applyGuidedCombatMishap({state,eventId,round,actorId,profile,roll=null,origin='melee'}={}){
  validateCombatState(state);
+ assert(['melee','missile'].includes(origin),'Neznámý původ bojového Mishap');
  assert(state.shock!=='KIA','Mrtvý účastník nepodstupuje Melee Mishap');
  assert(!state.events.some(e=>e.id===eventId)&&int(round,1,9999)&&round>=state.lastRound,'Duplicitní nebo zastaralý Mishap');
  assert(profile&&profile.kind,'Chybí původní ověřená pravidlová projekce');
@@ -46,7 +47,7 @@ export function applyGuidedCombatMishap({state,eventId,round,actorId,profile,rol
  if(result.effect==='drop-item')next.posture.dropPending=true;
  if(result.effect==='prone')next.posture.prone=true;
  if(result.effect==='pass-next-turn')next.posture.passNextTurn=true;
- next.events.push({id:eventId,type:'hmk-melee-mishap',round,details:{actorId,profile:copy(profile),result,
+ next.events.push({id:eventId,type:origin==='melee'?'hmk-melee-mishap':'hmk-missile-mishap',round,details:{actorId,origin,profile:copy(profile),result,
   physicalDice:roll===null?[]:[{id:'combatMishapD100',faces:100,value:roll,source:'GM-entered-physical-die'}]}});
  next.lastRound=round;validateCombatState(next);return {state:next,result};
 }

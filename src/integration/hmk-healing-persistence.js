@@ -60,7 +60,7 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
    const prior=w.healing??{};
    w.healing={...prior,treated:true,treatments,healingRate:treatment.result.healingRate,
     infectionPossible:!!treatment.result.infectionPossible,permanentEligible:!!treatment.result.permanentImpairmentEligible,
-    cauterised:prior.cauterised??false,area,grimWound:!!treatment.grimWound,nextGrimShockDay:treatment.grimWound?Math.max(1,daySinceInjury+1):null,
+    cauterised:prior.cauterised??w.cauterised??false,area,grimWound:!!treatment.grimWound,nextGrimShockDay:treatment.grimWound?Math.max(1,daySinceInjury+1):null,
     nextHealingDay:Math.floor(daySinceInjury/5)*5+5,healedDay:null};
    if(treatment.result.bleeding&&!w.bleeding){w.bleeding=true;w.nextAdvanceRound=round+60;}
   }
@@ -74,7 +74,7 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
  w.healing={treated:true,untreated:true,treatments:[],healingRate:result.result.healingRate,
   infectionPossible:!!result.result.infectionPossible,permanentEligible:!!result.result.permanentImpairmentEligible,
   grimWound:result.grimWound,nextGrimShockDay:result.grimWound?Math.max(1,daySinceInjury+1):null,area, nextHealingDay:Math.floor(daySinceInjury/5)*5+5,
-  cauterised:false,infectionWeakness:0};
+  cauterised:w.cauterised??false,infectionWeakness:0};
  track(s,{eventId,round,type:'injury-untreated',details:{woundId,daySinceInjury,source:'HMK p180'}});
  return {state:s,healed:false,treatment:w.healing};
 }

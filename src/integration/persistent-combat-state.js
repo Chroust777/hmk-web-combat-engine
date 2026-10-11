@@ -40,7 +40,37 @@ export function validateCombatState(s){
  requireCond(s.fatigue&&['windedness','weariness','otherWeakness'].every(k=>whole(s.fatigue[k],0,99999)),'Neplatný trvalý Fatigue');
  requireCond(Array.isArray(s.wounds)&&s.wounds.length<=1000&&Array.isArray(s.events)&&s.events.length<=5000,'Neplatný seznam ran nebo událostí');
  if(s.morale!==undefined){requireCond(s.morale&&['steady','brave','withdrawing','routed','catatonic'].includes(s.morale.state)&&whole(s.morale.psycheStress,0,99999)&&
-  (s.morale.braveSince==null||whole(s.morale.braveSince,1,9999))&&(s.morale.braveTimelineId==null||typeof s.morale.braveTimelineId==='string')&&(s.morale.lastReactionRound==null||whole(s.morale.lastReactionRound,1,9999))&&(s.morale.lastReactionTimelineId==null||typeof s.morale.lastReactionTimelineId==='string'),'Neplatný Morale State');}
+  (s.morale.braveSince==null||whole(s.morale.braveSince,1,9999))&&(s.morale.braveTimelineId==null||typeof s.morale.braveTimelineId==='string')&&(s.morale.lastReactionRound==null||whole(s.morale.lastReactionRound,1,9999))&&(s.morale.lastReactionTimelineId==null||typeof s.morale.lastReactionTimelineId==='string'),'Neplatný Morale State');
+  if(s.morale.rallyLockout!=null){const x=s.morale.rallyLockout;requireCond(typeof x.timelineId==='string'&&x.timelineId&&whole(x.untilRound,1,9999)&&whole(x.originRound,1,9999)&&whole(x.durationMinutes,1,5)&&x.untilRound===x.originRound+12*x.durationMinutes,'Neplatný časový zákaz Rally');}
+  if(s.morale.cohesion!=null){const c=s.morale.cohesion;const ids=c.allyIds??[];
+   requireCond(typeof c.timelineId==='string'&&c.timelineId.length>0&&Array.isArray(ids)&&ids.length>0&&ids.length<=99&&new Set(ids).size===ids.length&&ids.every(id=>typeof id==='string'&&id.length>0),'Neplatný Group Cohesion roster');
+   for(const k of ['remainingAtThreshold','knownVanquishedIds','assessedVanquishedIds']){
+    requireCond(Array.isArray(c[k])&&new Set(c[k]).size===c[k].length&&c[k].every(id=>ids.includes(id)),'Neplatné Group Cohesion členství: '+k);
+   }
+   requireCond(c.lastTriggerEventId==null||(typeof c.lastTriggerEventId==='string'&&c.lastTriggerEventId.length>0),'Neplatná vazba Group Cohesion');
+  }
+  if(s.morale.gmVanquished!==undefined&&s.morale.gmVanquished!==null){
+   const x=s.morale.gmVanquished;
+   requireCond(typeof x.active==='boolean'&&typeof x.category==='string'&&x.category&&
+    typeof x.reason==='string'&&x.reason.length>=5&&typeof x.timelineId==='string'&&x.timelineId&&
+    typeof x.sourceEventId==='string'&&x.sourceEventId,
+    'Neplatné doložení funkčního Vanquished');
+  }
+  if(s.morale.specialPending!==undefined){
+   const queue=s.morale.specialPending;
+   requireCond(Array.isArray(queue)&&queue.length<=100,'Neplatná fronta Special Morale');
+   const keys=new Set();
+   for(const t of queue){
+    requireCond(t&&typeof t.id==='string'&&t.id&&typeof t.sourceEventId==='string'&&t.sourceEventId&&
+     typeof t.incidentKey==='string'&&t.incidentKey&&!keys.has(t.incidentKey)&&
+     typeof t.kind==='string'&&typeof t.description==='string'&&t.description.length>=5&&
+     typeof t.incidentRef==='string'&&t.incidentRef&&typeof t.timelineId==='string'&&t.timelineId&&
+     whole(t.round,1,9999)&&t.facts&&typeof t.facts==='object'&&!Array.isArray(t.facts),
+     'Neplatný nebo duplicitní spouštěč Special Morale');
+    keys.add(t.incidentKey);
+   }
+  }
+  if(s.morale.rallyPending!=null){const x=s.morale.rallyPending;requireCond(typeof x.sourceEventId==='string'&&x.sourceEventId&&typeof x.timelineId==='string'&&x.timelineId&&x.required===true&&(x.lastReactionRound==null||whole(x.lastReactionRound,1,9999)),'Neplatný Rally Reaction');}}
  if(s.posture!==undefined){requireCond(s.posture&&['prone','dropPending','passNextTurn'].every(k=>typeof s.posture[k]==='boolean'),'Neplatná evidence Mishap');}
  if(s.mishaps!==undefined){requireCond(Array.isArray(s.mishaps)&&s.mishaps.length<=2000,'Neplatný seznam Injury Mishaps');
   for(const m of s.mishaps)requireCond(m&&typeof m.id==='string'&&typeof m.woundId==='string'&&['fumble-roll','stumble-roll','automatic-fumble','automatic-stumble'].includes(m.kind)&&typeof m.resolved==='boolean','Neplatný Injury Mishap');}
@@ -49,6 +79,11 @@ export function validateCombatState(s){
  requireCond(whole(s.lastRound,0,9999)&&(s.shockOriginRound===null||whole(s.shockOriginRound,1,9999)),'Neplatná časová značka');
  const ids=new Set(),events=new Set();
  for(const w of s.wounds){requireCond(w&&typeof w.id==='string'&&w.id&&!ids.has(w.id)&&typeof w.location==='string'&&w.location&&['M','S','G'].includes(w.severity)&&whole(w.level,1,5)&&typeof w.aspect==='string'&&typeof w.bleeding==='boolean'&&(w.nextAdvanceRound===null||whole(w.nextAdvanceRound,1,9999)),'Poškozená nebo duplicitní rána');ids.add(w.id);requireCond(!w.bleeding||s.shock==='KIA'||whole(w.nextAdvanceRound,1,9999),'Krvácející rána nemá termín Advance');requireCond(w.side===undefined||w.side===null||['left','right'].includes(w.side),'Neplatná strana zraněné končetiny');requireCond(w.shockSL===undefined||w.shockSL===null||['CS','S','F','CF'].includes(w.shockSL),'Neplatný Shock Roll u rány');requireCond(w.timelineId===undefined||w.timelineId===null||(typeof w.timelineId==='string'&&w.timelineId.length>0&&w.timelineId.length<=100),'Neplatná časová osa rány');requireCond(w.minorOnsetGM===undefined||typeof w.minorOnsetGM==='boolean','Neplatné rozhodnutí GM o nástupu impairment');requireCond(w.impaled===undefined||typeof w.impaled==='boolean','Neplatný příznak impalement');requireCond(w.amputation===undefined||w.amputation===null||typeof w.amputation.severed==='boolean','Neplatný stav amputace');requireCond(w.moralePending===undefined||typeof w.moralePending==='boolean','Neplatný závazek Morale po zranění');}
+  // Provenance is optional for old wounds, never implicitly inferred.
+  for(const w of s.wounds){
+   requireCond(w.moraleThreatId===undefined||(typeof w.moraleThreatId==='string'&&w.moraleThreatId.length>0&&w.moraleThreatId.length<=200),'Neplatný zdroj Morale rány');
+   requireCond(w.moraleThreatABE===undefined||(whole(w.moraleThreatABE,0,200)&&w.moraleThreatId),'Neplatná zdrojová Aberrance rány');
+  }
  if(s.shockFollowup!==undefined&&s.shockFollowup!==null){
   const q=s.shockFollowup;
   requireCond(q&&['STN','INC','UNC'].includes(q.kind)&&whole(q.originRound,1,9999)&&whole(q.dueRound,1,9999)
@@ -86,10 +121,15 @@ export function beginConfirmedEncounter({state,eventId,timelineId,gmConfirmed=fa
  requireCond(!s.wounds.some(w=>w.bleeding),'Před resetem kol je nutné vyřešit všechna aktivní krvácení a jejich časování');
  requireCond(s.shock==='NONE'&&!s.shockFollowup&&!s.extendedShock&&!s.coma?.active&&!s.bloodShockPending,
   'Před resetem kol musí být vyřešen Shock, Extended Shock, Coma a Blood Shock');
+ requireCond(!(s.morale?.specialPending??[]).length,'Před novým střetnutím je nutné vyřešit všechny doložené Special Morale triggery');
  requireCond(!(s.mishaps??[]).some(m=>!m.resolved)&&!s.wounds.some(w=>w.moralePending),
   'Před novým střetnutím musí být vyřešeny povinné Mishaps a Morale po zranění');
  requireCond(!s.posture?.passNextTurn,'Nevyřízený Pass z minulého tahu musí potvrdit GM před resetem kol');
  const oldRound=s.lastRound,oldTimeline=s.encounterTimelineId??null;
+ // Group Cohesion belongs to a specific known set of allies in a single
+ // encounter. Archive its source events but never carry an old roster into
+ // a new fight whose participants/alliance structure may be different.
+ if(s.morale?.cohesion)s.morale.cohesion=null;
  s.encounterTimelineId=timelineId;s.lastRound=1;
  s.events.push({id:eventId,type:'encounter-start',round:1,details:{timelineId,previousTimelineId:oldTimeline,previousLastRound:oldRound,source:'explicit GM encounter boundary, HMK p169/176–179',noAutomaticTimeAdvance:true}});
  validateCombatState(s);
@@ -102,6 +142,12 @@ function ready(s,round,id){const n=copy(s??initialCombatState());validateCombatS
  */
 function finalizeFatalState(s){
  if(s.shock!=='KIA')return;
+ // Death supersedes a future compulsory Mishap Pass. Preserve the wound and
+ // mishap evidence but never leave an impossible scheduled action.
+ if(s.posture)s.posture.passNextTurn=false;
+ // A dead combatant does not take later Morale rolls, but the declaration
+ // remains archived in prior event history.
+ if(s.morale?.specialPending)s.morale.specialPending=[];
  s.shockFollowup=null;s.extendedShock=null;s.coma=null;s.bloodShockPending=false;
  for(const w of s.wounds)w.nextAdvanceRound=null;
 }
@@ -194,7 +240,7 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
  record(s,eventId,'confirmed-hit',round,{targetId:characterId,location:draft.location,aspect:draft.aspect,kind:inj.kind,injury:inj.injury??null,woundId:wound?.id??null,shock:s.shock,bleeding:wound?.bleeding??false,compound:compound?{d10:adjudication.compoundD10,success:compound.success,affectedId:compound.compoundedInjuryId??null}:null,impact:draft.impactResult?.effectiveImpact??null,proposalId:draft.proposalId??null,amputation:amp?{affectedWoundId:ampFromOld?priorCompounded.id:wound?.id??null,severed:amp.severed,dead:amp.dead,sl:amp.slName,roll:amp.roll,forcedBleeder:amp.forceBleeder,shockTestModifier:amp.shockTestModifier}:null,injuryMishaps:wound?hmkInjuryMishaps(wound.location,wound.severity):[],moralePending:wound?.moralePending??false,impaled:wound?.impaled??false,source:'HMK 161–162, 167–170; verified special consequences'});
  return {state:s,wound};
 }
-export function dueBloodLoss(state,round){validateCombatState(state);if(state.shock==='KIA')return [];return state.wounds.filter(w=>w.bleeding&&w.nextAdvanceRound!==null&&w.nextAdvanceRound<=round).map(w=>({woundId:w.id,location:w.location,dueRound:w.nextAdvanceRound,overdue:round>w.nextAdvanceRound}));}
+export function dueBloodLoss(state,round){validateCombatState(state);if(state.shock==='KIA')return [];return state.wounds.filter(w=>w.bleeding&&w.nextAdvanceRound!==null&&w.nextAdvanceRound<=round).map(w=>({woundId:w.id,location:w.location,dueRound:w.nextAdvanceRound,overdue:round>w.nextAdvanceRound})).sort((a,b)=>a.dueRound-b.dueRound);}
 export function applyConfirmedBloodLoss({state,round,eventId,woundId,sl}={}){
  const s=ready(state,round,eventId);
  sl=parsedSL(sl);
@@ -202,6 +248,9 @@ export function applyConfirmedBloodLoss({state,round,eventId,woundId,sl}={}){
  const wound=s.wounds.find(w=>w.id===woundId);
  requireCond(wound?.bleeding===true&&whole(wound.nextAdvanceRound,1,9999),'Rána není aktivní Bleeder');
  requireCond(round>=wound.nextAdvanceRound,'Blood Loss Advance ještě není splatný');
+ requireCond(!s.wounds.some(w=>w.bleeding&&w.nextAdvanceRound!==null&&w.nextAdvanceRound<wound.nextAdvanceRound),
+  'Blood Loss: dříve splatný Bleeder musí být nejprve vyhodnocen; nelze přeskočit starší interval');
+ const previousDueRound=wound.nextAdvanceRound;
  const was=s.shock;
  const r=bloodLossAdvanceTransition({bloodLoss:s.bloodLoss,sl,currentShockState:SHOCK[was]});
  requireCond(!s.extendedShock||REVERSE[r.shockState]===was||REVERSE[r.shockState]==='KIA','Změna Shock během Extended Shock vyžaduje zvláštní rozhodnutí GM (BP)');
@@ -210,8 +259,10 @@ export function applyConfirmedBloodLoss({state,round,eventId,woundId,sl}={}){
  if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.bloodShockPending=false;for(const w of s.wounds)w.nextAdvanceRound=null;}
  if(was!==s.shock){s.shockOriginRound=round;installShockFollowup(s,{round});}
  // A late GM roll resolves one period only. Never silently advance several periods.
- wound.nextAdvanceRound=s.shock==='KIA'?null:round+BLOOD_LOSS_PERIOD_ROUNDS;
- record(s,eventId,'blood-loss-advance',round,{woundId,sl:Object.keys(SL).find(k=>SL[k]===sl),gainedBP:r.gainedBP,totalBP:s.bloodLoss.bp,shock:s.shock});
+ // The GM may adjudicate an overdue period late. Do not silently erase
+ // additional five-minute periods that have already elapsed (HMK p.178).
+ wound.nextAdvanceRound=s.shock==='KIA'?null:previousDueRound+BLOOD_LOSS_PERIOD_ROUNDS;
+ record(s,eventId,'blood-loss-advance',round,{woundId,scheduledDueRound:previousDueRound,sl:Object.keys(SL).find(k=>SL[k]===sl),gainedBP:r.gainedBP,totalBP:s.bloodLoss.bp,shock:s.shock});
  return {state:s,gainedBP:r.gainedBP,dead:r.dead};
 }
 export function applyConfirmedBloodStoppage({state,round,eventId,woundId,sl,advanceSL=null}={}){
@@ -220,13 +271,18 @@ export function applyConfirmedBloodStoppage({state,round,eventId,woundId,sl,adva
  requireCond(s.shock!=='KIA','KIA nelze léčit tímto bojovým krokem');
  const wound=s.wounds.find(w=>w.id===woundId);
  requireCond(wound?.bleeding===true,'Rána již nekrvácí');
+ requireCond(whole(wound.nextAdvanceRound,1,9999)&&round>=wound.nextAdvanceRound,'Blood Stoppage vyžaduje dokončený pětiminutový interval; předčasný zásah nesmí vytvořit Blood Loss');
+ requireCond(round<wound.nextAdvanceRound+BLOOD_LOSS_PERIOD_ROUNDS,
+  'Blood Stoppage: starší splatné pětiminutové intervaly vyžadují nejdříve samostatné fyzické Blood Loss hody; nelze je přeskočit');
+ requireCond(!s.wounds.some(w=>w.bleeding&&w.nextAdvanceRound!==null&&w.nextAdvanceRound<wound.nextAdvanceRound),
+  'Blood Stoppage: jiný Bleeder má starší splatný interval; nejdříve jej vyhodnoťte');
  const previousAttempt=[...s.events].reverse().find(e=>e.type==='blood-stoppage'&&e.details?.woundId===woundId);
  requireCond(!previousAttempt||round>=previousAttempt.round+BLOOD_LOSS_PERIOD_ROUNDS,'Blood Stoppage lze u stejného Bleederu opakovat až po 5 minutách (60 kol)');
  const stop=bloodStoppageResult(sl);
  requireCond(!stop.advanceRoll||slValues.has(advanceSL),'HMK str.178: po CF/F/S je nutný i závěrečný Blood Loss Advance');
  if(stop.advanceRoll){const r=bloodLossAdvanceTransition({bloodLoss:s.bloodLoss,sl:advanceSL,currentShockState:SHOCK[s.shock]});const was=s.shock;requireCond(!s.extendedShock||REVERSE[r.shockState]===was||REVERSE[r.shockState]==='KIA','Změna Shock během Extended Shock vyžaduje zvláštní rozhodnutí GM (BP)');s.bloodLoss=r.bloodLoss;s.shock=REVERSE[r.shockState];applyShockProne(s);if(r.gainedBP>0&&s.shock!==was&&s.shock!=='KIA')s.bloodShockPending=true;if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.bloodShockPending=false;for(const w of s.wounds)w.nextAdvanceRound=null;}if(was!==s.shock){s.shockOriginRound=round;installShockFollowup(s,{round});}}
  if(stop.stopped){wound.bleeding=false;wound.nextAdvanceRound=null;wound.staunchBonus=0;}
- else {wound.nextAdvanceRound=s.shock==='KIA'?null:round+BLOOD_LOSS_PERIOD_ROUNDS;wound.staunchBonus=stop.nextStaunchBonus;}
+ else {wound.nextAdvanceRound=s.shock==='KIA'?null:wound.nextAdvanceRound+BLOOD_LOSS_PERIOD_ROUNDS;wound.staunchBonus=stop.nextStaunchBonus;}
  // p178: once ALL bleeders stop, Blood Shock STN disappears automatically;
  // Blood Shock INC/UNC immediately requires Shock Reroll (not the usual wait).
  if(stop.stopped&&s.bloodShockPending&&s.shock!=='KIA'&&!s.wounds.some(w=>w.bleeding)){
@@ -330,12 +386,14 @@ export function applyExtendedShockCourse({state,round,eventId,healingBase,roll,p
 export function applyComaCourse({state,round,eventId,healingBase,roll,periodD10,daysElapsed,restfulShelter=true,arcaneBonus=0,gmConfirmed=false}={}){
  const s=ready(state,round,eventId);
  requireCond(gmConfirmed===true&&!!s.coma&&s.coma.active,'Chybí potvrzený aktivní Coma Course Roll');
- requireCond(whole(healingBase,1,100)&&whole(roll,1,100)&&whole(periodD10,1,10)&&whole(daysElapsed,1,10000)&&whole(arcaneBonus,0,100),'Neplatné údaje Coma Course Roll');
+ requireCond(whole(healingBase,1,100)&&whole(roll,1,100)&&whole(daysElapsed,1,10000)&&whole(arcaneBonus,0,100),'Neplatné údaje Coma Course Roll');
  requireCond(daysElapsed===s.coma.nextCourseDays,'Musí uplynout přesně předchozí d10denní interval Coma');
  const before=s.coma.hr,fatigue=fatigueTotalUnsafe(s);
  const rawEML=healingBase*before-fatigue+(restfulShelter?0:-20)+arcaneBonus;
  const sl=successLevel(roll,rawEML),hr=before+[-2,-1,1,2][sl];
  const duration=s.coma.elapsedDays+daysElapsed;
+ // A new interval is rolled only if Coma actually continues (p.179).
+ requireCond(hr<=0||hr>=6||whole(periodD10,1,10),'Pokračující Coma vyžaduje nový skutečný d10 pro další interval');
  let wearinessAdded=0;
  if(hr<=0){s.shock='KIA';s.shockOriginRound=round;s.coma=null;s.shockFollowup=null;}
  else if(hr>=6){wearinessAdded=Math.floor(duration/5)*5;s.fatigue.weariness+=wearinessAdded;s.coma=null;}
@@ -429,12 +487,14 @@ export function applyConfirmedInjuryMishap({state,round,eventId,mishapId,baseML=
  record(s,eventId,'injury-mishap',round,{mishapId,woundId:m.woundId,...r});
  return {state:s,result:r};
 }
-export function applyConfirmedInjuryMorale({state,round,eventId,woundId,initiativeML,roll,aberrance=0,timelineId=null,gmConfirmed=false}={}){
+export function applyConfirmedInjuryMorale({state,round,eventId,woundId,initiativeML,roll,aberrance=null,timelineId=null,gmConfirmed=false}={}){
  const s=ready(state,round,eventId);requireCond(s.shock!=='KIA','KIA: postavě nelze přidat další bojovou akci');
  requireCond(gmConfirmed===true,'GM musí potvrdit Morale Roll');
  requireCond(s.shock==='NONE'&&!s.extendedShock&&!s.coma?.active,'Morale z rány následuje až po plném zotavení ze Shock');
  const w=s.wounds.find(x=>x.id===woundId&&x.moralePending===true);
  requireCond(!!w,'Žádný splatný Morale Roll pro tuto ránu');
+ requireCond(whole(aberrance,0,200),'Morale vyžaduje doloženou Aberrance; nepřítomná hodnota není 0');
+ requireCond(w.moraleThreatABE===undefined||aberrance===w.moraleThreatABE,'Morale: zadaná Aberrance nesouhlasí s původně doloženou hodnotou rány');
  s.morale??={state:'steady',psycheStress:0,braveSince:null,braveTimelineId:null};
  const r=hmkMoraleTransition({initiativeML,fatigue:fatigueTotalUnsafe(s),aberrance,brave:s.morale.state==='brave',roll,current:s.morale.state});
  w.moralePending=false;

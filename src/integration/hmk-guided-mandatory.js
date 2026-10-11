@@ -32,14 +32,17 @@ export function guidedMandatoryEvents({state,characterId,round,actorId=null,turn
  const events=[];
  for(const m of unresolvedInjuryMishaps(state))events.push({kind:'injury-mishap',id:m.id,priority:0,
   label:`Mishap ${m.kind}`,source:'HMK pp.161,170'});
- for(const w of dueBloodLoss(state,round))events.push({kind:'blood-loss',id:w.woundId,priority:1,
+ for(const w of dueBloodLoss(state,round))events.push({kind:'blood-loss',id:w.woundId,dueRound:w.dueRound,priority:1,
   label:`Blood Loss: ${w.location} (splatné kolo ${w.dueRound})`,source:'HMK p.178'});
  const readiness=shockFollowupReadiness({state,round,characterId,actorId,turnEnded,timelineId,elapsedMinutesSinceOriginal});
  if(readiness.due)events.push({kind:'shock-recovery',id:state.shockFollowup?.kind??state.shock,priority:2,
   label:`Shock ${state.shock} Reroll`,source:'HMK p.169'});
  for(const w of dueInjuryMorale(state))events.push({kind:'injury-morale',id:w.woundId,priority:3,
   label:`Morale: ${w.location} ${w.severity}`,source:'HMK p.162'});
- return events.sort((a,b)=>a.priority-b.priority);
+ // When several bleeding periods are overdue, resolve the oldest period
+ // before newer ones, including across different wounds.
+ return events.sort((a,b)=>a.priority-b.priority || (a.kind==='blood-loss'&&b.kind==='blood-loss'?
+  a.dueRound-b.dueRound:0));
 }
 
 const skillML=(character,key)=>{

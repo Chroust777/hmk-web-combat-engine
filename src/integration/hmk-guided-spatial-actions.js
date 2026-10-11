@@ -11,6 +11,7 @@ import {guidedTurnChoices} from './hmk-guided-turn-choices.js';
 import {finishEncounterTurn,validateEncounterSequence,currentEncounterActor} from './encounter-turn-sequence.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {applyConfirmedFatigue} from './persistent-combat-state.js';
+import {validateSpatialBarriers,pathCrossesClosedBarrier} from './hmk-guided-spatial-barriers.js';
 const requireRule=(p,m)=>{if(!p)throw Error(m)};
 const number=v=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=1000000;
 const whole=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
@@ -56,6 +57,7 @@ function firstContact(start,end,enemy,radius){
 export function projectGuidedSpatialPath({actorId,battlefield,path,difficultSources=0,action,moveRate='full',
   effectiveMove,dodgeIndex=null,stunned=false,chargeAttack=null,chargeTargetId=null}={}){
  const units=ensureGeometry({actorId,battlefield});
+ const barriers=validateSpatialBarriers(battlefield.barriers??[]);
  requireRule(['move','evade','charge'].includes(action),'Neznámá pohybová akce HMK');
  requireRule(Array.isArray(path)&&path.length>=2&&path.length<=100&&path.every(pt),'Je nutná doložená trasa pohybu');
  const actor=units.find(u=>u.id===actorId);
@@ -98,6 +100,8 @@ export function projectGuidedSpatialPath({actorId,battlefield,path,difficultSour
   if(stop){contact={enemyId:stop.enemyId,point:target,segment:i};break;}
   if(reachable<1-EQ)break;
  }
+ const hitBarrier=pathCrossesClosedBarrier(actualPath,barriers);
+ requireRule(!hitBarrier,'Trasa protíná zavřené dveře nebo pevnou překážku: '+(hitBarrier?.id??''));
  const requested=path.slice(1).reduce((n,p,i)=>n+distance(path[i],p),0);
  requireRule(requested>0,'Akce musí mít skutečný pohyb');
  requireRule(travelled>0,'Threatening Engagement Zone zastavila pohyb v jeho počátku');
@@ -119,7 +123,7 @@ export function projectGuidedSpatialPath({actorId,battlefield,path,difficultSour
   requireRule(chargeAttack==='melee'?eligibility.mayMeleeAttack:eligibility.mayThrownAttack,
    'Po dokončení Charge není zvolený druh útoku pravidlově povolen');
  }
- return {format:'hmk-guided-spatial-projection-v1',action,actorId,requestedFt:requested,actualFt:travelled,
+ return {format:'hmk-guided-spatial-projection-v1',action,actorId,requestedPath:path.map(p=>({...p})),requestedFt:requested,actualFt:travelled,
   actualPath,finalPosition:actualPath.at(-1),contact,stoppedByEZ:!!contact,
   effectiveMove,moveRate:action==='move'?moveRate:'half',difficultSources,terrainFactor,
   chargedMovementFt:travelled*terrainFactor,maxMovementFt:max,
@@ -139,6 +143,32 @@ export function commitGuidedSpatialTurn({id,sequence,states,battlefield,projecti
  requireRule(projection?.format==='hmk-guided-spatial-projection-v1','Chybí ověřená prostorová akce');
  const s=validateEncounterSequence(sequence);
  requireRule(s.active&&currentEncounterActor(s)===projection.actorId,'Není tah správného účastníka');
+ // A restored or externally supplied projection is not authority to move.
+ // Recalculate from the current, fully witnessed battlefield and the original
+ // requested route. This also re-checks Threat, ENC-derived Move and distance.
+ requireRule(Array.isArray(projection.requestedPath),'Chybí původní ověřená trasa; nelze bezpečně obnovit pohyb');
+ requireRule(battlefield?.units?.length===s.order.length&&s.order.every(id=>
+  battlefield.units.filter(u=>u.id===id).length===1),'Pohyb vyžaduje kompletní mapu střetnutí');
+ if(s.spatialBarriers!==undefined){
+  requireRule(JSON.stringify(battlefield.barriers??[])===
+   JSON.stringify(s.spatialBarriers.map(b=>b.kind==='wall'?{...b,open:false}:{...b,
+    open:s.interactionObjects.find(o=>o.id===b.id)?.open})),
+   'Stav nebo geometrie dveří a stěn se změnily před dokončením pohybu');
+ }
+ if(s.spatialUnits?.length){
+  requireRule(s.spatialUnits.length===s.order.length&&s.order.every(id=>{
+   const saved=s.spatialUnits.find(u=>u.id===id),live=battlefield.units.find(u=>u.id===id);
+   return saved&&live&&distance(saved,live)<EQ;
+  }), 'Mapa se od ověření pohybu změnila');
+ }
+ const recalculated=projectGuidedSpatialPath({actorId:projection.actorId,battlefield,
+  path:projection.requestedPath,action:projection.action,moveRate:projection.moveRate,
+  effectiveMove:projection.effectiveMove,difficultSources:projection.difficultSources,
+  stunned:projection.terrainFactor/(2**projection.difficultSources)>1,
+  dodgeIndex:projection.action==='evade'?-projection.evadingMissilePenalty/5:null,
+  chargeAttack:projection.chargeAttack,chargeTargetId:projection.chargeTargetId});
+ requireRule(JSON.stringify(recalculated)===JSON.stringify(projection),
+  'Prostorový výsledek neodpovídá aktuálním pravidlům nebo původní trase');
  requireRule(projection.action!=='charge','Charge musí dokončit útok v témže průvodci; samotný přesun nelze uložit jako úplný tah');
  requireRule(!projection.requiresStumble||(whole(stumbleRoll,1,100)&&whole(stumbleEML,-500,500)),
   'Double Move s obratem vyžaduje doložený Stumble d100 a EML');

@@ -46,7 +46,14 @@ export function createGuidedFullHit({id,timelineId,round,attackerId,defenderId,k
  assert(integer(round,1,9999)&&typeof attackerId==='string'&&typeof defenderId==='string'&&attackerId!==defenderId,'Neplatní účastníci');
  assert(['melee','missile'].includes(kind),'Jen doložený Melee nebo Missile/Volley');
  assert(outcome?.ok===true&&kind==='melee'||kind==='missile'&&outcome?.complete===true,'Attack/Defence nebo Missile ještě není pravidlově uzavřeno');
- assert(safeProof(physicalDice)&&physicalDice.length>0,'Chybí doložené skutečné hody původního útoku');
+ // HMK p.163: spoiled Missile whose action is wasted NEVER receives an
+ // ordinary Attack d100. This is the only legal zero-dice completed attack.
+ const wastedMissile=kind==='missile'&&outcome.spoiled===true&&outcome.hit===false&&outcome.sl===null;
+ const grievousForcedCF=kind==='missile'&&outcome.forcedCF===true&&outcome.sl==='CF'&&
+  outcome.hit===false&&Array.isArray(outcome.forcedMishaps)&&outcome.forcedMishaps.length>0&&
+  Array.isArray(outcome.forcedWoundIds)&&outcome.forcedWoundIds.length>0;
+ assert(safeProof(physicalDice)&&(physicalDice.length>0||wastedMissile||grievousForcedCF),
+  'Chybí doložené skutečné hody původního útoku');
  assert(targetState&&typeof targetState==='object','Chybí trvalý stav zasažené postavy');
  validateCombatState(targetState);
  assert(targetState.shock!=='KIA','Mrtvé postavě nelze znovu připsat zásah');
@@ -182,7 +189,18 @@ export function advanceGuidedFullHit(s){
   const carried=applyShockState(SHOCK_STATE[n.targetState.shock],shock.state);
   const cod=STATE_CODES[carried];assert(cod,'Neznámý výsledný Shock State');
   const causal=r.compound?.injury??r.base.injury;
-  const bleeding=r.base.injury?(bleedingEligibleForInjury({bleedingClass:hmkHumanLocationSymbols(n.location).bleeds,injury:{...causal,aspect:n.weapon.aspect}})||r.amputation?.forceBleeder===true):false;
+  const bleedClass=hmkHumanLocationSymbols(n.location).bleeds;
+  // A Broad arrow/bolt (HMK p.108) grants +5 Effective Impact for the
+  // bleeder check ONLY. Preserve the actual injury severity and Shock.
+  const normalBleeding=bleedingEligibleForInjury({bleedingClass:bleedClass,
+   injury:causal?{...causal,aspect:n.weapon.aspect}:null});
+  const broadBonus=n.kind==='missile'?n.weapon?.broadBleedingBonus??0:0;
+  assert(broadBonus===0||broadBonus===5,'Neověřený Broad Head Bleeding bonus');
+  const broadVirtual=(!normalBleeding&&broadBonus===5&&r.base.injury)?
+   injuryFromEffectiveImpact({effectiveImpact:r.effectiveImpact+broadBonus,
+    aspect:n.weapon.aspect,rigidArmour:false}).injury:null;
+  const bleeding=!!(r.base.injury&&(normalBleeding||r.amputation?.forceBleeder===true||
+   bleedingEligibleForInjury({bleedingClass:bleedClass,injury:broadVirtual})));
   return {...n,computed:{...r,shock:{slName,rawEML,shock,carried:cod},bleeding},phase:'ready'};
  }
  return n;
