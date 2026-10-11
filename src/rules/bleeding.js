@@ -3,7 +3,8 @@ import { SHOCK_STATE, applyShockState } from './shock.js';
 export function bloodLossPoints(sl){if(sl===SL.CF)return 3;if(sl===SL.F)return 2;if(sl===SL.S)return 1;if(sl===SL.CS)return 0;throw new RangeError('Blood loss SL');}
 export function bloodLossState(bp){if(bp>=4)return SHOCK_STATE.KIA;if(bp===3)return SHOCK_STATE.UNC;if(bp===2)return SHOCK_STATE.INC;if(bp===1)return SHOCK_STATE.STN;return SHOCK_STATE.NONE;}
 export function applyBloodLoss({currentBP=0,sl,currentShockState=SHOCK_STATE.NONE}={}){
- const gained=bloodLossPoints(sl),bp=currentBP+gained,incoming=bloodLossState(bp);
+ // HMK p.178: the fourth BP kills the patient; BP cannot accumulate after death.
+ const gained=bloodLossPoints(sl),bp=Math.min(4,currentBP+gained),incoming=bloodLossState(bp);
  return {gainedBP:gained,bp,weaknessFatigue:bp*5,bloodLossState:incoming,shockState:applyShockState(currentShockState,incoming),dead:bp>=4};
 }
 export function bleedingAdvancePolicy({isFolk=true}={}){return {periodMinutes:5,test:isFolk?'strength':'fixed-ml',fixedML:isFolk?null:50,excludeFatigue:true,excludeImpairment:true};}

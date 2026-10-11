@@ -6,14 +6,19 @@ export function chargingThrowBonusEligible({chargeMovementFeet=0}={}){
   return Number.isFinite(chargeMovementFeet) && chargeMovementFeet>=20;
 }
 
-export function missileRange({distance,baseRange,thrownPbZD=null,chargingThrow=false}={}){
+export function missileRange({distance,baseRange,thrownPbZD=null,chargingThrow=false,volleyMaxMultiplier=null,volleyBaseRange=null}={}){
   if(distance<0||baseRange<=0) throw new RangeError('Valid distance and Base Range required');
   if(distance<=baseRange/2) return {band:MISSILE_RANGE.PB,type:'direct',rangeModifier:10,zd:thrownPbZD??6,impactModifier:2,chargeImpactModifier:chargingThrow?3:null,areaDiameter:null};
   if(distance<=baseRange) return {band:MISSILE_RANGE.DIRECT,type:'direct',rangeModifier:0,zd:8,impactModifier:0,chargeImpactModifier:chargingThrow?1:null,areaDiameter:null};
-  const max=chargingThrow?3:4;
-  if(distance<=baseRange*2) return {band:MISSILE_RANGE.VOLLEY2,type:'volley',rangeModifier:0,zd:10,impactModifier:-2,chargeImpactModifier:chargingThrow?-2:null,areaDiameter:15};
-  if(distance<=baseRange*3) return {band:MISSILE_RANGE.VOLLEY3,type:'volley',rangeModifier:-20,zd:10,impactModifier:-3,chargeImpactModifier:chargingThrow?-3:null,areaDiameter:15};
-  if(max>=4&&distance<=baseRange*4) return {band:MISSILE_RANGE.VOLLEY4,type:'volley',rangeModifier:-40,zd:10,impactModifier:-4,chargeImpactModifier:null,areaDiameter:15};
+  if(volleyBaseRange!==null&&(!Number.isFinite(volleyBaseRange)||volleyBaseRange<baseRange))
+    throw new RangeError('Verified Volley Base Range must be at least direct Base Range');
+  const vbr=volleyBaseRange??baseRange;
+  if(volleyMaxMultiplier!==null&&![2,3,4].includes(volleyMaxMultiplier))
+    throw new RangeError('Volley maximum multiplier must come from verified projectile shaft');
+  const max=volleyMaxMultiplier??(chargingThrow?3:4);
+  if(distance<=vbr*2) return {band:MISSILE_RANGE.VOLLEY2,type:'volley',rangeModifier:0,zd:10,impactModifier:-2,chargeImpactModifier:chargingThrow?-2:null,areaDiameter:15};
+  if(max>=3&&distance<=vbr*3) return {band:MISSILE_RANGE.VOLLEY3,type:'volley',rangeModifier:-20,zd:10,impactModifier:-3,chargeImpactModifier:chargingThrow?-3:null,areaDiameter:15};
+  if(max>=4&&distance<=vbr*4) return {band:MISSILE_RANGE.VOLLEY4,type:'volley',rangeModifier:-40,zd:10,impactModifier:-4,chargeImpactModifier:null,areaDiameter:15};
   return {band:'out-of-range',type:null,outOfRange:true};
 }
 
@@ -47,7 +52,8 @@ export function nearbyMissileStrike({targetCount,d20,d10=null}={}){
 }
 export function missileStrikeImpact({impactDieRoll,weaponImpactModifier=0,rangeImpactModifier=0,strengthImpactModifier=0,impactTACount=0,impactTAValue=0,bluntHead=false}={}){
   let total=impactDieRoll+weaponImpactModifier+rangeImpactModifier+strengthImpactModifier+(impactTACount*impactTAValue);
-  if(bluntHead) total=Math.floor(total/2);
+  // HMK p.7: absent an exception, computed fractions round normally.
+  if(bluntHead) total=Math.round(total/2);
   return total;
 }
 
