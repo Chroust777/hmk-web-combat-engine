@@ -31,7 +31,9 @@ export function minimumMovementResult({declaredDistanceFt,movedDistanceFt}){
 
 export function riderImpactBonus({mountRiderImpact=0,straightDistanceFt=0}){
   if(straightDistanceFt>=100) return mountRiderImpact;
-  if(straightDistanceFt>=50) return mountRiderImpact/2;
+  // HMK p7: unless stated otherwise computed fractions are rounded normally.
+  // p172 grants HALF the animal's printed Rider Impact after 50+ straight ft.
+  if(straightDistanceFt>=50) return Math.round(mountRiderImpact/2);
   return 0;
 }
 
@@ -120,4 +122,22 @@ export function thrownRiderTrauma({impactD10,moveRate='stop'}={}){
   if(!Number.isInteger(impactD10)||impactD10<1||impactD10>10) return {pending:{type:'thrown-rider-impact',die:'d10'}};
   const speedBonus=(moveRate==='full'||moveRate==='double')?5:0;
   return {aspect:'blunt',strikeImpact:impactD10-2+speedBonus,locationCount:1,zoneDie:'d10',fallingRoutine:true};
+}
+
+/** HMK p353: an overrun ignores only the currently intersected opponents'
+ * occupied space and Engagement Zones when their SUM of body Zone Numbers
+ * is strictly lower than the moving creature's Zone Number total.
+ * This pure check never authorises movement/Trample, injury or a commit.
+ * The caller must provide a complete, verified simultaneous contact set. */
+export function mountedOverrunEligibility({mountZoneNumbers,opponentsAtThisMoment}={}){
+  if(!Number.isSafeInteger(mountZoneNumbers)||mountZoneNumbers<1||mountZoneNumbers>100||
+   !Array.isArray(opponentsAtThisMoment)||!opponentsAtThisMoment.length||
+   opponentsAtThisMoment.some(x=>!x||typeof x.id!=='string'||!x.id||
+    !Number.isSafeInteger(x.zoneNumbers)||x.zoneNumbers<1||x.zoneNumbers>100)||
+   new Set(opponentsAtThisMoment.map(x=>x.id)).size!==opponentsAtThisMoment.length)
+    throw new RangeError('Overrun requires verified creature body ZN and a complete unique current opponent set');
+  const opposingZN=opponentsAtThisMoment.reduce((n,x)=>n+x.zoneNumbers,0);
+  return {eligible:opposingZN<mountZoneNumbers,mountZoneNumbers,opposingZoneNumbers:opposingZN,
+    opponents:opponentsAtThisMoment.map(x=>x.id),
+    rule:'HMK p353',authorisesSpatialMovement:false,authorisesTrample:false};
 }
