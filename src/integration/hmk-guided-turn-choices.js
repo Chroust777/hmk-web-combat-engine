@@ -45,9 +45,16 @@ export function guidedTurnChoices(sequence,states){
     if(trial.confirmedHits?.[token])continue;
     trial.confirmedHits??={};trial.confirmedHits[token]={round:trial.round,actorId};
    }
-   finishEncounterTurn(trial,states,{action,gmConfirmed:true,durationRounds:1,readiedAction:'attack'});
+   // Project only: if the GM later selects exceptional Pass under failed Morale,
+   // the real resolver must still request an explicit movement-impossible witness.
+   finishEncounterTurn(trial,states,{action,gmConfirmed:true,durationRounds:1,readiedAction:'attack',movementImpossibleConfirmed:true,threatenedConfirmed:false});
    choices.push(action);
-  }catch{/* Only actions the scheduler accepts may be offered to the player. */}
+  }catch(err){
+   // Geometry is supplied *after* choosing Move. This sentinel occurs only
+   // after all preceding turn, mandatory-event and concentration gates pass.
+   if(action==='move'&&String(err?.message).includes('povinný Move vyžaduje přepočítanou prostorovou trasu (zatím nedoložena)'))
+    choices.push(action);
+  }
  }
  return {kind:'player-choice',actorId,choices};
 }

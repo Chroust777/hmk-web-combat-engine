@@ -10,7 +10,7 @@
  */
 import {guidedTurnChoices} from './hmk-guided-turn-choices.js';
 import {finishEncounterTurn,validateEncounterSequence,currentEncounterActor,dueEndTurnEvents} from './encounter-turn-sequence.js';
-import {applyConfirmedSpecialAftermath} from './persistent-combat-state.js';
+import {applyConfirmedSpecialAftermath,recordConfirmedMoraleSurrender} from './persistent-combat-state.js';
 const assert=(ok,message)=>{if(!ok)throw Error(message)};
 const clone=structuredClone;
 const stamp=x=>JSON.stringify(x);
@@ -50,7 +50,7 @@ export function enterGuidedTurnDuration(s,value){
  const n=Number(str);assert(Number.isSafeInteger(n)&&n>=1&&n<=9999,'Neplatný počet kol');
  return {...s,durationRounds:n,phase:'ready'};
 }
-export function completeGuidedTurnAction({session,sequence,states}={}){
+export function completeGuidedTurnAction({session,sequence,states,movementImpossibleConfirmed=false,threatenedConfirmed=null}={}){
  const s=session;assert(s?.format==='hmk-guided-turn-action-v1'&&s.phase==='ready','Volba není dokončená');
  assert(stamp(validateEncounterSequence(sequence))===s.sequenceWitness&&stamp(states)===s.statesWitness,
   'Stav střetnutí se během volby změnil; rozhodnutí musí být opakováno');
@@ -74,18 +74,33 @@ export function completeGuidedTurnAction({session,sequence,states}={}){
   mandatoryAftermath={kind:'pass-next-turn',eventId:s.id+':mishap-pass',
    actorId:s.actorId,round:s.round};
  }
+ let surrenderEventId=null;
+ if(s.action==='pass'&&states[s.actorId]?.morale?.state==='routed'&&
+    states[s.actorId]?.morale?.surrender?.active!==true){
+  assert(typeof threatenedConfirmed==='boolean',
+   'HMK str.162: GM musí potvrdit, zda je Routed při nemožnosti útěku ohrožen');
+  if(threatenedConfirmed&&movementImpossibleConfirmed){
+   const eventId=s.id+':morale-surrender';
+   const result=recordConfirmedMoraleSurrender({state:stagedStates[s.actorId],round:s.round,
+    timelineId:s.timelineId,eventId,movementImpossibleConfirmed:true,threatenedConfirmed:true,gmConfirmed:true});
+   stagedStates={...stagedStates,[s.actorId]:result.state};surrenderEventId=eventId;
+  }
+ }
  const next=finishEncounterTurn(sequence,stagedStates,{action:s.action,
-  readiedAction:s.readiedAction,durationRounds:s.durationRounds,gmConfirmed:true});
+  readiedAction:s.readiedAction,durationRounds:s.durationRounds,movementImpossibleConfirmed,
+  threatenedConfirmed,gmConfirmed:true});
  const last=next.log.at(-1);
  assert(['turn-complete','turn-action-resolved-before-shock-reroll',
   'turn-action-resolved-before-confused-reaction','turn-action-resolved-before-rally-reaction'].includes(last.type)&&
   last.actorId===s.actorId&&last.action===s.action,
   'Není doloženo ukončení tahu ani jediná dokončená akce čekající na povinný test');
- return {sequence:next,states:stagedStates,mandatoryAftermath,
+ return {sequence:next,states:stagedStates,mandatoryAftermath,surrenderEventId,
   actorId:s.actorId,round:s.round,action:s.action,
   readiedAction:s.readiedAction,durationRounds:s.durationRounds,
   proof:{format:'hmk-guided-player-choice-v1',id:s.id,source:'HMK World of Kèthîra pp.158–162',
    timelineId:s.timelineId,round:s.round,actorId:s.actorId,decision:s.action,
    readiedAction:s.readiedAction,durationRounds:s.durationRounds,
-   mandatoryAftermath,physicalDice:[]}};
+   mandatoryAftermath,surrenderEventId,
+   ...(s.action==='pass'&&['routed','withdrawing'].includes(states[s.actorId]?.morale?.state)&&movementImpossibleConfirmed?
+    {movementImpossibleConfirmed:true}: {}),physicalDice:[]}};
 }

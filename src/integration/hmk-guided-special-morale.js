@@ -100,7 +100,7 @@ export function resolveSpecialMorale({sequence,character,state,roll,aberrance,ev
  const incident=dueSpecialMorale(state,seq.timelineId);
  good(incident,'Special Morale: není splatný žádný doložený spouštěč');
  const ml=oneInitiativeML(character),fatigue=combatFatigueTotals(state).total;
- const r=hmkMoraleTransition({initiativeML:ml,fatigue,aberrance,brave:state.morale.state==='brave',
+ const r=hmkMoraleTransition({initiativeML:ml,fatigue,aberrance,brave:state.morale.state==='brave'||state.fear?.state==='brave',
   roll,current:state.morale.state});
  const result=cp(state);result.morale.specialPending.shift();result.morale.state=r.state;
  result.morale.psycheStress+=r.result.psycheStress;

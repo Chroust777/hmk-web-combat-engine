@@ -24,6 +24,18 @@ function track(s,{eventId,round,type,details}){
  s.events.push({id:eventId,type,round,details});s.lastRound=round;validateCombatState(s);return s;
 }
 function wound(s,id){const w=s.wounds.find(x=>x.id===id);requireRule(!!w,'Rána neexistuje');requireRule(w.healed!==true,'Rána už je vyléčená');return w;}
+/** HMK p354: horse fore/hind leg fractures have permanently decreased HR.
+ * It is applied AFTER the existing treatment table, not as a second
+ * treatment or a separate write path.  HR <= 2 blocks mundane healing. */
+function correctedMountedHealingRate(w,base){
+ const penalty=w.mountedLegTreatmentHRModifier;
+ if(penalty===undefined)return {rate:base,blocked:false};
+ requireRule(w.bodyKind==='horse'&&['flg','hlg'].includes(w.location)&&
+  ({M:-1,S:-2,G:-3}[w.severity]===penalty)&&int(base,0,100),
+  'Horse leg HR: neověřený druh zranění nebo postih');
+ const rate=Math.max(0,base+penalty);
+ return {rate,blocked:rate<=2};
+}
 /** Expose infection weakness through the existing Fatigue counter; exact delta is reversible. */
 function setInfectionWeakness(s,w,next){const prior=w.healing?.infectionWeakness??0;
  requireRule(int(next,0,10)&&s.fatigue.otherWeakness+next-prior>=0,'Nekonzistentní infekční Weakness');
@@ -58,7 +70,8 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
   if(treatment.result.immediateHeal){w.healed=true;w.healing={...(w.healing??{}),treated:true,treatments,healingRate:0,healedDay:daySinceInjury,permanentImpairment:0,confirmedBy: eventId};}
   else {
    const prior=w.healing??{};
-   w.healing={...prior,treated:true,treatments,healingRate:treatment.result.healingRate,
+   w.healing={...prior,treated:true,treatments,healingRate:correctedMountedHealingRate(w,treatment.result.healingRate).rate,
+    noMundaneHealing:correctedMountedHealingRate(w,treatment.result.healingRate).blocked,
     infectionPossible:!!treatment.result.infectionPossible,permanentEligible:!!treatment.result.permanentImpairmentEligible,
     cauterised:prior.cauterised??w.cauterised??false,area,grimWound:!!treatment.grimWound,nextGrimShockDay:treatment.grimWound?Math.max(1,daySinceInjury+1):null,
     nextHealingDay:Math.floor(daySinceInjury/5)*5+5,healedDay:null};
@@ -71,7 +84,8 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
  requireRule(!w.healing?.treated,'Treatment already confirmed');
  const result=resolveTreatmentTable({aspect,injuryLevel:w.level,untreated:true,physicianIndex:0,broadhead,area});
  if(result.result.kind==='edge-injury')throw Error('Neošetřená frost amputace potřebuje samostatné potvrzení následného Edge zranění');
- w.healing={treated:true,untreated:true,treatments:[],healingRate:result.result.healingRate,
+ w.healing={treated:true,untreated:true,treatments:[],healingRate:correctedMountedHealingRate(w,result.result.healingRate).rate,
+  noMundaneHealing:correctedMountedHealingRate(w,result.result.healingRate).blocked,
   infectionPossible:!!result.result.infectionPossible,permanentEligible:!!result.result.permanentImpairmentEligible,
   grimWound:result.grimWound,nextGrimShockDay:result.grimWound?Math.max(1,daySinceInjury+1):null,area, nextHealingDay:Math.floor(daySinceInjury/5)*5+5,
   cauterised:w.cauterised??false,infectionWeakness:0};
@@ -81,6 +95,8 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
 export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,gmConfirmed=false}={}){
  const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing;
  requireRule(gmConfirmed===true&&h?.treated&&int(h.healingRate,1,6),'Rána nemá potvrzenou léčbu ani Healing Rate');
+ requireRule(!h.noMundaneHealing&&!(w.bodyKind==='horse'&&['flg','hlg'].includes(w.location)&&h.healingRate<=2),
+  'HMK str.354: HR koně po zlomenině nohy ≤2, bez esoteriky se rána nemůže hojit');
  requireRule(!s.wounds.some(x=>x.healing?.infected),'HMK str.181: jakákoli aktivní infekce přerušuje všechny Injury Healing Rolls');
  requireRule(daySinceInjury===h.nextHealingDay,'Healing Roll je splatný přesně podle pětideního intervalu: den '+h.nextHealingDay);
  requireRule(int(roll,1,100),'Povinný skutečný d100');

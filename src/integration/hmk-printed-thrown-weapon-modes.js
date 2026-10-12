@@ -23,3 +23,21 @@ export function annotatePrintedThrownWeapon(entry,printedCatalogKey){
    impactModifier:row.impactModifier,aspect:row.aspect,pbZoneDie:row.pbZoneDie,
    volleyMaxMultiplier:2,baseRangeFt:row.baseRangeFt,heft:row.heft}}};
 }
+
+/** Read-only printed-mode check shared with second Attack preparation.
+ * Rejects self-described throwing modes with altered name/impact/BR/HFT.
+ * This checks printed ballistic facts; inventory provenance is additionally
+ * checked by the existing actual-equipped-weapon adapter and document CAS.
+ */
+export function verifiedPrintedThrownItem(item){
+ const p=item?.snapshot?.properties??{},name=item?.snapshot?.name;
+ const entries=Object.values(TABLE).map(rows=>rows[name]).filter(Boolean);
+ if(item?.snapshot?.category!=='weapon'||entries.length!==1||p.missileType!=='thrown'||
+    !p.printedThrowingMode||p.heft!==entries[0].heft||p.baseRangeFt!==entries[0].baseRangeFt||
+    p.verifiedModes?.length!==1)return false;
+ const t=p.printedThrowingMode,r=entries[0];
+ return t.source==='HMK p.110 / Thrown Weapons'&&t.impactDie==='d8'&&
+    t.impactModifier===r.impactModifier&&t.aspect===r.aspect&&
+    t.pbZoneDie===r.pbZoneDie&&t.baseRangeFt===r.baseRangeFt&&
+    t.heft===r.heft&&t.volleyMaxMultiplier===2;
+}

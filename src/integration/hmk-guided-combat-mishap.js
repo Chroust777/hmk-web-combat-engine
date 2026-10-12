@@ -25,7 +25,7 @@ export function verifiedCombatMishap({kind,actor,state,round,timelineId,usesDEX=
  const ml=technique==='attribute'?5*actor.hmk.attributes?.[type==='fumble'?'dex':'agl']:learned.ml;
  assert(int(ml,0,200),'Chybí ověřené DEX/AGL nebo naučená dovednost');
  const projection=projectLiveInjuries({state,round,test:technique==='attribute'?test:alternative,
-  usedArms:type==='fumble'?(usedArms??null):['none'],timelineId});
+  usedArms:type==='fumble'?(usedArms??null):technique==='acrobatics'?['left','right']:['none'],timelineId});
  assert(projection.ready,'Mishap: '+projection.reason);
  const fatigue=combatFatigueTotals(state).total;
  return {kind:type==='fumble'?'fumble-roll':'stumble-roll',type,hasDEX,hasLegs,actionUsesDEX:usesDEX,

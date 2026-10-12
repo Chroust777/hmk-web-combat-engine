@@ -23,7 +23,7 @@ function oneML(character,name){
 export function definiteVanquished(state){
  validateCombatState(state);
  if(['INC','UNC','KIA'].includes(state.shock))return true;
- if(state.morale?.gmVanquished?.active===true)return true;
+ if(state.morale?.gmVanquished?.active===true||state.morale?.surrender?.active===true)return true;
  if(['catatonic','routed','withdrawing'].includes(state.morale?.state))return true;
  return false;
 }
@@ -111,7 +111,7 @@ export function assessGuidedCohesion({sequence,participants,observerId,noticedId
  if(triggered){
   const initiativeML=oneML(p.character,'initiative');
   const fatigue=combatFatigueTotals(state).total;
-  result=hmkMoraleTransition({initiativeML,fatigue,aberrance,brave:state.morale.state==='brave',roll,
+  result=hmkMoraleTransition({initiativeML,fatigue,aberrance,brave:state.morale.state==='brave'||state.fear?.state==='brave',roll,
    current:state.morale.state});
   state.morale.state=result.state;
   state.morale.psycheStress+=result.result.psycheStress;
@@ -127,7 +127,7 @@ export function assessGuidedCohesion({sequence,participants,observerId,noticedId
   threshold,previousRemaining:count,nextRemaining:tracking.remainingAtThreshold.length,
   triggered,initiativeML:result?oneML(p.character,'initiative'):null,
   fatigue:result?combatFatigueTotals(p.state).total:null,aberrance:result?aberrance:null,
-  rawEML:result?.rawEML??null,sl:result?.slName??null,state:state.morale.state,
+  rawEML:result?.rawEML??null,sl:result?.slName??null,psycheStress:result?.result?.psycheStress??0,state:state.morale.state,
   physicalDice:{format:'hmk-manual-dice-proof-v1',source:'HMK p.162',rolls:triggered?
    [{id:'groupCohesionD100',faces:100,value:roll,actorId:observerId,source:'GM-entered-physical-die'}]:[]}};
  state.events.push({id:eventId,type:'group-cohesion-assessment',round:seq.round,details});

@@ -25,6 +25,20 @@ const LOCATIONS={
  pv:{triangle:null,bleeds:1,zone:'torso'},pelvis:{triangle:null,bleeds:1,zone:'torso'},
  area:{triangle:null,bleeds:0,zone:'head'}
 };
+// Printed p355, animal Body Location tables B and C. Bleeder circles and
+// amputation triangles are the same symbols as p167; never borrow human ZN.
+const ANIMAL_LOCATIONS=Object.freeze({
+ hd:{triangle:null,bleeds:2,zone:'head'},nk:{triangle:20,bleeds:3,zone:'head'},
+ flg:{triangle:0,bleeds:1,zone:'legs'},flk:{triangle:null,bleeds:2,zone:'torso'},
+ ab:{triangle:null,bleeds:3,zone:'torso'},qtr:{triangle:null,bleeds:2,zone:'torso'},
+ hlg:{triangle:0,bleeds:1,zone:'legs'},tl:{triangle:0,bleeds:0,zone:'legs'}
+});
+export function hmkAnimalLocationSymbols(location){const v=ANIMAL_LOCATIONS[String(location??'').trim().toLowerCase()];return v?{...v}:null;}
+export function hmkBodyLocationSymbols(location,bodyKind='human'){
+ if(bodyKind==='horse')return hmkAnimalLocationSymbols(location);
+ if(bodyKind==='human')return hmkHumanLocationSymbols(location);
+ throw Error('Neznámá ověřená anatomie pro Injury Sequence');
+}
 export function hmkHumanLocationSymbols(location){const v=LOCATIONS[String(location??'').trim().toLowerCase()];return v?{...v}:null;}
 const edge=a=>['e','edge'].includes(String(a??'').toLowerCase());
 export function hmkAmputationAssessment({location,aspect,level,severity,strengthML,roll,isFolk=true}={}){
@@ -40,7 +54,7 @@ export function hmkAmputationAssessment({location,aspect,level,severity,strength
  const result=resolveAmputation({injury,triangleModifier:sym.triangle,strengthSL:sl,locationNormallyBleeds:sym.bleeds>0});
  return {...result,triangleModifier:sym.triangle,strengthML,roll,rawEML,slName:Object.keys(SL).find(k=>SL[k]===sl)};
 }
-export function hmkInjuryMishaps(location,severity){const sym=hmkHumanLocationSymbols(location);if(!sym)throw Error('Neznámá lokace pro Injury Mishap');return injuryMishap({severity,zone:sym.zone,location:String(location).toLowerCase()==='pv'?'pelvis':String(location).toLowerCase()});}
+export function hmkInjuryMishaps(location,severity,bodyKind='human'){const sym=hmkBodyLocationSymbols(location,bodyKind);if(!sym)throw Error('Neznámá lokace pro Injury Mishap');return injuryMishap({severity,zone:sym.zone,location:String(location).toLowerCase()==='pv'?'pelvis':String(location).toLowerCase()});}
 export function hmkInjuryMoraleEML({initiativeML,fatigue=0,aberrance=0,brave=false}={}){
  for(const x of [initiativeML,fatigue,aberrance])if(!Number.isSafeInteger(x)||x<0||x>200)throw Error('Morale potřebuje platné Initiative ML, Fatigue a Aberrance');
  return moraleEML({initiativeML,aberrance,brave})-fatigue;

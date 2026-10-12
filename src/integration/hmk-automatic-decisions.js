@@ -138,7 +138,7 @@ export function applyAutomaticDeclaredManeuver({decision,round,timelineId,source
  * The choice Take/Hold/decline is the tripper's, not a calculation or GM ruling.
  */
 export function resolveTripAutomaticGrab({state,round,eventId,grabberId,targetId,
- choice,zone=null}={}){
+ choice,zone=null,oneHanded=null,offHanded=null}={}){
  ensure(state&&typeof state==='object'&&state.shock!=='KIA','Cíl je mrtvý nebo není známý');
  const pending=state.pendingAutomaticGrab;
  ensure(pending&&pending.grabberId===grabberId&&pending.targetId===targetId,'Chybí doložený Trip s rozdílem 10+');
@@ -148,7 +148,8 @@ export function resolveTripAutomaticGrab({state,round,eventId,grabberId,targetId
  if(choice!=='decline')ensure(typeof zone==='string'&&zone.trim().length>0,'U Hold/Take je povinná skutečně zasažená zóna');
  const next=structuredClone(state);
  next.pendingAutomaticGrab=null;
- if(choice==='hold')next.grabHold={active:true,grabberId,targetId,zone,createdRound:round};
+ if(choice==='hold')next.grabHold={active:true,grabberId,targetId,zone,createdRound:round,
+  ...(typeof oneHanded==='boolean'&&typeof offHanded==='boolean'?{oneHanded,offHanded}:{})};
  if(choice==='take')next.pendingGrabTake={fromActorId:targetId,toActorId:grabberId,zone,sourceId:pending.sourceId};
  next.events.push({id:eventId,type:'hmk-trip-automatic-grab-choice',round,details:{
   choice,zone,grabberId,targetId,sourceId:pending.sourceId,opposedRollRequired:false,
@@ -162,15 +163,26 @@ export function resolveTripAutomaticGrab({state,round,eventId,grabberId,targetId
  * actor, actual character STR and unbiased d6 provided by the runner.
  */
 export function applyAutomaticGrabHoldRetest({state,round,eventId,grabberId,targetId,actorId,
- ownerSTR,targetSTR,ownerD6,targetD6}={}){
+ ownerSTR,targetSTR,ownerD6,targetD6,gripEvidence=null}={}){
  ensure(state?.grabHold?.active===true&&state.grabHold.grabberId===grabberId&&state.grabHold.targetId===targetId,
   'Není aktivní doložené Grab Hold');
  ensure(actorId===grabberId,'Hold lze opakovat pouze na tahu držícího');
  ensure(integer(round,1,9999)&&round===state.grabHold.createdRound+1,'Hold se opakuje přesně na následujícím tahu držícího');
  ensure(integer(ownerSTR,1,40)&&integer(targetSTR,1,40)&&integer(ownerD6,1,6)&&integer(targetD6,1,6),
   'Chybí skutečné STR nebo dva d6');
- const result=applyConfirmedGrabRetest({state,round,eventId,attackerId:grabberId,
+ const actual=structuredClone(state);
+ // Historical Trip 10+ Hold records can omit grip; never default to a
+ // two-handed modifier unless the GM explicitly verifies the hands.
+ if(typeof actual.grabHold.oneHanded!=='boolean'||typeof actual.grabHold.offHanded!=='boolean'){
+  ensure(gripEvidence&&typeof gripEvidence.oneHanded==='boolean'&&typeof gripEvidence.offHanded==='boolean'&&
+   (!gripEvidence.offHanded||gripEvidence.oneHanded),
+   'Starší Grab Hold vyžaduje skutečné potvrzení použitých rukou GM před d6');
+  actual.grabHold.oneHanded=gripEvidence.oneHanded;
+  actual.grabHold.offHanded=gripEvidence.offHanded;
+ }
+ const result=applyConfirmedGrabRetest({state:actual,round,eventId,attackerId:grabberId,
   attackerSTR:ownerSTR,targetSTR,attackerD6:ownerD6,targetD6,impactTA:0,
+  oneHanded:actual.grabHold.oneHanded,offHanded:actual.grabHold.offHanded,
   gmConfirmed:true});
  const proof=freeze({source:'HMK World of Kèthîra p.106',grabberId,targetId,round,
   ownerD6,targetD6,mode:'automatic-hold-retest-actor-validated'});

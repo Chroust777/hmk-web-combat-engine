@@ -14,7 +14,15 @@ const directions=new Set(['front','rear','side']);
 const materialCodes={C:'cloth',L:'leather',D:'padded',Q:'quilted',G:'gambeson',K:'kurbul',S:'scale',M:'mail',P:'plate'};
 const validSlots=new Set(['underFar','underNear','base','overNear','overFar']);
 const fail=(reason,detail)=>({ready:false,reason,detail:detail??null,requiresGMResolution:true});
-const canonName=(name)=>String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^(cloth|leather|padded|quilted|gambeson|kurbul|scale|mail|plate)\s+/i,'').toLowerCase().trim();
+// The printed suit summaries abbreviate two p.118 article names. These are
+// exact name aliases ONLY, not permission to substitute a different article.
+const canonName=(name)=>{
+ const raw=String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .replace(/^(cloth|leather|padded|quilted|gambeson|kurbul|scale|mail|plate)\s+/i,'')
+  .toLowerCase().trim();
+ if(['sleeved tunic','slvd. tunic','tunic, sleeved'].includes(raw))return 'tunic, sleeved';
+ return raw;
+};
 const stableValue=(obj)=>JSON.stringify(obj);
 const sameArray=(a,b)=>Array.isArray(a)&&a.length===b.length&&[...a].sort().every((x,i)=>x===[...b].sort()[i]);
 

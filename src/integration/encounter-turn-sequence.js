@@ -1,3 +1,5 @@
+import {classifySpellMisfire} from './hmk-spell-misfire-effects.js';
+import {listPelahnBurstSources,pelahnSourcesForActor} from './hmk-pelahn-burst-registry.js';
 /** HMK World of Kèthîra pp.158–162, 169, 176–179.
  * GM-controlled turn sequence. No dice rolls, time gaps, or unknown character
  * attributes are inferred. Event gates inspect the authoritative persistent
@@ -6,6 +8,7 @@
 import {validateCombatState,dueInjuryMorale,unresolvedInjuryMishaps} from './persistent-combat-state.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {validateSpatialBarriers} from './hmk-guided-spatial-barriers.js';
+import {projectGuidedSpatialPath} from './hmk-guided-spatial-actions.js';
 
 const ACTIONS=new Set(['attack','charge','evade','grope','incant','move','pass','ready','other','incapacitated','concentrate-start','concentrate-hold','concentrate-abandon']);
 const MAX_ROUND=9999;
@@ -53,6 +56,7 @@ export function validateEncounterSequence(input){
  requireValid(idset.size===ids.length&&new Set(s.order).size===s.order.length&&s.order.every(id=>idset.has(id)),'Pořadí obsahuje neznámé postavy');
  requireValid(int(s.cursor,0,s.order.length)&&typeof s.active==='boolean','Neplatný ukazatel tahu');
  requireValid(Array.isArray(s.log)&&s.log.length<=30000,'Neplatná historie tahů');
+ listPelahnBurstSources(s);
  requireValid(s.readied&&typeof s.readied==='object'&&!Array.isArray(s.readied),'Neplatný seznam připravených akcí');
  requireValid(s.interruptActiveId===undefined||s.interruptActiveId===null||s.order.includes(s.interruptActiveId),'Neplatný přerušující aktér');
  requireValid(s.confirmedHits===undefined||s.confirmedHits&&typeof s.confirmedHits==='object'&&!Array.isArray(s.confirmedHits),'Neplatný registr potvrzených zásahů');
@@ -61,11 +65,20 @@ export function validateEncounterSequence(input){
   (typeof s.pendingEndTurnAction==='object'&&!Array.isArray(s.pendingEndTurnAction)&&
    s.pendingEndTurnAction.actorId===s.order[s.cursor]&&s.pendingEndTurnAction.round===s.round&&
    s.active===true&&s.interruptActiveId===null&&
-   (['STN','INC'].includes(s.entryShock)||s.entryAlertness==='confused'||
+   (['STN','INC'].includes(s.entryShock)||['afraid','catatonic'].includes(s.entryFear)||s.entryAlertness==='confused'||
     ['routed','withdrawing'].includes(s.entryMorale))&&
    ACTIONS.has(s.pendingEndTurnAction.action)&&
+   (s.pendingEndTurnAction.surrenderEventId===undefined||typeof s.pendingEndTurnAction.surrenderEventId==='string')&&
+   (s.pendingEndTurnAction.pendingEffects===undefined||
+    Array.isArray(s.pendingEndTurnAction.pendingEffects)&&
+    s.pendingEndTurnAction.pendingEffects.length>=1&&
+    new Set(s.pendingEndTurnAction.pendingEffects).size===s.pendingEndTurnAction.pendingEffects.length&&
+    s.pendingEndTurnAction.pendingEffects.every(v=>
+     ['shock-end-turn','rally-end-turn-reaction','confused-end-turn-reaction','fear-end-turn-reaction'].includes(v)))&&
+   (s.pendingEndTurnAction.movementImpossibleConfirmed===undefined||
+    s.pendingEndTurnAction.movementImpossibleConfirmed===true)&&
    s.log.some(e=>['turn-action-resolved-before-shock-reroll','turn-action-resolved-before-confused-reaction',
-     'turn-action-resolved-before-rally-reaction'].includes(e.type)&&
+     'turn-action-resolved-before-rally-reaction','turn-action-resolved-before-fear-reaction'].includes(e.type)&&
     e.round===s.round&&
     e.actorId===s.pendingEndTurnAction.actorId&&e.action===s.pendingEndTurnAction.action)),
   'Neplatná nebo zastaralá odložená akce před Shock Reroll');
@@ -154,7 +167,9 @@ export function validateEncounterSequence(input){
  requireValid(s.entryAlertness===undefined||s.entryAlertness===null||['aware','confused','unaware'].includes(s.entryAlertness),'Neplatná Alertness při zahájení tahu');
  requireValid(s.entryShock===undefined||s.entryShock===null||['NONE','STN','INC','UNC','KIA'].includes(s.entryShock),'Neplatný původní Shock na začátku tahu');
  requireValid(s.entryMorale===undefined||s.entryMorale===null||typeof s.entryMorale==='string','Neplatná původní Morale na začátku tahu');
+ requireValid(s.entryFear===undefined||s.entryFear===null||['steady','brave','afraid','terrified','catatonic'].includes(s.entryFear),'Neplatný původní Fear');
  requireValid(s.entryForcedPass===undefined||typeof s.entryForcedPass==='boolean','Neplatný původní Mishap Pass');
+ requireValid(s.entryGrabHoldTarget===undefined||typeof s.entryGrabHoldTarget==='boolean','Neplatný důkaz Grab Hold při začátku tahu');
  requireValid(typeof s.timelineId==='string'&&s.timelineId.length>0,'Chybí ID časové osy');
  return s;
 }
@@ -178,7 +193,10 @@ export function concentrationInterruptionReason(state){
  validateCombatState(state);
  if(state.shock!=='NONE')return `shock-${state.shock}`;
  if(state.coma?.active)return 'coma';
- if(state.morale?.state==='catatonic')return 'catatonic';
+ // HMK p.162 forces withdrawing/routed combatants to retreat or flee.
+ // Such compulsory actions cannot coexist with a p.160 ongoing task; p.182
+ // likewise forbids concentration under fear and catatonia.
+ if(['withdrawing','routed','catatonic'].includes(state.morale?.state))return `morale-${state.morale.state}`;
  if((state.wounds||[]).some(w=>w.healed!==true&&w.severity==='G'&&
   ['sk','skull'].includes(String(w.location).trim().toLowerCase())))return 'grievous-skull';
  if((state.wounds||[]).some(w=>w.healed!==true&&w.healing?.grimWound===true))return 'grim-wound';
@@ -204,8 +222,12 @@ export function concentrationInterruptionHistory(state,commitment){
   if(e.type==='confirmed-hit'&&['STN','INC','UNC','KIA'].includes(d.shock))return 'historical-shock-hit';
   if(e.type==='shock-recovery'&&['STN','INC','UNC','KIA'].includes(d.before))return 'historical-shock-recovery';
   if(['blood-loss-advance','blood-stoppage'].includes(e.type)&&['STN','INC','UNC','KIA'].includes(d.shock))return 'historical-blood-shock';
-  if(['injury-morale','morale-reaction'].includes(e.type)&&
-    (['catatonic','afraid','terrified'].includes(d.state)||['catatonic','afraid','terrified'].includes(d.after)))
+  // Morale can arise from injury, special incidents, group cohesion and
+  // reactions.  A later successful Rally must not resurrect concentration.
+  if(['injury-morale','morale-reaction','special-morale-resolution',
+    'group-cohesion-assessment'].includes(e.type)&&
+    [d.state,d.after,d.before,d.finalState,d.resultState].some(value=>
+     ['withdrawing','routed','catatonic','afraid','terrified'].includes(value)))
    return 'historical-morale-interruption';
   if(e.type==='confirmed-hit'&&String(d.injury||'').startsWith('G')&&
     ['sk','skull'].includes(String(d.location||'').trim().toLowerCase()))return 'historical-grievous-skull';
@@ -245,7 +267,7 @@ export function dueEncounterEvents(sequence,states){
    const casualties=cohort.allyIds.filter(other=>{
     const q=persistentState(states,other);
     return !assessed.has(other)&&(['INC','UNC','KIA'].includes(q.shock)||
-      ['routed','withdrawing','catatonic'].includes(q.morale?.state)||q.morale?.gmVanquished?.active===true);
+      ['routed','withdrawing','catatonic'].includes(q.morale?.state)||q.morale?.gmVanquished?.active===true||q.morale?.surrender?.active===true);
    });
    if(casualties.length)due.push({characterId:id,type:'group-cohesion-assessment',dueRound:s.round,casualtyIds:casualties});
   }
@@ -267,6 +289,9 @@ export function dueEncounterEvents(sequence,states){
   // wound's Morale Roll becomes mandatory after all associated Shock ends.
   for(const m of unresolvedInjuryMishaps(ps))due.push({characterId:id,type:'injury-mishap',mishapId:m.id,dueRound:s.round});
   for(const m of dueInjuryMorale(ps))due.push({characterId:id,type:'injury-morale',woundId:m.woundId,dueRound:s.round});
+  if(ps.fear?.state==='brave'&&ps.fear.timelineId===s.timelineId&&
+   int(ps.fear.braveExpiresAtRound,1,MAX_ROUND)&&ps.fear.braveExpiresAtRound<=s.round)
+   due.push({characterId:id,type:'fear-brave-expiry',dueRound:ps.fear.braveExpiresAtRound});
   if(ps.morale?.state==='brave'&&ps.morale.braveTimelineId===s.timelineId
    &&int(ps.morale.braveSince,1,MAX_ROUND)&&ps.morale.braveSince+60<=s.round){
    due.push({characterId:id,type:'brave-expiry',dueRound:ps.morale.braveSince+60});
@@ -283,7 +308,7 @@ export function dueEncounterEvents(sequence,states){
  // distinct participants; never let the two resolvers demand different first
  // events (which would deadlock the unified guide).
  const priority={'injury-mishap':0,'group-cohesion-assessment':0.5,'special-morale':0.6,'blood-loss':1,'unc-shock-reroll':2,
-  'blood-shock-reroll':2,'brave-expiry':2.5,'injury-morale':3};
+  'blood-shock-reroll':2,'fear-brave-expiry':2.5,'brave-expiry':2.5,'injury-morale':3};
  const orderIndex=new Map(s.order.map((id,i)=>[id,i]));
  due.sort((a,b)=>(orderIndex.get(a.characterId)-orderIndex.get(b.characterId))||
   ((priority[a.type]??99)-(priority[b.type]??99))||(a.dueRound-b.dueRound));
@@ -306,6 +331,17 @@ export function dueEndTurnEvents(sequence,states){
  if(!['INC','UNC','KIA'].includes(p.shock)&&['routed','withdrawing'].includes(p.morale?.state)&&p.morale?.rallyPending?.required===true&&
    p.morale.rallyPending.timelineId===s.timelineId&&p.morale.rallyPending.lastReactionRound!==s.round)
   due.push({characterId:id,type:'rally-end-turn-reaction',dueRound:s.round});
+ // HMK p.187: afraid tests Will after each affected turn. A CF0
+ // catatonic victim first tests at the end of the NEXT turn (not at
+ // perception). The source event was placed in the same Initiative log.
+ if(['afraid','catatonic'].includes(p.fear?.state)&&p.fear.timelineId===s.timelineId&&
+    p.fear.lastReactionRound!==s.round){
+  const perceived=s.log.findIndex(e=>e.type==='fear-exposure'&&
+    e.eventId===p.fear.sourceEventId&&e.actorId===id);
+  const laterStart=perceived>=0&&s.log.slice(perceived+1).some(e=>
+    e.type==='turn-start'&&e.actorId===id);
+  if(laterStart)due.push({characterId:id,type:'fear-end-turn-reaction',dueRound:s.round});
+ }
  if(p.shock!=='KIA'&&p.morale?.state==='catatonic'&&
    !(p.morale.lastReactionRound===s.round&&p.morale.lastReactionTimelineId===s.timelineId)){
   due.push({characterId:id,type:'catatonic-end-turn-reaction',dueRound:s.round});
@@ -383,8 +419,35 @@ function relinquishInitialCrossbowPriority(sequence,{actorId,reason}={}){
   actorId,reason,automaticRule:true});
  return validateEncounterSequence(s);
 }
+/** HMK p.204: the completed regular IR has an outstanding bonus action and
+ * obligatory END roll. This gate reads only persisted sequence evidence; it
+ * does not invent an action, END result, or substitute sessionStorage state.
+ * The source and resolution event must match the same six-round burst. */
+export function duePelahnHyperBurstBonus(sequence){
+ const s=validateEncounterSequence(sequence);
+ if(s.active||s.pendingEndTurnAction||s.interruptActiveId||s.cursor<1)return null;
+ const actorId=s.order[s.cursor-1];
+ // Once transformed into Shade the actor has no physical body: an older
+ // overlapping source must not re-award a physical bonus or END roll.
+ if(s.log.some(e=>e.type==='pelahn-total-release-shade'&&e.actorId===actorId))return null;
+ const last=[...s.log].reverse().find(x=>x.type==='turn-complete'&&
+  x.actorId===actorId&&x.round===s.round);
+ if(!last)return null;
+ const sourceOptions=pelahnSourcesForActor(s,actorId).filter(b=>{
+  if(actorId===b.casterId&&s.log.some(e=>e.type==='pelahn-total-release-shade'&&
+   e.eventId===b.id&&e.actorId===actorId))return false;
+  const origin=s.log.findIndex(x=>x.type==='pelahn-total-release-source'&&x.eventId===b.id);
+  return origin>=0&&s.log.indexOf(last)>origin;
+ });
+ if(sourceOptions.length>1)throw Error('Raw Pèleáhn: postava je v překryvu více zdrojů; HMK str.204 neurčuje skládání bonusů a END — vyžaduje rozhodnutí GM');
+ const b=sourceOptions[0];
+ if(!b||s.log.some(x=>x.type==='pelahn-bonus-resolved'&&x.sourceEventId===b.id&&
+   x.round===s.round&&x.actorId===actorId))return null;
+ return {sourceEventId:b.id,actorId,round:s.round,regularAction:last.action};
+}
 export function startEncounterTurn(sequence,states){
  const s=validateEncounterSequence(sequence);
+ requireValid(!duePelahnHyperBurstBonus(s),'Hyper Burst: nejprve musí proběhnout druhá akce a fyzický END d100 před dalším IR');
  requireValid(!s.pendingEndTurnAction,'Před dalším tahem je nutné uzavřít Shock Reroll a původní akci');
  requireValid(!s.active&&!s.interruptActiveId&&s.cursor<s.order.length,'Tah již běží nebo kolo skončilo');
  const events=dueEncounterEvents(s,states);
@@ -397,7 +460,7 @@ export function startEncounterTurn(sequence,states){
   const row=s.roster.find(r=>r.id===id);
   const disqualified=['INC','UNC','KIA'].includes(p.shock)||p.coma?.active||
    ['routed','withdrawing','catatonic'].includes(p.morale?.state)||
-   p.posture?.passNextTurn||row?.alertness!=='aware';
+   p.posture?.passNextTurn||p.morale?.surrender?.active===true||row?.alertness!=='aware';
   if(disqualified){
    const shifted=relinquishInitialCrossbowPriority(s,{actorId:id,
     reason:'pre-turn incapacity / morale / alertness / mandatory pass'});
@@ -414,16 +477,21 @@ export function startEncounterTurn(sequence,states){
    fail('Vícekolová akce na tomto IR skončí právě teď: GM musí potvrdit nepřerušené soustředění nebo akci opustit');
  }
  s.active=true;s.entryAlertness=s.roster.find(x=>x.id===id)?.alertness||'aware';
- s.entryShock=p.shock;s.entryMorale=p.morale?.state??'steady';s.entryForcedPass=!!p.posture?.passNextTurn;
- s.log.push({round:s.round,type:'turn-start',actorId:id,shock:p.shock,alertness:s.entryAlertness});
+ s.entryShock=p.shock;s.entryMorale=p.morale?.state??'steady';s.entryFear=p.fear?.state??'steady';s.entryForcedPass=!!p.posture?.passNextTurn;
+ // Snapshot at TURN START: a Counterstrike Grab Hold earned later in this
+ // very attack obliges Pass on the NEXT turn, never retroactively.
+ s.entryGrabHoldTarget=p.grabHold?.active===true&&p.grabHold.targetId===id;
+ s.log.push({round:s.round,type:'turn-start',actorId:id,shock:p.shock,alertness:s.entryAlertness,
+  ...(p.morale?.surrender?.active===true?{surrenderEventId:p.morale.surrender.sourceEventId}:{})});
  return s;
 }
 /** HMK p.161: exactly one free action, BEFORE the main 1-turn action.
  * A free-action claim is an authoritative Initiative event, never a GM
  * checkbox. The same turn token works across save/restore and old saves. */
 function freeActionToken(s){return `${s.timelineId}:${s.round}:${s.cursor}:${s.order[s.cursor]}`;}
-export function encounterFreeActionAvailable(sequence,actorId){
+export function encounterFreeActionAvailable(sequence,actorId,states=null){
  const s=validateEncounterSequence(sequence);
+ if(states?.[actorId]?.morale?.surrender?.active===true||surrenderOpenInSequence(s,actorId))return false;
  if(!s.active||s.interruptActiveId||s.pendingEndTurnAction||currentEncounterActor(s)!==actorId||
   s.commitments?.[actorId]?.status==='in-progress')return false;
  const token=freeActionToken(s);
@@ -436,17 +504,60 @@ export function encounterFreeActionAvailable(sequence,actorId){
  return s.log.at(-1)?.type==='turn-start'&&s.log.at(-1)?.actorId===actorId&&
   s.log.at(-1)?.round===s.round;
 }
-export function recordEncounterFreeAction(sequence,{actorId,kind}={}){
+export function recordEncounterFreeAction(sequence,{actorId,kind,states=null}={}){
  const s=validateEncounterSequence(sequence);
  requireValid(['rally','mounted-control','draw-weapon','ready-pocket-item','five-foot-step','open-unlocked-object','command-allies','intimidate-foe','free-missile-load'].includes(kind),'Nepodporovaná volná akce HMK');
- requireValid(encounterFreeActionAvailable(s,actorId),
+ requireValid(encounterFreeActionAvailable(s,actorId,states),
   'Volná akce musí být jediná a provedená před hlavní akcí na vlastním IR');
  const token=freeActionToken(s);
  s.freeActionTurn={token,kind};
  s.log.push({round:s.round,type:'free-action',actorId,kind,token});
  return s;
 }
-export function finishEncounterTurn(sequence,states,{action='pass',durationRounds=null,readiedAction=null,gmConfirmed=false}={}){
+/** Shared pure authoritative concentration placement. Both normal turn and
+ * documented post-regular-action Hyper Burst call this very same scheduling
+ * implementation; no independent commitment calculation or persistence path.
+ */
+function placeEncounterConcentration(s,{actorId,durationRounds,eventCount}){
+ const row=s.roster.find(x=>x.id===actorId);
+ requireValid(!!row&&int(durationRounds,1,9999)&&s.round+durationRounds<=MAX_ROUND&&
+  int(eventCount,0,1000000),'Koncentrace vyžaduje živého aktéra a doložené trvání');
+ s.commitments??={};
+ requireValid(!s.commitments[actorId]||['completed','abandoned'].includes(s.commitments[actorId].status),
+  'Vícekolová koncentrace již právě probíhá');
+ s.commitments[actorId]={startRound:s.round,startIR:row.rank,completionRound:s.round+durationRounds,
+  durationRounds,startEventIndex:eventCount,status:'in-progress'};
+ s.log.push({round:s.round,type:'concentration-start',actorId,completionRound:s.round+durationRounds});
+ return s;
+}
+/** Placement-only continuation after completed regular IR. Explicitly does
+ * not grant a new ordinary turn. Obligations, END, and one document commit
+ * remain the caller's responsibility.
+ */
+export function beginPelahnBonusConcentration(sequence,states,{actorId,durationRounds,gmConfirmed=false}={}){
+ const s=validateEncounterSequence(sequence);
+ requireValid(gmConfirmed===true&&s.active===false&&s.interruptActiveId===null&&
+  !s.pendingEndTurnAction&&s.cursor>0&&s.order[s.cursor-1]===actorId,
+  'Hyper Burst Incant vyžaduje právě dokončenou běžnou akci');
+ requireValid(duePelahnHyperBurstBonus(s)?.actorId===actorId,
+  'Přímé volání nesmí zahájit bonusový Incant bez skutečného zdroje Hyper Burstu');
+ const last=[...s.log].reverse().find(e=>e.type==='turn-complete'&&e.round===s.round&&e.actorId===actorId);
+ requireValid(last&&!['incant','concentrate-start','concentrate-hold','concentrate-abandon'].includes(last.action),
+  'Incant smí být jen jednou v tahu');
+ requireValid(!s.commitments?.[actorId]||['completed','abandoned'].includes(s.commitments[actorId].status),
+  'Nelze začít další Incant při probíhající koncentraci');
+ const p=persistentState(states,actorId),row=s.roster.find(x=>x.id===actorId);
+ requireValid(p.shock==='NONE'&&!p.coma?.active&&!p.posture?.passNextTurn&&
+  !p.pendingManeuver&&!p.mishaps?.some(x=>!x.resolved)&&
+  ['steady','brave'].includes(p.morale?.state??'steady')&&row?.alertness==='aware'&&
+  !concentrationInterruptionReason(p),'Aktuální bojový stav brání Incant spellstart');
+ requireValid(!dueEncounterEvents(s,states).length,'Nejdřív splatný Shock/Morale/Mishap');
+ placeEncounterConcentration(s,{actorId,durationRounds,eventCount:p.events.length});
+ s.log.push({type:'pelahn-bonus-incant-spellstart',round:s.round,actorId,
+  durationRounds,source:'shared-concentration-scheduler',gmConfirmed:true});
+ return validateEncounterSequence(s);
+}
+export function finishEncounterTurn(sequence,states,{action='pass',durationRounds=null,readiedAction=null,movementImpossibleConfirmed=false,threatenedConfirmed=null,movementProof=null,gmConfirmed=false}={}){
  const s=validateEncounterSequence(sequence);
  requireValid(s.active&&s.cursor<s.order.length&&!s.interruptActiveId,'Nelze ukončit tah, který nezačal, nebo právě probíhá přerušující akce');
  requireValid(!s.pendingEndTurnAction,'Akce již byla vykonána; nelze ji opakovat před vyhodnocením Shock Reroll');
@@ -462,6 +573,110 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
    'Pětistopý volný krok nelze kombinovat s pohybem Move, Evade ani Charge (HMK str.161)');
  const pending=dueEndTurnEvents(s,states);
  const id=s.order[s.cursor],p=persistentState(states,id);
+ // G04 safety: a finished Pèleáhn bonus spellstart is NOT itself spellfire.
+ // Neither the older free-turn form nor a direct finishEncounterTurn call may
+ // consume the later Incant without a recorded physical casting resolution.
+ // The existing Doom Flame resolver remains the only production source of
+ // complete spellfire; unknown spells cannot masquerade as its result.
+ const bonusStart=[...s.log].reverse().find(e=>e.type==='pelahn-bonus-incant-spellstart'&&
+  e.actorId===id&&e.round<s.round);
+ const commitment=s.commitments?.[id];
+ if(bonusStart&&commitment?.status==='completed'&&commitment.completedRound===s.round&&
+  commitment.startRound===bonusStart.round&&commitment.durationRounds===bonusStart.durationRounds){
+  requireValid(action==='incant','HMK str.200–202: dokončený bonusový Incant vyžaduje Spellfire (nebo samostatně doložený Abort)');
+  const knownResolution=s.log.some(e=>{
+   if(e.actorId!==id||e.round!==s.round||e.spell!==(bonusStart.spell??'Doom Flame')||
+    !['area-source-resolved','area-casting-failed','spell-misfire-form-failure',
+      'spell-misfire-mental-trauma','spell-pyre-resolved','spell-pyre-casting-failed',
+      'spell-pyre-misfire-form-failure','spell-pyre-misfire-mental-trauma',
+      'spell-pyre-total-release'].includes(e.type)||
+    !Array.isArray(e.physicalDice)||typeof e.eventId!=='string')return false;
+   const roll=e.physicalDice.find(d=>d.faces===100&&int(d.value,1,100)&&
+    d.source==='GM-entered-physical-die');
+   if(!roll)return false;
+   if(e.type==='spell-pyre-total-release'){
+    // A synthetic log is insufficient: all physical GM dice, persisted
+    // consequences and the causal CL III Hyper Burst must agree.
+    if((bonusStart.spell??'Doom Flame')!=='Pyre'||
+     e.spellstartRound!==bonusStart.round||!int(e.castingEML,1,100)||
+     e.castingSL!=='CF'||e.effect!==false||e.castingFatigue!==15||
+     e.misfireKind!=='total-release'||e.crucial!==true||
+     e.misfirePsycheStress!==3||
+     successLevel(roll.value,e.castingEML)!==SL.CF)return false;
+    const [cast,mis,spirit,...dice]=e.physicalDice;
+    if(e.physicalDice.length<3||cast.value!==roll.value||mis.faces!==100||mis.value!==100||
+     spirit.faces!==100||!int(spirit.value,1,100)||
+     e.physicalDice.some(d=>d.source!=='GM-entered-physical-die'))return false;
+    const shock={CF:0,F:6,S:4,CS:2}[e.totalReleaseSpiritSL];
+    if(shock===undefined||e.misfireAuralShock!==shock||dice.length!==shock||
+     !dice.every(d=>d.faces===6&&int(d.value,1,6))||
+     dice.reduce((n,d)=>n+d.value,0)!==e.totalReleaseSpiritMLLoss)return false;
+    if(!listPelahnBurstSources(s).some(b=>b.id===e.eventId&&b.spell==='Pyre'&&
+     b.complexity===3&&b.durationRounds===3&&
+     b.startRound===s.round&&b.endRound===s.round+2))return false;
+    if(e.totalReleaseSpiritSL==='CF'&&
+     !s.log.some(x=>x.type==='pelahn-total-release-shade'&&x.eventId===e.eventId&&x.actorId===id&&
+      x.spiritD100===spirit.value))return false;
+    const source=s.log.find(x=>x.type==='pelahn-total-release-source'&&
+     x.eventId===e.eventId&&x.spell==='Pyre'&&x.complexity===3&&
+     JSON.stringify(x.physicalDice)===JSON.stringify(e.physicalDice));
+    return Boolean(source)&&p.events.some(x=>x.id===e.eventId+':total-release'&&
+     x.type==='hmk-spell-total-release'&&x.details?.spell==='Pyre'&&
+     x.details?.castingD100===cast.value&&x.details?.spiritD100===spirit.value&&
+     x.details?.spiritMLLoss===e.totalReleaseSpiritMLLoss&&
+     x.details?.auralShock===shock&&x.details?.psycheStress===3);
+   }
+   if(e.type.startsWith('spell-pyre-')){
+    if((bonusStart.spell??'Doom Flame')!=='Pyre'||e.spellstartRound!==bonusStart.round||
+     !int(e.castingEML,1,100)||!int(e.castingFatigue,0,9999))return false;
+    const actualSL=successLevel(roll.value,e.castingEML);
+    const label=actualSL===SL.CF?'CF':actualSL===SL.F?'F':actualSL===SL.CS?'CS':'S';
+    if(e.castingSL!==label||e.effect!==(label==='S'||label==='CS'))return false;
+    const misfire=e.physicalDice[1];
+    if(label==='CF'&&(!misfire||misfire.faces!==100||!int(misfire.value,1,99)||
+     misfire.source!=='GM-entered-physical-die'))return false;
+    if(label!=='CF'&&misfire)return false;
+    const mis=label==='CF'?classifySpellMisfire(misfire.value,3):null;
+    const fatigue=label==='CS'?5:label==='CF'?15+mis.extraFatigue:10;
+    if(label==='CF'&&(mis.totalRelease||e.crucial!==mis.crucial||
+     e.misfireKind!==mis.kind||e.misfirePsycheStress!==mis.psycheStress||
+     e.misfireAuralShock!==mis.auralShock))return false;
+    if(e.castingFatigue!==fatigue||e.type!== (label==='CF'?
+      (mis.category==='form-failure'?'spell-pyre-misfire-form-failure':'spell-pyre-misfire-mental-trauma'):
+      label==='F'?'spell-pyre-casting-failed':'spell-pyre-resolved'))return false;
+    return p.events.some(x=>x.id===e.eventId+':casting-fatigue'&&
+     x.type==='hmk-casting-fatigue'&&x.details?.spell==='Pyre'&&
+     x.details?.outcome===label&&x.details?.castingRoll===roll.value&&
+     x.details?.fatigue===fatigue&&x.details?.misfireD100===(misfire?.value??null));
+   }
+   if(e.type==='area-source-resolved'){
+    return s.log.some(x=>x.type==='hit-confirmed'&&x.actorId===id&&x.round===s.round)&&
+     Object.values(s.confirmedHits??{}).some(h=>h?.actionKind==='area'&&
+      h.sourceEventId===e.eventId)&&
+     p.events.some(x=>x.type==='hmk-casting-fatigue'&&
+      x.id===e.eventId+':casting-fatigue'&&x.details?.spell==='Doom Flame'&&
+      x.details?.castingRoll===roll.value);
+   }
+   if(e.type==='area-casting-failed')return p.events.some(x=>
+    x.id===e.eventId+':failed-casting'&&x.type==='hmk-casting-fatigue'&&
+    x.details?.outcome==='F'&&x.details?.castingRoll===roll.value);
+   return p.events.some(x=>x.id===e.eventId+':spell-misfire'&&
+    x.type==='hmk-spell-misfire'&&x.details?.castingRoll===roll.value&&
+    x.details?.castingSL==='CF');
+  });
+  requireValid(knownResolution,
+   'HMK str.202: před ukončením Incant musí proběhnout autoritativní fyzický Casting Roll a úplná Spellfire/Misfire Sequence');
+ }
+
+ // HMK p.227: proactive Doom Flame Evade is physically resolved NOW, but
+ // consumes the evader's NEXT scheduled IR action. Repeating the movement or
+ // selecting an unrelated action on that next IR is forbidden.
+ const unpaidAreaEvades=s.log.filter(e=>e.type==='proactive-area-evade'&&e.actorId===id&&
+  e.dueRound===s.round&&!s.log.some(x=>x.type==='proactive-area-evade-paid'&&x.eventId===e.eventId));
+ requireValid(unpaidAreaEvades.length<=1,'Duplicitní závazek proaktivní Area Evade');
+ const prepaidEvade=unpaidAreaEvades[0]??null;
+ if(prepaidEvade)requireValid(action==='evade'||(['INC','UNC','KIA'].includes(p.shock)&&action==='incapacitated'),
+  'HMK p227: proactive Evade spotřebovala tento Initiative Rank, nelze vykonat další akci');
  // An initial priority slot belongs to the nominated crossbow shot only.
  // A combatant disabled by an earlier priority shot may have an incapable
  // turn; a pre-existing compulsory Pass still takes precedence.
@@ -472,7 +687,13 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
    (s.entryForcedPass===true&&action==='pass'),
    'HMK str.161: před řádným IR lze vykonat pouze deklarovaný úvodní výstřel kuše');
  }
- const helpless=['INC','UNC','KIA'].includes(p.shock)||p.coma?.active||p.morale?.state==='catatonic';
+ const helpless=['INC','UNC','KIA'].includes(p.shock)||p.coma?.active||p.morale?.state==='catatonic'||
+  p.fear?.state==='catatonic'||s.entryFear==='catatonic';
+ if(!helpless&&['afraid','terrified'].includes(p.fear?.state))
+  requireValid(['pass','move'].includes(action),
+   'HMK p.187 Fear/Aberrance: povoleno pouze Pass nebo pohyb od zdroje');
+ if((p.morale?.surrender?.active===true||surrenderOpenInSequence(s,id))&&!helpless)
+  requireValid(action==='pass','Vzdávající se postava nesmí bez doloženého ukončení kapitulace zahájit bojovou akci');
  const startedConfused=s.entryAlertness==='confused';
  // A participant who BEGAN their turn incapacitated cannot Pass and thus
  // cannot take an additional Confused Reaction; their Shock reroll comes
@@ -488,12 +709,13 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
  // that character's action. Stage the fully adjudicated action once, then
  // request the physical Shock roll. Do not advance Initiative prematurely.
  const delayedShock=pending.some(e=>e.type==='shock-end-turn')&&['STN','INC'].includes(s.entryShock);
+ const delayedFear=pending.some(e=>e.type==='fear-end-turn-reaction');
  const delayedRally=pending.some(e=>e.type==='rally-end-turn-reaction')&&
   ['routed','withdrawing'].includes(s.entryMorale);
- requireValid(!pending.length||((delayedShock||delayedRally)&&
-  pending.every(e=>e.type==='shock-end-turn'||e.type==='rally-end-turn-reaction')),
+ requireValid(!pending.length||((delayedShock||delayedRally||delayedFear)&&
+  pending.every(e=>e.type==='shock-end-turn'||e.type==='rally-end-turn-reaction'||e.type==='fear-end-turn-reaction')),
   'Nelze ukončit tah: povinný Shock / Mishap Pass / Catatonic Reaction na konci tahu ještě nebyl vyhodnocen');
- if(action==='evade')requireValid(s.entryShock!=='STN'&&p.shock!=='STN','Stunned postava nesmí vybrat Evade (HMK str.161)');
+ if(action==='evade'&&!prepaidEvade)requireValid(s.entryShock!=='STN'&&p.shock!=='STN','Stunned postava nesmí vybrat Evade (HMK str.161)');
  if(action==='incapacitated')requireValid(helpless||['INC','UNC','KIA'].includes(s.entryShock)||s.entryMorale==='catatonic'||s.entryAlertness==='unaware',
   'Schopná, Aware postava nemůže deklarovat technický stav Incapacitated jako akci');
  // A counterstrike or other simultaneously resolved consequence may INC/UNC
@@ -508,10 +730,61 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
  if(['attack','charge'].includes(action))requireValid(!!s.confirmedHits?.[currentAttackToken(s)],
   'Attack/Charge se smí dokončit až po jediném ověřeném výsledku útoku v aktuálním tahu');
  if(s.entryForcedPass&&!helpless&&!['INC','UNC','KIA'].includes(s.entryShock)&&s.entryMorale!=='catatonic')requireValid(action==='pass','Mishap přikazuje v tomto tahu Pass, i když je následný efekt na konci tahu vyřešen');
- if(!helpless&&p.grabHold?.active&&p.grabHold.targetId===id)
+ if(!helpless&&['afraid','terrified'].includes(p.fear?.state)){
+  requireValid(['pass','move'].includes(action),
+   'HMK p.187: Afraid/Terrified nesmí útočit, sesílat ani jinak jednat; pouze Pass nebo pohyb od zdroje');
+  if(action==='pass'&&p.fear.state==='terrified'&&!s.entryForcedPass)
+   requireValid(movementImpossibleConfirmed===true,
+    'HMK p.187: Terrified musí prchat plným Move; Pass jen pokud útěk není možný');
+  if(action==='move'){
+   const proof=movementProof?.projection,world=movementProof?.battlefield;
+   const sourceId=p.fear.sourceId;
+   const source=world?.units?.find(u=>u.id===sourceId),
+    actor=world?.units?.find(u=>u.id===id),last=proof?.actualPath?.at(-1);
+   requireValid(Array.isArray(s.spatialUnits)&&s.spatialUnits.length===s.order.length&&
+    s.order.every(who=>{
+     const old=s.spatialUnits.find(u=>u.id===who),present=world?.units?.find(u=>u.id===who);
+     return old&&present&&Math.hypot(old.x-present.x,old.y-present.y)<1e-7;
+    }),
+    'Fear Move musí vycházet ze skutečných uložených prostorových pozic');
+   requireValid(p.fear.sourceKind==='character'&&source&&actor&&last&&
+    proof.format==='hmk-guided-spatial-projection-v1'&&proof.actorId===id&&proof.action==='move'&&
+    (p.fear.state!=='terrified'||proof.moveRate==='full')&&
+    Math.hypot(last.x-source.x,last.y-source.y)>Math.hypot(actor.x-source.x,actor.y-source.y)+1e-7,
+    'HMK p.187: skutečný Move musí být doložená trasa od zdroje Fear (Terrified: full Move)');
+   const recalculated=projectGuidedSpatialPath({actorId:id,battlefield:world,
+    path:proof.requestedPath,action:'move',moveRate:proof.moveRate,
+    effectiveMove:proof.effectiveMove,difficultSources:proof.difficultSources,
+    stunned:proof.terrainFactor/(2**proof.difficultSources)>1,
+    moralePurpose:null,retreatConfirmed:false});
+   requireValid(JSON.stringify(recalculated)===JSON.stringify(proof),
+    'Fear Move nemá autoritativně přepočtený prostorový důkaz');
+  }
+ }
+ if(!helpless&&p.grabHold?.active&&p.grabHold.targetId===id&&
+   (s.entryGrabHoldTarget===true||
+    // Legacy in-progress saves lack a turn-start witness; a *completed*
+    // current attack cannot be rewritten as a newly mandatory Pass.
+    (s.entryGrabHoldTarget===undefined&&!s.confirmedHits?.[currentAttackToken(s)])))
   requireValid(action==='pass','HMK str.106: cíl Grab Hold musí Pass na svém následujícím tahu (bránit se smí)');
- if(!helpless&&s.entryMorale!=='catatonic'&&p.morale?.state==='routed')requireValid(['move','pass'].includes(action),'Routed musí utíkat nebo Pass podle HMK str.162');
- if(!helpless&&s.entryMorale!=='catatonic'&&p.morale?.state==='withdrawing')requireValid(['move','pass'].includes(action),'Withdrawing musí ustupovat nebo Pass');
+ // HMK p.162: Routed flees at full Move; Withdrawing retreats at least
+ // a half Move. Pass is an EXCEPTION only if movement is impossible.
+ // The guide may offer the option for GM review, but a mere Pass selection
+ // cannot certify that factual condition. A separate mandatory Pass from
+ // Mishap or Confused is governed by its own rule and needs no such claim.
+ const forcedPass=!!s.entryForcedPass||s.entryAlertness==='confused';
+ if(!helpless&&s.entryMorale!=='catatonic'&&['routed','withdrawing'].includes(p.morale?.state)){
+  requireValid(['move','pass'].includes(action),
+   'Morale: Routed/Withdrawing musí utíkat nebo ustupovat; nelze jednat jinak (HMK str.162)');
+  if(action==='pass'&&!forcedPass&&!p.morale?.surrender?.active)requireValid(movementImpossibleConfirmed===true,
+   'HMK str.162: Pass při Routed/Withdrawing je dovolen pouze když útěk či ústup není možný; GM musí výjimku výslovně potvrdit');
+  if(action==='pass'&&p.morale?.state==='routed'&&!p.morale?.surrender?.active){
+   requireValid(typeof threatenedConfirmed==='boolean',
+    'HMK str.162: GM musí doložit, zda je Routed postava při nemožnosti útěku ohrožena');
+   if(threatenedConfirmed===true&&movementImpossibleConfirmed===true)requireValid(p.morale.surrender?.active===true,
+    'HMK str.162: ohrožená Routed postava musí před potvrzením Pass trvale zaznamenat kapitulaci');
+  }
+ }
  for(const [otherId,otherState] of Object.entries(states)){
   const hold=otherState?.grabHold;
   if(otherId!==id&&!helpless&&otherState.shock!=='KIA'&&hold?.active&&hold.grabberId===id&&hold.createdRound<s.round)
@@ -535,23 +808,71 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
    'HMK str.182: Shock, Grim Wound nebo Grievous Skull přerušuje koncentraci');
   requireValid(!helpless&&row.alertness==='aware','Vícekolovou akci může začít pouze schopný a Aware účastník');
   requireValid(int(durationRounds,1,9999)&&s.round+durationRounds<=MAX_ROUND,'Požadována potvrzená délka 1+ round akce');
-  s.commitments??={};s.commitments[id]={startRound:s.round,startIR:row.rank,completionRound:s.round+durationRounds,
-   durationRounds,startEventIndex:p.events.length,status:'in-progress'};
-  s.log.push({round:s.round,type:'concentration-start',actorId:id,completionRound:s.round+durationRounds});
+  placeEncounterConcentration(s,{actorId:id,durationRounds,eventCount:p.events.length});
  }else if(['concentrate-hold','concentrate-abandon'].includes(action))fail('Tato akce není v koncentraci');
  if(action==='ready'){
   requireValid(!s.readied[id],'Postava už má otevřenou připravenou akci');
   requireValid(['attack','grope','move'].includes(readiedAction),'Připravit lze pouze 1-turn Attack, Grope či Move (HMK str.161)');
   s.readied[id]={fromRound:s.round,originalRank:row.rank,kind:readiedAction,resolved:false};
  }
- if(delayedShock||delayedRally||confusedReactionPending){
-  s.pendingEndTurnAction={round:s.round,actorId:id,action};
+ // HMK p.162: category 'move' cannot stand in for a completed, correctly
+ // calculated flight. Re-run the same pure spatial projection at this final
+ // boundary. A manually constructed result without a source battlefield is
+ // NOT a valid movement proof, even if it claims 'full' and 'confirmed'.
+ if(!helpless&&['routed','withdrawing'].includes(p.morale?.state)&&action==='move'){
+  requireValid(movementProof!==null,
+   'HMK str.162: povinný Move vyžaduje přepočítanou prostorovou trasu (zatím nedoložena)');
+  const w=movementProof,proof=w?.projection,world=w?.battlefield;
+  requireValid(typeof w?.eventId==='string'&&w.eventId.length>0&&w.eventId.length<=180&&
+   proof?.format==='hmk-guided-spatial-projection-v1'&&proof.actorId===id&&proof.action==='move'&&
+   proof.moralePurpose===p.morale.state&&proof.retreatConfirmed===true&&
+   (p.morale.state!=='routed'||proof.moveRate==='full')&&
+   world&&Array.isArray(world.units)&&world.units.length===s.order.length&&
+   s.order.every(who=>world.units.filter(u=>u.id===who).length===1),
+   'HMK str.162: neplatný či nepodložený doklad full Move útěku / ústupu');
+  if(s.spatialUnits?.length)requireValid(s.spatialUnits.length===s.order.length&&
+   s.order.every(who=>{
+    const old=s.spatialUnits.find(u=>u.id===who),now=world.units.find(u=>u.id===who);
+    return old&&now&&Math.hypot(old.x-now.x,old.y-now.y)<1e-7;
+   }), 'HMK str.162: prostorový doklad nesouhlasí se současnými pozicemi');
+  if(s.spatialBarriers!==undefined)requireValid(JSON.stringify(world.barriers??[])===
+   JSON.stringify(s.spatialBarriers.map(b=>b.kind==='wall'?{...b,open:false}:{...b,
+    open:s.interactionObjects.find(o=>o.id===b.id)?.open})),
+   'HMK str.162: skutečné překážky se od dokladu pohybu změnily');
+  const recalculated=projectGuidedSpatialPath({actorId:id,battlefield:world,
+   path:proof.requestedPath,action:'move',moveRate:proof.moveRate,
+   effectiveMove:proof.effectiveMove,difficultSources:proof.difficultSources,
+   stunned:proof.terrainFactor/(2**proof.difficultSources)>1,
+   dodgeIndex:null,chargeAttack:null,chargeTargetId:null,
+   moralePurpose:p.morale.state,retreatConfirmed:true});
+  requireValid(JSON.stringify(recalculated)===JSON.stringify(proof),
+   'HMK str.162: doložený Move neodpovídá znovu přepočtené trase a Engagement Zone');
+  requireValid(!s.spatialEvents?.some(e=>e.id===w.eventId)&&
+   !s.log.some(e=>e.spatialEventId===w.eventId),
+   'Duplicitní prostorový důkaz povinného Morale pohybu');
+ }
+ if(prepaidEvade)s.log.push({type:'proactive-area-evade-paid',round:s.round,actorId:id,
+  eventId:prepaidEvade.eventId,sourceEventId:prepaidEvade.sourceEventId,
+  action:action==='incapacitated'?'incapacitated':'evade',movementAlreadyCompleted:true});
+ if(delayedShock||delayedRally||delayedFear||confusedReactionPending){
+  const pendingEffects=[...(delayedShock?['shock-end-turn']:[]),
+   ...(delayedRally?['rally-end-turn-reaction']:[]),
+   ...(delayedFear?['fear-end-turn-reaction']:[]),
+   ...(confusedReactionPending?['confused-end-turn-reaction']:[])];
+  s.pendingEndTurnAction={round:s.round,actorId:id,action,pendingEffects,
+   ...(movementProof&&action==='move'?{spatialEventId:movementProof.eventId,moralePurpose:movementProof.projection.moralePurpose}:{}),
+   ...(action==='pass'&&p.morale?.surrender?.active?{surrenderEventId:p.morale.surrender.sourceEventId}:{}),
+   ...(action==='pass'&&['routed','withdrawing'].includes(p.morale?.state)&&!forcedPass?{movementImpossibleConfirmed:true}: {})};
   s.log.push({round:s.round,type:delayedShock?'turn-action-resolved-before-shock-reroll':
    delayedRally?'turn-action-resolved-before-rally-reaction':
+   delayedFear?'turn-action-resolved-before-fear-reaction':
    'turn-action-resolved-before-confused-reaction',actorId:id,action});
   return s;
  }
- s.log.push({round:s.round,type:'turn-complete',actorId:id,action});s.active=false;s.entryAlertness=null;s.entryShock=null;s.entryMorale=null;s.entryForcedPass=false;s.freeActionTurn=null;s.cursor++;
+ s.log.push({round:s.round,type:'turn-complete',actorId:id,action,
+  ...(movementProof&&action==='move'?{spatialEventId:movementProof.eventId,moralePurpose:movementProof.projection.moralePurpose}:{}),
+  ...(action==='pass'&&p.morale?.surrender?.active?{surrenderEventId:p.morale.surrender.sourceEventId}:{}),
+  ...(action==='pass'&&['routed','withdrawing'].includes(p.morale?.state)&&!forcedPass?{movementImpossibleConfirmed:true}: {})});s.active=false;s.entryAlertness=null;s.entryShock=null;s.entryMorale=null;s.entryFear=null;s.entryForcedPass=false;s.entryGrabHoldTarget=undefined;s.freeActionTurn=null;s.cursor++;
  return s;
 }
 /** HMK p.169: after the physically entered end-of-next-turn STN reroll,
@@ -568,18 +889,56 @@ export function finalizeStagedEncounterTurn(sequence,states){
  requireValid(s.entryAlertness!=='confused'||['INC','UNC','KIA'].includes(s.entryShock)||
   (s.reactions?.[p.actorId]?.round===s.round&&s.reactions[p.actorId].phase==='end-turn'),
   'Confused Reaction musí být po Pass vyhodnocena skutečným d100');
+ // G04-005: the action was physically completed BEFORE its compulsory
+ // end-of-turn Shock/Confused/Rally reaction. Preserve the actual spatial
+ // evidence when closing the staged turn; do not silently sever its link.
+ // Older snapshots may lack pendingEffects. Recover the type from their
+ // immutable staged-action marker, rather than falsely labelling every
+ // Rally/Confused reaction as a Shock reroll.
+ const marker=[...s.log].reverse().find(e=>e.actorId===p.actorId&&e.round===s.round&&
+  ['turn-action-resolved-before-shock-reroll','turn-action-resolved-before-rally-reaction',
+   'turn-action-resolved-before-confused-reaction','turn-action-resolved-before-fear-reaction'].includes(e.type));
+ const effects=p.pendingEffects??(marker?[{
+  'turn-action-resolved-before-shock-reroll':'shock-end-turn',
+  'turn-action-resolved-before-rally-reaction':'rally-end-turn-reaction',
+  'turn-action-resolved-before-confused-reaction':'confused-end-turn-reaction',
+  'turn-action-resolved-before-fear-reaction':'fear-end-turn-reaction'}[marker.type]]:[]);
+ requireValid(effects.length>0,'Odložená akce nemá pravidlový důvod povinného konce tahu');
+ if(p.spatialEventId){
+  requireValid(typeof p.spatialEventId==='string'&&p.spatialEventId.length>0&&
+   s.spatialEvents?.some(e=>e.id===p.spatialEventId&&e.actorId===p.actorId&&e.round===s.round),
+   'Odložený Move nemá doloženou skutečnou prostorovou událost');
+ }
  s.log.push({round:s.round,type:'turn-complete',actorId:p.actorId,action:p.action,
-  afterEndTurnShock:true});
+  ...(p.spatialEventId?{spatialEventId:p.spatialEventId,moralePurpose:p.moralePurpose}:{}),
+  ...(p.movementImpossibleConfirmed?{movementImpossibleConfirmed:true}: {}),
+  ...(p.surrenderEventId?{surrenderEventId:p.surrenderEventId}:{}),
+  endTurnResolvedEffects:[...effects],
+  ...(effects.includes('shock-end-turn')?{afterEndTurnShock:true}:{}),
+  ...(effects.includes('rally-end-turn-reaction')?{afterEndTurnRally:true}:{}),
+  ...(effects.includes('fear-end-turn-reaction')?{afterEndTurnFear:true}:{}),
+  ...(effects.includes('confused-end-turn-reaction')?{afterEndTurnConfused:true}:{})});
  s.pendingEndTurnAction=null;s.active=false;s.entryAlertness=null;
- s.entryShock=null;s.entryMorale=null;s.entryForcedPass=false;s.freeActionTurn=null;s.cursor++;
+ s.entryShock=null;s.entryMorale=null;s.entryFear=null;s.entryForcedPass=false;s.entryGrabHoldTarget=undefined;s.freeActionTurn=null;s.cursor++;
  return validateEncounterSequence(s);
 }
 /** Readied 1-turn actions resolve later, may interrupt another turn;
  * next-round IR is the confirmed interrupt IR. Does not grant another turn. */
-export function resolveReadiedEncounterAction(sequence,{actorId,interruptIR,moveHalfConfirmed=false,gmConfirmed=false}={}){
+export function resolveReadiedEncounterAction(sequence,{actorId,interruptIR,states=null,moveHalfConfirmed=false,gmConfirmed=false}={}){
  const s=validateEncounterSequence(sequence);
  requireValid(gmConfirmed===true,'Přerušení připravenou akcí musí potvrdit GM');
+ // G04-006: a prepared action has not yet occurred. New compulsory
+ // Morale, shock, surrender, or Mishap conditions take precedence at trigger
+ // time. Requiring live state also blocks alternate callers that omit it.
+ const actorState=persistentState(states??{},actorId);
+ requireNoFearAttack(s,actorId,states);
+ requireValid(!['INC','UNC','KIA'].includes(actorState.shock)&&!actorState.coma?.active&&
+  !['routed','withdrawing','catatonic'].includes(actorState.morale?.state)&&
+  !['afraid','terrified','catatonic'].includes(actorState.fear?.state)&&
+  actorState.morale?.surrender?.active!==true&&!actorState.posture?.passNextTurn,
+  'Readied již nelze vyvolat: po přípravě vznikl povinný Shock/Morale/Mishap stav');
  const r=s.readied[actorId];
+ requireValid(!surrenderOpenInSequence(s,actorId),'Kapitulace znemožňuje vyvolání dříve připravené akce');
  requireValid(r&&!r.resolved&&r.fromRound===s.round,'Není otevřená připravená akce z tohoto kola');
  requireValid(!s.interruptActiveId,'Jiná připravená akce už právě přerušuje tah');
  requireValid(!s.pendingEndTurnAction,'Po skutečně dokončené akci se nejprve musí vyhodnotit Shock Reroll');
@@ -599,6 +958,7 @@ export function resolveReadiedEncounterAction(sequence,{actorId,interruptIR,move
 }
 export function nextEncounterRound(sequence,states){
  const s=validateEncounterSequence(sequence);
+ requireValid(!duePelahnHyperBurstBonus(s),'Hyper Burst: nevyřešená druhá akce a fyzický END d100 blokují další kolo');
  requireValid(!s.active&&!s.interruptActiveId&&s.cursor===s.order.length,'Nové kolo lze zahájit jen po skončení všech tahů a přerušení');
  requireValid(!s.pendingEndTurnAction,'Odložená akce čeká na povinný Shock Reroll');
  requireValid(s.round<MAX_ROUND,'Překročen maximální počet kol');
@@ -607,7 +967,7 @@ export function nextEncounterRound(sequence,states){
  for(const [id,r] of Object.entries(s.readied)){
   if(r.resolved){const original=s.roster.find(x=>x.id===id);original.rank=r.interruptIR;original.source='readied-action';}
  }
- s.readied={};s.reactions={};s.initialCrossbowPriority=null;s.round++;s.cursor=0;s.active=false;s.entryAlertness=null;s.entryShock=null;s.entryMorale=null;s.entryForcedPass=false;s.freeActionTurn=null;s.interruptActiveId=null;
+ s.readied={};s.reactions={};s.initialCrossbowPriority=null;s.round++;s.cursor=0;s.active=false;s.entryAlertness=null;s.entryShock=null;s.entryMorale=null;s.entryFear=null;s.entryForcedPass=false;s.entryGrabHoldTarget=undefined;s.freeActionTurn=null;s.interruptActiveId=null;
  // Rank changes due to Readied Action affect the next round. Tie resolution
  // remains explicit; no arbitrary id-order fallback.
  const ordered=orderHMKInitiative(s.roster.map(x=>({...x,initiativeML:x.rank,spiritWorld:false})),{astralscape:s.astralscape});
@@ -625,8 +985,46 @@ function currentAttackToken(s){
  requireValid(!!currentEncounterActor(s),'Zásah nemá aktivního jednajícího účastníka');
  return `${s.timelineId}:${s.round}:${s.cursor}:${s.interruptActiveId||'main'}`;
 }
-export function assertScheduledHitCanCommit(sequence,actorId){
+// No write path may rely on optional caller-supplied state alone: a surrender
+// must remain visible in the immutable Initiative chronology after JSON reload.
+// The durable character state remains authoritative if provided.
+function surrenderOpenInSequence(s,actorId){
+ for(let i=s.log.length-1;i>=0;i--){
+  const e=s.log[i];if(e.actorId!==actorId)continue;
+  if(e.type==='morale-surrender-released')return false;
+  if(e.surrenderEventId)return true;
+ }
+ return false;
+}
+/** Independent p.187 Fear cannot be erased by omitting optional caller
+ * state from a direct Attack/Readied invocation. The irreversible Initiative
+ * log is authoritative for the current feared action restriction. */
+function activeFearFromTimeline(sequence,actorId){
+ for(let i=sequence.log.length-1;i>=0;i--){
+  const e=sequence.log[i];if(e.actorId!==actorId)continue;
+  if(e.type==='fear-safe-recovery')return 'steady';
+  if(e.type==='fear-end-turn-reaction')return e.afterState;
+  if(e.type==='fear-exposure')return e.resultState;
+ }
+ return null;
+}
+function requireNoFearAttack(s,actorId,states){
+ const f=states?.[actorId]?.fear?.state??activeFearFromTimeline(s,actorId);
+ requireValid(!['afraid','terrified','catatonic'].includes(f),
+  'HMK p.187: Fear/Aberrance zakazuje Attack, Counterstrike a Readied Attack');
+}
+export function assertScheduledHitCanCommit(sequence,actorId,states=null){
  const s=validateEncounterSequence(sequence);
+ requireNoFearAttack(s,actorId,states);
+ requireValid(states?.[actorId]?.morale?.surrender?.active!==true&&!surrenderOpenInSequence(s,actorId),
+  'Vzdávající se postava nemůže útočit');
+ if(s.interruptActiveId===actorId){
+  const current=persistentState(states??{},actorId);
+  requireValid(!['INC','UNC','KIA'].includes(current.shock)&&!current.coma?.active&&
+   !['routed','withdrawing','catatonic'].includes(current.morale?.state)&&
+   !current.posture?.passNextTurn,
+   'Nově vzniklý Shock, Morale nebo Mishap přerušil dosud nevykonaný Readied Attack');
+ }
  requireValid(currentEncounterActor(s)===actorId,'Zásah je mimo aktivní tah útočníka');
  requireValid(!s.pendingEndTurnAction,'Druhý útok po již dokončené akci a před Shock Reroll je zakázán');
  // HMK p.160: the actor may not launch an Attack while a 1+ round action
@@ -637,10 +1035,10 @@ export function assertScheduledHitCanCommit(sequence,actorId){
   'HMK str.160: během 1+ round koncentrace nelze zahájit Attack; nejprve trvale potvrďte opuštění činnosti');
  requireValid(!s.confirmedHits?.[currentAttackToken(s)],'Tento účastník již potvrdil zásah v aktuální Attack akci; další samostatný zásah vyžaduje nový tah');
 }
-export function recordScheduledHitCommit(sequence,{actorId,gmConfirmed=false}={}){
+export function recordScheduledHitCommit(sequence,{actorId,states=null,gmConfirmed=false}={}){
  const s=validateEncounterSequence(sequence);
  requireValid(gmConfirmed===true,'Zápis do seznamu útoků vyžaduje skutečné potvrzení GM');
- assertScheduledHitCanCommit(s,actorId);
+ assertScheduledHitCanCommit(s,actorId,states);
  s.confirmedHits??={};s.confirmedHits[currentAttackToken(s)]={round:s.round,actorId};
  s.log.push({round:s.round,type:'hit-confirmed',actorId,token:currentAttackToken(s)});
  return s;
@@ -655,7 +1053,8 @@ export function setEncounterTieOrder(sequence,{actorId,tieOrder,gmConfirmed=fals
 export function currentEncounterActor(sequence){const s=validateEncounterSequence(sequence);return s.interruptActiveId|| (s.active?s.order[s.cursor]:null);}
 export function completeReadiedEncounterAction(sequence,{gmConfirmed=false}={}){
  const s=validateEncounterSequence(sequence);requireValid(gmConfirmed,'GM musí potvrdit skutečné dokončení přerušující akce');
- const id=s.interruptActiveId;requireValid(!!id&&s.readied[id]?.triggered&&!s.readied[id]?.resolved,'Není otevřené přerušení připravenou akcí');
+ const id=s.interruptActiveId;requireValid(!surrenderOpenInSequence(s,id),'Vzdávající se postava nesmí dokončit připravenou akci');
+ requireValid(!!id&&s.readied[id]?.triggered&&!s.readied[id]?.resolved,'Není otevřené přerušení připravenou akcí');
  // An Attack interrupted at a later IR must be adjudicated and committed
  // through the hit guide first; GM cannot simply click 'finished'. The
  // confirmed token is produced ONLY by the guided combat resolution.
@@ -701,9 +1100,19 @@ export function abandonEncounterConcentration(sequence,{actorId,gmConfirmed=fals
 export function ongoingEncounterConcentration(sequence,actorId){
  const s=validateEncounterSequence(sequence);return s.commitments?.[actorId]?.status==='in-progress'?s.commitments[actorId]:null;
 }
-export function assertScheduledMeleeActor(sequence,attackerId){
+export function assertScheduledMeleeActor(sequence,attackerId,states=null){
  if(!sequence)return;
  const s=validateEncounterSequence(sequence);
+ requireNoFearAttack(s,attackerId,states);
+ requireValid(states?.[attackerId]?.morale?.surrender?.active!==true&&!surrenderOpenInSequence(s,attackerId),
+  'Vzdávající se postava nemůže zahájit Melee útok');
+ if(s.interruptActiveId===attackerId){
+  const current=persistentState(states??{},attackerId);
+  requireValid(!['INC','UNC','KIA'].includes(current.shock)&&!current.coma?.active&&
+   !['routed','withdrawing','catatonic'].includes(current.morale?.state)&&
+   !current.posture?.passNextTurn,
+   'Readied Melee nelze zahájit po novém povinném Shock, Morale nebo Mishap');
+ }
  requireValid(currentEncounterActor(s)===attackerId,'Melee Attack lze nyní vyhodnotit jen pro právě jednající postavu v Initiative pořadí');
  requireValid(!s.pendingEndTurnAction,'Melee Attack nelze zahájit po již vykonané akci před Shock Reroll');
  if(s.interruptActiveId)requireValid(s.readied[s.interruptActiveId]?.kind==='attack','Melee Attack nelze vyhodnotit pro připravenou akci Grope či Move');

@@ -24,7 +24,7 @@ export function createGuidedFreePress({gate,attackerId,defenderId,round,timeline
  return {format:'hmk-guided-free-press-v1',decision,eventId,actorId:actor.id,targetId:target.id,
   ownerSTR:actor.hmk.attributes.str,targetSTR:target.hmk.attributes.str,
   targetState:copy(targetState),stateWitness:sig(targetState),targetProfile:copy(target),
-  phase:'choice',choice:null,ownerD6:null,targetD6:null,consequenceD100:null,physicalDice:[],staged:null,displacement:null};
+  phase:'choice',choice:null,ownerD6:null,targetD6:null,consequenceTechnique:null,consequenceD100:null,physicalDice:[],staged:null,displacement:null};
 }
 export function guidedFreePressRequirement(s){
  need(s?.format==='hmk-guided-free-press-v1','Neplatná posloupnost Free Press');
@@ -33,14 +33,24 @@ export function guidedFreePressRequirement(s){
  if(s.phase==='ownerD6')return {kind:'die',id:'freePressOwnerD6',faces:6,label:'Free Press: d6 vítěze',actorId:s.actorId};
  if(s.phase==='targetD6')return {kind:'die',id:'freePressTargetD6',faces:6,label:'Free Press: d6 cíle',actorId:s.targetId};
  if(s.phase==='displacement')return {kind:'maneuver-position',id:'free-press-displacement',label:'Volný Press musí zaznamenat skutečné odsunutí cíle'};
- if(s.phase==='consequence'&&verifiedManeuverConsequence({state:s.staged.state,character:s.targetProfile,round:s.decision.round,timelineId:s.decision.timelineId}).forcedCF)
+ if(s.phase==='consequence'&&s.staged.state.pendingManeuver?.kind==='stumble'&&s.consequenceTechnique===null&&
+  (s.targetProfile.hmk?.skills||[]).some(x=>String(x.name??x.key??'').trim().toLowerCase()==='acrobatics'&&Number.isSafeInteger(x.ml)))
+  return {kind:'choice',id:'free-press-stumble-technique',actorId:s.targetId,choices:[
+   {value:'attribute',label:'Stumble: Agility (AGL × 5)'},
+   {value:'acrobatics',label:'Stumble: Acrobatics ML (HMK str.161)'}]};
+ if(s.phase==='consequence'&&verifiedManeuverConsequence({state:s.staged.state,character:s.targetProfile,round:s.decision.round,timelineId:s.decision.timelineId,technique:s.consequenceTechnique??'attribute'}).forcedCF)
   return {kind:'automatic',id:'free-press-forced-cf'};
  if(s.phase==='consequence')return {kind:'die',id:'freePressConsequenceD100',faces:100,
   label:`Press ${s.staged.state.pendingManeuver?.kind==='shock'?'Shock':'Stumble'}: d100 cíle`,actorId:s.targetId};
  return {kind:'complete',choice:s.choice,result:s.staged};
 }
 export function chooseGuidedFreePress(s,choice){
- need(guidedFreePressRequirement(s).kind==='choice'&&['yes','no'].includes(choice),'Neplatná volba Free Press');
+ const req=guidedFreePressRequirement(s);
+ if(req.id==='free-press-stumble-technique'){
+  need(['attribute','acrobatics'].includes(choice),'Neplatná volba alternativního Stumble');
+  return {...s,consequenceTechnique:choice};
+ }
+ need(req.kind==='choice'&&['yes','no'].includes(choice),'Neplatná volba Free Press');
  return {...s,choice,phase:choice==='yes'?'ownerD6':'ready'};
 }
 function proof(req,value){return {id:req.id,faces:req.faces,value,label:req.label,source:'GM-entered-physical-die'};}
@@ -60,19 +70,19 @@ export function submitGuidedFreePressDie(s,value){
  }
  const pending=s.staged?.state?.pendingManeuver;
  need(pending?.kind==='shock'||pending?.kind==='stumble','Není splatný následek manévru');
- const ctx=verifiedManeuverConsequence({state:s.staged.state,character:s.targetProfile,round:s.decision.round,timelineId:s.decision.timelineId});
+ const ctx=verifiedManeuverConsequence({state:s.staged.state,character:s.targetProfile,round:s.decision.round,timelineId:s.decision.timelineId,technique:s.consequenceTechnique??'attribute'});
  need(!ctx.forcedCF,'Grievous impairment vyžaduje automatické CF bez d100');
  const changed=applyConfirmedManeuverConsequence({state:s.staged.state,round:s.decision.round,
-  eventId:s.eventId+':consequence',kind:pending.kind,roll:n,ml:ctx.ml,hasLegs:ctx.hasLegs,gmConfirmed:true});
+  eventId:s.eventId+':consequence',kind:pending.kind,roll:n,ml:ctx.ml,hasLegs:ctx.hasLegs,technique:ctx.technique,gmConfirmed:true});
  return {...next,consequenceD100:n,staged:{...s.staged,state:changed.state,consequence:changed.outcome},phase:'ready'};
 }
 
 /** HMK p.170: no dice are generated/requested for an automatic CF. */
 export function advanceGuidedFreePressForcedConsequence(s){
  need(guidedFreePressRequirement(s).id==='free-press-forced-cf','Není splatné automatické CF Free Press');
- const ctx=verifiedManeuverConsequence({state:s.staged.state,character:s.targetProfile,round:s.decision.round,timelineId:s.decision.timelineId});
+ const ctx=verifiedManeuverConsequence({state:s.staged.state,character:s.targetProfile,round:s.decision.round,timelineId:s.decision.timelineId,technique:s.consequenceTechnique??'attribute'});
  const changed=applyConfirmedManeuverConsequence({state:s.staged.state,round:s.decision.round,
-  eventId:s.eventId+':consequence',kind:ctx.kind,ml:ctx.ml,hasLegs:ctx.hasLegs,forcedCF:true,gmConfirmed:true});
+  eventId:s.eventId+':consequence',kind:ctx.kind,ml:ctx.ml,hasLegs:ctx.hasLegs,forcedCF:true,technique:ctx.technique,gmConfirmed:true});
  return {...s,staged:{...s.staged,state:changed.state,consequence:changed.outcome},phase:'ready'};
 }
 

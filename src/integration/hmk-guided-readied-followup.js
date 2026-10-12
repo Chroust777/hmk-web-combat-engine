@@ -18,8 +18,10 @@ function base({id,sequence,states,battlefield,actorId,kind}){
   'Připravovaná akce neodpovídá právě otevřenému přerušení');
  requireFact(!ready.resolution,'Připravená akce již má vyhodnocený výsledek');
  const st=states?.[actorId];validateCombatState(st);
- requireFact(!['INC','UNC','KIA'].includes(st.shock)&&!st.coma?.active&&st.morale?.state!=='catatonic'&&
-  !st.posture?.passNextTurn,'Postava při přerušení nemůže tuto akci vykonat');
+ requireFact(!['INC','UNC','KIA'].includes(st.shock)&&!st.coma?.active&&
+  !['routed','withdrawing','catatonic'].includes(st.morale?.state)&&
+  st.morale?.surrender?.active!==true&&!st.posture?.passNextTurn,
+  'Postava při přerušení nemůže tuto akci vykonat: Shock/Morale/Mishap/kapitulace');
  requireFact(battlefield?.units?.length===s.order.length&&s.order.every(a=>battlefield.units.filter(u=>u.id===a).length===1),
   'Přerušení vyžaduje kompletní skutečnou mapu účastníků');
  const saved=s.spatialUnits;

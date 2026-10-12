@@ -19,6 +19,16 @@ const req=(condition,message)=>{if(!condition)throw Error(message)};
 const integer=(v,lo,hi)=>Number.isSafeInteger(v)&&v>=lo&&v<=hi;
 const physical=(raw,faces)=>{req(/^\d+$/.test(String(raw)),`Zadejte skutečný celý hod d${faces}`);const n=Number(raw);req(integer(n,1,faces),`Hod d${faces} musí být 1–${faces}`);return n;};
 const copy=structuredClone;
+// HMK p.106: Grab suffers -2 when one-handed and an additional -3 with
+// the off-hand. Verify the hand BEFORE any physical Melee roll.
+function verifiedGrabGrip(person,usedArms){
+ req(['both','left','right'].includes(usedArms),'Grab vyžaduje doloženou použitou ruku (obě, levá, pravá) před Melee d100');
+ if(usedArms==='both')return {oneHanded:false,offHanded:false};
+ const hand=String(person?.hmk?.handedness??'').trim().toLowerCase();
+ req(['left','right'].includes(hand),'Grab jednou rukou vyžaduje skutečně doloženou handedness');
+ return {oneHanded:true,offHanded:hand!==usedArms};
+}
+
 const zoneOf=(zd,aimZN)=>{
  const zn=aimZN+zd-1;
  if(zn===1)return 'head';if(zn===2)return 'right-arm';if(zn===3)return 'left-arm';
@@ -37,6 +47,7 @@ export function createGuidedDeclaredManeuver({id,sourceSession,technique,attacke
  const ownerSTR=attacker.hmk?.attributes?.str,targetSTR=defender.hmk?.attributes?.str;
  req(integer(ownerSTR,1,40)&&integer(targetSTR,1,40),'Chybí přesná Strength obou postav');
  req(technique!=='grab'||aimZN===1,'Jiné zamíření Grab vyžaduje zohlednění Aim Penalty již při Melee; tento průvodce ho nemá');
+ if(technique==='grab')verifiedGrabGrip(attacker,attackerUsedArms);
  return {format:'hmk-guided-declared-v1',id,technique,attackerId:attacker.id,defenderId:defender.id,
   round:sourceSession.round,timelineId:sourceSession.timelineId,sourceSignature,aimZN,
   meleeSession:copy(sourceSession.meleeSession),attacker:copy(attacker),defender:copy(defender),
@@ -48,12 +59,17 @@ export function createGuidedDeclaredManeuver({id,sourceSession,technique,attacke
   usedArms:{[attacker.id]:attackerUsedArms,[defender.id]:defenderUsedArms},
   counterHit:null,counterHitProof:null,weaponDamageSession:null,weaponDamageProof:null,
   injuryAftermath:null,injuryMode:null,counterAbe:null,counterDirection:null,counterOpponents:null,injuryAlternative:null,mishapPending:[],mishapMode:null,mishapProofs:[],counterImpactTA:0,counterPrecisionTA:0,
-  ownerSTR,targetSTR,phase:'melee',gate:null,decision:null,impactTA:null,grabAction:'hold',grabZone:null,
-  ownerD6:null,targetD6:null,physicalDice:[],consequence:null,margin:null,displacement:null,finished:false};
+  ownerSTR,targetSTR,phase:'melee',gate:null,decision:null,impactTA:null,defenderCounterTechnique:null,
+  maneuverOwnerId:attacker.id,maneuverTargetId:defender.id,grabAction:'hold',grabZone:null,
+  ownerD6:null,targetD6:null,physicalDice:[],consequence:null,consequenceTechnique:null,margin:null,displacement:null,finished:false};
 }
 export function guidedDeclaredRequirement(s){
  req(s?.format==='hmk-guided-declared-v1','Neplatný průběh HMK manévru');
  if(s.phase==='melee')return guidedMeleeRequirement(s.meleeSession);
+ if(s.phase==='counter-technique')return {kind:'choice',id:'counterstrike-technique',actorId:s.defenderId,
+  choices:['strike','press','trip','grab'].map(value=>({value,label:'Před hodem deklarovat Counterstrike '+value}))};
+ if(s.phase==='counter-maneuver-ta')return {kind:'choice',id:'counter-maneuver-impact-ta',actorId:s.defenderId,
+  choices:Array.from({length:Math.min(3,s.gate.extraTA)+1},(_,i)=>({value:String(i),label:'Counterstrike '+s.defenderCounterTechnique+' Impact TA '+i}))};
  if(s.phase==='weapon-damage')return guidedBlockWeaponDamageRequirement(s.weaponDamageSession);
  if(s.phase==='counter-direction')return {kind:'choice',id:'counterstrike-direction',actorId:s.defenderId,
   choices:[{value:'front',label:'Zepředu – skutečný směr Counterstrike'},{value:'side',label:'Z boku – skutečný směr Counterstrike'},
@@ -88,22 +104,29 @@ export function guidedDeclaredRequirement(s){
  }
  if(s.phase==='ta')return {kind:'choice',id:'maneuver-impact-ta',choices:Array.from({length:s.gate.extraTA+1},(_,i)=>({value:String(i),label:`Impact TA ${i} (zbývá ${s.gate.extraTA-i})`}))};
  if(s.phase==='grab-action'){
-  const hasItem=s.inventory.some(i=>i.characterId===s.defenderId&&i.quantity===1&&['main_hand','off_hand'].includes(i.slot));
+  const hasItem=s.inventory.some(i=>i.characterId===s.maneuverTargetId&&i.quantity===1&&['main_hand','off_hand'].includes(i.slot));
   return {kind:'choice',id:'grab-type',choices:[{value:'hold',label:'Grab – Hold'},...(hasItem?[{value:'take',label:'Grab – Take'}]:[])]};
  }
- if(s.phase==='grab-zone')return {kind:'die',id:'grabZoneDie',faces:4,label:'Grab Zone Die d4 (HMK p.106)',actorId:s.attackerId};
- if(s.phase==='owner-roll')return {kind:'die',id:'ownerD6',faces:6,label:`${s.technique} STR + d6 útočníka`,actorId:s.attackerId};
- if(s.phase==='target-roll')return {kind:'die',id:'targetD6',faces:6,label:`${s.technique} STR + d6 obránce`,actorId:s.defenderId};
+ if(s.phase==='grab-zone')return {kind:'die',id:'grabZoneDie',faces:4,label:'Grab Zone Die d4 (HMK p.106)',actorId:s.maneuverOwnerId};
+ if(s.phase==='owner-roll')return {kind:'die',id:'ownerD6',faces:6,label:`${s.decision?.kind??s.technique} STR + d6 vítěze`,actorId:s.maneuverOwnerId};
+ if(s.phase==='target-roll')return {kind:'die',id:'targetD6',faces:6,label:`${s.decision?.kind??s.technique} STR + d6 cíle`,actorId:s.maneuverTargetId};
  if(s.phase==='displacement')return {kind:'maneuver-position',id:'maneuver-displacement',label:'Přesné polohy a volná skutečná dráha Press / Trip'};
- if(s.phase==='consequence'&&verifiedManeuverConsequence({state:s.targetState,character:s.defender,round:s.round,timelineId:s.timelineId}).forcedCF)
+ if(s.phase==='consequence'&&s.targetState.pendingManeuver?.kind==='stumble'&&s.consequenceTechnique===null){
+  const target=s.maneuverTargetId===s.attackerId?s.attacker:s.defender;
+  if((target.hmk?.skills||[]).some(x=>String(x.name??x.key??'').trim().toLowerCase()==='acrobatics'&&Number.isSafeInteger(x.ml)))
+   return {kind:'choice',id:'maneuver-stumble-technique',actorId:s.maneuverTargetId,choices:[
+    {value:'attribute',label:'Stumble: Agility (AGL × 5)'},
+    {value:'acrobatics',label:'Stumble: Acrobatics ML (HMK str.161)'}]};
+ }
+ if(s.phase==='consequence'&&verifiedManeuverConsequence({state:s.targetState,character:s.maneuverTargetId===s.attackerId?s.attacker:s.defender,round:s.round,timelineId:s.timelineId,technique:s.consequenceTechnique??'attribute'}).forcedCF)
   return {kind:'automatic',id:'maneuver-forced-cf'};
  if(s.phase==='consequence')return {kind:'die',id:'maneuverConsequenceD100',faces:100,
-  label:s.targetState.pendingManeuver?.kind==='stumble'?'Povinný Stumble AGL d100':'Povinný Shock d100',actorId:s.defenderId};
+  label:s.targetState.pendingManeuver?.kind==='stumble'?'Povinný Stumble AGL d100':'Povinný Shock d100',actorId:s.maneuverTargetId};
  if(s.phase==='automatic-grab')return {kind:'choice',id:'trip-grab-choice',choices:[{value:'decline',label:'Nepoužít Grab'},{value:'hold',label:'Grab Hold'},{value:'take',label:'Grab Take'}]};
- if(s.phase==='automatic-grab-zone')return {kind:'die',id:'automaticGrabZoneD4',faces:4,label:'Trip 10+ – Grab Zone Die d4 (HMK p.106)',actorId:s.attackerId};
+ if(s.phase==='automatic-grab-zone')return {kind:'die',id:'automaticGrabZoneD4',faces:4,label:'Trip 10+ – Grab Zone Die d4 (HMK p.106)',actorId:s.maneuverOwnerId};
  if(s.phase==='take-item'){
-  const slot=heldSlotInGrabZone(s.targetState.pendingGrabTake?.zone,s.defender.hmk?.handedness);
-  const items=s.inventory.filter(i=>i.characterId===s.defenderId&&i.slot===slot&&i.quantity===1);
+  const slot=heldSlotInGrabZone(s.targetState.pendingGrabTake?.zone,(s.maneuverTargetId===s.attackerId?s.attacker:s.defender).hmk?.handedness);
+  const items=s.inventory.filter(i=>i.characterId===s.maneuverTargetId&&i.slot===slot&&i.quantity===1);
   return items.length?{kind:'choice',id:'grab-item',choices:items.map(i=>({value:i.id,label:i.snapshot?.name??i.id}))}:
    {kind:'blocked',reason:'Cíl nedrží žádný jednotlivý předmět: Take nemůže být dokončen bez skutečného cíle'};
  }
@@ -112,7 +135,7 @@ export function guidedDeclaredRequirement(s){
  throw Error('Neznámá fáze deklarovaného HMK manévru');
 }
 function finishDeclared(s){
- const states={...s.states,[s.defenderId]:s.targetState};
+ const states={...s.states,[s.maneuverTargetId]:s.targetState};
  const next={...s,states};
  const pending=[s.gate?.attackerMishap?s.attackerId:null,s.gate?.defenderMishap?s.defenderId:null].filter(Boolean);
  return pending.length?{...next,mishapPending:pending,phase:'melee-mishap'}:{...next,phase:'complete',finished:true};
@@ -124,12 +147,12 @@ function afterManeuver(s){
  if(s.targetState.pendingManeuver)return {...s,phase:'consequence'};
  if(s.targetState.pendingAutomaticGrab)return {...s,phase:'automatic-grab'};
  if(s.targetState.pendingGrabTake){
-  const zone=s.targetState.pendingGrabTake.zone,slot=heldSlotInGrabZone(zone,s.defender.hmk?.handedness);
-  const possible=s.inventory.some(i=>i.characterId===s.defenderId&&i.slot===slot&&i.quantity===1);
+  const zone=s.targetState.pendingGrabTake.zone,slot=heldSlotInGrabZone(zone,(s.maneuverTargetId===s.attackerId?s.attacker:s.defender).hmk?.handedness);
+  const possible=s.inventory.some(i=>i.characterId===s.maneuverTargetId&&i.slot===slot&&i.quantity===1);
   if(possible)return {...s,phase:'take-item'};
   const targetState=copy(s.targetState);targetState.pendingGrabTake=null;
   targetState.events.push({id:s.id+':take-no-object',round:s.round,type:'hmk-grab-take-no-object',
-   details:{zone,grabberId:s.attackerId,targetId:s.defenderId,reason:'no-object-held-in-struck-zone'}});
+   details:{zone,grabberId:s.maneuverOwnerId,targetId:s.maneuverTargetId,reason:'no-object-held-in-struck-zone'}});
   return finishDeclared({...s,targetState});
  }
  return finishDeclared(s);
@@ -180,7 +203,7 @@ function enterCounterHit(s,impact=0,precision=0){
 function resolvedMelee(s,melee){
  const result=guidedMeleeResult(melee),gate=result.gate;
  const next={...s,meleeSession:melee,gate,physicalDice:result.physicalDice};
- if(gate.counterStrike)return {...next,phase:'counter-direction'};
+ if(gate.counterStrike)return {...next,phase:s.defenderCounterTechnique==='strike'?'counter-direction':'counter-maneuver-ta'};
  if(gate.weaponDamageCheck){
   const x=s.attackContext,rolls=result.physicalDice;
   const wd=createGuidedBlockWeaponDamage({id:s.id+':wq',timelineId:s.timelineId,round:s.round,
@@ -213,7 +236,7 @@ function advanceMishap(s,roll=null){
   item.slot='none';
   result.state.events.at(-1).details.droppedItemId=item.id;
  }
- const out={...s,states,targetState:states[s.defenderId],inventory,mishapPending:s.mishapPending.slice(1),mishapMode:null,
+ const out={...s,states,targetState:states[s.maneuverTargetId],inventory,mishapPending:s.mishapPending.slice(1),mishapMode:null,
   physicalDice:roll===null?s.physicalDice:[...s.physicalDice,{id:'combatMishapD100:'+id,faces:100,value:roll,source:'GM-entered-physical-die'}],
   mishapProofs:[...s.mishapProofs,{actorId:id,result:result.result}]};
  return out.mishapPending.length?out:{...out,phase:'complete',finished:true};
@@ -245,6 +268,7 @@ export function chooseGuidedDeclared(s,value){
  const r=guidedDeclaredRequirement(s);
  req(r.kind==='choice'&&r.choices.some(x=>String(x.value??x)===String(value)),'Nepovolená volba v manévru');
  if(s.phase==='counter-injury-choice')return afterCounterInjury({...s,injuryMode:String(value)});
+ if(s.phase==='consequence'&&r.id==='maneuver-stumble-technique')return {...s,consequenceTechnique:value};
  if(s.phase==='counter-direction')return {...s,counterDirection:String(value),phase:'counter-opponents'};
  if(s.phase==='counter-ta'){
   const [a,p]=String(value).split(':').map(Number);
@@ -254,27 +278,48 @@ export function chooseGuidedDeclared(s,value){
  if(s.phase==='counter-hit')return {...s,counterHit:chooseGuidedFullHit(s.counterHit,{id:r.id,value:String(value)})};
  if(s.phase==='melee-mishap'&&r.id==='combat-mishap-technique')return {...s,mishapMode:String(value)};
  if(s.phase==='melee'){
-  const melee=chooseGuidedMeleeDefence(s.meleeSession,value);return {...s,meleeSession:melee};
+  const melee=chooseGuidedMeleeDefence(s.meleeSession,value);
+  return {...s,meleeSession:melee,phase:value==='counterstrike'?'counter-technique':'melee',
+   defenderCounterTechnique:value==='counterstrike'?null:'strike'};
+ }
+ if(s.phase==='counter-technique'){
+  if(value==='grab')verifiedGrabGrip(s.defender,s.usedArms[s.defenderId]);
+  return {...s,defenderCounterTechnique:value,phase:'melee'};
+ }
+ if(s.phase==='counter-maneuver-ta'){
+  const ta=Number(value),gate={...s.gate,impactTA:ta,attackerMishap:null,defenderMishap:null};
+  const grip=s.defenderCounterTechnique==='grab'?verifiedGrabGrip(s.defender,s.usedArms[s.defenderId]):{oneHanded:false,offHanded:false};
+  const decision=decideDeclaredManeuver({gate,attackerId:s.attackerId,defenderId:s.defenderId,
+   round:s.round,timelineId:s.timelineId,sourceSignature:s.sourceSignature,
+   attackerTechnique:s.technique,defenderCounterTechnique:s.defenderCounterTechnique,meleeProofKey:s.id,
+   defenderOneHanded:grip.oneHanded,defenderOffHanded:grip.offHanded});
+  req(decision.eligible&&decision.ownerId===s.defenderId&&decision.targetId===s.attackerId,
+   'Counterstrike special vyžaduje vítězství obránce v původním Melee');
+  return {...s,impactTA:ta,decision,aimZN:1,maneuverOwnerId:s.defenderId,maneuverTargetId:s.attackerId,
+   ownerSTR:s.defender.hmk.attributes.str,targetSTR:s.attacker.hmk.attributes.str,
+   targetState:copy(s.states[s.attackerId]),phase:decision.kind==='grab'?'grab-action':'owner-roll'};
  }
  if(s.phase==='ta'){
   const ta=Number(value);
   const gate={...s.gate,impactTA:ta};
+  const grip=s.technique==='grab'?verifiedGrabGrip(s.attacker,s.usedArms[s.attackerId]):{oneHanded:false,offHanded:false};
   const decision=decideDeclaredManeuver({gate:{...gate,attackerMishap:null,defenderMishap:null},attackerId:s.attackerId,defenderId:s.defenderId,
    round:s.round,timelineId:s.timelineId,sourceSignature:s.sourceSignature,
-   attackerTechnique:s.technique,defenderCounterTechnique:'strike',meleeProofKey:s.id});
+   attackerTechnique:s.technique,defenderCounterTechnique:'strike',meleeProofKey:s.id,
+   attackerOneHanded:grip.oneHanded,attackerOffHanded:grip.offHanded});
   req(decision.eligible,'Deklarovaný manévr nebyl pravidlově přiznán');
   return {...s,impactTA:ta,decision,phase:s.technique==='grab'?'grab-action':'owner-roll'};
  }
  if(s.phase==='grab-action')return {...s,grabAction:value,phase:'grab-zone'};
  if(s.phase==='automatic-grab'){
   if(value==='decline')return afterManeuver({...s,targetState:resolveTripAutomaticGrab({state:s.targetState,round:s.round,
-   eventId:s.id+':trip-choice',grabberId:s.attackerId,targetId:s.defenderId,choice:value}).state});
+   eventId:s.id+':trip-choice',grabberId:s.maneuverOwnerId,targetId:s.maneuverTargetId,choice:value}).state});
   return {...s,grabAction:value,phase:'automatic-grab-zone'};
  }
   if(s.phase==='take-item'){
   const out=applyAutomaticGrabTake({state:s.targetState,inventory:s.inventory,round:s.round,
-   eventId:s.id+':take',grabberId:s.attackerId,targetId:s.defenderId,itemId:value,
-   targetHandedness:s.defender.hmk?.handedness});
+   eventId:s.id+':take',grabberId:s.maneuverOwnerId,targetId:s.maneuverTargetId,itemId:value,
+   targetHandedness:(s.maneuverTargetId===s.attackerId?s.attacker:s.defender).hmk?.handedness});
   return afterManeuver({...s,targetState:out.state,inventory:out.inventory});
  }
  throw Error('Neznámá hráčská volba');
@@ -301,7 +346,8 @@ export function submitGuidedDeclaredDie(s,raw){
   const zone=zoneOf(value,s.aimZN);
   if(!zone)throw Error('Grab Zone Die nezasáhl žádnou dovolenou zónu');
   const out=resolveTripAutomaticGrab({state:s.targetState,round:s.round,eventId:s.id+':trip-choice',
-   grabberId:s.attackerId,targetId:s.defenderId,choice:s.grabAction,zone});
+   grabberId:s.maneuverOwnerId,targetId:s.maneuverTargetId,choice:s.grabAction,zone,
+   ...(s.grabAction==='hold'?verifiedGrabGrip(s.maneuverOwnerId===s.attackerId?s.attacker:s.defender,s.usedArms[s.maneuverOwnerId]):{})});
   return afterManeuver({...s,targetState:out.state,physicalDice});
  }
  if(s.phase==='grab-zone'){
@@ -317,10 +363,10 @@ export function submitGuidedDeclaredDie(s,raw){
   return afterManeuver({...s,targetD6:value,margin:out.margin,targetState:out.state,physicalDice});
  }
  if(s.phase==='consequence'){
-  const ctx=verifiedManeuverConsequence({state:s.targetState,character:s.defender,round:s.round,timelineId:s.timelineId});
+  const ctx=verifiedManeuverConsequence({state:s.targetState,character:s.maneuverTargetId===s.attackerId?s.attacker:s.defender,round:s.round,timelineId:s.timelineId,technique:s.consequenceTechnique??'attribute'});
   req(!ctx.forcedCF,'Grievous impairment způsobuje automatické CF – nesmí se házet d100');
   const out=applyConfirmedManeuverConsequence({state:s.targetState,round:s.round,eventId:s.id+':consequence',
-   kind:ctx.kind,ml:ctx.ml,hasLegs:ctx.hasLegs,roll:value,gmConfirmed:true});
+   kind:ctx.kind,ml:ctx.ml,hasLegs:ctx.hasLegs,roll:value,technique:ctx.technique,gmConfirmed:true});
   return afterManeuver({...s,targetState:out.state,physicalDice});
  }
  throw Error('Hod není v této fázi povolen');
@@ -343,9 +389,9 @@ export function submitGuidedDeclaredFact(s,raw){
 /** HMK p.170: an unusable zone means automatic CF, no physical die. */
 export function advanceGuidedDeclaredForcedConsequence(s){
  req(guidedDeclaredRequirement(s).id==='maneuver-forced-cf','Není splatné automatické CF manévru');
- const ctx=verifiedManeuverConsequence({state:s.targetState,character:s.defender,round:s.round,timelineId:s.timelineId});
+ const ctx=verifiedManeuverConsequence({state:s.targetState,character:s.maneuverTargetId===s.attackerId?s.attacker:s.defender,round:s.round,timelineId:s.timelineId,technique:s.consequenceTechnique??'attribute'});
  const out=applyConfirmedManeuverConsequence({state:s.targetState,round:s.round,eventId:s.id+':consequence',
-  kind:ctx.kind,ml:ctx.ml,hasLegs:ctx.hasLegs,forcedCF:true,gmConfirmed:true});
+  kind:ctx.kind,ml:ctx.ml,hasLegs:ctx.hasLegs,forcedCF:true,technique:ctx.technique,gmConfirmed:true});
  return afterManeuver({...s,targetState:out.state});
 }
 
@@ -358,7 +404,7 @@ export function submitGuidedDeclaredDisplacement(s,{units,destination,clearPath}
   'Zadejte přesné polohy všech účastníků');
  req(new Set(units.map(u=>u.id)).size===units.length,'Duplicitní pozice účastníka');
  req(Number.isFinite(destination?.x)&&Number.isFinite(destination?.y),'Chybí přesné cílové souřadnice');
- const attacker=units.find(u=>u.id===s.attackerId),target=units.find(u=>u.id===s.defenderId);
+ const attacker=units.find(u=>u.id===s.maneuverOwnerId),target=units.find(u=>u.id===s.maneuverTargetId);
  req(!!attacker&&!!target,'Chybí počáteční pozice útočníka nebo cíle');
  const currentEvent=s.targetState.events.find(e=>e.id===s.id+':maneuver');
  const effect=currentEvent?.details?.effect||{};
@@ -371,9 +417,9 @@ export function submitGuidedDeclaredDisplacement(s,{units,destination,clearPath}
   const after=Math.hypot(destination.x-attacker.x,destination.y-attacker.y);
   req(after>before+0.00001,'Press musí odstrčit cíl od útočníka, nikoli k němu');
  }
- req(!units.some(u=>u.id!==s.defenderId&&Math.hypot(u.x-destination.x,u.y-destination.y)<0.00001),
+ req(!units.some(u=>u.id!==s.maneuverTargetId&&Math.hypot(u.x-destination.x,u.y-destination.y)<0.00001),
   'Cílovou polohu již zaujímá jiná postava');
- return afterManeuver({...s,displacement:{kind:s.technique,actorId:s.attackerId,targetId:s.defenderId,
+  return afterManeuver({...s,displacement:{kind:s.decision.kind,actorId:s.maneuverOwnerId,targetId:s.maneuverTargetId,
   feet,from:{x:target.x,y:target.y},to:{x:destination.x,y:destination.y},units:structuredClone(units),
   observedClearPath:true,source:'HMK p.106'}});
 }
@@ -383,16 +429,17 @@ export function completeGuidedDeclaredManeuver({session,currentState,currentInve
   'Manévr nemá vyhodnocány všechny povinné hody a volby');
  req(sourceSignature===s.sourceSignature,'Změna původního bojového stavu');
  req(JSON.stringify(currentState)===JSON.stringify(s.originalState),'Trvalý stav cíle se mezitím změnil');
- req(JSON.stringify(s.states[s.defenderId])===JSON.stringify(s.targetState),'Nesouhlasí výsledek manévru s trvalým stavem obránce');
+ req(JSON.stringify(s.states[s.maneuverTargetId])===JSON.stringify(s.targetState),'Nesouhlasí výsledek manévru s trvalým stavem cíle');
  req(JSON.stringify(currentInventory)===JSON.stringify(s.originalInventory),
   'Inventář se mezitím změnil');
  return {format:'hmk-guided-declared-proof-v1',id:s.id,actorId:s.attackerId,targetId:s.defenderId,
-  round:s.round,technique:s.technique,gate:s.gate,margin:s.margin,
+  round:s.round,technique:s.decision?.kind??s.technique,declaredAttackerTechnique:s.technique,defenderCounterTechnique:s.defenderCounterTechnique,
+  maneuverOwnerId:s.maneuverOwnerId,maneuverTargetId:s.maneuverTargetId,gate:s.gate,margin:s.margin,
   physicalDice:copy(s.physicalDice),state:copy(s.states[s.defenderId]),states:copy(s.states),
   originalStates:copy(s.originalStates),counterHit:copy(s.counterHitProof),
   weaponDamage:copy(s.weaponDamageProof),meleeMishaps:copy(s.mishapProofs),
   inventory:copy(s.inventory),
   displacement:s.displacement?copy(s.displacement):null,
-  outcome:s.margin===null||s.margin<=0?'not-won':s.targetState.events.at(-1)?.type,
+  outcome:s.margin===null||s.margin<=0?'not-won':s.targetState.events.find(e=>e.id===s.id+':maneuver')?.type??'not-applicable',
   source:'HMK World of Kèthîra p.106'};
 }

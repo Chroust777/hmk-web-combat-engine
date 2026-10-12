@@ -55,11 +55,35 @@ function firstContact(start,end,enemy,radius){
  * movement must stop. Any subsequent attack must use that new position.
  */
 export function projectGuidedSpatialPath({actorId,battlefield,path,difficultSources=0,action,moveRate='full',
-  effectiveMove,dodgeIndex=null,stunned=false,chargeAttack=null,chargeTargetId=null}={}){
+  effectiveMove,dodgeIndex=null,stunned=false,chargeAttack=null,chargeTargetId=null,
+  moralePurpose=null,retreatConfirmed=false,overrunProof=null}={}){
  const units=ensureGeometry({actorId,battlefield});
  const barriers=validateSpatialBarriers(battlefield.barriers??[]);
  requireRule(['move','evade','charge'].includes(action),'Neznámá pohybová akce HMK');
  requireRule(Array.isArray(path)&&path.length>=2&&path.length<=100&&path.every(pt),'Je nutná doložená trasa pohybu');
+ requireRule(moralePurpose===null||['routed','withdrawing'].includes(moralePurpose),
+  'Neznámý pravidlový účel povinného Morale pohybu');
+ requireRule(typeof retreatConfirmed==='boolean','Chybí doložené rozhodnutí GM o ústupu');
+ if(moralePurpose){
+  requireRule(action==='move'&&retreatConfirmed===true,
+   'HMK str.162: GM musí výslovně potvrdit útěk nebo ústup od boje');
+  if(moralePurpose==='routed')requireRule(moveRate==='full',
+   'HMK str.162: Routed musí použít full Move; half/double nestačí');
+ }
+ // HMK p353: size-based Overrun is a verified exception to normal EZ stop.
+ // The committing action must re-derive these ZN from the LIVE participants;
+ // a stand-alone projection or UI-supplied number is never a write capability.
+ if(overrunProof!==null){
+  requireRule(action==='move'&&['half','full'].includes(moveRate)&&
+   overrunProof?.format==='hmk-size-overrun-v1'&&whole(overrunProof.mountZN,1,100)&&
+   Array.isArray(overrunProof.opponents)&&overrunProof.opponents.length>0&&
+   overrunProof.opponents.every(x=>typeof x.id==='string'&&whole(x.zoneNumbers,1,100))&&
+   new Set(overrunProof.opponents.map(x=>x.id)).size===overrunProof.opponents.length&&
+   overrunProof.opponents.reduce((s,x)=>s+x.zoneNumbers,0)<overrunProof.mountZN&&
+   overrunProof.opponents.every(x=>units.some(u=>u.id===x.id&&u.foe)),
+   'HMK p353: Overrun vyžaduje jedinečné skutečné protivníky a přísně nižší součet ZN');
+ }
+ const ignoredOverrunIds=new Set(overrunProof?.opponents.map(x=>x.id)??[]);
  const actor=units.find(u=>u.id===actorId);
  requireRule(distance(actor,path[0])<EQ,'Začátek trasy nesouhlasí s uloženou pozicí účastníka');
  requireRule(whole(effectiveMove,0,100000),'Chybí skutečný efektivní Move po ENC, Fatigue a zranění');
@@ -89,9 +113,21 @@ export function projectGuidedSpatialPath({actorId,battlefield,path,difficultSour
   const reachable=Math.min(1,Math.max(0,remaining/len));
   const limited={x:from.x+reachable*(to.x-from.x),y:from.y+reachable*(to.y-from.y)};
   let stop=null;
-  for(const enemy of units.filter(u=>u.foe&&u.threatens)){
+  for(const enemy of units.filter(u=>u.foe&&u.threatens&&!ignoredOverrunIds.has(u.id))){
    const hit=firstContact(from,limited,enemy,Math.max(5,enemy.reachFt));
    if(hit&&(!stop||hit.t<stop.t))stop={...hit,enemyId:enemy.id};
+  }
+  // Do not permit an Overrun declaration to silently pass through an
+  // unlisted or insufficiently documented opponent's occupied position.
+  if(overrunProof!==null){
+   for(const enemy of units.filter(u=>u.foe&&!ignoredOverrunIds.has(u.id))){
+    const vx=limited.x-from.x,vy=limited.y-from.y;
+    const den=vx*vx+vy*vy;
+    const at=den>EQ?Math.max(0,Math.min(1,((enemy.x-from.x)*vx+(enemy.y-from.y)*vy)/den)):0;
+    const near={x:from.x+at*vx,y:from.y+at*vy};
+    requireRule(distance(near,enemy)>EQ,
+     'Overrun trasa kříží obsazený prostor protivníka bez potvrzených ZN');
+   }
   }
   const target=stop?stop.point:limited;
   const distanceTaken=distance(from,target);
@@ -124,8 +160,9 @@ export function projectGuidedSpatialPath({actorId,battlefield,path,difficultSour
    'Po dokončení Charge není zvolený druh útoku pravidlově povolen');
  }
  return {format:'hmk-guided-spatial-projection-v1',action,actorId,requestedPath:path.map(p=>({...p})),requestedFt:requested,actualFt:travelled,
-  actualPath,finalPosition:actualPath.at(-1),contact,stoppedByEZ:!!contact,
+  actualPath,finalPosition:actualPath.at(-1),contact,stoppedByEZ:!!contact,overrunProof:overrunProof===null?null:structuredClone(overrunProof),
   effectiveMove,moveRate:action==='move'?moveRate:'half',difficultSources,terrainFactor,
+  moralePurpose,retreatConfirmed,battlefieldWitness:same({units,barriers}),
   chargedMovementFt:travelled*terrainFactor,maxMovementFt:max,
   requiresStumble:action==='move'&&moveRate==='double'&&actualPath.length>2&&actualPath.slice(1,-1).some((p,i)=>{
    const prev=actualPath[i],next=actualPath[i+2];const ax=p.x-prev.x,ay=p.y-prev.y,bx=next.x-p.x,by=next.y-p.y;
@@ -161,12 +198,20 @@ export function commitGuidedSpatialTurn({id,sequence,states,battlefield,projecti
    return saved&&live&&distance(saved,live)<EQ;
   }), 'Mapa se od ověření pohybu změnila');
  }
+ const liveMorale=states?.[projection.actorId]?.morale?.state;
+ if(['routed','withdrawing'].includes(liveMorale)){
+  requireRule(projection.action==='move'&&projection.moralePurpose===liveMorale&&
+   projection.retreatConfirmed===true,
+   'HMK str.162: chybí potvrzená prostorová trasa útěku/ústupu podle aktuální Morale');
+ }else requireRule(projection.moralePurpose===null&&projection.retreatConfirmed===false,
+  'Projekce neodpovídá aktuální Morale postavy');
  const recalculated=projectGuidedSpatialPath({actorId:projection.actorId,battlefield,
   path:projection.requestedPath,action:projection.action,moveRate:projection.moveRate,
   effectiveMove:projection.effectiveMove,difficultSources:projection.difficultSources,
   stunned:projection.terrainFactor/(2**projection.difficultSources)>1,
   dodgeIndex:projection.action==='evade'?-projection.evadingMissilePenalty/5:null,
-  chargeAttack:projection.chargeAttack,chargeTargetId:projection.chargeTargetId});
+  chargeAttack:projection.chargeAttack,chargeTargetId:projection.chargeTargetId,
+  moralePurpose:projection.moralePurpose,retreatConfirmed:projection.retreatConfirmed});
  requireRule(JSON.stringify(recalculated)===JSON.stringify(projection),
   'Prostorový výsledek neodpovídá aktuálním pravidlům nebo původní trase');
  requireRule(projection.action!=='charge','Charge musí dokončit útok v témže průvodci; samotný přesun nelze uložit jako úplný tah');
@@ -191,7 +236,8 @@ export function commitGuidedSpatialTurn({id,sequence,states,battlefield,projecti
    kind:'windedness',delta:fatigueAdded}).state;
  }
  const withStates=actorState?{...states,[projection.actorId]:actorState}:states;
- const next=finishEncounterTurn(s,withStates,{action:projection.action,gmConfirmed:true});
+ const next=finishEncounterTurn(s,withStates,{action:projection.action,
+  movementProof:{eventId:id,projection,battlefield},gmConfirmed:true});
  next.spatialEvents??=[];
  requireRule(!next.spatialEvents.some(e=>e.id===id),'Duplicitní pohybová událost');
  const proof={id,round:s.round,actorId:projection.actorId,timelineId:s.timelineId,projection:structuredClone(projection)};

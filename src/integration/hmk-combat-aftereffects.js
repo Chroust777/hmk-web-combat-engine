@@ -33,15 +33,25 @@ export function applyConfirmedWeaponWQ({inventory,targetInventoryId,strikeImpact
 export function applyConfirmedAreaStrike({state,round,eventId,strikeImpact,areaAV,aspect='fire',dodgeML=null,dodgeRoll=null,shockML,shockRoll,compoundD10=null,gmConfirmed=false}={}){
  const s=safeState(state,round,eventId,gmConfirmed);
  assert(valid(strikeImpact,0,999)&&valid(areaAV,0,999)&&['fire','frost'].includes(aspect),'Neplatný Fire/Frost Area Impact nebo Area AV');
- assert(valid(shockML,0,200)&&valid(shockRoll,1,100),'Area Shock vyžaduje skutečný d100 a ověřené EML');
+ const needsShock=strikeImpact>areaAV;
+ assert(valid(shockML,0,200)&&(!needsShock?shockRoll===null:valid(shockRoll,1,100)),
+  'Area Shock: při zásahu nutný skutečný d100; bez Effective Impact se Shock neháže');
  assert(dodgeRoll==null||valid(dodgeML,0,200)&&valid(dodgeRoll,1,100),'Area Dodge vyžaduje kompletní ověřený hod');
  assert(compoundD10===null||valid(compoundD10,1,10),'Compound Injury pro Area vyžaduje skutečný d10');
  const priorArea=s.wounds.filter(w=>!w.healed&&w.location==='area').map(w=>({id:w.id,location:'area',area:true,level:w.level,severity:w.severity,aspect:w.aspect}));
  const dodgeSL=dodgeRoll==null?null:successLevel(dodgeRoll,dodgeML);
- const shockSL=successLevel(shockRoll,shockML);
+ const shockSL=needsShock?successLevel(shockRoll,shockML):null;
  const previous={NONE:'none',STN:'stunned',INC:'incapacitated',UNC:'unconscious',KIA:'killed'}[s.shock];
  const r=resolveAreaHit({strikeImpact,areaAV,aspect,evadeDodgeSL:dodgeSL,currentShockState:previous,shockSL,existingInjuries:priorArea,compoundD10});
  assert(r.injury?.complete,'Area Injury Sequence / Compound Injury vyžaduje další ověření: '+JSON.stringify(r.injury?.pending));
+ if(!needsShock){
+  if(dodgeSL!==null)s.posture.prone=true;
+  assert(r.injury.complete&&r.injury.shock===null&&!r.injury.step3,
+   'Area s nulovým Effective Impact nesmí způsobit zranění ani Shock');
+  return {state:record(s,eventId,round,'hmk-area-impact',{strikeImpact,areaAV,aspect,
+   dodgeML,dodgeRoll,shockML,shockRoll:null,shockSL:null,compoundD10,kind:null,shock:s.shock,
+   noEffectiveImpact:true}),result:r};
+ }
  const incident=r.injury.step3?.injury;const incoming=r.injury.shock.state;
  const compoundedPrior=r.injury.step3?.compound?.compoundedExisting??null;
  if(compoundedPrior){const old=s.wounds.find(w=>w.id===compoundedPrior.id);assert(!!old,'Poškozený odkaz na předchozí Area Injury');old.level=compoundedPrior.level;old.severity=compoundedPrior.severity;}
