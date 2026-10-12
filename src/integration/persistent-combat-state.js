@@ -5,8 +5,8 @@
 import {SHOCK_STATE,applyShockState,resolveStunnedRecovery,resolveShockReroll} from '../rules/shock.js';
 import {bloodLossAdvanceTransition,bloodStoppageResult,BLOOD_LOSS_PERIOD_ROUNDS} from '../rules/bleeding.js';
 import {SL,successLevel,effectiveMasteryLevel} from '../rules/tests.js';
-import {compoundInjury} from '../rules/injury.js';
-import {hmkHumanLocationSymbols,hmkAmputationAssessment,hmkInjuryMishaps,hmkMoraleTransition,hmkMishapTransition} from './injury-special-hmk.js';
+import {compoundInjury,compoundCompatible} from '../rules/injury.js';
+import {hmkHumanLocationSymbols,hmkBodyLocationSymbols,hmkAmputationAssessment,hmkInjuryMishaps,hmkMoraleTransition,hmkMishapTransition} from './injury-special-hmk.js';
 import {moraleActionPolicy} from '../rules/morale.js';
 import {projectileImpalement} from '../rules/injury-effects.js';
 const SHOCK={NONE:SHOCK_STATE.NONE,STN:SHOCK_STATE.STN,INC:SHOCK_STATE.INC,UNC:SHOCK_STATE.UNC,KIA:SHOCK_STATE.KIA};
@@ -41,6 +41,14 @@ export function validateCombatState(s){
  requireCond(Array.isArray(s.wounds)&&s.wounds.length<=1000&&Array.isArray(s.events)&&s.events.length<=5000,'Neplatný seznam ran nebo událostí');
  if(s.morale!==undefined){requireCond(s.morale&&['steady','brave','withdrawing','routed','catatonic'].includes(s.morale.state)&&whole(s.morale.psycheStress,0,99999)&&
   (s.morale.braveSince==null||whole(s.morale.braveSince,1,9999))&&(s.morale.braveTimelineId==null||typeof s.morale.braveTimelineId==='string')&&(s.morale.lastReactionRound==null||whole(s.morale.lastReactionRound,1,9999))&&(s.morale.lastReactionTimelineId==null||typeof s.morale.lastReactionTimelineId==='string'),'Neplatný Morale State');
+  if(s.morale.surrender!==undefined&&s.morale.surrender!==null){
+   const x=s.morale.surrender;
+   requireCond(typeof x.active==='boolean'&&typeof x.timelineId==='string'&&x.timelineId&&
+    typeof x.sourceEventId==='string'&&x.sourceEventId&&whole(x.round,1,9999)&&
+    typeof x.reason==='string'&&x.reason.length>=5&&
+    s.events.some(e=>e.id===x.sourceEventId&&e.type===(x.active?'morale-surrender':'morale-surrender-released')),
+    'Kapitulace musí být doložena trvalou událostí ve stejné postavě');
+  }
   if(s.morale.rallyLockout!=null){const x=s.morale.rallyLockout;requireCond(typeof x.timelineId==='string'&&x.timelineId&&whole(x.untilRound,1,9999)&&whole(x.originRound,1,9999)&&whole(x.durationMinutes,1,5)&&x.untilRound===x.originRound+12*x.durationMinutes,'Neplatný časový zákaz Rally');}
   if(s.morale.cohesion!=null){const c=s.morale.cohesion;const ids=c.allyIds??[];
    requireCond(typeof c.timelineId==='string'&&c.timelineId.length>0&&Array.isArray(ids)&&ids.length>0&&ids.length<=99&&new Set(ids).size===ids.length&&ids.every(id=>typeof id==='string'&&id.length>0),'Neplatný Group Cohesion roster');
@@ -71,6 +79,18 @@ export function validateCombatState(s){
    }
   }
   if(s.morale.rallyPending!=null){const x=s.morale.rallyPending;requireCond(typeof x.sourceEventId==='string'&&x.sourceEventId&&typeof x.timelineId==='string'&&x.timelineId&&x.required===true&&(x.lastReactionRound==null||whole(x.lastReactionRound,1,9999)),'Neplatný Rally Reaction');}}
+ if(s.fear!=null){
+  const f=s.fear;
+  requireCond(f&&['catatonic','terrified','afraid','steady','brave'].includes(f.state)&&
+   typeof f.sourceId==='string'&&f.sourceId.length>=1&&
+   ['character','gm-event'].includes(f.sourceKind)&&
+   typeof f.sourceEventId==='string'&&f.sourceEventId&&
+   typeof f.timelineId==='string'&&f.timelineId&&
+   whole(f.sourceABE,0,200)&&whole(f.createdRound,1,9999)&&
+   (f.lastReactionRound==null||whole(f.lastReactionRound,1,9999))&&
+   s.events.some(e=>e.id===f.sourceEventId&&e.type==='hmk-fear-exposure'),
+   'Fear musí odpovídat doloženému fyzickému Will testu a původní události');
+ }
  if(s.posture!==undefined){requireCond(s.posture&&['prone','dropPending','passNextTurn'].every(k=>typeof s.posture[k]==='boolean'),'Neplatná evidence Mishap');}
  if(s.mishaps!==undefined){requireCond(Array.isArray(s.mishaps)&&s.mishaps.length<=2000,'Neplatný seznam Injury Mishaps');
   for(const m of s.mishaps)requireCond(m&&typeof m.id==='string'&&typeof m.woundId==='string'&&['fumble-roll','stumble-roll','automatic-fumble','automatic-stumble'].includes(m.kind)&&typeof m.resolved==='boolean','Neplatný Injury Mishap');}
@@ -152,6 +172,38 @@ function finalizeFatalState(s){
  for(const w of s.wounds)w.nextAdvanceRound=null;
 }
 function record(s,id,type,round,details){finalizeFatalState(s);s.events.push({id,type,round,details});s.lastRound=round;validateCombatState(s);return s;}
+/** HMK p.162 cf5: unable to flee + threatened => surrenders.
+ * A surrendered character is recorded separately from their Morale SL.
+ * Only the GM may explicitly attest a subsequent factual end of surrender;
+ * neither a timed Reaction nor a Rally silently undoes the surrender event.
+ * No new dice roll or automatic post-surrender fate is invented. */
+export function recordConfirmedMoraleSurrender({state,round,timelineId,eventId,movementImpossibleConfirmed=false,threatenedConfirmed=false,gmConfirmed=false}={}){
+ const s=ready(state,round,eventId);
+ requireCond(gmConfirmed===true&&movementImpossibleConfirmed===true&&threatenedConfirmed===true&&
+  s.morale?.state==='routed'&&s.morale?.surrender?.active!==true,
+  'Kapitulaci lze potvrdit pouze pro dosud nevzdanou Routed postavu');
+ requireCond(typeof timelineId==='string'&&timelineId.length>0&&timelineId.length<=100&&
+  (s.encounterTimelineId==null||s.encounterTimelineId===timelineId),
+  'Kapitulace vyžaduje aktivní časovou osu');
+ s.morale.surrender={active:true,timelineId,round,sourceEventId:eventId,
+  reason:'routed-unable-to-flee-while-threatened'};
+ return {state:record(s,eventId,'morale-surrender',round,{source:'HMK p.162 cf5',timelineId,
+  routed:true,movementImpossibleConfirmed:true,threatenedConfirmed:true,gmConfirmed:true,physicalDice:{rolls:[]}}),eventId};
+}
+export function recordConfirmedSurrenderRelease({state,round,timelineId,eventId,reason,gmConfirmed=false}={}){
+ const s=ready(state,round,eventId);
+ requireCond(gmConfirmed===true&&s.morale?.surrender?.active===true,
+  'Ukončení kapitulace musí potvrdit GM u skutečně vzdávající se postavy');
+ requireCond(typeof timelineId==='string'&&timelineId.length>0&&timelineId.length<=100&&
+  (timelineId===s.morale.surrender.timelineId||s.encounterTimelineId===timelineId),
+  'Ukončení kapitulace vyžaduje doloženou současnou nebo původní časovou osu');
+ requireCond(typeof reason==='string'&&reason.trim().length>=5&&reason.trim().length<=400,
+  'GM musí uvést skutečnou změnu okolností ukončující kapitulaci');
+ const previous=s.morale.surrender.sourceEventId,previousTimelineId=s.morale.surrender.timelineId;
+ s.morale.surrender={active:false,timelineId,round,sourceEventId:eventId,reason:reason.trim()};
+ return {state:record(s,eventId,'morale-surrender-released',round,{source:'GM-confirmed factual ruling',timelineId,
+  previousSurrenderEventId:previous,previousSurrenderTimelineId:previousTimelineId,reason:reason.trim(),gmConfirmed:true,physicalDice:{rolls:[]}}),eventId};
+}
 export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudication={}}={}){
  const s=ready(state,round,eventId);
  requireCond(draft?.ok===true&&draft.format==='hmk-combat-event-draft-v1'&&draft.status==='preview-only'&&draft.mutatesCharacter===false,'Lze potvrdit jen původní ověřený návrh zásahu');
@@ -165,12 +217,17 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
  requireCond(calculated===draft.carryover.state,'Shock Carryover nesouhlasí s pravidly HMK');
  requireCond(!s.extendedShock||calculated===s.shock||calculated==='KIA','Změna Shock State během Extended Shock vyžaduje samostatné potvrzení GM; nelze přepsat léčebný průběh');
  requireCond(adjudication?.gmReviewed===true,'GM musí potvrdit zvláštní podmínky zranění dle HMK str.168');
- const limbLocations=['sh','ua','el','fo','ha','th','kn','ca','ft','shoulder','upper arm','elbow','forearm','hand','thigh','knee','calf','foot'];
+ const bodyKind=adjudication.bodyKind??'human';
+ requireCond(['human','horse'].includes(bodyKind),'Neznámý druh těla pro autoritativní Injury Sequence');
+ requireCond(!!hmkBodyLocationSymbols(draft.location,bodyKind),'Lokalizace nepatří do ověřené anatomické tabulky');
+ const limbLocations=['sh','ua','el','fo','ha','th','kn','ca','ft','shoulder','upper arm','elbow','forearm','hand','thigh','knee','calf','foot',
+  ...(bodyKind==='horse'?['flg','hlg']:[])];
  const isLimb=limbLocations.includes(String(draft.location).toLowerCase());
  if(inj.kind==='injury'&&isLimb)requireCond(['left','right'].includes(adjudication.side),'HMK str.167: zásah do končetiny vyžaduje potvrzení strany left/right');
  const sameLoc=s.wounds.filter(w=>!w.healed&&w.location.toLowerCase()===String(draft.location).toLowerCase());
  if(inj.kind==='injury'&&isLimb)requireCond(!sameLoc.some(w=>!['left','right'].includes(w.side)),'Před Compound Injury je nutné doplnit stranu starší rány stejné končetiny');
- const existing=sameLoc.filter(w=>!isLimb||w.side===adjudication.side);
+ const existing=sameLoc.filter(w=>(!isLimb||w.side===adjudication.side)&&
+  compoundCompatible(w,{location:draft.location,aspect:draft.aspect,area:false}));
  if(inj.kind==='none')requireCond(draft.shockResult.state==='NONE','Zásah bez účinku nemůže vyvolat nový Shock State');
  let compound=null;
  if(inj.kind==='injury'&&existing.length){
@@ -191,8 +248,9 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
  const aspectForSpecial=ampFromOld?priorCompounded.aspect:draft.aspect;
  let amp=null;
  if(inj.kind==='injury'){
-  const symbols=hmkHumanLocationSymbols(draft.location);
+  const symbols=hmkBodyLocationSymbols(draft.location,bodyKind);
   requireCond(!!symbols,'Speciální účinky nelze ověřit bez anatomické lokace HMK str.167');
+  requireCond(bodyKind!=='horse'||!(severityForSpecial==='G'&&levelForSpecial===5&&['e','edge'].includes(String(aspectForSpecial).toLowerCase())&&symbols.triangle!==null), 'Zvířecí G5e vyžaduje samostatnou ověřenou Amputation Sequence');
   if(severityForSpecial==='G'&&levelForSpecial===5&&['e','edge'].includes(String(aspectForSpecial).toLowerCase())&&symbols.triangle!==null){
    amp=hmkAmputationAssessment({location:draft.location,aspect:aspectForSpecial,severity:severityForSpecial,level:levelForSpecial,
     strengthML:adjudication.amputationStrengthML,roll:adjudication.amputationRoll,isFolk:adjudication.amputationIsFolk!==false});
@@ -210,7 +268,7 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
   const level=Number(inj.injury.slice(1)),severity=inj.injury[0];
   requireCond((level===1&&severity==='M')||([2,3].includes(level)&&severity==='S')||([4,5].includes(level)&&severity==='G'),'Nesouhlasí Severity a Injury Level');
   const fixedLevel=compound?.injury?.level??level;const fixedSeverity=compound?.injury?.severity??severity;
-  return {id:`wound:${eventId}`,location:draft.location,severity:fixedSeverity,level:fixedLevel,aspect:draft.aspect,bleeding:adjudication.bleeding,nextAdvanceRound:adjudication.bleeding?round+BLOOD_LOSS_PERIOD_ROUNDS:null,recordedRound:round,originEventId:eventId,compoundReviewed:!!adjudication.compoundReviewed,shockSL:draft.inputs?.shockLevel??null,side:adjudication.side??null,timelineId:adjudication.timelineId??null,amputation:amp&&!ampFromOld?{severed:amp.severed,triangleModifier:amp.triangleModifier,sl:amp.slName,roll:amp.roll,strengthML:amp.strengthML,shockTestModifier:amp.shockTestModifier}:null,moralePending:['S','G'].includes(fixedSeverity),projectileArrowOrBolt:adjudication.arrowOrBolt===true,impaled:projectileImpalement({projectile:adjudication.arrowOrBolt===true,severity:fixedSeverity,injuryLevel:fixedLevel})};
+  return {id:`wound:${eventId}`,location:draft.location,severity:fixedSeverity,level:fixedLevel,aspect:draft.aspect,bleeding:adjudication.bleeding,nextAdvanceRound:adjudication.bleeding?round+BLOOD_LOSS_PERIOD_ROUNDS:null,recordedRound:round,originEventId:eventId,compoundReviewed:!!adjudication.compoundReviewed,shockSL:draft.inputs?.shockLevel??null,side:adjudication.side??null,bodyKind,timelineId:adjudication.timelineId??null,amputation:amp&&!ampFromOld?{severed:amp.severed,triangleModifier:amp.triangleModifier,sl:amp.slName,roll:amp.roll,strengthML:amp.strengthML,shockTestModifier:amp.shockTestModifier}:null,moralePending:['S','G'].includes(fixedSeverity),projectileArrowOrBolt:adjudication.arrowOrBolt===true,impaled:projectileImpalement({projectile:adjudication.arrowOrBolt===true,severity:fixedSeverity,injuryLevel:fixedLevel})};
  })():null;
  if(wound)requireCond(!s.wounds.some(w=>w.id===wound.id),'Tato rána již byla potvrzena');
  if(compound?.compoundedExisting){
@@ -221,7 +279,7 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
   if(formerSeverity==='M'&&['S','G'].includes(prior.severity))prior.moralePending=true;
   if(prior.severity==='G'&&formerSeverity!=='G'&&calculated!=='KIA'&&!amp?.dead){
    s.mishaps??=[];
-   for(const kind of hmkInjuryMishaps(prior.location,'G'))s.mishaps.push({id:`mishap:${eventId}:compound:${kind}`,woundId:prior.id,kind,resolved:false});
+   for(const kind of hmkInjuryMishaps(prior.location,'G',bodyKind))s.mishaps.push({id:`mishap:${eventId}:compound:${kind}`,woundId:prior.id,kind,resolved:false});
   }
   if(ampFromOld&&amp){
    prior.amputation={severed:amp.severed,triangleModifier:amp.triangleModifier,sl:amp.slName,roll:amp.roll,strengthML:amp.strengthML,shockTestModifier:amp.shockTestModifier};
@@ -231,13 +289,13 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
  if(wound){if(calculated==='KIA'||amp?.dead)wound.nextAdvanceRound=null;s.wounds.push(wound);}
  if(wound&&calculated!=='KIA'&&!amp?.dead){
   s.mishaps??=[];
-  for(const kind of hmkInjuryMishaps(wound.location,wound.severity))s.mishaps.push({id:`mishap:${eventId}:${kind}`,woundId:wound.id,kind,resolved:false});
+  for(const kind of hmkInjuryMishaps(wound.location,wound.severity,bodyKind))s.mishaps.push({id:`mishap:${eventId}:${kind}`,woundId:wound.id,kind,resolved:false});
  }
  const previousShock=s.shock; s.shock=amp?.dead?'KIA':calculated;applyShockProne(s);
  if(s.shock!==previousShock)s.shockOriginRound=round;
  if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.shockFollowup=null;for(const w of s.wounds)w.nextAdvanceRound=null;}
  else if(s.shock!==previousShock)installShockFollowup(s,{round,timelineId:adjudication.timelineId??null});
- record(s,eventId,'confirmed-hit',round,{targetId:characterId,location:draft.location,aspect:draft.aspect,kind:inj.kind,injury:inj.injury??null,woundId:wound?.id??null,shock:s.shock,bleeding:wound?.bleeding??false,compound:compound?{d10:adjudication.compoundD10,success:compound.success,affectedId:compound.compoundedInjuryId??null}:null,impact:draft.impactResult?.effectiveImpact??null,proposalId:draft.proposalId??null,amputation:amp?{affectedWoundId:ampFromOld?priorCompounded.id:wound?.id??null,severed:amp.severed,dead:amp.dead,sl:amp.slName,roll:amp.roll,forcedBleeder:amp.forceBleeder,shockTestModifier:amp.shockTestModifier}:null,injuryMishaps:wound?hmkInjuryMishaps(wound.location,wound.severity):[],moralePending:wound?.moralePending??false,impaled:wound?.impaled??false,source:'HMK 161–162, 167–170; verified special consequences'});
+ record(s,eventId,'confirmed-hit',round,{targetId:characterId,location:draft.location,aspect:draft.aspect,kind:inj.kind,injury:inj.injury??null,woundId:wound?.id??null,shock:s.shock,bleeding:wound?.bleeding??false,compound:compound?{d10:adjudication.compoundD10,success:compound.success,affectedId:compound.compoundedInjuryId??null}:null,impact:draft.impactResult?.effectiveImpact??null,proposalId:draft.proposalId??null,amputation:amp?{affectedWoundId:ampFromOld?priorCompounded.id:wound?.id??null,severed:amp.severed,dead:amp.dead,sl:amp.slName,roll:amp.roll,forcedBleeder:amp.forceBleeder,shockTestModifier:amp.shockTestModifier}:null,injuryMishaps:wound?hmkInjuryMishaps(wound.location,wound.severity,bodyKind):[],moralePending:wound?.moralePending??false,impaled:wound?.impaled??false,source:'HMK 161–162, 167–170; verified special consequences'});
  return {state:s,wound};
 }
 export function dueBloodLoss(state,round){validateCombatState(state);if(state.shock==='KIA')return [];return state.wounds.filter(w=>w.bleeding&&w.nextAdvanceRound!==null&&w.nextAdvanceRound<=round).map(w=>({woundId:w.id,location:w.location,dueRound:w.nextAdvanceRound,overdue:round>w.nextAdvanceRound})).sort((a,b)=>a.dueRound-b.dueRound);}
@@ -449,6 +507,11 @@ export function unresolvedInjuryMishaps(state){validateCombatState(state);return
 export function specialActionReadiness(state,{role='attacker',defence='block'}={}){
  validateCombatState(state);
  if(state.shock==='KIA')return {ready:false,reason:'KIA: postava je mrtvá'};
+ const fear=state.fear?.state;
+ if(fear==='catatonic')return {ready:false,reason:'Fear CF0: postava nemůže jednat ani se bránit'};
+ if(['afraid','terrified'].includes(fear)&&role==='attacker')return {ready:false,reason:'Fear: pouze Pass nebo pohyb od zdroje'};
+ if(['afraid','terrified'].includes(fear)&&role==='defender'&&
+  !['dodge','block'].includes(defence))return {ready:false,reason:'Fear: dovolena pouze obrana Dodge nebo Block'};
  const pendingMishaps=unresolvedInjuryMishaps(state);
  const pendingMorale=dueInjuryMorale(state);
  if(state.pendingManeuver)return {ready:false,reason:'Povinný Press Shock/Stumble před další akcí (HMK str.106/161)'};
@@ -496,7 +559,7 @@ export function applyConfirmedInjuryMorale({state,round,eventId,woundId,initiati
  requireCond(whole(aberrance,0,200),'Morale vyžaduje doloženou Aberrance; nepřítomná hodnota není 0');
  requireCond(w.moraleThreatABE===undefined||aberrance===w.moraleThreatABE,'Morale: zadaná Aberrance nesouhlasí s původně doloženou hodnotou rány');
  s.morale??={state:'steady',psycheStress:0,braveSince:null,braveTimelineId:null};
- const r=hmkMoraleTransition({initiativeML,fatigue:fatigueTotalUnsafe(s),aberrance,brave:s.morale.state==='brave',roll,current:s.morale.state});
+ const r=hmkMoraleTransition({initiativeML,fatigue:fatigueTotalUnsafe(s),aberrance,brave:s.morale.state==='brave'||s.fear?.state==='brave',roll,current:s.morale.state});
  w.moralePending=false;
  s.morale.state=r.state;
  s.morale.psycheStress+=r.result.psycheStress;
