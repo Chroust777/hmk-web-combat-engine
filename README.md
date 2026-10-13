@@ -1,3 +1,230 @@
+## v93.214 — jeden autoritativní editor Skills / Attributes
+
+Pro postavy s HMK Character Creation se historický ruční Skills registr zobrazuje bez editačních tlačítek. Staré manuální záznamy se neztrácí a případné kolize jsou označeny k GM review. Ruční HMK Attributes editor se pro takové postavy deaktivuje; Edit průvodce a Perception switch zůstávají plně funkční. Pro starší postavy bez Creation zůstávají původní ruční formuláře i události dostupné. Přepnutí do Combat režimu vnímání není ještě automatizováno.
+
+## v93.214 — Perception (HMK p.57) a tabulka Skills
+Volitelný režim EYE/HRG/SML vyžaduje fyzické hody GM a lze jej přepnout v existující postavě bez přepisu historie. Charakter Sheet seskupuje všechny vypočtené Skills do sedmi skupin a odděluje osm DP stadií.
+
+## v93.212 — Veteran DP / dvě samostatná pětibodová kola (HMK v1.2, pp.40,47,49)
+
+Viz český regresní protokol. Stejný profil Character Creation/Sheet; žádný RNG; původní Combat, Magic a G04 beze změny. Chromium/localStorage E2E odloženo na závěrečnou akceptaci.
+
+## v93.208 — Chandler, Lìa-Kaváir, Thespian; Gladiator/Servant d0 (HMK v1.2 pp.42–44,47,51)
+
+- Chandler: exact One Craft 2 from printed Craft skills (p.46), explicit choice; no imaginary occupational die.
+- Lìa-Kaváir: exactly one Acrobatics 2 OR second Guile 2; Thespian: two different skills in ordered 4/3 distribution.
+- Parent Occupation uses the SAME derived specialized profiles via the `familyVariantChoice` GM choice; Family DP restricted to half each printed grant.
+- Gladiator d4/d0 and Servant, Domestic d2/d0 use the social class; d0 requires no physical throw, preserves the Wealth Advantage rule for only actual dice.
+- Combat, Magic, G04 and CSS remain byte-identical to v93.206. Browser Chromium/localStorage restart E2E remains deferred to final acceptance.
+
+## v93.206 — Fixed martial subtypes and cartography (HMK v1.2 pp.42–44)
+
+- Verified occupations: Cartographer/Artist; Man-at-arms (Archer) and the printed culture-conditioned Slings/Hideworking replacement; the Melee branch of Man-at-arms (Cavalry); Yeoman (Archer/Foot/Horse). All allocations use the sole authoritative Occupation DP table and actual printed Wealth dice.
+- Parent Archer can select Archery or Slings consciously with a documented cultural GM decision. Parent Cavalry permits automated Family Skills only for the fully resolved Melee branch. No invented subclass dice or generic Missile skill.
+- All new entries carry explicit printed page provenance, unchanged physical-roll history, and typed Family/Occupation proofs. Cartographer/Artist supports two distinct Script specialties in Occupation and Family Skills.
+- Deliberately not claimed: Cavalry Missile needs a concrete missile discipline; culturally eligible Slings groups are not specified by this table; Chandler One Craft, Gladiator d0, Chieftain subsistence and conditional/arcane professions require separate verified steps. Browser Chromium/localStorage restart acceptance remains deferred.
+
+## v93.206 — City Background Languages; distinct 2nd/3rd Script; verified occupations
+
+- City Background p.46/48: one paid Background Language DP projects into three concrete language DP; original five Background DP accounting remains exact.
+- Printed 2nd Script and 3rd Script: separate non-divisible source grants, different chosen writing systems, validated through Edit and stored profiles.
+- Newly completed Lexigrapher, Scholar, Scribe, Pilot and Legionnaire; pre-existing Charcoaler and Potter independently retested against pp.42–44.
+- No generated dice, no new storage authority. Pending other occupations, BG Elder Folk exceptions, browser E2E and restart localStorage tests.
+
+## v93.204 — Languages DP split with strict printed single-Script semantics (HMK v1.2 pp.47–48)
+
+- One Occupational Languages grant may be explicitly divided across distinct named languages (e.g. `Járin=2; Shôrka=1`), with an exactly conserved printed budget. Each language has its own Skill Base/SM/ML and optional native/regional first-DP bonuses.
+- The singular `Script` occupational entry can be assigned to exactly **one** writing system. Multiple Script instances can still be developed separately with Optional and later stage DP; the pure projection also supports future printed plural `Scripts` budgets without inventing such a profession today.
+- Existing one-language selections and older unspecialised characters remain readable. An invalid split or forged stored variant fails closed; changing Occupation/Edit deactivates prior projection while preserving physical GM roll history.
+- The new split is a derived display of the existing single Occupation DP grant, not a second tracked set of DP. No new dice. Chrome and restart-localStorage acceptance is deferred.
+
+## v93.203 — Language / Script / Ritual instances + verified professions (HMK v1.2)
+
+- **Concrete named Skills:** Language (name), Script (name), Ritual (deity) use the existing character creation DP allocations and Character Sheet calculation; no separate mutable counters or virtual dice. Choices constrained to verified Appendix II and pantheon entries (HMK pp.47–48, 321, 343, 424–425).
+- Native Language DP from Folk, parent social class/occupation; native Ritual by permitted pantheon and Folk; the Zâkimladal +4 DP exception requires five native Nâsik Azéri DP (Appendix I p.416). Opt-in for existing characters to preserve historic saved profiles.
+- First foreign-language DP bonus according to family, region and Kántâl (pp.48,425). Character Sheet visibly distinguishes actual DP from the no-DP SM bonus.
+- Nine printed occupation names + a Harper naming alias (Astrologer, Harper/Skald, Harper, Herald, Innkeeper, Litigant, Mercantyler, Runemaster, Seaman, Swordmaster). Also correct pre-existing Alchemist Native Language DP text (p.42).
+- Auto Occupational DP can be directed to a specific Script or Language using the existing transactional edit flow. Earlier non-specialised saved allocations remain readable but require GM review to claim precise written-language instances.
+- Still pending: distribution of plural Scripts or Languages DP across multiple instances, full remaining pantheons and nontrivial occupational prerequisites, all remaining occupations, and native Chromium/localStorage restart acceptance.
+
+## v93.203 — Labourer / Weaponcrafter subtypes (HMK v1.2 pp.42,44,47)
+
+This release adds **five distinct verified occupational DP templates**, each linked to the
+existing single authoritative character profile and the existing Character Sheet skill
+calculation. These are Labourer, Farm / Semi-skilled / Unskilled (d2 each), and
+Weaponcrafter, Armourer / Bowyer (d6 each). There is **no random dice generation**.
+
+A physical Parent Occupation d100 still resolves to generic `Weaponcrafter` per the
+printed Parent Occupation tables. The GM subsequently selects `Armourer` or `Bowyer`
+(there is no invented sub-die). This choice controls Family Skills, whose individual
+DP must not exceed floor(occupational DP/2). The PC's own Occupation selection exposes
+only the two accurate specialized alternatives. All dependent DP and Wealth results
+are invalidated on a changed earlier choice; previous physical rolls are retained.
+
+The five new templates are sourced directly from the printed tables, while Language,
+Script, Ritual specialization and certain other professions remain GM review.
+Native Chromium and full localStorage restart acceptance testing remain deferred.
+No Combat/Magic/G04/CSS changes. Run regressions via the separate tests archive.
+
+
+## v93.201 — Occupational Skill Development: 15 verified fixed-DP occupations (HMK v1.2, pp.42 & 44)
+
+Courtesan, Hideworker, Huscarl, Jester, Prostitute, Ratter, Salter, Shipwright, Teamster, Tentmaker, Thatcher, Toymaker, Trapper, Woodcrafter, Woodcutter. Uses existing one-profile DP/Wealth mutation and Sheet calculation. Generic Script specialization remains explicitly unfinished.
+
+## v93.200 — Occupational Skills: Mason, Ostler, Perfumer, Man-at-arms (Sapper) (HMK v1.2, p.43)
+
+- Čtyři přesné profesní balíčky v původním společném katalogu OCCUPATIONS; příslušné Wealth kostky: d6, d3, d3, d3. Automatické Occupation DP, Family Skills (max. floor(½ profesního DP), celkem 5), Character Sheet výpočty a fyzické Wealth hody běží přes stávající jedinou transakci a profil postavy.
+- Doložená stránka 43 je uložená do důkazu a ověřená invariantem. Filtrovaná nabídka respektuje Parent Class, Society i konkrétní vojenskou specializaci. Edit zneplatňuje závislé příděly a Wealth bez odstranění historie fyzických hodů.
+- Žádná změna Combat/Magic/G04/CSS ani nový RNG. Specializované Script/Language/Ritual jsou stále nedokončené a zde se nepředstírá jejich plná implementace. Nativní Chromium a restartový localStorage zůstávají na závěrečnou akceptaci.
+
+## v93.199 — Occupational Skills: Locksmith, Longshoreman, Metalsmith, Miner (HMK v1.2, p.43)
+
+- Přidány čtyři dosud neimplementované, jednoznačné profesní balíčky včetně tištěných kostek Wealth: Locksmith d3, Longshoreman d2, Metalsmith d4, Miner d4. Přesné DP jsou v původním společném `OCCUPATIONS` katalogu, s `sourcePage:43`; bez nové databáze, náhodného losování či nové cesty zápisu.
+- Krok 11, filtrované profese, automatická Occupation DP, Family Skills podle poloviny DP (max. 5 DP), Character Sheet SB/SM/ML/Mastery Boost a Wealth používají existující validaci. Edit měnící profesi zneplatňuje její navazující příděly; historie fyzických hodů se nemění.
+- Tato etapa nepřevádí profesní větve s volbou dovedností, individuálními jazyky, vyššími písmy, náboženstvím nebo magickými specializacemi. Nativní Chromium a restartování localStorage zůstávají dle dohody na závěrečnou akceptaci. Žádná úprava Combat, Magic, G04 ani CSS.
+
+## v93.198 — Occupation Skill Development, four further professions (HMK v1.2 p.42, pp.45–49, p.51)
+
+- Doplněny celé, podmínkami nerozvětvené profesní Skill balíčky: Farmer, Gaoler, Embalmer a Jeweller. Každý Skill používá stávající kanonický katalog p.46, sdílený výpočet SB/SM/ML/Mastery Boost a jedno autoritativní uložiště postavy.
+- Farmer: profesní Skills jsou totožné pro svobodné i nevolnické farmáře. Značení Wealth `d2 · d1` na p.42 se podle postavení rodiny vyhodnocuje jako d2 pro svobodného farmáře, d1 pro nevolníka; druhá varianta není druhá dodatečná kostka. GM zadává pouze fyzické hody, aplikace jejich rozsahy a počty ověřuje.
+- Family Skills: jejich volby i limit ½ odpovídají konkrétním profesním Skills p.47. Stávající Character Sheet nadále ukazuje rozpad každého výpočtu.
+- Edit: změna Parent Social Class, Parent Occupation nebo vlastní Occupation zneplatní stará aktivní čísla a formulářové Wealth hody, nikoli append-only historické události. Nezavádí se druhý zapisovač ani datastore.
+- Tato malá etapa nepřepisuje složitější profesní varianty (jazyky, písma, slave, chieftain, specializace) ani jinou část 14krokového systému. Combat, Magic/G04, CSS beze změny. Chromium a restartové testy localStorage zůstávají odložené dle dohody.
+
+## v93.197 — Occupation Skill Development: 4 complete professions (HMK v1.2 p.42; Skills pp.45–49)
+
+- Přesné, bezpodmínečné Occupational DP a wealth dice pro **Animal Trainer (d3), Beggar (d1), Clothier (d3), Glassworker (d3)** přepsány z p.42. Každý Skill je kanonicky identifikován podle p.46; všechny DP čte stávající Character Sheet a jednotný profil.
+- Volba nově přepsaného povolání v kroku 11 nastavuje přesný režim `occupationAuto=yes` a nabízí živý náhled celého balíčku; výslovně změněná volba režimu u stejného povolání se nepřepisuje. Nepřepsané profese jsou nadále GM review a z nich se nic neodhaduje.
+- Family Skills na p.47 respektují hranici poloviny profesních DP zaokrouhlenou dolů; Edit povolání zneplatňuje navazující Occupational, Optional, Veteran a Wealth záznamy, nikoliv append-only historii fyzických hodů.
+- Dílčí větev: **pouze 4 profese p.42**. Specializace Native Language, Scripts, Ritual, Chieftain a ostatní nevypočtené povolání zůstávají na další etapy; kompletní 14 kroků není dokončeno. Styling / CSS, Combat, Magic G04 nezměněny. Native Chromium ani restart localStorage nebyly prováděny.
+
+## v93.196 — Tribal / Tribal-Settled + Subsistence (HMK v1.2 p.29,33 & Appendix I)
+
+- Doložená obživa propojena s Parent Occupation pro 28 konkrétních regionálních řádků (Ketârh & Béshakan, Northern Anzelôria, Quârphor, Reksýna, Thónia a další výslovně pojmenované skupiny).
+- Reksýni a Mengólan jako Tribal-Settled (p.29); jiné kmeny bez uvedeného Settled statusu zůstávají Tribal. Z regionů bez doložitelného mapování Thonian dialect/tribe se obživa nehádá.
+- Omezené GM nabídky / bezpečná validace, Parent Social Class, Parent Occupation, Background, navazující Skills a Edit používají jeden profil a jeden původní CAS zápis.
+- Starší regionální důkazy v93.195 jsou rozpoznány bez zásahu do databáze; Edit krok 5 je povinný před dalšími změnami, s invalidací závislých údajů a zachováním auditní historie.
+- Regresní balík v93.196: všechny převzaté sady + 639 cílených kontrol. Combat, Magic, G04 a CSS beze změny. Browser/Chromium a restart localStorage dle dohody odloženy.
+
+## v93.195 — Hârn Region (HMK v1.2, Appendix I p.418)
+
+- 10 main region rows, 18 tribal groups with their separate physical d100, native language/dialect.
+- Contextual GM selection for Elder Realms (Járin under Kuzhai/Sinai), and for Orbáal when Realm is directly chosen.
+- Two tribal subgroup choices use printed subsistence rules p.29; no invented dice.
+- One profile, append-only physical roll record, safe Edit/invalidation; no changes to Combat or Magic.
+
+## v93.193 — Hèpekéria Region (HMK v1.2 Appendix I, str.418)
+
+23 tabulkových intervalů d100, dvě společenské výjimky řešené vědomou volbou GM (bez automatických hodů), Numec dialektové komunity, Nâsik Azéri Kolvisar/Dalazeri a kmenový subsistence Herding podle str.29. Původní CAS profil, Edit a append-only historie zachovány. Ostatní pravidlové moduly a CSS nedotčeny.
+
+## v93.192 — Ázeryàn Region (HMK v1.2 Appendix I, p.416)
+
+Malá etapa: přesná regionální tabulka Ázeryànu, fyzické d100 + povinné d10 jen u výsledků 98, 99 a 00, kontextová volba dialektů Nâsik Azéri, propojení na původní sdílený profil, Edit a historie hodů. Speciální pravidlo Zâkimladal 4 DP je evidováno jako neaplikované, protože specializované Language DP dosud nejsou kompletní. Combat, Magic, G04, CSS bez úprav. Nativní Chromium/restart localStorage nadále odložen.
+
+## v93.191 — Tríerzòn Region (HMK v1.2 Appendix I, p.422)
+
+Malá etapa: Tríerzòn 44 běžných intervalů d100 a výjimečný d100=00 + fyzický d10, Society, Pantheon, Native/Regional Languages a vícenásobné dialekty (vědomé omezené GM volby; žádný automatický hod). Jeden sdílený profil a historie fyzických hodů zůstaly zachovány. Moduly Combat, Magic, G04 a CSS beze změn. Viz regresní protokol a testovací archiv. Nativní Chromium a restart localStorage odloženy na závěrečnou akceptaci.
+
+## v93.190 — Palíthanè Region (HMK v1.2 Appendix I, p.420)
+
+Další malá etapa navazuje na v93.189. Převedeno 16 řádků hlavního d100 (9 odlišných Realm), společenská zřízení, panteony, mateřské i regionální jazyky. Přímá vědomá volba opakovaného Realm nabízí jen dvě konkrétní jazykové varianty. Dialekty Triérzi s pevným výsledkem se určují automaticky, variabilní dialekty pouze volitelným **fyzickým d100**, pokud je GM potřebuje (p.420, „roll d100 if needed“); bez něj zůstává dialekt neurčený. Žádné RNG ani nová databáze. Návraty/Edit zneplatňují staré aktivní podhody, nezměnitelná historie fyzických hodů zůstává. Combat, Magic, G04 a CSS nebyly měněny.
+
+## v93.189 — Huriséa Region (HMK v1.2 Appendix I p.419)
+
+Převedeno všech dvanáct řádků regionální d100. Všech jedenáct velkých knížectví a skupina drobných knížectví, společnost Tributary, místní panteony a regionální jazyky. Pět knížectví má dvě alternativy mateřského jazyka: podle poznámek na str.419 jde o jazyk vládnoucího rodu proti převládající Huriséan, nikoliv o fyzický náhodný d2. GM vybere jednu z přesně dvou povolených možností. Změny přes Edit zneplatňují starou aktivní volbu a zachovávají fyzické hody v historii. Žádné změny Combat, Magic, G04, CSS.
+
+## v93.188 — Ivínia Region, HMK v1.2 Appendix I p.419 (malá etapa)
+
+Doplněna celá hlavní Ivínia tabulka, včetně povinného FYZICKÉHO dodatečného d10 pro hlavní d100=80 nebo 97. Nikde se nehází automaticky.
+Výběr Realm GM bez d100 zůstává možný dle p.24; Society, Pantheon a jazyky vyplní tabulka. Návrat/Edit zneplatní starý podhod, aniž odstraní audit.
+
+Kompletní dokumentace předchozích verzí a historické moduly zůstávají uvnitř archivu.
+
+## v93.187 — Appendix I / Dalkésh (small scope)
+
+- Complete Dalkésh Region d100 table (17 realm entries); authoritative HMK v1.2 Appendix I, printed p.417.
+- Four dual-native-language provinces use an additional **physical GM d2**. The unselected native language becomes a regional language. This die is audited and survives Edit history, while previous inactive rolls remain in history.
+- Native Dalkesh characters' personal Occupation is constrained to their Parent Occupation by caste (printed p.417); GM adoption/marriage exceptions are not yet offered by the app.
+- Other Appendix I gaps, including Ivinia's required nested d10 at 80/97, intentionally remain in GM-review rather than receiving invented outcomes.
+
+# v93.186 — Context-aware Character Creation choices (ALPHA)
+
+**Úzce vymezená etapa navazující na v93.185.** Jde o filtrování navazujících nabídek, nikoli o nový přepis pravidlových tabulek. Všechny hody provádí fyzicky GM; aplikace pouze deterministicky vyhodnocuje a současnou datovou cestou ukládá jejich výsledky.
+
+- **Birthplace (HMK s. 24; Appendix I):** u všech 14 intervalově přepsaných regionů se Realm vybírá pouze z odpovídající regionální tabulky; Society se omezuje podle konkrétního Realm. Při změně regionu se starý lokální regionální hod a zvolený Realm ve formuláři zruší. Nevylosovaná oblast zůstává v přiznaném režimu GM review.
+- **Age (s. 21):** Kúzhai pouze Mature, Sinái/Sidhé pouze Young, Human/Ænarin všechny tři věkové skupiny.
+- **Parent Social Class (s. 26–32):** nabízí jen třídy platné pro Society a volbu d20/d100. Při změně typu kostky starý hod ve formuláři zanikne.
+- **Parent Occupation (s. 27–32):** menu omezeno na správnou společnost a rodičovskou třídu, pro Tribal Free i subsistenci. Podhody zůstávají fyzické a výsledný text doplní resolver. Při změně subsistence se původní rozpracovaný hod ve formuláři smaže.
+- **Occupation (s. 35, 41):** menu obsahuje doložené profese ve společnosti a sociálních třídách nejvýše na úrovni rodičů. Nepřepsaná povolání nelze vydávat za ověřená. Kampaňové výjimky GM zatím nepodporuje samostatný workflow.
+- **Skills (s. 45–49):** dostupné Skills se omezují podle Folk, Family, Background, Occupation, předchozích DP a Sunsign; Optional/Veteran nezobrazují neotevřenou Esoterica. Po vyčerpání rozpočtu lze upravit jen již alokované Skills. Nespecifikované Arcane Talent Skills ani nedoložené balíčky nejsou odhadovány.
+- **Background (s. 33):** další nabídka podle Society, urban chance a Folk, včetně Tribal Wilderness, Kúzhai City a Sinái/Sidhé bez City. Fyzický d100 při uložení zůstává autoritativní.
+- **Edit / persistence:** změna staršího postavení nebo regionu zneplatní již neplatné Occupation i odvozené Skill příděly. Historie fyzických hodů zůstává append-only; ostatní změny jdou stejnou atomickou cestou `mutate()`/CAS.
+
+**Regrese:** 6 145/6 145 stávajících testů v93.185 + 2 695/2 695 nových cílených kontrol filtru. Nativní Chromium ani restart localStorage nebyly prováděny (odloženy do závěrečné akceptace); kompletní historické Combat/G04 archivy nejsou v balíku dostupné. `styles.css`, Combat a Magic moduly zůstaly beze změny. Pravidlové mezery uvedené pro v93.185 přetrvávají.
+
+---
+
+# v93.185 — Character Creation: Class, Parent Occupation, Appendix I, Background (ALPHA)
+
+**Tato verze je stále ALPHA / GM review required, nikoli úplná implementace všech 14 kroků.**
+Jde o skutečně upravený úplný produkční webový balík navazující na v93.184. GM fyzicky hází všemi kostkami; pravidlová tabulka zadaný fyzický výsledek jen vyhodnotí. Všechny existující profily zůstávají v jediném společném úložišti Character/Combat/Magic a jediném atomickém zapisovači. Žádná bojová ani magická větev G04 a žádné CSS nebyly změněny.
+
+**V této verzi:**
+- **Parent Social Class:** d100/d20 pro všech deset typů společnosti včetně Feudal, Imperial, City-State, Tribal, Tribal-Settled, Tributary, Viking, Chélemby, Kúzhan a Sináin; Feudal/Imperial se řídí Feudal třídami. HMK s. 26–32 a Appendix I.
+- **Parent Occupation:** úplné hlavní intervaly u skupin Tribal, Tribal-Settled, Tributary/Viking/Chélemby, Kúzhan a Sináin doplněny k Feudal/Imperial; vybrané zvláštní fyzické podhody Arcanist d20, Shèk-Pvâr Convocation d6, Slave d20 a návazný šlechtický titul. Subsistenční Tribal Free používá předchozí autoritativní resolver. HMK s. 27–32, 195.
+- **Birthplace:** nyní je intervalově přepsáno 14 z 22 regionů a 138 Realm řádků. Nové jsou Áltôr, Býria, Chogôro & Mafán, Hácherdad, Hârbáal, Ketârh & Béshakan, Northern Anzelôria, Quârphor, Ûmélria. Ostatních pět regionů zůstává z v93.184. Bez hodu d100 lze přímo zvolit pouze skutečný Realm již přepsaného regionu. Některé regionální jazykové, kmenové a d10 podtabulky ještě vyžadují GM kontrolu.
+- **Skills:** opraven `ReferenceError: skillName is not defined` při validaci Background DP; ověřen a doplněn venkovský pool dle HMK s. 46 (Fletching a Metalcraft), Sináin/Sidhé včetně Pvârism a automatické Viking background special. Převod dalších profesních balíčků, native/foreign languages, ritual/script specializací a některých DP větví zůstává otevřený.
+- **Standing:** pro vybrané specifické šlechtické tituly se rozpozná Wealth die (d6 až d30), pro Parent Priest d6; Sinái a Sidhé dědí pravidla věku pro wealth a arcane research. HMK s. 51–55.
+- **Regrese:** nezávislá reprodukce 5 chyb přímo v nedotčené v93.184; nově 6 145/6 145 cílených Node kontrol včetně celých intervalů tabulek, nezměněných základních Combat testů, kroků 5–8, návratů, Edit, append-only historie a CAS atomic-write odmítnutí. Původní starší testovací archivy nejsou obsaženy v přiloženém ZIP, proto jejich historické počty nelze považovat za nyní spuštěnou regresi. Nativní Chromium a restart localStorage jsou výslovně odloženy.
+
+**Protokol a samostatné testy:** viz doprovodné soubory `HMK_v93_185_regresni_protokol_cs.md` a `HMK_Keeper_Ledger_v93_185_VYVOJOVE_REGRESNI_TESTY.zip`. Neodhadujte nepřepsaná pravidla; v těchto větvích zůstává potřeba GM ověření.
+
+---
+
+# v93.184 — Character Creation: Parent Occupation, City-State a Appendix I (ALPHA)
+
+**Přírůstek ověřený proti HMK v1.2:** kompletní hlavní d100 Parent Occupation tabulky Feudal (p.27) a Imperial (p.28), City-State podle Imperial occupation (p.28), doplňující fyzické Slave d20, Feudal/Imperial Noble podle parity původního Class hodu, titul Manor Lord / Tenant-in-chief / Patrician Major z pozdějšího Background hodu. Doložená Urban chance se automaticky přenáší z rodičovského povolání do kroku Background; u City-State GM fyzicky zadává i druhou desítkovou d10 a používá nižší desítky.
+
+**Appendix I:** kompletní regionální podtabulky Reksýna (5), Shôrkýnè (25), Thónia (10), p.421, doplňují Emélrenè (9) a Karéjia (14): celkem 5 ze 22 geografických regionů a 63 Realm řádků. Zbytek regionů není simulován.
+
+**Oprava:** Undefined `name` ve schvalování Background Skills DP (reprodukováno na původní v93.183). **Edit:** při změně Class, Parent Occupation nebo Birthplace se aktivní závislé hody zneplatní, ale append-only audit zachová událost `roll-deactivated`. Nezávislá kontrola uložené postavy ověřuje důkazy proti fyzickým hodům. Combat/CSS zůstávají beze změny; veškeré uložení stávající cestou.
+
+**Stále ALPHA, GM review required:** zbývajících 17 regionálních Realm tabulek, další společnosti/Parent Occupation (Tribal-Settled, Tributary, Kúzhan, Sináin atd.), kompletní profese a Mysteries, dokončení všech speciality Skills a Character Sheet grafika. Všechny fyzické hody provádí GM. Chromium po dokončení Character Sheet podle dohody.
+
+---
+
+# v93.183 — fyzický hod automaticky určuje volbu + Karéjia (ALPHA, HMK v1.2)
+
+- **Oprava průvodce:** platný fyzický hod automaticky vyplní textovou položku (Folk d100, Age d100, Sunsign Trait d6 včetně cusp, Region d1000, ověřený Realm d100, Parent Social Class d20/d100, Tribal Free Parent Occupation d100, Background d100). Již není nutné stejnou volbu potvrzovat druhým kliknutím.
+- **Bez generování kostek:** GM zadává skutečné fyzické hody; živý náhled jen aplikuje doslovné tištěné tabulky. Při nedokončených tabulkách zůstává kontrola GM. Žádný automatický generátor hodů.
+- **Dvouúrovňová validace:** formulář zobrazuje výsledek okamžitě, ale při ukládání se znovu nezávisle vypočítá. Podvržené a pozměněné volby se odmítají.
+- **Edit a audit:** starší fyzické hody jsou append-only, při vědomé změně na ruční volbu se jen označí jako neaktivní. Změna data zneplatní staré Sunsign Trait hody i jejich výběry.
+- **Rozšíření Appendix I:** celá regionální tabulka **Karéjia (14 Military Provinces, str. 419)** nyní přibyla k dosavadní Emélrenè (9 Realm). Převádí Region, Realm, Society, Pantheon i Native/Regional Languages.
+- **Regrese:** 628 historických Combat, 163 starších Character Creation, 103 testů nové auto-volby a 35 testů Karéjia = 929/929.
+- **Stále neúplné:** další regionální tabulky, zbytek Occupations a Skills/Mysteries zůstávají GM review. Nativní Chromium a úplný restart localStorage jsou odloženy podle dohody; CSS beze změny.
+
+---
+
+# v93.182 — Character Creation: původ, Skill DP a Standing/Mysteries (ALPHA, HMK v1.2)
+
+**Stav:** funkční průběžné rozšíření v93.181, stále `GM review required`; nepovažovat všechny tabulky HMK za automatizované. Všechna fyzická d6/d10/d20/d100/d1000 zadává GM, aplikace nehází. Zachován jediný HMK profil a původní atomický zapisovač; CSS je beze změny.
+
+## Nově pravidlově převedené části
+
+- **Birthplace (str.24, Appendix I str.415):** kompletní seznam 22 regionů s fyzickým d1000 a zdrojovým záznamem. Všech 9 Realm a související Society, Pantheon, Native / Regional Languages jsou strukturovány a automaticky vyhodnoceny pouze pro Emélrenè. Ostatní realm tabulky a Elder Folk regiony potřebují ještě přepis a GM kontrolu.
+- **Society/Parent Social Class (str.26–32):** všech šest základních společenských d100/d20 tabulek Feudal, Imperial, City-State, Tribal, Tribal-Settled a Tributary. Hybrid Feudal/Imperial používá Feudal class tabulku, speciální pravidlo pro Noble Occupation zatím čeká na resolver.
+- **Parent Occupation:** všechny čtyři Tribal Free subsistenční tabulky (p.29) s fyzickým d100 a automatickou Urban chance. Další kombinace Class/Occupation zůstávají GM-verified. 
+- **Skills:** katalog 13 výslovně ověřených Occupational DP sad (str.42–44); volitelný automatický příděl, přesný 5 DP Family budget s limitem poloviny Parent Occupation, omezené Background Skill výběry podle p.46 včetně dalšího Wilderness/City, Elder Folk a Viking seznamu, přesná 2d10 Kúzhai a 4d10 Sinái Folk Skills (str.45). Native Language, Ritual, jazykové specializace, Talents a ostatní profese stále vyžadují další resolver.
+- **Standing/Wealth (str.51–52):** oba oddělené fyzické dice pools a jejich počty podle Estrangement/Age/Folk, PC Advantage (extra kostka + drop lowest v každém poolu), Wealth, Lifestyle, startovní mince a budget possessions, persistentní provenience všech kostek. U nepřepsaných profesí musí GM určit velikost kostek podle tištěné tabulky.
+- **The Mysteries (str.40,53–55):** základ Fate jako dosud, nově Divine Grace fyzické d20, Blessed Circle/Bonus/Piety podle doloženého Ritual ML a Morality penalty, počáteční ARP podle Age/Folk × Pvârism ML a seznam výchozích Neutral kouzel od Pvârism ML40. Specializace Divine Doctrine, Shèk-Pvâr jednotlivých Convocation, spell research, Artefacts, astrální Spirit/Divine a další povinné kroky jsou stále mimo automatický rozsah.
+- Character Sheet navíc zobrazuje zdrojový detail regionálních, Folk, Wealth a Mysteries výpočtů, odděleně od již existující tabulky každé Skill s SB/SM/DP/Boost/ML.
+
+**Kompatibilita:** starší postavy bez Creation a ručně potvrzené GM údaje se nezměnily; nová přísná kontrola platí pro zvolený automatický režim a fyzické důkazy. Při aktivní Initiative zůstává Character Creation/Edit zakázáno. Přímé manipulace s důkazy a přepsané DP odmítá stávající validátor.
+
+**Regrese:** 628 historických bojových + 95 dosavadních Character Creation + 68 nových cílených = 791 Node kontrol (viz samostatný balík testů a protokol). Nativní Chromium se podle dohody ověří až při finální akceptaci Character Sheetu. G04 nadále otevřená.
+
+---
+
 # v93.181 — Character Creation + Character Sheet (ALPHA, HMK v1.2)
 
 **Upozornění:** první funkční, ale neúplný 14krokový průvodce. Stav po posledním kroku je vždy `GM review required`; **nejde o dokončenou věrnou implementaci všech tabulek HMK**. Dosavadní G04 Spellfire v93.180 zůstává ve stejném rozsahu.
@@ -289,3 +516,38 @@ Implementace používá dosavadní ověřený jediný CAS zápis. Není
 podporován souběh více aktivních zdrojů Raw Principle ani ostatní
 Pèleáhn spellfire resolvery. Nativní Chromium/localStorage restart je
 odložen na finální kontrolu s Character Sheet. **G04 zůstává otevřená.**
+
+## v93.208 — Chieftain + Hunter/Forester; audit Skills / DP
+
+- HMK v1.2 p.42: Chieftain acquires the complete Farmer/Fisher/Herder/Hunter
+  DP list corresponding to the *already established* tribal subsistence
+  (Farming/Fishing/Herding/Foraging), plus Law 3 / Command 2 / Intrigue 1.
+  Chieftain occupational choices are restricted to that one variant; no die
+  or GM-free replacement occupation is invented.
+- Forester is Hunter's exact DP list plus Law 2 / Melee 1. The parent
+  `Gentry: Forester` inherits the same Family Skills; parent Gentry wealth
+  continues to use printed d6, whereas PC Forester inherits Hunter d2.
+- Veteran stage display: Mature ordinary human = 5 DP (previously displayed
+  as 10 even though engine enforced 5); Young 0, Old/Elder 10 unchanged.
+- All physical rolls remain GM-originated; skill instance proofs, Edit
+  invalidation and existing Combat/Magic/G04/CSS remain otherwise unchanged.
+- Full current Skill/DP inventory and its remaining gaps are in the separate
+  `HMK_v93_208_regresni_protokol_a_inventar_skills_dp_cs.md` document.
+
+
+## v93.212 GM Bonus Languages (HMK p.48)
+Samostatné GM rozhodnutí o volitelných jazykových DP (Young 2, Mature 3, Old/Kúzhai/Sinái 4), rozdělené mezi konkrétní Language Skills. Není deváté oficiální stadium a neobsahuje žádné fyzické hody. Pro Sidhé tabulka p.48 výslovný příděl neuvádí: vyžaduje GM review. Audit append-only a read-only validace při načtení.
+
+## v93.212 Shèk-Pvâr Occupational DP (HMK p.44)
+Six primary convocations; Fývria has ten unordered pairs of two distinct Skills (2 DP each); all fixed bases and convocation grants in one canonical OCCUPATIONS register. Parent Guilded Shèk-Pvâr requires the already-implemented physical d6 convocation, then Fývria's bounded GM choice (no new die). See separate regression protocol for remaining Priest/Shaman/Invoker blockers and unverified wealth exceptions.
+
+## v93.212 — religion & arcane occupational branches (HMK pp.40,42–44,47,51,55)
+Priest: West Venarian religions (13 variants) and clergy Circle-dependent Wealth die; Shèk-Pvâr: six convocations / ten unique Fývria pair choices; Shaman: Spirit or an actually possessed Talent (20 branches); Invoker: two distinct physically obtained Talents before occupation, plus four tribal subsistence variants. Physical d20/d100 prerequisites can now be recorded at Step 11, credited at the official Stage 2/8. Local untranscribed pantheons and parent Invoker's special 4×d20 rule remain explicit GM review. See v93.212 Czech acceptance report.
+
+
+### v93.215 – pravidlová kontextová nápověda
+Ve všech 14 krocích je u editovatelných polí kontextové tlačítko ? otevírající malý dialog s pravidlovým účinkem, fyzickým hodem a stranou původního HMK v1.2. Texty jsou stručná česká vysvětlení, nikoli plošně dokončený doslovný přepis. Neověřené výjimky jsou explicitně GM review. Dialog neprovádí žádný zápis.
+
+
+### v93.216 – podmíněné Family Priest DP
+Parent Priest: volba náboženského suboccupation je u ověřených pantheonů omezena na dostupná náboženství. Ve Family Skills se generický Ritual nyní eviduje jako konkrétní Ritual příslušné víry; limit ½ Occupational DP i pětibodový rozpočet platí beze změny. Současně jsou blokovány podvržené jiné Ritual. Nepřepsané pantheony a Parent Invoker (4 fyzické d20, nejvyšší) zůstávají GM review. Neprovádí se žádný skrytý hod.

@@ -1,5 +1,7 @@
-import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
-import {creationWizardHTML,characterCalculationHTML} from './src/integration/hmk-character-creation-ui.js';
+import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} from './src/integration/hmk-sheet-legacy-authority.js';
+import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
+import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,setPerceptionMode,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
+import {creationWizardHTML,characterCalculationHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js';
 import {auditArmourLibraryConsistency} from './src/integration/armour-library-consistency.js';
 import {assertLegacyMutationDoesNotChangeCombat} from './src/integration/active-combat-write-boundary.js';
 import {assertAlternateManeuverWriteAllowed} from './src/integration/hmk-alternate-maneuver-write-gate.js';
@@ -111,7 +113,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.181';
+const APP_VERSION='93.214';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2847,6 +2849,20 @@ document.addEventListener('submit',event=>{
  }catch(error){alert('Fear / Aberrance — bez zápisu: '+error.message)}
 },true);
 // G04 guided source / shared-IR: only this route can submit its physical dice.
+// HMK p.57: post-creation Perception switch through the SAME CAS mutation boundary.
+document.addEventListener('submit',event=>{
+ const form=event.target;if(form.id!=='hmk-perception-mode-form')return;
+ event.preventDefault();event.stopImmediatePropagation();
+ if(combatInitiativeSequence)return alert('Perception nelze přepínat během aktivní Initiative.');
+ const original=character(selected);if(!original?.hmk?.creation)return alert('Nejprve otevřete Character Creation.');
+ const v=Object.fromEntries(new FormData(form)),dice={};
+ for(const k of ['eye','hrg','sml'])if(String(v[k]??'').trim())dice[k]=String(v[k]).split(',').map(x=>x.trim());
+ let update;
+ try{update=setPerceptionMode(original,{mode:v.mode,dice});syncCreationSkills(update.hmk,uuid);assertCreationInvariants(update)}
+ catch(err){return alert('HMK Perception: '+err.message)}
+ mutate(()=>{const item=character(selected);if(!item)throw Error('Postava zmizela');Object.assign(item,update)});
+},true);
+
 document.addEventListener('submit',e=>{if(!e.target?.id?.startsWith('hmk-g04-'))return;
  e.preventDefault();e.stopImmediatePropagation();g04Actions.handleSubmit(e.target);
 },true);
@@ -4221,7 +4237,11 @@ document.addEventListener('change',async e=>{if(e.target.closest?.('#impact-prev
 const HMK_ATTRIBUTES={PHYSICAL:[['str','Strength'],['end','Endurance'],['dex','Dexterity'],['agl','Agility'],['per','Perception'],['cml','Comeliness']],MENTAL:[['aur','Aura'],['wil','Will'],['rea','Reasoning'],['cre','Creativity'],['emp','Empathy'],['elo','Eloquence']]};
 const HMK_IDENTITY=[['folk','Folk'],['ageGroup','Age group'],['birthdate','Birthdate'],['sunsign','Sunsign'],['birthplace','Birthplace'],['society','Society'],['socialClass','Social class'],['familyOccupation','Parent occupation'],['background','Background'],['estrangement','Estrangement'],['morality','Morality'],['psyche','Psyche'],['home','Home'],['standing','Standing'],['complexion','Complexion'],['hair','Hair'],['eyes','Eyes'],['height','Height'],['weight','Weight'],['handedness','Handedness']];
 function numericField(key,label,val){return `<label>${esc(label)}<input type="number" step="1" min="0" max="999" name="${esc(key)}" value="${esc(val??'')}"></label>`}
-function hmkSheet(c){const h=c.hmk||{};const a=h.attributes||{};const skills=h.skills||[];return `<section class="panel wide"><h3>HMK · Charakteristika a původ</h3><p class="muted">Postava je připojená na Character Creation a Combat. Úpravy atributů mimo průvodce zruší staré důkazy fyzických hodů a vyžadují opětovné ověření.</p><details><summary>Edit · HMK Attributes a původ</summary><form id="hmk-profile-form"><div class="field-grid">${HMK_IDENTITY.map(([k,l])=>field('bio_'+k,l,h[k]??'')).join('')}${field('bio_creatureSizeReachModifier','Creature Size: ověřený RCH modifikátor (HMK p.401; celé číslo, prázdné = neověřeno)',h.creatureSizeReachModifier??'','number')}</div><h3>Physical Attributes</h3><div class="field-grid">${HMK_ATTRIBUTES.PHYSICAL.map(([k,l])=>numericField('attr_'+k,l,a[k])).join('')}</div><h3>Mental Attributes</h3><div class="field-grid">${HMK_ATTRIBUTES.MENTAL.map(([k,l])=>numericField('attr_'+k,l,a[k])).join('')}${numericField('attr_aberrance','Aberrance (ABE; zvláštní hodnota, není atribut)',a.aberrance)}</div><div class="actions"><button type="submit">Uložit HMK profil</button></div></form></details></section><section class="panel wide"><h3>Dovednosti · Skills</h3><p class="muted">SB/ML se zadávají ručně podle HMK; automatický výpočet bude připojen až k ověřenému pravidlovému resolveru.</p><div class="table-scroll"><table><thead><tr><th>Skupina</th><th>Dovednost</th><th>SB</th><th>ML</th><th></th></tr></thead><tbody>${skills.map(x=>`<tr><td>${esc(x.group)}</td><td>${esc(x.name)}</td><td>${esc(x.sb??'')}</td><td>${esc(x.ml??'')}</td><td><button class="secondary" data-edit-skill="${esc(x.id)}">Upravit</button> <button class="danger" data-remove-skill="${esc(x.id)}">×</button></td></tr>`).join('')}</tbody></table></div><form id="hmk-skill-form"><div class="field-grid"><label>Skupina<select name="group"><option>Social</option><option>Lore</option><option>Physical</option><option>Esoterica</option><option>Combat</option><option>Craft</option><option>Other</option></select></label>${field('name','Název dovednosti')}${numericField('sb','SB','')}${numericField('ml','ML','')}</div><button type="submit">Přidat dovednost</button></form></section><section class="panel wide"><h3>Zranění a stav postavy</h3><p class="muted">Záznamy jsou evidenční, nikoli výpočet šoku, krvácení nebo léčby. Ty musí zůstat pod kontrolou HMK jádra.</p>${(h.injuries||[]).map(x=>`<div class="list-row"><div><b>${esc(x.location)}</b> · ${esc(x.description)} <span class="muted">${esc(x.severity)}</span></div><div class="actions"><button class="secondary" data-edit-injury="${esc(x.id)}">Upravit</button><button class="danger" data-remove-injury="${esc(x.id)}">Odstranit</button></div></div>`).join('')}<form id="hmk-injury-form"><div class="field-grid">${field('location','Lokalita zásahu')}${field('severity','Závažnost / označení')}${field('description','Popis poranění')}</div><button type="submit">Zapsat zranění</button></form></section>`}
+function hmkSheet(c){const h=c.hmk||{};const a=h.attributes||{};const skills=h.skills||[];const guided=isCreationOwned(c);
+ const ledger=guided?inspectLegacySkillRecords(c,calculateSheetSkills(c)):null;
+ const rows=guided?ledger.manual:skills;
+ const collisionNotice=guided&&ledger.needsReview?`<p class="notice" role="alert">Historický ruční registr: ${ledger.manual.length} samostatných záznamů. Kolize s vypočtenou tabulkou: ${ledger.collisions.length}${ledger.collisions.some(x=>x.divergent)?' (rozdílné SB/ML)':''}. <strong>GM review:</strong> tyto údaje se nemažou ani automaticky nepřepisují; v aktuálních Skills je upravujte pouze přes Edit Character Creation.</p>`:'';
+ return `<section class="panel wide"><h3>HMK · Charakteristika a původ</h3><p class="muted">Postava je připojená na Character Creation a Combat. Úpravy atributů mimo průvodce zruší staré důkazy fyzických hodů a vyžadují opětovné ověření.</p>${guided?'<p class="notice">Atributy, Folk a Age Group jsou chráněné fyzickými hody a pravidly. Použijte Edit / Pokračovat v tvorbě; starý editor není pro tuto postavu zapisovatelný.</p>':`<details><summary>Edit · HMK Attributes a původ</summary><form id="hmk-profile-form"><div class="field-grid">${HMK_IDENTITY.map(([k,l])=>field('bio_'+k,l,h[k]??'')).join('')}${field('bio_creatureSizeReachModifier','Creature Size: ověřený RCH modifikátor (HMK p.401; celé číslo, prázdné = neověřeno)',h.creatureSizeReachModifier??'','number')}</div><h3>Physical Attributes</h3><div class="field-grid">${HMK_ATTRIBUTES.PHYSICAL.map(([k,l])=>numericField('attr_'+k,l,a[k])).join('')}</div><h3>Mental Attributes</h3><div class="field-grid">${HMK_ATTRIBUTES.MENTAL.map(([k,l])=>numericField('attr_'+k,l,a[k])).join('')}${numericField('attr_aberrance','Aberrance (ABE; zvláštní hodnota, není atribut)',a.aberrance)}</div><div class="actions"><button type="submit">Uložit HMK profil</button></div></form></details>`} </section><section class="panel wide">${collisionNotice}<details><summary>Historický ruční registr Skills (legacy; není hlavní tabulka Character Sheet)</summary><p class="muted">Při aktivním Character Creation jde o archiv původních ručních záznamů jen pro čtení. Autoritativní DP, SB a ML jsou ve výše uvedené tabulce; staré údaje se nikdy automaticky nemažou.</p><div class="table-scroll"><table><thead><tr><th>Skupina</th><th>Dovednost</th><th>SB</th><th>ML</th><th></th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.group)}</td><td>${esc(x.name)}</td><td>${esc(x.sb??'')}</td><td>${esc(x.ml??'')}</td><td>${guided?'Archiv (jen čtení)':`<button class="secondary" data-edit-skill="${esc(x.id)}">Upravit</button> <button class="danger" data-remove-skill="${esc(x.id)}">×</button>`}</td></tr>`).join('')}</tbody></table></div>${guided?'':`<form id="hmk-skill-form"><div class="field-grid"><label>Skupina<select name="group"><option>Social</option><option>Lore</option><option>Physical</option><option>Esoterica</option><option>Combat</option><option>Craft</option><option>Other</option></select></label>${field('name','Název dovednosti')}${numericField('sb','SB','')}${numericField('ml','ML','')}</div><button type="submit">Přidat ruční legacy dovednost</button></form>`}</details></section><section class="panel wide"><h3>Zranění a stav postavy</h3><p class="muted">Záznamy jsou evidenční, nikoli výpočet šoku, krvácení nebo léčby. Ty musí zůstat pod kontrolou HMK jádra.</p>${(h.injuries||[]).map(x=>`<div class="list-row"><div><b>${esc(x.location)}</b> · ${esc(x.description)} <span class="muted">${esc(x.severity)}</span></div><div class="actions"><button class="secondary" data-edit-injury="${esc(x.id)}">Upravit</button><button class="danger" data-remove-injury="${esc(x.id)}">Odstranit</button></div></div>`).join('')}<form id="hmk-injury-form"><div class="field-grid">${field('location','Lokalita zásahu')}${field('severity','Závažnost / označení')}${field('description','Popis poranění')}</div><button type="submit">Zapsat zranění</button></form></section>`}
 function parseStructuredModes(raw){
  if(!String(raw||'').trim())return [];
  let x;try{x=JSON.parse(raw)}catch{throw Error('Režimy zbraně: neplatný JSON')}
@@ -4313,7 +4333,7 @@ document.addEventListener('click',e=>{
  const t=e.target.closest('[data-edit-skill],[data-edit-injury]');if(!t)return;
  const id=t.dataset.editSkill||t.dataset.editInjury;
  const c=character(selected);if(!c)return;
- if(t.dataset.editSkill){if(combatInitiativeSequence)return alert('Během Initiative nelze mimo Combat měnit ML postavy.');const x=(c.hmk?.skills||[]).find(x=>x.id===id);if(!x)return;const name=prompt('Dovednost',x.name);if(name===null)return;if(!name.trim())return alert('Název je povinný');const sb=prompt('SB (prázdné = nezadáno)',x.sb??'');if(sb===null)return;const ml=prompt('ML (prázdné = nezadáno)',x.ml??'');if(ml===null)return;const parse=v=>v.trim()===''?null:Number(v);if([parse(sb),parse(ml)].some(n=>n!==null&&(!Number.isSafeInteger(n)||n<0||n>999)))return alert('SB a ML musí být celá nezáporná čísla');if(x.creationDerived&&!window.confirm('Jde o automaticky vypočtený Skill. Ruční úprava bude evidována jako GM override a původní pravidlový výpočet zůstane na kartě dohledatelný. Pokračovat?'))return;
+ if(t.dataset.editSkill){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}if(combatInitiativeSequence)return alert('Během Initiative nelze mimo Combat měnit ML postavy.');const x=(c.hmk?.skills||[]).find(x=>x.id===id);if(!x)return;const name=prompt('Dovednost',x.name);if(name===null)return;if(!name.trim())return alert('Název je povinný');const sb=prompt('SB (prázdné = nezadáno)',x.sb??'');if(sb===null)return;const ml=prompt('ML (prázdné = nezadáno)',x.ml??'');if(ml===null)return;const parse=v=>v.trim()===''?null:Number(v);if([parse(sb),parse(ml)].some(n=>n!==null&&(!Number.isSafeInteger(n)||n<0||n>999)))return alert('SB a ML musí být celá nezáporná čísla');if(x.creationDerived&&!window.confirm('Jde o automaticky vypočtený Skill. Ruční úprava bude evidována jako GM override a původní pravidlový výpočet zůstane na kartě dohledatelný. Pokračovat?'))return;
  mutate(()=>{if(x.creationDerived){x.manualOverride={source:'GM Edit',priorSB:x.sb,priorML:x.ml,confirmedAt:stamp()};x.creationDerived=false;if(c.hmk?.creation)c.hmk.creation.status='review-required';}
  x.name=name.trim();x.sb=parse(sb);x.ml=parse(ml)});return}
  if(t.dataset.editInjury){if(combatInitiativeSequence)return alert('Během Initiative nelze měnit žádné zranění mimo Combat průvodce.');const x=(c.hmk?.injuries||[]).find(x=>x.id===id);if(!x)return;if(x.combatRecord===true)return alert('Potvrzenou bojovou ránu lze upravit jen pravidlovým přechodem, ne ručně v deníku.');const location=prompt('Lokalita zásahu',x.location);if(location===null)return;if(!location.trim())return alert('Lokalita je povinná');const severity=prompt('Závažnost',x.severity||'');if(severity===null)return;const description=prompt('Popis poranění',x.description||'');if(description===null)return;mutate(()=>{x.location=location.trim();x.severity=severity;x.description=description})}
@@ -4324,7 +4344,7 @@ document.addEventListener('submit',e=>{const f=e.target;if(!['hmk-profile-form',
  }else if(v.category==='armor'){
   try{props.locationProtection=parseLocationProtection(v.locationProtection)}catch(err){return alert(err.message)}
  }
- const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties:props};if(mutate(()=>{if(current)Object.assign(current,record);else data.items.push(record)})){overlay=null;render()}return}const c=character(selected);if(!c)return;const h=structuredClone(c.hmk||{});if(f.id==='hmk-profile-form'){if(combatInitiativeSequence)return alert('Během Initiative se atributy bojovníka nemění mimo ověřený pravidlový průvodce.');const a={...(h.attributes||{})};for(const [k,val] of Object.entries(v)){if(k==='bio_creatureSizeReachModifier'){if(val==='')delete h.creatureSizeReachModifier;else if(!/^-?\d+$/.test(String(val))||!Number.isSafeInteger(Number(val)))return alert('Neplatný modifikátor Creature Size');else h.creatureSizeReachModifier=Number(val);}else if(k.startsWith('bio_'))h[k.slice(4)]=val;if(k.startsWith('attr_')){if(val==='')delete a[k.slice(5)];else{const n=Number(val);if(!Number.isSafeInteger(n)||n<0||n>(k==='attr_aberrance'?200:999))return alert('Neplatná charakteristika / Aberrance');a[k.slice(5)]=n}}}if(h.creation){
+ const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties:props};if(mutate(()=>{if(current)Object.assign(current,record);else data.items.push(record)})){overlay=null;render()}return}const c=character(selected);if(!c)return;const h=structuredClone(c.hmk||{});if(f.id==='hmk-profile-form'){try{assertLegacyMutationAllowed(c,'profile')}catch(err){return alert(err.message)}if(combatInitiativeSequence)return alert('Během Initiative se atributy bojovníka nemění mimo ověřený pravidlový průvodce.');const a={...(h.attributes||{})};for(const [k,val] of Object.entries(v)){if(k==='bio_creatureSizeReachModifier'){if(val==='')delete h.creatureSizeReachModifier;else if(!/^-?\d+$/.test(String(val))||!Number.isSafeInteger(Number(val)))return alert('Neplatný modifikátor Creature Size');else h.creatureSizeReachModifier=Number(val);}else if(k.startsWith('bio_'))h[k.slice(4)]=val;if(k.startsWith('attr_')){if(val==='')delete a[k.slice(5)];else{const n=Number(val);if(!Number.isSafeInteger(n)||n<0||n>(k==='attr_aberrance'?200:999))return alert('Neplatná charakteristika / Aberrance');a[k.slice(5)]=n}}}if(h.creation){
   if(h.folk!==c.hmk?.folk||h.ageGroup!==c.hmk?.ageGroup){
     if(!window.confirm('Edit Folk/Age Group zneplatní původní soubory fyzických hodů Attributes. Pokračovat?'))return;
     h.creation.attributeProof={};h.creation.skillDP={};h.creation.status='in-progress';
@@ -4335,9 +4355,9 @@ document.addEventListener('submit',e=>{const f=e.target;if(!['hmk-profile-form',
   if(changed.length&&!window.confirm('Edit změní '+changed.join(', ')+' a zruší důkazy fyzických hodů v Character Creation. Pokračovat?'))return;
   for(const key of changed)delete h.creation.attributeProof?.[key];
   if(changed.length){h.creation.status='in-progress';delete h.creation.completed[10];delete h.creation.completed[12];delete h.creation.completed[14];}
- }mutate(()=>{c.hmk={...h,attributes:a};syncCreationSkills(c.hmk,uuid)});return}if(f.id==='hmk-skill-form'){if(combatInitiativeSequence)return alert('Během Initiative nelze měnit dovednosti mimo Combat průvodce.');if(!String(v.name||'').trim())return alert('Zadejte název dovednosti');const skill={id:uuid(),group:v.group,name:v.name.trim(),sb:v.sb===''?null:Number(v.sb),ml:v.ml===''?null:Number(v.ml)};if([skill.sb,skill.ml].some(n=>n!==null&&(!Number.isSafeInteger(n)||n<0||n>999)))return alert('Neplatné SB/ML');mutate(()=>{c.hmk={...h,skills:[...(h.skills||[]),skill]}});return}if(f.id==='hmk-injury-form'){if(combatInitiativeSequence)return alert('Během Initiative nelze mimo Combat zapisovat nové rány.');if(!String(v.location||'').trim())return alert('Zadejte lokalitu');mutate(()=>{c.hmk={...h,injuries:[...(h.injuries||[]),{id:uuid(),location:v.location,description:v.description||'',severity:v.severity||''}]}})}},true);
+ }mutate(()=>{c.hmk={...h,attributes:a};syncCreationSkills(c.hmk,uuid)});return}if(f.id==='hmk-skill-form'){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}if(combatInitiativeSequence)return alert('Během Initiative nelze měnit dovednosti mimo Combat průvodce.');if(!String(v.name||'').trim())return alert('Zadejte název dovednosti');const skill={id:uuid(),group:v.group,name:v.name.trim(),sb:v.sb===''?null:Number(v.sb),ml:v.ml===''?null:Number(v.ml)};if([skill.sb,skill.ml].some(n=>n!==null&&(!Number.isSafeInteger(n)||n<0||n>999)))return alert('Neplatné SB/ML');mutate(()=>{c.hmk={...h,skills:[...(h.skills||[]),skill]}});return}if(f.id==='hmk-injury-form'){if(combatInitiativeSequence)return alert('Během Initiative nelze mimo Combat zapisovat nové rány.');if(!String(v.location||'').trim())return alert('Zadejte lokalitu');mutate(()=>{c.hmk={...h,injuries:[...(h.injuries||[]),{id:uuid(),location:v.location,description:v.description||'',severity:v.severity||''}]}})}},true);
 document.addEventListener('change',e=>{const id=e.target?.dataset?.encounterCharacter;if(!id)return;if(combatInitiativeSequence){e.target.checked=encounterSelection.has(id);return alert('Nejprve ukončete Initiative sekvenci; účastníky v jejím průběhu nelze tiše změnit.');}if(!data.characters.some(c=>c.id===id))return;if(e.target.checked)encounterSelection.add(id);else encounterSelection.delete(id);persistEncounterDraft();render()});
-document.addEventListener('click',e=>{const t=e.target.closest('[data-remove-skill],[data-remove-injury]');if(!t)return;const c=character(selected);if(!c||!window.confirm('Odstranit tento záznam?'))return;const key=t.dataset.removeSkill?'skills':'injuries';const id=t.dataset.removeSkill||t.dataset.removeInjury;if(combatInitiativeSequence)return alert('Během Initiative se nemohou ručně mazat dovednosti ani zranění.');if(key==='injuries'&&c.hmk?.combatState?.wounds?.some(w=>w.id===id))return alert('Potvrzenou bojovou ránu nelze vymazat mimo pravidlové zotavení.');mutate(()=>{c.hmk=c.hmk||{};c.hmk[key]=(c.hmk[key]||[]).filter(x=>x.id!==id)})});
+document.addEventListener('click',e=>{const t=e.target.closest('[data-remove-skill],[data-remove-injury]');if(!t)return;const c=character(selected);if(!c||!window.confirm('Odstranit tento záznam?'))return;if(t.dataset.removeSkill){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}}const key=t.dataset.removeSkill?'skills':'injuries';const id=t.dataset.removeSkill||t.dataset.removeInjury;if(combatInitiativeSequence)return alert('Během Initiative se nemohou ručně mazat dovednosti ani zranění.');if(key==='injuries'&&c.hmk?.combatState?.wounds?.some(w=>w.id===id))return alert('Potvrzenou bojovou ránu nelze vymazat mimo pravidlové zotavení.');mutate(()=>{c.hmk=c.hmk||{};c.hmk[key]=(c.hmk[key]||[]).filter(x=>x.id!==id)})});
 
 // v21: independent catalogue exchange. Never import character data or overwrite definitions.
 // Canonical fingerprint: JSON object key order does not change a definition's identity.
@@ -5279,6 +5299,59 @@ try{
  else if(guidedAttackSession&&guidedAttackNextRequirement().kind==='complete')continueGuidedAttack();
 }catch(e){guidedAttackLastOutcome='Bezpečné obnovení průvodce vyžaduje další krok: '+e.message;render();}
 
+// Show the deterministic result immediately as the GM types physical dice.
+// The same resolver runs AGAIN during the persistent mutation: UI updates
+// alone are never trusted as evidence and no die is generated by the app.
+// One source-linked explanatory dialog for every Character Creation field.
+// Pure UI: never modifies the creation state or generates random dice.
+document.addEventListener('click',event=>{
+ const btn=event.target?.closest?.('[data-hmk-rule-help]');if(!btn)return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const modal=document.getElementById('hmk-rule-dialog');if(!modal)return;
+ const selectedOption=btn.closest('label')?.querySelector('select')?.selectedOptions?.[0]?.textContent;
+ const title=btn.dataset.hmkRuleTitle||'Pravidla pro tuto volbu';
+ modal.querySelector('#hmk-rule-dialog-title').textContent=title+(selectedOption&&selectedOption!=='Vyberte…'?' · '+selectedOption:'');
+ modal.querySelector('#hmk-rule-dialog-page').textContent='HMK v1.2 · str. '+btn.dataset.hmkRulePage;
+ modal.querySelector('#hmk-rule-dialog-effect').textContent=btn.dataset.hmkRuleEffect||'';
+ modal.querySelector('#hmk-rule-dialog-dice').textContent=btn.dataset.hmkRuleDice||'';
+ modal.querySelector('#hmk-rule-dialog-status').textContent=btn.dataset.hmkRuleVerified==='yes'?'Shrnutí pravidla z ověřené stránky; nejde o úplný doslovný přepis.':'Konkrétní výjimka dosud čeká na GM review a ověření.';
+ if(typeof modal.showModal==='function')modal.showModal();else modal.setAttribute('open','');
+},true);
+
+document.addEventListener('input',event=>{
+ const form=event.target?.closest?.('#creation-step-form');if(!form)return;
+ const original=character(selected);if(!original)return;
+ const result=form.querySelector('[data-creation-roll-preview]');
+ const name=event.target?.name;
+ // Switching a prerequisite removes the active old roll in this form.
+ if(name==='birthRegion'||name==='venariveRoll'){
+  for(const field of ['regionRoll','birthplace','society','nativeLanguageRoll','regionSubRoll','regionDialectRoll','nativeLanguageChoice','regionTribeRoll','regionCommunityChoice','regionDialectChoice','regionAzeriDialectChoice']){
+   const el=form.elements.namedItem(field);if(el)el.value='';
+  }
+ }
+ if(name==='regionRoll'||name==='birthplace'){for(const field of ['nativeLanguageRoll','regionSubRoll','regionDialectRoll','nativeLanguageChoice','regionTribeRoll','regionCommunityChoice','regionDialectChoice','regionAzeriDialectChoice']){const el=form.elements.namedItem(field);if(el)el.value='';}}
+ if(name==='classDie'){const el=form.elements.namedItem('classRoll');if(el)el.value='';}
+ if(name==='subsistence'){
+  for(const field of ['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll','familyOccupation','familyWeaponcrafterType','familyMartialChoice','familyVariantChoice']){
+   const el=form.elements.namedItem(field);if(el)el.value='';
+  }
+ }
+ try{refreshCreationChoiceUI(form,original)}catch(err){if(result)result.textContent='Nabídku nelze obnovit: '+err.message}
+ const values=Object.fromEntries(new FormData(form));
+ try{
+  const computed=creationChoicesFromPhysicalDice(original,creationOf(original).step,values);
+  for(const [name,value] of Object.entries(computed)){
+   const target=Array.from(form.elements).find(el=>el.name===name);
+   if(target){
+    if(target.tagName==='SELECT'&&!Array.from(target.options).some(o=>o.value===String(value)))target.add(new Option(String(value),String(value)));
+    target.value=String(value);target.dataset.creationDerived='true'
+   }
+  }
+  refreshCreationChoiceUI(form,original);
+  if(result)result.textContent=Object.entries(computed).length?'Vypočteno z fyzického hodu: '+Object.entries(computed).map(([k,v])=>k+' → '+v).join(' · '):'Bez aktivního losování: použije se vaše ruční volba.';
+ }catch(err){if(result)result.textContent='Zatím nelze vyhodnotit: '+err.message}
+},true);
+
 // HMK v1.2 Character Creation. Capture the new forms before legacy editors;
 // all persistent changes flow through the existing mutate()/CAS save().
 document.addEventListener('submit',event=>{
@@ -5296,7 +5369,11 @@ document.addEventListener('submit',event=>{
  const original=character(selected);if(!original)return;
  const c=creationOf(original),step=c.step,action=event.submitter?.value||'next';
  let patch={step,values:{},advance:action==='next'};
- for(const [k,val] of Object.entries(v))if(['folk','ageGroup','birthMonth','birthDay','sunsignTraits','sunsignTraitSecondary','traitRollSecondary','birthplace','society','socialClass','familyOccupation','background','estrangementRoll','occupation','wealth','folkRoll','ageRoll','traitRoll','classRoll','classDie','backgroundRoll','urbanChance','tribalUnsettled'].includes(k))patch.values[k]=val;
+ for(const [k,val] of Object.entries(v))if(['folk','ageGroup','birthMonth','birthDay','sunsignTraits','sunsignTraitSecondary','traitRollSecondary','birthplace','society','socialClass','familyOccupation','familyWeaponcrafterType','familyMartialChoice','familyVariantChoice','familyScriptChoice','familySecondScriptChoice','familyThirdScriptChoice','background','estrangementRoll','occupation','wealth','folkRoll','ageRoll','traitRoll','classRoll','classDie','backgroundRoll','backgroundTensRoll','urbanChance','tribalUnsettled','birthRegion','regionRoll','venariveRoll','nativeLanguageRoll','regionSubRoll','regionDialectRoll','nativeLanguageChoice','regionTribeRoll','regionCommunityChoice','regionDialectChoice','regionAzeriDialectChoice','subsistence','parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll','familyAuto','backgroundAuto','viking','occupationAuto','occupationScriptChoice','occupationLanguageChoice','occupationLanguageDistribution','occupationScriptsDistribution','occupationSecondScriptChoice','occupationThirdScriptChoice','backgroundCityLanguageDistribution','occupationRitualChoice','nativeSkillsMode','nativeRitualChoice','wealthMethod','parentWealthDie','occupationWealthDie','familyDice','occupationDice','wealthAdvantage','ritualML','ritualClergy','ritualFightingOrder','orthodoxyPenalty','folkAuto','folkDice','arcaneTalentMode','veteranRoundsMode','veteranRound','graceDie','pvarismML'].includes(k))patch.values[k]=val;
+ // A typed physical die is authoritative; HTML selects may be blank or
+ // contain an older choice while the GM is editing the roll.
+ try{patch.values=mergeCreationChoices(original,step,patch.values,c.values,{strict:false})}
+ catch(err){return alert('HMK Character Creation: '+err.message)}
  if(action==='attribute'){
   const next=ATTRIBUTES.find(name=>!c.attributeProof?.[name]);
   const attributeName=next||creationAttributeChoice||ATTRIBUTES[0];
@@ -5305,8 +5382,30 @@ document.addEventListener('submit',event=>{
  } else if(action==='voice'){
   const req=voiceDiceRequirement(original.hmk?.folk);
   patch={...patch,advance:false,voice:{dice:Array.from({length:req.count},(_,i)=>v['die'+i])}};
+ } else if(action==='folk'){
+  patch={...patch,advance:false,folkSkillDice:String(v.folkDice||'').split(',').map(x=>x.trim()).filter(Boolean)};
+ } else if(action==='talent-prereq'){
+  patch={...patch,advance:false,arcaneTalentDice:{d20:v.arcaneTalentD20,d100s:String(v.arcaneTalentD100s||'').split(',').map(x=>x.trim()).filter(Boolean)}};
+ } else if(action==='talent'){
+  patch={...patch,advance:false,arcaneTalentDice:{d20:v.arcaneTalentD20,d100s:String(v.arcaneTalentD100s||'').split(',').map(x=>x.trim()).filter(Boolean)}};
+ } else if(action==='gmbonus'){
+  patch={...patch,advance:false,gmBonusLanguageUpdate:{decision:String(v.gmBonusDecision||''),distribution:String(v.gmBonusDistribution||'')}};
  } else if(action==='skill'){
-  patch={...patch,advance:false,skillAllocation:{skillName:v.skillName,dp:Number(v.skillDP)}};
+  patch={...patch,advance:false,skillAllocation:{skillName:v.skillName,dp:Number(v.skillDP),veteranRound:v.veteranRound?Number(v.veteranRound):undefined}};
+ }
+ if(step===13&&action==='next'&&v.wealthMethod==='dice'){
+  patch.wealthDice={parentDie:Number(v.parentWealthDie),occupationDie:Number(v.occupationWealthDie),
+   familyRolls:String(v.familyDice||'').split(',').map(x=>x.trim()).filter(Boolean),
+   occupationRolls:String(v.occupationDice||'').split(',').map(x=>x.trim()).filter(Boolean),
+   advantage:v.wealthAdvantage!=='no'};
+ }
+ if(step===14&&action==='next'&&v.ritualML!==undefined&&v.ritualML!==''){
+  patch.mysteries={ritualML:Number(v.ritualML),clergy:v.ritualClergy==='yes',fightingOrder:v.ritualFightingOrder==='yes',orthodoxyPenalty:Number(v.orthodoxyPenalty||0)};
+ }
+ if(step===14&&action==='next'){
+  patch.mysteries??={};
+  if(v.graceDie!==undefined&&v.graceDie!=='')patch.mysteries.graceDie=Number(v.graceDie);
+  if(v.pvarismML!==undefined&&v.pvarismML!=='')patch.mysteries.pvarismML=Number(v.pvarismML);
  }
  let updated;try{updated=applyCreationPatch(original,patch);syncCreationSkills(updated.hmk,uuid)}catch(err){return alert('HMK Character Creation: '+err.message)}
  const success=mutate(()=>{const entry=character(selected);if(!entry)throw Error('Postava neexistuje');Object.assign(entry,updated)});

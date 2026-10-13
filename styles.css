@@ -66,3 +66,25 @@
 
 /* v49: Structured rule parameters in readable lists, never raw JSON. */
 .catalog-data-list{margin:.3rem 0 .65rem;padding-left:1.45rem}.catalog-data-list li{margin:.35rem 0}.catalog-data-nested{padding-left:.65rem;border-left:1px solid var(--border,#625c4b)}
+
+/* HMK v93.213 — grouped, auditable Character Sheet; existing CSS untouched. */
+.hsk-scroll{max-width:100%;overflow-x:auto;border:1px solid #66563d;border-radius:7px;margin:.8rem 0}
+.hsk-table{width:max-content;min-width:100%;font-size:.78rem;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.hsk-table th,.hsk-table td{padding:.4rem .5rem;white-space:nowrap;vertical-align:top}
+.hsk-table thead th{position:sticky;top:0;background:#2b241c;color:#e8c990;z-index:1}
+.hsk-table tbody>tr>th:first-child{position:sticky;left:0;background:#302820;z-index:1;min-width:165px}
+.hsk-table .hsk-group-head th{background:#50412f;color:#f5ddb3;text-align:left;font-size:.92rem;padding:.5rem .8rem}
+.hsk-table .hsk-shared{opacity:.83}
+.hsk-table .dp-cell{text-align:center;min-width:45px}
+.hsk-perception{border:1px solid #66563d;border-radius:7px;padding:1rem;margin:.75rem 0 1.1rem}
+.hsk-perception .field-grid label{min-width:160px}
+
+/* v93.215: contextual HMK source help, independent of combat/Magic CSS */
+.creation-flow label{position:relative}
+.hmk-rule-help{display:inline-flex;align-items:center;justify-content:center;min-width:1.35rem;height:1.35rem;border:1px solid #8c7650;border-radius:50%;padding:0 .25rem;margin-left:.45rem;font-size:.82rem;font-weight:800;line-height:1;background:#ece2ca;color:#392d1f;vertical-align:middle;cursor:pointer}
+.hmk-rule-help:hover,.hmk-rule-help:focus-visible{outline:2px solid #af8c4b;outline-offset:2px}
+.hmk-rule-dialog{max-width:min(470px,calc(100vw - 32px));max-height:80vh;overflow:auto;border:1px solid #87704e;border-radius:12px;padding:1.15rem 1.3rem;background:#fcf9f0;color:#2c261c;box-shadow:0 18px 62px #100a044d}
+.hmk-rule-dialog::backdrop{background:#120f0c88}
+.hmk-rule-dialog h3{margin:0 0 .25rem;font-size:1.13rem}
+.hmk-rule-dialog p{line-height:1.5;margin:.7rem 0}
+.hmk-rule-dialog form{display:flex;justify-content:flex-end;margin-top:.9rem}
