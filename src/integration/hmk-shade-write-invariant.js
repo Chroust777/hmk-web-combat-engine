@@ -11,7 +11,11 @@ export function assertCommittedShadeTransitions(previous,next){
  for(const old of previous.characters){
   const before=old?.hmk?.arcane?.shade??null;
   const fresh=next.characters.find(c=>c.id===old.id);
-  insist(fresh);
+  // Removing a character without a confirmed Shade is a legitimate registry
+  // operation (notably discarding an unfinished Character Creation draft).
+  // A confirmed Shade remains irreversible: removing that actor cannot erase
+  // the transformation or its combat evidence.
+  if(!fresh){insist(!before);continue;}
   const after=fresh.hmk?.arcane?.shade??null;
   if(before){
    const id=before.sourceEventId;

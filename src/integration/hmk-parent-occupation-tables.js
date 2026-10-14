@@ -51,6 +51,14 @@ Object.assign(spec,{
   Konkuz:`25|Man-at-arms|99\n35|Man-at-arms (Sapper)|100\n39|Mercenary|100\n40|Swordmaster|100\n100|Weaponcrafter|100`,
   Yankuz:`100|Clanhead (Royal)|100`
  },
+ 'Malák':{
+  Military:`90|Mercenary|0\n100|Swordmaster|0`
+ },
+ 'Mizúni':{
+  Free:`55|Herder|0\n56|Invoker|0\n65|Man-at-arms|0\n70|Shaman|0\n100|Hunter|0`,
+  Crafter:`1|Alchemist|0\n2|Apothecary|0\n3|Astrologer|0\n20|Clothier|0\n22|Glassworker|0\n23|Harper|0\n28|Hideworker|0\n30|Jeweller|0\n32|Lexigrapher|0\n33|Locksmith|0\n43|Mason|0\n48|Mercantyler|0\n63|Metalsmith|0\n73|Miner|0\n74|Physician|0\n81|Potter|0\n83|Salter|0\n84|Shèk-Pvâr|0\n85|Tentmaker|0\n86|Thespian|0\n88|Timberwright|0\n90|Weaponcrafter|0\n100|Woodcrafter|0`,
+  Noble:`100|Chieftain|0`
+ },
  'Sináin':{
   Free:`1|Animal Trainer|40\n2|Cartographer/Artist|60\n3|Cook|50\n8|Fisher|30\n88|Hunter or Trapper|5\n89|Invoker|5\n93|Scholar|50\n95|Scribe|60\n96|Servant, Domestic|50\n97|Teamster|60\n98|Thatcher|1\n99|Toymaker|50\n100|Woodcutter|25`,
   Crafter:`2|Alchemist|60\n4|Apothecary|60\n6|Astrologer|60\n7|Chandler|60\n8|Charcoaler|5\n13|Clothier|60\n14|Embalmer|60\n16|Glassworker|60\n25|Harper|50\n27|Herald|50\n37|Hideworker|25\n40|Innkeeper|25\n49|Jeweller|65\n52|Lexigrapher|60\n53|Lìa-Kaváir|50\n54|Locksmith|60\n59|Mason|40\n61|Mercantyler|60\n66|Metalsmith|10\n67|Miller|5\n68|Miner|1\n70|Ostler|50\n71|Perfumer|60\n73|Physician|50\n74|Pilot|60\n76|Potter|55\n77|Salter|20\n78|Seaman|60\n80|Shèk-Pvâr (Fývria)|60\n86|Shèk-Pvâr|60\n88|Shipwright|60\n89|Tentmaker|60\n91|Thespian|50\n93|Timberwright|5\n96|Weaponcrafter|50\n100|Woodcrafter|20`,
@@ -75,6 +83,13 @@ export function parentOccupationFromRoll({society,socialClass,roll,classRoll,cla
  if(found.name==='Slave'){
   if(subRoll===undefined||String(subRoll).trim()==='')throw Error('Slave: vyžaduje doplňující fyzický d20 (HMK str.27–28)');
   const sr=physical(subRoll,20,'Slave type'),s=slavery[tableSociety].find(x=>sr<=x[0]);subtype=s[1];name=`Slave (${subtype})`;urbanChance=s[2];
+ }else if(found.name==='Tenant Officer'){
+  // Feudal p.27 footnote 2: the SAME additional physical d20 slot as
+  // Slave type, but a different printed OFFICE table, never a GM guess.
+  if(subRoll===undefined||String(subRoll).trim()==='')throw Error('Tenant Officer: povinný fyzický d20 pro office (HMK str.27)');
+  const sr=physical(subRoll,20,'Tenant Officer office');
+  subtype=sr<=4?'Beadle':sr<=7?'Herder':sr<=15?'Reeve':'Woodward';
+  name=`Tenant Officer (${subtype})`;
  }else if(subRoll!==undefined&&String(subRoll).trim()!=='')throw Error('Doplňkový d20 není pro tuto Parent Occupation určen');
  const isArcanist=found.name==='Gentry: Arcanist'||found.name==='Arcanist';
  let arcanistType=null,primaryConvocation=null,specialDie=null;
@@ -92,7 +107,7 @@ export function parentOccupationFromRoll({society,socialClass,roll,classRoll,cla
   if(primaryConvocation)name+=` (${primaryConvocation})`;
  }else if(convocationRoll!==undefined&&String(convocationRoll).trim()!=='')throw Error('Primary Convocation d6 není pro toto povolání určen');
  const secondaryRollRequired=['Manor Lord, Appointed','Tenant-in-chief','Patrician (Major)','Clanhead (Major)'].includes(found.name);
- return {name,urbanChance,society,socialClass,roll:die,tableSociety,subRoll:subtype?Number(subRoll):null,subtype,...(arcanistType?{specialRoll:Number(specialRoll),arcanistType}:{}),...(primaryConvocation?{convocationRoll:Number(convocationRoll),primaryConvocation}:{}),secondaryRollRequired,sourcePage:tableSociety==='Feudal'?27:tableSociety==='Imperial'?28:tableSociety==='Tribal'||tableSociety==='Tribal-Settled'?29:tableSociety==='Tributary'?30:tableSociety==='Kúzhan'?31:32};
+ return {name,urbanChance,society,socialClass,roll:die,tableSociety,subRoll:subtype?Number(subRoll):null,subtype,...(arcanistType?{specialRoll:Number(specialRoll),arcanistType}:{}),...(primaryConvocation?{convocationRoll:Number(convocationRoll),primaryConvocation}:{}),secondaryRollRequired,sourcePage:tableSociety==='Feudal'?27:tableSociety==='Imperial'?28:tableSociety==='Tribal'||tableSociety==='Tribal-Settled'?29:tableSociety==='Tributary'?30:tableSociety==='Kúzhan'?31:['Malák','Mizúni'].includes(tableSociety)?423:32};
 }
 export function parentTitleFromBackground(occupation,backgroundRoll,{society=null}={}){const n=physical(backgroundRoll,100,'Background / Noble Title');
  const rows=occupation==='Manor Lord, Appointed'?[[3,'Constable'],[5,'Sheriff'],[15,'Bailiff (Hundred)'],[100,'Bailiff']]:occupation==='Tenant-in-chief'?(society==='Sináin'?[[10,'King'],[30,'Earl/Count'],[100,'Baron']]:[[5,'King/Duke'],[30,'Earl/Count'],[100,'Baron']]):occupation==='Patrician (Major)'?[[5,'Royalty'],[100,'Great House']]:occupation==='Clanhead (Major)'?[[5,'Royalty'],[100,'Great Clan']]:null;
