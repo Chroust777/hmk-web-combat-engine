@@ -1,3 +1,139 @@
+## v93.235 – Oprava definitivního smazání rozpracované postavy
+
+Opraven bezpečnostní kontrolní bod Shade: odstranění postavy bez potvrzené nevratné proměny již není chybně odmítáno jako `invalid-shade-transition`. Postava se skutečně potvrzeným Shade nadále nesmí být tímto způsobem vymazána; rozhraní na to výslovně upozorní **před** zápisem. Při odstranění se ze stejného ověřeného databázového zápisu odstraní také inventář a osobní deník dané postavy. Po úspěchu se vyčistí nepřetrvávající session ukazatele na smazanou postavu, ne její historické údaje jiné postavy. Při odmítnutí zápisu se obnoví vybraná postava a otevřená obrazovka.
+
+Zachována single-record CAS persistence, historické záznamy ostatních postav a ochrany Combat/Magic. Viz samostatný regresní ZIP a český protokol.
+
+## v93.234 – Obnova rozpracované tvorby a kontextové úvody 14 kroků
+
+Rozpracované postavy jsou uvedeny v registru i navigaci s přímým tlačítkem pro obnovení. Tvorba je stále uložena v původní databázi charakterů. Každý krok má kontextový úvod podle skutečných předchozích voleb.
+
+## v93.233 – Bod 4: matice kompatibilních povolání a kontextové pravidlové nápovědy
+
+Výchozí verze **v93.232**. Provedeny dva oddělené kombinatorické průchody příděly dovedností: projekce 16 416 syntetických profilů (rodina × povolání × mateřský jazyk × Background) a zvláštní průchod pravidlově přípustnými kombinacemi Society / Parent Class / Parent Occupation / PC Occupation. Tyto kontroly nejsou kompletní fyzicky vyházené 14krokové postavy. Neuvedené profese a nutné rodičovské podtypy zůstávají transparentně označené.
+
+Přepsána obsluha pravidlových nápověd `?`: dialog nyní teprve při kliknutí vyhodnotí skutečnou aktuální možnost v poli, poslední volbu v rámci otevřeného formuláře, dřívější Folk / Region / Society / Parent Occupation a právě aktivní Skill stage. Odděluje české vysvětlení, doložený **doslovný anglický výňatek HMK v1.2 s číslem tištěné stránky** a hodnoty současného profilu (například přesné Occupational/Family DP a omezení). Zároveň výslovně přizná pole bez ověřeného doslovného originálu. Žádné nové kostky ani autoritativní ukládání; nápověda je pouze read-only. Díky zachování původních datových atributů nejsou rozbity regresní testy staršího dialogu.
+
+Nedotčeny Combat, Magic, G04, inventory, styles.css. Plný prohlížečový E2E a kompletní doslovný přepis všech lokálních výjimek zůstává otevřený, stejně jako bod 5 (Edit) a bod 6 (závěrečná certifikace).
+
+## v93.232 – Bod 4: kombinované Language/Script/Ritual a Sunsign/Veteran DP
+
+Autorita: HârnMaster v1.2, tištěné strany 47–49. Výchozí produkce **v93.231**. Opraveno rozpoznání již rozvinutých konkrétních dovedností v Optional, Veteran a Sunsign: profesní `Script` a `2nd/3rd Script` se převádí na reálné `Script (název)` před uplatněním limitu 1/2 DP; stejně tak rodný `Ritual (náboženství)`. **Language** podle výslovné výjimky str.48 nemá limit počtu DP ze stejného stádia; pět DP do jednoho jazyka je povoleno i v jednom Veteran kole, při zachování pětibodového rozpočtu kola. Sunsign nyní nabízí konkrétní Language/Script/Ritual místo generických názvů a všechny konkretizované Skills čerpají jediný skupinový rozpočet Sunsign.
+
+Nová funkce `priorSkillDevelopment()` vyhodnocuje předchozí DP pouze z již existujícího autoritativního výpočtu Character Sheet; nezavádí další stav ani nové náhodné hody. Regresní a reprodukční testy jsou v externím testovacím ZIP, včetně 342×3 projekcí profesních profilů. Plná prohlížečová E2E a celkové uzavření bodu 4 ještě nejsou certifikovány. Combat, Magic, G04, inventory a CSS beze změn.
+
+---
+
+## v93.231 – Family / Background / Occupation special grants; Character Creation follow-up
+
+HMK v1.2 pp.343–344: Émhlè Family Ritual SM2 correctly attributed to the exceptional Family grant; Ritual permitted among Background Skills for tribal Émhlè; †/‡ Covenant follower skills automatically reach the specified SM1/SM2 **after Occupational Skills**, using one calculated Skill ledger (not an additive bonus when already at or above the floor). See external Czech audit and regression tests.
+
+# v93.230 – Uzavření doložených mezer chantries, Covenant a šamanského průvodce (HMK v1.2)
+
+Výchozí archiv: v93.229 (všech 197 původních souborů zachováno). Žádný jiný ediční systém než originální HârnMaster v1.2 nebyl použit.
+
+- HMK p.197: přepsáno všech 109 pojmenovaných položek tabulky **Major Lýthian Chantries**: 72 konvokačních Shèk-Pvâr chantries (šest konvokací) a 37 Arcane Lore chapters. Průvodce nabízí 72 konvokačních chantries podle konvokace, říše a jména a **automaticky** doplní konvokaci a kvalitu; engine odmítá jejich podvržení nebo nesoulad. Arcane Lore kapituly nejsou falešně prezentované jako konvokační chantries. Nevyjmenované menší/proxy chantry lze doložit zvlášť; výsledek je označen `chantryReviewNeeded`, nikoli ověřený automatismus.
+- HMK pp.343–344: implementováno všech **10 Cult of the Covenant religions** s přesnou orthodoxní Morality, společnými a specifickými Doctrine Subjects a statusy odvozenými přímo z autoritativního Ritual ML (Laity 1–29, Fighting Order 30–59, Clergy 60+). Přepočty Morality, Circle, Piety a Blessing Bonus jsou součástí stejného důkazu v profilu postavy.
+- HMK p.302: Shaman začíná se stavem **Popular** u průvodce Ancestor Spirit. Jde o jiný vztah než rodinný Estrangement z kroku 9. Na p.301 uvedené tradiční preference nejsou zaměňovány za absolutní zákaz jiných Powers; případné nedoložené odchylky podléhají explicitní kontrole.
+- Návazné chyby: opraveno porovnání Covenant statusu při `assertCreationInvariants()` a ošetřeno chybějící Spirit ML ve formuláři nedokončeného Shamana. Replays/napojení na Character Sheet a historické důkazy zůstávají zachované.
+- Celkem 12 440 automatizovaných kontrol, z toho 509 nových; 21 nově **rekonstruovaných** případů Parent Arcanist zahrnuto v historické sadě. Testy na výsledném zabaleném ZIP jsou samostatně doloženy.
+
+**Omezení:** Tato verze nevyplňuje nepojmenované menší chantries, kmenové výjimky, které kniha vyjadřuje jen jako možnost, ani nevymýšlí Doctrine tabulky pro další místní kulty. Původní 21 historických Parent Arcanist případů nebylo součástí podkladů. Prohlížečový E2E přes localhost je v prostředí blokován administrátorem; klikací restart/localStorage certifikace ještě chybí. Viz samostatný auditní protokol.
+
+---
+
+# v93.229 – Bod 3: Shèk-Pvâr, Alchemy, Shamanism, Religion (HMK v1.2)
+
+- **Výchozí produkční soubor:** v93.228. Pravidlový zdroj: uživatelem dodaný *HârnMaster Roleplaying in the World of Kèthîra* v1.2, **nikoli Third Edition**.
+- **Shèk-Pvâr, str.54,197,199,200,205,211,249:** katalog 204 kouzel, automatické tři Neutral spells od ML40, assisted/unassisted výzkum a jeho ML prahy, affinity, řádně vypočtené dílčí i celkové ARP, cenový zdroj podle konvokace domovské chantry, dvojitá research cena Survey/Gate/Vortex, 1–5 chantry stars, výběr ranku ze čtyř možností, jméno domovské chantry a popis attuned elemental object, artefakty minor a major s podmínkou Vessel a dvěma známými enchantments pro major. Výhoda Natural Attunement vychází jen ze skutečně získaného Arcane Talent, ne ze zaškrtávacího políčka.
+- **Alchemy str.269,271–274:** přesně 35 dovolených názvů, při ML≥60 floor(Alchemy Index/2) elixírů, jejich AS od Index dolů po jednom; volby na jediný autoritativní Character Sheet.
+- **Shamanism str.53,300–306:** výběr ze šesti tištěných vzorových tradic plus Other, šest kmenových totemů Kath. Popisné výrazy jako „mostly“ se nepřekládají na falešná závazná omezení. Náklady a skutečné Spirit Powers zůstávají ověřovány původním enginem.
+- **Religion str.39,55,315,323–341:** deset podrobně doložených západovenárijských náboženství, intervaly Morality, automatická Orthodoxy penalizace, Follower/Circle/Ceremony, Blessing Bonus, Piety, výběr správného počtu odlišných Doctrine Subjects ze správných obřadních úrovní. Zabráněno ručnímu zadávání nezávislého Ritual ML; status se předává z reálné dovednosti.
+- **Edit:** odvozené proof i sheet projections se zneplatňují při změně základních předpokladů. Historie voleb je append-only. Některé staré výstupy vyžadují nové ověření v kroku 14 po otevření Edit.
+- **Omezení:** názvy a hvězdná kvalita konkrétní menší či nezapsané chantry, politicky schvalovaná Guild Rank a volba vlastního elementálního předmětu jsou vědomé hráčské volby vycházející z HMK, nikoli domyšlené automatické závěry. Některé kmenové zvyky a nezápadní lokální kultovní katalogy nemají v tomto zdroji pevně určené úplné volby. Herne účinky Spirit Powers, artefaktů a elixírů za běhu hry nejsou předmětem tvorby postavy. Celý Character Creation ještě čeká na end-to-end prohlížečový test a bod 4.
+- **Chráněné části:** Combat, Magic, G04, inventory, styles.css beze změn.
+
+---
+
+# v93.228 – Bod 3 / Mysteries, Psyche, Divine Grace a počáteční Spirit Powers
+
+- **Výchozí produkční verze:** v93.227. **Jediný pravidlový zdroj:** HMK v1.2, tištěné strany 40, 53–56, 300, 302–306, 310–311. Nejde o pravidla Third Edition.
+- **Divine Grace (p.40,53):** nová PC musí doložit fyzický d20 1–20, včetně výsledku 0 Marked. Marked (15–16) nebo Grace (17–20) vyžadují jeden ze 12 Divine Aspects z tištěné tabulky p.310. Bez těchto výsledků aspekt nelze přidělit. Doložená volba a hod se ukládají do jediné existující append-only audit history.
+- **Psyche (p.40):** povinné fyzické d20 podle Folk a Age, intenzity dle součtu výsledků, konkrétní volba z 10 vlastností nebo skutečné d10. Human/Nâdi podle věku 1/2/3, Kúzhai/Malákta 1, Sinái 4. Příručka výslovně neudává počet hodů pro Ænarin/Sidhé; tyto případy jsou v průvodci označené k přezkoumání, nikoliv vymyšlené.
+- **Fate (p.53):** pět Fate Points a Aura-odvozené Fate ML mají pouze PC; NPC je nezískávají.
+- **Ritual a Pvârism:** počáteční ML vychází jen ze skutečné dovednosti Character Sheet, není možné je obejít ručním číslem. Závislé Religious Status a Arcane Research se zneplatní při změně Skills/Attributes.
+- **Shaman (p.53,300,302–306):** výběr počátečních Ancestor, Totem a Energy Spirit Powers do vypočteného Spirit Index; anima I–III, jeden současný totem, talisman +1 anima, Energy bez talismanu; úplné dostupné nabídky jsou přímo v průvodci. Edit zneplatní uložené Powers bez mazání historického výběru.
+- **Přiznané hranice:** pouze 12 *vzorových* totemů, konkrétní kmenové tradice a instrumenty bez katalogu se nevymýšlejí; účinky Spirit Powers za hry a dostupnost průvodců podle kmenů neautomatizovány. Kompletní Shèk-Pvâr příprava/artefakty, počáteční Alchemy elixíry, Doctrine/Morality/Orthodoxy, další kampaní určené výjimky a skutečné browser E2E/localStorage zůstávají otevřené. **Bod 3 jako celek dosud není certifikován.**
+- **Regrese:** 478 nových cílených kontrol a všechny předchozí regresní testy (včetně 21 *rekonstruovaných* Parent Arcanist). Podrobnosti a záznamy opětovného běhu z nezávisle rozbaleného finálního ZIP viz oddělený testovací archiv.
+- **Neměněno:** Combat, Magic, G04, inventory, styles.css a starší produkční oblasti. Jeden autoritativní profil, žádné interní generování náhodných hodů.
+
+# v93.227 – Bod 3 / první verifikovaná etapa automatizace rozhodnutí
+
+- Výchozí verze v93.226, autoritativní pravidla HMK v1.2 s.40 a 45–49.
+- Doložené Occupation Skills nejsou přepínatelné do volného GM režimu. Příděly se vždy převezmou ze správné tištěné profesní tabulky.
+- Je povinný konkrétní Script, Language, Ritual a vícečetný Scripts/Language DP pool podle tištěného povolání. Hráč vybírá z katalogu, engine kontroluje a zachovává příděl.
+- Odstraněny volby vypnout předepsané Native, Folk, Background a Veteran Skills. O Arcane Talent rozhodují skutečné fyzické hody, ne přepnutí GM review.
+- Jazykové a písmové vícenásobné DP se nyní dají rozdělit nabídkami po jednom DP včetně City Background a volitelného GM Bonus. Stávající uložené rozdělení se zpětně načte do nabídek.
+- **Bod 3 není jako celek uzavřen**: čeká pravidlový audit Mysteries, Psyche, zbylých campaign rozhodnutí a plný browser E2E.
+
+## v93.226 — Uzavření doložených regionálních a kulturních pravidel (etapa 2)
+
+- **Výchozí produkční ZIP v93.225. Pravidla HMK v1.2, tištěné strany 20–21, 38, 47–48, 314–315, 343, 419 a 423.** Bez přepisu ostatních modulů.
+- **Karéjia, s.419:** právě tři *různé* povolené rodné Ritualy azérského panteonu, každý po 1 DP. Průvodce zobrazuje tři rozbalovací nabídky, kontroluje úplnost a duplicity, uložené projekce přidělují tři konkrétní dovednosti. Volbu nelze nahradit vypnutím Native Skills. Region Edit odstraňuje staré volby i navazující důkazy.
+- **Náboženství Venârivè, s.314–315, 343:** výčet doložených hlavních panteonů a výslovně zmíněných menšinových azérských kultů, aliasy smíšených panteonů, Kuélrhyn bez vymyšleného Ziém. U místních kultů bez jmenného výčtu nepřidáváme hypotetická božstva.
+- **Elder Folk, s.20–21, 38, 423:** Malákta a Nâdi lze skutečně zvolit jako Folk (nevkládají se do lidského náhodného d100). Nově uplatněny fyzické i mentální modifikátory, odlišné modifikátory pro Eyesight/Hearing/Smell, věkové podmínky, rodičovské d100 profese společnosti Malák/Mizúni a povinný Wilderness Background bez fiktivního hodu. Rozsah pravidlově doložených Occupational/Family Skills zůstává omezen katalogem; zvláštní profesní/campaign rozhodnutí nebudou domýšlena.
+- **Zachováno:** jediný autoritativní profil, append-only fyzické hody; Combat, Magic, G04, inventory a CSS beze změny. Nové cílené testy kontrolují 2162 případů, vedle starých regresních sad včetně 21 *rekonstruovaných* Parent Arcanist. Úplné výsledky jsou v samostatném testovacím archivu.
+- **Hranice ověření:** nepopsané místní kulty, campaign souhlas se vzácným Mature Malákta a úplný vizuální E2E/localStorage restart nejsou automaticky certifikovány; browser je v testovacím prostředí blokován. Dále následuje etapa 3 (odstranění obecných GM rozhodnutí s doloženou nabídkou).
+
+## v93.225 — Regionální a kulturní audit (etapa 2; ověřené regiony, otevřené pantheony)
+
+- **Zdroj:** HMK v1.2, Appendix I str.415–423 a Appendix II str.424–425; výchozí produkční archiv v93.224. Všech 22 běžných regionálních d100 tabulek a čtyři samostatné Elder Folk tabulky jsou zapojené do stejného existujícího kroku Region (není zaveden druhý profil ani druhé úložiště).
+- **Elder Folk, s.423:** Ælrhin/Sinái a Kúzhai, ale i Malákta (Malákrhyn fort) a Nâdi (Mizúna site), mají vlastní fyzický d100 (včetně jednostavové 01–00 tabulky), příslušnou Society, přesný přímo doložený Pantheon `(Siém)` / `(Seréniel)` nebo bez panteonu, Native Language a Regionální jazyky. Pro Malák/Mizúni jsou zpřístupněny také přímo vytištěné Class d100/d20 tabulky. Regiony Elder Folk nepatří do populace lidského d1000 a nelze je vybrat pro nesprávný Folk.
+- **Regionální dialekty / Appendix II:** původní jazyková označení, varianty a dialekty zůstávají nepozměněny v regionální důkazní stopě. Odvozená Skill projekce však pro stejný jazyk používá jeden kanonický název: Nâsik Azéri, Áltic, Tuvâran, Quârphic, Shôrka, Thónian, Tríerzi atd. Opravena cizojazyčná příbuznost a podmíněný příděl +4 Language Zâkimladal u Nâsik Azéri s 5 Native DP (s.416). Staré záznamy dialektových DP se v projekci slučují, zdrojové DP a auditEvents zůstávají beze změny.
+- **Katalog jazyků:** doložená regionální jména Nâblúgi, Tonátri, Malánuk a Mizúni. Nevyvozujeme neotištěné jazykové příbuzenství Malánuk a Mizúni; neudělujeme domnělý Foreign Language boost.
+- **Reprodukce:** 13 konkrétních závad na nedotčené v93.224, odstraněny v této verzi. Nové testy pokrývají všechny jednotlivé výsledky regionálních d100, Elder Folk Social Class, celý soubor 511 jazykových položek, validace forem voleb, znovunačtení historických DP, a další. Úplné počty, logy a integrita viz samostatný testovací ZIP.
+- **Přiznaná mez:** Karéjia s.419 požaduje 1 DP ve třech *různých* rodných náboženstvích. Z dodaného PDF se neodvozuje kompletní nabídka bohů všech azérských pantheonů, proto tato specifická větev Native Ritual zatím není automatizována a není prohlašována za ověřenou. U některých dalších pantheonů rovněž chybí doložený úplný výčet náboženství. Profesní větve Malákta/Nâdi po regionálním a Class kroku potřebují zvláštní následný audit (s.423). Úplný browser E2E/localStorage test nebyl proveden.
+- **Nedotčeno:** Combat, Magic, G04, inventory, `styles.css`, jediný autoritativní profil a append-only historie fyzických hodů. Žádné generované náhodné hody a žádné smyšlené GM varianty.
+
+## v93.224 — Dokončení pravidlových Family Skills pro Noble / Serf / Slave (etapa 1)
+
+- **Výchozí verze v93.223; zdroj pravidel výhradně HMK v1.2, tištěné strany 27–32, 42–44, 47 a 51.** Audit a změny jsou omezené na oblast tvorby postavy. Čistě řídicí verze `app.js`/`index.html` je aktualizována na v93.224.
+- **Slave:** pět přesných typů Craft, Domestic, Farming, Fishing, Herding. U každého je povinná VOLBA dvou různých Physical Skills z devíti vyjmenovaných dovedností, každá +2 Occupational DP; dohromady 5×36=180 povolených konfigurací. Typové profesní DP jsou přepsány z tištěné s.44, rodinná alokace má limit 5 DP a maximálně ⌊Occupational DP/2⌋. Výsledky Slave mají Wealth d0, fyzické d20 pro typ zůstává tam, kde jej přikazuje Parent tabulka (např. Feudal/Imperial/Tributary); Imperial Slave Gladiator má oddělený podtyp a svůj vytištěný profil.
+- **Serf/Feudal Unfree:** d1 Farmer (Thrall), Farmer DP, Servant a Tenant Officer (Beadle/Herder/Reeve/Woodward) podle fyzického d20. Opraveny rodinné profily těchto aliasů; d3 pro Tenant Officer a nulová Slave Wealth kostka.
+- **Noble, p.43:** všichni šlechtici mají šest společných Family Skills (Melee, Dancing, Riding, Heraldry, Intrigue, Script), každý nejvýše 1 DP. U Gentry se k nim přidává **jen první** Skill jejího konkrétního profesního profilu s limitem poloviny (např. Pilot -> Piloting 2 Family DP). U Courtier, Knight Bachelor, Manor Lord a Tenant-in-chief se přidávají výhradně dovednosti označené * v tištěné šlechtické tabulce; pro Patrician/Clanhead zůstávají společné možnosti bez nevymyšlených hvězdiček. Vlastní Occupational DP dítěte se tímto nemění.
+- **Parent Arcanist:** d20 a šest konvokací/10 dvojic Fývria zůstávají; Gentry parent používá šlechtická Family omezení p.43, zatímco běžný parent přebírá běžné Occupational DP; 21 nově rekonstruovaných testů prošlo, historický archiv z v93.219 k dispozici není.
+- **Další nové vazby:** Parent Bureaucrat včetně Scripts/Languages s jedním sdíleným Family DP limitem napříč konkrétními jazyky/písmy, `Artist`, `Servant`, `Priest (Siém)` a přesná nabídka Hunter/Trapper. Ověřené profily nejde obejít vypnutím pravidlové Family kontroly.
+- **Regrese na nově rozbaleném vydaném ZIP:** viz samostatný testovací ZIP a `HMK_Keeper_Ledger_v93_224_AUDIT_CZ.md` s výstupy. **Nevydáváme regionální pravidla a úplný browser E2E za uzavřené** — patří do dalších plánovaných etap.
+- **Nedotčeno:** Combat, Magic, G04, inventory, styles.css, single-source character profile, append-only physical dice proof and history.
+
+## v93.223 — Opakovaný zdrojový audit HMK v1.2 (Noble/Unfree, Family Skills, Wealth, Edit)
+
+- **Výchozí archiv:** beze změn rozbalený v93.222; všechny zásahy proběhly v izolované kopii.
+- **Reprodukované a opravené vady:** (1) Estrangement Edit ponechával staré Wealth/Standing, (2) Age Group Edit rovněž, (3) Noble Background d100 měnil titul bez zneplatnění Wealth a dokladu, (4) Gentry profesím chybělo přiřazení ke skutečným Occupational DP, (5) Gentry: Priest neměl příslušný Family Ritual profil, (6) Feudal Tenant Officer ignoroval povinný d20 podtyp, (7) PC Wealth Advantage se dala vypnout.
+- **Tenant Officer podle p.27 a p.44:** fyzický d20 → Beadle [1–4], Herder [5–7], Reeve [8–15], Woodward [16–20]; každý má Farmer základ + přesně dané odborné bonusy, d3 Wealth. Doplněna nabídka profesí a pravidlová nápověda.
+- **Family Skills:** 10 doložených Gentry profesních aliasů používá stejný tištěný katalog DP, Gentry Priest vybírá doloženou víru, bez vymyšleného Courtier profilu. Family rozpočty zůstávají 5 DP a na dovednost nejvýše ⌊profesní DP/2⌋.
+- **Wealth/Standing:** v PC je povinná výhoda +1 kostka v každé nenulové skupině a vyškrtnutí jejího minima; doložené kostky nelze obejít ručním GM součtem. U Priest je nutné nejprve doložit Ritual ML. d0 nepřidává žádný hod. Edit zneplatňuje starý Wealth, Standing, coins, possessions, důkazy a dříve zadané kostky.
+- **Testy:** 3 828 pravidlových/HTML kontrol + 21 samostatně rekonstruovaných Parent Arcanist případů. Původní historická sada 21 případů z v93.219 není součástí dostupných archivů; není možné prohlásit ji za totožnou. Reprodukce všech 7 vad na nedotčené v93.222 je součástí samostatného testovacího ZIP.
+- **Neměněno:** Combat, Magic, G04, inventory a styles.css; žádná automatická náhoda, žádné druhé úložiště.
+- **Omezení:** úplný vizuální Chromium/localStorage end-to-end test nebyl proveden (testovací prostředí blokuje lokální URL); nepřepsané nebo nejednoznačné regionální/Family profily nadále vyžadují explicitní review a nejsou předstírány jako automaticky ověřené.
+
+## v93.222 — Volby z nabídky namísto volného rozhodování GM
+
+- U doložených voleb Parent Man-at-arms, Weaponcrafter, profesních podtypů, regionálních jazyků a dialektů UI výslovně instruuje hráče vybrat z nabídky.
+- Výběry nadále validuje existující engine; žádná neověřená pravidlová automatizace ani hod kostkou nebyly přidány.
+- Neznámé regiony a nepřepsaná pravidla zůstávají označena GM review, nikoli smyšlenou automatickou volbou.
+- Stále otevřeno: end-to-end Noble/Serf/Slave, všechna Family Skills, Wealth, Edit invalidace a 21 původních Parent Arcanist testů (nedodány).
+
+## v93.221 — Upřesnění Parent Man-at-arms volby v UI
+
+- Oddělené vysvětlení GM volby pro Archer a Cavalry; povolené hodnoty, DP, bohatství a další výpočty beze změny.
+- Audit pravidel: HMK v1.2, tištěná s. 43.
+- Samostatný regresní balíček obsahuje nově vytvořené testy; historická sada 21 Parent Arcanist testů nebyla v dodaném ZIP přítomna.
+
+## v93.220 — Man-at-arms (Cavalry, Missile)
+
+HMK p.43: GM určuje, kterou konkrétní projektilovou Combat Skill (Archery/Slings/Throwing, p.46) znamená tištěný grant Missile 3. Jde o deklarovanou GM interpretaci širokého termínu Missile, nikoliv nový hod či samostatný Skill. Throwing 2 v základním řádku se s případnými Missile Throwing 3 sčítá. Stejné vymezení pro Family DP, edit, Wealth d4 a nabídky v UI.
+
 ## v93.214 — jeden autoritativní editor Skills / Attributes
 
 Pro postavy s HMK Character Creation se historický ruční Skills registr zobrazuje bez editačních tlačítek. Staré manuální záznamy se neztrácí a případné kolize jsou označeny k GM review. Ruční HMK Attributes editor se pro takové postavy deaktivuje; Edit průvodce a Perception switch zůstávají plně funkční. Pro starší postavy bez Creation zůstávají původní ruční formuláře i události dostupné. Přepnutí do Combat režimu vnímání není ještě automatizováno.
@@ -551,3 +687,15 @@ Ve všech 14 krocích je u editovatelných polí kontextové tlačítko ? oteví
 
 ### v93.216 – podmíněné Family Priest DP
 Parent Priest: volba náboženského suboccupation je u ověřených pantheonů omezena na dostupná náboženství. Ve Family Skills se generický Ritual nyní eviduje jako konkrétní Ritual příslušné víry; limit ½ Occupational DP i pětibodový rozpočet platí beze změny. Současně jsou blokovány podvržené jiné Ritual. Nepřepsané pantheony a Parent Invoker (4 fyzické d20, nejvyšší) zůstávají GM review. Neprovádí se žádný skrytý hod.
+
+### v93.217 — Parent Invoker × four physical Talent d20 (HMK p.42)
+
+Verified special printed **Family “Skill”**: offspring of an Invoker roll four actual Talent Possession d20 and use the highest, rather than treating this as four automatically granted Talents. The highest is evaluated through the existing p.40 physical d100 Talent table, in the same **Arcane Talent Skills stage** and DP ledger. Step 11 prerequisite entry and Step 12 Skill entry accept the four physical d20; normal parents still require exactly one physical d20. Invalid dice, missing or excessive d100, edited highest-roll proof and stale family proof are rejected atomically. Edit across Invoker/non-Invoker invalidates the active Talent proof while retaining append-only history; UI help and source calculation remain single authority. No RNG or extra DP stage. Future character quick-generator requires explicit **test/simulated dice** classification and must never represent generated dice as GM physical dice.
+
+
+## v93.218 — Parent Shaman + inventory slot edit
+Verified p.44 Shaman family named Ritual, Spirit or physically possessed Talent, and owner-bound atomic inventory edit preserving the opened character sheet. No new virtual GM dice.
+
+
+### v93.219 — Parent Arcanist Family Skills
+Fyvria: výběr dvou doložených dovedností, ostatní konvokace z fyzického d6; mapování rodičovského Arcanista z fyzického d20 na původní profesní balíčky bez druhých DP.

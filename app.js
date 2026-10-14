@@ -1,7 +1,9 @@
 import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} from './src/integration/hmk-sheet-legacy-authority.js';
+import {applyInventoryItemEdit} from './src/integration/hmk-inventory-edit.js';
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
 import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,setPerceptionMode,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
 import {creationWizardHTML,characterCalculationHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js';
+import {fieldRuleNote} from './src/integration/hmk-creation-rule-help.js';
 import {auditArmourLibraryConsistency} from './src/integration/armour-library-consistency.js';
 import {assertLegacyMutationDoesNotChangeCombat} from './src/integration/active-combat-write-boundary.js';
 import {assertAlternateManeuverWriteAllowed} from './src/integration/hmk-alternate-maneuver-write-gate.js';
@@ -113,7 +115,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.214';
+const APP_VERSION='93.235';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -254,10 +256,25 @@ function field(name,label,value='',type='text'){return `<label>${esc(label)}<inp
 function area(name,label,value=''){return `<label>${esc(label)}<textarea name="${name}">${esc(value)}</textarea></label>`}
 function character(id){return data.characters.find(c=>c.id===id)}
 function item(id){return findCatalogItem(id)}
-function main(){let body='';if(view==='characters')body=charactersView();if(view==='sheet')body=sheetView();if(view==='creation')body=creationWizardView();if(view==='library')body=libraryView();if(view==='trash')body=trashView();if(view==='backup')body=backupView();if(view==='encounter')body=encounterView();return `<div class="shell"><header class="mast"><div class="mast-top"><div class="eyebrow">HÂRNMASTER · GAME MASTER CONSOLE</div><div class="release-marker" aria-label="Aktuální verze webové aplikace">VERZE ${APP_VERSION}</div></div><h1>The Keeper's Ledger <span class="app-version" aria-label="Verze aplikace">v${APP_VERSION}</span></h1><p>Registr postav · osobní deníky · knihovna vybavení</p></header><div class="layout"><nav class="nav" aria-label="Hlavní navigace">${[['characters','⚜ Postavy'],['library','⚔ Knihovna'],['trash','♻ Archiv'],['backup','▣ Zálohy'],['encounter','⚔ Příprava boje']].map(([v,l])=>`<button class="${view===v?'':'secondary'}" data-nav="${v}">${l}</button>`).join('')}</nav><main class="content">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div><footer class="footer">HMK UI v${APP_VERSION} · samostatně nasaditelné doménové kontrakty + export do jádra · pravidlový Shock bridge · plný combat resolver zatím není připojen</footer></div>`}
+function main(){let body='';if(view==='characters')body=charactersView();if(view==='sheet')body=sheetView();if(view==='creation')body=creationWizardView();if(view==='library')body=libraryView();if(view==='trash')body=trashView();if(view==='backup')body=backupView();if(view==='encounter')body=encounterView();return `<div class="shell"><header class="mast"><div class="mast-top"><div class="eyebrow">HÂRNMASTER · GAME MASTER CONSOLE</div><div class="release-marker" aria-label="Aktuální verze webové aplikace">VERZE ${APP_VERSION}</div></div><h1>The Keeper's Ledger <span class="app-version" aria-label="Verze aplikace">v${APP_VERSION}</span></h1><p>Registr postav · osobní deníky · knihovna vybavení</p></header><div class="layout"><nav class="nav" aria-label="Hlavní navigace">${[['characters','⚜ Postavy'],['library','⚔ Knihovna'],['trash','♻ Archiv'],['backup','▣ Zálohy'],['encounter','⚔ Příprava boje']].map(([v,l])=>`<button class="${view===v?'':'secondary'}" data-nav="${v}">${l}</button>`).join('')}${creationDrafts().length?`<button type="button" class="secondary" data-resume-creation="${esc((creationDrafts().some(c=>c.id===selected)?selected:creationDrafts()[0].id))}">↩ Rozpracovaná tvorba</button>`:''}</nav><main class="content">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div><footer class="footer">HMK UI v${APP_VERSION} · samostatně nasaditelné doménové kontrakty + export do jádra · pravidlový Shock bridge · plný combat resolver zatím není připojen</footer></div>`}
 let creationAttributeChoice=null;
-function creationWizardView(){const c=character(selected);if(!c){view='characters';return charactersView()}return creationWizardHTML(c,{editAttribute:creationAttributeChoice})}
-function charactersView(){const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));return `<div class="topline"><h2>Registr postav (${data.characters.length})</h2>${button('+ Vytvořit postavu krok za krokem','new-character')}</div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards">${list.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><span class="pill">${esc(c.kind)}</span><h3>${esc(c.name)}</h3><div class="muted">${esc(c.occupation||'Bez povolání')}</div><div class="muted">${esc(c.description||'')}</div>${c.hmk?.creation?`<div class="muted">Character Creation · ${esc(c.hmk.creation.status==='review-required'?'Ke kontrole GM':'krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="actions"><button data-open="${esc(c.id)}">Otevřít deník</button><button class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></article>`).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`}
+// The current creation character is a persisted CHARACTER, never a second draft.
+const CREATION_LAST_ID='hmk-ledger-last-creation-character-v1';
+function creationDrafts(){return data.characters.filter(c=>c.hmk?.creation&&c.hmk.creation.status!=='complete')}
+function resumeCreation(id){
+ const c=character(id);if(!c?.hmk?.creation)return false;
+ if(combatInitiativeSequence)return false;
+ selected=id;view='creation';overlay=null;
+ try{sessionStorage.setItem(CREATION_LAST_ID,id)}catch{}
+ render();return true;
+}
+function creationResumeBar(){const drafts=creationDrafts();if(!drafts.length)return '';
+ const last=(()=>{try{return sessionStorage.getItem(CREATION_LAST_ID)}catch{return null}})();
+ const ordered=[...drafts].sort((a,b)=>(a.id===last?-1:0)-(b.id===last?-1:0));
+ return `<section class="panel" aria-label="Rozpracované postavy"><h3>Pokračovat v tvorbě postavy</h3><p>Postavy jsou bezpečně uloženy v registru. Otevření jiné části aplikace ani restart prohlížeče je neodstraní.</p>${ordered.map(c=>`<div class="list-row"><span>${esc(c.name)} · krok ${esc(c.hmk.creation.step)}/14</span><button type="button" data-resume-creation="${esc(c.id)}">Pokračovat v tvorbě</button><button type="button" class="secondary" data-open="${esc(c.id)}">Otevřít deník</button></div>`).join('')}</section>`;
+}
+function creationWizardView(){const c=character(selected);if(!c){view='characters';return charactersView()}try{sessionStorage.setItem(CREATION_LAST_ID,c.id)}catch{}return creationWizardHTML(c,{editAttribute:creationAttributeChoice})}
+function charactersView(){const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));return `<div class="topline"><h2>Registr postav (${data.characters.length})</h2>${button('+ Vytvořit postavu krok za krokem','new-character')}</div>${creationResumeBar()}<div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards">${list.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><span class="pill">${esc(c.kind)}</span><h3>${esc(c.name)}</h3><div class="muted">${esc(c.occupation||'Bez povolání')}</div><div class="muted">${esc(c.description||'')}</div>${c.hmk?.creation?`<div class="muted">Character Creation · ${esc(c.hmk.creation.status==='review-required'?'Ke kontrole GM':'krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="actions"><button data-open="${esc(c.id)}">Otevřít deník</button><button class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></article>`).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`}
 function armourLoadoutPanel(inv){
  const report=auditArmourLoadout(inv);
  const rows=report.rows.map(r=>`<tr><td>${esc(r.location)}</td><td>${r.count}</td><td>${r.protection.b}</td><td>${r.protection.e}</td><td>${r.protection.p}</td><td>${r.protection.f}</td></tr>`).join('');
@@ -2965,6 +2982,7 @@ document.addEventListener('click',e=>{
   render();
  }catch(err){alert('Initiative: '+err.message)}
 });
+document.addEventListener('click',e=>{const t=e.target.closest?.('[data-resume-creation]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();if(!resumeCreation(t.dataset.resumeCreation))alert('Rozpracovanou postavu nelze obnovit nebo je aktivní Initiative.');},true);
 document.addEventListener('click',e=>{const t=e.target.closest('[data-action],[data-nav],[data-open],[data-copy],[data-archive],[data-remove-inv],[data-delete-log],[data-edit-item],[data-copy-item],[data-delete-item],[data-restore],[data-purge],[data-delete-character],[data-export-character]');if(!t)return;
 if(t.dataset.exportCharacter){if(storageReadOnly)return alert('Nečitelná data: použijte nouzovou zálohu.');try{const pkg=characterPackage(t.dataset.exportCharacter);downloadJSON(pkg,'hmk-postava-'+safeFilename(pkg.character.name)+'.json')}catch(err){alert(err.message)}return}
 if(t.dataset.action==='skip-auto-free-press'){if(pendingAutomaticFreePress?.ready&&!pendingAutomaticFreePress.used){pendingAutomaticFreePress.used=true;render();}return;}
@@ -3003,14 +3021,22 @@ if(t.dataset.deleteCharacter){
  if(combatInitiativeSequence)return alert('Během Initiative nelze definitivně odstranit postavu.');
  const c=character(t.dataset.deleteCharacter);
  if(!c)return;
+ if(c.hmk?.arcane?.shade)return alert('Postavu s potvrzenou nevratnou proměnou Shade nelze definitivně odstranit z autoritativní evidence.');
  if(!ask(`Opravdu si přejete DEFINITIVNĚ smazat postavu „${c.name}“?\n\nSpolu s postavou se smaže její osobní deník, inventář a všechny uložené údaje. Akci nelze vrátit.\n\nPokračovat?`))return;
  const id=c.id;
- mutate(()=>{
+ const wasSelected=selected===id,originalView=view,originalOverlay=overlay;
+ const deleted=mutate(()=>{
   data.characters=data.characters.filter(x=>x.id!==id);
   data.inventory=data.inventory.filter(x=>x.characterId!==id);
   data.journal=data.journal.filter(x=>x.characterId!==id);
-  if(selected===id){selected=null;view='characters';overlay=null}
+  if(wasSelected){selected=null;view='characters';overlay=null}
  });
+ if(!deleted){if(wasSelected){selected=id;view=originalView;overlay=originalOverlay;render()}return;}
+ // Session pointers are UI hints, not authoritative character records. Clear
+ // them only after the verified database checkpoint has committed.
+ try{if(sessionStorage.getItem(CREATION_LAST_ID)===id)sessionStorage.removeItem(CREATION_LAST_ID)}catch{}
+ encounterSelection.delete(id);persistEncounterDraft();
+ if(wasSelected)render();
  return;
 }
 if(t.dataset.archive){if(combatInitiativeSequence)return alert('Během Initiative nelze archivovat postavu.');const c=character(t.dataset.archive);if(ask(`Archivovat postavu ${c.name}?`))mutate(()=>{data.characters=data.characters.filter(x=>x.id!==c.id);data.trash.push(c)});return}
@@ -4316,10 +4342,29 @@ function asNonNegativeNumber(v){if(v===null||v===undefined||String(v).trim()==="
 function asNumber(v){if(v===null||v===undefined||String(v).trim()==='')return null;const n=Number(v);return Number.isSafeInteger(n)&&n>=0?n:null}
 
 // v11: Form-based inventory editing with explicit category and slot validation.
-function inventoryEditForm(x){return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-inv-title"><h2 id="edit-inv-title">Upravit vybavení: ${esc(x.snapshot.name)}</h2><p class="muted">${esc(x.snapshot.category)} · Změny se projeví až po uložení.</p><form id="inventory-edit-form"><input type="hidden" name="id" value="${esc(x.id)}">${numericField('quantity','Počet kusů',x.quantity)}${field('condition','Stav / poznámka',x.condition||'')}${numericField('currentWQ','Aktuální WQ (neznámá = prázdné)',x.currentWQ??'')}${slotSelect('slot',x.slot||'none')}<label>Způsob nesení (pro výbavu mimo zbroj na těle)<select name="gearStowage">${[['normal','Běžně'],['awkward','Nepohodlně (dvojnásobná hmotnost)'],['backpack','Uvnitř správně sbaleného batohu (poloviční hmotnost)']].map(([k,v])=>`<option value="${k}" ${x.gearStowage===k?'selected':''}>${v}</option>`).join('')}</select></label>${x.snapshot.category==='armor'?`${field('layerOrder','Pořadí vrstvy zevnitř ven (0–99, pouze pro vlastní sestavy)',x.layerOrder??'','number')}${field('bulkExceptionZones','GM Bulk výjimka: head,arms,torso,legs (pouze doložená výjimka HMK)',(x.bulkExceptionZones||[]).join(','))}<label>Sloupec vrstvy podle HMK p.117 (volitelný)<select name="layerSlot">${[['','Neurčen'],['underFar','Under far'],['underNear','Under near'],['base','Base'],['overNear','Over near'],['overFar','Over far']].map(([k,v])=>`<option value="${k}" ${x.layerSlot===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}<div class="actions"><button type="submit">Uložit změny</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`}
+function inventoryEditForm(x){return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-inv-title"><h2 id="edit-inv-title">Upravit vybavení: ${esc(x.snapshot.name)}</h2><p class="muted">${esc(x.snapshot.category)} · Změny se projeví až po uložení.</p><form id="inventory-edit-form"><input type="hidden" name="id" value="${esc(x.id)}"><input type="hidden" name="ownerId" value="${esc(x.characterId)}">${numericField('quantity','Počet kusů',x.quantity)}${field('condition','Stav / poznámka',x.condition||'')}${numericField('currentWQ','Aktuální WQ (neznámá = prázdné)',x.currentWQ??'')}${slotSelect('slot',x.slot||'none')}<label>Způsob nesení (pro výbavu mimo zbroj na těle)<select name="gearStowage">${[['normal','Běžně'],['awkward','Nepohodlně (dvojnásobná hmotnost)'],['backpack','Uvnitř správně sbaleného batohu (poloviční hmotnost)']].map(([k,v])=>`<option value="${k}" ${x.gearStowage===k?'selected':''}>${v}</option>`).join('')}</select></label>${x.snapshot.category==='armor'?`${field('layerOrder','Pořadí vrstvy zevnitř ven (0–99, pouze pro vlastní sestavy)',x.layerOrder??'','number')}${field('bulkExceptionZones','GM Bulk výjimka: head,arms,torso,legs (pouze doložená výjimka HMK)',(x.bulkExceptionZones||[]).join(','))}<label>Sloupec vrstvy podle HMK p.117 (volitelný)<select name="layerSlot">${[['','Neurčen'],['underFar','Under far'],['underNear','Under near'],['base','Base'],['overNear','Over near'],['overFar','Over far']].map(([k,v])=>`<option value="${k}" ${x.layerSlot===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}<div class="actions"><button type="submit">Uložit změny</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`}
 
 document.addEventListener('click',e=>{const t=e.target.closest('[data-edit-inv]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();const x=data.inventory.find(x=>x.id===t.dataset.editInv&&x.characterId===selected);if(!x)return;overlay=inventoryEditForm(x);render()},true);
-document.addEventListener('submit',e=>{if(e.target.id!=='inventory-edit-form')return;e.preventDefault();e.stopImmediatePropagation();const v=Object.fromEntries(new FormData(e.target));const x=data.inventory.find(x=>x.id===v.id&&x.characterId===selected);if(!x)return alert('Předmět již neexistuje');const quantity=Number(v.quantity);const currentWQ=v.currentWQ.trim()===''?null:Number(v.currentWQ);if(!Number.isSafeInteger(quantity)||quantity<1||quantity>999999)return alert('Počet musí být celé číslo 1–999999');if(currentWQ!==null&&(!Number.isSafeInteger(currentWQ)||currentWQ<0||currentWQ>999))return alert('WQ musí být celé číslo 0–999');if(!validSlotForCategory(v.slot,x.snapshot.category))return alert('Neplatný slot pro tento typ předmětu');if(['main_hand','off_hand','worn'].includes(v.slot)&&quantity!==1)return alert('Nasazený předmět musí mít počet 1');if(!handSlotAvailable(x.characterId,v.slot,x.id))return alert('Ruka je již obsazena');if(combatInitiativeSequence)return alert('Změna vybavení během Initiative vyžaduje řádně vyhodnocenou Combat akci');const layerOrder=x.snapshot.category==='armor'&&String(v.layerOrder??'').trim()!==''?Number(v.layerOrder):null;const layerSlot=x.snapshot.category==='armor'?(v.layerSlot||null):null;const bulkExceptionZones=x.snapshot.category==='armor'&&String(v.bulkExceptionZones??'').trim()?String(v.bulkExceptionZones).split(',').map(z=>z.trim().toLowerCase()):[];if(new Set(bulkExceptionZones).size!==bulkExceptionZones.length||bulkExceptionZones.some(z=>!['head','arms','torso','legs'].includes(z)))return alert('Bulk: neplatné nebo opakované tělesné zóny');const gearStowage=v.gearStowage||'normal';if(!['normal','awkward','backpack'].includes(gearStowage))return alert('Neplatný způsob nesení');if(gearStowage==='backpack'&&v.slot!=='carried')return alert('Obsah batohu musí být ve slotu Neseno');if(gearStowage==='backpack'&&/\bbackpack\b/i.test(x.snapshot.name))return alert('Samotný batoh nesmí být zabalen jako svůj vlastní obsah. HMK str. 120: poloviční hmotnost platí pouze pro obsah.');if(layerOrder!==null&&(!Number.isSafeInteger(layerOrder)||layerOrder<0||layerOrder>99))return alert('Pořadí zbrojní vrstvy musí být celé číslo 0–99');if(mutate(()=>{const target=data.inventory.find(row=>row.id===v.id&&row.characterId===selected);if(!target)throw Error('Předmět již neexistuje');target.quantity=quantity;target.currentWQ=currentWQ;target.condition=v.condition;target.slot=v.slot;target.gearStowage=gearStowage;if(target.snapshot.category==='armor'){target.layerOrder=layerOrder;target.layerSlot=layerSlot;target.bulkExceptionZones=bulkExceptionZones}})){overlay=null;render()}},true);
+document.addEventListener('submit',e=>{
+ if(e.target?.id!=='inventory-edit-form')return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const v=Object.fromEntries(new FormData(e.target));
+ const ownerId=String(v.ownerId??'');
+ if(!ownerId||ownerId!==selected||view!=='sheet'||!character(ownerId))return alert('Změnila se otevřená postava. Znovu otevřete vybavení z jejího listu.');
+ if(combatInitiativeSequence)return alert('Změna vybavení během Initiative vyžaduje řádně vyhodnocenou Combat akci');
+ const quantity=Number(v.quantity),currentWQ=String(v.currentWQ??'').trim()===''?null:Number(v.currentWQ);
+ const layerOrder=String(v.layerOrder??'').trim()===''?null:Number(v.layerOrder);
+ const layerSlot=v.layerSlot||null;
+ const bulkExceptionZones=String(v.bulkExceptionZones??'').trim()?String(v.bulkExceptionZones).split(',').map(z=>z.trim().toLowerCase()):[];
+ const patch={ownerId,itemId:String(v.id??''),slot:v.slot,quantity,currentWQ,
+   condition:String(v.condition??''),gearStowage:v.gearStowage||'normal',
+   layerOrder:v.slot==='worn'?layerOrder:null,layerSlot:v.slot==='worn'?layerSlot:null,
+   bulkExceptionZones:v.slot==='worn'?bulkExceptionZones:[]};
+ let changed;try{changed=applyInventoryItemEdit(data,patch)}catch(err){return alert('Vybavení nezměněno: '+err.message)}
+ if(mutate(()=>{data.inventory=changed.inventory;})){
+   selected=ownerId;view='sheet';overlay=null;render();
+ }
+},true);
 
 // v11: Multi-line journal editor preserves timestamps and record identity.
 function journalEditForm(x){return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-log-title"><h2 id="edit-log-title">Upravit zápis deníku</h2><form id="journal-edit-form"><input type="hidden" name="id" value="${esc(x.id)}">${field('title','Nadpis',x.title||'')}${area('body','Text zápisu',x.body)}<div class="actions"><button type="submit">Uložit zápis</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`}
@@ -5308,13 +5353,32 @@ document.addEventListener('click',event=>{
  const btn=event.target?.closest?.('[data-hmk-rule-help]');if(!btn)return;
  event.preventDefault();event.stopImmediatePropagation();
  const modal=document.getElementById('hmk-rule-dialog');if(!modal)return;
- const selectedOption=btn.closest('label')?.querySelector('select')?.selectedOptions?.[0]?.textContent;
+ const field=btn.closest('label')?.querySelector('[name]');
+ const selectedOption=field?.tagName==='SELECT'?field.selectedOptions?.[0]?.textContent:'';
+ const step=Number(btn.dataset.hmkRuleStep);
+ const liveCharacter=character(selected);
+ const wizardForm=btn.closest('#creation-step-form');
+ const current=(name)=>wizardForm?.elements?.namedItem(name)?.value||'';
+ const previewCharacter={...liveCharacter,
+  occupation:current('occupation')||liveCharacter?.occupation,
+  hmk:{...(liveCharacter?.hmk??{}),
+   familyOccupation:current('familyOccupation')||liveCharacter?.hmk?.familyOccupation,
+   birthRegion:current('birthRegion')||liveCharacter?.hmk?.birthRegion,
+   socialClass:current('socialClass')||liveCharacter?.hmk?.socialClass,
+   society:current('society')||liveCharacter?.hmk?.society}};
+ const fieldName=btn.dataset.hmkRuleHelp;
+ // DP is interpreted for the actual Skill chosen immediately beside it.
+ const chosen=fieldName==='skillDP'?current('skillName'):(field?.value??'');
+ const stage=SKILL_STAGES[creationOf(liveCharacter).skillStage]??null;
+ const note=fieldRuleNote(step,fieldName,previewCharacter,chosen,stage);
  const title=btn.dataset.hmkRuleTitle||'Pravidla pro tuto volbu';
- modal.querySelector('#hmk-rule-dialog-title').textContent=title+(selectedOption&&selectedOption!=='Vyberte…'?' · '+selectedOption:'');
- modal.querySelector('#hmk-rule-dialog-page').textContent='HMK v1.2 · str. '+btn.dataset.hmkRulePage;
- modal.querySelector('#hmk-rule-dialog-effect').textContent=btn.dataset.hmkRuleEffect||'';
- modal.querySelector('#hmk-rule-dialog-dice').textContent=btn.dataset.hmkRuleDice||'';
- modal.querySelector('#hmk-rule-dialog-status').textContent=btn.dataset.hmkRuleVerified==='yes'?'Shrnutí pravidla z ověřené stránky; nejde o úplný doslovný přepis.':'Konkrétní výjimka dosud čeká na GM review a ověření.';
+ modal.querySelector('#hmk-rule-dialog-title').textContent=title+(selectedOption&&chosen?' · '+selectedOption:'');
+ modal.querySelector('#hmk-rule-dialog-page').textContent='HMK v1.2 · tištěná str. '+note.page;
+ modal.querySelector('#hmk-rule-dialog-effect').textContent=note.effect;
+ modal.querySelector('#hmk-rule-dialog-dice').textContent=note.dice;
+ modal.querySelector('#hmk-rule-dialog-original').textContent=note.excerpt.length?'Původní anglické znění HMK v1.2: “'+note.excerpt.join('”  “')+'”':'';
+ modal.querySelector('#hmk-rule-dialog-context').textContent=note.context||'Nejprve určete příslušné vstupní hodnoty postavy.';
+ modal.querySelector('#hmk-rule-dialog-status').textContent=note.hasExcerpt?'Doslovný výňatek je odlišen od vysvětlení a aktuálních vypočtených hodnot.':note.verified?'Konkrétní originální odstavec dosud není pro toto pole přepsán; výše je kontrolované vysvětlení.':'Pole zatím nemá doložené podrobné pravidlo. Neodvozujte další omezení odhadem.';
  if(typeof modal.showModal==='function')modal.showModal();else modal.setAttribute('open','');
 },true);
 
@@ -5369,7 +5433,7 @@ document.addEventListener('submit',event=>{
  const original=character(selected);if(!original)return;
  const c=creationOf(original),step=c.step,action=event.submitter?.value||'next';
  let patch={step,values:{},advance:action==='next'};
- for(const [k,val] of Object.entries(v))if(['folk','ageGroup','birthMonth','birthDay','sunsignTraits','sunsignTraitSecondary','traitRollSecondary','birthplace','society','socialClass','familyOccupation','familyWeaponcrafterType','familyMartialChoice','familyVariantChoice','familyScriptChoice','familySecondScriptChoice','familyThirdScriptChoice','background','estrangementRoll','occupation','wealth','folkRoll','ageRoll','traitRoll','classRoll','classDie','backgroundRoll','backgroundTensRoll','urbanChance','tribalUnsettled','birthRegion','regionRoll','venariveRoll','nativeLanguageRoll','regionSubRoll','regionDialectRoll','nativeLanguageChoice','regionTribeRoll','regionCommunityChoice','regionDialectChoice','regionAzeriDialectChoice','subsistence','parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll','familyAuto','backgroundAuto','viking','occupationAuto','occupationScriptChoice','occupationLanguageChoice','occupationLanguageDistribution','occupationScriptsDistribution','occupationSecondScriptChoice','occupationThirdScriptChoice','backgroundCityLanguageDistribution','occupationRitualChoice','nativeSkillsMode','nativeRitualChoice','wealthMethod','parentWealthDie','occupationWealthDie','familyDice','occupationDice','wealthAdvantage','ritualML','ritualClergy','ritualFightingOrder','orthodoxyPenalty','folkAuto','folkDice','arcaneTalentMode','veteranRoundsMode','veteranRound','graceDie','pvarismML'].includes(k))patch.values[k]=val;
+ for(const [k,val] of Object.entries(v))if(['folk','ageGroup','birthMonth','birthDay','sunsignTraits','sunsignTraitSecondary','traitRollSecondary','birthplace','society','socialClass','familyOccupation','familyWeaponcrafterType','familyMartialChoice','familyVariantChoice','familyScriptChoice','familySecondScriptChoice','familyThirdScriptChoice','background','estrangementRoll','occupation','wealth','folkRoll','ageRoll','traitRoll','classRoll','classDie','backgroundRoll','backgroundTensRoll','urbanChance','tribalUnsettled','birthRegion','regionRoll','venariveRoll','nativeLanguageRoll','regionSubRoll','regionDialectRoll','nativeLanguageChoice','regionTribeRoll','regionCommunityChoice','regionDialectChoice','regionAzeriDialectChoice','subsistence','parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll','familyAuto','backgroundAuto','viking','occupationAuto','occupationScriptChoice','occupationLanguageChoice','occupationLanguageDistribution','occupationScriptsDistribution','occupationSecondScriptChoice','occupationThirdScriptChoice','backgroundCityLanguageDistribution','occupationRitualChoice','nativeSkillsMode','nativeRitualChoice','nativeRitualChoice2','nativeRitualChoice3','wealthMethod','parentWealthDie','occupationWealthDie','familyDice','occupationDice','wealthAdvantage','ritualML','ritualClergy','ritualFightingOrder','orthodoxyPenalty','folkAuto','folkDice','arcaneTalentMode','veteranRoundsMode','veteranRound','graceDie','pvarismML','psycheDice','psycheTraitChoice1','psycheTraitChoice2','psycheTraitDie1','psycheTraitDie2','ritualSkill','graceAspect'].includes(k))patch.values[k]=val;
  // A typed physical die is authoritative; HTML selects may be blank or
  // contain an older choice while the GM is editing the roll.
  try{patch.values=mergeCreationChoices(original,step,patch.values,c.values,{strict:false})}
@@ -5385,9 +5449,9 @@ document.addEventListener('submit',event=>{
  } else if(action==='folk'){
   patch={...patch,advance:false,folkSkillDice:String(v.folkDice||'').split(',').map(x=>x.trim()).filter(Boolean)};
  } else if(action==='talent-prereq'){
-  patch={...patch,advance:false,arcaneTalentDice:{d20:v.arcaneTalentD20,d100s:String(v.arcaneTalentD100s||'').split(',').map(x=>x.trim()).filter(Boolean)}};
+  patch={...patch,advance:false,arcaneTalentDice:{d20:v.arcaneTalentD20,d20s:v.arcaneTalentD20s?String(v.arcaneTalentD20s).split(',').map(x=>x.trim()).filter(Boolean):undefined,d100s:String(v.arcaneTalentD100s||'').split(',').map(x=>x.trim()).filter(Boolean)}};
  } else if(action==='talent'){
-  patch={...patch,advance:false,arcaneTalentDice:{d20:v.arcaneTalentD20,d100s:String(v.arcaneTalentD100s||'').split(',').map(x=>x.trim()).filter(Boolean)}};
+  patch={...patch,advance:false,arcaneTalentDice:{d20:v.arcaneTalentD20,d20s:v.arcaneTalentD20s?String(v.arcaneTalentD20s).split(',').map(x=>x.trim()).filter(Boolean):undefined,d100s:String(v.arcaneTalentD100s||'').split(',').map(x=>x.trim()).filter(Boolean)}};
  } else if(action==='gmbonus'){
   patch={...patch,advance:false,gmBonusLanguageUpdate:{decision:String(v.gmBonusDecision||''),distribution:String(v.gmBonusDistribution||'')}};
  } else if(action==='skill'){
@@ -5399,13 +5463,55 @@ document.addEventListener('submit',event=>{
    occupationRolls:String(v.occupationDice||'').split(',').map(x=>x.trim()).filter(Boolean),
    advantage:v.wealthAdvantage!=='no'};
  }
- if(step===14&&action==='next'&&v.ritualML!==undefined&&v.ritualML!==''){
-  patch.mysteries={ritualML:Number(v.ritualML),clergy:v.ritualClergy==='yes',fightingOrder:v.ritualFightingOrder==='yes',orthodoxyPenalty:Number(v.orthodoxyPenalty||0)};
- }
+ // Religion status must be applied with the selected Ritual Skill, not gated
+ // by the non-existent manual ritualML input. The skill ML is authoritative.
  if(step===14&&action==='next'){
   patch.mysteries??={};
   if(v.graceDie!==undefined&&v.graceDie!=='')patch.mysteries.graceDie=Number(v.graceDie);
+  patch.mysteries.graceAspect=v.graceAspect||'';
   if(v.pvarismML!==undefined&&v.pvarismML!=='')patch.mysteries.pvarismML=Number(v.pvarismML);
+  if(v.ritualSkill)patch.mysteries.ritualSkill=v.ritualSkill;
+  if(v.ritualSkill){
+   patch.mysteries.clergy=v.ritualClergy==='yes';
+   patch.mysteries.fightingOrder=v.ritualFightingOrder==='yes';
+   if(v.moralityChoice!==undefined&&v.moralityChoice!=='')patch.mysteries.morality=Number(v.moralityChoice);
+   patch.mysteries.doctrineSubjects=Array.from({length:5},(_,i)=>v['doctrineSubject'+i]).filter(Boolean);
+  }
+  const aRows=Array.from({length:10},(_,i)=>v['startingElixir'+i]).filter(Boolean);
+  if(aRows.length||form.querySelector('[name="startingElixir0"]'))patch.mysteries.elixirs=aRows;
+  if(String(original.occupation??'').startsWith('Shèk-Pvâr (')){
+   const selections=new FormData(form);
+   patch.mysteries.pvarPrimary=String(original.occupation).slice('Shèk-Pvâr ('.length,-1);
+   patch.mysteries.chantryStars=Number(v.pvarChantryStars);
+   if(v.pvarChantryId)patch.mysteries.pvarChantryId=v.pvarChantryId;
+   patch.mysteries.pvarSpells=[...selections.getAll('pvarAssistedSpells').map(id=>({id,assisted:true})),...selections.getAll('pvarUnassistedSpells').map(id=>({id,assisted:false}))];
+   patch.mysteries.pvarArtefacts=Array.from({length:4},(_,i)=>{
+    if(!v['pvarArtifactKind'+i])return null;
+    return {kind:v['pvarArtifactKind'+i],enchantments:[v['pvarArtifactSpell'+i],v['pvarArtifactSpellExtra'+i]].filter(Boolean),result:v['pvarArtifactResult'+i],duration:v['pvarArtifactDuration'+i]};
+   }).filter(Boolean);
+   if(v.pvarGuildRank)patch.mysteries.pvarGuildRank=v.pvarGuildRank;
+   if(v.pvarAttunedObject)patch.mysteries.pvarAttunedObject=v.pvarAttunedObject;
+   if(v.pvarChantryName)patch.mysteries.pvarChantryName=v.pvarChantryName;
+   patch.mysteries.pvarChantryConvocation=v.pvarChantryConvocation;
+  }
+  if(String(original.occupation??'').startsWith('Shaman (')){
+   patch.mysteries.shamanTradition=v.shamanTradition||'';
+   patch.mysteries.shamanKathTotem=v.shamanKathTotem||'';
+  }
+  if(String(original.occupation??'').startsWith('Shaman (')){
+   const powers=[];for(let i=0;i<20;i++){
+    const token=String(v['spiritPower'+i]??'');if(!token)continue;
+    const parts=token.split('::');if(parts.length!==3)return alert('Neplatná volba Spirit Power.');
+    powers.push({family:parts[0],subject:parts[1],anima:Number(parts[2]),talisman:v['spiritTalisman'+i]==='yes'});
+   }
+   patch.mysteries.spiritPowers=powers;
+  }
+  if(v.psycheDice!==undefined&&String(v.psycheDice).trim()){
+   const rolls=String(v.psycheDice).split(',').map(x=>x.trim());
+   const dice=[v.psycheTraitDie1,v.psycheTraitDie2].map(x=>x===''?null:x);
+   const choices=[v.psycheTraitChoice1,v.psycheTraitChoice2];
+   patch.mysteries.psyche={d20s:rolls,d10s:dice,choices};
+  }
  }
  let updated;try{updated=applyCreationPatch(original,patch);syncCreationSkills(updated.hmk,uuid)}catch(err){return alert('HMK Character Creation: '+err.message)}
  const success=mutate(()=>{const entry=character(selected);if(!entry)throw Error('Postava neexistuje');Object.assign(entry,updated)});
