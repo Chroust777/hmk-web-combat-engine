@@ -1,3 +1,50 @@
+# HMK Keeper’s Ledger – v93.239 (automatická tvorba a Covenant)
+
+**Nové:** V registru je jedním kliknutím dostupný automatický náhodný generátor a generátor podle sedmi povahových zaměření. Nevyžadují hody ani potvrzení hráče: procházejí původní čtrnáctikrokový pravidlový engine, používají softwarovou náhodu a uchovávají historii hodů jako generovanou, nikoli fyzickou. Po dokončení se otevře Character Sheet a tvorba má stav `auto-generated` bez následného potvrzení GM. Edit zůstává dostupný.
+
+**Covenant, HMK p.343:** Pravidla Émhlè neuvádějí samostatné rodičovské povolání Priest. V kroku Occupation je zobrazena kněžská dráha Covenant; Character Sheet odvozuje titul Laity (ML1–29), Fighting Order (ML30–59) nebo Clergy/Priest (ML60+) z konkrétní dovednosti Ritual odpovídající víry. Nevymýšlejí se žádné Occupational DP.
+
+**Rozsah automatizace v tomto vydání:** Doložené bezpečné generované cesty začínají Folk Human; náhodné běhy používají region Hârn s ověřeným d100 výsledkem 50; Covenant používá region Emélrenè s doloženým výsledkem 95. Všechna pozdější rozhodnutí a softwarové hody proběhnou bez zásahu uživatele. Toto vydání zatím **nepředstavuje náhodné pokrytí všech ras, regionů, místních tradic a procentních distribucí tištěných rodičovských d100**; takové výsledky nejsou vydávány za otestované. Volby podle zaměření upřednostňují skutečně povolená povolání, Skills a odpovídající Sunsign Traits, bez přepisování skutečných kostkových pravděpodobností. Mezi interními pokusy se mohou odmítnout neúplné cesty; neúspěšný profil je odstraněn z jediné autoritativní databáze.
+
+**Omezení testování:** E2E probíhá v Chromium nad simulovaným localStorage. Není to certifikace hostovaného serveru; zdrojově nedoložené kmenové možnosti se nadále nesmějí generovat domněnkou.
+
+---
+
+## v93.238 – Šest kompletních klikacích E2E archetypů / opravy závislostí (HMK v1.2)
+
+**Základ:** produkční v93.237. Testováno šest *skutečných* 14krokových klikacích průchodů v headless Chromium (izolovaná aplikace se simulovaným localStorage); šlechtic Gentry Pilot, Slave Craft, rodič Gentry Arcanist-Alchemist s fyzickým d100+d20, Shèk-Pvâr Fývria s fyzickým d100+d6, Shaman z Covenant a feudal Priest Peóni. U všech následoval Character Sheet a nový start aplikace nad zachovanou serializací; dva průchody také Edit.
+
+Opraveny **tři konkrétní chyby**:
+1. `app.js` při potvrzení kroku 7 přehlížel `familyRitualChoice` v seznamu odesílaných položek, přestože uživatel správně volil náboženství v nabídce. Rodičovský Shaman tak nikdy neprošel validačním ověřením.
+2. `occupationWealthDie` nerozpoznával nespecializovaný rodičovský `Shèk-Pvâr` ani výsledek rodičovského d100 `Shèk-Pvâr (Fývria)`; HMK tištěná str.44 stanoví oběma d4.
+3. Doplněny explicitní rodičovské `Shaman` Wealth d2 a obecné `Slave` Wealth d0 podle tištěné str.44. Tyto názvy pocházejí ze skutečných rodičovských tabulek, nejsou novými profesemi.
+
+Historie fyzických hodů a jediný autoritativní profil zůstávají zachované. Nejsou změněny Combat, Magic, G04, Inventory ani CSS. Závěrečné klikací testy používají reálný DOM Chromium; uložiště je izolovaně simulované, nikoli skutečně hostované `localStorage`. Dokončení procesu končí právem ve stavu `review-required` (GM review), nikoli předstíraným definitivním schválením.
+
+Generátor **není** v této verzi součástí produktu; této etapě předchází jeho samostatný vývoj, jak požadoval uživatel.
+
+---
+
+## v93.237 – Audit Edit / důsledná invalidace závislostí 14 kroků
+
+- Změna zdrojových Skill DP v kroku 3/5/6/7/8/11/12 nesmí ponechat staré Mysteries, Doctrine, Spirit Powers, počáteční elixíry a ARP. Při invalidaci Skill stadia se deaktivují i navázané hotové Mysteries; historické fyzické hody zůstávají append-only.
+- Změna data narození zneplatní také vypsané Sunsign Traits, nikoliv pouze Trait roll vstupy; data nezávislá na znamení se zachovávají.
+- Změna Folk zneplatní staré Region/Society/Parent Class/Parent Occupation/Background/Occupation volby a nekompatibilní odvozené údaje; nezávislé narozeniny a jejich Sunsign se zachovávají.
+- Změna regionu nebo společenské třídy čistí také staré podtypy rodiče (Martial, Family Scripts) a jejich autoritativní profily.
+- Zneplatněná či změněná Aura již nesmí ponechat zastaralé Fate ML; přímý atributový přepočet a historie hodů jsou zachovány.
+- Cílené reprodukční testy běží na původním archivu (očekávaná selhání), poté nad opravenou verzí spolu s dosavadními regresními testy.
+- Omezení: skutečný UI test 14krokového Edit a obnovení po restartu v běžném prohlížeči zůstává pro bod 6; nelze jej nahradit pouhou syntaktickou kontrolou.
+
+## v93.236 – Doslovné kontextové nápovědy, profesní varianty a bod 4
+
+- **Všech 14 kroků:** každý skutečně zobrazený pojmenovaný vstup má tlačítko `?` se zdrojovým anglickým výňatkem z uživatelem dodaného HMK v1.2, správnou tištěnou stranou, českým vysvětlením a aktuální volbou. Používá se kontext **aktuálního formuláře**, nejen starých potvrzených dat.
+- **Přesný rozsah citací:** 113 přímo mapovaných typů polí a 14 podpůrných citací kroků; u všech 342 profesních variant se zobrazuje doslovný popis **tištěné základní profese** (78 popisů v původním katalogu), konkrétní volba a profesní DP jsou samostatné. Není-li vlastní tištěná věta pro specializaci, obecný text nesmí být vydáván za její specifickou definici.
+- **Rozdělovací řádky:** nápovědu nyní mají i jednotlivé nabídky vícenásobných Language/Script DP, které dříve neměly své `name` atributy.
+- **Cavalry/Throwing:** při výběru nezapsané rodičovské specializace se živě ukáže skutečný výsledný profil (např. Throwing 5 DP), žádný automatický hod.
+- **Bod 4:** nová cílená regrese kontroluje 22 různých rodičovských jmen vyžadujících skutečnou variantu/podhod; nadále se nesmí doplnit umělý profil před rozhodnutím. Všechny dosavadní regresní testy z v93.235 zachovány.
+- **Bez zásahů:** žádné změny Combat, Magic, G04, inventory, CSS ani pravidlových výpočtů; jedna nová read-only mapa textů z uživatelova PDF.
+- **Omezení:** citace vysvětlují všechna aktuálně vykreslená pole; pokud HMK uvádí pouze obecné pravidlo pro celé stadium, bude tak také označeno. Nejde o přepis celé knihy ani o nezávislé přeložení pravidel. Prohlížečový E2E test restartu/localStorage a úplná certifikace Edit jsou nadále vyhrazeny krokům 5–6.
+
 ## v93.235 – Oprava definitivního smazání rozpracované postavy
 
 Opraven bezpečnostní kontrolní bod Shade: odstranění postavy bez potvrzené nevratné proměny již není chybně odmítáno jako `invalid-shade-transition`. Postava se skutečně potvrzeným Shade nadále nesmí být tímto způsobem vymazána; rozhraní na to výslovně upozorní **před** zápisem. Při odstranění se ze stejného ověřeného databázového zápisu odstraní také inventář a osobní deník dané postavy. Po úspěchu se vyčistí nepřetrvávající session ukazatele na smazanou postavu, ne její historické údaje jiné postavy. Při odmítnutí zápisu se obnoví vybraná postava a otevřená obrazovka.
