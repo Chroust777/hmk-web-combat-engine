@@ -5,6 +5,8 @@
 import {SKILL_STAGES,calculateSheetSkills} from './hmk-character-creation.js';
 import {OCCUPATIONS, OCCUPATION_PAGES, familyOccupationProfile, familySkillCap} from './hmk-creation-tables.js';
 import {parseInstance} from './hmk-skill-instances.js';
+import {OCCUPATION_TABLE_PROSE} from './hmk-creation-occupation-excerpts.js';
+import {FIELD_LITERAL_QUOTES,STEP_LITERAL_QUOTES} from './hmk-creation-source-quotes.js';
 const ADDITIONAL_FIELD_NOTES=Object.freeze({
  graceAspect:[53,'Dvanáct Divine Aspects připadá v úvahu pouze pro postavu marked nebo s alespoň jedním Grace; vybere se přesně jeden.','Fyzický hod Divine Grace byl proveden samostatně; žádná další kostka pro volbu Aspect není předepsána.'],
  moralityChoice:[55,'Morality se posuzuje podle ortodoxního rozmezí daného náboženství. Výsledný postih je odvozený, nikoli zadávaný ručně.','Vyberte skutečnou Morality, neházejte zde další kostkou.'],
@@ -18,6 +20,8 @@ const ADDITIONAL_FIELD_NOTES=Object.freeze({
  pvarChantryName:[197,'Název vybrané jmenovité chantry se přenáší automaticky z položky p.197.','Ručně popisujte jen skutečně doloženou jinou chantry.'],
  pvarChantryConvocation:[205,'Konvokace chantry určuje její dostupné prostředky a cenu asistovaného výzkumu.','U jmenovité chantry je konvokace automatická, nelze ji svévolně přepsat.'],
  pvarChantryStars:[205,'Počet hvězd konvokační chantry ovlivňuje dostupné Resources pro asistovaný výzkum.','U jmenovité chantry se hvězdy doplňují přímo z p.197.'],
+ pvarAssistedSpells:[54,'Asistovaná Spell Research Capability určuje, které konvokace lze zkoumat s prostředky chantry; výsledné náklady ARP závisí na dostupných Resources.','Vybírá se z pravidlového seznamu kouzel; bez další kostky.'],
+ pvarUnassistedSpells:[54,'Neasistovaná Spell Research Capability je omezená Pvârism ML a příslušnou konvokací; aplikace zohlední skutečný ARP rozpočet.','Vybírá se z pravidlového seznamu kouzel; bez další kostky.'],
  pvarGuildRank:[199,'Guild Rank Shèk-Pvâr souvisí s Age, Pvârism ML i politikou guild; pravidlo nestanoví automatickou jedinou hodnost pro všechny.','Vyberte doloženou hodnost z nabídky; nevytvářejte dodatečnou kostku.'],
  pvarAttunedObject:[201,'Attuned Elemental Object je konkrétní předmět odpovídající konvokaci postavy.','Uživatel jej popisuje vlastními slovy; není to náhodný hod.'],
  pvarArtifactKind:[54,'Minor artefact vyžaduje jedno enchantment, major artefact dvě nebo více; navazují na známá kouzla.','Výběr typu, ne fyzický hod.'],
@@ -192,6 +196,33 @@ const OCCUPATION_DESCRIPTIONS=Object.freeze({
  'Man-at-arms (Sapper)':[43,'An expert in conducting siege warfare, including mining and the construction and use of missile siege engines.'],
 });
 const LANGUAGE_EXCEPTION='However, there is no limit to the number of DP that may be spent from the same source on languages (but not scripts). Thus, a character could spend all 5 DP from Optional Skills on the same language.';
+/** The book describes 78 base professions. The engine expands many of them into
+ * deterministic mechanical variants (not 342 independent printed definitions).
+ * Return only the base *verbatim description*; actual variant DP is separate. */
+function printedOccupationProse(name){
+ let key=String(name??'').trim().toLocaleLowerCase('en');
+ key=key.replace(/^gentry:\s*/, '');
+ // Preserve distinct printed Man-at-arms descriptions instead of merging them.
+ if(key.startsWith('man-at-arms (cavalry'))key='man-at-arms (cavalry)';
+ else if(key.startsWith('man-at-arms (archer'))key='man-at-arms (archer)';
+ else if(key.startsWith('man-at-arms (sapper'))key='man-at-arms (sapper)';
+ else key=key.replace(/\s*\(.*$/, '');
+ key=({'forester':'hunter','harper':'harper/skald','jester':'jester/fool',
+        'labourer, farm':'labourer','labourer, semi-skilled':'labourer',
+        'labourer, unskilled':'labourer'}[key]??key);
+ key=key.replace(/^slave(?:\s*\(.*)?$/, 'slave');
+ key=key.replace(/^tenant officer(?:\s*\(.*)?$/, 'tenant officer');
+ key=key.replace(/^chieftain(?:\s*\(.*)?$/, 'chieftain');
+ key=key.replace(/^shèk-pvâr(?:\s*\(.*)?$/, 'shèk-pvâr');
+ key=key.replace(/^shaman(?:\s*\(.*)?$/, 'shaman');
+ key=key.replace(/^man-at-arms(?:\s*\(.*)?$/, 'man-at-arms');
+ key=key.replace(/^weaponcrafter(?:\s*\(.*)?$/, 'weaponcrafter');
+ key=key.replace(/^priest(?:\s*\(.*)?$/, 'priest');
+ key=key.replace(/^farmer(?:\s*\(.*)?$/, 'farmer');
+ key=key.replace(/^hunter(?:\s*\(.*)?$/, 'hunter');
+ key=key.replace(/^gladiator(?:\s*\(.*)?$/, 'gladiator');
+ return OCCUPATION_TABLE_PROSE[key]??null;
+}
 const normalizeField=name=>String(name??'').replace(/\d+$/,'');
 function detailsForSkill(character,selected,stage){
  if(!character||!selected||!stage)return null;
@@ -231,8 +262,20 @@ export function fieldRuleNote(step,name,character=null,selected='',stageOverride
  if(selected)context.push(`Právě zvolená možnost: ${selected}`);
  let contextText=context.join(' · '),rule=n?.[1]??'Konkrétní pravidlo pro toto pole není dosud ověřeno proti příslušné tištěné tabulce.';
  let dice=n?.[2]??'Bez doložené tabulky nelze přidávat vlastní hody ani výjimky.';
- let excerpt=SOURCE_EXCERPTS[name]??SOURCE_EXCERPTS[canonical]??OTHER_SOURCE_EXCERPTS[canonical]??[];
- let excerptPage=excerpt[0]??null; excerpt=excerpt.slice(1);
+ // All visible fields have an excerpt extracted from the user-supplied PDF.
+ // A fallback is explicitly *step-level*, never misrepresented as a field rule.
+ const fieldQuote=FIELD_LITERAL_QUOTES[name]??FIELD_LITERAL_QUOTES[canonical]??null;
+ const stepQuote=(n||SOURCE_EXCERPTS[canonical]||OTHER_SOURCE_EXCERPTS[canonical])?(STEP_LITERAL_QUOTES[step]??null):null;
+ let excerptPage=(fieldQuote??stepQuote)?.[0]??null;
+ let excerpt=(fieldQuote??stepQuote)?[(fieldQuote??stepQuote)[1]]:[];
+ let quoteScope=fieldQuote?'pole / související tištěné pravidlo':'obecný text kroku (nikoli doslovná definice pole)';
+ // Previous citations provide additional, more specific quotation snippets.
+ // Never copy an unverified English paraphrase into the source quotation area.
+ const oldExact=SOURCE_EXCERPTS[name]??SOURCE_EXCERPTS[canonical]??OTHER_SOURCE_EXCERPTS[canonical];
+ if(oldExact?.length){
+  // These are editorially checked source passages; the PDF-built quote is the fallback.
+  excerptPage=oldExact[0];excerpt=oldExact.slice(1);quoteScope='doslovné pravidlo ke konkrétní volbě';
+ }
  const selectedOccupation=(name==='occupation'?(selected||character?.occupation):name==='familyOccupation'?(selected||h.familyOccupation):null);
  if(selectedOccupation){
   const profile=name==='occupation'?OCCUPATIONS[selectedOccupation]:familyOccupationProfile(selectedOccupation,v.familyWeaponcrafterType,v.familyMartialChoice,v.familyVariantChoice,v.regionProof?.subsistence??v.subsistence);
@@ -240,12 +283,31 @@ export function fieldRuleNote(step,name,character=null,selected='',stageOverride
    const skills=Object.entries(profile.skills??{}).map(([skill,dp])=>`${skill} ${dp}`).join(' · ');
    contextText+=` | Doložený profesní profil: ${skills||'bez profilu dovedností'}`;
    const jobPage=OCCUPATION_PAGES[selectedOccupation];if(jobPage&&!excerpt.length)excerptPage=jobPage;
-   const original=OCCUPATION_DESCRIPTIONS[selectedOccupation];if(original){excerpt=[original[1]];excerptPage=original[0];}
+   const original=printedOccupationProse(selectedOccupation)??OCCUPATION_DESCRIPTIONS[selectedOccupation];
+   if(original){excerpt=[original[1]];excerptPage=original[0];quoteScope='tištěný popis základní profese; variantní DP uvedeny zvlášť';}
   }else contextText+=' | Profese nemá v aktuálním katalogu přesně doložené DP. Není přípustné ji automaticky doplnit.';
  }
  if(name==='skillName'||name==='skillDP'){
-  const fromSkill=detailsForSkill(character,name==='skillDP'?(character?.hmk?.creation?.values?.helpSelectedSkill||''):selected,stage);
-  if(fromSkill){excerpt=fromSkill.excerpt;excerptPage=fromSkill.page;contextText+=' | '+fromSkill.context;}
+  const fromSkill=detailsForSkill(character,selected,stage);
+  if(fromSkill){
+   // A dedicated printed stage excerpt is more relevant than an unrelated group.
+   excerpt=fromSkill.excerpt;excerptPage=fromSkill.page;
+   quoteScope='původní pravidlo právě vybraného stadia Skills';
+   contextText+=' | '+fromSkill.context;
+  }
+ }
+ // For unsaved subtype changes, derive *only a preview* from the current selection.
+ // It is never committed as dice evidence or a second character authority.
+ if(['familyVariantChoice','familyMartialChoice','familyWeaponcrafterType'].includes(name)&&selected){
+  const specialization=name==='familyWeaponcrafterType'?selected:v.familyWeaponcrafterType;
+  const martial=name==='familyMartialChoice'?selected:v.familyMartialChoice;
+  const variant=name==='familyVariantChoice'?selected:v.familyVariantChoice;
+  const variantProfile=familyOccupationProfile(h.familyOccupation,specialization,martial,variant,v.regionProof?.subsistence??v.subsistence);
+  if(variantProfile){
+   contextText+=' | Výsledek právě zvolené rodičovské varianty: '+Object.entries(variantProfile.skills).map(([skill,points])=>skill+' '+points+' profesních DP').join(' · ');
+   const original=printedOccupationProse(variant)||printedOccupationProse(h.familyOccupation);
+   if(original){excerpt=[original[1]];excerptPage=original[0];quoteScope='tištěný popis základní profese; DP z aktuální specializace zvlášť';}
+  }
  }
  if(name==='occupationAuto'&&character?.occupation&&OCCUPATIONS[character.occupation])rule+=' Konkrétní příděly jsou uvedeny v profesním profilu.';
  if(name==='familyAuto'&&h.familyOccupation){const profile=familyOccupationProfile(h.familyOccupation,v.familyWeaponcrafterType,v.familyMartialChoice,v.familyVariantChoice,v.regionProof?.subsistence??v.subsistence);if(profile)contextText+=` | Family maxima: ${Object.entries(profile.skills).map(([skill,dp])=>`${skill} ${Math.floor(dp/2)}`).join(' · ')}`;}
@@ -255,15 +317,27 @@ export function fieldRuleNote(step,name,character=null,selected='',stageOverride
  if(name==='startingElixir'||name.startsWith('startingElixir'))contextText+=' | Alchemy: elixír vyberte pouze tehdy, má-li postava odpovídající Alchemy ML.';
  if(name==='shamanTradition'&&!String(character?.occupation??'').startsWith('Shaman'))contextText+=' | Šamanská pravidla se nyní na toto povolání nevztahují.';
  const verified=!!n,hasExcerpt=excerpt.length>0;
- return Object.freeze({page:excerptPage??page,effect:rule,dice,verified,excerpt:Object.freeze(excerpt),context:contextText,hasExcerpt});
+ // Quote provenance is separate from the present character's derived statistics.
+ return Object.freeze({page:excerptPage??page,effect:rule,dice,verified,excerpt:Object.freeze(excerpt),context:contextText,hasExcerpt,quoteScope});
 }
 const esc=t=>String(t??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 /** Annotates only visible/in-form controls. All actual game state stays in
  * hmk-character-creation.js and the existing CAS history pipeline. */
 export function withCreationRuleHelp(markup,step){
- return String(markup).replace(/<label>([^<]*)<(input|select)\b([^>]*\bname="([^"]+)"[^>]*)>/g,(whole,label,kind,attrs,name)=>{
+ // Labels containing a dynamically generated select are still fields; the DP
+ // pool controls do not have individual name= attributes, so use their
+ // data-hmk-rule-field on the enclosing label instead.
+ return String(markup).replace(/<label\b[^>]*>[\s\S]*?<\/label>/g,labelMarkup=>{
+  const opening=/<label\b[^>]*>/.exec(labelMarkup)?.[0]??'';
+  const inferred=/\bdata-hmk-rule-field="([^"]+)"/.exec(opening)?.[1];
+  const firstControl=/<(?:input|select)\b[^>]*>/.exec(labelMarkup);
+  if(!firstControl)return labelMarkup;
+  const name=inferred??/\bname="([^"]+)"/.exec(firstControl[0])?.[1];
+  if(!name || /\btype="hidden"/.test(firstControl[0]) || labelMarkup.includes('class="hmk-rule-help"'))return labelMarkup;
+  const before=labelMarkup.slice(opening.length,firstControl.index);
+  const caption=before.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim()||name;
   const note=fieldRuleNote(step,name);
-  const button=`<button type="button" class="hmk-rule-help" data-hmk-rule-help="${esc(name)}" data-hmk-rule-step="${step}" data-hmk-rule-title="${esc(label.trim())}" data-hmk-rule-page="${note.page}" data-hmk-rule-effect="${esc(note.effect)}" data-hmk-rule-dice="${esc(note.dice)}" data-hmk-rule-verified="${note.verified?'yes':'no'}" aria-label="Pravidla pro ${esc(label.trim())}" title="HMK v1.2 · kontextové pravidlo">?</button>`;
-  return `<label>${label}${button}<${kind}${attrs}>`;
+  const button=`<button type="button" class="hmk-rule-help" data-hmk-rule-help="${esc(name)}" data-hmk-rule-step="${step}" data-hmk-rule-title="${esc(caption)}" data-hmk-rule-page="${note.page}" data-hmk-rule-effect="${esc(note.effect)}" data-hmk-rule-dice="${esc(note.dice)}" data-hmk-rule-verified="${note.verified?'yes':'no'}" aria-label="Pravidla pro ${esc(caption)}" title="HMK v1.2 · kontextové pravidlo">?</button>`;
+  return labelMarkup.slice(0,firstControl.index)+button+labelMarkup.slice(firstControl.index);
  });
 }

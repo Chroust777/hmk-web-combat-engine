@@ -1162,6 +1162,11 @@ export function standingFromWealth(amount){if(!Number.isInteger(amount)||amount<
  * Do not use this for unverified composite occupation types. */
 export function occupationWealthDie(occupation,socialClass=null){
  const name=String(occupation??'');
+ // HMK v1.2 p.44: unspecialized PARENT headings use the same printed Wealth die
+ // as their listed Occupational profiles. These must never silently become d0.
+ if(name==='Shèk-Pvâr'||name==='Shèk-Pvâr (Fývria)')return 4;
+ if(name==='Shaman')return 2;
+ if(name==='Slave')return 0;
  if(name==='Farmer (Thrall)')return 1;
  if(name==='Farmer'&&socialClass==='Unfree')return 1;
  if(name==='Slave (Gladiator)'||name.startsWith('Slave ('))return 0;

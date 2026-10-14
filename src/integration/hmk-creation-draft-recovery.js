@@ -3,7 +3,7 @@
  */
 export function isUnfinishedCreation(character){
  const c=character?.hmk?.creation;
- return !!c&&(c.status!=='review-required'||!c.completed?.[14]);
+ return !!c&&(!['review-required','auto-generated'].includes(c.status)||!c.completed?.[14]);
 }
 export function creationDrafts(database){
  return (database?.characters??[]).filter(isUnfinishedCreation);

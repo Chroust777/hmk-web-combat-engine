@@ -438,19 +438,33 @@ export function applyCreationPatch(character,patch){
  if(patch.step<14&&Object.keys(patch.values??{}).length){c.status='in-progress';}
  const changed=(key)=>Object.prototype.hasOwnProperty.call(resolvedValues,key)&&resolvedValues[key]!==previousValues[key];
  const invalidateGmLanguage=()=>{if(c.values.gmBonusLanguageProof){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'gm-bonus-language-deactivated',reason:'changed Folk/Age/Birthplace'});delete c.values.gmBonusLanguageProof;}};
- const invalidateStage=(name)=>{delete c.skillDP?.[name];if(name==='Arcane Talent Skills')delete c.values.arcaneTalentProof;if(name==='Occupation Skills')delete c.values.occupationProof;if(name==='Veteran Skills')delete c.values.veteranRoundProof;delete c.completed[12];c.status='in-progress'};
+ // A changed skill stage changes the Character Sheet projection. All finished
+ // Mysteries (Ritual/Doctrine, Alchemy, Pvârism/ARP, Spirit) depend on that
+ // projection, even when the edit originated in an *earlier* creation step.
+ // No physical roll is erased from auditEvents; only its active derived proof.
+ const invalidateStage=(name)=>{
+  delete c.skillDP?.[name];
+  if(name==='Arcane Talent Skills')delete c.values.arcaneTalentProof;
+  if(name==='Occupation Skills')delete c.values.occupationProof;
+  if(name==='Veteran Skills')delete c.values.veteranRoundProof;
+  delete c.completed[12];c.status='in-progress';
+  invalidateSkillMysteries();
+ };
  const invalidateLaterSkills=(start)=>{
   for(const name of SKILL_STAGES.slice(SKILL_STAGES.indexOf(start)))invalidateStage(name);
   if(c.step===12)c.skillStage=Math.min(c.skillStage,SKILL_STAGES.indexOf(start));
  };
  // Invalidate later Mysteries computations when their rule inputs change.
  const invalidateCreationMysteries=()=>{
-  if(c.values.psycheProof){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-psyche-deactivated',reason:'Changed creation prerequisites'});delete c.values.psycheProof;delete c.values.psycheDice;delete c.values.psycheTraitChoice1;delete c.values.psycheTraitChoice2;delete c.values.psycheTraitDie1;delete c.values.psycheTraitDie2;delete h.psyche;}
+  delete c.values.psycheRuleReview;
+  for(const key of ['psycheDice','psycheTraitChoice1','psycheTraitChoice2','psycheTraitDie1','psycheTraitDie2'])delete c.values[key];
+  if(c.values.psycheProof){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-psyche-deactivated',reason:'Changed creation prerequisites'});delete c.values.psycheProof;}
+  delete h.psyche;
   if(c.values.spiritPowerProof)c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-spirit-powers-deactivated',reason:'Changed creation prerequisites'});
-  for(const key of ['arcaneResearchProof','mysteriesProof','mysteriesRitualSkill','spiritPowerProof','startingElixirProof','startingPvarSpellsProof','startingDoctrineProof','shamanTraditionProof'])delete c.values[key];
+  for(const key of ['arcaneResearchProof','mysteriesProof','mysteriesRitualSkill','spiritPowerProof','startingElixirProof','startingPvarSpellsProof','startingDoctrineProof','shamanTraditionProof','moralityChoice','religionNeedsReview'])delete c.values[key];
   delete h.startingElixirs;delete h.startingPvarSpells;delete h.startingDoctrine;delete h.shamanTradition;
   delete h.startingSpiritPowers;
-  delete h.religiousStatus;delete h.startingArcaneResearch;
+  delete h.religiousStatus;delete h.morality;delete h.startingArcaneResearch;
   delete c.completed[14];c.status='in-progress';
  };
  const invalidateSkillMysteries=()=>{
@@ -458,10 +472,10 @@ export function applyCreationPatch(character,patch){
    c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-mysteries-derived-deactivated',reason:'Changed Skills / Attributes'});
   }
   if(c.values.spiritPowerProof)c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-spirit-powers-deactivated',reason:'Changed Skills / Attributes'});
-  for(const key of ['mysteriesProof','arcaneResearchProof','mysteriesRitualSkill','spiritPowerProof','startingElixirProof','startingPvarSpellsProof','startingDoctrineProof','shamanTraditionProof'])delete c.values[key];
+  for(const key of ['mysteriesProof','arcaneResearchProof','mysteriesRitualSkill','spiritPowerProof','startingElixirProof','startingPvarSpellsProof','startingDoctrineProof','shamanTraditionProof','moralityChoice','religionNeedsReview'])delete c.values[key];
   delete h.startingElixirs;delete h.startingPvarSpells;delete h.startingDoctrine;delete h.shamanTradition;
   delete h.startingSpiritPowers;
-  delete h.religiousStatus;delete h.startingArcaneResearch;
+  delete h.religiousStatus;delete h.morality;delete h.startingArcaneResearch;
   delete c.completed[14];c.status='in-progress';
  };
  if((patch.step===11&&(Object.keys(patch.values??{}).length||patch.advance))||
@@ -499,7 +513,10 @@ export function applyCreationPatch(character,patch){
   for(const field of ['traitRoll','traitRollSecondary']){
    if(c.values[field]!==undefined&&String(c.values[field]).trim()!=='')c.auditEvents.push({sequence:c.auditEvents.length+1,type:'roll-deactivated',step:4,field});
   }
-  delete c.values.sunsignTraits;delete c.values.sunsignTraitSecondary;delete c.values.traitRoll;delete c.values.traitRollSecondary;delete c.completed[4];invalidateStage('Sunsign Skills')}
+  delete c.values.sunsignTraits;delete c.values.sunsignTraitSecondary;delete c.values.traitRoll;delete c.values.traitRollSecondary;
+  // Do not display a trait of the old Sunsign on the Character Sheet during Edit.
+  delete h.sunsignTraits;delete h.sunsignTraitSecondary;
+  delete c.completed[4];invalidateStage('Sunsign Skills')}
  if(patch.step===5&&(tribalLegacy||changed('birthplace')||changed('society')||changed('birthRegion')||changed('regionRoll')||changed('venariveRoll')||changed('regionTribeRoll'))){
   if(!Object.hasOwn(patch.values??{},'nativeLanguageRoll'))deactivateDependent(5,['nativeLanguageRoll']);
   if(!Object.hasOwn(patch.values??{},'regionSubRoll'))deactivateDependent(5,['regionSubRoll']);
@@ -509,8 +526,12 @@ export function applyCreationPatch(character,patch){
   if(!Object.hasOwn(patch.values??{},'regionAzeriDialectChoice'))delete c.values.regionAzeriDialectChoice;
   if(!Object.hasOwn(patch.values??{},'regionCommunityChoice'))delete c.values.regionCommunityChoice;
  }
- if(patch.step===5&&(tribalLegacy||changed('birthplace')||changed('society')||changed('birthRegion')||changed('regionRoll')||changed('venariveRoll')||changed('nativeLanguageRoll')||changed('regionSubRoll')||changed('regionDialectRoll')||changed('regionDialectChoice')||changed('regionAzeriDialectChoice')||changed('regionCommunityChoice')||changed('regionTribeRoll')||changed('nativeLanguageChoice'))){deactivateDependent(6,['classRoll']);deactivateDependent(7,['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll']);deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.socialClass;delete c.values.familyOccupation;delete c.values.familyWeaponcrafterType;delete c.values.familyVariantChoice;delete c.values.familyRitualChoice;delete c.values.parentOccupationProof;delete c.values.parentTitleProof;delete c.values.urbanChance;delete c.values.regionProof;delete h.socialClass;delete h.familyOccupation;delete h.background;delete h.parentTitle;for(let k=6;k<=14;k++)delete c.completed[k];invalidateStage('Family Skills');invalidateStage('Background Skills');delete c.values.nativeRitualChoice;delete c.values.nativeRitualChoice2;delete c.values.nativeRitualChoice3;delete c.values.nativeSkillsMode}
- if(patch.step===6&&(changed('socialClass')||changed('classRoll')||changed('classDie'))){invalidateWealthInputs();invalidateStage('Family Skills');invalidateStage('Background Skills');deactivateDependent(7,['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll']);deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.familyOccupation;delete c.values.familyWeaponcrafterType;delete c.values.familyVariantChoice;delete c.values.familyRitualChoice;delete c.values.parentOccupationProof;delete c.values.parentTitleProof;delete c.values.urbanChance;delete h.familyOccupation;delete h.background;delete h.parentTitle;delete c.completed[7];delete c.completed[8];delete c.completed[13];}
+ if(patch.step===5&&(tribalLegacy||changed('birthplace')||changed('society')||changed('birthRegion')||changed('regionRoll')||changed('venariveRoll')||changed('nativeLanguageRoll')||changed('regionSubRoll')||changed('regionDialectRoll')||changed('regionDialectChoice')||changed('regionAzeriDialectChoice')||changed('regionCommunityChoice')||changed('regionTribeRoll')||changed('nativeLanguageChoice'))){deactivateDependent(6,['classRoll']);deactivateDependent(7,['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll']);deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.socialClass;delete c.values.familyOccupation;delete c.values.familyWeaponcrafterType;delete c.values.familyMartialChoice;delete c.values.familyVariantChoice;delete c.values.familyRitualChoice;
+  delete c.values.familyScriptChoice;delete c.values.familySecondScriptChoice;delete c.values.familyThirdScriptChoice;delete c.values.familyAuto;
+  delete c.values.parentOccupationProof;delete c.values.parentTitleProof;delete c.values.urbanChance;delete c.values.regionProof;delete h.socialClass;delete h.familyOccupation;delete h.background;delete h.parentTitle;for(let k=6;k<=14;k++)delete c.completed[k];invalidateStage('Family Skills');invalidateStage('Background Skills');delete c.values.nativeRitualChoice;delete c.values.nativeRitualChoice2;delete c.values.nativeRitualChoice3;delete c.values.nativeSkillsMode}
+ if(patch.step===6&&(changed('socialClass')||changed('classRoll')||changed('classDie'))){invalidateWealthInputs();invalidateStage('Family Skills');invalidateStage('Background Skills');deactivateDependent(7,['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll']);deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.familyOccupation;delete c.values.familyWeaponcrafterType;delete c.values.familyMartialChoice;delete c.values.familyVariantChoice;delete c.values.familyRitualChoice;
+  delete c.values.familyScriptChoice;delete c.values.familySecondScriptChoice;delete c.values.familyThirdScriptChoice;delete c.values.familyAuto;
+  delete c.values.parentOccupationProof;delete c.values.parentTitleProof;delete c.values.urbanChance;delete h.familyOccupation;delete h.background;delete h.parentTitle;delete c.completed[7];delete c.completed[8];delete c.completed[13];}
  if(patch.step===7&&(changed('familyOccupation')||changed('familyWeaponcrafterType')||changed('familyMartialChoice')||changed('familyVariantChoice')||changed('familyAuto')||changed('subsistence')||changed('parentOccupationRoll')||changed('parentOccupationSubRoll')||changed('parentOccupationSpecialRoll')||changed('parentOccupationConvocationRoll'))){invalidateWealthInputs();invalidateStage('Family Skills');invalidateStage('Background Skills');deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.urbanChance;delete c.values.parentTitleProof;delete h.parentTitle;delete h.background;delete c.completed[8];delete c.values.wealthProof;delete c.completed[13]}
  if(patch.step===11&&(changed('occupation')||changed('occupationAuto'))){invalidateWealthInputs();invalidateStage('Occupation Skills');delete c.values.wealthProof;delete c.completed[13]}
  if(patch.step===8&&['background','backgroundRoll','backgroundTensRoll','urbanChance'].some(changed)){
@@ -530,6 +551,9 @@ export function applyCreationPatch(character,patch){
  if(patch.step===1&&c.values.folk&&c.values.folk!==h.folk ||
     patch.step===2&&c.values.ageGroup&&c.values.ageGroup!==h.ageGroup){
     c.attributeProof={};c.voiceProof=null;for(const a of [...ATTRIBUTES,'voi'])delete (h.attributes??={})[a];
+    // Fate ML is derived from Aura at the Mysteries stage (p.53).
+    // Never retain the old ML after invalidating that physical attribute.
+    delete h.fateML;
     c.skillDP={};c.skillStage=0;delete c.values.folkSkillProof;delete c.values.folkSkillDice;
     for(let k=10;k<=14;k++)delete c.completed[k];
  }
@@ -540,6 +564,32 @@ export function applyCreationPatch(character,patch){
   h.folk=c.values.folk;
   if(changed('folk')){
    delete c.values.ageGroup;deactivateDependent(2,['ageRoll']);delete h.ageGroup;
+   // A different Folk can have a different permitted birth region, society,
+   // parent class, language, religion and occupational eligibility (pp.20–44,
+   // Appendix I). Do not leave the old character's resolved region/parent
+   // values active while the new Folk has not yet reached those steps.
+   // Independent birthday/Sunsign rolls and ALL historical audit events stay.
+   deactivateDependent(5,['regionRoll','venariveRoll','nativeLanguageRoll','regionSubRoll','regionDialectRoll','regionTribeRoll']);
+   deactivateDependent(6,['classRoll']);
+   deactivateDependent(7,['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll']);
+   deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);
+   for(const key of [
+    'birthRegion','birthplace','society','venariveProof','regionProof','nativeLanguageChoice',
+    'regionDialectChoice','regionAzeriDialectChoice','regionCommunityChoice','regionTribeRoll',
+    'subsistence','tribalUnsettled','viking','socialClass','classDie',
+    'familyOccupation','familyWeaponcrafterType','familyMartialChoice','familyVariantChoice',
+    'familyAuto','familyRitualChoice','familyScriptChoice','familySecondScriptChoice','familyThirdScriptChoice',
+    'parentOccupationProof','parentTitleProof','urbanChance','background','backgroundAuto',
+    'backgroundCityLanguageDistribution','nativeRitualChoice','nativeRitualChoice2',
+    'nativeRitualChoice3','nativeSkillsMode','occupation','occupationAuto',
+    'occupationProof','occupationScriptChoice','occupationLanguageChoice',
+    'occupationRitualChoice','occupationLanguageDistribution','occupationScriptsDistribution',
+    'occupationSecondScriptChoice','occupationThirdScriptChoice'
+   ])delete c.values[key];
+   for(const key of ['birthRegion','birthplace','society','pantheon','nativeLanguage',
+    'regionalLanguages','harnTribe','alticTribe','socialClass','familyOccupation',
+    'parentTitle','background'])delete h[key];
+   clone.occupation='';
    for(let k=2;k<=14;k++)delete c.completed[k];
    delete c.values.wealthProof;delete c.values.occupationProof;
    invalidateLaterSkills('Folk Skills');delete c.values.arcaneTalentProof;
@@ -720,7 +770,12 @@ export function applyCreationPatch(character,patch){
     c.auditEvents.push({sequence:c.auditEvents.length+1,type:'arcane-talent-deactivated',reason:'Aura changed',previousD20:c.values.arcaneTalentProof.d20});
     delete c.values.arcaneTalentProof;invalidateStage('Arcane Talent Skills');
    }
-   c.attributeProof[x.name]=proof;h.attributes={...(h.attributes||{}),[x.name]:proof.score};}
+   c.attributeProof[x.name]=proof;h.attributes={...(h.attributes||{}),[x.name]:proof.score};
+   if(x.name==='aur'&&h.fateML!==undefined&&h.fateML!==fateML(proof.score)){
+    c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-fate-ml-deactivated',reason:'Aura physical dice changed'});
+    delete h.fateML;
+   }
+   }
    else if(ATTRIBUTES.some(key=>!c.attributeProof[key]))throw Error('Nejprve zadejte všech 12 fyzických souborů hodů d6');
    if(patch.voice){
     const proof=evaluateVoiceDice({folk:h.folk,dice:patch.voice.dice});
@@ -997,7 +1052,7 @@ export function applyCreationPatch(character,patch){
    const choice=m.graceAspect??(m.graceDie!==undefined&&c.values.graceProof.roll<15?'':c.values.graceAspect??'');
    const aspect=divineAspectFromChoice(c.values.graceProof,choice);
    if(aspect){
-    if(c.values.graceAspect!==choice){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'grace-aspect-choice',aspect:choice,sourcePage:310});}
+    if(c.values.graceAspect!==choice || c.auditEvents.filter(e=>e.type==='grace-aspect-choice'||e.type==='grace-aspect-deactivated').at(-1)?.aspect!==choice || c.auditEvents.filter(e=>e.type==='grace-aspect-choice'||e.type==='grace-aspect-deactivated').at(-1)?.type!=='grace-aspect-choice'){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'grace-aspect-choice',aspect:choice,sourcePage:310});}
     c.values.graceAspect=choice;h.divineAspect=aspect;
    }else{if(c.values.graceAspect){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'grace-aspect-deactivated',aspect:c.values.graceAspect,reason:'Grace changed'});}delete c.values.graceAspect;delete h.divineAspect;}
   }
@@ -1218,6 +1273,8 @@ export function assertCreationInvariants(character){
    if(!e.proof||!['granted','declined'].includes(e.proof.decision)||!e.proof.allocations||e.proof.sourcePage!==48)throw Error('Poškozená auditní GM Bonus Language volba');
   }else if(e.type==='gm-bonus-language-deactivated'){
    if(e.reason!=='changed Folk/Age/Birthplace')throw Error('Neplatné zneplatnění GM Bonus Language');
+  }else if(e.type==='automatic-generation'){
+   if(!['random','warrior','scholar','mystic','artisan','explorer','social','covenant'].includes(e.mode)||e.diceSource!=='browser PRNG/Web Crypto'||!Number.isInteger(e.attempt)||e.attempt<1)throw Error('Neplatný automatický generační důkaz');
   }else if(e.type==='step-dice'){
    const expected={1:{folkRoll:100},2:{ageRoll:100},3:{birthMonth:12,birthDay:30},4:{traitRoll:6,traitRollSecondary:6},5:{regionRoll:100,venariveRoll:1000,nativeLanguageRoll:2,regionSubRoll:10,regionDialectRoll:100,regionTribeRoll:100},6:{classRoll:100},7:{parentOccupationRoll:100,parentOccupationSubRoll:20,parentOccupationSpecialRoll:20,parentOccupationConvocationRoll:6},8:{backgroundRoll:100,backgroundTensRoll:10},9:{estrangementRoll:100}}[e.step];
    if(!expected||!Object.hasOwn(expected,e.field)||![`d${expected[e.field]}`,'d20'].includes(e.die)||
