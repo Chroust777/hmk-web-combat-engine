@@ -1,3 +1,57 @@
+# HMK Keeper’s Ledger v93.245 — automatická tvorba a volitelná skutečná AI
+
+**Zdroj:** přesně produkční ZIP v93.244, pravidla *HârnMaster: Roleplaying in the World of Kèthîra* v1.2. Na Combat, Magic, G04 a CSS se nesahalo.
+
+## Co je ve v93.245 opraveno
+
+- Automatická tvorba vyřešila závislost **Arcane Talent → Occupation**: doložený hod (u Parent Invoker čtyři d20, vybírá se nejvyšší) proběhne před závaznou volbou povolání. Týž výsledek je následně použit ve Skills; neprovádí se nový hod jen pro získání jiné profese.
+- V kroku Skills se při automatickém přidávání bodů DP **zvyšuje skutečná hodnota**, nepřepisuje se pokaždé jedničkou.
+- Výběr cíleného povolání se stále omezuje na možnosti povolené pravidlovou validací. V cíleném režimu je možné použít zvýhodněné rodičovské **d20** podle originálu p.26; čistý Random respektuje původní demografické **d100**.
+- Konfigurovatelný generátor má dva **výslovně odlišené** režimy výkladu českého popisu: `Skutečná AI` (serverový model, s připojením a klíčem) a `Lokální heuristický rozbor` (bez internetu). Přepínač je uvnitř odesílaného formuláře — správně se uloží do FormData.
+- Výstup AI je pouze **návrh** profese, Folk, věku, povahy, dovedností a dalších významových indicií; přístup se omezuje na názvy z původního registru 342 profesí, dostupné dovednosti a 122 checkboxových rysů. Každá citace musí doslova existovat v popisu uživatele. Neexistující ID a navrhované přímé změny Attribute Score/Wealth jsou ignorovány. Všechny nakonec zvolené možnosti validuje **původní 14krokový HMK engine**.
+- Při nedostupné AI **nevznikne falešně „AI analyzovaná“ postava**; zobrazí se chyba a formulář zůstane otevřen pro opakování nebo přepnutí na offline rozbor.
+
+## Spuštění skutečné AI
+
+Požadavky: **Node.js 20+**, odchozí HTTPS přístup k API poskytovatele, vlastní platný **serverový** API klíč. Aplikace nesmí vkládat tajný klíč do HTML, JS nebo úložiště prohlížeče. Příklad PowerShell na lokálním počítači:
+
+```powershell
+$env:HMK_OPENAI_API_KEY = "SEM_VLOZTE_SVUJ_SERVEROVY_API_KLIC"
+$env:HMK_OPENAI_MODEL = "gpt-4.1-mini"
+node .\hmk-ai-server.mjs
+```
+
+Potom otevřete `http://127.0.0.1:8787/`, v registru zvolte **Generovat podle rysů / Folk / povolání**, nastavte **Skutečná AI**, vyplňte text a klikněte na generování. **Bez nastaveného klíče běží offline režim**, AI režim však přizná 503 a nic nepředstírá. Pro vzdálené nasazení je třeba HTTPS, autentizace uživatelů, ochrana před zneužitím API a samostatná zálohovací strategie úložiště prohlížeče. Backend ve výchozím nastavení naslouchá jen na `127.0.0.1`; **není připraven jako veřejně dostupná multiuživatelská služba**.
+
+**Soukromí:** pouze popis a zatržené rysy prochází serverem k modelu; kompletní Character Sheet, inventář ani historie hodů se neposílají. Požadavek modelu obsahuje `store:false`; případná další retence podléhá politice poskytovatele. Ke spuštění serveru nestačí dvojklik na statické `index.html`.
+
+## Pravdivý rozsah testování
+
+- Existuje 342 definičních profilů a syntetická **matice dostupnosti pravidlového filtru** dosáhla **342/342** za vhodně zvolených předpokladů (včetně syntetických magických talentů). To není 342 dokončených postav.
+- Chromium se simulovaným `localStorage` dokončilo tři celý 14krokové automatické průchody (náhodná postava, cílený Hunter a Scribe) a samostatný Scribe s **napodobenou odpovědí AI HTTP**. Klikací test také ověřil odmítnutí AI bez serveru a nezaložení nové postavy.
+- Node regresní testy: 24/24, rozšířená sémantika 18/18, AI/coverage 13/13; jedna kompletní 14kroková doménová trasa (včetně JSON kontrolních bodů) prošla.
+- **Bez platného API klíče neproběhlo žádné živé volání OpenAI modelu**, takže přesnost reálné sémantiky není ověřena. Vzácné a extrémní archetypy nebyly všechny dokončeny; hromadný prohlížečový test pro ně vypršel. Plná produkční E2E validace, zejména reálné úložiště a nasazení, není certifikována.
+
+Podrobnosti, počty a omezení: samostatný český audit a regresní testovací ZIP.
+
+---
+
+# HMK Keeper’s Ledger – v93.242 (ověřená dílčí etapa, NE plná E2E certifikace)
+
+**Původ:** výhradně archiv v93.241 dodaný uživatelem a originální HMK v1.2. Produkční JS značku opravenou z 93.240 na 93.242 najdete v `app.js`; HTML/asset query také uvádí 93.242. Všechny ostatní původní integrační moduly Combat, Magic, G04 a původní CSS zůstávají beze změn.
+
+**Automatická tvorba:** v běžném náhodném režimu zaznamenává Human/Ænarin věk jako d100 podle p.21, lidský region jako d1000 podle Appendix I p.415 a jeho podrobný Realm jako oddělený d100. Parent Class nyní používá a ukládá d100 ze společenské tabulky; Parent Occupation v dostupných d100 UI používá a ukládá tištěný d100 spolu s případným d20/d6 podtypem. Background zaznamenává d100 včetně doplňkové City-State desítkové kostky. Na všech krocích zůstává použit původní `applyCreationPatch` a běžná pravidlová validace. Zadání konkrétního povolání už nesmí být potichu nahrazeno jiným.
+
+**Generator UI:** seznam preferovaných povolání se odvozuje přímo z 342 stávajících profesních profilů, nikoli samostatné tabulky. Rysy nově obsahují skupiny Vzhled, Schopnosti a vlohy a Životní styl. Slovní vstup je pouze lokální interpretace klíčových slov, nikoli skutečná AI.
+
+**Inventář:** stávající oprava Edit a přemísťování rukou z v93.241 ponechána. Nová bezpečná akce „Předat“ přesune jediný existující inventární záznam mezi dvěma postavami v původním CAS úložišti; zůstávají ID, WQ, katalogový odkaz a stav, mění se pouze vlastník, slot na `carried` a odstraní se stará vrstva nošené zbroje. Předání mimo pravidlovou Combat akci je během Initiative zakázáno. Dokončené automaticky vytvořené postavy se již neukazují mezi rozpracovanými.
+
+**Wealth podle tištěné str.51:** zůstává `Wealth×100d` jako limit *počátečních* předmětů a nezávisle `Wealth×10d` mincí. Pořízením výbavy pod prvním limitem se mince nesnižují; zbytek nevyužitého limitu nelze vyměnit za peníze. Katalog, peněženka a inventář nebyly duplikovány. Extra nákup převyšující limit za hotovost a následné běžné nakupování není touto dílčí etapou dokončeno.
+
+**Omezení vydání:** nebyl proveden plný 14krokový E2E v reálném hostovaném prohlížeči – administrátorské omezení v prostředí blokuje i localhost/file URL. V izolovaných Node testech proběhlo 20 testovacích skupin včetně mnoha tisíc tabulkových kombinací a testů inventáře. Nejde o certifikaci všech 342 profesních variant ani o doložení spolehlivého úspěchu 12-pokusového generátoru pro libovolnou kombinaci Folk a profese. U neuskutečnitelného profilu může generátor po pokusech oznámit neúspěch. Kontrola chování při skutečném klikání, uložení v reálně hostované produkci, bohatších Starting Kits a některých Mysteries zůstává otevřená. Podrobný protokol a samostatné regresní testy jsou předány mimo produkční ZIP.
+
+---
+
 # HMK Keeper’s Ledger – v93.241 (generátor: Folk, rysy, výbava a hotovost)
 
 **Základ:** v93.240 (odvozená z v93.239). Nově je v registru konfigurovatelný generátor Folk / preferovaného povolání / 7 skupin charakterových rysů / volného textového popisu. Text je interpretován pouze lokálními klíčovými slovy, nejde o připojené AI. Výběry mohou ovlivnit preference povolání a Optional Skills, **nikoli výsledky povinných kostek**. Čistě náhodný režim navíc provádí Folk d100 podle HMK str.20 (Human 90 %, Kúzhai 5 %, Ænarin 1 %, Sinái 3 %, Sidhé 1 %). Folk Malákta a Nâdi lze zvolit cíleně; netvrdíme, že patří do univerzální náhodné tabulky. Rodičovský d100 a regionální pravděpodobnostní matice nejsou pro všechny varianty automaticky certifikovány.
@@ -767,3 +821,22 @@ Fyvria: výběr dvou doložených dovedností, ostatní konvokace z fyzického d
 - **Referenční katalog:** dostupné cenově doložené položky Expedition Equipment (s. 120) a Craft Items (s. 121) byly doplněny jako neměnné referenční definice do společné knihovny, bez změny existujících uložených snapshotů.
 - **Stav univerzálního generátoru:** v93.240 stále používá omezené Folk/regionální cesty a sedm předchozích profilových zaměření. Detailní checkboxy fyzických a povahových rysů, volný text/AI i pravděpodobnostní pokrytí všech tabulek zatím **nejsou implementovány**. Nepovažovat za dokončený univerzální generátor HMK.
 - **Regrese:** 16/16 prohlížečových generování se simulovaným `localStorage`, samostatná browser regrese přesunu předmětů a editace deníku, 442 kontrol plánovače výbavy a zděděná sada 317 024 kontrol. Skutečný hosting s reálným `localStorage` zůstává k ověření po nasazení.
+
+
+## v93.244 — ovládání rozpracované tvorby z karty konkrétní postavy
+
+- V registru postav je tlačítko **Pokračovat v tvorbě** součástí akcí každé **rozpracované** postavy; má její vlastní `data-resume-creation` ID.
+- Po dokončení průvodce se na kartě mění na **GM kontrola tvorby**; u `complete` a `auto-generated` se zobrazuje **Upravit tvorbu**. Postavám bez vytvořeného `hmk.creation` se neslibuje neexistující možnost pokračování.
+- Odstraněn duplicitní společný panel rozpracovaných postav i nepřesný rychlý odkaz z levé navigace. Nové UI nepřevádí stav mezi postavami a nemění uložená data.
+- Zachovány původní handler `resumeCreation` s kontrolou aktivní Initiative, Character Sheet/Edit, všechna tlačítka Záloha/Kopírovat/Archivovat a pravidlový engine.
+- Ověření: renderovací a modulové testy, izolované klikání přes Chromium s `page.set_content`; **nejde o úplné nasazené E2E ani ověření skutečného místního úložiště**.
+
+## v93.244 — regrese Character Creation a lokální rozbor volného popisu
+
+- Základ výhradně produkční archiv v93.243. Pravidlové tabulky a algoritmus validace 14 kroků nejsou nahrazeny.
+- Rozšířený offline český lexikální analyzátor chápe lokální zápory, konkrétní profese, doporučené dovednosti, Folk, věk a nabídky Sunsign Traits. Identifikuje také všech 122 checkboxových rysů v jejich narativní podobě. Jde o **heuristiku, nikoli jazykový model ani záruku přesného porozumění všem volným větám**.
+- Interpretace používá pouze povolené přímé volby (např. Folk, Age, Sunsign Trait, Morality) a preference v legálních Occupational/Skill možnostech; nikdy nemění zákonné d100/d20/d6, Attribute Score, sociální status ani Wealth, aby násilně vyhověly popisu.
+- Nový průběžný náhled vysvětluje interpretovaný profil, profesi, navrhované dovednosti, Folk, věk, aspirace atributů a míru jistoty. Výklad s citovanými výrazy se ukládá k vygenerované postavě; neuskutečnitelné preference jsou uvedeny v poznámce.
+- Kompletní doménová regrese 14 kroků je přiložena samostatně (jeden celý základní lidský archetyp s obnovou z JSON na definovaných kontrolních bodech). Dřívější sada společenských tříd, Parent Arcanist a inventáře zůstává zachována.
+- Klikací browser-fragment test byl proveden nad skutečným produkčním generátorovým dialogem, parserem a náhledem. Plná navigace na localhost/file je blokována administrátorem prohlížeče, a proto nejde o plnohodnotné produkční E2E.
+- K dokonalému porozumění neomezeným přirozeným větám by byl nutný jazykový model integrovaný s přísně validovaným převodem jeho strukturovaných výstupů do stávajícího HMK enginu. Žádná taková externí AI zde není aktivní.
