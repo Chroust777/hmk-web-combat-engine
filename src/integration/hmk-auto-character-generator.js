@@ -5,8 +5,9 @@
  */
 import {arcaneTalentFromPhysical} from './hmk-arcane-talent.js';
 import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './hmk-creation-psyche.js';
-import {SKILL_DEFINITIONS,folkFromDie} from './hmk-character-creation.js';
-import {regionHarnTribeDieRequired,regionSubDieRequired,regionDialectDieRequired} from './hmk-creation-tables.js';
+import {SKILL_DEFINITIONS,folkFromDie,ageFromDie} from './hmk-character-creation.js';
+import {regionHarnTribeDieRequired,regionSubDieRequired,regionDialectDieRequired,regionFromD1000,classFromRoll,tribalFreeOccupation} from './hmk-creation-tables.js';
+import {PARENT_OCCUPATION_TABLES,parentOccupationFromRoll} from './hmk-parent-occupation-tables.js';
 export const AUTO_TRAIT_PROFILES=Object.freeze({
  random:{label:'Čistě náhodná postava',skills:[],jobs:[],traits:[]},
  warrior:{label:'Odvážný a bojovný',skills:['Melee','Initiative','Riding','Archery','Throwing'],jobs:['Man-at-arms','Yeoman','Mercenary','Swordmaster','Huscarl','Gladiator','Legionnaire'],traits:['confident', 'energetic', 'persistent', 'aggressive', 'tenacious', 'rebellious']},
@@ -37,8 +38,11 @@ function choice(form,name,die,pref=null){const options=opts(form,name);if(!optio
 }
 function weightedChoice(items,profile,die,preferences={}){
  const desired=String(preferences.occupation||'').trim().toLowerCase();
- if(desired){const matching=items.filter(x=>x.toLowerCase()===desired||x.toLowerCase().startsWith(desired+' (')||x.toLowerCase().startsWith(desired+':'));if(matching.length)return pick(matching,die);}const cfg=AUTO_TRAIT_PROFILES[profile]||AUTO_TRAIT_PROFILES.random;
- if(profile==='random')return pick(items,die);
+ if(desired){const matching=items.filter(x=>x.toLowerCase()===desired||x.toLowerCase().startsWith(desired+' (')||x.toLowerCase().startsWith(desired+':'));if(matching.length)return pick(matching,die);throw Error('Požadované povolání není pro tuto postavu pravidlově dostupné: '+preferences.occupation);}const cfg=AUTO_TRAIT_PROFILES[profile]||AUTO_TRAIT_PROFILES.random;
+ if(profile==='random'&&!preferences.semantic)return pick(items,die);
+ // Free text implies a soft preference, never permission to bypass HMK eligibility.
+ const inferred=preferences.semantic?.occupationCandidates||[];
+ for(const desiredJob of inferred){const job=desiredJob.toLowerCase();const matches=items.filter(x=>x.toLowerCase()===job||x.toLowerCase().startsWith(job+' (')||x.toLowerCase().startsWith(job+':'));if(matches.length)return pick(matches,die);}
  const targets=items.filter(item=>cfg.jobs.some(t=>item.toLowerCase().includes(t.toLowerCase())));
  if(targets.length)return pick(targets,die);
  const acceptable=items.filter(item=>!item.startsWith('Slave (')&&!item.startsWith('Tenant Officer'));
@@ -48,19 +52,48 @@ function weightedChoice(items,profile,die,preferences={}){
  for(let i=0;i<items.length;i++){d-=weights[i];if(d<=0)return items[i]}
  return items.at(-1);
 }
+/** One Arcane Talent proof is shared between occupation prerequisites (step 11)
+ * and stage 2 of Skills. It is never rerolled or replaced during generation.
+ * HMK p.40 / p.42: parent Invoker gets 4d20 and uses the highest.
+ */
+function prepareArcaneTalentRoll(form,h,die){
+ const invokerParent=h.familyOccupation==='Invoker';
+ const rolls=invokerParent?Array.from({length:4},()=>die(20)):[die(20)];
+ const d20=Math.max(...rolls);let needed=0;
+ try{arcaneTalentFromPhysical({aura:h.attributes.aur,folk:h.folk,ageGroup:h.ageGroup,d20,d100s:[]});}
+ catch(err){const match=/právě (\d+)/.exec(String(err.message));if(!match)throw err;needed=Number(match[1]);}
+ if(needed>8)throw Error('Arcane Talent požaduje více než osm hodů – kontrola pravidel');
+ if(invokerParent){if(!put(form,'arcaneTalentD20s',rolls.join(',')))throw Error('Chybí Parent Invoker 4d20 formulář');}
+ else if(!put(form,'arcaneTalentD20',d20))throw Error('Chybí formulář Arcane Talent d20');
+ if(!put(form,'arcaneTalentD100s',Array.from({length:needed},()=>die(100)).join(',')))throw Error('Chybí formulář Arcane Talent d100');
+ return 'talent-prereq';
+}
 /** One automatic tick, executed on the actual active wizard form. */
 export function prepareAutomaticStep(form,character,{profile='random',die=secureAutoDie,rejected=[],preferences={}}={}){
  const c=character.hmk.creation,h=character.hmk,step=c.step,stage=c.skillStage;
  const current=()=>Object.fromEntries(new FormData(form));
- if(step===1){const roll=profile==='random'&&!preferences.folk?die(100):null;const chosen=roll!==null?folkFromDie(roll):(preferences.folk||'Human');if(!put(form,'folk',chosen))throw Error('Požadovaný Folk nemá v průvodci platnou možnost: '+chosen);if(roll!==null)put(form,'folkRoll',roll);return 'next'}
- if(step===2){choice(form,'ageGroup',die,profile==='covenant'?'Young':null);return 'next'}
+ if(step===1){const preferredFolk=preferences.folk||preferences.semantic?.folkPreference||'';const roll=profile==='random'&&!preferredFolk?die(100):null;const chosen=roll!==null?folkFromDie(roll):(preferredFolk||'Human');if(!put(form,'folk',chosen))throw Error('Požadovaný Folk nemá v průvodci platnou možnost: '+chosen);if(roll!==null)put(form,'folkRoll',roll);return 'next'}
+ if(step===2){
+  // HMK p.21: for humans, half-elves and Nâdi record the actual age d100.
+  // The remaining Elder Folk have prescribed age groups, not a d100 choice.
+  if(['Human','Ænarin','Nâdi'].includes(h.folk)){
+   const agePref=preferences.semantic?.agePreference;if(agePref&&opts(form,'ageGroup').includes(agePref))put(form,'ageGroup',agePref);else{const roll=die(100);put(form,'ageRoll',roll);put(form,'ageGroup',ageFromDie(roll,h.folk));}
+  }else choice(form,'ageGroup',die,h.folk==='Kúzhai'?'Mature':'Young');
+  return 'next';
+ }
  if(step===3){put(form,'birthMonth',die(12));put(form,'birthDay',die(30));return 'next'}
- if(step===4){const cfg=AUTO_TRAIT_PROFILES[profile]||AUTO_TRAIT_PROFILES.random;for(const key of ['sunsignTraits','sunsignTraitSecondary']){const o=opts(form,key);if(o.length){const preferred=o.filter(x=>(cfg.traits||[]).includes(x));put(form,key,pick(preferred.length?preferred:o,die));}}return 'next'}
+ if(step===4){const cfg=AUTO_TRAIT_PROFILES[profile]||AUTO_TRAIT_PROFILES.random;for(const key of ['sunsignTraits','sunsignTraitSecondary']){const o=opts(form,key);if(o.length){const meaning=o.filter(x=>(preferences.semantic?.sunsignTraitPreferences||[]).includes(x));const preferred=o.filter(x=>(cfg.traits||[]).includes(x));put(form,key,pick(meaning.length?meaning:preferred.length?preferred:o,die));}}return 'next'}
  if(step===5){
   // Use verified regional tables; avoid unsupported, non-transcribed places.
-  const region=h.folk==='Kúzhai'?'Kúzhai (Elder Folk)':h.folk==='Sinái'||h.folk==='Sidhé'?'Ælrhin (Elder Folk)':h.folk==='Malákta'?'Malákta (Elder Folk)':h.folk==='Nâdi'?'Nâdi (Elder Folk)':profile==='covenant'?'Emélrenè':'Hârn';
+  // HMK Appendix I p.415: use the printed human regional d1000 distribution.
+  // Elder Folk use their own independent Appendix I p.423 tables.
+  // The Covenant-specific focus is a declared preference, not the random mode.
+  const elderRegion={Kúzhai:'Kúzhai (Elder Folk)',Sinái:'Ælrhin (Elder Folk)',Sidhé:'Ælrhin (Elder Folk)',Malákta:'Malákta (Elder Folk)',Nâdi:'Nâdi (Elder Folk)'}[h.folk];
+  const humanRegionalRoll=elderRegion||profile==='covenant'?null:die(1000);
+  const region=elderRegion||(profile==='covenant'?'Emélrenè':regionFromD1000(humanRegionalRoll).region);
   put(form,'birthRegion',region);
-  put(form,'regionRoll',profile==='covenant'?95:50);
+  if(humanRegionalRoll!==null)put(form,'venariveRoll',humanRegionalRoll);
+  put(form,'regionRoll',profile==='covenant'?95:die(100));
   // Secondary tables are only used when visible/available.
   const r=Number(val(form,'regionRoll'));
   if(regionHarnTribeDieRequired(region,{roll:r})===100)put(form,'regionTribeRoll',die(100));
@@ -71,27 +104,66 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
   return 'next';
  }
  if(step===6){
-  // Direct class choice follows the existing permitted table; no fictional modifier.
-  const candidates=opts(form,'socialClass');const preset=({warrior:'Military',scholar:'Noble',mystic:'Priestly',artisan:'Guilded',explorer:'Free',social:'Noble',covenant:'Priestly'})[profile]||null;
-  const selected=preset&&candidates.includes(preset)?preset:pick(candidates,die);
-  put(form,'socialClass',selected);
+  // True d100 demographic table, with the original roll kept in Creation.
+  // A themed character may have preferences later; it does not rewrite a d100.
+  // HMK p.26 explicitly offers a favourable d20 as an alternative
+  // to demographic d100. Focused generation uses this lawful choice;
+  // truly random generation continues to use demographic frequencies.
+  const dieSides=preferences.occupation||preferences.semantic?.occupationCandidates?.length||profile!=='random'?20:100;
+  const roll=die(dieSides);put(form,'classDie',String(dieSides));put(form,'classRoll',roll);
+  const selected=classFromRoll(h.society,roll,dieSides);
+  if(!put(form,'socialClass',selected))throw Error('Parent Class z hodu není v pravidlové nabídce: '+selected);
   return 'next';
  }
  if(step===7){
-  const candidates=opts(form,'familyOccupation');
-  const selection=weightedChoice(candidates,profile,die);
-  if(!selection)throw Error('Chybí doložené rodičovské povolání');
-  put(form,'familyOccupation',selection);
-  // Parent Occupation may be chosen directly from the verified table;
-  // without a recorded parent d100, no dependent d20/d6 is falsely claimed.
-  // The selected specialisation is still resolved by the ordinary validator.
+  const supported=form.elements.namedItem('parentOccupationRoll');
+  let selection;
+  if(supported){
+   const roll=die(100);
+   const subsistence=c.values.regionProof?.subsistence||val(form,'subsistence')||'Foraging';
+   if(['Tribal','Tribal-Settled'].includes(h.society)&&h.socialClass==='Free'){
+    if(form.elements.namedItem('subsistence'))put(form,'subsistence',subsistence);
+    put(form,'parentOccupationRoll',roll);
+    selection=tribalFreeOccupation(subsistence,roll).name;
+   }else{
+    const tableSociety=h.society==='Feudal/Imperial'&&h.socialClass==='Noble'
+      ?(Number(c.values.classRoll)%2?'Feudal':'Imperial')
+      :({'City-State':'Imperial',Viking:'Tributary',Chélemby:'Tributary','Tribal-Settled':h.socialClass==='Free'||h.socialClass==='Priestly'||h.socialClass==='Noble'?'Tribal':'Tribal-Settled','Feudal/Imperial':'Feudal'})[h.society]||h.society;
+    const row=PARENT_OCCUPATION_TABLES[tableSociety]?.[h.socialClass]?.find(x=>roll<=x.max);
+    if(!row)throw Error('Chybí tabulka Parent Occupation pro '+tableSociety+'/'+h.socialClass);
+    let subRoll,specialRoll,convocationRoll;
+    if(['Slave','Tenant Officer'].includes(row.name))subRoll=die(20);
+    if(['Gentry: Arcanist','Arcanist'].includes(row.name)){
+     specialRoll=die(20);
+    }
+    const arcanistShek=Number.isInteger(specialRoll)&&(tableSociety==='Sináin'?specialRoll>=8:specialRoll>=15);
+    if(row.name==='Shèk-Pvâr'||arcanistShek)convocationRoll=die(6);
+    put(form,'parentOccupationRoll',roll);
+    if(subRoll!==undefined)put(form,'parentOccupationSubRoll',subRoll);
+    if(specialRoll!==undefined)put(form,'parentOccupationSpecialRoll',specialRoll);
+    if(convocationRoll!==undefined)put(form,'parentOccupationConvocationRoll',convocationRoll);
+    selection=parentOccupationFromRoll({society:h.society,socialClass:h.socialClass,roll,
+      classRoll:c.values.classRoll,classDie:c.values.classDie??100,subRoll,specialRoll,convocationRoll}).name;
+   }
+   if(!put(form,'familyOccupation',selection))throw Error('Rodičovské povolání z d100 není v průvodci: '+selection);
+  }else{
+   // Elder societies without a visible printed-roll UI remain GM selections;
+   // never fabricate a recorded d100 for them.
+   const candidates=opts(form,'familyOccupation');selection=weightedChoice(candidates,profile,die);
+   if(!selection||!put(form,'familyOccupation',selection))throw Error('Chybí doložené rodičovské povolání');
+  }
   if(selection==='Shaman')choice(form,'familyVariantChoice',die,'Shaman (Spirit)');
   else choice(form,'familyVariantChoice',die);
   choice(form,'familyRitualChoice',die);
   choice(form,'familyMartialChoice',die);choice(form,'familyWeaponcrafterType',die);
   return 'next';
  }
- if(step===8){choice(form,'background',die);return 'next'}
+ if(step===8){
+  if(form.elements.namedItem('backgroundTensRoll'))put(form,'backgroundTensRoll',die(10));
+  if(form.elements.namedItem('backgroundRoll'))put(form,'backgroundRoll',die(100));
+  else choice(form,'background',die);
+  return 'next';
+ }
  if(step===9){put(form,'estrangementRoll',die(100));return 'next'}
  if(step===10){
   const names=['str','end','dex','agl','per','cml','aur','wil','rea','cre','emp','elo'];
@@ -101,8 +173,11 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
   return 'next';
  }
  if(step===11){
+  // Mandatory prerequisite before filtering Invoker/Shaman variants.
+  // The validator decides which of those are actually possible after the roll.
+  if(!c.values.arcaneTalentProof)return prepareArcaneTalentRoll(form,h,die);
   const occupations=opts(form,'occupation');
-  const usable=occupations.filter(x=>!x.startsWith('Invoker')&&!x.includes('Talent:')); 
+  const usable=occupations; 
   const job=weightedChoice(usable.length?usable:occupations,profile,die,preferences);
   if(!job)throw Error('Pro vzniklou společnost nejsou dostupná doložená povolání');
   put(form,'occupation',job);
@@ -133,13 +208,9 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
   }
   if(stage===1){
     if(c.values.arcaneTalentProof)return 'next';
-    const d20=die(20),d20s=h.familyOccupation==='Invoker'?Array.from({length:4},()=>die(20)):null;
-    const actual=d20s?Math.max(...d20s):d20;let required=0;
-    try{arcaneTalentFromPhysical({aura:h.attributes.aur,folk:h.folk,ageGroup:h.ageGroup,d20:actual,d100s:[]})}
-    catch(err){const m=/právě (\d+)/.exec(String(err.message));if(!m)throw err;required=Number(m[1]);}
-    if(d20s)put(form,'arcaneTalentD20s',d20s.join(','));else put(form,'arcaneTalentD20',d20);
-    put(form,'arcaneTalentD100s',Array.from({length:required},()=>die(100)).join(','));
-    return 'talent';
+    // Compatibility for imported drafts which skipped the prerequisite.
+    const action=prepareArcaneTalentRoll(form,h,die);
+    return action==='talent-prereq'?'talent':action;
   }
   if(stage===2){
    const used=[];for(const name of ['familyScriptChoice','familySecondScriptChoice','familyThirdScriptChoice']){const choices=opts(form,name).filter(x=>!used.includes(x));if(choices.length){const v=pick(choices,die);put(form,name,v);used.push(v)}}
@@ -163,12 +234,12 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
   const entries=skills.filter(n=>n&&!['Language','Script','Ritual'].includes(n)&&!rejected.includes(n)&&(!signGroups||signGroups.includes(SKILL_DEFINITIONS.find(d=>d.name===n)?.group)));
   if(!entries.length)return 'next';
   const affinities=[profile,...(preferences.semanticRanking||[])].filter((id,i,list)=>id!=='random'&&list.indexOf(id)===i);
-  const weighted=entries.map(n=>({n,w:1+affinities.reduce((bonus,id,i)=>bonus+(AUTO_TRAIT_PROFILES[id]?.skills.some(s=>n.includes(s))?Math.max(2,7-i*2):0),0)}));
+  const semanticSkills=preferences.semantic?.skillPreferences||[];const weighted=entries.map(n=>({n,w:1+affinities.reduce((bonus,id,i)=>bonus+(AUTO_TRAIT_PROFILES[id]?.skills.some(s=>n.includes(s))?Math.max(2,7-i*2):0),0)+(semanticSkills.some(s=>n===s||n.startsWith(s+' ('))?24:0)}));
   let total=weighted.reduce((a,b)=>a+b.w,0),r=die(Math.max(1,total));
   let picked=weighted.at(-1)?.n;
   for(const e of weighted){r-=e.w;if(r<=0){picked=e.n;break}}
   if(!picked)return 'next';
-  put(form,'skillName',picked);put(form,'skillDP',1);return 'skill';
+  put(form,'skillName',picked);put(form,'skillDP',Number(allocation[picked]||0)+1);return 'skill';
  }
  if(step===13){
   const method=val(form,'wealthMethod');
@@ -194,7 +265,7 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
   }
   const shamanTradition=choice(form,'shamanTradition',die);if(shamanTradition==='Kath')choice(form,'shamanKathTotem',die);
   choice(form,'pvarChantryId',die);choice(form,'pvarGuildRank',die);put(form,'pvarAttunedObject','Generated focus');
-  choice(form,'ritualSkill',die);put(form,'moralityChoice',die(20));
+  choice(form,'ritualSkill',die);put(form,'moralityChoice',preferences.semantic?.moralityPreference??die(20));
   for(let i=0;i<10;i++)choice(form,'startingElixir'+i,die);
   for(let i=0;i<5;i++)choice(form,'doctrineSubject'+i,die);
   return 'next';

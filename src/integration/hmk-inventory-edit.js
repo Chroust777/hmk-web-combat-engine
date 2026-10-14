@@ -20,3 +20,20 @@ export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,current
  if(target.snapshot.category==='armor'){target.layerOrder=layerOrder;target.layerSlot=layerSlot;target.bulkExceptionZones=bulkExceptionZones;}
  return next;
 }
+
+/** Non-combat hand-off: retain one inventory instance/ID and its catalogue
+ * provenance. The recipient receives the item as carried, not pre-equipped.
+ * UI invokes this only outside an active Initiative and persists via CAS.
+ */
+export function transferInventoryItem(doc,{ownerId,itemId,recipientId}={}){
+ if(!doc||!Array.isArray(doc.inventory)||!Array.isArray(doc.characters)||typeof ownerId!=='string'||typeof itemId!=='string'||typeof recipientId!=='string'||!ownerId||!itemId||!recipientId||ownerId===recipientId)
+  fail('Neplatné předání: vlastník, předmět nebo příjemce');
+ if(!doc.characters.some(c=>c.id===ownerId)||!doc.characters.some(c=>c.id===recipientId))fail('Předání vyžaduje dvě existující postavy');
+ const owned=doc.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
+ if(!owned||!owned.snapshot)fail('Předmět nepatří předávající postavě');
+ const next=structuredClone(doc);
+ const target=next.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
+ target.characterId=recipientId;target.slot='carried';target.gearStowage='normal';
+ if(target.snapshot.category==='armor'){target.layerOrder=null;target.layerSlot=null;target.bulkExceptionZones=[];}
+ return next;
+}

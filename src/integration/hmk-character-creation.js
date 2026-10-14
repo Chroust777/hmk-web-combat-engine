@@ -796,6 +796,12 @@ export function applyCreationPatch(character,patch){
    c.auditEvents.push({sequence:c.auditEvents.length+1,type:'arcane-talent-physical',d20:proof.d20,d20s:proof.familyInvoker?[...proof.d20s]:undefined,d100s:[...proof.d100s],aura:proof.aura,folk:proof.folk,ageGroup:proof.ageGroup,result:proof.result,grants:{...proof.grants}});
    delete c.completed[12];
   }
+  // HMK p.40/42: acquiring prerequisite Arcane Talents must be possible
+  // BEFORE any Occupation is selected. This is a valid, audited, non-advance
+  // action; do not demand the later Occupational Skills fields yet.
+  if(patch.arcaneTalentDice&&!patch.advance&&!String(c.values.occupation??'').trim()){
+   h.creation=c;clone.hmk=h;return clone;
+  }
 
   if(changed('occupation'))for(const key of ['occupationScriptChoice','occupationLanguageChoice','occupationRitualChoice','occupationLanguageDistribution','occupationScriptsDistribution','occupationSecondScriptChoice','occupationThirdScriptChoice'])if(!Object.hasOwn(patch.values??{},key))delete c.values[key];
   const chosenJob=OCCUPATIONS[c.values.occupation];
