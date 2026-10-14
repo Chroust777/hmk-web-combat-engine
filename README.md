@@ -1,3 +1,15 @@
+# HMK Keeper’s Ledger – v93.241 (generátor: Folk, rysy, výbava a hotovost)
+
+**Základ:** v93.240 (odvozená z v93.239). Nově je v registru konfigurovatelný generátor Folk / preferovaného povolání / 7 skupin charakterových rysů / volného textového popisu. Text je interpretován pouze lokálními klíčovými slovy, nejde o připojené AI. Výběry mohou ovlivnit preference povolání a Optional Skills, **nikoli výsledky povinných kostek**. Čistě náhodný režim navíc provádí Folk d100 podle HMK str.20 (Human 90 %, Kúzhai 5 %, Ænarin 1 %, Sinái 3 %, Sidhé 1 %). Folk Malákta a Nâdi lze zvolit cíleně; netvrdíme, že patří do univerzální náhodné tabulky. Rodičovský d100 a regionální pravděpodobnostní matice nejsou pro všechny varianty automaticky certifikovány.
+
+**Wealth p.51:** počáteční inventář používá předměty katalogu do limitu Wealth × 100d. Hotovost Wealth × 10d se **nespotřebovává** při výběru z tohoto limitu. Po vytvoření se v panelu *Vybavení postavy* zobrazuje hotovost a zvlášť náklady / nevyčerpaná část limitu vybavení. Nevyčerpaný limit nelze směnit za mince. Wallet panel je projekcí autoritativního `hmk.coinsPence`, nikoli druhým účetnictvím; pozdější nákupy za mince nejsou součástí této funkce.
+
+**Inventář:** zachována oprava přemístění předmětu mezi rukama i editace deníku z v93.240; zachovány původní bezpečnostní validace.
+
+**Omezení:** E2E běží v Chromium se simulovaným localStorage (bez hostovaného originu). Při nemožné kombinaci Folk / povolání musí rozhodnout pravidlový engine a přiznat neúspěch, nesmí vygenerovat pravidlově nemožný profil. Charakterové tělesné vlastnosti jsou čistě popisné a nejsou přepsány do fyzických atributů.
+
+---
+
 # HMK Keeper’s Ledger – v93.239 (automatická tvorba a Covenant)
 
 **Nové:** V registru je jedním kliknutím dostupný automatický náhodný generátor a generátor podle sedmi povahových zaměření. Nevyžadují hody ani potvrzení hráče: procházejí původní čtrnáctikrokový pravidlový engine, používají softwarovou náhodu a uchovávají historii hodů jako generovanou, nikoli fyzickou. Po dokončení se otevře Character Sheet a tvorba má stav `auto-generated` bez následného potvrzení GM. Edit zůstává dostupný.
@@ -746,3 +758,12 @@ Verified p.44 Shaman family named Ritual, Spirit or physically possessed Talent,
 
 ### v93.219 — Parent Arcanist Family Skills
 Fyvria: výběr dvou doložených dovedností, ostatní konvokace z fyzického d6; mapování rodičovského Arcanista z fyzického d20 na původní profesní balíčky bez druhých DP.
+
+## v93.240 — oprava formulářů inventáře a orientační počáteční výbava generátoru
+
+- **Opraven přesun předmětu mezi `off_hand` a `main_hand`.** Ve v93.239 mělo skryté pole `name="id"` stejný název jako DOM vlastnost formuláře `form.id`. Při odeslání se tedy místo řetězce ID formuláře vracel element, submit handler nepoznal formulář a prohlížeč provedl standardní GET navigaci. Pole je nyní `inventoryId`; kontrola používá `getAttribute('id')`. Oprava je ověřena skutečným klikáním v izolovaném Chromium (včetně obsazené ruky).
+- **Analogická oprava editace deníkového záznamu** (`journalId`), která měla stejnou kolizi.
+- **Automatické počáteční vybavení:** generátor při úspěšném dokončení vybere skutečné katalogové oblečení a základní zásoby, u bojových povolání též cenově dostupnou zbraň a lehkou zbroj. Předměty se zapisují do **existujícího inventáře téhož charakteru** a mají odkazy na pevné tištěné definice. Pořizovací rozpočet je maximálně `Wealth × 100d` dle tištěné strany 51 HMK v1.2; původní Wealth, coins a historie hodů se nemění. Výběr konkrétní kombinace není pravidly přikázaný a jde o konzervativní **orientační balíček**, který hráč může upravit. Pro Wealth 0 nevzniká vymyšlené bezplatné inventární vybavení.
+- **Referenční katalog:** dostupné cenově doložené položky Expedition Equipment (s. 120) a Craft Items (s. 121) byly doplněny jako neměnné referenční definice do společné knihovny, bez změny existujících uložených snapshotů.
+- **Stav univerzálního generátoru:** v93.240 stále používá omezené Folk/regionální cesty a sedm předchozích profilových zaměření. Detailní checkboxy fyzických a povahových rysů, volný text/AI i pravděpodobnostní pokrytí všech tabulek zatím **nejsou implementovány**. Nepovažovat za dokončený univerzální generátor HMK.
+- **Regrese:** 16/16 prohlížečových generování se simulovaným `localStorage`, samostatná browser regrese přesunu předmětů a editace deníku, 442 kontrol plánovače výbavy a zděděná sada 317 024 kontrol. Skutečný hosting s reálným `localStorage` zůstává k ověření po nasazení.
