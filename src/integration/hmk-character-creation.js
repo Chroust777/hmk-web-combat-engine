@@ -1,12 +1,20 @@
 import {parentPriestRitual,allowedParentPriestVariants} from './hmk-parent-priest-family.js';
+import {parentShamanRitual,verifiedParentShamanVariants,verifyParentShamanChoice} from './hmk-parent-shaman-family.js';
 import {gmLanguageProof} from './hmk-gm-bonus-language.js';
 import {veteranRoundCount,veteranRoundsProof} from './hmk-veteran-rounds.js';
-import {arcaneTalentFromPhysical} from './hmk-arcane-talent.js';
+import {arcaneTalentFromPhysical,parentInvokerTalentFromPhysical} from './hmk-arcane-talent.js';
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './hmk-creation-roll-choices.js';
 import {eligibleAges,eligibleRealms,eligibleSocietiesForRealm,eligibleParentClasses,eligibleFamilyOccupationNames,eligibleOccupations,eligibleSkills,eligibleBackgrounds} from './hmk-creation-eligibility.js';
 import {parentOccupationFromRoll,parentTitleFromBackground} from './hmk-parent-occupation-tables.js';
-import {SCRIPTS,languageChoices,religionChoices,validInstance,parseInstance,instanceKey,nativeLanguageDP,nativeRitualDP,foreignLanguageBoost,occupationalSpecializations,parseOccupationDistribution} from './hmk-skill-instances.js';
-import {SOCIETIES,classFromRoll,VERIFIED_REGIONS,realmFromRegionRoll,realmFromRegionSelection,OCCUPATIONS,occupationVariantNames,priestReligionOf,isArcaneOccupationEligible,CHIEFTAIN_VARIANTS,chieftainVariantForSubsistence,familyOccupationProfile,OCCUPATION_PAGES,availableBackgroundSkills,tribalFreeOccupation,standingFromWealth,printedParentWealthDie,evaluateWealthDice,wealthDiceCounts,ritualFollowerFromML,folkSkillsFromDice,graceFromDie,arcaneStartingResearch,REGION_D1000,ELDER_FOLK_REGIONS,regionFromD1000} from './hmk-creation-tables.js';
+import {SCRIPTS,canonicalLanguage,languageChoices,religionChoices,validInstance,parseInstance,instanceKey,nativeLanguageDP,nativeRitualDP,foreignLanguageBoost,occupationalSpecializations,parseOccupationDistribution,nativeRitualGrants} from './hmk-skill-instances.js';
+import {creationPsycheCount,creationPsycheFromPhysical} from './hmk-creation-psyche.js';
+import {divineAspectFromChoice} from './hmk-creation-divine-aspects.js';
+import {validateStartingSpiritPowers,validateShamanTradition} from './hmk-creation-spirit-powers.js';
+import {validateStartingElixirs} from './hmk-creation-starting-elixirs.js';
+import {validateStartingPvarSpells} from './hmk-creation-starting-pvar.js';
+import {VERIFIED_WEST_DOCTRINES,VERIFIED_COVENANT_DOCTRINES,moralityOrthodoxyPenalty,validateStartingReligion} from './hmk-creation-doctrine.js';
+import {isTribalEmhle,covenantPostOccupationGrants} from './hmk-creation-special-skill-grants.js';
+import {SOCIETIES,classFromRoll,VERIFIED_REGIONS,regionAllowedForFolk,realmFromRegionRoll,realmFromRegionSelection,OCCUPATIONS,occupationVariantNames,priestReligionOf,isArcaneOccupationEligible,CHIEFTAIN_VARIANTS,chieftainVariantForSubsistence,familyOccupationProfile,familySkillCap,validateFamilySkillAllocation,OCCUPATION_PAGES,availableBackgroundSkills,tribalFreeOccupation,standingFromWealth,printedParentWealthDie,occupationWealthDie,evaluateWealthDice,wealthDiceCounts,ritualFollowerFromML,folkSkillsFromDice,graceFromDie,arcaneStartingResearch,REGION_D1000,ELDER_FOLK_REGIONS,regionFromD1000} from './hmk-creation-tables.js';
 /** HMK v1.2 Character Generation, PDF pp. 19–56, Skill System pp. 45–49.
  * The wizard is a persistent guided draft. Tables not yet transcribed in full
  * are explicitly marked GM-verified rather than silently invented.
@@ -18,7 +26,7 @@ export const CHARACTER_STEPS=Object.freeze([
  ['Characteristics',38],['Occupation',41],['Skills',45],['Standing',51],['The Mysteries',53]
 ]);
 export const SKILL_STAGES=Object.freeze(['Folk Skills','Arcane Talent Skills','Family Skills','Background Skills','Occupation Skills','Optional Skills','Veteran Skills','Sunsign Skills']);
-export const FOLKS=Object.freeze(['Human','Kúzhai','Ænarin','Sinái','Sidhé']);
+export const FOLKS=Object.freeze(['Human','Kúzhai','Ænarin','Sinái','Sidhé','Malákta','Nâdi']);
 export const AGE_GROUPS=Object.freeze(['Young','Mature','Old']);
 export const SIGNS=Object.freeze(['Ùlándus','Arálius','Fenéri','Áhnù','Angberélius','Nadái','Hîrin','Táræl','Tai','Skôrus','Masâra','Ládo']);
 export const MONTHS=Object.freeze(['Núzyæl','Peónu','Kelén','Nólus','Laránè','Ágrazhâr','Azúra','Halánè','Savôr','Ilvín','Návek','Morgát']);
@@ -55,7 +63,7 @@ export function cityStateBackgroundDie(die,secondTens){
  return {original,secondTens:Number(secondTens),effectiveRoll:result||100};
 }
 export function backgroundFromRoll(die,urbanChance,{unsettledTribal=false,society=null,cityStateTens=null,folk='Human'}={}){
- if(unsettledTribal)return 'Wilderness';
+ if(unsettledTribal||['Malákta','Nâdi'].includes(folk))return 'Wilderness'; // Appendix I p.423: all occupations
  const d=society==='City-State'?cityStateBackgroundDie(die,cityStateTens).effectiveRoll:normalizeRoll(die,100),u=Number(urbanChance);
  if(!Number.isInteger(u)||u<0||u>100)throw Error('Urban chance musí být 0–100 podle Parent Occupation');
  const unusual=d%5===0;
@@ -63,8 +71,8 @@ export function backgroundFromRoll(die,urbanChance,{unsettledTribal=false,societ
 }
 const PHYSICAL=['str','end','dex','agl','per','cml'],MENTAL=['aur','wil','rea','cre','emp','elo'];
 export const ATTRIBUTES=Object.freeze([...PHYSICAL,...MENTAL]);
-const PHYS_MOD={Human:[0,0,0,0,0,0], 'Ænarin':[0,0,1,1,2,1],Kúzhai:[2,2,1,0,1,0],Sinái:[0,0,2,2,3,2],Sidhé:[0,0,3,3,5,4]};
-const MENT_MOD={Human:[0,0,0,0,0,0], 'Ænarin':[2,1,0,1,3,1],Kúzhai:[-2,3,0,0,-2,0],Sinái:[4,2,0,2,2,3],Sidhé:[6,2,0,3,1,4]};
+const PHYS_MOD={Human:[0,0,0,0,0,0], 'Ænarin':[0,0,1,1,2,1],Kúzhai:[2,2,1,0,1,0],Sinái:[0,0,2,2,3,2],Sidhé:[0,0,3,3,5,4],Malákta:[2,3,4,6,2,0],Nâdi:[0,0,2,0,0,-2]};
+const MENT_MOD={Human:[0,0,0,0,0,0], 'Ænarin':[2,1,0,1,3,1],Kúzhai:[-2,3,0,0,-2,0],Sinái:[4,2,0,2,2,3],Sidhé:[6,2,0,3,1,4],Malákta:[-2,3,-1,-2,-2,0],Nâdi:[0,0,0,1,0,0]};
 export function normalizeRoll(value,sides){const n=Number(value);if(!/^\d+$/.test(String(value))||n<1||n>sides)throw Error(`Fyzický d${sides} musí být celé číslo 1–${sides}`);return n;}
 export function physicalDiceRequirement(age,kind='PC',mental=false){
  if(mental)return kind==='NPC'?{count:3,drop:0}:{count:4,drop:1};
@@ -149,9 +157,18 @@ export function perceptionDefinition(character,definition){
  const parts=SUBATTRIBUTE_REPLACEMENTS[key];
  return parts?{...definition,primary:parts[0],secondary:parts[1]}:definition;
 }
+const SENSE_MODIFIERS=Object.freeze({
+ Human:[0,0,0], 'Ænarin':[2,1,1], Kúzhai:[0,2,0],
+ Malákta:[3,0,2], Nâdi:[-2,-2,2], Sidhé:[6,4,4], Sinái:[4,3,3]
+});
 export function evaluatePerceptionDice({name,ageGroup,folk,kind,dice}){
  if(!PERCEPTION_SENSES.includes(name))throw Error('Neznámý smyslový atribut HMK p.57');
- return {...evaluateAttributeDice({name:'per',ageGroup,folk,kind,dice}),attribute:name};
+ const proof=evaluateAttributeDice({name:'per',ageGroup,folk,kind,dice});
+ // P.38 explicitly replaces the common PER modifier with distinct EYE, HRG,
+ // SML modifiers when p.57 optional separate perception scores are rolled.
+ const index=PERCEPTION_SENSES.indexOf(name),folkModifier=SENSE_MODIFIERS[folk]?.[index];
+ if(!Number.isInteger(folkModifier))throw Error('Nepodporovaný Elder Folk sense modifier');
+ return {...proof,attribute:name,folkModifier,score:proof.adultMinimum+folkModifier};
 }
 /** One atomic authoritative character mutation. Optional sense rolls are REAL
  * GM physical dice, not copies of PER. Called through the normal CAS writer. */
@@ -207,6 +224,9 @@ export function calculateSkill(definition,attributes,allocations={}){
  const sb=skillBase(a,b);const sources=SKILL_STAGES.map(stage=>({stage,dp:allocations[stage]?.[definition.name]??0}));
  const native=allocations['Native Proficiencies']?.[definition.name]??0;
  if(native)sources.push({stage:'Native Language / Religion',dp:native});
+ for(const stage of ['Émhlè Family Ritual','Covenant post-Occupation SM']){
+  const dp=allocations[stage]?.[definition.name]??0;if(dp)sources.push({stage,dp});
+ }
  const gmBonus=allocations['GM Bonus Languages']?.[definition.name]??0;
  if(gmBonus)sources.push({stage:'GM Bonus Languages',dp:gmBonus});
  const totalDP=sources.reduce((n,x)=>n+x.dp,0);
@@ -231,18 +251,36 @@ export function calculateSheetSkills(character){
    // language grants are 3x the paid DP by explicit printed rule p.48.
    delete spec.Language;Object.assign(spec,split);
   }
-  allocations[stage]=spec;
+  // Historical v93.224 instances may store an Appendix I dialect in the
+  // language skill name. Reconcile ONLY in the derived projection, never
+  // rewrite the original stage ledger or append-only physical-roll history.
+  const reconciled={};
+  for(const [key,points] of Object.entries(spec)){
+   const parsed=parseInstance(key);
+   const canonical=parsed?.type==='Language'?instanceKey('Language',canonicalLanguage(parsed.name)):key;
+   reconciled[canonical]=(reconciled[canonical]??0)+points;
+  }
+  allocations[stage]=reconciled;
  }
  if(v.nativeSkillsMode==='yes'){
-  const grants={},lang=h.nativeLanguage;
+  const grants={},lang=canonicalLanguage(h.nativeLanguage);
   const count=nativeLanguageDP(character);
   if(lang&&count)grants[instanceKey('Language',lang)]=count;
-  const ritual=v.nativeRitualChoice;
-  if(ritual&&religionChoices(character).includes(ritual))grants[instanceKey('Ritual',ritual)]=nativeRitualDP(character);
+  const ritual=nativeRitualGrants(character,v);
+  // HMK p.343: tribal Émhlè Ritual SM2 is a FAMILY skill, not an
+  // additional native Religion grant on top of a family grant. It is
+  // independent of the five ordinary Parent Occupation Family DP.
+  if(isTribalEmhle(character))allocations['Émhlè Family Ritual']={...ritual};
+  else Object.assign(grants,ritual);
   if(lang==='Nâsik Azéri'&&count===5)grants[instanceKey('Language','Zâkimladal')]=4; // Appendix I p.416
   allocations['Native Proficiencies']=grants;
  }
  if(v.gmBonusLanguageProof?.decision==='granted')allocations['GM Bonus Languages']={...v.gmBonusLanguageProof.allocations};
+ const doctrinalReligion=v.startingDoctrineProof?.religion;
+ if(Object.hasOwn(VERIFIED_COVENANT_DOCTRINES,doctrinalReligion)){
+  const minimum=covenantPostOccupationGrants(doctrinalReligion,allocations,SKILL_DEFINITIONS,SKILL_STAGES);
+  if(Object.keys(minimum).length)allocations['Covenant post-Occupation SM']=minimum;
+ }
  const names=new Set(SKILL_DEFINITIONS.map(x=>x.name));
  for(const points of Object.values(allocations))for(const name of Object.keys(points))if(parseInstance(name))names.add(name);
  const normal=[...names].map(name=>{
@@ -268,6 +306,31 @@ if(perceptionMode(character)==='subattributes')for(const [name,primary] of [['Si
   const sourceAlloc={};for(const [stage,points] of Object.entries(creation.skillDP??{}))sourceAlloc[stage]={[x.name]:points[x.parent]??0};
   return {...calculateSkill({group:x.group??'Combat',name:x.name,primary:x.primary,secondary:x.secondary,baseSM:source.baseSM,sourcePage:x.parent==='Awareness'?57:49},attrs,sourceAlloc),subskillOf:x.parent};
  })];
+}
+/** HMK pp.48–49: “received DP thus far” refers to the ACTUAL named
+ * Skill on the sheet, not the printed generic occupation/family label.
+ * Read the one authoritative projection (native, Family, Occupation and
+ * covenant minima included); never persist a second skill counter.
+ * Earlier Veteran rounds are supplied separately by their proof.
+ */
+export function priorSkillDevelopment(character,skillName,beforeStage){
+ const before=SKILL_STAGES.indexOf(beforeStage);
+ if(before<0)throw Error('Unknown Skill stage');
+ const row=calculateSheetSkills(character).find(x=>x.name===skillName);
+ if(!row)return 0;
+ const earlier=new Set(SKILL_STAGES.slice(0,before));
+ // Native skills and Émhlè family grants exist before optional/veteran.
+ // Covenant floors apply after Occupation and before Optional.
+ if(before>=5)for(const extra of ['Native Language / Religion','Émhlè Family Ritual','Covenant post-Occupation SM','GM Bonus Languages'])earlier.add(extra);
+ return (row.dp??[]).filter(x=>earlier.has(x.stage)).reduce((sum,x)=>sum+x.dp,0);
+}
+/** Single physical Arcane Talent entry point; parent Invoker replaces
+ * ordinary one-d20 Possession with best of FOUR physical d20, p.42. */
+export function arcaneProofForCharacter(character,input){
+ const h=character?.hmk??{},a={aura:h.attributes?.aur,folk:h.folk,ageGroup:h.ageGroup,d100s:input.d100s??[]};
+ if(h.familyOccupation==='Invoker')return parentInvokerTalentFromPhysical({...a,d20s:input.d20s});
+ if(input.d20s!==undefined&&input.d20s!==null&&input.d20s.length)throw Error('Čtyři rodičovské d20 patří pouze Parent Invoker');
+ return arcaneTalentFromPhysical({...a,d20:input.d20});
 }
 export function defaultCreation(){return {version:1,step:1,skillStage:0,values:{},skillDP:{},attributeProof:{},voiceProof:null,auditEvents:[],completed:{},reviewRequired:true};}
 export function creationOf(character){return character?.hmk?.creation??defaultCreation()}
@@ -296,12 +359,31 @@ export function legacyTribalRegionNeedsReview(character){
    JSON.stringify(h.regionalLanguages)===JSON.stringify(historical.regionalLanguages);
  }catch{return false;}
 }
+/** Read-only compatibility for real pre-v93.217 records: a parent Invoker's
+ * original single-d20 proof was valid *in the old app* but is insufficient
+ * under the explicit four-d20 p.42 rule. Only the exact original physical
+ * evidence and stage ledger can qualify, never an arbitrary forged value.
+ * GM MUST re-enter four physical dice or change parent through Edit.
+ */
+export function legacyParentInvokerNeedsReview(character){
+ const h=character?.hmk??{},c=h.creation??{},t=c.values?.arcaneTalentProof;
+ if(h.familyOccupation!=='Invoker'||!t||t.familyInvoker||t.d20s!==undefined)return false;
+ try{
+  const verified=arcaneTalentFromPhysical({aura:h.attributes?.aur,folk:h.folk,ageGroup:h.ageGroup,d20:t.d20,d100s:t.d100s});
+  const last=c.auditEvents?.filter(e=>e.type==='arcane-talent-physical'||e.type==='arcane-talent-deactivated').at(-1);
+  return JSON.stringify(t)===JSON.stringify(verified)&&JSON.stringify(c.skillDP?.['Arcane Talent Skills']??{})===JSON.stringify(verified.grants)&&
+   last?.type==='arcane-talent-physical'&&last.d20s===undefined&&last.d20===verified.d20&&
+   JSON.stringify(last.d100s)===JSON.stringify(verified.d100s)&&JSON.stringify(last.grants)===JSON.stringify(verified.grants);
+ }catch{return false;}
+}
 export function applyCreationPatch(character,patch){
  const tribalLegacy=legacyTribalRegionNeedsReview(character);
+ const invokerLegacy=legacyParentInvokerNeedsReview(character);
  const clone=structuredClone(character),h=clone.hmk??={},c=structuredClone(h.creation??defaultCreation());
  if(!patch||!Number.isInteger(patch.step)||patch.step<1||patch.step>14)throw Error('Neplatný krok');
  if(patch.step!==c.step)throw Error('Krok průvodce se změnil');
  if(tribalLegacy&&patch.step!==5&&!patch.jump&&!patch.back)throw Error('Starší Tribal Region: nejprve přes Edit znovu potvrďte Birthplace (krok 5); historie hodů se zachová');
+ if(invokerLegacy&&!patch.back&&!patch.jump&&patch.step!==7&&!(patch.arcaneTalentDice&&[11,12].includes(patch.step)))throw Error('Starší Parent Invoker: přes Edit (krok 7) změňte povolání rodiče, nebo zadejte čtyři fyzické Talent d20 v kroku 11/12 (HMK p.42)');
  // Back / Edit navigation must never demand answers to a step not yet completed.
  if(patch.back||patch.jump){
   if(patch.jump){if(!Number.isInteger(patch.jump)||patch.jump<1||patch.jump>14)throw Error('Neplatný krok návratu');c.step=patch.jump;if(c.step===12)c.skillStage=0;for(let k=patch.jump;k<=14;k++)delete c.completed[k];}
@@ -356,11 +438,35 @@ export function applyCreationPatch(character,patch){
  if(patch.step<14&&Object.keys(patch.values??{}).length){c.status='in-progress';}
  const changed=(key)=>Object.prototype.hasOwnProperty.call(resolvedValues,key)&&resolvedValues[key]!==previousValues[key];
  const invalidateGmLanguage=()=>{if(c.values.gmBonusLanguageProof){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'gm-bonus-language-deactivated',reason:'changed Folk/Age/Birthplace'});delete c.values.gmBonusLanguageProof;}};
- const invalidateStage=(name)=>{delete c.skillDP?.[name];if(name==='Arcane Talent Skills')delete c.values.arcaneTalentProof;if(name==='Veteran Skills')delete c.values.veteranRoundProof;delete c.completed[12];c.status='in-progress'};
+ const invalidateStage=(name)=>{delete c.skillDP?.[name];if(name==='Arcane Talent Skills')delete c.values.arcaneTalentProof;if(name==='Occupation Skills')delete c.values.occupationProof;if(name==='Veteran Skills')delete c.values.veteranRoundProof;delete c.completed[12];c.status='in-progress'};
  const invalidateLaterSkills=(start)=>{
   for(const name of SKILL_STAGES.slice(SKILL_STAGES.indexOf(start)))invalidateStage(name);
   if(c.step===12)c.skillStage=Math.min(c.skillStage,SKILL_STAGES.indexOf(start));
  };
+ // Invalidate later Mysteries computations when their rule inputs change.
+ const invalidateCreationMysteries=()=>{
+  if(c.values.psycheProof){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-psyche-deactivated',reason:'Changed creation prerequisites'});delete c.values.psycheProof;delete c.values.psycheDice;delete c.values.psycheTraitChoice1;delete c.values.psycheTraitChoice2;delete c.values.psycheTraitDie1;delete c.values.psycheTraitDie2;delete h.psyche;}
+  if(c.values.spiritPowerProof)c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-spirit-powers-deactivated',reason:'Changed creation prerequisites'});
+  for(const key of ['arcaneResearchProof','mysteriesProof','mysteriesRitualSkill','spiritPowerProof','startingElixirProof','startingPvarSpellsProof','startingDoctrineProof','shamanTraditionProof'])delete c.values[key];
+  delete h.startingElixirs;delete h.startingPvarSpells;delete h.startingDoctrine;delete h.shamanTradition;
+  delete h.startingSpiritPowers;
+  delete h.religiousStatus;delete h.startingArcaneResearch;
+  delete c.completed[14];c.status='in-progress';
+ };
+ const invalidateSkillMysteries=()=>{
+  if(c.values.mysteriesProof||c.values.arcaneResearchProof){
+   c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-mysteries-derived-deactivated',reason:'Changed Skills / Attributes'});
+  }
+  if(c.values.spiritPowerProof)c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-spirit-powers-deactivated',reason:'Changed Skills / Attributes'});
+  for(const key of ['mysteriesProof','arcaneResearchProof','mysteriesRitualSkill','spiritPowerProof','startingElixirProof','startingPvarSpellsProof','startingDoctrineProof','shamanTraditionProof'])delete c.values[key];
+  delete h.startingElixirs;delete h.startingPvarSpells;delete h.startingDoctrine;delete h.shamanTradition;
+  delete h.startingSpiritPowers;
+  delete h.religiousStatus;delete h.startingArcaneResearch;
+  delete c.completed[14];c.status='in-progress';
+ };
+ if((patch.step===11&&(Object.keys(patch.values??{}).length||patch.advance))||
+    (patch.step===12&&(patch.skillAllocation||patch.arcaneTalentDice||patch.gmBonusLanguageUpdate||patch.advance||Object.keys(patch.values??{}).length))||
+    (patch.step===10&&(patch.attribute||patch.voice)))invalidateSkillMysteries();
  const invalidateOccupationIfNotAllowed=()=>{
   if(clone.occupation&&!eligibleOccupations(clone).includes(clone.occupation)){
    clone.occupation='';delete c.values.occupation;delete c.values.occupationProof;
@@ -374,6 +480,12 @@ export function applyCreationPatch(character,patch){
  // Physical results remain in append-only auditEvents and can be reviewed there.
  const invalidateWealthInputs=()=>{for(const key of ['wealth','wealthProof','parentWealthDie','occupationWealthDie','familyDice','occupationDice'])delete c.values[key];
   for(const key of ['wealth','standing','lifestyle','coinsPence','possessionsBudgetPence'])delete h[key];delete c.completed[13];};
+ // Edit: stale Wealth is never valid after changing a source of dice
+ // (Folk/Age/Birthplace/Estrangement) even when later steps are unfinished.
+ if(patch.step===1&&changed('folk')||patch.step===2&&changed('ageGroup'))invalidateCreationMysteries();
+ if(patch.step===1&&changed('folk')||patch.step===2&&changed('ageGroup')||
+    patch.step===5&&['birthRegion','birthplace','society','regionRoll','venariveRoll','nativeLanguageRoll','regionSubRoll','regionTribeRoll','regionCommunityChoice','nativeLanguageChoice','regionDialectRoll','regionDialectChoice','regionAzeriDialectChoice','subsistence'].some(changed)||
+    patch.step===9&&changed('estrangementRoll'))invalidateWealthInputs();
  // HMK p.57: an earlier optional perception roll must not silently
  // survive changed Folk/Age roll requirements. Keep historical dice, switch
  // explicitly to standard and require three fresh dice to reactivate.
@@ -397,13 +509,21 @@ export function applyCreationPatch(character,patch){
   if(!Object.hasOwn(patch.values??{},'regionAzeriDialectChoice'))delete c.values.regionAzeriDialectChoice;
   if(!Object.hasOwn(patch.values??{},'regionCommunityChoice'))delete c.values.regionCommunityChoice;
  }
- if(patch.step===5&&(tribalLegacy||changed('birthplace')||changed('society')||changed('birthRegion')||changed('regionRoll')||changed('venariveRoll')||changed('nativeLanguageRoll')||changed('regionSubRoll')||changed('regionDialectRoll')||changed('regionDialectChoice')||changed('regionAzeriDialectChoice')||changed('regionCommunityChoice')||changed('regionTribeRoll')||changed('nativeLanguageChoice'))){deactivateDependent(6,['classRoll']);deactivateDependent(7,['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll']);deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.socialClass;delete c.values.familyOccupation;delete c.values.familyWeaponcrafterType;delete c.values.familyVariantChoice;delete c.values.familyRitualChoice;delete c.values.parentOccupationProof;delete c.values.parentTitleProof;delete c.values.urbanChance;delete c.values.regionProof;delete h.socialClass;delete h.familyOccupation;delete h.background;delete h.parentTitle;for(let k=6;k<=14;k++)delete c.completed[k];invalidateStage('Family Skills');invalidateStage('Background Skills');delete c.values.nativeRitualChoice;delete c.values.nativeSkillsMode}
+ if(patch.step===5&&(tribalLegacy||changed('birthplace')||changed('society')||changed('birthRegion')||changed('regionRoll')||changed('venariveRoll')||changed('nativeLanguageRoll')||changed('regionSubRoll')||changed('regionDialectRoll')||changed('regionDialectChoice')||changed('regionAzeriDialectChoice')||changed('regionCommunityChoice')||changed('regionTribeRoll')||changed('nativeLanguageChoice'))){deactivateDependent(6,['classRoll']);deactivateDependent(7,['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll']);deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.socialClass;delete c.values.familyOccupation;delete c.values.familyWeaponcrafterType;delete c.values.familyVariantChoice;delete c.values.familyRitualChoice;delete c.values.parentOccupationProof;delete c.values.parentTitleProof;delete c.values.urbanChance;delete c.values.regionProof;delete h.socialClass;delete h.familyOccupation;delete h.background;delete h.parentTitle;for(let k=6;k<=14;k++)delete c.completed[k];invalidateStage('Family Skills');invalidateStage('Background Skills');delete c.values.nativeRitualChoice;delete c.values.nativeRitualChoice2;delete c.values.nativeRitualChoice3;delete c.values.nativeSkillsMode}
  if(patch.step===6&&(changed('socialClass')||changed('classRoll')||changed('classDie'))){invalidateWealthInputs();invalidateStage('Family Skills');invalidateStage('Background Skills');deactivateDependent(7,['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll']);deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.familyOccupation;delete c.values.familyWeaponcrafterType;delete c.values.familyVariantChoice;delete c.values.familyRitualChoice;delete c.values.parentOccupationProof;delete c.values.parentTitleProof;delete c.values.urbanChance;delete h.familyOccupation;delete h.background;delete h.parentTitle;delete c.completed[7];delete c.completed[8];delete c.completed[13];}
  if(patch.step===7&&(changed('familyOccupation')||changed('familyWeaponcrafterType')||changed('familyMartialChoice')||changed('familyVariantChoice')||changed('familyAuto')||changed('subsistence')||changed('parentOccupationRoll')||changed('parentOccupationSubRoll')||changed('parentOccupationSpecialRoll')||changed('parentOccupationConvocationRoll'))){invalidateWealthInputs();invalidateStage('Family Skills');invalidateStage('Background Skills');deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.urbanChance;delete c.values.parentTitleProof;delete h.parentTitle;delete h.background;delete c.completed[8];delete c.values.wealthProof;delete c.completed[13]}
  if(patch.step===11&&(changed('occupation')||changed('occupationAuto'))){invalidateWealthInputs();invalidateStage('Occupation Skills');delete c.values.wealthProof;delete c.completed[13]}
- if(patch.step===8&&changed('background')){invalidateStage('Background Skills');delete c.values.backgroundCityLanguageDistribution;}
+ if(patch.step===8&&['background','backgroundRoll','backgroundTensRoll','urbanChance'].some(changed)){
+  // One background d100 can change a Noble title even if Urban/Rural
+  // remains identical. Title changes Family d8/d10/d12/d20/d30 (p.27,51).
+  invalidateWealthInputs();
+  if(changed('background')){
+   invalidateLaterSkills('Background Skills');
+   delete c.values.backgroundCityLanguageDistribution;
+  }
+ }
  if(patch.step===11&&changed('occupation'))invalidateStage('Occupation Skills');
- if(patch.step===9&&changed('estrangementRoll')){delete c.values.wealth;delete c.values.wealthProof;delete c.completed[13];}
+
 
  // Revisiting a prerequisite invalidates affected derived evidence rather than
  // silently retaining modifiers or attributes calculated for another Folk/Age.
@@ -426,8 +546,8 @@ export function applyCreationPatch(character,patch){
    invalidateOccupationIfNotAllowed();
   }
  }
- if(patch.step===2){let age=c.values.ageGroup;if(!eligibleAges(h.folk).includes(age))throw Error('Age Group není povolená pro zvolený Folk (p.21)');if(c.values.folk==='Kúzhai'&&age!=='Mature'||['Sinái','Sidhé'].includes(c.values.folk)&&age!=='Young')throw Error('Nesprávná věková skupina Elder Folk');
-  if(c.values.ageRoll!==undefined&&c.values.ageRoll!==''&&!['Kúzhai','Sinái','Sidhé'].includes(c.values.folk)&&ageFromDie(c.values.ageRoll,c.values.folk)!==age)throw Error('Age neodpovídá fyzickému d100 (p.21)');
+ if(patch.step===2){if(h.folk==='Malákta'&&String(c.values.ageRoll??'').trim()!=='')throw Error('Malákta: p.21 výchozí Young; výjimečný Mature jen se souhlasem GM, nikoli z d100');let age=c.values.ageGroup;if(!eligibleAges(h.folk).includes(age))throw Error('Age Group není povolená pro zvolený Folk (p.21)');if(c.values.folk==='Kúzhai'&&age!=='Mature'||['Sinái','Sidhé'].includes(c.values.folk)&&age!=='Young')throw Error('Nesprávná věková skupina Elder Folk');
+  if(c.values.ageRoll!==undefined&&c.values.ageRoll!==''&&!['Kúzhai','Sinái','Sidhé','Malákta'].includes(c.values.folk)&&ageFromDie(c.values.ageRoll,c.values.folk)!==age)throw Error('Age neodpovídá fyzickému d100 (p.21)');
   h.ageGroup=age;
   if(changed('ageGroup')){
    invalidateLaterSkills('Veteran Skills');delete c.values.veteranRoundProof;delete c.values.arcaneTalentProof;invalidateStage('Arcane Talent Skills');
@@ -453,6 +573,8 @@ export function applyCreationPatch(character,patch){
   h.sunsignTraitSecondary=sources[1]?c.values.sunsignTraitSecondary:null;
  }
  if(patch.step===5){
+  if(!regionAllowedForFolk(c.values.birthRegion,h.folk))throw Error('Appendix I p.423: Elder Folk Region není přípustný pro vybraný Folk');
+  if(c.values.venariveRoll!==undefined&&String(c.values.venariveRoll).trim()!==''&&ELDER_FOLK_REGIONS.includes(c.values.birthRegion))throw Error('Elder Folk p.423 se určuje vlastní tabulkou d100, nikoliv Venârivè d1000');
   if(c.values.birthRegion!=='Palíthanè'&&c.values.regionDialectRoll!==undefined&&String(c.values.regionDialectRoll).trim()!=='')throw Error('Fyzický d100 pro dialekt platí jen pro Palíthanè (p.420)');
   if(c.values.birthRegion!=='Ázeryàn'&&c.values.regionAzeriDialectChoice!==undefined&&String(c.values.regionAzeriDialectChoice).trim()!=='')throw Error('GM dialekt Nâsik Azéri lze zadat jen v Ázeryànu (p.416)');
   if(!['Hèpekéria','Hârn'].includes(c.values.birthRegion)&&c.values.regionCommunityChoice!==undefined&&String(c.values.regionCommunityChoice).trim()!=='')throw Error('GM komunita Hèpekéria je povolená jen v daném regionu (p.418)');
@@ -488,6 +610,7 @@ export function applyCreationPatch(character,patch){
   }else{delete c.values.regionProof;delete h.birthRegion;delete h.pantheon;delete h.nativeLanguage;delete h.regionalLanguages;delete h.harnTribe;delete h.alticTribe;}
   if(!String(c.values.birthplace??'').trim()||!SOCIETIES.includes(c.values.society))throw Error('Vyberte známou Society a Birthplace Realm nebo doložený Region d100');
   h.birthplace=c.values.birthplace;h.society=c.values.society;
+  if(h.society==='Mizúni')c.values.subsistence='Herding'; // p.423 settled, herding tribe; Chieftain p.42
   if(h.society==='Tribal-Settled')c.values.tribalUnsettled='no';
   else if(h.society==='Tribal')c.values.tribalUnsettled='yes';
   else delete c.values.tribalUnsettled;
@@ -503,7 +626,7 @@ export function applyCreationPatch(character,patch){
   }
  }
  if(patch.step===7){
-  if(c.values.parentOccupationSubRoll!==undefined&&String(c.values.parentOccupationSubRoll).trim()!==''&&(!String(c.values.parentOccupationRoll??'').trim()||(h.society==='Tribal'&&h.socialClass==='Free')))throw Error('Doplňkový Slave d20 vyžaduje odpovídající rodičovské povolání Feudal/Imperial (p.27–28)');
+  if(c.values.parentOccupationSubRoll!==undefined&&String(c.values.parentOccupationSubRoll).trim()!==''&&(!String(c.values.parentOccupationRoll??'').trim()||(h.society==='Tribal'&&h.socialClass==='Free')))throw Error('Doplňkový d20 vyžaduje Parent Slave nebo Tenant Officer z tabulky (p.27–28)');
   if(c.values.parentOccupationRoll!==undefined&&String(c.values.parentOccupationRoll).trim()){
    const o=['Tribal','Tribal-Settled'].includes(h.society)&&h.socialClass==='Free' ? {...tribalFreeOccupation(c.values.subsistence,c.values.parentOccupationRoll),society:h.society} : parentOccupationFromRoll({society:h.society,socialClass:h.socialClass,roll:c.values.parentOccupationRoll,classRoll:c.values.classRoll,classDie:c.values.classDie??100,subRoll:c.values.parentOccupationSubRoll,specialRoll:c.values.parentOccupationSpecialRoll,convocationRoll:c.values.parentOccupationConvocationRoll});
    if(c.values.familyOccupation&&c.values.familyOccupation!==o.name)throw Error('Parent Occupation neodpovídá fyzickému Tribal Free d100');
@@ -528,33 +651,50 @@ export function applyCreationPatch(character,patch){
   }
   const parentCombat=c.values.familyOccupation;
   const choices=parentCombat==='Man-at-arms (Archer)'?['Archery','Slings']:
-   parentCombat==='Man-at-arms (Cavalry)'?['Melee']:null;
+   parentCombat==='Man-at-arms (Cavalry)'?['Melee','Archery','Slings','Throwing']:null;
   if(choices){
    if(changed('familyOccupation')&&!Object.hasOwn(patch.values??{},'familyMartialChoice'))delete c.values.familyMartialChoice;
    if(c.values.familyMartialChoice!==undefined&&c.values.familyMartialChoice!==''&&!choices.includes(c.values.familyMartialChoice))throw Error('Nepřípustná specializace Parent Man-at-arms');
-   // The alternate Cavalry 'Missile 3' still needs a concrete missile discipline.
-   if(c.values.familyAuto==='yes'&&!choices.includes(c.values.familyMartialChoice))throw Error('Auto Family Man-at-arms vyžaduje doložený podtyp');
+   // The printed Cavalry Missile 3 becomes a real p.46 skill explicitly selected from the bounded UI options.
+   if(!choices.includes(c.values.familyMartialChoice))throw Error('Family Man-at-arms: zvolte povolený podtyp z nabídky (p.43)');
   }else{
    if(Object.hasOwn(patch.values??{},'familyMartialChoice')&&patch.values.familyMartialChoice)throw Error('Vojenská podvarianta nepatří k Parent Occupation');
    delete c.values.familyMartialChoice;
   }
-  const familyVariants=c.values.familyOccupation==='Priest'?allowedParentPriestVariants(clone):occupationVariantNames(c.values.familyOccupation);
+  const familyVariants=['Priest','Gentry: Priest'].includes(c.values.familyOccupation)?allowedParentPriestVariants(clone):c.values.familyOccupation==='Shaman'?verifiedParentShamanVariants(clone):occupationVariantNames(c.values.familyOccupation);
   if(familyVariants.length){
    if(changed('familyOccupation')&&!Object.hasOwn(patch.values??{},'familyVariantChoice'))delete c.values.familyVariantChoice;
    if(c.values.familyVariantChoice&&!familyVariants.includes(c.values.familyVariantChoice))throw Error('Nepřípustný rodičovský profesní podtyp (pp.42–44)');
-   if(c.values.familyAuto==='yes'&&!familyVariants.includes(c.values.familyVariantChoice))throw Error('Auto Family vyžaduje konkrétní doložený profesní podtyp');
-   if(c.values.familyOccupation==='Priest'&&c.values.familyAuto==='yes'&&!parentPriestRitual(clone,c.values.familyVariantChoice))throw Error('Parent Priest: náboženství nepatří k doloženému pantheonu (p.27,43)');
+   if(!familyVariants.includes(c.values.familyVariantChoice))throw Error('Parent Occupation vyžaduje konkrétní podtyp z pravidlové nabídky (pp.42–44)');
+   if(['Priest','Gentry: Priest'].includes(c.values.familyOccupation)&&c.values.familyAuto==='yes'&&!parentPriestRitual(clone,c.values.familyVariantChoice))throw Error('Parent Priest: náboženství nepatří k doloženému pantheonu (p.27,43)');
   }else{
    if(Object.hasOwn(patch.values??{},'familyVariantChoice')&&patch.values.familyVariantChoice)throw Error('Rodinný podtyp nepatří k Parent Occupation');
    delete c.values.familyVariantChoice;
   }
   h.familyOccupation=c.values.familyOccupation;
-  if(changed('familyOccupation')||changed('familyVariantChoice'))delete c.values.familyRitualChoice;
-  if(h.familyOccupation==='Priest'&&parentPriestRitual(clone,c.values.familyVariantChoice))c.values.familyRitualChoice=parentPriestRitual(clone,c.values.familyVariantChoice).religion;
+  // p.43/47: source-backed Family lists are never an optional GM override.
+  // Unknown profiles remain explicitly separate for later source review.
+  if(familyOccupationProfile(h.familyOccupation,c.values.familyWeaponcrafterType,c.values.familyMartialChoice,c.values.familyVariantChoice,c.values.regionProof?.subsistence??c.values.subsistence)&&c.values.familyAuto!=='yes')
+   throw Error('Doložené Parent Occupation vyžaduje Family Skills podle pravidel; režim volného GM výběru nelze použít');
+  // An Invoker parent changes the ORIGINAL Talent Possession roll method.
+  // Never silently reuse a normal d20 as one of the required four (or vice versa).
+  if((previousValues.familyOccupation==='Invoker')!==(h.familyOccupation==='Invoker')&&c.values.arcaneTalentProof){
+   c.auditEvents.push({sequence:c.auditEvents.length+1,type:'arcane-talent-deactivated',reason:'Parent Invoker changed',previousD20:c.values.arcaneTalentProof.d20,
+    previousD20s:c.values.arcaneTalentProof.d20s? [...c.values.arcaneTalentProof.d20s]:undefined});
+   invalidateStage('Arcane Talent Skills');
+   delete c.completed[12];
+  }
+  if((changed('familyOccupation')||changed('familyVariantChoice'))&&!Object.hasOwn(patch.values??{},'familyRitualChoice'))delete c.values.familyRitualChoice;
+  if(['Priest','Gentry: Priest'].includes(h.familyOccupation)&&parentPriestRitual(clone,c.values.familyVariantChoice))c.values.familyRitualChoice=parentPriestRitual(clone,c.values.familyVariantChoice).religion;
+  if(h.familyOccupation==='Shaman'&&c.values.familyAuto==='yes')verifyParentShamanChoice(clone,c.values.familyVariantChoice,c.values.familyRitualChoice);
   if(changed('familyOccupation'))for(const fld of ['familySecondScriptChoice','familyThirdScriptChoice','familyScriptChoice'])if(!Object.hasOwn(patch.values??{},fld))delete c.values[fld];
   if(changed('familyOccupation')||changed('familyWeaponcrafterType')||changed('familyMartialChoice')||changed('familyVariantChoice')||changed('familyAuto')||changed('subsistence')||changed('parentOccupationRoll')){invalidateLaterSkills('Family Skills');invalidateOccupationIfNotAllowed();}
  }
  if(patch.step===8){
+  if(['Malákta','Nâdi'].includes(h.folk)){
+   if(String(c.values.backgroundRoll??'').trim()!=='')throw Error('Malákta/Nâdi: p.423 přiděluje Wilderness bez hodu Background d100');
+   if(c.values.background!=='Wilderness')throw Error('Malákta/Nâdi: Background je vždy Wilderness (p.423)');
+  }
   // HMK p.29,33: a non-settled Tribal household always comes from
   // Wilderness; it has no physical Background roll to interpret.
   if(h.society==='Tribal'&&c.values.tribalUnsettled!=='yes')throw Error('Tribal bez Settled má automaticky Rural (Wilderness) (p.29,33)');
@@ -596,14 +736,18 @@ export function applyCreationPatch(character,patch){
   // can be resolved before choosing the occupation, with identical proof.
   if(patch.arcaneTalentDice){
    const input=patch.arcaneTalentDice;
-   const proof=arcaneTalentFromPhysical({aura:h.attributes?.aur,folk:h.folk,ageGroup:h.ageGroup,d20:input.d20,d100s:input.d100s});
+   const proof=arcaneProofForCharacter({...clone,hmk:{...h,creation:c}},input);
    c.values.arcaneTalentMode='yes';c.values.arcaneTalentProof=proof;c.skillDP['Arcane Talent Skills']={...proof.grants};
-   c.auditEvents.push({sequence:c.auditEvents.length+1,type:'arcane-talent-physical',d20:proof.d20,d100s:[...proof.d100s],aura:proof.aura,folk:proof.folk,ageGroup:proof.ageGroup,result:proof.result,grants:{...proof.grants}});
+   c.auditEvents.push({sequence:c.auditEvents.length+1,type:'arcane-talent-physical',d20:proof.d20,d20s:proof.familyInvoker?[...proof.d20s]:undefined,d100s:[...proof.d100s],aura:proof.aura,folk:proof.folk,ageGroup:proof.ageGroup,result:proof.result,grants:{...proof.grants}});
    delete c.completed[12];
   }
 
   if(changed('occupation'))for(const key of ['occupationScriptChoice','occupationLanguageChoice','occupationRitualChoice','occupationLanguageDistribution','occupationScriptsDistribution','occupationSecondScriptChoice','occupationThirdScriptChoice'])if(!Object.hasOwn(patch.values??{},key))delete c.values[key];
   const chosenJob=OCCUPATIONS[c.values.occupation];
+  // HMK pp.42–44,48: a verified occupational table is compulsory, not
+  // a user-selectable GM override. Untranscribed jobs retain review mode.
+  if(chosenJob&&c.values.occupationAuto!=='yes')
+   throw Error('Doložené Occupation vyžaduje automatické Occupational DP z tištěné tabulky (p.48)');
   const priestReligion=priestReligionOf(c.values.occupation);
   if(priestReligion&&c.values.occupationAuto==='yes'){
    if(c.values.occupationRitualChoice!==priestReligion)throw Error('Priest: Ritual musí odpovídat doloženému náboženství');
@@ -623,6 +767,17 @@ export function applyCreationPatch(character,patch){
    const name=c.values[field];
    if(name&&(!chosenJob?.skills?.[printed]||!SCRIPTS.includes(name)))throw Error('Neplatná specializace '+printed);
    if(c.values.occupationAuto==='yes'&&chosenJob?.skills?.[printed]&&!name)throw Error('Povolání vyžaduje výběr konkrétního '+printed);
+  }
+  // A printed Language, Script(s), or Ritual is a real named skill,
+  // never a literal unassigned generic entry on the Character Sheet.
+  // The player chooses one from a bounded catalogue or allocates the
+  // original plural DP pool; the engine must not invent a choice.
+  if(c.values.occupationAuto==='yes'&&chosenJob){
+   const o=chosenJob.skills;
+   if(o.Script&&!c.values.occupationScriptChoice)throw Error('Occupation Script: vyberte konkrétní písmo z Appendix II (p.47)');
+   if(o.Scripts&&!c.values.occupationScriptChoice&&!c.values.occupationScriptsDistribution)throw Error('Occupation Scripts: vyberte písmo nebo rozdělte tištěný pool (p.47)');
+   if(o.Language&&!c.values.occupationLanguageChoice&&!c.values.occupationLanguageDistribution)throw Error('Occupation Languages: vyberte konkrétní jazyk nebo rozdělte tištěné DP (p.47)');
+   if(o.Ritual&&!c.values.occupationRitualChoice)throw Error('Occupation Ritual: vyberte konkrétní náboženství z doloženého panteonu (p.47)');
   }
   if(c.values.occupationAuto==='yes'&&chosenJob?.skills?.['2nd Script']&&(!c.values.occupationScriptChoice||c.values.occupationSecondScriptChoice===c.values.occupationScriptChoice))throw Error('Druhé písmo musí být odlišné od prvního Script');
   if(c.values.occupationAuto==='yes'&&chosenJob?.skills?.['3rd Script']&&(!c.values.occupationSecondScriptChoice||[c.values.occupationScriptChoice,c.values.occupationSecondScriptChoice].includes(c.values.occupationThirdScriptChoice)))throw Error('Třetí písmo musí být odlišné od prvního i druhého');
@@ -658,16 +813,34 @@ export function applyCreationPatch(character,patch){
     delete c.completed[12];c.status='in-progress';
    }
    const stage=SKILL_STAGES[c.skillStage];
+   // HMK pp.40,45–49: physical evidence and native skills are not
+   // optional GM modes. A genuine GM choice (bonus language DP) remains.
+   if(stage==='Folk Skills'&&nativeLanguageDP(clone)>0&&c.values.nativeSkillsMode!=='yes')
+    throw Error('Native Language DP podle p.47 jsou povinné, nelze je vypnout');
+   if(stage==='Folk Skills'&&['Kúzhai','Sinái','Sidhé'].includes(h.folk)&&c.values.folkAuto!=='yes')
+    throw Error('Folk Skills vyžadují fyzické d10 (p.45), GM režim není náhradou');
+   if(stage==='Arcane Talent Skills'&&c.values.arcaneTalentMode!=='yes')
+    throw Error('Arcane Talent Possession vyžaduje fyzický d20 a případné d100 (p.40)');
+   if(stage==='Veteran Skills'&&veteranRoundCount(h.folk,h.ageGroup)>0&&c.values.veteranRoundsMode!=='yes')
+    throw Error('Veteran Skills vyžadují samostatná kola 5 DP (p.49)');
+   if(stage==='Background Skills'&&c.values.backgroundAuto!=='yes')
+    throw Error('Background Skills musí použít tištěné tabulky (p.48)');
+   if(stage==='Occupation Skills'&&OCCUPATIONS[clone.occupation]&&c.values.occupationAuto!=='yes')
+    throw Error('Doložené Occupation Skills nelze přeskočit ani při úpravě starší postavy');
    if((changed('familyScriptChoice')||changed('familySecondScriptChoice')||changed('familyThirdScriptChoice'))&&stage==='Family Skills'){
     delete c.completed[12];c.status='in-progress';
    }
-   if(c.values.nativeSkillsMode==='yes'&&c.values.nativeRitualChoice&&!religionChoices(clone).includes(c.values.nativeRitualChoice))throw Error('Native Ritual neodpovídá místnímu pantheonu');
+   if(h.birthRegion==='Karéjia'&&h.folk==='Human'&&c.values.nativeSkillsMode==='no')throw Error('Karéjia p.419: tři rodné Ritualy jsou povinné, nelze je vypnout');
+   if(c.values.nativeSkillsMode==='yes')nativeRitualGrants(clone,c.values,{strict:patch.advance&&stage==='Folk Skills'});
+   // Even when nativeSkillsMode is disabled for a legacy record, never accept
+   // fabricated religion keys or a duplicated Karéjian triad.
+   if(c.values.nativeRitualChoice||c.values.nativeRitualChoice2||c.values.nativeRitualChoice3)nativeRitualGrants(clone,c.values,{strict:false});
    if(stage==='Arcane Talent Skills'&&patch.arcaneTalentDice){
     const input=patch.arcaneTalentDice;
-    const proof=arcaneTalentFromPhysical({aura:h.attributes?.aur,folk:h.folk,ageGroup:h.ageGroup,d20:input.d20,d100s:input.d100s});
+    const proof=arcaneProofForCharacter({...clone,hmk:{...h,creation:c}},input);
     c.values.arcaneTalentMode='yes';c.values.arcaneTalentProof=proof;
     c.skillDP[stage]={...proof.grants};
-    c.auditEvents.push({sequence:c.auditEvents.length+1,type:'arcane-talent-physical',d20:proof.d20,d100s:[...proof.d100s],aura:proof.aura,folk:proof.folk,ageGroup:proof.ageGroup,result:proof.result,grants:{...proof.grants}});
+    c.auditEvents.push({sequence:c.auditEvents.length+1,type:'arcane-talent-physical',d20:proof.d20,d20s:proof.familyInvoker?[...proof.d20s]:undefined,d100s:[...proof.d100s],aura:proof.aura,folk:proof.folk,ageGroup:proof.ageGroup,result:proof.result,grants:{...proof.grants}});
    }
    if(stage==='Folk Skills'&&patch.folkSkillDice){
     const result=folkSkillsFromDice(h.folk,patch.folkSkillDice);
@@ -680,7 +853,7 @@ export function applyCreationPatch(character,patch){
     if(!eligibleSkills(clone,stage).includes(skillName))throw Error('Dovednost není pro toto stadium a předchozí volby dostupná (HMK pp.45–49)');
     if(stage==='Background Skills'&&h.background==='City'&&parseInstance(skillName)?.type==='Language')throw Error('City Background: použijte pouze základní Language DP a zvláštní Languages 3× pool');
     if(stage==='Optional Skills'&&dp>2&&!(/^Language \(/.test(skillName)))throw Error('Optional Skills: nejvýše 2 DP při první výuce, jinak 1 DP (p.48)');
-    if(stage==='Optional Skills'&&dp>1&&SKILL_STAGES.slice(0,5).some(group=>(c.skillDP[group]?.[skillName]??0)>0)&&!parseInstance(skillName))throw Error('Optional Skills: již vyvinutý Skill má limit 1 DP (p.48)');
+    if(stage==='Optional Skills'&&dp>1&&parseInstance(skillName)?.type!=='Language'&&priorSkillDevelopment({...clone,hmk:{...h,creation:c}},skillName,stage)>0)throw Error('Optional Skills: již vyvinutý Skill (včetně konkrétního Script/Ritual) má limit 1 DP (p.48)');
     if(stage==='Optional Skills'&&def.group==='Esoterica'&&def.baseSM+SKILL_STAGES.slice(0,5).reduce((total,group)=>total+(c.skillDP[group]?.[skillName]??0),0)<1)throw Error('Esoterica Skill nesmí poprvé vzniknout v Optional Skills (p.48)');
     if(stage==='Folk Skills'&&c.values.folkAuto==='yes'&&['Kúzhai','Sinái','Sidhé'].includes(h.folk))throw Error('Folk Skills jsou určeny fyzickými d10, nelze ručně měnit');
     if(stage==='Family Skills'&&['2nd Script','3rd Script'].includes(skillName)){
@@ -692,11 +865,13 @@ export function applyCreationPatch(character,patch){
     }
     if(stage==='Family Skills'&&c.values.familyAuto==='yes'){
      const parent=familyOccupationProfile(h.familyOccupation,c.values.familyWeaponcrafterType,c.values.familyMartialChoice,c.values.familyVariantChoice,c.values.regionProof?.subsistence??c.values.subsistence);if(!parent)throw Error('Parent Occupation nemá ověřený profesní podtyp (p.44)');
-     if(h.familyOccupation==='Priest'&&parentPriestRitual(clone,c.values.familyVariantChoice)){const ritual=parentPriestRitual(clone,c.values.familyVariantChoice);if(skillName==='Ritual'||parseInstance(skillName)?.type==='Ritual'&&skillName!==ritual.skill)throw Error('Parent Priest: Family Ritual musí odpovídat vybranému náboženství');}
-     if(dp>Math.floor((parent.skills[parseInstance(skillName)?.type??skillName]??0)/2))throw Error('Family DP nesmí překročit polovinu Parent Occupation DP (p.47)');
+     if(['Priest','Gentry: Priest','Shaman'].includes(h.familyOccupation)){const ritual=['Priest','Gentry: Priest'].includes(h.familyOccupation)?parentPriestRitual(clone,c.values.familyVariantChoice):parentShamanRitual(clone,c.values.familyRitualChoice);if(ritual&&(skillName==='Ritual'||parseInstance(skillName)?.type==='Ritual'&&skillName!==ritual.skill))throw Error('Parent Priest/Shaman: Family Ritual musí odpovídat vybranému náboženství');}
+     const kind=parseInstance(skillName)?.type;const printed=(kind==='Ritual'||kind==='Script'||kind==='Language')?kind:skillName;
+     if(dp>familySkillCap(parent,skillName)&&!(skillName===printed&&dp===0))throw Error('Family DP nesmí překročit polovinu Parent Occupation DP (p.47)');
     }
     if(stage==='Background Skills'&&c.values.backgroundAuto==='yes'){
-     if(!availableBackgroundSkills(h.background,{folk:h.folk,viking:c.values.viking==='yes'||h.society==='Viking'}).includes(parseInstance(skillName)?.type??skillName))throw Error('Tento Skill není v doložené Background tabulce (p.46)');
+     if(skillName==='Ritual')throw Error('HMK p.343: zvolte konkrétní Ritual náboženství Émhlè');
+     if(!availableBackgroundSkills(h.background,{folk:h.folk,viking:c.values.viking==='yes'||h.society==='Viking',emhle:isTribalEmhle(clone)}).includes(parseInstance(skillName)?.type??skillName))throw Error('Tento Skill není v doložené Background tabulce (p.46)');
     }
     if(stage==='Arcane Talent Skills'&&c.values.arcaneTalentMode==='yes')throw Error('Arcane Talent DP určují fyzické d20/d100 (p.40,47), ne ruční rozdělení');
     if(stage==='Occupation Skills'&&c.values.occupationAuto==='yes')throw Error('Occupational Skills se přidělují automaticky podle p.42–44');
@@ -707,7 +882,7 @@ export function applyCreationPatch(character,patch){
      const previous=c.values.veteranRoundProof??Array.from({length:count},()=>({}));
      if(previous.length!==count)throw Error('Veteran: změnila se věková skupina; potvrďte DP znovu');
      const rounds=structuredClone(previous);rounds[which-1][skillName]=dp;
-     const combined=veteranRoundsProof(clone,rounds,skillDefinition,SKILL_STAGES);
+     const combined=veteranRoundsProof({...clone,hmk:{...h,creation:c}},rounds,skillDefinition,SKILL_STAGES,{priorPoints:name=>priorSkillDevelopment({...clone,hmk:{...h,creation:c}},name,'Veteran Skills')});
      c.values.veteranRoundProof=rounds;c.values.veteranRound=String(which);
      c.skillDP[stage]=combined;
      delete c.completed[12];c.status='in-progress';
@@ -715,25 +890,26 @@ export function applyCreationPatch(character,patch){
     const nextStage={...(c.skillDP[stage]??{}),[skillName]:dp};
     const total=Object.values(nextStage).reduce((n,x)=>n+x,0);
     if(stage==='Family Skills'&&c.values.familyAuto==='yes'&&total>5)throw Error('Family Skills mají rozpočet 5 DP (p.47)');
+    if(stage==='Family Skills'&&c.values.familyAuto==='yes'&&!validateFamilySkillAllocation(familyOccupationProfile(h.familyOccupation,c.values.familyWeaponcrafterType,c.values.familyMartialChoice,c.values.familyVariantChoice,c.values.regionProof?.subsistence??c.values.subsistence),nextStage))throw Error('Family DP překračují sdílenou půlku profesních Languages/Scripts nebo jiný limit (p.47)');
     if(['Background Skills','Optional Skills'].includes(stage)&&total>5)throw Error('Toto stadium má nejvýše 5 DP');
-   if(stage==='Background Skills'&&!availableBackgroundSkills(h.background,{folk:h.folk,viking:c.values.viking==='yes'||h.society==='Viking'}).includes(parseInstance(skillName)?.type??skillName))throw Error('Background DP mimo ověřenou tabulku');
+   if(stage==='Background Skills'&&!availableBackgroundSkills(h.background,{folk:h.folk,viking:c.values.viking==='yes'||h.society==='Viking',emhle:isTribalEmhle(clone)}).includes(parseInstance(skillName)?.type??skillName))throw Error('Background DP mimo ověřenou tabulku');
    if(stage==='Background Skills'&&dp>2)throw Error('Background Skill může dostat nejvýše 2 DP (p.48)');
     if(stage==='Veteran Skills'){
       const available=['Kúzhai','Sinái','Sidhé'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0;
       if(total>available)throw Error(`Veteran Skill přesahuje ${available} DP (p.49)`);
       // HMK p.49: max two DP only when this skill has no previous DP;
       // otherwise one, separately in each five-DP Veteran pool.
-      const prior=SKILL_STAGES.slice(0,6).reduce((n,g)=>n+(c.skillDP[g]?.[skillName]??0),0);
+      const prior=priorSkillDevelopment({...clone,hmk:{...h,creation:c}},skillName,'Veteran Skills');
       if(dp>1&&prior>0)throw Error('Veteran Skill se staršími DP může dostat nejvýše 1 DP (p.49)');
       if(dp>2)throw Error('Veteran Skill může dostat nejvýše 2 DP (p.49)');
     }
     if(stage==='Sunsign Skills'){
-      const prior=SKILL_STAGES.slice(0,7).reduce((n,g)=>n+(c.skillDP[g]?.[skillName]??0),0);
-      if(dp>1&&prior>0)throw Error('Sunsign Skill se staršími DP může dostat nejvýše 1 DP (p.49)');
-      if(dp>2)throw Error('Sunsign Skill může dostat nejvýše 2 DP (p.49)');
+      const prior=priorSkillDevelopment({...clone,hmk:{...h,creation:c}},skillName,'Sunsign Skills');
+      if(dp>1&&prior>0&&parseInstance(skillName)?.type!=='Language')throw Error('Sunsign Skill se staršími DP může dostat nejvýše 1 DP (p.49)');
+      if(dp>2&&parseInstance(skillName)?.type!=='Language')throw Error('Sunsign Skill může dostat nejvýše 2 DP (p.49)');
       const proof=c.values.sunsignProof;if(!proof)throw Error('Před Sunsign DP je nutný fyzický birthday d12/d30');
       const allowed=proof.dp.find(x=>x.group===def.group)?.value??0;
-      const groupTotal=SKILL_DEFINITIONS.filter(x=>x.group===def.group).reduce((n,x)=>n+(nextStage[x.name]??0),0);
+      const groupTotal=Object.entries(nextStage).reduce((n,[skill,points])=>n+(skillDefinition(clone,skill)?.group===def.group?points:0),0);
       if(groupTotal>allowed)throw Error(`${def.group}: Sunsign dovoluje jen ${allowed} DP (p.23)`);
       if(def.group==='Esoterica')throw Error('Sunsign Skill DP patří do mundane Skill Groups (p.23)');
     }
@@ -756,7 +932,7 @@ export function applyCreationPatch(character,patch){
       if(stage==='Veteran Skills'&&c.values.veteranRoundsMode==='yes'){
        const count=veteranRoundCount(h.folk,h.ageGroup);
        const rounds=c.values.veteranRoundProof??Array.from({length:count},()=>({}));
-       const result=veteranRoundsProof(clone,rounds,skillDefinition,SKILL_STAGES,{complete:true});
+       const result=veteranRoundsProof({...clone,hmk:{...h,creation:c}},rounds,skillDefinition,SKILL_STAGES,{complete:true,priorPoints:name=>priorSkillDevelopment({...clone,hmk:{...h,creation:c}},name,'Veteran Skills')});
        if(JSON.stringify(result)!==JSON.stringify(c.skillDP['Veteran Skills']??{}))throw Error('Veteran: nesouhlasí souhrn obou kol');
       }
       if(stage==='Veteran Skills'){
@@ -765,15 +941,27 @@ export function applyCreationPatch(character,patch){
       }
       if(stage==='Sunsign Skills'){
        const proof=c.values.sunsignProof;if(!proof)throw Error('Chybí Sunsign DP');
-       for(const x of proof.dp){const used=SKILL_DEFINITIONS.filter(def=>def.group===x.group).reduce((n,def)=>n+(c.skillDP[stage]?.[def.name]??0),0);
+       for(const x of proof.dp){const used=Object.entries(c.skillDP[stage]??{}).reduce((n,[skill,points])=>n+(skillDefinition(clone,skill)?.group===x.group?points:0),0);
         if(used!==x.value)throw Error(`${x.group}: Sunsign DP musí být rozděleny ${x.value}, aktuálně ${used}`);}
       }
    }
  }
  if(patch.step===13){
+  // A verified PC has no GM-only Wealth shortcut; p.51 requires physical
+  // dice. Manual review remains only when a printed die is unavailable.
+  const printedParent=printedParentWealthDie(h.familyOccupation,h.parentTitle,h.socialClass);
+  const printedOwn=priestReligionOf(clone.occupation)?null:occupationWealthDie(clone.occupation,h.socialClass);
+  if((clone.kind??'PC')==='PC'){
+   delete c.values.wealthAdvantage; // prevent legacy opt-out from masquerading as a rule
+   if(printedParent!==null&&(printedOwn!==null||priestReligionOf(clone.occupation))&&!patch.wealthDice)
+    throw Error('HMK p.51: u doložených PC Wealth kostek zadejte fyzické hody; Priest vyžaduje nejprve doložený Ritual ML (p.55), nikoli GM součet');
+  }
   let standing;
   if(patch.wealthDice){
    const r=patch.wealthDice;const estr=String(h.estrangement??'').split(' ')[0];
+   // HMK v1.2 p.51: PC Wealth Advantage is a rule, not an arbitrary
+   // GM opt-out. Keep the pure dice evaluator configurable for NPC tools.
+   if((clone.kind??'PC')==='PC'&&r.advantage===false)throw Error('PC Wealth Advantage je podle HMK p.51 povinná');
    const parentPrintedDie=printedParentWealthDie(h.familyOccupation,h.parentTitle,h.socialClass);
    if(parentPrintedDie!==null&&Number(r.parentDie)!==parentPrintedDie)throw Error('Family Wealth musí mít tištěnou velikost kostky Parent Occupation / Noble title (p.51)');
    if(priestReligionOf(clone.occupation)){
@@ -793,21 +981,124 @@ export function applyCreationPatch(character,patch){
   }
   h.standing=String(standing.wealth);h.lifestyle=standing.lifestyle;h.wealth=standing.wealth;h.coinsPence=standing.coinsPence;h.possessionsBudgetPence=standing.possessionsPence;
  }
- if(patch.step===14){h.fatePoints=5;h.fateML=fateML(h.attributes?.aur);if(h.fateML===null)throw Error('Fate vyžaduje ověřený Aura atribut');
-  if(patch.mysteries?.graceDie!==undefined){
-   const proof=graceFromDie(patch.mysteries.graceDie);
+ if(patch.step===14){
+  // HMK p.53: Fate Points are a PC-only mechanic.
+  if((clone.kind??'PC')==='PC'){h.fatePoints=5;h.fateML=fateML(h.attributes?.aur);if(h.fateML===null)throw Error('Fate vyžaduje ověřený Aura atribut');}
+  else {delete h.fatePoints;delete h.fateML;}
+  const m=patch.mysteries??{};
+  // HMK p.40: every generated PC receives a Grace d20. A prior physical
+  // proof can be reused, but an absent result must not be silently skipped.
+  if(m.graceDie!==undefined){
+   const proof=graceFromDie(m.graceDie);
    h.divineGrace={...proof};c.values.graceProof={...proof};
    c.auditEvents.push({sequence:c.auditEvents.length+1,type:'grace-d20',roll:proof.roll,result:proof.grace,marked:proof.marked});
   }
-  if(patch.mysteries?.pvarismML!==undefined){
-   const proof=arcaneStartingResearch(patch.mysteries.pvarismML,h.ageGroup,h.folk);
+  if(c.values.graceProof){
+   const choice=m.graceAspect??(m.graceDie!==undefined&&c.values.graceProof.roll<15?'':c.values.graceAspect??'');
+   const aspect=divineAspectFromChoice(c.values.graceProof,choice);
+   if(aspect){
+    if(c.values.graceAspect!==choice){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'grace-aspect-choice',aspect:choice,sourcePage:310});}
+    c.values.graceAspect=choice;h.divineAspect=aspect;
+   }else{if(c.values.graceAspect){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'grace-aspect-deactivated',aspect:c.values.graceAspect,reason:'Grace changed'});}delete c.values.graceAspect;delete h.divineAspect;}
+  }
+  if(patch.advance&&(clone.kind??'PC')==='PC'&&!c.values.graceProof)throw Error('HMK p.40: před dokončením je povinný fyzický Grace d20');
+  // Starting Psyche is deliberately separate from spell/morale Psyche Stress.
+  if(m.psyche){
+   const proof=creationPsycheFromPhysical({folk:h.folk,ageGroup:h.ageGroup,...m.psyche});
+   c.values.psycheProof=proof;h.psyche=proof.traits.length?proof.traits.map(x=>x.intensity+': '+x.trait).join('; '):'None';
+   c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-psyche',proof:structuredClone(proof)});
+  }
+  const count=creationPsycheCount(h.folk,h.ageGroup);
+  if(patch.advance&&(clone.kind??'PC')==='PC'&&count!==null&&!c.values.psycheProof)throw Error('HMK p.40: chybí povinné fyzické Psyche d20 a případné konkrétní Traity');
+  if(patch.advance&&(clone.kind??'PC')==='PC'&&count===null)c.values.psycheRuleReview='HMK p.40: počet hodů pro tento Folk není explicitní';
+  else delete c.values.psycheRuleReview;
+  // Ritual and Pvârism ML are DERIVED from the same Character Sheet skills;
+  // no independent user-typed number can become a second authority.
+  const skills=calculateSheetSkills(clone);
+  const selectedRitual=m.ritualSkill??c.values.mysteriesRitualSkill;
+  if(selectedRitual){
+   const row=skills.find(x=>x.name===selectedRitual&&x.name.startsWith('Ritual ('));
+   if(!row||!Number.isInteger(row.ml)||row.ml<1)throw Error('Vybraný Ritual nemá ověřený ML v Character Sheet');
+   if(m.ritualML!==undefined&&Number(m.ritualML)!==row.ml)throw Error('Ritual ML nesouhlasí s autoritativní Skill hodnotou');
+   const religion=selectedRitual.slice('Ritual ('.length,-1);
+   const provenWestern=Object.hasOwn(VERIFIED_WEST_DOCTRINES,religion);
+   const covenant=Object.hasOwn(VERIFIED_COVENANT_DOCTRINES,religion);
+   const provenDoctrine=provenWestern||covenant;
+   const isClergy=covenant?row.ml>=60:!!m.clergy;
+   const isFighting=covenant?row.ml>=30&&row.ml<60:!!m.fightingOrder;
+   const morality=m.morality!==undefined&&m.morality!==''?Number(m.morality):c.values.moralityChoice!==undefined?Number(c.values.moralityChoice):null;
+   let orthodoxyPenalty=Number(m.orthodoxyPenalty??0);
+   if(provenDoctrine&&morality!==null){
+    orthodoxyPenalty=moralityOrthodoxyPenalty(religion,morality);
+    if(m.orthodoxyPenalty!==undefined&&Number(m.orthodoxyPenalty)!==orthodoxyPenalty)throw Error('Morality a Orthodoxy musí být vypočtené z náboženského intervalu, ne ruční penalty');
+    c.values.moralityChoice=morality;h.morality=morality;
+   }
+   if(patch.advance&&provenDoctrine&&morality===null&&(clone.kind??'PC')==='PC')throw Error('HMK p.39,55: vyberte skutečnou Morality; Orthodoxy a Piety se vypočítají');
+   const result=ritualFollowerFromML(row.ml,{clergy:isClergy,fightingOrder:isFighting,orthodoxyPenalty});
+   h.religiousStatus={...result,ritualML:row.ml,clergy:isClergy,fightingOrder:isFighting,orthodoxyPenalty,ritualSkill:selectedRitual};
+   if(m.doctrineSubjects!==undefined||m.morality!==undefined){
+    if(!provenDoctrine){
+     if(m.doctrineSubjects?.length)throw Error('Pro dané místní náboženství neexistuje přepsaná tabulka Doctrine; nevymýšlejte Subjects');
+     c.values.religionNeedsReview=true;
+    }else{
+     const meleeml=skills.find(x=>x.name==='Melee')?.ml??0,initiativeml=skills.find(x=>x.name==='Initiative')?.ml??0;
+     const proof=validateStartingReligion({religion,morality,ritualML:row.ml,occupation:clone.occupation,clergy:isClergy,fightingOrder:isFighting,meleeML:meleeml,initiativeML:initiativeml,subjects:m.doctrineSubjects??[]});
+     if(covenant)h.religiousStatus={...h.religiousStatus,circle:proof.circle,ceremony:proof.ceremony,maxPiety:proof.maxPiety,blessingBonus:proof.blessingBonus};
+     c.values.startingDoctrineProof=proof;h.startingDoctrine={...proof};delete c.values.religionNeedsReview;
+     c.auditEvents.push({sequence:c.auditEvents.length+1,type:'starting-doctrine-choice',proof:structuredClone(proof)});
+    }
+   }
+   if(patch.advance&&provenDoctrine&&(clone.kind??'PC')==='PC'&&!c.values.startingDoctrineProof)throw Error('HMK p.55: vyberte všechny povolené Doctrine Subjects; max Piety určuje jejich počet');
+   c.values.mysteriesProof={...h.religiousStatus};c.values.mysteriesRitualSkill=selectedRitual;
+  }else if(m.ritualML!==undefined)throw Error('Ritual ML vyžaduje konkrétní Ritual Skill z nabídky');
+  else {delete h.religiousStatus;delete c.values.mysteriesProof;delete c.values.mysteriesRitualSkill;delete h.startingDoctrine;delete c.values.startingDoctrineProof;delete c.values.religionNeedsReview;}
+  const pvarism=skills.find(x=>x.name==='Pvârism');
+  const actualPvarism=(pvarism?.totalDP??0)>0?pvarism.ml:null;
+  if(m.pvarismML!==undefined&&m.pvarismML!==''&&Number(m.pvarismML)!==actualPvarism)throw Error('Pvârism ML nesouhlasí s vypočtenou Pvârism Skill');
+  if(Number.isInteger(actualPvarism)&&actualPvarism>=0){
+   const proof=arcaneStartingResearch(actualPvarism,h.ageGroup,h.folk);
    c.values.arcaneResearchProof=proof;h.startingArcaneResearch={...proof};
+  }else{delete c.values.arcaneResearchProof;delete h.startingArcaneResearch;}
+  // p.269: physical preparation took place before play; only choose printed 35 names.
+  const alchemy=skills.find(x=>x.name==='Alchemy');
+  const alchemyML=(alchemy?.totalDP??0)>0?alchemy.ml:0;
+  if(m.elixirs!==undefined){
+   const proof=validateStartingElixirs({alchemyML,choices:m.elixirs});
+   c.values.startingElixirProof=proof;h.startingElixirs={...proof};
+   c.auditEvents.push({sequence:c.auditEvents.length+1,type:'starting-elixirs-choice',proof:structuredClone(proof)});
   }
-  if(patch.mysteries?.ritualML!==undefined){
-   const m=patch.mysteries;const result=ritualFollowerFromML(Number(m.ritualML),{clergy:!!m.clergy,fightingOrder:!!m.fightingOrder,orthodoxyPenalty:Number(m.orthodoxyPenalty??0)});
-   h.religiousStatus={...result,ritualML:Number(m.ritualML),clergy:!!m.clergy,fightingOrder:!!m.fightingOrder,orthodoxyPenalty:Number(m.orthodoxyPenalty??0)};
-   c.values.mysteriesProof={...h.religiousStatus};
+  if(patch.advance&&(clone.kind??'PC')==='PC'&&alchemyML>=60&&!c.values.startingElixirProof)throw Error('HMK p.269: vyberte počáteční elixíry podle aktuálního Alchemy ML');
+  if(alchemyML<60){delete c.values.startingElixirProof;delete h.startingElixirs;}
+  // p.54 eight steps; the 204 entries are the exact list on p.211.
+  if(m.pvarSpells!==undefined){
+   if(!c.values.arcaneResearchProof)throw Error('Shèk-Pvâr: chybí Pvârism ARP');
+   const input={occupation:clone.occupation,pvarismML:actualPvarism,primary:m.pvarPrimary,chantryStars:Number(m.chantryStars),choices:m.pvarSpells,artefacts:m.pvarArtefacts??[],naturalAttunement:!!c.values.arcaneTalentProof?.generated?.includes('Natural Attunement'),chantryConvocation:m.pvarChantryConvocation??m.pvarPrimary,homeChantry:m.pvarChantryName??'',chantryId:m.pvarChantryId,guildRank:m.pvarGuildRank??'',attunedObject:m.pvarAttunedObject??'',startingARP:c.values.arcaneResearchProof.startingARP};
+   if(patch.advance&&(clone.kind??'PC')==='PC'&&(!input.homeChantry?.trim()||!input.guildRank||!input.attunedObject?.trim()))throw Error('HMK p.54: zvolte domovskou chantry, Guild Rank z nabídky a vlastní attuned elemental object');
+   const proof=validateStartingPvarSpells(input);
+   c.values.startingPvarSpellsProof=proof;h.startingPvarSpells={...proof};
+   c.auditEvents.push({sequence:c.auditEvents.length+1,type:'starting-pvar-spells-choice',proof:structuredClone(proof)});
   }
+  if(patch.advance&&(clone.kind??'PC')==='PC'&&String(clone.occupation??'').startsWith('Shèk-Pvâr (')&&!c.values.startingPvarSpellsProof)throw Error('HMK p.54: chybí explicitní výběr kouzel a ARP nákladů Shèk-Pvâr');
+  if(!String(clone.occupation??'').startsWith('Shèk-Pvâr (')){delete c.values.startingPvarSpellsProof;delete h.startingPvarSpells;}
+  // A Shaman may choose stored Spirit Powers after a successful starting
+  // astral journey (p.53). The burden may not exceed the printed Spirit
+  // Index (p.300). This records choices, not their runtime bonuses.
+  if(m.spiritPowers!==undefined){
+   const spirit=skills.find(x=>x.name==='Spirit');
+   const proof=validateStartingSpiritPowers({occupation:clone.occupation,spiritML:spirit?.ml,powers:m.spiritPowers,languages:(h.regionalLanguages??[]).concat(h.nativeLanguage?[h.nativeLanguage]:[])});
+   c.values.spiritPowerProof=proof;h.startingSpiritPowers={...proof};
+   c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-spirit-powers-choice',proof:structuredClone(proof)});
+  }
+  if(patch.advance&&clone.occupation?.startsWith('Shaman (')&&!c.values.spiritPowerProof){
+   throw Error('Shaman: vyberte počáteční Spirit Powers nebo výslovně potvrďte prázdný seznam podle Spirit Index');
+  }
+  if(m.shamanTradition!==undefined){
+   const proof=validateShamanTradition({occupation:clone.occupation,tradition:m.shamanTradition,clanTotem:m.shamanKathTotem??'',powers:c.values.spiritPowerProof?.powers??[]});
+   c.values.shamanTraditionProof=proof;h.shamanTradition={...proof};
+   c.auditEvents.push({sequence:c.auditEvents.length+1,type:'shaman-tradition-choice',proof:structuredClone(proof),powers:structuredClone(c.values.spiritPowerProof?.powers??[])});
+  }
+  if(patch.advance&&(clone.kind??'PC')==='PC'&&String(clone.occupation??'').startsWith('Shaman (')&&!c.values.shamanTraditionProof)throw Error('HMK p.301: vyberte doloženou shaman tradition / Other');
+  if(patch.advance)c.values.mysteriesCreationVersion=2;
  }
  // Switching a previously rolled choice back to a deliberate manual choice
  // does not erase the earlier physical roll. A separate audit event revokes
@@ -863,6 +1154,7 @@ export function syncCreationSkills(h,idFactory){
 export function assertCreationInvariants(character){
  const h=character?.hmk,c=h?.creation;
  if(!c)return true;
+ const parentInvokerLegacy=legacyParentInvokerNeedsReview(character);
  if(c.version!==1||!Number.isInteger(c.step)||c.step<1||c.step>14||
   !Number.isInteger(c.skillStage)||c.skillStage<0||c.skillStage>7||
   !c.values||typeof c.values!=='object'||Array.isArray(c.values)||
@@ -883,14 +1175,37 @@ export function assertCreationInvariants(character){
     throw Error('Poškozený audit volby Perception');
   }else if(e.type==='voice-dice'){
    if(!Array.isArray(e.rolls)||!Number.isInteger(e.score))throw Error('Poškozený důkaz Voice');
+  }else if(e.type==='grace-aspect-choice'){
+   if(e.sourcePage!==310||!divineAspectFromChoice({roll:15,grace:0,marked:true},e.aspect))throw Error('Poškozená volba Divine Aspect');
+  }else if(e.type==='grace-aspect-deactivated'){
+   if(e.reason!=='Grace changed'||!divineAspectFromChoice({roll:15,grace:0,marked:true},e.aspect))throw Error('Neplatné zneplatnění Grace aspektu');
+  }else if(e.type==='creation-spirit-powers-deactivated'){
+   if(!['Changed creation prerequisites','Changed Skills / Attributes'].includes(e.reason))throw Error('Neplatné zneplatnění Spirit Powers');
+  }else if(e.type==='creation-spirit-powers-choice'){
+   const q=e.proof;if(!q||JSON.stringify(validateStartingSpiritPowers({occupation:'Shaman (Spirit)',spiritML:q.spiritML,powers:q.powers,languages:q.powers.filter(x=>x.family==='Ancestor'&&x.subject.startsWith('Language (')).map(x=>x.subject.slice(10,-1))}))!==JSON.stringify(q))throw Error('Poškozený Spirit Powers audit');
+  }else if(e.type==='creation-psyche'){
+   if(!e.proof||JSON.stringify(creationPsycheFromPhysical({folk:e.proof.folk,ageGroup:e.proof.ageGroup,d20s:e.proof.d20s,d10s:e.proof.traits.map(t=>t.roll),choices:e.proof.traits.map(t=>t.trait)}))!==JSON.stringify(e.proof))throw Error('Poškozený audit počáteční Psyche');
+  }else if(e.type==='creation-psyche-deactivated'){
+   if(e.reason!=='Changed creation prerequisites')throw Error('Neplatné zneplatnění Psyche');
+  }else if(e.type==='creation-mysteries-derived-deactivated'){
+   if(e.reason!=='Changed Skills / Attributes')throw Error('Neplatné zneplatnění Mysteries výpočtů');
+  }else if(e.type==='starting-elixirs-choice'){
+   const p=e.proof;if(!p||JSON.stringify(validateStartingElixirs({alchemyML:p.alchemyML,choices:p.elixirs?.map(x=>x.name)}))!==JSON.stringify(p))throw Error('Poškozená historie Starting Elixirs');
+  }else if(e.type==='starting-pvar-spells-choice'){
+   const p=e.proof;if(!p||JSON.stringify(validateStartingPvarSpells({occupation:p.occupation,pvarismML:p.pvarismML,primary:p.primary,chantryStars:p.chantryStars,choices:p.spells?.map(x=>({id:x.id,assisted:x.assisted})),artefacts:p.artefacts,naturalAttunement:p.naturalAttunement,chantryConvocation:p.chantryConvocation,homeChantry:p.homeChantry,chantryId:p.chantryId,guildRank:p.guildRank,attunedObject:p.attunedObject,startingARP:p.startingARP}))!==JSON.stringify(p))throw Error('Poškozená historie Shèk-Pvâr ARP');
+  }else if(e.type==='shaman-tradition-choice'){
+   const p=e.proof;if(!p||JSON.stringify(validateShamanTradition({occupation:'Shaman (Spirit)',tradition:p.tradition,clanTotem:p.clanTotem,powers:e.powers??[]}))!==JSON.stringify(p))throw Error('Poškozený audit Shaman Tradition');
+  }else if(e.type==='starting-doctrine-choice'){
+   const p=e.proof;if(!p||!Number.isInteger(p.morality)||!Array.isArray(p.subjects))throw Error('Poškozená historie Doctrine');
   }else if(e.type==='grace-d20'){
     const r=graceFromDie(e.roll);
     if(r.grace!==e.result||r.marked!==e.marked)throw Error('Poškozený důkaz fyzického d20 Grace');
   }else if(e.type==='arcane-talent-deactivated'){
-    if(e.reason!=='Aura changed'||!Number.isSafeInteger(e.previousD20)||e.previousD20<1||e.previousD20>20)throw Error('Poškozené zneplatnění Arcane Talent');
+    if(!['Aura changed','Parent Invoker changed'].includes(e.reason)||!Number.isSafeInteger(e.previousD20)||e.previousD20<1||e.previousD20>20)throw Error('Poškozené zneplatnění Arcane Talent');
+    if(e.previousD20s!==undefined&&(!Array.isArray(e.previousD20s)||e.previousD20s.length!==4||e.previousD20s.some(n=>!Number.isInteger(n)||n<1||n>20)||Math.max(...e.previousD20s)!==e.previousD20))throw Error('Poškozený audit zneplatněných čtyř d20');
   }else if(e.type==='arcane-talent-physical'){
-    const p=arcaneTalentFromPhysical({aura:e.aura,folk:e.folk,ageGroup:e.ageGroup,d20:e.d20,d100s:e.d100s});
-    if(e.result!==p.result||JSON.stringify(e.grants)!==JSON.stringify(p.grants))throw Error('Poškozený fyzický Arcane Talent audit');
+    const p=e.d20s!==undefined?parentInvokerTalentFromPhysical({aura:e.aura,folk:e.folk,ageGroup:e.ageGroup,d20s:e.d20s,d100s:e.d100s}):arcaneTalentFromPhysical({aura:e.aura,folk:e.folk,ageGroup:e.ageGroup,d20:e.d20,d100s:e.d100s});
+    if(e.d20!==p.d20||e.result!==p.result||JSON.stringify(e.grants)!==JSON.stringify(p.grants))throw Error('Poškozený fyzický Arcane Talent audit');
   }else if(e.type==='folk-skill-dice'){
     const r=folkSkillsFromDice(e.folk,e.rolls);
     if(JSON.stringify(r.skills)!==JSON.stringify(e.skills))throw Error('Poškozené d10 Folk Skills');
@@ -927,7 +1242,10 @@ export function assertCreationInvariants(character){
   }
  }
  if(c.values.nativeSkillsMode!==undefined&&!['yes','no'].includes(c.values.nativeSkillsMode))throw Error('Neplatný režim Native Language/Ritual');
- if(c.values.nativeRitualChoice&&!religionChoices(character).includes(c.values.nativeRitualChoice))throw Error('Nedoložený Ritual pro tento Pantheon');
+ if(h.birthRegion==='Karéjia'&&h.folk==='Human'&&c.completed[12]&&c.values.nativeSkillsMode!=='yes')throw Error('Karéjia p.419: rodné Ritualy nesmějí být vypnuté');
+ if(c.values.nativeSkillsMode==='yes')nativeRitualGrants(character,c.values,{strict:!!c.completed[12]});
+ if([c.values.nativeRitualChoice,c.values.nativeRitualChoice2,c.values.nativeRitualChoice3].filter(Boolean).some(n=>!religionChoices(character).includes(n)))throw Error('Nedoložený Ritual pro tento Pantheon');
+ if(new Set([c.values.nativeRitualChoice,c.values.nativeRitualChoice2,c.values.nativeRitualChoice3].filter(Boolean)).size!==[c.values.nativeRitualChoice,c.values.nativeRitualChoice2,c.values.nativeRitualChoice3].filter(Boolean).length)throw Error('Karéjia: tři Ritualy musejí být různé');
  const bonusLast=c.auditEvents.filter(e=>e.type==='gm-bonus-language-decision'||e.type==='gm-bonus-language-deactivated').at(-1);
  if(!c.values.gmBonusLanguageProof&&bonusLast?.type==='gm-bonus-language-decision')throw Error('GM Bonus Language: rozhodnutí z historie nemůže zmizet bez zneplatnění');
  if(c.values.gmBonusLanguageProof){
@@ -1011,16 +1329,46 @@ export function assertCreationInvariants(character){
  if(c.completed[13]&&c.values.wealth!==undefined&&Number(c.values.wealth)!==h.wealth)throw Error('Změněný GM Wealth');
  if(c.completed[12]&&c.values.folkAuto==='yes'&&['Kúzhai','Sinái','Sidhé'].includes(h.folk)&&!c.values.folkSkillProof)throw Error('Chybí fyzické Folk d10');
  if(c.values.arcaneTalentProof){
-  const t=c.values.arcaneTalentProof,p=arcaneTalentFromPhysical({aura:h.attributes?.aur,folk:h.folk,ageGroup:h.ageGroup,d20:t.d20,d100s:t.d100s});
+  const t=c.values.arcaneTalentProof,p=parentInvokerLegacy?arcaneTalentFromPhysical({aura:h.attributes?.aur,folk:h.folk,ageGroup:h.ageGroup,d20:t.d20,d100s:t.d100s}):arcaneProofForCharacter(character,{d20:t.d20,d20s:t.d20s,d100s:t.d100s});
   const last=c.auditEvents.filter(e=>e.type==='arcane-talent-physical').at(-1);
-  if(JSON.stringify(t)!==JSON.stringify(p)||JSON.stringify(c.skillDP['Arcane Talent Skills']??{})!==JSON.stringify(p.grants)||!last||last.d20!==p.d20||JSON.stringify(last.d100s)!==JSON.stringify(p.d100s)||JSON.stringify(last.grants)!==JSON.stringify(p.grants))throw Error('Poškozený fyzický Arcane Talent důkaz');
+  if(JSON.stringify(t)!==JSON.stringify(p)||JSON.stringify(c.skillDP['Arcane Talent Skills']??{})!==JSON.stringify(p.grants)||!last||last.d20!==p.d20||JSON.stringify(last.d20s)!==JSON.stringify(p.d20s)||JSON.stringify(last.d100s)!==JSON.stringify(p.d100s)||JSON.stringify(last.grants)!==JSON.stringify(p.grants))throw Error('Poškozený fyzický Arcane Talent důkaz');
  }
+ if(c.values.arcaneTalentProof&&!parentInvokerLegacy&&Boolean(c.values.arcaneTalentProof.familyInvoker)!==(h.familyOccupation==='Invoker'))throw Error('Arcane Talent Possession neodpovídá rodičovskému Invoker');
  if(c.completed[12]&&c.values.arcaneTalentMode==='yes'&&!c.values.arcaneTalentProof)throw Error('Chybí fyzické Arcane Talent hody');
+ if(c.values.psycheProof){
+  const q=c.values.psycheProof;const expected=creationPsycheFromPhysical({folk:h.folk,ageGroup:h.ageGroup,d20s:q.d20s,d10s:q.traits.map(x=>x.roll),choices:q.traits.map(x=>x.trait)});
+  const event=c.auditEvents.filter(e=>e.type==='creation-psyche').at(-1);
+  if(JSON.stringify(q)!==JSON.stringify(expected)||!event||JSON.stringify(event.proof)!==JSON.stringify(q)||h.psyche!==(q.traits.length?q.traits.map(x=>x.intensity+': '+x.trait).join('; '):'None'))throw Error('Změněný počáteční Psyche důkaz HMK p.40');
+ }
+ if(c.completed[14]&&c.values.mysteriesCreationVersion===2){
+  if((character.kind??'PC')==='PC'&&!c.values.graceProof)throw Error('Dokončená postava nemá Grace d20');
+  if((character.kind??'PC')==='PC'&&creationPsycheCount(h.folk,h.ageGroup)!==null&&!c.values.psycheProof)throw Error('Dokončená hráčská postava nemá Psyche d20');
+ }
  if(h.divineGrace&&!c.values.graceProof)throw Error('Grace bez fyzického d20 důkazu');
  if(c.values.graceProof){
   const r=graceFromDie(c.values.graceProof.roll),e=c.auditEvents.filter(x=>x.type==='grace-d20').at(-1);
   if(JSON.stringify(r)!==JSON.stringify(c.values.graceProof)||JSON.stringify(h.divineGrace)!==JSON.stringify(r)||!e||e.roll!==r.roll||e.result!==r.grace)throw Error('Změněný fyzický Grace důkaz');
  }
+ const currentPsycheEvent=c.auditEvents.filter(e=>e.type==='creation-psyche'||e.type==='creation-psyche-deactivated').at(-1);
+ if(!c.values.psycheProof&&currentPsycheEvent?.type==='creation-psyche')throw Error('Aktivní Psyche důkaz zmizel bez zneplatnění historie');
+ const currentAspectEvent=c.auditEvents.filter(e=>e.type==='grace-aspect-choice'||e.type==='grace-aspect-deactivated').at(-1);
+ if(!c.values.graceAspect&&currentAspectEvent?.type==='grace-aspect-choice')throw Error('Divine Aspect zmizel bez zneplatnění historie');
+ if(c.values.graceProof&&(c.values.graceAspect||c.values.mysteriesCreationVersion===2)){
+  const expected=divineAspectFromChoice(c.values.graceProof,c.values.graceAspect??'');
+  if(JSON.stringify(h.divineAspect??null)!==JSON.stringify(expected))throw Error('Divine Aspect neodpovídá fyzickému Grace výsledku');
+  if(expected&&c.values.mysteriesCreationVersion===2&&c.completed[14]){
+   const last=c.auditEvents.filter(x=>x.type==='grace-aspect-choice').at(-1);
+   if(!last||last.aspect!==expected.id)throw Error('Divine Aspect není doložen výběrem z tabulky');
+  }
+ }
+ if(c.values.spiritPowerProof){
+  const q=c.values.spiritPowerProof,spirit=calculateSheetSkills(character).find(x=>x.name==='Spirit');
+  const check=validateStartingSpiritPowers({occupation:character.occupation,spiritML:spirit?.ml,powers:q.powers,languages:(h.regionalLanguages??[]).concat(h.nativeLanguage?[h.nativeLanguage]:[])});
+  const last=c.auditEvents.filter(e=>e.type==='creation-spirit-powers-choice').at(-1);
+  if(JSON.stringify(q)!==JSON.stringify(check)||JSON.stringify(h.startingSpiritPowers)!==JSON.stringify(q)||!last||JSON.stringify(last.proof)!==JSON.stringify(q))throw Error('Změněné počáteční Spirit Powers nebo Spirit Index');
+ }
+ const currentSpiritEvent=c.auditEvents.filter(e=>e.type==='creation-spirit-powers-choice'||e.type==='creation-spirit-powers-deactivated').at(-1);
+ if(!c.values.spiritPowerProof&&currentSpiritEvent?.type==='creation-spirit-powers-choice')throw Error('Spirit Powers chybí zneplatnění dřívějšího důkazu');
  if(c.values.arcaneResearchProof){
   const r=arcaneStartingResearch(c.values.arcaneResearchProof.pvarismML,h.ageGroup,h.folk);
   if(JSON.stringify(r)!==JSON.stringify(c.values.arcaneResearchProof)||JSON.stringify(h.startingArcaneResearch)!==JSON.stringify(r))throw Error('Změněný výpočet počátečních Arcane Research Points');
@@ -1034,6 +1382,7 @@ export function assertCreationInvariants(character){
   const r=regionFromD1000(c.values.venariveRoll);
   if(JSON.stringify(r)!==JSON.stringify(c.values.venariveProof)||c.values.birthRegion!==r.region)throw Error('Změněný zdrojový Region d1000');
  }
+ if(!regionAllowedForFolk(c.values.birthRegion,h.folk))throw Error('Elder Folk p.423: nepřípustný Folk pro regionální tabulku');
  if(c.values.regionProof){
   const r=c.values.regionProof.selectedByGM?(()=>{
    if(String(c.values.regionRoll??'').trim())throw Error('Neplatná vědomá volba Realm bez fyzického hodu');
@@ -1042,20 +1391,21 @@ export function assertCreationInvariants(character){
   if(!legacyTribalRegionNeedsReview(character)&&(JSON.stringify(r)!==JSON.stringify(c.values.regionProof)||h.birthplace!==r.realm||h.society!==r.society||h.nativeLanguage!==r.nativeLanguage||JSON.stringify(h.regionalLanguages)!==JSON.stringify(r.regionalLanguages)||h.pantheon!==r.pantheon||h.harnTribe!==(r.region==='Hârn'?r.tribe:undefined)||h.alticTribe!==(r.region==='Áltôr'?r.tribe:undefined)))throw Error('Nesoulad doložené Region tabulky');
  }
  if(c.values.regionProof?.subsistence&&c.values.subsistence!==c.values.regionProof.subsistence)throw Error('Nesoulad kmenové obživy s HMK str. 29 / Appendix I');
- if(c.values.regionProof?.region==='Dalkésh'&&c.completed[11]&&h.familyOccupation&&character.occupation!==h.familyOccupation&&!(h.familyOccupation==='Weaponcrafter'&&['Weaponcrafter (Armourer)','Weaponcrafter (Bowyer)'].includes(character.occupation))&&!(h.familyOccupation==='Man-at-arms (Archer)'&&['Man-at-arms (Archer)','Man-at-arms (Archer, Slings)'].includes(character.occupation))&&!(h.familyOccupation==='Man-at-arms (Cavalry)'&&character.occupation==='Man-at-arms (Cavalry, Melee)'))throw Error('Dalkésh: Occupation musí odpovídat Parent Occupation (p.417)');
+ if(c.values.regionProof?.region==='Dalkésh'&&c.completed[11]&&h.familyOccupation&&character.occupation!==h.familyOccupation&&!(h.familyOccupation==='Weaponcrafter'&&['Weaponcrafter (Armourer)','Weaponcrafter (Bowyer)'].includes(character.occupation))&&!(h.familyOccupation==='Man-at-arms (Archer)'&&['Man-at-arms (Archer)','Man-at-arms (Archer, Slings)'].includes(character.occupation))&&!(h.familyOccupation==='Man-at-arms (Cavalry)'&&(character.occupation==='Man-at-arms (Cavalry, Melee)'||/^Man-at-arms \(Cavalry, Missile: (?:Archery|Slings|Throwing)\)$/.test(character.occupation))))throw Error('Dalkésh: Occupation musí odpovídat Parent Occupation (p.417)');
  if(c.values.classRoll!==undefined&&String(c.values.classRoll).trim()&&c.completed[6]&&classFromRoll(h.society,c.values.classRoll,Number(c.values.classDie||100))!==h.socialClass)throw Error('Nesoulad Parent Class fyzického hodu');
  if(c.values.parentOccupationProof){
   const x=['Tribal','Tribal-Settled'].includes(h.society)&&h.socialClass==='Free' ? {...tribalFreeOccupation(c.values.subsistence,c.values.parentOccupationRoll),society:h.society} : parentOccupationFromRoll({society:h.society,socialClass:h.socialClass,roll:c.values.parentOccupationRoll,classRoll:c.values.classRoll,classDie:c.values.classDie??100,subRoll:c.values.parentOccupationSubRoll,specialRoll:c.values.parentOccupationSpecialRoll,convocationRoll:c.values.parentOccupationConvocationRoll,allowLegacyIncomplete:!Object.hasOwn(c.values.parentOccupationProof,"specialRoll")&&!Object.hasOwn(c.values.parentOccupationProof,"convocationRoll")});
   if(JSON.stringify(x)!==JSON.stringify(c.values.parentOccupationProof)||h.familyOccupation!==x.name||Number(c.values.urbanChance)!==x.urbanChance)throw Error('Nesoulad rodičovského povolání s fyzickým hodem');
  }
  if(c.values.familyWeaponcrafterType!==undefined&&h.familyOccupation!=='Weaponcrafter')throw Error('Neplatná specializace Parent Weaponcrafter');
- if(c.values.familyRitualChoice!==undefined){const expected=parentPriestRitual(character,c.values.familyVariantChoice);if(h.familyOccupation!=='Priest'||!expected||expected.religion!==c.values.familyRitualChoice)throw Error('Rodinný Priest Ritual je v rozporu s pantheonem (p.27,43)');}
- if(h.familyOccupation==='Priest'&&c.values.familyAuto==='yes'&&c.completed[7]&&c.values.familyRitualChoice&&!parentPriestRitual(character,c.values.familyVariantChoice))throw Error('Neplatný doložený Parent Priest podtyp');
- const familyVariants=h.familyOccupation==='Priest'&&c.values.familyRitualChoice?allowedParentPriestVariants(character):occupationVariantNames(h.familyOccupation);
+ if(c.values.familyRitualChoice!==undefined){const expected=['Priest','Gentry: Priest'].includes(h.familyOccupation)?parentPriestRitual(character,c.values.familyVariantChoice):h.familyOccupation==='Shaman'?parentShamanRitual(character,c.values.familyRitualChoice):null;if(!expected||expected.religion!==c.values.familyRitualChoice)throw Error('Rodinný Priest/Shaman Ritual je v rozporu s pantheonem (p.43–44)');}
+ if(['Priest','Gentry: Priest'].includes(h.familyOccupation)&&c.values.familyAuto==='yes'&&c.completed[7]&&c.values.familyRitualChoice&&!parentPriestRitual(character,c.values.familyVariantChoice))throw Error('Neplatný doložený Parent Priest podtyp');
+ const familyVariants=['Priest','Gentry: Priest'].includes(h.familyOccupation)&&c.values.familyRitualChoice?allowedParentPriestVariants(character):h.familyOccupation==='Shaman'?verifiedParentShamanVariants(character):occupationVariantNames(h.familyOccupation);
  if(c.values.familyVariantChoice!==undefined&&!familyVariants.includes(c.values.familyVariantChoice))throw Error('Uložený rodičovský podtyp neodpovídá tištěnému povolání');
  if(c.values.familyAuto==='yes'&&c.completed[7]&&familyVariants.length&&!familyVariants.includes(c.values.familyVariantChoice))throw Error('Family DP vyžadují konkrétní profesní podtyp');
+ if(h.familyOccupation==='Shaman'&&c.values.familyAuto==='yes'&&c.completed[7])verifyParentShamanChoice(character,c.values.familyVariantChoice,c.values.familyRitualChoice);
  if(c.values.familyMartialChoice!==undefined){
-  const allowed=h.familyOccupation==='Man-at-arms (Archer)'?['Archery','Slings']:h.familyOccupation==='Man-at-arms (Cavalry)'?['Melee']:[];
+  const allowed=h.familyOccupation==='Man-at-arms (Archer)'?['Archery','Slings']:h.familyOccupation==='Man-at-arms (Cavalry)'?['Melee','Archery','Slings','Throwing']:[];
   if(!allowed.includes(c.values.familyMartialChoice))throw Error('Poškozený rodičovský vojenský podtyp');
  }
  if(c.values.familyAuto==='yes'&&c.skillDP['Family Skills']&&['Man-at-arms (Archer)','Man-at-arms (Cavalry)'].includes(h.familyOccupation)&&!familyOccupationProfile(h.familyOccupation,c.values.familyWeaponcrafterType,c.values.familyMartialChoice,c.values.familyVariantChoice,c.values.regionProof?.subsistence??c.values.subsistence))throw Error('Parent Man-at-arms nemá doloženou variantu');
@@ -1064,10 +1414,11 @@ export function assertCreationInvariants(character){
  if(c.values.familyAuto==='yes'&&c.skillDP['Family Skills']){
   const spec=familyOccupationProfile(h.familyOccupation,c.values.familyWeaponcrafterType,c.values.familyMartialChoice,c.values.familyVariantChoice,c.values.regionProof?.subsistence??c.values.subsistence);
   if(spec){const family=c.skillDP['Family Skills'];
-   const expectedRitual=h.familyOccupation==='Priest'&&c.values.familyRitualChoice?parentPriestRitual(character,c.values.familyVariantChoice):null;
+   if(!validateFamilySkillAllocation(spec,family))throw Error('Family Skills překračují profesní sdílenou skupinu (p.47)');
+   const expectedRitual=['Priest','Gentry: Priest'].includes(h.familyOccupation)&&c.values.familyRitualChoice?parentPriestRitual(character,c.values.familyVariantChoice):h.familyOccupation==='Shaman'&&c.values.familyRitualChoice?parentShamanRitual(character,c.values.familyRitualChoice):null;
    if(Object.values(family).reduce((a,b)=>a+Number(b),0)>5||Object.entries(family).some(([skill,dp])=>{
     const printed=expectedRitual&&skill===expectedRitual.skill?'Ritual':skill;
-    return !Number.isInteger(dp)||dp<0||(expectedRitual&&(skill==='Ritual'||parseInstance(skill)?.type==='Ritual'&&skill!==expectedRitual.skill))||dp>Math.floor((spec.skills[printed]??0)/2);
+    return !Number.isInteger(dp)||dp<0||(expectedRitual&&(skill==='Ritual'||parseInstance(skill)?.type==='Ritual'&&skill!==expectedRitual.skill))||dp>familySkillCap(spec,printed==='Ritual'?printed:skill);
    }))throw Error('Nesoulad Family Skills se zvolenou profesní tabulkou (p.47)');
   }
  }
@@ -1088,9 +1439,46 @@ export function assertCreationInvariants(character){
   const e=c.auditEvents.filter(x=>x.type==='wealth-dice').at(-1);
   if(JSON.stringify(test)!==JSON.stringify(v)||test.wealth!==h.wealth||h.coinsPence!==test.coinsPence||h.possessionsBudgetPence!==test.possessionsPence||h.lifestyle!==test.lifestyle||!e||JSON.stringify(e.familyRolls)!==JSON.stringify(v.familyRolls)||JSON.stringify(e.occupationRolls)!==JSON.stringify(v.occupationRolls)||e.wealth!==v.wealth)throw Error('Změněný fyzický Wealth důkaz');
  }
+ if(c.values.mysteriesCreationVersion===2&&c.completed[14]){
+  const sheet=calculateSheetSkills(character);
+  const p=sheet.find(x=>x.name==='Pvârism');
+  const expected=((p?.totalDP??0)>0)?arcaneStartingResearch(p.ml,h.ageGroup,h.folk):null;
+  if(JSON.stringify(expected)!==JSON.stringify(c.values.arcaneResearchProof??null)||JSON.stringify(expected)!==JSON.stringify(h.startingArcaneResearch??null))throw Error('Při Edit se změnilo Pvârism ML bez zneplatnění počátečních ARP');
+  if(c.values.mysteriesProof){
+   const r=sheet.find(x=>x.name===c.values.mysteriesProof.ritualSkill);
+   if(!r||r.ml!==c.values.mysteriesProof.ritualML)throw Error('Při Edit se změnilo Ritual ML bez zneplatnění Blessing/Circle');
+  }
+ }
  if(c.values.mysteriesProof){
   const m=c.values.mysteriesProof,r=ritualFollowerFromML(m.ritualML,m);
-  if(JSON.stringify({...r,ritualML:m.ritualML,clergy:m.clergy,fightingOrder:m.fightingOrder,orthodoxyPenalty:m.orthodoxyPenalty})!==JSON.stringify(m)||JSON.stringify(h.religiousStatus)!==JSON.stringify(m))throw Error('Nesoulad Ritual/Piety pravidlového výpočtu');
+  const covenant=Object.hasOwn(VERIFIED_COVENANT_DOCTRINES,String(m.ritualSkill??'').slice(8,-1));
+  const verified=c.values.startingDoctrineProof;
+  const expected={...r,ritualML:m.ritualML,clergy:m.clergy,fightingOrder:m.fightingOrder,orthodoxyPenalty:m.orthodoxyPenalty,...(m.ritualSkill?{ritualSkill:m.ritualSkill}:{})};
+  if(covenant&&verified){expected.circle=verified.circle;expected.ceremony=verified.ceremony;expected.maxPiety=verified.maxPiety;expected.blessingBonus=verified.blessingBonus;}
+  if(JSON.stringify(expected)!==JSON.stringify(m)||JSON.stringify(h.religiousStatus)!==JSON.stringify(m))throw Error('Nesoulad Ritual/Piety pravidlového výpočtu');
+ }
+ // New starting Mysteries proofs must still match the single authoritative skill projection.
+ const sheetCreation=calculateSheetSkills(character);
+ if(c.values.startingElixirProof){
+  const ml=sheetCreation.find(x=>x.name==='Alchemy'&&x.totalDP>0)?.ml??0;
+  const p=c.values.startingElixirProof,recalc=validateStartingElixirs({alchemyML:ml,choices:p.elixirs.map(x=>x.name)});
+  if(JSON.stringify(p)!==JSON.stringify(recalc)||JSON.stringify(h.startingElixirs)!==JSON.stringify(p))throw Error('Alchemy Starting Elixirs: chybný / zastaralý důkaz');
+ }
+ if(c.values.startingPvarSpellsProof){
+  const p=c.values.startingPvarSpellsProof,ml=sheetCreation.find(x=>x.name==='Pvârism'&&x.totalDP>0)?.ml;
+  const arp=c.values.arcaneResearchProof?.startingARP;
+  const recalc=validateStartingPvarSpells({occupation:character.occupation,pvarismML:ml,primary:p.primary,chantryStars:p.chantryStars,choices:p.spells.map(x=>({id:x.id,assisted:x.assisted})),artefacts:p.artefacts,naturalAttunement:p.naturalAttunement,chantryConvocation:p.chantryConvocation,homeChantry:p.homeChantry,chantryId:p.chantryId,guildRank:p.guildRank,attunedObject:p.attunedObject,startingARP:arp});
+  if(JSON.stringify(p)!==JSON.stringify(recalc)||JSON.stringify(h.startingPvarSpells)!==JSON.stringify(p))throw Error('Shèk-Pvâr: neplatný nebo zastaralý ARP důkaz');
+ }
+ if(c.values.shamanTraditionProof){
+  const p=c.values.shamanTraditionProof,q=validateShamanTradition({occupation:character.occupation,tradition:p.tradition,clanTotem:p.clanTotem,powers:c.values.spiritPowerProof?.powers??[]});
+  if(JSON.stringify(p)!==JSON.stringify(q)||JSON.stringify(h.shamanTradition)!==JSON.stringify(p))throw Error('Zastaralý / neplatný shaman tradition proof');
+ }
+ if(c.values.startingDoctrineProof){
+  const p=c.values.startingDoctrineProof,r=sheetCreation.find(x=>x.name===`Ritual (${p.religion})`);
+  if(h.morality!==p.morality||c.values.moralityChoice!==p.morality||c.values.mysteriesRitualSkill!==`Ritual (${p.religion})`)throw Error('Doctrine/Morality je odpojena od zvoleného Ritual');
+  const recalc=validateStartingReligion({religion:p.religion,morality:p.morality,ritualML:r?.ml,occupation:character.occupation,clergy:p.clergy,fightingOrder:p.fightingOrder,meleeML:sheetCreation.find(x=>x.name==='Melee')?.ml??0,initiativeML:sheetCreation.find(x=>x.name==='Initiative')?.ml??0,subjects:p.subjects});
+  if(JSON.stringify(p)!==JSON.stringify(recalc)||JSON.stringify(h.startingDoctrine)!==JSON.stringify(p))throw Error('Doctrine: chybné / zastaralé piety nebo Morality');
  }
  const mode=perceptionMode(character);
  if(c.values.perceptionMode!==undefined&&!PERCEPTION_MODES.includes(c.values.perceptionMode))throw Error('Neplatný Perception režim');
@@ -1136,7 +1524,7 @@ export function assertCreationInvariants(character){
  }
  if(c.values.veteranRoundProof!==undefined&&c.values.veteranRoundsMode!=='yes')throw Error('Veteran: neplatný režim již doložených kol');
  if(c.values.veteranRoundProof!==undefined){
-  const result=veteranRoundsProof(character,c.values.veteranRoundProof,skillDefinition,SKILL_STAGES,{complete:!!c.completed[12]});
+  const result=veteranRoundsProof(character,c.values.veteranRoundProof,skillDefinition,SKILL_STAGES,{complete:!!c.completed[12],priorPoints:name=>priorSkillDevelopment(character,name,'Veteran Skills')});
   if(JSON.stringify(result)!==JSON.stringify(c.skillDP['Veteran Skills']??{}))throw Error('Veteran: změněný zdroj DP ve dvou kolech');
  }
  if(c.completed[12]&&c.values.veteranRoundsMode==='yes'&&veteranRoundCount(h.folk,h.ageGroup)>0&&!c.values.veteranRoundProof)throw Error('Veteran: chybí doklad samostatných kol');
@@ -1146,22 +1534,23 @@ export function assertCreationInvariants(character){
   for(const [name,dp] of Object.entries(allocations)){
    const def=skillDefinition(character,name);
    if(!def||!Number.isSafeInteger(dp)||dp<0||dp>20)throw Error('Poškozené rozdělení Skill DP');
-   const earlier=(until)=>SKILL_STAGES.slice(0,until).reduce((n,g)=>n+(c.skillDP[g]?.[name]??0),0);
+   const earlier=(until)=>priorSkillDevelopment(character,name,SKILL_STAGES[until]??'Sunsign Skills');
    if(stage==='Family Skills'&&c.values.familyAuto==='yes'){
-    const priest=h.familyOccupation==='Priest'&&c.values.familyRitualChoice?parentPriestRitual(character,c.values.familyVariantChoice):null;
+    const priest=['Priest','Gentry: Priest'].includes(h.familyOccupation)&&c.values.familyRitualChoice?parentPriestRitual(character,c.values.familyVariantChoice):h.familyOccupation==='Shaman'&&c.values.familyRitualChoice?parentShamanRitual(character,c.values.familyRitualChoice):null;
     const printed=priest&&name===priest.skill?'Ritual':name;
     if(priest&&(name==='Ritual'||parseInstance(name)?.type==='Ritual'&&name!==priest.skill))throw Error('Family Ritual není z vlastního náboženství rodičů');
-    if(dp>Math.floor((familyOccupationProfile(h.familyOccupation,c.values.familyWeaponcrafterType,c.values.familyMartialChoice,c.values.familyVariantChoice,c.values.regionProof?.subsistence??c.values.subsistence)?.skills[printed]??0)/2))throw Error('Family DP mimo půlku Parent Occupation');
+    if(dp>familySkillCap(familyOccupationProfile(h.familyOccupation,c.values.familyWeaponcrafterType,c.values.familyMartialChoice,c.values.familyVariantChoice,c.values.regionProof?.subsistence??c.values.subsistence),printed==='Ritual'?printed:name))throw Error('Family DP mimo půlku Parent Occupation');
    }
-   if(stage==='Background Skills'&&c.values.backgroundAuto==='yes'&&!availableBackgroundSkills(h.background,{folk:h.folk,viking:c.values.viking==='yes'||h.society==='Viking'}).includes(parseInstance(name)?.type??name))throw Error('Background DP mimo ověřenou tabulku');
+   if(stage==='Background Skills'&&name==='Ritual')throw Error('HMK p.343: Background Ritual musí mít konkrétní náboženství');
+   if(stage==='Background Skills'&&c.values.backgroundAuto==='yes'&&!availableBackgroundSkills(h.background,{folk:h.folk,viking:c.values.viking==='yes'||h.society==='Viking',emhle:isTribalEmhle(character)}).includes(parseInstance(name)?.type??name))throw Error('Background DP mimo ověřenou tabulku');
    if(stage==='Background Skills'&&dp>2)throw Error('Background Skill: nejvýše 2 DP');
-   if(['Optional Skills','Veteran Skills','Sunsign Skills'].includes(stage)&&!(stage==='Veteran Skills'&&c.values.veteranRoundProof)&&!(stage!=='Sunsign Skills'&&name.startsWith('Language ('))&&dp>(earlier(SKILL_STAGES.indexOf(stage))>0?1:2))
+   if(['Optional Skills','Veteran Skills','Sunsign Skills'].includes(stage)&&!(stage==='Veteran Skills'&&c.values.veteranRoundProof)&&!name.startsWith('Language (')&&dp>(earlier(SKILL_STAGES.indexOf(stage))>0?1:2))
     throw Error('Neplatný počet DP pro dříve rozvinutou Skill');
    if(['Optional Skills','Veteran Skills'].includes(stage)&&def.group==='Esoterica'&&def.baseSM+earlier(5)<1)
     throw Error('Esoterica Skill bez dřívějšího výcviku');
    if(stage==='Sunsign Skills'&&def.group==='Esoterica')throw Error('Neplatná Sunsign Esoterica DP');
   }
-  if(stage==='Family Skills'&&c.values.familyAuto==='yes'&&sum>5)throw Error('Family DP přesahuje pět');
+  if(stage==='Family Skills'&&c.values.familyAuto==='yes'&&!validateFamilySkillAllocation(familyOccupationProfile(h.familyOccupation,c.values.familyWeaponcrafterType,c.values.familyMartialChoice,c.values.familyVariantChoice,c.values.regionProof?.subsistence??c.values.subsistence),allocations))throw Error('Family DP přesahují sdílený profesní limit');
   if(['Background Skills','Optional Skills'].includes(stage)&&sum>5)throw Error('Neplatný součet pěti DP');
   if(stage==='Veteran Skills'){
    const budget=['Kúzhai','Sinái','Sidhé'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0;
@@ -1170,7 +1559,7 @@ export function assertCreationInvariants(character){
   if(stage==='Sunsign Skills'){
    if(!c.values.sunsignProof)throw Error('Sunsign DP bez fyzického d12/d30');
    for(const {group,value} of c.values.sunsignProof.dp){
-    const assigned=SKILL_DEFINITIONS.filter(d=>d.group===group).reduce((n,d)=>n+(allocations[d.name]??0),0);
+    const assigned=Object.entries(allocations).reduce((n,[skill,points])=>n+(skillDefinition(character,skill)?.group===group?points:0),0);
     if(assigned>value)throw Error('Sunsign DP přesahují pravidlový příděl '+group);
    }
   }

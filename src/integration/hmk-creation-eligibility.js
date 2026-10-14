@@ -1,16 +1,18 @@
+import {isTribalEmhle} from './hmk-creation-special-skill-grants.js';
 import {parentPriestRitual} from './hmk-parent-priest-family.js';
 /** HMK v1.2 pp.20–21,24,26–32,41,45–49. Selection constraints, shared by
  * the creation UI and the domain mutation. Pure: no DOM, storage or dice.
  * Unknown / not-yet-transcribed rule branches NEVER acquire invented choices.
  */
-import {SOCIETY_TABLES,VERIFIED_REGIONS,regionRealmRows,OCCUPATIONS,occupationVariantNames,chieftainVariantForSubsistence,CHIEFTAIN_VARIANTS,priestReligionOf,isArcaneOccupationEligible,TRIBAL_INVOKER_VARIANTS,familyOccupationProfile,availableBackgroundSkills} from './hmk-creation-tables.js';
+import {SOCIETY_TABLES,VERIFIED_REGIONS,regionRealmRows,regionAllowedForFolk,OCCUPATIONS,occupationVariantNames,SLAVE_VARIANTS,chieftainVariantForSubsistence,CHIEFTAIN_VARIANTS,priestReligionOf,isArcaneOccupationEligible,TRIBAL_INVOKER_VARIANTS,familyOccupationProfile,availableBackgroundSkills} from './hmk-creation-tables.js';
 import {PARENT_OCCUPATION_TABLES} from './hmk-parent-occupation-tables.js';
+import {parentShamanRitual,verifiedParentShamanVariants} from './hmk-parent-shaman-family.js';
 import {SKILL_STAGES,SKILL_DEFINITIONS} from './hmk-character-creation.js';
 import {languageChoices,SCRIPTS,religionChoices,instanceKey,parseInstance} from './hmk-skill-instances.js';
 const uniq=a=>[...new Set(a)];
 const d100Value=n=>/^[1-9]\d{0,2}$/.test(String(n))&&Number(n)<=100;
-export function eligibleAges(folk){return folk==='Kúzhai'?['Mature']:['Sinái','Sidhé'].includes(folk)?['Young']:['Young','Mature','Old'];}
-export function eligibleRealms(region,{folk=null}={}){return uniq(regionRealmRows(region).filter(x=>!(region==='Hârn'&&x.harnElder&&folk&&!['Human','Ænarin'].includes(folk))).map(x=>x.realm));}
+export function eligibleAges(folk){return folk==='Kúzhai'?['Mature']:['Sinái','Sidhé'].includes(folk)?['Young']:folk==='Malákta'?['Young','Mature']:['Young','Mature','Old'];}
+export function eligibleRealms(region,{folk=null}={}){if(folk&&!regionAllowedForFolk(region,folk))return [];return uniq(regionRealmRows(region).filter(x=>!(region==='Hârn'&&x.harnElder&&folk&&!['Human','Ænarin'].includes(folk))).map(x=>x.realm));}
 export function eligibleSocietiesForRealm(region,realm){
  const rows=regionRealmRows(region);
  return VERIFIED_REGIONS[region]?uniq(rows.filter(r=>!realm||r.realm===realm).flatMap(r=>region==='Áltôr'&&r.alticTribal?['Tribal','Tribal-Settled']:[r.society])):null;
@@ -47,20 +49,26 @@ const RANKS={
  'City-State':['Unfree','Free','Guilded','Military','Priestly','Noble'], 'Feudal/Imperial':['Unfree','Free','Guilded','Military','Priestly','Noble'],
  Tributary:['Unfree','Free','Guilded','Military','Priestly','Noble'],Viking:['Unfree','Free','Guilded','Military','Priestly','Noble'],Chélemby:['Unfree','Free','Guilded','Military','Priestly','Noble'],
  Tribal:['Unfree','Free','Priestly','Noble'],'Tribal-Settled':['Unfree','Free','Guilded','Priestly','Noble'],
- Sináin:['Free','Crafter','Military','Valpalen']
+ Sináin:['Free','Crafter','Military','Valpalen'],Malák:['Military'],Mizúni:['Free','Crafter','Noble']
 };
 function toJob(raw){
  if(raw.startsWith('Gentry: ')){
   const job=raw.slice(8);return job==='Arcanist'?['Alchemist','Astrologer','Shèk-Pvâr']:[job==='Cartographer'?'Cartographer/Artist':job];
  }
  if(raw==='Arcanist')return ['Alchemist','Astrologer','Shèk-Pvâr'];
- if(raw==='Slave')return ['Slave (Craft)','Slave (Domestic)','Slave (Farming)','Slave (Fishing)','Slave (Herding)', 'Slave (Gladiator)'];
+ if(raw==='Tenant Officer')return ['Tenant Officer (Beadle)','Tenant Officer (Herder)','Tenant Officer (Reeve)','Tenant Officer (Woodward)'];
+ if(raw==='Slave')return [...SLAVE_VARIANTS, 'Slave (Gladiator)'];
+ if(raw.startsWith('Slave (')&&!raw.includes(':'))return raw==='Slave (Gladiator)'?[raw]:occupationVariantNames(raw);
  if(raw==='Hunter or Trapper')return ['Hunter','Trapper'];
+ if(raw==='Farmer (Thrall)')return ['Farmer'];
+ if(raw==='Priest (Siém)')return ['Priest (Siém: Astrology)'];
+ if(raw==='Servant')return ['Servant, Domestic'];
+ if(raw==='Artist')return ['Cartographer/Artist'];
  if(raw==='Chieftain')return [...CHIEFTAIN_VARIANTS];
  if(raw==='Weaponcrafter')return ['Weaponcrafter (Armourer)','Weaponcrafter (Bowyer)'];
  if(occupationVariantNames(raw).length)return occupationVariantNames(raw);
  if(raw==='Man-at-arms (Archer)')return ['Man-at-arms (Archer)','Man-at-arms (Archer, Slings)'];
- if(raw==='Man-at-arms (Cavalry)')return ['Man-at-arms (Cavalry, Melee)']; // missile branch GM review
+ if(raw==='Man-at-arms (Cavalry)')return ['Man-at-arms (Cavalry, Melee)',...['Archery','Slings','Throwing'].map(n=>`Man-at-arms (Cavalry, Missile: ${n})`)]; // printed Missile 3: concrete GM projectile choice, p.43
  if(raw==='Yeoman (Archer)'||raw==='Yeoman (Foot)'||raw==='Yeoman (Horse)')return [raw];
  return [raw];
 }
@@ -84,7 +92,7 @@ export function eligibleOccupations(character){
   const source=parentOccupationSource(society,group,{classRoll:h.creation?.values?.classRoll,classDie:h.creation?.values?.classDie});
   for(const s of (source===null?['Feudal','Imperial']:[source]))for(const row of PARENT_OCCUPATION_TABLES[s]?.[group]??[])jobs.push(...toJob(row.name));
  }
- const subsistence=h.creation?.values?.regionProof?.subsistence??h.creation?.values?.subsistence;
+ const subsistence=h.society==='Mizúni'?'Herding':h.creation?.values?.regionProof?.subsistence??h.creation?.values?.subsistence;
  const allowedChief=chieftainVariantForSubsistence(subsistence);
  return uniq(jobs).filter(n=>
   (!CHIEFTAIN_VARIANTS.includes(n)||n===allowedChief) &&
@@ -101,14 +109,19 @@ export function eligibleSkills(character,stageName=null){
  let pool=[];
  if(stage==='Family Skills'){
   const parent=familyOccupationProfile(h.familyOccupation,v.familyWeaponcrafterType,v.familyMartialChoice,v.familyVariantChoice,v.regionProof?.subsistence??v.subsistence);
-  const priest=h.familyOccupation==='Priest'?parentPriestRitual(character,v.familyVariantChoice):null;
-  pool=parent?Object.keys(parent.skills).filter(name=>Math.floor(parent.skills[name]/2)>0).map(name=>name==='Ritual'&&priest?priest.skill:name):[];
+  const priest=['Priest','Gentry: Priest'].includes(h.familyOccupation)?parentPriestRitual(character,v.familyVariantChoice):null;
+  const shaman=h.familyOccupation==='Shaman'&&verifiedParentShamanVariants(character).includes(v.familyVariantChoice)?parentShamanRitual(character,v.familyRitualChoice):null;
+  pool=parent?Object.keys(parent.skills).filter(name=>Math.floor(parent.skills[name]/2)>0).flatMap(name=>
+   name==='Ritual'&&(priest||shaman)?[(priest||shaman).skill]:
+   name==='Scripts'?SCRIPTS.map(script=>instanceKey('Script',script)):
+   name==='Language'?languageChoices(character).map(lang=>instanceKey('Language',lang)):[name]):[];
   // Family Script is selected by the parent-specific choice, while the
   // printed DP remains one Skill allocation (never a second counter).
  }else if(stage==='Background Skills'){
-  try{pool=availableBackgroundSkills(h.background,{folk:h.folk,viking:v.viking==='yes'||h.society==='Viking'});}catch{pool=[];}
+  try{pool=availableBackgroundSkills(h.background,{folk:h.folk,viking:v.viking==='yes'||h.society==='Viking',emhle:isTribalEmhle(character)});}catch{pool=[];}
   if(pool.includes('Language'))pool.push(...languageChoices(character).map(n=>instanceKey('Language',n)));
   if(pool.includes('Script'))pool.push(...SCRIPTS.map(n=>instanceKey('Script',n)));
+  if(pool.includes('Ritual')){pool=pool.filter(n=>n!=='Ritual');pool.push(...religionChoices(character).map(n=>instanceKey('Ritual',n)));}
  }else if(stage==='Occupation Skills'){
   pool=Object.keys(OCCUPATIONS[character.occupation]?.skills??{});
  }else if(stage==='Optional Skills'||stage==='Veteran Skills'){
@@ -125,11 +138,21 @@ export function eligibleSkills(character,stageName=null){
   if(stage==='Veteran Skills'&&h.ageGroup==='Young'&&!['Kúzhai','Sinái','Sidhé'].includes(h.folk))pool=[];
  }else if(stage==='Sunsign Skills'){
   const sign=v.sunsignProof;
-  pool=sign?SKILL_DEFINITIONS.filter(d=>d.group!=='Esoterica'&&sign.dp.some(p=>p.group===d.group&&p.value>0)).map(d=>d.name):[];
+  // HMK pp.47–49: Sunsign may improve Language, Script and Ritual, but
+  // never an unbound generic skill. Each named skill spends from the SAME
+  // printed Sunsign-group pool, with no extra group allowance per variant.
+  pool=sign?SKILL_DEFINITIONS.filter(d=>d.group!=='Esoterica'&&sign.dp.some(p=>p.group===d.group&&p.value>0)).flatMap(d=>
+    d.name==='Language'?languageChoices(character).map(x=>instanceKey('Language',x)):
+    d.name==='Script'?SCRIPTS.map(x=>instanceKey('Script',x)):
+    d.name==='Ritual'?religionChoices(character).map(x=>instanceKey('Ritual',x)):[d.name]):[];
   if(sign){pool=pool.filter(name=>{
-    const group=SKILL_DEFINITIONS.find(def=>def.name===name).group;
+    const printed=parseInstance(name)?.type??name;
+    const group=SKILL_DEFINITIONS.find(def=>def.name===printed)?.group;
     const budget=sign.dp.find(x=>x.group===group)?.value??0;
-    const used=SKILL_DEFINITIONS.filter(x=>x.group===group).reduce((sum,x)=>sum+(selected[x.name]??0),0);
+    const used=Object.entries(selected).reduce((sum,[key,points])=>{
+      const base=parseInstance(key)?.type??key;
+      return sum+(SKILL_DEFINITIONS.find(def=>def.name===base)?.group===group?points:0);
+    },0);
     return used<budget||Object.prototype.hasOwnProperty.call(selected,name);
   });}
  }
@@ -141,6 +164,7 @@ export function eligibleSkills(character,stageName=null){
 }
 export function eligibleBackgrounds(character,overrides={}){
  const h=character?.hmk??{},v={...(h.creation?.values??{}),...overrides};
+ if(['Malákta','Nâdi'].includes(h.folk))return ['Wilderness'];
  if(h.society==='Tribal'&&v.tribalUnsettled!=='no')return ['Wilderness'];
  const proof=v.parentOccupationProof,urban=proof?.urbanChance??v.urbanChance;
  if(urban===undefined||urban===null||urban==='')return ['Urban','City','Rural','Wilderness']; // GM has not supplied the chance yet

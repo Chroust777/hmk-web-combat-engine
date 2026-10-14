@@ -47,3 +47,16 @@ export function arcaneTalentFromPhysical({aura,folk,ageGroup,d20,d100s=[]}){
  }
  return {aura:a,folk,ageGroup,d20:r,d100s:rolls,column:generationFolkColumn(folk),result:code,dormancy,generated:names,grants};
 }
+
+/** HMK v1.2 p.42, Invoker Occupation footnote: for an Invoker PARENT,
+ * the child makes FOUR physical Talent Possession d20 rolls, keeping the
+ * highest.  This is not four automatic Talents, nor four free DP pools.
+ * The highest follows exactly the ordinary p.40 d100/Talent procedure.
+ * No random generator, persistence, or second talent calculation.
+ */
+export function parentInvokerTalentFromPhysical({aura,folk,ageGroup,d20s,d100s=[]}){
+ if(!Array.isArray(d20s)||d20s.length!==4)throw Error('Parent Invoker: právě čtyři fyzické d20 (HMK p.42)');
+ const dice=d20s.map(x=>roll(x,20)),highest=Math.max(...dice);
+ const base=arcaneTalentFromPhysical({aura,folk,ageGroup,d20:highest,d100s});
+ return {...base,familyInvoker:true,d20s:dice,sourcePage:42};
+}

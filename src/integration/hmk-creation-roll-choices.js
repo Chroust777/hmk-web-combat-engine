@@ -12,6 +12,7 @@ export function creationChoicesFromPhysicalDice(character,step,values={}){
  if(step===1&&has(values.folkRoll))out.folk=folkFromDie(values.folkRoll);
  if(step===2){
   const folk=h.folk??values.folk;
+  if(folk==='Malákta'&&has(values.ageRoll))throw Error('Malákta Age Group p.21 je Young, vzácně Mature; žádný fyzický d100');
   if(['Kúzhai','Sinái','Sidhé'].includes(folk)){
    if(has(values.ageRoll))throw Error('Tato Elder Folk Age Group se neurčuje d100 (HMK str.21)');
    out.ageGroup=ageFromDie(1,folk);
@@ -42,7 +43,8 @@ export function creationChoicesFromPhysicalDice(character,step,values={}){
   out.familyOccupation=r.name;out.urbanChance=String(r.urbanChance);
  }
  if(step===8){
-  if(values.tribalUnsettled==='yes')out.background='Wilderness';
+  if(['Malákta','Nâdi'].includes(h.folk)){if(has(values.backgroundRoll))throw Error('Malákta/Nâdi: Wilderness bez fyzického d100 (p.423)');out.background='Wilderness';}
+  else if(values.tribalUnsettled==='yes')out.background='Wilderness';
   else if(has(values.backgroundRoll))out.background=backgroundFromRoll(values.backgroundRoll,values.urbanChance,{unsettledTribal:false,society:h.society,cityStateTens:values.backgroundTensRoll,folk:h.folk});
  }
  return out;

@@ -12,6 +12,9 @@ export const SOCIETY_TABLES=Object.freeze({
  'Chélemby':{d100:[[12,'Unfree'],[67,'Free'],[92,'Guilded'],[97,'Military'],[98,'Priestly'],[100,'Noble']],d20:[[9,'Free'],[15,'Guilded'],[18,'Military'],[19,'Priestly'],[20,'Noble']]},
  'Kúzhan':{d100:[[15,'Larkuz'],[25,'Tolkuz'],[45,'Azkuz'],[50,'Erkuz'],[80,'Zerkuz'],[99,'Konkuz'],[100,'Yankuz']],d20:[[1,'Larkuz'],[3,'Tolkuz'],[7,'Azkuz'],[9,'Erkuz'],[15,'Zerkuz'],[19,'Konkuz'],[20,'Yankuz']]},
  'Sináin':{d100:[[70,'Free'],[98,'Crafter'],[99,'Military'],[100,'Valpalen']],d20:[[13,'Free'],[18,'Crafter'],[19,'Military'],[20,'Valpalen']]},
+ // HMK Appendix I p.423, two remaining player-character Elder Folk societies.
+ 'Malák':{d100:[[100,'Military']],d20:[[20,'Military']]},
+ 'Mizúni':{d100:[[90,'Free'],[99,'Crafter'],[100,'Noble']],d20:[[16,'Free'],[19,'Crafter'],[20,'Noble']]},
 });
 export const SOCIETIES=Object.freeze([...Object.keys(SOCIETY_TABLES),'Feudal/Imperial']);
 export function classFromRoll(society,die,sides=100){
@@ -24,6 +27,25 @@ export function classFromRoll(society,die,sides=100){
 /** Fully intervalled realm tables transcribed from HMK v1.2 Appendix I, pp.416–422.
  * Regions with additional language/tribal subrolls still require GM review. */
 export const VERIFIED_REGIONS=Object.freeze({
+// HMK v1.2 Appendix I p.423: Elder Folk have their OWN complete d100
+// tables. The printed roll is across the Ælrhin or Kúzhai realms, not a
+// 22-region Venârivè d1000 roll. No synthetic random roll is introduced.
+ 'Ælrhin (Elder Folk)':Object.freeze([
+  {max:45,realm:'Eváel Kingdom',society:'Sináin',pantheon:'Siém',nativeLanguage:'Sináin',regionalLanguages:['Járin','Hârnic','Eméla']},
+  {max:100,realm:'Hwæthârwyn lands',society:'Sináin',pantheon:'Siém',nativeLanguage:'Sináin',regionalLanguages:['Áltic','Ivínian','Reksýni']}
+ ]),
+ 'Malákta (Elder Folk)':Object.freeze([
+  {max:100,realm:'Malákrhyn fort',society:'Malák',pantheon:'—',nativeLanguage:'Malánuk',regionalLanguages:['Eméla']}
+ ]),
+ 'Nâdi (Elder Folk)':Object.freeze([
+  {max:100,realm:'Mizúna site',society:'Mizúni',pantheon:'—',nativeLanguage:'Mizúni',regionalLanguages:['Eméla','Shôrka','Triérzi']}
+ ]),
+ 'Kúzhai (Elder Folk)':Object.freeze([
+  {max:30,realm:'Ázadmêre Kingdom',society:'Kúzhan',pantheon:'Seréniel',nativeLanguage:'Kúzhan',regionalLanguages:['Járin','Hârnic']},
+  {max:80,realm:'Êrdar Kingdom',society:'Kúzhan',pantheon:'Seréniel',nativeLanguage:'Kúzhan',regionalLanguages:['Nâblúgi','Uméni']},
+  {max:87,realm:'Hârhakeim city',society:'Kúzhan',pantheon:'Seréniel',nativeLanguage:'Kúzhan',regionalLanguages:['Yaríli','Ivínian']},
+  {max:100,realm:'Kóndasgel city',society:'Kúzhan',pantheon:'Seréniel',nativeLanguage:'Kúzhan',regionalLanguages:['Yaríli','Ivínian']}
+ ]),
 // HMK v1.2 Appendix I p.418: printed Hârn main regional table.
 // The Elder Realms entry describes Járin HUMAN residents; Elder Folk use p.423.
 // No unprinted die is inferred from the 90/10 residence proportions.
@@ -730,11 +752,12 @@ export const BACKGROUND_SKILL_POOLS=Object.freeze({
  Sinái:['Fletching','Folklore','Herblore','Initiative','Physician','Pvârism','Riding','Spirit','Tracking'],
  Kúzhai:['Command','Folklore','Initiative','Mercantilism'],Malákta:['Command','Initiative','Melee']
 });
-export function availableBackgroundSkills(background,{viking=false,folk='Human'}={}){
+export function availableBackgroundSkills(background,{viking=false,folk='Human',emhle=false}={}){
  let key=background==='City'?'Urban':background==='Wilderness'?'Rural':background;
  if(!BACKGROUND_SKILL_POOLS[key])throw Error('Neznámý Background');
  const extras=[...(BACKGROUND_SKILL_POOLS[background]??[])];
  if(viking)extras.push('Seamanship','Piloting');
+ if(emhle)extras.push('Ritual'); // HMK p.343: Émhlè added to Background options
  // The printed p.46 special columns supplement the ordinary Background options.
  const heritage=folk==='Sidhé'?'Sinái':folk;
  if(BACKGROUND_SKILL_POOLS[heritage])extras.push(...BACKGROUND_SKILL_POOLS[heritage]);
@@ -744,12 +767,41 @@ export function availableBackgroundSkills(background,{viking=false,folk='Human'}
 // Chandler's One Craft is any skill listed in the Craft GROUP on p.46.
 // Thespian chooses two DISTINCT items among three: the first receives 4 DP,
 // the second 3 DP. No new die or phantom composite Skill is introduced.
+// HMK v1.2 printed p.44: every Slave receives TWO DIFFERENT Physical
+// skills (p.46) at 2 DP EACH, plus the type-specific grants below.
+// No die is rolled for these skills; the player selects a bounded pair.
+export const SLAVE_PHYSICAL_CHOICES=Object.freeze(['Acrobatics','Awareness','Climbing','Dancing','Jumping','Legerdemain','Riding','Stealth','Swimming']);
+export const SLAVE_TYPE_GRANTS=Object.freeze({
+ Craft:{Woodworking:4,Metalcraft:3},
+ Domestic:{Textilecraft:4,Herblore:1,Cookery:2},
+ Farming:{Agriculture:4,Animalcraft:3},
+ Fishing:{Fishing:4,Seamanship:3},
+ Herding:{Animalcraft:4,Survival:3}
+});
+const SLAVE_PROFILES=Object.freeze(Object.fromEntries(Object.entries(SLAVE_TYPE_GRANTS).flatMap(([type,grants])=>
+ SLAVE_PHYSICAL_CHOICES.flatMap((first,i)=>SLAVE_PHYSICAL_CHOICES.slice(i+1).map(second=>{
+  const name=`Slave (${type}: ${first} + ${second})`;
+  return [name,{die:0,skills:{...grants,[first]:2,[second]:2}}];
+ }))
+)));
+export const SLAVE_VARIANTS=Object.freeze(Object.keys(SLAVE_PROFILES));
+export function slaveVariantsForType(name){
+ const match=/^Slave \((Craft|Domestic|Farming|Fishing|Herding)\)$/.exec(String(name??''));
+ return match?SLAVE_VARIANTS.filter(n=>n.startsWith(`Slave (${match[1]}:`)):[];
+}
 export const CHANDLER_CRAFT_CHOICES=Object.freeze(['Ceramics','Drawing','Fletching','Glassworking','Hideworking','Jewelcraft','Lockcraft','Masonry','Metalcraft','Milling','Musician','Textilecraft','Weaponcraft','Woodworking']);
 export const THESPIAN_EXTRA_CHOICES=Object.freeze(['Acrobatics','Legerdemain','Musician']);
 export function occupationVariantNames(name){
+ // The Parent Occupation d20 (p.27/32) and, when needed, physical d6 (p.195)
+ // are already resolved by parentOccupationFromRoll. Fyvria alone still needs
+ // the printed bounded GM choice of two DIFFERENT crafts from its five choices.
+ const arcanistFyvria=/^(?:Gentry: )?Arcanist \(Shèk-Pvâr\) \(Fývria\)$/.test(name);
+ if(arcanistFyvria)return PVAR_VARIANTS.filter(n=>n.startsWith('Shèk-Pvâr (Fývria:'));
+ if(name==='Hunter or Trapper')return ['Hunter','Trapper'];
+ if(slaveVariantsForType(name).length)return slaveVariantsForType(name);
  if(name==='Shaman')return [...SHAMAN_VARIANTS];
  if(name==='Invoker')return ['Invoker',...TRIBAL_INVOKER_VARIANTS];
- if(name==='Priest')return [...PRIEST_VARIANTS];
+ if(name==='Priest'||name==='Gentry: Priest')return [...PRIEST_VARIANTS];
   if(name==='Shèk-Pvâr')return [...PVAR_VARIANTS];
  if(name==='Shèk-Pvâr (Fývria)')return PVAR_VARIANTS.filter(n=>n.startsWith('Shèk-Pvâr (Fývria:'));
   if(name==='Chandler')return CHANDLER_CRAFT_CHOICES.map(skill=>`Chandler (${skill})`);
@@ -855,19 +907,38 @@ const CHIEFTAIN_TRADES={
  Herder:{Animalcraft:4,Tracking:3,Survival:3,Hideworking:2},
  Hunter:{Tracking:4,Hideworking:2,Survival:3,Herblore:2,Archery:3,Fletching:2}
 };
+// HMK v1.2 p.44: Tenant Officer is an Unfree farmer with the
+// complete Farmer skills PLUS the printed d20 office bonus; die d3.
+const TENANT_OFFICER_BONUSES=Object.freeze({
+ Beadle:{Law:3,Animalcraft:3,Melee:1,Survival:1},
+ Herder:{Animalcraft:4,Survival:2,Woodworking:1,Masonry:1},
+ Reeve:{Law:3,Mercantilism:2,Animalcraft:3,Survival:1},
+ Woodward:{Timbercraft:3,Survival:2,Animalcraft:3,Woodworking:1}
+});
+const TENANT_FARMER_BASE=Object.freeze({Agriculture:4,Woodworking:2,Animalcraft:3,Survival:1,Herblore:2});
+const TENANT_OFFICER_PROFILES=Object.freeze(Object.fromEntries(Object.entries(TENANT_OFFICER_BONUSES).map(([office,bonus])=>{
+ const skills={...TENANT_FARMER_BASE};
+ for(const [skill,dp] of Object.entries(bonus))skills[skill]=(skills[skill]??0)+dp;
+ return [`Tenant Officer (${office})`,{die:3,skills}];
+})));
 const CHIEFTAIN_PROFILES=Object.fromEntries(Object.entries(CHIEFTAIN_TRADES).map(([trade,skills])=>[
  `Chieftain (${trade})`,{die:4,skills:{...skills,Law:(skills.Law??0)+3,Command:(skills.Command??0)+2,Intrigue:(skills.Intrigue??0)+1}}
 ]));
 /** Verified occupational DP excerpts from printed pp.42–44; unsupported professions = GM review. */
+const GLADIATOR_SKILLS=Object.freeze({Melee:2,Weaponcraft:2,Archery:2,Initiative:1,Throwing:2,Physician:1,Riding:2});
 export const OCCUPATIONS=Object.freeze({
  ...CHIEFTAIN_PROFILES,
+ ...TENANT_OFFICER_PROFILES,
+ ...SLAVE_PROFILES,
  ...PVAR_OCCUPATIONS,
  ...PRIEST_OCCUPATIONS,
  ...SHAMAN_OCCUPATIONS,
  ...INVOKER_OCCUPATIONS,
  Forester:{die:2,skills:{...CHIEFTAIN_TRADES.Hunter,Law:2,Melee:1}},
  ...OPTIONAL_OCCUPATIONS,
- Gladiator:{die:4,skills:{Melee:2,Weaponcraft:2,Archery:2,Initiative:1,Throwing:2,Physician:1,Riding:2}},
+ Bureaucrat:{die:4,skills:{Law:4,Intrigue:2,Heraldry:3,Language:4,Discourse:2,Scripts:5}},
+ Gladiator:{die:4,skills:{...GLADIATOR_SKILLS}},
+ 'Slave (Gladiator)':{die:0,skills:{...GLADIATOR_SKILLS}},
  "Servant, Domestic":{die:2,skills:{Textilecraft:4,Agriculture:2,Cookery:3,Herblore:2}},
  // v93.206: HMK pp.42–44, p.46. These are COMPLETE printed fixed DP
  // branches. Archer's culturally optional Slings replacement is a distinct
@@ -875,9 +946,15 @@ export const OCCUPATIONS=Object.freeze({
  'Cartographer/Artist':{die:4,skills:{Drawing:3,Mineralogy:2,Folklore:2,Script:4,Mathematics:2,'2nd Script':3}},
  'Man-at-arms (Archer)':{die:3,skills:{Archery:3,Fletching:2,Throwing:2,Melee:1,Survival:2,Initiative:1,Heraldry:2,Physician:1}},
  'Man-at-arms (Archer, Slings)':{die:3,skills:{Slings:4,Hideworking:2,Throwing:2,Melee:1,Survival:2,Initiative:1,Heraldry:2,Physician:1}},
- // Cavalry Missile branch is NOT flattened into a fictitious generic 'Missile'
- // Skill.  It remains GM review until the specific missile discipline is resolved.
+ // HMK p.43 prints Missile 3 as a projectile CATEGORY, not a separate
+ // p.46 Skill. The GM expressly selects one real projectile Skill. Printed
+ // Throwing 2 always remains; choosing Throwing adds the Missile 3 grant
+ // to it (total Throwing 5), not a second fictitious Throwing Skill.
  'Man-at-arms (Cavalry, Melee)':{die:4,skills:{Riding:3,Throwing:2,Animalcraft:2,Initiative:1,Survival:2,Physician:1,Melee:2,Weaponcraft:2}},
+ ...Object.fromEntries(['Archery','Slings','Throwing'].map(missile=>[
+  `Man-at-arms (Cavalry, Missile: ${missile})`,
+  {die:4,skills:{Riding:3,Throwing:2+(missile==='Throwing'?3:0),Animalcraft:2,Initiative:1,Survival:2,Physician:1,Melee:1,Fletching:2,...(missile==='Throwing'?{}:{[missile]:3})}}
+ ])),
  'Yeoman (Archer)':{die:3,skills:{Agriculture:4,Survival:2,Animalcraft:3,Initiative:1,Archery:3,Melee:1,Fletching:2}},
  'Yeoman (Foot)':{die:3,skills:{Agriculture:4,Survival:2,Animalcraft:3,Initiative:1,Melee:2,Weaponcraft:2}},
  'Yeoman (Horse)':{die:4,skills:{Agriculture:4,Survival:2,Animalcraft:3,Initiative:1,Riding:3,Weaponcraft:2,Melee:2}},
@@ -964,21 +1041,87 @@ export const OCCUPATIONS=Object.freeze({
 /** Parent Weaponcrafter has a generic printed entry (p.27–32). Its family
  * skills are not defined until the GM selects the printed specialty (p.44).
  * This uses the SAME occupational data, not a parallel family table. */
+/** HMK v1.2 p.43, NOBILITY sidebar (Family Skills, NOT a second
+ * occupational DP table). All noble parents grant these six possibilities,
+ * each capped at ONE Family DP. Gentry adds only HALF OF THE FIRST listed
+ * occupational skill (the printed example is Gentry Pilot => Piloting 2).
+ * Non-gentry nobles add only the skills marked * in the printed table.
+ * The p.43 table distinguishes parent Family choices from the child's own
+ * occupational skill list: those are NOT interchangeable. */
+export const NOBLE_COMMON_FAMILY_SKILLS=Object.freeze({Melee:2,Dancing:2,Riding:2,Heraldry:2,Intrigue:2,Script:2});
+const NOBLE_STARRED_FAMILY=Object.freeze({
+ 'Gentry: Courtier':{Musician:2,Survival:2,Language:4},
+ 'Knight Bachelor':{Throwing:2,Survival:2,Weaponcraft:2},
+ 'Manor Lord, Appointed':{Throwing:2,Survival:2,Weaponcraft:2,Law:3,Agriculture:2,Discourse:2},
+ 'Manor Lord, Enfeoffed':{Throwing:2,Survival:2,Weaponcraft:2,Law:3,Agriculture:2,Discourse:2},
+ 'Tenant-in-chief':{Throwing:2,Survival:2,Weaponcraft:2,Law:3,Agriculture:2,Discourse:2,Command:2},
+ 'Patrician (Minor)':{},'Patrician (Major)':{},
+ 'Clanhead (Minor)':{},'Clanhead (Major)':{},'Clanhead (Royal)':{}
+});
+function nobleFamilyFromGentryTrade(profile){
+ if(!profile?.skills)return null;
+ const [first,dp]=Object.entries(profile.skills)[0]??[];
+ if(!first||!Number.isInteger(dp))return null;
+ const skills={...NOBLE_COMMON_FAMILY_SKILLS};
+ // The one Gentry speciality can raise the family maximum beyond the common
+ // one-DP limit when it is the same skill (e.g. Gentry Herald: Heraldry).
+ skills[first]=Math.max(skills[first]??0,dp);
+ return {die:profile.die,skills,nobleFamily:true,gentryFirstSkill:first};
+}
+function nobleFamilyFromStarred(name){
+ const star=NOBLE_STARRED_FAMILY[name];
+ if(!star)return null;
+ return {die:null,skills:{...NOBLE_COMMON_FAMILY_SKILLS,...star},nobleFamily:true};
+}
 export function familyOccupationProfile(familyOccupation, specialty=null, martialType=null, familyVariant=null, subsistence=null){
  if(familyOccupation==='Chieftain')return OCCUPATIONS[chieftainVariantForSubsistence(subsistence)]??null;
- if(familyOccupation==='Gentry: Forester')return OCCUPATIONS.Forester;
- if(familyOccupation?.startsWith('Arcanist (Shèk-Pvâr) (')){const convocation=familyOccupation.split('(').at(-1).replace(')','');return familyOccupationProfile('Shèk-Pvâr ('+convocation+')',specialty,martialType,familyVariant,subsistence);}
+ // Source labels in the society/caste tables are not always the profession's
+ // actual printed name. Resolve only source-supported aliases, never invent DP.
+ if(familyOccupation==='Farmer (Thrall)')return OCCUPATIONS.Farmer;
+ const nobility=nobleFamilyFromStarred(familyOccupation);if(nobility)return nobility;
+ if(familyOccupation==='Artist')return OCCUPATIONS['Cartographer/Artist'];
+ if(familyOccupation==='Servant')return OCCUPATIONS['Servant, Domestic'];
+ if(familyOccupation==='Priest (Siém)')return OCCUPATIONS['Priest (Siém: Astrology)'];
+ if(familyOccupation==='Slave (Gladiator)')return OCCUPATIONS['Slave (Gladiator)'];
+ // Raw 'Slave' still needs its mandatory printed d20 subtype (pp.27–30).
+ if(familyOccupation==='Slave')return null;
+ // Noble gentry retain the printed OCCUPATIONAL skills of their specific
+ // profession (pp.27,42–44); 'Gentry:' modifies Class/Wealth, not DP.
+ // Courtier has no corresponding printed occupational profile: DO NOT invent one.
+ const gentrySkillTrades=Object.freeze({
+  'Gentry: Cartographer':'Cartographer/Artist', 'Gentry: Forester':'Forester',
+  'Gentry: Harper':'Harper', 'Gentry: Herald':'Herald',
+  'Gentry: Litigant':'Litigant', 'Gentry: Mercantyler':'Mercantyler',
+  'Gentry: Mercenary':'Mercenary', 'Gentry: Physician':'Physician',
+  'Gentry: Pilot':'Pilot', 'Gentry: Scholar':'Scholar'
+ });
+ if(Object.hasOwn(gentrySkillTrades,familyOccupation))return nobleFamilyFromGentryTrade(OCCUPATIONS[gentrySkillTrades[familyOccupation]]);
+ // Gentry Arcanist and Sináin Valpalen Arcanist are different printed
+ // societies, but share the same Alchemist/Astrologer/Shèk-Pvâr occupations.
+ // Their subclass is NOT a fresh GM choice: it is the result of the earlier
+ // physical d20. A Shèk-Pvâr convocation is the earlier physical d6.
+ const arcanistFixed=/^(?:Gentry: )?Arcanist \((Alchemist|Astrologer)\)$/.exec(familyOccupation??'');
+ if(arcanistFixed)return familyOccupation.startsWith('Gentry:')?nobleFamilyFromGentryTrade(OCCUPATIONS[arcanistFixed[1]]):OCCUPATIONS[arcanistFixed[1]];
+ const arcanistPvar=/^(?:Gentry: )?Arcanist \(Shèk-Pvâr\) \((Fývria|Jmôrvi|Pèleáhn|Lyáhvi|Sàvôrya|Odívshè)\)$/.exec(familyOccupation??'');
+ if(arcanistPvar){
+  const convocation=arcanistPvar[1];
+  const profession=convocation==='Fývria'?(occupationVariantNames(familyOccupation).includes(familyVariant)?OCCUPATIONS[familyVariant]:null):OCCUPATIONS[`Shèk-Pvâr (${convocation})`];
+  return familyOccupation.startsWith('Gentry:')?nobleFamilyFromGentryTrade(profession):(profession??null);
+ }
 
  if(occupationVariantNames(familyOccupation).length){
-  return occupationVariantNames(familyOccupation).includes(familyVariant)?OCCUPATIONS[familyVariant]:null;
+  const profession=occupationVariantNames(familyOccupation).includes(familyVariant)?OCCUPATIONS[familyVariant]:null;
+  return familyOccupation==='Gentry: Priest'?nobleFamilyFromGentryTrade(profession):profession;
  }
  if(familyOccupation==='Man-at-arms (Archer)'){
   if(!['Archery','Slings'].includes(martialType))return null;
   return OCCUPATIONS[martialType==='Slings'?'Man-at-arms (Archer, Slings)':'Man-at-arms (Archer)'];
  }
  if(familyOccupation==='Man-at-arms (Cavalry)'){
-  // Missile 3 cannot yet be resolved to a specific p.46 combat Skill.
-  return martialType==='Melee'?OCCUPATIONS['Man-at-arms (Cavalry, Melee)']:null;
+  if(martialType==='Melee')return OCCUPATIONS['Man-at-arms (Cavalry, Melee)'];
+  // The explicit GM choice is the named p.46 skill that receives Missile 3.
+  if(['Archery','Slings','Throwing'].includes(martialType))return OCCUPATIONS[`Man-at-arms (Cavalry, Missile: ${martialType})`];
+  return null;
  }
  if(familyOccupation==='Weaponcrafter'){
   if(!['Armourer','Bowyer'].includes(specialty))return null;
@@ -986,7 +1129,31 @@ export function familyOccupationProfile(familyOccupation, specialty=null, martia
  }
  return OCCUPATIONS[familyOccupation]??null;
 }
-export const OCCUPATION_PAGES=Object.freeze({...Object.fromEntries(CHIEFTAIN_VARIANTS.map(n=>[n,42])),Forester:42,...Object.fromEntries(PVAR_VARIANTS.map(n=>[n,44])),...Object.fromEntries(PRIEST_VARIANTS.map(n=>[n,43])),...Object.fromEntries(SHAMAN_VARIANTS.map(n=>[n,44])),...Object.fromEntries(TRIBAL_INVOKER_VARIANTS.map(n=>[n,42])),...Object.fromEntries(occupationVariantNames("Chandler").map(x=>[x,42])),...Object.fromEntries(occupationVariantNames("Lìa-Kaváir").map(x=>[x,43])),...Object.fromEntries(occupationVariantNames("Thespian").map(x=>[x,44])),Gladiator:42,"Servant, Domestic":44,'Cartographer/Artist':42,'Man-at-arms (Archer)':43,'Man-at-arms (Archer, Slings)':43,'Man-at-arms (Cavalry, Melee)':43,'Yeoman (Archer)':44,'Yeoman (Foot)':44,'Yeoman (Horse)':44,'Lexigrapher':43,'Scholar':44,'Scribe':44,'Pilot':43,'Legionnaire':43,'Runemaster':44,'Seaman':44,'Swordmaster':44,'Astrologer':42,'Harper/Skald':42,'Harper':42,'Herald':42,'Innkeeper':42,'Litigant':43,'Mercantyler':43,'Labourer, Farm':42,'Labourer, Semi-skilled':42,'Labourer, Unskilled':42,'Weaponcrafter (Armourer)':44,'Weaponcrafter (Bowyer)':44,'Man-at-arms':43,'Mercenary':43,'Miller':43,'Physician':43,'Potter':43,'Timberwright':44,'Locksmith':43,'Longshoreman':43,'Metalsmith':43,'Miner':43,'Mason':43,'Ostler':43,'Perfumer':43,'Man-at-arms (Sapper)':43,"Courtesan":42,"Hideworker":42,"Huscarl":42,"Jester":42,"Prostitute":44,"Ratter":44,"Salter":44,"Shipwright":44,"Teamster":44,"Tentmaker":44,"Thatcher":44,"Toymaker":44,"Trapper":44,"Woodcrafter":44,"Woodcutter":44});
+/** p.47 Family allocation: bounded per-skill caps also work for the
+ * printed plural 'Scripts' and 'Languages' when realised as named skills.
+ * There is ONE shared printed DP pool, not a fresh allowance per script. */
+export function familySkillCap(profile,skillName){
+ if(!profile?.skills)return 0;
+ const m=/^(Language|Script|Ritual) \((.+)\)$/.exec(String(skillName));
+ const original=m?.[1]??skillName;
+ const printed=profile.skills[skillName]??profile.skills[original]??
+  (original==='Script'?profile.skills.Scripts:undefined)??0;
+ return Math.floor(printed/2);
+}
+export function validateFamilySkillAllocation(profile,points){
+ if(!profile?.skills)return false;
+ if(Object.values(points??{}).reduce((n,v)=>n+v,0)>5)return false;
+ if(Object.entries(points??{}).some(([skill,dp])=>!Number.isInteger(dp)||dp<0||dp>familySkillCap(profile,skill)))return false;
+ // Singular Language and plural Scripts printed grant one occupational
+ // amount; distributing it does not multiply its Family DP allowance.
+ for(const [printed,instance] of [['Language','Language'],['Scripts','Script']]){
+  if(!profile.skills[printed])continue;
+  const used=Object.entries(points??{}).reduce((sum,[name,dp])=>sum+(name===printed||name.startsWith(instance+' (')?dp:0),0);
+  if(used>Math.floor(profile.skills[printed]/2))return false;
+ }
+ return true;
+}
+export const OCCUPATION_PAGES=Object.freeze({...Object.fromEntries(Object.keys(TENANT_OFFICER_PROFILES).map(n=>[n,44])),...Object.fromEntries(CHIEFTAIN_VARIANTS.map(n=>[n,42])),Forester:42,...Object.fromEntries(PVAR_VARIANTS.map(n=>[n,44])),...Object.fromEntries(PRIEST_VARIANTS.map(n=>[n,43])),...Object.fromEntries(SHAMAN_VARIANTS.map(n=>[n,44])),...Object.fromEntries(TRIBAL_INVOKER_VARIANTS.map(n=>[n,42])),...Object.fromEntries(occupationVariantNames("Chandler").map(x=>[x,42])),...Object.fromEntries(occupationVariantNames("Lìa-Kaváir").map(x=>[x,43])),...Object.fromEntries(occupationVariantNames("Thespian").map(x=>[x,44])),Gladiator:42,"Servant, Domestic":44,'Cartographer/Artist':42,'Man-at-arms (Archer)':43,'Man-at-arms (Archer, Slings)':43,'Man-at-arms (Cavalry, Melee)':43,...Object.fromEntries(['Archery','Slings','Throwing'].map(n=>[`Man-at-arms (Cavalry, Missile: ${n})`,43])),'Yeoman (Archer)':44,'Yeoman (Foot)':44,'Yeoman (Horse)':44,'Lexigrapher':43,'Scholar':44,'Scribe':44,'Pilot':43,'Legionnaire':43,'Runemaster':44,'Seaman':44,'Swordmaster':44,'Astrologer':42,'Harper/Skald':42,'Harper':42,'Herald':42,'Innkeeper':42,'Litigant':43,'Mercantyler':43,'Labourer, Farm':42,'Labourer, Semi-skilled':42,'Labourer, Unskilled':42,'Weaponcrafter (Armourer)':44,'Weaponcrafter (Bowyer)':44,'Man-at-arms':43,'Mercenary':43,'Miller':43,'Physician':43,'Potter':43,'Timberwright':44,'Locksmith':43,'Longshoreman':43,'Metalsmith':43,'Miner':43,'Mason':43,'Ostler':43,'Perfumer':43,'Man-at-arms (Sapper)':43,"Courtesan":42,"Hideworker":42,"Huscarl":42,"Jester":42,"Prostitute":44,"Ratter":44,"Salter":44,"Shipwright":44,"Teamster":44,"Tentmaker":44,"Thatcher":44,"Toymaker":44,"Trapper":44,"Woodcrafter":44,"Woodcutter":44});
 export const WEALTH_CLASSES=Object.freeze([[1,'Poor'],[4,'Poor'],[9,'Meagre'],[19,'Comfortable'],[49,'Affluent'],[149,'Ostentatious']]);
 export function standingFromWealth(amount){if(!Number.isInteger(amount)||amount<0)throw Error('Wealth musí být celé nezáporné');
  const bracket=WEALTH_CLASSES.find(([max])=>amount<=max);return {wealth:amount,lifestyle:bracket?.[1]??'Beyond standing table (GM review)',possessionsPence:amount*100,coinsPence:amount*10,sourcePage:52};}
@@ -995,13 +1162,19 @@ export function standingFromWealth(amount){if(!Number.isInteger(amount)||amount<
  * Do not use this for unverified composite occupation types. */
 export function occupationWealthDie(occupation,socialClass=null){
  const name=String(occupation??'');
+ if(name==='Farmer (Thrall)')return 1;
  if(name==='Farmer'&&socialClass==='Unfree')return 1;
+ if(name==='Slave (Gladiator)'||name.startsWith('Slave ('))return 0;
+ if(name==='Artist')return OCCUPATIONS['Cartographer/Artist'].die;
+ if(name==='Servant')return OCCUPATIONS['Servant, Domestic'].die;
+ if(name==='Hunter or Trapper')return 2;
+ if(name==='Priest (Siém)')return null; // Priest is Circle based, no fictitious die
  if(name==='Chieftain')return 4;
  if(name==='Gladiator'||name==='Servant, Domestic')return socialClass==='Unfree'?0:(name==='Gladiator'?4:2);
  if(occupationVariantNames(name).length)return OCCUPATIONS[name]?.die??null;
  if(['Chandler','Lìa-Kaváir','Thespian'].includes(name))return ({Chandler:3,'Lìa-Kaváir':3,Thespian:2})[name];
  if(name==='Man-at-arms (Archer, Slings)'||name==='Man-at-arms (Archer)')return 3;
- if(name==='Man-at-arms (Cavalry)'||name==='Man-at-arms (Cavalry, Melee)')return 4;
+ if(name==='Man-at-arms (Cavalry)'||name==='Man-at-arms (Cavalry, Melee)'||/^Man-at-arms \(Cavalry, Missile: (?:Archery|Slings|Throwing)\)$/.test(name))return 4;
  if(name.startsWith('Yeoman ('))return name==='Yeoman (Horse)'?4:3;
  if(name==='Weaponcrafter')return 6; // parent generic entry; both specialties d6 (p.44)
  return OCCUPATIONS[name]?.die??null;
@@ -1088,6 +1261,15 @@ export const REGION_D1000=Object.freeze([
  [566,'Hácherdad'],[576,'Hârbáal'],[587,'Hârn'],[627,'Hèpekéria'],[630,'Huriséa'],[641,'Ivínia'],
  [735,'Karéjia'],[747,'Ketârh & Béshakan'],[765,'Northern Anzelôria'],[779,'Palíthanè'],[791,'Quârphor'],
  [810,'Reksýna'],[839,'Shôrkýnè'],[849,'Thónia'],[956,'Tríerzòn'],[1000,'Ûmélria']]);
-export const ELDER_FOLK_REGIONS=Object.freeze(['Eváel','Ázadmêre','Kuzjêra','Malákrhyn','Mizúna','Hwæthârwyn','Êrdar']);
+// All four player-character Elder Folk groups have independent p.423 tables.
+// These do not belong to the 22 Human-population d1000 region weights.
+export const ELDER_FOLK_REGIONS=Object.freeze(['Ælrhin (Elder Folk)','Kúzhai (Elder Folk)','Malákta (Elder Folk)','Nâdi (Elder Folk)']);
+export function regionAllowedForFolk(region,folk){
+ if(region==='Ælrhin (Elder Folk)')return ['Sinái','Sidhé'].includes(folk);
+ if(region==='Kúzhai (Elder Folk)')return folk==='Kúzhai';
+ if(region==='Malákta (Elder Folk)')return folk==='Malákta';
+ if(region==='Nâdi (Elder Folk)')return folk==='Nâdi';
+ return true;
+}
 export function regionFromD1000(die){const n=Number(die);if(!Number.isInteger(n)||n<1||n>1000||String(die).trim()==='')throw Error('Fyzický Region d1000 musí být 1–1000');
  return {roll:n,region:REGION_D1000.find(([max])=>n<=max)[1],sourcePage:415};}
