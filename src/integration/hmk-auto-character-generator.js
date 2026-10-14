@@ -5,7 +5,7 @@
  */
 import {arcaneTalentFromPhysical} from './hmk-arcane-talent.js';
 import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './hmk-creation-psyche.js';
-import {SKILL_DEFINITIONS} from './hmk-character-creation.js';
+import {SKILL_DEFINITIONS,folkFromDie} from './hmk-character-creation.js';
 import {regionHarnTribeDieRequired,regionSubDieRequired,regionDialectDieRequired} from './hmk-creation-tables.js';
 export const AUTO_TRAIT_PROFILES=Object.freeze({
  random:{label:'Čistě náhodná postava',skills:[],jobs:[],traits:[]},
@@ -35,7 +35,9 @@ function choice(form,name,die,pref=null){const options=opts(form,name);if(!optio
  const selected=pref&&options.includes(pref)?pref:pick(options,die);
  put(form,name,selected);return selected;
 }
-function weightedChoice(items,profile,die){const cfg=AUTO_TRAIT_PROFILES[profile]||AUTO_TRAIT_PROFILES.random;
+function weightedChoice(items,profile,die,preferences={}){
+ const desired=String(preferences.occupation||'').trim().toLowerCase();
+ if(desired){const matching=items.filter(x=>x.toLowerCase()===desired||x.toLowerCase().startsWith(desired+' (')||x.toLowerCase().startsWith(desired+':'));if(matching.length)return pick(matching,die);}const cfg=AUTO_TRAIT_PROFILES[profile]||AUTO_TRAIT_PROFILES.random;
  if(profile==='random')return pick(items,die);
  const targets=items.filter(item=>cfg.jobs.some(t=>item.toLowerCase().includes(t.toLowerCase())));
  if(targets.length)return pick(targets,die);
@@ -47,16 +49,16 @@ function weightedChoice(items,profile,die){const cfg=AUTO_TRAIT_PROFILES[profile
  return items.at(-1);
 }
 /** One automatic tick, executed on the actual active wizard form. */
-export function prepareAutomaticStep(form,character,{profile='random',die=secureAutoDie,rejected=[]}={}){
+export function prepareAutomaticStep(form,character,{profile='random',die=secureAutoDie,rejected=[],preferences={}}={}){
  const c=character.hmk.creation,h=character.hmk,step=c.step,stage=c.skillStage;
  const current=()=>Object.fromEntries(new FormData(form));
- if(step===1){choice(form,'folk',die,'Human');return 'next'}
+ if(step===1){const roll=profile==='random'&&!preferences.folk?die(100):null;const chosen=roll!==null?folkFromDie(roll):(preferences.folk||'Human');if(!put(form,'folk',chosen))throw Error('Požadovaný Folk nemá v průvodci platnou možnost: '+chosen);if(roll!==null)put(form,'folkRoll',roll);return 'next'}
  if(step===2){choice(form,'ageGroup',die,profile==='covenant'?'Young':null);return 'next'}
  if(step===3){put(form,'birthMonth',die(12));put(form,'birthDay',die(30));return 'next'}
  if(step===4){const cfg=AUTO_TRAIT_PROFILES[profile]||AUTO_TRAIT_PROFILES.random;for(const key of ['sunsignTraits','sunsignTraitSecondary']){const o=opts(form,key);if(o.length){const preferred=o.filter(x=>(cfg.traits||[]).includes(x));put(form,key,pick(preferred.length?preferred:o,die));}}return 'next'}
  if(step===5){
   // Use verified regional tables; avoid unsupported, non-transcribed places.
-  const region=profile==='covenant'?'Emélrenè':'Hârn';
+  const region=h.folk==='Kúzhai'?'Kúzhai (Elder Folk)':h.folk==='Sinái'||h.folk==='Sidhé'?'Ælrhin (Elder Folk)':h.folk==='Malákta'?'Malákta (Elder Folk)':h.folk==='Nâdi'?'Nâdi (Elder Folk)':profile==='covenant'?'Emélrenè':'Hârn';
   put(form,'birthRegion',region);
   put(form,'regionRoll',profile==='covenant'?95:50);
   // Secondary tables are only used when visible/available.
@@ -101,7 +103,7 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
  if(step===11){
   const occupations=opts(form,'occupation');
   const usable=occupations.filter(x=>!x.startsWith('Invoker')&&!x.includes('Talent:')); 
-  const job=weightedChoice(usable.length?usable:occupations,profile,die);
+  const job=weightedChoice(usable.length?usable:occupations,profile,die,preferences);
   if(!job)throw Error('Pro vzniklou společnost nejsou dostupná doložená povolání');
   put(form,'occupation',job);
   for(const name of ['occupationScriptChoice','occupationSecondScriptChoice','occupationThirdScriptChoice','occupationLanguageChoice','occupationRitualChoice']){
@@ -115,10 +117,19 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
  }
  if(step===12){
   if(stage===0){
+   // Folk dice and native religion may both be required in the same form.
+   // Select the religion BEFORE clicking Folk dice; otherwise native HTML
+   // validation blocks the click despite a valid folkDice roll.
+   for(const field of ['nativeRitualChoice','nativeRitualChoice2','nativeRitualChoice3']){
+    const picker=form.elements.namedItem(field);
+    if(picker&&picker.disabled){picker.disabled=false;picker.required=true;}
+   }
+   if(form.elements.namedItem('nativeRitualChoice')&&!choice(form,'nativeRitualChoice',die,profile==='covenant'?'Beóna':null))throw Error('Chybí ověřená nabídka rodného náboženství');
+   choice(form,'nativeRitualChoice2',die);choice(form,'nativeRitualChoice3',die);
    if(['Kúzhai','Sinái','Sidhé'].includes(h.folk)&&!c.values.folkSkillProof){
     put(form,'folkDice',Array.from({length:h.folk==='Kúzhai'?2:4},()=>die(10)).join(','));return 'folk';
    }
-   if(form.elements.namedItem('nativeRitualChoice')&&!choice(form,'nativeRitualChoice',die,profile==='covenant'?'Beóna':null))throw Error('Chybí ověřená nabídka rodného náboženství');choice(form,'nativeRitualChoice2',die);choice(form,'nativeRitualChoice3',die);return 'next';
+   return 'next';
   }
   if(stage===1){
     if(c.values.arcaneTalentProof)return 'next';
@@ -151,7 +162,8 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
   const signGroups=stage===7?(c.values.sunsignProof?.dp||[]).filter(entry=>{const groupUsed=Object.entries(allocation).reduce((a,[n,points])=>a+(SKILL_DEFINITIONS.find(d=>d.name===n)?.group===entry.group?Number(points):0),0);return groupUsed<entry.value}).map(entry=>entry.group):null;
   const entries=skills.filter(n=>n&&!['Language','Script','Ritual'].includes(n)&&!rejected.includes(n)&&(!signGroups||signGroups.includes(SKILL_DEFINITIONS.find(d=>d.name===n)?.group)));
   if(!entries.length)return 'next';
-  const weighted=entries.map(n=>({n,w:cfg.skills.some(s=>n.includes(s))?8:1}));
+  const affinities=[profile,...(preferences.semanticRanking||[])].filter((id,i,list)=>id!=='random'&&list.indexOf(id)===i);
+  const weighted=entries.map(n=>({n,w:1+affinities.reduce((bonus,id,i)=>bonus+(AUTO_TRAIT_PROFILES[id]?.skills.some(s=>n.includes(s))?Math.max(2,7-i*2):0),0)}));
   let total=weighted.reduce((a,b)=>a+b.w,0),r=die(Math.max(1,total));
   let picked=weighted.at(-1)?.n;
   for(const e of weighted){r-=e.w;if(r<=0){picked=e.n;break}}
