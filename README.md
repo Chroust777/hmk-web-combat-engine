@@ -1059,3 +1059,11 @@ Fyvria: výběr dvou doložených dovedností, ostatní konvokace z fyzického d
 
 ## v93.271 – automatické výjimky Bulk
 Pravidlově doložená jediná dodatečná vrstva Cloth/Padded za dotčenou zónu je automaticky vyhodnocena podle HMK 117 (−5 Bulk za zónu). Ostatní nepřípustné kombinace se nesmějí obléknout. Změny se promítají do výpočtů Skill Tests i Combat; neověřené údaje se dále nepovažují za nulové. Tištěné sety bez ověřitelného pořadí jednotlivých článků zůstávají samostatnou výjimkou.
+
+
+### v93.276 – Character Sheet: inline edit
+- Jediný režim Edit / Uložit / Zrušit nahoře na detailu postavy.
+- Osobní údaje se editují přímo ve stejném přehledu, kde jsou běžně zobrazeny.
+- U ručně vedených historických profilů lze měnit přímo atributy, původ i ML/SB Skills.
+- U Character Creation profilů zůstávají potvrzené atributy, původ a vypočítané Skills chráněné. Upravují se původním čtrnáctikrokovým průvodcem, nikoli druhou tabulkou; přímá editace osobních údajů je zachována.
+- Duplicitní rozbalovací tabulka DP/SB/SM byla odstraněna z běžného Character Sheet.
