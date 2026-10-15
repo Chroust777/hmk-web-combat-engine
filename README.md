@@ -1,4 +1,42 @@
+# HMK Keeper’s Ledger v93.265
+
+## v93.265 – Knihovna: nákup / bezplatné převzetí; Character Sheet: kompaktní Skills
+
+- Každý katalogový předmět a všech 12 tištěných kompletů nabízí **Koupit** za doloženou cenu nebo **Vzít zdarma**. Nákup je blokován, pokud cena nebo hotovost není ověřená, či pokud postava nemá dostatek mincí. Předměty se ukládají výhradně jako `carried`, tedy do inventáře, nikoli do ruky či nasazené zbroje.
+- Ceny katalogu `pricePerDozenPence` znamenají nákup **12 kusů** za uvedenou cenu; bezplatné převzetí dává jeden kus. Cena tištěného kompletu se odečte jednou za celý komplet a do inventáře se uloží ověřené jednotlivé součásti.
+- Hotovost začíná na `hmk.coinsPence` (Wealth × 10 d). Skutečné nákupy se zapisují do `hmk.cashLedger`, aktuální zůstatek se odvozuje jako počáteční mince minus výdaje. Počáteční Wealth, limit výbavy a historické hody se nákupy nemění. Transakce se ukládá společně s inventářem a kontroluje se její návaznost. Postavy bez doložených mincí smějí věci převzít zdarma, nikoli kupovat.
+- Stávající systém ENC dál čte všechny `carried` kusy včetně množství a přepočte jejich hmotnost. Pokud hmotnost chybí, nedoplňuje odhad.
+- Character Sheet nově standardně ukazuje v seznamu Skills pouze `Skill`, `Atributy (Skill Base)` a `ML`. Původní podrobné DP, SB, SM a Boost zůstávají v rozbalitelném `Edit` a jejich pravidlové výpočty se nemění. Vlastní přidělování DP nadále probíhá prostřednictvím Character Creation / Edit.
+
+**Hranice:** Nákup není simulací trhu, smlouváním ani plně měnovým systémem s drobnými nominály. Položky bez jednoznačné celočíselné ceny v denárech nelze za peníze bezpečně pořídit, bezplatné převzetí zůstává dostupné. Přidání a nákup jsou mimo běžící Initiative. Živé GitHub Pages a všechny možné bojové kombinace nejsou součástí testů.
+
+
+Knihovna má samostatné záložky a stránkované řádky. Přidání do inventáře používá nezávislé kopie původních katalogových položek, neprovádí nákup a nemanipuluje s bojovým stavem. Tištěné komplety se převádějí pouze na ověřené jednotlivé součásti jako nesené; automaticky se neoblékají.
+
+# HMK Keeper’s Ledger v93.263 — Samostatné Skill Tests a automatický stav (HMK v1.2, pp. 60–62)
+
+- **Pět samostatných záložek** mimo Character Sheet: Success Test, Opposed Success Test, Success Value, Secondary Mastery d10, Assistance. Charakterový list obsahuje jen odkaz do této sekce. Český stavový přehled zobrazuje ML, stavové vlivy a výsledný EML, obě strany Opposed jsou posuzovány zvlášť.
+- **Bez GM přepínačů zranění, Shock, Bulk, Fatigue nebo ENC na stránce Skill Tests.** Vše se čte ze skutečného profilu, bojového stavu, vybavení, zbroje a držení zbraně a znovu ověří před hodem. Sejmutí helmy a přesuny inventáře mění výpočet při dalším otevření / aktualizaci panelu. Známý Shock STN mění výslednou úroveň úspěchu; INC/UNC/KIA blokuje samostatný test.
+- **Nikdy neodhaduje chybějící důkazy.** Nevalidní vrstvení zbroje, historická zranění mimo Combat State, neznámá používaná ruka u poraněné končetiny, neověřený věk Minor Injury a mounted stav bez potvrzeného bojového kontextu vedou k srozumitelnému odmítnutí hodu. Stav se opravuje v autoritativním Character Sheet / Combat, nikoli ručním přepsáním hodnoty testu.
+- Success Value užívá primární ML Index a konečný Success Level; jsou zobrazeny SV hvězdy a případné Victory Stars. Opposed zobrazuje oba výsledky a hvězdy; při dvou neúspěších není vítěz. **Secondary d10** je jen úspěch/neúspěch proti indexu, nikoli druhý d100 (a podle pravidel nemá SV hvězdy). Assistance zůstává samostatným pravidlovým výpočtem, nikoli automaticky domýšlenou účastí pomocníků.
+- Standardní Skill Test není duplicitní bojový útok. Skutečné CF0/CF5 a fyzické Fumble/Stumble provádí jediný původní Combat systém. Výsledky Skill Testů jsou chráněné důkazy v původním deníku, žádné druhé úložiště ani externí API.
+- Změněny jen `app.js`, `index.html`, `README.md`, `skill-workbench.css`, `src/integration/hmk-skill-workbench-ui.js`, `src/integration/hmk-skill-trauma.js`; přidán `src/integration/hmk-skill-auto-context.js`. Combat, Magic, G04, katalogy a originální `styles.css` zůstaly byte-for-byte beze změny.
+
+---
+
 # HMK Keeper’s Ledger v93.261 — Long-term temporal audit and safeguards
+
+## v93.262 — Unified Campaign Calendar (HMK v1.2, pp. 178–182)
+
+- New **Kalendář** section records one GM-confirmed campaign clock (day number + HH:MM) inside the existing `hmk-keepers-ledger-v1` localStorage backup. No guessed Kèthîran month names, real-world timezone, or conversion from combat rounds.
+- Original Combat and Healing rules engines remain authoritative for all dice, wounds and status transitions. New confirmed injuries, Coma, Extended Shock and fresh Blood Loss begin at the current GM-confirmed minute **in the same durable save** as their Combat state. Legacy conditions require separately attested onset; unknown onset is never treated as zero.
+- Due-list covers 4h Extended Shock, d10-day Coma, 5-day Injury Healing, daily Infection and Grim Wound, and 10-day Blood Loss Regeneration. Infection suspends the patient's Injury Healing schedule. A recurrent episode receives a new onset while prior provenance stays immutable.
+- Clock advancement cannot move past an unresolved documented deadline, nor proceed while active bleeding, unresolved Shock Follow-up, or a necessary onset remains unverified. GM explicitly confirms a positive time jump and reason. No clock advance triggers dice or silently advances combat Initiative.
+- Existing treatment forms automatically display days elapsed from a verified injury onset and reject discordant data. A completed treatment event stores a matching calendar resolution linked to its existing Combat event ID; journal and character status remain under the original authoritative engine.
+- Older localStorage JSON remains valid without `campaignClock`. Export/import through the existing backup flow includes the new optional field. If you have historical injuries, start the calendar and attest each real onset before advancing time.
+- Current day labels **Den N · HH:MM** are deliberately neutral relative-time markers, *not* a full Kèthîran civil calendar; an optional named epoch is for campaign notes only.
+- No changes to original Combat/Magic/G04, healing tables, equipment catalogues or main CSS; only one new calendar module plus `app.js`, `index.html` and this README.
+
 
 The infection healing resume bug for multiple wounds and Coma fatal state cleanup have been corrected. Other wound elapsed days are expressly GM-confirmed, never inferred from another injury timeline. See Czech audit and test ZIP.
 
