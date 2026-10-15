@@ -1,3 +1,7 @@
+## v93.274 · pravidlové SR a přehled výsledků
+
+Secondary Roll d10 / TN se zobrazuje pouze při výběru konkrétní doložené Success Value činnosti. Běžné a opposed testy TN nepoužívají. Závěrečný verdikt je rozdělený do jednotlivých orámovaných metrik; historie nadále ukládá úplný text i pravidlový důkaz.
+
 ## v93.273 – Skill Tests: přehlednost a d10 podle Indexu
 
 - Odstraněna obě volitelná pole volného popisu scény ve všech třech panelech. Příběhové výstupy zůstávají podle dovednosti a výsledku.
