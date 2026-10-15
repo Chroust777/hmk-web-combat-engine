@@ -1,11 +1,12 @@
-/** v93.263: one read-only, fail-closed automatic calculation. No GM override
- * controls and no combat writes. A missing Combat State means the same clean
+/** v93.268: read-only validated calculation. Unverifiable equipment inputs
+ * may be explicitly adjudicated by GM and are preserved in the journal.
+ * No combat writes. A missing Combat State means the same clean
  * baseline used by the original Ledger only for characters without legacy
  * injuries. No unknown helmet layers, attack hand or elapsed time are invented.
  */
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
-import {resolveSkillConditions} from './hmk-skill-context.js';
-import {resolveSkillTrauma,impairedSkillKind} from './hmk-skill-trauma.js';
+import {resolveSkillConditions,skillConditionAvailability} from './hmk-skill-context.js';
+import {resolveSkillTrauma,impairedSkillKind,skillTraumaAvailability} from './hmk-skill-trauma.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 const sides=new Set(['left','right']);
 const armSkills=new Set(['Melee','Archery','Slings','Throwing','Dodge','Dexterity','Legerdemain','Climbing','Swimming','Acrobatics','Dancing','Jumping','Stealth','Riding']);
@@ -30,22 +31,44 @@ export function inferredArms(actor,inventory,name,state){
  }
  throw Error('Zranění paže a činnost '+name+' neumožňují doložit použitou ruku ze samotného názvu skillu. Použijte konkrétní akci v Combat; postih nelze odhadnout.');
 }
-export function automaticSkillContext({actor,inventory=[],name,combatRound=null,combatTimelineId=null}={}){
+export function automaticSkillContext({actor,inventory=[],name,combatRound=null,combatTimelineId=null,gearPolicy='strict',manualENC=null,manualBulk=null,manualPerception=null}={}){
  if(!Array.isArray(inventory))throw Error('Chybí potvrzený inventář');
  const base=recordedActor(actor);const state=base.state;
  // Mounted conditions cannot be guessed from equipment alone. The confirmed
  // encounter rider/mount state belongs to Combat, not a standalone skill die.
  if(state.mounted===true||state.mountId)throw Error('Aktivní jízda: vyhodnoťte test v potvrzeném Mounted Combat kontextu.');
- let condition;
- try{condition=resolveSkillConditions({actor:base.actor,inventory,name,fatigueMode:'auto',encMode:'auto',mounted:false});}
- catch(e){throw Error(e.message.replace(/\. Zadejte ověřené ENC.*$/,'').replace(/\. Zadejte potvrzenou hodnotu GM.*$/,'')+' — opravte zdroj v inventáři nebo Combat State.');}
+ // HMK 112/117/160: an unresolved armour layering is NOT a prohibition on
+ // trying a skill. Never silently treat unknown encumbrance/bulk as zero:
+ // GM must explicitly confirm an omitted or supplied penalty. Saved inventory
+ // and Combat state remain unchanged, and the journal records this decision.
+ if(!['strict','gm'].includes(gearPolicy))throw Error('Neznámé rozhodnutí o výbavě');
+ const allowedGM=gearPolicy==='gm',issues=[];
+ const conditionAvail=skillConditionAvailability({actor:base.actor,inventory,name,mounted:false});
+ const traumaAvail=skillTraumaAvailability({actor:base.actor,inventory,name,mounted:false});
+ const manual=(value,label)=>{
+  if(value===null||value===undefined||String(value).trim()==='')return null;
+  const n=Number(value);
+  if(!Number.isSafeInteger(n)||n<0||n>500||n%5)throw Error(label+' musí být nezáporné celé číslo po 5');
+  return n;
+ };
+ const gmEnc=manual(manualENC,'GM ENC'),gmBulk=manual(manualBulk,'GM Bulk'),gmPer=manual(manualPerception,'GM PER');
+ function fallback(preview,label,value){
+  if(preview.ready)return {mode:'auto',value:null};
+  if(!allowedGM)throw Error(label+': '+preview.reason+' — potvrďte rozhodnutí GM pod rozpisem zbroje.');
+  issues.push(label+': '+preview.reason+'; '+(value===null?'GM rozhodl nezahrnout neověřený postih':'GM určil '+value));
+  return {mode:value===null?'omit':'manual',value};
+ }
+ const ec=fallback(conditionAvail.enc,'ENC',gmEnc);
+ const bk=fallback(traumaAvail.bulk,'Bulk',gmBulk);
+ const pe=fallback(traumaAvail.perception,'Zbroj / PER',gmPer);
+ const condition=resolveSkillConditions({actor:base.actor,inventory,name,fatigueMode:'auto',encMode:ec.mode,manualENC:ec.value,mounted:false});
  const impaired=impairedSkillKind(base.actor,name);
  const arm=inferredArms(base.actor,inventory,name,state);
  let trauma;
  if(!state.wounds.length){
   // The old resolver required per-test GM mode decisions even on a clean
   // character. Zero injury and STN check are completely source-proven here.
-  trauma=resolveSkillTrauma({actor:base.actor,inventory,name,shockMode:'auto',injuryMode:'auto',bulkMode:'auto',perceptionMode:'auto'});
+  trauma=resolveSkillTrauma({actor:base.actor,inventory,name,shockMode:'auto',injuryMode:'auto',bulkMode:bk.mode,manualBulk:bk.value,perceptionMode:pe.mode,manualPerception:pe.value});
  }else {
   if(!impaired)throw Error('Zranění: činnost '+name+' nemá v HMK p.170 doloženou kategorii Impaired Tests. Nepoužijeme vymyšlený postih.');
   const round=Number.isSafeInteger(combatRound)&&combatRound>=1?combatRound:state.lastRound;
@@ -57,9 +80,9 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
    throw Error('Minor Injury: není doloženo, zda již uplynulo 10 minut od poranění; aktualizujte časovou osu v Combat/Kalendáři.');
   const projected=projectLiveInjuries({state,round,test:impaired,usedArms:arm.usedArms,timelineId:timeline});
   if(!projected.ready)throw Error('Zranění: '+projected.reason);
-  trauma=resolveSkillTrauma({actor:base.actor,inventory,name,shockMode:'auto',injuryMode:'auto',bulkMode:'auto',perceptionMode:'auto',currentRound:round,usedArm:arm.usedArms.length===2?'both':arm.usedArms[0]??'none'});
+  trauma=resolveSkillTrauma({actor:base.actor,inventory,name,shockMode:'auto',injuryMode:'auto',bulkMode:bk.mode,manualBulk:bk.value,perceptionMode:pe.mode,manualPerception:pe.value,currentRound:round,usedArm:arm.usedArms.length===2?'both':arm.usedArms[0]??'none'});
  }
- return {kind:'hmk-auto-skill-context-v1',actorId:actor.id,name,condition,trauma,
+ return {kind:'hmk-auto-skill-context-v1',actorId:actor.id,name,condition,trauma,gmArmourDecision:allowedGM,armourWarnings:issues,
   modifier:condition.modifier+trauma.modifier,source:base.source,hand:arm.source,
   breakdown:[{label:'Fatigue',value:condition.fatigue.modifier,source:condition.fatigue.source},
    {label:'ENC',value:condition.enc.modifier,source:condition.enc.source},
