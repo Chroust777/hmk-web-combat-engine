@@ -92,5 +92,5 @@ export function checkArmourLayering(articles=[]){
   zones.push({zone,articleIds:relevant.map(a=>a.id),issues:zoneIssues});issues.push(...zoneIssues.map(x=>({...x,zone})));
  }
  return {format:'hmk-layer-legality-v2',authoritative:false,status:issues.some(i=>i.kind==='invalid'||i.kind==='violation')?'violation':issues.length?'unresolved':'compatible',issues,zones,locations,
-  notes:['No implicit layer ordering or automatic Bulk exception','A compatible result checks material columns, not all suit ENC, per-location anatomy exceptions or optional rules','Bulk exception: one C or D violating article per affected Body Zone may incur -5 per zone; requires explicit GM selection','Last over-column D/Q article adds 5 ENC; not applied without a verified column assignment']};
+  notes:['No implicit layer ordering or automatic Bulk exception','A compatible result checks material columns, not all suit ENC, per-location anatomy exceptions or optional rules','Bulk exception: one C or D violating article per affected Body Zone may incur -5 per zone; automatic once verified by the ordered evaluator','Last over-column D/Q article adds 5 ENC; not applied without a verified column assignment']};
 }

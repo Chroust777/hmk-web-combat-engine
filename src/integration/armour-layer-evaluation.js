@@ -1,5 +1,6 @@
 /** HMK printed p.117, strict read-only ordered layer evaluator.
- * A selected Bulk exception is a GM decision, not an implicit permission.
+ * A proved, rules-permitted Cloth/Padded Bulk exception is automatic.
+ * No unverified/ineligible material stack is silently legalized.
  * This module never equips items, alters character storage or certifies suit totals.
  */
 import {ARMOUR_LAYER_COLUMNS} from '../rules/armour-layer-reference.js';
@@ -38,7 +39,7 @@ function matchesFor(stack,zone){
 /** @param {Array} articles Explicit {id,name,material,coveredLocations,bodyZones?,layerOrder}.
  * @param {object} options bulkExceptionByZone: {head:id,arms:id,torso:id,legs:id}; opt-in only.
  */
-export function evaluateOrderedArmour(articles,{bulkExceptionByZone={},slotByArticleId={},slotByZoneLocation={}}={}){
+function evaluateOrderedArmourSelected(articles,{bulkExceptionByZone={},slotByArticleId={},slotByZoneLocation={}}={}){
  const errors=[],unresolved=[],zoneReports=[],locationReports=[];
  if(!Array.isArray(articles))return {status:'invalid',errors:['Articles must be an array'],unresolved,zoneReports,locationReports,bulkPenalty:0,extraEnc:0,combatReady:false};
  if(!bulkExceptionByZone||typeof bulkExceptionByZone!=='object'||Array.isArray(bulkExceptionByZone))errors.push('Invalid Bulk selection');
@@ -138,6 +139,22 @@ export function evaluateOrderedArmour(articles,{bulkExceptionByZone={},slotByArt
      encPossibilities.set(article.id,combined);
     }
    }
+   // An exceptional outer Padded (D) coat can still occupy the last pink
+   // over-column of an otherwise valid Mail/Kurbul/Scale/Plate outfit.
+   // HMK p.117 Obris explicitly applies +5 ENC *and* −5 Bulk per zone.
+   const bulkArticle=excluded[0];
+   if(bulkArticle?.code==='D'&&LAST.has(normalizeName(bulkArticle.name))&&
+      bulkArticle.layerOrder>Math.max(-1,...normal.map(a=>a.layerOrder))&&
+      (slotByArticleId[bulkArticle.id]===undefined||slotByArticleId[bulkArticle.id]==='overFar')){
+    const lastColumnValid=matches.some(assignment=>{
+     if(assignment.some(a=>a.slot==='overFar'))return false;
+     const baseEntry=assignment.find(a=>a.slot==='base');
+     const baseMaterial=normal.find(a=>a.id===baseEntry?.id)?.code;
+     const baseRow=ARMOUR_LAYER_COLUMNS.find(row=>row.code===baseMaterial);
+     return !!baseRow&&tokenAllows(baseRow.overFar,'D',zone);
+    });
+    if(lastColumnValid)encPossibilities.set(bulkArticle.id,new Set([true]));
+   }
    locationReports.push({zone,location,status:matches.length?'compatible':'violation',matches:matches.length,articleIds:ordered.map(a=>a.id)});
   }
   // Each location is checked independently as in the Obris example p.117.
@@ -159,5 +176,57 @@ export function evaluateOrderedArmour(articles,{bulkExceptionByZone={},slotByArt
   else if(possibilities.has(true))extraEnc+=5;
  }
  return {status:errors.length?'violation':unresolved.length?'unresolved':'compatible',errors,unresolved,zoneReports,locationReports,bulkPenalty:errors.length?0:unresolved.length?null:bulkPenalty,extraEnc:errors.length?0:unresolved.length?null:extraEnc,combatReady:false,
-  notes:['Reference-only: printed suit ENC and conditional article ENC must be checked separately','Bulk requires GM approval and one eligible violating C/D item per affected Body Zone']};
+  notes:['Reference-only: printed suit ENC and conditional article ENC must be checked separately','Only one eligible violating Cloth/Padded article per affected Body Zone may incur -5 Bulk; automatic when unambiguously verified']};
+}
+
+/** HMK p.117: a single Cloth or Padded article per affected Body Zone MAY
+ * exceed layer restrictions at -5 Bulk. This is a printed, mechanically
+ * determinable exception, not a GM approval gate. Try only precisely verified
+ * exceptions; all other restrictions and unresolved anatomy still fail closed.
+ * Explicit selections (if supplied by older saves) remain fully validated.
+ */
+export function evaluateOrderedArmour(articles,options={}){
+ const opts=options??{};
+ const first=evaluateOrderedArmourSelected(articles,opts);
+ if(first.status==='compatible'||first.status==='invalid'||!Array.isArray(articles)||
+    !articles.every(a=>a&&typeof a==='object'&&!Array.isArray(a)))return first;
+ const fixed=opts.bulkExceptionByZone??{};
+ const badZones=BODY_ZONES.filter(zone=>first.zoneReports.some(r=>r.zone===zone&&r.issues?.length));
+ // Never convert malformed records, unknown references or structural failures
+ // into Bulk. Only the four printed Body Zones are candidates.
+ if(!badZones.length||first.errors.some(e=>!BODY_ZONES.some(z=>e.startsWith(z+': '))))return first;
+ const selections=[];
+ for(const zone of badZones){
+  if(Object.hasOwn(fixed,zone)){selections.push([[zone,fixed[zone]]]);continue;}
+  const eligible=articles.filter(a=>['cloth','padded'].includes(String(a.material||'').toLowerCase())&&articleCoversZone(a,zone));
+  const admissible=[];
+  for(const candidate of eligible){
+   const trial=evaluateOrderedArmourSelected(articles,{...opts,bulkExceptionByZone:{...fixed,[zone]:candidate.id}});
+   if(!trial.errors.some(e=>e.startsWith(zone+': '))&&
+      trial.zoneReports.find(r=>r.zone===zone)?.bulkArticleId===candidate.id&&
+      !trial.zoneReports.find(r=>r.zone===zone)?.issues?.length){
+    admissible.push([zone,candidate.id]);
+   }
+  }
+  if(!admissible.length)return first;
+  admissible.sort((a,b)=>a[1].localeCompare(b[1]));
+  selections.push(admissible);
+ }
+ // Combining zone-local proofs is essential for coats affecting both arms
+ // and torso. A result is accepted only after a FULL independent audit.
+ let best=null,bestMap=null;
+ function examine(i,map){
+  if(i===selections.length){
+   const checked=evaluateOrderedArmourSelected(articles,{...opts,bulkExceptionByZone:{...fixed,...map}});
+   if(checked.status!=='compatible')return;
+   // Prefer the smallest justified Bulk penalty, then a stable ID order.
+   const score=[-checked.bulkPenalty,Object.values(map).join('|')];
+   if(!best||score[0]<best.score[0]||(score[0]===best.score[0]&&score[1]<best.score[1]))best={outcome:checked,score};
+   return;
+  }
+  for(const [zone,id] of selections[i])examine(i+1,{...map,[zone]:id});
+ }
+ examine(0,{});
+ if(!best)return first;
+ return {...best.outcome,bulkAutoApplied:true,notes:[...(best.outcome.notes||[]),'Automatic p.117 Cloth/Padded Bulk exception; GM approval not required']};
 }

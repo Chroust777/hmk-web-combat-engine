@@ -1,7 +1,7 @@
 /** HMK World of Kèthîra, printed pp.112,117-118,122,170.
  * Read-only, inventory-derived Armour ENC, Gear ENC, modified ENC, PF and
  * body-zone Bulk. Do not conflate an equipment load with accrued Fatigue.
- * Unknown masses, unsupported suit layering and unconfirmed GM Bulk are not zero.
+ * Unknown masses and unsupported suit layering are not zero; verified C/D Bulk is automatic.
  */
 import {PRINTED_ARMOUR_ARTICLES_P118} from '../rules/armour-articles-printed.js';
 import {PRINTED_ARMOUR_SUITS_P113_116} from '../rules/armour-suit-printed.js';
@@ -96,8 +96,8 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   }
   if(ordered.length===articles.length){
    const slots=Object.fromEntries(articles.filter(({item})=>item.layerSlot).map(({item,article})=>[article.id,item.layerSlot]));
-   // Bulk exceptions are explicit GM decisions stored on the actual worn
-   // inventory item. They are not inferred from an invalid material stack.
+   // Older saves may contain explicit selections. Otherwise the ordered
+   // evaluator now derives only proven p.117 C/D Bulk exceptions automatically.
    const bulkExceptionByZone={};
    for(const {item,article} of articles){
     const nominated=item.bulkExceptionZones??[];

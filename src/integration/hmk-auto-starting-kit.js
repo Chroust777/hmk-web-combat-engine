@@ -82,5 +82,5 @@ export function prepareStartingKit(character,catalog,idFactory){
  if(!Number.isSafeInteger(startingCoinsPence)||startingCoinsPence!==h.wealth*10)throw Error('Nesoulad mince/Wealth (HMK p.51)');
  if(costPence<0||costPence>budget||items.some(x=>!x.sourceItemId))throw Error('Počáteční vybavení překračuje povolený Wealth rozpočet');
  return {items,summary:{profession,martial,basicCount,combatCount,itemCount:items.length,...armourLayout,costPence,budgetPence:budget,unspentPossessionsAllowancePence:remaining,startingCoinsPence,
-  note:budget===0?'Wealth 0: pravidla nepovolují nákup počátečních předmětů; oblečení se řídí životní úrovní, nikoli fiktivními bezplatnými položkami.':'Výbava je automaticky navržená, ceny podle originálního katalogu; zbroj je nasazena jen při ověřeném vrstvení HMK p.117, jinak zůstává nesená. Nejde o předepsaný balíček HMK.'}};
+  note:budget===0?'Wealth 0: pravidla nepovolují nákup počátečních předmětů; oblečení se řídí životní úrovní, nikoli fiktivními bezplatnými položkami.':'Výbava je automaticky navržená, ceny podle originálního katalogu; zbroj je nasazena jen při ověřeném vrstvení HMK p.117 (včetně dovolené automatické Cloth/Padded Bulk výjimky), jinak zůstává nesená. Nejde o předepsaný balíček HMK.'}};
 }
