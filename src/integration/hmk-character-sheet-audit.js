@@ -29,12 +29,26 @@ export function auditCharacterSheet(character,inventory=[]){
 }
 
 /** Faithful read-only summary of existing character values. Never reconstruct missing data. */
-export function characterSheetSummaryHTML(character){
- const E=x=>String(x??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
- const h=character?.hmk??{},a=h.attributes??{};
- const labels=[['str','Strength'],['end','Endurance'],['dex','Dexterity'],['agl','Agility'],['per','Perception'],['cml','Comeliness'],['aur','Aura'],['wil','Will'],['rea','Reasoning'],['cre','Creativity'],['emp','Empathy'],['elo','Eloquence']];
- const line=(title,v)=>'<tr><th scope="row">'+E(title)+'</th><td>'+E(v)+'</td></tr>';
- const attrs=labels.map(([key,label])=>line(label,Number.isSafeInteger(a[key])?a[key]+' (test ML '+5*a[key]+')':'nedoloženo')).join('');
- const bio=[['Folk',h.folk],['Age Group',h.ageGroup],['Birthdate',h.birthdate],['Sunsign',h.sunsign],['Birthplace',h.birthplace],['Society',h.society],['Parent Class',h.socialClass],['Parent Occupation',h.familyOccupation],['Background',h.background],['Estrangement',h.estrangement],['Occupation',character?.occupation],['Wealth',h.wealth],['Coin (d)',h.coinsPence],['Possessions allowance (d)',h.possessionsBudgetPence],['Morality',h.morality],['Psyche',h.psyche],['Divine Grace',h.divineGrace?.grace],['Arcane status',h.arcaneStatus],['Religion / Pantheon',h.pantheon],['Home',h.home],['Standing',h.standing]].map(([k,v])=>line(k,v??'nedoloženo')).join('');
- return '<section class="panel wide"><h3>Character Sheet · přímý přehled hodnot</h3><p class="muted">Hodnoty jsou načteny přímo ze stávajícího profilu; chybějící data jsou označena jako nedoložená, nikoli odhadnutá. Atributový test používá ML = 5 × score (HMK p.61).</p><div class="field-grid"><div class="table-scroll"><table class="catalog-spec"><caption>12 Attributes</caption><tbody>'+attrs+'</tbody></table></div><div class="table-scroll"><table class="catalog-spec"><caption>Birth · Family · Persona · Standing</caption><tbody>'+bio+'</tbody></table></div></div></section>'
+export function characterSheetSummaryHTML(character,{editing=false}={}){
+ const E=x=>String(x??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const h=character?.hmk??{},a=h.attributes??{},guided=Boolean(h.creation);
+ const attrs=[['str','Strength'],['end','Endurance'],['dex','Dexterity'],['agl','Agility'],['per','Perception'],['cml','Comeliness'],['aur','Aura'],['wil','Will'],['rea','Reasoning'],['cre','Creativity'],['emp','Empathy'],['elo','Eloquence']];
+ const bio=[['folk','Folk'],['ageGroup','Age Group'],['birthdate','Birthdate'],['sunsign','Sunsign'],['birthplace','Birthplace'],['society','Society'],['socialClass','Parent Class'],['familyOccupation','Parent Occupation'],['background','Background'],['estrangement','Estrangement'],['occupation','Occupation'],['wealth','Wealth'],['coinsPence','Coin (d)'],['possessionsBudgetPence','Possessions allowance (d)'],['morality','Morality'],['psyche','Psyche'],['divineGrace','Divine Grace'],['arcaneStatus','Arcane status'],['pantheon','Religion / Pantheon'],['home','Home'],['standing','Standing']];
+ const input=(name,value,{number=false}={})=>`<input class="sheet-inline-input" name="${E(name)}" aria-label="${E(name)}" type="${number?'number':'text'}" ${number?'min="0" step="1"':''} value="${E(value??'')}">`;
+ const isScalar=x=>x===null||x===undefined||['string','number','boolean'].includes(typeof x);
+ const value=(key)=>key==='occupation'?character.occupation:key==='divineGrace'?h.divineGrace?.grace:h[key];
+ const bioRows=bio.map(([k,label])=>{
+  const v=value(k),shown=isScalar(v)?(v??'nedoloženo'):'Dle Character Creation';
+  const editable=editing&&!guided&&k!=='occupation'&&k!=='divineGrace'&&isScalar(v);
+  const view=editing&&!guided&&k==='occupation'?input('sheet_occupation',v):editable?input('sheet_bio_'+k,v,{number:['wealth','coinsPence','possessionsBudgetPence','morality'].includes(k)}):E(shown);
+  return `<tr><th scope="row">${E(label)}</th><td>${view}${editing&&guided?'<span class="sheet-managed-dot" title="Hodnota vychází z Character Creation">◈</span>':''}</td></tr>`;
+ }).join('');
+ const attrRows=attrs.map(([key,label])=>{
+  const n=a[key],shown=Number.isSafeInteger(n)?n+' (test ML '+(5*n)+')':'nedoloženo';
+  const cell=editing&&!guided?input('sheet_attr_'+key,Number.isSafeInteger(n)?n:'',{number:true}):E(shown);
+  return `<tr><th scope="row">${E(label)}</th><td>${cell}</td></tr>`;
+ }).join('');
+ const txt=(key,val,label)=>editing?`<label>${label}${key==='description'?`<textarea name="sheet_${key}" rows="3">${E(val??'')}</textarea>`:input('sheet_'+key,val)}</label>`:`<div><strong>${label}:</strong> ${E(val??'—')}</div>`;
+ const who=editing?`<div class="sheet-personal-fields">${txt('name',character?.name,'Jméno')}<label>Typ<select name="sheet_kind"><option value="PC" ${character?.kind!=='NPC'?'selected':''}>PC</option><option value="NPC" ${character?.kind==='NPC'?'selected':''}>NPC</option></select></label>${txt('portrait',character?.portrait,'URL portrétu')}${txt('description',character?.description,'Popis a historie')}</div>`:`<div class="sheet-personal-read">${txt('name',character?.name,'Jméno')}<div><strong>Typ:</strong> ${E(character?.kind||'PC')}</div>${txt('description',character?.description,'Popis a historie')}</div>`;
+ return `<section class="panel wide sheet-inline-projection"><h3>Character Sheet · přímý přehled hodnot</h3>${editing?(guided?'<p class="notice">Úprava osobních údajů přímo zde. Atributy, původ, Wealth a další pravidlové hodnoty vznikly při Character Creation; změňte je v průvodci, aby zůstaly zachované doklady hodů a výpočty Skills.</p>':'<p class="muted">Hodnoty upravte přímo v tabulkách. Uložení aktualizuje původní profil, nikoli jeho kopii.</p>'):'<p class="muted">Hodnoty jsou načteny přímo z profilu; chybějící data jsou označena jako nedoložená. Atributový test ML = 5 × score (HMK p.61).</p>'}${who}<div class="field-grid"><div class="table-scroll"><table class="catalog-spec"><caption>12 Attributes</caption><tbody>${attrRows}</tbody></table></div><div class="table-scroll"><table class="catalog-spec"><caption>Birth · Family · Persona · Standing</caption><tbody>${bioRows}</tbody></table></div></div>${editing&&guided?'<p><button type="button" class="secondary" data-action="creation-open">Upravit pravidlové hodnoty v Character Creation</button></p>':''}</section>`;
 }
