@@ -1,3 +1,7 @@
+## v93.275 · SR/TN u všech relevantních typů Skill Tests
+
+Předepsaná činnost HMK určuje SR a TN u běžného Success Testu, na obou stranách Opposed Testu, u Success Value i při Assistance; jinak SR nenastává. Vzácné zvláštní podmínky (aktivní talent, Reverie, tělesný návrat) vyžadují výběr příslušné činnosti; aplikace je nesmí automaticky předpokládat jen podle názvu dovednosti. Ověřené předpisy jsou vyjmenované ve zdrojové databázi s čísly tištěných stran. Samostatné hodiny únavy, specializované kouzelnické a náboženské sekvence řeší jiné mechanismy, nejsou zde vydávány za běžné testy.
+
 ## v93.274 · pravidlové SR a přehled výsledků
 
 Secondary Roll d10 / TN se zobrazuje pouze při výběru konkrétní doložené Success Value činnosti. Běžné a opposed testy TN nepoužívají. Závěrečný verdikt je rozdělený do jednotlivých orámovaných metrik; historie nadále ukládá úplný text i pravidlový důkaz.

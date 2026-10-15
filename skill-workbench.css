@@ -110,3 +110,8 @@
 .hsk-verdict-footnote{font-size:.86rem;color:#c9d3c8;margin:.55rem 0 .1rem}
 .hsk-verdict-narrative p{margin:.2rem 0;max-width:95ch;white-space:pre-wrap}
 @media(max-width:580px){.hsk-verdict-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* v93.275: per-party documented SR activity */
+.hsk-sr-activity[hidden]{display:none!important}
+.hsk-sr-activity label{display:block;min-width:0}
+.hsk-sr-activity .hsk-tn-readout{display:block;font-weight:700;color:#f6ddab;margin:.4rem 0}
