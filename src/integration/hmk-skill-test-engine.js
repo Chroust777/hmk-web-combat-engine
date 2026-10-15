@@ -42,6 +42,23 @@ export function resolveOpposedTests(a,b,{breakTie=false,finalD10A=null,finalD10B
  // Base engine uses actual primary ML for its final tie check; p.61.
  return opposed({a:{sl:a.sl,roll:a.roll,ml:a.ml},b:{sl:b.sl,roll:b.roll,ml:b.ml},tie:breakTie?'break':'none',finalD10A,finalD10B});
 }
+/** HMK p.61: a tiebreak is an optional follow-up only to equal successful
+ * levels (S/S or CS/CS). Original opposed tests remain immutable.
+ */
+export function canResolveOpposedTie(a,b){
+ return !!(a&&b&&Number.isInteger(a.sl)&&a.sl>=SL.S&&a.sl===b.sl&&
+   Number.isInteger(a.roll)&&Number.isInteger(b.roll)&&
+   Number.isInteger(a.ml)&&Number.isInteger(b.ml));
+}
+export function resolveOptionalOpposedTie(a,b,{d10A=null,d10B=null}={}){
+ if(!canResolveOpposedTie(a,b))throw Error('Rozstřel je dovolen pouze při shodném S/S nebo CS/CS s doloženými původními hody');
+ if((d10A!==null&&!Number.isInteger(d10A))||(d10B!==null&&!Number.isInteger(d10B))||
+   (d10A!==null&&(d10A<1||d10A>10))||(d10B!==null&&(d10B<1||d10B>10)))throw Error('Rozhodující d10 musí být 1–10');
+ const d10Needed=a.roll===b.roll&&a.ml===b.ml;
+ const result=resolveOpposedTests(a,b,{breakTie:true,finalD10A:d10Needed?d10A:null,finalD10B:d10Needed?d10B:null});
+ return {...result,d10Needed,method:!d10Needed?(a.roll!==b.roll?'higher-d100':'higher-ml'):'d10',
+   sourcePage:61,requiresAnotherD10:d10Needed&&(!result.winner||result.needsFinalD10)};
+}
 export function testSecondaryRoll({ml,roll,tnAdjust=0}={}){
  if(ml===null||ml===undefined||ml===0)return {kind:'secondary-roll',tn:0,success:false,reason:'Není osvojeno – sekundární hod neuspěl.'};
  const q=secondaryMastery(ml,{kind:'roll',roll,tnAdjust});return {...q,roll};
