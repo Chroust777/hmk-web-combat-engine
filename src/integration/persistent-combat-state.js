@@ -453,7 +453,7 @@ export function applyComaCourse({state,round,eventId,healingBase,roll,periodD10,
  // A new interval is rolled only if Coma actually continues (p.179).
  requireCond(hr<=0||hr>=6||whole(periodD10,1,10),'Pokračující Coma vyžaduje nový skutečný d10 pro další interval');
  let wearinessAdded=0;
- if(hr<=0){s.shock='KIA';s.shockOriginRound=round;s.coma=null;s.shockFollowup=null;}
+ if(hr<=0){s.shock='KIA';s.shockOriginRound=round;s.coma=null;s.extendedShock=null;s.shockFollowup=null;s.bloodShockPending=false;for(const w of s.wounds)w.nextAdvanceRound=null;}
  else if(hr>=6){wearinessAdded=Math.floor(duration/5)*5;s.fatigue.weariness+=wearinessAdded;s.coma=null;}
  else {s.coma.hr=hr;s.coma.elapsedDays=duration;s.coma.nextCourseDays=periodD10;}
  record(s,eventId,'coma-course',round,{before,afterHR:hr,daysElapsed,duration,periodD10,healingBase,fatigue,arcaneBonus,restfulShelter,rawEML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),wearinessAdded,dead:s.shock==='KIA'});
