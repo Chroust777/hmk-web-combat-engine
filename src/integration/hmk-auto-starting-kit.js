@@ -6,6 +6,7 @@
  * Never change coins (Wealth * 10) or the original Wealth proof.
  */
 import {EXPEDITION_EQUIPMENT_P120, CRAFT_ITEMS_TOOLS_P121} from '../rules/possessions-printed.js';
+import {arrangeStartingArmour} from './hmk-starting-armour-layout.js';
 
 const printedRows=[...EXPEDITION_EQUIPMENT_P120,...CRAFT_ITEMS_TOOLS_P121];
 const money=row=>/^\d+d$/.test(row.pricePrinted||'')?Number(row.pricePrinted.slice(0,-1)):null;
@@ -41,9 +42,8 @@ export function prepareStartingKit(character,catalog,idFactory){
    condition:'Počáteční výbava (automatický návrh)',slot,currentWQ:source.category==='weapon'?Number(source.properties?.quality)||null:null,
    gearStowage:'normal',startingKitSource:'HMK v1.2 p.51, p.99–121; orientační výběr'};
   if(source.category==='armor'&&slot==='worn'){
-   entry.layerOrder=source.name==='Cloth Tunic'?0:1;
-   entry.layerSlot=source.name==='Cloth Tunic'?'base':'overNear';
-   entry.bulkExceptionZones=[];
+   // Tentative only. Exact legal order/columns are resolved AFTER selection.
+   entry.layerOrder=null;entry.layerSlot=null;entry.bulkExceptionZones=[];
   }
   chosen.add(source.id);items.push(entry);remaining-=MONEY(source);
   if(kind==='basic')basicCount++;else combatCount++;
@@ -76,10 +76,11 @@ export function prepareStartingKit(character,catalog,idFactory){
    :['Waterskin, 2 quart','Bag, leather, 15 lb','Flask, 1 pint'];
   for(const name of addOns){if(basicCount>=5)break;add(gear(catalog,name));}
  }
+ const armourLayout=arrangeStartingArmour(items);
  const costPence=budget-remaining;
  const startingCoinsPence=h.coinsPence;
  if(!Number.isSafeInteger(startingCoinsPence)||startingCoinsPence!==h.wealth*10)throw Error('Nesoulad mince/Wealth (HMK p.51)');
  if(costPence<0||costPence>budget||items.some(x=>!x.sourceItemId))throw Error('Počáteční vybavení překračuje povolený Wealth rozpočet');
- return {items,summary:{profession,martial,basicCount,combatCount,itemCount:items.length,costPence,budgetPence:budget,unspentPossessionsAllowancePence:remaining,startingCoinsPence,
-  note:budget===0?'Wealth 0: pravidla nepovolují nákup počátečních předmětů; oblečení se řídí životní úrovní, nikoli fiktivními bezplatnými položkami.':'Výbava je automaticky navržená, ceny podle originálního katalogu; nejde o předepsaný balíček HMK.'}};
+ return {items,summary:{profession,martial,basicCount,combatCount,itemCount:items.length,...armourLayout,costPence,budgetPence:budget,unspentPossessionsAllowancePence:remaining,startingCoinsPence,
+  note:budget===0?'Wealth 0: pravidla nepovolují nákup počátečních předmětů; oblečení se řídí životní úrovní, nikoli fiktivními bezplatnými položkami.':'Výbava je automaticky navržená, ceny podle originálního katalogu; zbroj je nasazena jen při ověřeném vrstvení HMK p.117, jinak zůstává nesená. Nejde o předepsaný balíček HMK.'}};
 }
