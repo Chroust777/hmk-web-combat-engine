@@ -1,3 +1,16 @@
+# HMK Keeper’s Ledger v93.270 – bezpečné vrstvení počáteční výbavy
+
+**Aktualizace 15. 10. 2026; výchozí verze: HMK_Keeper_Ledger_v93_269_COMPLETE.zip.**
+
+- **Generátor postav:** před uložením automaticky ověřuje všechny navržené nasazené kusy oděvu a zbroje podle tištěných pravidel Armour Layers HMK v1.2 str. 117 a skutečných anatomických zón článků ze str. 118.
+- **Pořadí vrstev:** `layerOrder` se stanoví z právoplatné kombinace; globální `layerSlot` se vyplní pouze tehdy, je-li slučitelný se všemi dotčenými lokacemi (jinde zůstane `null`, protože kus oděvu může být v různých zónách jinou relativní vrstvou). Nepřiděluje se automatická Bulk výjimka.
+- **Nepřípustný kus:** generátor jej nepředstírá jako nasazený. Položka zůstane téže postavě v inventáři jako `carried` s poznámkou, nulovým aktivním vrstvením a běžným režimem stowage (bez vymyšleného fyzického batohu). Její skutečná váha dále vstupuje do Gear ENC. Pořizovací cena i původ katalogové položky zůstávají zachované.
+- **Běžné oblečení:** Cloth Tunic a Cloth Breeches mohou mít nezávislé základní vrstvy v různých Body Zones. **Bojové profese:** doplňková Leather/Padded Vest se nasadí jen při potvrzené kompatibilitě.
+- **Bez přepisu historie:** změna se týká nově vytvářených automatických postav. Již uložený inventář starších postav se potichu nepřevrstvuje. Ostatní části Character Creation, Skill Tests, Combat, Magic, knihovny, kalendáře a ukládání zůstávají beze změn.
+- **Build:** `node tools/build_bundle.cjs`, žádné placené služby. Kompletní ZIP obsahuje všechny původní aplikační soubory včetně `src`, nový pomocný modul, produkční bundle a README. Neobsahuje auditní protokoly, testovací skripty ani obrázky.
+
+---
+
 # HMK Keeper’s Ledger v93.269 – přehledné Success Value a neblokující vyhodnocení zbroje
 
 **Aktualizace 15. 10. 2026; přímý základ: kompletní archiv v93.268.**
