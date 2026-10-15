@@ -133,7 +133,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.265';
+const APP_VERSION='93.267';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -478,9 +478,9 @@ function wealthInventoryPanel(c){
  const remaining=kit&&Number.isSafeInteger(kit.unspentPossessionsAllowancePence)?kit.unspentPossessionsAllowancePence:null;
  return `<div class="equipment-summary" role="group" aria-label="Hotovost a počáteční Wealth">${cash.ok?`<div><strong>Aktuální hotovost</strong><span>${esc(cash.balance)}d</span></div><div><strong>Počáteční hotovost</strong><span>${esc(cash.initial)}d · výdaje ${esc(cash.spent)}d</span></div>`:`<p class="library-warning">Hotovost nelze bezpečně doložit: ${esc(cash.reason)} Nákupy jsou zablokované, zdarma lze věci převzít.</p>`}${kit?`<div><strong>Vybavení · počáteční hodnota</strong><span>${esc(kit.costPence)}d / ${esc(kit.budgetPence)}d</span></div><div><strong>Nevyčerpaný počáteční limit vybavení (nejsou mince)</strong><span>${esc(remaining??Math.max(0,kit.budgetPence-kit.costPence))}d</span></div>`:''}${cash.ok&&cash.transactions?`<details><summary>Historie nákupů · ${cash.transactions}</summary><ol>${(h.cashLedger||[]).map(t=>`<li>${esc(t.label||'Předmět')} · −${esc(t.amountPence)}d <small>${esc(t.at||'datum neznámé')}</small></li>`).join('')}</ol></details>`:''}<p class="tiny">HMK v1.2, str. 51: počáteční hotovost = Wealth × 10d; počáteční výbava má oddělený limit Wealth × 100d. Nákupy se odečítají z hotovosti prostřednictvím neměnné historie výdajů; Wealth se nákupem nemění.</p></div>`;
 }
-let activeSkillTab='success';
+let activeSkillTab='secondary';
 function skillWorkbenchView(){
- const actor=character(selected)??data.characters[0];if(!actor)return `<section class="panel"><h2>Skill Tests</h2><p>Nejprve vytvořte postavu.</p><button data-nav="characters">Přejít do registru</button></section>`;
+ const actor=character(selected)??data.characters[0];if(actor&&selected!==actor.id)selected=actor.id;if(!actor)return `<section class="panel"><h2>Skill Tests</h2><p>Nejprve vytvořte postavu.</p><button data-nav="characters">Přejít do registru</button></section>`;
  return skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab);
 }
 function charactersView(){const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));return `<div class="topline"><h2>Registr postav (${data.characters.length})</h2>${button('+ Vytvořit postavu krok za krokem','new-character')}<button type="button" data-action="auto-random-character">⚄ Generovat náhodnou postavu</button><button type="button" data-action="open-generator-config">✦ Generovat podle rysů / Folk / povolání</button></div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards">${list.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><span class="pill">${esc(c.kind)}</span><h3>${esc(c.name)}</h3><div class="muted">${esc(c.occupation||'Bez povolání')}</div><div class="muted">${esc(c.description||'')}</div>${c.hmk?.creation?`<div class="muted">Character Creation · ${esc(c.hmk.creation.status==='auto-generated'?'Automaticky dokončeno':c.hmk.creation.status==='review-required'?'Ke kontrole GM':'krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="actions">${creationCardAction(c)}<button data-open="${esc(c.id)}">Otevřít deník</button><button class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></article>`).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`}
@@ -3349,17 +3349,29 @@ function skillDie(form,key,sides){const str=form.elements.namedItem(key)?.value?
 }
 function recordSkillEvidence(title,body,proof){
  if(!mutate(()=>{if(proof?.consequenceProof?.eventId)assertUniqueSkillConsequence(data.journal,proof.consequenceProof.eventId);data.journal.push({id:uuid(),characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof});}))throw Error('Záznam nebyl uložen; nepovažujte tento hod za uložený.');
- const slot=proof?.type==='opposed-success-test'?'hsk-result-opposed':proof?.type==='secondary-roll'?'hsk-result-secondary':proof?.type==='success-value-specific'?'hsk-result-value':'hsk-result-success';
+ const slot=proof?.type==='opposed-success-test'?'hsk-result-opposed':proof?.type==='secondary-roll'||proof?.type==='secondary-mastery-test'||proof?.type==='secondary-mastery-value-test'?'hsk-result-secondary':proof?.type==='success-value-specific'?'hsk-result-value':'hsk-result-success';
  const output=document.getElementById(slot);if(output){output.textContent=body;output.scrollIntoView({block:'nearest',behavior:'smooth'});}
- if(['success-value-test','success-value-specific'].includes(proof?.type)){
+ if(['success-value-test','success-value-specific','secondary-mastery-value-test'].includes(proof?.type)){
   const summary=document.getElementById('hsk-value-summary');if(summary){const r=proof.result;
    summary.textContent='SV '+r.sv+' · '+r.svTier.label+' · '+(r.svTier.stars?'★'.repeat(Math.min(10,r.svTier.stars)):'—')+' · Success '+r.level+' · Victory Stars '+r.unopposedStars;}}
 
 }
+function refreshSecondaryRollPreview(form,actor){
+ if(form?.id!=='skill-secondary-form')return;
+ const node=form.querySelector('[data-secondary-roll-preview]');if(!node)return;
+ const name=form.elements.namedItem('secondaryRoll')?.value;
+ if(!name){node.textContent='Secondary Roll d10 není zvolen. Primární d100 test proběhne samostatně.';return;}
+ try{
+  const mastery=skillActorMastery(actor,name);
+  const tn=mastery.index;
+  node.innerHTML='<strong>'+esc(name)+'</strong>: ML '+mastery.ml+' → Index '+tn+' → TN '+tn+'. Úspěch SR při d10 ≤ '+tn+'. Jeho účinek závisí na konkrétní činnosti HMK; sám nemění EML.';
+ }catch(err){node.textContent='Secondary Roll: '+err.message;}
+}
 function refreshSkillAutoPreview(form){
- if(!['skill-test-form','skill-value-form','skill-opposed-form'].includes(form?.id))return;
+ if(!['skill-test-form','skill-value-form','skill-opposed-form','skill-secondary-form'].includes(form?.id))return;
  const actor=character(selected);if(!actor)return;
- const specs=['skill-test-form','skill-value-form'].includes(form.id)?[['primary',actor,'primary']]:[
+ refreshSecondaryRollPreview(form,actor);
+ const specs=['skill-test-form','skill-value-form','skill-secondary-form'].includes(form.id)?[['primary',actor,'primary']]:[
   ['a',actor,'primary'],['b',character(form.elements.namedItem('opponentId')?.value),'opponentSkill']];
  for(const [key,person,field] of specs){const node=form.querySelector('[data-auto-preview="'+key+'"]');
   if(!node||!person)continue;const name=form.elements.namedItem(field)?.value;
@@ -3379,7 +3391,7 @@ document.addEventListener('change',e=>{
   const other=character(e.target.value),wrap=e.target.form.querySelector('[data-opponent-skill-wrap]');if(!wrap)return;
   wrap.innerHTML=other?'<select name="opponentSkill" required>'+availableMasteries(other).map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+' · ML '+x.ml+'</option>').join('')+'</select>':'Nenalezen protivník';
  }
- if(['skill-test-form','skill-value-form','skill-opposed-form'].includes(e.target?.form?.id)&&['primary','opponentSkill','opponentId','secondary1','secondary2'].includes(e.target.name))refreshSkillAutoPreview(e.target.form);
+ if(['skill-test-form','skill-value-form','skill-opposed-form','skill-secondary-form'].includes(e.target?.form?.id)&&['primary','opponentSkill','opponentId','secondary1','secondary2','secondaryRoll'].includes(e.target.name))refreshSkillAutoPreview(e.target.form);
 });
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-skill-tab]');if(!t)return;
  activeSkillTab=t.dataset.skillTab;const root=t.closest('.hmk-skill-workbench');if(!root)return;
@@ -3395,13 +3407,41 @@ document.addEventListener('submit',event=>{
  try{
   const actor=character(selected);if(!actor)throw Error('Postava není otevřená');
   const v=Object.fromEntries(new FormData(form));
-  if(['skill-test-form','skill-value-form','skill-opposed-form'].includes(form.id)&&v.actionContext==='combat')
+  if(['skill-test-form','skill-value-form','skill-opposed-form','skill-secondary-form'].includes(form.id)&&v.actionContext==='combat')
    throw Error('Konkrétní bojový útok/obranu vyhodnoťte přímo v Combat. Dvojí d100 a paralelní Mishap se nesmí vytvořit. Použijte panel „Konkrétní bojová akce“ níže.');
   const int=(key,min=-1000,max=1000)=>{const n=Number(v[key]??0);if(!Number.isSafeInteger(n)||n<min||n>max)throw Error('Neplatné celé číslo: '+key);return n;};
   if(form.id==='skill-secondary-form'){
-   const mastery=skillActorMastery(actor,v.secondary),d=skillDie(form,'roll',10);
-   const result=testSecondaryRoll({ml:mastery.ml,roll:d.roll,tnAdjust:0});
-   recordSkillEvidence('Secondary Roll · '+v.secondary,'HMK p.62 · '+actor.name+' · '+v.secondary+' ML'+mastery.ml+' Index '+mastery.index+' · d10 '+d.roll+' vs TN '+result.tn+' → '+(result.success?'ÚSPĚCH':'NEÚSPĚCH')+' ('+d.origin+').', {type:'secondary-roll',actorId:actor.id,skill:v.secondary,result,rollOrigin:d.origin});return;
+   const primary=skillActorMastery(actor,v.primary);
+   const secondary=[v.secondary1,v.secondary2].filter(Boolean);
+   if(new Set(secondary).size!==secondary.length)throw Error('Sekundární dovednost je vybraná dvakrát');
+   if(secondary.includes(v.primary))throw Error('Primární Skill nesmí být zároveň vlastním sekundárním modifikátorem.');
+   if(v.secondaryRoll===v.primary)throw Error('Secondary Roll musí používat samostatnou dovednost nebo atribut, nikoli primární Skill.');
+   if(!v.secondaryRoll&&String(v.roll10??'').trim())throw Error('Je zadán d10, ale nebyla vybrána dovednost Secondary Roll.');
+   if(v.testMode!=='success'&&v.testMode!=='value')throw Error('Neznámý typ primárního testu Secondary Mastery.');
+   const helpers=skillAssistantMLs(form,v.primary);
+   const auto=skillAutoFor(actor,v.primary);
+   const condition=auto.condition,trauma=auto.trauma;
+   const gmUserModifier=0;
+   const {die:d100,result:r}=skillResolvedResult({mastery:primary,form,dieKey:'roll',gmModifier:gmUserModifier,condition,trauma,
+     svExtra:0,secondaryMLs:secondary.map(name=>skillActorMastery(actor,name).ml),
+     assistants:helpers.map(x=>x.mastery.ml),exceptional:false});
+   let srText='Žádný Secondary Roll';
+   let srProof=null;
+   if(v.secondaryRoll){
+    const srMastery=skillActorMastery(actor,v.secondaryRoll);
+    const d10=skillDie(form,'roll10',10);
+    srProof={mastery:srMastery,die:d10,result:testSecondaryRoll({ml:srMastery.ml,roll:d10.roll,tnAdjust:0})};
+    srText=v.secondaryRoll+' ML '+srMastery.ml+' Index '+srMastery.index+' · d10 '+d10.roll+' vs TN '+srProof.result.tn+' → '+(srProof.result.success?'ÚSPĚCH':'NEÚSPĚCH')+' ('+d10.origin+')';
+   }
+   const consequence=classifySkillConsequence({actor,skill:v.primary,result:r,trauma,context:v.actionContext||'general'});
+   const eventId=uuid(),consequenceProof=skillConsequenceProof({eventId,actorId:actor.id,skill:v.primary,result:r,consequence,rollOrigin:d100.origin});
+   const valueMode=v.testMode==='value';
+   const body='HMK p.62 · Secondary Mastery · '+actor.name+' / '+v.primary+' · ML '+r.ml+' Index '+r.index+' → EML '+(r.eml??'—')+' (automatický stav '+condition.modifier+' ['+skillConditionsText(condition)+', trauma '+skillTraumaText(trauma)+'], secondary '+r.secondary.reduce((s,x)=>s+x.modifier,0)+', assistance +'+r.assistance+')'+
+    '\nSecondary Roll: '+srText+
+    '\nPrimární d100: '+(r.forcedCF?'AUTO CF bez d100':'d100 '+r.roll+' ('+d100.origin+')')+' → '+r.level+(r.splitCF?' '+r.splitCF:'')+
+    (valueMode?' · SV '+r.sv+' / '+r.svTier.label+' ('+r.svTier.stars+' SV hvězd '+(r.svTier.stars?'★'.repeat(Math.min(10,r.svTier.stars)):'—')+')':' · běžné unopposed Victory Stars '+r.unopposedStars+' '+(r.unopposedStars?'★'.repeat(Math.min(10,r.unopposedStars)):'—'))+
+    '\nAutomatic Consequence: '+skillConsequenceText(consequence)+skillPendingText(consequence.pending);
+   recordSkillEvidence((valueMode?'Secondary Mastery · SV · ':'Secondary Mastery · Success Test · ')+v.primary,body,{type:valueMode?'secondary-mastery-value-test':'secondary-mastery-test',actorId:actor.id,skill:v.primary,secondarySkills:secondary,secondaryRollSkill:v.secondaryRoll||null,secondaryRollResult:srProof?srProof.result:null,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result:r,conditions:condition,trauma,rollOrigin:d100.origin,secondaryRollOrigin:srProof?.die?.origin||null,consequence,consequenceProof});return;
   }
   const primary=skillActorMastery(actor,v.primary);
   if(form.id==='skill-assistance-form'){
@@ -3443,8 +3483,10 @@ document.addEventListener('submit',event=>{
     assistants:helpers.map(x=>x.mastery.ml),exceptional:false});
   const consequence=classifySkillConsequence({actor,skill:v.primary,result:r,trauma,context:v.actionContext||'general'});
   const eventId=uuid(),consequenceProof=skillConsequenceProof({eventId,actorId:actor.id,skill:v.primary,result:r,consequence,rollOrigin:d.origin});
-  const body='HMK p.60–62 · '+actor.name+' / '+v.primary+' · ML '+r.ml+' Index '+r.index+' → EML '+(r.eml??'—')+' (automatický stav '+condition.modifier+' ['+skillConditionsText(condition)+', trauma '+skillTraumaText(trauma)+'], secondary '+r.secondary.reduce((s,x)=>s+x.modifier,0)+', assistance +'+r.assistance+') · '+(r.forcedCF?'AUTO CF bez d100':'d100 '+r.roll+' ('+d.origin+')')+' → '+r.level+(r.splitCF?' '+r.splitCF:'')+' · SV '+r.sv+' / '+r.svTier.label+' ('+r.svTier.stars+' SV hvězd '+(r.svTier.stars?'★'.repeat(Math.min(10,r.svTier.stars)):'—')+'); běžné unopposed Victory Stars '+r.unopposedStars+' '+(r.unopposedStars?'★'.repeat(Math.min(10,r.unopposedStars)):'—')+'.\nAutomatic Consequence: '+skillConsequenceText(consequence)+skillPendingText(consequence.pending)+'';
-  recordSkillEvidence((form.id==='skill-value-form'?'Success Value Test · ':'Success Test / SV · ')+v.primary,body,{type:form.id==='skill-value-form'?'success-value-specific':'success-value-test',actorId:actor.id,skill:v.primary,secondarySkills:secondary,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result:r,conditions:condition,trauma,rollOrigin:d.origin,consequence,consequenceProof});
+  const isSV=form.id==='skill-value-form';
+  const outcome=isSV?' · SV '+r.sv+' / '+r.svTier.label+' ('+r.svTier.stars+' SV hvězd '+(r.svTier.stars?'★'.repeat(Math.min(10,r.svTier.stars)):'—')+')':' · běžné unopposed Victory Stars '+r.unopposedStars+' '+(r.unopposedStars?'★'.repeat(Math.min(10,r.unopposedStars)):'—');
+  const body='HMK p.60–62 · '+actor.name+' / '+v.primary+' · ML '+r.ml+' Index '+r.index+' → EML '+(r.eml??'—')+' (automatický stav '+condition.modifier+' ['+skillConditionsText(condition)+', trauma '+skillTraumaText(trauma)+'], secondary '+r.secondary.reduce((s,x)=>s+x.modifier,0)+', assistance +'+r.assistance+') · '+(r.forcedCF?'AUTO CF bez d100':'d100 '+r.roll+' ('+d.origin+')')+' → '+r.level+(r.splitCF?' '+r.splitCF:'')+outcome+'.\nAutomatic Consequence: '+skillConsequenceText(consequence)+skillPendingText(consequence.pending);
+  recordSkillEvidence((isSV?'Success Value Test · ':'Success Test · ')+v.primary,body,{type:isSV?'success-value-specific':'success-test',actorId:actor.id,skill:v.primary,secondarySkills:secondary,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result:r,conditions:condition,trauma,rollOrigin:d.origin,consequence,consequenceProof});
  }catch(err){const id=form.id==='skill-opposed-form'?'hsk-result-opposed':form.id==='skill-value-form'?'hsk-result-value':form.id==='skill-secondary-form'?'hsk-result-secondary':form.id==='skill-assistance-form'?'hsk-result-assistance':'hsk-result-success';const out=document.getElementById(id);if(out)out.textContent='Test nebyl dokončen: '+err.message;else alert(err.message);}
 },true);
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-resume-creation]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();if(!resumeCreation(t.dataset.resumeCreation))alert('Rozpracovanou postavu nelze obnovit nebo je aktivní Initiative.');},true);

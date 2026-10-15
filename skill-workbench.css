@@ -45,3 +45,5 @@
 .hsk-tabs button[data-skill-active="yes"]{background:#a4824e!important;color:#111a19!important;border-color:#d6b881}
 
 .hsk-eml{margin:.4rem 0!important;background:#302b20;padding:.5rem;border-radius:5px;color:#f1d8a4;font-size:1.05rem}
+/* v93.267: display the independent d10 TN next to the primary d100 EML. */
+.hsk-secondary-timing {background:#272f29;border-left:3px solid #afbf96;padding:.65rem .8rem;margin:.7rem 0;color:#f1dfbd;line-height:1.5}

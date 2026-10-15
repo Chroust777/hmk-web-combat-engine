@@ -1,3 +1,29 @@
+# HMK Keeper’s Ledger v93.267 – oprava Secondary Mastery / Skill Tests (HMK v1.2, str. 60–62)
+
+**Zdroj:** skutečný produkční ZIP v93.266, tištěné HMK v1.2 str. 60–62 a původní funkční Excelový návrh uživatele.
+
+- **Opravená chyba:** panel Secondary Mastery dosud obsahoval pouze samostatný d10. V pravidlech Secondary Mastery znamená použití sekundárních *modifikátorů* a/nebo sekundárního *hodu* společně s **primárním Success Testem d100** či **Success Value Testem**. Nový formulář to provádí v jednom potvrzení a ukládá jeden doložený záznam.
+- **Primární test:** vybrané primární ML + 1./2. Secondary Modifier (+ případné Assistance) + doložené automatické stavové úpravy (ENC, Fatigue, zranění, Shock, Bulk, zbroj) → EML → skutečný d100 → CF/F/S/CS. Zobrazení ml/EML a každého postihu zachováno.
+- **Secondary Modifier:** p.62 Index = floor(ML/10), modifikátor `5 × (Index − 5)`. Požadované sekundární dovednosti musejí být osvojované; bez jejich ML není jejich použití potvrzeno. Primární skill nesmí být současně vlastním Secondary Modifierem, ani dvakrát vybraným modifikátorem.
+- **Secondary Roll:** volitelná odlišná dovednost / atribut; d10 <= TN = Index jejího vlastního ML. Samotný SR nemá kritické úspěchy ani hvězdičky a nedostává automaticky ENC/Fatigue. Výsledek SR **sám o sobě nepřičítá bonus k EML ani SV**; přímý účinek musí stanovovat konkrétní HMK rutina. Pro dosud nezmapované speciální rutiny jej aplikace zaznamená a nedomýšlí. Jestliže žádný SR není vybrán, dodatečný d10 se neprovádí.
+- **Success Test vs. Success Value:** čistý Success Test vypisuje CF/F/S/CS a případné běžné Victory Stars; neprezentuje automaticky SV, jako by šlo o dlouhodobou činnost. SV test počítá `Index primárního ML + modifikátor z CF/F/S/CS` (−2/−1/0/+1), nikoli z Indexu EML, a zobrazuje SV hvězdy.
+- **Opposed Success Test** zůstává oddělený, neboť jde o dva současné Success Testy (např. Stealth vs. Awareness) s porovnáním úrovní a Victory Stars, nikoliv d10 proti TN. Assistance zůstává samostatný připravovaný bonus.
+- Při otevření Skill Tests přímo z navigace se první zobrazená postava nyní nastaví jako aktivní pro zápis, aby provedený hod neselhal „Postava není otevřená“.
+- **Přesný test p.62:** Alchemy ML82; Herblore ML43 (−5); Mineralogy ML54 (0) → EML77; Mathematics ML35 → SR TN3 (d10=3 úspěch); primární d100=40 → CS, Index primárního ML8 → SV9, standardně 5 SV hvězd. Účinek Mathematics SR na konkrétní elixír se má řídit jeho pravidlovou rutinou a v tomto obecném kalkulátoru se nepředstírá.
+- Nové rozhraní zachovává všech pět záložek. Nezměněny původní moduly Combat, Magic, Character Creation, Equipment katalog, kalendář a hlavní CSS. Produkční GitHub Pages nadále startuje z jediného `hmk-app.bundle.js` s viditelnou chybovou diagnostikou, nikoli ze stovek dílčích importů.
+
+**Limity:** Nejsou automaticky odvozovány recepty typu Alchemy (Herblore, Mineralogy, Mathematics SR), pokud samotný vybraný skill neidentifikuje konkrétní pravidlovou činnost. Výběr požadovaných sekundárních dovedností musí odpovídat skutečně zvolené činnosti; program je nepřiřazuje odhadem. Opravný test probíhá ve skutečném DOM Chromium se simulovaným localStorage, nikoli na živém GitHub Pages.
+
+---
+
+# HMK Keeper’s Ledger v93.267 – oprava prázdné stránky na GitHub Pages
+
+- Produkční HTML nyní načítá jeden kompletní `hmk-app.bundle.js` namísto řetězce závislých modulů `src/`. Původní `app.js` a `src/` zůstávají pro vývoj; pravidla a stavové mechanismy nejsou změněny.
+- Pokud hlavní soubor nelze načíst nebo aplikace při startu vyhodí chybu, uživatel neuvidí bílou stránku, ale viditelnou diagnostiku. Do uložených postav se při tomto výpadku nijak nezasahuje.
+- Součástí ZIP je `.nojekyll` pro GitHub Pages. Nahrajte **celý obsah rozbaleného ZIP**, nikoli samotný ZIP. V kořenu publikované složky musí být vedle sebe `index.html`, `hmk-app.bundle.js`, `styles.css`, `library.css` a `skill-workbench.css`.
+- Samotnou příčinu prázdné stránky na konkrétním uživatelově nasazení nelze bez URL a chybové konzole zpětně jednoznačně určit; tato oprava odstraňuje riziko chybějících dílčích JS importů.
+- Produkční převod ES modulů používá stejné testované jádro skriptu jako předchozí izolované browser testy. Prohlížečové testy běží bez živého GitHub Pages a neověřují osobní localStorage uživatele.
+
 # HMK Keeper’s Ledger v93.265
 
 ## v93.265 – Knihovna: nákup / bezplatné převzetí; Character Sheet: kompaktní Skills
