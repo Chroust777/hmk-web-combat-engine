@@ -1,38 +1,57 @@
-# HMK Keeper’s Ledger v93.245 — automatická tvorba a volitelná skutečná AI
+# HMK Keeper’s Ledger v93.250 — targeted creation repair (HMK v1.2)
 
-**Zdroj:** přesně produkční ZIP v93.244, pravidla *HârnMaster: Roleplaying in the World of Kèthîra* v1.2. Na Combat, Magic, G04 a CSS se nesahalo.
+**Source:** v93.249 production ZIP. This release extends the existing offline 14-step wizard and validates through its normal CAS rules. No external AI, OpenAI API, or paid service.
 
-## Co je ve v93.245 opraveno
+- Explicitly selected occupation: a rule-verified plan determines permitted Folk, birthplace (HMK p.24), parent class and mandatory specializations **before** generation. Unsupported Folk–occupation combinations produce an explicit error; the generator never silently substitutes a different occupation.
+- The plan reuses the original 343 occupational skill/wealth profiles. Its region/occupation witness data is NOT a second skill or equipment catalogue; contexts are revalidated by the existing engine.
+- Class and talent candidate trials are genuine software rolls. Discarded candidate trials are kept separate from the final character's recorded dice; selecting an occupation changes the conditional distribution and is not the same as demographic random generation. The truly random button preserves its previous behavior.
+- Corrects Tribal/Áltôr secondary dice fields, Chieftain family validation flags, Hârn Orbáal community disambiguation and exact occupation preference over any prefixed variants (Man-at-arms vs Man-at-arms (Archer)). All 14 creation steps, Wealth, inventory and Character Sheet remain governed by the existing rules.
+- Known scope: a full-generation test for each profile covers ONE witness scenario per occupation, **not every theoretical combination of Folk, region, parents, age, skills and all dice outcomes**. Browser tests use isolated in-memory storage, not live GitHub Pages.
 
-- Automatická tvorba vyřešila závislost **Arcane Talent → Occupation**: doložený hod (u Parent Invoker čtyři d20, vybírá se nejvyšší) proběhne před závaznou volbou povolání. Týž výsledek je následně použit ve Skills; neprovádí se nový hod jen pro získání jiné profese.
-- V kroku Skills se při automatickém přidávání bodů DP **zvyšuje skutečná hodnota**, nepřepisuje se pokaždé jedničkou.
-- Výběr cíleného povolání se stále omezuje na možnosti povolené pravidlovou validací. V cíleném režimu je možné použít zvýhodněné rodičovské **d20** podle originálu p.26; čistý Random respektuje původní demografické **d100**.
-- Konfigurovatelný generátor má dva **výslovně odlišené** režimy výkladu českého popisu: `Skutečná AI` (serverový model, s připojením a klíčem) a `Lokální heuristický rozbor` (bez internetu). Přepínač je uvnitř odesílaného formuláře — správně se uloží do FormData.
-- Výstup AI je pouze **návrh** profese, Folk, věku, povahy, dovedností a dalších významových indicií; přístup se omezuje na názvy z původního registru 342 profesí, dostupné dovednosti a 122 checkboxových rysů. Každá citace musí doslova existovat v popisu uživatele. Neexistující ID a navrhované přímé změny Attribute Score/Wealth jsou ignorovány. Všechny nakonec zvolené možnosti validuje **původní 14krokový HMK engine**.
-- Při nedostupné AI **nevznikne falešně „AI analyzovaná“ postava**; zobrazí se chyba a formulář zůstane otevřen pro opakování nebo přepnutí na offline rozbor.
+---
 
-## Spuštění skutečné AI
+# HMK Keeper’s Ledger v93.248 – Knight Bachelor a přesnější offline čeština
 
-Požadavky: **Node.js 20+**, odchozí HTTPS přístup k API poskytovatele, vlastní platný **serverový** API klíč. Aplikace nesmí vkládat tajný klíč do HTML, JS nebo úložiště prohlížeče. Příklad PowerShell na lokálním počítači:
+**Základ:** výhradně produkční ZIP v93.247; **pravidlová autorita:** HârnMaster: Roleplaying in the World of Kèthîra (HMK v1.2), tištěné strany 27, 32, 35, 41, 43 a 51. Nepoužito HârnMaster Third Edition. Pro GitHub Pages stačí soubory z ZIP; **žádná externí AI, API klíč, placený server ani internetové volání pro interpretaci textu nejsou potřeba**.
 
-```powershell
-$env:HMK_OPENAI_API_KEY = "SEM_VLOZTE_SVUJ_SERVEROVY_API_KLIC"
-$env:HMK_OPENAI_MODEL = "gpt-4.1-mini"
-node .\hmk-ai-server.mjs
-```
+- **Knight Bachelor:** nyní přímo existuje v jediném `OCCUPATIONS` katalogu s přesně 10 profesními Skills (HMK str.43); Occupation Wealth d8 a zdrojová strana 43. Nezvyšuje automaticky společenskou třídu ani nemaže pravidlová omezení. Pro dítě rodiče Knight Bachelor zůstávají samostatné specifické *Family Skills*, jen hvězdičkou označené přídavky, bez zdvojených profesních DP.
+- **Offline čeština v5:** přibližně čtyři desítky nových přesných pravidel významových vazeb plus 13 nových parafrází rysů; lepší rozpoznání minulých povolání, přání, budoucích a údajně zastávaných profesí, předstírání, rodinných profesí a zobrazených osob. Vzájemně protikladné rysy jsou označené jako nejisté, nikoli svévolně odstraněné.
+- **Bez výmyslů:** popis může předávat preference do 14krokového enginu, nikdy nesmí bez hodu nastavovat STR/END/Wealth, měnit dostupnost Knight Bachelor nebo předstírat vyšší postavení. Podrobné výsledky skutečných testů obsahuje samostatný český audit a regresní archiv.
+- `index.html` mění pouze verzi JavaScript asset URL pro obejití cache při nasazení; žádné pravidlové moduly Combat, Magic, G04 ani `styles.css` nebyly upraveny.
 
-Potom otevřete `http://127.0.0.1:8787/`, v registru zvolte **Generovat podle rysů / Folk / povolání**, nastavte **Skutečná AI**, vyplňte text a klikněte na generování. **Bez nastaveného klíče běží offline režim**, AI režim však přizná 503 a nic nepředstírá. Pro vzdálené nasazení je třeba HTTPS, autentizace uživatelů, ochrana před zneužitím API a samostatná zálohovací strategie úložiště prohlížeče. Backend ve výchozím nastavení naslouchá jen na `127.0.0.1`; **není připraven jako veřejně dostupná multiuživatelská služba**.
+---
 
-**Soukromí:** pouze popis a zatržené rysy prochází serverem k modelu; kompletní Character Sheet, inventář ani historie hodů se neposílají. Požadavek modelu obsahuje `store:false`; případná další retence podléhá politice poskytovatele. Ke spuštění serveru nestačí dvojklik na statické `index.html`.
+# HMK Keeper’s Ledger v93.247 – rozšířený offline slovník
 
-## Pravdivý rozsah testování
+Oproti v93.246 byl rozšířen čistě lokální český slovník popisů povolání,
+dovedností, Folk a povahových rysů. Parser nevydává ani jeden nový hod nebo
+novou číselnou vlastnost; všechny výsledné volby musí projít pravidly HMK v1.2.
+Žádné AI, žádný API klíč, žádný nový server.
 
-- Existuje 342 definičních profilů a syntetická **matice dostupnosti pravidlového filtru** dosáhla **342/342** za vhodně zvolených předpokladů (včetně syntetických magických talentů). To není 342 dokončených postav.
-- Chromium se simulovaným `localStorage` dokončilo tři celý 14krokové automatické průchody (náhodná postava, cílený Hunter a Scribe) a samostatný Scribe s **napodobenou odpovědí AI HTTP**. Klikací test také ověřil odmítnutí AI bez serveru a nezaložení nové postavy.
-- Node regresní testy: 24/24, rozšířená sémantika 18/18, AI/coverage 13/13; jedna kompletní 14kroková doménová trasa (včetně JSON kontrolních bodů) prošla.
-- **Bez platného API klíče neproběhlo žádné živé volání OpenAI modelu**, takže přesnost reálné sémantiky není ověřena. Vzácné a extrémní archetypy nebyly všechny dokončeny; hromadný prohlížečový test pro ně vypršel. Plná produkční E2E validace, zejména reálné úložiště a nasazení, není certifikována.
+# HMK Keeper’s Ledger v93.247 — čistě lokální rozbor charakteru (bez AI)
 
-Podrobnosti, počty a omezení: samostatný český audit a regresní testovací ZIP.
+**Autoritativní základ:** přesně produkční ZIP v93.245, pravidla *HârnMaster: Roleplaying in the World of Kèthîra* v1.2. **Bez OpenAI, API klíče, Node serveru a externích placených služeb.** Funguje i na statickém hostingu typu GitHub Pages.
+
+## Generátor podle českého popisu
+
+V registru zvolte **Generovat podle rysů / Folk / povolání**. Vyplňte volný popis česky, případně checkboxy a explicitní Folk/povolání. Pod textem se živě zobrazí odhad archetypu, kandidáti povolání, Skills, Folk, věku, popisné rysy, dohledatelné spouštěcí výrazy, zápory a možné rozpory. **Není potřeba volit režim AI** — ten a jeho server byly kompletně odstraněny.
+
+Lokální analyzátor v3: rozšířené slovníky profesí, české tvary výrazů, sousloví, řádkování vět, zápory, kontext rodiny („otec byl kovář“), minulých povolání („býval žoldnéř“) a pouhých přání („chtěl by být šaman“), časté protiklady a rozumné omezení opakovaných indicií. Výklad se předává existujícímu 14krokovému enginu jako **preference**, nikoli jako druhý systém tvorby. Generovaná postava uchovává auditní doklady, proč byla preference navržena. Neexistující ani nedostupné povolání se nesmí podstrčit.
+
+**Limit:** deterministický parser není jazykový model. Neporozumí spolehlivě všem významům, ironii, metaforám, komplikované souvěté negaci ani neznámé odborné terminologii. Když výklad nesedí, přesnější je explicitní výběr povolání/Folk a checkboxů. Kontrolní náhled upozorňuje na nejednoznačnost. Tělesné rysy nejsou záminka přepsat hody STR/DEX atd.; Wealth vychází z originálních pravidel.
+
+## Nasazení na GitHub Pages
+
+1. Nahrajte **obsah tohoto ZIP** do stejné větve/složky, odkud je publikována původní aplikace.
+2. Otevřete adresu aplikace, případně obnovte stránku vymazáním cache (např. Ctrl+F5).
+3. V registru zvolte generátor podle rysů a napište větu. Při psaní se zobrazí lokální náhled bez internetu. Stiskem Generovat spustíte původní 14krokový engine.
+4. **Pro jistotu nejdřív exportujte zálohu postav.** Uložené postavy sídlí v prohlížeči a nezávisí na zdrojové větvi GitHub.
+
+## Testování v93.247
+
+Z čerstvého rozbalení produkčního ZIP: 24/24 původních regresních skupin; 18/18 starších sémantických skupin; 40/40 nových offline kontrol; 14krokový doménový průchod; dva izolované Chromium testy registru/náhledu; tři kompletní klikací automatické tvorby Random/Hunter/Scribe v Chromium s **testovacím simulovaným localStorage**. Počet 342 definovaných profesí není počet 342 dokončených E2E průchodů. Reálná produkční persistence na GitHub Pages se zde netestovala.
+
+**Rozsah změn:** pouze `app.js`, `index.html`, `src/integration/hmk-generator-traits.js`, `README.md`; odstraněny `hmk-ai-server.mjs` a `src/integration/hmk-ai-intent.js`. Ostatní zdroje včetně Combat, Magic, G04, CSS, katalogu předmětů a persistence zůstaly beze změn.
 
 ---
 
