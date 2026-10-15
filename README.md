@@ -1,3 +1,9 @@
+## v93.272 – Rozstřel a příběhové popisy Skill Tests
+
+- Dobrovolný rozstřel jen při skutečné remíze S/S nebo CS/CS podle HMK v1.2 str. 61; vyšší původní d100, při shodě vyšší Primary ML, následně opakované d10 do rozhodnutí.
+- Výsledek rozstřelu je nová neměnná položka deníku odkazující na původní Opposed Test; žádné přepsání hodu.
+- Stručné české příběhové texty v Success, Opposed, Success Value a Assistance. Volitelný záměr a okolnosti scény upřesní text, ale nemění mechaniku.
+
 # HMK Keeper’s Ledger v93.271 – bezpečné vrstvení počáteční výbavy
 
 **Aktualizace 15. 10. 2026; výchozí verze: HMK_Keeper_Ledger_v93_269_COMPLETE.zip.**

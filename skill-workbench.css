@@ -67,3 +67,11 @@
 .hsk-sv-outcomes span{background:#354139;padding:.3rem .45rem;border-radius:4px;font-size:.92rem}
 .hsk-sv-extras{background:#242d29!important;border-color:#516554!important}
 .hsk-soft-note{font-size:.86rem!important;color:#c3cabc;border-left:2px solid #778775;padding:.2rem .6rem;margin:.5rem 0!important;line-height:1.4!important}
+
+/* v93.272: optional HMK p.61 tiebreak and scenario-specific GM narration. */
+.hsk-scene-fields{border:1px solid #647666;background:#24332d;border-radius:7px;padding:.6rem .7rem;margin:.7rem 0}
+.hsk-scene-fields p{margin:.35rem 0 0}
+.hsk-tiebreak{border:1px solid #b08d56;background:#322b21;border-radius:8px;padding:.75rem 1rem;margin-top:.85rem}
+.hsk-tiebreak h4{margin:.15rem 0 .5rem;color:#f1d19b}
+.hsk-tiebreak p{margin:.35rem 0 .6rem}
+.hsk-tiebreak-message{display:block;white-space:pre-wrap;margin:.5rem 0;color:#f4cfa3}
