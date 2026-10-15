@@ -1,4 +1,4 @@
-# HMK Keeper’s Ledger v93.270 – bezpečné vrstvení počáteční výbavy
+# HMK Keeper’s Ledger v93.271 – bezpečné vrstvení počáteční výbavy
 
 **Aktualizace 15. 10. 2026; výchozí verze: HMK_Keeper_Ledger_v93_269_COMPLETE.zip.**
 
@@ -1033,3 +1033,6 @@ Fyvria: výběr dvou doložených dovedností, ostatní konvokace z fyzického d
 - Kompletní doménová regrese 14 kroků je přiložena samostatně (jeden celý základní lidský archetyp s obnovou z JSON na definovaných kontrolních bodech). Dřívější sada společenských tříd, Parent Arcanist a inventáře zůstává zachována.
 - Klikací browser-fragment test byl proveden nad skutečným produkčním generátorovým dialogem, parserem a náhledem. Plná navigace na localhost/file je blokována administrátorem prohlížeče, a proto nejde o plnohodnotné produkční E2E.
 - K dokonalému porozumění neomezeným přirozeným větám by byl nutný jazykový model integrovaný s přísně validovaným převodem jeho strukturovaných výstupů do stávajícího HMK enginu. Žádná taková externí AI zde není aktivní.
+
+## v93.271 – automatické výjimky Bulk
+Pravidlově doložená jediná dodatečná vrstva Cloth/Padded za dotčenou zónu je automaticky vyhodnocena podle HMK 117 (−5 Bulk za zónu). Ostatní nepřípustné kombinace se nesmějí obléknout. Změny se promítají do výpočtů Skill Tests i Combat; neověřené údaje se dále nepovažují za nulové. Tištěné sety bez ověřitelného pořadí jednotlivých článků zůstávají samostatnou výjimkou.
