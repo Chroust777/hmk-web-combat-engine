@@ -8,6 +8,48 @@ import {initialCombatState,validateCombatState} from './persistent-combat-state.
 import {resolveSkillConditions,skillConditionAvailability} from './hmk-skill-context.js';
 import {resolveSkillTrauma,impairedSkillKind,skillTraumaAvailability} from './hmk-skill-trauma.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
+import {resolveCombatantLoad} from './combatant-load.js';
+import {resolveOwnedArmourArticle} from './live-combat-armour.js';
+import {strengthEncumbranceModifier,modifiedEncumbrance} from '../rules/encumbrance.js';
+
+/** Read-side minimum, independently source-proven ENC.  Printed article ENC and
+ * carried Gear ENC do not disappear because the layer ordering is illegal.
+ * Any p117 outer D/Q extra ENC remains UNRESOLVED until a valid layer mapping
+ * proves it; do not certify this minimum as a complete load. */
+export function partialSkillArmourLoad(actor,inventory){
+ const checked=resolveCombatantLoad({character:actor,inventory,mounted:false});
+ if(checked.encReady&&Number.isSafeInteger(checked.modifiedENC))
+  return {ready:true,enc:checked.modifiedENC,per:checked.perceptionPenalty,complete:!(checked.issues||[]).length,source:'audited-load'};
+ const worn=inventory.filter(x=>x?.characterId===actor.id&&x.slot==='worn');
+ const validated=worn.map(resolveOwnedArmourArticle);
+ if(validated.some(x=>!x.ready))return {ready:false,reason:'Některá nasazená zbroj nemá ověřený katalogový záznam.'};
+ // The existing load resolver calculates carried gear even when a worn layer
+ // prevents armour validation. No guessed carried masses are used.
+ if(!Number.isSafeInteger(checked.gearENC))return {ready:false,reason:'Hmotnost nesené výbavy není doložena.'};
+ const str=actor?.hmk?.attributes?.str;
+ if(!Number.isSafeInteger(str)||str<1||str>200)return {ready:false,reason:'Chybí ověřená Strength pro ENC.'};
+ const parts=validated.map(x=>x.article);
+ if(parts.some(x=>!Number.isSafeInteger(x.enc)&&!['a','p'].includes(x.enc)))
+  return {ready:false,reason:'Některá součást zbroje nemá ověřenou hodnotu ENC.'};
+ const base=parts.reduce((n,x)=>n+(Number.isSafeInteger(x.enc)?x.enc:0),0);
+ const arms=parts.filter(x=>x.enc==='a').length>=3?5:0;
+ // With invalid layering no overFar assignment is certified. Any possible
+ // extra D/Q ENC remains unresolved, even if an explicit slot was recorded.
+ const extra=0;
+ const total=modifiedEncumbrance({armourENC:base+arms+extra,gearENC:checked.gearENC,str,mounted:false});
+ const per=parts.reduce((n,x)=>n+(x.enc==='p'?x.perceptionPenalty??0:0),0);
+ return {ready:true,enc:total,per:-per,complete:false,base,arms,extra,gearENC:checked.gearENC,strModifier:strengthEncumbranceModifier(str,{mounted:false}),
+  source:'p118-known-components-only',reason:'Neověřené vrstvení: tento ENC zahrnuje doložené díly, nikoli neprokázané další příplatky za vrstvy.'};
+}
+function simplifyArmourReason(message){
+ const txt=String(message||'');
+ const zones=['head','arms','torso','legs'].filter(z=>new RegExp('\\b'+z+':','i').test(txt));
+ const cz={head:'hlava',arms:'paže',torso:'trup',legs:'nohy'};
+ const place=zones.length? ' ('+zones.map(z=>cz[z]).join(', ')+')':'';
+ if(/forbidden material order|incompatible explicit slot|Unresolved or forbidden armour layers/i.test(txt))
+  return 'Kombinace nasazených vrstev zbroje není podle HMK str. 117 pravidlově potvrzena'+place+'. Některé materiály nelze tímto způsobem vrstvit; nejde automaticky jen o Bulk −5.';
+ return 'Nelze ověřit zbrojní údaj'+place+'. '+(txt.startsWith('Body-zone')?'Chybí potvrzené vrstvy pro příslušnou část těla.':'Zkontrolujte inventář nebo určete chybějící postih GM.');
+}
 const sides=new Set(['left','right']);
 const armSkills=new Set(['Melee','Archery','Slings','Throwing','Dodge','Dexterity','Legerdemain','Climbing','Swimming','Acrobatics','Dancing','Jumping','Stealth','Riding']);
 const bothArms=new Set(['Archery','Slings','Climbing','Swimming']);
@@ -31,7 +73,7 @@ export function inferredArms(actor,inventory,name,state){
  }
  throw Error('Zranění paže a činnost '+name+' neumožňují doložit použitou ruku ze samotného názvu skillu. Použijte konkrétní akci v Combat; postih nelze odhadnout.');
 }
-export function automaticSkillContext({actor,inventory=[],name,combatRound=null,combatTimelineId=null,gearPolicy='strict',manualENC=null,manualBulk=null,manualPerception=null}={}){
+export function automaticSkillContext({actor,inventory=[],name,combatRound=null,combatTimelineId=null,gearPolicy='advisory',manualENC=null,manualBulk=null,manualPerception=null}={}){
  if(!Array.isArray(inventory))throw Error('Chybí potvrzený inventář');
  const base=recordedActor(actor);const state=base.state;
  // Mounted conditions cannot be guessed from equipment alone. The confirmed
@@ -39,10 +81,10 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
  if(state.mounted===true||state.mountId)throw Error('Aktivní jízda: vyhodnoťte test v potvrzeném Mounted Combat kontextu.');
  // HMK 112/117/160: an unresolved armour layering is NOT a prohibition on
  // trying a skill. Never silently treat unknown encumbrance/bulk as zero:
- // GM must explicitly confirm an omitted or supplied penalty. Saved inventory
+ // Missing data remains visibly provisional until GM adjudication. Saved inventory
  // and Combat state remain unchanged, and the journal records this decision.
- if(!['strict','gm'].includes(gearPolicy))throw Error('Neznámé rozhodnutí o výbavě');
- const allowedGM=gearPolicy==='gm',issues=[];
+ if(!['strict','gm','advisory'].includes(gearPolicy))throw Error('Neznámé rozhodnutí o výbavě');
+ const allowedGM=gearPolicy==='gm',advisory=gearPolicy==='advisory',issues=[],provisional=[];
  const conditionAvail=skillConditionAvailability({actor:base.actor,inventory,name,mounted:false});
  const traumaAvail=skillTraumaAvailability({actor:base.actor,inventory,name,mounted:false});
  const manual=(value,label)=>{
@@ -54,14 +96,40 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
  const gmEnc=manual(manualENC,'GM ENC'),gmBulk=manual(manualBulk,'GM Bulk'),gmPer=manual(manualPerception,'GM PER');
  function fallback(preview,label,value){
   if(preview.ready)return {mode:'auto',value:null};
-  if(!allowedGM)throw Error(label+': '+preview.reason+' — potvrďte rozhodnutí GM pod rozpisem zbroje.');
-  issues.push(label+': '+preview.reason+'; '+(value===null?'GM rozhodl nezahrnout neověřený postih':'GM určil '+value));
+  const description=simplifyArmourReason(preview.reason);
+  if(!allowedGM&&!advisory)throw Error(label+': '+description);
+  if(advisory){
+   if(value!==null){issues.push(label+': hodnota '+value+' určená GM');return {mode:'manual',value};}
+   // Provisional is ALWAYS conspicuous in the preview, journal, and result.
+   // A missing input is not quietly certified as zero.
+   provisional.push(label+': '+description);
+   return {mode:'omit',value:null};
+  }
+  issues.push(label+': '+(value===null?'GM potvrdil nezahrnutí neověřeného postihu':'GM určil '+value)+'. '+description);
   return {mode:value===null?'omit':'manual',value};
  }
- const ec=fallback(conditionAvail.enc,'ENC',gmEnc);
- const bk=fallback(traumaAvail.bulk,'Bulk',gmBulk);
- const pe=fallback(traumaAvail.perception,'Zbroj / PER',gmPer);
+ let ec=fallback(conditionAvail.enc,'ENC',gmEnc);
+ let bk=fallback(traumaAvail.bulk,'Bulk',gmBulk);
+ let pe=fallback(traumaAvail.perception,'Zbroj / PER',gmPer);
+ // Independently proven p118 article ENC is still a real penalty when layer
+ // validation fails. This never pretends that the full load is certified.
+ const partial=(advisory&&(!conditionAvail.enc.ready||!traumaAvail.perception.ready))?partialSkillArmourLoad(base.actor,inventory):null;
+ if(partial?.ready&&ec.mode==='omit'&&!conditionAvail.enc.ready){
+  ec={mode:'manual',value:partial.enc,source:'provisional-verified-enc'};
+  provisional.push('ENC: z doložených součástí zbroje a výbavy započteno '+partial.enc+'; další příplatky neověřeny.');
+ }
+ if(partial?.ready&&pe.mode==='omit'&&!traumaAvail.perception.ready&&traumaAvail.perceptionApplicability==='applies'){
+  pe={mode:'manual',value:-partial.per,source:'provisional-verified-per'};
+  provisional.push('PER: doložený postih z přilby '+partial.per+' započten; úplnost výbavy nebyla potvrzena.');
+ }
  const condition=resolveSkillConditions({actor:base.actor,inventory,name,fatigueMode:'auto',encMode:ec.mode,manualENC:ec.value,mounted:false});
+ if(advisory&&partial?.ready&&!conditionAvail.enc.ready&&gmEnc===null){
+  condition.enc.source='verified-p118-minimum-enc-not-full-load';
+  condition.enc.mode='provisional-known-components';
+ }else if(advisory&&ec.mode==='omit'&&!conditionAvail.enc.ready){
+  condition.enc.source='unresolved-enc-not-assumed-zero';
+  condition.enc.mode='provisional-unresolved';
+ }
  const impaired=impairedSkillKind(base.actor,name);
  const arm=inferredArms(base.actor,inventory,name,state);
  let trauma;
@@ -82,7 +150,15 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
   if(!projected.ready)throw Error('Zranění: '+projected.reason);
   trauma=resolveSkillTrauma({actor:base.actor,inventory,name,shockMode:'auto',injuryMode:'auto',bulkMode:bk.mode,manualBulk:bk.value,perceptionMode:pe.mode,manualPerception:pe.value,currentRound:round,usedArm:arm.usedArms.length===2?'both':arm.usedArms[0]??'none'});
  }
- return {kind:'hmk-auto-skill-context-v1',actorId:actor.id,name,condition,trauma,gmArmourDecision:allowedGM,armourWarnings:issues,
+ if(advisory&&bk.mode==='omit'&&!traumaAvail.bulk.ready){
+  trauma.bulk.source='unresolved-bulk-not-assumed-zero';trauma.bulk.mode='provisional-unresolved';
+ }
+ if(advisory&&pe.mode==='omit'&&!traumaAvail.perception.ready){
+  trauma.perception.source='unresolved-per-not-assumed-zero';trauma.perception.mode='provisional-unresolved';
+ }else if(advisory&&pe.mode==='manual'&&partial?.ready&&gmPer===null){
+  trauma.perception.source='verified-p118-minimum-per-not-full-armour';trauma.perception.mode='provisional-known-components';
+ }
+ return {kind:'hmk-auto-skill-context-v1',actorId:actor.id,name,condition,trauma,gmArmourDecision:allowedGM,armourWarnings:issues,provisionalArmour:provisional,armourIsProvisional:provisional.length>0,
   modifier:condition.modifier+trauma.modifier,source:base.source,hand:arm.source,
   breakdown:[{label:'Fatigue',value:condition.fatigue.modifier,source:condition.fatigue.source},
    {label:'ENC',value:condition.enc.modifier,source:condition.enc.source},
