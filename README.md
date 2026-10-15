@@ -1,3 +1,69 @@
+# HMK Keeper’s Ledger v93.261 — Long-term temporal audit and safeguards
+
+The infection healing resume bug for multiple wounds and Coma fatal state cleanup have been corrected. Other wound elapsed days are expressly GM-confirmed, never inferred from another injury timeline. See Czech audit and test ZIP.
+
+# HMK Keeper’s Ledger v93.260 — Combat outcome matrix / evidence milestone
+
+The combat engine of v93.259 remains untouched. The 52-entry CF/F/S/CS × defence domain matrix and browser scenarios document its behaviour. This is a **test-and-certification release**, not a claim that every trauma permutation has been played through.
+
+The following time-dependent audit and corrections are delivered separately in v93.261.
+
+# v93.259 — Vazba konkrétní bojové akce na její Mishaps
+
+Charakter Sheet nyní připraví konkrétní Melee/Missile/Press/Trip/Grab akci výhradně pro původní Combat průvodce. Rozlišení Block/Dodge/Counterstrike/Ignore, fyzické hody, Injury a Mishaps zůstávají ve stávajícím enginu. Před potvrzením se kontroluje vazba na aktéra, cíl, kolo, časovou osu a původní podpis stavu. Po akci se kontroluje úplnost všech požadovaných Mishaps a do bojového důkazu se přidá jejich strukturovaný uzávěr. Samostatný Skill Workbench nepovolí druhý „bojový d100“.
+
+# v93.258 — Mandatory Combat Consequence Handoff
+
+Nad původním Combat enginem je přidaná kontrola první splatné události, jejích
+zdrojových ID, kola, časové osy a fáze tahu. Na Character Sheet se pro právě
+oprávněného účastníka zobrazí **tentýž původní formulář Guided Mandatory**,
+který používá Combat. Po jeho potvrzení se skutečná změna provede pouze
+existujícím `commitGuidedMandatory` a uloží jako jedna atomická Combat událost
+s původní evidencí fyzických hodů a deníkovým důkazem.
+
+Před prvním hodem se odmítají staré formuláře, nesprávný aktér a nesplatný
+následek. Automatický Injury Mishap nepotřebuje fiktivní hod; Blood Loss,
+Morale a Shock Recovery vyžadují původní fyzické kostky. Pokračování časové
+osy nikdy neodvozuje chybějící herní čas. Neznámé jiné povinné typy se
+předávají původní Combat proceduře a nelze je přeskočit.
+
+**Rozsah:** propojení existujících povinných bojových následků, nikoli obecný
+samostatný mechanismus pro libovolný CF v Skill Workbench. Nejsou zavedeny
+nové databáze Combat, nové hody za hráče, nebo změny Combat/Magic/G04 pravidel.
+
+# v93.258 — Automatic Consequence Resolution (bez paralelního Combat engine)
+
+Viz samostatný český audit dodávaný s vydáním. Vynucené CF při nepoužitelné zóně,
+rozlišení obecného CF od Combat Fumble/Stumble, read-only navázání na původní
+Combat pending události a neměnné důkazy Skill Testů. Skutečné bojové následky
+(odhození zbraně, prone, šok, další zranění) se mění výhradně původním
+Combat průvodcem, protože bez potvrzené konkrétní akce nemají univerzální
+automatickou hodnotu. Žádné externí AI ani změna úložiště.
+
+# v93.256 — Skill Workbench / Shock, Injury, Bulk, PER
+
+Rule-backed, read-only assessment of Shock action availability, injury impairment/SL, armour Bulk and helmet Perception with explicit GM evidentiary controls. HMK v1.2 printed pp.112,117–118,169–170. Combat/Magic/G04/original styles unchanged. No unverified zeros.
+
+# v93.255 — Skill Workbench / stav postavy
+
+Read-only propojení aktuálního Skill testu s potvrzeným Combat Fatigue a validovaným ENC z inventáře. Chybějící data jsou explicitní GM volba, nikoliv automatická nula. Originální Combat, Magic, G04, katalogy a styles.css beze změny.
+
+# v93.254 — Integration / release regression
+
+Identical feature set to 93.253 with end-to-end regression and version consistency checks. Character Creation, Combat, Magic, G04 and original styles.css are unchanged from v93.250. This release does not claim to have tested every possible combination.
+
+# v93.253 — interactive Skill Workbench
+
+Adds four accessible panels for Success/SV, Opposed, Secondary d10 and Assistance; rolls are recorded in the EXISTING journal with typed skillTestProof and software/manual provenance. Dedicated new skill-workbench.css only; original styles.css, Combat, Magic and G04 are unchanged.
+
+# v93.252 — HMK Skill System (pure rules module)
+
+Adds Success Test, Success Value, Victory Stars, Opposed, Secondary Modifier / Roll and Assistance as a read-only wrapper over src/rules/tests.js. The UI arrives in v93.253.
+
+# v93.251 — Character Sheet read-side audit
+
+Source v93.250. Adds non-mutating sheet audit, protects creation-owned occupation in legacy editor and presents the authoritative occupation. Existing Combat/Magic/G04/CSS untouched.
+
 # HMK Keeper’s Ledger v93.250 — targeted creation repair (HMK v1.2)
 
 **Source:** v93.249 production ZIP. This release extends the existing offline 14-step wizard and validates through its normal CAS rules. No external AI, OpenAI API, or paid service.
