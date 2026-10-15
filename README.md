@@ -1,3 +1,23 @@
+# HMK Keeper’s Ledger v93.268 – sjednocení Skill Tests a pravidlové postihy zbroje
+
+**Produkční vydání 15. 10. 2026 – zdroj výhradně HMK_Keeper_Ledger_v93_267_PRODUCTION(1).zip.**
+
+- **Tři záložky:** Secondary Mastery / Opposed, Success Value, Assistance. Přímý primární d100 lze použít i bez Secondary Mastery. Volitelné Secondary Modifier 1 a 2 a samostatný Secondary Roll d10 s TN fungují pro aktivní stranu, v Opposed také pro protivníka.
+- **Protiskill:** doložená doporučení z HMK v1.2 p.61/p.138 (např. Charm/Seduction → Will, Command/Intimidation → Initiative, Guile/Bluff → Intrigue, Theatrics/Disguise → Awareness). GM má možnost výběr změnit. Neznámé kombinace aplikace nevymýšlí.
+- **Rozpis EML:** zvlášť Primary ML, Secondary 1 a 2, Fatigue, ENC, Injury, Bulk, PER, Assistance a GM situační modifikátor. Výsledná EML jsou omezena na 05–95 u běžných testů.
+- **Opposed:** současně se hází dvěma samostatnými d100, správně se porovnají CF/F/S/CS a Victory Stars. Oba neúspěšní = běžně bez hvězd; remíza bez automatického rozstřelu. Pravidlové výjimky řeší GM.
+- **CF0/CF5:** rozlišeno jako možné Fumble / Stumble, ale následky se nevymýšlejí pro dovednosti, kde je pravidlo nepředepisuje. Plná bojová Mishap zůstává v Combat.
+- **Success Value:** hodnota z Indexu původního ML a modifikátoru úspěchu, SR d10 má efekt určený konkrétní rutinou, nikoli univerzální automatické SV+1.
+- **Assistance:** nově opravdu provede d100 s bonusem kvalifikovaných pomocníků (max +10), uloží výsledek do neměnné historie.
+- **Zbroj a ENC:** nerozumná kombinace vrstev již neblokuje nesouvisející mentální testy. Tam, kde je ENC/Bulk/PER relevantní a nelze jej automaticky doložit, GM explicitně potvrdí vlastní hodnotu nebo rozhodne o nezahrnutí nedoloženého postihu. Neztrácí se historie ani se nespravuje inventář v pozadí. Combat si uchovává původní přísnou validaci.
+- **Změny pouze v oblasti Skill Tests, stránce vstupu, bundle a dokumentaci**; ostatní doménové a bojové moduly zachovány.
+- Regresní kontroly v93.268 byly provedeny samostatně; pomocné testovací skripty nejsou součástí distribučního archivu. Testy Chromium proběhly v izolovaném prohlížečovém dokumentu, nikoliv proti veřejnému GitHub Pages URL.
+- GitHub Pages: pouze statické soubory, žádná placená služba. `index.html` načítá jediný `hmk-app.bundle.js`; `.nojekyll` přítomno. Zdrojové soubory jsou v `app.js` a `src/`; produkční bundle lze znovu sestavit pomocí `node tools/build_bundle.cjs` v prostředí Node.js s dostupným balíčkem TypeScript (pouze pro sestavení, nikoliv pro běh webu).
+
+Archiv neobsahuje auditní ani pomocné testovací soubory. Je určen jako úplná pracovní a produkční verze projektu.
+
+---
+
 # HMK Keeper’s Ledger v93.267 – oprava Secondary Mastery / Skill Tests (HMK v1.2, str. 60–62)
 
 **Zdroj:** skutečný produkční ZIP v93.266, tištěné HMK v1.2 str. 60–62 a původní funkční Excelový návrh uživatele.

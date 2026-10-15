@@ -47,3 +47,14 @@
 .hsk-eml{margin:.4rem 0!important;background:#302b20;padding:.5rem;border-radius:5px;color:#f1d8a4;font-size:1.05rem}
 /* v93.267: display the independent d10 TN next to the primary d100 EML. */
 .hsk-secondary-timing {background:#272f29;border-left:3px solid #afbf96;padding:.65rem .8rem;margin:.7rem 0;color:#f1dfbd;line-height:1.5}
+/* v93.268: combined primary/opposed instrument and transparent GM fallback. */
+.hsk-test-card h4 {color:#ead1a3;margin:1.2rem 0 .55rem}
+.hsk-opposition-toggle{margin:1rem 0;padding:.75rem;background:#302c22;border:1px solid #806d51;border-radius:6px}
+.hsk-gm-controls{margin:.7rem 0;border:1px solid #8b704c;background:#2a2a26;border-radius:6px;padding:.55rem .75rem}
+.hsk-gm-controls summary{color:#eed0a0;cursor:pointer;font-weight:650}
+.hsk-gm-controls p{line-height:1.45;margin:.4rem 0}
+.hsk-eml-trace{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .55rem;margin:.5rem 0}
+.hsk-eml-trace span{padding:.15rem .32rem;background:#382f26;border-radius:3px;white-space:normal}
+.hsk-eml-trace strong{color:#f3d49b;font-size:1.1rem}
+.hsk-gm-warning{color:#ffc899;border-left:3px solid #d99263;padding:.45rem .75rem;margin:.65rem 0}
+.hsk-test-card [data-hsk-defender][hidden]{display:none!important}
