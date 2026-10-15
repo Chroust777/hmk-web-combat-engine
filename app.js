@@ -134,7 +134,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.268';
+const APP_VERSION='93.269';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3327,7 +3327,7 @@ function skillAssistantMLs(form,primaryName){
  if(new Set(ids).size!==ids.length)throw Error('Stejný pomocník je uveden vícekrát');
  return ids.map(id=>{const other=character(id);if(!other||id===selected)throw Error('Neplatný pomocník');return {actor:other,mastery:skillActorMastery(other,primaryName)}});
 }
-// Shared Skill Workbench v93.268. One primary d100 for each participant.
+// Shared Skill Workbench v93.269. One primary d100 for each participant.
 // All evidenced modifiers remain visible; GM may only adjudicate unresolved
 // armour fields with an explicit checkbox, preserved in immutable journal.
 function skillAutoFor(actor,name,form=null,prefix='A'){
@@ -3336,7 +3336,7 @@ function skillAutoFor(actor,name,form=null,prefix='A'){
  const value=k=>{const s=field(k)?.value?.trim();return s===''||s==null?null:s;};
  return automaticSkillContext({actor,inventory:data.inventory,name,
   combatRound:seq?.round??null,combatTimelineId:seq?.timelineId??null,
-  gearPolicy:field('gearConfirmed')?.checked?'gm':'strict',
+  gearPolicy:field('gearConfirmed')?.checked?'gm':'advisory',
   manualENC:value('gmENC'),manualBulk:value('gmBulk'),manualPerception:value('gmPer')});
 }
 function skillTraumaText(tr){return 'Shock '+tr.shock.value+', Injury '+tr.injury.modifier+', Bulk '+tr.bulk.modifier+', PER '+tr.perception.modifier+(tr.slPenalty?' · STN: −'+tr.slPenalty+' SL':'');}
@@ -3396,7 +3396,7 @@ function hskTrace(person,mastery,ctx,secs=[],assist=0,gmModifier=0){
  if(assist)rows.push(['Assistance',assist]);
  rows.push(['GM situace',gmModifier]);
  const raw=rows.reduce((sum,x)=>sum+x[1],0),eml=effectiveMasteryLevel(raw);
- return '<div class="hsk-calculation"><b>'+esc(person.name)+' · rozklad EML</b><div class="hsk-eml-trace">'+rows.map(([k,v],i)=>'<span>'+esc(k)+' '+(i?hskSigned(v):v)+'</span>').join('<span>+</span>')+' <strong>= EML '+eml+'</strong>'+(raw!==eml?' (hranice 05–95, před limitem '+raw+')':'')+'</div>'+ (ctx.armourWarnings?.length?'<p class="hsk-gm-warning">Rozhodnutí GM: '+ctx.armourWarnings.map(esc).join(' · ')+'</p>':'')+'</div>';
+ return '<div class="hsk-calculation"><b>'+esc(person.name)+' · rozklad EML</b><div class="hsk-eml-trace">'+rows.map(([k,v],i)=>'<span>'+esc(k)+' '+(i?hskSigned(v):v)+'</span>').join('<span>+</span>')+' <strong>= EML '+eml+'</strong>'+(raw!==eml?' (hranice 05–95, před limitem '+raw+')':'')+'</div>'+ (ctx.armourIsProvisional?'<p class="hsk-soft-note">Dostupný postih zbroje započítán. Výsledek je předběžný: '+esc([...new Set(ctx.provisionalArmour.map(x=>x.split(':')[0]))].join(', '))+' není zcela ověřen. GM může hodnoty upřesnit.</p>':'')+(ctx.armourWarnings?.length?'<p class="hsk-soft-note">Rozhodnutí GM: '+ctx.armourWarnings.map(esc).join(' · ')+'</p>':'')+'</div>';
 }
 function hskPreviewFor(form,person,field,side){
  const node=form.querySelector('[data-auto-preview="'+side.toLowerCase()+'"]');if(!node||!person)return;
@@ -3433,6 +3433,7 @@ function refreshSkillAutoPreview(form){
  if(!['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id))return;
  const actor=character(selected);if(!actor)return;
  hskPreviewFor(form,actor,'primary','A');
+ if(form.id==='skill-value-form'){const guide=form.querySelector('[data-sv-guide]');if(guide){const ml=skillActorMastery(actor,form.elements.namedItem('primary')?.value).ml;const idx=Math.floor(ml/10);guide.innerHTML='<div class="hsk-sv-guide"><strong>Primary ML '+ml+' → Index '+idx+'</strong><p class="tiny muted">Hod d100 určí úpravu Indexu. Platí původní ML, nikoli EML.</p><div class="hsk-sv-outcomes">'+[['CF',-2],['F',-1],['S',0],['CS',1]].map(([level,modifier])=>{const value=idx+modifier,stars=Math.max(0,Math.min(5,value-4));return '<span><b>'+level+'</b> '+(modifier>0?'+':'')+modifier+' → SV '+value+' · '+(stars?'★'.repeat(stars):'—')+'</span>';}).join('')+'</div></div>';}}
  if(form.id==='skill-secondary-form'&&form.elements.namedItem('opposed')?.checked){
   hskPreviewFor(form,character(form.elements.namedItem('opponentId')?.value),'opponentSkill','B');}
  const node=form.querySelector('[data-secondary-roll-preview]');if(node){
@@ -3477,7 +3478,7 @@ function hskResolveSide({person,form,side,helpers=[]}){
 function hskResultText(side,{person,mastery,secs,ctx,die,result,sr}){
  const breakdown='ML '+mastery.ml+secs.map(x=>' '+hskSigned(x.modifier)+' '+x.name).join('')+
   ctx.breakdown.map(x=>' '+hskSigned(x.value)+' '+x.label).join('')+' '+hskSigned(Number.isSafeInteger(result.gmModifier)?result.gmModifier-ctx.modifier:0)+' GM situace';
- const warnings=ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'';
+ const warnings=(ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+(ctx.armourIsProvisional?'\nPŘEDBĚŽNÝ výsledek: '+ctx.provisionalArmour.join('; '):'');
  return side+' · '+person.name+' / '+mastery.name+' | '+breakdown+' = EML '+(result.eml??'—')+
   '\nPrimární '+(result.forcedCF?'vynucené CF bez hodu':'d100 '+result.roll+' ('+die.origin+')')+' → '+result.level+
   (result.splitCF?' ['+result.splitCF+(result.splitCF==='CF0'?' / potenciální Fumble':' / potenciální Stumble')+' – jen při předepsané činnosti]':'')+
@@ -3500,9 +3501,9 @@ document.addEventListener('submit',event=>{
    const consequenceProof=skillConsequenceProof({eventId:uuid(),actorId:actor.id,skill:v.primary,result,consequence,rollOrigin:die.origin});
    const body='Assistance · HMK p.60 · '+actor.name+' / '+v.primary+' ML '+primary.ml+'\n'+checks.map(x=>x.name+' ML '+x.ml+' → '+(x.eligible?'+'+x.index:'nesplňuje poloviční ML')).join('\n')+
     '\nBonus Assistance '+hskSigned(bonus)+' (strop +10); stav '+hskSigned(ctx.modifier)+'; GM situace '+hskSigned(hskGMModifier(form,'A'))+'; EML '+result.eml+'\nd100 '+result.roll+' → '+result.level+(result.splitCF?' '+result.splitCF:'')+' · '+result.unopposedStars+' Victory Stars'+
-    (ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+'\nNásledek: '+skillConsequenceText(consequence);
+    (ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+(ctx.armourIsProvisional?'\nPŘEDBĚŽNÝ zbrojní kontext: '+ctx.provisionalArmour.join('; '):'')+'\nNásledek: '+skillConsequenceText(consequence);
    recordSkillEvidence('Assistance · '+v.primary,body,{type:'assistance-success-test',actorId:actor.id,skill:v.primary,
-    helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',
+    preliminaryArmour:ctx.armourIsProvisional,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',
     rollOrigin:die.origin,consequence,consequenceProof},slot);return;
   }
   const a=hskResolveSide({person:actor,form,side:'A'});
@@ -3517,7 +3518,7 @@ document.addEventListener('submit',event=>{
    body+='\n\n'+hskResultText('B',b)+'\n\nVítěz: '+winner+' · Victory Stars: '+comparison.stars+' '+(comparison.stars?'★'.repeat(Math.min(10,comparison.stars)):'—')+
      '\nTiebreak jen pokud jej předepisuje konkrétní rutina.';
   }else if(sv){body+='\n\nIndex Primary ML '+a.result.index+' + SL modifier '+({'CF':-2,'F':-1,'S':0,'CS':1}[a.result.level])+
-    ' = SV '+a.result.sv+' · '+a.result.svTier.label+' · '+a.result.svTier.stars+' SV ★ '+(a.result.svTier.stars?'★'.repeat(Math.min(10,a.result.svTier.stars)):'—');
+    ' = SV '+a.result.sv+' · '+a.result.svTier.label+' · '+a.result.svTier.stars+' SV ★ '+(a.result.svTier.stars?'★'.repeat(Math.min(10,a.result.svTier.stars)):'—')+(a.result.level==='CF'?'\nPozor: CF může podle konkrétní činnosti způsobit další následek bez ohledu na hodnotu SV.':'');
   }else body+='\nUnopposed Victory Stars: '+a.result.unopposedStars+' '+(a.result.unopposedStars?'★'.repeat(a.result.unopposedStars):'—');
   body+='\nNásledek A: '+skillConsequenceText(a.consequence)+(b?'\nNásledek B: '+skillConsequenceText(b.consequence):'')+
     skillPendingText(a.consequence.pending)+(b?skillPendingText(b.consequence.pending):'');
@@ -3525,7 +3526,7 @@ document.addEventListener('submit',event=>{
   const type=opposed?'opposed-success-test':sv?'secondary-mastery-value-test':'secondary-mastery-test';
   recordSkillEvidence((opposed?'Opposed · ':sv?'Success Value · ':'Success Test · ')+a.info.primary,body,{type,actorId:actor.id,
    opponentId:b?.person?.id||null,skills:b?[a.info.primary,b.info.primary]:[a.info.primary],
-   secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
+   preliminaryArmour:a.ctx.armourIsProvisional||b?.ctx.armourIsProvisional||false,secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
    secondaryRollResult:a.sr,secondaryRollResultB:b?.sr||null,
    a:a.result,b:b?.result||null,result:opposed?comparison:a.result,
    comparison:comparison??null,rollOrigins:b?[a.die.origin,b.die.origin]:[a.die.origin],

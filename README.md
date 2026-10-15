@@ -1,3 +1,14 @@
+# HMK Keeper’s Ledger v93.269 – přehledné Success Value a neblokující vyhodnocení zbroje
+
+**Aktualizace 15. 10. 2026; přímý základ: kompletní archiv v93.268.**
+
+- **Success Value (HMK str. 61):** výchozí pohled obsahuje jen Primary Skill, d100 a přehled Index → CF/F/S/CS → SV a hvězdiček. Dodatečné Secondary Modifiers / Secondary Roll zůstávají v rozbalitelné části *pouze pro činnosti, které je podle str. 62 skutečně vyžadují*. Výpočet SV používá Index původního ML (ne upraveného EML); CF může vyvolat zvláštní následek dle činnosti.
+- **Skill Tests a zbroj:** neplatné vrstvení v inventáři již nevyvolá rozsáhlé chybové hlášení ani zákaz hodu. Automaticky se použijí doložené dílčí postihy (včetně známého ENC ze skutečných ověřených článků p.118, PER, Fatigue a zranění). Neověřitelné složky jsou viditelně označené jako **předběžné**, nejsou vydávány za pravidlově potvrzené nuly. GM může určit postihy v rozbalené sekci. Postih Bulk nelze libovolně dopočíst pro pravidly nepovolené materiálové kombinace (p.117).
+- **Combat:** přísná kontrola zbroje zůstává beze změny. Žádné změny Character Sheet, inventáře ani stávajících uložených dat.
+- Produkční `hmk-app.bundle.js` sestaven z aktuálního `app.js` a `src/`. Kompletní ZIP obsahuje všechny zdroje i statické soubory pro GitHub Pages; bez auditů/testovacích skriptů.
+
+---
+
 # HMK Keeper’s Ledger v93.268 – sjednocení Skill Tests a pravidlové postihy zbroje
 
 **Produkční vydání 15. 10. 2026 – zdroj výhradně HMK_Keeper_Ledger_v93_267_PRODUCTION(1).zip.**

@@ -58,3 +58,12 @@
 .hsk-eml-trace strong{color:#f3d49b;font-size:1.1rem}
 .hsk-gm-warning{color:#ffc899;border-left:3px solid #d99263;padding:.45rem .75rem;margin:.65rem 0}
 .hsk-test-card [data-hsk-defender][hidden]{display:none!important}
+
+/* v93.269: minimal Success Value instrument, quiet evidence transparency. */
+.hsk-sv-guide{background:#202c26;border:1px solid #637359;border-radius:7px;padding:.7rem .85rem;margin:.8rem 0}
+.hsk-sv-guide strong{color:#f1d7a8;font-size:1.05rem}
+.hsk-sv-guide p{margin:.35rem 0 .55rem}
+.hsk-sv-outcomes{display:flex;flex-wrap:wrap;gap:.4rem}
+.hsk-sv-outcomes span{background:#354139;padding:.3rem .45rem;border-radius:4px;font-size:.92rem}
+.hsk-sv-extras{background:#242d29!important;border-color:#516554!important}
+.hsk-soft-note{font-size:.86rem!important;color:#c3cabc;border-left:2px solid #778775;padding:.2rem .6rem;margin:.5rem 0!important;line-height:1.4!important}
