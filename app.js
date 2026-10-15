@@ -135,7 +135,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.272';
+const APP_VERSION='93.273';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3380,7 +3380,7 @@ function hskSecondaryRoll(form,person,info,side){
  const dieString=form.elements.namedItem('roll10'+side)?.value?.trim()??'';
  if(!info.secondaryRoll&&tnString===''&&dieString==='')return null;
  const skill=info.secondaryRoll?skillActorMastery(person,info.secondaryRoll):null;
- if(!skill&&tnString==='')throw Error('Secondary Roll d10 vyžaduje Skill nebo GM potvrzený TN');
+ if(!skill&&tnString==='')throw Error('Secondary Roll d10 vyžaduje sekundární dovednost nebo speciální TN doložené pravidlem');
  const tn=tnString===''?skill.index:Number(tnString);
  if(!Number.isSafeInteger(tn)||tn<-100||tn>100)throw Error('TN musí být celé číslo od −100 do 100');
  const die=skillDie(form,'roll10'+side,10);
@@ -3403,7 +3403,7 @@ function hskTrace(person,mastery,ctx,secs=[],assist=0,gmModifier=0){
  if(assist)rows.push(['Assistance',assist]);
  rows.push(['GM situace',gmModifier]);
  const raw=rows.reduce((sum,x)=>sum+x[1],0),eml=effectiveMasteryLevel(raw);
- return '<div class="hsk-calculation"><b>'+esc(person.name)+' · rozklad EML</b><div class="hsk-eml-trace">'+rows.map(([k,v],i)=>'<span>'+esc(k)+' '+(i?hskSigned(v):v)+'</span>').join('<span>+</span>')+' <strong>= EML '+eml+'</strong>'+(raw!==eml?' (hranice 05–95, před limitem '+raw+')':'')+'</div>'+ (ctx.armourIsProvisional?'<p class="hsk-soft-note">Dostupný postih zbroje započítán. Výsledek je předběžný: '+esc([...new Set(ctx.provisionalArmour.map(x=>x.split(':')[0]))].join(', '))+' není zcela ověřen. GM může hodnoty upřesnit.</p>':'')+(ctx.armourWarnings?.length?'<p class="hsk-soft-note">Rozhodnutí GM: '+ctx.armourWarnings.map(esc).join(' · ')+'</p>':'')+'</div>';
+ return '<div class="hsk-calculation"><b>'+esc(person.name)+' · rozklad EML</b><div class="hsk-eml-trace">'+rows.map(([k,v],i)=>'<span class="hsk-eml-chip" title="'+(i?'Příspěvek k EML':'Primární ML')+'"><small>'+esc(k)+'</small><b class="'+(v<0?'hsk-negative':v>0?'hsk-positive':'hsk-zero')+'">'+(i?hskSigned(v):v)+'</b></span>').join('')+' <strong class="hsk-eml-total">EML '+eml+'</strong>'+(raw!==eml?' <em class="hsk-eml-cap">05–95 (před limitem '+raw+')</em>':'')+'</div>'+ (ctx.armourIsProvisional?'<p class="hsk-soft-note">Dostupný postih zbroje započítán. Výsledek je předběžný: '+esc([...new Set(ctx.provisionalArmour.map(x=>x.split(':')[0]))].join(', '))+' není zcela ověřen. GM může hodnoty upřesnit.</p>':'')+(ctx.armourWarnings?.length?'<p class="hsk-soft-note">Rozhodnutí GM: '+ctx.armourWarnings.map(esc).join(' · ')+'</p>':'')+'</div>';
 }
 function hskPreviewFor(form,person,field,side){
  const node=form.querySelector('[data-auto-preview="'+side.toLowerCase()+'"]');if(!node||!person)return;
@@ -3436,17 +3436,29 @@ function hskRebuildOpponent(form){
  for(const name of ['defSecondary1','defSecondary2','defSecondaryRoll']){const el=form.elements.namedItem(name);if(!el)continue;el.outerHTML=opt(name,true);}
  hskApplyOpposedAction(form);
 }
+function hskRefreshSRTarget(form,person,side){
+ const out=form.querySelector('[data-sr-tn="'+side+'"]');if(!out)return;
+ const name=form.elements.namedItem(side==='A'?'secondaryRoll':'defSecondaryRoll')?.value||'';
+ const extra=form.elements.namedItem('tn'+side)?.value?.trim()??'';
+ if(!name&&!extra){out.textContent='— bez SR —';return;}
+ try{const m=name&&person?skillActorMastery(person,name):null;
+  const tn=extra!==''?Number(extra):m?.index;
+  out.textContent=(m?'ML '+m.ml+' / Index '+m.index+' → ':'')+'TN '+tn+(extra!==''?' (speciální pravidlo)':'');
+ }catch(e){out.textContent=e.message;}
+}
 function refreshSkillAutoPreview(form){
  if(!['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id))return;
  const actor=character(selected);if(!actor)return;
  hskPreviewFor(form,actor,'primary','A');
+ hskRefreshSRTarget(form,actor,'A');
  if(form.id==='skill-value-form'){const guide=form.querySelector('[data-sv-guide]');if(guide){const ml=skillActorMastery(actor,form.elements.namedItem('primary')?.value).ml;const idx=Math.floor(ml/10);guide.innerHTML='<div class="hsk-sv-guide"><strong>Primary ML '+ml+' → Index '+idx+'</strong><p class="tiny muted">Hod d100 určí úpravu Indexu. Platí původní ML, nikoli EML.</p><div class="hsk-sv-outcomes">'+[['CF',-2],['F',-1],['S',0],['CS',1]].map(([level,modifier])=>{const value=idx+modifier,stars=Math.max(0,Math.min(5,value-4));return '<span><b>'+level+'</b> '+(modifier>0?'+':'')+modifier+' → SV '+value+' · '+(stars?'★'.repeat(stars):'—')+'</span>';}).join('')+'</div></div>';}}
  if(form.id==='skill-secondary-form'&&form.elements.namedItem('opposed')?.checked){
-  hskPreviewFor(form,character(form.elements.namedItem('opponentId')?.value),'opponentSkill','B');}
+  const opponent=character(form.elements.namedItem('opponentId')?.value);
+  hskPreviewFor(form,opponent,'opponentSkill','B');hskRefreshSRTarget(form,opponent,'B');}
  const node=form.querySelector('[data-secondary-roll-preview]');if(node){
   const selectedSR=form.elements.namedItem('secondaryRoll')?.value||'';
   try{const sr=selectedSR?skillActorMastery(actor,selectedSR):null;const manual=form.elements.namedItem('tnA')?.value?.trim();
-   node.textContent=sr?selectedSR+' Index '+sr.index+' → TN '+(manual!==''&&manual!=null?manual:sr.index)+' (d10 ≤ TN = S; jinak F). SR sám nemění EML ani SV.':manual?'GM určil TN '+manual+' pro volitelný d10.':'Není vybraný Secondary Roll – bude proveden pouze primární d100.';
+   node.textContent=(sr?selectedSR+' ML '+sr.ml+' → Index '+sr.index+' → TN '+(manual!==''&&manual!=null?manual:sr.index):manual?'Speciální TN '+manual:'Bez sekundárního hodu')+'. SR d10 ≤ TN znamená úspěch; vyšší hod je neúspěch samotného SR. Primární d100 se vyhodnotí nezávisle, účinek SR se řídí činností.';
   }catch(err){node.textContent=err.message;}}
 }
 document.addEventListener('change',e=>{

@@ -1,3 +1,12 @@
+## v93.273 – Skill Tests: přehlednost a d10 podle Indexu
+
+- Odstraněna obě volitelná pole volného popisu scény ve všech třech panelech. Příběhové výstupy zůstávají podle dovednosti a výsledku.
+- Seznamy dovedností a atributů se řadí společně abecedně (čeština).
+- Rozklad EML zobrazuje každý příspěvek v samostatném orámovaném bloku s názvem a hodnotou, včetně samostatného finálního EML.
+- Secondary Roll nyní ukazuje TN přímo z Indexu vybrané dovednosti; speciální ruční TN je ukryto do volitelného pokročilého pravidla. Hod d10 lze zadat nebo generovat.
+- Text vysvětluje, že neúspěšný sekundární d10 automaticky neruší primární d100; účinky závisí na konkrétních pravidlech str. 62.
+- Žádná automatická další Fumble/Stumble zkouška se nepřidává k libovolnému CF; tyto následky vyžaduje konkrétní pravidlo (HMK str. 161 a popisy dovedností).
+
 ## v93.272 – Rozstřel a příběhové popisy Skill Tests
 
 - Dobrovolný rozstřel jen při skutečné remíze S/S nebo CS/CS podle HMK v1.2 str. 61; vyšší původní d100, při shodě vyšší Primary ML, následně opakované d10 do rozhodnutí.

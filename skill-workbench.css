@@ -75,3 +75,17 @@
 .hsk-tiebreak h4{margin:.15rem 0 .5rem;color:#f1d19b}
 .hsk-tiebreak p{margin:.35rem 0 .6rem}
 .hsk-tiebreak-message{display:block;white-space:pre-wrap;margin:.5rem 0;color:#f4cfa3}
+
+/* v93.273: grouped EML contributions, one outlined unit per modifier. */
+.hsk-eml-trace{display:flex;align-items:stretch;flex-wrap:wrap;gap:.45rem;margin:.65rem 0}
+.hsk-eml-trace .hsk-eml-chip{display:flex;flex-direction:column;justify-content:center;gap:.14rem;min-width:95px;max-width:220px;white-space:normal;overflow-wrap:anywhere;background:#302b22;border:1px solid #826d4c;border-radius:7px;padding:.45rem .7rem;margin:0;line-height:1.35}
+.hsk-eml-chip small{font-size:.75rem;line-height:1.25;color:#dbc7aa;font-weight:550}
+.hsk-eml-chip b{font-size:1.1rem;font-variant-numeric:tabular-nums}
+.hsk-eml-chip .hsk-negative{color:#ffb09b}
+.hsk-eml-chip .hsk-positive{color:#c7e1ad}
+.hsk-eml-chip .hsk-zero{color:#e0d9c7}
+.hsk-eml-trace .hsk-eml-total{display:flex;align-items:center;border:1px solid #dfba72;border-radius:7px;padding:.4rem .8rem;margin-left:.15rem;color:#ffe4aa;background:#4a3b22;font-size:1.15rem;white-space:nowrap}
+.hsk-eml-cap{display:flex;align-items:center;font-size:.84rem;opacity:.8}
+.hsk-tn-readout{display:block;border:1px solid #667e70;border-radius:6px;background:#1c3029;color:#d7edcc;font-variant-numeric:tabular-nums;padding:.55rem .65rem;min-height:2.4rem}
+.hsk-sr-override{background:#252d28!important;border-color:#586a55!important}
+@media(max-width:640px){.hsk-eml-trace .hsk-eml-chip{min-width:105px;flex:1 1 35%}.hsk-eml-trace .hsk-eml-total{flex:1 1 100%;margin-left:0}}
