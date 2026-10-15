@@ -214,26 +214,24 @@ export function groupedSkillTableHTML(character){
  const list=calculateSheetSkills(character),mode=perceptionMode(character);
  const names=new Set(list.map(x=>x.name)),expected=SKILL_DEFINITIONS.map(x=>x.name);
  if(expected.some(n=>!names.has(n)))throw Error('Chybí základní Skill definice');
- const headers=['Skill','SB: atributy','SB','Base SM',...DP_COLUMNS.map(x=>x[1]),'DP Σ','SM','ML / Boost'];
- const th=headers.map(t=>`<th scope="col">${E(t)}</th>`).join('');
- const cellValue=(x,stage)=>{const n=x.dp.find(d=>d.stage===stage)?.dp??0;return n?E(n):'·';};
- const groups=GROUPED_SKILLS.map(group=>{
+ const Eattr=x=>x.perceptionParent?'Sdílené SM • Sight / Sound / Odour':`${x.primary?.toUpperCase()??'—'} (${x.primaryValue??'?'}) + ${x.secondary?.toUpperCase()??'—'} (${x.secondaryValue??'?'})`;
+ const detailHeaders=['Skill','SB: atributy','SB','Base SM',...DP_COLUMNS.map(x=>x[1]),'DP Σ','SM','ML / Boost'];
+ const detailGroups=GROUPED_SKILLS.map(group=>{
   const rows=list.filter(x=>x.group===group).sort((a,b)=>a.name.localeCompare(b.name,'en'));
-  const body=rows.map(x=>{
-   const shared=!!x.subskillOf,master=!!x.perceptionParent;
-   const dp=DP_COLUMNS.map(([stage])=>`<td class="dp-cell">${cellValue(x,stage)}</td>`).join('');
-   const attr=master?'Sdílené SM • Sight / Sound / Odour':`${x.primary?.toUpperCase()??'—'} (${x.primaryValue??'?'}) + ${x.secondary?.toUpperCase()??'—'} (${x.secondaryValue??'?'})`;
+  const compact=rows.map(x=>`<tr><th scope="row">${E(x.name)}${x.subskillOf?` <span class="tiny muted">↳ ${E(x.subskillOf)}</span>`:''}</th><td>${E(Eattr(x))}</td><td><strong>${x.ml===null?'—':E(x.ml)}</strong></td></tr>`).join('');
+  const detailed=rows.map(x=>{
+   const dp=DP_COLUMNS.map(([stage])=>{const n=x.dp.find(d=>d.stage===stage)?.dp??0;return `<td class="dp-cell">${n?E(n):'·'}</td>`}).join('');
    const sourceSummary=x.dp.filter(d=>d.dp).map(d=>d.stage+': +'+d.dp).join(' · ');
-   const desc=x.name+(shared?' ↳ '+x.subskillOf:master?' (sdílené SM)':'');
-   const bonus=x.boosts?.length?`<div class="tiny">Boost: ${E(x.boosts.map(b=>'+'+b.boost).join(', '))}</div>`:'';
    const legacy=(character.hmk?.skills??[]).find(r=>r.name===x.name&&!r.creationDerived);
-   const conflict=legacy?`<div class="notice tiny">Legacy ruční záznam ML ${E(legacy.ml??'—')} se může lišit. GM musí sjednotit s Character Creation.</div>`:'';
-   const extra=x.bonusSM?`<div class="tiny">Language +${E(x.bonusSM)} SM</div>`:'';
-   return `<tr title="${E(sourceSummary)}" class="${shared?'hsk-shared':''}"><th scope="row">${E(desc)}</th><td>${E(attr)}</td><td>${x.sb===null?'—':E(x.sb)}</td><td>${E(x.baseSM)}</td>${dp}<td>${E(x.totalDP)}${shared?'<span title="Sdílené, NE další DP">*</span>':''}</td><td><strong>${E(x.sm)}</strong>${extra}</td><td><strong>${x.ml===null?'—':E(x.ml)}</strong>${bonus}${conflict}</td></tr>`;
+   const conflict=legacy?`<div class="notice tiny">Legacy ML ${E(legacy.ml??'—')} vyžaduje sjednocení při Edit.</div>`:'';
+   const bonus=x.boosts?.length?`<div class="tiny">Boost: ${E(x.boosts.map(b=>'+'+b.boost).join(', '))}</div>`:'';
+   return `<tr title="${E(sourceSummary)}"><th scope="row">${E(x.name)}</th><td>${E(Eattr(x))}</td><td>${x.sb===null?'—':E(x.sb)}</td><td>${E(x.baseSM)}</td>${dp}<td>${E(x.totalDP)}${x.subskillOf?'*':''}</td><td>${E(x.sm)}</td><td><strong>${x.ml===null?'—':E(x.ml)}</strong>${bonus}${conflict}</td></tr>`;
   }).join('');
-  return `<tbody class="hsk-group"><tr class="hsk-group-head"><th scope="rowgroup" colspan="${headers.length}">${E(group)} · ${rows.length} ${group==='Physical'&&mode==='subattributes'?'(včetně 3 smyslových subskills)':''}</th></tr>${body}</tbody>`;
- }).join('');
- return `<div class="table-scroll hsk-scroll"><table class="hsk-table"><thead><tr>${th}</tr></thead>${groups}</table></div><p class="tiny muted">* Odvozené Shock, Dodge a volitelné Sight/Sound/Odour sdílejí přidělené DP a Skill Multiple s mateřskou Skill; zobrazené DP se nesčítají znovu. ML se počítá samostatně podle jejich SB. Background City Languages může přidělit 3 jazykové DP za jediný zaplacený Background DP.</p>`;
+  return {group,compact,detailed,count:rows.length};
+ });
+ const compact=`<div class="table-scroll hsk-scroll"><table class="hsk-table hsk-compact"><thead><tr><th scope="col">Skill</th><th scope="col">Atributy (Skill Base)</th><th scope="col">ML</th></tr></thead>${detailGroups.map(x=>`<tbody class="hsk-group"><tr class="hsk-group-head"><th scope="rowgroup" colspan="3">${E(x.group)} · ${x.count}${x.group==='Physical'&&mode==='subattributes'?' (smyslové subskills)':''}</th></tr>${x.compact}</tbody>`).join('')}</table></div>`;
+ const detailed=`<details class="hsk-dp-edit"><summary>Edit · rozpad DP, SB, SM a Boost (rozšířený pohled)</summary><p class="tiny">DP se přidělují přes Character Creation / Edit podle pravidel. Otevření podrobností nic nepřidává ani nepřepisuje.</p><div class="table-scroll hsk-scroll"><table class="hsk-table"><thead><tr>${detailHeaders.map(v=>`<th scope="col">${E(v)}</th>`).join('')}</tr></thead>${detailGroups.map(x=>`<tbody class="hsk-group"><tr class="hsk-group-head"><th scope="rowgroup" colspan="${detailHeaders.length}">${E(x.group)} · ${x.count}</th></tr>${x.detailed}</tbody>`).join('')}</table></div><p class="tiny muted">* Sdílené DP / SM nejsou další body; různé ML se odvozují podle vlastních SB.</p></details>`;
+ return `<div class="hsk-skill-view">${compact}${detailed}</div>`;
 }
 export function perceptionModePanelHTML(character){
  const c=creationOf(character),mode=perceptionMode(character),proof=c.perceptionProof??{};
