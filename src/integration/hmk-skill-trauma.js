@@ -39,6 +39,9 @@ export function skillTraumaAvailability({actor,inventory=[],name,mounted=false,b
  :{ready:false,reason:kind?'Aktuální kolo, časovou osu a použitou ruku musí potvrdit GM':'Test není výslovně uveden v tabulce Impaired Tests; účinek ran musí rozhodnout GM'};}
  let bulk={ready:false,reason:'Body-zone Bulk nebyl vyhodnocen'},perception={ready:false,reason:'Vliv zbroje na PER nebyl vyhodnocen'};
  const perApplies=skillPerceptionApplicability(actor,name);
+ // Bulk on the printed Impaired Tests table cannot apply to an unrelated
+ // skill: absence from that list is a verified non-applicability, not a GM switch.
+ if(!kind)bulk={ready:true,modifier:0,source:'not-an-impaired-test'};
  if(!Array.isArray(inventory)) { /* No inventář != no armour; require GM evidence. */ }
  else if(!ownedArmour(inventory,actor)){
    bulk={ready:true,modifier:0,source:'confirmed-unarmoured'};
@@ -47,7 +50,7 @@ export function skillTraumaAvailability({actor,inventory=[],name,mounted=false,b
    try{
     const load=resolveCombatantLoad({character:actor,inventory,mounted,
      bulkConfirmation:bulkAssessed?{assessed:true,violatingZones:bulkZones}:null});
-    if(!kind)bulk={ready:false,reason:'Činnost nemá ověřenou tabulku Impaired Tests pro účinek Bulk – rozhodne GM'};
+    if(!kind)bulk={ready:true,modifier:0,source:'not-an-impaired-test'};
     else if(load.bulkReady===true&&!(load.issues||[]).length){const b=bulkForTest(load,ruleZones(kind));bulk=b.ready?{...b,modifier:b.penalty,source:load.bulkSource,loadSource:load.mode}:{ready:false,reason:b.reason};}
     else bulk={ready:false,reason:(load.issues||[]).join('; ')||'Bulk u tištěného kompletu vyžaduje výslovné posouzení vrstvení GM (HMK p.117)'};
     if(perApplies==='not-applicable')perception={ready:true,modifier:0,source:'skill-base-not-perception'};
