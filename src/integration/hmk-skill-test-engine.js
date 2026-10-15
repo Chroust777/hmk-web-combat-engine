@@ -12,7 +12,7 @@ export function availableMasteries(character){
  if(h.creation){for(const s of calculateSheetSkills(character))if(s.ml!==null&&s.sm>0)add('skill',s.name,s.ml);}
  else for(const s of h.skills??[])add('skill',s.name,s.ml);
  for(const [key,label] of Object.entries(ATTRIBUTE_LABELS)){const x=h.attributes?.[key];if(Number.isSafeInteger(x)&&x>0)add('attribute',label,x*5);}
- return result.sort((a,b)=>a.kind.localeCompare(b.kind)||a.name.localeCompare(b.name,'cs'));
+ return result.sort((a,b)=>a.name.localeCompare(b.name,'cs',{sensitivity:'base'})||a.kind.localeCompare(b.kind));
 }
 export function secondaryMastery(ml,{kind='modifier',roll=null,tnAdjust=0}={}){
  integer(ml,1,1000,'Sekundární ML');
