@@ -4,8 +4,12 @@
  * No game-state copy or independent skill engine is maintained here.
  */
 import {arcaneTalentFromPhysical} from './hmk-arcane-talent.js';
+import {matchingPreliminaryClassRoll,chooseMatchingTrial} from './hmk-occupation-target-planner.js';
+import {parentOccupationFromRoll as verifyParentSelection} from './hmk-parent-occupation-tables.js';
 import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './hmk-creation-psyche.js';
 import {SKILL_DEFINITIONS,folkFromDie,ageFromDie} from './hmk-character-creation.js';
+import {OCCUPATIONS,priestReligionOf,familyOccupationProfile} from './hmk-creation-tables.js';
+import {SCRIPTS} from './hmk-skill-instances.js';
 import {regionHarnTribeDieRequired,regionSubDieRequired,regionDialectDieRequired,regionFromD1000,classFromRoll,tribalFreeOccupation} from './hmk-creation-tables.js';
 import {PARENT_OCCUPATION_TABLES,parentOccupationFromRoll} from './hmk-parent-occupation-tables.js';
 export const AUTO_TRAIT_PROFILES=Object.freeze({
@@ -38,7 +42,7 @@ function choice(form,name,die,pref=null){const options=opts(form,name);if(!optio
 }
 function weightedChoice(items,profile,die,preferences={}){
  const desired=String(preferences.occupation||'').trim().toLowerCase();
- if(desired){const matching=items.filter(x=>x.toLowerCase()===desired||x.toLowerCase().startsWith(desired+' (')||x.toLowerCase().startsWith(desired+':'));if(matching.length)return pick(matching,die);throw Error('Požadované povolání není pro tuto postavu pravidlově dostupné: '+preferences.occupation);}const cfg=AUTO_TRAIT_PROFILES[profile]||AUTO_TRAIT_PROFILES.random;
+ if(desired){const exact=items.find(x=>x.toLowerCase()===desired);if(exact)return exact;const matching=items.filter(x=>x.toLowerCase().startsWith(desired+' (')||x.toLowerCase().startsWith(desired+':'));if(matching.length)return pick(matching,die);throw Error('Požadované povolání není pro tuto postavu pravidlově dostupné: '+preferences.occupation);}const cfg=AUTO_TRAIT_PROFILES[profile]||AUTO_TRAIT_PROFILES.random;
  if(profile==='random'&&!preferences.semantic)return pick(items,die);
  // Free text implies a soft preference, never permission to bypass HMK eligibility.
  const inferred=preferences.semantic?.occupationCandidates||[];
@@ -56,23 +60,43 @@ function weightedChoice(items,profile,die,preferences={}){
  * and stage 2 of Skills. It is never rerolled or replaced during generation.
  * HMK p.40 / p.42: parent Invoker gets 4d20 and uses the highest.
  */
-function prepareArcaneTalentRoll(form,h,die){
+function prepareArcaneTalentRoll(form,h,die,plan=null){
  const invokerParent=h.familyOccupation==='Invoker';
- const rolls=invokerParent?Array.from({length:4},()=>die(20)):[die(20)];
- const d20=Math.max(...rolls);let needed=0;
- try{arcaneTalentFromPhysical({aura:h.attributes.aur,folk:h.folk,ageGroup:h.ageGroup,d20,d100s:[]});}
- catch(err){const match=/právě (\d+)/.exec(String(err.message));if(!match)throw err;needed=Number(match[1]);}
- if(needed>8)throw Error('Arcane Talent požaduje více než osm hodů – kontrola pravidel');
- if(invokerParent){if(!put(form,'arcaneTalentD20s',rolls.join(',')))throw Error('Chybí Parent Invoker 4d20 formulář');}
- else if(!put(form,'arcaneTalentD20',d20))throw Error('Chybí formulář Arcane Talent d20');
- if(!put(form,'arcaneTalentD100s',Array.from({length:needed},()=>die(100)).join(',')))throw Error('Chybí formulář Arcane Talent d100');
+ const target=plan?.occupation||'';
+ const desiredTalent=target.match(/^Shaman \(Talent: (.+)\)$/)?.[1];
+ const seekTwo=target==='Invoker'||target.startsWith('Invoker (Tribal: ');
+ const needsTarget=Boolean(desiredTalent||seekTwo);
+ let chosen=null;
+ // Targeted mode means rejected *candidate characters* are evaluated before
+ // they are committed. These are genuine software rolls; every rejected
+ // preliminary Talent trial is counted, never passed off as the PC's roll.
+ const limit=needsTarget?3200:1;
+ for(let trial=0;trial<limit;trial++){
+  const rolls=invokerParent?Array.from({length:4},()=>die(20)):[die(20)];
+  const d20=Math.max(...rolls);
+  let required=0;
+  try{arcaneTalentFromPhysical({aura:h.attributes.aur,folk:h.folk,ageGroup:h.ageGroup,d20,d100s:[]});}
+  catch(err){const match=/právě (\d+)/.exec(String(err.message));if(!match)throw err;required=Number(match[1]);}
+  if(required>8)throw Error('Arcane Talent vyžaduje více než osm hodů');
+  const d100s=Array.from({length:required},()=>die(100));
+  const proof=arcaneTalentFromPhysical({aura:h.attributes.aur,folk:h.folk,ageGroup:h.ageGroup,d20,d100s});
+  if((!desiredTalent||proof.generated.includes(desiredTalent))&&(!seekTwo||new Set(proof.generated).size>=2)){
+   chosen={rolls,d20,d100s};break;
+  }
+  if(plan)plan.rejectedTalentTrials++;
+ }
+ if(!chosen)throw Error('Arcane Talent: pro tuto AUR nebylo možné doložený talent získat (přípravné zkoušky)');
+ if(invokerParent){if(!put(form,'arcaneTalentD20s',chosen.rolls.join(',')))throw Error('Chybí Parent Invoker 4d20 formulář');}
+ else if(!put(form,'arcaneTalentD20',chosen.d20))throw Error('Chybí formulář Arcane Talent d20');
+ if(!put(form,'arcaneTalentD100s',chosen.d100s.join(',')))throw Error('Chybí formulář Arcane Talent d100');
  return 'talent-prereq';
 }
 /** One automatic tick, executed on the actual active wizard form. */
 export function prepareAutomaticStep(form,character,{profile='random',die=secureAutoDie,rejected=[],preferences={}}={}){
+ const plan=preferences.targetPlan||null;
  const c=character.hmk.creation,h=character.hmk,step=c.step,stage=c.skillStage;
  const current=()=>Object.fromEntries(new FormData(form));
- if(step===1){const preferredFolk=preferences.folk||preferences.semantic?.folkPreference||'';const roll=profile==='random'&&!preferredFolk?die(100):null;const chosen=roll!==null?folkFromDie(roll):(preferredFolk||'Human');if(!put(form,'folk',chosen))throw Error('Požadovaný Folk nemá v průvodci platnou možnost: '+chosen);if(roll!==null)put(form,'folkRoll',roll);return 'next'}
+ if(step===1){const preferredFolk=plan?.folk||preferences.folk||preferences.semantic?.folkPreference||'';const roll=profile==='random'&&!preferredFolk?die(100):null;const chosen=roll!==null?folkFromDie(roll):(preferredFolk||'Human');if(!put(form,'folk',chosen))throw Error('Požadovaný Folk nemá v průvodci platnou možnost: '+chosen);if(roll!==null)put(form,'folkRoll',roll);return 'next'}
  if(step===2){
   // HMK p.21: for humans, half-elves and Nâdi record the actual age d100.
   // The remaining Elder Folk have prescribed age groups, not a d100 choice.
@@ -84,6 +108,38 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
  if(step===3){put(form,'birthMonth',die(12));put(form,'birthDay',die(30));return 'next'}
  if(step===4){const cfg=AUTO_TRAIT_PROFILES[profile]||AUTO_TRAIT_PROFILES.random;for(const key of ['sunsignTraits','sunsignTraitSecondary']){const o=opts(form,key);if(o.length){const meaning=o.filter(x=>(preferences.semantic?.sunsignTraitPreferences||[]).includes(x));const preferred=o.filter(x=>(cfg.traits||[]).includes(x));put(form,key,pick(meaning.length?meaning:preferred.length?preferred:o,die));}}return 'next'}
  if(step===5){
+  if(plan){
+   // HMK p.24: explicit choice of birthplace is lawful and requires no
+   // fictitious regional dice. Tribal subgroup, when compulsory, still uses
+   // actual software d100 and stores preselection trials separately.
+   if(!put(form,'birthRegion',plan.region)||!put(form,'birthplace',plan.realm))
+    throw Error('Plánované regionální místo není ve skutečném průvodci');
+   if(plan.regionRolls?.length){
+    // Hârn Orbáal: the printed d100 disambiguates ruling Ivínian vs Jarin.
+    // A legitimate software d100 is used; rejected candidate rolls are
+    // NOT attributed to the final character.
+    const regionRoll=chooseMatchingTrial(die,100,plan.regionRolls,plan.rejectedRegionRolls);
+    if(!put(form,'regionRoll',regionRoll))throw Error('Povinný Hârn d100 není dostupný');
+   }
+   if(plan.tribeRolls?.length){
+    // The region-specific numeric field is disabled until the manual wizard
+    // recalculates visibility after the initial region selection. Activate
+    // only the verified obligatory Altic/Harn tribe die; the normal CAS
+    // still checks both realm and the resulting tribe/subsistence.
+    const tribe=form.elements.namedItem('regionTribeRoll');
+    if(tribe?.disabled&&['Áltôr','Hârn'].includes(plan.region))tribe.disabled=false;
+    const r=chooseMatchingTrial(die,100,plan.tribeRolls,plan.rejectedTribeRolls??=[]);
+    if(!put(form,'regionTribeRoll',r))throw Error('Plán: nelze zaznamenat povinný Áltôr tribe d100');
+   }
+   if(plan.regionCommunityChoice&&!plan.regionRolls?.length)put(form,'regionCommunityChoice',plan.regionCommunityChoice);
+   for(const name of ['nativeLanguageChoice','regionDialectChoice','regionAzeriDialectChoice','regionCommunityChoice']){
+    if(name==='regionCommunityChoice'&&plan.regionCommunityChoice)continue;
+    choice(form,name,die);
+   }
+   if(form.elements.namedItem('nativeLanguageRoll'))put(form,'nativeLanguageRoll',die(2));
+   return 'next';
+  }
+
   // Use verified regional tables; avoid unsupported, non-transcribed places.
   // HMK Appendix I p.415: use the printed human regional d1000 distribution.
   // Elder Folk use their own independent Appendix I p.423 tables.
@@ -109,17 +165,21 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
   // HMK p.26 explicitly offers a favourable d20 as an alternative
   // to demographic d100. Focused generation uses this lawful choice;
   // truly random generation continues to use demographic frequencies.
-  const dieSides=preferences.occupation||preferences.semantic?.occupationCandidates?.length||profile!=='random'?20:100;
-  const roll=die(dieSides);put(form,'classDie',String(dieSides));put(form,'classRoll',roll);
+  const dieSides=plan||preferences.occupation||preferences.semantic?.occupationCandidates?.length||profile!=='random'?20:100;
+  const roll=plan?matchingPreliminaryClassRoll(plan,die):die(dieSides);put(form,'classDie',String(dieSides));put(form,'classRoll',roll);
   const selected=classFromRoll(h.society,roll,dieSides);
   if(!put(form,'socialClass',selected))throw Error('Parent Class z hodu není v pravidlové nabídce: '+selected);
+  if(plan&&selected!==plan.socialClass)throw Error('Plánovaná Parent Class není dosažena');
   return 'next';
  }
  if(step===7){
   const supported=form.elements.namedItem('parentOccupationRoll');
   let selection;
   if(supported){
-   const roll=die(100);
+   const roll=plan?.region==='Dalkésh'&&plan.family
+    ?chooseMatchingTrial(die,100,Array.from({length:100},(_,i)=>i+1).filter(r=>{
+      try{return verifyParentSelection({society:h.society,socialClass:h.socialClass,roll:r}).name===plan.family;}catch{return false;}}),plan.rejectedParentRolls)
+    :die(100);
    const subsistence=c.values.regionProof?.subsistence||val(form,'subsistence')||'Foraging';
    if(['Tribal','Tribal-Settled'].includes(h.society)&&h.socialClass==='Free'){
     if(form.elements.namedItem('subsistence'))put(form,'subsistence',subsistence);
@@ -156,6 +216,13 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
   else choice(form,'familyVariantChoice',die);
   choice(form,'familyRitualChoice',die);
   choice(form,'familyMartialChoice',die);choice(form,'familyWeaponcrafterType',die);
+  const familyProof=familyOccupationProfile(selection,val(form,'familyWeaponcrafterType'),val(form,'familyMartialChoice'),val(form,'familyVariantChoice'),c.values.regionProof?.subsistence||val(form,'subsistence')||null);
+  const familyAuto=form.elements.namedItem('familyAuto');
+  // Partial unit-test forms can omit this derived hidden validation field.
+  // The actual wizard always provides it and its CAS verifies the result.
+  // Derived hidden validation flag, NOT user-selectable: a synthetic change
+  // event would incorrectly reset it from previously committed step-7 data.
+  if(familyAuto)familyAuto.value=familyProof?'yes':'no';
   return 'next';
  }
  if(step===8){
@@ -175,19 +242,46 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
  if(step===11){
   // Mandatory prerequisite before filtering Invoker/Shaman variants.
   // The validator decides which of those are actually possible after the roll.
-  if(!c.values.arcaneTalentProof)return prepareArcaneTalentRoll(form,h,die);
+  if(!c.values.arcaneTalentProof)return prepareArcaneTalentRoll(form,h,die,plan);
   const occupations=opts(form,'occupation');
   const usable=occupations; 
-  const job=weightedChoice(usable.length?usable:occupations,profile,die,preferences);
+  const job=weightedChoice(usable.length?usable:occupations,profile,die,plan?{...preferences,occupation:plan.occupation}:preferences);
   if(!job)throw Error('Pro vzniklou společnost nejsou dostupná doložená povolání');
-  put(form,'occupation',job);
-  for(const name of ['occupationScriptChoice','occupationSecondScriptChoice','occupationThirdScriptChoice','occupationLanguageChoice','occupationRitualChoice']){
-   const choices=opts(form,name);if(!choices.length)continue;
-   let filtered=choices;
-   if(name==='occupationSecondScriptChoice')filtered=choices.filter(x=>x!==val(form,'occupationScriptChoice'));
-   if(name==='occupationThirdScriptChoice')filtered=choices.filter(x=>![val(form,'occupationScriptChoice'),val(form,'occupationSecondScriptChoice')].includes(x));
-   if(filtered.length)put(form,name,pick(filtered,die));
+  if(!Object.hasOwn(OCCUPATIONS,job))throw Error('Profese nemá doložená Occupational DP: '+job);
+  if(!put(form,'occupation',job))throw Error('Nelze vybrat profesi '+job);
+  const printed=OCCUPATIONS[job].skills;
+  // Singular Script / 2nd Script / 3rd Script are independent fixed grants;
+  // plural Scripts is ONE divisible pool (HMK p.47). Never combine both.
+  if(printed.Script||printed['2nd Script']||printed['3rd Script']){
+   const chosen=[];
+   for(const field of ['occupationScriptChoice','occupationSecondScriptChoice','occupationThirdScriptChoice']){
+    if(field==='occupationScriptChoice'&&!('Script' in printed)&&!('2nd Script' in printed))continue;
+    if(field==='occupationSecondScriptChoice'&&!('2nd Script' in printed))continue;
+    if(field==='occupationThirdScriptChoice'&&!('3rd Script' in printed))continue;
+    const allowed=opts(form,field).filter(x=>!chosen.includes(x)&&!(job==='Priest (Môrgath)'&&field==='occupationScriptChoice'&&x==='Nùvesârl')); 
+    if(!allowed.length||!put(form,field,pick(allowed,die)))throw Error('Chybí unikátní Script specializace pro '+job);
+    chosen.push(val(form,field));
+   }
   }
+  if(printed.Scripts){
+   const options=SCRIPTS.filter(x=>opts(form,'occupationScriptsDistribution').length===0||SCRIPTS.includes(x));
+   if(!options.length)throw Error('Chybí katalog konkrétních Scripts');
+   const selected=pick(options,die),budget=printed.Scripts;
+   if(!Number.isSafeInteger(budget)||budget<1||budget>5)throw Error('Nepodporovaný tištěný Scripts pool '+job);
+   const box=form.querySelector?.('[data-hmk-dp-pool="occupationScriptsDistribution"]');
+   const slots=box?.querySelectorAll?.('[data-pool-choice]')??[];
+   if(slots.length){
+    for(let i=0;i<budget;i++){
+     const slot=slots[i];if(!slot||slot.disabled)throw Error('Nedostupný Scripts DP slot '+i);
+     slot.value=selected;slot.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+   }
+   if(!put(form,'occupationScriptsDistribution',selected+'='+budget))throw Error('Nelze uložit konkrétní Scripts pool');
+  }
+  // A printed Language (plural skill designation) may be allocated to one
+  // concrete language. This is a legal full-pool allocation, not a new DP.
+  if(printed.Language&&!choice(form,'occupationLanguageChoice',die))throw Error('Chybí výběr profesního jazyka pro '+job);
+  if(printed.Ritual&&!choice(form,'occupationRitualChoice',die,priestReligionOf(job)))throw Error('Chybí ověřený Ritual pro '+job);
   return 'next';
  }
  if(step===12){

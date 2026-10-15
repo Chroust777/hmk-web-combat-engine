@@ -75,28 +75,38 @@ function toJob(raw){
 export function eligibleOccupations(character){
  const h=character?.hmk??{},society=h.society,cls=h.socialClass;
  if(!society||!cls)return [];
- // HMK p.417: native Dalkesh castes inherit parental occupation; GM
- // adoption/marriage exceptions require their own explicit approval flow.
- if(h.birthRegion==='Dalkésh'&&h.familyOccupation)
-  return toJob(h.familyOccupation);
- let classes;
- if(society==='Kúzhan')classes=[cls]; // seven vocational people, not interchangeable ranks
- else{const order=RANKS[society];if(!order||!order.includes(cls))return [];
- classes=order.slice(0,order.indexOf(cls)+1);}
- const jobs=[];
- for(const group of classes){
-  if(['Tribal','Tribal-Settled'].includes(society)&&group==='Free'){
-   const livelihood=h.creation?.values?.regionProof?.subsistence??h.creation?.values?.subsistence;
-   jobs.push(...(livelihood&&TRIBAL_FREE[livelihood]?Object.keys(TRIBAL_FREE[livelihood]):Object.values(TRIBAL_FREE).flatMap(x=>Object.keys(x))));continue;
+ // In Dalkésh the occupational candidate is inherited (HMK App. I p.417),
+ // but inheritance never waives Religion, Folk or Arcane Talent prerequisites.
+ // All candidates go through the SAME rule predicate below.
+ const dalkeshInherited=h.birthRegion==='Dalkésh'&&h.familyOccupation;
+ let jobs=[];
+ if(dalkeshInherited){
+  jobs=toJob(h.familyOccupation);
+ }else{
+  let classes;
+  if(society==='Kúzhan')classes=[cls];
+  else{const order=RANKS[society];if(!order||!order.includes(cls))return [];
+   classes=order.slice(0,order.indexOf(cls)+1);}
+  for(const group of classes){
+   if(['Tribal','Tribal-Settled'].includes(society)&&group==='Free'){
+    const livelihood=h.creation?.values?.regionProof?.subsistence??h.creation?.values?.subsistence;
+    jobs.push(...(livelihood&&TRIBAL_FREE[livelihood]?Object.keys(TRIBAL_FREE[livelihood]):Object.values(TRIBAL_FREE).flatMap(x=>Object.keys(x))));continue;
+   }
+   const source=parentOccupationSource(society,group,{classRoll:h.creation?.values?.classRoll,classDie:h.creation?.values?.classDie});
+   for(const s of (source===null?['Feudal','Imperial']:[source]))for(const row of PARENT_OCCUPATION_TABLES[s]?.[group]??[])jobs.push(...toJob(row.name));
   }
-  const source=parentOccupationSource(society,group,{classRoll:h.creation?.values?.classRoll,classDie:h.creation?.values?.classDie});
-  for(const s of (source===null?['Feudal','Imperial']:[source]))for(const row of PARENT_OCCUPATION_TABLES[s]?.[group]??[])jobs.push(...toJob(row.name));
  }
  const subsistence=h.society==='Mizúni'?'Herding':h.creation?.values?.regionProof?.subsistence??h.creation?.values?.subsistence;
  const allowedChief=chieftainVariantForSubsistence(subsistence);
  return uniq(jobs).filter(n=>
+  // A published GM title is not automatically an implemented PC profile.
+  // Never expose such titles as fully automatic or silently invent DP/Wealth.
+  Object.hasOwn(OCCUPATIONS,n) &&
   (!CHIEFTAIN_VARIANTS.includes(n)||n===allowedChief) &&
   (!priestReligionOf(n)||religionChoices(character).includes(priestReligionOf(n))||(n==='Priest (Siém: Runecraft)'&&h.folk==='Kúzhai')) &&
+  // Some Shaman/Invoker entries require a named Ritual. A society with no
+  // verified local pantheon cannot complete such a profile unattended.
+  (!OCCUPATIONS[n].skills.Ritual||religionChoices(character).length>0) &&
   isArcaneOccupationEligible(character,n) &&
   (!TRIBAL_INVOKER_VARIANTS.includes(n)||['Tribal','Tribal-Settled'].includes(society)) &&
   (n!=='Priest (Siém: Runecraft)'||h.folk==='Kúzhai') &&
