@@ -24,6 +24,15 @@ function track(s,{eventId,round,type,details}){
  s.events.push({id:eventId,type,round,details});s.lastRound=round;validateCombatState(s);return s;
 }
 function wound(s,id){const w=s.wounds.find(x=>x.id===id);requireRule(!!w,'Rána neexistuje');requireRule(w.healed!==true,'Rána už je vyléčená');return w;}
+/** The GM's elapsed-day clock is independent per injury, but may never go
+ * backwards relative to any earlier confirmed event for that same wound. */
+function verifyWoundDay(s,id,day){
+ const previous=s.events.filter(e=>e.details?.woundId===id&&int(e.details?.daySinceInjury,0,100000))
+  .map(e=>e.details.daySinceInjury);
+ requireRule(!previous.length||day>=Math.max(...previous),
+  'Časová osa této rány se vrací do minulosti: '+id);
+}
+
 /** HMK p354: horse fore/hind leg fractures have permanently decreased HR.
  * It is applied AFTER the existing treatment table, not as a second
  * treatment or a separate write path.  HR <= 2 blocks mundane healing. */
@@ -43,7 +52,7 @@ function setInfectionWeakness(s,w,next){const prior=w.healing?.infectionWeakness
 }
 export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInjury,physicianML=null,physicianIndex=null,
  physicianRoll=null,dexSecondaryModifier=0,available=[],untreated=false,area=false,broadhead=false,gmConfirmed=false}={}){
- const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId);
+ const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId);verifyWoundDay(s,woundId,daySinceInjury);
  requireRule(gmConfirmed===true,'GM musí potvrdit podmínky léčení');
  requireRule(!s.wounds.some(x=>x.bleeding)&&!s.extendedShock,'HMK str.180: nejprve musí skončit veškeré krvácení a Extended Shock');
  requireRule(!w.healing?.infected,'Nejdříve je nutné vyřešit aktivní infekci');
@@ -93,7 +102,7 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
  return {state:s,healed:false,treatment:w.healing};
 }
 export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,gmConfirmed=false}={}){
- const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing;
+ const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing;verifyWoundDay(s,woundId,daySinceInjury);
  requireRule(gmConfirmed===true&&h?.treated&&int(h.healingRate,1,6),'Rána nemá potvrzenou léčbu ani Healing Rate');
  requireRule(!h.noMundaneHealing&&!(w.bodyKind==='horse'&&['flg','hlg'].includes(w.location)&&h.healingRate<=2),
   'HMK str.354: HR koně po zlomenině nohy ≤2, bez esoteriky se rána nemůže hojit');
@@ -114,8 +123,20 @@ export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinc
  track(s,{eventId,round,type:'injury-healing-roll',details:{woundId,daySinceInjury,hb,hr:h.healingRate,rawEML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:w.healed?'healed':w.severity+w.level,infected:!!result.infected}});
  return {state:s,healed:!!w.healed,infected:!!h.infected,result};
 }
-export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,physicianSV=0,gmConfirmed=false}={}){
- const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing;
+/** HMK p181: Infection suspends ALL injury healing. The day index of an
+ * unrelated wound cannot be inferred from the infected wound's day index.
+ * The caller must supply separately confirmed elapsed days for every other
+ * live treated wound before the LAST infection is defeated. No missed rolls
+ * are retroactively invented. The next period begins after recovery.
+ */
+export function infectionResumptionRequirements(state,sourceWoundId){
+ validateCombatState(state);
+ return state.wounds.filter(x=>x.id!==sourceWoundId&&!x.healed&&x.healing?.treated&&
+  !x.healing.noMundaneHealing).map(x=>({woundId:x.id,location:x.location,
+   label:`${x.location} ${x.severity}${x.level}`}));
+}
+export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,physicianSV=0,otherWoundDays={},gmConfirmed=false}={}){
+ const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing;verifyWoundDay(s,woundId,daySinceInjury);
  requireRule(gmConfirmed===true&&h?.infected,'Neexistuje aktivní infekce této rány');
  requireRule(daySinceInjury===h.nextInfectionDay,'Infection Course je splatný v den '+h.nextInfectionDay);
  requireRule(int(roll,1,100)&&int(physicianSV,-20,30),'Neplatný Infection Roll nebo Physician SV');
@@ -123,9 +144,32 @@ export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySi
  const sl=successLevel(roll,rawEML),result=resolveInfectionCourse({hr:h.infectionHR,sl});
  h.infectionHR=result.hr;
  if(result.dead){s.shock='KIA';s.shockFollowup=null;s.extendedShock=null;s.coma=null;for(const x of s.wounds)x.nextAdvanceRound=null;}
- if(result.defeated){h.infected=false;h.nextInfectionDay=null;h.nextHealingDay=daySinceInjury+5;setInfectionWeakness(s,w,0);}
- else if(result.active){h.nextInfectionDay=daySinceInjury+1;setInfectionWeakness(s,w,result.weaknessFatigue);}
- track(s,{eventId,round,type:'infection-course',details:{woundId,daySinceInjury,hb,rawEML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),afterHR:result.hr,dead:result.dead,defeated:result.defeated}});
+ const resumed=[];
+ if(result.defeated){
+  h.infected=false;h.nextInfectionDay=null;setInfectionWeakness(s,w,0);
+  // Another active infection continues the patient-wide freeze.
+  if(!s.wounds.some(x=>x.healing?.infected)){
+   if(!h.noMundaneHealing){h.nextHealingDay=daySinceInjury+5;resumed.push({woundId,confirmedElapsedDays:daySinceInjury,nextHealingDay:h.nextHealingDay});}
+   const required=infectionResumptionRequirements(s,woundId);
+   requireRule(otherWoundDays&&typeof otherWoundDays==='object'&&!Array.isArray(otherWoundDays),
+    'Po infekci je nutný doložený počet dní ostatních ran');
+   for(const item of required){
+    requireRule(Object.prototype.hasOwnProperty.call(otherWoundDays,item.woundId)&&int(otherWoundDays[item.woundId],0,100000),
+     'Chybí potvrzený počet dní od vzniku rány '+item.woundId);
+    const other=s.wounds.find(x=>x.id===item.woundId);
+    const elapsed=otherWoundDays[item.woundId];
+    // A past documented healing/course event cannot be moved back in time.
+    const previousDays=s.events.filter(e=>e.details?.woundId===item.woundId&&
+     int(e.details?.daySinceInjury,0,100000)).map(e=>e.details.daySinceInjury);
+    requireRule(previousDays.length===0||elapsed>=Math.max(...previousDays),
+     'Dny od poranění jiné rány nemohou běžet zpět: '+item.woundId);
+    other.healing.nextHealingDay=elapsed+5;
+    resumed.push({woundId:item.woundId,confirmedElapsedDays:elapsed,nextHealingDay:other.healing.nextHealingDay});
+   }
+  }
+ }else if(result.active){h.nextInfectionDay=daySinceInjury+1;setInfectionWeakness(s,w,result.weaknessFatigue);}
+ if(result.dead){s.shockOriginRound=round;s.bloodShockPending=false;}
+ track(s,{eventId,round,type:'infection-course',details:{woundId,daySinceInjury,hb,rawEML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),afterHR:result.hr,dead:result.dead,defeated:result.defeated,resumedInjuries:resumed}});
  return {state:s,result};
 }
 /** HMK p181: every ten days after actual BP loss; ignore only weakness CAUSED by anaemia. */
@@ -148,7 +192,7 @@ export function applyConfirmedBloodLossHealing({state,round,eventId,daySinceBloo
 }
 /** Grim G/CF wound: daily Location Shock Roll until no longer G or CF-treated (p180). */
 export function applyConfirmedGrimWoundShock({state,round,eventId,woundId,daySinceInjury,locationShock,shockML,roll,gmConfirmed=false}={}){
- const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId);
+ const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId);verifyWoundDay(s,woundId,daySinceInjury);
  requireRule(gmConfirmed===true&&w.severity==='G'&&w.healing?.grimWound===true,'Rána není aktivní Grim Wound (G/CF-treatment)');
  const due=w.healing.nextGrimShockDay??Math.max(1,(w.healing.treatments?.at(-1)?.day??0)+1);
  requireRule(daySinceInjury===due,'Denní Grim Wound Shock je splatný den '+due);
