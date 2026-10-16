@@ -8,6 +8,7 @@ import {PRINTED_ARMOUR_SUITS_P113_116} from '../rules/armour-suit-printed.js';
 import {identifyWornPrintedSuit} from './printed-suit-combat.js';
 import {resolveOwnedArmourArticle} from './live-combat-armour.js';
 import {evaluateOrderedArmour} from './armour-layer-evaluation.js';
+import {assessArmourFeasibility,prepareArmourForFeasibility} from './hmk-armour-feasibility.js';
 import {calculateGearLoad} from '../rules/gear-load.js';
 import {modifiedEncumbrance,strengthEncumbranceModifier,encumbranceTestPenalty} from '../rules/encumbrance.js';
 import {personalFatigue} from '../rules/fatigue.js';
@@ -58,17 +59,22 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   if(!checked.ready){issues.push(`${item.snapshot?.name||item.id}: ${checked.reason}`);continue;}
   articles.push({item,article:checked.article});
  }
+ const layeringFeasibility=articles.length===worn.length?assessArmourFeasibility(prepareArmourForFeasibility(articles)):null;
  let armourENC=null,extraEnc=null,conditionalArmENC=null,perceptionPenalty=null;
+ // Item ENC is independent of whether the player's chosen layer order is legal.
+ // Conditional outer D/Q +5 cannot be presumed without a verified layer assignment.
+ let knownArmourENC=null;let unknownExtraENC=false;
+ let armourENCUpperBound=null;let armourArithmeticENC=null;
  let bulkReady=false,bulkByZone=null,bulkSource=null,armourSource=null,layering=null;
  const match=identifyWornPrintedSuit(inventory,id);
  if(worn.length===0){
-  armourENC=0;extraEnc=0;conditionalArmENC=0;perceptionPenalty=0;
+  armourENC=0;knownArmourENC=0;extraEnc=0;conditionalArmENC=0;perceptionPenalty=0;
   bulkReady=true;bulkByZone=Object.fromEntries(ZONES.map(z=>[z,0]));bulkSource='unarmoured';armourSource='unarmoured';
  }else if(articles.length===worn.length&&match.ok){
   const suit=SUITS.get(match.name);
   if(!suit)issues.push('Printed suit missing in HMK catalogue');
   else {
-   armourENC=suit.enc;extraEnc=null;conditionalArmENC=null;perceptionPenalty=-suit.per;
+   armourENC=suit.enc;knownArmourENC=suit.enc;extraEnc=null;conditionalArmENC=null;perceptionPenalty=-suit.per;
    armourSource=`printed-suit:${suit.name}`;
    // The exact, unchanged published suit (pp.113–116) is an approved assembled
    // outfit: no added layers and therefore no exception-driven Bulk. No GM
@@ -81,19 +87,38 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
     issues.push('Printed suit alone cannot carry manually nominated extra Bulk layers');
   }
  }else if(articles.length===worn.length){
+  // Do not collapse all armour ENC to unknown merely because the player
+  // has omitted layerOrder or equipped a prohibited non-C/D combination.
+  const conditionalCount=articles.filter(({article})=>article.enc==='a').length;
+  const unknownBase=articles.some(({article})=>!Number.isSafeInteger(article.enc)&&!['a','p'].includes(article.enc));
+  conditionalArmENC=conditionalCount>=3?5:0;
+  knownArmourENC=unknownBase?null:articles.reduce((sum,{article})=>sum+(Number.isSafeInteger(article.enc)?article.enc:0),0)+conditionalArmENC;
+  // Determine the printed article subtotal even when a chosen outfit is invalid.
+  // A possible D/Q outermost article adds +5, but never guess its column.
+  const outerArticle=/\b(cloak|mantle|vest|surcoat|coat|robe|cuisse|cuisses)\b/i;
+  const possibleOuter=articles.filter(({article})=>['padded','quilted'].includes(String(article.material).toLowerCase())&&outerArticle.test(article.name));
+  armourArithmeticENC=knownArmourENC;
+  armourENCUpperBound=knownArmourENC===null?null:knownArmourENC+5*possibleOuter.length;
+  unknownExtraENC=possibleOuter.length>0;
+  if(!unknownExtraENC&&layeringFeasibility?.status!=='forbidden'&&knownArmourENC!==null){armourENC=knownArmourENC;extraEnc=0;}
+  perceptionPenalty=-articles.reduce((s,{article})=>s+(article.enc==='p'?(article.perceptionPenalty??0):0),0);
+  // If *every* possible physical arrangement is legal, Bulk is provably zero.
+  // This covers separate basic clothes with no need to ask the GM.
+  const orderInvariant=layeringFeasibility&&Object.values(layeringFeasibility.zones).every(z=>z.orderInvariant);
+  if(orderInvariant){bulkReady=true;bulkByZone=Object.fromEntries(ZONES.map(z=>[z,0]));bulkSource='p117-order-invariant-valid';armourSource='audited-p118-order-invariant';}
   const ordered=[];
   for(const {item,article} of articles){
    // With exactly one worn article its physical order is unique; requesting
    // a GM-defined order would add no actual information (HMK p.117).
    const effectiveOrder=item.layerOrder??(worn.length===1?0:null);
-   if(!Number.isSafeInteger(effectiveOrder)||effectiveOrder<0){issues.push(`${item.id}: inner-to-outer layerOrder required`);continue;}
+   if(!Number.isSafeInteger(effectiveOrder)||effectiveOrder<0){if(!orderInvariant)issues.push(`${item.id}: inner-to-outer layerOrder required`);continue;}
    if(item.layerSlot!==undefined&&item.layerSlot!==null&&item.layerSlot!==''&&!SLOTS.has(item.layerSlot)){
     issues.push(`${item.id}: invalid layer slot`);continue;
    }
-   ordered.push({...article,layerOrder:effectiveOrder});
+   ordered.push({...article,id:item.id,layerOrder:effectiveOrder});
   }
   if(ordered.length===articles.length){
-   const slots=Object.fromEntries(articles.filter(({item})=>item.layerSlot).map(({item,article})=>[article.id,item.layerSlot]));
+   const slots=Object.fromEntries(articles.filter(({item})=>item.layerSlot).map(({item,article})=>[item.id,item.layerSlot]));
    // Older saves may contain explicit selections. Otherwise the ordered
    // evaluator now derives only proven p.117 C/D Bulk exceptions automatically.
    const bulkExceptionByZone={};
@@ -104,7 +129,7 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
     }
     for(const zone of nominated){
      if(bulkExceptionByZone[zone]!==undefined){issues.push(`More than one GM Bulk article nominated for ${zone}`);continue;}
-     bulkExceptionByZone[zone]=article.id;
+     bulkExceptionByZone[zone]=item.id;
     }
    }
    if(layerOptions.bulkExceptionByZone&&Object.entries(layerOptions.bulkExceptionByZone).some(([z,id])=>bulkExceptionByZone[z]!==undefined&&bulkExceptionByZone[z]!==id))
@@ -124,10 +149,12 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
    if(layering.status!=='compatible')issues.push(`Unresolved or forbidden armour layers: ${[...layering.errors,...layering.unresolved].join('; ')}`);
    else {
     extraEnc=layering.extraEnc;
+    unknownExtraENC=false;
     conditionalArmENC=articles.filter(({article})=>article.enc==='a').length>=3?5:0;
     const unknown=articles.filter(({article})=>!Number.isSafeInteger(article.enc)&&!['a','p'].includes(article.enc));
     if(unknown.length)issues.push(`Unknown printed article ENC: ${unknown.map(x=>x.article.id).join(', ')}`);
-    else armourENC=articles.filter(({article})=>Number.isSafeInteger(article.enc)).reduce((s,{article})=>s+article.enc,0)+conditionalArmENC+extraEnc;
+    else {armourENC=articles.filter(({article})=>Number.isSafeInteger(article.enc)).reduce((s,{article})=>s+article.enc,0)+conditionalArmENC+extraEnc;
+     knownArmourENC=armourENC;armourENCUpperBound=armourENC;armourArithmeticENC=armourENC;}
     perceptionPenalty=-articles.reduce((s,{article})=>s+(article.enc==='p'?(article.perceptionPenalty??0):0),0);
     bulkByZone=Object.fromEntries(ZONES.map(z=>[z,layering.zoneReports.find(r=>r.zone===z)?.bulkArticleId?-5:0]));
     bulkReady=true;bulkSource='validated-p117-ordered-layers';armourSource='audited-p118-articles';
@@ -169,15 +196,24 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
  const str=character.hmk?.attributes?.str;
  const validSTR=Number.isSafeInteger(str)&&str>=1&&str<=200;
  if(!validSTR)issues.push('Character STR must be a recorded positive integer (1–200)');
- const encReady=Number.isSafeInteger(armourENC)&&gearLoad!==null&&validSTR;
+ // A prohibited outfit has no *rules-valid* ENC, even though its known
+ // component encumbrances are displayed. Never silently legalise it.
+ const prohibitedOutfit=layeringFeasibility?.status==='forbidden';
+ const encReady=Number.isSafeInteger(armourENC)&&gearLoad!==null&&validSTR&&!prohibitedOutfit;
  const baseENC=encReady?armourENC+gearLoad.gearENC:null;
+ const knownBaseENC=Number.isFinite(knownArmourENC)&&gearLoad!==null?knownArmourENC+gearLoad.gearENC:null;
+ // This is a known lower bound, NOT an invented total: unknown outer-layer
+ // additions can still increase it. Only the exact total enters skill EML.
+ const knownMinimumENC=knownBaseENC!==null&&validSTR?modifiedEncumbrance({armourENC:knownArmourENC,gearENC:gearLoad.gearENC,str,mounted}):null;
+ const knownMaximumENC=Number.isFinite(armourENCUpperBound)&&gearLoad!==null&&validSTR?modifiedEncumbrance({armourENC:armourENCUpperBound,gearENC:gearLoad.gearENC,str,mounted}):null;
  const strengthModifier=encReady?strengthEncumbranceModifier(str,{mounted}):null;
  const modifiedENC=encReady?modifiedEncumbrance({armourENC,gearENC:gearLoad.gearENC,str,mounted}):null;
  const pf=encReady?personalFatigue(modifiedENC):null;
  const meleeBulk=bulkReady?ZONES.reduce((s,z)=>s+bulkByZone[z],0):null;
  const result={ready:encReady&&bulkReady&&issues.length===0,encReady,bulkReady,issues,
   characterId:id,mode:armourSource,printedSuit:match.ok?match.name:null,
-  armourENC,baseENC,gearENC:gearLoad?.gearENC??null,gearLoad,
+  armourENC,baseENC,knownArmourENC,knownBaseENC,knownMinimumENC,knownMaximumENC,armourENCUpperBound,armourArithmeticENC,unknownExtraENC,layeringFeasibility,prohibitedOutfit,
+  layeringDetails:layering,gearENC:gearLoad?.gearENC??null,gearLoad,
   extraEnc,conditionalArmENC,perceptionPenalty,str,mounted,strengthModifier,modifiedENC,
   personalFatiguePerPeriod:pf,agilityAndMeleePenalty:encReady?encumbranceTestPenalty({encumbrance:modifiedENC,skillBaseIncludesAgility:true}):null,
   bulkByZone,meleeBulkPenalty:meleeBulk,bulkSource,layeringStatus:layering?.status??null,
