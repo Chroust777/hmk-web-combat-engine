@@ -58,6 +58,65 @@ export function validateCombatState(s){
   }
  }
 
+ if(s.toxinCourses!==undefined){
+  requireCond(Array.isArray(s.toxinCourses)&&s.toxinCourses.length<=100,'Neplatná evidence Poison/Toxin');
+  const ids=new Set();
+  for(const t of s.toxinCourses){
+   requireCond(t&&typeof t.id==='string'&&t.id.startsWith('poison:')&&!ids.has(t.id)&&
+    typeof t.sourceId==='string'&&t.id==='poison:'+t.sourceId&&
+    ['digested','vector','contact'].includes(t.transmission)&&
+    whole(t.onsetMinutes,10,60)&&whole(t.periodMinutes,10,60)&&whole(t.initialHR,1,5)&&
+    Array.isArray(t.symptomD10s)&&t.symptomD10s.length===4&&t.symptomD10s.every(n=>whole(n,1,10))&&
+    Array.isArray(t.symptoms)&&t.symptoms.length===4&&t.symptoms.every(x=>typeof x==='string'&&x.length>0)&&
+    whole(t.hr,0,6)&&['incubating','active','defeated','dead'].includes(t.status)&&
+    whole(t.elapsedMinutes,0,10000000)&&whole(t.sequence,0,10000)&&
+    [0,5,10].includes(t.weaknessApplied)&&['NONE','STN','INC','UNC','KIA'].includes(t.shockApplied)&&
+    t.standardLethal===true&&
+    s.events.some(e=>e.id===t.id&&e.type==='poison-start'),
+    'Poison Course nemá doloženou a konzistentní původní expozici');
+   ids.add(t.id);
+  }
+ }
+ if(s.diseaseCourses!==undefined){
+  requireCond(Array.isArray(s.diseaseCourses)&&s.diseaseCourses.length<=200,'Neplatný seznam Disease expozic');
+  const diseaseIds=new Set();
+  for(const d of s.diseaseCourses){
+   const unprofiled=['pending-profile','avoided'].includes(d?.status);
+   requireCond(d&&typeof d.id==='string'&&d.id==='disease:'+d.sourceId&&!diseaseIds.has(d.id)&&
+    typeof d.sourceId==='string'&&d.sourceId.length>=3&&d.sourceId.length<=120&&
+    typeof d.diseaseKey==='string'&&d.diseaseKey.length>=3&&d.diseaseKey.length<=120&&
+    ['airborne','contact','digested','vector'].includes(d.transmission)&&
+    whole(d.contagionIndex,1,5)&&(d.contagionIndexD20===null||whole(d.contagionIndexD20,1,20))&&
+    whole(d.contagionD100,1,100)&&whole(d.priorBonus,0,1)&&
+    d.usedCI===d.contagionIndex+d.priorBonus&&whole(d.contagionEML,1,594)&&
+    ['CF','F','S','CS'].includes(d.contagionSL)&&whole(d.nextExposureBonus,0,1)&&
+    (unprofiled?(d.onsetD6===null&&d.onsetMinutes===null&&d.initialHR===null&&d.hr===null&&
+      d.virulenceD20===null&&Array.isArray(d.symptomD10s)&&d.symptomD10s.length===0&&
+      Array.isArray(d.symptoms)&&d.symptoms.length===0):
+      (whole(d.onsetD6,1,6)&&d.onsetMinutes===d.onsetD6*(d.contagionSL==='CF'?720:1440)&&
+       whole(d.initialHR,1,5)&&(d.virulenceD20===null||whole(d.virulenceD20,1,20))&&
+       Array.isArray(d.symptomD10s)&&d.symptomD10s.length===4&&d.symptomD10s.every(v=>whole(v,1,10))&&
+       Array.isArray(d.symptoms)&&d.symptoms.length===4&&d.symptoms.every(x=>typeof x==='string')&&whole(d.hr,0,6)))&&
+    ['pending-profile','avoided','incubating','active','defeated','dead'].includes(d.status)&&
+    whole(d.elapsedMinutes,0,10000000)&&whole(d.sequence,0,10000)&&
+    [0,5,10].includes(d.weaknessApplied)&&['NONE','STN','INC','UNC','KIA'].includes(d.shockApplied)&&
+    ((d.standardLethal===true&&(d.floorHR===undefined||d.floorHR===0))||
+     (d.standardLethal===false&&whole(d.floorHR,1,2)))&&
+    (d.hr===null||d.hr>=(d.floorHR||0))&&
+    s.events.some(e=>e.id===d.id&&e.type==='disease-exposure'),
+    'Disease nemá konzistentní Contagion expozici nebo povinné hody');
+   diseaseIds.add(d.id);
+   if(d.status==='dead')requireCond(d.standardLethal===true&&d.hr===0,'Disease: HR0 není smrtelný při neletálním minimu');
+   if(d.status==='defeated')requireCond(d.hr===6,'Disease: uzdravení vyžaduje HR6');
+   if(d.status==='active')requireCond(whole(d.hr,1,5),'Disease: aktivní nemoc musí být HR1–5');
+   if(d.status==='avoided')requireCond(['S','CS'].includes(d.contagionSL),'Disease: vyhnutí vyžaduje S nebo CS');
+   if(d.status!=='avoided')requireCond(['F','CF'].includes(d.contagionSL),'Disease: kontrakce vyžaduje F nebo CF');
+   if(d.status==='incubating')requireCond(d.sequence===0&&d.elapsedMinutes===0&&d.weaknessApplied===0&&d.shockApplied==='NONE',
+    'Disease: nástup ještě nenastal');
+   if(['active','defeated','dead'].includes(d.status))requireCond(s.events.some(e=>e.id===d.id+':onset'&&e.type==='disease-onset'),
+    'Disease: chybí potvrzený onset');
+  }
+ }
  if(s.morale!==undefined){requireCond(s.morale&&['steady','brave','withdrawing','routed','catatonic'].includes(s.morale.state)&&whole(s.morale.psycheStress,0,99999)&&
   (s.morale.braveSince==null||whole(s.morale.braveSince,1,9999))&&(s.morale.braveTimelineId==null||typeof s.morale.braveTimelineId==='string')&&(s.morale.lastReactionRound==null||whole(s.morale.lastReactionRound,1,9999))&&(s.morale.lastReactionTimelineId==null||typeof s.morale.lastReactionTimelineId==='string'),'Neplatný Morale State');
   if(s.morale.surrender!==undefined&&s.morale.surrender!==null){
