@@ -3,8 +3,8 @@
  * CF adds PSY1 with a mandatory separate trait choice; S/CS reduce Aural Shock
  * by 1/2 and its own weakness by 5/10. Does not elapse time automatically.
  * Never directly writes storage: uses the shared full-document CAS checkpoint.
- * Supports a verified embodied spell-origin Aural Shock only; other astral,
- * spirit, possession and undated cases remain fail-closed.
+ * Supports verified spell-origin or witnessed Shaman Trance CF Aural Shock.
+ * Undated or uncommitted sources remain fail-closed.
  */
 import {successLevel,SL} from '../rules/tests.js';
 import {auralShockRecovery} from '../rules/mental-trauma.js';
@@ -19,7 +19,11 @@ function validateCandidate(document,characterId){
  const person=document?.characters?.find(c=>c.id===characterId);
  check(person&&document.characters.filter(c=>c.id===characterId).length===1,
   'Aural Recovery: postava není jednoznačně doložena');
- const seq=validateEncounterSequence(document?.combatRuntime?.sequence);
+ const shamanOrigin=person.hmk?.combatState?.events?.some(e=>e.type==='hmk-shaman-talisman-aural'&&whole(e.details?.auralShock,1,6));
+ // Shamanic bestowals take place outside combat; unlike spell-origin recovery,
+ // an explicit active encounter is not a prerequisite for one-game-day recovery.
+ const seq=document?.combatRuntime?.sequence?validateEncounterSequence(document.combatRuntime.sequence):
+  (shamanOrigin?{active:false,round:Math.max(1,person.hmk.combatState?.lastRound||1),pendingEndTurnAction:null,interruptActiveId:null}:validateEncounterSequence(null));
  check(seq.active!==true&&!seq.pendingEndTurnAction&&!seq.interruptActiveId,
   'Aural Recovery: nedokončené Initiative, povinnosti nebo přerušení');
  const state=validateCombatState(person.hmk?.combatState),arc=person.hmk?.arcane;
@@ -30,9 +34,9 @@ function validateCandidate(document,characterId){
   !arc.astralState&&!arc.spiritState&&!arc.possessed,
   'Aural Recovery: nevyřešené mentální povinnosti / spirit-astral souběh');
  // We only resolve cases with a committed spell-origin causal event.
- check(state.events.some(e=>['hmk-spell-misfire','hmk-spell-total-release'].includes(e.type)&&
+ check(state.events.some(e=>['hmk-spell-misfire','hmk-spell-total-release','hmk-shaman-talisman-aural'].includes(e.type)&&
   whole(e.details?.auralShock,1,6)),
-  'Aural Recovery: není doložen původ Aural Shock ze Spellfire');
+  'Aural Recovery: není doložen původ Aural Shock ze Spellfire ani Shaman Trance CF');
  const wil=person.hmk?.attributes?.wil;
  check(whole(wil,1,40),'Aural Recovery: chybí skutečný Will attribute');
  const earlier=state.events.filter(e=>e.type==='hmk-aural-shock-recovery');
@@ -76,7 +80,7 @@ export function persistSpellAuralRecovery({document,characterId,eventId,gameDay,
   s.morale.psycheStress+=outcome.psycheStressGained;
   a.pendingPsycheTraitChoice={sourceEventId:eventId,levels:outcome.psycheStressGained};
  }
- const details={source:'spell-origin-aural-shock',gameDay,willAttribute:willEML/5,
+ const details={source:'verified-spell-or-shaman-origin-aural-shock',gameDay,willAttribute:willEML/5,
   willEML,physicalD100:d100,successLevel:resultName[sl],before:arc.auralShockLevels,
   after:outcome.levels,auralWeaknessRemoved:delta*5,
   psycheStressGained:outcome.psycheStressGained,psycheTraitChoicePending:!!outcome.psycheStressGained,
