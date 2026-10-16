@@ -70,17 +70,15 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   else {
    armourENC=suit.enc;extraEnc=null;conditionalArmENC=null;perceptionPenalty=-suit.per;
    armourSource=`printed-suit:${suit.name}`;
-   // A printed suit has exact ENC, but its article order/Bulk is NOT independently
-   // certified by the printed AV matrix. Explicit GM verification is mandatory.
-   if(bulkConfirmation?.assessed===true){
-    const zones=bulkConfirmation.violatingZones;
-    if(!Array.isArray(zones)||zones.some(z=>!ZONES.includes(z))||new Set(zones).size!==zones.length)
-     issues.push('Invalid confirmed Bulk body zones');
-    else {
-     bulkReady=true;bulkByZone=Object.fromEntries(ZONES.map(z=>[z,zones.includes(z)?-5:0]));
-     bulkSource='explicit-GM-printed-suit-assessment';
-    }
-   }else if(bulkConfirmation!==null)issues.push('Printed suit Bulk assessment was not confirmed');
+   // The exact, unchanged published suit (pp.113–116) is an approved assembled
+   // outfit: no added layers and therefore no exception-driven Bulk. No GM
+   // confirmation is necessary for a completely identified printed suit.
+   // Explicit legacy confirmations may not override the printed suit's baseline.
+   bulkReady=true;
+   bulkByZone=Object.fromEntries(ZONES.map(z=>[z,0]));
+   bulkSource='exact-printed-suit-zero-bulk';
+   if(bulkConfirmation?.assessed===true && bulkConfirmation.violatingZones?.length)
+    issues.push('Printed suit alone cannot carry manually nominated extra Bulk layers');
   }
  }else if(articles.length===worn.length){
   const ordered=[];
@@ -113,6 +111,16 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
     issues.push('Conflicting Bulk selection from the inventory and GM options');
    const merged={...layerOptions,bulkExceptionByZone:{...bulkExceptionByZone,...layerOptions.bulkExceptionByZone},slotByArticleId:{...slots,...layerOptions.slotByArticleId}};
    layering=evaluateOrderedArmour(ordered,merged);
+   // A legacy 'layerSlot' is a convenience hint, not the authoritative physical
+   // inner-to-outer order. Early character generators assigned an over-column
+   // to standalone Breeches, causing a false failure in the legs Body Zone.
+   // If the SAME article order is fully rules-valid without those hints, use
+   // the proved layer result; do not rewrite the inventory or invent any Bulk.
+   if(layering.status!=='compatible'&&Object.keys(slots).length&&
+      layering.errors.some(e=>/incompatible explicit slot|forbidden material order/i.test(e))){
+     const withoutSlotHints=evaluateOrderedArmour(ordered,{...merged,slotByArticleId:{},slotByZoneLocation:{}});
+     if(withoutSlotHints.status==='compatible')layering={...withoutSlotHints,legacySlotsIgnored:true};
+   }
    if(layering.status!=='compatible')issues.push(`Unresolved or forbidden armour layers: ${[...layering.errors,...layering.unresolved].join('; ')}`);
    else {
     extraEnc=layering.extraEnc;
@@ -174,6 +182,6 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   personalFatiguePerPeriod:pf,agilityAndMeleePenalty:encReady?encumbranceTestPenalty({encumbrance:modifiedENC,skillBaseIncludesAgility:true}):null,
   bulkByZone,meleeBulkPenalty:meleeBulk,bulkSource,layeringStatus:layering?.status??null,
   source:'HMK World of Kèthîra pp.112,117–118,122,170',
-  limitations:['Personal Fatigue is accrual per exertion, not current Fatigue','Printed suit Bulk requires explicit GM assessment','No carried mass or omitted armour ENC is silently treated as zero','No character state is modified']};
+  limitations:['Personal Fatigue is accrual per exertion, not current Fatigue','Published suit baseline Bulk is automatic; prohibited non-C/D layers cannot be replaced by a penalty','No carried mass or omitted armour ENC is silently treated as zero','No character state is modified']};
  return result;
 }
