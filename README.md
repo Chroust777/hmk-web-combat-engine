@@ -1,3 +1,91 @@
+# HMK Keeper’s Ledger v93.309 — Falling CF a STN mezi dopady
+
+Toto je **nejnovější kompletní produkční verze**. V93.309 uzavírá dílčí mezeru Falling CF → další dopad při STN z předchozího nárazu: Jumping/Acrobatics/Swimming jsou pravidlově Impaired Tests a STN snižuje jejich skutečný Success Level o jeden stupeň. Náhled zobrazuje původní a upravený výsledek, následné Impact/Injury/Shock se počítají podle upraveného SL. INC/UNC nebo nepoužitelná končetina zůstávají z bezpečnostních důvodů neuzavřenou větví bez automaticky vymyšleného testu. V93.308 doplňuje do již existujícího mapového průvodce dva nezávislé povinné Stumble Rolls, když trvale slepý účastník během Double Move změní směr. Každý hod má samostatnou příčinu, EML, metodu Agility/Acrobatics a zaznamenaný d100; při prvním neúspěchu končí skutečný pohyb u GM potvrzené pozice a druhý hod se nedělá, nebyla-li zatáčka dosažena. Při dvou úspěších nebo úspěchu a následném neúspěchu se zapisují oba hody. Druhý nelze vynechat, pokud první uspěl. Byl zachován Endurance SR d10 i únava Double Move. Nedoložené jiné situace zůstávají oddělené. Obsahuje v93.306 (cílený Deadly Attack po doložené jednokolové koncentraci) a novou větev v93.307 (kouř/Swimming → skutečný Endurance CF → UNC + Extended Shock HR4 + čekající Coma HR). HMK p.179 neurčuje počáteční Coma HR při dušení bez rány; systém hodnotu **nikdy neodvozuje** a k pokračování vyžaduje zřetelně označené samostatné rozhodnutí GM a fyzický d10 pro první Coma Course. Je zaznamenán důvod odchylky. Přehled nálezů i podrobnosti jsou níže ve verzované historii. Plný prohlížečový E2E test není potvrzen.
+
+---
+
+# HMK Keeper’s Ledger v93.305 – Deadly Melee proti ověřeně bezbrannému cíli (HMK v1.2, str. 191)
+
+**První funkční etapa Deadly Attacks** navazuje na v93.304. V `Combat → HMK · řízený celý zásah` přibyla samostatná volba **Deadly Melee**. Pokud skutečný Combat State cíle dokládá **úplnou paralýzu**, **UNC**, aktivní **Coma** nebo **trvalou slepotu** (doloženou Disease HR0), nesmí průvodce tento útok chybně vyhodnotit jako běžný Melee test.
+
+- Podle str. 191 se povinně uplatní **Ignore a automatický čtyřhvězdičkový CS**. Útočník ani obránce **nehází Melee d100**. Pravidlový výsledek je označen zvláštním zdrojem; žádný fyzický hod není simulován.
+- GM musí zvlášť potvrdit, že bezbranný cíl je **ve skutečném dosahu zvolené zbraně**. Zbraň musí být skutečně nasazená; jsou kontrolovány ověřené Weapon Modes, použitá paže, Weapon Quality, STR, ENC/Bulk, Injury Impairment, dosah a připravenost útočníka. Obránce **nepotřebuje vybavenou obrannou zbraň ani Block ML**, ale musí mít doložené Shock ML a STR a kompatibilní anatomii.
+- Čtyři hvězdičky opravňují k **volbě tří TA** mezi Impact a Precision. Poté pokračuje stávající nezměněná Injury Sequence: fyzické ZD/LD, Impact, skutečná ochrana zbroje, Compound pouze při kompatibilním předchozím zranění, případná amputace, Shock a povinné následky.
+- Útok je průběžný **návrh bez zápisu**. Teprve po dokončení se provede jediný atomický zápis do Combat State, Initiative a historie, včetně přesného seznamu skutečně hozených kostek a důkazu `deadlyAttack: true`. Opakování, změna stavu cíle/inventáře/časové osy a neplatný podpis jsou odmítnuty. Rozpracovaný průvodce lze obnovit přes původní `sessionStorage` draft, aniž by se zranění zapsalo podruhé.
+- Běžný Melee/Press/Trip/Grab na takto doložený helpless stav je nyní blokován již před hodem. Není dovoleno převést jeho výsledek do běžného Attack/Defence ani vnitřním pravidlovým adaptérem. Samostatný Deadly Melee používá původní rozhraní a zachovává starší uložené kampaně; není nutná migrace.
+
+**Záměrně otevřeno:** soustředění **jedno celé kolo** umožňující cílenou anatomickou lokaci **bez ZD/LD** podle p.191 potřebuje samostatný důkaz návazný na Initiative scheduler. Tato verze proto používá standardní fyzické ZD/LD a cílené zacílení dosud nenabízí. U spících, svázaných, držených pod hrozbou zbraně nebo dočasně oslepených postav dosud chybí jednotný autoritativní zápis příslušného bezbranného stavu; pouze GM prohlášení bez důkazu nová automatika neakceptuje. Samotná **unaware** situace vynucuje Ignore, ale není automaticky four-star CS; není touto větví pokryta. Plný prohlížečový E2E test není potvrzen.
+
+**Testování:** 47 nových cílených a integračních kontrol včetně skutečné Disease→HR0 paralýzy, nulového Melee d100, TA, fyzické Injury Sequence, podpisu, duplicit, změny stavu a nedovoleného běžného Melee. Regrese v93.304: 96 kontrol, v93.303: 44 kontrol, Falling 31, Disease 60, Poison 41, Sleep 62 a Skills UI 12. Starší testy pro v93.298/300 obsahují již překonaná očekávání (například že slepota ještě nesmí být zvolena); jejich text není relevantní pro v93.305 a nebyly započítány jako úspěšné. Syntaktická kontrola, offline bundle a archivní integrita jsou součástí release preflight. Testovací zdroje ani screenshoty nejsou v ZIP.
+
+**Změněné oproti v93.304:** `app.js`, `src/integration/hmk-guided-live-attack-inputs.js`, `src/integration/hmk-guided-attack-journey.js`, `src/integration/hmk-guided-full-hit.js`, `index.html`, `hmk-app.bundle.js`, `README.md`. **Nové:** `src/integration/hmk-deadly-attack.js`. **Odstraněné:** žádné.
+
+---
+
+# HMK Keeper’s Ledger v93.304 – Paralysis HR0 (omezený rozsah)
+
+Nová GM potvrzená varianta Disease p.184: HR0 → trvalá paralýza s povinně určenou končetinou (levá/pravá paže/noha) nebo úplná paralýza. Course Roll je povinný; bez něho se stav nezapíše. Úplná paralýza nastavuje prone a znemožňuje vlastní akce/pohyb v Initiative. Paralýza paže zakazuje její použití v podporované živé melee/missile větvi. Paralýza nohy zastaví automatický prostorový pohyb k rozhodnutí GM. Deadly Attacks p.191 (automatický four-star CS) **NEJSOU** v této etapě připojené; běžný Melee průvodce na úplně ochrnutý cíl je proto bezpečně blokován. Žádné automatické zotavení se nevymýšlí.
+
+# HMK Keeper’s Ledger v93.303 – trvalá slepota: Stumble při pohybu (HMK str. 160–161, 184)
+
+- V průvodci Combat → Move je při aktivním trvalém následku `blindness` povinný skutečný Stumble d100 pro deklarovaný Full Move nebo přímočarý Double Move. Half Move žádný dodatečný Stumble nevyžaduje.
+- Test Agility nebo alternativní Acrobatics obsahuje tištěný postih −40 EML, navíc ke stávajícím ENC, Fatigue a zranění; není přepsána základní AGL ani ML postavy.
+- Neúspěch vyžaduje GM doložené souřadnice skutečného pádu na dosažitelné trase; postava končí prone na uvedeném místě. Zápis Combat State, Initiative, mapy a historie je atomický. Neúplný doklad není zapsán.
+- Přímočarý Double Move zachovává povinný Endurance SR d10 a Fatigue; poloha pádu se nedomýšlí. Obnovení rozpracovaného průvodce je omezeno živým svědkem stavu.
+- Vzácný souběh slepoty a zatáčejícího Double Move vyžaduje dva samostatné Stumble Rolls a zůstává úmyslně blokovaný; stejně tak mimo-Combat pohyb a jiné obchvatové akce vyžadují zvláštní audit.
+- Není přidána náhodná kostka ani léčba slepoty. Bez změn datového formátu uložených kampaní.
+- Testování této etapy: 44 cílených kontrol (včetně skutečného HR0 z Disease Course, zápisu Initiative/Combat State, selhání, jiných cest zápisu a JSON obnovy) plus starší regresní sady Falling, Poison, Disease, Sleep Deprivation, Psyche, Deafness a Skills. Syntaktická kontrola 240 modulů a produkční sestavení prošly; skutečný prohlížečový end-to-end test nebyl potvrzen.
+
+---
+
+# v93.302 – GM nefatální Disease HR0 → trvalá slepota (HMK v1.2, p.184)
+
+**Nová samostatná etapa nad v93.301.** GM nyní může potvrdit nemoc s HR0 → trvalá slepota (odděleně od standardního fatálního HR0, neletálního minima HR1/HR2 a hluchoty). Projev následuje až po skutečném Course Roll dosažení HR0: nemění se zpětně žádné hody a nevzniká předčasný ani duplicitní zápis. Trvalý stav přežívá ukončení nemoci i načtení kampaně, bez vymyšleného uzdravení.
+
+**Skill Workbench:** u skutečně slepé postavy lze z doložené Skill Base a atributových testů automaticky identifikovat DEX/AGL, a GM musí výslovně rozhodnout, zda lze test provést. U proveditelného testu se automaticky započte **−40 EML** (HMK p.184), u nemožného se test zastaví před hodem. U zrakových PER/Awareness a Sight se test nesmí vydávat za normálně proveditelný. Běžné neovlivněné testy se nemění.
+
+**Otevřené:** HMK na p.184 vyžaduje Stumble při pohybu slepého rychleji než Half Move; toto ještě není všude provedeno jako atomické navazující vyhodnocení a musí rozhodnout GM. Slepota v jiných než Skill Workbench procedurách (zejména Combat, Travel) dosud nemá úplný propojený vynucovací mechanismus. Paralýza, specifické HR0 toxiny, Asphyxia → Coma a Falling CF následující Shock zůstávají otevřené. Před vydáním této etapy jsou vyžadovány cílené a regresní testy; skutečný browser E2E nebyl potvrzen.
+
+**Testy v93.302:** 99 cílených testovacích kontrol slepoty, 46 kontrol čtyřhodinového odpočinku a regresní sady Falling (31), Poison (41), Disease (60), HR minimum (20), Sleep Deprivation (62), PSY (8), původní hluchota (48) a viditelné Skills (12). Dvě starší regresní očekávání vyžadovala aktualizaci na nyní přípustnou slepotu a nové znění validačního textu. Produkční bundle byl sestaven; skutečný prohlížečový end-to-end test není potvrzen.
+
+**Oproti v93.301**: změněny `app.js`, `src/integration/hmk-disease-course.js`, `src/integration/persistent-combat-state.js`, `src/integration/hmk-skill-auto-context.js`, `src/integration/hmk-skill-workbench-ui.js`, `index.html`, `hmk-app.bundle.js` (generovaný) a `README.md`. Nové ani odstraněné soubory nejsou.
+
+# v93.301 – Sleep Deprivation: čtyřhodinový odpočinek (HMK v1.2 str. 176)
+
+**Pravidlově doložená nová etapa:** U otevřené epizody nedostatku spánku může GM potvrdit skutečně dokončený **4hodinový odpočinek**, který odstraní **nejvýše 5 Weariness**, a to **jednou za herní den**. Osmihodinový spánek (−15 Weariness jednou denně) zůstává oddělený; tato etapa nemění jeho dosavadní formulář ani po potvrzeném odpočinku sama neuzavírá epizodu. Psychické trauma (PSY) zůstává beze změny.
+
+- Vyžaduje existující autoritativní kalendář kampaně, předem posunutý na konec odpočinku, a začátek doložený **přesně 240 minut** před aktuálním časem. Kalendář se odpočinkem sám neposune.
+- Automatika z bezpečnostních důvodů nevyhodnocuje 4h odpočinek zasahující do půlnoci; jeho zařazení do herního dne rozhodne GM mimo tento průvodce.
+- Unikátní trvalý záznam dne se kontroluje napříč epizodami téže postavy; duplicita (včetně jiného klíče epizody) je odmítnuta. Do autoritativního Combat State i historie se zapisují začátek, konec, den, obnovená Weariness a zdrojový identifikátor.
+- Nové volitelné `sleepDeprivation.restRecords` přežívají pokračování dalších 24 hodin, obnovení stránky a následný osmihodinový spánek. Starší uložené epizody bez tohoto pole zůstávají platné.
+- Při současné Weariness z neurčených dalších zdrojů aplikace odečtení **zablokuje**: bez rozdělení únavy od GM nelze legitimně určit, ze kterého zdroje ji odebrat. Větev obecné 4h obnovy pro jiné příčiny Weariness zatím není zahrnuta.
+- Obecná maximální frekvence odpočinku HMK p.176 je jeden čtyřhodinový odpočinek a jeden osmihodinový spánek za den. V této etapě se denní omezení kontroluje u nového 4h odpočinku, zatímco stávající 8h spánek není automaticky denně omezen, protože nebyla provedena synchronizace jeho starších historických záznamů s kalendářem. To zůstává otevřené.
+
+**Testy:** cílená sada 46 kontrol nového 4h odpočinku; regrese Falling, Poison, Disease, Sleep Deprivation/Psyche, permanentní hluchota, zobrazení Skills, stavební skript, syntaxe a integrita produkčního ZIPu. Plný browser E2E nebyl potvrzen.
+
+**Změny proti v93.300:** `app.js`, `src/integration/hmk-sleep-deprivation.js`, `src/integration/persistent-combat-state.js`, `index.html`, `hmk-app.bundle.js`, `README.md`. **Nové/odstraněné soubory:** žádné.
+
+---
+
+# v93.299 – Nebezpečí / Trauma mimo deník + Sleep Deprivation (HMK 62, 176, 186, 188)
+
+**Úprava navigace:** Plné GM formuláře Mundane Fire / Smoke, Poison / Toxin a Disease nejsou nadále duplicitně v osobním deníku a na stránce Skill Tests. Mají vlastní společnou navigační položku **⚠ Nebezpečí / Trauma** a odkaz z běžných Skill Tests. V deníku je **pouze čitelný souhrn autoritativního Combat State** (Shock, Fatigue, PSY, otevřený kouř, probíhající otrava/nemoc, spánková deprivace), historický zápis a odkaz na vyhodnocení. Samotné následky mohou vzniknout z fyzického Skill Testu, boje nebo samostatného nebezpečí; neodvozují se automaticky z libovolného neúspěchu.
+
+**Nová dílčí, otestovaná procedura Sleep Deprivation:**
+- GM zadává jedinečnou epizodu, skutečně uplynulých 24 / 48 / 72… hodin bez spánku a skutečný fyzický **Endurance SR d10**. TN = Index END × 5 (tj. floor(END/2)), nezávisle na Fatigue. SR úspěch = +10 Weariness; neúspěch = +15 (str. 62, 176, 186). Neprovádí se d100 Success Test ani CF/CS.
+- Každé období se trvale a neduplicitně zapíše do Combat State a historie, včetně počtu hodin, TN, skutečného hodu, výsledku a rozdílu Weariness. Bez potvrzení GM nebo mimo pořadí se nic neuloží.
+- Za každých celkem 30 bodů Weariness **z nedostatku spánku** vznikne PSY1 (str. 186), zaznamenaný do Morale PSY a jako povinná volba Psyche Traitu. Stávající ověřená procedura volby Traitu (Combat → Psyche) následně vyžaduje GM volbu; projev a Weakness nastanou až podle pravidel cca po 10 minutách (str. 188), nikoli okamžitě. Před volbou Traitu nelze přejít na další bezesný den. Zotavení Psyche Stress má vlastní doložené hody.
+- GM může potvrdit **8 hodin skutečného spánku**; odečte se nejvýše 15 Weariness a uzavře se epizoda. PSY nepominulo. Další epizoda musí mít nový klíč. Při současné Weariness z neodlišených příčin se samovolný nebo částečný odpočet odmítá.
+- Nevyřešené: 4h odpočinek (−5 Weariness pouze jednou za den), souběh spánkové Weariness s jinými zdroji, samostatná GM evidence přechodu mezi herními dny. Nejde o hotovou automatizaci všech pravidel Fatigue.
+
+**Zpětná kompatibilita:** nepřepisují se starší stavy, `sleepDeprivation` je volitelné doplňkové pole. Formát a serializace kampaně zůstaly beze změn. Kompletní statická aplikace pro GitHub Pages se sestavuje beze služeb či plateb.
+
+**Testy:** 62 cílených unit/strukturálních kontrol, 8 dalších kontrol návaznosti PSY a 80 regresních testů Disease/Poison. Kontrola syntaxe a sestavení produkčního bundle prošly. Úplný browser E2E stále není doložen.
+
+**Změněné proti v93.298:** `app.js`, `src/integration/persistent-combat-state.js`, `hmk-app.bundle.js`, `index.html`, `README.md`. **Nový:** `src/integration/hmk-sleep-deprivation.js`. **Odstraněné:** žádné.
+
+---
+
 # v93.298 – GM neletální Disease HR minimum (HMK v1.2 strana 184)
 
 **Další samostatná funkční etapa** navazující na v93.297. Strana 184 HMK umožňuje, aby některé nemoci nikdy neklesly pod HR1 nebo HR2. Nyní lze v novém Disease Contagion průvodci explicitně vybrat jednu ze tří variant: **standardní HR0 = smrt**, **neletální minimum HR1** nebo **neletální minimum HR2**. Pro neletální variantu musí GM samostatně potvrdit, že daná konkrétní nemoc skutečně má tuto zvláštnost; systém to nesmí vybrat automaticky.
@@ -1295,3 +1383,40 @@ Celý inventář přes šířku Character Sheet. Dva řádkové seznamy pro nasa
 The physical injury continuation is shared with the existing confirmed Injury Sequence and stored Combat State, never a second, independent wound counter. **Fishing:** CF in the required DEX/AGL follow-up mandates physical d10 edge impact, independently rolled ZD/LD, real armour, Shock and Compound when indicated. **Acrobatics–Balance** and **Jumping:** a failed prescribed follow-up exposes a verified Falling Routine; short falls and falls over five feet are distinct. **Climbing:** retains the same routine, with the original source skill recorded. **Acrobatics–Gymnastics CF:** records prone directly in the persistent state. **Survival–Trekking:** CF triggers a distinct Survival Hazard d10; Accident (4–6) tests the randomly designated victim's live Agility and creates d6+4 blunt impact (+5 on CF) only after a failed test. Equipment or Complication hazards remain GM procedures without invented wounds.
 
 All injury-bearing outcomes require explicitly entered physical dice, currently verified protection and a GM confirmation; accepted wounds, Shock and the evidence are committed atomically with the journal. Repeated entries, missing Shock dice, unsupported armour, invalid stage, or conflicting active Initiative are rejected. Other distinct mechanisms (combat Riding/mounted mishaps, Swimming-induced Asphyxia and arbitrary GM-defined travel mishaps) must continue through their respective rule systems. A skill failure alone is NOT a blanket instruction to create injury.
+
+
+## v93.300 — non-fatal Disease HR0: permanent deafness (HMK p.184)
+- Disease exposure offers a **GM-confirmed nonfatal HR0 → permanent deafness** variant. Standard lethal HR0 and HR1/HR2 floors remain distinct.
+- A genuinely rolled HR0 Course transition commits an immutable event, removes the superseded illness Shock/weakness, and creates a separately validated, persistent `ailmentSequelae` record. Repeated/replayed courses cannot duplicate it. No unsupported healing clock is invented.
+- In Skill Tests a hearing-based Perception / Awareness check is **automatic CF without d100**; the GM must identify the sensory basis. Existing profiles without this condition are unaffected. The `Sound` subattribute test is always hearing-based.
+- Other permanent sequelae (blindness, paralysis) and combat/other special procedure effects of deafness remain NOT COMPLETE. An unresolved case must be adjudicated by GM, not treated as ordinary success.
+- The build contains only production application files; test scripts and audit files remain outside the ZIP.
+
+## v93.306 · Called Deadly Melee (HMK p.191)
+One round of confirmed, uninterrupted Initiative concentration may bind a helpless target to one called anatomical strike location without ZD/LD. The strike and subsequent Injury/Shock remain manual-die-driven. If no proof, ordinary ZD/LD. Concentration cannot be manufactured at strike time.
+
+## v93.307 · Asphyxia Endurance CF → pending Coma
+Endurance CF for Swimming or Smoke Asphyxia now persists actual original d100,
+EML and Extended Shock HR4, UNC and a **pending** Coma HR without inventing
+Location Shock/Injury Level. The source p179 defines initial HR only for an
+injury-caused Coma; this variable is UNDEFINED for pure Asphyxia (p183).
+Optional separately confirmed GM ruling with provenance and a physical d10
+can explicitly supply an HR (not falsely represented as HMK 1:1), initiating
+the existing Extended Shock + Coma Course state and history. Other modifiers
+and recovery remain per p179. No automatic fabricated coma HR.
+
+
+## v93.308 · Dva nezávislé Stumble pro slepý zatáčející Double Move (HMK pp.160, 161, 184)
+- Původní větev odmítající souběh (`blindnessStumble` + `double-bend`) byla nahrazena dvěma odlišnými příčinami a fyzickými d100; střídavé AGL/Acrobatics jsou přípustné, každý s aktuálním postihem slepoty −40.
+- První neúspěch přeruší pohyb, zapisuje `prone` a skutečné GM potvrzené místo pádu na trase před dosaženou zatáčkou; další nedosažená příčina nevytváří fiktivní hod. Druhý neúspěch nemůže zastavit postavu před zatáčkou, která jej vyvolala.
+- Ochrana `commitGuidedSpatialTurn` i centrální `finishEncounterTurn` odmítá chybějící druhý hod, podvržené pořadí, přidaný hod po prvním neúspěchu, nesoulad důkazů, falešnou polohu pádu i duplicitní potvrzení.
+- Dvě skutečné kostky, příčiny a SL jsou zachované v Combat spatial events a Journalu. Plný prohlížečový E2E test nebyl potvrzen.
+- Po etapě zůstává neuzavřena složitá Falling CF s mezilehlým Shock / neschopnou končetinou; výsledek není automaticky doplňován z dohadu.
+
+
+## v93.309 · Falling CF s mezilehlým STN (HMK str.67, 169–170)
+- Dřívější blanket blok `state.shock !== NONE` nesprávně zastavoval i druhý, pravidly povinný Falling Test po STN. Oprava používá sdílený `stunnedImpairedSL` pouze pro Impaired Tests.
+- Celý následný dopad včetně nových fyzických ZD/LD/Impact/d100, případného Shock a Compound pokračuje a používá skutečný SL po STN. Rozdíl je vidět v náhledu a dokladu události.
+- INC/UNC/KIA a nepoužitelnost nutné končetiny zůstávají blokovány a jsou výslovně označeny jako otevřené rozhodnutí (nelze bez opory automatizovat další d100 nebo opakované CF).
+- Cílená sada otestovala skutečný první náraz se STN, SL S→F u druhého dopadu, pokračování CF, validaci uloženého stavu a bezpečné blokování INC. Regresní sady pro Falling, Disease, Poison, Sleep, Skills, Combat i v93.308 prošly.
+- Plný prohlížečový end-to-end test není potvrzen.
