@@ -79,7 +79,7 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
   if(treatment.result.immediateHeal){w.healed=true;w.healing={...(w.healing??{}),treated:true,treatments,healingRate:0,healedDay:daySinceInjury,permanentImpairment:0,confirmedBy: eventId};}
   else {
    const prior=w.healing??{};
-   w.healing={...prior,treated:true,treatments,healingRate:correctedMountedHealingRate(w,treatment.result.healingRate).rate,
+   w.healing={...prior,treated:true,treatments,healingRate:Math.max(1,correctedMountedHealingRate(w,treatment.result.healingRate).rate-(w.aggravationUntreatedReduction??0)),
     noMundaneHealing:correctedMountedHealingRate(w,treatment.result.healingRate).blocked,
     infectionPossible:!!treatment.result.infectionPossible,permanentEligible:!!treatment.result.permanentImpairmentEligible,
     cauterised:prior.cauterised??w.cauterised??false,area,grimWound:!!treatment.grimWound,nextGrimShockDay:treatment.grimWound?Math.max(1,daySinceInjury+1):null,
@@ -93,7 +93,7 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
  requireRule(!w.healing?.treated,'Treatment already confirmed');
  const result=resolveTreatmentTable({aspect,injuryLevel:w.level,untreated:true,physicianIndex:0,broadhead,area});
  if(result.result.kind==='edge-injury')throw Error('Neošetřená frost amputace potřebuje samostatné potvrzení následného Edge zranění');
- w.healing={treated:true,untreated:true,treatments:[],healingRate:correctedMountedHealingRate(w,result.result.healingRate).rate,
+ w.healing={treated:true,untreated:true,treatments:[],healingRate:Math.max(1,correctedMountedHealingRate(w,result.result.healingRate).rate-(w.aggravationUntreatedReduction??0)),
   noMundaneHealing:correctedMountedHealingRate(w,result.result.healingRate).blocked,
   infectionPossible:!!result.result.infectionPossible,permanentEligible:!!result.result.permanentImpairmentEligible,
   grimWound:result.grimWound,nextGrimShockDay:result.grimWound?Math.max(1,daySinceInjury+1):null,area, nextHealingDay:Math.floor(daySinceInjury/5)*5+5,
