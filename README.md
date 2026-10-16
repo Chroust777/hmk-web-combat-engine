@@ -1121,3 +1121,9 @@ Celý inventář přes šířku Character Sheet. Dva řádkové seznamy pro nasa
 - A critical failure in an expressly supported skill opens a follow-up panel for the actual activity. The primary result stays immutable; a confirmed follow-up becomes a separate append-only journal event.
 - Verified activity rules: Acrobatics Balance/Gymnastics (p.64), Climbing easy/difficult and falling (p.67), Fishing (p.71), Jumping (p.77), Lockcraft picking (p.77), Script writing routine (p.132). Fumble/Stumble use Dexterity/Legerdemain or Agility/Acrobatics as relevant (p.161).
 - Combat's own independent Mishap sequences remain in Combat. Other special activities without an explicit source-backed continuation are not assigned invented rolls. A full certification of every specialized spell/creature/optional rule remains separate future work.
+
+
+### v93.285 – CF follow-up: ML in skill alternatives
+- Fumble/Stumble follow-up choices show each current Mastery Level (ML) from the active character sheet, for example Dexterity · ML 55 or Legerdemain · ML 0 (untrained).
+- Untrained or missing alternatives remain visible but cannot be selected; the continued d100 cannot be submitted when no eligible alternative is available. No new ruling for an untrained attempt is fabricated.
+- No changes to original CF, critical outcome rules or immutable journal records. All source and production files included; test artifacts excluded.

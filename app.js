@@ -142,7 +142,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.284';
+const APP_VERSION='93.285';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3440,7 +3440,7 @@ function hskCriticalNextHTML(originalId,proof){
  const sides=proof.a?[{id:proof.actorId,skill:proof.skills?.[0],result:proof.a,side:'A'},...(proof.b?[{id:proof.opponentId,skill:proof.skills?.[1],result:proof.b,side:'B'}]:[])]:[{id:proof.actorId,skill:proof.skill,result:proof.result,side:'A'}];
  return sides.filter(x=>x.result?.level==='CF'&&!x.result?.forcedCF&&criticalActivities(x.skill).length).map(x=>{
   const options=criticalActivities(x.skill).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+' · HMK str. '+a.page+'</option>').join('');
-  return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Kritický neúspěch · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Pravidlový následek nelze určit pouze podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+options+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique"></select></label><label>Pokračovací d100 (prázdné = automatický hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><button type="submit">Vyhodnotit pravidlový následek CF</button><output class="hsk-followup-output" role="status"></output></form>';
+  return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Kritický neúspěch · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Pravidlový následek nelze určit pouze podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+options+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací d100 (prázdné = automatický hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><button type="submit">Vyhodnotit pravidlový následek CF</button><output class="hsk-followup-output" role="status"></output></form>';
  }).join('');
 }
 function recordSkillEvidence(title,body,proof,slotId=null){
@@ -3461,6 +3461,18 @@ function recordSkillEvidence(title,body,proof,slotId=null){
    summary.textContent='SV '+r.sv+' · '+r.svTier.label+' · '+(r.svTier.stars?'★'.repeat(Math.min(10,r.svTier.stars)):'—')+' · Success '+r.level;}}
 }
 
+// CF alternative choices come from the CURRENT actor sheet, not from a hard-coded
+// skills list. An untrained alternative stays visible (ML 0) but cannot be chosen.
+function hskCriticalSkillChoices(actor,names){
+ const mastered=actor?availableMasteries(actor):[];
+ return names.map(name=>({name,ml:mastered.find(x=>x.name===name)?.ml??0}));
+}
+function hskCriticalTechniqueNote(form){
+ const selector=form.elements.namedItem('technique'),notice=form.querySelector('.hsk-critical-technique-note');
+ if(!selector||!notice)return;
+ const selected=selector.selectedOptions[0];
+ notice.textContent=selected&&selected.value?'Vybráno: '+selected.textContent.trim()+' · pokračovací d100 používá aktuální stav postavy.':'Žádná z dostupných dovedností nemá platné ML. Nelze nyní provést následný d100.';
+}
 // Critical follow-up is an append-only event: original d100 proof is never rewritten.
 document.addEventListener('change',event=>{
  const f=event.target?.closest?.('[data-skill-critical-form]');if(!f||event.target.name!=='activity')return;
@@ -3470,11 +3482,24 @@ document.addEventListener('change',event=>{
  const res=side==='B'?proof?.b:proof?.a||proof?.result;
  const plan=criticalFollowupPlan(skill,event.target.value,res);
  const techniques=plan?.test==='Fumble'?['Dexterity','Legerdemain']:plan?.test==='Stumble'?['Agility','Acrobatics']:plan?.requiresRoll?[plan.test]:[];
+ const actor=character(side==='B'?proof?.opponentId:proof?.actorId);
+ const choices=hskCriticalSkillChoices(actor,techniques);
+ const selectable=choices.filter(c=>c.ml>0);
  const selector=f.elements.namedItem('technique'),wrap=f.querySelector('[data-hsk-critical-technique]');
- if(selector){selector.innerHTML=techniques.map(t=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join('');selector.disabled=!plan?.requiresRoll;}
+ if(selector){
+  selector.innerHTML=(selectable.length?'':'<option value="">— žádná osvojená dovednost —</option>')+choices.map(c=>'<option value="'+esc(c.name)+'"'+(c.ml>0?'':' disabled')+'>'+esc(c.name)+' · ML '+c.ml+(c.ml>0?'':' (neosvojeno)')+'</option>').join('');
+  selector.disabled=!plan?.requiresRoll||!selectable.length;
+  if(selectable.length)selector.value=selectable[0].name;
+ }
  if(wrap)wrap.hidden=!plan?.requiresRoll;
- const field=f.elements.namedItem('followRoll');if(field){field.disabled=!plan?.requiresRoll;field.value='';}
+ const field=f.elements.namedItem('followRoll');if(field){field.disabled=!plan?.requiresRoll||!selectable.length;field.value='';}
+ const submit=f.querySelector('button[type="submit"]');if(submit)submit.disabled=!!plan?.requiresRoll&&!selectable.length;
+ hskCriticalTechniqueNote(f);
  f.querySelector('.hsk-followup-guidance').textContent=plan?plan.detail:'Vyberte konkrétní činnost.';
+},true);
+document.addEventListener('change',event=>{
+ const f=event.target?.closest?.('[data-skill-critical-form]');
+ if(f&&event.target.name==='technique')hskCriticalTechniqueNote(f);
 },true);
 document.addEventListener('submit',event=>{
  const f=event.target;if(!f?.matches?.('[data-skill-critical-form]'))return;
@@ -3494,8 +3519,8 @@ document.addEventListener('submit',event=>{
   let result=null,technique=null,provisional=false;
   if(plan.requiresRoll){
    const allowed=plan.test==='Fumble'?['Dexterity','Legerdemain']:plan.test==='Stumble'?['Agility','Acrobatics']:[plan.test];
-   technique=f.elements.namedItem('technique')?.value||allowed[0];
-   if(!allowed.includes(technique))throw Error('Následný test používá jinou dovednost, než dovoluje pravidlo');
+   technique=f.elements.namedItem('technique')?.value||'';
+   if(!allowed.includes(technique))throw Error('Vyberte osvojenou dovednost pro tento následný hod.');
    const mastery=skillActorMastery(actor,technique),ctx=skillAutoFor(actor,technique),raw=f.elements.namedItem('followRoll')?.value?.trim()||'';
    const roll=raw?Number(raw):secureAutoDie(100);
    // Same validated mechanics as primary tests, but never replace the original critical test.
