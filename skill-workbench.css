@@ -118,3 +118,10 @@
 
 /* Disabled defender controls must not invalidate a solo Skill Test. */
 .hsk-test-card .hsk-defender-fields{border:0;margin:0;padding:0;min-width:0}
+
+/* v93.279: explicit, independent special SR sequence interface */
+.hsk-special-container{border:1px solid var(--line,#876e59);border-radius:12px;margin-top:1rem;padding:0.9rem 1rem;background:rgba(80,53,39,.07)}
+.hsk-special-container>summary{font-weight:700;cursor:pointer;padding:.2rem}
+.hsk-special-container[open]>summary{margin-bottom:.7rem}
+.hsk-special-container .hsk-form-grid{margin:.65rem 0}
+#hsk-special-result .hsk-verdict{margin-top:.9rem}

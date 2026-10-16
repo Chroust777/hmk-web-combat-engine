@@ -1078,3 +1078,13 @@ Edit only current attributes, skill DP and coin balance. Immutable creation proo
 - Zapnutí Opposed obránce aktivuje; jeho kontrola platnosti a d100 zůstávají nezměněné.
 - Neplatné pole kterékoli ze tří záložek Skill Tests nově vysvětlí, proč se test nespustil, v místě výsledku.
 - Způsob výpočtu HMK, Character Sheet a dosavadní historie zůstávají beze změny.
+
+
+### v93.279 – Zvláštní Secondary Rolls a automatické vrstvení Bulk
+
+- Rozšířená databáze *doložených* rutin doplňuje výzkum kouzel (Convocation / Creativity SR) a opravuje církevní postup (Intrigue SR nerozdává automatické +1 SV). Specificky zahrnuje Peóni (Creativity SR pro Reslâva a ordeal), Siém (Spirit SR místo Intrigue), Sárajìn (Melee + Initiative SR) a specializaci kněží Sávè-Knôra (Folklore + Creativity SR).
+- Pod záložkami Skill Tests je rozbalitelný oddíl pro periodické Endurance SR (HMK 149, 176), astrální/arkánní zvláštní SR a vícečetné Style SR v ceremoniích/festivalech (HMK 300, 316–317). TN a počet d10 se počítá automaticky z uložených ML a z primárního hodu, kde je předepsán. Výsledky se ukládají do historie.
+- Vyhodnocený přírůstek únavy *nezapisuje bez potvrzené časové události* do Combat State a neposouvá kalendář; generická sekvence nepřebírá vedení všech časových postupů a více než 200 individuálních kouzel.
+- Přesné tištěné zbrojní komplety nemají žádný přidaný Bulk (pokud k nim nejsou přidány články); není třeba GM potvrzení. Starší chybné explicitní sloupce vrstev lze ignorovat, když identické skutečné pořadí materiálů nezávisle projde tabulkou HMK 117. Automatické Cloth/Padded výjimky −5/zóna jsou zachovány.
+- Jiné zakázané kombinace materiálů **nejsou** povolenou Bulk výjimkou. Aplikace je nesmí bez důkazu zaměnit za −5. U nich zůstává nutnost opravit skutečné vybavení, nikoli ručně schvalovat vymyšlený postih.
+- **Zbývající hranice pokrytí:** jednotlivá kouzla s vlastními d10 podmínkami, úplné rituální kvalifikační podmínky a automatické zápisy periodické únavy do Combat State zatím nejsou jednotně propojené. Nelze prohlašovat všechny SR z celé příručky za kompletní, dokud nebude audit každé individuální sekvence.

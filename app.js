@@ -11,6 +11,7 @@ import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOppose
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEligible} from './src/integration/hmk-skill-secondary-routines.js';
+import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES,specialSecondaryById,resolveSpecialSR} from './src/integration/hmk-special-secondary-routines.js';
 import {HMK_OPPOSED_ACTIONS} from './src/integration/hmk-opposed-skill-pairs.js';
 import {skillNarrativeSolo,skillNarrativeOpposed,skillNarrativeTiebreak} from './src/integration/hmk-skill-narrative.js';
 import {automaticSkillContext} from './src/integration/hmk-skill-auto-context.js';
@@ -136,7 +137,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.278';
+const APP_VERSION='93.279';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3372,6 +3373,15 @@ function hskVerdictSide(label,who,result,sr){
 }
 function hskResultRichHTML(proof,body){
  if(!proof)return '<p>'+esc(body)+'</p>';
+ if(proof.type==='special-secondary-roll')return '<section class="hsk-verdict"><h3>'+esc(proof.routineName)+'</h3><div class="hsk-verdict-grid">'+
+  hskVerdictMetric('Zdroj HMK','str. '+proof.page)+hskVerdictMetric('Secondary TN',proof.outcome.tn)+
+  hskVerdictMetric('Úspěšné SR',proof.outcome.successes+'/'+proof.outcome.rolls.length)+
+  hskVerdictMetric('Hody d10',proof.outcome.rolls.join(', ')||'—')+
+  (proof.outcome.kind==='fatigue'?hskVerdictMetric('Nová únava','+'+proof.outcome.accrual,'z původních '+proof.outcome.base):'')+
+  (proof.outcome.kind==='recovery'?hskVerdictMetric('Obnovená weariness','−'+proof.outcome.wearinessRecovered):'')+
+  (proof.outcome.kind==='divine'?hskVerdictMetric(proof.outcome.benedictionModifier===null?'Renewed Faith':'Benediction modifier',proof.outcome.benedictionModifier===null?(proof.outcome.renewedFaith?'+1 maximální Piety':'nepřidáno'):'+'+proof.outcome.benedictionModifier):'')+
+  '</div><p class="hsk-verdict-footnote">'+esc(proof.explanation)+'</p></section>';
+
  const type=proof.type;
  const actor=character(proof.actorId),opponent=proof.opponentId?character(proof.opponentId):null;
  const a=proof.a||proof.result,b=proof.b||null,comparison=proof.comparison||null;
@@ -3402,10 +3412,118 @@ function hskResultRichHTML(proof,body){
 function recordSkillEvidence(title,body,proof,slotId=null){
  if(!mutate(()=>{if(proof?.consequenceProof?.eventId)assertUniqueSkillConsequence(data.journal,proof.consequenceProof.eventId);data.journal.push({id:uuid(),characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof});}))throw Error('Záznam nebyl uložen; nepovažujte tento hod za uložený.');
  const slot=slotId||((proof?.type==='success-value-specific'||proof?.type==='secondary-mastery-value-test')?'hsk-result-value':proof?.type==='assistance-success-test'?'hsk-result-assistance':'hsk-result-secondary');
- const output=document.getElementById(slot);if(output){output.innerHTML=hskResultRichHTML(proof,body);output.scrollIntoView({block:'nearest',behavior:'smooth'});}
+ const output=document.getElementById(slot);if(output){
+  output.innerHTML=hskResultRichHTML(proof,body);
+  if(proof?.type==='special-secondary-roll'){
+   const details=output.closest('details');if(details)details.open=true;
+   const selection=details?.querySelector('[name="specialRoutine"]');
+   if(selection){selection.value=proof.routineId;hskSpecialRefresh(selection.form);}
+  }
+  output.scrollIntoView({block:'nearest',behavior:'smooth'});
+ }
  if(['success-value-test','success-value-specific','secondary-mastery-value-test'].includes(proof?.type)){
   const summary=document.getElementById('hsk-value-summary');if(summary){const r=proof.result;
    summary.textContent='SV '+r.sv+' · '+r.svTier.label+' · '+(r.svTier.stars?'★'.repeat(Math.min(10,r.svTier.stars)):'—')+' · Success '+r.level;}}
+}
+
+function hskSpecialSelectedInfo(form){
+ const routine=specialSecondaryById(form.elements.namedItem('specialRoutine')?.value);
+ if(!routine)throw Error('Vyberte existující zvláštní činnost HMK');
+ return routine;
+}
+function hskSpecialRefresh(form){
+ const routine=hskSpecialSelectedInfo(form),kind=routine.family;
+ const row=(selector,on)=>{const el=form.querySelector(selector);if(el)el.hidden=!on;};
+ row('[data-special-period]',kind==='fatigue');
+ row('[data-special-divine]',kind==='divine'||routine.id==='astral-rite-member');
+ row('[data-special-astral]',kind==='astral');
+ row('[data-special-festival]',routine.id==='festival-style');
+ const label=form.querySelector('[data-special-description]');
+ if(label)label.textContent='HMK str. '+routine.page+' · '+(routine.description||'Úspěšný SR sníží přírůstek únavy o 5; primární test tím není zrušen.')+
+ (kind==='fatigue'?' · Období: '+routine.period+'.':'');
+ const priestBox=form.querySelector('[name=specialPriest]'),ritualSelect=form.querySelector('[name=specialRitual]');
+ if(priestBox&&ritualSelect){const priest=character(priestBox.value),sk=priest?availableMasteries(priest):[];
+ const allowed=sk.filter(x=>routine.id==='astral-rite-member'?x.name==='Trance':x.name==='Ritual'||x.name.startsWith('Ritual (')));
+ ritualSelect.innerHTML=allowed.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+' · ML '+x.ml+'</option>').join('');}
+}
+function hskSpecialNumericDice(form,count){
+ const raw=form.elements.namedItem('specialDice')?.value?.trim()||'';
+ if(!raw)return Array.from({length:count},()=>secureAutoDie(10));
+ if(!/^(?:10|[1-9])(?:\s*,\s*(?:10|[1-9]))*$/.test(raw))throw Error('Hody d10 zadejte oddělené čárkou, každý od 1 do 10');
+ const parts=raw.split(',').map(x=>Number(x.trim()));
+ if(parts.length!==count)throw Error('Pro tuto činnost je potřeba přesně '+count+' hodů d10.');
+ return parts;
+}
+function hskSpecialRun(form){
+ const routine=hskSpecialSelectedInfo(form),actor=character(selected);
+ if(!actor)throw Error('Vyberte platnou postavu');
+ const kind=routine.family;
+ let priest=null,primaryResult=null,styleInfo=null,stars=0,modifierDetails='',secondaryML=0,tnAdjustment=0;
+ if(kind==='divine'||routine.id==='astral-rite-member'){
+  priest=character(form.elements.namedItem('specialPriest')?.value);
+  if(!priest)throw Error('Vyberte vedoucí postavu');
+  const primaryName=form.elements.namedItem('specialRitual')?.value;
+  if(!primaryName)throw Error('Vedoucí postava neovládá vyžadovanou dovednost '+(kind==='divine'?'Ritual':'Trance'));
+  const ml=skillActorMastery(priest,primaryName),ctx=skillAutoFor(priest,primaryName);
+  if(ctx.armourIsProvisional)throw Error('Nelze osvědčit EML vedoucí postavy; zbrojní vrstvy musí být doložené.');
+  primaryResult=skillResolvedResult({mastery:ml,form,dieKey:'specialPrimaryRoll',condition:ctx.condition,trauma:ctx.trauma}).result;
+  stars=kind==='divine'?primaryResult.svTier.stars:0;
+  modifierDetails='Primární '+primaryName+' ML '+ml.ml+' / EML '+primaryResult.eml+' / d100 '+primaryResult.roll+' → '+primaryResult.level+' / SV '+primaryResult.sv;
+ }
+ if(kind==='divine'){
+  const style=HMK_CEREMONY_STYLES.find(x=>x.id===form.elements.namedItem('specialStyle')?.value);
+  if(!style)throw Error('Neznámý styl obřadu');
+  const names=[style.skill,style.alternate].filter(Boolean);
+  const skills=names.map(name=>availableMasteries(priest).find(x=>x.name===name)||{name,ml:0,index:0});
+  styleInfo=skills.sort((a,b)=>b.index-a.index)[0];
+  secondaryML=styleInfo.ml;
+ }else if(routine.id==='astral-rite-member'){
+  const found=availableMasteries(actor).find(x=>x.name==='Spirit');secondaryML=found?.ml??0;
+  tnAdjustment=primaryResult.level==='CS'?2:0;
+ }else{
+  secondaryML=availableMasteries(actor).find(x=>x.name===routine.skill||routine.skill==='Sensitivity'&&x.name==='Talent (Sensitivity)')?.ml??0;
+ }
+ const outsider=!!form.elements.namedItem('specialOutsider')?.checked;
+ const moralityField=form.elements.namedItem('moralityDifference')?.value?.trim()??'';
+ if(routine.id==='festival-style'&&moralityField==='')throw Error('Festival: bez doložené odchylky od Orthodox MOR nelze určit počet Style SR.');
+ const moralityDifference=routine.id==='festival-style'?Number(moralityField):0;
+ if(!Number.isSafeInteger(moralityDifference)||moralityDifference<0||moralityDifference>20)throw Error('Nesprávná odchylka MOR');
+ let criticalBenedictionPenalty=0,criticalWill=null;
+ if(kind==='divine'&&primaryResult?.level==='CF'){
+  const will=skillActorMastery(priest,'Will'),ctx=skillAutoFor(priest,'Will');
+  criticalWill=skillResolvedResult({mastery:will,form,dieKey:'specialWillRoll',condition:ctx.condition,trauma:ctx.trauma}).result;
+  criticalBenedictionPenalty=['F','CF'].includes(criticalWill.level)?-1:0;
+ }
+ const count=kind==='divine'?(routine.id==='festival-style'?Math.max(0,stars-moralityDifference):stars):
+  (routine.id==='astral-rite-member'&&!['S','CS'].includes(primaryResult?.level)?0:outsider&&['astral-rite-member','astral-talisman'].includes(routine.id)?2:1);
+ let fatigue=null;
+ if(routine.id==='recovery-no-bedroll'){
+  const bedroll=data.inventory.some(x=>x.characterId===actor.id&&x.quantity>0&&
+   /\bbedroll\b/i.test(x.snapshot?.name||'')&&['carried','none'].includes(x.slot));
+  if(bedroll)throw Error('Postava vlastní bedroll. Tento Endurance SR je určen jen pro spánek bez bedrollu (HMK str. 120); zvláštní věta o těžkém bedrollu se v tisku překrývá a nesmí být automaticky domýšlena.');
+ }
+ if(kind==='fatigue'){
+  if(routine.base==='PF'){
+   const load=resolveCombatantLoad({character:actor,inventory:data.inventory});
+   if(!load.encReady||!load.bulkReady||load.issues.length)throw Error('PF nelze stanovit: '+(load.issues.join('; ')||'chybí ověřené zatížení'));
+   fatigue=load.personalFatiguePerPeriod;
+  }else if(routine.base==='variable'){
+   const raw=form.elements.namedItem('baseFatigue')?.value?.trim();
+   if(raw==='')throw Error('Pro tuto konkrétní magickou/astrální sekvenci není pevná únava: zadejte hodnotu podle jejího účinku');
+   fatigue=Number(raw);
+  }else fatigue=routine.base;
+ }
+ const rolls=hskSpecialNumericDice(form,count);
+ const outcome= count===0&&routine.id==='astral-rite-member'?{kind:'astral',tn:Math.floor(secondaryML/10)+tnAdjustment,index:Math.floor(secondaryML/10),rolls:[],successes:0,success:false,requiresPriestSuccess:true,priestSuccessLevel:primaryResult.level}:
+  resolveSpecialSR({routine,secondaryML,rolls,stars,baseFatigue:fatigue,styleTNAdjust:tnAdjustment,outsider,moralityDifference,priestSuccessLevel:primaryResult?.level,criticalBenedictionPenalty});
+ let explanation=routine.description||'Úspěch Endurance SR sníží přírůstek o 5.';
+ if(kind==='divine')explanation+=' Použitý Style: '+styleInfo.name+' ML '+styleInfo.ml+'. '+modifierDetails+'; hvězd: '+stars+'.'+(routine.id==='festival-style'?' Renewed Faith po alespoň jednom úspěchu (+1 maximum Piety na rok).':' Každý úspěch Style SR přidává +1 k Benediction Modifier.');
+ if(kind==='fatigue')explanation+=' Nový přírůstek za jedno období '+routine.period+': '+outcome.accrual+' únavy.';
+ if(kind==='recovery')explanation+=' Výsledná obnova weariness: '+outcome.wearinessRecovered+'.';
+ if(criticalWill)explanation+=' Ritual CF: následný Will d100 '+criticalWill.roll+' → '+criticalWill.level+'; úprava Benediction Modifier '+criticalBenedictionPenalty+'.';
+ if(routine.id==='astral-rite-member')explanation+=' '+modifierDetails+'; bonus +2 TN pouze při Trance CS.';
+ const body=routine.name+' · HMK '+routine.page+'\nSR '+routine.skill+' ML '+secondaryML+' → TN '+outcome.tn+'; hody '+(outcome.rolls.join(', ')||'žádné')+'; úspěchy '+outcome.successes+'\n'+explanation;
+ return {body,proof:{type:'special-secondary-roll',actorId:actor.id,priestId:priest?.id??null,routineId:routine.id,routineName:routine.name,page:routine.page,skill:routine.skill,secondaryML,stars,style:styleInfo?.name??null,primaryResult,criticalWill,outcome,explanation,sourcePages:[62,routine.page]}};
 }
 function hskFields(form,side){return {
   secondary1:form.elements.namedItem(side==='A'?'secondary1':'defSecondary1')?.value||'',
@@ -3582,6 +3700,18 @@ document.addEventListener('focusin',e=>{
  if(form.id==='skill-secondary-form')hskConfigureSR(form,'B');
  refreshSkillAutoPreview(form);
 });
+document.addEventListener('change',e=>{
+ const form=e.target?.form;
+ if(form?.id==='hsk-special-sr-form'&&['specialRoutine','specialPriest'].includes(e.target.name))hskSpecialRefresh(form);
+},true);
+document.addEventListener('focusin',e=>{const form=e.target?.closest?.('#hsk-special-sr-form');if(form&&!form.dataset.ready){form.dataset.ready='yes';hskSpecialRefresh(form);}},true);
+document.addEventListener('submit',e=>{
+ const form=e.target;if(form?.id!=='hsk-special-sr-form')return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const out=document.getElementById('hsk-special-result');
+ try{const saved=hskSpecialRun(form);recordSkillEvidence('Zvláštní SR · '+saved.proof.routineName,saved.body,saved.proof,'hsk-special-result');}
+ catch(error){if(out)out.textContent='Zvláštní SR nelze dokončit: '+error.message;}
+},true);
 document.addEventListener('change',e=>{
  if(e.target?.matches?.('[data-skill-actor]')){selected=e.target.value;render();return;}
  const form=e.target?.form;
