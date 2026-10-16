@@ -1,3 +1,102 @@
+# v93.298 – GM neletální Disease HR minimum (HMK v1.2 strana 184)
+
+**Další samostatná funkční etapa** navazující na v93.297. Strana 184 HMK umožňuje, aby některé nemoci nikdy neklesly pod HR1 nebo HR2. Nyní lze v novém Disease Contagion průvodci explicitně vybrat jednu ze tří variant: **standardní HR0 = smrt**, **neletální minimum HR1** nebo **neletální minimum HR2**. Pro neletální variantu musí GM samostatně potvrdit, že daná konkrétní nemoc skutečně má tuto zvláštnost; systém to nesmí vybrat automaticky.
+
+- Čtyřstupňový Contagion → Onset d6 / 4×d10 Symptoms / Virulence → stav po nástupu → opakovaný Course zůstává zachovaný a persistovaný.
+- Výsledek Course se **nejprve** normálně vypočítá z fyzického d100 a CF/F/S/CS; teprve následně se použije pravidlově potvrzené nejnižší HR1/HR2. V historii je dohledatelný i původní nevynucený výsledek a příznak, že bylo nutné minimum uplatnit.
+- Při HR2 nebo HR1 zůstává odpovídající INC nebo UNC; nepředstírá se uzdravení ani smrt. Kdykoliv Course později zvýší HR, stav se aktualizuje jako u standardní nemoci.
+- Pokud vybrané původní HR leží pod potvrzeným minimem, profil nemoci se neuloží. Neslučitelné volby jsou zablokovány.
+- Starší uložené Disease z v93.297 bez `floorHR` zůstávají validní a fatální výklad jejich HR0 zůstává beze změn; starší kampaně i Poison moduly zůstávají zpětně kompatibilní.
+
+**Neautomatizováno:** samostatné neletální HR0 s případnou trvalou paralýzou, slepotou a hluchotou. To není totéž jako nepřekročitelné HR1/HR2 a potřebuje oddělenou, doloženou stavovou sekvenci.
+
+**Testy:** 60 dřívějších Disease / Poison cross-branch kontrol + 20 nových cílených regresí neletálních variant, dále 12 kontrol Character Sheet a 41 regresí Poison z v93.296. Kódy jsou mimo produkční archiv; syntaxe, offline bundle a ZIP integrita kontrolovány. Plný browser E2E nadále nepotvrzen (omezení zdejšího Chromium).
+
+**Změněné soubory oproti v93.297:** `app.js`, `src/integration/hmk-disease-course.js`, `src/integration/persistent-combat-state.js`, `hmk-app.bundle.js`, `index.html`, `README.md`. **Nové:** žádné. **Odstraněné:** žádné.
+
+---
+
+# v93.297 – viditelná běžná tabulka Skills + Disease Course (HMK v1.2 str. 183–184)
+
+**Oprava deníku:** v běžném Character Sheet se nyní automaticky zobrazuje kompaktní přehled všech sedmi skupin Skills (`Skill`, základní atributy, aktuální `ML`). Nebyl odstraněn, jen byl chybně schovaný v uzavřeném `<details>`. Po volbě **Edit** místo něj uvidíte rozšířenou DP tabulku (`SB`, `Base SM`, dílčí `DP`, `DP Σ`, `SM`, `ML`, `Boost`) s editovatelnými body. Historické hody a nastavení Perception zůstávají rozbalitelné odděleně. Nezměnil se výpočet ani persistence dovedností.
+
+**Nový průvodce Disease (standardní nemoc, fatální HR0):** čtyři samostatně ukládané fáze (v Skill Tests i v deníku postavy). Každý dokončený krok vytváří doloženou Combat State událost a neměnný zápis v osobním deníku.
+
+1. **Transmission + Contagion** – Airborne/Contact/Digested/Vector, GM potvrzený `CI1–5` nebo ověřený fyzický `d20` podle tabulky, fyzický `d100` proti `CI × END`. Jen `CF/F` znamená nákazu; `S/CS` žádné onemocnění a `CS` dává jednorázové `+1 CI` při **další expozici stejné nemoci**. Unikátní ID expozice zabraňuje opakovanému zápisu.
+2. **Onset / Symptoms / Virulence** – jen u potvrzené nákazy d6 dní nástupu (u Contagion `CF` poloviční počet dní), 4 samostatné d10 Symptoms bez přehazování duplicit; HR1–5 na základě skutečného d20 nebo rozhodnutí GM. Neúplné hody blokují postup; rozpracovaná fáze přežije reload.
+3. **Nástup nemoci** – až po potvrzené době expozice se automaticky promítne odpovídající `HR` stav do Combat State: 5/10 Weakness, STN, INC, UNC. Změny původně nezávislého Shock a jiné nevyřešené hazardy se nepřepisují.
+4. **Course každý den** – potvrzený fyzický d100, aktuální `HB × HR` a případné již doložené `Physician SV`, CF −2, F −1, S +1, CS +2 HR. Vždy se nahradí předchozí stav nemoci; HR6 uzdravení, HR0 smrt. Vlastní léčba je podle p184 omezena na **počáteční HR4–5**. Bonus Physician SV neodvozujeme z nedoloženého testu.
+
+**Ochrana kompatibility:** stejný `schemaVersion:1`, stejné úložiště, nové volitelné pole `combatState.diseaseCourses`; historické kampaně bez něj jsou nadále platné. Standardní Poison/Toxin byl doplněn o ochranu proti současné otevřené Disease expozici (včetně pozdějšího Poison Course). Zvláštní, neletální nemoci s trvalými následky či kombinovanými stavy **nejsou** v této verzi označené za automatizované. Nepoužívá žádnou placenou službu.
+
+**Cílené testy:** 60 Disease/cross-branch kontrol (Contagion S/CS/F/CF, CS CI bonus, CF poloviční onset, p183–184 Sea Plague, HR6/HR0, duplicate, soudržnost uloženého stavu, konfliktní Shock/Poison, self-treatment), 12 kontrol Character Sheet UI výstupu, 41 regresních Poison testů; syntaktické kontroly JS, offline bundle a archivní integrita. **Skutečný prohlížečový end-to-end test není potvrzen** kvůli bezpečnostní blokaci místních URL (Chromium `ERR_BLOCKED_BY_ADMINISTRATOR`) a omezení alternativního headless běhu. Testy jsou uchovány pouze mimo produkční ZIP.
+
+**Změněné soubory proti v93.296:** `app.js`, `src/integration/hmk-character-creation-ui.js`, `src/integration/persistent-combat-state.js`, `src/integration/hmk-poison-course.js`, `index.html`, `hmk-app.bundle.js`, `README.md`.
+
+**Nové:** `src/integration/hmk-disease-course.js`. **Odstraněné:** žádné.
+
+**Další otevřené větve:** neletální/alternativní HR0 nemoci a toxiny, specifické trvalé následky blindness/deafness/paralysis, souběžné nezávislé Shock a více nemocí, asphyxia → coma bez doložené lokalizované rány, Falling CF při Shock po předchozím dopadu; ostatní nepokryté Skill/Travel následky vyžadují samostatný audit a nesmějí se interpolovat.
+
+---
+
+# v93.296 – Poison / Toxin: onset, Disease Course a autoritativní stav (HMK v1.2 str. 183–184, 186)
+
+**Standardní obecný toxin s fatálním HR0**. Nový GM panel Poison / Toxin je dostupný v Skill Tests a na kartě postavy; nemění původní Skill Tests, zbraně ani inventář.
+
+- Fyzicky doložená expozice: `vector`, `digested`, výjimečně `contact`; jedinečný klíč; GM potvrdí konkrétní látku, HR1–5, standardní onset a periodu 10–60 minut a čtyři skutečné d10 z tabulky symptomů HMK p183. Protože poison není infekce, není vymyšlen Contagion d100.
+- Onset je samostatný potvrzený krok po skutečně uplynulé době. Do té doby je stav `incubating` a nevyvolává účinky. Po onset se nastaví tištěný HR5/HR4 (5/10 weakness), HR3 STN, HR2 INC nebo HR1 UNC. Automaticky se nic nepřeskakuje ani neřeší podle hodin počítače.
+- Každý Course Roll je splatný jen po zadání skutečného období od expozice. EML = živá Healing Base (END/WIL) × aktuální HR + doložený Physician SV; fyzický d100 určí CF/F/S/CS a převod HR podle p184. Lékařský SV může GM použít pouze jako doložený výsledek předchozího testu. HR6 nemoc/otrava končí, HR0 smrt; jednotlivé stavy se **nahrazují** a slabost se nesčítá duplicitně.
+- Atomické potvrzení na Combat State a append-only Journal pro zahájení, onset a každé pokračování. Trvalé `toxinCourses` přežívá restart i export/import původních kampaní bez migrace. Testuje se jedinečnost klíčů, původ v historii, chybné časování, nepotvrzené hody a souběh se Shock/Coma a aktivním Weather Hazard.
+- **Pevná bezpečnostní omezení**: pouze běžný standardní jed, který je smrtelný při HR0. Alternativní výsledky (např. paralýza), jedy s jinými pravidly, nenormální časy, více současných jedů a souběh cizího Shock jsou bez specifického GM/source pravidlového modelu zablokovány, nikoli prohlašovány za dokončené. Poisson během aktivní Initiative se musí vyhodnotit v autoritativním Combat pořadí. Nejsou vymyšleny sekundární Physician hody ani jejich SV.
+- **Testování**: 41 cílených automatických testů včetně JSON reload, validace postavy, HR/SL, léčebných bonusů, ochrany proti duplikaci a konkurenčnímu Shock; zdroje a bundle prošly syntaktickou kontrolou. End-to-end prohlížečový test v tomto prostředí nebyl úspěšně potvrzen a za úspěch jej nevydávám. Testovací soubory nejsou součástí produkčního ZIP.
+
+**Změněné soubory proti v93.295:** `app.js`, `src/integration/persistent-combat-state.js`, `index.html`, `hmk-app.bundle.js`, `README.md`. **Nové:** `src/integration/hmk-poison-course.js`. **Odstraněné:** žádné.
+
+---
+
+# v93.295 – Falling Routine: průvodce povinnými hody a oprava diagnostiky (HMK v1.2 str. 67)
+
+- Detailní český postup vysvětluje d10 Impact, d10 ZD, d10 LD, volbu Jumping/Acrobatics/Swimming, d100 proti živému EML, následný Shock a podmíněný Compound. Odlišuje CF původního Climbing od CF následujícího testu dopadu.
+- Během vyplňování je dostupný **pouze náhled**: skutečný EML, Success Level, lokalita, strike Impact − skutečná AV, Injury Level, povinné a zakázané hody a upozornění, kdy je vyžadován další celý dopad po CF. Náhled používá reálný inventář, žádné náhradní hody ani hodnoty; neukládá výsledky.
+- Nový čistý `inspectClimbingFallingStep` sdílí pravidlové výpočty s commit a rozlišuje nemožný / chybějící Shock d100 a Compound d10. Hláška „Nepotřebný Compound“ nyní konkrétně říká, proč jej vymazat. Atomický zápis zůstává až po všech dopadech.
+- Ochrana proti duplicitnímu uzavření pádu a proti uložení do dřívějšího kola. Staré kampaně beze změny formátu.
+- **Testy:** 31 cílených assertions pro d100/EML/SL, Impact, zbroj, Compound, CF pokračování, opakování, chybné hody, krátký pád, sklon a vodu. Skript testů není součástí distribuce. Sestavení bundle a kontrola ZIP dokončeny.
+- **Otevřené:** Při opakovaném dopadu po CF, pokud předchozí náraz vytvořil Shock/STN nebo nepoužitelnou končetinu, dosavadní autoritativní výpočet Falling EML bezpečně skončí blokací; nelze bez pravidlového rozhodnutí ignorovat vyvolaný Shock. Poison/Toxin a Disease Course nejsou touto verzí implementovány.
+
+**Změněné soubory oproti v93.294:** `app.js`, `src/integration/hmk-climbing-fall-sequence.js`, `skill-workbench.css`, `index.html`, `hmk-app.bundle.js`, `README.md`. **Nové:** žádné. **Odstraněné:** žádné.
+
+---
+
+# v93.294 – Mundane Fire / Smoke Inhalation / Asphyxia (HMK v1.2)
+
+Navazuje přímo na kompletní produkční v93.293. Všechny dosavadní moduly a staré kampaně zůstávají zachované.
+
+**Oheň (HMK str. 121; Injury str. 167–170, Area AV str. 133)**
+
+- Samostatná GM-potvrzená událost v Skill Tests i na kartě postavy; pro každý kontakt je povinný jedinečný klíč a skutečný Fire Impact d4.
+- FS0–2 = Location, FS3–4 = Area; odpovídající Impact d4 + (2 + FS), při kontaktu kratším než celé kolo −3. Plný impact vyžaduje potvrzené Grab and hold. Při potvrzeném dotyku plamene je přímo zasažena ruka; jinak jsou povinné skutečné ZD/LD.
+- Location ověřuje skutečnou ochranu Fire AV z nasazených článků zbroje. Area užívá ověřený Area AV; volitelná metoda Thorax−1 je výslovná volba GM. Pro Area v tomto panelu musí GM potvrdit, že nedošlo k Evade; jakékoli Evade se musí řešit v Combat.
+- Injury Level se určí výhradně z efektivního Impact pravidlovým Injury resolverem. Compound Injury vyžaduje konkrétní skutečný d10, Shock skutečný d100; použije se stávající autoritativní Combat State, následná Injury Morale a standardní hojení.
+- Zápis do postavy a neměnného deníku probíhá v jediné transakci. Stejné ID expozice nelze zapsat dvakrát; neúplné, nesmyslné nebo vnitřně rozporné hody blokují celý zápis.
+
+**Kouř (HMK str. 121 a 183)**
+
+- V uzavřeném prostoru s potvrzeným ohněm a kouřem GM založí *čekající Smoke Asphyxia*. Tato otevřená událost trvale přežije reload; bez potvrzeného času a fyzických hodů nedělá žádné vymyšlené poškození.
+- Při skutečném osvobození nebo smrti lze zadat uplynulá pětisekundová kola, Will SV d100, případný Death Countdown d10 a po záchraně v bezvědomí Endurance d100. Možné výsledky zahrnují Windedness +5, STN, Extended Shock/UNC, okamžité zotavení nebo KIA. Přetrvávající Shock pokračuje již existujícím Combat Recovery.
+- Přímé CF Endurance po bezvědomí z Asphyxia **zůstává otevřeným pravidlovým blokátorem**: strana 169 vyžaduje počáteční Coma HR odvozené od zranění/lokace, ale samotná Asphyxia žádnou takovou lokaci neuvádí. Systém nevytváří umělé Coma HR a tuto větev nezapíše jako hotovou.
+
+**Záměrná omezení a další fáze**
+
+- Během aktivní Initiative se tento samostatný panel nezapisuje mimo autoritativní Combat sekvenci. Složité Area Evade, neurčitá zbroj, vícezdrojové požáry a konfliktní Shock musejí být ověřeny zvlášť GM.
+- Fire a Smoke jsou dvě samostatně potvrzené události. Příští nedokončené větve zahrnují Poison/Toxin, Disease, další nehody při cestování a následné léčebné procedury; nejsou v této verzi označeny za dokončené.
+- Testování: 21 cílených automatizovaných kontrol reducerů prošlo, syntaktická kontrola zdrojového `app.js` a sestavení produkčního bundle prošly. **Prohlížečový end-to-end test se nepodařilo provést**: zdejší Chromium blokovalo i lokální URL / `file://`. Tento nedostatek se nepovažuje za úspěšný test.
+
+**Sestavení a nasazení**: obsah ZIPu umístěte do kořene GitHub Pages. Pro běh není potřeba server, placená služba ani další balíček. Výchozí `index.html` načítá již sestavený `hmk-app.bundle.js`. Pro nové sestavení ze zdrojů použijte `node tools/build_bundle.cjs` s dostupným TypeScriptem při sestavování; runtime žádné npm balíčky nepotřebuje.
+
+**Soubory změněné proti v93.293**: `app.js`, `index.html`, `hmk-app.bundle.js`, `README.md`. **Nový**: `src/integration/hmk-mundane-fire-smoke.js`. **Odstraněné**: žádné.
+
+---
+
 # v93.293 – uzavření Frostbite, Sunburn a Cold Shock (HMK p.185)
 
 Tato verze navazuje na v93.292 a přidává čistý modul `src/integration/hmk-weather-trauma-completion.js`:
