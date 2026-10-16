@@ -1,3 +1,17 @@
+# v93.293 – uzavření Frostbite, Sunburn a Cold Shock (HMK p.185)
+
+Tato verze navazuje na v93.292 a přidává čistý modul `src/integration/hmk-weather-trauma-completion.js`:
+
+- Frostbite: skutečné d20 pro vítr a expozici, jednotlivé lokace včetně ochrany AV0, 1–3, 4+, výpočet přímého IL a jeho zápis s aspektem `frost` do Combat State.
+- Sunburn: skutečné d10 pro každou vystavenou lokaci, pravděpodobnost podle complexion, zranění `fire` M1/S2 a následné léčení podle správné tabulky.
+- Všechny vzniklé rány procházejí standardním Compound Injury, Shock, případně plánem Morale/Mishaps. Rány a fyzické hody se zaznamenávají atomicky, bez fiktivního Impact.
+- Cold Shock po ponoření: fyzické 3d6 a Endurance d100, SHK 5/6/7 s úpravou CF/F/S/CS, včetně STN/INC/UNC/KIA a naplánovaného Shock Recovery. Vodní Cold Exposure CF/F nyní vyžaduje doložený předcházející Cold Shock.
+- Formuláře jsou dostupné mezi čekajícími návaznostmi Skill Tests a v deníku; neúplná expozice zůstává čekající i po zotavení ze základního HR.
+
+**Pravidlová omezení:** GM potvrzuje fyzicky vystavená místa a podmínky. Pro dobu vytvářející více než IL5 v jedné lokaci příručka v tomto kroku neposkytuje bezpečné převedení na další samostatné rány, a proto se transakce přeruší. Nelze přeskočit nevyřešený Shock ani nepřípustnou zbroj. Dopady kouře, otevřeného ohně a toxinů jsou další oddělené větve, které tato verze neimplementuje.
+
+---
+
 # v93.292 — Trekking: potvrzené Cold/Heat Hazards a Exposure Course
 
 - Originální Endurance (Survival) Skill Test lze po potvrzení GM navázat na předcházející Weather Hazard z Trekking (HMK v1.2 str.149). F/CF zakládají doloženou expozici, S/CS vytvářejí pouze pravidlem stanovenou dodatečnou Weariness.

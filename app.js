@@ -16,6 +16,7 @@ import {prepareClimbingFallingSequence,prepareShortClimbingFall} from './src/int
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
 import {prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {prepareTrekkingWeatherTest,advanceTrekkingWeatherExposure} from './src/integration/hmk-weather-hazard-aftermath.js';
+import {prepareColdWaterShock,prepareExposureSkinInjuries} from './src/integration/hmk-weather-trauma-completion.js';
 import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEligible} from './src/integration/hmk-skill-secondary-routines.js';
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES,specialSecondaryById,resolveSpecialSR} from './src/integration/hmk-special-secondary-routines.js';
 import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,validateSpecialEffectEvidence} from './src/integration/hmk-special-outcome-commit.js';
@@ -148,7 +149,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.292';
+const APP_VERSION='93.293';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3608,6 +3609,37 @@ function hskTrekkingWeatherForm(entry){
  <button type="submit">Zapsat Trekking Weather Hazard do stavu</button><output role="status" aria-live="polite"></output>
  </form></details>`;
 }
+function hskTrekkingColdShockForm(entry){
+ const p=entry?.skillTestProof,r=p?.a||p?.result,sk=p?.skills?.[0]||p?.skill;
+ if(!['Endurance','Survival'].includes(sk)||!['CF','F'].includes(r?.level)||
+  !['secondary-mastery-value-test','secondary-mastery-test','assistance-success-test'].includes(p?.type)||
+  data.journal.some(j=>j.skillTestProof?.type==='skill-cold-water-shock'&&j.skillTestProof.sourceId===entry.id))return '';
+ return `<details class="hsk-climb-fall"><summary>Studená voda · Cold Shock před expozicí · HMK str.185</summary>
+ <form data-skill-cold-shock><input type="hidden" name="sourceId" value="${esc(entry.id)}">
+ <p>Pouze při doloženém skutečném ponoření do studené vody. Po fyzických 3d6 kolech se provede jednorázový Endurance test; výsledný Shock se zapíše a případná další Cold Exposure následuje samostatně.</p>
+ <div class="field-grid"><label>Teplota vody<select name="condition"><option value="coolWater">Cool Water · SHK5</option><option value="coldWater">Cold Water · SHK6</option><option value="freezingWater">Freezing Water · SHK7</option></select></label>
+ ${[1,2,3].map(i=>`<label>d6 č. ${i}<input name="d6_${i}" type="number" min="1" max="6" required></label>`).join('')}
+ <label>Endurance d100<input name="enduranceD100" type="number" min="1" max="100" required></label></div>
+ <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečné ponoření, uplynutí 3d6 kol a fyzické hody</label>
+ <button type="submit">Vyhodnotit a uložit Cold Shock</button><output role="status" aria-live="polite"></output></form></details>`;
+}
+function hskTrekkingSkinForms(actorId){
+ const actor=character(actorId);if(!actor)return '';
+ const hazards=(persistentStateOf(actor).environmentalHazards||[]).filter(h=>h.skinPending);
+ const locations='sk, fa, nk, sh, ua, el, fo, ha, tx, ab, pv, th, kn, ca, ft';
+ return hazards.map(h=>`<details class="hsk-climb-fall"><summary>Dokončit ${h.skinPending==='frostbite'?'Frostbite':'Sunburn'} · jednotlivá zranění · HMK str.185</summary>
+ <form data-skill-weather-skin><input name="sourceId" type="hidden" value="${esc(h.sourceId)}">
+ <p>Každou skutečně vystavenou anatomickou lokaci uveď na samostatný řádek. Při Frostbite musí zadané AV odpovídat skutečné zbroji; při Sunburn se používá samostatné d10 pro každou lokaci. Vznikne-li zranění, doplň jeho fyzický Shock d100 a případný Compound d10. Vše se zapíše jako jediná transakce.</p>
+ ${h.skinPending==='frostbite'?`<div class="field-grid"><label>Vítr · fyzické d20<input name="windD20" type="number" min="1" max="20" required></label><label>Délka expozice · fyzické d20<input name="durationD20" type="number" min="1" max="20" required></label></div>`:
+ `<label>Skutečná pleť postavy<select name="complexion"><option value="very-light">Very Light · TN10</option><option value="light">Light · TN7</option><option value="medium">Medium · TN4</option><option value="dark">Dark · TN2</option><option value="very-dark">Very Dark · TN1</option></select></label>`}
+ <label>Lokace; strana; AV; Sunburn d10; Shock d100; Compound d10
+ <textarea name="rows" rows="5" required placeholder="ha;left;0;8;55;\nft;right;2;4;63;"></textarea></label>
+ <p class="tiny">Kódy: ${locations}. Strana jen u končetiny left/right, jinak nevyplňuj. Šest sloupců oddělených středníkem; nepovinné d10/d100 ponech prázdné. Frostbite AV0/1–3/4+ se ověří proti vybavení. U Sunburn pole AV ignoruj. Pro bezránovou lokaci nevyplňuj Shock. Celý soupis musí potvrdit GM.</p>
+ <label><input type="checkbox" name="allLocationsReviewed" required> GM potvrzuje, že soupis obsahuje všechna vystavená místa; nezadaná místa nebyla vystavena</label>
+ <label><input type="checkbox" name="gmConfirmed" required> GM ověřil současnou ochranu a všechna fyzická d20/d10/d100</label>
+ <button type="submit">Zapsat všechna kožní zranění</button><output role="status" aria-live="polite"></output>
+ </form></details>`).join('');
+}
 function hskTrekkingWeatherCourseForms(actorId){
  const actor=character(actorId);if(!actor)return '';
  const state=persistentStateOf(actor),active=(state.environmentalHazards||[]).filter(x=>x.active);
@@ -3631,7 +3663,7 @@ function hskPendingSkillPhysicalConsequences(actorId){
  const unresolved=data.journal.filter(x=>x.characterId===actorId&&x.skillTestProof&&
   !['critical-followup','climbing-falling','skill-physical-consequence','special-secondary-roll'].includes(x.skillTestProof.type));
  const originalForms=unresolved.map(x=>hskCriticalNextHTML(x.id,x.skillTestProof)).join('');
- const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskSkillPhysicalImpactForm(x)).join('')+data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)).join('')+hskTrekkingWeatherCourseForms(actorId);
+ const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskSkillPhysicalImpactForm(x)).join('')+data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
  return html?'<section class="panel wide"><h3>Čekající pravidlové následky Skill Tests</h3><p class="muted">Nevyřešené kritické hody jsou dostupné i po obnovení stránky; původní hod se znovu nehází.</p>'+html+'</section>':'';
 }
 function recordSkillEvidence(title,body,proof,slotId=null){
@@ -3939,6 +3971,57 @@ document.addEventListener('submit',event=>{
   }))throw Error('Zápis Weather Hazard se neuložil');
   form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Weather Hazard byl doložen a uložen. Následné Course/Healing hody jsou dostupné v deníku.'}));
  }catch(e){if(out)out.textContent='Weather Hazard nebyl uložen: '+e.message;}
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-skill-cold-shock]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  const sourceId=form.elements.namedItem('sourceId').value,src=data.journal.find(x=>x.id===sourceId),proof=src?.skillTestProof;
+  const actor=character(proof?.actorId),result=proof?.a||proof?.result;
+  if(!actor||actor.id!==src.characterId||!['CF','F'].includes(result?.level)||!['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill))throw Error('Nedoložený původní Cold Hazard');
+  if(combatInitiativeSequence)throw Error('Cold Shock v Initiative patří do řízeného Combat State');
+  const old=persistentStateOf(actor);
+  const outcome=prepareColdWaterShock({actor,state:old,sourceId,round:Math.max(1,combatClock.round||1,old.lastRound||0),
+   condition:form.elements.namedItem('condition').value,d6s:[1,2,3].map(i=>Number(form.elements.namedItem('d6_'+i).value)),
+   enduranceD100:Number(form.elements.namedItem('enduranceD100').value),gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
+  if(!mutate(()=>{
+   if(data.journal.some(x=>x.skillTestProof?.type==='skill-cold-water-shock'&&x.skillTestProof.sourceId===sourceId))throw Error('Opakovaný Cold Shock');
+   synchronizeCombatInjuries(actor,outcome.state);
+   data.journal.push({id:uuid(),characterId:actor.id,title:'Cold Shock · HMK str.185',
+    body:'3d6: '+outcome.report.immersionRounds+' kol · Endurance '+outcome.report.enduranceD100+' → '+outcome.report.sl+' · SHK '+outcome.report.index+' · '+outcome.report.shock,
+    createdAt:stamp(),skillTestProof:{type:'skill-cold-water-shock',sourceId,actorId:actor.id,report:outcome.report}});
+  }))throw Error('Cold Shock nebyl uložen');
+  form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Cold Shock uložen v Combat State. Další Cold Exposure se posoudí samostatně.'}));
+ }catch(e){if(out)out.textContent='Cold Shock nebyl zapsán: '+e.message;}
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-skill-weather-skin]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  const sourceId=form.elements.namedItem('sourceId').value,actor=character(selected),orig=actor&&persistentStateOf(actor);
+  if(!actor||!orig?.environmentalHazards?.some(h=>h.sourceId===sourceId&&h.skinPending))throw Error('Neexistuje nedokončené kožní poranění této postavy');
+  if(combatInitiativeSequence)throw Error('Zranění během Initiative musí vést Combat');
+  const toNumber=x=>x?.trim()?Number(x.trim()):null;
+  const rows=form.elements.namedItem('rows').value.trim().split('\n').filter(x=>x.trim()).map(line=>{
+   const v=line.split(';');if(v.length!==6)throw Error('Každý řádek musí obsahovat přesně 6 údajů oddělených středníkem');
+   return {location:v[0].trim().toLowerCase(),side:v[1].trim().toLowerCase()||null,av:toNumber(v[2]),skinD10:toNumber(v[3]),
+    shockD100:toNumber(v[4]),compoundD10:toNumber(v[5])};
+  });
+  const outcome=prepareExposureSkinInjuries({actor,inventory:data.inventory,state:orig,sourceId,
+   round:Math.max(1,combatClock.round||1,orig.lastRound||0),rows,
+   windD20:toNumber(form.elements.namedItem('windD20')?.value),durationD20:toNumber(form.elements.namedItem('durationD20')?.value),
+   complexion:form.elements.namedItem('complexion')?.value||null,
+   gmConfirmed:form.elements.namedItem('gmConfirmed').checked,allLocationsReviewed:form.elements.namedItem('allLocationsReviewed').checked});
+  if(!mutate(()=>{
+   if(data.journal.some(x=>x.skillTestProof?.type==='skill-weather-skin'&&x.skillTestProof.sourceId===sourceId))throw Error('Dvojí zápis kožního traumatu');
+   synchronizeCombatInjuries(actor,outcome.state);
+   data.journal.push({id:uuid(),characterId:actor.id,title:'Weather '+outcome.report.kind+' · HMK str.185',
+    body:'Zkontrolováno '+outcome.report.reviewedLocations+' lokací · založeno '+outcome.report.wounds.length+' ran: '+
+     outcome.report.wounds.map(w=>w.location+' '+(w.side||'')+' '+w.severity+w.il).join(', '),createdAt:stamp(),
+    skillTestProof:{type:'skill-weather-skin',sourceId,actorId:actor.id,report:outcome.report}});
+  }))throw Error('Kožní zranění nelze uložit');
+  form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Zranění byla automaticky zapsána do Combat State a historie.'}));
+ }catch(e){if(out)out.textContent='Kožní poranění nebylo zapsáno: '+e.message;}
 },true);
 document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-skill-weather-course]'))return;
