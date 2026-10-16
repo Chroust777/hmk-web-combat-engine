@@ -15,10 +15,10 @@ function evaluatedWornOrder(worn){
  const ids=new Set();
  for(const item of worn){
   const result=resolveOwnedArmourArticle(item);
-  if(!result.ready || ids.has(result.article?.id))return null;
-  ids.add(result.article.id);
-  articles.push({...result.article,layerOrder:item.layerOrder});
-  if(item.layerSlot)slotByArticleId[result.article.id]=item.layerSlot;
+  if(!result.ready || ids.has(item.id))return null;
+  ids.add(item.id);
+  articles.push({...result.article,id:item.id,layerOrder:item.layerOrder});
+  if(item.layerSlot)slotByArticleId[item.id]=item.layerSlot;
  }
  const outcome=evaluateOrderedArmour(articles,{slotByArticleId});
  return outcome.status==='compatible' && Number.isSafeInteger(outcome.bulkPenalty) && Number.isSafeInteger(outcome.extraEnc)?outcome:null;
@@ -38,7 +38,7 @@ function chooseSlots(worn){
  const exceptions=new Set(evaluatedWornOrder(worn)?.zoneReports.filter(z=>z.bulkArticleId).map(z=>z.bulkArticleId)??[]);
  const ranked=worn.map(item=>{
   const result=resolveOwnedArmourArticle(item);
-  if(result.ready&&exceptions.has(result.article.id))return [];
+  if(result.ready&&exceptions.has(item.id))return [];
   const possible=[];
   for(const slot of COLUMN_SLOTS){
    item.layerSlot=slot;
@@ -52,7 +52,7 @@ function chooseSlots(worn){
  function search(i){
   if(i===worn.length)return validateWornOrder(worn);
   const resolved=resolveOwnedArmourArticle(worn[i]);
-  if(resolved.ready&&exceptions.has(resolved.article.id)){
+  if(resolved.ready&&exceptions.has(worn[i].id)){
    worn[i].layerSlot=null;return search(i+1);
   }
   for(const value of [...ranked[i],null]){
@@ -97,9 +97,25 @@ export function arrangeStartingArmour(items){
  }
  // Keep the physical inner-to-outer order authoritative; assign only safe
  // whole-article columns, because one article may cross several Body Zones.
- if(accepted.length)chooseSlots(accepted);
+ if(accepted.length){if(accepted.length<=8)chooseSlots(accepted);else accepted.forEach(x=>x.layerSlot=null);}
  if(!validateWornOrder(accepted))throw Error('Nepodařilo se ověřit počáteční zbrojní vrstvy');
  const result=evaluatedWornOrder(accepted);
  return {wornArmourCount:accepted.length,carriedArmourCount:armour.length-accepted.length,
   startingBulkPenalty:result?.bulkPenalty??0,automaticBulkZones:result?.zoneReports.filter(z=>z.bulkArticleId).map(z=>z.zone)??[]};
+}
+
+/** Non-destructive preview for an existing custom outfit. Does not remove pieces,
+ * choose a historically worn order or alter the character's stored inventory.
+ * A caller may offer the resulting arrangement as an explicit one-click action.
+ */
+export function previewExistingArmourArrangement(inventory=[]){
+ if(!Array.isArray(inventory))return {ready:false,reason:'Inventář není seznam'};
+ const originals=inventory.filter(x=>x?.slot==='worn'&&x.snapshot?.category==='armor');
+ if(!originals.length)return {ready:true,placements:[],bulkPenalty:0};
+ const copies=originals.map(x=>({...x,bulkExceptionZones:[...(x.bulkExceptionZones||[])]}));
+ try{
+  const result=arrangeStartingArmour(copies);
+  if(result.carriedArmourCount)return {ready:false,reason:'Část zbroje nelze ani přeuspořádáním legálně nosit. Nejprve ji odeberte.'};
+  return {ready:true,placements:copies.map(x=>({id:x.id,layerOrder:x.layerOrder,layerSlot:x.layerSlot??null,bulkExceptionZones:x.bulkExceptionZones??[]})),bulkPenalty:result.startingBulkPenalty};
+ }catch(e){return {ready:false,reason:'Doložené vrstvení nelze jednoznačně sestavit z dostupných údajů.'};}
 }
