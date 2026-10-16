@@ -39,3 +39,17 @@
 .hsk-dp-edit{margin-top:.9rem;padding:.6rem;border:1px solid #736147;border-radius:6px}
 .hsk-compact{min-width:425px}
 .hsk-compact td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+
+
+/* v93.310 scenic library overrides */
+.library-navigation{gap:.55rem;margin:.3rem 0 1rem}
+.library-navigation button{border-radius:14px;background:linear-gradient(180deg,#eadfc7,#d9c39c);color:#2d1d11;border-color:rgba(96,74,40,.24);box-shadow:0 8px 16px rgba(27,17,8,.12)}
+.library-navigation button[aria-selected="true"]{background:linear-gradient(180deg,#82592f,#66431f);color:#fff4dc;border-color:#e6c483}
+.library-toolbar{background:linear-gradient(180deg,rgba(247,241,228,.92),rgba(233,223,201,.92));padding:.8rem 1rem;border:1px solid rgba(103,78,43,.18);border-radius:18px;box-shadow:0 10px 20px rgba(0,0,0,.12)}
+.library-results{color:#efe1c0;margin:.6rem 0 .85rem}
+.library-table-wrap{background:rgba(250,246,238,.95);border:1px solid rgba(106,79,44,.24);border-radius:18px;box-shadow:0 12px 24px rgba(0,0,0,.15)}
+.library-table{font-size:.86rem;color:#241912}
+.library-table thead th{background:#74522f;color:#fff2d6}
+.library-table tbody tr:nth-child(2n){background:rgba(107,80,43,.06)}
+.library-warning,.library-purchase-hint{color:#62431d}
+.library-rules-details{background:linear-gradient(180deg,rgba(247,240,226,.94),rgba(233,221,198,.92));padding:.85rem 1rem;border-radius:16px;border:1px solid rgba(104,79,45,.16)}
