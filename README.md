@@ -1109,9 +1109,15 @@ Celý inventář přes šířku Character Sheet. Dva řádkové seznamy pro nasa
 - Katalogové součty hmotností/cen nadále přiznávají chybějící vstupní data a Gear ENC se počítá z celkové efektivní hmotnosti dle p.122.
 
 
-### v93.283 – Výklad nulového ENC/Bulk ve Skill Tests
+### v93.284 – Výklad nulového ENC/Bulk ve Skill Tests
 - U testu je přímo zobrazeno, jak se skládá Armour ENC, Gear ENC a modifier STR.
 - Pokud je upravené ENC při nedoloženém vrstvení jen interval (např. 0–10), Skill Tests rozlišují prokázané minimum od aritmeticky možného postihu.
 - U dovedností bez Agility ve Skill Base se vysvětluje, proč přímé ENC v EML nevzniká.
 - Neověřený Bulk už není prezentován jako potvrzené `+0`, ale jako `neurčeno*`; předběžný výsledek zůstává transparentně označen.
 - Pravidla hodů, ENC a Bulk, inventář a historie jsou beze změny.
+
+### v93.284 – Skill CF continuations and provisional EML
+- Skill Tests now display an explicit ENC-dependent EML interval in the live modifier breakdown and saved result whenever the load evidence supplies both bounds. The interval is *arithmetical*, not permission to wear prohibited armour; missing Bulk/PER remain marked unknown.
+- A critical failure in an expressly supported skill opens a follow-up panel for the actual activity. The primary result stays immutable; a confirmed follow-up becomes a separate append-only journal event.
+- Verified activity rules: Acrobatics Balance/Gymnastics (p.64), Climbing easy/difficult and falling (p.67), Fishing (p.71), Jumping (p.77), Lockcraft picking (p.77), Script writing routine (p.132). Fumble/Stumble use Dexterity/Legerdemain or Agility/Acrobatics as relevant (p.161).
+- Combat's own independent Mishap sequences remain in Combat. Other special activities without an explicit source-backed continuation are not assigned invented rolls. A full certification of every specialized spell/creature/optional rule remains separate future work.
