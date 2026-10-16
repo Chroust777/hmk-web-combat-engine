@@ -8,7 +8,8 @@ import {resolveLiveCombatArmour} from './live-combat-armour.js';
 import {resolveCombatantLoad} from './combatant-load.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {combatFatigueTotals,validateCombatState} from './persistent-combat-state.js';
-import {successLevel,SL} from '../rules/tests.js';
+import {successLevel,effectiveMasteryLevel} from '../rules/tests.js';
+import {injuryFromEffectiveImpact,compoundCompatible} from '../rules/injury.js';
 const must=(condition,message)=>{if(!condition)throw Error(message)};
 const die=(n,max)=>Number.isSafeInteger(n)&&n>=1&&n<=max;
 const surfaces=Object.freeze({water:-16,mud:-12,snow:-8,earth:-4,paving:-2,rock:0});
@@ -26,10 +27,65 @@ function heightImpact(ft){
 }
 const adjustment={Jumping:{CF:4,F:0,S:-2,CS:-4},Acrobatics:{CF:2,F:0,S:-4,CS:-6},Swimming:{CF:4,F:0,S:-2,CS:-4}};
 const limbs=new Set(['sh','ua','el','fo','ha','th','kn','ca','ft']);
+/** Read-only step inspection for an on-screen falling checklist.  No dice are rolled,
+ * no state is written, and no optional roll is guessed or silently discarded.
+ * This uses the same armour, fatigue, skill and Injury functions as the commit.
+ */
+export function inspectClimbingFallingStep({actor,inventory,state,fallHeightFt,surface,slope='sheer',
+ direction='front',row,round=1,timelineId='skill-falling-preview'}={}){
+ must(actor?.id&&Array.isArray(inventory)&&state,'Pro náhled chybí postava, inventář nebo stav');
+ validateCombatState(state);
+ must(Object.hasOwn(surfaces,surface)&&['sheer','steep','very-steep'].includes(slope),
+  'Pro náhled nejprve vyberte doložený povrch a sklon');
+ must(['front','rear','side'].includes(direction),'Pro náhled vyberte skutečný směr dopadu');
+ const needed=[];
+ const dice={impactD10:10,zoneD10:10,locationD10:10,fallingD100:100};
+ for(const [field,faces] of Object.entries(dice)){
+  if(row?.[field]===null||row?.[field]===undefined)needed.push(field);
+  else must(die(row[field],faces),'Neplatný '+field+' (přípustné 1–'+faces+')');
+ }
+ must(Object.hasOwn(adjustment,row?.technique),'Zvolte Jumping, Acrobatics nebo Swimming');
+ must(row.technique!=='Swimming'||surface==='water','Swimming lze použít pouze při dopadu do vody');
+ const load=resolveCombatantLoad({character:actor,inventory});
+ must(load.ready&&load.encReady&&load.bulkReady,'Nelze určit skutečné ENC/Bulk: '+(load.issues||[]).join('; '));
+ const injury=projectLiveInjuries({state,round,test:row.technique.toLowerCase(),
+  usedArms:['left','right'],timelineId});
+ must(injury.ready,'Nelze ověřit oslabení z ran: '+(injury.reason||''));
+ must(!injury.unusable&&!injury.stunned&&state.shock==='NONE',
+  'Stávající Shock nebo nepoužitelná končetina blokuje nový Falling Test; je nutné rozhodnutí GM');
+ const rawEML=skillML(actor,row.technique)-combatFatigueTotals(state).total+
+  load.agilityAndMeleePenalty+injury.modifier;
+ const eml=effectiveMasteryLevel(rawEML);
+ if(needed.length)return {ready:false,needed,rawEML,eml,technique:row.technique};
+ const sl=levelNames[successLevel(row.fallingD100,rawEML)];
+ const loc=humanLocation(row.zoneD10,row.locationD10);
+ const armour=resolveLiveCombatArmour({inventory,targetId:actor.id,location:loc.location,
+  aspect:'b',direction,mode:'auto',rigidStatus:'unknown'});
+ must(armour.ready,'Skutečná ochrana zbroje neověřena: '+(armour.reason||'?'));
+ const fullImpact=row.impactD10+heightImpact(fallHeightFt)+surfaces[surface]+adjustment[row.technique][sl];
+ const strikeImpact=slope==='steep'&&['S','CS'].includes(sl)?0:
+  slope==='sheer'?fullImpact:Math.floor(fullImpact/2);
+ const effectiveImpact=strikeImpact-armour.armourValue;
+ const base=injuryFromEffectiveImpact({effectiveImpact,aspect:'b',rigidArmour:false});
+ const limb=new Set(['sh','ua','el','fo','ha','th','kn','ca','ft']);
+ const existing=state.wounds.filter(w=>!w.healed&&w.location===loc.location&&
+  (!limb.has(loc.location)||w.side===loc.side)&&
+  compoundCompatible(w,{location:loc.location,aspect:'b',area:false}));
+ const needsCompound=!!base.injury&&existing.length>0;
+ const needsShock=effectiveImpact>0;
+ return {ready:true,needed:[],rawEML,eml,sl,repeatRequired:sl==='CF',
+  location:loc.location,side:loc.side,locationShock:loc.locationShock,
+  armourValue:armour.armourValue,strikeImpact,effectiveImpact,
+  injury:base.injury?base.injury.severity+base.injury.level:null,
+  needsShock,needsCompound,existingWounds:existing.length,technique:row.technique};
+}
+
 export function prepareClimbingFallingSequence({actor,inventory,state,fallHeightFt,surface,originSkill='Climbing',slope='sheer',direction='front',rows,round=1,timelineId,eventId,gmConfirmed=false}={}){
  must(gmConfirmed===true&&actor?.id&&Array.isArray(inventory)&&state&&typeof eventId==='string'&&eventId&&typeof timelineId==='string'&&timelineId&&die(round,9999),
   'Pád vyžaduje živou postavu, Combat State, totožnost události a potvrzení GM');
  validateCombatState(state);
+ must(round>=state.lastRound,'Pád nelze zapsat do dřívějšího kola');
+ must(!state.events.some(x=>x.id===eventId+':complete'),'Tento pád byl již zapsán');
  must(Array.isArray(rows)&&rows.length>=1&&rows.length<=20,'Vyplňte jeden nebo více úplných pádových zásahů (nejvýše 20)');
  must(Object.hasOwn(surfaces,surface),'Povrch dopadu musí být ověřen GM');
  must(['Climbing','Acrobatics','Jumping'].includes(originSkill),'Nepovolený původ Falling Routine');
@@ -43,24 +99,18 @@ export function prepareClimbingFallingSequence({actor,inventory,state,fallHeight
  let current=structuredClone(state),proofs=[];
  for(let i=0;i<rows.length;i++){
   const r=rows[i];
-  must(die(r.impactD10,10)&&die(r.zoneD10,10)&&die(r.locationD10,10)&&die(r.fallingD100,100),
-   'Zásah '+(i+1)+': chybí d10 Impact, ZD, LD nebo Falling d100');
-  must(Object.hasOwn(adjustment,r.technique),
-   'Zásah '+(i+1)+': vyberte Jumping, Acrobatics nebo u dopadu do vody Swimming');
-  must(r.technique!=='Swimming'||surface==='water', 'Swimming je volitelné pouze pro dopad do vody');
-  const injury=projectLiveInjuries({state:current,round,test:r.technique.toLowerCase(),usedArms:['left','right'],timelineId});
-  must(injury.ready&&!injury.unusable&&!injury.stunned,
-   'Zásah '+(i+1)+': nelze bezpečně doložit EML Falling Test při aktuálním zranění / Shock');
-  must(current.shock==='NONE','Před dalším Falling Test je nutné řešit aktuální Shock stav');
-  const eml=skillML(actor,r.technique)-combatFatigueTotals(current).total+load.agilityAndMeleePenalty+injury.modifier;
-  const sl=levelNames[successLevel(r.fallingD100,eml)];
-  const loc=humanLocation(r.zoneD10,r.locationD10);
-  const armour=resolveLiveCombatArmour({inventory,targetId:actor.id,location:loc.location,aspect:'b',direction,mode:'auto',rigidStatus:'unknown'});
-  must(armour.ready,'Zásah '+(i+1)+': chybí ověřená skutečná ochrana zbroje: '+(armour.reason||'neznámý důvod'));
-  const fullImpact=r.impactD10+distanceModifier+surfaces[surface]+adjustment[r.technique][sl];
-  // p.67: modifiers from less-than-sheer climbing apply BEFORE armour.
-  const strikeImpact=slope==='steep'&&['S','CS'].includes(sl)?0:
-   slope==='sheer'?fullImpact:Math.floor(fullImpact/2);
+  const step=inspectClimbingFallingStep({actor,inventory,state:current,fallHeightFt,
+   surface,slope,direction,row:r,round,timelineId});
+  must(step.ready,'Zásah '+(i+1)+': chybí fyzické hody '+step.needed.join(', '));
+  must(step.needsShock?die(r.shockD100,100):r.shockD100==null,
+   'Zásah '+(i+1)+': Shock d100 '+(step.needsShock?'je povinný po účinném Impact':'není povolen, protože účinný Impact ≤ 0'));
+  must(step.needsCompound?die(r.compoundD10,10):r.compoundD10==null,
+   'Zásah '+(i+1)+': Compound d10 '+(step.needsCompound?'je povinný pro novou ránu na již zraněné lokalitě':'se NESMÍ zadávat: nevzniká nové zranění na již zraněné lokalitě'));
+  const sl=step.sl;
+  const loc={location:step.location,side:step.side,locationShock:step.locationShock};
+  const strikeImpact=step.strikeImpact;
+  const armour={armourValue:step.armourValue};
+  const eml=step.rawEML;
   const physicalDice=[{faces:10,value:r.impactD10,source:'GM-entered-physical-die'},
    {faces:10,value:r.zoneD10,source:'GM-entered-physical-die'},
    {faces:10,value:r.locationD10,source:'GM-entered-physical-die'},
