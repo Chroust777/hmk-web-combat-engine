@@ -281,6 +281,17 @@ export function calculateSheetSkills(character){
   const minimum=covenantPostOccupationGrants(doctrinalReligion,allocations,SKILL_DEFINITIONS,SKILL_STAGES);
   if(Object.keys(minimum).length)allocations['Covenant post-Occupation SM']=minimum;
  }
+ // In-game modifications: effective DP may differ from the immutable 14-step
+ // allocation. These overrides do not rewrite creation.skillDP or dice proofs.
+ const advancement=h.advancement?.skillDP??{};
+ const allowedStages=new Set([...SKILL_STAGES,'Native Language / Religion','Émhlè Family Ritual','Covenant post-Occupation SM','GM Bonus Languages']);
+ for(const [name,byStage] of Object.entries(advancement)){
+  if(!byStage||typeof byStage!=='object'||Array.isArray(byStage)||!skillDefinition(character,name))throw Error('Neplatná Skill DP úprava: '+name);
+  for(const [stage,n] of Object.entries(byStage)){
+   if(!allowedStages.has(stage)||!Number.isSafeInteger(n)||n<0||n>100)throw Error('Neplatná GM Skill DP úprava: '+stage);
+   (allocations[stage==='Native Language / Religion'?'Native Proficiencies':stage]??={})[name]=n;
+  }
+ }
  const names=new Set(SKILL_DEFINITIONS.map(x=>x.name));
  for(const points of Object.values(allocations))for(const name of Object.keys(points))if(parseInstance(name))names.add(name);
  const normal=[...names].map(name=>{
@@ -1215,6 +1226,12 @@ export function syncCreationSkills(h,idFactory){
 export function assertCreationInvariants(character){
  const h=character?.hmk,c=h?.creation;
  if(!c)return true;
+ // Character Creation proofs must remain tied to ORIGINAL dice and DP,
+ // not the current in-game trained/injured values. Both projections are
+ // validated independently; this one is only for historical proof checks.
+ const startingAttributes={...h.attributes};
+ for(const [name,proof] of Object.entries(c.attributeProof??{}))if(Number.isSafeInteger(proof?.score))startingAttributes[name]=proof.score;
+ const creationSource={...character,hmk:{...h,attributes:startingAttributes,advancement:undefined}};
  const parentInvokerLegacy=legacyParentInvokerNeedsReview(character);
  if(c.version!==1||!Number.isInteger(c.step)||c.step<1||c.step>14||
   !Number.isInteger(c.skillStage)||c.skillStage<0||c.skillStage>7||
@@ -1353,7 +1370,7 @@ export function assertCreationInvariants(character){
   if(!isArcaneOccupationEligible(character,character.occupation))throw Error('Uložené magické povolání bez doložených Talentů');
  }
  if(c.values.wealthProof&&priestReligionOf(character.occupation)){
-  const religion=priestReligionOf(character.occupation),row=calculateSheetSkills(character).find(r=>r.name===instanceKey('Ritual',religion));
+  const religion=priestReligionOf(character.occupation),row=calculateSheetSkills(creationSource).find(r=>r.name===instanceKey('Ritual',religion));
   if(!row||row.ml===null||row.ml<20)throw Error('Priest Wealth: chybí Ritual ML20 pro Clergy');
   const circle=ritualFollowerFromML(row.ml,{clergy:true}).circle;
   if(c.values.wealthProof.occupationDie!==circle*2)throw Error('Priest Wealth musí být d(Circle × 2), HMK str.51');
@@ -1392,7 +1409,9 @@ export function assertCreationInvariants(character){
  if(c.completed[13]&&c.values.wealth!==undefined&&Number(c.values.wealth)!==h.wealth)throw Error('Změněný GM Wealth');
  if(c.completed[12]&&c.values.folkAuto==='yes'&&['Kúzhai','Sinái','Sidhé'].includes(h.folk)&&!c.values.folkSkillProof)throw Error('Chybí fyzické Folk d10');
  if(c.values.arcaneTalentProof){
-  const t=c.values.arcaneTalentProof,p=parentInvokerLegacy?arcaneTalentFromPhysical({aura:h.attributes?.aur,folk:h.folk,ageGroup:h.ageGroup,d20:t.d20,d100s:t.d100s}):arcaneProofForCharacter(character,{d20:t.d20,d20s:t.d20s,d100s:t.d100s});
+  const t=c.values.arcaneTalentProof,startingAura=c.attributeProof?.aur?.score??h.attributes?.aur,
+   startingCharacter={...character,hmk:{...h,attributes:{...h.attributes,aur:startingAura}}},
+   p=parentInvokerLegacy?arcaneTalentFromPhysical({aura:startingAura,folk:h.folk,ageGroup:h.ageGroup,d20:t.d20,d100s:t.d100s}):arcaneProofForCharacter(startingCharacter,{d20:t.d20,d20s:t.d20s,d100s:t.d100s});
   const last=c.auditEvents.filter(e=>e.type==='arcane-talent-physical').at(-1);
   if(JSON.stringify(t)!==JSON.stringify(p)||JSON.stringify(c.skillDP['Arcane Talent Skills']??{})!==JSON.stringify(p.grants)||!last||last.d20!==p.d20||JSON.stringify(last.d20s)!==JSON.stringify(p.d20s)||JSON.stringify(last.d100s)!==JSON.stringify(p.d100s)||JSON.stringify(last.grants)!==JSON.stringify(p.grants))throw Error('Poškozený fyzický Arcane Talent důkaz');
  }
@@ -1425,7 +1444,7 @@ export function assertCreationInvariants(character){
   }
  }
  if(c.values.spiritPowerProof){
-  const q=c.values.spiritPowerProof,spirit=calculateSheetSkills(character).find(x=>x.name==='Spirit');
+  const q=c.values.spiritPowerProof,spirit=calculateSheetSkills(creationSource).find(x=>x.name==='Spirit');
   const check=validateStartingSpiritPowers({occupation:character.occupation,spiritML:spirit?.ml,powers:q.powers,languages:(h.regionalLanguages??[]).concat(h.nativeLanguage?[h.nativeLanguage]:[])});
   const last=c.auditEvents.filter(e=>e.type==='creation-spirit-powers-choice').at(-1);
   if(JSON.stringify(q)!==JSON.stringify(check)||JSON.stringify(h.startingSpiritPowers)!==JSON.stringify(q)||!last||JSON.stringify(last.proof)!==JSON.stringify(q))throw Error('Změněné počáteční Spirit Powers nebo Spirit Index');
@@ -1503,7 +1522,7 @@ export function assertCreationInvariants(character){
   if(JSON.stringify(test)!==JSON.stringify(v)||test.wealth!==h.wealth||h.coinsPence!==test.coinsPence||h.possessionsBudgetPence!==test.possessionsPence||h.lifestyle!==test.lifestyle||!e||JSON.stringify(e.familyRolls)!==JSON.stringify(v.familyRolls)||JSON.stringify(e.occupationRolls)!==JSON.stringify(v.occupationRolls)||e.wealth!==v.wealth)throw Error('Změněný fyzický Wealth důkaz');
  }
  if(c.values.mysteriesCreationVersion===2&&c.completed[14]){
-  const sheet=calculateSheetSkills(character);
+  const sheet=calculateSheetSkills(creationSource);
   const p=sheet.find(x=>x.name==='Pvârism');
   const expected=((p?.totalDP??0)>0)?arcaneStartingResearch(p.ml,h.ageGroup,h.folk):null;
   if(JSON.stringify(expected)!==JSON.stringify(c.values.arcaneResearchProof??null)||JSON.stringify(expected)!==JSON.stringify(h.startingArcaneResearch??null))throw Error('Při Edit se změnilo Pvârism ML bez zneplatnění počátečních ARP');
@@ -1521,7 +1540,7 @@ export function assertCreationInvariants(character){
   if(JSON.stringify(expected)!==JSON.stringify(m)||JSON.stringify(h.religiousStatus)!==JSON.stringify(m))throw Error('Nesoulad Ritual/Piety pravidlového výpočtu');
  }
  // New starting Mysteries proofs must still match the single authoritative skill projection.
- const sheetCreation=calculateSheetSkills(character);
+ const sheetCreation=calculateSheetSkills(creationSource);
  if(c.values.startingElixirProof){
   const ml=sheetCreation.find(x=>x.name==='Alchemy'&&x.totalDP>0)?.ml??0;
   const p=c.values.startingElixirProof,recalc=validateStartingElixirs({alchemyML:ml,choices:p.elixirs.map(x=>x.name)});
@@ -1562,12 +1581,15 @@ export function assertCreationInvariants(character){
  }
  if(mode==='subattributes'&&PERCEPTION_SENSES.some(n=>!c.perceptionProof?.[n]))throw Error('Chybí tři smyslové atributy HMK p.57');
  if(mode==='standard'&&PERCEPTION_SENSES.some(n=>h.attributes?.[n]!==undefined))throw Error('Neaktivní smyslový atribut vstupuje do profilu');
+ for(const [name,value] of Object.entries(h.advancement?.attributes??{})){
+  if(!ATTRIBUTES.includes(name)||!Number.isSafeInteger(value)||value<0||value>99||!c.attributeProof[name])throw Error('Neplatná pozdější změna atributu '+name);
+ }
  for(const [name,proof] of Object.entries(c.attributeProof)){
   if(!ATTRIBUTES.includes(name))throw Error('Neznámý důkaz fyzického atributu');
   const actual=evaluateAttributeDice({name,ageGroup:h.ageGroup,folk:h.folk,kind:character.kind||'PC',dice:proof.rolls});
   const last=c.auditEvents.filter(e=>e.type==='attribute-dice'&&e.name===name).at(-1);
   if(!last||JSON.stringify(last.rolls)!==JSON.stringify(proof.rolls)||last.score!==proof.score||
-     JSON.stringify(actual)!==JSON.stringify(proof)||h.attributes?.[name]!==actual.score)
+     JSON.stringify(actual)!==JSON.stringify(proof)||h.attributes?.[name]!==(h.advancement?.attributes?.[name]??actual.score))
    throw Error('Nesoulad uložených kostek a atributu '+name);
  }
  if(c.voiceProof){
