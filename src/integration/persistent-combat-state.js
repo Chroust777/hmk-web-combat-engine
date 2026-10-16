@@ -39,6 +39,25 @@ export function validateCombatState(s){
  requireCond(s.bloodShockPending===undefined||typeof s.bloodShockPending==='boolean','Neplatný příznak Blood Shock');
  requireCond(s.fatigue&&['windedness','weariness','otherWeakness'].every(k=>whole(s.fatigue[k],0,99999)),'Neplatný trvalý Fatigue');
  requireCond(Array.isArray(s.wounds)&&s.wounds.length<=1000&&Array.isArray(s.events)&&s.events.length<=5000,'Neplatný seznam ran nebo událostí');
+ if(s.environmentalHazards!==undefined){
+  requireCond(Array.isArray(s.environmentalHazards)&&s.environmentalHazards.length<=200,
+   'Neplatná evidence Cold/Heat Exposure');
+  const weatherIds=new Set();
+  for(const h of s.environmentalHazards){
+   requireCond(h&&typeof h.id==='string'&&h.id&&!weatherIds.has(h.id)&&
+    typeof h.sourceId==='string'&&h.sourceId&&['cold','heat'].includes(h.kind)&&
+    whole(h.hr,0,100)&&whole(h.initialHR,1,5)&&whole(h.periodMinutes,1,240)&&
+    typeof h.active==='boolean'&&whole(h.lastElapsedMinutes,0,10000000)&&
+    whole(h.sequence,0,99999)&&whole(h.weaknessApplied,0,10)&&
+    ['NONE','STN','INC','UNC','KIA'].includes(h.shockApplied)&&
+    (h.skinPending===null||['frostbite','sunburn'].includes(h.skinPending))&&
+    typeof h.treatmentStarted==='boolean','Poškozená Cold/Heat expozice');
+   weatherIds.add(h.id);
+   requireCond(s.events.some(e=>e.id===h.id&&e.type==='skill-trekking-weather-hazard'),
+    'Cold/Heat expozice vyžaduje původní dohledatelnou událost');
+  }
+ }
+
  if(s.morale!==undefined){requireCond(s.morale&&['steady','brave','withdrawing','routed','catatonic'].includes(s.morale.state)&&whole(s.morale.psycheStress,0,99999)&&
   (s.morale.braveSince==null||whole(s.morale.braveSince,1,9999))&&(s.morale.braveTimelineId==null||typeof s.morale.braveTimelineId==='string')&&(s.morale.lastReactionRound==null||whole(s.morale.lastReactionRound,1,9999))&&(s.morale.lastReactionTimelineId==null||typeof s.morale.lastReactionTimelineId==='string'),'Neplatný Morale State');
   if(s.morale.surrender!==undefined&&s.morale.surrender!==null){

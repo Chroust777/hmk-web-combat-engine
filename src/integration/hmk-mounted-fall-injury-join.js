@@ -47,24 +47,24 @@ const skill=(c,n)=>{
  required(xs?.length===1&&int(xs[0].ml,0,200),'Chybí živá '+n+' ML pro '+(c?.id||'?'));
  return xs[0].ml;
 };
-function humanLocation(z,l){
+export function humanLocation(z,l){
  required(int(z,1,10)&&int(l,1,10),'Pád člověka vyžaduje d10 ZD a d10 LD');
  const zone=HUMAN_ZONE(z),hit=HUMAN_ROWS[zone].find(r=>l>=r[1]&&l<=r[2]);
  required(hit,'Neplatná lidská lokalizace pádu');
  return {location:hit[0],locationShock:hit[3],side:zone==='arms'||zone==='legs'?(z%2?'left':'right'):null};
 }
-function woundFromFall({state,character,round,timelineId,eventId,bodyKind,location,side,locationShock,
- strikeImpact,AV,shockRoll=null,compoundD10=null,physicalDice,hrModifier=0}={}){
+export function woundFromFall({state,character,round,timelineId,eventId,bodyKind,location,side,locationShock,
+ strikeImpact,AV,aspect='b',shockRoll=null,compoundD10=null,physicalDice,hrModifier=0}={}){
  validateCombatState(state);
- required(int(strikeImpact,-100,999)&&int(AV,0,999),'Falling Impact/AV musí být doloženy');
+ required(int(strikeImpact,-100,999)&&int(AV,0,999)&&['b','e'].includes(aspect),'Impact/AV/aspect musí být doloženy');
  const symbols=bodyKind==='horse'?hmkAnimalLocationSymbols(location):hmkHumanLocationSymbols(location);
  required(symbols&&int(locationShock,1,10),'Neznámá anatomie zasaženého místa');
  const effectiveImpact=strikeImpact-AV;
- const base=injuryFromEffectiveImpact({effectiveImpact,aspect:'b',rigidArmour:false});
+ const base=injuryFromEffectiveImpact({effectiveImpact,aspect,rigidArmour:false});
  const old=state.wounds.filter(w=>!w.healed&&w.location===location&&
   (!limb.has(location)&&!['sh','ua','el','fo','ha'].includes(location)||w.side===side)&&
-  compoundCompatible(w,{location,aspect:'b',area:false}));
- const newInjury=base.injury?{...base.injury,id:`wound:${eventId}`,location,aspect:'b',area:false}:null;
+  compoundCompatible(w,{location,aspect,area:false}));
+ const newInjury=base.injury?{...base.injury,id:`wound:${eventId}`,location,aspect,area:false}:null;
  let comp=null;
  if(newInjury&&old.length){
   required(int(compoundD10,1,10),'Povinný fyzický Compound d10 u '+eventId);
@@ -86,11 +86,11 @@ function woundFromFall({state,character,round,timelineId,eventId,bodyKind,locati
  required(carry,'Nepodporovaný Shock Carryover');
  const candidate=comp?.injury??newInjury;
  const bleeding=!!(candidate&&bleedingEligibleForInjury({bleedingClass:symbols.bleeds,
-  injury:{...candidate,aspect:'b'}}));
+  injury:{...candidate,aspect}}));
  const draft={ok:true,format:'hmk-combat-event-draft-v1',status:'preview-only',mutatesCharacter:false,
-  target:{id:character.id},location,aspect:'b',proposalId:eventId,
+  target:{id:character.id},location,aspect,proposalId:eventId,
   inputs:{previousState:state.shock,shockLevel:name[shockSL]},
-  impactResult:{effectiveImpact,strikeImpact,baseAV:AV,effectiveAV:AV,aspect:'b'},
+  impactResult:{effectiveImpact,strikeImpact,baseAV:AV,effectiveAV:AV,aspect},
   injuryResult:{kind:newInjury?'injury':'none',injury:newInjury?newInjury.severity+newInjury.level:null},
   shockResult:{state:states[sh.state],injuryShock,locationShock},carryover:{state:carry}};
  const applied=applyConfirmedHit({state,characterId:character.id,draft,round,eventId,
@@ -99,7 +99,7 @@ function woundFromFall({state,character,round,timelineId,eventId,bodyKind,locati
  const evt=applied.events.find(e=>e.id===eventId);
  required(evt,'Povinný Injury Sequence event chybí');
  evt.details.physicalDice={format:'hmk-manual-dice-proof-v1',rolls:cpy(physicalDice)};
- evt.details.falling={kind:bodyKind,AV,impact:strikeImpact,effectiveImpact,shockML,
+ evt.details.falling={kind:bodyKind,aspect,AV,impact:strikeImpact,effectiveImpact,shockML,
   shockEML,shockRoll,shockSL:name[shockSL],compoundD10};
  if(bodyKind==='horse'&&['flg','hlg'].includes(location)&&newInjury){
   const touched=[`wound:${eventId}`,comp?.compoundedExisting?.id].filter(Boolean);
