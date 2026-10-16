@@ -1,3 +1,25 @@
+# v93.292 — Trekking: potvrzené Cold/Heat Hazards a Exposure Course
+
+- Originální Endurance (Survival) Skill Test lze po potvrzení GM navázat na předcházející Weather Hazard z Trekking (HMK v1.2 str.149). F/CF zakládají doloženou expozici, S/CS vytvářejí pouze pravidlem stanovenou dodatečnou Weariness.
+- Cold Exposure má správnou HR5/HR4 u suchých nebo mokrých podmínek; Heat Exposure má HR5 při F, HR4 při CF. Aktivní expozice má dohledatelný stav Combat State, slabost a případný STN/INC/UNC/KIA.
+- Každé další období vyžaduje nový fyzický d100, potvrzený uplynulý čas a podle druhu terapie Warming/Compress. Nevynechává se čas a nevymýšlí se pokračovací hody. Časované Course/Healing používají pravidlové HB a HR (str.185).
+- CF v chladném/horkém Trekking vynucuje navíc **neuzavřenou anatomickou proceduru** Frostbite/Sunburn. Ta se nezaměňuje za automaticky hotovou ránu: pro ni musí být potvrzeny jednotlivé anatomické lokace, AV a fyzické hody.
+- Cold Shock při pádu do chladné vody rovněž vyžaduje zvláštní 3d6 a Endurance hody, proto je jeho nesprávné předčasné uzavření nyní blokované.
+- Po uložení/reloadu se kontroluje struktura a vazba každé expozice na původní událost. Současné nezávislé Shock stavy nesmí být tímto mechanismem potichu přepsány.
+- **Nepokryto v této verzi:** dokončený autoritativní zápis Frostbite a Sunburn ran, jejich Compound/Shock/Morale sekvence, Cold Shock, samostatné zvířecí expozice, obecné nemoci a všechny GM-specifické nebezpečné činnosti. Není tvrzeno plné pokrytí všech možných nehod příručky. Testy v Chromium nebylo možné kvůli politice místního prostředí spustit.
+
+---
+
+# v93.291 — Swimming/Asphyxia a volitelné zhoršení vážných ran po CF
+
+- **Swimming (HMK v1.2 str. 86):** následný přepočet **původního fyzického d100** s čtyřnásobným base ENC, doloženým ENC mokrého oděvu, silou větru a vzdáleností od pobřeží. Není vytvářen další Swimming hod ani odhad chybějící ochrany či vybavení.
+- **Asphyxia (str. 183):** po potvrzení doby pod vodou, Will hodu, případného d10 a Endurance SR se zapíše Windedness, STN/UNC, Extended Shock nebo KIA do Combat State a neměnné historie. Výsledek s nedoloženým počátečním Coma HR je záměrně pozastaven, nikoli doplněn smyšlenými čísly.
+- **Serious Injury Aggravation – volitelné (str. 182):** po CF a potvrzení použitých vážných/grievous ran samostatný Shock d10 pro každou ránu; neúspěch odečte jeden bod HR (minimum 1) nebo přenese postih neošetřené rány do pozdějšího ošetření. Shock SR správně nepoužívá Fatigue.
+- **Bezpečnost:** nelze uložit stejné pokračování dvakrát, přeskočit povinné hody, přepsat původní d100 ani alternativním zápisem obejít aktivní Initiative. Pokračování je dostupné i v deníku po obnovení.
+- **Rozsah:** nové pokračovací kroky z existujícího Skill Tests; nezahrnuje novou plně automatizovanou Trekking meteorologii a všechny expozice, Cold Shock, Frostbite/Sunburn a činnosti s volitelnými okolnostmi; ty vyžadují vlastní pravidlové postupy. Prohlížečový smoke test v izolovaném Chromium byl blokován testovacím prostředím (místní URL); zde nejsou tvrzeny úspěšné prohlížečové průchody.
+
+---
+
 # v93.287 — HMK p.300: Trance Bestowal, Talisman a perzistence
 
 Přidán GM-potvrzený Trance Bestowal na konkrétní uložené Ancestor/Totem Spirit Power s připlacenou Anima, jiného příjemce a fyzický předmět z inventáře; S/CS časované předání, F 30denní zákaz, CF povinný Will a případný Aural Shock/Weakness. Vše jako atomický zápis do stavu a historii. Navázaný Spirit SR může obnovit účinek na konci období. Obnova Aural Shock přijímá také původ doložený šamanským Trance CF. Potvrzení času a souhlasu patří GM; libovolné nevypočitatelné účinky uložených Spirit Powers zatím nejsou simulovány.
@@ -1135,3 +1157,28 @@ Celý inventář přes šířku Character Sheet. Dva řádkové seznamy pro nasa
 - Fumble/Stumble follow-up choices show each current Mastery Level (ML) from the active character sheet, for example Dexterity · ML 55 or Legerdemain · ML 0 (untrained).
 - Untrained or missing alternatives remain visible but cannot be selected; the continued d100 cannot be submitted when no eligible alternative is available. No new ruling for an untrained attempt is fabricated.
 - No changes to original CF, critical outcome rules or immutable journal records. All source and production files included; test artifacts excluded.
+
+
+## v93.288 – UI responsive / clarity
+- Content now expands to the monitor width rather than staying inside a fixed 1300px shell and 1050px content column.
+- Library item rows show a compact printed-rule source; item audit clutter is hidden, while custom-item management remains available.
+- Character journal displays current cash only, with live hand occupancy in its own panel.
+- Skill proof and optional PER/EYE/HRG/SML details are collapsed by default in a native `<details>` element.
+- Climbing follow-up CF guidance retains the printed p.67 Falling Routine requirement. It is not an automatically committed injury until the full GM verified falling and injury sequence is completed.
+
+
+## v93.289 – Climbing CF / falling and inventory clarity
+- Verified Climbing CF0/CF5 Mishap continuations can initiate a GM-confirmed Falling Routine (p.67).
+- A fall above five feet asks for its height, incline, terrain, hit-location d10s, impact d10, falling d100 and conditionally Shock/Compound dice; exact worn AV and current load are required.
+- Resulting wound(s), Shock and posture are committed atomically into the authoritative Combat State and append-only history; duplicate completion is rejected. Falling Test CF requires extra full repeat(s).
+- A fall of no more than five feet does not invent a p.67 Injury Sequence and may be marked resolved after GM confirmation of posture.
+- Active Initiative blocks alternate Skill Workbench combat-state writes; resolve those in the combat flow.
+- The left/right hand display now respects actual character handedness rather than equating right with main for all.
+- Width/layout, condensed catalog citation, current cash and collapsible skills from v93.288 are retained.
+
+
+## v93.290 – Skill Tests with injury-bearing CF consequences (HMK pp.64,67,71,77,148,167–170)
+
+The physical injury continuation is shared with the existing confirmed Injury Sequence and stored Combat State, never a second, independent wound counter. **Fishing:** CF in the required DEX/AGL follow-up mandates physical d10 edge impact, independently rolled ZD/LD, real armour, Shock and Compound when indicated. **Acrobatics–Balance** and **Jumping:** a failed prescribed follow-up exposes a verified Falling Routine; short falls and falls over five feet are distinct. **Climbing:** retains the same routine, with the original source skill recorded. **Acrobatics–Gymnastics CF:** records prone directly in the persistent state. **Survival–Trekking:** CF triggers a distinct Survival Hazard d10; Accident (4–6) tests the randomly designated victim's live Agility and creates d6+4 blunt impact (+5 on CF) only after a failed test. Equipment or Complication hazards remain GM procedures without invented wounds.
+
+All injury-bearing outcomes require explicitly entered physical dice, currently verified protection and a GM confirmation; accepted wounds, Shock and the evidence are committed atomically with the journal. Repeated entries, missing Shock dice, unsupported armour, invalid stage, or conflicting active Initiative are rejected. Other distinct mechanisms (combat Riding/mounted mishaps, Swimming-induced Asphyxia and arbitrary GM-defined travel mishaps) must continue through their respective rule systems. A skill failure alone is NOT a blanket instruction to create injury.

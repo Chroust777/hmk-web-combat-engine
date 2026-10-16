@@ -126,3 +126,9 @@
 .arm-layer-row.arm-layer-forbidden .arm-layer-explain,.arm-layer-row.arm-layer-over-limit .arm-layer-explain{font-weight:650;color:#f3b0a8}
 .arm-layer-row.arm-layer-unverified .arm-layer-explain{color:#f3d49c}
 .arm-layer-row .arm-layer-explain{max-width:30rem;line-height:1.35}
+
+/* v93.288: responsive wide-screen layout, retaining readable content at narrow widths */
+@media (min-width:761px){.shell{max-width:none;width:100%;margin:0 auto}.content{max-width:none;width:100%;padding:clamp(1rem,1.8vw,2.5rem)}.layout{grid-template-columns:clamp(195px,15vw,285px) minmax(0,1fr)}.mast{padding-inline:clamp(1.2rem,2vw,3rem)}.cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,275px),1fr))}.inv-summary-grid{grid-template-columns:repeat(auto-fit,minmax(165px,1fr))}.library-table-wrap,.inv-table-scroll{max-width:100%;overflow-x:auto}}
+.skill-proof-collapsible>summary{cursor:pointer;font-size:1.07rem;font-weight:bold;color:#dfc396;padding:.35rem 0}.skill-proof-collapsible[open]>summary{margin-bottom:1rem}
+.equipped-hands{grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.equipped-hands>div{display:grid;gap:.3rem;min-width:0}.equipped-hands span{white-space:normal}
+@media(max-width:760px){.equipped-hands{grid-template-columns:1fr}}

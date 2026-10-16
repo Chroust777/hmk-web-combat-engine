@@ -12,6 +12,10 @@ import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
 import {criticalActivities,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
+import {prepareClimbingFallingSequence,prepareShortClimbingFall} from './src/integration/hmk-climbing-fall-sequence.js';
+import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
+import {prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
+import {prepareTrekkingWeatherTest,advanceTrekkingWeatherExposure} from './src/integration/hmk-weather-hazard-aftermath.js';
 import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEligible} from './src/integration/hmk-skill-secondary-routines.js';
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES,specialSecondaryById,resolveSpecialSR} from './src/integration/hmk-special-secondary-routines.js';
 import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,validateSpecialEffectEvidence} from './src/integration/hmk-special-outcome-commit.js';
@@ -144,7 +148,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.287';
+const APP_VERSION='93.292';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -489,7 +493,7 @@ function wealthInventoryPanel(c){
  const h=c.hmk||{},wealth=Number(h.wealth),coins=Number(h.coinsPence),cash=coinBalance(c);
  const kit=h.creation?.values?.autoStartingKit;
  const remaining=kit&&Number.isSafeInteger(kit.unspentPossessionsAllowancePence)?kit.unspentPossessionsAllowancePence:null;
- return `<div class="equipment-summary" role="group" aria-label="Hotovost a počáteční Wealth">${cash.ok?`<div><strong>Aktuální hotovost</strong><span>${esc(cash.balance)}d</span></div><div><strong>Počáteční hotovost</strong><span>${esc(cash.initial)}d · příjmy/úpravy ${esc(cash.gained??0)}d · nákupy ${esc(cash.spent)}d</span></div>`:`<p class="library-warning">Hotovost nelze bezpečně doložit: ${esc(cash.reason)} Nákupy jsou zablokované, zdarma lze věci převzít.</p>`}${kit?`<div><strong>Vybavení · počáteční hodnota</strong><span>${esc(kit.costPence)}d / ${esc(kit.budgetPence)}d</span></div><div><strong>Nevyčerpaný počáteční limit vybavení (nejsou mince)</strong><span>${esc(remaining??Math.max(0,kit.budgetPence-kit.costPence))}d</span></div>`:''}${cash.ok&&cash.adjustments?`<details><summary>Historie mincí · ${cash.adjustments} GM úprav</summary><ol>${(h.coinAdjustments||[]).map(t=>`<li>${esc(t.deltaPence>0?"+":"")}${esc(t.deltaPence)}d · ${esc(t.at)}</li>`).join('')}</ol></details>`:""}${cash.ok&&cash.transactions?`<details><summary>Historie nákupů · ${cash.transactions}</summary><ol>${(h.cashLedger||[]).map(t=>`<li>${esc(t.label||'Předmět')} · −${esc(t.amountPence)}d <small>${esc(t.at||'datum neznámé')}</small></li>`).join('')}</ol></details>`:''}<p class="tiny">HMK v1.2, str. 51: počáteční hotovost = Wealth × 10d; počáteční výbava má oddělený limit Wealth × 100d. Nákupy se odečítají z hotovosti prostřednictvím neměnné historie výdajů; Wealth se nákupem nemění.</p></div>`;
+ return `<div class="equipment-summary" role="group" aria-label="Hotovost a počáteční Wealth">${cash.ok?`<div><strong>Aktuální hotovost</strong><span>${esc(cash.balance)}d</span></div>`:`<p class="library-warning">Hotovost nelze bezpečně doložit: ${esc(cash.reason)} Nákupy jsou zablokované, zdarma lze věci převzít.</p>`}${kit?`<div><strong>Vybavení · počáteční hodnota</strong><span>${esc(kit.costPence)}d / ${esc(kit.budgetPence)}d</span></div><div><strong>Nevyčerpaný počáteční limit vybavení (nejsou mince)</strong><span>${esc(remaining??Math.max(0,kit.budgetPence-kit.costPence))}d</span></div>`:''}${cash.ok&&cash.adjustments?`<details><summary>Historie mincí · ${cash.adjustments} GM úprav</summary><ol>${(h.coinAdjustments||[]).map(t=>`<li>${esc(t.deltaPence>0?"+":"")}${esc(t.deltaPence)}d · ${esc(t.at)}</li>`).join('')}</ol></details>`:""}${cash.ok&&cash.transactions?`<details><summary>Historie nákupů · ${cash.transactions}</summary><ol>${(h.cashLedger||[]).map(t=>`<li>${esc(t.label||'Předmět')} · −${esc(t.amountPence)}d <small>${esc(t.at||'datum neznámé')}</small></li>`).join('')}</ol></details>`:''}<p class="tiny">HMK v1.2, str. 51: počáteční hotovost = Wealth × 10d; počáteční výbava má oddělený limit Wealth × 100d. Nákupy se odečítají z hotovosti prostřednictvím neměnné historie výdajů; Wealth se nákupem nemění.</p></div>`;
 }
 let activeSkillTab='secondary';
 function skillWorkbenchView(){
@@ -497,6 +501,12 @@ function skillWorkbenchView(){
  return skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null);
 }
 function charactersView(){const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));return `<div class="topline"><h2>Registr postav (${data.characters.length})</h2>${button('+ Vytvořit postavu krok za krokem','new-character')}<button type="button" data-action="auto-random-character">⚄ Generovat náhodnou postavu</button><button type="button" data-action="open-generator-config">✦ Generovat podle rysů / Folk / povolání</button></div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards">${list.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><span class="pill">${esc(c.kind)}</span><h3>${esc(c.name)}</h3><div class="muted">${esc(c.occupation||'Bez povolání')}</div><div class="muted">${esc(c.description||'')}</div>${c.hmk?.creation?`<div class="muted">Character Creation · ${esc(c.hmk.creation.status==='auto-generated'?'Automaticky dokončeno':c.hmk.creation.status==='review-required'?'Ke kontrole GM':'krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="actions">${creationCardAction(c)}<button data-open="${esc(c.id)}">Otevřít deník</button><button class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></article>`).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`}
+function equippedHandsPanel(inv,character){
+ const handedness=character?.hmk?.handedness;
+ const mainRight=handedness==='right';
+ const show=(slot,label)=>{const items=inv.filter(x=>x.slot===slot);return `<div><strong>${label}</strong><span>${items.length?items.map(x=>esc(x.snapshot?.name||x.name||'Neznámý předmět')).join(', '):'Volná'}</span></div>`};
+ return `<div class="equipment-summary equipped-hands" aria-label="Aktuální obsazení rukou">${handedness==='right'||handedness==='left'?show(mainRight?'off_hand':'main_hand','Levá ruka')+show(mainRight?'main_hand':'off_hand','Pravá ruka'):show('main_hand','Hlavní ruka – fyzická strana neurčena')+show('off_hand','Vedlejší ruka – fyzická strana neurčena')}</div>`;
+}
 function characterInventoryOverview(c,inv){
  const rows=projectInventoryRows(inv),totals=inventoryTotals(rows);
  const load=resolveCombatantLoad({character:c,inventory:data.inventory});
@@ -567,7 +577,7 @@ function liveSpecialEffectsPanel(c){
  if(!rows.length)rows.push('Žádný aktivní časovaný účinek (starší účinky mohou být již prošlé).');
  return '<section class="panel wide"><h3>Trvalé účinky z potvrzených SR</h3><p class="tiny muted">Časované účinky se po uplynutí lhůty automaticky přestanou uplatňovat; původní důkazy zůstanou zachované.</p>'+rows.map(x=>'<p>'+esc(x)+'</p>').join('')+'</section>';
 }
-function sheetView(){const c=character(selected);if(!c){view='characters';return charactersView()}const editing=sheetEditingId===c.id;const inv=data.inventory.filter(x=>x.characterId===c.id);const sheetAudit=auditCharacterSheet(c,data.inventory);const auditPanel=`<section class="panel wide"><details><summary>Kontrola integrity Character Sheet · ${sheetAudit.ok?'bez nalezeného nesouladu':'vyžaduje pozornost'}</summary><p class="muted">Kontrola je pouze pro čtení a žádné hodnoty neopravuje ani nemaže. Zdroj: stávající HMK profil, Character Creation a inventář.</p>${sheetAudit.issues.map(x=>`<p class="notice error">${esc(x)}</p>`).join('')}${sheetAudit.notes.map(x=>`<p class="notice">${esc(x)}</p>`).join('')}${sheetAudit.ok?'<p>Promítnuté Skills a vybavení: kontrola prošla v rozsahu známých dat.</p>':''}</details></section>`;const logs=data.journal.filter(x=>x.characterId===c.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));return `<div class="topline"><h2>Osobní deník: ${esc(c.name)}</h2>${data.campaignClock?`<button type="button" class="secondary" data-nav="calendar">◷ ${esc(displayCampaignMinute(data.campaignClock.minute))}</button>`:''}${button('← Registr','go-characters')}${editing?'<button type="submit" form="sheet-inline-form">Uložit změny</button><button type="button" class="secondary" data-sheet-cancel>Zrušit</button>':'<button type="button" data-sheet-edit>✎ Edit</button>'}${button('Pravidlová tvorba','creation-open')}${button('Export HMK profilu','export-kernel-character')}</div><div class="columns"><section class="panel wide"><h3>Identita postavy</h3><p><strong>${esc(c.name)}</strong> · ${esc(c.hmk?.folk||"—")} · ${esc(c.hmk?.ageGroup||"—")} · ${esc(c.occupation||"—")}</p>${c.description?`<p>${esc(c.description)}</p>`:""}<p class="muted tiny">Údaje dané tvorbou postavy se během hry v režimu Edit nemění.</p></section><section class="panel wide"><h3>Inventář postavy</h3>${wealthInventoryPanel(c)}${characterInventoryOverview(c,inv)}<form id="add-inventory"><label>Předmět z knihovny<select name="itemId" required><option value="">Vyberte…</option>${allCatalogItems().map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${field('condition','Stav / poznámka','')}${field('currentWQ','Aktuální WQ kusu (nepovinné)','', 'number')}${slotSelect('slot','none')}<button type="submit" ${allCatalogItems().length?'':'disabled'}>Přiřadit předmět</button></form><div class="notice tiny">Při přiřazení vzniká samostatná kopie parametrů. Úprava knihovny nezmění již přidělené předměty.</div></section>${armourLoadoutPanel(inv,c)}${combatantLoadPanel(c)}${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:""})()}${auditPanel}${editing?'<form id="sheet-inline-form" class="sheet-inline-form">':''}${characterSheetSummaryHTML(c,{editing,currentCoins:coinBalance(c).ok?coinBalance(c).balance:null})}${characterCalculationHTML(c,{editing})}${editing?'</form>':''}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section>${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section></div>`}
+function sheetView(){const c=character(selected);if(!c){view='characters';return charactersView()}const editing=sheetEditingId===c.id;const inv=data.inventory.filter(x=>x.characterId===c.id);const sheetAudit=auditCharacterSheet(c,data.inventory);const auditPanel=`<section class="panel wide"><details><summary>Kontrola integrity Character Sheet · ${sheetAudit.ok?'bez nalezeného nesouladu':'vyžaduje pozornost'}</summary><p class="muted">Kontrola je pouze pro čtení a žádné hodnoty neopravuje ani nemaže. Zdroj: stávající HMK profil, Character Creation a inventář.</p>${sheetAudit.issues.map(x=>`<p class="notice error">${esc(x)}</p>`).join('')}${sheetAudit.notes.map(x=>`<p class="notice">${esc(x)}</p>`).join('')}${sheetAudit.ok?'<p>Promítnuté Skills a vybavení: kontrola prošla v rozsahu známých dat.</p>':''}</details></section>`;const logs=data.journal.filter(x=>x.characterId===c.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));return `<div class="topline"><h2>Osobní deník: ${esc(c.name)}</h2>${data.campaignClock?`<button type="button" class="secondary" data-nav="calendar">◷ ${esc(displayCampaignMinute(data.campaignClock.minute))}</button>`:''}${button('← Registr','go-characters')}${editing?'<button type="submit" form="sheet-inline-form">Uložit změny</button><button type="button" class="secondary" data-sheet-cancel>Zrušit</button>':'<button type="button" data-sheet-edit>✎ Edit</button>'}${button('Pravidlová tvorba','creation-open')}${button('Export HMK profilu','export-kernel-character')}</div><div class="columns"><section class="panel wide"><h3>Identita postavy</h3><p><strong>${esc(c.name)}</strong> · ${esc(c.hmk?.folk||"—")} · ${esc(c.hmk?.ageGroup||"—")} · ${esc(c.occupation||"—")}</p>${c.description?`<p>${esc(c.description)}</p>`:""}<p class="muted tiny">Údaje dané tvorbou postavy se během hry v režimu Edit nemění.</p></section><section class="panel wide"><h3>Inventář postavy</h3>${wealthInventoryPanel(c)}${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}<form id="add-inventory"><label>Předmět z knihovny<select name="itemId" required><option value="">Vyberte…</option>${allCatalogItems().map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${field('condition','Stav / poznámka','')}${field('currentWQ','Aktuální WQ kusu (nepovinné)','', 'number')}${slotSelect('slot','none')}<button type="submit" ${allCatalogItems().length?'':'disabled'}>Přiřadit předmět</button></form><div class="notice tiny">Při přiřazení vzniká samostatná kopie parametrů. Úprava knihovny nezmění již přidělené předměty.</div></section>${hskPendingSkillPhysicalConsequences(c.id)}${armourLoadoutPanel(inv,c)}${combatantLoadPanel(c)}${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:""})()}${auditPanel}${editing?'<form id="sheet-inline-form" class="sheet-inline-form">':''}${characterSheetSummaryHTML(c,{editing,currentCoins:coinBalance(c).ok?coinBalance(c).balance:null})}${characterCalculationHTML(c,{editing})}${editing?'</form>':''}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section>${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section></div>`}
 // Advisory-only catalog audit. Missing data are never silently fabricated or written to storage.
 function catalogAuditEntry(i){
  const p=i.properties||{}, missing=[];
@@ -832,12 +842,16 @@ function libraryBrief(i){
  if(p.projectileKind)return [esc(p.projectileKind),esc(p.shaftWeight||p.slingProjectileForm||'—'),esc(p.impactDie||'—'),price,weight];
  return [esc(i.category),esc(p.skill||p.use||'—'),esc(p.quality||'—'),price,weight];
 }
+function libraryPrintedPages(source){
+ const m=String(source||'').match(/(?:pp?\.?|str\.?|page[s]?)\s*(\d+(?:\s*[–-]\s*\d+)?)/i);
+ return m?'str. '+m[1].replaceAll(/\s+/g,''): 'strana neuvedena';
+}
 function libraryDataRows(rows){
  return rows.map(i=>{
  const b=libraryBrief(i);const audit=catalogAuditEntry(i);
- return `<tr data-library-item="${esc(i.id)}"><td class="library-item-title">${esc(i.name)}<small>${i.builtin?'HMK · pravidlový katalog':'Vlastní položka'} · ${esc(i.source||'zdroj neuveden')}</small></td>
+ return `<tr data-library-item="${esc(i.id)}"><td class="library-item-title">${esc(i.name)}<small>${i.builtin?'Pravidla '+esc(libraryPrintedPages(i.source)):'Vlastní položka · '+esc(i.source||'zdroj neuveden')}</small></td>
  ${b.map(s=>`<td class="library-mini">${s}</td>`).join('')}
- <td class="library-details-cell">${catalogParameters(i)}<details><summary>${audit.ready?'Kontrola údajů':'Upozornění k evidenci'}</summary><p class="tiny">${audit.ready?'Struktura bez upozornění':esc(audit.missing.join(' · '))}</p><p class="tiny">${esc(i.description||'Bez popisu')}</p>${i.builtin?'':`<div class="actions"><button data-edit-item="${esc(i.id)}">Upravit</button><button data-copy-item="${esc(i.id)}" class="secondary">Kopírovat</button><button data-delete-item="${esc(i.id)}" class="danger">Smazat</button></div>`}</details></td>
+ <td class="library-details-cell">${catalogParameters(i)}${i.builtin?'':`<details><summary>Správa vlastní položky</summary><p class="tiny">${esc(i.description||'')}</p><div class="actions"><button data-edit-item="${esc(i.id)}">Upravit</button><button data-copy-item="${esc(i.id)}" class="secondary">Kopírovat</button><button data-delete-item="${esc(i.id)}" class="danger">Smazat</button></div></details>`}</td>
  <td>${libraryAssignForm(i.id,'item',true,libraryPurchaseOffer(i))}</td></tr>`;
  }).join('');
 }
@@ -3466,17 +3480,166 @@ function hskResultRichHTML(proof,body){
 function hskCriticalNextHTML(originalId,proof){
  if(!originalId||!proof||proof.type==='critical-followup')return '';
  const sides=proof.a?[{id:proof.actorId,skill:proof.skills?.[0],result:proof.a,side:'A'},...(proof.b?[{id:proof.opponentId,skill:proof.skills?.[1],result:proof.b,side:'B'}]:[])]:[{id:proof.actorId,skill:proof.skill,result:proof.result,side:'A'}];
- return sides.filter(x=>x.result?.level==='CF'&&!x.result?.forcedCF&&criticalActivities(x.skill).length).map(x=>{
+ return sides.filter(x=>x.result?.level==='CF'&&!x.result?.forcedCF&&criticalActivities(x.skill).length&&
+  !data.journal.some(j=>j.skillTestProof?.type==='critical-followup'&&j.skillTestProof.originId===originalId&&j.skillTestProof.side===x.side)).map(x=>{
   const options=criticalActivities(x.skill).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+' · HMK str. '+a.page+'</option>').join('');
   return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Kritický neúspěch · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Pravidlový následek nelze určit pouze podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+options+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací d100 (prázdné = automatický hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><button type="submit">Vyhodnotit pravidlový následek CF</button><output class="hsk-followup-output" role="status"></output></form>';
  }).join('');
+}
+function hskClimbingFallRow(i){
+ return `<fieldset data-climb-fall-row class="hsk-fall-row"><legend>${i===0?'První dopad':'Opakovaný dopad po CF'} · HMK str. 67, kroky 1–4</legend><div class="field-grid">
+ <label>d10 Impact<input type="number" name="impactD10" min="1" max="10" required></label>
+ <label>d10 ZD – tělesná zóna<input type="number" name="zoneD10" min="1" max="10" required></label>
+ <label>d10 LD – lokalita<input type="number" name="locationD10" min="1" max="10" required></label>
+ <label>Test dopadu<select name="technique"><option value="Jumping">Jumping</option><option value="Acrobatics">Acrobatics</option><option value="Swimming">Swimming (jen hluboká voda)</option></select></label>
+ <label>Test dopadu d100<input type="number" name="fallingD100" min="1" max="100" required></label>
+ <label>Shock d100 (pokud Impact po zbroji vyžaduje)<input type="number" name="shockD100" min="1" max="100"></label>
+ <label>Compound d10 (pokud se opakuje zranění na stejné lokaci)<input type="number" name="compoundD10" min="1" max="10"></label>
+ </div>${i?'<button type="button" class="secondary" data-climb-fall-remove>Odebrat tento dopad</button>':''}</fieldset>`;
+}
+function hskClimbingFallForm(entry){
+ const proof=entry.skillTestProof;
+ if(proof?.type!=='critical-followup'||!['Climbing','Acrobatics','Jumping'].includes(proof.skill)||
+  !['climb-easy','climb-difficult','acro-balance','jumping-sv'].includes(proof.activity)||
+  !['CF','F'].includes(proof.result?.level))return '';
+ if(data.journal.some(x=>x.skillTestProof?.type==='climbing-falling'&&x.skillTestProof.sourceId===entry.id))return '';
+ return `<div class="hsk-fall-choice"><form class="hsk-climb-fall" data-climbing-short-fall>
+ <input type="hidden" name="sourceId" value="${esc(entry.id)}">
+ <h4>Krátký pád do 5 stop · bez Injury Sequence</h4>
+ <p>HMK str. 67 předepisuje výpočet zranění až pro pády <strong>nad 5 stop</strong>. Potvrď skutečnou výšku a polohu postavy; nevytváří se smyšlené zranění.</p>
+ <div class="field-grid"><label>Výška (0–5 stop)<input name="heightFt" type="number" min="0" max="5" required></label>
+ <label>Po dopadu je postava<select name="prone"><option value="yes">Prone – leží</option><option value="no">Stojí – GM potvrzeno</option></select></label></div>
+ <label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil výšku a výslednou polohu postavy</label>
+ <button type="submit">Uzavřít krátký pád bez zranění</button><output role="status" aria-live="polite"></output></form>
+ <form class="hsk-climb-fall" data-climbing-fall-form>
+ <input type="hidden" name="sourceId" value="${esc(entry.id)}">
+ <h4>Neuzavřený pád z ${esc(proof.skill)} · HMK str. 67</h4>
+ <p>Fumble/Stumble byl neúspěšný. Poslední číslice druhého hodu <strong>nevyvolává další Fumble/Stumble</strong>; nyní se provede celá Falling Routine. Pro pád do 5 stop zde nejsou pravidlem určeny zranění podle této procedury. Zásahy lze trvale zapsat až po všech povinných fyzických hodech.</p>
+ <div class="field-grid"><label>Výška pádu (stop, nejméně 6)<input name="heightFt" type="number" min="6" max="1000" required></label>
+ <label>Povrch<select name="surface"><option value="rock">Skála / tvrdý kámen (0)</option><option value="paving">Dlažba (−2)</option><option value="earth">Tráva / hlína (−4)</option><option value="snow">Sníh / seno (−8)</option><option value="mud">Bláto / bažina (−12)</option><option value="water">Hluboká voda (−16)</option></select></label>
+ <label>Sklon svahu<select name="slope"><option value="sheer">Svislý pád / bez Climbing úprav</option>${proof.skill==='Climbing'?'<option value="very-steep">Very steep · 40–59° (poloviční Impact)</option><option value="steep">Steep · 20–39° (S/CS bez nárazu)</option>':''}</select></label>
+ <label>Směr nárazu pro skutečnou ochranu zbroje<select name="direction"><option value="front">Zepředu</option><option value="rear">Zezadu</option><option value="side">Z boku</option></select></label></div>
+ <div data-climb-fall-rows>${hskClimbingFallRow(0)}</div>
+ <button type="button" class="secondary" data-climb-fall-add>+ Další zranění, jestliže test dopadu skončil CF</button>
+ <label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje výšku, povrch, anatomii, fyzické hody a skutečné vybavení postavy</label>
+ <button type="submit">Vyhodnotit a trvale zapsat všechna zranění po pádu</button>
+ <output class="hsk-followup-output" role="status" aria-live="polite"></output></form></div>`;
+}
+function hskSkillPhysicalImpactForm(entry){
+ const proof=entry.skillTestProof;
+ if(proof?.type!=='critical-followup')return '';
+ const fishing=proof.skill==='Fishing'&&proof.activity==='fishing-sv'&&proof.result?.level==='CF';
+ const survival=proof.skill==='Survival'&&proof.activity==='trek-survival-hazard';
+ if(!fishing&&!survival)return '';
+ if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===entry.id))return '';
+ const actor=character(proof.actorId);
+ if(!actor)return '';
+ const id=survival?'survival-accident':'fishing-cf';
+ const targets=survival?data.characters.filter(x=>!x.archived&&!x.hmk?.verifiedMountedBreed&&x.kind!=='Animal').map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(''):'';
+ return `<form class="hsk-climb-fall" data-skill-physical-impact>
+ <input type="hidden" name="sourceId" value="${esc(entry.id)}"><input type="hidden" name="kind" value="${id}">
+ <h4>${survival?'Survival Hazard · Accident (str. 148)':'Fishing · náhodné zranění d10e (str. 71)'}</h4>
+ <p>${survival?'CF v Trekking vyvolá Survival Hazard. Pokud padne 4–6, náhodně určená postava testuje Agility; F/CF vede k nárazu d6+4b, při CF navíc +5. Při jiném výsledku Hazard GM vyhodnotí Equipment nebo Complication.':'Následné CF rybářského Dexterity/Agility testu způsobí skutečný Impact d10e do náhodné tělesné lokace. Zbraň ani zbroj se nesmějí domýšlet.'}</p>
+ <div class="field-grid">
+ ${survival?`<label>Survival Hazard d10 (1–10)<input type="number" name="hazardD10" min="1" max="10" required></label><label>Náhodně určená postižená postava<select name="targetId">${targets}</select></label><label>Agility d100 (jen Accident 4–6)<input type="number" name="agilityD100" min="1" max="100"></label>`:''}
+ <label>${survival?'Impact d6 (jen neúspěšný Accident)':'Impact d10e'}<input type="number" name="impactDie" min="1" max="${survival?6:10}" ${survival?'':'required'}></label>
+ <label>d10 ZD – náhodná zóna<input type="number" name="zoneD10" min="1" max="10" ${survival?'':'required'}></label>
+ <label>d10 LD – náhodná lokalita<input type="number" name="locationD10" min="1" max="10" ${survival?'':'required'}></label>
+ <label>Směr dopadu<select name="direction"><option value="front">Zepředu</option><option value="rear">Zezadu</option><option value="side">Z boku</option></select></label>
+ <label>Shock d100 (jen při účinném Impact)<input type="number" name="shockD100" min="1" max="100"></label>
+ <label>Compound d10 (povinný při již zraněné lokaci)<input type="number" name="compoundD10" min="1" max="10"></label>
+ </div>
+ ${survival?'<label><input type="checkbox" name="randomVictimConfirmed"> GM potvrzuje náhodný výběr postižené postavy při Accident</label>':''}
+ <label><input type="checkbox" name="gmConfirmed" required> GM potvrdil fyzické hody, vybavení a skutečné okolnosti</label>
+ <button type="submit">${survival?'Vyhodnotit Survival Hazard a případně zapsat zranění':'Trvale zapsat Fishing zranění'}</button>
+ <output role="status" aria-live="polite"></output></form>`;
+}
+function hskSkillEnvironmentFollowup(entry){
+ const proof=entry?.skillTestProof,primary=proof?.a||proof?.result;
+ const skill=proof?.skills?.[0]||proof?.skill;
+ if(skill!=='Swimming'||!primary||!Number.isInteger(primary.roll)||!Number.isInteger(primary.rawEML)||
+  !['secondary-mastery-value-test','secondary-mastery-test','assistance-success-test'].includes(proof.type))return '';
+ if(data.journal.some(x=>x.skillTestProof?.type==='skill-swimming-aftermath'&&x.skillTestProof.sourceId===entry.id))return '';
+ return `<form class="hsk-climb-fall" data-skill-swimming-aftermath>
+ <input type="hidden" name="sourceId" value="${esc(entry.id)}">
+ <h4>Swimming · voda, vítr a Asphyxia · HMK str. 86, 183</h4>
+ <p>Vezme se původní d100, avšak EML se přepočte se čtyřnásobným základním ENC a potvrzenou zátěží mokrého oděvu. Upravená SV určí, zda postava plave, šlape vodu nebo se potápí. Při utonutí se použije Will, doba bez vzduchu a případně Endurance / Shock Reroll. <strong>Nezadávej další Swimming d100.</strong></p>
+ <div class="field-grid">
+ <label>Voda / vzdálenost od pobřeží<select name="water"><option value="inland">Vnitrozemí nebo do 1 league</option><option value="near">Otevřené moře 1–5 league</option><option value="mid">Otevřené moře 6–19 league</option><option value="far">Otevřené moře 20+ league</option></select></label>
+ <label>Wind Force (0–4)<input type="number" name="windForce" min="0" max="4" value="0" required></label>
+ <label>Mokrý oděv – Swimming ENC<select name="soakedClothingENC"><option value="">— GM musí potvrdit —</option><option value="0">0 · bez uvedeného oděvního kompletu</option><option value="10">10 · Clothing Suit</option><option value="20">20 · Heavy Clothing Suit</option></select></label>
+ <label>Doba bez vzduchu (pětisekundová kola)<input type="number" name="roundsWithoutAir" min="0" max="20000" value="0" required></label>
+ <label>Postava se vynořila / je zachráněna<select name="rescued"><option value="yes">Ano</option><option value="no">Ne, vynuceně až po smrtelné lhůtě</option></select></label>
+ <label>Will SV d100 (jen při potopení)<input type="number" name="willD100" min="1" max="100"></label>
+ <label>d10 smrtelné lhůty (po vyčerpání dechu)<input type="number" name="deathD10" min="1" max="10"></label>
+ <label>Endurance d100 (záchrana po bezvědomí)<input type="number" name="enduranceD100" min="1" max="100"></label></div>
+ <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečné podmínky plavání, oděv, dobu bez vzduchu a uvedené fyzické hody</label>
+ <button type="submit">Vyhodnotit Swimming a zapsat stav postavy</button><output role="status" aria-live="polite"></output></form>`;
+}
+function hskSeriousAggravationForm(entry){
+ const proof=entry?.skillTestProof;
+ if(!proof||!['secondary-mastery-value-test','secondary-mastery-test','assistance-success-test'].includes(proof.type))return '';
+ const result=proof.a||proof.result;
+ if(result?.level!=='CF')return '';
+ const actor=character(proof.actorId),wounds=persistentStateOf(actor).wounds.filter(x=>!x.healed&&['S','G'].includes(x.severity));
+ if(!wounds.length||data.journal.some(x=>x.skillTestProof?.type==='skill-aggravation-aftermath'&&x.skillTestProof.sourceId===entry.id))return '';
+ const rows=wounds.map(w=>`<label data-aggravation-wound data-wound-id="${esc(w.id)}"><input type="checkbox" name="used"> ${esc(w.location)} · ${esc(w.severity)}${w.level} · Shock SR d10 <input type="number" name="d10" min="1" max="10" placeholder="d10, pokud dotčeno"></label>`).join('');
+ return `<details class="hsk-climb-fall"><summary>Volitelné pravidlo: CF → zhoršení vážné rány · HMK str.182</summary>
+ <form data-skill-aggravation-aftermath><input type="hidden" name="sourceId" value="${esc(entry.id)}">
+ <p>Pouze je-li toto pravidlo v kampani zapnuté a CF skutečně použilo zraněnou zónu. U každé vybrané S/G rány je samostatný Shock SR. Nevybrané rány zůstávají beze změny.</p>
+ ${rows}<label><input name="ruleEnabled" type="checkbox" required> GM používá volitelné pravidlo Serious Injury Aggravation</label>
+ <label><input name="gmConfirmed" type="checkbox" required> GM potvrzuje, že vybrané rány byly při činnosti skutečně použity</label>
+ <button type="submit">Vyhodnotit zhoršení ran</button><output role="status" aria-live="polite"></output></form></details>`;
+}
+
+function hskTrekkingWeatherForm(entry){
+ const proof=entry?.skillTestProof,origin=proof?.a||proof?.result;
+ const skill=proof?.skills?.[0]||proof?.skill;
+ if(!['Endurance','Survival'].includes(skill)||!origin||!['CF','F','S','CS'].includes(origin.level)||
+  !['secondary-mastery-value-test','secondary-mastery-test','assistance-success-test'].includes(proof.type))return '';
+ if(data.journal.some(x=>x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===entry.id))return '';
+ return `<details class="hsk-climb-fall"><summary>Trekking · Cold/Heat Hazard, Endurance (Survival) · HMK str.149,185</summary>
+ <form data-skill-weather-onset><input type="hidden" name="sourceId" value="${esc(entry.id)}">
+ <p>Jen pokud tento původní hod skutečně patřil do Trekking Weather Hazard. Neúspěch může vytvořit trvající Cold/Heat Exposure; CF navíc vyžaduje samostatné určení Frostbite/Sunburn. Původní d100 se nepřehazuje.</p>
+ <div class="field-grid"><label>Počasí<select name="kind"><option value="cold">Cold Hazard</option><option value="heat">Heat Hazard</option></select></label>
+ <label>Skutečné podmínky Cold Exposure<select name="coldCondition"><option value="dry">Sucho · HR5</option><option value="damp">Déšť / mokro · HR4</option><option value="coolWater">Chladná voda (vyžaduje samostatný Cold Shock)</option><option value="coldWater">Studená voda (Cold Shock)</option><option value="freezingWater">Ledová voda (Cold Shock)</option></select></label></div>
+ <label><input type="checkbox" name="weatherHazardConfirmed" required> GM ověřil, že jde o Weather Hazard po předchozím Cold/Heat Hazard hodu dle str.149</label>
+ <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje následky původního Endurance (Survival) testu</label>
+ <button type="submit">Zapsat Trekking Weather Hazard do stavu</button><output role="status" aria-live="polite"></output>
+ </form></details>`;
+}
+function hskTrekkingWeatherCourseForms(actorId){
+ const actor=character(actorId);if(!actor)return '';
+ const state=persistentStateOf(actor),active=(state.environmentalHazards||[]).filter(x=>x.active);
+ return active.map(h=>`<details class="hsk-climb-fall"><summary>${h.kind==='cold'?'Cold':'Heat'} Exposure · HR${h.hr} · pokračování, HMK str.185</summary>
+ <form data-skill-weather-course><input type="hidden" name="sourceId" value="${esc(h.sourceId)}">
+ <p>Trvající expozice: HR${h.hr}, interval ${h.periodMinutes} minut; naposledy potvrzeno ${h.lastElapsedMinutes} minut od začátku. ${h.skinPending?'<strong>Neuzavřené samostatné poranění '+esc(h.skinPending)+' – vyžaduje anatomické vyhodnocení GM.</strong>':''}</p>
+ <div class="field-grid"><label>Druh postupu<select name="method"><option value="advance">Exposure Advance</option><option value="healing">Exposure Healing</option></select></label>
+ <label>Skutečně uběhlé minuty od začátku expozice<input type="number" name="elapsedMinutes" min="1" required></label>
+ <label>Nový Course/Healing d100<input type="number" name="roll" min="1" max="100" required></label>
+ <label><input type="checkbox" name="removedFromHazard"> Vyvedeno z chladu/horka (povinné pro Healing)</label>
+ <label><input type="checkbox" name="treatmentConfirmed"> Warming/Compress potvrzen GM (povinné pro Healing)</label>
+ <label><input type="checkbox" name="coolWater"> Chlazeno ve vodě (jen Heat Healing; zkrácený interval)</label></div>
+ <label><input type="checkbox" name="gmConfirmed" required> GM potvrdil čas, terapii a fyzický d100</label>
+ <button type="submit">Vyhodnotit další období expozice</button><output role="status" aria-live="polite"></output>
+ </form></details>`).join('');
+}
+function hskPendingSkillPhysicalConsequences(actorId){
+ const pending=data.journal.filter(x=>x.skillTestProof?.type==='critical-followup'&&
+  x.skillTestProof.actorId===actorId&&
+  !data.journal.some(j=>['climbing-falling','skill-physical-consequence'].includes(j.skillTestProof?.type)&&j.skillTestProof.sourceId===x.id));
+ const unresolved=data.journal.filter(x=>x.characterId===actorId&&x.skillTestProof&&
+  !['critical-followup','climbing-falling','skill-physical-consequence','special-secondary-roll'].includes(x.skillTestProof.type));
+ const originalForms=unresolved.map(x=>hskCriticalNextHTML(x.id,x.skillTestProof)).join('');
+ const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskSkillPhysicalImpactForm(x)).join('')+data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)).join('')+hskTrekkingWeatherCourseForms(actorId);
+ return html?'<section class="panel wide"><h3>Čekající pravidlové následky Skill Tests</h3><p class="muted">Nevyřešené kritické hody jsou dostupné i po obnovení stránky; původní hod se znovu nehází.</p>'+html+'</section>':'';
 }
 function recordSkillEvidence(title,body,proof,slotId=null){
  const savedId=uuid();
  if(!mutate(()=>{if(proof?.consequenceProof?.eventId)assertUniqueSkillConsequence(data.journal,proof.consequenceProof.eventId);data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof});}))throw Error('Záznam nebyl uložen; nepovažujte tento hod za uložený.');
  const slot=slotId||((proof?.type==='success-value-specific'||proof?.type==='secondary-mastery-value-test')?'hsk-result-value':proof?.type==='assistance-success-test'?'hsk-result-assistance':'hsk-result-secondary');
  const output=document.getElementById(slot);if(output){
-  output.innerHTML=hskResultRichHTML(proof,body)+hskCriticalNextHTML(savedId,proof);
+  output.innerHTML=hskResultRichHTML(proof,body)+hskCriticalNextHTML(savedId,proof)+hskSkillEnvironmentFollowup({id:savedId,skillTestProof:proof})+hskSeriousAggravationForm({id:savedId,skillTestProof:proof})+hskTrekkingWeatherForm({id:savedId,skillTestProof:proof});
   if(proof?.type==='special-secondary-roll'){
    const details=output.closest('details');if(details)details.open=true;
    const selection=details?.querySelector('[name="specialRoutine"]');
@@ -3560,11 +3723,249 @@ document.addEventListener('submit',event=>{
   const explanation=plan.requiresRoll?result.effect:plan.detail;
   const body='Následek '+skill+' · '+plan.label+' (HMK '+plan.page+')'+(result?'\n'+technique+' d100 '+result.roll+' / EML '+result.eml+' → '+result.level:'')+'\n'+explanation+(provisional?'\nVýsledek následného testu předběžný kvůli neověřenému zatížení.':'');
   const appended={type:'critical-followup',actorId:actor.id,originId,side,skill,activity:plan.id,page:plan.page,technique,result,effect:explanation,preliminaryArmour:provisional,originalRoll:old.roll,originalLevel:old.level};
-  if(!mutate(()=>{data.journal.push({id:uuid(),characterId:selected,title:'Následek CF · '+skill,body,createdAt:stamp(),skillTestProof:appended});}))throw Error('Navazující záznam nebyl potvrzen');
+  if(!mutate(()=>{
+   if(plan.id==='acro-gymnastics'){
+    if(combatInitiativeSequence)throw Error('Během Initiative se Prone zapisuje výhradně přes bojový systém');
+    const state=structuredClone(persistentStateOf(actor));
+    state.posture.prone=true;
+    state.events.push({id:'skill-prone:'+originId+':'+side,type:'skill-acrobatics-prone',round:Math.max(1,combatClock.round||1,state.lastRound||0),details:{originId,side,rulePage:64}});
+    validateCombatState(state);synchronizeCombatInjuries(actor,state);
+   }
+   data.journal.push({id:uuid(),characterId:selected,title:'Následek CF · '+skill,body,createdAt:stamp(),skillTestProof:appended});
+  }))throw Error('Navazující záznam nebyl potvrzen');
   const restoredSlot=proof.type==='secondary-mastery-value-test'?'hsk-result-value':proof.type==='assistance-success-test'?'hsk-result-assistance':'hsk-result-secondary';
   const refreshed=document.getElementById(restoredSlot);
-  if(refreshed)refreshed.innerHTML=hskResultRichHTML(proof,original.body)+'<section class="hsk-verdict-section hsk-critical-resolved"><h4>Následný hod · uložený výsledek</h4><p>'+esc(body).replaceAll('\n','<br>')+'</p></section>';
+  if(refreshed){const committed=data.journal.find(x=>x.skillTestProof?.type==='critical-followup'&&x.skillTestProof.originId===originId&&x.skillTestProof.side===side);refreshed.innerHTML=hskResultRichHTML(proof,original.body)+'<section class="hsk-verdict-section hsk-critical-resolved"><h4>Následný hod · uložený výsledek</h4><p>'+esc(body).replaceAll('\n','<br>')+'</p></section>'+(committed?hskClimbingFallForm(committed)+hskSkillPhysicalImpactForm(committed):'');}
  }catch(error){output.textContent='Následek nebyl uložen: '+error.message;}
+},true);
+document.addEventListener('click',event=>{
+ const add=event.target.closest('[data-climb-fall-add]');
+ if(add){const form=add.closest('[data-climbing-fall-form]'),rows=form?.querySelector('[data-climb-fall-rows]');if(!rows)return;
+  const n=rows.querySelectorAll('[data-climb-fall-row]').length;if(n>=20)return alert('Nejvýše 20 následných zranění; další zpracování vyžaduje GM');
+  rows.insertAdjacentHTML('beforeend',hskClimbingFallRow(n));return;}
+ const rem=event.target.closest('[data-climb-fall-remove]');if(rem)rem.closest('[data-climb-fall-row]')?.remove();
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-climbing-short-fall]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  const sourceId=form.elements.namedItem('sourceId').value,source=data.journal.find(x=>x.id===sourceId),proof=source?.skillTestProof;
+  if(proof?.type!=='critical-followup'||!['Climbing','Acrobatics','Jumping'].includes(proof.skill)||!['F','CF'].includes(proof.result?.level))throw Error('Neověřený původní pád');
+  if(data.journal.some(x=>x.skillTestProof?.type==='climbing-falling'&&x.skillTestProof.sourceId===sourceId))throw Error('Pád je již uzavřen');
+  const actor=character(proof.actorId);if(!actor)throw Error('Postava nebyla nalezena');
+  if(combatInitiativeSequence)throw Error('Aktivní Initiative: pád se musí řešit přímo v Combat pořadí');
+  const fall=prepareShortClimbingFall({actor,state:persistentStateOf(actor),
+   fallHeightFt:Number(form.elements.namedItem('heightFt').value),originSkill:proof.skill,
+   prone:form.elements.namedItem('prone').value==='yes',
+   round:Math.max(1,combatClock.round||1,persistentStateOf(actor).lastRound||0),
+   eventId:'climbing-fall:'+sourceId,timelineId:'skill-falling:'+sourceId,
+   gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
+  const details={type:'climbing-falling',sourceId,actorId:actor.id,originSkill:proof.skill,page:67,shortFall:true,
+   fallHeightFt:fall.fallHeightFt,prone:fall.prone,proofs:[],physicalDice:[]};
+  if(!mutate(()=>{synchronizeCombatInjuries(actor,fall.state);
+   data.journal.push({id:uuid(),characterId:actor.id,title:'Krátký pád '+proof.skill+' · HMK 67',
+    body:'Pád '+fall.fallHeightFt+' stop; bez pravidlové Injury Sequence; prone '+(fall.prone?'ano':'ne'),
+    createdAt:stamp(),skillTestProof:details});}))throw Error('Uložení krátkého pádu nebylo potvrzeno');
+ }catch(error){if(out)out.textContent='Pád nebyl zapsán: '+error.message;}
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;
+ if(!form?.matches?.('[data-climbing-fall-form]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const out=form.querySelector('output');
+ try{
+  const sourceId=form.elements.namedItem('sourceId').value;
+  const origin=data.journal.find(x=>x.id===sourceId),follow=origin?.skillTestProof;
+  if(!follow||follow.type!=='critical-followup'||!['Climbing','Acrobatics','Jumping'].includes(follow.skill)||!['F','CF'].includes(follow.result?.level))throw Error('Chybí potvrzený neúspěšný následek pádu');
+  if(data.journal.some(x=>x.skillTestProof?.type==='climbing-falling'&&x.skillTestProof.sourceId===sourceId))throw Error('Tento pád již byl uzavřen');
+  const actor=character(follow.actorId);
+  if(!actor||actor.hmk?.combatState?.shock==='KIA')throw Error('Aktuální postava není způsobilá pro tuto proceduru');
+  if(combatInitiativeSequence)throw Error('Při probíhající Initiative se pád musí vyhodnotit v autoritativním bojovém pořadí. Přímý zápis ze Skill Tests je zablokován.');
+  const value=(row,key,optional=false)=>{const raw=row.querySelector('[name="'+key+'"]')?.value.trim();return optional&&!raw?null:Number(raw)};
+  const rows=[...form.querySelectorAll('[data-climb-fall-row]')].map(row=>({
+   impactD10:value(row,'impactD10'),zoneD10:value(row,'zoneD10'),locationD10:value(row,'locationD10'),
+   technique:row.querySelector('[name="technique"]').value,fallingD100:value(row,'fallingD100'),
+   shockD100:value(row,'shockD100',true),compoundD10:value(row,'compoundD10',true)}));
+  const id='climbing-fall:'+sourceId;
+  const report=prepareClimbingFallingSequence({actor,inventory:data.inventory,state:persistentStateOf(actor),
+   fallHeightFt:Number(form.elements.namedItem('heightFt').value),originSkill:follow.skill,surface:form.elements.namedItem('surface').value,
+   slope:form.elements.namedItem('slope').value,
+   direction:form.elements.namedItem('direction').value,rows,round:Math.max(1,combatClock.round||1,persistentStateOf(actor).lastRound||0),
+   timelineId:'skill-falling:'+sourceId,eventId:id,gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
+  const body='Falling Routine HMK str. 67 · pád '+report.fallHeightFt+' ft · '+report.surface+' · '+report.slope+'\n'+
+   report.proofs.map((p,i)=>'Dopad '+(i+1)+': '+p.location+', Impact '+p.impact+', AV '+p.armourValue+', efekt '+p.effectiveImpact+
+    ', '+p.fallingTechnique+' d100 '+p.fallingD100+' / EML '+p.fallingEML+' → '+p.level+', Shock '+(p.shock||'—')).join('\n')+
+   '\nProne: '+(report.prone?'ano':'ne');
+  const evidence={type:'climbing-falling',sourceId,actorId:actor.id,originSkill:follow.skill,page:67,fallHeightFt:report.fallHeightFt,
+   surface:report.surface,slope:report.slope,direction:report.direction,proofs:report.proofs,prone:report.prone,physicalDice:report.physicalDice};
+  if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='climbing-falling'&&x.skillTestProof.sourceId===sourceId))throw Error('Duplicitní pád');
+   synchronizeCombatInjuries(actor,report.state);
+   data.journal.push({id:uuid(),characterId:actor.id,title:'Pád po '+follow.skill+' · HMK str. 67',body,createdAt:stamp(),skillTestProof:evidence});}))throw Error('Transakce nebyla uložena');
+  const target=document.querySelector('[data-climbing-fall-form]');if(target)target.replaceWith(Object.assign(document.createElement('p'),{textContent:'Falling Routine byla potvrzena; zranění je nyní součástí Combat State a historie.'}));
+ }catch(error){if(out)out.textContent='Pád nebyl zapsán: '+error.message;}
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-skill-physical-impact]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const out=form.querySelector('output');
+ try{
+  const sourceId=form.elements.namedItem('sourceId').value;
+  const origin=data.journal.find(x=>x.id===sourceId),proof=origin?.skillTestProof;
+  const kind=form.elements.namedItem('kind').value;
+  if(proof?.type!=='critical-followup'||
+    (kind==='fishing-cf'&&!(proof.skill==='Fishing'&&proof.activity==='fishing-sv'&&proof.result?.level==='CF'))||
+    (kind==='survival-accident'&&!(proof.skill==='Survival'&&proof.activity==='trek-survival-hazard')))
+   throw Error('Nedoložený původní CF a následný test');
+  if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===sourceId))
+   throw Error('Tato událost už byla potvrzena');
+  if(combatInitiativeSequence)throw Error('Aktivní Initiative vyžaduje autoritativní bojové pořadí');
+  const raw=name=>form.elements.namedItem(name)?.value?.trim()||'';
+  const optional=name=>raw(name)===''?null:Number(raw(name));
+  const target=character(kind==='survival-accident'?raw('targetId'):proof.actorId);
+  if(!target)throw Error('Cílová postava nebyla nalezena');
+  if(target.hmk?.verifiedMountedBreed||target.kind==='Animal')throw Error('Zvířecí anatomii nelze vyhodnotit lidskou tabulkou. Použijte zvířecí Injury Sequence.');
+  const hazardD10=optional('hazardD10');
+  const round=Math.max(1,combatClock.round||1,persistentStateOf(target).lastRound||0);
+  // Non-accident branches are GM follow-ups, not invented injuries.
+  if(kind==='survival-accident'&&hazardD10!=null&&(hazardD10<=3||hazardD10>=7)){
+   if(!Number.isSafeInteger(hazardD10)||hazardD10<1||hazardD10>10)throw Error('Neplatný fyzický hazard d10');
+   if(!form.elements.namedItem('gmConfirmed').checked)throw Error('GM musí potvrdit hazard');
+   const description=hazardD10<=3?'Equipment (GM dořeší výbavu)':'Complication (GM dořeší překážku)';
+   if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===sourceId))throw Error('Duplicitní hazard');
+    data.journal.push({id:uuid(),characterId:proof.actorId,title:'Survival Hazard · '+description,
+     body:'Survival Hazard d10 '+hazardD10+' · '+description+' · žádné automatické zranění',createdAt:stamp(),
+     skillTestProof:{type:'skill-physical-consequence',sourceId,kind,nonInjuryHazard:true,hazardD10,rulePage:148}});
+   }))throw Error('Hazard nelze uložit');
+  }else{
+   const report=prepareSkillPhysicalInjury({kind,actor:target,inventory:data.inventory,
+    state:persistentStateOf(target),sourceId,round,gmConfirmed:form.elements.namedItem('gmConfirmed').checked,
+    impactDie:optional('impactDie'),zoneD10:optional('zoneD10'),locationD10:optional('locationD10'),
+    direction:raw('direction'),shockD100:optional('shockD100'),compoundD10:optional('compoundD10'),
+    hazardD10,agilityD100:optional('agilityD100'),randomVictimConfirmed:form.elements.namedItem('randomVictimConfirmed')?.checked===true});
+   const body='HMK str. '+(kind==='fishing-cf'?'71':'148')+' · '+kind+' · '+target.name+
+    (report.sl?' · Agility '+report.sl+' / EML '+report.eml:'')+
+    (report.avoided?' · nehoda odvrácena':' · Impact '+report.impact+report.aspect+
+      ', lokalita '+report.location+', AV '+report.armourValue+', účinný Impact '+report.effectiveImpact+
+      ', zranění '+(report.injury?report.injury.severity+report.injury.level+report.aspect:'bez rány')+', Shock '+(report.shock??'—'));
+   if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===sourceId))throw Error('Duplicitní zranění');
+    synchronizeCombatInjuries(target,report.state);
+    data.journal.push({id:uuid(),characterId:target.id,title:'Následek Skill Testu · '+kind,body,createdAt:stamp(),
+     skillTestProof:{type:'skill-physical-consequence',sourceId,kind,actorId:target.id,report:{...report,state:undefined}}});
+   }))throw Error('Zranění nebylo uloženo');
+  }
+  form.replaceWith(Object.assign(document.createElement('p'),{textContent:'Následek byl potvrzen a uložen do historie a příslušného stavu.'}));
+ }catch(e){if(out)out.textContent='Následek nebyl zapsán: '+e.message;}
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-skill-swimming-aftermath]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  const sourceId=form.elements.namedItem('sourceId').value;
+  const saved=data.journal.find(x=>x.id===sourceId),proof=saved?.skillTestProof;
+  const actor=character(proof?.actorId),original=proof?.a||proof?.result;
+  if(!actor||actor.id!==saved?.characterId||(proof.skills?.[0]||proof.skill)!=='Swimming'||
+   !original||!Number.isInteger(original.roll))throw Error('Chybí ověřený původní Swimming d100');
+  if(data.journal.some(x=>x.skillTestProof?.type==='skill-swimming-aftermath'&&x.skillTestProof.sourceId===sourceId))throw Error('Následek již byl zapsán');
+  if(combatInitiativeSequence)throw Error('Aktivní Initiative: stav musí být řešen v bojovém pořadí');
+  const field=n=>form.elements.namedItem(n)?.value?.trim()??'';
+  const opt=n=>field(n)===''?null:Number(field(n));
+  if(field('soakedClothingENC')==='')throw Error('Doložte typ skutečně mokrého oděvu');
+  const report=prepareSwimmingConsequence({actor,inventory:data.inventory,state:persistentStateOf(actor),sourceId,
+   original,round:Math.max(1,combatClock.round||1,persistentStateOf(actor).lastRound||0),
+   water:field('water'),windForce:Number(field('windForce')),soakedClothingENC:Number(field('soakedClothingENC')),
+   roundsWithoutAir:Number(field('roundsWithoutAir')),rescued:field('rescued')==='yes',
+   willD100:opt('willD100'),deathD10:opt('deathD10'),enduranceD100:opt('enduranceD100'),
+   gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
+  const proofReport={...report.report};
+  if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='skill-swimming-aftermath'&&x.skillTestProof.sourceId===sourceId))throw Error('Duplicitní následek');
+   synchronizeCombatInjuries(actor,report.state);
+   data.journal.push({id:uuid(),characterId:actor.id,title:'Swimming / Asphyxia · HMK 86,183',
+    body:'Původní d100 '+original.roll+' · upravená SV '+(proofReport.swim.adjustedSV??'automatické potopení')+
+     ' · Swimming ENC '+proofReport.swim.swimmingENC+' · '+proofReport.asphyxia+
+     ' · Windedness +'+proofReport.windednessAdded,createdAt:stamp(),
+    skillTestProof:{type:'skill-swimming-aftermath',sourceId,actorId:actor.id,report:proofReport}});
+  }))throw Error('Zápis Swimming nebyl dokončen');
+  form.replaceWith(Object.assign(document.createElement('p'),{textContent:'Swimming / Asphyxia potvrzena a uložena do Combat State a historie.'}));
+ }catch(e){if(out)out.textContent='Swimming nebylo uloženo: '+e.message;}
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-skill-aggravation-aftermath]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  const sourceId=form.elements.namedItem('sourceId').value;
+  const src=data.journal.find(x=>x.id===sourceId),proof=src?.skillTestProof;
+  const actor=character(proof?.actorId),result=proof?.a||proof?.result;
+  if(!actor||actor.id!==src?.characterId||result?.level!=='CF')throw Error('Chybí potvrzený původní CF u postavy');
+  if(combatInitiativeSequence)throw Error('Zhoršení rány během Initiative patří do řízeného bojového pořadí');
+  const rows=[...form.querySelectorAll('[data-aggravation-wound]')].filter(x=>x.querySelector('[name="used"]')?.checked);
+  const woundRolls=rows.map(x=>({woundId:x.dataset.woundId,d10:Number(x.querySelector('[name="d10"]').value)}));
+  const outcome=prepareSeriousInjuryAggravation({actor,state:persistentStateOf(actor),sourceId,
+   round:Math.max(1,combatClock.round||1,persistentStateOf(actor).lastRound||0),
+   originalSL:result.level,woundRolls,ruleEnabled:form.elements.namedItem('ruleEnabled').checked,
+   gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
+  if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='skill-aggravation-aftermath'&&x.skillTestProof.sourceId===sourceId))throw Error('Dvojí aggravation');
+   synchronizeCombatInjuries(actor,outcome.state);
+   data.journal.push({id:uuid(),characterId:actor.id,title:'Serious Injury Aggravation · HMK 182',
+    body:outcome.report.consequences.map(x=>x.woundId+' d10 '+x.d10+' / TN '+x.tn+' → '+(x.passed?'bez zhoršení':'HR −1')).join('\n'),
+    createdAt:stamp(),skillTestProof:{type:'skill-aggravation-aftermath',sourceId,actorId:actor.id,
+     results:outcome.report.consequences,rulePage:182}});
+  }))throw Error('Zápis zhoršení rány nebyl dokončen');
+  form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Aggravation potvrzena; všechny Shock SR a úpravy léčby jsou uloženy.'}));
+ }catch(e){if(out)out.textContent='Aggravation nebyla uložena: '+e.message;}
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-skill-weather-onset]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  const sourceId=form.elements.namedItem('sourceId').value,src=data.journal.find(x=>x.id===sourceId),proof=src?.skillTestProof;
+  const actor=character(proof?.actorId),result=proof?.a||proof?.result;
+  if(!actor||src?.characterId!==actor.id||!['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill)||
+   !['CF','F','S','CS'].includes(result?.level))throw Error('Chybí doložený původní test Endurance (Survival)');
+  if(combatInitiativeSequence)throw Error('Během Initiative musí stav řídit Combat');
+  const kind=form.elements.namedItem('kind').value;
+  const outcome=prepareTrekkingWeatherTest({state:persistentStateOf(actor),sourceId,
+   round:Math.max(1,combatClock.round||1,persistentStateOf(actor).lastRound||0),kind,
+   originalSL:result.level,coldCondition:form.elements.namedItem('coldCondition').value,
+   weatherHazardConfirmed:form.elements.namedItem('weatherHazardConfirmed').checked,
+   gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
+  if(!mutate(()=>{
+   if(data.journal.some(x=>x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===sourceId))throw Error('Dvojí zápis');
+   synchronizeCombatInjuries(actor,outcome.state);
+   data.journal.push({id:uuid(),characterId:actor.id,title:'Trekking '+kind+' Hazard · HMK 149,185',
+    body:'Původní '+result.level+' · HR '+(outcome.report.hr??'bez expozice')+
+     ' · Weariness +'+outcome.report.addedWeariness+
+     (outcome.report.skinPending?' · VYŽADUJE samostatné '+outcome.report.skinPending:''),createdAt:stamp(),
+    skillTestProof:{type:'skill-weather-onset',sourceId,actorId:actor.id,report:outcome.report}});
+  }))throw Error('Zápis Weather Hazard se neuložil');
+  form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Weather Hazard byl doložen a uložen. Následné Course/Healing hody jsou dostupné v deníku.'}));
+ }catch(e){if(out)out.textContent='Weather Hazard nebyl uložen: '+e.message;}
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-skill-weather-course]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  const sourceId=form.elements.namedItem('sourceId').value;
+  const first=data.journal.find(x=>x.id===sourceId),actor=character(first?.characterId);
+  if(!actor||!data.journal.some(x=>x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===sourceId))
+   throw Error('Chybí ověřený původ expozice');
+  if(combatInitiativeSequence)throw Error('V aktivní Initiative nelze obejít Combat State');
+  const orig=persistentStateOf(actor),outcome=advanceTrekkingWeatherExposure({state:orig,actor,sourceId,
+   round:Math.max(1,combatClock.round||1,orig.lastRound||0),method:form.elements.namedItem('method').value,
+   elapsedMinutes:Number(form.elements.namedItem('elapsedMinutes').value),roll:Number(form.elements.namedItem('roll').value),
+   gmConfirmed:form.elements.namedItem('gmConfirmed').checked,
+   removedFromHazard:form.elements.namedItem('removedFromHazard').checked,
+   treatmentConfirmed:form.elements.namedItem('treatmentConfirmed').checked,
+   coolWater:form.elements.namedItem('coolWater').checked});
+  if(!mutate(()=>{
+   synchronizeCombatInjuries(actor,outcome.state);
+   data.journal.push({id:uuid(),characterId:actor.id,title:'Exposure '+outcome.report.method+' · HMK 185',
+    body:'d100 '+form.elements.namedItem('roll').value+' · '+outcome.report.sl+
+     ' · HR '+outcome.report.hr+' · slabost '+outcome.report.weakness+
+     ' · Shock '+outcome.report.shock,createdAt:stamp(),skillTestProof:{type:'skill-weather-course',sourceId,
+      actorId:actor.id,report:outcome.report}});
+  }))throw Error('Course/Healing nelze uložit');
+  form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Course/Healing Roll byl trvale zapsán. Další splatný krok najdeš v deníku.'}));
+ }catch(e){if(out)out.textContent='Exposure Course se neuložil: '+e.message;}
 },true);
 function hskSpecialSelectedInfo(form){
  const routine=specialSecondaryById(form.elements.namedItem('specialRoutine')?.value);
