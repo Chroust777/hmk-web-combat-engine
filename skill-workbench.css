@@ -142,3 +142,9 @@
 .hsk-critical-next .hsk-critical-technique-note{display:block;max-width:70ch;font-size:.85rem;line-height:1.4;color:#e7d3af;margin-top:.2rem}
 .hsk-critical-next select option:disabled{color:#9f9a90}
 .hsk-critical-next button:disabled{opacity:.6;cursor:not-allowed}
+
+/* v93.286: distinct proof→state confirmation, never implicit from a d10. */
+.hsk-special-commits{margin-top:1rem;padding:1rem;border:1px solid var(--line, #9c9c9c);border-radius:0.75rem}
+.hsk-special-commits form{display:grid;gap:.65rem;margin:.75rem 0 1.25rem}
+.hsk-special-commits fieldset{display:flex;flex-wrap:wrap;gap:.4rem .9rem}
+.hsk-special-commits .hsk-verdict-section{margin:.75rem 0;padding:.75rem;border:1px solid #80808055;border-radius:.6rem}

@@ -1,3 +1,11 @@
+# v93.287 — HMK p.300: Trance Bestowal, Talisman a perzistence
+
+Přidán GM-potvrzený Trance Bestowal na konkrétní uložené Ancestor/Totem Spirit Power s připlacenou Anima, jiného příjemce a fyzický předmět z inventáře; S/CS časované předání, F 30denní zákaz, CF povinný Will a případný Aural Shock/Weakness. Vše jako atomický zápis do stavu a historii. Navázaný Spirit SR může obnovit účinek na konci období. Obnova Aural Shock přijímá také původ doložený šamanským Trance CF. Potvrzení času a souhlasu patří GM; libovolné nevypočitatelné účinky uložených Spirit Powers zatím nejsou simulovány.
+
+# v93.287 — potvrzené navazující účinky zvláštních Secondary Rolls
+
+Fatigue/Recovery, Festival, Ceremony a Aural Shock Spirit Power recovery mají oddělený GM potvrzený zápis do autoritativního Character/Combat State. Originální d10 důkaz je neměnný. Časované efekty se odvozují z potvrzeného kalendáře; bez kalendáře nebo dalšího GM potvrzení není dovoleno zpětně hádat čas. Talisman extension a generic shamanic rites zůstávají bezpečně blokované bez předchozího Trance bestowal / konkrétní síly a předmětu. Kouzla bez úplné sekvence se nevydávají za implementovaná. Viz module `src/integration/hmk-special-outcome-commit.js`.
+
 ## v93.275 · SR/TN u všech relevantních typů Skill Tests
 
 Předepsaná činnost HMK určuje SR a TN u běžného Success Testu, na obou stranách Opposed Testu, u Success Value i při Assistance; jinak SR nenastává. Vzácné zvláštní podmínky (aktivní talent, Reverie, tělesný návrat) vyžadují výběr příslušné činnosti; aplikace je nesmí automaticky předpokládat jen podle názvu dovednosti. Ověřené předpisy jsou vyjmenované ve zdrojové databázi s čísly tištěných stran. Samostatné hodiny únavy, specializované kouzelnické a náboženské sekvence řeší jiné mechanismy, nejsou zde vydávány za běžné testy.

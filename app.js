@@ -14,6 +14,8 @@ import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/
 import {criticalActivities,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
 import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEligible} from './src/integration/hmk-skill-secondary-routines.js';
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES,specialSecondaryById,resolveSpecialSR} from './src/integration/hmk-special-secondary-routines.js';
+import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,validateSpecialEffectEvidence} from './src/integration/hmk-special-outcome-commit.js';
+import {applyTalismanBestowal,projectTalismanStatus,validateTalismanEvidence,activeShamanSkillModifier,reconcileTalismanPossession} from './src/integration/hmk-shaman-talisman-state.js';
 import {HMK_OPPOSED_ACTIONS} from './src/integration/hmk-opposed-skill-pairs.js';
 import {skillNarrativeSolo,skillNarrativeOpposed,skillNarrativeTiebreak} from './src/integration/hmk-skill-narrative.js';
 import {automaticSkillContext} from './src/integration/hmk-skill-auto-context.js';
@@ -142,7 +144,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.285';
+const APP_VERSION='93.287';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -189,6 +191,8 @@ if(!storageReadOnly){
 }
 function validate(d){
  if(d?.campaignClock!==undefined)validateCampaignCalendar(d.campaignClock);
+ if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
+ if(d?.journal&&d?.characters)validateTalismanEvidence(d);
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
@@ -277,7 +281,7 @@ window.addEventListener('storage',event=>{if(event.key===STORAGE&&event.newValue
 function mutate(fn){
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {fn();assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignCalendarAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save()){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
+ try {fn();reconcileTalismanPossession(previous,data);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignCalendarAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save()){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(!automaticGenerationBusy)alert('Změna nebyla uložena: '+e.message);return false}
 }
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
@@ -490,7 +494,7 @@ function wealthInventoryPanel(c){
 let activeSkillTab='secondary';
 function skillWorkbenchView(){
  const actor=character(selected)??data.characters[0];if(actor&&selected!==actor.id)selected=actor.id;if(!actor)return `<section class="panel"><h2>Skill Tests</h2><p>Nejprve vytvořte postavu.</p><button data-nav="characters">Přejít do registru</button></section>`;
- return skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab);
+ return skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null);
 }
 function charactersView(){const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));return `<div class="topline"><h2>Registr postav (${data.characters.length})</h2>${button('+ Vytvořit postavu krok za krokem','new-character')}<button type="button" data-action="auto-random-character">⚄ Generovat náhodnou postavu</button><button type="button" data-action="open-generator-config">✦ Generovat podle rysů / Folk / povolání</button></div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards">${list.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><span class="pill">${esc(c.kind)}</span><h3>${esc(c.name)}</h3><div class="muted">${esc(c.occupation||'Bez povolání')}</div><div class="muted">${esc(c.description||'')}</div>${c.hmk?.creation?`<div class="muted">Character Creation · ${esc(c.hmk.creation.status==='auto-generated'?'Automaticky dokončeno':c.hmk.creation.status==='review-required'?'Ke kontrole GM':'krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="actions">${creationCardAction(c)}<button data-open="${esc(c.id)}">Otevřít deník</button><button class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></article>`).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`}
 function characterInventoryOverview(c,inv){
@@ -546,7 +550,24 @@ function sheetMandatoryBridge(c){
  if(!bridge.ready)return `<section class="panel wide hmk-skill-mandatory-bridge">${header}<p class="notice">${esc(bridge.reason)}</p><button type="button" class="secondary" data-nav="encounter">Přejít k příslušnému Combat kroku</button></section>`;
  return `<section class="panel wide hmk-skill-mandatory-bridge">${header}${guidedMandatoryPanel(roster)}</section>`;
 }
-function sheetView(){const c=character(selected);if(!c){view='characters';return charactersView()}const editing=sheetEditingId===c.id;const inv=data.inventory.filter(x=>x.characterId===c.id);const sheetAudit=auditCharacterSheet(c,data.inventory);const auditPanel=`<section class="panel wide"><details><summary>Kontrola integrity Character Sheet · ${sheetAudit.ok?'bez nalezeného nesouladu':'vyžaduje pozornost'}</summary><p class="muted">Kontrola je pouze pro čtení a žádné hodnoty neopravuje ani nemaže. Zdroj: stávající HMK profil, Character Creation a inventář.</p>${sheetAudit.issues.map(x=>`<p class="notice error">${esc(x)}</p>`).join('')}${sheetAudit.notes.map(x=>`<p class="notice">${esc(x)}</p>`).join('')}${sheetAudit.ok?'<p>Promítnuté Skills a vybavení: kontrola prošla v rozsahu známých dat.</p>':''}</details></section>`;const logs=data.journal.filter(x=>x.characterId===c.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));return `<div class="topline"><h2>Osobní deník: ${esc(c.name)}</h2>${data.campaignClock?`<button type="button" class="secondary" data-nav="calendar">◷ ${esc(displayCampaignMinute(data.campaignClock.minute))}</button>`:''}${button('← Registr','go-characters')}${editing?'<button type="submit" form="sheet-inline-form">Uložit změny</button><button type="button" class="secondary" data-sheet-cancel>Zrušit</button>':'<button type="button" data-sheet-edit>✎ Edit</button>'}${button('Pravidlová tvorba','creation-open')}${button('Export HMK profilu','export-kernel-character')}</div><div class="columns"><section class="panel wide"><h3>Identita postavy</h3><p><strong>${esc(c.name)}</strong> · ${esc(c.hmk?.folk||"—")} · ${esc(c.hmk?.ageGroup||"—")} · ${esc(c.occupation||"—")}</p>${c.description?`<p>${esc(c.description)}</p>`:""}<p class="muted tiny">Údaje dané tvorbou postavy se během hry v režimu Edit nemění.</p></section><section class="panel wide"><h3>Inventář postavy</h3>${wealthInventoryPanel(c)}${characterInventoryOverview(c,inv)}<form id="add-inventory"><label>Předmět z knihovny<select name="itemId" required><option value="">Vyberte…</option>${allCatalogItems().map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${field('condition','Stav / poznámka','')}${field('currentWQ','Aktuální WQ kusu (nepovinné)','', 'number')}${slotSelect('slot','none')}<button type="submit" ${allCatalogItems().length?'':'disabled'}>Přiřadit předmět</button></form><div class="notice tiny">Při přiřazení vzniká samostatná kopie parametrů. Úprava knihovny nezmění již přidělené předměty.</div></section>${armourLoadoutPanel(inv,c)}${combatantLoadPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:""})()}${auditPanel}${editing?'<form id="sheet-inline-form" class="sheet-inline-form">':''}${characterSheetSummaryHTML(c,{editing,currentCoins:coinBalance(c).ok?coinBalance(c).balance:null})}${characterCalculationHTML(c,{editing})}${editing?'</form>':''}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section>${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section></div>`}
+function liveSpecialEffectsPanel(c){
+ const now=data.campaignClock?.minute,live=activeSpecialEffects(c,now);
+ const all=c.hmk?.liveEffects;
+ if(!all)return '';
+ const rows=[];
+ if(live.festival)rows.push('Renewed Faith: +1 maximum Piety · do '+displayCampaignMinute(live.festival.until));
+ if(live.blessing)rows.push('Ceremony: Blessing +'+live.blessing.bonus+' · '+live.blessing.subjects.join(', ')+' · do '+displayCampaignMinute(live.blessing.until));
+ if(live.maxPiety!==null)rows.push('Aktuální maximum Piety: '+live.maxPiety+' (dle aktivního Festivalu a Morality)');
+ if(live.currentPiety!==null)rows.push('Aktuální Piety: '+live.currentPiety+' (omezeno aktuálním maximem)');
+ for(const rite of live.rites)rows.push('Shamanic Rite · do '+displayCampaignMinute(rite.until));
+ for(const t of projectTalismanStatus({recipient:c,inventory:data.inventory,minute:now}))rows.push('Talisman '+t.family+' / '+t.subject+' · '+t.reason+' · do '+displayCampaignMinute(t.until));
+ for(const lock of all.talismanLockouts||[])if(now!=null&&now<lock.until)rows.push('Talisman Bestowal: zákaz dalšího pokusu do '+displayCampaignMinute(lock.until)+' (Trance F).');
+ if(live.lostSpiritPowers.length)rows.push('Ztracené uložené Spirit Powers (indexy): '+live.lostSpiritPowers.join(', '));
+ if(now==null)rows.push('K zobrazení platnosti časovaných účinků je nutný kalendář kampaně.');
+ if(!rows.length)rows.push('Žádný aktivní časovaný účinek (starší účinky mohou být již prošlé).');
+ return '<section class="panel wide"><h3>Trvalé účinky z potvrzených SR</h3><p class="tiny muted">Časované účinky se po uplynutí lhůty automaticky přestanou uplatňovat; původní důkazy zůstanou zachované.</p>'+rows.map(x=>'<p>'+esc(x)+'</p>').join('')+'</section>';
+}
+function sheetView(){const c=character(selected);if(!c){view='characters';return charactersView()}const editing=sheetEditingId===c.id;const inv=data.inventory.filter(x=>x.characterId===c.id);const sheetAudit=auditCharacterSheet(c,data.inventory);const auditPanel=`<section class="panel wide"><details><summary>Kontrola integrity Character Sheet · ${sheetAudit.ok?'bez nalezeného nesouladu':'vyžaduje pozornost'}</summary><p class="muted">Kontrola je pouze pro čtení a žádné hodnoty neopravuje ani nemaže. Zdroj: stávající HMK profil, Character Creation a inventář.</p>${sheetAudit.issues.map(x=>`<p class="notice error">${esc(x)}</p>`).join('')}${sheetAudit.notes.map(x=>`<p class="notice">${esc(x)}</p>`).join('')}${sheetAudit.ok?'<p>Promítnuté Skills a vybavení: kontrola prošla v rozsahu známých dat.</p>':''}</details></section>`;const logs=data.journal.filter(x=>x.characterId===c.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));return `<div class="topline"><h2>Osobní deník: ${esc(c.name)}</h2>${data.campaignClock?`<button type="button" class="secondary" data-nav="calendar">◷ ${esc(displayCampaignMinute(data.campaignClock.minute))}</button>`:''}${button('← Registr','go-characters')}${editing?'<button type="submit" form="sheet-inline-form">Uložit změny</button><button type="button" class="secondary" data-sheet-cancel>Zrušit</button>':'<button type="button" data-sheet-edit>✎ Edit</button>'}${button('Pravidlová tvorba','creation-open')}${button('Export HMK profilu','export-kernel-character')}</div><div class="columns"><section class="panel wide"><h3>Identita postavy</h3><p><strong>${esc(c.name)}</strong> · ${esc(c.hmk?.folk||"—")} · ${esc(c.hmk?.ageGroup||"—")} · ${esc(c.occupation||"—")}</p>${c.description?`<p>${esc(c.description)}</p>`:""}<p class="muted tiny">Údaje dané tvorbou postavy se během hry v režimu Edit nemění.</p></section><section class="panel wide"><h3>Inventář postavy</h3>${wealthInventoryPanel(c)}${characterInventoryOverview(c,inv)}<form id="add-inventory"><label>Předmět z knihovny<select name="itemId" required><option value="">Vyberte…</option>${allCatalogItems().map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${field('condition','Stav / poznámka','')}${field('currentWQ','Aktuální WQ kusu (nepovinné)','', 'number')}${slotSelect('slot','none')}<button type="submit" ${allCatalogItems().length?'':'disabled'}>Přiřadit předmět</button></form><div class="notice tiny">Při přiřazení vzniká samostatná kopie parametrů. Úprava knihovny nezmění již přidělené předměty.</div></section>${armourLoadoutPanel(inv,c)}${combatantLoadPanel(c)}${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:""})()}${auditPanel}${editing?'<form id="sheet-inline-form" class="sheet-inline-form">':''}${characterSheetSummaryHTML(c,{editing,currentCoins:coinBalance(c).ok?coinBalance(c).balance:null})}${characterCalculationHTML(c,{editing})}${editing?'</form>':''}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section>${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section></div>`}
 // Advisory-only catalog audit. Missing data are never silently fabricated or written to storage.
 function catalogAuditEntry(i){
  const p=i.properties||{}, missing=[];
@@ -3364,10 +3385,17 @@ function skillAutoFor(actor,name,form=null,prefix='A'){
  const seq=liveInitiativeSequence();
  const field=k=>form?.elements.namedItem(k+prefix);
  const value=k=>{const s=field(k)?.value?.trim();return s===''||s==null?null:s;};
- return automaticSkillContext({actor,inventory:data.inventory,name,
+ const ctx=automaticSkillContext({actor,inventory:data.inventory,name,
   combatRound:seq?.round??null,combatTimelineId:seq?.timelineId??null,
   gearPolicy:field('gearConfirmed')?.checked?'gm':'advisory',
   manualENC:value('gmENC'),manualBulk:value('gmBulk'),manualPerception:value('gmPer')});
+ const shamanBoost=activeShamanSkillModifier({actor,skill:name,minute:data.campaignClock?.minute,inventory:data.inventory});
+ if(shamanBoost){ctx.condition.modifier+=shamanBoost;ctx.modifier+=shamanBoost;
+  ctx.breakdown.push({label:'Ancestor Rite/Talisman · overlapping MB',value:shamanBoost,source:'confirmed-shaman-rite-talisman-p302'});}
+ const bonus=activeDoctrineModifier(actor,name,data.campaignClock?.minute);
+ if(bonus){ctx.condition.modifier+=bonus;ctx.modifier+=bonus;
+  ctx.breakdown.push({label:'Doctrine Blessing',value:bonus,source:'confirmed-ceremony-p316'});}
+ return ctx;
 }
 function skillTraumaText(tr){return 'Shock '+tr.shock.value+', Injury '+tr.injury.modifier+', Bulk '+tr.bulk.modifier+', PER '+tr.perception.modifier+(tr.slPenalty?' · STN: −'+tr.slPenalty+' SL':'');}
 function skillConditionsText(ctx){return 'Fatigue '+ctx.fatigue.modifier+' ('+ctx.fatigue.source+'), ENC '+ctx.enc.modifier+' ('+ctx.enc.source+')';}
@@ -3635,7 +3663,7 @@ function hskSpecialRun(form){
  if(criticalWill)explanation+=' Ritual CF: následný Will d100 '+criticalWill.roll+' → '+criticalWill.level+'; úprava Benediction Modifier '+criticalBenedictionPenalty+'.';
  if(routine.id==='astral-rite-member')explanation+=' '+modifierDetails+'; bonus +2 TN pouze při Trance CS.';
  const body=routine.name+' · HMK '+routine.page+'\nSR '+routine.skill+' ML '+secondaryML+' → TN '+outcome.tn+'; hody '+(outcome.rolls.join(', ')||'žádné')+'; úspěchy '+outcome.successes+'\n'+explanation;
- return {body,proof:{type:'special-secondary-roll',actorId:actor.id,priestId:priest?.id??null,routineId:routine.id,routineName:routine.name,page:routine.page,skill:routine.skill,secondaryML,stars,style:styleInfo?.name??null,primaryResult,criticalWill,outcome,explanation,sourcePages:[62,routine.page]}};
+ return {body,proof:{type:'special-secondary-roll',actorId:actor.id,priestId:priest?.id??null,routineId:routine.id,routineName:routine.name,page:routine.page,skill:routine.skill,secondaryML,stars,style:styleInfo?.name??null,primaryResult,criticalWill,outcome,explanation,campaignMinute:data.campaignClock?.minute??null,sourcePages:[62,routine.page]}};
 }
 function hskFields(form,side){return {
   secondary1:form.elements.namedItem(side==='A'?'secondary1':'defSecondary1')?.value||'',
@@ -3817,6 +3845,57 @@ document.addEventListener('focusin',e=>{
 document.addEventListener('change',e=>{
  const form=e.target?.form;
  if(form?.id==='hsk-special-sr-form'&&['specialRoutine','specialPriest'].includes(e.target.name))hskSpecialRefresh(form);
+},true);
+document.addEventListener('submit',event=>{
+ const f=event.target;
+ if(f?.id!=='hsk-talisman-bestowal')return;
+ event.preventDefault();event.stopImmediatePropagation();
+ try{
+  if(combatInitiativeSequence)throw Error('Talisman Bestowal nelze zapisovat během aktivního Initiative.');
+  const shaman=character(selected),v=Object.fromEntries(new FormData(f));
+  if(!shaman)throw Error('Nejprve vyberte konkrétního šamana.');
+  const recipient=character(v.talismanRecipient),possession=data.inventory.find(i=>i.id===v.talismanItem);
+  if(!recipient||recipient.id===shaman.id)throw Error('Zvolte jiného skutečného příjemce.');
+  if(!possession||possession.characterId!==recipient.id||possession.quantity!==1||
+   possession.snapshot?.category!=='other'||!['carried','main_hand','off_hand'].includes(possession.slot))
+   throw Error('Před hodem vyberte skutečně nesený jednotlivý předmět právě tohoto příjemce.');
+  if(v.recipientWilling!=='yes'||v.ritualElapsed!=='yes'||v.gmConfirmed!=='yes')
+   throw Error('Před hodem potvrďte souhlas, skutečně dokončený obřad a zápis GM.');
+  const trance=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');
+  if(ctx.armourIsProvisional)throw Error('U Trance je nutné před rituálem ověřit zatížení. Neověřené EML nelze použít.');
+  const primary=skillResolvedResult({mastery:trance,form:f,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result;
+  let will=null;
+  if(primary.level==='CF'){
+   const mastery=skillActorMastery(shaman,'Will'),context=skillAutoFor(shaman,'Will');
+   if(context.armourIsProvisional)throw Error('U povinného Will je nutné ověřené EML.');
+   will=skillResolvedResult({mastery,form:f,dieKey:'talismanWillRoll',condition:context.condition,trauma:context.trauma}).result;
+  }else if(f.elements.namedItem('talismanWillRoll')?.value?.trim())throw Error('Následný Will d100 se zadává pouze při Trance CF.');
+  const result=applyTalismanBestowal({document:data,shamanId:shaman.id,recipientId:v.talismanRecipient,
+   itemId:v.talismanItem,powerIndex:Number(v.talismanPower),eventId:uuid(),
+   tranceRoll:primary.roll,tranceEML:primary.eml,willRoll:will?.roll??null,willEML:will?.eml??null,
+   gmConfirmed:v.gmConfirmed==='yes',ritualElapsed:v.ritualElapsed==='yes',recipientWilling:v.recipientWilling==='yes'});
+  if(!mutate(()=>{data=result.document;}))return;
+  alert(result.note+' Potvrzené Trance '+result.proof.tranceLevel+' (d100 '+result.proof.tranceRoll+').');
+ }catch(error){alert('Talisman Bestowal nebyl proveden: '+error.message);}
+},true);
+document.addEventListener('submit',event=>{
+ const f=event.target;
+ if(!f?.matches?.('[data-hsk-special-commit]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ try{
+  if(combatInitiativeSequence)throw Error('Během aktivní Initiative je přímý zápis následků SR zablokován.');
+  const v=Object.fromEntries(new FormData(f)),sourceId=v.sourceId;
+  const source=data.journal.find(x=>x.id===sourceId);
+  if(!source||source.characterId!==selected)throw Error('Aktivní postava neodpovídá původnímu SR.');
+  const subjects=[...new FormData(f).getAll('subjects')].map(String);
+  const result=applyRecordedSpecialOutcome({document:data,sourceId,commitId:uuid(),gmConfirmed:v.gmConfirmed==='yes',
+   attestedPeriod:v.attestedPeriod==='yes',ceremonyName:v.ceremonyName||'',ceremonyLevel:v.ceremonyLevel||'',subjects,
+   spiritPowerIndex:v.spiritPowerIndex===''||v.spiritPowerIndex==null?null:Number(v.spiritPowerIndex),
+   talismanItemId:v.talismanItemId||'',powerIndex:v.powerIndex===''||v.powerIndex==null?null:Number(v.powerIndex)});
+  const previous=data;
+  if(!mutate(()=>{data=result.document;}))return;
+  alert('Následek SR bezpečně uložen do postavy: '+result.detail);
+ }catch(err){alert('Následek SR nebyl zapsán: '+err.message);}
 },true);
 document.addEventListener('focusin',e=>{const form=e.target?.closest?.('#hsk-special-sr-form');if(form&&!form.dataset.ready){form.dataset.ready='yes';hskSpecialRefresh(form);}},true);
 document.addEventListener('submit',e=>{
