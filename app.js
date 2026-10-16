@@ -10,6 +10,7 @@ import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/h
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML} from './src/integration/hmk-skill-workbench-ui.js';
+import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
 import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEligible} from './src/integration/hmk-skill-secondary-routines.js';
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES,specialSecondaryById,resolveSpecialSR} from './src/integration/hmk-special-secondary-routines.js';
 import {HMK_OPPOSED_ACTIONS} from './src/integration/hmk-opposed-skill-pairs.js';
@@ -140,7 +141,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.282';
+const APP_VERSION='93.283';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3649,7 +3650,7 @@ function hskTrace(person,mastery,ctx,secs=[],assist=0,gmModifier=0){
  if(assist)rows.push(['Assistance',assist]);
  rows.push(['GM situace',gmModifier]);
  const raw=rows.reduce((sum,x)=>sum+x[1],0),eml=effectiveMasteryLevel(raw);
- return '<div class="hsk-calculation"><b>'+esc(person.name)+' · rozklad EML</b><div class="hsk-eml-trace">'+rows.map(([k,v],i)=>'<span class="hsk-eml-chip" title="'+(i?'Příspěvek k EML':'Primární ML')+'"><small>'+esc(k)+'</small><b class="'+(v<0?'hsk-negative':v>0?'hsk-positive':'hsk-zero')+'">'+(i?hskSigned(v):v)+'</b></span>').join('')+' <strong class="hsk-eml-total">EML '+eml+'</strong>'+(raw!==eml?' <em class="hsk-eml-cap">05–95 (před limitem '+raw+')</em>':'')+'</div>'+ (ctx.armourIsProvisional?'<p class="hsk-soft-note">Dostupný postih zbroje započítán. Výsledek je předběžný: '+esc([...new Set(ctx.provisionalArmour.map(x=>x.split(':')[0]))].join(', '))+' není zcela ověřen. GM může hodnoty upřesnit.</p>':'')+(ctx.armourWarnings?.length?'<p class="hsk-soft-note">Rozhodnutí GM: '+ctx.armourWarnings.map(esc).join(' · ')+'</p>':'')+'</div>';
+ return '<div class="hsk-calculation"><b>'+esc(person.name)+' · rozklad EML</b><div class="hsk-eml-trace">'+rows.map(([k,v],i)=>'<span class="hsk-eml-chip" title="'+(i?'Příspěvek k EML':'Primární ML')+'"><small>'+esc(k)+'</small><b class="'+(v<0?'hsk-negative':v>0?'hsk-positive':'hsk-zero')+'">'+skillLoadModifierDisplay(ctx,k,v,i===0)+'</b></span>').join('')+' <strong class="hsk-eml-total">EML '+eml+'</strong>'+(raw!==eml?' <em class="hsk-eml-cap">05–95 (před limitem '+raw+')</em>':'')+'</div>'+skillLoadEvidenceHTML(ctx,esc)+(ctx.armourWarnings?.length?'<p class="hsk-soft-note">Rozhodnutí GM: '+ctx.armourWarnings.map(esc).join(' · ')+'</p>':'')+'</div>';
 }
 function hskPreviewFor(form,person,field,side){
  const node=form.querySelector('[data-auto-preview="'+side.toLowerCase()+'"]');if(!node||!person)return;

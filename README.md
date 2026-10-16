@@ -1107,3 +1107,11 @@ Celý inventář přes šířku Character Sheet. Dva řádkové seznamy pro nasa
 - Tam, kde všechny kusy lze uspořádat přípustně, může uživatel na Character Sheet potvrdit jediné automaticky vypočtené nové fyzické pořadí vrstev; součástí zápisu je opětovná pravidlová kontrola, bez změn majetku.
 - Ochrana B/E/P/F v přetížené zóně nadále zůstává aritmetickým součtem, nikoli tvrzením, že nepravidlová sestava poskytuje legální ochranu.
 - Katalogové součty hmotností/cen nadále přiznávají chybějící vstupní data a Gear ENC se počítá z celkové efektivní hmotnosti dle p.122.
+
+
+### v93.283 – Výklad nulového ENC/Bulk ve Skill Tests
+- U testu je přímo zobrazeno, jak se skládá Armour ENC, Gear ENC a modifier STR.
+- Pokud je upravené ENC při nedoloženém vrstvení jen interval (např. 0–10), Skill Tests rozlišují prokázané minimum od aritmeticky možného postihu.
+- U dovedností bez Agility ve Skill Base se vysvětluje, proč přímé ENC v EML nevzniká.
+- Neověřený Bulk už není prezentován jako potvrzené `+0`, ale jako `neurčeno*`; předběžný výsledek zůstává transparentně označen.
+- Pravidla hodů, ENC a Bulk, inventář a historie jsou beze změny.

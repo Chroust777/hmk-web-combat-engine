@@ -125,3 +125,10 @@
 .hsk-special-container[open]>summary{margin-bottom:.7rem}
 .hsk-special-container .hsk-form-grid{margin:.65rem 0}
 #hsk-special-result .hsk-verdict{margin-top:.9rem}
+
+/* v93.283: a provisional zero must never resemble a certified zero. */
+.hsk-eml-chip:has(b.hsk-zero){min-width:105px}
+.hsk-load-evidence{border:1px solid #d5a45e;border-left:4px solid #d5a45e;background:#383024;border-radius:7px;padding:.7rem .85rem;margin:.7rem 0;line-height:1.45;color:#f4e7cd}
+.hsk-load-evidence b{color:#ffe0a3}
+.hsk-load-evidence p{margin:.4rem 0!important;font-size:.9rem}
+.hsk-load-evidence strong{color:#ffbd98}
