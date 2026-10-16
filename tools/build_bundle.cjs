@@ -4,6 +4,15 @@
 const fs=require('node:fs'),path=require('node:path');
 let ts;try{ts=require('typescript');}catch(e){ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');}
 const root=path.resolve(__dirname,'..');const files=[];
+// Release-safety guard: refuse to generate a bundle displaying a stale UI version.
+const appSource=fs.readFileSync(path.join(root,'app.js'),'utf8');
+const htmlSource=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const appVersion=appSource.match(/const APP_VERSION\s*=\s*['"](\d+\.\d+)['"]/);
+const titleVersion=htmlSource.match(/<title>[^<]*?v(\d+\.\d+)<\/title>/);
+const assetVersion=htmlSource.match(/hmk-app\.bundle\.js\?v=(\d+\.\d+)/);
+if(!appVersion||!titleVersion||!assetVersion||appVersion[1]!==titleVersion[1]||appVersion[1]!==assetVersion[1]){
+ throw Error(`Release version mismatch: app.js=${appVersion?.[1]||'missing'}, index title=${titleVersion?.[1]||'missing'}, bundle URL=${assetVersion?.[1]||'missing'}`);
+}
 function walk(dir){for(const name of fs.readdirSync(dir)){
  const p=path.join(dir,name),st=fs.statSync(p);if(st.isDirectory()){if(name!=='node_modules'&&name!=='tools')walk(p);}else if(name.endsWith('.js')&&name!=='hmk-app.bundle.js')files.push(p);}}
 walk(root);
