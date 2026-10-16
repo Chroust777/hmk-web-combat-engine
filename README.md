@@ -1080,7 +1080,7 @@ Edit only current attributes, skill DP and coin balance. Immutable creation proo
 - Způsob výpočtu HMK, Character Sheet a dosavadní historie zůstávají beze změny.
 
 
-### v93.279 – Zvláštní Secondary Rolls a automatické vrstvení Bulk
+### v93.281 – Zvláštní Secondary Rolls a automatické vrstvení Bulk
 
 - Rozšířená databáze *doložených* rutin doplňuje výzkum kouzel (Convocation / Creativity SR) a opravuje církevní postup (Intrigue SR nerozdává automatické +1 SV). Specificky zahrnuje Peóni (Creativity SR pro Reslâva a ordeal), Siém (Spirit SR místo Intrigue), Sárajìn (Melee + Initiative SR) a specializaci kněží Sávè-Knôra (Folklore + Creativity SR).
 - Pod záložkami Skill Tests je rozbalitelný oddíl pro periodické Endurance SR (HMK 149, 176), astrální/arkánní zvláštní SR a vícečetné Style SR v ceremoniích/festivalech (HMK 300, 316–317). TN a počet d10 se počítá automaticky z uložených ML a z primárního hodu, kde je předepsán. Výsledky se ukládají do historie.
@@ -1088,3 +1088,22 @@ Edit only current attributes, skill DP and coin balance. Immutable creation proo
 - Přesné tištěné zbrojní komplety nemají žádný přidaný Bulk (pokud k nim nejsou přidány články); není třeba GM potvrzení. Starší chybné explicitní sloupce vrstev lze ignorovat, když identické skutečné pořadí materiálů nezávisle projde tabulkou HMK 117. Automatické Cloth/Padded výjimky −5/zóna jsou zachovány.
 - Jiné zakázané kombinace materiálů **nejsou** povolenou Bulk výjimkou. Aplikace je nesmí bez důkazu zaměnit za −5. U nich zůstává nutnost opravit skutečné vybavení, nikoli ručně schvalovat vymyšlený postih.
 - **Zbývající hranice pokrytí:** jednotlivá kouzla s vlastními d10 podmínkami, úplné rituální kvalifikační podmínky a automatické zápisy periodické únavy do Combat State zatím nejsou jednotně propojené. Nelze prohlašovat všechny SR z celé příručky za kompletní, dokud nebude audit každé individuální sekvence.
+
+
+### 93.281 – vrstvení a ENC
+Tabulka anatomických lokací přímo zvýrazňuje prokázané překročení pěti vrstev a chybějící pořadí; technická UUID se v souhrnu nezobrazují. Při chybějícím pořadí se z doložených parametrů nezávisle vypočte **minimum ENC**, nikoliv smyšlená konečná hodnota. Potvrzené postihy do Skill Tests vstupují teprve při úplném výpočtu.
+
+
+### v93.281 – Inventář postavy
+Celý inventář přes šířku Character Sheet. Dva řádkové seznamy pro nasazené/držené a nesené předměty, s cenou, množstvím, WQ, váhou, katalogovými parametry, dostupnými AV podle anatomických lokací, původními akcemi Upravit/Předat/Odebrat a souhrnnými hodnotami. Hodnota Gear ENC zůstává autoritativním výpočtem společné hmotnosti, nikoliv součtem libovolných příspěvků jednotlivých kusů. Neověřené ceny a hmotnosti nejsou nahrazovány nulami.
+
+
+### v93.282 – Audit anatomického vrstvení, ENC a Bulk
+
+- Přímé označení prokazatelně nepřípustných materiálových kombinací v anatomické tabulce i při chybějícím historickém pořadí; odděleno od pouze chybějících údajů.
+- Samostatné vyhodnocení fyzicky možných kombinací bez domýšlení skutečného pořadí. Automatický nulový Bulk jen tehdy, pokud je výsledek na fyzickém pořadí nezávislý, včetně běžného oblečení.
+- Každý nasazený kus má při interním vyhodnocení vlastní inventární identitu, i když jde o dva kusy stejného katalogového předmětu.
+- U nedoloženého pořadí se ukáže známý základ a konzervativní možné rozpětí podmíněného ENC vnějšího oděvu D/Q. Skutečně zakázaná kombinace nemá podle HMK svůj legální výsledný ENC/Bulk a není normalizována náhodným postihem.
+- Tam, kde všechny kusy lze uspořádat přípustně, může uživatel na Character Sheet potvrdit jediné automaticky vypočtené nové fyzické pořadí vrstev; součástí zápisu je opětovná pravidlová kontrola, bez změn majetku.
+- Ochrana B/E/P/F v přetížené zóně nadále zůstává aritmetickým součtem, nikoli tvrzením, že nepravidlová sestava poskytuje legální ochranu.
+- Katalogové součty hmotností/cen nadále přiznávají chybějící vstupní data a Gear ENC se počítá z celkové efektivní hmotnosti dle p.122.

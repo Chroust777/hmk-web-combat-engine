@@ -100,3 +100,29 @@
 .hsk-edit-scroll{max-width:100%;overflow-x:auto}
 .sheet-inline-form{display:contents}
 @media(max-width:760px){.sheet-inline-input{min-width:90px}}
+
+/* v93.280 – armour exceptions and missing orders visible at the affected locations */
+.arm-layer-table{min-width:690px}.arm-layer-table .arm-layer-count{font-variant-numeric:tabular-nums;font-size:1.04rem;font-weight:700;text-align:center;border-radius:5px}.arm-layer-row.arm-layer-over-limit .arm-layer-alert,.arm-layer-row.arm-layer-forbidden .arm-layer-alert{background:#7d2826;color:#fff0e9;box-shadow:inset 0 0 0 2px #e8a098}.arm-layer-row.arm-layer-unverified .arm-layer-alert{background:#57452b;color:#ffe0a5;box-shadow:inset 0 0 0 2px #ad8655}.arm-layer-explain{min-width:210px;font-size:.83rem}.armour-friendly-warnings .notice{margin:.45rem 0}.arm-layer-table th{white-space:nowrap}
+
+/* v93.281: full-width readable inventory, totals and category-specific item data. */
+.inv-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.55rem;margin:.65rem 0 1rem}
+.inv-summary-stat{display:grid;gap:.35rem;padding:.75rem;border:1px solid #706044;border-radius:9px;background:#1e2827;min-width:0}
+.inv-summary-stat span{font:.78rem/1.3 system-ui,sans-serif;color:#d4b993}.inv-summary-stat strong{font:700 1.05rem/1.3 system-ui,sans-serif;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.inv-table-scroll{width:100%;overflow-x:auto;border:1px solid #67563e;border-radius:9px;margin:.6rem 0 1.4rem}
+.inv-ledger-table{width:100%;min-width:1020px;font-size:.81rem}
+.inv-ledger-table th,.inv-ledger-table td{vertical-align:top;padding:.52rem .5rem}
+.inv-ledger-table thead th{background:#332c23;white-space:nowrap;position:sticky;top:0;z-index:1}
+.inv-ledger-table tbody th{min-width:175px;max-width:225px;overflow-wrap:anywhere}
+.inv-number{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.inv-item-kind{display:block;font-size:.73rem;line-height:1.45;color:#b8a58e;margin-top:.16rem;font-weight:400;white-space:normal}
+.inv-key-spec{min-width:200px;max-width:290px;overflow-wrap:anywhere}.inv-spec-details summary{cursor:pointer;font-weight:650;color:#e4c78e}.inv-spec-details>div{padding:.2rem 0;font-size:.79rem}
+.inv-av-scroll{max-width:285px;overflow-x:auto}.inv-av-scroll .catalog-spec{font-size:.7rem}.inv-av-scroll th,.inv-av-scroll td{padding:.18rem .24rem}
+.inv-row-actions{display:flex;flex-direction:column;gap:.3rem;min-width:90px}.inv-row-actions button{min-height:32px;padding:.25rem .4rem;font-size:.74rem}
+.inv-footer-totals{display:flex;gap:.8rem 1.4rem;flex-wrap:wrap;align-items:center;border:1px solid #8b7755;border-radius:8px;padding:.8rem;background:#342e23;font-variant-numeric:tabular-nums}
+.inv-footer-totals span{font-size:.86rem}
+@media(max-width:760px){.inv-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.inv-footer-totals{display:grid;gap:.4rem}}
+/* v93.282: distinguish proved illegality from missing physical order. */
+.arm-layer-row.arm-layer-bulk .arm-layer-count{background:#314d45;color:#c6f1df;box-shadow:inset 0 0 0 2px #6eb7a0}
+.arm-layer-row.arm-layer-forbidden .arm-layer-explain,.arm-layer-row.arm-layer-over-limit .arm-layer-explain{font-weight:650;color:#f3b0a8}
+.arm-layer-row.arm-layer-unverified .arm-layer-explain{color:#f3d49c}
+.arm-layer-row .arm-layer-explain{max-width:30rem;line-height:1.35}
