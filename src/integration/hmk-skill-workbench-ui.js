@@ -3,6 +3,7 @@
  */
 import {availableMasteries} from './hmk-skill-test-engine.js';
 import {automaticSkillContext} from './hmk-skill-auto-context.js';
+import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './hmk-skill-load-evidence.js';
 import {skillSecondaryRoutines,skillSecondaryRoutineEligible} from './hmk-skill-secondary-routines.js';
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES} from './hmk-special-secondary-routines.js';
 const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -14,7 +15,7 @@ function automaticPreview(actor,inventory,skill){try{
  const ctx=automaticSkillContext({actor,inventory,name:skill,gearPolicy:'advisory'});const ml=availableMasteries(actor).find(x=>x.name===skill)?.ml??0;
  const parts=[['Primary ML',ml],['Secondary 1 (nezvoleno)',0],['Secondary 2 (nezvoleno)',0],...ctx.breakdown.map(x=>[x.label,x.value])];
  const e=Math.max(5,Math.min(95,parts.reduce((a,x)=>a+x[1],0)));
- return `<div class="hsk-calculation"><b>${E(actor.name)} · rozklad EML</b><div class="hsk-eml-trace">${parts.map(([k,v],i)=>`<span class="hsk-eml-chip"><small>${E(k)}</small><b class="${v<0?'hsk-negative':v>0?'hsk-positive':'hsk-zero'}">${i&&v>=0?'+':''}${v}</b></span>`).join('')} <strong class="hsk-eml-total">EML ${e}</strong></div>${ctx.armourIsProvisional?'<p class="hsk-soft-note">Dostupné postihy započteny; některé zbrojní údaje jsou předběžné. GM může upřesnit hodnoty níže.</p>':''}</div>`;
+ return `<div class="hsk-calculation"><b>${E(actor.name)} · rozklad EML</b><div class="hsk-eml-trace">${parts.map(([k,v],i)=>`<span class="hsk-eml-chip"><small>${E(k)}</small><b class="${v<0?'hsk-negative':v>0?'hsk-positive':'hsk-zero'}">${skillLoadModifierDisplay(ctx,k,v,i===0)}</b></span>`).join('')} <strong class="hsk-eml-total">EML ${e}</strong></div>${skillLoadEvidenceHTML(ctx,E)}</div>`;
  }catch(e){return `<div class="hsk-calculation hsk-unready"><b>Pravidlová kontrola:</b> ${E(e.message)}<p class="tiny">Neověřené zbrojní postihy může GM výslovně posoudit v rozbalovací nabídce. Postava může test provést bez zásahu do inventáře.</p></div>`;}}
 function svQuickGuide(character,selected){
  const ml=availableMasteries(character).find(x=>x.name===selected)?.ml;

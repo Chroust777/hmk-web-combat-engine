@@ -85,6 +85,20 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
  // and Combat state remain unchanged, and the journal records this decision.
  if(!['strict','gm','advisory'].includes(gearPolicy))throw Error('Neznámé rozhodnutí o výbavě');
  const allowedGM=gearPolicy==='gm',advisory=gearPolicy==='advisory',issues=[],provisional=[];
+ // The load is independent of the skill and remains useful evidence even when
+ // this particular Skill does not use Agility or the outfit is prohibited.
+ // Printed ENC, Gear ENC and STR must not be confused with EML penalties.
+ let loadEvidence=null;
+ try{
+  const load=resolveCombatantLoad({character:base.actor,inventory,mounted:false});
+  loadEvidence={gearENC:load.gearENC,armourENC:load.armourENC,knownArmourENC:load.knownArmourENC,
+   armourUpperBound:load.armourENCUpperBound,modifiedENC:load.modifiedENC,
+   knownMinimumENC:load.knownMinimumENC,knownMaximumENC:load.knownMaximumENC,
+   strengthModifier:Number.isSafeInteger(load.str)?strengthEncumbranceModifier(load.str,{mounted:false}):null,
+   encReady:load.encReady===true&&!(load.issues||[]).length,
+   bulkReady:load.bulkReady===true&&!(load.issues||[]).length,
+   prohibitedOutfit:load.prohibitedOutfit===true};
+ }catch(_){/* Existing rule-evidence checks explain unavailable values. */}
  const conditionAvail=skillConditionAvailability({actor:base.actor,inventory,name,mounted:false});
  const traumaAvail=skillTraumaAvailability({actor:base.actor,inventory,name,mounted:false});
  const manual=(value,label)=>{
@@ -159,7 +173,7 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
   trauma.perception.source='verified-p118-minimum-per-not-full-armour';trauma.perception.mode='provisional-known-components';
  }
  return {kind:'hmk-auto-skill-context-v1',actorId:actor.id,name,condition,trauma,gmArmourDecision:allowedGM,armourWarnings:issues,provisionalArmour:provisional,armourIsProvisional:provisional.length>0,
-  modifier:condition.modifier+trauma.modifier,source:base.source,hand:arm.source,
+  modifier:condition.modifier+trauma.modifier,source:base.source,hand:arm.source,loadEvidence,
   breakdown:[{label:'Fatigue',value:condition.fatigue.modifier,source:condition.fatigue.source},
    {label:'ENC',value:condition.enc.modifier,source:condition.enc.source},
    {label:'Zranění',value:trauma.injury.modifier,source:trauma.injury.source},
