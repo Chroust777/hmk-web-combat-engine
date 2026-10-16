@@ -8,7 +8,8 @@ import {listPelahnBurstSources,pelahnSourcesForActor} from './hmk-pelahn-burst-r
 import {validateCombatState,dueInjuryMorale,unresolvedInjuryMishaps} from './persistent-combat-state.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {validateSpatialBarriers} from './hmk-guided-spatial-barriers.js';
-import {projectGuidedSpatialPath} from './hmk-guided-spatial-actions.js';
+import {projectGuidedSpatialPath,isPermanentlyBlind} from './hmk-guided-spatial-actions.js';
+import {completeParalysis,requireParalysisAction} from './hmk-paralysis-sequela.js';
 
 const ACTIONS=new Set(['attack','charge','evade','grope','incant','move','pass','ready','other','incapacitated','concentrate-start','concentrate-hold','concentrate-abandon']);
 const MAX_ROUND=9999;
@@ -573,6 +574,33 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
    'Pětistopý volný krok nelze kombinovat s pohybem Move, Evade ani Charge (HMK str.161)');
  const pending=dueEndTurnEvents(s,states);
  const id=s.order[s.cursor],p=persistentState(states,id);
+ // HMK p184: a blind combatant moving faster than Half Move must take
+ // a real Stumble test. Guard the authoritative turn boundary, not only UI.
+ if(action==='move'&&isPermanentlyBlind(p)&&movementProof?.projection?.moveRate===undefined)
+  requireValid(false,'HMK str.184: u slepé postavy je nutné doložit rychlost pohybu a případný Stumble');
+ if(action==='move'&&isPermanentlyBlind(p)&&['full','double'].includes(movementProof?.projection?.moveRate)){
+  const pr=movementProof.projection,ev=movementProof.stumbleEvidence;
+  const causes=pr.stumbleCauses??[pr.stumbleCause];
+  const rolls=ev?.rolls??(ev?.roll===undefined?[]:[{cause:'blindness',roll:ev.roll,eml:ev.eml,technique:ev.technique,usedArms:ev.usedArms}]);
+  requireValid(pr.blindnessStumble===true&&Array.isArray(causes)&&causes[0]==='blindness'&&
+   causes.length>=1&&causes.length<=2&&new Set(causes).size===causes.length&&
+   causes.every(x=>['blindness','double-bend'].includes(x))&&Array.isArray(rolls)&&
+   rolls.length>=1&&rolls.length<=causes.length&&rolls.every((r,i)=>
+    r?.cause===causes[i]&&int(r.roll,1,100)&&int(r.eml,-500,500)&&
+    ['agility','acrobatics'].includes(r.technique)&&Array.isArray(r.usedArms)),
+   'HMK str.160,184: slepý při Full/Double Move musí mít samostatný skutečný Stumble d100 pro každou dosaženou příčinu');
+  const failing=rolls.findIndex(r=>successLevel(r.roll,r.eml)<SL.S);
+  requireValid(rolls.length===(failing>=0?failing+1:causes.length),
+   'Neúplné Stumble: po úspěchu vyžaduje zatáčka druhý nezávislý hod, po pádu už další hod nepatří');
+  const failed=failing>=0,failedDie=failed?rolls[failing]:null;
+  requireValid(failed?ev.stop!==null&&p.posture.prone===true&&
+   p.events.some(e=>e.id===movementProof.eventId+':stumble'&&e.type==='movement-stumble-fall'&&
+    e.details?.roll===failedDie.roll&&e.details?.eml===failedDie.eml&&e.details?.cause===failedDie.cause):
+   ev.stop===null,
+   'HMK str.161: Stumble neodpovídá skutečnému pádu a doložené poloze');
+ }
+
+
  // G04 safety: a finished Pèleáhn bonus spellstart is NOT itself spellfire.
  // Neither the older free-turn form nor a direct finishEncounterTurn call may
  // consume the later Incant without a recorded physical casting resolution.
@@ -687,7 +715,7 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
    (s.entryForcedPass===true&&action==='pass'),
    'HMK str.161: před řádným IR lze vykonat pouze deklarovaný úvodní výstřel kuše');
  }
- const helpless=['INC','UNC','KIA'].includes(p.shock)||p.coma?.active||p.morale?.state==='catatonic'||
+ const helpless=completeParalysis(p)||['INC','UNC','KIA'].includes(p.shock)||p.coma?.active||p.morale?.state==='catatonic'||
   p.fear?.state==='catatonic'||s.entryFear==='catatonic';
  if(!helpless&&['afraid','terrified'].includes(p.fear?.state))
   requireValid(['pass','move'].includes(action),
@@ -756,7 +784,7 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
     path:proof.requestedPath,action:'move',moveRate:proof.moveRate,
     effectiveMove:proof.effectiveMove,difficultSources:proof.difficultSources,
     stunned:proof.terrainFactor/(2**proof.difficultSources)>1,
-    moralePurpose:null,retreatConfirmed:false});
+    moralePurpose:null,retreatConfirmed:false,blindness:isPermanentlyBlind(p)});
    requireValid(JSON.stringify(recalculated)===JSON.stringify(proof),
     'Fear Move nemá autoritativně přepočtený prostorový důkaz');
   }
@@ -844,7 +872,7 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
    effectiveMove:proof.effectiveMove,difficultSources:proof.difficultSources,
    stunned:proof.terrainFactor/(2**proof.difficultSources)>1,
    dodgeIndex:null,chargeAttack:null,chargeTargetId:null,
-   moralePurpose:p.morale.state,retreatConfirmed:true});
+   moralePurpose:p.morale.state,retreatConfirmed:true,blindness:isPermanentlyBlind(p)});
   requireValid(JSON.stringify(recalculated)===JSON.stringify(proof),
    'HMK str.162: doložený Move neodpovídá znovu přepočtené trase a Engagement Zone');
   requireValid(!s.spatialEvents?.some(e=>e.id===w.eventId)&&

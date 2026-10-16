@@ -11,6 +11,7 @@ import {guidedTurnChoices} from './hmk-guided-turn-choices.js';
 import {finishEncounterTurn,validateEncounterSequence,currentEncounterActor} from './encounter-turn-sequence.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {applyConfirmedFatigue} from './persistent-combat-state.js';
+import {requireParalysisAction} from './hmk-paralysis-sequela.js';
 import {validateSpatialBarriers,pathCrossesClosedBarrier} from './hmk-guided-spatial-barriers.js';
 const requireRule=(p,m)=>{if(!p)throw Error(m)};
 const number=v=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=1000000;
@@ -19,6 +20,7 @@ const same=x=>JSON.stringify(x);
 const pt=p=>p&&number(p.x)&&number(p.y);
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const round5=x=>Math.floor((x+1e-9)/5)*5;
+export const isPermanentlyBlind=state=>!!state?.ailmentSequelae?.some(x=>x?.active===true&&x?.permanent===true&&x?.condition==='blindness');
 const EQ=1e-7;
 function ensureGeometry({actorId,battlefield}){
  requireRule(battlefield&&Array.isArray(battlefield.units),'Chybí mapa skutečných pozic všech účastníků');
@@ -56,10 +58,11 @@ function firstContact(start,end,enemy,radius){
  */
 export function projectGuidedSpatialPath({actorId,battlefield,path,difficultSources=0,action,moveRate='full',
   effectiveMove,dodgeIndex=null,stunned=false,chargeAttack=null,chargeTargetId=null,
-  moralePurpose=null,retreatConfirmed=false,overrunProof=null}={}){
+  moralePurpose=null,retreatConfirmed=false,overrunProof=null,blindness=false}={}){
  const units=ensureGeometry({actorId,battlefield});
  const barriers=validateSpatialBarriers(battlefield.barriers??[]);
  requireRule(['move','evade','charge'].includes(action),'Neznámá pohybová akce HMK');
+ requireRule(typeof blindness==='boolean','Slepota musí pocházet z doloženého stavu postavy');
  requireRule(Array.isArray(path)&&path.length>=2&&path.length<=100&&path.every(pt),'Je nutná doložená trasa pohybu');
  requireRule(moralePurpose===null||['routed','withdrawing'].includes(moralePurpose),
   'Neznámý pravidlový účel povinného Morale pohybu');
@@ -159,24 +162,62 @@ export function projectGuidedSpatialPath({actorId,battlefield,path,difficultSour
   requireRule(chargeAttack==='melee'?eligibility.mayMeleeAttack:eligibility.mayThrownAttack,
    'Po dokončení Charge není zvolený druh útoku pravidlově povolen');
  }
+ const curvedDouble=action==='move'&&moveRate==='double'&&actualPath.length>2&&actualPath.slice(1,-1).some((p,i)=>{
+  const prev=actualPath[i],next=actualPath[i+2];const ax=p.x-prev.x,ay=p.y-prev.y,bx=next.x-p.x,by=next.y-p.y;
+  return Math.abs(ax*by-ay*bx)>EQ;
+ });
+ const blindnessStumble=blindness&&action==='move'&&['full','double'].includes(moveRate);
+ // Independent triggers: blindness (p184) and change of direction during
+ // Double Move (p160). A failed first roll stops the movement; a bend that
+ // was never reached does not create a second roll.
+ const stumbleCauses=[...(blindnessStumble?['blindness']:[]),...(curvedDouble?['double-bend']:[])];
+ let bendAtFt=null;
+ if(curvedDouble){let travelledToBend=0;
+  for(let i=1;i<actualPath.length-1;i++){
+   travelledToBend+=distance(actualPath[i-1],actualPath[i]);
+   const a=actualPath[i-1],b=actualPath[i],c=actualPath[i+1];
+   if(Math.abs((b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x))>EQ){bendAtFt=travelledToBend;break;}
+  }
+ }
  return {format:'hmk-guided-spatial-projection-v1',action,actorId,requestedPath:path.map(p=>({...p})),requestedFt:requested,actualFt:travelled,
   actualPath,finalPosition:actualPath.at(-1),contact,stoppedByEZ:!!contact,overrunProof:overrunProof===null?null:structuredClone(overrunProof),
   effectiveMove,moveRate:action==='move'?moveRate:'half',difficultSources,terrainFactor,
   moralePurpose,retreatConfirmed,battlefieldWitness:same({units,barriers}),
   chargedMovementFt:travelled*terrainFactor,maxMovementFt:max,
-  requiresStumble:action==='move'&&moveRate==='double'&&actualPath.length>2&&actualPath.slice(1,-1).some((p,i)=>{
-   const prev=actualPath[i],next=actualPath[i+2];const ax=p.x-prev.x,ay=p.y-prev.y,bx=next.x-p.x,by=next.y-p.y;
-   return Math.abs(ax*by-ay*bx)>EQ;
-  }),chargeAttack:action==='charge'?chargeAttack:null,chargeTargetId:action==='charge'?chargeTargetId:null,
+  blindnessStumble,stumbleCause:stumbleCauses[0]??null,stumbleCauses,bendAtFt,
+  requiresStumble:stumbleCauses.length>0,chargeAttack:action==='charge'?chargeAttack:null,chargeTargetId:action==='charge'?chargeTargetId:null,
   evadingMissilePenalty:action==='evade'?-dodgeIndex*5:null,
   chargeAttackPending:action==='charge',source:'HMK World of Kèthîra pp.159–161'};
+}
+/** Verified GM witness of where a failed Stumble stopped movement.
+ * The point MUST be on an actual reachable route segment, including endpoints.
+ * We never silently move a fallen character to the requested destination.
+ */
+export function verifySpatialStumbleStop(projection,point){
+ requireRule(projection?.format==='hmk-guided-spatial-projection-v1'&&projection.requiresStumble,
+  'Stumble Stop: chybí povinný Stumble na doložené trase');
+ requireRule(pt(point),'Stumble Stop: GM musí doložit skutečnou polohu x,y');
+ let before=0;
+ for(let i=1;i<projection.actualPath.length;i++){
+  const a=projection.actualPath[i-1],b=projection.actualPath[i],dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
+  if(den<EQ)continue;
+  const t=((point.x-a.x)*dx+(point.y-a.y)*dy)/den;
+  const clamped=Math.max(0,Math.min(1,t));
+  if(t>=-EQ&&t<=1+EQ&&distance(point,{x:a.x+clamped*dx,y:a.y+clamped*dy})<EQ){
+   const actualFt=before+clamped*Math.sqrt(den);
+   const actualPath=[...projection.actualPath.slice(0,i),{x:a.x+clamped*dx,y:a.y+clamped*dy}];
+   return {point:actualPath.at(-1),actualFt,actualPath,source:'GM confirmed fall position on reachable path, HMK p161'};
+  }
+  before+=Math.sqrt(den);
+ }
+ throw Error('Stumble Stop: poloha pádu neleží na skutečně dosažené části trasy');
 }
 /** Atomic dry-run of turn completion. Charge must be resolved by its attached
  * Attack journey before consuming the main action, so it is NOT auto-committed.
  * A double Move with a bend requires a physical Stumble test before commit.
  */
 export function commitGuidedSpatialTurn({id,sequence,states,battlefield,projection,
- stumbleRoll=null,stumbleEML=null,enduranceRoll=null,enduranceTN=null,personalFatigue=null}={}){
+ stumbleRoll=null,stumbleEML=null,stumbleTechnique=null,stumbleUsedArms=null,stumbleRolls=null,stumbleStopPoint=null,enduranceRoll=null,enduranceTN=null,personalFatigue=null}={}){
  requireRule(projection?.format==='hmk-guided-spatial-projection-v1','Chybí ověřená prostorová akce');
  const s=validateEncounterSequence(sequence);
  requireRule(s.active&&currentEncounterActor(s)===projection.actorId,'Není tah správného účastníka');
@@ -205,30 +246,72 @@ export function commitGuidedSpatialTurn({id,sequence,states,battlefield,projecti
    'HMK str.162: chybí potvrzená prostorová trasa útěku/ústupu podle aktuální Morale');
  }else requireRule(projection.moralePurpose===null&&projection.retreatConfirmed===false,
   'Projekce neodpovídá aktuální Morale postavy');
+ requireParalysisAction(states?.[projection.actorId],projection.action);
  const recalculated=projectGuidedSpatialPath({actorId:projection.actorId,battlefield,
   path:projection.requestedPath,action:projection.action,moveRate:projection.moveRate,
   effectiveMove:projection.effectiveMove,difficultSources:projection.difficultSources,
   stunned:projection.terrainFactor/(2**projection.difficultSources)>1,
   dodgeIndex:projection.action==='evade'?-projection.evadingMissilePenalty/5:null,
   chargeAttack:projection.chargeAttack,chargeTargetId:projection.chargeTargetId,
-  moralePurpose:projection.moralePurpose,retreatConfirmed:projection.retreatConfirmed});
+  moralePurpose:projection.moralePurpose,retreatConfirmed:projection.retreatConfirmed,
+  blindness:isPermanentlyBlind(states?.[projection.actorId])});
+ requireRule(projection.blindnessStumble===(isPermanentlyBlind(states?.[projection.actorId])&&
+  projection.action==='move'&&['full','double'].includes(projection.moveRate)),
+  'Slepota se změnila od ověření trasy; není povolen přesun bez povinného Stumble');
  requireRule(JSON.stringify(recalculated)===JSON.stringify(projection),
   'Prostorový výsledek neodpovídá aktuálním pravidlům nebo původní trase');
  requireRule(projection.action!=='charge','Charge musí dokončit útok v témže průvodci; samotný přesun nelze uložit jako úplný tah');
- requireRule(!projection.requiresStumble||(whole(stumbleRoll,1,100)&&whole(stumbleEML,-500,500)),
-  'Double Move s obratem vyžaduje doložený Stumble d100 a EML');
+ const causes=projection.stumbleCauses??(projection.requiresStumble?[projection.stumbleCause]:[]);
+ requireRule(Array.isArray(causes)&&causes.length<3&&
+  causes.every(c=>['blindness','double-bend'].includes(c))&&new Set(causes).size===causes.length,
+  'Stumble: neplatné příčiny v projekci pohybu');
+ const dice=stumbleRolls===null?
+  (stumbleRoll===null?[]:[{cause:causes[0],roll:stumbleRoll,eml:stumbleEML,
+   technique:stumbleTechnique,usedArms:stumbleUsedArms}]):stumbleRolls;
+ requireRule(Array.isArray(dice)&&dice.length<=2&&dice.every((r,i)=>
+  r&&r.cause===causes[i]&&whole(r.roll,1,100)&&whole(r.eml,-500,500)&&
+  ['agility','acrobatics'].includes(r.technique)&&Array.isArray(r.usedArms)&&
+  r.usedArms.every(x=>['left','right','none'].includes(x))),
+  'Povinný Stumble vyžaduje samostatný skutečný d100, metodu Agility/Acrobatics a EML pro každou příčinu');
+ const firstFailure=dice.findIndex(r=>successLevel(r.roll,r.eml)<SL.S);
+ requireRule(dice.length===(firstFailure>=0?firstFailure+1:causes.length),
+  'Stumble: po úspěchu musí následovat druhý nezávislý hod, po pádu se další hod neprovádí');
+ requireRule(stumbleRolls===null||(stumbleRoll===null&&stumbleEML===null&&stumbleTechnique===null&&stumbleUsedArms===null),
+  'Stumble: nelze smíchat jednotlivé hody s vícekolovým důkazem');
  const doubleMove=projection.action==='move'&&projection.moveRate==='double';
  requireRule(!doubleMove||(whole(enduranceRoll,1,10)&&whole(enduranceTN,0,20)&&whole(personalFatigue,5,999)),
   'Double Move vyžaduje skutečný END Secondary Roll d10 a Personal Fatigue');
  requireRule(doubleMove||enduranceRoll===null,'END SR nepatří k běžnému pohybu');
+ requireRule(projection.requiresStumble||(dice.length===0&&stumbleRoll===null&&stumbleEML===null&&stumbleTechnique===null),
+  'Stumble nelze dokládat, pokud nebyl pravidly vyžadován');
  requireRule(battlefield?.units&&battlefield.units.some(u=>u.id===projection.actorId),'Chybí nezměněná mapa');
  const positions=Object.fromEntries(battlefield.units.map(u=>[u.id,{x:u.x,y:u.y}]));
  const start=positions[projection.actorId];
  requireRule(distance(start,projection.actualPath[0])<EQ,'Pozice se po výpočtu změnila');
- let actorState=null,fatigueAdded=0;
- if(projection.requiresStumble&&successLevel(stumbleRoll,stumbleEML)<SL.S){
+ let actorState=null,fatigueAdded=0,stop=null;
+ const failedStumble=firstFailure>=0;
+ const failureCause=failedStumble?dice[firstFailure].cause:null;
+ if(failedStumble){
+  requireRule(stumbleStopPoint!==null,'Neúspěšný Stumble: GM musí určit skutečnou polohu pádu na trase (HMK str.161)');
+  stop=verifySpatialStumbleStop(projection,stumbleStopPoint);
+  // The first failed sight-based test must stop before the unrated turn.
+  // A bend-triggered Stumble cannot cause a fall before that bend occurs.
+  if(projection.bendAtFt!==null&&projection.bendAtFt!==undefined){
+   if(failureCause==='blindness')requireRule(stop.actualFt<=projection.bendAtFt+EQ,
+    'Stumble slepoty: pád po zatáčce by obešel dosud neprovedený hod za změnu směru');
+   if(failureCause==='double-bend')requireRule(stop.actualFt+EQ>=projection.bendAtFt,
+    'Stumble za zatáčku: pád nemůže nastat před dosažením skutečné zatáčky');
+  }
+  requireRule(projection.moralePurpose===null,
+   'Pád při povinném Morale/Fear ústupu vyžaduje samostatné rozhodnutí o skutečném pohybu; nelze jej uzavřít automaticky');
   actorState=structuredClone(states[projection.actorId]);actorState.posture.prone=true;
- }
+  requireRule(!actorState.events.some(e=>e.id===id+':stumble'),'Stumble již byl zapsán');
+  actorState.events.push({id:id+':stumble',type:'movement-stumble-fall',round:s.round,details:{
+   sourcePage:failureCause==='blindness'?184:160,roll:dice[firstFailure].roll,eml:dice[firstFailure].eml,
+   cause:failureCause,rolls:structuredClone(dice),point:stop.point,actualFt:stop.actualFt}});
+  actorState.lastRound=Math.max(actorState.lastRound,s.round);
+ }else requireRule(stumbleStopPoint===null,
+  'Úspěšný Stumble nebo pohyb bez Stumble nesmí obsahovat polohu pádu');
  if(doubleMove){
   const base=actorState??structuredClone(states[projection.actorId]);
   fatigueAdded=Math.max(0,personalFatigue-(enduranceRoll<=enduranceTN?5:0));
@@ -237,16 +320,18 @@ export function commitGuidedSpatialTurn({id,sequence,states,battlefield,projecti
  }
  const withStates=actorState?{...states,[projection.actorId]:actorState}:states;
  const next=finishEncounterTurn(s,withStates,{action:projection.action,
-  movementProof:{eventId:id,projection,battlefield},gmConfirmed:true});
+  movementProof:{eventId:id,projection,battlefield,stumbleEvidence:projection.requiresStumble?{rolls:structuredClone(dice),
+   cause:failureCause,stop}:null},gmConfirmed:true});
  next.spatialEvents??=[];
  requireRule(!next.spatialEvents.some(e=>e.id===id),'Duplicitní pohybová událost');
  const proof={id,round:s.round,actorId:projection.actorId,timelineId:s.timelineId,projection:structuredClone(projection)};
  next.spatialEvents.push(proof);
  next.log.push({round:s.round,type:'spatial-action',actorId:projection.actorId,
-  eventId:id,action:projection.action,actualFt:projection.actualFt,stopByEZ:projection.stoppedByEZ});
- const updated={...structuredClone(battlefield),units:battlefield.units.map(u=>u.id===projection.actorId?{...u,...projection.finalPosition}:u)};
- proof.dice=[...(stumbleRoll===null?[]:[{faces:100,value:stumbleRoll,eml:stumbleEML,kind:'stumble'}]),
+  eventId:id,action:projection.action,actualFt:stop?.actualFt??projection.actualFt,stopByEZ:!stop&&projection.stoppedByEZ,stumbleCause:failureCause,stumbleRolls:structuredClone(dice),stumbleStop:stop?.point??null});
+ const updated={...structuredClone(battlefield),units:battlefield.units.map(u=>u.id===projection.actorId?{...u,...(stop?.point??projection.finalPosition)}:u)};
+ proof.stumbleStop=stop;
+ proof.dice=[...dice.map(r=>({faces:100,value:r.roll,eml:r.eml,kind:'stumble',technique:r.technique,usedArms:r.usedArms,cause:r.cause})),
   ...(enduranceRoll===null?[]:[{faces:10,value:enduranceRoll,tn:enduranceTN,kind:'endurance-sr'}])];
  proof.fatigueAdded=fatigueAdded;
- return {sequence:next,battlefield:updated,actorState,proof,fatigueAdded};
+ return {sequence:next,battlefield:updated,actorState,proof,fatigueAdded,stumbleStop:stop};
 }

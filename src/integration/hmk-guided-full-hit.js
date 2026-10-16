@@ -1,3 +1,5 @@
+import {assertDeadlyEvidence} from './hmk-deadly-attack.js';
+import {validDeadlyCalledLocation} from './hmk-deadly-aim.js';
 /**
  * HârnMaster: Roleplaying in the World of Kèthîra, printed pp.166–170.
  * An atomic, headless continuation of a verified Melee or Missile strike.
@@ -41,18 +43,27 @@ const requiresSide=x=>['arms','legs'].includes(x);
  * must be attested again before storage. The caller cannot pass free-form AV. */
 export function createGuidedFullHit({id,timelineId,round,attackerId,defenderId,kind,outcome,
  weapon,aimZN=1,precisionDice=0,impactTA=0,armourReduction=0,direction,
- opponents=1,inventory,targetState,shockML,strengthML,sourceSignature,physicalDice=[]}={}){
+ opponents=1,inventory,targetState,shockML,strengthML,sourceSignature,physicalDice=[],
+ aimedLocation=null,aimedSide=null}={}){
  assert(typeof id==='string'&&id&&typeof timelineId==='string'&&timelineId&&typeof sourceSignature==='string'&&sourceSignature,'Chybí identita nebo podpis původní akce');
  assert(integer(round,1,9999)&&typeof attackerId==='string'&&typeof defenderId==='string'&&attackerId!==defenderId,'Neplatní účastníci');
  assert(['melee','missile'].includes(kind),'Jen doložený Melee nebo Missile/Volley');
  assert(outcome?.ok===true&&kind==='melee'||kind==='missile'&&outcome?.complete===true,'Attack/Defence nebo Missile ještě není pravidlově uzavřeno');
- // HMK p.163: spoiled Missile whose action is wasted NEVER receives an
- // ordinary Attack d100. This is the only legal zero-dice completed attack.
+ // Zero-die attack cases are limited to wasted/forced-CF Missile or the
+ // independently verified p.191 automatic four-star Deadly Melee outcome.
  const wastedMissile=kind==='missile'&&outcome.spoiled===true&&outcome.hit===false&&outcome.sl===null;
  const grievousForcedCF=kind==='missile'&&outcome.forcedCF===true&&outcome.sl==='CF'&&
   outcome.hit===false&&Array.isArray(outcome.forcedMishaps)&&outcome.forcedMishaps.length>0&&
   Array.isArray(outcome.forcedWoundIds)&&outcome.forcedWoundIds.length>0;
- assert(safeProof(physicalDice)&&(physicalDice.length>0||wastedMissile||grievousForcedCF),
+ if(kind==='melee'&&outcome?.deadlyAttack===true)assertDeadlyEvidence(outcome,targetState,physicalDice);
+ if(aimedLocation!==null){
+  assert(kind==='melee'&&outcome?.deadlyAttack===true&&outcome.deadlyAim?.location===aimedLocation&&
+   outcome.deadlyAim?.actorId===attackerId&&outcome.deadlyAim?.targetId===defenderId&&
+   outcome.deadlyAim?.timelineId===timelineId&&outcome.deadlyAim?.completionRound===round&&
+   (outcome.deadlyAim?.side??null)===aimedSide&&validDeadlyCalledLocation(aimedLocation,aimedSide),
+   'HMK 191: cílená lokace vyžaduje skutečně dokončenou Deadly koncentraci');
+ }else assert(aimedSide===null&&!outcome?.deadlyAim,'Bez koncentrace musí následovat standardní ZD a LD');
+ assert(safeProof(physicalDice)&&(physicalDice.length>0||wastedMissile||grievousForcedCF||kind==='melee'&&outcome?.deadlyAttack===true),
   'Chybí doložené skutečné hody původního útoku');
  assert(targetState&&typeof targetState==='object','Chybí trvalý stav zasažené postavy');
  validateCombatState(targetState);
@@ -88,9 +99,11 @@ export function createGuidedFullHit({id,timelineId,round,attackerId,defenderId,k
   strikerId,targetId,kind,outcome:clone(outcome),weapon:weapon?clone(weapon):null,
   aimZN,precisionDice,impactTA,armourReduction,direction,opponents,
   inventory:clone(inventory),targetState:clone(targetState),stateWitness:stateSignature(targetState),sourceSignature,
-  shockML,strengthML,physicalDice:clone(physicalDice),phase:strike?'zone':'miss',
-  zoneRolls:[],zoneChoice:null,locationRolls:[],locationChoice:null,location:null,
-  side:null,directionalD10:null,impactRoll:kind==='missile'&&strike?0:null,compoundD10:null,amputationRoll:null,
+  shockML,strengthML,physicalDice:clone(physicalDice),phase:strike?(aimedLocation?'impact':'zone'):'miss',
+  aimedLocation,aimedSide,
+  zoneRolls:[],zoneChoice:null,locationRolls:[],locationChoice:null,
+  location:aimedLocation,locationShock:aimedLocation?LOCATION_ROWS[Object.keys(LOCATION_ROWS).find(k=>LOCATION_ROWS[k].some(row=>row[0]===aimedLocation))].find(row=>row[0]===aimedLocation)[3]:null,
+  side:aimedSide,directionalD10:null,impactRoll:kind==='missile'&&strike?0:null,compoundD10:null,amputationRoll:null,
   shockRoll:null,computed:null,blockedReason:null};
 }
 function zoneResults(s){return s.zoneRolls.map((roll,index)=>({index,zn:s.aimZN+roll-1,zone:ZONE(s.aimZN+roll-1)}));}
@@ -233,6 +246,12 @@ export function finalizeGuidedFullHit({session,currentState,sourceSignature}={})
  assert(stateSignature(currentState)===session.stateWitness&&session.sourceSignature===sourceSignature,
   'Postava, vybavení nebo výsledek útoku se změnily; spusťte nový výpočet');
  assert(session.phase==='ready'||session.phase==='miss','Výsledek není úplný: chybí kostka nebo volba');
+ if(session.outcome?.deadlyAttack===true)assertDeadlyEvidence(session.outcome,currentState,session.physicalDice);
+ if(session.aimedLocation!==null)assert(validDeadlyCalledLocation(session.aimedLocation,session.aimedSide)&&
+ session.outcome?.deadlyAim?.location===session.aimedLocation&&
+ (session.outcome?.deadlyAim?.side??null)===session.aimedSide&&
+ !session.physicalDice.some(d=>['zoneDie','locationDie'].includes(d.id)),
+ 'Cílený Deadly Attack musí doložit přesnou lokaci bez ZD/LD');
  if(session.phase==='miss')return {strike:false,mutatesState:false,proof:clone(session.physicalDice),outcome:session.outcome};
  const r=session.computed,loc=session.location;
  assert(r?.shock||r?.amputation?.dead,'Povinný Shock Roll nebo ověřená smrt chybí');

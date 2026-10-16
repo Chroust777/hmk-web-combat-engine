@@ -18,6 +18,8 @@ import {outnumberedEMLModifier} from './melee-outnumbered.js';
 import {proneMeleeEMLModifier} from './melee-position-modifiers.js';
 import {assembleMeleeEML} from './melee-eml.js';
 import {createGuidedAttackJourney} from './hmk-guided-attack-journey.js';
+import {requireParalysisArms,completeParalysis,requireParalysisAction} from './hmk-paralysis-sequela.js';
+import {verifiedDeadlyHelplessReason} from './hmk-deadly-attack.js';
 import {verifiedLoadedProjectileBallistics} from './hmk-guided-missile-preparation.js';
 import {resolveCrossbowArcheryChoice} from './hmk-crossbow-archery-choice.js';
 const must=(test,text)=>{if(!test)throw Error(text)};
@@ -54,6 +56,7 @@ function validatedActor({person,state,inventory,weaponId,skillId,usedArms,round,
  const load=resolveCombatantLoad({character:person,inventory});
  must(load.encReady&&load.bulkReady&&load.ready,`${person.name}: ENC/Bulk nelze určit bez ověřených vrstev a hmotností (${(load.issues||[]).join('; ')})`);
  const arms=usedArms==='both'?['left','right']:usedArms==='left'||usedArms==='right'?[usedArms]:null;
+ requireParalysisArms(state,arms);
  must(arms,`${person.name}: hráč musí určit použitou ruku`);
  const trauma=projectLiveInjuries({state,round,test:'melee',usedArms:arms,timelineId});
  must(trauma.ready&&!trauma.unusable,`${person.name}: zranění nepovoluje tento Melee test (${trauma.reason||trauma.unusableWoundIds?.join(', ')})`);
@@ -108,6 +111,8 @@ export function createLiveGuidedMelee({id,timelineId,round,attacker,defender,att
  attackerSkillId,defenderSkillId,attackerUsedArms,defenderUsedArms,inventory,direction,opponents=1,
  attackerFoes=1,defenderFoes=1,aimZN=1,sourceSignature}={}){
  must(attacker?.id!==defender?.id&&attacker&&defender,'Chybí odlišný útočník a obránce');
+ must(!verifiedDeadlyHelplessReason(defender.hmk?.combatState),
+  'HMK str.191: doložený helpless cíl vyžaduje povinný Ignore a automatický four-star CS. Použijte Deadly Melee místo běžné Melee obrany.');
  const a=validatedActor({person:attacker,state:attacker.hmk?.combatState??initialCombatState(),inventory,weaponId:attackerWeaponId,
   skillId:attackerSkillId,usedArms:attackerUsedArms,round,timelineId,threateningFoes:attackerFoes});
  const d=validatedActor({person:defender,state:defender.hmk?.combatState??initialCombatState(),inventory,weaponId:defenderWeaponId,
@@ -132,6 +137,40 @@ export function createLiveGuidedMelee({id,timelineId,round,attacker,defender,att
   usedArms:{[attacker.id]:attackerUsedArms,[defender.id]:defenderUsedArms}});
  return {session,preflight:{attackerEML:ae,defenderEML:de,weaponByActor:{[attacker.id]:a.w.record.id,[defender.id]:d.w.record.id},
   source:'HMK pp.97,112,158–170; selected actual skills & equipped inventory',restrictions:['Primary Strike Mode only','Ignore or Block only','No unverified In Close, mounted context or situational TA']}};
+}
+
+/** HMK p.191: the target has NO defence roll or weapon requirement.
+ * The attacker must still carry a certified weapon and be able to use it.
+ * Do not silently infer proximity, sleep, restraints or a free aimed strike. */
+export function createLiveGuidedDeadlyMelee({id,timelineId,round,attacker,defender,attackerWeaponId,
+ attackerSkillId,attackerUsedArms,inventory,direction,opponents=1,aimZN=1,
+ attackerFoes=1,sourceSignature,gmReachConfirmed=false,deadlyAim=null}={}){
+ must(attacker?.id&&defender?.id&&attacker.id!==defender.id,'Chybí odlišný útočník a cíl');
+ must(gmReachConfirmed===true,'Deadly Melee: GM musí potvrdit, že cíl je v aktuálním dosahu zvolené zbraně (HMK str.191).');
+ const state=defender.hmk?.combatState??initialCombatState();
+ const reason=verifiedDeadlyHelplessReason(state);
+ must(!!reason,'Deadly Melee: stav cíle nedokládá helpless (úplná paralýza, UNC, Coma nebo trvalá slepota).');
+ must(['human','human-sized','human sized','human folk'].includes(String(defender.hmk?.folk??'').trim().toLowerCase()),
+  'Deadly Melee: pro tohoto tvora není doložena kompatibilní anatomická tabulka');
+ const a=validatedActor({person:attacker,state:attacker.hmk?.combatState??initialCombatState(),inventory,
+  weaponId:attackerWeaponId,skillId:attackerSkillId,usedArms:attackerUsedArms,round,timelineId,threateningFoes:attackerFoes});
+ const shockSkill=(defender.hmk?.skills||[]).filter(x=>String(x.name).trim().toLowerCase()==='shock');
+ must(shockSkill.length===1&&int(shockSkill[0].ml,0,200),'Cíl nemá doložený Shock ML');
+ must(int(defender.hmk?.attributes?.str,1,200),'Cíl nemá doloženou STR');
+ const effective=eml(a,'attack',0);
+ const participants={
+  [attacker.id]:{state:a.state,shockML:0,strengthML:attacker.hmk.attributes.str*5},
+  [defender.id]:{state,shockML:shockSkill[0].ml,strengthML:defender.hmk.attributes.str*5}};
+ const session=createGuidedAttackJourney({id,timelineId,round,attackerId:attacker.id,defenderId:defender.id,
+  kind:'melee',sourceSignature,participants,inventory,direction,opponents,aimZN,
+  melee:{deadly:true,attackerEML:effective.effectiveEML,defenderEML:0},deadlyAim,
+  weaponByActor:{[attacker.id]:a.weapon},weaponItemIds:{[attacker.id]:a.w.record.id},
+  usedArms:{[attacker.id]:attackerUsedArms}});
+ return {session,preflight:{deadly:true,helplessReason:reason,attackerEML:effective,
+  gmReachConfirmed:true,deadlyAim,weaponByActor:{[attacker.id]:a.w.record.id},
+  source:'HMK v1.2 p.191; actual equipped weapon / persistent helpless state',
+  restrictions:['Ignore + automatic four-star CS','No Attack/Defence d100',
+   'No called location without proved one-round concentration']}};
 }
 
 /** Direct/Volley from a certified missile snapshot: all factors from the
@@ -176,6 +215,8 @@ export function createLiveGuidedMissile({id,timelineId,round,attacker,defender,w
   `${attacker.name}: neověřené ENC/Bulk nebo postih vnímání střelce (${(shooterLoad.issues||[]).join('; ')||'chybí ověřené zóny Bulk tištěného kompletu'})`);
  const targetState=defender.hmk?.combatState??initialCombatState();
  const attackerState=attacker.hmk?.combatState??initialCombatState();
+ requireParalysisAction(attackerState,'missile');
+ requireParalysisArms(attackerState,attackerUsedArms==='both'?['left','right']:['left','right'].includes(attackerUsedArms)?[attackerUsedArms]:null);
  must(attackerState.shock==='NONE','Shock střelce mění oprávnění ke střelbě');
  // HMK p.170: Archery, Slings and Throwing are Impaired Tests. Minor and
  // Serious wounds modify the final test; they do NOT make firing illegal.

@@ -10,6 +10,7 @@ import {projectLiveInjuries} from './live-injury-impairment.js';
 import {combatFatigueTotals,validateCombatState} from './persistent-combat-state.js';
 import {successLevel,effectiveMasteryLevel} from '../rules/tests.js';
 import {injuryFromEffectiveImpact,compoundCompatible} from '../rules/injury.js';
+import {stunnedImpairedSL} from '../rules/injury-effects.js';
 const must=(condition,message)=>{if(!condition)throw Error(message)};
 const die=(n,max)=>Number.isSafeInteger(n)&&n>=1&&n<=max;
 const surfaces=Object.freeze({water:-16,mud:-12,snow:-8,earth:-4,paving:-2,rock:0});
@@ -51,13 +52,15 @@ export function inspectClimbingFallingStep({actor,inventory,state,fallHeightFt,s
  const injury=projectLiveInjuries({state,round,test:row.technique.toLowerCase(),
   usedArms:['left','right'],timelineId});
  must(injury.ready,'Nelze ověřit oslabení z ran: '+(injury.reason||''));
- must(!injury.unusable&&!injury.stunned&&state.shock==='NONE',
-  'Stávající Shock nebo nepoužitelná končetina blokuje nový Falling Test; je nutné rozhodnutí GM');
+ must(!injury.unusable&&!['INC','UNC','KIA'].includes(state.shock),
+  'INC/UNC/KIA nebo nepoužitelná končetina vyžadují samostatné vyhodnocení dalšího Falling Test; nelze je označit za normální d100');
  const rawEML=skillML(actor,row.technique)-combatFatigueTotals(state).total+
   load.agilityAndMeleePenalty+injury.modifier;
  const eml=effectiveMasteryLevel(rawEML);
  if(needed.length)return {ready:false,needed,rawEML,eml,technique:row.technique};
- const sl=levelNames[successLevel(row.fallingD100,rawEML)];
+ const rolledSL=successLevel(row.fallingD100,rawEML);
+ const finalSL=stunnedImpairedSL(rolledSL,{stunned:state.shock==='STN',isImpairedTest:true});
+ const sl=levelNames[finalSL];
  const loc=humanLocation(row.zoneD10,row.locationD10);
  const armour=resolveLiveCombatArmour({inventory,targetId:actor.id,location:loc.location,
   aspect:'b',direction,mode:'auto',rigidStatus:'unknown'});
@@ -73,7 +76,7 @@ export function inspectClimbingFallingStep({actor,inventory,state,fallHeightFt,s
   compoundCompatible(w,{location:loc.location,aspect:'b',area:false}));
  const needsCompound=!!base.injury&&existing.length>0;
  const needsShock=effectiveImpact>0;
- return {ready:true,needed:[],rawEML,eml,sl,repeatRequired:sl==='CF',
+ return {ready:true,needed:[],rawEML,eml,sl,rolledSL:levelNames[rolledSL],stunnedPenalty:state.shock==='STN'?1:0,repeatRequired:sl==='CF',
   location:loc.location,side:loc.side,locationShock:loc.locationShock,
   armourValue:armour.armourValue,strikeImpact,effectiveImpact,
   injury:base.injury?base.injury.severity+base.injury.level:null,
@@ -124,7 +127,7 @@ export function prepareClimbingFallingSequence({actor,inventory,state,fallHeight
   current=result.state;
   proofs.push({index:i,location:loc.location,side:loc.side,impact:strikeImpact,effectiveImpact:result.effectiveImpact,
    armourValue:armour.armourValue,fallingTechnique:r.technique,fallingD100:r.fallingD100,fallingEML:eml,
-   level:sl,injury:result.injury,shock:result.shockSL,physicalDice});
+   level:sl,rolledLevel:step.rolledSL,stunnedPenalty:step.stunnedPenalty,injury:result.injury,shock:result.shockSL,physicalDice});
   if(sl==='CF')must(i+1<rows.length,'CF v testu dopadu: HMK str.67 vyžaduje opakovat kroky 1–4 pro DALŠÍ zranění');
   else must(i===rows.length-1,'Dodatečné zranění po Falling Test bez CF není přípustné');
  }

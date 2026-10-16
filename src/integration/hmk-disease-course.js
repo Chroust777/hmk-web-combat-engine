@@ -8,6 +8,7 @@ import {SL,successLevel} from '../rules/tests.js';
 import {ailmentOutcome,ailmentCourse} from '../rules/ailments.js';
 import {contagionTest} from '../rules/ailments.js';
 import {validateCombatState} from './persistent-combat-state.js';
+import {PARALYSIS_LOCATIONS} from './hmk-paralysis-sequela.js';
 
 const check=(ok,msg)=>{if(!ok)throw Error(msg)};
 const integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
@@ -17,6 +18,10 @@ const transmissionModes=['airborne','contact','digested','vector'];
 const symptoms=['chills','coughing','diarrhoea','dizziness','fever','headache','lesions/rash','pain','swelling','vomiting'];
 const hrShock=['KIA','UNC','INC','STN','NONE','NONE','NONE'];
 const hrWeakness=[0,0,0,0,10,5,0];
+// HMK p184 supports non-lethal HR0. This stage covers one explicitly described
+// GM-attested non-lethal HR0 outcomes explicitly named on p184.
+// Permanent impairments have NO inferred recovery timetable.
+const NONFATAL_ZERO=new Set(['deafness','blindness','paralysis']);
 function actorProfile(actor){const a=actor?.hmk?.attributes;
  check(actor?.id&&integer(a?.end,1,99)&&integer(a?.wil,1,99),'Disease: chybí ověřené END nebo WIL');
  return {end:a.end,hb:healingBase({endurance:a.end,will:a.wil})};}
@@ -44,6 +49,23 @@ function apply(state,episode,next,round){
  check(state.fatigue.otherWeakness>=episode.weaknessApplied,'Disease: změněná evidence slabosti');
  check(state.shock===episode.shockApplied,'Disease: Shock změnil jiný zdroj');
  check(next>=(episode.floorHR||0),'Disease: nepovolené překročení neletálního HR minima');
+ if(next===0&&NONFATAL_ZERO.has(episode.zeroOutcome)){
+  check(episode.standardLethal===false&&episode.floorHR===0,'Disease: HR0 alternativa bez GM doložení');
+  check(!(state.ailmentSequelae||[]).some(x=>x.sourceId===episode.id),
+   'Disease: tento trvalý následek již byl zapsán');
+  const id='disease-sequela:'+episode.sourceId;
+  const sequela={id,sourceId:episode.id,condition:episode.zeroOutcome,
+   ...(episode.zeroOutcome==='paralysis'?{affectedLimb:episode.zeroParalysisLimb}:{}),permanent:true,
+   active:true,round,courseSequence:episode.sequence,sourcePage:184};
+  state.ailmentSequelae=[...(state.ailmentSequelae||[]),sequela];
+  state.fatigue.otherWeakness-=episode.weaknessApplied;episode.weaknessApplied=0;
+  state.shock='NONE';episode.shockApplied='NONE';episode.hr=0;episode.status='sequela';
+  if(episode.zeroOutcome==='paralysis'&&episode.zeroParalysisLimb==='complete')state.posture.prone=true;
+  // HR0 explicitly replaces, and does not add to, the previous Disease outcome.
+  // Permanent sensory loss survives disease resolution and is not a KIA state.
+  return {hr:0,shock:'NONE',weakness:0,status:'sequela',
+   permanentCondition:episode.zeroOutcome,affectedLimb:episode.zeroParalysisLimb??null,sequelaId:id};
+ }
 const out=ailmentOutcome(next),normalized=Math.max(0,Math.min(next,6)),kind=hrShock[normalized],weak=hrWeakness[normalized];
  check(({KIA:'killed',UNC:'unconscious',INC:'incapacitated',STN:'stunned',NONE:'none'})[kind]===out.shockState,
   'Disease: interní rozdíl v Outcome tabulce');
@@ -65,14 +87,17 @@ const out=ailmentOutcome(next),normalized=Math.max(0,Math.min(next,6)),kind=hrSh
  */
 export function prepareDiseaseExposure({actor,state,sourceId,diseaseKey,transmission,
  contagionIndex,contagionIndexD20=null,contagionD100,round=1,
- confirmedStandardLethal=false,nonlethalFloorHR=null,gmConfirmedFloor=false,gmConfirmed=false}={}){
+ confirmedStandardLethal=false,nonlethalFloorHR=null,gmConfirmedFloor=false,
+ nonlethalZeroOutcome=null,zeroParalysisLimb=null,gmConfirmedZero=false,gmConfirmed=false}={}){
  const s=draft(actor,state,round),{end}=actorProfile(actor);
  check(gmConfirmed===true&&isId(sourceId)&&isId(diseaseKey),
   'Disease: GM musí potvrdit skutečný zdroj a totožnost nemoci');
  const hasFloor=nonlethalFloorHR!==null;
- check((!hasFloor&&confirmedStandardLethal===true)||
-  (hasFloor&&confirmedStandardLethal===false&&gmConfirmedFloor===true&&[1,2].includes(nonlethalFloorHR)),
-  'Disease: potvrďte buď standardní fatální HR0, nebo doložené neletální minimum HR1/HR2 (p.184)');
+ check((!hasFloor&&confirmedStandardLethal===true&&nonlethalZeroOutcome===null&&zeroParalysisLimb===null)||
+  (hasFloor&&confirmedStandardLethal===false&&nonlethalZeroOutcome===null&&zeroParalysisLimb===null&&gmConfirmedFloor===true&&[1,2].includes(nonlethalFloorHR))||
+  (!hasFloor&&confirmedStandardLethal===false&&NONFATAL_ZERO.has(nonlethalZeroOutcome)&&gmConfirmedZero===true&&
+   (nonlethalZeroOutcome==='paralysis'?PARALYSIS_LOCATIONS.includes(zeroParalysisLimb):zeroParalysisLimb===null)),
+  'Disease: GM musí potvrdit standardní HR0, minimum HR1/HR2, nebo doložený nefatální HR0 s trvalou hluchotou/slepotou/paralýzou (p.184); při paralýze přesnou končetinu nebo úplnou paralýzu');
  check(transmissionModes.includes(transmission),'Disease: neplatný způsob přenosu');
  check(integer(contagionIndex,1,5)&&integer(contagionD100,1,100),
   'Disease: je nutné doložit CI1–5 a skutečný Contagion d100');
@@ -91,12 +116,15 @@ export function prepareDiseaseExposure({actor,state,sourceId,diseaseKey,transmis
   onsetD6:null,onsetMinutes:null,initialHR:null,virulenceD20:null,
   symptomD10s:[],symptoms:[],hr:null,
   status:contracted?'pending-profile':'avoided',elapsedMinutes:0,sequence:0,
-  weaknessApplied:0,shockApplied:'NONE',standardLethal:!hasFloor,floorHR:nonlethalFloorHR??0};
+  weaknessApplied:0,shockApplied:'NONE',standardLethal:confirmedStandardLethal===true,
+  floorHR:nonlethalFloorHR??0,zeroOutcome:nonlethalZeroOutcome,
+  ...(nonlethalZeroOutcome==='paralysis'?{zeroParalysisLimb}:{} )};
  s.diseaseCourses=[...(s.diseaseCourses||[]),current];
  push(s,id,'disease-exposure',round,{sourceId:current.sourceId,diseaseKey:current.diseaseKey,
   transmission,contagionIndex,contagionIndexD20,contagionD100,usedCI,priorBonus,
   eml:current.contagionEML,sl:current.contagionSL,contracted,
-  standardLethal:current.standardLethal,floorHR:current.floorHR,rulePages:[183,184]});
+  standardLethal:current.standardLethal,floorHR:current.floorHR,zeroOutcome:current.zeroOutcome,
+  ...(current.zeroOutcome==='paralysis'?{zeroParalysisLimb:current.zeroParalysisLimb}:{}),rulePages:[183,184]});
  return {state:s,episode:structuredClone(current),report:{phase:'contagion',contracted,
   sl:current.contagionSL,eml:current.contagionEML,usedCI,nextExposureBonus:current.nextExposureBonus}};
 }

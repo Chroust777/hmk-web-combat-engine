@@ -11,6 +11,7 @@ import {createGuidedFullHit,guidedFullHitRequirement,chooseGuidedFullHit,submitG
 import {readPhysicalDieValue} from './hmk-manual-dice-queue.js';
 import {createGuidedBlockWeaponDamage,guidedBlockWeaponDamageRequirement,submitGuidedBlockWeaponDamageDie,completeGuidedBlockWeaponDamage} from './hmk-guided-block-weapon-damage.js';
 import {successLevel,SL} from '../rules/tests.js';
+import {verifiedDeadlyHelplessReason,verifiedDeadlyMeleeOutcome,assertDeadlyEvidence} from './hmk-deadly-attack.js';
 const assert=(x,message)=>{if(!x)throw Error(message)};
 const int=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
 const copy=structuredClone;
@@ -22,7 +23,7 @@ const signature=state=>JSON.stringify(state);
 export function createGuidedAttackJourney({id,timelineId,round,attackerId,defenderId,
  kind,sourceSignature,melee=null,missile=null,participants,inventory,
  direction,opponents=1,aimZN=1,armourReduction=0,impactTA=0,
- precisionDice=0,weaponByActor,weaponItemIds=null,usedArms=null}={}){
+ precisionDice=0,weaponByActor,weaponItemIds=null,usedArms=null,deadlyAim=null}={}){
  assert(['melee','missile'].includes(kind)&&typeof sourceSignature==='string'&&sourceSignature,
   'Chybí potvrzený výběr útoku a jeho pravidlový podpis');
  assert(participants&&participants[attackerId]&&participants[defenderId]&&Array.isArray(inventory)&&weaponByActor,
@@ -31,13 +32,20 @@ export function createGuidedAttackJourney({id,timelineId,round,attackerId,defend
   'Chybí směr nebo doložené okolnosti zásahu');
  assert(int(armourReduction,0,99)&&int(impactTA,0,3)&&int(precisionDice,0,4),
   'Neplatná volba Tactical Advantage / Armour Reduction');
+ const deadly=kind==='melee'&&melee?.deadly===true;
  let meleeSession=null;
- if(kind==='melee'){
+ if(kind==='melee'&&!deadly){
+  assert(!verifiedDeadlyHelplessReason(participants[defenderId]?.state),
+   'HMK str.191: helpless cíl musí dostat automatický four-star CS; běžný Melee hod je zakázán.');
   assert(melee&&int(melee.attackerEML,0,100)&&int(melee.defenderEML,0,100),'Chybí doložené finální Melee EML');
   meleeSession=createGuidedMeleeSequence({id:id+':attack',timelineId,round,attackerId,defenderId,
    attackerEML:melee.attackerEML,defenderEML:melee.defenderEML,attackerML:melee.attackerML??null,
    defenderML:melee.defenderML??null,defenderEMLByDefence:melee.defenderEMLByDefence,
    defenderMLByDefence:melee.defenderMLByDefence??null,allowedDefences:melee.allowedDefences,sourceSignature});
+ }
+ if(deadly){
+  assert(melee&&int(melee.attackerEML,0,100)&&int(melee.defenderEML,0,100),'Deadly Melee: neúplný ověřený útočník');
+  assert(participants[defenderId]?.state,'Deadly Melee: chybí autoritativní cíl');
  }
  if(kind==='missile'){
   assert(missile&&['bow','crossbow','sling','thrown'].includes(missile.weaponType),'Chybí údaje skutečné střelné/vrhací zbraně');
@@ -58,13 +66,15 @@ export function createGuidedAttackJourney({id,timelineId,round,attackerId,defend
   sourceSignature,meleeSession,missile:missile?copy(missile):null,
   participants:copy(participants),inventory:copy(inventory),direction,opponents,aimZN,armourReduction,
   impactTA,precisionDice,weaponByActor:copy(weaponByActor),weaponItemIds:weaponItemIds?copy(weaponItemIds):null,
-  weaponDamageSession:null,weaponDamageProof:null,usedArms:usedArms?copy(usedArms):null,
+  weaponDamageSession:null,weaponDamageProof:null,deadlyAttack:deadly,deadlyAim:deadlyAim?copy(deadlyAim):null,
+  usedArms:usedArms?copy(usedArms):null,
   counterDirection:null,counterOpponents:null,missileRoll:null,
   missileImpactRoll:null,choiceImpactTA:null,nearbyD20:null,nearbyImpactD10:null,
   volleyRolls:[],volleyImpactD10:null,selectedTargetRollIndex:null,spoiledDisposition:null,spoiledD100:null,
   deviationD8:null,deviationTargetCount:null,targetSlots:[],nearbySlots:[],deviationSlots:[],
   missileActualTargetId:null,missileActualDirection:null,missileActualOpponents:null,
-  physicalDice:[],hitSession:null,finalAttack:null,phase:kind==='melee'?'melee':'missile'};
+  physicalDice:[],hitSession:null,finalAttack:deadly?verifiedDeadlyMeleeOutcome(participants[defenderId].state,deadlyAim):null,
+  phase:deadly?'melee-ta':kind==='melee'?'melee':'missile'};
 }
 function missileArgs(s){return {...s.missile,roll:s.missileRoll,
  choiceImpactTA:s.choiceImpactTA,impactDieRoll:s.missileImpactRoll,
@@ -195,7 +205,8 @@ function transitionToHit(s,outcome,dice){
   opponents:outcome.counterStrike?s.counterOpponents:
    s.kind==='missile'&&s.missileActualTargetId!==s.defenderId?s.missileActualOpponents:s.opponents,
   inventory:s.inventory,targetState:entry.state,shockML:entry.shockML,strengthML:entry.strengthML,
-  sourceSignature:s.sourceSignature,physicalDice:dice});
+  sourceSignature:s.sourceSignature,physicalDice:dice,
+  aimedLocation:outcome?.deadlyAim?.location??null,aimedSide:outcome?.deadlyAim?.side??null});
  return {...s,hitSession:hit,finalAttack:copy(outcome),phase:'hit'};
 }
 export function submitGuidedAttackDie(s,value){
