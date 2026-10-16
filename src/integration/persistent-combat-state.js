@@ -3,6 +3,7 @@
  * missing special-injury rulings, elapsed turns or unattended blood-loss rolls.
  */
 import {SHOCK_STATE,applyShockState,resolveStunnedRecovery,resolveShockReroll} from '../rules/shock.js';
+import {PARALYSIS_LOCATIONS} from './hmk-paralysis-sequela.js';
 import {bloodLossAdvanceTransition,bloodStoppageResult,BLOOD_LOSS_PERIOD_ROUNDS} from '../rules/bleeding.js';
 import {SL,successLevel,effectiveMasteryLevel} from '../rules/tests.js';
 import {compoundInjury,compoundCompatible} from '../rules/injury.js';
@@ -77,6 +78,51 @@ export function validateCombatState(s){
    ids.add(t.id);
   }
  }
+ if(s.ailmentSequelae!==undefined){
+  requireCond(Array.isArray(s.ailmentSequelae)&&s.ailmentSequelae.length<=200,
+   'Disease: neplatný seznam trvalých následků');
+  const seen=new Set();
+  for(const x of s.ailmentSequelae){
+   requireCond(x&&typeof x.id==='string'&&x.id.startsWith('disease-sequela:')&&
+    !seen.has(x.id)&&x.sourceId==='disease:'+x.id.slice('disease-sequela:'.length)&&
+    ['deafness','blindness','paralysis'].includes(x.condition)&&
+    (x.condition==='paralysis'?PARALYSIS_LOCATIONS.includes(x.affectedLimb):x.affectedLimb===undefined)&&
+    x.permanent===true&&x.active===true&&
+    whole(x.round,1,9999)&&whole(x.courseSequence,1,10000)&&x.sourcePage===184&&
+    (s.diseaseCourses||[]).some(d=>d.id===x.sourceId&&d.status==='sequela'&&
+      d.hr===0&&d.zeroOutcome===x.condition&&
+      (x.condition!=='paralysis'||d.zeroParalysisLimb===x.affectedLimb)&&
+      d.sequence===x.courseSequence&&
+      s.events.some(e=>e.id===d.id+':course:'+d.sequence&&e.type==='disease-course')),
+    'Disease: trvalý následek musí být doložen nefatálním Course HR0');
+   if(x.condition==='paralysis'&&x.affectedLimb==='complete')
+    requireCond(s.posture?.prone===true,'Úplná paralýza: stav postavy musí být prone (HMK 184)');
+   seen.add(x.id);
+  }
+ }
+ if(s.sleepDeprivation!==undefined){
+  const t=s.sleepDeprivation;
+  requireCond(t&&typeof t.id==='string'&&t.id==='sleep-deprivation:'+t.episodeId&&
+   typeof t.episodeId==='string'&&t.episodeId.length>=3&&t.episodeId.length<=120&&
+   ['awake','slept'].includes(t.status)&&whole(t.hoursAwake,24,2400)&&t.hoursAwake%24===0&&
+   whole(t.totalAccrued,10,1500)&&whole(t.activeWeariness,0,1500)&&
+   t.activeWeariness<=t.totalAccrued&&
+   (t.status!=='slept'||s.events.some(e=>e.id===t.id+':sleep'&&e.type==='hmk-sleep-deprivation-sleep'))&&
+   (t.restRecords===undefined||(Array.isArray(t.restRecords)&&t.restRecords.length<=1000&&
+    new Set(t.restRecords.map(r=>r.dayIndex)).size===t.restRecords.length&&
+    t.restRecords.every(r=>r&&whole(r.dayIndex,0,694444)&&
+     whole(r.startMinute,0,1000000000)&&whole(r.endMinute,0,1000000000)&&
+     r.endMinute-r.startMinute===240&&
+     Math.floor(r.startMinute/1440)===r.dayIndex&&
+     Math.floor(r.endMinute/1440)===r.dayIndex&&whole(r.amount,1,5)&&
+     s.events.some(e=>e.id===t.id+':rest:'+r.dayIndex&&e.type==='hmk-sleep-deprivation-rest'&&
+      e.details?.startMinute===r.startMinute&&e.details?.endMinute===r.endMinute&&
+      e.details?.wearinessRemoved===r.amount))))&&
+   whole(t.psycheLevelsAccrued,0,50)&&t.psycheLevelsAccrued===Math.floor(t.totalAccrued/30)&&
+   typeof t.psychePending==='boolean'&&
+   s.events.some(e=>e.id===t.id+':day:'+t.hoursAwake&&e.type==='hmk-sleep-deprivation-day'),
+   'Sleep Deprivation: nekonzistentní doložení bezesného období');
+ }
  if(s.diseaseCourses!==undefined){
   requireCond(Array.isArray(s.diseaseCourses)&&s.diseaseCourses.length<=200,'Neplatný seznam Disease expozic');
   const diseaseIds=new Set();
@@ -97,15 +143,21 @@ export function validateCombatState(s){
        whole(d.initialHR,1,5)&&(d.virulenceD20===null||whole(d.virulenceD20,1,20))&&
        Array.isArray(d.symptomD10s)&&d.symptomD10s.length===4&&d.symptomD10s.every(v=>whole(v,1,10))&&
        Array.isArray(d.symptoms)&&d.symptoms.length===4&&d.symptoms.every(x=>typeof x==='string')&&whole(d.hr,0,6)))&&
-    ['pending-profile','avoided','incubating','active','defeated','dead'].includes(d.status)&&
+    ['pending-profile','avoided','incubating','active','defeated','dead','sequela'].includes(d.status)&&
     whole(d.elapsedMinutes,0,10000000)&&whole(d.sequence,0,10000)&&
     [0,5,10].includes(d.weaknessApplied)&&['NONE','STN','INC','UNC','KIA'].includes(d.shockApplied)&&
-    ((d.standardLethal===true&&(d.floorHR===undefined||d.floorHR===0))||
-     (d.standardLethal===false&&whole(d.floorHR,1,2)))&&
+    ((d.standardLethal===true&&(d.floorHR===undefined||d.floorHR===0)&&!d.zeroOutcome)||
+     (d.standardLethal===false&&whole(d.floorHR,1,2)&&!d.zeroOutcome)||
+     (d.standardLethal===false&&d.floorHR===0&&['deafness','blindness','paralysis'].includes(d.zeroOutcome)&&
+      (d.zeroOutcome==='paralysis'?PARALYSIS_LOCATIONS.includes(d.zeroParalysisLimb):d.zeroParalysisLimb===undefined)))&&
     (d.hr===null||d.hr>=(d.floorHR||0))&&
     s.events.some(e=>e.id===d.id&&e.type==='disease-exposure'),
     'Disease nemá konzistentní Contagion expozici nebo povinné hody');
    diseaseIds.add(d.id);
+   if(d.status==='sequela')requireCond(d.hr===0&&['deafness','blindness','paralysis'].includes(d.zeroOutcome)&&
+     (d.zeroOutcome==='paralysis'?PARALYSIS_LOCATIONS.includes(d.zeroParalysisLimb):d.zeroParalysisLimb===undefined)&&
+     (s.ailmentSequelae||[]).some(x=>x.sourceId===d.id&&x.active===true),
+     'Disease: nefatální HR0 vyžaduje evidovaný trvalý následek');
    if(d.status==='dead')requireCond(d.standardLethal===true&&d.hr===0,'Disease: HR0 není smrtelný při neletálním minimu');
    if(d.status==='defeated')requireCond(d.hr===6,'Disease: uzdravení vyžaduje HR6');
    if(d.status==='active')requireCond(whole(d.hr,1,5),'Disease: aktivní nemoc musí být HR1–5');
@@ -113,7 +165,7 @@ export function validateCombatState(s){
    if(d.status!=='avoided')requireCond(['F','CF'].includes(d.contagionSL),'Disease: kontrakce vyžaduje F nebo CF');
    if(d.status==='incubating')requireCond(d.sequence===0&&d.elapsedMinutes===0&&d.weaknessApplied===0&&d.shockApplied==='NONE',
     'Disease: nástup ještě nenastal');
-   if(['active','defeated','dead'].includes(d.status))requireCond(s.events.some(e=>e.id===d.id+':onset'&&e.type==='disease-onset'),
+   if(['active','defeated','dead','sequela'].includes(d.status))requireCond(s.events.some(e=>e.id===d.id+':onset'&&e.type==='disease-onset'),
     'Disease: chybí potvrzený onset');
   }
  }
@@ -196,6 +248,27 @@ export function validateCombatState(s){
    &&whole(x.elapsedHours,0,100000)&&x.elapsedHours%EXTENDED_HOURS===0
    &&s.shockFollowup==null,'Neplatný Extended Shock (HR / časování / stav)');
  }
+ if(s.asphyxiaComaPending!==undefined&&s.asphyxiaComaPending!==null){
+  const a=s.asphyxiaComaPending;
+  requireCond(a?.active===true&&['smoke','swimming'].includes(a.sourceKind)&&
+   typeof a.sourceEventId==='string'&&a.sourceEventId.length>0&&
+   whole(a.originRound,1,9999)&&whole(a.enduranceD100,1,100)&&
+   Number.isSafeInteger(a.enduranceEML)&&s.shock==='UNC'&&
+   s.extendedShock?.originState==='UNC'&&s.extendedShock.hr===4&&
+   s.extendedShock.elapsedHours===0&&!s.coma&&s.shockFollowup==null,
+   'Asphyxia CF: čekající Coma musí zachovat UNC a Extended Shock HR4');
+  // Require the actual printed CF roll on the linked source event. A pending
+  // coma flag alone must never manufacture coma or a false CF provenance.
+  const origin=s.events.find(e=>e.id===a.sourceEventId);
+  requireCond(!!origin && (
+   (a.sourceKind==='smoke'&&origin.type==='mundane-smoke-asphyxia-complete'&&
+    origin.details?.endRecovery?.level==='CF'&&origin.details.endRecovery.roll===a.enduranceD100&&
+    origin.details.endRecovery.eml===a.enduranceEML)||
+   (a.sourceKind==='swimming'&&origin.type==='skill-swimming-consequence'&&
+    origin.details?.recovery?.level==='CF'&&origin.details.recovery.roll===a.enduranceD100&&
+    origin.details.recovery.eml===a.enduranceEML)),
+   'Asphyxia CF: chybí ověřený původní Endurance CF pro čekající Coma');
+ }
  if(s.coma!==undefined&&s.coma!==null){
   const c=s.coma;
   requireCond(c&&c.active===true&&whole(c.hr,1,20)&&whole(c.elapsedDays,0,100000)
@@ -233,7 +306,7 @@ export function beginConfirmedEncounter({state,eventId,timelineId,gmConfirmed=fa
  validateCombatState(s);
  return {state:s,started:true,previousLastRound:oldRound};
 }
-function ready(s,round,id){const n=copy(s??initialCombatState());validateCombatState(n);requireCond(whole(round,1,9999)&&round>=n.lastRound,'Bojovou událost nelze zapsat do minulého kola');requireCond(typeof id==='string'&&id&&!n.events.some(e=>e.id===id),'Událost byla již zpracována');return n;}
+function ready(s,round,id){const n=copy(s??initialCombatState());validateCombatState(n);requireCond(!n.asphyxiaComaPending,'Asphyxia CF: nejprve GM musí rozhodnout počáteční Coma HR, jinak další Combat procedury nelze dokončit');requireCond(whole(round,1,9999)&&round>=n.lastRound,'Bojovou událost nelze zapsat do minulého kola');requireCond(typeof id==='string'&&id&&!n.events.some(e=>e.id===id),'Událost byla již zpracována');return n;}
 /** Fatal state is terminal across ALL pending injury/bleeding/healing streams.
  * Preserve wounds and history; only future rolls cease to be scheduled.
  * HMK World of Kèthîra, pp.168–169,177–179.
@@ -503,6 +576,7 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
 export function applyExtendedShockCourse({state,round,eventId,healingBase,roll,physicianStars=0,arcaneBonus=0,elapsedHoursSinceOnset=null,gmConfirmed=false}={}){
  const s=ready(state,round,eventId);
  requireCond(gmConfirmed===true,'GM musí potvrdit pravidlové podmínky a čas Extended Shock');
+ requireCond(!s.asphyxiaComaPending,'Asphyxia CF: nejprve GM musí rozhodnout počáteční Coma HR, jinak Course nelze dokončit');
  requireCond(!!s.extendedShock&&['INC','UNC'].includes(s.shock),'Postava není v Extended Shock');
  requireCond(whole(elapsedHoursSinceOnset,4,100000)&&elapsedHoursSinceOnset===s.extendedShock.elapsedHours+EXTENDED_HOURS,'Course Roll musí následovat po doložených 4 hodinách: celkem '+(s.extendedShock.elapsedHours+4)+' h');
  requireCond(whole(healingBase,1,100)&&whole(roll,1,100)&&whole(physicianStars,0,10)&&whole(arcaneBonus,0,100),'Neplatné údaje Healing Base, d100 či bonusů');

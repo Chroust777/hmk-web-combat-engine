@@ -5,7 +5,8 @@
  * injuries. No unknown helmet layers, attack hand or elapsed time are invented.
  */
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
-import {resolveSkillConditions,skillConditionAvailability} from './hmk-skill-context.js';
+import {completeParalysis,blockedLimbs} from './hmk-paralysis-sequela.js';
+import {resolveSkillConditions,skillConditionAvailability,encApplicability} from './hmk-skill-context.js';
 import {resolveSkillTrauma,impairedSkillKind,skillTraumaAvailability} from './hmk-skill-trauma.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {resolveCombatantLoad} from './combatant-load.js';
@@ -73,9 +74,38 @@ export function inferredArms(actor,inventory,name,state){
  }
  throw Error('Zranění paže a činnost '+name+' neumožňují doložit použitou ruku ze samotného názvu skillu. Použijte konkrétní akci v Combat; postih nelze odhadnout.');
 }
-export function automaticSkillContext({actor,inventory=[],name,combatRound=null,combatTimelineId=null,gearPolicy='advisory',manualENC=null,manualBulk=null,manualPerception=null}={}){
+export function automaticSkillContext({actor,inventory=[],name,combatRound=null,combatTimelineId=null,gearPolicy='advisory',manualENC=null,manualBulk=null,manualPerception=null,sensoryBasis=null,blindnessDecision=null,visionBasis=null}={}){
  if(!Array.isArray(inventory))throw Error('Chybí potvrzený inventář');
  const base=recordedActor(actor);const state=base.state;
+ if(completeParalysis(state))throw Error('HMK str.184: úplně paralyzovaná postava nemůže provést samostatný Skill Test.');
+ const disabled=blockedLimbs(state);
+ const armActivity=['Climbing','Swimming','Archery','Slings','Throwing','Melee','Dexterity','Legerdemain','Acrobatics','Dancing','Jumping','Stealth','Riding'];
+ const legActivity=['Agility','Climbing','Swimming','Acrobatics','Dancing','Jumping','Stealth','Riding','Dodge'];
+ if([...disabled].some(x=>x.endsWith('-arm'))&&armActivity.includes(name))
+  throw Error('HMK str.184: ochrnutá paže – samostatný Skill Test neověřuje použitou končetinu. Pro útok použijte Combat s potvrzenou rukou; ostatní činnosti vyžadují rozhodnutí GM.');
+ if([...disabled].some(x=>x.endsWith('-leg'))&&legActivity.includes(name))
+  throw Error('HMK str.184: ochrnutá noha – tento test může používat postiženou končetinu; bez rozhodnutí GM jej nelze vyhodnotit.');
+ const hasDeafness=(state.ailmentSequelae||[]).some(x=>x.active&&x.condition==='deafness');
+ const mayHear=['Awareness','Perception'].includes(name);
+ const certainHearing=name==='Sound';
+ if(hasDeafness&&mayHear&&!['hearing','other'].includes(sensoryBasis))
+  throw Error('Trvalá hluchota (p184): GM musí označit, zda PER/Awareness test vyžaduje SLUCH (automatické CF), nebo jiný smysl.');
+ const deafnessForcedCF=hasDeafness&&(certainHearing||(mayHear&&sensoryBasis==='hearing'));
+ const hasBlindness=(state.ailmentSequelae||[]).some(x=>x.active&&x.condition==='blindness');
+ const baseAttrs=encApplicability(base.actor,name);
+ if(hasBlindness&&name==='Sight')throw Error('Trvalá slepota (HMK 184): Sight vyžaduje zrak; nelze provést běžný test. GM musí vyřešit nemožnou činnost.');
+ if(hasBlindness&&mayHear){
+  if(!['sight','other'].includes(visionBasis))throw Error('Trvalá slepota (HMK 184): GM musí u PER/Awareness potvrdit, zda je test založen na ZRAKU, nebo jiném smyslu.');
+  if(visionBasis==='sight')throw Error('Trvalá slepota (HMK 184): čistě zrakový PER/Awareness test není možný; nehází se d100.');
+ }
+ if(hasBlindness&&baseAttrs.kind==='unknown'&&!['Awareness'].includes(name))
+  throw Error('Trvalá slepota (HMK 184): chybí ověřená Skill Base; bez ní nelze určit postih −40.');
+ const blindnessApplies=hasBlindness&&(name==='Agility'||name==='Dexterity'||
+  [baseAttrs.primary,baseAttrs.secondary].some(x=>x==='agl'||x==='dex'));
+ if(blindnessApplies&&blindnessDecision!=='possible'){
+  if(blindnessDecision==='impossible')throw Error('Trvalá slepota (HMK 184): GM určil činnost za nemožnou; test a hod d100 jsou zakázány.');
+  throw Error('Trvalá slepota (HMK 184): GM musí určit, zda je činnost proveditelná s postihem −40, nebo nemožná.');
+ }
  // Mounted conditions cannot be guessed from equipment alone. The confirmed
  // encounter rider/mount state belongs to Combat, not a standalone skill die.
  if(state.mounted===true||state.mountId)throw Error('Aktivní jízda: vyhodnoťte test v potvrzeném Mounted Combat kontextu.');
@@ -137,6 +167,8 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
   provisional.push('PER: doložený postih z přilby '+partial.per+' započten; úplnost výbavy nebyla potvrzena.');
  }
  const condition=resolveSkillConditions({actor:base.actor,inventory,name,fatigueMode:'auto',encMode:ec.mode,manualENC:ec.value,mounted:false});
+ if(deafnessForcedCF)condition.deafnessForcedCF=true;
+ if(blindnessApplies){condition.blindnessModifier=-40;condition.modifier-=40;}
  if(advisory&&partial?.ready&&!conditionAvail.enc.ready&&gmEnc===null){
   condition.enc.source='verified-p118-minimum-enc-not-full-load';
   condition.enc.mode='provisional-known-components';
@@ -173,11 +205,12 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
   trauma.perception.source='verified-p118-minimum-per-not-full-armour';trauma.perception.mode='provisional-known-components';
  }
  return {kind:'hmk-auto-skill-context-v1',actorId:actor.id,name,condition,trauma,gmArmourDecision:allowedGM,armourWarnings:issues,provisionalArmour:provisional,armourIsProvisional:provisional.length>0,
-  modifier:condition.modifier+trauma.modifier,source:base.source,hand:arm.source,loadEvidence,
-  breakdown:[{label:'Fatigue',value:condition.fatigue.modifier,source:condition.fatigue.source},
+  modifier:condition.modifier+trauma.modifier,deafnessForcedCF,blindnessApplies,blindnessModifier:blindnessApplies?-40:0,blindnessDecision:blindnessApplies?blindnessDecision:null,visionBasis:hasBlindness&&mayHear?visionBasis:null,
+  sensoryBasis:hasDeafness?(certainHearing?'hearing':mayHear?sensoryBasis:'not-applicable'):null,source:base.source,hand:arm.source,loadEvidence,
+  breakdown:[...(deafnessForcedCF?[{label:'Deafness: forced CF',value:0,source:'p184-no-d100'}]:[]),...(blindnessApplies?[{label:'Blindness: DEX/AGL in Skill Base',value:-40,source:'p184-gm-confirmed-possible'}]:[]),{label:'Fatigue',value:condition.fatigue.modifier,source:condition.fatigue.source},
    {label:'ENC',value:condition.enc.modifier,source:condition.enc.source},
    {label:'Zranění',value:trauma.injury.modifier,source:trauma.injury.source},
    {label:'Bulk',value:trauma.bulk.modifier,source:trauma.bulk.source},
    {label:'Zbroj / PER',value:trauma.perception.modifier,source:trauma.perception.source}],
-  sourcePages:[60,61,62,112,117,118,169,170,176],readOnly:true};
+  sourcePages:[60,61,62,112,117,118,169,170,176,...(hasBlindness||hasDeafness?[184]:[])],readOnly:true};
 }

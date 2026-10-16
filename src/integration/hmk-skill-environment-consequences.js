@@ -6,6 +6,7 @@ import {resolveCombatantLoad} from './combatant-load.js';
 import {availableMasteries} from './hmk-skill-test-engine.js';
 import {validateCombatState,combatFatigueTotals} from './persistent-combat-state.js';
 import {asphyxiaCapacity,asphyxiaDeathCountdown,asphyxiaAfterRelease} from '../rules/ailments.js';
+import {markPendingAsphyxiaComa} from './hmk-asphyxia-coma.js';
 import {successLevel,successValue,SL,indexOf} from '../rules/tests.js';
 import {applyAggravationShockSR,aggravationChecksForAction} from '../rules/healing.js';
 const req=(yes,reason)=>{if(!yes)throw Error(reason)};
@@ -93,12 +94,14 @@ export function prepareSwimmingConsequence({actor,inventory,state,sourceId,round
     // p.183: use p.169 Shock Reroll table WITHOUT the standard −20 penalty.
     // CF coma has a location/injury-based initial HR, which drowning itself
     // does not specify; it must not be manufactured as a valid closed state.
-    if(rsl===SL.CF)throw Error('Endurance CF po utonutí: podle str.169 následuje Coma; bez určeného počátečního Coma HR nelze bezpečně uzavřít stav. Vyžaduje samostatný GM postup.');
     recovery={roll:enduranceD100,eml:endEML,level};
+    if(rsl===SL.CF){markPendingAsphyxiaComa(s,{sourceEventId:id,sourceKind:'swimming',round,
+      enduranceD100,enduranceEML:endEML});asphyxia='coma-pending-gm-initial-hr';}
+
     if(rsl===SL.CS){asphyxia='recovered';}
     else if(rsl===SL.S){asphyxia='stunned';s.shock='STN';s.shockOriginRound=round;
      s.shockFollowup={kind:'STN',originRound:round,dueRound:round+1,phase:'end-next-turn',timelineId:null};}
-    else{asphyxia='extended-shock';s.shock='UNC';s.shockOriginRound=round;s.posture.prone=true;
+    else if(rsl===SL.F){asphyxia='extended-shock';s.shock='UNC';s.shockOriginRound=round;s.posture.prone=true;
      s.shockFollowup=null;s.extendedShock={originState:'UNC',hr:5,elapsedHours:0};}
    }
   }else{

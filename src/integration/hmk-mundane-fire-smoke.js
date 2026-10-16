@@ -6,6 +6,7 @@ import {mundaneFireImpact,mundaneFireTarget,fireSmokeHazard} from '../rules/craf
 import {injuryFromEffectiveImpact,resolveInjurySequence,compoundCompatible} from '../rules/injury.js';
 import {successLevel,successValue,SL} from '../rules/tests.js';
 import {asphyxiaCapacity,asphyxiaDeathCountdown} from '../rules/ailments.js';
+import {markPendingAsphyxiaComa} from './hmk-asphyxia-coma.js';
 import {humanLocation} from './hmk-mounted-fall-injury-join.js';
 import {availableMasteries} from './hmk-skill-test-engine.js';
 import {resolveLiveCombatArmour} from './live-combat-armour.js';
@@ -191,12 +192,15 @@ export function prepareEnclosedSmokeCompletion({actor,state,sourceId,round=1,
    die(enduranceD100,100,'Endurance Recovery d100');
    const eml=end*5-combatFatigueTotals(s).total;
    const sl=successLevel(enduranceD100,eml);
-   requireIt(sl!==SL.CF,'Endurance CF po Asphyxia: p169 Coma vyžaduje neznámé počáteční HR; rozhodnutí GM, nelze předstírat ukončení');
    endRecovery={roll:enduranceD100,eml,level:levels[sl]};
+   if(sl===SL.CF){
+    markPendingAsphyxiaComa(s,{sourceEventId:id+':complete',sourceKind:'smoke',round,
+     enduranceD100,enduranceEML:eml});recovered='coma-pending-gm-initial-hr';
+   }
    if(sl===SL.CS){recovered='recovered';}
    else if(sl===SL.S){recovered='stunned';s.shock='STN';s.shockOriginRound=round;
     s.shockFollowup={kind:'STN',originRound:round,dueRound:round+1,phase:'end-next-turn',timelineId:null};}
-   else {recovered='extended-shock';s.shock='UNC';s.shockOriginRound=round;s.posture.prone=true;
+   else if(sl===SL.F){recovered='extended-shock';s.shock='UNC';s.shockOriginRound=round;s.posture.prone=true;
     s.shockFollowup=null;s.extendedShock={originState:'UNC',hr:5,elapsedHours:0};}
   }
  }else {
