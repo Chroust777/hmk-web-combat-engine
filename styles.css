@@ -89,14 +89,14 @@
 .hmk-rule-dialog p{line-height:1.5;margin:.7rem 0}
 .hmk-rule-dialog form{display:flex;justify-content:flex-end;margin-top:.9rem}
 
-/* v93.276: Character Sheet single-surface view / inline edit */
-.sheet-inline-projection .catalog-spec td{min-width:145px}
-.sheet-inline-input{width:100%;min-width:105px;max-width:100%;box-sizing:border-box;padding:.4rem .45rem;border:1px solid #ab9167;border-radius:5px;background:#192322;color:#f6e5ce;font:inherit}
-.sheet-inline-projection .sheet-personal-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.8rem;margin:.7rem 0 1.2rem}
-.sheet-inline-projection .sheet-personal-fields label{display:grid;gap:.3rem;min-width:0}
-.sheet-inline-projection .sheet-personal-fields textarea{min-height:70px}
-.sheet-personal-read{border:1px solid #675844;border-radius:8px;padding:.8rem;margin:.6rem 0 1rem;display:grid;gap:.4rem;overflow-wrap:anywhere}
-.sheet-managed-dot{color:#d8b98a;margin-left:.35rem;font-size:.75rem}
+/* v93.277: game-time edit (12 attributes, effective DP and coin ledger) */
+.sheet-inline-projection .catalog-spec td{min-width:130px}
+.sheet-inline-input,.sheet-dp-input{box-sizing:border-box;padding:.4rem .45rem;border:1px solid #ab9167;border-radius:5px;background:#192322;color:#f6e5ce;font:inherit}
+.sheet-inline-input{width:100%;min-width:95px;max-width:100%}
+.sheet-dp-input{width:4.1rem;min-width:3.6rem;padding:.3rem .2rem;text-align:center;font-variant-numeric:tabular-nums}
+.hsk-edit-detail{min-width:max-content}
+.hsk-edit-detail th:first-child,.hsk-edit-detail td:first-child{position:sticky;left:0;background:#273330;z-index:1;min-width:135px}
+.hsk-edit-detail .dp-cell{padding:.16rem .23rem}
+.hsk-edit-scroll{max-width:100%;overflow-x:auto}
 .sheet-inline-form{display:contents}
-.sheet-inline-form .hsk-dp-edit{display:none}
-@media(max-width:760px){.sheet-inline-projection .sheet-personal-fields{grid-template-columns:1fr}.sheet-inline-input{min-width:90px}}
+@media(max-width:760px){.sheet-inline-input{min-width:90px}}

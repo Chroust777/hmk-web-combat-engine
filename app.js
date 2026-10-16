@@ -136,7 +136,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.276';
+const APP_VERSION='93.277';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -479,7 +479,7 @@ function wealthInventoryPanel(c){
  const h=c.hmk||{},wealth=Number(h.wealth),coins=Number(h.coinsPence),cash=coinBalance(c);
  const kit=h.creation?.values?.autoStartingKit;
  const remaining=kit&&Number.isSafeInteger(kit.unspentPossessionsAllowancePence)?kit.unspentPossessionsAllowancePence:null;
- return `<div class="equipment-summary" role="group" aria-label="Hotovost a počáteční Wealth">${cash.ok?`<div><strong>Aktuální hotovost</strong><span>${esc(cash.balance)}d</span></div><div><strong>Počáteční hotovost</strong><span>${esc(cash.initial)}d · výdaje ${esc(cash.spent)}d</span></div>`:`<p class="library-warning">Hotovost nelze bezpečně doložit: ${esc(cash.reason)} Nákupy jsou zablokované, zdarma lze věci převzít.</p>`}${kit?`<div><strong>Vybavení · počáteční hodnota</strong><span>${esc(kit.costPence)}d / ${esc(kit.budgetPence)}d</span></div><div><strong>Nevyčerpaný počáteční limit vybavení (nejsou mince)</strong><span>${esc(remaining??Math.max(0,kit.budgetPence-kit.costPence))}d</span></div>`:''}${cash.ok&&cash.transactions?`<details><summary>Historie nákupů · ${cash.transactions}</summary><ol>${(h.cashLedger||[]).map(t=>`<li>${esc(t.label||'Předmět')} · −${esc(t.amountPence)}d <small>${esc(t.at||'datum neznámé')}</small></li>`).join('')}</ol></details>`:''}<p class="tiny">HMK v1.2, str. 51: počáteční hotovost = Wealth × 10d; počáteční výbava má oddělený limit Wealth × 100d. Nákupy se odečítají z hotovosti prostřednictvím neměnné historie výdajů; Wealth se nákupem nemění.</p></div>`;
+ return `<div class="equipment-summary" role="group" aria-label="Hotovost a počáteční Wealth">${cash.ok?`<div><strong>Aktuální hotovost</strong><span>${esc(cash.balance)}d</span></div><div><strong>Počáteční hotovost</strong><span>${esc(cash.initial)}d · příjmy/úpravy ${esc(cash.gained??0)}d · nákupy ${esc(cash.spent)}d</span></div>`:`<p class="library-warning">Hotovost nelze bezpečně doložit: ${esc(cash.reason)} Nákupy jsou zablokované, zdarma lze věci převzít.</p>`}${kit?`<div><strong>Vybavení · počáteční hodnota</strong><span>${esc(kit.costPence)}d / ${esc(kit.budgetPence)}d</span></div><div><strong>Nevyčerpaný počáteční limit vybavení (nejsou mince)</strong><span>${esc(remaining??Math.max(0,kit.budgetPence-kit.costPence))}d</span></div>`:''}${cash.ok&&cash.adjustments?`<details><summary>Historie mincí · ${cash.adjustments} GM úprav</summary><ol>${(h.coinAdjustments||[]).map(t=>`<li>${esc(t.deltaPence>0?"+":"")}${esc(t.deltaPence)}d · ${esc(t.at)}</li>`).join('')}</ol></details>`:""}${cash.ok&&cash.transactions?`<details><summary>Historie nákupů · ${cash.transactions}</summary><ol>${(h.cashLedger||[]).map(t=>`<li>${esc(t.label||'Předmět')} · −${esc(t.amountPence)}d <small>${esc(t.at||'datum neznámé')}</small></li>`).join('')}</ol></details>`:''}<p class="tiny">HMK v1.2, str. 51: počáteční hotovost = Wealth × 10d; počáteční výbava má oddělený limit Wealth × 100d. Nákupy se odečítají z hotovosti prostřednictvím neměnné historie výdajů; Wealth se nákupem nemění.</p></div>`;
 }
 let activeSkillTab='secondary';
 function skillWorkbenchView(){
@@ -519,7 +519,7 @@ function sheetMandatoryBridge(c){
  if(!bridge.ready)return `<section class="panel wide hmk-skill-mandatory-bridge">${header}<p class="notice">${esc(bridge.reason)}</p><button type="button" class="secondary" data-nav="encounter">Přejít k příslušnému Combat kroku</button></section>`;
  return `<section class="panel wide hmk-skill-mandatory-bridge">${header}${guidedMandatoryPanel(roster)}</section>`;
 }
-function sheetView(){const c=character(selected);if(!c){view='characters';return charactersView()}const editing=sheetEditingId===c.id;const inv=data.inventory.filter(x=>x.characterId===c.id);const sheetAudit=auditCharacterSheet(c,data.inventory);const auditPanel=`<section class="panel wide"><details><summary>Kontrola integrity Character Sheet · ${sheetAudit.ok?'bez nalezeného nesouladu':'vyžaduje pozornost'}</summary><p class="muted">Kontrola je pouze pro čtení a žádné hodnoty neopravuje ani nemaže. Zdroj: stávající HMK profil, Character Creation a inventář.</p>${sheetAudit.issues.map(x=>`<p class="notice error">${esc(x)}</p>`).join('')}${sheetAudit.notes.map(x=>`<p class="notice">${esc(x)}</p>`).join('')}${sheetAudit.ok?'<p>Promítnuté Skills a vybavení: kontrola prošla v rozsahu známých dat.</p>':''}</details></section>`;const logs=data.journal.filter(x=>x.characterId===c.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));return `<div class="topline"><h2>Osobní deník: ${esc(c.name)}</h2>${data.campaignClock?`<button type="button" class="secondary" data-nav="calendar">◷ ${esc(displayCampaignMinute(data.campaignClock.minute))}</button>`:''}${button('← Registr','go-characters')}${editing?'<button type="submit" form="sheet-inline-form">Uložit změny</button><button type="button" class="secondary" data-sheet-cancel>Zrušit</button>':'<button type="button" data-sheet-edit>✎ Edit</button>'}${button('Pravidlová tvorba','creation-open')}${button('Export HMK profilu','export-kernel-character')}</div><div class="columns"><section class="panel"><h3>Vybavení postavy</h3>${wealthInventoryPanel(c)}<div class="equipment-summary">${[['main_hand','Hlavní ruka'],['off_hand','Vedlejší ruka'],['worn','Nasazená zbroj']].map(([slot,label])=>`<div><strong>${label}</strong><span>${esc(inv.filter(x=>x.slot===slot).map(x=>x.snapshot.name).join(', ')||'—')}</span></div>`).join('')}</div>${inv.length?inv.map(x=>`<div class="list-row"><div><b>${esc(x.snapshot.name)}</b><div class="muted">${esc(x.snapshot.category)} · ${esc(x.condition||'Bez stavu')} · ${esc(x.quantity)} ks · ${esc(slotLabel(x.slot))}${x.currentWQ!==undefined&&x.currentWQ!==null?' · WQ '+esc(x.currentWQ):''}</div></div><div class="actions"><button class="secondary" data-edit-inv="${esc(x.id)}">Upravit</button>${data.characters.length>1?`<button class="secondary" data-transfer-inv="${esc(x.id)}">Předat</button>`:""}<button class="danger" data-remove-inv="${esc(x.id)}">Odebrat</button></div></div>`).join(''):'<p class="muted">Zatím bez vybavení.</p>'}<form id="add-inventory"><label>Předmět z knihovny<select name="itemId" required><option value="">Vyberte…</option>${allCatalogItems().map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${field('condition','Stav / poznámka','')}${field('currentWQ','Aktuální WQ kusu (nepovinné)','', 'number')}${slotSelect('slot','none')}<button type="submit" ${allCatalogItems().length?'':'disabled'}>Přiřadit předmět</button></form><div class="notice tiny">Při přiřazení vzniká samostatná kopie parametrů. Úprava knihovny nezmění již přidělené předměty.</div></section>${armourLoadoutPanel(inv)}${combatantLoadPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:""})()}${auditPanel}${editing?'<form id="sheet-inline-form" class="sheet-inline-form">':''}${characterSheetSummaryHTML(c,{editing})}${characterCalculationHTML(c,{editing})}${editing?'</form>':''}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section>${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section></div>`}
+function sheetView(){const c=character(selected);if(!c){view='characters';return charactersView()}const editing=sheetEditingId===c.id;const inv=data.inventory.filter(x=>x.characterId===c.id);const sheetAudit=auditCharacterSheet(c,data.inventory);const auditPanel=`<section class="panel wide"><details><summary>Kontrola integrity Character Sheet · ${sheetAudit.ok?'bez nalezeného nesouladu':'vyžaduje pozornost'}</summary><p class="muted">Kontrola je pouze pro čtení a žádné hodnoty neopravuje ani nemaže. Zdroj: stávající HMK profil, Character Creation a inventář.</p>${sheetAudit.issues.map(x=>`<p class="notice error">${esc(x)}</p>`).join('')}${sheetAudit.notes.map(x=>`<p class="notice">${esc(x)}</p>`).join('')}${sheetAudit.ok?'<p>Promítnuté Skills a vybavení: kontrola prošla v rozsahu známých dat.</p>':''}</details></section>`;const logs=data.journal.filter(x=>x.characterId===c.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));return `<div class="topline"><h2>Osobní deník: ${esc(c.name)}</h2>${data.campaignClock?`<button type="button" class="secondary" data-nav="calendar">◷ ${esc(displayCampaignMinute(data.campaignClock.minute))}</button>`:''}${button('← Registr','go-characters')}${editing?'<button type="submit" form="sheet-inline-form">Uložit změny</button><button type="button" class="secondary" data-sheet-cancel>Zrušit</button>':'<button type="button" data-sheet-edit>✎ Edit</button>'}${button('Pravidlová tvorba','creation-open')}${button('Export HMK profilu','export-kernel-character')}</div><div class="columns"><section class="panel"><h3>Identita postavy</h3><p><strong>${esc(c.name)}</strong> · ${esc(c.hmk?.folk||"—")} · ${esc(c.hmk?.ageGroup||"—")} · ${esc(c.occupation||"—")}</p>${c.description?`<p>${esc(c.description)}</p>`:""}<p class="muted tiny">Údaje dané tvorbou postavy se během hry v režimu Edit nemění.</p></section><section class="panel"><h3>Vybavení postavy</h3>${wealthInventoryPanel(c)}<div class="equipment-summary">${[['main_hand','Hlavní ruka'],['off_hand','Vedlejší ruka'],['worn','Nasazená zbroj']].map(([slot,label])=>`<div><strong>${label}</strong><span>${esc(inv.filter(x=>x.slot===slot).map(x=>x.snapshot.name).join(', ')||'—')}</span></div>`).join('')}</div>${inv.length?inv.map(x=>`<div class="list-row"><div><b>${esc(x.snapshot.name)}</b><div class="muted">${esc(x.snapshot.category)} · ${esc(x.condition||'Bez stavu')} · ${esc(x.quantity)} ks · ${esc(slotLabel(x.slot))}${x.currentWQ!==undefined&&x.currentWQ!==null?' · WQ '+esc(x.currentWQ):''}</div></div><div class="actions"><button class="secondary" data-edit-inv="${esc(x.id)}">Upravit</button>${data.characters.length>1?`<button class="secondary" data-transfer-inv="${esc(x.id)}">Předat</button>`:""}<button class="danger" data-remove-inv="${esc(x.id)}">Odebrat</button></div></div>`).join(''):'<p class="muted">Zatím bez vybavení.</p>'}<form id="add-inventory"><label>Předmět z knihovny<select name="itemId" required><option value="">Vyberte…</option>${allCatalogItems().map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${field('condition','Stav / poznámka','')}${field('currentWQ','Aktuální WQ kusu (nepovinné)','', 'number')}${slotSelect('slot','none')}<button type="submit" ${allCatalogItems().length?'':'disabled'}>Přiřadit předmět</button></form><div class="notice tiny">Při přiřazení vzniká samostatná kopie parametrů. Úprava knihovny nezmění již přidělené předměty.</div></section>${armourLoadoutPanel(inv)}${combatantLoadPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:""})()}${auditPanel}${editing?'<form id="sheet-inline-form" class="sheet-inline-form">':''}${characterSheetSummaryHTML(c,{editing,currentCoins:coinBalance(c).ok?coinBalance(c).balance:null})}${characterCalculationHTML(c,{editing})}${editing?'</form>':''}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section>${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section></div>`}
 // Advisory-only catalog audit. Missing data are never silently fabricated or written to storage.
 function catalogAuditEntry(i){
  const p=i.properties||{}, missing=[];
@@ -5034,40 +5034,73 @@ document.addEventListener('submit',e=>{
  const c=character(selected);if(!c||sheetEditingId!==c.id)return;
  if(combatInitiativeSequence)return alert('Během aktivní Initiative nelze měnit Character Sheet.');
  const v=Object.fromEntries(new FormData(form));
- const name=String(v.sheet_name??'').trim();if(!name)return alert('Jméno postavy nesmí být prázdné.');
- if(name.length>200)return alert('Jméno je příliš dlouhé.');
- const guided=isCreationOwned(c);
  const attrKeys=['str','end','dex','agl','per','cml','aur','wil','rea','cre','emp','elo'];
- const bioKeys=['folk','ageGroup','birthdate','sunsign','birthplace','society','socialClass','familyOccupation','background','estrangement','wealth','coinsPence','possessionsBudgetPence','morality','psyche','arcaneStatus','pantheon','home','standing'];
- const whole=(raw,label,max=999999999)=>{if(raw==='')return null;if(!/^(?:0|[1-9][0-9]*)$/.test(String(raw))||!Number.isSafeInteger(Number(raw))||Number(raw)>max)throw Error(label+': očekávám celé nezáporné číslo.');return Number(raw)};
- let edits=[];
- try{if(!guided){
-  for(const k of attrKeys)edits.push(['attr',k,whole(v['sheet_attr_'+k]??'',k,999)]);
-  for(const k of bioKeys){const initial=c.hmk?.[k];if(initial!==null&&typeof initial==='object')continue;const raw=String(v['sheet_bio_'+k]??'');const val=['wealth','coinsPence','possessionsBudgetPence','morality'].includes(k)?whole(raw,k):raw.trim();edits.push(['bio',k,val]);}
-  const skills=c.hmk?.skills??[];
-  for(let i=0;i<skills.length;i++){
-   const r=skills[i];if(!r||r.creationDerived)continue;
-   const label=String(v['sheet_skill_'+i+'_name']??'').trim();if(!label)throw Error('Dovednost v řádku '+(i+1)+' musí mít název.');
-   if(v['sheet_skill_'+i+'_remove']==='yes'){edits.push(['remove-skill',i]);continue;}
-   edits.push(['skill',i,{name:label,group:String(v['sheet_skill_'+i+'_group']??r.group??''),sb:whole(v['sheet_skill_'+i+'_sb']??'',label+' SB',999),ml:whole(v['sheet_skill_'+i+'_ml']??'',label+' ML',200)}]);
+ const valid=(raw,label,max)=>{if(!/^(?:0|[1-9][0-9]*)$/.test(String(raw??''))||!Number.isSafeInteger(Number(raw))||Number(raw)>max)throw Error(label+': zadejte celé nezáporné číslo.');return Number(raw)};
+ let attrs=[],dp=[],legacy=[],coinChange=null;
+ try{
+  for(const key of attrKeys){
+   const raw=v['sheet_attr_'+key];
+   attrs.push([key,valid(raw,key,99)]);
   }
-  const newName=String(v.sheet_skill_new_name??'').trim();
-  if(newName){edits.push(['new-skill',0,{id:uuid(),name:newName,group:String(v.sheet_skill_new_group??'Other'),sb:whole(v.sheet_skill_new_sb??'',newName+' SB',999),ml:whole(v.sheet_skill_new_ml??'',newName+' ML',200)}]);}
- }}catch(err){return alert(err.message)}
+  if(isCreationOwned(c)){
+   const original=calculateSheetSkills(c);
+   const stages=['Folk Skills','Arcane Talent Skills','Family Skills','Background Skills','Occupation Skills','Optional Skills','Veteran Skills','Sunsign Skills','Native Language / Religion','GM Bonus Languages'];
+   for(const skill of original){
+    if(skill.subskillOf||skill.perceptionParent)continue;
+    for(const stage of stages){
+     const name='sheet_dp_'+encodeURIComponent(skill.name)+'_'+encodeURIComponent(stage);
+     if(!(name in v))throw Error('Chybí editační DP pole: '+skill.name+' / '+stage);
+     dp.push([skill.name,stage,valid(v[name],skill.name+' / '+stage,100)]);
+    }
+   }
+  }else{
+   for(let i=0;i<(c.hmk?.skills??[]).length;i++){
+    if(!('sheet_legacy_ml_'+i in v))continue;
+    legacy.push([i,valid(v['sheet_legacy_ml_'+i],'Skill ML',200)]);
+   }
+  }
+  const cash=coinBalance(c);
+  if('sheet_coin_current' in v){
+   if(!cash.ok)throw Error('Aktuální hotovost nelze upravit: '+cash.reason);
+   coinChange=valid(v.sheet_coin_current,'Aktuální mince',999999999)-cash.balance;
+  }
+ }catch(err){return alert(err.message)}
  const ok=mutate(()=>{
   const live=character(selected);if(!live||live.id!==c.id)throw Error('Postava se změnila');
-  live.name=name;live.description=String(v.sheet_description??'');live.portrait=String(v.sheet_portrait??'').trim();live.kind=v.sheet_kind==='NPC'?'NPC':'PC';
-  if(!guided){live.occupation=String(v.sheet_occupation??'').trim();live.hmk=live.hmk||{};live.hmk.attributes=live.hmk.attributes||{};
-   for(const [type,key,value] of edits){if(type==='attr'){if(value===null)delete live.hmk.attributes[key];else live.hmk.attributes[key]=value;}
-    if(type==='bio'){if(value===null||value==='')delete live.hmk[key];else live.hmk[key]=value;}
-    if(type==='skill')Object.assign(live.hmk.skills[key],value);
-    if(type==='new-skill')live.hmk.skills.push(value);
+  const h=live.hmk??(live.hmk={});h.attributes??={};
+  if(isCreationOwned(live)){
+   h.advancement??={};h.advancement.attributes??={};h.advancement.skillDP??={};
+   for(const [key,n] of attrs){
+    const original=live.hmk.creation?.attributeProof?.[key]?.score;
+    if(!Number.isSafeInteger(original))throw Error('Chybí původní atributový hod '+key);
+    if(n===original)delete h.advancement.attributes[key];else h.advancement.attributes[key]=n;
+    h.attributes[key]=n;
    }
-   for(const [type,key] of edits.filter(x=>x[0]==='remove-skill').sort((a,b)=>b[1]-a[1]))live.hmk.skills.splice(key,1);
+   // Persist only changes relative to the previous effective ledger. The
+   // original DP allocations / dice proofs stay untouched in creation.
+   const baseline=calculateSheetSkills({...live,hmk:{...h,advancement:{...h.advancement,skillDP:{}}}});
+   const baselineMap=new Map(baseline.map(x=>[x.name,x]));
+   for(const [skill,stage,n] of dp){
+    const initial=baselineMap.get(skill)?.dp.find(x=>x.stage===stage)?.dp??0;
+    const existing=h.advancement.skillDP[skill]??{};
+    if(n===initial)delete existing[stage];else existing[stage]=n;
+    if(Object.keys(existing).length)h.advancement.skillDP[skill]=existing;
+    else delete h.advancement.skillDP[skill];
+   }
+   syncCreationSkills(h,uuid);
+  }else{
+   for(const [key,n] of attrs)h.attributes[key]=n;
+   for(const [i,n] of legacy)h.skills[i].ml=n;
   }
+  if(coinChange){
+   h.coinAdjustments??=[];
+   h.coinAdjustments.push({kind:'gm-coin-adjustment',id:uuid(),at:stamp(),deltaPence:coinChange});
+  }
+  if(!coinBalance(live).ok&&coinChange!==null)throw Error('Nová hotovost nesouhlasí s účetní historií.');
  });
  if(ok){sheetEditingId=null;render();}
 },true);
+
 document.addEventListener('submit',e=>{const f=e.target;if(!['character-editor','item-editor','character-form','add-inventory','journal-form'].includes(f.id))return;e.preventDefault();const v=Object.fromEntries(new FormData(f));if(f.id==='character-editor'){if(!v.name.trim())return alert('Zadejte jméno');if(mutate(()=>data.characters.push({id:uuid(),name:v.name.trim(),occupation:v.occupation||'',kind:v.kind,description:v.description||'',portrait:''}))) {overlay=null;render()}return}if(f.id==='character-form'){if(combatInitiativeSequence&&encounterSelection.has(selected))return alert('Identitu aktivního účastníka během Initiative nelze měnit mimo Combat průvodce.');if(!v.name.trim())return alert('Zadejte jméno');mutate(()=>{const live=character(selected);Object.assign(live,{name:v.name.trim(),kind:v.kind,description:v.description,portrait:v.portrait});if(!isCreationOwned(live))live.occupation=v.occupation;});return}if(f.id==='item-editor'){if(editItem&&item(editItem)?.builtin)return alert('Vestavěné definice nelze upravit.');if(!v.name.trim())return alert('Zadejte název');let properties;try{properties=JSON.parse(v.properties||'{}');if(!properties||Array.isArray(properties)||typeof properties!=='object')throw Error()}catch{return alert('Parametry musí být platný JSON objekt')}if(mutate(()=>{const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties};if(editItem)Object.assign(item(editItem),record);else data.items.push(record)})){overlay=null;render()}return}if(f.id==='add-inventory'){if(combatInitiativeSequence)return alert('Během Initiative měňte inventář pouze pravidlově dokončenou akcí Combat průvodce.');const i=item(v.itemId);const quantity=Number(v.quantity);if(!i||!Number.isSafeInteger(quantity)||quantity<1||quantity>999999)return alert('Vyberte předmět a platný počet');if(!validSlotForCategory(v.slot,i.category))return alert('Tento slot neodpovídá kategorii předmětu');if(['main_hand','off_hand','worn'].includes(v.slot)&&quantity!==1)return alert('Vybavený předmět musí představovat jeden kus. Další kusy evidujte samostatně jako nesené.');if(!handSlotAvailable(selected,v.slot))return alert('Ruka je již obsazena. Nejprve přesuňte stávající předmět.');const currentWQ=v.currentWQ===''?null:Number(v.currentWQ);if(currentWQ!==null&&(!Number.isSafeInteger(currentWQ)||currentWQ<0||currentWQ>999))return alert('Neplatná aktuální WQ');mutate(()=>data.inventory.push({id:uuid(),currentWQ,characterId:selected,sourceItemId:i.id,snapshot:structuredClone(i),quantity,condition:v.condition||'',slot:v.slot||'none'}));return}if(f.id==='journal-form'){if(!v.title.trim()&&!v.body.trim())return;mutate(()=>data.journal.push({id:uuid(),characterId:selected,title:v.title.trim()||'Bez názvu',body:v.body,createdAt:stamp()}))}});
 document.addEventListener('click',e=>{
  const tab=e.target.closest('[data-library-tab]');
