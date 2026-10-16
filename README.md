@@ -1071,3 +1071,10 @@ Pravidlově doložená jediná dodatečná vrstva Cloth/Padded za dotčenou zón
 
 ### v93.277: Game-time Character Sheet edit
 Edit only current attributes, skill DP and coin balance. Immutable creation proofs remain unchanged; in-game adjustments are stored separately. Coin changes are journal entries, not rewrites of starting Wealth.
+
+
+### v93.278 – Samostatný Skill Test a skrytá protistrana
+- Opraveno nativní blokování submitu: skrytý oddíl obránce je v režimu bez Opposed skutečně deaktivovaný (disabled fieldset).
+- Zapnutí Opposed obránce aktivuje; jeho kontrola platnosti a d100 zůstávají nezměněné.
+- Neplatné pole kterékoli ze tří záložek Skill Tests nově vysvětlí, proč se test nespustil, v místě výsledku.
+- Způsob výpočtu HMK, Character Sheet a dosavadní historie zůstávají beze změny.

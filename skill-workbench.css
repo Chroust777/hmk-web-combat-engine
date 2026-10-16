@@ -115,3 +115,6 @@
 .hsk-sr-activity[hidden]{display:none!important}
 .hsk-sr-activity label{display:block;min-width:0}
 .hsk-sr-activity .hsk-tn-readout{display:block;font-weight:700;color:#f6ddab;margin:.4rem 0}
+
+/* Disabled defender controls must not invalidate a solo Skill Test. */
+.hsk-test-card .hsk-defender-fields{border:0;margin:0;padding:0;min-width:0}

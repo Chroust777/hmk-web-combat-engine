@@ -136,7 +136,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.277';
+const APP_VERSION='93.278';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3540,6 +3540,17 @@ function hskRebuildOpponent(form){
  for(const name of ['defSecondary1','defSecondary2','defSecondaryRoll']){const el=form.elements.namedItem(name);if(!el)continue;el.outerHTML=opt(name,true);}
  hskApplyOpposedAction(form);
 }
+// HTML constraint validation includes hidden fields unless they are explicitly disabled.
+// A solo test must never depend on a previously selected/invalid defender skill.
+function hskSyncDefenderFields(form){
+ if(form?.id!=='skill-secondary-form')return;
+ const opposed=!!form.elements.namedItem('opposed')?.checked;
+ const panel=form.querySelector('[data-hsk-defender]');
+ if(!panel)return;
+ panel.hidden=!opposed;
+ const fieldset=panel.querySelector('[data-hsk-defender-fields]');
+ if(fieldset)fieldset.disabled=!opposed;
+}
 function hskRefreshSRTarget(form,person,side){
  const parent=form.querySelector('[data-sr-side="'+side+'"]'),out=parent?.querySelector('[data-sr-tn="'+side+'"]');if(!out||!person)return;
  try{
@@ -3564,7 +3575,9 @@ function refreshSkillAutoPreview(form){
 }
 document.addEventListener('focusin',e=>{
  const form=e.target?.closest?.('#skill-secondary-form,#skill-value-form,#skill-assistance-form');
- if(!form||form.dataset.srConfigured==='yes')return;
+ if(!form)return;
+ hskSyncDefenderFields(form);
+ if(form.dataset.srConfigured==='yes')return;
  form.dataset.srConfigured='yes';hskConfigureSR(form,'A');
  if(form.id==='skill-secondary-form')hskConfigureSR(form,'B');
  refreshSkillAutoPreview(form);
@@ -3574,7 +3587,7 @@ document.addEventListener('change',e=>{
  const form=e.target?.form;
  if(!['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id))return;
  if(e.target.name==='opposed'){
-  form.querySelector('[data-hsk-defender]').hidden=!e.target.checked;
+  hskSyncDefenderFields(form);
   hskConfigureSR(form,'B');
   if(e.target.checked){hskRefreshOpposedAction(form);hskApplyOpposedAction(form);}
  }
@@ -3653,6 +3666,21 @@ document.addEventListener('submit',event=>{
    diceAttempts:requiresD10?hskTieDiceAttempts.map(x=>({...x})):[],gmNarrative:narrative,result:decision},'hsk-result-secondary');
   hskTieDiceOrigin=null;hskTieDiceAttempts=[];
  }catch(err){if(slot)slot.textContent='Rozstřel nebyl uložen: '+err.message;else alert(err.message);}
+},true);
+document.addEventListener('invalid',event=>{
+ const control=event.target,form=control?.form;
+ if(!['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id))return;
+ const slot=form.id==='skill-value-form'?'hsk-result-value':form.id==='skill-assistance-form'?'hsk-result-assistance':'hsk-result-secondary';
+ const out=document.getElementById(slot);
+ if(out){
+  const field=control.closest('label')?.firstChild?.textContent?.trim()||control.name||'neplatný údaj';
+  const issue=control.validity?.valueMissing?'Vyplňte nebo vyberte povinnou hodnotu.':
+   control.validity?.rangeOverflow?'Hodnota je vyšší než povolené maximum.':
+   control.validity?.rangeUnderflow?'Hodnota je nižší než povolené minimum.':
+   control.validity?.stepMismatch?'Zadejte platný krok nebo celé číslo.':
+   control.validity?.badInput?'Zadejte platné číslo.':'Zkontrolujte zadanou hodnotu.';
+  out.textContent='Test nebyl spuštěn: opravte pole „'+field+'“. '+issue;
+ }
 },true);
 document.addEventListener('submit',event=>{
  const form=event.target;
