@@ -1,3 +1,40 @@
+# HMK Keeper’s Ledger v93.315 — Master Ornament Components
+
+This release reconstructs the book visuals with 15 local, reusable image/vector components: clean vellum, transparent heraldic shield, separate repeatable edge rails, masked corner ornaments, section title engraving, open-book spine and an empty portrait plate. The technical tabs remain mutually exclusive and preserve the previous interactive forms. Other modules share illuminated parchment panels. No rules or campaign data formats were changed.
+
+The full ZIP contains app.js, all src modules, stylesheets, the production bundle, tools/build_bundle.cjs and local assets; deploy the **contents** of the ZIP to the root of GitHub Pages. Offline, no paid assets or external services.
+
+# HMK Keeper’s Ledger v93.315 – Image-backed Book Templates
+
+This is a **visual reconstruction release** on top of v93.313 (GitHub Pages, static, offline, no paid services). The existing localStorage schema, game rules, Combat State, skills, creation logic, saved character data, history, and `src` modules are unchanged.
+
+## What changed
+
+- The previously unlinked `journal-illumination.css` now actually loads through `index.html`, before the new `book-templates.css`.
+- The book and main journal are now assembled from separate image templates taken from the user-provided reference artwork: photographed upper and lower bindings, outer side edges, center gutter, historical title jewel, house crest and heraldic sidebar banner.
+- The former repeating parchment image contained **printed text**. It is replaced with a clean, seamless, local paper texture synthesized from sampled colors of the reference. No static letterforms are baked into the reusable parchment.
+- The small simplistic body-location drawing is replaced on the journal overview by an isolated image of the original illustrated armored figure. It remains a **decorative display**, not a replacement for authoritative injury / armor mechanics.
+- Where a character has no uploaded portrait, a visibly generic, anonymous placeholder appears; **the image of Sir Kaelen is not falsely assigned to another character**.
+- The spread, headers, section ornaments, table rules and left navigation are restyled to follow the original illustration's geometry and scale. Real HTML remains selectable and interactive. On small screens, pages stack; longer skills lists extend the book naturally.
+- Character journal section switching stays exclusive: `Chronicle Spread`, `Arsenal & Gear`, `Combat & Conditions`, `Editace & výpočty`, `Notes & Logbook` replace each other, not stack underneath one another.
+- More identity, appearance, standing and Fate/Grace/Piety fields are shown on the overview, displaying `—` when the source document does not have a value. No HMK values are invented.
+
+## Visual fidelity and limits
+
+The image-backed book is much closer to the reference than the previous solid-color panel approach, but **not a literal pixel-perfect copy**. A fixed image and arbitrary live text cannot occupy the same pixels at every screen size or with arbitrarily long content. Portraits, named skills, injuries and items are displayed from current saved state rather than the fictional data printed in the illustration.
+
+## Validation
+
+- Source syntax (`node --check app.js`) and full production JS bundle (`tools/build_bundle.cjs`) checked (244 bundled modules).
+- An isolated Chromium browser rendered the actual bundled application using an in-memory mock for browser storage (real user data not modified). In the test, an automatically generated character opened the journal with no JavaScript exceptions.
+- Navigation passed for all five journal sub-tabs (one content view at a time).
+- Dynamically adding 50 extra Skills rows increased the book's measured rendered height.
+- Tested at 1672, 1280 and 390 px; no page-wide horizontal overflow was detected on 1280 and 390 px.
+- A full deployed GitHub Pages browser end-to-end test and all existing HMK rules regressions were **not** performed; no claims are made to that effect.
+
+The **original v93.309 visual baseline** and v93.313 remain usable as a fallback if the new art direction is rejected.
+
+---
 # HMK Keeper’s Ledger v93.313 — Illuminated Book UI
 
 This release is a **visual and presentation-only redesign** based on the user-supplied character-journal reference, built on **v93.311 HOTFIX 1**. The existing rule engine, `src` modules, save key, character creation, combat, skills, inventory, histories and editing forms are retained.

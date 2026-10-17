@@ -157,7 +157,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.313';
+const APP_VERSION='93.315';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -776,7 +776,7 @@ function charactersView(){
 }
 function firstPresent(...values){for(const value of values){if(value===0)return '0';if(value!==undefined&&value!==null&&String(value).trim()!=='')return String(value);}return '—';}
 function listPresent(value){return Array.isArray(value)&&value.length?value.join(', '):'—';}
-function sheetPortraitHTML(c){const label=(c.name||'?').trim().slice(0,2).toUpperCase();return typeof c.portrait==='string'&&c.portrait.trim()?`<img class="sheet-portrait-image" src="${esc(c.portrait)}" alt="Portrét ${esc(c.name)}">`:`<div class="sheet-portrait-placeholder" aria-hidden="true">${esc(label)}</div>`;}
+function sheetPortraitHTML(c){const label=(c.name||'?').trim().slice(0,2).toUpperCase();return typeof c.portrait==='string'&&c.portrait.trim()?`<img class="sheet-portrait-image" src="${esc(c.portrait)}" alt="Portrét ${esc(c.name)}">`:`<div class="sheet-portrait-placeholder" aria-label="Portrét není vložen"><span class="portrait-not-set">Bez portrétu</span></div>`;}
 function groupedSheetSkills(c){const grouped=new Map();for(const row of calculateSheetSkills(c)){const group=row.group||'Other';if(!grouped.has(group))grouped.set(group,[]);grouped.get(group).push(row);}return grouped;}
 function sheetSkillPreviewHTML(c){const grouped=groupedSheetSkills(c);const preferred=['Combat','Physical','Communication','Lore','Craft','Ritual','Magic','Psionics','Other'];const groups=[...preferred.filter(g=>grouped.has(g)),...[...grouped.keys()].filter(g=>!preferred.includes(g))].slice(0,6);const labelMap={Combat:'Combat',Physical:'Physical',Communication:'Social',Lore:'Lore',Craft:'Craft',Ritual:'Ritual',Magic:'Magic',Psionics:'Psionics',Other:'Other'};return `<div class="journal-skill-grid">${groups.map(group=>{const rows=grouped.get(group).slice().sort((a,b)=>(b.ml??-999)-(a.ml??-999)||(a.name||'').localeCompare(b.name||'')).slice(0,8);return `<section class="journal-skill-group"><h4>${esc(labelMap[group]||group)}</h4>${rows.length?`<ul>${rows.map(row=>`<li><span>${esc(row.name)}</span><strong>${esc(String(row.ml??'—'))}</strong></li>`).join('')}</ul>`:'<p class="muted">Bez evidovaných dovedností.</p>'}</section>`}).join('')}</div>`;}
 function signedNumber(value){return Number.isFinite(value)?`${value>=0?'+':''}${value}`:'—';}
@@ -815,16 +815,16 @@ function bodyLocationRows(c){
  const countFor=keys=>wounds.filter(w=>keys.some(k=>String(w.location||w.loc||'').toLowerCase().includes(k))).length;
  return [['Head','—',countFor(['head','skull','face'])||'—'],['Neck','—',countFor(['neck'])||'—'],['Right Arm','—',countFor(['right arm','arm','shoulder','elbow','forearm','hand'])||'—'],['Left Arm','—',countFor(['left arm'])||'—'],['Chest','—',countFor(['chest','thorax'])||'—'],['Abdomen','—',countFor(['abdomen','belly'])||'—'],['Right Leg','—',countFor(['right leg','thigh','knee','calf','foot'])||'—'],['Left Leg','—',countFor(['left leg'])||'—']];
 }
-function journalBodyLocationsHTML(c){const rows=bodyLocationRows(c);return `<section class="journal-book-section journal-body-locations"><div class="journal-book-title">Body Locations</div><div class="journal-body-grid"><div class="journal-body-figure" aria-hidden="true"><img src="./assets/ui/body-armour-figure.svg" alt=""></div><div class="journal-ledger-wrap"><table class="journal-ledger journal-ledger--compact"><thead><tr><th>Loc</th><th>AP</th><th>Injury</th></tr></thead><tbody>${rows.map(r=>`<tr>${r.map(cell=>`<td>${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div></section>`;}
+function journalBodyLocationsHTML(c){const rows=bodyLocationRows(c);return `<section class="journal-book-section journal-body-locations"><div class="journal-book-title">Body Locations</div><div class="journal-body-grid"><div class="journal-body-figure" aria-hidden="true"><img src="./assets/ui/book/reference_armoured_anatomy.png" alt=""></div><div class="journal-ledger-wrap"><table class="journal-ledger journal-ledger--compact"><thead><tr><th>Loc</th><th>AP</th><th>Injury</th></tr></thead><tbody>${rows.map(r=>`<tr>${r.map(cell=>`<td>${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div></section>`;}
 function journalSimpleChecklist(title,rows){return `<section class="journal-book-section"><div class="journal-book-title">${esc(title)}</div><div class="journal-check-grid">${rows.map(([label,value])=>`<label><span class="journal-check"></span><em>${esc(label)}</em><strong>${esc(firstPresent(value,'—'))}</strong></label>`).join('')}</div></section>`;}
-function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['edit','Editace & výpočty'],['notes','Notes & Logbook']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}">${esc(label)}</button>`).join('')}</div>`;}
+function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['edit','Editace & výpočty'],['notes','Notes & Logbook']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}</div>`;}
 function journalShell(inner,extraClass=''){return `<section class="journal-book panel wide ${extraClass}"><div class="journal-book-frame"><div class="book-cover-ornament book-cover-ornament--tl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--tr" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--bl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--br" aria-hidden="true"></div>${journalSectionNav()}${inner}</div></section>`;}
 function characterJournalHero(c,inv){
  const h=c.hmk||{},creation=h.creation?.values||{},state=persistentStateOf(c),attrs=h.attributes||{};
  const bio=(key,...fallbacks)=>firstPresent(h[key],...fallbacks,creation[key],'—');
- const lineageRows=[['Name',c.name],['Race',bio('folk')],['Class',bio('socialClass',c.occupation)],['Subclass',bio('occupationSubtype')],['Background',bio('background')],['Alignment',bio('morality')]];
- const appearanceRows=[['Height',bio('height')],['Build',bio('weight')],['Hair',bio('hair')],['Eyes',bio('eyes')],['Complexion',bio('complexion')],['Age',bio('ageGroup')],['Deportment',bio('standing')]];
- const familyRows=[['Birthdate',bio('birthdate')],['Sunsign',bio('sunsign')],['Birthplace',bio('birthplace')],['Society',bio('society')],['Family',bio('familyOccupation')],['Home',bio('home')],['Region',bio('birthRegion')],['Languages',h.regionalLanguages?.length?listPresent(h.regionalLanguages):bio('nativeLanguage')]];
+ const lineageRows=[['Name',c.name],['Race / Folk',bio('folk')],['Age group',bio('ageGroup')],['Birthdate',bio('birthdate')],['Sunsign',bio('sunsign')],['Birthplace',bio('birthplace')],['Class',bio('socialClass',c.occupation)],['Background',bio('background')]];
+ const appearanceRows=[['Height',bio('height')],['Weight',bio('weight')],['Hair',bio('hair')],['Eyes',bio('eyes')],['Complexion',bio('complexion')],['Handedness',bio('handedness')],['Deportment',bio('standing')]];
+ const familyRows=[['Society',bio('society')],['Family',bio('familyOccupation')],['Occupation',firstPresent(c.occupation,bio('occupation'))],['Home',bio('home')],['Realm',bio('realm')],['Settlement',bio('settlement')],['Wealth',bio('wealth')],['Coins',bio('coins')],['Estrangement',bio('estrangement')],['Pantheon',bio('pantheon')],['Region',bio('birthRegion')],['Languages',h.regionalLanguages?.length?listPresent(h.regionalLanguages):bio('nativeLanguage')]];
  const traitValues=[bio('psyche'),bio('estrangement'),bio('pantheon'),creation.autoGeneration?.semantic?.summary,c.description].filter(v=>v&&v!=='—');
  const move=Number.isFinite(attrs.agl)&&Number.isFinite(attrs.str)?baseMove({agility:attrs.agl,strength:attrs.str,folk:String(h.folk||'').toLowerCase().includes('kuzhai')?'kuzhai':'human-sized'}):null;
  const load=resolveCombatantLoad({character:c,inventory:data.inventory});
@@ -834,7 +834,7 @@ function characterJournalHero(c,inv){
  const trauma=[['Fatigue',combatFatigueTotals(state).total],['Stress',firstPresent(state.morale?.psycheStress,0)],['Shock',firstPresent(state.shock,0)],['Wounds',firstPresent((state.wounds||[]).length,(h.injuries||[]).length,0)],['Injuries',firstPresent((h.injuries||[]).length,0)]];
  const physical=HMK_ATTRIBUTES.PHYSICAL.map(([key,label])=>[label,attrs[key]??'—']);
  const mental=HMK_ATTRIBUTES.MENTAL.map(([key,label])=>[label,attrs[key]??'—']);
- const gracePiety=[['Grace',creation.graceDie??h.grace??'—'],['Piety',h.piety??'—'],['Aura',attrs.aur??'—'],['Will',attrs.wil??'—']];
+ const gracePiety=[['Fate',h.fate??creation.fate??'—'],['Grace',creation.graceDie??h.grace??'—'],['Piety',h.piety??'—'],['Doctrine',h.doctrine??'—'],['Blessing',h.blessing??'—'],['Morality',bio('morality')]];
  const meleeRows=journalWeaponRows(inv,'melee');
  const missileRows=journalWeaponRows(inv,'missile');
  const armourRows=inventoryRowsForJournal(inv,'armour');
