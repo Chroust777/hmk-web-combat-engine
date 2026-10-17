@@ -69,6 +69,8 @@ import {resolveWeaponStrikeImpact} from './src/integration/weapon-strike-impact.
 import {specialStrikeFromSnapshot} from './src/integration/special-strike-preview.js';
 import {missingPrintedArmourCatalogEntries} from './src/integration/armour-article-catalog.js';
 import {identifyWornPrintedSuit,resolvePrintedSuitProtection,selectPrintedSuitRigidStatus} from './src/integration/printed-suit-combat.js';
+import {hmkHumanLocationSymbols} from './src/integration/injury-special-hmk.js';
+import {locationArmourValue} from './src/rules/armour-options.js';
 import {auditPrintedSuitLayers} from './src/integration/armour-suit-layer-audit.js';
 import {auditArmourCoverage} from './src/integration/armour-coverage-readiness.js';
 import {reconcileSuitArticles} from './src/integration/armour-suit-article-crosswalk.js';
@@ -157,7 +159,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.321';
+const APP_VERSION='93.322';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -827,7 +829,7 @@ function journalWeaponRows(inv,mode){
  const filtered=items.filter(x=>mode==='missile'?isMissile(x):!isMissile(x));
  return filtered.map(x=>{const p=x.snapshot?.properties||{};const m=(p.verifiedModes||[])[0]||{};const dmg=m.impactDie?`${m.impactDie}${Number.isFinite(m.impactModifier)?signedNumber(m.impactModifier):''}`:firstPresent(p.impact,p.damage,'—');const atk=firstPresent(p.attack,p.quality!==undefined?`WQ ${p.quality}`:null,'—');const ap=firstPresent(m.aspect,p.aspect,'—');const range=mode==='missile'?firstPresent(p.baseRangeFt?`${p.baseRangeFt} ft`:null,m.baseRangeFt?`${m.baseRangeFt} ft`:null,'—'):'Melee';const notes=[slotLabel(x.slot),x.condition].filter(Boolean).join(' · ');return [x.snapshot?.name||x.name||'—',atk,dmg,ap,range,notes||'—'];});
 }
-const JOURNAL_ANATOMICAL_LOCATIONS=[['sk','Skull'],['fa','Face'],['nk','Neck'],['sh','Shoulder'],['ua','Upper arm'],['el','Elbow'],['fo','Forearm'],['ha','Hand'],['tx','Thorax'],['ab','Abdomen'],['pv','Pelvis'],['th','Thigh'],['kn','Knee'],['ca','Calf'],['ft','Foot']];
+const JOURNAL_ANATOMICAL_LOCATIONS=[['sk','Skull',5],['fa','Face',4],['nk','Neck',5],['sh','Shoulder',3],['ua','Upper arm',1],['el','Elbow',2],['fo','Forearm',1],['ha','Hand',2],['tx','Thorax',4],['ab','Abdomen',4],['pv','Pelvis',4],['th','Thigh',3],['kn','Knee',2],['ca','Calf',1],['ft','Foot',2]];
 function journalBodyLocationsHTML(c){
  const inv=data.inventory.filter(x=>x.characterId===c.id);
  const worn=inv.filter(x=>x.slot==='worn'&&x.snapshot?.category==='armor');
@@ -835,30 +837,88 @@ function journalBodyLocationsHTML(c){
  const coverage=armourCoverageReport(c);
  const state=persistentStateOf(c);
  const wounds=[...(c.hmk?.injuries||[]),...(state.wounds||[])].filter((w,i,all)=>!w?.id||all.findIndex(x=>x?.id===w.id)===i);
- const codes=JOURNAL_ANATOMICAL_LOCATIONS.map(([code,name])=>({code,name}));
- const aggregate=(code)=>{
-  const layers=coverage.locations[code]||[];
-  // Printed complete suit has a rules-verified location matrix; each aspect is read independently.
+ const codes=JOURNAL_ANATOMICAL_LOCATIONS.map(([code,name,shock])=>({code,name,shock}));
+ // Each location is independent: an invalid article on SK must not blank the
+ // verified AV of a cloth tunic on TX/AB. Invalid / absent coverage stays unknown.
+ const materialNames={C:'cloth',L:'leather',D:'padded',Q:'quilted',G:'gambeson',K:'kurbul',S:'scale',M:'mail',P:'plate'};
+ // Read-only backfill for legacy armour snapshots: if an item explicitly states
+ // both material and anatomical coverage, p.117 gives the per-aspect values.
+ // Do not alter the authoritative combat armour gate or persisted equipment.
+ const aggregate=code=>{
   if(suit.ok){
    const pieces=['b','e','p','f'].map(a=>resolvePrintedSuitProtection(suit.name,code,a));
-   return pieces.every(x=>x.ok)?{av:Object.fromEntries(pieces.map((x,i)=>[['b','e','p','f'][i],x.av[['b','e','p','f'][i]]])),verified:true}:null;
+   if(pieces.every(x=>x.ok))return {av:Object.fromEntries(pieces.map((x,i)=>[['b','e','p','f'][i],x.av[['b','e','p','f'][i]]])),provisional:false};
   }
-  if(!worn.length)return {av:{b:0,e:0,p:0,f:0},verified:true};
-  if(coverage.invalidProtectionCount||coverage.warnings.some(x=>/vrstv|pokrytí|neplatn|množství/i.test(x)))return null;
-  if(layers.length>1&&layers.some(x=>!Number.isSafeInteger(inv.find(i=>i.id===x.inventoryId)?.layerOrder)))return null;
-  return coverage.locationAV[code]?.complete?{av:coverage.locationAV[code].av,verified:true}:{av:{b:0,e:0,p:0,f:0},verified:true};
+  const av={b:0,e:0,p:0,f:0};let provisional=false;
+  for(const item of worn){
+   if(item.quantity!==1)return null;
+   const prop=item.snapshot?.properties||{};
+   const local=prop.locationProtection?.[code];
+   const declared=Array.isArray(prop.coveredLocations)?prop.coveredLocations:null;
+   if(declared&&(!declared.every(x=>/^(sk|fa|nk|sh|ua|el|fo|ha|tx|ab|pv|th|kn|ca|ft)$/.test(x))||new Set(declared).size!==declared.length))return null;
+   // A complete per-location AV takes precedence over the optional fallback.
+   if(local&&['b','e','p','f'].every(k=>Number.isSafeInteger(local[k])&&local[k]>=0)){
+    if(declared&&!declared.includes(code))return null;
+    for(const k of ['b','e','p','f'])av[k]+=local[k];
+    continue;
+   }
+   // The item claims to cover this location, but the old record has no AV.
+   if(declared?.includes(code)){
+    const material=materialNames[prop.material]??String(prop.material??'').toLowerCase();
+    try{for(const k of ['b','e','p','f'])av[k]+=locationArmourValue({layers:[{material}],zone:code,aspect:k}).av;}
+    catch{return null;}
+    provisional=true;
+    continue;
+   }
+   // An item with no complete coverage declaration might still protect here.
+   if(!declared){
+    if(prop.locationProtection&&Object.keys(prop.locationProtection).length&&
+       Object.values(prop.locationProtection).every(row=>row&&['b','e','p','f'].every(k=>Number.isSafeInteger(row[k])&&row[k]>=0)))continue;
+    return null;
+   }
+  }
+  return {av,provisional};
  };
- const rows=codes.map(({code,name})=>{
+ const rows=codes.map(({code,name,shock})=>{
   const layers=coverage.locations[code]||[];
-  const values=aggregate(code);
+  const result=aggregate(code),values=result?.av;
   const associated=wounds.filter(w=>{const loc=String(w.location??w.loc??'').trim().toLowerCase();return loc===code||loc===name.toLowerCase()||({sk:['skull','head'],fa:['face'],nk:['neck'],sh:['shoulder'],ua:['upper arm'],el:['elbow'],fo:['forearm'],ha:['hand'],tx:['thorax','chest'],ab:['abdomen'],pv:['pelvis'],th:['thigh'],kn:['knee'],ca:['calf'],ft:['foot']}[code]||[]).includes(loc)});
-  const bleed=associated.some(w=>Number(w.bleedingRate??w.bleedRate??w.bleed??0)>0||w.bleeding===true);
-  const shocks=associated.map(w=>w.locationShock??w.shk??null).filter(Number.isFinite);
+  const liveBleed=associated.some(w=>w.bleeding===true||Number(w.bleedingRate??w.bleedRate??w.bleed??0)>0);
+  const symbols=hmkHumanLocationSymbols(code);
+  const potentialBleed=symbols?.bleeds??0;
+  const arrows=potentialBleed?`<span class="journal-bleed-mark ${liveBleed?'journal-bleed-active':'journal-bleed-possible'}" title="${liveBleed?'Aktivní krvácení':'Potenciální Bleeder podle HMK p.167'} · ${potentialBleed} značek">${'↓'.repeat(potentialBleed)}</span>`:'<span class="journal-bleed-empty">—</span>';
   const injuryText=associated.map(w=>[w.severity??w.injuryLevel??w.injury??w.kind??'Injury',w.description].filter(Boolean).join(': ')).join('; ');
-  return `<tr title="${esc(layers.map(x=>x.name).join(' → ')||'Žádný evidovaný zbrojní článek')}"><th scope="row">${esc(code.toUpperCase())}</th><td title="${esc(name)}">${esc(name)}</td><td class="journal-layer-cell">${layers.length?esc(layers.map(x=>x.name).join(' / ')):'—'}</td>${['b','e','p','f'].map(k=>`<td class="journal-numeric">${values?esc(values.av[k]):'?'}</td>`).join('')}<td class="journal-numeric">${shocks.length?esc(shocks.join('/')):'—'}</td><td>${bleed?'<span class="journal-bleed" title="Zaznamenané krvácení">↓</span>':''}${associated.length?`<span title="${esc(injuryText)}">${esc(associated.length)} ✚</span>`:'—'}</td></tr>`;
+  return `<tr title="${esc(layers.map(x=>x.name).join(' → ')||'Žádný doložený zbrojní článek')}"><th scope="row">${esc(code.toUpperCase())}</th><td class="journal-location-name" title="${esc(name)}">${esc(name)}</td>${['b','e','p','f'].map(k=>`<td class="journal-av${result?.provisional?' journal-av-derived':''}" title="${esc(code.toUpperCase()+': '+k+(result?.provisional?' · odvozeno z doloženého materiálu a deklarovaného pokrytí; GM potvrdí':''))}">${values?esc(values[k]):'?'}</td>`).join('')}<td class="journal-shk" title="Location Shock z pravidlové tabulky HMK p.167">${shock}</td><td class="journal-arrows">${arrows}</td><td class="journal-injuries">${associated.length?`<span title="${esc(injuryText)}">${esc(associated.map(w=>w.severity&&w.level?w.severity+w.level:(w.injury??w.injuryLevel??'✚')).join(' · '))}</span>`:'—'}</td></tr>`;
  }).join('');
  const unknown=wounds.filter(w=>{const loc=String(w.location??w.loc??'').trim().toLowerCase();return !codes.some(({code,name})=>loc===code||loc===name.toLowerCase());});
- return `<section class="journal-book-section journal-body-locations"><div class="journal-book-title">Body Locations · Armour / Injuries</div><div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><thead><tr><th>LOC</th><th>Location</th><th>Gear · vrstvy</th><th>b</th><th>e</th><th>p</th><th>f</th><th>SHK</th><th>Injuries ↓</th></tr></thead><tbody>${rows}</tbody></table></div><p class="journal-anatomy-note">AV: b/e/p/f · ? = vrstva nebo ochrana není ověřena. Zásahy bez přiřaditelné lokace: ${unknown.length}. Směrové krytí a vrstvy musí zkontrolovat GM. ${suit.ok?'Tištěný komplet: '+esc(suit.name)+'.':''}</p>${unknown.length?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>${unknown.map(w=>`<div>${esc([w.location??w.loc??'—',w.severity??w.injuryLevel??w.description??''].filter(Boolean).join(' · '))}</div>`).join('')}</details>`:''}</section>`;
+ return `<section class="journal-book-section journal-body-locations"><div class="journal-book-title">Body Locations · Armour / Injuries</div><div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><colgroup><col class="journal-col-code"><col class="journal-col-name">${['b','e','p','f'].map(()=>'<col class="journal-col-av">').join('')}<col class="journal-col-shk"><col class="journal-col-bleed"><col class="journal-col-injuries"></colgroup><thead><tr><th>LOC</th><th>Location</th>${['b','e','p','f'].map(k=>`<th class="journal-av">${k}</th>`).join('')}<th class="journal-shk">SHK</th><th class="journal-arrows" title="Bleeder arrows">↓</th><th>Injuries</th></tr></thead><tbody>${rows}</tbody></table></div><p class="journal-anatomy-note">AV: b/e/p/f; ? = nedostatečná evidence. Tečkované hodnoty jsou informativně odvozené z uvedeného materiálu a pokrytí, GM je musí potvrdit; bojový výpočet se nemění. SHK = Location Shock dle tabulky, nikoli aktuální stav. Šedé šipky = pravidlová možnost krvácení, černé = aktuálně krvácející rána. Přesné vrstvy jsou v Arsenal & Gear. Nepřiřazené rány: ${unknown.length}.</p>${unknown.length?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>${unknown.map(w=>`<div>${esc([w.location??w.loc??'—',w.severity??w.injuryLevel??w.description??''].filter(Boolean).join(' · '))}</div>`).join('')}</details>`:''}</section>`;
+}
+function journalConvocationsHTML(c){
+ const arc=c.hmk?.arcane||{},primary=arc.primaryConvocation??c.hmk?.creation?.values?.pvarPrimary??null;
+ const names=['Fývria','Jmôrvi','Pèleáhn','Lyáhvi','Sàvôrya','Odívshè','Neutral'];
+ const projection=c.hmk?.creation?calculateSheetSkills(c):c.hmk?.skills||[];
+ const rows=names.map(name=>{
+  const row=projection.find(x=>String(x.name??'').toLocaleLowerCase()===name.toLocaleLowerCase()||String(x.name??'').toLocaleLowerCase()===('convocation ('+name+')').toLocaleLowerCase());
+  const value=Number.isFinite(row?.ml)?row.ml:null;
+  return [name,value===null?'—':value];
+ });
+ const isMage=!!primary||String(c.occupation||'').includes('Shèk-Pvâr');
+ if(!isMage&&!rows.some(x=>x[1]!=='—'))return '';
+ const pvar=projection.find(x=>x.name==='Pvârism');
+ return `<section class="journal-book-section journal-convocations"><div class="journal-book-title">Convocation ML</div>${primary?`<p class="journal-minor">Primary: ${esc(primary)}${pvar&&Number.isFinite(pvar.ml)?` · Pvârism ${pvar.ml}`:''}</p>`:''}<div class="journal-convocation-list">${rows.map(([name,value])=>`<div><span>${esc(name)}${name===primary?' ★':''}</span><strong>${esc(value)}</strong></div>`).join('')}</div>${rows.every(x=>x[1]==='—')?'<p class="journal-minor">ML není v profilu samostatně evidováno; Pvârism ML nelze automaticky vydávat za ML jednotlivých convocations.</p>':''}</section>`;
+}
+function journalConditionDetailsHTML(c,state,load){
+ const h=c.hmk||{},fat=combatFatigueTotals(state),impact=[...(state.events||[])].reverse().find(x=>x.type==='confirmed-hit');
+ const d=impact?.details||{};
+ const impactValue=Number.isFinite(d.impact)?d.impact:'—';
+ const shock=String(state.shock??'NONE');
+ const stress=Number.isFinite(state.morale?.psycheStress)?state.morale.psycheStress:'—';
+ const shadow=Number.isFinite(h.arcane?.shadow)?h.arcane.shadow:'—';
+ const auraShock=Number.isFinite(h.arcane?.auraShock)?h.arcane.auraShock:'—';
+ const endSR=Number.isFinite(h.attributes?.end)?Math.floor(h.attributes.end/2):'—';
+ const pf=Number.isFinite(load.personalFatiguePerPeriod)?load.personalFatiguePerPeriod:'—';
+ const block=(title,items,cl='')=>`<section class="journal-book-section ${cl}"><div class="journal-book-title">${title}</div><div class="journal-mini-stats">${items.map(([a,b])=>`<div><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`).join('')}</div></section>`;
+ return `<div class="journal-condition-detail-grid">${block('Impact',[['Poslední Impact',impactValue],['Recorded Hits',(state.events||[]).filter(x=>x.type==='confirmed-hit').length]])}${block('Shock State',[['Current',shock],['Extended HR',state.extendedShock?.hr??'—'],['Coma HR',state.coma?.hr??'—']],'journal-shock-state')}${block('Stress',[['Psyche',stress],['Aural Shock',auraShock],['Shadow',shadow]])}${block('Fatigue',[['Winded',fat.windedness],['Weary',fat.weariness],['Weak',fat.weakness],['Total',fat.total],['PF',pf],['END SR (TN)',endSR]])}</div>`;
 }
 function journalSimpleChecklist(title,rows){return `<section class="journal-book-section"><div class="journal-book-title">${esc(title)}</div><div class="journal-check-grid">${rows.map(([label,value])=>`<label><span class="journal-check"></span><em>${esc(label)}</em><strong>${esc(firstPresent(value,'—'))}</strong></label>`).join('')}</div></section>`;}
 function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['notes','Notes & Logbook']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}</div>`;}
@@ -888,7 +948,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.unconscious?'Yes':'No'],['Death Save',state.death?'Pending':'—']];
  const conditionRows=[['Poisoned',state.poisoned?'Yes':'No'],['Diseased',state.diseased?'Yes':'No'],['Cursed',state.cursed?'Yes':'No'],['Winded',state.winded?'Yes':'No'],['Weary',state.weary?'Yes':'No'],['Fatigued',combatFatigueTotals(state).total]];
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div><h3>${esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows)}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalStatBoxes('Grace & Piety',gracePiety)}</div>${editing?`<details class="journal-dp-edit"><summary>Rozbalit dovednosti · DP, SB, SM a ML (editovat)</summary>${characterCalculationHTML(c,{editing:true})}</details>`:journalSkillColumnsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],meleeRows)}${journalInventoryTable('Missile Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],missileRows)}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div></section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div><h3>${esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalStatBoxes('Grace & Piety',gracePiety)}</div>${editing?`<details class="journal-dp-edit"><summary>Rozbalit dovednosti · DP, SB, SM a ML (editovat)</summary>${characterCalculationHTML(c,{editing:true})}</details>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],meleeRows)}${journalInventoryTable('Missile Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],missileRows)}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;

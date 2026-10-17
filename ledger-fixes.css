@@ -1,0 +1,48 @@
+/* v93.322: anatomical table and missing dossier panels. Skin and functionality preserved. */
+.content-sheet .journal-right-mid-grid .journal-body-locations{grid-column:1/-1!important;min-width:0}
+.content-sheet .journal-right-mid-grid .journal-right-card{grid-column:1/-1;min-width:0}
+.content-sheet .journal-anatomy-wrap{width:100%;overflow-x:auto;scrollbar-width:thin}
+.content-sheet .journal-anatomy-table{width:100%;min-width:395px!important;border-collapse:collapse!important;table-layout:fixed!important;font:10px/1.2 Georgia,serif!important}
+.content-sheet .journal-anatomy-table col.journal-col-code{width:8%}
+.content-sheet .journal-anatomy-table col.journal-col-name{width:25%}
+.content-sheet .journal-anatomy-table col.journal-col-av{width:8.4%}
+.content-sheet .journal-anatomy-table col.journal-col-shk{width:9%}
+.content-sheet .journal-anatomy-table col.journal-col-bleed{width:10%}
+.content-sheet .journal-anatomy-table col.journal-col-injuries{width:14.4%}
+.content-sheet .journal-anatomy-table th,.content-sheet .journal-anatomy-table td{padding:3px 2px!important;font-size:10px!important;vertical-align:middle!important}
+.content-sheet .journal-anatomy-table th.journal-av,.content-sheet .journal-anatomy-table td.journal-av,
+.content-sheet .journal-anatomy-table th.journal-shk,.content-sheet .journal-anatomy-table td.journal-shk,
+.content-sheet .journal-anatomy-table th.journal-arrows,.content-sheet .journal-anatomy-table td.journal-arrows{text-align:center!important;font-variant-numeric:tabular-nums;white-space:nowrap}
+.content-sheet .journal-anatomy-table td.journal-av{font-weight:650;color:#162e48!important}
+.content-sheet .journal-anatomy-table td.journal-shk{font-weight:800;color:#56361d!important}
+.content-sheet .journal-anatomy-table td.journal-injuries{font-size:9px!important;overflow-wrap:anywhere}
+.content-sheet .journal-anatomy-table .journal-location-name{overflow-wrap:anywhere}
+.content-sheet .journal-bleed-mark{display:inline-flex;letter-spacing:-2px;font-weight:900;font-size:12px;white-space:nowrap}
+.content-sheet .journal-bleed-possible{color:#99938d!important}
+.content-sheet .journal-bleed-active{color:#161616!important}
+.content-sheet .journal-bleed-empty{color:#b7a68c}
+.content-sheet .journal-anatomy-note{font:9px/1.3 Georgia,serif!important;margin:4px 0}
+/* Never clip Appearance when nameplate or portrait length changes. */
+.content-sheet .journal-left-top{min-height:0;align-items:stretch!important}
+.content-sheet .journal-appearance{min-width:0;overflow:visible!important}
+.content-sheet .journal-appearance .journal-book-table{min-width:0}
+.content-sheet .journal-appearance .journal-book-table div{min-width:0}
+.content-sheet .journal-appearance dd{overflow-wrap:anywhere;min-width:0}
+/* Additional read-only status panels are small, legible and match the manuscript. */
+.content-sheet .journal-condition-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:6px}
+.content-sheet .journal-condition-detail-grid>.journal-book-section{min-width:0;padding:6px!important;margin:0!important;border:1px solid rgba(128,91,47,.34)!important}
+.content-sheet .journal-condition-detail-grid .journal-mini-stats{display:grid;grid-template-columns:1fr;gap:0}
+.content-sheet .journal-mini-stats>div{display:flex;align-items:center;justify-content:space-between;min-width:0;gap:4px;padding:3px 2px;border-bottom:1px solid rgba(119,89,55,.19)}
+.content-sheet .journal-mini-stats span{font:10px/1.2 Georgia,serif!important;color:#5b4128;min-width:0;overflow-wrap:anywhere}
+.content-sheet .journal-mini-stats strong{font:700 11px/1.2 Georgia,serif!important;color:#1e3042;white-space:nowrap}
+.content-sheet .journal-convocations{margin-top:7px!important}
+.content-sheet .journal-convocation-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 8px}
+.content-sheet .journal-convocation-list>div{display:flex;justify-content:space-between;gap:6px;border-bottom:1px solid rgba(119,89,55,.19);padding:3px 1px;min-width:0;font:10px Georgia,serif}
+.content-sheet .journal-convocation-list>div strong{font-variant-numeric:tabular-nums;color:#1c3651}
+.content-sheet .journal-minor{font:9px/1.3 Georgia,serif!important;color:#685036;margin:3px 0!important}
+@media(max-width:550px){
+ .content-sheet .journal-condition-detail-grid{grid-template-columns:1fr}
+ .content-sheet .journal-anatomy-table{min-width:450px!important}
+}
+
+.content-sheet .journal-anatomy-table .journal-av-derived{text-decoration:underline dotted rgba(110,76,44,.6);text-underline-offset:2px}
