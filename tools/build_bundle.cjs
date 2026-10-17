@@ -1,7 +1,7 @@
 /* Offline reproducible GitHub Pages build. Node.js + TypeScript (build-time only).
  * No server, npm package, paid API or runtime dependency on TypeScript.
  */
-const fs=require('node:fs'),path=require('node:path');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 let ts;try{ts=require('typescript');}catch(e){ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');}
 const root=path.resolve(__dirname,'..');const files=[];
 // Release-safety guard: refuse to generate a bundle displaying a stale UI version.
@@ -17,8 +17,12 @@ function walk(dir){for(const name of fs.readdirSync(dir)){
  const p=path.join(dir,name),st=fs.statSync(p);if(st.isDirectory()){if(name!=='node_modules'&&name!=='tools')walk(p);}else if(name.endsWith('.js')&&name!=='hmk-app.bundle.js')files.push(p);}}
 walk(root);
 const modules={};for(const p of files){const key=path.relative(root,p).replaceAll('\\','/');
+ const sourceFile=ts.createSourceFile(key,fs.readFileSync(p,'utf8'),ts.ScriptTarget.ES2022,true,ts.ScriptKind.JS);
+ if(sourceFile.parseDiagnostics.length)throw Error('Source syntax error in '+key+': '+sourceFile.parseDiagnostics.map(d=>ts.flattenDiagnosticMessageText(d.messageText,' ')).join('; '));
  const source=fs.readFileSync(p,'utf8');const t=ts.transpileModule(source,{fileName:key,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,allowJs:true}});
  if(t.diagnostics?.length){throw Error(key+': '+t.diagnostics.map(x=>x.messageText).join('; '));}
+ try{new vm.Script('(function(require,module,exports){\n'+t.outputText+'\n})',{filename:key});}
+ catch(err){throw Error('Bundled module syntax error in '+key+': '+err.stack);}
  modules[key]=t.outputText;
 }
 const body=`(()=>{const MOD=${JSON.stringify(modules)};const CACHE={};
