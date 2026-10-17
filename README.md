@@ -1,3 +1,22 @@
+# HMK Keeper’s Ledger v93.312 — Illuminated Book UI
+
+This release is a **visual and presentation-only redesign** based on the user-supplied character-journal reference, built on **v93.311 HOTFIX 1**. The existing rule engine, `src` modules, save key, character creation, combat, skills, inventory, histories and editing forms are retained.
+
+- New castle-themed dark heraldic left navigation with scrollable character roster and compact top navigation.
+- A book-shaped, gold-edged, double-page character journal with a binding down the middle and decorative corners, using CSS and bundled local SVGs, not a flattened image.
+- Parchment texture, illustrated accents, finer table rules, Roman-style headings, traditional three-letter attribute labels with full titles, and responsive layout.
+- All existing Skill groups now render completely in the overview instead of an eight-row excerpt. Weapon, clothing, inventory and abilities previews also no longer have artificial row limits.
+- The facing pages and whole cover grow automatically when rendered content grows; no forced fixed heights or clipped content. At narrow widths the pages stack vertically.
+- Internal journal tabs for Arsenal, Combat/Conditions, Edit and Notes remain live, as do all application navigation and data entry controls.
+- Body-locations graphic improved; it remains decorative and does not invent armour AP or injury values. Missing data display as `—`.
+- All imagery is bundled locally and works on GitHub Pages without paid services.
+
+**Validation:** production bundle built with `tools/build_bundle.cjs`; source and bundle syntax checks passed. Chromium UI smoke tests at 1672, 1280 and 390 px, including navigation, edit/cancel and 45 added skills growing the open book, passed without console JavaScript exceptions. This was an isolated browser test, not a test against a live GitHub Pages deployment. Rules/regression calculations were not re-certified in this visual-only release.
+
+**Exact changes vs v93.311 HOTFIX 1:** modified `app.js`, `index.html`, `hmk-app.bundle.js`, `README.md`; added `journal-illumination.css`, `assets/ui/illumination-corner.svg`, `assets/ui/parchment-grain.svg`, `assets/ui/body-armour-figure.svg`; removed no files. 
+
+---
+
 # HMK Keeper’s Ledger v93.311 – HOTFIX 1 (spuštění aplikace)
 
 **DŮLEŽITÁ OPRAVA:** Původní vydání v93.311 mělo dvě chyby v `app.js`:
