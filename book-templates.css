@@ -1,0 +1,128 @@
+/* v93.314 — image-backed, nine-slice illuminated book.  Real HTML/DOM remains interactive.
+ * All images below are LOCAL; source: user's reference screenshot or a clean vellum
+ * regenerated from its color palette. Nothing requires a remote service. */
+:root{--script-ink:#251b14;--book-brown:#703c21;--book-gold:#b58a52;--book-blue:#122640;--book-ivory:#f5e6c4}
+.shell{background:#141a20}
+.shell::before{opacity:1;filter:saturate(1.16) brightness(1.18)}
+.shell::after{background:linear-gradient(90deg,#080c1466 0,transparent 20%,transparent 89%,#080c1440 100%)}
+.mast{height:61px;min-height:61px;padding:0 16px 0 0;border:0;border-bottom:2px solid #654626;background:linear-gradient(180deg,#091521ef,#0f1a28ef);box-shadow:0 4px 12px #06090bc0}
+.mast-top{min-height:59px;gap:0}
+.mast-brand{width:260px;min-width:260px;min-height:59px;margin:0;padding:0;background:url('./assets/ui/book/sidebar_header.png') center/100% 100% no-repeat;border:0;box-shadow:none;position:relative}
+.mast-brand .brand-mark,.mast-brand h1,.mast-brand p,.mast-brand .eyebrow{opacity:0;pointer-events:none}
+.mast-brand::after{content:"";position:absolute;inset:0;border-right:1px solid #af7940;pointer-events:none}
+.mast-links{padding-left:15px;gap:12px}
+.mast-links button{font:16px/1.2 Georgia,serif;text-shadow:0 1px 0 #08090b;letter-spacing:0;padding:12px 10px;color:#dcd9d2}
+.mast-links button.current{color:#f7e7c7;border-bottom:2px solid #cba46c}
+.layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:0;padding:0;align-items:stretch}
+.nav{position:sticky;top:0;width:260px;min-height:calc(100vh - 61px);height:auto;max-height:calc(100vh - 61px);background:linear-gradient(90deg,#08111cf5 0%,#111d2de8 75%,#152335ee);border-right:3px ridge #976739;padding:8px 72px 12px 12px;box-shadow:3px 0 13px #0b0c14c7;overflow-y:auto}
+.nav:after{content:"";z-index:0;pointer-events:none;position:absolute;right:0;top:0;width:79px;height:350px;background:url('./assets/ui/book/sidebar_banner.png') center top/79px 350px no-repeat;opacity:1}
+.nav:before{z-index:0}
+.nav>*{position:relative;z-index:1}
+.castle-campaign-card{width:235px;max-width:calc(100% + 60px);height:93px;min-height:93px;margin-bottom:15px;padding:.5rem .7rem;z-index:2;background:linear-gradient(0deg,#050d17aa,transparent),url('./assets/ui/background-valley.png') center/cover;border:1px solid #c59e62}
+.castle-campaign-card strong{font:16px/1.1 Georgia,serif;color:#f9e7cc}
+.nav .castle-nav-link,.nav .castle-character{font-family:Georgia,serif;font-size:13px;min-height:30px;z-index:2}
+.nav .castle-character{width:235px;max-width:calc(100% + 60px)}
+.nav-section-label{color:#d5a969}
+.nav .castle-create{font-size:13px;border-color:#d0a05a;z-index:2}
+.content-sheet{padding:0 0 55px;min-width:0}
+.content-sheet>.ledger-topline{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;min-height:0;margin:0;gap:4px;padding:3px 11px 2px;color:#e7d7bc;background:#08152270}
+.content-sheet>.ledger-topline h2{font-size:12px;line-height:1.2;opacity:.8;flex:1;min-width:150px}
+.content-sheet>.ledger-topline button{font-size:11px;min-height:24px;padding:2px 7px}
+/* Accurate photo-derived frame: top, foot, left and right boards and an exact central gutter.
+ * The edges are separate sprites so a long Skills list stretches the book naturally. */
+.content-sheet .journal-book.panel{margin:0;background:none;border:0;border-radius:0;box-shadow:none;max-width:none;overflow:visible}
+.content-sheet .journal-book-frame{
+ position:relative;isolation:isolate;margin:0 auto;border:0;border-radius:0;padding:44px 39px 46px;
+ background-color:#d2b285;
+ background-image:
+  url('./assets/ui/book/book_top.png'),url('./assets/ui/book/book_bottom.png'),
+  url('./assets/ui/book/book_left.png'),url('./assets/ui/book/book_right.png'),
+  url('./assets/ui/book/book_gutter.png');
+ background-position:center top,center bottom,left top,right top,center top;
+ background-size:100% 44px,100% 50px,42px 100%,52px 100%,46px 100%;
+ background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat;
+ box-shadow:0 21px 35px #0504068f,0 3px 3px #060507cd;
+}
+.content-sheet .journal-book-frame::before{content:"";position:absolute;inset:32px 34px 35px;border:1px solid #b18955;outline:1px solid #54341f;outline-offset:3px;pointer-events:none;z-index:5}
+.content-sheet .journal-book-frame::after{content:"";position:absolute;z-index:4;pointer-events:none;top:44px;bottom:46px;width:44px;left:calc(39px + (100% - 78px)*.455 - 22px);border:0;transform:none;box-shadow:none;background:url('./assets/ui/book/book_gutter.png') center center/100% 100% no-repeat;opacity:.76}
+.book-cover-ornament{display:none}
+.journal-book-subnav{position:relative;z-index:6;margin:-21px 24px 11px;display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:29px}
+.journal-book-subnav button{min-height:28px!important;padding:4px 10px!important;border-radius:2px 2px 7px 7px!important;border:1px solid #ae7945!important;box-shadow:inset 0 1px #f3e6c4,0 2px 4px #0006!important;background:linear-gradient(180deg,#b88749,#ddbb81)!important;color:#342318!important;font:11px/1.15 Georgia,serif;letter-spacing:.025em;font-variant:small-caps}
+.journal-book-subnav button:not(.secondary){background:linear-gradient(180deg,#324a66,#142941)!important;border-color:#b99051!important;color:#ffe1a6!important}
+.journal-book-spread{display:grid;grid-template-columns:minmax(0,45.5fr) minmax(0,54.5fr);gap:0;align-items:stretch;min-width:0;position:relative}
+.journal-book-page,.journal-book-page--left,.journal-book-page--right{
+ display:flex;flex-direction:column;gap:0;min-width:0;min-height:745px;height:auto;margin:0;padding:14px 20px 20px;
+ border:0!important;border-radius:0!important;color:var(--script-ink);
+ background:linear-gradient(90deg,#aa83502c 0%,transparent 11%,transparent 88%,#966d3c40 100%),url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+ box-shadow:inset 0 0 0 1px #a78a5e9e,inset 0 0 18px #855e3455!important;
+}
+.journal-book-page--left{padding:6px 24px 22px 7px}
+.journal-book-page--right{padding:6px 7px 22px 27px}
+.journal-book-page:before{content:"";position:absolute;inset:1px;border:1px solid #b7935aa8;outline:none;box-shadow:none;pointer-events:none}
+.journal-book-page:after{content:"";position:absolute;bottom:1px;left:3%;right:3%;height:1px;background:#ad824c6b;transform:none}
+.journal-book-page--left::after{content:""}
+/* crisp engraved frames on the parchment, derived jewel cap from original reference */
+.journal-book-section{position:relative;margin:0 0 2px!important;min-width:0;padding:2px 6px 4px;border:1px solid #a27a467d!important;border-radius:0!important;background:transparent!important;box-shadow:inset 0 1px #fff3d1a3,0 0 0 1px #efdbb48c!important;color:#241a14}
+.journal-book-title{display:flex;align-items:center;gap:3px;min-height:23px;margin:-2px -6px 3px!important;padding:2px 3px 2px 29px;border-bottom:1px solid #b58d4e!important;background:url('./assets/ui/book/section_jewel.png') left center/26px 25px no-repeat,linear-gradient(90deg,#bf955136,#e9d5a706);font:700 12px/1.15 Georgia,serif;letter-spacing:.03em;color:#653019;font-variant:small-caps;text-transform:uppercase}
+.journal-book-title::before,.journal-book-title::after{content:none!important}
+.journal-book-table{display:grid;gap:0}
+.journal-book-table div{padding:2px 1px 3px;align-items:baseline;border-bottom:1px solid #a7845338;gap:3px}
+.journal-book-table dt,.journal-book-table dd{font:12px/1.2 Georgia,serif;color:#2e211a;text-align:left}
+.journal-book-table dd{font-weight:500;text-align:right;overflow-wrap:anywhere}
+.journal-book-section--tight{padding:1px 5px 3px}
+.journal-book-section--tight .journal-book-table div{padding:2px 1px 2px}
+.journal-nameplate{margin:0 0 4px;padding:0;min-height:90px;border:0!important;border-radius:0!important;box-shadow:none!important;background:none!important;display:flex;align-items:center;justify-content:center;gap:10px}
+.journal-nameplate:before,.journal-nameplate:after{content:"❧";font-size:31px;opacity:.55;color:#926e41}
+.journal-nameplate:after{transform:scaleX(-1)}
+.journal-crest{flex:0 0 67px;width:67px;height:87px;border:0;border-radius:0!important;background:url('./assets/ui/book/cover_crest.png') center/cover no-repeat!important;color:transparent!important;font-size:0;box-shadow:none!important}
+.journal-nameplate h3{font:500 clamp(24px,2.7vw,41px)/1.0 Georgia,serif;letter-spacing:.01em;color:#10243d;text-shadow:none;text-transform:uppercase;margin:0}
+.journal-nameplate p{font:700 13px/1.3 Georgia,serif;color:#2f211b;letter-spacing:.13em;margin:0}
+.journal-nameplate-minor{font:11px/1.3 Georgia,serif;color:#4d321c;letter-spacing:0}
+.journal-left-top{display:grid;grid-template-columns:1.02fr 1.11fr .81fr;align-items:stretch;gap:2px}
+.journal-left-mid{display:grid;grid-template-columns:1.08fr .92fr;gap:2px;margin:0}
+.journal-attributes-row{display:grid;grid-template-columns:1fr 1fr .80fr;gap:2px;margin:0}
+.journal-right-top-grid{display:grid;grid-template-columns:1fr .85fr .8fr 1.08fr;gap:3px;margin:0 0 1px}
+.journal-right-mid-grid,.journal-right-low-grid{display:grid;grid-template-columns:1.05fr .83fr;gap:3px;margin:0}
+.journal-right-bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin:0}
+.journal-right-bottom-grid>.journal-notes-card{grid-column:1/-1}
+.journal-portrait-panel{margin:0;min-height:252px;border:0!important;background:transparent!important;padding:0;overflow:hidden;display:flex;align-items:stretch}
+.sheet-portrait--book{position:relative;width:100%;height:100%;min-height:252px;overflow:hidden;background:transparent!important;border:0!important}
+.sheet-portrait--book .sheet-portrait-image{display:block;width:100%;height:100%;min-height:252px;object-fit:cover;box-shadow:none;border:0!important}
+.sheet-portrait--book .sheet-portrait-placeholder{display:grid;width:100%;height:100%;min-height:252px;background:url('./assets/ui/book/anonymous_portrait.png') center/cover no-repeat!important;color:#edd2a3;text-align:center;box-shadow:none!important;border:0!important}
+.portrait-not-set{font:italic 10px Georgia,serif;color:#f0d5a7;align-self:end;justify-self:center;margin-bottom:8px;text-shadow:0 1px 4px #100c0b}
+.journal-trait-list{margin:0;padding:0;gap:0;list-style:none}
+.journal-trait-list li{font:11px/1.22 Georgia,serif;padding:3px 2px;border:0;border-bottom:1px solid #ad8c5a3d;border-radius:0;background:none}
+.journal-stat-boxes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}
+.journal-stat-box{padding:4px 1px;border:1px solid #ac8b5e9c!important;border-radius:0!important;background:#f3e3c84d!important;box-shadow:inset 0 0 0 1px #fff5d697}
+.journal-stat-box span{font:700 10px/1.2 Georgia,serif;color:#65321c}
+.journal-stat-box strong{font:500 clamp(17px,1.55vw,24px)/1.3 Georgia,serif;color:#12263f}
+.journal-book-skills{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;grid-auto-flow:row}
+.journal-book-skills .journal-skill-family{border:0;border-right:1px solid #b28d5c83;border-radius:0;background:none;padding:2px 6px 6px}
+.journal-book-skills .journal-skill-family h4{font:700 11px/1.3 Georgia,serif;color:#66361c;border-bottom:1px solid #ba9966;padding:0 0 3px;margin:0 0 3px}
+.journal-book-skills .journal-skill-family li{font:11px/1.23 Georgia,serif;color:#332318;padding:2px 0;gap:3px;overflow-wrap:anywhere}
+.journal-ledger{font:11px/1.3 Georgia,serif;color:#312018;background:none}
+.journal-ledger thead th,.journal-book .journal-ledger thead th{font:700 10px/1.15 Georgia,serif;letter-spacing:0;background:transparent!important;color:#4a2e1c!important;border-bottom:1px solid #977247!important;padding:2px 2px}
+.journal-ledger td{font:11px/1.2 Georgia,serif;background:transparent!important;color:#372517!important;border-bottom:1px solid #b49b754b!important;padding:3px 2px}
+.journal-book .journal-ledger tbody tr:nth-child(even){background:transparent!important}
+.journal-body-grid{display:grid;grid-template-columns:minmax(102px,.82fr) minmax(0,1.18fr);align-items:start;gap:2px}
+.journal-body-figure{width:100%;height:auto;min-height:0;padding:0;margin:0;background:none}
+.journal-body-figure img{display:block;height:auto;max-height:220px;width:100%;object-fit:contain;filter:none}
+.journal-ledger--compact th,.journal-ledger--compact td{font-size:10px;padding:1px 2px}
+.journal-check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px}
+.journal-check-grid label{display:grid;grid-template-columns:12px minmax(0,1fr) auto;align-items:center;font:11px/1.1 Georgia,serif;color:#372417;gap:2px}
+.journal-check{width:10px;height:10px;border:1px solid #73543a;background:#f3e3c9}
+.journal-check-grid strong{font:10px Georgia,serif}
+.journal-notes-card p{font:11px/1.35 Georgia,serif;color:#372618;margin:3px 0}
+/* A selected technical chapter REPLACES the spread, retaining one book, one live view. */
+.journal-book--chapter .journal-book-frame:after{display:none}
+.journal-book--chapter .journal-technical-shell{background:linear-gradient(90deg,#b58c5333,transparent 13%,transparent 85%,#a17a4033),url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat;border:0;min-height:680px;padding:20px 28px;box-shadow:none}
+.journal-alt-header{padding:14px 20px;border-bottom:2px double #b7925d;background:transparent}
+.journal-alt-header h3{font:500 33px/1.1 Georgia,serif;color:#172840}
+.journal-technical-shell .panel{background:rgba(252,243,222,.66)!important;border:1px solid #ac895ba8!important;border-radius:0!important;box-shadow:0 1px 0 #fff7e6 inset!important}
+.journal-technical-shell .panel h3{color:#66331f!important;font-family:Georgia,serif}
+/* responsive: preserve the book image at desktop widths, stack chapters on smaller screens */
+@media(min-width:1650px){.content-sheet .journal-book-frame{max-width:1440px}}
+@media(max-width:1530px){.mast-brand{width:233px;min-width:233px}.layout{grid-template-columns:233px minmax(0,1fr)}.nav{width:233px;padding-right:53px}.journal-book-page--left{padding-right:21px}.journal-book-page--right{padding-left:25px}.journal-book-page{padding-top:8px}.journal-nameplate h3{font-size:27px}.journal-book-title{font-size:11px}.journal-book-table dt,.journal-book-table dd,.journal-ledger td,.journal-book-skills .journal-skill-family li{font-size:10px}}
+@media(max-width:1160px){.content-sheet .journal-book-frame::after{display:none}.journal-book-spread{grid-template-columns:1fr}.journal-book-page{min-height:0}.journal-book-page--left,.journal-book-page--right{padding:16px 18px}.journal-book-frame{background-image:url('./assets/ui/book/book_top.png'),url('./assets/ui/book/book_bottom.png'),url('./assets/ui/book/book_left.png'),url('./assets/ui/book/book_right.png')}.journal-book-table dt,.journal-book-table dd,.journal-ledger td,.journal-book-skills .journal-skill-family li{font-size:12px}.journal-nameplate h3{font-size:33px}}
+@media(max-width:800px){.mast{height:auto;min-height:60px}.mast-top{min-height:60px}.mast-brand{width:220px;min-width:220px}.layout{display:block}.nav{width:100%;max-height:none;min-height:0;padding:8px 12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.nav:after{display:none}.nav .castle-nav-link{min-height:35px}.castle-campaign-card,.nav-section-label,.castle-character-list,.nav .castle-create{grid-column:1/-1}.content-sheet .journal-book-frame{padding:36px 26px 39px;background-size:100% 36px,100% 42px,27px 100%,27px 100%}.content-sheet .journal-book-frame::before{inset:22px 18px 25px}.journal-book-subnav{margin:-22px 0 10px}.journal-nameplate h3{font-size:27px}}
+@media(max-width:550px){.content-sheet .journal-book-frame{padding:34px 13px 38px;background-size:100% 34px,100% 38px,14px 100%,14px 100%}.content-sheet .journal-book-frame::before{inset:22px 8px 25px}.journal-book-page--left,.journal-book-page--right{padding:12px 11px}.journal-left-top,.journal-left-mid,.journal-attributes-row,.journal-right-top-grid,.journal-right-mid-grid,.journal-right-low-grid,.journal-right-bottom-grid{grid-template-columns:1fr}.journal-portrait-panel{min-height:225px}.sheet-portrait--book{min-height:225px;max-width:220px;margin:0 auto}.journal-nameplate h3{font-size:24px}.journal-book-skills{grid-template-columns:repeat(2,minmax(0,1fr))}.journal-stat-boxes{grid-template-columns:repeat(3,minmax(0,1fr))}.journal-book-subnav button{font-size:10px;padding:3px 7px!important}.journal-body-grid{grid-template-columns:100px 1fr}}
