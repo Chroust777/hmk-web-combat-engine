@@ -1,3 +1,19 @@
+# HMK Keeper’s Ledger v93.311 – HOTFIX 1 (spuštění aplikace)
+
+**DŮLEŽITÁ OPRAVA:** Původní vydání v93.311 mělo dvě chyby v `app.js`:
+1. Rozlomený regulární výraz v Notes & Logbook (`replace(/\n/g,...)`) způsobil při spuštění `Uncaught SyntaxError: Invalid regular expression: missing /` v produkčním bundle.
+2. Omylem zdvojená deklarace `function equippedHandsPanel(...)` uzavřela zbytek aplikace do vnořené funkce, takže ani po opravě výrazu nenaběhl úvodní render.
+
+Opraven byl i chybně uzavřený výraz `startsWith('Ritual (')` v pomocné části Divine Routine. V přehledové stránce deníku se neexistující Combat State zobrazuje jako bezpečný výchozí stav pro čtení; žádný záznam postavy se tím nemění. Únavové souhrny používají `combatFatigueTotals(...).total` místo neexistujícího `.pf`.
+
+`tools/build_bundle.cjs` při sestavování nově kontroluje syntaxi zdrojů přes TypeScript parser a každého z 244 přeložených modulů přes `vm.Script`; tím má vydání selhat před vytvořením neplatného bundle. V `index.html` je nový cache parametr `93.311-hotfix1`. **Číslo verze zůstává 93.311, herní pravidla a formát dat se nemění.**
+
+Archiv má produkční soubory přímo v kořeni ZIPu – po rozbalení je možné je nahrát přímo do kořene repozitáře GitHub Pages. Nepřidává interní testovací artefakty.
+
+**Provedené kontroly:** validace TypeScript parse AST, kompilace 244 modulů, kontrola každého generovaného modulu, syntaktická kontrola finálního bundle, interaktivní test v Chromium přes lokálně vložený HTML/JS obsah: načtení hlavní obrazovky, otevření postavy a dvoustránkového deníku, interní záložky Inventář, Combat & Conditions, Notes & Logbook, přepnutí do Edit a zpět, Skills a Library – bez zachycené JS výjimky. Plný test přes skutečnou síť GitHub Pages nebyl proveden.
+
+---
+
 # HMK Keeper’s Ledger v93.309 — Falling CF a STN mezi dopady
 
 **Oprava zobrazení verze v93.309 (display hotfix 1):** Opravená konstanta `APP_VERSION` v produkčním `app.js` a sestaveném `hmk-app.bundle.js` z chybné `93.299` na `93.309`. V `index.html` je jednorázově změněný cache-busting identifikátor JavaScriptu na `v=93.309-displayfix1`, aby prohlížeč nestahoval starý bundle. `tools/build_bundle.cjs` před sestavením ověřuje shodu mezi `APP_VERSION`, verzí v `<title>` a URL bundle; při nesouladu sestavení zastaví. Herní logika, CSS, struktura uložených kampaní i pravidlové moduly jsou beze změny. Po nahrání všech souborů na GitHub Pages doporučen `Ctrl+F5`.
