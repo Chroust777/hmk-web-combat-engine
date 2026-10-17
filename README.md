@@ -1,4 +1,4 @@
-# HMK Keeper’s Ledger v93.312 — Illuminated Book UI
+# HMK Keeper’s Ledger v93.313 — Illuminated Book UI
 
 This release is a **visual and presentation-only redesign** based on the user-supplied character-journal reference, built on **v93.311 HOTFIX 1**. The existing rule engine, `src` modules, save key, character creation, combat, skills, inventory, histories and editing forms are retained.
 
