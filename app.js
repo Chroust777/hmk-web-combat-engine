@@ -159,7 +159,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper's Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.322';
+const APP_VERSION='93.323';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -819,7 +819,7 @@ function journalSkillColumnsHTML(c){
 function inventoryRowsForJournal(inv,kind){
  const source=projectInventoryRows(inv);
  if(kind==='armour')return source.filter(r=>r.item.slot==='worn').map(r=>[r.item.snapshot?.name||'—',r.armourENC||'—',r.wq??'—',r.item.condition||'']);
- if(kind==='possessions')return source.filter(r=>!['worn','main_hand','off_hand'].includes(r.item.slot)).map(r=>[r.item.snapshot?.name||'—',r.qty??1,r.weight===null?'—':r.weight.toFixed(1),r.item.condition||'']);
+ if(kind==='possessions')return source.filter(r=>!['worn','main_hand','off_hand'].includes(r.item.slot)).map(r=>[r.item.snapshot?.name||'—',r.qty??1,r.weight===null?'—':r.weight.toFixed(1),/^Počáteční výbava(?: \(automatický návrh\))?$/i.test(String(r.item.condition||'').trim())?'':(r.item.condition||'')]);
  return [];
 }
 function journalInventoryTable(title,headers,rows,klass=''){return `<section class="journal-book-section ${klass}"><div class="journal-book-title">${esc(title)}</div><div class="journal-ledger-wrap"><table class="journal-ledger"><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map(cell=>`<td>${esc(firstPresent(cell,'—'))}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}" class="muted">Bez evidovaných údajů.</td></tr>`}</tbody></table></div></section>`;}
@@ -847,15 +847,20 @@ function journalBodyLocationsHTML(c){
  const aggregate=code=>{
   if(suit.ok){
    const pieces=['b','e','p','f'].map(a=>resolvePrintedSuitProtection(suit.name,code,a));
-   if(pieces.every(x=>x.ok))return {av:Object.fromEntries(pieces.map((x,i)=>[['b','e','p','f'][i],x.av[['b','e','p','f'][i]]])),provisional:false};
+   if(pieces.every(x=>x.ok))return {av:Object.fromEntries(pieces.map((x,i)=>[['b','e','p','f'][i],x.av[['b','e','p','f'][i]]])),rigid:Object.fromEntries(pieces.map((x,i)=>[['b','e','p','f'][i],x.rigid])),provisional:false};
   }
-  const av={b:0,e:0,p:0,f:0};let provisional=false;
+  const av={b:0,e:0,p:0,f:0};let provisional=false;const rigid={b:false,e:false,p:false,f:false};
   for(const item of worn){
    if(item.quantity!==1)return null;
    const prop=item.snapshot?.properties||{};
    const local=prop.locationProtection?.[code];
    const declared=Array.isArray(prop.coveredLocations)?prop.coveredLocations:null;
    if(declared&&(!declared.every(x=>/^(sk|fa|nk|sh|ua|el|fo|ha|tx|ab|pv|th|kn|ca|ft)$/.test(x))||new Set(declared).size!==declared.length))return null;
+   // Boxed AV is a rule marker, not a decorative style. Only a location-
+   // verified article can establish rigid; its colour is inferred solely
+   // from its verified material (Metal Armour Option p133).
+   const isRigid=prop.locationAttributes?.[code]?.rigid===true||['rigid','front-only'].includes(prop.coverageMarkers?.[code]);
+   if(isRigid){rigid.e=true;rigid.p=true;}
    // A complete per-location AV takes precedence over the optional fallback.
    if(local&&['b','e','p','f'].every(k=>Number.isSafeInteger(local[k])&&local[k]>=0)){
     if(declared&&!declared.includes(code))return null;
@@ -877,21 +882,35 @@ function journalBodyLocationsHTML(c){
     return null;
    }
   }
-  return {av,provisional};
+  return {av,rigid,provisional};
  };
  const rows=codes.map(({code,name,shock})=>{
   const layers=coverage.locations[code]||[];
   const result=aggregate(code),values=result?.av;
   const associated=wounds.filter(w=>{const loc=String(w.location??w.loc??'').trim().toLowerCase();return loc===code||loc===name.toLowerCase()||({sk:['skull','head'],fa:['face'],nk:['neck'],sh:['shoulder'],ua:['upper arm'],el:['elbow'],fo:['forearm'],ha:['hand'],tx:['thorax','chest'],ab:['abdomen'],pv:['pelvis'],th:['thigh'],kn:['knee'],ca:['calf'],ft:['foot']}[code]||[]).includes(loc)});
-  const liveBleed=associated.some(w=>w.bleeding===true||Number(w.bleedingRate??w.bleedRate??w.bleed??0)>0);
   const symbols=hmkHumanLocationSymbols(code);
-  const potentialBleed=symbols?.bleeds??0;
-  const arrows=potentialBleed?`<span class="journal-bleed-mark ${liveBleed?'journal-bleed-active':'journal-bleed-possible'}" title="${liveBleed?'Aktivní krvácení':'Potenciální Bleeder podle HMK p.167'} · ${potentialBleed} značek">${'↓'.repeat(potentialBleed)}</span>`:'<span class="journal-bleed-empty">—</span>';
+  // Printed p167: one circle per location: white, grey or black. Each shade
+  // selects a different severity/aspect bleeding threshold (p168).
+  const bleedShade=symbols?.bleeds===3?'black':symbols?.bleeds===1?'grey':'white';
+  const bleedRule={white:'S3/G4: žádný; G5: Edge, Point nebo Blunt',grey:'S3: žádný; G4: Edge nebo Point; G5: Edge, Point nebo Blunt',black:'S3: Edge; G4: Edge nebo Point; G5: Edge, Point nebo Blunt'}[bleedShade];
+  const circle=`<span class="hmk-bleed-circle hmk-shade-${bleedShade}" tabindex="0" role="img" aria-label="Krvácení: ${bleedShade}; ${bleedRule}" title="HMK s.167–168 · Potenciální krvácení (${bleedShade}). ${bleedRule}. Samotná značka neříká, že rána už krvácí."></span>`;
+  const triangleShade=symbols?.triangle===20?'white':symbols?.triangle===0?'grey':symbols?.triangle===-20?'black':null;
+  const triangleFill={white:'#fffdf7',grey:'#9ba0a5',black:'#1c1e23'}[triangleShade];
+  const triangle=triangleShade?`<svg class="hmk-amputation-triangle" tabindex="0" role="img" aria-label="Amputace: ${triangleShade}, Strength ${symbols.triangle>=0?'+':''}${symbols.triangle}" title="HMK s.168: možnost amputace jen při G5 edge. Strength modifier ${symbols.triangle>=0?'+':''}${symbols.triangle}." viewBox="0 0 16 16"><title>HMK s.168: amputace G5 Edge; Strength modifikátor ${symbols.triangle>=0?'+':''}${symbols.triangle}.</title><path d="M2 3 H14 L8 14 Z" fill="${triangleFill}" stroke="#38302a" stroke-width="1.5"/></svg>`:'<span class="hmk-symbol-none">·</span>';
   const injuryText=associated.map(w=>[w.severity??w.injuryLevel??w.injury??w.kind??'Injury',w.description].filter(Boolean).join(': ')).join('; ');
-  return `<tr title="${esc(layers.map(x=>x.name).join(' → ')||'Žádný doložený zbrojní článek')}"><th scope="row">${esc(code.toUpperCase())}</th><td class="journal-location-name" title="${esc(name)}">${esc(name)}</td>${['b','e','p','f'].map(k=>`<td class="journal-av${result?.provisional?' journal-av-derived':''}" title="${esc(code.toUpperCase()+': '+k+(result?.provisional?' · odvozeno z doloženého materiálu a deklarovaného pokrytí; GM potvrdí':''))}">${values?esc(values[k]):'?'}</td>`).join('')}<td class="journal-shk" title="Location Shock z pravidlové tabulky HMK p.167">${shock}</td><td class="journal-arrows">${arrows}</td><td class="journal-injuries">${associated.length?`<span title="${esc(injuryText)}">${esc(associated.map(w=>w.severity&&w.level?w.severity+w.level:(w.injury??w.injuryLevel??'✚')).join(' · '))}</span>`:'—'}</td></tr>`;
+  const materials=worn.filter(x=>x.snapshot?.properties?.coveredLocations?.includes(code)).map(x=>String(x.snapshot.properties.material||'').toLowerCase());
+  const metal=materials.some(m=>['p','plate'].includes(m))?'black':materials.some(m=>['m','mail','s','scale'].includes(m))?'grey':null;
+  const avcell=k=>{
+   const rigid=!!result?.rigid?.[k],shade=rigid?(metal||'white'):null;
+   const rText=rigid?` · Rigid armour: snižuje závažnost edge/point glancing; ${metal==='black'?'Plate (černý box)':metal==='grey'?'Mail/Scale (šedý box)':'jiný rigid materiál (bílý box)'}`:'';
+   const tip=`${code.toUpperCase()} · ${k.toUpperCase()} AV ${values?values[k]:'neověřena'}${rText}${result?.provisional?' · materiálově odvozeno; GM musí potvrdit':''}`;
+   const number=values?esc(values[k]):'?';
+   return `<td class="journal-av${result?.provisional?' journal-av-derived':''}"><span tabindex="0" title="${esc(tip)}" class="journal-av-value${rigid?' journal-av-rigid journal-av-rigid-'+shade:''}">${number}</span></td>`;
+  };
+  return `<tr><th scope="row">${esc(code.toUpperCase())}</th><td class="journal-location-name" title="${esc(name)}">${esc(name)}</td>${['b','e','p','f'].map(avcell).join('')}<td class="journal-symbol-cell">${circle}</td><td class="journal-shk"><span class="hmk-location-shk" title="HMK s.169: Location Shock ${shock}, ke kterému se přičítá Injury Level a výsledek Shock Roll.">${shock}</span></td><td class="journal-symbol-cell">${triangle}</td><td class="journal-injuries">${associated.length?`<span title="${esc(injuryText)}">${esc(associated.map(w=>w.severity&&w.level?w.severity+w.level:(w.injury??w.injuryLevel??'✚')).join(' · '))}</span>`:'—'}</td></tr>`;
  }).join('');
  const unknown=wounds.filter(w=>{const loc=String(w.location??w.loc??'').trim().toLowerCase();return !codes.some(({code,name})=>loc===code||loc===name.toLowerCase());});
- return `<section class="journal-book-section journal-body-locations"><div class="journal-book-title">Body Locations · Armour / Injuries</div><div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><colgroup><col class="journal-col-code"><col class="journal-col-name">${['b','e','p','f'].map(()=>'<col class="journal-col-av">').join('')}<col class="journal-col-shk"><col class="journal-col-bleed"><col class="journal-col-injuries"></colgroup><thead><tr><th>LOC</th><th>Location</th>${['b','e','p','f'].map(k=>`<th class="journal-av">${k}</th>`).join('')}<th class="journal-shk">SHK</th><th class="journal-arrows" title="Bleeder arrows">↓</th><th>Injuries</th></tr></thead><tbody>${rows}</tbody></table></div><p class="journal-anatomy-note">AV: b/e/p/f; ? = nedostatečná evidence. Tečkované hodnoty jsou informativně odvozené z uvedeného materiálu a pokrytí, GM je musí potvrdit; bojový výpočet se nemění. SHK = Location Shock dle tabulky, nikoli aktuální stav. Šedé šipky = pravidlová možnost krvácení, černé = aktuálně krvácející rána. Přesné vrstvy jsou v Arsenal & Gear. Nepřiřazené rány: ${unknown.length}.</p>${unknown.length?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>${unknown.map(w=>`<div>${esc([w.location??w.loc??'—',w.severity??w.injuryLevel??w.description??''].filter(Boolean).join(' · '))}</div>`).join('')}</details>`:''}</section>`;
+ return `<section class="journal-book-section journal-body-locations"><div class="journal-book-title">Body Locations · Armour / Injuries</div><div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><colgroup><col class="journal-col-code"><col class="journal-col-name">${['b','e','p','f'].map(()=>'<col class="journal-col-av">').join('')}<col class="journal-col-bleed"><col class="journal-col-shk"><col class="journal-col-amp"><col class="journal-col-injuries"></colgroup><thead><tr><th>LOC</th><th>Location</th>${['b','e','p','f'].map(k=>`<th class="journal-av">${k}</th>`).join('')}<th class="journal-symbol-cell" title="Potenciální krvácení (HMK p.167–168)">●</th><th class="journal-shk">SHK</th><th class="journal-symbol-cell" title="Možnost amputace při G5 Edge (HMK p.168)">▽</th><th>Injuries</th></tr></thead><tbody>${rows}</tbody></table></div><p class="journal-anatomy-note">HMK s.111, 133, 167–169: AV v rámečku = Rigid (E/P Glancing Blow). Šedá / černá výplň značí volitelné pravidlo Metal Armour (Scale/Mail / Plate). ● = možné krvácení dle severity a aspektu zásahu; ▽ = možné amputace při G5 edge. Najetím / fokusem zobrazíš vysvětlení. SHK v tmavém poli = Location Shock. AV s tečkovaným podtržením vyžaduje potvrzení GM. Nepřiřazené rány: ${unknown.length}.</p>${unknown.length?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>${unknown.map(w=>`<div>${esc([w.location??w.loc??'—',w.severity??w.injuryLevel??w.description??''].filter(Boolean).join(' · '))}</div>`).join('')}</details>`:''}</section>`;
 }
 function journalConvocationsHTML(c){
  const arc=c.hmk?.arcane||{},primary=arc.primaryConvocation??c.hmk?.creation?.values?.pvarPrimary??null;
@@ -921,7 +940,7 @@ function journalConditionDetailsHTML(c,state,load){
  return `<div class="journal-condition-detail-grid">${block('Impact',[['Poslední Impact',impactValue],['Recorded Hits',(state.events||[]).filter(x=>x.type==='confirmed-hit').length]])}${block('Shock State',[['Current',shock],['Extended HR',state.extendedShock?.hr??'—'],['Coma HR',state.coma?.hr??'—']],'journal-shock-state')}${block('Stress',[['Psyche',stress],['Aural Shock',auraShock],['Shadow',shadow]])}${block('Fatigue',[['Winded',fat.windedness],['Weary',fat.weariness],['Weak',fat.weakness],['Total',fat.total],['PF',pf],['END SR (TN)',endSR]])}</div>`;
 }
 function journalSimpleChecklist(title,rows){return `<section class="journal-book-section"><div class="journal-book-title">${esc(title)}</div><div class="journal-check-grid">${rows.map(([label,value])=>`<label><span class="journal-check"></span><em>${esc(label)}</em><strong>${esc(firstPresent(value,'—'))}</strong></label>`).join('')}</div></section>`;}
-function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['notes','Notes & Logbook']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}</div>`;}
+function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['notes','Notes & Logbook']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}</div>`;}
 function journalShell(inner,extraClass=''){return `<section class="journal-book panel wide ${extraClass}"><div class="journal-book-frame"><div class="book-cover-ornament book-cover-ornament--tl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--tr" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--bl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--br" aria-hidden="true"></div>${journalSectionNav()}${inner}</div></section>`;}
 function characterJournalHero(c,inv,editing=false){
  const h=c.hmk||{},creation=h.creation?.values||{},state=persistentStateOf(c),attrs=h.attributes||{};
@@ -1040,7 +1059,7 @@ function sheetView(){
  const sheetAudit=auditCharacterSheet(c,data.inventory);
  const auditPanel=`<section class="panel wide"><details><summary>Kontrola integrity Character Sheet · ${sheetAudit.ok?'bez nalezeného nesouladu':'vyžaduje pozornost'}</summary><p class="muted">Kontrola je pouze pro čtení a žádné hodnoty neopravuje ani nemaže. Zdroj: stávající HMK profil, Character Creation a inventář.</p>${sheetAudit.issues.map(x=>`<p class="notice error">${esc(x)}</p>`).join('')}${sheetAudit.notes.map(x=>`<p class="notice">${esc(x)}</p>`).join('')}${sheetAudit.ok?'<p>Promítnuté Skills a vybavení: kontrola prošla v rozsahu známých dat.</p>':''}</details></section>`;
  const logs=data.journal.filter(x=>x.characterId===c.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
- return `<div class="topline ledger-topline"><h2>Osobní deník: ${esc(c.name)}</h2>${data.campaignClock?`<button type="button" class="secondary" data-nav="calendar">◷ ${esc(displayCampaignMinute(data.campaignClock.minute))}</button>`:''}${button('← Registr','go-characters')}${editing?'<button type="submit" form="sheet-inline-form">Uložit změny</button><button type="button" class="secondary" data-sheet-cancel>Zrušit</button>':'<button type="button" data-sheet-edit>✎ Upravit atributy · Skills · peníze</button>'}${button('Pravidlová tvorba','creation-open')}${button('Export HMK profilu','export-kernel-character')}</div>${activeSheetSection==='overview'?characterJournalHero(c,inv,editing):sheetSupplementTabs(c,inv,editing,auditPanel,logs)}`
+ return `<div class="topline ledger-topline"><h2>Osobní deník: ${esc(c.name)}</h2>${data.campaignClock?`<button type="button" class="secondary" data-nav="calendar">◷ ${esc(displayCampaignMinute(data.campaignClock.minute))}</button>`:''}${button('← Registr','go-characters')}${button('Pravidlová tvorba','creation-open')}${button('Export HMK profilu','export-kernel-character')}</div>${activeSheetSection==='overview'?characterJournalHero(c,inv,editing):sheetSupplementTabs(c,inv,editing,auditPanel,logs)}`
 }
 function catalogAuditEntry(i){
  const p=i.properties||{}, missing=[];

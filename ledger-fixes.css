@@ -1,4 +1,4 @@
-/* v93.322: anatomical table and missing dossier panels. Skin and functionality preserved. */
+/* v93.323: anatomical table and missing dossier panels. Skin and functionality preserved. */
 .content-sheet .journal-right-mid-grid .journal-body-locations{grid-column:1/-1!important;min-width:0}
 .content-sheet .journal-right-mid-grid .journal-right-card{grid-column:1/-1;min-width:0}
 .content-sheet .journal-anatomy-wrap{width:100%;overflow-x:auto;scrollbar-width:thin}
@@ -46,3 +46,30 @@
 }
 
 .content-sheet .journal-anatomy-table .journal-av-derived{text-decoration:underline dotted rgba(110,76,44,.6);text-underline-offset:2px}
+
+/* v93.323 • Faithful HMK printed body-location symbols and exposed Edit button. */
+.content-sheet .journal-anatomy-table col.journal-col-code{width:7%!important}
+.content-sheet .journal-anatomy-table col.journal-col-name{width:20%!important}
+.content-sheet .journal-anatomy-table col.journal-col-av{width:7.2%!important}
+.content-sheet .journal-anatomy-table col.journal-col-shk{width:8%!important}
+.content-sheet .journal-anatomy-table col.journal-col-bleed{width:6%!important}
+.content-sheet .journal-anatomy-table col.journal-col-amp{width:6%!important}
+.content-sheet .journal-anatomy-table col.journal-col-injuries{width:24.2%!important}
+.content-sheet .journal-anatomy-table th.journal-symbol-cell,
+.content-sheet .journal-anatomy-table td.journal-symbol-cell{text-align:center!important;white-space:nowrap;vertical-align:middle!important}
+.content-sheet .journal-anatomy-table .journal-av-value{display:inline-flex;align-items:center;justify-content:center;min-width:1.4em;min-height:1.5em;border:1px solid transparent;line-height:1;font-variant-numeric:tabular-nums}
+.content-sheet .journal-anatomy-table .journal-av-rigid{border:1px solid #40342b;border-radius:1px;color:#221a11;background:#fffef5;text-decoration:none!important}
+.content-sheet .journal-anatomy-table .journal-av-rigid-grey{background:#a7abb0;color:#17191c}
+.content-sheet .journal-anatomy-table .journal-av-rigid-black{background:#252529;color:#fff!important}
+.content-sheet .journal-anatomy-table .hmk-location-shk{display:inline-flex;min-width:2.1em;justify-content:center;align-items:center;background:#4b4b4f;color:#fff!important;font-size:10px;line-height:1.4;font-weight:700;border-radius:2px}
+.content-sheet .journal-anatomy-table .hmk-bleed-circle{display:inline-block;vertical-align:middle;box-sizing:border-box;width:11px;height:11px;border:1px solid #45413d;border-radius:50%;background:#fdfaf3;cursor:help}
+.content-sheet .journal-anatomy-table .hmk-bleed-circle.hmk-shade-grey{background:#a1a5a9;border-color:#a1a5a9}
+.content-sheet .journal-anatomy-table .hmk-bleed-circle.hmk-shade-black{background:#151719;border-color:#151719}
+.content-sheet .journal-anatomy-table .hmk-amputation-triangle{display:inline-block;vertical-align:middle;width:13px;height:13px;cursor:help}
+.content-sheet .journal-anatomy-table .hmk-symbol-none{color:transparent;user-select:none}
+.content-sheet .journal-anatomy-table :is([tabindex="0"]):focus-visible{outline:2px solid #8c5a21;outline-offset:2px}
+.content-sheet .journal-book-subnav .journal-edit-divider{height:22px;width:1px;background:rgba(90,58,23,.35);margin-inline:3px}
+.content-sheet .journal-book-subnav .journal-edit-button,
+.content-sheet .journal-book-subnav .journal-edit-save{background:linear-gradient(#24425c,#142b42)!important;border:1px solid #d0a363!important;color:#fff6dd!important;font-weight:700!important;box-shadow:0 1px 3px #23160944;min-width:85px}
+.content-sheet .journal-book-subnav .journal-edit-cancel{background:#ead9bc!important;color:#412b14!important;border:1px solid #9b7141!important}
+@media(max-width:680px){.content-sheet .journal-anatomy-table{min-width:480px!important}.content-sheet .journal-book-subnav .journal-edit-divider{display:none}}
