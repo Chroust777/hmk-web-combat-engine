@@ -1,0 +1,223 @@
+/** HMK World of Kèthîra, printed pp.112,117-118,122,170.
+ * Read-only, inventory-derived Armour ENC, Gear ENC, modified ENC, PF and
+ * body-zone Bulk. Do not conflate an equipment load with accrued Fatigue.
+ * Unknown masses and unsupported suit layering are not zero; verified C/D Bulk is automatic.
+ */
+import {PRINTED_ARMOUR_ARTICLES_P118} from '../rules/armour-articles-printed.js';
+import {PRINTED_ARMOUR_SUITS_P113_116} from '../rules/armour-suit-printed.js';
+import {identifyWornPrintedSuit} from './printed-suit-combat.js';
+import {resolveOwnedArmourArticle} from './live-combat-armour.js';
+import {evaluateOrderedArmour} from './armour-layer-evaluation.js';
+import {assessArmourFeasibility,prepareArmourForFeasibility} from './hmk-armour-feasibility.js';
+import {calculateGearLoad} from '../rules/gear-load.js';
+import {modifiedEncumbrance,strengthEncumbranceModifier,encumbranceTestPenalty} from '../rules/encumbrance.js';
+import {personalFatigue} from '../rules/fatigue.js';
+
+const ZONES=['head','arms','torso','legs'];
+const SUITS=new Map(PRINTED_ARMOUR_SUITS_P113_116.map(s=>[s.name,s]));
+const ARMOUR=new Map(PRINTED_ARMOUR_ARTICLES_P118.map(a=>[a.id,a]));
+const SLOTS=new Set(['underFar','underNear','base','overNear','overFar']);
+const MASS_SLOTS=new Set(['carried','main_hand','off_hand']);
+const finiteMass=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
+const fail=(issues,partial={})=>({ready:false,encReady:false,bulkReady:false,issues, ...partial});
+
+/** Melee is impaired by all four zones under p.170; other tests must specify zones. */
+export function bulkForTest(load,zones=ZONES){
+ if(!load?.bulkReady)return {ready:false,reason:'Body-zone Bulk is unresolved'};
+ if(!Array.isArray(zones)||zones.some(z=>!ZONES.includes(z))||new Set(zones).size!==zones.length)
+  return {ready:false,reason:'Invalid or repeated impaired body zone'};
+ const zonePenalties=Object.fromEntries(zones.map(z=>[z,load.bulkByZone[z]]));
+ return {ready:true,zonePenalties,penalty:Object.values(zonePenalties).reduce((s,n)=>s+n,0)};
+}
+
+/**
+ * @param {object} character User-stored record with hmk.attributes.str, not GM-supplied dummy STR.
+ * @param {Array} inventory Actual owned inventory rows.
+ * @param {object} options
+ *  - bulkConfirmation: {assessed:true,violatingZones:[]} for exact printed suits
+ *    where physical layer order is NOT source-verified. Not inferred from suit name.
+ *  - layerOptions: GM-assessed p.117 custom Bulk exceptions and optional explicit columns.
+ *  - mounted: confirmed mount context from GM; no mount state stored in character yet.
+ */
+export function resolveCombatantLoad({character,inventory,layerOptions={},bulkConfirmation=null,mounted=false}={}){
+ const issues=[];
+ if(!character||typeof character.id!=='string'||!character.id)return fail(['Character ID is required']);
+ if(!Array.isArray(inventory))return fail(['Owned inventory is required']);
+ if(typeof mounted!=='boolean')return fail(['Mounted state must be boolean']);
+ const id=character.id;
+ const owned=inventory.filter(x=>x?.characterId===id),seen=new Set();
+ for(const x of owned){
+  if(!x||typeof x.id!=='string'||!x.id.trim()||seen.has(x.id))issues.push('Invalid or duplicate inventory ID');
+  else seen.add(x.id);
+  if(!['worn','carried','main_hand','off_hand','none',undefined,null].includes(x.slot))issues.push(`Unknown equipment slot: ${x.id}`);
+ }
+ const worn=owned.filter(x=>x.slot==='worn');
+ if(worn.some(x=>x.snapshot?.category!=='armor'))issues.push('Non-armour item in worn slot');
+ const articles=[];
+ for(const item of worn){
+  const checked=resolveOwnedArmourArticle(item);
+  if(!checked.ready){issues.push(`${item.snapshot?.name||item.id}: ${checked.reason}`);continue;}
+  articles.push({item,article:checked.article});
+ }
+ const layeringFeasibility=articles.length===worn.length?assessArmourFeasibility(prepareArmourForFeasibility(articles)):null;
+ let armourENC=null,extraEnc=null,conditionalArmENC=null,perceptionPenalty=null;
+ // Item ENC is independent of whether the player's chosen layer order is legal.
+ // Conditional outer D/Q +5 cannot be presumed without a verified layer assignment.
+ let knownArmourENC=null;let unknownExtraENC=false;
+ let armourENCUpperBound=null;let armourArithmeticENC=null;
+ let bulkReady=false,bulkByZone=null,bulkSource=null,armourSource=null,layering=null;
+ const match=identifyWornPrintedSuit(inventory,id);
+ if(worn.length===0){
+  armourENC=0;knownArmourENC=0;extraEnc=0;conditionalArmENC=0;perceptionPenalty=0;
+  bulkReady=true;bulkByZone=Object.fromEntries(ZONES.map(z=>[z,0]));bulkSource='unarmoured';armourSource='unarmoured';
+ }else if(articles.length===worn.length&&match.ok){
+  const suit=SUITS.get(match.name);
+  if(!suit)issues.push('Printed suit missing in HMK catalogue');
+  else {
+   armourENC=suit.enc;knownArmourENC=suit.enc;extraEnc=null;conditionalArmENC=null;perceptionPenalty=-suit.per;
+   armourSource=`printed-suit:${suit.name}`;
+   // The exact, unchanged published suit (pp.113–116) is an approved assembled
+   // outfit: no added layers and therefore no exception-driven Bulk. No GM
+   // confirmation is necessary for a completely identified printed suit.
+   // Explicit legacy confirmations may not override the printed suit's baseline.
+   bulkReady=true;
+   bulkByZone=Object.fromEntries(ZONES.map(z=>[z,0]));
+   bulkSource='exact-printed-suit-zero-bulk';
+   if(bulkConfirmation?.assessed===true && bulkConfirmation.violatingZones?.length)
+    issues.push('Printed suit alone cannot carry manually nominated extra Bulk layers');
+  }
+ }else if(articles.length===worn.length){
+  // Do not collapse all armour ENC to unknown merely because the player
+  // has omitted layerOrder or equipped a prohibited non-C/D combination.
+  const conditionalCount=articles.filter(({article})=>article.enc==='a').length;
+  const unknownBase=articles.some(({article})=>!Number.isSafeInteger(article.enc)&&!['a','p'].includes(article.enc));
+  conditionalArmENC=conditionalCount>=3?5:0;
+  knownArmourENC=unknownBase?null:articles.reduce((sum,{article})=>sum+(Number.isSafeInteger(article.enc)?article.enc:0),0)+conditionalArmENC;
+  // Determine the printed article subtotal even when a chosen outfit is invalid.
+  // A possible D/Q outermost article adds +5, but never guess its column.
+  const outerArticle=/\b(cloak|mantle|vest|surcoat|coat|robe|cuisse|cuisses)\b/i;
+  const possibleOuter=articles.filter(({article})=>['padded','quilted'].includes(String(article.material).toLowerCase())&&outerArticle.test(article.name));
+  armourArithmeticENC=knownArmourENC;
+  armourENCUpperBound=knownArmourENC===null?null:knownArmourENC+5*possibleOuter.length;
+  unknownExtraENC=possibleOuter.length>0;
+  if(!unknownExtraENC&&layeringFeasibility?.status!=='forbidden'&&knownArmourENC!==null){armourENC=knownArmourENC;extraEnc=0;}
+  perceptionPenalty=-articles.reduce((s,{article})=>s+(article.enc==='p'?(article.perceptionPenalty??0):0),0);
+  // If *every* possible physical arrangement is legal, Bulk is provably zero.
+  // This covers separate basic clothes with no need to ask the GM.
+  const orderInvariant=layeringFeasibility&&Object.values(layeringFeasibility.zones).every(z=>z.orderInvariant);
+  if(orderInvariant){bulkReady=true;bulkByZone=Object.fromEntries(ZONES.map(z=>[z,0]));bulkSource='p117-order-invariant-valid';armourSource='audited-p118-order-invariant';}
+  const ordered=[];
+  for(const {item,article} of articles){
+   // With exactly one worn article its physical order is unique; requesting
+   // a GM-defined order would add no actual information (HMK p.117).
+   const effectiveOrder=item.layerOrder??(worn.length===1?0:null);
+   if(!Number.isSafeInteger(effectiveOrder)||effectiveOrder<0){if(!orderInvariant)issues.push(`${item.id}: inner-to-outer layerOrder required`);continue;}
+   if(item.layerSlot!==undefined&&item.layerSlot!==null&&item.layerSlot!==''&&!SLOTS.has(item.layerSlot)){
+    issues.push(`${item.id}: invalid layer slot`);continue;
+   }
+   ordered.push({...article,id:item.id,layerOrder:effectiveOrder});
+  }
+  if(ordered.length===articles.length){
+   const slots=Object.fromEntries(articles.filter(({item})=>item.layerSlot).map(({item,article})=>[item.id,item.layerSlot]));
+   // Older saves may contain explicit selections. Otherwise the ordered
+   // evaluator now derives only proven p.117 C/D Bulk exceptions automatically.
+   const bulkExceptionByZone={};
+   for(const {item,article} of articles){
+    const nominated=item.bulkExceptionZones??[];
+    if(!Array.isArray(nominated)||nominated.some(z=>!ZONES.includes(z))||new Set(nominated).size!==nominated.length){
+     issues.push(`${item.id}: invalid Bulk exception zones`);continue;
+    }
+    for(const zone of nominated){
+     if(bulkExceptionByZone[zone]!==undefined){issues.push(`More than one GM Bulk article nominated for ${zone}`);continue;}
+     bulkExceptionByZone[zone]=item.id;
+    }
+   }
+   if(layerOptions.bulkExceptionByZone&&Object.entries(layerOptions.bulkExceptionByZone).some(([z,id])=>bulkExceptionByZone[z]!==undefined&&bulkExceptionByZone[z]!==id))
+    issues.push('Conflicting Bulk selection from the inventory and GM options');
+   const merged={...layerOptions,bulkExceptionByZone:{...bulkExceptionByZone,...layerOptions.bulkExceptionByZone},slotByArticleId:{...slots,...layerOptions.slotByArticleId}};
+   layering=evaluateOrderedArmour(ordered,merged);
+   // A legacy 'layerSlot' is a convenience hint, not the authoritative physical
+   // inner-to-outer order. Early character generators assigned an over-column
+   // to standalone Breeches, causing a false failure in the legs Body Zone.
+   // If the SAME article order is fully rules-valid without those hints, use
+   // the proved layer result; do not rewrite the inventory or invent any Bulk.
+   if(layering.status!=='compatible'&&Object.keys(slots).length&&
+      layering.errors.some(e=>/incompatible explicit slot|forbidden material order/i.test(e))){
+     const withoutSlotHints=evaluateOrderedArmour(ordered,{...merged,slotByArticleId:{},slotByZoneLocation:{}});
+     if(withoutSlotHints.status==='compatible')layering={...withoutSlotHints,legacySlotsIgnored:true};
+   }
+   if(layering.status!=='compatible')issues.push(`Unresolved or forbidden armour layers: ${[...layering.errors,...layering.unresolved].join('; ')}`);
+   else {
+    extraEnc=layering.extraEnc;
+    unknownExtraENC=false;
+    conditionalArmENC=articles.filter(({article})=>article.enc==='a').length>=3?5:0;
+    const unknown=articles.filter(({article})=>!Number.isSafeInteger(article.enc)&&!['a','p'].includes(article.enc));
+    if(unknown.length)issues.push(`Unknown printed article ENC: ${unknown.map(x=>x.article.id).join(', ')}`);
+    else {armourENC=articles.filter(({article})=>Number.isSafeInteger(article.enc)).reduce((s,{article})=>s+article.enc,0)+conditionalArmENC+extraEnc;
+     knownArmourENC=armourENC;armourENCUpperBound=armourENC;armourArithmeticENC=armourENC;}
+    perceptionPenalty=-articles.reduce((s,{article})=>s+(article.enc==='p'?(article.perceptionPenalty??0):0),0);
+    bulkByZone=Object.fromEntries(ZONES.map(z=>[z,layering.zoneReports.find(r=>r.zone===z)?.bulkArticleId?-5:0]));
+    bulkReady=true;bulkSource='validated-p117-ordered-layers';armourSource='audited-p118-articles';
+   }
+  }
+ }
+ // Any piece not worn but explicitly held/carried is gear. Never add worn armour twice.
+ const gear=[];
+ for(const item of owned.filter(x=>MASS_SLOTS.has(x.slot))){
+  if(!Number.isSafeInteger(item.quantity)||item.quantity<1){issues.push(`${item.id}: invalid carried quantity`);continue;}
+  const p=item.snapshot?.properties;
+  let physicalWeight=p?.weightLb;
+  if(item.snapshot?.category==='armor'&&typeof item.sourceItemId==='string'&&item.sourceItemId.startsWith('hmk:armour:p118:')){
+   const verified=resolveOwnedArmourArticle(item,{allowCarried:true});
+   if(!verified.ready){issues.push(`${item.id}: stowed HMK armour is not source-verified: ${verified.reason}`);continue;}
+   physicalWeight=verified.article.weightLb;
+  }
+  if(!finiteMass(physicalWeight)){issues.push(`${item.id}: unknown physical weight; cannot calculate Gear ENC`);continue;}
+  const stowage=item.gearStowage??'normal';
+  if(!['normal','awkward','backpack'].includes(stowage)) {issues.push(`${item.id}: invalid gear stowage`);continue;}
+  if(stowage==='backpack'&&item.slot!=='carried') {issues.push(`${item.id}: only carried gear can be packed in backpack`);continue;}
+  // HMK p.120: only the CONTENTS of a backpack receive the half-weight
+  // reduction. The backpack itself must always contribute its full weight.
+  if(stowage==='backpack'&&/\bbackpack\b/i.test(item.snapshot?.name||'')){
+   issues.push(`${item.id}: a backpack cannot be packed into itself or receive its own half-weight allowance`);continue;
+  }
+  gear.push({id:item.id,weightLb:physicalWeight,quantity:item.quantity,stowage});
+ }
+ const backpackPacked=gear.some(x=>x.stowage==='backpack');
+ if(backpackPacked&&!owned.some(x=>MASS_SLOTS.has(x.slot)&&/\bbackpack\b/i.test(x.snapshot?.name||'')))
+  issues.push('Backpack reduction claimed but no actual backpack is carried');
+ let gearLoad=null;
+ if(!issues.some(x=>/weight|stowage|quantity|backpack|duplicate inventory|equipment slot/.test(x.toLowerCase()))){
+  try{gearLoad=calculateGearLoad(gear);}catch(e){issues.push(`Gear load: ${e.message}`);}
+ }
+ // HMK p.112 STR table explicitly continues with an ellipsis beyond 20–21;
+ // p.122 confirms the same progression at STR27 (−40 ENC). Do not reject
+ // valid stronger characters/creatures merely because the table is abbreviated.
+ const str=character.hmk?.attributes?.str;
+ const validSTR=Number.isSafeInteger(str)&&str>=1&&str<=200;
+ if(!validSTR)issues.push('Character STR must be a recorded positive integer (1–200)');
+ // A prohibited outfit has no *rules-valid* ENC, even though its known
+ // component encumbrances are displayed. Never silently legalise it.
+ const prohibitedOutfit=layeringFeasibility?.status==='forbidden';
+ const encReady=Number.isSafeInteger(armourENC)&&gearLoad!==null&&validSTR&&!prohibitedOutfit;
+ const baseENC=encReady?armourENC+gearLoad.gearENC:null;
+ const knownBaseENC=Number.isFinite(knownArmourENC)&&gearLoad!==null?knownArmourENC+gearLoad.gearENC:null;
+ // This is a known lower bound, NOT an invented total: unknown outer-layer
+ // additions can still increase it. Only the exact total enters skill EML.
+ const knownMinimumENC=knownBaseENC!==null&&validSTR?modifiedEncumbrance({armourENC:knownArmourENC,gearENC:gearLoad.gearENC,str,mounted}):null;
+ const knownMaximumENC=Number.isFinite(armourENCUpperBound)&&gearLoad!==null&&validSTR?modifiedEncumbrance({armourENC:armourENCUpperBound,gearENC:gearLoad.gearENC,str,mounted}):null;
+ const strengthModifier=encReady?strengthEncumbranceModifier(str,{mounted}):null;
+ const modifiedENC=encReady?modifiedEncumbrance({armourENC,gearENC:gearLoad.gearENC,str,mounted}):null;
+ const pf=encReady?personalFatigue(modifiedENC):null;
+ const meleeBulk=bulkReady?ZONES.reduce((s,z)=>s+bulkByZone[z],0):null;
+ const result={ready:encReady&&bulkReady&&issues.length===0,encReady,bulkReady,issues,
+  characterId:id,mode:armourSource,printedSuit:match.ok?match.name:null,
+  armourENC,baseENC,knownArmourENC,knownBaseENC,knownMinimumENC,knownMaximumENC,armourENCUpperBound,armourArithmeticENC,unknownExtraENC,layeringFeasibility,prohibitedOutfit,
+  layeringDetails:layering,gearENC:gearLoad?.gearENC??null,gearLoad,
+  extraEnc,conditionalArmENC,perceptionPenalty,str,mounted,strengthModifier,modifiedENC,
+  personalFatiguePerPeriod:pf,agilityAndMeleePenalty:encReady?encumbranceTestPenalty({encumbrance:modifiedENC,skillBaseIncludesAgility:true}):null,
+  bulkByZone,meleeBulkPenalty:meleeBulk,bulkSource,layeringStatus:layering?.status??null,
+  source:'HMK World of Kèthîra pp.112,117–118,122,170',
+  limitations:['Personal Fatigue is accrual per exertion, not current Fatigue','Published suit baseline Bulk is automatic; prohibited non-C/D layers cannot be replaced by a penalty','No carried mass or omitted armour ENC is silently treated as zero','No character state is modified']};
+ return result;
+}
