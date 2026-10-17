@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 235" role="img" aria-label="Anatomická silueta v plátové zbroji">
+ <defs>
+  <linearGradient id="steel" x1="0" x2="1"><stop stop-color="#b9ad8e"/><stop offset=".48" stop-color="#e4d8b5"/><stop offset="1" stop-color="#78684f"/></linearGradient>
+  <linearGradient id="shade" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#978267"/><stop offset="1" stop-color="#514838"/></linearGradient>
+ </defs>
+ <g stroke="#544b3c" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M44 22 Q43 3 55 4 Q68 4 66 22L62 32L47 32Z" fill="url(#steel)"/>
+  <path d="M47 17Q55 13 63 17L62 25H48Z" fill="#3e403a"/>
+  <path d="M48 23L55 27L62 23M55 5V18M45 12H65" fill="none"/>
+  <path d="M44 32L55 38L66 32L72 44L67 76H43L38 44Z" fill="url(#steel)"/>
+  <path d="M45 39L55 42L65 39L64 57L55 64L46 57Z" fill="none"/>
+  <path d="M55 43V62M45 46H65M44 54H66M41 67H69" fill="none" stroke="#87785e"/>
+  <path d="M36 42Q32 30 25 39Q21 44 25 58L35 60L44 45Z" fill="url(#steel)"/>
+  <path d="M74 42Q78 30 85 39Q89 44 85 58L75 60L66 45Z" fill="url(#steel)"/>
+  <path d="M25 56L20 77L29 83L35 59Z" fill="url(#steel)"/>
+  <path d="M85 56L90 77L81 83L75 59Z" fill="url(#steel)"/>
+  <path d="M20 76L16 110L25 113L29 83Z" fill="url(#shade)"/>
+  <path d="M90 76L94 110L85 113L81 83Z" fill="url(#shade)"/>
+  <path d="M16 108Q12 120 18 129L24 128L25 111Z" fill="url(#steel)"/>
+  <path d="M94 108Q98 120 92 129L86 128L85 111Z" fill="url(#steel)"/>
+  <path d="M41 76L69 76L72 100L55 108L38 100Z" fill="url(#shade)"/>
+  <path d="M42 84H68M40 94H70" fill="none"/>
+  <path d="M39 101L55 108L71 101L70 115L60 122H50L40 115Z" fill="url(#steel)"/>
+  <path d="M41 115L50 121L52 153L48 172L34 172L34 148Z" fill="url(#steel)"/>
+  <path d="M69 115L60 121L58 153L62 172L76 172L76 148Z" fill="url(#steel)"/>
+  <path d="M35 146L50 146M60 146H75M34 164L49 164M61 164H76" fill="none"/>
+  <path d="M34 173L48 173L47 208L34 212L31 192Z" fill="url(#steel)"/>
+  <path d="M62 173L76 173L79 192L76 212L63 208Z" fill="url(#steel)"/>
+  <path d="M33 205L47 205L47 218L22 224L20 218Z" fill="url(#shade)"/>
+  <path d="M63 205L77 205L90 218L88 224L63 218Z" fill="url(#shade)"/>
+  <path d="M19 86L31 86M79 86H91M32 187L46 187M64 187H78M55 108V121" fill="none" stroke="#bda979"/>
+ </g>
+</svg>
