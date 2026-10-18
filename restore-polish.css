@@ -456,3 +456,38 @@
 @media(max-width:800px){
   .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
 }
+
+
+/* --- Fix pass 7: remove lingering inner gutter/side-page textures and keep only the outer frame plus vellum field --- */
+.content-sheet .journal-book-frame{
+  background-image:
+    url('./assets/ui/book/book_top.png'),
+    url('./assets/ui/book/book_bottom.png'),
+    url('./assets/ui/book/book_left.png'),
+    url('./assets/ui/book/book_right.png')!important;
+  background-position:center top,center bottom,left top,right top!important;
+  background-size:100% 44px,100% 49px,42px 100%,52px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:22px 22px 1px!important;
+  background:url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+  box-shadow:none!important;
+  border:none!important;
+  outline:none!important;
+}
+.content-sheet .journal-book-frame::after,
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  -webkit-mask-image:none!important;
+  mask-image:none!important;
+}
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 1px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
+}
