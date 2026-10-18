@@ -572,3 +572,55 @@
 @media(max-width:800px){
   .content-sheet .journal-book-frame::before{inset:6px 8px 6px 8px!important;background-size:calc(100% + 28px) calc(100% + 28px)!important}
 }
+
+
+/* --- Fix pass 8: use the exact open-book parchment image and let it bleed beneath the dark frame so no secondary parchment is visible --- */
+.content-sheet .journal-book-frame{
+  overflow:hidden!important;
+  background:transparent!important;
+}
+.content-sheet .journal-book-frame::before{
+  content:""!important;
+  position:absolute!important;
+  inset:-26px -28px -28px -28px!important;
+  z-index:1!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+  background:url('./assets/ui/book/parchment_dynamic_open.png') center center / 100% 100% no-repeat!important;
+  opacity:1!important;
+}
+.content-sheet .journal-book-frame > *{position:relative!important;z-index:2!important}
+.content-sheet .journal-book-spread,
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right,
+.content-sheet .journal-technical-shell,
+.content-sheet .journal-page,
+.content-sheet .character-page,
+.content-sheet .sheet-page{
+  background:transparent!important;
+  background-image:none!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+}
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after,
+.content-sheet .journal-book-page::before,
+.content-sheet .journal-book-page::after,
+.content-sheet .journal-book-page--left::before,
+.content-sheet .journal-book-page--left::after,
+.content-sheet .journal-book-page--right::before,
+.content-sheet .journal-book-page--right::after{
+  display:none!important;
+  background:none!important;
+  background-image:none!important;
+  box-shadow:none!important;
+}
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:-18px -18px -20px -18px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:-12px -12px -14px -12px!important}
+}
