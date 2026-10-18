@@ -1,0 +1,172 @@
+/* Restore-polish pass based on v93.333
+   Focus: logo fidelity, sidebar buttons, campaign card cleanup, higher content start, preserved book shell. */
+
+/* --- Header logo: larger, crisp, no stretch --- */
+.mast{height:72px!important;min-height:72px!important;padding:0 16px 0 0!important}
+.mast-top{min-height:70px!important;align-items:center!important}
+.mast .mast-brand{
+  width:308px!important;
+  min-width:308px!important;
+  max-width:308px!important;
+  min-height:70px!important;
+  height:70px!important;
+  aspect-ratio:262/60!important;
+  background:url('./assets/ui/book/sidebar_header.png') left center/contain no-repeat!important;
+  image-rendering:auto!important;
+  filter:none!important;
+}
+.mast .mast-brand::after{right:-1px!important}
+@media (max-width:980px){
+  .mast{height:auto!important;min-height:66px!important}
+  .mast-top{min-height:66px!important}
+  .mast .mast-brand{width:286px!important;min-width:286px!important;max-width:286px!important;height:64px!important;min-height:64px!important}
+}
+@media (max-width:760px){
+  .mast .mast-brand{width:262px!important;min-width:262px!important;max-width:262px!important;height:60px!important;min-height:60px!important}
+}
+
+/* --- Sidebar campaign card: keep image clear, move decorative banner away so no emblem sits behind it --- */
+.nav{padding-top:12px!important}
+.nav::after{
+  top:118px!important;
+  right:0!important;
+  opacity:.96!important;
+}
+.castle-campaign-card{
+  position:relative!important;
+  overflow:hidden!important;
+  background:
+    linear-gradient(180deg,rgba(8,14,24,.18),rgba(8,14,24,.38)),
+    url('./assets/ui/background-valley.png?v=93.333') center/cover no-repeat!important;
+  box-shadow:inset 0 0 0 1px rgba(246,231,201,.12), 0 4px 10px rgba(0,0,0,.35)!important;
+}
+.castle-campaign-card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg,rgba(5,13,23,.16),rgba(5,13,23,.06) 36%, rgba(5,13,23,.18));
+  pointer-events:none;
+}
+.castle-campaign-card > *{position:relative;z-index:1}
+
+/* --- Sidebar buttons styled like the top tabs, across nav and character list --- */
+.nav .castle-nav-link,
+.nav .castle-character,
+.nav .castle-create{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:.6rem!important;
+  width:100%!important;
+  min-height:42px!important;
+  margin:0 0 .55rem!important;
+  padding:8px 12px!important;
+  text-align:left!important;
+  border:1px solid #aa7d40!important;
+  border-bottom:2px solid #a6793f!important;
+  border-radius:6px 6px 0 0!important;
+  background:linear-gradient(180deg,#f3e4c6 0%,#ddc397 53%,#c7a571 100%)!important;
+  color:#3b281a!important;
+  box-shadow:inset 0 2px rgba(255,254,244,.72),inset 0 0 0 1px rgba(122,84,43,.14),0 -1px 5px rgba(0,0,0,.25)!important;
+  font:700 15px/1.1 Georgia,serif!important;
+  font-variant:small-caps!important;
+  letter-spacing:.03em!important;
+  text-shadow:0 1px rgba(255,252,241,.65)!important;
+}
+.nav .castle-nav-link:hover,
+.nav .castle-character:hover,
+.nav .castle-create:hover{background:linear-gradient(180deg,#fff0d4,#e5c88f)!important}
+.nav .castle-nav-link.active,
+.nav .castle-character.active,
+.nav .castle-nav-link[aria-current="page"]{
+  background:linear-gradient(180deg,#385675 0%,#1b354e 48%,#0c2036 100%)!important;
+  color:#ffdf9e!important;
+  border-color:#ca9d57!important;
+  border-bottom-color:#0c2036!important;
+  box-shadow:inset 0 1px #d9ad6c,inset 0 0 0 1px rgba(233,191,108,.18),0 -2px 10px rgba(0,0,0,.34)!important;
+  text-shadow:0 1px #09101c!important;
+}
+.nav .castle-nav-icon{color:#996c32!important;flex:0 0 auto!important}
+.nav .castle-nav-link.active .castle-nav-icon,
+.nav .castle-character.active .castle-nav-icon{color:#ecc078!important}
+.nav .castle-create{justify-content:space-between!important}
+
+/* Character buttons: fix doubled initials by giving the portrait its own badge space */
+.nav .castle-character{padding:7px 10px!important}
+.nav .castle-char-portrait{
+  display:grid!important;
+  place-items:center!important;
+  flex:0 0 28px!important;
+  width:28px!important;
+  height:28px!important;
+  border:1px solid rgba(162,119,57,.75)!important;
+  border-radius:4px!important;
+  background:linear-gradient(180deg,#24496f,#163350)!important;
+  color:#f4dfaf!important;
+  font:700 15px/1 Georgia,serif!important;
+  overflow:hidden!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+.nav .castle-character.active .castle-char-portrait{border-color:#d4a661!important;color:#ffe4ab!important}
+.nav .castle-char-portrait img{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important}
+.nav .castle-character > span:last-child{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+/* --- Lift the content higher: less dead space before page content --- */
+.content-sheet{padding-top:0!important}
+.content-sheet > .ledger-topline{padding:1px 11px 1px!important;min-height:0!important}
+.content-sheet .journal-book.panel{margin-top:-2px!important}
+.content-sheet .journal-book-frame{
+  padding-top:38px!important;
+  padding-bottom:44px!important;
+}
+.content-sheet .journal-book-frame::before{inset:28px 34px 33px!important}
+.content-sheet .journal-book-frame::after{top:38px!important;bottom:44px!important}
+.journal-book-subnav{margin:-26px 24px 8px!important}
+.journal-book-page--left,.journal-book-page--right{padding-top:4px!important}
+.content-sheet .journal-book--chapter .journal-book-frame{padding-top:12px!important}
+.content-sheet .journal-book--chapter .journal-book-frame::after{top:12px!important}
+.content-sheet .journal-book--chapter .journal-alt-header{padding:0 18px 4px!important}
+.content-sheet .journal-book--chapter .journal-alt-header-block{min-height:70px!important;padding:4px 14px 6px!important}
+.content-sheet .journal-book--chapter .journal-chapter-body{padding:0 18px 16px!important}
+
+/* --- Preserve and subtly strengthen the page-edge book shell from v93.333 --- */
+.content-sheet .journal-book-frame{
+  background-color:#d2b285!important;
+  background-image:
+    url('./assets/ui/book/book_top.png'),
+    url('./assets/ui/book/book_bottom.png'),
+    url('./assets/ui/book/book_left.png'),
+    url('./assets/ui/book/book_right.png'),
+    url('./assets/ui/book/book_gutter.png')!important;
+  background-position:center top,center bottom,left top,right top,center top!important;
+  background-size:100% 44px,100% 50px,42px 100%,52px 100%,46px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat!important;
+  box-shadow:0 21px 35px rgba(5,4,6,.56),0 3px 3px rgba(6,5,7,.80)!important;
+}
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  background:linear-gradient(90deg,rgba(170,131,80,.17) 0%,transparent 10%,transparent 90%,rgba(150,109,60,.22) 100%),url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame{padding-top:34px!important;padding-bottom:38px!important;background-size:100% 36px,100% 42px,27px 100%,27px 100%,36px 100%!important}
+  .content-sheet .journal-book-frame::before{inset:24px 18px 27px!important}
+  .content-sheet .journal-book-frame::after{top:34px!important;bottom:38px!important}
+  .journal-book-subnav{margin:-24px 10px 8px!important}
+  .content-sheet .journal-book--chapter .journal-book-frame{padding-top:10px!important}
+}
+@media(max-width:800px){
+  .nav::after{display:none!important}
+  .nav .castle-nav-link,
+  .nav .castle-character,
+  .nav .castle-create{font-size:13px!important;min-height:38px!important;padding:7px 10px!important}
+  .content-sheet .journal-book-frame{padding-top:32px!important;padding-bottom:38px!important}
+  .journal-book-subnav{margin:-22px 0 8px!important}
+}
