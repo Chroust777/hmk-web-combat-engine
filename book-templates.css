@@ -18,7 +18,7 @@
 .nav:after{content:"";z-index:0;pointer-events:none;position:absolute;right:0;top:0;width:79px;height:350px;background:url('./assets/ui/book/sidebar_banner.png') center top/79px 350px no-repeat;opacity:1}
 .nav:before{z-index:0}
 .nav>*{position:relative;z-index:1}
-.castle-campaign-card{width:235px;max-width:calc(100% + 60px);height:93px;min-height:93px;margin-bottom:15px;padding:.5rem .7rem;z-index:2;background:linear-gradient(0deg,#050d17aa,transparent),url('./assets/ui/background-valley.png') center/cover;border:1px solid #c59e62}
+.castle-campaign-card{width:235px;max-width:calc(100% + 60px);height:93px;min-height:93px;margin-bottom:15px;padding:.5rem .7rem;z-index:2;background:linear-gradient(0deg,#050d17aa,transparent),url('./assets/ui/background-valley.png?v=93.332') center/cover;border:1px solid #c59e62}
 .castle-campaign-card strong{font:16px/1.1 Georgia,serif;color:#f9e7cc}
 .nav .castle-nav-link,.nav .castle-character{font-family:Georgia,serif;font-size:13px;min-height:30px;z-index:2}
 .nav .castle-character{width:235px;max-width:calc(100% + 60px)}

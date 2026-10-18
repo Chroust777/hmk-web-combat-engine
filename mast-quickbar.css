@@ -1,39 +1,127 @@
-/* Keeper's Ledger v93.329 — integrated top controls.
-   The v93.328 quick actions remain available on every tab, but no longer
-   float underneath the book or consume a full vertical screen on phones. */
-.mast{height:auto!important;min-height:61px!important;overflow:visible!important;padding:0!important}
-.mast .mast-top{display:grid!important;grid-template-columns:minmax(190px,260px) minmax(0,1fr);grid-template-rows:minmax(59px,auto) auto;gap:0!important;align-items:center!important}
-.mast .mast-brand{grid-column:1;grid-row:1;min-width:0;max-width:100%}
-.mast .mast-links{grid-column:2;grid-row:1;align-self:center;display:flex;flex-wrap:wrap;padding-left:12px;padding-right:240px;min-width:0}
-.mast .mast-side{grid-column:1 / -1;grid-row:2;position:relative;min-width:0!important;width:100%;display:block!important;align-items:stretch!important}
-.mast .mast-meta{position:absolute;right:12px;top:-47px;z-index:2;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px}
-.mast .mast-meta .scene-chip,.mast .mast-meta .release-marker{font-size:10px!important;letter-spacing:.04em;padding:5px 8px!important}
-.mast .mast-control-panel{margin:0!important;padding:7px 15px!important;border-radius:0!important;border-top:1px solid rgba(212,169,100,.28)!important;border-left:0!important;border-right:0!important;border-bottom:0!important;display:flex!important;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 15px;min-width:0;box-shadow:none!important}
-.mast .mast-control-panel__title{font-size:10px!important;margin:0!important;letter-spacing:.1em;white-space:nowrap}
-.mast .mast-control-panel__selected{margin:0!important;padding:4px 7px!important;min-width:120px;display:flex;flex-direction:row;flex-wrap:wrap;gap:4px!important;align-items:baseline;justify-content:flex-start!important}
-.mast .mast-control-panel__selected span{font-size:10px!important;letter-spacing:0;text-transform:none}
-.mast .mast-control-panel__selected strong{font-size:12px!important;max-width:200px;text-align:left}
-.mast .mast-control-panel__grid{display:flex!important;flex:1 1 680px;justify-content:flex-end;flex-wrap:wrap;gap:5px!important;min-width:0}
-.mast .mast-control-panel__grid button{flex:0 1 auto;min-height:30px!important;max-width:100%;font-size:11px!important;line-height:1.1;padding:5px 8px!important;border-radius:3px!important;box-shadow:none!important}
-@media(max-width:1300px){
- .mast .mast-links{padding-right:205px}
- .mast .mast-control-panel__grid{justify-content:flex-start}
- .mast .mast-control-panel__title{display:none}
+/* HMK Keeper's Ledger v93.332 — one coherent illuminated header.
+   This file is last in the stylesheet order, so it owns mast layout and tabs. */
+.mast{
+ position:relative!important;z-index:10!important;height:auto!important;min-height:0!important;
+ margin:0!important;padding:9px clamp(12px,1.4vw,26px) 0!important;overflow:visible!important;
+ border:0!important;border-bottom:3px double #a9824c!important;border-radius:0!important;
+ background:linear-gradient(180deg,#0b1a2a 0%,#142c43 55%,#0b1b2e 100%)!important;
+ box-shadow:inset 0 1px rgba(225,188,125,.35),0 4px 16px rgba(0,0,0,.43)!important;
+ backdrop-filter:none!important;
 }
-@media(max-width:800px){
- .mast .mast-top{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto auto auto!important}
- .mast .mast-brand{grid-column:1;grid-row:1;width:220px!important;min-width:0!important;max-width:90%}
- .mast .mast-links{grid-column:1;grid-row:2;padding:2px 9px 5px!important;gap:3px;justify-content:flex-start}
- .mast .mast-links button{font-size:11px!important;padding:6px 7px!important}
- .mast .mast-side{grid-column:1;grid-row:3}
- .mast .mast-meta{position:static;justify-content:flex-start;padding:3px 10px 6px;background:rgba(6,16,27,.55)}
- .mast .mast-control-panel{display:grid!important;grid-template-columns:minmax(0,1fr);gap:6px;padding:8px 10px!important}
- .mast .mast-control-panel__title{display:none}
- .mast .mast-control-panel__selected{display:flex!important;flex-direction:row!important;max-width:none;min-width:0}
- .mast .mast-control-panel__grid{flex:none;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px!important}
- .mast .mast-control-panel__grid button{width:100%;min-width:0;min-height:34px!important;font-size:11px!important;white-space:normal;overflow-wrap:anywhere}
+.mast::after{content:"";position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,#b98c49,transparent 40%,#b98c49);pointer-events:none}
+.mast .mast-top{
+ display:grid!important;grid-template-columns:clamp(190px,18vw,282px) minmax(0,1fr) auto!important;
+ grid-template-areas:"brand tabs meta" "actions actions actions"!important;
+ grid-template-rows:auto auto!important;gap:7px clamp(10px,1.6vw,25px)!important;
+ align-items:end!important;min-height:0!important;
 }
-@media(max-width:440px){
- .mast .mast-control-panel__grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
- .mast .mast-control-panel__selected strong{max-width:100%;overflow-wrap:anywhere}
+.mast .mast-brand{
+ grid-area:brand!important;position:relative!important;width:auto!important;max-width:290px!important;
+ min-width:0!important;min-height:64px!important;margin:0!important;align-self:center!important;
+}
+.mast .mast-links{
+ grid-area:tabs!important;display:flex!important;flex-wrap:wrap!important;
+ align-self:end!important;align-items:flex-end!important;justify-content:center!important;
+ gap:5px!important;margin:0!important;padding:0 4px!important;min-width:0!important;
+ border-bottom:1px solid rgba(221,180,111,.47)!important;
+ background:none!important;
+}
+.mast .mast-links button{
+ appearance:none;flex:0 1 auto!important;position:relative;min-height:39px!important;
+ margin:0 0 -1px!important;padding:8px clamp(9px,1vw,20px)!important;
+ border:1px solid #aa7d40!important;border-bottom:2px solid #a6793f!important;
+ border-radius:6px 6px 0 0!important;
+ background:linear-gradient(180deg,#f3e4c6 0%,#ddc397 53%,#c7a571 100%)!important;
+ color:#3b281a!important;
+ box-shadow:inset 0 2px rgba(255,254,244,.7),inset 0 0 0 1px rgba(122,84,43,.14),0 -1px 5px #0004!important;
+ font:700 clamp(12px,1vw,17px)/1.1 Georgia,serif!important;
+ font-variant:small-caps!important;letter-spacing:.03em!important;text-shadow:0 1px rgba(255,252,241,.65)!important;
+ white-space:nowrap!important;transform:none!important;filter:none!important;
+}
+.mast .mast-links button::before{content:"✦";font:10px Georgia,serif;margin-right:6px;color:#996c32}
+.mast .mast-links button.current,
+.mast .mast-links button[aria-current="page"]{
+ background:linear-gradient(180deg,#385675 0%,#1b354e 48%,#0c2036 100%)!important;
+ color:#ffdf9e!important;border-color:#ca9d57!important;border-bottom-color:#0c2036!important;
+ box-shadow:inset 0 1px #d9ad6c,inset 0 0 0 1px rgba(233,191,108,.18),0 -2px 10px #0006!important;
+ text-shadow:0 1px #09101c!important;
+}
+.mast .mast-links button.current::before{color:#ecc078}
+.mast .mast-links button:hover:not(.current){background:linear-gradient(180deg,#fff0d4,#e5c88f)!important}
+.mast .mast-links button:focus-visible,.mast .mast-control-panel button:focus-visible{outline:2px solid #f6d28e!important;outline-offset:3px!important}
+.mast .mast-meta{
+ grid-area:meta!important;position:static!important;display:flex!important;align-items:center!important;
+ justify-content:flex-end!important;gap:6px!important;margin:0 0 5px!important;padding:0!important;
+ background:none!important;min-width:0!important;
+}
+.mast .mast-meta .scene-chip,.mast .mast-meta .release-marker{
+ display:inline-flex!important;padding:4px 7px!important;font:600 10px/1.2 Georgia,serif!important;
+ letter-spacing:.045em!important;border-radius:3px!important;
+ color:#e9d3a8!important;background:rgba(234,204,145,.075)!important;
+ border:1px solid rgba(190,146,82,.42)!important;white-space:nowrap!important;
+}
+.mast .mast-side{
+ grid-area:actions!important;grid-column:1/-1!important;grid-row:2!important;
+ display:block!important;position:static!important;width:100%!important;min-width:0!important;
+ margin:0!important;padding:0!important;background:none!important;align-self:stretch!important;
+}
+.mast .mast-control-panel{
+ display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;
+ flex-wrap:wrap!important;gap:7px 16px!important;margin:0!important;
+ padding:8px 0 9px!important;border:0!important;border-top:1px solid rgba(215,170,99,.29)!important;
+ border-radius:0!important;background:none!important;box-shadow:none!important;
+}
+.mast .mast-control-panel__title{display:none!important}
+.mast .mast-control-panel__selected{
+ display:flex!important;flex-direction:row!important;align-items:center!important;flex-wrap:wrap!important;
+ gap:6px!important;min-width:0!important;margin:0!important;padding:0!important;
+ border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;
+}
+.mast .mast-control-panel__selected span{font:600 10px/1.1 Georgia,serif!important;color:#bba071!important;letter-spacing:.1em;text-transform:uppercase}
+.mast .mast-control-panel__selected strong{font:700 13px/1.15 Georgia,serif!important;color:#ffe6b3!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:250px}
+.mast .mast-control-panel__grid{
+ display:flex!important;flex:0 1 auto!important;flex-wrap:wrap!important;
+ justify-content:flex-end!important;align-items:center!important;gap:5px!important;
+ width:auto!important;min-width:0!important;margin:0!important;
+}
+.mast .mast-control-panel__grid button{
+ width:auto!important;min-width:0!important;flex:0 1 auto!important;
+ min-height:31px!important;margin:0!important;padding:5px 11px!important;
+ border:1px solid #b38b56!important;border-radius:3px 3px 7px 7px!important;
+ background:linear-gradient(180deg,#ebd8b7 0%,#c6a270 100%)!important;
+ box-shadow:inset 0 1px rgba(255,246,221,.8),0 1px 3px #0005!important;
+ color:#3e2b1c!important;font:600 12px/1.12 Georgia,serif!important;
+ text-shadow:0 1px #f8eccc!important;letter-spacing:.01em;white-space:nowrap!important;
+}
+.mast .mast-control-panel__grid button.current,
+.mast .mast-control-panel__grid button[data-open]{
+ border-color:#d4a661!important;background:linear-gradient(180deg,#385775,#0e263d)!important;
+ color:#ffe3ad!important;text-shadow:0 1px #101d2d!important;
+}
+.mast .mast-control-panel__grid button:disabled{opacity:.45!important;cursor:not-allowed!important}
+@media(max-width:1320px){
+ .mast .mast-top{grid-template-columns:clamp(168px,18vw,235px) minmax(0,1fr)!important;grid-template-areas:"brand tabs" "meta meta" "actions actions"!important;gap:5px 12px!important}
+ .mast .mast-meta{justify-content:flex-end!important;margin:0!important}
+ .mast .mast-side{grid-row:3!important}
+ .mast .mast-links{justify-content:flex-start!important}
+ .mast .mast-control-panel__grid{justify-content:flex-end!important}
+}
+@media(max-width:810px){
+ .mast{padding:7px 9px 0!important}
+ .mast .mast-top{grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"brand" "tabs" "meta" "actions"!important;gap:6px!important}
+ .mast .mast-brand{min-height:54px!important;max-width:230px!important}
+ .mast .mast-links{justify-content:flex-start!important;gap:4px!important;overflow:visible!important}
+ .mast .mast-links button{min-height:32px!important;padding:6px 9px!important;font-size:12px!important}
+ .mast .mast-links button::before{margin-right:4px}
+ .mast .mast-meta{justify-content:flex-start!important;margin:0!important}
+ .mast .mast-side{grid-row:4!important}
+ .mast .mast-control-panel{align-items:flex-start!important;flex-direction:column!important;gap:6px!important;padding:6px 0 8px!important}
+ .mast .mast-control-panel__grid{width:100%!important;justify-content:flex-start!important}
+ .mast .mast-control-panel__grid button{white-space:normal!important;min-height:31px!important}
+}
+@media(max-width:430px){
+ .mast .mast-links button{padding:6px 8px!important;font-size:11px!important}
+ .mast .mast-control-panel__selected strong{max-width:190px}
+ .mast .mast-control-panel__grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .mast .mast-control-panel__grid button{width:100%!important;padding:6px!important;font-size:11px!important}
 }

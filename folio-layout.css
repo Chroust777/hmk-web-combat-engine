@@ -216,3 +216,163 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .journal-book--creation .creation-flow summary{cursor:pointer;font-weight:700;color:#6a4323}
 .content-sheet .journal-book--creation .creation-flow dialog{max-width:100%}
 @media(max-width:1160px){.content-sheet .journal-book--creation .creation-flow .field-grid{grid-template-columns:1fr}}
+
+
+/* v93.330: character registry folio compaction */
+.folio-chapter-content .ledger-topline{align-items:flex-start!important;gap:6px 8px!important;margin:6px 0 7px!important}
+.folio-chapter-content .ledger-topline h2{margin:0 .3rem 0 0!important;font-size:16px!important;line-height:1.15!important;color:#6b3b23!important}
+.folio-chapter-content .ledger-topline > button{min-height:28px!important;padding:4px 10px!important;font-size:11px!important}
+.folio-chapter-content .toolbar{margin:0 0 8px!important}
+.folio-chapter-content .toolbar input{max-width:none!important;background:rgba(255,252,244,.88)!important;border:1px solid var(--folio-rule)!important;color:#3a2817!important;padding:7px 10px!important}
+.folio-chapter-content .hero-characters{padding-bottom:4px!important}
+.folio-chapter-content .hero-characters p{margin-bottom:6px!important}
+
+
+/* v93.331 — compact illuminated index cards with real HTML controls. */
+.content-sheet .journal-book--characters .folio-character-list{
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:9px!important;align-content:start;
+}
+.content-sheet .journal-book--characters .character-card{
+ display:grid!important;grid-template-columns:44px minmax(0,1fr)!important;
+ gap:5px 10px!important;align-items:start!important;position:relative;max-width:100%;
+ padding:9px 10px!important;border:1px solid rgba(134,93,49,.42)!important;border-radius:2px!important;
+ background:linear-gradient(180deg,rgba(255,249,233,.96),rgba(236,216,179,.94))!important;
+ box-shadow:inset 0 0 0 1px rgba(255,248,228,.55),0 2px 5px rgba(101,65,28,.09)!important;
+}
+.content-sheet .journal-book--characters .character-card::before{display:none!important}
+.content-sheet .journal-book--characters .character-card__crest{
+ width:44px!important;height:44px!important;min-height:44px!important;border:1px solid #a27a45!important;
+ border-radius:2px!important;background:linear-gradient(145deg,#2c4b68,#102a45)!important;
+ font:700 22px/1 Georgia,serif!important;color:#ffebbb!important;box-shadow:inset 0 0 0 2px rgba(213,172,105,.16)!important;
+}
+.content-sheet .journal-book--characters .character-card__body{gap:3px!important;padding-right:16px;min-width:0}
+.content-sheet .journal-book--characters .character-card__body h3{
+ font:700 clamp(12px,1vw,15px)/1.2 "Cinzel",Georgia,serif!important;
+ color:#273f50!important;margin:1px 0 2px!important;overflow-wrap:anywhere;
+}
+.content-sheet .journal-book--characters .character-card__tags{margin:0!important;gap:3px 5px!important}
+.content-sheet .journal-book--characters .character-card .pill{
+ display:inline-block!important;border:1px solid rgba(151,110,56,.25)!important;border-radius:20px!important;
+ padding:1px 6px!important;background:rgba(208,175,119,.22)!important;font:11px/1.1 Georgia,serif!important;
+ color:#593d20!important;
+}
+.content-sheet .journal-book--characters .character-card .muted{
+ font:12px/1.22 "Cormorant Garamond",Georgia,serif!important;color:#62472b!important;margin:0;
+}
+.content-sheet .journal-book--characters .character-card__description{
+ display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+ overflow-wrap:anywhere;
+}
+.content-sheet .journal-book--characters .character-card__progress{
+ color:#77603d!important;font-style:italic!important;
+}
+.content-sheet .journal-book--characters .character-card .actions{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:4px!important;margin:4px 0 0!important;
+}
+.content-sheet .journal-book--characters .character-card .actions button{
+ min-width:0!important;width:100%!important;min-height:26px!important;
+ padding:4px 5px!important;border-radius:3px!important;font:600 10px/1.1 Georgia,serif!important;
+ background:linear-gradient(180deg,#f5e5c7,#d9bf93)!important;color:#49311c!important;
+ border:1px solid rgba(134,96,48,.45)!important;box-shadow:0 1px 2px #50371918!important;
+ white-space:normal!important;
+}
+.content-sheet .journal-book--characters .character-card .actions button[data-open]{
+ background:linear-gradient(180deg,#345573,#142d48)!important;color:#ffebc1!important;
+ border-color:#ae854a!important;
+}
+.content-sheet .journal-book--characters .character-card .actions button.danger{
+ color:#6e3428!important;background:linear-gradient(180deg,#eed6c2,#dcbba4)!important;
+}
+.content-sheet .journal-book--characters .character-card .character-delete{
+ position:absolute!important;top:6px!important;right:6px!important;display:grid!important;place-items:center!important;
+ width:22px!important;height:22px!important;min-height:22px!important;padding:0!important;
+ border-radius:2px!important;background:linear-gradient(180deg,#7e4439,#562721)!important;
+ color:#ffe9d4!important;font:700 15px/1 Arial,sans-serif!important;
+}
+.content-sheet .journal-book--characters .folio-chapter-content .toolbar input{
+ background:rgba(255,252,241,.91)!important;border:1px solid rgba(121,82,42,.45)!important;
+ color:#302317!important;border-radius:3px!important;
+}
+@media(max-width:600px){
+ .content-sheet .journal-book--characters .character-card{grid-template-columns:40px minmax(0,1fr)!important}
+ .content-sheet .journal-book--characters .character-card__crest{width:40px!important;height:40px!important;min-height:40px!important}
+}
+@media(max-width:360px){
+ .content-sheet .journal-book--characters .character-card .actions{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+
+/* v93.332: Actual multi-column character cards, not just smaller full-width cards. */
+.content-sheet .journal-book--characters .folio-chapter-content{container-name:character-folio;container-type:inline-size}
+.content-sheet .journal-book--characters .folio-character-list{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:8px!important;align-content:start!important;min-width:0!important;
+}
+.content-sheet .journal-book--characters .character-card{
+ display:flex!important;flex-direction:column!important;align-items:stretch!important;
+ gap:5px!important;min-height:174px!important;padding:9px!important;
+}
+.content-sheet .journal-book--characters .character-card__crest{
+ width:34px!important;height:34px!important;min-height:34px!important;
+ font-size:19px!important;flex:0 0 auto!important;
+}
+.content-sheet .journal-book--characters .character-card__body{
+ display:flex!important;flex-direction:column!important;gap:3px!important;
+ padding:0!important;min-width:0!important;flex:1!important;
+}
+.content-sheet .journal-book--characters .character-card__tags{padding-right:16px!important}
+.content-sheet .journal-book--characters .character-card__body h3{font:700 14px/1.2 "Cinzel",Georgia,serif!important;margin:0!important}
+.content-sheet .journal-book--characters .character-card__occupation{font:12px/1.2 "Cormorant Garamond",Georgia,serif!important}
+.content-sheet .journal-book--characters .character-card__description{
+ display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;
+ overflow:hidden!important;font:12px/1.2 "Cormorant Garamond",Georgia,serif!important;
+ max-height:2.4em!important;
+}
+.content-sheet .journal-book--characters .character-card__progress{
+ font:10px/1.1 Georgia,serif!important;letter-spacing:0!important;margin-top:auto!important;
+}
+.content-sheet .journal-book--characters .character-card__controls{
+ display:flex!important;flex-direction:column!important;gap:4px!important;margin-top:auto!important;
+}
+.content-sheet .journal-book--characters .character-card__controls>button{
+ width:100%!important;min-height:27px!important;padding:4px 5px!important;
+ font:600 12px/1.15 Georgia,serif!important;white-space:normal!important;
+ background:linear-gradient(180deg,#f1e2c5,#d6b985)!important;
+ border:1px solid rgba(139,95,48,.55)!important;border-radius:3px!important;color:#40301e!important;
+}
+.content-sheet .journal-book--characters .character-card__controls>button.character-card__open{
+ background:linear-gradient(180deg,#365777,#122b46)!important;color:#ffebc1!important;
+ border-color:#ba904f!important;
+}
+.content-sheet .journal-book--characters .character-card__more{position:relative!important;min-width:0!important}
+.content-sheet .journal-book--characters .character-card__more summary{
+ display:block!important;cursor:pointer!important;list-style:none!important;
+ border-top:1px solid rgba(124,88,45,.25)!important;padding:4px 2px 2px!important;
+ text-align:center!important;font:italic 11px/1.15 Georgia,serif!important;color:#694625!important;
+}
+.content-sheet .journal-book--characters .character-card__more summary::-webkit-details-marker{display:none!important}
+.content-sheet .journal-book--characters .character-card__more summary::after{content:" ▾"}
+.content-sheet .journal-book--characters .character-card__more[open] summary::after{content:" ▴"}
+.content-sheet .journal-book--characters .character-card__more-actions{
+ display:grid!important;grid-template-columns:1fr!important;gap:4px!important;margin:5px 0 1px!important;
+}
+.content-sheet .journal-book--characters .character-card__more-actions button{
+ display:block!important;width:100%!important;min-height:26px!important;padding:4px!important;
+ font:600 11px/1.12 Georgia,serif!important;white-space:normal!important;
+ background:linear-gradient(180deg,#f0dfc0,#d8bd93)!important;border:1px solid rgba(124,87,43,.38)!important;
+ color:#49321f!important;border-radius:3px!important;
+}
+.content-sheet .journal-book--characters .character-card__more-actions button.danger{color:#8e3e30!important}
+@container character-folio (max-width:550px){
+ .content-sheet .journal-book--characters .folio-character-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@container character-folio (max-width:430px){
+ .content-sheet .journal-book--characters .folio-character-list{grid-template-columns:1fr!important}
+}
+@media(max-width:810px){
+ .content-sheet .journal-book--characters .folio-character-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:500px){
+ .content-sheet .journal-book--characters .folio-character-list{grid-template-columns:1fr!important}
+}
