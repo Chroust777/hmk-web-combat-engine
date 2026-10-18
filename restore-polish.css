@@ -526,15 +526,14 @@
   outline: 0 !important;
 }
 
-/* FIX14: dynamic parchment from 41.png, stretched edge-to-edge inside the dark rails.
-   The inner field must grow with the book height, so the asset is applied to the
-   full live surface and scaled to 100% width and 100% height. */
+/* FIX14: dynamic parchment from 41.png, stretched under the full book frame so the parchment reaches the black/dark rails on all sides.
+   The inner field grows with the live book height, and the 41.png artwork is scaled to 100% width and 100% height. */
 .content-sheet .journal-book-frame::before,
 .content-sheet .journal-book--chapter .journal-book-frame::before {
   content: "" !important;
   display: block !important;
   position: absolute !important;
-  inset: 25px 26px 25px 26px !important;
+  inset: 0 !important;
   z-index: 0 !important;
   background-color: #efe3c8 !important;
   background-image: url('./assets/ui/book/41.png') !important;
@@ -589,14 +588,14 @@
 @media (max-width: 1160px) {
   .content-sheet .journal-book-frame::before,
   .content-sheet .journal-book--chapter .journal-book-frame::before {
-    inset: 24px 22px 24px 22px !important;
+    inset: 0 !important;
     background-size: 100% 100% !important;
   }
 }
 @media (max-width: 800px) {
   .content-sheet .journal-book-frame::before,
   .content-sheet .journal-book--chapter .journal-book-frame::before {
-    inset: 16px 13px 16px 13px !important;
+    inset: 0 !important;
     background-size: 100% 100% !important;
   }
   .content-sheet .hmk-rail--top,
