@@ -526,8 +526,9 @@
   outline: 0 !important;
 }
 
-/* Retain a completely plain inner surface for the future parchment image.
-   Stop it beneath the solid rail artwork, not beyond the outer book contour. */
+/* FIX14: dynamic parchment from 41.png, stretched edge-to-edge inside the dark rails.
+   The inner field must grow with the book height, so the asset is applied to the
+   full live surface and scaled to 100% width and 100% height. */
 .content-sheet .journal-book-frame::before,
 .content-sheet .journal-book--chapter .journal-book-frame::before {
   content: "" !important;
@@ -535,7 +536,11 @@
   position: absolute !important;
   inset: 25px 26px 25px 26px !important;
   z-index: 0 !important;
-  background: #efe3c8 none !important;
+  background-color: #efe3c8 !important;
+  background-image: url('./assets/ui/book/41.png') !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100% !important;
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
@@ -585,12 +590,14 @@
   .content-sheet .journal-book-frame::before,
   .content-sheet .journal-book--chapter .journal-book-frame::before {
     inset: 24px 22px 24px 22px !important;
+    background-size: 100% 100% !important;
   }
 }
 @media (max-width: 800px) {
   .content-sheet .journal-book-frame::before,
   .content-sheet .journal-book--chapter .journal-book-frame::before {
     inset: 16px 13px 16px 13px !important;
+    background-size: 100% 100% !important;
   }
   .content-sheet .hmk-rail--top,
   .content-sheet .hmk-rail--bottom {
