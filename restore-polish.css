@@ -257,3 +257,65 @@
   .content-sheet .journal-book-spread::before,
   .content-sheet .journal-book-spread::after{display:none!important}
 }
+
+
+/* --- Fix pass 3: darker parchment reaches the frame, remove pale strip under rail, unify all 4 corners --- */
+.content-sheet .journal-book-frame{
+  background-color:transparent!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:24px 24px 12px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:
+    inset 0 0 28px rgba(105,76,44,.12),
+    inset 14px 0 18px -18px rgba(139,102,58,.32),
+    inset -14px 0 18px -18px rgba(139,102,58,.32),
+    inset 0 -8px 12px -10px rgba(139,102,58,.22)!important;
+  background:
+    linear-gradient(90deg,rgba(197,164,119,.28) 0%, rgba(197,164,119,.08) 4%, rgba(0,0,0,0) 11%, rgba(0,0,0,0) 89%, rgba(197,164,119,.08) 96%, rgba(197,164,119,.28) 100%),
+    linear-gradient(180deg,rgba(236,223,196,.08),rgba(236,223,196,0) 10%),
+    url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+}
+.content-sheet .journal-book-frame::after{top:38px!important;bottom:12px!important;opacity:.84!important}
+
+/* bring the side page stacks closer over the parchment so no pale seam is visible */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  width:112px!important;
+  top:-4px!important;
+  bottom:-4px!important;
+  z-index:4!important;
+}
+.content-sheet .journal-book-spread::before{left:-18px!important;background-size:112px 100%!important}
+.content-sheet .journal-book-spread::after{right:-22px!important;background-size:112px 100%!important}
+
+/* all four visible outer corners use the same rich style as the lower-left reference */
+.content-sheet .book-cover-ornament{
+  display:block!important;
+  width:120px!important;
+  height:136px!important;
+  z-index:8!important;
+  filter:none!important;
+  background-size:contain!important;
+  background-repeat:no-repeat!important;
+}
+.content-sheet .book-cover-ornament--tl{top:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_tl.png')!important;background-position:left top!important}
+.content-sheet .book-cover-ornament--tr{top:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_tr.png')!important;background-position:right top!important}
+.content-sheet .book-cover-ornament--bl{bottom:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_bl.png')!important;background-position:left bottom!important}
+.content-sheet .book-cover-ornament--br{bottom:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_br.png')!important;background-position:right bottom!important}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:20px 18px 10px!important}
+  .content-sheet .journal-book-frame::after{top:34px!important;bottom:10px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{width:86px!important;background-size:86px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-10px!important}
+  .content-sheet .journal-book-spread::after{right:-12px!important}
+  .content-sheet .book-cover-ornament{width:92px!important;height:104px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:18px 14px 8px!important}
+  .content-sheet .journal-book-frame::after{bottom:8px!important}
+  .content-sheet .book-cover-ornament{width:62px!important;height:72px!important}
+}
