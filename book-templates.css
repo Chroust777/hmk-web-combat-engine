@@ -1,0 +1,3030 @@
+/* v93.314 — image-backed, nine-slice illuminated book.  Real HTML/DOM remains interactive.
+ * All images below are LOCAL; source: user's reference screenshot or a clean vellum
+ * regenerated from its color palette. Nothing requires a remote service. */
+:root{--script-ink:#251b14;--book-brown:#703c21;--book-gold:#b58a52;--book-blue:#122640;--book-ivory:#f5e6c4}
+.shell{background:#141a20}
+.shell::before{opacity:1;filter:saturate(1.16) brightness(1.18)}
+.shell::after{background:linear-gradient(90deg,#080c1466 0,transparent 20%,transparent 89%,#080c1440 100%)}
+.mast{height:61px;min-height:61px;padding:0 16px 0 0;border:0;border-bottom:2px solid #654626;background:linear-gradient(180deg,#091521ef,#0f1a28ef);box-shadow:0 4px 12px #06090bc0}
+.mast-top{min-height:59px;gap:0}
+.mast-brand{width:260px;min-width:260px;min-height:59px;margin:0;padding:0;background:url('./assets/ui/book/sidebar_header.png') center/100% 100% no-repeat;border:0;box-shadow:none;position:relative}
+.mast-brand .brand-mark,.mast-brand h1,.mast-brand p,.mast-brand .eyebrow{opacity:0;pointer-events:none}
+.mast-brand::after{content:"";position:absolute;inset:0;border-right:1px solid #af7940;pointer-events:none}
+.mast-links{padding-left:15px;gap:12px}
+.mast-links button{font:16px/1.2 Georgia,serif;text-shadow:0 1px 0 #08090b;letter-spacing:0;padding:12px 10px;color:#dcd9d2}
+.mast-links button.current{color:#f7e7c7;border-bottom:2px solid #cba46c}
+.layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:0;padding:0;align-items:stretch}
+.nav{position:sticky;top:0;width:260px;min-height:calc(100vh - 61px);height:auto;max-height:calc(100vh - 61px);background:linear-gradient(90deg,#08111cf5 0%,#111d2de8 75%,#152335ee);border-right:3px ridge #976739;padding:8px 72px 12px 12px;box-shadow:3px 0 13px #0b0c14c7;overflow-y:auto}
+.nav:after{content:"";z-index:0;pointer-events:none;position:absolute;right:0;top:0;width:79px;height:350px;background:url('./assets/ui/book/sidebar_banner.png') center top/79px 350px no-repeat;opacity:1}
+.nav:before{z-index:0}
+.nav>*{position:relative;z-index:1}
+.castle-campaign-card{width:235px;max-width:calc(100% + 60px);height:93px;min-height:93px;margin-bottom:15px;padding:.5rem .7rem;z-index:2;background:linear-gradient(0deg,#050d17aa,transparent),url('./assets/ui/background-valley.png?v=93.332') center/cover;border:1px solid #c59e62}
+.castle-campaign-card strong{font:16px/1.1 Georgia,serif;color:#f9e7cc}
+.nav .castle-nav-link,.nav .castle-character{font-family:Georgia,serif;font-size:13px;min-height:30px;z-index:2}
+.nav .castle-character{width:235px;max-width:calc(100% + 60px)}
+.nav-section-label{color:#d5a969}
+.nav .castle-create{font-size:13px;border-color:#d0a05a;z-index:2}
+.content-sheet{padding:0 0 55px;min-width:0}
+.content-sheet>.ledger-topline{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;min-height:0;margin:0;gap:4px;padding:3px 11px 2px;color:#e7d7bc;background:#08152270}
+.content-sheet>.ledger-topline h2{font-size:12px;line-height:1.2;opacity:.8;flex:1;min-width:150px}
+.content-sheet>.ledger-topline button{font-size:11px;min-height:24px;padding:2px 7px}
+/* Accurate photo-derived frame: top, foot, left and right boards and an exact central gutter.
+ * The edges are separate sprites so a long Skills list stretches the book naturally. */
+.content-sheet .journal-book.panel{margin:0;background:none;border:0;border-radius:0;box-shadow:none;max-width:none;overflow:visible}
+.content-sheet .journal-book-frame{
+ position:relative;isolation:isolate;margin:0 auto;border:0;border-radius:0;padding:44px 39px 46px;
+ background-color:#d2b285;
+ background-image:
+  none,none,
+  none,none,
+  none;
+ background-position:center top,center bottom,left top,right top,center top;
+ background-size:100% 44px,100% 50px,42px 100%,52px 100%,46px 100%;
+ background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat;
+ box-shadow:0 21px 35px #0504068f,0 3px 3px #060507cd;
+}
+.content-sheet .journal-book-frame::before{content:"";position:absolute;inset:32px 34px 35px;border:1px solid #b18955;outline:1px solid #54341f;outline-offset:3px;pointer-events:none;z-index:5}
+.content-sheet .journal-book-frame::after{content:"";position:absolute;z-index:4;pointer-events:none;top:44px;bottom:46px;width:44px;left:calc(39px + (100% - 78px)*.455 - 22px);border:0;transform:none;box-shadow:none;background:none center center/100% 100% no-repeat;opacity:.76}
+.book-cover-ornament{display:none}
+.journal-book-subnav{position:relative;z-index:6;margin:-21px 24px 11px;display:flex;gap:5px;justify-content:center;flex-wrap:wrap;min-height:29px}
+.journal-book-subnav button{min-height:28px!important;padding:4px 10px!important;border-radius:2px 2px 7px 7px!important;border:1px solid #ae7945!important;box-shadow:inset 0 1px #f3e6c4,0 2px 4px #0006!important;background:linear-gradient(180deg,#b88749,#ddbb81)!important;color:#342318!important;font:11px/1.15 Georgia,serif;letter-spacing:.025em;font-variant:small-caps}
+.journal-book-subnav button:not(.secondary){background:linear-gradient(180deg,#324a66,#142941)!important;border-color:#b99051!important;color:#ffe1a6!important}
+.journal-book-spread{display:grid;grid-template-columns:minmax(0,45.5fr) minmax(0,54.5fr);gap:0;align-items:stretch;min-width:0;position:relative}
+.journal-book-page,.journal-book-page--left,.journal-book-page--right{
+ display:flex;flex-direction:column;gap:0;min-width:0;min-height:745px;height:auto;margin:0;padding:14px 20px 20px;
+ border:0!important;border-radius:0!important;color:var(--script-ink);
+ background:linear-gradient(90deg,#aa83502c 0%,transparent 11%,transparent 88%,#966d3c40 100%),url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+ box-shadow:inset 0 0 0 1px #a78a5e9e,inset 0 0 18px #855e3455!important;
+}
+.journal-book-page--left{padding:6px 24px 22px 7px}
+.journal-book-page--right{padding:6px 7px 22px 27px}
+.journal-book-page:before{content:"";position:absolute;inset:1px;border:1px solid #b7935aa8;outline:none;box-shadow:none;pointer-events:none}
+.journal-book-page:after{content:"";position:absolute;bottom:1px;left:3%;right:3%;height:1px;background:#ad824c6b;transform:none}
+.journal-book-page--left::after{content:""}
+/* crisp engraved frames on the parchment, derived jewel cap from original reference */
+.journal-book-section{position:relative;margin:0 0 2px!important;min-width:0;padding:2px 6px 4px;border:1px solid #a27a467d!important;border-radius:0!important;background:transparent!important;box-shadow:inset 0 1px #fff3d1a3,0 0 0 1px #efdbb48c!important;color:#241a14}
+.journal-book-title{display:flex;align-items:center;gap:3px;min-height:23px;margin:-2px -6px 3px!important;padding:2px 3px 2px 29px;border-bottom:1px solid #b58d4e!important;background:url('./assets/ui/book/section_jewel.png') left center/26px 25px no-repeat,linear-gradient(90deg,#bf955136,#e9d5a706);font:700 12px/1.15 Georgia,serif;letter-spacing:.03em;color:#653019;font-variant:small-caps;text-transform:uppercase}
+.journal-book-title::before,.journal-book-title::after{content:none!important}
+.journal-book-table{display:grid;gap:0}
+.journal-book-table div{padding:2px 1px 3px;align-items:baseline;border-bottom:1px solid #a7845338;gap:3px}
+.journal-book-table dt,.journal-book-table dd{font:12px/1.2 Georgia,serif;color:#2e211a;text-align:left}
+.journal-book-table dd{font-weight:500;text-align:right;overflow-wrap:anywhere}
+.journal-book-section--tight{padding:1px 5px 3px}
+.journal-book-section--tight .journal-book-table div{padding:2px 1px 2px}
+.journal-nameplate{margin:0 0 4px;padding:0;min-height:90px;border:0!important;border-radius:0!important;box-shadow:none!important;background:none!important;display:flex;align-items:center;justify-content:center;gap:10px}
+.journal-nameplate:before,.journal-nameplate:after{content:"❧";font-size:31px;opacity:.55;color:#926e41}
+.journal-nameplate:after{transform:scaleX(-1)}
+.journal-crest{flex:0 0 67px;width:67px;height:87px;border:0;border-radius:0!important;background:none center/cover no-repeat!important;color:transparent!important;font-size:0;box-shadow:none!important}
+.journal-nameplate h3{font:500 clamp(24px,2.7vw,41px)/1.0 Georgia,serif;letter-spacing:.01em;color:#10243d;text-shadow:none;text-transform:uppercase;margin:0}
+.journal-nameplate p{font:700 13px/1.3 Georgia,serif;color:#2f211b;letter-spacing:.13em;margin:0}
+.journal-nameplate-minor{font:11px/1.3 Georgia,serif;color:#4d321c;letter-spacing:0}
+.journal-left-top{display:grid;grid-template-columns:1.02fr 1.11fr .81fr;align-items:stretch;gap:2px}
+.journal-left-mid{display:grid;grid-template-columns:1.08fr .92fr;gap:2px;margin:0}
+.journal-attributes-row{display:grid;grid-template-columns:1fr 1fr .80fr;gap:2px;margin:0}
+.journal-right-top-grid{display:grid;grid-template-columns:1fr .85fr .8fr 1.08fr;gap:3px;margin:0 0 1px}
+.journal-right-mid-grid,.journal-right-low-grid{display:grid;grid-template-columns:1.05fr .83fr;gap:3px;margin:0}
+.journal-right-bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin:0}
+.journal-right-bottom-grid>.journal-notes-card{grid-column:1/-1}
+.journal-portrait-panel{margin:0;min-height:252px;border:0!important;background:transparent!important;padding:0;overflow:hidden;display:flex;align-items:stretch}
+.sheet-portrait--book{position:relative;width:100%;height:100%;min-height:252px;overflow:hidden;background:transparent!important;border:0!important}
+.sheet-portrait--book .sheet-portrait-image{display:block;width:100%;height:100%;min-height:252px;object-fit:cover;box-shadow:none;border:0!important}
+.sheet-portrait--book .sheet-portrait-placeholder{display:grid;width:100%;height:100%;min-height:252px;background:none center/cover no-repeat!important;color:#edd2a3;text-align:center;box-shadow:none!important;border:0!important}
+.portrait-not-set{font:italic 10px Georgia,serif;color:#f0d5a7;align-self:end;justify-self:center;margin-bottom:8px;text-shadow:0 1px 4px #100c0b}
+.journal-trait-list{margin:0;padding:0;gap:0;list-style:none}
+.journal-trait-list li{font:11px/1.22 Georgia,serif;padding:3px 2px;border:0;border-bottom:1px solid #ad8c5a3d;border-radius:0;background:none}
+.journal-stat-boxes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}
+.journal-stat-box{padding:4px 1px;border:1px solid #ac8b5e9c!important;border-radius:0!important;background:#f3e3c84d!important;box-shadow:inset 0 0 0 1px #fff5d697}
+.journal-stat-box span{font:700 10px/1.2 Georgia,serif;color:#65321c}
+.journal-stat-box strong{font:500 clamp(17px,1.55vw,24px)/1.3 Georgia,serif;color:#12263f}
+.journal-book-skills{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;grid-auto-flow:row}
+.journal-book-skills .journal-skill-family{border:0;border-right:1px solid #b28d5c83;border-radius:0;background:none;padding:2px 6px 6px}
+.journal-book-skills .journal-skill-family h4{font:700 11px/1.3 Georgia,serif;color:#66361c;border-bottom:1px solid #ba9966;padding:0 0 3px;margin:0 0 3px}
+.journal-book-skills .journal-skill-family li{font:11px/1.23 Georgia,serif;color:#332318;padding:2px 0;gap:3px;overflow-wrap:anywhere}
+.journal-ledger{font:11px/1.3 Georgia,serif;color:#312018;background:none}
+.journal-ledger thead th,.journal-book .journal-ledger thead th{font:700 10px/1.15 Georgia,serif;letter-spacing:0;background:transparent!important;color:#4a2e1c!important;border-bottom:1px solid #977247!important;padding:2px 2px}
+.journal-ledger td{font:11px/1.2 Georgia,serif;background:transparent!important;color:#372517!important;border-bottom:1px solid #b49b754b!important;padding:3px 2px}
+.journal-book .journal-ledger tbody tr:nth-child(even){background:transparent!important}
+.journal-body-grid{display:grid;grid-template-columns:minmax(102px,.82fr) minmax(0,1.18fr);align-items:start;gap:2px}
+.journal-body-figure{width:100%;height:auto;min-height:0;padding:0;margin:0;background:none}
+.journal-body-figure img{display:block;height:auto;max-height:220px;width:100%;object-fit:contain;filter:none}
+.journal-ledger--compact th,.journal-ledger--compact td{font-size:10px;padding:1px 2px}
+.journal-check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px}
+.journal-check-grid label{display:grid;grid-template-columns:12px minmax(0,1fr) auto;align-items:center;font:11px/1.1 Georgia,serif;color:#372417;gap:2px}
+.journal-check{width:10px;height:10px;border:1px solid #73543a;background:#f3e3c9}
+.journal-check-grid strong{font:10px Georgia,serif}
+.journal-notes-card p{font:11px/1.35 Georgia,serif;color:#372618;margin:3px 0}
+/* A selected technical chapter REPLACES the spread, retaining one book, one live view. */
+.journal-book--chapter .journal-book-frame:after{display:none}
+.journal-book--chapter .journal-technical-shell{background:linear-gradient(90deg,#b58c5333,transparent 13%,transparent 85%,#a17a4033),url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat;border:0;min-height:680px;padding:20px 28px;box-shadow:none}
+.journal-alt-header{padding:14px 20px;border-bottom:2px double #b7925d;background:transparent}
+.journal-alt-header h3{font:500 33px/1.1 Georgia,serif;color:#172840}
+.journal-technical-shell .panel{background:rgba(252,243,222,.66)!important;border:1px solid #ac895ba8!important;border-radius:0!important;box-shadow:0 1px 0 #fff7e6 inset!important}
+.journal-technical-shell .panel h3{color:#66331f!important;font-family:Georgia,serif}
+/* responsive: preserve the book image at desktop widths, stack chapters on smaller screens */
+@media(min-width:1650px){.content-sheet .journal-book-frame{max-width:1440px}}
+@media(max-width:1530px){.mast-brand{width:233px;min-width:233px}.layout{grid-template-columns:233px minmax(0,1fr)}.nav{width:233px;padding-right:53px}.journal-book-page--left{padding-right:21px}.journal-book-page--right{padding-left:25px}.journal-book-page{padding-top:8px}.journal-nameplate h3{font-size:27px}.journal-book-title{font-size:11px}.journal-book-table dt,.journal-book-table dd,.journal-ledger td,.journal-book-skills .journal-skill-family li{font-size:10px}}
+@media(max-width:1160px){.content-sheet .journal-book-frame::after{display:none}.journal-book-spread{grid-template-columns:1fr}.journal-book-page{min-height:0}.journal-book-page--left,.journal-book-page--right{padding:16px 18px}.journal-book-frame{background-image:none,none,none,none}.journal-book-table dt,.journal-book-table dd,.journal-ledger td,.journal-book-skills .journal-skill-family li{font-size:12px}.journal-nameplate h3{font-size:33px}}
+@media(max-width:800px){.mast{height:auto;min-height:60px}.mast-top{min-height:60px}.mast-brand{width:220px;min-width:220px}.layout{display:block}.nav{width:100%;max-height:none;min-height:0;padding:8px 12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.nav:after{display:none}.nav .castle-nav-link{min-height:35px}.castle-campaign-card,.nav-section-label,.castle-character-list,.nav .castle-create{grid-column:1/-1}.content-sheet .journal-book-frame{padding:36px 26px 39px;background-size:100% 36px,100% 42px,27px 100%,27px 100%}.content-sheet .journal-book-frame::before{inset:22px 18px 25px}.journal-book-subnav{margin:-22px 0 10px}.journal-nameplate h3{font-size:27px}}
+@media(max-width:550px){.content-sheet .journal-book-frame{padding:34px 13px 38px;background-size:100% 34px,100% 38px,14px 100%,14px 100%}.content-sheet .journal-book-frame::before{inset:22px 8px 25px}.journal-book-page--left,.journal-book-page--right{padding:12px 11px}.journal-left-top,.journal-left-mid,.journal-attributes-row,.journal-right-top-grid,.journal-right-mid-grid,.journal-right-low-grid,.journal-right-bottom-grid{grid-template-columns:1fr}.journal-portrait-panel{min-height:225px}.sheet-portrait--book{min-height:225px;max-width:220px;margin:0 auto}.journal-nameplate h3{font-size:24px}.journal-book-skills{grid-template-columns:repeat(2,minmax(0,1fr))}.journal-stat-boxes{grid-template-columns:repeat(3,minmax(0,1fr))}.journal-book-subnav button{font-size:10px;padding:3px 7px!important}.journal-body-grid{grid-template-columns:100px 1fr}}
+
+/* v93.333: refined brand, compact starts, stronger page edges, cleaner sidebar card */
+.mast-brand{
+  background:url('./assets/ui/book/sidebar_header.png') left center/contain no-repeat!important;
+  width:clamp(262px,19vw,292px)!important;
+  min-width:clamp(262px,19vw,292px)!important;
+  max-width:clamp(262px,19vw,292px)!important;
+  min-height:60px!important;
+  aspect-ratio:262/60;
+}
+.mast-brand::after{display:none!important}
+
+.castle-campaign-card{
+  position:relative;
+  width:235px;max-width:calc(100% + 60px);min-height:100px;height:auto;
+  margin-bottom:12px;
+  padding:.75rem .85rem .7rem;
+  border:1px solid #c59e62;
+  box-shadow:inset 0 1px rgba(255,246,225,.18),0 10px 18px rgba(0,0,0,.22);
+  background:linear-gradient(0deg,#050d17aa,transparent),url('./assets/ui/background-valley.png?v=93.333') center/cover;
+  overflow:hidden;
+}
+.nav::after{display:none!important}
+
+/* side navigation buttons visually match the top illuminated tabs */
+.nav .castle-nav-link,
+.nav .castle-character,
+.nav .castle-create{
+  display:flex;align-items:center;gap:.55rem;
+  width:100%;text-align:left;
+  min-height:34px;
+  margin:0 0 .45rem;
+  padding:7px 12px;
+  border:1px solid #aa7d40!important;
+  border-bottom:2px solid #a6793f!important;
+  border-radius:6px 6px 0 0!important;
+  background:linear-gradient(180deg,#f3e4c6 0%,#ddc397 53%,#c7a571 100%)!important;
+  color:#3b281a!important;
+  box-shadow:inset 0 2px rgba(255,254,244,.7),inset 0 0 0 1px rgba(122,84,43,.14),0 -1px 5px #0004!important;
+  font:700 15px/1.1 Georgia,serif!important;
+  font-variant:small-caps!important;
+  letter-spacing:.03em!important;
+  text-shadow:0 1px rgba(255,252,241,.65)!important;
+}
+.nav .castle-nav-link .castle-nav-icon,
+.nav .castle-character .castle-nav-icon{color:#996c32!important;flex:0 0 auto}
+.nav .castle-nav-link.active,
+.nav .castle-character.active,
+.nav .castle-nav-link[aria-current="page"]{
+  background:linear-gradient(180deg,#385675 0%,#1b354e 48%,#0c2036 100%)!important;
+  color:#ffdf9e!important;
+  border-color:#ca9d57!important;
+  border-bottom-color:#0c2036!important;
+  box-shadow:inset 0 1px #d9ad6c,inset 0 0 0 1px rgba(233,191,108,.18),0 -2px 10px #0006!important;
+  text-shadow:0 1px #09101c!important;
+}
+.nav .castle-nav-link.active .castle-nav-icon,
+.nav .castle-character.active .castle-nav-icon{color:#ecc078!important}
+.nav .castle-create{justify-content:space-between}
+
+/* stronger visible page-stack edges like the reference book */
+.content-sheet .journal-book-frame{
+  padding:34px 78px 40px!important;
+  background-size:100% 44px,100% 50px,78px 100%,78px 100%,46px 100%!important;
+  box-shadow:0 24px 38px #0504068f,0 3px 3px #060507cd!important;
+}
+.content-sheet .journal-book-frame::before{inset:23px 69px 27px!important}
+.content-sheet .journal-book-frame::after{top:34px!important;bottom:40px!important}
+.journal-book-subnav{margin:-15px 24px 8px!important}
+.journal-book-page,.journal-book-page--left,.journal-book-page--right{padding-top:6px!important}
+
+/* chapter tabs start higher on the page */
+.content-sheet .journal-book--chapter .journal-book-frame{padding-top:20px!important}
+.content-sheet .journal-book--chapter .journal-book-frame::after{top:20px!important;bottom:40px!important}
+.content-sheet .journal-book--chapter .journal-alt-header{padding:4px 20px 6px!important}
+.content-sheet .journal-book--chapter .journal-alt-header-block{min-height:88px!important;padding:8px 18px 8px!important}
+.content-sheet .journal-book--chapter .journal-alt-header h3{margin:0 0 8px!important}
+.content-sheet .journal-book--chapter .journal-alt-header p{max-width:96%!important}
+.content-sheet .journal-book--chapter .journal-chapter-body{padding:0 20px 18px!important}
+
+@media(max-width:1530px){
+  .content-sheet .journal-book-frame{padding:32px 60px 38px!important;background-size:100% 44px,100% 50px,60px 100%,60px 100%,42px 100%!important}
+  .content-sheet .journal-book-frame::before{inset:23px 51px 26px!important}
+}
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame{padding:28px 42px 34px!important;background-size:100% 36px,100% 42px,42px 100%,42px 100%!important}
+  .content-sheet .journal-book-frame::before{inset:18px 34px 24px!important}
+  .content-sheet .journal-book--chapter .journal-book-frame{padding-top:14px!important}
+  .content-sheet .journal-book--chapter .journal-alt-header{padding:2px 14px 4px!important}
+  .content-sheet .journal-book--chapter .journal-alt-header-block{min-height:68px!important;padding:6px 12px 6px!important}
+}
+@media(max-width:800px){
+  .mast-brand{width:220px!important;min-width:220px!important;max-width:220px!important}
+  .nav .castle-nav-link,.nav .castle-character,.nav .castle-create{border-radius:6px!important}
+}
+@media(max-width:550px){
+  .content-sheet .journal-book-frame{padding:24px 22px 30px!important;background-size:100% 30px,100% 34px,22px 100%,22px 100%!important}
+  .content-sheet .journal-book-frame::before{inset:15px 15px 20px!important}
+}
+
+
+/* === Consolidated from illumination-master.css (same cascade order as original) === */
+/* HMK 93.315 — multi-layer graphic master. Raster fragments are isolated from
+   the source artwork, masked, and recomposed without embedded table text.
+   No fixed-height, noninteractive page screenshots are used. */
+:root{--ill-ink:#302014;--ill-navy:#132843;--ill-gold:#a8793d;--ill-paper:#eee0c4;--ill-shadow:#39220c66}
+.shell::before{opacity:.98;filter:saturate(1.10) brightness(1.1)}
+.shell::after{background:linear-gradient(90deg,#070a1122 0%,transparent 22%,transparent 85%,#070a111b 100%)}
+/* 9-slice-style decorative book assembly: the rail strips repeat, without
+   stretching ornaments or accidentally repeating characters' printed data. */
+.content-sheet .journal-book-frame{
+  background-color:#dac29b;
+  background-image:
+    none,
+    none,
+    none,
+    none,
+    url('./assets/ui/components/vellum_master.png');
+  background-repeat:repeat-x,repeat-x,repeat-y,repeat-y,repeat;
+  background-position:center top,center bottom,left center,right center,center center;
+  background-size:auto 27px,auto 19px,27px auto,29px auto,1024px 1024px;
+  padding:44px 37px 46px;
+  box-shadow:inset 0 0 0 3px #6b421f,inset 0 0 0 5px #cda365,0 19px 30px #0403038f;
+}
+.content-sheet .journal-book-frame::before{inset:27px 26px 27px;border:1px solid #a67e49;outline:1px solid #e3cc9c;outline-offset:-4px;box-shadow:inset 0 0 0 2px #9b78452e;z-index:1}
+.content-sheet .journal-book-frame::after{background:none center/100% 100% no-repeat;z-index:4;opacity:.72;top:40px;bottom:43px;left:calc(37px + (100% - 74px)*.455 - 22px);width:44px}
+.book-cover-ornament{display:block!important;position:absolute;pointer-events:none;z-index:7;width:84px;height:82px;transform:none!important;filter:drop-shadow(0 2px 2px #21150b75)}
+.book-cover-ornament--tl{top:0;left:0;background:none left top/contain no-repeat}
+.book-cover-ornament--tr{top:0;right:0;background:none right top/contain no-repeat}
+.book-cover-ornament--bl{bottom:0;left:0;background:none left bottom/contain no-repeat}
+.book-cover-ornament--br{bottom:0;right:0;background:none right bottom/contain no-repeat}
+.content-sheet .journal-book-page,.content-sheet .journal-book-page--left,.content-sheet .journal-book-page--right{
+ background-image:
+    linear-gradient(90deg,#96734422 0%,transparent 12%,transparent 89%,#96734426 100%),
+    url('./assets/ui/components/vellum_master.png')!important;
+ background-repeat:no-repeat,repeat!important;
+ background-size:100% 100%,1024px 1024px!important;
+ background-position:center,center!important;
+ border:0!important;
+ box-shadow:inset 0 0 0 1px #b69a715e,inset 0 0 19px #9973422a!important;
+}
+.journal-book-page:before{border:1px solid #b38c5780!important;opacity:.8}
+.journal-book-section{
+ border:1px solid #ad865060!important;
+ background:transparent!important;
+ box-shadow:inset 0 1px 0 #fff2d196!important;
+}
+.journal-book-title{
+ position:relative;min-height:25px;
+ padding:3px 8px 3px 29px!important;
+ margin:-2px -6px 4px!important;
+ background:linear-gradient(90deg,#b18c5061 0%,#e7d1a84d 25%,transparent 100%)!important;
+ border-top:1px solid #b48b5390!important;
+ border-bottom:1px solid #a87a47!important;
+ color:#5d2e19!important;
+ font:700 12px/1.22 'Palatino Linotype','Book Antiqua',Georgia,serif!important;
+ font-variant:small-caps;text-transform:uppercase;letter-spacing:.035em;
+ text-shadow:0 1px 0 #fbecd3;
+}
+.journal-book-title::before{
+ content:''!important;position:absolute;left:2px;top:50%;transform:translateY(-50%);
+ width:25px;height:25px;flex:none;
+ background:none center/contain no-repeat!important;
+}
+.journal-book-title::after{content:none!important}
+.journal-book-title:focus-visible{outline:2px solid #22558c}
+.journal-nameplate{position:relative;min-height:90px;z-index:1}
+.journal-nameplate:before,.journal-nameplate:after{content:'❧';color:#a17944;opacity:.55;font-size:31px}
+.journal-crest{width:70px;height:87px;flex:0 0 70px;background:none center/contain no-repeat!important;overflow:visible;filter:drop-shadow(1px 2px 1px #21150960)}
+.journal-nameplate h3{font-family:'Palatino Linotype','Book Antiqua',Georgia,serif!important;font-size:clamp(22px,2.4vw,39px)!important;line-height:1.06;color:#132947}
+.journal-nameplate p{font-family:'Palatino Linotype','Book Antiqua',Georgia,serif;color:#392819}
+.journal-stat-box{background:#f4e7ce5d!important;border:1px solid #b08b597d!important;box-shadow:inset 0 1px #fff2d7a6!important}
+.journal-book-table div,.journal-book .journal-ledger td{border-bottom:1px solid #ac88523b!important}
+.journal-book .journal-ledger thead th{border-bottom:1px solid #a8844d!important}
+/* A dedicated illustrated locator rather than a geometric CSS person. */
+.journal-body-figure img{height:auto;max-height:235px;object-fit:contain;width:100%;filter:drop-shadow(1px 2px 1px #69584444)}
+/* A clean parchment chapter when the user switches tabs: overview disappears
+   entirely. The live original form controls remain in the replacement view. */
+.journal-book--chapter .journal-technical-shell{background-image:url('./assets/ui/components/vellum_master.png');background-size:1024px 1024px;background-repeat:repeat;box-shadow:inset 0 0 0 1px #b99662;min-height:460px}
+.journal-book--chapter .panel{background:#f6eddbd9!important}
+.journal-alt-header{background:transparent}
+/* Shared illuminated component family for the rest of the application. It
+   keeps the original functionality, event handlers and input semantics. */
+.content-library,.content-skills,.content-encounter,.content-hazards,.content-creation,.content-characters{
+ --accent:#83501f;
+}
+.content-library .panel,.content-skills .panel,.content-encounter .panel,
+.content-hazards .panel,.content-creation .panel,.content-characters .panel,
+.content-library .card,.content-skills .card,.content-encounter .card,.content-hazards .card{
+ background-image:linear-gradient(90deg,#d3ba9070,transparent 9%,transparent 91%,#d3ba9070),url('./assets/ui/components/vellum_master.png');
+ background-size:100% 100%,1024px 1024px;
+ border:1px solid #a47b46;
+ border-radius:3px;
+ box-shadow:inset 0 0 0 2px #f9eccb80,inset 0 0 0 3px #af824a4f,0 10px 24px #09060377;
+}
+.content-library h2,.content-skills h2,.content-encounter h2,.content-hazards h2,
+.content-library h3,.content-skills h3,.content-encounter h3,.content-hazards h3,
+.content-creation h2,.content-characters h2,.journal-alt-header h3{
+ font-family:'Palatino Linotype','Book Antiqua',Georgia,serif;
+}
+.content-library .panel h3,.content-skills .panel h3,.content-encounter .panel h3,
+.content-hazards .panel h3,.content-creation .panel h3{
+ color:#5a2d1b;border-bottom:1px solid #b99861;
+ padding-bottom:6px;
+}
+.content-library input,.content-skills input,.content-encounter input,.content-hazards input,
+.content-library select,.content-skills select,.content-encounter select,.content-hazards select,
+.journal-book--chapter input,.journal-book--chapter select,.journal-book--chapter textarea{
+ border-radius:2px;background:#fff8eac9;border-color:#9f8157;color:#2e2014;
+}
+.content-library .library-table-wrap{border-radius:3px;background:url('./assets/ui/components/vellum_master.png') repeat center/1024px}
+.content-library .library-table-wrap thead th,.content-library .library-table thead th{
+ background:#d0b887!important;color:#4c2817!important;font-family:Georgia,serif;
+ border-bottom:2px solid #8a6037;
+}
+.content-skills button,.content-encounter button,.content-library button,.content-hazards button{
+ border-radius:2px;
+}
+.content-characters .view-hero{background-image:url('./assets/ui/components/vellum_master.png')}
+.nav .castle-character.active,.nav .castle-nav-link.active{border:1px solid #c5a066;background:linear-gradient(90deg,#264669,#102944);box-shadow:inset 4px 0 0 #e4b86b}
+.nav .castle-char-portrait{border-color:#d4ae6c}
+@media(max-width:1160px){
+ .content-sheet .journal-book-frame::after{display:none}
+ .book-cover-ornament{width:55px;height:55px}
+ .journal-book-subnav{padding:0 10px}
+}
+@media(max-width:550px){
+ .content-sheet .journal-book-frame{padding:37px 16px 41px;background-size:auto 19px,auto 16px,13px auto,13px auto,1024px 1024px}
+ .content-sheet .journal-book-frame::before{inset:23px 9px}
+ .book-cover-ornament{width:36px;height:39px}
+ .journal-nameplate:before,.journal-nameplate:after{display:none}
+ .journal-book-title{font-size:11px!important}
+}
+/* No false character portrait: an engraved landscape occupies empty frame. */
+.sheet-portrait--book .sheet-portrait-placeholder{
+ background:url('./assets/ui/components/portrait_unset_engraving.png') center/cover no-repeat!important;
+ box-shadow:inset 0 0 20px #7b5b3166!important;
+}
+.sheet-portrait--book .sheet-portrait-placeholder::before{content:none}
+.portrait-not-set{color:#49331f!important;text-shadow:0 1px #e8d8ba!important;background:#f1e2bfbb;border:1px solid #96734688;padding:4px 8px;font-size:11px!important}
+
+/* v93.316 cleanup pass — remove legacy visual interference and tighten fidelity */
+.content-sheet .journal-book-frame{
+  background-color:#d8be94;
+  box-shadow:inset 0 0 0 2px #6e4623,inset 0 0 0 4px #c89d61,0 18px 28px #0c07037a;
+  overflow:visible;
+}
+.content-sheet .journal-book-frame::before{
+  inset:26px 24px 26px;
+  border:1px solid #a67f4c;
+  outline:1px solid #d9bc8e;
+  outline-offset:-3px;
+}
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  box-shadow:inset 0 0 0 1px #ba9b6d55,inset 0 0 24px #9e75432a!important;
+}
+.journal-book-page--left{padding:8px 24px 22px 10px}
+.journal-book-page--right{padding:8px 10px 22px 28px}
+.journal-nameplate{margin-bottom:8px}
+.journal-crest{
+  width:78px;height:96px;flex:0 0 78px;
+  background:none center/contain no-repeat!important;
+  filter:drop-shadow(0 2px 1px #1f160e55);
+}
+.journal-nameplate h3{
+  font-family:'Palatino Linotype','Book Antiqua',Georgia,serif!important;
+  font-weight:600!important;
+  letter-spacing:.02em!important;
+}
+.journal-nameplate p,.journal-nameplate-minor,
+.journal-book-table dt,.journal-book-table dd,
+.journal-book .journal-ledger td,
+.journal-book .journal-ledger th,
+.journal-book .journal-ledger thead th,
+.journal-book .journal-list li,
+.journal-book p,
+.journal-book label,
+.journal-book input,
+.journal-book select,
+.journal-book textarea{
+  font-family:'Palatino Linotype','Book Antiqua',Georgia,serif!important;
+}
+.journal-book-title{
+  font-family:'Palatino Linotype','Book Antiqua',Georgia,serif!important;
+  font-size:12px!important;
+  letter-spacing:.04em!important;
+  border-top:1px solid #c39f65!important;
+  border-bottom:1px solid #a87a47!important;
+  background:linear-gradient(90deg,#b78b4d75 0%,#ead8b267 28%,transparent 100%)!important;
+}
+.journal-book-table div,.journal-book .journal-ledger td{
+  border-bottom:1px solid #b18a5633!important;
+}
+.journal-book .journal-ledger{
+  border-collapse:collapse;
+}
+.journal-book-section{
+  border:1px solid #b08a576e!important;
+  box-shadow:inset 0 0 0 1px #f4e5c171!important;
+}
+.journal-body-figure img{
+  filter:drop-shadow(0 1px 1px #7a64471f);
+}
+/* slightly reduce visible dark seam around the assembled book */
+.content-sheet{padding-bottom:42px}
+
+
+/* v93.318 — higher-fidelity illuminated pass
+   Goal: closer 1:1 alignment with the approved reference image while preserving
+   fully dynamic HTML content and tab-switching chapters. */
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap");
+:root{
+  --ref-paper:#efe1c4;
+  --ref-paper-deep:#d7bc90;
+  --ref-line:#9f7845;
+  --ref-line-soft:#d9be8d;
+  --ref-ink:#2d1d13;
+  --ref-heading:#5e321d;
+  --ref-blue:#142c49;
+}
+body, .journal-book .journal-ledger td, .journal-book-table dt, .journal-book-table dd,
+.journal-trait-list li, .journal-book-skills .journal-skill-family li, .journal-check-grid label,
+.journal-notes-card p, .mast-links button, .nav .castle-nav-link, .nav .castle-character,
+.content-library, .content-skills, .content-encounter, .content-hazards, .content-creation, .content-characters{
+  font-family:"Cormorant Garamond", Georgia, "Times New Roman", serif !important;
+}
+.journal-nameplate h3,
+.journal-book-title,
+.journal-book-skills .journal-skill-family h4,
+.journal-ledger thead th,
+.mast-links button,
+.nav-section-label,
+.content-library h2,.content-skills h2,.content-encounter h2,.content-hazards h2,
+.content-library h3,.content-skills h3,.content-encounter h3,.content-hazards h3,
+.content-creation h2,.content-characters h2,.journal-alt-header h3{
+  font-family:"Cinzel", Georgia, serif !important;
+}
+
+/* Better aligned book shell: slimmer dark seams, cleaner parchment, ornaments covering the joins. */
+.content-sheet .journal-book-frame{
+  background-color:#d5bb92 !important;
+  background-image:none,none,none,none,none !important;
+  background-position:center top,center bottom,left top,right top,center top !important;
+  background-size:100% 40px,100% 47px,32px 100%,36px 100%,42px 100% !important;
+  background-repeat:no-repeat !important;
+  padding:41px 30px 43px !important;
+  box-shadow:0 18px 30px rgba(7,4,2,.55), inset 0 0 0 1px rgba(103,62,28,.70), inset 0 0 0 3px rgba(205,165,102,.60) !important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:23px 19px 24px !important;
+  border:1px solid rgba(142,104,59,.95) !important;
+  outline:1px solid rgba(225,201,157,.95) !important;
+  outline-offset:-4px !important;
+  box-shadow:inset 0 0 0 1px rgba(153,116,70,.35) !important;
+}
+.content-sheet .journal-book-frame::after{
+  top:39px !important;
+  bottom:42px !important;
+  width:38px !important;
+  left:calc(30px + (100% - 60px)*.455 - 19px) !important;
+  opacity:.62 !important;
+  background:none center/100% 100% no-repeat !important;
+}
+.book-cover-ornament{display:block !important; width:68px !important; height:68px !important; z-index:8 !important; filter:none !important; opacity:.98}
+.book-cover-ornament--tl{top:-1px !important; left:-1px !important}
+.book-cover-ornament--tr{top:-1px !important; right:-1px !important}
+.book-cover-ornament--bl{bottom:-1px !important; left:-1px !important}
+.book-cover-ornament--br{bottom:-1px !important; right:-1px !important}
+
+/* Warmer vellum pages with finer double-line boundaries. */
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  background:
+    linear-gradient(90deg, rgba(164,126,74,.12) 0%, rgba(255,255,255,0) 9%, rgba(255,255,255,0) 91%, rgba(164,126,74,.12) 100%),
+    url('./assets/ui/book/clean_vellum.png') center/420px 420px repeat !important;
+  box-shadow:inset 0 0 0 1px rgba(188,152,103,.48), inset 0 0 20px rgba(139,99,52,.11) !important;
+}
+.journal-book-page--left{padding:10px 24px 18px 10px !important}
+.journal-book-page--right{padding:10px 10px 18px 26px !important}
+.journal-book-page:before{
+  inset:2px !important;
+  border:1px solid rgba(185,148,92,.82) !important;
+}
+
+/* Nameplate closer to reference. */
+.journal-nameplate{
+  min-height:95px !important;
+  margin:0 0 6px !important;
+  gap:14px !important;
+}
+.journal-nameplate:before,.journal-nameplate:after{
+  font-size:28px !important;
+  color:#a47b43 !important;
+}
+.journal-crest{
+  flex:0 0 72px !important;
+  width:72px !important;
+  height:94px !important;
+  background:none center center/contain no-repeat !important;
+  filter:drop-shadow(0 1px 1px rgba(51,29,11,.35)) !important;
+}
+.journal-nameplate h3{
+  font:600 clamp(24px,2.5vw,40px)/1.0 "Cinzel", Georgia, serif !important;
+  color:var(--ref-blue) !important;
+  letter-spacing:.03em !important;
+}
+.journal-nameplate p{
+  font:600 13px/1.25 "Cinzel", Georgia, serif !important;
+  color:#6a4423 !important;
+  letter-spacing:.14em !important;
+}
+.journal-nameplate-minor{font:500 12px/1.2 "Cormorant Garamond", Georgia, serif !important; color:#593722 !important}
+
+/* Section headings: thin engraved rule, no bulky brown stripe. */
+.journal-book-title{
+  min-height:24px !important;
+  margin:-1px -6px 5px !important;
+  padding:1px 4px 1px 30px !important;
+  background:url('./assets/ui/book/section_jewel.png') left center/24px 24px no-repeat !important;
+  border-top:0 !important;
+  border-bottom:0 !important;
+  color:var(--ref-heading) !important;
+  font:600 11px/1.18 "Cinzel", Georgia, serif !important;
+  letter-spacing:.06em !important;
+  text-transform:uppercase !important;
+  font-variant:normal !important;
+}
+.journal-book-title::after{
+  content:"" !important;
+  display:block !important;
+  flex:1 1 auto !important;
+  height:1px !important;
+  margin-left:8px !important;
+  background:linear-gradient(90deg, rgba(160,121,64,.82), rgba(160,121,64,.22) 72%, transparent 100%) !important;
+}
+.journal-book-section{
+  border:1px solid rgba(172,136,85,.62) !important;
+  box-shadow:inset 0 0 0 1px rgba(251,240,212,.50) !important;
+  padding:3px 6px 4px !important;
+}
+
+.journal-book-table dt,.journal-book-table dd,
+.journal-ledger td,
+.journal-trait-list li,
+.journal-book-skills .journal-skill-family li,
+.journal-check-grid label,
+.journal-notes-card p{font-size:12px !important; line-height:1.12 !important; color:#2c1d13 !important}
+.journal-book-table div,
+.journal-ledger td{border-bottom:1px solid rgba(165,127,75,.28) !important}
+.journal-ledger thead th,.journal-book .journal-ledger thead th{
+  font:600 10px/1.15 "Cinzel", Georgia, serif !important;
+  color:#60351e !important;
+  border-bottom:1px solid rgba(158,118,65,.68) !important;
+}
+.journal-book-skills .journal-skill-family h4{
+  font:600 11px/1.2 "Cinzel", Georgia, serif !important;
+  color:#60331b !important;
+  border-bottom:1px solid rgba(166,128,77,.68) !important;
+}
+.journal-stat-box{background:rgba(246,231,203,.38) !important}
+.journal-stat-box span{font:600 9px/1.15 "Cinzel", Georgia, serif !important; color:#77411f !important}
+.journal-stat-box strong{font:600 clamp(18px,1.55vw,25px)/1.15 "Cormorant Garamond", Georgia, serif !important; color:#122941 !important}
+
+/* Body-location panel figure closer to the source proportions. */
+.journal-body-grid{grid-template-columns:minmax(112px,.87fr) minmax(0,1.13fr) !important}
+.journal-body-figure img{max-height:238px !important; width:100% !important; object-position:center top !important}
+
+/* Sidebar closer to the illustrated reference. */
+.mast-links button{font-size:15px !important; color:#e7e0d3 !important}
+.mast-links button.current{color:#f5e8cd !important; border-bottom:2px solid #d7ae6f !important}
+.nav{
+  padding:10px 70px 12px 13px !important;
+  background:linear-gradient(180deg, rgba(9,18,30,.97), rgba(14,25,39,.93)) !important;
+}
+.nav .castle-nav-link,.nav .castle-character{
+  font-size:12px !important;
+  letter-spacing:.01em !important;
+}
+.nav .castle-character.active,.nav .castle-nav-link.active{
+  border:1px solid rgba(205,164,102,.85) !important;
+  background:linear-gradient(90deg,#2d4d72,#15304b) !important;
+  box-shadow:inset 3px 0 0 #e2ba78 !important;
+}
+.castle-campaign-card strong{font-family:"Cormorant Garamond", Georgia, serif !important; font-size:18px !important}
+
+/* Book-tab chapters occupy the book only, with matching parchment and headings. */
+.journal-book--chapter .journal-technical-shell{
+  background:
+    linear-gradient(90deg, rgba(173,131,75,.13), transparent 10%, transparent 90%, rgba(173,131,75,.13)),
+    url('./assets/ui/book/clean_vellum.png') center/420px 420px repeat !important;
+  padding:18px 24px !important;
+  min-height:700px !important;
+}
+.journal-alt-header{
+  padding:10px 4px 14px !important;
+  border-bottom:1px solid rgba(170,129,72,.80) !important;
+}
+.journal-alt-header h3{font:600 30px/1.05 "Cinzel", Georgia, serif !important; color:#162944 !important}
+.journal-technical-shell .panel{
+  background:rgba(248,238,218,.60) !important;
+  border:1px solid rgba(172,136,85,.68) !important;
+  box-shadow:inset 0 0 0 1px rgba(250,242,226,.62) !important;
+}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame{
+    background-size:100% 36px,100% 42px,22px 100%,22px 100%,0 0 !important;
+    padding:36px 22px 38px !important;
+  }
+  .content-sheet .journal-book-frame::before{inset:20px 14px 22px !important}
+  .journal-book-page--left,.journal-book-page--right{padding:14px 15px !important}
+  .journal-nameplate h3{font-size:31px !important}
+  .book-cover-ornament{width:48px !important; height:48px !important}
+}
+@media(max-width:550px){
+  .content-sheet .journal-book-frame{padding:33px 11px 36px !important}
+  .content-sheet .journal-book-frame::before{inset:19px 7px 21px !important}
+  .journal-book-title{font-size:10px !important}
+  .journal-nameplate{gap:8px !important}
+  .journal-crest{width:60px !important;height:79px !important;flex-basis:60px !important}
+}
+
+
+
+/* === Consolidated from ledger-skin.css (same cascade order as original) === */
+/* v93.319: Dynamic illustrated book — overlay-only design layer.
+ * Gameplay, state, save/export, and all application handlers remain v93.318.
+ * Components in assets/ui/ledger-skin are individually replaceable.
+ * Corners NEVER stretch to follow the text. Rails tile along long edges,
+ * parchment repeats behind live HTML, the book grows with content. */
+:root{
+ --ledger-corner-tl:none;
+ --ledger-corner-tr:none;
+ --ledger-corner-bl:none;
+ --ledger-corner-br:none;
+ --ledger-parchment:none;
+}
+/* The shell is built from a repeating set of rails, NOT a single stretched page image. */
+.content-sheet .journal-book.panel{overflow:visible !important; background:transparent !important;}
+.content-sheet .journal-book-frame{
+ position:relative!important; isolation:isolate!important;
+ width:100%; height:auto; min-height:720px;
+ padding:48px 37px 49px!important;
+ background-color:#142238!important;
+ background-image:
+   none,
+   none,
+   none,
+   none,
+   linear-gradient(90deg,#142239,#17283b 3%,#ddc095 4%,#e4cda6 50%,#e0c297 96%,#142239 97%)!important;
+ background-position:left top,left bottom,left top,right top,center!important;
+ background-size:auto 43px,auto 46px,37px auto,37px auto,100% 100%!important;
+ background-repeat:repeat-x,repeat-x,repeat-y,repeat-y,no-repeat!important;
+ box-shadow:0 26px 37px #05070bd1,inset 0 0 0 2px #775029,inset 0 0 0 4px #d5a85c7a!important;
+}
+.content-sheet .journal-book-frame::before{
+ content:"";inset:29px 28px 30px!important;pointer-events:none;
+ border:1px solid #af8554ba!important;
+ outline:1px solid #f5dfb0ba!important;outline-offset:-4px!important;
+ background:none!important;box-shadow:inset 0 0 0 1px #84572b44!important;
+ z-index:3!important;
+}
+/* 93.318 used a vertically stretched spine; tile it instead so tall books retain texture. */
+.content-sheet .journal-book-frame::after{
+ content:"";top:45px!important;bottom:45px!important;
+ width:36px!important;
+ left:calc(37px + (100% - 74px)*.455 - 18px)!important;
+ background:none center top/36px auto repeat-y!important;
+ opacity:.72!important;z-index:3!important;
+}
+/* These FOUR objects are independently-sized originals, no 9-slice stretching. */
+.content-sheet .book-cover-ornament{
+ display:block!important;position:absolute!important;z-index:9!important;
+ width:clamp(78px,8.6vw,126px)!important;
+ height:clamp(78px,8.6vw,126px)!important;
+ pointer-events:none!important;
+ background-position:center!important;
+ background-size:contain!important;
+ background-repeat:no-repeat!important;
+ filter:drop-shadow(0 1px 1px #160c07b0)!important;
+ opacity:1!important;
+}
+.content-sheet .book-cover-ornament--tl{top:0!important;left:0!important;background-image:var(--ledger-corner-tl)!important}
+.content-sheet .book-cover-ornament--tr{top:0!important;right:0!important;background-image:var(--ledger-corner-tr)!important}
+.content-sheet .book-cover-ornament--bl{bottom:0!important;left:0!important;background-image:var(--ledger-corner-bl)!important}
+.content-sheet .book-cover-ornament--br{bottom:0!important;right:0!important;background-image:var(--ledger-corner-br)!important}
+/* Living paper, both pages remain semantic HTML with buttons / forms intact. */
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+ min-height:0!important;height:auto!important;
+ background-image:
+   linear-gradient(90deg,#9e713d29 0%,transparent 12%,transparent 90%,#aa824529 100%),
+   var(--ledger-parchment)!important;
+ background-size:100% 100%,420px 420px!important;
+ background-repeat:no-repeat,repeat!important;
+ background-position:center,center!important;
+ box-shadow:inset 0 0 0 1px #bc975e7a,inset 0 0 22px #94693138!important;
+}
+/* Real character crest from provided package — a fixed, independently replaceable asset. */
+.content-sheet .journal-crest{
+ background:none center/contain no-repeat!important;
+ width:77px!important;flex:0 0 77px!important;height:94px!important;
+}
+/* The central book hinge follows the live height and the divider stays centered. */
+.content-sheet .journal-book-spread{position:relative;align-items:stretch!important;gap:0!important}
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+ content:"";position:absolute;left:45.5%;z-index:6;
+ transform:translateX(-50%);pointer-events:none;
+ width:115px;height:72px;background-position:center;background-size:contain;background-repeat:no-repeat;
+}
+.content-sheet .journal-book-spread::before{top:-52px;background-image:none}
+.content-sheet .journal-book-spread::after{bottom:-48px;background-image:none}
+/* Small decorative headings: data remains live text. */
+.content-sheet .journal-book-title{
+ padding-left:29px!important;
+ background:none left center/23px 23px no-repeat!important;
+}
+/* Dress the left campaign sidebar with the matching blue/gold lion standard. */
+@media(min-width:801px){
+ .nav:after{width:76px!important;height:266px!important;
+  background:none center top/contain no-repeat!important;
+  top:0!important;right:0!important;opacity:.88!important;}
+}
+/* Gallery and data tables always remain above parchment. */
+.content-sheet .journal-book-subnav{z-index:7!important}
+.content-sheet .journal-book-page>*{position:relative;z-index:1}
+/* Page growth at narrower widths continues to work — spine is hidden when stacked. */
+@media(max-width:1160px){
+ .content-sheet .journal-book-frame{padding:42px 24px 44px!important;
+  background-size:auto 38px,auto 42px,25px auto,25px auto,100% 100%!important;}
+ .content-sheet .journal-book-frame::before{inset:25px 15px!important}
+ .content-sheet .journal-book-frame::after{display:none!important}
+ .content-sheet .journal-book-spread::before,.content-sheet .journal-book-spread::after{display:none!important}
+ .content-sheet .journal-book-page--left,.content-sheet .journal-book-page--right{padding:15px 18px!important}
+ .content-sheet .book-cover-ornament{width:70px!important;height:70px!important}
+}
+@media(max-width:550px){
+ .content-sheet .journal-book-frame{padding:36px 13px 39px!important;
+  background-size:auto 34px,auto 38px,15px auto,15px auto,100% 100%!important;}
+ .content-sheet .journal-book-frame::before{inset:21px 8px!important}
+ .content-sheet .book-cover-ornament{width:48px!important;height:48px!important}
+ .content-sheet .journal-book-page--left,.content-sheet .journal-book-page--right{padding:12px 11px!important}
+ .content-sheet .journal-crest{width:57px!important;height:72px!important;flex-basis:57px!important}
+}
+
+
+
+/* === Consolidated from ledger-unified.css (same cascade order as original) === */
+/* v93.320 – Unified Keeper's Ledger visual language
+ * Presentation ONLY. No changes to application event handlers, game rules, or save format.
+ * The open-book journal keeps its separate, fully dynamic image-backed layout.
+ * All other views are living vellum folios constructed with replaceable sprites.
+ */
+:root {
+  --ledger-page-ink:#332216;
+  --ledger-page-accent:#64391e;
+  --ledger-page-navy:#152e49;
+  --ledger-page-gold:#b58a52;
+  --ledger-page-line:#b39667;
+  --ledger-page-paper:#e9d6af;
+  --ledger-page-surface:rgba(246,232,205,.76);
+}
+/* The sidebar is still scrollable with mouse wheel, keyboard and touch.
+   Only the distracting visible scrollbar is removed (also on narrow screens). */
+.nav {
+  overflow-y:auto;
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+  overscroll-behavior-y:contain;
+}
+.nav::-webkit-scrollbar,
+.nav .castle-character-list::-webkit-scrollbar {display:none;width:0;height:0;background:transparent}
+.nav .castle-character-list {scrollbar-width:none;-ms-overflow-style:none}
+
+/* Dark blue, engraved gold: the same aesthetic as the book cover. */
+.nav {
+  background:linear-gradient(90deg,#081523f7 0%,#101d2df4 69%,#1d2a3ae8 100%)!important;
+  border-right:2px solid #a77e46!important;
+  box-shadow:inset -3px 0 0 #342619,4px 0 15px #05050899!important;
+}
+.nav-section-label {
+  font:600 10px/1.4 "Cinzel",Georgia,serif!important;
+  letter-spacing:.13em;color:#dfbf86!important;
+  border-bottom:1px solid #a77b477a;
+  margin-top:12px!important;
+  padding-bottom:6px!important;
+}
+.nav .castle-nav-link,.nav .castle-character,.nav .castle-create {
+  border-radius:2px!important;
+  border:1px solid transparent!important;
+  background:linear-gradient(90deg,#1a2c4066,#13233622)!important;
+  box-shadow:none!important;
+  color:#eee0c6!important;
+  font:500 13px/1.25 "Cormorant Garamond",Georgia,serif!important;
+  transition:background-color .14s ease,border-color .14s ease;
+}
+.nav .castle-nav-link:hover,.nav .castle-character:hover,.nav .castle-create:hover {
+  border-color:#b58d567a!important;
+  background:linear-gradient(90deg,#2c4461be,#1b314998)!important;
+}
+.nav .castle-nav-link.active,.nav .castle-character.active {
+  border:1px solid #c9a067!important;
+  box-shadow:inset 3px 0 0 #e8c083,inset 0 0 0 1px #203c5b!important;
+  background:linear-gradient(90deg,#325276,#17314e)!important;
+  color:#fff1d1!important;
+}
+.nav .castle-create {border-color:#bc945d8c!important;background:#253951!important}
+.nav .castle-nav-icon{color:#debd80}
+.nav .castle-sidebar-footer{color:#d5b47e!important;border-top:1px solid #a77b476b!important}
+.nav .castle-campaign-card{
+  border:1px solid #bd9158!important;
+  border-radius:2px!important;
+  box-shadow:inset 0 0 0 2px #17273a,0 2px 8px #0008!important;
+}
+/* Chapter tabs across the top remain actual accessible buttons. */
+.mast-links button{
+  border-radius:0!important;
+  border-bottom:2px solid transparent!important;
+  color:#e3d6c2!important;
+  font:600 13px/1.2 "Cinzel",Georgia,serif!important;
+  padding:10px 10px 11px!important;
+  letter-spacing:.015em!important;
+}
+.mast-links button:hover{background:#b18a4930!important;color:#fff1d7!important}
+.mast-links button.current{border-bottom-color:#e3bc7d!important;background:linear-gradient(0deg,#c9a36a30,transparent 68%)!important;color:#fff1d7!important}
+
+/* Single scrollable vellum folio around other app chapters (not a stretched screenshot).
+   Corner cap sprites are fixed; each border is a repeatable rail, page paper tiles.
+   Additional images can later be exchanged by swapping files under ledger-skin/. */
+main.content:not(.content-sheet){
+  position:relative;
+  isolation:isolate;
+  color:var(--ledger-page-ink)!important;
+  min-width:0;
+  margin:16px clamp(12px,1.7vw,28px) 30px!important;
+  padding:clamp(44px,4.3vw,66px) clamp(24px,3.6vw,60px) clamp(45px,4.5vw,70px)!important;
+  border:1px solid #845625!important;
+  border-radius:3px!important;
+  background-color:var(--ledger-page-paper)!important;
+  background-image:
+    var(--ledger-corner-tl),var(--ledger-corner-tr),var(--ledger-corner-bl),var(--ledger-corner-br),
+    none,
+    none,
+    none,
+    none,
+    linear-gradient(90deg,#84582f18,transparent 9%,transparent 90%,#80532c1b),
+    var(--ledger-parchment)!important;
+  background-position:
+    left top,right top,left bottom,right bottom,
+    left top,left bottom,left top,right top,
+    center,center!important;
+  background-repeat:
+    no-repeat,no-repeat,no-repeat,no-repeat,
+    repeat-x,repeat-x,repeat-y,repeat-y,
+    no-repeat,repeat!important;
+  background-size:
+    88px 88px,88px 88px,88px 88px,88px 88px,
+    auto 35px,auto 40px,28px auto,28px auto,
+    100% 100%,420px 420px!important;
+  box-shadow:0 18px 36px #040608b8,inset 0 0 0 2px #ab8653,inset 0 0 0 5px #f8e1b37a!important;
+}
+main.content:not(.content-sheet)::before{
+  content:"";position:absolute;inset:25px;z-index:0;pointer-events:none;
+  border:1px solid #ae8553a3;
+  box-shadow:inset 0 0 0 2px #f5e4b786;
+}
+main.content:not(.content-sheet) :is(h2,h3,h4,legend) {color:var(--ledger-page-accent)}
+main.content:not(.content-sheet) :is(h2,h3){font-family:"Cinzel",Georgia,serif!important;letter-spacing:.012em}
+main.content:not(.content-sheet) > .topline,
+main.content:not(.content-sheet) > h2,
+main.content:not(.content-sheet) > header,
+main.content:not(.content-sheet) > .toolbar:first-child{
+  padding-bottom:10px;
+  border-bottom:1px solid #a87d49a3;
+  margin-bottom:15px;
+}
+main.content:not(.content-sheet) .topline h2,
+main.content:not(.content-sheet)>h2{color:#18304c!important;font:600 clamp(22px,2.0vw,30px)/1.2 "Cinzel",Georgia,serif!important}
+main.content:not(.content-sheet) .topline{align-items:center}
+main.content:not(.content-sheet) :is(.panel,.card,.catalog-card,.skill-card,.hsk-test-card){
+  color:#382619!important;
+  background:linear-gradient(90deg,#b8874933,transparent 8%,transparent 92%,#b8874933),var(--ledger-page-surface)!important;
+  border:1px solid #b18a55!important;
+  border-radius:3px!important;
+  box-shadow:inset 0 0 0 1px #fff4daa6,0 3px 9px #553b1a20!important;
+}
+main.content:not(.content-sheet) :is(.panel,.card,.catalog-card,.skill-card,.hsk-test-card) > h3,
+main.content:not(.content-sheet) :is(.panel,.card,.hsk-test-card) > h4{
+  margin:0 0 8px!important;
+  padding:3px 0 7px 26px!important;
+  color:#65391f!important;
+  background:url('./assets/ui/book/section_jewel.png') 0 2px/20px 20px no-repeat!important;
+  border-bottom:1px solid #b18a557b!important;
+  font-family:"Cinzel",Georgia,serif!important;
+  font-size:clamp(12px,1.12vw,15px)!important;
+  font-weight:600!important;
+}
+main.content:not(.content-sheet) :is(p,li,dt,dd,td,small,.muted,.tiny,.library-results,.library-warning,.library-purchase-hint){color:#3e2c1e}
+main.content:not(.content-sheet) .muted {color:#6e5131!important}
+main.content:not(.content-sheet) label,
+main.content:not(.content-sheet) summary {color:#5b3b20!important}
+main.content:not(.content-sheet) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
+  background:#fcf3dded!important;
+  color:#302216!important;
+  border:1px solid #ae8b5e!important;
+  border-radius:3px!important;
+  box-shadow:inset 0 1px 2px #a8864d1d!important;
+}
+main.content:not(.content-sheet) :is(input[type="checkbox"],input[type="radio"]){accent-color:#24486a}
+main.content:not(.content-sheet) button{
+  border-radius:3px!important;
+  border-color:#a7804d!important;
+  background:linear-gradient(180deg,#304c67,#182e48)!important;
+  color:#f8ebd3!important;
+  box-shadow:inset 0 1px #d3b5813d!important;
+}
+main.content:not(.content-sheet) button.secondary,
+main.content:not(.content-sheet) .library-navigation button:not([aria-selected="true"]){
+  background:linear-gradient(180deg,#f3e3c5,#dbc298)!important;
+  color:#51341d!important;
+}
+main.content:not(.content-sheet) button.danger,
+main.content:not(.content-sheet) .character-delete{
+  background:linear-gradient(180deg,#823f34,#612b29)!important;
+  color:#fff2df!important;
+  border-color:#9d5846!important;
+}
+main.content:not(.content-sheet) button:hover{filter:brightness(1.13)}
+main.content:not(.content-sheet) button:focus-visible{outline:3px solid #b68e50!important;outline-offset:2px}
+main.content:not(.content-sheet) :is(table,.catalog-spec,.library-table){color:#332318!important}
+main.content:not(.content-sheet) :is(th,thead th){
+  background:linear-gradient(180deg,#e6d2aa,#d5b78a)!important;
+  color:#543019!important;
+  border-bottom:1px solid #9c7546!important;
+  font:600 12px/1.3 "Cinzel",Georgia,serif!important;
+}
+main.content:not(.content-sheet) :is(td,tbody tr){border-color:#ae89515b!important}
+main.content:not(.content-sheet) :is(.table-scroll,.catalog-scroll,.inv-table-scroll,.library-table-wrap){
+  border:1px solid #bd9967;
+  background:#f4e4c7c4!important;
+  border-radius:3px!important;
+}
+main.content:not(.content-sheet) :is(.notice,.empty,.catalog-readiness,.library-rules-details,.library-toolbar,.list-row,.equipment-summary,.inv-summary-stat){
+  border-color:#b39461!important;
+  border-radius:3px!important;
+  background:#f2e2c4e0!important;
+  color:#52391f!important;
+}
+main.content:not(.content-sheet) :is(.notice.error,.catalog-missing){background:#f2d8c7!important;color:#67271d!important;border-color:#a96e5e!important}
+main.content:not(.content-sheet) .pill{color:#69451d;border-color:#a88651;background:#f5e5c9a8}
+main.content:not(.content-sheet) .character-card__crest{border-radius:3px;background:linear-gradient(180deg,#1b3b5c,#10263e);border:1px solid #b58b4d}
+/* Skill Tests: replace the old green/dark mini-console panels with readable vellum.
+   Keep semantic outcome colors in place but use gold/navy for presentation. */
+.content-skills :is(.hsk-workbench-result,.hsk-calculation,.hsk-value-display,.hsk-opposition-toggle,.hsk-gm-controls,.hsk-sv-guide,.hsk-sv-extras,.hsk-special-container,.hsk-critical-next,.hsk-verdict-section,.hsk-verdict-chip,.hsk-secondary-timing,.hsk-sr-activity,.hsk-tiebreak,.hsk-falling-help,.hsk-falling-guide,.hsk-climb-fall,.hsk-trauma,.hsk-bulk-zones,.hsk-condition,.hsk-eml,.hsk-load-evidence,.hsk-tn-readout,.hsk-scene-fields,.hsk-gm-warning,.hsk-eml-trace .hsk-eml-chip){
+  background:rgba(241,221,187,.75)!important;
+  border-color:#b08c58!important;
+  color:#382516!important;
+  border-radius:3px!important;
+}
+.content-skills :is(.hsk-test-card h3,.hsk-test-card h4,.hsk-gm-controls summary,.hsk-sv-guide strong,.hsk-eml-chip strong,.hsk-verdict-chip strong,.hsk-verdict-final h4,.hsk-verdict-section h4,.hsk-condition legend,.hsk-bulk-zones legend,.hsk-falling-help summary,.hsk-calculation span,.hsk-eml-trace b,.hsk-result-slot){color:#58341b!important}
+.content-skills :is(.hsk-verdict-chip small,.hsk-eml-chip small,.hsk-sr-info,.hsk-soft-note,.hsk-load-evidence p){color:#644a2c!important}
+.content-skills .hsk-tabs{border-bottom:1px solid #b48d52!important}
+.content-skills .hsk-tabs button[data-skill-active="yes"],
+.content-library .library-navigation button[aria-selected="true"]{
+  background:linear-gradient(180deg,#bd9255,#88612f)!important;
+  color:#fff8e7!important;
+  border-color:#7d552e!important;
+}
+/* Information that is generated outside the folio (e.g. modal dialogs) still uses
+   existing app styling, preserving modal contrast and functionality. */
+@media(max-width:1160px){
+  main.content:not(.content-sheet){margin:12px 11px 24px!important;padding:43px 31px 48px!important;
+    background-size:70px 70px,70px 70px,70px 70px,70px 70px,auto 30px,auto 35px,23px auto,23px auto,100% 100%,420px 420px!important}
+  main.content:not(.content-sheet)::before{inset:20px}
+}
+@media(max-width:760px){
+  .nav{overflow-y:visible!important;scrollbar-width:none!important}
+  .nav::after{opacity:.35!important}
+  main.content:not(.content-sheet){margin:12px 0 22px!important;padding:40px 20px 43px!important;
+    background-size:56px 56px,56px 56px,56px 56px,56px 56px,auto 28px,auto 32px,17px auto,17px auto,100% 100%,420px 420px!important}
+  main.content:not(.content-sheet)::before{inset:13px}
+  main.content:not(.content-sheet) .columns{grid-template-columns:1fr}
+  main.content:not(.content-sheet) .cards{grid-template-columns:1fr}
+  .mast-links{overflow-x:auto;scrollbar-width:none}
+  .mast-links::-webkit-scrollbar{display:none}
+}
+@media(max-width:460px){
+  main.content:not(.content-sheet){padding:35px 13px 38px!important;
+    background-size:44px 44px,44px 44px,44px 44px,44px 44px,auto 24px,auto 27px,13px auto,13px auto,100% 100%,420px 420px!important}
+  main.content:not(.content-sheet)::before{inset:9px}
+  main.content:not(.content-sheet) .panel{padding:.65rem!important}
+  .mast-links button{font-size:11px!important;padding:7px 5px!important}
+}
+@media(prefers-reduced-motion:reduce){.nav .castle-nav-link,.nav .castle-character{transition:none}}
+
+
+
+/* === Consolidated from ledger-dense.css (same cascade order as original) === */
+/* v93.321 — The same compact illuminated-manuscript typographic system for
+   the full app. Layer-only; no new data model or gameplay calculations. */
+:root {--folio-rule:rgba(132,88,43,.48);--folio-ink:#30271f;--folio-deep:#152f4a;}
+/* Common tables as ruled manuscript lines instead of large framed grid cells. */
+main.content:not(.content-sheet) :is(.panel,.card,.catalog-card,.skill-card,.hsk-test-card){
+  padding:clamp(7px,.85vw,12px)!important;
+  box-shadow:inset 0 0 0 1px #faebcba8!important;
+}
+main.content:not(.content-sheet) :is(.panel,.card,.catalog-card,.skill-card,.hsk-test-card) > h3,
+main.content:not(.content-sheet) :is(.panel,.card,.hsk-test-card) > h4{
+  margin-bottom:5px!important;padding:3px 0 5px 22px!important;
+  font:700 clamp(11px,1vw,13px)/1.25 Georgia,serif!important;
+  background-size:17px 17px!important;
+}
+main.content:not(.content-sheet) :is(table,.catalog-spec,.library-table,.hsk-table){
+  width:100%;border-collapse:collapse!important;border-spacing:0!important;
+  font:clamp(10px,.82vw,12px)/1.32 Georgia,serif!important;
+  background:transparent!important;
+}
+main.content:not(.content-sheet) :is(thead th,.catalog-spec thead th,.library-table thead th,.hsk-table thead th){
+  padding:4px 5px!important;
+  background:rgba(199,166,108,.15)!important;
+  border:0!important;border-bottom:1px solid #92693e!important;
+  text-align:left;white-space:normal;
+  font:700 clamp(10px,.79vw,12px)/1.25 Georgia,serif!important;
+}
+main.content:not(.content-sheet) :is(table td,table tbody th,.catalog-spec td,.library-table td,.hsk-table td){
+  padding:3px 5px!important;vertical-align:top!important;
+  border:0!important;border-bottom:1px solid var(--folio-rule)!important;
+  background:transparent!important;
+  line-height:1.33!important;
+}
+main.content:not(.content-sheet) :is(table tbody tr,.hsk-group){background:transparent!important}
+main.content:not(.content-sheet) :is(.hsk-group-head,.hsk-group-head th){
+  background:rgba(214,185,133,.25)!important;
+  border-bottom:1px solid #ad8655!important;
+  font:700 11px/1.3 Georgia,serif!important;
+}
+main.content:not(.content-sheet) :is(.table-scroll,.catalog-scroll,.inv-table-scroll,.library-table-wrap){
+  padding:4px 6px!important;border:1px solid #b49562!important;
+  background:rgba(250,237,210,.55)!important;
+}
+main.content:not(.content-sheet) :is(.field-grid,.columns,.cards){gap:clamp(6px,.75vw,12px)!important}
+main.content:not(.content-sheet) :is(.toolbar,.actions,.topline){gap:6px!important}
+main.content:not(.content-sheet) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
+  min-height:31px;max-width:100%;font:12px/1.3 Georgia,serif!important;padding:5px 7px!important;
+}
+main.content:not(.content-sheet) button{font:600 12px/1.3 Georgia,serif!important;padding:6px 10px!important;min-height:29px}
+main.content:not(.content-sheet) :is(p,.muted,.tiny){line-height:1.43!important}
+main.content:not(.content-sheet) :is(.notice,.equipment-summary,.list-row){padding:8px 10px!important}
+/* Skills and combat's tool-heavy screens: compact rows, no large inset panels. */
+.content-skills :is(.hsk-test-card,.hsk-skill-view,.hsk-result-panel){padding:8px!important}
+.content-skills :is(.hsk-table,.hsk-calculation,.hsk-result-slot){font:11px/1.32 Georgia,serif!important}
+.content-library .library-table-wrap{overflow-x:auto;max-width:100%}
+/* Diary: editable fields live where they are displayed; non-editable creation identity unchanged. */
+.content-sheet .journal-stat-input{width:min(100%,58px);text-align:center;margin:1px auto 0;
+ padding:2px 3px!important;background:#fff0cc!important;color:#182d45!important;
+ border:1px solid #a77c42!important;border-radius:2px;font:700 16px Georgia,serif!important}
+.content-sheet .journal-coins-input{width:100%;min-width:54px;max-width:100px;padding:2px!important;
+ border:1px solid #a77c42!important;background:#fff0cc!important;color:#162c46!important;
+ font:700 12px Georgia,serif!important}
+.content-sheet .journal-book-hint{font:400 9px/1.1 Georgia,serif;letter-spacing:0;color:#62452a}
+.content-sheet .journal-group-mod{font:700 9px Georgia,serif;color:#855b31;white-space:nowrap}
+.content-sheet .journal-skill-basis{display:block;font:9px/1.1 Georgia,serif;color:#796046;
+ white-space:normal;overflow-wrap:anywhere}
+.content-sheet .journal-skill-name{min-width:0;overflow-wrap:anywhere}
+.content-sheet .journal-book-skills .journal-skill-family li{align-items:start;padding:2px 1px!important;min-height:26px}
+.content-sheet .journal-dp-edit{margin-top:8px;border:1px solid #9b7849;padding:6px;
+ background:rgba(247,230,190,.74);min-width:0}
+.content-sheet .journal-dp-edit>summary{cursor:pointer;color:#4d2b18;font:700 12px Georgia,serif;padding:6px;
+ border-bottom:1px solid #bb925e}
+.content-sheet .journal-dp-edit .hsk-skill-view{min-width:0;max-width:100%}
+.content-sheet .journal-dp-edit .hsk-scroll{overflow-x:auto;max-width:100%;font-size:10px}
+.content-sheet .journal-dp-edit .hsk-table{min-width:980px;font-size:10px}
+.content-sheet .journal-dp-edit .sheet-dp-input{max-width:44px;min-width:36px;padding:2px!important;font-size:11px}
+/* Grace & Piety labels: fit Doctrine, Blessing, Morality within narrow stat boxes. */
+.content-sheet .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box span{
+  display:block;max-width:100%;font:700 clamp(7px,.64vw,9px)/1.1 Georgia,serif!important;
+  letter-spacing:-.02em;overflow-wrap:anywhere;hyphens:auto;
+}
+.content-sheet .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box strong{
+  font:700 clamp(10px,.9vw,14px)/1.15 Georgia,serif!important;overflow-wrap:anywhere;
+}
+/* Body Locations: full-width, readable 15-location anatomy table, with per-aspect AV and injury state. */
+.content-sheet .journal-right-mid-grid .journal-body-locations{grid-column:1 / -1;max-width:100%;min-width:0}
+.content-sheet .journal-anatomy-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.content-sheet .journal-anatomy-table{width:100%;border-collapse:collapse;table-layout:auto;
+ font:clamp(9px,.73vw,11px)/1.18 Georgia,serif!important;color:#362719}
+.content-sheet .journal-anatomy-table th,.content-sheet .journal-anatomy-table td{
+ border:0!important;border-bottom:1px solid #ad8a5a80!important;
+ padding:3px 3px!important;vertical-align:top;background:transparent!important;
+ text-align:left;color:#322419!important
+}
+.content-sheet .journal-anatomy-table thead th{border-bottom:1px solid #876539!important;
+ font:700 clamp(9px,.7vw,11px)/1.15 Georgia,serif!important;color:#572e1a!important;
+ background:rgba(200,167,115,.24)!important}
+.content-sheet .journal-anatomy-table tbody th{font-weight:700;color:#172f49!important;white-space:nowrap}
+.content-sheet .journal-anatomy-table .journal-numeric{text-align:center;min-width:20px;font-variant-numeric:tabular-nums}
+.content-sheet .journal-layer-cell{max-width:180px;overflow-wrap:anywhere;font-size:.95em}
+.content-sheet .journal-bleed{color:#992a1b;font-weight:800;margin-right:3px}
+.content-sheet .journal-anatomy-note{font:9px/1.3 Georgia,serif;color:#6e5030;margin:3px 0 0}
+.content-sheet .journal-unmapped-wounds{font:10px Georgia,serif;padding:4px}
+.content-sheet .journal-book-section--skills{margin-top:6px!important}
+.content-sheet .journal-book-subnav{gap:4px;flex-wrap:wrap}
+@media(max-width:950px){
+ main.content:not(.content-sheet) :is(.panel,.card){padding:7px!important}
+ .content-sheet .journal-anatomy-table{min-width:640px;font-size:10px!important}
+}
+@media(max-width:550px){
+ main.content:not(.content-sheet) :is(.panel,.card){padding:6px!important}
+ main.content:not(.content-sheet) :is(table td,table tbody th){font-size:10px!important}
+ .content-sheet .journal-anatomy-table{min-width:600px}
+ .content-sheet .journal-skill-basis{font-size:9px}
+}
+
+/* Fit long labels in the small sacred-attributes cells without forcing breaks. */
+.content-sheet .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box span{
+  font:700 clamp(6.5px,.51vw,8px)/1.1 Georgia,serif!important;
+  white-space:nowrap;overflow-wrap:normal;hyphens:none;letter-spacing:-.06em;
+}
+
+
+
+/* === Consolidated from ledger-fixes.css (same cascade order as original) === */
+/* v93.323: anatomical table and missing dossier panels. Skin and functionality preserved. */
+.content-sheet .journal-right-mid-grid .journal-body-locations{grid-column:1/-1!important;min-width:0}
+.content-sheet .journal-right-mid-grid .journal-right-card{grid-column:1/-1;min-width:0}
+.content-sheet .journal-anatomy-wrap{width:100%;overflow-x:auto;scrollbar-width:thin}
+.content-sheet .journal-anatomy-table{width:100%;min-width:395px!important;border-collapse:collapse!important;table-layout:fixed!important;font:10px/1.2 Georgia,serif!important}
+.content-sheet .journal-anatomy-table col.journal-col-code{width:8%}
+.content-sheet .journal-anatomy-table col.journal-col-name{width:25%}
+.content-sheet .journal-anatomy-table col.journal-col-av{width:8.4%}
+.content-sheet .journal-anatomy-table col.journal-col-shk{width:9%}
+.content-sheet .journal-anatomy-table col.journal-col-bleed{width:10%}
+.content-sheet .journal-anatomy-table col.journal-col-injuries{width:14.4%}
+.content-sheet .journal-anatomy-table th,.content-sheet .journal-anatomy-table td{padding:3px 2px!important;font-size:10px!important;vertical-align:middle!important}
+.content-sheet .journal-anatomy-table th.journal-av,.content-sheet .journal-anatomy-table td.journal-av,
+.content-sheet .journal-anatomy-table th.journal-shk,.content-sheet .journal-anatomy-table td.journal-shk,
+.content-sheet .journal-anatomy-table th.journal-arrows,.content-sheet .journal-anatomy-table td.journal-arrows{text-align:center!important;font-variant-numeric:tabular-nums;white-space:nowrap}
+.content-sheet .journal-anatomy-table td.journal-av{font-weight:650;color:#162e48!important}
+.content-sheet .journal-anatomy-table td.journal-shk{font-weight:800;color:#56361d!important}
+.content-sheet .journal-anatomy-table td.journal-injuries{font-size:9px!important;overflow-wrap:anywhere}
+.content-sheet .journal-anatomy-table .journal-location-name{overflow-wrap:anywhere}
+.content-sheet .journal-bleed-mark{display:inline-flex;letter-spacing:-2px;font-weight:900;font-size:12px;white-space:nowrap}
+.content-sheet .journal-bleed-possible{color:#99938d!important}
+.content-sheet .journal-bleed-active{color:#161616!important}
+.content-sheet .journal-bleed-empty{color:#b7a68c}
+.content-sheet .journal-anatomy-note{font:9px/1.3 Georgia,serif!important;margin:4px 0}
+/* Never clip Appearance when nameplate or portrait length changes. */
+.content-sheet .journal-left-top{min-height:0;align-items:stretch!important}
+.content-sheet .journal-appearance{min-width:0;overflow:visible!important}
+.content-sheet .journal-appearance .journal-book-table{min-width:0}
+.content-sheet .journal-appearance .journal-book-table div{min-width:0}
+.content-sheet .journal-appearance dd{overflow-wrap:anywhere;min-width:0}
+/* Additional read-only status panels are small, legible and match the manuscript. */
+.content-sheet .journal-condition-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:6px}
+.content-sheet .journal-condition-detail-grid>.journal-book-section{min-width:0;padding:6px!important;margin:0!important;border:1px solid rgba(128,91,47,.34)!important}
+.content-sheet .journal-condition-detail-grid .journal-mini-stats{display:grid;grid-template-columns:1fr;gap:0}
+.content-sheet .journal-mini-stats>div{display:flex;align-items:center;justify-content:space-between;min-width:0;gap:4px;padding:3px 2px;border-bottom:1px solid rgba(119,89,55,.19)}
+.content-sheet .journal-mini-stats span{font:10px/1.2 Georgia,serif!important;color:#5b4128;min-width:0;overflow-wrap:anywhere}
+.content-sheet .journal-mini-stats strong{font:700 11px/1.2 Georgia,serif!important;color:#1e3042;white-space:nowrap}
+.content-sheet .journal-convocations{margin-top:7px!important}
+.content-sheet .journal-convocation-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 8px}
+.content-sheet .journal-convocation-list>div{display:flex;justify-content:space-between;gap:6px;border-bottom:1px solid rgba(119,89,55,.19);padding:3px 1px;min-width:0;font:10px Georgia,serif}
+.content-sheet .journal-convocation-list>div strong{font-variant-numeric:tabular-nums;color:#1c3651}
+.content-sheet .journal-minor{font:9px/1.3 Georgia,serif!important;color:#685036;margin:3px 0!important}
+@media(max-width:550px){
+ .content-sheet .journal-condition-detail-grid{grid-template-columns:1fr}
+ .content-sheet .journal-anatomy-table{min-width:450px!important}
+}
+
+.content-sheet .journal-anatomy-table .journal-av-derived{text-decoration:underline dotted rgba(110,76,44,.6);text-underline-offset:2px}
+
+/* v93.323 • Faithful HMK printed body-location symbols and exposed Edit button. */
+.content-sheet .journal-anatomy-table col.journal-col-code{width:7%!important}
+.content-sheet .journal-anatomy-table col.journal-col-name{width:20%!important}
+.content-sheet .journal-anatomy-table col.journal-col-av{width:7.2%!important}
+.content-sheet .journal-anatomy-table col.journal-col-shk{width:8%!important}
+.content-sheet .journal-anatomy-table col.journal-col-bleed{width:6%!important}
+.content-sheet .journal-anatomy-table col.journal-col-amp{width:6%!important}
+.content-sheet .journal-anatomy-table col.journal-col-injuries{width:24.2%!important}
+.content-sheet .journal-anatomy-table th.journal-symbol-cell,
+.content-sheet .journal-anatomy-table td.journal-symbol-cell{text-align:center!important;white-space:nowrap;vertical-align:middle!important}
+.content-sheet .journal-anatomy-table .journal-av-value{display:inline-flex;align-items:center;justify-content:center;min-width:1.4em;min-height:1.5em;border:1px solid transparent;line-height:1;font-variant-numeric:tabular-nums}
+.content-sheet .journal-anatomy-table .journal-av-rigid{border:1px solid #40342b;border-radius:1px;color:#221a11;background:#fffef5;text-decoration:none!important}
+.content-sheet .journal-anatomy-table .journal-av-rigid-grey{background:#a7abb0;color:#17191c}
+.content-sheet .journal-anatomy-table .journal-av-rigid-black{background:#252529;color:#fff!important}
+.content-sheet .journal-anatomy-table .hmk-location-shk{display:inline-flex;min-width:2.1em;justify-content:center;align-items:center;background:#4b4b4f;color:#fff!important;font-size:10px;line-height:1.4;font-weight:700;border-radius:2px}
+.content-sheet .journal-anatomy-table .hmk-bleed-circle{display:inline-block;vertical-align:middle;box-sizing:border-box;width:11px;height:11px;border:1px solid #45413d;border-radius:50%;background:#fdfaf3;cursor:help}
+.content-sheet .journal-anatomy-table .hmk-bleed-circle.hmk-shade-grey{background:#a1a5a9;border-color:#a1a5a9}
+.content-sheet .journal-anatomy-table .hmk-bleed-circle.hmk-shade-black{background:#151719;border-color:#151719}
+.content-sheet .journal-anatomy-table .hmk-amputation-triangle{display:inline-block;vertical-align:middle;width:13px;height:13px;cursor:help}
+.content-sheet .journal-anatomy-table .hmk-symbol-none{color:transparent;user-select:none}
+.content-sheet .journal-anatomy-table :is([tabindex="0"]):focus-visible{outline:2px solid #8c5a21;outline-offset:2px}
+.content-sheet .journal-book-subnav .journal-edit-divider{height:22px;width:1px;background:rgba(90,58,23,.35);margin-inline:3px}
+.content-sheet .journal-book-subnav .journal-edit-button,
+.content-sheet .journal-book-subnav .journal-edit-save{background:linear-gradient(#24425c,#142b42)!important;border:1px solid #d0a363!important;color:#fff6dd!important;font-weight:700!important;box-shadow:0 1px 3px #23160944;min-width:85px}
+.content-sheet .journal-book-subnav .journal-edit-cancel{background:#ead9bc!important;color:#412b14!important;border:1px solid #9b7141!important}
+@media(max-width:680px){.content-sheet .journal-anatomy-table{min-width:480px!important}.content-sheet .journal-book-subnav .journal-edit-divider{display:none}}
+
+/* v93.325: anatomy cell centering and embedded sheet edit polish */
+.content-sheet .journal-anatomy-table .journal-av-value{display:inline-grid;place-items:center;min-width:1.7em;width:1.7em;min-height:1.7em;height:1.7em;padding:0;line-height:1;box-sizing:border-box;text-align:center;vertical-align:middle}
+.content-sheet .journal-inline-skills .journal-book-hint{font-size:.76rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:#7a5a36;margin-left:.4rem}
+.content-sheet .journal-inline-skills .journal-edit-skills-surface,.content-sheet .journal-inline-skills .hsk-character-skills{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;color:#24180f}
+.content-sheet .journal-inline-skills .hsk-skill-view>p.muted{margin:.3rem 0 .9rem;color:#5b4028}
+.content-sheet .journal-inline-skills .skill-proof-collapsible{margin-top:1rem;border:1px solid rgba(100,71,40,.22);border-radius:12px;background:rgba(255,249,238,.7);padding:.8rem .95rem}
+.content-sheet .journal-inline-skills .skill-proof-collapsible>summary{cursor:pointer;font-weight:700;color:#52301a}
+.content-sheet .journal-inline-skills .table-scroll{background:rgba(255,250,243,.74);border:1px solid rgba(107,75,43,.18);border-radius:12px;padding:.25rem .25rem .35rem}
+.content-sheet .journal-inline-skills .hsk-table{background:transparent;color:#261b13}
+.content-sheet .journal-inline-skills .hsk-table th,.content-sheet .journal-inline-skills .hsk-table td{border-color:rgba(121,88,53,.22)}
+.content-sheet .journal-inline-skills .hsk-table thead th,.content-sheet .journal-inline-skills .hsk-group-head th{background:#8b6435;color:#fff1d4}
+.content-sheet .journal-inline-skills .sheet-dp-input{background:#fffaf0;border:1px solid #8e6b41;color:#24180f;text-align:center}
+
+
+
+/* === Consolidated from keeper-hires.css (same cascade order as original) === */
+/* v93.324 - original Keeper's Ledger HiRes graphics from user-provided sets 1-6.
+   Decoration is independent of live HTML and does not intercept clicks.
+   Preserved: v93.323 combat/rule logic, character-edit workflow and section layout. */
+:root{
+  --kh-vellum:url('./assets/ui/keeper-hires/render/parchment_repeat_seamless.png');
+  --kh-leather:url('./assets/ui/keeper-hires/render/navy_leather_repeat_seamless.png');
+  --kh-rail-h:url('./assets/ui/keeper-hires/render/navy_gold_rail_repeat_horizontal.png');
+  --kh-rail-v:url('./assets/ui/keeper-hires/render/navy_gold_rail_repeat_vertical.png');
+}
+/* The background is a *periodic texture*, never a stretched two-page raster. */
+.content-sheet .journal-book-frame{
+  position:relative!important;isolation:isolate!important;
+  background-image:var(--kh-leather)!important;
+  background-size:520px 520px!important;background-repeat:repeat!important;
+  background-position:0 0!important;
+  padding:43px 39px 45px!important;
+  box-shadow:0 22px 42px #060608a8,0 1px 0 #ddaa6099,inset 0 0 0 2px #a57c43!important;
+}
+.content-sheet .journal-book-frame::before{
+  content:""!important;z-index:2!important;
+  inset:24px 24px 24px!important;border:1px solid #b4884b!important;
+  outline:1px solid #e2be7e!important;outline-offset:-4px!important;
+  background:none!important;box-shadow:inset 0 0 0 1px #170b0720!important;
+  pointer-events:none!important;
+}
+/* The central gutter's blur may stretch vertically: it contains NO embossed motif. */
+.content-sheet .journal-book-frame::after{
+  content:""!important;display:block!important;
+  top:45px!important;bottom:45px!important;
+  left:calc(39px + (100% - 78px)*.455 - 15px)!important;
+  width:30px!important;opacity:.85!important;z-index:5!important;
+  background:url('./assets/ui/keeper-hires/render/trim_44.png') center / 100% 100% no-repeat!important;
+  pointer-events:none!important;
+}
+.content-sheet .hmk-book-decor{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:visible}
+.content-sheet .hmk-rail{position:absolute;display:block;pointer-events:none;z-index:0}
+.content-sheet .hmk-rail--top{top:4px;left:23px;right:23px;height:34px;background:var(--kh-rail-h) center/auto 100% repeat-x}
+.content-sheet .hmk-rail--bottom{bottom:4px;left:23px;right:23px;height:34px;background:var(--kh-rail-h) center/auto 100% repeat-x}
+.content-sheet .hmk-rail--left{left:4px;top:25px;bottom:25px;width:33px;background:var(--kh-rail-v) center/100% auto repeat-y}
+.content-sheet .hmk-rail--right{right:4px;top:25px;bottom:25px;width:33px;background:var(--kh-rail-v) center/100% auto repeat-y}
+/* Native artwork is only trimmed, never upscaled from previous low-resolution crops. */
+.content-sheet .book-cover-ornament{
+  display:block!important;position:absolute!important;z-index:11!important;
+  width:clamp(112px,13.3vw,184px)!important;height:clamp(112px,13.3vw,184px)!important;
+  opacity:1!important;pointer-events:none!important;
+  filter:drop-shadow(0 1px 1px #100b0a66)!important;
+  background-size:contain!important;background-repeat:no-repeat!important;
+  background-position:center!important;
+}
+.content-sheet .book-cover-ornament--tl{top:-2px!important;left:-2px!important;background-image:url('./assets/ui/keeper-hires/render/trim_11.png')!important}
+.content-sheet .book-cover-ornament--tr{top:-2px!important;right:-2px!important;background-image:url('./assets/ui/keeper-hires/render/trim_38.png')!important}
+.content-sheet .book-cover-ornament--bl{bottom:-2px!important;left:-2px!important;background-image:url('./assets/ui/keeper-hires/render/trim_10.png')!important}
+.content-sheet .book-cover-ornament--br{bottom:-2px!important;right:-2px!important;background-image:url('./assets/ui/keeper-hires/render/trim_37.png')!important}
+.content-sheet .hmk-frame-jewel{position:absolute;z-index:10;width:52px;height:44px;left:50%;transform:translateX(-50%);background:url('./assets/ui/keeper-hires/render/trim_42.png') center/contain no-repeat}
+.content-sheet .hmk-frame-jewel--top{top:-1px}
+.content-sheet .hmk-frame-jewel--bottom{bottom:-1px}
+.content-sheet .hmk-frame-side{position:absolute;top:50%;z-index:8;width:43px;height:78px;transform:translateY(-50%);background-size:contain;background-repeat:no-repeat;background-position:center}
+.content-sheet .hmk-frame-side--left{left:-9px;background-image:url('./assets/ui/keeper-hires/render/trim_09.png')}
+.content-sheet .hmk-frame-side--right{right:-9px;background-image:url('./assets/ui/keeper-hires/render/trim_36.png')}
+/* Pages are live, can grow without stretching or re-sizing their gilded corners. */
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  position:relative;
+  background-image:linear-gradient(90deg,#906b3840 0%,transparent 10%,transparent 89%,#96704330 100%),var(--kh-vellum)!important;
+  background-position:center,center!important;
+  background-repeat:no-repeat,repeat!important;
+  background-size:100% 100%,520px 520px!important;
+  box-shadow:inset 0 0 0 1px #a7885799,inset 0 0 29px #8e6e4042!important;
+}
+.content-sheet .journal-book-page--left{
+  background-image:linear-gradient(90deg,#80634325,transparent 12%,transparent 85%,#4d32184d),var(--kh-vellum)!important;
+}
+.content-sheet .journal-book-page--right{
+  background-image:linear-gradient(90deg,#4d321852,transparent 14%,transparent 86%,#80634331),var(--kh-vellum)!important;
+}
+/* The spine caps are optional; the visible reference uses small diamond clasps. */
+.content-sheet .journal-book-spread::before,.content-sheet .journal-book-spread::after{
+  content:none!important;background:none!important;
+}
+.content-sheet .journal-book-subnav{z-index:14!important}
+.content-sheet .journal-book-spread{z-index:3;position:relative}
+.content-sheet .journal-book-page>*{position:relative;z-index:2}
+/* Small gilded heraldic headers; preserve native real text, not an image label. */
+.content-sheet .journal-book-title{
+  background:linear-gradient(90deg,#b68b5255,#e6d1a729,transparent 95%)!important;
+  padding-left:27px!important;
+}
+.content-sheet .journal-book-title::before{
+  content:""!important;background:url('./assets/ui/keeper-hires/render/trim_49.png') center/contain no-repeat!important;
+  width:23px;height:21px;left:0px;
+}
+/* Update the other sections with the same parchment and blue leather without disturbing controls. */
+.content-library .panel,.content-skills .panel,.content-encounter .panel,
+.content-hazards .panel,.content-creation .panel,.content-characters .panel,
+.content-world .panel,.content-calendar .panel,.content-npcs .panel,
+.content-library .card,.content-skills .card,.content-encounter .card,.content-hazards .card,
+.journal-book--chapter .journal-technical-shell{
+  background-image:linear-gradient(90deg,#c9a9772d,transparent 7%,transparent 93%,#c9a9772d),var(--kh-vellum)!important;
+  background-size:100% 100%,520px 520px!important;
+  background-repeat:no-repeat,repeat!important;
+}
+/* The old chapter shell remains full live HTML, including editable inputs. */
+.journal-book--chapter .journal-technical-shell{min-height:400px!important}
+/* Consistent sidebar base - no visible scrollbar; content remains scrollable. */
+.nav{background-image:linear-gradient(90deg,#0b1825ec,#142a43e8),var(--kh-leather)!important;
+  background-size:100% 100%,460px 460px!important}
+.nav::-webkit-scrollbar,.nav *::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}
+.nav,.nav *{scrollbar-width:none}
+/* Keep the original illustrated lion shield; blank alternative is available in the registry. */
+@media(min-width:801px){
+ .nav::after{background-image:none!important}
+}
+@media(max-width:1160px){
+ .content-sheet .journal-book-frame{padding:38px 24px 42px!important}
+ .content-sheet .journal-book-frame::after{display:none!important}
+ .content-sheet .hmk-book-decor .hmk-frame-jewel{width:41px;height:35px}
+ .content-sheet .book-cover-ornament{width:105px!important;height:105px!important}
+ .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{height:25px}
+ .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{width:24px}
+ .content-sheet .hmk-frame-side{width:30px;height:60px}
+}
+@media(max-width:550px){
+ .content-sheet .journal-book-frame{padding:34px 14px 38px!important}
+ .content-sheet .journal-book-frame::before{inset:18px 9px!important}
+ .content-sheet .book-cover-ornament{width:67px!important;height:67px!important}
+ .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{height:17px;left:12px;right:12px}
+ .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{width:16px;top:14px;bottom:14px}
+ .content-sheet .hmk-frame-jewel{width:30px!important;height:26px!important}
+ .content-sheet .hmk-frame-side{width:19px;height:46px}
+ .content-sheet .hmk-frame-side--left{left:-4px}
+ .content-sheet .hmk-frame-side--right{right:-4px}
+}
+
+/* v93.325: chapter views aligned to Keeper's Ledger journal shell */
+.content-sheet--chapter-proxy{display:block}
+.content-sheet--chapter-proxy .journal-book.panel{margin:0}
+.content-sheet--chapter-proxy .journal-chapter-body{display:grid;gap:1rem}
+.content-sheet--chapter-proxy .topline{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin:0 0 .5rem}
+.content-sheet--chapter-proxy h2,.content-sheet--chapter-proxy h3,.content-sheet--chapter-proxy h4{font-family:var(--book-heading-font,"Cinzel Decorative","Cormorant Garamond",serif);color:#3c2416;letter-spacing:.02em}
+.content-sheet--chapter-proxy .panel,
+.content-sheet--chapter-proxy .hsk-test-card,
+.content-sheet--chapter-proxy .hsk-tiebreak,
+.content-sheet--chapter-proxy .hsk-condition,
+.content-sheet--chapter-proxy .hsk-opposition-toggle,
+.content-sheet--chapter-proxy .hsk-gm-controls,
+.content-sheet--chapter-proxy .hsk-sv-guide,
+.content-sheet--chapter-proxy .hsk-secondary-timing,
+.content-sheet--chapter-proxy .hsk-sr-activity,
+.content-sheet--chapter-proxy .hsk-verdict-section,
+.content-sheet--chapter-proxy .hsk-value-display,
+.content-sheet--chapter-proxy .hsk-result-slot,
+.content-sheet--chapter-proxy .hsk-workbench-result,
+.content-sheet--chapter-proxy .encounter-details,
+.content-sheet--chapter-proxy .library-rules-details,
+.content-sheet--chapter-proxy .library-table-wrap,
+.content-sheet--chapter-proxy .library-toolbar{background:rgba(249,243,230,.95)!important;color:#261a12!important;border:1px solid rgba(104,74,41,.25)!important;box-shadow:0 8px 18px rgba(49,27,12,.08);border-radius:14px}
+.content-sheet--chapter-proxy .muted,.content-sheet--chapter-proxy .tiny{color:#6a5138}
+.content-sheet--chapter-proxy .notice{background:rgba(255,247,232,.92);border:1px solid rgba(140,97,49,.32);color:#4a2d19}
+.content-sheet--chapter-proxy .hsk-test-card p,
+.content-sheet--chapter-proxy .panel p,
+.content-sheet--chapter-proxy li,
+.content-sheet--chapter-proxy label,
+.content-sheet--chapter-proxy summary,
+.content-sheet--chapter-proxy span,
+.content-sheet--chapter-proxy small{color:inherit}
+.content-sheet--chapter-proxy .hsk-tabs{border-bottom:1px solid rgba(105,73,42,.28)}
+.content-sheet--chapter-proxy .hsk-tabs button,
+.content-sheet--chapter-proxy .library-navigation button{background:linear-gradient(180deg,#f4ead5,#dfc79f)!important;color:#2f1d10!important;border:1px solid rgba(104,76,42,.25)!important;box-shadow:0 6px 14px rgba(49,27,12,.1)}
+.content-sheet--chapter-proxy .hsk-tabs button[data-skill-active="yes"],
+.content-sheet--chapter-proxy .library-navigation button[aria-selected="true"]{background:linear-gradient(180deg,#7b552a,#5f3d1c)!important;color:#fff5de!important;border-color:#d8bb86!important}
+.content-sheet--chapter-proxy input,
+.content-sheet--chapter-proxy select,
+.content-sheet--chapter-proxy textarea{background:rgba(255,251,243,.96);color:#261a12;border:1px solid rgba(113,82,48,.38)}
+.content-sheet--chapter-proxy button{font-family:inherit}
+.content-sheet--chapter-proxy table{color:#23170f}
+.content-sheet--chapter-proxy .library-table thead th,
+.content-sheet--chapter-proxy .hsk-table thead th,
+.content-sheet--chapter-proxy .hsk-group-head th{background:#7d592f!important;color:#fff1d1!important}
+.content-sheet--chapter-proxy .library-table tbody tr:nth-child(2n),
+.content-sheet--chapter-proxy .hsk-table tbody tr:nth-child(2n){background:rgba(110,80,46,.05)}
+.content-sheet--chapter-proxy .hsk-calculation,
+.content-sheet--chapter-proxy .hsk-load-evidence,
+.content-sheet--chapter-proxy .hsk-value-display,
+.content-sheet--chapter-proxy .hsk-tn-readout,
+.content-sheet--chapter-proxy .hsk-eml-chip,
+.content-sheet--chapter-proxy .hsk-eml-total,
+.content-sheet--chapter-proxy .hsk-verdict-chip{background:rgba(255,250,240,.92)!important;color:#261a12!important;border-color:rgba(120,88,55,.36)!important}
+.content-sheet--chapter-proxy .hsk-bigstars{color:#9b6c20}
+.content-sheet--chapter-proxy .equipment-summary>div{background:rgba(255,249,239,.9);border:1px solid rgba(104,74,41,.22);border-radius:12px;padding:.65rem .8rem}
+
+/* v93.326: true chapter-shell cleanup and two-page chapter styling */
+main.content.content-sheet{
+  margin:0!important;
+  padding:0!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  max-width:none!important;
+}
+main.content.content-sheet::before,
+main.content.content-sheet::after{display:none!important;content:none!important}
+main.content.content-sheet>.notice.error{margin:0 0 12px}
+
+/* Chapter views must not inherit character-sheet subnav layout. */
+.content-sheet .journal-book--chapter .journal-book-subnav{display:none!important}
+
+/* Replace the previous technical single-panel feel with a real spread-like chapter layout. */
+.content-sheet .journal-book--chapter .journal-book-frame{
+  padding-top:34px!important;
+}
+.content-sheet .journal-book--chapter .journal-book-frame::after{
+  display:block!important;
+  top:44px;
+  bottom:46px;
+  width:44px;
+  left:calc(39px + (100% - 78px)*.455 - 22px);
+  background:none center center/100% 100% no-repeat!important;
+  opacity:.78;
+}
+.content-sheet .journal-book--chapter .journal-technical-shell{
+  position:relative;
+  min-height:680px!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:0;
+}
+.content-sheet .journal-book--chapter .journal-technical-shell::before,
+.content-sheet .journal-book--chapter .journal-technical-shell::after{
+  content:"";
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:calc(50% - 6px);
+  z-index:0;
+  background:
+    linear-gradient(90deg,#b58c5330,transparent 10%,transparent 90%,#a17a4030),
+    var(--kh-vellum);
+  background-size:100% 100%,520px 520px;
+  background-repeat:no-repeat,repeat;
+}
+.content-sheet .journal-book--chapter .journal-technical-shell::before{left:0;border-right:1px solid rgba(166,128,74,.18)}
+.content-sheet .journal-book--chapter .journal-technical-shell::after{right:0;border-left:1px solid rgba(166,128,74,.18)}
+.content-sheet .journal-book--chapter .journal-alt-header,
+.content-sheet .journal-book--chapter .journal-chapter-body{
+  position:relative;
+  z-index:1;
+  grid-column:1 / -1;
+}
+.content-sheet .journal-book--chapter .journal-alt-header{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:22px;
+  padding:18px 26px 8px;
+  border-bottom:0!important;
+  background:transparent!important;
+}
+.content-sheet .journal-book--chapter .journal-alt-header-block{
+  min-height:150px;
+  padding:24px 24px 20px;
+}
+.content-sheet .journal-book--chapter .journal-alt-header-block--ghost{opacity:0}
+.content-sheet .journal-book--chapter .journal-alt-header h3{
+  font:600 clamp(32px,3vw,56px)/1.04 var(--book-heading-font,"Cinzel Decorative","Cormorant Garamond",serif)!important;
+  color:#16345d!important;
+  margin:0 0 16px!important;
+}
+.content-sheet .journal-book--chapter .journal-alt-header p{
+  margin:0;
+  font:400 clamp(18px,1.55vw,28px)/1.36 "Cormorant Garamond",Georgia,serif;
+  color:#4c3521!important;
+  max-width:92%;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:16px 22px;
+  align-items:start;
+  padding:0 26px 22px;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body > h2,
+.content-sheet .journal-book--chapter .journal-chapter-body > .topline,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-navigation,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-toolbar,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-results,
+.content-sheet .journal-book--chapter .journal-chapter-body > .notice,
+.content-sheet .journal-book--chapter .journal-chapter-body > .empty,
+.content-sheet .journal-book--chapter .journal-chapter-body > .actions,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-tabs,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-topgrid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-opposed-grid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-mastery-grid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-ml-grid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-support-grid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-physical-grid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-physical-summary,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-result-band,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-result-toolbar,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-history,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-current-profile,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-workbench-result,
+.content-sheet .journal-book--chapter .journal-chapter-body > .wide,
+.content-sheet .journal-book--chapter .journal-chapter-body > .panel.wide,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-pagebar,
+.content-sheet .journal-book--chapter .journal-chapter-body > .table-scroll,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-table-wrap,
+.content-sheet .journal-book--chapter .journal-chapter-body > details{
+  grid-column:1 / -1;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body > .topline{margin:0 0 .2rem}
+.content-sheet .journal-book--chapter .journal-chapter-body > h2{
+  margin:0;
+  padding:0 0 10px;
+  border-bottom:1px solid rgba(166,128,74,.35);
+  font:600 clamp(30px,2.35vw,46px)/1.05 var(--book-heading-font,"Cinzel Decorative","Cormorant Garamond",serif)!important;
+  color:#6b3f23!important;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body > .panel,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-test-card,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-tiebreak,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-condition,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-opposition-toggle,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-gm-controls,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-sv-guide,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-secondary-timing,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-sr-activity,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-verdict-section,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-value-display,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-result-slot,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-workbench-result,
+.content-sheet .journal-book--chapter .journal-chapter-body > .encounter-details,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-rules-details,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-table-wrap,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-toolbar{
+  background:rgba(251,244,231,.9)!important;
+  color:#261a12!important;
+  border:1px solid rgba(104,74,41,.24)!important;
+  box-shadow:0 1px 0 rgba(255,250,240,.85) inset!important;
+  border-radius:0!important;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body :is(.library-table,.hsk-table,.catalog-spec){background:transparent!important}
+.content-sheet .journal-book--chapter .journal-chapter-body :is(th,thead th){background:#7d592f!important;color:#fff1d1!important}
+.content-sheet .journal-book--chapter .journal-chapter-body > :not(.wide){min-width:0}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book--chapter .journal-book-frame::after{display:none!important}
+  .content-sheet .journal-book--chapter .journal-technical-shell,
+  .content-sheet .journal-book--chapter .journal-alt-header,
+  .content-sheet .journal-book--chapter .journal-chapter-body{grid-template-columns:1fr!important}
+  .content-sheet .journal-book--chapter .journal-technical-shell::before,
+  .content-sheet .journal-book--chapter .journal-technical-shell::after{left:0;right:0;width:auto}
+  .content-sheet .journal-book--chapter .journal-technical-shell::after{display:none}
+  .content-sheet .journal-book--chapter .journal-alt-header-block,
+  .content-sheet .journal-book--chapter .journal-alt-header-block--ghost{min-height:0;padding:18px 18px 10px}
+  .content-sheet .journal-book--chapter .journal-alt-header-block--ghost{display:none}
+  .content-sheet .journal-book--chapter .journal-chapter-body{padding:0 18px 18px}
+}
+
+
+
+/* === Consolidated from folio-layout.css (same cascade order as original) === */
+/* v93.327 — real two-page chapter layout. Shared original Keeper HiRes assets.
+   This file only affects book folios; it does not replace game logic, data or art. */
+:root{--folio-ink:#342316;--folio-muted:#705238;--folio-rule:rgba(137,94,45,.44);--folio-blue:#142e49;--folio-gold:#936b38}
+
+/* One frame. The legacy scenery around main is suppressed for folio screens. */
+main.content.content-sheet{margin:0!important;padding:0 0 30px!important;background:transparent!important;border:0!important;box-shadow:none!important;min-width:0!important;overflow:visible!important}
+main.content.content-sheet::before,main.content.content-sheet::after{display:none!important;content:none!important}
+main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 16px 3px}
+.content-sheet .journal-book--chapter .journal-book-frame{background-image:var(--kh-leather)!important;min-width:0}
+.content-sheet .journal-book--chapter .journal-book-frame::after{display:block!important;background:url('./assets/ui/keeper-hires/render/trim_44.png') center/100% 100% no-repeat!important;z-index:5!important}
+.content-sheet .journal-book--chapter .journal-book-subnav{display:none!important}
+.content-sheet .journal-book--chapter:has(.journal-book-subnav) .journal-book-subnav{display:flex!important}
+
+/* Two actual book pages, not a decorative canvas underneath existing panels. */
+.content-sheet .journal-book--chapter .folio-chapter-spread{display:grid!important;grid-template-columns:minmax(0,45.5fr) minmax(0,54.5fr)!important;gap:0!important;align-items:stretch!important;position:relative;z-index:3;width:100%;min-width:0}
+.content-sheet .journal-book--chapter .folio-chapter-page{position:relative!important;min-width:0!important;min-height:560px!important;overflow:visible!important;border-radius:0!important;box-sizing:border-box;color:var(--folio-ink)!important}
+.content-sheet .journal-book--chapter .folio-chapter-page--left{padding:10px 26px 28px 10px!important}
+.content-sheet .journal-book--chapter .folio-chapter-page--right{padding:10px 10px 28px 28px!important}
+.content-sheet .journal-book--chapter .folio-chapter-page::before{pointer-events:none}
+.content-sheet .journal-book--chapter .folio-chapter-page :is(h2,h3,h4,legend){color:#693c23!important;font-family:"Cinzel",Georgia,serif!important;letter-spacing:.015em;text-shadow:none!important}
+.content-sheet .journal-book--chapter .folio-chapter-page :is(p,li,dt,dd,td,th,summary,label,small,em,.tiny,.muted){font-family:"Cormorant Garamond",Georgia,serif;color:var(--folio-ink)}
+.content-sheet .journal-book--chapter .folio-chapter-page :is(p,li,dt,dd,label){line-height:1.28}
+.content-sheet .journal-book--chapter .folio-chapter-page :is(.muted,.tiny,.library-results){color:var(--folio-muted)!important}
+
+.folio-chapter-heading{margin:0 0 11px;padding:6px 4px 11px;border-bottom:2px double rgba(154,113,63,.65);min-width:0}
+.content-sheet .folio-chapter-heading h3{font:600 clamp(19px,1.75vw,32px)/1.16 "Cinzel",Georgia,serif!important;color:#152f49!important;margin:0 0 7px!important;overflow-wrap:anywhere}
+.folio-chapter-heading p{font:italic 16px/1.3 "Cormorant Garamond",Georgia,serif!important;color:#684629!important;margin:0!important}
+.folio-chapter-content{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0}
+.folio-chapter-content>*{min-width:0;max-width:100%;box-sizing:border-box}
+.folio-chapter-content>h2{margin:5px 0 2px!important;border-bottom:1px solid var(--folio-rule);padding-bottom:5px;font-size:19px!important}
+.folio-chapter-content :is(.topline,.toolbar,.actions){gap:5px;min-width:0;flex-wrap:wrap}
+.folio-chapter-content .topline h2{font-size:17px!important}
+.folio-chapter-content .panel,.folio-chapter-content .hsk-test-card,
+.folio-chapter-content .library-rules-details,.folio-chapter-content .library-toolbar,
+.folio-chapter-content .folio-rules-group,.folio-chapter-content .notice,
+.folio-chapter-content .equipment-summary,.folio-chapter-content .encounter-details,
+.folio-chapter-content .hsk-condition,.folio-chapter-content .hsk-gm-controls,
+.folio-chapter-content .hsk-secondary-timing,.folio-chapter-content .hsk-calculation,
+.folio-chapter-content .hsk-opposition-toggle,.folio-chapter-content .hsk-verdict-section,
+.folio-chapter-content .hsk-result-slot,.folio-chapter-content .hsk-workbench-result,
+.folio-chapter-content .hsk-value-display,.folio-chapter-content .hsk-scene-fields,
+.folio-chapter-content .hsk-eml,.folio-chapter-content .hsk-tn-readout,
+.folio-chapter-content .hsk-sv-guide,.folio-chapter-content .hsk-sv-extras,
+.folio-chapter-content .hsk-special-container,.folio-chapter-content .hsk-critical-next,
+.folio-chapter-content .hsk-tiebreak,.folio-chapter-content .hsk-verdict-chip,
+.folio-chapter-content .hsk-eml-trace .hsk-eml-chip,
+.folio-chapter-content .hsk-load-evidence,.folio-chapter-content .hsk-sr-activity,
+.folio-chapter-content .hsk-trauma,.folio-chapter-content .hsk-climb-fall,
+.folio-chapter-content .inv-summary-stat,.folio-chapter-content .inv-footer-totals{
+ background:rgba(251,242,222,.38)!important;
+ background-image:none!important;
+ color:var(--folio-ink)!important;
+ border:1px solid var(--folio-rule)!important;
+ box-shadow:inset 0 1px rgba(255,247,225,.65)!important;
+ border-radius:0!important;
+ margin:0!important;
+ padding:7px 9px!important;
+ min-width:0;
+ max-width:100%;
+}
+.folio-chapter-content .panel.wide{width:100%;grid-column:auto}
+.folio-chapter-content .panel :is(h3,h4),.folio-chapter-content .hsk-test-card :is(h3,h4){margin:0 0 4px!important;font:700 13px/1.25 "Cinzel",Georgia,serif!important;color:#743f24!important;border-bottom:1px solid var(--folio-rule);padding:0 0 4px!important}
+.folio-chapter-content .panel :is(h3,h4)::before{content:none!important}
+.folio-chapter-content p{margin:3px 0 6px}
+.folio-chapter-content :is(button,input,select,textarea){font-family:Georgia,serif;font-size:12px;line-height:1.25;max-width:100%;box-sizing:border-box}
+.folio-chapter-content :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){background:#fff8e9!important;color:#2c2119!important;border:1px solid #a48356!important;border-radius:2px!important;min-height:29px;padding:4px 6px!important}
+.folio-chapter-content input[type="checkbox"],.folio-chapter-content input[type="radio"]{accent-color:#274562}
+.folio-chapter-content button{background:linear-gradient(#314b65,#1a314a)!important;border:1px solid #a98043!important;border-radius:2px!important;color:#f9ebd0!important;min-height:27px;padding:4px 7px!important;box-shadow:0 1px 1px #0003!important;white-space:normal}
+.folio-chapter-content button.secondary,.folio-chapter-content button[aria-selected="false"]{background:linear-gradient(#f4e7cc,#dec69b)!important;color:#452e1b!important;border-color:#a4875a!important}
+.folio-chapter-content button.danger{background:#7b3c30!important;color:#fff2e2!important}
+.folio-chapter-content button:focus-visible,.folio-chapter-content summary:focus-visible{outline:2px solid #173e66!important;outline-offset:2px}
+.folio-chapter-content :is(.notice.error,.library-warning){background:rgba(239,202,174,.45)!important;border-left:3px solid #a65036!important;color:#652b20!important}
+.folio-chapter-content .equipment-summary{display:grid!important;grid-template-columns:1fr!important;gap:2px!important}
+.folio-chapter-content .equipment-summary>div{display:flex!important;align-items:baseline;justify-content:space-between;gap:8px;background:transparent!important;border:0!important;border-bottom:1px solid var(--folio-rule)!important;padding:4px 2px!important;box-shadow:none!important;min-width:0}
+.folio-chapter-content .equipment-summary strong{color:#693919!important;line-height:1.3;font-weight:700}
+.folio-chapter-content .equipment-summary span{color:#192f47!important;text-align:right;font-weight:700}
+.folio-chapter-content .equipped-hands{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px!important}
+.folio-chapter-content .equipped-hands>div{display:grid!important;justify-content:initial!important;gap:2px;border:1px solid var(--folio-rule)!important;padding:5px!important}
+.folio-chapter-content .equipped-hands span{color:#523d28!important;text-align:left;font-weight:400}
+.folio-chapter-content .inv-summary-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:4px!important}
+.folio-chapter-content .inv-summary-stat{padding:5px!important;display:flex;flex-direction:column;gap:3px}
+.folio-chapter-content .inv-summary-stat :is(strong,b){color:#18364f!important;font-size:14px!important}
+.folio-chapter-content .inv-summary-stat span{color:#715337!important;font-size:11px!important}
+.folio-chapter-content :is(.table-scroll,.catalog-scroll,.inv-table-scroll,.library-table-wrap){max-width:100%!important;min-width:0!important;overflow-x:auto!important;overscroll-behavior-x:contain;background:rgba(255,250,238,.22)!important;border:1px solid var(--folio-rule)!important;border-radius:0!important;padding:2px!important}
+.folio-chapter-content :is(table,.catalog-spec,.hsk-table,.inv-ledger-table){font:12px/1.25 "Cormorant Garamond",Georgia,serif!important;width:100%;border-collapse:collapse;color:var(--folio-ink)!important}
+.folio-chapter-content :is(thead th,.hsk-group-head th){background:rgba(171,125,66,.16)!important;color:#583316!important;border:0!important;border-bottom:1px solid #987344!important;font:700 11px/1.2 "Cinzel",Georgia,serif!important;padding:4px 5px!important;text-align:left}
+.folio-chapter-content :is(td,tbody th){background:transparent!important;color:var(--folio-ink)!important;border:0!important;border-bottom:1px solid rgba(149,105,59,.25)!important;padding:3px 5px!important;text-align:left;vertical-align:top!important}
+.folio-chapter-content .hsk-table{min-width:0!important}
+.folio-chapter-content .hsk-actor-chooser{margin:0!important;max-width:none!important}
+.folio-chapter-content .hsk-tabs{padding:4px 0;gap:3px;display:flex;flex-wrap:wrap;border-bottom:1px solid var(--folio-rule)}
+.folio-chapter-content .hsk-tabs button{font-size:10px!important;padding:4px 6px!important;min-height:27px!important}
+.folio-chapter-content .hsk-tabs button[data-skill-active="yes"]{background:#183c5c!important;color:#fff2d8!important}
+.folio-chapter-content .hsk-separated-tests{display:block!important;margin:0!important}
+.folio-chapter-content .hsk-test-card{scroll-margin-top:30px}
+.folio-chapter-content .hsk-test-card[hidden]{display:none!important}
+.folio-chapter-content :is(.hsk-verdict-chip strong,.hsk-eml-chip b,.hsk-eml-total,.hsk-bigstars){color:#21476a!important}
+.folio-chapter-content :is(.hsk-verdict-chip small,.hsk-eml-chip small){color:#5c3e27!important}
+.folio-chapter-content .field-grid,.folio-chapter-content .hsk-form-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:4px 7px!important}
+.folio-chapter-content .field-grid>*{min-width:0}
+.folio-chapter-content .encounter-roster{display:grid;grid-template-columns:1fr;gap:4px}
+.folio-chapter-content .encounter-entry{background:rgba(250,239,212,.35);border:1px solid var(--folio-rule);padding:4px 5px;min-width:0}
+.folio-chapter-content .journal-book-title{font-size:12px}
+.folio-chapter-content details>summary{color:#664320!important;cursor:pointer}
+.folio-chapter-content .library-navigation{display:flex;flex-wrap:wrap;gap:3px;margin:0}
+.folio-chapter-content .library-navigation button{min-height:27px!important;font-size:10px!important;padding:3px 6px!important}
+.folio-chapter-content .library-navigation button[aria-selected="true"]{background:#1c3b57!important;color:#fff1d1!important}
+.folio-chapter-content .library-toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:6px;margin:0}
+.folio-chapter-content .library-toolbar label{flex:1 1 135px}
+.folio-chapter-content .library-results{font-size:12px}
+.folio-rules-group{min-width:0}
+.folio-rules-group>.library-rules-details{margin:4px 0!important;max-width:100%;min-width:0}
+
+/* Library cards keep 100% of the original table cells, including live actions. */
+.folio-catalog-list{display:grid;grid-template-columns:1fr;gap:6px;min-width:0}
+.folio-catalog-list:empty{display:none}
+.folio-catalog-entry{min-width:0;position:relative;padding:7px 8px 8px;background:rgba(248,233,202,.22);border:1px solid var(--folio-rule);box-shadow:inset 0 1px rgba(255,247,228,.85)}
+.folio-catalog-heading{font:700 13px/1.25 "Cinzel",Georgia,serif;color:#203c55!important;padding:0 0 5px;border-bottom:1px solid var(--folio-rule);overflow-wrap:anywhere}
+.folio-catalog-heading small{display:block;color:#795e3f;font:11px/1.2 Georgia,serif;font-weight:400;margin-top:2px}
+.folio-catalog-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:4px 0 7px;gap:3px 7px}
+.folio-catalog-field{min-width:0;display:grid;gap:1px}
+.folio-catalog-field dt{font:700 10px/1.2 Georgia,serif;color:#7a5734}
+.folio-catalog-field dd{margin:0;font:12px/1.25 "Cormorant Garamond",Georgia,serif;color:#292019;overflow-wrap:anywhere}
+.folio-catalog-foot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.04fr);gap:5px;align-items:start;padding-top:6px;border-top:1px solid var(--folio-rule)}
+.folio-catalog-foot>*{min-width:0}
+.folio-catalog-actions{padding-left:6px;border-left:1px solid var(--folio-rule)}
+.folio-catalog-actions form{max-width:100%;min-width:0}
+.folio-catalog-actions .library-assign{min-width:0;display:grid;gap:3px}
+.folio-catalog-actions .library-assign select{min-width:0;width:100%}
+.folio-catalog-actions .library-acquire-actions{display:flex;gap:3px;flex-wrap:wrap}
+.folio-catalog-actions .library-acquire-actions button{flex:1 1 45%;min-width:0;font-size:10px!important;padding:3px 4px!important;min-height:25px!important}
+.folio-catalog-details{font-size:11px;overflow-wrap:anywhere}
+.folio-catalog-details .catalog-parameters-inner{min-width:0;max-width:100%}
+.folio-catalog-details .catalog-parameters{max-width:100%}
+.folio-catalog-details details{min-width:0}
+.folio-catalog-details .catalog-spec{min-width:0}
+.folio-chapter-content .library-pagebar{display:flex;gap:5px;justify-content:center;align-items:center;flex-wrap:wrap}
+
+@media(max-width:1160px){
+ .content-sheet .journal-book--chapter .journal-book-frame::after{display:none!important}
+ .content-sheet .journal-book--chapter .folio-chapter-spread{grid-template-columns:minmax(0,1fr)!important}
+ .content-sheet .journal-book--chapter .folio-chapter-page{min-height:0!important}
+ .content-sheet .journal-book--chapter .folio-chapter-page--left,.content-sheet .journal-book--chapter .folio-chapter-page--right{padding:18px!important}
+ .folio-chapter-heading h3{font-size:27px!important}
+}
+@media(max-width:550px){
+ .content-sheet .journal-book--chapter .folio-chapter-page--left,.content-sheet .journal-book--chapter .folio-chapter-page--right{padding:12px!important}
+ .folio-chapter-content .field-grid,.folio-chapter-content .hsk-form-grid{grid-template-columns:1fr!important}
+ .folio-chapter-content .equipped-hands{grid-template-columns:1fr!important}
+ .folio-catalog-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .folio-catalog-foot{grid-template-columns:1fr}
+ .folio-catalog-actions{padding-left:0;border-left:0;border-top:1px solid var(--folio-rule);padding-top:4px}
+ .folio-chapter-content .inv-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+/* Keep live content clear of the non-scaled gilded corner artworks. */
+@media(min-width:1161px){
+ .content-sheet .journal-book--chapter .folio-chapter-page--left,
+ .content-sheet .journal-book--chapter .folio-chapter-page--right{padding-top:clamp(107px,8.5vw,140px)!important;min-height:700px!important}
+}
+@media(max-width:1160px){
+ .content-sheet .journal-book--chapter .folio-chapter-page--left{padding-top:98px!important}
+ .content-sheet .journal-book--chapter .folio-chapter-page--right{padding-top:16px!important}
+}
+@media(max-width:550px){
+ .content-sheet .journal-book--chapter .folio-chapter-page--left{padding-top:64px!important}
+ .content-sheet .journal-book--chapter .folio-chapter-page--right{padding-top:12px!important}
+}
+/* Correct selector: page elements retain journal-book-page--left/right names. */
+@media(min-width:1161px){
+ .content-sheet .journal-book--chapter .folio-chapter-page.journal-book-page--left,
+ .content-sheet .journal-book--chapter .folio-chapter-page.journal-book-page--right{padding-top:clamp(107px,8.5vw,140px)!important;min-height:700px!important}
+}
+@media (min-width:551px) and (max-width:1160px){
+ .content-sheet .journal-book--chapter .folio-chapter-page.journal-book-page--left{padding-top:95px!important}
+ .content-sheet .journal-book--chapter .folio-chapter-page.journal-book-page--right{padding-top:16px!important}
+}
+@media(max-width:550px){
+ .content-sheet .journal-book--chapter .folio-chapter-page.journal-book-page--left{padding-top:65px!important}
+ .content-sheet .journal-book--chapter .folio-chapter-page.journal-book-page--right{padding-top:12px!important}
+}
+/* The Postavy register belongs in the same approved folio as all major tabs. */
+.folio-chapter-content .view-hero,.folio-chapter-content .hero-characters{background:transparent!important;background-image:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:3px 0 7px!important;display:block!important;min-height:0!important;color:var(--folio-ink)!important}
+.folio-chapter-content .view-hero__copy{max-width:none!important}
+.folio-chapter-content .view-hero h2{font:700 17px/1.2 "Cinzel",Georgia,serif!important;color:#6b3b23!important;margin:0 0 5px!important}
+.folio-chapter-content .view-hero p{font:13px/1.32 "Cormorant Garamond",Georgia,serif!important;color:#4a3322!important}
+.folio-chapter-content .view-hero__stats,.folio-chapter-content .registry-stats{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:7px 0!important}
+.folio-chapter-content .view-hero__stats>div{min-width:0;background:rgba(249,234,207,.36)!important;border:1px solid var(--folio-rule)!important;border-radius:0!important;padding:5px!important;color:#44301e!important;box-shadow:none!important}
+.folio-chapter-content .view-hero__stats span{display:block;font:11px/1.2 Georgia,serif!important;color:#634c31!important}
+.folio-chapter-content .view-hero__stats strong{display:block;font:700 18px Georgia,serif!important;color:#183b59!important}
+.folio-chapter-content .topline.ledger-topline{position:relative;padding:0;background:transparent;border:0;box-shadow:none;display:flex;gap:5px;flex-wrap:wrap}
+.folio-chapter-content .toolbar{margin:0!important;max-width:100%}
+.folio-character-list{display:grid;grid-template-columns:1fr;gap:7px;min-width:0}
+.folio-chapter-content .character-card{display:block!important;min-width:0!important;background:rgba(250,238,215,.35)!important;background-image:none!important;border:1px solid var(--folio-rule)!important;border-radius:0!important;box-shadow:inset 0 1px rgba(255,247,227,.85)!important;padding:10px!important;max-width:100%}
+.folio-chapter-content .character-card__crest{background:#173956!important;border:1px solid #b58b4d!important;border-radius:0!important;box-shadow:none!important}
+.folio-chapter-content .character-card__body{min-width:0!important}
+.folio-chapter-content .character-card__body>h3{color:#233f58!important;font:700 16px/1.25 "Cinzel",Georgia,serif!important;margin:4px 0!important}
+.folio-chapter-content .character-card :is(.pill,.muted){color:#543a22!important}
+.folio-chapter-content .character-card .actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.folio-chapter-content .character-card button{font-size:11px!important;min-height:26px!important}
+@media(max-width:550px){.folio-chapter-content .view-hero__stats,.folio-chapter-content .registry-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* v93.328: creation wizard adopts the same folio layout as chapter tabs */
+.content-sheet .journal-book--creation .folio-chapter-content{display:grid;gap:1rem}
+.content-sheet .journal-book--creation .creation-flow{margin:0!important;background:rgba(250,244,232,.9)!important;border:1px solid rgba(104,74,41,.24)!important;box-shadow:0 1px 0 rgba(255,250,240,.85) inset!important;border-radius:0!important;color:#261a12!important}
+.content-sheet .journal-book--creation .creation-flow--folio{min-height:100%}
+.content-sheet .journal-book--creation .creation-flow h2,
+.content-sheet .journal-book--creation .creation-flow h3,
+.content-sheet .journal-book--creation .creation-flow h4{color:#693c23!important}
+.content-sheet .journal-book--creation .creation-flow .topline{margin:0 0 .35rem;align-items:flex-start}
+.content-sheet .journal-book--creation .creation-flow progress{width:100%;height:16px;accent-color:#7b552a}
+.content-sheet .journal-book--creation .creation-flow .field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem 1rem}
+.content-sheet .journal-book--creation .creation-flow .creation-inputs{gap:.75rem 1rem}
+.content-sheet .journal-book--creation .creation-flow .actions{justify-content:flex-start}
+.content-sheet .journal-book--creation .creation-flow .notice{margin:.7rem 0;background:rgba(255,247,232,.92)!important;border:1px solid rgba(140,97,49,.32)!important;border-left-width:4px!important;color:#4a2d19!important}
+.content-sheet .journal-book--creation .creation-flow details{padding:.85rem 1rem;border:1px solid rgba(115,84,45,.28);background:rgba(255,250,241,.8)}
+.content-sheet .journal-book--creation .creation-flow summary{cursor:pointer;font-weight:700;color:#6a4323}
+.content-sheet .journal-book--creation .creation-flow dialog{max-width:100%}
+@media(max-width:1160px){.content-sheet .journal-book--creation .creation-flow .field-grid{grid-template-columns:1fr}}
+
+
+/* v93.330: character registry folio compaction */
+.folio-chapter-content .ledger-topline{align-items:flex-start!important;gap:6px 8px!important;margin:6px 0 7px!important}
+.folio-chapter-content .ledger-topline h2{margin:0 .3rem 0 0!important;font-size:16px!important;line-height:1.15!important;color:#6b3b23!important}
+.folio-chapter-content .ledger-topline > button{min-height:28px!important;padding:4px 10px!important;font-size:11px!important}
+.folio-chapter-content .toolbar{margin:0 0 8px!important}
+.folio-chapter-content .toolbar input{max-width:none!important;background:rgba(255,252,244,.88)!important;border:1px solid var(--folio-rule)!important;color:#3a2817!important;padding:7px 10px!important}
+.folio-chapter-content .hero-characters{padding-bottom:4px!important}
+.folio-chapter-content .hero-characters p{margin-bottom:6px!important}
+
+
+/* v93.331 — compact illuminated index cards with real HTML controls. */
+.content-sheet .journal-book--characters .folio-character-list{
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:9px!important;align-content:start;
+}
+.content-sheet .journal-book--characters .character-card{
+ display:grid!important;grid-template-columns:44px minmax(0,1fr)!important;
+ gap:5px 10px!important;align-items:start!important;position:relative;max-width:100%;
+ padding:9px 10px!important;border:1px solid rgba(134,93,49,.42)!important;border-radius:2px!important;
+ background:linear-gradient(180deg,rgba(255,249,233,.96),rgba(236,216,179,.94))!important;
+ box-shadow:inset 0 0 0 1px rgba(255,248,228,.55),0 2px 5px rgba(101,65,28,.09)!important;
+}
+.content-sheet .journal-book--characters .character-card::before{display:none!important}
+.content-sheet .journal-book--characters .character-card__crest{
+ width:44px!important;height:44px!important;min-height:44px!important;border:1px solid #a27a45!important;
+ border-radius:2px!important;background:linear-gradient(145deg,#2c4b68,#102a45)!important;
+ font:700 22px/1 Georgia,serif!important;color:#ffebbb!important;box-shadow:inset 0 0 0 2px rgba(213,172,105,.16)!important;
+}
+.content-sheet .journal-book--characters .character-card__body{gap:3px!important;padding-right:16px;min-width:0}
+.content-sheet .journal-book--characters .character-card__body h3{
+ font:700 clamp(12px,1vw,15px)/1.2 "Cinzel",Georgia,serif!important;
+ color:#273f50!important;margin:1px 0 2px!important;overflow-wrap:anywhere;
+}
+.content-sheet .journal-book--characters .character-card__tags{margin:0!important;gap:3px 5px!important}
+.content-sheet .journal-book--characters .character-card .pill{
+ display:inline-block!important;border:1px solid rgba(151,110,56,.25)!important;border-radius:20px!important;
+ padding:1px 6px!important;background:rgba(208,175,119,.22)!important;font:11px/1.1 Georgia,serif!important;
+ color:#593d20!important;
+}
+.content-sheet .journal-book--characters .character-card .muted{
+ font:12px/1.22 "Cormorant Garamond",Georgia,serif!important;color:#62472b!important;margin:0;
+}
+.content-sheet .journal-book--characters .character-card__description{
+ display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+ overflow-wrap:anywhere;
+}
+.content-sheet .journal-book--characters .character-card__progress{
+ color:#77603d!important;font-style:italic!important;
+}
+.content-sheet .journal-book--characters .character-card .actions{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:4px!important;margin:4px 0 0!important;
+}
+.content-sheet .journal-book--characters .character-card .actions button{
+ min-width:0!important;width:100%!important;min-height:26px!important;
+ padding:4px 5px!important;border-radius:3px!important;font:600 10px/1.1 Georgia,serif!important;
+ background:linear-gradient(180deg,#f5e5c7,#d9bf93)!important;color:#49311c!important;
+ border:1px solid rgba(134,96,48,.45)!important;box-shadow:0 1px 2px #50371918!important;
+ white-space:normal!important;
+}
+.content-sheet .journal-book--characters .character-card .actions button[data-open]{
+ background:linear-gradient(180deg,#345573,#142d48)!important;color:#ffebc1!important;
+ border-color:#ae854a!important;
+}
+.content-sheet .journal-book--characters .character-card .actions button.danger{
+ color:#6e3428!important;background:linear-gradient(180deg,#eed6c2,#dcbba4)!important;
+}
+.content-sheet .journal-book--characters .character-card .character-delete{
+ position:absolute!important;top:6px!important;right:6px!important;display:grid!important;place-items:center!important;
+ width:22px!important;height:22px!important;min-height:22px!important;padding:0!important;
+ border-radius:2px!important;background:linear-gradient(180deg,#7e4439,#562721)!important;
+ color:#ffe9d4!important;font:700 15px/1 Arial,sans-serif!important;
+}
+.content-sheet .journal-book--characters .folio-chapter-content .toolbar input{
+ background:rgba(255,252,241,.91)!important;border:1px solid rgba(121,82,42,.45)!important;
+ color:#302317!important;border-radius:3px!important;
+}
+@media(max-width:600px){
+ .content-sheet .journal-book--characters .character-card{grid-template-columns:40px minmax(0,1fr)!important}
+ .content-sheet .journal-book--characters .character-card__crest{width:40px!important;height:40px!important;min-height:40px!important}
+}
+@media(max-width:360px){
+ .content-sheet .journal-book--characters .character-card .actions{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+
+/* v93.332: Actual multi-column character cards, not just smaller full-width cards. */
+.content-sheet .journal-book--characters .folio-chapter-content{container-name:character-folio;container-type:inline-size}
+.content-sheet .journal-book--characters .folio-character-list{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:8px!important;align-content:start!important;min-width:0!important;
+}
+.content-sheet .journal-book--characters .character-card{
+ display:flex!important;flex-direction:column!important;align-items:stretch!important;
+ gap:5px!important;min-height:174px!important;padding:9px!important;
+}
+.content-sheet .journal-book--characters .character-card__crest{
+ width:34px!important;height:34px!important;min-height:34px!important;
+ font-size:19px!important;flex:0 0 auto!important;
+}
+.content-sheet .journal-book--characters .character-card__body{
+ display:flex!important;flex-direction:column!important;gap:3px!important;
+ padding:0!important;min-width:0!important;flex:1!important;
+}
+.content-sheet .journal-book--characters .character-card__tags{padding-right:16px!important}
+.content-sheet .journal-book--characters .character-card__body h3{font:700 14px/1.2 "Cinzel",Georgia,serif!important;margin:0!important}
+.content-sheet .journal-book--characters .character-card__occupation{font:12px/1.2 "Cormorant Garamond",Georgia,serif!important}
+.content-sheet .journal-book--characters .character-card__description{
+ display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;
+ overflow:hidden!important;font:12px/1.2 "Cormorant Garamond",Georgia,serif!important;
+ max-height:2.4em!important;
+}
+.content-sheet .journal-book--characters .character-card__progress{
+ font:10px/1.1 Georgia,serif!important;letter-spacing:0!important;margin-top:auto!important;
+}
+.content-sheet .journal-book--characters .character-card__controls{
+ display:flex!important;flex-direction:column!important;gap:4px!important;margin-top:auto!important;
+}
+.content-sheet .journal-book--characters .character-card__controls>button{
+ width:100%!important;min-height:27px!important;padding:4px 5px!important;
+ font:600 12px/1.15 Georgia,serif!important;white-space:normal!important;
+ background:linear-gradient(180deg,#f1e2c5,#d6b985)!important;
+ border:1px solid rgba(139,95,48,.55)!important;border-radius:3px!important;color:#40301e!important;
+}
+.content-sheet .journal-book--characters .character-card__controls>button.character-card__open{
+ background:linear-gradient(180deg,#365777,#122b46)!important;color:#ffebc1!important;
+ border-color:#ba904f!important;
+}
+.content-sheet .journal-book--characters .character-card__more{position:relative!important;min-width:0!important}
+.content-sheet .journal-book--characters .character-card__more summary{
+ display:block!important;cursor:pointer!important;list-style:none!important;
+ border-top:1px solid rgba(124,88,45,.25)!important;padding:4px 2px 2px!important;
+ text-align:center!important;font:italic 11px/1.15 Georgia,serif!important;color:#694625!important;
+}
+.content-sheet .journal-book--characters .character-card__more summary::-webkit-details-marker{display:none!important}
+.content-sheet .journal-book--characters .character-card__more summary::after{content:" ▾"}
+.content-sheet .journal-book--characters .character-card__more[open] summary::after{content:" ▴"}
+.content-sheet .journal-book--characters .character-card__more-actions{
+ display:grid!important;grid-template-columns:1fr!important;gap:4px!important;margin:5px 0 1px!important;
+}
+.content-sheet .journal-book--characters .character-card__more-actions button{
+ display:block!important;width:100%!important;min-height:26px!important;padding:4px!important;
+ font:600 11px/1.12 Georgia,serif!important;white-space:normal!important;
+ background:linear-gradient(180deg,#f0dfc0,#d8bd93)!important;border:1px solid rgba(124,87,43,.38)!important;
+ color:#49321f!important;border-radius:3px!important;
+}
+.content-sheet .journal-book--characters .character-card__more-actions button.danger{color:#8e3e30!important}
+@container character-folio (max-width:550px){
+ .content-sheet .journal-book--characters .folio-character-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@container character-folio (max-width:430px){
+ .content-sheet .journal-book--characters .folio-character-list{grid-template-columns:1fr!important}
+}
+@media(max-width:810px){
+ .content-sheet .journal-book--characters .folio-character-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:500px){
+ .content-sheet .journal-book--characters .folio-character-list{grid-template-columns:1fr!important}
+}
+
+
+
+/* === Consolidated from creation-polish.css (same cascade order as original) === */
+/* Keeper's Ledger 93.329 — Character Creation folio polish.
+   UI-only: no character generation, rule calculations, persistence, or die rolls. */
+:root { --cc-ink:#342519; --cc-gold:#9e7745; --cc-muted:#6e5238; --cc-line:rgba(117,80,39,.29); --cc-paper:rgba(252,244,227,.50); }
+
+/* Only the Creation chapter; all other book chapters retain their approved look. */
+.content-sheet .journal-book--creation .folio-chapter-spread{align-items:stretch!important}
+.content-sheet .journal-book--creation .folio-chapter-page{min-width:0!important}
+.content-sheet .journal-book--creation .folio-chapter-page--left{padding-right:clamp(17px,2vw,32px)!important}
+.content-sheet .journal-book--creation .folio-chapter-page--right{padding-left:clamp(18px,2.1vw,35px)!important}
+.content-sheet .journal-book--creation .folio-chapter-heading{margin-bottom:11px}
+.content-sheet .journal-book--creation .folio-chapter-content{display:block;min-width:0}
+.content-sheet .journal-book--creation .creation-flow--folio{
+  background:transparent!important; background-image:none!important;
+  border:0!important; box-shadow:none!important; border-radius:0!important;
+  padding:0!important;min-width:0;max-width:100%;color:var(--cc-ink)!important;
+}
+.content-sheet .journal-book--creation .creation-flow--context>.topline{margin:0 0 11px!important;padding-bottom:10px;border-bottom:1px solid var(--cc-line)}
+.content-sheet .journal-book--creation .creation-flow--context #cc-title{font:600 clamp(17px,1.35vw,23px)/1.25 'Cinzel',Georgia,serif!important;color:#173651!important;margin:0!important;overflow-wrap:anywhere}
+.content-sheet .journal-book--creation .creation-flow .topline button{flex:0 0 auto;max-width:100%;min-height:34px!important}
+.content-sheet .journal-book--creation .creation-flow--context>.notice{
+  margin:6px 0!important;background:rgba(247,232,199,.35)!important;border:0!important;
+  border-left:2px solid var(--cc-gold)!important;padding:8px 10px!important;
+  font:15px/1.42 'Cormorant Garamond',Georgia,serif;color:#4b3321!important;
+}
+.content-sheet .journal-book--creation .creation-flow--context>.notice strong{color:#683c20!important}
+.content-sheet .journal-book--creation [data-creation-step-intro]{border-left-color:#244b68!important}
+.content-sheet .journal-book--creation .creation-flow--context progress{
+  display:block;appearance:none;-webkit-appearance:none;width:100%;height:11px!important;overflow:hidden;
+  border:1px solid #a6804b;border-radius:1px!important;background:#e4d1ab;margin:12px 0 12px;
+}
+.content-sheet .journal-book--creation progress::-webkit-progress-bar{background:#e4d1ab}
+.content-sheet .journal-book--creation progress::-webkit-progress-value{background:linear-gradient(90deg,#345c77,#173b5d);border-right:1px solid #cca46e}
+.content-sheet .journal-book--creation progress::-moz-progress-bar{background:linear-gradient(90deg,#345c77,#173b5d)}
+
+/* Left folio — real, non-clickable 14-step chapter index. */
+.folio-creation-index{margin:12px 0 4px;padding:10px 10px 8px;background:rgba(246,232,204,.28);border-top:2px double var(--cc-gold);border-bottom:1px solid var(--cc-line)}
+.folio-creation-index__heading{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 7px;font:600 12px/1.25 'Cinzel',Georgia,serif;text-transform:uppercase;letter-spacing:.065em;color:#19374e}
+.folio-creation-index__heading span{font:12px/1.2 Georgia,serif;color:#80613c;white-space:nowrap}
+.folio-creation-index__steps{padding:0;margin:0;list-style:none;display:grid;grid-template-columns:1fr;gap:0}
+.folio-creation-step{display:grid;grid-template-columns:26px minmax(0,1fr) auto;align-items:center;gap:7px;min-width:0;padding:4px 5px;border-bottom:1px solid rgba(121,83,43,.13);color:#5e4834;line-height:1.2}
+.folio-creation-step:last-child{border-bottom:0}
+.folio-creation-step__number{display:grid;place-items:center;width:23px;height:23px;font:700 12px/1 Georgia,serif;border:1px solid #bfa37a;background:rgba(255,250,238,.63);color:#6d502e}
+.folio-creation-step__label{font:500 14px/1.15 'Cormorant Garamond',Georgia,serif;min-width:0;overflow-wrap:anywhere}
+.folio-creation-step__page{font:11px/1 Georgia,serif;color:#826648;white-space:nowrap}
+.folio-creation-step--complete .folio-creation-step__number{background:#e4dcc8;border-color:#9f957e;color:#385047}
+.folio-creation-step--complete .folio-creation-step__number::after{content:'✓';position:absolute;transform:translate(12px,-9px);font:700 10px Georgia,serif;color:#3e695a}
+.folio-creation-step--complete .folio-creation-step__label{color:#557263}
+.folio-creation-step--active{background:linear-gradient(90deg,rgba(30,64,89,.15),rgba(230,202,151,.12));border-left:3px solid #244965;margin-left:-3px}
+.folio-creation-step--active .folio-creation-step__number{color:#fff5df;background:#203e59;border-color:#b99153}
+.folio-creation-step--active .folio-creation-step__label{color:#18364b;font-weight:700}
+.folio-creation-index__note{margin:8px 0 2px!important;color:#806545!important;font:italic 12px/1.35 Georgia,serif}
+.folio-visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+
+/* Right folio — the existing native form, with a clear step heading. */
+.content-sheet .journal-book--creation .folio-creation-active{padding:1px 1px 10px;margin:0 0 13px;border-bottom:2px double rgba(145,103,54,.52)}
+.folio-creation-active__eyebrow{font:600 11px/1.4 'Cinzel',Georgia,serif;color:#8b6339;text-transform:uppercase;letter-spacing:.1em}
+.content-sheet .journal-book--creation .folio-creation-active h3{font:600 clamp(19px,1.8vw,30px)/1.14 'Cinzel',Georgia,serif!important;color:#153553!important;margin:4px 0 6px!important;padding:0!important;border:0!important;overflow-wrap:anywhere}
+.folio-creation-active__source,.folio-creation-active__stage{display:inline-flex;align-items:center;margin:0 7px 0 0;color:#785837;font:13px/1.35 'Cormorant Garamond',Georgia,serif}
+.folio-creation-active__stage{font-weight:700;color:#27455b}
+.content-sheet .journal-book--creation #creation-step-form{min-width:0;margin:0;width:100%}
+.content-sheet .journal-book--creation #creation-step-form .creation-inputs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px 12px!important;min-width:0;align-items:start}
+.content-sheet .journal-book--creation .creation-inputs > :is(p,fieldset,section,div.field-grid,.notice,output,table,.table-scroll,details,hr,ul,ol){grid-column:1 / -1;min-width:0;max-width:100%}
+.content-sheet .journal-book--creation .creation-inputs > label{grid-column:auto;min-width:0;margin:0 0 3px!important}
+.content-sheet .journal-book--creation .creation-inputs label{
+  position:relative;display:block;min-width:0;margin:2px 0!important;
+  color:#5c3921!important;font:600 14px/1.3 'Cormorant Garamond',Georgia,serif!important;
+  overflow-wrap:anywhere;
+}
+.content-sheet .journal-book--creation .creation-inputs label:has(> input[type='checkbox']),
+.content-sheet .journal-book--creation .creation-inputs label:has(> input[type='radio']){display:flex;align-items:center;gap:8px}
+.content-sheet .journal-book--creation .creation-inputs input:not([type='checkbox']):not([type='radio']),
+.content-sheet .journal-book--creation .creation-inputs select,
+.content-sheet .journal-book--creation .creation-inputs textarea,
+.content-sheet .journal-book--creation #creation-jump-select{
+  width:100%;min-width:0;min-height:35px!important;border-radius:2px!important;
+  border:1px solid #ab8b5b!important;background:rgba(255,250,238,.91)!important;color:#2c2118!important;
+  box-shadow:inset 0 1px 3px rgba(78,48,17,.09)!important;
+  padding:7px 8px!important;font:14px/1.3 Georgia,serif!important;
+}
+.content-sheet .journal-book--creation .creation-inputs input:focus-visible,
+.content-sheet .journal-book--creation .creation-inputs select:focus-visible,
+.content-sheet .journal-book--creation .creation-inputs textarea:focus-visible{outline:2px solid #265477!important;outline-offset:1px}
+.content-sheet .journal-book--creation .creation-inputs textarea{min-height:78px;resize:vertical}
+.content-sheet .journal-book--creation .creation-inputs :is(p,.tiny){font:15px/1.4 'Cormorant Garamond',Georgia,serif;color:#4e3b28!important;margin:4px 0!important}
+.content-sheet .journal-book--creation .creation-inputs fieldset{
+  padding:12px 10px!important;margin:7px 0!important;border:1px solid #b39668!important;
+  background:rgba(249,239,220,.31)!important;min-width:0;max-width:100%;
+}
+.content-sheet .journal-book--creation .creation-inputs legend{font:600 14px/1.3 'Cinzel',Georgia,serif!important;color:#693e23!important;padding:0 5px;max-width:95%}
+.content-sheet .journal-book--creation .creation-inputs .field-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px 12px!important;align-items:start;min-width:0}
+.content-sheet .journal-book--creation .creation-inputs .field-grid>.field-grid{grid-column:1 / -1}
+.content-sheet .journal-book--creation .creation-inputs .notice{
+  padding:7px 9px!important;margin:6px 0!important;border:1px solid rgba(136,93,52,.3)!important;
+  border-left:3px solid #a27b48!important;background:rgba(249,233,204,.5)!important;
+  border-radius:0!important;color:#513821!important;font-size:14px!important;
+}
+.content-sheet .journal-book--creation .creation-inputs [data-creation-roll-preview]{min-height:40px;display:block}
+.content-sheet .journal-book--creation #creation-step-form button,
+.content-sheet .journal-book--creation .creation-flow--context button{border-radius:2px!important;min-height:35px!important;line-height:1.2!important;padding:7px 10px!important}
+.content-sheet .journal-book--creation #creation-step-form .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end!important;padding:12px 0 3px;margin:13px 0 0!important;border-top:2px double var(--cc-line)}
+.content-sheet .journal-book--creation #creation-step-form .actions button{font:600 13px/1.2 'Cinzel',Georgia,serif!important}
+.content-sheet .journal-book--creation #creation-step-form .actions button[value='next']{background:linear-gradient(180deg,#335d7d,#19344e)!important;color:#ffefcc!important;border-color:#ab8248!important}
+.content-sheet .journal-book--creation .hmk-rule-help{
+  display:inline-grid!important;place-items:center!important;vertical-align:middle!important;
+  min-width:23px!important;width:23px!important;height:23px!important;min-height:23px!important;
+  border-radius:50%!important;padding:0!important;margin-left:4px!important;
+  background:#e8d1a5!important;color:#3d2b19!important;border:1px solid #9f763a!important;
+  font:700 12px/1 Georgia,serif!important;
+}
+.content-sheet .journal-book--creation .creation-flow--action>.muted{font:italic 13px/1.35 Georgia,serif;color:#785b3e!important;margin:12px 0 8px!important}
+.content-sheet .journal-book--creation .creation-flow--action>details{margin:8px 0!important;padding:9px 11px!important;border:1px solid var(--cc-line);background:rgba(252,241,220,.5)}
+.content-sheet .journal-book--creation .creation-flow--action>details summary{font:600 14px/1.3 Georgia,serif;color:#5a3d21!important}
+.content-sheet .journal-book--creation .hmk-rule-dialog{
+  position:fixed;max-width:min(660px,calc(100vw - 32px))!important;max-height:min(88dvh,780px)!important;
+  margin:auto;padding:18px 21px;background:#f7ebd2!important;border:2px solid #8c6536!important;
+  box-shadow:0 20px 80px rgba(0,0,0,.48)!important;color:#2e2118!important;overflow:auto;
+}
+.content-sheet .journal-book--creation .hmk-rule-dialog::backdrop{background:rgba(7,16,25,.72)}
+.content-sheet .journal-book--creation .hmk-rule-dialog header h3{font-size:20px!important}
+
+/* Do not make a single folio too narrow for real HMK selects, tables or help controls. */
+@media(max-width:1600px){
+ .content-sheet .journal-book--creation #creation-step-form .creation-inputs,
+ .content-sheet .journal-book--creation .creation-inputs .field-grid{grid-template-columns:1fr!important}
+}
+@media(max-width:1160px){
+ .content-sheet .journal-book--creation .folio-chapter-page--left,
+ .content-sheet .journal-book--creation .folio-chapter-page--right{padding-left:16px!important;padding-right:16px!important}
+ .folio-creation-index__steps{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 11px}
+ .content-sheet .journal-book--creation .creation-flow--context>.topline{align-items:center}
+}
+@media(max-width:650px){
+ .folio-creation-index__steps{grid-template-columns:1fr}
+ .content-sheet .journal-book--creation .creation-flow--context #cc-title{font-size:16px!important}
+ .content-sheet .journal-book--creation .creation-flow--context>.topline{flex-direction:column;align-items:stretch}
+ .content-sheet .journal-book--creation .creation-flow--context>.topline button{width:100%}
+ .content-sheet .journal-book--creation .folio-creation-active h3{font-size:18px!important}
+ .content-sheet .journal-book--creation #creation-step-form .actions{justify-content:stretch!important}
+ .content-sheet .journal-book--creation #creation-step-form .actions button{flex:1 1 100%}
+}
+.folio-creation-step__number{position:relative}
+/* Collapsible chapter index: expanded on desktop, compact by default on phones. */
+.folio-creation-index>summary{display:flex!important;list-style:none!important;cursor:pointer}
+.folio-creation-index>summary::-webkit-details-marker{display:none}
+.folio-creation-index>summary::after{content:'−';font:700 13px Georgia,serif;color:#476179;padding-left:6px}
+.folio-creation-index:not([open])>summary::after{content:'+'}
+@media(max-width:550px){
+ .folio-creation-index{padding:9px 10px!important;margin:10px 0 2px!important}
+ .folio-creation-index>summary{margin:0!important}
+ .folio-creation-index[open]>summary{margin-bottom:6px!important}
+}
+
+
+
+/* === Consolidated from mast-quickbar.css (same cascade order as original) === */
+/* HMK Keeper's Ledger v93.332 — one coherent illuminated header.
+   This file is last in the stylesheet order, so it owns mast layout and tabs. */
+.mast{
+ position:relative!important;z-index:10!important;height:auto!important;min-height:0!important;
+ margin:0!important;padding:9px clamp(12px,1.4vw,26px) 0!important;overflow:visible!important;
+ border:0!important;border-bottom:3px double #a9824c!important;border-radius:0!important;
+ background:linear-gradient(180deg,#0b1a2a 0%,#142c43 55%,#0b1b2e 100%)!important;
+ box-shadow:inset 0 1px rgba(225,188,125,.35),0 4px 16px rgba(0,0,0,.43)!important;
+ backdrop-filter:none!important;
+}
+.mast::after{content:"";position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,#b98c49,transparent 40%,#b98c49);pointer-events:none}
+.mast .mast-top{
+ display:grid!important;grid-template-columns:clamp(190px,18vw,282px) minmax(0,1fr) auto!important;
+ grid-template-areas:"brand tabs meta" "actions actions actions"!important;
+ grid-template-rows:auto auto!important;gap:7px clamp(10px,1.6vw,25px)!important;
+ align-items:end!important;min-height:0!important;
+}
+.mast .mast-brand{
+ grid-area:brand!important;position:relative!important;width:auto!important;max-width:290px!important;
+ min-width:0!important;min-height:64px!important;margin:0!important;align-self:center!important;
+}
+.mast .mast-links{
+ grid-area:tabs!important;display:flex!important;flex-wrap:wrap!important;
+ align-self:end!important;align-items:flex-end!important;justify-content:center!important;
+ gap:5px!important;margin:0!important;padding:0 4px!important;min-width:0!important;
+ border-bottom:1px solid rgba(221,180,111,.47)!important;
+ background:none!important;
+}
+.mast .mast-links button{
+ appearance:none;flex:0 1 auto!important;position:relative;min-height:39px!important;
+ margin:0 0 -1px!important;padding:8px clamp(9px,1vw,20px)!important;
+ border:1px solid #aa7d40!important;border-bottom:2px solid #a6793f!important;
+ border-radius:6px 6px 0 0!important;
+ background:linear-gradient(180deg,#f3e4c6 0%,#ddc397 53%,#c7a571 100%)!important;
+ color:#3b281a!important;
+ box-shadow:inset 0 2px rgba(255,254,244,.7),inset 0 0 0 1px rgba(122,84,43,.14),0 -1px 5px #0004!important;
+ font:700 clamp(12px,1vw,17px)/1.1 Georgia,serif!important;
+ font-variant:small-caps!important;letter-spacing:.03em!important;text-shadow:0 1px rgba(255,252,241,.65)!important;
+ white-space:nowrap!important;transform:none!important;filter:none!important;
+}
+.mast .mast-links button::before{content:"✦";font:10px Georgia,serif;margin-right:6px;color:#996c32}
+.mast .mast-links button.current,
+.mast .mast-links button[aria-current="page"]{
+ background:linear-gradient(180deg,#385675 0%,#1b354e 48%,#0c2036 100%)!important;
+ color:#ffdf9e!important;border-color:#ca9d57!important;border-bottom-color:#0c2036!important;
+ box-shadow:inset 0 1px #d9ad6c,inset 0 0 0 1px rgba(233,191,108,.18),0 -2px 10px #0006!important;
+ text-shadow:0 1px #09101c!important;
+}
+.mast .mast-links button.current::before{color:#ecc078}
+.mast .mast-links button:hover:not(.current){background:linear-gradient(180deg,#fff0d4,#e5c88f)!important}
+.mast .mast-links button:focus-visible,.mast .mast-control-panel button:focus-visible{outline:2px solid #f6d28e!important;outline-offset:3px!important}
+.mast .mast-meta{
+ grid-area:meta!important;position:static!important;display:flex!important;align-items:center!important;
+ justify-content:flex-end!important;gap:6px!important;margin:0 0 5px!important;padding:0!important;
+ background:none!important;min-width:0!important;
+}
+.mast .mast-meta .scene-chip,.mast .mast-meta .release-marker{
+ display:inline-flex!important;padding:4px 7px!important;font:600 10px/1.2 Georgia,serif!important;
+ letter-spacing:.045em!important;border-radius:3px!important;
+ color:#e9d3a8!important;background:rgba(234,204,145,.075)!important;
+ border:1px solid rgba(190,146,82,.42)!important;white-space:nowrap!important;
+}
+.mast .mast-side{
+ grid-area:actions!important;grid-column:1/-1!important;grid-row:2!important;
+ display:block!important;position:static!important;width:100%!important;min-width:0!important;
+ margin:0!important;padding:0!important;background:none!important;align-self:stretch!important;
+}
+.mast .mast-control-panel{
+ display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;
+ flex-wrap:wrap!important;gap:7px 16px!important;margin:0!important;
+ padding:8px 0 9px!important;border:0!important;border-top:1px solid rgba(215,170,99,.29)!important;
+ border-radius:0!important;background:none!important;box-shadow:none!important;
+}
+.mast .mast-control-panel__title{display:none!important}
+.mast .mast-control-panel__selected{
+ display:flex!important;flex-direction:row!important;align-items:center!important;flex-wrap:wrap!important;
+ gap:6px!important;min-width:0!important;margin:0!important;padding:0!important;
+ border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;
+}
+.mast .mast-control-panel__selected span{font:600 10px/1.1 Georgia,serif!important;color:#bba071!important;letter-spacing:.1em;text-transform:uppercase}
+.mast .mast-control-panel__selected strong{font:700 13px/1.15 Georgia,serif!important;color:#ffe6b3!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:250px}
+.mast .mast-control-panel__grid{
+ display:flex!important;flex:0 1 auto!important;flex-wrap:wrap!important;
+ justify-content:flex-end!important;align-items:center!important;gap:5px!important;
+ width:auto!important;min-width:0!important;margin:0!important;
+}
+.mast .mast-control-panel__grid button{
+ width:auto!important;min-width:0!important;flex:0 1 auto!important;
+ min-height:31px!important;margin:0!important;padding:5px 11px!important;
+ border:1px solid #b38b56!important;border-radius:3px 3px 7px 7px!important;
+ background:linear-gradient(180deg,#ebd8b7 0%,#c6a270 100%)!important;
+ box-shadow:inset 0 1px rgba(255,246,221,.8),0 1px 3px #0005!important;
+ color:#3e2b1c!important;font:600 12px/1.12 Georgia,serif!important;
+ text-shadow:0 1px #f8eccc!important;letter-spacing:.01em;white-space:nowrap!important;
+}
+.mast .mast-control-panel__grid button.current,
+.mast .mast-control-panel__grid button[data-open]{
+ border-color:#d4a661!important;background:linear-gradient(180deg,#385775,#0e263d)!important;
+ color:#ffe3ad!important;text-shadow:0 1px #101d2d!important;
+}
+.mast .mast-control-panel__grid button:disabled{opacity:.45!important;cursor:not-allowed!important}
+@media(max-width:1320px){
+ .mast .mast-top{grid-template-columns:clamp(168px,18vw,235px) minmax(0,1fr)!important;grid-template-areas:"brand tabs" "meta meta" "actions actions"!important;gap:5px 12px!important}
+ .mast .mast-meta{justify-content:flex-end!important;margin:0!important}
+ .mast .mast-side{grid-row:3!important}
+ .mast .mast-links{justify-content:flex-start!important}
+ .mast .mast-control-panel__grid{justify-content:flex-end!important}
+}
+@media(max-width:810px){
+ .mast{padding:7px 9px 0!important}
+ .mast .mast-top{grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"brand" "tabs" "meta" "actions"!important;gap:6px!important}
+ .mast .mast-brand{min-height:54px!important;max-width:230px!important}
+ .mast .mast-links{justify-content:flex-start!important;gap:4px!important;overflow:visible!important}
+ .mast .mast-links button{min-height:32px!important;padding:6px 9px!important;font-size:12px!important}
+ .mast .mast-links button::before{margin-right:4px}
+ .mast .mast-meta{justify-content:flex-start!important;margin:0!important}
+ .mast .mast-side{grid-row:4!important}
+ .mast .mast-control-panel{align-items:flex-start!important;flex-direction:column!important;gap:6px!important;padding:6px 0 8px!important}
+ .mast .mast-control-panel__grid{width:100%!important;justify-content:flex-start!important}
+ .mast .mast-control-panel__grid button{white-space:normal!important;min-height:31px!important}
+}
+@media(max-width:430px){
+ .mast .mast-links button{padding:6px 8px!important;font-size:11px!important}
+ .mast .mast-control-panel__selected strong{max-width:190px}
+ .mast .mast-control-panel__grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .mast .mast-control-panel__grid button{width:100%!important;padding:6px!important;font-size:11px!important}
+}
+
+/* v93.333 final overrides: precise header/sidebar alignment and chapter lift */
+.mast .mast-brand{
+  background:url('./assets/ui/book/sidebar_header.png') left center/contain no-repeat!important;
+  width:clamp(262px,19vw,292px)!important;
+  min-width:clamp(262px,19vw,292px)!important;
+  max-width:clamp(262px,19vw,292px)!important;
+  min-height:60px!important;
+  aspect-ratio:262/60!important;
+}
+.mast .mast-top{align-items:center!important}
+.mast .mast-links{align-self:center!important}
+
+.content-sheet .journal-book--chapter .journal-book-frame{padding-top:20px!important}
+.content-sheet .journal-book--chapter .journal-book-frame::after{top:20px!important;bottom:40px!important}
+.content-sheet .journal-book--chapter .journal-alt-header{padding:4px 20px 6px!important}
+.content-sheet .journal-book--chapter .journal-alt-header-block{min-height:88px!important;padding:8px 18px 8px!important}
+.content-sheet .journal-book--chapter .journal-alt-header h3{margin:0 0 8px!important}
+.content-sheet .journal-book--chapter .journal-chapter-body{padding:0 20px 18px!important}
+
+.nav .castle-nav-link,
+.nav .castle-character,
+.nav .castle-create{
+  display:flex!important;align-items:center!important;gap:.55rem!important;justify-content:flex-start!important;
+  width:100%!important;text-align:left!important;min-height:34px!important;margin:0 0 .45rem!important;padding:7px 12px!important;
+  border:1px solid #aa7d40!important;border-bottom:2px solid #a6793f!important;border-radius:6px 6px 0 0!important;
+  background:linear-gradient(180deg,#f3e4c6 0%,#ddc397 53%,#c7a571 100%)!important;color:#3b281a!important;
+  box-shadow:inset 0 2px rgba(255,254,244,.7),inset 0 0 0 1px rgba(122,84,43,.14),0 -1px 5px #0004!important;
+  font:700 15px/1.1 Georgia,serif!important;font-variant:small-caps!important;letter-spacing:.03em!important;text-shadow:0 1px rgba(255,252,241,.65)!important;
+}
+.nav .castle-nav-link.active,
+.nav .castle-character.active,
+.nav .castle-nav-link[aria-current="page"]{
+  background:linear-gradient(180deg,#385675 0%,#1b354e 48%,#0c2036 100%)!important;color:#ffdf9e!important;border-color:#ca9d57!important;border-bottom-color:#0c2036!important;
+  box-shadow:inset 0 1px #d9ad6c,inset 0 0 0 1px rgba(233,191,108,.18),0 -2px 10px #0006!important;text-shadow:0 1px #09101c!important;
+}
+.nav .castle-nav-icon{color:#996c32!important}
+.nav .castle-nav-link.active .castle-nav-icon,
+.nav .castle-character.active .castle-nav-icon{color:#ecc078!important}
+.nav .castle-create{justify-content:space-between!important}
+.nav::after{display:none!important}
+.castle-campaign-card{background:linear-gradient(0deg,#050d17aa,transparent),url('./assets/ui/background-valley.png?v=93.333') center/cover!important}
+
+@media(max-width:1160px){
+ .content-sheet .journal-book--chapter .journal-book-frame{padding-top:14px!important}
+ .content-sheet .journal-book--chapter .journal-alt-header{padding:2px 14px 4px!important}
+ .content-sheet .journal-book--chapter .journal-alt-header-block{min-height:68px!important;padding:6px 12px 6px!important}
+}
+
+
+
+/* === Consolidated from restore-polish.css (same cascade order as original) === */
+/* Restore-polish pass based on v93.333
+   Focus: logo fidelity, sidebar buttons, campaign card cleanup, higher content start, preserved book shell. */
+
+/* --- Header logo: larger, crisp, no stretch --- */
+.mast{height:72px!important;min-height:72px!important;padding:0 16px 0 0!important}
+.mast-top{min-height:70px!important;align-items:center!important}
+.mast .mast-brand{
+  width:308px!important;
+  min-width:308px!important;
+  max-width:308px!important;
+  min-height:70px!important;
+  height:70px!important;
+  aspect-ratio:262/60!important;
+  background:url('./assets/ui/book/sidebar_header.png') left center/contain no-repeat!important;
+  image-rendering:auto!important;
+  filter:none!important;
+}
+.mast .mast-brand::after{right:-1px!important}
+@media (max-width:980px){
+  .mast{height:auto!important;min-height:66px!important}
+  .mast-top{min-height:66px!important}
+  .mast .mast-brand{width:286px!important;min-width:286px!important;max-width:286px!important;height:64px!important;min-height:64px!important}
+}
+@media (max-width:760px){
+  .mast .mast-brand{width:262px!important;min-width:262px!important;max-width:262px!important;height:60px!important;min-height:60px!important}
+}
+
+/* --- Sidebar campaign card: keep image clear, move decorative banner away so no emblem sits behind it --- */
+.nav{padding-top:12px!important}
+.nav::after{
+  top:118px!important;
+  right:0!important;
+  opacity:.96!important;
+}
+.castle-campaign-card{
+  position:relative!important;
+  overflow:hidden!important;
+  background:
+    linear-gradient(180deg,rgba(8,14,24,.18),rgba(8,14,24,.38)),
+    url('./assets/ui/background-valley.png?v=93.333') center/cover no-repeat!important;
+  box-shadow:inset 0 0 0 1px rgba(246,231,201,.12), 0 4px 10px rgba(0,0,0,.35)!important;
+}
+.castle-campaign-card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg,rgba(5,13,23,.16),rgba(5,13,23,.06) 36%, rgba(5,13,23,.18));
+  pointer-events:none;
+}
+.castle-campaign-card > *{position:relative;z-index:1}
+
+/* --- Sidebar buttons styled like the top tabs, across nav and character list --- */
+.nav .castle-nav-link,
+.nav .castle-character,
+.nav .castle-create{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:.6rem!important;
+  width:100%!important;
+  min-height:42px!important;
+  margin:0 0 .55rem!important;
+  padding:8px 12px!important;
+  text-align:left!important;
+  border:1px solid #aa7d40!important;
+  border-bottom:2px solid #a6793f!important;
+  border-radius:6px 6px 0 0!important;
+  background:linear-gradient(180deg,#f3e4c6 0%,#ddc397 53%,#c7a571 100%)!important;
+  color:#3b281a!important;
+  box-shadow:inset 0 2px rgba(255,254,244,.72),inset 0 0 0 1px rgba(122,84,43,.14),0 -1px 5px rgba(0,0,0,.25)!important;
+  font:700 15px/1.1 Georgia,serif!important;
+  font-variant:small-caps!important;
+  letter-spacing:.03em!important;
+  text-shadow:0 1px rgba(255,252,241,.65)!important;
+}
+.nav .castle-nav-link:hover,
+.nav .castle-character:hover,
+.nav .castle-create:hover{background:linear-gradient(180deg,#fff0d4,#e5c88f)!important}
+.nav .castle-nav-link.active,
+.nav .castle-character.active,
+.nav .castle-nav-link[aria-current="page"]{
+  background:linear-gradient(180deg,#385675 0%,#1b354e 48%,#0c2036 100%)!important;
+  color:#ffdf9e!important;
+  border-color:#ca9d57!important;
+  border-bottom-color:#0c2036!important;
+  box-shadow:inset 0 1px #d9ad6c,inset 0 0 0 1px rgba(233,191,108,.18),0 -2px 10px rgba(0,0,0,.34)!important;
+  text-shadow:0 1px #09101c!important;
+}
+.nav .castle-nav-icon{color:#996c32!important;flex:0 0 auto!important}
+.nav .castle-nav-link.active .castle-nav-icon,
+.nav .castle-character.active .castle-nav-icon{color:#ecc078!important}
+.nav .castle-create{justify-content:space-between!important}
+
+/* Character buttons: fix doubled initials by giving the portrait its own badge space */
+.nav .castle-character{padding:7px 10px!important}
+.nav .castle-char-portrait{
+  display:grid!important;
+  place-items:center!important;
+  flex:0 0 28px!important;
+  width:28px!important;
+  height:28px!important;
+  border:1px solid rgba(162,119,57,.75)!important;
+  border-radius:4px!important;
+  background:linear-gradient(180deg,#24496f,#163350)!important;
+  color:#f4dfaf!important;
+  font:700 15px/1 Georgia,serif!important;
+  overflow:hidden!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+.nav .castle-character.active .castle-char-portrait{border-color:#d4a661!important;color:#ffe4ab!important}
+.nav .castle-char-portrait img{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important}
+.nav .castle-character > span:last-child{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+/* --- Lift the content higher: less dead space before page content --- */
+.content-sheet{padding-top:0!important}
+.content-sheet > .ledger-topline{padding:1px 11px 1px!important;min-height:0!important}
+.content-sheet .journal-book.panel{margin-top:-2px!important}
+.content-sheet .journal-book-frame{
+  padding-top:38px!important;
+  padding-bottom:44px!important;
+}
+.content-sheet .journal-book-frame::before{inset:28px 34px 33px!important}
+.content-sheet .journal-book-frame::after{top:38px!important;bottom:44px!important}
+.journal-book-subnav{margin:-26px 24px 8px!important}
+.journal-book-page--left,.journal-book-page--right{padding-top:4px!important}
+.content-sheet .journal-book--chapter .journal-book-frame{padding-top:12px!important}
+.content-sheet .journal-book--chapter .journal-book-frame::after{top:12px!important}
+.content-sheet .journal-book--chapter .journal-alt-header{padding:0 18px 4px!important}
+.content-sheet .journal-book--chapter .journal-alt-header-block{min-height:70px!important;padding:4px 14px 6px!important}
+.content-sheet .journal-book--chapter .journal-chapter-body{padding:0 18px 16px!important}
+
+/* --- Preserve and subtly strengthen the page-edge book shell from v93.333 --- */
+.content-sheet .journal-book-frame{
+  background-color:#d2b285!important;
+  background-image:
+    none,
+    none,
+    none,
+    none,
+    none!important;
+  background-position:center top,center bottom,left top,right top,center top!important;
+  background-size:100% 44px,100% 50px,42px 100%,52px 100%,46px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat!important;
+  box-shadow:0 21px 35px rgba(5,4,6,.56),0 3px 3px rgba(6,5,7,.80)!important;
+}
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  background:linear-gradient(90deg,rgba(170,131,80,.17) 0%,transparent 10%,transparent 90%,rgba(150,109,60,.22) 100%),url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame{padding-top:34px!important;padding-bottom:38px!important;background-size:100% 36px,100% 42px,27px 100%,27px 100%,36px 100%!important}
+  .content-sheet .journal-book-frame::before{inset:24px 18px 27px!important}
+  .content-sheet .journal-book-frame::after{top:34px!important;bottom:38px!important}
+  .journal-book-subnav{margin:-24px 10px 8px!important}
+  .content-sheet .journal-book--chapter .journal-book-frame{padding-top:10px!important}
+}
+@media(max-width:800px){
+  .nav::after{display:none!important}
+  .nav .castle-nav-link,
+  .nav .castle-character,
+  .nav .castle-create{font-size:13px!important;min-height:38px!important;padding:7px 10px!important}
+  .content-sheet .journal-book-frame{padding-top:32px!important;padding-bottom:38px!important}
+  .journal-book-subnav{margin:-22px 0 8px!important}
+}
+
+
+/* --- Fix pass 2: top controls separation, clean lower parchment, unified inner corners --- */
+.mast{padding-top:2px!important;padding-bottom:6px!important;min-height:84px!important}
+.mast-top{align-items:flex-start!important;padding-top:2px!important}
+.mast .mast-side{align-self:flex-start!important}
+.mast .mast-control-panel{padding:2px 0 10px!important;transform:translateY(-8px)!important}
+.mast .mast-control-panel__grid{row-gap:4px!important}
+.content-sheet{padding-top:2px!important}
+.content-sheet .journal-book.panel{margin-top:8px!important}
+.journal-book-subnav{margin:-18px 24px 8px!important}
+
+.content-sheet .journal-book-frame{
+  overflow:hidden!important;
+  background-image:
+    none,
+    none,
+    none,
+    none,
+    none!important;
+  background-position:center top,center bottom,left top,right top,center top!important;
+  background-size:100% 44px,100% 22px,42px 100%,52px 100%,46px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:28px 34px 22px!important;
+  z-index:0!important;
+  background:url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+  border:1px solid #b18955!important;
+  outline:1px solid #54341f!important;
+  outline-offset:3px!important;
+  box-shadow:inset 0 0 22px rgba(120,89,47,.12)!important;
+}
+.content-sheet .journal-book-frame::after{top:38px!important;bottom:22px!important}
+.content-sheet .journal-book-spread{position:relative!important;z-index:2!important}
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{position:relative!important;z-index:3!important;background-color:transparent!important}
+
+/* Inner side page-stack shells with matching corner style on all four corners */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  content:""!important;
+  position:absolute!important;
+  top:-2px!important;
+  bottom:-2px!important;
+  width:104px!important;
+  pointer-events:none!important;
+  z-index:1!important;
+  background-repeat:no-repeat!important;
+  background-size:104px 100%!important;
+  opacity:1!important;
+}
+.content-sheet .journal-book-spread::before{
+  left:-14px!important;
+  background-image:none!important;
+  background-position:left top!important;
+}
+.content-sheet .journal-book-spread::after{
+  right:-18px!important;
+  background-image:none!important;
+  background-position:right top!important;
+}
+.content-sheet .journal-book-page--left{padding-left:28px!important;padding-right:28px!important}
+.content-sheet .journal-book-page--right{padding-left:30px!important;padding-right:28px!important}
+
+@media(max-width:1160px){
+  .mast .mast-control-panel{transform:none!important;padding:4px 0 8px!important}
+  .content-sheet .journal-book.panel{margin-top:4px!important}
+  .journal-book-subnav{margin:-16px 10px 8px!important}
+  .content-sheet .journal-book-frame{background-size:100% 36px,100% 18px,27px 100%,27px 100%,36px 100%!important}
+  .content-sheet .journal-book-frame::before{inset:24px 18px 18px!important}
+  .content-sheet .journal-book-frame::after{top:34px!important;bottom:18px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{width:72px!important;background-size:72px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-8px!important}
+  .content-sheet .journal-book-spread::after{right:-10px!important}
+  .content-sheet .journal-book-page--left,.content-sheet .journal-book-page--right{padding-left:18px!important;padding-right:18px!important}
+}
+@media(max-width:800px){
+  .mast{min-height:76px!important}
+  .mast .mast-control-panel{transform:none!important}
+  .content-sheet .journal-book.panel{margin-top:2px!important}
+  .journal-book-subnav{margin:-14px 0 8px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{display:none!important}
+}
+
+
+/* --- Fix pass 3: darker parchment reaches the frame, remove pale strip under rail, unify all 4 corners --- */
+.content-sheet .journal-book-frame{
+  background-color:transparent!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:24px 24px 12px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:
+    inset 0 0 28px rgba(105,76,44,.12),
+    inset 14px 0 18px -18px rgba(139,102,58,.32),
+    inset -14px 0 18px -18px rgba(139,102,58,.32),
+    inset 0 -8px 12px -10px rgba(139,102,58,.22)!important;
+  background:
+    linear-gradient(90deg,rgba(197,164,119,.28) 0%, rgba(197,164,119,.08) 4%, rgba(0,0,0,0) 11%, rgba(0,0,0,0) 89%, rgba(197,164,119,.08) 96%, rgba(197,164,119,.28) 100%),
+    linear-gradient(180deg,rgba(236,223,196,.08),rgba(236,223,196,0) 10%),
+    url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+}
+.content-sheet .journal-book-frame::after{top:38px!important;bottom:12px!important;opacity:.84!important}
+
+/* bring the side page stacks closer over the parchment so no pale seam is visible */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  width:112px!important;
+  top:-4px!important;
+  bottom:-4px!important;
+  z-index:4!important;
+}
+.content-sheet .journal-book-spread::before{left:-18px!important;background-size:112px 100%!important}
+.content-sheet .journal-book-spread::after{right:-22px!important;background-size:112px 100%!important}
+
+/* all four visible outer corners use the same rich style as the lower-left reference */
+.content-sheet .book-cover-ornament{
+  display:block!important;
+  width:120px!important;
+  height:136px!important;
+  z-index:8!important;
+  filter:none!important;
+  background-size:contain!important;
+  background-repeat:no-repeat!important;
+}
+.content-sheet .book-cover-ornament--tl{top:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_tl.png')!important;background-position:left top!important}
+.content-sheet .book-cover-ornament--tr{top:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_tr.png')!important;background-position:right top!important}
+.content-sheet .book-cover-ornament--bl{bottom:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_bl.png')!important;background-position:left bottom!important}
+.content-sheet .book-cover-ornament--br{bottom:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_br.png')!important;background-position:right bottom!important}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:20px 18px 10px!important}
+  .content-sheet .journal-book-frame::after{top:34px!important;bottom:10px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{width:86px!important;background-size:86px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-10px!important}
+  .content-sheet .journal-book-spread::after{right:-12px!important}
+  .content-sheet .book-cover-ornament{width:92px!important;height:104px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:18px 14px 8px!important}
+  .content-sheet .journal-book-frame::after{bottom:8px!important}
+  .content-sheet .book-cover-ornament{width:62px!important;height:72px!important}
+}
+
+
+.content-sheet .book-cover-ornament--tl{top:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_tl.png')!important;background-position:left top!important}
+.content-sheet .book-cover-ornament--tr{top:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_tr.png')!important;background-position:right top!important}
+.content-sheet .book-cover-ornament--bl{bottom:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_bl.png')!important;background-position:left bottom!important}
+.content-sheet .book-cover-ornament--br{bottom:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_br.png')!important;background-position:right bottom!important}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 14px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{width:76px!important;background-size:76px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-8px!important}
+  .content-sheet .journal-book-spread::after{right:-10px!important}
+  .content-sheet .book-cover-ornament{width:92px!important;height:92px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 10px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{display:none!important}
+  .content-sheet .book-cover-ornament{width:64px!important;height:64px!important}
+}
+
+
+/* --- Fix pass 5: remove corner page-stack ghosts, extend dark parchment fully to the bottom rail, and remove stray lower lines/strips --- */
+.content-sheet .journal-book-frame{
+  background-color:transparent!important;
+  background-image:
+    none,
+    none,
+    none,
+    none!important;
+  background-position:center top,center bottom,left top,right top!important;
+  background-size:100% 44px,100% 49px,42px 100%,52px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:22px 24px 1px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:
+    inset 0 0 18px rgba(109,80,48,.10),
+    inset 18px 0 18px -18px rgba(128,93,56,.28),
+    inset -18px 0 18px -18px rgba(128,93,56,.28)!important;
+  background:
+    linear-gradient(90deg,
+      rgba(145,112,68,.18) 0,
+      rgba(145,112,68,.08) 6px,
+      rgba(0,0,0,0) 18px,
+      rgba(0,0,0,0) calc(50% - 10px),
+      rgba(133,102,66,.12) calc(50% - 3px),
+      rgba(103,73,45,.18) calc(50% - 1px),
+      rgba(78,54,33,.20) 50%,
+      rgba(103,73,45,.18) calc(50% + 1px),
+      rgba(133,102,66,.12) calc(50% + 3px),
+      rgba(0,0,0,0) calc(50% + 10px),
+      rgba(0,0,0,0) calc(100% - 18px),
+      rgba(145,112,68,.08) calc(100% - 6px),
+      rgba(145,112,68,.18) 100%),
+    url('./assets/ui/book/parchment_dynamic_texture.png') center/420px 420px repeat!important;
+}
+.content-sheet .journal-book-frame::after{display:none!important}
+
+/* move the decorative side page-stacks down so no torn/blurred top fragments appear under the upper rail */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  top:18px!important;
+  bottom:14px!important;
+  width:92px!important;
+  background-size:92px 100%!important;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,transparent 14px,#000 28px,#000 calc(100% - 8px),transparent 100%)!important;
+  mask-image:linear-gradient(to bottom,transparent 0,transparent 14px,#000 28px,#000 calc(100% - 8px),transparent 100%)!important;
+}
+.content-sheet .journal-book-spread::before{left:-8px!important}
+.content-sheet .journal-book-spread::after{right:-10px!important}
+
+/* remove any remaining inner page panel borders and pseudo-lines so nothing shows above or below the bottom rail */
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  background:transparent!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+}
+.content-sheet .journal-book-page::before,
+.content-sheet .journal-book-page::after,
+.content-sheet .journal-book-page--left::before,
+.content-sheet .journal-book-page--left::after,
+.content-sheet .journal-book-page--right::before,
+.content-sheet .journal-book-page--right::after{
+  content:none!important;
+  display:none!important;
+  opacity:0!important;
+}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 1px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{top:16px!important;bottom:12px!important;width:72px!important;background-size:72px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-6px!important}
+  .content-sheet .journal-book-spread::after{right:-8px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
+}
+
+
+/* --- Fix pass 6: only the continuous vellum surface, without the extra inner parchment sheet --- */
+.content-sheet .journal-book-frame::before{
+  inset:22px 22px 1px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+  background:url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+}
+
+/* keep the content directly on the continuous vellum and do not let any secondary parchment/card edge appear */
+.content-sheet .journal-book-spread,
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right,
+.content-sheet .journal-technical-shell{
+  background:transparent!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+}
+
+/* let the vellum reach visually all the way to the dark lower rail with no pale strip */
+.content-sheet .journal-book-spread{padding-bottom:0!important;margin-bottom:0!important}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 1px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
+}
+
+
+/* --- Fix pass 7: remove lingering inner gutter/side-page textures and keep only the outer frame plus vellum field --- */
+.content-sheet .journal-book-frame{
+  background-image:
+    none,
+    none,
+    none,
+    none!important;
+  background-position:center top,center bottom,left top,right top!important;
+  background-size:100% 44px,100% 49px,42px 100%,52px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:22px 22px 1px!important;
+  background:url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+  box-shadow:none!important;
+  border:none!important;
+  outline:none!important;
+}
+.content-sheet .journal-book-frame::after,
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+  -webkit-mask-image:none!important;
+  mask-image:none!important;
+}
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 1px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
+}
+
+
+/* --- Fix pass 8: remove the active parchment texture entirely; keep a flat fill only --- */
+.content-sheet .journal-book-frame::before{
+  background:#efe3c8!important;
+  background-image:none!important;
+}
+
+
+/* --- Fix pass 9: align the flat inner background so it ends before the lower dark rail --- */
+.content-sheet .journal-book-frame::before{
+  inset:22px 22px 16px!important;
+}
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 14px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 12px!important}
+}
+
+
+/* --- FIX13: single clean gold-and-navy frame; no photographic backing or outer halo --- */
+/* The former book_top/bottom/left/right rasters contain fragments of an old
+   photographed book and room. They must never sit behind the true decorative
+   rails: their pale and dark margins were visible outside the finished frame. */
+.content-sheet .journal-book-frame,
+.content-sheet .journal-book--chapter .journal-book-frame {
+  background: transparent none !important;
+  background-image: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+}
+
+/* FIX19: clip the parchment field inside the OUTER gold-and-navy rails.
+   The graphic keeps FIX18's overscan (116%/122%) to cover transparent PNG
+   margins, but its containing pseudo-element now begins 30px inside the
+   book box: 4px beneath the 34/33px decorative rail, never outside it.
+   On narrow screens the 22px rails receive a matching 19px inset.
+   No corner or border assets are altered. */
+.content-sheet .journal-book-frame::before,
+.content-sheet .journal-book--chapter .journal-book-frame::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: 30px !important;
+  z-index: 0 !important;
+  background-color: #efe3c8 !important;
+  background-image: none !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  background-size: 116% 122% !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+
+/* Only the self-contained repeating rail images build the four frame edges.
+   Removing the four-pixel offsets eliminates the second outside band. */
+.content-sheet .hmk-book-decor {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 5 !important;
+  pointer-events: none !important;
+}
+.content-sheet .hmk-rail--top,
+.content-sheet .hmk-rail--bottom {
+  left: 25px !important;
+  right: 25px !important;
+  height: 34px !important;
+  background: var(--kh-rail-h) center / auto 100% repeat-x !important;
+  box-shadow: none !important;
+}
+.content-sheet .hmk-rail--top { top: 0 !important; }
+.content-sheet .hmk-rail--bottom { bottom: 0 !important; }
+.content-sheet .hmk-rail--left,
+.content-sheet .hmk-rail--right {
+  top: 25px !important;
+  bottom: 25px !important;
+  width: 33px !important;
+  background: var(--kh-rail-v) center / 100% auto repeat-y !important;
+  box-shadow: none !important;
+}
+.content-sheet .hmk-rail--left { left: 0 !important; }
+.content-sheet .hmk-rail--right { right: 0 !important; }
+
+/* The four approved corner ornaments and the small center jewels remain.
+   The old book-gutter and side-page pseudo-layers must remain disabled. */
+.content-sheet .journal-book-frame::after,
+.content-sheet .journal-book--chapter .journal-book-frame::after,
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after {
+  content: none !important;
+  display: none !important;
+}
+
+@media (max-width: 1160px) {
+  .content-sheet .journal-book-frame::before,
+  .content-sheet .journal-book--chapter .journal-book-frame::before {
+    inset: 30px !important;
+    background-size: 116% 122% !important;
+  }
+}
+@media (max-width: 800px) {
+  .content-sheet .journal-book-frame::before,
+  .content-sheet .journal-book--chapter .journal-book-frame::before {
+    inset: 19px !important;
+    background-size: 116% 122% !important;
+  }
+  .content-sheet .hmk-rail--top,
+  .content-sheet .hmk-rail--bottom {
+    left: 17px !important;
+    right: 17px !important;
+    height: 22px !important;
+  }
+  .content-sheet .hmk-rail--left,
+  .content-sheet .hmk-rail--right {
+    top: 17px !important;
+    bottom: 17px !important;
+    width: 22px !important;
+  }
+}
+
+/* --- FIX20: slice 41.png into dynamic parchment pieces so height can grow
+   without stretching the whole artwork. The visible frame stays FIX19.
+   Strategy: fixed corners + adaptive edge strips + a large center fill tile.
+   Nothing repeats along the outside silhouette; only the inner parchment field
+   tiles, using a large crop from 41.png to keep repetition unobtrusive. --- */
+.content-sheet .journal-book-frame,
+.content-sheet .journal-book--chapter .journal-book-frame {
+  --hmk41-slice: 110px;
+  --hmk41-fill-w: 425px;
+  --hmk41-fill-h: 520px;
+}
+
+.content-sheet .journal-book-frame::before,
+.content-sheet .journal-book--chapter .journal-book-frame::before {
+  inset: 30px !important;
+  background-color: #efe3c8 !important;
+  background-image:
+    none,
+    none,
+    none,
+    none,
+    none,
+    none,
+    none,
+    none,
+    none !important;
+  background-position:
+    left top,
+    right top,
+    left bottom,
+    right bottom,
+    center top,
+    center bottom,
+    left center,
+    right center,
+    center center !important;
+  background-repeat:
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    repeat-y !important;
+  background-size:
+    var(--hmk41-slice) var(--hmk41-slice),
+    var(--hmk41-slice) var(--hmk41-slice),
+    var(--hmk41-slice) var(--hmk41-slice),
+    var(--hmk41-slice) var(--hmk41-slice),
+    calc(100% - (var(--hmk41-slice) * 2)) var(--hmk41-slice),
+    calc(100% - (var(--hmk41-slice) * 2)) var(--hmk41-slice),
+    var(--hmk41-slice) calc(100% - (var(--hmk41-slice) * 2)),
+    var(--hmk41-slice) calc(100% - (var(--hmk41-slice) * 2)),
+    100% auto !important;
+}
+
+@media (max-width: 1160px) {
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame {
+    --hmk41-slice: 96px;
+    --hmk41-fill-w: 360px;
+    --hmk41-fill-h: 440px;
+  }
+  .content-sheet .journal-book-frame::before,
+  .content-sheet .journal-book--chapter .journal-book-frame::before {
+    inset: 30px !important;
+  }
+}
+
+@media (max-width: 800px) {
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame {
+    --hmk41-slice: 72px;
+    --hmk41-fill-w: 280px;
+    --hmk41-fill-h: 340px;
+  }
+  .content-sheet .journal-book-frame::before,
+  .content-sheet .journal-book--chapter .journal-book-frame::before {
+    inset: 19px !important;
+  }
+}
+
