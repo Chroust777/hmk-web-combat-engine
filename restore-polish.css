@@ -398,3 +398,133 @@
   .content-sheet .journal-book-spread::after{display:none!important}
   .content-sheet .book-cover-ornament{width:64px!important;height:64px!important}
 }
+
+
+/* --- Fix pass 5: remove corner page-stack ghosts, extend dark parchment fully to the bottom rail, and remove stray lower lines/strips --- */
+.content-sheet .journal-book-frame{
+  background-color:transparent!important;
+  background-image:
+    url('./assets/ui/book/book_top.png'),
+    url('./assets/ui/book/book_bottom.png'),
+    url('./assets/ui/book/book_left.png'),
+    url('./assets/ui/book/book_right.png')!important;
+  background-position:center top,center bottom,left top,right top!important;
+  background-size:100% 44px,100% 49px,42px 100%,52px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:22px 24px 1px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:
+    inset 0 0 18px rgba(109,80,48,.10),
+    inset 18px 0 18px -18px rgba(128,93,56,.28),
+    inset -18px 0 18px -18px rgba(128,93,56,.28)!important;
+  background:
+    linear-gradient(90deg,
+      rgba(145,112,68,.18) 0,
+      rgba(145,112,68,.08) 6px,
+      rgba(0,0,0,0) 18px,
+      rgba(0,0,0,0) calc(50% - 10px),
+      rgba(133,102,66,.12) calc(50% - 3px),
+      rgba(103,73,45,.18) calc(50% - 1px),
+      rgba(78,54,33,.20) 50%,
+      rgba(103,73,45,.18) calc(50% + 1px),
+      rgba(133,102,66,.12) calc(50% + 3px),
+      rgba(0,0,0,0) calc(50% + 10px),
+      rgba(0,0,0,0) calc(100% - 18px),
+      rgba(145,112,68,.08) calc(100% - 6px),
+      rgba(145,112,68,.18) 100%),
+    url('./assets/ui/book/parchment_dynamic_texture.png') center/420px 420px repeat!important;
+}
+.content-sheet .journal-book-frame::after{display:none!important}
+
+/* move the decorative side page-stacks down so no torn/blurred top fragments appear under the upper rail */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  top:18px!important;
+  bottom:14px!important;
+  width:92px!important;
+  background-size:92px 100%!important;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,transparent 14px,#000 28px,#000 calc(100% - 8px),transparent 100%)!important;
+  mask-image:linear-gradient(to bottom,transparent 0,transparent 14px,#000 28px,#000 calc(100% - 8px),transparent 100%)!important;
+}
+.content-sheet .journal-book-spread::before{left:-8px!important}
+.content-sheet .journal-book-spread::after{right:-10px!important}
+
+/* remove any remaining inner page panel borders and pseudo-lines so nothing shows above or below the bottom rail */
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  background:transparent!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+}
+.content-sheet .journal-book-page::before,
+.content-sheet .journal-book-page::after,
+.content-sheet .journal-book-page--left::before,
+.content-sheet .journal-book-page--left::after,
+.content-sheet .journal-book-page--right::before,
+.content-sheet .journal-book-page--right::after{
+  content:none!important;
+  display:none!important;
+  opacity:0!important;
+}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 1px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{top:16px!important;bottom:12px!important;width:72px!important;background-size:72px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-6px!important}
+  .content-sheet .journal-book-spread::after{right:-8px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
+}
+
+
+/* --- Fix pass 6: use only the clean continuous vellum texture, stretched to the frame edges, with no secondary parchment sheet visible --- */
+.content-sheet .journal-book-frame::before{
+  inset:22px 22px 1px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:
+    inset 0 0 16px rgba(112,84,48,.10),
+    inset 12px 0 14px -12px rgba(128,93,56,.16),
+    inset -12px 0 14px -12px rgba(128,93,56,.16)!important;
+  background:
+    linear-gradient(90deg,
+      rgba(124,91,56,.08) 0,
+      rgba(0,0,0,0) 22px,
+      rgba(0,0,0,0) calc(50% - 9px),
+      rgba(120,90,56,.10) calc(50% - 2px),
+      rgba(84,60,37,.12) 50%,
+      rgba(120,90,56,.10) calc(50% + 2px),
+      rgba(0,0,0,0) calc(50% + 9px),
+      rgba(0,0,0,0) calc(100% - 22px),
+      rgba(124,91,56,.08) 100%),
+    url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+}
+
+/* keep the content directly on the continuous vellum and do not let any secondary parchment/card edge appear */
+.content-sheet .journal-book-spread,
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right,
+.content-sheet .journal-technical-shell{
+  background:transparent!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+}
+
+/* let the vellum reach visually all the way to the dark lower rail with no pale strip */
+.content-sheet .journal-book-spread{padding-bottom:0!important;margin-bottom:0!important}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 1px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
+}
