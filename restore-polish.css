@@ -615,3 +615,87 @@
     width: 22px !important;
   }
 }
+
+/* --- FIX20: slice 41.png into dynamic parchment pieces so height can grow
+   without stretching the whole artwork. The visible frame stays FIX19.
+   Strategy: fixed corners + adaptive edge strips + a large center fill tile.
+   Nothing repeats along the outside silhouette; only the inner parchment field
+   tiles, using a large crop from 41.png to keep repetition unobtrusive. --- */
+.content-sheet .journal-book-frame,
+.content-sheet .journal-book--chapter .journal-book-frame {
+  --hmk41-slice: 110px;
+  --hmk41-fill-w: 425px;
+  --hmk41-fill-h: 520px;
+}
+
+.content-sheet .journal-book-frame::before,
+.content-sheet .journal-book--chapter .journal-book-frame::before {
+  inset: 30px !important;
+  background-color: #efe3c8 !important;
+  background-image:
+    url('./assets/ui/book/41_slice_tl.png'),
+    url('./assets/ui/book/41_slice_tr.png'),
+    url('./assets/ui/book/41_slice_bl.png'),
+    url('./assets/ui/book/41_slice_br.png'),
+    url('./assets/ui/book/41_slice_top.png'),
+    url('./assets/ui/book/41_slice_bottom.png'),
+    url('./assets/ui/book/41_slice_left.png'),
+    url('./assets/ui/book/41_slice_right.png'),
+    url('./assets/ui/book/41_fill_band.png') !important;
+  background-position:
+    left top,
+    right top,
+    left bottom,
+    right bottom,
+    center top,
+    center bottom,
+    left center,
+    right center,
+    center center !important;
+  background-repeat:
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    repeat-y !important;
+  background-size:
+    var(--hmk41-slice) var(--hmk41-slice),
+    var(--hmk41-slice) var(--hmk41-slice),
+    var(--hmk41-slice) var(--hmk41-slice),
+    var(--hmk41-slice) var(--hmk41-slice),
+    calc(100% - (var(--hmk41-slice) * 2)) var(--hmk41-slice),
+    calc(100% - (var(--hmk41-slice) * 2)) var(--hmk41-slice),
+    var(--hmk41-slice) calc(100% - (var(--hmk41-slice) * 2)),
+    var(--hmk41-slice) calc(100% - (var(--hmk41-slice) * 2)),
+    100% auto !important;
+}
+
+@media (max-width: 1160px) {
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame {
+    --hmk41-slice: 96px;
+    --hmk41-fill-w: 360px;
+    --hmk41-fill-h: 440px;
+  }
+  .content-sheet .journal-book-frame::before,
+  .content-sheet .journal-book--chapter .journal-book-frame::before {
+    inset: 30px !important;
+  }
+}
+
+@media (max-width: 800px) {
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame {
+    --hmk41-slice: 72px;
+    --hmk41-fill-w: 280px;
+    --hmk41-fill-h: 340px;
+  }
+  .content-sheet .journal-book-frame::before,
+  .content-sheet .journal-book--chapter .journal-book-frame::before {
+    inset: 19px !important;
+  }
+}
