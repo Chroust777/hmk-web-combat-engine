@@ -528,3 +528,47 @@
 @media(max-width:800px){
   .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
 }
+
+
+/* --- Fix pass 7: the open-book parchment image must fill the entire inner window and slip slightly under the dark frame so no second underlay is visible --- */
+.content-sheet .journal-book-frame{overflow:hidden!important}
+.content-sheet .journal-book-frame::before{
+  inset:10px 12px 8px 12px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+  background:url('./assets/ui/book/parchment_dynamic_open.png') center center / calc(100% + 56px) calc(100% + 56px) no-repeat!important;
+}
+
+/* the inner shell must stay completely transparent so only the enlarged open-book parchment is seen */
+.content-sheet .journal-book-spread,
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right,
+.content-sheet .journal-technical-shell,
+.content-sheet .journal-page,
+.content-sheet .character-page,
+.content-sheet .sheet-page{
+  background:transparent!important;
+  background-image:none!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+}
+.content-sheet .journal-book-page::before,
+.content-sheet .journal-book-page::after,
+.content-sheet .journal-book-page--left::before,
+.content-sheet .journal-book-page--left::after,
+.content-sheet .journal-book-page--right::before,
+.content-sheet .journal-book-page--right::after,
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  background-image:none!important;
+}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:8px 10px 6px 10px!important;background-size:calc(100% + 42px) calc(100% + 42px)!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:6px 8px 6px 8px!important;background-size:calc(100% + 28px) calc(100% + 28px)!important}
+}
