@@ -1,7 +1,7 @@
-/* HMK Keeper's Ledger v93.339 — frame rails visible + cleaner parchment/page-stack transition */
+/* HMK Keeper's Ledger v93.340 — restore full corners + full page stack ring + unified parchment */
 html{scrollbar-gutter:stable}
 
-/* stable journal section tabs */
+/* stable journal subnav */
 .content-sheet .journal-book-subnav,
 .content-sheet .journal-book--chapter .journal-book-subnav{
   display:flex !important;
@@ -26,39 +26,37 @@ html{scrollbar-gutter:stable}
   overflow:visible !important;
   isolation:isolate;
   margin:0 auto;
-  padding:50px 82px 48px !important;
+  padding:60px 96px 58px !important;
   background:transparent !important;
-  box-shadow:0 26px 44px rgba(5,4,6,.40), 0 4px 3px rgba(6,5,7,.68) !important;
+  box-shadow:0 26px 44px rgba(5,4,6,.38), 0 4px 3px rgba(6,5,7,.64) !important;
 }
 
-/* Fill almost the whole inner area with parchment, with side shading for a cleaner transition into page stacks. */
+/* central parchment spread that visually matches the surrounding page stacks */
 .content-sheet .journal-book-frame::before,
 .content-sheet .journal-book--chapter .journal-book-frame::before{
   content:"";
   position:absolute;
-  inset:22px 58px 22px 58px;
+  inset:28px 48px 28px 48px;
   background:
-    linear-gradient(90deg, rgba(180,146,96,.20) 0%, rgba(236,223,196,.06) 3.5%, rgba(236,223,196,0) 7%),
-    linear-gradient(270deg, rgba(180,146,96,.20) 0%, rgba(236,223,196,.06) 3.5%, rgba(236,223,196,0) 7%),
-    url('./assets/ui/bookframe/page_spread.png') center/100% 100% no-repeat !important;
-  border:0 !important;
-  outline:0 !important;
-  box-shadow:none !important;
+    linear-gradient(90deg, rgba(195,167,122,.18) 0%, rgba(195,167,122,.08) 3%, rgba(0,0,0,0) 8%),
+    linear-gradient(270deg, rgba(195,167,122,.18) 0%, rgba(195,167,122,.08) 3%, rgba(0,0,0,0) 8%),
+    linear-gradient(180deg, rgba(195,167,122,.12) 0%, rgba(0,0,0,0) 6%),
+    linear-gradient(0deg, rgba(195,167,122,.10) 0%, rgba(0,0,0,0) 6%),
+    url('./assets/ui/bookframe/page_spread_blended.png') center/100% 100% no-repeat !important;
   z-index:1;
   pointer-events:none;
 }
 .content-sheet .journal-book-frame::after,
 .content-sheet .journal-book--chapter .journal-book-frame::after{display:none !important;content:none !important;}
 .content-sheet .journal-book-frame > *{position:relative; z-index:6;}
-.content-sheet .journal-book-frame > .hmk-book-decor{z-index:auto;}
+.content-sheet .journal-book-frame > .hmk-book-decor,
+.content-sheet .journal-book-frame > .book-cover-ornament,
+.content-sheet .journal-book-frame > .hkl-deluxe-edge{z-index:auto;}
 
-/* Hide the old extra systems that were creating visual conflicts. */
-.content-sheet .hmk-frame-jewel,
-.content-sheet .hmk-frame-side,
-.content-sheet .book-cover-ornament,
-.content-sheet .hkl-deluxe-edge{display:none !important;}
+/* hide only the unused helper side pieces, not the main corners */
+.content-sheet .hmk-frame-side{display:none !important;}
 
-/* Visible top/bottom/left/right rails from the approved graphics set. */
+/* main outer frame rails */
 .content-sheet .hmk-book-decor{position:absolute; inset:0; z-index:14; pointer-events:none; overflow:visible;}
 .content-sheet .hmk-rail{
   position:absolute;
@@ -69,24 +67,67 @@ html{scrollbar-gutter:stable}
   background-size:100% 100%;
   filter:drop-shadow(0 1px 2px rgba(18,9,3,.14));
 }
-.content-sheet .hmk-rail--top{
-  top:0; left:0; right:0; height:54px;
-  background-image:url('./assets/ui/bookframe/frame_rail_top.png') !important;
-}
-.content-sheet .hmk-rail--bottom{
-  bottom:0; left:0; right:0; height:54px;
-  background-image:url('./assets/ui/bookframe/frame_rail_bottom.png') !important;
-}
-.content-sheet .hmk-rail--left{
-  top:0; bottom:0; left:0; width:54px;
-  background-image:url('./assets/ui/bookframe/frame_rail_left.png') !important;
-}
-.content-sheet .hmk-rail--right{
-  top:0; bottom:0; right:0; width:54px;
-  background-image:url('./assets/ui/bookframe/frame_rail_right.png') !important;
-}
+.content-sheet .hmk-rail--top{top:0; left:0; right:0; height:58px; background-image:url('./assets/ui/bookframe/frame_rail_top.png') !important;}
+.content-sheet .hmk-rail--bottom{bottom:0; left:0; right:0; height:58px; background-image:url('./assets/ui/bookframe/frame_rail_bottom.png') !important;}
+.content-sheet .hmk-rail--left{top:0; bottom:0; left:0; width:58px; background-image:url('./assets/ui/bookframe/frame_rail_left.png') !important;}
+.content-sheet .hmk-rail--right{top:0; bottom:0; right:0; width:58px; background-image:url('./assets/ui/bookframe/frame_rail_right.png') !important;}
 
-/* unify spacing across sections */
+/* restore all 4 corners */
+.content-sheet .book-cover-ornament{
+  display:block !important;
+  position:absolute;
+  width:118px !important;
+  height:118px !important;
+  z-index:18 !important;
+  pointer-events:none;
+  background-size:contain !important;
+  background-repeat:no-repeat !important;
+  background-position:center !important;
+  filter:drop-shadow(0 2px 4px rgba(28,16,8,.24));
+  opacity:1 !important;
+}
+.content-sheet .book-cover-ornament--tl{top:-2px !important; left:-2px !important; background-image:url('./assets/ui/bookframe/frame_corner_tl.png') !important;}
+.content-sheet .book-cover-ornament--tr{top:-2px !important; right:-2px !important; background-image:url('./assets/ui/bookframe/frame_corner_tr.png') !important;}
+.content-sheet .book-cover-ornament--bl{bottom:-2px !important; left:-2px !important; background-image:url('./assets/ui/bookframe/frame_corner_bl.png') !important;}
+.content-sheet .book-cover-ornament--br{bottom:-2px !important; right:-2px !important; background-image:url('./assets/ui/bookframe/frame_corner_br.png') !important;}
+
+/* page stack ring: left/right use dedicated vertical repeats, top/bottom use rotated repeats */
+.content-sheet .hkl-deluxe-edge{
+  position:absolute;
+  display:block !important;
+  pointer-events:none;
+  z-index:4;
+  background-repeat:repeat-y;
+  background-position:center top;
+  background-size:100% auto;
+}
+.content-sheet .hkl-deluxe-edge--left{top:46px; bottom:46px; left:28px; width:24px; background-image:url('./assets/ui/bookframe/frame_pages_left_repeat.png') !important;}
+.content-sheet .hkl-deluxe-edge--right{top:46px; bottom:46px; right:28px; width:24px; background-image:url('./assets/ui/bookframe/frame_pages_right_repeat.png') !important;}
+.content-sheet .hkl-deluxe-edge::after{content:"";position:absolute;top:0;bottom:0;width:12px;}
+.content-sheet .hkl-deluxe-edge--left::after{right:-2px;background:linear-gradient(90deg,rgba(225,207,175,0),rgba(225,207,175,1));}
+.content-sheet .hkl-deluxe-edge--right::after{left:-2px;background:linear-gradient(270deg,rgba(225,207,175,0),rgba(225,207,175,1));}
+.content-sheet .hkl-deluxe-edge::before{display:none !important;content:none !important;}
+
+/* top and bottom page-edge strips */
+.content-sheet .hmk-frame-jewel{
+  position:absolute;
+  display:block !important;
+  pointer-events:none;
+  z-index:4;
+  background-repeat:repeat-x;
+  background-position:center;
+  background-size:auto 100%;
+}
+.content-sheet .hmk-frame-jewel--top{top:28px; left:46px; right:46px; height:18px; background-image:url('./assets/ui/bookframe/page_stack_top_repeat.png') !important;}
+.content-sheet .hmk-frame-jewel--bottom{bottom:28px; left:46px; right:46px; height:18px; background-image:url('./assets/ui/bookframe/page_stack_bottom_repeat.png') !important;}
+.content-sheet .hmk-frame-jewel--top::after,
+.content-sheet .hmk-frame-jewel--bottom::after{
+  content:""; position:absolute; left:0; right:0; height:8px;
+}
+.content-sheet .hmk-frame-jewel--top::after{bottom:-1px; background:linear-gradient(180deg,rgba(224,206,173,0), rgba(224,206,173,.94));}
+.content-sheet .hmk-frame-jewel--bottom::after{top:-1px; background:linear-gradient(0deg,rgba(224,206,173,0), rgba(224,206,173,.94));}
+
+/* consistent content spacing across sections */
 .content-sheet .journal-book-page,
 .content-sheet .journal-book-page--left,
 .content-sheet .journal-book-page--right{padding-top:8px !important;}
@@ -99,30 +140,46 @@ html{scrollbar-gutter:stable}
 
 @media(max-width:1530px){
   .content-sheet .journal-book-frame,
-  .content-sheet .journal-book--chapter .journal-book-frame{padding:44px 72px 42px !important;}
+  .content-sheet .journal-book--chapter .journal-book-frame{padding:54px 82px 50px !important;}
   .content-sheet .journal-book-frame::before,
-  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:18px 50px 18px 50px;}
-  .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{height:46px;}
-  .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{width:46px;}
+  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:24px 42px 24px 42px;}
+  .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{height:52px;}
+  .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{width:52px;}
+  .content-sheet .book-cover-ornament{width:106px !important;height:106px !important;}
+  .content-sheet .hkl-deluxe-edge--left,.content-sheet .hkl-deluxe-edge--right{top:42px;bottom:42px;width:21px;}
+  .content-sheet .hkl-deluxe-edge--left{left:24px;}
+  .content-sheet .hkl-deluxe-edge--right{right:24px;}
+  .content-sheet .hmk-frame-jewel--top,.content-sheet .hmk-frame-jewel--bottom{left:42px; right:42px; height:16px;}
+  .content-sheet .hmk-frame-jewel--top{top:24px;} .content-sheet .hmk-frame-jewel--bottom{bottom:24px;}
 }
 @media(max-width:1160px){
   .content-sheet .journal-book-frame,
-  .content-sheet .journal-book--chapter .journal-book-frame{padding:34px 50px 34px !important;}
+  .content-sheet .journal-book--chapter .journal-book-frame{padding:40px 58px 40px !important;}
   .content-sheet .journal-book-subnav,
   .content-sheet .journal-book--chapter .journal-book-subnav{margin:0 8px 8px !important; gap:6px;}
   .content-sheet .journal-book-frame::before,
-  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:14px 34px 14px 34px;}
-  .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{height:34px;}
-  .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{width:34px;}
+  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:18px 30px 18px 30px;}
+  .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{height:36px;}
+  .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{width:36px;}
+  .content-sheet .book-cover-ornament{width:78px !important;height:78px !important;}
+  .content-sheet .hkl-deluxe-edge--left,.content-sheet .hkl-deluxe-edge--right{top:30px;bottom:30px;width:14px;}
+  .content-sheet .hkl-deluxe-edge--left{left:16px;} .content-sheet .hkl-deluxe-edge--right{right:16px;}
+  .content-sheet .hmk-frame-jewel--top,.content-sheet .hmk-frame-jewel--bottom{left:30px; right:30px; height:12px;}
+  .content-sheet .hmk-frame-jewel--top{top:18px;} .content-sheet .hmk-frame-jewel--bottom{bottom:18px;}
 }
 @media(max-width:800px){
   .content-sheet .journal-book-frame,
-  .content-sheet .journal-book--chapter .journal-book-frame{padding:24px 24px 24px !important;}
+  .content-sheet .journal-book--chapter .journal-book-frame{padding:26px 26px 26px !important;}
   .content-sheet .journal-book-subnav,
   .content-sheet .journal-book--chapter .journal-book-subnav{margin:0 0 8px !important;}
   .content-sheet .journal-book-subnav button{min-height:34px !important; padding:7px 10px !important;}
   .content-sheet .journal-book-frame::before,
-  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:10px 18px 10px 18px;}
+  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:12px 14px 12px 14px;}
   .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{height:20px;}
   .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{width:20px;}
+  .content-sheet .book-cover-ornament{width:54px !important;height:54px !important;}
+  .content-sheet .hkl-deluxe-edge--left,.content-sheet .hkl-deluxe-edge--right{top:16px;bottom:16px;width:8px;}
+  .content-sheet .hkl-deluxe-edge--left{left:9px;} .content-sheet .hkl-deluxe-edge--right{right:9px;}
+  .content-sheet .hmk-frame-jewel--top,.content-sheet .hmk-frame-jewel--bottom{left:14px; right:14px; height:8px;}
+  .content-sheet .hmk-frame-jewel--top{top:8px;} .content-sheet .hmk-frame-jewel--bottom{bottom:8px;}
 }
