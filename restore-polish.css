@@ -319,3 +319,82 @@
   .content-sheet .journal-book-frame::after{bottom:8px!important}
   .content-sheet .book-cover-ornament{width:62px!important;height:72px!important}
 }
+
+
+/* --- Fix pass 4: replace old texture with user parchment, use the provided open-book spread, and rebuild all 4 corners from the supplied corner reference --- */
+.content-sheet .journal-book-frame{
+  background-color:transparent!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:22px 24px 18px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+  background:
+    url('./assets/ui/book/parchment_dynamic_open.png') center center/100% 100% no-repeat,
+    url('./assets/ui/book/parchment_dynamic_texture.png') center/420px 420px repeat!important;
+}
+/* remove the older synthetic center gutter texture; the new parchment already contains its own fold */
+.content-sheet .journal-book-frame::after{
+  display:none!important;
+}
+/* keep content floating directly on the new parchment without reintroducing a second paper layer */
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  background:transparent!important;
+  box-shadow:none!important;
+  border-color:rgba(163,127,77,.22)!important;
+}
+.content-sheet .journal-book-page::before,
+.content-sheet .journal-book-page::after,
+.content-sheet .journal-book-page--left::before,
+.content-sheet .journal-book-page--left::after,
+.content-sheet .journal-book-page--right::before,
+.content-sheet .journal-book-page--right::after{
+  opacity:.28!important;
+}
+/* slightly narrower side page stacks so the new central parchment remains clean and book-like */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  width:104px!important;
+  top:-3px!important;
+  bottom:-3px!important;
+}
+.content-sheet .journal-book-spread::before{
+  left:-14px!important;
+  background-size:104px 100%!important;
+}
+.content-sheet .journal-book-spread::after{
+  right:-18px!important;
+  background-size:104px 100%!important;
+}
+/* use the supplied ornate corner as the master and generate the other three by transform-derived variants */
+.content-sheet .book-cover-ornament{
+  display:block!important;
+  width:124px!important;
+  height:124px!important;
+  z-index:9!important;
+  filter:none!important;
+  background-size:contain!important;
+  background-repeat:no-repeat!important;
+}
+.content-sheet .book-cover-ornament--tl{top:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_tl.png')!important;background-position:left top!important}
+.content-sheet .book-cover-ornament--tr{top:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_tr.png')!important;background-position:right top!important}
+.content-sheet .book-cover-ornament--bl{bottom:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_bl.png')!important;background-position:left bottom!important}
+.content-sheet .book-cover-ornament--br{bottom:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_br.png')!important;background-position:right bottom!important}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 14px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{width:76px!important;background-size:76px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-8px!important}
+  .content-sheet .journal-book-spread::after{right:-10px!important}
+  .content-sheet .book-cover-ornament{width:92px!important;height:92px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 10px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{display:none!important}
+  .content-sheet .book-cover-ornament{width:64px!important;height:64px!important}
+}
