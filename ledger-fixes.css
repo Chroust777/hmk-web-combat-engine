@@ -73,3 +73,16 @@
 .content-sheet .journal-book-subnav .journal-edit-save{background:linear-gradient(#24425c,#142b42)!important;border:1px solid #d0a363!important;color:#fff6dd!important;font-weight:700!important;box-shadow:0 1px 3px #23160944;min-width:85px}
 .content-sheet .journal-book-subnav .journal-edit-cancel{background:#ead9bc!important;color:#412b14!important;border:1px solid #9b7141!important}
 @media(max-width:680px){.content-sheet .journal-anatomy-table{min-width:480px!important}.content-sheet .journal-book-subnav .journal-edit-divider{display:none}}
+
+/* v93.325: anatomy cell centering and embedded sheet edit polish */
+.content-sheet .journal-anatomy-table .journal-av-value{display:inline-grid;place-items:center;min-width:1.7em;width:1.7em;min-height:1.7em;height:1.7em;padding:0;line-height:1;box-sizing:border-box;text-align:center;vertical-align:middle}
+.content-sheet .journal-inline-skills .journal-book-hint{font-size:.76rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:#7a5a36;margin-left:.4rem}
+.content-sheet .journal-inline-skills .journal-edit-skills-surface,.content-sheet .journal-inline-skills .hsk-character-skills{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;color:#24180f}
+.content-sheet .journal-inline-skills .hsk-skill-view>p.muted{margin:.3rem 0 .9rem;color:#5b4028}
+.content-sheet .journal-inline-skills .skill-proof-collapsible{margin-top:1rem;border:1px solid rgba(100,71,40,.22);border-radius:12px;background:rgba(255,249,238,.7);padding:.8rem .95rem}
+.content-sheet .journal-inline-skills .skill-proof-collapsible>summary{cursor:pointer;font-weight:700;color:#52301a}
+.content-sheet .journal-inline-skills .table-scroll{background:rgba(255,250,243,.74);border:1px solid rgba(107,75,43,.18);border-radius:12px;padding:.25rem .25rem .35rem}
+.content-sheet .journal-inline-skills .hsk-table{background:transparent;color:#261b13}
+.content-sheet .journal-inline-skills .hsk-table th,.content-sheet .journal-inline-skills .hsk-table td{border-color:rgba(121,88,53,.22)}
+.content-sheet .journal-inline-skills .hsk-table thead th,.content-sheet .journal-inline-skills .hsk-group-head th{background:#8b6435;color:#fff1d4}
+.content-sheet .journal-inline-skills .sheet-dp-input{background:#fffaf0;border:1px solid #8e6b41;color:#24180f;text-align:center}
