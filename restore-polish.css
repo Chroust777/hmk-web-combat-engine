@@ -498,3 +498,15 @@
   background:#efe3c8!important;
   background-image:none!important;
 }
+
+
+/* --- Fix pass 9: align the flat inner background so it ends before the lower dark rail --- */
+.content-sheet .journal-book-frame::before{
+  inset:22px 22px 16px!important;
+}
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 14px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 12px!important}
+}
