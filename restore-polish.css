@@ -321,64 +321,6 @@
 }
 
 
-/* --- Fix pass 4: replace old texture with user parchment, use the provided open-book spread, and rebuild all 4 corners from the supplied corner reference --- */
-.content-sheet .journal-book-frame{
-  background-color:transparent!important;
-}
-.content-sheet .journal-book-frame::before{
-  inset:22px 24px 18px!important;
-  border:none!important;
-  outline:none!important;
-  box-shadow:none!important;
-  background:
-    url('./assets/ui/book/parchment_dynamic_open.png') center center/100% 100% no-repeat,
-    url('./assets/ui/book/parchment_dynamic_texture.png') center/420px 420px repeat!important;
-}
-/* remove the older synthetic center gutter texture; the new parchment already contains its own fold */
-.content-sheet .journal-book-frame::after{
-  display:none!important;
-}
-/* keep content floating directly on the new parchment without reintroducing a second paper layer */
-.content-sheet .journal-book-page,
-.content-sheet .journal-book-page--left,
-.content-sheet .journal-book-page--right{
-  background:transparent!important;
-  box-shadow:none!important;
-  border-color:rgba(163,127,77,.22)!important;
-}
-.content-sheet .journal-book-page::before,
-.content-sheet .journal-book-page::after,
-.content-sheet .journal-book-page--left::before,
-.content-sheet .journal-book-page--left::after,
-.content-sheet .journal-book-page--right::before,
-.content-sheet .journal-book-page--right::after{
-  opacity:.28!important;
-}
-/* slightly narrower side page stacks so the new central parchment remains clean and book-like */
-.content-sheet .journal-book-spread::before,
-.content-sheet .journal-book-spread::after{
-  width:104px!important;
-  top:-3px!important;
-  bottom:-3px!important;
-}
-.content-sheet .journal-book-spread::before{
-  left:-14px!important;
-  background-size:104px 100%!important;
-}
-.content-sheet .journal-book-spread::after{
-  right:-18px!important;
-  background-size:104px 100%!important;
-}
-/* use the supplied ornate corner as the master and generate the other three by transform-derived variants */
-.content-sheet .book-cover-ornament{
-  display:block!important;
-  width:124px!important;
-  height:124px!important;
-  z-index:9!important;
-  filter:none!important;
-  background-size:contain!important;
-  background-repeat:no-repeat!important;
-}
 .content-sheet .book-cover-ornament--tl{top:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_tl.png')!important;background-position:left top!important}
 .content-sheet .book-cover-ornament--tr{top:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_tr.png')!important;background-position:right top!important}
 .content-sheet .book-cover-ornament--bl{bottom:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_bl.png')!important;background-position:left bottom!important}
@@ -484,27 +426,13 @@
 }
 
 
-/* --- Fix pass 6: use only the clean continuous vellum texture, stretched to the frame edges, with no secondary parchment sheet visible --- */
+/* --- Fix pass 6: only the continuous vellum surface, without the extra inner parchment sheet --- */
 .content-sheet .journal-book-frame::before{
   inset:22px 22px 1px!important;
   border:none!important;
   outline:none!important;
-  box-shadow:
-    inset 0 0 16px rgba(112,84,48,.10),
-    inset 12px 0 14px -12px rgba(128,93,56,.16),
-    inset -12px 0 14px -12px rgba(128,93,56,.16)!important;
-  background:
-    linear-gradient(90deg,
-      rgba(124,91,56,.08) 0,
-      rgba(0,0,0,0) 22px,
-      rgba(0,0,0,0) calc(50% - 9px),
-      rgba(120,90,56,.10) calc(50% - 2px),
-      rgba(84,60,37,.12) 50%,
-      rgba(120,90,56,.10) calc(50% + 2px),
-      rgba(0,0,0,0) calc(50% + 9px),
-      rgba(0,0,0,0) calc(100% - 22px),
-      rgba(124,91,56,.08) 100%),
-    url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+  box-shadow:none!important;
+  background:url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
 }
 
 /* keep the content directly on the continuous vellum and do not let any secondary parchment/card edge appear */
