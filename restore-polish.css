@@ -526,8 +526,11 @@
   outline: 0 !important;
 }
 
-/* FIX14: dynamic parchment from 41.png, stretched under the full book frame so the parchment reaches the black/dark rails on all sides.
-   The inner field grows with the live book height, and the 41.png artwork is scaled to 100% width and 100% height. */
+/* FIX16: dynamic 9-slice parchment from 41.png.
+   The full spread is no longer stretched as one image.
+   Instead, the center uses a derived repeatable tile and the torn parchment edges/corners
+   are rendered through border-image slicing from 41.png, so the surface can grow in height
+   and width without deforming the whole artwork. */
 .content-sheet .journal-book-frame::before,
 .content-sheet .journal-book--chapter .journal-book-frame::before {
   content: "" !important;
@@ -535,12 +538,18 @@
   position: absolute !important;
   inset: 0 !important;
   z-index: 0 !important;
+  box-sizing: border-box !important;
   background-color: #efe3c8 !important;
-  background-image: url('./assets/ui/book/41.png') !important;
-  background-position: center center !important;
-  background-repeat: no-repeat !important;
-  background-size: 100% 100% !important;
-  border: none !important;
+  background-image: url('./assets/ui/book/41_center_tile.png') !important;
+  background-position: left top !important;
+  background-repeat: repeat !important;
+  background-size: 768px 768px !important;
+  border-style: solid !important;
+  border-width: 70px !important;
+  border-image-source: url('./assets/ui/book/41.png') !important;
+  border-image-slice: 70 !important;
+  border-image-width: 70 !important;
+  border-image-repeat: round !important;
   outline: none !important;
   box-shadow: none !important;
   pointer-events: none !important;
@@ -589,14 +598,14 @@
   .content-sheet .journal-book-frame::before,
   .content-sheet .journal-book--chapter .journal-book-frame::before {
     inset: 0 !important;
-    background-size: 100% 100% !important;
+    background-size: 768px 768px !important;
   }
 }
 @media (max-width: 800px) {
   .content-sheet .journal-book-frame::before,
   .content-sheet .journal-book--chapter .journal-book-frame::before {
     inset: 0 !important;
-    background-size: 100% 100% !important;
+    background-size: 768px 768px !important;
   }
   .content-sheet .hmk-rail--top,
   .content-sheet .hmk-rail--bottom {
