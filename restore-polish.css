@@ -491,3 +491,10 @@
 @media(max-width:800px){
   .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
 }
+
+
+/* --- Fix pass 8: remove the active parchment texture entirely; keep a flat fill only --- */
+.content-sheet .journal-book-frame::before{
+  background:#efe3c8!important;
+  background-image:none!important;
+}
