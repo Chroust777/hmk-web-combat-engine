@@ -159,7 +159,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.326';
+const APP_VERSION='93.327';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -325,7 +325,7 @@ function activeSceneLabel(scene){
 }
 function main(){
  let body='';
- if(view==='characters')body=charactersView();
+ if(view==='characters')body=journalChapterShell('Postavy','Registr postav a přístup k osobním deníkům.',charactersView(),'journal-book--characters');
  if(view==='sheet')body=sheetView();
  if(view==='creation')body=creationWizardView();
  if(view==='library')body=libraryView();
@@ -353,7 +353,7 @@ function main(){
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character">✣ Vytvořit postavu <span>＋</span></button>
   <div class="castle-sidebar-footer">⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
- </nav><main class="content content-${view}${['sheet','calendar','skills','library','encounter'].includes(view)?' content-sheet':''}">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
+ </nav><main class="content content-${view}${['characters','sheet','calendar','skills','library','encounter'].includes(view)?' content-sheet':''}">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
  <footer class="footer">HârnMaster Keeper’s Ledger · v${APP_VERSION} · offline aplikace pro GitHub Pages</footer></div>`;
 }
 
@@ -941,8 +941,116 @@ function journalConditionDetailsHTML(c,state,load){
 }
 function journalSimpleChecklist(title,rows){return `<section class="journal-book-section"><div class="journal-book-title">${esc(title)}</div><div class="journal-check-grid">${rows.map(([label,value])=>`<label><span class="journal-check"></span><em>${esc(label)}</em><strong>${esc(firstPresent(value,'—'))}</strong></label>`).join('')}</div></section>`;}
 function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['notes','Notes & Logbook']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}</div>`;}
-function journalShell(inner,extraClass='',showSubnav=true){return `<section class="journal-book panel wide ${extraClass}"><div class="journal-book-frame"><div class="hmk-book-decor" aria-hidden="true"><i class="hmk-rail hmk-rail--top"></i><i class="hmk-rail hmk-rail--bottom"></i><i class="hmk-rail hmk-rail--left"></i><i class="hmk-rail hmk-rail--right"></i><i class="hmk-frame-jewel hmk-frame-jewel--top"></i><i class="hmk-frame-jewel hmk-frame-jewel--bottom"></i><i class="hmk-frame-side hmk-frame-side--left"></i><i class="hmk-frame-side hmk-frame-side--right"></i></div><div class="book-cover-ornament book-cover-ornament--tl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--tr" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--bl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--br" aria-hidden="true"></div>${showSubnav?journalSectionNav():''}${inner}</div></section>`;}
-function journalChapterShell(title,subtitle,body,extraClass=''){const sub=subtitle?`<p>${esc(subtitle)}</p>`:'';return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><div class="journal-alt-header-block"><h3>${esc(title)}</h3>${sub}</div><div class="journal-alt-header-block journal-alt-header-block--ghost" aria-hidden="true"></div></header><div class="journal-chapter-body">${body}</div></section>`,`journal-book--chapter ${extraClass}`,false);}
+/** A page contains live DOM controls; the book decoration is the same for all folios.
+ * Character-only navigation never belongs to World, Combat, Skills or Library.
+ * Keep ordinary page contents in document order. Do not manufacture rule values.
+ */
+function folioHTMLNodes(html){
+ const template=document.createElement('template');template.innerHTML=html;
+ return [...template.content.children];
+}
+function folioWeight(element){
+ const n=(element.textContent||'').length;
+ return 2+Math.min(200,n/105)+element.querySelectorAll('form,fieldset').length*7+
+  element.querySelectorAll('tr').length*1.8+element.querySelectorAll('input,select,button,textarea').length*.9;
+}
+function folioBalancedParts(elements){
+ if(elements.length<2)return [elements.map(x=>x.outerHTML).join(''),''];
+ const weights=elements.map(folioWeight),total=weights.reduce((a,b)=>a+b,0);
+ let balance=Infinity,split=Math.max(1,Math.floor(elements.length/2)),sum=0;
+ for(let i=1;i<elements.length;i++){
+  sum+=weights[i-1];const diff=Math.abs(total-2*sum);
+  if(diff<balance){balance=diff;split=i;}
+ }
+ return [elements.slice(0,split).map(x=>x.outerHTML).join(''),elements.slice(split).map(x=>x.outerHTML).join('')];
+}
+/** Render the full original library record as a compact manuscript entry.
+ * Form fields and data attributes remain actual DOM; purchase/edit handlers are unchanged.
+ */
+function folioLibraryEntry(row,headers){
+ const cells=[...row.children];
+ if(!cells.length)return '';
+ const fields=cells.slice(1,-2).map((cell,i)=>`<div class="folio-catalog-field"><dt>${esc(headers[i+1]||'Parametr')}</dt><dd>${cell.innerHTML}</dd></div>`).join('');
+ const identity=[...row.attributes].filter(a=>a.name.startsWith('data-')).map(a=>` ${a.name}="${esc(a.value)}"`).join('');
+ return `<article class="folio-catalog-entry"${identity}><div class="folio-catalog-heading">${cells[0].innerHTML}</div><dl class="folio-catalog-stats">${fields}</dl><div class="folio-catalog-foot"><div class="folio-catalog-details">${cells.at(-2)?.innerHTML||''}</div><div class="folio-catalog-actions">${cells.at(-1)?.innerHTML||''}</div></div></article>`;
+}
+function folioChapterParts(body,kind=''){
+ const nodes=folioHTMLNodes(body);
+ if(kind.includes('journal-book--characters')){
+  const gallery=nodes.find(x=>x.classList.contains('character-gallery'));
+  if(gallery){
+   const cards=[...gallery.children].map(x=>x.outerHTML),middle=Math.floor(cards.length/2);
+   const pre=nodes.filter(x=>x!==gallery).map(x=>x.outerHTML).join('');
+   return [pre+(middle?`<div class="folio-character-list">${cards.slice(0,middle).join('')}</div>`:''),
+    `<div class="folio-character-list">${cards.slice(middle).join('')}</div>`];
+  }
+  return [nodes.filter(x=>!x.classList.contains('empty')).map(x=>x.outerHTML).join(''),
+   nodes.filter(x=>x.classList.contains('empty')).map(x=>x.outerHTML).join('')];
+ }
+ if(kind.includes('journal-book--library')){
+  const tableWrap=nodes.find(e=>e.classList.contains('library-table-wrap'));
+  const table=tableWrap?.querySelector('table.library-table');
+  if(table){
+   const headers=[...(table.tHead?.rows[0]?.cells||[])].map(x=>x.textContent.trim());
+   const cards=[...(table.tBodies[0]?.rows||[])].map(x=>folioLibraryEntry(x,headers));
+   const tableIndex=nodes.indexOf(tableWrap);
+   const pre=nodes.slice(0,tableIndex).map(x=>x.outerHTML).join('');
+   const post=nodes.slice(tableIndex+1).map(x=>x.outerHTML).join('');
+   const middle=Math.ceil(cards.length/2);
+   return [pre+`<div class="folio-catalog-list">${cards.slice(0,middle).join('')}</div>`,
+    `<div class="folio-catalog-list">${cards.slice(middle).join('')}</div>`+post];
+  }
+  const panel=nodes.find(e=>e.matches('section.panel')&&e.querySelector('.library-rules-details'));
+  if(panel){
+   const entries=[...panel.children].filter(x=>x.matches('.library-rules-details'));
+   if(entries.length>1){
+    const halfway=Math.ceil(entries.length/2);
+    const heading=[...panel.children].filter(x=>!entries.includes(x)).map(x=>x.outerHTML).join('');
+    return [nodes.filter(x=>x!==panel).map(x=>x.outerHTML).join('')+`<section class="folio-rules-group">${heading}${entries.slice(0,halfway).map(x=>x.outerHTML).join('')}</section>`,
+     `<section class="folio-rules-group">${entries.slice(halfway).map(x=>x.outerHTML).join('')}</section>`];
+   }
+  }
+ }
+ if(kind.includes('journal-book--skills')){
+  const workbench=nodes.find(x=>x.classList.contains('hmk-skill-workbench'));
+  if(workbench){
+   const workChildren=[...workbench.children];
+   const split=workChildren.findIndex(x=>x.classList.contains('hsk-separated-tests'));
+   if(split!==-1){
+    const head=workChildren.slice(0,split).map(x=>x.outerHTML).join('');
+    const tests=workChildren.slice(split).map(x=>x.outerHTML).join('');
+    return [head+nodes.filter(x=>x!==workbench).map(x=>x.outerHTML).join(''),tests];
+   }
+  }
+ }
+ const root=nodes.length===1&&nodes[0].classList.contains('journal-tech-columns')?[...nodes[0].children]:nodes;
+ return folioBalancedParts(root);
+}
+function folioChapterSpread(title,subtitle,body,kind=''){
+ const [left,right]=folioChapterParts(body,kind);
+ const header=`<header class="folio-chapter-heading"><h3>${esc(title)}</h3>${subtitle?`<p>${esc(subtitle)}</p>`:''}</header>`;
+ const pages=`<section class="journal-book-page journal-book-page--left folio-chapter-page" aria-label="Levá stránka: ${esc(title)}">${header}<div class="folio-chapter-content">${left}</div></section><section class="journal-book-page journal-book-page--right folio-chapter-page" aria-label="Pravá stránka: ${esc(title)}"><div class="folio-chapter-content folio-chapter-content--right">${right}</div></section>`;
+ // Skill tab controls need the same .hmk-skill-workbench ancestor as before.
+ return `<div class="journal-book-spread folio-chapter-spread${kind.includes('journal-book--skills')?' hmk-skill-workbench':''}"${kind.includes('journal-book--skills')?' id="hmk-skill-workbench"':''}>${pages}</div>`;
+}
+function journalShell(inner,extraClass='',showSubnav=true){
+ if(extraClass.includes('journal-book--chapter')&&showSubnav){
+  // Existing character's Inventory/Conditions/Notes chapters use precisely the
+  // same dual-page renderer. Keep character-only subnavigation in place.
+  const nodes=folioHTMLNodes(inner),shell=nodes.find(x=>x.classList.contains('journal-technical-shell'));
+  if(shell){
+   const heading=shell.querySelector('.journal-alt-header');
+   const title=heading?.querySelector('h3')?.textContent||'Character Sheet';
+   const subtitle=heading?.querySelector('p')?.textContent||'';
+   const content=shell.querySelector('.journal-tech-columns')?.innerHTML||shell.innerHTML;
+   inner=folioChapterSpread(title,subtitle,content,'journal-book--sheet-chapter');
+  }
+ }
+ return `<section class="journal-book panel wide ${extraClass}"><div class="journal-book-frame"><div class="hmk-book-decor" aria-hidden="true"><i class="hmk-rail hmk-rail--top"></i><i class="hmk-rail hmk-rail--bottom"></i><i class="hmk-rail hmk-rail--left"></i><i class="hmk-rail hmk-rail--right"></i><i class="hmk-frame-jewel hmk-frame-jewel--top"></i><i class="hmk-frame-jewel hmk-frame-jewel--bottom"></i><i class="hmk-frame-side hmk-frame-side--left"></i><i class="hmk-frame-side hmk-frame-side--right"></i></div><div class="book-cover-ornament book-cover-ornament--tl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--tr" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--bl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--br" aria-hidden="true"></div>${showSubnav?journalSectionNav():''}${inner}</div></section>`;
+}
+function journalChapterShell(title,subtitle,body,extraClass=''){
+ return journalShell(folioChapterSpread(title,subtitle,body,extraClass),`journal-book--chapter ${extraClass}`,false);
+}
 function characterJournalHero(c,inv,editing=false){
  const h=c.hmk||{},creation=h.creation?.values||{},state=persistentStateOf(c),attrs=h.attributes||{};
  const bio=(key,...fallbacks)=>firstPresent(h[key],...fallbacks,creation[key],'—');
