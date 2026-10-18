@@ -1,0 +1,120 @@
+/* v93.321 — The same compact illuminated-manuscript typographic system for
+   the full app. Layer-only; no new data model or gameplay calculations. */
+:root {--folio-rule:rgba(132,88,43,.48);--folio-ink:#30271f;--folio-deep:#152f4a;}
+/* Common tables as ruled manuscript lines instead of large framed grid cells. */
+main.content:not(.content-sheet) :is(.panel,.card,.catalog-card,.skill-card,.hsk-test-card){
+  padding:clamp(7px,.85vw,12px)!important;
+  box-shadow:inset 0 0 0 1px #faebcba8!important;
+}
+main.content:not(.content-sheet) :is(.panel,.card,.catalog-card,.skill-card,.hsk-test-card) > h3,
+main.content:not(.content-sheet) :is(.panel,.card,.hsk-test-card) > h4{
+  margin-bottom:5px!important;padding:3px 0 5px 22px!important;
+  font:700 clamp(11px,1vw,13px)/1.25 Georgia,serif!important;
+  background-size:17px 17px!important;
+}
+main.content:not(.content-sheet) :is(table,.catalog-spec,.library-table,.hsk-table){
+  width:100%;border-collapse:collapse!important;border-spacing:0!important;
+  font:clamp(10px,.82vw,12px)/1.32 Georgia,serif!important;
+  background:transparent!important;
+}
+main.content:not(.content-sheet) :is(thead th,.catalog-spec thead th,.library-table thead th,.hsk-table thead th){
+  padding:4px 5px!important;
+  background:rgba(199,166,108,.15)!important;
+  border:0!important;border-bottom:1px solid #92693e!important;
+  text-align:left;white-space:normal;
+  font:700 clamp(10px,.79vw,12px)/1.25 Georgia,serif!important;
+}
+main.content:not(.content-sheet) :is(table td,table tbody th,.catalog-spec td,.library-table td,.hsk-table td){
+  padding:3px 5px!important;vertical-align:top!important;
+  border:0!important;border-bottom:1px solid var(--folio-rule)!important;
+  background:transparent!important;
+  line-height:1.33!important;
+}
+main.content:not(.content-sheet) :is(table tbody tr,.hsk-group){background:transparent!important}
+main.content:not(.content-sheet) :is(.hsk-group-head,.hsk-group-head th){
+  background:rgba(214,185,133,.25)!important;
+  border-bottom:1px solid #ad8655!important;
+  font:700 11px/1.3 Georgia,serif!important;
+}
+main.content:not(.content-sheet) :is(.table-scroll,.catalog-scroll,.inv-table-scroll,.library-table-wrap){
+  padding:4px 6px!important;border:1px solid #b49562!important;
+  background:rgba(250,237,210,.55)!important;
+}
+main.content:not(.content-sheet) :is(.field-grid,.columns,.cards){gap:clamp(6px,.75vw,12px)!important}
+main.content:not(.content-sheet) :is(.toolbar,.actions,.topline){gap:6px!important}
+main.content:not(.content-sheet) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
+  min-height:31px;max-width:100%;font:12px/1.3 Georgia,serif!important;padding:5px 7px!important;
+}
+main.content:not(.content-sheet) button{font:600 12px/1.3 Georgia,serif!important;padding:6px 10px!important;min-height:29px}
+main.content:not(.content-sheet) :is(p,.muted,.tiny){line-height:1.43!important}
+main.content:not(.content-sheet) :is(.notice,.equipment-summary,.list-row){padding:8px 10px!important}
+/* Skills and combat's tool-heavy screens: compact rows, no large inset panels. */
+.content-skills :is(.hsk-test-card,.hsk-skill-view,.hsk-result-panel){padding:8px!important}
+.content-skills :is(.hsk-table,.hsk-calculation,.hsk-result-slot){font:11px/1.32 Georgia,serif!important}
+.content-library .library-table-wrap{overflow-x:auto;max-width:100%}
+/* Diary: editable fields live where they are displayed; non-editable creation identity unchanged. */
+.content-sheet .journal-stat-input{width:min(100%,58px);text-align:center;margin:1px auto 0;
+ padding:2px 3px!important;background:#fff0cc!important;color:#182d45!important;
+ border:1px solid #a77c42!important;border-radius:2px;font:700 16px Georgia,serif!important}
+.content-sheet .journal-coins-input{width:100%;min-width:54px;max-width:100px;padding:2px!important;
+ border:1px solid #a77c42!important;background:#fff0cc!important;color:#162c46!important;
+ font:700 12px Georgia,serif!important}
+.content-sheet .journal-book-hint{font:400 9px/1.1 Georgia,serif;letter-spacing:0;color:#62452a}
+.content-sheet .journal-group-mod{font:700 9px Georgia,serif;color:#855b31;white-space:nowrap}
+.content-sheet .journal-skill-basis{display:block;font:9px/1.1 Georgia,serif;color:#796046;
+ white-space:normal;overflow-wrap:anywhere}
+.content-sheet .journal-skill-name{min-width:0;overflow-wrap:anywhere}
+.content-sheet .journal-book-skills .journal-skill-family li{align-items:start;padding:2px 1px!important;min-height:26px}
+.content-sheet .journal-dp-edit{margin-top:8px;border:1px solid #9b7849;padding:6px;
+ background:rgba(247,230,190,.74);min-width:0}
+.content-sheet .journal-dp-edit>summary{cursor:pointer;color:#4d2b18;font:700 12px Georgia,serif;padding:6px;
+ border-bottom:1px solid #bb925e}
+.content-sheet .journal-dp-edit .hsk-skill-view{min-width:0;max-width:100%}
+.content-sheet .journal-dp-edit .hsk-scroll{overflow-x:auto;max-width:100%;font-size:10px}
+.content-sheet .journal-dp-edit .hsk-table{min-width:980px;font-size:10px}
+.content-sheet .journal-dp-edit .sheet-dp-input{max-width:44px;min-width:36px;padding:2px!important;font-size:11px}
+/* Grace & Piety labels: fit Doctrine, Blessing, Morality within narrow stat boxes. */
+.content-sheet .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box span{
+  display:block;max-width:100%;font:700 clamp(7px,.64vw,9px)/1.1 Georgia,serif!important;
+  letter-spacing:-.02em;overflow-wrap:anywhere;hyphens:auto;
+}
+.content-sheet .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box strong{
+  font:700 clamp(10px,.9vw,14px)/1.15 Georgia,serif!important;overflow-wrap:anywhere;
+}
+/* Body Locations: full-width, readable 15-location anatomy table, with per-aspect AV and injury state. */
+.content-sheet .journal-right-mid-grid .journal-body-locations{grid-column:1 / -1;max-width:100%;min-width:0}
+.content-sheet .journal-anatomy-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.content-sheet .journal-anatomy-table{width:100%;border-collapse:collapse;table-layout:auto;
+ font:clamp(9px,.73vw,11px)/1.18 Georgia,serif!important;color:#362719}
+.content-sheet .journal-anatomy-table th,.content-sheet .journal-anatomy-table td{
+ border:0!important;border-bottom:1px solid #ad8a5a80!important;
+ padding:3px 3px!important;vertical-align:top;background:transparent!important;
+ text-align:left;color:#322419!important
+}
+.content-sheet .journal-anatomy-table thead th{border-bottom:1px solid #876539!important;
+ font:700 clamp(9px,.7vw,11px)/1.15 Georgia,serif!important;color:#572e1a!important;
+ background:rgba(200,167,115,.24)!important}
+.content-sheet .journal-anatomy-table tbody th{font-weight:700;color:#172f49!important;white-space:nowrap}
+.content-sheet .journal-anatomy-table .journal-numeric{text-align:center;min-width:20px;font-variant-numeric:tabular-nums}
+.content-sheet .journal-layer-cell{max-width:180px;overflow-wrap:anywhere;font-size:.95em}
+.content-sheet .journal-bleed{color:#992a1b;font-weight:800;margin-right:3px}
+.content-sheet .journal-anatomy-note{font:9px/1.3 Georgia,serif;color:#6e5030;margin:3px 0 0}
+.content-sheet .journal-unmapped-wounds{font:10px Georgia,serif;padding:4px}
+.content-sheet .journal-book-section--skills{margin-top:6px!important}
+.content-sheet .journal-book-subnav{gap:4px;flex-wrap:wrap}
+@media(max-width:950px){
+ main.content:not(.content-sheet) :is(.panel,.card){padding:7px!important}
+ .content-sheet .journal-anatomy-table{min-width:640px;font-size:10px!important}
+}
+@media(max-width:550px){
+ main.content:not(.content-sheet) :is(.panel,.card){padding:6px!important}
+ main.content:not(.content-sheet) :is(table td,table tbody th){font-size:10px!important}
+ .content-sheet .journal-anatomy-table{min-width:600px}
+ .content-sheet .journal-skill-basis{font-size:9px}
+}
+
+/* Fit long labels in the small sacred-attributes cells without forcing breaks. */
+.content-sheet .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box span{
+  font:700 clamp(6.5px,.51vw,8px)/1.1 Georgia,serif!important;
+  white-space:nowrap;overflow-wrap:normal;hyphens:none;letter-spacing:-.06em;
+}

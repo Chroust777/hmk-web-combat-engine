@@ -1,0 +1,55 @@
+/* v93.264: compact, separately tabbed library. Existing application CSS unchanged. */
+.library-navigation{display:flex;flex-wrap:wrap;gap:.45rem;margin:.55rem 0 1rem}
+.library-navigation button{margin:0;min-height:40px;border:1px solid #846945;border-radius:7px;padding:.5rem .75rem;background:#242d2a;color:#e7d3b0}
+.library-navigation button[aria-selected="true"]{background:#73542f;color:#fff3d4;border-color:#d8b476;font-weight:700}
+.library-toolbar{display:flex;gap:.7rem;align-items:end;flex-wrap:wrap;margin:.4rem 0 1rem}
+.library-toolbar label{flex:1 1 175px;min-width:0}
+.library-toolbar input,.library-toolbar select{width:100%;min-width:0}
+.library-results{margin:.45rem 0;color:#cbbb9d}
+.library-table-wrap{overflow:auto;border:1px solid #776244;border-radius:9px;max-width:100%;background:#192221}
+.library-table{width:100%;min-width:780px;border-collapse:collapse;font-size:.84rem}
+.library-table thead th{position:sticky;top:0;z-index:2;background:#3a3023;color:#f1cf91;padding:.65rem .55rem;white-space:nowrap}
+.library-table tbody tr:nth-child(2n){background:#ffffff06}
+.library-table td{padding:.55rem .6rem;vertical-align:middle;white-space:normal}
+.library-table .library-item-title{font-weight:700;min-width:165px;max-width:250px;overflow-wrap:anywhere}
+.library-table .library-item-title small{display:block;color:#b7a892;font-weight:400;font-size:.7rem;margin-top:.2rem}
+.library-table .library-mini{white-space:nowrap;font-variant-numeric:tabular-nums}
+.library-table .library-details-cell{min-width:165px}
+.library-table .library-details-cell details{min-width:145px}
+.library-table .catalog-parameters{margin:0}
+.library-table .catalog-parameters-inner{min-width:220px;max-width:500px;overflow-wrap:anywhere}
+.library-assign{display:flex;gap:.35rem;align-items:center;min-width:235px}
+.library-assign select{min-width:130px;max-width:175px;font-size:.8rem;padding:.42rem}
+.library-assign button{font-size:.78rem;min-height:36px;white-space:nowrap;padding:.35rem .5rem}
+.library-pagebar{display:flex;gap:.5rem;align-items:center;justify-content:center;margin:1rem 0;flex-wrap:wrap}
+.library-pagebar button{min-height:38px;padding:.4rem .65rem}
+.library-warning{color:#f0d9a9;font-size:.8rem}
+.library-rules-details{margin:.75rem 0}
+.library-suit-parts{columns:2;column-gap:2rem;margin:.5rem 0;padding-left:1.3rem}
+.library-suit-parts li{break-inside:avoid;padding:.1rem 0}
+@media(max-width:760px){.library-navigation{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.4rem}.library-navigation button{font-size:.78rem;padding:.5rem .35rem;min-height:43px}.library-table{font-size:.82rem}.library-toolbar label{flex-basis:100%}.library-suit-parts{columns:1}}
+
+/* v93.265 – direct purchase / free collection, always carried. */
+.library-assign{flex-direction:column;align-items:stretch;min-width:210px}
+.library-assign select{max-width:none;width:100%}
+.library-acquire-actions{display:flex;gap:.3rem;flex-wrap:wrap}
+.library-acquire-actions button{flex:1 1 auto}
+.library-purchase-hint{font-size:.68rem;color:#e3bf87}
+.library-acquire-actions button:disabled{opacity:.42;cursor:not-allowed}
+.hsk-dp-edit{margin-top:.9rem;padding:.6rem;border:1px solid #736147;border-radius:6px}
+.hsk-compact{min-width:425px}
+.hsk-compact td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+
+
+/* v93.310 scenic library overrides */
+.library-navigation{gap:.55rem;margin:.3rem 0 1rem}
+.library-navigation button{border-radius:14px;background:linear-gradient(180deg,#eadfc7,#d9c39c);color:#2d1d11;border-color:rgba(96,74,40,.24);box-shadow:0 8px 16px rgba(27,17,8,.12)}
+.library-navigation button[aria-selected="true"]{background:linear-gradient(180deg,#82592f,#66431f);color:#fff4dc;border-color:#e6c483}
+.library-toolbar{background:linear-gradient(180deg,rgba(247,241,228,.92),rgba(233,223,201,.92));padding:.8rem 1rem;border:1px solid rgba(103,78,43,.18);border-radius:18px;box-shadow:0 10px 20px rgba(0,0,0,.12)}
+.library-results{color:#efe1c0;margin:.6rem 0 .85rem}
+.library-table-wrap{background:rgba(250,246,238,.95);border:1px solid rgba(106,79,44,.24);border-radius:18px;box-shadow:0 12px 24px rgba(0,0,0,.15)}
+.library-table{font-size:.86rem;color:#241912}
+.library-table thead th{background:#74522f;color:#fff2d6}
+.library-table tbody tr:nth-child(2n){background:rgba(107,80,43,.06)}
+.library-warning,.library-purchase-hint{color:#62431d}
+.library-rules-details{background:linear-gradient(180deg,rgba(247,240,226,.94),rgba(233,221,198,.92));padding:.85rem 1rem;border-radius:16px;border:1px solid rgba(104,79,45,.16)}

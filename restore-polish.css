@@ -1,0 +1,530 @@
+/* Restore-polish pass based on v93.333
+   Focus: logo fidelity, sidebar buttons, campaign card cleanup, higher content start, preserved book shell. */
+
+/* --- Header logo: larger, crisp, no stretch --- */
+.mast{height:72px!important;min-height:72px!important;padding:0 16px 0 0!important}
+.mast-top{min-height:70px!important;align-items:center!important}
+.mast .mast-brand{
+  width:308px!important;
+  min-width:308px!important;
+  max-width:308px!important;
+  min-height:70px!important;
+  height:70px!important;
+  aspect-ratio:262/60!important;
+  background:url('./assets/ui/book/sidebar_header.png') left center/contain no-repeat!important;
+  image-rendering:auto!important;
+  filter:none!important;
+}
+.mast .mast-brand::after{right:-1px!important}
+@media (max-width:980px){
+  .mast{height:auto!important;min-height:66px!important}
+  .mast-top{min-height:66px!important}
+  .mast .mast-brand{width:286px!important;min-width:286px!important;max-width:286px!important;height:64px!important;min-height:64px!important}
+}
+@media (max-width:760px){
+  .mast .mast-brand{width:262px!important;min-width:262px!important;max-width:262px!important;height:60px!important;min-height:60px!important}
+}
+
+/* --- Sidebar campaign card: keep image clear, move decorative banner away so no emblem sits behind it --- */
+.nav{padding-top:12px!important}
+.nav::after{
+  top:118px!important;
+  right:0!important;
+  opacity:.96!important;
+}
+.castle-campaign-card{
+  position:relative!important;
+  overflow:hidden!important;
+  background:
+    linear-gradient(180deg,rgba(8,14,24,.18),rgba(8,14,24,.38)),
+    url('./assets/ui/background-valley.png?v=93.333') center/cover no-repeat!important;
+  box-shadow:inset 0 0 0 1px rgba(246,231,201,.12), 0 4px 10px rgba(0,0,0,.35)!important;
+}
+.castle-campaign-card::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg,rgba(5,13,23,.16),rgba(5,13,23,.06) 36%, rgba(5,13,23,.18));
+  pointer-events:none;
+}
+.castle-campaign-card > *{position:relative;z-index:1}
+
+/* --- Sidebar buttons styled like the top tabs, across nav and character list --- */
+.nav .castle-nav-link,
+.nav .castle-character,
+.nav .castle-create{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:.6rem!important;
+  width:100%!important;
+  min-height:42px!important;
+  margin:0 0 .55rem!important;
+  padding:8px 12px!important;
+  text-align:left!important;
+  border:1px solid #aa7d40!important;
+  border-bottom:2px solid #a6793f!important;
+  border-radius:6px 6px 0 0!important;
+  background:linear-gradient(180deg,#f3e4c6 0%,#ddc397 53%,#c7a571 100%)!important;
+  color:#3b281a!important;
+  box-shadow:inset 0 2px rgba(255,254,244,.72),inset 0 0 0 1px rgba(122,84,43,.14),0 -1px 5px rgba(0,0,0,.25)!important;
+  font:700 15px/1.1 Georgia,serif!important;
+  font-variant:small-caps!important;
+  letter-spacing:.03em!important;
+  text-shadow:0 1px rgba(255,252,241,.65)!important;
+}
+.nav .castle-nav-link:hover,
+.nav .castle-character:hover,
+.nav .castle-create:hover{background:linear-gradient(180deg,#fff0d4,#e5c88f)!important}
+.nav .castle-nav-link.active,
+.nav .castle-character.active,
+.nav .castle-nav-link[aria-current="page"]{
+  background:linear-gradient(180deg,#385675 0%,#1b354e 48%,#0c2036 100%)!important;
+  color:#ffdf9e!important;
+  border-color:#ca9d57!important;
+  border-bottom-color:#0c2036!important;
+  box-shadow:inset 0 1px #d9ad6c,inset 0 0 0 1px rgba(233,191,108,.18),0 -2px 10px rgba(0,0,0,.34)!important;
+  text-shadow:0 1px #09101c!important;
+}
+.nav .castle-nav-icon{color:#996c32!important;flex:0 0 auto!important}
+.nav .castle-nav-link.active .castle-nav-icon,
+.nav .castle-character.active .castle-nav-icon{color:#ecc078!important}
+.nav .castle-create{justify-content:space-between!important}
+
+/* Character buttons: fix doubled initials by giving the portrait its own badge space */
+.nav .castle-character{padding:7px 10px!important}
+.nav .castle-char-portrait{
+  display:grid!important;
+  place-items:center!important;
+  flex:0 0 28px!important;
+  width:28px!important;
+  height:28px!important;
+  border:1px solid rgba(162,119,57,.75)!important;
+  border-radius:4px!important;
+  background:linear-gradient(180deg,#24496f,#163350)!important;
+  color:#f4dfaf!important;
+  font:700 15px/1 Georgia,serif!important;
+  overflow:hidden!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+.nav .castle-character.active .castle-char-portrait{border-color:#d4a661!important;color:#ffe4ab!important}
+.nav .castle-char-portrait img{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important}
+.nav .castle-character > span:last-child{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+/* --- Lift the content higher: less dead space before page content --- */
+.content-sheet{padding-top:0!important}
+.content-sheet > .ledger-topline{padding:1px 11px 1px!important;min-height:0!important}
+.content-sheet .journal-book.panel{margin-top:-2px!important}
+.content-sheet .journal-book-frame{
+  padding-top:38px!important;
+  padding-bottom:44px!important;
+}
+.content-sheet .journal-book-frame::before{inset:28px 34px 33px!important}
+.content-sheet .journal-book-frame::after{top:38px!important;bottom:44px!important}
+.journal-book-subnav{margin:-26px 24px 8px!important}
+.journal-book-page--left,.journal-book-page--right{padding-top:4px!important}
+.content-sheet .journal-book--chapter .journal-book-frame{padding-top:12px!important}
+.content-sheet .journal-book--chapter .journal-book-frame::after{top:12px!important}
+.content-sheet .journal-book--chapter .journal-alt-header{padding:0 18px 4px!important}
+.content-sheet .journal-book--chapter .journal-alt-header-block{min-height:70px!important;padding:4px 14px 6px!important}
+.content-sheet .journal-book--chapter .journal-chapter-body{padding:0 18px 16px!important}
+
+/* --- Preserve and subtly strengthen the page-edge book shell from v93.333 --- */
+.content-sheet .journal-book-frame{
+  background-color:#d2b285!important;
+  background-image:
+    url('./assets/ui/book/book_top.png'),
+    url('./assets/ui/book/book_bottom.png'),
+    url('./assets/ui/book/book_left.png'),
+    url('./assets/ui/book/book_right.png'),
+    url('./assets/ui/book/book_gutter.png')!important;
+  background-position:center top,center bottom,left top,right top,center top!important;
+  background-size:100% 44px,100% 50px,42px 100%,52px 100%,46px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat!important;
+  box-shadow:0 21px 35px rgba(5,4,6,.56),0 3px 3px rgba(6,5,7,.80)!important;
+}
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  background:linear-gradient(90deg,rgba(170,131,80,.17) 0%,transparent 10%,transparent 90%,rgba(150,109,60,.22) 100%),url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame{padding-top:34px!important;padding-bottom:38px!important;background-size:100% 36px,100% 42px,27px 100%,27px 100%,36px 100%!important}
+  .content-sheet .journal-book-frame::before{inset:24px 18px 27px!important}
+  .content-sheet .journal-book-frame::after{top:34px!important;bottom:38px!important}
+  .journal-book-subnav{margin:-24px 10px 8px!important}
+  .content-sheet .journal-book--chapter .journal-book-frame{padding-top:10px!important}
+}
+@media(max-width:800px){
+  .nav::after{display:none!important}
+  .nav .castle-nav-link,
+  .nav .castle-character,
+  .nav .castle-create{font-size:13px!important;min-height:38px!important;padding:7px 10px!important}
+  .content-sheet .journal-book-frame{padding-top:32px!important;padding-bottom:38px!important}
+  .journal-book-subnav{margin:-22px 0 8px!important}
+}
+
+
+/* --- Fix pass 2: top controls separation, clean lower parchment, unified inner corners --- */
+.mast{padding-top:2px!important;padding-bottom:6px!important;min-height:84px!important}
+.mast-top{align-items:flex-start!important;padding-top:2px!important}
+.mast .mast-side{align-self:flex-start!important}
+.mast .mast-control-panel{padding:2px 0 10px!important;transform:translateY(-8px)!important}
+.mast .mast-control-panel__grid{row-gap:4px!important}
+.content-sheet{padding-top:2px!important}
+.content-sheet .journal-book.panel{margin-top:8px!important}
+.journal-book-subnav{margin:-18px 24px 8px!important}
+
+.content-sheet .journal-book-frame{
+  overflow:hidden!important;
+  background-image:
+    url('./assets/ui/book/book_top.png'),
+    url('./assets/ui/book/book_bottom_clean.png'),
+    url('./assets/ui/book/book_left.png'),
+    url('./assets/ui/book/book_right.png'),
+    url('./assets/ui/book/book_gutter.png')!important;
+  background-position:center top,center bottom,left top,right top,center top!important;
+  background-size:100% 44px,100% 22px,42px 100%,52px 100%,46px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:28px 34px 22px!important;
+  z-index:0!important;
+  background:url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+  border:1px solid #b18955!important;
+  outline:1px solid #54341f!important;
+  outline-offset:3px!important;
+  box-shadow:inset 0 0 22px rgba(120,89,47,.12)!important;
+}
+.content-sheet .journal-book-frame::after{top:38px!important;bottom:22px!important}
+.content-sheet .journal-book-spread{position:relative!important;z-index:2!important}
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{position:relative!important;z-index:3!important;background-color:transparent!important}
+
+/* Inner side page-stack shells with matching corner style on all four corners */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  content:""!important;
+  position:absolute!important;
+  top:-2px!important;
+  bottom:-2px!important;
+  width:104px!important;
+  pointer-events:none!important;
+  z-index:1!important;
+  background-repeat:no-repeat!important;
+  background-size:104px 100%!important;
+  opacity:1!important;
+}
+.content-sheet .journal-book-spread::before{
+  left:-14px!important;
+  background-image:url('./assets/ui/book/book_side_left_deluxe.png')!important;
+  background-position:left top!important;
+}
+.content-sheet .journal-book-spread::after{
+  right:-18px!important;
+  background-image:url('./assets/ui/book/book_side_right_deluxe.png')!important;
+  background-position:right top!important;
+}
+.content-sheet .journal-book-page--left{padding-left:28px!important;padding-right:28px!important}
+.content-sheet .journal-book-page--right{padding-left:30px!important;padding-right:28px!important}
+
+@media(max-width:1160px){
+  .mast .mast-control-panel{transform:none!important;padding:4px 0 8px!important}
+  .content-sheet .journal-book.panel{margin-top:4px!important}
+  .journal-book-subnav{margin:-16px 10px 8px!important}
+  .content-sheet .journal-book-frame{background-size:100% 36px,100% 18px,27px 100%,27px 100%,36px 100%!important}
+  .content-sheet .journal-book-frame::before{inset:24px 18px 18px!important}
+  .content-sheet .journal-book-frame::after{top:34px!important;bottom:18px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{width:72px!important;background-size:72px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-8px!important}
+  .content-sheet .journal-book-spread::after{right:-10px!important}
+  .content-sheet .journal-book-page--left,.content-sheet .journal-book-page--right{padding-left:18px!important;padding-right:18px!important}
+}
+@media(max-width:800px){
+  .mast{min-height:76px!important}
+  .mast .mast-control-panel{transform:none!important}
+  .content-sheet .journal-book.panel{margin-top:2px!important}
+  .journal-book-subnav{margin:-14px 0 8px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{display:none!important}
+}
+
+
+/* --- Fix pass 3: darker parchment reaches the frame, remove pale strip under rail, unify all 4 corners --- */
+.content-sheet .journal-book-frame{
+  background-color:transparent!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:24px 24px 12px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:
+    inset 0 0 28px rgba(105,76,44,.12),
+    inset 14px 0 18px -18px rgba(139,102,58,.32),
+    inset -14px 0 18px -18px rgba(139,102,58,.32),
+    inset 0 -8px 12px -10px rgba(139,102,58,.22)!important;
+  background:
+    linear-gradient(90deg,rgba(197,164,119,.28) 0%, rgba(197,164,119,.08) 4%, rgba(0,0,0,0) 11%, rgba(0,0,0,0) 89%, rgba(197,164,119,.08) 96%, rgba(197,164,119,.28) 100%),
+    linear-gradient(180deg,rgba(236,223,196,.08),rgba(236,223,196,0) 10%),
+    url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+}
+.content-sheet .journal-book-frame::after{top:38px!important;bottom:12px!important;opacity:.84!important}
+
+/* bring the side page stacks closer over the parchment so no pale seam is visible */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  width:112px!important;
+  top:-4px!important;
+  bottom:-4px!important;
+  z-index:4!important;
+}
+.content-sheet .journal-book-spread::before{left:-18px!important;background-size:112px 100%!important}
+.content-sheet .journal-book-spread::after{right:-22px!important;background-size:112px 100%!important}
+
+/* all four visible outer corners use the same rich style as the lower-left reference */
+.content-sheet .book-cover-ornament{
+  display:block!important;
+  width:120px!important;
+  height:136px!important;
+  z-index:8!important;
+  filter:none!important;
+  background-size:contain!important;
+  background-repeat:no-repeat!important;
+}
+.content-sheet .book-cover-ornament--tl{top:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_tl.png')!important;background-position:left top!important}
+.content-sheet .book-cover-ornament--tr{top:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_tr.png')!important;background-position:right top!important}
+.content-sheet .book-cover-ornament--bl{bottom:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_bl.png')!important;background-position:left bottom!important}
+.content-sheet .book-cover-ornament--br{bottom:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_br.png')!important;background-position:right bottom!important}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:20px 18px 10px!important}
+  .content-sheet .journal-book-frame::after{top:34px!important;bottom:10px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{width:86px!important;background-size:86px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-10px!important}
+  .content-sheet .journal-book-spread::after{right:-12px!important}
+  .content-sheet .book-cover-ornament{width:92px!important;height:104px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:18px 14px 8px!important}
+  .content-sheet .journal-book-frame::after{bottom:8px!important}
+  .content-sheet .book-cover-ornament{width:62px!important;height:72px!important}
+}
+
+
+/* --- Fix pass 4: replace old texture with user parchment, use the provided open-book spread, and rebuild all 4 corners from the supplied corner reference --- */
+.content-sheet .journal-book-frame{
+  background-color:transparent!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:22px 24px 18px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+  background:
+    url('./assets/ui/book/parchment_dynamic_open.png') center center/100% 100% no-repeat,
+    url('./assets/ui/book/parchment_dynamic_texture.png') center/420px 420px repeat!important;
+}
+/* remove the older synthetic center gutter texture; the new parchment already contains its own fold */
+.content-sheet .journal-book-frame::after{
+  display:none!important;
+}
+/* keep content floating directly on the new parchment without reintroducing a second paper layer */
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  background:transparent!important;
+  box-shadow:none!important;
+  border-color:rgba(163,127,77,.22)!important;
+}
+.content-sheet .journal-book-page::before,
+.content-sheet .journal-book-page::after,
+.content-sheet .journal-book-page--left::before,
+.content-sheet .journal-book-page--left::after,
+.content-sheet .journal-book-page--right::before,
+.content-sheet .journal-book-page--right::after{
+  opacity:.28!important;
+}
+/* slightly narrower side page stacks so the new central parchment remains clean and book-like */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  width:104px!important;
+  top:-3px!important;
+  bottom:-3px!important;
+}
+.content-sheet .journal-book-spread::before{
+  left:-14px!important;
+  background-size:104px 100%!important;
+}
+.content-sheet .journal-book-spread::after{
+  right:-18px!important;
+  background-size:104px 100%!important;
+}
+/* use the supplied ornate corner as the master and generate the other three by transform-derived variants */
+.content-sheet .book-cover-ornament{
+  display:block!important;
+  width:124px!important;
+  height:124px!important;
+  z-index:9!important;
+  filter:none!important;
+  background-size:contain!important;
+  background-repeat:no-repeat!important;
+}
+.content-sheet .book-cover-ornament--tl{top:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_tl.png')!important;background-position:left top!important}
+.content-sheet .book-cover-ornament--tr{top:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_tr.png')!important;background-position:right top!important}
+.content-sheet .book-cover-ornament--bl{bottom:-2px!important;left:-2px!important;background-image:url('./assets/ui/book/corner_unified_bl.png')!important;background-position:left bottom!important}
+.content-sheet .book-cover-ornament--br{bottom:-2px!important;right:-2px!important;background-image:url('./assets/ui/book/corner_unified_br.png')!important;background-position:right bottom!important}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 14px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{width:76px!important;background-size:76px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-8px!important}
+  .content-sheet .journal-book-spread::after{right:-10px!important}
+  .content-sheet .book-cover-ornament{width:92px!important;height:92px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 10px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{display:none!important}
+  .content-sheet .book-cover-ornament{width:64px!important;height:64px!important}
+}
+
+
+/* --- Fix pass 5: remove corner page-stack ghosts, extend dark parchment fully to the bottom rail, and remove stray lower lines/strips --- */
+.content-sheet .journal-book-frame{
+  background-color:transparent!important;
+  background-image:
+    url('./assets/ui/book/book_top.png'),
+    url('./assets/ui/book/book_bottom.png'),
+    url('./assets/ui/book/book_left.png'),
+    url('./assets/ui/book/book_right.png')!important;
+  background-position:center top,center bottom,left top,right top!important;
+  background-size:100% 44px,100% 49px,42px 100%,52px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:22px 24px 1px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:
+    inset 0 0 18px rgba(109,80,48,.10),
+    inset 18px 0 18px -18px rgba(128,93,56,.28),
+    inset -18px 0 18px -18px rgba(128,93,56,.28)!important;
+  background:
+    linear-gradient(90deg,
+      rgba(145,112,68,.18) 0,
+      rgba(145,112,68,.08) 6px,
+      rgba(0,0,0,0) 18px,
+      rgba(0,0,0,0) calc(50% - 10px),
+      rgba(133,102,66,.12) calc(50% - 3px),
+      rgba(103,73,45,.18) calc(50% - 1px),
+      rgba(78,54,33,.20) 50%,
+      rgba(103,73,45,.18) calc(50% + 1px),
+      rgba(133,102,66,.12) calc(50% + 3px),
+      rgba(0,0,0,0) calc(50% + 10px),
+      rgba(0,0,0,0) calc(100% - 18px),
+      rgba(145,112,68,.08) calc(100% - 6px),
+      rgba(145,112,68,.18) 100%),
+    url('./assets/ui/book/parchment_dynamic_texture.png') center/420px 420px repeat!important;
+}
+.content-sheet .journal-book-frame::after{display:none!important}
+
+/* move the decorative side page-stacks down so no torn/blurred top fragments appear under the upper rail */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  top:18px!important;
+  bottom:14px!important;
+  width:92px!important;
+  background-size:92px 100%!important;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,transparent 14px,#000 28px,#000 calc(100% - 8px),transparent 100%)!important;
+  mask-image:linear-gradient(to bottom,transparent 0,transparent 14px,#000 28px,#000 calc(100% - 8px),transparent 100%)!important;
+}
+.content-sheet .journal-book-spread::before{left:-8px!important}
+.content-sheet .journal-book-spread::after{right:-10px!important}
+
+/* remove any remaining inner page panel borders and pseudo-lines so nothing shows above or below the bottom rail */
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  background:transparent!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+}
+.content-sheet .journal-book-page::before,
+.content-sheet .journal-book-page::after,
+.content-sheet .journal-book-page--left::before,
+.content-sheet .journal-book-page--left::after,
+.content-sheet .journal-book-page--right::before,
+.content-sheet .journal-book-page--right::after{
+  content:none!important;
+  display:none!important;
+  opacity:0!important;
+}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 1px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{top:16px!important;bottom:12px!important;width:72px!important;background-size:72px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-6px!important}
+  .content-sheet .journal-book-spread::after{right:-8px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
+}
+
+
+/* --- Fix pass 6: use only the clean continuous vellum texture, stretched to the frame edges, with no secondary parchment sheet visible --- */
+.content-sheet .journal-book-frame::before{
+  inset:22px 22px 1px!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:
+    inset 0 0 16px rgba(112,84,48,.10),
+    inset 12px 0 14px -12px rgba(128,93,56,.16),
+    inset -12px 0 14px -12px rgba(128,93,56,.16)!important;
+  background:
+    linear-gradient(90deg,
+      rgba(124,91,56,.08) 0,
+      rgba(0,0,0,0) 22px,
+      rgba(0,0,0,0) calc(50% - 9px),
+      rgba(120,90,56,.10) calc(50% - 2px),
+      rgba(84,60,37,.12) 50%,
+      rgba(120,90,56,.10) calc(50% + 2px),
+      rgba(0,0,0,0) calc(50% + 9px),
+      rgba(0,0,0,0) calc(100% - 22px),
+      rgba(124,91,56,.08) 100%),
+    url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+}
+
+/* keep the content directly on the continuous vellum and do not let any secondary parchment/card edge appear */
+.content-sheet .journal-book-spread,
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right,
+.content-sheet .journal-technical-shell{
+  background:transparent!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+}
+
+/* let the vellum reach visually all the way to the dark lower rail with no pale strip */
+.content-sheet .journal-book-spread{padding-bottom:0!important;margin-bottom:0!important}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame::before{inset:18px 18px 1px!important}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame::before{inset:14px 12px 1px!important}
+}
