@@ -1,7 +1,7 @@
-/* HMK Keeper's Ledger v93.338 — cleaner full book page spread + full visible side page stacks */
+/* HMK Keeper's Ledger v93.339 — frame rails visible + cleaner parchment/page-stack transition */
 html{scrollbar-gutter:stable}
 
-/* stable sub-navigation */
+/* stable journal section tabs */
 .content-sheet .journal-book-subnav,
 .content-sheet .journal-book--chapter .journal-book-subnav{
   display:flex !important;
@@ -19,7 +19,6 @@ html{scrollbar-gutter:stable}
 }
 .content-sheet .journal-book-subnav button{min-height:38px !important;padding:8px 14px !important;}
 
-/* the frame container */
 .content-sheet .journal-book.panel{overflow:visible !important;background:none !important;box-shadow:none !important}
 .content-sheet .journal-book-frame,
 .content-sheet .journal-book--chapter .journal-book-frame{
@@ -27,38 +26,39 @@ html{scrollbar-gutter:stable}
   overflow:visible !important;
   isolation:isolate;
   margin:0 auto;
-  padding:34px 60px 36px !important;
+  padding:50px 82px 48px !important;
   background:transparent !important;
-  box-shadow:0 26px 44px rgba(5,4,6,.44), 0 4px 3px rgba(6,5,7,.72) !important;
+  box-shadow:0 26px 44px rgba(5,4,6,.40), 0 4px 3px rgba(6,5,7,.68) !important;
 }
-/* page spread fills almost the whole book interior */
+
+/* Fill almost the whole inner area with parchment, with side shading for a cleaner transition into page stacks. */
 .content-sheet .journal-book-frame::before,
 .content-sheet .journal-book--chapter .journal-book-frame::before{
   content:"";
   position:absolute;
-  inset:18px 18px 18px 18px;
-  background:url('./assets/ui/bookframe/page_spread.png') center/100% 100% no-repeat !important;
+  inset:22px 58px 22px 58px;
+  background:
+    linear-gradient(90deg, rgba(180,146,96,.20) 0%, rgba(236,223,196,.06) 3.5%, rgba(236,223,196,0) 7%),
+    linear-gradient(270deg, rgba(180,146,96,.20) 0%, rgba(236,223,196,.06) 3.5%, rgba(236,223,196,0) 7%),
+    url('./assets/ui/bookframe/page_spread.png') center/100% 100% no-repeat !important;
   border:0 !important;
   outline:0 !important;
   box-shadow:none !important;
   z-index:1;
   pointer-events:none;
 }
-/* old inner artificial gutter removed — the page spread already contains one */
 .content-sheet .journal-book-frame::after,
 .content-sheet .journal-book--chapter .journal-book-frame::after{display:none !important;content:none !important;}
-
-/* all real content stays above parchment */
 .content-sheet .journal-book-frame > *{position:relative; z-index:6;}
-.content-sheet .journal-book-frame > .hmk-book-decor,
-.content-sheet .journal-book-frame > .book-cover-ornament,
-.content-sheet .journal-book-frame > .hkl-deluxe-edge{z-index:auto;}
+.content-sheet .journal-book-frame > .hmk-book-decor{z-index:auto;}
 
-/* Remove the old competing jewel/side helpers. */
+/* Hide the old extra systems that were creating visual conflicts. */
 .content-sheet .hmk-frame-jewel,
-.content-sheet .hmk-frame-side{display:none !important;}
+.content-sheet .hmk-frame-side,
+.content-sheet .book-cover-ornament,
+.content-sheet .hkl-deluxe-edge{display:none !important;}
 
-/* outer blue-gold frame rails */
+/* Visible top/bottom/left/right rails from the approved graphics set. */
 .content-sheet .hmk-book-decor{position:absolute; inset:0; z-index:14; pointer-events:none; overflow:visible;}
 .content-sheet .hmk-rail{
   position:absolute;
@@ -67,75 +67,26 @@ html{scrollbar-gutter:stable}
   background-repeat:no-repeat;
   background-position:center;
   background-size:100% 100%;
+  filter:drop-shadow(0 1px 2px rgba(18,9,3,.14));
 }
 .content-sheet .hmk-rail--top{
-  top:0; left:74px; right:74px; height:26px;
+  top:0; left:0; right:0; height:54px;
   background-image:url('./assets/ui/bookframe/frame_rail_top.png') !important;
 }
 .content-sheet .hmk-rail--bottom{
-  bottom:0; left:74px; right:74px; height:26px;
+  bottom:0; left:0; right:0; height:54px;
   background-image:url('./assets/ui/bookframe/frame_rail_bottom.png') !important;
 }
 .content-sheet .hmk-rail--left{
-  top:24px; bottom:24px; left:0; width:26px;
+  top:0; bottom:0; left:0; width:54px;
   background-image:url('./assets/ui/bookframe/frame_rail_left.png') !important;
 }
 .content-sheet .hmk-rail--right{
-  top:24px; bottom:24px; right:0; width:26px;
+  top:0; bottom:0; right:0; width:54px;
   background-image:url('./assets/ui/bookframe/frame_rail_right.png') !important;
 }
 
-/* preferred floral corner on every corner */
-.content-sheet .book-cover-ornament{
-  display:block !important;
-  position:absolute;
-  width:114px !important;
-  height:114px !important;
-  z-index:18 !important;
-  pointer-events:none;
-  background-size:contain !important;
-  background-repeat:no-repeat !important;
-  background-position:center !important;
-  filter:drop-shadow(0 2px 4px rgba(28,16,8,.28));
-  opacity:1 !important;
-}
-.content-sheet .book-cover-ornament--tl{top:-2px !important; left:-2px !important; background-image:url('./assets/ui/bookframe/frame_corner_tl.png') !important;}
-.content-sheet .book-cover-ornament--tr{top:-2px !important; right:-2px !important; background-image:url('./assets/ui/bookframe/frame_corner_tr.png') !important;}
-.content-sheet .book-cover-ornament--bl{bottom:-2px !important; left:-2px !important; background-image:url('./assets/ui/bookframe/frame_corner_bl.png') !important;}
-.content-sheet .book-cover-ornament--br{bottom:-2px !important; right:-2px !important; background-image:url('./assets/ui/bookframe/frame_corner_br.png') !important;}
-
-/* full visible side page stacks, cleanly touching the parchment spread */
-.content-sheet .hkl-deluxe-edge{
-  position:absolute;
-  display:block !important;
-  pointer-events:none;
-  top:20px;
-  bottom:20px;
-  width:52px;
-  z-index:4;
-  background-repeat:repeat-y;
-  background-position:center top;
-  background-size:100% auto;
-}
-.content-sheet .hkl-deluxe-edge--left{
-  left:20px;
-  background-image:url('./assets/ui/bookframe/frame_pages_left_repeat.png') !important;
-}
-.content-sheet .hkl-deluxe-edge--right{
-  right:20px;
-  background-image:url('./assets/ui/bookframe/frame_pages_right_repeat.png') !important;
-}
-/* soft blending edge into the parchment */
-.content-sheet .hkl-deluxe-edge::after{
-  content:"";
-  position:absolute;
-  top:0; bottom:0; width:10px;
-}
-.content-sheet .hkl-deluxe-edge--left::after{right:-1px;background:linear-gradient(90deg,rgba(231,216,186,0),rgba(231,216,186,.98));}
-.content-sheet .hkl-deluxe-edge--right::after{left:-1px;background:linear-gradient(270deg,rgba(231,216,186,0),rgba(231,216,186,.98));}
-.content-sheet .hkl-deluxe-edge::before{display:none !important;content:none !important;}
-
-/* unified top spacing for chapter shells so the book does not jump on tab switch */
+/* unify spacing across sections */
 .content-sheet .journal-book-page,
 .content-sheet .journal-book-page--left,
 .content-sheet .journal-book-page--right{padding-top:8px !important;}
@@ -148,40 +99,30 @@ html{scrollbar-gutter:stable}
 
 @media(max-width:1530px){
   .content-sheet .journal-book-frame,
-  .content-sheet .journal-book--chapter .journal-book-frame{padding:30px 50px 32px !important;}
+  .content-sheet .journal-book--chapter .journal-book-frame{padding:44px 72px 42px !important;}
   .content-sheet .journal-book-frame::before,
-  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:16px 16px 16px 16px;}
-  .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{left:62px; right:62px; height:22px;}
-  .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{top:20px; bottom:20px; width:22px;}
-  .content-sheet .book-cover-ornament{width:98px !important;height:98px !important;}
-  .content-sheet .hkl-deluxe-edge{top:18px;bottom:18px;width:44px;}
-  .content-sheet .hkl-deluxe-edge--left{left:16px;}
-  .content-sheet .hkl-deluxe-edge--right{right:16px;}
+  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:18px 50px 18px 50px;}
+  .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{height:46px;}
+  .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{width:46px;}
 }
 @media(max-width:1160px){
   .content-sheet .journal-book-frame,
-  .content-sheet .journal-book--chapter .journal-book-frame{padding:26px 38px 28px !important;}
+  .content-sheet .journal-book--chapter .journal-book-frame{padding:34px 50px 34px !important;}
   .content-sheet .journal-book-subnav,
   .content-sheet .journal-book--chapter .journal-book-subnav{margin:0 8px 8px !important; gap:6px;}
-  .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{left:48px; right:48px; height:18px;}
-  .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{top:16px; bottom:16px; width:18px;}
-  .content-sheet .book-cover-ornament{width:74px !important;height:74px !important;}
-  .content-sheet .hkl-deluxe-edge{top:14px;bottom:14px;width:28px;}
-  .content-sheet .hkl-deluxe-edge--left{left:12px;}
-  .content-sheet .hkl-deluxe-edge--right{right:12px;}
+  .content-sheet .journal-book-frame::before,
+  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:14px 34px 14px 34px;}
+  .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{height:34px;}
+  .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{width:34px;}
 }
 @media(max-width:800px){
   .content-sheet .journal-book-frame,
-  .content-sheet .journal-book--chapter .journal-book-frame{padding:24px 22px 24px !important;}
+  .content-sheet .journal-book--chapter .journal-book-frame{padding:24px 24px 24px !important;}
   .content-sheet .journal-book-subnav,
   .content-sheet .journal-book--chapter .journal-book-subnav{margin:0 0 8px !important;}
   .content-sheet .journal-book-subnav button{min-height:34px !important; padding:7px 10px !important;}
   .content-sheet .journal-book-frame::before,
-  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:12px 12px 12px 12px;}
-  .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{left:26px; right:26px; height:12px;}
-  .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{top:10px; bottom:10px; width:12px;}
-  .content-sheet .book-cover-ornament{width:52px !important;height:52px !important;}
-  .content-sheet .hkl-deluxe-edge{top:10px;bottom:10px;width:14px;}
-  .content-sheet .hkl-deluxe-edge--left{left:8px;}
-  .content-sheet .hkl-deluxe-edge--right{right:8px;}
+  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:10px 18px 10px 18px;}
+  .content-sheet .hmk-rail--top,.content-sheet .hmk-rail--bottom{height:20px;}
+  .content-sheet .hmk-rail--left,.content-sheet .hmk-rail--right{width:20px;}
 }
