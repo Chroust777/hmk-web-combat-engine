@@ -1,0 +1,1027 @@
+{
+  "version": "93.324",
+  "source": "User graficka_sada_pro_web.zip",
+  "components": [
+    {
+      "id": 1,
+      "name": "dlouhy_pergamenovy_stitek.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.508,
+      "sha256": "61c18f46ec25e0f88e2a4d03e39536ab2f740e09795848eb461b6278d7756c9e",
+      "role": "header-parchment-plaque",
+      "status": "available-alternative",
+      "file": "originals/01.png"
+    },
+    {
+      "id": 2,
+      "name": "dolni_ramovy_tram_knihy.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.835,
+      "sha256": "d1f4595c2a64e3ea3540559303b07debb385d3b02a93c68806b962aa3017d19c",
+      "role": "bottom-frame-fixed",
+      "status": "available-alternative",
+      "file": "originals/02.png"
+    },
+    {
+      "id": 3,
+      "name": "dolni_stredovy_ornament.png",
+      "size": [
+        1774,
+        887
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.682,
+      "sha256": "c2ee975c5073331fee9abd5eefa117f5e9773b9d1d0839920f5b9bd25520f6a2",
+      "role": "bottom-spine-flourish",
+      "status": "available-alternative",
+      "file": "originals/03.png"
+    },
+    {
+      "id": 4,
+      "name": "gotick├Ż_zlat├Ż_ornament├íln├ş_odd─Ťlova─Ź_s_modr├Żm_emai.png",
+      "size": [
+        1086,
+        1448
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.956,
+      "sha256": "b17671f9b10552648de2f734f0722dac375e450862916b67d8029911d00687e1",
+      "role": "slim-gothic-divider",
+      "status": "available-alternative",
+      "file": "originals/04.png"
+    },
+    {
+      "id": 5,
+      "name": "horni_dekorativni_ramovy_pruh.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.893,
+      "sha256": "f16052b3212269745e4fbc2f22c78899e751443fbf5edf4bfb5860ad2553dc9b",
+      "role": "top-frame-fixed-alt",
+      "status": "available-alternative",
+      "file": "originals/05.png"
+    },
+    {
+      "id": 6,
+      "name": "horni_ramovy_tram_knihy.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.804,
+      "sha256": "cc4043a4b2f99dd5a34ff668bf63c460e05d8d8ef60519af40e69ac9c896b523",
+      "role": "top-frame-fixed",
+      "status": "available-alternative",
+      "file": "originals/06.png"
+    },
+    {
+      "id": 7,
+      "name": "horni_stredovy_ornament.png",
+      "size": [
+        1774,
+        887
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.753,
+      "sha256": "2483248c63beed895338913d4c9a1e7c278872eacbd618de2c0081f4645ad22d",
+      "role": "top-spine-flourish",
+      "status": "available-alternative",
+      "file": "originals/07.png"
+    },
+    {
+      "id": 8,
+      "name": "jemný_oválný_stín_na_průhledném_pozadí.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        237
+      ],
+      "transparent_ratio": 1.0,
+      "sha256": "490b94163fc98345e490881fa865e276673653589b9520bf2867e1b1393827f4",
+      "role": "book-drop-shadow",
+      "status": "main",
+      "file": "originals/08.png"
+    },
+    {
+      "id": 9,
+      "name": "levy_bocni_heraldicky_prvek.png",
+      "size": [
+        1024,
+        1536
+      ],
+      "alpha_extrema": [
+        0,
+        254
+      ],
+      "transparent_ratio": 0.87,
+      "sha256": "56c9bc01ee419d4286412745cf7d900c764b5b624e17eba5a0fd0176d266c022",
+      "role": "left-side-accent",
+      "status": "main",
+      "file": "originals/09.png"
+    },
+    {
+      "id": 10,
+      "name": "levy_dolni_knihovni_roh_varianta.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.764,
+      "sha256": "fb213617d377d43a546d90738a233c5d25478afbe7dbcc8602d6efa116ca8a18",
+      "role": "bottom-left-corner-primary",
+      "status": "main",
+      "file": "originals/10.png"
+    },
+    {
+      "id": 11,
+      "name": "levy_horni_knihovni_roh_varianta.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.778,
+      "sha256": "1178e9e8a18a9397e156ba96d17fac8381c0e3b4a186594ea791cf135399646f",
+      "role": "top-left-corner-primary",
+      "status": "main",
+      "file": "originals/11.png"
+    },
+    {
+      "id": 12,
+      "name": "levy_svisly_knizni_okraj.png",
+      "size": [
+        724,
+        2172
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.795,
+      "sha256": "8f9c18b43ddbf21ece5a0e1e704fb5050e0f00d319b1a9b881a632cf978abcd6",
+      "role": "left-side-rail-accent",
+      "status": "main",
+      "file": "originals/12.png"
+    },
+    {
+      "id": 13,
+      "name": "obdelnikovy_pergamenovy_panel.png",
+      "size": [
+        1448,
+        1086
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.446,
+      "sha256": "9645dfc3798ef522dd0526aa7412054c2ca540fbdabaff4cf264218c6349316e",
+      "role": "parchment-panel-alt",
+      "status": "available-alternative",
+      "file": "originals/13.png"
+    },
+    {
+      "id": 14,
+      "name": "ornament├íln├ş_gotick├Ż_zlat├Ż_d─Ťlic├ş_pruh.png",
+      "size": [
+        1448,
+        1086
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.926,
+      "sha256": "fee0391e6cdcb390f75eb7ae5ca46221643b18cf51c43b4f1faf8d20b99c347a",
+      "role": "small-horizontal-gold-rule",
+      "status": "available-alternative",
+      "file": "originals/14.png"
+    },
+    {
+      "id": 15,
+      "name": "ornament├íln├ş_modrozlat├Ż_heraldick├Ż_h┼Öeben.png",
+      "size": [
+        1448,
+        1086
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.779,
+      "sha256": "ebd28c174dc4ee02a9e5e9c7bd9a3882906c01428b1583d83461b958fdc6d3cc",
+      "role": "gilded-blue-spine-cap-alt",
+      "status": "available-alternative",
+      "file": "originals/15.png"
+    },
+    {
+      "id": 16,
+      "name": "ornament├íln├ş_zlat├Ż_kni┼żn├ş_odd─Ťlova─Ź.png",
+      "size": [
+        1086,
+        1448
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.947,
+      "sha256": "37a46810e59e42c8333d9dd91cc092d605e2e8f3932afc672d3bbc77cb115bdf",
+      "role": "vertical-gold-rule",
+      "status": "available-alternative",
+      "file": "originals/16.png"
+    },
+    {
+      "id": 17,
+      "name": "ornamentální_modro_zlatý_heraldický_přívěsek.png",
+      "size": [
+        1024,
+        1536
+      ],
+      "alpha_extrema": [
+        0,
+        254
+      ],
+      "transparent_ratio": 0.77,
+      "sha256": "e2b372c40490734e02d372b174a4cd0a40c3034ead9eb085132b3a9c77c794a6",
+      "role": "small-spine-flourish-alt",
+      "status": "available-alternative",
+      "file": "originals/17.png"
+    },
+    {
+      "id": 18,
+      "name": "ornamentální_modrozlatý_fantasy_rám.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.815,
+      "sha256": "7315a181cd731fd53de156ccaf90dbbe2405a1700ec03b96328ef5eadb8de0cc",
+      "role": "top-frame-fixed-alt2",
+      "status": "available-alternative",
+      "file": "originals/18.png"
+    },
+    {
+      "id": 19,
+      "name": "ornamentální_okraje_starobylé_knihy.png",
+      "size": [
+        1448,
+        1086
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.832,
+      "sha256": "cb7c6b133cbbac8310c3a5e01454d7d5d0dc8a68df33271133438c2d873575a3",
+      "role": "page-edges-pair",
+      "status": "main",
+      "file": "originals/19.png"
+    },
+    {
+      "id": 20,
+      "name": "ornamentalni_pergamenovy_stitek.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.361,
+      "sha256": "3f1b42db8ef67a3a3e80fc8589bb286d5ac6cf0f0d2cb2e47c37554bdbfac8a2",
+      "role": "long-parchment-plaque",
+      "status": "available-alternative",
+      "file": "originals/20.png"
+    },
+    {
+      "id": 21,
+      "name": "ornamentální_prázdná_pergamenová_stránka.png",
+      "size": [
+        1086,
+        1448
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.137,
+      "sha256": "460f2f4a453d2b91d79ae276f566d87d77844262842cb63d1ba6c5f50733ee14",
+      "role": "gilded-page-panel-alt",
+      "status": "available-alternative",
+      "file": "originals/21.png"
+    },
+    {
+      "id": 22,
+      "name": "ornamentální_zlatomodrý_fantasy_předěl.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.888,
+      "sha256": "f31d3d6c3ee657a1b7e7be530662a029e97b6ef4ef71981da541306f233363d3",
+      "role": "ornamental-title-rule",
+      "status": "available-alternative",
+      "file": "originals/22.png"
+    },
+    {
+      "id": 23,
+      "name": "ornamentální_zlatomodrý_heraldický_štít.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.583,
+      "sha256": "87443a7d76bee7b0dca488032d3d550700ce61ccc107e9fe174ec44332e8c3e4",
+      "role": "blank-blue-heraldic-shield",
+      "status": "main",
+      "file": "originals/23.png"
+    },
+    {
+      "id": 24,
+      "name": "ornamentovan├Ż_modrozlat├Ż_fantasy_sloup.png",
+      "size": [
+        1086,
+        1448
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.826,
+      "sha256": "f7ef5d58e5723b98b7441681b0ab71c5c69e940e4d7fda20701a2f9ab3d7ceab",
+      "role": "blue-gold-vertical-pillar",
+      "status": "available-alternative",
+      "file": "originals/24.png"
+    },
+    {
+      "id": 25,
+      "name": "ornate_marinebl├ątsk├Ż_zlat├Ż_erb.png",
+      "size": [
+        1448,
+        1086
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.664,
+      "sha256": "ee828ffb08b91926a8cf7a96d314ca526b1d8e8bedf992c1eb3a67c81a57ad3a",
+      "role": "spine-cap-alt",
+      "status": "available-alternative",
+      "file": "originals/25.png"
+    },
+    {
+      "id": 26,
+      "name": "ornate_zlatomodr├Ż_fantasy_odd─Ťlova─Ź.png",
+      "size": [
+        1448,
+        1086
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.934,
+      "sha256": "240550e9704a49795cacc733db28dd3b3acebc972e45fb725b380847e34c6d28",
+      "role": "short-blue-gold-rule",
+      "status": "available-alternative",
+      "file": "originals/26.png"
+    },
+    {
+      "id": 27,
+      "name": "ornate_zlatomodrý_fantasy_sloupový_ornament.png",
+      "size": [
+        724,
+        2172
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.858,
+      "sha256": "45bf0f0e67a5da7528555b1c20124de21fdb760615c8a09d0e52bf7a107e2d37",
+      "role": "slim-vertical-gold-rule",
+      "status": "available-alternative",
+      "file": "originals/27.png"
+    },
+    {
+      "id": 28,
+      "name": "ornate_zlatomodrý_gotický_rám.png",
+      "size": [
+        724,
+        2172
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.83,
+      "sha256": "cddc11e4b079760f4d2235eeb53250d6ec13de18edaaf4abc19ed00634e410c7",
+      "role": "outer-gothic-side-rail-alt",
+      "status": "available-alternative",
+      "file": "originals/28.png"
+    },
+    {
+      "id": 29,
+      "name": "ornate_zlatý_heraldický_oddělovač.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.899,
+      "sha256": "9cd400c9447f3c50855b28727b7aac2259b136d66306a9c6ee43237877855da0",
+      "role": "heraldic-horizontal-divider",
+      "status": "available-alternative",
+      "file": "originals/29.png"
+    },
+    {
+      "id": 30,
+      "name": "ozdobený_gotický_pergamenový_banner.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.509,
+      "sha256": "0b1161f186ca5e0b40609a7e9642459fd9fb3e110bffdb67379e450b928db898",
+      "role": "gilded-header-scroll",
+      "status": "available-alternative",
+      "file": "originals/30.png"
+    },
+    {
+      "id": 31,
+      "name": "ozdobn├Ż_pr├ízdn├Ż_pergamenov├Ż_banner.png",
+      "size": [
+        1448,
+        1086
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.785,
+      "sha256": "979eb647e8aff05520003f2f8849f4c0fa4084418838c4c5fde4e1a7a4ab7fac",
+      "role": "plain-parchment-plaque",
+      "status": "available-alternative",
+      "file": "originals/31.png"
+    },
+    {
+      "id": 32,
+      "name": "ozdobn├Ż_zlat├Ż_roh_kni┼żn├şho_r├ímu.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.746,
+      "sha256": "2b149dbcc6c07cee8add1ff695d7278cc041d2df6fa2554bd890b553314f7b75",
+      "role": "top-left-corner-alt",
+      "status": "available-alternative",
+      "file": "originals/32.png"
+    },
+    {
+      "id": 33,
+      "name": "ozdobn├Ż_zlat├Ż_roh_s_modrou_patinou.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.756,
+      "sha256": "64fa2c63ac391ee5f9c142bf17e762741adaddb2e71e359ebff1c2c84f7ba3c1",
+      "role": "top-right-corner-alt",
+      "status": "available-alternative",
+      "file": "originals/33.png"
+    },
+    {
+      "id": 34,
+      "name": "ozdobný_modrozlatý_pergamenový_panel.png",
+      "size": [
+        1024,
+        1536
+      ],
+      "alpha_extrema": [
+        0,
+        254
+      ],
+      "transparent_ratio": 0.557,
+      "sha256": "61bdfbffb91fef3ad4afee478b7839323b1f56fe4267bde6f67e5b2a8854fe55",
+      "role": "vertical-parchment-panel-alt",
+      "status": "available-alternative",
+      "file": "originals/34.png"
+    },
+    {
+      "id": 35,
+      "name": "ozdobný_zlatomodrý_fantasy_rám_panel.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.639,
+      "sha256": "4b0c87887fcca1cf21eac29384f2eef32c1a029ee19e0f8a9dba066540d2eda0",
+      "role": "footer-banner-alt",
+      "status": "available-alternative",
+      "file": "originals/35.png"
+    },
+    {
+      "id": 36,
+      "name": "pravy_bocni_heraldicky_prvek.png",
+      "size": [
+        1024,
+        1536
+      ],
+      "alpha_extrema": [
+        0,
+        254
+      ],
+      "transparent_ratio": 0.894,
+      "sha256": "7e206486b90ad6d91e506321cd80714a85acb42d37d5852d35134ffc08a67e71",
+      "role": "right-side-accent",
+      "status": "main",
+      "file": "originals/36.png"
+    },
+    {
+      "id": 37,
+      "name": "pravy_dolni_knihovni_roh_varianta.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.736,
+      "sha256": "68941509b74ab964863a22edf805e9a1e6e3de2042afd0634b67d7b2addba4f8",
+      "role": "bottom-right-corner-primary",
+      "status": "main",
+      "file": "originals/37.png"
+    },
+    {
+      "id": 38,
+      "name": "pravy_horni_knihovni_roh_varianta.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.75,
+      "sha256": "a027feef54fec600d283d48a3d1f3dd2ebf45d6cf6e9778f466382f09c43ee44",
+      "role": "top-right-corner-primary",
+      "status": "main",
+      "file": "originals/38.png"
+    },
+    {
+      "id": 39,
+      "name": "pravy_svisly_knizni_okraj.png",
+      "size": [
+        724,
+        2172
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.798,
+      "sha256": "d3fd2de88a6b21bc66f1cd8c8c15c70190d029fa5413c0fc9486c6b49d83723f",
+      "role": "right-side-rail-accent",
+      "status": "main",
+      "file": "originals/39.png"
+    },
+    {
+      "id": 40,
+      "name": "spodni_dekorativni_ramovy_pruh.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.861,
+      "sha256": "cba3f8c0954ca1acbb1e1ebf505d06f18f790e6bac36189a19aefb16c83270eb",
+      "role": "bottom-frame-fixed-alt",
+      "status": "available-alternative",
+      "file": "originals/40.png"
+    },
+    {
+      "id": 41,
+      "name": "starobyl├Ż_pr├ízdn├Ż_pergamenov├Ż_dvojlist.png",
+      "size": [
+        1448,
+        1086
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.152,
+      "sha256": "7f0316c68aea8d88cb631c9fff78b0d850dc67a6ae56677223eacc72bb95db9f",
+      "role": "two-page-parchment-reference",
+      "status": "available-alternative",
+      "file": "originals/41.png"
+    },
+    {
+      "id": 42,
+      "name": "stredovy_diamantovy_emblem.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.792,
+      "sha256": "23c1dea1d87f4e2bfe907999af68557ae06ad94b9029b1806baace6681d32ecf",
+      "role": "diamond-spine-emblem",
+      "status": "main",
+      "file": "originals/42.png"
+    },
+    {
+      "id": 43,
+      "name": "stredovy_knizni_hrbet.png",
+      "size": [
+        724,
+        2172
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.754,
+      "sha256": "10ab117f7ad36c180bf72d976e45b00c94157ee1868b18bb7d362354d40fcbce",
+      "role": "ornate-blue-book-spine-alt",
+      "status": "available-alternative",
+      "file": "originals/43.png"
+    },
+    {
+      "id": 44,
+      "name": "středový_stín_knižního_hřbetu.png",
+      "size": [
+        724,
+        2172
+      ],
+      "alpha_extrema": [
+        0,
+        252
+      ],
+      "transparent_ratio": 0.99,
+      "sha256": "f73dc9b721f8cadbcc7c1da9eb43959aa92e4113b8f149a5f8c2b4e84b83d392",
+      "role": "book-fold-gradient",
+      "status": "main",
+      "file": "originals/44.png"
+    },
+    {
+      "id": 45,
+      "name": "svisly_pergamenovy_panel.png",
+      "size": [
+        724,
+        2172
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.368,
+      "sha256": "b78e92697d8955709b1dd54a0738712c3aa1faf402cf55ee034c5c14d6877f8d",
+      "role": "vertical-parchment-panel",
+      "status": "available-alternative",
+      "file": "originals/45.png"
+    },
+    {
+      "id": 46,
+      "name": "zlat├Ż_barokn├ş_ornament_s_modr├Żm_smaltem.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.85,
+      "sha256": "779f12d47d068287b274ed1517c37a1c2f6e323981dd7f91e4d73bc1f5d9dfa4",
+      "role": "blue-spine-flourish-alt",
+      "status": "available-alternative",
+      "file": "originals/46.png"
+    },
+    {
+      "id": 47,
+      "name": "zlat├Ż_gotick├Ż_ornament├íln├ş_d─Ťli─Ź.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.807,
+      "sha256": "d7cccc13709eb043057131505ea7c059ec76b42669af8c163fe0e4844235c9e9",
+      "role": "large-gothic-rule-alt",
+      "status": "available-alternative",
+      "file": "originals/47.png"
+    },
+    {
+      "id": 48,
+      "name": "zlaté_ornamentální.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.964,
+      "sha256": "bc5e0cff1a33f9fb60f2a44364a7af8562bb9c01da1cebd14236c3593d78c1ee",
+      "role": "thin-gold-rule",
+      "status": "main",
+      "file": "originals/48.png"
+    },
+    {
+      "id": 49,
+      "name": "zlaté_ornamentální_dělicí_linie_fantasy_ui.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.985,
+      "sha256": "c7a85da7302a38636048cfc05801be104722ade06b0f2897453421a5a4194943",
+      "role": "minimal-gold-cornerlines",
+      "status": "main",
+      "file": "originals/49.png"
+    },
+    {
+      "id": 50,
+      "name": "antick├Ż_zlatomodr├Ż_ornament_s_diamantem.png",
+      "size": [
+        724,
+        2172
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.715,
+      "sha256": "0480566681a615ed780c64a3b3477c7b90070d63342af8e617a19fcb7f4c8480",
+      "role": "vertical-diamond-rule",
+      "status": "available-alternative",
+      "file": "originals/50.png"
+    },
+    {
+      "id": 51,
+      "name": "antique_gold_diamond_divider.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.816,
+      "sha256": "276667f13ea2a36efe7eb7d47debc45c8176da19a5bbbb3297bc44cd5afbc407",
+      "role": "antique-horizontal-diamond-rule",
+      "status": "available-alternative",
+      "file": "originals/51.png"
+    },
+    {
+      "id": 52,
+      "name": "antique_parchment_panel_frame.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.178,
+      "sha256": "616301cd61e6ce2ee33a340f1b79bfb85a622f600fa4d04bff59aa16d526c267",
+      "role": "blank-parchment-panel",
+      "status": "available-alternative",
+      "file": "originals/52.png"
+    },
+    {
+      "id": 53,
+      "name": "barokn├ş_modrozlat├Ż_ornament_knihy.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.824,
+      "sha256": "e4fca788379fbf3cca63a347250fb3cfc967d18aac1c57eea2e5cbdb8a8fee07",
+      "role": "spine-flower-alt",
+      "status": "available-alternative",
+      "file": "originals/53.png"
+    },
+    {
+      "id": 54,
+      "name": "barokn├ş_zlat├Ż_ornament_s_modr├Żmi_akcenty.png",
+      "size": [
+        724,
+        2172
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.746,
+      "sha256": "7a9cc2dc930f5011e1004f3b28231359de4d41fe78459369d8fd76b45b81f9f7",
+      "role": "vertical-gold-ornament-alt",
+      "status": "available-alternative",
+      "file": "originals/54.png"
+    },
+    {
+      "id": 55,
+      "name": "barokn├ş_zlat├Ż_roh_fantasy_knihy.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.691,
+      "sha256": "1c17ca82d8d0a5b2ea102d772034c0d1b3befc556f368b046803f8af52518a93",
+      "role": "bottom-right-corner-alt",
+      "status": "available-alternative",
+      "file": "originals/55.png"
+    },
+    {
+      "id": 56,
+      "name": "barokn├ş_zlato_modr├Ż_rohov├Ż_ornament.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.712,
+      "sha256": "f71293b1e4302dc68581a6ae56bb8994522397fdfa59206f2c7d61e0225b2eb5",
+      "role": "bottom-left-corner-alt",
+      "status": "available-alternative",
+      "file": "originals/56.png"
+    },
+    {
+      "id": 57,
+      "name": "barokní_zlatomodrý_knižní_ornament.png",
+      "size": [
+        1024,
+        1536
+      ],
+      "alpha_extrema": [
+        0,
+        254
+      ],
+      "transparent_ratio": 0.729,
+      "sha256": "551c88c0375664e017f972cb2580fcf8320c7aa27d34fa470b7992def75be886",
+      "role": "ornate-blue-gold-medallion",
+      "status": "available-alternative",
+      "file": "originals/57.png"
+    },
+    {
+      "id": 58,
+      "name": "bezešvá_textura_starého_pergamenu.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        255,
+        255
+      ],
+      "transparent_ratio": 0.0,
+      "sha256": "c98d96a11fc35ecd8789a6d5e89a0b1c15a1f288d79b9897b04c56280dd98b66",
+      "role": "parchment-tile-source",
+      "status": "main",
+      "file": "originals/58.png"
+    },
+    {
+      "id": 59,
+      "name": "bezešvý_námořnicky_modrý_zlatý_ornamentální_pás.png",
+      "size": [
+        2172,
+        724
+      ],
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_ratio": 0.785,
+      "sha256": "235dc6e6a2fc1b2fee6029ecd7723daccc6ec0766db884e4ae65ed5859b4c72b",
+      "role": "navy-gold-rail-source",
+      "status": "main",
+      "file": "originals/59.png"
+    },
+    {
+      "id": 60,
+      "name": "bezešvý_tmavě_modrý_kožený_povrch.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_extrema": [
+        255,
+        255
+      ],
+      "transparent_ratio": 0.0,
+      "sha256": "49532b8252f7fba24829e08c6349e727448136807cf7d9266d8a5a8c92b10663",
+      "role": "navy-leather-tile-source",
+      "status": "main",
+      "file": "originals/60.png"
+    }
+  ],
+  "note": "Originals are preserved as uploaded; derived cropped/raster-seamless repeat tiles are in render. Optional alternatives are intentionally not all rendered simultaneously."
+}
