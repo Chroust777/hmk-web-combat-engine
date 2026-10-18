@@ -1,0 +1,210 @@
+/* HMK v93.335 final fixes: stable journal tabs, Czech labels shell, deluxe frame visibility */
+
+/* Keep the journal section tabs visible and fixed in the same vertical position on every sheet. */
+.content-sheet .journal-book-subnav,
+.content-sheet .journal-book--chapter .journal-book-subnav{
+  display:flex !important;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+  margin:0 22px 10px !important;
+  padding:0 !important;
+  position:relative !important;
+  top:0 !important;
+  transform:none !important;
+  z-index:20 !important;
+}
+
+/* Remove old auxiliary blue rails that created the stray blue line above the frame. */
+.content-sheet .hmk-rail--top,
+.content-sheet .hmk-rail--left,
+.content-sheet .hmk-rail--right,
+.content-sheet .hmk-frame-jewel--top,
+.content-sheet .hmk-frame-side{
+  display:none !important;
+}
+
+/* Force the deluxe split book sides to be the visible frame on all journal views. */
+.content-sheet .journal-book-frame,
+.content-sheet .journal-book--chapter .journal-book-frame{
+  position:relative;
+  overflow:visible !important;
+  padding:26px 96px 38px !important;
+  background-image:
+    url('./assets/ui/book/book_top.png'),
+    url('./assets/ui/book/book_bottom.png'),
+    url('./assets/ui/book/book_side_left_deluxe.png'),
+    url('./assets/ui/book/book_side_right_deluxe.png'),
+    url('./assets/ui/book/book_gutter.png') !important;
+  background-position:center top,center bottom,left top,right top,center top !important;
+  background-size:100% 42px,100% 48px,96px 100%,96px 100%,44px 100% !important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat !important;
+  box-shadow:0 24px 40px rgba(5,4,6,.52),0 4px 3px rgba(6,5,7,.8) !important;
+}
+.content-sheet .journal-book-frame::before,
+.content-sheet .journal-book--chapter .journal-book-frame::before{
+  inset:18px 83px 24px !important;
+}
+.content-sheet .journal-book-frame::after,
+.content-sheet .journal-book--chapter .journal-book-frame::after{
+  display:block !important;
+  top:26px !important;
+  bottom:38px !important;
+  width:44px !important;
+  left:calc(96px + (100% - 192px) * .455 - 22px) !important;
+  background:url('./assets/ui/book/book_gutter.png') center/100% 100% no-repeat !important;
+  opacity:.78 !important;
+}
+
+/* Same content offset for overview and the other tabs so the shell no longer jumps. */
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{
+  padding-top:8px !important;
+}
+.content-sheet .journal-book--chapter .journal-alt-header{
+  padding:0 18px 6px !important;
+  margin:0 !important;
+}
+.content-sheet .journal-book--chapter .journal-alt-header-block{
+  min-height:70px !important;
+  padding:6px 14px 8px !important;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body{
+  padding:0 18px 16px !important;
+}
+.content-sheet .journal-book--chapter .journal-technical-shell{
+  min-height:640px !important;
+  margin-top:0 !important;
+}
+
+/* Czech sheet tabs styling consistency */
+.content-sheet .journal-book-subnav button{
+  min-height:38px !important;
+  padding:8px 14px !important;
+}
+
+@media(max-width:1530px){
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame{
+    padding:24px 78px 36px !important;
+    background-size:100% 40px,100% 46px,78px 100%,78px 100%,40px 100% !important;
+  }
+  .content-sheet .journal-book-frame::before,
+  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:17px 67px 22px !important;}
+  .content-sheet .journal-book-frame::after,
+  .content-sheet .journal-book--chapter .journal-book-frame::after{left:calc(78px + (100% - 156px) * .455 - 20px) !important; top:24px !important; bottom:36px !important;}
+}
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame{
+    padding:22px 54px 32px !important;
+    background-size:100% 34px,100% 40px,54px 100%,54px 100%,34px 100% !important;
+  }
+  .content-sheet .journal-book-frame::before,
+  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:16px 44px 20px !important;}
+  .content-sheet .journal-book-frame::after,
+  .content-sheet .journal-book--chapter .journal-book-frame::after{left:calc(54px + (100% - 108px) * .455 - 17px) !important; top:22px !important; bottom:32px !important;}
+  .content-sheet .journal-book-subnav,
+  .content-sheet .journal-book--chapter .journal-book-subnav{margin:0 10px 8px !important; gap:6px;}
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame{
+    padding:20px 28px 28px !important;
+    background-size:100% 28px,100% 32px,28px 100%,28px 100%,24px 100% !important;
+  }
+  .content-sheet .journal-book-frame::before,
+  .content-sheet .journal-book--chapter .journal-book-frame::before{inset:14px 18px 18px !important;}
+  .content-sheet .journal-book-frame::after,
+  .content-sheet .journal-book--chapter .journal-book-frame::after{display:none !important;}
+  .content-sheet .journal-book-subnav,
+  .content-sheet .journal-book--chapter .journal-book-subnav{margin:0 0 8px !important;}
+  .content-sheet .journal-book-subnav button{min-height:34px !important; padding:7px 10px !important;}
+}
+
+/* v93.336: true stretchable deluxe side rails.
+   The full 1050px ornaments are never stretched to the book's changing height.
+   A cropped repeat fills the centre; the original top/bottom details stay fixed. */
+html{scrollbar-gutter:stable}
+.content-sheet .journal-book-frame,
+.content-sheet .journal-book--chapter .journal-book-frame{
+  --hkl-side-width:96px;
+  background-image:
+    url('./assets/ui/book/book_top.png'),
+    url('./assets/ui/book/book_bottom.png'),
+    none,none,
+    url('./assets/ui/book/book_gutter.png') !important;
+  background-size:100% 42px,100% 48px,0 0,0 0,44px 100% !important;
+  overflow:visible !important;
+  isolation:isolate;
+  overflow-anchor:none;
+}
+.content-sheet .hkl-deluxe-edge{
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:var(--hkl-side-width);
+  z-index:10;
+  pointer-events:none;
+  background-position:left top;
+  background-size:100% auto;
+  background-repeat:repeat-y;
+  filter:drop-shadow(0 3px 2px rgba(13,8,5,.18));
+}
+.content-sheet .hkl-deluxe-edge--left{
+  left:0;
+  background-image:url('./assets/ui/book/book_side_left_repeat.png');
+}
+.content-sheet .hkl-deluxe-edge--right{
+  right:0;
+  background-image:url('./assets/ui/book/book_side_right_repeat.png');
+}
+.content-sheet .hkl-deluxe-edge::before,
+.content-sheet .hkl-deluxe-edge::after{
+  content:"";
+  position:absolute;
+  left:0;
+  width:100%;
+  height:calc(var(--hkl-side-width) * 1.69);
+  pointer-events:none;
+  background-repeat:no-repeat;
+  background-size:100% auto;
+}
+.content-sheet .hkl-deluxe-edge::before{top:0;background-position:center top}
+.content-sheet .hkl-deluxe-edge::after{bottom:0;background-position:center bottom}
+.content-sheet .hkl-deluxe-edge--left::before,
+.content-sheet .hkl-deluxe-edge--left::after{background-image:url('./assets/ui/book/book_side_left_deluxe.png')}
+.content-sheet .hkl-deluxe-edge--right::before,
+.content-sheet .hkl-deluxe-edge--right::after{background-image:url('./assets/ui/book/book_side_right_deluxe.png')}
+/* The old helper strips should not compete with the deluxe frame. */
+.content-sheet .hmk-rail--bottom{display:none!important}
+/* These dimensions match the padding and inner-rule offsets used by the frame. */
+@media(max-width:1530px){
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame{
+    --hkl-side-width:78px;
+    background-size:100% 40px,100% 46px,0 0,0 0,40px 100% !important;
+  }
+}
+@media(max-width:1160px){
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame{
+    --hkl-side-width:54px;
+    background-size:100% 34px,100% 40px,0 0,0 0,34px 100% !important;
+  }
+}
+@media(max-width:800px){
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame{
+    --hkl-side-width:28px;
+    background-size:100% 28px,100% 32px,0 0,0 0,24px 100% !important;
+  }
+}
+@media(max-width:550px){
+  .content-sheet .journal-book-frame,
+  .content-sheet .journal-book--chapter .journal-book-frame{
+    --hkl-side-width:18px;
+    background-size:100% 26px,100% 30px,0 0,0 0,18px 100% !important;
+  }
+}
