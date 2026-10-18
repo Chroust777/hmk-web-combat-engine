@@ -170,3 +170,90 @@
   .content-sheet .journal-book-frame{padding-top:32px!important;padding-bottom:38px!important}
   .journal-book-subnav{margin:-22px 0 8px!important}
 }
+
+
+/* --- Fix pass 2: top controls separation, clean lower parchment, unified inner corners --- */
+.mast{padding-top:2px!important;padding-bottom:6px!important;min-height:84px!important}
+.mast-top{align-items:flex-start!important;padding-top:2px!important}
+.mast .mast-side{align-self:flex-start!important}
+.mast .mast-control-panel{padding:2px 0 10px!important;transform:translateY(-8px)!important}
+.mast .mast-control-panel__grid{row-gap:4px!important}
+.content-sheet{padding-top:2px!important}
+.content-sheet .journal-book.panel{margin-top:8px!important}
+.journal-book-subnav{margin:-18px 24px 8px!important}
+
+.content-sheet .journal-book-frame{
+  overflow:hidden!important;
+  background-image:
+    url('./assets/ui/book/book_top.png'),
+    url('./assets/ui/book/book_bottom_clean.png'),
+    url('./assets/ui/book/book_left.png'),
+    url('./assets/ui/book/book_right.png'),
+    url('./assets/ui/book/book_gutter.png')!important;
+  background-position:center top,center bottom,left top,right top,center top!important;
+  background-size:100% 44px,100% 22px,42px 100%,52px 100%,46px 100%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat!important;
+}
+.content-sheet .journal-book-frame::before{
+  inset:28px 34px 22px!important;
+  z-index:0!important;
+  background:url('./assets/ui/book/clean_vellum.png') center/440px 440px repeat!important;
+  border:1px solid #b18955!important;
+  outline:1px solid #54341f!important;
+  outline-offset:3px!important;
+  box-shadow:inset 0 0 22px rgba(120,89,47,.12)!important;
+}
+.content-sheet .journal-book-frame::after{top:38px!important;bottom:22px!important}
+.content-sheet .journal-book-spread{position:relative!important;z-index:2!important}
+.content-sheet .journal-book-page,
+.content-sheet .journal-book-page--left,
+.content-sheet .journal-book-page--right{position:relative!important;z-index:3!important;background-color:transparent!important}
+
+/* Inner side page-stack shells with matching corner style on all four corners */
+.content-sheet .journal-book-spread::before,
+.content-sheet .journal-book-spread::after{
+  content:""!important;
+  position:absolute!important;
+  top:-2px!important;
+  bottom:-2px!important;
+  width:104px!important;
+  pointer-events:none!important;
+  z-index:1!important;
+  background-repeat:no-repeat!important;
+  background-size:104px 100%!important;
+  opacity:1!important;
+}
+.content-sheet .journal-book-spread::before{
+  left:-14px!important;
+  background-image:url('./assets/ui/book/book_side_left_deluxe.png')!important;
+  background-position:left top!important;
+}
+.content-sheet .journal-book-spread::after{
+  right:-18px!important;
+  background-image:url('./assets/ui/book/book_side_right_deluxe.png')!important;
+  background-position:right top!important;
+}
+.content-sheet .journal-book-page--left{padding-left:28px!important;padding-right:28px!important}
+.content-sheet .journal-book-page--right{padding-left:30px!important;padding-right:28px!important}
+
+@media(max-width:1160px){
+  .mast .mast-control-panel{transform:none!important;padding:4px 0 8px!important}
+  .content-sheet .journal-book.panel{margin-top:4px!important}
+  .journal-book-subnav{margin:-16px 10px 8px!important}
+  .content-sheet .journal-book-frame{background-size:100% 36px,100% 18px,27px 100%,27px 100%,36px 100%!important}
+  .content-sheet .journal-book-frame::before{inset:24px 18px 18px!important}
+  .content-sheet .journal-book-frame::after{top:34px!important;bottom:18px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{width:72px!important;background-size:72px 100%!important}
+  .content-sheet .journal-book-spread::before{left:-8px!important}
+  .content-sheet .journal-book-spread::after{right:-10px!important}
+  .content-sheet .journal-book-page--left,.content-sheet .journal-book-page--right{padding-left:18px!important;padding-right:18px!important}
+}
+@media(max-width:800px){
+  .mast{min-height:76px!important}
+  .mast .mast-control-panel{transform:none!important}
+  .content-sheet .journal-book.panel{margin-top:2px!important}
+  .journal-book-subnav{margin:-14px 0 8px!important}
+  .content-sheet .journal-book-spread::before,
+  .content-sheet .journal-book-spread::after{display:none!important}
+}
