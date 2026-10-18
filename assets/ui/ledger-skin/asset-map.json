@@ -1,0 +1,156 @@
+{
+  "version": "93.319",
+  "instructions": "Každý PNG je vyměnitelný bez změn aplikace. Ponechte názvy souborů, transparentní pozadí a vhodnou orientaci; nahradit lze ve složce assets/ui/ledger-skin/. Zdrojové prvky pouze oříznuty na skutečný obsah bez upscalingu.",
+  "components": [
+    {
+      "file": "corner-top-left.png",
+      "source_from_user_zip": "royal_sapphire_frame_corner_left.png",
+      "role": "Vnější levý horní roh",
+      "width": 1253,
+      "height": 1248,
+      "resized": false
+    },
+    {
+      "file": "corner-top-right.png",
+      "source_from_user_zip": "royal_sapphire_frame_corner_right.png",
+      "role": "Vnější pravý horní roh",
+      "width": 1254,
+      "height": 1245,
+      "resized": false
+    },
+    {
+      "file": "corner-bottom-left.png",
+      "source_from_user_zip": "05_royal_lower_left_corner.png",
+      "role": "Vnější levý dolní roh",
+      "width": 1253,
+      "height": 1248,
+      "resized": false
+    },
+    {
+      "file": "corner-bottom-right.png",
+      "source_from_user_zip": "06_sapphire_lower_right_corner.png",
+      "role": "Vnější pravý dolní roh",
+      "width": 1218,
+      "height": 1233,
+      "resized": false
+    },
+    {
+      "file": "divider-horizontal.png",
+      "source_from_user_zip": "01_gold_blue_horizontal_divider.png",
+      "role": "Vnitřní vodorovný oddělovač",
+      "width": 2172,
+      "height": 546,
+      "resized": false
+    },
+    {
+      "file": "divider-vertical.png",
+      "source_from_user_zip": "03_gold_blue_vertical_divider.png",
+      "role": "Vnitřní svislý oddělovač",
+      "width": 465,
+      "height": 2119,
+      "resized": false
+    },
+    {
+      "file": "title-filigree.png",
+      "source_from_user_zip": "05_horizontal_filigree_divider.png",
+      "role": "Dekorativní lišta kapitoly",
+      "width": 1312,
+      "height": 264,
+      "resized": false
+    },
+    {
+      "file": "spine-top.png",
+      "source_from_user_zip": "09_sapphire_lower_center_crest.png",
+      "role": "Klenutá ozdoba hřbetu",
+      "width": 1434,
+      "height": 1057,
+      "resized": false
+    },
+    {
+      "file": "spine-bottom.png",
+      "source_from_user_zip": "10_draped_lower_center_crest.png",
+      "role": "Spodní klenutá ozdoba",
+      "width": 1448,
+      "height": 1085,
+      "resized": false
+    },
+    {
+      "file": "shield.png",
+      "source_from_user_zip": "01_lion_shield_crest.png",
+      "role": "Erb u jména postavy",
+      "width": 566,
+      "height": 634,
+      "resized": false
+    },
+    {
+      "file": "banner-sidebar.png",
+      "source_from_user_zip": "08_hanging_lion_banner.png",
+      "role": "Levý svislý heraldický prapor",
+      "width": 342,
+      "height": 636,
+      "resized": false
+    },
+    {
+      "file": "section-jewel.png",
+      "source_from_user_zip": "19_diamond_sapphire_ornament.png",
+      "role": "Malý symbol u nadpisů",
+      "width": 1239,
+      "height": 1222,
+      "resized": false
+    },
+    {
+      "file": "frame-parchment.png",
+      "source_from_user_zip": "15_parchment_panel_frame.png",
+      "role": "Volitelný samostatný pergamenový panel",
+      "width": 1448,
+      "height": 1077,
+      "resized": false
+    },
+    {
+      "file": "rail-top-repeat.png",
+      "source_v93_318": "assets/ui/book/book_top.png",
+      "role": "Dynamicky opakovaný originální pruh obalu",
+      "width": 300,
+      "height": 42,
+      "resized": false
+    },
+    {
+      "file": "rail-bottom-repeat.png",
+      "source_v93_318": "assets/ui/book/book_bottom.png",
+      "role": "Dynamicky opakovaný originální pruh obalu",
+      "width": 300,
+      "height": 49,
+      "resized": false
+    },
+    {
+      "file": "rail-left-repeat.png",
+      "source_v93_318": "assets/ui/book/book_left.png",
+      "role": "Dynamicky opakovaný originální pruh obalu",
+      "width": 41,
+      "height": 260,
+      "resized": false
+    },
+    {
+      "file": "rail-right-repeat.png",
+      "source_v93_318": "assets/ui/book/book_right.png",
+      "role": "Dynamicky opakovaný originální pruh obalu",
+      "width": 52,
+      "height": 260,
+      "resized": false
+    },
+    {
+      "file": "spine-repeat.png",
+      "source_v93_318": "assets/ui/book/book_gutter.png",
+      "role": "Dynamicky opakovaný originální pruh obalu",
+      "width": 46,
+      "height": 260,
+      "resized": false
+    },
+    {
+      "file": "parchment-repeat.png",
+      "source_v93_318": "assets/ui/book/clean_vellum.png",
+      "role": "Textura obou stránek, opakování bez deformace",
+      "resized": false
+    }
+  ]
+}
