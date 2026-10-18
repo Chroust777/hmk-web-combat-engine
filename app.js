@@ -159,7 +159,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.327';
+const APP_VERSION='93.329';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -327,7 +327,7 @@ function main(){
  let body='';
  if(view==='characters')body=journalChapterShell('Postavy','Registr postav a přístup k osobním deníkům.',charactersView(),'journal-book--characters');
  if(view==='sheet')body=sheetView();
- if(view==='creation')body=creationWizardView();
+ if(view==='creation')body=creationBookView();
  if(view==='library')body=libraryView();
  if(view==='trash')body=trashView();
  if(view==='backup')body=backupView();
@@ -336,14 +336,15 @@ function main(){
  if(view==='hazards')body=hazardsView();
  if(view==='encounter')body=encounterView();
  const scene=activeVisualScene();
- const activeCharacter=view==='sheet'?character(selected):null;
+ const selectedCharacter=selected?character(selected):null;
+ const activeCharacter=view==='sheet'?selectedCharacter:null;
  const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['hazards','✣','Nebezpečí / Trauma'],['backup','▤','Zálohy'],['trash','♧','Archiv']];
  const characterButtons=data.characters.map(c=>`<button type="button" class="castle-character ${c.id===selected?'active':''}" data-open="${esc(c.id)}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span>${esc(c.name)}</span></button>`).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <header class="mast"><div class="mast-top">
    <div class="mast-brand"><div class="brand-mark" aria-hidden="true">⚜</div><div class="brand-copy"><div class="eyebrow">HMK · KÈTHÎRA</div><h1>Keeper’s Ledger</h1></div></div>
    <div class="mast-links"><button type="button" class="${['characters','sheet','creation'].includes(view)?'current':''}" data-nav="characters">Postavy</button><button type="button" class="${view==='calendar'?'current':''}" data-nav="calendar">Svět</button><button type="button" class="${view==='encounter'?'current':''}" data-nav="encounter">Combat</button><button type="button" class="${view==='skills'?'current':''}" data-nav="skills">Skills</button><button type="button" class="${view==='library'?'current':''}" data-nav="library">Knihovna</button></div>
-   <div class="mast-side"><span class="scene-chip">${esc(activeSceneLabel(scene))}</span><span class="release-marker">v${APP_VERSION}</span></div>
+   <div class="mast-side"><div class="mast-meta"><span class="scene-chip">${esc(activeSceneLabel(scene))}</span><span class="release-marker">v${APP_VERSION}</span></div>${globalMastPanel(view,selectedCharacter)}</div>
  </div></header>
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
   <div class="castle-campaign-card"><span>KAMPANĚ</span><strong>HÂRNMASTER KÈTHÎRA</strong><small>Keeper’s Campaign Ledger</small></div>
@@ -353,7 +354,7 @@ function main(){
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character">✣ Vytvořit postavu <span>＋</span></button>
   <div class="castle-sidebar-footer">⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
- </nav><main class="content content-${view}${['characters','sheet','calendar','skills','library','encounter'].includes(view)?' content-sheet':''}">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
+ </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter'].includes(view)?' content-sheet':''}">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
  <footer class="footer">HârnMaster Keeper’s Ledger · v${APP_VERSION} · offline aplikace pro GitHub Pages</footer></div>`;
 }
 
@@ -1023,6 +1024,31 @@ function folioChapterParts(body,kind=''){
    }
   }
  }
+ if(kind.includes('journal-book--creation')){
+  const flow=nodes.find(x=>x.classList.contains('creation-flow'));
+  if(flow){
+   const parts=[...flow.children];
+   const formIndex=parts.findIndex(x=>x.matches('form#creation-step-form'));
+   if(formIndex!==-1){
+    const actor=selected?character(selected):null;
+    const creation=actor?creationOf(actor):null;
+    const activeStep=creation?.step??1;
+    const current=CHARACTER_STEPS[activeStep-1]??['Character Creation','—'];
+    const stages=CHARACTER_STEPS.map(([name,page],index)=>{
+     const number=index+1;
+     const state=creation?.completed?.[number]?'complete':number===activeStep?'active':'pending';
+     const status=state==='complete'?'Dokončeno':state==='active'?'Aktuální krok':'Nevyplněno';
+     return `<li class="folio-creation-step folio-creation-step--${state}"${number===activeStep?' aria-current="step"':''}><span class="folio-creation-step__number">${number}</span><span class="folio-creation-step__label">${esc(name)}</span><span class="folio-creation-step__page">str. ${esc(page)}</span><span class="folio-visually-hidden">${status}</span></li>`;
+    }).join('');
+    const outline=`<details class="folio-creation-index" aria-label="Přehled pravidlové tvorby"${window.innerWidth>550?' open':''}><summary class="folio-creation-index__heading">Kapitoly tvorby <span>14 kroků</span></summary><ol class="folio-creation-index__steps">${stages}</ol><p class="folio-creation-index__note">Přehled je informativní. Postup a návrat se řídí původním průvodcem a kontrolami HMK.</p></details>`;
+    const intro=parts.slice(0,formIndex).map(x=>x.outerHTML).join('');
+    const interactive=parts.slice(formIndex).map(x=>x.outerHTML).join('');
+    const left=`<section class="panel wide creation-flow creation-flow--folio creation-flow--context">${intro}${outline}</section>`;
+    const right=`<section class="panel wide creation-flow creation-flow--folio creation-flow--action"><header class="folio-creation-active"><div class="folio-creation-active__eyebrow">Krok ${activeStep} z 14 · HMK v1.2</div><h3>${esc(current[0])}</h3><span class="folio-creation-active__source">Tištěná strana ${esc(current[1])}</span>${activeStep===12?`<span class="folio-creation-active__stage">Stadium Skills: ${esc((SKILL_STAGES[creation?.skillStage]??'aktuální'))}</span>`:''}</header>${interactive}</section>`;
+    return [left,right];
+   }
+  }
+ }
  const root=nodes.length===1&&nodes[0].classList.contains('journal-tech-columns')?[...nodes[0].children]:nodes;
  return folioBalancedParts(root);
 }
@@ -1050,6 +1076,18 @@ function journalShell(inner,extraClass='',showSubnav=true){
 }
 function journalChapterShell(title,subtitle,body,extraClass=''){
  return journalShell(folioChapterSpread(title,subtitle,body,extraClass),`journal-book--chapter ${extraClass}`,false);
+}
+function creationBookView(){
+ const c=selected?character(selected):null;
+ if(!c)return journalChapterShell('Pravidlová tvorba postavy','Průvodce je navázán na konkrétní postavu v registru.',`<div class="empty">Nejprve v registru otevřete nebo založte konkrétní postavu. Poté bude dostupná kompletní 14kroková pravidlová tvorba HMK 1:1.</div>`,'journal-book--creation');
+ return journalChapterShell('Pravidlová tvorba postavy',`${c.name} · 14 kroků podle HMK v1.2`,creationWizardView(),'journal-book--creation');
+}
+function globalMastPanel(view,currentCharacter){
+ const hasClock=Boolean(data.campaignClock);
+ const clockLabel=hasClock?displayCampaignMinute(data.campaignClock.minute):'Svět · Kalendář';
+ const selectedLabel=currentCharacter?currentCharacter.name:'Žádná vybraná postava';
+ const charButtons=currentCharacter?`<button type="button" data-open="${esc(currentCharacter.id)}">📖 Deník</button><button type="button" data-action="creation-open">Pravidlová tvorba</button><button type="button" data-action="export-kernel-character">Export HMK profilu</button>`:`<button type="button" disabled>📖 Deník</button><button type="button" disabled>Pravidlová tvorba</button><button type="button" disabled>Export HMK profilu</button>`;
+ return `<section class="mast-control-panel" aria-label="Rychlý přístup"><div class="mast-control-panel__title">Rychlý přístup</div><div class="mast-control-panel__selected"><span>Aktivní postava</span><strong>${esc(selectedLabel)}</strong></div><div class="mast-control-panel__grid"><button type="button" class="${view==='characters'?'current':''}" data-nav="characters">↩ Registr</button><button type="button" class="${view==='calendar'?'current':''}" data-nav="calendar">◷ ${esc(clockLabel)}</button><button type="button" data-action="new-character">＋ Nová postava</button><button type="button" data-action="auto-random-character">⚄ Náhodná postava</button>${charButtons}</div></section>`;
 }
 function characterJournalHero(c,inv,editing=false){
  const h=c.hmk||{},creation=h.creation?.values||{},state=persistentStateOf(c),attrs=h.attributes||{};

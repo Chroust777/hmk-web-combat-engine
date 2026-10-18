@@ -1,0 +1,39 @@
+/* Keeper's Ledger v93.329 — integrated top controls.
+   The v93.328 quick actions remain available on every tab, but no longer
+   float underneath the book or consume a full vertical screen on phones. */
+.mast{height:auto!important;min-height:61px!important;overflow:visible!important;padding:0!important}
+.mast .mast-top{display:grid!important;grid-template-columns:minmax(190px,260px) minmax(0,1fr);grid-template-rows:minmax(59px,auto) auto;gap:0!important;align-items:center!important}
+.mast .mast-brand{grid-column:1;grid-row:1;min-width:0;max-width:100%}
+.mast .mast-links{grid-column:2;grid-row:1;align-self:center;display:flex;flex-wrap:wrap;padding-left:12px;padding-right:240px;min-width:0}
+.mast .mast-side{grid-column:1 / -1;grid-row:2;position:relative;min-width:0!important;width:100%;display:block!important;align-items:stretch!important}
+.mast .mast-meta{position:absolute;right:12px;top:-47px;z-index:2;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px}
+.mast .mast-meta .scene-chip,.mast .mast-meta .release-marker{font-size:10px!important;letter-spacing:.04em;padding:5px 8px!important}
+.mast .mast-control-panel{margin:0!important;padding:7px 15px!important;border-radius:0!important;border-top:1px solid rgba(212,169,100,.28)!important;border-left:0!important;border-right:0!important;border-bottom:0!important;display:flex!important;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 15px;min-width:0;box-shadow:none!important}
+.mast .mast-control-panel__title{font-size:10px!important;margin:0!important;letter-spacing:.1em;white-space:nowrap}
+.mast .mast-control-panel__selected{margin:0!important;padding:4px 7px!important;min-width:120px;display:flex;flex-direction:row;flex-wrap:wrap;gap:4px!important;align-items:baseline;justify-content:flex-start!important}
+.mast .mast-control-panel__selected span{font-size:10px!important;letter-spacing:0;text-transform:none}
+.mast .mast-control-panel__selected strong{font-size:12px!important;max-width:200px;text-align:left}
+.mast .mast-control-panel__grid{display:flex!important;flex:1 1 680px;justify-content:flex-end;flex-wrap:wrap;gap:5px!important;min-width:0}
+.mast .mast-control-panel__grid button{flex:0 1 auto;min-height:30px!important;max-width:100%;font-size:11px!important;line-height:1.1;padding:5px 8px!important;border-radius:3px!important;box-shadow:none!important}
+@media(max-width:1300px){
+ .mast .mast-links{padding-right:205px}
+ .mast .mast-control-panel__grid{justify-content:flex-start}
+ .mast .mast-control-panel__title{display:none}
+}
+@media(max-width:800px){
+ .mast .mast-top{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto auto auto!important}
+ .mast .mast-brand{grid-column:1;grid-row:1;width:220px!important;min-width:0!important;max-width:90%}
+ .mast .mast-links{grid-column:1;grid-row:2;padding:2px 9px 5px!important;gap:3px;justify-content:flex-start}
+ .mast .mast-links button{font-size:11px!important;padding:6px 7px!important}
+ .mast .mast-side{grid-column:1;grid-row:3}
+ .mast .mast-meta{position:static;justify-content:flex-start;padding:3px 10px 6px;background:rgba(6,16,27,.55)}
+ .mast .mast-control-panel{display:grid!important;grid-template-columns:minmax(0,1fr);gap:6px;padding:8px 10px!important}
+ .mast .mast-control-panel__title{display:none}
+ .mast .mast-control-panel__selected{display:flex!important;flex-direction:row!important;max-width:none;min-width:0}
+ .mast .mast-control-panel__grid{flex:none;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px!important}
+ .mast .mast-control-panel__grid button{width:100%;min-width:0;min-height:34px!important;font-size:11px!important;white-space:normal;overflow-wrap:anywhere}
+}
+@media(max-width:440px){
+ .mast .mast-control-panel__grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .mast .mast-control-panel__selected strong{max-width:100%;overflow-wrap:anywhere}
+}
