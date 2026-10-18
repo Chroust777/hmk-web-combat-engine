@@ -526,17 +526,18 @@
   outline: 0 !important;
 }
 
-/* FIX18: image 41 has transparent outer pixels, so full-frame 100% sizing still
-   exposed the lower layer. Overscan by 16% horizontally / 22% vertically;
-   with centered positioning the actual parchment bleeds BEHIND the dark rails.
-   This is deliberately the original single image from FIX15, not the
-   unsuccessful FIX16/17 nine-slice construction. */
+/* FIX19: clip the parchment field inside the OUTER gold-and-navy rails.
+   The graphic keeps FIX18's overscan (116%/122%) to cover transparent PNG
+   margins, but its containing pseudo-element now begins 30px inside the
+   book box: 4px beneath the 34/33px decorative rail, never outside it.
+   On narrow screens the 22px rails receive a matching 19px inset.
+   No corner or border assets are altered. */
 .content-sheet .journal-book-frame::before,
 .content-sheet .journal-book--chapter .journal-book-frame::before {
   content: "" !important;
   display: block !important;
   position: absolute !important;
-  inset: 0 !important;
+  inset: 30px !important;
   z-index: 0 !important;
   background-color: #efe3c8 !important;
   background-image: url('./assets/ui/book/41.png') !important;
@@ -591,14 +592,14 @@
 @media (max-width: 1160px) {
   .content-sheet .journal-book-frame::before,
   .content-sheet .journal-book--chapter .journal-book-frame::before {
-    inset: 0 !important;
+    inset: 30px !important;
     background-size: 116% 122% !important;
   }
 }
 @media (max-width: 800px) {
   .content-sheet .journal-book-frame::before,
   .content-sheet .journal-book--chapter .journal-book-frame::before {
-    inset: 0 !important;
+    inset: 19px !important;
     background-size: 116% 122% !important;
   }
   .content-sheet .hmk-rail--top,
