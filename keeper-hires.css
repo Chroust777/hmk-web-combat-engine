@@ -188,3 +188,174 @@
 .content-sheet--chapter-proxy .hsk-verdict-chip{background:rgba(255,250,240,.92)!important;color:#261a12!important;border-color:rgba(120,88,55,.36)!important}
 .content-sheet--chapter-proxy .hsk-bigstars{color:#9b6c20}
 .content-sheet--chapter-proxy .equipment-summary>div{background:rgba(255,249,239,.9);border:1px solid rgba(104,74,41,.22);border-radius:12px;padding:.65rem .8rem}
+
+/* v93.326: true chapter-shell cleanup and two-page chapter styling */
+main.content.content-sheet{
+  margin:0!important;
+  padding:0!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  max-width:none!important;
+}
+main.content.content-sheet::before,
+main.content.content-sheet::after{display:none!important;content:none!important}
+main.content.content-sheet>.notice.error{margin:0 0 12px}
+
+/* Chapter views must not inherit character-sheet subnav layout. */
+.content-sheet .journal-book--chapter .journal-book-subnav{display:none!important}
+
+/* Replace the previous technical single-panel feel with a real spread-like chapter layout. */
+.content-sheet .journal-book--chapter .journal-book-frame{
+  padding-top:34px!important;
+}
+.content-sheet .journal-book--chapter .journal-book-frame::after{
+  display:block!important;
+  top:44px;
+  bottom:46px;
+  width:44px;
+  left:calc(39px + (100% - 78px)*.455 - 22px);
+  background:url('./assets/ui/book/book_gutter.png') center center/100% 100% no-repeat!important;
+  opacity:.78;
+}
+.content-sheet .journal-book--chapter .journal-technical-shell{
+  position:relative;
+  min-height:680px!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:0;
+}
+.content-sheet .journal-book--chapter .journal-technical-shell::before,
+.content-sheet .journal-book--chapter .journal-technical-shell::after{
+  content:"";
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:calc(50% - 6px);
+  z-index:0;
+  background:
+    linear-gradient(90deg,#b58c5330,transparent 10%,transparent 90%,#a17a4030),
+    var(--kh-vellum);
+  background-size:100% 100%,520px 520px;
+  background-repeat:no-repeat,repeat;
+}
+.content-sheet .journal-book--chapter .journal-technical-shell::before{left:0;border-right:1px solid rgba(166,128,74,.18)}
+.content-sheet .journal-book--chapter .journal-technical-shell::after{right:0;border-left:1px solid rgba(166,128,74,.18)}
+.content-sheet .journal-book--chapter .journal-alt-header,
+.content-sheet .journal-book--chapter .journal-chapter-body{
+  position:relative;
+  z-index:1;
+  grid-column:1 / -1;
+}
+.content-sheet .journal-book--chapter .journal-alt-header{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:22px;
+  padding:18px 26px 8px;
+  border-bottom:0!important;
+  background:transparent!important;
+}
+.content-sheet .journal-book--chapter .journal-alt-header-block{
+  min-height:150px;
+  padding:24px 24px 20px;
+}
+.content-sheet .journal-book--chapter .journal-alt-header-block--ghost{opacity:0}
+.content-sheet .journal-book--chapter .journal-alt-header h3{
+  font:600 clamp(32px,3vw,56px)/1.04 var(--book-heading-font,"Cinzel Decorative","Cormorant Garamond",serif)!important;
+  color:#16345d!important;
+  margin:0 0 16px!important;
+}
+.content-sheet .journal-book--chapter .journal-alt-header p{
+  margin:0;
+  font:400 clamp(18px,1.55vw,28px)/1.36 "Cormorant Garamond",Georgia,serif;
+  color:#4c3521!important;
+  max-width:92%;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:16px 22px;
+  align-items:start;
+  padding:0 26px 22px;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body > h2,
+.content-sheet .journal-book--chapter .journal-chapter-body > .topline,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-navigation,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-toolbar,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-results,
+.content-sheet .journal-book--chapter .journal-chapter-body > .notice,
+.content-sheet .journal-book--chapter .journal-chapter-body > .empty,
+.content-sheet .journal-book--chapter .journal-chapter-body > .actions,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-tabs,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-topgrid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-opposed-grid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-mastery-grid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-ml-grid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-support-grid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-physical-grid,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-physical-summary,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-result-band,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-result-toolbar,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-history,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-current-profile,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-workbench-result,
+.content-sheet .journal-book--chapter .journal-chapter-body > .wide,
+.content-sheet .journal-book--chapter .journal-chapter-body > .panel.wide,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-pagebar,
+.content-sheet .journal-book--chapter .journal-chapter-body > .table-scroll,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-table-wrap,
+.content-sheet .journal-book--chapter .journal-chapter-body > details{
+  grid-column:1 / -1;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body > .topline{margin:0 0 .2rem}
+.content-sheet .journal-book--chapter .journal-chapter-body > h2{
+  margin:0;
+  padding:0 0 10px;
+  border-bottom:1px solid rgba(166,128,74,.35);
+  font:600 clamp(30px,2.35vw,46px)/1.05 var(--book-heading-font,"Cinzel Decorative","Cormorant Garamond",serif)!important;
+  color:#6b3f23!important;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body > .panel,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-test-card,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-tiebreak,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-condition,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-opposition-toggle,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-gm-controls,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-sv-guide,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-secondary-timing,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-sr-activity,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-verdict-section,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-value-display,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-result-slot,
+.content-sheet .journal-book--chapter .journal-chapter-body > .hsk-workbench-result,
+.content-sheet .journal-book--chapter .journal-chapter-body > .encounter-details,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-rules-details,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-table-wrap,
+.content-sheet .journal-book--chapter .journal-chapter-body > .library-toolbar{
+  background:rgba(251,244,231,.9)!important;
+  color:#261a12!important;
+  border:1px solid rgba(104,74,41,.24)!important;
+  box-shadow:0 1px 0 rgba(255,250,240,.85) inset!important;
+  border-radius:0!important;
+}
+.content-sheet .journal-book--chapter .journal-chapter-body :is(.library-table,.hsk-table,.catalog-spec){background:transparent!important}
+.content-sheet .journal-book--chapter .journal-chapter-body :is(th,thead th){background:#7d592f!important;color:#fff1d1!important}
+.content-sheet .journal-book--chapter .journal-chapter-body > :not(.wide){min-width:0}
+
+@media(max-width:1160px){
+  .content-sheet .journal-book--chapter .journal-book-frame::after{display:none!important}
+  .content-sheet .journal-book--chapter .journal-technical-shell,
+  .content-sheet .journal-book--chapter .journal-alt-header,
+  .content-sheet .journal-book--chapter .journal-chapter-body{grid-template-columns:1fr!important}
+  .content-sheet .journal-book--chapter .journal-technical-shell::before,
+  .content-sheet .journal-book--chapter .journal-technical-shell::after{left:0;right:0;width:auto}
+  .content-sheet .journal-book--chapter .journal-technical-shell::after{display:none}
+  .content-sheet .journal-book--chapter .journal-alt-header-block,
+  .content-sheet .journal-book--chapter .journal-alt-header-block--ghost{min-height:0;padding:18px 18px 10px}
+  .content-sheet .journal-book--chapter .journal-alt-header-block--ghost{display:none}
+  .content-sheet .journal-book--chapter .journal-chapter-body{padding:0 18px 18px}
+}

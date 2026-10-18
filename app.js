@@ -159,7 +159,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.325';
+const APP_VERSION='93.326';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -353,7 +353,7 @@ function main(){
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character">✣ Vytvořit postavu <span>＋</span></button>
   <div class="castle-sidebar-footer">⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
- </nav><main class="content content-${view}">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
+ </nav><main class="content content-${view}${['sheet','calendar','skills','library','encounter'].includes(view)?' content-sheet':''}">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
  <footer class="footer">HârnMaster Keeper’s Ledger · v${APP_VERSION} · offline aplikace pro GitHub Pages</footer></div>`;
 }
 
@@ -941,8 +941,8 @@ function journalConditionDetailsHTML(c,state,load){
 }
 function journalSimpleChecklist(title,rows){return `<section class="journal-book-section"><div class="journal-book-title">${esc(title)}</div><div class="journal-check-grid">${rows.map(([label,value])=>`<label><span class="journal-check"></span><em>${esc(label)}</em><strong>${esc(firstPresent(value,'—'))}</strong></label>`).join('')}</div></section>`;}
 function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['notes','Notes & Logbook']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}</div>`;}
-function journalShell(inner,extraClass=''){return `<section class="journal-book panel wide ${extraClass}"><div class="journal-book-frame"><div class="hmk-book-decor" aria-hidden="true"><i class="hmk-rail hmk-rail--top"></i><i class="hmk-rail hmk-rail--bottom"></i><i class="hmk-rail hmk-rail--left"></i><i class="hmk-rail hmk-rail--right"></i><i class="hmk-frame-jewel hmk-frame-jewel--top"></i><i class="hmk-frame-jewel hmk-frame-jewel--bottom"></i><i class="hmk-frame-side hmk-frame-side--left"></i><i class="hmk-frame-side hmk-frame-side--right"></i></div><div class="book-cover-ornament book-cover-ornament--tl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--tr" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--bl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--br" aria-hidden="true"></div>${journalSectionNav()}${inner}</div></section>`;}
-function journalChapterShell(title,subtitle,body,extraClass=''){const sub=subtitle?`<p>${esc(subtitle)}</p>`:'';return `<div class="content-sheet content-sheet--chapter-proxy">${journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>${esc(title)}</h3>${sub}</header><div class="journal-chapter-body">${body}</div></section>`,`journal-book--chapter ${extraClass}`)}</div>`;}
+function journalShell(inner,extraClass='',showSubnav=true){return `<section class="journal-book panel wide ${extraClass}"><div class="journal-book-frame"><div class="hmk-book-decor" aria-hidden="true"><i class="hmk-rail hmk-rail--top"></i><i class="hmk-rail hmk-rail--bottom"></i><i class="hmk-rail hmk-rail--left"></i><i class="hmk-rail hmk-rail--right"></i><i class="hmk-frame-jewel hmk-frame-jewel--top"></i><i class="hmk-frame-jewel hmk-frame-jewel--bottom"></i><i class="hmk-frame-side hmk-frame-side--left"></i><i class="hmk-frame-side hmk-frame-side--right"></i></div><div class="book-cover-ornament book-cover-ornament--tl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--tr" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--bl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--br" aria-hidden="true"></div>${showSubnav?journalSectionNav():''}${inner}</div></section>`;}
+function journalChapterShell(title,subtitle,body,extraClass=''){const sub=subtitle?`<p>${esc(subtitle)}</p>`:'';return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><div class="journal-alt-header-block"><h3>${esc(title)}</h3>${sub}</div><div class="journal-alt-header-block journal-alt-header-block--ghost" aria-hidden="true"></div></header><div class="journal-chapter-body">${body}</div></section>`,`journal-book--chapter ${extraClass}`,false);}
 function characterJournalHero(c,inv,editing=false){
  const h=c.hmk||{},creation=h.creation?.values||{},state=persistentStateOf(c),attrs=h.attributes||{};
  const bio=(key,...fallbacks)=>firstPresent(h[key],...fallbacks,creation[key],'—');
