@@ -4160,3 +4160,96 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  font-size:11px!important;line-height:1.23!important;font-family:Georgia,serif!important;
  font-weight:700!important;color:#211b15!important;
 }
+
+/* v93.360 — Tuzyn Reckoning: parchment calendar, 30-day/three-tenday months,
+   24-hour navigator and genuine single-minute agenda. No extra CSS files. */
+.content-calendar .hc-root{font-family:Georgia,"Cormorant Garamond",serif;color:#352819;max-width:100%;min-width:0}
+.content-calendar .hc-title{display:flex;align-items:start;justify-content:space-between;gap:14px;margin:4px 0 12px}
+.content-calendar .hc-title h2{margin:.1em 0;font-size:clamp(1.22rem,2.4vw,1.9rem);color:#42301d}
+.content-calendar .hc-title p{font-size:.86rem;margin:.4rem 0;line-height:1.45}
+.content-calendar .hc-calendar{border:1px solid rgba(109,78,44,.48);border-radius:5px;margin:13px 0;padding:clamp(10px,1.5vw,18px);background:rgba(173,133,75,.10);box-shadow:inset 0 0 0 1px rgba(255,241,210,.24);max-width:100%;min-width:0}
+.content-calendar .hc-calendar h3{color:#4a351f;margin:0 0 10px;font-size:1.12rem}
+.content-calendar .hc-calendar h4{color:#53361e;margin:10px 0;font-size:.98rem}
+.content-calendar .hc-calendar p{line-height:1.46}
+.content-calendar .hc-stats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;font:.82rem/1.4 system-ui,sans-serif}
+.content-calendar .hc-stats>span{border:1px solid #92734b75;padding:6px 8px;border-radius:3px;background:rgba(91,60,28,.06)}
+.content-calendar .hc-small,.content-calendar .hc-calendar button:not(.hc-date):not(.hc-hour):not(.hc-minute-time){min-height:32px;font:.78rem/1.25 system-ui,sans-serif;padding:6px 10px}
+.content-calendar .hc-month-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 10px}
+.content-calendar .hc-month-bar h3{text-align:center;margin:0;font-size:1.08rem}
+.content-calendar .hc-decade-labels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:5px;text-align:center;color:#66482c;font:650 .77rem system-ui,sans-serif}
+.content-calendar .hc-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;min-width:0}
+.content-calendar .hc-date{display:flex;flex-direction:column;align-items:stretch;justify-content:start;gap:3px;min-width:0;min-height:74px;border:1px solid #7b603e75;border-radius:3px;background:rgba(224,197,149,.13);padding:5px 3px;color:#382c1d;overflow:hidden;text-align:left;font:400 .68rem/1.23 system-ui,sans-serif;box-shadow:none}
+.content-calendar .hc-date strong{font-size:.9rem;color:#412a15;font-variant-numeric:tabular-nums}
+.content-calendar .hc-date:hover,.content-calendar .hc-hour:hover,.content-calendar .hc-minute-time:hover{background:rgba(169,120,55,.19);border-color:#88642d}
+.content-calendar .hc-date--now,.content-calendar .hc-hour--now,.content-calendar .hc-minute--now{border:2px solid #915b29;background:rgba(200,147,56,.18)}
+.content-calendar .hc-date--selected,.content-calendar .hc-hour--selected{outline:2px solid #73532b;outline-offset:-2px}
+.content-calendar .hc-now-mark{color:#70401d;font-weight:900;font-size:.62rem;letter-spacing:.02em}
+.content-calendar .hc-count{font-size:.59rem;opacity:.88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.content-calendar .hc-date-event{display:block;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:.58rem;color:#5e4a31}
+.content-calendar .hc-date-event--due{color:#923d20;font-weight:800}
+.content-calendar .hc-hint{font:.78rem/1.45 system-ui,sans-serif;color:#63533d;margin:10px 0 0}
+.content-calendar .hc-hours{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;margin:9px 0 16px}
+.content-calendar .hc-hour{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;padding:7px 2px;min-height:49px;background:rgba(215,184,130,.20);color:#4d351d;border:1px solid #997c5369;border-radius:3px;font:650 .75rem/1.2 system-ui,sans-serif}
+.content-calendar .hc-hour span,.content-calendar .hc-hour em{font:normal .59rem system-ui,sans-serif}
+.content-calendar .hc-hour em{color:#824a26;font-weight:800;font-style:normal}
+.content-calendar .hc-minutes{max-height:460px;overflow:auto;overscroll-behavior:contain;border:1px solid #87725877;background:rgba(237,219,187,.14)}
+.content-calendar .hc-minute{display:grid;grid-template-columns:86px minmax(0,1fr);border-bottom:1px dotted #876c4c60;min-height:30px}
+.content-calendar .hc-minute:last-child{border-bottom:0}
+.content-calendar .hc-minute-time{min-height:30px;text-align:left;padding:5px 8px;border:0;border-right:1px solid #90714a44;background:rgba(177,145,95,.08);color:#44321f;font:600 .75rem/1.3 ui-monospace,monospace;white-space:nowrap}
+.content-calendar .hc-minute-events{min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:2px 6px}
+.content-calendar .hc-muted-tick{opacity:.4}
+.content-calendar .hc-entry{display:block;flex:1 1 250px;min-width:0;margin:4px 0;padding:9px 11px;background:rgba(255,239,205,.18);border-left:3px solid #83683f;border-bottom:1px solid #ac8a5e65;border-radius:2px;font:.83rem/1.4 system-ui,sans-serif}
+.content-calendar .hc-entry--due{border-left-color:#a44325}
+.content-calendar .hc-entry--done{opacity:.7}
+.content-calendar .hc-entry p{margin:5px 0;overflow-wrap:anywhere}
+.content-calendar .hc-entry-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;overflow-wrap:anywhere}
+.content-calendar .hc-entry-head>span{font:.76rem/1.3 ui-monospace,monospace;color:#5c472e}
+.content-calendar .hc-annotation,.content-calendar .hc-soft{font:.71rem/1.35 system-ui,sans-serif;color:#6e563a}
+.content-calendar .hc-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.content-calendar .hc-event-list{display:grid;gap:6px;margin:7px 0}
+.content-calendar .hc-warning{color:#8a3525;border-left:3px solid #ad563d;padding-left:9px}
+.content-calendar .hc-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.content-calendar .hc-calendar form label{display:flex;flex-direction:column;gap:4px;font:.78rem/1.3 system-ui,sans-serif;color:#523d27;min-width:0;margin:5px 0}
+.content-calendar .hc-calendar form input:not([type=checkbox]),.content-calendar .hc-calendar form select,.content-calendar .hc-calendar form textarea{display:block;max-width:100%;width:100%;box-sizing:border-box;min-width:0;background:rgba(248,231,196,.68);color:#302719;border:1px solid #98744d;border-radius:3px;padding:7px 8px;font:.84rem/1.35 system-ui,sans-serif}
+.content-calendar .hc-calendar form textarea{resize:vertical;margin:6px 0}
+.content-calendar .hc-calendar form .hc-check{display:flex;flex-direction:row;gap:7px;align-items:center;line-height:1.35}
+.content-calendar .hc-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.content-calendar .hc-inline>label{flex:1 1 130px}
+.content-calendar .hc-inline>button{flex:0 1 auto}
+.content-calendar .hc-advanced{margin:16px 0;border-top:1px solid #7c6244;padding:12px 0}
+.content-calendar .hc-advanced>summary{cursor:pointer;font-weight:700;color:#4a341f;margin-bottom:9px}
+@media(max-width:980px){.content-calendar .hc-hours{grid-template-columns:repeat(8,minmax(0,1fr))}.content-calendar .hc-date{min-height:67px}.content-calendar .hc-date-event{display:none}}
+@media(max-width:650px){.content-calendar .hc-title{display:block}.content-calendar .hc-grid{gap:2px}.content-calendar .hc-date{padding:3px 2px;min-height:56px}.content-calendar .hc-date strong{font-size:.78rem}.content-calendar .hc-count{font-size:.52rem}.content-calendar .hc-decade-labels{font-size:.63rem}.content-calendar .hc-hours{grid-template-columns:repeat(6,minmax(0,1fr))}.content-calendar .hc-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.content-calendar .hc-month-bar h3{font-size:.87rem}.content-calendar .hc-month-bar .hc-small{font-size:.7rem;padding:4px 5px}}
+@media(max-width:380px){.content-calendar .hc-date{min-height:48px}.content-calendar .hc-now-mark{font-size:.48rem}.content-calendar .hc-count{font-size:.46rem}.content-calendar .hc-minute{grid-template-columns:75px minmax(0,1fr)}}
+/* v93.360: new calendar sections are independent folio nodes, so the book can
+   distribute month and forms across BOTH pages without duplicating controls. */
+.content-calendar .folio-chapter-content>.hc-title,
+.content-calendar .folio-chapter-content>.hc-stats,
+.content-calendar .folio-chapter-content>.hc-calendar{min-width:0;max-width:100%;box-sizing:border-box}
+.content-calendar .folio-chapter-content button.hc-date{
+ background:rgba(194,159,101,.19)!important;color:#4a301b!important;
+ border:1px solid #987a4e99!important;box-shadow:none!important;
+}
+.content-calendar .folio-chapter-content button.hc-date:disabled{
+ background:rgba(222,202,165,.13)!important;color:#786957!important;
+ opacity:.58!important;cursor:not-allowed!important
+}
+.content-calendar .folio-chapter-content button.hc-date--now{
+ border:2px solid #844b20!important;background:rgba(184,118,43,.26)!important
+}
+.content-calendar .folio-chapter-content button.hc-date--selected{outline:2px solid #77512a!important;outline-offset:-2px!important}
+.content-calendar .folio-chapter-content button.hc-date:hover:not(:disabled){background:rgba(190,129,57,.27)!important}
+.content-calendar .folio-chapter-content button.hc-hour{background:rgba(194,159,101,.18)!important;color:#43301d!important;box-shadow:none!important}
+.content-calendar .folio-chapter-content button.hc-hour--now{background:rgba(184,118,43,.24)!important;border:2px solid #824f20!important}
+.content-calendar .folio-chapter-content button.hc-minute-time{background:rgba(194,159,101,.12)!important;color:#43301d!important;box-shadow:none!important}
+.content-calendar .folio-chapter-content button.hc-minute-time:hover{background:rgba(184,118,43,.25)!important}
+/* 3 x 10-day month layout: decade headers describe ROWS, not columns. */
+.content-calendar .hc-decade-row-label{font:650 .72rem/1.2 system-ui,sans-serif;color:#725034;padding:7px 1px 3px;text-align:left}
+.content-calendar .hc-grid{margin-bottom:2px}
+.content-calendar .hc-calendar form label.hc-check{
+ display:flex!important;flex-direction:row!important;justify-content:flex-start!important;
+ align-items:center!important;gap:8px!important;text-align:left!important;min-width:0!important;
+}
+.content-calendar .hc-calendar form label.hc-check input[type=checkbox]{flex:none!important;width:16px!important;height:16px!important;margin:0!important}
+@media(max-width:650px){.content-calendar .hc-decade-row-label{font-size:.65rem}}
+.content-calendar .hc-continuing{font:.78rem/1.4 system-ui,sans-serif;color:#5b3b21;background:rgba(186,143,76,.20);border-left:3px solid #86633d;padding:7px 9px;margin:6px 0}

@@ -101,7 +101,9 @@ import {startGuidedCrossbowSpan,startGuidedMissileLoad,startGuidedMissileAim,per
 import {parseSpatialBarrierSegments,effectiveSpatialBarriers} from './src/integration/hmk-guided-spatial-barriers.js';
 import {recordEncounterFreeAction,encounterFreeActionAvailable,createEncounterSequence,validateEncounterSequence,startEncounterTurn,finishEncounterTurn,finalizeStagedEncounterTurn,nextEncounterRound,dueEncounterEvents,dueEndTurnEvents,currentEncounterActor,assertScheduledMeleeActor,resolveReadiedEncounterAction,cancelReadiedEncounterAction,completeReadiedEncounterAction,confirmAlertnessReaction,confirmConcentrationCompletion,abandonEncounterConcentration,ongoingEncounterConcentration,requireConcentrationCompatibleDefence,assertScheduledHitCanCommit,recordScheduledHitCommit,setEncounterTieOrder,configureInitialCrossbowPriority,requireInitialCrossbowShot} from './src/integration/encounter-turn-sequence.js';
 import {applyConfirmedTreatment,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock} from './src/integration/hmk-healing-persistence.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
+import {calendarInitialUI,campaignCalendarBoardHTML} from './src/integration/hmk-campaign-calendar-ui.js';
+import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan} from './src/integration/hmk-calendar-planner.js';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
 import {applyConfirmedManeuverConsequence,verifiedManeuverConsequence,applyConfirmedGrabTakeTransfer} from './src/integration/hmk-maneuver-persistence.js';
 import {decideFreePress,applyAutomaticFreePress,decideDeclaredManeuver,applyAutomaticDeclaredManeuver,resolveTripAutomaticGrab,applyAutomaticGrabHoldRetest,applyAutomaticGrabTake} from './src/integration/hmk-automatic-decisions.js';
@@ -164,7 +166,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.359';
+const APP_VERSION='93.360';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -370,6 +372,16 @@ function confirmCalendarElapsed(characterId,kind,ageMinutes){
  if(data.campaignClock.minute-a.minute<ageMinutes)
   throw Error('Kalendář: '+kind+' dosud nemá uplynulý požadovaný čas.');
 }
+/** HMK Poison/Disease timed courses must not be resolved BEFORE the attested
+ * elapsed campaign minutes. The actual dice and state commit stay in the
+ * already-existing rule-specific module, never the calendar presentation. */
+function confirmCalendarEpisodeElapsed(kind,characterId,episodeId,elapsedMinutes){
+ const clock=data.campaignClock;if(!clock)return; // Pre-calendar legacy workflows remain available.
+ const anchor=getCampaignEpisodeAnchor(clock,kind,characterId,episodeId);
+ if(!anchor)throw Error(`Kalendář: epizoda ${kind} nemá doloženou minutu počátku; nejprve ji ukotvěte.`);
+ if(!Number.isSafeInteger(elapsedMinutes)||clock.minute-anchor.minute<elapsedMinutes)
+  throw Error(`Kalendář: ${kind} ještě nedosáhl požadované doby ${elapsedMinutes} minut.`);
+}
 function logCalendarCombatResolution(c,state,kind){
  if(!data.campaignClock)return;
  const sourceEventId=state.events?.at(-1)?.id;
@@ -418,9 +430,10 @@ function refreshAllCalendarHealingFields(){
  for(const f of document.querySelectorAll('#hmk-treatment-form,#hmk-healing-roll-form,#hmk-infection-course-form,#hmk-grim-shock-form,#hmk-blood-regeneration-form'))
   refreshCalendarHealingFields(f);
 }
+let calendarUI=null; // Presentation state only, never stored in character/campaign evidence.
 function campaignCalendarView(){
  const clock=data.campaignClock;
- if(!clock)return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`<h2>Jednotný kalendář kampaně</h2><div class="panel"><p>HMK str. 178–182: časové intervaly léčení, infekcí a Shock. Údaje o bojových kolech nepřevádíme na hodiny ani dny. Založení kalendáře neposune bojový stav a nespustí žádný hod.</p><form id="campaign-start-form"><div class="field-grid">${field('label','Označení kampaně (bez domyšleného harenského data)','')}${field('day','Den kampaně (1 = první evidovaný den)',1,'number')}${field('hour','Hodina (0–23)',8,'number')}${field('minute','Minuta (0–59)',0,'number')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje výchozí čas kampaně</label><button type="submit">Založit kalendář</button></form></div>`,`journal-book--calendar`);
+ if(!clock)return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`<h2>Jednotný kalendář kampaně</h2><div class="panel"><p>HMK str. 178–182: časové intervaly léčení, infekcí a Shock. Údaje o bojových kolech nepřevádíme na hodiny ani dny. Založení kalendáře neposune bojový stav a nespustí žádný hod.</p><form id="campaign-start-form"><div class="field-grid">${field('label','Označení kampaně (bez domyšleného harenského data)','')}${field('day','Den kampaně (1 = první evidovaný den)',1,'number')}${field('hour','Hodina (0–23)',8,'number')}${field('minute','Minuta (0–59)',0,'number')}</div><p>HMK str. 11 a 22: 12 měsíců × 30 dní, tři desetidenní úseky. Zvolte skutečné datum TR podle své kampaně (nikoli automaticky podle dnešního kalendáře).</p><div class="field-grid">${field('trYear','Rok TR (GM určí)',720,'number')}<label>Měsíc TR<select name="trMonth">${TR_MONTHS.map((m,i)=>`<option value="${i+1}">${esc(m)}</option>`).join('')}</select></label>${field('trDay','Den měsíce (1–30)',1,'number')}</div><label><input type="checkbox" name="setTR" value="yes" checked> Přiřadit GM potvrzené datum TR (lze také později)</label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje výchozí čas kampaně</label><button type="submit">Založit kalendář</button></form></div>`,`journal-book--calendar`);
  const agenda=campaignCalendarAgenda(clock,data.characters);
  const unresolved=data.characters.flatMap(c=>{
   const s=c.hmk?.combatState;if(!s||s.shock==='KIA')return [];
@@ -434,17 +447,21 @@ function campaignCalendarView(){
   if(s.extendedShock&&!getCampaignAnchor(clock,'extended-shock',c.id))arr.push({kind:'extended-shock',name:'Extended Shock',unit:'hodiny'});
   if(s.coma?.active&&!getCampaignAnchor(clock,'coma',c.id))arr.push({kind:'coma',name:'Coma',unit:'dny'});
   if(s.bloodLoss?.bp>0&&!getCampaignAnchor(clock,'blood-loss',c.id))arr.push({kind:'blood-loss',name:'První Blood Loss',unit:'dny'});
+  for(const t of s.toxinCourses??[])if(['incubating','active'].includes(t.status)&&!getCampaignEpisodeAnchor(clock,'poison',c.id,t.id))arr.push({kind:'poison',name:'Poison · '+t.sourceId,unit:'minuty',episodeId:t.id});
+  for(const t of s.diseaseCourses??[])if(['pending-profile','incubating','active'].includes(t.status)&&!getCampaignEpisodeAnchor(clock,'disease',c.id,t.id))arr.push({kind:'disease',name:'Disease · '+t.diseaseKey,unit:'minuty',episodeId:t.id});
   return arr.map(x=>({...x,characterId:c.id,label:c.name+' · '+x.name}));
  });
  const renderItem=x=>`<div class="list-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}${x.woundId?' · '+esc(x.woundId):''}</div></div><span>${x.status==='due'?'SPLATNÉ':'Čeká'}</span></div>`;
- return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`<h2>Jednotný kalendář kampaně</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Pouze GM posouvá čas; fyzické hody se neprovádějí automaticky.</p>
+ if(!calendarUI)calendarUI=calendarInitialUI(clock);
+ const board=campaignCalendarBoardHTML({clock,characters:data.characters,ui:calendarUI,escapeHTML:esc});
+ return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${board}<details class="hc-advanced"><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Pouze GM posouvá čas; fyzické hody se neprovádějí automaticky.</p>
  <form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form><p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
  <section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Vyřešení probíhá v původním Combat / Healing průvodci; kalendář pouze hlídá čas, nerozhoduje o hodu ani nezapisuje paralelní Combat State.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
  <section class="panel"><h3>Následující termíny · ${agenda.future.length}</h3>${agenda.future.length?agenda.future.slice(0,100).map(renderItem).join(''):'<p class="muted">Žádná další doložená splatnost.</p>'}</section>
  <section class="panel"><h3>Historické rány – potvrzení počátku · ${unresolved.length}</h3><p>Starší rány nepřevádíme automaticky z čísla bojového kola. Zadejte jejich skutečný věk v celých dnech a zbývajících hodinách/minutách.</p>${anchorOptions?`<form id="campaign-anchor-wound-form"><label>Rána<select name="wound" required>${anchorOptions}</select></label><div class="field-grid">${field('days','Počet uplynulých dní',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje doložený okamžik zranění</label><button type="submit">Ukotvit historickou ránu</button></form>`:'<p>Všechny existující otevřené rány mají doložený počátek.</p>'}</section>
- <section class="panel"><h3>Další historické procedury</h3>${timeOrigins.length?`<form id="campaign-anchor-procedure-form"><label>Procedura<select name="origin" required>${timeOrigins.map(x=>`<option value="${esc(x.kind+'::'+x.characterId)}">${esc(x.label)} (${x.unit})</option>`).join('')}</select></label>${field('days','Skutečně uplynulé dny',0,'number')}${field('hours','Zbývající hodiny',0,'number')}${field('minutes','Zbývající minuty',0,'number')}<label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje počátek procedury</label><button type="submit">Ukotvit proceduru</button></form>`:'<p>Žádná další aktivní procedura nepotřebuje potvrzení počátku.</p>'}</section>
+ <section class="panel"><h3>Další historické procedury</h3>${timeOrigins.length?`<form id="campaign-anchor-procedure-form"><label>Procedura<select name="origin" required>${timeOrigins.map(x=>`<option value="${esc(x.kind+'::'+x.characterId+(x.episodeId?'::'+x.episodeId:''))}">${esc(x.label)} (${x.unit})</option>`).join('')}</select></label>${field('days','Skutečně uplynulé dny',0,'number')}${field('hours','Zbývající hodiny',0,'number')}${field('minutes','Zbývající minuty',0,'number')}<label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje počátek procedury</label><button type="submit">Ukotvit proceduru</button></form>`:'<p>Žádná další aktivní procedura nepotřebuje potvrzení počátku.</p>'}</section>
  <section class="panel"><h3>Nedoložené termíny · ${agenda.unknown.length}</h3>${agenda.unknown.map(x=>`<p class="notice">${esc(x.name)}: ${esc(x.description)} – ${esc(x.reason)}</p>`).join('')||'<p class="muted">Není evidován žádný neznámý počátek naplánované procedury.</p>'}</section>
- <section class="panel"><details><summary>Časový audit a historie · ${clock.events.length} potvrzení</summary>${clock.events.slice(-150).map(e=>`<p><strong>${esc(displayCampaignMinute(e.minute))}</strong> · ${esc(e.type)} · ${esc(e.reason)}</p>`).join('')}</details></section>`,`journal-book--calendar`);
+ <section class="panel"><details><summary>Časový audit a historie · ${clock.events.length} potvrzení</summary>${clock.events.slice(-150).map(e=>`<p><strong>${esc(displayCampaignMinute(e.minute))}</strong> · ${esc(e.type)} · ${esc(e.reason)}</p>`).join('')}</details></section></details>`,`journal-book--calendar`);
 }
 // Ephemeral presentation state only. Completion still comes from the persisted HMK
 // validator; unsaved edits and failed confirmations must never display a green tick.
@@ -5550,6 +5567,8 @@ document.addEventListener('submit',event=>{
   if(!mutate(()=>{
    if(persistentStateOf(actor).events.some(e=>e.id===result.report.id))throw Error('Opakovaná otrava');
    synchronizeCombatInjuries(actor,result.state);
+   if(data.campaignClock)data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'poison',characterId:actor.id,
+    eventId:uuid(),combatEventId:result.course.id,source:'confirmed-combat'});
    data.journal.push({id:uuid(),characterId:actor.id,title:'Poison/Toxin · expozice · HMK 186',
     body:'Zdroj '+result.course.sourceId+'; HR'+result.course.initialHR+'; onset '+result.course.onsetMinutes+' minut; Course každých '+result.course.periodMinutes+' minut. Zatím bez stavového účinku.',
     createdAt:stamp(),skillTestProof:{type:'poison-start',sourceId:result.course.sourceId,actorId:actor.id,course:result.course}});
@@ -5565,6 +5584,7 @@ document.addEventListener('submit',event=>{
   const result=preparePoisonOnset({actor,state,sourceId:f('sourceId').value.trim(),
    round:Math.max(1,combatClock.round||1,state.lastRound||0),elapsedMinutes:Number(f('elapsedMinutes').value),
    gmConfirmed:f('gmConfirmed').checked});
+  confirmCalendarEpisodeElapsed('poison',actor.id,result.course.id,result.report.elapsedMinutes);
   if(!mutate(()=>{
    synchronizeCombatInjuries(actor,result.state);
    data.journal.push({id:uuid(),characterId:actor.id,title:'Poison/Toxin · příznaky · HMK 186',
@@ -5584,6 +5604,7 @@ document.addEventListener('submit',event=>{
    elapsedMinutes:Number(f('elapsedMinutes').value),courseD100:Number(f('courseD100').value),
    physicianSV:Number(f('physicianSV').value),physicianConfirmed:f('physicianConfirmed').checked,
    gmConfirmed:f('gmConfirmed').checked});
+  confirmCalendarEpisodeElapsed('poison',actor.id,result.course.id,result.report.elapsedMinutes);
   if(!mutate(()=>{
    synchronizeCombatInjuries(actor,result.state);
    data.journal.push({id:uuid(),characterId:actor.id,title:'Poison Course · HMK 184/186',
@@ -5598,6 +5619,9 @@ function hskCommitDisease(actor,result,title,body,kind){
   const now=persistentStateOf(actor);
   if(JSON.stringify(now)!==JSON.stringify(result._baseline))throw Error('Disease: stav se změnil mezi hodem a zápisem');
   synchronizeCombatInjuries(actor,result.state);
+  if(kind==='disease-exposure'&&result.report.contracted&&data.campaignClock)
+   data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'disease',characterId:actor.id,
+    eventId:uuid(),combatEventId:result.episode.id,source:'confirmed-combat'});
   data.journal.push({id:uuid(),characterId:actor.id,title,body,createdAt:stamp(),
    skillTestProof:{type:kind,actorId:actor.id,sourceId:result.episode.sourceId,
     report:result.report,episode:structuredClone(result.episode)}});
@@ -5611,6 +5635,8 @@ function hskDiseaseTransaction(form,build,title,body,kind){
   const original=persistentStateOf(actor),f=n=>form.elements.namedItem(n);
   const round=Math.max(1,combatClock.round||1,original.lastRound||0);
   const result=build({actor,state:original,round,f});result._baseline=structuredClone(original);
+  if(kind==='disease-onset'||kind==='disease-course')
+   confirmCalendarEpisodeElapsed('disease',actor.id,result.episode.id,result.report.elapsedMinutes);
   hskCommitDisease(actor,result,title(result),body(result),kind);
  }catch(e){if(out?.isConnected)out.textContent='Disease zůstává nedokončeno: '+e.message;else alert('Disease: '+e.message);}
 }
@@ -6180,6 +6206,82 @@ document.addEventListener('submit',event=>{
  }catch(err){const output=document.getElementById(slot);if(output)output.textContent='Test nebyl dokončen: '+err.message;else alert(err.message);}
 },true);
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-resume-creation]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();if(!resumeCreation(t.dataset.resumeCreation))alert('Rozpracovanou postavu nelze obnovit nebo je aktivní Initiative.');},true);
+// Calendar planner – all mutations pass through mutate() and the append-only clock validator.
+document.addEventListener('submit',e=>{
+ const f=e.target;
+ if(!['campaign-quick-advance-form','campaign-plan-form','campaign-tr-origin-form'].includes(f.id))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const v=Object.fromEntries(new FormData(f)),n=x=>/^\d+$/.test(String(x??''))?Number(x):NaN;
+ try{
+  if(!data.campaignClock)throw Error('Nejdříve založte kampaň');
+  if(v.gmConfirmed!=='yes')throw Error('Akci musí potvrdit GM');
+  if(f.id==='campaign-tr-origin-form'){
+   const next=setCampaignTROrigin(data.campaignClock,{year:n(v.year),month:n(v.month),day:n(v.day),eventId:uuid(),confirmed:true});
+   if(!window.confirm('Přiřadit '+formatTRDate(campaignTRDate(next,next.minute))+' ke skutečnému dni kampaně? Datum již nepůjde nenápadně změnit.'))return;
+   mutate(()=>{data.campaignClock=next;});return;
+  }
+  if(f.id==='campaign-quick-advance-form'){
+   if(combatInitiativeSequence)throw Error('Při aktivním Initiative nelze samostatně posouvat čas kampaně');
+   const delta=n(v.deltaMinutes),next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:delta,eventId:uuid(),reason:v.reason,gmConfirmed:true,characters:data.characters});
+   if(!window.confirm('Potvrdit skutečné plynutí času do '+displayCampaignMinute(next.minute)+'? Hody se automaticky neprovedou.'))return;
+   mutate(()=>{data.campaignClock=next;});return;
+  }
+  const minute=(n(v.day)-1)*DAY_MINUTES+n(v.hour)*60+n(v.minute), duration=n(v.durationDays)*DAY_MINUTES+n(v.durationHours)*60+n(v.durationMinutes);
+  if(!Number.isSafeInteger(minute)||!Number.isSafeInteger(duration)||duration<0)throw Error('Zadejte platný den a délku trvání');
+  if(v.characterId&&!character(v.characterId))throw Error('Postava není v registru');
+  if(v.requiresAction==='yes'&&minute<data.campaignClock.minute&&v.trigger!=='end')throw Error('Povinnou nevyřízenou událost nelze plánovat zpětně; použijte běžnou historickou poznámku');
+  const next=addGMCalendarPlan(data.campaignClock,{id:uuid(),eventId:uuid(),title:v.title,note:v.note||'',place:v.place||'',characterId:v.characterId||'',minute,endMinute:minute+duration,destination:v.destination,requiresAction:v.requiresAction==='yes',trigger:v.trigger,confirmed:true});
+  if(!window.confirm('Zapsat událost „'+v.title+'“ na '+displayCampaignMinute(minute)+'?'))return;
+  if(mutate(()=>{data.campaignClock=next;}))calendarUI.prefillMinute=null;
+ }catch(err){alert('Kalendář nebyl změněn: '+err.message)}
+},true);
+document.addEventListener('click',e=>{
+ const t=e.target.closest?.('[data-cal-day],[data-cal-hour],[data-cal-prefill],[data-cal-action],[data-cal-link],[data-cal-resolve],[data-cal-cancel]');
+ if(!t)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(!data.campaignClock)return;
+ if(!calendarUI)calendarUI=calendarInitialUI(data.campaignClock);
+ if(t.dataset.calDay){calendarUI.dayNumber=Number(t.dataset.calDay);calendarUI.hour=calendarUI.dayNumber===Math.floor(data.campaignClock.minute/DAY_MINUTES)+1?Math.floor(data.campaignClock.minute%1440/60):8;calendarUI.mode='day';calendarUI.prefillMinute=null;render();return;}
+ if(t.dataset.calHour!==undefined){calendarUI.hour=Number(t.dataset.calHour);render();return;}
+ if(t.dataset.calPrefill){calendarUI.prefillMinute=Number(t.dataset.calPrefill);render();document.getElementById('hc-planner')?.scrollIntoView({block:'start',behavior:'auto'});return;}
+ if(t.dataset.calAction){const action=t.dataset.calAction;
+  if(action==='today'){calendarUI=calendarInitialUI(data.campaignClock);calendarUI.mode='day';}
+  if(action==='month'){calendarUI.mode='month';}
+  if(action==='prev-month'){calendarUI.monthShift=Math.max(-240000,calendarUI.monthShift-1);}
+  if(action==='next-month'){calendarUI.monthShift=Math.min(240000,calendarUI.monthShift+1);}
+  render();return;
+ }
+ if(t.dataset.calLink){
+  const target=character(t.dataset.calLink);if(!target)return alert('Postava již není v registru');
+  selected=target.id;const destination=t.dataset.calDestination||'notes';
+  if(destination==='combat'||destination==='healing'){if(!combatInitiativeSequence)encounterSelection.add(target.id);view='encounter';}
+  else if(destination==='skills'){view='skills';}
+  else{activeSheetSection=destination==='inventory'?'inventory':destination==='hazards'?'hazards':'notes';view='sheet';}
+  render();
+  // Focus the actual existing rule editor, never open a duplicate roll form.
+  const followup=destination==='healing'?'#hmk-healing-roll-form,#hmk-infection-course-form,#hmk-grim-shock-form,#hmk-blood-regeneration-form':
+   destination==='hazards'&&(t.dataset.calKind==='poison')?'form[data-hmk-poison-onset],form[data-hmk-poison-course]':
+   destination==='hazards'&&(t.dataset.calKind==='disease')?'form[data-hmk-disease-profile],form[data-hmk-disease-onset],form[data-hmk-disease-course]':null;
+  if(followup)document.querySelector(followup)?.scrollIntoView({block:'start'});
+  return;
+ }
+ if(t.dataset.calResolve||t.dataset.calCancel){
+  const cancel=!!t.dataset.calCancel,planId=t.dataset.calResolve||t.dataset.calCancel;
+  const plan=data.campaignClock.plans?.find(x=>x.id===planId);
+  if(!plan)return alert('Událost neexistuje');
+  const note=window.prompt(cancel?'Důvod zrušení (nepovinné):':'Zápis výsledku rozhodnutí GM (nenahrazuje pravidlový test):','');
+  if(note===null)return;
+  if(!window.confirm((cancel?'Zrušit':'Potvrdit vyřízení')+' událost „'+plan.title+'“? Zápis zůstane v auditní historii.'))return;
+  try{
+   const next=completeGMCalendarPlan(data.campaignClock,{id:uuid(),planId,note,kind:cancel?'cancelled':'resolved',confirmed:true});
+   mutate(()=>{data.campaignClock=next;
+    if(!cancel&&plan.characterId&&character(plan.characterId))data.journal.push({id:uuid(),characterId:plan.characterId,createdAt:stamp(),title:'Kalendář GM · '+plan.title,
+     body:'Čas události: '+displayCampaignMinute(plan.minute)+'\nMísto: '+plan.place+'\n'+plan.note+'\nPotvrzení GM: '+note+'\n(Tento záznam nenahrazuje pravidlový hod.)',calendarPlanId:planId});
+   });
+  }catch(err){alert('Událost nelze vyřídit: '+err.message)}
+  return;
+ }
+},true);
 document.addEventListener('submit',e=>{
  const f=e.target;
  if(!['campaign-start-form','campaign-advance-form','campaign-anchor-wound-form','campaign-anchor-procedure-form'].includes(f.id))return;
@@ -6190,8 +6292,9 @@ document.addEventListener('submit',e=>{
   if(v.gmConfirmed!=='yes')throw Error('GM musí potvrdit skutečný čas');
   if(f.id==='campaign-start-form'){
    if(data.campaignClock)throw Error('Kalendář už existuje');
-   const next=createCampaignCalendar({day:parse(v.day),hour:parse(v.hour),minute:parse(v.minute),label:v.label,
+   let next=createCampaignCalendar({day:parse(v.day),hour:parse(v.hour),minute:parse(v.minute),label:v.label,
     gmConfirmed:true,eventId:uuid()});
+   if(v.setTR==='yes')next=setCampaignTROrigin(next,{year:parse(v.trYear),month:parse(v.trMonth),day:parse(v.trDay),eventId:uuid(),confirmed:true});
    if(!window.confirm('Založit autoritativní kalendář '+displayCampaignMinute(next.minute)+'?'))return;
    mutate(()=>{data.campaignClock=next;});return;
   }
@@ -6208,16 +6311,16 @@ document.addEventListener('submit',e=>{
   const days=parse(v.days),hours=parse(v.hours),minutes=parse(v.minutes);
   if(![days,hours,minutes].every(Number.isSafeInteger)||hours>23||minutes>59)throw Error('Doložte počet dní a HH:MM');
   const elapsedMinutes=days*DAY_MINUTES+hours*60+minutes;
-  let kind,characterId,woundId=null;
+  let kind,characterId,woundId=null,episodeId=null;
   if(f.id==='campaign-anchor-wound-form'){
    [characterId,woundId]=String(v.wound??'').split('::');kind='wound';
    if(!character(characterId)?.hmk?.combatState?.wounds?.some(w=>w.id===woundId&&!w.healed))throw Error('Rána už neexistuje nebo je zhojená');
   }else{
-   [kind,characterId]=String(v.origin??'').split('::');
+   [kind,characterId,episodeId]=String(v.origin??'').split('::');
    const s=character(characterId)?.hmk?.combatState;
-   if(!s||!((kind==='extended-shock'&&s.extendedShock)||(kind==='coma'&&s.coma?.active)||(kind==='blood-loss'&&s.bloodLoss?.bp>0)))throw Error('Procedura již není aktivní');
+   if(!s||!((kind==='extended-shock'&&s.extendedShock)||(kind==='coma'&&s.coma?.active)||(kind==='blood-loss'&&s.bloodLoss?.bp>0)||(kind==='poison'&&(s.toxinCourses??[]).some(t=>t.id===episodeId&&['incubating','active'].includes(t.status)))||(kind==='disease'&&(s.diseaseCourses??[]).some(t=>t.id===episodeId&&['pending-profile','incubating','active'].includes(t.status)))))throw Error('Procedura již není aktivní');
   }
-  const next=anchorCampaignOrigin(data.campaignClock,{kind,characterId,woundId,elapsedMinutes,
+  const next=anchorCampaignOrigin(data.campaignClock,{kind,characterId,woundId,episodeId,elapsedMinutes,
    gmConfirmed:true,eventId:uuid()});
   if(!window.confirm('Trvale potvrdit počátek '+kind+' před '+elapsedMinutes+' minutami?'))return;
   mutate(()=>{data.campaignClock=next;});
