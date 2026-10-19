@@ -4048,3 +4048,89 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  background:#f8dda4!important;color:#4c290f!important;outline:2px solid #9b6a2e!important;
  outline-offset:2px!important;
 }
+
+
+/* v93.358 — single parchment surface per book card. A second translucent
+   overlay on individual stat boxes / skill families used to make the tables
+   visibly whiter than Birth & Origins / Family & Links. */
+.content-sheet .journal-book--overview .journal-attributes-row .journal-stat-box,
+.content-sheet .journal-book--overview .journal-book-skills .journal-skill-family,
+.content-sheet .journal-book--overview .journal-book-section--skills .journal-skill-family{
+ background:transparent!important;background-image:none!important;
+ box-shadow:none!important;
+}
+.content-sheet .journal-book--overview .journal-attributes-row .journal-book-section,
+.content-sheet .journal-book--overview .journal-book-section--skills{
+ background:rgba(251,242,222,.38)!important;
+ background-image:none!important;
+}
+/* Balance both outer panels around the portrait; centre the name on the full folio. */
+.content-sheet .journal-book--overview .journal-left-top{
+ grid-template-columns:minmax(0,1fr) minmax(0,1.13fr) minmax(0,1fr)!important;
+}
+.content-sheet .journal-book--overview .journal-nameplate{
+ position:relative!important;width:100%!important;min-width:0!important;
+}
+.content-sheet .journal-book--overview .journal-nameplate .journal-crest{
+ position:absolute!important;left:0;top:0;pointer-events:none;
+}
+.content-sheet .journal-book--overview .journal-nameplate .journal-nameplate-copy{
+ width:100%!important;max-width:100%!important;padding:0 34px!important;
+ box-sizing:border-box!important;
+}
+/* Original Fate reference splits the Roll number from the available FP. */
+.content-sheet .journal-book--overview .journal-grace-piety .journal-stat-boxes{
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;align-items:stretch;
+}
+.content-sheet .journal-book--overview .journal-grace-piety .journal-fate-pair{
+ grid-column:1/-1;min-width:0;
+}
+.content-sheet .journal-book--overview .journal-grace-piety .journal-fate-heading{
+ display:block;font:700 10px/1.2 Georgia,serif;color:#65321c;text-align:center;
+}
+.content-sheet .journal-book--overview .journal-grace-piety .journal-fate-split{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;
+}
+.content-sheet .journal-book--overview .journal-grace-piety :is(.journal-stat-box,.journal-fate-split .journal-stat-box){
+ background:transparent!important;box-shadow:none!important;padding:3px 1px!important;
+ min-width:0;text-align:center;
+}
+.content-sheet .journal-book--overview .journal-grace-piety .journal-stat-box strong{
+ display:block;font:700 11px/1.25 Georgia,serif!important;
+ color:#241a14!important;overflow-wrap:anywhere;
+}
+.content-sheet .journal-book--overview .journal-grace-piety .journal-stat-box span{font-size:9px!important}
+/* Inventory figures: subdued ink, not oversized navy-blue headline numbers. */
+.content-sheet .journal-book--chapter .folio-chapter-content .equipment-summary:not(.equipped-hands) :is(strong,span),
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-summary-stat :is(strong,b),
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-summary-stat span,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-footer-totals :is(strong,span){
+ color:#292117!important;font:600 11px/1.28 Georgia,serif!important;
+}
+/* Body location die information as printed on p.436, next to the locations. */
+.content-sheet .journal-book--overview .journal-anatomy-table{min-width:495px!important;}
+.content-sheet .journal-book--overview .journal-anatomy-table col.journal-col-code{width:7%!important}
+.content-sheet .journal-book--overview .journal-anatomy-table col.journal-col-name{width:16%!important}
+.content-sheet .journal-book--overview .journal-anatomy-table col.journal-col-zn{width:10%!important}
+.content-sheet .journal-book--overview .journal-anatomy-table col.journal-col-ln{width:7%!important}
+.content-sheet .journal-book--overview .journal-anatomy-table col.journal-col-av{width:6.1%!important}
+.content-sheet .journal-book--overview .journal-anatomy-table col.journal-col-bleed{width:6%!important}
+.content-sheet .journal-book--overview .journal-anatomy-table col.journal-col-shk{width:7%!important}
+.content-sheet .journal-book--overview .journal-anatomy-table col.journal-col-amp{width:5%!important}
+.content-sheet .journal-book--overview .journal-anatomy-table col.journal-col-injuries{width:17.6%!important}
+.content-sheet .journal-book--overview .journal-anatomy-table :is(.journal-zn-cell,.journal-ln-cell){
+ text-align:center!important;vertical-align:middle!important;font:600 9px/1.2 Georgia,serif!important;
+ white-space:nowrap!important;color:#493421!important;padding:2px 1px!important;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table .journal-zn-cell{
+ background:rgba(170,136,83,.08)!important;border-left:1px solid rgba(120,83,45,.26)!important;
+ border-right:1px solid rgba(120,83,45,.26)!important;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table .journal-zn-cell span{
+ display:block;font-variant:small-caps;font-size:9px;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table .journal-zn-cell strong{display:block;font-size:10px}
+@media(max-width:550px){
+ .content-sheet .journal-book--overview .journal-left-top{grid-template-columns:minmax(0,1fr)!important}
+ .content-sheet .journal-book--overview .journal-nameplate .journal-nameplate-copy{padding:0 7px!important}
+}
