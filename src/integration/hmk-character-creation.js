@@ -451,6 +451,9 @@ export function creationRevisionIssues(character){
    [14,'graceDie','Chybí uložený Grace d20.'],
    [14,'psycheDice','Chybí uložený Psyche hod.']];
   for(const [step,field,message] of required){
+   // HMK p.40 prescribes no starting Psyche dice count for Ænarin or Sidhé.
+   // Do not require a non-existent dice proof or fabricate rolls for them.
+   if(field==='psycheDice'&&creationPsycheCount(h.folk,h.ageGroup)===null)continue;
    let absent=field==='creation-attr-name'?ATTRIBUTES.some(a=>!c.attributeProof?.[a])||!c.voiceProof:
     field==='occupation'?!filled(v.occupation)&&!filled(character.occupation):
     field==='graceDie'?!v.graceProof:field==='psycheDice'?!v.psycheProof:missing(field);
@@ -1456,7 +1459,7 @@ export function assertCreationInvariants(character){
   }else if(e.type==='gm-bonus-language-deactivated'){
    if(e.reason!=='changed Folk/Age/Birthplace')throw Error('Neplatné zneplatnění GM Bonus Language');
   }else if(e.type==='automatic-generation'){
-   if(!['random','warrior','scholar','mystic','artisan','explorer','social','covenant'].includes(e.mode)||e.diceSource!=='browser PRNG/Web Crypto'||!Number.isInteger(e.attempt)||e.attempt<1)throw Error('Neplatný automatický generační důkaz');
+   if(!['random','traits','warrior','scholar','mystic','artisan','explorer','social','covenant'].includes(e.mode)||e.diceSource!=='browser PRNG/Web Crypto'||!Number.isInteger(e.attempt)||e.attempt<1|| (e.mode==='traits'&&!['random','warrior','scholar','mystic','artisan','explorer','social','covenant'].includes(e.profile)))throw Error('Neplatný automatický generační důkaz');
   }else if(e.type==='step-dice'){
    const expected={1:{folkRoll:100},2:{ageRoll:100},3:{birthMonth:12,birthDay:30},4:{traitRoll:6,traitRollSecondary:6},5:{regionRoll:100,venariveRoll:1000,nativeLanguageRoll:2,regionSubRoll:10,regionDialectRoll:100,regionTribeRoll:100},6:{classRoll:100},7:{parentOccupationRoll:100,parentOccupationSubRoll:20,parentOccupationSpecialRoll:20,parentOccupationConvocationRoll:6},8:{backgroundRoll:100,backgroundTensRoll:10},9:{estrangementRoll:100}}[e.step];
    if(!expected||!Object.hasOwn(expected,e.field)||![`d${expected[e.field]}`,'d20'].includes(e.die)||
