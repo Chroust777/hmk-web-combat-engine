@@ -1,3 +1,4 @@
+import {isHandheldItem,validateHandInventory} from './hmk-hand-equipment.js';
 /** A direct, owner-bound, atomic inventory item edit. No navigation changes,
  * no RNG and no alternate storage path. UI calls within existing mutate/CAS. */
 const SLOTS=['none','main_hand','off_hand','worn','carried'];
@@ -6,7 +7,7 @@ export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,current
  if(!doc||!Array.isArray(doc.inventory)||typeof ownerId!=='string'||!ownerId||typeof itemId!=='string'||!itemId)fail('Neplatný vlastník nebo předmět');
  const item=doc.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
  if(!item||!doc.characters?.some(x=>x.id===ownerId))fail('Předmět nepatří otevřené postavě');
- if(!SLOTS.includes(slot)||(['main_hand','off_hand'].includes(slot)&&!['weapon','shield','other'].includes(item.snapshot?.category))||(slot==='worn'&&item.snapshot?.category!=='armor'))fail('Nepřípustný slot pro tento předmět');
+ if(!SLOTS.includes(slot)||(['main_hand','off_hand'].includes(slot)&&!isHandheldItem(item))||(slot==='worn'&&item.snapshot?.category!=='armor'))fail('Nepřípustný slot pro tento předmět');
  if(!Number.isSafeInteger(quantity)||quantity<1||quantity>999999||(['main_hand','off_hand','worn'].includes(slot)&&quantity!==1))fail('Neplatný počet kusů pro vybavený předmět');
  if(currentWQ!==null&&(!Number.isSafeInteger(currentWQ)||currentWQ<0||currentWQ>999))fail('Neplatná WQ');
  if(typeof condition!=='string')fail('Neplatný stav předmětu');
@@ -18,6 +19,7 @@ export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,current
  const next=structuredClone(doc);const target=next.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
  target.slot=slot;target.quantity=quantity;target.currentWQ=currentWQ;target.condition=condition;target.gearStowage=gearStowage;
  if(target.snapshot.category==='armor'){target.layerOrder=layerOrder;target.layerSlot=layerSlot;target.bulkExceptionZones=bulkExceptionZones;}
+ validateHandInventory(next.inventory,ownerId);
  return next;
 }
 
