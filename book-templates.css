@@ -3344,124 +3344,225 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 }
 
 
-/* v93.343 — parchment dialogs + creation jump links.
-   Overlay windows (new character / generator / editors) now use the same
-   readable manuscript palette as the journal tabs, instead of black-on-black.
-   Creation chapter index steps become clickable links back to prior steps. */
+/* v93.344 — modal windows share the journal parchment and folio tables.
+   Unlike v93.343, checkbox/radio controls are never styled as text inputs. */
 .editor-backdrop{
-  position:fixed!important;
-  inset:0!important;
-  display:flex!important;
-  align-items:flex-start!important;
-  justify-content:center!important;
-  padding:clamp(18px,4vh,44px) 16px!important;
-  background:rgba(17,14,12,.58)!important;
-  backdrop-filter:blur(1.5px);
-  z-index:1200!important;
+  position:fixed!important;inset:0!important;z-index:1200!important;
+  display:flex!important;justify-content:center!important;align-items:flex-start!important;
+  padding:clamp(12px,3vh,32px) 16px!important;
+  background:rgba(13,15,21,.60)!important;backdrop-filter:blur(2px);
 }
-.editor-backdrop .editor-dialog,
-.editor-backdrop .panel.editor-dialog{
-  width:min(920px,calc(100vw - 32px))!important;
-  max-width:min(920px,calc(100vw - 32px))!important;
-  max-height:min(90vh,980px)!important;
-  overflow:auto!important;
-  padding:18px 20px 16px!important;
-  border:1px solid rgba(137,94,45,.54)!important;
-  border-radius:18px!important;
-  background:
-    linear-gradient(180deg,rgba(255,250,239,.92),rgba(245,233,206,.94)),
-    radial-gradient(circle at 16% 12%,rgba(255,255,255,.35),transparent 34%),
-    radial-gradient(circle at 82% 14%,rgba(203,152,72,.10),transparent 24%)!important;
-  color:#4f2c1c!important;
-  box-shadow:0 18px 42px rgba(18,12,8,.34),inset 0 1px rgba(255,249,234,.95)!important;
+.editor-backdrop > .editor-dialog,
+.editor-backdrop > .panel.editor-dialog{
+  box-sizing:border-box!important;position:relative!important;
+  width:min(900px,calc(100vw - 32px))!important;
+  max-width:min(900px,calc(100vw - 32px))!important;
+  max-height:min(94vh,1040px)!important;overflow:auto!important;
+  margin:0!important;padding:24px 26px!important;
+  border:1px solid rgba(143,100,51,.72)!important;
+  border-radius:2px!important;
+  color:#322217!important;
+  background-color:#efe3c8!important;
+  background-image:linear-gradient(90deg,rgba(110,74,32,.08),transparent 10%,transparent 90%,rgba(110,74,32,.08)),url('./assets/ui/book/parchment_dynamic_texture.png')!important;
+  background-size:100% 100%,2400px 2400px!important;
+  background-repeat:no-repeat,repeat!important;
+  box-shadow:0 18px 46px rgba(10,10,13,.55),inset 0 0 0 2px rgba(253,241,216,.65)!important;
+  font:15px/1.36 Georgia,serif!important;
 }
-.editor-backdrop .editor-dialog h2,
-.editor-backdrop .editor-dialog h3{
-  margin:0 0 10px!important;
-  color:#6a3320!important;
-  font:700 clamp(24px,2.3vw,34px)/1.08 "Cinzel",Georgia,serif!important;
-  letter-spacing:.02em!important;
+.editor-backdrop .editor-dialog :is(h2,h3,h4){
+  color:#63371f!important;
+  margin:0 0 12px!important;
+  font:700 clamp(20px,2vw,28px)/1.18 Georgia,serif!important;
 }
-.editor-backdrop .editor-dialog p,
-.editor-backdrop .editor-dialog li,
-.editor-backdrop .editor-dialog label,
-.editor-backdrop .editor-dialog legend,
-.editor-backdrop .editor-dialog .muted,
-.editor-backdrop .editor-dialog .tiny,
-.editor-backdrop .editor-dialog .notice{
-  color:#52311f!important;
+.editor-backdrop .editor-dialog :is(p,li,label,legend,.muted,.tiny,.notice){
+  color:#4a301e!important;
   font-family:Georgia,serif!important;
+  text-shadow:none!important;
 }
-.editor-backdrop .editor-dialog .field-grid{gap:12px 16px!important}
+.editor-backdrop .editor-dialog p{line-height:1.43!important}
+.editor-backdrop .editor-dialog .field-grid{gap:12px 14px!important;align-items:start!important}
+.editor-backdrop .editor-dialog .field-grid>label{min-width:0!important}
 .editor-backdrop .editor-dialog fieldset{
-  margin:8px 0 0!important;
-  padding:10px 12px 12px!important;
-  border:1px solid rgba(137,94,45,.42)!important;
-  border-radius:12px!important;
-  background:rgba(251,242,222,.42)!important;
+  margin:9px 0!important;padding:11px 12px 10px!important;
+  border:1px solid rgba(135,91,44,.46)!important;
+  border-radius:2px!important;
+  background:rgba(251,242,222,.38)!important;
+  box-shadow:inset 0 1px rgba(255,247,225,.65)!important;
 }
 .editor-backdrop .editor-dialog legend{
-  padding:0 6px!important;
-  font:700 13px/1.2 "Cinzel",Georgia,serif!important;
-  letter-spacing:.04em!important;
-  color:#6a3320!important;
+  padding:0 7px!important;
+  color:#63371f!important;
+  font:700 14px/1.2 Georgia,serif!important;
 }
-.editor-backdrop .editor-dialog :is(input,select,textarea){
-  width:100%!important;
-  border:1px solid rgba(137,94,45,.55)!important;
-  border-radius:16px!important;
-  background:rgba(255,252,245,.96)!important;
-  color:#4f2c1c!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.85)!important;
-  font:400 16px/1.35 Georgia,serif!important;
+/* Match the journal's pale, restrained forms; text inputs only. */
+.editor-backdrop .editor-dialog :is(input:not([type=checkbox]):not([type=radio]),select,textarea){
+  box-sizing:border-box!important;display:block!important;
+  width:100%!important;max-width:100%!important;
+  color:#392619!important;background:rgba(255,251,240,.79)!important;
+  border:1px solid rgba(135,91,44,.55)!important;border-radius:2px!important;
+  box-shadow:inset 0 1px rgba(255,251,241,.7)!important;
+  font:14px/1.3 Georgia,serif!important;
 }
-.editor-backdrop .editor-dialog input,
-.editor-backdrop .editor-dialog select{min-height:48px!important;padding:10px 16px!important}
-.editor-backdrop .editor-dialog textarea{min-height:108px!important;padding:12px 16px!important;resize:vertical!important}
-.editor-backdrop .editor-dialog select option{color:#2e1b11!important;background:#fffaf1!important}
-.editor-backdrop .editor-dialog input::placeholder,
-.editor-backdrop .editor-dialog textarea::placeholder{color:#8f7458!important;opacity:1}
-.editor-backdrop .editor-dialog :is(input,select,textarea):focus{
-  outline:none!important;
-  border-color:#a86d34!important;
-  box-shadow:0 0 0 2px rgba(216,175,102,.22),inset 0 1px 0 rgba(255,255,255,.92)!important;
+.editor-backdrop .editor-dialog :is(input:not([type=checkbox]):not([type=radio]),select){
+  min-height:38px!important;padding:7px 10px!important;
 }
-.editor-backdrop .editor-dialog .actions{
-  display:flex!important;
-  flex-wrap:wrap!important;
-  gap:10px!important;
-  justify-content:flex-end!important;
-  margin-top:14px!important;
+.editor-backdrop .editor-dialog textarea{min-height:100px!important;padding:9px 10px!important;resize:vertical!important}
+.editor-backdrop .editor-dialog select option{color:#352319!important;background:#f7e9cc!important}
+.editor-backdrop .editor-dialog :is(input,textarea)::placeholder{color:#866748!important}
+/* Generator traits: real 17px square checks, not huge white text controls. */
+.editor-backdrop .editor-dialog :is(input[type=checkbox],input[type=radio]){
+  appearance:auto!important;-webkit-appearance:auto!important;
+  display:inline-block!important;flex:0 0 17px!important;
+  width:17px!important;min-width:17px!important;max-width:17px!important;
+  height:17px!important;min-height:17px!important;max-height:17px!important;
+  margin:0!important;padding:0!important;
+  border:0!important;border-radius:0!important;
+  box-shadow:none!important;
+  background:transparent!important;
+  accent-color:#80582c!important;
+  vertical-align:middle!important;
 }
-.editor-backdrop .editor-dialog .actions button,
-.editor-backdrop .editor-dialog button.secondary,
-.editor-backdrop .editor-dialog button[type="submit"]{
-  min-height:42px!important;
-  padding:9px 14px!important;
+.editor-backdrop .editor-dialog fieldset label:has(> input[type=checkbox]),
+.editor-backdrop .editor-dialog fieldset label:has(> input[type=radio]){
+  display:flex!important;flex-direction:row!important;
+  align-items:center!important;justify-content:flex-start!important;
+  min-height:26px!important;gap:9px!important;
+  padding:3px 2px!important;margin:0!important;
+  color:#442d1e!important;text-align:left!important;
+  font:13px/1.25 Georgia,serif!important;
+  background:transparent!important;
+}
+.editor-backdrop .editor-dialog fieldset>div[style*="grid"]{
+  gap:4px 10px!important;
+  grid-template-columns:repeat(auto-fit,minmax(155px,1fr))!important;
 }
 .editor-backdrop .editor-dialog .notice{
-  background:rgba(251,242,222,.46)!important;
-  border:1px solid rgba(137,94,45,.42)!important;
+  background:rgba(251,242,222,.38)!important;
+  border:1px solid rgba(135,91,44,.42)!important;
+  color:#563c27!important;
 }
-.content-sheet .journal-book--creation .folio-creation-step--link{
-  cursor:pointer!important;
-  transition:background .15s ease,border-color .15s ease,transform .15s ease;
+.editor-backdrop .editor-dialog .actions{display:flex!important;flex-wrap:wrap!important;gap:8px!important;justify-content:flex-end!important;margin-top:14px!important}
+.editor-backdrop .editor-dialog .actions button{min-height:36px!important;padding:7px 12px!important}
+.editor-backdrop .editor-dialog :is(input,select,textarea,button):focus-visible{outline:2px solid #ae814d!important;outline-offset:2px!important}
+/* Every reachable chapter keeps a real button after returning to Folk. */
+.content-sheet .journal-book--creation .folio-creation-step{padding:0!important}
+.content-sheet .journal-book--creation .folio-creation-step__link,
+.content-sheet .journal-book--creation .folio-creation-step__locked{
+  box-sizing:border-box!important;display:grid!important;
+  grid-template-columns:26px minmax(0,1fr) auto!important;align-items:center!important;
+  gap:7px!important;width:100%!important;min-height:33px!important;
+  margin:0!important;padding:4px 5px!important;
+  border:0!important;border-radius:0!important;
+  background:transparent!important;color:inherit!important;
+  text-align:left!important;box-shadow:none!important;
+  font:inherit!important;letter-spacing:normal!important;
 }
-.content-sheet .journal-book--creation .folio-creation-step--link:hover,
-.content-sheet .journal-book--creation .folio-creation-step--link:focus-visible{
-  background:rgba(251,242,222,.58)!important;
-  border-color:rgba(137,94,45,.54)!important;
-  transform:translateY(-1px);
-  outline:none!important;
+.content-sheet .journal-book--creation .folio-creation-step__link{cursor:pointer!important}
+.content-sheet .journal-book--creation .folio-creation-step__link:hover,
+.content-sheet .journal-book--creation .folio-creation-step__link:focus-visible{
+  background:rgba(251,242,222,.62)!important;
+  outline:1px solid rgba(135,91,44,.6)!important;
 }
-.content-sheet .journal-book--creation .folio-creation-step--link .folio-creation-step__label{
-  text-decoration:underline;
-  text-decoration-color:rgba(137,94,45,.48);
-  text-underline-offset:2px;
+.content-sheet .journal-book--creation .folio-creation-step__link .folio-creation-step__label{
+  text-decoration:underline;text-decoration-color:rgba(135,91,44,.43);text-underline-offset:2px;
 }
+.content-sheet .journal-book--creation .folio-creation-step__locked{opacity:.55}
 @media(max-width:700px){
   .editor-backdrop{padding:10px!important}
-  .editor-backdrop .editor-dialog,
-  .editor-backdrop .panel.editor-dialog{width:min(100vw - 20px,920px)!important;padding:14px 14px 13px!important;border-radius:14px!important}
+  .editor-backdrop > .editor-dialog,
+  .editor-backdrop > .panel.editor-dialog{width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important;padding:15px!important;max-height:calc(100vh - 20px)!important}
   .editor-backdrop .editor-dialog .field-grid{grid-template-columns:1fr!important}
 }
+
+/* v93.345 — revision of the original HMK 14-step creation flow.
+   A changed prerequisite invalidates ONLY its real dependants in the rules
+   engine. The step review highlights the affected controls inside the book. */
+.content-sheet .journal-book--creation .folio-creation-step--review .folio-creation-step__link{
+  border-color:rgba(151,44,34,.75)!important;
+  box-shadow:inset 3px 0 rgba(167,37,32,.75)!important;
+}
+.content-sheet .journal-book--creation .folio-creation-step--review .folio-creation-step__number{
+  color:#9b2520!important;
+  font-weight:800!important;
+}
+.content-sheet .journal-book--creation .folio-creation-revision{
+  margin:10px 0 14px;
+  padding:12px 14px;
+  border:1px solid rgba(151,44,34,.55);
+  background:rgba(251,242,222,.68);
+  color:#4b2c1f;
+  font-family:Georgia,serif;
+}
+.content-sheet .journal-book--creation .folio-creation-revision h4{
+  margin:0 0 6px;
+  color:#6a3222;
+  font:700 18px/1.2 Georgia,serif;
+}
+.content-sheet .journal-book--creation .folio-creation-revision p{
+  margin:0 0 8px;
+  font:14px/1.4 Georgia,serif;
+  color:#583825;
+}
+.content-sheet .journal-book--creation .folio-creation-revision ol{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));
+  gap:7px;
+  padding:0;margin:0;list-style:none;
+}
+.content-sheet .journal-book--creation .folio-creation-revision li{min-width:0;}
+.content-sheet .journal-book--creation .folio-creation-revision-link{
+  display:flex!important;flex-direction:column!important;align-items:flex-start!important;
+  gap:4px!important;width:100%!important;height:100%!important;min-height:64px!important;
+  border:1px solid rgba(151,44,34,.45)!important;
+  border-radius:4px!important;padding:8px 10px!important;
+  background:rgba(255,248,230,.80)!important;
+  color:#572f20!important;text-align:left!important;
+  white-space:normal!important;font:13px/1.4 Georgia,serif!important;
+  cursor:pointer!important;
+}
+.content-sheet .journal-book--creation .folio-creation-revision-link strong{color:#902820!important;}
+.content-sheet .journal-book--creation .folio-creation-revision-link:hover,
+.content-sheet .journal-book--creation .folio-creation-revision-link:focus-visible{
+  border-color:#9b2520!important;background:#fff5e0!important;outline:2px solid rgba(155,37,32,.26);
+}
+.content-sheet .journal-book--creation .folio-creation-revision-current{
+  border-left:4px solid #a5302b;
+  padding:8px 10px;margin:10px 0;
+  background:rgba(255,238,226,.8)!important;
+  color:#812d23!important;font:700 14px/1.4 Georgia,serif;
+}
+.content-sheet .journal-book--creation .folio-creation-revision-target{
+  outline:2px solid rgba(180,39,35,.85)!important;
+  outline-offset:3px!important;
+  background:rgba(253,218,206,.50)!important;
+}
+.content-sheet .journal-book--creation .folio-creation-revision-control{
+  border-color:#b12e27!important;
+  box-shadow:0 0 0 2px rgba(177,46,39,.17)!important;
+}
+
+/* v93.346: unfinished creation profiles have a prominent, full-width resume
+   action in the character registry; their journal control is deliberately locked.
+   Keep the same manuscript appearance used by the existing register buttons. */
+.content-sheet .journal-book--characters .character-card__controls > button.character-card__continue{
+  display:block!important;
+  width:100%!important;
+  min-height:36px!important;
+  background:linear-gradient(180deg,#365777,#122b46)!important;
+  color:#ffebc1!important;
+  border:1px solid #ba904f!important;
+  font:700 12px/1.2 Georgia,serif!important;
+  cursor:pointer!important;
+}
+.content-sheet .journal-book--characters .character-card__controls > button.character-card__locked{
+  display:block!important;
+  width:100%!important;
+  min-height:27px!important;
+  background:rgba(217,196,163,.50)!important;
+  color:#745d49!important;
+  border:1px solid rgba(139,95,48,.28)!important;
+  font:italic 11px/1.15 Georgia,serif!important;
+  opacity:.85!important;
+  cursor:not-allowed!important;
+}
+.nav .castle-character--draft{outline:1px solid rgba(226,178,95,.50)!important;outline-offset:-3px!important}

@@ -34,7 +34,7 @@ import {resolveSkillTrauma,skillTraumaAvailability} from './src/integration/hmk-
 import {automaticCriticalFailure,classifySkillConsequence,skillConsequenceProof,assertUniqueSkillConsequence,assertSkillProofAppendOnly} from './src/integration/hmk-skill-consequence-resolution.js';
 import {applyInventoryItemEdit,transferInventoryItem} from './src/integration/hmk-inventory-edit.js';
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
-import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,setPerceptionMode,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
+import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
 import {creationWizardHTML,characterCalculationHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js';
 import {fieldRuleNote} from './src/integration/hmk-creation-rule-help.js';
 import {auditArmourLibraryConsistency} from './src/integration/armour-library-consistency.js';
@@ -159,7 +159,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.341';
+const APP_VERSION='93.346';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -335,7 +335,7 @@ function main(){
  if(view==='encounter')body=encounterView();
  const scene=activeVisualScene();
  const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['backup','▤','Zálohy'],['trash','♧','Archiv']];
- const characterButtons=data.characters.map(c=>`<button type="button" class="castle-character ${c.id===selected?'active':''}" data-open="${esc(c.id)}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`).join('');
+ const characterButtons=data.characters.map(c=>{const ready=characterJournalReadiness(c).ready;return `<button type="button" class="castle-character ${c.id===selected?'active':''} ${ready?'':'castle-character--draft'}" ${ready?'data-open':'data-resume-creation'}="${esc(c.id)}" title="${ready?'Otevřít deník':'Pokračovat v pravidlové tvorbě'}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`;}).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
   <div class="castle-campaign-card"><strong>HârnMaster World of Kèthîra</strong></div>
@@ -444,11 +444,20 @@ function campaignCalendarView(){
 let creationAttributeChoice=null;
 // The current creation character is a persisted CHARACTER, never a second draft.
 const CREATION_LAST_ID='hmk-ledger-last-creation-character-v1';
+function openCharacterJournal(id){
+ const c=character(id);if(!c)return false;
+ selected=id;overlay=null;sheetEditingId=null;
+ const gate=characterJournalReadiness(c);
+ if(gate.ready){activeSheetSection='overview';view='sheet';render();return true;}
+ activeSheetSection='overview';view=c.hmk?.creation?'creation':'characters';
+ notice=gate.reason+' Deník se odemkne po potvrzení všech 14 kroků a úspěšné revizi.';
+ render();return false;
+}
 function creationDrafts(){return data.characters.filter(c=>c.hmk?.creation&&!['complete','auto-generated'].includes(c.hmk.creation.status))}
 function resumeCreation(id){
- const c=character(id);if(!c?.hmk?.creation)return false;
+ const c=character(id);if(!c)return false;
  if(combatInitiativeSequence)return false;
- selected=id;view='creation';overlay=null;
+ selected=id;view='creation';overlay=null;notice='';
  try{sessionStorage.setItem(CREATION_LAST_ID,id)}catch{}
  render();return true;
 }
@@ -762,9 +771,9 @@ function skillWorkbenchView(){
 }
 function charactersView(){
  const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));
- const completed=data.characters.filter(c=>c.hmk?.creation?.status==='auto-generated'||c.hmk?.creation?.status==='complete').length;
- const inProgress=data.characters.filter(c=>c.hmk?.creation&&!['auto-generated','complete'].includes(c.hmk.creation.status)).length;
- return `<section class="view-hero hero-characters"><div class="view-hero__stats registry-stats"><div><span>Aktivní profily</span><strong>${data.characters.length}</strong></div><div><span>Hotové deníky</span><strong>${completed}</strong></div><div><span>Rozpracovaná tvorba</span><strong>${inProgress}</strong></div></div></section><div class="registry-actions" role="group" aria-label="Vytvoření nové postavy">${button('+ Vytvořit postavu krok za krokem','new-character')}<button type="button" data-action="auto-random-character">⚄ Generovat náhodnou postavu</button><button type="button" data-action="open-generator-config">✦ Generovat podle rysů / Folk / povolání</button></div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards character-gallery">${list.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><div class="character-card__crest" aria-hidden="true">${esc((c.name||'?').trim().slice(0,1).toUpperCase())}</div><div class="character-card__body"><div class="character-card__tags"><span class="pill">${esc(c.kind)}</span>${c.hmk?.folk?`<span class="pill">${esc(c.hmk.folk)}</span>`:''}${c.hmk?.ageGroup?`<span class="pill">${esc(c.hmk.ageGroup)}</span>`:''}</div><h3>${esc(c.name)}</h3><div class="muted character-card__occupation">${esc(c.occupation||'Bez povolání')}</div><div class="muted character-card__description" title="${esc(c.description||'')}">${esc(c.description||'')}</div>${c.hmk?.creation?`<div class="muted character-card__progress">Character Creation · ${esc(c.hmk.creation.status==='auto-generated'?'Automaticky dokončeno':c.hmk.creation.status==='review-required'?'Ke kontrole GM':'krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="character-card__controls"><button type="button" class="character-card__open" data-open="${esc(c.id)}">Otevřít deník</button>${creationCardAction(c)}<details class="character-card__more"><summary>Další možnosti</summary><div class="character-card__more-actions"><button type="button" class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button type="button" class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button type="button" class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></details></div></div></article>`).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`
+ const completed=data.characters.filter(c=>characterJournalReadiness(c).ready).length;
+ const inProgress=data.characters.length-completed;
+ return `<section class="view-hero hero-characters"><div class="view-hero__stats registry-stats"><div><span>Aktivní profily</span><strong>${data.characters.length}</strong></div><div><span>Hotové deníky</span><strong>${completed}</strong></div><div><span>Rozpracovaná tvorba</span><strong>${inProgress}</strong></div></div></section><div class="registry-actions" role="group" aria-label="Vytvoření nové postavy">${button('+ Vytvořit postavu krok za krokem','new-character')}<button type="button" data-action="auto-random-character">⚄ Generovat náhodnou postavu</button><button type="button" data-action="open-generator-config">✦ Generovat podle rysů / Folk / povolání</button></div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards character-gallery">${list.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><div class="character-card__crest" aria-hidden="true">${esc((c.name||'?').trim().slice(0,1).toUpperCase())}</div><div class="character-card__body"><div class="character-card__tags"><span class="pill">${esc(c.kind)}</span>${c.hmk?.folk?`<span class="pill">${esc(c.hmk.folk)}</span>`:''}${c.hmk?.ageGroup?`<span class="pill">${esc(c.hmk.ageGroup)}</span>`:''}</div><h3>${esc(c.name)}</h3><div class="muted character-card__occupation">${esc(c.occupation||'Bez povolání')}</div><div class="muted character-card__description" title="${esc(c.description||'')}">${esc(c.description||'')}</div>${c.hmk?.creation?`<div class="muted character-card__progress">Character Creation · ${esc(characterJournalReadiness(c).ready?(c.hmk.creation.status==='auto-generated'?'Automaticky dokončeno':'14/14 · ke kontrole GM'):'nedokončeno · krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="character-card__controls">${characterJournalReadiness(c).ready?`<button type="button" class="character-card__open" data-open="${esc(c.id)}">Otevřít deník</button>${creationCardAction(c)}`:`<button type="button" class="character-card__continue" data-resume-creation="${esc(c.id)}">Pokračovat v tvorbě</button><button type="button" class="character-card__locked" disabled title="Nejprve dokončete všech 14 kroků a revizi">Deník zatím uzamčen</button>`}<details class="character-card__more"><summary>Další možnosti</summary><div class="character-card__more-actions"><button type="button" class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button type="button" class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button type="button" class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></details></div></div></article>`).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`
 }
 function firstPresent(...values){for(const value of values){if(value===0)return '0';if(value!==undefined&&value!==null&&String(value).trim()!=='')return String(value);}return '—';}
 function listPresent(value){return Array.isArray(value)&&value.length?value.join(', '):'—';}
@@ -964,6 +973,22 @@ function folioLibraryEntry(row,headers){
  const identity=[...row.attributes].filter(a=>a.name.startsWith('data-')).map(a=>` ${a.name}="${esc(a.value)}"`).join('');
  return `<article class="folio-catalog-entry"${identity}><div class="folio-catalog-heading">${cells[0].innerHTML}</div><dl class="folio-catalog-stats">${fields}</dl><div class="folio-catalog-foot"><div class="folio-catalog-details">${cells.at(-2)?.innerHTML||''}</div><div class="folio-catalog-actions">${cells.at(-1)?.innerHTML||''}</div></div></article>`;
 }
+// The completed-step map is intentionally cleared when editing an earlier
+// chapter. Keep only the furthest visited page number as UI navigation state.
+// No rolls, choices, validation flags or character data are inferred from it.
+const HMK_CREATION_REACH_KEY='hmk-ledger-creation-reached-v1:';
+function creationReachableStep(actor,creation){
+ if(!actor?.id)return Math.max(1,Number(creation?.step)||1);
+ const key=HMK_CREATION_REACH_KEY+actor.id;
+ let previous=1;
+ try{previous=Number(localStorage.getItem(key))||1}catch{}
+ const completed=Math.max(0,...Object.keys(creation?.completed||{}).filter(k=>creation.completed[k]).map(Number).filter(Number.isInteger));
+ const terminal=['auto-generated','review-required','complete'].includes(creation?.status)?14:1;
+ const reached=Math.max(1,previous,Number(creation?.step)||1,completed,terminal);
+ const safe=Math.min(14,reached);
+ if(safe>previous){try{localStorage.setItem(key,String(safe))}catch{}}
+ return safe;
+}
 function folioChapterParts(body,kind=''){
  const nodes=folioHTMLNodes(body);
  if(kind.includes('journal-book--characters')){
@@ -1024,17 +1049,43 @@ function folioChapterParts(body,kind=''){
     const creation=actor?creationOf(actor):null;
     const activeStep=creation?.step??1;
     const current=CHARACTER_STEPS[activeStep-1]??['Character Creation','—'];
+    // Highest legitimately reached step is a UI-only bookmark. It survives an
+    // Edit jump back to Folk, unlike creation.completed which is intentionally
+    // invalidated by applyCreationPatch. Character data stay authoritative.
+    const reachable=creationReachableStep(actor,creation);
+    const revision=actor?creationRevisionIssues(actor):[];
     const stages=CHARACTER_STEPS.map(([name,page],index)=>{
      const number=index+1;
      const state=creation?.completed?.[number]?'complete':number===activeStep?'active':'pending';
-     const status=state==='complete'?'Dokončeno':state==='active'?'Aktuální krok':'Nevyplněno';
-     return `<li class="folio-creation-step folio-creation-step--${state}"${number===activeStep?' aria-current="step"':''}><span class="folio-creation-step__number">${number}</span><span class="folio-creation-step__label">${esc(name)}</span><span class="folio-creation-step__page">str. ${esc(page)}</span><span class="folio-visually-hidden">${status}</span></li>`;
+     const needsReview=revision.some(x=>x.step===number)&&number<=reachable;
+     const status=needsReview&&number!==activeStep?'Vyžaduje nové potvrzení':state==='complete'?'Dokončeno':state==='active'?'Aktuální krok':number<=reachable?'Dříve navštíveno':'Dosud nepřístupné';
+     const inner=`<span class="folio-creation-step__number">${number}</span><span class="folio-creation-step__label">${esc(name)}</span><span class="folio-creation-step__page">str. ${esc(page)}</span><span class="folio-visually-hidden">${status}</span>`;
+     // Buttons, not links inside a disconnected select. All navigation runs
+     // through the same original applyCreationPatch validation/mutation code.
+     return `<li class="folio-creation-step folio-creation-step--${state}${number<=reachable?' folio-creation-step--visited':''}${needsReview?' folio-creation-step--review':''}"${number===activeStep?' aria-current="step"':''}>${number<=reachable?`<button type="button" class="folio-creation-step__link" data-creation-step="${number}" ${number===activeStep?'aria-current="step"':''} aria-label="Otevřít krok ${number}: ${esc(name)}">${inner}</button>`:`<span class="folio-creation-step__locked" aria-disabled="true">${inner}</span>`}</li>`;
     }).join('');
-    const outline=`<details class="folio-creation-index" aria-label="Přehled pravidlové tvorby"${window.innerWidth>550?' open':''}><summary class="folio-creation-index__heading">Kapitoly tvorby <span>14 kroků</span></summary><ol class="folio-creation-index__steps">${stages}</ol><p class="folio-creation-index__note">Přehled je informativní. Postup a návrat se řídí původním průvodcem a kontrolami HMK.</p></details>`;
+    const outline=`<details class="folio-creation-index" aria-label="Přehled pravidlové tvorby"${window.innerWidth>550?' open':''}><summary class="folio-creation-index__heading">Kapitoly tvorby <span>14 kroků</span></summary><ol class="folio-creation-index__steps">${stages}</ol><p class="folio-creation-index__note">Kliknutím lze otevřít aktuální a dříve navštívené kapitoly. Budoucí kroky odemkne pravidlový průvodce postupně; změny v předchozích krocích mohou vyžadovat nové ověření navazujících hodnot.</p></details>`;
+    // Highlight the exact active form field when its prior evidence was
+    // invalidated. On a first-time step, do not show a red error before any
+    // user interaction. A revisited step is marked until the normal HMK
+    // validator successfully confirms it.
+    const localIssues=revision.filter(i=>i.step===activeStep);
+    const revisited=reachable>activeStep;
+    if((revisited||activeStep===14)&&localIssues.length){
+     for(const issue of localIssues){
+      const form=parts[formIndex];
+      const field=[...form.querySelectorAll('input,select,textarea,button')].find(el=>el.name===issue.field||el.id===issue.field);
+      const target=field?.closest('label,fieldset')||field||form.querySelector('.creation-inputs');
+      if(target){target.classList.add('folio-creation-revision-target');if(field){field.classList.add('folio-creation-revision-control');field.setAttribute('aria-invalid','true');}}
+     }
+    }
+    const revisionPanel=activeStep===14?
+     `<section class="folio-creation-revision" aria-label="Závěrečná revize tvorby"><h4>Revize tvorby · kroky 1–14</h4>${revision.length?`<p>Tyto kroky obsahují neověřené nebo změnou zneplatněné údaje. Otevřete je, opravte červeně označená pole a krok znovu potvrďte.</p><ol>${revision.map(i=>`<li><button type="button" class="folio-creation-revision-link" ${i.step===activeStep?`data-creation-review-focus="${esc(i.field||'')}"`:`data-creation-step="${i.step}"`}><strong>Krok ${i.step} · ${esc(i.title)}</strong><span>${esc(i.message)}</span></button></li>`).join('')}</ol>`:`<p>Dosavadní kroky jsou potvrzené. Závěrečné uložení ještě provede pravidlové kontroly HMK.</p>`}</section>`:
+     revisited&&localIssues.length?`<p class="folio-creation-revision-current" role="status">Vyžaduje opravu: ${esc(localIssues.map(i=>i.message).join(' '))}</p>`:'';
     const intro=parts.slice(0,formIndex).map(x=>x.outerHTML).join('');
     const interactive=parts.slice(formIndex).map(x=>x.outerHTML).join('');
     const left=`<section class="panel wide creation-flow creation-flow--folio creation-flow--context">${intro}${outline}</section>`;
-    const right=`<section class="panel wide creation-flow creation-flow--folio creation-flow--action"><header class="folio-creation-active"><div class="folio-creation-active__eyebrow">Krok ${activeStep} z 14 · HMK v1.2</div><h3>${esc(current[0])}</h3><span class="folio-creation-active__source">Tištěná strana ${esc(current[1])}</span>${activeStep===12?`<span class="folio-creation-active__stage">Stadium Skills: ${esc((SKILL_STAGES[creation?.skillStage]??'aktuální'))}</span>`:''}</header>${interactive}</section>`;
+    const right=`<section class="panel wide creation-flow creation-flow--folio creation-flow--action"><header class="folio-creation-active"><div class="folio-creation-active__eyebrow">Krok ${activeStep} z 14 · HMK v1.2</div><h3>${esc(current[0])}</h3><span class="folio-creation-active__source">Tištěná strana ${esc(current[1])}</span>${activeStep===12?`<span class="folio-creation-active__stage">Stadium Skills: ${esc((SKILL_STAGES[creation?.skillStage]??'aktuální'))}</span>`:''}</header>${revisionPanel}${interactive}</section>`;
     return [left,right];
    }
   }
@@ -1186,6 +1237,10 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
 }
 function sheetView(){
  const c=character(selected);if(!c){view='characters';return charactersView()}
+ if(!characterJournalReadiness(c).ready){
+  view=c.hmk?.creation?'creation':'characters';
+  return view==='creation'?creationBookView():charactersView();
+ }
  const editing=sheetEditingId===c.id;
  const inv=data.inventory.filter(x=>x.characterId===c.id);
  const sheetAudit=auditCharacterSheet(c,data.inventory);
@@ -3886,6 +3941,16 @@ const g04Actions=createG04ActionWizards({getDocument:()=>data,getBaseline:()=>st
   guidedAttackLastOutcome='G04 – dokončen jeden ověřený společný atomický zápis.';render();}});
 restoreGuidedDraft();
 function render(){
+ // Deny all paths to partially generated sheets, even routes that set view
+ // directly without clicking a registry card (import, skill link, wizard exit).
+ if(view==='sheet'){
+  const c=character(selected),gate=characterJournalReadiness(c);
+  if(!gate.ready){
+   activeSheetSection='overview';sheetEditingId=null;overlay=null;
+   view=c?.hmk?.creation?'creation':'characters';
+   notice=gate.reason+' Dokončete pravidlovou tvorbu a její závěrečnou revizi.';
+  }
+ }
  // The sidebar has its own scrolling container. Rendering replaces its DOM node,
  // so retain the actual scroll position instead of resetting the menu to the top.
  const app=document.getElementById('app');
@@ -5703,7 +5768,7 @@ if(t.dataset.nav){lastCombatEvent=null;
   if(!actor){view='characters';overlay=null;render();return}
   selected=actor.id;activeSheetSection='hazards';sheetEditingId=null;view='sheet';
  }else{view=t.dataset.nav;}
- query='';overlay=null;render();return}if(t.dataset.open){selected=t.dataset.open;view='sheet';overlay=null;render();return}
+ query='';overlay=null;render();return}if(t.dataset.open){openCharacterJournal(t.dataset.open);return}
 if(t.dataset.copy){if(combatInitiativeSequence)return alert('Během Initiative nelze kopírovat postavu včetně bojového stavu a inventáře.');const c=character(t.dataset.copy);mutate(()=>{const id=uuid();const copy={...structuredClone(c),id,name:c.name+' (kopie)'};if(copy.hmk){copy.hmk.skills=(copy.hmk.skills||[]).map(s=>({...s,id:uuid()}));copy.hmk.injuries=(copy.hmk.injuries||[]).map(i=>({...i,id:uuid()}))}data.characters.push(copy);const clonedInvIds=new Map();for(const x of data.inventory.filter(x=>x.characterId===c.id)){const newId=uuid();clonedInvIds.set(x.id,newId);data.inventory.push({...structuredClone(x),id:newId,characterId:id})}if(copy.hmk?.cashLedger){copy.hmk.cashLedger=copy.hmk.cashLedger.map(t=>({...t,id:uuid(),inventoryIds:t.inventoryIds.map(i=>clonedInvIds.get(i)??i)}))}for(const x of data.journal.filter(x=>x.characterId===c.id))data.journal.push({...structuredClone(x),id:uuid(),characterId:id});});return}
 if(t.dataset.deleteCharacter){
  if(combatInitiativeSequence)return alert('Během Initiative nelze definitivně odstranit postavu.');
@@ -8471,23 +8536,41 @@ document.addEventListener('submit',event=>{
    patch.mysteries.psyche={d20s:rolls,d10s:dice,choices};
   }
  }
+ if(step===14&&action==='next'){
+  const pending=creationRevisionIssues(original).filter(i=>i.step<14);
+  if(pending.length){render();document.querySelector('.folio-creation-revision')?.scrollIntoView({block:'start',behavior:'smooth'});return;}
+ }
  let updated;try{updated=applyCreationPatch(original,patch);syncCreationSkills(updated.hmk,uuid)}catch(err){if(automaticGenerationDebug)console.warn('Auto creation validation:',err.message,'step',step,'action',action);if(!automaticGenerationBusy)return alert('HMK Character Creation: '+err.message);return}
  const success=mutate(()=>{const entry=character(selected);if(!entry)throw Error('Postava neexistuje');Object.assign(entry,updated)});
  if(success&&updated.hmk?.creation?.status==='review-required'&&action==='next'){
-  view='sheet';render();
+  if(characterJournalReadiness(character(selected)).ready){view='sheet';notice='';render();}
+  else{view='creation';render();}
  }
 },true);
 
 document.addEventListener('click',event=>{
- const t=event.target.closest?.('[data-creation-back],[data-creation-leave],[data-creation-jump],[data-creation-select-attr],[data-creation-edit-voice]');if(!t)return;
+ const focus=event.target.closest?.('[data-creation-review-focus]');
+ if(focus){event.preventDefault();const name=focus.dataset.creationReviewFocus;
+  const field=[...document.querySelectorAll('#creation-step-form input,#creation-step-form select,#creation-step-form textarea')].find(el=>el.name===name||el.id===name);
+  const element=field||document.querySelector('#creation-step-form .folio-creation-revision-target');
+  element?.scrollIntoView({block:'center',behavior:'smooth'});field?.focus({preventScroll:true});return;
+ }
+ const t=event.target.closest?.('[data-creation-back],[data-creation-leave],[data-creation-jump],[data-creation-step],[data-creation-select-attr],[data-creation-edit-voice]');if(!t)return;
  event.preventDefault();event.stopImmediatePropagation();
- if(t.hasAttribute('data-creation-leave')){view='sheet';render();return}
+ if(t.hasAttribute('data-creation-leave')){
+  if(characterJournalReadiness(character(selected)).ready){view='sheet';notice='';}
+  else{view='characters';notice='Deník postavy bude dostupný až po dokončení všech 14 kroků a závěrečné revizi.';}
+  render();return
+ }
  if(t.hasAttribute('data-creation-edit-voice')){creationAttributeChoice='voi';render();return}
  if(t.hasAttribute('data-creation-select-attr')){creationAttributeChoice=document.getElementById('creation-attr-name')?.value||null;render();return}
  if(combatInitiativeSequence)return alert('Během aktivní Initiative nelze měnit Character Creation.');
  const original=character(selected);if(!original)return;
  const c=creationOf(original);
- const target=t.hasAttribute('data-creation-jump')?Number(document.getElementById('creation-jump-select')?.value):null;
+ const direct=t.hasAttribute('data-creation-step')?Number(t.dataset.creationStep):null;
+ if(direct!==null&&(!Number.isInteger(direct)||direct<1||direct>creationReachableStep(original,c)))return;
+ if(direct===c.step)return;
+ const target=direct??(t.hasAttribute('data-creation-jump')?Number(document.getElementById('creation-jump-select')?.value):null);
  let patched;try{patched=applyCreationPatch(original,{step:c.step,jump:target,back:t.hasAttribute('data-creation-back')});syncCreationSkills(patched.hmk,uuid)}catch(err){return alert(err.message)}
  mutate(()=>Object.assign(character(selected),patched));
 },true);

@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HMK Keeper’s Ledger · v93.343</title>
+<title>HMK Keeper’s Ledger · v93.346</title>
 <link rel="stylesheet" href="./styles.css?v=93.333-github-clean-1">
 <link rel="stylesheet" href="./skill-workbench.css?v=93.333-github-clean-1">
 <link rel="stylesheet" href="./library.css?v=93.333-github-clean-1">
-<link rel="stylesheet" href="./book-templates.css?v=93.343-dialogs-creation-links">
+<link rel="stylesheet" href="./book-templates.css?v=93.346-creation-journal-guard">
 <style>.hmk-boot-note{max-width:760px;margin:5rem auto;padding:1.5rem;border:1px solid #8f7652;border-radius:10px;background:#f3eddf;color:#332817;font:16px/1.6 system-ui,sans-serif}.hmk-boot-note code{font-size:90%;overflow-wrap:anywhere}</style>
 
 </head>
 <body>
-<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.343…</main></div>
+<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.346…</main></div>
 <script>
 (function(){
  var app=document.getElementById('app');
@@ -22,14 +22,14 @@
   if(reported||document.querySelector('#app .shell'))return;
   reported=true;
   var msg=String(detail||'Neznámá chyba načítání.');
-  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.343 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>hmk-app.bundle.js</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
+  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.346 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>hmk-app.bundle.js</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
  };
  window.addEventListener('error',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.message||('Nelze načíst '+(event.filename||'skript')));});
  window.addEventListener('unhandledrejection',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.reason?.message||String(event.reason));});
  window.addEventListener('load',function(){setTimeout(function(){if(!document.querySelector('#app .shell'))window.__hmkBootFailure('Produkční aplikace se nespustila nebo nebyl načten její JavaScript.');},4000);});
 })();
 </script>
-<script defer src="./hmk-app.bundle.js?v=93.341-registry-overview-light" onerror="window.__hmkBootFailure('HTTP chyba: chybí hmk-app.bundle.js nebo není dostupný na GitHub Pages.')"></script>
+<script defer src="./hmk-app.bundle.js?v=93.346-creation-journal-guard" onerror="window.__hmkBootFailure('HTTP chyba: chybí hmk-app.bundle.js nebo není dostupný na GitHub Pages.')"></script>
 
 <script>
 (function(){
@@ -119,6 +119,15 @@
   function persistCreationDraft(form){ safeSet(creationDraftKey(form),JSON.stringify(serializeForm(form))); }
   function restoreCreationDraft(form){
     if(form.dataset.hmkDraftReady==='1') return;
+    // The authoritative CAS creation engine may have cleared values after a
+    // changed prerequisite. Never reinsert stale session-only form fields in
+    // a revision step: that would silently undo the user's invalidation.
+    const revision=document.querySelector('.folio-creation-revision-current, .folio-creation-revision-target');
+    if(revision){
+      try{sessionStorage.removeItem(creationDraftKey(form))}catch{}
+      form.dataset.hmkDraftReady='1';
+      return;
+    }
     const snapshot=parseJSON(safeGet(creationDraftKey(form)),null);
     if(snapshot) restoreForm(form,snapshot,{preferExisting:true});
     form.dataset.hmkDraftReady='1';
@@ -130,41 +139,11 @@
     if(snapshot) restoreForm(form,snapshot,{preferExisting:false});
     form.dataset.hmkDraftReady='1';
   }
-  function enhanceCreationIndex(){
-    const jumpSelect=document.getElementById('creation-jump-select');
-    const jumpButton=document.querySelector('[data-creation-jump]');
-    if(!jumpSelect||!jumpButton) return;
-    const currentText=document.querySelector('.folio-creation-active__eyebrow')?.textContent||'';
-    const currentStep=parseInt((currentText.match(/Krok\s+(\d+)/)||[])[1]||'0',10);
-    document.querySelectorAll('.folio-creation-index__steps .folio-creation-step').forEach((node)=>{
-      if(node.dataset.hmkJumpBound==='1') return;
-      const num=parseInt(node.querySelector('.folio-creation-step__number')?.textContent||'0',10);
-      if(!num||num>currentStep) return;
-      node.dataset.hmkJumpBound='1';
-      node.classList.add('folio-creation-step--link');
-      node.setAttribute('role','button');
-      node.tabIndex=0;
-      node.setAttribute('title','Otevřít krok '+num+' v průvodci');
-      const openStep=(event)=>{
-        if(event){event.preventDefault();event.stopPropagation();}
-        jumpSelect.value=String(num);
-        jumpButton.click();
-      };
-      node.addEventListener('click',openStep);
-      node.addEventListener('keydown',(event)=>{ if(event.key==='Enter'||event.key===' '){ openStep(event); } });
-    });
-    const note=document.querySelector('.folio-creation-index__note');
-    if(note && !note.dataset.hmkNotePatched){
-      note.dataset.hmkNotePatched='1';
-      note.textContent='Kliknutím na dokončený nebo aktuální krok se vrátíte na příslušnou stránku průvodce. Budoucí kroky zůstávají uzamčené.';
-    }
-  }
   function enhance(){
     const creationForm=document.getElementById('creation-step-form');
     if(creationForm) restoreCreationDraft(creationForm);
     const generatorForm=document.getElementById('hmk-generator-config');
     if(generatorForm) restoreGeneratorDraft(generatorForm);
-    enhanceCreationIndex();
   }
   document.addEventListener('input',event=>{
     const generatorForm=event.target?.closest?.('#hmk-generator-config');
