@@ -3445,12 +3445,17 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .editor-backdrop .editor-dialog .actions button{min-height:36px!important;padding:7px 12px!important}
 .editor-backdrop .editor-dialog :is(input,select,textarea,button):focus-visible{outline:2px solid #ae814d!important;outline-offset:2px!important}
 /* Every reachable chapter keeps a real button after returning to Folk. */
-.content-sheet .journal-book--creation .folio-creation-step{padding:0!important}
+.content-sheet .journal-book--creation .folio-creation-step{
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+  padding:0!important;
+}
 .content-sheet .journal-book--creation .folio-creation-step__link,
 .content-sheet .journal-book--creation .folio-creation-step__locked{
   box-sizing:border-box!important;display:grid!important;
   grid-template-columns:26px minmax(0,1fr) auto!important;align-items:center!important;
-  gap:7px!important;width:100%!important;min-height:33px!important;
+  gap:7px!important;width:100%!important;min-width:0!important;min-height:33px!important;
   margin:0!important;padding:4px 5px!important;
   border:0!important;border-radius:0!important;
   background:transparent!important;color:inherit!important;
@@ -3458,6 +3463,13 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
   font:inherit!important;letter-spacing:normal!important;
 }
 .content-sheet .journal-book--creation .folio-creation-step__link{cursor:pointer!important}
+.content-sheet .journal-book--creation .folio-creation-step__label{
+  white-space:normal!important;
+  overflow-wrap:normal!important;
+  word-break:normal!important;
+  min-width:0!important;
+}
+.content-sheet .journal-book--creation .folio-creation-step__page{white-space:nowrap!important;}
 .content-sheet .journal-book--creation .folio-creation-step__link:hover,
 .content-sheet .journal-book--creation .folio-creation-step__link:focus-visible{
   background:rgba(251,242,222,.62)!important;
