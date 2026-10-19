@@ -1,3 +1,4 @@
+import {heftPenalty} from './src/rules/weapon-modes.js';
 import {prepareSleeplessDay,prepareSleeplessNight,prepareSleeplessFourHourRest} from './src/integration/hmk-sleep-deprivation.js';
 import {LIBRARY_TABS,LIBRARY_PAGE_SIZE,libraryTabsForItem,libraryVisiblePage,resolveSuitCatalogParts} from './src/integration/hmk-library-tabs.js';
 import {coinBalance,libraryPurchasePrice,libraryPurchaseOffer,suitPurchasePrice,prepareLibraryPurchase,assertCashLedgerAppendOnly} from './src/integration/hmk-library-economy.js';
@@ -161,7 +162,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.355';
+const APP_VERSION='93.356';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1120,7 +1121,39 @@ function journalInventoryTable(title,headers,rows,klass=''){
  const cells=row=>Array.isArray(row)?row:row.cells;
  return `<section class="journal-book-section ${klass}">${journalRuleTitle(title)}<div class="journal-ledger-wrap"><table class="journal-ledger${weaponTable?' journal-weapon-ledger':''}"><thead><tr>${headers.map(h=>`<th>${journalTerm(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(row=>`<tr>${cells(row).map((cell,i)=>`<td>${weaponTable&&i===0?`<span${journalHelp(headers[i],row.detail||'Identifikace zbraně.')}>${esc(firstPresent(cell,'—'))}</span>`:`<span${journalHelp(headers[i],!Array.isArray(row)?row.cellHelp?.[i]||null:null)}>${esc(firstPresent(cell,'—'))}</span>`}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}" class="muted">Bez evidovaných údajů.</td></tr>`}</tbody></table></div></section>`;
 }
-function journalWeaponRows(inv,mode){
+/** Character-sheet baseline, not final combat EML: the latter needs a declared
+ * opponent, Reach, chosen manoeuvre, current injury, and turn context.
+ * No guessed weapon trait, ENC or skill entry is ever substituted. */
+function journalWeaponBaseline(c,inventoryItem,mode='melee'){
+ const p=inventoryItem.snapshot?.properties||{},m=p.verifiedModes?.[0];
+ if(mode==='missile'){
+  const kind=String(p.missileType??m?.missileType??'').toLowerCase();
+  const skillNames=kind==='sling'?['Slings']:kind==='thrown'?['Throwing']:['Archery'];
+  const ml=skillValueForJournal(c,skillNames);
+  return Number.isFinite(ml)?{atk:ml,def:'—',hint:`Základ: ${skillNames[0]} ML ${ml}. Vzdálenost, střela, pohyb a okolnosti mění finální EML až při útoku.`}:{atk:'—',def:'—',hint:`Není doložena ${skillNames[0]} ML; situační EML se bez ní nedopočítává.`};
+ }
+ const ml=skillValueForJournal(c,['Melee']);
+ if(!Number.isFinite(ml)||!m)return {atk:'—',def:'—',hint:'Chybí doložený Melee ML nebo strukturovaný Strike Mode.'};
+ const attack=verifiedMeleeModifiers(inventoryItem.snapshot,{role:'attack',threateningFoeCount:1});
+ const block=verifiedMeleeModifiers(inventoryItem.snapshot,{role:'defence',defence:'block',threateningFoeCount:1});
+ const str=c.hmk?.attributes?.str,heft=m.heft??p.heft;
+ if(!attack.ok||!block.ok||!Number.isSafeInteger(str)||!Number.isSafeInteger(heft))
+  return {atk:'—',def:'—',hint:'Pro výpočet chybí doložené Melee/Block Traits, STR nebo Heft. Katalogové modifikátory nejsou finální ATK/DEF.'};
+ const offHand=inventoryItem.slot==='off_hand';
+ const heftMod=heftPenalty({str,hft:heft,twoHanded:!!m.twoHanded,offHand}).penalty;
+ const load=resolveCombatantLoad({character:c,inventory:data.inventory});
+ if(!load.encReady||!load.bulkReady||!Number.isSafeInteger(load.agilityAndMeleePenalty)||!Number.isSafeInteger(load.meleeBulkPenalty))
+  return {atk:'—',def:'—',hint:'Nedoložené ENC/Bulk zbroje nebo vybavení – nelze bezpečně vypočítat ATK/DEF.'};
+ const fatigue=combatFatigueTotals(persistentStateOf(c)).total;
+ if(!Number.isSafeInteger(fatigue))return {atk:'—',def:'—',hint:'Nedoložená Fatigue – základní ATK/DEF není bezpečně určen.'};
+ const common=[{label:'ENC',value:load.agilityAndMeleePenalty},{label:'Bulk',value:load.meleeBulkPenalty},{label:'Fatigue',value:-fatigue},{label:'Heft',value:heftMod}];
+ const atk=assembleMeleeEML({baseML:ml,modifiers:[...common,...attack.modifiers]});
+ const def=assembleMeleeEML({baseML:ml,modifiers:[...common,...block.modifiers]});
+ if(!atk.ok||!def.ok)return {atk:'—',def:'—',hint:'Výpočet Melee EML byl zamítnut pravidlovým enginem.'};
+ const hint=`Aktuální základ bez protivníka a zvolené obrany: Melee ML ${ml}, ENC ${load.agilityAndMeleePenalty}, Bulk ${load.meleeBulkPenalty}, Fatigue −${fatigue}, Heft ${heftMod}, Traits ATK ${attack.total}, Block ${block.total}. V boji se doplní dosah, protivník, zranění a další situační změny.`;
+ return {atk:atk.effectiveEML,def:def.effectiveEML,hint};
+}
+function journalWeaponRows(inv,mode,c){
  const items=inv.filter(x=>(x.snapshot?.category==='weapon'||x.snapshot?.category==='shield')&&['main_hand','off_hand','carried','none'].includes(x.slot));
  const typeOf=x=>{const p=x.snapshot?.properties||{};return String(p.missileType??p.verifiedModes?.[0]?.missileType??'').toLowerCase()};
  const isMissile=x=>{const p=x.snapshot?.properties||{};return ['bow','crossbow','sling','thrown'].includes(typeOf(x))||Number.isFinite(p.baseRangeFt)};
@@ -1142,8 +1175,9 @@ function journalWeaponRows(inv,mode){
   const actualMissileImpact=p.projectileImpactDie||p.loadedProjectileImpactDie||null;
   const imp=actualMissileImpact?`${actualMissileImpact}${modifier===null?'':fmtSigned(modifier)}${aspect}`:isBow?'—':die?`${die}${modifier===null?'':fmtSigned(modifier)}${aspect}`:fmt(p.impact);
   const quality=Number.isFinite(x.currentWQ)?x.currentWQ:Number.isFinite(p.quality)?p.quality:'—';
-  const atk=fmt(modeValue(m,p,'attack')); // Never equate WQ with Attack.
-  const def=fmt(modeValue(m,p,'defense')); // Defence modifier is not the final DEF value.
+  const baseline=c?journalWeaponBaseline(c,x,mode):{atk:'—',def:'—',hint:'Nenalezen profil postavy.'};
+  const atk=fmt(baseline.atk);
+  const def=fmt(baseline.def);
   const zd=fmt(modeValue(m,p,'zoneDie'));
   const ta=taText(m.impactTAModifier??p.impactTAModifier,aspect);
   const modeList=[...(p.verifiedModes||[]),...(p.alternateStrikeModes||[])].map(t=>`${t.name||'Mode'}: ${t.length||p.length||'—'} / ${t.zoneDie||p.zoneDie||'—'} / ${t.impactDie||'—'}${Number.isFinite(t.impactModifier)?fmtSigned(t.impactModifier):''}${t.aspect||''}`).join('; ');
@@ -1152,14 +1186,16 @@ function journalWeaponRows(inv,mode){
    Number.isFinite(p.blockModifier)?`Block modifier: ${fmtSigned(p.blockModifier)}`:null,
    p.verifiedTraits?.length?`Traits: ${p.verifiedTraits.join(', ')}`:null,modeList?`Ověřené režimy: ${modeList}`:null].filter(Boolean).join(' · ');
   const cellHelp=[];
+  cellHelp[4]=baseline.hint;
+  cellHelp[5]=baseline.hint;
   cellHelp[1]=Number.isFinite(x.currentWQ)?'Aktuální WQ z inventáře.':'Základní katalogová WQ; skutečný stav kvality se může lišit.';
   if(!ranged){
-   cellHelp[4]=atk==='—'?'ATK není v inventáři doložen jako výsledná útočná hodnota; nevymýšlíme jej z WQ.':null;
-   cellHelp[5]=def==='—'?'DEF je závislé na způsobu obrany, dovednosti a platných postizích. Případné Defence Modifier viz nápověda názvu zbraně.':null;
+   
    return {cells:[name,quality,fmt(p.heft),fmt(modeValue(m,p,'length')),atk,def,zd,imp,ta],detail:extra,cellHelp};
   }
   const projectile=fmt(p.loadedProjectileName??p.projectileName??p.projectile?.name);
-  cellHelp[4]=projectile==='—'?'Přesná střela není v tomto záznamu doložena; Projectile není vhodné odhadovat.':null;
+  cellHelp[4]=baseline.hint;
+  cellHelp[5]=projectile==='—'?'Přesná střela není v tomto záznamu doložena; Projectile není vhodné odhadovat.':'Zvolená střela z inventáře nebo doloženého katalogového záznamu.';
   cellHelp[6]=`Zdrojový režim uvádí ZD ${zd}; v reálném ranged útoku jej mění vzdálenost a další podmínky.`;
   cellHelp[7]=isBow?`Základní zbraň má tištěný Impact modifier ${modifier===null?'neurčený':fmtSigned(modifier)+aspect}; skutečná kostka se řídí zvolenou střelou a shaft-weight (str.108–109). Dokud střela není doložena, IMP zůstává neurčené.`:null;
   return {cells:[name,quality,fmt(p.draw),Number.isFinite(p.baseRangeFt)?`${p.baseRangeFt} ft`:'—',atk,projectile,zd,imp,ta],detail:extra,cellHelp};
@@ -1506,8 +1542,8 @@ function characterJournalHero(c,inv,editing=false){
  const mental=HMK_ATTRIBUTES.MENTAL.map(([key,label])=>[label,attrs[key]??'—',key]);
  const graceDisplay=Number.isFinite(h.fatePoints)&&Number.isFinite(h.fateML)?`${h.fatePoints} FP · ML ${h.fateML}`:Number.isFinite(h.fatePoints)?`${h.fatePoints} FP`:Number.isFinite(h.fateML)?`ML ${h.fateML}`:'—';
  const gracePiety=[['Fate',graceDisplay],['Grace',h.divineGrace?.grace??h.grace??'—'],['Piety',h.piety??'—'],['Doctrine',h.doctrine??'—'],['Blessing',h.blessing??'—'],['Morality',bio('morality')]];
- const meleeRows=journalWeaponRows(inv,'melee');
- const missileRows=journalWeaponRows(inv,'missile');
+ const meleeRows=journalWeaponRows(inv,'melee',c);
+ const missileRows=journalWeaponRows(inv,'missile',c);
  const armourRows=inventoryRowsForJournal(inv,'armour');
  const possessionRows=inventoryRowsForJournal(inv,'possessions');
  const abilities=(h.abilities||h.spells||[]);
@@ -1520,7 +1556,13 @@ function characterJournalHero(c,inv,editing=false){
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
  const mainRight=handedness==='right';
- const show=(slot,label)=>{const items=inv.filter(x=>x.slot===slot);return `<div><strong>${label}</strong><span>${items.length?items.map(x=>esc(x.snapshot?.name||x.name||'Neznámý předmět')).join(', '):'Volná'}</span></div>`};
+ const show=(slot,label)=>{
+  const actual=inv.find(x=>x.slot===slot);
+  const choices=inv.filter(x=>x.id!==actual?.id&&!x.destroyed&&
+   !['main_hand','off_hand','worn'].includes(x.slot)&&validSlotForCategory(slot,x.snapshot?.category)&&
+   (['weapon','shield'].includes(x.snapshot?.category)||x.snapshot?.properties?.handheld===true));
+  return `<label class="hmk-hand-slot"><strong>${esc(label)}</strong><select data-equip-hand="${esc(slot)}" aria-label="${esc(label)} – vybavení z inventáře" ${combatInitiativeSequence?'disabled title="Změny výbavy během Initiative vyžadují Combat akci"':''}><option value="">Volná${actual?' (odložit do inventáře)':''}</option>${actual?`<option selected value="${esc(actual.id)}">${esc(actual.snapshot?.name||'Nasazený předmět')}</option>`:''}${choices.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot?.name||'Předmět')}${x.quantity>1?' · 1 z '+x.quantity:''}</option>`).join('')}</select></label>`;
+ };
  return `<div class="equipment-summary equipped-hands" aria-label="Aktuální obsazení rukou">${handedness==='right'||handedness==='left'?show(mainRight?'off_hand':'main_hand','Levá ruka')+show(mainRight?'main_hand':'off_hand','Pravá ruka'):show('main_hand','Hlavní ruka – fyzická strana neurčena')+show('off_hand','Vedlejší ruka – fyzická strana neurčena')}</div>`;
 }
 function characterInventoryOverview(c,inv){
@@ -1557,7 +1599,7 @@ function combatantLoadPanel(c){
   r.prohibitedOutfit?'Bulk nelze stanovit: sestava je podle HMK nepřípustná, nepoužije se smyšlený náhradní postih.':
   'Bulk není doložen: chybí skutečné pořadí více vrstev. Možné uspořádání se zobrazuje přímo u lokací.';
  const readable=readableLayerIssues(r,data.inventory.filter(x=>x.characterId===c.id));
- return `<section class="panel wide"><h3>HMK · zatížení postavy (str. 112, 117, 122)</h3><p>${info}</p><p class="tiny">${bulk} ENC a Bulk jsou oddělené veličiny. Postihy se do Skill Tests započtou pouze při úplném pravidlovém výpočtu. Neexistuje univerzální postih za zakázanou kovovou kombinaci.</p>${readable.length?`<div class="armour-friendly-warnings">${readable.map(x=>`<p class="notice">${esc(x)}</p>`).join('')}</div>`:''}</section>`;
+ return `<section class="panel wide"><h3>HMK · zatížení postavy (str. 112, 117, 122)</h3><p>${info}</p><p class="tiny">${bulk} ENC a Bulk jsou oddělené veličiny. Postihy se do Skill Tests započtou pouze při úplném pravidlovém výpočtu. Neexistuje univerzální postih za zakázanou kovovou kombinaci.</p>${readable.length?`<div class="armour-friendly-warnings">${readable.map(x=>`<p class="notice">${esc(x)}</p>`).join('')}</div>`:''}${journalAddInventoryForm()}</section>`;
 }
 /** Display the SAME active Combat mandatory form on Character Sheet, without
  * inventing a new writer or independent combat clock. Other participants'
@@ -1593,10 +1635,14 @@ function liveSpecialEffectsPanel(c){
  if(!rows.length)rows.push('Žádný aktivní časovaný účinek (starší účinky mohou být již prošlé).');
  return '<section class="panel wide"><h3>Trvalé účinky z potvrzených SR</h3><p class="tiny muted">Časované účinky se po uplynutí lhůty automaticky přestanou uplatňovat; původní důkazy zůstanou zachované.</p>'+rows.map(x=>'<p>'+esc(x)+'</p>').join('')+'</section>';
 }
+function journalAddInventoryForm(){
+ const catalog=allCatalogItems();
+ return `<div class="hmk-inventory-add"><h4>Předmět z knihovny</h4><form id="add-inventory"><label>Předmět<select name="itemId" required><option value="">Vyberte…</option>${catalog.map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${field('condition','Stav / poznámka','')}${field('currentWQ','Aktuální WQ kusu (nepovinné)','', 'number')}${slotSelect('slot','none')}<button type="submit" ${catalog.length?'':'disabled'}>Přiřadit předmět</button></form><p class="tiny muted">V inventáři vzniká kopie parametrů z knihovny.</p></div>`;
+}
 function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  if(activeSheetSection==='overview')return '';
  if(activeSheetSection==='hazards')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Nebezpečí / Trauma</h3><p>GM procedury a následky postavy ${esc(c.name)} · HMK</p></header><div class="columns journal-tech-columns">${hazardsView(c.id)}</div></section>`,`journal-book--chapter journal-book--hazards`);
- if(activeSheetSection==='inventory')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Arsenal & Gear</h3><p>Inventář, výbava, zatížení a speciální efekty.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Inventář postavy</h3>${wealthInventoryPanel(c)}${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}<form id="add-inventory"><label>Předmět z knihovny<select name="itemId" required><option value="">Vyberte…</option>${allCatalogItems().map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${field('condition','Stav / poznámka','')}${field('currentWQ','Aktuální WQ kusu (nepovinné)','', 'number')}${slotSelect('slot','none')}<button type="submit" ${allCatalogItems().length?'':'disabled'}>Přiřadit předmět</button></form><div class="notice tiny">Při přiřazení vzniká samostatná kopie parametrů. Úprava knihovny nezmění již přidělené předměty.</div></section>${armourLoadoutPanel(inv,c)}${combatantLoadPanel(c)}${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:''})()}</div></section>`,`journal-book--chapter`);
+ if(activeSheetSection==='inventory')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Arsenal & Gear</h3><p>Inventář, výbava, zatížení a speciální efekty.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Inventář postavy</h3>${wealthInventoryPanel(c)}${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}</section>${armourLoadoutPanel(inv,c)}${combatantLoadPanel(c)}${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:''})()}</div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='status')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Combat & Conditions</h3><p>Aktuální stav, povinné procedury, zranění a návazné herní sekvence.</p></header><div class="columns journal-tech-columns">${hskPendingSkillPhysicalConsequences(c.id)}${hskHazardSummary(c.id)}${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section></div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='notes')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row journal-log-row"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section>${auditPanel}</div></section>`,`journal-book--chapter`);
  return '';
@@ -7684,6 +7730,30 @@ document.addEventListener('click',e=>{
  });
  if(done){selected=id;view='sheet';render();}
 },true);
+// Equipment dropdown writes to the SAME authoritative inventory used by Combat.
+// Never equip during active Initiative, never silently replace an occupied hand.
+document.addEventListener('change',e=>{
+ const ctrl=e.target?.closest?.('[data-equip-hand]');if(!ctrl)return;
+ e.stopImmediatePropagation();
+ const slot=ctrl.dataset.equipHand,id=String(ctrl.value||''),ownerId=selected;
+ if(view!=='sheet'||activeSheetSection!=='inventory'||!character(ownerId))return;
+ if(combatInitiativeSequence){alert('Během Initiative vybavujte pouze pravidlově potvrzenou Combat akcí.');render();return}
+ if(!['main_hand','off_hand'].includes(slot))return;
+ const active=data.inventory.find(x=>x.characterId===ownerId&&x.slot===slot);
+ const chosen=id?data.inventory.find(x=>x.id===id&&x.characterId===ownerId):null;
+ if(id&&(!chosen||chosen.destroyed||!validSlotForCategory(slot,chosen.snapshot?.category)||
+    !['none','carried',slot].includes(chosen.slot))){alert('Tento předmět nelze vložit do zvolené ruky.');render();return}
+ if(chosen?.id===active?.id)return;
+ const ok=mutate(()=>{
+  if(active) {active.slot='carried';active.gearStowage='normal'}
+  if(!chosen)return;
+  if(chosen.quantity>1){
+   chosen.quantity-=1;
+   data.inventory.push({...structuredClone(chosen),id:uuid(),quantity:1,slot,gearStowage:'normal'});
+  }else{chosen.slot=slot;chosen.gearStowage='normal'}
+ });
+ if(!ok)render();
+},true);
 document.addEventListener('click',e=>{const t=e.target.closest('[data-edit-inv]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();const x=data.inventory.find(x=>x.id===t.dataset.editInv&&x.characterId===selected);if(!x)return;overlay=inventoryEditForm(x);render()},true);
 document.addEventListener('submit',e=>{
  if(e.target?.getAttribute('id')!=='inventory-edit-form')return;
@@ -9289,6 +9359,16 @@ function hmkShowJournalTooltip(element){
  hmkJournalTooltip.style.left=Math.round(x)+'px';
  hmkJournalTooltip.style.top=Math.round(y)+'px';
 }
+// Highlight contextual ? only while the pointer actually targets that button.
+// CSS :hover alone can linger on nested labels after layout/scroll changes.
+document.addEventListener('pointerover',event=>{
+ const button=event.target?.closest?.('button.hmk-rule-help');
+ if(button)button.classList.add('hmk-help-direct-hover');
+},true);
+document.addEventListener('pointerout',event=>{
+ const button=event.target?.closest?.('button.hmk-rule-help');
+ if(button&&!button.contains(event.relatedTarget))button.classList.remove('hmk-help-direct-hover');
+},true);
 document.addEventListener('pointerover',event=>{
  const target=event.target?.closest?.('[data-hmk-help]');
  if(target&&target!==hmkJournalTooltipTarget)hmkShowJournalTooltip(target);

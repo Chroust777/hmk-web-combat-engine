@@ -3926,3 +3926,79 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .journal-weapon-ledger tbody td span[data-hmk-help]{cursor:help}
 .content-sheet .creation-psyche-guidance{border-color:#a77d44!important;background:rgba(249,236,207,.7)!important;color:#633a20!important;margin:8px 0!important}
 @media(max-width:1160px){.content-sheet .journal-weapon-ledger{min-width:545px}}
+
+
+/* v93.356 – compact character-sheet numbers and translucent vellum. */
+.content-sheet .journal-book--overview .journal-stat-box strong{
+ font-size:11px!important;
+ line-height:1.3!important;
+}
+.content-sheet .journal-book--overview .journal-attributes-row .journal-stat-box,
+.content-sheet .journal-book--overview .journal-book-section--skills,
+.content-sheet .journal-book--overview .journal-book-skills .journal-skill-family{
+ background:transparent!important;background-image:none!important;
+ box-shadow:none!important;
+}
+/* All action controls share one thin line; never expand item rows vertically. */
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-row-actions{
+ display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
+ gap:3px!important;align-items:center!important;white-space:nowrap!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-row-actions button{
+ display:inline-flex!important;width:auto!important;min-width:0!important;
+ align-items:center!important;justify-content:center!important;flex:none!important;
+ min-height:23px!important;padding:2px 4px!important;
+ font:600 10px/1.1 Georgia,serif!important;margin:0!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table td:last-child{white-space:nowrap!important}
+.content-sheet .journal-book--chapter .inv-table-scroll{overflow-x:auto!important}
+/* Currency/starting wealth summary should not dominate the inventory. */
+.content-sheet .journal-book--chapter .equipment-summary:not(.equipped-hands) :is(strong,span){
+ font:600 12px/1.3 Georgia,serif!important;
+}
+/* Hand picker writes the slot back to the existing inventory. */
+.content-sheet .journal-book--chapter .equipped-hands .hmk-hand-slot{
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+ gap:3px!important;min-width:0!important;padding:4px!important;
+ border:1px solid var(--folio-rule)!important;
+}
+.content-sheet .journal-book--chapter .equipped-hands .hmk-hand-slot strong{font-size:12px!important}
+.content-sheet .journal-book--chapter .equipped-hands .hmk-hand-slot select{
+ display:block!important;min-width:0!important;width:100%!important;
+ max-width:100%!important;height:31px!important;font:12px/1.25 Georgia,serif!important;
+}
+/* Place the add-from-library form immediately underneath the authoritative HMK load summary. */
+.content-sheet .journal-book--chapter .hmk-inventory-add{margin-top:11px;padding-top:9px;border-top:1px solid var(--folio-rule)}
+.content-sheet .journal-book--chapter .hmk-inventory-add h4{margin:2px 0 6px!important}
+.content-sheet .journal-book--chapter .hmk-inventory-add form{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px 9px!important;
+}
+.content-sheet .journal-book--chapter .hmk-inventory-add form>label:first-child{grid-column:1/-1}
+.content-sheet .journal-book--chapter .hmk-inventory-add form button[type=submit]{grid-column:1/-1;justify-self:start}
+@media(max-width:620px){
+ .content-sheet .journal-book--chapter .hmk-inventory-add form{grid-template-columns:minmax(0,1fr)!important}
+ .content-sheet .journal-book--chapter .hmk-inventory-add form>label:first-child,
+ .content-sheet .journal-book--chapter .hmk-inventory-add form button[type=submit]{grid-column:1}
+}
+/* The ? button must react to its own pointer hover ONLY, never hover on the label. */
+.content-sheet .journal-book--creation label:hover .hmk-rule-help:not(:hover):not(:focus-visible),
+.content-sheet .journal-book--creation .hmk-creation-field-heading:hover .hmk-rule-help:not(:hover):not(:focus-visible){
+ background:#e8d1a5!important;box-shadow:none!important;outline:0!important;filter:none!important;
+ color:#3d2b19!important;border-color:#9f763a!important;
+}
+.content-sheet .journal-book--creation .hmk-rule-help:hover{
+ background:#f8dda4!important;outline:2px solid #9b6a2e!important;outline-offset:2px!important;
+}
+
+/* v93.356 exact-pointer help button highlighting, independent of parent hover */
+.content-sheet .journal-book--creation #creation-step-form button.hmk-rule-help:not(.hmk-help-direct-hover):not(:focus-visible),
+.content-sheet .journal-book--creation #creation-step-form button.hmk-rule-help:hover:not(.hmk-help-direct-hover):not(:focus-visible){
+ background:#e8d1a5!important;color:#3d2b19!important;
+ outline:0!important;box-shadow:none!important;filter:none!important;
+ border-color:#9f763a!important;
+}
+.content-sheet .journal-book--creation #creation-step-form button.hmk-rule-help.hmk-help-direct-hover,
+.content-sheet .journal-book--creation #creation-step-form button.hmk-rule-help:focus-visible{
+ background:#f8dda4!important;color:#4c290f!important;
+ outline:2px solid #9b6a2e!important;outline-offset:2px!important;
+}
