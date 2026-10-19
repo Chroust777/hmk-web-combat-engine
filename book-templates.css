@@ -3747,3 +3747,91 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 @media(max-width:680px){
  .content-sheet .journal-book--overview .journal-attributes-row .journal-stat-box span[data-hmk-help]{font-size:10px!important}
 }
+
+
+/* v93.353: legible attribute labels, with full names fitting in three cells. */
+.content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster{
+  min-width:0!important;
+  container-type:inline-size;
+}
+.content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster .journal-stat-box{
+  min-width:0!important;
+  padding-inline:1px!important;
+  overflow:hidden!important;
+}
+.content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster .journal-stat-box span[data-hmk-help]{
+  display:block!important;
+  box-sizing:border-box!important;
+  width:100%!important;
+  font:700 clamp(6px,3.1cqi,10px)/1.22 Georgia,serif!important;
+  letter-spacing:-.045em!important;
+  white-space:nowrap!important;
+  word-break:normal!important;
+  overflow-wrap:normal!important;
+  text-align:center!important;
+}
+/* Person's editable name, separate from rules-derived creation and attributes. */
+.content-sheet .journal-name-edit-label{
+  display:grid;gap:4px;color:#754122;
+  font:600 12px/1.2 Georgia,serif!important;
+}
+.content-sheet .journal-name-edit-input{
+  display:block;min-width:0;width:min(100%,330px)!important;
+  max-width:100%;box-sizing:border-box;
+  padding:5px 7px!important;border:1px solid #af8953!important;
+  background:#fff6df!important;color:#173047!important;
+  font:600 clamp(15px,1.8vw,23px)/1.2 Georgia,serif!important;
+}
+/* All rule validation errors must visually identify the actual control. */
+.content-sheet .journal-book--creation .hmk-creation-validation{
+  grid-column:1/-1!important;margin:5px 0 9px!important;
+  border:2px solid #a82925!important;background:#ffe3d9!important;
+  color:#7c211e!important;padding:10px 12px!important;
+  font:700 14px/1.4 Georgia,serif!important;
+}
+.content-sheet .journal-book--creation #creation-step-form .hmk-creation-invalid{
+  outline:3px solid #b22626!important;outline-offset:2px!important;
+  border-color:#b22626!important;background-color:#fff0e8!important;
+  box-shadow:0 0 0 3px rgba(198,34,34,.15)!important;
+}
+.content-sheet .journal-book--creation #creation-step-form .hmk-creation-invalid-label{
+  border-left:3px solid #bb2424!important;
+  padding-left:8px!important;
+  color:#8c2525!important;
+}
+.content-sheet .journal-book--creation .hmk-appearance-later{
+  grid-column:1/-1!important;color:#65452d!important;
+  font:italic 12px/1.4 Georgia,serif!important;
+  background:rgba(251,242,222,.34);
+  padding:6px 8px;border-left:2px solid rgba(137,94,45,.45);
+}
+/* Final override: the sacred-attribute cluster has an extra-specific legacy
+   font rule; size it separately to stop Doctrine / Blessing / Morality overlap. */
+.content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box span[data-hmk-help]{
+  font:700 7px/1.22 Georgia,serif!important;
+  white-space:nowrap!important;
+  letter-spacing:-.045em!important;
+  overflow:visible!important;
+  text-align:center!important;
+}
+@media(max-width:1160px){
+ .content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box span[data-hmk-help]{font-size:clamp(7px,2.7cqi,10px)!important}
+}
+/* Physical and mental cells can fit larger than the previous safety minimum. */
+.content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster:not(:last-child) .journal-stat-box span[data-hmk-help]{
+ font:700 8px/1.22 Georgia,serif!important;
+ white-space:nowrap!important;letter-spacing:-.045em!important;
+}
+/* At medium desktop widths the original nine-across cells become too narrow.
+   Two balanced clusters and a full-width sacred row keep full labels readable. */
+@media(min-width:1161px) and (max-width:1420px){
+ .content-sheet .journal-book--overview .journal-attributes-row{
+   grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+ .content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster:last-child{
+   grid-column:1/-1!important;
+ }
+ .content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box span[data-hmk-help]{
+   font-size:10px!important;
+ }
+}

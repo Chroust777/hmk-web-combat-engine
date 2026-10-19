@@ -160,7 +160,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.352';
+const APP_VERSION='93.353';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1414,7 +1414,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.unconscious?'Yes':'No'],['Death Save',state.death?'Pending':'—']];
  const conditionRows=[['Poisoned',state.poisoned?'Yes':'No'],['Diseased',state.diseased?'Yes':'No'],['Cursed',state.cursed?'Yes':'No'],['Winded',state.winded?'Yes':'No'],['Weary',state.weary?'Yes':'No'],['Fatigued',combatFatigueTotals(state).total]];
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div><h3>${esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalStatBoxes('Grace & Piety',gracePiety)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],meleeRows)}${journalInventoryTable('Missile Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],missileRows)}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalStatBoxes('Grace & Piety',gracePiety)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],meleeRows)}${journalInventoryTable('Missile Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],missileRows)}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -7309,6 +7309,8 @@ document.addEventListener('submit',e=>{
  const c=character(selected);if(!c||sheetEditingId!==c.id)return;
  if(combatInitiativeSequence)return alert('Během aktivní Initiative nelze měnit Character Sheet.');
  const v=Object.fromEntries(new FormData(form));
+ const revisedName=String(v.sheet_character_name??c.name).trim();
+ if(!revisedName||revisedName.length>120){return alert('Jméno postavy: zadejte 1–120 znaků.');}
  const attrKeys=['str','end','dex','agl','per','cml','aur','wil','rea','cre','emp','elo'];
  const valid=(raw,label,max)=>{if(!/^(?:0|[1-9][0-9]*)$/.test(String(raw??''))||!Number.isSafeInteger(Number(raw))||Number(raw)>max)throw Error(label+': zadejte celé nezáporné číslo.');return Number(raw)};
  let attrs=[],dp=[],legacy=[],coinChange=null;
@@ -7342,6 +7344,9 @@ document.addEventListener('submit',e=>{
  }catch(err){return alert(err.message)}
  const ok=mutate(()=>{
   const live=character(selected);if(!live||live.id!==c.id)throw Error('Postava se změnila');
+  // Rename is a presentation/identity edit, never a change of the 14-step
+  // creation proofs, dice or the completed status.
+  live.name=revisedName;
   const h=live.hmk??(live.hmk={});h.attributes??={};
   if(isCreationOwned(live)){
    h.advancement??={};h.advancement.attributes??={};h.advancement.skillDP??={};
@@ -8709,7 +8714,7 @@ document.addEventListener('input',event=>{
  * mode; a later automatic candidate may roll an otherwise unset value. */
 const APPEARANCE_FORM_KEYS={
  1:['handednessChoice','handD100'],
- 5:['complexionChoice','complexionD100','hairChoice','hairD100','eyesChoice','eyesD100'],
+ 14:['complexionChoice','complexionD100','hairChoice','hairD100','eyesChoice','eyesD100'],
  10:['heightChoice','buildD100','weightExtraChoice','weightDice']
 };
 function persistAppearanceStep(original,updated,step,form){
@@ -8732,7 +8737,7 @@ function persistAppearanceStep(original,updated,step,form){
  }
  // The currently submitted choices override invalidation only if they are
  // deliberate NEW choices from this very step, not an old archived field.
- if((step===5&&regionChanged)||(step===10&&strChanged)){
+ if((step===14&&regionChanged)||(step===10&&strChanged)){
   for(const key of keys)next[key]=String(form.elements.namedItem(key)?.value||'').trim();
  }
  const oldProof=original.hmk?.appearanceProof;
@@ -8800,7 +8805,7 @@ function persistAppearanceStep(original,updated,step,form){
 }
 /** Recalculate dependent dropdowns without losing other character inputs. */
 function refreshAppearanceSelects(form,original){
- const step=creationOf(original).step;if(step!==1&&step!==5)return;
+ const step=creationOf(original).step;if(step!==1&&step!==14)return;
  const folk=String(form.elements.namedItem('folk')?.value||original.hmk?.folk||'Human');
  const region=String(form.elements.namedItem('birthRegion')?.value||original.hmk?.birthRegion||'');
  let complexion=String(form.elements.namedItem('complexionChoice')?.value||'');
@@ -8822,7 +8827,7 @@ function refreshAppearanceSelects(form,original){
 }
 document.addEventListener('change',event=>{
  const form=event.target?.closest?.('#creation-step-form');if(!form)return;
- if(['folk','birthRegion','complexionChoice','complexionD100'].includes(event.target?.name))refreshAppearanceSelects(form,character(selected));
+ if(['folk','complexionChoice','complexionD100'].includes(event.target?.name))refreshAppearanceSelects(form,character(selected));
 },false);
 // Optional Appearance does not invalidate a completed character or reopen
 // the mandatory 14-step validation. This separate save also preserves the
@@ -8835,13 +8840,74 @@ document.addEventListener('click',event=>{
  if(!form||!original)return;
  const step=creationOf(original).step;
  if(step===1&&form.elements.namedItem('folk')?.value&&form.elements.namedItem('folk').value!==original.hmk.folk){alert('Nejprve potvrďte změnu Folk tlačítkem Uložit a pokračovat.');return;}
- if(step===5&&form.elements.namedItem('birthRegion')?.value&&form.elements.namedItem('birthRegion').value!==original.hmk.birthRegion){alert('Nejprve potvrďte změnu regionu v kroku Birthplace.');return;}
+ 
  try{
   const updated=structuredClone(original);
   persistAppearanceStep(original,updated,step,form);
   const ok=mutate(()=>Object.assign(character(selected),updated));
   if(ok){notice='Volitelný Appearance uložen. Čtrnáct kroků pravidlové tvorby zůstalo beze změny.';render();}
  }catch(err){alert('Appearance: '+err.message);}
+},true);
+
+// Clear, deterministic validation guidance for the *current* manual step.
+// Keep the unsaved fields in place; never mutate the character on failure.
+function creationProblemField(form,message){
+ const text=String(message||'');
+ const choices=[
+  [/divine\s+aspects?|grace\s*nebo\s*marked|grace\s*aspect|vyberte jeden z 12/i,['graceAspect']],
+  [/grace.*d20|fyzick.*grace/i,['graceDie']],
+  [/psyche.*trait/i,['psycheTraitChoice1','psycheTraitDie1','psycheDice']],
+  [/psyche/i,['psycheDice']],
+  [/doctrine/i,['doctrineSubject0','ritualSkill']],
+  [/ritual/i,['ritualSkill','nativeRitualChoice']],
+  [/folk/i,['folk','folkRoll']],
+  [/age|v[eě]kov/i,['ageGroup','ageRoll']],
+  [/sunsign.*trait/i,['sunsignTraits','traitRoll']],
+  [/sunsign|birthday|birthdate/i,['birthMonth','birthDay']],
+  [/birthplace|realm|region/i,['birthRegion','birthplace']],
+  [/class/i,['socialClass','classRoll']],
+  [/occupation/i,['occupation','familyOccupation']],
+  [/background/i,['background','backgroundRoll']],
+  [/estrangement/i,['estrangementRoll']],
+  [/wealth/i,['wealthMethod','wealthDice']],
+  [/attributes|attribute|strength|voice|aura/i,['creation-attr-name','die0']],
+  [/skill|DP/i,['skillName','skillDP']],
+ ];
+ const byName=name=>[...form.querySelectorAll('input,select,textarea')].find(el=>el.name===name||el.id===name);
+ for(const [regex,fields]of choices)if(regex.test(text))for(const field of fields){const el=byName(field);if(el)return el;}
+ // Prefer a genuinely empty editable field over arbitrarily marking a valid one.
+ return [...form.querySelectorAll('select,input,textarea')].find(el=>el.required&&!el.disabled&&!String(el.value||'').trim())||null;
+}
+function showCreationProblem(form,message,preferred=null){
+ form.querySelectorAll('.hmk-creation-invalid').forEach(el=>{el.classList.remove('hmk-creation-invalid');el.removeAttribute('aria-invalid')});
+ form.querySelectorAll('.hmk-creation-invalid-label').forEach(el=>el.classList.remove('hmk-creation-invalid-label'));
+ const output=form.querySelector('.hmk-creation-validation')||document.createElement('p');
+ output.className='hmk-creation-validation';output.setAttribute('role','alert');output.textContent='Je třeba doplnit nebo opravit: '+String(message);
+ if(!output.isConnected)form.querySelector('.creation-inputs')?.prepend(output);
+ const control=preferred||creationProblemField(form,message);
+ if(control){
+  control.classList.add('hmk-creation-invalid');control.setAttribute('aria-invalid','true');
+  const label=control.closest('label,fieldset');label?.classList.add('hmk-creation-invalid-label');
+  (label||control).scrollIntoView({block:'center',behavior:'smooth'});
+  try{control.focus({preventScroll:true})}catch{}
+ }else output.scrollIntoView({block:'center',behavior:'smooth'});
+}
+function clearCreationProblem(event){
+ const form=event.target?.closest?.('#creation-step-form');if(!form)return;
+ const el=event.target;
+ if(el?.classList?.contains('hmk-creation-invalid')){
+  el.classList.remove('hmk-creation-invalid');el.removeAttribute('aria-invalid');
+  el.closest('label,fieldset')?.classList.remove('hmk-creation-invalid-label');
+ }
+ if(!form.querySelector('.hmk-creation-invalid'))form.querySelector('.hmk-creation-validation')?.remove();
+}
+document.addEventListener('input',clearCreationProblem,true);
+document.addEventListener('change',clearCreationProblem,true);
+document.addEventListener('invalid',event=>{
+ const form=event.target?.closest?.('#creation-step-form');if(!form||automaticGenerationBusy)return;
+ event.target.classList.add('hmk-creation-invalid');event.target.setAttribute('aria-invalid','true');
+ event.target.closest('label,fieldset')?.classList.add('hmk-creation-invalid-label');
+ // Native validation focuses and scrolls to the first missing field.
 },true);
 
 // HMK v1.2 Character Creation. Capture the new forms before legacy editors;
@@ -8865,7 +8931,17 @@ document.addEventListener('submit',event=>{
  // A typed physical die is authoritative; HTML selects may be blank or
  // contain an older choice while the GM is editing the roll.
  try{patch.values=mergeCreationChoices(original,step,patch.values,c.values,{strict:false})}
- catch(err){if(automaticGenerationDebug)console.warn('Auto creation validation:',err.message,'step',step,'action',action);if(!automaticGenerationBusy)return alert('HMK Character Creation: '+err.message);return}
+ catch(err){if(automaticGenerationDebug)console.warn('Auto creation validation:',err.message,'step',step,'action',action);if(!automaticGenerationBusy){alert('HMK Character Creation: '+err.message);showCreationProblem(form,err.message)}return}
+ if(step===14&&action==='next'&&!automaticGenerationBusy){
+  const graceRoll=String(v.graceDie||c.values?.graceProof?.roll||'').trim();
+  const graceAspect=String(v.graceAspect||'').trim();
+  if(graceRoll&&Number(graceRoll)>=15&&Number(graceRoll)<=20&&!graceAspect){
+   const message='Divine Grace d20 '+graceRoll+' vyžaduje jeden z 12 Divine Aspects (HMK str. 53 a 310).';
+   alert('HMK Character Creation: '+message);
+   showCreationProblem(form,message,form.elements.namedItem('graceAspect'));
+   return;
+  }
+ }
  if(action==='attribute'){
   const next=ATTRIBUTES.find(name=>!c.attributeProof?.[name]);
   const attributeName=next||creationAttributeChoice||ATTRIBUTES[0];
@@ -8948,7 +9024,7 @@ document.addEventListener('submit',event=>{
   const pending=creationRevisionIssues(original).filter(i=>i.step<14);
   if(pending.length){render();document.querySelector('.folio-creation-revision')?.scrollIntoView({block:'start',behavior:'smooth'});return;}
  }
- let updated;try{updated=applyCreationPatch(original,patch);persistAppearanceStep(original,updated,step,form);syncCreationSkills(updated.hmk,uuid)}catch(err){if(automaticGenerationDebug)console.warn('Auto creation validation:',err.message,'step',step,'action',action);if(!automaticGenerationBusy)return alert('HMK Character Creation: '+err.message);return}
+ let updated;try{updated=applyCreationPatch(original,patch);persistAppearanceStep(original,updated,step,form);syncCreationSkills(updated.hmk,uuid)}catch(err){if(automaticGenerationDebug)console.warn('Auto creation validation:',err.message,'step',step,'action',action);if(!automaticGenerationBusy){alert('HMK Character Creation: '+err.message);showCreationProblem(form,err.message)}return}
  const success=mutate(()=>{const entry=character(selected);if(!entry)throw Error('Postava neexistuje');Object.assign(entry,updated)});
  if(success&&updated.hmk?.creation?.status==='review-required'&&action==='next'){
   if(characterJournalReadiness(character(selected)).ready){view='sheet';notice='';render();}
