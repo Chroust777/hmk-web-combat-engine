@@ -37,6 +37,7 @@ import {applyInventoryItemEdit,transferInventoryItem} from './src/integration/hm
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
 import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
 import {creationWizardHTML,characterCalculationHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js';
+import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './src/integration/hmk-creation-psyche.js';
 import {fieldRuleNote} from './src/integration/hmk-creation-rule-help.js';
 import {auditArmourLibraryConsistency} from './src/integration/armour-library-consistency.js';
 import {assertLegacyMutationDoesNotChangeCombat} from './src/integration/active-combat-write-boundary.js';
@@ -160,7 +161,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.354';
+const APP_VERSION='93.355';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -874,6 +875,16 @@ const JOURNAL_HELP=Object.freeze({
  'lb':'Hmotnost v librách (pounds), základní jednotka váhy v HMK.',
  'ENC':'Encumbrance: zatížení zbrojí a výbavou používané při pohybu a fyzických testech.',
  'WQ':'Weapon Quality: kvalita zbraně; používá se v pravidlech poškození a zničení zbraní.',
+ 'HFT':'Heft: náročnost manipulace se zbraní v závislosti na STR a úchopu; při útoku může vzniknout postih (HMK str. 97–98, 165).',
+ 'RCH':'Reach: dosah zbraně v kontaktním boji, určený délkou a režimem úderu. Číslo s písmenem t označuje režim thrust.',
+ 'DEF':'Defence: obranný parametr zvoleného režimu. Samotný modifier není celé obranné EML; konečný výsledek vyžaduje dovednost a situaci.',
+ 'ZD':'Zone Die: kostka pro určení zasažené tělesné zóny. V boji se může měnit podle typu útoku, vzdálenosti a pravidlových modifikátorů (str. 165–167).',
+ 'IMP':'Impact: kostka, bonus a aspekt zásahu (b = blunt, e = edge, p = point, f = fire). Skutečný Impact může ovlivnit síla, způsob útoku a střela (str. 97, 167).',
+ 'TA':'Tactical Advantage: bonusy udělované zvolenému manévru či aspektu pouze při doložených podmínkách; není automatickým bonusem každého útoku.',
+ 'DRW':'Draw: síla nátahu luku nebo kuše, ověřovaná proti příslušnému pravidlu přípravy (HMK str. 109, 163).',
+ 'BR':'Base Range: základní dostřel zbraně ve stopách; skutečná vzdálenost mění účinnost a Zone Die (HMK str. 109, 163–164).',
+ 'PRJ':'Projectile: konkrétní střela nebo druh střely. Její shaft a hmotnost mohou určit Impact Die; nelze jej automaticky odvozovat jen z luku (HMK str. 108–109).',
+
  'LOC':'Location: zkratka anatomické lokace (SK, FA, NK atd.).',
  'Location':'Anatomická lokace zásahu; každá má vlastní Location Shock a případné charakteristiky zbroje.',
  'b':'Blunt (B): tupý aspekt zásahu. Zde je číslo Armour Value (AV) proti tomuto aspektu.',
@@ -1104,12 +1115,55 @@ function inventoryRowsForJournal(inv,kind){
  if(kind==='possessions')return source.filter(r=>!['worn','main_hand','off_hand'].includes(r.item.slot)).map(r=>[r.item.snapshot?.name||'—',r.qty??1,r.weight===null?'—':r.weight.toFixed(1),/^Počáteční výbava(?: \(automatický návrh\))?$/i.test(String(r.item.condition||'').trim())?'':(r.item.condition||'')]);
  return [];
 }
-function journalInventoryTable(title,headers,rows,klass=''){return `<section class="journal-book-section ${klass}">${journalRuleTitle(title)}<div class="journal-ledger-wrap"><table class="journal-ledger"><thead><tr>${headers.map(h=>`<th>${journalTerm(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map((cell,i)=>`<td><span${journalHelp(headers[i])}>${esc(firstPresent(cell,'—'))}</span></td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}" class="muted">Bez evidovaných údajů.</td></tr>`}</tbody></table></div></section>`;}
+function journalInventoryTable(title,headers,rows,klass=''){
+ const weaponTable=klass.includes('journal-weapon-table');
+ const cells=row=>Array.isArray(row)?row:row.cells;
+ return `<section class="journal-book-section ${klass}">${journalRuleTitle(title)}<div class="journal-ledger-wrap"><table class="journal-ledger${weaponTable?' journal-weapon-ledger':''}"><thead><tr>${headers.map(h=>`<th>${journalTerm(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(row=>`<tr>${cells(row).map((cell,i)=>`<td>${weaponTable&&i===0?`<span${journalHelp(headers[i],row.detail||'Identifikace zbraně.')}>${esc(firstPresent(cell,'—'))}</span>`:`<span${journalHelp(headers[i],!Array.isArray(row)?row.cellHelp?.[i]||null:null)}>${esc(firstPresent(cell,'—'))}</span>`}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}" class="muted">Bez evidovaných údajů.</td></tr>`}</tbody></table></div></section>`;
+}
 function journalWeaponRows(inv,mode){
  const items=inv.filter(x=>(x.snapshot?.category==='weapon'||x.snapshot?.category==='shield')&&['main_hand','off_hand','carried','none'].includes(x.slot));
- const isMissile=item=>{const p=item.snapshot?.properties||{};const missileType=p.missileType??p.verifiedModes?.[0]?.missileType;return ['bow','crossbow','sling','thrown'].includes(missileType)||Number.isFinite(p.baseRangeFt);};
- const filtered=items.filter(x=>mode==='missile'?isMissile(x):!isMissile(x));
- return filtered.map(x=>{const p=x.snapshot?.properties||{};const m=(p.verifiedModes||[])[0]||{};const dmg=m.impactDie?`${m.impactDie}${Number.isFinite(m.impactModifier)?signedNumber(m.impactModifier):''}`:firstPresent(p.impact,p.damage,'—');const atk=firstPresent(p.attack,p.quality!==undefined?`WQ ${p.quality}`:null,'—');const ap=firstPresent(m.aspect,p.aspect,'—');const range=mode==='missile'?firstPresent(p.baseRangeFt?`${p.baseRangeFt} ft`:null,m.baseRangeFt?`${m.baseRangeFt} ft`:null,'—'):'Melee';const notes=[slotLabel(x.slot),x.condition].filter(Boolean).join(' · ');return [x.snapshot?.name||x.name||'—',atk,dmg,ap,range,notes||'—'];});
+ const typeOf=x=>{const p=x.snapshot?.properties||{};return String(p.missileType??p.verifiedModes?.[0]?.missileType??'').toLowerCase()};
+ const isMissile=x=>{const p=x.snapshot?.properties||{};return ['bow','crossbow','sling','thrown'].includes(typeOf(x))||Number.isFinite(p.baseRangeFt)};
+ const isMelee=x=>!['bow','crossbow','sling'].includes(typeOf(x));
+ const modeValue=(m,p,k)=>m[k]??p[k];
+ const fmt=v=>v===undefined||v===null||v===''?'—':String(v);
+ const fmtSigned=v=>Number.isFinite(v)?`${v>=0?'+':''}${v}`:fmt(v);
+ const taText=(ta,aspect)=>{
+  if(Number.isFinite(ta))return `${fmtSigned(ta)}${aspect||''}`;
+  if(ta&&typeof ta==='object')return Object.entries(ta).filter(([k,v])=>['b','e','p','f'].includes(k)&&Number.isFinite(v)).map(([k,v])=>`${fmtSigned(v)}${k}`).join(' / ')||'—';
+  return '—';
+ };
+ return items.filter(x=>mode==='missile'?isMissile(x):isMelee(x)).map(x=>{
+  const p=x.snapshot?.properties||{},m=p.verifiedModes?.[0]||{},type=typeOf(x),ranged=mode==='missile',isBow=['bow','crossbow'].includes(type);
+  const name=x.snapshot?.name||x.name||'—';
+  const aspect=m.aspect||p.aspect||'';
+  const die=m.impactDie||p.impactDie||null;
+  const modifier=Number.isFinite(m.impactModifier)?m.impactModifier:null;
+  const actualMissileImpact=p.projectileImpactDie||p.loadedProjectileImpactDie||null;
+  const imp=actualMissileImpact?`${actualMissileImpact}${modifier===null?'':fmtSigned(modifier)}${aspect}`:isBow?'—':die?`${die}${modifier===null?'':fmtSigned(modifier)}${aspect}`:fmt(p.impact);
+  const quality=Number.isFinite(x.currentWQ)?x.currentWQ:Number.isFinite(p.quality)?p.quality:'—';
+  const atk=fmt(modeValue(m,p,'attack')); // Never equate WQ with Attack.
+  const def=fmt(modeValue(m,p,'defense')); // Defence modifier is not the final DEF value.
+  const zd=fmt(modeValue(m,p,'zoneDie'));
+  const ta=taText(m.impactTAModifier??p.impactTAModifier,aspect);
+  const modeList=[...(p.verifiedModes||[]),...(p.alternateStrikeModes||[])].map(t=>`${t.name||'Mode'}: ${t.length||p.length||'—'} / ${t.zoneDie||p.zoneDie||'—'} / ${t.impactDie||'—'}${Number.isFinite(t.impactModifier)?fmtSigned(t.impactModifier):''}${t.aspect||''}`).join('; ');
+  const extra=[name,x.snapshot?.description,x.snapshot?.source?`Zdroj: ${x.snapshot.source}`:'',`Umístění: ${slotLabel(x.slot)}`,
+   x.condition?`Stav: ${x.condition}`:'',Number.isFinite(p.defenceModifier)?`Defence modifier: ${fmtSigned(p.defenceModifier)} (není finální DEF)`:null,
+   Number.isFinite(p.blockModifier)?`Block modifier: ${fmtSigned(p.blockModifier)}`:null,
+   p.verifiedTraits?.length?`Traits: ${p.verifiedTraits.join(', ')}`:null,modeList?`Ověřené režimy: ${modeList}`:null].filter(Boolean).join(' · ');
+  const cellHelp=[];
+  cellHelp[1]=Number.isFinite(x.currentWQ)?'Aktuální WQ z inventáře.':'Základní katalogová WQ; skutečný stav kvality se může lišit.';
+  if(!ranged){
+   cellHelp[4]=atk==='—'?'ATK není v inventáři doložen jako výsledná útočná hodnota; nevymýšlíme jej z WQ.':null;
+   cellHelp[5]=def==='—'?'DEF je závislé na způsobu obrany, dovednosti a platných postizích. Případné Defence Modifier viz nápověda názvu zbraně.':null;
+   return {cells:[name,quality,fmt(p.heft),fmt(modeValue(m,p,'length')),atk,def,zd,imp,ta],detail:extra,cellHelp};
+  }
+  const projectile=fmt(p.loadedProjectileName??p.projectileName??p.projectile?.name);
+  cellHelp[4]=projectile==='—'?'Přesná střela není v tomto záznamu doložena; Projectile není vhodné odhadovat.':null;
+  cellHelp[6]=`Zdrojový režim uvádí ZD ${zd}; v reálném ranged útoku jej mění vzdálenost a další podmínky.`;
+  cellHelp[7]=isBow?`Základní zbraň má tištěný Impact modifier ${modifier===null?'neurčený':fmtSigned(modifier)+aspect}; skutečná kostka se řídí zvolenou střelou a shaft-weight (str.108–109). Dokud střela není doložena, IMP zůstává neurčené.`:null;
+  return {cells:[name,quality,fmt(p.draw),Number.isFinite(p.baseRangeFt)?`${p.baseRangeFt} ft`:'—',atk,projectile,zd,imp,ta],detail:extra,cellHelp};
+ });
 }
 const JOURNAL_ANATOMICAL_LOCATIONS=[['sk','Skull',5],['fa','Face',4],['nk','Neck',5],['sh','Shoulder',3],['ua','Upper arm',1],['el','Elbow',2],['fo','Forearm',1],['ha','Hand',2],['tx','Thorax',4],['ab','Abdomen',4],['pv','Pelvis',4],['th','Thigh',3],['kn','Knee',2],['ca','Calf',1],['ft','Foot',2]];
 function journalBodyLocationsHTML(c){
@@ -1461,7 +1515,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.unconscious?'Yes':'No'],['Death Save',state.death?'Pending':'—']];
  const conditionRows=[['Poisoned',state.poisoned?'Yes':'No'],['Diseased',state.diseased?'Yes':'No'],['Cursed',state.cursed?'Yes':'No'],['Winded',state.winded?'Yes':'No'],['Weary',state.weary?'Yes':'No'],['Fatigued',combatFatigueTotals(state).total]];
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalStatBoxes('Grace & Piety',gracePiety)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],meleeRows)}${journalInventoryTable('Missile Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],missileRows)}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalStatBoxes('Grace & Piety',gracePiety)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -8898,8 +8952,32 @@ document.addEventListener('click',event=>{
 
 // Clear, deterministic validation guidance for the *current* manual step.
 // Keep the unsaved fields in place; never mutate the character on failure.
+function creationPsycheProblemField(form,message){
+ if(!/psyche/i.test(message||''))return null;
+ const get=name=>[...form.querySelectorAll('input,select,textarea')].find(x=>x.name===name);
+ const dice=get('psycheDice');if(!dice)return null;
+ const actor=selected?character(selected):null;
+ const count=actor?creationPsycheCount(actor.hmk?.folk,actor.hmk?.ageGroup):null;
+ if(count===null)return dice;
+ const parts=String(dice.value||'').split(',').map(x=>x.trim()).filter(Boolean);
+ if(parts.length!==count||parts.some(x=>!/^(?:[1-9]|1\d|20)$/.test(x)))return dice;
+ const rolls=parts.map(Number);
+ const sum=rolls.reduce((total,n)=>total+(n===20?3:n===19?2:n===18?1:0),0);
+ const wanted=psycheIntensity(sum).length;
+ for(let i=1;i<=2;i++){
+  const choice=get('psycheTraitChoice'+i),traitDie=get('psycheTraitDie'+i);
+  const selectedValue=choice?.value||'',dieValue=traitDie?.value?.trim()||'';
+  if(i<=wanted){
+   if(dieValue&&!/^(?:[1-9]|10)$/.test(dieValue))return traitDie;
+   if(dieValue&&selectedValue&&selectedValue!==CREATION_PSYCHE_TRAITS[Number(dieValue)-1])return choice;
+   if(!dieValue&&!selectedValue)return choice;
+  }else if(dieValue||selectedValue)return dieValue?traitDie:choice;
+ }
+ return dice;
+}
 function creationProblemField(form,message){
  const text=String(message||'');
+ const psyche=creationPsycheProblemField(form,text);if(psyche)return psyche;
  const choices=[
   [/divine\s+aspects?|grace\s*nebo\s*marked|grace\s*aspect|vyberte jeden z 12/i,['graceAspect']],
   [/grace.*d20|fyzick.*grace/i,['graceDie']],
@@ -8924,6 +9002,21 @@ function creationProblemField(form,message){
  for(const [regex,fields]of choices)if(regex.test(text))for(const field of fields){const el=byName(field);if(el)return el;}
  // Prefer a genuinely empty editable field over arbitrarily marking a valid one.
  return [...form.querySelectorAll('select,input,textarea')].find(el=>el.required&&!el.disabled&&!String(el.value||'').trim())||null;
+}
+function updateCreationPsycheGuidance(form){
+ const output=form.querySelector('[data-psyche-guidance]');if(!output)return;
+ const dice=form.elements.namedItem('psycheDice');if(!dice)return;
+ const actor=selected?character(selected):null;
+ const count=actor?creationPsycheCount(actor.hmk?.folk,actor.hmk?.ageGroup):null;
+ if(count===null)return;
+ const parts=String(dice.value||'').split(',').map(x=>x.trim()).filter(Boolean);
+ if(parts.length!==count||parts.some(x=>!/^(?:[1-9]|1\d|20)$/.test(x))){
+  output.textContent=`Nejdřív vyplňte ${count}× Psyche d20; bez nich nelze určit, zda Trait vzniká. Samotný výběr názvu nestačí.`;
+  return;
+ }
+ const sum=parts.map(Number).reduce((total,n)=>total+(n===20?3:n===19?2:n===18?1:0),0);
+ const intensities=psycheIntensity(sum);
+ output.textContent=`Psyche d20 potvrzují součet ${sum}: ${intensities.length?intensities.join(' + '):'žádný počáteční Trait'}. ${intensities.length?'Nyní vyberte odpovídající názvy nebo zadejte Trait d10.':'Obě pole Psyche Trait musejí zůstat prázdná.'}`;
 }
 function showCreationProblem(form,message,preferred=null){
  const actor=selected?character(selected):null;
@@ -8964,6 +9057,8 @@ document.addEventListener('input',markCreationFormEditing,true);
 document.addEventListener('change',markCreationFormEditing,true);
 document.addEventListener('input',clearCreationProblem,true);
 document.addEventListener('change',clearCreationProblem,true);
+document.addEventListener('input',event=>{const f=event.target?.closest?.('#creation-step-form');if(f)updateCreationPsycheGuidance(f);},true);
+document.addEventListener('change',event=>{const f=event.target?.closest?.('#creation-step-form');if(f)updateCreationPsycheGuidance(f);},true);
 document.addEventListener('invalid',event=>{
  const form=event.target?.closest?.('#creation-step-form');if(!form||automaticGenerationBusy)return;
  const actor=selected?character(selected):null;
@@ -9076,7 +9171,13 @@ document.addEventListener('submit',event=>{
    }
    patch.mysteries.spiritPowers=powers;
   }
-  if(v.psycheDice!==undefined&&String(v.psycheDice).trim()){
+  if(v.psycheDice!==undefined){
+   // An empty field is an explicit incomplete edit: never silently reuse an
+   // old completed Psyche proof while the currently visible dice are blank.
+   if(!String(v.psycheDice).trim()){
+    if(!automaticGenerationBusy)showCreationProblem(form,'HMK p.40: chybí povinné Psyche d20. Nejdřív zadejte výsledky d20; samotný výběr Traitu neurčuje, zda Trait vznikl.');
+    return;
+   }
    const rolls=String(v.psycheDice).split(',').map(x=>x.trim());
    const dice=[v.psycheTraitDie1,v.psycheTraitDie2].map(x=>x===''?null:x);
    const choices=[v.psycheTraitChoice1,v.psycheTraitChoice2];
