@@ -3578,3 +3578,45 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
   cursor:not-allowed!important;
 }
 .nav .castle-character--draft{outline:1px solid rgba(226,178,95,.50)!important;outline-offset:-3px!important}
+
+
+/* v93.350 — journal glossary and anatomically readable type, HMK p.427–428 */
+.content-sheet .journal-book--overview .hmk-journal-glossary{
+  position:relative;cursor:help;text-decoration:underline dotted rgba(113,73,38,.52);
+  text-underline-offset:3px;color:inherit!important;
+}
+.content-sheet .journal-book--overview .hmk-journal-glossary:focus-visible{
+  outline:2px solid #8e5c2b;outline-offset:2px;
+}
+.content-sheet .journal-book--overview .hmk-journal-glossary:is(:hover,:focus-visible)::after{
+  content:attr(data-hmk-help);position:absolute;left:0;bottom:calc(100% + 8px);
+  z-index:120;display:block;min-width:220px;width:max-content;max-width:min(330px,75vw);
+  white-space:normal;overflow-wrap:normal;padding:10px 12px;
+  border:1px solid #936e3d;border-radius:5px;
+  background:#f6ead0;color:#3e281a;font:normal 13px/1.45 Georgia,serif;
+  box-shadow:0 6px 14px rgba(43,29,15,.27);pointer-events:none;
+}
+.content-sheet .journal-book--overview .journal-body-locations .journal-anatomy-wrap{
+  max-width:100%;overflow-x:auto;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table{
+  min-width:595px!important;font:normal 12px/1.38 Georgia,serif!important;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table :is(th,td){
+  padding:5px 3px!important;font:normal 12px/1.38 Georgia,serif!important;
+  letter-spacing:normal!important;font-stretch:normal!important;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table thead th,
+.content-sheet .journal-book--overview .journal-anatomy-table tbody th{
+  font-weight:700!important;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table :is(.journal-av-value,.hmk-location-shk){
+  font:700 12px/1.3 Georgia,serif!important;font-variant-numeric:tabular-nums;
+  min-width:1.7em;min-height:1.7em;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table .journal-location-name{
+  overflow-wrap:normal!important;white-space:nowrap;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table .journal-injuries{
+  font-size:11px!important;overflow-wrap:anywhere;
+}
