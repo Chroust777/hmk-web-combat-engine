@@ -159,7 +159,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.333';
+const APP_VERSION='93.334';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -336,16 +336,12 @@ function main(){
  if(view==='hazards')body=hazardsView();
  if(view==='encounter')body=encounterView();
  const scene=activeVisualScene();
- const selectedCharacter=selected?character(selected):null;
- const activeCharacter=view==='sheet'?selectedCharacter:null;
  const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['hazards','✣','Nebezpečí / Trauma'],['backup','▤','Zálohy'],['trash','♧','Archiv']];
  const characterButtons=data.characters.map(c=>`<button type="button" class="castle-character ${c.id===selected?'active':''}" data-open="${esc(c.id)}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span>${esc(c.name)}</span></button>`).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <header class="mast"><div class="mast-top">
    <div class="mast-brand"><div class="brand-mark" aria-hidden="true">⚜</div><div class="brand-copy"><div class="eyebrow">HMK · KÈTHÎRA</div><h1>Keeper’s Ledger</h1></div></div>
-   <nav class="mast-links" aria-label="Hlavní záložky"><button type="button" class="${['characters','sheet','creation'].includes(view)?'current':''}" data-nav="characters">Postavy</button><button type="button" class="${view==='calendar'?'current':''}" data-nav="calendar">Svět</button><button type="button" class="${view==='encounter'?'current':''}" data-nav="encounter">Combat</button><button type="button" class="${view==='skills'?'current':''}" data-nav="skills">Skills</button><button type="button" class="${view==='library'?'current':''}" data-nav="library">Knihovna</button></nav>
-   <div class="mast-meta"><span class="scene-chip">${esc(activeSceneLabel(scene))}</span><span class="release-marker">v${APP_VERSION}</span></div>
-   <div class="mast-side">${globalMastPanel(view,selectedCharacter)}</div>
+   <div class="mast-meta"><span class="release-marker">v${APP_VERSION}</span></div>
  </div></header>
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
   <div class="castle-campaign-card"><span>KAMPANĚ</span><strong>HÂRNMASTER KÈTHÎRA</strong><small>Keeper’s Campaign Ledger</small></div>
@@ -353,6 +349,7 @@ function main(){
   ${navLinks.map(([id,icon,label])=>`<button type="button" class="castle-nav-link ${view===id?'active':''}" data-nav="${id}"><span class="castle-nav-icon">${icon}</span>${esc(label)}</button>`).join('')}
   <div class="nav-section-label castle-character-section">POSTAVY <span>${data.characters.length}</span></div>
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
+  ${selected&&character(selected)?`<div class="castle-character-tools"><button type="button" class="castle-nav-link" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="castle-nav-link" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`:''}
   <button type="button" class="castle-create" data-action="new-character">✣ Vytvořit postavu <span>＋</span></button>
   <div class="castle-sidebar-footer">⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
  </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter'].includes(view)?' content-sheet':''}">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
@@ -1083,13 +1080,6 @@ function creationBookView(){
  const c=selected?character(selected):null;
  if(!c)return journalChapterShell('Pravidlová tvorba postavy','Průvodce je navázán na konkrétní postavu v registru.',`<div class="empty">Nejprve v registru otevřete nebo založte konkrétní postavu. Poté bude dostupná kompletní 14kroková pravidlová tvorba HMK 1:1.</div>`,'journal-book--creation');
  return journalChapterShell('Pravidlová tvorba postavy',`${c.name} · 14 kroků podle HMK v1.2`,creationWizardView(),'journal-book--creation');
-}
-function globalMastPanel(view,currentCharacter){
- const hasClock=Boolean(data.campaignClock);
- const clockLabel=hasClock?displayCampaignMinute(data.campaignClock.minute):'Svět · Kalendář';
- const selectedLabel=currentCharacter?currentCharacter.name:'Žádná vybraná postava';
- const charButtons=currentCharacter?`<button type="button" data-open="${esc(currentCharacter.id)}">📖 Deník</button><button type="button" data-action="creation-open">Pravidlová tvorba</button><button type="button" data-action="export-kernel-character">Export HMK profilu</button>`:'';
- return `<section class="mast-control-panel" aria-label="Rychlý přístup"><div class="mast-control-panel__title">Rychlý přístup</div><div class="mast-control-panel__selected"><span>Aktivní postava</span><strong>${esc(selectedLabel)}</strong></div><div class="mast-control-panel__grid"><button type="button" class="${view==='characters'?'current':''}" data-nav="characters">↩ Registr</button><button type="button" class="${view==='calendar'?'current':''}" data-nav="calendar">◷ ${esc(clockLabel)}</button><button type="button" data-action="new-character">＋ Nová postava</button><button type="button" data-action="auto-random-character">⚄ Náhodná postava</button>${charButtons}</div></section>`;
 }
 function characterJournalHero(c,inv,editing=false){
  const h=c.hmk||{},creation=h.creation?.values||{},state=persistentStateOf(c),attrs=h.attributes||{};
@@ -6934,7 +6924,25 @@ if(e.target.id==='shock-ml-form'){
  const outcome=injury.kind==='none'?'Žádné zranění (Impact 0).':injury.kind==='undetermined'?'Úroveň zranění nerozhodnuta: nejprve ověřte Rigid Armour na zasažené lokaci.':injury.kind==='glancing'?'GLANCING BLOW: žádné M1; Injury Shock 1; bonus +10 k Shock Roll.':`Zranění ${injury.injury} (${v.aspect}); Injury Shock ${injury.injuryShock}.`;
  output.textContent=`Zbroj: ${resolved.mode==='custom-worn'?'skutečně nasazené články':'tištěný komplet'} · směr ${v.direction} · ${resolved.inventoryIds.length} položek · Rigid ${resolved.rigidStatus}${resolved.extraEnc!==null?' · vrstvy Extra ENC '+resolved.extraEnc:''}. ${meleeGate?`Melee ENC útočník/obránce ${attackerLoad.modifiedENC}/${defenderLoad.modifiedENC}; Bulk ${attackerLoad.meleeBulkPenalty}/${defenderLoad.meleeBulkPenalty}; Injury p170 ${meleeGate.injuryAudit.attacker.impairment}/${meleeGate.injuryAudit.defender?.impairment??0}${meleeGate.attackerForcedCF||meleeGate.defenderForcedCF?' (Grievous: nucený CF; GM vyhodnotí Mishap)':''}; výsledné EML ${meleeGate.emlAudit.attacker.effectiveEML}/${meleeGate.emlAudit.defender?.effectiveEML??'—'}. `:`ENC cíl: ${draft.loadEvidence.loadouts[0].encReady?draft.loadEvidence.loadouts[0].modifiedENC:'neúplné údaje'}. `}${target.name} · ${v.location} · ${v.aspect}: Impact ${result.strikeImpact} − AV ${result.effectiveAV}${result.armourReduction?` (základ ${result.baseAV}, AR ${result.armourReduction})`:''} = efektivní Impact ${result.effectiveImpact}. ${outcome} Shock: Location ${sequence.shock.locationShock} + Injury ${sequence.shock.injuryShock} + ${sequence.shock.shockLevel} (${sequence.shock.rollModifier>=0?'+':''}${sequence.shock.rollModifier}) = SHK ${sequence.shock.shk} → ${sequence.shock.state}. ${sequence.shock.glancingBonus?'Pro Shock Roll platí +10 za Glancing Blow. ':''}Výsledek Shock Roll je převzat od GM (včetně Fatigue, bez Injury impairment). Přenos stavu: ${v.previousState} → ${draft.carryover.state}. Návrh lze po GM kontrole zapsat do trvalého bojového stavu v sekci níže. Samotné vyhodnocení náhledu stav nemění.`;
 });
-document.addEventListener('click',e=>{const t=e.target.closest?.('[data-sheet-section]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();activeSheetSection=t.dataset.sheetSection==='edit'?'overview':t.dataset.sheetSection||'overview';if(activeSheetSection!=='overview')sheetEditingId=null;render();},true);
+document.addEventListener('click',e=>{
+ const t=e.target.closest?.('[data-sheet-section]');if(!t)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ // Replacing the book HTML can shift the document's scroll anchoring when its
+ // chapter layout changes. Preserve the subnav's on-screen position instead.
+ const oldNav=document.querySelector('.journal-book-subnav');
+ const oldTop=oldNav?.getBoundingClientRect().top??null;
+ const oldScroll=window.scrollY;
+ activeSheetSection=t.dataset.sheetSection==='edit'?'overview':t.dataset.sheetSection||'overview';
+ if(activeSheetSection!=='overview')sheetEditingId=null;
+ render();
+ if(oldTop!==null&&oldScroll>0){
+  const currentNav=document.querySelector('.journal-book-subnav');
+  if(currentNav){
+   const displacement=currentNav.getBoundingClientRect().top-oldTop;
+   if(Math.abs(displacement)>1)window.scrollTo({top:Math.max(0,window.scrollY+displacement),behavior:'instant'});
+  }
+ }
+},true);
 // v93.276: direct, single-surface Character Sheet edit.
 // Rule-derived Creation values cannot be silently overwritten outside their 14-step proof trail.
 document.addEventListener('click',e=>{
