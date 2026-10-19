@@ -4,12 +4,13 @@
  * A day has 1,440 minutes. Day numbers are intentionally neutral: no
  * unsupported Kèthîran month/calendar names or real-world timezone.
  */
+import {validateCalendarPlans,nextGMBlockingEvent,assertCalendarPlansAppendOnly} from './hmk-calendar-planner.js';
 export const DAY_MINUTES=1440;
 const validInt=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const ensure=(ok,msg)=>{if(!ok)throw Error(msg);};
 const MAX_MINUTE=1000000000;
 const KEY=(kind,characterId,woundId='')=>`${kind}:${characterId}:${woundId}`;
-const KNOWN=['wound','extended-shock','coma','blood-loss'];
+const KNOWN=['wound','extended-shock','coma','blood-loss','poison','disease'];
 export function displayCampaignMinute(minute){
  ensure(validInt(minute,-MAX_MINUTE,MAX_MINUTE),'Neplatný čas kampaně');
  const day=Math.floor(minute/DAY_MINUTES)+1;
@@ -31,7 +32,8 @@ export function validateCampaignCalendar(clock){
    (a.kind==='wound'||a.woundId==null)&&
    ['gm-attested','confirmed-combat'].includes(a.source)&&
    (a.source!=='confirmed-combat'||(typeof a.combatEventId==='string'&&a.combatEventId.length>0))&&
-   (a.eventId==null||(typeof a.eventId==='string'&&a.eventId.length>0)),
+   (a.eventId==null||(typeof a.eventId==='string'&&a.eventId.length>0))&&
+   (a.episodeId==null||(['poison','disease'].includes(a.kind)&&typeof a.episodeId==='string'&&a.episodeId.length>0&&a.episodeId.length<=200)),
    'Neplatný důkaz počátku časované procedury');
   const key=KEY(a.kind,a.characterId,a.woundId);
   // Wound IDs are permanent. Shock/Coma/BP may begin another episode after recovery.
@@ -42,13 +44,14 @@ export function validateCampaignCalendar(clock){
  let last=-1;const eventIds=new Set();
  for(const e of clock.events){
   ensure(e&&typeof e.id==='string'&&e.id.length>0&&!eventIds.has(e.id)&&
-   ['init','advance','anchor','resolution'].includes(e.type)&&validInt(e.minute,0,MAX_MINUTE)&&
+   ['init','advance','anchor','resolution','tr-origin','plan','resolve-plan','cancel-plan'].includes(e.type)&&validInt(e.minute,0,MAX_MINUTE)&&
    e.minute>=last&&typeof e.reason==='string'&&e.reason.length>0&&e.reason.length<=400,
    'Neplatná nebo zpětně vložená časová událost');
   eventIds.add(e.id);last=e.minute;
  }
  ensure(clock.events.length>0&&clock.events[0].type==='init'&&clock.events.at(-1).minute===clock.minute,
   'Kalendář nemá doložený poslední čas');
+ validateCalendarPlans(clock);
  return clock;
 }
 export function createCampaignCalendar({day,hour,minute,label='',eventId,gmConfirmed}={}){
@@ -66,18 +69,26 @@ export function getCampaignAnchor(clock,kind,characterId,woundId=null){
  return clock.anchors.filter(x=>x.kind===kind&&x.characterId===characterId&&
   (kind!=='wound'||x.woundId===woundId)).at(-1)??null;
 }
+/** Episodes use the original verified Combat event ID, not a second timer. */
+export function getCampaignEpisodeAnchor(clock,kind,characterId,episodeId){
+ if(!clock)return null;
+ return clock.anchors.filter(x=>x.kind===kind&&x.characterId===characterId&&
+  (x.combatEventId===episodeId||x.episodeId===episodeId)).at(-1)??null;
+}
 export function elapsedCalendarDays(clock,kind,characterId,woundId=null){
  const a=getCampaignAnchor(clock,kind,characterId,woundId);
  return a?Math.floor((clock.minute-a.minute)/DAY_MINUTES):null;
 }
-export function anchorCampaignOrigin(clock,{kind,characterId,woundId=null,elapsedMinutes=0,eventId,source='gm-attested',combatEventId=null,gmConfirmed=false}={}){
+export function anchorCampaignOrigin(clock,{kind,characterId,woundId=null,elapsedMinutes=0,eventId,source='gm-attested',combatEventId=null,episodeId=null,gmConfirmed=false}={}){
  validateCampaignCalendar(clock);
  ensure(gmConfirmed===true||source==='confirmed-combat','Původ historické události musí potvrdit GM');
  ensure(KNOWN.includes(kind)&&typeof characterId==='string'&&characterId&&
   (kind!=='wound'||(typeof woundId==='string'&&woundId)), 'Neplatný cíl kotvy');
- const prior=getCampaignAnchor(clock,kind,characterId,woundId);
+ const prior=['poison','disease'].includes(kind)?getCampaignEpisodeAnchor(clock,kind,characterId,combatEventId||episodeId):getCampaignAnchor(clock,kind,characterId,woundId);
  ensure(!prior||(source==='confirmed-combat'&&kind!=='wound'&&combatEventId&&combatEventId!==prior.combatEventId),
   'Časový počátek této události už byl jednou potvrzen');
+ ensure(!['poison','disease'].includes(kind)||
+  (source==='confirmed-combat'?!!combatEventId:typeof episodeId==='string'&&episodeId.length>0),'Poison/Disease vyžaduje identitu jedné konkrétní epizody');
  ensure(validInt(elapsedMinutes,0,MAX_MINUTE)&&elapsedMinutes<=clock.minute+MAX_MINUTE/2,
   'Neplatná doložená doba od začátku');
  ensure(typeof eventId==='string'&&eventId.length>0&&!clock.events.some(e=>e.id===eventId),
@@ -85,7 +96,7 @@ export function anchorCampaignOrigin(clock,{kind,characterId,woundId=null,elapse
  ensure(source!=='confirmed-combat'||(typeof combatEventId==='string'&&combatEventId),
   'Automatická kotva vyžaduje ID potvrzeného bojového výsledku');
  const next=structuredClone(clock);
- next.anchors.push({kind,characterId,...(kind==='wound'?{woundId}:{}),minute:clock.minute-elapsedMinutes,source,eventId,...(source==='confirmed-combat'?{combatEventId}:{})});
+ next.anchors.push({kind,characterId,...(kind==='wound'?{woundId}:{}),minute:clock.minute-elapsedMinutes,source,eventId,...(episodeId?{episodeId}:{}),...(source==='confirmed-combat'?{combatEventId}:{})});
  next.events.push({id:eventId,type:'anchor',minute:clock.minute,
   reason:`${source}: ${KEY(kind,characterId,woundId)}; doložený věk ${elapsedMinutes} minut`});
  validateCampaignCalendar(next);return next;
@@ -128,6 +139,31 @@ export function campaignCalendarAgenda(clock,characters=[]){
   if(s.extendedShock){add(c,'extended-shock','Extended Shock Course (4 h)',s.extendedShock.elapsedHours+4,null,'hours');}
   if(s.coma?.active&&s.coma.nextCourseDays!=null){add(c,'coma','Coma Course (d10 dní)',s.coma.elapsedDays+s.coma.nextCourseDays);}
   if(s.bloodLoss?.bp>0){add(c,'blood-loss','Blood Loss Regeneration (10 dní)',s.bloodLoss.healingNextDay??10);}
+  // HMK p.183–184,186: onsets and courses are timed by confirmed GM data.
+  // Older imported episodes lacking a real campaign origin remain unresolved,
+  // never assigned a guessed start from their combat round.
+  for(const t of s.toxinCourses??[]){
+   if(!['incubating','active'].includes(t.status))continue;
+   const anchor=getCampaignEpisodeAnchor(clock,'poison',c.id,t.id);
+   if(!anchor){unknown.push({characterId:c.id,name:c.name,kind:'poison',description:'Poison '+t.sourceId+' · chybí potvrzená expozice v minutách',reason:'Ukotvěte historickou expozici v Kalendáři'});continue;}
+   const minutes=t.status==='incubating'?t.onsetMinutes:t.elapsedMinutes+t.periodMinutes;
+   if(!Number.isSafeInteger(minutes)||minutes<0){unknown.push({characterId:c.id,name:c.name,kind:'poison',description:'Poison Course čeká na přesný čas potvrzený GM',reason:'Chybí pravidlový interval'});continue;}
+   const minute=anchor.minute+minutes;
+   all.push({id:KEY('poison',c.id,t.id),characterId:c.id,name:c.name,kind:'poison',
+    description:t.status==='incubating'?'Poison Onset (HMK 186)':'Poison Course d100 (HMK 184/186)',
+    minute,anchorMinute:anchor.minute,status:minute<=clock.minute?'due':'future'});
+  }
+  for(const t of s.diseaseCourses??[]){
+   if(!['pending-profile','incubating','active'].includes(t.status))continue;
+   const anchor=getCampaignEpisodeAnchor(clock,'disease',c.id,t.id);
+   if(!anchor){unknown.push({characterId:c.id,name:c.name,kind:'disease',description:'Disease '+t.diseaseKey+' · chybí potvrzená expozice v minutách',reason:'Ukotvěte historickou expozici v Kalendáři'});continue;}
+   const minutes=t.status==='pending-profile'?0:t.status==='incubating'?t.onsetMinutes:t.elapsedMinutes+DAY_MINUTES;
+   if(!Number.isSafeInteger(minutes)||minutes<0){unknown.push({characterId:c.id,name:c.name,kind:'disease',description:'Disease Course čeká na přesný čas potvrzený GM',reason:'Doplňte údaje o nástupu'});continue;}
+   const minute=anchor.minute+minutes;
+   all.push({id:KEY('disease',c.id,t.id),characterId:c.id,name:c.name,kind:'disease',
+    description:t.status==='pending-profile'?'Disease Profile (GM/d6+d10; HMK 183)':t.status==='incubating'?'Disease Onset (HMK 183)':'Disease Course d100 (HMK 184)',
+    minute,anchorMinute:anchor.minute,status:minute<=clock.minute?'due':'future'});
+  }
   const blocked=s.wounds?.some(w=>w.healing?.infected);
   for(const w of s.wounds??[]){
    if(w.healed)continue;
@@ -153,6 +189,8 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
  if(agenda.unknown.length)throw Error('Nelze posunout čas: neověřený nebo neuzavřený časový závazek – '+
   agenda.unknown[0].name+' / '+agenda.unknown[0].description+'. '+agenda.unknown[0].reason);
  const nextMinute=clock.minute+deltaMinutes;
+ const gmBlocking=nextGMBlockingEvent(clock,nextMinute);
+ if(gmBlocking)throw Error(`Nelze přeskočit nevyřízenou GM událost „${gmBlocking.title}“: ${displayCampaignMinute(gmBlocking.dueMinute)}.`);
  const blocked=agenda.all.find(x=>x.minute<nextMinute);
  if(blocked)throw Error(`Nelze přeskočit povinný termín ${blocked.description} u ${blocked.name}: ${displayCampaignMinute(blocked.minute)}. Nejprve vyřešte událost.`);
  const next=structuredClone(clock);next.minute=nextMinute;
@@ -170,5 +208,6 @@ export function assertCampaignCalendarAppendOnly(before,after){
   old.events.every((x,i)=>JSON.stringify(x)===JSON.stringify(now.events[i]))&&
   old.anchors.every((x,i)=>JSON.stringify(x)===JSON.stringify(now.anchors[i])),
   'Dřívější potvrzené důkazy času nelze přepisovat');
+ assertCalendarPlansAppendOnly(old,now);
  return true;
 }
