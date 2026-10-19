@@ -160,7 +160,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.351';
+const APP_VERSION='93.352';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -815,6 +815,96 @@ function skillValueForJournal(c,names){
  return row?.ml??'—';
 }
 const JOURNAL_HELP=Object.freeze({
+ 'Skills':'Dovednosti postavy: ML stanoví základ pro Skill Check d100, zatímco EML se upraví platnými okolnostmi (HMK str. 46, 60–62).',
+ 'Birth & Origins':'Původ, narození, Folk a sociální zázemí postavy; údaje vznikají v krocích 1–9 (HMK str. 20–34).',
+ 'Appearance':'Vzhled postavy: Height, Weight, Hair, Eyes, Complexion a Handedness dle volitelného Appendix III (HMK str. 427–428).',
+ 'Family & Links':'Rodinné a společenské vazby postavy: rodiče, společnost, jazyky a zaměstnání (HMK str. 25–34).',
+ 'Traits & Character':'Vlastnosti osobnosti, znamení a další popisné rysy; nejsou náhradou za číselné atributy (HMK str. 23).',
+ 'Convocation ML':'ML jednotlivých magických convocations: samostatná zběhlost v magickém oboru, nikoli automaticky ML Pvârism.',
+ 'Physical Attributes':'Fyzické atributy vyhodnocují sílu, zdraví, pohyb a vzhled. Test atributu má vlastní pravidla (HMK str. 38, 61).',
+ 'Mental Attributes':'Mentální atributy popisují schopnosti mysli a ducha (HMK str. 38).',
+ 'Grace & Piety':'Náboženské hodnoty; Fate, Grace, Piety a Morality jsou samostatné charakteristiky s různým použitím.',
+ 'Combat Skills':'Bojově důležité hodnoty vybrané z dovedností postavy; testy se provádějí podle bojových pravidel (HMK str. 157–170).',
+ 'Encumbrance':'Zatížení postavy z výbavy a zbroje; může ovlivnit pohyb a fyzické činnosti (HMK str. 112, 117, 122).',
+ 'Movement':'Pohyb postavy v boji, odvozený ze základního Move a aktuálních postihů (HMK str. 56, 159–160).',
+ 'Trauma & Conditions':'Souhrn únavy, šoku a zranění pro použití v boji a dalších testech.',
+ 'Melee Weapons':'Zbraně pro boj zblízka; ATK, DMG a AP závisejí na použitém režimu a výbavě.',
+ 'Missile Weapons':'Střelné a vrhací zbraně; útok, Impact, aspekt a dosah se odvozují ze zbraně a střely.',
+ 'Armour & Clothing':'Zbroj a oblečení postavy; ochrana jednotlivých lokací se posuzuje podle typu zásahu.',
+ 'Body Locations · Armour / Injuries':'Anatomické lokace zásahu, hodnoty ochrany AV, potenciál krvácení a Location Shock (HMK str. 167–169).',
+ 'Possessions':'Nesené a uložené předměty, jejich množství a hmotnost.',
+ 'Spells & Abilities':'Evidovaná kouzla a zvláštní schopnosti postavy; konkrétní použití určuje jejich pravidlový popis.',
+ 'Shock & Injury':'Stav šoku a zranění postavy; Shock se vyhodnocuje při zásahu (HMK str. 169).',
+ 'Conditions':'Přehled aktivních podmínek, které mohou měnit testy nebo akce postavy.',
+ 'Notes':'Volné osobní poznámky k postavě.',
+ 'Gear':'Gear ENC: zatížení nesenou výbavou; v kombinaci se zbrojí a Strength Modifier přispívá k celkové zátěži.',
+ 'Str Mod':'Strength Modifier: modifikátor odvozený ze STR pro výpočet zatížení (HMK pravidla Encumbrance).',
+ 'STR Mod':'Strength Modifier: modifikátor odvozený ze STR pro výpočet zatížení.',
+ 'Base':'Základní Move (pohyb za tah) před uplatněním aktuálních postihů.',
+ 'Effective':'Efektivní pohyb po zohlednění zatížení, únavy, zranění a jiných platných postihů.',
+ 'Half':'Poloviční pohyb v akcích, které to pravidla připouštějí.',
+ 'Full':'Plný pohyb podle aktuálně dostupného Move.',
+ 'Double':'Dvojnásobný pohyb jen za podmínek příslušné akce.',
+ 'ATK':'Attack: útočná hodnota nebo odpovídající režim zbraně; nenahrazuje konečné EML (HMK boj).',
+ 'DMG':'Damage/Impact: kostka a modifikátor účinku zásahu; výsledný Impact se upravuje ochrannou hodnotou AV.',
+ 'AP':'Aspect: způsob zásahu zbraní (blunt, edge, point nebo fire podle použitého režimu).',
+ 'Range':'Dosah použité střelné či vrhací zbraně.',
+ 'Weapon':'Zbraň; parametry se odvozují od skutečně drženého či neseného předmětu.',
+ 'Item':'Předmět; evidovaná zbroj, výbava nebo osobní věc.',
+ 'Notes':'Poznámky k dané položce nebo ke stavu postavy.',
+ 'Qty':'Quantity: počet evidovaných kusů.',
+ 'lb':'Hmotnost v librách (pounds), základní jednotka váhy v HMK.',
+ 'ENC':'Encumbrance: zatížení zbrojí a výbavou používané při pohybu a fyzických testech.',
+ 'WQ':'Weapon Quality: kvalita zbraně; používá se v pravidlech poškození a zničení zbraní.',
+ 'LOC':'Location: zkratka anatomické lokace (SK, FA, NK atd.).',
+ 'Location':'Anatomická lokace zásahu; každá má vlastní Location Shock a případné charakteristiky zbroje.',
+ 'b':'Blunt (B): tupý aspekt zásahu. Zde je číslo Armour Value (AV) proti tomuto aspektu.',
+ 'e':'Edge (E): sečný aspekt zásahu. Zde je Armour Value (AV) proti sečnému zásahu.',
+ 'p':'Point (P): bodný aspekt zásahu. Zde je Armour Value (AV) proti bodnému zásahu.',
+ 'f':'Fire (F): ohnivý aspekt; zde je Armour Value (AV) proti požáru/ohni.',
+ '●':'Kroužek vyznačuje možnost krvácení po zásahu. Barva označuje pravidlový práh závažnosti podle lokace a aspektu (HMK str. 167–168).',
+ '▽':'Trojúhelník označuje možnost amputace při Grievous G5 Edge a případný Strength Modifier (HMK str. 168).',
+ 'Injuries':'Dosud evidovaná zranění lokace; jejich závažnost a typ ovlivňují další postihy.',
+ 'Current Shock':'Aktuální Shock, který ovlivňuje stav postavy po zásahu.',
+ 'Shock Save':'Test zachování vědomí či navazující obrana při Shock podle konkrétní situace.',
+ 'Unconscious':'Bezvědomí; postava nemůže běžně jednat, dokud stav neodezní.',
+ 'Death Save':'Evidovaný smrtelný následek či jeho ověřování dle pravidel poranění.',
+ 'Fatigue':'Únava se podle stupně projeví na bojových i jiných fyzických činnostech.',
+ 'Stress':'Psyche Stress: psychické zatížení postavy.',
+ 'Wounds':'Počet aktuálně evidovaných ran postavy.',
+ 'Psyche':'Psychická stavová veličina používaná v příslušných pravidlech strachu či Morality.',
+ 'Morality':'Morality (MOR): morální charakteristika dle HMK str. 39; samostatná od Grace.',
+ 'Fate':'Fate Points: pravidlové body osudu postavy dle příslušných situací.',
+ 'Doctrine':'Náboženské doktríny či závazky relevantní pro vyznání postavy.',
+ 'Blessing':'Evidované požehnání, má jen účinky dané svou pravidlovou procedurou.',
+ 'Shock State':'Aktuální stav zasažení a jeho možné dlouhodobé následky.',
+ 'Impact':'Účinek zásahu před odečtením zbroje; po redukci se odvozují zranění.',
+ 'PF':'Personal Fatigue: osobní únava podle příslušné činnosti a času.',
+ 'END SR (TN)':'Endurance Secondary Roll: pomocný d10 proti Target Number.',
+ 'Current':'Aktuální evidovaná hodnota daného stavu.',
+ 'Recorded Hits':'Počet potvrzených zásahových událostí v historii.',
+ 'Extended HR':'Healing Rate dlouhodobého šoku, pokud je evidován.',
+ 'Coma HR':'Healing Rate stavu Coma, je-li doložen.',
+ 'Weary':'Stupeň únavy Weary.',
+ 'Winded':'Stupeň únavy Winded.',
+ 'Weak':'Stupeň únavy Weak.',
+ 'Total':'Celkový součet relevantních složek.',
+ 'Aural Shock':'Psychický nebo magický šok spojený s Aura; podle daného pravidla.',
+ 'Shadow':'Evidovaný magický či duchovní stav Shadow podle příslušné schopnosti.',
+ 'Native Language':'Rodný jazyk postavy; jeho příslušné ML lze použít při jazykovém testu.',
+ 'Family':'Rodina či domácnost postavy, od níž se odvíjí některé dovednosti.',
+ 'Occupation':'Povolání postavy, ovlivňuje Skills a některé výchozí prostředky.',
+ 'Home':'Domovské místo postavy.',
+ 'Realm':'Království nebo oblast původu postavy.',
+ 'Settlement':'Konkrétní sídlo.',
+ 'Society':'Typ společnosti původu a její sociální struktura.',
+ 'Languages':'Jazyky ovládané postavou; příslušné Skill ML určuje skutečnou zběhlost.',
+ 'Pantheon':'Náboženská soustava postavy.',
+ 'Region':'Původní region, který určuje dostupnost některých voleb (HMK str. 24).',
+ 'Grace':'Grace, zvláštní náboženská hodnota podle HMK str. 40.',
+ 'Armour':'Hodnota zbroje nebo zatížení zbrojí podle kontextu sekce; AV pro lokaci a aspekt, ENC pro zatížení.',
+ 'SHK':'Location Shock: pevná hodnota zasažené lokace vstupující do Shock Sequence (HMK str. 169).',
+
  Strength:'HMK str. 38: STR je fyzická síla. Používá se také pro výšku a váhu podle Appendix III (původní STR před modifikátorem Folk).',
  Endurance:'HMK str. 38: END vyjadřuje tělesnou odolnost a schopnost snášet zátěž.',
  Dexterity:'HMK str. 38: DEX je přesnost a jemná motorika.',
@@ -859,22 +949,134 @@ const JOURNAL_HELP=Object.freeze({
  'SHK':'HMK str. 169: Location Shock dané anatomické lokace.',
  'AV':'HMK ochrana zbroje: Armour Value proti aspektům b/e/p/f.',
 });
-function journalHelp(label){const text=JOURNAL_HELP[label];return text?` title="${esc(text)}" data-hmk-help="${esc(text)}" tabindex="0" aria-label="${esc(label+': '+text)}" class="hmk-journal-glossary"`:'';}
-function journalSectionTable(title,rows,klass='',editing=false){return `<section class="journal-book-section ${klass}"><div class="journal-book-title">${esc(title)}</div><div class="journal-book-table">${rows.map(([label,value])=>`<div><dt${journalHelp(label)}>${esc(label)}</dt><dd>${editing&&label==='Coins'&&Number.isSafeInteger(value)?`<input class="journal-coins-input" type="number" name="sheet_coin_current" aria-label="Aktuální mince" min="0" max="999999999" step="1" value="${value}">`:esc(firstPresent(value,'—'))}</dd></div>`).join('')}</div></section>`;}
-function journalStatBoxes(title,rows,editing=false){return `<section class="journal-book-section journal-box-cluster"><div class="journal-book-title">${esc(title)}</div><div class="journal-stat-boxes">${rows.map(([label,value,key])=>`<div class="journal-stat-box"><span${journalHelp(label)}>${esc(({Strength:'STR',Endurance:'END',Dexterity:'DEX',Agility:'AGL',Perception:'PER',Comeliness:'CML',Aura:'AUR',Will:'WIL',Reasoning:'REA',Creativity:'CRE',Empathy:'EMP',Eloquence:'ELO',Grace:'GRA',Piety:'PTY'})[label]||label)}</span>${editing&&key?`<input type="number" name="sheet_attr_${esc(key)}" aria-label="${esc(label)}" class="journal-stat-input" min="0" max="99" step="1" required value="${Number.isSafeInteger(value)?value:''}">`:`<strong>${esc(firstPresent(value,'—'))}</strong>`}</div>`).join('')}</div></section>`;}
+const JOURNAL_GROUP_HELP=Object.freeze({
+ 'Social':'Sociální dovednosti: jednání s lidmi, řeč, přesvědčování a sociální interakce (HMK str. 63).',
+ 'Lore':'Znalosti: technika, historie, lékařství a kultura světa Kèthîra; některé vyžadují výcvik (HMK str. 63).',
+ 'Physical':'Fyzické dovednosti: pohyb, koordinace, tělesné výkony a smysly (HMK str. 63).',
+ 'Nature':'Dovednosti přírody: práce v krajině, s přírodními zdroji a zvířaty (HMK str. 63).',
+ 'Craft':'Řemeslné dovednosti: výroba, opravy a odborné zacházení s materiály; při delší práci se používají Success Value testy (HMK str. 61, 63).',
+ 'Combat':'Bojové dovednosti: účinné jednání v boji, útok, obrana a iniciativa (HMK str. 63, 157–170).',
+ 'Esoterica':'Esoterické dovednosti: magické, duchovní a okultní postupy; příslušné testy mají vlastní pravidla (HMK str. 63 a kapitola The Mysteries).',
+ 'Communication':'Komunikace: jazykové a sociální činnosti; test určuje porozumění či účinnost komunikace.',
+ 'Ritual':'Rituály a víra: náboženské obřady a náboženské znalosti; postup závisí na daném náboženství.',
+ 'Ritual & Faith':'Rituály a víra: náboženské obřady a náboženské znalosti; postup závisí na daném náboženství.',
+ 'Arcane':'Arcane: magické znalosti a postupy, podle příslušných pravidel magie.',
+ 'Magic':'Magie: kouzelnické obory a jejich ověřené testy.',
+ 'Psionics':'Psionics: mentální či nadpřirozené schopnosti podle pravidel příslušné schopnosti.',
+ 'Other':'Ostatní evidované dovednosti, které nespadají do běžných skupin.',
+});
+const JOURNAL_SKILL_HELP=Object.freeze({
+ 'Brewing':'Výroba nápojů, kvašení a vaření nápojů; test ověřuje úspěšnost postupu nebo kvalitu výsledku.',
+ 'Cookery':'Příprava pokrmů; test řeší úspěšnost či kvalitu kuchařské činnosti.',
+ 'Embalming':'Konzervování a příprava mrtvých těl; test při odborné práci.',
+ 'Engineering':'Navrhování a posuzování staveb a technických zařízení; test při technickém problému.',
+ 'Folklore':'Znalost místních tradic, pověstí, zvyků a ústních příběhů; test při jejich rozpoznání.',
+ 'Heraldry':'Znalost erbů, rodů a heraldických symbolů; test při identifikaci.',
+ 'Law':'Znalost právních zvyklostí a pravidel společnosti; test při výkladu práva.',
+ 'Mathematics':'Počty a matematické uvažování; test při odborných výpočtech.',
+ 'Mercantilism':'Obchodní znalosti a oceňování zboží; test při obchodním posouzení.',
+ 'Perfumery':'Příprava a hodnocení vůní a vonných směsí; test při řemeslné práci.',
+ 'Physician':'Diagnostika, léčba a ošetřování; konkrétní lékařské testy stanovují pravidla léčby.',
+ 'Ritual':'Znalost a vykonávání náboženských obřadů; při rituálních testech se použijí pravidla dané víry.',
+ 'Script':'Čtení a psaní určitým písmem; test v případě nejistého porozumění či zápisu.',
+ 'Shipwright':'Stavba, údržba a posuzování lodí; test při námořním řemesle.',
+ 'Charm':'Získávání sympatií a přátelského přijetí; sociální Success Test podle situace.',
+ 'Command':'Vedení, povely a udržení disciplíny; mj. Rally Roll v boji (HMK str. 62).',
+ 'Discourse':'Rozhovor, argumentace a vysvětlování; test při náročném slovním jednání.',
+ 'Guile':'Klamání, lest a zastírání úmyslu; test proti vnímání či posouzení protivníka.',
+ 'Intrigue':'Politické a společenské zákulisí, získávání informací a manipulace; test podle situace.',
+ 'Language':'Znalost konkrétního jazyka; příslušný ML vyjadřuje zběhlost v tomto jazyce.',
+ 'Singing':'Zpěv a hlasový projev; test při hudebním výkonu.',
+ 'Theatrics':'Herectví a dramatické vystupování; test při představení nebo hrané roli.',
+ 'Agriculture':'Pěstování plodin a zemědělské práce; test může sloužit i k předpovědi počasí (HMK str. 64).',
+ 'Animalcraft':'Zacházení se zvířaty a jejich vedení či výcvik; test podle konkrétní činnosti.',
+ 'Fishing':'Rybolov a související znalosti vod a ryb; test při lovu.',
+ 'Herblore':'Poznávání a použití bylin; test při vyhledání a správném určení.',
+ 'Mineralogy':'Znalost minerálů, rud a hornin; test při rozpoznávání a posuzování.',
+ 'Piloting':'Vedení plavidla a navigace; test při obtížné plavbě.',
+ 'Seamanship':'Námořnické dovednosti, práce na lodi a její provoz; test v plavebních situacích.',
+ 'Survival':'Přežití mimo osídlení, hledání zdrojů a zvládání pobytu v přírodě; test dle prostředí.',
+ 'Timbercraft':'Znalost lesních zdrojů a práce se dřevem v přírodě; test při jejich získávání.',
+ 'Tracking':'Sledování stop osob a zvířat; test při hledání a vyhodnocování stop.',
+ 'Acrobatics':'Akrobatické manévry a rovnováha; test při obtížném pohybu, pádu či předvádění (HMK str. 64).',
+ 'Awareness':'Všímavost, zpozorování skrytého podnětu nebo hrozby; často proti Stealth.',
+ 'Climbing':'Lezení a šplhání; test při zdolávání obtížného povrchu a nebezpečí pádu.',
+ 'Dancing':'Tanec a taneční vystoupení; test pro provedení či kvalitu výkonu.',
+ 'Jumping':'Skoky přes překážky a mezery; test při obtížném skoku.',
+ 'Legerdemain':'Obratnost rukou, drobné triky a manipulace s předměty; test při nenápadné činnosti.',
+ 'Riding':'Ovládání jízdního zvířete při pohybu a náročných manévrech.',
+ 'Stealth':'Tichý a skrytý pohyb; typicky protitest Awareness (HMK str. 61).',
+ 'Swimming':'Plavání a zvládání vody; test při náročném plaveckém výkonu.',
+ 'Archery':'Střelba lukem; příslušný útok nebo Skill Check proti EML.',
+ 'Initiative':'Reakce a pohotovost v boji, pořadí a související bojové testy.',
+ 'Melee':'Boj zblízka; útočné a obranné testy podle použité zbraně.',
+ 'Slings':'Používání praku; test pro střelbu a další situace s touto zbraní.',
+ 'Throwing':'Hody zbraněmi nebo předměty; test při vrhu na cíl.',
+ 'Ceramics':'Výroba keramiky a práce s hlínou; test úspěšnosti výroby.',
+ 'Drawing':'Kreslení, skicování a dokumentační výtvarná práce; test kvality díla.',
+ 'Fletching':'Výroba šípů a jejich částí; test při výrobě střeliva.',
+ 'Glassworking':'Zpracování skla; test při řemeslné výrobě.',
+ 'Hideworking':'Zpracování kožešin, kůží a usní; test při výrobě.',
+ 'Jewelcraft':'Výroba a oprava šperků a drobných ozdob; test řemesla.',
+ 'Lockcraft':'Výroba či manipulace se zámky a jejich mechanismy; test podle úkolu.',
+ 'Masonry':'Kamenická práce a zdění; test řemeslného postupu.',
+ 'Metalcraft':'Kovářské a kovodělné práce; test při opracování kovu.',
+ 'Milling':'Mletí obilí a provoz mlýnských zařízení; test při řemeslné práci.',
+ 'Musician':'Hra na hudební nástroje; test při hudebním výkonu.',
+ 'Textilecraft':'Výroba a zpracování textilií; test řemesla.',
+ 'Weaponcraft':'Výroba a údržba zbraní; pravidla mohou vyžadovat Success Value test (HMK str. 61).',
+ 'Woodworking':'Truhlářská a dřevozpracující práce; test při výrobě.',
+ 'Alchemy':'Výzkum, příprava a proměna bylinných a minerálních látek v elixíry (HMK str. 64, 265).',
+ 'Astrology':'Výklad nebeských jevů a jejich esoterických souvislostí; test dle pravidel této disciplíny.',
+ 'Pvârism':'Znalost Pvârické magie a jejích principů; použití závisí na magickém kontextu.',
+ 'Runecraft':'Znalost a použití run v esoterických postupech; test podle daného pravidla.',
+ 'Summoning':'Povolávání nadpřirozených bytostí; nejedná se o běžný řemeslný test.',
+ 'Talent':'Arcane Talent; nadání určené při tvorbě, používá se podle příslušných magických pravidel.',
+ 'Spirit':'Vnímání a jednání s duchovním světem; testy podle pravidel Spirits.',
+ 'Tarotry':'Výklad tarotových znamení; test při esoterické interpretaci.',
+ 'Trance':'Uvedení sebe sama do transu; test při příslušném duchovním postupu.',
+ 'Dodge':'Úhyb před útokem; bojový obranný test.',
+ 'Shock':'Dovednost související s odolností vůči následkům zásahu; použití dle Shock pravidel.',
+ 'Unarmed':'Boj beze zbraně; útok a obrana bez držené zbraně.',
+});
+const JOURNAL_NUMERIC_HELP=Object.freeze({
+ ML:'Mastery Level (ML): aktuální stupeň ovládání dovednosti. Při Skill Checku se proti Effective Mastery Level (EML) provádí d100; EML může být upraveno okolnostmi (HMK str. 46, 60–62).',
+ SB:'Skill Base (SB): základ odvozený z primárního a sekundárního atributu; slouží k výpočtu počátečního ML i limitů rozvoje (HMK str. 46).',
+ SM:'Skill Multiple (SM): násobitel Skill Base. Počáteční ML = SB × SM; Development Points zvyšují SM (HMK str. 46).',
+ DP:'Development Points (DP): body rozvoje přidělované ve fázích tvorby; zvyšují SM dovednosti (HMK str. 46–49).',
+ EML:'Effective Mastery Level (EML): modifikovaná cílová hodnota d100 Success Testu; počítá se z ML a pravidlových modifikátorů (HMK str. 60–62).',
+});
+function journalHelp(label,override=null){
+ const text=override||JOURNAL_HELP[label]||JOURNAL_SKILL_HELP[label]||JOURNAL_GROUP_HELP[label]||JOURNAL_NUMERIC_HELP[label];
+ return text?` data-hmk-help="${esc(text)}" tabindex="0" aria-label="${esc(label+': '+text)}"`:'';
+}
+function journalHelpData(label,override=null){
+ const text=override||JOURNAL_HELP[label]||JOURNAL_SKILL_HELP[label]||JOURNAL_GROUP_HELP[label]||JOURNAL_NUMERIC_HELP[label];
+ return text?` data-hmk-help="${esc(text)}"`:'';
+}
+function journalTerm(label,explanation=null){return `<span${journalHelp(label,explanation)}>${esc(label)}</span>`;}
+function journalRuleTitle(title){return `<div class="journal-book-title">${journalTerm(title)}</div>`;}
+function journalSectionTable(title,rows,klass='',editing=false){return `<section class="journal-book-section ${klass}">${journalRuleTitle(title)}<div class="journal-book-table">${rows.map(([label,value])=>`<div><dt>${journalTerm(label)}</dt><dd>${editing&&label==='Coins'&&Number.isSafeInteger(value)?`<input class="journal-coins-input" type="number" name="sheet_coin_current" aria-label="Aktuální mince" min="0" max="999999999" step="1" value="${value}">`:`<span${journalHelp(label)}>${esc(firstPresent(value,'—'))}</span>`}</dd></div>`).join('')}</div></section>`;}
+function journalStatBoxes(title,rows,editing=false){return `<section class="journal-book-section journal-box-cluster">${journalRuleTitle(title)}<div class="journal-stat-boxes">${rows.map(([label,value,key])=>`<div class="journal-stat-box"><span${journalHelp(label)}>${esc(label)}</span>${editing&&key?`<input type="number" name="sheet_attr_${esc(key)}" aria-label="${esc(label)}" class="journal-stat-input" min="0" max="99" step="1" required value="${Number.isSafeInteger(value)?value:''}">`:`<strong${journalHelp(label)}>${esc(firstPresent(value,'—'))}</strong>`}</div>`).join('')}</div></section>`;}
 function journalSkillColumnsHTML(c){
  const groups=groupedSheetSkills(c);
  const order=['Social','Lore','Physical','Nature','Craft','Combat','Esoterica','Communication','Ritual','Magic','Psionics','Other'];
  const present=[...order.filter(k=>groups.has(k)), ...[...groups.keys()].filter(k=>!order.includes(k))];
  const titles={Communication:'Social',Lore:'Lore',Social:'Social',Nature:'Nature',Physical:'Physical',Craft:'Craft',Combat:'Combat',Ritual:'Ritual & Faith',Magic:'Arcane',Esoterica:'Esoterica',Psionics:'Psionics',Other:'Other'};
  const sunsign=c.hmk?.creation?.values?.sunsignProof?.modifiers||[];
- return `<section class="journal-book-section journal-book-section--skills"><div class="journal-book-title">Skills <span class="journal-book-hint">ML a atributy SB · úpravy přes Edit</span></div><div class="journal-book-skills">${present.map(key=>{
+ return `<section class="journal-book-section journal-book-section--skills">${journalRuleTitle('Skills')} <span class="journal-book-hint">${journalTerm('ML')} a atributy ${journalTerm('SB')} · úpravy přes Edit</span><div class="journal-book-skills">${present.map(key=>{
   const rows=groups.get(key)||[];
   const modifier=sunsign.find(x=>x.group===key)?.value;
-  const groupMark=Number.isFinite(modifier)?` <small class="journal-group-mod">[${signedNumber(modifier)}]</small>`:'';
-  return `<section class="journal-skill-family"><h4>${esc(titles[key]||key)}${groupMark}</h4><ul>${rows.filter(row=>row.ml!==null||row.totalDP>0||row.subskillOf).map(row=>{
+  const modInfo='Sunsign Modifier skupiny '+(titles[key]||key)+': '+signedNumber(modifier)+'. Tato hodnota se používá ve vybraných esoterických testech, například Fate Rolls; NENÍ to přímý bonus k běžnému Skill Checku ani počet dovedností (HMK str. 22).';
+  const groupMark=Number.isFinite(modifier)?` <small class="journal-group-mod"${journalHelp('Sunsign Modifier',modInfo)}>[${signedNumber(modifier)}]</small>`:'';
+  return `<section class="journal-skill-family"><h4>${journalTerm(titles[key]||key,JOURNAL_GROUP_HELP[key]||JOURNAL_GROUP_HELP[titles[key]])}${groupMark}</h4><ul>${rows.filter(row=>row.ml!==null||row.totalDP>0||row.subskillOf).map(row=>{
    const basis=row.primary&&row.secondary?`${row.primary.toUpperCase()} ${row.primaryValue??'?'} + ${row.secondary.toUpperCase()} ${row.secondaryValue??'?'}`:row.perceptionParent?'Sdílené SM':'SB neověřen';
-   return `<li title="${esc('Skill Base: '+basis+'; SB '+(row.sb??'—')+', SM '+(row.sm??'—'))}"><span class="journal-skill-name">${esc(row.name)}<small class="journal-skill-basis">${esc(basis)}</small></span><strong>${esc(row.ml??'—')}</strong></li>`;
+   const skillName=String(row.name);
+   const baseName=skillName.replace(/\s*\(.*?\).*$/,'').replace(/^(2nd|3rd)\s+/,'');
+   const specific=JOURNAL_SKILL_HELP[skillName]||JOURNAL_SKILL_HELP[baseName]||JOURNAL_SKILL_HELP[baseName.split(' ')[0]];
+   const meaning=(specific||'Samostatně evidovaná specializace dovednosti. Podrobné použití vyžaduje příslušný pravidlový popis.')+' Při Skill Checku se provádí d100 proti EML odvozenému z ML a okolností (HMK str. 60–62).';
+   const basisHelp='Skill Base a atributy: '+basis+'. SB vychází z hlavního a vedlejšího atributu. Základní ML = SB × SM; DP zvyšují SM (HMK str. 46).';
+   return `<li><span class="journal-skill-name"><span${journalHelp(skillName,meaning)}>${esc(skillName)}</span><small class="journal-skill-basis"${journalHelp('SB',basisHelp)}>${esc(basis)}</small></span><strong${journalHelp('ML',JOURNAL_NUMERIC_HELP.ML+' Pro '+skillName+' je aktuální ML '+(row.ml??'neurčeno')+'.')}>${esc(row.ml??'—')}</strong></li>`;
   }).join('')}</ul></section>`;
  }).join('')}</div></section>`;
 }
@@ -884,7 +1086,7 @@ function inventoryRowsForJournal(inv,kind){
  if(kind==='possessions')return source.filter(r=>!['worn','main_hand','off_hand'].includes(r.item.slot)).map(r=>[r.item.snapshot?.name||'—',r.qty??1,r.weight===null?'—':r.weight.toFixed(1),/^Počáteční výbava(?: \(automatický návrh\))?$/i.test(String(r.item.condition||'').trim())?'':(r.item.condition||'')]);
  return [];
 }
-function journalInventoryTable(title,headers,rows,klass=''){return `<section class="journal-book-section ${klass}"><div class="journal-book-title">${esc(title)}</div><div class="journal-ledger-wrap"><table class="journal-ledger"><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map(cell=>`<td>${esc(firstPresent(cell,'—'))}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}" class="muted">Bez evidovaných údajů.</td></tr>`}</tbody></table></div></section>`;}
+function journalInventoryTable(title,headers,rows,klass=''){return `<section class="journal-book-section ${klass}">${journalRuleTitle(title)}<div class="journal-ledger-wrap"><table class="journal-ledger"><thead><tr>${headers.map(h=>`<th>${journalTerm(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(r=>`<tr>${r.map((cell,i)=>`<td><span${journalHelp(headers[i])}>${esc(firstPresent(cell,'—'))}</span></td>`).join('')}</tr>`).join(''):`<tr><td colspan="${headers.length}" class="muted">Bez evidovaných údajů.</td></tr>`}</tbody></table></div></section>`;}
 function journalWeaponRows(inv,mode){
  const items=inv.filter(x=>(x.snapshot?.category==='weapon'||x.snapshot?.category==='shield')&&['main_hand','off_hand','carried','none'].includes(x.slot));
  const isMissile=item=>{const p=item.snapshot?.properties||{};const missileType=p.missileType??p.verifiedModes?.[0]?.missileType;return ['bow','crossbow','sling','thrown'].includes(missileType)||Number.isFinite(p.baseRangeFt);};
@@ -955,10 +1157,10 @@ function journalBodyLocationsHTML(c){
   // selects a different severity/aspect bleeding threshold (p168).
   const bleedShade=symbols?.bleeds===3?'black':symbols?.bleeds===1?'grey':'white';
   const bleedRule={white:'S3/G4: žádný; G5: Edge, Point nebo Blunt',grey:'S3: žádný; G4: Edge nebo Point; G5: Edge, Point nebo Blunt',black:'S3: Edge; G4: Edge nebo Point; G5: Edge, Point nebo Blunt'}[bleedShade];
-  const circle=`<span class="hmk-bleed-circle hmk-shade-${bleedShade}" tabindex="0" role="img" aria-label="Krvácení: ${bleedShade}; ${bleedRule}" title="HMK s.167–168 · Potenciální krvácení (${bleedShade}). ${bleedRule}. Samotná značka neříká, že rána už krvácí."></span>`;
+  const circle=`<span class="hmk-bleed-circle hmk-shade-${bleedShade}" tabindex="0" role="img" aria-label="Krvácení: ${bleedShade}; ${bleedRule}" ${journalHelpData('●',`HMK str. 167–168: potenciál krvácení (${bleedShade}). ${bleedRule}. Značka neznamená, že rána již krvácí.`)}></span>`;
   const triangleShade=symbols?.triangle===20?'white':symbols?.triangle===0?'grey':symbols?.triangle===-20?'black':null;
   const triangleFill={white:'#fffdf7',grey:'#9ba0a5',black:'#1c1e23'}[triangleShade];
-  const triangle=triangleShade?`<svg class="hmk-amputation-triangle" tabindex="0" role="img" aria-label="Amputace: ${triangleShade}, Strength ${symbols.triangle>=0?'+':''}${symbols.triangle}" title="HMK s.168: možnost amputace jen při G5 edge. Strength modifier ${symbols.triangle>=0?'+':''}${symbols.triangle}." viewBox="0 0 16 16"><title>HMK s.168: amputace G5 Edge; Strength modifikátor ${symbols.triangle>=0?'+':''}${symbols.triangle}.</title><path d="M2 3 H14 L8 14 Z" fill="${triangleFill}" stroke="#38302a" stroke-width="1.5"/></svg>`:'<span class="hmk-symbol-none">·</span>';
+  const triangle=triangleShade?`<svg class="hmk-amputation-triangle" tabindex="0" role="img" aria-label="Amputace: ${triangleShade}, Strength ${symbols.triangle>=0?'+':''}${symbols.triangle}" ${journalHelpData('▽',`HMK str. 168: amputace pouze při G5 Edge; Strength Modifier ${symbols.triangle>=0?'+':''}${symbols.triangle}.`)} viewBox="0 0 16 16"><title>HMK s.168: amputace G5 Edge; Strength modifikátor ${symbols.triangle>=0?'+':''}${symbols.triangle}.</title><path d="M2 3 H14 L8 14 Z" fill="${triangleFill}" stroke="#38302a" stroke-width="1.5"/></svg>`:'<span class="hmk-symbol-none">·</span>';
   const injuryText=associated.map(w=>[w.severity??w.injuryLevel??w.injury??w.kind??'Injury',w.description].filter(Boolean).join(': ')).join('; ');
   const materials=worn.filter(x=>x.snapshot?.properties?.coveredLocations?.includes(code)).map(x=>String(x.snapshot.properties.material||'').toLowerCase());
   const metal=materials.some(m=>['p','plate'].includes(m))?'black':materials.some(m=>['m','mail','s','scale'].includes(m))?'grey':null;
@@ -967,12 +1169,12 @@ function journalBodyLocationsHTML(c){
    const rText=rigid?` · Rigid armour: snižuje závažnost edge/point glancing; ${metal==='black'?'Plate (černý box)':metal==='grey'?'Mail/Scale (šedý box)':'jiný rigid materiál (bílý box)'}`:'';
    const tip=`${code.toUpperCase()} · ${k.toUpperCase()} AV ${values?values[k]:'neověřena'}${rText}${result?.provisional?' · materiálově odvozeno; GM musí potvrdit':''}`;
    const number=values?esc(values[k]):'?';
-   return `<td class="journal-av${result?.provisional?' journal-av-derived':''}"><span tabindex="0" title="${esc(tip)}" class="journal-av-value${rigid?' journal-av-rigid journal-av-rigid-'+shade:''}">${number}</span></td>`;
+   return `<td class="journal-av${result?.provisional?' journal-av-derived':''}"><span tabindex="0" ${journalHelpData('AV',tip)} class="journal-av-value${rigid?' journal-av-rigid journal-av-rigid-'+shade:''}">${number}</span></td>`;
   };
-  return `<tr><th scope="row">${esc(code.toUpperCase())}</th><td class="journal-location-name" title="${esc(name)}">${esc(name)}</td>${['b','e','p','f'].map(avcell).join('')}<td class="journal-symbol-cell">${circle}</td><td class="journal-shk"><span class="hmk-location-shk" title="HMK s.169: Location Shock ${shock}, ke kterému se přičítá Injury Level a výsledek Shock Roll.">${shock}</span></td><td class="journal-symbol-cell">${triangle}</td><td class="journal-injuries">${associated.length?`<span title="${esc(injuryText)}">${esc(associated.map(w=>w.severity&&w.level?w.severity+w.level:(w.injury??w.injuryLevel??'✚')).join(' · '))}</span>`:'—'}</td></tr>`;
+  return `<tr><th scope="row">${esc(code.toUpperCase())}</th><td class="journal-location-name">${journalTerm(name,`Anatomická lokace ${name} (${code.toUpperCase()}). Při zásahu se zde uplatní lokalizovaná zbroj, zranění a Location Shock ${shock} (HMK str. 167–169).`)}</td>${['b','e','p','f'].map(avcell).join('')}<td class="journal-symbol-cell">${circle}</td><td class="journal-shk"><span class="hmk-location-shk" ${journalHelpData('SHK',`Location Shock ${shock} pro ${name} (HMK str. 169). Ve Shock Sequence se sčítá s dalšími stanovenými složkami.`)}>${shock}</span></td><td class="journal-symbol-cell">${triangle}</td><td class="journal-injuries">${associated.length?`<span title="${esc(injuryText)}">${esc(associated.map(w=>w.severity&&w.level?w.severity+w.level:(w.injury??w.injuryLevel??'✚')).join(' · '))}</span>`:'—'}</td></tr>`;
  }).join('');
  const unknown=wounds.filter(w=>{const loc=String(w.location??w.loc??'').trim().toLowerCase();return !codes.some(({code,name})=>loc===code||loc===name.toLowerCase());});
- return `<section class="journal-book-section journal-body-locations"><div class="journal-book-title">Body Locations · Armour / Injuries</div><div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><colgroup><col class="journal-col-code"><col class="journal-col-name">${['b','e','p','f'].map(()=>'<col class="journal-col-av">').join('')}<col class="journal-col-bleed"><col class="journal-col-shk"><col class="journal-col-amp"><col class="journal-col-injuries"></colgroup><thead><tr><th>LOC</th><th>Location</th>${['b','e','p','f'].map(k=>`<th class="journal-av">${k}</th>`).join('')}<th class="journal-symbol-cell" title="Potenciální krvácení (HMK p.167–168)">●</th><th class="journal-shk">SHK</th><th class="journal-symbol-cell" title="Možnost amputace při G5 Edge (HMK p.168)">▽</th><th>Injuries</th></tr></thead><tbody>${rows}</tbody></table></div><p class="journal-anatomy-note">HMK s.111, 133, 167–169: AV v rámečku = Rigid (E/P Glancing Blow). Šedá / černá výplň značí volitelné pravidlo Metal Armour (Scale/Mail / Plate). ● = možné krvácení dle severity a aspektu zásahu; ▽ = možné amputace při G5 edge. Najetím / fokusem zobrazíš vysvětlení. SHK v tmavém poli = Location Shock. AV s tečkovaným podtržením vyžaduje potvrzení GM. Nepřiřazené rány: ${unknown.length}.</p>${unknown.length?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>${unknown.map(w=>`<div>${esc([w.location??w.loc??'—',w.severity??w.injuryLevel??w.description??''].filter(Boolean).join(' · '))}</div>`).join('')}</details>`:''}</section>`;
+ return `<section class="journal-book-section journal-body-locations">${journalRuleTitle('Body Locations · Armour / Injuries')}<div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><colgroup><col class="journal-col-code"><col class="journal-col-name">${['b','e','p','f'].map(()=>'<col class="journal-col-av">').join('')}<col class="journal-col-bleed"><col class="journal-col-shk"><col class="journal-col-amp"><col class="journal-col-injuries"></colgroup><thead><tr><th>${journalTerm('LOC')}</th><th>${journalTerm('Location')}</th>${['b','e','p','f'].map(k=>`<th class="journal-av">${journalTerm(k)}</th>`).join('')}<th class="journal-symbol-cell">${journalTerm('●')}</th><th class="journal-shk">${journalTerm('SHK')}</th><th class="journal-symbol-cell">${journalTerm('▽')}</th><th>${journalTerm('Injuries')}</th></tr></thead><tbody>${rows}</tbody></table></div><p class="journal-anatomy-note">HMK s.111, 133, 167–169: AV v rámečku = Rigid (E/P Glancing Blow). Šedá / černá výplň značí volitelné pravidlo Metal Armour (Scale/Mail / Plate). ● = možné krvácení dle severity a aspektu zásahu; ▽ = možné amputace při G5 edge. Najetím / fokusem zobrazíš vysvětlení. SHK v tmavém poli = Location Shock. Předběžně odvozené hodnoty AV vyžadují potvrzení GM. Nepřiřazené rány: ${unknown.length}.</p>${unknown.length?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>${unknown.map(w=>`<div>${esc([w.location??w.loc??'—',w.severity??w.injuryLevel??w.description??''].filter(Boolean).join(' · '))}</div>`).join('')}</details>`:''}</section>`;
 }
 function journalConvocationsHTML(c){
  const arc=c.hmk?.arcane||{},primary=arc.primaryConvocation??c.hmk?.creation?.values?.pvarPrimary??null;
@@ -998,10 +1200,10 @@ function journalConditionDetailsHTML(c,state,load){
  const auraShock=Number.isFinite(h.arcane?.auraShock)?h.arcane.auraShock:'—';
  const endSR=Number.isFinite(h.attributes?.end)?Math.floor(h.attributes.end/2):'—';
  const pf=Number.isFinite(load.personalFatiguePerPeriod)?load.personalFatiguePerPeriod:'—';
- const block=(title,items,cl='')=>`<section class="journal-book-section ${cl}"><div class="journal-book-title">${title}</div><div class="journal-mini-stats">${items.map(([a,b])=>`<div><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`).join('')}</div></section>`;
+ const block=(title,items,cl='')=>`<section class="journal-book-section ${cl}">${journalRuleTitle(title)}<div class="journal-mini-stats">${items.map(([a,b])=>`<div><span>${journalTerm(a)}</span><strong${journalHelp(a)}>${esc(b)}</strong></div>`).join('')}</div></section>`;
  return `<div class="journal-condition-detail-grid">${block('Impact',[['Poslední Impact',impactValue],['Recorded Hits',(state.events||[]).filter(x=>x.type==='confirmed-hit').length]])}${block('Shock State',[['Current',shock],['Extended HR',state.extendedShock?.hr??'—'],['Coma HR',state.coma?.hr??'—']],'journal-shock-state')}${block('Stress',[['Psyche',stress],['Aural Shock',auraShock],['Shadow',shadow]])}${block('Fatigue',[['Winded',fat.windedness],['Weary',fat.weariness],['Weak',fat.weakness],['Total',fat.total],['PF',pf],['END SR (TN)',endSR]])}</div>`;
 }
-function journalSimpleChecklist(title,rows){return `<section class="journal-book-section"><div class="journal-book-title">${esc(title)}</div><div class="journal-check-grid">${rows.map(([label,value])=>`<label><span class="journal-check"></span><em>${esc(label)}</em><strong>${esc(firstPresent(value,'—'))}</strong></label>`).join('')}</div></section>`;}
+function journalSimpleChecklist(title,rows){return `<section class="journal-book-section">${journalRuleTitle(title)}<div class="journal-check-grid">${rows.map(([label,value])=>`<label><span class="journal-check"></span><em>${journalTerm(label)}</em><strong${journalHelp(label)}>${esc(firstPresent(value,'—'))}</strong></label>`).join('')}</div></section>`;}
 function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['notes','Notes & Logbook'],['hazards','Nebezpečí / Trauma']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}<span class="journal-character-action-divider" aria-hidden="true"></span><button type="button" class="secondary journal-character-action" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="secondary journal-character-action" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`;}
 /** A page contains live DOM controls; the book decoration is the same for all folios.
  * Character-only navigation never belongs to World, Combat, Skills or Library.
@@ -1186,16 +1388,6 @@ function creationBookView(){
  if(!c)return journalChapterShell('Pravidlová tvorba postavy','Průvodce je navázán na konkrétní postavu v registru.',`<div class="empty">Nejprve v registru otevřete nebo založte konkrétní postavu. Poté bude dostupná kompletní 14kroková pravidlová tvorba HMK 1:1.</div>`,'journal-book--creation');
  return journalChapterShell('Pravidlová tvorba postavy',`${c.name} · 14 kroků podle HMK v1.2`,creationWizardView(),'journal-book--creation');
 }
-function appearanceDetailsHTML(c){
- const p=c?.hmk?.appearanceProof;if(!p?.values||!Object.keys(p.values).length)return '';
- const labels={complexion:'Complexion',hair:'Hair',eyes:'Eyes',handedness:'Handedness',height:'Height',weight:'Weight'};
- const keyMap={complexion:['complexionD100'],hair:['hairD100'],eyes:['eyesD100'],handedness:['handD100'],height:['buildD100'],weight:['weightD6','weightD6_1','weightD6_2','weightD6_3']};
- const rows=Object.entries(labels).filter(([key])=>p.values[key]).map(([key,label])=>{
-  const die=(keyMap[key]||[]).filter(k=>p.rolls?.[k]!==undefined).map(k=>k+': '+(Array.isArray(p.rolls[k])?p.rolls[k].join(', '):p.rolls[k])).join(' · ');
-  return `<div><dt>${esc(label)}</dt><dd>${esc(p.values[key])}${die?`<small>${esc(die)}</small>`:''}<small>${esc(p.methods?.[key]||'uloženo')}</small></dd></div>`;
- }).join('');
- return `<details class="hmk-appearance-proof"><summary>Appearance · tabulkové volby a uložené hody (Appendix III)</summary><dl>${rows}</dl>${(p.warnings||[]).map(w=>`<p class="tiny muted">${esc(w)}</p>`).join('')}</details>`;
-}
 function characterJournalHero(c,inv,editing=false){
  const h=c.hmk||{},creation=h.creation?.values||{},state=persistentStateOf(c),attrs=h.attributes||{};
  const bio=(key,...fallbacks)=>firstPresent(h[key],...fallbacks,creation[key],'—');
@@ -1222,7 +1414,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.unconscious?'Yes':'No'],['Death Save',state.death?'Pending':'—']];
  const conditionRows=[['Poisoned',state.poisoned?'Yes':'No'],['Diseased',state.diseased?'Yes':'No'],['Cursed',state.cursed?'Yes':'No'],['Winded',state.winded?'Yes':'No'],['Weary',state.weary?'Yes':'No'],['Fatigued',combatFatigueTotals(state).total]];
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div><h3>${esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}${appearanceDetailsHTML(c)}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalStatBoxes('Grace & Piety',gracePiety)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],meleeRows)}${journalInventoryTable('Missile Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],missileRows)}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div><h3>${esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalStatBoxes('Grace & Piety',gracePiety)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],meleeRows)}${journalInventoryTable('Missile Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],missileRows)}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -1251,8 +1443,8 @@ function armourLoadoutPanel(inv,owner=null){
  const report=auditArmourLoadout(inv);
  const load=owner?resolveCombatantLoad({character:owner,inventory:data.inventory}):null;
  const reorderPreview=load&&!load.bulkReady&&load.layeringFeasibility?.status!=='forbidden'?previewExistingArmourArrangement(inv):null;
- const rows=layerDisplayRows(report,inv,load).map(r=>`<tr class="arm-layer-row arm-layer-${r.status}"><th scope="row" title="${esc(r.names)}">${esc(r.location)} <span class="muted tiny">${esc(r.locationName)}</span></th><td class="arm-layer-count ${r.status==='valid'?'':'arm-layer-alert'}" title="${esc(r.detail)}">${r.count}${r.status==='over-limit'?` <b>+${r.count-5}</b>`:''}</td><td>${r.protection.b}</td><td>${r.protection.e}</td><td>${r.protection.p}</td><td>${r.protection.f}</td><td class="arm-layer-explain">${r.status==='valid'?'—':esc(r.detail)}</td></tr>`).join('');
- return `<section class="panel wide"><h3>Nasazená zbroj · anatomická ochrana a vrstvení</h3><p class="muted tiny">Zobrazené B/E/P/F jsou součty z předmětů, nikoli automatické potvrzení pravidlové ochrany. Červeně je prokázané překročení počtu vrstev či nepřípustná materiálová kombinace, jantarově neznámé fyzické pořadí.</p>${rows?`<div class="catalog-scroll"><table class="catalog-spec arm-layer-table"><thead><tr><th>Lokace</th><th>Vrstvy</th><th>B</th><th>E</th><th>P</th><th>F</th><th>Kontrola</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p>Žádná nasazená zbroj.</p>'}${reorderPreview?.ready?`<div class="actions"><button type="button" class="secondary" data-armour-autolayer="${esc(owner.id)}">Uspořádat zbroj do přípustných vrstev</button><p class="tiny muted">Aplikace navrhne a zapíše doložené pořadí, nikoli nová pravidla ani nový postih. Nemění počet či vlastnictví předmětů.</p></div>`:''}${report.skipped.length?`<p class="notice">U ${report.skipped.length} položek chybí úplná anatomická data; ochrana je jen částečný součet.</p>`:''}</section>`;
+ const rows=layerDisplayRows(report,inv,load).map(r=>`<tr class="arm-layer-row arm-layer-${r.status}"><th scope="row" title="${esc(r.names)}">${esc(r.location)} <span class="muted tiny">${esc(JOURNAL_ANATOMICAL_LOCATIONS.find(([code])=>code===r.location)?.[1]||r.locationName)}</span></th><td class="arm-layer-count ${r.status==='valid'?'':'arm-layer-alert'}" title="${esc(r.detail)}">${r.count}${r.status==='over-limit'?` <b>+${r.count-5}</b>`:''}</td><td>${r.protection.b}</td><td>${r.protection.e}</td><td>${r.protection.p}</td><td>${r.protection.f}</td><td class="arm-layer-explain">${r.status==='valid'?'—':esc(r.detail)}</td></tr>`).join('');
+ return `<section class="panel wide"><h3>Worn Armour · Location Protection & Layers</h3><p class="muted tiny">Zobrazené B/E/P/F jsou součty z předmětů, nikoli automatické potvrzení pravidlové ochrany. Červeně je prokázané překročení počtu vrstev či nepřípustná materiálová kombinace, jantarově neznámé fyzické pořadí.</p>${rows?`<div class="catalog-scroll"><table class="catalog-spec arm-layer-table"><thead><tr><th>Location</th><th>Layers</th><th>${journalTerm('b')}</th><th>${journalTerm('e')}</th><th>${journalTerm('p')}</th><th>${journalTerm('f')}</th><th>Kontrola</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p>Žádná nasazená zbroj.</p>'}${reorderPreview?.ready?`<div class="actions"><button type="button" class="secondary" data-armour-autolayer="${esc(owner.id)}">Uspořádat zbroj do přípustných vrstev</button><p class="tiny muted">Aplikace navrhne a zapíše doložené pořadí, nikoli nová pravidla ani nový postih. Nemění počet či vlastnictví předmětů.</p></div>`:''}${report.skipped.length?`<p class="notice">U ${report.skipped.length} položek chybí úplná anatomická data; ochrana je jen částečný součet.</p>`:''}</section>`;
 }
 function combatantLoadPanel(c){
  const r=resolveCombatantLoad({character:c,inventory:data.inventory});
@@ -8826,3 +9018,49 @@ document.addEventListener('submit',e=>{
  const profile=String(v.get('profile')||'random');
  void generateCharacterFullyAutomatically('traits',profile,preferences);
 },true);
+
+
+/* Fixed glossary tooltip: no pseudo-element clipping inside tables or book rails. */
+let hmkJournalTooltip=null,hmkJournalTooltipTarget=null;
+function hmkHideJournalTooltip(){if(hmkJournalTooltip)hmkJournalTooltip.hidden=true;hmkJournalTooltipTarget=null;}
+function hmkShowJournalTooltip(element){
+ if(!element||!element.isConnected||!element.closest('.journal-book'))return;
+ const explanation=element.getAttribute('data-hmk-help');if(!explanation)return;
+ if(!hmkJournalTooltip){
+  hmkJournalTooltip=document.createElement('div');
+  hmkJournalTooltip.className='hmk-journal-floating-tooltip';
+  hmkJournalTooltip.setAttribute('role','tooltip');
+  hmkJournalTooltip.hidden=true;
+  document.body.appendChild(hmkJournalTooltip);
+ }
+ hmkJournalTooltipTarget=element;
+ hmkJournalTooltip.textContent=explanation;
+ hmkJournalTooltip.hidden=false;
+ hmkJournalTooltip.style.left='0px';hmkJournalTooltip.style.top='0px';
+ const target=element.getBoundingClientRect();const tooltip=hmkJournalTooltip.getBoundingClientRect();
+ const vw=document.documentElement.clientWidth,vh=document.documentElement.clientHeight;
+ let x=Math.max(8,Math.min(vw-tooltip.width-8,target.left));
+ let y=target.top-tooltip.height-9;
+ if(y<8)y=target.bottom+9;
+ if(y+tooltip.height>vh-8)y=Math.max(8,vh-tooltip.height-8);
+ hmkJournalTooltip.style.left=Math.round(x)+'px';
+ hmkJournalTooltip.style.top=Math.round(y)+'px';
+}
+document.addEventListener('pointerover',event=>{
+ const target=event.target?.closest?.('[data-hmk-help]');
+ if(target&&target!==hmkJournalTooltipTarget)hmkShowJournalTooltip(target);
+},true);
+document.addEventListener('pointerout',event=>{
+ if(!hmkJournalTooltipTarget)return;
+ const next=event.relatedTarget;
+ if(next&&hmkJournalTooltipTarget.contains(next))return;
+ if(event.target===hmkJournalTooltipTarget||hmkJournalTooltipTarget.contains(event.target))hmkHideJournalTooltip();
+},true);
+document.addEventListener('focusin',event=>{
+ const target=event.target?.closest?.('[data-hmk-help]');if(target)hmkShowJournalTooltip(target);
+},true);
+document.addEventListener('focusout',event=>{
+ if(hmkJournalTooltipTarget&&event.target===hmkJournalTooltipTarget)hmkHideJournalTooltip();
+},true);
+document.addEventListener('keydown',event=>{if(event.key==='Escape')hmkHideJournalTooltip();},true);
+document.addEventListener('scroll',()=>{if(hmkJournalTooltipTarget)hmkHideJournalTooltip();},true);

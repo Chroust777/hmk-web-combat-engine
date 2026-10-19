@@ -3680,20 +3680,6 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 }
 .content-sheet .journal-book--creation .hmk-appearance-evidence small{margin-left:6px;font-style:italic;color:#765037!important}
 .content-sheet .journal-book--creation .hmk-appearance-summary{background:rgba(251,242,222,.38)!important}
-.content-sheet .journal-book--overview .hmk-appearance-proof{
-  margin:8px 0 14px!important;
-  padding:8px 10px!important;
-  border:1px solid rgba(137,94,45,.45)!important;
-  background:rgba(251,242,222,.38)!important;
-  color:#4b2f20!important;
-  font:12px/1.5 Georgia,serif!important;
-}
-.content-sheet .journal-book--overview .hmk-appearance-proof summary{cursor:pointer;font-weight:700;color:#6b361e!important}
-.content-sheet .journal-book--overview .hmk-appearance-proof dl{margin:6px 0 0}
-.content-sheet .journal-book--overview .hmk-appearance-proof dl>div{display:grid;grid-template-columns:minmax(80px,1fr) 2fr;gap:8px;padding:4px 0;border-top:1px solid rgba(137,94,45,.25)}
-.content-sheet .journal-book--overview .hmk-appearance-proof dt{font-weight:700}
-.content-sheet .journal-book--overview .hmk-appearance-proof dd{margin:0}
-.content-sheet .journal-book--overview .hmk-appearance-proof small{display:block;color:#795034!important}
 @media(max-width:720px){
  .content-sheet .journal-book--creation .hmk-appearance-fields{grid-template-columns:1fr!important}
 }
@@ -3703,4 +3689,61 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  border:1px solid #af874f!important;color:#f7e6cb!important;
  background:linear-gradient(180deg,#345574,#17334e)!important;
  font:600 12px/1.3 Georgia,serif!important;cursor:pointer;
+}
+
+
+/* v93.352 — native journal terminology, readable complete attribute names,
+   fixed accessible tooltips. No dotted underlines or clipped pseudo tooltips. */
+.content-sheet .journal-book [data-hmk-help],
+.content-sheet .journal-book .hmk-journal-glossary,
+.content-sheet .journal-book--overview .journal-anatomy-table .journal-av-derived,
+.content-sheet .journal-book--overview .journal-skill-name,
+.content-sheet .journal-book--overview .journal-book-title [data-hmk-help]{
+  text-decoration:none!important;
+  border-bottom:none!important;
+  text-decoration-style:solid!important;
+  text-decoration-line:none!important;
+  cursor:help;
+}
+.content-sheet .journal-book--overview .hmk-journal-glossary:is(:hover,:focus-visible)::after{content:none!important;display:none!important}
+.content-sheet .journal-book--overview .journal-attributes-row .journal-stat-box span[data-hmk-help],
+.content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box span[data-hmk-help]{
+  font:700 clamp(9px,.85vw,12px)/1.18 Georgia,serif!important;
+  letter-spacing:normal!important;
+  white-space:normal!important;
+  overflow-wrap:normal!important;
+  hyphens:none!important;
+  display:block;
+  max-width:100%;
+  text-align:center;
+}
+.content-sheet .journal-book--overview .journal-stat-box{min-width:0;overflow:visible!important}
+.content-sheet .journal-book--overview .journal-skill-family h4 .hmk-journal-glossary{font:inherit!important;letter-spacing:inherit!important;color:inherit!important}
+.content-sheet .journal-book--overview .journal-group-mod[data-hmk-help]{white-space:nowrap;display:inline-block}
+.content-sheet .journal-book--overview .journal-skill-basis[data-hmk-help]{display:block;max-width:100%}
+.content-sheet .journal-book--overview .journal-anatomy-table [data-hmk-help]{text-decoration:none!important}
+.hmk-journal-floating-tooltip:not([hidden]){
+ position:fixed!important;
+ z-index:999999!important;
+ display:block!important;
+ box-sizing:border-box!important;
+ width:max-content!important;
+ min-width:190px!important;
+ max-width:min(355px,calc(100vw - 20px))!important;
+ padding:11px 13px!important;
+ border:1px solid #987440!important;
+ border-radius:7px!important;
+ background:#f6ead0!important;
+ color:#402818!important;
+ box-shadow:0 8px 20px rgba(31,20,12,.30)!important;
+ font:normal 14px/1.48 Georgia,serif!important;
+ white-space:normal!important;
+ overflow-wrap:break-word!important;
+ pointer-events:none!important;
+ text-align:left!important;
+}
+.hmk-journal-floating-tooltip[hidden]{display:none!important}
+.content-sheet .journal-book [data-hmk-help]:focus-visible{outline:2px solid #916d39;outline-offset:2px}
+@media(max-width:680px){
+ .content-sheet .journal-book--overview .journal-attributes-row .journal-stat-box span[data-hmk-help]{font-size:10px!important}
 }
