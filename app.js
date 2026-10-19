@@ -160,7 +160,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.353';
+const APP_VERSION='93.354';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -442,6 +442,24 @@ function campaignCalendarView(){
  <section class="panel"><h3>Nedoložené termíny · ${agenda.unknown.length}</h3>${agenda.unknown.map(x=>`<p class="notice">${esc(x.name)}: ${esc(x.description)} – ${esc(x.reason)}</p>`).join('')||'<p class="muted">Není evidován žádný neznámý počátek naplánované procedury.</p>'}</section>
  <section class="panel"><details><summary>Časový audit a historie · ${clock.events.length} potvrzení</summary>${clock.events.slice(-150).map(e=>`<p><strong>${esc(displayCampaignMinute(e.minute))}</strong> · ${esc(e.type)} · ${esc(e.reason)}</p>`).join('')}</details></section>`,`journal-book--calendar`);
 }
+// Ephemeral presentation state only. Completion still comes from the persisted HMK
+// validator; unsaved edits and failed confirmations must never display a green tick.
+const creationStepUIState=new Map();
+function creationStepUIKey(id,step){return String(id||'')+':'+String(step);}
+function creationUIStatus(id,step){return creationStepUIState.get(creationStepUIKey(id,step))||null;}
+function updateCreationStepUI(step,kind,message=''){
+ const id=selected;if(!id||!Number.isInteger(Number(step)))return;
+ creationStepUIState.set(creationStepUIKey(id,step),{kind,message});
+ const row=document.querySelector('.folio-creation-step[data-creation-step-row="'+step+'"]');
+ if(!row)return;
+ row.classList.remove('folio-creation-step--complete','folio-creation-step--invalid','folio-creation-step--editing');
+ row.classList.add('folio-creation-step--'+(kind==='invalid'?'invalid':'editing'));
+ const status=row.querySelector('.folio-visually-hidden');
+ if(status)status.textContent=kind==='invalid'?'Chyba: '+message:'Změna čeká na kontrolu';
+ const btn=row.querySelector('.folio-creation-step__link');
+ if(btn)btn.setAttribute('aria-label',(kind==='invalid'?'Chyba v kroku ':'Nevyhodnocená změna v kroku ')+step+': '+(row.querySelector('.folio-creation-step__label')?.textContent||''));
+}
+function clearCreationStepUI(id,step){creationStepUIState.delete(creationStepUIKey(id,step));}
 let creationAttributeChoice=null;
 // The current creation character is a persisted CHARACTER, never a second draft.
 const CREATION_LAST_ID='hmk-ledger-last-creation-character-v1';
@@ -1321,13 +1339,26 @@ function folioChapterParts(body,kind=''){
     const revision=actor?creationRevisionIssues(actor):[];
     const stages=CHARACTER_STEPS.map(([name,page],index)=>{
      const number=index+1;
-     const state=creation?.completed?.[number]?'complete':number===activeStep?'active':'pending';
-     const needsReview=revision.some(x=>x.step===number)&&number<=reachable;
-     const status=needsReview&&number!==activeStep?'Vyžaduje nové potvrzení':state==='complete'?'Dokončeno':state==='active'?'Aktuální krok':number<=reachable?'Dříve navštíveno':'Dosud nepřístupné';
+     const ui=creationUIStatus(actor?.id,number);
+     // The very first visit to a new step is *in progress*, not a defect.
+     // Revision issues become red for previously confirmed/revisited steps.
+     const needsReview=revision.some(x=>x.step===number)&&number<=reachable&&
+      (Boolean(creation?.completed?.[number])||number!==activeStep||reachable>activeStep||ui?.kind==='invalid');
+     // A current form may differ from the already-confirmed saved version.
+     // For Grace/Marked, never show a tick while Divine Aspect is missing.
+     const activeForm=parts[formIndex];
+     const pendingAspect=number===14&&number===activeStep&&(()=>{
+      const grace=Number(activeForm.querySelector('[name="graceDie"]')?.value??creation?.values?.graceProof?.roll);
+      const aspect=String(activeForm.querySelector('[name="graceAspect"]')?.value||'').trim();
+      return Number.isFinite(grace)&&grace>=15&&grace<=20&&!aspect;
+     })();
+     const hasError=Boolean(needsReview||ui?.kind==='invalid'||pendingAspect);
+     const dirty=ui?.kind==='editing'&&!hasError;
+     const confirmed=Boolean(creation?.completed?.[number])&&!hasError&&!dirty;
+     const state=hasError?'invalid':dirty?'editing':confirmed?'complete':number===activeStep?'active':'pending';
+     const status=hasError?'Vyžaduje opravu':dirty?'Změna čeká na potvrzení':confirmed?'Dokončeno':number===activeStep?'Aktuální krok':number<=reachable?'Dříve navštíveno':'Dosud nepřístupné';
      const inner=`<span class="folio-creation-step__number">${number}</span><span class="folio-creation-step__label">${esc(name)}</span><span class="folio-creation-step__page">str. ${esc(page)}</span><span class="folio-visually-hidden">${status}</span>`;
-     // Buttons, not links inside a disconnected select. All navigation runs
-     // through the same original applyCreationPatch validation/mutation code.
-     return `<li class="folio-creation-step folio-creation-step--${state}${number<=reachable?' folio-creation-step--visited':''}${needsReview?' folio-creation-step--review':''}"${number===activeStep?' aria-current="step"':''}>${number<=reachable?`<button type="button" class="folio-creation-step__link" data-creation-step="${number}" ${number===activeStep?'aria-current="step"':''} aria-label="Otevřít krok ${number}: ${esc(name)}">${inner}</button>`:`<span class="folio-creation-step__locked" aria-disabled="true">${inner}</span>`}</li>`;
+     return `<li class="folio-creation-step folio-creation-step--${state}${number<=reachable?' folio-creation-step--visited':''}${needsReview?' folio-creation-step--review':''}" data-creation-step-row="${number}"${number===activeStep?' aria-current="step"':''}>${number<=reachable?`<button type="button" class="folio-creation-step__link" data-creation-step="${number}" ${number===activeStep?'aria-current="step"':''} aria-label="${esc(status)} · Otevřít krok ${number}: ${name}">${inner}</button>`:`<span class="folio-creation-step__locked" aria-disabled="true">${inner}</span>`}</li>`;
     }).join('');
     const outline=`<details class="folio-creation-index" aria-label="Přehled pravidlové tvorby"${window.innerWidth>550?' open':''}><summary class="folio-creation-index__heading">Kapitoly tvorby <span>14 kroků</span></summary><ol class="folio-creation-index__steps">${stages}</ol><p class="folio-creation-index__note">Kliknutím lze otevřít aktuální a dříve navštívené kapitoly. Budoucí kroky odemkne pravidlový průvodce postupně; změny v předchozích krocích mohou vyžadovat nové ověření navazujících hodnot.</p></details>`;
     // Highlight the exact active form field when its prior evidence was
@@ -1343,6 +1374,22 @@ function folioChapterParts(body,kind=''){
       const target=field?.closest('label,fieldset')||field||form.querySelector('.creation-inputs');
       if(target){target.classList.add('folio-creation-revision-target');if(field){field.classList.add('folio-creation-revision-control');field.setAttribute('aria-invalid','true');}}
      }
+    }
+    // A consistent two-row label layout regardless of long Czech/English names,
+    // optional ? button, or wrapped text. Do not touch checkbox/radio labels.
+    // This only transforms the rendered DOM; the original form input/name stays
+    // inside its label and keeps its normal submit/validation semantics.
+    for(const label of parts[formIndex].querySelectorAll('label')){
+     const direct=[...label.children].filter(el=>el.matches('input:not([type="hidden"]),select,textarea'));
+     if(direct.length!==1||['checkbox','radio'].includes(direct[0].type))continue;
+     const control=direct[0];
+     const prefix=[];
+     for(const node of [...label.childNodes]){if(node===control)break;prefix.push(node);}
+     if(!prefix.length)continue;
+     const head=document.createElement('span');head.className='hmk-creation-field-heading';
+     prefix.forEach(node=>head.appendChild(node));
+     label.insertBefore(head,control);
+     label.classList.add('hmk-creation-aligned-label');
     }
     const revisionPanel=activeStep===14?
      `<section class="folio-creation-revision" aria-label="Závěrečná revize tvorby"><h4>Revize tvorby · kroky 1–14</h4>${revision.length?`<p>Tyto kroky obsahují neověřené nebo změnou zneplatněné údaje. Otevřete je, opravte červeně označená pole a krok znovu potvrďte.</p><ol>${revision.map(i=>`<li><button type="button" class="folio-creation-revision-link" ${i.step===activeStep?`data-creation-review-focus="${esc(i.field||'')}"`:`data-creation-step="${i.step}"`}><strong>Krok ${i.step} · ${esc(i.title)}</strong><span>${esc(i.message)}</span></button></li>`).join('')}</ol>`:`<p>Dosavadní kroky jsou potvrzené. Závěrečné uložení ještě provede pravidlové kontroly HMK.</p>`}</section>`:
@@ -1414,7 +1461,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.unconscious?'Yes':'No'],['Death Save',state.death?'Pending':'—']];
  const conditionRows=[['Poisoned',state.poisoned?'Yes':'No'],['Diseased',state.diseased?'Yes':'No'],['Cursed',state.cursed?'Yes':'No'],['Winded',state.winded?'Yes':'No'],['Weary',state.weary?'Yes':'No'],['Fatigued',combatFatigueTotals(state).total]];
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalStatBoxes('Grace & Piety',gracePiety)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],meleeRows)}${journalInventoryTable('Missile Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],missileRows)}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalStatBoxes('Grace & Piety',gracePiety)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],meleeRows)}${journalInventoryTable('Missile Weapons',['Weapon','ATK','DMG','AP','Range','Notes'],missileRows)}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -8879,6 +8926,8 @@ function creationProblemField(form,message){
  return [...form.querySelectorAll('select,input,textarea')].find(el=>el.required&&!el.disabled&&!String(el.value||'').trim())||null;
 }
 function showCreationProblem(form,message,preferred=null){
+ const actor=selected?character(selected):null;
+ if(actor)updateCreationStepUI(creationOf(actor).step,'invalid',String(message||''));
  form.querySelectorAll('.hmk-creation-invalid').forEach(el=>{el.classList.remove('hmk-creation-invalid');el.removeAttribute('aria-invalid')});
  form.querySelectorAll('.hmk-creation-invalid-label').forEach(el=>el.classList.remove('hmk-creation-invalid-label'));
  const output=form.querySelector('.hmk-creation-validation')||document.createElement('p');
@@ -8901,10 +8950,24 @@ function clearCreationProblem(event){
  }
  if(!form.querySelector('.hmk-creation-invalid'))form.querySelector('.hmk-creation-validation')?.remove();
 }
+function markCreationFormEditing(event){
+ const form=event.target?.closest?.('#creation-step-form');
+ if(!form||automaticGenerationBusy)return;
+ const control=event.target;
+ if(!control.matches?.('input,select,textarea')||control.type==='hidden')return;
+ const actor=selected?character(selected):null;if(!actor)return;
+ const step=creationOf(actor).step;
+ if(creationUIStatus(actor.id,step)?.kind==='invalid')return; // remains red until saved
+ updateCreationStepUI(step,'editing');
+}
+document.addEventListener('input',markCreationFormEditing,true);
+document.addEventListener('change',markCreationFormEditing,true);
 document.addEventListener('input',clearCreationProblem,true);
 document.addEventListener('change',clearCreationProblem,true);
 document.addEventListener('invalid',event=>{
  const form=event.target?.closest?.('#creation-step-form');if(!form||automaticGenerationBusy)return;
+ const actor=selected?character(selected):null;
+ if(actor)updateCreationStepUI(creationOf(actor).step,'invalid','Nevyplněné nebo nesprávné pole');
  event.target.classList.add('hmk-creation-invalid');event.target.setAttribute('aria-invalid','true');
  event.target.closest('label,fieldset')?.classList.add('hmk-creation-invalid-label');
  // Native validation focuses and scrolls to the first missing field.
@@ -9025,7 +9088,10 @@ document.addEventListener('submit',event=>{
   if(pending.length){render();document.querySelector('.folio-creation-revision')?.scrollIntoView({block:'start',behavior:'smooth'});return;}
  }
  let updated;try{updated=applyCreationPatch(original,patch);persistAppearanceStep(original,updated,step,form);syncCreationSkills(updated.hmk,uuid)}catch(err){if(automaticGenerationDebug)console.warn('Auto creation validation:',err.message,'step',step,'action',action);if(!automaticGenerationBusy){alert('HMK Character Creation: '+err.message);showCreationProblem(form,err.message)}return}
+ const beforeUI=creationUIStatus(original.id,step);
+ clearCreationStepUI(original.id,step);
  const success=mutate(()=>{const entry=character(selected);if(!entry)throw Error('Postava neexistuje');Object.assign(entry,updated)});
+ if(!success&&beforeUI)creationStepUIState.set(creationStepUIKey(original.id,step),beforeUI);
  if(success&&updated.hmk?.creation?.status==='review-required'&&action==='next'){
   if(characterJournalReadiness(character(selected)).ready){view='sheet';notice='';render();}
   else{view='creation';render();}

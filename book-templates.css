@@ -3835,3 +3835,81 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
    font-size:10px!important;
  }
 }
+
+
+/* v93.354 — honest step validation; aligned creation labels; journal nameplate.
+   Red means a confirmed revision issue/failed input; amber means an unsaved
+   edit; green applies only to confirmed and still-valid saved steps. */
+.content-sheet .journal-book--creation .folio-creation-step--invalid .folio-creation-step__number{
+  position:relative!important;background:#f8ded8!important;border:1px solid #9e3028!important;
+  color:#8a201e!important;
+}
+.content-sheet .journal-book--creation .folio-creation-step--invalid .folio-creation-step__number::after{
+  content:'✕'!important;position:absolute!important;right:-8px!important;top:-6px!important;
+  transform:none!important;border-radius:100%;padding:0 2px;
+  background:#f7e5da!important;font:800 13px/1 Georgia,serif!important;color:#ae2525!important;
+}
+.content-sheet .journal-book--creation .folio-creation-step--invalid .folio-creation-step__label{
+  color:#9a2b24!important;font-weight:700!important;
+}
+.content-sheet .journal-book--creation .folio-creation-step--invalid .folio-creation-step__link{
+  box-shadow:inset 3px 0 #b5322a!important;background:rgba(252,216,202,.30)!important;
+}
+.content-sheet .journal-book--creation .folio-creation-step--editing .folio-creation-step__number{
+  background:#fbefd3!important;border-color:#ae833e!important;color:#79501e!important;
+}
+.content-sheet .journal-book--creation .folio-creation-step--editing .folio-creation-step__number::after{
+  content:'•'!important;position:absolute!important;right:-5px!important;top:-8px!important;
+  transform:none!important;font:800 17px Georgia,serif!important;color:#a87728!important;
+}
+.content-sheet .journal-book--creation .folio-creation-step--editing .folio-creation-step__label{color:#765322!important}
+/* Hold the label/title row at one shared height across paired fields; the
+   question button belongs INSIDE the heading, not between heading and input. */
+.content-sheet .journal-book--creation #creation-step-form .creation-inputs label.hmk-creation-aligned-label,
+.content-sheet .journal-book--creation #creation-step-form .creation-inputs .field-grid label.hmk-creation-aligned-label{
+  display:grid!important;grid-template-rows:minmax(58px,1fr) auto!important;
+  grid-template-columns:minmax(0,1fr)!important;align-content:start!important;align-items:stretch!important;
+  min-width:0!important;gap:0!important;margin:0!important;align-self:stretch!important;height:100%!important;
+}
+.content-sheet .journal-book--creation .hmk-creation-field-heading{
+  display:block!important;position:relative!important;
+  box-sizing:border-box!important;
+  padding:0 32px 7px 0!important;
+  width:100%!important;min-width:0!important;
+  line-height:1.3!important;
+}
+.content-sheet .journal-book--creation .hmk-creation-field-heading > .hmk-rule-help{
+  position:absolute!important;right:2px!important;bottom:7px!important;
+  margin:0!important;
+}
+.content-sheet .journal-book--creation .hmk-creation-aligned-label > :is(input,select,textarea){
+  grid-column:1!important;grid-row:2!important;align-self:start!important;
+  width:100%!important;min-width:0!important;margin:0!important;
+}
+.content-sheet .journal-book--creation .hmk-creation-aligned-label > :is(small,.tiny){grid-column:1!important;grid-row:3!important}
+/* Help icon is styled by its own hover/focus only; hovering a label/input
+   never produces a help-button highlight. */
+.content-sheet .journal-book--creation .hmk-rule-help:not(:hover):not(:focus-visible){
+  outline:none!important;outline-offset:0!important;
+  filter:none!important;box-shadow:none!important;
+  background:#e8d1a5!important;color:#3d2b19!important;
+}
+.content-sheet .journal-book--creation .hmk-rule-help:is(:hover,:focus-visible){
+  background:#f8dda4!important;color:#4c290f!important;
+  outline:2px solid #9b6a2e!important;outline-offset:2px!important;
+  filter:none!important;
+}
+.content-sheet .journal-book--creation .hmk-rule-help:focus:not(:focus-visible){outline:none!important}
+/* When a long occupation spans two lines the lineage stays centered BELOW it. */
+.content-sheet .journal-book--overview .journal-nameplate .journal-nameplate-copy{
+ display:flex!important;flex:1 1 auto!important;min-width:0!important;
+ flex-direction:column!important;align-items:center!important;justify-content:center!important;
+ text-align:center!important;
+}
+.content-sheet .journal-book--overview .journal-nameplate .journal-nameplate-copy :is(h3,p,.journal-nameplate-minor){
+ display:block!important;width:100%!important;max-width:100%!important;
+ text-align:center!important;overflow-wrap:break-word!important;
+}
+.content-sheet .journal-book--overview .journal-nameplate .journal-nameplate-minor{
+ margin:5px auto 0!important;line-height:1.3!important;
+}
