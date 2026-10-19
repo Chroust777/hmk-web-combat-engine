@@ -9,6 +9,7 @@ import {resolveCombatantLoad} from './combatant-load.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {combatFatigueTotals,initialCombatState} from './persistent-combat-state.js';
 import {strengthImpactModifier,heftPenalty,twoHandedImpactBonus} from '../rules/weapon-modes.js';
+import {gripOf,validateHandInventory} from './hmk-hand-equipment.js';
 import {verifiedImpactTA,verifiedMeleeModifiers} from './melee-verified-modifiers.js';
 import {qualityImpactPenalty} from '../rules/weapon-damage.js';
 import {resolveCharacterReachSizeModifier} from './character-reach-size.js';
@@ -48,6 +49,7 @@ function validatedActor({person,state,inventory,weaponId,skillId,usedArms,round,
  must(state.shock==='NONE',`${person.name}: speciální akci pod Shock musí vyhodnotit pravidlové omezení`);
  must(state.morale?.state===undefined||['steady','brave', 'STEADY','BRAVE'].includes(state.morale.state),
   `${person.name}: nevyřešený Morale mění přípustné akce`);
+ validateHandInventory(inventory,person.id);
  const w=held(inventory,person.id,weaponId),chosenSkill=skill(person,skillId);
  must(String(chosenSkill.name??'').trim().toLowerCase()==='melee',
   `${person.name}: Melee Strike/Block vyžaduje skutečnou dovednost Melee, nikoli jinou vybranou ML`);
@@ -65,8 +67,9 @@ function validatedActor({person,state,inventory,weaponId,skillId,usedArms,round,
  must(size.ok,`${person.name}: Creature Size Reach modifier není ověřen`);
  const reach=reachFromSelectedEquipment(inventory,person.id,weaponId,{sizeReachModifier:size.value});
  must(reach.ok,`${person.name}: neověřený dosah zbraně (${reach.reason})`);
- const traitsAttack=verifiedMeleeModifiers(w.record.snapshot,{role:'attack',threateningFoeCount:threateningFoes});
- const traitsBlock=verifiedMeleeModifiers(w.record.snapshot,{role:'defence',defence:'block',threateningFoeCount:threateningFoes});
+ const twoHanded=gripOf(w.record)==='two';
+ const traitsAttack=verifiedMeleeModifiers(w.record.snapshot,{role:'attack',threateningFoeCount:threateningFoes,twoHanded});
+ const traitsBlock=verifiedMeleeModifiers(w.record.snapshot,{role:'defence',defence:'block',threateningFoeCount:threateningFoes,twoHanded});
  must(traitsAttack.ok&&traitsBlock.ok,`${person.name}: nelze doložit všechny Melee/Block Traits`);
  const foe=outnumberedEMLModifier(threateningFoes);
  must(foe.ok,`${person.name}: neověřený počet protivníků`);
@@ -75,22 +78,24 @@ function validatedActor({person,state,inventory,weaponId,skillId,usedArms,round,
  const fatigue=combatFatigueTotals(state).total;
  must(int(fatigue,0,1000),`${person.name}: neověřená Fatigue`);
  const mode=w.mode;
- must(!mode.twoHanded||usedArms==='both',`${person.name}: obouruční zbraň potřebuje obě paže`);
+ must(!twoHanded||usedArms==='both',`${person.name}: obouruční režim potřebuje obě paže`);
+ must(twoHanded||usedArms!=='both',`${person.name}: obě paže musí být předem přiřazeny zbrani v Arsenal & Gear`);
  const heft=mode.heft??w.record.snapshot.properties.heft;
  must(int(heft,0,100),`${person.name}: nelze doložit Heft pro správný Melee modifikátor`);
- const offHand=w.record.slot==='off_hand';
- const heftResult=heftPenalty({str,hft:heft,twoHanded:!!mode.twoHanded,offHand});
+ const offHand=w.record.slot==='off_hand'&&!twoHanded;
+ const heftResult=heftPenalty({str,hft:heft,twoHanded,offHand});
  const quality=qualityImpactPenalty({baseWQ:w.record.snapshot.properties.quality,currentWQ:w.record.currentWQ});
  const ta=verifiedImpactTA({aspect:mode.aspect,count:1,override:w.record.snapshot.properties.impactTAModifier??null});must(ta.ok,`Chybí Impact TA pro aspekt ${mode.aspect}`);
  // HMK weapon-table Armour Reduction belongs to the CURRENT strike aspect.
  // In particular p.99 Pickaxe is Point AR3; do not silently replace it by 0.
- const arEntry=mode.armourReduction??w.record.snapshot.properties.armourReduction;
+ const arEntry=w.record.snapshot.properties.armourReductionCondition==='two-handed'&&!twoHanded?0:
+  mode.armourReduction??w.record.snapshot.properties.armourReduction;
  const arValue=arEntry==null?0:(Number.isSafeInteger(arEntry)?arEntry:arEntry[mode.aspect]);
  must(int(arValue,0,30),`${person.name}: neověřený Armour Reduction zvoleného Strike Mode`);
  return {person,state,w,skill:chosenSkill,reach:reach.rch,load,trauma,foe,prone,fatigue,heft:heftResult.penalty,
   traitsAttack,traitsBlock,quality,weapon:{impactDie:w.impactDie,zoneDie:w.zoneDie,aspect:mode.aspect,
    armourReduction:arValue,modifier:mode.impactModifier+strengthImpactModifier(str)+(offHand?-1:0)+quality+
-    twoHandedImpactBonus({str,listedHft:heft,twoHanded:!!mode.twoHanded}),impactTABonus:ta.bonus}};
+    twoHandedImpactBonus({str,listedHft:heft,twoHanded,swung:!String(mode.length??w.record.snapshot.properties.length).includes('t')}),impactTABonus:ta.bonus}};
 }
 function eml(a,role,reach){
  const traits=role==='attack'?a.traitsAttack:a.traitsBlock;
