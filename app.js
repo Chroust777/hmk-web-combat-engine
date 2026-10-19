@@ -159,7 +159,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.334';
+const APP_VERSION='93.335';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3893,7 +3893,29 @@ const g04Actions=createG04ActionWizards({getDocument:()=>data,getBaseline:()=>st
   mirrorInitiative(validateEncounterSequence(data.combatRuntime.sequence),data.combatRuntime.clock);
   guidedAttackLastOutcome='G04 – dokončen jeden ověřený společný atomický zápis.';render();}});
 restoreGuidedDraft();
-function render(){writeGuidedDraft();document.getElementById('app').innerHTML=main()+(overlay||'');refreshAllCalendarHealingFields();}
+function render(){
+ // The sidebar has its own scrolling container. Rendering replaces its DOM node,
+ // so retain the actual scroll position instead of resetting the menu to the top.
+ const app=document.getElementById('app');
+ const sidebarPosition=app.querySelector('.layout>.nav')?.scrollTop??0;
+ writeGuidedDraft();
+ app.innerHTML=main()+(overlay||'');
+ const sidebar=app.querySelector('.layout>.nav');
+ if(sidebar)sidebar.scrollTop=sidebarPosition;
+ refreshAllCalendarHealingFields();
+}
+// On narrow layouts the navigation joins the page scroll instead of using
+// its own scroll container. Keep the viewport at the same position on sidebar
+// clicks, rather than allowing focus/scroll anchoring to jump to page top.
+document.addEventListener('click',e=>{
+ if(!e.target.closest?.('.nav button'))return;
+ const previousY=window.scrollY;
+ requestAnimationFrame(()=>{
+  if(Math.abs(window.scrollY-previousY)>1){
+   window.scrollTo({top:previousY,behavior:'instant'});
+  }
+ });
+},true);
 function ask(msg){return window.confirm(msg)}
 // HMK p.187: independent Fear/Aberrance form, ONE existing full-record CAS.
 document.addEventListener('submit',event=>{
