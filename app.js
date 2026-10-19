@@ -1,4 +1,4 @@
-import {heftPenalty} from './src/rules/weapon-modes.js';
+import {heftPenalty,strengthImpactModifier,twoHandedImpactBonus} from './src/rules/weapon-modes.js';
 import {resolveCrossbowArcheryChoice} from './src/integration/hmk-crossbow-archery-choice.js';
 import {prepareSleeplessDay,prepareSleeplessNight,prepareSleeplessFourHourRest} from './src/integration/hmk-sleep-deprivation.js';
 import {LIBRARY_TABS,LIBRARY_PAGE_SIZE,libraryTabsForItem,libraryVisiblePage,resolveSuitCatalogParts} from './src/integration/hmk-library-tabs.js';
@@ -36,7 +36,7 @@ import {resolveSkillConditions,skillConditionAvailability} from './src/integrati
 import {resolveSkillTrauma,skillTraumaAvailability} from './src/integration/hmk-skill-trauma.js';
 import {automaticCriticalFailure,classifySkillConsequence,skillConsequenceProof,assertUniqueSkillConsequence,assertSkillProofAppendOnly} from './src/integration/hmk-skill-consequence-resolution.js';
 import {applyInventoryItemEdit,transferInventoryItem} from './src/integration/hmk-inventory-edit.js';
-import {isHandheldItem,requiresTwoHands,validateHandInventory,equipInventoryHand} from './src/integration/hmk-hand-equipment.js';
+import {isHandheldItem,requiresTwoHands,gripOf,supportsSelectableTwoHandGrip,setWeaponGrip,validateHandInventory,equipInventoryHand} from './src/integration/hmk-hand-equipment.js';
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
 import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
 import {creationWizardHTML,characterCalculationHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js';
@@ -164,7 +164,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.358';
+const APP_VERSION='93.359';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1184,7 +1184,7 @@ function journalWeaponBaseline(c,inventoryItem,mode='melee'){
  const str=c.hmk?.attributes?.str,heft=m.heft??p.heft;
  if(!attack.ok||!block.ok||!Number.isSafeInteger(str)||!Number.isSafeInteger(heft))
   return {atk:'—',def:'—',hint:'Nedoložené bojové Traits, Strength nebo Heft. Katalogový modifikátor není úplné EML.'};
- const offHand=inventoryItem.slot==='off_hand',shield=inventoryItem.snapshot.category==='shield';
+ const offHand=inventoryItem.slot==='off_hand'&&!gripTwoHanded,shield=inventoryItem.snapshot.category==='shield';
   const defenceHeft=heftPenalty({str,hft:heft,twoHanded:gripTwoHanded,offHand,shieldBlockOrPress:shield}).penalty;
  const strikeHeft=heftPenalty({str,hft:heft,twoHanded:gripTwoHanded,offHand}).penalty;
  const load=resolveCombatantLoad({character:c,inventory:data.inventory});
@@ -1221,30 +1221,44 @@ function journalWeaponRows(inv,mode,c){
  };
  return items.filter(x=>mode==='missile'?isMissile(x):isMelee(x)).map(x=>{
   const p=x.snapshot?.properties||{},m=p.verifiedModes?.[0]||{},type=typeOf(x),ranged=mode==='missile',isBow=['bow','crossbow'].includes(type);
-  const name=x.snapshot?.name||x.name||'—';
+  const name=(x.snapshot?.name||x.name||'—')+(x.snapshot?.category==='weapon'?` (${gripOf(x)==='two'?'2H':'1H'})`:'');
   const aspect=m.aspect||p.aspect||'';
   const die=m.impactDie||p.impactDie||null;
   const modifier=Number.isFinite(m.impactModifier)?m.impactModifier:null;
   const actualMissileImpact=p.projectileImpactDie||p.loadedProjectileImpactDie||null;
-  const imp=actualMissileImpact?`${actualMissileImpact}${modifier===null?'':fmtSigned(modifier)}${aspect}`:isBow?'—':die?`${die}${modifier===null?'':fmtSigned(modifier)}${aspect}`:fmt(p.impact);
+  const rawLength=modeValue(m,p,'length');
+  // HMK p.98: Impact +1 is for SWUNG two-handed weapons when STR >= printed HFT.
+  // This remains a baseline reference: the roll and situational TA occur in Combat.
+  const statStr=c?.hmk?.attributes?.str;
+  const heft=m.heft??p.heft;
+  const swing=!String(rawLength).includes('t');
+  const bonus=!ranged&&Number.isSafeInteger(statStr)&&Number.isSafeInteger(heft)?
+   twoHandedImpactBonus({str:statStr,listedHft:heft,twoHanded:requiresTwoHands(x),swung:swing}):0;
+  const actualModifier=modifier===null?null:modifier+bonus;
+  const imp=actualMissileImpact?`${actualMissileImpact}${modifier===null?'':fmtSigned(modifier)}${aspect}`:isBow?'—':die?`${die}${actualModifier===null?'':fmtSigned(actualModifier)}${aspect}`:fmt(p.impact);
   const quality=Number.isFinite(x.currentWQ)?x.currentWQ:Number.isFinite(p.quality)?p.quality:'—';
   const baseline=c?journalWeaponBaseline(c,x,mode):{atk:'—',def:'—',hint:'Nenalezen profil postavy.'};
   const atk=fmt(baseline.atk);
   const def=fmt(baseline.def);
   const zd=fmt(modeValue(m,p,'zoneDie'));
+  const printedLength=modeValue(m,p,'length');
+  const shownLength=typeof printedLength==='string'&&/^\d\|\d$/.test(printedLength)?
+   printedLength.split('|')[gripOf(x)==='two'?1:0]:printedLength;
   const ta=taText(m.impactTAModifier??p.impactTAModifier,aspect);
   const modeList=[...(p.verifiedModes||[]),...(p.alternateStrikeModes||[])].map(t=>`${t.name||'Mode'}: ${t.length||p.length||'—'} / ${t.zoneDie||p.zoneDie||'—'} / ${t.impactDie||'—'}${Number.isFinite(t.impactModifier)?fmtSigned(t.impactModifier):''}${t.aspect||''}`).join('; ');
   const extra=[name,x.snapshot?.description,x.snapshot?.source?`Zdroj: ${x.snapshot.source}`:'',`Umístění: ${slotLabel(x.slot)}`,
    visibleInventoryNote(x.condition)?`Stav: ${visibleInventoryNote(x.condition)}`:'',Number.isFinite(p.defenceModifier)?`Defence modifier: ${fmtSigned(p.defenceModifier)} (není finální DEF)`:null,
    Number.isFinite(p.blockModifier)?`Block modifier: ${fmtSigned(p.blockModifier)}`:null,
-   p.verifiedTraits?.length?`Traits: ${p.verifiedTraits.join(', ')}`:null,modeList?`Ověřené režimy: ${modeList}`:null].filter(Boolean).join(' · ');
+   p.verifiedTraits?.length?`Traits: ${p.verifiedTraits.join(', ')}`:null,
+   bonus?`Švih obouručně: Impact +1 (STR ${statStr} ≥ HFT ${heft}; HMK s.98)`:null,
+   modeList?`Ověřené režimy: ${modeList}`:null].filter(Boolean).join(' · ');
   const cellHelp=[];
   cellHelp[4]=baseline.hint;
   cellHelp[5]=baseline.hint;
   cellHelp[1]=Number.isFinite(x.currentWQ)?'Aktuální WQ z inventáře.':'Základní katalogová WQ; skutečný stav kvality se může lišit.';
   if(!ranged){
    
-   return {cells:[name,quality,fmt(p.heft),fmt(modeValue(m,p,'length')),atk,def,zd,imp,ta],detail:extra,cellHelp};
+   return {cells:[name,quality,fmt(p.heft),fmt(shownLength),atk,def,zd,imp,ta],detail:extra,cellHelp};
   }
   const projectile=fmt(p.loadedProjectileName??p.projectileName??p.projectile?.name);
   cellHelp[4]=baseline.hint;
@@ -1627,7 +1641,9 @@ function equippedHandsPanel(inv,character){
   const reserved=other&&requiresTwoHands(other);
   const choices=inv.filter(x=>x.id!==actual?.id&&!x.destroyed&&isHandheldItem(x)&&
    ['none','carried'].includes(x.slot??'none')&&Number.isSafeInteger(x.quantity)&&x.quantity>0);
-  return `<label class="hmk-hand-slot"><strong>${esc(label)}</strong><select data-equip-hand="${esc(slot)}" aria-label="${esc(label)} – vybavení z inventáře" ${combatInitiativeSequence?'disabled title="Změny výbavy během Initiative vyžadují Combat akci"':''}><option value="">${reserved?'Vyhrazeno obouruční zbrani':`Volná${actual?' (odložit do inventáře)':''}`}</option>${actual?`<option selected value="${esc(actual.id)}">${esc(actual.snapshot?.name||'Nasazený předmět')}</option>`:''}${!reserved?choices.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot?.name||'Předmět')}${x.quantity>1?' · 1 z '+x.quantity:''}${requiresTwoHands(x)?' · obouruč':''}</option>`).join(''):''}</select></label>`;
+  const gripSelector=actual?.snapshot?.category==='weapon'&&supportsSelectableTwoHandGrip(actual)&&!actual.snapshot.properties?.twoHanded&&!actual.snapshot.properties?.verifiedModes?.[0]?.twoHanded?
+   `<label class="hmk-grip-slot"><span>Držení ${esc(actual.snapshot.name)}</span><select data-weapon-grip="${esc(actual.id)}" aria-label="Držení ${esc(actual.snapshot.name)}" ${combatInitiativeSequence?'disabled':''}><option value="one" ${gripOf(actual)==='one'?'selected':''}>Jednoručně</option><option value="two" ${gripOf(actual)==='two'?'selected':''}>Obouručně</option></select></label>`:actual?.snapshot?.category==='weapon'&&requiresTwoHands(actual)?'<small>Držení: obouručně (povinné)</small>':'';
+  return `<div class="hmk-hand-control"><label class="hmk-hand-slot"><strong>${esc(label)}</strong><select data-equip-hand="${esc(slot)}" aria-label="${esc(label)} – vybavení z inventáře" ${combatInitiativeSequence?'disabled title="Změny výbavy během Initiative vyžadují Combat akci"':''}><option value="">${reserved?'Vyhrazeno obouruční zbrani':`Volná${actual?' (odložit do inventáře)':''}`}</option>${actual?`<option selected value="${esc(actual.id)}">${esc(actual.snapshot?.name||'Nasazený předmět')}</option>`:''}${!reserved?choices.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot?.name||'Předmět')}${x.quantity>1?' · 1 z '+x.quantity:''}${requiresTwoHands(x)?' · obouruč':''}</option>`).join(''):''}</select></label>${gripSelector||''}</div>`;
  };
  return `<div class="equipment-summary equipped-hands" aria-label="Aktuální obsazení rukou">${handedness==='right'||handedness==='left'?show(mainRight?'off_hand':'main_hand','Levá ruka')+show(mainRight?'main_hand':'off_hand','Pravá ruka'):show('main_hand','Hlavní ruka – fyzická strana neurčena')+show('off_hand','Vedlejší ruka – fyzická strana neurčena')}</div>`;
 }
@@ -1643,7 +1659,7 @@ function characterInventoryOverview(c,inv){
  const viewRow=r=>{
   const x=r.item,p=x.snapshot?.properties||{};
   const details=r.keyFields.length||r.protection.length?`<details class="inv-spec-details"><summary>Parametry (${r.keyFields.length+r.protection.length})</summary>${r.keyFields.map(t=>`<div>${esc(t)}</div>`).join('')}${r.protection.length?`<div class="inv-av-scroll"><table class="catalog-spec"><thead><tr><th>Lokace</th><th>B</th><th>E</th><th>P</th><th>F</th></tr></thead><tbody>${r.protection.map(y=>`<tr><td>${esc(y.loc)}</td><td>${esc(y.b)}</td><td>${esc(y.e)}</td><td>${esc(y.p)}</td><td>${esc(y.f)}</td></tr>`).join('')}</tbody></table></div>`:''}</details>`:'<span class="muted">Bez dalších katalogových atributů</span>';
-  return `<tr><th scope="row">${esc(x.snapshot?.name||'Bezejmenný předmět')}<span class="inv-item-kind">${esc(x.snapshot?.category||'jiné')}${visibleInventoryNote(x.condition)?' · '+esc(visibleInventoryNote(x.condition)):''}${x.gearStowage==='backpack'?' · v batohu':x.gearStowage==='awkward'?' · nepohodlně neseno':''}</span></th><td>${esc(slotLabel(x.slot))}</td><td class="inv-number">${number(r.qty)}</td><td class="inv-number">${number(r.wq)}</td><td title="${esc(r.priceLabel)}">${esc(r.priceLabel)}${r.totalPrice===null?'':`<span class="inv-item-kind">Celkem ${r.totalPrice} d</span>`}</td><td class="inv-number">${r.weight===null?'—':r.weight.toFixed(1)}${r.totalWeight!==null&&r.qty!==1?`<span class="inv-item-kind">Celkem ${r.totalWeight.toFixed(1)}</span>`:''}</td><td>${esc(r.armourENC)}</td><td class="inv-key-spec">${details}</td><td><div class="inv-row-actions"><button type="button" class="secondary" data-edit-inv="${esc(x.id)}">Upravit</button>${data.characters.length>1?`<button type="button" class="secondary" data-transfer-inv="${esc(x.id)}">Předat</button>`:''}<button type="button" class="danger" data-remove-inv="${esc(x.id)}">Odebrat</button></div></td></tr>`;
+  return `<tr><th scope="row">${esc(x.snapshot?.name||'Bezejmenný předmět')}<span class="inv-item-kind">${esc(x.snapshot?.category||'jiné')}${visibleInventoryNote(x.condition)?' · '+esc(visibleInventoryNote(x.condition)):''}${x.gearStowage==='backpack'?' · v batohu':x.gearStowage==='awkward'?' · nepohodlně neseno':''}${['main_hand','off_hand'].includes(x.slot)&&x.snapshot?.category==='weapon'?' · '+(gripOf(x)==='two'?'obouručně':'jednoručně'):''}</span></th><td>${esc(slotLabel(x.slot))}</td><td class="inv-number">${number(r.qty)}</td><td class="inv-number">${number(r.wq)}</td><td title="${esc(r.priceLabel)}">${esc(r.priceLabel)}${r.totalPrice===null?'':`<span class="inv-item-kind">Celkem ${r.totalPrice} d</span>`}</td><td class="inv-number">${r.weight===null?'—':r.weight.toFixed(1)}${r.totalWeight!==null&&r.qty!==1?`<span class="inv-item-kind">Celkem ${r.totalWeight.toFixed(1)}</span>`:''}</td><td>${esc(r.armourENC)}</td><td class="inv-key-spec">${details}</td><td><div class="inv-row-actions"><button type="button" class="secondary" data-edit-inv="${esc(x.id)}">Upravit</button>${data.characters.length>1?`<button type="button" class="secondary" data-transfer-inv="${esc(x.id)}">Předat</button>`:''}<button type="button" class="danger" data-remove-inv="${esc(x.id)}">Odebrat</button></div></td></tr>`;
  };
  const table=(list,title)=>`<h4>${title} · ${list.length}</h4>${list.length?`<div class="inv-table-scroll"><table class="catalog-spec inv-ledger-table"><thead><tr><th>Předmět</th><th>Umístění</th><th>Ks</th><th>WQ</th><th>Cena</th><th>lb/ks</th><th>ENC zbroje</th><th>Vlastnosti / účinky</th><th>Akce</th></tr></thead><tbody>${list.map(viewRow).join('')}</tbody></table></div>`:'<p class="muted">Žádné položky.</p>'}`;
  return `<div class="inv-summary-grid">${cards.map(([name,value])=>`<div class="inv-summary-stat"><span>${esc(name)}</span><strong>${esc(value)}</strong></div>`).join('')}</div><p class="tiny muted">ENC výbavy se odvozuje z celkové efektivní hmotnosti a způsobu nesení. Nelze ho přidělovat každému předmětu zvlášť. Jednotkové ceny a váhy chybějících katalogových údajů nejsou odhadovány.</p>${table(rows.filter(r=>r.kind==='equipped'),'Nasazené a držené předměty')}${table(rows.filter(r=>r.kind==='carried'),'Nesené a uložené předměty')}<div class="inv-footer-totals"><strong>Celkem ${rows.length} položek</strong><span>Známá hodnota: ${totals.knownValue} d${totals.unknownValue?` (${totals.unknownValue} bez ceny)`:''}</span><span>Známá hmotnost: ${totals.knownWeightLb.toFixed(1)} lb${totals.unknownWeight?` (${totals.unknownWeight} bez hmotnosti)`:''}</span><span>Gear ENC: ${number(load.gearENC)} · Armour ENC: ${number(load.armourENC)}${Number.isFinite(load.knownArmourENC)&&!Number.isFinite(load.armourENC)?` (známé od ${load.knownArmourENC}${Number.isFinite(load.armourENCUpperBound)&&load.armourENCUpperBound!==load.knownArmourENC?' do '+load.armourENCUpperBound:''})`: ''} · Bulk: ${load.bulkReady?number(load.meleeBulkPenalty):load.prohibitedOutfit?'zakázaná sestava':'pořadí neurčeno'}</span></div>`;
@@ -7325,15 +7341,35 @@ if(e.target.id==='shock-ml-form'){
    if(v.weaponStrikeMode!=='primary'){output.textContent='Automatické Traits zatím podporují pouze Primary Mode.';return;}
    const equipped=data.inventory.find(x=>x.id===v.weaponInventoryId&&x.characterId===attacker.id&&['main_hand','off_hand'].includes(x.slot)&&x.snapshot?.category==='weapon');
    if(!equipped){output.textContent='Pro automatické Traits vyberte nasazenou zbraň útočníka.';return;}
-   const automaticAttack=verifiedMeleeModifiers(equipped.snapshot,{role:'attack'});
+   const automaticAttack=verifiedMeleeModifiers(equipped.snapshot,{role:'attack',twoHanded:requiresTwoHands(equipped)});
    if(!automaticAttack.ok){output.textContent='Útočné Traits: '+automaticAttack.reason;return;}
+   // Only this opt-in AUTO branch supplies Heft; the manual GM branch
+   // remains untouched to avoid silently counting a entered penalty twice.
+   const attSTR=attacker.hmk?.attributes?.str,attHFT=equipped.snapshot.properties?.heft;
+   if(!Number.isSafeInteger(attSTR)||!Number.isSafeInteger(attHFT)){
+    output.textContent='Pro automatický Heft útočníka chybí STR/HFT.';return;
+   }
+   const att2H=requiresTwoHands(equipped);
+   if((att2H&&v.attackerUsedArms!=='both')||(!att2H&&v.attackerUsedArms==='both')){
+    output.textContent='Deklarace paží útočníka se liší od držení v Arsenal & Gear.';return;
+   }
    attackMods.push(...automaticAttack.modifiers);
+   attackMods.push({label:'HMK p98/165 Heft podle nasazené zbraně a držení',value:heftPenalty({str:attSTR,hft:attHFT,twoHanded:att2H,offHand:equipped.slot==='off_hand'&&!att2H}).penalty});
    if(v.defence==='block'||v.defence==='counterstrike'){
     const defendingWeapons=data.inventory.filter(x=>x.characterId===target.id&&['main_hand','off_hand'].includes(x.slot)&&x.snapshot?.category==='weapon');
     if(defendingWeapons.length!==1){output.textContent='Pro automatické obranné Traits musí mít obránce právě jednu nasazenou zbraň; jinak vypněte automatiku.';return;}
-    const automaticDefence=verifiedMeleeModifiers(defendingWeapons[0].snapshot,{role:'defence',defence:v.defence,threateningFoeCount:integerField('defenderFoeCount')});
+    const automaticDefence=verifiedMeleeModifiers(defendingWeapons[0].snapshot,{role:'defence',defence:v.defence,threateningFoeCount:integerField('defenderFoeCount'),twoHanded:requiresTwoHands(defendingWeapons[0])});
     if(!automaticDefence.ok){output.textContent='Obranné Traits: '+automaticDefence.reason;return;}
+    const defWeapon=defendingWeapons[0],defSTR=target.hmk?.attributes?.str,defHFT=defWeapon.snapshot.properties?.heft;
+    if(!Number.isSafeInteger(defSTR)||!Number.isSafeInteger(defHFT)){
+     output.textContent='Pro automatický Heft obránce chybí STR/HFT.';return;
+    }
+    const def2H=requiresTwoHands(defWeapon);
+    if((def2H&&v.defenderUsedArms!=='both')||(!def2H&&v.defenderUsedArms==='both')){
+     output.textContent='Deklarace paží obránce se liší od držení v Arsenal & Gear.';return;
+    }
     defendMods.push(...automaticDefence.modifiers);
+    defendMods.push({label:'HMK p98/165 Heft obrany podle držení',value:heftPenalty({str:defSTR,hft:defHFT,twoHanded:def2H,offHand:defWeapon.slot==='off_hand'&&!def2H}).penalty});
    }
   }
   for(const c of [attacker,target]){
@@ -7416,6 +7452,24 @@ if(e.target.id==='shock-ml-form'){
   const baseWQ=Number(equipped.snapshot.properties?.quality);
   if(!Number.isSafeInteger(baseWQ)||!Number.isSafeInteger(equipped.currentWQ)){output.textContent='Zbraň nemá ověřené základní/aktuální WQ pro výpočet Impact';return;}
   const wqImpactPenalty=qualityImpactPenalty({baseWQ,currentWQ:equipped.currentWQ});
+  const actualWielder=character(equipped.characterId),impactSTR=actualWielder?.hmk?.attributes?.str;
+  if(!Number.isSafeInteger(impactSTR)||impactSTR<1){output.textContent='Chybí ověřená Strength držitele zbraně pro Impact.';return;}
+  // The selected grip is persisted in inventory, not a second Combat checkbox.
+  // HMK p.98: both hands lower HFT; swung two-handed +1 Impact only if STR >= listed HFT.
+  const printHFT=equipped.snapshot.properties?.heft;
+  const primary=equipped.snapshot.properties?.verifiedModes?.[0];
+  const twoH=requiresTwoHands(equipped);
+  const gripImpactBonus=v.weaponStrikeMode==='primary'&&Number.isSafeInteger(printHFT)?
+   twoHandedImpactBonus({str:impactSTR,listedHft:printHFT,twoHanded:twoH,
+    swung:!String(primary?.length??equipped.snapshot.properties.length).includes('t')}):0;
+  // Special Strike Modes still have separate rules; do not grant a primary-mode grip bonus.
+  const verifiedStrengthImpact=strengthImpactModifier(impactSTR);
+  if(v.impactSource==='melee'&&actualStriker){
+   const armChoice=actualStriker.id===v.attackerId?v.attackerUsedArms:v.defenderUsedArms;
+   if((twoH&&armChoice!=='both')||(!twoH&&armChoice==='both')){
+    output.textContent='Použité paže neodpovídají držení zbraně uloženému v Arsenal & Gear. Nejdříve sjednoťte režim a deklaraci.';return;
+   }
+  }
   // HMK p172. A confirmed mounted charge belongs to the real striker, not to
   // whichever participant happens to be selected in the initial attack form.
   // The bonus is stored in the persistent character state for the earning round
@@ -7432,7 +7486,7 @@ if(e.target.id==='shock-ml-form'){
   const ta=verifiedImpactTA({aspect:weaponStrike.aspect,count:meleeGate?.impactTA??0,override:taOverride});
   if(!ta.ok){output.textContent='Impact TA: '+ta.reason;return;}
   if(meleeGate){meleeGate.impactBonus=ta.bonus;meleeGate.impactTAAspect=weaponStrike.aspect;}
-  v.strikeImpact=String(Math.max(0,weaponStrike.impact+ta.bonus+wqImpactPenalty+confirmedMountedImpact));v.aspect=weaponStrike.aspect;
+  v.strikeImpact=String(Math.max(0,weaponStrike.impact+ta.bonus+wqImpactPenalty+verifiedStrengthImpact+gripImpactBonus+confirmedMountedImpact));v.aspect=weaponStrike.aspect;
   if(meleeGate)meleeGate.confirmedMountedImpact=confirmedMountedImpact;
  }
  const rawImpact=String(v.strikeImpact??'');const rawAR=String(v.armourReduction??'');const rawLocationShock=String(v.locationShock??'');
@@ -7795,6 +7849,17 @@ document.addEventListener('click',e=>{
   if(!verified.bulkReady||!verified.encReady||verified.layeringStatus==='violation')throw Error('Nové pořadí neprošlo pravidlovou kontrolou HMK');
  });
  if(done){selected=id;view='sheet';render();}
+},true);
+// Persisted grip is the single authority for hand reservations and combat.
+document.addEventListener('change',e=>{
+ const ctrl=e.target?.closest?.('[data-weapon-grip]');if(!ctrl)return;
+ e.stopImmediatePropagation();
+ const ownerId=selected;
+ if(view!=='sheet'||activeSheetSection!=='inventory'||!character(ownerId)||combatInitiativeSequence){render();return;}
+ try{
+  const next=setWeaponGrip(data,{ownerId,itemId:ctrl.dataset.weaponGrip,grip:ctrl.value});
+  if(!mutate(()=>{data.inventory=next.inventory;}))render();
+ }catch(err){alert('Držení nebylo změněno: '+err.message);render();}
 },true);
 // Equipment dropdown writes to the SAME authoritative inventory used by Combat.
 // Never equip during active Initiative, never silently replace an occupied hand.

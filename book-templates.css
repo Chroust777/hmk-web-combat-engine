@@ -4134,3 +4134,29 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  .content-sheet .journal-book--overview .journal-left-top{grid-template-columns:minmax(0,1fr)!important}
  .content-sheet .journal-book--overview .journal-nameplate .journal-nameplate-copy{padding:0 7px!important}
 }
+
+/* v93.359 — balanced family/traits folio, consistent quiet-ink numerals. */
+.content-sheet .journal-book--overview .journal-left-mid{
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ align-items:stretch;
+}
+.content-sheet .journal-book--overview .journal-left-mid>.journal-book-section{min-width:0;width:100%;box-sizing:border-box}
+.content-sheet .journal-book--overview .journal-anatomy-table thead th:nth-child(3){text-align:center!important;vertical-align:middle!important}
+.content-sheet .journal-book--overview .journal-anatomy-table thead th:nth-child(3)>span{display:inline-block;text-align:center!important;width:100%}
+.content-sheet .journal-book--overview .journal-grace-piety .journal-stat-box strong,
+.content-sheet .journal-book--overview .journal-attributes-row .journal-stat-box strong{
+ font:700 11px/1.23 Georgia,serif!important;color:#211b15!important;
+ font-variant-numeric:tabular-nums!important;
+}
+.content-sheet .journal-book--chapter .equipped-hands .hmk-hand-control{min-width:0;display:grid;gap:3px}
+.content-sheet .journal-book--chapter .equipped-hands .hmk-grip-slot{min-width:0;display:grid;gap:2px}
+.content-sheet .journal-book--chapter .equipped-hands .hmk-grip-slot span{font:600 10px/1.2 Georgia,serif;color:#342719}
+.content-sheet .journal-book--chapter .equipped-hands .hmk-grip-slot select{min-width:0;width:100%;font-size:11px;padding:3px}
+@media(max-width:550px){.content-sheet .journal-book--overview .journal-left-mid{grid-template-columns:minmax(0,1fr)!important}}
+
+/* v93.359 – override legacy 12.96px clamp in the third sacred-stat cluster. */
+.content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster.journal-grace-piety .journal-stat-box strong,
+.content-sheet .journal-book--overview .journal-attributes-row .journal-box-cluster:last-child .journal-stat-box strong{
+ font-size:11px!important;line-height:1.23!important;font-family:Georgia,serif!important;
+ font-weight:700!important;color:#211b15!important;
+}
