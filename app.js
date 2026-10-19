@@ -340,7 +340,7 @@ function main(){
  const characterButtons=data.characters.map(c=>`<button type="button" class="castle-character ${c.id===selected?'active':''}" data-open="${esc(c.id)}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span>${esc(c.name)}</span></button>`).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <header class="mast"><div class="mast-top">
-   <div class="mast-brand"><div class="brand-mark" aria-hidden="true">⚜</div><div class="brand-copy"><div class="eyebrow">HMK · KÈTHÎRA</div><h1>Keeper’s Ledger</h1></div></div>
+   <div class="mast-brand"><div class="brand-mark" aria-hidden="true">⚜</div><div class="brand-copy"><div class="eyebrow">HMK · KÈTHÎRA</div><h1>HârnMaster Roleplaying in the World of Kèthîra</h1></div></div>
    <div class="mast-meta"><span class="release-marker">v${APP_VERSION}</span></div>
  </div></header>
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
