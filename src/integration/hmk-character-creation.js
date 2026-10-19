@@ -433,6 +433,7 @@ export function creationRevisionIssues(character){
  // generated-proof gate. Direct GM/thematic choices remain legitimate without
  // a fabricated random roll.
  if(v.autoGeneration?.version>=2){
+  if(v.autoGeneration.version>=3&&(!v.moralityProof||!Number.isInteger(h.morality)))push(10,'moralityChoice','Chybí Morality (MOR) podle HMK p.39: doložené 4d6 nebo přímá volba.');
   const missing=(key)=>!filled(v[key]);
   const required=[[1,'folk','Chybí uložená volba Folk.'],
    [2,'ageGroup','Chybí uložená věková skupina.'],
@@ -578,10 +579,13 @@ export function applyCreationPatch(character,patch){
   if(c.values.psycheProof){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-psyche-deactivated',reason:'Changed creation prerequisites'});delete c.values.psycheProof;}
   delete h.psyche;
   if(c.values.spiritPowerProof)c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-spirit-powers-deactivated',reason:'Changed creation prerequisites'});
-  for(const key of ['arcaneResearchProof','mysteriesProof','mysteriesRitualSkill','spiritPowerProof','startingElixirProof','startingPvarSpellsProof','startingDoctrineProof','shamanTraditionProof','moralityChoice','religionNeedsReview'])delete c.values[key];
+  for(const key of ['arcaneResearchProof','mysteriesProof','mysteriesRitualSkill','spiritPowerProof','startingElixirProof','startingPvarSpellsProof','startingDoctrineProof','shamanTraditionProof','religionNeedsReview'])delete c.values[key];
   delete h.startingElixirs;delete h.startingPvarSpells;delete h.startingDoctrine;delete h.shamanTradition;
   delete h.startingSpiritPowers;
-  delete h.religiousStatus;delete h.morality;delete h.startingArcaneResearch;
+  delete h.religiousStatus;
+  if(c.values.moralityProof){c.values.moralityChoice=c.values.moralityProof.score;h.morality=c.values.moralityProof.score;}
+  else {delete c.values.moralityChoice;delete h.morality;}
+  delete h.startingArcaneResearch;
   delete c.completed[14];c.status='in-progress';
  };
  const invalidateSkillMysteries=()=>{
@@ -589,10 +593,13 @@ export function applyCreationPatch(character,patch){
    c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-mysteries-derived-deactivated',reason:'Changed Skills / Attributes'});
   }
   if(c.values.spiritPowerProof)c.auditEvents.push({sequence:c.auditEvents.length+1,type:'creation-spirit-powers-deactivated',reason:'Changed Skills / Attributes'});
-  for(const key of ['mysteriesProof','arcaneResearchProof','mysteriesRitualSkill','spiritPowerProof','startingElixirProof','startingPvarSpellsProof','startingDoctrineProof','shamanTraditionProof','moralityChoice','religionNeedsReview'])delete c.values[key];
+  for(const key of ['mysteriesProof','arcaneResearchProof','mysteriesRitualSkill','spiritPowerProof','startingElixirProof','startingPvarSpellsProof','startingDoctrineProof','shamanTraditionProof','religionNeedsReview'])delete c.values[key];
   delete h.startingElixirs;delete h.startingPvarSpells;delete h.startingDoctrine;delete h.shamanTradition;
   delete h.startingSpiritPowers;
-  delete h.religiousStatus;delete h.morality;delete h.startingArcaneResearch;
+  delete h.religiousStatus;
+  if(c.values.moralityProof){c.values.moralityChoice=c.values.moralityProof.score;h.morality=c.values.moralityProof.score;}
+  else {delete c.values.moralityChoice;delete h.morality;}
+  delete h.startingArcaneResearch;
   delete c.completed[14];c.status='in-progress';
  };
  if((patch.step===11&&(Object.keys(patch.values??{}).length||patch.advance))||
@@ -680,6 +687,8 @@ export function applyCreationPatch(character,patch){
    if(folkFromDie(c.values.folkRoll)!==c.values.folk)throw Error('Folk neodpovídá fyzickému d100 (p.20)');}
   h.folk=c.values.folk;
   if(changed('folk')){
+   if(c.values.moralityProof){c.auditEvents.push({sequence:c.auditEvents.length+1,type:'morality-proof-deactivated',reason:'Folk modifier changed'});}
+   delete c.values.moralityProof;delete c.values.moralityChoice;delete h.morality;
    delete c.values.ageGroup;deactivateDependent(2,['ageRoll']);delete h.ageGroup;
    // A different Folk can have a different permitted birth region, society,
    // parent class, language, religion and occupational eligibility (pp.20–44,
@@ -902,6 +911,30 @@ export function applyCreationPatch(character,patch){
     const proof=evaluateVoiceDice({folk:h.folk,dice:patch.voice.dice});
     c.auditEvents.push({sequence:c.auditEvents.length+1,type:'voice-dice',rolls:[...proof.rolls],score:proof.score});
     c.voiceProof=proof;h.attributes={...(h.attributes||{}),voi:proof.score};
+   }
+   if(patch.advance){
+    if(ATTRIBUTES.some(key=>!c.attributeProof?.[key])||!c.voiceProof)throw Error('Morality vyžaduje nejprve dvanáct atributů a Voice.');
+    const rolls=patch.moralityDice??[];
+    if(rolls.length){
+     if(rolls.length!==4||rolls.some(d=>!/^([1-6])$/.test(String(d))))throw Error('HMK p.39: Morality vyžaduje přesně čtyři d6 v rozsahu 1–6.');
+     const dice=rolls.map(Number), kept=[...dice].sort((a,b)=>b-a).slice(0,3);
+     const folkMod=h.folk==='Kúzhai'?2:['Sinái','Sidhé'].includes(h.folk)?4:0;
+     const score=kept.reduce((a,b)=>a+b,0)+folkMod;
+     const old=c.values.moralityProof;
+     if(!old||old.method!=='dice'||old.rolls.join(',')!==dice.join(',')){
+      c.auditEvents.push({sequence:c.auditEvents.length+1,type:'morality-dice',rolls:dice,kept,folkModifier:folkMod,score,sourcePage:39});
+     }
+     c.values.moralityProof={method:'dice',rolls:dice,kept,folkModifier:folkMod,score,sourcePage:39};
+     c.values.moralityChoice=score;h.morality=score;
+    }else{
+     const score=Number(c.values.moralityChoice??c.values.moralityProof?.score);
+     if(!Number.isInteger(score)||score<1||score>30)throw Error('HMK p.39: vyberte Morality 1–30 nebo zadejte skutečný hod 4d6.');
+     if(c.values.moralityProof?.score!==score||!c.values.moralityProof){
+      c.values.moralityProof={method:'chosen',score,sourcePage:39};
+      c.auditEvents.push({sequence:c.auditEvents.length+1,type:'morality-selected',score,sourcePage:39});
+     }
+     c.values.moralityChoice=score;h.morality=score;
+    }
    }
  }
  if(patch.step===11){
@@ -1213,6 +1246,10 @@ export function applyCreationPatch(character,patch){
    if(provenDoctrine&&morality!==null){
     orthodoxyPenalty=moralityOrthodoxyPenalty(religion,morality);
     if(m.orthodoxyPenalty!==undefined&&Number(m.orthodoxyPenalty)!==orthodoxyPenalty)throw Error('Morality a Orthodoxy musí být vypočtené z náboženského intervalu, ne ruční penalty');
+    if(c.values.moralityProof?.score!==morality){
+     c.values.moralityProof={method:'chosen',score:morality,sourcePage:39};
+     c.auditEvents.push({sequence:c.auditEvents.length+1,type:'morality-selected',score:morality,sourcePage:39});
+    }
     c.values.moralityChoice=morality;h.morality=morality;
    }
    if(patch.advance&&provenDoctrine&&morality===null&&(clone.kind??'PC')==='PC')throw Error('HMK p.39,55: vyberte skutečnou Morality; Orthodoxy a Piety se vypočítají');
@@ -1367,6 +1404,14 @@ export function assertCreationInvariants(character){
     throw Error('Poškozený audit volby Perception');
   }else if(e.type==='voice-dice'){
    if(!Array.isArray(e.rolls)||!Number.isInteger(e.score))throw Error('Poškozený důkaz Voice');
+  }else if(e.type==='morality-dice'){
+   if(e.sourcePage!==39||!Array.isArray(e.rolls)||e.rolls.length!==4||e.rolls.some(d=>!Number.isInteger(d)||d<1||d>6)||
+      ![0,2,4].includes(e.folkModifier)||JSON.stringify([...e.rolls].sort((a,b)=>b-a).slice(0,3))!==JSON.stringify(e.kept)||
+      e.score!==e.kept.reduce((a,b)=>a+b,0)+e.folkModifier)throw Error('Poškozený hod Morality 4d6');
+  }else if(e.type==='morality-selected'){
+   if(e.sourcePage!==39||!Number.isInteger(e.score)||e.score<1||e.score>30)throw Error('Poškozená volba Morality');
+  }else if(e.type==='morality-proof-deactivated'){
+   if(e.reason!=='Folk modifier changed')throw Error('Poškozené zneplatnění Morality');
   }else if(e.type==='grace-aspect-choice'){
    if(e.sourcePage!==310||!divineAspectFromChoice({roll:15,grace:0,marked:true},e.aspect))throw Error('Poškozená volba Divine Aspect');
   }else if(e.type==='grace-aspect-deactivated'){
