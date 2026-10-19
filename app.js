@@ -159,7 +159,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.339';
+const APP_VERSION='93.340';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -316,7 +316,6 @@ function activeVisualScene(){
  }
  if(view==='calendar')return 'valley';
  if(view==='skills')return 'warroom';
- if(view==='hazards')return 'study';
  if(view==='encounter')return 'armory';
  return 'study';
 }
@@ -333,23 +332,17 @@ function main(){
  if(view==='backup')body=backupView();
  if(view==='calendar')body=campaignCalendarView();
  if(view==='skills')body=skillWorkbenchView();
- if(view==='hazards')body=hazardsView();
  if(view==='encounter')body=encounterView();
  const scene=activeVisualScene();
- const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['hazards','✣','Nebezpečí / Trauma'],['backup','▤','Zálohy'],['trash','♧','Archiv']];
+ const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['backup','▤','Zálohy'],['trash','♧','Archiv']];
  const characterButtons=data.characters.map(c=>`<button type="button" class="castle-character ${c.id===selected?'active':''}" data-open="${esc(c.id)}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
- <header class="mast"><div class="mast-top">
-   <div class="mast-brand"><div class="brand-mark" aria-hidden="true">⚜</div><div class="brand-copy"><div class="eyebrow">HMK · KÈTHÎRA</div><h1>HârnMaster World of Kèthîra</h1></div></div>
-   <div class="mast-meta"><span class="release-marker">v${APP_VERSION}</span></div>
- </div></header>
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
   <div class="castle-campaign-card"><strong>HârnMaster World of Kèthîra</strong></div>
   <div class="nav-section-label">HLAVNÍ MENU</div>
   ${navLinks.map(([id,icon,label])=>`<button type="button" class="castle-nav-link ${view===id?'active':''}" data-nav="${id}"><span class="castle-nav-icon" aria-hidden="true">${icon}</span><span class="castle-nav-label">${esc(label)}</span><span class="castle-nav-spacer" aria-hidden="true"></span></button>`).join('')}
   <div class="nav-section-label castle-character-section">POSTAVY <span>${data.characters.length}</span></div>
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
-  ${selected&&character(selected)?`<div class="castle-character-tools"><button type="button" class="castle-nav-link" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="castle-nav-link" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`:''}
   <button type="button" class="castle-create" data-action="new-character"><span class="castle-create-symbol" aria-hidden="true">✣</span><span class="castle-create-label">Vytvořit postavu</span><span class="castle-create-plus" aria-hidden="true">＋</span></button>
   <div class="castle-sidebar-footer">⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
  </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter'].includes(view)?' content-sheet':''}">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
@@ -718,7 +711,7 @@ function hskHazardSummary(actorId){
  <p class="muted">Zobrazený stav je převzat z autoritativního Combat State. Otravy, nemoc, kouř ani oheň se zde nově nespouštějí.</p>
  ${lines.length?`<ul>${lines.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p>Zatím žádná otevřená událost z Fire / Smoke / Poison / Disease / Sleep Deprivation.</p>'}
  <p>Shock: <strong>${esc(s.shock)}</strong> · Windedness ${s.fatigue.windedness} · Weariness ${s.fatigue.weariness} · Weakness ${s.fatigue.otherWeakness} · PSY ${s.morale?.psycheStress??0}</p>
- <button type="button" class="secondary" data-nav="hazards">⚠ Vyhodnotit nehody, nemoci a toxiny</button></section>`;
+ ${view==='sheet'&&activeSheetSection==='hazards'?'':'<button type="button" class="secondary" data-nav="hazards">⚠ Vyhodnotit nehody, nemoci a toxiny</button>'}</section>`;
 }
 function hskSleeplessPanel(actorId){
  const actor=character(actorId);if(!actor)return '';
@@ -758,16 +751,14 @@ function hskSleeplessPanel(actorId){
  <button type="submit">Obnovit Weariness a uzavřít epizodu</button><output role="status" aria-live="polite"></output></form></details>`:''}
  <p class="tiny muted">Tato etapa automatizuje bezesná 24h období, časově doložený 4h odpočinek a potvrzený 8h spánek. Souběh Weariness z více zdrojů zůstává otevřenou větví; nelze jim bez potvrzení času přisuzovat automatickou úlevu. PSY se nezapočítá podruhé, jeho výběr/nástup/zotavení využívá existující Psyche proceduru.</p></section>`;
 }
-function hazardsView(){
- const actor=character(selected)??data.characters[0];if(!actor)return `<section class="panel"><h2>Nebezpečí / Trauma</h2><p>Nejprve vytvořte postavu.</p></section>`;
- if(selected!==actor.id)selected=actor.id;
- return `<div class="topline"><h2>⚠ Nebezpečí / Trauma · ${esc(actor.name)}</h2><button type="button" class="secondary" data-nav="skills">⚄ Skill Tests</button><button type="button" class="secondary" data-nav="sheet">Osobní deník</button></div>
- <p class="notice">Tady GM vyhodnocuje následky nehody, expozice a onemocnění. Původ může být Skill Test, Combat nebo samostatná událost. Zdejší procedura nemění zpětně původní hod a nevyvolává automaticky Skill CF.</p>
+function hazardsView(actorId){
+ const actor=character(actorId);if(!actor)return '<section class="panel wide"><p>Nejprve otevřete deník konkrétní postavy.</p></section>';
+ return `<section class="panel wide panel--chapter"><h3>Nebezpečí, nehody a zdravotní následky</h3><p class="notice">GM zde vyhodnocuje následky nehody, expozice a onemocnění postavy <strong>${esc(actor.name)}</strong>. Původ může být Skill Test, Combat nebo samostatná událost. Procedura nemění zpětně původní hod a automaticky nevyvolává Skill CF.</p><button type="button" class="secondary" data-nav="skills">⚄ Skill Tests</button></section>
  ${hskHazardSummary(actor.id)}${hskAsphyxiaComaPanel(actor.id)}${hskMundaneFireSmokePanel(actor.id)}${hskPoisonPanel(actor.id)}${hskDiseasePanel(actor.id)}${hskSleeplessPanel(actor.id)}`;
 }
 function skillWorkbenchView(){
  const actor=character(selected)??data.characters[0];if(actor&&selected!==actor.id)selected=actor.id;if(!actor)return journalChapterShell('Skills','Skill testy ve stejném stylu deníku.',`<section class="panel"><h2>Skill Tests</h2><p>Nejprve vytvořte postavu.</p><button data-nav="characters">Přejít do registru</button></section>`,`journal-book--skills`);
- return journalChapterShell('Skills','Skill testy, výpočty a navazující následky v jednotném vzhledu Keeper’s Ledger.',skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null)+`<section class="panel wide"><h3>Navazující nehody a stavové následky</h3><p>Climbing, Swimming a jiné Skills mohou vyvolat nehodu. Oheň, kouř, otrava a nemoc však mohou nastat i bez Skill Testu, proto mají vlastní společnou obrazovku. Výsledky se zapisují do Combat State a deníku postavy.</p><button type="button" data-nav="hazards">⚠ Otevřít Nebezpečí / Trauma</button></section>`,`journal-book--skills`);
+ return journalChapterShell('Skills','Skill testy, výpočty a navazující následky v jednotném vzhledu Keeper’s Ledger.',skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null)+`<section class="panel wide"><h3>Navazující nehody a stavové následky</h3><p>Climbing, Swimming a jiné Skills mohou vyvolat nehodu. Oheň, kouř, otrava a nemoc však mohou nastat i bez Skill Testu, proto se vyhodnocují v záložce Nebezpečí / Trauma v deníku příslušné postavy. Výsledky se zapisují do Combat State a deníku postavy.</p><button type="button" data-nav="hazards">⚠ Otevřít Nebezpečí / Trauma v deníku postavy</button></section>`,`journal-book--skills`);
 }
 function charactersView(){
  const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));
@@ -939,7 +930,7 @@ function journalConditionDetailsHTML(c,state,load){
  return `<div class="journal-condition-detail-grid">${block('Impact',[['Poslední Impact',impactValue],['Recorded Hits',(state.events||[]).filter(x=>x.type==='confirmed-hit').length]])}${block('Shock State',[['Current',shock],['Extended HR',state.extendedShock?.hr??'—'],['Coma HR',state.coma?.hr??'—']],'journal-shock-state')}${block('Stress',[['Psyche',stress],['Aural Shock',auraShock],['Shadow',shadow]])}${block('Fatigue',[['Winded',fat.windedness],['Weary',fat.weariness],['Weak',fat.weakness],['Total',fat.total],['PF',pf],['END SR (TN)',endSR]])}</div>`;
 }
 function journalSimpleChecklist(title,rows){return `<section class="journal-book-section"><div class="journal-book-title">${esc(title)}</div><div class="journal-check-grid">${rows.map(([label,value])=>`<label><span class="journal-check"></span><em>${esc(label)}</em><strong>${esc(firstPresent(value,'—'))}</strong></label>`).join('')}</div></section>`;}
-function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['notes','Notes & Logbook']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}</div>`;}
+function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['notes','Notes & Logbook'],['hazards','Nebezpečí / Trauma']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}<span class="journal-character-action-divider" aria-hidden="true"></span><button type="button" class="secondary journal-character-action" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="secondary journal-character-action" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`;}
 /** A page contains live DOM controls; the book decoration is the same for all folios.
  * Character-only navigation never belongs to World, Combat, Skills or Library.
  * Keep ordinary page contents in document order. Do not manufacture rule values.
@@ -1187,6 +1178,7 @@ function liveSpecialEffectsPanel(c){
 }
 function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  if(activeSheetSection==='overview')return '';
+ if(activeSheetSection==='hazards')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Nebezpečí / Trauma</h3><p>GM procedury a následky postavy ${esc(c.name)} · HMK</p></header><div class="columns journal-tech-columns">${hazardsView(c.id)}</div></section>`,`journal-book--chapter journal-book--hazards`);
  if(activeSheetSection==='inventory')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Arsenal & Gear</h3><p>Inventář, výbava, zatížení a speciální efekty.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Inventář postavy</h3>${wealthInventoryPanel(c)}${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}<form id="add-inventory"><label>Předmět z knihovny<select name="itemId" required><option value="">Vyberte…</option>${allCatalogItems().map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${field('condition','Stav / poznámka','')}${field('currentWQ','Aktuální WQ kusu (nepovinné)','', 'number')}${slotSelect('slot','none')}<button type="submit" ${allCatalogItems().length?'':'disabled'}>Přiřadit předmět</button></form><div class="notice tiny">Při přiřazení vzniká samostatná kopie parametrů. Úprava knihovny nezmění již přidělené předměty.</div></section>${armourLoadoutPanel(inv,c)}${combatantLoadPanel(c)}${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:''})()}</div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='status')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Combat & Conditions</h3><p>Aktuální stav, povinné procedury, zranění a návazné herní sekvence.</p></header><div class="columns journal-tech-columns">${hskPendingSkillPhysicalConsequences(c.id)}${hskHazardSummary(c.id)}${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section></div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='notes')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row journal-log-row"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section>${auditPanel}</div></section>`,`journal-book--chapter`);
@@ -5705,7 +5697,13 @@ if(t.dataset.action==='export-diagnostic'){downloadJSON(diagnosticReport(),'hmk-
 if(t.dataset.action==='export-raw'){downloadRawStorage();return}
 if(t.dataset.action==='export-kernel-character'){const c=character(selected);if(c)downloadJSON(kernelExport([c]),'hmk-character-'+safeFilename(c.name)+'.json');return}
 if(t.dataset.action==='export-kernel-all'){downloadJSON(kernelExport(data.characters),'hmk-domain-export.json');return}
-if(t.dataset.nav){lastCombatEvent=null;view=t.dataset.nav;query='';overlay=null;render();return}if(t.dataset.open){selected=t.dataset.open;view='sheet';overlay=null;render();return}
+if(t.dataset.nav){lastCombatEvent=null;
+ if(t.dataset.nav==='hazards'){
+  const actor=character(selected)??data.characters[0];
+  if(!actor){view='characters';overlay=null;render();return}
+  selected=actor.id;activeSheetSection='hazards';sheetEditingId=null;view='sheet';
+ }else{view=t.dataset.nav;}
+ query='';overlay=null;render();return}if(t.dataset.open){selected=t.dataset.open;view='sheet';overlay=null;render();return}
 if(t.dataset.copy){if(combatInitiativeSequence)return alert('Během Initiative nelze kopírovat postavu včetně bojového stavu a inventáře.');const c=character(t.dataset.copy);mutate(()=>{const id=uuid();const copy={...structuredClone(c),id,name:c.name+' (kopie)'};if(copy.hmk){copy.hmk.skills=(copy.hmk.skills||[]).map(s=>({...s,id:uuid()}));copy.hmk.injuries=(copy.hmk.injuries||[]).map(i=>({...i,id:uuid()}))}data.characters.push(copy);const clonedInvIds=new Map();for(const x of data.inventory.filter(x=>x.characterId===c.id)){const newId=uuid();clonedInvIds.set(x.id,newId);data.inventory.push({...structuredClone(x),id:newId,characterId:id})}if(copy.hmk?.cashLedger){copy.hmk.cashLedger=copy.hmk.cashLedger.map(t=>({...t,id:uuid(),inventoryIds:t.inventoryIds.map(i=>clonedInvIds.get(i)??i)}))}for(const x of data.journal.filter(x=>x.characterId===c.id))data.journal.push({...structuredClone(x),id:uuid(),characterId:id});});return}
 if(t.dataset.deleteCharacter){
  if(combatInitiativeSequence)return alert('Během Initiative nelze definitivně odstranit postavu.');

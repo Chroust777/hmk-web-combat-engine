@@ -3238,3 +3238,36 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
   .nav .castle-nav-link{grid-template-columns:22px minmax(0,1fr) 22px!important;padding:8px 5px!important}
   .nav .castle-nav-label{font-size:12px!important}
 }
+
+
+/* v93.340: Navigation uses the left sidebar only; no top mast exists.
+   Keep sidebar scroll independent and do not reserve the removed mast height. */
+@media(min-width:801px){
+ .layout>.nav{
+   top:0!important;
+   min-height:100vh!important;
+   max-height:100vh!important;
+   overflow-y:auto!important;
+ }
+}
+/* Character-owned actions live in the journal's tab strip, not the sidebar. */
+.content-sheet .journal-book-subnav .journal-character-action{
+  min-height:30px!important;
+  padding:5px 9px!important;
+  font:600 11px/1.2 Georgia,serif!important;
+  white-space:normal!important;
+  border-color:#a8814e!important;
+  background:linear-gradient(180deg,#e7d5b4,#ccb08b)!important;
+  color:#432b18!important;
+}
+.content-sheet .journal-book-subnav .journal-character-action-divider{
+  width:1px;
+  height:24px;
+  flex:0 0 1px;
+  background:#9c754a80;
+  align-self:center;
+}
+@media(max-width:800px){
+ .content-sheet .journal-book-subnav .journal-character-action-divider{display:none}
+ .content-sheet .journal-book-subnav .journal-character-action{font-size:10px!important}
+}
