@@ -321,7 +321,7 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
    }
    if(form.elements.namedItem('nativeRitualChoice')&&!choice(form,'nativeRitualChoice',die,profile==='covenant'?'Beóna':null))throw Error('Chybí ověřená nabídka rodného náboženství');
    choice(form,'nativeRitualChoice2',die);choice(form,'nativeRitualChoice3',die);
-   if(['Kúzhai','Sinái','Sidhé'].includes(h.folk)&&!c.values.folkSkillProof){
+   if(['Kúzhai','Sinái'].includes(h.folk)&&!c.values.folkSkillProof){
     put(form,'folkDice',Array.from({length:h.folk==='Kúzhai'?2:4},()=>die(10)).join(','));return 'folk';
    }
    return 'next';
@@ -339,9 +339,9 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
   const stageName=['Folk Skills','Arcane Talent Skills','Family Skills','Background Skills','Occupation Skills','Optional Skills','Veteran Skills','Sunsign Skills'][stage];
   const allocation=c.skillDP?.[stageName]||{};
   const used=Object.values(allocation).reduce((a,b)=>a+Number(b||0),0);
-  const budget=stage===2||stage===3||stage===5?5:stage===6?(['Kúzhai','Sinái','Sidhé'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0):stage===7?5:0;
+  const budget=stage===2||stage===3||stage===5?5:stage===6?(['Kúzhai','Sinái'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0):stage===7?5:0;
   if(stage===6){
-   const count=['Kúzhai','Sinái','Sidhé'].includes(h.folk)||h.ageGroup==='Old'?2:h.ageGroup==='Mature'?1:0;
+   const count=['Kúzhai','Sinái'].includes(h.folk)||h.ageGroup==='Old'?2:h.ageGroup==='Mature'?1:0;
    const rounds=c.values.veteranRoundProof||[];
    let pending=0;while(pending<count&&Object.values(rounds[pending]||{}).reduce((a,b)=>a+Number(b||0),0)>=5)pending++;
    if(pending>=count)return 'next';
@@ -368,7 +368,7 @@ export function prepareAutomaticStep(form,character,{profile='random',die=secure
    const estr=String(h.estrangement||'').split(' ')[0];
    const counts={Outcast:1,Unpopular:2,Accepted:3,Popular:4,Favourite:5};
    const n=(counts[estr]||3)+1;
-   const m=(['Kúzhai','Sinái','Sidhé'].includes(h.folk)||h.ageGroup==='Old'?3:h.ageGroup==='Mature'?2:1)+1;
+   const m=(['Kúzhai','Sinái'].includes(h.folk)||h.ageGroup==='Old'?3:h.ageGroup==='Mature'?2:1)+1;
    put(form,'familyDice',a>0?Array.from({length:n},()=>die(a)).join(','):'');
    put(form,'occupationDice',b>0?Array.from({length:m},()=>die(b)).join(','):'');
   }

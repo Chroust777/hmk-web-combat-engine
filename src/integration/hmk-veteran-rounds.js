@@ -2,7 +2,7 @@
  * five-point rounds for Old / Ælrhin / Kúzhai, one for Mature, none for Young.
  * The printed per-round cap depends on all points gained BEFORE each round.
  * No physical dice and no second persistence path. */
-export function veteranRoundCount(folk,ageGroup){return ['Kúzhai','Sinái','Sidhé'].includes(folk)||ageGroup==='Old'?2:ageGroup==='Mature'?1:0;}
+export function veteranRoundCount(folk,ageGroup){return ['Kúzhai','Sinái'].includes(folk)||ageGroup==='Old'?2:ageGroup==='Mature'?1:0;}
 export function sumRound(o){return Object.values(o??{}).reduce((n,x)=>n+x,0)}
 export function veteranRoundsProof(character,rounds,definitions,stages,{complete=false,priorPoints=null}={}){
  const c=character?.hmk?.creation??{},folk=character?.hmk?.folk,age=character?.hmk?.ageGroup;

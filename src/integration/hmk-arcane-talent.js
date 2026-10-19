@@ -39,7 +39,7 @@ export function arcaneTalentFromPhysical({aura,folk,ageGroup,d20,d100s=[]}){
  const grants={};
  const spirit=code[0]==='S'?Number(code[1]):n?2:0;
  if(spirit)grants.Spirit=spirit;
- const base=['Kúzhai','Sinái','Sidhé'].includes(folk)||ageGroup==='Old'?4:ageGroup==='Mature'?3:ageGroup==='Young'?2:null;
+ const base=['Kúzhai','Sinái'].includes(folk)||ageGroup==='Old'?4:ageGroup==='Mature'?3:ageGroup==='Young'?2:null;
  if(n&&base===null)throw Error('Arcane Talent vyžaduje platnou věkovou skupinu');
  const dormancy=code==='D-'?-1:0;
  for(const name of names){const key='Talent ('+name+')';if(!Object.hasOwn(grants,key))grants[key]=base+dormancy;else if(dormancy!==0)throw Error('Neplatná duplicitní dormance');

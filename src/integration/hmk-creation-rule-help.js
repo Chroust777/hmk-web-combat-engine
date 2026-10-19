@@ -97,7 +97,7 @@ const NOTES=Object.freeze({
  familyScriptChoice:[47,'Family příděl Script patří konkrétnímu písmu používanému rodičovským povoláním.','Stejný rozpočet Family 5 DP; nevzniká další zdroj.'],
  familySecondScriptChoice:[47,'Druhý rodičovský Script je jiná konkrétní dovednost než první.','Písmo se nesmí duplicitně započítat.'],
  familyThirdScriptChoice:[47,'Třetí rodičovský Script musí být jiné písmo než první dvě.','Písmo se nesmí opakovat.'],
- folkAuto:[45,'Folk Skills závisí na Folk a někdy na předepsaných fyzických hodech.','Kúzhai/Sinái/Sidhé mají zvláštní fyzické d10 tabulky.'],
+ folkAuto:[45,'Folk Skills závisí na Folk a někdy na předepsaných fyzických hodech.','Kúzhai a Sinái mají zvláštní fyzické d10 tabulky (HMK str. 45).'],
  folkDice:[45,'Fyzické Folk d10 určují konkrétní rasové DP tam, kde to pravidla požadují.','Počet hodů podle Folk; žádné virtuální kostky.'],
  arcaneTalentD20s:[42,'Potomek Invokera má čtyři fyzické Talent Possession hody d20; použije se nejvyšší.','Čtyři skutečně hozené d20, poté případné d100 podle výsledku a Aura.'],
  arcaneTalentD20:[40,'Talent Possession používá skutečný d20, AUR a tabulku pro počet Talentů nebo Spirit.','Bez fyzického d20 není potvrzen počet Talentů.'],

@@ -1202,7 +1202,7 @@ export function printedParentWealthDie(occupation,title=null,socialClass=null){
 }
 export function wealthDiceCounts(estrangement,ageGroup,folk='Human'){
  const family={Outcast:1,Unpopular:2,Accepted:3,Popular:4,Favourite:5}[estrangement];
- const occupation=['Kúzhai','Sinái','Sidhé'].includes(folk)||ageGroup==='Old'?3:ageGroup==='Mature'?2:ageGroup==='Young'?1:null;
+ const occupation=['Kúzhai','Sinái'].includes(folk)||ageGroup==='Old'?3:ageGroup==='Mature'?2:ageGroup==='Young'?1:null;
  if(!family||!occupation)throw Error('Chybí doložené Estrangement / Age pro Wealth');return {family,occupation};
 }
 export function evaluateWealthDice({estrangement,ageGroup,folk,occupation,occupationDie,parentDie,familyRolls,occupationRolls,advantage=true,socialClass=null}){
@@ -1240,7 +1240,7 @@ export function tribalFreeOccupation(subsistence,die){const table=TRIBAL_FREE_OC
  const row=table.find(([max])=>n<=max);return {name:row[1],urbanChance:row[2],society:'Tribal',socialClass:'Free',subsistence,roll:n,sourcePage:29};}
 /** Folk Skill DP (p.45): physical d10, duplicate results use special rule. */
 export function folkSkillsFromDice(folk,rolls){
- const count=folk==='Kúzhai'?2:['Sinái','Sidhé'].includes(folk)?4:0;
+ const count=folk==='Kúzhai'?2:folk==='Sinái'?4:0;
  if(!count)throw Error('Přesná Folk d10 tabulka není pro tuto rasu přepsaná');
  if(!Array.isArray(rolls)||rolls.length!==count||rolls.some(d=>!Number.isInteger(Number(d))||Number(d)<1||Number(d)>10||String(d).trim()===''))throw Error(`Fyzické Folk Skills: ${count}×d10`);
  const table=folk==='Kúzhai'?

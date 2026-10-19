@@ -145,7 +145,7 @@ export function eligibleSkills(character,stageName=null){
    ...SCRIPTS.map(n=>instanceKey('Script',n)),
    ...religionChoices(character).map(n=>instanceKey('Ritual',n)),
    ...new Set((c.values?.arcaneTalentProof?.generated??[]).map(n=>instanceKey('Talent',n))));
-  if(stage==='Veteran Skills'&&h.ageGroup==='Young'&&!['Kúzhai','Sinái','Sidhé'].includes(h.folk))pool=[];
+  if(stage==='Veteran Skills'&&h.ageGroup==='Young'&&!['Kúzhai','Sinái'].includes(h.folk))pool=[];
  }else if(stage==='Sunsign Skills'){
   const sign=v.sunsignProof;
   // HMK pp.47–49: Sunsign may improve Language, Script and Ritual, but
@@ -168,7 +168,7 @@ export function eligibleSkills(character,stageName=null){
  }
  // No other skill can be allocated after the stage's allowance is exhausted.
  const cap=({'Family Skills':5,'Background Skills':5,'Optional Skills':5})[stage]??
-  (stage==='Veteran Skills'?(['Kúzhai','Sinái','Sidhé'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0):null);
+  (stage==='Veteran Skills'?(['Kúzhai','Sinái'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0):null);
  if(cap!==null&&Object.values(selected).reduce((sum,n)=>sum+n,0)>=cap)pool=pool.filter(name=>Object.prototype.hasOwnProperty.call(selected,name));
  return uniq(pool);
 }

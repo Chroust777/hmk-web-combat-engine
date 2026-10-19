@@ -94,7 +94,7 @@ export function evaluateAttributeDice({name,ageGroup,folk='Human',kind='PC',dice
 }
 /** Voice is a separate physical trait for Singing, HMK p.49 (not a 13th core Attribute). */
 export function voiceDiceRequirement(folk='Human'){
- return ['Sinái','Sidhé'].includes(folk)?{count:5,drop:2}:{count:4,drop:1};
+ return folk==='Sinái'?{count:5,drop:2}:{count:4,drop:1};
 }
 export function evaluateVoiceDice({folk='Human',dice}){
  const req=voiceDiceRequirement(folk);
@@ -921,7 +921,7 @@ export function applyCreationPatch(character,patch){
     if(rolls.length){
      if(rolls.length!==4||rolls.some(d=>!/^([1-6])$/.test(String(d))))throw Error('HMK p.39: Morality vyžaduje přesně čtyři d6 v rozsahu 1–6.');
      const dice=rolls.map(Number), kept=[...dice].sort((a,b)=>b-a).slice(0,3);
-     const folkMod=h.folk==='Kúzhai'?2:['Sinái','Sidhé'].includes(h.folk)?4:0;
+     const folkMod=h.folk==='Kúzhai'?2:h.folk==='Sinái'?4:0;
      const score=kept.reduce((a,b)=>a+b,0)+folkMod;
      const old=c.values.moralityProof;
      if(!old||old.method!=='dice'||old.rolls.join(',')!==dice.join(',')){
@@ -1035,7 +1035,7 @@ export function applyCreationPatch(character,patch){
    // optional GM modes. A genuine GM choice (bonus language DP) remains.
    if(stage==='Folk Skills'&&nativeLanguageDP(clone)>0&&c.values.nativeSkillsMode!=='yes')
     throw Error('Native Language DP podle p.47 jsou povinné, nelze je vypnout');
-   if(stage==='Folk Skills'&&['Kúzhai','Sinái','Sidhé'].includes(h.folk)&&c.values.folkAuto!=='yes')
+   if(stage==='Folk Skills'&&['Kúzhai','Sinái'].includes(h.folk)&&c.values.folkAuto!=='yes')
     throw Error('Folk Skills vyžadují fyzické d10 (p.45), GM režim není náhradou');
    if(stage==='Arcane Talent Skills'&&c.values.arcaneTalentMode!=='yes')
     throw Error('Arcane Talent Possession vyžaduje fyzický d20 a případné d100 (p.40)');
@@ -1073,7 +1073,7 @@ export function applyCreationPatch(character,patch){
     if(stage==='Optional Skills'&&dp>2&&!(/^Language \(/.test(skillName)))throw Error('Optional Skills: nejvýše 2 DP při první výuce, jinak 1 DP (p.48)');
     if(stage==='Optional Skills'&&dp>1&&parseInstance(skillName)?.type!=='Language'&&priorSkillDevelopment({...clone,hmk:{...h,creation:c}},skillName,stage)>0)throw Error('Optional Skills: již vyvinutý Skill (včetně konkrétního Script/Ritual) má limit 1 DP (p.48)');
     if(stage==='Optional Skills'&&def.group==='Esoterica'&&def.baseSM+SKILL_STAGES.slice(0,5).reduce((total,group)=>total+(c.skillDP[group]?.[skillName]??0),0)<1)throw Error('Esoterica Skill nesmí poprvé vzniknout v Optional Skills (p.48)');
-    if(stage==='Folk Skills'&&c.values.folkAuto==='yes'&&['Kúzhai','Sinái','Sidhé'].includes(h.folk))throw Error('Folk Skills jsou určeny fyzickými d10, nelze ručně měnit');
+    if(stage==='Folk Skills'&&c.values.folkAuto==='yes'&&['Kúzhai','Sinái'].includes(h.folk))throw Error('Folk Skills jsou určeny fyzickými d10, nelze ručně měnit');
     if(stage==='Family Skills'&&['2nd Script','3rd Script'].includes(skillName)){
      const fld=skillName==='2nd Script'?'familySecondScriptChoice':'familyThirdScriptChoice';
      const choice=c.values[fld],parent=familyOccupationProfile(h.familyOccupation,c.values.familyWeaponcrafterType,c.values.familyMartialChoice,c.values.familyVariantChoice,c.values.regionProof?.subsistence??c.values.subsistence);
@@ -1113,7 +1113,7 @@ export function applyCreationPatch(character,patch){
    if(stage==='Background Skills'&&!availableBackgroundSkills(h.background,{folk:h.folk,viking:c.values.viking==='yes'||h.society==='Viking',emhle:isTribalEmhle(clone)}).includes(parseInstance(skillName)?.type??skillName))throw Error('Background DP mimo ověřenou tabulku');
    if(stage==='Background Skills'&&dp>2)throw Error('Background Skill může dostat nejvýše 2 DP (p.48)');
     if(stage==='Veteran Skills'){
-      const available=['Kúzhai','Sinái','Sidhé'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0;
+      const available=['Kúzhai','Sinái'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0;
       if(total>available)throw Error(`Veteran Skill přesahuje ${available} DP (p.49)`);
       // HMK p.49: max two DP only when this skill has no previous DP;
       // otherwise one, separately in each five-DP Veteran pool.
@@ -1142,7 +1142,7 @@ export function applyCreationPatch(character,patch){
    if(patch.advance){
       const sum=Object.values(c.skillDP[stage]??{}).reduce((n,x)=>n+x,0);
       if(stage==='Arcane Talent Skills'&&c.values.arcaneTalentMode==='yes'&&!c.values.arcaneTalentProof)throw Error('Arcane Talent: GM musí zadat fyzický d20 a případné d100 (p.40)');
-      if(stage==='Folk Skills'&&c.values.folkAuto==='yes'&&['Kúzhai','Sinái','Sidhé'].includes(h.folk)&&!c.values.folkSkillProof)throw Error('Povinné fyzické d10 Folk Skill hody (p.45)');
+      if(stage==='Folk Skills'&&c.values.folkAuto==='yes'&&['Kúzhai','Sinái'].includes(h.folk)&&!c.values.folkSkillProof)throw Error('Povinné fyzické d10 Folk Skill hody (p.45)');
       if(stage==='Family Skills'&&c.values.familyAuto==='yes'&&sum!==5)throw Error('Family Skills musí přesně rozdělit 5 DP (p.47)');
       if(stage==='Optional Skills'&&sum!==5)throw Error('Optional Skills: přidělte přesně 5 DP (p.48)');
       if(stage==='Background Skills'&&h.background==='City'&&(c.skillDP[stage]?.Language??0)>0&&!c.values.backgroundCityLanguageDistribution)throw Error('City Background: rozdělte 3 DP na každé přidělené Language DP (p.48)');
@@ -1154,7 +1154,7 @@ export function applyCreationPatch(character,patch){
        if(JSON.stringify(result)!==JSON.stringify(c.skillDP['Veteran Skills']??{}))throw Error('Veteran: nesouhlasí souhrn obou kol');
       }
       if(stage==='Veteran Skills'){
-       const required=['Kúzhai','Sinái','Sidhé'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0;
+       const required=['Kúzhai','Sinái'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0;
        if(sum!==required)throw Error(`Veteran Skills: přidělte přesně ${required} DP (p.49)`);
       }
       if(stage==='Sunsign Skills'){
@@ -1569,7 +1569,7 @@ export function assertCreationInvariants(character){
   if(!title||c.values.parentTitleProof.title!==title||c.values.parentTitleProof.name!==x.name||h.parentTitle!==title||Number(c.values.backgroundRoll)!==c.values.parentTitleProof.backgroundRoll||c.values.parentTitleProof.effectiveBackgroundRoll!==effective)throw Error('Nesoulad Noble Title s fyzickým Background hodem');
  }
  if(c.completed[13]&&c.values.wealth!==undefined&&Number(c.values.wealth)!==h.wealth)throw Error('Změněný GM Wealth');
- if(c.completed[12]&&c.values.folkAuto==='yes'&&['Kúzhai','Sinái','Sidhé'].includes(h.folk)&&!c.values.folkSkillProof)throw Error('Chybí fyzické Folk d10');
+ if(c.completed[12]&&c.values.folkAuto==='yes'&&['Kúzhai','Sinái'].includes(h.folk)&&!c.values.folkSkillProof)throw Error('Chybí fyzické Folk d10');
  if(c.values.arcaneTalentProof){
   const t=c.values.arcaneTalentProof,startingAura=c.attributeProof?.aur?.score??h.attributes?.aur,
    startingCharacter={...character,hmk:{...h,attributes:{...h.attributes,aur:startingAura}}},
@@ -1800,7 +1800,7 @@ export function assertCreationInvariants(character){
   if(stage==='Family Skills'&&c.values.familyAuto==='yes'&&!validateFamilySkillAllocation(familyOccupationProfile(h.familyOccupation,c.values.familyWeaponcrafterType,c.values.familyMartialChoice,c.values.familyVariantChoice,c.values.regionProof?.subsistence??c.values.subsistence),allocations))throw Error('Family DP přesahují sdílený profesní limit');
   if(['Background Skills','Optional Skills'].includes(stage)&&sum>5)throw Error('Neplatný součet pěti DP');
   if(stage==='Veteran Skills'){
-   const budget=['Kúzhai','Sinái','Sidhé'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0;
+   const budget=['Kúzhai','Sinái'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0;
    if(sum>budget)throw Error('Neplatný Veteran DP rozpočet');
   }
   if(stage==='Sunsign Skills'){
@@ -1814,7 +1814,7 @@ export function assertCreationInvariants(character){
  if(c.completed[12]){
   if(c.values.familyAuto==='yes'&&Object.values(c.skillDP['Family Skills']??{}).reduce((n,x)=>n+x,0)!==5)throw Error('Chybí 5 Family DP');
   if(['Background Skills','Optional Skills'].some(g=>Object.values(c.skillDP[g]??{}).reduce((n,x)=>n+x,0)!==5))throw Error('Chybějících 5 Background/Optional DP');
-  const available=['Kúzhai','Sinái','Sidhé'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0;
+  const available=['Kúzhai','Sinái'].includes(h.folk)||h.ageGroup==='Old'?10:h.ageGroup==='Mature'?5:0;
   if(Object.values(c.skillDP['Veteran Skills']??{}).reduce((n,x)=>n+x,0)!==available)throw Error('Neúplné Veteran DP');
   for(const {group,value} of c.values.sunsignProof.dp){
    const allocated=SKILL_DEFINITIONS.filter(d=>d.group===group).reduce((n,d)=>n+(c.skillDP['Sunsign Skills']?.[d.name]??0),0);

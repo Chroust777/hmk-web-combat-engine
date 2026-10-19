@@ -119,7 +119,7 @@ export function validInstance(character,key){const x=parseInstance(key);return !
  )):x.type==='Script'?SCRIPTS.includes(x.name):x.type==='Talent'?TALENT_NAMES.includes(x.name)&&!!character?.hmk?.creation?.values?.arcaneTalentProof?.generated?.includes(x.name):religionChoices(character).includes(x.name));}
 export function nativeLanguageDP(character){
  const h=character?.hmk??{};if(!h.nativeLanguage||!h.socialClass)return 0;
- if(['Kúzhai','Sinái','Sidhé'].includes(h.folk)||['Priestly','Noble','Valpalen'].includes(h.socialClass)||['Scholar','Scribe'].includes(h.familyOccupation))return 5;
+ if(['Kúzhai','Sinái'].includes(h.folk)||['Priestly','Noble','Valpalen'].includes(h.socialClass)||['Scholar','Scribe'].includes(h.familyOccupation))return 5;
  if(h.socialClass==='Guilded'&&['Alchemist','Astrologer','Herald','Lexigrapher','Litigant','Mercantyler','Physician','Runemaster','Shèk-Pvâr'].includes(h.familyOccupation))return 5;
  return 4;
 }
@@ -127,7 +127,7 @@ export function nativeRitualDP(character){
  const h=character?.hmk??{};
  if(['Malákta','Nâdi'].includes(h.folk))return 0;
  if(h.folk==='Kúzhai')return 2;
- if(['Sinái','Sidhé'].includes(h.folk))return 3;
+ if(h.folk==='Sinái')return 3;
  // p.343: the SM2 exception applies to TRIBAL Émhlè, not to
  // every native Émhlèn speaker in a different society.
  if(isTribalEmhle(character))return 2;
