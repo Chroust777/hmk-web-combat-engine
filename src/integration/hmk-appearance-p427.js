@@ -54,42 +54,117 @@ export function appearanceBaseBuild(str,d100,folk='Human'){
  const [heightIn,baseWeightLb]=band[column];
  return {heightIn,baseWeightLb,bonusNadi:code==='nadi'?10:0,tableSTR:str,buildD100:d100,sourcePage:428};
 }
-/** roll is injected so tests can use deterministic dice; does not mutate the character. */
-export function generateAppearance(character,die){
+/** Only results actually contained in the selected printed column may be
+ * offered for deliberate choices. Human/Ænarin depend on home latitude;
+ * Nâdi do not have a complexion (fur instead). */
+const labels=column=>column?[...new Set(column.map(entry=>entry[1]))]:[];
+export function appearanceOptions({folk='Human',region='',complexion='',rawSTR=null}={}){
+ const code=normalized(folk),elrhin=ELRHIN.includes(code),kuzhai=code==='kuzhai',malakta=code==='malakta',nadi=code==='nadi';
+ const latitude=nadi?null:malakta?'equa':elrhin?'elrhin':kuzhai?'kuzhai':REGION_LATITUDES[normalized(region)]||null;
+ const hairColumn=kuzhai?'kuzhai':elrhin?'elrhin':complexion?hairColumnFor(complexion):null;
+ const eyeColumn=elrhin?'elrhin':malakta?'dark':complexion?(hairColumnFor(complexion)==='verydark'?'dark':hairColumnFor(complexion)):null;
+ const handColumn=malakta?'malakta':kuzhai?'kuzhai':elrhin?'elrhin':'human';
+ const heightRows=[];
+ if(Number.isInteger(rawSTR)){
+  for(const [first,last]of RANGES){const build=appearanceBaseBuild(rawSTR,first,folk);if(build)heightRows.push({...build,from:first,to:last});}
+ }
+ return {latitude,hairColumn,eyeColumn,handColumn,
+   complexion:labels(COMPLEXION[latitude]),hair:labels(HAIR[hairColumn]),
+   eyes:labels(EYES[eyeColumn]),handedness:labels(HAND[handColumn]),heightRows};
+}
+function hairColumnFor(complexion){return hairColumn(complexion);}
+/** Deliberate selections never create fictitious dice. `mode=manual` leaves
+ * unprovided values empty; `mode=auto` rolls all unselected fields.
+ * A manually supplied d100 remains a real die, distinct from a choice. */
+export function generateAppearance(character,die,preferences=character?.hmk?.creation?.values?.appearancePreferences||{},mode='auto'){
  const h=character?.hmk||{},creation=h.creation||{},rawSTR=creation.attributeProof?.str?.adultMinimum;
- const folk=h.folk||creation.values?.folk||'Human',code=normalized(folk),elrhin=ELRHIN.includes(code),kuzhai=code==='kuzhai',malakta=code==='malakta',nadi=code==='nadi';
- const result={source:'HMK Appendix III pp.427–428',version:1,folk,rolls:{},values:{},warnings:[]};
+ const folk=h.folk||creation.values?.folk||'Human';
+ const opts=preferences||{},automatic=mode==='auto';
+ const result={source:'HMK Appendix III pp.427–428',version:2,folk,mode,rolls:{},values:{},methods:{},warnings:[]};
  const d=(label,sides)=>{const n=roll(die,sides);result.rolls[label]=n;return n};
- if(!nadi){
-  const latitude=malakta?'equa':elrhin?'elrhin':kuzhai?'kuzhai':REGION_LATITUDES[normalized(h.birthRegion||creation.values?.birthRegion)];
-  if(latitude){result.values.complexion=fromTable(COMPLEXION[latitude],d('complexionD100',100));result.latitude=latitude;}
-  else result.warnings.push('Chybí doložená zeměpisná šířka domovského regionu: Complexion není automaticky určena.');
- }else result.warnings.push('Nâdi nemají Complexion; popis srsti zůstává volbou hráče / GM.');
- const hColumn=kuzhai?'kuzhai':elrhin?'elrhin':result.values.complexion?hairColumn(result.values.complexion):null;
- if(hColumn){result.hairColumn=hColumn;result.values.hair=fromTable(HAIR[hColumn],d('hairD100',100));}
- const eColumn=elrhin?'elrhin':malakta?'dark':result.values.complexion?hairColumn(result.values.complexion):null;
- if(eColumn){result.eyeColumn=eColumn==='verydark'?'dark':eColumn;result.values.eyes=fromTable(EYES[result.eyeColumn],d('eyesD100',100));}
- const hd=malakta?'malakta':kuzhai?'kuzhai':elrhin?'elrhin':'human';result.handColumn=hd;
- result.values.handedness=fromTable(HAND[hd],d('handD100',100));
+ const chosen=(field,column,rollName,table)=>{
+  if(!column)return null;
+  const choice=String(opts[field+'Choice']||'');
+  const raw=String(opts[rollName]??'').trim();
+  if(choice&&raw)throw Error('Appearance '+field+': zvolte buď výsledek, nebo hod d100 (ne obojí).');
+  if(choice){if(!labels(table[column]).includes(choice))throw Error('Appearance '+field+': vybraná hodnota není v tabulce '+column);result.methods[field]='choice';return choice;}
+  if(raw){const n=Number(raw);if(!Number.isInteger(n)||n<1||n>100)throw Error('Appearance: neplatný fyzický '+rollName);result.methods[field]='physical-d100';result.rolls[rollName]=n;return fromTable(table[column],n);}
+  if(!automatic)return null;
+  result.methods[field]='software-d100';return fromTable(table[column],d(rollName,100));
+ };
+ const base=appearanceOptions({folk,region:h.birthRegion||creation.values?.birthRegion||''});
+ if(base.latitude){
+  result.latitude=base.latitude;
+  const complexion=chosen('complexion',base.latitude,'complexionD100',COMPLEXION);
+  if(complexion)result.values.complexion=complexion;
+ }else if(normalized(folk)==='nadi')result.warnings.push('Nâdi nemají Complexion; popis srsti je volbou hráče / GM.');
+ else result.warnings.push('Neznámá zeměpisná šířka domovského regionu: Complexion není určena.');
+ const options=appearanceOptions({folk,region:h.birthRegion||creation.values?.birthRegion||'',complexion:result.values.complexion,rawSTR});
+ if(options.hairColumn){result.hairColumn=options.hairColumn;const value=chosen('hair',options.hairColumn,'hairD100',HAIR);if(value)result.values.hair=value;}
+ if(options.eyeColumn){result.eyeColumn=options.eyeColumn;const value=chosen('eyes',options.eyeColumn,'eyesD100',EYES);if(value)result.values.eyes=value;}
+ result.handColumn=options.handColumn;
+ const hand=chosen('handedness',options.handColumn,'handD100',HAND);if(hand)result.values.handedness=hand;
  if(Number.isSafeInteger(rawSTR)){
-  const build=appearanceBaseBuild(rawSTR,d('buildD100',100),folk);
-  if(build){const extra=[d('weightD6_1',6),d('weightD6_2',6),d('weightD6_3',6)];result.values.height=build.heightIn+' in';result.values.weight=(build.baseWeightLb+build.bonusNadi+extra.reduce((a,b)=>a+b,0))+' lb';result.build={...build,weightDice:extra,finalWeightLb:build.baseWeightLb+build.bonusNadi+extra.reduce((a,b)=>a+b,0)};}
-  else result.warnings.push('STR před modifikátorem Folk je mimo tištěnou tabulku 5–18; výška a váha vyžadují rozhodnutí GM.');
- }else result.warnings.push('Chybí původní STR před modifikátorem Folk; výšku a váhu nelze doložit.');
+  const raw=String(opts.buildD100??'').trim(),height=String(opts.heightChoice??'').trim();
+  if(raw&&height)throw Error('Appearance Build: buď přímá výška, nebo d100 (ne obojí).');
+  let build=null;
+  if(height){
+   const row=options.heightRows.find(x=>x.heightIn+' in'===height);
+   if(!row)throw Error('Appearance: výška není v tabulce pro tuto STR a Folk');
+   build=row;result.methods.height='choice';result.buildChoice={heightIn:row.heightIn,tableSTR:rawSTR};
+  }else if(raw){
+   const n=Number(raw);if(!Number.isInteger(n)||n<1||n>100)throw Error('Appearance Build: neplatný d100');
+   result.rolls.buildD100=n;build=appearanceBaseBuild(rawSTR,n,folk);result.methods.height='physical-d100';
+  }else if(automatic){build=appearanceBaseBuild(rawSTR,d('buildD100',100),folk);result.methods.height='software-d100';}
+  if(build){
+   result.values.height=build.heightIn+' in';
+   const extraText=String(opts.weightExtraChoice??'').trim(),diceText=String(opts.weightDice??'').trim();
+   if(extraText&&diceText)throw Error('Appearance Weight: buď volba výsledku 3–18, nebo tři d6.');
+   let extra=null,rolls=[];
+   if(extraText){extra=Number(extraText);if(!Number.isInteger(extra)||extra<3||extra>18)throw Error('Appearance Weight: povoleno pouze 3–18 lb');result.methods.weight='choice';}
+   else if(diceText){rolls=diceText.split(',').map(x=>Number(x.trim()));if(rolls.length!==3||rolls.some(x=>!Number.isInteger(x)||x<1||x>6))throw Error('Appearance Weight: zadejte tři skutečné d6');extra=rolls.reduce((a,b)=>a+b,0);result.rolls.weightD6=rolls;result.methods.weight='physical-3d6';}
+   else if(automatic){rolls=[d('weightD6_1',6),d('weightD6_2',6),d('weightD6_3',6)];extra=rolls.reduce((a,b)=>a+b,0);result.methods.weight='software-3d6';}
+   if(extra!==null){result.values.weight=(build.baseWeightLb+build.bonusNadi+extra)+' lb';}
+   result.build={...build,weightDice:rolls,weightExtra:extra,finalWeightLb:extra===null?null:build.baseWeightLb+build.bonusNadi+extra};
+  }
+  else result.warnings.push('STR před modifikátorem Folk mimo tabulku 5–18; Height/Weight určí GM.');
+ }else result.warnings.push('Výška a váha čekají na základní STR z kroku 10.');
  return result;
 }
-/** Verify generated evidence without rerolling or trusting copied display fields. */
 export function verifyAppearance(character){
  const p=character?.hmk?.appearanceProof;if(!p)return {ok:false,issues:['Chybí Appearance důkaz']};
- const h=character.hmk,errors=[];
- const requireTable=(key,col,rollKey,tables)=>{if(!col)return;if(!Number.isInteger(p.rolls?.[rollKey]))errors.push('Chybí '+rollKey);else if(p.values[key]!==fromTable(tables[col],p.rolls[rollKey]))errors.push('Rozpor '+key);};
- if(p.latitude)requireTable('complexion',p.latitude,'complexionD100',COMPLEXION);
- if(p.hairColumn)requireTable('hair',p.hairColumn,'hairD100',HAIR);
- if(p.eyeColumn)requireTable('eyes',p.eyeColumn,'eyesD100',EYES);
- requireTable('handedness',p.handColumn,'handD100',HAND);
- if(p.build){const proof=appearanceBaseBuild(h.creation?.attributeProof?.str?.adultMinimum,p.rolls.buildD100,p.folk);const wd=p.build.weightDice;
-  if(!proof||JSON.stringify([proof.heightIn,proof.baseWeightLb,proof.bonusNadi])!==JSON.stringify([p.build.heightIn,p.build.baseWeightLb,p.build.bonusNadi])||!Array.isArray(wd)||wd.length!==3||wd.some(x=>!Number.isInteger(x)||x<1||x>6)||p.values.height!==proof.heightIn+' in'||p.values.weight!==(proof.baseWeightLb+proof.bonusNadi+wd.reduce((a,b)=>a+b,0))+' lb')errors.push('Nesouhlasí Body Build s Appendix III');
+ const h=character.hmk,issues=[],picks=h.creation?.values?.appearancePreferences||{};
+ let expected;
+ try{expected=generateAppearance(character,()=>{throw Error('Nepřípustné opakování hodu')},picks,'manual');}
+ catch(e){issues.push(e.message);return {ok:false,issues};}
+ const options=appearanceOptions({folk:p.folk,region:h.birthRegion||h.creation?.values?.birthRegion,complexion:p.values?.complexion,rawSTR:h.creation?.attributeProof?.str?.adultMinimum});
+ for(const [key,values]of Object.entries({complexion:options.complexion,hair:options.hair,eyes:options.eyes,handedness:options.handedness})){
+  if(p.values?.[key]&&!values.includes(p.values[key]))issues.push('Nepovolená hodnota '+key);
  }
- for(const [key,value]of Object.entries(p.values||{}))if(h[key]!==value)errors.push('Profil nesouhlasí s Appearance: '+key);
- return {ok:!errors.length,issues:errors};
+ // A new auto-generated result is checked by reconstructing each rolled
+ // table lookup, while direct choices are checked against allowed columns.
+ const verifyTable=(field,col,rollKey,tables)=>{
+  if(!p.values?.[field])return;
+  const n=p.rolls?.[rollKey];
+  if(p.methods?.[field]==='choice'){if(n!==undefined)issues.push('Fiktivní hod pro '+field);return;}
+  if(!Number.isInteger(n)||n<1||n>100||p.values[field]!==fromTable(tables[col],n))issues.push('Nesouhlasí hod '+field);
+ };
+ try{
+  if(p.latitude)verifyTable('complexion',p.latitude,'complexionD100',COMPLEXION);
+  if(p.hairColumn)verifyTable('hair',p.hairColumn,'hairD100',HAIR);
+  if(p.eyeColumn)verifyTable('eyes',p.eyeColumn,'eyesD100',EYES);
+  verifyTable('handedness',p.handColumn,'handD100',HAND);
+ }catch(e){issues.push('Nesouhlasí tabulkový sloupec');}
+ if(p.build){
+  let proof=null;
+  if(p.methods?.height==='choice')proof=options.heightRows.find(x=>x.heightIn+' in'===p.values.height);
+  else proof=appearanceBaseBuild(h.creation?.attributeProof?.str?.adultMinimum,p.rolls.buildD100,p.folk);
+  if(!proof||proof.heightIn!==p.build.heightIn||proof.baseWeightLb!==p.build.baseWeightLb)issues.push('Chybný Character Build');
+  const dice=p.build.weightDice,extra=p.build.weightExtra;
+  if(p.methods?.weight?.endsWith('3d6')&&(!Array.isArray(dice)||dice.length!==3||dice.some(n=>!Number.isInteger(n)||n<1||n>6)||dice.reduce((a,b)=>a+b,0)!==extra))issues.push('Chybné Weight d6');
+  if(p.methods?.weight==='choice'&&(!Number.isInteger(extra)||extra<3||extra>18||dice?.length))issues.push('Neplatná volba Weight');
+  if(p.values.weight!==undefined&&(!proof||p.values.weight!==(proof.baseWeightLb+proof.bonusNadi+extra)+' lb'))issues.push('Nesprávná váha');
+ }
+ for(const [key,value]of Object.entries(p.values||{}))if(h[key]!==value)issues.push('Profil nesouhlasí s Appearance: '+key);
+ return {ok:!issues.length,issues};
 }

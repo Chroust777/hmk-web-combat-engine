@@ -1,3 +1,4 @@
+import {appearanceOptions} from './hmk-appearance-p427.js';
 import {covenantClergyPath} from './hmk-covenant-clergy-path.js';
 import {isTribalEmhle} from './hmk-creation-special-skill-grants.js';
 import {MAJOR_CHANTRIES,NAMED_PVAR_CHANTRIES,UNLISTED_CHANTRY_ID,majorChantryById} from './hmk-creation-chantries.js';
@@ -38,6 +39,39 @@ function poolChoices(name,label,options,maxSlots,budget,raw=''){
  }
  const rows=Array.from({length:maxSlots},(_,i)=>`<label data-hmk-rule-field="${E(name)}" data-pool-row ${i>=budget?'hidden style="display:none"':''}>${E(label)} – DP ${i+1}/${budget||'…'}<select data-pool-choice ${i>=budget?'disabled':''}><option value="">Vyberte…</option>${opt(options,tokens[i])}</select></label>`).join('');
  return `<div data-hmk-dp-pool="${E(name)}" data-pool-budget="${budget}" data-pool-max="${maxSlots}"><input type="hidden" name="${E(name)}" value="${E(raw)}">${rows}</div>`;
+}
+/** Appendix III is an optional detail integrated at the points where its
+ * dependencies exist; it never adds a mandatory fifteenth HMK step. */
+function appearanceStepHTML(character){
+ const h=character.hmk||{},c=creationOf(character),v=c.values||{},step=c.step,pref=v.appearancePreferences||{},proof=h.appearanceProof||{};
+ const folk=v.folk||h.folk||'Human',region=v.birthRegion||h.birthRegion||'';
+ const options=appearanceOptions({folk,region,complexion:pref.complexionChoice||proof.values?.complexion||h.complexion||'',rawSTR:c.attributeProof?.str?.adultMinimum});
+ const saved=(key)=>pref[key]??'';
+ const choose=(field,title,values)=>`<label>${E(title)}<select name="${field}Choice" data-appearance-choice="${field}"><option value="">${step===14?'Neurčeno':'Náhodně / ponechat na později'}</option>${opt(values,saved(field+'Choice'))}</select></label>`;
+ const die=(key,title,value='')=>`<label>${E(title)}<input type="number" min="1" max="100" step="1" inputmode="numeric" name="${E(key)}" value="${E(value)}" placeholder="Nevyplněno = přímá volba / automatika"></label>`;
+ const evidence=(keys)=>{
+  if(!proof.values||!Object.keys(proof.values).length)return '';
+  const lines=keys.filter(k=>proof.values[k]).map(k=>{
+   const rollKeys={handedness:['handD100'],complexion:['complexionD100'],hair:['hairD100'],eyes:['eyesD100'],height:['buildD100'],weight:['weightD6','weightD6_1','weightD6_2','weightD6_3']}[k]||[];
+   const numbers=rollKeys.filter(r=>proof.rolls?.[r]!==undefined).map(r=>r+'='+proof.rolls[r]).join(', ');
+   return `<div><strong>${E(k)}:</strong> ${E(proof.values[k])} <small>${E(proof.methods?.[k]|| (numbers?'doložený hod':'uloženo'))}${numbers?' · '+E(numbers):''}</small></div>`;
+  }).join('');
+  return lines?`<div class="hmk-appearance-evidence"><strong>Uložený výsledek a důkaz</strong>${lines}</div>`:'';
+ };
+ if(step===1){
+  return `<fieldset class="hmk-appearance-step" data-appearance-section="1"><legend>Appearance · Handedness (Appendix III, str. 427)</legend><p>Pravá / levá ruka a obourukost se řídí Folk. Zvolte povolenou možnost, nebo zadejte skutečný d100. U automatického generátoru se jinak uloží softwarový hod.</p><div class="hmk-appearance-fields">${choose('handedness','Dominantní ruka podle Folk',options.handedness)}${die('handD100','Případný skutečný d100',saved('handD100'))}</div>${evidence(['handedness'])}<button type="button" class="secondary hmk-appearance-save" data-appearance-save>Uložit Appearance bez změny kroků</button></fieldset>`;
+ }
+ if(step===5){
+  return `<fieldset class="hmk-appearance-step" data-appearance-section="5"><legend>Appearance · Complexion, Hair, Eyes (Appendix III, str. 427)</legend><p>Zvolte výsledky z příslušných tabulek, nebo uveďte skutečné d100. Barva vlasů a očí se zpřesňuje podle Folk a Complexion. Když není sloupec určen, je třeba nejprve potvrdit rodiště či Complexion.</p><div class="hmk-appearance-fields">${choose('complexion','Complexion · barva pleti',options.complexion)}${die('complexionD100','Complexion d100',saved('complexionD100'))}${choose('hair','Hair Colour · vlasy',options.hair)}${die('hairD100','Hair d100',saved('hairD100'))}${choose('eyes','Eye Colour · oči',options.eyes)}${die('eyesD100','Eyes d100',saved('eyesD100'))}</div>${folk==='Nâdi'?'<p>U Nâdi se Complexion neurčuje: vzhled srsti je volitelný popis.</p>':''}${evidence(['complexion','hair','eyes'])}<button type="button" class="secondary hmk-appearance-save" data-appearance-save>Uložit Appearance bez změny kroků</button></fieldset>`;
+ }
+ if(step===10){
+  const heights=options.heightRows.map(r=>r.heightIn+' in');
+  return `<fieldset class="hmk-appearance-step" data-appearance-section="10"><legend>Appearance · Height / Weight (Appendix III, str. 428)</legend><p>Výška a základní hmotnost vycházejí ze STR před Folk modifikátorem. Zvolte výšku povolenou tabulkou, nebo zadejte skutečný d100. Ke základní váze se přidává 3d6 lb; pravidla dovolují také přesnou volbu přírůstku v rozsahu 3–18 lb.</p>${heights.length?`<div class="hmk-appearance-fields">${choose('height','Výška dle STR '+options.heightRows[0].tableSTR,[...new Set(heights)])}${die('buildD100','Character Build d100',saved('buildD100'))}${choose('weightExtra','Weight · volba +3 až +18 lb',Array.from({length:16},(_,i)=>String(i+3)))}<label>Weight · skutečné 3d6 (např. 4,2,6)<input type="text" name="weightDice" value="${E(saved('weightDice'))}" pattern="\s*[1-6]\s*,\s*[1-6]\s*,\s*[1-6]\s*" placeholder="Tři fyzické hody oddělené čárkou"></label></div>`:'<p><strong>Výšku a váhu lze určit po doložení všech atributů včetně STR.</strong></p>'}${evidence(['height','weight'])}<button type="button" class="secondary hmk-appearance-save" data-appearance-save>Uložit Appearance bez změny kroků</button></fieldset>`;
+ }
+ if(step===14){
+  return `<section class="hmk-appearance-step hmk-appearance-summary" aria-label="Volitelný Appearance"><h4>Appearance · kontrola doplňujících údajů</h4><p>Vzhled je podle Appendix III volitelný a sám neblokuje 14krokovou tvorbu. Přímé volby jsou označené jako volby a u skutečných hodů zůstává uložené číslo kostky. K úpravám se vraťte do kroků 1, 5 a 10.</p>${evidence(['handedness','complexion','hair','eyes','height','weight'])||'<p>U ruční tvorby dosud nebyly žádné volitelné údaje Appearance potvrzeny.</p>'}</section>`;
+ }
+ return '';
 }
 function body(character,editAttribute=null){
  const c=creationOf(character),v=c.values??{},s=c.step,stage=SKILL_STAGES[c.skillStage]??SKILL_STAGES[0],h=character.hmk??{};
@@ -198,7 +232,7 @@ export function creationStepIntroduction(character){
 }
 export function creationWizardHTML(character,{editAttribute=null}={}){
  const c=creationOf(character),step=c.step,title=CHARACTER_STEPS[step-1],complete=Object.keys(c.completed??{}).length;
- const enrichedBody=withCreationRuleHelp(body(character,editAttribute),step);
+ const enrichedBody=withCreationRuleHelp(body(character,editAttribute),step)+appearanceStepHTML(character);
  const invokerLegacyNotice=legacyParentInvokerNeedsReview(character)?'<p class="notice">Starší rodičovský Invoker: čtyři fyzické Talent d20 nebyly doloženy. Je nutné přes Edit znovu zadat fyzické hody v kroku 11/12 nebo opravit rodičovské povolání v kroku 7 (HMK str.42). Původní hody jsou v historii.</p>':'';
  const legacyNotice=legacyTribalRegionNeedsReview(character)?'<p class="notice">Pravidla Tribal/Settled byla upřesněna podle HMK str. 29. Historický profil není smazán; před dalšími změnami potvrďte <strong>Birthplace (krok 5)</strong> přes Edit. Původní fyzické hody zůstávají zachované.</p>':'';
  return `<section class="panel wide creation-flow" aria-labelledby="cc-title"><div class="topline"><h2 id="cc-title">Character Creation · ${E(character.name)}</h2><button type="button" class="secondary" data-creation-leave>← Character Sheet</button></div><div class="notice">Průvodce podle HMK v1.2, krok ${step}/14 · ${E(title[0])} · tištěná str. ${title[1]}. ${c.status==='auto-generated'?'Hody provedl software automaticky.':'Ruční průvodce používá fyzické kostky.'} Data ukládá stávající úložiště postav. <strong>Stav: ${c.status==='auto-generated'?'automaticky dokončeno (softwarové hody)':c.status==='review-required'?'GM review required':'rozpracováno'}</strong>.</div>${legacyNotice}${creationStepIntroduction(character)}<progress value="${complete}" max="14" aria-label="Dokončené kroky"></progress><form id="creation-step-form"><div class="field-grid creation-inputs">${enrichedBody}<output data-creation-roll-preview aria-live="polite" class="notice tiny">Zadejte fyzický hod; při známé tabulce se výsledek doplní automaticky.</output></div><div class="actions">${step>1?'<button type="button" class="secondary" data-creation-back>← Předchozí krok</button>':''}<button type="submit" name="action" value="next">${step===14?'Uložit a předat GM kontrole':step===12&&c.skillStage<7?'Další stadium Skillů →':'Uložit a pokračovat →'}</button></div></form><p class="muted">Možnost návratu a pozdějšího Edit zůstává dostupná. Změny základních atributů mohou vyžadovat znovu ověřit navazující Skill DP a bojové parametry.</p>${complete?`<details><summary>Edit: přejít na již vyplněný krok</summary><div class="field-grid"><select id="creation-jump-select">${CHARACTER_STEPS.map(([label,page],i)=>`<option value="${i+1}" ${step===i+1?'selected':''}>${i+1}. ${E(label)} (str. ${page})</option>`).join('')}</select><button type="button" data-creation-jump>Otevřít vybraný krok</button></div></details>`:''}<dialog class="hmk-rule-dialog" id="hmk-rule-dialog" aria-labelledby="hmk-rule-dialog-title"><header><h3 id="hmk-rule-dialog-title">HMK · pravidlová nápověda</h3><p id="hmk-rule-dialog-page" class="tiny"></p></header><p id="hmk-rule-dialog-effect"></p><p id="hmk-rule-dialog-dice" class="tiny"></p><p id="hmk-rule-dialog-original"></p><p id="hmk-rule-dialog-context" class="tiny"></p><p id="hmk-rule-dialog-status" class="tiny"></p><form method="dialog"><button type="submit" class="secondary">Zavřít</button></form></dialog></section>`;
