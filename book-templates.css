@@ -3031,10 +3031,9 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 }
 
 
-/* v93.337 — centered, height-independent genuine trim_44 book gutter.
-   Fixed original-art endcaps plus a perfectly seam-matched midsection.
-   No image is stretched to the live chapter height, and the transparent sides
-   blend naturally into the existing parchment texture. */
+/* v93.337.2 — center gutter uses only the seamless trim_44 middle texture.
+   No separate upper/lower caps: the middle repeats at its native 120px width
+   under both frame ornaments, without stretching as the book grows. */
 @media (min-width:1161px) {
   .content-sheet .journal-book-frame::after,
   .content-sheet .journal-book--chapter .journal-book-frame::after {
@@ -3043,8 +3042,8 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
     position: absolute !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    top: 21px !important;
-    bottom: 30px !important;
+    top: 0 !important;
+    bottom: 0 !important;
     width: 120px !important;
     height: auto !important;
     opacity: 1 !important;
@@ -3054,13 +3053,10 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
     outline: 0 !important;
     box-shadow: none !important;
     background-color: transparent !important;
-    background-image:
-      url('./assets/ui/keeper-hires/render/trim_44_gutter_top.png'),
-      url('./assets/ui/keeper-hires/render/trim_44_gutter_bottom.png'),
-      url('./assets/ui/keeper-hires/render/trim_44_gutter_middle.png') !important;
-    background-repeat: no-repeat, no-repeat, repeat-y !important;
-    background-position: center top, center bottom, center top !important;
-    background-size: 120px auto, 120px auto, 120px auto !important;
+    background-image: url('./assets/ui/keeper-hires/render/trim_44_gutter_middle.png') !important;
+    background-repeat: repeat-y !important;
+    background-position: center top !important;
+    background-size: 120px auto !important;
   }
 }
 /* At tablet/mobile sizes the journal is one page wide, not a two-page spread. */
