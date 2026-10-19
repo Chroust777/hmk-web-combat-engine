@@ -387,6 +387,72 @@ export function legacyParentInvokerNeedsReview(character){
    JSON.stringify(last.d100s)===JSON.stringify(verified.d100s)&&JSON.stringify(last.grants)===JSON.stringify(verified.grants);
  }catch{return false;}
 }
+/**
+ * Read-only end-of-creation revision. It never guesses physical dice or
+ * rewrites the append-only audit. Incomplete / invalidated proofs are reported
+ * by their original HMK step; the wizard's existing validators remain the
+ * authority for every conditional profession, culture and supernatural path.
+ * Each field is the closest editable control for focus/highlighting, or null
+ * where proof is produced by a multi-control workflow (attributes / skills).
+ */
+export function creationRevisionIssues(character){
+ const c=character?.hmk?.creation;
+ if(!c)return [];
+ const v=c.values??{},h=character.hmk??{},completed=c.completed??{},issues=[];
+ const title={1:'Folk',2:'Age Group',3:'Birthdate',4:'Sunsign Traits',5:'Birthplace / Region',6:'Parent Social Class',7:'Parent Occupation',8:'Background',9:'Estrangement',10:'Attributes / Voice',11:'Occupation',12:'Skills',13:'Wealth',14:'Mysteries / Fate'};
+ const filled=value=>value!==undefined&&value!==null&&String(value).trim()!=='';
+ const firstMissing=(...names)=>names.find(x=>!filled(v[x]));
+ const push=(step,field,message)=>{
+  if(!issues.some(i=>i.step===step&&i.field===field))issues.push({step,field:field||null,title:title[step],message});
+ };
+ for(let step=1;step<=13;step++){
+  if(completed[step])continue;
+  let field=null,reason='Krok nebyl potvrzen, případně byl jeho výsledek zneplatněn změnou související volby.';
+  switch(step){
+   case 1:field='folk';if(!filled(v.folk))reason='Vyberte platný Folk.';break;
+   case 2:field='ageGroup';if(!filled(v.ageGroup))reason='Vyberte věkovou skupinu odpovídající Folk.';break;
+   case 3:field=firstMissing('birthMonth','birthDay')||'birthMonth';if(firstMissing('birthMonth','birthDay'))reason='Doplňte datum narození pro určení Sunsign.';break;
+   case 4:field='sunsignTraits';if(!filled(v.sunsignTraits))reason='Vyberte trait platný pro aktuální Sunsign (a druhý trait, pokud je cusp).';break;
+   case 5:field=firstMissing('birthRegion','birthplace')||'birthRegion';if(firstMissing('birthRegion','birthplace'))reason='Zvolte znovu Region a příslušný Realm / Birthplace.';break;
+   case 6:field='socialClass';if(!filled(v.socialClass))reason='Určete Parent Social Class z odpovídající tabulky.';break;
+   case 7:field='familyOccupation';if(!filled(v.familyOccupation))reason='Určete Parent Occupation pro platnou společnost a třídu.';break;
+   case 8:field='background';if(!filled(v.background))reason='Doložte platný Background pro Parent Occupation.';break;
+   case 9:field='estrangementRoll';if(!filled(v.estrangementRoll))reason='Chybí fyzický d100 pro Estrangement.';break;
+   case 10:{const missing=ATTRIBUTES.filter(a=>!c.attributeProof?.[a]);field=missing.length?'creation-attr-name':!c.voiceProof?'die0':null;
+    if(missing.length||!c.voiceProof)reason='Chybí fyzický důkaz: '+(missing.length?missing.join(', '):'')+(missing.length&&!c.voiceProof?', ':'')+(!c.voiceProof?'Voice':'')+'.';break;}
+   case 11:field='occupation';if(!filled(v.occupation)&&!filled(character.occupation))reason='Vyberte Occupation podle dosud doloženého původu a atributů.';break;
+   case 12:field='skillName';reason='Zkontrolujte a znovu potvrďte všechna potřebná stadia Skill DP a jejich pravidlové důkazy.';break;
+   case 13:field='wealthMethod';reason='Wealth a počáteční hotovost vyžadují aktuální pravidlové důkazy (HMK str. 51).';break;
+  }
+  push(step,field,reason);
+ }
+ // Do not demand rolls for a step which is not currently being completed.
+ // These warnings are visible at step 14, and block its final confirmation.
+ if(c.step===14&&!completed[14]&&(character.kind??'PC')==='PC'){
+  if(!c.values?.graceProof)push(14,'graceDie','Chybí povinný Grace d20 (HMK str. 40).');
+  const requiredPsyche=creationPsycheCount(h.folk,h.ageGroup);
+  if(requiredPsyche!==null&&!c.values?.psycheProof)push(14,'psycheDice','Chybí fyzický Psyche hod a případné trait volby (HMK str. 40).');
+ }
+ return issues;
+}
+/**
+ * Character Journal release gate. The journal must never infer combat, skills or
+ * identity data from a partially built (or later invalidated) 14-step profile.
+ * "review-required" is a valid terminal state: it denotes completed creation
+ * awaiting GM review, NOT an unfinished step. This is distinct from the final
+ * character-sheet audit and makes no mutations or new dice rolls.
+ */
+export function characterJournalReadiness(character){
+ const creation=character?.hmk?.creation;
+ if(!creation)return {ready:false,missingSteps:Array.from({length:14},(_,i)=>i+1),issues:[],reason:'Chybí uložený 14krokový záznam Character Creation.'};
+ const completed=creation.completed??{};
+ const missingSteps=Array.from({length:14},(_,i)=>i+1).filter(step=>completed[step]!==true);
+ const issues=creationRevisionIssues(character);
+ const terminal=['review-required','complete','auto-generated'].includes(creation.status);
+ const ready=terminal&&missingSteps.length===0&&issues.length===0;
+ return {ready,missingSteps,issues,reason:ready?'':missingSteps.length?'Pravidlová tvorba nemá potvrzeno všech 14 kroků.':issues.length?'Revize tvorby hlásí nevyřešené návaznosti.':'Pravidlová tvorba zatím není dokončena.'};
+}
+
 export function applyCreationPatch(character,patch){
  const tribalLegacy=legacyTribalRegionNeedsReview(character);
  const invokerLegacy=legacyParentInvokerNeedsReview(character);
@@ -397,10 +463,12 @@ export function applyCreationPatch(character,patch){
  if(invokerLegacy&&!patch.back&&!patch.jump&&patch.step!==7&&!(patch.arcaneTalentDice&&[11,12].includes(patch.step)))throw Error('Starší Parent Invoker: přes Edit (krok 7) změňte povolání rodiče, nebo zadejte čtyři fyzické Talent d20 v kroku 11/12 (HMK p.42)');
  // Back / Edit navigation must never demand answers to a step not yet completed.
  if(patch.back||patch.jump){
-  if(patch.jump){if(!Number.isInteger(patch.jump)||patch.jump<1||patch.jump>14)throw Error('Neplatný krok návratu');c.step=patch.jump;if(c.step===12)c.skillStage=0;for(let k=patch.jump;k<=14;k++)delete c.completed[k];}
+  if(patch.jump){if(!Number.isInteger(patch.jump)||patch.jump<1||patch.jump>14)throw Error('Neplatný krok návratu');c.step=patch.jump;if(c.step===12)c.skillStage=0;/* A jump changes only the UI cursor. A completed step is invalidated by a REAL change to its prerequisites below, never by navigation alone. */}
   else if(c.step===12&&c.skillStage>0)c.skillStage--;
   else{c.step=Math.max(1,c.step-1);if(c.step===12)c.skillStage=7;}
-  c.status='in-progress';h.creation=c;clone.hmk=h;return clone;
+  // Reading a historic step is not itself a data edit; preserve the
+  // completed/auto-generated status until a real validated update.
+  h.creation=c;clone.hmk=h;return clone;
  }
  const previousValues={...c.values};
  // A new realm or region makes the prior dual-language die inapplicable.
@@ -539,7 +607,7 @@ export function applyCreationPatch(character,patch){
  }
  if(patch.step===5&&(tribalLegacy||changed('birthplace')||changed('society')||changed('birthRegion')||changed('regionRoll')||changed('venariveRoll')||changed('nativeLanguageRoll')||changed('regionSubRoll')||changed('regionDialectRoll')||changed('regionDialectChoice')||changed('regionAzeriDialectChoice')||changed('regionCommunityChoice')||changed('regionTribeRoll')||changed('nativeLanguageChoice'))){deactivateDependent(6,['classRoll']);deactivateDependent(7,['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll']);deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.socialClass;delete c.values.familyOccupation;delete c.values.familyWeaponcrafterType;delete c.values.familyMartialChoice;delete c.values.familyVariantChoice;delete c.values.familyRitualChoice;
   delete c.values.familyScriptChoice;delete c.values.familySecondScriptChoice;delete c.values.familyThirdScriptChoice;delete c.values.familyAuto;
-  delete c.values.parentOccupationProof;delete c.values.parentTitleProof;delete c.values.urbanChance;delete c.values.regionProof;delete h.socialClass;delete h.familyOccupation;delete h.background;delete h.parentTitle;for(let k=6;k<=14;k++)delete c.completed[k];invalidateStage('Family Skills');invalidateStage('Background Skills');delete c.values.nativeRitualChoice;delete c.values.nativeRitualChoice2;delete c.values.nativeRitualChoice3;delete c.values.nativeSkillsMode}
+  delete c.values.parentOccupationProof;delete c.values.parentTitleProof;delete c.values.urbanChance;delete c.values.regionProof;delete h.socialClass;delete h.familyOccupation;delete h.background;delete h.parentTitle;for(const k of [6,7,8])delete c.completed[k];invalidateStage('Family Skills');invalidateStage('Background Skills');delete c.values.nativeRitualChoice;delete c.values.nativeRitualChoice2;delete c.values.nativeRitualChoice3;delete c.values.nativeSkillsMode}
  if(patch.step===6&&(changed('socialClass')||changed('classRoll')||changed('classDie'))){invalidateWealthInputs();invalidateStage('Family Skills');invalidateStage('Background Skills');deactivateDependent(7,['parentOccupationRoll','parentOccupationSubRoll','parentOccupationSpecialRoll','parentOccupationConvocationRoll']);deactivateDependent(8,['backgroundRoll','backgroundTensRoll']);delete c.values.familyOccupation;delete c.values.familyWeaponcrafterType;delete c.values.familyMartialChoice;delete c.values.familyVariantChoice;delete c.values.familyRitualChoice;
   delete c.values.familyScriptChoice;delete c.values.familySecondScriptChoice;delete c.values.familyThirdScriptChoice;delete c.values.familyAuto;
   delete c.values.parentOccupationProof;delete c.values.parentTitleProof;delete c.values.urbanChance;delete h.familyOccupation;delete h.background;delete h.parentTitle;delete c.completed[7];delete c.completed[8];delete c.completed[13];}
@@ -601,7 +669,11 @@ export function applyCreationPatch(character,patch){
     'regionalLanguages','harnTribe','alticTribe','socialClass','familyOccupation',
     'parentTitle','background'])delete h[key];
    clone.occupation='';
-   for(let k=2;k<=14;k++)delete c.completed[k];
+   // Independent Birthdate/Sunsign Traits (3–4) and Estrangement (9)
+   // survive Folk edits. Only branches whose choices/proofs were cleared
+   // above need fresh confirmation; Stage/Wealth/Attributes invalidate
+   // 10, 12–14 separately.
+   for(const k of [2,5,6,7,8,11])delete c.completed[k];
    delete c.values.wealthProof;delete c.values.occupationProof;
    invalidateLaterSkills('Folk Skills');delete c.values.arcaneTalentProof;
    invalidateOccupationIfNotAllowed();
@@ -1200,6 +1272,10 @@ export function applyCreationPatch(character,patch){
   c.auditEvents.push({sequence:c.auditEvents.length+1,type:'step-dice',step:patch.step,field,die:`d${sides}`,roll:result});
  }
  if(patch.advance){
+  if(patch.step===14){
+   const pending=creationRevisionIssues({...clone,hmk:{...h,creation:c}}).filter(i=>i.step<14);
+   if(pending.length)throw Error('Závěrečná revize: nejprve opravte kroky '+[...new Set(pending.map(i=>i.step))].join(', ')+'. Použijte odkazy v panelu Revize tvorby.');
+  }
   if(patch.step===10&&(ATTRIBUTES.some(key=>!c.attributeProof[key])||!c.voiceProof))throw Error('Chybí 12 fyzických atributů nebo Voice pro Singing (p.49)');
   if(patch.step===12&&c.skillStage<7)c.skillStage++;
   else {c.completed[patch.step]=true;c.step=Math.min(15,patch.step+1)}
