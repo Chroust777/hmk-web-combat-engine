@@ -426,6 +426,44 @@ export function creationRevisionIssues(character){
   }
   push(step,field,reason);
  }
+ // Full evidence audit for profiles produced by the revised unattended
+ // generator. Earlier versions did not record every random Sunsign d6; a
+ // historical missing roll can NEVER be reconstructed without falsifying
+ // the physical/automatic roll history, so only v2 profiles get this strict
+ // generated-proof gate. Direct GM/thematic choices remain legitimate without
+ // a fabricated random roll.
+ if(v.autoGeneration?.version>=2){
+  const missing=(key)=>!filled(v[key]);
+  const required=[[1,'folk','Chybí uložená volba Folk.'],
+   [2,'ageGroup','Chybí uložená věková skupina.'],
+   [3,'birthMonth','Chybí uložený měsíc narození.'],
+   [3,'birthDay','Chybí uložený den narození.'],
+   [4,'sunsignTraits','Chybí uložený první Sunsign Trait.'],
+   [5,'birthRegion','Chybí doložený region původu.'],
+   [6,'socialClass','Chybí doložená sociální třída.'],
+   [7,'familyOccupation','Chybí doložené rodičovské povolání.'],
+   [8,'background','Chybí doložený Background.'],
+   [9,'estrangementRoll','Chybí původní d100 pro Estrangement.'],
+   [10,'creation-attr-name','Chybí potvrzený atribut nebo Voice.'],
+   [11,'occupation','Chybí potvrzené povolání.'],
+   [13,'wealthProof','Chybí uložený výpočet a důkazy Wealth.'],
+   [14,'graceDie','Chybí uložený Grace d20.'],
+   [14,'psycheDice','Chybí uložený Psyche hod.']];
+  for(const [step,field,message] of required){
+   let absent=field==='creation-attr-name'?ATTRIBUTES.some(a=>!c.attributeProof?.[a])||!c.voiceProof:
+    field==='occupation'?!filled(v.occupation)&&!filled(character.occupation):
+    field==='graceDie'?!v.graceProof:field==='psycheDice'?!v.psycheProof:missing(field);
+   if(absent)push(step,field,message);
+  }
+  if(h.sunsign?.includes(' / ')&&missing('sunsignTraitSecondary'))push(4,'sunsignTraitSecondary','Chybí druhý trait pro Sunsign cusp.');
+  if(v.autoGeneration.mode==='random'){
+   if(missing('folkRoll'))push(1,'folkRoll','Chybí uložený náhodný d100 Folk.');
+   if(['Human','Ænarin','Nâdi'].includes(h.folk)&&missing('ageRoll'))push(2,'ageRoll','Chybí uložený náhodný d100 Age.');
+   if(missing('traitRoll'))push(4,'traitRoll','Chybí uložený náhodný d6 pro první Sunsign Trait.');
+   if(h.sunsign?.includes(' / ')&&missing('traitRollSecondary'))push(4,'traitRollSecondary','Chybí uložený d6 pro druhý Sunsign Trait.');
+  }
+  if(missing('classRoll'))push(6,'classRoll','Chybí doložený hod Parent Social Class.');
+ }
  // Do not demand rolls for a step which is not currently being completed.
  // These warnings are visible at step 14, and block its final confirmation.
  if(c.step===14&&!completed[14]&&(character.kind??'PC')==='PC'){
