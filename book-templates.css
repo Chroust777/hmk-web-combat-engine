@@ -3620,3 +3620,87 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .journal-book--overview .journal-anatomy-table .journal-injuries{
   font-size:11px!important;overflow-wrap:anywhere;
 }
+
+/* v93.351 · Optional HMK Appendix III controls, integrated into steps 1/5/10.
+   Same parchment and warm semi-transparent table field as Arsenal & Gear. */
+.content-sheet .journal-book--creation .hmk-appearance-step{
+  grid-column:1/-1!important;
+  min-width:0!important;
+  margin:12px 0 4px!important;
+  padding:12px 14px!important;
+  border:1px solid rgba(137,94,45,.54)!important;
+  border-radius:3px!important;
+  background:rgba(251,242,222,.38)!important;
+  color:#4c3020!important;
+  box-shadow:inset 0 1px rgba(255,247,225,.66)!important;
+}
+.content-sheet .journal-book--creation .hmk-appearance-step legend{
+  padding:0 9px!important;
+  color:#6b361c!important;
+  font:700 13px/1.4 Georgia,serif!important;
+}
+.content-sheet .journal-book--creation .hmk-appearance-step p{
+  color:#57351f!important;
+  margin:5px 0 10px!important;
+  font:400 12px/1.5 Georgia,serif!important;
+}
+.content-sheet .journal-book--creation .hmk-appearance-fields{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px 12px!important;
+  min-width:0!important;
+}
+.content-sheet .journal-book--creation .hmk-appearance-fields label{
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  gap:4px!important;
+  font:600 12px/1.3 Georgia,serif!important;
+  color:#5c351e!important;
+}
+.content-sheet .journal-book--creation .hmk-appearance-fields :is(select,input){
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+  min-height:36px!important;
+  box-sizing:border-box!important;
+  padding:6px 8px!important;
+  background:rgba(255,252,242,.65)!important;
+  color:#3f291d!important;
+  border:1px solid rgba(137,94,45,.52)!important;
+  border-radius:2px!important;
+  font:400 13px/1.4 Georgia,serif!important;
+}
+.content-sheet .journal-book--creation .hmk-appearance-evidence{
+  margin:10px 0 0!important;
+  padding:8px 10px!important;
+  border-top:1px solid rgba(137,94,45,.5)!important;
+  color:#49301d!important;
+  font:400 12px/1.5 Georgia,serif!important;
+}
+.content-sheet .journal-book--creation .hmk-appearance-evidence small{margin-left:6px;font-style:italic;color:#765037!important}
+.content-sheet .journal-book--creation .hmk-appearance-summary{background:rgba(251,242,222,.38)!important}
+.content-sheet .journal-book--overview .hmk-appearance-proof{
+  margin:8px 0 14px!important;
+  padding:8px 10px!important;
+  border:1px solid rgba(137,94,45,.45)!important;
+  background:rgba(251,242,222,.38)!important;
+  color:#4b2f20!important;
+  font:12px/1.5 Georgia,serif!important;
+}
+.content-sheet .journal-book--overview .hmk-appearance-proof summary{cursor:pointer;font-weight:700;color:#6b361e!important}
+.content-sheet .journal-book--overview .hmk-appearance-proof dl{margin:6px 0 0}
+.content-sheet .journal-book--overview .hmk-appearance-proof dl>div{display:grid;grid-template-columns:minmax(80px,1fr) 2fr;gap:8px;padding:4px 0;border-top:1px solid rgba(137,94,45,.25)}
+.content-sheet .journal-book--overview .hmk-appearance-proof dt{font-weight:700}
+.content-sheet .journal-book--overview .hmk-appearance-proof dd{margin:0}
+.content-sheet .journal-book--overview .hmk-appearance-proof small{display:block;color:#795034!important}
+@media(max-width:720px){
+ .content-sheet .journal-book--creation .hmk-appearance-fields{grid-template-columns:1fr!important}
+}
+
+.content-sheet .journal-book--creation .hmk-appearance-step .hmk-appearance-save{
+ margin:12px 0 0!important;padding:7px 12px!important;
+ border:1px solid #af874f!important;color:#f7e6cb!important;
+ background:linear-gradient(180deg,#345574,#17334e)!important;
+ font:600 12px/1.3 Georgia,serif!important;cursor:pointer;
+}
