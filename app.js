@@ -1,4 +1,5 @@
 import {heftPenalty} from './src/rules/weapon-modes.js';
+import {resolveCrossbowArcheryChoice} from './src/integration/hmk-crossbow-archery-choice.js';
 import {prepareSleeplessDay,prepareSleeplessNight,prepareSleeplessFourHourRest} from './src/integration/hmk-sleep-deprivation.js';
 import {LIBRARY_TABS,LIBRARY_PAGE_SIZE,libraryTabsForItem,libraryVisiblePage,resolveSuitCatalogParts} from './src/integration/hmk-library-tabs.js';
 import {coinBalance,libraryPurchasePrice,libraryPurchaseOffer,suitPurchasePrice,prepareLibraryPurchase,assertCashLedgerAppendOnly} from './src/integration/hmk-library-economy.js';
@@ -35,6 +36,7 @@ import {resolveSkillConditions,skillConditionAvailability} from './src/integrati
 import {resolveSkillTrauma,skillTraumaAvailability} from './src/integration/hmk-skill-trauma.js';
 import {automaticCriticalFailure,classifySkillConsequence,skillConsequenceProof,assertUniqueSkillConsequence,assertSkillProofAppendOnly} from './src/integration/hmk-skill-consequence-resolution.js';
 import {applyInventoryItemEdit,transferInventoryItem} from './src/integration/hmk-inventory-edit.js';
+import {isHandheldItem,requiresTwoHands,validateHandInventory,equipInventoryHand} from './src/integration/hmk-hand-equipment.js';
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
 import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
 import {creationWizardHTML,characterCalculationHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js';
@@ -162,7 +164,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.356';
+const APP_VERSION='93.357';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1126,32 +1128,72 @@ function journalInventoryTable(title,headers,rows,klass=''){
  * No guessed weapon trait, ENC or skill entry is ever substituted. */
 function journalWeaponBaseline(c,inventoryItem,mode='melee'){
  const p=inventoryItem.snapshot?.properties||{},m=p.verifiedModes?.[0];
+ // Character Sheet is a readied-weapon reference, never an attack preview.
+ if(inventoryItem.destroyed||!['main_hand','off_hand'].includes(inventoryItem.slot))
+  return {atk:'—',def:'—',hint:inventoryItem.destroyed?'Zbraň je zničena.':'Předmět není připraven v ruce. Nejprve jej vybavte v Arsenal & Gear.'};
+ const gripTwoHanded=requiresTwoHands(inventoryItem);
+ const paired=data.inventory.filter(x=>x.characterId===c.id&&['main_hand','off_hand'].includes(x.slot));
+ if(gripTwoHanded&&paired.some(x=>x.id!==inventoryItem.id))
+  return {atk:'—',def:'—',hint:'Nepřípustná souběžná výbava: obouruční zbraň a druhý předmět.'};
  if(mode==='missile'){
   const kind=String(p.missileType??m?.missileType??'').toLowerCase();
   const skillNames=kind==='sling'?['Slings']:kind==='thrown'?['Throwing']:['Archery'];
   const ml=skillValueForJournal(c,skillNames);
-  return Number.isFinite(ml)?{atk:ml,def:'—',hint:`Základ: ${skillNames[0]} ML ${ml}. Vzdálenost, střela, pohyb a okolnosti mění finální EML až při útoku.`}:{atk:'—',def:'—',hint:`Není doložena ${skillNames[0]} ML; situační EML se bez ní nedopočítává.`};
+  if(!Number.isSafeInteger(ml))return {atk:'—',def:'—',hint:`Není doložena ${skillNames[0]} ML; útok se nedopočítává.`};
+  const missileLoad=resolveCombatantLoad({character:c,inventory:data.inventory});
+  if(!missileLoad.ready||!Number.isSafeInteger(missileLoad.perceptionPenalty))
+   return {atk:'—',def:'—',hint:'Nelze doložit aktuální postih Perception z nasazené zbroje. Pro útok na dálku není přípustné odhadovat nulu.'};
+  const penalty=missileLoad.perceptionPenalty;
+  if(kind==='crossbow'){
+   const row=(c.hmk?.creation?calculateSheetSkills(c):c.hmk?.skills||[]).find(x=>String(x.name||x.key||'').toLowerCase()==='archery');
+   try{
+    const mlChoice=resolveCrossbowArcheryChoice({character:c,archerySkill:row,basis:'ml'});
+    const sbChoice=resolveCrossbowArcheryChoice({character:c,archerySkill:row,basis:'sb3'});
+    const a=effectiveMasteryLevel(mlChoice.baseML+penalty),b=effectiveMasteryLevel(sbChoice.baseML+penalty);
+    return {atk:`${a} / ${b}`,def:'—',hint:`Kuše: dvě přípustné základní hodnoty ATK (Archery ML ${mlChoice.baseML} → ${a} / Archery SB × 3 ${sbChoice.baseML} → ${b}). Perception postih ${penalty}. Střelec musí zvolit způsob při konkrétním výstřelu (HMK str. 66, 163). Dosah a další situační změny nejsou započteny.`};
+   }catch(err){return {atk:'—',def:'—',hint:'Dvě volby kuše nelze ověřit: '+err.message};}
+  }
+  return {atk:effectiveMasteryLevel(ml+penalty),def:'—',hint:`Základní ${skillNames[0]} ML ${ml}, Perception ze zbroje ${penalty}; dosah, střela, pohyb a další situace až při útoku. Pro Volley nebo zvláštní režimy se zde nedoplňují náhodné či GM hodnoty.`};
  }
  const ml=skillValueForJournal(c,['Melee']);
  if(!Number.isFinite(ml)||!m)return {atk:'—',def:'—',hint:'Chybí doložený Melee ML nebo strukturovaný Strike Mode.'};
- const attack=verifiedMeleeModifiers(inventoryItem.snapshot,{role:'attack',threateningFoeCount:1});
- const block=verifiedMeleeModifiers(inventoryItem.snapshot,{role:'defence',defence:'block',threateningFoeCount:1});
+ // Reuse verifiedMeleeModifiers; adapt only IDENTICAL official catalogue
+ // snapshots to its structured-trait schema. Unknown user data stays unknown.
+ let snapshot=inventoryItem.snapshot;
+ const canonical=inventoryItem.sourceItemId?.startsWith('hmk:')?findCatalogItem(inventoryItem.sourceItemId):null;
+ if(!m.traits&&canonical&&canonical.category===snapshot.category&&
+    sameCatalogProperties(canonical.properties,p)&&canonical.name===snapshot.name){
+  const traits={};
+  if(Number.isSafeInteger(p.defenceModifier))traits.defence=p.defenceModifier;
+  if(Number.isSafeInteger(p.blockModifier))traits.block=p.blockModifier;
+  if(typeof p.slow==='boolean')traits.slow=p.slow;
+  if(typeof p.slowOneHand==='boolean')traits.slowOneHanded=p.slowOneHand;
+  snapshot={...snapshot,properties:{...p,verifiedModes:[{...m,traits},...p.verifiedModes.slice(1)]}};
+ }
+ const attack=verifiedMeleeModifiers(snapshot,{role:'attack',twoHanded:gripTwoHanded});
+ const block=verifiedMeleeModifiers(snapshot,{role:'defence',defence:'block',twoHanded:gripTwoHanded,threateningFoeCount:1});
  const str=c.hmk?.attributes?.str,heft=m.heft??p.heft;
  if(!attack.ok||!block.ok||!Number.isSafeInteger(str)||!Number.isSafeInteger(heft))
-  return {atk:'—',def:'—',hint:'Pro výpočet chybí doložené Melee/Block Traits, STR nebo Heft. Katalogové modifikátory nejsou finální ATK/DEF.'};
- const offHand=inventoryItem.slot==='off_hand';
- const heftMod=heftPenalty({str,hft:heft,twoHanded:!!m.twoHanded,offHand}).penalty;
+  return {atk:'—',def:'—',hint:'Nedoložené bojové Traits, Strength nebo Heft. Katalogový modifikátor není úplné EML.'};
+ const offHand=inventoryItem.slot==='off_hand',shield=inventoryItem.snapshot.category==='shield';
+  const defenceHeft=heftPenalty({str,hft:heft,twoHanded:gripTwoHanded,offHand,shieldBlockOrPress:shield}).penalty;
+ const strikeHeft=heftPenalty({str,hft:heft,twoHanded:gripTwoHanded,offHand}).penalty;
  const load=resolveCombatantLoad({character:c,inventory:data.inventory});
  if(!load.encReady||!load.bulkReady||!Number.isSafeInteger(load.agilityAndMeleePenalty)||!Number.isSafeInteger(load.meleeBulkPenalty))
-  return {atk:'—',def:'—',hint:'Nedoložené ENC/Bulk zbroje nebo vybavení – nelze bezpečně vypočítat ATK/DEF.'};
- const fatigue=combatFatigueTotals(persistentStateOf(c)).total;
- if(!Number.isSafeInteger(fatigue))return {atk:'—',def:'—',hint:'Nedoložená Fatigue – základní ATK/DEF není bezpečně určen.'};
- const common=[{label:'ENC',value:load.agilityAndMeleePenalty},{label:'Bulk',value:load.meleeBulkPenalty},{label:'Fatigue',value:-fatigue},{label:'Heft',value:heftMod}];
- const atk=assembleMeleeEML({baseML:ml,modifiers:[...common,...attack.modifiers]});
- const def=assembleMeleeEML({baseML:ml,modifiers:[...common,...block.modifiers]});
- if(!atk.ok||!def.ok)return {atk:'—',def:'—',hint:'Výpočet Melee EML byl zamítnut pravidlovým enginem.'};
- const hint=`Aktuální základ bez protivníka a zvolené obrany: Melee ML ${ml}, ENC ${load.agilityAndMeleePenalty}, Bulk ${load.meleeBulkPenalty}, Fatigue −${fatigue}, Heft ${heftMod}, Traits ATK ${attack.total}, Block ${block.total}. V boji se doplní dosah, protivník, zranění a další situační změny.`;
- return {atk:atk.effectiveEML,def:def.effectiveEML,hint};
+  return {atk:'—',def:'—',hint:'Nedoložené ENC/Bulk zbroje nebo vybavení – nelze vypočítat základní ATK/DEF.'};
+ const shieldItem=paired.find(x=>x.snapshot.category==='shield');
+ const shieldP=shieldItem?.snapshot?.properties||{};
+ const canonicalShield=shieldItem?.sourceItemId?.startsWith('hmk:shields:p104:')?findCatalogItem(shieldItem.sourceItemId):null;
+ const shieldBonus=canonicalShield&&sameCatalogProperties(shieldP,canonicalShield.properties)&&
+  Number.isSafeInteger(shieldP.shieldModifier)?shieldP.shieldModifier:0;
+ // The shield modifier on pp. 98, 104 applies to its wielder's Block;
+ // the opposed-enemy penalty during a counterstrike is situational.
+ const common=[{label:'ENC',value:load.agilityAndMeleePenalty},{label:'Bulk',value:load.meleeBulkPenalty}];
+ const atk=assembleMeleeEML({baseML:ml,modifiers:[...common,{label:'Heft (strike)',value:strikeHeft},...attack.modifiers]});
+ const def=assembleMeleeEML({baseML:ml,modifiers:[...common,{label:'Heft (block)',value:defenceHeft},{label:'Readied shield bonus',value:shieldBonus},...block.modifiers]});
+ if(!atk.ok||!def.ok)return {atk:'—',def:'—',hint:'Základní Melee EML byl zamítnut pravidlovým jádrem.'};
+ return {atk:atk.effectiveEML,def:def.effectiveEML,
+  hint:`Základ připravené zbraně: Melee ML ${ml}, ENC ${load.agilityAndMeleePenalty}, Bulk ${load.meleeBulkPenalty}, Heft útok ${strikeHeft}, Heft blok ${defenceHeft}, ověřené Traits útok ${attack.total}, blok ${block.total}, štít Block ${shieldBonus}. Bez Fatigue, zranění, dosahu, volby obrany a dalších situačních úprav. WQ mění Impact/poškození zbraně, není samo o sobě bonusem k Melee EML.`};
 }
 function journalWeaponRows(inv,mode,c){
  const items=inv.filter(x=>(x.snapshot?.category==='weapon'||x.snapshot?.category==='shield')&&['main_hand','off_hand','carried','none'].includes(x.slot));
@@ -1364,6 +1406,11 @@ function creationReachableStep(actor,creation){
 }
 function folioChapterParts(body,kind=''){
  const nodes=folioHTMLNodes(body);
+ if(kind.includes('journal-book--sheet-inventory')){
+  // Arsenal has a fixed split. The load summary and its complete add-item form
+  // always stay on the right folio regardless of inventory length.
+  return [nodes.slice(0,1).map(x=>x.outerHTML).join(''),nodes.slice(1).map(x=>x.outerHTML).join('')];
+ }
  if(kind.includes('journal-book--characters')){
   const gallery=nodes.find(x=>x.classList.contains('character-gallery'));
   if(gallery){
@@ -1512,7 +1559,7 @@ function journalShell(inner,extraClass='',showSubnav=true){
    const title=heading?.querySelector('h3')?.textContent||'Character Sheet';
    const subtitle=heading?.querySelector('p')?.textContent||'';
    const content=shell.querySelector('.journal-tech-columns')?.innerHTML||shell.innerHTML;
-   inner=folioChapterSpread(title,subtitle,content,'journal-book--sheet-chapter');
+   inner=folioChapterSpread(title,subtitle,content,title==='Arsenal & Gear'?'journal-book--sheet-inventory':'journal-book--sheet-chapter');
   }
  }
  return `<section class="journal-book panel wide ${extraClass}"><div class="journal-book-frame"><div class="hmk-book-decor" aria-hidden="true"><i class="hmk-rail hmk-rail--top"></i><i class="hmk-rail hmk-rail--bottom"></i><i class="hmk-rail hmk-rail--left"></i><i class="hmk-rail hmk-rail--right"></i><i class="hmk-frame-jewel hmk-frame-jewel--top"></i><i class="hmk-frame-jewel hmk-frame-jewel--bottom"></i><i class="hmk-frame-side hmk-frame-side--left"></i><i class="hmk-frame-side hmk-frame-side--right"></i></div><div class="book-cover-ornament book-cover-ornament--tl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--tr" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--bl" aria-hidden="true"></div><div class="book-cover-ornament book-cover-ornament--br" aria-hidden="true"></div>${showSubnav?journalSectionNav():''}${inner}</div></section>`;
@@ -1558,10 +1605,11 @@ function equippedHandsPanel(inv,character){
  const mainRight=handedness==='right';
  const show=(slot,label)=>{
   const actual=inv.find(x=>x.slot===slot);
-  const choices=inv.filter(x=>x.id!==actual?.id&&!x.destroyed&&
-   !['main_hand','off_hand','worn'].includes(x.slot)&&validSlotForCategory(slot,x.snapshot?.category)&&
-   (['weapon','shield'].includes(x.snapshot?.category)||x.snapshot?.properties?.handheld===true));
-  return `<label class="hmk-hand-slot"><strong>${esc(label)}</strong><select data-equip-hand="${esc(slot)}" aria-label="${esc(label)} – vybavení z inventáře" ${combatInitiativeSequence?'disabled title="Změny výbavy během Initiative vyžadují Combat akci"':''}><option value="">Volná${actual?' (odložit do inventáře)':''}</option>${actual?`<option selected value="${esc(actual.id)}">${esc(actual.snapshot?.name||'Nasazený předmět')}</option>`:''}${choices.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot?.name||'Předmět')}${x.quantity>1?' · 1 z '+x.quantity:''}</option>`).join('')}</select></label>`;
+  const other=inv.find(x=>x.slot===(slot==='main_hand'?'off_hand':'main_hand'));
+  const reserved=other&&requiresTwoHands(other);
+  const choices=inv.filter(x=>x.id!==actual?.id&&!x.destroyed&&isHandheldItem(x)&&
+   ['none','carried'].includes(x.slot??'none')&&Number.isSafeInteger(x.quantity)&&x.quantity>0);
+  return `<label class="hmk-hand-slot"><strong>${esc(label)}</strong><select data-equip-hand="${esc(slot)}" aria-label="${esc(label)} – vybavení z inventáře" ${combatInitiativeSequence?'disabled title="Změny výbavy během Initiative vyžadují Combat akci"':''}><option value="">${reserved?'Vyhrazeno obouruční zbrani':`Volná${actual?' (odložit do inventáře)':''}`}</option>${actual?`<option selected value="${esc(actual.id)}">${esc(actual.snapshot?.name||'Nasazený předmět')}</option>`:''}${!reserved?choices.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot?.name||'Předmět')}${x.quantity>1?' · 1 z '+x.quantity:''}${requiresTwoHands(x)?' · obouruč':''}</option>`).join(''):''}</select></label>`;
  };
  return `<div class="equipment-summary equipped-hands" aria-label="Aktuální obsazení rukou">${handedness==='right'||handedness==='left'?show(mainRight?'off_hand':'main_hand','Levá ruka')+show(mainRight?'main_hand':'off_hand','Pravá ruka'):show('main_hand','Hlavní ruka – fyzická strana neurčena')+show('off_hand','Vedlejší ruka – fyzická strana neurčena')}</div>`;
 }
@@ -7528,7 +7576,7 @@ document.addEventListener('submit',e=>{
  if(ok){sheetEditingId=null;render();}
 },true);
 
-document.addEventListener('submit',e=>{const f=e.target;if(!['character-editor','item-editor','character-form','add-inventory','journal-form'].includes(f.id))return;e.preventDefault();const v=Object.fromEntries(new FormData(f));if(f.id==='character-editor'){if(!v.name.trim())return alert('Zadejte jméno');if(mutate(()=>data.characters.push({id:uuid(),name:v.name.trim(),occupation:v.occupation||'',kind:v.kind,description:v.description||'',portrait:''}))) {overlay=null;render()}return}if(f.id==='character-form'){if(combatInitiativeSequence&&encounterSelection.has(selected))return alert('Identitu aktivního účastníka během Initiative nelze měnit mimo Combat průvodce.');if(!v.name.trim())return alert('Zadejte jméno');mutate(()=>{const live=character(selected);Object.assign(live,{name:v.name.trim(),kind:v.kind,description:v.description,portrait:v.portrait});if(!isCreationOwned(live))live.occupation=v.occupation;});return}if(f.id==='item-editor'){if(editItem&&item(editItem)?.builtin)return alert('Vestavěné definice nelze upravit.');if(!v.name.trim())return alert('Zadejte název');let properties;try{properties=JSON.parse(v.properties||'{}');if(!properties||Array.isArray(properties)||typeof properties!=='object')throw Error()}catch{return alert('Parametry musí být platný JSON objekt')}if(mutate(()=>{const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties};if(editItem)Object.assign(item(editItem),record);else data.items.push(record)})){overlay=null;render()}return}if(f.id==='add-inventory'){if(combatInitiativeSequence)return alert('Během Initiative měňte inventář pouze pravidlově dokončenou akcí Combat průvodce.');const i=item(v.itemId);const quantity=Number(v.quantity);if(!i||!Number.isSafeInteger(quantity)||quantity<1||quantity>999999)return alert('Vyberte předmět a platný počet');if(!validSlotForCategory(v.slot,i.category))return alert('Tento slot neodpovídá kategorii předmětu');if(['main_hand','off_hand','worn'].includes(v.slot)&&quantity!==1)return alert('Vybavený předmět musí představovat jeden kus. Další kusy evidujte samostatně jako nesené.');if(!handSlotAvailable(selected,v.slot))return alert('Ruka je již obsazena. Nejprve přesuňte stávající předmět.');const currentWQ=v.currentWQ===''?null:Number(v.currentWQ);if(currentWQ!==null&&(!Number.isSafeInteger(currentWQ)||currentWQ<0||currentWQ>999))return alert('Neplatná aktuální WQ');mutate(()=>data.inventory.push({id:uuid(),currentWQ,characterId:selected,sourceItemId:i.id,snapshot:structuredClone(i),quantity,condition:v.condition||'',slot:v.slot||'none'}));return}if(f.id==='journal-form'){if(!v.title.trim()&&!v.body.trim())return;mutate(()=>data.journal.push({id:uuid(),characterId:selected,title:v.title.trim()||'Bez názvu',body:v.body,createdAt:stamp()}))}});
+document.addEventListener('submit',e=>{const f=e.target;if(!['character-editor','item-editor','character-form','add-inventory','journal-form'].includes(f.id))return;e.preventDefault();const v=Object.fromEntries(new FormData(f));if(f.id==='character-editor'){if(!v.name.trim())return alert('Zadejte jméno');if(mutate(()=>data.characters.push({id:uuid(),name:v.name.trim(),occupation:v.occupation||'',kind:v.kind,description:v.description||'',portrait:''}))) {overlay=null;render()}return}if(f.id==='character-form'){if(combatInitiativeSequence&&encounterSelection.has(selected))return alert('Identitu aktivního účastníka během Initiative nelze měnit mimo Combat průvodce.');if(!v.name.trim())return alert('Zadejte jméno');mutate(()=>{const live=character(selected);Object.assign(live,{name:v.name.trim(),kind:v.kind,description:v.description,portrait:v.portrait});if(!isCreationOwned(live))live.occupation=v.occupation;});return}if(f.id==='item-editor'){if(editItem&&item(editItem)?.builtin)return alert('Vestavěné definice nelze upravit.');if(!v.name.trim())return alert('Zadejte název');let properties;try{properties=JSON.parse(v.properties||'{}');if(!properties||Array.isArray(properties)||typeof properties!=='object')throw Error()}catch{return alert('Parametry musí být platný JSON objekt')}if(mutate(()=>{const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties};if(editItem)Object.assign(item(editItem),record);else data.items.push(record)})){overlay=null;render()}return}if(f.id==='add-inventory'){if(combatInitiativeSequence)return alert('Během Initiative měňte inventář pouze pravidlově dokončenou akcí Combat průvodce.');const i=item(v.itemId);const quantity=Number(v.quantity);if(!i||!Number.isSafeInteger(quantity)||quantity<1||quantity>999999)return alert('Vyberte předmět a platný počet');if(!validSlotForCategory(v.slot,i.category))return alert('Tento slot neodpovídá kategorii předmětu');if(['main_hand','off_hand','worn'].includes(v.slot)&&quantity!==1)return alert('Vybavený předmět musí představovat jeden kus. Další kusy evidujte samostatně jako nesené.');if(!handSlotAvailable(selected,v.slot))return alert('Ruka je již obsazena. Nejprve přesuňte stávající předmět.');const currentWQ=v.currentWQ===''?null:Number(v.currentWQ);if(currentWQ!==null&&(!Number.isSafeInteger(currentWQ)||currentWQ<0||currentWQ>999))return alert('Neplatná aktuální WQ');const nextItem={id:uuid(),currentWQ,characterId:selected,sourceItemId:i.id,snapshot:structuredClone(i),quantity,condition:v.condition||'',slot:v.slot||'none'};try{if(['main_hand','off_hand'].includes(v.slot)){if(!isHandheldItem(nextItem))throw Error('Tento předmět nelze držet v ruce');validateHandInventory([...data.inventory,nextItem],selected);}}catch(err){return alert(err.message)}mutate(()=>data.inventory.push(nextItem));return}if(f.id==='journal-form'){if(!v.title.trim()&&!v.body.trim())return;mutate(()=>data.journal.push({id:uuid(),characterId:selected,title:v.title.trim()||'Bez názvu',body:v.body,createdAt:stamp()}))}});
 document.addEventListener('click',e=>{
  const tab=e.target.closest('[data-library-tab]');
  if(tab){e.preventDefault();libraryTab=tab.dataset.libraryTab;libraryPage=0;query='';render();return}
@@ -7737,22 +7785,12 @@ document.addEventListener('change',e=>{
  e.stopImmediatePropagation();
  const slot=ctrl.dataset.equipHand,id=String(ctrl.value||''),ownerId=selected;
  if(view!=='sheet'||activeSheetSection!=='inventory'||!character(ownerId))return;
- if(combatInitiativeSequence){alert('Během Initiative vybavujte pouze pravidlově potvrzenou Combat akcí.');render();return}
- if(!['main_hand','off_hand'].includes(slot))return;
- const active=data.inventory.find(x=>x.characterId===ownerId&&x.slot===slot);
- const chosen=id?data.inventory.find(x=>x.id===id&&x.characterId===ownerId):null;
- if(id&&(!chosen||chosen.destroyed||!validSlotForCategory(slot,chosen.snapshot?.category)||
-    !['none','carried',slot].includes(chosen.slot))){alert('Tento předmět nelze vložit do zvolené ruky.');render();return}
- if(chosen?.id===active?.id)return;
- const ok=mutate(()=>{
-  if(active) {active.slot='carried';active.gearStowage='normal'}
-  if(!chosen)return;
-  if(chosen.quantity>1){
-   chosen.quantity-=1;
-   data.inventory.push({...structuredClone(chosen),id:uuid(),quantity:1,slot,gearStowage:'normal'});
-  }else{chosen.slot=slot;chosen.gearStowage='normal'}
- });
- if(!ok)render();
+ if(combatInitiativeSequence){alert('Během Initiative vybavujte pouze pravidlově potvrzenou Combat akcí.');render();return;}
+ try{
+  const updated=equipInventoryHand(data,{ownerId,slot,itemId:id,newItemId:uuid()});
+  // The existing CAS writer persists inventory only; it does not rewrite actors.
+  if(!mutate(()=>{data.inventory=updated.inventory;}))render();
+ }catch(err){alert('Ruce nebyly změněny: '+err.message);render();}
 },true);
 document.addEventListener('click',e=>{const t=e.target.closest('[data-edit-inv]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();const x=data.inventory.find(x=>x.id===t.dataset.editInv&&x.characterId===selected);if(!x)return;overlay=inventoryEditForm(x);render()},true);
 document.addEventListener('submit',e=>{
