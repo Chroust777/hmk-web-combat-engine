@@ -159,7 +159,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.335';
+const APP_VERSION='93.339';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -337,20 +337,20 @@ function main(){
  if(view==='encounter')body=encounterView();
  const scene=activeVisualScene();
  const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['hazards','✣','Nebezpečí / Trauma'],['backup','▤','Zálohy'],['trash','♧','Archiv']];
- const characterButtons=data.characters.map(c=>`<button type="button" class="castle-character ${c.id===selected?'active':''}" data-open="${esc(c.id)}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span>${esc(c.name)}</span></button>`).join('');
+ const characterButtons=data.characters.map(c=>`<button type="button" class="castle-character ${c.id===selected?'active':''}" data-open="${esc(c.id)}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <header class="mast"><div class="mast-top">
-   <div class="mast-brand"><div class="brand-mark" aria-hidden="true">⚜</div><div class="brand-copy"><div class="eyebrow">HMK · KÈTHÎRA</div><h1>HârnMaster Roleplaying in the World of Kèthîra</h1></div></div>
+   <div class="mast-brand"><div class="brand-mark" aria-hidden="true">⚜</div><div class="brand-copy"><div class="eyebrow">HMK · KÈTHÎRA</div><h1>HârnMaster World of Kèthîra</h1></div></div>
    <div class="mast-meta"><span class="release-marker">v${APP_VERSION}</span></div>
  </div></header>
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
-  <div class="castle-campaign-card"><span>KAMPANĚ</span><strong>HÂRNMASTER KÈTHÎRA</strong><small>Keeper’s Campaign Ledger</small></div>
+  <div class="castle-campaign-card"><strong>HârnMaster World of Kèthîra</strong></div>
   <div class="nav-section-label">HLAVNÍ MENU</div>
-  ${navLinks.map(([id,icon,label])=>`<button type="button" class="castle-nav-link ${view===id?'active':''}" data-nav="${id}"><span class="castle-nav-icon">${icon}</span>${esc(label)}</button>`).join('')}
+  ${navLinks.map(([id,icon,label])=>`<button type="button" class="castle-nav-link ${view===id?'active':''}" data-nav="${id}"><span class="castle-nav-icon" aria-hidden="true">${icon}</span><span class="castle-nav-label">${esc(label)}</span><span class="castle-nav-spacer" aria-hidden="true"></span></button>`).join('')}
   <div class="nav-section-label castle-character-section">POSTAVY <span>${data.characters.length}</span></div>
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   ${selected&&character(selected)?`<div class="castle-character-tools"><button type="button" class="castle-nav-link" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="castle-nav-link" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`:''}
-  <button type="button" class="castle-create" data-action="new-character">✣ Vytvořit postavu <span>＋</span></button>
+  <button type="button" class="castle-create" data-action="new-character"><span class="castle-create-symbol" aria-hidden="true">✣</span><span class="castle-create-label">Vytvořit postavu</span><span class="castle-create-plus" aria-hidden="true">＋</span></button>
   <div class="castle-sidebar-footer">⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
  </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter'].includes(view)?' content-sheet':''}">${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
  <footer class="footer">HârnMaster Keeper’s Ledger · v${APP_VERSION} · offline aplikace pro GitHub Pages</footer></div>`;

@@ -3068,100 +3068,173 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
   }
 }
 
-
-/* v93.338 — centered leather header and centered sidebar controls.
-   Header title now uses the exact requested wording and the navy leather texture.
-   Left sidebar buttons/cards are centered inside the menu column. */
+/* v93.339 — unified sidebar geometry and visible navy-leather covers.
+   All buttons share a single centered content column and symmetrical icon slots.
+   The campaign image shows only the canonical title; no campaign label.
+   The original 1254px texture is NOT repeatedly shrunk under dark opaque layers. */
 .mast{
-  background-image:linear-gradient(180deg,rgba(9,21,33,.94),rgba(15,26,40,.94)),var(--kh-leather)!important;
-  background-repeat:no-repeat,repeat!important;
-  background-size:100% 100%,460px 460px!important;
-  background-position:center,0 0!important;
+  background-color:#102840!important;
+  background-image:var(--kh-leather)!important;
+  background-position:center top!important;
+  background-size:1254px 1254px!important;
+  background-repeat:repeat!important;
 }
 .mast .mast-brand{
   display:flex!important;
   align-items:center!important;
   justify-content:center!important;
-  padding:0 16px!important;
-  background-image:linear-gradient(180deg,rgba(5,12,22,.12),rgba(5,12,22,.32)),var(--kh-leather)!important;
-  background-repeat:no-repeat,repeat!important;
-  background-size:100% 100%,420px 420px!important;
-  background-position:center,0 0!important;
+  padding:3px 14px!important;
+  background-color:#112840!important;
+  background-image:var(--kh-leather)!important;
+  background-position:center top!important;
+  background-size:1254px 1254px!important;
+  background-repeat:repeat!important;
   border:1px solid #b4884b!important;
-  box-shadow:inset 0 0 0 1px rgba(228,190,126,.18),0 2px 8px rgba(0,0,0,.28)!important;
+  box-shadow:inset 0 0 0 1px rgba(228,190,126,.2),0 2px 8px #0005!important;
+  overflow:hidden!important;
 }
-.mast .mast-brand::after{display:none!important}
-.mast .mast-brand .brand-mark{display:none!important}
+.mast .mast-brand::after,.mast .mast-brand .brand-mark{display:none!important}
 .mast .mast-brand .brand-copy,
-.mast .mast-brand .brand-copy h1,
-.mast .mast-brand .brand-copy .eyebrow{
+.mast .mast-brand .brand-copy h1{
+  display:block!important;
   opacity:1!important;
+  visibility:visible!important;
   pointer-events:auto!important;
 }
-.mast .mast-brand .brand-copy{
-  width:100%!important;
-  text-align:center!important;
-}
+.mast .mast-brand .brand-copy{width:100%!important;min-width:0!important;text-align:center!important}
 .mast .mast-brand .brand-copy .eyebrow{display:none!important}
 .mast .mast-brand h1{
   margin:0!important;
-  font:600 clamp(15px,1.12vw,19px)/1.18 "Cormorant Garamond", Georgia, serif!important;
-  letter-spacing:.03em!important;
-  color:#f3e4c8!important;
+  font:600 clamp(16px,1.22vw,20px)/1.16 "Cormorant Garamond",Georgia,serif!important;
+  letter-spacing:.025em!important;
   text-transform:none!important;
-  text-shadow:0 1px 0 rgba(0,0,0,.55)!important;
+  text-align:center!important;
+  color:#f8e7ca!important;
+  text-shadow:0 2px 3px #030b16!important;
+  overflow-wrap:normal!important;
 }
 
+/* Full sidebar width is a 260px border-box, never a 260px content box.
+   Remove the obsolete 72px right gutter reserved for a discarded banner. */
+.nav{
+  box-sizing:border-box!important;
+  padding:12px 16px 18px!important;
+  background-color:#102840!important;
+  background-image:var(--kh-leather)!important;
+  background-size:1254px 1254px!important;
+  background-position:center top!important;
+  background-repeat:repeat!important;
+  backdrop-filter:none!important;
+}
 .nav .castle-campaign-card,
 .nav .nav-section-label,
 .nav .castle-character-list,
 .nav .castle-character-tools,
 .nav .castle-create,
-.nav .castle-sidebar-footer{
-  width:min(214px,calc(100% - 8px))!important;
+.nav .castle-sidebar-footer,
+.nav .castle-nav-link,
+.nav .castle-character{
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
   margin-left:auto!important;
   margin-right:auto!important;
+}
+.nav .castle-campaign-card{
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:center!important;
+  align-items:center!important;
+  min-height:94px!important;
+  height:auto!important;
+  padding:12px 10px!important;
+  overflow:hidden!important;
+  text-align:center!important;
+}
+.nav .castle-campaign-card strong{
+  display:block!important;
+  max-width:100%!important;
+  margin:0!important;
+  color:#fff4d9!important;
+  font:700 clamp(14px,1.1vw,18px)/1.16 Georgia,serif!important;
+  text-transform:none!important;
+  text-align:center!important;
+  letter-spacing:.015em!important;
+  text-shadow:0 2px 5px #020710,0 0 8px #020710!important;
+  overflow-wrap:normal!important;
+}
+.nav .nav-section-label,.nav .castle-sidebar-footer{text-align:center!important}
+.nav .castle-character-list{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:0!important;
+  justify-items:stretch!important;
+}
+.nav .castle-character-tools{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:6px!important;
 }
 .nav .castle-nav-link,
 .nav .castle-character,
 .nav .castle-create{
-  width:min(214px,calc(100% - 8px))!important;
-  margin-left:auto!important;
-  margin-right:auto!important;
+  display:grid!important;
+  grid-template-columns:29px minmax(0,1fr) 29px!important;
+  align-items:center!important;
+  justify-items:center!important;
+  justify-content:normal!important;
+  gap:0!important;
+  padding:8px 8px!important;
+  text-align:center!important;
+  white-space:normal!important;
+}
+.nav .castle-nav-icon,
+.nav .castle-char-portrait,
+.nav .castle-create-symbol{grid-column:1!important;grid-row:1!important;justify-self:center!important}
+.nav .castle-nav-label,
+.nav .castle-char-name,
+.nav .castle-create-label{
+  grid-column:2!important;
+  grid-row:1!important;
+  min-width:0!important;
+  max-width:100%!important;
+  display:block!important;
+  justify-self:stretch!important;
+  text-align:center!important;
+  overflow-wrap:normal!important;
+  word-break:normal!important;
+  hyphens:none!important;
+}
+.nav .castle-nav-spacer,
+.nav .castle-char-spacer,
+.nav .castle-create-plus{grid-column:3!important;grid-row:1!important;justify-self:center!important}
+.nav .castle-char-portrait{width:28px!important;height:28px!important;min-width:28px!important;overflow:hidden!important}
+.nav .castle-character-tools .castle-nav-link{
+  display:flex!important;
   justify-content:center!important;
   text-align:center!important;
+  min-height:38px!important;
 }
-.nav .castle-nav-link,
-.nav .castle-create{padding-left:12px!important;padding-right:12px!important}
-.nav .castle-character{
-  gap:.55rem!important;
-  padding-left:12px!important;
-  padding-right:12px!important;
+.nav .castle-sidebar-footer{overflow-wrap:anywhere!important}
+@media(min-width:801px){
+ .nav{display:flex!important;flex-direction:column!important;align-items:stretch!important}
 }
-.nav .castle-character span:last-child,
-.nav .castle-campaign-card,
-.nav .nav-section-label,
-.nav .castle-sidebar-footer{text-align:center!important}
-.nav .castle-campaign-card{
-  display:flex!important;
-  flex-direction:column!important;
-  align-items:center!important;
-  justify-content:center!important;
-}
-.nav .castle-campaign-card strong,
-.nav .castle-campaign-card small,
-.nav .castle-campaign-card span{display:block;text-align:center!important}
-.nav .castle-character-list{display:grid!important;gap:0!important}
-.nav .castle-character-tools{display:grid!important;gap:6px!important;justify-items:center!important}
-.nav .castle-sidebar-footer{padding-left:0!important;padding-right:0!important}
 @media(max-width:800px){
-  .mast .mast-brand h1{font-size:15px!important;line-height:1.16!important}
-  .nav .castle-nav-link,
-  .nav .castle-character,
-  .nav .castle-create,
-  .nav .castle-campaign-card,
-  .nav .nav-section-label,
-  .nav .castle-character-list,
-  .nav .castle-character-tools,
-  .nav .castle-sidebar-footer{width:min(100%,260px)!important}
+ .nav{padding:12px 12px 16px!important}
+ .nav .castle-campaign-card,
+ .nav .nav-section-label,
+ .nav .castle-character-list,
+ .nav .castle-character-tools,
+ .nav .castle-create,
+ .nav .castle-sidebar-footer{grid-column:1/-1!important}
+ .nav .castle-nav-link,.nav .castle-character,.nav .castle-create{font-size:13px!important}
+ .mast .mast-brand h1{font-size:15px!important}
+}
+
+@media(max-width:550px){
+  /* Two readable columns rather than three cramped, broken-word buttons. */
+  .nav{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .nav .castle-nav-link{grid-template-columns:22px minmax(0,1fr) 22px!important;padding:8px 5px!important}
+  .nav .castle-nav-label{font-size:12px!important}
 }
