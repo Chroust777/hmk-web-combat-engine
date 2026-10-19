@@ -3029,3 +3029,45 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  .content-sheet .journal-book-spread,
  .content-sheet .journal-book--chapter .folio-chapter-spread{grid-template-columns:1fr!important;}
 }
+
+
+/* v93.337 — centered, height-independent genuine trim_44 book gutter.
+   Fixed original-art endcaps plus a perfectly seam-matched midsection.
+   No image is stretched to the live chapter height, and the transparent sides
+   blend naturally into the existing parchment texture. */
+@media (min-width:1161px) {
+  .content-sheet .journal-book-frame::after,
+  .content-sheet .journal-book--chapter .journal-book-frame::after {
+    content: "" !important;
+    display: block !important;
+    position: absolute !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    top: 33px !important;
+    bottom: 30px !important;
+    width: 120px !important;
+    height: auto !important;
+    opacity: 1 !important;
+    z-index: 4 !important;
+    pointer-events: none !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
+    background-image:
+      url('./assets/ui/keeper-hires/render/trim_44_gutter_top.png'),
+      url('./assets/ui/keeper-hires/render/trim_44_gutter_bottom.png'),
+      url('./assets/ui/keeper-hires/render/trim_44_gutter_middle.png') !important;
+    background-repeat: no-repeat, no-repeat, repeat-y !important;
+    background-position: center top, center bottom, center top !important;
+    background-size: 120px auto, 120px auto, 120px auto !important;
+  }
+}
+/* At tablet/mobile sizes the journal is one page wide, not a two-page spread. */
+@media (max-width:1160px) {
+  .content-sheet .journal-book-frame::after,
+  .content-sheet .journal-book--chapter .journal-book-frame::after {
+    content: none !important;
+    display: none !important;
+  }
+}
