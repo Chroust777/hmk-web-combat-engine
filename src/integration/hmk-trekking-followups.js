@@ -9,7 +9,8 @@ const KINDS=Object.freeze({
  direction:{kind:'trek-direction-hazard',route:'skills',label:'Direction Hazard – vyhodnotit skutečné bloudění a jeho následky'},
  encounter:{kind:'trek-encounter',route:'combat',label:'Random Encounter – vyhodnotit Encounter Tables a následnou situaci'},
  survival:{kind:'trek-survival',route:'skills',label:'Survival Hazard – vyhodnotit CF a případný Accident'},
- 'survival-test':{kind:'trek-survival-test',route:'skills',label:'Orienteering / Survival Success Value – doložit povinný test (HMK 145,148)'}
+ 'survival-test':{kind:'trek-survival-test',route:'skills',label:'Orienteering / Survival Success Value – doložit povinný test (HMK 145,148)'},
+ drover:{kind:'trek-drover-test',route:'skills',label:'Drover Test – Riding / Animalcraft (HMK 145)'}
 });
 export function trekkingOutstandingCases(characters=[],journal=[],campaignId=null){
  const names=new Map(characters.map(c=>[c.id,c.name]));
@@ -44,6 +45,7 @@ export function trekkingOutstandingCases(characters=[],journal=[],campaignId=nul
   if(!journal.some(j=>j.calendarTrekSkillSource?.format==='hmk-trek-linked-skill-v1'&&
     j.calendarTrekSkillSource.sourceId===entry.id&&j.calendarTrekSkillSource.hazard==='survival'&&
     j.characterId===entry.characterId&&j.calendarCampaignId===entry.calendarCampaignId))triggers.push('survival-test');
+  if(p.orienteeringContext&&p.conveyance!=='foot')triggers.push('drover');
   if(p.weatherWatch?.requiresWeatherHazardRoll)triggers.push('weather');
   if(p.hazards?.direction&&!(p.hazards.direction==='lost-time'&&p.effectiveMovement&&
    JSON.stringify(p.effectiveMovement)===JSON.stringify(adjustedTrekkingMovement(p))))triggers.push('direction');
@@ -52,13 +54,15 @@ export function trekkingOutstandingCases(characters=[],journal=[],campaignId=nul
    (j.skillTestProof?.a||j.skillTestProof?.result)?.level==='CF'))triggers.push('survival');
   if(p.encounter?.encounter)triggers.push('encounter');
   for(const hazard of triggers){
-   const k=[entry.calendarCampaignId,entry.characterId,entry.id,hazard].join('|');
+   const subjectId=hazard==='drover'?p.orienteeringContext?.droverId:entry.characterId;
+   if(!names.has(subjectId))continue;
+   const k=[entry.calendarCampaignId,subjectId,entry.id,hazard].join('|');
    if(resolutions.has(k)||hasFinishedLinkedTrekHazard(entry,hazard,journal))continue;
    const spec=KINDS[hazard];
    cases.push({id:'trek:'+encodeURIComponent(entry.id)+':'+hazard,
-    characterId:entry.characterId,name:names.get(entry.characterId),sourceId:entry.id,
+    characterId:subjectId,name:names.get(subjectId),sourceId:entry.id,
     kind:spec.kind,description:spec.label,minute:entry.campaignMinute,route:spec.route,
-    hazard:hazard==='survival-test'?'survival':hazard,sourcePage:hazard==='encounter'?150:hazard==='weather'?144:hazard==='survival-test'?145:148});
+    hazard:hazard==='survival-test'?'survival':hazard,sourcePage:hazard==='encounter'?150:hazard==='weather'?144:hazard==='survival-test'||hazard==='drover'?145:148});
   }
  }
  return cases;

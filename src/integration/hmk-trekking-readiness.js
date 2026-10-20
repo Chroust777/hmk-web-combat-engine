@@ -4,6 +4,7 @@
  * Not an alternative Skill SV / Fatigue / Injury engine.
  */
 import {trekkingOutstandingCases} from './hmk-trekking-followups.js';
+import {adjustedOrienteeringSV,assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 const valid = x => Number.isSafeInteger(x) && x>=0 && x<=1e9;
 const requireFact=(ok,message)=>{if(!ok)throw Error(message);};
 export function assessTrekkingReadiness({journal=[],characters=[],actorId,campaignId,minute,kind}={}){
@@ -29,13 +30,24 @@ export function assessTrekkingReadiness({journal=[],characters=[],actorId,campai
  const result=linked[0].skillTestProof.a||linked[0].skillTestProof.result;
  requireFact(Number.isSafeInteger(result.sv)&&['CF','F','S','CS'].includes(result.level),
   'Uložený Survival test nedokládá vyhodnotitelný Success Value.');
- const available=result.sv>=5?Math.min(5,result.sv-4):0;
- const spent=p.modes.progress+p.modes.bearing;
- requireFact(Number.isSafeInteger(spent)&&spent>=0&&spent<=available,
-  `Orienteering SV ${result.sv} dovoluje ${available} Advantage Modes, ale v hlídce je ${spent} Progress/Bearing. Znovu připravte hlídku s pravidlově možnými režimy.`);
- if(result.sv<=0)throw Error('Orienteering SV ≤ 0 ukládá Lax i Slow Mode. Lax Mode zatím není v cestovní hlídce evidován; nelze bezpečně postoupit.');
- if(result.sv<=2)requireFact(p.modes.slow>=1,
-  `Orienteering SV ${result.sv} vyžaduje Slow Mode (alternativní Lax Mode zde zatím není evidován).`);
+ let available,spent,verifiedSV=result.sv;
+ if(p.orienteeringContext){
+  const drover=journal.filter(j=>j.calendarTrekSkillSource?.sourceId===source.id&&
+   j.calendarTrekSkillSource.hazard==='drover'&&j.calendarCampaignId===campaignId&&
+   j.characterId===p.orienteeringContext.droverId&&j.campaignMinute>=minute);
+  requireFact(p.conveyance==='foot'||drover.length===1,
+   'Chybí doložený Riding/Animalcraft Drover Test pro tuto hlídku.');
+  const droverResult=p.conveyance==='foot'?null:(drover[0].skillTestProof?.a||drover[0].skillTestProof?.result);
+  const adjustment=adjustedOrienteeringSV({baseSV:result.sv,context:p.orienteeringContext,droverResult});
+  const certified=assertOrienteeringModes({adjustment,modes:p.modes});
+  available=certified.available;spent=certified.spent;verifiedSV=certified.adjustedSV;
+ }else{
+  available=result.sv>=5?Math.min(5,result.sv-4):0;spent=p.modes.progress+p.modes.bearing;
+  requireFact(Number.isSafeInteger(spent)&&spent>=0&&spent<=available,
+   `Orienteering SV ${result.sv} dovoluje ${available} Advantage Modes, ale v hlídce je ${spent} Progress/Bearing.`);
+  if(result.sv<=0)throw Error('Starší hlídka se SV ≤ 0 nemá doložený Lax Mode. Nelze ji bezpečně vyhodnotit.');
+  if(result.sv<=2)requireFact(p.modes.slow>=1,'Orienteering SV 1–2 vyžaduje Slow Mode.');
+ }
  const pending=trekkingOutstandingCases(characters,journal,campaignId)
   .filter(x=>x.sourceId===source.id&&x.characterId===actorId);
  requireFact(pending.length===0,
@@ -45,6 +57,6 @@ export function assessTrekkingReadiness({journal=[],characters=[],actorId,campai
  const movement=p.effectiveMovement??p.movement;
  requireFact(movement&&Number.isFinite(movement.leagues)&&Number.isFinite(movement.kilometres),
   'Nedoložená vypočtená vzdálenost cesty.');
- return {sourceId:source.id,source,orienteeringId:linked[0].id,sv:result.sv,
+ return {sourceId:source.id,source,orienteeringId:linked[0].id,sv:verifiedSV,rawSV:result.sv,
   availableModes:available,spentModes:spent,movement};
 }

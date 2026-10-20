@@ -4,6 +4,7 @@
  * actual inputs: never invent terrain, orientation, encounters or injuries.
  */
 import {validateTrekPartySnapshot} from './hmk-trekking-party-modes.js';
+import {createOrienteeringContext,adjustedOrienteeringSV,assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 const assert=(yes,msg)=>{if(!yes)throw Error(msg)};
 const int=(n,a,b)=>Number.isSafeInteger(n)&&n>=a&&n<=b;
 export const TREK_CLIMATES=Object.freeze(['subpolar','cool','warm','subtropical','dry-tropical','wet-tropical']);
@@ -125,10 +126,19 @@ export function validateTrekkingJournalEvidence(document){
    typeof p.area==='string'&&p.area.length>0&&p.area.length<=90&&
    ['flat','rough','mountain'].includes(p.landscape)&&
    typeof entry.calendarCampaignId==='string'&&entry.calendarCampaignId,'Neplatný cestovní čas či identita kampaně');
+  if(p.orienteeringContext){
+   const c=createOrienteeringContext(p.orienteeringContext);
+   assert(JSON.stringify(c)===JSON.stringify(p.orienteeringContext)&&c.night===p.night&&
+    c.partySize===(p.partyModes?.memberIds?.length??1)&&c.conveyance===p.conveyance&&
+    (c.conveyance==='foot'||p.partyModes?.memberIds?.includes(c.droverId)),
+    'Orienteering context neodpovídá doložené hlídce');
+   assert(typeof p.modes?.lax==='boolean'&&[0,1].includes(p.modes.orienteeringSlow),
+    'Chybí doložený Lax/Slow z Orienteering');
+  }
   if(p.partyModes){
    validateTrekPartySnapshot(p.partyModes);
    assert(p.partyModes.guideId===entry.characterId&&p.partyModes.conveyance===p.conveyance&&
-    p.modes.slow===p.modes.manualSlow+p.partyModes.forcedSlow+(p.weatherWatch?.slowMode?1:0)&&
+    p.modes.slow===p.modes.manualSlow+p.partyModes.forcedSlow+(p.weatherWatch?.slowMode?1:0)+(p.modes.orienteeringSlow??0)&&
     p.modes.loaded===p.partyModes.loaded&&int(p.modes.manualSlow,0,20),
     'Skupinové postihy neodpovídají uloženému pohybu a počasí.');
   }
@@ -192,7 +202,14 @@ export function validateTrekkingJournalEvidence(document){
    const roll=byId.get(e.orienteeringId),link=roll?.calendarTrekSkillSource;
    const test=roll?.skillTestProof?.a??roll?.skillTestProof?.result;
    const selected=p.modes?.progress+p.modes?.bearing;
-   const stars=Number.isSafeInteger(test?.sv)?Math.max(0,Math.min(5,test.sv-4)):NaN;
+   const droverRow=document.journal.find(j=>j.calendarTrekSkillSource?.sourceId===source.id&&
+    j.calendarTrekSkillSource.hazard==='drover'&&j.characterId===p.orienteeringContext?.droverId&&
+    j.calendarCampaignId===entry.calendarCampaignId);
+   const droverResult=droverRow?.skillTestProof?.a??droverRow?.skillTestProof?.result;
+   const adjusted=p.orienteeringContext?adjustedOrienteeringSV({baseSV:test?.sv,
+    context:p.orienteeringContext,droverResult:p.conveyance==='foot'?null:droverResult}):null;
+   if(adjusted)assertOrienteeringModes({adjustment:adjusted,modes:p.modes});
+   const stars=adjusted?adjusted.advantageModes:Number.isSafeInteger(test?.sv)?Math.max(0,Math.min(5,test.sv-4)):NaN;
    assert(roll&&link?.format==='hmk-trek-linked-skill-v1'&&link.hazard==='survival'&&
     link.sourceId===source.id&&roll.characterId===source.characterId&&
     roll.calendarCampaignId===entry.calendarCampaignId&&
@@ -200,7 +217,7 @@ export function validateTrekkingJournalEvidence(document){
     roll.campaignMinute<=entry.campaignMinute&&
     ['secondary-mastery-value-test','success-value-specific'].includes(roll.skillTestProof?.type)&&
     Number.isSafeInteger(selected)&&selected<=stars&&
-    (test.sv>=3||(test.sv>=1&&p.modes.slow>=1)),
+    (adjusted?true:(test.sv>=3||(test.sv>=1&&p.modes.slow>=1))),
     'Únava neodkazuje na přípustný, zdrojově doložený Orienteering SV');
   }
  }
