@@ -8,7 +8,7 @@ const ok=(condition,message)=>{if(!condition)throw Error(message);};
 const isD10=x=>Number.isSafeInteger(x)&&x>=1&&x<=10;
 export const TREK_CORRECTION_FORMAT='hmk-trekking-watch-correction-v1';
 export const extras=m=>({foraging:m?.foraging??0,stalking:m?.stalking??0,vigilance:m?.vigilance??0});
-export const modeTotal=m=>m.progress+m.bearing+extras(m).foraging+extras(m).stalking+extras(m).vigilance;
+export const modeTotal=m=>m.progress+m.bearing-(m.trackingForcedBearingSourceId?1:0)+extras(m).foraging+extras(m).stalking+extras(m).vigilance;
 export function certifyTrekOrienteering(source,journal){
  const p=source?.calendarTrekProof;
  ok(p?.format==='hmk-trekking-watch-evidence-v1','Chybí původní cestovní hlídka');
@@ -38,9 +38,13 @@ export function correctedModes(prepared,adjustment,{lowChoice=null}={}){
  ok(Object.values(original).every(x=>Number.isSafeInteger(x)&&x>=0)&&
   original.stalking<=1&&original.vigilance<=1,'Neplatné připravené režimy hlídky');
  const result={...prepared};
+ const forced=prepared.trackingForcedBearingSourceId?1:0;
+ ok(original.bearing>=forced,'Povinný Bearing po Tracking CF nelze odebrat');
  let spare=adjustment.advantageModes;
  for(const key of adjustment.stationaryForaging?['foraging','stalking','vigilance']:['bearing','foraging','stalking','vigilance','progress']){
-  result[key]=Math.min(original[key],spare);spare-=result[key];
+  const voluntary=key==='bearing'?original[key]-forced:original[key];
+  result[key]=Math.min(voluntary,spare)+(key==='bearing'?forced:0);
+  spare-=Math.min(voluntary,spare);
  }
  const sv=adjustment.adjustedSV;
  const validLowChoice=sv>=1&&sv<=2&&Number(prepared.lax)+Number(prepared.orienteeringSlow)===1;

@@ -6,6 +6,7 @@
  * shortages are atomic; the daily ledger never advances the clock.
  */
 import {availableSupplyLots,createSupplyUse} from './hmk-foraging-supply-ledger.js';
+import {assertExclusiveForagingProven} from './hmk-inventory-provisions.js';
 export const NUTRITION_POLICY_FORMAT='hmk-nutrition-policy-v1';
 export const NUTRITION_DAY_FORMAT='hmk-nutrition-day-v1';
 const DAY=1440;
@@ -44,10 +45,10 @@ export function nutritionRisk(journal=[],campaignId,actorId){
  for(const [unit,risk] of [['foodDays','starvation'],['waterDays','thirst']]){
   let zeros=0,halves=0;
   for(const row of records){const p=row.calendarNutritionDay,need=unit==='foodDays'?p.foodNeed:p.waterNeed,got=unit==='foodDays'?p.foodReceived:p.waterReceived;
-   if(got>=need){zeros=0;halves=0;continue;}
+   if(got>=need){zeros=0;halves=0;risks[risk]=false;continue;}
    if(got===0){zeros++;halves=0;}else if(got===need/2){halves++;zeros=0;}
    else {zeros=0;halves=0;}
-   if(zeros>=1||halves>=2)risks[risk]=true;
+   risks[risk]=zeros>=1||halves>=2;
   }
  }
  return risks;
@@ -76,6 +77,9 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
   const {policy,start}=due,end=start+DAY,actorId=policy.characterId,p=policy.calendarNutritionPolicy;
   const actor=database.characters.find(c=>c.id===actorId);
   check(actor&&members.has(actorId),'Nutriční režim postavy mimo aktuální kampaň');
+  // Character-specific purchased/owned rations invalidate the GM's previous
+  // exclusivity claim. A bad proof must never create a false medical onset.
+  assertExclusiveForagingProven({inventory:database.inventory??[],actorId});
   // A dead character cannot keep automatically consuming supplies.
   if(actor.hmk?.combatState?.shock==='KIA'){due.start=clock.minute;continue;}
   const automatic=[],received={};

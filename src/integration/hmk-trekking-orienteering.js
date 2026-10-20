@@ -58,7 +58,9 @@ export function assertOrienteeringModes({adjustment,modes}={}){
   requireFact(others.foraging>=Math.min(2,adjustment.advantageModes),
    'Při Foraging bez pohybu musí první dva dostupné Advantage Modes připadnout na Foraging (HMK 145)');
  }
- const spent=modes.progress+modes.bearing+others.foraging+others.stalking+others.vigilance;
+ const forced=modes.trackingForcedBearingSourceId?1:0;
+ requireFact(modes.bearing>=forced,'Chybí povinný Bearing po Tracking CF');
+ const spent=modes.progress+modes.bearing-forced+others.foraging+others.stalking+others.vigilance;
  requireFact(spent<=adjustment.advantageModes,
   `Upravený Orienteering SV ${adjustment.adjustedSV} dovoluje ${adjustment.advantageModes} Progress/Bearing Modes, ale bylo použito ${spent}.`);
  const sv=adjustment.adjustedSV,penalties=Number(modes.lax)+modes.orienteeringSlow;

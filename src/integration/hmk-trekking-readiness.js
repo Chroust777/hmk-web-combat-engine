@@ -45,7 +45,7 @@ export function assessTrekkingReadiness({journal=[],characters=[],actorId,campai
   const certified=assertOrienteeringModes({adjustment,modes:p.modes});
   available=certified.available;spent=certified.spent;verifiedSV=certified.adjustedSV;
  }else{
-  available=result.sv>=5?Math.min(5,result.sv-4):0;spent=p.modes.progress+p.modes.bearing+(p.modes.foraging??0)+(p.modes.stalking??0)+(p.modes.vigilance??0);
+  available=result.sv>=5?Math.min(5,result.sv-4):0;spent=p.modes.progress+p.modes.bearing-(p.modes.trackingForcedBearingSourceId?1:0)+(p.modes.foraging??0)+(p.modes.stalking??0)+(p.modes.vigilance??0);
   requireFact(Number.isSafeInteger(spent)&&spent>=0&&spent<=available,
    `Orienteering SV ${result.sv} dovoluje ${available} Advantage Modes, ale v hlídce je ${spent} Progress/Bearing.`);
   if(result.sv<=0)throw Error('Starší hlídka se SV ≤ 0 nemá doložený Lax Mode. Nelze ji bezpečně vyhodnotit.');

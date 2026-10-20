@@ -5,6 +5,7 @@ import {validateTrekCorrections,effectiveTrekSource} from './hmk-trekking-correc
  * actual inputs: never invent terrain, orientation, encounters or injuries.
  */
 import {validateTrekPartySnapshot} from './hmk-trekking-party-modes.js';
+import {assertTrackingBearingWatch} from './hmk-tracking-bearing-handoff.js';
 import {createOrienteeringContext,adjustedOrienteeringSV,assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 const assert=(yes,msg)=>{if(!yes)throw Error(msg)};
 const int=(n,a,b)=>Number.isSafeInteger(n)&&n>=a&&n<=b;
@@ -140,8 +141,11 @@ export function trekEncounterCheck({environ,night=false,roll,elapsedWildernessNi
  * cannot acquire a second independent pair of weather d10 rolls. */
 export function validateTrekkingJournalEvidence(document){
  const days=new Map();
+ const priorRows=[];
  for(const entry of document?.journal??[]){
-  const p=entry.calendarTrekProof;if(!p)continue;
+  const p=entry.calendarTrekProof;if(!p){priorRows.push(entry);continue;}
+  assertTrackingBearingWatch(entry,priorRows);
+  priorRows.push(entry);
   assert(p.format==='hmk-trekking-watch-evidence-v1'&&int(p.campaignMinute,0,1e9)&&
    p.campaignMinute===entry.campaignMinute&&p.dayIndex===Math.floor(p.campaignMinute/1440)&&
    typeof p.area==='string'&&p.area.length>0&&p.area.length<=90&&
@@ -225,7 +229,7 @@ export function validateTrekkingJournalEvidence(document){
   if(e.orienteeringId!==undefined){
    const roll=byId.get(e.orienteeringId),link=roll?.calendarTrekSkillSource;
    const test=roll?.skillTestProof?.a??roll?.skillTestProof?.result;
-   const selected=p.modes?.progress+p.modes?.bearing+(p.modes?.foraging??0)+(p.modes?.stalking??0)+(p.modes?.vigilance??0);
+   const selected=p.modes?.progress+p.modes?.bearing-(p.modes?.trackingForcedBearingSourceId?1:0)+(p.modes?.foraging??0)+(p.modes?.stalking??0)+(p.modes?.vigilance??0);
    const droverRow=document.journal.find(j=>j.calendarTrekSkillSource?.sourceId===source.id&&
     j.calendarTrekSkillSource.hazard==='drover'&&j.characterId===p.orienteeringContext?.droverId&&
     j.calendarCampaignId===entry.calendarCampaignId);

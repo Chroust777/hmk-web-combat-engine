@@ -18,7 +18,9 @@ export function trekkingModeHardLimit(modes={}){
  const x=modes.foraging??0,y=modes.stalking??0,z=modes.vigilance??0;
  test(Number.isSafeInteger(x)&&x>=0&&x<=5&&[0,1].includes(y)&&[0,1].includes(z),
   'Neplatné počty dalších HMK Advantage Modes');
- const selected=progress+bearing+x+y+z;
+ const forced=modes.trackingForcedBearingSourceId?1:0;
+ test(bearing>=forced,'Chybí povinný Bearing po Tracking CF');
+ const selected=progress+bearing-forced+x+y+z;
  test(selected<=5,'Orienteering dovoluje nejvýše pět Advantage Modes (HMK str. 145)');
  return {selected,max:5,requiresAdjustedSurvivalSV:true};
 }
