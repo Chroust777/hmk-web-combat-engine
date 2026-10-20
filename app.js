@@ -108,7 +108,7 @@ import {availableSpellAuralRecoveries,persistSpellAuralRecovery} from './src/int
 import {availableSpellPsycheRecoveries,persistSpellPsycheRecoverySchedule,persistSpellPsycheRecoveryRoll} from './src/integration/hmk-spell-psyche-recovery.js';
 import {pendingSpellPsycheManifestations,persistSpellPsycheManifestation} from './src/integration/hmk-spell-psyche-manifestation.js';
 import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan} from './src/integration/hmk-calendar-planner.js';
-import {secureHMKDie,expeditionWatchFatigue,expeditionRestRecovery,commitExpeditionFatigue} from './src/integration/hmk-calendar-expedition.js';
+import {secureHMKDie,expeditionDiceSubmission,expeditionWatchFatigue,expeditionRestRecovery,commitExpeditionFatigue} from './src/integration/hmk-calendar-expedition.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
@@ -175,7 +175,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.369';
+const APP_VERSION='93.370';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -665,9 +665,17 @@ function campaignCalendarView(){
  <p class="hc-hint">HMK str. 62, 145–150, 176. Odpočinek provádí automatické snížení Windedness/Weariness. Jeden čtyřhodinový cestovní watch zapisuje Weariness a END Secondary Roll. <strong>Jde o časový/únavový díl Trekking Routine, nikoliv o náhradu chybějících testů Weather, Orienteering, Hazards a Encounter.</strong> Před cestováním nejprve vyhodnoťte tyto situace jejich pravidlovými průvodci.</p>
  <form id="campaign-expedition-form"><div class="hc-fields"><label>Postava<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <label>Činnost<select name="kind"><option value="winded">Klid 10 minut · Windedness −5 (1× za hodinu)</option><option value="rest">Odpočinek 4 hodiny · Weariness −5 (1× za 24 h)</option><option value="sleep">Spánek 8 hodin · Weariness −15 (1× za 24 h)</option><option value="walk">Trekking 4 hodiny · pěšky (END SR)</option><option value="ride">Cesta 4 hodiny · v sedle (END SR +2 TN)</option><option value="drive">Cesta 4 hodiny · řidič (END SR +2 TN)</option><option value="double-walk">Double Time · 4× 1 hodina (4 END SR)</option><option value="double-drover">Double Time · pohánění zvířat 4× 1 hodina</option></select></label>
- <label>Zdroj d10<select name="diceOrigin"><option value="software">Automatické hody</option><option value="manual">Ruční hody</option></select></label>
- <label>Ruční hody d10 (u Double Time čtyři čísla oddělená čárkou)<input name="rolls" maxlength="30" placeholder="Např. 4 nebo 4,7,2,5"></label></div>
- <label class="hc-check"><input type="checkbox" name="confirmedConditions" value="yes"> Při cestě byly zvlášť vyřešeny Orienteering, Weather, Hazards a případný Encounter; odpočinek tento souhlas nepotřebuje. </label>
+ </div>
+ <div class="hc-expedition-dice" data-expedition-dice hidden>
+  <strong>END Secondary Roll · d10</strong>
+  <p class="hc-hint">Zapište skutečné hody do jednotlivých polí, nebo klikněte na tlačítko pro jejich vygenerování. U Double Time se používají čtyři samostatné d10. Čísla už nemusíte oddělovat čárkami.</p>
+  <div class="hc-expedition-dice-grid">${[1,2,3,4].map(i=>`<label data-expedition-die-cell="${i}">Hod ${i} · d10<input type="number" name="die${i}" class="hc-expedition-die-input" inputmode="numeric" min="1" max="10" step="1" autocomplete="off" placeholder="1–10" required></label>`).join('')}</div>
+  <button type="button" class="hc-small hc-expedition-auto-button" data-expedition-roll>⚄ Vygenerovat d10</button>
+  <p class="hc-expedition-dice-info" aria-live="polite">Ruční zadání bude označeno jako ruční hod.</p>
+ </div>
+ <div class="hc-expedition-checks"><label class="hc-check"><input type="checkbox" name="confirmedConditions" value="yes"> Při cestě byly zvlášť vyřešeny Orienteering, Weather, Hazards a případný Encounter. Odpočinek tento souhlas nepotřebuje.</label>
+ <p class="hc-hint">Toto zaškrtnutí je zatím pouze potvrzení, <strong>nikoli provedený pravidlový test</strong>. Podklady Weather/Encounter jsou výše v Trekking Routine, Orienteering v Skill Tests, následky v Nebezpečí / Trauma a Combat.</p>
+ <div class="hc-expedition-links"><button type="button" class="hc-small" data-nav="skills">⚄ Skill Tests / Orienteering</button><button type="button" class="hc-small" data-nav="hazards">⚠ Nebezpečí / Trauma</button><button type="button" class="hc-small" data-nav="encounter">⚔ Combat / Encounter</button></div></div>
  <button type="submit">Vyhodnotit dobu, END SR a uložit do postavy</button></form></section>`;
  const included=new Set(participants.map(c=>c.id));
  const usedElsewhere=new Set();
@@ -4747,6 +4755,7 @@ function render(){
  if(sidebar)sidebar.scrollTop=sidebarPosition;
  refreshAllCalendarHealingFields();
  enhanceHMKDiceFields();
+ updateExpeditionDiceFields(app.querySelector('#campaign-expedition-form'),{reset:false});
 }
 // On narrow layouts the navigation joins the page scroll instead of using
 // its own scroll container. Keep the viewport at the same position on sidebar
@@ -6665,6 +6674,60 @@ document.addEventListener('submit',e=>{
    body:summary,calendarTrekProof:proof});}))notice='Doložené podklady Trekking byly zapsány. Nejdříve doložte Orienteering Survival SV v kalendáři: bez jeho modifikátorů zatím nelze potvrdit oprávněnost zvolených Advantage Modes. Následky se otevírají v původních testech.';
  }catch(error){alert('Trekking Routine nebyla uložena: '+error.message)}
 },true);
+// Each travel roll is individually visible and may be entered by hand or
+// generated on demand. The software origin is evidence-backed by keeping the
+// exact generated sequence until submission; changing any value makes it a
+// manual roll. Rest and sleep never request a die.
+const expeditionGeneratedDice=new WeakMap();
+function updateExpeditionDiceFields(form,{reset=true}={}){
+ if(!form||form.id!=='campaign-expedition-form')return;
+ const kind=form.elements.namedItem('kind')?.value??'';
+ const travel=!['winded','rest','sleep'].includes(kind);
+ const count=kind.startsWith('double-')?4:1;
+ const panel=form.querySelector('[data-expedition-dice]');
+ if(panel)panel.hidden=!travel;
+ for(const cell of form.querySelectorAll('[data-expedition-die-cell]')){
+  const number=Number(cell.dataset.expeditionDieCell),active=travel&&number<=count;
+  cell.hidden=!active;
+  const input=cell.querySelector('input');
+  if(input){input.disabled=!active;input.required=active;if(reset)input.value='';}
+ }
+ if(reset){expeditionGeneratedDice.delete(form);
+  const info=form.querySelector('.hc-expedition-dice-info');
+  if(info)info.textContent=travel?'Ruční zadání bude označeno jako ruční hod.':'Odpočinek nepoužívá žádné kostky.';
+ }
+ const button=form.querySelector('[data-expedition-roll]');
+ if(button)button.textContent=count===4?'⚄ Vygenerovat 4 × d10':'⚄ Vygenerovat d10';
+ const checks=form.querySelector('.hc-expedition-checks');if(checks)checks.hidden=!travel;
+ const confirm=form.elements.namedItem('confirmedConditions');
+ if(confirm){confirm.disabled=!travel;if(!travel)confirm.checked=false;}
+}
+document.addEventListener('change',e=>{
+ const target=e.target;
+ if(target?.name==='kind'&&target.closest('#campaign-expedition-form'))updateExpeditionDiceFields(target.form);
+},true);
+document.addEventListener('input',e=>{
+ const input=e.target;
+ if(!input?.matches?.('#campaign-expedition-form .hc-expedition-die-input'))return;
+ expeditionGeneratedDice.delete(input.form);
+ const info=input.form.querySelector('.hc-expedition-dice-info');
+ if(info)info.textContent='Ruční zadání · zkontrolujte všechny zobrazené hody d10.';
+},true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('#campaign-expedition-form [data-expedition-roll]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=button.closest('form');
+ const kind=form?.elements.namedItem('kind')?.value??'';
+ if(['winded','rest','sleep'].includes(kind))return;
+ try{
+  const dice=Array.from(form.querySelectorAll('.hc-expedition-die-input:not(:disabled)'));
+  const rolls=dice.map(()=>secureHMKDie(10));
+  dice.forEach((input,i)=>{input.value=String(rolls[i]);});
+  expeditionGeneratedDice.set(form,{kind,rolls});
+  const info=form.querySelector('.hc-expedition-dice-info');
+  if(info)info.textContent='Automatický hod: '+rolls.join(' · ')+' (ověřený původ se uloží spolu s výsledkem).';
+ }catch(err){alert('Automatické kostky nejsou dostupné: '+err.message);}
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(form?.id!=='campaign-expedition-form')return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -6699,12 +6762,11 @@ document.addEventListener('submit',e=>{
   if(travel){
    const endurance=actor.hmk?.attributes?.end;
    if(!Number.isSafeInteger(endurance))throw Error('Postava nemá ověřenou hodnotu END');
-   let rolls=[];
-   if(input.diceOrigin==='manual'){
-    rolls=String(input.rolls??'').split(',').map(x=>Number(x.trim()));
-    if(rolls.length!==count||rolls.some(x=>!Number.isSafeInteger(x)||x<1||x>10))throw Error('Zadejte '+count+' platný hod(y) d10');
-    origin='manual';
-   }else{rolls=Array.from({length:count},()=>secureHMKDie(10));origin='cryptographic-software-die';}
+   const fields=Array.from(form.querySelectorAll('.hc-expedition-die-input:not(:disabled)'));
+   if(fields.length!==count)throw Error('Nesoulad počtu polí pro END Secondary Roll');
+   const submitted=expeditionDiceSubmission({kind,rawValues:fields.map(field=>field.value),
+    generated:expeditionGeneratedDice.get(form)});
+   const rolls=submitted.rolls;origin=submitted.origin;
    plan={...expeditionWatchFatigue({mode:kind,endurance,rolls}),kind:'travel',
     ...(prepared?{trekSourceId:trekSource.id,travelledLeagues:(prepared.effectiveMovement??prepared.movement).leagues,
      travelledKilometres:(prepared.effectiveMovement??prepared.movement).kilometres}:{} )};

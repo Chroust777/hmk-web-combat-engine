@@ -4295,3 +4295,23 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-calendar .hc-week-list{max-height:400px;overflow:auto;overscroll-behavior:contain}
 .content-calendar .hc-campaign-settings fieldset{margin:10px 0;border:1px solid #8e704657;min-width:0}
 .content-calendar .hc-campaign-settings legend{font-size:.85rem;font-weight:700}
+
+
+/* v93.370: END Secondary Rolls share the Character Creation dice pattern. */
+.content-calendar .hc-expedition-dice{
+ margin:12px 0;padding:11px 12px;border:1px solid rgba(118,87,50,.50);
+ border-radius:4px;background:rgba(203,165,102,.11);
+}
+.content-calendar .hc-expedition-dice[hidden],
+.content-calendar .hc-expedition-checks[hidden],
+.content-calendar .hc-expedition-dice-grid [hidden]{display:none!important}
+.content-calendar .hc-expedition-dice>strong{font:.86rem/1.3 system-ui,sans-serif;color:#48321e}
+.content-calendar .hc-expedition-dice-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:9px 0}
+.content-calendar .hc-expedition-dice-grid>label{min-width:0;margin:0!important}
+.content-calendar .hc-expedition-dice-grid input{text-align:center;font-weight:700;font-size:1rem!important;color:#292016!important}
+.content-calendar .hc-expedition-auto-button{display:block;margin-top:8px;margin-bottom:4px;max-width:100%}
+.content-calendar .hc-expedition-dice-info{font:.73rem/1.4 system-ui,sans-serif;color:#5b422a;margin:6px 0 0}
+.content-calendar .hc-expedition-checks{padding-top:8px;border-top:1px solid rgba(107,76,47,.32);margin:12px 0}
+.content-calendar .hc-expedition-links{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.content-calendar .hc-expedition-links button{flex:1 1 135px}
+@media(max-width:650px){.content-calendar .hc-expedition-dice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
