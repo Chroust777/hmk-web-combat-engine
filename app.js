@@ -109,7 +109,8 @@ import {availableSpellPsycheRecoveries,persistSpellPsycheRecoverySchedule,persis
 import {pendingSpellPsycheManifestations,persistSpellPsycheManifestation} from './src/integration/hmk-spell-psyche-manifestation.js';
 import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan} from './src/integration/hmk-calendar-planner.js';
 import {secureHMKDie,expeditionDiceSubmission,expeditionWatchFatigue,expeditionRestRecovery} from './src/integration/hmk-calendar-expedition.js';
-import {scheduleHMKActivity,finishDueHMKActivities,validateHMKActivityEvidence,assertHMKActivitiesAppendOnly} from './src/integration/hmk-calendar-activities.js';
+import {scheduleHMKActivity,finishDueHMKActivities,validateHMKActivityEvidence,assertHMKActivitiesAppendOnly,activeHMKActivities,interruptHMKActivity} from './src/integration/hmk-calendar-activities.js';
+import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
 import {assessTrekkingReadiness} from './src/integration/hmk-trekking-readiness.js';
@@ -177,7 +178,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.372';
+const APP_VERSION='93.373';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -291,12 +292,12 @@ function validate(d){
  for(const c of ids){for(const slot of ['main_hand','off_hand']){if(d.inventory.filter(x=>x.characterId===c&&x.slot===slot).length>1)throw Error('Více předmětů v jednom slotu ruky')}}
  return d
 }
-function save(){
+function save({gmClockAdvance=false,restoreBackup=false}={}){
  if(storageReadOnly){notice='Zápis je zablokován: původní úložiště se nepodařilo načíst.';return false;}
  try{
   if(storageBaseline!==null)linkNewMoralePsycheAccrual(JSON.parse(storageBaseline),data);
   const serialized=JSON.stringify(data);
-  const r=persistVerifiedCombatSnapshot({storage:localStorage,key:STORAGE,baseline:storageBaseline,serialized});
+  const r=persistVerifiedCombatSnapshot({storage:localStorage,key:STORAGE,baseline:storageBaseline,serialized,gmClockAdvance,restoreBackup});
   if(r.ok){storageBaseline=serialized;notice='';return true;}
   if(r.readOnly){
    storageReadOnly=true;
@@ -441,10 +442,10 @@ function installCalendarDiceControls(form,kind,sourceId,actorId){
  }
 }
 let pendingTrekHandoff=null; // UI-only context; the journal proof is the authority after save.
-function mutate(fn){
+function mutate(fn,{gmClockAdvance=false}={}){
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();if(previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save()){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(!automaticGenerationBusy)alert('Změna nebyla uložena: '+e.message);return false}
 }
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
@@ -681,11 +682,13 @@ function campaignCalendarView(){
  <button type="button" class="hc-small" data-expedition-open-trek>Přejít na Trekking Routine</button></div>
  <div class="hc-expedition-links"><button type="button" class="hc-small" data-nav="skills">⚄ Skill Tests / Orienteering</button><button type="button" class="hc-small" data-nav="hazards">⚠ Nebezpečí / Trauma</button><button type="button" class="hc-small" data-nav="encounter">⚔ Combat / Encounter</button></div></div>
  <p class="hc-hint">Tato akce pouze zapíše interval do kalendáře. <strong>Čas kampaně posouvá výhradně GM.</strong> Únava se přepočte po dokončení intervalu při jeho posunu. U cestovní hlídky s END SR vyberte jednu postavu a doložte její původní Trekking.</p><button type="submit">Naplánovat činnost vybraných postav (bez posunu času)</button></form></section>`;
+ const activeActivities=activeHMKActivities(data.journal,clock).filter(row=>participants.some(c=>c.id===row.characterId));
+ const interruptionsHTML=`<section class="hc-calendar hc-expedition"><details><summary>Probíhající a naplánované činnosti · přerušení (${activeActivities.length})</summary><p class="hc-hint">GM může ukončit nedokončený spánek, odpočinek nebo cestu například při přepadení. Přerušení čas neposune a za neúplný interval nepřizná automatickou obnovu. Případné zranění nebo částečnou cestovní únavu řeší původní pravidlový modul.</p><div class="hc-event-list">${activeActivities.map(row=>{const a=row.calendarActivityProof;return `<div class="hc-event"><strong>${esc(a.name)} · ${esc(a.kind)}</strong> · ${esc(displayCampaignMinute(a.startMinute))}–${esc(displayCampaignMinute(a.endMinute))}<label class="hc-check"><input type="checkbox" data-calendar-activity-selected="${esc(row.id)}" aria-label="Vybrat činnost postavy ${esc(a.name)}"> Vybrat</label><button type="button" class="hc-small" data-calendar-interrupt-activity="${esc(row.id)}">Přerušit činnost</button></div>`}).join('')||'<p>Žádné nedokončené činnosti.</p>'}</div>${activeActivities.length>1?'<button type="button" class="hc-small" data-calendar-interrupt-selected>Přerušit vybrané činnosti</button>':''}</details></section>`;
  const included=new Set(participants.map(c=>c.id));
  const usedElsewhere=new Set();
  const memberRow=(c,checked)=>`<label class="hc-character"><input type="checkbox" name="characterId" value="${esc(c.id)}" ${checked?'checked':''}><span>${esc(c.name)}</span></label>`;
  const membersHTML=`<section class="hc-calendar hc-campaign-settings"><button type="button" class="hc-small" data-calendar-back="yes">‹ Všechny kalendáře</button><h3>Postavy kampaně · ${participants.length} zahrnutých</h3><p class="hc-hint">Stejnou postavu lze přidat do více kampaní. V každé se odděleně ukládají zranění, únava, časované magické účinky a inventář; původní datované události z jiného kalendáře se samy nepřesouvají.</p><form id="campaign-members-form"><fieldset><legend>Zahrnuté postavy</legend><div class="hc-characters">${data.characters.filter(c=>included.has(c.id)).map(c=>memberRow(c,true)).join('')||'<p>Bez účastníků</p>'}</div></fieldset><fieldset><legend>Nezahrnuté postavy · kliknutím přidat</legend><div class="hc-characters">${data.characters.filter(c=>!included.has(c.id)).map(c=>memberRow(c,false)).join('')||'<p>Všechny postavy již patří do kampaně.</p>'}</div></fieldset><button type="submit">Uložit účastníky kampaně</button></form><details><summary>Odstranění tohoto kalendáře</summary><p>Smazáním odstraníte jen tento kalendář a jeho GM události. Neaktivní kalendáře ani postavy se nemažou. Časové důkazy se zachovají.</p><button type="button" class="danger" data-calendar-delete="yes">Zálohovat a smazat tento kalendář</button></details></section>`;
- return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${membersHTML}${board}${trekPanel}${expeditionHTML}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
+ return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${membersHTML}${board}${trekPanel}${expeditionHTML}${interruptionsHTML}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form><p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
  <section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Vyřešení probíhá v původním Combat / Healing průvodci; kalendář pouze hlídá čas, nerozhoduje o hodu ani nezapisuje paralelní Combat State.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
  <section class="panel"><h3>Následující termíny · ${agenda.future.length}</h3>${agenda.future.length?agenda.future.slice(0,100).map(renderItem).join(''):'<p class="muted">Žádná další doložená splatnost.</p>'}</section>
@@ -6681,6 +6684,24 @@ document.addEventListener('submit',e=>{
    body:summary,calendarTrekProof:proof});}))notice='Doložené podklady Trekking byly zapsány. Nejdříve doložte Orienteering Survival SV v kalendáři: bez jeho modifikátorů zatím nelze potvrdit oprávněnost zvolených Advantage Modes. Následky se otevírají v původních testech.';
  }catch(error){alert('Trekking Routine nebyla uložena: '+error.message)}
 },true);
+// Explicit GM decision to interrupt an individual interval. No change to
+// the campaign clock and no premature credit for a partial rest.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-calendar-interrupt-activity],[data-calendar-interrupt-selected]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(combatInitiativeSequence)throw Error('Nejdříve dokončete probíhající Initiative.');
+  const reason=window.prompt('Důvod přerušení činnosti (nejméně 3 znaky):','Přerušeno událostí ve hře');
+  if(reason===null)return;
+  const ids=button.hasAttribute('data-calendar-interrupt-selected')?
+   [...button.closest('details').querySelectorAll('[data-calendar-activity-selected]:checked')].map(x=>x.dataset.calendarActivitySelected):
+   [button.dataset.calendarInterruptActivity];
+  if(!ids.length||new Set(ids).size!==ids.length)throw Error('Vyberte alespoň jednu činnost bez duplicit.');
+  const proofs=ids.map(activityId=>interruptHMKActivity({journal:data.journal,clock:data.campaignClock,
+   activityId,reason,id:uuid(),createdAt:stamp()}));
+  if(mutate(()=>{data.journal.push(...proofs);}))notice=proofs.length+' činností přerušeno bez posunu času. Nedokončená obnova nebyla přiznána.';
+ }catch(err){alert('Činnost nebyla přerušena: '+err.message)}
+},true);
 // Each travel roll is individually visible and may be entered by hand or
 // generated on demand. The software origin is evidence-backed by keeping the
 // exact generated sequence until submission; changing any value makes it a
@@ -6825,7 +6846,7 @@ document.addEventListener('submit',e=>{
    if(combatInitiativeSequence)throw Error('Při aktivním Initiative nelze samostatně posouvat čas kampaně');
    const delta=n(v.deltaMinutes),next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:delta,eventId:uuid(),reason:v.reason,gmConfirmed:true,characters:data.characters,journal:data.journal});
    if(!window.confirm('Potvrdit skutečné plynutí času do '+displayCampaignMinute(next.minute)+'? Nástup bez hodu se automaticky zapíše; splatné hody se samy nevynechají.'))return;
-   mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();});return;
+   mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();},{gmClockAdvance:true});return;
   }
   const minute=(n(v.day)-1)*DAY_MINUTES+n(v.hour)*60+n(v.minute), duration=n(v.durationDays)*DAY_MINUTES+n(v.durationHours)*60+n(v.durationMinutes);
   if(!Number.isSafeInteger(minute)||!Number.isSafeInteger(duration)||duration<0)throw Error('Zadejte platný den a délku trvání');
@@ -6991,6 +7012,9 @@ document.addEventListener('submit',e=>{
   const ids=new FormData(f).getAll('characterId').filter(id=>availableCampaignCharacters(data,campaignKey(data.campaignClock)).some(c=>c.id===id));
   if(!ids.length)throw Error('Vyberte alespoň jednu postavu.');
   if(!data.campaignClock)throw Error('Kalendář nebyl vytvořen');
+  const removed=(data.campaignClock.characterIds??[]).filter(id=>!ids.includes(id));
+  const active=activeHMKActivities(data.journal,data.campaignClock).filter(row=>removed.includes(row.characterId));
+  if(active.length)throw Error('Nejdříve dokončete nebo přerušte '+active.length+' otevřených činností odcházejících postav. Jejich časové závazky se nesmějí ztratit.');
   if(!confirm('Změnit účastníky časové osy? Postavy mimo výběr zůstanou nezměněné.'))return;
   const current=data.campaignClock;
   assertCompatibleLiveEffectTimeAxis(current,data.calendarEvidenceArchives??[],data.characters,ids);
@@ -7017,7 +7041,7 @@ document.addEventListener('click',e=>{
    if(reason===null)return;
    const next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:delta,eventId:uuid(),reason,gmConfirmed:true,characters:data.characters,journal:data.journal});
    if(!window.confirm('Nastavit čas kampaně na '+displayCampaignMinute(target)+'? Nevyřízené termíny se nesmějí přeskočit.'))return;
-   mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();});
+   mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();},{gmClockAdvance:true});
   }catch(error){alert('Čas nebyl změněn: '+error.message);}
   return;
  }
@@ -7089,8 +7113,8 @@ document.addEventListener('submit',e=>{
    if(![days,hours,minutes].every(Number.isSafeInteger)||hours>23||minutes>59)throw Error('Zadejte celé dny a HH:MM');
    const next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:days*DAY_MINUTES+hours*60+minutes,
     reason:v.reason,eventId:uuid(),gmConfirmed:true,characters:data.characters,journal:data.journal});
-   if(!window.confirm('Posunout celou kampaň na '+displayCampaignMinute(next.minute)+'? Žádný hod se automaticky neprovede.'))return;
-   mutate(()=>{data.campaignClock=next;});return;
+   if(!window.confirm('Posunout celou kampaň na '+displayCampaignMinute(next.minute)+'? Splatné dokončené činnosti budou vyhodnoceny automaticky.'))return;
+   mutate(()=>{data.campaignClock=next;},{gmClockAdvance:true});return;
   }
   const days=parse(v.days),hours=parse(v.hours),minutes=parse(v.minutes);
   if(![days,hours,minutes].every(Number.isSafeInteger)||hours>23||minutes>59)throw Error('Doložte počet dní a HH:MM');
@@ -8629,7 +8653,7 @@ document.addEventListener('change',async e=>{if(e.target.matches?.('form[data-li
   }catch(err){alert('Import katalogu selhal: '+err.message)}finally{e.target.value=''}
   return;
  }
- if(e.target.id==='import-file'){const f=e.target.files?.[0];if(!f)return;try{if(combatInitiativeSequence)throw Error('Import zálohy během běžící Initiative by mohl přepsat nedokončený boj a jeho trvalé následky. Nejprve bezpečně ukončete střetnutí.');if(f.size>10*1024*1024)throw Error('Záloha přesahuje limit 10 MB');const baselineBeforeImport=storageBaseline;const imported=validate(JSON.parse(await f.text()));if(localStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');if(storageReadOnly)throw Error('Import je zablokován kvůli nečitelným původním datům.');if(!ask('Import nahradí všechna současná data. Máte uloženou aktuální JSON zálohu? Pokračovat?'))return;if(combatInitiativeSequence)throw Error('Během načítání zálohy začala Initiative; nelze přepsat rozpracovaný boj.');const old=data;data=imported;if(!save()){data=old;render();throw Error('Úložiště odmítlo zápis; původní data zůstala zachována')}selected=null;encounterSelection.clear();persistEncounterDraft();if(combatInitiativeSequence)persistInitiativeSequence(null);view='characters';notice='Import byl dokončen.';render() }catch(err){alert('Neplatný soubor zálohy: '+err.message)}}});
+ if(e.target.id==='import-file'){const f=e.target.files?.[0];if(!f)return;try{if(combatInitiativeSequence)throw Error('Import zálohy během běžící Initiative by mohl přepsat nedokončený boj a jeho trvalé následky. Nejprve bezpečně ukončete střetnutí.');if(f.size>10*1024*1024)throw Error('Záloha přesahuje limit 10 MB');const baselineBeforeImport=storageBaseline;const imported=validate(JSON.parse(await f.text()));if(localStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');if(storageReadOnly)throw Error('Import je zablokován kvůli nečitelným původním datům.');if(!ask('Import nahradí všechna současná data. Máte uloženou aktuální JSON zálohu? Pokračovat?'))return;if(combatInitiativeSequence)throw Error('Během načítání zálohy začala Initiative; nelze přepsat rozpracovaný boj.');const old=data;data=imported;if(!save({restoreBackup:true})){data=old;render();throw Error('Úložiště odmítlo zápis; původní data zůstala zachována')}selected=null;encounterSelection.clear();persistEncounterDraft();if(combatInitiativeSequence)persistInitiativeSequence(null);view='characters';notice='Import byl dokončen.';render() }catch(err){alert('Neplatný soubor zálohy: '+err.message)}}});
 
 
 // HMK UI v2: source-grounded character attributes and editable equipment records.
