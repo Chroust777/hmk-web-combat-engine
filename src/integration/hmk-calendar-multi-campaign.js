@@ -6,6 +6,7 @@
  * A calendar timestamp identifies the event within that campaign ONLY.
  */
 import {validateCampaignCalendar,assertCampaignCalendarAppendOnly} from './hmk-campaign-calendar.js';
+import {coinBalance,ensureCampaignCashAccount} from './hmk-library-economy.js';
 const fail=(msg)=>{throw Error(msg)};
 const clone=v=>structuredClone(v);
 const TIME_KEYS=['combatState','injuries','arcane','liveEffects','expedition'];
@@ -94,6 +95,14 @@ export function switchCampaign(database,key){
 }
 export function beginAdditionalCalendar(database,clock){
  validateCampaignCalendar(clock);const next=clone(database);
+ // The new campaign forks the *visible* cash at the GM-confirmed creation
+ // instant; existing legacy purchase proofs remain untouched and unassigned.
+ const source=next.campaignClock,origin=source?campaignKey(source):null;
+ for(const actor of next.characters||[]){
+  if(!((clock.characterIds??next.characters.map(c=>c.id)).includes(actor.id)))continue;
+  const balance=coinBalance(actor,origin);
+  if(balance.ok)ensureCampaignCashAccount(actor,campaignKey(clock),clock.minute,{forkFrom:origin,openingPence:balance.balance});
+ }
  captureActive(next);next.campaignClocks??=[];
  if(next.campaignClock)next.campaignClocks.push(next.campaignClock);
  next.campaignClock=clock;activate(next,clock);

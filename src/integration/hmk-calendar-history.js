@@ -30,5 +30,27 @@ export function historicalHMKCalendarEntries(clock,characters=[],journal=[]){
    minute:entry.campaignMinute,dueMinute:entry.campaignMinute,status:'resolved',
    destination:'notes'});
  }
+ // Actual campaign-scoped receipts are held by each character's immutable
+ // financial account, not duplicated into the consumables/skill journal.
+ // Legacy purchases have no established campaign minute and are excluded.
+ for(const [characterId,name] of allowed){
+  const actor=characters.find(c=>c.id===characterId);
+  const account=actor?.hmk?.campaignCashAccounts?.[clock.campaignId];
+  if(!account||account.campaignId!==clock.campaignId)continue;
+  for(const [kind,records] of [['cash-purchase',account.purchases??[]],['cash-adjustment',account.adjustments??[]]]){
+   for(const proof of records){
+    if(proof.campaignId!==clock.campaignId||!safeMinute(proof.campaignMinute)||proof.campaignMinute>clock.minute||
+     typeof proof.id!=='string'||!proof.id)continue;
+    const buying=kind==='cash-purchase';
+    out.push({id:'history:cash:'+encodeURIComponent(proof.id),origin:'history',
+     characterId,name,kind,sourceId:proof.id,
+     title:buying?'Nákup · '+(proof.label||'Předmět'):'GM úprava mincí',
+     description:buying?'Katalogový nákup / Arsenal & Gear':'Doložená změna hotovosti GM',
+     note:buying?`−${proof.amountPence}d, inventární důkazy ${proof.inventoryIds.join(', ')}. Kampaň ${proof.campaignId}, minuta ${proof.campaignMinute}. Nákup neposunul čas.`:
+       `${proof.deltaPence>0?'+':''}${proof.deltaPence}d · ${proof.reason}, kampaň ${proof.campaignId}, minuta ${proof.campaignMinute}. GM čas beze změny.`,
+     minute:proof.campaignMinute,dueMinute:proof.campaignMinute,status:'resolved',destination:'notes'});
+   }
+  }
+ }
  return out.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
 }
