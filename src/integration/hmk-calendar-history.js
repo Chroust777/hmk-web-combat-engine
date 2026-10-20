@@ -14,17 +14,17 @@ export function historicalHMKCalendarEntries(clock,characters=[],journal=[]){
     (entry.calendarCampaignId&&clock.campaignId&&entry.calendarCampaignId!==clock.campaignId&&!clock.journalMinuteEvidence?.some(e=>e.id===entry.id))||
     !allowed.has(entry.characterId)||!safeMinute(entry.campaignMinute)||
     entry.campaignMinute>clock.minute)continue;
-  const skill=entry.skillTestProof,combat=entry.combatProof,special=entry.specialOutcomeProof,expedition=entry.calendarExpeditionProof,trek=entry.calendarTrekProof;
+  const skill=entry.skillTestProof,combat=entry.combatProof,special=entry.specialOutcomeProof,expedition=entry.calendarExpeditionProof,trek=entry.calendarTrekProof,wilderness=entry.calendarTrekWildernessProof,tracking=entry.calendarTrekTrackingProof;
   // Ordinary free-text GM notes and unverified timestamps are NOT marked done.
-  if(!skill&&!combat&&!special&&!expedition&&!trek)continue;
+  if(!skill&&!combat&&!special&&!expedition&&!trek&&!wilderness&&!tracking)continue;
   seen.add(entry.id);
   const name=allowed.get(entry.characterId),
-   action=skill?.type||combat?.actionKind||special?.kind||expedition?.kind||(trek?'Cestovní podklady / Travel Watch':'pravidlový výsledek'),
+   action=skill?.type||combat?.actionKind||special?.kind||expedition?.kind||(trek?'Cestovní podklady / Travel Watch':wilderness?'Foraging / Wilderness Tasks':tracking?'Tracking / Stalking':'pravidlový výsledek'),
    original=typeof entry.title==='string'&&entry.title.trim()?entry.title.trim():action;
   out.push({id:'history:'+encodeURIComponent(entry.id),origin:'history',
-   characterId:entry.characterId,name,kind:trek?'trek-preparation':expedition?'expedition-result':skill?'skill-result':combat?'combat-result':'special-result',
+   characterId:entry.characterId,name,kind:trek?'trek-preparation':wilderness?'wilderness-foraging':tracking?'wilderness-tracking':expedition?'expedition-result':skill?'skill-result':combat?'combat-result':'special-result',
    sourceId:entry.id,title:original,description:action,
-   note:trek?'Zapsány pouze doložené hody počasí, pohybu a setkání. '+(trek.unresolved?.length?'Nevyřešené návaznosti: '+trek.unresolved.join(', '):'Nevznikl předpoklad nové události.'): 'Uložený výsledek konkrétního pravidlového kroku. Navazující léčba a další povinnosti se evidují samostatně.',
+   note:tracking?'Doložený výsledek Tracking / Stalking bez posunu času GM. ':wilderness?'Doložený zisk potravy, vody nebo bylin bez posunu času GM. ':trek?'Zapsány pouze doložené hody počasí, pohybu a setkání. '+(trek.unresolved?.length?'Nevyřešené návaznosti: '+trek.unresolved.join(', '):'Nevznikl předpoklad nové události.'): 'Uložený výsledek konkrétního pravidlového kroku. Navazující léčba a další povinnosti se evidují samostatně.',
    minute:entry.campaignMinute,dueMinute:entry.campaignMinute,status:'resolved',
    destination:'notes'});
  }

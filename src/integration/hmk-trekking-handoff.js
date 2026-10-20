@@ -5,7 +5,7 @@
 
 const validMinute=n=>Number.isSafeInteger(n)&&n>=0&&n<=1e9;
 const test=(p,msg)=>{if(!p)throw Error(msg)};
-export const TREK_TEST_SKILLS=Object.freeze({weather:['Endurance','Survival'],direction:['Awareness'],survival:['Survival'],drover:['Riding','Animalcraft']});
+export const TREK_TEST_SKILLS=Object.freeze({weather:['Endurance','Survival'],direction:['Awareness'],survival:['Survival'],drover:['Riding','Animalcraft'],tracking:['Tracking']});
 /** HMK p.145: each advantage consumes one Orienteering star, up to five.
  * The COMPLETE budget cannot be inferred without situational SV modifiers
  * (familiarity, foraging, night lighting, party size, drover test, etc.).
@@ -24,11 +24,13 @@ export function trekkingModeHardLimit(modes={}){
 }
 export function trekkingSkillLinkForNewProof({pending,source,actorId,campaignId,minute,proof}={}){
  if(!pending||!source?.calendarTrekProof||source.id!==pending.sourceId||
-    (pending.hazard==='drover'?source.calendarTrekProof.orienteeringContext?.droverId:source.characterId)!==actorId||source.calendarCampaignId!==campaignId||
+    (pending.hazard==='tracking'?!(source.calendarTrekProof.partyModes?.memberIds??[source.characterId]).includes(actorId):
+      (pending.hazard==='drover'?source.calendarTrekProof.orienteeringContext?.droverId:source.characterId)!==actorId)||source.calendarCampaignId!==campaignId||
     !validMinute(minute)||minute<source.campaignMinute||
-    !['weather','survival','direction','drover'].includes(pending.hazard))return null;
+    !['weather','survival','direction','drover','tracking'].includes(pending.hazard))return null;
  const skills=TREK_TEST_SKILLS[pending.hazard];
  const used=proof?.skills?.[0]||proof?.skill;
+ if(pending.hazard==='tracking'&&source.calendarTrekProof.modes?.stalking!==1)return null;
  if(pending.hazard==='weather'&&!source.calendarTrekProof.weatherWatch?.requiresWeatherHazardRoll)return null;
  if(pending.hazard==='drover'&&(source.calendarTrekProof.conveyance==='foot'||
    used!==(source.calendarTrekProof.conveyance==='mount'?'Riding':'Animalcraft')))return null;
@@ -70,13 +72,13 @@ export function validateTrekLinkedEvidence(journal=[]){
  const seen=new Set();
  for(const entry of journal){
   const p=entry?.calendarTrekSkillSource;if(!p)continue;
-  test(p.format==='hmk-trek-linked-skill-v1'&&['weather','direction','survival','drover'].includes(p.hazard),
+  test(p.format==='hmk-trek-linked-skill-v1'&&['weather','direction','survival','drover','tracking'].includes(p.hazard),
    'Neplatná vazba testu na Trekking');
   const src=byId.get(p.sourceId),valid=trekkingSkillLinkForNewProof({
    pending:{sourceId:p.sourceId,hazard:p.hazard},source:src,actorId:entry.characterId,
    campaignId:entry.calendarCampaignId,minute:entry.campaignMinute,proof:entry.skillTestProof});
   test(valid&&JSON.stringify(valid)===JSON.stringify(p),'Neplatný nebo cizí pravidlový důkaz Trekking');
-  const key=[entry.calendarCampaignId,entry.characterId,p.sourceId,p.hazard].join('|');
+  const key=[entry.calendarCampaignId,p.hazard==='tracking'?'watch':entry.characterId,p.sourceId,p.hazard].join('|');
   test(!seen.has(key),'Duplicitní původní test cestovního následku');seen.add(key);
  }
  return true;

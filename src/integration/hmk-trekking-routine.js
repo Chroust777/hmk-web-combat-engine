@@ -139,7 +139,7 @@ export function validateTrekkingJournalEvidence(document){
   if(p.partyModes){
    validateTrekPartySnapshot(p.partyModes);
    assert(p.partyModes.guideId===entry.characterId&&p.partyModes.conveyance===p.conveyance&&
-    p.modes.slow===p.modes.manualSlow+p.partyModes.forcedSlow+(p.weatherWatch?.slowMode?1:0)+(p.modes.orienteeringSlow??0)&&
+    p.modes.slow===p.modes.manualSlow+p.partyModes.forcedSlow+(p.weatherWatch?.slowMode?1:0)+(p.modes.orienteeringSlow??0)+(p.modes.foraging>0?1:0)+(p.modes.stalking??0)&&
     p.modes.loaded===p.partyModes.loaded&&int(p.modes.manualSlow,0,20),
     'Skupinové postihy neodpovídají uloženému pohybu a počasí.');
   }

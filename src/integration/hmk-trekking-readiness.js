@@ -49,6 +49,8 @@ export function assessTrekkingReadiness({journal=[],characters=[],actorId,campai
   if(result.sv<=0)throw Error('Starší hlídka se SV ≤ 0 nemá doložený Lax Mode. Nelze ji bezpečně vyhodnotit.');
   if(result.sv<=2)requireFact(p.modes.slow>=1,'Orienteering SV 1–2 vyžaduje Slow Mode.');
  }
+ if((p.modes.foraging??0)>0)requireFact(journal.filter(j=>j.calendarTrekWildernessProof?.sourceId===source.id&&j.calendarCampaignId===campaignId).length===1,
+  'Hlídka má Foraging Modes: nejprve proveďte a uložte všechny příslušné d10 z HMK 147.');
  const pending=trekkingOutstandingCases(characters,journal,campaignId)
   .filter(x=>x.sourceId===source.id&&x.characterId===actorId);
  requireFact(pending.length===0,
