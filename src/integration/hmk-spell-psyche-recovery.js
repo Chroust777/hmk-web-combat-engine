@@ -43,7 +43,12 @@ function checkEvidence(document,person,trait){
  check(whole(s.morale.psycheStress,totalPsy,99999)&&
   whole(s.fatigue.otherWeakness,totalPsy*5,99999),
   'Psyche Recovery: neodpovídající globální PSY / Weakness');
- const seq=validateEncounterSequence(document?.combatRuntime?.sequence);
+ // Recovery is a campaign-time procedure, not an Initiative action. A verified
+ // trauma may exist with no encounter sequence (spell or shamanic origin).
+ // Reject an active sequence, but do not invent a completed encounter.
+ const seq=document?.combatRuntime?.sequence?validateEncounterSequence(document.combatRuntime.sequence):
+  {active:false,round:Math.max(1,s.lastRound||1),pendingEndTurnAction:null,
+   interruptActiveId:null,cursor:0,order:[],commitments:{}};
  check(!seq.active&&!seq.pendingEndTurnAction&&!seq.interruptActiveId&&
   (seq.cursor===0||seq.cursor===seq.order.length)&&
   !Object.values(seq.commitments??{}).some(q=>q?.status==='in-progress'),
@@ -100,10 +105,11 @@ function checkedEvent(s,document,eventId){
 /** GM enters a physical d6, the beginning game-day witness and confirms it.
  * This alone never heals PSY and never marks a Will test as completed. */
 export function persistSpellPsycheRecoverySchedule({document,characterId,trait,eventId,
- periodStartDay,d6,gmConfirmed=false,gmConfirmedStartDay=false,storage,key,baseline}={}){
+ periodStartDay,d6,diceOrigin='manual',gmConfirmed=false,gmConfirmedStartDay=false,storage,key,baseline}={}){
  ensureWriteArgs({gmConfirmed,eventId,document,characterId,trait});
  check(gmConfirmedStartDay===true&&whole(periodStartDay,1,999999)&&whole(d6,1,6),
   'Psyche Recovery: fyzický d6 a potvrzený počáteční herní den jsou povinné');
+ check(['manual','software'].includes(diceOrigin),'Neplatný původ hodu');
  const {s,t,seq,last}=candidate(document,characterId,trait);
  check(t.recoverySchedulePending===true,'Psyche Recovery: d6 již byl naplánován');
  check(last===null||last===periodStartDay,
@@ -121,21 +127,22 @@ export function persistSpellPsycheRecoverySchedule({document,characterId,trait,e
   type:'hmk-psyche-recovery-schedule',details:cp(d)});
  person.hmk.combatState.lastRound=Math.max(seq.round,s.lastRound);
  validateCombatState(person.hmk.combatState);
- next.journal.push({id:'psyche-recovery-schedule:'+eventId,characterId,createdAt:new Date().toISOString(),
+ next.journal.push({id:'psyche-recovery-schedule:'+eventId,characterId,createdAt:new Date().toISOString(),campaignMinute:document.campaignClock?.minute??null,
   title:`HMK Psyche Recovery · ${trait} · d6=${d6}`,
-  body:`GM fyzicky hodil d6 ${d6}. Interval dne ${periodStartDay} → ${dueGameDay}. PSY zatím beze změny.`,
+  body:`Hod d6 (${diceOrigin}) = ${d6}. Interval dne ${periodStartDay} → ${dueGameDay}. PSY zatím beze změny.`,
   combatProof:{actionKind:'psyche-recovery-schedule',sourceEventId:eventId,...cp(d),
-   physicalDice:[{faces:6,value:d6,source:'GM-entered-physical-die'}]}});
+   physicalDice:[{faces:6,value:d6,source:diceOrigin==='software'?'cryptographic-software-die':'GM-entered-physical-die'}]}});
  const serialized=js(next),r=persistVerifiedCombatSnapshot({storage,key,baseline,serialized});
  return {...r,document:r.ok?next:null,serialized:r.ok?serialized:null};
 }
 /** Physical GM Will d100 after the due d6-day period. The next d6 must be
  * separately physically rolled and committed after any unresolved PSY. */
 export function persistSpellPsycheRecoveryRoll({document,characterId,trait,eventId,
- gameDay,d100,gmConfirmed=false,gmConfirmedIntervalElapsed=false,storage,key,baseline}={}){
+ gameDay,d100,diceOrigin='manual',gmConfirmed=false,gmConfirmedIntervalElapsed=false,storage,key,baseline}={}){
  ensureWriteArgs({gmConfirmed,eventId,document,characterId,trait});
  check(gmConfirmedIntervalElapsed===true&&whole(gameDay,1,999999)&&whole(d100,1,100),
   'Psyche Recovery: potvrďte skutečně uplynulý d6 interval a fyzický Will d100');
+ check(['manual','software'].includes(diceOrigin),'Neplatný původ hodu');
  const {s,t,seq,plan,willEML}=candidate(document,characterId,trait);
  check(!t.recoverySchedulePending&&plan&&gameDay>=plan.dueGameDay,
   'Psyche Recovery: interval d6 dnů ještě neuplynul nebo nebyl fyzicky doložen');
@@ -177,11 +184,11 @@ export function persistSpellPsycheRecoveryRoll({document,characterId,trait,event
  state.events.push({id:eventId,round:seq.round,type:'hmk-psyche-recovery-roll',details:cp(details)});
  state.lastRound=Math.max(seq.round,s.lastRound);
  validateCombatState(state);
- next.journal.push({id:'psyche-recovery-roll:'+eventId,characterId,createdAt:new Date().toISOString(),
+ next.journal.push({id:'psyche-recovery-roll:'+eventId,characterId,createdAt:new Date().toISOString(),campaignMinute:document.campaignClock?.minute??null,
   title:`HMK Psyche Recovery · ${trait} · ${slNames[sl]}`,
   body:`Will d100 ${d100} vs EML ${willEML}: ${slNames[sl]}; PSY ${t.psycheLevels} → ${outcome.psycheLevels}, Weakness −${removed*5}. ${outcome.permanent?'Permanentní trait trvá.':outcome.recovered?'Neurčitý trait zanikl.':'Další fyzický d6 interval je povinný.'}`,
   combatProof:{actionKind:'psyche-recovery-roll',sourceEventId:eventId,...cp(details),
-   physicalDice:[{faces:100,value:d100,source:'GM-entered-physical-die'}]}});
+   physicalDice:[{faces:100,value:d100,source:diceOrigin==='software'?'cryptographic-software-die':'GM-entered-physical-die'}]}});
  const serialized=js(next),r=persistVerifiedCombatSnapshot({storage,key,baseline,serialized});
  return {...r,document:r.ok?next:null,serialized:r.ok?serialized:null};
 }

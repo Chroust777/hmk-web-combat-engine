@@ -23,7 +23,7 @@ function validateCandidate(document,characterId){
  // Shamanic bestowals take place outside combat; unlike spell-origin recovery,
  // an explicit active encounter is not a prerequisite for one-game-day recovery.
  const seq=document?.combatRuntime?.sequence?validateEncounterSequence(document.combatRuntime.sequence):
-  (shamanOrigin?{active:false,round:Math.max(1,person.hmk.combatState?.lastRound||1),pendingEndTurnAction:null,interruptActiveId:null}:validateEncounterSequence(null));
+  {active:false,round:Math.max(1,person.hmk.combatState?.lastRound||1),pendingEndTurnAction:null,interruptActiveId:null};
  check(seq.active!==true&&!seq.pendingEndTurnAction&&!seq.interruptActiveId,
   'Aural Recovery: nedokončené Initiative, povinnosti nebo přerušení');
  const state=validateCombatState(person.hmk?.combatState),arc=person.hmk?.arcane;
@@ -55,10 +55,11 @@ export function availableSpellAuralRecoveries(document){
  });
 }
 export function persistSpellAuralRecovery({document,characterId,eventId,gameDay,
- d100,gmConfirmed=false,gmConfirmedDayElapsed=false,storage,key,baseline}={}){
+ d100,diceOrigin='manual',gmConfirmed=false,gmConfirmedDayElapsed=false,storage,key,baseline}={}){
  check(gmConfirmed===true&&gmConfirmedDayElapsed===true&&whole(gameDay,1,999999)&&
   whole(d100,1,100)&&typeof eventId==='string'&&eventId.length>=3&&eventId.length<=140,
   'Aural Recovery vyžaduje fyzický d100, den a dvě výslovná potvrzení GM');
+ check(['manual','software'].includes(diceOrigin),'Neplatný původ hodu');
  const {seq,state,arc,willEML,previous}=validateCandidate(document,characterId);
  check(previous===null||gameDay>previous,
   'Aural Recovery: pouze jeden fyzický Will test za herní den');
@@ -88,10 +89,10 @@ export function persistSpellAuralRecovery({document,characterId,eventId,gameDay,
  s.events.push({id:eventId,round:seq.round,type:'hmk-aural-shock-recovery',details:cp(details)});
  s.lastRound=Math.max(s.lastRound,seq.round);
  validateCombatState(s);
- next.journal.push({id:'aural-recovery:'+eventId,characterId,createdAt:new Date().toISOString(),
-  title:`HMK Aural Shock Recovery · den ${gameDay}`,body:`Fyzický Will d100 ${d100}: ${resultName[sl]}; Aural ${details.before} → ${outcome.levels}, Aural Weakness -${delta*5}${outcome.psycheStressGained?'; PSY +1 a povinná volba traitu':''}.`,
+ next.journal.push({id:'aural-recovery:'+eventId,characterId,createdAt:new Date().toISOString(),campaignMinute:document.campaignClock?.minute??null,
+  title:`HMK Aural Shock Recovery · den ${gameDay}`,body:`Will d100 (${diceOrigin}) ${d100}: ${resultName[sl]}; Aural ${details.before} → ${outcome.levels}, Aural Weakness -${delta*5}${outcome.psycheStressGained?'; PSY +1 a povinná volba traitu':''}.`,
   combatProof:{actionKind:'aural-shock-recovery',sourceEventId:eventId,
-   ...cp(details),physicalDice:[{faces:100,value:d100,source:'GM-entered-physical-die'}]}});
+   ...cp(details),physicalDice:[{faces:100,value:d100,source:diceOrigin==='software'?'cryptographic-software-die':'GM-entered-physical-die'}]}});
  const serialized=js(next);
  const verified=persistVerifiedCombatSnapshot({storage,key,baseline,serialized});
  return {...verified,document:verified.ok?next:null,serialized:verified.ok?serialized:null};
