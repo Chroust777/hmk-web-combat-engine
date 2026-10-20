@@ -14,15 +14,15 @@ export function historicalHMKCalendarEntries(clock,characters=[],journal=[]){
     (entry.calendarCampaignId&&clock.campaignId&&entry.calendarCampaignId!==clock.campaignId&&!clock.journalMinuteEvidence?.some(e=>e.id===entry.id))||
     !allowed.has(entry.characterId)||!safeMinute(entry.campaignMinute)||
     entry.campaignMinute>clock.minute)continue;
-  const skill=entry.skillTestProof,combat=entry.combatProof,special=entry.specialOutcomeProof;
+  const skill=entry.skillTestProof,combat=entry.combatProof,special=entry.specialOutcomeProof,expedition=entry.calendarExpeditionProof;
   // Ordinary free-text GM notes and unverified timestamps are NOT marked done.
-  if(!skill&&!combat&&!special)continue;
+  if(!skill&&!combat&&!special&&!expedition)continue;
   seen.add(entry.id);
   const name=allowed.get(entry.characterId),
-   action=skill?.type||combat?.actionKind||special?.kind||'pravidlový výsledek',
+   action=skill?.type||combat?.actionKind||special?.kind||expedition?.kind||'pravidlový výsledek',
    original=typeof entry.title==='string'&&entry.title.trim()?entry.title.trim():action;
   out.push({id:'history:'+encodeURIComponent(entry.id),origin:'history',
-   characterId:entry.characterId,name,kind:skill?'skill-result':combat?'combat-result':'special-result',
+   characterId:entry.characterId,name,kind:expedition?'expedition-result':skill?'skill-result':combat?'combat-result':'special-result',
    sourceId:entry.id,title:original,description:action,
    note:'Uložený výsledek konkrétního pravidlového kroku. Navazující léčba a další povinnosti se evidují samostatně.',
    minute:entry.campaignMinute,dueMinute:entry.campaignMinute,status:'resolved',
