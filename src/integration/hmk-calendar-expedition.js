@@ -13,6 +13,20 @@ export function secureHMKDie(sides){
  do{globalThis.crypto.getRandomValues(a);}while(a[0]>=top);
  return a[0]%sides+1;
 }
+/** UI-to-rules boundary: preserve the exact dice the GM entered or clicked.
+ * A cryptographic provenance claim survives only if all visible values still
+ * match this form's generated witness for the currently chosen travel mode.
+ */
+export function expeditionDiceSubmission({kind,rawValues,generated=null}={}){
+ assert(['walk','ride','drive','double-walk','double-drover'].includes(kind),'Hody jsou pouze pro cestovní END SR');
+ const count=kind.startsWith('double-')?4:1;
+ assert(Array.isArray(rawValues)&&rawValues.length===count,'Nesoulad počtu polí pro END SR');
+ const rolls=rawValues.map(value=>String(value??'').trim()===''?NaN:Number(value));
+ assert(rolls.every(x=>whole(x,1,10)),'Vyplňte '+count+' platný hod(y) d10 (1 až 10)');
+ const software=generated&&generated.kind===kind&&Array.isArray(generated.rolls)&&
+   generated.rolls.length===count&&generated.rolls.every((n,i)=>n===rolls[i]);
+ return {rolls,origin:software?'cryptographic-software-die':'manual'};
+}
 export function expeditionSecondaryRoll({endurance,roll,riding=false}={}){
  assert(whole(endurance,0,50)&&whole(roll,1,10),'END SR vyžaduje potvrzené END a hod d10');
  const tn=Math.floor(endurance/2)+(riding?2:0);
