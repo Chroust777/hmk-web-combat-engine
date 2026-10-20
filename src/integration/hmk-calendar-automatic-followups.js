@@ -127,7 +127,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
  }
  // Persistent trekking results become distinct obligations until an actual
  // rules-executor proof, not a calendar click, resolves each hazard.
- for(const t of trekkingOutstandingCases(characters,journal)){
+ for(const t of trekkingOutstandingCases(characters,journal,clock.campaignId??null)){
   const actor=characters.find(c=>c.id===t.characterId);
   if(actor)push(actor,t.kind,t.sourceId,t.description,t.minute,t.route,{hazard:t.hazard});
  }

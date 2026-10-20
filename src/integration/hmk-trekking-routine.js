@@ -76,6 +76,21 @@ export function trekMovement({topography,terrain,conveyance='foot',progress=0,sl
   leagues:finalLPW*(hours/4),kilometres:finalLPW*(hours/4)*4,
   requiredBearing:dots,bearingDeficit:deficit,directionHazardDue:deficit>0,sourcePage:146};
 }
+/** HMK p.148: Lost Time gives one extra Slow Mode on this very watch.
+ * If a Progress Mode remains it is consumed first, and the corresponding
+ * previously-prepared Progress die does not confer a second benefit.
+ */
+export function adjustedTrekkingMovement(proof){
+ assert(proof?.format==='hmk-trekking-watch-evidence-v1','Chybí doložená Trekking Routine');
+ if(proof.hazards?.direction!=='lost-time')return proof.movement;
+ const m=proof.modes;
+ const oldSpare=Math.max(0,m.progress-m.slow);
+ return trekMovement({topography:proof.landscape,terrain:proof.terrain,
+  conveyance:proof.conveyance,progress:m.progress,slow:m.slow+1,
+  loaded:m.loaded,bearing:m.bearing,doubleTime:m.doubleTime,
+  continuousPrecipitation:proof.weatherWatch?.continuous===true,
+  progressD10:oldSpare>0?m.progressD10.slice(1):m.progressD10});
+}
 export function trekHazards({bearingDeficit=0,directionD10=[],survivalCriticalFailure=false,survivalD10=null}={}){
  assert(int(bearingDeficit,0,20)&&Array.isArray(directionD10)&&directionD10.length===bearingDeficit&&
   directionD10.every(r=>int(r,1,10)),'Chybí samostatné hody Direction Hazard');
@@ -126,6 +141,8 @@ export function validateTrekkingJournalEvidence(document){
    progressD10:p.modes?.progressD10,doubleTime:p.modes?.doubleTime,
    continuousPrecipitation:watch.continuous});
   assert(JSON.stringify(movement)===JSON.stringify(p.movement),'Nesouhlasí vypočítaný pohyb');
+  if(p.effectiveMovement)assert(JSON.stringify(adjustedTrekkingMovement(p))===JSON.stringify(p.effectiveMovement),
+   'Doložené zkrácení trasy v Direction Lost Time neodpovídá HMK 148');
   const hazards=trekHazards({bearingDeficit:movement.bearingDeficit,directionD10:p.modes?.directionD10});
   assert(JSON.stringify(hazards)===JSON.stringify(p.hazards),'Nesouhlasí uložení Direction Hazard');
   const encounter=trekEncounterCheck({environ:p.modes?.environ,night:p.night,
@@ -154,7 +171,7 @@ export function validateTrekkingJournalEvidence(document){
   assert(p&&p.format==='hmk-trekking-watch-evidence-v1'&&
    source.characterId===entry.characterId&&source.calendarCampaignId===entry.calendarCampaignId&&
    source.campaignMinute+e.durationMinutes===entry.campaignMinute&&
-   e.travelledLeagues===p.movement.leagues&&e.travelledKilometres===p.movement.kilometres,
+   e.travelledLeagues===(p.effectiveMovement??p.movement).leagues&&e.travelledKilometres===(p.effectiveMovement??p.movement).kilometres,
    'Cestovní únava nemá doloženou stejnou trasu, kampaň a čas');
  }
  return true;

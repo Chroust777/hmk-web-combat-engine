@@ -1,3 +1,5 @@
+import {hasFinishedLinkedTrekHazard} from './hmk-trekking-handoff.js';
+import {adjustedTrekkingMovement} from './hmk-trekking-routine.js';
 /** Evidence-only Trekking hazards → calendar obligations. HMK v1.2 pp.148–150.
  * A weather/route/encounter roll is a trigger, NOT an inferred injury.
  */
@@ -6,9 +8,10 @@ const KINDS=Object.freeze({
  weather:{kind:'trek-weather-hazard',route:'hazards',label:'Weather Hazard – dokončit původní Cold/Heat proceduru'},
  direction:{kind:'trek-direction-hazard',route:'skills',label:'Direction Hazard – vyhodnotit skutečné bloudění a jeho následky'},
  encounter:{kind:'trek-encounter',route:'combat',label:'Random Encounter – vyhodnotit Encounter Tables a následnou situaci'},
- survival:{kind:'trek-survival',route:'skills',label:'Survival Hazard – vyhodnotit CF a případný Accident'}
+ survival:{kind:'trek-survival',route:'skills',label:'Survival Hazard – vyhodnotit CF a případný Accident'},
+ 'survival-test':{kind:'trek-survival-test',route:'skills',label:'Orienteering / Survival Success Value – doložit povinný test (HMK 145,148)'}
 });
-export function trekkingOutstandingCases(characters=[],journal=[]){
+export function trekkingOutstandingCases(characters=[],journal=[],campaignId=null){
  const names=new Map(characters.map(c=>[c.id,c.name]));
  const resolutions=new Set();
  for(const entry of journal){
@@ -20,7 +23,14 @@ export function trekkingOutstandingCases(characters=[],journal=[]){
    // clicking the calendar or by a free-text GM note.
    const result=journal.find(j=>j.id===proof.authoritativeResultId&&j.characterId===entry.characterId&&
     j.calendarCampaignId===entry.calendarCampaignId&&whole(j.campaignMinute)&&j.campaignMinute>=proof.sourceMinute&&
-    (j.skillTestProof||j.combatProof||j.specialOutcomeProof));
+    (j.skillTestProof||j.combatProof||j.specialOutcomeProof)&&
+    // A general skill/combat journal record of the same actor must NEVER
+    // close an unrelated Trekking hazard: source identity must be explicit.
+    (j.calendarTrekSkillSource?.sourceId===proof.sourceId&&
+      j.calendarTrekSkillSource?.hazard===proof.hazard||
+     j.skillTestProof?.sourceId===proof.sourceId||
+     j.combatProof?.sourceId===proof.sourceId||
+     j.specialOutcomeProof?.sourceId===proof.sourceId));
    if(result)resolutions.add([entry.calendarCampaignId,entry.characterId,proof.sourceId,proof.hazard].join('|'));
   }
  }
@@ -28,20 +38,27 @@ export function trekkingOutstandingCases(characters=[],journal=[]){
  for(const entry of journal){
   const p=entry?.calendarTrekProof;
   if(!p||p.format!=='hmk-trekking-watch-evidence-v1'||!entry.id||!names.has(entry.characterId)||
-   !entry.calendarCampaignId||!whole(entry.campaignMinute)||entry.campaignMinute!==p.campaignMinute)continue;
+   !entry.calendarCampaignId||(campaignId&&entry.calendarCampaignId!==campaignId)||
+   !whole(entry.campaignMinute)||entry.campaignMinute!==p.campaignMinute)continue;
   const triggers=[];
+  if(!journal.some(j=>j.calendarTrekSkillSource?.format==='hmk-trek-linked-skill-v1'&&
+    j.calendarTrekSkillSource.sourceId===entry.id&&j.calendarTrekSkillSource.hazard==='survival'&&
+    j.characterId===entry.characterId&&j.calendarCampaignId===entry.calendarCampaignId))triggers.push('survival-test');
   if(p.weatherWatch?.requiresWeatherHazardRoll)triggers.push('weather');
-  if(p.hazards?.direction)triggers.push('direction');
-  if(p.hazards?.survival)triggers.push('survival');
+  if(p.hazards?.direction&&!(p.hazards.direction==='lost-time'&&p.effectiveMovement&&
+   JSON.stringify(p.effectiveMovement)===JSON.stringify(adjustedTrekkingMovement(p))))triggers.push('direction');
+  if(p.hazards?.survival||journal.some(j=>j.calendarTrekSkillSource?.sourceId===entry.id&&
+   j.calendarTrekSkillSource.hazard==='survival'&&
+   (j.skillTestProof?.a||j.skillTestProof?.result)?.level==='CF'))triggers.push('survival');
   if(p.encounter?.encounter)triggers.push('encounter');
   for(const hazard of triggers){
    const k=[entry.calendarCampaignId,entry.characterId,entry.id,hazard].join('|');
-   if(resolutions.has(k))continue;
+   if(resolutions.has(k)||hasFinishedLinkedTrekHazard(entry,hazard,journal))continue;
    const spec=KINDS[hazard];
    cases.push({id:'trek:'+encodeURIComponent(entry.id)+':'+hazard,
     characterId:entry.characterId,name:names.get(entry.characterId),sourceId:entry.id,
     kind:spec.kind,description:spec.label,minute:entry.campaignMinute,route:spec.route,
-    hazard,sourcePage:hazard==='encounter'?150:hazard==='weather'?144:148});
+    hazard:hazard==='survival-test'?'survival':hazard,sourcePage:hazard==='encounter'?150:hazard==='weather'?144:hazard==='survival-test'?145:148});
   }
  }
  return cases;
