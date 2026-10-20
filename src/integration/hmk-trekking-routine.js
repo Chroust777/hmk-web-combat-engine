@@ -79,12 +79,32 @@ export function trekMovement({topography,terrain,conveyance='foot',progress=0,sl
   leagues:finalLPW*(hours/4),kilometres:finalLPW*(hours/4)*4,
   requiredBearing:dots,bearingDeficit:deficit,directionHazardDue:deficit>0,sourcePage:146};
 }
+/** HMK p.145: the party may spend the entire four-hour watch foraging in
+ * its starting hex. It travels ZERO leagues; the printed movement table must
+ * not create progress or direction hazards during that stationary watch.
+ * Keep the original rate metadata for audit, but never claim it was covered. */
+export function trekWatchMovement(options={}){
+ if(!options.stationaryForaging)return trekMovement(options);
+ const column=CONVEYANCE.indexOf(options.conveyance??'foot');
+ const rate=MOVE[options.topography]?.[options.terrain];
+ assert(rate&&column>=0&&int(options.slow,0,20)&&typeof options.loaded==='boolean'&&
+  options.progress===0&&options.bearing===0&&options.doubleTime===false&&
+  Array.isArray(options.progressD10)&&options.progressD10.length===0,
+  'Foraging na místě vyžaduje známý terén, nulový Progress/Bearing a žádný Double Time');
+ // Not moving means no terrain movement-rate restrictions apply. A cart can
+ // remain parked where it could not itself complete a travelling watch.
+ return {baseLPW:rate[column],progressSuccess:false,remainingSlow:options.slow,
+  spareProgress:0,loaded:options.loaded,finalLPW:0,leagues:0,kilometres:0,
+  requiredBearing:0,bearingDeficit:0,directionHazardDue:false,
+  stationaryForaging:true,sourcePage:145};
+}
 /** HMK p.148: Lost Time gives one extra Slow Mode on this very watch.
  * If a Progress Mode remains it is consumed first, and the corresponding
  * previously-prepared Progress die does not confer a second benefit.
  */
 export function adjustedTrekkingMovement(proof){
  assert(proof?.format==='hmk-trekking-watch-evidence-v1','Chybí doložená Trekking Routine');
+ if(proof.orienteeringContext?.stationaryForaging)return proof.movement;
  if(proof.hazards?.direction!=='lost-time')return proof.movement;
  const m=proof.modes;
  const oldSpare=Math.max(0,m.progress-m.slow);
@@ -128,6 +148,8 @@ export function validateTrekkingJournalEvidence(document){
    ['flat','rough','mountain'].includes(p.landscape)&&
    typeof entry.calendarCampaignId==='string'&&entry.calendarCampaignId,'Neplatný cestovní čas či identita kampaně');
   if(p.orienteeringContext){
+   if(p.orienteeringContext.stationaryForaging)assert(p.modes.foraging>=2&&p.modes.progress===0&&
+    p.modes.bearing===0&&!p.modes.doubleTime,'Stacionární hlídka vyžaduje první dva připravené Foraging Modes');
    const c=createOrienteeringContext(p.orienteeringContext);
    assert(JSON.stringify(c)===JSON.stringify(p.orienteeringContext)&&c.night===p.night&&
     c.partySize===(p.partyModes?.memberIds?.length??1)&&c.conveyance===p.conveyance&&
@@ -139,7 +161,7 @@ export function validateTrekkingJournalEvidence(document){
   if(p.partyModes){
    validateTrekPartySnapshot(p.partyModes);
    assert(p.partyModes.guideId===entry.characterId&&p.partyModes.conveyance===p.conveyance&&
-    p.modes.slow===p.modes.manualSlow+p.partyModes.forcedSlow+(p.weatherWatch?.slowMode?1:0)+(p.modes.orienteeringSlow??0)+(p.modes.foraging>0?1:0)+(p.modes.stalking??0)&&
+    p.modes.slow===p.modes.manualSlow+p.partyModes.forcedSlow+(p.weatherWatch?.slowMode?1:0)+(p.modes.orienteeringSlow??0)+(p.orienteeringContext?.stationaryForaging?0:(p.modes.foraging>0?1:0)+(p.modes.stalking??0))&&
     p.modes.loaded===p.partyModes.loaded&&int(p.modes.manualSlow,0,20),
     'Skupinové postihy neodpovídají uloženému pohybu a počasí.');
   }
@@ -155,7 +177,7 @@ export function validateTrekkingJournalEvidence(document){
   const watch=trekWeatherWatch(expectedDay,{night:p.night,pavedRoad:p.terrain==='paved-road',
    precipitationD6:p.weatherWatch?.precipitationD6});
   assert(JSON.stringify(watch)===JSON.stringify(p.weatherWatch),'Nesouhlasí výsledek srážek pro hlídku');
-  const movement=trekMovement({topography:p.landscape,terrain:p.terrain,conveyance:p.conveyance,
+  const movement=trekWatchMovement({stationaryForaging:p.orienteeringContext?.stationaryForaging===true,topography:p.landscape,terrain:p.terrain,conveyance:p.conveyance,
    progress:p.modes?.progress,slow:p.modes?.slow,loaded:p.modes?.loaded,bearing:p.modes?.bearing,
    progressD10:p.modes?.progressD10,doubleTime:p.modes?.doubleTime,
    continuousPrecipitation:watch.continuous});
@@ -192,7 +214,7 @@ export function validateTrekkingJournalEvidence(document){
   const validPartyMember=source?.characterId===entry.characterId||
    (group?.format==='hmk-group-watch-v1'&&group.guideId===source?.characterId&&
     group.memberIds?.includes(entry.characterId));
-  assert(p&&p.format==='hmk-trekking-watch-evidence-v1'&&validPartyMember&&
+  assert(p&&!p.orienteeringContext?.stationaryForaging&&p.format==='hmk-trekking-watch-evidence-v1'&&validPartyMember&&
    source.calendarCampaignId===entry.calendarCampaignId&&
    source.campaignMinute+e.durationMinutes===entry.campaignMinute&&
    e.travelledLeagues===(p.effectiveMovement??p.movement).leagues&&e.travelledKilometres===(p.effectiveMovement??p.movement).kilometres,

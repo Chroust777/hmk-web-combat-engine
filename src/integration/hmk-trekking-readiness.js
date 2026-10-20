@@ -16,6 +16,8 @@ export function assessTrekkingReadiness({journal=[],characters=[],actorId,campai
   j.campaignMinute===minute&&j.calendarTrekProof?.format==='hmk-trekking-watch-evidence-v1');
  requireFact(rows.length===1,'Před cestou je nutná právě jedna uložená Trekking Routine pro tuto postavu, kampaň a minutu.');
  const source=effectiveTrekSource(rows[0],journal),p=source.calendarTrekProof;
+ requireFact(!p.orienteeringContext?.stationaryForaging,
+  'Foraging bez pohybu je čtyřhodinová činnost na místě, nikoli cestovní END hlídka. Čas posune GM v kalendáři.');
  const compatible=(kind==='walk'||kind==='double-walk')?p.conveyance==='foot':
   kind==='ride'?p.conveyance==='mount':kind==='drive'?['cart','wagon'].includes(p.conveyance):
   ['mount','cart','wagon'].includes(p.conveyance);

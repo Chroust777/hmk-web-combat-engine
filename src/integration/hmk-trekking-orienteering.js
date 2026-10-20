@@ -6,9 +6,9 @@ const requireFact=(yes,message)=>{if(!yes)throw Error(message);};
 const isBool=x=>typeof x==='boolean';
 export const ORIENTEERING_FORMAT='hmk-trek-orienteering-context-v1';
 export function createOrienteeringContext({night=false,partySize,familiar=false,
- torchlight=false,fullMoon=false,afterSnowfall=false,conveyance='foot',droverId=null}={}){
+ torchlight=false,fullMoon=false,afterSnowfall=false,conveyance='foot',droverId=null,stationaryForaging=false}={}){
  requireFact(Number.isSafeInteger(partySize)&&partySize>=1&&partySize<=10000,'Neplatný počet členů cestovní družiny');
- requireFact([night,familiar,torchlight,fullMoon,afterSnowfall].every(isBool),
+ requireFact([night,familiar,torchlight,fullMoon,afterSnowfall,stationaryForaging].every(isBool),
   'Neplatné doložené podmínky Orienteering');
  requireFact(['foot','mount','cart','wagon'].includes(conveyance),'Neplatná doprava Orienteering');
  requireFact(conveyance==='foot'?droverId===null:typeof droverId==='string'&&droverId.length>0,
@@ -18,7 +18,7 @@ export function createOrienteeringContext({night=false,partySize,familiar=false,
  requireFact(night||!(torchlight||fullMoon||afterSnowfall),
   'Noční zdroje světla lze použít jen při noční hlídce');
  return {format:ORIENTEERING_FORMAT,night,partySize,familiar,torchlight,fullMoon,
-  afterSnowfall,conveyance,droverId,sourcePage:145};
+  afterSnowfall,conveyance,droverId,...(stationaryForaging?{stationaryForaging:true}:{}),sourcePage:145};
 }
 export function adjustedOrienteeringSV({baseSV,context,droverResult=null}={}){
  requireFact(Number.isSafeInteger(baseSV)&&baseSV>=-100&&baseSV<=100,
@@ -33,8 +33,10 @@ export function adjustedOrienteeringSV({baseSV,context,droverResult=null}={}){
  const largePartyPenalty=-Math.floor(c.partySize/10);
  const droverPenalty=droverResult&&['CF','F'].includes(droverResult.level)?-1:0;
  const familiarityBonus=Number(c.familiar);
- const adjustedSV=baseSV+nightPenalty+largePartyPenalty+droverPenalty+familiarityBonus;
+ const stationaryForagingBonus=c.stationaryForaging===true?2:0;
+ const adjustedSV=baseSV+nightPenalty+largePartyPenalty+droverPenalty+familiarityBonus+stationaryForagingBonus;
  return {baseSV,adjustedSV,nightPenalty,largePartyPenalty,droverPenalty,familiarityBonus,
+   stationaryForagingBonus,stationaryForaging:c.stationaryForaging===true,
    advantageModes:adjustedSV>=5?Math.min(5,adjustedSV-4):0,sourcePage:145};
 }
 /** The low-SV penalties must be explicitly carried in the prepared watch.
@@ -50,6 +52,12 @@ export function assertOrienteeringModes({adjustment,modes}={}){
   Number.isSafeInteger(others.stalking)&&others.stalking>=0&&others.stalking<=1&&
   Number.isSafeInteger(others.vigilance)&&others.vigilance>=0&&others.vigilance<=1,
   'Neplatné Foraging/Stalking/Vigilance Modes');
+ if(adjustment.stationaryForaging){
+  requireFact(modes.progress===0&&modes.bearing===0&&!modes.doubleTime,
+   'Stacionární Foraging neumožňuje Progress, Bearing ani Double Time: družina neopouští počáteční hex');
+  requireFact(others.foraging>=Math.min(2,adjustment.advantageModes),
+   'Při Foraging bez pohybu musí první dva dostupné Advantage Modes připadnout na Foraging (HMK 145)');
+ }
  const spent=modes.progress+modes.bearing+others.foraging+others.stalking+others.vigilance;
  requireFact(spent<=adjustment.advantageModes,
   `Upravený Orienteering SV ${adjustment.adjustedSV} dovoluje ${adjustment.advantageModes} Progress/Bearing Modes, ale bylo použito ${spent}.`);

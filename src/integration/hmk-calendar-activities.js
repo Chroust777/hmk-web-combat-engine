@@ -146,7 +146,28 @@ export function calendarActorActivities(clock,characters=[],journal=[]){
     note:row.calendarActivityInterruptProof.reason+' · neúplný interval bez automatické obnovy.',
     minute:row.campaignMinute,dueMinute:row.campaignMinute,status:'cancelled',destination:'notes'
   }));
- return [...activities,...stops];
+ // A stationary Foraging watch covers four hours in one hex. It is not a
+ // travelling/fatigue activity and must not secretly advance the GM clock.
+ // Show every party member during the documented interval, but do not mark
+ // the task completed until its actual Foraging proof exists.
+ const stationary=journal.filter(row=>row.calendarCampaignId===campaignId&&
+  row.calendarTrekProof?.orienteeringContext?.stationaryForaging===true).flatMap(row=>{
+   const start=row.campaignMinute,end=start+240;
+   const finished=journal.some(j=>j.calendarCampaignId===campaignId&&
+    j.calendarTrekWildernessProof?.sourceId===row.id);
+   return (row.calendarTrekProof.partyModes?.memberIds??[row.characterId])
+    .filter(id=>allowed.has(id)).map(id=>({
+     id:'stationary-foraging:'+row.id+':'+id,sourceId:row.id,origin:'activity',
+     kind:'foraging-stationary',characterId:id,name:allowed.get(id),
+     title:'HMK · Foraging na místě',description:'Čtyřhodinová hlídka v počátečním hexu',
+     note:finished?'Nález doložený skutečnými Foraging hody.':
+      'Čeká na doložené Foraging hody. Družina se nepřesunula.',
+     minute:start,dueMinute:start,endMinute:end,
+     status:finished&&clock.minute>=end?'resolved':clock.minute>=end?'due':clock.minute>=start?'active':'future',
+     destination:'notes'
+    }));
+  });
+ return [...activities,...stops,...stationary];
 }
 /** Explicitly inspect all scheduled cases; legacy evidence is not mutated. */
 export function validateHMKActivityEvidence(journal=[]){

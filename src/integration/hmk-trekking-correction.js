@@ -3,7 +3,7 @@
  * correction is an additional, source-linked, replayable proof.
  */
 import {adjustedOrienteeringSV,assertOrienteeringModes} from './hmk-trekking-orienteering.js';
-import {trekMovement,trekHazards,adjustedTrekkingMovement} from './hmk-trekking-routine.js';
+import {trekWatchMovement,trekHazards,adjustedTrekkingMovement} from './hmk-trekking-routine.js';
 const ok=(condition,message)=>{if(!condition)throw Error(message);};
 const isD10=x=>Number.isSafeInteger(x)&&x>=1&&x<=10;
 export const TREK_CORRECTION_FORMAT='hmk-trekking-watch-correction-v1';
@@ -39,7 +39,7 @@ export function correctedModes(prepared,adjustment,{lowChoice=null}={}){
   original.stalking<=1&&original.vigilance<=1,'Neplatné připravené režimy hlídky');
  const result={...prepared};
  let spare=adjustment.advantageModes;
- for(const key of ['bearing','foraging','stalking','vigilance','progress']){
+ for(const key of adjustment.stationaryForaging?['foraging','stalking','vigilance']:['bearing','foraging','stalking','vigilance','progress']){
   result[key]=Math.min(original[key],spare);spare-=result[key];
  }
  const sv=adjustment.adjustedSV;
@@ -50,7 +50,7 @@ export function correctedModes(prepared,adjustment,{lowChoice=null}={}){
  result.orienteeringSlow=sv<=0?1:sv<=2?(validLowChoice?prepared.orienteeringSlow:Number(lowChoice==='slow')):0;
  result.slow=result.manualSlow+(result.orienteeringSlow)+(prepared.slow-prepared.manualSlow-(prepared.orienteeringSlow??0));
  // A forfeited Foraging/Stalking Mode removes its associated movement penalty.
- result.slow+=(result.foraging>0?1:0)-(original.foraging>0?1:0)+result.stalking-original.stalking;
+ if(!adjustment.stationaryForaging)result.slow+=(result.foraging>0?1:0)-(original.foraging>0?1:0)+result.stalking-original.stalking;
  ok(Number.isSafeInteger(result.slow)&&result.slow>=0,'Neplatný součet Slow Modes');
  assertOrienteeringModes({adjustment,modes:result});
  ok(modeTotal(result)<=adjustment.advantageModes,'Překročený rozpočet Advantage Modes');
@@ -62,7 +62,7 @@ export function previewTrekCorrection(source,journal,{lowChoice=null}={}){
  const modes=correctedModes(old,adjustment,{lowChoice});
  const neededProgress=Math.max(0,modes.progress-modes.slow),oldProgress=old.progressD10.length;
  const additionalProgress=Math.max(0,neededProgress-oldProgress);
- const movementBase=trekMovement({topography:p.landscape,terrain:p.terrain,conveyance:p.conveyance,
+ const movementBase=trekWatchMovement({stationaryForaging:!!p.orienteeringContext?.stationaryForaging,topography:p.landscape,terrain:p.terrain,conveyance:p.conveyance,
   progress:modes.progress,slow:modes.slow,loaded:modes.loaded,bearing:modes.bearing,
   doubleTime:modes.doubleTime,continuousPrecipitation:p.weatherWatch.continuous,
   progressD10:[...old.progressD10.slice(0,neededProgress),...Array(additionalProgress).fill(1)]});
@@ -82,7 +82,7 @@ export function createTrekCorrection({source,journal,additionalRolls=[],origin='
  const modes={...preview.modes};let cursor=0;
  modes.progressD10=[...p.modes.progressD10.slice(0,Math.max(0,modes.progress-modes.slow)),
   ...additionalRolls.slice(cursor,cursor+preview.additionalProgress)];cursor+=preview.additionalProgress;
- const movement=trekMovement({topography:p.landscape,terrain:p.terrain,conveyance:p.conveyance,
+ const movement=trekWatchMovement({stationaryForaging:!!p.orienteeringContext?.stationaryForaging,topography:p.landscape,terrain:p.terrain,conveyance:p.conveyance,
   progress:modes.progress,slow:modes.slow,loaded:modes.loaded,bearing:modes.bearing,
   doubleTime:modes.doubleTime,continuousPrecipitation:p.weatherWatch.continuous,progressD10:modes.progressD10});
  modes.directionD10=[...p.modes.directionD10.slice(0,movement.bearingDeficit),...additionalRolls.slice(cursor)];
