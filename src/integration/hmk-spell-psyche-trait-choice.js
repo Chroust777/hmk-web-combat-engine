@@ -81,6 +81,7 @@ export function persistSpellPsycheTraitChoice({document,characterId,sourceEventI
  const journalId='psyche-choice:'+sourceEventId;
  check(!(out.journal??[]).some(j=>j.id===journalId),'Duplicitní Psyche rozhodnutí');
  out.journal.push({id:journalId,characterId,createdAt:new Date().toISOString(),
+  campaignMinute:document.campaignClock?.minute??null,
   title:`HMK Psyche Trait — ${trait}`,
   body:`GM přiřadil ${trait} k traumatu ${sourceEventId}, PSY ${pending.levels}. ${addedManifestedWeakness?'Již projevený stejnojmenný trait: Weakness +'+addedManifestedWeakness+'. ':''}Nástup nového traitu, pokud dosud neprojeven, a d6-denní Recovery zůstávají otevřené.`,
   combatProof:{actionKind:'spell-psyche-trait-choice',sourceEventId,

@@ -58,6 +58,7 @@ export function persistSpellPsycheManifestation({document,characterId,trait,even
  s.lastRound=Math.max(s.lastRound,witness.round);
  validateCombatState(s);
  out.journal.push({id:'psyche-manifestation:'+eventId,characterId,createdAt:new Date().toISOString(),
+  campaignMinute:document.campaignClock?.minute??null,
   title:`HMK Psyche Trait · nástup ${trait}`,
   body:`GM potvrdil ~10 herních minut od traumatu. ${trait}: PSY ${t.psycheLevels}, Weakness +${add}. D6-denní Psyche Recovery nadále není vyřízena.`,
   combatProof:{actionKind:'psyche-trait-manifestation',sourceEventId:eventId,
