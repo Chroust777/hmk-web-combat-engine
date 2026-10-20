@@ -4282,3 +4282,16 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 
 .content-calendar .hc-status--elapsed{color:#5e543e;background:rgba(138,121,94,.11)}
 .journal-log-row.calendar-history-focus{outline:2px solid #8d642f;outline-offset:2px;background:rgba(195,153,77,.17)}
+
+/* v93.365 – choice of independent campaign calendars, weekly agenda. */
+.content-calendar .hc-campaign-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin:14px 0}
+.content-calendar .hc-campaign-card{border:1px solid #90734a88;background:rgba(184,141,78,.12);padding:12px;min-width:0;border-radius:4px}
+.content-calendar .hc-campaign-card h3{font-size:1rem;margin:0 0 6px}
+.content-calendar .hc-campaign-card p{overflow-wrap:anywhere;font-size:.81rem}
+.content-calendar .hc-campaign-people{min-height:2em}
+.content-calendar .hc-week-tabs{display:grid;gap:7px}
+.content-calendar .hc-week-tabs details{border:1px solid #8e704657;background:rgba(176,137,78,.08);border-radius:4px;padding:7px 10px;min-width:0}
+.content-calendar .hc-week-tabs summary{cursor:pointer;font-weight:700;color:#52371e}
+.content-calendar .hc-week-list{max-height:400px;overflow:auto;overscroll-behavior:contain}
+.content-calendar .hc-campaign-settings fieldset{margin:10px 0;border:1px solid #8e704657;min-width:0}
+.content-calendar .hc-campaign-settings legend{font-size:.85rem;font-weight:700}
