@@ -1,3 +1,4 @@
+import {assertGMOnlyCampaignTime} from './hmk-gm-clock-authority.js';
 import {assertCommittedMoralePsycheDebts} from './hmk-morale-psyche-bridge.js';
 import {assertCommittedFearTransitions} from './hmk-fear-write-invariant.js';
 import {assertCommittedShadeTransitions} from './hmk-shade-write-invariant.js';
@@ -11,7 +12,7 @@ import {assertCommittedPelahnBurstSources} from './hmk-pelahn-burst-write-invari
  * This adapter makes NO game-rule decisions and rolls NO dice.
  */
 const result=(ok,readOnly,code)=>({ok,readOnly,code});
-export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized}={}){
+export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,gmClockAdvance=false,restoreBackup=false}={}){
  if(!storage||typeof key!=='string'||!key||
     !(baseline===null||typeof baseline==='string')||typeof serialized!=='string')
   throw Error('Neplatný požadavek na trvalý kontrolní bod');
@@ -25,12 +26,15 @@ export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized}=
  try{
   if(before!==null){
    const old=JSON.parse(before),next=JSON.parse(serialized);
+   if(old&&next&&Array.isArray(old.characters)&&Array.isArray(next.characters)&&!restoreBackup)
+    assertGMOnlyCampaignTime(old,next,{gmClockAdvance});
    assertCommittedMoralePsycheDebts(old,next);
    assertCommittedFearTransitions(old,next);
    assertCommittedShadeTransitions(old,next);
    assertCommittedPelahnBurstSources(old,next);
   }
  }catch(e){
+  if(e?.message?.startsWith('Čas kampaně')||e?.message?.startsWith('Předchozí časové')||e?.message?.startsWith('Posun času'))return result(false,false,'gm-only-clock');
   if(e?.message?.startsWith('Morale → Psyche:'))return result(false,true,'unresolved-morale-psyche');
   if(e?.message?.startsWith('Fear/Aberrance:'))return result(false,true,'unresolved-fear-aberrance');
   if(e?.message?.startsWith('Total Release Shade:'))return result(false,true,'invalid-shade-transition');
