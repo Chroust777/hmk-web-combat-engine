@@ -112,7 +112,7 @@ export function gmCalendarAgenda(clock){
  const resolutions=new Map((clock.planResolutions??[]).map(r=>[r.planId,r]));
  return (clock.plans??[]).map(p=>{
   const dueMinute=p.trigger==='end'?p.endMinute:p.minute;
-  return {...p,dueMinute,resolution:resolutions.get(p.id)||null,status:resolutions.has(p.id)?resolutions.get(p.id).kind:dueMinute<=clock.minute?'due':'future'};
+  return {...p,dueMinute,resolution:resolutions.get(p.id)||null,status:resolutions.has(p.id)?resolutions.get(p.id).kind:dueMinute<=clock.minute?(p.requiresAction?'due':'elapsed'):'future'};
  }).sort((a,b)=>a.dueMinute-b.dueMinute||a.id.localeCompare(b.id));
 }
 export function nextGMBlockingEvent(clock,nextMinute){

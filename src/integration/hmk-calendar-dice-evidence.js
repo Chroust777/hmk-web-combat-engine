@@ -15,7 +15,8 @@ export const CALENDAR_DICE_FIELDS=Object.freeze({
    shockD100:100,compoundD10:10},
  'skill-injury':{hazardD10:10,agilityD100:100,impactDie:[6,10],zoneD10:10,
    locationD10:10,shockD100:100,compoundD10:10},
- 'aural-recovery':{die:100},'psyche-interval':{die:6},'psyche-recovery':{die:100}
+ 'aural-recovery':{die:100},'psyche-interval':{die:6},'psyche-recovery':{die:100},
+ 'talisman-period':{specialDice:10}
 });
 const whole=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const permits=(available,faces)=>Array.isArray(available)?available.includes(faces):available===faces;
