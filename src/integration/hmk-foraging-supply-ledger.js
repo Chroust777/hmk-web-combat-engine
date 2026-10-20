@@ -32,7 +32,7 @@ export function supplyBalances(journal=[],campaignId){
 }
 export function availableSupplyLots(journal=[],campaignId){return supplyBalances(journal,campaignId).lots.filter(x=>x.remaining>0)};
 export function createSupplyUse({journal=[],campaignId,minute,sourceId,resultIndex,unit,quantity,
- actorId,disposition,purpose=''}={}){
+ actorId,disposition,purpose='',containerFillId=null}={}){
  requireIt(typeof campaignId==='string'&&campaignId&&Number.isSafeInteger(minute)&&minute>=0,
   'Zásoby vyžadují konkrétní kampaň a doloženou aktuální minutu');
  requireIt(typeof sourceId==='string'&&sourceId&&Number.isSafeInteger(resultIndex)&&resultIndex>=0&&
@@ -40,8 +40,11 @@ export function createSupplyUse({journal=[],campaignId,minute,sourceId,resultInd
   Number.isSafeInteger(quantity*(unit==='herbDoses'?1:2)),
   'Neplatný zdroj nebo množství zásob');
  requireIt(typeof actorId==='string'&&actorId.length>0,'Vyberte postavu, která zásobu používá');
- requireIt(unit==='herbDoses'?disposition==='ingredient-reserved':disposition==='consumed',
-  'Byliny lze rezervovat jako ingredienci; jídlo a vodu lze evidovat jako spotřebované');
+ requireIt(unit==='herbDoses'?disposition==='ingredient-reserved':
+  unit==='waterDays'?['consumed','stored-in-container'].includes(disposition):disposition==='consumed',
+  'Byliny lze rezervovat; voda může být spotřebována nebo doloženě naplněna do nádoby');
+ requireIt(disposition!=='stored-in-container'||(quantity===0.5&&typeof containerFillId==='string'&&containerFillId.length>0),
+  'Převod vody do nádoby vyžaduje jedinečný důkaz naplnění a půl galonu');
  requireIt(typeof purpose==='string'&&purpose.length<=120&&(disposition!=='ingredient-reserved'||purpose.trim()),
   'Rezervace bylin potřebuje označení zamýšlené Concoction (nenahrazuje její výrobu)');
  const origin=journal.find(j=>j.id===sourceId);
@@ -55,7 +58,8 @@ export function createSupplyUse({journal=[],campaignId,minute,sourceId,resultInd
  return {format:FORAGING_SUPPLY_USE_FORMAT,sourceId,resultIndex,unit,quantity,actorId,
   disposition,purpose:disposition==='ingredient-reserved'?purpose.trim():'',
   herbName:unit==='herbDoses'?result.herbName:null,sourceMinute:origin.campaignMinute,
-  minute,sourcePages:unit==='herbDoses'?[74,147]:[147,186]};
+  minute,sourcePages:unit==='herbDoses'?[74,147]:[147,186],
+  ...(disposition==='stored-in-container'?{containerFillId}:{})};
 }
 export function validateSupplyJournal(journal=[]){
  // Replay STRICTLY in insertion order: receipts must exist before debits and
@@ -66,7 +70,8 @@ export function validateSupplyJournal(journal=[]){
   if(p){
    const expected=createSupplyUse({journal:prior,campaignId:row.calendarCampaignId,
     minute:row.campaignMinute,sourceId:p.sourceId,resultIndex:p.resultIndex,
-    unit:p.unit,quantity:p.quantity,actorId:p.actorId,disposition:p.disposition,purpose:p.purpose});
+    unit:p.unit,quantity:p.quantity,actorId:p.actorId,disposition:p.disposition,purpose:p.purpose,
+    containerFillId:p.containerFillId});
    if(p.nutritionDayId!==undefined){
     requireIt(typeof p.nutritionDayId==='string'&&p.nutritionDayId.length>0,
      'Neplatná vazba automatického denního přídělu');

@@ -24,7 +24,7 @@ export function waterskinBalances(journal=[],campaignId,actorId,minute=1e9){
 export function filledWaterForItem(journal=[],campaignId,actorId,itemId,minute=1e9){
  return waterskinBalances(journal,campaignId,actorId,minute).filter(x=>x.itemId===itemId).reduce((n,x)=>n+x.remaining,0);
 }
-export function createPotableWaterFill({inventory=[],journal=[],campaignId,actorId,itemId,minute,gmConfirmed=false,waterSource=''}={}){
+export function createPotableWaterFill({inventory=[],journal=[],campaignId,actorId,itemId,minute,gmConfirmed=false,waterSource='',foragingSupplyUseId=null}={}){
  check(typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&
   typeof itemId==='string'&&itemId&&isMinute(minute),'Voda vyžaduje postavu, kampaň a skutečný čas');
  const item=inventory.find(x=>x.id===itemId&&x.characterId===actorId);
@@ -34,7 +34,8 @@ export function createPotableWaterFill({inventory=[],journal=[],campaignId,actor
   'Uveďte skutečný zdroj pitné vody (např. studna ve vsi)');
  check(filledWaterForItem(journal,campaignId,actorId,itemId,minute)===0,'Nádoba už obsahuje doloženou vodu – nejprve ji spotřebujte');
  return {format:WATER_FILL,campaignId,actorId,itemId,minute,quantity:0.5,unit:'waterDays',weightLb:5,
-  potableAndFilledConfirmedByGM:true,waterSource:waterSource.trim(),sourcePages:[120,121,186]};
+  potableAndFilledConfirmedByGM:true,waterSource:waterSource.trim(),sourcePages:[120,121,186],
+  ...(foragingSupplyUseId?{foragingSupplyUseId}:{})};
 }
 export function availablePhysicalWater(journal=[],campaignId,actorId,minute){
  return waterskinBalances(journal,campaignId,actorId,minute).filter(x=>x.remaining>=0.5&&x.minute<=minute)
@@ -58,6 +59,7 @@ export function validatePhysicalWaterJournal(journal=[],inventory=null,database=
    f.unit==='waterDays'&&f.potableAndFilledConfirmedByGM===true&&
    typeof f.waterSource==='string'&&f.waterSource.length>=2&&f.waterSource.length<=160&&
    JSON.stringify(f.sourcePages)==='[120,121,186]'&&typeof f.itemId==='string'&&f.itemId&&
+   (f.foragingSupplyUseId===undefined||(typeof f.foragingSupplyUseId==='string'&&f.foragingSupplyUseId.length>0))&&
    filledWaterForItem(prior,f.campaignId,f.actorId,f.itemId,f.minute)===0,
    'Poškozené nebo duplicitní naplnění nádoby na vodu');
    if(inventory!==null||database!==null){
