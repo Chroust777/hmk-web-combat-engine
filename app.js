@@ -102,6 +102,7 @@ import {parseSpatialBarrierSegments,effectiveSpatialBarriers} from './src/integr
 import {recordEncounterFreeAction,encounterFreeActionAvailable,createEncounterSequence,validateEncounterSequence,startEncounterTurn,finishEncounterTurn,finalizeStagedEncounterTurn,nextEncounterRound,dueEncounterEvents,dueEndTurnEvents,currentEncounterActor,assertScheduledMeleeActor,resolveReadiedEncounterAction,cancelReadiedEncounterAction,completeReadiedEncounterAction,confirmAlertnessReaction,confirmConcentrationCompletion,abandonEncounterConcentration,ongoingEncounterConcentration,requireConcentrationCompatibleDefence,assertScheduledHitCanCommit,recordScheduledHitCommit,setEncounterTieOrder,configureInitialCrossbowPriority,requireInitialCrossbowShot} from './src/integration/encounter-turn-sequence.js';
 import {applyConfirmedTreatment,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock} from './src/integration/hmk-healing-persistence.js';
 import {calendarInitialUI,campaignCalendarBoardHTML} from './src/integration/hmk-campaign-calendar-ui.js';
+import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
 import {availableSpellAuralRecoveries,persistSpellAuralRecovery} from './src/integration/hmk-spell-aural-recovery.js';
 import {availableSpellPsycheRecoveries,persistSpellPsycheRecoverySchedule,persistSpellPsycheRecoveryRoll} from './src/integration/hmk-spell-psyche-recovery.js';
@@ -170,7 +171,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.362';
+const APP_VERSION='93.363';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -217,6 +218,7 @@ if(!storageReadOnly){
 }
 function validate(d){
  if(d?.campaignClock!==undefined)validateCampaignCalendar(d.campaignClock);
+ if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
@@ -346,8 +348,14 @@ function synchronizeAutomaticCalendarOrigins(before,after){
  // Record the campaign clock at which NEW journal evidence was committed.
  // Historical journal entries remain byte-for-byte unchanged.
  const existing=new Set((before.journal||[]).map(j=>j.id));
- for(const entry of after.journal||[])if(!existing.has(entry.id)&&entry.campaignMinute===undefined)
-  entry.campaignMinute=after.campaignClock.minute;
+ for(const entry of after.journal||[])if(!existing.has(entry.id)){
+  if(entry.campaignMinute===undefined)entry.campaignMinute=after.campaignClock.minute;
+  if(!entry.calendarCampaignId&&after.campaignClock.campaignId)entry.calendarCampaignId=after.campaignClock.campaignId;
+  if(!entry.campaignTRDate&&after.campaignClock.trOrigin){
+   const date=campaignTRDate(after.campaignClock,after.campaignClock.minute);
+   if(date)entry.campaignTRDate={year:date.year,month:date.month,day:date.day,minuteOfDay:after.campaignClock.minute%DAY_MINUTES};
+  }
+ }
 }
 // Software dice are offered only inside an opened, character-specific HMK
 // calendar follow-up. The source action still validates and commits its roll.
@@ -401,7 +409,7 @@ function installCalendarDiceControls(form,kind,sourceId,actorId){
 function mutate(fn){
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignCalendarAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save()){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignCalendarAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save()){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(!automaticGenerationBusy)alert('Změna nebyla uložena: '+e.message);return false}
 }
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
@@ -531,7 +539,26 @@ function refreshAllCalendarHealingFields(){
 let calendarUI=null; // Presentation state only, never stored in character/campaign evidence.
 function campaignCalendarView(){
  const clock=data.campaignClock;
- if(!clock)return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`<h2>Jednotný kalendář kampaně</h2><div class="panel"><p>HMK str. 178–182: časové intervaly léčení, infekcí a Shock. Údaje o bojových kolech nepřevádíme na hodiny ani dny. Založení kalendáře neposune bojový stav a nespustí žádný hod.</p><form id="campaign-start-form"><div class="field-grid">${field('label','Označení kampaně (bez domyšleného harenského data)','')}${field('day','Den kampaně (1 = první evidovaný den)',1,'number')}${field('hour','Hodina (0–23)',8,'number')}${field('minute','Minuta (0–59)',0,'number')}</div><p>HMK str. 11 a 22: 12 měsíců × 30 dní, tři desetidenní úseky. Zvolte skutečné datum TR podle své kampaně (nikoli automaticky podle dnešního kalendáře).</p><div class="field-grid">${field('trYear','Rok TR (GM určí)',720,'number')}<label>Měsíc TR<select name="trMonth">${TR_MONTHS.map((m,i)=>`<option value="${i+1}">${esc(m)}</option>`).join('')}</select></label>${field('trDay','Den měsíce (1–30)',1,'number')}</div><label><input type="checkbox" name="setTR" value="yes" checked> Přiřadit GM potvrzené datum TR (lze také později)</label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje výchozí čas kampaně</label><button type="submit">Založit kalendář</button></form></div>`,`journal-book--calendar`);
+ if(!clock){
+  const candidate=data.characters.map(c=>`<label class="hc-character"><input type="checkbox" name="characterId" value="${esc(c.id)}" checked><span>${esc(c.name)} (${esc(c.kind||'PC')})</span></label>`).join('');
+  const history=(data.calendarEvidenceArchives??[]);
+  return journalChapterShell('Svět · Kalendář kampaně','Doložený čas kampaně a výběr účastníků.',`<h2>Jednotný kalendář kampaně</h2><section class="panel hc-calendar hc-setup"><p>HMK str. 11, 22 a 178–182. Časová evidence zranění postav se zachovává i po odstranění předchozího kalendáře. Dny bojových kol se nikdy automaticky nepřevádějí na minuty.</p>
+  <form id="campaign-start-form"><div class="hc-start-grid">
+   ${field('label','Označení kampaně (bez domyšleného data)','')}
+   ${field('day','Den kampaně (1 = první evidovaný den)',1,'number')}
+   ${field('hour','Hodina (0–23)',8,'number')}
+   ${field('minute','Minuta (0–59)',0,'number')}</div>
+   <p>Tuzyn Reckoning: 12 měsíců × 30 dnů, tři desetidenní úseky. Zadejte skutečné datum své kampaně:</p>
+   <div class="hc-start-grid">${field('trYear','Rok TR (GM určí)',720,'number')}
+   <label>Měsíc TR<select name="trMonth">${TR_MONTHS.map((m,i)=>`<option value="${i+1}">${esc(m)}</option>`).join('')}</select></label>
+   ${field('trDay','Den měsíce (1–30)',1,'number')}</div>
+   <label class="hc-check"><input type="checkbox" name="setTR" value="yes" checked> Přiřadit GM potvrzené datum TR (lze také později)</label>
+   <fieldset class="hc-member-chooser"><legend>Postavy v této kampani</legend><p>Kalendář plánuje časované procedury jen pro vybrané postavy. Stav a historie ostatních se nemění.</p><div class="hc-characters">${candidate||'<p>Nejdříve vytvořte postavy v registru.</p>'}</div></fieldset>
+   ${history.length?`<p><strong>Nalezeno ${history.length} uchovaných sad časových důkazů.</strong> Po zvolení postav lze rekonstruovat ověřené časy z předchozích kalendářů.</p><label class="hc-check"><input type="checkbox" name="sameDayAxis" value="yes"> Potvrzuji, že nový kalendář používá přesně stejné číslování dní jako předchozí (pouze pro důkazy bez TR data).</label><p class="hc-hint">S uvedenými oběma daty TR se čas převede automaticky. Neurčený čas nebude odhadnut.</p>`:''}
+   <label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje datum, čas a účastníky kampaně</label>
+   <button type="submit">Založit kalendář a načíst doložené termíny</button>
+  </form></section>`,`journal-book--calendar`);
+ }
  const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
  const unresolved=data.characters.flatMap(c=>{
   const s=c.hmk?.combatState;if(!s||s.shock==='KIA')return [];
@@ -561,8 +588,10 @@ function campaignCalendarView(){
  });
  const renderItem=x=>`<div class="list-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}${x.woundId?' · '+esc(x.woundId):''}</div></div><span>${x.status==='due'?'SPLATNÉ':'Čeká'}</span></div>`;
  if(!calendarUI)calendarUI=calendarInitialUI(clock);
- const board=campaignCalendarBoardHTML({clock,characters:data.characters,journal:data.journal,ui:calendarUI,escapeHTML:esc});
- return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${board}<details class="hc-advanced"><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Pouze GM posouvá čas; fyzické hody se neprovádějí automaticky.</p>
+ const selectedCalendarPeople=calendarMemberIds(clock,data.characters);
+ const board=campaignCalendarBoardHTML({clock,characters:selectedCalendarPeople,journal:data.journal,ui:calendarUI,escapeHTML:esc});
+ const membersHTML=`<section class="hc-calendar hc-campaign-settings"><details><summary>Správa postav a kalendáře · ${selectedCalendarPeople.length} účastníků</summary><form id="campaign-members-form"><div class="hc-characters">${data.characters.map(c=>`<label class="hc-character"><input type="checkbox" name="characterId" value="${esc(c.id)}" ${selectedCalendarPeople.some(x=>x.id===c.id)?'checked':''}><span>${esc(c.name)}</span></label>`).join('')}</div><button type="submit">Uložit účastníky kampaně</button></form><hr><p>Smazáním odstraníte kalendář, jeho GM události a nastavení času. Časové důkazy postav se uchovají samostatně. Postavy, zranění ani jejich historie se nemažou.</p><button type="button" class="danger" data-calendar-delete="yes">Zálohovat a smazat celý kalendář</button></details></section>`;
+ return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${board}${membersHTML}<details class="hc-advanced"><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Pouze GM posouvá čas; fyzické hody se neprovádějí automaticky.</p>
  <form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form><p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
  <section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Vyřešení probíhá v původním Combat / Healing průvodci; kalendář pouze hlídá čas, nerozhoduje o hodu ani nezapisuje paralelní Combat State.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
  <section class="panel"><h3>Následující termíny · ${agenda.future.length}</h3>${agenda.future.length?agenda.future.slice(0,100).map(renderItem).join(''):'<p class="muted">Žádná další doložená splatnost.</p>'}</section>
@@ -6480,6 +6509,12 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   form=byHidden(t?.status==='pending-profile'?'form[data-hmk-disease-profile]':t?.status==='incubating'?'form[data-hmk-disease-onset]':'form[data-hmk-disease-course]');
   choose(form,'elapsedMinutes',elapsedText);break;
  }
+ case 'talisman-period':{
+  form=document.getElementById('hsk-special-sr-form');
+  choose(form,'specialRoutine','astral-talisman');
+  if(form)hskSpecialRefresh(form);
+  break;
+ }
  case 'skill-critical':form=q('form[data-skill-critical-form]').find(f=>sourceId.startsWith(f.elements.namedItem('origin')?.value+'-'));break;
  case 'skill-fall':form=byHidden('form[data-climbing-fall-form]')||byHidden('form[data-climbing-short-fall]');break;
  case 'skill-injury':form=byHidden('form[data-skill-physical-impact]');break;
@@ -6495,11 +6530,43 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   form.scrollIntoView({block:'center',behavior:'instant'});
   const rollInput=form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"]');
   rollInput?.focus({preventScroll:true});
- }else if(['skill-fall','skill-critical','weather-course','treatment','healing','infection','grim','poison','disease','psyche-recovery','psyche-interval','aural-recovery'].includes(kind)){
+ }else if(['skill-fall','skill-critical','weather-course','treatment','healing','infection','grim','poison','disease','psyche-recovery','psyche-interval','aural-recovery','talisman-period'].includes(kind)){
   notice='Kalendář otevřel správnou záložku, ale pravidlový formulář není v aktuálním stavu dostupný. Nejprve dokončete případné předchozí povinnosti.';
   render();
  }
 }
+// Calendar lifecycle is explicitly separate from ordinary append-only changes.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-calendar-delete]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(storageReadOnly||!data.campaignClock)return alert('Nejdříve ověřte uložená data.');
+ if(combatInitiativeSequence)return alert('Během aktivní Initiative nelze odstranit časovou osu kampaně.');
+ if(!confirm('Smazat celý kalendář a všechny ručně plánované GM události? Časové důkazy postav zůstanou zachovány. Před odstraněním se stáhne úplná záloha.'))return;
+ if(prompt('Pro potvrzení napište přesně SMAZAT:','')!=='SMAZAT')return;
+ try{
+  downloadJSON(structuredClone(data),'hmk-zaloha-pred-smazanim-kalendare.json');
+  const next=removeCalendarSafely(data,uuid());
+  if(mutate(()=>{delete data.campaignClock;data.calendarEvidenceArchives=next.calendarEvidenceArchives;})){
+   calendarUI=null;notice='Kalendář odstraněn, důkazy časů postav zachovány. Můžete založit nový.';
+  }
+ }catch(error){alert('Kalendář nebyl odstraněn: '+error.message)}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(f.id!=='campaign-members-form')return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const ids=new FormData(f).getAll('characterId').filter(id=>data.characters.some(c=>c.id===id));
+  if(!ids.length)throw Error('Vyberte alespoň jednu postavu.');
+  if(!data.campaignClock)throw Error('Kalendář nebyl vytvořen');
+  if(!confirm('Změnit účastníky časové osy? Postavy mimo výběr zůstanou nezměněné.'))return;
+  const current=data.campaignClock;
+  assertCompatibleLiveEffectTimeAxis(current,data.calendarEvidenceArchives??[],data.characters,ids);
+  const reconstructed=recoverCalendarEvidence(current,data.calendarEvidenceArchives??[],ids,{idFactory:uuid});
+  reconstructed.clock.events.push({id:uuid(),type:'membership',minute:current.minute,reason:'GM potvrdil změnu účastníků kampaně'});
+  // For an existing origin-less campaign, no historical conversion is invented.
+  if(mutate(()=>{data.campaignClock=reconstructed.clock;}))notice='Aktualizováni účastníci kampaně.';
+ }catch(error){alert('Postavy nebyly změněny: '+error.message)}
+},true);
 document.addEventListener('click',e=>{
  const t=e.target.closest?.('[data-cal-day],[data-cal-hour],[data-cal-prefill],[data-cal-action],[data-cal-link],[data-cal-resolve],[data-cal-cancel]');
  if(!t)return;
@@ -6556,11 +6623,16 @@ document.addEventListener('submit',e=>{
   if(v.gmConfirmed!=='yes')throw Error('GM musí potvrdit skutečný čas');
   if(f.id==='campaign-start-form'){
    if(data.campaignClock)throw Error('Kalendář už existuje');
+   const memberIds=new FormData(f).getAll('characterId').filter(id=>data.characters.some(c=>c.id===id));
+   if(data.characters.length&&!memberIds.length)throw Error('Vyberte alespoň jednu postavu kampaně');
    let next=createCampaignCalendar({day:parse(v.day),hour:parse(v.hour),minute:parse(v.minute),label:v.label,
-    gmConfirmed:true,eventId:uuid()});
+    gmConfirmed:true,eventId:uuid(),campaignId:uuid(),characterIds:memberIds});
    if(v.setTR==='yes')next=setCampaignTROrigin(next,{year:parse(v.trYear),month:parse(v.trMonth),day:parse(v.trDay),eventId:uuid(),confirmed:true});
-   if(!window.confirm('Založit autoritativní kalendář '+displayCampaignMinute(next.minute)+'?'))return;
-   mutate(()=>{data.campaignClock=next;});return;
+   assertCompatibleLiveEffectTimeAxis(next,data.calendarEvidenceArchives??[],data.characters,memberIds,{identicalDayAxis:v.sameDayAxis==='yes'});
+   const restored=recoverCalendarEvidence(next,data.calendarEvidenceArchives??[],memberIds,{identicalDayAxis:v.sameDayAxis==='yes',idFactory:uuid});
+   next=restored.clock;validateCampaignCalendar(next);
+   if(!window.confirm('Založit kalendář '+displayCampaignMinute(next.minute)+' pro '+memberIds.length+' postav? Obnovené časové počátky: '+restored.recovered+'. Neurčitelné časy: '+restored.unmapped+'.'))return;
+   if(mutate(()=>{data.campaignClock=next;}))calendarUI=null;return;
   }
   if(!data.campaignClock)throw Error('Kalendář ještě nebyl založen');
   if(f.id==='campaign-advance-form'){
