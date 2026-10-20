@@ -109,6 +109,7 @@ import {availableSpellPsycheRecoveries,persistSpellPsycheRecoverySchedule,persis
 import {pendingSpellPsycheManifestations,persistSpellPsycheManifestation} from './src/integration/hmk-spell-psyche-manifestation.js';
 import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan} from './src/integration/hmk-calendar-planner.js';
 import {secureHMKDie,expeditionWatchFatigue,expeditionRestRecovery,commitExpeditionFatigue} from './src/integration/hmk-calendar-expedition.js';
+import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekHazards,trekEncounterCheck,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -173,7 +174,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.366';
+const APP_VERSION='93.367';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -223,6 +224,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
+ if(d?.journal)validateTrekkingJournalEvidence(d);
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
@@ -633,6 +635,30 @@ function campaignCalendarView(){
  if(!calendarUI)calendarUI=calendarInitialUI(clock);
  const selectedCalendarPeople=calendarMemberIds(clock,data.characters);
  const board=campaignCalendarBoardHTML({clock,characters:selectedCalendarPeople,journal:data.journal,ui:calendarUI,escapeHTML:esc});
+ const trekPanel=`<section class="hc-calendar hc-trek-routine"><h3>HMK · Trekking Routine: počasí, pohyb, nebezpečí a setkání</h3>
+ <p class="hc-hint">Pravidla HMK str. 141–150: počasí se určuje jednou za 24 hodin, srážky po čtyřhodinových hlídkách. Podklady pro další cestovní kroky se zaznamenají k vybrané postavě a konkrétní minutě; neprovádí se zde automatické zranění ani posun času. Orienteering, Cold/Heat Exposure a skutečný Encounter se vyhodnocují původními průvodci.</p>
+ <details><summary>Vyhodnotit cestovní hlídku – pravidlové podklady</summary><form id="campaign-trekking-context-form">
+ <div class="hc-fields"><label>Postava / průvodce<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+ <label>Oblast / označení trasy<input name="area" maxlength="90" required placeholder="Např. Východní les u Tashalu"></label>
+ <label>Roční období<select name="season"><option value="auto">Z data TR (je-li doloženo)</option>${[['spring','Jaro'],['summer','Léto'],['autumn','Podzim'],['winter','Zima']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
+ <label>Klimatické pásmo<select name="climate"><option value="subpolar">Subpolar</option><option value="cool" selected>Cool Temperate</option><option value="warm">Warm Temperate</option><option value="subtropical">Subtropical</option><option value="dry-tropical">Dry Tropical</option><option value="wet-tropical">Wet Tropical</option></select></label>
+ <label>Krajina<select name="landscape"><option value="flat">Flat</option><option value="rough">Rough / Hilly</option><option value="mountain">Mountainous</option></select></label>
+ <label>Terén / cesta<select name="terrain">${[['paved-road','Paved Road'],['unpaved-road','Unpaved Road'],['rural-track','Rural Track'],['wilderness-trail','Wilderness Trail'],['cropland-grassland','Cropland / Grassland'],['mixed-woodland','Mixed Woodland'],['cold-woodland','Cold Woodland'],['heath-moor','Heath / Moor'],['needleleaf-forest','Needleleaf Forest'],['mixed-forest','Mixed Forest'],['dunes','Dunes'],['wetlands','Wetlands'],['alpine-vegetation','Alpine Vegetation'],['ice-snow-rockfield','Ice / Snow / Rockfield']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
+ <label>Doprava<select name="conveyance"><option value="foot">Foot</option><option value="mount">Mount</option><option value="cart">Cart</option><option value="wagon">Wagon</option></select></label>
+ <label>Environ pro Encounter<select name="environ"><option value="highway">Highway</option><option value="rural">Rural</option><option value="wilderness">Wilderness</option><option value="underworld">Underworld</option></select></label>
+ <label>Progress Modes (doložené ze Survival SV)<input name="progress" type="number" min="0" max="10" value="0"></label>
+ <label>Slow Modes (včetně zranění, únavy a úkolů; srážky se přidají automaticky)<input name="slow" type="number" min="0" max="20" value="0"></label>
+ <label>Bearing Modes (doložené)<input name="bearing" type="number" min="0" max="20" value="0"></label>
+ <label>Starší nedoložené noční hlídky v divočině (volitelné, jinak automaticky)<input name="wildernessNightWatches" type="number" min="0" max="10000" placeholder="Automaticky z doložených hlídek"></label>
+ <label>Kostky<select name="diceOrigin"><option value="software">Automatické kryptografické hody</option><option value="manual">Ruční zápis (v pořadí: denní teplota, denní srážky, případné watch srážky, Progress, Direction, Encounter)</option></select></label>
+ <label>Ruční d10/d6 řada oddělená čárkami<input name="rolls" placeholder="Např. 4,2,1,7" maxlength="120"></label>
+ </div><label class="hc-check"><input name="night" type="checkbox" value="yes"> Noční watch</label>
+ <label class="hc-check"><input name="alpine" type="checkbox" value="yes"> Alpine Vegetation / Ice (−4 teplota)</label>
+ <label class="hc-check"><input name="aridDesert" type="checkbox" value="yes"> Arid Desert (zvláštní modifikátory)</label>
+ <label class="hc-check"><input name="loaded" type="checkbox" value="yes"> Loaded Mode</label>
+ <label class="hc-check"><input name="doubleTime" type="checkbox" value="yes"> Double Time (jen bez Slow/Loaded)</label>
+ <button type="submit">Vyhodnotit a uložit podklady (bez posunu času)</button></form>
+ <p class="tiny">Pokud vyjde Encounter, hazard či expozice, skutečné vyhodnocení otevřete v Combat / Skill Tests. Generování podkladů samo nezakládá zranění ani neprohlašuje následek za vyřízený.</p></details></section>`;
  const expeditionHTML=`<section class="hc-calendar hc-expedition"><h3>HMK · časově doložený odpočinek a únava během cesty</h3>
  <p class="hc-hint">HMK str. 62, 145–150, 176. Odpočinek provádí automatické snížení Windedness/Weariness. Jeden čtyřhodinový cestovní watch zapisuje Weariness a END Secondary Roll. <strong>Jde o časový/únavový díl Trekking Routine, nikoliv o náhradu chybějících testů Weather, Orienteering, Hazards a Encounter.</strong> Před cestováním nejprve vyhodnoťte tyto situace jejich pravidlovými průvodci.</p>
  <form id="campaign-expedition-form"><div class="hc-fields"><label>Postava<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
@@ -645,7 +671,7 @@ function campaignCalendarView(){
  const usedElsewhere=new Set();
  const memberRow=(c,checked)=>`<label class="hc-character"><input type="checkbox" name="characterId" value="${esc(c.id)}" ${checked?'checked':''}><span>${esc(c.name)}</span></label>`;
  const membersHTML=`<section class="hc-calendar hc-campaign-settings"><button type="button" class="hc-small" data-calendar-back="yes">‹ Všechny kalendáře</button><h3>Postavy kampaně · ${participants.length} zahrnutých</h3><p class="hc-hint">Stejnou postavu lze přidat do více kampaní. V každé se odděleně ukládají zranění, únava, časované magické účinky a inventář; původní datované události z jiného kalendáře se samy nepřesouvají.</p><form id="campaign-members-form"><fieldset><legend>Zahrnuté postavy</legend><div class="hc-characters">${data.characters.filter(c=>included.has(c.id)).map(c=>memberRow(c,true)).join('')||'<p>Bez účastníků</p>'}</div></fieldset><fieldset><legend>Nezahrnuté postavy · kliknutím přidat</legend><div class="hc-characters">${data.characters.filter(c=>!included.has(c.id)).map(c=>memberRow(c,false)).join('')||'<p>Všechny postavy již patří do kampaně.</p>'}</div></fieldset><button type="submit">Uložit účastníky kampaně</button></form><details><summary>Odstranění tohoto kalendáře</summary><p>Smazáním odstraníte jen tento kalendář a jeho GM události. Neaktivní kalendáře ani postavy se nemažou. Časové důkazy se zachovají.</p><button type="button" class="danger" data-calendar-delete="yes">Zálohovat a smazat tento kalendář</button></details></section>`;
- return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${membersHTML}${board}${expeditionHTML}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
+ return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${membersHTML}${board}${trekPanel}${expeditionHTML}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form><p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
  <section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Vyřešení probíhá v původním Combat / Healing průvodci; kalendář pouze hlídá čas, nerozhoduje o hodu ani nezapisuje paralelní Combat State.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
  <section class="panel"><h3>Následující termíny · ${agenda.future.length}</h3>${agenda.future.length?agenda.future.slice(0,100).map(renderItem).join(''):'<p class="muted">Žádná další doložená splatnost.</p>'}</section>
@@ -6510,6 +6536,81 @@ document.addEventListener('submit',e=>{
   notice='Nástup Psyche '+trait+' byl uložen do stavu postavy a její historie.';render();
  }catch(error){if(output?.isConnected)output.textContent=error.message;else alert(error.message)}
 },true);
+/** Environment stage of the printed Trekking Routine; ALL actual rolls and
+ * geography are in the journal, never guessed from modern date or location. */
+document.addEventListener('submit',e=>{
+ const form=e.target;if(form?.id!=='campaign-trekking-context-form')return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(!data.campaignClock||combatInitiativeSequence)throw Error('Vyžaduje aktivní kalendář bez běžící Initiative');
+  const v=Object.fromEntries(new FormData(form)),clock=data.campaignClock;
+  const actor=character(v.characterId);
+  if(!actor||(clock.characterIds&&!clock.characterIds.includes(actor.id)))throw Error('Postava není v této kampani');
+  const area=String(v.area||'').trim();if(!area||area.length>90)throw Error('Zadejte oblast trasy');
+  let season=v.season;
+  if(season==='auto'){
+   const tr=campaignTRDate(clock,clock.minute);
+   if(!tr||!Number.isSafeInteger(tr.month))throw Error('Nejdříve potvrďte datum TR, nebo ručně zvolte roční období');
+   season=trekSeasonFromMonth(tr.month);
+  }
+  const dayIndex=Math.floor(clock.minute/1440),campaignId=campaignKey(clock);
+  const previous=data.journal.find(j=>j.calendarCampaignId===campaignId&&j.calendarTrekProof?.area===area&&
+    j.calendarTrekProof?.dayIndex===dayIndex&&j.calendarTrekProof?.season===season&&j.calendarTrekProof?.climate===v.climate&&
+    j.calendarTrekProof?.landscape===v.landscape&&j.calendarTrekProof?.alpine===(v.alpine==='yes')&&
+    j.calendarTrekProof?.aridDesert===(v.aridDesert==='yes'))?.calendarTrekProof?.weatherDay;
+  const diceOrigin=v.diceOrigin==='manual'?'manual':'cryptographic-software-die';
+  let supplied=v.diceOrigin==='manual'?String(v.rolls||'').split(',').map(x=>x.trim()).filter(Boolean).map(Number):[];
+  let draw=(faces)=>{
+   if(diceOrigin!=='manual')return secureHMKDie(faces);
+   const n=supplied.shift();if(!Number.isSafeInteger(n)||n<1||n>faces)throw Error(`Chybí platný ruční hod d${faces} ve správném pořadí`);
+   return n;
+  };
+  const rolls=[];const die=(faces,label)=>{const value=draw(faces);rolls.push({faces,value,label,origin:diceOrigin});return value;};
+  const day=previous||trekWeatherDay({season,climate:v.climate,landscape:v.landscape,
+    alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',
+    temperatureD10:die(10,'Daily Temperature'),precipitationD10:die(10,'Daily Precipitation')});
+  const dayAlready=!!previous;
+  // For already proven daily weather, new d10s must NOT be rolled.
+  const precipitationD6=day.hasPrecipitation?die(6,'Precipitation per Watch'):null;
+  const wet=trekWeatherWatch(day,{night:v.night==='yes',precipitationD6,pavedRoad:v.terrain==='paved-road'});
+  const qty=(name,max)=>{const n=Number(v[name]);if(!Number.isSafeInteger(n)||n<0||n>max)throw Error('Neplatný počet '+name);return n;};
+  const progress=qty('progress',10),slow=qty('slow',20)+(wet.slowMode?1:0),bearing=qty('bearing',20);
+  // Progress dice require the original LPW. A zero-dice dry preview first
+  // yields the total remaining Progress allocation.
+  const spare=Math.max(0,progress-slow),progressD10=Array.from({length:spare},()=>die(10,'Progress')); 
+  const movement=trekMovement({topography:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
+    progress,slow,loaded:v.loaded==='yes',bearing,progressD10,continuousPrecipitation:wet.continuous,
+    doubleTime:v.doubleTime==='yes'});
+  const directionD10=Array.from({length:movement.bearingDeficit},()=>die(10,'Direction Hazard'));
+  const hazards=trekHazards({bearingDeficit:movement.bearingDeficit,directionD10});
+  const priorNightWatch=data.journal.find(j=>j.characterId===actor.id&&j.calendarCampaignId===campaignId&&
+    j.campaignMinute===clock.minute-240&&j.calendarTrekProof?.area===area&&
+    j.calendarTrekProof?.night===true&&j.calendarTrekProof?.modes?.environ==='wilderness');
+  const wildernessNightWatches=String(v.wildernessNightWatches??'').trim()!==''?
+    qty('wildernessNightWatches',10000):(priorNightWatch?.calendarTrekProof?.modes?.wildernessNightWatches??-1)+1;
+  const encounterDue=!(v.environ==='wilderness'&&v.night==='yes'&&wildernessNightWatches%2===0);
+  const encounter=trekEncounterCheck({environ:v.environ,night:v.night==='yes',
+    elapsedWildernessNightWatches:wildernessNightWatches,roll:encounterDue?die(10,'Random Encounter'):null});
+  if(supplied.length)throw Error('Ruční řada obsahuje nadbytečné hody. Nic nebylo uloženo.');
+  const unresolved=[...(wet.requiresWeatherHazardRoll?[`Weather Hazard: ${wet.hazard}`]:[]),
+    ...(hazards.direction?[`Direction Hazard: ${hazards.direction}`]:[]),
+    ...(encounter.encounter?['Random Encounter – nutné vyhodnocení']:[])];
+  const proof={format:'hmk-trekking-watch-evidence-v1',dayIndex,campaignMinute:clock.minute,area,
+    modes:{progress,slow,loaded:v.loaded==='yes',bearing,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
+     environ:v.environ,wildernessNightWatches},
+    season,climate:v.climate,landscape:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
+    night:v.night==='yes',alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',weatherDay:day,
+    dayAlready,weatherWatch:wet,movement,hazards,encounter,rolls,unresolved,sourcePages:[141,144,145,146,148,149,150]};
+  const summary=`${area} · ${season}/${v.climate} · ${wet.precipitation}${wet.continuous?' (continuous)':''}; `+
+   `den ${day.temperatureD10}/${day.precipitationD10}${dayAlready?' (doložené počasí)':''}; `+
+   `LPW ${movement.finalLPW}; ${movement.leagues} leagues; encounter ${encounter.checkDue?(encounter.encounter?'ANO':'ne'):'bez hodu'}`+
+   (unresolved.length?'; NAVAZUJÍCÍ PROCEDURY: '+unresolved.join(', '):'');
+  if(!window.confirm('Uložit cestovní podklady pro '+actor.name+'?\n'+summary+'\nŽádný zdravotní ani bojový následek se tím automaticky nevyřeší.'))return;
+  if(mutate(()=>{data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignId,
+   campaignMinute:clock.minute,createdAt:stamp(),title:'HMK Trekking Routine · počasí / pohyb / setkání',
+   body:summary,calendarTrekProof:proof});}))notice='Doložené podklady Trekking Routine byly zapsány ke konkrétnímu času. Rizika dokončete v příslušných testech.';
+ }catch(error){alert('Trekking Routine nebyla uložena: '+error.message)}
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(form?.id!=='campaign-expedition-form')return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -6528,6 +6629,18 @@ document.addEventListener('submit',e=>{
   const duration=kind==='winded'?10:kind==='rest'?240:kind==='sleep'?480:240;
   const count=kind.startsWith('double-')?4:1;
   const travel=!['winded','rest','sleep'].includes(kind);
+  // Attach only a preparation for this same actor, campaign and START minute.
+  // Old fatigue records without a Trekking Routine preparation remain valid.
+  const trekSource=travel?[...data.journal].reverse().find(j=>j.characterId===actor.id&&
+    j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===start&&j.calendarTrekProof):null;
+  const prepared=trekSource?.calendarTrekProof;
+  if(prepared){
+   const allowed=kind==='walk'||kind==='double-walk'?prepared.conveyance==='foot':
+    kind==='ride'?prepared.conveyance==='mount':kind==='drive'?['cart','wagon'].includes(prepared.conveyance):
+    kind==='double-drover'?['mount','cart','wagon'].includes(prepared.conveyance):false;
+   if(!allowed||prepared.modes.doubleTime!==kind.startsWith('double-'))
+    throw Error('Neshoda mezi doloženou Trekking Routine a skutečným způsobem pohybu');
+  }
   let origin='none',plan;
   if(travel){
    const endurance=actor.hmk?.attributes?.end;
@@ -6538,13 +6651,15 @@ document.addEventListener('submit',e=>{
     if(rolls.length!==count||rolls.some(x=>!Number.isSafeInteger(x)||x<1||x>10))throw Error('Zadejte '+count+' platný hod(y) d10');
     origin='manual';
    }else{rolls=Array.from({length:count},()=>secureHMKDie(10));origin='cryptographic-software-die';}
-   plan={...expeditionWatchFatigue({mode:kind,endurance,rolls}),kind:'travel'};
+   plan={...expeditionWatchFatigue({mode:kind,endurance,rolls}),kind:'travel',
+    ...(prepared?{trekSourceId:trekSource.id,travelledLeagues:prepared.movement.leagues,
+     travelledKilometres:prepared.movement.kilometres}:{} )};
   }else{
    const state=persistentStateOf(actor),claims=actor.hmk?.expedition?.claims||{};
    plan=expeditionRestRecovery({minute:start,kind,current:kind==='winded'?state.fatigue.windedness:state.fatigue.weariness,claims});
   }
   const next=advanceCampaignCalendar(clock,{deltaMinutes:duration,eventId:uuid(),reason:'HMK · '+kind+' · '+actor.name,gmConfirmed:true,characters:data.characters,journal:data.journal});
-  const note=travel?'END SR: '+plan.rolls.map(r=>r.roll+' / TN '+r.tn+' ('+(r.success?'S':'F')+')').join(' · ')+'. Změna Weariness +'+plan.accrual:'Obnova únavy −'+plan.recovered;
+  const note=travel?'END SR: '+plan.rolls.map(r=>r.roll+' / TN '+r.tn+' ('+(r.success?'S':'F')+')').join(' · ')+'. Změna Weariness +'+plan.accrual+(prepared?'; potvrzená trasa '+plan.travelledLeagues+' league; podklady '+trekSource.id+(prepared.unresolved.length?'; NEVYŘEŠENÁ RIZIKA: '+prepared.unresolved.join(', '):''):''):'Obnova únavy −'+plan.recovered;
   if(!window.confirm('Potvrdit '+actor.name+' · '+kind+' ('+duration+' minut)? '+note+' Plynutí času se týká celé kampaně.'))return;
   const evidenceId=uuid(),rowId=uuid();
   if(mutate(()=>{
