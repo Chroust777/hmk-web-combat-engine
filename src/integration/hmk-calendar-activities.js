@@ -32,10 +32,19 @@ export function interruptHMKActivity({journal=[],clock,activityId,reason,id,crea
  const p={format:STOP,activityId:source.id,characterId:activity.characterId,
   campaignId:activeClockKey(clock),startMinute:activity.startMinute,
   minute:clock.minute,elapsedMinutes:Math.max(0,clock.minute-activity.startMinute),
-  reason:reason.trim(),awardFatigue:false};
+  reason:reason.trim(),awardFatigue:false,
+  ...(activity.plan.kind==='travel'&&Number.isFinite(activity.plan.travelledLeagues)&&Number.isFinite(activity.plan.travelledKilometres)?{
+   // Printed short-trek ratio p.146: provisional distance only. END SR is
+   // NEVER prorated from a four-hour test or awarded for an incomplete watch.
+   projectedShortTravel:{format:'hmk-interrupted-short-trek-v1',
+    elapsedMinutes:Math.max(0,clock.minute-activity.startMinute),
+    projectedLeagues:Math.round(activity.plan.travelledLeagues*Math.max(0,clock.minute-activity.startMinute)/activity.durationMinutes*1000)/1000,
+    projectedKilometres:Math.round(activity.plan.travelledKilometres*Math.max(0,clock.minute-activity.startMinute)/activity.durationMinutes*1000)/1000,
+    confirmedDistance:false,sourcePage:146}}:{})};
  return {id,createdAt,characterId:source.characterId,calendarCampaignId:source.calendarCampaignId,
   campaignMinute:clock.minute,title:'HMK · přerušeno · '+activity.kind+' · '+activity.name,
-  body:'Přerušeno: '+reason.trim()+'. Nedokončená činnost nepřiznává automatickou obnovu ani cestovní únavu. Nedokončené následky je nutné vyhodnotit podle pravidel.',
+  body:'Přerušeno: '+reason.trim()+'. Nedokončená činnost nepřiznává automatickou obnovu ani cestovní únavu. Nedokončené následky je nutné vyhodnotit podle pravidel.'+
+   (p.projectedShortTravel?' Orientační vzdálenost při nepřetržitém tempu '+p.projectedShortTravel.projectedLeagues+' leagues; skutečná trasa není automaticky potvrzena.':''),
   calendarActivityInterruptProof:p};
 }
 export function scheduleHMKActivity({journal=[],clock,characterId,name='',kind,plan,id,origin='none'}={}){
@@ -52,10 +61,15 @@ export function scheduleHMKActivity({journal=[],clock,characterId,name='',kind,p
   check(endMinute<=a.startMinute||startMinute>=a.endMinute,
    'Postava '+(name||characterId)+' už má v této době naplánovanou činnost ('+a.kind+').');
  }
- check(!journal.some(row=>row.calendarExpeditionProof?.trekSourceId&&row.calendarExpeditionProof.trekSourceId===plan.trekSourceId&&plan.trekSourceId),
-  'Cestovní hlídka byla už vyhodnocena.');
- check(!plannedHMKActivities(journal,campaignId).some(row=>row.calendarActivityProof?.plan?.trekSourceId&&plan.trekSourceId&&row.calendarActivityProof.plan.trekSourceId===plan.trekSourceId),
-  'Cestovní hlídka je již naplánována.');
+ // A guide's single authenticated Trekking watch is shared by the party,
+ // but each traveler owns independent END dice, fatigue and completion.
+ // A second group cannot reuse that watch; a second member of the SAME group can.
+ const sameSource=journal.filter(row=>plan.trekSourceId&&(
+  row.calendarActivityProof?.plan?.trekSourceId===plan.trekSourceId||
+  row.calendarExpeditionProof?.trekSourceId===plan.trekSourceId));
+ check(!sameSource.some(row=>row.characterId===characterId||
+  !plan.travelGroup||row.calendarActivityProof?.plan?.travelGroup?.id!==plan.travelGroup.id),
+  'Cestovní hlídka už byla vyhodnocena nebo patří jinému plánování.');
  const activity={format:F,id,characterId,name,kind,startMinute,endMinute,durationMinutes:plan.durationMinutes,origin,plan:structuredClone(plan)};
  return {id,characterId,calendarCampaignId:campaignId,campaignMinute:startMinute,
   title:'HMK · '+kind+' · '+name,
@@ -143,6 +157,40 @@ export function validateHMKActivityEvidence(journal=[]){
    'Poškozený časový interval činnosti');
   check(!ids.has(a.id),'Duplicitní činnost');ids.add(a.id);
  }
+ // Audit every group as one atomic, time-synchronous watch. Never accept a
+ // partial group or a fabricated additional passenger in imported evidence.
+ const groups=new Map(),travelWatchOwners=new Map();
+ for(const row of journal){
+  const a=row.calendarActivityProof,g=a?.plan?.travelGroup;
+  if(a?.plan?.trekSourceId){
+   const id=a.plan.trekSourceId,owner=g?.id??'solo:'+row.id;
+   check(!travelWatchOwners.has(id)||travelWatchOwners.get(id)===owner,
+    'Jedna doložená cestovní hlídka nesmí být použita dvěma nezávislými skupinami');
+   travelWatchOwners.set(id,owner);
+  }
+  if(!g)continue;
+  const trek=all.get(a.plan.trekSourceId),skill=all.get(a.plan.orienteeringId);
+  check(trek?.calendarTrekProof?.format==='hmk-trekking-watch-evidence-v1'&&
+   trek.characterId===g.guideId&&trek.calendarCampaignId===row.calendarCampaignId&&
+   trek.campaignMinute===a.startMinute&&
+   skill?.calendarTrekSkillSource?.sourceId===trek.id&&
+   skill.calendarTrekSkillSource.hazard==='survival'&&
+   skill.characterId===g.guideId&&skill.calendarCampaignId===row.calendarCampaignId,
+   'Skupinový průvodce nemá vlastní původní Trekking/Survival důkazy');
+  check(a.plan.kind==='travel'&&g.format==='hmk-group-watch-v1'&&typeof g.id==='string'&&g.id&&
+   typeof g.guideId==='string'&&Array.isArray(g.memberIds)&&g.memberIds.length>=1&&
+   g.memberIds.length===new Set(g.memberIds).size&&g.memberIds.includes(a.characterId)&&
+   g.memberIds.includes(g.guideId)&&typeof a.plan.trekSourceId==='string'&&
+   typeof a.plan.orienteeringId==='string','Poškozený skupinový cestovní důkaz');
+  const signature=JSON.stringify([g,row.calendarCampaignId,a.startMinute,a.endMinute,
+   a.plan.trekSourceId,a.plan.orienteeringId,a.plan.mode]);
+  if(!groups.has(g.id))groups.set(g.id,{signature,members:new Set(),expected:g.memberIds});
+  const grp=groups.get(g.id);
+  check(grp.signature===signature&&!grp.members.has(a.characterId),'Nesoulad členů a časů skupinové cesty');
+  grp.members.add(a.characterId);
+ }
+ for(const group of groups.values())check(group.members.size===group.expected.length&&
+  group.expected.every(id=>group.members.has(id)), 'Skupinová cesta musí být uložena pro všechny vybrané postavy najednou');
  const stopped=new Set(),finished=new Set();
  for(const row of journal){const p=row.calendarActivityInterruptProof;if(!p)continue;
   const source=all.get(p.activityId),a=source?.calendarActivityProof;
@@ -150,13 +198,21 @@ export function validateHMKActivityEvidence(journal=[]){
    p.campaignId===source.calendarCampaignId&&row.calendarCampaignId===source.calendarCampaignId&&
    min(p.minute)&&p.minute===row.campaignMinute&&p.minute<a.endMinute&&
    p.startMinute===a.startMinute&&p.elapsedMinutes===Math.max(0,p.minute-a.startMinute)&&
-   p.awardFatigue===false&&typeof p.reason==='string'&&p.reason.length>=3&&!stopped.has(p.activityId),
+   p.awardFatigue===false&&(!p.projectedShortTravel||(
+    p.projectedShortTravel.format==='hmk-interrupted-short-trek-v1'&&
+    p.projectedShortTravel.confirmedDistance===false&&
+    p.projectedShortTravel.elapsedMinutes===p.elapsedMinutes&&
+    a.plan.kind==='travel'&&
+    p.projectedShortTravel.projectedLeagues===Math.round(a.plan.travelledLeagues*p.elapsedMinutes/a.durationMinutes*1000)/1000&&
+    p.projectedShortTravel.projectedKilometres===Math.round(a.plan.travelledKilometres*p.elapsedMinutes/a.durationMinutes*1000)/1000))&&
+   typeof p.reason==='string'&&p.reason.length>=3&&!stopped.has(p.activityId),
    'Přerušení činnosti nemá jednoznačný platný zdroj');
   stopped.add(p.activityId);
  }
  for(const row of journal){const p=row.calendarExpeditionProof;if(!p?.activityId)continue;
   const source=all.get(p.activityId),a=source?.calendarActivityProof;
-  check(a&&a.characterId===row.characterId&&source.calendarCampaignId===row.calendarCampaignId&&a.endMinute===row.campaignMinute&&p.campaignMinute===row.campaignMinute&&!finished.has(p.activityId)&&!stopped.has(p.activityId),
+  check(a&&a.characterId===row.characterId&&source.calendarCampaignId===row.calendarCampaignId&&a.endMinute===row.campaignMinute&&p.campaignMinute===row.campaignMinute&&!finished.has(p.activityId)&&!stopped.has(p.activityId)&&
+   (!a.plan.travelGroup||JSON.stringify(p.travelGroup)===JSON.stringify(a.plan.travelGroup)),
    'Výsledek činnosti nemá jednoznačný správný zdroj');
   finished.add(p.activityId);
  }

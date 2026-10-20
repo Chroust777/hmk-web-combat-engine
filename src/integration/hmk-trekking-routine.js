@@ -168,8 +168,12 @@ export function validateTrekkingJournalEvidence(document){
  for(const entry of document?.journal??[]){
   const e=entry.calendarExpeditionProof;if(!e?.trekSourceId)continue;
   const source=byId.get(e.trekSourceId),p=source?.calendarTrekProof;
-  assert(p&&p.format==='hmk-trekking-watch-evidence-v1'&&
-   source.characterId===entry.characterId&&source.calendarCampaignId===entry.calendarCampaignId&&
+  const group=e.travelGroup;
+  const validPartyMember=source?.characterId===entry.characterId||
+   (group?.format==='hmk-group-watch-v1'&&group.guideId===source?.characterId&&
+    group.memberIds?.includes(entry.characterId));
+  assert(p&&p.format==='hmk-trekking-watch-evidence-v1'&&validPartyMember&&
+   source.calendarCampaignId===entry.calendarCampaignId&&
    source.campaignMinute+e.durationMinutes===entry.campaignMinute&&
    e.travelledLeagues===(p.effectiveMovement??p.movement).leagues&&e.travelledKilometres===(p.effectiveMovement??p.movement).kilometres,
    'Cestovní únava nemá doloženou stejnou trasu, kampaň a čas');
@@ -182,7 +186,7 @@ export function validateTrekkingJournalEvidence(document){
    const selected=p.modes?.progress+p.modes?.bearing;
    const stars=Number.isSafeInteger(test?.sv)?Math.max(0,Math.min(5,test.sv-4)):NaN;
    assert(roll&&link?.format==='hmk-trek-linked-skill-v1'&&link.hazard==='survival'&&
-    link.sourceId===source.id&&roll.characterId===entry.characterId&&
+    link.sourceId===source.id&&roll.characterId===source.characterId&&
     roll.calendarCampaignId===entry.calendarCampaignId&&
     Number.isSafeInteger(roll.campaignMinute)&&roll.campaignMinute>=source.campaignMinute&&
     roll.campaignMinute<=entry.campaignMinute&&

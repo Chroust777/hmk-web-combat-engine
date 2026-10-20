@@ -71,7 +71,8 @@ export function commitExpeditionFatigue(actor,plan,minute,origin,sourceId){
  if(plan.claimKey&&plan.recovered>0)expedition.claims[plan.claimKey]=minute-plan.durationMinutes;
  const evidence={format:'hmk-expedition-time-v1',kind:plan.kind,sourceId,campaignMinute:minute,
   durationMinutes:plan.durationMinutes,origin,priorFatigue:before,finalFatigue:after,
-  ...(plan.trekSourceId?{trekSourceId:plan.trekSourceId,orienteeringId:plan.orienteeringId,travelledLeagues:plan.travelledLeagues,travelledKilometres:plan.travelledKilometres}:{}),
+  ...(plan.trekSourceId?{trekSourceId:plan.trekSourceId,orienteeringId:plan.orienteeringId,travelledLeagues:plan.travelledLeagues,travelledKilometres:plan.travelledKilometres,
+   ...(plan.travelGroup?{travelGroup:structuredClone(plan.travelGroup)}:{})}:{}),
   delta,sourcePages:plan.sourcePages,physicalDice:(plan.rolls??[]).map(r=>({faces:10,value:r.roll,origin})),
   ...(plan.mode?{travelMode:plan.mode,endSR:plan.rolls.map(r=>({tn:r.tn,roll:r.roll,success:r.success}))}:{})};
  return evidence;
