@@ -144,6 +144,7 @@ import {verifyMandatoryHandoff,mandatoryFormWitness} from './src/integration/hmk
 import {prepareSheetCombatAction,confirmSheetCombatAction,combatMishapClosure} from './src/integration/hmk-combat-action-link.js';
 import {guidedTraumaCourseReadiness,createGuidedTraumaCourse,guidedTraumaCourseRequirement,submitGuidedTraumaCourseDie,commitGuidedTraumaCourse} from './src/integration/hmk-guided-trauma-course.js';
 import {createGuidedBloodStoppage,guidedBloodStoppageRequirement,submitGuidedBloodStoppageDie,commitGuidedBloodStoppage} from './src/integration/hmk-guided-blood-stoppage.js';
+import {coagulantBleedingEvidence} from './src/integration/hmk-herbal-bleeding-bridge.js';
 import {bloodCohortRef,validateGuidedBloodCohort} from './src/integration/hmk-guided-blood-cohort.js';
 import {guidedMoraleReactionReadiness,resolveGuidedMoraleReaction} from './src/integration/hmk-guided-morale-reaction.js';
 import {guidedRallyReadiness,resolveGuidedRally,resolveGuidedRallyReaction} from './src/integration/hmk-guided-rally.js';
@@ -197,7 +198,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.395';
+const APP_VERSION='93.396';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -828,12 +829,13 @@ function campaignCalendarView(){
  <input type="hidden" name="completeId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(p.actorId)}"><input type="hidden" name="method" value="${method}">
  <label>${needsWound?'Zranění příjemce':'Příjemce'}<select name="targetRef" required>${targets.map(t=>`<option value="${esc(t.ref)}">${esc(t.label)}</option>`).join('')}</select></label>
  ${p.herbType==='hallucinogenic'?'<label>Podání<select name="methodOverride"><option value="ingested">Požití</option><option value="smoked">Kouř</option></select></label>':''}
+ ${p.herbType==='coagulant'?'<label class="hc-check"><input type="checkbox" name="combatAnchorConfirmed" required> GM potvrzuje, že aktuální bojové kolo a kalendářní minuta označují stejný okamžik (pro následné Blood Loss hody)</label>':''}
  <label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečné podání této dávky</label>
  <button type="submit" ${targets.length?'':'disabled'}>Podat jednu dávku (bez posunu času)</button></form>`;
  }).join('')||'<p class="hc-hint">Žádný účinný, dosud nepodaný lektvar.</p>'}
- ${appliedPotions.slice(-15).map(j=>{const p=j.calendarHerbPotionAdminister,e=herbPotionEffectAt(p,clock.minute);return `<p class="hc-hint">${esc(p.herbType)} → ${esc(character(p.targetId)?.name||p.targetId)}${p.woundId?' · rána '+esc(p.woundId):''} · původní bonus ${p.bonus} · ${esc(e.status)}${e.status==='active'?' · nyní '+e.bonus:''} · ${p.herbType==='curative'?'bonus se automaticky načte při příštím Healing/Infection hodu dané rány':'další hod zůstává v příslušném původním modulu'}; důkaz ${esc(j.id)}</p>`}).join('')}
+ ${appliedPotions.slice(-15).map(j=>{const p=j.calendarHerbPotionAdminister,e=herbPotionEffectAt(p,clock.minute);return `<p class="hc-hint">${esc(p.herbType)} → ${esc(character(p.targetId)?.name||p.targetId)}${p.woundId?' · rána '+esc(p.woundId):''} · původní bonus ${p.bonus} · ${esc(e.status)}${e.status==='active'?' · nyní '+e.bonus:''} · ${p.herbType==='curative'?'bonus se automaticky načte při příštím Healing/Infection hodu dané rány':p.herbType==='coagulant'?'bonus se ověří při Blood Loss Strength d100, pouze při souhlasu bojových kol s minutou GM':'další hod zůstává v příslušném původním modulu'}; důkaz ${esc(j.id)}</p>`}).join('')}
 
- <p class="hc-hint">Podání všech 12 druhů je doložitelné. Curative se u přesně doložené rány automaticky započte do původních Injury Healing a Infection Course hodů; ostatní návazné účinky, včetně Coagulant, dosud nejsou automaticky vyhodnoceny. Bylinné dávky zatím nemají doloženou hmotnost nádoby. Nedokončeno: mundánní receptury a Alchemy 267–268.</p>
+ <p class="hc-hint">Podání všech 12 druhů je doložitelné. Curative ovlivňuje Healing a Infection; Coagulant ovlivňuje původní Strength Blood Loss d100 v ověřeném bojovém intervalu. Ostatní účinky dosud nejsou automaticky vyhodnoceny. Bylinné dávky zatím nemají doloženou hmotnost nádoby. Nedokončeno: mundánní receptury a Alchemy 267–268.</p>
  </details></section>`;
  const wildernessHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>Wilderness Tasks · Foraging / Stalking / Vigilance (HMK 147) · ${forageRows.length} k doložení</summary>
  <p class="hc-hint">Foraging: jeden d10 za každý skutečně potvrzený režim, podle okolního biotopu a sezóny. Nalezené jídlo/voda/byliny jsou nejprve účetním časovým důkazem (nikoli nezdokumentovanou fyzickou položkou inventáře). Stalking zpřístupňuje Tracking ve Skill Workbench. Stalking/Vigilance se zachovávají pro vyhodnocení překvapení během Encounter; bez doložené procedury se nepřiděluje fiktivní bonus.</p>
@@ -4398,6 +4400,7 @@ function continueGuidedAttack(){
       guidedAttackAftermath=createGuidedMandatory({state:guidedAttackCandidate.state,character:target,
        round:guidedAttackSession.round,eventId:uuid(),actorId:combatClock.actorId,
        turnEnded:false,timelineId:combatInjuryTimelineId,abe,
+       herbalContext:activeCoagulantContext(),
        mishapTechnique:guidedAttackAftermathTechnique||'attribute',
        mishapContext:{actionUsesDEX:guidedAttackSession.hitSession.targetId===guidedAttackSession.attackerId||
         (guidedAttackSession.kind==='melee'&&['block','counterstrike'].includes(String(guidedAttackSession.meleeSession?.defence).toLowerCase()))}});
@@ -4406,7 +4409,7 @@ function continueGuidedAttack(){
      const target=character(guidedAttackSession.hitSession.targetId);
      const out=commitGuidedMandatory({session:guidedAttackAftermath,state:guidedAttackCandidate.state,
       character:target,round:guidedAttackSession.round,actorId:combatClock.actorId,
-      turnEnded:false,timelineId:combatInjuryTimelineId,elapsedMinutesSinceOriginal:null});
+      turnEnded:false,timelineId:combatInjuryTimelineId,elapsedMinutesSinceOriginal:null,herbalContext:activeCoagulantContext()});
      guidedAttackCandidate={...guidedAttackCandidate,state:out.state};
      guidedAttackAftermath=null;guidedAttackAftermathTechnique=null;
      continue;
@@ -4635,6 +4638,11 @@ function continueGuidedTrauma(){
   writeGuidedDraft();render();
  }catch(error){guidedAttackLastOutcome='Trauma Course: '+error.message;writeGuidedDraft();render();}
 }
+function activeCoagulantContext(){
+ const clock=data.campaignClock;
+ if(!clock)return null;
+ return {journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute};
+}
 function continueGuidedBlood(){
  if(!guidedBloodSession)return;
  try{
@@ -4645,7 +4653,8 @@ function continueGuidedBlood(){
   if(!patient||!healer)throw Error('Léčitel nebo pacient není dostupný');
   const result=commitGuidedBloodStoppage({session,round:combatClock.round,
    timelineId:combatInjuryTimelineId,healer,patient,
-   patientState:persistentStateOf(patient),healerState:persistentStateOf(healer)});
+   patientState:persistentStateOf(patient),healerState:persistentStateOf(healer),
+   herbalContext:activeCoagulantContext()});
   const saveResult=mutate(()=>{
    if(data.journal.some(j=>j.combatProof?.sourceEventId===session.id))throw Error('Duplicitní Blood Stoppage');
    const cohort=checkGuidedBloodCohort({healerId:healer.id,memberRefs:session.cohortMembers,
@@ -7159,7 +7168,12 @@ document.addEventListener('submit',e=>{
    if(type==='curative'&&(wound.area||wound.healing?.area))throw Error('Area Injury podle HMK 75 vyžaduje pět skutečných dávek; jednorázové podání není přípustné.');
   }
   const proof=createHerbPotionAdministration({journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,
-   actorId,completeId:String(fd.get('completeId')),targetId,method,woundId,gmConfirmed:!!fd.get('gmConfirmed'),memberIds});
+   actorId,completeId:String(fd.get('completeId')),targetId,method,woundId,gmConfirmed:!!fd.get('gmConfirmed'),memberIds,
+   combatAnchor:type==='coagulant'?(()=>{
+    if(!fd.get('combatAnchorConfirmed')||!encounterSelection.has(targetId))
+     throw Error('Coagulant: GM musí potvrdit současnou bojovou časovou osu a účast pacienta ve střetnutí');
+    return {confirmedByGM:true,round:combatClock.round,campaignMinute:clock.minute,timelineId:combatInjuryTimelineId};
+   })():null});
   if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
    createdAt:stamp(),title:'HMK 75 · podání bylinného lektvaru',body:'Doložené podání bez posunu GM času. Následné testy řeší příslušný původní modul.',calendarHerbPotionAdminister:proof})))
    notice='Podání zapsáno s pravidlovým původem. Následný zdravotní hod zatím není automaticky vyhodnocen.';
@@ -8161,6 +8175,11 @@ document.addEventListener('submit',e=>{
    const raw=String(v.wound||'');const separator=raw.indexOf('::');if(separator<1)throw Error('Neplatné ID krvácení');
    c=character(raw.slice(0,separator));if(!c||!encounterSelection.has(c.id))throw Error('Postava není účastníkem střetnutí');
    const woundId=raw.slice(separator+2);
+   // The legacy form accepts only a self-reported SL, not the physical d100.
+   // Never let it silently bypass a proven active Coagulant modifier.
+   if(activeCoagulantContext()){const hp=coagulantBleedingEvidence({...activeCoagulantContext(),targetId:c.id,
+    woundId,combatRound:round,timelineId:combatInjuryTimelineId});
+    if(hp.bonus>0)throw Error('Coagulant: použijte povinný průvodce se skutečným Strength d100, nikoli ruční SL.');}
    transition=f.id==='combat-blood-loss-form'?applyConfirmedBloodLoss({state:persistentStateOf(c),round,eventId,woundId,sl:v.sl}):applyConfirmedBloodStoppage({state:persistentStateOf(c),round,eventId,woundId,sl:v.sl,advanceSL:v.advanceSL||null});
   }else{
    c=character(v.characterId);if(!c||!encounterSelection.has(c.id))throw Error('Postava není účastníkem střetnutí');
@@ -8330,7 +8349,7 @@ document.addEventListener('submit',e=>{
    healer,healerState:persistentStateOf(healer),woundId:v.woundId,method:v.method,
    hasBandage:v.hasBandage==='yes',hasWater:v.hasWater==='yes',
    hasNeedleThread:v.hasNeedleThread==='yes',hasHeatedTool:v.hasHeatedTool==='yes',
-   tourniquet:v.tourniquet==='yes',plannedBleeders:cohort.plannedBleeders});
+   tourniquet:v.tourniquet==='yes',plannedBleeders:cohort.plannedBleeders,herbalContext:activeCoagulantContext()});
   guidedBloodSession.cohortMembers=cohort.members;
   guidedBloodSession.cohortId=cohort.cohortId;
   guidedAttackLastOutcome=`Blood Stoppage · Physician EML ${guidedBloodSession.context.physicianEML}. Zadejte skutečný d100.`;
@@ -8384,6 +8403,7 @@ document.addEventListener('submit',e=>{
    }
   }
   let session=createGuidedMandatory({...context,state:persistentStateOf(c),eventId:uuid(),
+   herbalContext:activeCoagulantContext(),
    mishapContext,mishapTechnique,
    abe:pending?.kind==='injury-morale'&&documentedInjuryMoraleAberrance(c,pending.id)!==null?documentedInjuryMoraleAberrance(c,pending.id):parseOptional('abe'),comaLocationShock:parseOptional('comaLocationShock'),comaInjuryLevel:parseOptional('comaInjuryLevel')});
   if(session.event.kind!==bridge.event.kind||session.event.id!==bridge.event.id)
@@ -8395,7 +8415,7 @@ document.addEventListener('submit',e=>{
    if(answer===null)return; // Cancellation never commits a partial action.
    session=submitGuidedMandatoryDie(session,answer);
   }
-  const result=commitGuidedMandatory({session,state:persistentStateOf(c),...context});
+  const result=commitGuidedMandatory({session,state:persistentStateOf(c),...context,herbalContext:activeCoagulantContext()});
   const seqBefore=combatInitiativeSequence?liveInitiativeSequence():null;
   const candidateStates=seqBefore?.pendingEndTurnAction?.actorId===c.id?
    {...combatSequenceStates(),[c.id]:result.state}:null;
