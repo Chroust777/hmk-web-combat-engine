@@ -1,5 +1,6 @@
 import {TR_MONTHS,campaignTRDate,formatTRDate,gmCalendarAgenda,campaignSunsignForDate} from './hmk-calendar-planner.js';
 import {displayCampaignMinute,campaignCalendarAgenda} from './hmk-campaign-calendar.js';
+import {passiveHMKCalendarMilestones} from './hmk-calendar-campaign-lifecycle.js';
 const pad=(x)=>String(x).padStart(2,'0');
 const dayNumber=(m)=>Math.floor(m/1440)+1;
 const minDay=(n)=>Math.max(1,Math.min(n,694444));
@@ -26,12 +27,12 @@ function shortTime(m){return `${pad(Math.floor((m%1440)/60))}:${pad(m%60)}`;}
 function eventMark(p){return p.status==='resolved'?'✓':p.status==='cancelled'?'×':p.status==='due'?'!':'•';}
 function eventName(p){return p.title||p.description||'Událost';}
 function eventDestination(p){return p.destination==='healing'?'Healing · Combat':p.destination==='skills'?'Skill Tests':p.destination==='combat'?'Combat':p.destination==='inventory'?'Arsenal & Gear':p.destination==='hazards'?'Nebezpečí / Trauma':'Deník postavy';}
-function issueAction(p,esc){const id=esc(p.id),isRule=p.origin==='hml';
+function issueAction(p,esc){if(p.origin==='passive')return '<span class="hc-soft">Automatická časová změna · bez hodu</span>';const id=esc(p.id),isRule=p.origin==='hml';
  return `${p.characterId?`<button type="button" class="hc-small" data-cal-link="${esc(p.characterId)}" data-cal-destination="${esc(p.destination||'healing')}" data-cal-kind="${esc(p.kind||'gm')}" data-cal-source="${esc(p.sourceId||p.woundId||'')}" data-cal-elapsed="${esc(p.elapsedMinutes??'')}">Otevřít ${esc(eventDestination(p))} ↗</button>`:(!isRule?`<span class="hc-soft">${esc(p.place||'Celá kampaň')}</span>`:'')}
  ${!isRule&&!p.resolution?`<button type="button" class="hc-small" data-cal-resolve="${id}">GM: vyřídit</button><button type="button" class="hc-small" data-cal-cancel="${id}">Zrušit</button>`:''}`;
 }
 function renderAgendaEntry(p,esc,clock){
- const type=p.origin==='hml'?'HMK · vyžaduje pravidlový průvodce':p.requiresAction?'GM · čeká na rozhodnutí':'GM · událost';
+ const type=p.origin==='passive'?'HMK · automatický konec časového účinku':p.origin==='hml'?'HMK · vyžaduje pravidlový průvodce':p.requiresAction?'GM · čeká na rozhodnutí':'GM · událost';
  return `<article class="hc-entry ${p.status==='due'?'hc-entry--due':''} ${p.resolution?'hc-entry--done':''}"><div class="hc-entry-head"><strong>${esc(eventName(p))}</strong><span>${esc(displayCampaignMinute(p.dueMinute))}</span></div>
  <p class="hc-annotation">${esc(type)}${p.characterId&&p.name?' · '+esc(p.name):''}${p.place?' · '+esc(p.place):''}${p.woundId?' · rána '+esc(p.woundId):''}</p>
  ${p.note?`<p>${esc(p.note)}</p>`:''}${p.endMinute>p.minute?`<p class="hc-annotation">Trvání: ${esc(displayCampaignMinute(p.minute))} → ${esc(displayCampaignMinute(p.endMinute))}</p>`:''}
@@ -39,7 +40,7 @@ function renderAgendaEntry(p,esc,clock){
 }
 export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,escapeHTML}={}){
  const esc=escapeHTML,agenda=campaignCalendarAgenda(clock,characters,journal),custom=gmCalendarAgenda(clock);
- const all=[...agenda.all.map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:['poison','disease','asphyxia','sleep-deprivation'].includes(p.kind)?'hazards':p.route==='skills'?'skills':p.route==='hazards'?'hazards':['treatment','healing','infection','grim','blood-loss','coma','extended-shock'].includes(p.kind)?'healing':'combat'})),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
+ const all=[...agenda.all.map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:['poison','disease','asphyxia','sleep-deprivation'].includes(p.kind)?'hazards':p.route==='skills'?'skills':p.route==='hazards'?'hazards':['treatment','healing','infection','grim','blood-loss','coma','extended-shock'].includes(p.kind)?'healing':'combat'})),...passiveHMKCalendarMilestones(clock,characters),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
  all.sort((a,b)=>a.dueMinute-b.dueMinute||a.id.localeCompare(b.id));
  const currentSign=campaignSunsignForDate(campaignTRDate(clock,clock.minute));
  const today=dayNumber(clock.minute),selected=minDay(ui.dayNumber),currentTime=shortTime(clock.minute),month=monthDetails(clock,ui.monthShift);
@@ -80,7 +81,7 @@ export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,esc
   ${agenda.unknown.length?`<details><summary>Nedoložené nebo blokující procedury (${agenda.unknown.length})</summary>${agenda.unknown.map(x=>`<p class="hc-warning">${esc(x.name)} · ${esc(x.description)} — ${esc(x.reason)}</p>`).join('')}</details>`:''}
   <details open><summary>Ke zpracování / čeká na hod (${all.filter(p=>p.status==='due').length})</summary><div class="hc-event-list">${all.filter(p=>p.status==='due').map(p=>renderAgendaEntry(p,esc,clock)).join('')||'<p>Žádné splatné události.</p>'}</div></details>
   <details><summary>Budoucí události (${all.filter(p=>p.status==='future').length})</summary><div class="hc-event-list">${all.filter(p=>p.status==='future').slice(0,250).map(p=>renderAgendaEntry(p,esc,clock)).join('')||'<p>Žádné budoucí události.</p>'}</div></details>
-  <details><summary>Vyřízené / zrušené (${all.filter(p=>p.resolution).length})</summary><div class="hc-event-list">${all.filter(p=>p.resolution).slice(-250).map(p=>renderAgendaEntry(p,esc,clock)).join('')||'<p>Bez uzavřených záznamů.</p>'}</div></details></section>`;
+  <details><summary>Vyřízené / zrušené (${all.filter(p=>p.resolution||p.status==='resolved').length})</summary><div class="hc-event-list">${all.filter(p=>p.resolution||p.status==='resolved').slice(-250).map(p=>renderAgendaEntry(p,esc,clock)).join('')||'<p>Bez uzavřených záznamů.</p>'}</div></details></section>`;
  const create=`<section class="hc-calendar hc-planner" id="hc-planner"><h3>Přidat událost GM</h3><p>Trvání zahrnuje začátek a konec intervalu. Volbou „vyžaduje vyřízení“ zabráníte přeskočení termínu bez potvrzení GM.</p>
   <form id="campaign-plan-form"><div class="hc-fields"><label>Název události<input name="title" maxlength="160" required placeholder="Například příjezd posla"></label><label>Místo<input name="place" maxlength="160" placeholder="Pevnost, les, vesnice…"></label><label>Postava<select name="characterId">${opts(charOptions,'')}</select></label><label>Odkaz na část aplikace<select name="destination">${opts([['notes','Deník / poznámky'],['skills','Skill Tests'],['healing','Healing / Combat'],['hazards','Nebezpečí / Trauma'],['combat','Combat'],['inventory','Arsenal & Gear']],'notes')}</select></label>
   <label>Den kampaně<input name="day" required type="number" min="1" max="694444" value="${planDay}"></label><label>Hodina<input name="hour" required type="number" min="0" max="23" value="${planHour}"></label><label>Minuta<input name="minute" required type="number" min="0" max="59" value="${planMinute}"></label><label>Trvání · dny<input name="durationDays" type="number" min="0" max="10000" value="0"></label><label>Trvání · hodiny<input name="durationHours" type="number" min="0" max="23" value="0"></label><label>Trvání · minuty<input name="durationMinutes" type="number" min="0" max="59" value="0"></label><label>Požadovaný okamžik řešení<select name="trigger">${opts([['start','Na začátku'],['end','Na konci trvání']],'start')}</select></label></div>

@@ -6,6 +6,7 @@
  */
 import {validateCalendarPlans,nextGMBlockingEvent,assertCalendarPlansAppendOnly} from './hmk-calendar-planner.js';
 import {automaticHMKFollowups} from './hmk-calendar-automatic-followups.js';
+import {projectedCalendarJournal} from './hmk-calendar-campaign-lifecycle.js';
 export const DAY_MINUTES=1440;
 const validInt=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const ensure=(ok,msg)=>{if(!ok)throw Error(msg);};
@@ -45,24 +46,27 @@ export function validateCampaignCalendar(clock){
  let last=-1;const eventIds=new Set();
  for(const e of clock.events){
   ensure(e&&typeof e.id==='string'&&e.id.length>0&&!eventIds.has(e.id)&&
-   ['init','advance','anchor','resolution','tr-origin','plan','resolve-plan','cancel-plan'].includes(e.type)&&validInt(e.minute,0,MAX_MINUTE)&&
+   ['init','advance','anchor','resolution','tr-origin','plan','resolve-plan','cancel-plan','membership'].includes(e.type)&&validInt(e.minute,0,MAX_MINUTE)&&
    e.minute>=last&&typeof e.reason==='string'&&e.reason.length>0&&e.reason.length<=400,
    'Neplatná nebo zpětně vložená časová událost');
   eventIds.add(e.id);last=e.minute;
  }
  ensure(clock.events.length>0&&clock.events[0].type==='init'&&clock.events.at(-1).minute===clock.minute,
   'Kalendář nemá doložený poslední čas');
+ if(clock.characterIds!==undefined){ensure(Array.isArray(clock.characterIds)&&clock.characterIds.length<=10000&&clock.characterIds.every(x=>typeof x==='string'&&x)&&new Set(clock.characterIds).size===clock.characterIds.length,'Neplatné členství postav v kampani');}
+ if(clock.journalMinuteEvidence!==undefined){ensure(Array.isArray(clock.journalMinuteEvidence)&&clock.journalMinuteEvidence.length<=400000,'Neplatné propojení starších časů');
+  const jIds=new Set();for(const j of clock.journalMinuteEvidence){ensure(j&&typeof j.id==='string'&&j.id&&!jIds.has(j.id)&&typeof j.characterId==='string'&&validInt(j.minute,-MAX_MINUTE,MAX_MINUTE),'Neplatný historický čas hodu');jIds.add(j.id);}}
  validateCalendarPlans(clock);
  return clock;
 }
-export function createCampaignCalendar({day,hour,minute,label='',eventId,gmConfirmed}={}){
+export function createCampaignCalendar({day,hour,minute,label='',eventId,gmConfirmed,campaignId=null,characterIds=null}={}){
  ensure(gmConfirmed===true,'Založení kalendáře musí potvrdit GM');
  ensure(validInt(day,1,600000)&&validInt(hour,0,23)&&validInt(minute,0,59),
   'Zadejte platný den kampaně a čas HH:MM');
  ensure(typeof eventId==='string'&&eventId.length>0,'Chybí identita potvrzení');
  const current=(day-1)*DAY_MINUTES+hour*60+minute;
  const c={format:'hmk-campaign-calendar-v1',label:String(label).slice(0,120),minute:current,
-  anchors:[],events:[{id:eventId,type:'init',minute:current,reason:'GM potvrdil výchozí den a čas kampaně'}]};
+  ...(campaignId?{campaignId}:{}),...(characterIds?{characterIds:[...characterIds]}:{}),anchors:[],events:[{id:eventId,type:'init',minute:current,reason:'GM potvrdil výchozí den a čas kampaně'}]};
  return validateCampaignCalendar(c);
 }
 export function getCampaignAnchor(clock,kind,characterId,woundId=null){
@@ -122,6 +126,8 @@ export function recordCampaignResolution(clock,{eventId,sourceEventId,characterI
 export function campaignCalendarAgenda(clock,characters=[],journal=[]){
  if(!clock)return {due:[],future:[],unknown:[],all:[]};
  validateCampaignCalendar(clock);
+ characters=Array.isArray(clock.characterIds)?characters.filter(c=>clock.characterIds.includes(c.id)):characters;
+ journal=projectedCalendarJournal(clock,journal);
  const all=[],unknown=[];
  const add=(c,kind,description,daysOrHours,woundId=null,unit='days')=>{
   const anchor=getCampaignAnchor(clock,kind==='healing'||kind==='infection'||kind==='grim'?'wound':kind,c.id,woundId);
@@ -203,7 +209,14 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
 export function assertCampaignCalendarAppendOnly(before,after){
  if(!before?.campaignClock)return true;
  validateCampaignCalendar(before.campaignClock);
- ensure(after?.campaignClock,'Potvrzený kalendář nelze odstranit běžnou změnou');
+ if(!after?.campaignClock){
+  const archives=after?.calendarEvidenceArchives??[],prior=before?.calendarEvidenceArchives??[];
+  ensure(archives.length===prior.length+1&&archives.at(-1)?.format==='hmk-calendar-character-time-evidence-v1'&&
+   before.campaignClock.anchors.length===archives.at(-1).anchors.length&&
+   before.campaignClock.anchors.every((a,i)=>JSON.stringify(a)===JSON.stringify(archives.at(-1).anchors[i])),
+   'Kalendář lze odstranit jen se zachováním všech časových důkazů postav');
+  return true;
+ }
  validateCampaignCalendar(after.campaignClock);
  const old=before.campaignClock,now=after.campaignClock;
  ensure(now.minute>=old.minute&&now.label===old.label,'Kalendář se nesmí vracet ani přejmenovat bez migrace');
@@ -212,5 +225,7 @@ export function assertCampaignCalendarAppendOnly(before,after){
   old.anchors.every((x,i)=>JSON.stringify(x)===JSON.stringify(now.anchors[i])),
   'Dřívější potvrzené důkazy času nelze přepisovat');
  assertCalendarPlansAppendOnly(old,now);
+ if(JSON.stringify(old.characterIds??null)!==JSON.stringify(now.characterIds??null))
+  ensure(now.events.slice(old.events.length).some(e=>e.type==='membership'),'Změna členství vyžaduje auditní zápis');
  return true;
 }
