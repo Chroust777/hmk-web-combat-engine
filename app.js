@@ -120,6 +120,7 @@ import {previewTrekCorrection,createTrekCorrection,latestTrekCorrection,effectiv
 import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING_HABITATS,validateWildernessJournal,createTrackingProof,validateTrackingJournal,trekWatchfulness,trekSurpriseProcedure} from './src/integration/hmk-trekking-wilderness-tasks.js';
 import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,validateSupplyJournal,assertSupplyJournalAppendOnly,supplyBalances} from './src/integration/hmk-foraging-supply-ledger.js';
 import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,validateNutritionJournal,assertNutritionJournalAppendOnly,nutritionRisk} from './src/integration/hmk-nutrition-days.js';
+import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
@@ -185,7 +186,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.380';
+const APP_VERSION='93.381';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -235,7 +236,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateNutritionJournal(d.journal);validateHMKActivityEvidence(d.journal);}
+ if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateNutritionJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
@@ -452,7 +453,7 @@ let pendingTrekHandoff=null; // UI-only context; the journal proof is the author
 function mutate(fn,{gmClockAdvance=false}={}){
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(!automaticGenerationBusy)alert('Změna nebyla uložena: '+e.message);return false}
 }
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
@@ -717,18 +718,25 @@ function campaignCalendarView(){
  const dailyPolicyMap=new Map(dailyPolicies.map(x=>[x.characterId,x]));
  const recentNutritionDays=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarNutritionDay).slice(-14).reverse();
  const nutritionHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>HMK 186 · automatické denní zásobování · ${dailyPolicies.length} postav</summary>
- <p class="hc-hint"><strong>Čas mění pouze GM.</strong> Pro vybrané postavy lze jednou potvrdit, že budou čerpat <strong>výhradně z doložených nálezů Foraging</strong>; při každém potvrzeném posunu času GM se automaticky uzavře každých 24 hodin, vydají se dostupné zásoby a zapíší případné schodky. Postavám s dalšími neznámými zásobami tento režim nezapínejte. Lékařské Starvation/Thirst, HR a hody Advance/Healing se <strong>zatím automaticky nepřipisují</strong>: jejich vznik vyžaduje plně doložený skutečný přísun a samostatnou medicínskou návaznost.</p>
+ <p class="hc-hint"><strong>Čas mění pouze GM.</strong> Pro vybrané postavy lze jednou potvrdit, že budou čerpat <strong>výhradně z doložených nálezů Foraging</strong>; při každém potvrzeném posunu času GM se automaticky uzavře každých 24 hodin, vydají se dostupné zásoby a zapíší případné schodky. Postavám s dalšími neznámými zásobami tento režim nezapínejte. Při plně doloženém zásobování se Starvation/Thirst při nástupu zapíše automaticky. Navazující Advance/Healing d100 vyžaduje skutečný hod v termínu; nelze ho nahradit odhadem.</p>
  <form data-nutrition-policy-form><fieldset class="hc-expedition-actors"><legend>Postavy pro stejný denní režim</legend><div class="hc-characters">${participants.map(c=>{const current=dailyPolicyMap.get(c.id)?.calendarNutritionPolicy;return `<label class="hc-character"><input type="checkbox" name="nutritionActorIds" value="${esc(c.id)}"><span>${esc(c.name)}${current?' · aktivní režim '+current.foodNeed+' jídlo / '+current.waterNeed+' voda':''}</span></label>`}).join('')}</div></fieldset>
  <div class="hc-fields"><label>Denní potřeba potravy<select name="foodNeed"><option value="1">1 food-day · aktivní den</option><option value="0.5">0,5 food-day · úplný klid</option></select></label>
  <label>Denní potřeba vody<select name="waterNeed"><option value="1">1 water-day · běžná aktivita</option><option value="2">2 water-days · horko / Heat Hazard</option><option value="0.5">0,5 water-day · úplná nečinnost</option></select></label></div>
  <label>Akce<select name="policyAction"><option value="activate">Aktivovat / změnit režim</option><option value="pause">Pozastavit automatický výdej</option></select></label>
  <label class="hc-check"><input type="checkbox" name="foragingOnly" value="yes"> Potvrzuji: při aktivaci nemají vybrané postavy pro tyto dávky žádné jiné nezaznamenané zásoby; výhradním doloženým zdrojem je Foraging. Údaje platí pro následující 24h období.</label>
  <button type="submit">Uložit režim · čas se nemění</button></form>
+ <h4>Starvation / Thirst · HR a Course Rolls (HMK 184–186)</h4>
+ <p class="hc-hint">Po doložené celodenní ztrátě dávky (nebo dvou dnech s poloviční dávkou) se automaticky založí skutečná Starvation HR5 nebo Thirst HR4 do Combat State a přičte se příslušná Weakness. Další Advance/Healing je samostatný d100 test splatný až podle pravidel. <strong>Čas mění pouze GM.</strong> Externí Shock z jiného zdroje nesmí být přepsán.</p>
+ ${dueMalnutritionCases(data).map(t=>`<article class="hc-hint"><strong>${esc(t.actorName)} · ${t.kind==='starvation'?'Starvation':'Thirst'} HR${t.hr}</strong> · ${t.mode==='healing'?'Healing':'Advance'} · splatnost ${esc(displayCampaignMinute(t.dueMinute))}${t.overdue?' · PO TERMÍNU':''}
+ <form data-malnutrition-course><input type="hidden" name="actorId" value="${esc(t.characterId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}">
+ <label>Skutečný d100 (1–100)<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-malnutrition-die="yes">⚄ Vygenerovat d100</button>
+ 
+ <button type="submit" ${clock.minute<t.dueMinute?'disabled title="Ještě není splatné"':''}>Trvale zapsat ${t.mode==='healing'?'Healing':'Advance'} Roll</button></form></article>`).join('')||'<p class="hc-hint">Žádná aktivní splatná ani budoucí Starvation/Thirst epizoda.</p>'}
  <h4>Poslední dokončené 24h intervaly</h4>
  ${recentNutritionDays.map(j=>{const p=j.calendarNutritionDay,short=p.foodShortfall||p.waterShortfall;const risk=nutritionRisk(data.journal,campaignKey(clock),j.characterId);return `<p class="hc-hint"><strong>${esc(character(j.characterId)?.name||j.characterId)}</strong> · ${esc(displayCampaignMinute(p.endMinute))} · potrava ${p.foodReceived}/${p.foodNeed}, voda ${p.waterReceived}/${p.waterNeed}${short?' · <strong>NEDOSTATEK · kontrola Starvation/Thirst</strong>':''}${(risk.starvation||risk.thirst)?' · nutná medicínská kontrola':''}</p>`}).join('')||'<p class="hc-hint">Čeká se na první dokončené 24hodinové období od potvrzení režimu.</p>'}
  </details></section>`;
  const supplyHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>Účetní zásoby družiny · Foraging (HMK 147, 186)</summary>
- <p class="hc-hint">Doložené dostupné zásoby: ${supplyReport.available.foodDays} food-days, ${supplyReport.available.waterDays} water-days a ${supplyReport.available.herbDoses} dávek bylin. Získané celkem: ${supplyReport.gross.foodDays} / ${supplyReport.gross.waterDays} / ${supplyReport.gross.herbDoses}. Výdej nikdy neposune čas GM. Spotřeba se zapisuje po skutečném vydání, nikoliv automaticky při uplynutí dne: HMK 186 rozlišuje odpočinek, horko a poloviční dávky.</p>
+ <p class="hc-hint">Doložené dostupné zásoby: ${supplyReport.available.foodDays} food-days, ${supplyReport.available.waterDays} water-days a ${supplyReport.available.herbDoses} dávek bylin. Získané celkem: ${supplyReport.gross.foodDays} / ${supplyReport.gross.waterDays} / ${supplyReport.gross.herbDoses}. Výdej nikdy neposune čas GM. Ručně vydané dávky se zapisují ihned, automatické denní dávky až po dokončení 24 hodin potvrzeným posunem času GM. HMK 186 rozlišuje odpočinek, horko a poloviční dávky.</p>
  <p class="hc-hint"><strong>Concoctions:</strong> rezervace byliny znamená pouze převzetí přesně doložené dávky pro zamýšlený přípravek. Nevyrábí elixír, nehází Herblore a nezakládá domnělý fyzický předmět v inventáři; tyto procedury se vyhodnocují v příslušných původních formulářích.</p>
  <form data-foraging-batch-rations><h4>Společný výdej denních dávek</h4>
  <p class="hc-hint">V jednom kroku vyber postavy a velikost skutečně vydaných dávek. Aplikace automaticky odečte nejstarší doložené nálezy a rozdělí výdej do jednotlivých postav. Standardní aktivita: 1 food-day + 1 water-day; úplný klid může vyžadovat polovinu a horko dvojnásobek vody (HMK 186). Nejde o automatické vyhodnocení Starvation/Thirst.</p>
@@ -6909,6 +6917,28 @@ document.addEventListener('submit',e=>{
     calendarTrekWildernessProof:proof})))notice='Foraging bylo vyhodnoceno v původní minutě hlídky. Čas GM ani únava se nezměnily.';
  }catch(err){alert('Foraging nebylo uloženo: '+err.message)}
 },true);
+// HMK 184–186: medical rolls change only a character's persistent condition,
+// never the GM's clock. The d100 is optionally generated into the SAME field.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-malnutrition-die]');if(!button)return;
+ const input=button.closest('form')?.elements.namedItem('roll');if(!input)return;
+ input.value=String(secureAutoDie(100));input.dataset.generatedMalnutritionRoll=input.value;input.dispatchEvent(new Event('change',{bubbles:true}));
+ button.textContent='⚄ d100 = '+input.value;
+});
+document.addEventListener('input',e=>{if(e.target?.matches?.('[data-malnutrition-course] [name="roll"]'))delete e.target.dataset.generatedMalnutritionRoll;},true);
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-malnutrition-course]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{const fd=new FormData(form),actorId=fd.get('actorId'),episodeId=fd.get('episodeId');
+  if(!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===actorId))throw Error('Postava nepatří do této kampaně');
+  const input=form.elements.namedItem('roll'),value=Number(fd.get('roll'));
+  const rollOrigin=input?.dataset?.generatedMalnutritionRoll===String(value)?'software':'manual';
+  if(mutate(()=>resolveMalnutritionCourse(data,{actorId,episodeId,roll:value,rollOrigin,
+   gmConfirmed:true,idFactory:uuid,stamp}))){
+   notice='Malnutrition: potvrzený d100 byl zapsán do zdravotního stavu i historie v aktuální minutě. Čas zůstal beze změny.';
+  }
+ }catch(error){alert('Malnutrition Course nebyl uložen: '+error.message)}
+},true);
 // A standing 24h food/water policy records attested assumptions only.
 // The policy DOES NOT change the clock or the actor's medical condition.
 document.addEventListener('submit',e=>{
@@ -7382,6 +7412,18 @@ document.addEventListener('click',e=>{
   if(action==='prev-month'){calendarUI.monthShift=Math.max(-240000,calendarUI.monthShift-1);}
   if(action==='next-month'){calendarUI.monthShift=Math.min(240000,calendarUI.monthShift+1);}
   render();return;
+ }
+ if(t.dataset.calLink&&t.dataset.calKind==='malnutrition-course'){
+  // This authoritative executor lives in the calendar, not in Combat.
+  calendarLanding=false;view='calendar';render();
+  const matches=[...document.querySelectorAll('[data-malnutrition-course]')];
+  const form=matches.find(f=>f.elements.namedItem('actorId')?.value===t.dataset.calLink&&
+    f.elements.namedItem('episodeId')?.value===t.dataset.calSource);
+  if(form){for(let n=form.parentElement;n;n=n.parentElement)if(n.tagName==='DETAILS')n.open=true;
+   form.scrollIntoView({block:'center',behavior:'auto'});
+   form.elements.namedItem('roll')?.focus({preventScroll:true});}
+  else notice='Malnutrition: původní zdravotní epizoda nebyla nalezena; zkontrolujte přepnutí kampaně.';
+  return;
  }
  if(t.dataset.calLink){
   pendingTrekHandoff=null;
