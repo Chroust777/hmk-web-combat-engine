@@ -123,6 +123,7 @@ import {assessTrekkingReadiness} from './src/integration/hmk-trekking-readiness.
 import {previewTrekCorrection,createTrekCorrection,latestTrekCorrection,effectiveTrekSource} from './src/integration/hmk-trekking-correction.js';
 import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING_HABITATS,validateWildernessJournal,createTrackingProof,validateTrackingJournal,trekWatchfulness,trekSurpriseProcedure} from './src/integration/hmk-trekking-wilderness-tasks.js';
 import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,validateSupplyJournal,assertSupplyJournalAppendOnly,supplyBalances} from './src/integration/hmk-foraging-supply-ledger.js';
+import {EXOTIC_POTIONS,herbAssessmentCandidates,herbDoseStatus,herbPotionReservationCandidates,createHerbPotency,createHerbPreservation,createHerbPotionStart,createHerbPotionComplete,validateHerbalJournal,assertHerbalJournalAppendOnly,potencyLabel} from './src/integration/hmk-herbal-concoctions.js';
 import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,validateNutritionJournal,assertNutritionJournalAppendOnly,nutritionRisk} from './src/integration/hmk-nutrition-days.js';
 import {createNutritionDayConditions,createNutritionConditionsCancel,nextNutritionDayStart,validateNutritionActivityJournal,assertNutritionActivityAppendOnly,dailyNutritionNeeds} from './src/integration/hmk-nutrition-activity.js';
 import {pendingTrackingBearing} from './src/integration/hmk-tracking-bearing-handoff.js';
@@ -194,7 +195,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.392';
+const APP_VERSION='93.393';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -244,7 +245,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
+ if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
@@ -461,7 +462,7 @@ let pendingTrekHandoff=null; // UI-only context; the journal proof is the author
 function mutate(fn,{gmClockAdvance=false}={}){
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(!automaticGenerationBusy)alert('Změna nebyla uložena: '+e.message);return false}
 }
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
@@ -790,6 +791,35 @@ function campaignCalendarView(){
  ${l.unit==='herbDoses'?`<label>Účel / připravovaná Concoction<input name="purpose" maxlength="120" required placeholder="Např. Coagulant · dávka pro Herbalism"></label>`:''}</div>
  <button type="submit">${l.unit==='herbDoses'?'Rezervovat skutečnou bylinnou ingredienci':'Zapsat spotřebu'} · bez posunu času</button></form>`).join('')||'<p class="hc-hint">Zatím nejsou k vydání doložené volné zásoby.</p>'}
  </details></section>`;
+ const herbCandidates=herbAssessmentCandidates(data.journal,campaignKey(clock));
+ const herbalProofs=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarHerbPotency);
+ const herbalSkills=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&
+  participants.some(c=>c.id===j.characterId)&&j.skillTestProof&&
+  (j.skillTestProof.skills?.[0]||j.skillTestProof.skill)==='Herblore'&&Number.isInteger((j.skillTestProof.a||j.skillTestProof.result)?.sv));
+ const usableHerblore=actorId=>herbalSkills.filter(j=>(!actorId||j.characterId===actorId)&&
+  !data.journal.some(r=>r.calendarHerbPreservation?.skillId===j.id||r.calendarHerbPotionComplete?.skillId===j.id));
+ const herbalReservations=herbPotionReservationCandidates(data.journal,campaignKey(clock),clock.minute);
+ const pendingHerbalPotions=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarHerbPotionStart&&
+  !data.journal.some(r=>r.calendarHerbPotionComplete?.startId===j.id));
+ const herbalHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>HMK 74–75 · byliny, potence, konzervace a lektvary · ${herbCandidates.length} nálezů</summary>
+ <p class="hc-hint">Každá nalezená dávka má skutečně doložený d10: Mild (1–6), Strong (7–9), Great (10); HMK dovoluje i jediný d10 pro všechny dávky téhož nálezu. Každý stupeň klesá po 2d6 dnech. Suchá tmavá dílna a skutečný Herblore SV umožňují konzervaci (30 + 10×SV dní na stupeň). Příprava lektvaru trvá 10 minut potvrzeného času GM. Podání, zdravotní účinky a alchymistické elixíry nejsou totožné s přípravou.</p>
+ ${herbCandidates.map(l=>`<form data-herb-assess><h4>${esc(l.herbName)} · ${l.quantity} dávek · Foraging ${esc(displayCampaignMinute(l.minute))}</h4><input type="hidden" name="sourceId" value="${esc(l.sourceId)}"><input type="hidden" name="resultIndex" value="${l.resultIndex}">
+ <label>Postava dokládající potenci<select name="actorId">${participants.map(c=>`<option value="${esc(c.id)}" ${c.id===data.journal.find(j=>j.id===l.sourceId)?.characterId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
+ ${Array.from({length:l.quantity},(_,i)=>`<fieldset><legend>Dávka ${i+1}</legend><div class="hc-fields">${Array.from({length:7},(_,k)=>`<label>${k===0?'d10 potence':'Rozpad '+Math.ceil(k/2)+' · d6 '+(k%2?'A':'B')}<input type="number" name="dice_${i}_${k}" min="1" max="${k===0?10:6}" step="1" required></label>`).join('')}</div></fieldset>`).join('')}
+ <label class="hc-check"><input type="checkbox" name="singlePotencyRoll"> Jeden d10 potence pro všechny dávky (HMK 74)</label>
+ <button type="button" class="hc-small" data-herb-auto>⚄ Vygenerovat d10 a d6</button>
+ <button type="button" class="hc-small" data-herb-shared>⚄ Jeden společný d10, ostatní 2d6</button>
+ <button type="submit">Doložit potenci bez posunu času</button></form>`).join('')||'<p class="hc-hint">Všechny nálezy již mají doloženou potenci.</p>'}
+ ${herbalProofs.flatMap(a=>a.calendarHerbPotency.doses.map((dose,i)=>{let q;try{q=herbDoseStatus(data.journal,campaignKey(clock),a.calendarHerbPotency.sourceId,a.calendarHerbPotency.resultIndex,i,clock.minute)}catch{return ''}
+ return `<div class="hc-event"><strong>${esc(a.calendarHerbPotency.herbName)} · dávka ${i+1} · ${esc(q.potency)}</strong> ${q.preserved?'· konzervováno':''}
+ ${q.quality>0&&!q.preserved&&usableHerblore(null).length?`<form data-herb-preserve><input type="hidden" name="assessmentId" value="${esc(a.id)}"><input type="hidden" name="doseIndex" value="${i}"><label>Herblore SV z původního Skill Workbench<select name="skillId">${usableHerblore(null).map(j=>`<option value="${esc(j.id)}">${esc(character(j.characterId)?.name||j.characterId)} · SV ${(j.skillTestProof.a||j.skillTestProof.result).sv}</option>`).join('')}</select></label><label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrdil suchou, tmavou dílnu</label><button type="submit">Konzervovat bez posunu času</button></form>`:''}</div>`})).join('')}
+ <h4>Lektvary · 12 kategorií HMK str. 75</h4><p class="hc-hint">Nejdřív vyhraďte přesně jednu dávku ve stávajícím formuláři zásob. Lektvar lze dokončit až po deseti minutách GM času a novém skutečném Herblore SV. Výroba nic nepodává ani neléčí.</p>
+ ${herbalReservations.filter(x=>EXOTIC_POTIONS.includes(x.row.calendarForagingSupplyUse.herbName?.toLowerCase().trim())).map(({row,status})=>`<form data-herb-start><input type="hidden" name="reserveId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(row.characterId)}"><input type="hidden" name="herbType" value="${esc(row.calendarForagingSupplyUse.herbName.toLowerCase().trim())}"><strong>${esc(character(row.characterId)?.name||row.characterId)} · ${esc(row.calendarForagingSupplyUse.herbName)} · ${esc(status.potency)}</strong><button type="submit">Zahájit výrobu na 10 minut</button></form>`).join('')||'<p class="hc-hint">Žádná dostupná, účinná a rezervovaná bylina odpovídající tištěným kategoriím.</p>'}
+ ${pendingHerbalPotions.map(j=>{const p=j.calendarHerbPotionStart,skills=usableHerblore(p.actorId);return `<div class="hc-event"><strong>${esc(character(p.actorId)?.name||p.actorId)} · ${esc(p.herbType)} · ${esc(potencyLabel(p.quality))}</strong> · Herblore splatný ${esc(displayCampaignMinute(p.dueMinute))}
+ ${clock.minute>=p.dueMinute&&skills.length?`<form data-herb-complete><input type="hidden" name="startId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(p.actorId)}"><label>Skutečný Herblore SV<select name="skillId">${skills.map(x=>`<option value="${esc(x.id)}">SV ${(x.skillTestProof.a||x.skillTestProof.result).sv} · ${esc(x.id)}</option>`).join('')}</select></label><label>Trvanlivost · d6<input name="shelfD6" type="number" min="1" max="6" required></label><button type="button" class="hc-small" data-herb-shelf-roll>⚄ Generovat d6</button><button type="submit">Dokončit výrobu bez podání</button></form>`:clock.minute<p.dueMinute?'<p>Čeká na skutečný posun GM.</p>':'<p>Čeká na nový Herblore SV v této minutě.</p>'}</div>`}).join('')}
+ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarHerbPotionComplete).slice(-12).map(j=>{const p=j.calendarHerbPotionComplete;return `<p class="hc-hint">${esc(character(p.actorId)?.name||p.actorId)} · ${esc(p.herbType)} · ${p.usable?(clock.minute>=p.expiryMinute?'prošlý':'připraven')+' · SV '+p.sv+' · účinný do '+esc(displayCampaignMinute(p.expiryMinute)):'neúčinný'} · <strong>nepodáno</strong></p>`}).join('')}
+ <p class="hc-hint">Nedokončeno: podání potions, 12 konkrétních efektů v Combat/Healing, výroba mundánních receptur přes Brewing/Cookery/Embalming/Perfumery a samostatná Alchemy str. 267–268.</p>
+ </details></section>`;
  const wildernessHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>Wilderness Tasks · Foraging / Stalking / Vigilance (HMK 147) · ${forageRows.length} k doložení</summary>
  <p class="hc-hint">Foraging: jeden d10 za každý skutečně potvrzený režim, podle okolního biotopu a sezóny. Nalezené jídlo/voda/byliny jsou nejprve účetním časovým důkazem (nikoli nezdokumentovanou fyzickou položkou inventáře). Stalking zpřístupňuje Tracking ve Skill Workbench. Stalking/Vigilance se zachovávají pro vyhodnocení překvapení během Encounter; bez doložené procedury se nepřiděluje fiktivní bonus.</p>
  <p class="hc-hint"><strong>Dosud nalezeno v této kampani (před případnou spotřebou):</strong> ${supplies.foodDays} food-days, ${supplies.waterDays} water-days, ${supplies.herbDoses} dávek bylin. Tyto hodnoty nejsou automatickým stavem spotřebovaného inventáře.</p>
@@ -830,7 +860,7 @@ function campaignCalendarView(){
  const usedElsewhere=new Set();
  const memberRow=(c,checked)=>`<label class="hc-character"><input type="checkbox" name="characterId" value="${esc(c.id)}" ${checked?'checked':''}><span>${esc(c.name)}</span></label>`;
  const membersHTML=`<section class="hc-calendar hc-campaign-settings"><button type="button" class="hc-small" data-calendar-back="yes">‹ Všechny kalendáře</button><h3>Postavy kampaně · ${participants.length} zahrnutých</h3><p class="hc-hint">Stejnou postavu lze přidat do více kampaní. V každé se odděleně ukládají zranění, únava, časované magické účinky a inventář; původní datované události z jiného kalendáře se samy nepřesouvají.</p><form id="campaign-members-form"><fieldset><legend>Zahrnuté postavy</legend><div class="hc-characters">${data.characters.filter(c=>included.has(c.id)).map(c=>memberRow(c,true)).join('')||'<p>Bez účastníků</p>'}</div></fieldset><fieldset><legend>Nezahrnuté postavy · kliknutím přidat</legend><div class="hc-characters">${data.characters.filter(c=>!included.has(c.id)).map(c=>memberRow(c,false)).join('')||'<p>Všechny postavy již patří do kampaně.</p>'}</div></fieldset><button type="submit">Uložit účastníky kampaně</button></form><details><summary>Odstranění tohoto kalendáře</summary><p>Smazáním odstraníte jen tento kalendář a jeho GM události. Neaktivní kalendáře ani postavy se nemažou. Časové důkazy se zachovají.</p><button type="button" class="danger" data-calendar-delete="yes">Zálohovat a smazat tento kalendář</button></details></section>`;
- return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${membersHTML}${board}${trekPanel}${repairPanel}${wildernessHTML}${supplyHTML}${nutritionHTML}${activityNeedsHTML}${expeditionHTML}${interruptionsHTML}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
+ return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${membersHTML}${board}${trekPanel}${repairPanel}${wildernessHTML}${supplyHTML}${herbalHTML}${nutritionHTML}${activityNeedsHTML}${expeditionHTML}${interruptionsHTML}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form><p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
  <section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Vyřešení probíhá v původním Combat / Healing průvodci; kalendář pouze hlídá čas, nerozhoduje o hodu ani nezapisuje paralelní Combat State.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
  <section class="panel"><h3>Následující termíny · ${agenda.future.length}</h3>${agenda.future.length?agenda.future.slice(0,100).map(renderItem).join(''):'<p class="muted">Žádná další doložená splatnost.</p>'}</section>
@@ -5418,6 +5448,7 @@ function recordSkillEvidence(title,body,proof,slotId=null){
     campaignId:data.campaignClock?campaignKey(data.campaignClock):null,
     minute:data.campaignClock?.minute,proof});
   data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof,
+    ...(data.campaignClock?{calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute}:{}),
     ...(link?{calendarTrekSkillSource:link,calendarCampaignId:link.campaignId,
       campaignMinute:data.campaignClock.minute}:{} )});
   // A certified Orienteering SV is sufficient to rectify the prepared
@@ -7073,6 +7104,62 @@ document.addEventListener('submit',e=>{
 },true);
 // Issue proven food-days, water-days or herb doses from a unique watch lot.
 // This transaction never advances campaign time or claims a completed potion.
+// Herbal dice: visible numeric cells, manual or securely generated dice origins.
+document.addEventListener('click',e=>{
+ const auto=e.target.closest?.('[data-herb-auto],[data-herb-shared]');if(auto){
+  const f=auto.closest('form'),shared=auto.matches('[data-herb-shared]'),one=shared?secureAutoDie(10):null;
+  for(const input of f.querySelectorAll('input[name^="dice_"]')){
+   const n=input.name.endsWith('_0')?(shared?one:secureAutoDie(10)):secureAutoDie(6);
+   input.value=String(n);input.dataset.herbGenerated=input.value;
+  }
+  if(shared)f.elements.namedItem('singlePotencyRoll').checked=true;
+  auto.textContent=shared?'⚄ Společný d10 '+one+' a nezávislé 2d6 vygenerovány':'⚄ Hody byly vygenerovány';return;
+ }
+ const b=e.target.closest?.('[data-herb-shelf-roll]');if(b){const x=b.closest('form')?.elements.namedItem('shelfD6');if(x){x.value=String(secureAutoDie(6));x.dataset.herbGenerated=x.value;b.textContent='⚄ d6 '+x.value;}}
+},true);
+document.addEventListener('input',e=>{if(e.target?.matches?.('[data-herb-assess] input[name^="dice_"], [data-herb-complete] [name="shelfD6"]')&&
+ e.target.dataset.herbGenerated!==e.target.value)delete e.target.dataset.herbGenerated;},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-herb-assess],[data-herb-preserve],[data-herb-start],[data-herb-complete]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const clock=data.campaignClock;if(!clock)throw Error('Chybí GM kalendář');
+  const fd=new FormData(f),v=x=>String(fd.get(x)||''),field=x=>f.elements.namedItem(x);
+  const campaignId=campaignKey(clock),minute=clock.minute;
+  let p,kind,title,actorId;
+  if(f.matches('[data-herb-assess]')){
+   actorId=v('actorId');const inputs=[...f.querySelectorAll('input[name^="dice_"]')],n=inputs.length/7;
+   if(!Number.isSafeInteger(n)||n<1)throw Error('Chybí dávky');
+   const doses=Array.from({length:n},(_,i)=>{
+    const x=Array.from({length:7},(_,k)=>field(`dice_${i}_${k}`));
+    const origin=el=>el.dataset.herbGenerated===el.value?'cryptographic-software-die':'manual';
+    return {potencyRoll:Number(x[0].value),potencyOrigin:origin(x[0]),
+     decayRolls:[[1,2],[3,4],[5,6]].map(([a,b])=>[Number(x[a].value),Number(x[b].value)]),
+     decayOrigins:[[1,2],[3,4],[5,6]].map(([a,b])=>[origin(x[a]),origin(x[b])]),
+     origin:x.every(el=>origin(el)==='cryptographic-software-die')?'cryptographic-software-die':'manual'};
+   });
+   p=createHerbPotency({journal:data.journal,campaignId,minute,sourceId:v('sourceId'),resultIndex:Number(v('resultIndex')),
+    doses,actorId,potencyMode:fd.get('singlePotencyRoll')?'single-roll-all':'per-dose'});
+   kind='calendarHerbPotency';title='HMK · potence nalezených bylin';
+  }else if(f.matches('[data-herb-preserve]')){
+   const sk=data.journal.find(j=>j.id===v('skillId'));actorId=sk?.characterId;
+   p=createHerbPreservation({journal:data.journal,campaignId,minute,actorId,assessmentId:v('assessmentId'),
+    doseIndex:Number(v('doseIndex')),skillId:v('skillId'),workshopConfirmed:!!fd.get('workshopConfirmed')});
+   kind='calendarHerbPreservation';title='HMK · konzervace bylin';
+  }else if(f.matches('[data-herb-start]')){
+   actorId=v('actorId');p=createHerbPotionStart({journal:data.journal,campaignId,minute,actorId,reserveId:v('reserveId'),herbType:v('herbType')});
+   kind='calendarHerbPotionStart';title='HMK · zahájení přípravy lektvaru';
+  }else{
+   actorId=v('actorId');const shelf=field('shelfD6');p=createHerbPotionComplete({journal:data.journal,campaignId,minute,
+    actorId,startId:v('startId'),skillId:v('skillId'),shelfD6:Number(shelf.value),
+    shelfOrigin:shelf.dataset.herbGenerated===shelf.value?'cryptographic-software-die':'manual'});
+   kind='calendarHerbPotionComplete';title='HMK · dokončení výroby bylinného lektvaru';
+  }
+  if(!calendarMemberIds(clock,data.characters).some(c=>c.id===actorId))throw Error('Postava není členem kampaně');
+  if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,
+   createdAt:stamp(),title,body:'HMK 74–75 · doloženo bez posunu GM času',[kind]:p})))notice=title+' · auditováno bez posunu času';
+ }catch(err){alert('Bylinná procedura nebyla uložena: '+err.message)}
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-foraging-supply-use]'))return;
  e.preventDefault();e.stopImmediatePropagation();
