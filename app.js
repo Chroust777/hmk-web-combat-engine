@@ -116,6 +116,7 @@ import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
 import {assessTrekkingReadiness} from './src/integration/hmk-trekking-readiness.js';
+import {previewTrekCorrection,createTrekCorrection,latestTrekCorrection} from './src/integration/hmk-trekking-correction.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
@@ -181,7 +182,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.376';
+const APP_VERSION='93.377';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -676,6 +677,22 @@ function campaignCalendarView(){
  <label class="hc-check"><input name="doubleTime" type="checkbox" value="yes"> Double Time (jen bez Slow/Loaded)</label>
  <p class="hc-hint">Postihy celé skupiny (Wearied, Injured a doložený Loaded) se odvodí automaticky při uložení. Závažné zranění nebo chybějící údaje o výbavě se nebudou vykládat jako nulový postih. Kdo není v této hlídce, tomu se nepřipíše cestovní účinek.</p><button type="submit">Vyhodnotit a uložit podklady (bez posunu času)</button></form>
  <p class="tiny">Pokud vyjde Encounter, hazard či expozice, skutečné vyhodnocení otevřete v Combat / Skill Tests. Generování podkladů samo nezakládá zranění ani neprohlašuje následek za vyřízený.</p></details></section>`;
+ const repairAssessments=data.journal.filter(j=>j.calendarTrekProof&&j.calendarCampaignId===campaignKey(clock)&&participants.some(c=>c.id===j.characterId)&&!latestTrekCorrection(j,data.journal)).map(j=>{
+  try{const preview=previewTrekCorrection(j,data.journal);
+   return {j,preview,blocked:data.journal.some(x=>x.calendarExpeditionProof?.trekSourceId===j.id)?'Cesta již byla započtena a nesmí se zpětně změnit.':null};
+  }catch(err){
+   if(/SV 1–2 vyžaduje rozhodnutí GM/.test(err.message)){
+    try{return {j,preview:previewTrekCorrection(j,data.journal,{lowChoice:'slow'}),requiresChoice:true}}catch{}
+   }
+   return {j,blocked:err.message}
+  }
+ });
+ const repairCandidates=repairAssessments.filter(x=>x.preview&&!x.preview.alreadyValid&&!x.blocked);
+ const repairBlocked=repairAssessments.filter(x=>x.blocked);
+ const repairPanel=`<section class="hc-calendar hc-trek-repair"><details><summary>Opravit připravenou hlídku podle skutečného Orienteering SV (${repairCandidates.length})</summary>
+ <p class="hc-hint">Původní hlídka i všechny původní hody zůstanou beze změny. Oprava vytvoří nový ověřitelný záznam, odebere nadbytečné Advantage Modes a přepočítá pohyb. Případné NOVÉ Direction Hazard či Progress hody budou vyžádány přesně v nezbytném počtu. Kampaňový čas se nemění.</p>
+ ${repairBlocked.length?`<p class="hc-hint"><strong>Čekající nebo pravidlově nejednoznačné hlídky (${repairBlocked.length}):</strong></p>${repairBlocked.map(({j,blocked})=>`<p class="hc-hint">${esc(character(j.characterId)?.name||j.characterId)} · ${esc(j.calendarTrekProof.area)} · ${esc(blocked)}</p>`).join('')}`:''}
+ ${repairCandidates.length?`<form id="campaign-trek-repair-form"><label>Hlídka k opravě<select name="sourceId">${repairCandidates.map(({j,preview})=>`<option value="${esc(j.id)}">${esc(character(j.characterId)?.name||j.characterId)} · ${esc(j.calendarTrekProof.area)} · ${esc(displayCampaignMinute(j.campaignMinute))} · SV ${preview.adjustment.adjustedSV} · ${preview.additionalProgress+preview.additionalDirection} nových d10 při zobrazeném návrhu</option>`).join('')}</select></label><label>Orienteering SV 1–2: pokud původní hlídka neurčila jeden režim, GM musí zvolit Lax nebo Slow<select name="lowChoice"><option value="">Původní platná volba (jinak vyberte)</option><option value="lax">Lax Mode</option><option value="slow">Slow Mode</option></select></label><label>Původ nových doplňkových hodů<select name="origin"><option value="software">Generovat kryptograficky</option><option value="manual">Ruční d10</option></select></label><label>Ruční nové hody d10, oddělené čárkami (nejprve Progress, potom Direction Hazard)<input name="rolls" placeholder="Např. 4,7"></label><button type="submit">Vypočítat a doložit opravu bez posunu času</button></form>`:'<p class="hc-hint">Žádná hlídka s doloženým SV nevyžaduje opravu. Nevyhodnocené SV nebo Drover Test najdete mezi povinnostmi kalendáře.</p>'}</details></section>`;
  const expeditionHTML=`<section class="hc-calendar hc-expedition"><h3>HMK · časově doložený odpočinek a únava během cesty</h3>
  <p class="hc-hint">HMK str. 62, 145–150, 176. Odpočinek se plánuje pro jednu či více postav současně; společný čas kampaně nemění. Obnova Windedness/Weariness nastane až po uplynutí intervalu při posunu času GM. Jeden čtyřhodinový cestovní watch zapisuje Weariness a END Secondary Roll. <strong>Jde o časový/únavový díl Trekking Routine, nikoliv o náhradu chybějících testů Weather, Orienteering, Hazards a Encounter.</strong> Před cestováním nejprve vyhodnoťte tyto situace jejich pravidlovými průvodci.</p>
  <form id="campaign-expedition-form"><fieldset class="hc-expedition-actors"><legend>Postavy – vyberte jednu nebo více současně</legend><div class="hc-characters">${participants.map((c,i)=>`<label class="hc-character"><input type="checkbox" name="characterIds" value="${esc(c.id)}" ${i===0?'checked':''}><span>${esc(c.name)}</span></label>`).join('')}</div><div class="hc-expedition-select-all"><button type="button" class="hc-small" data-expedition-select="all">Vybrat všechny</button><button type="button" class="hc-small" data-expedition-select="none">Zrušit výběr</button></div></fieldset><div class="hc-fields">
@@ -701,7 +718,7 @@ function campaignCalendarView(){
  const usedElsewhere=new Set();
  const memberRow=(c,checked)=>`<label class="hc-character"><input type="checkbox" name="characterId" value="${esc(c.id)}" ${checked?'checked':''}><span>${esc(c.name)}</span></label>`;
  const membersHTML=`<section class="hc-calendar hc-campaign-settings"><button type="button" class="hc-small" data-calendar-back="yes">‹ Všechny kalendáře</button><h3>Postavy kampaně · ${participants.length} zahrnutých</h3><p class="hc-hint">Stejnou postavu lze přidat do více kampaní. V každé se odděleně ukládají zranění, únava, časované magické účinky a inventář; původní datované události z jiného kalendáře se samy nepřesouvají.</p><form id="campaign-members-form"><fieldset><legend>Zahrnuté postavy</legend><div class="hc-characters">${data.characters.filter(c=>included.has(c.id)).map(c=>memberRow(c,true)).join('')||'<p>Bez účastníků</p>'}</div></fieldset><fieldset><legend>Nezahrnuté postavy · kliknutím přidat</legend><div class="hc-characters">${data.characters.filter(c=>!included.has(c.id)).map(c=>memberRow(c,false)).join('')||'<p>Všechny postavy již patří do kampaně.</p>'}</div></fieldset><button type="submit">Uložit účastníky kampaně</button></form><details><summary>Odstranění tohoto kalendáře</summary><p>Smazáním odstraníte jen tento kalendář a jeho GM události. Neaktivní kalendáře ani postavy se nemažou. Časové důkazy se zachovají.</p><button type="button" class="danger" data-calendar-delete="yes">Zálohovat a smazat tento kalendář</button></details></section>`;
- return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${membersHTML}${board}${trekPanel}${expeditionHTML}${interruptionsHTML}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
+ return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${membersHTML}${board}${trekPanel}${repairPanel}${expeditionHTML}${interruptionsHTML}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form><p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
  <section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Vyřešení probíhá v původním Combat / Healing průvodci; kalendář pouze hlídá čas, nerozhoduje o hodu ani nezapisuje paralelní Combat State.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
  <section class="panel"><h3>Následující termíny · ${agenda.future.length}</h3>${agenda.future.length?agenda.future.slice(0,100).map(renderItem).join(''):'<p class="muted">Žádná další doložená splatnost.</p>'}</section>
@@ -5263,7 +5280,33 @@ function recordSkillEvidence(title,body,proof,slotId=null){
     campaignId:data.campaignClock?campaignKey(data.campaignClock):null,
     minute:data.campaignClock?.minute,proof});
   data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof,
-    ...(link?{calendarTrekSkillSource:link}:{} )});
+    ...(link?{calendarTrekSkillSource:link,calendarCampaignId:link.campaignId,
+      campaignMinute:data.campaignClock.minute}:{} )});
+  // A certified Orienteering SV is sufficient to rectify the prepared
+  // modes without another GM confirmation. A Drover result can arrive
+  // before or after Survival; correct only when both witnesses exist.
+  if(link&&['survival','drover'].includes(link.hazard)&&origin?.calendarTrekProof&&
+     !latestTrekCorrection(origin,data.journal)&&
+     !data.journal.some(j=>j.calendarExpeditionProof?.trekSourceId===origin.id)){
+   try{
+    const preview=previewTrekCorrection(origin,data.journal);
+    if(!preview.alreadyValid){
+     const rolls=Array.from({length:preview.additionalProgress+preview.additionalDirection},()=>secureHMKDie(10));
+     const correction=createTrekCorrection({source:origin,journal:data.journal,additionalRolls:rolls,
+      origin:'cryptographic-software-die'});
+     data.journal.push({id:uuid(),characterId:origin.characterId,
+      calendarCampaignId:origin.calendarCampaignId,campaignMinute:data.campaignClock.minute,
+      createdAt:stamp(),title:'HMK Trekking · automatická oprava po Orienteering SV',
+      body:'Opravená příprava podle SV '+correction.adjustedSV+'; původní hody zachovány; nové d10: '+rolls.length,
+      calendarTrekCorrection:correction});
+    }
+   }catch(err){
+    // Missing companion Drover evidence or a contradictory Double Time result
+    // must not discard a valid already-rolled Skill Test. The unresolved watch
+    // stays visible in calendar repair controls for explicit GM resolution.
+    if(!/Chybí původní Riding|Chybí jeden autoritativní|Double Time|SV 1–2 vyžaduje rozhodnutí GM/.test(err.message))throw err;
+   }
+  }
  }))throw Error('Záznam nebyl uložen; nepovažujte tento hod za uložený.');
  const sourceLink=data.journal.find(x=>x.id===savedId)?.calendarTrekSkillSource;
  if(sourceLink){
@@ -6707,6 +6750,31 @@ document.addEventListener('submit',e=>{
    campaignMinute:clock.minute,createdAt:stamp(),title:'HMK Trekking Routine · počasí / pohyb / setkání',
    body:summary,calendarTrekProof:proof});}))notice='Doložené podklady Trekking byly zapsány. Nejdříve doložte Orienteering Survival SV v kalendáři: bez jeho modifikátorů zatím nelze potvrdit oprávněnost zvolených Advantage Modes. Následky se otevírají v původních testech.';
  }catch(error){alert('Trekking Routine nebyla uložena: '+error.message)}
+},true);
+// Append-only repair AFTER the linked Survival / Drover test. No change to
+// campaign time, original watch evidence, dice or character fatigue.
+document.addEventListener('submit',e=>{
+ const form=e.target;if(form?.id!=='campaign-trek-repair-form')return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const v=Object.fromEntries(new FormData(form)),clock=data.campaignClock;
+  if(!clock||combatInitiativeSequence)throw Error('Oprava vyžaduje otevřenou kampaň bez Initiative');
+  const source=data.journal.find(j=>j.id===v.sourceId&&j.calendarCampaignId===campaignKey(clock));
+  if(!source?.calendarTrekProof)throw Error('Neznámá zdrojová hlídka');
+  if(latestTrekCorrection(source,data.journal))throw Error('Hlídka již má doloženou opravu');
+  if(data.journal.some(j=>j.calendarExpeditionProof?.trekSourceId===source.id))throw Error('Již započtenou cestu nelze zpětně měnit');
+  const lowChoice=v.lowChoice||null;
+  const preview=previewTrekCorrection(source,data.journal,{lowChoice});
+  const count=preview.additionalProgress+preview.additionalDirection;
+  const origin=v.origin==='manual'?'manual':'cryptographic-software-die';
+  const rolls=origin==='manual'?String(v.rolls||'').split(',').map(x=>x.trim()).filter(Boolean).map(Number):Array.from({length:count},()=>secureHMKDie(10));
+  const proof=createTrekCorrection({source,journal:data.journal,additionalRolls:rolls,origin,lowChoice});
+  if(mutate(()=>{data.journal.push({id:uuid(),characterId:source.characterId,calendarCampaignId:source.calendarCampaignId,
+    campaignMinute:clock.minute,createdAt:stamp(),title:'HMK Trekking · oprava Orienteering Modes',
+    body:'Původní hod a hlídka zachovány; skutečné SV '+proof.adjustedSV+'; nové Progress '+proof.modes.progress+
+     ', Bearing '+proof.modes.bearing+'; přepočteno '+proof.effectiveMovement.leagues+' leagues. Doplňkových d10: '+proof.rolls.length,
+    calendarTrekCorrection:proof});}))notice='Doložená oprava uložena bez opakování původních hodů a bez posunu času kampaně.';
+ }catch(err){alert('Oprava hlídky se neuložila: '+err.message)}
 },true);
 // Explicit GM decision to interrupt an individual interval. No change to
 // the campaign clock and no premature credit for a partial rest.
