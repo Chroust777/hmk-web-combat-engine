@@ -4323,3 +4323,8 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-calendar .hc-expedition-actors .hc-character{display:flex;flex-direction:row;align-items:center;gap:7px;min-width:0}
 .content-calendar .hc-expedition-actors .hc-character input{width:auto;margin:0;flex:0 0 auto}
 .content-calendar .hc-expedition-select-all{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+
+/* v93.374: one authenticated group watch, individual END secondary rolls */
+.hc-expedition-dice-actor{margin:.55rem 0;padding:.65rem;border:1px solid var(--line,#8f7652);border-radius:8px;min-width:0}
+.hc-expedition-dice-actor legend{font-weight:700;padding:0 .4rem}
+.hc-expedition-dice-actor .hc-expedition-dice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:.5rem}
