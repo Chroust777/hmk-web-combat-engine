@@ -15,6 +15,7 @@ import {validateCombatState,combatFatigueTotals,
  applyConfirmedShockRecovery} from './persistent-combat-state.js';
 import {createManualDiceQueue,recordManualDie,nextManualDie,completedManualDice} from './hmk-manual-dice-queue.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
+import {coagulantBleedingEvidence} from './hmk-herbal-bleeding-bridge.js';
 
 const assert=(x,msg)=>{if(!x)throw Error(msg)};
 const integer=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -106,7 +107,7 @@ export function guidedMandatoryMastery({kind,character,mishapKind=null,abe=null,
 
 export function createGuidedMandatory({state,character,round,eventId,actorId=null,turnEnded=false,
  timelineId=null,elapsedMinutesSinceOriginal=null,kind=null,mishapTechnique='attribute',
- abe=null,comaLocationShock=null,comaInjuryLevel=null,mishapContext=null}={}){
+ abe=null,comaLocationShock=null,comaInjuryLevel=null,mishapContext=null,herbalContext=null}={}){
  validateCombatState(state);
  assert(integer(round,1,9999)&&round>=state.lastRound&&typeof eventId==='string'&&eventId.length>0,
   'Chybí skutečné kolo nebo ID události');
@@ -135,12 +136,15 @@ export function createGuidedMandatory({state,character,round,eventId,actorId=nul
  }
 
  const fatigue=combatFatigueTotals(state).total;
+ const herbalProof=event.kind==='blood-loss'&&herbalContext?
+  coagulantBleedingEvidence({...herbalContext,targetId:character.id,woundId:event.id,combatRound:round,timelineId}):
+  {bonus:0,stage:0,sourceIds:[],completeIds:[],sourcePage:75};
  const proofId=`${eventId}:${event.kind}:${event.id}`;
  const queue=rollRequired?createManualDiceQueue({id:proofId,source:event.source,round,
   actorId:character.id,requests:[{id:'resultD100',faces:100,label:`${event.label}: skutečný d100`}]}):null;
  return {format:'hmk-guided-mandatory-v1',event,characterId:character.id,round,eventId,actorId,turnEnded,
   timelineId,elapsedMinutesSinceOriginal,context:{ml,abe,technique:mishapTechnique,comaLocationShock,comaInjuryLevel,fatigue,
-   mishapProfile:profile,injuryImpairment:impaired?.impairment??null,impairedTest:impaired?.test??null,usedArms:impaired?.usedArms??null},
+   herbalProof,mishapProfile:profile,injuryImpairment:impaired?.impairment??null,impairedTest:impaired?.test??null,usedArms:impaired?.usedArms??null},
   stateWitness:stateSignature(state),characterWitness:stateSignature(character.hmk),queue,rolls:[],phase:queue?'waiting-die':'ready',outcome:null};
 }
 
@@ -180,7 +184,7 @@ export function submitGuidedMandatoryDie(session,value){
 /** One atomic transition; any failure leaves the source state untouched.
  * Caller persists ONLY the returned state. The proof is stored in the event. */
 export function commitGuidedMandatory({session,state,character,round,actorId=null,turnEnded=false,
- timelineId=null,elapsedMinutesSinceOriginal=null}={}){
+ timelineId=null,elapsedMinutesSinceOriginal=null,herbalContext=null}={}){
  assert(session?.format==='hmk-guided-mandatory-v1'&&session.phase==='ready','Hody ještě nejsou úplné');
  validateCombatState(state);
  assert(stateSignature(state)===session.stateWitness,'Stav postavy se změnil; před hodem je nutné obnovit pravidlový krok');
@@ -192,11 +196,15 @@ export function commitGuidedMandatory({session,state,character,round,actorId=nul
  const all=guidedMandatoryEvents({state,characterId:character.id,round,actorId,turnEnded,timelineId,elapsedMinutesSinceOriginal});
  assert(all[0]?.kind===session.event.kind&&all[0]?.id===session.event.id,'Povinná událost se změnila');
  const ctx=session.context,roll=session.rolls.find(x=>x.id==='resultD100')?.value;
+ const herb=session.event.kind==='blood-loss'&&herbalContext?
+  coagulantBleedingEvidence({...herbalContext,targetId:character.id,woundId:session.event.id,combatRound:round,timelineId}):
+  {bonus:0,stage:0,sourceIds:[],completeIds:[],sourcePage:75};
+ assert(JSON.stringify(herb)===JSON.stringify(ctx.herbalProof),'Coagulant: změnil se původ podání nebo čas GM; obnovte fyzický hod');
  let transition=null;
  if(session.event.kind==='blood-loss'){
   assert(integer(roll,1,100),'Blood Loss vyžaduje skutečný Strength d100');
   transition=applyConfirmedBloodLoss({state,round,eventId:session.eventId,woundId:session.event.id,
-   sl:nameSL(successLevel(roll,ctx.ml))});
+   sl:nameSL(successLevel(roll,ctx.ml+herb.bonus))});
  }else if(session.event.kind==='injury-mishap'){
   assert(ctx.mishapProfile&&integer(ctx.injuryImpairment,0,9999),'Mishap: neověřená anatomie nebo impairment');
   transition=applyConfirmedInjuryMishap({state,round,eventId:session.eventId,mishapId:session.event.id,
@@ -220,10 +228,11 @@ export function commitGuidedMandatory({session,state,character,round,actorId=nul
  const finished=transition.state;
  const last=finished.events.at(-1);
  assert(last?.id===session.eventId,'Nepodařilo se doložit automatický přechod');
+ if(session.event.kind==='blood-loss')last.details.coagulant={...herb,baseStrengthML:ctx.ml,rawEML:ctx.ml+herb.bonus,actualD100:roll};
  last.details.physicalDice={format:'hmk-manual-dice-proof-v1',source:session.event.source,
   rolls:session.rolls.map(x=>({...x}))};
  last.details.guidedResolution={kind:session.event.kind,ml:ctx.ml,abe:ctx.abe,derivedSL:roll==null?null:
-  nameSL(successLevel(roll,session.event.kind==='blood-loss'?ctx.ml:session.event.kind==='injury-mishap'?
+  nameSL(successLevel(roll,session.event.kind==='blood-loss'?ctx.ml+herb.bonus:session.event.kind==='injury-mishap'?
   ctx.ml-ctx.fatigue-ctx.injuryImpairment:session.event.kind==='shock-recovery'?
   ctx.ml-combatFatigueTotals(state).total-(state.shock==='STN'?0:20):session.event.kind==='injury-morale'?
   ctx.ml-5*ctx.abe-combatFatigueTotals(state).total+(state.morale?.state==='brave'?20:0):ctx.ml)),

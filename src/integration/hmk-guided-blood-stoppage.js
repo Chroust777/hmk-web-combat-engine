@@ -7,6 +7,7 @@ import {SL,successLevel} from '../rules/tests.js';
 import {bloodStoppageResult,multipleBleederStaunchModifier} from '../rules/bleeding.js';
 import {applyConfirmedBloodStoppage,combatFatigueTotals,validateCombatState} from './persistent-combat-state.js';
 import {createManualDiceQueue,recordManualDie,nextManualDie,completedManualDice} from './hmk-manual-dice-queue.js';
+import {coagulantBleedingEvidence} from './hmk-herbal-bleeding-bridge.js';
 
 const insist=(ok,msg)=>{if(!ok)throw Error(msg)};
 const whole=(n,a,b)=>Number.isSafeInteger(n)&&n>=a&&n<=b;
@@ -39,7 +40,7 @@ function queueFor({session,id,label,actorId}){
  */
 export function createGuidedBloodStoppage({id,round,timelineId=null,healer,healerState,
  patient,patientState,woundId,method,hasBandage=null,hasWater=null,hasNeedleThread=null,hasHeatedTool=null,
- tourniquet=false,plannedBleeders=null}={}){
+ tourniquet=false,plannedBleeders=null,herbalContext=null}={}){
  insist(typeof id==='string'&&id&&whole(round,1,9999),'Chybí identita ošetření nebo skutečné kolo');
  insist(healer?.id&&patient?.id&&healer?.hmk&&patient?.hmk,'Nejsou doloženi léčitel a pacient');
  validateCombatState(patientState);validateCombatState(healerState);
@@ -65,6 +66,8 @@ export function createGuidedBloodStoppage({id,round,timelineId=null,healer,heale
   'Turniket lze použít jen při Staunch končetiny');
  insist(whole(plannedBleeders,1,100),'Chybí skutečný počet Bleederů léčených tímto léčitelem během 5 minut');
  const base=physicianML(healer),bloodML=bleedingML(patient);
+ const herbalProof=herbalContext?coagulantBleedingEvidence({...herbalContext,targetId:patient.id,woundId,combatRound:round,timelineId}):
+  {bonus:0,stage:0,sourceIds:[],completeIds:[],sourcePage:75};
  const fatigue=combatFatigueTotals(healerState).total;
  const methodModifier=method==='cau'?30:tourniquet?20:0;
  const repeatingBonus=method==='sta'?(wound.staunchBonus??0):0;
@@ -74,7 +77,7 @@ export function createGuidedBloodStoppage({id,round,timelineId=null,healer,heale
  const session={format:'hmk-guided-blood-stoppage-v1',id,round,timelineId,patientId:patient.id,healerId:healer.id,
   woundId,method,hasBandage,hasWater,hasNeedleThread,hasHeatedTool,tourniquet,plannedBleeders,
   context:{physicianML:base,healerFatigue:fatigue,methodModifier,repeatingBonus,multiModifier,
-   physicianEML:eml,bloodLossML:bloodML,dueRound:wound.nextAdvanceRound},
+   physicianEML:eml,bloodLossML:bloodML+herbalProof.bonus,baseStrengthML:bloodML,herbalProof,dueRound:wound.nextAdvanceRound},
   patientWitness:signature(patientState),healerWitness:signature(healerState),
   patientSheetWitness:signature(patient.hmk),healerSheetWitness:signature(healer.hmk),
   queue:null,rolls:[],phase:'waiting-treatment',stoppageSL:null};
@@ -106,12 +109,16 @@ export function submitGuidedBloodStoppageDie(session,value){
  }else next.phase='ready';
  return next;
 }
-export function commitGuidedBloodStoppage({session,round,timelineId=null,healer,healerState,patient,patientState}={}){
+export function commitGuidedBloodStoppage({session,round,timelineId=null,healer,healerState,patient,patientState,herbalContext=null}={}){
  insist(session?.phase==='ready'&&session.format==='hmk-guided-blood-stoppage-v1',
   'Před trvalým zápisem chybí povinný fyzický hod');
  insist(session.round===round&&session.timelineId===timelineId&&healer?.id===session.healerId&&
   patient?.id===session.patientId,'Účastník, kolo nebo časová osa se změnili');
  validateCombatState(patientState);validateCombatState(healerState);
+ const herb=herbalContext?coagulantBleedingEvidence({...herbalContext,targetId:patient.id,woundId:session.woundId,combatRound:round,timelineId}):
+  {bonus:0,stage:0,sourceIds:[],completeIds:[],sourcePage:75};
+ insist(JSON.stringify(herb)===JSON.stringify(session.context.herbalProof),
+  'Coagulant: změnila se časová osa nebo historie podání; obnovte fyzické hody');
  insist(signature(patientState)===session.patientWitness&&signature(healerState)===session.healerWitness&&
   signature(patient.hmk)===session.patientSheetWitness&&signature(healer.hmk)===session.healerSheetWitness,
   'Léčitel, pacient nebo jejich stav se po fyzickém hodu změnili');
@@ -131,7 +138,7 @@ export function commitGuidedBloodStoppage({session,round,timelineId=null,healer,
  }
  const evidence=transition.state.events.at(-1);
  insist(evidence?.id===session.id,'Ošetření nemá doložený trvalý výsledek');
- evidence.details={...evidence.details,healerId:session.healerId,patientId:session.patientId,
+ evidence.details={...evidence.details,coagulant:stop.advanceRoll?{...herb,baseStrengthML:session.context.baseStrengthML,rawEML:session.context.bloodLossML,actualD100:bDie}:null,healerId:session.healerId,patientId:session.patientId,
   method:session.method,tourniquet:session.tourniquet,plannedBleeders:session.plannedBleeders,
   physicianEML:session.context.physicianEML,physicianML:session.context.physicianML,
   healerFatigue:session.context.healerFatigue,methodModifier:session.context.methodModifier,
