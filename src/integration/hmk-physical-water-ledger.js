@@ -8,6 +8,7 @@
 export const WATER_FILL='hmk-physical-water-fill-v1';
 export const WATER_USE='hmk-physical-water-use-v1';
 export const WATER_TRANSFER='hmk-water-transfer-v1';
+export const WATER_LOSS='hmk-water-loss-v1';
 export const WATER_ITEM='hmk:gear:hmk-p120-040';
 export const WATER_JUG_ITEM='hmk:gear:hmk-p121-043';
 const VESSELS=Object.freeze({
@@ -33,6 +34,8 @@ export function waterskinBalances(journal=[],campaignId,actorId,minute=1e9){
   if(u&&map.has(u.fillId))map.get(u.fillId).remaining=Math.round((map.get(u.fillId).remaining-u.quantity)*2)/2;
   const t=row.calendarInventoryWaterTransfer;
   if(t&&map.has(t.donorFillId))map.get(t.donorFillId).remaining=Math.round((map.get(t.donorFillId).remaining-t.quantity)*2)/2;
+  const l=row.calendarInventoryWaterLoss;
+  if(l&&map.has(l.fillId))map.get(l.fillId).remaining=Math.round((map.get(l.fillId).remaining-l.quantity)*2)/2;
  }
  return result;
 }
@@ -123,10 +126,45 @@ export function recordPhysicalWaterTransfer(database,{donorId,recipientId,donorF
  validatePhysicalWaterJournal(next.journal,next.inventory,next);
  return next;
 }
+/** Witnessed spill, loss or disposal of potable contents. This is NOT
+ * drinking or automatically a source of Thirst; future daily supplies are
+ * evaluated by the existing GM-time nutrition system. */
+export function recordPhysicalWaterLoss(database,{actorId,fillId,quantity,eventId,
+ campaignId,minute,reason='',confirmedByGM=false,createdAt=''}={}){
+ check(database&&Array.isArray(database.journal)&&Array.isArray(database.inventory)&&
+  Array.isArray(database.characters)&&database.campaignClock,'Chybí inventář vody a kalendář');
+ check((database.campaignClock.campaignId||`legacy:${database.campaignClock.events?.[0]?.id||''}`)===campaignId&&
+  database.campaignClock.minute===minute&&isMinute(minute),'Odpis vody vyžaduje aktuální čas GM');
+ check(database.characters.some(c=>c.id===actorId)&&
+  (database.campaignClock.characterIds??database.characters.map(c=>c.id)).includes(actorId),
+  'Postava nepatří do aktuální kampaně');
+ check(!database.combatRuntime?.sequence?.active,'Ztrátu během Initiative řešte pravidlovou Combat akcí');
+ check(confirmedByGM===true&&typeof reason==='string'&&reason.trim().length>=2&&reason.trim().length<=160,
+  'GM musí potvrdit skutečnou ztrátu a její okolnosti');
+ check([0.5,1].includes(quantity)&&typeof eventId==='string'&&eventId&&
+  typeof createdAt==='string'&&createdAt&&!database.journal.some(j=>j.id===eventId),
+  'Neplatný objem nebo duplicitní auditní ID');
+ const fill=database.journal.find(j=>j.id===fillId&&j.calendarInventoryWaterFill&&
+  j.characterId===actorId&&j.calendarCampaignId===campaignId&&j.campaignMinute<=minute);
+ const balance=waterskinBalances(database.journal,campaignId,actorId,minute).find(x=>x.fillId===fillId);
+ check(fill&&balance&&balance.remaining>=quantity,'Voda v původní nádobě již není dostupná');
+ const item=database.inventory.find(i=>i.id===balance.itemId&&i.characterId===actorId);
+ check(waterContainerCapacity(item)!==null&&item.slot==='carried',
+  'Nádoba s vodou musí být skutečně nesená v otevřené kampani');
+ const proof={format:WATER_LOSS,campaignId,actorId,minute,fillId,itemId:balance.itemId,
+  quantity,unit:'waterDays',reason:reason.trim(),confirmedByGM:true};
+ const next=structuredClone(database);
+ next.journal.push({id:eventId,characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,
+  createdAt,title:'Inventář · odpis doložené vody',
+  body:`${quantity} gal · ${item.snapshot.name} · ${reason.trim()}; nevypito, čas GM beze změny`,
+  calendarInventoryWaterLoss:proof});
+ validatePhysicalWaterJournal(next.journal,next.inventory,next);
+ return next;
+}
 export function validatePhysicalWaterJournal(journal=[],inventory=null,database=null){
  const transfers=new Map(),fillsFromTransfer=new Set();
  const prior=[];
- for(const row of journal){const f=row.calendarInventoryWaterFill,u=row.calendarInventoryWaterUse,t=row.calendarInventoryWaterTransfer;
+ for(const row of journal){const f=row.calendarInventoryWaterFill,u=row.calendarInventoryWaterUse,t=row.calendarInventoryWaterTransfer,l=row.calendarInventoryWaterLoss;
   if(t){
    check(t.format===WATER_TRANSFER&&row.characterId===t.donorId&&row.calendarCampaignId===t.campaignId&&
     row.campaignMinute===t.minute&&isMinute(t.minute)&&typeof row.createdAt==='string'&&row.createdAt&&
@@ -175,6 +213,18 @@ export function validatePhysicalWaterJournal(journal=[],inventory=null,database=
    if(u.nutritionDayId!==undefined){check(typeof u.nutritionDayId==='string'&&u.nutritionDayId,'Chybí denní vazba vody');expected.nutritionDayId=u.nutritionDayId;}
    check(JSON.stringify(expected)===JSON.stringify(u),'Pozměněný výdej fyzické vody');
   }
+  if(l){
+   const origin=prior.find(x=>x.id===l.fillId)?.calendarInventoryWaterFill;
+   const balance=waterskinBalances(prior,l.campaignId,l.actorId,l.minute).find(x=>x.fillId===l.fillId);
+   check(l.format===WATER_LOSS&&l.campaignId===row.calendarCampaignId&&
+    l.actorId===row.characterId&&l.minute===row.campaignMinute&&isMinute(l.minute)&&
+    [0.5,1].includes(l.quantity)&&origin&&origin.actorId===l.actorId&&
+    origin.itemId===l.itemId&&balance&&balance.remaining>=l.quantity&&
+    l.unit==='waterDays'&&l.confirmedByGM===true&&
+    typeof l.reason==='string'&&l.reason.length>=2&&l.reason.length<=160&&
+    typeof row.createdAt==='string'&&row.createdAt,
+    'Poškozený nebo nedoložený odpis vody');
+  }
   prior.push(row);
  }
  for(const id of transfers.keys())check(fillsFromTransfer.has(id),'Osiřelý převod vody bez příjemcovy nádoby');
@@ -196,7 +246,7 @@ export function assertWaterBacking(before,after,campaignId=null){
 }
 export function assertWaterAppendOnly(before=[],after=[]){
  const now=new Map(after.map(j=>[j.id,j]));
- for(const row of before)if(row.calendarInventoryWaterFill||row.calendarInventoryWaterUse||row.calendarInventoryWaterTransfer)
+ for(const row of before)if(row.calendarInventoryWaterFill||row.calendarInventoryWaterUse||row.calendarInventoryWaterTransfer||row.calendarInventoryWaterLoss)
   check(now.has(row.id)&&JSON.stringify(now.get(row.id))===JSON.stringify(row),
    'Doložená naplnění a spotřeba vody se nesmějí změnit ani smazat');
  return true;

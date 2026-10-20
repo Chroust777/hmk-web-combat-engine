@@ -8,6 +8,7 @@ import {provenCarriedRations} from './hmk-inventory-provisions.js';
 export const PHYSICAL_RATION_STOCK='hmk-physical-ration-stock-v1';
 export const PHYSICAL_RATION_USE='hmk-physical-ration-use-v1';
 export const PHYSICAL_RATION_TRANSFER='hmk-physical-ration-transfer-v1';
+export const PHYSICAL_RATION_LOSS='hmk-physical-ration-loss-v1';
 const DAY=1440;
 const fail=message=>{throw Error(message)};
 const check=(value,message)=>{if(!value)fail(message)};
@@ -21,7 +22,7 @@ export function rationStockBalances(journal=[],campaignId,actorId,minute=1e9){
  const lots=[],map=new Map();
  for(const row of journal){
   if(row.calendarCampaignId!==campaignId||row.campaignMinute>minute)continue;
-  const s=row.calendarInventoryRationStock,t=row.calendarInventoryRationTransfer,u=row.calendarInventoryRationUse;
+  const s=row.calendarInventoryRationStock,t=row.calendarInventoryRationTransfer,u=row.calendarInventoryRationUse,l=row.calendarInventoryRationLoss;
   if(s&&row.characterId===actorId){
    const lot={sourceId:row.id,itemId:s.itemId,actorId,sourceItemId:s.sourceItemId,name:s.name,
     quantity:s.quantity,remaining:s.quantity,minute:s.minute,expiresAt:s.expiresAt};
@@ -37,6 +38,9 @@ export function rationStockBalances(journal=[],campaignId,actorId,minute=1e9){
   }
   if(t&&t.donorId===actorId&&map.has(t.sourceId)){
    const lot=map.get(t.sourceId);lot.remaining=Math.round((lot.remaining-t.quantity)*2)/2;
+  }
+  if(l&&row.characterId===actorId&&map.has(l.sourceId)){
+   const lot=map.get(l.sourceId);lot.remaining=Math.round((lot.remaining-l.quantity)*2)/2;
   }
  }
  return lots;
@@ -110,6 +114,35 @@ export function recordPhysicalRationHandoff(database,{donorId,recipientId,source
  validatePhysicalRationJournal(next.journal,next.inventory);
  return next;
 }
+/** Witnessed spoilage, theft or discarding of EXISTING edible stock. This
+ * changes physical custody only (never eating or a health roll). The baseline
+ * inventory and original source receipts stay immutable across campaigns. */
+export function recordPhysicalRationLoss(database,{actorId,sourceId,quantity,eventId,
+ campaignId,minute,reason='',confirmedByGM=false,createdAt=''}={}){
+ check(database&&Array.isArray(database.journal)&&Array.isArray(database.inventory)&&
+  Array.isArray(database.characters)&&database.campaignClock,'Chybí inventář a kalendář');
+ check((database.campaignClock.campaignId||`legacy:${database.campaignClock.events?.[0]?.id||''}`)===campaignId&&
+  database.campaignClock.minute===minute&&isMinute(minute),'Odpis vyžaduje aktuální čas GM');
+ check(database.characters.some(c=>c.id===actorId)&&
+  (database.campaignClock.characterIds??database.characters.map(c=>c.id)).includes(actorId),
+  'Postava nepatří do aktuální kampaně');
+ check(!database.combatRuntime?.sequence?.active,'Během Initiative řešte ztrátu pravidlovou Combat akcí');
+ check(confirmedByGM===true&&typeof reason==='string'&&reason.trim().length>=2&&reason.trim().length<=160,
+  'GM musí potvrdit konkrétní ztrátu a okolnosti');
+ check(isHalf(quantity)&&typeof eventId==='string'&&eventId&&typeof createdAt==='string'&&createdAt&&
+  !database.journal.some(j=>j.id===eventId),'Neplatný objem či duplicitní auditní záznam');
+ const lot=rationStockBalances(database.journal,campaignId,actorId,minute).find(x=>x.sourceId===sourceId);
+ check(lot&&lot.minute<=minute&&lot.remaining>=quantity,'Doložené příděly nestačí nebo již byly vydány');
+ const proof={format:PHYSICAL_RATION_LOSS,campaignId,actorId,minute,sourceId,itemId:lot.itemId,
+  quantity,unit:'foodDays',reason:reason.trim(),confirmedByGM:true};
+ const next=structuredClone(database);
+ next.journal.push({id:eventId,characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,
+  createdAt,title:'Inventář · odpis fyzických přídělů',
+  body:`${quantity} food-days · ${lot.name} · ${reason.trim()}; není spotřeba, čas GM beze změny`,
+  calendarInventoryRationLoss:proof});
+ validatePhysicalRationJournal(next.journal,next.inventory,next);
+ return next;
+}
 /** Replay preserves origin, chronology, uniqueness, ration units and no
  * cross-campaign borrowing. Legacy journal entries remain untouched. */
 export function validatePhysicalRationJournal(journal=[],inventory=null,database=null){
@@ -156,6 +189,17 @@ export function validatePhysicalRationJournal(journal=[],inventory=null,database
     !prior.some(x=>x.calendarInventoryRationTransfer?.receivedItemId===t.receivedItemId||x.id===row.id),
     'Neplatný či duplicitní důkaz předání potravin');
   }
+  const l=row.calendarInventoryRationLoss;
+  if(l){
+   const lot=rationStockBalances(prior,l.campaignId,l.actorId,l.minute).find(x=>x.sourceId===l.sourceId);
+   check(l.format===PHYSICAL_RATION_LOSS&&l.campaignId===row.calendarCampaignId&&
+    l.actorId===row.characterId&&l.minute===row.campaignMinute&&isMinute(l.minute)&&
+    isHalf(l.quantity)&&lot&&lot.remaining>=l.quantity&&lot.itemId===l.itemId&&
+    l.unit==='foodDays'&&l.confirmedByGM===true&&
+    typeof l.reason==='string'&&l.reason.length>=2&&l.reason.length<=160&&
+    typeof row.createdAt==='string'&&row.createdAt,
+    'Poškozený nebo nedoložený odpis fyzických přídělů');
+  }
   const u=row.calendarInventoryRationUse;
   if(u){
    const expected=createPhysicalRationUse({journal:prior,campaignId:row.calendarCampaignId,
@@ -173,7 +217,7 @@ export function projectCampaignRationInventory(inventory=[],journal=[],campaignI
  const quantities=new Map(),received=[];
  for(const row of journal){
   if(row.calendarCampaignId!==campaignId)continue;
-  const stock=row.calendarInventoryRationStock,t=row.calendarInventoryRationTransfer,u=row.calendarInventoryRationUse;
+  const stock=row.calendarInventoryRationStock,t=row.calendarInventoryRationTransfer,u=row.calendarInventoryRationUse,l=row.calendarInventoryRationLoss;
   if(stock)quantities.set(stock.itemId,stock.quantity);
   if(t){
    if(quantities.has(t.sourceInventoryItemId))quantities.set(t.sourceInventoryItemId,
@@ -182,6 +226,8 @@ export function projectCampaignRationInventory(inventory=[],journal=[],campaignI
   }
   if(u&&quantities.has(u.itemId))quantities.set(u.itemId,
    Math.round((quantities.get(u.itemId)-u.quantity)*2)/2);
+  if(l&&quantities.has(l.itemId))quantities.set(l.itemId,
+   Math.round((quantities.get(l.itemId)-l.quantity)*2)/2);
  }
  const owned=inventory.flatMap(item=>{
   const quantity=quantities.get(item.id);
@@ -215,7 +261,7 @@ export function assertPhysicalRationBacking(before,after){
 }
 export function assertPhysicalRationAppendOnly(previous=[],next=[]){
  const byId=new Map(next.map(x=>[x.id,x]));
- for(const row of previous)if(row.calendarInventoryRationStock||row.calendarInventoryRationUse||row.calendarInventoryRationTransfer)
+ for(const row of previous)if(row.calendarInventoryRationStock||row.calendarInventoryRationUse||row.calendarInventoryRationTransfer||row.calendarInventoryRationLoss)
   check(byId.has(row.id)&&JSON.stringify(byId.get(row.id))===JSON.stringify(row),'Historické fyzické příděly nelze přepsat ani smazat');
  return true;
 }
