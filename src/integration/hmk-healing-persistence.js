@@ -8,6 +8,7 @@ import {treatmentContract,canPerformTreatment,resolveTreatmentTable,treatmentRol
  severityFromInjuryLevel,permanentHealingImpairment,infectionInitialHR,infectionCourseEML,
  resolveInfectionCourse,infectionWeaknessFatigue} from '../rules/healing.js';
 import {validateCombatState,initialCombatState} from './persistent-combat-state.js';
+import {curativeHealingEvidence} from './hmk-herbal-healing-bridge.js';
 const int=(x,lo=0,hi=999999)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
 const requireRule=(ok,message)=>{if(!ok)throw Error(message);};
 const copy=x=>structuredClone(x);
@@ -101,7 +102,7 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
  track(s,{eventId,round,type:'injury-untreated',details:{woundId,daySinceInjury,source:'HMK p180'}});
  return {state:s,healed:false,treatment:w.healing};
 }
-export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,gmConfirmed=false}={}){
+export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,herbalContext=null,gmConfirmed=false}={}){
  const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing;verifyWoundDay(s,woundId,daySinceInjury);
  requireRule(gmConfirmed===true&&h?.treated&&int(h.healingRate,1,6),'Rána nemá potvrzenou léčbu ani Healing Rate');
  requireRule(!h.noMundaneHealing&&!(w.bodyKind==='horse'&&['flg','hlg'].includes(w.location)&&h.healingRate<=2),
@@ -109,7 +110,8 @@ export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinc
  requireRule(!s.wounds.some(x=>x.healing?.infected),'HMK str.181: jakákoli aktivní infekce přerušuje všechny Injury Healing Rolls');
  requireRule(daySinceInjury===h.nextHealingDay,'Healing Roll je splatný přesně podle pětideního intervalu: den '+h.nextHealingDay);
  requireRule(int(roll,1,100),'Povinný skutečný d100');
- const hb=healingBase({endurance,will}),rawEML=hb*h.healingRate;
+ const herb=herbalContext?curativeHealingEvidence({...herbalContext,woundId}):{bonus:0,sourceIds:[]};
+ const hb=healingBase({endurance,will}),rawEML=hb*h.healingRate+herb.bonus;
  let sl=successLevel(roll,rawEML);
  if(sl===SL.F&&healingFailureIsCritical({roll,cauterised:!!h.cauterised,area:!!h.area}))sl=SL.CF;
  const result=resolveInjuryHealingRoll({injuryLevel:w.level,sl,infectionPossible:!!h.infectionPossible});
@@ -120,7 +122,7 @@ export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinc
   if(w.severity==='M'&&h.daysToMinor==null){h.daysToMinor=daySinceInjury;h.permanentImpairment=permanentHealingImpairment({daysToMinor:daySinceInjury,eligible:!!h.permanentEligible});}
  }
  if(!w.healed&&!result.infected)h.nextHealingDay=daySinceInjury+5;
- track(s,{eventId,round,type:'injury-healing-roll',details:{woundId,daySinceInjury,hb,hr:h.healingRate,rawEML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:w.healed?'healed':w.severity+w.level,infected:!!result.infected}});
+ track(s,{eventId,round,type:'injury-healing-roll',details:{woundId,daySinceInjury,hb,hr:h.healingRate,rawEML,herbalBonus:herb.bonus,herbalSourceIds:herb.sourceIds,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:w.healed?'healed':w.severity+w.level,infected:!!result.infected}});
  return {state:s,healed:!!w.healed,infected:!!h.infected,result};
 }
 /** HMK p181: Infection suspends ALL injury healing. The day index of an
@@ -135,12 +137,13 @@ export function infectionResumptionRequirements(state,sourceWoundId){
   !x.healing.noMundaneHealing).map(x=>({woundId:x.id,location:x.location,
    label:`${x.location} ${x.severity}${x.level}`}));
 }
-export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,physicianSV=0,otherWoundDays={},gmConfirmed=false}={}){
+export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,physicianSV=0,otherWoundDays={},herbalContext=null,gmConfirmed=false}={}){
  const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing;verifyWoundDay(s,woundId,daySinceInjury);
  requireRule(gmConfirmed===true&&h?.infected,'Neexistuje aktivní infekce této rány');
  requireRule(daySinceInjury===h.nextInfectionDay,'Infection Course je splatný v den '+h.nextInfectionDay);
  requireRule(int(roll,1,100)&&int(physicianSV,-20,30),'Neplatný Infection Roll nebo Physician SV');
- const hb=healingBase({endurance,will}),rawEML=infectionCourseEML({healingBase:hb,infectionHR:h.infectionHR,physicianSV});
+ const herb=herbalContext?curativeHealingEvidence({...herbalContext,woundId}):{bonus:0,sourceIds:[]};
+ const hb=healingBase({endurance,will}),rawEML=infectionCourseEML({healingBase:hb,infectionHR:h.infectionHR,physicianSV})+herb.bonus;
  const sl=successLevel(roll,rawEML),result=resolveInfectionCourse({hr:h.infectionHR,sl});
  h.infectionHR=result.hr;
  if(result.dead){s.shock='KIA';s.shockFollowup=null;s.extendedShock=null;s.coma=null;for(const x of s.wounds)x.nextAdvanceRound=null;}
@@ -169,7 +172,7 @@ export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySi
   }
  }else if(result.active){h.nextInfectionDay=daySinceInjury+1;setInfectionWeakness(s,w,result.weaknessFatigue);}
  if(result.dead){s.shockOriginRound=round;s.bloodShockPending=false;}
- track(s,{eventId,round,type:'infection-course',details:{woundId,daySinceInjury,hb,rawEML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),afterHR:result.hr,dead:result.dead,defeated:result.defeated,resumedInjuries:resumed}});
+ track(s,{eventId,round,type:'infection-course',details:{woundId,daySinceInjury,hb,rawEML,physicianSV,herbalBonus:herb.bonus,herbalSourceIds:herb.sourceIds,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),afterHR:result.hr,dead:result.dead,defeated:result.defeated,resumedInjuries:resumed}});
  return {state:s,result};
 }
 /** HMK p181: every ten days after actual BP loss; ignore only weakness CAUSED by anaemia. */
