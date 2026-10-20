@@ -38,6 +38,7 @@ import {automaticCriticalFailure,classifySkillConsequence,skillConsequenceProof,
 import {applyInventoryItemEdit,transferInventoryItem} from './src/integration/hmk-inventory-edit.js';
 import {moveInventoryChest,chestRows,validateChestTransferJournal,assertChestTransferAppendOnly} from './src/integration/hmk-inventory-chest.js';
 import {createPotableWaterFill,availablePhysicalWater,waterskinBalances,projectCampaignWaterInventory,validatePhysicalWaterJournal,assertWaterBacking,assertWaterAppendOnly} from './src/integration/hmk-physical-water-ledger.js';
+import {createForagingWaterStorage,validateForagingWaterStorageJournal} from './src/integration/hmk-foraging-water-storage.js';
 import {isHandheldItem,requiresTwoHands,gripOf,supportsSelectableTwoHandGrip,setWeaponGrip,validateHandInventory,equipInventoryHand} from './src/integration/hmk-hand-equipment.js';
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
 import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
@@ -191,7 +192,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.385';
+const APP_VERSION='93.386';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -241,7 +242,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateNutritionJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
+ if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateNutritionJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
@@ -1761,7 +1762,7 @@ function foragingEvidenceInCharacterInventory(actorId){
  return `<section class="panel wide"><h3>Foraging · doložené zásoby (HMK 147)</h3>
  <p>Společná zásoba kampaně: ${balance.available.foodDays} food-days · ${balance.available.waterDays} water-days · ${balance.available.herbDoses} dávek bylin.</p>
  <p class="muted">Tento oddíl je auditní propojení zásob s evidencí výbavy postavy. Jde o jednotky potravy, vody a dávky bylin, nikoliv o vymyšlený fyzický předmět s neznámou hmotností. Výdeje se provádějí v Kalendáři.</p>
- ${claims.length?claims.slice(-10).reverse().map(j=>`<p class="hc-hint">${esc(displayCampaignMinute(j.campaignMinute))} · ${j.calendarForagingSupplyUse.quantity} ${esc(j.calendarForagingSupplyUse.unit)}${j.calendarForagingSupplyUse.herbName?' · '+esc(j.calendarForagingSupplyUse.herbName):''} · ${j.calendarForagingSupplyUse.disposition==='consumed'?'Spotřebováno':'Ingredience rezervována pro Concoction'}</p>`).join(''):'<p class="hc-hint">Postava zatím nemá žádný doložený výdej zásob.</p>'}
+ ${claims.length?claims.slice(-10).reverse().map(j=>`<p class="hc-hint">${esc(displayCampaignMinute(j.campaignMinute))} · ${j.calendarForagingSupplyUse.quantity} ${esc(j.calendarForagingSupplyUse.unit)}${j.calendarForagingSupplyUse.herbName?' · '+esc(j.calendarForagingSupplyUse.herbName):''} · ${j.calendarForagingSupplyUse.disposition==='consumed'?'Spotřebováno':j.calendarForagingSupplyUse.disposition==='stored-in-container'?'Převedeno do Waterskin (nikoli vypito)':'Ingredience rezervována pro Concoction'}</p>`).join(''):'<p class="hc-hint">Postava zatím nemá žádný doložený výdej zásob.</p>'}
  </section>`;
 }
 function journalSectionNav(){return `<div class="journal-book-subnav">${[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['notes','Notes & Logbook'],['hazards','Nebezpečí / Trauma']].map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}<span class="journal-character-action-divider" aria-hidden="true"></span><button type="button" class="secondary journal-character-action" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="secondary journal-character-action" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`;}
@@ -9147,7 +9148,12 @@ function asNonNegativeNumber(v){if(v===null||v===undefined||String(v).trim()==="
 function asNumber(v){if(v===null||v===undefined||String(v).trim()==='')return null;const n=Number(v);return Number.isSafeInteger(n)&&n>=0?n:null}
 
 // v11: Form-based inventory editing with explicit category and slot validation.
-function waterFillForm(x){return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Naplnit Waterskin, 2 quart</h2><p class="muted">Přijme se právě 0,5 gal pitné vody (+5 lb). Čas zůstane beze změny a založí se nezměnitelný kampaňový důkaz.</p><form id="water-fill-form"><label>Doložený zdroj vody<input name="waterSource" maxlength="160" required placeholder="Např. studna u domu, potok ověřený GM"></label><input type="hidden" name="itemId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(x.characterId)}"><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil existující zdroj nezávadné pitné vody, skutečné naplnění a přístup postavy k nádobě</label><div class="actions"><button type="submit">Potvrdit naplnění</button><button type="button" data-action="cancel-editor" class="secondary">Zrušit</button></div></form></section></div>`;}
+function waterFillForm(x){
+ const clock=data.campaignClock,key=campaignKey(clock);
+ const lots=clock?availableSupplyLots(data.journal,key).filter(l=>l.unit==='waterDays'&&l.remaining>=0.5&&l.minute<=clock.minute):[];
+ const choices=lots.map(l=>`<option value="${esc(l.sourceId+'|'+l.resultIndex)}">Foraging · zdroj ${esc(l.sourceId)} / výsledek ${l.resultIndex+1} · k dispozici ${l.remaining} dne vody</option>`).join('');
+ return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Naplnit Waterskin, 2 quart</h2><p class="muted">Přijme se přesně 0,5 gal pitné vody (+5 lb). Doložený Foraging výsledek bude odečten z jeho zásoby a tentýž objem nebude zároveň započítán jako vypitý. Čas zůstane beze změny.</p><form id="water-fill-form"><label>Zdroj skutečné vody<select name="foragingLot">${lots.length?`<option value="">Jiný doložený zdroj (GM)</option>${choices}`:'<option value="">Jiný doložený zdroj (GM) · žádný dostupný Foraging nález</option>'}</select></label><label>Pokud zdroj není Foraging: kde byla voda získána?<input name="waterSource" maxlength="160" placeholder="Např. studna u domu, potok ověřený GM"></label><input type="hidden" name="itemId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(x.characterId)}"><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil skutečnou pitnou vodu, přístup k jejímu zdroji, naplnění a přístup k nádobě</label><div class="actions"><button type="submit">Potvrdit naplnění</button><button type="button" data-action="cancel-editor" class="secondary">Zrušit</button></div></form></section></div>`;
+}
 function chestMoveForm(x){
  const stored=x.slot==='chest';const place=stored?x.chestLocation||'':'';
  return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="chest-move-title"><h2 id="chest-move-title">${stored?'Vyzvednout z Truhlice':'Uložit do Truhlice'} · ${esc(x.snapshot?.name||'Předmět')}</h2><p class="muted">Majetek zůstane postavě. Truhlice nepatří do nesené hmotnosti ani ENC. Po vyzvednutí bude předmět nesený, nikoli rovnou vybavený.</p><form id="chest-move-form"><input type="hidden" name="itemId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(x.characterId)}"><label>Počet kusů (max. ${x.quantity})<input type="number" name="quantity" min="1" max="${x.quantity}" step="1" value="${x.quantity}" required></label><label>Skutečné místo Truhlice<input name="location" maxlength="160" value="${esc(place)}" placeholder="Např. vlastní dům v Tashálu" required ${stored?'readonly':''}></label><label><input name="accessConfirmed" type="checkbox" value="yes" required> GM potvrzuje, že postava má v tomto okamžiku k místu skutečný přístup</label><div class="actions"><button type="submit">${stored?'Vyzvednout':'Uložit'}</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
@@ -9217,11 +9223,29 @@ document.addEventListener('submit',e=>{
  const fd=new FormData(e.target),clock=data.campaignClock;
  if(!clock||String(fd.get('actorId'))!==selected||view!=='sheet')return alert('Nesouhlasí postava nebo kalendář.');
  try{
-  const proof=createPotableWaterFill({inventory:data.inventory,journal:data.journal,campaignId:campaignKey(clock),
-   actorId:selected,itemId:String(fd.get('itemId')||''),minute:clock.minute,gmConfirmed:fd.get('gmConfirmed')==='yes',waterSource:String(fd.get('waterSource')||'')});
-  if(mutate(()=>data.journal.push({id:uuid(),characterId:selected,calendarCampaignId:proof.campaignId,campaignMinute:proof.minute,
-   createdAt:stamp(),title:'HMK · naplnění nádoby pitnou vodou',body:`0,5 gal pitné vody · Waterskin ${proof.itemId}; zdroj ${proof.waterSource}; doloženo GM; čas se nemění`,
-   calendarInventoryWaterFill:proof}))){overlay=null;render();}
+  const campaignId=campaignKey(clock),itemId=String(fd.get('itemId')||''),lot=String(fd.get('foragingLot')||'');
+  if(lot){
+   const source=availableSupplyLots(data.journal,campaignId).filter(x=>x.unit==='waterDays'&&x.remaining>=0.5&&x.minute<=clock.minute)
+    .find(x=>x.sourceId+'|'+x.resultIndex===lot);
+   if(!source)throw Error('Zvolený doložený Foraging zdroj už není k dispozici.');
+   const fillId=uuid(),useId=uuid();
+   const {use,fill}=createForagingWaterStorage({inventory:data.inventory,journal:data.journal,
+    campaignId,actorId:selected,minute:clock.minute,itemId,sourceId:source.sourceId,resultIndex:source.resultIndex,
+    fillId,useId,gmConfirmed:fd.get('gmConfirmed')==='yes'});
+   if(mutate(()=>data.journal.push({id:useId,characterId:selected,calendarCampaignId:campaignId,campaignMinute:clock.minute,
+    createdAt:stamp(),title:'HMK · Foraging voda převedena do měchu',
+    body:`0,5 water-days z Foraging ${source.sourceId} do Waterskin ${itemId}; nevypito; čas beze změny`,
+    calendarForagingSupplyUse:use},{id:fillId,characterId:selected,calendarCampaignId:campaignId,campaignMinute:clock.minute,
+    createdAt:stamp(),title:'HMK · doložená voda v nádobě',
+    body:`0,5 gal Foraging ${source.sourceId} · Waterskin ${itemId}; doloženo GM; čas beze změny`,
+    calendarInventoryWaterFill:fill}))){overlay=null;render();}
+  }else{
+   const proof=createPotableWaterFill({inventory:data.inventory,journal:data.journal,campaignId,
+    actorId:selected,itemId,minute:clock.minute,gmConfirmed:fd.get('gmConfirmed')==='yes',waterSource:String(fd.get('waterSource')||'')});
+   if(mutate(()=>data.journal.push({id:uuid(),characterId:selected,calendarCampaignId:proof.campaignId,campaignMinute:proof.minute,
+    createdAt:stamp(),title:'HMK · naplnění nádoby pitnou vodou',body:`0,5 gal pitné vody · Waterskin ${proof.itemId}; zdroj ${proof.waterSource}; doloženo GM; čas se nemění`,
+    calendarInventoryWaterFill:proof}))){overlay=null;render();}
+  }
  }catch(err){alert('Voda nebyla doplněna: '+err.message)}
 },true);
 document.addEventListener('click',e=>{
