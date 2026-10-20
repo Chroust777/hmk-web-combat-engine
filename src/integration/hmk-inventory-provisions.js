@@ -7,7 +7,7 @@ const RATIONS=Object.freeze({
  'hmk:gear:hmk-p120-027':'Rations, standard'
 });
 export function provenCarriedRations(inventory=[],actorId){
- return inventory.filter(x=>x.characterId===actorId&&
+ return inventory.filter(x=>x.characterId===actorId&&x.slot!=='chest'&&
   RATIONS[x.sourceItemId]===x.snapshot?.name&&x.snapshot?.id===x.sourceItemId&&
   x.snapshot?.category==='other'&&x.snapshot?.properties?.weightLb===3&&
   Number.isSafeInteger(x.quantity*2)&&x.quantity>0)

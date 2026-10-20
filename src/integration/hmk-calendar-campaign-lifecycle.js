@@ -20,7 +20,7 @@ export function calendarMemberIds(clock,people){
  const all=people.filter(c=>c&&typeof c.id==='string');
  return clock&&Array.isArray(clock.characterIds)?all.filter(c=>clock.characterIds.includes(c.id)):all;
 }
-export function makeCalendarEvidenceArchive(clock,people,journal,id){
+export function makeCalendarEvidenceArchive(clock,people,journal,id,inventory=[]){
  assert(clock&&typeof id==='string'&&id,'Chybí kalendář nebo identifikátor časového archivu');
  const ids=new Set([...calendarMemberIds(clock,people).map(c=>c.id),...(clock.anchors||[]).map(a=>a.characterId)]);
  // Only the durable evidence is retained; GM plans, clock controls and
@@ -29,6 +29,15 @@ export function makeCalendarEvidenceArchive(clock,people,journal,id){
  // Calendar deletion may remove its actor snapshot. Preserve only the medical
  // course identity and event chain needed to verify append-only HR proofs;
  // no new medical outcome is generated, and nothing is restored into gameplay.
+ // Water-fill proofs outlive a deleted campaign; keep only their source
+ // Waterskin inventory backings, not another mutable inventory or water pool.
+ const skinIds=new Set((journal||[]).filter(j=>j.calendarCampaignId===sourceCampaignId&&
+  ids.has(j.characterId)&&j.calendarInventoryWaterFill)
+  .map(j=>j.calendarInventoryWaterFill.itemId));
+ const waterInventoryBackings=(inventory||[]).filter(i=>skinIds.has(i.id)&&ids.has(i.characterId))
+  .map(i=>structuredClone(i));
+ assert(waterInventoryBackings.length===skinIds.size,
+  'Nelze odstranit kalendář: chybí inventární původ některé doložené nádoby na vodu');
  const medicalBranches=people.filter(c=>ids.has(c.id)).flatMap(c=>{
   const state=c.hmk?.combatState;
   const episodes=(state?.malnutritionEpisodes??[]).filter(e=>e.campaignId===sourceCampaignId);
@@ -38,7 +47,7 @@ export function makeCalendarEvidenceArchive(clock,people,journal,id){
    (e.type?.startsWith('malnutrition-')&&sourceIds.has(e.details?.episodeId)));
   return [{actorId:c.id,state:{malnutritionEpisodes:structuredClone(episodes),events:structuredClone(events)}}];
  });
- return {format:'hmk-calendar-character-time-evidence-v1',id,sourceCampaignId,medicalBranches,
+ return {format:'hmk-calendar-character-time-evidence-v1',id,sourceCampaignId,medicalBranches,waterInventoryBackings,
   trOrigin:clock.trOrigin?structuredClone(clock.trOrigin):null,
   characterIds:[...ids],
   anchors:structuredClone((clock.anchors||[]).filter(a=>ids.has(a.characterId))),
@@ -71,6 +80,18 @@ export function validateCalendarEvidenceArchives(archives){
     included.add(b.actorId);
    }
   }
+  if(a.waterInventoryBackings!==undefined){
+   assert(Array.isArray(a.waterInventoryBackings)&&a.waterInventoryBackings.length<=40000,
+    'Poškozený archiv inventárních důkazů o vodě');
+   const sources=new Set();
+   for(const item of a.waterInventoryBackings){
+    assert(item&&typeof item.id==='string'&&item.id&&!sources.has(item.id)&&
+     typeof item.characterId==='string'&&a.characterIds.includes(item.characterId)&&
+     item.snapshot&&typeof item.snapshot==='object',
+     'Poškozený inventární původ vody v archivu kampaně');
+    sources.add(item.id);
+   }
+  }
   if(a.trOrigin)assert(integer(a.trOrigin.anchorDay)&&integer(a.trOrigin.year)&&integer(a.trOrigin.month)&&integer(a.trOrigin.day)&&a.trOrigin.month>=1&&a.trOrigin.month<=12&&a.trOrigin.day>=1&&a.trOrigin.day<=30,'Neplatný původ TR');
   for(const p of a.anchors)assert(p&&a.characterIds.includes(p.characterId)&&typeof p.kind==='string'&&
    integer(p.minute)&&Math.abs(p.minute)<=LIMIT,'Poškozený čas vzniku případu');
@@ -81,7 +102,7 @@ export function validateCalendarEvidenceArchives(archives){
 /** Keeps append-only evidence across calendar deletion; does not touch actors. */
 export function removeCalendarSafely(database,id){
  assert(database?.campaignClock,'Kalendář už neexistuje');
- const archive=makeCalendarEvidenceArchive(database.campaignClock,database.characters,database.journal,id);
+ const archive=makeCalendarEvidenceArchive(database.campaignClock,database.characters,database.journal,id,database.inventory);
  const next=structuredClone(database);next.calendarEvidenceArchives??=[];
  next.calendarEvidenceArchives.push(archive);
  validateCalendarEvidenceArchives(next.calendarEvidenceArchives);

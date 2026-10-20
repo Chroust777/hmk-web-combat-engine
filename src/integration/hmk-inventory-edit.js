@@ -1,12 +1,14 @@
 import {isHandheldItem,validateHandInventory} from './hmk-hand-equipment.js';
 /** A direct, owner-bound, atomic inventory item edit. No navigation changes,
  * no RNG and no alternate storage path. UI calls within existing mutate/CAS. */
-const SLOTS=['none','main_hand','off_hand','worn','carried'];
+const SLOTS=['none','main_hand','off_hand','worn','carried','chest'];
 function fail(reason){throw Error(reason)}
 export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,currentWQ,condition,gearStowage='normal',layerOrder=null,layerSlot=null,bulkExceptionZones=[]}={}){
  if(!doc||!Array.isArray(doc.inventory)||typeof ownerId!=='string'||!ownerId||typeof itemId!=='string'||!itemId)fail('Neplatný vlastník nebo předmět');
  const item=doc.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
  if(!item||!doc.characters?.some(x=>x.id===ownerId))fail('Předmět nepatří otevřené postavě');
+ if((item.slot==='chest')!== (slot==='chest'))fail('Předměty se do Truhlice přesouvají pouze auditovanou akcí Truhlice');
+ if(item.slot==='chest'&&quantity!==item.quantity)fail('Počet věcí v Truhlici lze změnit pouze vyzvednutím a novým doloženým uložením');
  if(!SLOTS.includes(slot)||(['main_hand','off_hand'].includes(slot)&&!isHandheldItem(item))||(slot==='worn'&&item.snapshot?.category!=='armor'))fail('Nepřípustný slot pro tento předmět');
  if(!Number.isSafeInteger(quantity)||quantity<1||quantity>999999||(['main_hand','off_hand','worn'].includes(slot)&&quantity!==1))fail('Neplatný počet kusů pro vybavený předmět');
  if(currentWQ!==null&&(!Number.isSafeInteger(currentWQ)||currentWQ<0||currentWQ>999))fail('Neplatná WQ');
@@ -33,6 +35,7 @@ export function transferInventoryItem(doc,{ownerId,itemId,recipientId}={}){
  if(!doc.characters.some(c=>c.id===ownerId)||!doc.characters.some(c=>c.id===recipientId))fail('Předání vyžaduje dvě existující postavy');
  const owned=doc.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
  if(!owned||!owned.snapshot)fail('Předmět nepatří předávající postavě');
+ if(owned.slot==='chest')fail('Předmět je v Truhlici: nejprve jej s potvrzeným přístupem vyzvedněte');
  const next=structuredClone(doc);
  const target=next.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
  target.characterId=recipientId;target.slot='carried';target.gearStowage='normal';

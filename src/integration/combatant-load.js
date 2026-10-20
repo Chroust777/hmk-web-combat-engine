@@ -49,7 +49,7 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
  for(const x of owned){
   if(!x||typeof x.id!=='string'||!x.id.trim()||seen.has(x.id))issues.push('Invalid or duplicate inventory ID');
   else seen.add(x.id);
-  if(!['worn','carried','main_hand','off_hand','none',undefined,null].includes(x.slot))issues.push(`Unknown equipment slot: ${x.id}`);
+  if(!['worn','carried','main_hand','off_hand','none','chest',undefined,null].includes(x.slot))issues.push(`Unknown equipment slot: ${x.id}`);
  }
  const worn=owned.filter(x=>x.slot==='worn');
  if(worn.some(x=>x.snapshot?.category!=='armor'))issues.push('Non-armour item in worn slot');
@@ -164,9 +164,13 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
  // Any piece not worn but explicitly held/carried is gear. Never add worn armour twice.
  const gear=[];
  for(const item of owned.filter(x=>MASS_SLOTS.has(x.slot))){
-  if(!Number.isSafeInteger(item.quantity)||item.quantity<1){issues.push(`${item.id}: invalid carried quantity`);continue;}
+  const halfRation=['hmk:gear:hmk-p120-026','hmk:gear:hmk-p120-027'].includes(item.sourceItemId)&&
+   item.snapshot?.id===item.sourceItemId&&item.snapshot?.properties?.weightLb===3&&
+   Number.isSafeInteger(item.quantity*2)&&item.quantity>=0.5;
+  if((!Number.isSafeInteger(item.quantity)||item.quantity<1)&&!halfRation){issues.push(`${item.id}: invalid carried quantity`);continue;}
   const p=item.snapshot?.properties;
   let physicalWeight=p?.weightLb;
+  if(Number.isFinite(physicalWeight)&&Number.isFinite(item.waterContentsLb))physicalWeight+=item.waterContentsLb/item.quantity;
   if(item.snapshot?.category==='armor'&&typeof item.sourceItemId==='string'&&item.sourceItemId.startsWith('hmk:armour:p118:')){
    const verified=resolveOwnedArmourArticle(item,{allowCarried:true});
    if(!verified.ready){issues.push(`${item.id}: stowed HMK armour is not source-verified: ${verified.reason}`);continue;}
@@ -181,7 +185,12 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   if(stowage==='backpack'&&/\bbackpack\b/i.test(item.snapshot?.name||'')){
    issues.push(`${item.id}: a backpack cannot be packed into itself or receive its own half-weight allowance`);continue;
   }
-  gear.push({id:item.id,weightLb:physicalWeight,quantity:item.quantity,stowage});
+  // A half-ration is a legitimate physical 1.5 lb remainder. The general
+  // gear-load calculator counts whole objects, so normalise this portion
+  // to one weighed remainder without silently rounding the burden away.
+  const fractionalRation=halfRation&&!Number.isSafeInteger(item.quantity);
+  gear.push({id:item.id,weightLb:fractionalRation?physicalWeight*item.quantity:physicalWeight,
+   quantity:fractionalRation?1:item.quantity,stowage});
  }
  const backpackPacked=gear.some(x=>x.stowage==='backpack');
  if(backpackPacked&&!owned.some(x=>MASS_SLOTS.has(x.slot)&&/\bbackpack\b/i.test(x.snapshot?.name||'')))

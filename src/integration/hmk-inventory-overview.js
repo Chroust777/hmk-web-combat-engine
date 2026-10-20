@@ -14,7 +14,7 @@ export function projectInventoryRows(inventory=[]){
  return inventory.map(item=>{
   const p=item.snapshot?.properties||{},isPrintedRation=['hmk:gear:hmk-p120-026','hmk:gear:hmk-p120-027'].includes(item.sourceItemId),
    qty=(Number.isSafeInteger(item.quantity)||isPrintedRation&&Number.isSafeInteger(item.quantity*2))&&item.quantity>0?item.quantity:null;
-  const price=knownPrice(item),weight=isFiniteNonnegative(p.weightLb)?p.weightLb:null;
+  const price=knownPrice(item),weight=isFiniteNonnegative(p.weightLb)&&isFiniteNonnegative(item.waterContentsLb??0)?p.weightLb+(item.waterContentsLb??0)/(item.quantity||1):null;
   const totalPrice=qty!==null&&price.unit!==null?qty*price.unit:
    qty!==null&&Number.isSafeInteger(p.pricePerDozenPence)&&qty%12===0?qty/12*p.pricePerDozenPence:null;
   const totalWeight=qty!==null&&weight!==null?qty*weight:null;
@@ -54,7 +54,7 @@ export function projectInventoryRows(inventory=[]){
    Number.isFinite(printedEnc)?String(printedEnc):typeof printedEnc==='string'?`podm. ${printedEnc}`:'nedoloženo':'—';
   const protection=isArmour&&p.locationProtection&&typeof p.locationProtection==='object'?
    Object.entries(p.locationProtection).filter(([,v])=>v&&typeof v==='object').map(([loc,v])=>({loc,b:v.b,e:v.e,p:v.p,f:v.f})):[];
-  const kind=item.slot==='worn'||item.slot==='main_hand'||item.slot==='off_hand'?'equipped':'carried';
+  const kind=item.slot==='chest'?'chest':item.slot==='worn'||item.slot==='main_hand'||item.slot==='off_hand'?'equipped':'carried';
   return {item,qty,priceLabel:price.label,totalPrice,weight,totalWeight,wq,keyFields,armourENC,protection,kind};
  });
 }
