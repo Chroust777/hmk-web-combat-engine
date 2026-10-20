@@ -25,7 +25,20 @@ export function makeCalendarEvidenceArchive(clock,people,journal,id){
  const ids=new Set([...calendarMemberIds(clock,people).map(c=>c.id),...(clock.anchors||[]).map(a=>a.characterId)]);
  // Only the durable evidence is retained; GM plans, clock controls and
  // presentation events really ARE deleted.
- return {format:'hmk-calendar-character-time-evidence-v1',id,
+ const sourceCampaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
+ // Calendar deletion may remove its actor snapshot. Preserve only the medical
+ // course identity and event chain needed to verify append-only HR proofs;
+ // no new medical outcome is generated, and nothing is restored into gameplay.
+ const medicalBranches=people.filter(c=>ids.has(c.id)).flatMap(c=>{
+  const state=c.hmk?.combatState;
+  const episodes=(state?.malnutritionEpisodes??[]).filter(e=>e.campaignId===sourceCampaignId);
+  if(!episodes.length)return [];
+  const sourceIds=new Set(episodes.map(e=>e.id));
+  const events=(state.events??[]).filter(e=>sourceIds.has(e.id)||
+   (e.type?.startsWith('malnutrition-')&&sourceIds.has(e.details?.episodeId)));
+  return [{actorId:c.id,state:{malnutritionEpisodes:structuredClone(episodes),events:structuredClone(events)}}];
+ });
+ return {format:'hmk-calendar-character-time-evidence-v1',id,sourceCampaignId,medicalBranches,
   trOrigin:clock.trOrigin?structuredClone(clock.trOrigin):null,
   characterIds:[...ids],
   anchors:structuredClone((clock.anchors||[]).filter(a=>ids.has(a.characterId))),
@@ -46,6 +59,18 @@ export function validateCalendarEvidenceArchives(archives){
    'Poškozený archiv časových důkazů');ids.add(a.id);
   assert(a.characterIds.every(x=>typeof x==='string'&&x.length>0)&&new Set(a.characterIds).size===a.characterIds.length,
    'Neplatný výběr postav v archivu');
+  if(a.sourceCampaignId!==undefined||a.medicalBranches!==undefined){
+   assert(typeof a.sourceCampaignId==='string'&&a.sourceCampaignId&&Array.isArray(a.medicalBranches)&&
+    a.medicalBranches.length<=a.characterIds.length,'Neplatný archiv medicínských důkazů');
+   const included=new Set();
+   for(const b of a.medicalBranches){
+    assert(b&&a.characterIds.includes(b.actorId)&&!included.has(b.actorId)&&
+     Array.isArray(b.state?.malnutritionEpisodes)&&Array.isArray(b.state?.events)&&
+     b.state.malnutritionEpisodes.every(e=>e.campaignId===a.sourceCampaignId),
+     'Poškozená archivní zdravotní větev');
+    included.add(b.actorId);
+   }
+  }
   if(a.trOrigin)assert(integer(a.trOrigin.anchorDay)&&integer(a.trOrigin.year)&&integer(a.trOrigin.month)&&integer(a.trOrigin.day)&&a.trOrigin.month>=1&&a.trOrigin.month<=12&&a.trOrigin.day>=1&&a.trOrigin.day<=30,'Neplatný původ TR');
   for(const p of a.anchors)assert(p&&a.characterIds.includes(p.characterId)&&typeof p.kind==='string'&&
    integer(p.minute)&&Math.abs(p.minute)<=LIMIT,'Poškozený čas vzniku případu');

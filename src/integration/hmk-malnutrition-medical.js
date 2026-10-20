@@ -5,6 +5,7 @@
  * Both conditions contribute to the EXISTING persistent Combat Fatigue.
  */
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
+import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {healingBase} from '../rules/healing.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {ailmentOutcome,exposureAdvance,exposureHealing,malnutritionSchedule} from '../rules/ailments.js';
@@ -18,6 +19,16 @@ const weakness=hr=>ailmentOutcome(hr).weaknessFatigue;
 const shock=hr=>({stunned:'STN',incapacitated:'INC',unconscious:'UNC',killed:'KIA',none:'NONE'})[ailmentOutcome(hr).shockState]??'NONE';
 const severity={NONE:0,STN:1,INC:2,UNC:3,KIA:4};
 function episodes(c){return c?.hmk?.combatState?.malnutritionEpisodes??[]}
+/** Journal entries survive campaign switches. Their medical events may reside
+ * in an inactive campaign's preserved actor branch, not the visible actor.
+ * Never validate an old medical proof against another campaign's snapshot. */
+function evidenceState(database,actorId,campaignId){
+ const actor=database.characters?.find(c=>c.id===actorId);
+ if(campaignId===campaignKey(database.campaignClock))return actor?.hmk?.combatState;
+ return database.campaignActorBranches?.[campaignId]?.[actorId]?.hmk?.combatState??
+  (database.calendarEvidenceArchives??[]).find(a=>a.sourceCampaignId===campaignId)
+   ?.medicalBranches?.find(b=>b.actorId===actorId)?.state;
+}
 function ensureState(c){c.hmk??={};c.hmk.combatState??=initialCombatState();return c.hmk.combatState}
 function rationStatus(p,kind){const [received,needed]=column[kind],got=p[received],want=p[needed];
  if(got>=want)return 'full';if(got===0)return 'none';if(got===want/2)return 'half';return 'partial';}
@@ -46,7 +57,11 @@ export function applyDueMalnutritionOnsets(database,{idFactory,stamp}={}){
   const history=entries(database.journal,campaignId,actor.id);if(!history.length||actor.hmk?.combatState?.shock==='KIA')continue;
   for(const kind of kinds){
    let zero=0,halves=0;
-   const previousOnset=Math.max(-1,...episodes(actor).filter(e=>e.kind===kind&&e.campaignId===campaignId).map(e=>e.originMinute));
+   // A cured episode cannot recur from ration shortages that were already
+   // accounted for while that episode was active. Resume onset surveillance
+   // only AFTER its final proven healing/death roll.
+   const previousOnset=Math.max(-1,...episodes(actor).filter(e=>e.kind===kind&&e.campaignId===campaignId)
+    .map(e=>e.status==='active'?e.originMinute:Math.max(e.originMinute,e.lastDueMinute)));
    for(const j of history){const d=j.calendarNutritionDay;
     if(d.endMinute<=previousOnset)continue;
     const policy=database.journal.find(x=>x.id===d.policyId)?.calendarNutritionPolicy;
@@ -183,8 +198,8 @@ export function validateMalnutritionEvidence(database){
    j.calendarCampaignId&&j.characterId&&minute(j.campaignMinute)&&minute(p.dueMinute)&&
    journal.some(x=>x.id===p.sourceDayId&&x.characterId===j.characterId&&x.calendarCampaignId===j.calendarCampaignId&&x.calendarNutritionDay),
    'Malnutrition: neplatná vazba na doložené denní dávky');
-  const actor=(database.characters??[]).find(c=>c.id===j.characterId);
-  const e=actor?.hmk?.combatState?.malnutritionEpisodes?.find(x=>x.id===p.episodeId);
+  const proofState=evidenceState(database,j.characterId,j.calendarCampaignId);
+  const e=proofState?.malnutritionEpisodes?.find(x=>x.id===p.episodeId);
   check(e&&e.sourceDayId===p.sourceDayId&&e.campaignId===j.calendarCampaignId&&e.kind===p.kind,
    'Malnutrition: chybí pravá zdravotní epizoda');
   if(p.phase==='onset')check(p.hr===e.initialHR&&p.dueMinute===e.originMinute&&p.weakness===weakness(e.initialHR)&&
@@ -192,7 +207,7 @@ export function validateMalnutritionEvidence(database){
   else{
    check(['advance','healing'].includes(p.phase)&&['manual','software'].includes(p.rollOrigin)&&Number.isSafeInteger(p.roll)&&p.roll>=1&&p.roll<=100&&
     p.resolvedMinute===j.campaignMinute&&p.dueMinute<=p.resolvedMinute&&
-    actor.hmk.combatState.events.some(x=>x.id===p.combatEventId&&x.type==='malnutrition-'+p.phase&&
+    proofState.events.some(x=>x.id===p.combatEventId&&x.type==='malnutrition-'+p.phase&&
       x.details?.episodeId===p.episodeId&&x.details.roll===p.roll&&
       x.details.dueMinute===p.dueMinute&&x.details.resolvedMinute===p.resolvedMinute),
     'Malnutrition: pozměněný nebo chybějící zdravotní hod');
