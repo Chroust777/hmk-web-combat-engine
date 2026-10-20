@@ -67,6 +67,11 @@ export function validateSupplyJournal(journal=[]){
    const expected=createSupplyUse({journal:prior,campaignId:row.calendarCampaignId,
     minute:row.campaignMinute,sourceId:p.sourceId,resultIndex:p.resultIndex,
     unit:p.unit,quantity:p.quantity,actorId:p.actorId,disposition:p.disposition,purpose:p.purpose});
+   if(p.nutritionDayId!==undefined){
+    requireIt(typeof p.nutritionDayId==='string'&&p.nutritionDayId.length>0,
+     'Neplatná vazba automatického denního přídělu');
+    expected.nutritionDayId=p.nutritionDayId;
+   }
    requireIt(row.characterId===p.actorId&&JSON.stringify(p)===JSON.stringify(expected),
     'Nepodložený, cizí nebo pozměněný výdej zásob');
   }

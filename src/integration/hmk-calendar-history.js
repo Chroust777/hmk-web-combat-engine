@@ -14,18 +14,18 @@ export function historicalHMKCalendarEntries(clock,characters=[],journal=[]){
     (entry.calendarCampaignId&&clock.campaignId&&entry.calendarCampaignId!==clock.campaignId&&!clock.journalMinuteEvidence?.some(e=>e.id===entry.id))||
     !allowed.has(entry.characterId)||!safeMinute(entry.campaignMinute)||
     entry.campaignMinute>clock.minute)continue;
-  const skill=entry.skillTestProof,combat=entry.combatProof,special=entry.specialOutcomeProof,expedition=entry.calendarExpeditionProof,trek=entry.calendarTrekProof,wilderness=entry.calendarTrekWildernessProof,tracking=entry.calendarTrekTrackingProof;
+  const skill=entry.skillTestProof,combat=entry.combatProof,special=entry.specialOutcomeProof,expedition=entry.calendarExpeditionProof,trek=entry.calendarTrekProof,wilderness=entry.calendarTrekWildernessProof,tracking=entry.calendarTrekTrackingProof,nutritionDay=entry.calendarNutritionDay,nutritionPolicy=entry.calendarNutritionPolicy;
   // Ordinary free-text GM notes and unverified timestamps are NOT marked done.
-  if(!skill&&!combat&&!special&&!expedition&&!trek&&!wilderness&&!tracking)continue;
+  if(!skill&&!combat&&!special&&!expedition&&!trek&&!wilderness&&!tracking&&!nutritionDay&&!nutritionPolicy)continue;
   seen.add(entry.id);
   const name=allowed.get(entry.characterId),
-   action=skill?.type||combat?.actionKind||special?.kind||expedition?.kind||(trek?'Cestovní podklady / Travel Watch':wilderness?'Foraging / Wilderness Tasks':tracking?'Tracking / Stalking':'pravidlový výsledek'),
+   action=skill?.type||combat?.actionKind||special?.kind||expedition?.kind||(trek?'Cestovní podklady / Travel Watch':wilderness?'Foraging / Wilderness Tasks':tracking?'Tracking / Stalking':nutritionDay?'Denní výživa / HMK 186':nutritionPolicy?'Denní režim / HMK 186':'pravidlový výsledek'),
    original=typeof entry.title==='string'&&entry.title.trim()?entry.title.trim():action;
   out.push({id:'history:'+encodeURIComponent(entry.id),origin:'history',
-   characterId:entry.characterId,name,kind:trek?'trek-preparation':wilderness?'wilderness-foraging':tracking?'wilderness-tracking':expedition?'expedition-result':skill?'skill-result':combat?'combat-result':'special-result',
+   characterId:entry.characterId,name,kind:nutritionDay?'nutrition-day':nutritionPolicy?'nutrition-policy':trek?'trek-preparation':wilderness?'wilderness-foraging':tracking?'wilderness-tracking':expedition?'expedition-result':skill?'skill-result':combat?'combat-result':'special-result',
    sourceId:entry.id,title:original,description:action,
-   note:tracking?'Doložený výsledek Tracking / Stalking bez posunu času GM. ':wilderness?'Doložený zisk potravy, vody nebo bylin bez posunu času GM. ':trek?'Zapsány pouze doložené hody počasí, pohybu a setkání. '+(trek.unresolved?.length?'Nevyřešené návaznosti: '+trek.unresolved.join(', '):'Nevznikl předpoklad nové události.'): 'Uložený výsledek konkrétního pravidlového kroku. Navazující léčba a další povinnosti se evidují samostatně.',
-   minute:entry.campaignMinute,dueMinute:entry.campaignMinute,status:'resolved',
+   note:nutritionDay?`Doložený 24hodinový výdej: potrava ${nutritionDay.foodReceived}/${nutritionDay.foodNeed}, voda ${nutritionDay.waterReceived}/${nutritionDay.waterNeed}. ${nutritionDay.foodShortfall||nutritionDay.waterShortfall?'Nedostatek zásob; Starvation/Thirst vyžaduje samostatné zdravotní vyhodnocení.':'Účetní den dokončen.'} Čas posunul pouze GM.`:nutritionPolicy?'GM nastavil či pozastavil budoucí denní spotřebu; čas se nezměnil.':tracking?'Doložený výsledek Tracking / Stalking bez posunu času GM. ':wilderness?'Doložený zisk potravy, vody nebo bylin bez posunu času GM. ':trek?'Zapsány pouze doložené hody počasí, pohybu a setkání. '+(trek.unresolved?.length?'Nevyřešené návaznosti: '+trek.unresolved.join(', '):'Nevznikl předpoklad nové události.'): 'Uložený výsledek konkrétního pravidlového kroku. Navazující léčba a další povinnosti se evidují samostatně.',
+   minute:entry.campaignMinute,dueMinute:entry.campaignMinute,status:nutritionDay&&(nutritionDay.foodShortfall||nutritionDay.waterShortfall)?'due':'resolved',
    destination:'notes'});
  }
  return out.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
