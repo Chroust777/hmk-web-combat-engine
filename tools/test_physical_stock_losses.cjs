@@ -1,0 +1,104 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+let ts;try{ts=require('typescript')}catch{ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js')}
+const root=path.resolve(__dirname,'..'),ext=require.extensions['.js'];
+require.extensions['.js']=function(m,file){if(!file.startsWith(path.join(root,'src')+path.sep))return ext(m,file);m._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,file)};
+const R=require('../src/integration/hmk-physical-ration-ledger.js');
+const W=require('../src/integration/hmk-physical-water-ledger.js');
+const {createCampaignCalendar}=require('../src/integration/hmk-campaign-calendar.js');
+const {beginAdditionalCalendar,switchCampaign}=require('../src/integration/hmk-calendar-multi-campaign.js');
+const {assertGMOnlyCampaignTime}=require('../src/integration/hmk-gm-clock-authority.js');
+const {historicalHMKCalendarEntries}=require('../src/integration/hmk-calendar-history.js');
+const {resolveCombatantLoad}=require('../src/integration/combatant-load.js');
+const {finishDueNutritionDays,createNutritionPolicy}=require('../src/integration/hmk-nutrition-days.js');
+const {removeCalendarSafely}=require('../src/integration/hmk-calendar-campaign-lifecycle.js');
+let n=0;
+const eq=(a,b)=>{assert.deepEqual(a,b);n++},ok=a=>{assert.ok(a);n++},no=(f,re)=>{assert.throws(f,re);n++};
+const food={id:'hmk:gear:hmk-p120-027',name:'Rations, standard',category:'other',properties:{weightLb:3}};
+const jug={id:'hmk:gear:hmk-p121-043',name:'Jug, 1 gallon',category:'other',properties:{weightLb:5}};
+const actor={id:'a',name:'A',hmk:{attributes:{str:12}}},other={id:'b',name:'B',hmk:{attributes:{str:12}}};
+const inventory=[{id:'r1',characterId:'a',sourceItemId:food.id,snapshot:food,slot:'carried',quantity:4},
+ {id:'j1',characterId:'a',sourceItemId:jug.id,snapshot:jug,slot:'carried',quantity:1}];
+const clock=id=>createCampaignCalendar({day:1,hour:0,minute:0,label:id,eventId:'origin-'+id,gmConfirmed:true,campaignId:id,characterIds:['a','b']});
+let data={characters:[actor,other],inventory,journal:[],campaignClock:clock('A')};
+const stock=R.createFreshRationStocks({inventory,journal:[],campaignId:'A',actorId:'a',minute:0,freshConfirmed:true})[0];
+const fill=W.createPotableWaterFill({inventory,journal:[],campaignId:'A',actorId:'a',itemId:'j1',minute:0,gmConfirmed:true,waterSource:'Studna ve vsi'});
+data.journal.push({id:'stock',characterId:'a',calendarCampaignId:'A',campaignMinute:0,createdAt:'now',calendarInventoryRationStock:stock},
+ {id:'fill',characterId:'a',calendarCampaignId:'A',campaignMinute:0,createdAt:'now',calendarInventoryWaterFill:fill});
+const base=structuredClone(data);
+const foodArgs={actorId:'a',sourceId:'stock',quantity:1.5,eventId:'f-loss',campaignId:'A',minute:0,reason:'Doložená ztráta v lese',confirmedByGM:true,createdAt:'now'};
+const waterArgs={actorId:'a',fillId:'fill',quantity:0.5,eventId:'w-loss',campaignId:'A',minute:0,reason:'Doložené rozlití',confirmedByGM:true,createdAt:'now'};
+data=R.recordPhysicalRationLoss(data,foodArgs);eq(data.campaignClock.minute,0);eq(data.inventory,base.inventory);
+eq(R.rationStockBalances(data.journal,'A','a')[0].remaining,2.5);eq(R.validatePhysicalRationJournal(data.journal,data.inventory,data),true);
+data=W.recordPhysicalWaterLoss(data,waterArgs);eq(data.campaignClock.minute,0);eq(data.inventory,base.inventory);
+eq(W.filledWaterForItem(data.journal,'A','a','j1'),0.5);eq(W.validatePhysicalWaterJournal(data.journal,data.inventory,data),true);
+eq(R.projectCampaignRationInventory(data.inventory,data.journal,'A').find(x=>x.id==='r1').quantity,2.5);
+eq(W.projectCampaignWaterInventory(data.inventory,data.journal,'A').find(x=>x.id==='j1').waterContentsLb,5);
+eq(W.projectCampaignWaterInventory(data.inventory,data.journal,'B').find(x=>x.id==='j1').waterContentsLb,undefined);
+eq(R.projectCampaignRationInventory(data.inventory,data.journal,'B').find(x=>x.id==='r1').quantity,4);
+const load=(database,actorId)=>resolveCombatantLoad({character:database.characters.find(c=>c.id===actorId),
+ inventory:W.projectCampaignWaterInventory(R.projectCampaignRationInventory(database.inventory,database.journal,'A'),database.journal,'A')});
+eq(load(base,'a').gearLoad.physicalLb-load(data,'a').gearLoad.physicalLb,9.5);
+eq(assertGMOnlyCampaignTime(base,data),true);
+let h=historicalHMKCalendarEntries(data.campaignClock,data.characters,data.journal);
+ok(h.some(x=>x.kind==='physical-ration-loss'&&x.note.includes('Nejde o konzumaci')));
+ok(h.some(x=>x.kind==='physical-water-loss'&&x.note.includes('Nejde o vypití')));
+no(()=>R.recordPhysicalRationLoss(data,foodArgs),/duplicitní/);
+no(()=>W.recordPhysicalWaterLoss(data,waterArgs),/duplicitní/);
+no(()=>R.recordPhysicalRationLoss(base,{...foodArgs,quantity:5}),/nestačí/);
+no(()=>W.recordPhysicalWaterLoss(base,{...waterArgs,quantity:2}),/Neplatný/);
+no(()=>R.recordPhysicalRationLoss(base,{...foodArgs,campaignId:'B'}),/aktuální čas/);
+no(()=>W.recordPhysicalWaterLoss(base,{...waterArgs,campaignId:'B'}),/aktuální čas/);
+no(()=>R.recordPhysicalRationLoss(base,{...foodArgs,minute:2}),/aktuální čas/);
+no(()=>W.recordPhysicalWaterLoss(base,{...waterArgs,minute:2}),/aktuální čas/);
+no(()=>R.recordPhysicalRationLoss(base,{...foodArgs,actorId:'b'}),/nestačí/);
+no(()=>W.recordPhysicalWaterLoss(base,{...waterArgs,actorId:'b'}),/není dostupná/);
+no(()=>R.recordPhysicalRationLoss(base,{...foodArgs,confirmedByGM:false}),/GM musí/);
+no(()=>W.recordPhysicalWaterLoss(base,{...waterArgs,confirmedByGM:false}),/GM musí/);
+no(()=>R.recordPhysicalRationLoss(base,{...foodArgs,reason:''}),/GM musí/);
+no(()=>W.recordPhysicalWaterLoss(base,{...waterArgs,reason:''}),/GM musí/);
+no(()=>R.recordPhysicalRationLoss({...base,combatRuntime:{sequence:{active:true}}},foodArgs),/Initiative/);
+no(()=>W.recordPhysicalWaterLoss({...base,combatRuntime:{sequence:{active:true}}},waterArgs),/Initiative/);
+no(()=>W.recordPhysicalWaterLoss({...base,inventory:base.inventory.map(i=>i.id==='j1'?{...i,slot:'chest'}:i)},waterArgs),/nesená/);
+no(()=>R.createPhysicalRationUse({journal:data.journal,campaignId:'A',actorId:'a',minute:0,sourceId:'stock',quantity:3}),/nestačí/);
+no(()=>W.createPhysicalWaterUse({journal:data.journal,campaignId:'A',actorId:'a',minute:0,fillId:'fill',quantity:1}),/půl galonu/);
+// Still available physical contents can be consumed normally; the loss itself is not a meal.
+let f=R.createPhysicalRationUse({journal:data.journal,campaignId:'A',actorId:'a',minute:0,sourceId:'stock',quantity:1});
+data.journal.push({id:'eat',characterId:'a',calendarCampaignId:'A',campaignMinute:0,createdAt:'now',calendarInventoryRationUse:f});
+let w=W.createPhysicalWaterUse({journal:data.journal,campaignId:'A',actorId:'a',minute:0,fillId:'fill',quantity:0.5});
+data.journal.push({id:'drink',characterId:'a',calendarCampaignId:'A',campaignMinute:0,createdAt:'now',calendarInventoryWaterUse:w});
+eq(R.rationStockBalances(data.journal,'A','a')[0].remaining,1.5);
+eq(W.filledWaterForItem(data.journal,'A','a','j1'),0);
+eq(R.validatePhysicalRationJournal(data.journal,data.inventory,data),true);
+eq(W.validatePhysicalWaterJournal(data.journal,data.inventory,data),true);
+no(()=>W.createPhysicalWaterUse({journal:data.journal,campaignId:'A',actorId:'a',minute:0,fillId:'fill',quantity:0.5}),/nestačí/);
+// Lost food can still be logged after expiration: expiry forbids EATING, not discarding spoiled goods.
+let expired={...structuredClone(base),campaignClock:clock('A')};expired.campaignClock.minute=11*1440;
+let expiredLoss=R.recordPhysicalRationLoss(expired,{...foodArgs,minute:11*1440,eventId:'rotten',quantity:4,reason:'Trvanlivost skončila'});
+eq(R.rationStockBalances(expiredLoss.journal,'A','a')[0].remaining,0);
+eq(R.validatePhysicalRationJournal(expiredLoss.journal,expiredLoss.inventory,expiredLoss),true);
+// Every write-off is immutable and replay-verifiable, including zero-byte corpus tampering.
+no(()=>R.assertPhysicalRationAppendOnly(data.journal,data.journal.filter(x=>x.id!=='f-loss')),/nelze přepsat/);
+no(()=>W.assertWaterAppendOnly(data.journal,data.journal.filter(x=>x.id!=='w-loss')),/nesmějí/);
+let fake=structuredClone(data.journal);fake.find(x=>x.id==='f-loss').calendarInventoryRationLoss.quantity=4;
+no(()=>R.validatePhysicalRationJournal(fake,data.inventory,data),/Poškozený|nestačí/);
+fake=structuredClone(data.journal);fake.find(x=>x.id==='w-loss').calendarInventoryWaterLoss.quantity=1;
+no(()=>W.validatePhysicalWaterJournal(fake,data.inventory,data),/Poškozený|nestačí/);
+// Separate branches retain independent stock histories without altering shared baseline inventory.
+let multi=beginAdditionalCalendar(data,clock('B'));
+eq(W.filledWaterForItem(multi.journal,'B','a','j1'),0);
+eq(R.rationStockBalances(multi.journal,'B','a').length,0);
+multi=switchCampaign(multi,'A');eq(W.validatePhysicalWaterJournal(multi.journal,multi.inventory,multi),true);
+eq(R.validatePhysicalRationJournal(multi.journal,multi.inventory,multi),true);
+const archived=removeCalendarSafely(multi,'delete-A');
+eq(archived.calendarEvidenceArchives.length,1);
+eq(R.validatePhysicalRationJournal(archived.journal,archived.inventory,archived),true);
+eq(W.validatePhysicalWaterJournal(archived.journal,archived.inventory,archived),true);
+// Catalog purchase accounting already exists and is not a new GM money mechanic.
+const {libraryPurchaseOffer,prepareLibraryPurchase,coinBalance}=require('../src/integration/hmk-library-economy.js');
+eq(libraryPurchaseOffer({properties:{pricePerDozenPence:12}}).quantity,12);
+eq(libraryPurchaseOffer({properties:{pricePence:5}}).pricePence,5);
+eq(prepareLibraryPurchase({hmk:{coinsPence:30}},20).balanceAfter,10);
+no(()=>prepareLibraryPurchase({hmk:{coinsPence:30}},31),/Nedostatek/);
+eq(coinBalance({hmk:{coinsPence:30,cashLedger:[{kind:'library-purchase',id:'p',amountPence:15,inventoryIds:['thing']}]}}).balance,15);
+console.log('PASS:',n,'active-food/water losses, audited balances, reuse protection, expired disposal, ENC, campaigns, archived sources, GM-only clock, existing purchases');
