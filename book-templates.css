@@ -4315,3 +4315,11 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-calendar .hc-expedition-links{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .content-calendar .hc-expedition-links button{flex:1 1 135px}
 @media(max-width:650px){.content-calendar .hc-expedition-dice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* v93.372: parallel character activities, compact party-selection controls */
+.content-calendar .hc-expedition-actors{min-width:0;border:1px solid rgba(107,76,47,.30);border-radius:4px;padding:9px 12px;margin:8px 0 12px}
+.content-calendar .hc-expedition-actors legend{font-weight:700;font-size:.85rem;padding:0 5px}
+.content-calendar .hc-expedition-actors .hc-characters{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:5px 10px}
+.content-calendar .hc-expedition-actors .hc-character{display:flex;flex-direction:row;align-items:center;gap:7px;min-width:0}
+.content-calendar .hc-expedition-actors .hc-character input{width:auto;margin:0;flex:0 0 auto}
+.content-calendar .hc-expedition-select-all{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
