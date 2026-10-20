@@ -4253,3 +4253,16 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-calendar .hc-calendar form label.hc-check input[type=checkbox]{flex:none!important;width:16px!important;height:16px!important;margin:0!important}
 @media(max-width:650px){.content-calendar .hc-decade-row-label{font-size:.65rem}}
 .content-calendar .hc-continuing{font:.78rem/1.4 system-ui,sans-serif;color:#5b3b21;background:rgba(186,143,76,.20);border-left:3px solid #86633d;padding:7px 9px;margin:6px 0}
+
+/* v93.363 – aligned campaign creation fields and safe calendar management */
+.content-calendar .hc-setup .hc-start-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;column-gap:12px!important;row-gap:10px!important;align-items:start!important}
+.content-calendar .hc-setup .hc-start-grid>label{display:flex!important;flex-direction:column!important;justify-content:flex-end!important;min-width:0!important;align-self:stretch!important;margin:0!important;line-height:1.3!important}
+.content-calendar .hc-setup .hc-start-grid>label :is(input,select){margin-top:auto!important;min-height:39px!important;height:39px!important;box-sizing:border-box!important}
+.content-calendar .hc-setup .hc-member-chooser{border:1px solid rgba(119,86,45,.55);border-radius:4px;margin:12px 0;padding:10px;min-width:0}
+.content-calendar .hc-characters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 12px;margin:8px 0}
+.content-calendar .hc-calendar form label.hc-character{display:flex!important;flex-direction:row!important;align-items:center!important;gap:8px!important;padding:5px;min-width:0;margin:0!important}
+.content-calendar .hc-character input{flex:0 0 16px!important;width:16px!important;height:16px!important;margin:0!important}
+.content-calendar .hc-calendar .hc-check{min-width:0;max-width:100%;margin:10px 0!important;align-items:flex-start!important}
+.content-calendar .hc-campaign-settings details>summary{cursor:pointer;font-weight:bold;color:#543b24}
+.content-calendar .hc-campaign-settings button.danger{background:#873c31!important;color:#fff4db!important}
+@media(max-width:580px){.content-calendar .hc-setup .hc-start-grid{grid-template-columns:1fr!important}.content-calendar .hc-characters{grid-template-columns:1fr}}
