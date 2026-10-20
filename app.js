@@ -120,6 +120,8 @@ import {previewTrekCorrection,createTrekCorrection,latestTrekCorrection,effectiv
 import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING_HABITATS,validateWildernessJournal,createTrackingProof,validateTrackingJournal,trekWatchfulness,trekSurpriseProcedure} from './src/integration/hmk-trekking-wilderness-tasks.js';
 import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,validateSupplyJournal,assertSupplyJournalAppendOnly,supplyBalances} from './src/integration/hmk-foraging-supply-ledger.js';
 import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,validateNutritionJournal,assertNutritionJournalAppendOnly,nutritionRisk} from './src/integration/hmk-nutrition-days.js';
+import {pendingTrackingBearing} from './src/integration/hmk-tracking-bearing-handoff.js';
+import {provenCarriedRations,assertExclusiveForagingProven} from './src/integration/hmk-inventory-provisions.js';
 import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
@@ -186,7 +188,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.382';
+const APP_VERSION='93.383';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -662,7 +664,7 @@ function campaignCalendarView(){
  <label>Environ pro Encounter<select name="environ"><option value="highway">Highway</option><option value="rural">Rural</option><option value="wilderness">Wilderness</option><option value="underworld">Underworld</option></select></label>
  <label>Progress Modes (z upraveného Orienteering SV)<input name="progress" type="number" min="0" max="10" value="0"></label>
  <label>Další Slow Modes (jen jiné potvrzené příčiny; Foraging, Stalking, zranění, únava a srážky se přičítají automaticky)<input name="slow" type="number" min="0" max="20" value="0"></label>
- <label>Bearing Modes (z upraveného Orienteering SV)<input name="bearing" type="number" min="0" max="20" value="0"></label>
+ <label>Vlastní Bearing Modes (z Orienteering SV; +1 po doloženém Tracking CF přidá systém)<input name="bearing" type="number" min="0" max="20" value="0"></label>
  <label class="hc-check"><input name="stationaryForaging" type="checkbox" value="yes"> Celá hlídka Foraging na místě: +2 SV; první dva Advantage Modes na Foraging; vzdálenost 0; bez Progress/Bearing (HMK 145)</label>
  <label>Foraging Modes (HMK 145, 147; při pohybu společně +1 Slow, na místě bez pohybu)<input name="foraging" type="number" min="0" max="5" value="0"></label>
  <label class="hc-check"><input name="stalking" type="checkbox" value="yes"> Stalking (nejvýše 1; automaticky +1 Slow; možnost Tracking SV)</label>
@@ -735,7 +737,9 @@ function campaignCalendarView(){
  <h4>Poslední dokončené 24h intervaly</h4>
  ${recentNutritionDays.map(j=>{const p=j.calendarNutritionDay,short=p.foodShortfall||p.waterShortfall;const risk=nutritionRisk(data.journal,campaignKey(clock),j.characterId);return `<p class="hc-hint"><strong>${esc(character(j.characterId)?.name||j.characterId)}</strong> · ${esc(displayCampaignMinute(p.endMinute))} · potrava ${p.foodReceived}/${p.foodNeed}, voda ${p.waterReceived}/${p.waterNeed}${short?' · <strong>NEDOSTATEK · kontrola Starvation/Thirst</strong>':''}${(risk.starvation||risk.thirst)?' · nutná medicínská kontrola':''}</p>`}).join('')||'<p class="hc-hint">Čeká se na první dokončené 24hodinové období od potvrzení režimu.</p>'}
  </details></section>`;
+ const carriedRations=participants.flatMap(c=>provenCarriedRations(data.inventory,c.id).map(x=>({character:c.name,name:x.name,count:x.foodDays,weightLb:x.weightLb})));
  const supplyHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>Účetní zásoby družiny · Foraging (HMK 147, 186)</summary>
+ <p class="hc-hint"><strong>Skutečné nesené potravinové zásoby v inventáři (HMK 120):</strong> ${carriedRations.map(x=>esc(x.character)+' · '+esc(x.name)+' · '+x.count+' denních dávek ('+x.weightLb+' lb)').join('; ')||'Žádné přesně identifikované Rations standard/iron'}. Tyto fyzické předměty se nyní do automatického Foraging-only režimu <strong>nezapočítávají</strong> a nesmějí vést k závěru o hladovění. Waterskin je pouze nádoba, nikoli důkaz vody uvnitř. Plné propojení výdeje z inventáře ještě není implementováno.</p>
  <p class="hc-hint">Doložené dostupné zásoby: ${supplyReport.available.foodDays} food-days, ${supplyReport.available.waterDays} water-days a ${supplyReport.available.herbDoses} dávek bylin. Získané celkem: ${supplyReport.gross.foodDays} / ${supplyReport.gross.waterDays} / ${supplyReport.gross.herbDoses}. Výdej nikdy neposune čas GM. Ručně vydané dávky se zapisují ihned, automatické denní dávky až po dokončení 24 hodin potvrzeným posunem času GM. HMK 186 rozlišuje odpočinek, horko a poloviční dávky.</p>
  <p class="hc-hint"><strong>Concoctions:</strong> rezervace byliny znamená pouze převzetí přesně doložené dávky pro zamýšlený přípravek. Nevyrábí elixír, nehází Herblore a nezakládá domnělý fyzický předmět v inventáři; tyto procedury se vyhodnocují v příslušných původních formulářích.</p>
  <form data-foraging-batch-rations><h4>Společný výdej denních dávek</h4>
@@ -6791,13 +6795,15 @@ document.addEventListener('submit',e=>{
    droverId:v.conveyance==='foot'?null:v.droverId,stationaryForaging:v.stationaryForaging==='yes'});
   if(orienteeringContext.droverId&&!memberIds.includes(orienteeringContext.droverId))
    throw Error('Drover musí být jedním z vybraných účastníků hlídky');
-  const progress=qty('progress',10),bearing=qty('bearing',20),foraging=qty('foraging',5),
+  const trackingBearing=pendingTrackingBearing({journal:data.journal,campaignId,minute:clock.minute,memberIds:partyModes.memberIds});
+  const progress=qty('progress',10),bearing=qty('bearing',20)+Number(!!trackingBearing),foraging=qty('foraging',5),
    stalking=Number(v.stalking==='yes'),vigilance=Number(v.vigilance==='yes');
   const stationaryForaging=v.stationaryForaging==='yes';
+  if(stationaryForaging&&trackingBearing)throw Error('Tracking CF ukládá další hlídce Bearing; nelze jej bez rozhodnutí GM ztratit stacionárním Foraging');
   if(stationaryForaging&&(progress>0||bearing>0||v.doubleTime==='yes'))throw Error('Stacionární Foraging vyžaduje 0 Progress, 0 Bearing a bez Double Time');
   if(stationaryForaging&&foraging<2)throw Error('Při Foraging bez pohybu připravte nejdříve dva Foraging Modes; po Survival SV se případný přebytek automaticky opraví');
   const slow=manualSlow+partyModes.forcedSlow+(wet.slowMode?1:0)+orienteeringSlow+(stationaryForaging?0:Number(foraging>0)+stalking);
-  trekkingModeHardLimit({progress,bearing,foraging,stalking,vigilance});
+  trekkingModeHardLimit({progress,bearing,foraging,stalking,vigilance,trackingForcedBearingSourceId:trackingBearing?.trackingId??null});
   // Progress dice require the original LPW. A zero-dice dry preview first
   // yields the total remaining Progress allocation.
   const spare=Math.max(0,progress-slow),progressD10=Array.from({length:spare},()=>die(10,'Progress')); 
@@ -6819,7 +6825,7 @@ document.addEventListener('submit',e=>{
     ...(hazards.direction&&hazards.direction!=='lost-time'?[`Direction Hazard: ${hazards.direction}`]:[]),
     ...(encounter.encounter?['Random Encounter – nutné vyhodnocení']:[])];
   const proof={format:'hmk-trekking-watch-evidence-v1',dayIndex,campaignMinute:clock.minute,area,
-    partyModes,orienteeringContext,modes:{progress,slow,manualSlow,orienteeringSlow,lax,loaded:partyModes.loaded,bearing,foraging,stalking,vigilance,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
+    partyModes,orienteeringContext,modes:{progress,slow,manualSlow,orienteeringSlow,lax,loaded:partyModes.loaded,bearing,trackingForcedBearingSourceId:trackingBearing?.trackingId??null,foraging,stalking,vigilance,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
      environ:v.environ,wildernessNightWatches},
     season,climate:v.climate,landscape:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
     night:v.night==='yes',alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',weatherDay:day,
@@ -6829,7 +6835,7 @@ document.addEventListener('submit',e=>{
   proof.effectiveMovement=effectiveMovement;
   if(hazards.direction==='lost-time')proof.unresolved=proof.unresolved.filter(x=>!x.startsWith('Direction Hazard:'));
  const summary=`${area} · ${season}/${v.climate} · ${wet.precipitation}${wet.continuous?' (continuous)':''}; `+
-   `den ${day.temperatureD10}/${day.precipitationD10}${dayAlready?' (doložené počasí)':''}; `+
+   `den ${day.temperatureD10}/${day.precipitationD10}${dayAlready?' (doložené počasí)':''}${trackingBearing?' · povinný Bearing po Tracking CF '+trackingBearing.trackingId:''}; `+
    `skupina ${partyModes.memberIds.length}; automatické Slow ${partyModes.forcedSlow}; Loaded ${partyModes.loaded?'ano':'ne'}; LPW ${effectiveMovement.finalLPW}; ${effectiveMovement.leagues} leagues${stationaryForaging?' (Foraging na místě · +2 Orienteering SV)':''}${hazards.direction==='lost-time'?' (Lost Time → Slow +1, HMK 148)':''}; encounter ${encounter.checkDue?(encounter.encounter?'ANO':'ne'):'bez hodu'}`+
    (unresolved.length?'; NAVAZUJÍCÍ PROCEDURY: '+unresolved.join(', '):'');
   // Submission is already the explicit confirmation of this reversible,
@@ -6950,6 +6956,7 @@ document.addEventListener('submit',e=>{
   const allowed=new Set(calendarMemberIds(clock,data.characters).map(c=>c.id));
   if(!ids.length||ids.some(id=>!allowed.has(id))||new Set(ids).size!==ids.length)throw Error('Vyberte platné postavy současné kampaně');
   const enabled=f.get('policyAction')==='activate';
+  if(enabled)for(const actorId of ids)assertExclusiveForagingProven({inventory:data.inventory,actorId});
   const proofs=ids.map(actorId=>createNutritionPolicy({campaignId:campaignKey(clock),minute:clock.minute,actorId,
    foodNeed:Number(f.get('foodNeed')),waterNeed:Number(f.get('waterNeed')),foragingOnly:f.get('foragingOnly')==='yes',enabled}));
   if(mutate(()=>data.journal.push(...proofs.map(p=>({id:uuid(),characterId:p.actorId,calendarCampaignId:p.campaignId,
