@@ -19,6 +19,17 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
  };
  for(const c of characters){
   const s=c?.hmk?.combatState; if(s?.shock==='KIA')continue;
+  // HMK p.300: a bestowed talisman does NOT simply expire. At the exact
+  // end of every period its recipient must make Spirit SR (two successful
+  // SR for outsiders). The ORIGINAL astral-talisman executor extends the
+  // period or terminates the effect; the calendar cannot skip that roll.
+  for(const talisman of c.hmk?.liveEffects?.talismans??[]){
+   if(talisman.active===false||!Number.isSafeInteger(talisman.until)||
+     talisman.until<0||!talisman.itemId)continue;
+   push(c,'talisman-period',talisman.itemId,
+    'Talisman – Spirit SR při konci období (HMK 300; outsider 2 úspěchy)',
+    talisman.until,'skills',{sourceId:talisman.itemId});
+  }
   // Mental-trauma recovery is independently valid without an encounter/combat state.
   // The wound and environmental branches below need actual combat evidence.
   // All these are current unresolved obligations, not new fabricated time intervals.
