@@ -14,17 +14,17 @@ export function historicalHMKCalendarEntries(clock,characters=[],journal=[]){
     (entry.calendarCampaignId&&clock.campaignId&&entry.calendarCampaignId!==clock.campaignId&&!clock.journalMinuteEvidence?.some(e=>e.id===entry.id))||
     !allowed.has(entry.characterId)||!safeMinute(entry.campaignMinute)||
     entry.campaignMinute>clock.minute)continue;
-  const skill=entry.skillTestProof,combat=entry.combatProof,special=entry.specialOutcomeProof,expedition=entry.calendarExpeditionProof;
+  const skill=entry.skillTestProof,combat=entry.combatProof,special=entry.specialOutcomeProof,expedition=entry.calendarExpeditionProof,trek=entry.calendarTrekProof;
   // Ordinary free-text GM notes and unverified timestamps are NOT marked done.
-  if(!skill&&!combat&&!special&&!expedition)continue;
+  if(!skill&&!combat&&!special&&!expedition&&!trek)continue;
   seen.add(entry.id);
   const name=allowed.get(entry.characterId),
-   action=skill?.type||combat?.actionKind||special?.kind||expedition?.kind||'pravidlový výsledek',
+   action=skill?.type||combat?.actionKind||special?.kind||expedition?.kind||(trek?'Cestovní podklady / Travel Watch':'pravidlový výsledek'),
    original=typeof entry.title==='string'&&entry.title.trim()?entry.title.trim():action;
   out.push({id:'history:'+encodeURIComponent(entry.id),origin:'history',
-   characterId:entry.characterId,name,kind:expedition?'expedition-result':skill?'skill-result':combat?'combat-result':'special-result',
+   characterId:entry.characterId,name,kind:trek?'trek-preparation':expedition?'expedition-result':skill?'skill-result':combat?'combat-result':'special-result',
    sourceId:entry.id,title:original,description:action,
-   note:'Uložený výsledek konkrétního pravidlového kroku. Navazující léčba a další povinnosti se evidují samostatně.',
+   note:trek?'Zapsány pouze doložené hody počasí, pohybu a setkání. '+(trek.unresolved?.length?'Nevyřešené návaznosti: '+trek.unresolved.join(', '):'Nevznikl předpoklad nové události.'): 'Uložený výsledek konkrétního pravidlového kroku. Navazující léčba a další povinnosti se evidují samostatně.',
    minute:entry.campaignMinute,dueMinute:entry.campaignMinute,status:'resolved',
    destination:'notes'});
  }

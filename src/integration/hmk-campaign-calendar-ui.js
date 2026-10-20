@@ -26,7 +26,7 @@ function dayLabel(clock,n){
 }
 function shortTime(m){return `${pad(Math.floor((m%1440)/60))}:${pad(m%60)}`;}
 function eventMark(p){return p.status==='resolved'?'✓':p.status==='cancelled'?'–':p.status==='due'?'!':p.status==='elapsed'?'◷':'•';}
-function eventStatus(p){return p.status==='resolved'?(p.origin==='history'?'Vyhodnoceno':'Dokončeno'):p.status==='cancelled'?'Zrušeno':p.status==='due'?'K vyřízení':p.status==='elapsed'?'Proběhlo':'Naplánováno';}
+function eventStatus(p){return p.status==='resolved'?(p.kind==='trek-preparation'?'Podklady zapsány':p.origin==='history'?'Vyhodnoceno':'Dokončeno'):p.status==='cancelled'?'Zrušeno':p.status==='due'?'K vyřízení':p.status==='elapsed'?'Proběhlo':'Naplánováno';}
 function eventName(p){return p.title||p.description||'Událost';}
 function eventDestination(p){return p.destination==='healing'?'Healing · Combat':p.destination==='skills'?'Skill Tests':p.destination==='combat'?'Combat':p.destination==='inventory'?'Arsenal & Gear':p.destination==='hazards'?'Nebezpečí / Trauma':'Deník postavy';}
 function issueAction(p,esc){if(p.origin==='passive')return '<span class="hc-soft">Automatická časová změna · bez hodu</span>';const id=esc(p.id),isRule=p.origin==='hml'||p.origin==='history';
