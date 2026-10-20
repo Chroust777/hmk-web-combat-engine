@@ -1,3 +1,4 @@
+import {effectiveTrekSource} from './hmk-trekking-correction.js';
 import {hasFinishedLinkedTrekHazard} from './hmk-trekking-handoff.js';
 import {adjustedTrekkingMovement} from './hmk-trekking-routine.js';
 /** Evidence-only Trekking hazards → calendar obligations. HMK v1.2 pp.148–150.
@@ -37,7 +38,7 @@ export function trekkingOutstandingCases(characters=[],journal=[],campaignId=nul
  }
  const cases=[];
  for(const entry of journal){
-  const p=entry?.calendarTrekProof;
+  const p=entry?.calendarTrekProof?effectiveTrekSource(entry,journal).calendarTrekProof:null;
   if(!p||p.format!=='hmk-trekking-watch-evidence-v1'||!entry.id||!names.has(entry.characterId)||
    !entry.calendarCampaignId||(campaignId&&entry.calendarCampaignId!==campaignId)||
    !whole(entry.campaignMinute)||entry.campaignMinute!==p.campaignMinute)continue;

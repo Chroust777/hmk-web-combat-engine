@@ -45,7 +45,12 @@ export function assertOrienteeringModes({adjustment,modes}={}){
   Number.isSafeInteger(modes.bearing)&&Number.isSafeInteger(modes.orienteeringSlow)&&
   [0,1].includes(modes.orienteeringSlow)&&isBool(modes.lax),
   'Chybí doložený Lax/Slow režim Orienteering');
- const spent=modes.progress+modes.bearing;
+ const others={foraging:modes.foraging??0,stalking:modes.stalking??0,vigilance:modes.vigilance??0};
+ requireFact(Number.isSafeInteger(others.foraging)&&others.foraging>=0&&others.foraging<=5&&
+  Number.isSafeInteger(others.stalking)&&others.stalking>=0&&others.stalking<=1&&
+  Number.isSafeInteger(others.vigilance)&&others.vigilance>=0&&others.vigilance<=1,
+  'Neplatné Foraging/Stalking/Vigilance Modes');
+ const spent=modes.progress+modes.bearing+others.foraging+others.stalking+others.vigilance;
  requireFact(spent<=adjustment.advantageModes,
   `Upravený Orienteering SV ${adjustment.adjustedSV} dovoluje ${adjustment.advantageModes} Progress/Bearing Modes, ale bylo použito ${spent}.`);
  const sv=adjustment.adjustedSV,penalties=Number(modes.lax)+modes.orienteeringSlow;

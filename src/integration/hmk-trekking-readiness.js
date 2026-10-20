@@ -1,3 +1,4 @@
+import {effectiveTrekSource} from './hmk-trekking-correction.js';
 /** HMK 1.2 pp.145–150: verify a watch before advancing the campaign clock.
  * Travel cannot be certified by a checkbox or a general GM journal note.
  * Only proofs for the SAME guide, calendar, watch and source are admissible.
@@ -14,7 +15,7 @@ export function assessTrekkingReadiness({journal=[],characters=[],actorId,campai
  const rows=journal.filter(j=>j.characterId===actorId&&j.calendarCampaignId===campaignId&&
   j.campaignMinute===minute&&j.calendarTrekProof?.format==='hmk-trekking-watch-evidence-v1');
  requireFact(rows.length===1,'Před cestou je nutná právě jedna uložená Trekking Routine pro tuto postavu, kampaň a minutu.');
- const source=rows[0],p=source.calendarTrekProof;
+ const source=effectiveTrekSource(rows[0],journal),p=source.calendarTrekProof;
  const compatible=(kind==='walk'||kind==='double-walk')?p.conveyance==='foot':
   kind==='ride'?p.conveyance==='mount':kind==='drive'?['cart','wagon'].includes(p.conveyance):
   ['mount','cart','wagon'].includes(p.conveyance);
@@ -42,7 +43,7 @@ export function assessTrekkingReadiness({journal=[],characters=[],actorId,campai
   const certified=assertOrienteeringModes({adjustment,modes:p.modes});
   available=certified.available;spent=certified.spent;verifiedSV=certified.adjustedSV;
  }else{
-  available=result.sv>=5?Math.min(5,result.sv-4):0;spent=p.modes.progress+p.modes.bearing;
+  available=result.sv>=5?Math.min(5,result.sv-4):0;spent=p.modes.progress+p.modes.bearing+(p.modes.foraging??0)+(p.modes.stalking??0)+(p.modes.vigilance??0);
   requireFact(Number.isSafeInteger(spent)&&spent>=0&&spent<=available,
    `Orienteering SV ${result.sv} dovoluje ${available} Advantage Modes, ale v hlídce je ${spent} Progress/Bearing.`);
   if(result.sv<=0)throw Error('Starší hlídka se SV ≤ 0 nemá doložený Lax Mode. Nelze ji bezpečně vyhodnotit.');

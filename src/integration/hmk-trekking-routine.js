@@ -1,3 +1,4 @@
+import {validateTrekCorrections,effectiveTrekSource} from './hmk-trekking-correction.js';
 /** HârnMaster Kèthîra v1.2, printed pp. 141–150.
  * Non-mutating, evidence-driven parts of the nine-step Trekking Routine.
  * Geographic facts and previously rolled skill outcomes MUST come from
@@ -182,10 +183,11 @@ export function validateTrekkingJournalEvidence(document){
    new Set(p.rolls.map(r=>r.origin)).size===1,
    'Uložené hody nesouhlasí s vyhodnocenými kostkami a jejich původem');
  }
+ validateTrekCorrections(document?.journal??[]);
  const byId=new Map((document?.journal??[]).map(x=>[x.id,x]));
  for(const entry of document?.journal??[]){
   const e=entry.calendarExpeditionProof;if(!e?.trekSourceId)continue;
-  const source=byId.get(e.trekSourceId),p=source?.calendarTrekProof;
+  const originalSource=byId.get(e.trekSourceId),source=originalSource?.calendarTrekProof?effectiveTrekSource(originalSource,document.journal):null,p=source?.calendarTrekProof;
   const group=e.travelGroup;
   const validPartyMember=source?.characterId===entry.characterId||
    (group?.format==='hmk-group-watch-v1'&&group.guideId===source?.characterId&&
@@ -201,7 +203,7 @@ export function validateTrekkingJournalEvidence(document){
   if(e.orienteeringId!==undefined){
    const roll=byId.get(e.orienteeringId),link=roll?.calendarTrekSkillSource;
    const test=roll?.skillTestProof?.a??roll?.skillTestProof?.result;
-   const selected=p.modes?.progress+p.modes?.bearing;
+   const selected=p.modes?.progress+p.modes?.bearing+(p.modes?.foraging??0)+(p.modes?.stalking??0)+(p.modes?.vigilance??0);
    const droverRow=document.journal.find(j=>j.calendarTrekSkillSource?.sourceId===source.id&&
     j.calendarTrekSkillSource.hazard==='drover'&&j.characterId===p.orienteeringContext?.droverId&&
     j.calendarCampaignId===entry.calendarCampaignId);
