@@ -111,6 +111,7 @@ import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarP
 import {secureHMKDie,expeditionDiceSubmission,expeditionWatchFatigue,expeditionRestRecovery} from './src/integration/hmk-calendar-expedition.js';
 import {scheduleHMKActivity,finishDueHMKActivities,validateHMKActivityEvidence,assertHMKActivitiesAppendOnly,activeHMKActivities,interruptHMKActivity} from './src/integration/hmk-calendar-activities.js';
 import {planHMKGroupWatch} from './src/integration/hmk-group-travel.js';
+import {trekPartyModes} from './src/integration/hmk-trekking-party-modes.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
@@ -179,7 +180,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.374';
+const APP_VERSION='93.375';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -644,7 +645,7 @@ function campaignCalendarView(){
  const trekPanel=`<section class="hc-calendar hc-trek-routine"><h3>HMK · Trekking Routine: počasí, pohyb, nebezpečí a setkání</h3>
  <p class="hc-hint">Pravidla HMK str. 141–150: počasí se určuje jednou za 24 hodin, srážky po čtyřhodinových hlídkách. Podklady pro další cestovní kroky se zaznamenají k vybrané postavě a konkrétní minutě; neprovádí se zde automatické zranění ani posun času. Orienteering, Cold/Heat Exposure a skutečný Encounter se vyhodnocují původními průvodci.</p>
  <details><summary>Vyhodnotit cestovní hlídku – pravidlové podklady</summary><form id="campaign-trekking-context-form">
- <div class="hc-fields"><label>Postava / průvodce<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+ <fieldset class="hc-expedition-actors"><legend>Účastníci této cestovní hlídky (průvodce se přidá automaticky)</legend><div class="hc-characters">${participants.map((c,i)=>`<label class="hc-character"><input type="checkbox" name="trekMemberIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset><div class="hc-fields"><label>Postava / průvodce<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <label>Oblast / označení trasy<input name="area" maxlength="90" required placeholder="Např. Východní les u Tashalu"></label>
  <label>Roční období<select name="season"><option value="auto">Z data TR (je-li doloženo)</option>${[['spring','Jaro'],['summer','Léto'],['autumn','Podzim'],['winter','Zima']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
  <label>Klimatické pásmo<select name="climate"><option value="subpolar">Subpolar</option><option value="cool" selected>Cool Temperate</option><option value="warm">Warm Temperate</option><option value="subtropical">Subtropical</option><option value="dry-tropical">Dry Tropical</option><option value="wet-tropical">Wet Tropical</option></select></label>
@@ -653,7 +654,7 @@ function campaignCalendarView(){
  <label>Doprava<select name="conveyance"><option value="foot">Foot</option><option value="mount">Mount</option><option value="cart">Cart</option><option value="wagon">Wagon</option></select></label>
  <label>Environ pro Encounter<select name="environ"><option value="highway">Highway</option><option value="rural">Rural</option><option value="wilderness">Wilderness</option><option value="underworld">Underworld</option></select></label>
  <label>Progress Modes (doložené ze Survival SV)<input name="progress" type="number" min="0" max="10" value="0"></label>
- <label>Slow Modes (včetně zranění, únavy a úkolů; srážky se přidají automaticky)<input name="slow" type="number" min="0" max="20" value="0"></label>
+ <label>Další Slow Modes (např. foraging / stalking; zranění, únava a srážky se přičítají automaticky)<input name="slow" type="number" min="0" max="20" value="0"></label>
  <label>Bearing Modes (doložené)<input name="bearing" type="number" min="0" max="20" value="0"></label>
  <label>Starší nedoložené noční hlídky v divočině (volitelné, jinak automaticky)<input name="wildernessNightWatches" type="number" min="0" max="10000" placeholder="Automaticky z doložených hlídek"></label>
  <label>Kostky<select name="diceOrigin"><option value="software">Automatické kryptografické hody</option><option value="manual">Ruční zápis (v pořadí: denní teplota, denní srážky, případné watch srážky, Progress, Direction, Encounter)</option></select></label>
@@ -661,9 +662,9 @@ function campaignCalendarView(){
  </div><label class="hc-check"><input name="night" type="checkbox" value="yes"> Noční watch</label>
  <label class="hc-check"><input name="alpine" type="checkbox" value="yes"> Alpine Vegetation / Ice (−4 teplota)</label>
  <label class="hc-check"><input name="aridDesert" type="checkbox" value="yes"> Arid Desert (zvláštní modifikátory)</label>
- <label class="hc-check"><input name="loaded" type="checkbox" value="yes"> Loaded Mode</label>
+ <label class="hc-check"><input name="loaded" type="checkbox" value="yes"> Loaded Mode – pouze pokud není zatížení doložitelné z inventáře / případně naložené zvíře</label>
  <label class="hc-check"><input name="doubleTime" type="checkbox" value="yes"> Double Time (jen bez Slow/Loaded)</label>
- <button type="submit">Vyhodnotit a uložit podklady (bez posunu času)</button></form>
+ <p class="hc-hint">Postihy celé skupiny (Wearied, Injured a doložený Loaded) se odvodí automaticky při uložení. Závažné zranění nebo chybějící údaje o výbavě se nebudou vykládat jako nulový postih. Kdo není v této hlídce, tomu se nepřipíše cestovní účinek.</p><button type="submit">Vyhodnotit a uložit podklady (bez posunu času)</button></form>
  <p class="tiny">Pokud vyjde Encounter, hazard či expozice, skutečné vyhodnocení otevřete v Combat / Skill Tests. Generování podkladů samo nezakládá zranění ani neprohlašuje následek za vyřízený.</p></details></section>`;
  const expeditionHTML=`<section class="hc-calendar hc-expedition"><h3>HMK · časově doložený odpočinek a únava během cesty</h3>
  <p class="hc-hint">HMK str. 62, 145–150, 176. Odpočinek se plánuje pro jednu či více postav současně; společný čas kampaně nemění. Obnova Windedness/Weariness nastane až po uplynutí intervalu při posunu času GM. Jeden čtyřhodinový cestovní watch zapisuje Weariness a END Secondary Roll. <strong>Jde o časový/únavový díl Trekking Routine, nikoliv o náhradu chybějících testů Weather, Orienteering, Hazards a Encounter.</strong> Před cestováním nejprve vyhodnoťte tyto situace jejich pravidlovými průvodci.</p>
@@ -6643,13 +6644,17 @@ document.addEventListener('submit',e=>{
   const precipitationD6=day.hasPrecipitation?die(6,'Precipitation per Watch'):null;
   const wet=trekWeatherWatch(day,{night:v.night==='yes',precipitationD6,pavedRoad:v.terrain==='paved-road'});
   const qty=(name,max)=>{const n=Number(v[name]);if(!Number.isSafeInteger(n)||n<0||n>max)throw Error('Neplatný počet '+name);return n;};
-  const progress=qty('progress',10),slow=qty('slow',20)+(wet.slowMode?1:0),bearing=qty('bearing',20);
+  const memberIds=[...new Set([...new FormData(form).getAll('trekMemberIds'),actor.id])];
+  const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:data.characters,
+   inventory:data.inventory,conveyance:v.conveyance,loadedByGM:v.loaded==='yes'});
+  const manualSlow=qty('slow',20);
+  const progress=qty('progress',10),slow=manualSlow+partyModes.forcedSlow+(wet.slowMode?1:0),bearing=qty('bearing',20);
   trekkingModeHardLimit({progress,bearing});
   // Progress dice require the original LPW. A zero-dice dry preview first
   // yields the total remaining Progress allocation.
   const spare=Math.max(0,progress-slow),progressD10=Array.from({length:spare},()=>die(10,'Progress')); 
   const movement=trekMovement({topography:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
-    progress,slow,loaded:v.loaded==='yes',bearing,progressD10,continuousPrecipitation:wet.continuous,
+    progress,slow,loaded:partyModes.loaded,bearing,progressD10,continuousPrecipitation:wet.continuous,
     doubleTime:v.doubleTime==='yes'});
   const directionD10=Array.from({length:movement.bearingDeficit},()=>die(10,'Direction Hazard'));
   const hazards=trekHazards({bearingDeficit:movement.bearingDeficit,directionD10});
@@ -6666,7 +6671,7 @@ document.addEventListener('submit',e=>{
     ...(hazards.direction&&hazards.direction!=='lost-time'?[`Direction Hazard: ${hazards.direction}`]:[]),
     ...(encounter.encounter?['Random Encounter – nutné vyhodnocení']:[])];
   const proof={format:'hmk-trekking-watch-evidence-v1',dayIndex,campaignMinute:clock.minute,area,
-    modes:{progress,slow,loaded:v.loaded==='yes',bearing,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
+    partyModes,modes:{progress,slow,manualSlow,loaded:partyModes.loaded,bearing,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
      environ:v.environ,wildernessNightWatches},
     season,climate:v.climate,landscape:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
     night:v.night==='yes',alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',weatherDay:day,
@@ -6677,7 +6682,7 @@ document.addEventListener('submit',e=>{
   if(hazards.direction==='lost-time')proof.unresolved=proof.unresolved.filter(x=>!x.startsWith('Direction Hazard:'));
  const summary=`${area} · ${season}/${v.climate} · ${wet.precipitation}${wet.continuous?' (continuous)':''}; `+
    `den ${day.temperatureD10}/${day.precipitationD10}${dayAlready?' (doložené počasí)':''}; `+
-   `LPW ${effectiveMovement.finalLPW}; ${effectiveMovement.leagues} leagues${hazards.direction==='lost-time'?' (Lost Time → Slow +1, HMK 148)':''}; encounter ${encounter.checkDue?(encounter.encounter?'ANO':'ne'):'bez hodu'}`+
+   `skupina ${partyModes.memberIds.length}; automatické Slow ${partyModes.forcedSlow}; Loaded ${partyModes.loaded?'ano':'ne'}; LPW ${effectiveMovement.finalLPW}; ${effectiveMovement.leagues} leagues${hazards.direction==='lost-time'?' (Lost Time → Slow +1, HMK 148)':''}; encounter ${encounter.checkDue?(encounter.encounter?'ANO':'ne'):'bez hodu'}`+
    (unresolved.length?'; NAVAZUJÍCÍ PROCEDURY: '+unresolved.join(', '):'');
   // Submission is already the explicit confirmation of this reversible,
   // append-only preparation. Do not interrupt GM with a redundant modal.
@@ -6750,6 +6755,11 @@ function updateExpeditionReadiness(form){
   if(!ids.includes(guideId))throw Error('Vyberte průvodce ze skupiny cestujících.');
   const ok=assessTrekkingReadiness({journal:data.journal,characters:data.characters,
    actorId:guideId,campaignId:campaignKey(clock),minute:clock.minute,kind});
+  if(ok.source.calendarTrekProof.partyModes){
+   const expected=ok.source.calendarTrekProof.partyModes.memberIds;
+   if(ids.length!==expected.length||ids.some(id=>!expected.includes(id)))
+    throw Error('Vybrané postavy neodpovídají členům připravené hlídky. V Trekking Routine zvolte skupinu před vyhodnocením.');
+  }
   output.textContent='Ověřeno: průvodce '+character(guideId)?.name+' · hlídka '+ok.sourceId+
    ' · Survival SV '+ok.sv+' · '+ok.spentModes+'/'+ok.availableModes+' Advantage Modes. '+
    ids.length+' cestujících provede samostatný END SR; čas zůstane beze změny.';
@@ -6831,7 +6841,7 @@ document.addEventListener('submit',e=>{
     if(!row)throw Error('Chybí pole END SR postavy '+character(id)?.name);
     return [id,{rawValues:[...row.querySelectorAll('input')].map(input=>input.value),generated:expeditionGeneratedDice.get(form)?.get(id)}];
    }));
-   const group=planHMKGroupWatch({journal:data.journal,characters:data.characters,clock,
+   const group=planHMKGroupWatch({journal:data.journal,characters:data.characters,inventory:data.inventory,clock,
     memberIds:ids,guideId,kind,diceByActor,idFactory:uuid});
    plans.push(...group.plans);
   }else{
