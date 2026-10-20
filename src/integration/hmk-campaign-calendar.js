@@ -183,6 +183,17 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
  }
  const automatic=automaticHMKFollowups(clock,characters,journal,getCampaignEpisodeAnchor);
  all.push(...automatic.all);unknown.push(...automatic.unknown);
+ // A potion remains due at exactly its ten-minute preparation deadline.
+ // The GM may arrive at the deadline but not skip it without the Herblore result.
+ const herbMembers=new Map(characters.map(c=>[c.id,c]));
+ for(const j of journal){const h=j.calendarHerbPotionStart;
+  if(!h||j.calendarCampaignId!==clock.campaignId||!herbMembers.has(j.characterId)||
+   journal.some(x=>x.calendarHerbPotionComplete?.startId===j.id&&x.calendarCampaignId===clock.campaignId))continue;
+  const actor=herbMembers.get(j.characterId);
+  all.push({id:'herbal-potion:'+j.id,characterId:actor.id,name:actor.name,kind:'herbal-potion',
+   sourceId:j.id,description:'Herblore SV – dokončení '+h.herbType+' (HMK 74)',
+   minute:h.dueMinute,anchorMinute:h.minute,status:h.dueMinute<=clock.minute?'due':'future'});
+ }
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
  return {due:all.filter(x=>x.status==='due'),future:all.filter(x=>x.status==='future'),unknown,all};
 }
