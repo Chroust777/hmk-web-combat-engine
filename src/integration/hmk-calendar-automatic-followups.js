@@ -20,6 +20,12 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
  };
  for(const c of characters){
   const s=c?.hmk?.combatState; if(s?.shock==='KIA')continue;
+  // HMK pp.184–186: nutrition is an ailment in persistent Combat State.
+  // Its first onset is based on explicit sole-source 24h ration proofs.
+  // Advance and Healing dice are NEVER inferred from the time alone.
+  for(const m of s?.malnutritionEpisodes??[])if(m.status==='active'&&m.campaignId===(clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`))
+   push(c,'malnutrition-course',m.id,`${m.kind==='thirst'?'Thirst':'Starvation'} · Exposure Advance/Healing d100 (HMK 185–186)`,
+    m.nextDueMinute,'calendar',{episodeId:m.id});
   // HMK p.300: a bestowed talisman does NOT simply expire. At the exact
   // end of every period its recipient must make Spirit SR (two successful
   // SR for outsiders). The ORIGINAL astral-talisman executor extends the
