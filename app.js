@@ -102,6 +102,8 @@ import {parseSpatialBarrierSegments,effectiveSpatialBarriers} from './src/integr
 import {recordEncounterFreeAction,encounterFreeActionAvailable,createEncounterSequence,validateEncounterSequence,startEncounterTurn,finishEncounterTurn,finalizeStagedEncounterTurn,nextEncounterRound,dueEncounterEvents,dueEndTurnEvents,currentEncounterActor,assertScheduledMeleeActor,resolveReadiedEncounterAction,cancelReadiedEncounterAction,completeReadiedEncounterAction,confirmAlertnessReaction,confirmConcentrationCompletion,abandonEncounterConcentration,ongoingEncounterConcentration,requireConcentrationCompatibleDefence,assertScheduledHitCanCommit,recordScheduledHitCommit,setEncounterTieOrder,configureInitialCrossbowPriority,requireInitialCrossbowShot} from './src/integration/encounter-turn-sequence.js';
 import {applyConfirmedTreatment,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock} from './src/integration/hmk-healing-persistence.js';
 import {calendarInitialUI,campaignCalendarBoardHTML} from './src/integration/hmk-campaign-calendar-ui.js';
+import {availableSpellAuralRecoveries,persistSpellAuralRecovery} from './src/integration/hmk-spell-aural-recovery.js';
+import {availableSpellPsycheRecoveries,persistSpellPsycheRecoverySchedule,persistSpellPsycheRecoveryRoll} from './src/integration/hmk-spell-psyche-recovery.js';
 import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan} from './src/integration/hmk-calendar-planner.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -166,7 +168,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.360';
+const APP_VERSION='93.361';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -300,10 +302,55 @@ function save(){
  }
 }
 window.addEventListener('storage',event=>{if(event.key===STORAGE&&event.newValue!==storageBaseline){storageReadOnly=true;notice='Data se změnila v jiné záložce. Zápisy jsou zablokovány, obnovte stránku.';render()}});
+/** Attach origin evidence for newly committed, state-changing HMK procedures.
+ * Called only inside the original atomic mutate transaction, after the rule
+ * engine has produced a verified persistent state. No guessed timestamps.
+ */
+function synchronizeAutomaticCalendarOrigins(before,after){
+ const clock=after.campaignClock;if(!clock)return;
+ const oldPeople=new Map((before.characters||[]).map(c=>[c.id,c]));
+ for(const c of after.characters){
+  const previous=oldPeople.get(c.id),s=c.hmk?.combatState,prior=previous?.hmk?.combatState;
+  if(!s)continue;
+  const newEvents=(s.events||[]).filter(e=>!(prior?.events||[]).some(x=>x.id===e.id));
+  const verified=newEvents.at(-1)?.id;
+  if(!verified)continue; // No state event: no time proof.
+  const anchor=(kind,episodeId,elapsedMinutes=0,woundId=null)=>{
+   if(kind==='wound'&&getCampaignAnchor(after.campaignClock,'wound',c.id,woundId))return;
+   if(kind!=='wound'&&getCampaignEpisodeAnchor(after.campaignClock,kind,c.id,episodeId||verified))return;
+   after.campaignClock=anchorCampaignOrigin(after.campaignClock,{
+    kind,characterId:c.id,...(woundId?{woundId}:{}),...(episodeId?{episodeId}:{}),
+    elapsedMinutes,eventId:uuid(),combatEventId:verified,source:'confirmed-combat'});
+  };
+  const oldWounds=new Set((prior?.wounds||[]).map(w=>w.id));
+  for(const w of s.wounds||[])if(!oldWounds.has(w.id))anchor('wound',null,0,w.id);
+  for(const [kind,started] of [['extended-shock',!prior?.extendedShock&&!!s.extendedShock],
+    ['coma',!prior?.coma?.active&&!!s.coma?.active],
+    ['blood-loss',!(prior?.bloodLoss?.bp>0)&&s.bloodLoss?.bp>0]]){
+   if(started)anchor(kind,verified);
+  }
+  const oldWeather=new Set((prior?.environmentalHazards||[]).map(h=>h.id));
+  for(const h of s.environmentalHazards||[])if(h.active&&!oldWeather.has(h.id))anchor('weather',h.id);
+  const oldSleep=prior?.sleepDeprivation;
+  if(s.sleepDeprivation?.status==='awake'&&
+      (!oldSleep||oldSleep.episodeId!==s.sleepDeprivation.episodeId)&&
+      Number.isSafeInteger(s.sleepDeprivation.hoursAwake))
+   anchor('sleep',s.sleepDeprivation.episodeId,s.sleepDeprivation.hoursAwake*60);
+  const oldShock=previous?.hmk?.arcane?.auralShockLevels||0;
+  const newShock=c.hmk?.arcane?.auralShockLevels||0;
+  if(newShock>oldShock&&oldShock===0&&newEvents.some(e=>['hmk-spell-misfire','hmk-spell-total-release','hmk-shaman-talisman-aural'].includes(e.type)))
+   anchor('aural','aural-'+verified);
+ }
+ // Record the campaign clock at which NEW journal evidence was committed.
+ // Historical journal entries remain byte-for-byte unchanged.
+ const existing=new Set((before.journal||[]).map(j=>j.id));
+ for(const entry of after.journal||[])if(!existing.has(entry.id)&&entry.campaignMinute===undefined)
+  entry.campaignMinute=after.campaignClock.minute;
+}
 function mutate(fn){
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {fn();reconcileTalismanPossession(previous,data);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignCalendarAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save()){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
+ try {fn();synchronizeAutomaticCalendarOrigins(previous,data);reconcileTalismanPossession(previous,data);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignCalendarAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save()){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(!automaticGenerationBusy)alert('Změna nebyla uložena: '+e.message);return false}
 }
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
@@ -434,7 +481,7 @@ let calendarUI=null; // Presentation state only, never stored in character/campa
 function campaignCalendarView(){
  const clock=data.campaignClock;
  if(!clock)return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`<h2>Jednotný kalendář kampaně</h2><div class="panel"><p>HMK str. 178–182: časové intervaly léčení, infekcí a Shock. Údaje o bojových kolech nepřevádíme na hodiny ani dny. Založení kalendáře neposune bojový stav a nespustí žádný hod.</p><form id="campaign-start-form"><div class="field-grid">${field('label','Označení kampaně (bez domyšleného harenského data)','')}${field('day','Den kampaně (1 = první evidovaný den)',1,'number')}${field('hour','Hodina (0–23)',8,'number')}${field('minute','Minuta (0–59)',0,'number')}</div><p>HMK str. 11 a 22: 12 měsíců × 30 dní, tři desetidenní úseky. Zvolte skutečné datum TR podle své kampaně (nikoli automaticky podle dnešního kalendáře).</p><div class="field-grid">${field('trYear','Rok TR (GM určí)',720,'number')}<label>Měsíc TR<select name="trMonth">${TR_MONTHS.map((m,i)=>`<option value="${i+1}">${esc(m)}</option>`).join('')}</select></label>${field('trDay','Den měsíce (1–30)',1,'number')}</div><label><input type="checkbox" name="setTR" value="yes" checked> Přiřadit GM potvrzené datum TR (lze také později)</label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje výchozí čas kampaně</label><button type="submit">Založit kalendář</button></form></div>`,`journal-book--calendar`);
- const agenda=campaignCalendarAgenda(clock,data.characters);
+ const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
  const unresolved=data.characters.flatMap(c=>{
   const s=c.hmk?.combatState;if(!s||s.shock==='KIA')return [];
   return (s.wounds??[]).filter(w=>!w.healed&&!getCampaignAnchor(clock,'wound',c.id,w.id))
@@ -449,11 +496,21 @@ function campaignCalendarView(){
   if(s.bloodLoss?.bp>0&&!getCampaignAnchor(clock,'blood-loss',c.id))arr.push({kind:'blood-loss',name:'První Blood Loss',unit:'dny'});
   for(const t of s.toxinCourses??[])if(['incubating','active'].includes(t.status)&&!getCampaignEpisodeAnchor(clock,'poison',c.id,t.id))arr.push({kind:'poison',name:'Poison · '+t.sourceId,unit:'minuty',episodeId:t.id});
   for(const t of s.diseaseCourses??[])if(['pending-profile','incubating','active'].includes(t.status)&&!getCampaignEpisodeAnchor(clock,'disease',c.id,t.id))arr.push({kind:'disease',name:'Disease · '+t.diseaseKey,unit:'minuty',episodeId:t.id});
+  // Imported legacy cases have no provable start timestamp. Offer the existing
+  // one-time, audited origin attestation instead of permanently deadlocking
+  // the calendar or guessing age from a combat round.
+  for(const h of s.environmentalHazards??[])if(h.active&&!getCampaignEpisodeAnchor(clock,'weather',c.id,h.id))
+   arr.push({kind:'weather',name:(h.kind==='cold'?'Cold':'Heat')+' Exposure',unit:'minuty',episodeId:h.id});
+  const sl=s.sleepDeprivation;
+  if(sl?.status==='awake'&&sl.episodeId&&!getCampaignEpisodeAnchor(clock,'sleep',c.id,sl.episodeId))
+   arr.push({kind:'sleep',name:'Sleep Deprivation',unit:'hodiny',episodeId:sl.episodeId});
+  if(c.hmk?.arcane?.auralShockLevels>0&&!clock.anchors.some(a=>a.kind==='aural'&&a.characterId===c.id))
+   arr.push({kind:'aural',name:'Aural Shock',unit:'hodiny',episodeId:'aural-legacy'});
   return arr.map(x=>({...x,characterId:c.id,label:c.name+' · '+x.name}));
  });
  const renderItem=x=>`<div class="list-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}${x.woundId?' · '+esc(x.woundId):''}</div></div><span>${x.status==='due'?'SPLATNÉ':'Čeká'}</span></div>`;
  if(!calendarUI)calendarUI=calendarInitialUI(clock);
- const board=campaignCalendarBoardHTML({clock,characters:data.characters,ui:calendarUI,escapeHTML:esc});
+ const board=campaignCalendarBoardHTML({clock,characters:data.characters,journal:data.journal,ui:calendarUI,escapeHTML:esc});
  return journalChapterShell('Svět · Kalendář kampaně','Jednotný kampanový čas, navázané procedury a HMK termíny na pergamenu deníku.',`${board}<details class="hc-advanced"><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Pouze GM posouvá čas; fyzické hody se neprovádějí automaticky.</p>
  <form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form><p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
  <section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Vyřešení probíhá v původním Combat / Healing průvodci; kalendář pouze hlídá čas, nerozhoduje o hodu ani nezapisuje paralelní Combat State.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
@@ -4422,6 +4479,26 @@ function offerGuidedMissilePreparation(seq,states,actorId){
  render();return 'handled';
 }
 
+/** Calendar-sourced recovery forms reuse the exact existing HMK rule transitions.
+ * The calendar supplies authoritative game time; dice may be cryptographically
+ * generated by the application or entered manually, with distinct provenance.
+ */
+function hmkTemporalRecoveryPanel(chars){
+ if(!data.campaignClock||!chars.length)return '';
+ const due=campaignCalendarAgenda(data.campaignClock,data.characters,data.journal).due;
+ const ids=new Set(chars.map(c=>c.id));
+ const pending=[];
+ for(const entry of availableSpellAuralRecoveries(data))if(ids.has(entry.characterId)&&due.some(x=>x.kind==='aural-recovery'&&x.characterId===entry.characterId)){
+  pending.push(`<form data-hmk-calendar-aural-recovery class="hc-recovery-form"><h4>${esc(entry.name)} · Aural Shock Recovery (HMK 190)</h4><input type="hidden" name="characterId" value="${esc(entry.characterId)}"><p>Will EML ${esc(entry.willEML)} · Aural ${esc(entry.levels)} · den kampaně ${Math.floor(data.campaignClock.minute/DAY_MINUTES)+1}.</p>${calendarDiceControls(100)}<button type="submit">Provést a uložit Aural Recovery</button><output role="status" aria-live="polite"></output></form>`);
+ }
+ for(const item of availableSpellPsycheRecoveries(data))if(ids.has(item.characterId)){
+  const kind=item.schedulePending?'psyche-interval':'psyche-recovery';
+  if(!due.some(x=>x.kind===kind&&x.characterId===item.characterId&&decodeURIComponent(x.sourceId.split(':')[0])===item.trait))continue;
+  pending.push(`<form ${item.schedulePending?'data-hmk-calendar-psyche-schedule':'data-hmk-calendar-psyche-roll'} class="hc-recovery-form"><h4>${esc(item.name)} · Psyche Recovery · ${esc(item.trait)} (HMK 189)</h4><input type="hidden" name="characterId" value="${esc(item.characterId)}"><input type="hidden" name="trait" value="${esc(item.trait)}"><p>${item.schedulePending?'Naplánovat doložený d6-denní interval':'Nastal den Will d100 · EML '+esc(item.willEML)+' · termín '+item.plan.dueGameDay+'.'}</p>${calendarDiceControls(item.schedulePending?6:100)}<button type="submit">${item.schedulePending?'Zapsat interval d6':'Provést a uložit Psyche Recovery'}</button><output role="status" aria-live="polite"></output></form>`);
+ }
+ return pending.length?`<section class="panel hc-recovery" id="hmk-calendar-recovery"><h3>HMK · pravidlové časované obnovy</h3><p>Hody i výsledek jsou zapisovány přímo původním pravidlovým modulem. Software hod a ručně zadaný hod mají odlišný původ v auditu.</p>${pending.join('')}</section>`:'';
+}
+function calendarDiceControls(faces){return `<div class="field-grid"><label>Zdroj d${faces}<select name="diceOrigin"><option value="software">Automatický hod (bezpečný generátor)</option><option value="manual">Ruční zadání čísla</option></select></label><label>d${faces} při ručním zadání<input name="die" type="number" min="1" max="${faces}" step="1" placeholder="Auto = nechat prázdné"></label></div>`;}
 function encounterView(){
  const chars=data.characters;
  const selectedChars=selectedEncounterCharacters();
@@ -4433,7 +4510,7 @@ function encounterView(){
  ${chars.length?`<div class="encounter-roster">${chars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues,...equippedCombatInputs(c).issues];return `<label class="encounter-entry"><input type="checkbox" data-encounter-character="${esc(c.id)}" ${encounterSelection.has(c.id)?'checked':''}><span><strong>${esc(c.name)}</strong><small>${esc(c.kind||'PC')} · ${warnings.length?warnings.length+' upozornění k údajům':'bez upozornění k úplnosti údajů'}</small></span></label>`}).join('')}</div>`:'<p class="muted">Nejprve vytvořte postavy v registru.</p>'}
  <div class="equipment-summary"><div><strong>Vybráno</strong><span>${count} postav</span></div><div><strong>Chybějící evidenční údaje</strong><span>${issues} upozornění</span></div></div>
  <div class="actions"><button type="button" data-action="encounter-all" ${chars.length?'':'disabled'}>Vybrat všechny</button><button type="button" class="secondary" data-action="encounter-clear" ${count?'':'disabled'}>Zrušit výběr</button><button type="button" data-action="encounter-export" ${count?'':'disabled'}>Exportovat podklady JSON</button></div></section>
- ${selectedChars.length?`<section class="panel"><h3>Kontrola účastníků</h3>${selectedChars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues.map(x=>'Výbava: '+x),...equippedCombatInputs(c).issues.map(x=>'Combat: '+x)];return `<details class="encounter-details"><summary>${esc(c.name)} · ${warnings.length} upozornění</summary>${warnings.length?`<ul class="audit-list">${warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="muted">Evidenční kontrola bez upozornění; pravidlová správnost není potvrzena.</p>'}</details>${armourCoveragePanel(c)}${combatantLoadPanel(c)}${equippedCombatInputsPanel(c)}`}).join('')}</section>`:''}${initiativeSequencePanel(selectedChars)}${guidedAttackPanel(selectedChars)}${combatClockPanel(selectedChars)}${taLedgerPanel(selectedChars)}${inClosePanel(selectedChars)}${specialStrikePreviewPanel(selectedChars)}${hmkMissilePanel(selectedChars)}${hmkSpecialBranchesPanel(selectedChars)}${encounterImpactPreviewPanel(selectedChars)}${combatPersistentStatePanel(selectedChars)}${hmkFearPanel(selectedChars)}${hmkLongtermHealingPanel(selectedChars)}${combatDraftHistoryPanel()}${combatContinuityPanel()}${combatReplayPanel()}${combatStateProjectionPanel()}${encounterShockFollowupPanel()}${encounterD100Panel()}${encounterShockMLPanel()}`,`journal-book--combat`);
+ ${selectedChars.length?`<section class="panel"><h3>Kontrola účastníků</h3>${selectedChars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues.map(x=>'Výbava: '+x),...equippedCombatInputs(c).issues.map(x=>'Combat: '+x)];return `<details class="encounter-details"><summary>${esc(c.name)} · ${warnings.length} upozornění</summary>${warnings.length?`<ul class="audit-list">${warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="muted">Evidenční kontrola bez upozornění; pravidlová správnost není potvrzena.</p>'}</details>${armourCoveragePanel(c)}${combatantLoadPanel(c)}${equippedCombatInputsPanel(c)}`}).join('')}</section>`:''}${initiativeSequencePanel(selectedChars)}${guidedAttackPanel(selectedChars)}${combatClockPanel(selectedChars)}${taLedgerPanel(selectedChars)}${inClosePanel(selectedChars)}${specialStrikePreviewPanel(selectedChars)}${hmkMissilePanel(selectedChars)}${hmkSpecialBranchesPanel(selectedChars)}${encounterImpactPreviewPanel(selectedChars)}${combatPersistentStatePanel(selectedChars)}${hmkFearPanel(selectedChars)}${hmkLongtermHealingPanel(selectedChars)}${hmkTemporalRecoveryPanel(selectedChars)}${combatDraftHistoryPanel()}${combatContinuityPanel()}${combatReplayPanel()}${combatStateProjectionPanel()}${encounterShockFollowupPanel()}${encounterD100Panel()}${encounterShockMLPanel()}`,`journal-book--combat`);
 }
 function editor(title,obj,kind){return `<div class="panel"><h2>${esc(title)}</h2><form id="${kind}-editor">${field('name','Název / jméno',obj.name||'')}${kind==='character'?`${field('occupation','Povolání',obj.occupation||'')}<label>Typ<select name="kind"><option>PC</option><option>NPC</option></select></label>${area('description','Popis',obj.description||'')}`:`<label>Kategorie<select name="category">${[['weapon','Zbraň'],['shield','Štít'],['armor','Zbroj'],['other','Ostatní předmět']].map(([v,l])=>`<option value="${v}" ${obj.category===v?'selected':''}>${l}</option>`).join('')}</select></label>${area('description','Popis',obj.description||'')}${field('source','Odkaz na zdroj (např. kapitola/strana)',obj.source||'')}${area('properties','Vlastní parametry JSON',JSON.stringify(obj.properties||{},null,2))}`}<div class="actions"><button type="submit">Uložit</button>${button('Zrušit','cancel-editor')}</div></form></div>`}
 let sheetEditingId=null; // only an ephemeral UI flag, never persisted
@@ -6207,6 +6284,42 @@ document.addEventListener('submit',event=>{
 },true);
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-resume-creation]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();if(!resumeCreation(t.dataset.resumeCreation))alert('Rozpracovanou postavu nelze obnovit nebo je aktivní Initiative.');},true);
 // Calendar planner – all mutations pass through mutate() and the append-only clock validator.
+document.addEventListener('submit',event=>{
+ const form=event.target;
+ const aural=form?.matches?.('[data-hmk-calendar-aural-recovery]');
+ const schedule=form?.matches?.('[data-hmk-calendar-psyche-schedule]');
+ const psyche=form?.matches?.('[data-hmk-calendar-psyche-roll]');
+ if(!aural&&!schedule&&!psyche)return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const output=form.querySelector('output');
+ try{
+  if(storageReadOnly||!data.campaignClock||combatInitiativeSequence)throw Error('Kalendář nebo bezpečný zápis nejsou připravené, případně probíhá Initiative');
+  const v=Object.fromEntries(new FormData(form));
+  const characterId=v.characterId,trait=v.trait,diceOrigin=v.diceOrigin;
+  if(!['manual','software'].includes(diceOrigin))throw Error('Neplatná volba původu hodu');
+  if(!character(characterId))throw Error('Postava nebyla nalezena');
+  const sides=schedule?6:100,raw=String(v.die||'').trim();
+  if(diceOrigin==='software'&&raw)throw Error('Pro automatický hod nevyplňujte ruční číslo');
+  if(diceOrigin==='software'&&!globalThis.crypto?.getRandomValues)throw Error('Bezpečný automatický hod není v tomto prohlížeči dostupný; použijte ruční zadání');
+  if(diceOrigin==='manual'&&!/^\d+$/.test(raw))throw Error('Zadejte celé číslo ručního hodu');
+  const die=diceOrigin==='software'?secureAutoDie(sides):Number(raw);
+  if(!Number.isSafeInteger(die)||die<1||die>sides)throw Error('Hod mimo rozsah d'+sides);
+  const clock=data.campaignClock,gameDay=Math.floor(clock.minute/DAY_MINUTES)+1;
+  const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
+  const kind=aural?'aural-recovery':schedule?'psyche-interval':'psyche-recovery';
+  if(!agenda.due.some(x=>x.characterId===characterId&&x.kind===kind&&
+   (aural||decodeURIComponent(x.sourceId.split(':')[0])===trait)))throw Error('Kalendář nyní tento test nepovoluje');
+  const args={document:data,characterId,eventId:uuid(),diceOrigin,gmConfirmed:true,
+   storage:localStorage,key:STORAGE,baseline:storageBaseline};
+  const result=aural?persistSpellAuralRecovery({...args,gameDay,d100:die,gmConfirmedDayElapsed:true}):
+   schedule?persistSpellPsycheRecoverySchedule({...args,trait,periodStartDay:gameDay,d6:die,gmConfirmedStartDay:true}):
+   persistSpellPsycheRecoveryRoll({...args,trait,gameDay,d100:die,gmConfirmedIntervalElapsed:true});
+  if(!result.ok||!result.document)throw Error('Trvalé uložení nebylo potvrzeno; neopakujte hod bez kontroly historie');
+  data=validate(result.document);storageBaseline=result.serialized;
+  notice='Pravidlový hod d'+sides+' = '+die+' ('+(diceOrigin==='software'?'software':'ruční')+'); výsledek je uložen v Combat State i deníku.';
+  render();
+ }catch(err){if(output?.isConnected)output.textContent=err.message;else alert(err.message);}
+},true);
 document.addEventListener('submit',e=>{
  const f=e.target;
  if(!['campaign-quick-advance-form','campaign-plan-form','campaign-tr-origin-form'].includes(f.id))return;
@@ -6222,7 +6335,7 @@ document.addEventListener('submit',e=>{
   }
   if(f.id==='campaign-quick-advance-form'){
    if(combatInitiativeSequence)throw Error('Při aktivním Initiative nelze samostatně posouvat čas kampaně');
-   const delta=n(v.deltaMinutes),next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:delta,eventId:uuid(),reason:v.reason,gmConfirmed:true,characters:data.characters});
+   const delta=n(v.deltaMinutes),next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:delta,eventId:uuid(),reason:v.reason,gmConfirmed:true,characters:data.characters,journal:data.journal});
    if(!window.confirm('Potvrdit skutečné plynutí času do '+displayCampaignMinute(next.minute)+'? Hody se automaticky neprovedou.'))return;
    mutate(()=>{data.campaignClock=next;});return;
   }
@@ -6235,6 +6348,53 @@ document.addEventListener('submit',e=>{
   if(mutate(()=>{data.campaignClock=next;}))calendarUI.prefillMinute=null;
  }catch(err){alert('Kalendář nebyl změněn: '+err.message)}
 },true);
+/** A calendar notification points to an actual existing rule executor. */
+function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
+ const q=selector=>[...document.querySelectorAll(selector)];
+ const byHidden=(selector)=>q(selector).find(f=>f.querySelector('[name="sourceId"]')?.value===sourceId);
+ const choose=(form,name,value)=>{const el=form?.elements?.namedItem(name);if(!el||value===undefined||value===null)return;
+  if(el instanceof HTMLSelectElement&&!Array.from(el.options).some(o=>o.value===String(value)))return;
+  el.value=String(value);el.dispatchEvent(new Event('change',{bubbles:true}));};
+ let form=null;
+ const s=actor.hmk?.combatState,attrs=actor.hmk?.attributes||{};
+ switch(kind){
+ case 'treatment':case 'healing':case 'infection':case 'grim':{
+  form=document.getElementById(kind==='treatment'?'hmk-treatment-form':kind==='healing'?'hmk-healing-roll-form':kind==='infection'?'hmk-infection-course-form':'hmk-grim-shock-form');
+  choose(form,'wound',actor.id+'::'+sourceId);
+  if(form)refreshCalendarHealingFields(form);
+  choose(form,'endurance',attrs.end);choose(form,'will',attrs.wil);break;
+ }
+ case 'blood-loss':form=document.getElementById('hmk-blood-regeneration-form');choose(form,'targetId',actor.id);
+  if(form)refreshCalendarHealingFields(form);choose(form,'endurance',attrs.end);break;
+ case 'poison':{
+  const t=s?.toxinCourses?.find(z=>z.sourceId===sourceId);
+  form=byHidden(t?.status==='incubating'?'form[data-hmk-poison-onset]':'form[data-hmk-poison-course]');
+  choose(form,'elapsedMinutes',elapsedText);break;
+ }
+ case 'disease':{
+  const t=s?.diseaseCourses?.find(z=>z.sourceId===sourceId);
+  form=byHidden(t?.status==='pending-profile'?'form[data-hmk-disease-profile]':t?.status==='incubating'?'form[data-hmk-disease-onset]':'form[data-hmk-disease-course]');
+  choose(form,'elapsedMinutes',elapsedText);break;
+ }
+ case 'skill-critical':form=q('form[data-skill-critical-form]').find(f=>sourceId.startsWith(f.elements.namedItem('origin')?.value+'-'));break;
+ case 'skill-fall':form=byHidden('form[data-climbing-fall-form]')||byHidden('form[data-climbing-short-fall]');break;
+ case 'skill-injury':form=byHidden('form[data-skill-physical-impact]');break;
+ case 'weather-course':form=byHidden('form[data-skill-weather-course]');choose(form,'elapsedMinutes',elapsedText);break;
+ case 'weather-skin':form=byHidden('form[data-skill-weather-skin]');break;
+ case 'sleep-deprivation':form=q('form[data-hmk-sleep-deprivation-day]')[0]||null;break;
+ case 'aural-recovery':form=q('form[data-hmk-calendar-aural-recovery]').find(f=>f.elements.namedItem('characterId')?.value===actor.id);break;
+ case 'psyche-interval':case 'psyche-recovery':form=q(kind==='psyche-interval'?'form[data-hmk-calendar-psyche-schedule]':'form[data-hmk-calendar-psyche-roll]').find(f=>f.elements.namedItem('characterId')?.value===actor.id&&(!sourceId||encodeURIComponent(f.elements.namedItem('trait')?.value||'')===sourceId.split(':')[0]));break;
+ default:break;
+ }
+ if(form){for(let parent=form.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+  form.scrollIntoView({block:'center',behavior:'instant'});
+  const rollInput=form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"]');
+  rollInput?.focus({preventScroll:true});
+ }else if(['skill-fall','skill-critical','weather-course','treatment','healing','infection','grim','poison','disease','psyche-recovery','psyche-interval','aural-recovery'].includes(kind)){
+  notice='Kalendář otevřel správnou záložku, ale pravidlový formulář není v aktuálním stavu dostupný. Nejprve dokončete případné předchozí povinnosti.';
+  render();
+ }
+}
 document.addEventListener('click',e=>{
  const t=e.target.closest?.('[data-cal-day],[data-cal-hour],[data-cal-prefill],[data-cal-action],[data-cal-link],[data-cal-resolve],[data-cal-cancel]');
  if(!t)return;
@@ -6258,11 +6418,10 @@ document.addEventListener('click',e=>{
   else if(destination==='skills'){view='skills';}
   else{activeSheetSection=destination==='inventory'?'inventory':destination==='hazards'?'hazards':'notes';view='sheet';}
   render();
-  // Focus the actual existing rule editor, never open a duplicate roll form.
-  const followup=destination==='healing'?'#hmk-healing-roll-form,#hmk-infection-course-form,#hmk-grim-shock-form,#hmk-blood-regeneration-form':
-   destination==='hazards'&&(t.dataset.calKind==='poison')?'form[data-hmk-poison-onset],form[data-hmk-poison-course]':
-   destination==='hazards'&&(t.dataset.calKind==='disease')?'form[data-hmk-disease-profile],form[data-hmk-disease-onset],form[data-hmk-disease-course]':null;
-  if(followup)document.querySelector(followup)?.scrollIntoView({block:'start'});
+  // Locate the exact rule engine form by event kind AND its permanent source ID.
+  // Prefill documented character/time facts only; never guess situational
+  // anatomy, medical help, die results, or auto-check GM decisions.
+  focusCalendarRuleAction(target,t.dataset.calKind||'gm',t.dataset.calSource||'',t.dataset.calElapsed);
   return;
  }
  if(t.dataset.calResolve||t.dataset.calCancel){
@@ -6304,7 +6463,7 @@ document.addEventListener('submit',e=>{
    const days=parse(v.days),hours=parse(v.hours),minutes=parse(v.minutes);
    if(![days,hours,minutes].every(Number.isSafeInteger)||hours>23||minutes>59)throw Error('Zadejte celé dny a HH:MM');
    const next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:days*DAY_MINUTES+hours*60+minutes,
-    reason:v.reason,eventId:uuid(),gmConfirmed:true,characters:data.characters});
+    reason:v.reason,eventId:uuid(),gmConfirmed:true,characters:data.characters,journal:data.journal});
    if(!window.confirm('Posunout celou kampaň na '+displayCampaignMinute(next.minute)+'? Žádný hod se automaticky neprovede.'))return;
    mutate(()=>{data.campaignClock=next;});return;
   }
@@ -6318,7 +6477,7 @@ document.addEventListener('submit',e=>{
   }else{
    [kind,characterId,episodeId]=String(v.origin??'').split('::');
    const s=character(characterId)?.hmk?.combatState;
-   if(!s||!((kind==='extended-shock'&&s.extendedShock)||(kind==='coma'&&s.coma?.active)||(kind==='blood-loss'&&s.bloodLoss?.bp>0)||(kind==='poison'&&(s.toxinCourses??[]).some(t=>t.id===episodeId&&['incubating','active'].includes(t.status)))||(kind==='disease'&&(s.diseaseCourses??[]).some(t=>t.id===episodeId&&['pending-profile','incubating','active'].includes(t.status)))))throw Error('Procedura již není aktivní');
+   if(!s||!((kind==='extended-shock'&&s.extendedShock)||(kind==='coma'&&s.coma?.active)||(kind==='blood-loss'&&s.bloodLoss?.bp>0)||(kind==='poison'&&(s.toxinCourses??[]).some(t=>t.id===episodeId&&['incubating','active'].includes(t.status)))||(kind==='disease'&&(s.diseaseCourses??[]).some(t=>t.id===episodeId&&['pending-profile','incubating','active'].includes(t.status)))||(kind==='weather'&&(s.environmentalHazards??[]).some(h=>h.id===episodeId&&h.active))||(kind==='sleep'&&s.sleepDeprivation?.status==='awake'&&s.sleepDeprivation?.episodeId===episodeId)||(kind==='aural'&&character(characterId)?.hmk?.arcane?.auralShockLevels>0&&episodeId==='aural-legacy')))throw Error('Procedura již není aktivní');
   }
   const next=anchorCampaignOrigin(data.campaignClock,{kind,characterId,woundId,episodeId,elapsedMinutes,
    gmConfirmed:true,eventId:uuid()});
