@@ -4266,3 +4266,19 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-calendar .hc-campaign-settings details>summary{cursor:pointer;font-weight:bold;color:#543b24}
 .content-calendar .hc-campaign-settings button.danger{background:#873c31!important;color:#fff4db!important}
 @media(max-width:580px){.content-calendar .hc-setup .hc-start-grid{grid-template-columns:1fr!important}.content-calendar .hc-characters{grid-template-columns:1fr}}
+
+/* v93.364: visible, evidence-backed history and minute-by-minute clock setting. */
+.content-calendar .hc-status{display:inline-flex;align-items:center;border:1px solid #856e4c88;border-radius:3px;padding:2px 6px;background:rgba(147,129,91,.13);color:#392d21;font:700 .7rem/1.2 system-ui,sans-serif;white-space:nowrap}
+.content-calendar .hc-status--resolved{color:#314b30;background:rgba(97,134,88,.13);border-color:#6b805b80}
+.content-calendar .hc-status--cancelled{color:#5a5248;text-decoration:none;opacity:.86}
+.content-calendar .hc-entry--done{opacity:1;border-left-color:#61794f}
+.content-calendar .hc-minute{grid-template-columns:minmax(145px,175px) minmax(0,1fr)}
+.content-calendar .hc-minute-commands{display:flex;flex-wrap:wrap;align-items:stretch;min-width:0;border-right:1px solid #90714a44}
+.content-calendar .hc-minute-time{flex:0 0 66px;border-right:0}
+.content-calendar .folio-chapter-content button.hc-minute-jump{flex:1 1 auto;min-width:0;min-height:27px;padding:3px 5px;background:rgba(123,143,94,.14)!important;border:1px solid #667d5488!important;border-radius:2px;color:#2e452d!important;font:700 .62rem/1.18 system-ui,sans-serif;box-shadow:none!important}
+.content-calendar .folio-chapter-content button.hc-minute-jump:hover{background:rgba(123,143,94,.30)!important}
+@media(max-width:650px){.content-calendar .hc-minute{grid-template-columns:minmax(115px,145px) minmax(0,1fr)}.content-calendar .hc-minute-time{flex-basis:65px}.content-calendar .folio-chapter-content button.hc-minute-jump{font-size:.59rem}}
+@media(max-width:380px){.content-calendar .hc-minute{grid-template-columns:110px minmax(0,1fr)}.content-calendar .hc-minute-commands{flex-direction:column}.content-calendar .hc-minute-time{flex-basis:auto;text-align:center}.content-calendar .folio-chapter-content button.hc-minute-jump{font-size:.57rem}}
+
+.content-calendar .hc-status--elapsed{color:#5e543e;background:rgba(138,121,94,.11)}
+.journal-log-row.calendar-history-focus{outline:2px solid #8d642f;outline-offset:2px;background:rgba(195,153,77,.17)}

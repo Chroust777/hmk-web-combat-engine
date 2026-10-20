@@ -171,7 +171,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.363';
+const APP_VERSION='93.364';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -367,7 +367,9 @@ function calendarDiceWitnessForActiveForm(clock){
  if(!dice?.size)return null;
  const rolls=[];
  for(const [input,entry] of dice){
-  if(input.isConnected&&input.form===form&&String(input.value)===String(entry.value))rolls.push(entry);
+  const entries=Array.isArray(entry)?entry:[entry];
+  const typed=input.type==='text'?entries.map(x=>x.value).join(', '):String(entries[0]?.value);
+  if(input.isConnected&&input.form===form&&String(input.value).trim()===typed)rolls.push(...entries);
  }
  if(!rolls.length)return null;
  return verifiedCalendarDiceWitness({kind:form.dataset.hmkCalendarKind,
@@ -380,6 +382,29 @@ function installCalendarDiceControls(form,kind,sourceId,actorId){
  form.dataset.hmkCalendarSource=sourceId||'';
  form.dataset.hmkCalendarActor=actorId;
  const witnessed=new Map();calendarGeneratedDice.set(form,witnessed);
+ if(kind==='talisman-period'){
+  const input=form.querySelector('input[name="specialDice"]');
+  const outsider=form.querySelector('input[name="specialOutsider"]');
+  if(input){
+   if(input.nextElementSibling?.dataset?.hmkCalendarAutoDie==='true')input.nextElementSibling.remove();
+   input.addEventListener('input',()=>witnessed.delete(input));
+   outsider?.addEventListener('change',()=>{witnessed.delete(input);input.value='';});
+   const b=document.createElement('button');b.type='button';b.className='hc-small';
+   b.dataset.hmkCalendarAutoDie='true';b.textContent='⚄ Hodit d10';
+   b.title='Automatický Spirit SR, jedna nebo dvě d10 podle účastníka; původ se ověří podle uloženého hodu';
+   b.addEventListener('click',()=>{
+    const count=outsider?.checked?2:1;
+    const entries=Array.from({length:count},(_,occurrence)=>({field:'specialDice',occurrence,faces:10,
+     value:secureAutoDie(10),origin:'cryptographic-software-die',id:uuid()}));
+    input.value=entries.map(x=>x.value).join(', ');
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    witnessed.set(input,entries);
+    b.textContent='⚄ d10 = '+entries.map(x=>x.value).join(', ');
+   });
+   input.insertAdjacentElement('afterend',b);
+  }
+  return;
+ }
  for(const [name,permitted] of Object.entries(allowed)){
   const inputs=[...form.querySelectorAll('input[type="number"]')].filter(el=>el.name===name);
   inputs.forEach((input,occurrence)=>{
@@ -1880,7 +1905,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  if(activeSheetSection==='hazards')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Nebezpečí / Trauma</h3><p>GM procedury a následky postavy ${esc(c.name)} · HMK</p></header><div class="columns journal-tech-columns">${hazardsView(c.id)}</div></section>`,`journal-book--chapter journal-book--hazards`);
  if(activeSheetSection==='inventory')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Arsenal & Gear</h3><p>Inventář, výbava, zatížení a speciální efekty.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Inventář postavy</h3>${wealthInventoryPanel(c)}${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}</section>${combatantLoadPanel(c)}${armourLoadoutPanel(inv,c)}<section class="panel wide hmk-inventory-add-panel">${journalAddInventoryForm()}</section>${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:''})()}</div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='status')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Combat & Conditions</h3><p>Aktuální stav, povinné procedury, zranění a návazné herní sekvence.</p></header><div class="columns journal-tech-columns">${hskPendingSkillPhysicalConsequences(c.id)}${hskHazardSummary(c.id)}${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section></div></section>`,`journal-book--chapter`);
- if(activeSheetSection==='notes')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row journal-log-row"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section>${auditPanel}</div></section>`,`journal-book--chapter`);
+ if(activeSheetSection==='notes')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row journal-log-row" data-journal-entry="${esc(l.id)}"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section>${auditPanel}</div></section>`,`journal-book--chapter`);
  return '';
 }
 function sheetView(){
@@ -5891,7 +5916,10 @@ function hskSpecialRefresh(form){
 }
 function hskSpecialNumericDice(form,count){
  const raw=form.elements.namedItem('specialDice')?.value?.trim()||'';
- if(!raw)return Array.from({length:count},()=>secureAutoDie(10));
+ if(!raw){
+  if(form.dataset.hmkCalendarKind==='talisman-period')throw Error('Pro kalendářový Spirit SR zadejte hod d10 nebo použijte tlačítko pro automatický hod.');
+  return Array.from({length:count},()=>secureAutoDie(10));
+ }
  if(!/^(?:10|[1-9])(?:\s*,\s*(?:10|[1-9]))*$/.test(raw))throw Error('Hody d10 zadejte oddělené čárkou, každý od 1 do 10');
  const parts=raw.split(',').map(x=>Number(x.trim()));
  if(parts.length!==count)throw Error('Pro tuto činnost je potřeba přesně '+count+' hodů d10.');
@@ -5966,7 +5994,7 @@ function hskSpecialRun(form){
  if(criticalWill)explanation+=' Ritual CF: následný Will d100 '+criticalWill.roll+' → '+criticalWill.level+'; úprava Benediction Modifier '+criticalBenedictionPenalty+'.';
  if(routine.id==='astral-rite-member')explanation+=' '+modifierDetails+'; bonus +2 TN pouze při Trance CS.';
  const body=routine.name+' · HMK '+routine.page+'\nSR '+routine.skill+' ML '+secondaryML+' → TN '+outcome.tn+'; hody '+(outcome.rolls.join(', ')||'žádné')+'; úspěchy '+outcome.successes+'\n'+explanation;
- return {body,proof:{type:'special-secondary-roll',actorId:actor.id,priestId:priest?.id??null,routineId:routine.id,routineName:routine.name,page:routine.page,skill:routine.skill,secondaryML,stars,style:styleInfo?.name??null,primaryResult,criticalWill,outcome,explanation,campaignMinute:data.campaignClock?.minute??null,sourcePages:[62,routine.page]}};
+ return {body,proof:{type:'special-secondary-roll',actorId:actor.id,priestId:priest?.id??null,routineId:routine.id,routineName:routine.name,page:routine.page,skill:routine.skill,secondaryML,stars,style:styleInfo?.name??null,primaryResult,criticalWill,outcome,explanation,physicalDice:rolls.map(value=>({faces:10,value,source:form.elements.namedItem('specialDice')?.value?.trim()?'entered-number':'internal-software-die'})),campaignMinute:data.campaignClock?.minute??null,sourcePages:[62,routine.page]}};
 }
 function hskFields(form,side){return {
   secondary1:form.elements.namedItem(side==='A'?'secondary1':'defSecondary1')?.value||'',
@@ -6568,13 +6596,26 @@ document.addEventListener('submit',e=>{
  }catch(error){alert('Postavy nebyly změněny: '+error.message)}
 },true);
 document.addEventListener('click',e=>{
- const t=e.target.closest?.('[data-cal-day],[data-cal-hour],[data-cal-prefill],[data-cal-action],[data-cal-link],[data-cal-resolve],[data-cal-cancel]');
+ const t=e.target.closest?.('[data-cal-day],[data-cal-hour],[data-cal-prefill],[data-cal-set-time],[data-cal-action],[data-cal-link],[data-cal-resolve],[data-cal-cancel]');
  if(!t)return;
  e.preventDefault();e.stopImmediatePropagation();
  if(!data.campaignClock)return;
  if(!calendarUI)calendarUI=calendarInitialUI(data.campaignClock);
  if(t.dataset.calDay){calendarUI.dayNumber=Number(t.dataset.calDay);calendarUI.hour=calendarUI.dayNumber===Math.floor(data.campaignClock.minute/DAY_MINUTES)+1?Math.floor(data.campaignClock.minute%1440/60):8;calendarUI.mode='day';calendarUI.prefillMinute=null;render();return;}
  if(t.dataset.calHour!==undefined){calendarUI.hour=Number(t.dataset.calHour);render();return;}
+ if(t.dataset.calSetTime!==undefined){
+  try{
+   if(combatInitiativeSequence)throw Error('Během aktivní Initiative nejdříve dokončete bojovou časovou osu.');
+   const target=Number(t.dataset.calSetTime),delta=target-data.campaignClock.minute;
+   if(!Number.isSafeInteger(target)||delta<=0)throw Error('Čas lze nastavit pouze do budoucnosti; historické události lze prohlížet.');
+   const reason=window.prompt('Důvod přesunu na '+displayCampaignMinute(target)+':','Plynutí času ve hře');
+   if(reason===null)return;
+   const next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:delta,eventId:uuid(),reason,gmConfirmed:true,characters:data.characters,journal:data.journal});
+   if(!window.confirm('Nastavit čas kampaně na '+displayCampaignMinute(target)+'? Nevyřízené termíny se nesmějí přeskočit.'))return;
+   mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();});
+  }catch(error){alert('Čas nebyl změněn: '+error.message);}
+  return;
+ }
  if(t.dataset.calPrefill){calendarUI.prefillMinute=Number(t.dataset.calPrefill);render();document.getElementById('hc-planner')?.scrollIntoView({block:'start',behavior:'auto'});return;}
  if(t.dataset.calAction){const action=t.dataset.calAction;
   if(action==='today'){calendarUI=calendarInitialUI(data.campaignClock);calendarUI.mode='day';}
@@ -6590,6 +6631,7 @@ document.addEventListener('click',e=>{
   else if(destination==='skills'){view='skills';}
   else{activeSheetSection=destination==='inventory'?'inventory':destination==='hazards'?'hazards':'notes';view='sheet';}
   render();
+  if(t.dataset.calHistoryId){const row=[...document.querySelectorAll('[data-journal-entry]')].find(x=>x.dataset.journalEntry===t.dataset.calHistoryId);if(row){row.classList.add('calendar-history-focus');row.scrollIntoView({block:'center',behavior:'auto'});}return;}
   // Locate the exact rule engine form by event kind AND its permanent source ID.
   // Prefill documented character/time facts only; never guess situational
   // anatomy, medical help, die results, or auto-check GM decisions.
