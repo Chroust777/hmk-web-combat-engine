@@ -174,7 +174,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.367';
+const APP_VERSION='93.368';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6785,6 +6785,9 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   form.scrollIntoView({block:'center',behavior:'instant'});
   const rollInput=form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"]');
   rollInput?.focus({preventScroll:true});
+ }else if(['trek-weather-hazard','trek-direction-hazard','trek-encounter','trek-survival'].includes(kind)){
+  notice='Trekking: doložené nebezpečí zůstává povinné. Samostatný potvrzený pravidlový výsledek zatím není propojen s konkrétním cestovním záznamem; nelze jej považovat za vyřešený. Zdroj: '+sourceId;
+  render();
  }else if(['skill-fall','skill-critical','weather-course','treatment','healing','infection','grim','poison','disease','psyche-recovery','psyche-interval','aural-recovery','talisman-period'].includes(kind)){
   notice='Kalendář otevřel správnou záložku, ale pravidlový formulář není v aktuálním stavu dostupný. Nejprve dokončete případné předchozí povinnosti.';
   render();
