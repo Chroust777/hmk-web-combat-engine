@@ -4,6 +4,7 @@
  * HMK v1.2 pp.62,67,71,148,169,175–190.
  */
 import {criticalActivities} from './hmk-skill-critical-activities.js';
+import {trekkingOutstandingCases} from './hmk-trekking-followups.js';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -123,6 +124,12 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
     else unknown.push({characterId:c.id,name:c.name,kind:'psyche-recovery',sourceId:id,description:`Psyche Recovery · ${t.trait}`,reason:'Chybí přesná minuta doloženého d6 plánu; nelze určit čas Will testu'});
    }
   }
+ }
+ // Persistent trekking results become distinct obligations until an actual
+ // rules-executor proof, not a calendar click, resolves each hazard.
+ for(const t of trekkingOutstandingCases(characters,journal)){
+  const actor=characters.find(c=>c.id===t.characterId);
+  if(actor)push(actor,t.kind,t.sourceId,t.description,t.minute,t.route,{hazard:t.hazard});
  }
  // A critical failure has *activity-dependent* consequences: request the
  // existing follow-up workflow, never fabricate a fall, injury or date.
