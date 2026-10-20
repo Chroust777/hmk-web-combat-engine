@@ -10,7 +10,7 @@ export function provenCarriedRations(inventory=[],actorId){
  return inventory.filter(x=>x.characterId===actorId&&
   RATIONS[x.sourceItemId]===x.snapshot?.name&&x.snapshot?.id===x.sourceItemId&&
   x.snapshot?.category==='other'&&x.snapshot?.properties?.weightLb===3&&
-  Number.isSafeInteger(x.quantity)&&x.quantity>0)
+  Number.isSafeInteger(x.quantity*2)&&x.quantity>0)
   .map(x=>({itemId:x.id,actorId,sourceItemId:x.sourceItemId,
    name:x.snapshot.name,foodDays:x.quantity,weightLb:3*x.quantity,sourcePages:[120,186]}));
 }

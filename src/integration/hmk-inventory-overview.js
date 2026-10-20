@@ -12,7 +12,8 @@ const knownPrice=(item)=>{
 };
 export function projectInventoryRows(inventory=[]){
  return inventory.map(item=>{
-  const p=item.snapshot?.properties||{},qty=Number.isSafeInteger(item.quantity)&&item.quantity>0?item.quantity:null;
+  const p=item.snapshot?.properties||{},isPrintedRation=['hmk:gear:hmk-p120-026','hmk:gear:hmk-p120-027'].includes(item.sourceItemId),
+   qty=(Number.isSafeInteger(item.quantity)||isPrintedRation&&Number.isSafeInteger(item.quantity*2))&&item.quantity>0?item.quantity:null;
   const price=knownPrice(item),weight=isFiniteNonnegative(p.weightLb)?p.weightLb:null;
   const totalPrice=qty!==null&&price.unit!==null?qty*price.unit:
    qty!==null&&Number.isSafeInteger(p.pricePerDozenPence)&&qty%12===0?qty/12*p.pricePerDozenPence:null;

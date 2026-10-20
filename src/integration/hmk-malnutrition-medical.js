@@ -65,7 +65,8 @@ export function applyDueMalnutritionOnsets(database,{idFactory,stamp}={}){
    for(const j of history){const d=j.calendarNutritionDay;
     if(d.endMinute<=previousOnset)continue;
     const policy=database.journal.find(x=>x.id===d.policyId)?.calendarNutritionPolicy;
-    check(policy?.foragingOnly===true&&policy.enabled===true,'Malnutrition: chybí doklad výhradního zdroje zásob');
+    check(policy?.enabled===true&&(policy.foragingOnly===true||policy.inventoryRations===true),
+     'Malnutrition: chybí doložený úplný režim účtování zásob');
     const r=rationStatus(d,kind);
     if(r==='full'){zero=0;halves=0;}
     else if(r==='none'){zero++;halves=0;}

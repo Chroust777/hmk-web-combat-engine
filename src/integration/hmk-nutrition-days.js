@@ -7,6 +7,7 @@
  */
 import {availableSupplyLots,createSupplyUse} from './hmk-foraging-supply-ledger.js';
 import {assertExclusiveForagingProven} from './hmk-inventory-provisions.js';
+import {availableRationLots,createPhysicalRationUse,projectCampaignRationInventory} from './hmk-physical-ration-ledger.js';
 export const NUTRITION_POLICY_FORMAT='hmk-nutrition-policy-v1';
 export const NUTRITION_DAY_FORMAT='hmk-nutrition-day-v1';
 const DAY=1440;
@@ -23,13 +24,14 @@ export function activeNutritionPolicies(journal=[],campaignId,actorIds=null){
 /** Explicitly confirmed source restriction, activity and climate. A different
  * carried ration source is not inferable from the Foraging supply ledger.
  */
-export function createNutritionPolicy({campaignId,minute,actorId,foodNeed=1,waterNeed=1,foragingOnly=false,enabled=true}={}){
+export function createNutritionPolicy({campaignId,minute,actorId,foodNeed=1,waterNeed=1,foragingOnly=false,inventoryRations=false,enabled=true}={}){
  check(typeof campaignId==='string'&&campaignId&&validMinute(minute),'Denní režim potřebuje doložený čas kampaně');
  check(typeof actorId==='string'&&actorId,'Denní režim musí mít konkrétní postavu');
  check(ration(foodNeed)&&[0.5,1,2].includes(waterNeed)&&foodNeed<=1,'HMK 186: neplatný denní příděl');
  check(typeof enabled==='boolean','Neplatná volba aktivity denního režimu');
- check(!enabled||foragingOnly===true,'Automatickou spotřebu lze zapnout jen při doložení, že nejsou jiné zdroje potravy či vody');
- return {format:NUTRITION_POLICY_FORMAT,campaignId,minute,actorId,foodNeed,waterNeed,foragingOnly:enabled,enabled,sourcePages:[147,186]};
+ check(!enabled||(foragingOnly===true)!==(inventoryRations===true),'Vyžadováno doložení právě jednoho režimu: výhradně Foraging nebo vlastní fyzické příděly + Foraging');
+ return {format:NUTRITION_POLICY_FORMAT,campaignId,minute,actorId,foodNeed,waterNeed,foragingOnly:enabled&&foragingOnly,enabled,
+  ...(inventoryRations?{inventoryRations:true}:{}),sourcePages:inventoryRations?[120,147,186]:[147,186]};
 }
 const dayRecords=(journal,campaignId,actorId)=>journal.filter(x=>x.calendarCampaignId===campaignId&&x.characterId===actorId&&x.calendarNutritionDay?.format===NUTRITION_DAY_FORMAT);
 const consumeBeforeDay=(journal,actorId,campaignId,start,end,unit,includeStart=false)=>round(journal.filter(x=>x.characterId===actorId&&x.calendarCampaignId===campaignId&&x.calendarForagingSupplyUse?.unit===unit&&
@@ -77,15 +79,32 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
   const {policy,start}=due,end=start+DAY,actorId=policy.characterId,p=policy.calendarNutritionPolicy;
   const actor=database.characters.find(c=>c.id===actorId);
   check(actor&&members.has(actorId),'Nutriční režim postavy mimo aktuální kampaň');
-  // Character-specific purchased/owned rations invalidate the GM's previous
-  // exclusivity claim. A bad proof must never create a false medical onset.
-  assertExclusiveForagingProven({inventory:database.inventory??[],actorId});
-  // A dead character cannot keep automatically consuming supplies.
+  // A dead character cannot keep consuming supplies and cannot be forced
+  // into a new ration-source decision merely by a later GM clock advance.
   if(actor.hmk?.combatState?.shock==='KIA'){due.start=clock.minute;continue;}
+  // Character-specific purchased/owned rations invalidate a former
+  // Foraging-only claim, unless all of that CAMPAIGN's physical stock has
+  // really been debited in the immutable physical ration ledger.
+  if(p.foragingOnly)assertExclusiveForagingProven({inventory:projectCampaignRationInventory(database.inventory??[],database.journal,campaignId),actorId});
   const automatic=[],received={};
   for(const [unit,required] of [['foodDays',p.foodNeed],['waterDays',p.waterNeed]]){
    const manual=Math.min(required,consumeBeforeDay(database.journal,actorId,campaignId,start,end,unit,start===policy.campaignMinute));
    let remaining=round(required-manual);
+   // Only a GM-attested, time-stamped physical ration stock can supply food.
+   // Expired lots are NOT consumed, and carried waterskins do not imply water.
+   if(unit==='foodDays'&&p.inventoryRations===true){
+    while(remaining>0){
+     const lot=availableRationLots(database.journal,campaignId,actorId,end)[0];
+     if(!lot)break;
+     const quantity=Math.min(remaining,lot.remaining);
+     const proof=createPhysicalRationUse({journal:database.journal,campaignId,actorId,minute:end,sourceId:lot.sourceId,quantity});
+     proof.nutritionDayId=`${policy.id}:${end}`;
+     const row={id:idFactory(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:end,createdAt:stamp(),
+      title:'HMK · automatická fyzická potrava',body:`${quantity} food-days · ${actor.name} · inventární stack ${lot.itemId}; bez posunu času`,
+      calendarInventoryRationUse:proof};
+     database.journal.push(row);automatic.push(row);remaining=round(remaining-quantity);
+    }
+   }
    while(remaining>0){
     const lot=availableSupplyLots(database.journal,campaignId).find(l=>l.unit===unit&&l.minute<=end&&l.remaining>=0.5);
     if(!lot)break;
@@ -124,6 +143,9 @@ export function validateNutritionJournal(journal=[]){
    JSON.stringify(createNutritionPolicy({...p}))===JSON.stringify(p),'Poškozený nebo nedoložený denní režim');
    known.set(row.id,row);last.set(row.id,p.minute);
   }
+  const physical=row.calendarInventoryRationUse;
+  if(physical?.nutritionDayId){check(typeof physical.nutritionDayId==='string','Neplatný výdej fyzických dávek');
+   if(!seen.has(physical.nutritionDayId))seen.set(physical.nutritionDayId,[]);seen.get(physical.nutritionDayId).push(row);}
   const use=row.calendarForagingSupplyUse;
   if(use?.nutritionDayId){check(typeof use.nutritionDayId==='string'&&use.nutritionDayId,'Poškozená vazba automatického výdeje');
    if(!seen.has(use.nutritionDayId))seen.set(use.nutritionDayId,[]);seen.get(use.nutritionDayId).push(row);
@@ -142,9 +164,10 @@ export function validateNutritionJournal(journal=[]){
    'Neplatná nebo duplicitní denní evidence HMK zásobování');
   const debitRows=seen.get(token)||[];
   const expectedFood=round(Math.min(d.foodNeed,consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'foodDays',d.startMinute===policy.minute))+
-   debitRows.filter(x=>x.calendarForagingSupplyUse.unit==='foodDays').reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0));
+   debitRows.filter(x=>x.calendarForagingSupplyUse?.unit==='foodDays').reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0)+
+   debitRows.filter(x=>x.calendarInventoryRationUse?.unit==='foodDays').reduce((n,x)=>n+x.calendarInventoryRationUse.quantity,0));
   const expectedWater=round(Math.min(d.waterNeed,consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'waterDays',d.startMinute===policy.minute))+
-   debitRows.filter(x=>x.calendarForagingSupplyUse.unit==='waterDays').reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0));
+   debitRows.filter(x=>x.calendarForagingSupplyUse?.unit==='waterDays').reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0));
   check(d.foodReceived===expectedFood&&d.waterReceived===expectedWater,'Doložená denní spotřeba neodpovídá výdejům');
   check(JSON.stringify(d.automaticDebitIds)===JSON.stringify(debitRows.map(x=>x.id))&&
    debitRows.every(x=>x.characterId===d.actorId&&x.calendarCampaignId===d.campaignId&&x.campaignMinute===d.endMinute),
