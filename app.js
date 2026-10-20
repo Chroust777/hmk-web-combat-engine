@@ -116,6 +116,7 @@ import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
 import {assessTrekkingReadiness} from './src/integration/hmk-trekking-readiness.js';
+import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -180,7 +181,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.375';
+const APP_VERSION='93.376';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -646,6 +647,7 @@ function campaignCalendarView(){
  <p class="hc-hint">Pravidla HMK str. 141–150: počasí se určuje jednou za 24 hodin, srážky po čtyřhodinových hlídkách. Podklady pro další cestovní kroky se zaznamenají k vybrané postavě a konkrétní minutě; neprovádí se zde automatické zranění ani posun času. Orienteering, Cold/Heat Exposure a skutečný Encounter se vyhodnocují původními průvodci.</p>
  <details><summary>Vyhodnotit cestovní hlídku – pravidlové podklady</summary><form id="campaign-trekking-context-form">
  <fieldset class="hc-expedition-actors"><legend>Účastníci této cestovní hlídky (průvodce se přidá automaticky)</legend><div class="hc-characters">${participants.map((c,i)=>`<label class="hc-character"><input type="checkbox" name="trekMemberIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset><div class="hc-fields"><label>Postava / průvodce<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+ <label>Drover (vodič zvířat pro Riding/Animalcraft; při pěší cestě se nepoužije)<select name="droverId">${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <label>Oblast / označení trasy<input name="area" maxlength="90" required placeholder="Např. Východní les u Tashalu"></label>
  <label>Roční období<select name="season"><option value="auto">Z data TR (je-li doloženo)</option>${[['spring','Jaro'],['summer','Léto'],['autumn','Podzim'],['winter','Zima']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
  <label>Klimatické pásmo<select name="climate"><option value="subpolar">Subpolar</option><option value="cool" selected>Cool Temperate</option><option value="warm">Warm Temperate</option><option value="subtropical">Subtropical</option><option value="dry-tropical">Dry Tropical</option><option value="wet-tropical">Wet Tropical</option></select></label>
@@ -653,13 +655,21 @@ function campaignCalendarView(){
  <label>Terén / cesta<select name="terrain">${[['paved-road','Paved Road'],['unpaved-road','Unpaved Road'],['rural-track','Rural Track'],['wilderness-trail','Wilderness Trail'],['cropland-grassland','Cropland / Grassland'],['mixed-woodland','Mixed Woodland'],['cold-woodland','Cold Woodland'],['heath-moor','Heath / Moor'],['needleleaf-forest','Needleleaf Forest'],['mixed-forest','Mixed Forest'],['dunes','Dunes'],['wetlands','Wetlands'],['alpine-vegetation','Alpine Vegetation'],['ice-snow-rockfield','Ice / Snow / Rockfield']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
  <label>Doprava<select name="conveyance"><option value="foot">Foot</option><option value="mount">Mount</option><option value="cart">Cart</option><option value="wagon">Wagon</option></select></label>
  <label>Environ pro Encounter<select name="environ"><option value="highway">Highway</option><option value="rural">Rural</option><option value="wilderness">Wilderness</option><option value="underworld">Underworld</option></select></label>
- <label>Progress Modes (doložené ze Survival SV)<input name="progress" type="number" min="0" max="10" value="0"></label>
+ <label>Progress Modes (z upraveného Orienteering SV)<input name="progress" type="number" min="0" max="10" value="0"></label>
  <label>Další Slow Modes (např. foraging / stalking; zranění, únava a srážky se přičítají automaticky)<input name="slow" type="number" min="0" max="20" value="0"></label>
- <label>Bearing Modes (doložené)<input name="bearing" type="number" min="0" max="20" value="0"></label>
+ <label>Bearing Modes (z upraveného Orienteering SV)<input name="bearing" type="number" min="0" max="20" value="0"></label>
  <label>Starší nedoložené noční hlídky v divočině (volitelné, jinak automaticky)<input name="wildernessNightWatches" type="number" min="0" max="10000" placeholder="Automaticky z doložených hlídek"></label>
  <label>Kostky<select name="diceOrigin"><option value="software">Automatické kryptografické hody</option><option value="manual">Ruční zápis (v pořadí: denní teplota, denní srážky, případné watch srážky, Progress, Direction, Encounter)</option></select></label>
  <label>Ruční d10/d6 řada oddělená čárkami<input name="rolls" placeholder="Např. 4,2,1,7" maxlength="120"></label>
- </div><label class="hc-check"><input name="night" type="checkbox" value="yes"> Noční watch</label>
+ </div><fieldset><legend>Orienteering · doložené okolnosti (HMK 145)</legend>
+ <label class="hc-check"><input name="familiar" type="checkbox" value="yes"> Průvodce zná oblast (+1 SV)</label>
+ <label class="hc-check"><input name="torchlight" type="checkbox" value="yes"> Noční světlo: lucerna / pochodeň (+1 proti nočnímu postihu)</label>
+ <label class="hc-check"><input name="fullMoon" type="checkbox" value="yes"> Úplněk (+1 proti nočnímu postihu)</label>
+ <label class="hc-check"><input name="afterSnowfall" type="checkbox" value="yes"> GM potvrzuje předchozí souvislé sněžení (+1 proti nočnímu postihu)</label>
+ <label class="hc-check"><input name="lax" type="checkbox" value="yes"> Lax Mode podle výsledného SV (při SV ≤ 0 povinný)</label>
+ <label class="hc-check"><input name="orienteeringSlow" type="checkbox" value="yes"> Slow Mode podle výsledného SV (při SV ≤ 0 povinný)</label>
+ <p class="hc-hint">Po uložení skutečného Survival testu se automaticky vypočte upravený SV. Pokud je cesta se zvířaty, vyžaduje se navíc skutečný Riding/Animalcraft Drover Test. Výběr Lax/Slow a režimů se musí shodovat s výsledkem; do té doby nejsou uznány.</p></fieldset>
+ <label class="hc-check"><input name="night" type="checkbox" value="yes"> Noční watch</label>
  <label class="hc-check"><input name="alpine" type="checkbox" value="yes"> Alpine Vegetation / Ice (−4 teplota)</label>
  <label class="hc-check"><input name="aridDesert" type="checkbox" value="yes"> Arid Desert (zvláštní modifikátory)</label>
  <label class="hc-check"><input name="loaded" type="checkbox" value="yes"> Loaded Mode – pouze pokud není zatížení doložitelné z inventáře / případně naložené zvíře</label>
@@ -6647,8 +6657,15 @@ document.addEventListener('submit',e=>{
   const memberIds=[...new Set([...new FormData(form).getAll('trekMemberIds'),actor.id])];
   const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:data.characters,
    inventory:data.inventory,conveyance:v.conveyance,loadedByGM:v.loaded==='yes'});
-  const manualSlow=qty('slow',20);
-  const progress=qty('progress',10),slow=manualSlow+partyModes.forcedSlow+(wet.slowMode?1:0),bearing=qty('bearing',20);
+  const manualSlow=qty('slow',20),orienteeringSlow=Number(v.orienteeringSlow==='yes');
+  const lax=v.lax==='yes';
+  const orienteeringContext=createOrienteeringContext({night:v.night==='yes',partySize:partyModes.memberIds.length,
+   familiar:v.familiar==='yes',torchlight:v.torchlight==='yes',fullMoon:v.fullMoon==='yes',
+   afterSnowfall:v.afterSnowfall==='yes',conveyance:v.conveyance,
+   droverId:v.conveyance==='foot'?null:v.droverId});
+  if(orienteeringContext.droverId&&!memberIds.includes(orienteeringContext.droverId))
+   throw Error('Drover musí být jedním z vybraných účastníků hlídky');
+  const progress=qty('progress',10),slow=manualSlow+partyModes.forcedSlow+(wet.slowMode?1:0)+orienteeringSlow,bearing=qty('bearing',20);
   trekkingModeHardLimit({progress,bearing});
   // Progress dice require the original LPW. A zero-dice dry preview first
   // yields the total remaining Progress allocation.
@@ -6671,7 +6688,7 @@ document.addEventListener('submit',e=>{
     ...(hazards.direction&&hazards.direction!=='lost-time'?[`Direction Hazard: ${hazards.direction}`]:[]),
     ...(encounter.encounter?['Random Encounter – nutné vyhodnocení']:[])];
   const proof={format:'hmk-trekking-watch-evidence-v1',dayIndex,campaignMinute:clock.minute,area,
-    partyModes,modes:{progress,slow,manualSlow,loaded:partyModes.loaded,bearing,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
+    partyModes,orienteeringContext,modes:{progress,slow,manualSlow,orienteeringSlow,lax,loaded:partyModes.loaded,bearing,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
      environ:v.environ,wildernessNightWatches},
     season,climate:v.climate,landscape:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
     night:v.night==='yes',alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',weatherDay:day,
@@ -6761,7 +6778,7 @@ function updateExpeditionReadiness(form){
     throw Error('Vybrané postavy neodpovídají členům připravené hlídky. V Trekking Routine zvolte skupinu před vyhodnocením.');
   }
   output.textContent='Ověřeno: průvodce '+character(guideId)?.name+' · hlídka '+ok.sourceId+
-   ' · Survival SV '+ok.sv+' · '+ok.spentModes+'/'+ok.availableModes+' Advantage Modes. '+
+   ' · Survival SV '+ok.rawSV+' → upravený Orienteering SV '+ok.sv+' · '+ok.spentModes+'/'+ok.availableModes+' Advantage Modes. '+
    ids.length+' cestujících provede samostatný END SR; čas zůstane beze změny.';
  }catch(err){output.textContent='Čeká na doložení: '+err.message;}
 }
@@ -6969,10 +6986,11 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   form.scrollIntoView({block:'center',behavior:'instant'});
   const rollInput=form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"]');
   rollInput?.focus({preventScroll:true});
- }else if(['trek-weather-hazard','trek-direction-hazard','trek-encounter','trek-survival','trek-survival-test'].includes(kind)){
+ }else if(['trek-weather-hazard','trek-direction-hazard','trek-encounter','trek-survival','trek-survival-test','trek-drover-test'].includes(kind)){
   const hazard=kind==='trek-weather-hazard'?'weather':kind==='trek-direction-hazard'?'direction':
-   kind==='trek-encounter'?'encounter':'survival';
-  const source=data.journal.find(j=>j.id===sourceId&&j.characterId===actor.id&&
+   kind==='trek-encounter'?'encounter':kind==='trek-drover-test'?'drover':'survival';
+  const source=data.journal.find(j=>j.id===sourceId&&(j.characterId===actor.id||
+   (hazard==='drover'&&j.calendarTrekProof?.orienteeringContext?.droverId===actor.id))&&
    j.calendarCampaignId===campaignKey(data.campaignClock));
   if(!source?.calendarTrekProof){notice='Chybí originální důkaz cestovní hlídky.';render();return;}
   if(hazard==='encounter'){
@@ -6987,9 +7005,10 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   // linked to THIS source. No duplicate dice or independent EML formula.
   const known=TREK_TEST_SKILLS[hazard]||[];
   const options=[...document.querySelectorAll('#skill-value-form [name="primary"] option')];
-  const choice=known.find(x=>options.some(o=>o.value===x));
+  const applicable=hazard==='drover'?[source.calendarTrekProof.conveyance==='mount'?'Riding':'Animalcraft']:known;
+  const choice=applicable.find(x=>options.some(o=>o.value===x));
   if(!choice){notice='Postava nemá osvojenou požadovanou dovednost ('+known.join(' / ')+'). Opravte skutečná Skills, nepočítejte fiktivní ML.';render();return;}
-  pendingTrekHandoff={sourceId,hazard};activeSkillTab=hazard==='survival'?'value':'secondary';
+  pendingTrekHandoff={sourceId,hazard};activeSkillTab=['survival','drover'].includes(hazard)?'value':'secondary';
   render();const form=document.getElementById(activeSkillTab==='value'?'skill-value-form':'skill-secondary-form');
   const field=form?.elements.namedItem('primary');if(field&&[...field.options].some(x=>x.value===choice)){
    field.value=choice;field.dispatchEvent(new Event('change',{bubbles:true}));
