@@ -125,6 +125,7 @@ import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING
 import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,validateSupplyJournal,assertSupplyJournalAppendOnly,supplyBalances} from './src/integration/hmk-foraging-supply-ledger.js';
 import {EXOTIC_POTIONS,herbAssessmentCandidates,herbDoseStatus,herbPotionReservationCandidates,createHerbPotency,createHerbPreservation,createHerbPotionStart,createHerbPotionComplete,validateHerbalJournal,assertHerbalJournalAppendOnly,potencyLabel} from './src/integration/hmk-herbal-concoctions.js';
 import {createHerbPotionAdministration,validateHerbAdministrationJournal,assertHerbAdministrationAppendOnly,availableHerbalPotions,herbPotionEffectAt} from './src/integration/hmk-herbal-administration.js';
+import {curativeHealingEvidence} from './src/integration/hmk-herbal-healing-bridge.js';
 import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,validateNutritionJournal,assertNutritionJournalAppendOnly,nutritionRisk} from './src/integration/hmk-nutrition-days.js';
 import {createNutritionDayConditions,createNutritionConditionsCancel,nextNutritionDayStart,validateNutritionActivityJournal,assertNutritionActivityAppendOnly,dailyNutritionNeeds} from './src/integration/hmk-nutrition-activity.js';
 import {pendingTrackingBearing} from './src/integration/hmk-tracking-bearing-handoff.js';
@@ -196,7 +197,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.394';
+const APP_VERSION='93.395';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -830,9 +831,9 @@ function campaignCalendarView(){
  <label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečné podání této dávky</label>
  <button type="submit" ${targets.length?'':'disabled'}>Podat jednu dávku (bez posunu času)</button></form>`;
  }).join('')||'<p class="hc-hint">Žádný účinný, dosud nepodaný lektvar.</p>'}
- ${appliedPotions.slice(-15).map(j=>{const p=j.calendarHerbPotionAdminister,e=herbPotionEffectAt(p,clock.minute);return `<p class="hc-hint">${esc(p.herbType)} → ${esc(character(p.targetId)?.name||p.targetId)}${p.woundId?' · rána '+esc(p.woundId):''} · původní bonus ${p.bonus} · ${esc(e.status)}${e.status==='active'?' · nyní '+e.bonus:''} · další hod v příslušném původním modulu; důkaz ${esc(j.id)}</p>`}).join('')}
+ ${appliedPotions.slice(-15).map(j=>{const p=j.calendarHerbPotionAdminister,e=herbPotionEffectAt(p,clock.minute);return `<p class="hc-hint">${esc(p.herbType)} → ${esc(character(p.targetId)?.name||p.targetId)}${p.woundId?' · rána '+esc(p.woundId):''} · původní bonus ${p.bonus} · ${esc(e.status)}${e.status==='active'?' · nyní '+e.bonus:''} · ${p.herbType==='curative'?'bonus se automaticky načte při příštím Healing/Infection hodu dané rány':'další hod zůstává v příslušném původním modulu'}; důkaz ${esc(j.id)}</p>`}).join('')}
 
- <p class="hc-hint">Podání všech 12 druhů je nyní doložitelné; návazné hody a účinky v Combat/Healing a astrálních modulech zůstávají nevyhodnocené, dokud je nepřevezme původní pravidlový modul. Bylinné dávky zatím nemají doloženou hmotnost nádoby. Nedokončeno: mundánní receptury a Alchemy 267–268.</p>
+ <p class="hc-hint">Podání všech 12 druhů je doložitelné. Curative se u přesně doložené rány automaticky započte do původních Injury Healing a Infection Course hodů; ostatní návazné účinky, včetně Coagulant, dosud nejsou automaticky vyhodnoceny. Bylinné dávky zatím nemají doloženou hmotnost nádoby. Nedokončeno: mundánní receptury a Alchemy 267–268.</p>
  </details></section>`;
  const wildernessHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>Wilderness Tasks · Foraging / Stalking / Vigilance (HMK 147) · ${forageRows.length} k doložení</summary>
  <p class="hc-hint">Foraging: jeden d10 za každý skutečně potvrzený režim, podle okolního biotopu a sezóny. Nalezené jídlo/voda/byliny jsou nejprve účetním časovým důkazem (nikoli nezdokumentovanou fyzickou položkou inventáře). Stalking zpřístupňuje Tracking ve Skill Workbench. Stalking/Vigilance se zachovávají pro vyhodnocení překvapení během Encounter; bez doložené procedury se nepřiděluje fiktivní bonus.</p>
@@ -3686,7 +3687,16 @@ function hmkLongtermHealingPanel(chars){
   const others=persistentStateOf(c).wounds.filter(x=>x.id!==w.id&&!x.healed&&x.healing?.treated&&!x.healing.noMundaneHealing);
   return `<fieldset class="infection-resume-source" data-infection-source="${esc(c.id+'::'+w.id)}" ${i===0?'':'hidden disabled'}><legend>Jen pokud poslední infekce skončí: dny od vzniku ostatních léčených ran</legend><p class="tiny">Každá rána má vlastní časovou osu. Chybějící údaj zastaví vyhodnocení; aplikace nevymýšlí uplynulé dny ani zmeškané hody.</p>${others.map(x=>`<label>${esc(x.location)} ${esc(x.severity+x.level)} · ${esc(x.id)}<input type="number" name="resumeDay:${esc(x.id)}" min="0" step="1" ${i===0?'':'disabled'}></label>`).join('')||'<p>Žádné další léčené rány.</p>'}</fieldset>`;
  }).join('');
- return `<section class="panel"><h3>HMK · dlouhodobé léčení zranění (str. 177–182)</h3><p class="muted">Pro každou ránu samostatně. Léčení vyžaduje zastavené krvácení, ukončený Extended Shock, potvrzený den a skutečné hody. Další léčitel musí mít vyšší Physician Index. Aktivní infekce přerušuje Healing Rolls všech ran. Veškeré výsledky jsou trvale uloženy u postavy, nikoli odhadované podle bojových kol.</p>
+ const clock=data.campaignClock;
+ const herbHints=clock?chars.flatMap(c=>persistentStateOf(c).wounds.filter(w=>!w.healed).flatMap(w=>{
+  const origin=getCampaignAnchor(clock,'wound',c.id,w.id);
+  if(!origin)return [];
+  try{const e=curativeHealingEvidence({journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,
+   targetId:c.id,woundId:w.id,woundOnsetMinute:origin.minute});
+   return e.bonus?[`<p class="tiny">Curative · ${esc(c.name)} / ${esc(w.id)}: automatický +${e.bonus} k Healing a Infection EML · důkaz ${esc(e.sourceIds.join(', '))}</p>`]:[];
+  }catch(error){return [`<p class="tiny">Curative · ${esc(c.name)} / ${esc(w.id)}: ${esc(error.message)}. Zdravotní hod bude zastaven.</p>`]}
+ })) .join(''):'';
+ return `<section class="panel"><h3>HMK · dlouhodobé léčení zranění (str. 177–182)</h3>${herbHints}<p class="muted">Pro každou ránu samostatně. Léčení vyžaduje zastavené krvácení, ukončený Extended Shock, potvrzený den a skutečné hody. Další léčitel musí mít vyšší Physician Index. Aktivní infekce přerušuje Healing Rolls všech ran. Veškeré výsledky jsou trvale uloženy u postavy, nikoli odhadované podle bojových kol.</p>
  <div class="field-grid"><form id="hmk-treatment-form"><h4>Treatment Roll</h4>${fields}<label><input type="checkbox" name="untreated" value="yes"> Bez skutečného ošetření (vlastnosti CF; žádný vymyšlený d100)</label><label>Physician ML<input type="number" name="physicianML" min="0" max="200"></label><label>Physician Index<input type="number" name="physicianIndex" min="0" max="20"></label><label>Skutečný d100<input type="number" name="physicianRoll" min="1" max="100"></label><label>DEX Secondary Modifier při náročném Treatment<input type="number" name="dexSecondaryModifier" value="0" step="1"></label><label>Dostupné prostředky (vyberte pouze reálně přítomné)<select name="available" multiple size="4"><option value="water">Voda</option><option value="bandages">Obvazy</option><option value="needle-thread">Jehla a nit</option><option value="surgery-tools">Chirurgické nástroje</option></select></label><label><input type="checkbox" name="broadhead" value="yes"> Projectile Broadhead</label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil léčbu i dostupnost prostředků</label><button type="submit" ${woundOptions?'':'disabled'}>Potvrdit Treatment</button></form>
  <form id="hmk-healing-roll-form"><h4>Injury Healing Roll · každých 5 dní</h4>${fields}<label>Endurance<input type="number" name="endurance" min="1" max="40" required></label><label>Will<input type="number" name="will" min="1" max="40" required></label><label>Skutečný d100<input type="number" name="roll" min="1" max="100" required></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil splatnost pětidenního Healing Roll</label><button type="submit" ${woundOptions?'':'disabled'}>Trvale zapsat Healing Roll</button></form>
  <form id="hmk-infection-course-form"><h4>Infection Course · každý den</h4>${infectionFields}${infectionResumptionFields}<label>Endurance<input type="number" name="endurance" min="1" max="40" required></label><label>Will<input type="number" name="will" min="1" max="40" required></label><label>Skutečný d100<input type="number" name="roll" min="1" max="100" required></label><label>Physician SV bonus<input type="number" name="physicianSV" value="0" step="1"></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil denní Course</label><button type="submit" ${woundOptions?'':'disabled'}>Trvale zapsat Infection Course</button></form>
@@ -8678,16 +8688,22 @@ document.addEventListener('submit',e=>{
   if(!c||!encounterSelection.has(c.id))throw Error('Postava není v aktuálním střetnutí');
   const args={state:persistentStateOf(c),round:combatClock.round,eventId:uuid(),woundId,daySinceInjury:Number(v.daySinceInjury),gmConfirmed:v.gmConfirmed==='yes'};
   confirmCalendarWoundDay(c.id,woundId,args.daySinceInjury);
+  // Historical Curative evidence is read from THIS calendar and THIS wound.
+  // The health resolver validates it again before modifying the original EML.
+  const clock=data.campaignClock;
+  const origin=clock?getCampaignAnchor(clock,'wound',c.id,woundId):null;
+  const herbalContext=clock?{journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,
+   targetId:c.id,woundOnsetMinute:origin?.minute}:null;
   let t;
   if(f.id==='hmk-treatment-form')t=applyConfirmedTreatment({...args,untreated:v.untreated==='yes',physicianML:v.physicianML===''?null:Number(v.physicianML),physicianIndex:v.physicianIndex===''?null:Number(v.physicianIndex),physicianRoll:v.physicianRoll===''?null:Number(v.physicianRoll),dexSecondaryModifier:Number(v.dexSecondaryModifier),broadhead:v.broadhead==='yes',available:form.getAll('available')});
-  else if(f.id==='hmk-healing-roll-form')t=applyConfirmedInjuryHealing({...args,endurance:Number(v.endurance),will:Number(v.will),roll:Number(v.roll)});
+  else if(f.id==='hmk-healing-roll-form')t=applyConfirmedInjuryHealing({...args,endurance:Number(v.endurance),will:Number(v.will),roll:Number(v.roll),herbalContext});
   else {const otherWoundDays=Object.fromEntries([...form.entries()].filter(([k])=>k.startsWith('resumeDay:')&&k.slice(10)).map(([k,val])=>[k.slice(10),val===''?null:Number(val)]));
    if(data.campaignClock)for(const other of persistentStateOf(c).wounds){if(other.id===woundId||other.healed||!other.healing?.treated||other.healing?.noMundaneHealing)continue;
     const n=elapsedCalendarDays(data.campaignClock,'wound',c.id,other.id);
     if(n===null)throw Error('Kalendář: před Infection Course ukotvěte také ránu '+other.id);
     otherWoundDays[other.id]=n;
    }
-   t=applyConfirmedInfectionCourse({...args,endurance:Number(v.endurance),will:Number(v.will),roll:Number(v.roll),physicianSV:Number(v.physicianSV),otherWoundDays});}
+   t=applyConfirmedInfectionCourse({...args,endurance:Number(v.endurance),will:Number(v.will),roll:Number(v.roll),physicianSV:Number(v.physicianSV),otherWoundDays,herbalContext});}
   if(!window.confirm('Trvale zapsat léčení '+c.name+' podle doložených dnů a hodů?'))return;
   mutate(()=>{synchronizeCombatInjuries(c,t.state);logCalendarCombatResolution(c,t.state,f.id);});
  }catch(err){alert('Léčení nebylo zapsáno: '+err.message);}
