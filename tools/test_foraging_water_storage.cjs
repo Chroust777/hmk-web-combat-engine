@@ -39,7 +39,7 @@ no(()=>createForagingWaterStorage({...created,inventory, journal:db.journal,camp
 no(()=>createForagingWaterStorage({inventory,journal:db.journal,campaignId:'other',actorId,minute,itemId:'skin-2',sourceId:'found',resultIndex:0,fillId:'f2',useId:'u2',gmConfirmed:true}),/Foraging/);
 no(()=>createForagingWaterStorage({inventory,journal:db.journal,campaignId,actorId,minute:10,itemId:'skin-2',sourceId:'found',resultIndex:0,fillId:'f2',useId:'u2',gmConfirmed:true}),/Foraging/);
 no(()=>createForagingWaterStorage({inventory,journal:db.journal,campaignId,actorId,minute,itemId:'skin-2',sourceId:'found',resultIndex:0,fillId:'f2',useId:'u2'}),/GM musí/);
-no(()=>createSupplyUse({journal:db.journal,campaignId,minute,sourceId:'found',resultIndex:0,unit:'waterDays',quantity:1,actorId,disposition:'stored-in-container',containerFillId:'f2'}),/půl galonu/);
+no(()=>createSupplyUse({journal:db.journal,campaignId,minute,sourceId:'found',resultIndex:0,unit:'waterDays',quantity:1,actorId,disposition:'stored-in-container',containerFillId:'f2'}),/Zásoba byla již vydána nebo nestačí/);
 const orphan=structuredClone(db.journal).filter(j=>j.id!=='fill-1');no(()=>validateForagingWaterStorageJournal(orphan),/odpovídající/);
 const missingDebit=structuredClone(db.journal).filter(j=>j.id!=='stored-1');no(()=>validateForagingWaterStorageJournal(missingDebit),/Nepárový/);
 const wrongActor=structuredClone(db.journal);wrongActor.at(-1).characterId='somebody';no(()=>validateForagingWaterStorageJournal(wrongActor),/Nepárový/);
