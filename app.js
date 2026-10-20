@@ -111,6 +111,7 @@ import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarP
 import {secureHMKDie,expeditionDiceSubmission,expeditionWatchFatigue,expeditionRestRecovery,commitExpeditionFatigue} from './src/integration/hmk-calendar-expedition.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
+import {assessTrekkingReadiness} from './src/integration/hmk-trekking-readiness.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -175,7 +176,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.370';
+const APP_VERSION='93.371';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -673,8 +674,10 @@ function campaignCalendarView(){
   <button type="button" class="hc-small hc-expedition-auto-button" data-expedition-roll>⚄ Vygenerovat d10</button>
   <p class="hc-expedition-dice-info" aria-live="polite">Ruční zadání bude označeno jako ruční hod.</p>
  </div>
- <div class="hc-expedition-checks"><label class="hc-check"><input type="checkbox" name="confirmedConditions" value="yes"> Při cestě byly zvlášť vyřešeny Orienteering, Weather, Hazards a případný Encounter. Odpočinek tento souhlas nepotřebuje.</label>
- <p class="hc-hint">Toto zaškrtnutí je zatím pouze potvrzení, <strong>nikoli provedený pravidlový test</strong>. Podklady Weather/Encounter jsou výše v Trekking Routine, Orienteering v Skill Tests, následky v Nebezpečí / Trauma a Combat.</p>
+ <div class="hc-expedition-checks" data-expedition-readiness aria-live="polite"><strong>Pravidlové cestovní podklady</strong>
+ <p class="hc-hint">Cestovní čas lze zapsat jen po uložení hlídky Trekking Routine, přímo navázaného Orienteering / Survival SV a všech skutečně povinných následků. Žádný checkbox ani opakovaný hod není potřeba.</p>
+ <p class="hc-hint" data-expedition-readiness-result>Vyberte postavu a cestovní činnost.</p>
+ <button type="button" class="hc-small" data-expedition-open-trek>Přejít na Trekking Routine</button></div>
  <div class="hc-expedition-links"><button type="button" class="hc-small" data-nav="skills">⚄ Skill Tests / Orienteering</button><button type="button" class="hc-small" data-nav="hazards">⚠ Nebezpečí / Trauma</button><button type="button" class="hc-small" data-nav="encounter">⚔ Combat / Encounter</button></div></div>
  <button type="submit">Vyhodnotit dobu, END SR a uložit do postavy</button></form></section>`;
  const included=new Set(participants.map(c=>c.id));
@@ -6611,6 +6614,9 @@ document.addEventListener('submit',e=>{
    season=trekSeasonFromMonth(tr.month);
   }
   const dayIndex=Math.floor(clock.minute/1440),campaignId=campaignKey(clock);
+  if(data.journal.some(j=>j.characterId===actor.id&&j.calendarCampaignId===campaignId&&
+      j.campaignMinute===clock.minute&&j.calendarTrekProof))
+   throw Error('Pro tuto postavu a minutu je již hlídka připravená. Nejprve vyhodnoťte její pravidlové návaznosti.');
   const previous=data.journal.find(j=>j.calendarCampaignId===campaignId&&j.calendarTrekProof?.area===area&&
     j.calendarTrekProof?.dayIndex===dayIndex&&j.calendarTrekProof?.season===season&&j.calendarTrekProof?.climate===v.climate&&
     j.calendarTrekProof?.landscape===v.landscape&&j.calendarTrekProof?.alpine===(v.alpine==='yes')&&
@@ -6699,12 +6705,35 @@ function updateExpeditionDiceFields(form,{reset=true}={}){
  const button=form.querySelector('[data-expedition-roll]');
  if(button)button.textContent=count===4?'⚄ Vygenerovat 4 × d10':'⚄ Vygenerovat d10';
  const checks=form.querySelector('.hc-expedition-checks');if(checks)checks.hidden=!travel;
- const confirm=form.elements.namedItem('confirmedConditions');
- if(confirm){confirm.disabled=!travel;if(!travel)confirm.checked=false;}
+ updateExpeditionReadiness(form);
 }
+function updateExpeditionReadiness(form){
+ const output=form?.querySelector('[data-expedition-readiness-result]');if(!output)return;
+ const kind=form.elements.namedItem('kind')?.value??'';
+ if(['winded','rest','sleep'].includes(kind)){output.textContent='Odpočinek: bez Orienteering a bez hodu kostkou.';return;}
+ try{
+  const clock=data.campaignClock,actorId=form.elements.namedItem('characterId')?.value;
+  if(!clock)throw Error('Kalendář ještě nebyl založen.');
+  const ok=assessTrekkingReadiness({journal:data.journal,characters:data.characters,
+   actorId,campaignId:campaignKey(clock),minute:clock.minute,kind});
+  output.textContent='Ověřeno: hlídka '+ok.sourceId+' · Survival SV '+ok.sv+
+    ' · využito '+ok.spentModes+'/'+ok.availableModes+' Advantage Modes. Lze pokračovat.';
+ }catch(err){output.textContent='Čeká na doložení: '+err.message;}
+}
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('#campaign-expedition-form [data-expedition-open-trek]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=document.getElementById('campaign-trekking-context-form');
+ if(!form)return;
+ const member=form.elements.namedItem('characterId'),origin=b.closest('form')?.elements.namedItem('characterId');
+ if(member&&origin&&[...member.options].some(o=>o.value===origin.value))member.value=origin.value;
+ for(let el=form.parentElement;el;el=el.parentElement)if(el.tagName==='DETAILS')el.open=true;
+ form.scrollIntoView({block:'start',behavior:'smooth'});
+},true);
 document.addEventListener('change',e=>{
  const target=e.target;
  if(target?.name==='kind'&&target.closest('#campaign-expedition-form'))updateExpeditionDiceFields(target.form);
+ if(target?.name==='characterId'&&target.closest('#campaign-expedition-form'))updateExpeditionReadiness(target.form);
 },true);
 document.addEventListener('input',e=>{
  const input=e.target;
@@ -6734,7 +6763,6 @@ document.addEventListener('submit',e=>{
  try{
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Vyžaduje otevřený kalendář bez probíhající Initiative');
   const input=Object.fromEntries(new FormData(form));
-  if(!['winded','rest','sleep'].includes(input.kind)&&input.confirmedConditions!=='yes')throw Error('Nejdříve dokončete případné další procedury cestování');
   const actor=character(input.characterId);
   if(!actor||!(data.campaignClock.characterIds??data.characters.map(c=>c.id)).includes(actor.id))throw Error('Postava nepatří do vybrané kampaně');
   const clock=data.campaignClock,start=clock.minute,kind=input.kind;
@@ -6746,18 +6774,13 @@ document.addEventListener('submit',e=>{
   const duration=kind==='winded'?10:kind==='rest'?240:kind==='sleep'?480:240;
   const count=kind.startsWith('double-')?4:1;
   const travel=!['winded','rest','sleep'].includes(kind);
-  // Attach only a preparation for this same actor, campaign and START minute.
-  // Old fatigue records without a Trekking Routine preparation remain valid.
-  const trekSource=travel?[...data.journal].reverse().find(j=>j.characterId===actor.id&&
-    j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===start&&j.calendarTrekProof):null;
+  // New travel commits require authoritative same-watch proof. It is not
+  // possible to bypass missing Orienteering, Hazards or Encounter by ticking
+  // a box; older certified journal rows remain intact and importable.
+  const readiness=travel?assessTrekkingReadiness({journal:data.journal,
+   characters:data.characters,actorId:actor.id,campaignId:campaignKey(clock),minute:start,kind}):null;
+  const trekSource=readiness?.source??null;
   const prepared=trekSource?.calendarTrekProof;
-  if(prepared){
-   const allowed=kind==='walk'||kind==='double-walk'?prepared.conveyance==='foot':
-    kind==='ride'?prepared.conveyance==='mount':kind==='drive'?['cart','wagon'].includes(prepared.conveyance):
-    kind==='double-drover'?['mount','cart','wagon'].includes(prepared.conveyance):false;
-   if(!allowed||prepared.modes.doubleTime!==kind.startsWith('double-'))
-    throw Error('Neshoda mezi doloženou Trekking Routine a skutečným způsobem pohybu');
-  }
   let origin='none',plan;
   if(travel){
    const endurance=actor.hmk?.attributes?.end;
@@ -6768,15 +6791,15 @@ document.addEventListener('submit',e=>{
     generated:expeditionGeneratedDice.get(form)});
    const rolls=submitted.rolls;origin=submitted.origin;
    plan={...expeditionWatchFatigue({mode:kind,endurance,rolls}),kind:'travel',
-    ...(prepared?{trekSourceId:trekSource.id,travelledLeagues:(prepared.effectiveMovement??prepared.movement).leagues,
-     travelledKilometres:(prepared.effectiveMovement??prepared.movement).kilometres}:{} )};
+    ...(readiness?{trekSourceId:trekSource.id,orienteeringId:readiness.orienteeringId,
+     travelledLeagues:readiness.movement.leagues,travelledKilometres:readiness.movement.kilometres}:{} )};
   }else{
    const state=persistentStateOf(actor),claims=actor.hmk?.expedition?.claims||{};
    plan=expeditionRestRecovery({minute:start,kind,current:kind==='winded'?state.fatigue.windedness:state.fatigue.weariness,claims});
   }
   const next=advanceCampaignCalendar(clock,{deltaMinutes:duration,eventId:uuid(),reason:'HMK · '+kind+' · '+actor.name,gmConfirmed:true,characters:data.characters,journal:data.journal});
   const note=travel?'END SR: '+plan.rolls.map(r=>r.roll+' / TN '+r.tn+' ('+(r.success?'S':'F')+')').join(' · ')+'. Změna Weariness +'+plan.accrual+(prepared?'; potvrzená trasa '+plan.travelledLeagues+' league; podklady '+trekSource.id+(prepared.unresolved.length?'; NEVYŘEŠENÁ RIZIKA: '+prepared.unresolved.join(', '):''):''):'Obnova únavy −'+plan.recovered;
-  if(!window.confirm('Potvrdit '+actor.name+' · '+kind+' ('+duration+' minut)? '+note+' Plynutí času se týká celé kampaně.'))return;
+  // Odeslání formuláře potvrzuje akci; neduplikovat GM potvrzení modálem.
   const evidenceId=uuid(),rowId=uuid();
   if(mutate(()=>{
    const c=character(actor.id);c.hmk??={};c.hmk.combatState??=initialCombatState();
