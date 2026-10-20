@@ -1,21 +1,33 @@
-/** HMK v1.2 pp.120–121,186. One verified 2-quart waterskin is a half-gallon
- * container (5 lb water). The EMPTY 2 lb waterskin is catalogue inventory;
- * water contents exist only after an explicit GM potable-water confirmation.
- * The same container can be refilled after its ledger balance is exhausted.
- * One camp and one character only; no imaginary source or clock advance.
+/** HMK v1.2 pp.120–121,186. Exact printed empty vessels are inventory;
+ * their contents are GM-attested, campaign-scoped immutable water evidence.
+ * Waterskin 2 quart = 0.5 gallon, Jug 1 gallon = 1 gallon. 5 lb per
+ * half-gallon of water is the original water-ledger weight convention.
+ * Water can be consumed as two separately audited 0.5-gallon uses from a jug.
+ * No water without a witnessed source, no separate clock changes.
  */
 export const WATER_FILL='hmk-physical-water-fill-v1';
 export const WATER_USE='hmk-physical-water-use-v1';
 export const WATER_ITEM='hmk:gear:hmk-p120-040';
+export const WATER_JUG_ITEM='hmk:gear:hmk-p121-043';
+const VESSELS=Object.freeze({
+ [WATER_ITEM]:Object.freeze({name:'Waterskin, 2 quart',emptyLb:2,capacity:0.5,page:120}),
+ [WATER_JUG_ITEM]:Object.freeze({name:'Jug, 1 gallon',emptyLb:5,capacity:1,page:121})
+});
+/** Exactly identified single-item inventory stacks; no guessed capacities. */
+export function waterContainerCapacity(item){
+ const v=VESSELS[item?.sourceItemId];
+ return v&&item.snapshot?.id===item.sourceItemId&&item.snapshot?.name===v.name&&
+  item.snapshot?.category==='other'&&item.snapshot?.properties?.weightLb===v.emptyLb&&
+  item.quantity===1?v.capacity:null;
+}
 const fail=m=>{throw Error(m)};
 const check=(v,m)=>{if(!v)fail(m)};
 const isMinute=n=>Number.isSafeInteger(n)&&n>=0&&n<=1e9;
-const isSkin=x=>x?.sourceItemId===WATER_ITEM&&x.snapshot?.id===WATER_ITEM&&x.snapshot?.name==='Waterskin, 2 quart'&&x.snapshot?.category==='other'&&x.snapshot?.properties?.weightLb===2&&x.quantity===1;
 export function waterskinBalances(journal=[],campaignId,actorId,minute=1e9){
  const result=[],map=new Map();
  for(const row of journal){if(row.calendarCampaignId!==campaignId||row.characterId!==actorId||row.campaignMinute>minute)continue;
   const f=row.calendarInventoryWaterFill;
-  if(f){const rec={fillId:row.id,itemId:f.itemId,remaining:0.5,quantity:0.5,minute:f.minute};result.push(rec);map.set(row.id,rec);}
+  if(f){const rec={fillId:row.id,itemId:f.itemId,remaining:f.quantity,quantity:f.quantity,minute:f.minute};result.push(rec);map.set(row.id,rec);}
   const u=row.calendarInventoryWaterUse;
   if(u&&map.has(u.fillId))map.get(u.fillId).remaining=Math.round((map.get(u.fillId).remaining-u.quantity)*2)/2;
  }
@@ -28,12 +40,13 @@ export function createPotableWaterFill({inventory=[],journal=[],campaignId,actor
  check(typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&
   typeof itemId==='string'&&itemId&&isMinute(minute),'Voda vyžaduje postavu, kampaň a skutečný čas');
  const item=inventory.find(x=>x.id===itemId&&x.characterId===actorId);
- check(isSkin(item)&&item.slot==='carried','Naplnit lze jen přesně doložený a nesený Waterskin, 2 quart (1 ks; HMK 120)');
+ const capacity=waterContainerCapacity(item);
+ check(capacity!==null&&item.slot==='carried','Naplnit lze jen přesně doložený a nesený Waterskin 2 quart nebo Jug 1 gallon (1 ks; HMK 120–121)');
  check(gmConfirmed===true,'GM musí doložit skutečnou pitnou vodu, naplnění a dostupnost nádoby');
  check(typeof waterSource==='string'&&waterSource.trim().length>=2&&waterSource.trim().length<=160,
   'Uveďte skutečný zdroj pitné vody (např. studna ve vsi)');
  check(filledWaterForItem(journal,campaignId,actorId,itemId,minute)===0,'Nádoba už obsahuje doloženou vodu – nejprve ji spotřebujte');
- return {format:WATER_FILL,campaignId,actorId,itemId,minute,quantity:0.5,unit:'waterDays',weightLb:5,
+ return {format:WATER_FILL,campaignId,actorId,itemId,minute,quantity:capacity,unit:'waterDays',weightLb:capacity*10,
   potableAndFilledConfirmedByGM:true,waterSource:waterSource.trim(),sourcePages:[120,121,186],
   ...(foragingSupplyUseId?{foragingSupplyUseId}:{})};
 }
@@ -55,7 +68,7 @@ export function validatePhysicalWaterJournal(journal=[],inventory=null,database=
  const prior=[];
  for(const row of journal){const f=row.calendarInventoryWaterFill,u=row.calendarInventoryWaterUse;
   if(f){check(f.format===WATER_FILL&&f.campaignId===row.calendarCampaignId&&f.actorId===row.characterId&&
-   f.minute===row.campaignMinute&&isMinute(f.minute)&&f.quantity===0.5&&f.weightLb===5&&
+   f.minute===row.campaignMinute&&isMinute(f.minute)&&[0.5,1].includes(f.quantity)&&f.weightLb===f.quantity*10&&
    f.unit==='waterDays'&&f.potableAndFilledConfirmedByGM===true&&
    typeof f.waterSource==='string'&&f.waterSource.length>=2&&f.waterSource.length<=160&&
    JSON.stringify(f.sourcePages)==='[120,121,186]'&&typeof f.itemId==='string'&&f.itemId&&
@@ -68,8 +81,8 @@ export function validatePhysicalWaterJournal(journal=[],inventory=null,database=
     const archive=database?.calendarEvidenceArchives?.find(a=>a.sourceCampaignId===f.campaignId);
     const source=database?(live?database.inventory:
       database.campaignActorBranches?.[f.campaignId]?.[f.actorId]?.inventory??archive?.waterInventoryBackings):inventory;
-    check(Array.isArray(source)&&isSkin(source.find(x=>x.id===f.itemId&&x.characterId===f.actorId)),
-    'Doložený Waterskin nebyl nalezen ve své původní časové větvi');
+    check(Array.isArray(source)&&waterContainerCapacity(source.find(x=>x.id===f.itemId&&x.characterId===f.actorId))===f.quantity,
+    'Doložená nádoba nebo její objem nebyly nalezeny ve své původní časové větvi');
    }
   }
   if(u){const expected=createPhysicalWaterUse({journal:prior,campaignId:row.calendarCampaignId,

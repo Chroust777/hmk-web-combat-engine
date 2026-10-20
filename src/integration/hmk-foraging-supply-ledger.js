@@ -43,8 +43,8 @@ export function createSupplyUse({journal=[],campaignId,minute,sourceId,resultInd
  requireIt(unit==='herbDoses'?disposition==='ingredient-reserved':
   unit==='waterDays'?['consumed','stored-in-container'].includes(disposition):disposition==='consumed',
   'Byliny lze rezervovat; voda může být spotřebována nebo doloženě naplněna do nádoby');
- requireIt(disposition!=='stored-in-container'||(quantity===0.5&&typeof containerFillId==='string'&&containerFillId.length>0),
-  'Převod vody do nádoby vyžaduje jedinečný důkaz naplnění a půl galonu');
+ requireIt(disposition!=='stored-in-container'||([0.5,1].includes(quantity)&&unit==='waterDays'&&typeof containerFillId==='string'&&containerFillId.length>0),
+  'Převod vody do nádoby vyžaduje jedinečný důkaz naplnění a 0,5 nebo 1 galon');
  requireIt(typeof purpose==='string'&&purpose.length<=120&&(disposition!=='ingredient-reserved'||purpose.trim()),
   'Rezervace bylin potřebuje označení zamýšlené Concoction (nenahrazuje její výrobu)');
  const origin=journal.find(j=>j.id===sourceId);
