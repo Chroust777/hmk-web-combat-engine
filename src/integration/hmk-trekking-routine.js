@@ -173,6 +173,24 @@ export function validateTrekkingJournalEvidence(document){
    source.campaignMinute+e.durationMinutes===entry.campaignMinute&&
    e.travelledLeagues===(p.effectiveMovement??p.movement).leagues&&e.travelledKilometres===(p.effectiveMovement??p.movement).kilometres,
    'Cestovní únava nemá doloženou stejnou trasu, kampaň a čas');
+  // From 93.371 onward the END entry retains a witness to the *specific*
+  // Orienteering Success Value that certified this source watch. Legacy
+  // entries without this field remain readable; no historical data is guessed.
+  if(e.orienteeringId!==undefined){
+   const roll=byId.get(e.orienteeringId),link=roll?.calendarTrekSkillSource;
+   const test=roll?.skillTestProof?.a??roll?.skillTestProof?.result;
+   const selected=p.modes?.progress+p.modes?.bearing;
+   const stars=Number.isSafeInteger(test?.sv)?Math.max(0,Math.min(5,test.sv-4)):NaN;
+   assert(roll&&link?.format==='hmk-trek-linked-skill-v1'&&link.hazard==='survival'&&
+    link.sourceId===source.id&&roll.characterId===entry.characterId&&
+    roll.calendarCampaignId===entry.calendarCampaignId&&
+    Number.isSafeInteger(roll.campaignMinute)&&roll.campaignMinute>=source.campaignMinute&&
+    roll.campaignMinute<=entry.campaignMinute&&
+    ['secondary-mastery-value-test','success-value-specific'].includes(roll.skillTestProof?.type)&&
+    Number.isSafeInteger(selected)&&selected<=stars&&
+    (test.sv>=3||(test.sv>=1&&p.modes.slow>=1)),
+    'Únava neodkazuje na přípustný, zdrojově doložený Orienteering SV');
+  }
  }
  return true;
 }
