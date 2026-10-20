@@ -3,6 +3,7 @@
  * Geographic facts and previously rolled skill outcomes MUST come from
  * actual inputs: never invent terrain, orientation, encounters or injuries.
  */
+import {validateTrekPartySnapshot} from './hmk-trekking-party-modes.js';
 const assert=(yes,msg)=>{if(!yes)throw Error(msg)};
 const int=(n,a,b)=>Number.isSafeInteger(n)&&n>=a&&n<=b;
 export const TREK_CLIMATES=Object.freeze(['subpolar','cool','warm','subtropical','dry-tropical','wet-tropical']);
@@ -124,6 +125,13 @@ export function validateTrekkingJournalEvidence(document){
    typeof p.area==='string'&&p.area.length>0&&p.area.length<=90&&
    ['flat','rough','mountain'].includes(p.landscape)&&
    typeof entry.calendarCampaignId==='string'&&entry.calendarCampaignId,'Neplatný cestovní čas či identita kampaně');
+  if(p.partyModes){
+   validateTrekPartySnapshot(p.partyModes);
+   assert(p.partyModes.guideId===entry.characterId&&p.partyModes.conveyance===p.conveyance&&
+    p.modes.slow===p.modes.manualSlow+p.partyModes.forcedSlow+(p.weatherWatch?.slowMode?1:0)&&
+    p.modes.loaded===p.partyModes.loaded&&int(p.modes.manualSlow,0,20),
+    'Skupinové postihy neodpovídají uloženému pohybu a počasí.');
+  }
   const expectedDay=trekWeatherDay({season:p.season,climate:p.climate,landscape:p.landscape,
    alpine:p.alpine,aridDesert:p.aridDesert,temperatureD10:p.weatherDay?.temperatureD10,
    precipitationD10:p.weatherDay?.precipitationD10});

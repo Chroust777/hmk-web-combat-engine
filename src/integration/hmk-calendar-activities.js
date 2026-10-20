@@ -170,6 +170,10 @@ export function validateHMKActivityEvidence(journal=[]){
   }
   if(!g)continue;
   const trek=all.get(a.plan.trekSourceId),skill=all.get(a.plan.orienteeringId);
+  check(!trek?.calendarTrekProof?.partyModes||(
+   g.memberIds.length===trek.calendarTrekProof.partyModes.memberIds.length&&
+   g.memberIds.every(id=>trek.calendarTrekProof.partyModes.memberIds.includes(id))),
+   'Cestovní skupina není totožná se skupinou doloženou v Trekking Routine.');
   check(trek?.calendarTrekProof?.format==='hmk-trekking-watch-evidence-v1'&&
    trek.characterId===g.guideId&&trek.calendarCampaignId===row.calendarCampaignId&&
    trek.campaignMinute===a.startMinute&&

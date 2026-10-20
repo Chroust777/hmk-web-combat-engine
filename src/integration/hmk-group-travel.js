@@ -7,8 +7,9 @@ import {expeditionDiceSubmission,expeditionWatchFatigue} from './hmk-calendar-ex
 import {scheduleHMKActivity} from './hmk-calendar-activities.js';
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {totalFatigue} from '../rules/fatigue.js';
+import {trekPartyModes} from './hmk-trekking-party-modes.js';
 const requireFact=(ok,msg)=>{if(!ok)throw Error(msg);};
-export function planHMKGroupWatch({journal=[],characters=[],clock,memberIds=[],guideId,kind,diceByActor={},idFactory}={}){
+export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,memberIds=[],guideId,kind,diceByActor={},idFactory}={}){
  requireFact(clock&&Number.isSafeInteger(clock.minute)&&typeof idFactory==='function','Chybí potvrzený čas kampaně nebo generátor ID');
  requireFact(['walk','ride','drive','double-walk','double-drover'].includes(kind),'Nepodporovaná cestovní činnost');
  requireFact(Array.isArray(memberIds)&&memberIds.length>0&&new Set(memberIds).size===memberIds.length,
@@ -18,6 +19,15 @@ export function planHMKGroupWatch({journal=[],characters=[],clock,memberIds=[],g
  requireFact(memberIds.every(id=>roster.has(id)),'Postava není součástí aktivní kampaně');
  const ready=assessTrekkingReadiness({journal,characters,actorId:guideId,
   campaignId:campaignKey(clock),minute:clock.minute,kind});
+ if(ready.source.calendarTrekProof.partyModes){
+  const prepared=ready.source.calendarTrekProof.partyModes;
+  requireFact(memberIds.length===prepared.memberIds.length&&memberIds.every(id=>prepared.memberIds.includes(id)),
+   'Vybraná skupina neodpovídá účastníkům původně připravené Trekking Routine.');
+  const current=trekPartyModes({memberIds:prepared.members.map(m=>m.id),guideId,
+   characters,inventory,conveyance:prepared.conveyance,loadedByGM:prepared.manualLoaded});
+  requireFact(current.members.every((x,i)=>JSON.stringify(x)===JSON.stringify(prepared.members[i])),
+   'Stav postav nebo zatížení skupiny se po přípravě hlídky změnily. Nepoužívejte zastaralé cestovní podklady.');
+ }
  const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort()};
  const fatigueOf=actor=>{const f=actor.hmk?.combatState?.fatigue??{};
   return totalFatigue({windedness:f.windedness??0,weariness:f.weariness??0,weakness:f.otherWeakness??0});};
@@ -27,7 +37,7 @@ export function planHMKGroupWatch({journal=[],characters=[],clock,memberIds=[],g
  }
  // HMK p.145: a single wearied party member imposes one extra Slow Mode.
  // The original weather-induced Slow Mode is a separate penalty.
- if(memberIds.some(id=>fatigueOf(roster.get(id))>=20)){
+ if(!ready.source.calendarTrekProof.partyModes&&memberIds.some(id=>fatigueOf(roster.get(id))>=20)){
   const p=ready.source.calendarTrekProof;
   requireFact(p.modes.slow>=(p.weatherWatch?.slowMode?2:1),
    'Skupina má postavu s Fatigue ≥ 20: Trekking Routine musí zahrnovat Wearied Slow Mode (HMK 145).');
