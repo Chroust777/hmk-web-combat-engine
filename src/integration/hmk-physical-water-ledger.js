@@ -7,6 +7,7 @@
  */
 export const WATER_FILL='hmk-physical-water-fill-v1';
 export const WATER_USE='hmk-physical-water-use-v1';
+export const WATER_TRANSFER='hmk-water-transfer-v1';
 export const WATER_ITEM='hmk:gear:hmk-p120-040';
 export const WATER_JUG_ITEM='hmk:gear:hmk-p121-043';
 const VESSELS=Object.freeze({
@@ -30,13 +31,15 @@ export function waterskinBalances(journal=[],campaignId,actorId,minute=1e9){
   if(f){const rec={fillId:row.id,itemId:f.itemId,remaining:f.quantity,quantity:f.quantity,minute:f.minute};result.push(rec);map.set(row.id,rec);}
   const u=row.calendarInventoryWaterUse;
   if(u&&map.has(u.fillId))map.get(u.fillId).remaining=Math.round((map.get(u.fillId).remaining-u.quantity)*2)/2;
+  const t=row.calendarInventoryWaterTransfer;
+  if(t&&map.has(t.donorFillId))map.get(t.donorFillId).remaining=Math.round((map.get(t.donorFillId).remaining-t.quantity)*2)/2;
  }
  return result;
 }
 export function filledWaterForItem(journal=[],campaignId,actorId,itemId,minute=1e9){
  return waterskinBalances(journal,campaignId,actorId,minute).filter(x=>x.itemId===itemId).reduce((n,x)=>n+x.remaining,0);
 }
-export function createPotableWaterFill({inventory=[],journal=[],campaignId,actorId,itemId,minute,gmConfirmed=false,waterSource='',foragingSupplyUseId=null}={}){
+export function createPotableWaterFill({inventory=[],journal=[],campaignId,actorId,itemId,minute,gmConfirmed=false,waterSource='',foragingSupplyUseId=null,waterTransferId=null}={}){
  check(typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&
   typeof itemId==='string'&&itemId&&isMinute(minute),'Voda vyžaduje postavu, kampaň a skutečný čas');
  const item=inventory.find(x=>x.id===itemId&&x.characterId===actorId);
@@ -48,7 +51,7 @@ export function createPotableWaterFill({inventory=[],journal=[],campaignId,actor
  check(filledWaterForItem(journal,campaignId,actorId,itemId,minute)===0,'Nádoba už obsahuje doloženou vodu – nejprve ji spotřebujte');
  return {format:WATER_FILL,campaignId,actorId,itemId,minute,quantity:capacity,unit:'waterDays',weightLb:capacity*10,
   potableAndFilledConfirmedByGM:true,waterSource:waterSource.trim(),sourcePages:[120,121,186],
-  ...(foragingSupplyUseId?{foragingSupplyUseId}:{})};
+  ...(foragingSupplyUseId?{foragingSupplyUseId}:{}),...(waterTransferId?{waterTransferId}:{})};
 }
 export function availablePhysicalWater(journal=[],campaignId,actorId,minute){
  return waterskinBalances(journal,campaignId,actorId,minute).filter(x=>x.remaining>=0.5&&x.minute<=minute)
@@ -64,17 +67,99 @@ export function createPhysicalWaterUse({journal=[],campaignId,actorId,minute,fil
  check(balance&&balance.remaining>=quantity,'Voda v nádobě nestačí nebo již byla vydána');
  return {format:WATER_USE,campaignId,actorId,minute,fillId,itemId:balance.itemId,quantity,unit:'waterDays',sourcePages:[120,121,186]};
 }
+
+/** A witnessed pour of already owned WATER CONTENTS (not a transfer of
+ * either container). The source bottle remains the donor's property. The
+ * receiver needs an actual empty and carried vessel of sufficient capacity.
+ * Both receipts are committed atomically and time stays GM-controlled. */
+export function recordPhysicalWaterTransfer(database,{donorId,recipientId,donorFillId,
+ recipientItemId,transferId,fillId,campaignId,minute,gmConfirmed=false,
+ reason='',createdAt=''}={}){
+ check(database&&Array.isArray(database.inventory)&&Array.isArray(database.journal)&&
+  Array.isArray(database.characters),'Chybí inventární účet vody');
+ check(database.campaignClock&&(database.campaignClock.campaignId||`legacy:${database.campaignClock.events?.[0]?.id||''}`)===campaignId&&
+  database.campaignClock.minute===minute&&isMinute(minute),'Převod vody vyžaduje skutečný čas otevřené kampaně GM');
+ const members=database.campaignClock.characterIds??database.characters.map(c=>c.id);
+ check(typeof donorId==='string'&&typeof recipientId==='string'&&donorId!==recipientId&&
+  members.includes(donorId)&&members.includes(recipientId)&&
+  database.characters.some(c=>c.id===donorId)&&database.characters.some(c=>c.id===recipientId),
+  'Převod vody vyžaduje dvě různé postavy stejné kampaně');
+ check(!database.combatRuntime?.sequence?.active,'V aktivním boji musí být převod řešen pravidlovou akcí');
+ check(gmConfirmed===true&&typeof reason==='string'&&reason.trim().length>=2&&reason.trim().length<=120,
+  'GM musí potvrdit skutečný přístup, pitnou vodu a okolnosti předání');
+ check(typeof createdAt==='string'&&createdAt&&typeof transferId==='string'&&transferId&&
+  typeof fillId==='string'&&fillId&&fillId!==transferId&&
+  !database.journal.some(j=>j.id===transferId||j.id===fillId),
+  'Převod potřebuje jedinečné auditní identifikátory');
+ const source=database.journal.find(j=>j.id===donorFillId&&j.calendarInventoryWaterFill);
+ check(source&&source.characterId===donorId&&source.calendarCampaignId===campaignId&&source.campaignMinute<=minute,
+  'Původní naplnění vody není doloženo u předávající postavy');
+ const donorItem=database.inventory.find(i=>i.id===source.calendarInventoryWaterFill.itemId&&i.characterId===donorId);
+ const recipientItem=database.inventory.find(i=>i.id===recipientItemId&&i.characterId===recipientId);
+ const volume=waterContainerCapacity(recipientItem);
+ check(waterContainerCapacity(donorItem)!==null&&donorItem.slot==='carried',
+  'Předávající musí skutečně nést původní nádobu');
+ check(volume!==null&&recipientItem.slot==='carried',
+  'Příjemce potřebuje vlastní prázdnou nesenou nádobu s doloženou kapacitou');
+ check(filledWaterForItem(database.journal,campaignId,recipientId,recipientItemId,minute)===0,
+  'Příjemcova nádoba není prázdná');
+ const balance=availablePhysicalWater(database.journal,campaignId,donorId,minute).find(x=>x.fillId===donorFillId);
+ check(balance&&balance.remaining>=volume,'V konkrétním zdrojovém naplnění není dostatek nepoužité vody');
+ const receipt={format:WATER_TRANSFER,campaignId,minute,donorId,recipientId,donorFillId,
+  donorItemId:donorItem.id,recipientItemId,quantity:volume,targetFillId:fillId,
+  confirmedByGM:true,reason:reason.trim()};
+ const staged=[...database.journal,{id:transferId,characterId:donorId,calendarCampaignId:campaignId,
+  campaignMinute:minute,createdAt,title:'Voda · předání do nádoby',
+  body:`${volume} gal · ${donorId} → ${recipientId}; zdroj ${donorFillId}; čas beze změny`,
+  calendarInventoryWaterTransfer:receipt}];
+ const fill=createPotableWaterFill({inventory:database.inventory,journal:staged,campaignId,actorId:recipientId,
+  itemId:recipientItemId,minute,gmConfirmed:true,waterSource:`Předání od ${donorId}: ${reason.trim()}`,
+  waterTransferId:transferId});
+ const next=structuredClone(database);
+ next.journal.push(staged.at(-1),{id:fillId,characterId:recipientId,calendarCampaignId:campaignId,
+  campaignMinute:minute,createdAt,title:'Voda · převzetí do nádoby',
+  body:`${volume} gal · ${recipientId}; doložený převod ${transferId}; čas beze změny`,
+  calendarInventoryWaterFill:fill});
+ validatePhysicalWaterJournal(next.journal,next.inventory,next);
+ return next;
+}
 export function validatePhysicalWaterJournal(journal=[],inventory=null,database=null){
+ const transfers=new Map(),fillsFromTransfer=new Set();
  const prior=[];
- for(const row of journal){const f=row.calendarInventoryWaterFill,u=row.calendarInventoryWaterUse;
+ for(const row of journal){const f=row.calendarInventoryWaterFill,u=row.calendarInventoryWaterUse,t=row.calendarInventoryWaterTransfer;
+  if(t){
+   check(t.format===WATER_TRANSFER&&row.characterId===t.donorId&&row.calendarCampaignId===t.campaignId&&
+    row.campaignMinute===t.minute&&isMinute(t.minute)&&typeof row.createdAt==='string'&&row.createdAt&&
+    typeof t.donorId==='string'&&t.donorId&&typeof t.recipientId==='string'&&t.recipientId&&
+    t.recipientId!==t.donorId&&typeof t.donorFillId==='string'&&t.donorFillId&&
+    typeof t.donorItemId==='string'&&t.donorItemId&&typeof t.recipientItemId==='string'&&t.recipientItemId&&
+    typeof t.targetFillId==='string'&&t.targetFillId&&[0.5,1].includes(t.quantity)&&
+    t.confirmedByGM===true&&typeof t.reason==='string'&&t.reason.length>=2&&t.reason.length<=160&&
+    !transfers.has(row.id),'Poškozené nebo opakované předání vody');
+   const source=prior.find(x=>x.id===t.donorFillId)?.calendarInventoryWaterFill;
+   check(source&&source.campaignId===t.campaignId&&source.actorId===t.donorId&&
+    source.itemId===t.donorItemId&&source.minute<=t.minute&&
+    waterskinBalances(prior,t.campaignId,t.donorId,t.minute).some(x=>x.fillId===t.donorFillId&&x.remaining>=t.quantity),
+    'Předaná voda nemá původní nepoužitý objem u dárce');
+   transfers.set(row.id,t);
+  }
   if(f){check(f.format===WATER_FILL&&f.campaignId===row.calendarCampaignId&&f.actorId===row.characterId&&
    f.minute===row.campaignMinute&&isMinute(f.minute)&&[0.5,1].includes(f.quantity)&&f.weightLb===f.quantity*10&&
    f.unit==='waterDays'&&f.potableAndFilledConfirmedByGM===true&&
    typeof f.waterSource==='string'&&f.waterSource.length>=2&&f.waterSource.length<=160&&
    JSON.stringify(f.sourcePages)==='[120,121,186]'&&typeof f.itemId==='string'&&f.itemId&&
    (f.foragingSupplyUseId===undefined||(typeof f.foragingSupplyUseId==='string'&&f.foragingSupplyUseId.length>0))&&
+   (f.waterTransferId===undefined||(typeof f.waterTransferId==='string'&&f.waterTransferId.length>0))&&
    filledWaterForItem(prior,f.campaignId,f.actorId,f.itemId,f.minute)===0,
    'Poškozené nebo duplicitní naplnění nádoby na vodu');
+   if(f.waterTransferId!==undefined){
+    const transfer=transfers.get(f.waterTransferId);
+    check(transfer&&transfer.targetFillId===row.id&&transfer.campaignId===f.campaignId&&
+     transfer.recipientId===f.actorId&&transfer.recipientItemId===f.itemId&&transfer.minute===f.minute&&
+     transfer.quantity===f.quantity&&f.waterSource.startsWith(`Předání od ${transfer.donorId}: `)&&
+     !fillsFromTransfer.has(f.waterTransferId),'Nedoložené nebo duplicitní převzetí vody');
+    fillsFromTransfer.add(f.waterTransferId);
+   }
    if(inventory!==null||database!==null){
     const live=database?.campaignClock?.campaignId===f.campaignId||
      (database?.campaignClock&&!database.campaignClock.campaignId&&f.campaignId===`legacy:${database.campaignClock.events?.[0]?.id||''}`);
@@ -92,6 +177,7 @@ export function validatePhysicalWaterJournal(journal=[],inventory=null,database=
   }
   prior.push(row);
  }
+ for(const id of transfers.keys())check(fillsFromTransfer.has(id),'Osiřelý převod vody bez příjemcovy nádoby');
  return true;
 }
 export function projectCampaignWaterInventory(inventory=[],journal=[],campaignId){
@@ -110,7 +196,7 @@ export function assertWaterBacking(before,after,campaignId=null){
 }
 export function assertWaterAppendOnly(before=[],after=[]){
  const now=new Map(after.map(j=>[j.id,j]));
- for(const row of before)if(row.calendarInventoryWaterFill||row.calendarInventoryWaterUse)
+ for(const row of before)if(row.calendarInventoryWaterFill||row.calendarInventoryWaterUse||row.calendarInventoryWaterTransfer)
   check(now.has(row.id)&&JSON.stringify(now.get(row.id))===JSON.stringify(row),
    'Doložená naplnění a spotřeba vody se nesmějí změnit ani smazat');
  return true;

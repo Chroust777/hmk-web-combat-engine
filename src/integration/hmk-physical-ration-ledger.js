@@ -7,24 +7,37 @@
 import {provenCarriedRations} from './hmk-inventory-provisions.js';
 export const PHYSICAL_RATION_STOCK='hmk-physical-ration-stock-v1';
 export const PHYSICAL_RATION_USE='hmk-physical-ration-use-v1';
+export const PHYSICAL_RATION_TRANSFER='hmk-physical-ration-transfer-v1';
 const DAY=1440;
 const fail=message=>{throw Error(message)};
 const check=(value,message)=>{if(!value)fail(message)};
 const isMinute=n=>Number.isSafeInteger(n)&&n>=0&&n<=1e9;
 const isHalf=n=>Number.isSafeInteger(n*2)&&n>=0.5&&n<=999999;
 const duration=(id)=>id==='hmk:gear:hmk-p120-026'?30*DAY:id==='hmk:gear:hmk-p120-027'?10*DAY:null;
+/** Physical lot identity follows an immutable custody receipt. No campaign
+ * changes a shared inventory baseline; incoming food is a projected carried
+ * stack and takes the source lot's ORIGINAL expiry (never a new freshness date). */
 export function rationStockBalances(journal=[],campaignId,actorId,minute=1e9){
- const lots=[];
+ const lots=[],map=new Map();
  for(const row of journal){
-  if(row.calendarCampaignId!==campaignId||row.characterId!==actorId)continue;
-  const s=row.calendarInventoryRationStock;
-  if(s&&row.campaignMinute<=minute)lots.push({sourceId:row.id,itemId:s.itemId,actorId,sourceItemId:s.sourceItemId,
-   name:s.name,quantity:s.quantity,remaining:s.quantity,minute:s.minute,expiresAt:s.expiresAt});
- }
- const map=new Map(lots.map(l=>[l.sourceId,l]));
- for(const row of journal){
-  if(row.calendarCampaignId!==campaignId||row.characterId!==actorId||row.campaignMinute>minute)continue;
-  const use=row.calendarInventoryRationUse;if(use&&map.has(use.sourceId))map.get(use.sourceId).remaining=Math.round((map.get(use.sourceId).remaining-use.quantity)*2)/2;
+  if(row.calendarCampaignId!==campaignId||row.campaignMinute>minute)continue;
+  const s=row.calendarInventoryRationStock,t=row.calendarInventoryRationTransfer,u=row.calendarInventoryRationUse;
+  if(s&&row.characterId===actorId){
+   const lot={sourceId:row.id,itemId:s.itemId,actorId,sourceItemId:s.sourceItemId,name:s.name,
+    quantity:s.quantity,remaining:s.quantity,minute:s.minute,expiresAt:s.expiresAt};
+   lots.push(lot);map.set(row.id,lot);
+  }
+  if(t&&t.recipientId===actorId){
+   const lot={sourceId:row.id,itemId:t.receivedItemId,actorId,sourceItemId:t.sourceItemId,
+    name:t.name,quantity:t.quantity,remaining:t.quantity,minute:t.minute,expiresAt:t.expiresAt};
+   lots.push(lot);map.set(row.id,lot);
+  }
+  if(u&&row.characterId===actorId&&map.has(u.sourceId)){
+   const lot=map.get(u.sourceId);lot.remaining=Math.round((lot.remaining-u.quantity)*2)/2;
+  }
+  if(t&&t.donorId===actorId&&map.has(t.sourceId)){
+   const lot=map.get(t.sourceId);lot.remaining=Math.round((lot.remaining-t.quantity)*2)/2;
+  }
  }
  return lots;
 }
@@ -52,17 +65,54 @@ export function availableRationLots(journal=[],campaignId,actorId,minute){
 export function createPhysicalRationUse({journal=[],campaignId,actorId,minute,sourceId,quantity}={}){
  check(typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&isMinute(minute)&&
   typeof sourceId==='string'&&sourceId&&isHalf(quantity), 'Neplatný fyzický výdej přídělů');
- const source=journal.find(row=>row.id===sourceId&&row.calendarInventoryRationStock);
- check(source&&source.characterId===actorId&&source.calendarCampaignId===campaignId&&
-  source.campaignMinute<=minute&&source.calendarInventoryRationStock.expiresAt>=minute,'Příděl není doložen, patří jiné kampani nebo překročil doloženou trvanlivost');
+ const source=journal.find(row=>row.id===sourceId&&(row.calendarInventoryRationStock||row.calendarInventoryRationTransfer));
+ check(source&&source.calendarCampaignId===campaignId&&source.campaignMinute<=minute&&
+  (source.calendarInventoryRationStock?source.characterId===actorId&&source.calendarInventoryRationStock.expiresAt>=minute:
+   source.calendarInventoryRationTransfer.recipientId===actorId&&source.calendarInventoryRationTransfer.expiresAt>=minute),
+  'Příděl není doložen, patří jiné kampani nebo překročil doloženou trvanlivost');
  const lot=availableRationLots(journal,campaignId,actorId,minute).find(x=>x.sourceId===sourceId);
  check(lot&&lot.remaining>=quantity,'Fyzické potravinové dávky nestačí nebo již byly vydány');
  return {format:PHYSICAL_RATION_USE,campaignId,actorId,minute,sourceId,itemId:lot.itemId,
   quantity,unit:'foodDays',sourcePages:[120,186]};
 }
+/** An actual witnessed hand-off of stock, NOT eating. A transfer cannot
+ * extend freshness, duplicate rations, or advance campaign time. */
+export function recordPhysicalRationHandoff(database,{donorId,recipientId,sourceId,quantity,
+ eventId,receivedItemId,campaignId,minute,reason='',confirmedByGM=false,createdAt=''}={}){
+ check(database&&Array.isArray(database.journal)&&Array.isArray(database.characters)&&
+  Array.isArray(database.inventory)&&database.campaignClock,'Chybí otevřený inventář a kalendář');
+ check((database.campaignClock.campaignId||`legacy:${database.campaignClock.events?.[0]?.id||''}`)===campaignId&&
+  database.campaignClock.minute===minute&&isMinute(minute),'Předání přídělů vyžaduje aktuální čas GM');
+ const members=database.campaignClock.characterIds??database.characters.map(c=>c.id);
+ check(typeof donorId==='string'&&typeof recipientId==='string'&&donorId!==recipientId&&
+  members.includes(donorId)&&members.includes(recipientId)&&
+  database.characters.some(c=>c.id===donorId)&&database.characters.some(c=>c.id===recipientId),
+  'Příděly lze předat pouze jinému účastníkovi stejné kampaně');
+ check(!database.combatRuntime?.sequence?.active,'Během aktivního boje je nutná příslušná Combat akce');
+ check(confirmedByGM===true&&typeof reason==='string'&&reason.trim().length>=2&&reason.trim().length<=160,
+  'GM musí potvrdit skutečné předání a jeho okolnosti');
+ check(isHalf(quantity)&&typeof eventId==='string'&&eventId&&typeof receivedItemId==='string'&&
+  receivedItemId&&receivedItemId!==eventId&&typeof createdAt==='string'&&createdAt&&
+  !database.journal.some(j=>j.id===eventId||j.id===receivedItemId)&&
+  !database.inventory.some(i=>i.id===receivedItemId)&&
+  !database.journal.some(j=>j.calendarInventoryRationTransfer?.receivedItemId===receivedItemId),
+  'Neplatné množství nebo duplicitní identifikátor potravinového balíku');
+ const origin=availableRationLots(database.journal,campaignId,donorId,minute).find(l=>l.sourceId===sourceId);
+ check(origin&&origin.remaining>=quantity,'Zdrojový příděl není volný, už byl spotřebován nebo expiroval');
+ const proof={format:PHYSICAL_RATION_TRANSFER,campaignId,minute,donorId,recipientId,sourceId,
+  sourceItemId:origin.sourceItemId,sourceInventoryItemId:origin.itemId,receivedItemId,
+  name:origin.name,quantity,expiresAt:origin.expiresAt,unit:'foodDays',
+  confirmedByGM:true,reason:reason.trim(),sourcePages:[120,186]};
+ const next=structuredClone(database);
+ next.journal.push({id:eventId,characterId:donorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt,
+  title:'HMK · fyzické příděly předány',body:`${quantity} food-days · ${donorId} → ${recipientId}; ${reason.trim()}; čas GM beze změny`,
+  calendarInventoryRationTransfer:proof});
+ validatePhysicalRationJournal(next.journal,next.inventory);
+ return next;
+}
 /** Replay preserves origin, chronology, uniqueness, ration units and no
  * cross-campaign borrowing. Legacy journal entries remain untouched. */
-export function validatePhysicalRationJournal(journal=[],inventory=null){
+export function validatePhysicalRationJournal(journal=[],inventory=null,database=null){
  const prior=[],usedInventoryIds=new Set();
  for(const row of journal){
   const s=row.calendarInventoryRationStock;
@@ -75,12 +125,36 @@ export function validatePhysicalRationJournal(journal=[],inventory=null){
     s.expiresAt===s.minute+duration(s.sourceItemId)&&s.freshnessAttestedByGM===true&&
     JSON.stringify(s.sourcePages)==='[120,186]'&&!usedInventoryIds.has(key),
     'Poškozený, duplicitní nebo nedoložený počáteční stav fyzických přídělů');
-   if(inventory!==null){
-    const backing=provenCarriedRations(inventory,s.actorId).find(x=>x.itemId===s.itemId);
+   if(inventory!==null||database!==null){
+    const active=database?.campaignClock?.campaignId===s.campaignId||
+     (database?.campaignClock&&!database.campaignClock.campaignId&&
+      s.campaignId===`legacy:${database.campaignClock.events?.[0]?.id||''}`);
+    const archive=database?.calendarEvidenceArchives?.find(a=>a.sourceCampaignId===s.campaignId);
+    const source=database?(active?database.inventory:
+      database.campaignActorBranches?.[s.campaignId]?.[s.actorId]?.inventory??archive?.rationInventoryBackings):inventory;
+    const backing=provenCarriedRations(source??[],s.actorId).find(x=>x.itemId===s.itemId);
     check(backing&&backing.sourceItemId===s.sourceItemId&&backing.name===s.name&&backing.foodDays===s.quantity,
      'Doložený inventární balík již neodpovídá původnímu zdroji, vlastníkovi ani počtu kusů');
    }
    usedInventoryIds.add(key);
+  }
+  const t=row.calendarInventoryRationTransfer;
+  if(t){
+   const lot=availableRationLots(prior,t.campaignId,t.donorId,t.minute).find(l=>l.sourceId===t.sourceId);
+   check(t.format===PHYSICAL_RATION_TRANSFER&&t.campaignId===row.calendarCampaignId&&
+    t.minute===row.campaignMinute&&isMinute(t.minute)&&row.characterId===t.donorId&&
+    typeof t.recipientId==='string'&&t.recipientId&&t.recipientId!==t.donorId&&
+    typeof t.receivedItemId==='string'&&t.receivedItemId&&
+    typeof t.sourceId==='string'&&t.sourceId&&t.receivedItemId!==t.sourceInventoryItemId&&
+    isHalf(t.quantity)&&lot&&lot.remaining>=t.quantity&&
+    t.sourceItemId===lot.sourceItemId&&t.sourceInventoryItemId===lot.itemId&&
+    t.name===lot.name&&t.expiresAt===lot.expiresAt&&t.expiresAt>=t.minute&&
+    t.unit==='foodDays'&&t.confirmedByGM===true&&
+    typeof t.reason==='string'&&t.reason.length>=2&&t.reason.length<=160&&
+    JSON.stringify(t.sourcePages)==='[120,186]'&&
+    typeof row.createdAt==='string'&&row.createdAt&&
+    !prior.some(x=>x.calendarInventoryRationTransfer?.receivedItemId===t.receivedItemId||x.id===row.id),
+    'Neplatný či duplicitní důkaz předání potravin');
   }
   const u=row.calendarInventoryRationUse;
   if(u){
@@ -96,24 +170,41 @@ export function validatePhysicalRationJournal(journal=[],inventory=null){
 /** Read-only inventory per campaign. The global baseline remains unchanged. */
 export function projectCampaignRationInventory(inventory=[],journal=[],campaignId){
  if(!campaignId)return inventory;
- const quantities=new Map();
+ const quantities=new Map(),received=[];
  for(const row of journal){
   if(row.calendarCampaignId!==campaignId)continue;
-  const stock=row.calendarInventoryRationStock;
+  const stock=row.calendarInventoryRationStock,t=row.calendarInventoryRationTransfer,u=row.calendarInventoryRationUse;
   if(stock)quantities.set(stock.itemId,stock.quantity);
-  const used=row.calendarInventoryRationUse;
-  if(used&&quantities.has(used.itemId))quantities.set(used.itemId,Math.round((quantities.get(used.itemId)-used.quantity)*2)/2);
+  if(t){
+   if(quantities.has(t.sourceInventoryItemId))quantities.set(t.sourceInventoryItemId,
+    Math.round((quantities.get(t.sourceInventoryItemId)-t.quantity)*2)/2);
+   quantities.set(t.receivedItemId,t.quantity);received.push(t);
+  }
+  if(u&&quantities.has(u.itemId))quantities.set(u.itemId,
+   Math.round((quantities.get(u.itemId)-u.quantity)*2)/2);
  }
- return inventory.flatMap(item=>{
+ const owned=inventory.flatMap(item=>{
   const quantity=quantities.get(item.id);
   if(quantity===undefined)return [item];
   return quantity>0?[{...item,quantity}]:[];
  });
+ // A projected custody item is READ ONLY, not an editable second inventory.
+ // It is carried for ENC, can be consumed and re-transferred by its receipt ID.
+ for(const t of received){
+  const q=quantities.get(t.receivedItemId);if(q<=0)continue;
+  owned.push({id:t.receivedItemId,characterId:t.recipientId,sourceItemId:t.sourceItemId,
+   snapshot:{id:t.sourceItemId,name:t.name,category:'other',properties:{weightLb:3}},
+   slot:'carried',quantity:q,gearStowage:'normal',_campaignRationReceipt:true});
+ }
+ return owned;
 }
 /** Stock-bound inventory IDs stay unchanged in the shared BASELINE. Otherwise
  * an edit, transfer, deletion or restack would make evidence untraceable. */
 export function assertPhysicalRationBacking(before,after){
- const ids=new Set((after.journal||[]).filter(x=>x.calendarInventoryRationStock).map(x=>x.calendarInventoryRationStock.itemId));
+ const active=after.campaignClock?.campaignId||
+  (after.campaignClock?`legacy:${after.campaignClock.events?.[0]?.id||''}`:null);
+ const ids=new Set((after.journal||[]).filter(x=>x.calendarInventoryRationStock&&(active===null||x.calendarCampaignId===active))
+  .map(x=>x.calendarInventoryRationStock.itemId));
  const prev=new Map((before.inventory||[]).map(x=>[x.id,x]));
  const next=new Map((after.inventory||[]).map(x=>[x.id,x]));
  for(const id of ids){
@@ -124,7 +215,7 @@ export function assertPhysicalRationBacking(before,after){
 }
 export function assertPhysicalRationAppendOnly(previous=[],next=[]){
  const byId=new Map(next.map(x=>[x.id,x]));
- for(const row of previous)if(row.calendarInventoryRationStock||row.calendarInventoryRationUse)
+ for(const row of previous)if(row.calendarInventoryRationStock||row.calendarInventoryRationUse||row.calendarInventoryRationTransfer)
   check(byId.has(row.id)&&JSON.stringify(byId.get(row.id))===JSON.stringify(row),'Historické fyzické příděly nelze přepsat ani smazat');
  return true;
 }

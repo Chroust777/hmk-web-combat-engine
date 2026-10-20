@@ -38,6 +38,15 @@ export function makeCalendarEvidenceArchive(clock,people,journal,id,inventory=[]
   .map(i=>structuredClone(i));
  assert(waterInventoryBackings.length===skinIds.size,
   'Nelze odstranit kalendář: chybí inventární původ některé doložené nádoby na vodu');
+ // Preserve the original ration backing when deleting a campaign, even
+ // after its remaining food has been consumed or transferred.
+ const rationIds=new Set((journal||[]).filter(j=>j.calendarCampaignId===sourceCampaignId&&
+  ids.has(j.characterId)&&j.calendarInventoryRationStock)
+  .map(j=>j.calendarInventoryRationStock.itemId));
+ const rationInventoryBackings=(inventory||[]).filter(i=>rationIds.has(i.id)&&ids.has(i.characterId))
+  .map(i=>structuredClone(i));
+ assert(rationInventoryBackings.length===rationIds.size,
+  'Nelze odstranit kalendář: chybí původní inventární příděly');
  const medicalBranches=people.filter(c=>ids.has(c.id)).flatMap(c=>{
   const state=c.hmk?.combatState;
   const episodes=(state?.malnutritionEpisodes??[]).filter(e=>e.campaignId===sourceCampaignId);
@@ -47,7 +56,7 @@ export function makeCalendarEvidenceArchive(clock,people,journal,id,inventory=[]
    (e.type?.startsWith('malnutrition-')&&sourceIds.has(e.details?.episodeId)));
   return [{actorId:c.id,state:{malnutritionEpisodes:structuredClone(episodes),events:structuredClone(events)}}];
  });
- return {format:'hmk-calendar-character-time-evidence-v1',id,sourceCampaignId,medicalBranches,waterInventoryBackings,
+ return {format:'hmk-calendar-character-time-evidence-v1',id,sourceCampaignId,medicalBranches,waterInventoryBackings,rationInventoryBackings,
   trOrigin:clock.trOrigin?structuredClone(clock.trOrigin):null,
   characterIds:[...ids],
   anchors:structuredClone((clock.anchors||[]).filter(a=>ids.has(a.characterId))),
@@ -78,6 +87,18 @@ export function validateCalendarEvidenceArchives(archives){
      b.state.malnutritionEpisodes.every(e=>e.campaignId===a.sourceCampaignId),
      'Poškozená archivní zdravotní větev');
     included.add(b.actorId);
+   }
+  }
+  if(a.rationInventoryBackings!==undefined){
+   assert(Array.isArray(a.rationInventoryBackings)&&a.rationInventoryBackings.length<=40000,
+    'Poškozený archiv inventárních zásob potravy');
+   const seenRations=new Set();
+   for(const item of a.rationInventoryBackings){
+    assert(item&&typeof item.id==='string'&&item.id&&!seenRations.has(item.id)&&
+     typeof item.characterId==='string'&&a.characterIds.includes(item.characterId)&&
+     item.snapshot&&typeof item.snapshot==='object',
+     'Poškozený původ přídělů v archivu kampaně');
+    seenRations.add(item.id);
    }
   }
   if(a.waterInventoryBackings!==undefined){
