@@ -122,6 +122,7 @@ import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,v
 import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,validateNutritionJournal,assertNutritionJournalAppendOnly,nutritionRisk} from './src/integration/hmk-nutrition-days.js';
 import {pendingTrackingBearing} from './src/integration/hmk-tracking-bearing-handoff.js';
 import {provenCarriedRations,assertExclusiveForagingProven} from './src/integration/hmk-inventory-provisions.js';
+import {createFreshRationStocks,rationStockBalances,projectCampaignRationInventory,validatePhysicalRationJournal,assertPhysicalRationBacking,assertPhysicalRationAppendOnly} from './src/integration/hmk-physical-ration-ledger.js';
 import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
@@ -188,7 +189,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.383';
+const APP_VERSION='93.384';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -238,7 +239,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateNutritionJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
+ if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory);validateNutritionJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
@@ -455,13 +456,14 @@ let pendingTrekHandoff=null; // UI-only context; the journal proof is the author
 function mutate(fn,{gmClockAdvance=false}={}){
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(!automaticGenerationBusy)alert('Změna nebyla uložena: '+e.message);return false}
 }
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
 function field(name,label,value='',type='text'){return `<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}"></label>`}
 function area(name,label,value=''){return `<label>${esc(label)}<textarea name="${name}">${esc(value)}</textarea></label>`}
 function character(id){return data.characters.find(c=>c.id===id)}
+function activeRationInventory(){return projectCampaignRationInventory(data.inventory,data.journal,campaignKey(data.campaignClock));}
 function item(id){return findCatalogItem(id)}
 function activeVisualScene(){
  const tab=LIBRARY_TABS.some(t=>t.id===libraryTab)?libraryTab:'melee';
@@ -720,12 +722,14 @@ function campaignCalendarView(){
  const dailyPolicyMap=new Map(dailyPolicies.map(x=>[x.characterId,x]));
  const recentNutritionDays=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarNutritionDay).slice(-14).reverse();
  const nutritionHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>HMK 186 · automatické denní zásobování · ${dailyPolicies.length} postav</summary>
- <p class="hc-hint"><strong>Čas mění pouze GM.</strong> Pro vybrané postavy lze jednou potvrdit, že budou čerpat <strong>výhradně z doložených nálezů Foraging</strong>; při každém potvrzeném posunu času GM se automaticky uzavře každých 24 hodin, vydají se dostupné zásoby a zapíší případné schodky. Postavám s dalšími neznámými zásobami tento režim nezapínejte. Při plně doloženém zásobování se Starvation/Thirst při nástupu zapíše automaticky. Navazující Advance/Healing d100 vyžaduje skutečný hod v termínu; nelze ho nahradit odhadem.</p>
+ <p class="hc-hint"><strong>Čas mění pouze GM.</strong> GM může potvrdit režim <strong>výhradně Foraging</strong> nebo <strong>doložené čerstvé inventární dávky + Foraging</strong>. Každých 24 hodin po skutečném posunu času GM se odečtou dostupné zdroje a zapíšou případné schodky. V obou režimech musí být skutečně vyloučeny další nezapsané zdroje potravy či vody; jinak režim nezapínejte. Při plně doloženém zásobování se Starvation/Thirst při nástupu zapíše automaticky. Navazující Advance/Healing d100 vyžaduje skutečný hod v termínu; nelze ho nahradit odhadem.</p>
  <form data-nutrition-policy-form><fieldset class="hc-expedition-actors"><legend>Postavy pro stejný denní režim</legend><div class="hc-characters">${participants.map(c=>{const current=dailyPolicyMap.get(c.id)?.calendarNutritionPolicy;return `<label class="hc-character"><input type="checkbox" name="nutritionActorIds" value="${esc(c.id)}"><span>${esc(c.name)}${current?' · aktivní režim '+current.foodNeed+' jídlo / '+current.waterNeed+' voda':''}</span></label>`}).join('')}</div></fieldset>
  <div class="hc-fields"><label>Denní potřeba potravy<select name="foodNeed"><option value="1">1 food-day · aktivní den</option><option value="0.5">0,5 food-day · úplný klid</option></select></label>
  <label>Denní potřeba vody<select name="waterNeed"><option value="1">1 water-day · běžná aktivita</option><option value="2">2 water-days · horko / Heat Hazard</option><option value="0.5">0,5 water-day · úplná nečinnost</option></select></label></div>
  <label>Akce<select name="policyAction"><option value="activate">Aktivovat / změnit režim</option><option value="pause">Pozastavit automatický výdej</option></select></label>
- <label class="hc-check"><input type="checkbox" name="foragingOnly" value="yes"> Potvrzuji: při aktivaci nemají vybrané postavy pro tyto dávky žádné jiné nezaznamenané zásoby; výhradním doloženým zdrojem je Foraging. Údaje platí pro následující 24h období.</label>
+ <label>Zdroje potravy<select name="sourceMode"><option value="foraging">Pouze prokazatelné nálezy Foraging</option><option value="inventory">Doložené inventární příděly + Foraging</option></select></label>
+ <label class="hc-check"><input type="checkbox" name="foragingOnly" value="yes"> Potvrzuji: v režimu pouze Foraging nejsou žádné jiné využitelné zdroje potravy či vody; v režimu inventáře jsou všechny další dostupné zdroje řádně doložené a voda pochází výhradně z účtovaných nálezů Foraging. Nezaznamenané nákupy/voda znamenají, že tento režim nelze bezpečně zapnout.</label>
+ <label class="hc-check"><input type="checkbox" name="freshRations" value="yes"> Při novém převzetí inventárních dávek výslovně potvrzuji, že jsou DNES čerstvé a skutečně dostupné této postavě v této kampani; standardní vydrží 10 dní, iron 30 dní (HMK 120). Bez potvrzení nelze nové balíky použít.</label>
  <button type="submit">Uložit režim · čas se nemění</button></form>
  <h4>Starvation / Thirst · HR a Course Rolls (HMK 184–186)</h4>
  <p class="hc-hint">Po doložené celodenní ztrátě dávky (nebo dvou dnech s poloviční dávkou) se automaticky založí skutečná Starvation HR5 nebo Thirst HR4 do Combat State a přičte se příslušná Weakness. Další Advance/Healing je samostatný d100 test splatný až podle pravidel. <strong>Čas mění pouze GM.</strong> Externí Shock z jiného zdroje nesmí být přepsán.</p>
@@ -737,9 +741,11 @@ function campaignCalendarView(){
  <h4>Poslední dokončené 24h intervaly</h4>
  ${recentNutritionDays.map(j=>{const p=j.calendarNutritionDay,short=p.foodShortfall||p.waterShortfall;const risk=nutritionRisk(data.journal,campaignKey(clock),j.characterId);return `<p class="hc-hint"><strong>${esc(character(j.characterId)?.name||j.characterId)}</strong> · ${esc(displayCampaignMinute(p.endMinute))} · potrava ${p.foodReceived}/${p.foodNeed}, voda ${p.waterReceived}/${p.waterNeed}${short?' · <strong>NEDOSTATEK · kontrola Starvation/Thirst</strong>':''}${(risk.starvation||risk.thirst)?' · nutná medicínská kontrola':''}</p>`}).join('')||'<p class="hc-hint">Čeká se na první dokončené 24hodinové období od potvrzení režimu.</p>'}
  </details></section>`;
- const carriedRations=participants.flatMap(c=>provenCarriedRations(data.inventory,c.id).map(x=>({character:c.name,name:x.name,count:x.foodDays,weightLb:x.weightLb})));
+ const activeStockRows=participants.flatMap(c=>rationStockBalances(data.journal,campaignKey(clock),c.id).map(l=>({...l,character:c.name})));
+ const carriedRations=participants.flatMap(c=>provenCarriedRations(activeRationInventory(),c.id).map(x=>({character:c.name,name:x.name,count:x.foodDays,weightLb:x.weightLb})));
  const supplyHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>Účetní zásoby družiny · Foraging (HMK 147, 186)</summary>
- <p class="hc-hint"><strong>Skutečné nesené potravinové zásoby v inventáři (HMK 120):</strong> ${carriedRations.map(x=>esc(x.character)+' · '+esc(x.name)+' · '+x.count+' denních dávek ('+x.weightLb+' lb)').join('; ')||'Žádné přesně identifikované Rations standard/iron'}. Tyto fyzické předměty se nyní do automatického Foraging-only režimu <strong>nezapočítávají</strong> a nesmějí vést k závěru o hladovění. Waterskin je pouze nádoba, nikoli důkaz vody uvnitř. Plné propojení výdeje z inventáře ještě není implementováno.</p>
+ <p class="hc-hint"><strong>Skutečné nesené potravinové zásoby v inventáři (HMK 120):</strong> ${carriedRations.map(x=>esc(x.character)+' · '+esc(x.name)+' · '+x.count+' denních dávek ('+x.weightLb+' lb)').join('; ')||'Žádné přesně identifikované Rations standard/iron'}. Inventární příděly jsou pro každou kampaň spotřebovávány jen po samostatném potvrzení GM o jejich čerstvosti a skutečné dostupnosti. Jejich zůstatek v přehledu je projekce konkrétní kampaně, globální inventární základ se nepřepisuje. Waterskin je pouze nádoba, nikoli důkaz vody uvnitř. Již zaznamenané balíky nelze doplňovat přepisem počtu kusů; nové zásoby vložte jako nový stack.</p>
+ <p class="hc-hint"><strong>Kampaňově doložené balíky:</strong> ${activeStockRows.map(l=>`${esc(l.character)} · ${esc(l.name)}: zbývá ${l.remaining}/${l.quantity} food-days, čerstvost doložena do ${esc(displayCampaignMinute(l.expiresAt))}${l.expiresAt<clock.minute?' · PO TRVANLIVOSTI':''}`).join('; ')||'Zatím žádný inventární balík s potvrzenou čerstvostí'}.</p>
  <p class="hc-hint">Doložené dostupné zásoby: ${supplyReport.available.foodDays} food-days, ${supplyReport.available.waterDays} water-days a ${supplyReport.available.herbDoses} dávek bylin. Získané celkem: ${supplyReport.gross.foodDays} / ${supplyReport.gross.waterDays} / ${supplyReport.gross.herbDoses}. Výdej nikdy neposune čas GM. Ručně vydané dávky se zapisují ihned, automatické denní dávky až po dokončení 24 hodin potvrzeným posunem času GM. HMK 186 rozlišuje odpočinek, horko a poloviční dávky.</p>
  <p class="hc-hint"><strong>Concoctions:</strong> rezervace byliny znamená pouze převzetí přesně doložené dávky pro zamýšlený přípravek. Nevyrábí elixír, nehází Herblore a nezakládá domnělý fyzický předmět v inventáři; tyto procedury se vyhodnocují v příslušných původních formulářích.</p>
  <form data-foraging-batch-rations><h4>Společný výdej denních dávek</h4>
@@ -1480,7 +1486,7 @@ function visibleInventoryNote(value){
  return /^Počáteční výbava(?: \(automatický návrh\))?$/i.test(note)?'':note;
 }
 function inventoryRowsForJournal(inv,kind){
- const source=projectInventoryRows(inv);
+ const source=projectInventoryRows(projectCampaignRationInventory(inv,data.journal,campaignKey(data.campaignClock)));
  if(kind==='armour')return source.filter(r=>r.item.slot==='worn').map(r=>[r.item.snapshot?.name||'—',r.armourENC||'—',r.wq??'—',visibleInventoryNote(r.item.condition)]);
  if(kind==='possessions')return source.filter(r=>!['worn','main_hand','off_hand'].includes(r.item.slot)).map(r=>[r.item.snapshot?.name||'—',r.qty??1,r.weight===null?'—':r.weight.toFixed(1),visibleInventoryNote(r.item.condition)]);
  return [];
@@ -1507,7 +1513,7 @@ function journalWeaponBaseline(c,inventoryItem,mode='melee'){
   const skillNames=kind==='sling'?['Slings']:kind==='thrown'?['Throwing']:['Archery'];
   const ml=skillValueForJournal(c,skillNames);
   if(!Number.isSafeInteger(ml))return {atk:'—',def:'—',hint:`Není doložena ${skillNames[0]} ML; útok se nedopočítává.`};
-  const missileLoad=resolveCombatantLoad({character:c,inventory:data.inventory});
+  const missileLoad=resolveCombatantLoad({character:c,inventory:activeRationInventory()});
   if(!missileLoad.ready||!Number.isSafeInteger(missileLoad.perceptionPenalty))
    return {atk:'—',def:'—',hint:'Nelze doložit aktuální postih Perception z nasazené zbroje. Pro útok na dálku není přípustné odhadovat nulu.'};
   const penalty=missileLoad.perceptionPenalty;
@@ -1545,7 +1551,7 @@ function journalWeaponBaseline(c,inventoryItem,mode='melee'){
  const offHand=inventoryItem.slot==='off_hand'&&!gripTwoHanded,shield=inventoryItem.snapshot.category==='shield';
   const defenceHeft=heftPenalty({str,hft:heft,twoHanded:gripTwoHanded,offHand,shieldBlockOrPress:shield}).penalty;
  const strikeHeft=heftPenalty({str,hft:heft,twoHanded:gripTwoHanded,offHand}).penalty;
- const load=resolveCombatantLoad({character:c,inventory:data.inventory});
+ const load=resolveCombatantLoad({character:c,inventory:activeRationInventory()});
  if(!load.encReady||!load.bulkReady||!Number.isSafeInteger(load.agilityAndMeleePenalty)||!Number.isSafeInteger(load.meleeBulkPenalty))
   return {atk:'—',def:'—',hint:'Nedoložené ENC/Bulk zbroje nebo vybavení – nelze vypočítat základní ATK/DEF.'};
  const shieldItem=paired.find(x=>x.snapshot.category==='shield');
@@ -1979,7 +1985,7 @@ function characterJournalHero(c,inv,editing=false){
  const familyRows=[['Society',bio('society')],['Family',bio('familyOccupation')],['Occupation',firstPresent(c.occupation,bio('occupation'))],['Home',bio('home')],['Realm',bio('realm')],['Settlement',bio('settlement')],['Wealth',bio('wealth')],['Coins',coinBalance(c).ok?coinBalance(c).balance:bio('coins')],['Estrangement',bio('estrangement')],['Pantheon',bio('pantheon')],['Region',bio('birthRegion')],['Languages',h.regionalLanguages?.length?listPresent(h.regionalLanguages):bio('nativeLanguage')]];
  const traitValues=[bio('psyche'),bio('estrangement'),bio('pantheon'),creation.autoGeneration?.semantic?.summary,c.description].filter(v=>v&&v!=='—');
  const move=Number.isFinite(attrs.agl)&&Number.isFinite(attrs.str)?baseMove({agility:attrs.agl,strength:attrs.str,folk:String(h.folk||'').toLowerCase().includes('kuzhai')?'kuzhai':'human-sized'}):null;
- const load=resolveCombatantLoad({character:c,inventory:data.inventory});
+ const load=resolveCombatantLoad({character:c,inventory:activeRationInventory()});
  const combatSkills=[['Initiative',skillValueForJournal(c,['Initiative'])],['Awareness',skillValueForJournal(c,['Awareness'])],['Dodge',skillValueForJournal(c,['Dodge'])],['Shield',skillValueForJournal(c,['Shield'])],['Melee',skillValueForJournal(c,['Sword','Melee','Axe','Spear'])],['Missile',skillValueForJournal(c,['Archery','Missile','Bow'])],['Mounted',skillValueForJournal(c,['Riding'])],['Unarmed',skillValueForJournal(c,['Unarmed'])]];
  const encumbrance=[['Armour',load.armourENC??'—'],['Gear',load.gearENC??'—'],['Str Mod',load.strengthModifier??'—'],['Enc',load.modifiedENC??'—'],['Shock',state.shock??0]];
  const movement=[['Base',move?.move??'—'],['Effective',move?.move??'—'],['Half',move?Math.floor(move.move/2):'—'],['Full',move?.move??'—'],['Double',move?move.move*2:'—']];
@@ -2016,8 +2022,8 @@ function equippedHandsPanel(inv,character){
  return `<div class="equipment-summary equipped-hands" aria-label="Aktuální obsazení rukou">${handedness==='right'||handedness==='left'?show(mainRight?'off_hand':'main_hand','Levá ruka')+show(mainRight?'main_hand':'off_hand','Pravá ruka'):show('main_hand','Hlavní ruka – fyzická strana neurčena')+show('off_hand','Vedlejší ruka – fyzická strana neurčena')}</div>`;
 }
 function characterInventoryOverview(c,inv){
- const rows=projectInventoryRows(inv),totals=inventoryTotals(rows);
- const load=resolveCombatantLoad({character:c,inventory:data.inventory});
+ const rows=projectInventoryRows(projectCampaignRationInventory(inv,data.journal,campaignKey(data.campaignClock))),totals=inventoryTotals(rows);
+ const load=resolveCombatantLoad({character:c,inventory:activeRationInventory()});
  const number=x=>Number.isFinite(x)?String(x):'—';
  const cards=[['Předmětů',rows.length],['Zjištěná hodnota',totals.knownValue+' d'+(totals.unknownValue?` · ${totals.unknownValue} bez ceny`:'')],
   ['Zjištěná hmotnost',totals.knownWeightLb.toFixed(1)+' lb'+(totals.unknownWeight?` · ${totals.unknownWeight} bez váhy`:'')],
@@ -2034,13 +2040,13 @@ function characterInventoryOverview(c,inv){
 }
 function armourLoadoutPanel(inv,owner=null){
  const report=auditArmourLoadout(inv);
- const load=owner?resolveCombatantLoad({character:owner,inventory:data.inventory}):null;
+ const load=owner?resolveCombatantLoad({character:owner,inventory:activeRationInventory()}):null;
  const reorderPreview=load&&!load.bulkReady&&load.layeringFeasibility?.status!=='forbidden'?previewExistingArmourArrangement(inv):null;
  const rows=layerDisplayRows(report,inv,load).map(r=>`<tr class="arm-layer-row arm-layer-${r.status}"><th scope="row" title="${esc(r.names)}">${esc(r.location)} <span class="muted tiny">${esc(JOURNAL_ANATOMICAL_LOCATIONS.find(([code])=>code===r.location)?.[1]||r.locationName)}</span></th><td class="arm-layer-count ${r.status==='valid'?'':'arm-layer-alert'}" title="${esc(r.detail)}">${r.count}${r.status==='over-limit'?` <b>+${r.count-5}</b>`:''}</td><td>${r.protection.b}</td><td>${r.protection.e}</td><td>${r.protection.p}</td><td>${r.protection.f}</td><td class="arm-layer-explain">${r.status==='valid'?'—':esc(r.detail)}</td></tr>`).join('');
  return `<section class="panel wide"><h3>Worn Armour · Location Protection & Layers</h3><p class="muted tiny">Zobrazené B/E/P/F jsou součty z předmětů, nikoli automatické potvrzení pravidlové ochrany. Červeně je prokázané překročení počtu vrstev či nepřípustná materiálová kombinace, jantarově neznámé fyzické pořadí.</p>${rows?`<div class="catalog-scroll"><table class="catalog-spec arm-layer-table"><thead><tr><th>Location</th><th>Layers</th><th>${journalTerm('b')}</th><th>${journalTerm('e')}</th><th>${journalTerm('p')}</th><th>${journalTerm('f')}</th><th>Kontrola</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p>Žádná nasazená zbroj.</p>'}${reorderPreview?.ready?`<div class="actions"><button type="button" class="secondary" data-armour-autolayer="${esc(owner.id)}">Uspořádat zbroj do přípustných vrstev</button><p class="tiny muted">Aplikace navrhne a zapíše doložené pořadí, nikoli nová pravidla ani nový postih. Nemění počet či vlastnictví předmětů.</p></div>`:''}${report.skipped.length?`<p class="notice">U ${report.skipped.length} položek chybí úplná anatomická data; ochrana je jen částečný součet.</p>`:''}</section>`;
 }
 function combatantLoadPanel(c){
- const r=resolveCombatantLoad({character:c,inventory:data.inventory});
+ const r=resolveCombatantLoad({character:c,inventory:activeRationInventory()});
  const fmt=n=>Number.isFinite(n)?String(n):'—';
  const info=r.encReady?`<strong>Upravené ENC ${fmt(r.modifiedENC)}</strong> · Zbroj ${fmt(r.armourENC)} + nesená výbava ${fmt(r.gearENC)}; STR ${fmt(r.str)} (${r.strengthModifier>=0?'+':''}${fmt(r.strengthModifier)}); PF / období ${fmt(r.personalFatiguePerPeriod)}.`:
   Number.isFinite(r.knownMinimumENC)?`<strong>${r.prohibitedOutfit?'Aritmetické zatížení nepřípustné sestavy':'Známý rozsah upraveného ENC'}: ${fmt(r.knownMinimumENC)}${Number.isFinite(r.knownMaximumENC)&&r.knownMaximumENC!==r.knownMinimumENC?' až '+fmt(r.knownMaximumENC):''}</strong> (zbroj ${fmt(r.knownArmourENC)}${Number.isFinite(r.armourENCUpperBound)&&r.armourENCUpperBound!==r.knownArmourENC?' až '+fmt(r.armourENCUpperBound):''}, výbava ${fmt(r.gearENC)}). ${r.prohibitedOutfit?'Kombinace se podle HMK nesmí nosit; zobrazený součet ji nelegalizuje.':'Pokud není zakresleno pořadí, možné dodatečné ENC za vnější D/Q je uvedeno rozpětím.'}`:
@@ -3946,7 +3952,7 @@ function liveSpatialProfile(c){
  const size=['kuzhai','kûzhai'].includes(folk)?'kuzhai':['human','human-sized','human sized','human folk'].includes(folk)?'human-sized':null;
  if(!size)throw Error('Move podle HMK str.56 lze zatím odvodit pouze pro výslovně doložené Human-sized nebo Kûzhai; Folk nelze odhadnout');
  const original=baseMove({agility:a.agl,strength:a.str,folk:size});
- const load=resolveCombatantLoad({character:c,inventory:data.inventory});
+ const load=resolveCombatantLoad({character:c,inventory:activeRationInventory()});
  if(!load.encReady)throw Error('Neověřené ENC: '+load.issues.join('; '));
  const state=persistentStateOf(c),fatigue=combatFatigueTotals(state).total;
  const injury=projectInjuredMovement({state,round:combatClock.round,timelineId:combatInjuryTimelineId});
@@ -6271,7 +6277,7 @@ function hskSpecialRun(form){
  }
  if(kind==='fatigue'){
   if(routine.base==='PF'){
-   const load=resolveCombatantLoad({character:actor,inventory:data.inventory});
+   const load=resolveCombatantLoad({character:actor,inventory:activeRationInventory()});
    if(!load.encReady||!load.bulkReady||load.issues.length)throw Error('PF nelze stanovit: '+(load.issues.join('; ')||'chybí ověřené zatížení'));
    fatigue=load.personalFatiguePerPeriod;
   }else if(routine.base==='variable'){
@@ -6956,13 +6962,21 @@ document.addEventListener('submit',e=>{
   const allowed=new Set(calendarMemberIds(clock,data.characters).map(c=>c.id));
   if(!ids.length||ids.some(id=>!allowed.has(id))||new Set(ids).size!==ids.length)throw Error('Vyberte platné postavy současné kampaně');
   const enabled=f.get('policyAction')==='activate';
-  if(enabled)for(const actorId of ids)assertExclusiveForagingProven({inventory:data.inventory,actorId});
+  const inventoryMode=enabled&&f.get('sourceMode')==='inventory';
+  if(enabled&&f.get('foragingOnly')!=='yes')throw Error('Potvrďte úplnost dostupných zdrojů potravy a vody.');
+  if(enabled&&!inventoryMode)for(const actorId of ids)assertExclusiveForagingProven({inventory:activeRationInventory(),actorId});
+  const stocks=inventoryMode?ids.flatMap(actorId=>createFreshRationStocks({inventory:data.inventory,journal:data.journal,campaignId:campaignKey(clock),actorId,minute:clock.minute,freshConfirmed:f.get('freshRations')==='yes'})):[];
+  if(inventoryMode)for(const actorId of ids){
+   const old=rationStockBalances(data.journal,campaignKey(clock),actorId).filter(x=>x.remaining>0);
+   if(!stocks.some(x=>x.actorId===actorId)&&!old.length)throw Error('Postava nemá doložené fyzické dávky v této kampani.');
+  }
   const proofs=ids.map(actorId=>createNutritionPolicy({campaignId:campaignKey(clock),minute:clock.minute,actorId,
-   foodNeed:Number(f.get('foodNeed')),waterNeed:Number(f.get('waterNeed')),foragingOnly:f.get('foragingOnly')==='yes',enabled}));
-  if(mutate(()=>data.journal.push(...proofs.map(p=>({id:uuid(),characterId:p.actorId,calendarCampaignId:p.campaignId,
+   foodNeed:Number(f.get('foodNeed')),waterNeed:Number(f.get('waterNeed')),foragingOnly:enabled&&!inventoryMode,inventoryRations:inventoryMode,enabled}));
+  if(mutate(()=>{data.journal.push(...stocks.map(p=>({id:uuid(),characterId:p.actorId,calendarCampaignId:p.campaignId,campaignMinute:p.minute,createdAt:stamp(),title:'HMK · doložené fyzické příděly',body:`${p.quantity} ks ${p.name} · ${p.itemId}; čerstvost potvrzena GM; bez posunu času`,calendarInventoryRationStock:p})));
+   data.journal.push(...proofs.map(p=>({id:uuid(),characterId:p.actorId,calendarCampaignId:p.campaignId,
    campaignMinute:p.minute,createdAt:stamp(),title:'HMK · denní zásobovací režim',
-   body:p.enabled?`Od teď: ${p.foodNeed} jídlo, ${p.waterNeed} voda / 24 h, výhradně doložený Foraging. Hodiny beze změny.`:'GM pozastavil automatické denní zásobování; čas se nemění.',
-   calendarNutritionPolicy:p})))))notice='Zásobovací režim byl uložen; při aktivaci se první den zúčtuje až po 24h potvrzených GM.';
+   body:p.enabled?`Od teď: ${p.foodNeed} jídlo, ${p.waterNeed} voda / 24 h, ${p.inventoryRations?'čerstvé inventární dávky + Foraging':'výhradně Foraging'}. Hodiny beze změny.`:'GM pozastavil automatické denní zásobování; čas se nemění.',
+   calendarNutritionPolicy:p})));}))notice='Zásobovací režim a doložené fyzické zásoby byly uloženy; den se zúčtuje až po posunu GM.';
  }catch(err){alert('Režim výživy nebyl uložen: '+err.message)}
 },true);
 // Single atomic ration issue for several characters. No clock movement.
@@ -8593,8 +8607,8 @@ if(e.target.id==='shock-ml-form'){
   if(!defenderSpecial.ready){output.textContent='Obránce: '+defenderSpecial.reason;return;}
   if(persistentStateOf(attacker).posture?.prone)v.attackerProne='yes';
   if(persistentStateOf(target).posture?.prone)v.defenderProne='yes';
-  attackerLoad=resolveCombatantLoad({character:attacker,inventory:data.inventory,mounted:v.attackerMounted==='yes',bulkConfirmation:parsePrintedBulkConfirmation(v.attackerBulkZones)});
-  defenderLoad=resolveCombatantLoad({character:target,inventory:data.inventory,mounted:v.defenderMounted==='yes',bulkConfirmation:parsePrintedBulkConfirmation(v.defenderBulkZones)});
+  attackerLoad=resolveCombatantLoad({character:attacker,inventory:activeRationInventory(),mounted:v.attackerMounted==='yes',bulkConfirmation:parsePrintedBulkConfirmation(v.attackerBulkZones)});
+  defenderLoad=resolveCombatantLoad({character:target,inventory:activeRationInventory(),mounted:v.defenderMounted==='yes',bulkConfirmation:parsePrintedBulkConfirmation(v.defenderBulkZones)});
   if(!attackerLoad.ready||(v.defence!=='ignore'&&!defenderLoad.ready)){
    const failed=!attackerLoad.ready?attackerLoad:defenderLoad;
    output.textContent='ENC/Bulk postavy nelze použít do Melee: '+(failed.issues.join(' · ')||(!failed.encReady?'Neúplné ENC':'Bulk tištěného kompletu musí výslovně ověřit GM (none nebo zóny).'));
@@ -8797,7 +8811,7 @@ if(e.target.id==='shock-ml-form'){
  if(draft.ok&&weaponStrike)draft.weaponStrike={...weaponStrike,inventoryId:v.weaponInventoryId};
  if(draft.ok&&meleeGate)draft.attackDefence={...meleeGate,attackerId:v.attackerId,defenderId:originalDefenderId,actualStrikerId:actualStriker.id,actualTargetId:target.id};
  if(draft.ok){
-  const targetLoad=meleeGate?(target.id===v.attackerId?attackerLoad:defenderLoad):resolveCombatantLoad({character:target,inventory:data.inventory});
+  const targetLoad=meleeGate?(target.id===v.attackerId?attackerLoad:defenderLoad):resolveCombatantLoad({character:target,inventory:activeRationInventory()});
   const evidence=meleeGate?[attackerLoad,defenderLoad]:[targetLoad];
   draft.loadEvidence={source:'HMK pp112,117-118,122,170',mutatesCharacter:false,
    loadouts:evidence.map(r=>({characterId:r.characterId,encReady:r.encReady,bulkReady:r.bulkReady,mode:r.mode,
@@ -9127,7 +9141,7 @@ document.addEventListener('click',e=>{
  const preview=previewExistingArmourArrangement(current);
  if(!preview.ready)return alert(preview.reason);
  if(!preview.placements.length)return;
- const original=resolveCombatantLoad({character:character(id),inventory:data.inventory});
+ const original=resolveCombatantLoad({character:character(id),inventory:activeRationInventory()});
  if(original.layeringFeasibility?.status==='forbidden')return alert('Skutečně zakázané vrstvy nelze pouhým přeuspořádáním legalizovat.');
  if(!ask('Zapsat automaticky ověřené pořadí oblečených vrstev? Žádný předmět nebude odebrán ani přesunut.'))return;
  const done=mutate(()=>{
@@ -9136,7 +9150,7 @@ document.addEventListener('click',e=>{
    const p=targets.get(item.id);if(item.slot!=='worn')throw Error('Během rozhodnutí se změnilo oblečení');
    item.layerOrder=p.layerOrder;item.layerSlot=p.layerSlot;item.bulkExceptionZones=[...p.bulkExceptionZones];
   }
-  const verified=resolveCombatantLoad({character:character(id),inventory:data.inventory});
+  const verified=resolveCombatantLoad({character:character(id),inventory:activeRationInventory()});
   if(!verified.bulkReady||!verified.encReady||verified.layeringStatus==='violation')throw Error('Nové pořadí neprošlo pravidlovou kontrolou HMK');
  });
  if(done){selected=id;view='sheet';render();}
