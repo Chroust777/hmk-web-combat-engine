@@ -40,12 +40,13 @@ export function createHerbVialBinding({journal=[],inventory=[],campaignId,minute
  ok(minute<c.calendarHerbPotionComplete.expiryMinute,'Nelze plnit prošlý lektvar');
  ok(!vialBinding(journal,campaignId,completeId),'Tento lektvar už má fyzickou lahvičku');
  ok(!journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarHerbPotionAdminister?.completeId===completeId),'Podaný lektvar nelze plnit do lahvičky');
+ ok(!journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarHerbWeaponPaste?.completeId===completeId),'Nanesený Poison již nelze nalít zpět do nové lahvičky');
  const item=inventory.find(x=>x.id===vialId&&x.characterId===actorId);
  ok(item&&item.sourceItemId===PRINTED_VIAL&&item.snapshot?.properties?.weightLb===0.25&&item.quantity===1&&['carried','none'].includes(item.slot),'Je nutná samostatná skutečně nesená lahvička Vial, 4 oz (1 ks)');
  ok(!journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarHerbVialBinding?.vialId===vialId&&
    x.campaignMinute<=minute&&x.calendarHerbPotionComplete===undefined&&(()=>{
      const old=x.calendarHerbVialBinding,cp=journal.find(j=>j.id===old.completeId)?.calendarHerbPotionComplete;
-     return cp&&cp.expiryMinute>minute&&!journal.some(j=>j.calendarCampaignId===campaignId&&(j.calendarHerbPotionAdminister?.completeId===old.completeId||j.calendarHerbVialDiscard?.completeId===old.completeId));
+     return cp&&cp.expiryMinute>minute&&!journal.some(j=>j.calendarCampaignId===campaignId&&(j.calendarHerbPotionAdminister?.completeId===old.completeId||j.calendarHerbVialDiscard?.completeId===old.completeId||j.calendarHerbWeaponPaste?.completeId===old.completeId));
    })()),'Lahvička již obsahuje jiný účinný nepodaný lektvar');
  return {format:HERB_VIAL_FORMAT,campaignId,minute,actorId,completeId,vialId,printedCatalogId:PRINTED_VIAL,
   quantity:1,emptyVialWeightLb:0.25,initialSlot:item.slot,confirmedByGM:true,contentsWeight:'not-specified-by-HMK',sourcePages:[74,75,121]};
@@ -59,7 +60,7 @@ export function createHerbVialDiscard({journal=[],inventory=[],campaignId,minute
  const item=inventory.find(x=>x.id===state.vialId&&x.characterId===actorId);
  ok(item&&item.sourceItemId===PRINTED_VIAL&&item.snapshot?.properties?.weightLb===0.25&&item.quantity===1&&['carried','none'].includes(item.slot),'Chybí doložená fyzická lahvička');
  ok(!journal.some(x=>x.calendarCampaignId===campaignId&&
-   (x.calendarHerbPotionAdminister?.completeId===completeId||x.calendarHerbVialDiscard?.completeId===completeId)),
+   (x.calendarHerbPotionAdminister?.completeId===completeId||x.calendarHerbVialDiscard?.completeId===completeId||x.calendarHerbWeaponPaste?.completeId===completeId)),
    'Obsah již byl podán nebo odepsán');
  const c=journal.find(x=>x.id===completeId&&x.calendarCampaignId===campaignId)?.calendarHerbPotionComplete;
  ok(c&&minute>=c.minute&&minute<c.expiryMinute,'Odpis je určen pro dosud účinný fyzický lektvar');
@@ -91,7 +92,7 @@ export function assertActiveHerbVials(data){const clock=data.campaignClock;if(!c
  const key=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
  for(const row of data.journal){const p=row.calendarHerbVialBinding;if(!p||row.calendarCampaignId!==key)continue;
   const complete=data.journal.find(x=>x.id===p.completeId)?.calendarHerbPotionComplete;
-  if(!complete||clock.minute>=complete.expiryMinute||data.journal.some(x=>x.calendarCampaignId===key&&(x.calendarHerbPotionAdminister?.completeId===p.completeId||x.calendarHerbVialDiscard?.completeId===p.completeId)))continue;
+  if(!complete||clock.minute>=complete.expiryMinute||data.journal.some(x=>x.calendarCampaignId===key&&(x.calendarHerbPotionAdminister?.completeId===p.completeId||x.calendarHerbVialDiscard?.completeId===p.completeId||x.calendarHerbWeaponPaste?.completeId===p.completeId)))continue;
   const state=vialState(data.journal,key,p.completeId,clock.minute);
   const item=data.inventory.find(x=>x.id===p.vialId);
   ok(item&&item.sourceItemId===PRINTED_VIAL&&item.snapshot?.properties?.weightLb===0.25&&item.quantity===1&&item.characterId===state.ownerId&&item.slot===state.slot,
