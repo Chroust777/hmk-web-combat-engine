@@ -128,6 +128,7 @@ import {createHerbPotionAdministration,validateHerbAdministrationJournal,assertH
 import {PRINTED_VIAL,createHerbVialBinding,createHerbVialDiscard,vialBinding,vialState,validateHerbVialJournal,assertHerbVialAppendOnly,assertActiveHerbVials} from './src/integration/hmk-herbal-vial-ledger.js';
 import {applyConfirmedEmeticShock,pendingEmeticShocks,validateEmeticShockJournal,assertEmeticShockAppendOnly,requireEmeticRoundMayAdvance,requireEmeticGMTimeMayAdvance} from './src/integration/hmk-herbal-emetic-shock.js';
 import {pendingParalyticChecks,applyConfirmedParalyticEndurance,activeHerbalParalysis,validateParalyticEnduranceJournal,assertParalyticEnduranceAppendOnly,requireParalyticRoundMayAdvance,requireParalyticGMTimeMayAdvance} from './src/integration/hmk-herbal-paralytic.js';
+import {narcoticEvidence,narcoticMovement} from './src/integration/hmk-herbal-narcotic.js';
 import {pendingSoporificTests,pendingSoporificEffects,applyConfirmedSoporificEnd,applyConfirmedSoporificEffect,activeHerbalSoporific,validateSoporificJournal,assertSoporificAppendOnly,requireSoporificGMTimeMayAdvance,requireSoporificRoundMayAdvance} from './src/integration/hmk-herbal-soporific.js';
 import {curativeHealingEvidence} from './src/integration/hmk-herbal-healing-bridge.js';
 import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,validateNutritionJournal,assertNutritionJournalAppendOnly,nutritionRisk} from './src/integration/hmk-nutrition-days.js';
@@ -202,7 +203,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.401';
+const APP_VERSION='93.402';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -901,7 +902,7 @@ function campaignCalendarView(){
   ${ready&&Number.isSafeInteger(skill)?`<form data-herb-emetic-shock><input type="hidden" name="applicationId" value="${esc(t.applicationId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Skutečný Shock d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-emetic-roll-d100>⚄ Generovat d100</button><p class="hc-hint">Ověřený Shock ML ${skill}, bonus podaného Emetic −${t.source.calendarHerbPotionAdminister.bonus}.</p><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečný hod v splatném bojovém kole</label><button type="submit">Vyhodnotit původní Shock a zapsat trvalý stav</button></form>`:
   `<p class="hc-hint">${ready?'Nelze vyhodnotit bez existujícího Shock ML postavy.': 'Čeká na přesné bojové kolo původní osy ('+t.timelineId+'). GM nesmí termín přeskočit.'}</p>`}</div>`;
  }).join('')||'<p class="hc-hint">Žádný nový doložený Emetic Shock nyní nečeká v této bojové ose.</p>'}
- ${appliedPotions.slice(-15).map(j=>{const p=j.calendarHerbPotionAdminister,e=herbPotionEffectAt(p,clock.minute);return `<p class="hc-hint">${esc(p.herbType)} → ${esc(character(p.targetId)?.name||p.targetId)}${p.woundId?' · rána '+esc(p.woundId):''} · původní bonus ${p.bonus} · ${esc(e.status)}${e.status==='active'?' · nyní '+e.bonus:''} · ${p.herbType==='curative'?'bonus se automaticky načte při příštím Healing/Infection hodu dané rány':p.herbType==='coagulant'?'bonus se ověří při Blood Loss Strength d100, pouze při souhlasu bojových kol s minutou GM':p.herbType==='antivenin'?'bonus se ověří u Poison Course '+esc(p.poisonSourceId||'(staré nepřiřazené podání)')+' až po nástupu účinku':p.herbType==='soporific'?'END SV a následné Weariness/INC/UNC se vyhodnocují výše':'další hod zůstává v příslušném původním modulu'}; důkaz ${esc(j.id)}</p>`}).join('')}
+ ${appliedPotions.slice(-15).map(j=>{const p=j.calendarHerbPotionAdminister,e=herbPotionEffectAt(p,clock.minute);return `<p class="hc-hint">${esc(p.herbType)} → ${esc(character(p.targetId)?.name||p.targetId)}${p.woundId?' · rána '+esc(p.woundId):''} · původní bonus ${p.bonus} · ${esc(e.status)}${e.status==='active'?' · nyní '+e.bonus:''} · ${p.herbType==='curative'?'bonus se automaticky načte při příštím Healing/Infection hodu dané rány':p.herbType==='coagulant'?'bonus se ověří při Blood Loss Strength d100, pouze při souhlasu bojových kol s minutou GM':p.herbType==='antivenin'?'bonus se ověří u Poison Course '+esc(p.poisonSourceId||'(staré nepřiřazené podání)')+' až po nástupu účinku':p.herbType==='soporific'?'END SV a následné Weariness/INC/UNC se vyhodnocují výše':p.herbType==='narcotic'?'aktuální Shock bonus +'+e.bonus+', Move/AGL/AGL dovednosti postih −'+(e.bonus/2)+' (časové stupně po 4 h); aplikováno ve vedeném Shock Recovery a prostorovém Move/Stumble':'další hod zůstává v příslušném původním modulu'}; důkaz ${esc(j.id)}</p>`}).join('')}
 
  <p class="hc-hint">Podání všech 12 druhů je doložitelné. Curative ovlivňuje Healing/Infection, Coagulant Blood Loss a doložený Antivenin navazující Poison Course. Great Antivenin v minutě podání vyžaduje ověření bojového kola. Soporific vyžaduje END SV a GM potvrzené termíny Weariness/INC/UNC; léčebné zotavení z účinku zatím není automatizováno. Ostatní dosud nepřipojené účinky nejsou automaticky vyhodnoceny. Hmotnost bylinného obsahu není HMK doložena. Nedokončeno: mundánní receptury a Alchemy 267–268.</p>
  </details></section>`;
@@ -4134,20 +4135,25 @@ function liveSpatialProfile(c){
  const state=persistentStateOf(c),fatigue=combatFatigueTotals(state).total;
  const injury=projectInjuredMovement({state,round:combatClock.round,timelineId:combatInjuryTimelineId});
  if(!injury.ready||injury.blocked)throw Error(`Pohyb není použitelný: ${injury.reason||injury.unusableWoundIds?.join(', ')}`);
- const effectiveMove=original.move-load.modifiedENC-fatigue-injury.impairment;
- if(!Number.isSafeInteger(effectiveMove))throw Error('Neplatný efektivní Move');
+ const unmedicatedMove=original.move-load.modifiedENC-fatigue-injury.impairment;
+ if(!Number.isSafeInteger(unmedicatedMove))throw Error('Neplatný efektivní Move');
+ const narcotic=narcoticEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),
+  minute:data.campaignClock?.minute??0,targetId:c.id});
+ const medicated=narcoticMovement({baseMove:Math.max(0,unmedicatedMove),evidence:narcotic});
+ const effectiveMove=medicated.effectiveMove;
  // Dodge is a separate skill. Do not pretend that it equals Initiative or AGL.
  const dodge=(c.hmk?.skills||[]).filter(s=>String(s.name||'').trim().toLowerCase()==='dodge');
  const dodgeTrauma=projectLiveInjuries({state,round:combatClock.round,test:'dodge',usedArms:[],timelineId:combatInjuryTimelineId});
  const dodgeIndex=dodge.length===1&&Number.isSafeInteger(dodge[0].ml)&&dodgeTrauma.ready&&!dodgeTrauma.unusable?
   Math.floor(Math.min(95,Math.max(5,dodge[0].ml-load.modifiedENC-fatigue+dodgeTrauma.modifier))/10):null;
  return {effectiveMove:Math.max(0,effectiveMove),dodgeIndex,baseMove:original.move,
-  fatigue,encumbrance:load.modifiedENC,impairment:injury.impairment};
+  fatigue,encumbrance:load.modifiedENC,impairment:injury.impairment,narcotic};
 }
 function spatialLiveWitness(actorId){
  // Any changed character/weapon/armour/position invalidates the projected route.
  // In particular, changing STR, ENC or a readied weapon may change movement or EZ.
  return JSON.stringify({sequence:liveInitiativeSequence(),states:combatSequenceStates(),
+  narcotic:narcoticEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),minute:data.campaignClock?.minute??0,targetId:actorId}),
   characters:selectedEncounterCharacters().map(c=>structuredClone(c)).sort((a,b)=>a.id.localeCompare(b.id)),
   inventory:data.inventory.filter(i=>encounterSelection.has(i.characterId)).map(i=>structuredClone(i)).sort((a,b)=>a.id.localeCompare(b.id))});
 }
@@ -4230,7 +4236,7 @@ function submitLiveSpatialDie(s,value){
  if(skill&&!(skill.length===1&&Number.isSafeInteger(skill[0].ml)&&skill[0].ml>=0&&skill[0].ml<=200))
   throw Error('Acrobatics: chybí jediná ověřená ML; zvolte Agility, nebo opravte list postavy');
  const raw=s.stumbleTechnique==='acrobatics'?skill[0].ml:a.agl*5;
- const eml=raw-s.profile.encumbrance-s.profile.fatigue+injury.modifier-(s.projection?.blindnessStumble?40:0);
+ const eml=raw-s.profile.encumbrance-s.profile.fatigue+injury.modifier-(s.projection?.blindnessStumble?40:0)-(s.profile.narcotic?.agilityPenalty??0);
  const sl=successLevel(Number(value),eml);
  const causes=s.projection?.stumbleCauses??[s.projection?.stumbleCause];
  const rolls=[...(s.stumbleRolls??[]),{cause:causes[(s.stumbleRolls??[]).length],roll:Number(value),eml,
@@ -8391,7 +8397,10 @@ document.addEventListener('submit',e=>{
   }else{
    c=character(v.characterId);if(!c||!encounterSelection.has(c.id))throw Error('Postava není účastníkem střetnutí');
    if(f.id==='combat-recovery-persistent-form'&&combatInitiativeSequence&&['STN','INC'].includes(persistentStateOf(c).shock)&&v.turnEnded==='yes'&&currentEncounterActor(liveInitiativeSequence())!==c.id)throw Error('Shock na konci tahu lze při Initiative potvrdit jen pro právě jednající postavu');
-   if(f.id==='combat-recovery-persistent-form')transition=applyConfirmedShockRecovery({state:persistentStateOf(c),round,eventId,sl:v.sl,timingConfirmed:v.timingConfirmed==='yes',characterId:c.id,actorId:combatClock.actorId,turnEnded:v.turnEnded==='yes',timelineId:combatInjuryTimelineId,elapsedMinutesSinceOriginal:v.elapsedMinutes===''?null:Number(v.elapsedMinutes),comaLocationShock:v.comaLocationShock===''?null:Number(v.comaLocationShock),comaInjuryLevel:v.comaInjuryLevel===''?null:Number(v.comaInjuryLevel),initialComaD10:v.initialComaD10===''?null:Number(v.initialComaD10),shockML:Number(v.shockML),roll:Number(v.roll)});
+   if(f.id==='combat-recovery-persistent-form'){
+    const narcotic=narcoticEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),
+      minute:data.campaignClock?.minute??0,targetId:c.id});
+    transition=applyConfirmedShockRecovery({state:persistentStateOf(c),round,eventId,sl:v.sl,timingConfirmed:v.timingConfirmed==='yes',characterId:c.id,actorId:combatClock.actorId,turnEnded:v.turnEnded==='yes',timelineId:combatInjuryTimelineId,elapsedMinutesSinceOriginal:v.elapsedMinutes===''?null:Number(v.elapsedMinutes),comaLocationShock:v.comaLocationShock===''?null:Number(v.comaLocationShock),comaInjuryLevel:v.comaInjuryLevel===''?null:Number(v.comaInjuryLevel),initialComaD10:v.initialComaD10===''?null:Number(v.initialComaD10),shockML:Number(v.shockML),roll:Number(v.roll),herbalBonus:narcotic.bonus,herbalProof:narcotic});}
    else if(f.id==='combat-extended-course-form'){confirmCalendarElapsed(c.id,'extended-shock',Number(v.elapsedHoursSinceOnset)*60);transition=applyExtendedShockCourse({state:persistentStateOf(c),round,eventId,healingBase:Number(v.healingBase),roll:Number(v.roll),physicianStars:Number(v.physicianStars),arcaneBonus:Number(v.arcaneBonus),elapsedHoursSinceOnset:Number(v.elapsedHoursSinceOnset),gmConfirmed:v.gmConfirmed==='yes'});}
    else if(f.id==='combat-coma-course-form'){confirmCalendarElapsed(c.id,'coma',(persistentStateOf(c).coma?.elapsedDays+Number(v.daysElapsed))*DAY_MINUTES);transition=applyComaCourse({state:persistentStateOf(c),round,eventId,healingBase:Number(v.healingBase),roll:Number(v.roll),periodD10:Number(v.periodD10),daysElapsed:Number(v.daysElapsed),restfulShelter:v.restfulShelter==='yes',arcaneBonus:Number(v.arcaneBonus),gmConfirmed:v.gmConfirmed==='yes'});}
    else transition=applyConfirmedFatigue({state:persistentStateOf(c),round,eventId,kind:v.kind,delta:Number(v.delta)});
