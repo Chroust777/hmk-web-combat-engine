@@ -135,7 +135,7 @@ import {pendingParalyticChecks,applyConfirmedParalyticEndurance,activeHerbalPara
 import {narcoticEvidence,narcoticMovement} from './src/integration/hmk-herbal-narcotic.js';
 import {stimulantEvidence,stimulantInitiativeValues,verifyStimulantInitiativeSnapshot,validateStimulantInitiativeJournal,assertStimulantInitiativeAppendOnly,validateStimulantEncounterCheckpoint} from './src/integration/hmk-herbal-stimulant.js';
 import {herbalCharmSkillModifier,validateHerbalCharmSkillJournal} from './src/integration/hmk-herbal-charm.js';
-import {pendingHallucinogenicDreams,pendingHallucinogenicTrances,createHallucinogenicLucidDream,createHallucinogenicTranceStart,createHallucinogenicVeil,createHallucinogenicTranceAbort,requireHallucinogenicGMTimeMayAdvance,validateHallucinogenicJournal,assertHallucinogenicAppendOnly} from './src/integration/hmk-herbal-hallucinogenic.js';
+import {pendingHallucinogenicDreams,pendingHallucinogenicTrances,pendingHallucinogenicSaviris,pendingHallucinogenicTranscendence,createHallucinogenicSaviris,createHallucinogenicTranscendence,createHallucinogenicLucidDream,createHallucinogenicTranceStart,createHallucinogenicVeil,createHallucinogenicTranceAbort,requireHallucinogenicGMTimeMayAdvance,validateHallucinogenicJournal,assertHallucinogenicAppendOnly} from './src/integration/hmk-herbal-hallucinogenic.js';
 import {pendingSoporificTests,pendingSoporificEffects,applyConfirmedSoporificEnd,applyConfirmedSoporificEffect,activeHerbalSoporific,validateSoporificJournal,assertSoporificAppendOnly,requireSoporificGMTimeMayAdvance,requireSoporificRoundMayAdvance} from './src/integration/hmk-herbal-soporific.js';
 import {curativeHealingEvidence} from './src/integration/hmk-herbal-healing-bridge.js';
 import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,validateNutritionJournal,assertNutritionJournalAppendOnly,nutritionRisk} from './src/integration/hmk-nutrition-days.js';
@@ -210,7 +210,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.409';
+const APP_VERSION='93.410';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -820,6 +820,8 @@ function campaignCalendarView(){
  const unresolvedEmetics=pendingEmeticShocks(data.journal,campaignKey(clock),combatInjuryTimelineId);
  const pendingHallDreams=pendingHallucinogenicDreams(data.journal,campaignKey(clock));
  const pendingHallTrances=pendingHallucinogenicTrances(data.journal,campaignKey(clock));
+ const pendingSaviris=pendingHallucinogenicSaviris(data.journal,campaignKey(clock));
+ const pendingTranscendence=pendingHallucinogenicTranscendence(data.journal,campaignKey(clock));
  const unresolvedGreatPoison=pendingGreatPoisons(data.journal,campaignKey(clock));
  const armedWeaponPoisons=pendingWeaponPoisonPastes(data.journal,campaignKey(clock));
  const unresolvedParalytics=pendingParalyticChecks(data.journal,campaignKey(clock));
@@ -934,13 +936,15 @@ function campaignCalendarView(){
  return `<div class="hc-event"><strong>${esc(target?.name||t.targetId)} · HR4 · splatné kolo ${t.dueRound}</strong> · skutečné požití ${esc(t.applicationId)} · (15 − SV) = ${t.dueRound-t.originRound} kol. ${ready?`<form data-herb-great-poison-onset><input type="hidden" name="applicationId" value="${esc(t.applicationId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Poison Course interval (GM 10–60 minut)<input name="periodMinutes" type="number" min="10" max="60" required></label><div class="field-grid">${[1,2,3,4].map(i=>`<label>Skutečný symptom d10 #${i}<input type="number" name="symptom${i}" min="1" max="10" required></label>`).join('')}</div><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje splatné kolo, požití a standardní smrtelný HR0 průběh</label><button type="submit">Založit Poison Course a vyhodnotit nástup (bez dalšího hodu)</button></form>`:'<p class="hc-hint">Čeká na přesné kolo původní osy. Nelze přeskočit, převést na minuty ani ukončit Initiative před vyřešením.</p>'}</div>`;
  }).join('')||'<p class="hc-hint">Žádné nové, bojově doložené požití Great Poison nečeká.</p>'}
 
- <h4>Hallucinogenic · Lucid Dream a Trance (HMK 75, 291–292)</h4>
- <p class="hc-hint">Hallucinogenic po 10 minutách vyžaduje skutečný d20 proti tištěné tabulce Aura. Případný počet kol snu je omezen Will Indexem; Saviris a Reembodiment jsou samostatné následky, nikoli automaticky vyřešené hody. Pokud GM doloží podání během již probíhající Trance, platí čas 15 − Herblore SV minut pro Lift the Veil a doložený bonus k budoucímu Transcendence Roll. Úspěch astrální cesty se sám nepředpokládá. Starší podání bez časového důkazu neblokují kalendář.</p>
+ <h4>Hallucinogenic · Lucid Dream, Sâvirìs a Transcendence (HMK 75, 291–292)</h4>
+ <p class="hc-hint">Hallucinogenic po 10 minutách vyžaduje d20 proti tištěné Aura tabulce. U nově doloženého lucidního snu následuje samostatný Sâvirìs d20 před prvním kolem. Během nepřerušené Trance nastává termín 15 − SV minut; po něm se doloží skutečný Transcendence d100 se současnou Fatigue. CS vyžaduje samostatný d3. CF vyžaduje následný Will test a reembodiment zůstává oddělen. Starší doklady se zpětně nepřepočítávají.</p>
  ${appliedPotions.filter(j=>j.calendarHerbPotionAdminister.herbType==='hallucinogenic'&&j.calendarHerbPotionAdminister.hallucinogenicTracked===true&&j.campaignMinute===clock.minute&&
   !data.journal.some(x=>x.calendarHerbHallucinogenicTranceStart?.applicationId===j.id)&&!data.journal.some(x=>x.calendarHerbLucidDream?.applicationId===j.id)).map(j=>{const a=j.calendarHerbPotionAdminister,who=character(a.targetId),ml=who?skillValueForJournal(who,['Trance']):null;return `<form data-hallucinogenic-trance-start class="hc-event"><strong>Trance při podání · ${esc(who?.name||a.targetId)} · ${esc(j.id)}</strong><input type="hidden" name="applicationId" value="${esc(j.id)}"><input type="hidden" name="targetId" value="${esc(a.targetId)}"><p class="hc-hint">Termín 15 − SV = ${15-a.sv} minut; přidaný bonus Transcendence +${a.bonus}. ${15-a.sv<=0?'Nekladný interval – vyžaduje rozhodnutí GM, automatická větev nedostupná.':''}</p><label class="hc-check"><input type="checkbox" name="conscious" required> GM potvrzuje vědomí a skutečnou Trance již při podání</label><label class="hc-check"><input type="checkbox" name="uninterrupted" required> GM potvrzuje zahájení nepřerušené koncentrace</label><button type="submit" ${Number.isInteger(ml)&&ml>0&&15-a.sv>0?'':'disabled'}>Doložit zahájení Trance bez posunu času</button></form>`;}).join('')}
  ${pendingHallDreams.map(t=>{const who=character(t.targetId),aura=who?.hmk?.attributes?.aur;return `<div class="hc-event"><strong>Lucid Dream d20 · ${esc(who?.name||t.targetId)}</strong> · termín ${esc(displayCampaignMinute(t.dueMinute))}, podání ${esc(t.applicationId)}.${clock.minute===t.dueMinute?`<form data-hallucinogenic-dream><input type="hidden" name="applicationId" value="${esc(t.applicationId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Aura (ověřená atributová hodnota)<input name="aura" type="number" min="1" max="100" required value="${Number.isInteger(aura)?aura:''}"></label><label>Will Index (ověřený GM)<input name="willIndex" type="number" min="0" max="100" required></label><label>Skutečný d20<input name="d20" type="number" min="1" max="20" required></label><button type="button" data-hallucinogenic-d20>⚄ Generovat d20</button><label class="hc-check"><input name="gmConfirmed" type="checkbox" required> GM potvrzuje atributy a skutečný d20, nevyhodnocuje následnou Saviris/Reembodiment</label><button type="submit">Zapsat Lucid Dream check</button></form>`:'<p class="hc-hint">GM musí nejdříve dosáhnout přesně splatné minuty. Nelze ji přeskočit.</p>'}</div>`;}).join('')}
- ${pendingHallTrances.map(t=>`<div class="hc-event"><strong>Trance / Lift the Veil · ${esc(character(t.targetId)?.name||t.targetId)}</strong> · termín ${esc(displayCampaignMinute(t.dueMinute))}. ${clock.minute===t.dueMinute?`<form data-hallucinogenic-veil><input type="hidden" name="startId" value="${esc(t.startId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label class="hc-check"><input name="uninterrupted" type="checkbox" required> GM potvrzuje nepřerušenou koncentraci až do tohoto okamžiku</label><label class="hc-check"><input name="gmConfirmed" type="checkbox" required> GM potvrzuje Lift the Veil; vlastní Transcendence Roll a jeho následky jsou stále otevřené</label><button type="submit">Zaznamenat splatný Lift the Veil</button></form>`:'<p class="hc-hint">Čeká na přesnou minutu. Nevyhodnocuje Transcendence.</p>'}<form data-hallucinogenic-trance-abort><input type="hidden" name="startId" value="${esc(t.startId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Důvod přerušení<input name="reason" minlength="3" maxlength="400" required></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje přerušení Trance bez Lift the Veil</label><button type="submit" ${clock.minute>t.dueMinute?'disabled':''}>Přerušit Trance bez účinku</button></form></div>`).join('')}
- ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&(j.calendarHerbLucidDream||j.calendarHerbHallucinogenicVeil||j.calendarHerbHallucinogenicTranceAbort)).slice(-12).map(j=>{const d=j.calendarHerbLucidDream,v=j.calendarHerbHallucinogenicVeil,ab=j.calendarHerbHallucinogenicTranceAbort;return `<p class="hc-hint">${ab?'Trance přerušena: '+esc(ab.reason)+'. Bez astrálního účinku.':d?'Lucid Dream d20 '+d.d20+' / Aura '+d.aura+' → '+d.dreamRounds+' kol, '+(d.lucid?'Saviris a Reembodiment dosud nezapsány':'bez lucidního snu'):'Lift the Veil; Transcendence bonus +'+v.transcendenceBonus+', skutečný Trance Roll dosud otevřen'} · důkaz ${esc(j.id)}</p>`;}).join('')}
+ ${pendingHallTrances.map(t=>`<div class="hc-event"><strong>Trance / Lift the Veil · ${esc(character(t.targetId)?.name||t.targetId)}</strong> · termín ${esc(displayCampaignMinute(t.dueMinute))}. ${clock.minute===t.dueMinute?`<form data-hallucinogenic-veil><input type="hidden" name="startId" value="${esc(t.startId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label class="hc-check"><input name="uninterrupted" type="checkbox" required> GM potvrzuje nepřerušenou koncentraci až do tohoto okamžiku</label><label class="hc-check"><input name="gmConfirmed" type="checkbox" required> GM potvrzuje Lift the Veil; vlastní Transcendence d100 bude následovat v této minutě</label><button type="submit">Zaznamenat splatný Lift the Veil</button></form>`:'<p class="hc-hint">Čeká na přesnou minutu. Nevyhodnocuje Transcendence.</p>'}<form data-hallucinogenic-trance-abort><input type="hidden" name="startId" value="${esc(t.startId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Důvod přerušení<input name="reason" minlength="3" maxlength="400" required></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje přerušení Trance bez Lift the Veil</label><button type="submit" ${clock.minute>t.dueMinute?'disabled':''}>Přerušit Trance bez účinku</button></form></div>`).join('')}
+ ${pendingSaviris.map(t=>`<div class="hc-event"><strong>Sâvirìs · ${esc(character(t.targetId)?.name||t.targetId)}</strong> · před prvním kolem Lucid Dream (${t.dreamRounds} kol). ${clock.minute===t.dueMinute?`<form data-hallucinogenic-saviris><input type="hidden" name="dreamId" value="${esc(t.dreamId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Skutečný Sâvirìs d20<input name="d20" type="number" min="1" max="20" required></label><button type="button" data-hallucinogenic-d20>⚄ Generovat d20</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečný d20. Případné Dream Binding zůstává zvláštním pravidlovým následkem.</label><button type="submit">Vyhodnotit Sâvirìs · bez posunu času</button></form>`:'<p class="hc-hint">Vraťte se do správné minuty; další čas nesmí přeskočit d20.</p>'}</div>`).join('')}
+ ${pendingTranscendence.map(t=>`<div class="hc-event"><strong>Transcendence · ${esc(character(t.targetId)?.name||t.targetId)}</strong> · bonus +${t.bonus} · termín ${esc(displayCampaignMinute(t.dueMinute))}. ${clock.minute===t.dueMinute?`<form data-hallucinogenic-transcendence><input type="hidden" name="veilId" value="${esc(t.veilId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>GM potvrzený celkový postih Fatigue<input type="number" name="fatiguePenalty" min="0" max="300" required></label><label>Skutečný Trance d100<input type="number" name="d100" min="1" max="100" required></label><button type="button" data-hallucinogenic-d100>⚄ Generovat d100</button><label>Skutečný d3 jen při CS (jinak nechat prázdné)<input type="number" name="bonusD3" min="1" max="3"></label><button type="button" data-hallucinogenic-d3>⚄ Generovat d3</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM ověřil aktuální Fatigue, Trance ML a skutečné kostky. Vlastní Spirit actions a Reembodiment nejsou touto událostí vyřešeny.</label><button type="submit">Vyhodnotit Transcendence d100</button></form>`:'<p class="hc-hint">Čeká na přesnou minutu, nelze přeskočit.</p>'}</div>`).join('')}
+ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&(j.calendarHerbLucidDream||j.calendarHerbHallucinogenicVeil||j.calendarHerbHallucinogenicTranceAbort||j.calendarHerbSaviris||j.calendarHerbTranscendence)).slice(-12).map(j=>{const d=j.calendarHerbLucidDream,v=j.calendarHerbHallucinogenicVeil,ab=j.calendarHerbHallucinogenicTranceAbort,sv=j.calendarHerbSaviris,tr=j.calendarHerbTranscendence;return `<p class="hc-hint">${sv?'Sâvirìs d20 '+sv.d20+' → '+(sv.bound?'potenciální Dream Binding, GM další pravidla':'bez vazby'):tr?'Transcendence d100 '+tr.d100+' / EML '+tr.rawEML+' → '+tr.sl+(tr.bonusSpiritRounds?' +'+tr.bonusSpiritRounds+' kol':'')+'. '+(tr.astralJourneyEligible?'Cesta možná; Reembodiment otevřen':tr.requiresWillTest?'Je nutný Will test':'Bez astrální cesty'):ab?'Trance přerušena: '+esc(ab.reason)+'. Bez astrálního účinku.':d?'Lucid Dream d20 '+d.d20+' / Aura '+d.aura+' → '+d.dreamRounds+' kol, '+(d.lucid?'Saviris a Reembodiment dosud nezapsány':'bez lucidního snu'):'Lift the Veil; Transcendence bonus +'+v.transcendenceBonus+', skutečný Trance Roll dosud otevřen'} · důkaz ${esc(j.id)}</p>`;}).join('')}
  <h4>Emetic · povinné Shock Rolls (HMK 75)</h4>
  ${unresolvedEmetics.map(t=>{const patient=character(t.targetId),skill=patient?skillValueForJournal(patient,['Shock']):null;
   const ready=!!combatInitiativeSequence&&combatInitiativeSequence.timelineId===t.timelineId&&combatInitiativeSequence.round===t.dueRound;
@@ -7325,7 +7329,7 @@ document.addEventListener('submit',e=>{
    if(aura!==who.hmk?.attributes?.aur)throw Error('Aura nesouhlasí s ověřenou postavou');
    proof=createHallucinogenicLucidDream({journal,campaignId,applicationId:String(fd.get('applicationId')),minute,targetId,aura,
     willIndex:Number(fd.get('willIndex')),d20,dieOrigin:f.elements.namedItem('d20').dataset.herbGenerated===String(d20)?'cryptographic-software-die':'manual',
-    gmConfirmed:fd.get('gmConfirmed')==='on'});
+    gmConfirmed:fd.get('gmConfirmed')==='on',savirisTracked:true});
    type='calendarHerbLucidDream';title='HMK 75/292 · Hallucinogenic Lucid Dream';
    body='Skutečný d20 '+d20+', Aura '+aura+'; Lucid Dream '+proof.dreamRounds+' bojových kol. Saviris a Reembodiment zůstávají samostatnými hody.';
   }else if(f.matches('[data-hallucinogenic-trance-start]')){
@@ -7337,7 +7341,7 @@ document.addEventListener('submit',e=>{
    body='Nepřerušená Trance zahájena; Lift the Veil splatné '+proof.dueMinute+'; bonus k budoucímu Transcendence '+proof.transcendenceBonus+'.';
   }else if(f.matches('[data-hallucinogenic-veil]')){
    proof=createHallucinogenicVeil({journal,campaignId,startId:String(fd.get('startId')),minute,targetId,
-    concentrationUninterrupted:fd.get('uninterrupted')==='on',gmConfirmed:fd.get('gmConfirmed')==='on'});
+    concentrationUninterrupted:fd.get('uninterrupted')==='on',gmConfirmed:fd.get('gmConfirmed')==='on',transcendenceTracked:true});
    type='calendarHerbHallucinogenicVeil';title='HMK 75/291 · Hallucinogenic Lift the Veil';
    body='GM doložil nepřerušenou Trance; bonus Transcendence '+proof.transcendenceBonus+'; výsledek Transcendence a astrální následky nejsou vyhodnoceny.';
   }else{
@@ -7349,6 +7353,42 @@ document.addEventListener('submit',e=>{
    createdAt:stamp(),title,body,[type]:proof};
   if(mutate(()=>data.journal.push(entry))){notice=title+' · GM čas zůstal beze změny';render();}
  }catch(err){alert('Hallucinogenic nebyl uložen: '+err.message)}
+},true);
+
+document.addEventListener('click',e=>{const b=e.target.closest?.('[data-hallucinogenic-d100],[data-hallucinogenic-d3]');if(!b)return;
+ const die=b.matches('[data-hallucinogenic-d3]')?3:100,key=die===3?'bonusD3':'d100',field=b.closest('form')?.elements.namedItem(key);
+ if(field){field.value=String(secureAutoDie(die));field.dataset.herbGenerated=field.value;}
+},true);
+document.addEventListener('input',e=>{if(e.target?.matches?.('[data-hallucinogenic-saviris] input[name="d20"],[data-hallucinogenic-transcendence] input[name="d100"],[data-hallucinogenic-transcendence] input[name="bonusD3"]')&&e.target.dataset.herbGenerated!==e.target.value)delete e.target.dataset.herbGenerated;},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-hallucinogenic-saviris],[data-hallucinogenic-transcendence]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const clock=data.campaignClock;if(!clock)throw Error('Chybí GM kalendář');
+  const fd=new FormData(f),campaignId=campaignKey(clock),minute=clock.minute,targetId=String(fd.get('targetId')||'');
+  const who=character(targetId);if(!who||!calendarMemberIds(clock,data.characters).some(c=>c.id===targetId))throw Error('Postava není v této kampani');
+  let proof,type,title,body;
+  if(f.matches('[data-hallucinogenic-saviris]')){
+   const x=f.elements.namedItem('d20'),d20=Number(fd.get('d20'));
+   proof=createHallucinogenicSaviris({journal:data.journal,campaignId,dreamId:String(fd.get('dreamId')),targetId,minute,d20,
+    dieOrigin:x.dataset.herbGenerated===String(d20)?'cryptographic-software-die':'manual',gmConfirmed:fd.get('gmConfirmed')==='on'});
+   type='calendarHerbSaviris';title='HMK 292 · Sâvirìs d20';body='Sâvirìs d20 '+d20+' proti '+proof.dreamRounds+' kolům → '+(proof.bound?'možná vazba Aura Elemental, zvláštní Dream Binding zůstává otevřené.':'žádná vazba.')+' GM čas beze změny.';
+  }else{
+   const veilId=String(fd.get('veilId')),row=data.journal.find(j=>j.id===veilId),start=data.journal.find(j=>j.id===row?.calendarHerbHallucinogenicVeil?.startId);
+   const ml=start?.calendarHerbHallucinogenicTranceStart?.tranceSkillML;
+   const d100=Number(fd.get('d100')),d3raw=String(fd.get('bonusD3')||'').trim(),d3=d3raw?Number(d3raw):null;
+   proof=createHallucinogenicTranscendence({journal:data.journal,campaignId,veilId,minute,targetId,tranceML:ml,
+    fatiguePenalty:Number(fd.get('fatiguePenalty')),d100,bonusD3:d3,
+    dieOrigin:f.elements.namedItem('d100').dataset.herbGenerated===String(d100)?'cryptographic-software-die':'manual',
+    bonusDieOrigin:d3===null?null:f.elements.namedItem('bonusD3').dataset.herbGenerated===String(d3)?'cryptographic-software-die':'manual',
+    gmConfirmed:fd.get('gmConfirmed')==='on'});
+   type='calendarHerbTranscendence';title='HMK 291 · Transcendence d100';
+   body='Trance '+ml+' − Fatigue '+proof.fatiguePenalty+' + bylinný bonus '+proof.herbalBonus+' = EML '+proof.rawEML+'; d100 '+d100+' → '+proof.sl+'. '+(proof.astralJourneyEligible?'Přechod k astrální cestě, Spirit actions a Reembodiment zůstávají otevřené.':proof.requiresWillTest?'Následuje samostatný Will test; zdravotní následek není automaticky vytvořen.':'Bez astrálního přechodu; případný opakovaný pokus rozhodne GM.');
+  }
+  const entry={id:uuid(),characterId:targetId,calendarCampaignId:campaignId,campaignMinute:minute,
+   createdAt:stamp(),title,body,[type]:proof};
+  if(mutate(()=>data.journal.push(entry))){notice=title+' · GM čas nezměněn';render();}
+ }catch(err){alert('Astrální důkaz nebyl uložen: '+err.message)}
 },true);
 document.addEventListener('click',e=>{const b=e.target.closest?.('[data-paralytic-roll-d100]');if(!b)return;const x=b.closest('form')?.elements.namedItem('d100');if(x){x.value=String(secureAutoDie(100));x.dataset.herbGenerated=x.value;}},true);
 document.addEventListener('input',e=>{if(e.target?.matches?.('[data-herb-paralytic-endurance] input[name="d100"]')&&e.target.dataset.herbGenerated!==e.target.value)delete e.target.dataset.herbGenerated;},true);
