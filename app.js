@@ -134,6 +134,7 @@ import {applyConfirmedEmeticShock,pendingEmeticShocks,validateEmeticShockJournal
 import {pendingParalyticChecks,applyConfirmedParalyticEndurance,activeHerbalParalysis,validateParalyticEnduranceJournal,assertParalyticEnduranceAppendOnly,requireParalyticRoundMayAdvance,requireParalyticGMTimeMayAdvance} from './src/integration/hmk-herbal-paralytic.js';
 import {narcoticEvidence,narcoticMovement} from './src/integration/hmk-herbal-narcotic.js';
 import {stimulantEvidence,stimulantInitiativeValues,verifyStimulantInitiativeSnapshot,validateStimulantInitiativeJournal,assertStimulantInitiativeAppendOnly,validateStimulantEncounterCheckpoint} from './src/integration/hmk-herbal-stimulant.js';
+import {herbalCharmSkillModifier,validateHerbalCharmSkillJournal} from './src/integration/hmk-herbal-charm.js';
 import {pendingSoporificTests,pendingSoporificEffects,applyConfirmedSoporificEnd,applyConfirmedSoporificEffect,activeHerbalSoporific,validateSoporificJournal,assertSoporificAppendOnly,requireSoporificGMTimeMayAdvance,requireSoporificRoundMayAdvance} from './src/integration/hmk-herbal-soporific.js';
 import {curativeHealingEvidence} from './src/integration/hmk-herbal-healing-bridge.js';
 import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,validateNutritionJournal,assertNutritionJournalAppendOnly,nutritionRisk} from './src/integration/hmk-nutrition-days.js';
@@ -208,7 +209,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.407';
+const APP_VERSION='93.408';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -258,7 +259,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateHerbVialJournal(d.journal);validateHerbAdministrationJournal(d.journal);validateHerbalPoisonExposureJournal(d.journal);validateGreatPoisonJournal(d.journal);validateHerbWeaponPasteJournal(d.journal);validateWeaponPoisonResistanceJournal(d.journal);assertActiveHerbWeaponPastes(d);validateStimulantInitiativeJournal(d.journal);validateEmeticShockJournal(d.journal);validateParalyticEnduranceJournal(d.journal);validateSoporificJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);assertActiveHerbVials(d);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
+ if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateHerbVialJournal(d.journal);validateHerbAdministrationJournal(d.journal);validateHerbalPoisonExposureJournal(d.journal);validateGreatPoisonJournal(d.journal);validateHerbWeaponPasteJournal(d.journal);validateWeaponPoisonResistanceJournal(d.journal);assertActiveHerbWeaponPastes(d);validateStimulantInitiativeJournal(d.journal);validateHerbalCharmSkillJournal(d.journal);validateEmeticShockJournal(d.journal);validateParalyticEnduranceJournal(d.journal);validateSoporificJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);assertActiveHerbVials(d);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
@@ -5328,6 +5329,17 @@ function skillAutoFor(actor,name,form=null,prefix='A'){
    ctx.breakdown.push({label:'Stimulant · p.75 ('+stim.sourceIds.join(', ')+')',value:stim.bonus,source:'verified-stimulant-p75'});
    ctx.stimulant=stim;}
  }
+ // HMK p.75: Aromatic benefits Charm; Aphrodisiac impairs ONLY the
+ // ingester's resistance when GM explicitly confirms Charm (seduction).
+ const herbalCharm=data.campaignClock?herbalCharmSkillModifier({journal:data.journal,campaignId:campaignKey(data.campaignClock),
+  minute:data.campaignClock?.minute??0,actorId:actor.id,skill:name,side:prefix,
+  opposed:!!form?.elements.namedItem('opposed')?.checked,
+  seductionConfirmed:!!form?.elements.namedItem('seductionConfirmed')?.checked,
+  attackerSkill:form?.elements.namedItem('primary')?.value||''}):null;
+ if(herbalCharm){ctx.condition.modifier+=herbalCharm.modifier;ctx.modifier+=herbalCharm.modifier;
+  ctx.breakdown.push({label:(herbalCharm.type==='aromatic'?'Aromatic · Charm':'Aphrodisiac · odolání svádění')+
+   ' · HMK p.75 ('+herbalCharm.sourceIds.join(', ')+')',value:herbalCharm.modifier,source:'verified-herbal-charm-p75'});
+  ctx.herbalCharm=herbalCharm;}
  const bonus=activeDoctrineModifier(actor,name,data.campaignClock?.minute);
  if(bonus){ctx.condition.modifier+=bonus;ctx.modifier+=bonus;
   ctx.breakdown.push({label:'Doctrine Blessing',value:bonus,source:'confirmed-ceremony-p316'});}
@@ -6902,7 +6914,7 @@ document.addEventListener('submit',event=>{
     '\nBonus Assistance '+hskSigned(bonus)+' (strop +10); stav '+hskSigned(ctx.modifier)+'; GM situace '+hskSigned(hskGMModifier(form,'A'))+'; EML '+result.eml+'\nd100 '+result.roll+' → '+result.level+(result.splitCF?' '+result.splitCF:'')+' · '+result.unopposedStars+' Victory Stars'+(sr?'\nPředepsaný SR '+sr.name+' d10 '+sr.roll+' / TN '+sr.tn+' → '+(sr.success?'S':'F')+'; '+sr.effect:'')+
     (ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+(ctx.armourIsProvisional?'\nPŘEDBĚŽNÝ zbrojní kontext: '+ctx.provisionalArmour.join('; '):'')+'\nNásledek: '+skillConsequenceText(consequence)+hskNarrativeBlock(skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}));
    recordSkillEvidence('Assistance · '+v.primary,body,{type:'assistance-success-test',actorId:actor.id,skill:v.primary,
-    preliminaryArmour:ctx.armourIsProvisional,stimulant:ctx.stimulant??null,secondaryRollResult:sr,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',
+    preliminaryArmour:ctx.armourIsProvisional,stimulant:ctx.stimulant??null,herbalCharmA:ctx.herbalCharm??null,secondaryRollResult:sr,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',
     rollOrigin:die.origin,gmNarrative:skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}),scene:hskScene(form),consequence,consequenceProof},slot);return;
   }
   const a=hskResolveSide({person:actor,form,side:'A'});
@@ -6928,7 +6940,7 @@ document.addEventListener('submit',event=>{
   const type=opposed?'opposed-success-test':sv?'secondary-mastery-value-test':'secondary-mastery-test';
   recordSkillEvidence((opposed?'Opposed · ':sv?'Success Value · ':'Success Test · ')+a.info.primary,body,{type,actorId:actor.id,
    opponentId:b?.person?.id||null,skills:b?[a.info.primary,b.info.primary]:[a.info.primary],
-   preliminaryArmour:a.ctx.armourIsProvisional||b?.ctx.armourIsProvisional||false,stimulantA:a.ctx.stimulant??null,stimulantB:b?.ctx.stimulant??null,emlRangeA:a.emlRange,emlRangeB:b?.emlRange||null,secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
+   preliminaryArmour:a.ctx.armourIsProvisional||b?.ctx.armourIsProvisional||false,stimulantA:a.ctx.stimulant??null,stimulantB:b?.ctx.stimulant??null,herbalCharmA:a.ctx.herbalCharm??null,herbalCharmB:b?.ctx.herbalCharm??null,seductionConfirmed:opposed&&form.elements.namedItem('seductionConfirmed')?.checked===true,emlRangeA:a.emlRange,emlRangeB:b?.emlRange||null,secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
    secondaryRollResult:a.sr,secondaryRollResultB:b?.sr||null,
    a:a.result,b:b?.result||null,result:opposed?comparison:a.result,
    comparison:comparison??null,gmNarrative:narrative,scene,opposedAction:actionName,rollOrigins:b?[a.die.origin,b.die.origin]:[a.die.origin],
