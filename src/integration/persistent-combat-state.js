@@ -85,7 +85,13 @@ export function validateCombatState(s){
    requireCond(t&&typeof t.id==='string'&&t.id.startsWith('poison:')&&!ids.has(t.id)&&
     typeof t.sourceId==='string'&&t.id==='poison:'+t.sourceId&&
     ['digested','vector','contact'].includes(t.transmission)&&
-    whole(t.onsetMinutes,10,60)&&whole(t.periodMinutes,10,60)&&whole(t.initialHR,1,5)&&
+    (t.herbalSource?
+      (typeof t.herbalSource.applicationId==='string'&&t.herbalSource.applicationId.length>=3&&
+       [1,2].includes(t.herbalSource.potency)&&whole(t.herbalSource.sv,1,14)&&
+       t.sourceId==='herb:'+t.herbalSource.applicationId&&t.transmission==='digested'&&
+       t.initialHR===(t.herbalSource.potency===1?4:3)&&
+       t.onsetMinutes===(15-t.herbalSource.sv)*(t.herbalSource.potency===1?60:1)):
+      whole(t.onsetMinutes,10,60))&&whole(t.periodMinutes,10,60)&&whole(t.initialHR,1,5)&&
     Array.isArray(t.symptomD10s)&&t.symptomD10s.length===4&&t.symptomD10s.every(n=>whole(n,1,10))&&
     Array.isArray(t.symptoms)&&t.symptoms.length===4&&t.symptoms.every(x=>typeof x==='string'&&x.length>0)&&
     whole(t.hr,0,6)&&['incubating','active','defeated','dead'].includes(t.status)&&

@@ -56,13 +56,21 @@ function applyOutcome(s,t,nextHR,round){
 function push(s,id,type,round,details){check(!s.events.some(x=>x.id===id),'Duplicitní Poison událost '+id);
  s.events.push({id,type,round,details});s.lastRound=round;validateCombatState(s);return s;}
 export function preparePoisonStart({actor,state,round=1,sourceId,transmission,
- onsetMinutes,periodMinutes,initialHR,symptomD10s,standardLethal=true,
+ onsetMinutes,periodMinutes,initialHR,symptomD10s,standardLethal=true,herbalSource=null,
  actualExposureConfirmed=false,gmConfirmed=false}={}){
  const s=prepare(actor,state,round);
  check(gmConfirmed===true&&actualExposureConfirmed===true&&isGoodId(sourceId),
   'Poison: GM musí potvrdit konkrétní skutečnou expozici a jednoznačný klíč');
  check(['digested','vector','contact'].includes(transmission),'Poison: potvrďte skutečnou cestu přenosu');
- check(int(onsetMinutes,10,60)&&int(periodMinutes,10,60),
+ if(herbalSource!==null){
+  check(herbalSource&&typeof herbalSource.applicationId==='string'&&herbalSource.applicationId.length>=3&&
+   int(herbalSource.potency,1,2)&&int(herbalSource.sv,1,14)&&
+   sourceId==='herb:'+herbalSource.applicationId&&transmission==='digested'&&
+   initialHR===(herbalSource.potency===1?4:3)&&
+   onsetMinutes===(15-herbalSource.sv)*(herbalSource.potency===1?60:1),
+   'Herbal Poison: skutečný HR a nástup musí přesně odpovídat HMK 75');
+  check(int(periodMinutes,10,60),'Herbal Poison: GM musí doložit Course period 10–60 minut podle HMK 186');
+ }else check(int(onsetMinutes,10,60)&&int(periodMinutes,10,60),
   'Pro standardní toxin jsou potřebné GM potvrzené časy 10–60 minut (p.186)');
  check(int(initialHR,1,5)&&fourDice(symptomD10s),'Poison: potvrďte HR1–5 a čtyři skutečné d10 symptomů (p.183)');
  check(standardLethal===true,'Alternativní Poison výsledek (paralysis apod.) vyžaduje jiný doložený průchod GM');
@@ -71,10 +79,11 @@ export function preparePoisonStart({actor,state,round=1,sourceId,transmission,
  const course={id,sourceId:sourceId.trim(),transmission,onsetMinutes,periodMinutes,initialHR,
   symptoms:symptomD10s.map(sym),symptomD10s:[...symptomD10s],hr:initialHR,
   status:'incubating',elapsedMinutes:0,sequence:0,weaknessApplied:0,shockApplied:'NONE',
-  standardLethal:true};
+  standardLethal:true,...(herbalSource?{herbalSource:structuredClone(herbalSource)}:{})};
  s.toxinCourses=[...(s.toxinCourses||[]),course];
  push(s,id,'poison-start',round,{sourceId:course.sourceId,transmission,
-  onsetMinutes,periodMinutes,initialHR,symptomD10s:[...symptomD10s],symptoms:course.symptoms,rulePages:[183,184,186]});
+  onsetMinutes,periodMinutes,initialHR,symptomD10s:[...symptomD10s],symptoms:course.symptoms,
+  ...(herbalSource?{herbalSource:structuredClone(herbalSource)}:{}),rulePages:herbalSource?[75,183,184,186]:[183,184,186]});
  return {state:s,course:structuredClone(course),report:{id,phase:'incubating',onsetMinutes,periodMinutes}};
 }
 export function preparePoisonOnset({actor,state,sourceId,round=1,elapsedMinutes,gmConfirmed=false}={}){
