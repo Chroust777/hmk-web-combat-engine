@@ -4,6 +4,7 @@
  * Never advances calendar time, never assumes an unspecified container weight.
  */
 import {EXOTIC_POTIONS} from './hmk-herbal-concoctions.js';
+import {vialState} from './hmk-herbal-vial-ledger.js';
 const need=(x,m)=>{if(!x)throw Error(m);};
 const safeMinute=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000000;
 export const HERB_ADMIN_FORMAT='hmk-herb-potion-application-v1';
@@ -51,11 +52,14 @@ export function createHerbPotionAdministration({journal=[],campaignId,minute,act
  need(typeof campaignId==='string'&&campaignId&&safeMinute(minute)&&typeof actorId==='string'&&actorId&&typeof targetId==='string'&&targetId,'Chybí kampaň, čas či postava');
  need(Array.isArray(memberIds)&&memberIds.includes(actorId)&&memberIds.includes(targetId),'Podávající i příjemce musí být členem stejné kampaně');
  const completeRow=journal.find(j=>j.id===completeId&&j.calendarCampaignId===campaignId&&j.calendarHerbPotionComplete);
- need(completeRow&&completeRow.characterId===actorId&&completeRow.calendarHerbPotionComplete.actorId===actorId,'Lektvar nepatří doloženému výrobci v této kampani');
+ const physical=vialState(journal,campaignId,completeId,minute);
+ if(physical){need(physical.ownerId===actorId&&['carried','none'].includes(physical.slot),'Lektvar není fyzicky nesen podávající postavou; vyzvedněte jej z Truhlice');}
+ else need(completeRow?.characterId===actorId&&completeRow?.calendarHerbPotionComplete?.actorId===actorId,'Lektvar nepatří doloženému výrobci v této kampani');
  const potion=completeRow.calendarHerbPotionComplete;
  need(completeRow.campaignMinute<=minute,'Lektvar ještě nebyl vyroben');
  need(potion.usable===true&&safeMinute(potion.expiryMinute)&&minute<potion.expiryMinute,'Lektvar je neúčinný nebo prošlý');
  need(!journal.some(j=>j.calendarCampaignId===campaignId&&j.calendarHerbPotionAdminister?.completeId===completeId),'Tento lektvar již byl podán');
+ need(!journal.some(j=>j.calendarCampaignId===campaignId&&j.calendarHerbVialDiscard?.completeId===completeId),'Obsah tohoto lektvaru byl doloženě odepsán');
  need(EXOTIC_POTIONS.includes(potion.herbType)&&METHODS[potion.herbType]?.includes(method),'Nepovolená metoda podání pro tištěný druh lektvaru');
  const antivenin=potion.herbType==='antivenin',emetic=potion.herbType==='emetic';
  if(emetic&&(!legacyValidation||emeticOnsetD6!==null)){
@@ -78,6 +82,7 @@ export function createHerbPotionAdministration({journal=[],campaignId,minute,act
   herbType:potion.herbType,potency:potion.potency,sv:potion.sv,bonus:consequence.bonus,
   schedule:consequence.schedule,rule:consequence.rule,sourcePage:75,
   applicationStatus:'APPLIED_NO_AUTOMATIC_HEALTH_ROLL',gmConfirmed:true,
+  ...(physical?{vialId:physical.vialId,vialBindingId:physical.bindingId}:{}),
   ...(antivenin&&poisonSourceId?{poisonSourceId:poisonSourceId.trim()}:{}),
   ...(emetic&&emeticOnsetD6!==null?{emeticOnsetD6,emeticOnsetOrigin}:{}),
   ...(combatAnchor?{combatAnchor:{confirmedByGM:true,round:combatAnchor.round,campaignMinute:minute,timelineId:combatAnchor.timelineId}}:{})};
@@ -112,5 +117,5 @@ export function assertHerbAdministrationAppendOnly(before=[],after=[]){
 export function availableHerbalPotions(journal,campaignId,minute){
  return journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarHerbPotionComplete&&j.campaignMinute<=minute&&
   j.calendarHerbPotionComplete.usable&&minute<j.calendarHerbPotionComplete.expiryMinute&&
-  !journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarHerbPotionAdminister?.completeId===j.id));
+  !journal.some(x=>x.calendarCampaignId===campaignId&&(x.calendarHerbPotionAdminister?.completeId===j.id||x.calendarHerbVialDiscard?.completeId===j.id))); 
 }
