@@ -129,6 +129,7 @@ import {PRINTED_VIAL,createHerbVialBinding,createHerbVialDiscard,vialBinding,via
 import {applyConfirmedEmeticShock,pendingEmeticShocks,validateEmeticShockJournal,assertEmeticShockAppendOnly,requireEmeticRoundMayAdvance,requireEmeticGMTimeMayAdvance} from './src/integration/hmk-herbal-emetic-shock.js';
 import {pendingParalyticChecks,applyConfirmedParalyticEndurance,activeHerbalParalysis,validateParalyticEnduranceJournal,assertParalyticEnduranceAppendOnly,requireParalyticRoundMayAdvance,requireParalyticGMTimeMayAdvance} from './src/integration/hmk-herbal-paralytic.js';
 import {narcoticEvidence,narcoticMovement} from './src/integration/hmk-herbal-narcotic.js';
+import {stimulantEvidence,stimulantInitiativeValues,verifyStimulantInitiativeSnapshot,validateStimulantInitiativeJournal,assertStimulantInitiativeAppendOnly,validateStimulantEncounterCheckpoint} from './src/integration/hmk-herbal-stimulant.js';
 import {pendingSoporificTests,pendingSoporificEffects,applyConfirmedSoporificEnd,applyConfirmedSoporificEffect,activeHerbalSoporific,validateSoporificJournal,assertSoporificAppendOnly,requireSoporificGMTimeMayAdvance,requireSoporificRoundMayAdvance} from './src/integration/hmk-herbal-soporific.js';
 import {curativeHealingEvidence} from './src/integration/hmk-herbal-healing-bridge.js';
 import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,validateNutritionJournal,assertNutritionJournalAppendOnly,nutritionRisk} from './src/integration/hmk-nutrition-days.js';
@@ -203,7 +204,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.402';
+const APP_VERSION='93.403';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -253,7 +254,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateHerbVialJournal(d.journal);validateHerbAdministrationJournal(d.journal);validateEmeticShockJournal(d.journal);validateParalyticEnduranceJournal(d.journal);validateSoporificJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);assertActiveHerbVials(d);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
+ if(d?.journal){validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateHerbVialJournal(d.journal);validateHerbAdministrationJournal(d.journal);validateStimulantInitiativeJournal(d.journal);validateEmeticShockJournal(d.journal);validateParalyticEnduranceJournal(d.journal);validateSoporificJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);assertActiveHerbVials(d);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
@@ -274,6 +275,7 @@ function validate(d){
     (r.clock.actorId!==''&&!activeIds.has(r.clock.actorId))||
     (r.sequence!==null&&r.sequence!==undefined&&validateEncounterSequence(r.sequence).timelineId!==r.timelineId))
     throw Error('Poškozený trvalý kontrolní bod Initiative');
+  if(r.sequence)validateStimulantEncounterCheckpoint({sequence:r.sequence,journal:d.journal});
   if(r.sequence&&JSON.stringify([...new Set(r.participants)].sort())!==JSON.stringify([...r.sequence.order].sort()))
    throw Error('Kontrolní bod Initiative nemá odpovídající účastníky');
   // v93.128: optional in older backups; authoritative once a checkpoint carries them.
@@ -470,7 +472,7 @@ let pendingTrekHandoff=null; // UI-only context; the journal proof is the author
 function mutate(fn,{gmClockAdvance=false}={}){
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(!automaticGenerationBusy)alert('Změna nebyla uložena: '+e.message);return false}
 }
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
@@ -3121,9 +3123,10 @@ function initiativeSequencePanel(chars){
  let dues=[],endDues=[],statusError='';
  if(active)try{verifyCombatSequenceRoster(active);dues=dueEncounterEvents(active,combatSequenceStates());endDues=dueEndTurnEvents(active,combatSequenceStates());}catch(e){statusError=e.message;}
  const fieldFor=(c)=>{
-  const skills=c.hmk?.skills||[];
+  const skills=availableMasteries(c);
   const mlFor=name=>{const matches=skills.filter(x=>String(x.name||'').toLowerCase()===name);return matches.length===1&&Number.isSafeInteger(Number(matches[0].ml))?Number(matches[0].ml):''};
-  return `<div class="field-grid"><strong>${esc(c.name)} (${esc(c.kind||'PC')})</strong><input type="hidden" name="participantId" value="${esc(c.id)}"><label>Initiative ML<input type="number" name="ir_${esc(c.id)}" min="0" max="200" step="1" value="${esc(mlFor('initiative'))}" required></label><label>Awareness EML (tiebreak)<input type="number" name="aw_${esc(c.id)}" min="0" max="200" step="1" value="${esc(mlFor('awareness'))}" required></label><label>GM/PC pořadí při úplné shodě IR<input type="number" name="tie_${esc(c.id)}" min="0" max="999" step="1" placeholder="jen při shodě"></label><label>Počáteční Alertness<select name="alert_${esc(c.id)}"><option value="aware">Aware</option><option value="confused">Confused</option><option value="unaware">Unaware</option></select></label></div>`;
+  const stim=stimulantEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),minute:data.campaignClock?.minute??0,targetId:c.id});
+  return `<div class="field-grid"><strong>${esc(c.name)} (${esc(c.kind||'PC')}) · Stimulant ${stim.bonus?`+${stim.bonus} (${esc(stim.sourceIds.join(', '))})`:'0'}</strong><input type="hidden" name="participantId" value="${esc(c.id)}"><label>Základní Initiative ML (bez Stimulant)<input type="number" name="ir_${esc(c.id)}" min="0" max="200" step="1" value="${esc(mlFor('initiative'))}" required></label><label>Základní Awareness EML (bez Stimulant, tiebreak)<input type="number" name="aw_${esc(c.id)}" min="0" max="200" step="1" value="${esc(mlFor('awareness'))}" required></label><label>GM/PC pořadí při úplné shodě IR<input type="number" name="tie_${esc(c.id)}" min="0" max="999" step="1" placeholder="jen při shodě"></label><label>Počáteční Alertness<select name="alert_${esc(c.id)}"><option value="aware">Aware</option><option value="confused">Confused</option><option value="unaware">Unaware</option></select></label></div>`;
  };
  return `<section class="panel" id="hmk-initiative-manager"><h3>Initiative · řízené tahy (HMK str. 158–162)</h3>
  <p class="muted">Řazení podle Initiative <strong>ML</strong>, při shodě podle Awareness EML a přednosti PC. Poslední shodu rozhoduje hráč/GM. Potvrzené pořadí, rány, Shock a krvácení se ukládají společně do trvalých dat; sessionStorage drží jen pomocnou pracovní kopii. Žádné hody nejsou generovány.</p>
@@ -5282,6 +5285,15 @@ function skillAutoFor(actor,name,form=null,prefix='A'){
  const shamanBoost=activeShamanSkillModifier({actor,skill:name,minute:data.campaignClock?.minute,inventory:data.inventory});
  if(shamanBoost){ctx.condition.modifier+=shamanBoost;ctx.modifier+=shamanBoost;
   ctx.breakdown.push({label:'Ancestor Rite/Talisman · overlapping MB',value:shamanBoost,source:'confirmed-shaman-rite-talisman-p302'});}
+ // HMK p.75: a currently ingested Stimulant modifies Initiative and all
+ // three Awareness sensory subskills; it does not alter PRIMARY ML or SV Index.
+ if(name==='Initiative'||/^Awareness(?:\s*\(|$)/i.test(name)){
+  const stim=stimulantEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),
+   minute:data.campaignClock?.minute??0,targetId:actor.id});
+  if(stim.bonus){ctx.condition.modifier+=stim.bonus;ctx.modifier+=stim.bonus;
+   ctx.breakdown.push({label:'Stimulant · p.75 ('+stim.sourceIds.join(', ')+')',value:stim.bonus,source:'verified-stimulant-p75'});
+   ctx.stimulant=stim;}
+ }
  const bonus=activeDoctrineModifier(actor,name,data.campaignClock?.minute);
  if(bonus){ctx.condition.modifier+=bonus;ctx.modifier+=bonus;
   ctx.breakdown.push({label:'Doctrine Blessing',value:bonus,source:'confirmed-ceremony-p316'});}
@@ -6856,7 +6868,7 @@ document.addEventListener('submit',event=>{
     '\nBonus Assistance '+hskSigned(bonus)+' (strop +10); stav '+hskSigned(ctx.modifier)+'; GM situace '+hskSigned(hskGMModifier(form,'A'))+'; EML '+result.eml+'\nd100 '+result.roll+' → '+result.level+(result.splitCF?' '+result.splitCF:'')+' · '+result.unopposedStars+' Victory Stars'+(sr?'\nPředepsaný SR '+sr.name+' d10 '+sr.roll+' / TN '+sr.tn+' → '+(sr.success?'S':'F')+'; '+sr.effect:'')+
     (ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+(ctx.armourIsProvisional?'\nPŘEDBĚŽNÝ zbrojní kontext: '+ctx.provisionalArmour.join('; '):'')+'\nNásledek: '+skillConsequenceText(consequence)+hskNarrativeBlock(skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}));
    recordSkillEvidence('Assistance · '+v.primary,body,{type:'assistance-success-test',actorId:actor.id,skill:v.primary,
-    preliminaryArmour:ctx.armourIsProvisional,secondaryRollResult:sr,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',
+    preliminaryArmour:ctx.armourIsProvisional,stimulant:ctx.stimulant??null,secondaryRollResult:sr,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',
     rollOrigin:die.origin,gmNarrative:skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}),scene:hskScene(form),consequence,consequenceProof},slot);return;
   }
   const a=hskResolveSide({person:actor,form,side:'A'});
@@ -6882,7 +6894,7 @@ document.addEventListener('submit',event=>{
   const type=opposed?'opposed-success-test':sv?'secondary-mastery-value-test':'secondary-mastery-test';
   recordSkillEvidence((opposed?'Opposed · ':sv?'Success Value · ':'Success Test · ')+a.info.primary,body,{type,actorId:actor.id,
    opponentId:b?.person?.id||null,skills:b?[a.info.primary,b.info.primary]:[a.info.primary],
-   preliminaryArmour:a.ctx.armourIsProvisional||b?.ctx.armourIsProvisional||false,emlRangeA:a.emlRange,emlRangeB:b?.emlRange||null,secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
+   preliminaryArmour:a.ctx.armourIsProvisional||b?.ctx.armourIsProvisional||false,stimulantA:a.ctx.stimulant??null,stimulantB:b?.ctx.stimulant??null,emlRangeA:a.emlRange,emlRangeB:b?.emlRange||null,secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
    secondaryRollResult:a.sr,secondaryRollResultB:b?.sr||null,
    a:a.result,b:b?.result||null,result:opposed?comparison:a.result,
    comparison:comparison??null,gmNarrative:narrative,scene,opposedAction:actionName,rollOrigins:b?[a.die.origin,b.die.origin]:[a.die.origin],
@@ -8103,8 +8115,19 @@ document.addEventListener('submit',e=>{
   if(f.id==='combat-initiative-setup-form'){
    if(v.gmConfirmed!=='yes')throw Error('GM nepotvrdil vstupy Initiative');
    const chars=selectedEncounterCharacters();
-   const roster=chars.map(c=>({id:c.id,name:c.name,isPC:String(c.kind||'PC').toLowerCase()==='pc',initiativeML:v['ir_'+c.id]===''?null:Number(v['ir_'+c.id]),awarenessEML:v['aw_'+c.id]===''?null:Number(v['aw_'+c.id]),tieOrder:v['tie_'+c.id]===''?null:Number(v['tie_'+c.id]),alertness:v['alert_'+c.id]||'aware'}));
+   const stimulantProofs=[];
+   const roster=chars.map(c=>{
+    const med=stimulantEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),minute:data.campaignClock?.minute??0,targetId:c.id});
+    const actual=stimulantInitiativeValues({baseInitiativeML:v['ir_'+c.id]===''?null:Number(v['ir_'+c.id]),
+     baseAwarenessEML:v['aw_'+c.id]===''?null:Number(v['aw_'+c.id]),evidence:med});
+    if(actual.bonus)stimulantProofs.push({targetId:c.id,...actual});
+    return {id:c.id,name:c.name,isPC:String(c.kind||'PC').toLowerCase()==='pc',
+     initiativeML:actual.initiativeML,baseInitiativeML:actual.baseInitiativeML,
+     awarenessEML:actual.awarenessEML,tieOrder:v['tie_'+c.id]===''?null:Number(v['tie_'+c.id]),alertness:v['alert_'+c.id]||'aware'};
+   });
    const seq=createEncounterSequence({roster,round:combatClock.round,timelineId:combatInjuryTimelineId});
+   if(stimulantProofs.length)seq.stimulantInitiativeSnapshot={campaignId:campaignKey(data.campaignClock),
+    minute:data.campaignClock.minute,proofs:stimulantProofs};
    const geom=window.prompt('Skutečně známé neprůchodné úsečky mapy (HMK, souřadnice v ft).\n'+
      'Formát door:ID:x1,y1:x2,y2 nebo wall:ID:x1,y1:x2,y2; více úseček oddělte středníkem.\n'+
      'Prázdné = GM potvrzuje, že nejsou doloženy žádné takové překážky. Zrušit = boj nezahajovat.','');
@@ -8166,6 +8189,14 @@ document.addEventListener('submit',e=>{
    // A new encounter must never inherit Action/Setup TA or pairwise In Close
    // from an earlier per-tab draft. Reset them in the SAME durable setup write.
    commitGuidedTransition(initialSequence,()=>{
+    if(stimulantProofs.length){
+     for(const p of stimulantProofs)data.journal.push({id:uuid(),characterId:p.targetId,createdAt:stamp(),
+      title:'HMK Stimulant · pořadí Initiative p.75',
+      body:'Doložený Stimulant +'+p.bonus+' k Initiative/Awareness; původ '+p.sourceIds.join(', ')+'. Bez posunu GM času.',
+      calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute,
+      calendarHerbStimulantInitiative:{...p,campaignId:campaignKey(data.campaignClock),minute:data.campaignClock.minute,
+       timelineId:combatInjuryTimelineId}});
+    }
     if(initiallyLoaded.length)data.inventory=initialInventory;
     for(const proof of initiallyLoaded){
      if(data.journal.some(j=>j.combatProof?.sourceEventId===proof.sourceEventId))throw Error('Duplicitní počáteční Load');
@@ -8184,6 +8215,9 @@ document.addEventListener('submit',e=>{
    persistInitiativeSequence(setEncounterTieOrder(seq,{actorId:v.actorId,tieOrder:Number(v.tieOrder),gmConfirmed:v.gmConfirmed==='yes'}));
   }else if(f.id==='combat-alertness-reaction-form'){
    const seq=liveInitiativeSequence();
+   if(seq.stimulantInitiativeSnapshot)verifyStimulantInitiativeSnapshot({journal:data.journal,
+    campaignId:seq.stimulantInitiativeSnapshot.campaignId,minute:data.campaignClock?.minute??0,
+    proofs:seq.stimulantInitiativeSnapshot.proofs});
    if(v.gmConfirmed!=='yes')throw Error('GM nepotvrdil Reaction');
    persistInitiativeSequence(confirmAlertnessReaction(seq,combatSequenceStates(),{actorId:v.actorId,roll:Number(v.roll),immediateAlert:v.immediateAlert==='yes',gmConfirmed:true}));
   }else if(f.id==='combat-initiative-finish-form'){
