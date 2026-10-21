@@ -645,6 +645,26 @@ export function applyComaCourse({state,round,eventId,healingBase,roll,periodD10,
  record(s,eventId,'coma-course',round,{before,afterHR:hr,daysElapsed,duration,periodD10,healingBase,fatigue,arcaneBonus,restfulShelter,rawEML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),wearinessAdded,dead:s.shock==='KIA'});
  return {state:s,hr,wearinessAdded};
 }
+/** HMK p.298: reembodiment restores physical perspective, adds real
+ * weariness and, on CF/F, enters the original Stunned recovery stream.
+ * Never overwrite an existing injury-derived Shock state. */
+export function applyConfirmedAstralReembodiment({state,round,eventId,proof}={}){
+ const s=ready(state,round,eventId);
+ requireCond(proof?.format==='hmk-reembodiment-audited-v1'&&proof.gmConfirmed===true&&
+  whole(proof.weariness,0,20)&&[0,5,10,20].includes(proof.weariness)&&
+  ['CF','F','S','CS'].includes(proof.adjustedSL)&&
+  proof.stunned===(proof.adjustedSL==='CF'||proof.adjustedSL==='F'),
+  'Reembodiment vyžaduje ověřený GM Spirit Roll');
+ requireCond(s.shock!=='KIA','Mrtvá postava nemůže dokončit návrat');
+ if(proof.stunned)requireCond(s.shock==='NONE'&&!s.shockFollowup&&!s.extendedShock&&!s.coma?.active,
+  'Stunned z Reembodiment nelze přepsat přes existující traumatický Shock; rozhodne GM');
+ requireCond(whole(s.fatigue.weariness+proof.weariness,0,99999),'Překročen rozsah Weariness');
+ s.fatigue.weariness+=proof.weariness;
+ if(proof.stunned){s.shock='STN';s.shockOriginRound=round;installShockFollowup(s,{round,timelineId:null});}
+ return {state:record(s,eventId,'astral-reembodiment',round,{sourceId:proof.sourceId,adjustedSL:proof.adjustedSL,
+  spiritRoll:proof.d100,spiritML:proof.spiritML,tranceSecondarySuccess:proof.secondarySuccess,
+  wearinessAdded:proof.weariness,stunned:proof.stunned,noClockAdvance:true,sourcePage:298}),wearinessAdded:proof.weariness};
+}
 export function applyConfirmedFatigue({state,round,eventId,kind,delta}={}){
  const s=ready(state,round,eventId);
  requireCond(['windedness','weariness','otherWeakness'].includes(kind),'Zvolte druh únavy');

@@ -56,14 +56,14 @@ export function pendingHallucinogenicTrances(journal=[],campaignId=''){
  return starts.filter(x=>!completed.has(x.id)).map(x=>({startId:x.id,targetId:x.calendarHerbHallucinogenicTranceStart.targetId,
   dueMinute:x.calendarHerbHallucinogenicTranceStart.dueMinute,source:x}));
 }
-export function createHallucinogenicLucidDream({journal=[],campaignId,applicationId,minute,targetId,aura,willIndex,d20,dieOrigin='manual',gmConfirmed=false,savirisTracked=false}={}){
+export function createHallucinogenicLucidDream({journal=[],campaignId,applicationId,minute,targetId,aura,willIndex,d20,dieOrigin='manual',gmConfirmed=false,savirisTracked=false,reembodimentTracked=false}={}){
  check(gmConfirmed===true&&ORIGINS.includes(dieOrigin)&&integer(minute,0,1e9),'chybí GM potvrzení, čas nebo původ d20');
  const {row,application}=source(journal,campaignId,applicationId);
  check(targetId===application.targetId&&minute===row.campaignMinute+10,'Lucid Dream d20 je splatné přesně po deseti minutách');
  check(!journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarHerbLucidDream?.applicationId===applicationId),'Lucid Dream d20 již bylo použito');
  return {format:HALLUCINOGENIC_DREAM_FORMAT,campaignId,minute,applicationId,targetId,dieOrigin,
   ...hallucinogenicLucidTable({aura,willIndex,d20}),gmConfirmed:true,sourcePage:292,
-  ...(savirisTracked===true?{savirisTracked:true}:{})};
+  ...(savirisTracked===true?{savirisTracked:true}:{}),...(reembodimentTracked===true?{reembodimentTracked:true}:{})};
 }
 export function createHallucinogenicTranceStart({journal=[],campaignId,applicationId,minute,targetId,
  tranceSkillML,consciousConfirmed=false,uninterruptedIntended=false,gmConfirmed=false}={}){
@@ -129,7 +129,7 @@ export function pendingHallucinogenicTranscendence(journal=[],campaignId=''){
  * the Spirit actions, reembodiment and any aural consequence remain separate.
  */
 export function createHallucinogenicTranscendence({journal=[],campaignId,veilId,minute,targetId,
- tranceML,fatiguePenalty,d100,bonusD3=null,dieOrigin='manual',bonusDieOrigin=null,gmConfirmed=false}={}){
+ tranceML,fatiguePenalty,d100,bonusD3=null,dieOrigin='manual',bonusDieOrigin=null,gmConfirmed=false,reembodimentTracked=false,willIndex=null}={}){
  check(gmConfirmed===true&&ORIGINS.includes(dieOrigin)&&integer(d100,1,100),'Transcendence vyžaduje skutečný d100 a potvrzení GM');
  const veil=journal.find(x=>x.id===veilId&&x.calendarCampaignId===campaignId&&x.calendarHerbHallucinogenicVeil?.transcendenceTracked===true);
  check(veil&&veil.calendarHerbHallucinogenicVeil.targetId===targetId,'chybí nové doložené Lift the Veil');
@@ -139,6 +139,7 @@ export function createHallucinogenicTranscendence({journal=[],campaignId,veilId,
  check(start&&start.calendarHerbHallucinogenicTranceStart.targetId===targetId&&
   tranceML===start.calendarHerbHallucinogenicTranceStart.tranceSkillML,'Trance ML nesouhlasí s původním podkladem');
  check(integer(fatiguePenalty,0,300),'GM musí doložit aktuální postih Fatigue');
+ if(reembodimentTracked===true)check(integer(willIndex,1,100),'nová astrální cesta vyžaduje doložený Will Index');
  const bonus=veil.calendarHerbHallucinogenicVeil.transcendenceBonus,rawEML=tranceML-fatiguePenalty+bonus;
  const sl=['CF','F','S','CS'][successLevel(d100,rawEML)];
  if(sl==='CS')check(integer(bonusD3,1,3)&&ORIGINS.includes(bonusDieOrigin),'Critical Success vyžaduje skutečný d3');
@@ -147,7 +148,59 @@ export function createHallucinogenicTranscendence({journal=[],campaignId,veilId,
   applicationId:start.calendarHerbHallucinogenicTranceStart.applicationId,targetId,tranceML,fatiguePenalty,
   herbalBonus:bonus,rawEML,d100,dieOrigin,sl,bonusD3,bonusDieOrigin,
   bonusSpiritRounds:sl==='CS'?bonusD3:0,astralJourneyEligible:sl==='S'||sl==='CS',
-  requiresWillTest:sl==='CF',repeatTranceGMDecision:sl==='F',gmConfirmed:true,sourcePages:[75,291,294]};
+  requiresWillTest:sl==='CF',repeatTranceGMDecision:sl==='F',gmConfirmed:true,sourcePages:[75,291,294],
+  ...(reembodimentTracked===true?{reembodimentTracked:true,willIndex}:{})};
+}
+
+/** HMK v1.2 pp.292,294,298: the astral Return roll is separate from
+ * Lucid Dream/Saviris and from the Transcendence roll.
+ * Time is GM-attested in spirit rounds (five seconds each); there is no
+ * automatic conversion of a spirit round into a campaign clock action.
+ */
+export const HALLUCINOGENIC_REEMBODIMENT_FORMAT='hmk-reembodiment-audited-v1';
+const reemSource=(journal,camp,id)=>journal.find(x=>x.id===id&&x.calendarCampaignId===camp&&
+ (x.calendarHerbTranscendence?.reembodimentTracked===true&&x.calendarHerbTranscendence.astralJourneyEligible===true||
+  x.calendarHerbLucidDream?.reembodimentTracked===true&&x.calendarHerbLucidDream.dreamRounds>0));
+export function pendingHallucinogenicReembodiments(journal=[],campaignId=''){
+ const done=new Set(journal.filter(x=>x.calendarCampaignId===campaignId&&x.calendarHerbReembodiment).map(x=>x.calendarHerbReembodiment.sourceId));
+ return journal.filter(x=>reemSource(journal,campaignId,x.id)&&!done.has(x.id)).map(x=>{
+  const tr=x.calendarHerbTranscendence,d=x.calendarHerbLucidDream;
+  const maxSpiritRounds=tr?tr.willIndex+tr.bonusSpiritRounds:d.dreamRounds;
+  return {sourceId:x.id,targetId:(tr||d).targetId,kind:tr?'trance':'dream',startMinute:x.campaignMinute,
+   maxSpiritRounds,dueMinute:x.campaignMinute+Math.ceil(maxSpiritRounds/12),
+   savirisRequired:!!d?.savirisTracked,tranceEligible:!!tr};
+ });
+}
+export function createHallucinogenicReembodiment({journal=[],campaignId,sourceId,targetId,minute,spiritRoundsSpent,
+ spiritML,d100,dieOrigin='manual',tranceML=null,tranceD10=null,tranceDieOrigin=null,
+ physicalStateClear=false,spiritActionsAdjudicated=false,gmConfirmed=false}={}){
+ check(gmConfirmed===true&&physicalStateClear===true&&spiritActionsAdjudicated===true&&ORIGINS.includes(dieOrigin),
+  'GM musí potvrdit astrální kola, skutečný Spirit d100 a zdravotní podmínky');
+ const row=reemSource(journal,campaignId,sourceId);
+ check(row,'chybí nový doložený Lucid Dream nebo úspěšná Transcendence');
+ const entry=pendingHallucinogenicReembodiments(journal,campaignId).find(x=>x.sourceId===sourceId);
+ check(entry&&entry.targetId===targetId,'astrální cesta již dokončena nebo příjemce nesouhlasí');
+ if(entry.savirisRequired)check(journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarHerbSaviris?.dreamId===sourceId),
+  'před návratem z Lucid Dream je nutný Sâvirìs d20');
+ check(integer(minute,entry.startMinute,entry.dueMinute)&&integer(spiritRoundsSpent,1,entry.maxSpiritRounds),
+  'nesouhlasí počet skutečných astrálních kol nebo čas návratu');
+ check(integer(spiritML,1,300)&&integer(d100,1,100),'Spirit ML nebo skutečný d100 nejsou doloženy');
+ let secondarySuccess=false;
+ if(entry.kind==='trance'){
+  check(integer(tranceML,1,300)&&integer(tranceD10,1,10)&&ORIGINS.includes(tranceDieOrigin),
+   'Trance Secondary Roll vyžaduje Trance ML a skutečný d10');
+  // HMK secondary-roll TN = mastery index (p.61).
+  secondarySuccess=tranceD10<=Math.floor(tranceML/10);
+ }else check(tranceML===null&&tranceD10===null&&tranceDieOrigin===null,
+  'Lucid Dream nemá podložený Trance Secondary Roll');
+ const baseSL=['CF','F','S','CS'][successLevel(d100,spiritML)];
+ const adjustedSL=['CF','F','S','CS'][Math.min(3,successLevel(d100,spiritML)+(secondarySuccess?1:0))];
+ const weariness=({CF:20,F:10,S:5,CS:0})[adjustedSL];
+ return {format:HALLUCINOGENIC_REEMBODIMENT_FORMAT,campaignId,sourceId,targetId,minute,kind:entry.kind,
+  startMinute:entry.startMinute,maxSpiritRounds:entry.maxSpiritRounds,spiritRoundsSpent,
+  spiritML,d100,dieOrigin,baseSL,tranceML,tranceD10,tranceDieOrigin,secondarySuccess,adjustedSL,
+  weariness,stunned:adjustedSL==='CF'||adjustedSL==='F',physicalPerspectiveRestored:true,
+  physicalStateClear:true,spiritActionsAdjudicated:true,gmConfirmed:true,sourcePages:[292,294,298]};
 }
 export function requireHallucinogenicGMTimeMayAdvance({journal=[],campaignId,beforeMinute,afterMinute}={}){
  if(afterMinute<=beforeMinute)return true;
@@ -157,6 +210,8 @@ export function requireHallucinogenicGMTimeMayAdvance({journal=[],campaignId,bef
  check(!saviris,'nelze přeskočit Sâvirìs d20 v minutě '+saviris?.dueMinute);
  const transcendence=pendingHallucinogenicTranscendence(journal,campaignId).find(x=>x.dueMinute<afterMinute);
  check(!transcendence,'nelze přeskočit Transcendence d100 v minutě '+transcendence?.dueMinute);
+ const reembodiment=pendingHallucinogenicReembodiments(journal,campaignId).find(x=>x.dueMinute<afterMinute);
+ check(!reembodiment,'nelze přeskočit návrat z astrální cesty v minutě '+reembodiment?.dueMinute);
  const trance=pendingHallucinogenicTrances(journal,campaignId).find(x=>x.dueMinute<afterMinute);
  check(!trance,'nelze přeskočit dokončení Trance v minutě '+trance?.dueMinute);
  return true;
@@ -165,12 +220,12 @@ export function validateHallucinogenicJournal(journal=[]){
  const earlier=[];
  for(const row of journal){
   const dream=row.calendarHerbLucidDream,start=row.calendarHerbHallucinogenicTranceStart,veil=row.calendarHerbHallucinogenicVeil,abort=row.calendarHerbHallucinogenicTranceAbort,
-   saviris=row.calendarHerbSaviris,transcendence=row.calendarHerbTranscendence;
-  if(dream||start||veil||abort||saviris||transcendence){
-   const p=dream||start||veil||abort||saviris||transcendence;
+   saviris=row.calendarHerbSaviris,transcendence=row.calendarHerbTranscendence,reembodiment=row.calendarHerbReembodiment;
+  if(dream||start||veil||abort||saviris||transcendence||reembodiment){
+   const p=dream||start||veil||abort||saviris||transcendence||reembodiment;
    check(p.campaignId===row.calendarCampaignId&&p.minute===row.campaignMinute&&p.gmConfirmed===true&&p.targetId===row.characterId,
     'čas, postava nebo kampaň nesouhlasí s auditním důkazem');
-   const expected=dream?createHallucinogenicLucidDream({journal:earlier,...dream}):start?createHallucinogenicTranceStart({journal:earlier,...start}):veil?createHallucinogenicVeil({journal:earlier,...veil}):abort?createHallucinogenicTranceAbort({journal:earlier,...abort}):saviris?createHallucinogenicSaviris({journal:earlier,...saviris}):createHallucinogenicTranscendence({journal:earlier,...transcendence});
+   const expected=dream?createHallucinogenicLucidDream({journal:earlier,...dream}):start?createHallucinogenicTranceStart({journal:earlier,...start}):veil?createHallucinogenicVeil({journal:earlier,...veil}):abort?createHallucinogenicTranceAbort({journal:earlier,...abort}):saviris?createHallucinogenicSaviris({journal:earlier,...saviris}):transcendence?createHallucinogenicTranscendence({journal:earlier,...transcendence}):createHallucinogenicReembodiment({journal:earlier,...reembodiment});
    check(JSON.stringify(p)===JSON.stringify(expected),'důkaz nesouhlasí s původním skutečným hodem nebo časem');
   }
   earlier.push(row);
@@ -179,7 +234,7 @@ export function validateHallucinogenicJournal(journal=[]){
 }
 export function assertHallucinogenicAppendOnly(before=[],after=[]){
  const map=new Map(after.map(x=>[x.id,x]));
- for(const row of before)if(row.calendarHerbLucidDream||row.calendarHerbHallucinogenicTranceStart||row.calendarHerbHallucinogenicVeil||row.calendarHerbHallucinogenicTranceAbort||row.calendarHerbSaviris||row.calendarHerbTranscendence)
+ for(const row of before)if(row.calendarHerbLucidDream||row.calendarHerbHallucinogenicTranceStart||row.calendarHerbHallucinogenicVeil||row.calendarHerbHallucinogenicTranceAbort||row.calendarHerbSaviris||row.calendarHerbTranscendence||row.calendarHerbReembodiment)
   check(map.has(row.id)&&JSON.stringify(map.get(row.id))===JSON.stringify(row),'historický důkaz nelze upravit nebo smazat');
  return true;
 }
