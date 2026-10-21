@@ -46,7 +46,7 @@ export function herbPotionRuleConsequence({type,potency,sv,minute}={}){
  }[type];
  return {bonus,schedule,rule:nextCheck,sourcePage:75,externalRollResolved:false};
 }
-export function createHerbPotionAdministration({journal=[],campaignId,minute,actorId,completeId,targetId,method,woundId='',gmConfirmed=false,memberIds=[],combatAnchor=null}={}){
+export function createHerbPotionAdministration({journal=[],campaignId,minute,actorId,completeId,targetId,method,woundId='',gmConfirmed=false,memberIds=[],combatAnchor=null,poisonSourceId='',legacyValidation=false}={}){
  need(gmConfirmed===true,'Podání musí potvrdit GM');
  need(typeof campaignId==='string'&&campaignId&&safeMinute(minute)&&typeof actorId==='string'&&actorId&&typeof targetId==='string'&&targetId,'Chybí kampaň, čas či postava');
  need(Array.isArray(memberIds)&&memberIds.includes(actorId)&&memberIds.includes(targetId),'Podávající i příjemce musí být členem stejné kampaně');
@@ -57,19 +57,23 @@ export function createHerbPotionAdministration({journal=[],campaignId,minute,act
  need(potion.usable===true&&safeMinute(potion.expiryMinute)&&minute<potion.expiryMinute,'Lektvar je neúčinný nebo prošlý');
  need(!journal.some(j=>j.calendarCampaignId===campaignId&&j.calendarHerbPotionAdminister?.completeId===completeId),'Tento lektvar již byl podán');
  need(EXOTIC_POTIONS.includes(potion.herbType)&&METHODS[potion.herbType]?.includes(method),'Nepovolená metoda podání pro tištěný druh lektvaru');
+ const antivenin=potion.herbType==='antivenin';
+ need(antivenin?(typeof poisonSourceId==='string'&&(poisonSourceId===''||poisonSourceId.trim().length>=3&&poisonSourceId.length<=120)):poisonSourceId==='',
+  'Antivenin vyžaduje doložený jednoznačný zdroj aktivní otravy');
  const woundNeeded=potion.herbType==='curative'||potion.herbType==='coagulant';
  need(woundNeeded?(typeof woundId==='string'&&woundId.length>0):woundId==='','Poultice musí cílit na jednu doloženou ránu, ostatní lektvary ne');
  if(combatAnchor!==null){
-  need(potion.herbType==='coagulant'&&combatAnchor&&combatAnchor.confirmedByGM===true&&
+  need((potion.herbType==='coagulant'||antivenin&&potion.potency===3)&&combatAnchor&&combatAnchor.confirmedByGM===true&&
    Number.isSafeInteger(combatAnchor.round)&&combatAnchor.round>=1&&combatAnchor.round<=9999&&
    combatAnchor.campaignMinute===minute&&typeof combatAnchor.timelineId==='string'&&combatAnchor.timelineId,
-   'Coagulant: neplatná GM vazba podání na bojové kolo');
+   'Neplatná GM vazba podání na bojové kolo');
  }
  const consequence=herbPotionRuleConsequence({type:potion.herbType,potency:potion.potency,sv:potion.sv,minute});
  return {format:HERB_ADMIN_FORMAT,campaignId,minute,actorId,completeId,targetId,method,woundId,
   herbType:potion.herbType,potency:potion.potency,sv:potion.sv,bonus:consequence.bonus,
   schedule:consequence.schedule,rule:consequence.rule,sourcePage:75,
   applicationStatus:'APPLIED_NO_AUTOMATIC_HEALTH_ROLL',gmConfirmed:true,
+  ...(antivenin&&poisonSourceId?{poisonSourceId:poisonSourceId.trim()}:{}),
   ...(combatAnchor?{combatAnchor:{confirmedByGM:true,round:combatAnchor.round,campaignMinute:minute,timelineId:combatAnchor.timelineId}}:{})};
 }
 export function validateHerbAdministrationJournal(journal=[]){
@@ -84,7 +88,8 @@ export function validateHerbAdministrationJournal(journal=[]){
    // witness using the persisted participant identities without guessing.
    const x=createHerbPotionAdministration({journal:prior,campaignId:p.campaignId,minute:p.minute,
     actorId:p.actorId,completeId:p.completeId,targetId:p.targetId,method:p.method,woundId:p.woundId,
-    gmConfirmed:p.gmConfirmed,memberIds:[p.actorId,p.targetId],combatAnchor:p.combatAnchor??null});
+    gmConfirmed:p.gmConfirmed,memberIds:[p.actorId,p.targetId],combatAnchor:p.combatAnchor??null,
+    poisonSourceId:p.poisonSourceId??'',legacyValidation:true});
    need(JSON.stringify(x)===JSON.stringify(p),'Podání neodpovídá původnímu doloženému lektvaru');
   }
   prior.push(row);

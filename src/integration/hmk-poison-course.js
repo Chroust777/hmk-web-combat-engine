@@ -8,6 +8,7 @@ import {healingBase} from '../rules/healing.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {ailmentOutcome,ailmentCourse} from '../rules/ailments.js';
 import {validateCombatState} from './persistent-combat-state.js';
+import {antiveninPoisonEvidence} from './hmk-herbal-antivenin-bridge.js';
 const check=(ok,msg)=>{if(!ok)throw Error(msg)};
 const int=(n,lo,hi)=>Number.isSafeInteger(n)&&n>=lo&&n<=hi;
 const names=['CF','F','S','CS'];
@@ -86,7 +87,7 @@ export function preparePoisonOnset({actor,state,sourceId,round=1,elapsedMinutes,
  return {state:s,course:structuredClone(t),report:{phase:'onset',...effects,elapsedMinutes}};
 }
 export function preparePoisonCourse({actor,state,sourceId,round=1,elapsedMinutes,
- courseD100,physicianSV=0,physicianConfirmed=false,gmConfirmed=false}={}){
+ courseD100,physicianSV=0,physicianConfirmed=false,gmConfirmed=false,herbalContext=null}={}){
  const s=prepare(actor,state,round);check(gmConfirmed===true&&isGoodId(sourceId),'Potvrďte GM a toxin');
  const t=entry(s,sourceId);
  check(t.status==='active','Poison Course smí pokračovat až po doloženém onset a jen při aktivním průběhu');
@@ -98,13 +99,25 @@ export function preparePoisonCourse({actor,state,sourceId,round=1,elapsedMinutes
  check(!s.shockFollowup&&!s.extendedShock&&!s.coma?.active,'Poison Course: paralelní Shock/Coma musí posoudit GM');
  check(!(s.diseaseCourses||[]).some(x=>['pending-profile','incubating','active'].includes(x.status)),
   'Poison Course: současná Disease expozice vyžaduje dořešení GM');
- const hb=profile(actor),rawEML=hb*t.hr+physicianSV,
+ const hb=profile(actor),baseEML=hb*t.hr+physicianSV;
+ let antivenin={bonus:0,sourceIds:[],completeIds:[],sourcePage:75};
+ if(herbalContext!==null){
+  check(herbalContext&&herbalContext.campaignId&&Number.isSafeInteger(herbalContext.minute)&&
+   Number.isSafeInteger(herbalContext.poisonOriginMinute)&&
+   herbalContext.minute===herbalContext.poisonOriginMinute+elapsedMinutes,
+   'Antivenin: Course musí odpovídat doložené minutě původní expozice');
+  antivenin=antiveninPoisonEvidence({journal:herbalContext.journal,
+   campaignId:herbalContext.campaignId,minute:herbalContext.minute,
+   poisonOriginMinute:herbalContext.poisonOriginMinute,targetId:actor.id,sourceId:t.sourceId,
+   combatRound:herbalContext.combatRound??null,timelineId:herbalContext.timelineId??null});
+ }
+ const rawEML=baseEML+antivenin.bonus,
   sl=successLevel(courseD100,rawEML),course=ailmentCourse({healingRate:t.hr,sl});
  const beforeHR=t.hr;t.elapsedMinutes=elapsedMinutes;t.sequence++;
  const effects=applyOutcome(s,t,course.healingRate,round);
  push(s,t.id+':course:'+t.sequence,'poison-course',round,
   {elapsedMinutes,beforeHR,afterHR:t.hr,hb,rawEML,courseD100,sl:names[sl],
-   physicianSV,physicianConfirmed,delta:course.delta,conditions:effects,rulePages:[183,184,186]});
+   physicianSV,physicianConfirmed,baseEML,antivenin,delta:course.delta,conditions:effects,rulePages:[75,183,184,186]});
  return {state:s,course:structuredClone(t),report:{phase:'course',beforeHR,...effects,hb,rawEML,
-  courseD100,sl:names[sl],physicianSV,elapsedMinutes,nextDueMinutes:t.status==='active'?elapsedMinutes+t.periodMinutes:null}};
+  courseD100,sl:names[sl],physicianSV,baseEML,antivenin,elapsedMinutes,nextDueMinutes:t.status==='active'?elapsedMinutes+t.periodMinutes:null}};
 }
