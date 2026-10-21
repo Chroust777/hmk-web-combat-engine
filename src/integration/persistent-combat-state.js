@@ -40,6 +40,15 @@ export function validateCombatState(s){
  requireCond(s.bloodShockPending===undefined||typeof s.bloodShockPending==='boolean','Neplatný příznak Blood Shock');
  requireCond(s.fatigue&&['windedness','weariness','otherWeakness'].every(k=>whole(s.fatigue[k],0,99999)),'Neplatný trvalý Fatigue');
  requireCond(Array.isArray(s.wounds)&&s.wounds.length<=1000&&Array.isArray(s.events)&&s.events.length<=5000,'Neplatný seznam ran nebo událostí');
+ if(s.herbalSoporific!==undefined){
+  const t=s.herbalSoporific;
+  requireCond(t&&typeof t.applicationId==='string'&&t.applicationId&&typeof t.campaignId==='string'&&t.campaignId&&
+   ['INC','UNC'].includes(t.status)&&whole(t.onsetMinute,0,1000000000)&&
+   typeof t.resultEventId==='string'&&t.resultEventId&&
+   s.events.some(e=>e.id===t.resultEventId&&e.type==='herb-soporific-effect'&&
+    e.details?.applicationId===t.applicationId&&e.details?.inducedState===t.status),
+   'Soporific INC/UNC musí mít nezměněný bylinný původ, bez přepisu Shock');
+ }
  if(s.herbalParalysis!==undefined){
   const p=s.herbalParalysis;
   requireCond(p&&typeof p.applicationId==='string'&&p.applicationId&&
