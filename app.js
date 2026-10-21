@@ -198,7 +198,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.396';
+const APP_VERSION='93.397';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -823,19 +823,23 @@ function campaignCalendarView(){
  ${pendingHerbalPotions.map(j=>{const p=j.calendarHerbPotionStart,skills=usableHerblore(p.actorId);return `<div class="hc-event"><strong>${esc(character(p.actorId)?.name||p.actorId)} · ${esc(p.herbType)} · ${esc(potencyLabel(p.quality))}</strong> · Herblore splatný ${esc(displayCampaignMinute(p.dueMinute))}
  ${clock.minute>=p.dueMinute&&skills.length?`<form data-herb-complete><input type="hidden" name="startId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(p.actorId)}"><label>Skutečný Herblore SV<select name="skillId">${skills.map(x=>`<option value="${esc(x.id)}">SV ${(x.skillTestProof.a||x.skillTestProof.result).sv} · ${esc(x.id)}</option>`).join('')}</select></label><label>Trvanlivost · d6<input name="shelfD6" type="number" min="1" max="6" required></label><button type="button" class="hc-small" data-herb-shelf-roll>⚄ Generovat d6</button><button type="submit">Dokončit výrobu bez podání</button></form>`:clock.minute<p.dueMinute?'<p>Čeká na skutečný posun GM.</p>':'<p>Čeká na nový Herblore SV v této minutě.</p>'}</div>`}).join('')}
  ${availablePotions.map(j=>{const p=j.calendarHerbPotionComplete,needsWound=['coagulant','curative'].includes(p.herbType);
- const targets=needsWound?participants.flatMap(c=>(c.hmk?.combatState?.wounds||[]).filter(w=>!w.healed&&(p.herbType!=='coagulant'||w.bleeding)&&(p.herbType!=='curative'||!(w.area||w.healing?.area))).map(w=>({ref:c.id+'::'+w.id,label:c.name+' · '+w.location+' · '+w.id}))):participants.map(c=>({ref:c.id,label:c.name}));
+ const targets=p.herbType==='antivenin'?participants.flatMap(c=>(c.hmk?.combatState?.toxinCourses||[])
+  .filter(t=>['incubating','active'].includes(t.status))
+  .map(t=>({ref:c.id+'::'+encodeURIComponent(t.sourceId),label:c.name+' · Poison '+t.sourceId+' · HR'+t.hr}))):
+  needsWound?participants.flatMap(c=>(c.hmk?.combatState?.wounds||[]).filter(w=>!w.healed&&(p.herbType!=='coagulant'||w.bleeding)&&(p.herbType!=='curative'||!(w.area||w.healing?.area))).map(w=>({ref:c.id+'::'+w.id,label:c.name+' · '+w.location+' · '+w.id}))):participants.map(c=>({ref:c.id,label:c.name}));
  const method=p.herbType==='aromatic'?'perfume':needsWound?'poultice':p.herbType==='hallucinogenic'?'ingested':'ingested';
  return `<form data-herb-admin><strong>${esc(p.herbType)} · ${esc(potencyLabel(p.potency))} · SV ${p.sv}</strong> · připravil ${esc(character(p.actorId)?.name||p.actorId)} · platí do ${esc(displayCampaignMinute(p.expiryMinute))}
  <input type="hidden" name="completeId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(p.actorId)}"><input type="hidden" name="method" value="${method}">
- <label>${needsWound?'Zranění příjemce':'Příjemce'}<select name="targetRef" required>${targets.map(t=>`<option value="${esc(t.ref)}">${esc(t.label)}</option>`).join('')}</select></label>
+ <label>${needsWound?'Zranění příjemce':p.herbType==='antivenin'?'Pacient a doložená otrava':'Příjemce'}<select name="targetRef" required>${targets.map(t=>`<option value="${esc(t.ref)}">${esc(t.label)}</option>`).join('')}</select></label>
  ${p.herbType==='hallucinogenic'?'<label>Podání<select name="methodOverride"><option value="ingested">Požití</option><option value="smoked">Kouř</option></select></label>':''}
  ${p.herbType==='coagulant'?'<label class="hc-check"><input type="checkbox" name="combatAnchorConfirmed" required> GM potvrzuje, že aktuální bojové kolo a kalendářní minuta označují stejný okamžik (pro následné Blood Loss hody)</label>':''}
+ ${p.herbType==='antivenin'&&p.potency===3?'<label class="hc-check"><input type="checkbox" name="combatAnchorConfirmed"> GM potvrzuje bojovou časovou osu pro Great Antivenin – nástup již po jednom kole (bez tohoto důkazu se v minutě podání bonus neuplatní)</label>':''}
  <label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečné podání této dávky</label>
  <button type="submit" ${targets.length?'':'disabled'}>Podat jednu dávku (bez posunu času)</button></form>`;
  }).join('')||'<p class="hc-hint">Žádný účinný, dosud nepodaný lektvar.</p>'}
- ${appliedPotions.slice(-15).map(j=>{const p=j.calendarHerbPotionAdminister,e=herbPotionEffectAt(p,clock.minute);return `<p class="hc-hint">${esc(p.herbType)} → ${esc(character(p.targetId)?.name||p.targetId)}${p.woundId?' · rána '+esc(p.woundId):''} · původní bonus ${p.bonus} · ${esc(e.status)}${e.status==='active'?' · nyní '+e.bonus:''} · ${p.herbType==='curative'?'bonus se automaticky načte při příštím Healing/Infection hodu dané rány':p.herbType==='coagulant'?'bonus se ověří při Blood Loss Strength d100, pouze při souhlasu bojových kol s minutou GM':'další hod zůstává v příslušném původním modulu'}; důkaz ${esc(j.id)}</p>`}).join('')}
+ ${appliedPotions.slice(-15).map(j=>{const p=j.calendarHerbPotionAdminister,e=herbPotionEffectAt(p,clock.minute);return `<p class="hc-hint">${esc(p.herbType)} → ${esc(character(p.targetId)?.name||p.targetId)}${p.woundId?' · rána '+esc(p.woundId):''} · původní bonus ${p.bonus} · ${esc(e.status)}${e.status==='active'?' · nyní '+e.bonus:''} · ${p.herbType==='curative'?'bonus se automaticky načte při příštím Healing/Infection hodu dané rány':p.herbType==='coagulant'?'bonus se ověří při Blood Loss Strength d100, pouze při souhlasu bojových kol s minutou GM':p.herbType==='antivenin'?'bonus se ověří u Poison Course '+esc(p.poisonSourceId||'(staré nepřiřazené podání)')+' až po nástupu účinku':'další hod zůstává v příslušném původním modulu'}; důkaz ${esc(j.id)}</p>`}).join('')}
 
- <p class="hc-hint">Podání všech 12 druhů je doložitelné. Curative ovlivňuje Healing a Infection; Coagulant ovlivňuje původní Strength Blood Loss d100 v ověřeném bojovém intervalu. Ostatní účinky dosud nejsou automaticky vyhodnoceny. Bylinné dávky zatím nemají doloženou hmotnost nádoby. Nedokončeno: mundánní receptury a Alchemy 267–268.</p>
+ <p class="hc-hint">Podání všech 12 druhů je doložitelné. Curative ovlivňuje Healing/Infection, Coagulant Blood Loss a doložený Antivenin navazující Poison Course. Great Antivenin v minutě podání vyžaduje ověření bojového kola. Ostatní účinky dosud nejsou automaticky vyhodnoceny. Bylinné dávky zatím nemají doloženou hmotnost nádoby. Nedokončeno: mundánní receptury a Alchemy 267–268.</p>
  </details></section>`;
  const wildernessHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>Wilderness Tasks · Foraging / Stalking / Vigilance (HMK 147) · ${forageRows.length} k doložení</summary>
  <p class="hc-hint">Foraging: jeden d10 za každý skutečně potvrzený režim, podle okolního biotopu a sezóny. Nalezené jídlo/voda/byliny jsou nejprve účetním časovým důkazem (nikoli nezdokumentovanou fyzickou položkou inventáře). Stalking zpřístupňuje Tracking ve Skill Workbench. Stalking/Vigilance se zachovávají pro vyhodnocení překvapení během Encounter; bez doložené procedury se nepřiděluje fiktivní bonus.</p>
@@ -1114,7 +1118,7 @@ function hskPoisonPanel(actorId){
  <button type="submit">Zapsat onset a podmínky do postavy</button><output role="status" aria-live="polite"></output></form></details>`:
  `<details class="hsk-climb-fall"><summary>Poison Course ${esc(t.sourceId)} · HR${t.hr} · následuje ${t.elapsedMinutes+t.periodMinutes}. minuta</summary>
  <form data-hmk-poison-course><input type="hidden" name="sourceId" value="${esc(t.sourceId)}">
- <p>Každých <strong>${t.periodMinutes} minut</strong> se provádí Disease Course (HMK str.184). EML = aktuální Healing Base × HR + doložený Physician SV. CF: −2 HR, F: −1, S: +1, CS: +2. HR6 = uzdravení, HR0 = smrt. Stav se nahrazuje, nesčítá.</p>
+ <p>Každých <strong>${t.periodMinutes} minut</strong> se provádí Disease Course (HMK str.184). EML = Healing Base × HR + doložený Physician SV + prokázaný účinný Antivenin (HMK 75). CF: −2 HR, F: −1, S: +1, CS: +2. HR6 = uzdravení, HR0 = smrt. Stav se nahrazuje, nesčítá.</p>
  <div class="field-grid"><label>Minuty od expozice (další splatný okamžik)<input name="elapsedMinutes" type="number" min="${t.elapsedMinutes+t.periodMinutes}" required value="${t.elapsedMinutes+t.periodMinutes}"></label>
  <label>Fyzický Course d100<input type="number" name="courseD100" min="1" max="100" required></label>
  <label>Skutečně doložený Physician SV bonus<input type="number" name="physicianSV" min="0" max="30" value="0" required></label></div>
@@ -6195,16 +6199,22 @@ document.addEventListener('submit',event=>{
  try{
   if(combatInitiativeSequence)throw Error('Poison Course během Initiative musí vést Combat');
   const actor=character(selected),state=persistentStateOf(actor),f=n=>form.elements.namedItem(n);
-  const result=preparePoisonCourse({actor,state,sourceId:f('sourceId').value.trim(),
+  const poisonSourceId=f('sourceId').value.trim();
+  const poisonCourse=state.toxinCourses?.find(t=>t.sourceId===poisonSourceId);
+  const poisonAnchor=data.campaignClock&&poisonCourse?getCampaignEpisodeAnchor(data.campaignClock,'poison',actor.id,poisonCourse.id):null;
+  const result=preparePoisonCourse({actor,state,sourceId:poisonSourceId,
    round:Math.max(1,combatClock.round||1,state.lastRound||0),
    elapsedMinutes:Number(f('elapsedMinutes').value),courseD100:Number(f('courseD100').value),
    physicianSV:Number(f('physicianSV').value),physicianConfirmed:f('physicianConfirmed').checked,
-   gmConfirmed:f('gmConfirmed').checked});
+   gmConfirmed:f('gmConfirmed').checked,
+   herbalContext:data.campaignClock?{journal:data.journal,campaignId:campaignKey(data.campaignClock),
+    minute:data.campaignClock.minute,poisonOriginMinute:poisonAnchor?.minute,
+    combatRound:combatClock.round,timelineId:combatInjuryTimelineId}:null});
   confirmCalendarEpisodeElapsed('poison',actor.id,result.course.id,result.report.elapsedMinutes);
   if(!mutate(()=>{
    synchronizeCombatInjuries(actor,result.state);
    data.journal.push({id:uuid(),characterId:actor.id,title:'Poison Course · HMK 184/186',
-    body:'Zdroj '+result.course.sourceId+'; min '+result.report.elapsedMinutes+'; '+result.report.beforeHR+'→'+result.report.hr+' HR; d100 '+result.report.courseD100+' / EML '+result.report.rawEML+' => '+result.report.sl+'; '+result.report.shock+'; weakness '+result.report.weakness+'; '+result.report.status,
+    body:'Zdroj '+result.course.sourceId+'; min '+result.report.elapsedMinutes+'; '+result.report.beforeHR+'→'+result.report.hr+' HR; d100 '+result.report.courseD100+' / EML '+result.report.rawEML+' (Antivenin +'+result.report.antivenin.bonus+' · '+result.report.antivenin.sourceIds.join(',')+') => '+result.report.sl+'; '+result.report.shock+'; weakness '+result.report.weakness+'; '+result.report.status,
     createdAt:stamp(),skillTestProof:{type:'poison-course',sourceId:result.course.sourceId,actorId:actor.id,report:result.report}});
   }))throw Error('Course se neuložil');
  }catch(e){if(out?.isConnected)out.textContent='Poison Course čeká: '+e.message;else alert('Poison: '+e.message);}
@@ -7158,20 +7168,24 @@ document.addEventListener('submit',e=>{
  try{
   const clock=data.campaignClock;if(!clock)throw Error('Chybí kalendář');
   const fd=new FormData(f),actorId=String(fd.get('actorId')||''),targetRef=String(fd.get('targetRef')||''),
-   [targetId,woundId='']=targetRef.split('::'),method=String(fd.get('methodOverride')||fd.get('method')||'');
+   [targetId,woundPart='']=targetRef.split('::'),method=String(fd.get('methodOverride')||fd.get('method')||'');
   const memberIds=calendarMemberIds(clock,data.characters).map(c=>c.id);
   const target=character(targetId),potionRow=data.journal.find(x=>x.id===fd.get('completeId'));
   const type=potionRow?.calendarHerbPotionComplete?.herbType;
+  const poisonSourceId=type==='antivenin'?decodeURIComponent(woundPart):'';
+  const woundId=['curative','coagulant'].includes(type)?woundPart:'';
+  if(type==='antivenin'&&!target?.hmk?.combatState?.toxinCourses?.some(t=>t.sourceId===poisonSourceId&&['incubating','active'].includes(t.status)))
+   throw Error('Antivenin: vybraná otrava není aktivní nebo nemá doložený původ v této kampani');
   if(['curative','coagulant'].includes(type)){
    const wound=target?.hmk?.combatState?.wounds?.find(w=>w.id===woundId&&!w.healed);
    if(!wound||type==='coagulant'&&!wound.bleeding)throw Error('Není doložená odpovídající aktivní rána');
    if(type==='curative'&&(wound.area||wound.healing?.area))throw Error('Area Injury podle HMK 75 vyžaduje pět skutečných dávek; jednorázové podání není přípustné.');
   }
   const proof=createHerbPotionAdministration({journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,
-   actorId,completeId:String(fd.get('completeId')),targetId,method,woundId,gmConfirmed:!!fd.get('gmConfirmed'),memberIds,
-   combatAnchor:type==='coagulant'?(()=>{
+   actorId,completeId:String(fd.get('completeId')),targetId,method,woundId,poisonSourceId,gmConfirmed:!!fd.get('gmConfirmed'),memberIds,
+   combatAnchor:type==='coagulant'||type==='antivenin'&&potionRow?.calendarHerbPotionComplete?.potency===3&&fd.get('combatAnchorConfirmed')?(()=>{
     if(!fd.get('combatAnchorConfirmed')||!encounterSelection.has(targetId))
-     throw Error('Coagulant: GM musí potvrdit současnou bojovou časovou osu a účast pacienta ve střetnutí');
+     throw Error('Chybí GM potvrzená bojová osa a účast pacienta ve střetnutí');
     return {confirmedByGM:true,round:combatClock.round,campaignMinute:clock.minute,timelineId:combatInjuryTimelineId};
    })():null});
   if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
