@@ -85,6 +85,7 @@ export function createHerbPotionAdministration({journal=[],campaignId,minute,act
   herbType:potion.herbType,potency:potion.potency,sv:potion.sv,bonus:consequence.bonus,
   schedule:consequence.schedule,rule:consequence.rule,sourcePage:75,
   applicationStatus:'APPLIED_NO_AUTOMATIC_HEALTH_ROLL',gmConfirmed:true,
+  ...(potion.herbType==='hallucinogenic'&&!legacyValidation?{hallucinogenicTracked:true}:{}),
   ...(potion.herbType==='paralytic'&&!legacyValidation?{paralyticTracked:true}:{}),
   ...(potion.herbType==='soporific'&&!legacyValidation?{soporificTracked:true}:{}),
   ...(potion.herbType==='poison'&&potion.potency===3&&!legacyValidation?{poisonGreatTracked:true}:{}),
@@ -107,7 +108,7 @@ export function validateHerbAdministrationJournal(journal=[]){
     actorId:p.actorId,completeId:p.completeId,targetId:p.targetId,method:p.method,woundId:p.woundId,
     gmConfirmed:p.gmConfirmed,memberIds:[p.actorId,p.targetId],combatAnchor:p.combatAnchor??null,
     poisonSourceId:p.poisonSourceId??'',emeticOnsetD6:p.emeticOnsetD6??null,
-    emeticOnsetOrigin:p.emeticOnsetOrigin??'',legacyValidation:p.paralyticTracked!==true&&p.soporificTracked!==true&&p.poisonGreatTracked!==true});
+    emeticOnsetOrigin:p.emeticOnsetOrigin??'',legacyValidation:p.paralyticTracked!==true&&p.soporificTracked!==true&&p.poisonGreatTracked!==true&&p.hallucinogenicTracked!==true});
    need(JSON.stringify(x)===JSON.stringify(p),'Podání neodpovídá původnímu doloženému lektvaru');
   }
   prior.push(row);
