@@ -40,6 +40,16 @@ export function validateCombatState(s){
  requireCond(s.bloodShockPending===undefined||typeof s.bloodShockPending==='boolean','Neplatný příznak Blood Shock');
  requireCond(s.fatigue&&['windedness','weariness','otherWeakness'].every(k=>whole(s.fatigue[k],0,99999)),'Neplatný trvalý Fatigue');
  requireCond(Array.isArray(s.wounds)&&s.wounds.length<=1000&&Array.isArray(s.events)&&s.events.length<=5000,'Neplatný seznam ran nebo událostí');
+ if(s.herbalParalysis!==undefined){
+  const p=s.herbalParalysis;
+  requireCond(p&&typeof p.applicationId==='string'&&p.applicationId&&
+   typeof p.campaignId==='string'&&p.campaignId&&whole(p.onsetMinute,0,1000000000)&&
+   p.endMinute===p.onsetMinute+60&&p.endMinute<=1000000060&&
+   typeof p.resultEventId==='string'&&p.resultEventId&&
+   s.events.some(e=>e.id===p.resultEventId&&e.type==='herb-paralytic-endurance'&&
+    e.details?.applicationId===p.applicationId&&e.details?.paralyzed===true),
+   'Herbal Paralysis musí mít platný původ a trvání (HMK 75/184)');
+ }
  if(s.environmentalHazards!==undefined){
   requireCond(Array.isArray(s.environmentalHazards)&&s.environmentalHazards.length<=200,
    'Neplatná evidence Cold/Heat Exposure');

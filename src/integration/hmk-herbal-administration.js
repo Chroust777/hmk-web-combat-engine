@@ -70,8 +70,9 @@ export function createHerbPotionAdministration({journal=[],campaignId,minute,act
   'Antivenin vyžaduje doložený jednoznačný zdroj aktivní otravy');
  const woundNeeded=potion.herbType==='curative'||potion.herbType==='coagulant';
  need(woundNeeded?(typeof woundId==='string'&&woundId.length>0):woundId==='','Poultice musí cílit na jednu doloženou ránu, ostatní lektvary ne');
+ if(potion.herbType==='paralytic'&&potion.potency===3&&!legacyValidation)need(combatAnchor!==null,'Great Paralytic vyžaduje doložené bojové kolo pro nástup účinku');
  if(combatAnchor!==null){
-  need((potion.herbType==='coagulant'||antivenin&&potion.potency===3||emetic)&&combatAnchor&&combatAnchor.confirmedByGM===true&&
+  need((potion.herbType==='coagulant'||antivenin&&potion.potency===3||emetic||potion.herbType==='paralytic'&&potion.potency===3)&&combatAnchor&&combatAnchor.confirmedByGM===true&&
    Number.isSafeInteger(combatAnchor.round)&&combatAnchor.round>=1&&combatAnchor.round<=9999&&
    combatAnchor.campaignMinute===minute&&typeof combatAnchor.timelineId==='string'&&combatAnchor.timelineId,
    'Neplatná GM vazba podání na bojové kolo');
@@ -82,6 +83,7 @@ export function createHerbPotionAdministration({journal=[],campaignId,minute,act
   herbType:potion.herbType,potency:potion.potency,sv:potion.sv,bonus:consequence.bonus,
   schedule:consequence.schedule,rule:consequence.rule,sourcePage:75,
   applicationStatus:'APPLIED_NO_AUTOMATIC_HEALTH_ROLL',gmConfirmed:true,
+  ...(potion.herbType==='paralytic'&&!legacyValidation?{paralyticTracked:true}:{}),
   ...(physical?{vialId:physical.vialId,vialBindingId:physical.bindingId}:{}),
   ...(antivenin&&poisonSourceId?{poisonSourceId:poisonSourceId.trim()}:{}),
   ...(emetic&&emeticOnsetD6!==null?{emeticOnsetD6,emeticOnsetOrigin}:{}),
@@ -101,7 +103,7 @@ export function validateHerbAdministrationJournal(journal=[]){
     actorId:p.actorId,completeId:p.completeId,targetId:p.targetId,method:p.method,woundId:p.woundId,
     gmConfirmed:p.gmConfirmed,memberIds:[p.actorId,p.targetId],combatAnchor:p.combatAnchor??null,
     poisonSourceId:p.poisonSourceId??'',emeticOnsetD6:p.emeticOnsetD6??null,
-    emeticOnsetOrigin:p.emeticOnsetOrigin??'',legacyValidation:true});
+    emeticOnsetOrigin:p.emeticOnsetOrigin??'',legacyValidation:p.paralyticTracked!==true});
    need(JSON.stringify(x)===JSON.stringify(p),'Podání neodpovídá původnímu doloženému lektvaru');
   }
   prior.push(row);
