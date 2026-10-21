@@ -34,7 +34,7 @@ function validateCandidate(document,characterId){
   !arc.astralState&&!arc.spiritState&&!arc.possessed,
   'Aural Recovery: nevyřešené mentální povinnosti / spirit-astral souběh');
  // We only resolve cases with a committed spell-origin causal event.
- check(state.events.some(e=>['hmk-spell-misfire','hmk-spell-total-release','hmk-shaman-talisman-aural'].includes(e.type)&&
+ check(state.events.some(e=>['hmk-spell-misfire','hmk-spell-total-release','hmk-shaman-talisman-aural','hmk-astral-transcendence-aural'].includes(e.type)&&
   whole(e.details?.auralShock,1,6)),
   'Aural Recovery: není doložen původ Aural Shock ze Spellfire ani Shaman Trance CF');
  const wil=person.hmk?.attributes?.wil;
@@ -81,7 +81,7 @@ export function persistSpellAuralRecovery({document,characterId,eventId,gameDay,
   s.morale.psycheStress+=outcome.psycheStressGained;
   a.pendingPsycheTraitChoice={sourceEventId:eventId,levels:outcome.psycheStressGained};
  }
- const details={source:'verified-spell-or-shaman-origin-aural-shock',gameDay,willAttribute:willEML/5,
+ const details={source:'verified-spell-shaman-or-astral-origin-aural-shock',gameDay,willAttribute:willEML/5,
   willEML,physicalD100:d100,successLevel:resultName[sl],before:arc.auralShockLevels,
   after:outcome.levels,auralWeaknessRemoved:delta*5,
   psycheStressGained:outcome.psycheStressGained,psycheTraitChoicePending:!!outcome.psycheStressGained,

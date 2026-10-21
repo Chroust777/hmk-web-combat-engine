@@ -129,7 +129,7 @@ export function pendingHallucinogenicTranscendence(journal=[],campaignId=''){
  * the Spirit actions, reembodiment and any aural consequence remain separate.
  */
 export function createHallucinogenicTranscendence({journal=[],campaignId,veilId,minute,targetId,
- tranceML,fatiguePenalty,d100,bonusD3=null,dieOrigin='manual',bonusDieOrigin=null,gmConfirmed=false,reembodimentTracked=false,willIndex=null}={}){
+ tranceML,fatiguePenalty,d100,bonusD3=null,dieOrigin='manual',bonusDieOrigin=null,gmConfirmed=false,reembodimentTracked=false,willIndex=null,willTracked=false}={}){
  check(gmConfirmed===true&&ORIGINS.includes(dieOrigin)&&integer(d100,1,100),'Transcendence vyžaduje skutečný d100 a potvrzení GM');
  const veil=journal.find(x=>x.id===veilId&&x.calendarCampaignId===campaignId&&x.calendarHerbHallucinogenicVeil?.transcendenceTracked===true);
  check(veil&&veil.calendarHerbHallucinogenicVeil.targetId===targetId,'chybí nové doložené Lift the Veil');
@@ -149,7 +149,7 @@ export function createHallucinogenicTranscendence({journal=[],campaignId,veilId,
   herbalBonus:bonus,rawEML,d100,dieOrigin,sl,bonusD3,bonusDieOrigin,
   bonusSpiritRounds:sl==='CS'?bonusD3:0,astralJourneyEligible:sl==='S'||sl==='CS',
   requiresWillTest:sl==='CF',repeatTranceGMDecision:sl==='F',gmConfirmed:true,sourcePages:[75,291,294],
-  ...(reembodimentTracked===true?{reembodimentTracked:true,willIndex}:{})};
+  ...(reembodimentTracked===true?{reembodimentTracked:true,willIndex}:{}),...(willTracked===true?{willTracked:true}:{})};
 }
 
 /** HMK v1.2 pp.292,294,298: the astral Return roll is separate from
