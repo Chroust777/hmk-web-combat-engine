@@ -15,7 +15,8 @@ const make=(type,potency=3,sv=6,usable=true)=>row('complete-'+type,actor,minute,
 for(const type of EXOTIC_POTIONS){
  const source=make(type),j=[source],w=['curative','coagulant'].includes(type)?'wound1':'';
  const method=type==='aromatic'?'perfume':w?'poultice':'ingested';
- const options={journal:j,campaignId:c,minute:at,actorId:actor,completeId:source.id,targetId:target,method,woundId:w,memberIds:[actor,target],gmConfirmed:true};
+ const options={journal:j,campaignId:c,minute:at,actorId:actor,completeId:source.id,targetId:target,method,woundId:w,memberIds:[actor,target],gmConfirmed:true,
+  ...(type==='emetic'?{emeticOnsetD6:3,emeticOnsetOrigin:'manual',combatAnchor:{confirmedByGM:true,round:17,campaignMinute:at,timelineId:'combat-A'}}:{})};
  const p=createHerbPotionAdministration(options);eq(p.bonus,24);eq(p.herbType,type);eq(p.applicationStatus,'APPLIED_NO_AUTOMATIC_HEALTH_ROLL');
  const admin=row('admin-'+type,actor,at,'calendarHerbPotionAdminister',p);
  const together=[...j,admin];eq(validateHerbAdministrationJournal(together),true);
