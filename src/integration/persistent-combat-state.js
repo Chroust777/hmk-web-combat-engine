@@ -87,10 +87,15 @@ export function validateCombatState(s){
     ['digested','vector','contact'].includes(t.transmission)&&
     (t.herbalSource?
       (typeof t.herbalSource.applicationId==='string'&&t.herbalSource.applicationId.length>=3&&
-       [1,2].includes(t.herbalSource.potency)&&whole(t.herbalSource.sv,1,14)&&
+       [1,2,3].includes(t.herbalSource.potency)&&whole(t.herbalSource.sv,1,14)&&
        t.sourceId==='herb:'+t.herbalSource.applicationId&&t.transmission==='digested'&&
-       t.initialHR===(t.herbalSource.potency===1?4:3)&&
-       t.onsetMinutes===(15-t.herbalSource.sv)*(t.herbalSource.potency===1?60:1)):
+       t.initialHR===(t.herbalSource.potency===2?3:4)&&
+       (t.herbalSource.potency===3?
+        t.onsetMinutes===0&&whole(t.herbalSource.originRound,1,9999)&&
+        s.events.some(e=>e.id===t.id&&e.type==='poison-start'&&e.round===t.herbalSource.originRound+t.herbalSource.onsetRounds)&&
+        whole(t.herbalSource.onsetRounds,1,14)&&t.herbalSource.onsetRounds===15-t.herbalSource.sv&&
+        typeof t.herbalSource.timelineId==='string'&&t.herbalSource.timelineId.length>=3:
+        t.onsetMinutes===(15-t.herbalSource.sv)*(t.herbalSource.potency===1?60:1))):
       whole(t.onsetMinutes,10,60))&&whole(t.periodMinutes,10,60)&&whole(t.initialHR,1,5)&&
     Array.isArray(t.symptomD10s)&&t.symptomD10s.length===4&&t.symptomD10s.every(n=>whole(n,1,10))&&
     Array.isArray(t.symptoms)&&t.symptoms.length===4&&t.symptoms.every(x=>typeof x==='string'&&x.length>0)&&

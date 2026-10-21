@@ -64,10 +64,14 @@ export function preparePoisonStart({actor,state,round=1,sourceId,transmission,
  check(['digested','vector','contact'].includes(transmission),'Poison: potvrďte skutečnou cestu přenosu');
  if(herbalSource!==null){
   check(herbalSource&&typeof herbalSource.applicationId==='string'&&herbalSource.applicationId.length>=3&&
-   int(herbalSource.potency,1,2)&&int(herbalSource.sv,1,14)&&
+   int(herbalSource.potency,1,3)&&int(herbalSource.sv,1,14)&&
    sourceId==='herb:'+herbalSource.applicationId&&transmission==='digested'&&
-   initialHR===(herbalSource.potency===1?4:3)&&
-   onsetMinutes===(15-herbalSource.sv)*(herbalSource.potency===1?60:1),
+   initialHR===(herbalSource.potency===2?3:4)&&
+   (herbalSource.potency===3?onsetMinutes===0&&
+     int(herbalSource.onsetRounds,1,14)&&herbalSource.onsetRounds===15-herbalSource.sv&&
+     int(herbalSource.originRound,1,9999)&&round===herbalSource.originRound+herbalSource.onsetRounds&&
+     typeof herbalSource.timelineId==='string'&&herbalSource.timelineId.length>=3:
+     onsetMinutes===(15-herbalSource.sv)*(herbalSource.potency===1?60:1)),
    'Herbal Poison: skutečný HR a nástup musí přesně odpovídat HMK 75');
   check(int(periodMinutes,10,60),'Herbal Poison: GM musí doložit Course period 10–60 minut podle HMK 186');
  }else check(int(onsetMinutes,10,60)&&int(periodMinutes,10,60),
