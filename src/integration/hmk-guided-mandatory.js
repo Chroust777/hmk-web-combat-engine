@@ -16,6 +16,7 @@ import {validateCombatState,combatFatigueTotals,
 import {createManualDiceQueue,recordManualDie,nextManualDie,completedManualDice} from './hmk-manual-dice-queue.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {coagulantBleedingEvidence} from './hmk-herbal-bleeding-bridge.js';
+import {narcoticEvidence} from './hmk-herbal-narcotic.js';
 
 const assert=(x,msg)=>{if(!x)throw Error(msg)};
 const integer=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -139,12 +140,15 @@ export function createGuidedMandatory({state,character,round,eventId,actorId=nul
  const herbalProof=event.kind==='blood-loss'&&herbalContext?
   coagulantBleedingEvidence({...herbalContext,targetId:character.id,woundId:event.id,combatRound:round,timelineId}):
   {bonus:0,stage:0,sourceIds:[],completeIds:[],sourcePage:75};
+ const narcotic=event.kind==='shock-recovery'&&herbalContext?
+  narcoticEvidence({...herbalContext,targetId:character.id}):
+  {bonus:0,movePenalty:0,agilityPenalty:0,stage:0,sourceIds:[],completeIds:[],sourcePage:75};
  const proofId=`${eventId}:${event.kind}:${event.id}`;
  const queue=rollRequired?createManualDiceQueue({id:proofId,source:event.source,round,
   actorId:character.id,requests:[{id:'resultD100',faces:100,label:`${event.label}: skutečný d100`}]}):null;
  return {format:'hmk-guided-mandatory-v1',event,characterId:character.id,round,eventId,actorId,turnEnded,
   timelineId,elapsedMinutesSinceOriginal,context:{ml,abe,technique:mishapTechnique,comaLocationShock,comaInjuryLevel,fatigue,
-   herbalProof,mishapProfile:profile,injuryImpairment:impaired?.impairment??null,impairedTest:impaired?.test??null,usedArms:impaired?.usedArms??null},
+   herbalProof,narcotic,mishapProfile:profile,injuryImpairment:impaired?.impairment??null,impairedTest:impaired?.test??null,usedArms:impaired?.usedArms??null},
   stateWitness:stateSignature(state),characterWitness:stateSignature(character.hmk),queue,rolls:[],phase:queue?'waiting-die':'ready',outcome:null};
 }
 
@@ -167,7 +171,7 @@ export function submitGuidedMandatoryDie(session,value){
  const proof=completedManualDice(queue).proof;
  next.rolls=[...next.rolls,...proof.rolls];
  if(request.id==='resultD100'&&session.event.kind==='shock-recovery'&&session.event.id==='UNC'){
-  const sl=successLevel(proof.rolls[0].value,session.context.ml-session.context.fatigue-20);
+  const sl=successLevel(proof.rolls[0].value,session.context.ml-session.context.fatigue-20+(session.context.narcotic?.bonus??0));
   if(sl===SL.CF){
    assert(integer(session.context.comaLocationShock,0,15)&&integer(session.context.comaInjuryLevel,1,5)
     &&12-session.context.comaLocationShock-session.context.comaInjuryLevel>0,
@@ -196,6 +200,11 @@ export function commitGuidedMandatory({session,state,character,round,actorId=nul
  const all=guidedMandatoryEvents({state,characterId:character.id,round,actorId,turnEnded,timelineId,elapsedMinutesSinceOriginal});
  assert(all[0]?.kind===session.event.kind&&all[0]?.id===session.event.id,'Povinná událost se změnila');
  const ctx=session.context,roll=session.rolls.find(x=>x.id==='resultD100')?.value;
+ const narcotic=session.event.kind==='shock-recovery'&&herbalContext?
+  narcoticEvidence({...herbalContext,targetId:character.id}):
+  {bonus:0,movePenalty:0,agilityPenalty:0,stage:0,sourceIds:[],completeIds:[],sourcePage:75};
+ assert(JSON.stringify(narcotic)===JSON.stringify(ctx.narcotic),
+  'Narcotic: změnil se čas GM nebo původ podání; proveďte nový doložený Shock Roll');
  const herb=session.event.kind==='blood-loss'&&herbalContext?
   coagulantBleedingEvidence({...herbalContext,targetId:character.id,woundId:session.event.id,combatRound:round,timelineId}):
   {bonus:0,stage:0,sourceIds:[],completeIds:[],sourcePage:75};
@@ -216,13 +225,13 @@ export function commitGuidedMandatory({session,state,character,round,actorId=nul
  }else if(session.event.kind==='shock-recovery'){
   assert(integer(roll,1,100),'Shock Recovery vyžaduje skutečný d100');
   const fatigue=combatFatigueTotals(state).total;
-  const sl=nameSL(successLevel(roll,ctx.ml-fatigue-(state.shock==='STN'?0:20)));
+  const sl=nameSL(successLevel(roll,ctx.ml-fatigue-(state.shock==='STN'?0:20)+narcotic.bonus));
   const comaNeeded=state.shock==='UNC'&&sl==='CF';
   const comaD10=session.rolls.find(x=>x.id==='comaIntervalD10')?.value??null;
   assert(!comaNeeded||integer(comaD10,1,10),'UNC + CF vyžaduje další skutečný d10 pro Coma; výsledek se nesmí domyslet');
   transition=applyConfirmedShockRecovery({state,round,eventId:session.eventId,sl,
    timingConfirmed:true,characterId:character.id,actorId,turnEnded,timelineId,elapsedMinutesSinceOriginal,
-   shockML:ctx.ml,roll,comaLocationShock:comaNeeded?ctx.comaLocationShock:null,
+   shockML:ctx.ml,roll,herbalBonus:narcotic.bonus,herbalProof:narcotic,comaLocationShock:comaNeeded?ctx.comaLocationShock:null,
    comaInjuryLevel:comaNeeded?ctx.comaInjuryLevel:null,initialComaD10:comaD10});
  }else throw Error('Neznámá událost');
  const finished=transition.state;
@@ -234,7 +243,7 @@ export function commitGuidedMandatory({session,state,character,round,actorId=nul
  last.details.guidedResolution={kind:session.event.kind,ml:ctx.ml,abe:ctx.abe,derivedSL:roll==null?null:
   nameSL(successLevel(roll,session.event.kind==='blood-loss'?ctx.ml+herb.bonus:session.event.kind==='injury-mishap'?
   ctx.ml-ctx.fatigue-ctx.injuryImpairment:session.event.kind==='shock-recovery'?
-  ctx.ml-combatFatigueTotals(state).total-(state.shock==='STN'?0:20):session.event.kind==='injury-morale'?
+  ctx.ml-combatFatigueTotals(state).total-(state.shock==='STN'?0:20)+narcotic.bonus:session.event.kind==='injury-morale'?
   ctx.ml-5*ctx.abe-combatFatigueTotals(state).total+(state.morale?.state==='brave'?20:0):ctx.ml)),
   source:'HMK World of Kèthîra',ruleChoice:'automatic-verified-event'};
  if(session.event.kind==='injury-mishap'){

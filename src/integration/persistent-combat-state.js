@@ -548,7 +548,7 @@ export function shockFollowupReadiness({state,round,characterId=null,actorId=nul
  if(!characterId||actorId!==characterId||turnEnded!==true)return {due:false,reason:'actor-end-turn-not-confirmed'};
  return {due:true,kind:q.kind,requirement:'end-next-turn'};
 }
-export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfirmed=false,characterId=null,actorId=null,turnEnded=false,timelineId=null,elapsedMinutesSinceOriginal=null,comaLocationShock=null,comaInjuryLevel=null,initialComaD10=null,shockML=null,roll=null}={}){
+export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfirmed=false,characterId=null,actorId=null,turnEnded=false,timelineId=null,elapsedMinutesSinceOriginal=null,comaLocationShock=null,comaInjuryLevel=null,initialComaD10=null,shockML=null,roll=null,herbalBonus=0,herbalProof=null}={}){
  const s=ready(state,round,eventId);
  requireCond(timingConfirmed===true,'GM musí potvrdit přípustný čas Shock recovery / reroll');
  sl=parsedSL(sl);
@@ -557,10 +557,14 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
  let verifiedRoll=null;
  if(shockML!==null||roll!==null){
   requireCond(whole(shockML,0,200)&&whole(roll,1,100),'Vyžadován platný Shock ML a skutečný d100');
-  const fatigue=fatigueTotalUnsafe(s),rawEML=shockML-fatigue-(s.shock==='STN'?0:20);
+  requireCond(whole(herbalBonus,0,800)&&
+   (herbalBonus===0||herbalProof&&herbalProof.bonus===herbalBonus&&
+    herbalProof.sourceIds?.length===1&&herbalProof.sourcePage===75),
+   'Shock + Narcotic vyžaduje doložené podání a aktuální čas GM');
+  const fatigue=fatigueTotalUnsafe(s),rawEML=shockML-fatigue-(s.shock==='STN'?0:20)+herbalBonus;
   const calculated=successLevel(roll,rawEML);
   requireCond(calculated===sl,'Zadané Shock SL nesouhlasí se skutečným d100 a EML podle HMK str.169');
-  verifiedRoll={shockML,roll,fatigue,rawEML,effectiveEML:effectiveMasteryLevel(rawEML)};
+  verifiedRoll={shockML,roll,fatigue,rawEML,effectiveEML:effectiveMasteryLevel(rawEML),...(herbalBonus?{narcotic:{bonus:herbalBonus,sourceIds:[...herbalProof.sourceIds],sourcePage:75}}:{})};
  }
  requireCond(!(s.bloodLoss.bp>0&&s.wounds.some(w=>w.bleeding)),'Krvácením podmíněný Shock State nelze odstranit před zastavením všech Bleederů (HMK str.178)');
  const q=s.shockFollowup;
