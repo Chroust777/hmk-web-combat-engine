@@ -16,7 +16,7 @@ function setup(potency,sv,id='one',c=campaignId){
   calendarHerbPotionComplete:{format:'hmk-herb-potion-complete-v1',campaignId:c,minute:0,actorId:giver,
    herbType:'poison',potency,sv,usable:true,expiryMinute:100000}};
  const p=createHerbPotionAdministration({journal:[complete],campaignId:c,minute:1,actorId:giver,completeId:complete.id,
-  targetId:patient,method:'ingested',gmConfirmed:true,memberIds:[giver,patient]});
+  targetId:patient,method:'ingested',gmConfirmed:true,memberIds:[giver,patient],legacyValidation:potency===3});
  const app={id:'use-'+id,characterId:giver,calendarCampaignId:c,campaignMinute:1,calendarHerbPotionAdminister:p};
  return [complete,app];
 }
