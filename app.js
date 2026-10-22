@@ -218,7 +218,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.426';
+const APP_VERSION='93.427';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -925,7 +925,7 @@ function campaignCalendarView(){
  ${alchemyDecayDue.map(x=>clock.minute===x.nextDueMinute?`<form data-alchemy-decay><strong>Decay splatný · ${esc(x.elixirName)} · AS ${x.currentAS}</strong><input type="hidden" name="finishId" value="${esc(x.finishId)}"><input type="hidden" name="actorId" value="${esc(x.actorId)}"><label>Decay d10<input name="d10" type="number" min="1" max="10" required></label><button type="button" data-alchemy-roll-decay class="hc-small">⚄ Generovat d10</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečný hod při splatnosti</label><button type="submit">Zapsat Decay Roll (bez posunu času)</button></form>`:`<p class="hc-hint">POZOR: ${esc(x.elixirName)} má nevyřešený Decay Roll z ${esc(displayCampaignMinute(x.nextDueMinute))}. GM nesmí pokračovat, dokud se časový důkaz neopraví.</p>`).join('')}
  <h4>Alchemy · Darkvision / Physic Imbibing (HMK 269–273)</h4>
  <p class="hc-hint">První dokončená větev použití elixíru: Darkvision. Imbibing d100 používá skutečné Aura či Alchemy ML příjemce bez postihů za Fatigue a Impairment. F/CF upravuje AS. Profusion: u další dávky se rozšiřují neúspěšné CF výsledky; skutečné CF vyvolá samostatný Ill Effect každého aktivního Darkvision. Každý má vlastní HP d6 a zotavení. Při CF je doložena i citlivost na světlo (HR5, HP d6 dní); léčení vyžaduje skutečný d6 pro HP a v každém termínu d100 proti HB × HR podle existující Exposure Healing tabulky. Dočasný efekt zůstává po vypití v kalendáři a dále podléhá 30denním Decay Rolls. Žádný společný čas se neposouvá.</p>
- ${participants.map(c=>{const effects=activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute);return effects.map(x=>`<p class="hc-hint">${esc(c.name)} · Darkvision AS ${x.state.currentAS} · vidění i v úplné tmě do <strong>${x.state.currentAS*5} ft</strong> · původ ${esc(x.useId)}${x.illEffect?' · CF: citlivost na světlo; léčení v samostatném panelu':''}</p>`).join('')}).join('')}
+ ${participants.map(c=>{const effects=activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute),shock=c.hmk?.arcane?.auralShockLevels??0;return effects.map(x=>`<p class="hc-hint">${esc(c.name)} · Darkvision AS ${x.state.currentAS} · ${shock>0?`<strong>Aural Shock ${esc(shock)}: prospěch z vidění ve tmě pozastaven (HMK 270)</strong>; AS a Decay běží dál`:`vidění i v úplné tmě do <strong>${x.state.currentAS*5} ft</strong>`} · původ ${esc(x.useId)}${x.illEffect?' · CF: citlivost na světlo; léčení v samostatném panelu':''}</p>`).join('')}).join('')}
 <h4>Darkvision · CF citlivost na světlo · HP d6 dní / HR5</h4>
  <p class="hc-hint">HMK 270–271: postih mimo stín/pološero je polovina původní AS × 5. Úplné uzdravení při HR6; další testy po d6 dnech od skutečného CF. Success +1 HR, Critical Success +2 HR; CF znamená přeskočit další periodu. Doba pouze podle kalendáře GM.</p>
  ${pendingDarkvisionHealing(data.journal,campaignKey(clock),clock.minute).map(h=>{const c=character(h.targetId),attrs=c?.hmk?.attributes;return `<article class="hc-event"><strong>${esc(c?.name||h.targetId)} · citlivost na světlo −${h.penalty} EML (jen zrak při jasném světle)</strong><p>HR ${h.healingRate} · ${h.pendingStart?'Chybí d6 Healing Period – starý CF důkaz':clock.minute>h.nextDueMinute?'ZMEŠKANÁ SPLATNOST '+esc(displayCampaignMinute(h.nextDueMinute)):'Příští hod '+esc(displayCampaignMinute(h.nextDueMinute))}</p>
@@ -5505,6 +5505,7 @@ function skillAutoFor(actor,name,form=null,prefix='A'){
   const distanceText=value('darkvisionDistance');
   const vision=darkvisionSkillContext({journal:data.journal,campaignId:campaignKey(data.campaignClock),
    minute:data.campaignClock.minute,actorId:actor.id,visionUse,light,
+   auralShockLevels:actor.hmk?.arcane?.auralShockLevels??0,
    distanceFeet:distanceText===null?null:Number(distanceText)});
   if(vision.applies){ctx.condition.modifier+=vision.modifier;ctx.modifier+=vision.modifier;
    ctx.breakdown.push({label:'Darkvision · '+vision.reason+' ('+vision.sourceIds.join(', ')+')',
