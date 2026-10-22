@@ -215,7 +215,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.419';
+const APP_VERSION='93.420';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -855,6 +855,10 @@ function campaignCalendarView(){
  const knownInventorElixirs=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyFinish?.result==='completed'&&
   j.calendarAlchemyFinish?.uniqueElixir?.mode==='invent').filter((row,i,all)=>all.findIndex(other=>
   other.calendarAlchemyFinish.uniqueElixir.title.toLocaleLowerCase()===row.calendarAlchemyFinish.uniqueElixir.title.toLocaleLowerCase())===i);
+ const alchemyAssistantFields=(actorId,alchemyML)=>{
+  const options=participants.filter(x=>x.id!==actorId).map(x=>({person:x,ml:availableMasteries(x).find(y=>y.name==='Alchemy')?.ml||0})).filter(x=>x.ml>=40);
+  return `<fieldset><legend>Alchemy Assistance · nejvýše 2 osoby (HMK 268)</legend><p class="hc-hint">Pomocníky určete před zahájením. ML40+ dovoluje asistovat, Index přispěje do EML jen při ML alespoň polovině výrobce (${alchemyML}); celkový strop +10. Na konci se musí shodovat s původním Skill Workbench SV.</p><div class="hc-fields">${[1,2].map(i=>`<label>Pomocník ${i}<select name="alchemyAssist${i}"><option value="">— nikdo —</option>${options.map(x=>`<option value="${esc(x.person.id)}">${esc(x.person.name)} · Alchemy ML ${x.ml}${x.ml*2>=alchemyML?' · Index +'+Math.floor(x.ml/10):' · bez EML bonusu'}</option>`).join('')}</select></label>`).join('')}</div></fieldset>`;
+ };
  const alchemyHTML=`<section class="hc-calendar hc-wilderness"><details><summary>HMK 265–268 · Alchemy · Create a Invent (${pendingAlchemy.length} rozpracovaných)</summary>
  <p class="hc-hint">Create ML60+, Invent ML100+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Tekuté elixíry lze doloženě uložit do stávající Vial, 4 oz; plná nádoba má 0,5 lb v existujícím ENC. Účinky elixírů dosud nejsou aktivovány.</p>
  ${participants.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0,pend=pendingAlchemy.find(x=>x.characterId===c.id);
@@ -866,6 +870,7 @@ function campaignCalendarView(){
   <label>Chantry stars<select name="workshopStars">${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label>
   <input type="hidden" name="wealth" value="${esc(c.hmk?.wealth??'')}"></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
+  ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrzuje skutečný přístup k dílně a zajištěnou možnost nepřerušené přípravy</label>
   <button type="submit">Zahájit přípravu v čase GM (bez posunu)</button></form>`}).join('')}
@@ -884,6 +889,7 @@ function campaignCalendarView(){
   <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry (GM doloží hvězdy)</option></select></label>
   <label>Chantry stars<select name="workshopStars">${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
+  ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="gmInventionConfirmed" required> GM potvrzuje parametry unikátního elixíru a jejich znalost výrobcem</label>
   <label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrzuje vhodnou dílnu a nepřerušenou přípravu</label>
@@ -896,19 +902,20 @@ function campaignCalendarView(){
   <input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}"><input type="hidden" name="mode" value="known"><input type="hidden" name="elixirName" value="${esc(recipe.title)}"><input type="hidden" name="knowledgeFinishId" value="${esc(source.id)}">
   <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry</option></select></label><label>Chantry stars<select name="workshopStars">${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
+  ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="gmInventionConfirmed" required> GM potvrzuje přístup této postavy k doložené receptuře a veškerým parametrům</label>
   <label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrzuje vhodnou dílnu a nepřerušenou přípravu</label>
   <button type="submit">Připravit známý unikátní elixír (bez posunu času)</button></form>`;}).join('');}).join('')}
  ${pendingAlchemy.map(row=>{const a=row.calendarAlchemyStart,actor=character(a.actorId),proofs=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.characterId===a.actorId&&j.campaignMinute===a.dueMinute&&j.skillTestProof?.type==='secondary-mastery-value-test'&&j.skillTestProof.skills?.[0]==='Alchemy'&&j.skillTestProof.secondarySkills?.[0]==='Herblore'&&j.skillTestProof.secondarySkills?.[1]==='Mineralogy'&&j.skillTestProof.secondaryRollResult?.routineId==='alchemy-elixir'&&j.skillTestProof.gmModifiers?.[0]===a.sunsignModifier&&!data.journal.some(x=>x.calendarAlchemyFinish?.skillId===j.id));
- return `<article class="hc-event"><strong>${esc(actor?.name||a.actorId)} · ${esc(a.elixirName)} · ${a.workshopStars} ★</strong><p>${a.durationDays} dní · zahájeno ${esc(displayCampaignMinute(a.minute))} · Preparation Roll přesně ${esc(displayCampaignMinute(a.dueMinute))} · Sunsign GM ${a.sunsignModifier>=0?'+':''}${a.sunsignModifier}. ${clock.minute<a.dueMinute?'Čeká na GM hodiny.':clock.minute>a.dueMinute?'CHYBA TERMÍNU: GM čas již přeskočil splatnost.':'Příprava splatná.'}</p>
+  return `<article class="hc-event"><strong>${esc(actor?.name||a.actorId)} · ${esc(a.elixirName)} · ${a.workshopStars} ★</strong><p>${a.assistantPlan?.length?'Pomocníci: '+a.assistantPlan.map(h=>esc(character(h.actorId)?.name||h.actorId)+' (Alchemy '+h.ml+')').join(', ')+'. ':''}${a.durationDays} dní · zahájeno ${esc(displayCampaignMinute(a.minute))} · Preparation Roll přesně ${esc(displayCampaignMinute(a.dueMinute))} · Sunsign GM ${a.sunsignModifier>=0?'+':''}${a.sunsignModifier}. ${clock.minute<a.dueMinute?'Čeká na GM hodiny.':clock.minute>a.dueMinute?'CHYBA TERMÍNU: GM čas již přeskočil splatnost.':'Příprava splatná.'}</p>
  ${clock.minute<a.dueMinute?`<form data-alchemy-abort><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="startId" value="${esc(row.id)}"><label>Důvod přerušení / narušení koncentrace<input name="reason" minlength="3" maxlength="240" required></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje přerušení a zničení rozpracovaného elixíru</label><button type="submit">Ukončit a znehodnotit přípravu (bez posunu času)</button></form>`:''}
  ${clock.minute===a.dueMinute?proofs.map(proof=>{const t=proof.skillTestProof,r=t.a||t.result,sv=r.sv+(a.uniqueElixir?inventionSVPenalty({journal:data.journal,campaignId:campaignKey(clock),actorId:a.actorId,startId:row.id}):0),count=sv>=5?Math.min(5,sv-4):0;
   const willML=availableMasteries(actor).find(x=>x.name==='Will')?.ml??0;
   const shockML=availableMasteries(actor).find(x=>x.name==='Shock')?.ml??0;
   return `<form data-alchemy-finish data-alchemy-will-index="${Math.floor(willML/10)}" data-alchemy-shock-ml="${shockML}"><input type="hidden" name="startId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="skillId" value="${esc(proof.id)}"><strong>Doložený Preparation Roll · SV ${sv} · d100 ${r.roll} · ${esc(r.level)} · až ${count} × d10</strong>
   ${r.level==='CF'?`<div class="hc-fields"><label>Will SR d10 (Will Index ${Math.floor(willML/10)})<input type="number" name="cfWillD10" min="1" max="10" required></label><label>Pokud Will SR neuspěje: Alchemical Dissolution d100<input type="number" name="dissolutionD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-will>⚄ Generovat Will SR d10</button> <button type="button" class="hc-small" data-alchemy-roll-dissolution>⚄ Generovat Dissolution d100 (jen po neúspěšném Will SR)</button><div class="hc-fields"><label>Crucial Dissolution (d100 končí 5/0): skutečný Shock d100<input type="number" name="crucialShockD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-shock>⚄ Generovat Crucial Shock d100 (jen 5/0)</button><p class="hc-hint">Will SR → Dissolution d100 → případný Shock d100 proti ověřenému Shock ML ${shockML} − Fatigue (včetně nové Aural Weakness). SHK 8 upraví původní Shock SL. Při následném STN/INC/UNC zůstává povinný původní Shock Recovery.</p>`:''}
-  <div class="hc-fields">${Array.from({length:count},(_,i)=>`<label>Augmentation d10 #${i+1} (TN ${a.workshopStars})<input type="number" name="aug${i}" min="1" max="10" ${r.level==='CF'?'':'required'}></label>`).join('')}</div>${count?'<button type="button" class="hc-small" data-alchemy-roll-augment>⚄ Generovat Augmentation d10</button>':''}<label class="hc-check"><input type="checkbox" name="gmContinuityConfirmed" required> GM potvrzuje skutečně nepřerušenou přípravu a koncentraci po celou požadovanou pracovní dobu</label><button type="submit">Zapsat Preparation Roll · bez vytvoření inventáře</button></form>`}).join('')||'<p class="hc-hint">Na konec přípravy musí být nový příslušný SV ve Skill Workbench; u GM modifieru zadejte Sunsign v uvedené hodnotě.</p>':''}</article>`}).join('')}
+  <div class="hc-fields">${Array.from({length:count},(_,i)=>`<label>Augmentation d10 #${i+1} (TN ${a.workshopStars})<input type="number" name="aug${i}" min="1" max="10" ${r.level==='CF'?'':'required'}></label>`).join('')}</div>${count?'<button type="button" class="hc-small" data-alchemy-roll-augment>⚄ Generovat Augmentation d10</button>':''}<label class="hc-check"><input type="checkbox" name="gmContinuityConfirmed" required> GM potvrzuje nepřerušenou přípravu, koncentraci a skutečnou účast všech předem zapsaných pomocníků po nezbytnou pracovní dobu</label><button type="submit">Zapsat Preparation Roll · bez vytvoření inventáře</button></form>`}).join('')||'<p class="hc-hint">Na konec přípravy musí být nový příslušný SV ve Skill Workbench; u GM modifieru zadejte Sunsign v uvedené hodnotě.</p>':''}</article>`}).join('')}
  <h4>Elixir Decay · HMK 268 (30 dní)</h4>
  <p class="hc-hint">Každých 30 dní od dokončení: d10 proti aktuální AS; úspěch −1 AS, neúspěch −2 AS. Při AS 0 enchantment zaniká. Hody ukládají neměnný důkaz; GM musí zastavit společné hodiny na splatnosti. Samotná AS neimplikuje fyzickou lahvičku ani účinek. Naplnění vyžaduje zvláštní GM důkaz.</p>
  ${alchemyStates.map(x=>`<p class="hc-hint"><strong>${esc(x.elixirName)}</strong> · ${esc(character(x.actorId)?.name||x.actorId)} · dokončeno ${esc(displayCampaignMinute(x.completedMinute))} · AS ${x.initialAS} → <strong>${x.currentAS}</strong>${x.dispersed?' · obsah vyprázdněn':x.expires?' · ENCHANTMENT LOST':' · další d10 '+esc(displayCampaignMinute(x.nextDueMinute))} · ${x.period} kontrol</p>`).join('')}
@@ -6798,7 +6805,7 @@ function hskPreviewFor(form,person,field,side){
  try{
   const info=hskFields(form,side);if(!info.primary)return;
   const mastery=skillActorMastery(person,info.primary),ctx=skillAutoFor(person,info.primary,form,side),secs=hskValidatedSecondaries(person,info);
-  const helpers=form.id==='skill-assistance-form'?skillAssistantMLs(form,mastery.name):[];
+  const helpers=form.id==='skill-assistance-form'?skillAssistantMLs(form,mastery.name):form.id==='skill-value-form'?hskAlchemySVHelpers(form,mastery.name):[];
   const assist=Math.min(10,helpers.filter(x=>x.mastery.ml*2>=mastery.ml).reduce((total,x)=>total+x.mastery.index,0));
   node.innerHTML=hskTrace(person,mastery,ctx,secs,assist,hskGMModifier(form,side));
  }catch(err){node.innerHTML='<div class="hsk-calculation hsk-unready"><b>Pravidlová kontrola:</b> '+esc(err.message)+'<p class="tiny muted">Test není zrušen: lze vyřešit stav v inventáři, nebo doložit rozhodnutí GM pro chybějící hodnoty ENC / Bulk / PER. Nedoložený postih nelze automaticky považovat za nulu.</p></div>';}
@@ -6851,6 +6858,8 @@ function refreshSkillAutoPreview(form){
  const actor=character(selected);if(!actor)return;
  hskPreviewFor(form,actor,'primary','A');
  hskRefreshSRTarget(form,actor,'A');
+ if(form.id==='skill-value-form'){const block=form.querySelector('[data-alchemy-sv-helpers]');
+  if(block)block.hidden=form.elements.namedItem('srActivityA')?.value!=='alchemy-elixir';}
  if(form.id==='skill-value-form'){const guide=form.querySelector('[data-sv-guide]');if(guide){const ml=skillActorMastery(actor,form.elements.namedItem('primary')?.value).ml;const idx=Math.floor(ml/10);guide.innerHTML='<div class="hsk-sv-guide"><strong>Primary ML '+ml+' → Index '+idx+'</strong><p class="tiny muted">Hod d100 určí úpravu Indexu. Platí původní ML, nikoli EML.</p><div class="hsk-sv-outcomes">'+[['CF',-2],['F',-1],['S',0],['CS',1]].map(([level,modifier])=>{const value=idx+modifier,stars=Math.max(0,Math.min(5,value-4));return '<span><b>'+level+'</b> '+(modifier>0?'+':'')+modifier+' → SV '+value+' · '+(stars?'★'.repeat(stars):'—')+'</span>';}).join('')+'</div></div>';}}
  if(form.id==='skill-secondary-form'&&form.elements.namedItem('opposed')?.checked){
   const opponent=character(form.elements.namedItem('opponentId')?.value);
@@ -6960,15 +6969,27 @@ document.addEventListener('click',e=>{const t=e.target.closest?.('[data-skill-ta
  const thisForm=root.querySelector(activeSkillTab==='value'?'#skill-value-form':activeSkillTab==='assistance'?'#skill-assistance-form':'#skill-secondary-form');
  if(thisForm){hskConfigureSR(thisForm,'A');if(thisForm.id==='skill-secondary-form')hskConfigureSR(thisForm,'B');refreshSkillAutoPreview(thisForm);}
 });
+function hskAlchemySVHelpers(form,primary){
+ if(form?.id!=='skill-value-form')return [];
+ const ids=[form.elements.namedItem('assist1')?.value||'',form.elements.namedItem('assist2')?.value||''].filter(Boolean);
+ const routine=hskSelectedSRRoutine(form,primary,'A');
+ if(ids.length&&routine?.id!=='alchemy-elixir')throw Error('Alchemy Assistance smí být použita pouze pro doloženou přípravu elixíru');
+ if(!ids.length)return [];
+ if(primary!=='Alchemy')throw Error('Alchemy Assistance vyžaduje primární dovednost Alchemy');
+ const helpers=skillAssistantMLs(form,primary);
+ if(helpers.some(x=>x.mastery.ml<40))throw Error('Alchemy Assistant musí mít Alchemy ML40+ (HMK 268)');
+ return helpers;
+}
 function hskResolveSide({person,form,side,helpers=[]}){
  const info=hskFields(form,side),mastery=skillActorMastery(person,info.primary),secs=hskValidatedSecondaries(person,info);
+ if(form.id==='skill-value-form')helpers=hskAlchemySVHelpers(form,info.primary);
  const sr=hskSecondaryRoll(form,person,info,side);
  const ctx=skillAutoFor(person,info.primary,form,side);
  const resolved=skillResolvedResult({mastery,form,dieKey:'roll'+side,condition:ctx.condition,trauma:ctx.trauma,
   secondaryMLs:secs.map(x=>x.ml),assistants:helpers.map(x=>x.mastery.ml),gmModifier:hskGMModifier(form,side)});
  const die=resolved.die,result=hskApplySRResult(resolved.result,sr);
  const consequence=classifySkillConsequence({actor:person,skill:info.primary,result,trauma:ctx.trauma,context:'general'});
- return {person,mastery,secs,ctx,die,result,sr,consequence,info,emlRange:criticalEMLRange(result,ctx)};
+ return {person,mastery,secs,ctx,die,result,sr,consequence,info,helpers,emlRange:criticalEMLRange(result,ctx)};
 }
 function hskResultText(side,{person,mastery,secs,ctx,die,result,sr}){
  const breakdown='ML '+mastery.ml+secs.map(x=>' '+hskSigned(x.modifier)+' '+x.name).join('')+
@@ -7064,7 +7085,7 @@ document.addEventListener('submit',event=>{
    const winner=comparison.winner==='a'?actor.name:comparison.winner==='b'?other.name:comparison.bothFailed?'Nikdo (oba testy neuspěly)':'Nikdo (remíza)';
    body+='\n\n'+hskResultText('B',b)+'\n\nVítěz: '+winner+' · Victory Stars: '+comparison.stars+' '+(comparison.stars?'★'.repeat(Math.min(10,comparison.stars)):'—')+
      '\nRozstřel: dostupný jen při shodném S/S nebo CS/CS, pokud činnost vyžaduje vítěze.';
-  }else if(sv){body+='\n\nIndex Primary ML '+a.result.index+' + SL modifier '+({'CF':-2,'F':-1,'S':0,'CS':1}[a.result.level])+
+  }else if(sv){if(a.helpers.length)body+='\nAlchemy Assistance · '+a.helpers.map(x=>x.actor.name+' ML '+x.mastery.ml).join('; ')+' · bonus EML +'+a.result.assistance;body+='\n\nIndex Primary ML '+a.result.index+' + SL modifier '+({'CF':-2,'F':-1,'S':0,'CS':1}[a.result.level])+
     ' + předepsaný SR bonus '+(a.result.secondarySVBonus||0)+' = SV '+a.result.sv+' · '+a.result.svTier.label+' · '+a.result.svTier.stars+' SV ★ '+(a.result.svTier.stars?'★'.repeat(Math.min(10,a.result.svTier.stars)):'—')+(a.result.level==='CF'?'\nPozor: CF může podle konkrétní činnosti způsobit další následek bez ohledu na hodnotu SV.':'');
   }else body+='\nUnopposed Victory Stars: '+a.result.unopposedStars+' '+(a.result.unopposedStars?'★'.repeat(a.result.unopposedStars):'—');
   body+='\nNásledek A: '+skillConsequenceText(a.consequence)+(b?'\nNásledek B: '+skillConsequenceText(b.consequence):'')+
@@ -7078,6 +7099,7 @@ document.addEventListener('submit',event=>{
    opponentId:b?.person?.id||null,skills:b?[a.info.primary,b.info.primary]:[a.info.primary],
    preliminaryArmour:a.ctx.armourIsProvisional||b?.ctx.armourIsProvisional||false,stimulantA:a.ctx.stimulant??null,stimulantB:b?.ctx.stimulant??null,herbalCharmA:a.ctx.herbalCharm??null,herbalCharmB:b?.ctx.herbalCharm??null,seductionConfirmed:opposed&&form.elements.namedItem('seductionConfirmed')?.checked===true,emlRangeA:a.emlRange,emlRangeB:b?.emlRange||null,secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
    secondaryRollResult:a.sr,secondaryRollResultB:b?.sr||null,
+   ...(sv&&a.info.primary==='Alchemy'&&a.sr?.routineId==='alchemy-elixir'?{helpers:a.helpers.map(x=>({actorId:x.actor.id,skill:'Alchemy',ml:x.mastery.ml}))}:{}),
    a:a.result,b:b?.result||null,result:opposed?comparison:a.result,
    comparison:comparison??null,gmNarrative:narrative,scene,opposedAction:actionName,rollOrigins:b?[a.die.origin,b.die.origin]:[a.die.origin],
    conditions:a.ctx.condition,conditionsB:b?.ctx.condition||null,trauma:a.ctx.trauma,traumaB:b?.ctx.trauma||null,
@@ -7897,9 +7919,17 @@ document.addEventListener('submit',e=>{
      duration:original.duration,effect:original.effect,knowledgeFinishId:v.knowledgeFinishId,
      gmConfirmed:!!v.gmInventionConfirmed};
    }
+   const ids=[v.alchemyAssist1||'',v.alchemyAssist2||''].filter(Boolean);
+   if(new Set(ids).size!==ids.length)throw Error('Stejný Alchemy Assistant byl vybrán dvakrát');
+   const members=new Set(calendarMemberIds(clock,data.characters).map(c=>c.id));
+   const assistantPlan=ids.map(id=>{if(!members.has(id)||id===actorId)throw Error('Alchemy Assistant musí být jiný člen stejné kampaně');
+    const helper=character(id),ml=availableMasteries(helper).find(x=>x.name==='Alchemy')?.ml;
+    if(!Number.isInteger(ml)||ml<40)throw Error('Alchemy Assistant nemá ověřené ML40+');
+    if(helper.hmk?.arcane?.auralShockLevels>0||helper.hmk?.combatState?.shock==='KIA')throw Error('Alchemy Assistant není způsobilý pro nepřerušenou asistenci');
+    return {actorId:id,ml};});
    const proof=createAlchemyStart({journal:data.journal,campaignId,minute,actorId,alchemyML:actualML,elixirName:v.elixirName,
     sunsign:actualSunsign,workshopSource:v.workshopSource,wealth:who.hmk?.wealth??null,workshopStars:Number(v.workshopStars),
-    workshopConfirmed:!!v.workshopConfirmed,timeD6:time.map(x=>x.value),timeOrigins:time.map(x=>x.origin),uniqueElixir});
+    workshopConfirmed:!!v.workshopConfirmed,timeD6:time.map(x=>x.value),timeOrigins:time.map(x=>x.origin),uniqueElixir,assistantPlan});
    if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
     title:'Alchemy · '+(proof.uniqueElixir?'Invent':'Create')+' · zahájení · '+proof.elixirName,body:'HMK 267–268 · 10+3d6='+proof.durationDays+' dní; splatnost '+proof.dueMinute+'; GM čas neposunut',calendarAlchemyStart:proof})))
     notice='Alchemy zahájena · čas GM beze změny';
