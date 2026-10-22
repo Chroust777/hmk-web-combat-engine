@@ -341,7 +341,7 @@ function ready(s,round,id){const n=copy(s??initialCombatState());validateCombatS
  * Preserve wounds and history; only future rolls cease to be scheduled.
  * HMK World of Kèthîra, pp.168–169,177–179.
  */
-function finalizeFatalState(s){
+export function finalizeFatalState(s){
  if(s.shock!=='KIA')return;
  // Death supersedes a future compulsory Mishap Pass. Preserve the wound and
  // mishap evidence but never leave an impossible scheduled action.

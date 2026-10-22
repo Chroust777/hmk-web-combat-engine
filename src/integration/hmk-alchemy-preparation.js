@@ -1,12 +1,12 @@
 /** HMK v1.2 pp.265–268. The initial canonical preparation stage.
  * Uses existing campaign journal, GM clock and Skill Workbench SV proof.
  * Deliberately NO duplicate inventory, magic effects, or timer authority.
- * CF Will SR and non-crucial dissolution are committed with real dice.
- * Crucial Dissolution needs the existing Shock authority and fails closed.
+ * CF / Dissolution reuse canonical Skill and Shock rules; no separate clock.
  */
 import {workshopQuality} from '../rules/craft-workshop-p121.js';
-import {secondaryModifier,secondaryRoll,indexOf} from '../rules/tests.js';
-import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
+import {secondaryModifier,secondaryRoll,indexOf,successLevel,SL} from '../rules/tests.js';
+import {shockRollModifier,shockStateFromIndex} from '../rules/shock.js';
+import {initialCombatState,validateCombatState,combatFatigueTotals,finalizeFatalState} from './persistent-combat-state.js';
 import {STARTING_ELIXIR_NAMES} from './hmk-creation-starting-elixirs.js';
 export const ALCHEMY_START_FORMAT='hmk-alchemy-preparation-start-v1';
 export const ALCHEMY_FINISH_FORMAT='hmk-alchemy-preparation-finish-v1';
@@ -87,7 +87,8 @@ export function createAlchemyAbort({journal=[],campaignId,minute,actorId,startId
   gmConfirmed:true,result:'ruined-by-interruption',sourcePage:268};
 }
 export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startId,skillId,gmContinuityConfirmed=false,augmentationD10=[],augmentationOrigins=[],
- cfWillML=null,cfWillD10=null,cfWillOrigin=null,dissolutionD100=null,dissolutionOrigin=null,criticalFailure:storedCriticalFailure=null}={}){
+ cfWillML=null,cfWillD10=null,cfWillOrigin=null,dissolutionD100=null,dissolutionOrigin=null,
+ crucialShockML=null,crucialShockFatigue=null,crucialShockD100=null,crucialShockOrigin=null,criticalFailure:storedCriticalFailure=null}={}){
  const src=journal.find(x=>x.id===startId&&x.calendarCampaignId===campaignId&&x.calendarAlchemyStart),start=src?.calendarAlchemyStart;
  ok(start&&start.actorId===actorId&&whole(minute,0,1e9)&&minute===start.dueMinute,'Alchemy: Preparation Roll je možný pouze přesně na konci doložené přípravy');
  ok(!campaignRows(journal,campaignId).some(x=>x.calendarAlchemyFinish?.startId===startId||x.calendarAlchemyAbort?.startId===startId),'Příprava už byla ukončena');
@@ -126,6 +127,10 @@ export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startI
   cfWillOrigin??=storedCriticalFailure.willOrigin;
   dissolutionD100??=storedCriticalFailure.dissolutionD100;
   dissolutionOrigin??=storedCriticalFailure.dissolutionOrigin;
+  crucialShockML??=storedCriticalFailure.shockRoll?.ml??null;
+  crucialShockFatigue??=storedCriticalFailure.shockRoll?.fatigue??null;
+  crucialShockD100??=storedCriticalFailure.shockRoll?.d100??null;
+  crucialShockOrigin??=storedCriticalFailure.shockRoll?.origin??null;
  }
  let criticalFailure=null;
  if(r.level==='CF'){
@@ -137,18 +142,32 @@ export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startI
   else {
    ok(whole(dissolutionD100,1,100)&&validOrigin(dissolutionOrigin),
     'Critical Failure: neúspěšný Will SR vyžaduje skutečný d100 Alchemical Dissolution');
-   // HMK p.267: final digit 5/0 invokes a separate Shock Roll vs SHK 8.
-   // Until that existing Combat authority can witness a noncombat Shock and its
-   // follow-ups without fabricating rounds, do not store an incomplete event.
-   ok(dissolutionD100%5!==0,
-    'Crucial Dissolution (d100 končí 5/0): vyžaduje navazující Shock Roll proti SHK 8; tento případ nelze zatím bezpečně uzavřít');
+   // p.267: every dissolution roll ending in 0/5 also triggers a Shock Roll
+   // against base SHK8. Exactly one d100 Shock test is mandatory here.
+   if(dissolutionD100%5===0){
+    ok(whole(crucialShockML,1,1000)&&whole(crucialShockFatigue,0,99999)&&
+      whole(crucialShockD100,1,100)&&validOrigin(crucialShockOrigin),
+      'Crucial Dissolution: vyžaduje skutečné Shock ML, Fatigue a Shock d100 s původem hodu');
+   }else ok(crucialShockML===null&&crucialShockFatigue===null&&crucialShockD100===null&&crucialShockOrigin===null,
+    'Běžná Dissolution nesmí obsahovat fiktivní Crucial Shock Roll');
   }
   const auralShockAdded=willSuccess?0:dissolutionD100<=60?1:dissolutionD100<=90?3:5;
+  const crucialDissolution=!willSuccess&&dissolutionD100%5===0;
+  const shockSL=crucialDissolution?successLevel(crucialShockD100,crucialShockML-crucialShockFatigue):null;
+  const shockIndex=crucialDissolution?8+shockRollModifier(shockSL):null;
+  const shockStates={none:'NONE',stunned:'STN',incapacitated:'INC',unconscious:'UNC',killed:'KIA'};
+  const shockRoll=crucialDissolution?{ml:crucialShockML,fatigue:crucialShockFatigue,
+   rawEML:crucialShockML-crucialShockFatigue,d100:crucialShockD100,origin:crucialShockOrigin,
+   sl:Object.keys(SL).find(k=>SL[k]===shockSL),baseSHK:8,index:shockIndex,state:shockStates[shockStateFromIndex(shockIndex)],sourcePage:169}:null;
+  if(willSuccess)ok(crucialShockML===null&&crucialShockFatigue===null&&crucialShockD100===null&&crucialShockOrigin===null,
+    'Úspěšný Will SR nesmí vést k Shock Roll');
   criticalFailure={willML:cfWillML,willIndex,willD10:cfWillD10,willOrigin:cfWillOrigin,
    willSuccess,dissolutionD100:willSuccess?null:dissolutionD100,
    dissolutionOrigin:willSuccess?null:dissolutionOrigin,auralShockAdded,
-   weaknessAdded:5*auralShockAdded,crucialDissolution:false,sourcePages:[267,268,190]};
- }else ok(storedCriticalFailure===null&&cfWillML===null&&cfWillD10===null&&cfWillOrigin===null&&dissolutionD100===null&&dissolutionOrigin===null,
+   weaknessAdded:5*auralShockAdded,crucialDissolution,
+   ...(crucialDissolution?{shockRoll}:{}),sourcePages:[267,268,190,...(crucialDissolution?[169]:[])]};
+ }else ok(storedCriticalFailure===null&&cfWillML===null&&cfWillD10===null&&cfWillOrigin===null&&dissolutionD100===null&&dissolutionOrigin===null&&
+  crucialShockML===null&&crucialShockFatigue===null&&crucialShockD100===null&&crucialShockOrigin===null,
   'Will SR a Dissolution smějí následovat pouze po Alchemy CF');
  const sv=r.sv,numberOfRolls=criticalFailure&&!criticalFailure.willSuccess?0:sv>=5?Math.min(5,sv-4):0;
  ok(Array.isArray(augmentationD10)&&augmentationD10.length===numberOfRolls&&augmentationD10.every(x=>whole(x,1,10))&&
@@ -181,17 +200,17 @@ export function assertAlchemyAppendOnly(before=[],after=[]){const byId=new Map(a
  return true;
 }
 
-/** Apply ONLY the p.267 non-crucial CF dissolution to existing Combat/Aural
- * state. No invented combat round, initiative, health subsystem or clock tick.
+/** Apply p.267 ordinary and crucial dissolution to existing Combat/Aural
+ * state. No invented encounter, clock tick or extra health subsystem.
  * All dice are already immutable in the linked Alchemy Finish proof.
  */
-export function applyAlchemyNoncrucialDissolution({state=null,arcane=null,proof,eventId}={}){
+export function applyAlchemyDissolution({state=null,arcane=null,proof,eventId}={}){
  const cf=proof?.criticalFailure;
  ok(proof?.format===ALCHEMY_FINISH_FORMAT&&proof.result==='ruined-by-dissolution'&&
-  cf&&!cf.willSuccess&&whole(cf.auralShockAdded,1,5)&&!cf.crucialDissolution&&
+  cf&&!cf.willSuccess&&whole(cf.auralShockAdded,1,5)&&
   cf.weaknessAdded===cf.auralShockAdded*5&&
   typeof eventId==='string'&&eventId.length>=3,
-  'Alchemy Dissolution: neexistuje ověřený nenásilný CF důkaz');
+  'Alchemy Dissolution: neexistuje ověřený CF důkaz');
  const s=structuredClone(state??initialCombatState()),a=structuredClone(arcane??{});
  validateCombatState(s);
  ok(s.shock!=='KIA'&&!s.events.some(e=>e.id===eventId),
@@ -200,13 +219,37 @@ export function applyAlchemyNoncrucialDissolution({state=null,arcane=null,proof,
  ok(whole(before,0,99)&&before+cf.auralShockAdded<=99&&
   s.fatigue.otherWeakness+cf.weaknessAdded<=99999,
   'Alchemy Dissolution: Aural Shock / Weakness mimo limit');
+ const fatigueBefore=combatFatigueTotals(s).total;
+ if(cf.crucialDissolution){
+  const shock=cf.shockRoll;
+  ok(shock&&shock.baseSHK===8&&shock.fatigue===fatigueBefore+cf.weaknessAdded&&
+   s.shock==='NONE'&&!s.shockFollowup&&!s.extendedShock&&!s.coma?.active&&!s.bloodShockPending,
+   'Crucial Dissolution: Shock musí vycházet ze skutečného Fatigue po Aural Shock a z nekolizního Combat State');
+  // Reuse the authoritative Shock index and the *same* existing state and
+  // Recovery queue as other non-combat Shock sources (e.g. Cold Water).
+  ok(['STN','INC','UNC','KIA'].includes(shock.state),'Crucial Dissolution: nedoložený výsledný Shock State');
+  const technicalRound=Math.max(1,s.lastRound||1); // schema field, NOT an elapsed combat round
+  s.shock=shock.state;
+  s.shockOriginRound=technicalRound;
+  if(['INC','UNC','KIA'].includes(s.shock))s.posture.prone=true;
+  if(['STN','INC','UNC'].includes(s.shock)){
+   const dueRound=technicalRound+(s.shock==='UNC'?120:1);
+   ok(dueRound<=9999,'Crucial Dissolution: Recovery překračuje rozsah kola');
+   s.shockFollowup={kind:s.shock,originRound:technicalRound,timelineId:null,dueRound,
+    phase:s.shock==='UNC'?'after-ten-minutes':'end-next-turn'};
+  }else finalizeFatalState(s); // same canonical cleanup as other terminal Shock sources
+ }
  a.auralShockLevels=before+cf.auralShockAdded;
  s.fatigue.otherWeakness+=cf.weaknessAdded;
- // The calendar carries the true event minute; no fictional combat round is added.
+ // calendarMinute is authoritative; event.round is a mandatory legacy field,
+ // not evidence of a combat encounter or of automatic passage of time.
  s.events.push({id:eventId,type:'hmk-alchemy-dissolution-aural',round:Math.max(1,s.lastRound||1),
   details:{sourceEventId:eventId,alchemyStartId:proof.startId,auralShock:cf.auralShockAdded,
    weaknessAdded:cf.weaknessAdded,calendarMinute:proof.minute,dissolutionD100:cf.dissolutionD100,
+   ...(cf.crucialDissolution?{crucialShock:structuredClone(cf.shockRoll),nonCombat:true}:{}),
    auralBefore:before,auralAfter:a.auralShockLevels,sourcePage:267}});
  validateCombatState(s);
- return {state:s,arcane:a,auralShockAdded:cf.auralShockAdded};
+ return {state:s,arcane:a,auralShockAdded:cf.auralShockAdded,shockState:cf.shockRoll?.state??null};
 }
+/** Backward-compatible name: existing v93.415 callers / imports. */
+export function applyAlchemyNoncrucialDissolution(args){return applyAlchemyDissolution(args)}

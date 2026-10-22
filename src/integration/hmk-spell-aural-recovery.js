@@ -27,6 +27,7 @@ function validateCandidate(document,characterId){
  check(seq.active!==true&&!seq.pendingEndTurnAction&&!seq.interruptActiveId,
   'Aural Recovery: nedokončené Initiative, povinnosti nebo přerušení');
  const state=validateCombatState(person.hmk?.combatState),arc=person.hmk?.arcane;
+ check(state.shock!=='KIA','Aural Recovery: zemřelá postava nemůže provádět Will Roll');
  check(arc&&whole(arc.auralShockLevels,1,99)&&
   whole(state.fatigue.otherWeakness,5*arc.auralShockLevels,99999),
   'Aural Recovery: neplatné úrovně či současná Aural Weakness');
