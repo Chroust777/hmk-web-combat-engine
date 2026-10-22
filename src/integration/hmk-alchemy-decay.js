@@ -23,37 +23,44 @@ function initialElixir(journal,campaignId,finishId){
 export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9){
  requireTrue(integer(minute,0,1e9),'Alchemy Decay: neplatná minuta kampaně');
  const {finish,proof}=initialElixir(journal,campaignId,finishId);
- let as=proof.baseAS,period=0, lastDecayId=null;
+ let as=proof.baseAS,period=0,lastDecayId=null,imbibingId=null,activeTemporary=false;
  let dueMinute=proof.minute+ALCHEMY_DECAY_PERIOD_MINUTES;
  requireTrue(integer(dueMinute,0,1e9),'Alchemy Decay: termín mimo kalendář');
+ let emptied=false;
  for(const row of journal){
+  if(!relevant(row,campaignId)||row.campaignMinute>minute)continue;
+  const use=row.calendarAlchemyImbibing;
+  if(use?.finishId===finishId){
+   requireTrue(!imbibingId&&emptied&&as>0&&use.asBefore===as&&
+    use.finalAS===Math.max(0,as+use.modifier)&&use.temporary===(use.finalAS>0),
+    'Alchemy Decay: neplatná změna AS po vypití');
+   as=use.finalAS;imbibingId=row.id;activeTemporary=use.temporary;
+  }
+  if(row.calendarAlchemyVialEmpty?.finishId===finishId){
+   requireTrue(!emptied,'Alchemy Decay: elixír lze vyprázdnit jen jednou');
+   emptied=true;
+  }
   const d=row.calendarAlchemyDecay;
-  if(!d||!relevant(row,campaignId)||d.finishId!==finishId)continue;
-  requireTrue(as>0,'Alchemy Decay: vyčerpaný elixír nelze znovu degradovat');
-  requireTrue(row.campaignMinute===d.minute&&row.campaignMinute===dueMinute&&row.campaignMinute<=minute,
-    'Alchemy Decay: hody musí být na přesné splatnosti v rámci tohoto stavu');
+  if(!d||d.finishId!==finishId)continue;
+  requireTrue(as>0&&(!emptied||activeTemporary),'Alchemy Decay: prázdný nebo zaniklý elixír nelze degradovat');
+  requireTrue(row.campaignMinute===d.minute&&row.campaignMinute===dueMinute,
+    'Alchemy Decay: hody musí být na přesné splatnosti');
   requireTrue(d.period===period+1&&d.asBefore===as&&integer(d.d10,1,10)&&originOK(d.origin),
-    'Alchemy Decay: nesouhlasí pořadí, původ hodu nebo původní AS');
+    'Alchemy Decay: nesouhlasí pořadí nebo původ hodu');
   const success=d.d10<=as,next=Math.max(0,as-(success?1:2));
   requireTrue(d.success===success&&d.asAfter===next&&d.dueMinute===dueMinute,
-    'Alchemy Decay: důkaz AS neodpovídá hodu d10');
+    'Alchemy Decay: důkaz AS neodpovídá d10');
   as=next;period++;lastDecayId=row.id;
   dueMinute+=ALCHEMY_DECAY_PERIOD_MINUTES;
   requireTrue(integer(dueMinute,0,1e9),'Alchemy Decay: termín mimo kalendář');
  }
- // Physical loss of the full contents ends future periodic checks, but does
- // not erase earlier Decay evidence. A bare inventory loss is forbidden by
- // the existing physical-vial lock and is never taken as a silent disposal.
- const emptied=journal.find(r=>relevant(r,campaignId)&&r.calendarAlchemyVialEmpty?.finishId===finishId&&r.campaignMinute<=minute);
- if(emptied){
-  requireTrue(!journal.some(r=>relevant(r,campaignId)&&r.calendarAlchemyDecay?.finishId===finishId&&
-   journal.indexOf(r)>journal.indexOf(emptied)),
-   'Alchemy Decay: nelze házet po doloženém vyprázdnění elixíru');
- }
+ // Legacy empty proofs denote disposal. A new Imbibing receipt turns the same
+ // physical emptying into a continuing Temporary enchantment (pp.269-270).
+ const dispersed=emptied&&!activeTemporary;
  return {finishId,actorId:finish.characterId,elixirName:proof.elixirName,campaignId,
   completedMinute:proof.minute,initialAS:proof.baseAS,currentAS:as,period,
-  lastDecayId,dispersed:!!emptied,expires:as===0||!!emptied,
-  nextDueMinute:as>0&&!emptied?dueMinute:null};
+  lastDecayId,imbibingId,activeTemporary:activeTemporary&&as>0,dispersed,
+  expires:as===0||dispersed,nextDueMinute:as>0&&!dispersed?dueMinute:null};
 }
 /** For every campaign elixir, list unresolved aging milestones; ignoring an
  * unbound elixir cannot silently suspend its mandatory natural decay.
