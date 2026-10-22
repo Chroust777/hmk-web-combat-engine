@@ -54,7 +54,7 @@ export function pendingAlchemyPreparations(journal=[],campaignId){
 }
 export function createAlchemyStart({journal=[],campaignId,minute,actorId,alchemyML,elixirName,sunsign,
  workshopSource='private',wealth=null,workshopStars=null,workshopConfirmed=false,
- timeD6=[],timeOrigins=[],uniqueElixir=null}={}){
+ timeD6=[],timeOrigins=[],uniqueElixir=null,assistantPlan=null}={}){
  ok(typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&whole(minute,0,1e9),'Alchemy: chybí kampaň, postava nebo platný čas GM');
  ok(whole(alchemyML,60,1000),'Alchemy Create vyžaduje ML 60+');
  let elixir=CANONICAL_ALCHEMY_ELIXIRS.find(x=>x.name===elixirName);
@@ -112,13 +112,30 @@ export function createAlchemyStart({journal=[],campaignId,minute,actorId,alchemy
  ok(whole(stars,1,5),'Dílna musí mít skutečnou kvalitu 1–5 ★');
  ok(Array.isArray(timeD6)&&timeD6.length===3&&timeD6.every(x=>whole(x,1,6))&&
   Array.isArray(timeOrigins)&&timeOrigins.length===3&&timeOrigins.every(validOrigin),'Nutné přesné 3d6 a auditní původ každé kostky');
- ok(!pendingAlchemyPreparations(journal,campaignId).some(r=>r.characterId===actorId),'Postava již připravuje jiný nepřerušený elixír');
+ ok(!pendingAlchemyPreparations(journal,campaignId).some(r=>r.characterId===actorId||
+  r.calendarAlchemyStart.assistantPlan?.some(h=>h.actorId===actorId)),
+  'Postava již připravuje jiný elixír nebo asistuje u nepřerušené alchymistické přípravy');
+ // Historical preparations predate assistant planning: null deliberately replays
+ // their unchanged proof shape. New calendar starts explicitly submit [] or 1–2.
+ if(assistantPlan!==null){
+  ok(Array.isArray(assistantPlan)&&assistantPlan.length<=2,'Alchemy: nejvýše dva pomocníci (HMK 268)');
+  const seen=new Set();
+  for(const h of assistantPlan){
+   ok(h&&typeof h.actorId==='string'&&h.actorId&&h.actorId!==actorId&&!seen.has(h.actorId)&&
+    whole(h.ml,40,1000),'Alchemy: pomocník musí být jiná skutečná postava s Alchemy ML40+');
+   seen.add(h.actorId);
+   ok(!pendingAlchemyPreparations(journal,campaignId).some(r=>r.characterId===h.actorId||
+     r.calendarAlchemyStart.assistantPlan?.some(v=>v.actorId===h.actorId)),
+     'Alchemy: pomocník je již přidělen k jiné nepřerušené alchymistické přípravě');
+  }
+ }
  const durationDays=10+timeD6.reduce((a,b)=>a+b,0),dueMinute=minute+durationDays*DAY;
  ok(whole(dueMinute,0,1e9),'Konec přípravy překračuje dostupnou časovou osu');
  return {format:ALCHEMY_START_FORMAT,campaignId,minute,actorId,alchemyML,elixirName,principle:elixir.principle,
   convocation:elixir.convocation,sunsign,sunsignModifier:alchemySunsignModifier(sunsign,elixir.convocation),
   workshopSource,wealth:workshopSource==='private'?wealth:null,workshopStars:stars,workshopConfirmed:true,
   timeD6:[...timeD6],timeOrigins:[...timeOrigins],durationDays,dueMinute,inventoryCreated:false,
+  ...(assistantPlan!==null?{assistantPlan:assistantPlan.map(h=>({actorId:h.actorId,ml:h.ml}))}:{}),
   ...(unique?{uniqueElixir:unique}:{}),sourcePages:[265,266,267,268]};
 }
 export function requireAlchemyGMTimeMayAdvance({journal=[],campaignId,beforeMinute,afterMinute}={}){
@@ -173,8 +190,22 @@ export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startI
  ok(r.secondarySVBonus===(sr.success&&['S','CS'].includes(r.level)?1:0)||
    (r.secondarySVBonus===undefined&&r.sv===r.index+({CF:-2,F:-1,S:0,CS:1}[r.level])+(sr.success&&['S','CS'].includes(r.level)?1:0)),
   'Mathematics SR se nesmí přičítat dvakrát nebo při F/CF');
- ok(!p.helpers?.length||p.helpers.length<=2&&p.helpers.every(h=>whole(h.ml,40,1000)&&h.ml*2>=r.ml),
-  'Alchemy: nejvýše dva způsobilí pomocníci (ML40+, alespoň polovina ML výrobce)');
+ // Reuse the ORIGINAL Skill Workbench result and its assistant calculations;
+ // never create a second roll or silently change the already rolled EML/SL.
+ const helpers=p.helpers||[],checks=r.assistantChecks||[];
+ if(Object.hasOwn(start,'assistantPlan')){
+  const assigned=start.assistantPlan;
+  ok(helpers.length===assigned.length&&checks.length===assigned.length&&
+   helpers.every((h,i)=>h.actorId===assigned[i].actorId&&h.skill==='Alchemy'&&h.ml===assigned[i].ml&&
+    checks[i].ml===h.ml&&checks[i].index===indexOf(h.ml)&&
+    checks[i].eligible===(h.ml*2>=r.ml)),
+    'Alchemy: pomocníci závěrečného Skill Workbench SV neodpovídají předem doloženému plánu');
+  const assistanceBonus=Math.min(10,assigned.reduce((sum,h)=>sum+(h.ml*2>=r.ml?indexOf(h.ml):0),0));
+  ok(r.assistance===assistanceBonus&&Number.isSafeInteger(r.rawEML)&&
+   r.rawEML===r.ml+r.gmModifier+sm.reduce((sum,h)=>sum+h.modifier,0)+assistanceBonus,
+   'Alchemy: bonus Assistance/EML musí být přesně doložen originálním Skill Workbench testem');
+ }else ok(!helpers.length||helpers.length<=2&&helpers.every(h=>whole(h.ml,40,1000)&&h.ml*2>=r.ml),
+  'Alchemy: historická Assistance vyžaduje nejvýše dva způsobilé pomocníky');
  // Sunsign is an explicit GM modifier in the existing Skill Workbench; fail closed
  // rather than secretly adding it after the roll (that would change critical SL).
  ok(p.gmModifiers?.[0]===start.sunsignModifier,
@@ -238,6 +269,8 @@ export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startI
  return {format:ALCHEMY_FINISH_FORMAT,campaignId,minute,actorId,startId,skillId,elixirName:start.elixirName,
   alchemyML:r.ml,gmContinuityConfirmed:true,primaryRoll:r.roll,primaryLevel:r.level,secondaryModifiers:sm.map(x=>x.modifier),
   mathRoll:sr.roll,mathTN:sr.tn,mathSuccess:sr.success,sunsignModifier:start.sunsignModifier,
+  ...(Object.hasOwn(start,'assistantPlan')?{assistantPlan:start.assistantPlan.map(h=>({...h})),
+   assistanceBonus:r.assistance}:{}),
   preparationSV:sv,...(start.uniqueElixir?{rawPreparationSV:r.sv,inventionSVModifier:inventModifier,
    uniqueElixir:structuredClone(start.uniqueElixir)}:{}),workshopStars:start.workshopStars,augmentationD10:[...augmentationD10],
   augmentationOrigins:[...augmentationOrigins],augmentationSuccesses,
