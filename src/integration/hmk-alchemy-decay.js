@@ -41,9 +41,19 @@ export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9)
   dueMinute+=ALCHEMY_DECAY_PERIOD_MINUTES;
   requireTrue(integer(dueMinute,0,1e9),'Alchemy Decay: termín mimo kalendář');
  }
+ // Physical loss of the full contents ends future periodic checks, but does
+ // not erase earlier Decay evidence. A bare inventory loss is forbidden by
+ // the existing physical-vial lock and is never taken as a silent disposal.
+ const emptied=journal.find(r=>relevant(r,campaignId)&&r.calendarAlchemyVialEmpty?.finishId===finishId&&r.campaignMinute<=minute);
+ if(emptied){
+  requireTrue(!journal.some(r=>relevant(r,campaignId)&&r.calendarAlchemyDecay?.finishId===finishId&&
+   journal.indexOf(r)>journal.indexOf(emptied)),
+   'Alchemy Decay: nelze házet po doloženém vyprázdnění elixíru');
+ }
  return {finishId,actorId:finish.characterId,elixirName:proof.elixirName,campaignId,
   completedMinute:proof.minute,initialAS:proof.baseAS,currentAS:as,period,
-  lastDecayId,expires:as===0,nextDueMinute:as>0?dueMinute:null};
+  lastDecayId,dispersed:!!emptied,expires:as===0||!!emptied,
+  nextDueMinute:as>0&&!emptied?dueMinute:null};
 }
 /** For every campaign elixir, list unresolved aging milestones; ignoring an
  * unbound elixir cannot silently suspend its mandatory natural decay.
