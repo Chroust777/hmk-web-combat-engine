@@ -134,6 +134,7 @@ import {alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchem
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
 import {activeDarkvision,createAlchemyDarkvisionImbibing,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js';
 import {darkvisionHealingState,pendingDarkvisionHealing,createDarkvisionHealingStart,createDarkvisionHealingRoll,requireDarkvisionHealingGMTimeMayAdvance,validateDarkvisionHealingJournal,assertDarkvisionHealingAppendOnly} from './src/integration/hmk-alchemy-darkvision-healing.js';
+import {darkvisionSkillContext} from './src/integration/hmk-alchemy-darkvision-skill.js';
 import {EXOTIC_POTIONS,herbAssessmentCandidates,herbDoseStatus,herbPotionReservationCandidates,createHerbPotency,createHerbPreservation,createHerbPotionStart,createHerbPotionComplete,validateHerbalJournal,assertHerbalJournalAppendOnly,potencyLabel} from './src/integration/hmk-herbal-concoctions.js';
 import {createHerbPotionAdministration,validateHerbAdministrationJournal,assertHerbAdministrationAppendOnly,availableHerbalPotions,herbPotionEffectAt} from './src/integration/hmk-herbal-administration.js';
 import {PRINTED_VIAL,createHerbVialBinding,createHerbVialDiscard,vialBinding,vialState,validateHerbVialJournal,assertHerbVialAppendOnly,assertActiveHerbVials} from './src/integration/hmk-herbal-vial-ledger.js';
@@ -217,7 +218,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.422';
+const APP_VERSION='93.423';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5494,6 +5495,19 @@ function skillAutoFor(actor,name,form=null,prefix='A'){
   ctx.breakdown.push({label:(herbalCharm.type==='aromatic'?'Aromatic · Charm':'Aphrodisiac · odolání svádění')+
    ' · HMK p.75 ('+herbalCharm.sourceIds.join(', ')+')',value:herbalCharm.modifier,source:'verified-herbal-charm-p75'});
   ctx.herbalCharm=herbalCharm;}
+ // HMK pp.269–271: immutable Darkvision and CF healing evidence feeds the
+ // existing EML. A GM's optical classification is mandatory ONLY if affected.
+ if(form&&data.campaignClock){
+  const visionUse=value('darkvisionSense')||'',light=value('darkvisionLight')||'';
+  const distanceText=value('darkvisionDistance');
+  const vision=darkvisionSkillContext({journal:data.journal,campaignId:campaignKey(data.campaignClock),
+   minute:data.campaignClock.minute,actorId:actor.id,visionUse,light,
+   distanceFeet:distanceText===null?null:Number(distanceText)});
+  if(vision.applies){ctx.condition.modifier+=vision.modifier;ctx.modifier+=vision.modifier;
+   ctx.breakdown.push({label:'Darkvision · '+vision.reason+' ('+vision.sourceIds.join(', ')+')',
+    value:vision.modifier,source:'confirmed-alchemy-darkvision-p269-271'});
+   ctx.darkvision=vision;}
+ }
  const bonus=activeDoctrineModifier(actor,name,data.campaignClock?.minute);
  if(bonus){ctx.condition.modifier+=bonus;ctx.modifier+=bonus;
   ctx.breakdown.push({label:'Doctrine Blessing',value:bonus,source:'confirmed-ceremony-p316'});}
@@ -7082,7 +7096,7 @@ document.addEventListener('submit',event=>{
     '\nBonus Assistance '+hskSigned(bonus)+' (strop +10); stav '+hskSigned(ctx.modifier)+'; GM situace '+hskSigned(hskGMModifier(form,'A'))+'; EML '+result.eml+'\nd100 '+result.roll+' → '+result.level+(result.splitCF?' '+result.splitCF:'')+' · '+result.unopposedStars+' Victory Stars'+(sr?'\nPředepsaný SR '+sr.name+' d10 '+sr.roll+' / TN '+sr.tn+' → '+(sr.success?'S':'F')+'; '+sr.effect:'')+
     (ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+(ctx.armourIsProvisional?'\nPŘEDBĚŽNÝ zbrojní kontext: '+ctx.provisionalArmour.join('; '):'')+'\nNásledek: '+skillConsequenceText(consequence)+hskNarrativeBlock(skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}));
    recordSkillEvidence('Assistance · '+v.primary,body,{type:'assistance-success-test',actorId:actor.id,skill:v.primary,
-    preliminaryArmour:ctx.armourIsProvisional,stimulant:ctx.stimulant??null,herbalCharmA:ctx.herbalCharm??null,secondaryRollResult:sr,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',
+    preliminaryArmour:ctx.armourIsProvisional,stimulant:ctx.stimulant??null,herbalCharmA:ctx.herbalCharm??null,darkvisionA:ctx.darkvision??null,secondaryRollResult:sr,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',
     rollOrigin:die.origin,gmNarrative:skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}),scene:hskScene(form),consequence,consequenceProof},slot);return;
   }
   const a=hskResolveSide({person:actor,form,side:'A'});
@@ -7108,7 +7122,7 @@ document.addEventListener('submit',event=>{
   const type=opposed?'opposed-success-test':sv?'secondary-mastery-value-test':'secondary-mastery-test';
   recordSkillEvidence((opposed?'Opposed · ':sv?'Success Value · ':'Success Test · ')+a.info.primary,body,{type,actorId:actor.id,
    opponentId:b?.person?.id||null,skills:b?[a.info.primary,b.info.primary]:[a.info.primary],
-   preliminaryArmour:a.ctx.armourIsProvisional||b?.ctx.armourIsProvisional||false,stimulantA:a.ctx.stimulant??null,stimulantB:b?.ctx.stimulant??null,herbalCharmA:a.ctx.herbalCharm??null,herbalCharmB:b?.ctx.herbalCharm??null,seductionConfirmed:opposed&&form.elements.namedItem('seductionConfirmed')?.checked===true,emlRangeA:a.emlRange,emlRangeB:b?.emlRange||null,secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
+   preliminaryArmour:a.ctx.armourIsProvisional||b?.ctx.armourIsProvisional||false,stimulantA:a.ctx.stimulant??null,stimulantB:b?.ctx.stimulant??null,herbalCharmA:a.ctx.herbalCharm??null,herbalCharmB:b?.ctx.herbalCharm??null,darkvisionA:a.ctx.darkvision??null,darkvisionB:b?.ctx.darkvision??null,seductionConfirmed:opposed&&form.elements.namedItem('seductionConfirmed')?.checked===true,emlRangeA:a.emlRange,emlRangeB:b?.emlRange||null,secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
    secondaryRollResult:a.sr,secondaryRollResultB:b?.sr||null,
    ...(sv&&a.info.primary==='Alchemy'&&a.sr?.routineId==='alchemy-elixir'?{helpers:a.helpers.map(x=>({actorId:x.actor.id,skill:'Alchemy',ml:x.mastery.ml}))}:{}),
    a:a.result,b:b?.result||null,result:opposed?comparison:a.result,
