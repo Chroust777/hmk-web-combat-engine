@@ -129,7 +129,7 @@ import {previewTrekCorrection,createTrekCorrection,latestTrekCorrection,effectiv
 import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING_HABITATS,validateWildernessJournal,createTrackingProof,validateTrackingJournal,trekWatchfulness,trekSurpriseProcedure} from './src/integration/hmk-trekking-wilderness-tasks.js';
 import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,validateSupplyJournal,assertSupplyJournalAppendOnly,supplyBalances} from './src/integration/hmk-foraging-supply-ledger.js';
 import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJournal,assertMundaneHerbalAppendOnly} from './src/integration/hmk-herbal-mundane.js';
-import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyNoncrucialDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js';
+import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js';
 import {EXOTIC_POTIONS,herbAssessmentCandidates,herbDoseStatus,herbPotionReservationCandidates,createHerbPotency,createHerbPreservation,createHerbPotionStart,createHerbPotionComplete,validateHerbalJournal,assertHerbalJournalAppendOnly,potencyLabel} from './src/integration/hmk-herbal-concoctions.js';
 import {createHerbPotionAdministration,validateHerbAdministrationJournal,assertHerbAdministrationAppendOnly,availableHerbalPotions,herbPotionEffectAt} from './src/integration/hmk-herbal-administration.js';
 import {PRINTED_VIAL,createHerbVialBinding,createHerbVialDiscard,vialBinding,vialState,validateHerbVialJournal,assertHerbVialAppendOnly,assertActiveHerbVials} from './src/integration/hmk-herbal-vial-ledger.js';
@@ -213,7 +213,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.415';
+const APP_VERSION='93.416';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -267,7 +267,8 @@ function validate(d){
  if(entry.calendarCampaignId!==campaignKey(d.campaignClock)||proof?.result!=='ruined-by-dissolution')continue;
  const actor=d.characters.find(c=>c.id===entry.characterId);
  if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===entry.id&&e.type==='hmk-alchemy-dissolution-aural'&&
- e.details?.auralShock===proof.criticalFailure?.auralShockAdded&&e.details?.dissolutionD100===proof.criticalFailure?.dissolutionD100))
+ e.details?.auralShock===proof.criticalFailure?.auralShockAdded&&e.details?.dissolutionD100===proof.criticalFailure?.dissolutionD100&&
+ (proof.criticalFailure?.crucialDissolution?JSON.stringify(e.details?.crucialShock)===JSON.stringify(proof.criticalFailure.shockRoll):!e.details?.crucialShock)))
  throw Error('Alchemy: Dissolution nemá nezměněný Aural/Combat State důkaz');}
  validateHerbVialJournal(d.journal);validateHerbAdministrationJournal(d.journal);validateHerbalPoisonExposureJournal(d.journal);validateGreatPoisonJournal(d.journal);validateHerbWeaponPasteJournal(d.journal);validateWeaponPoisonResistanceJournal(d.journal);assertActiveHerbWeaponPastes(d);validateStimulantInitiativeJournal(d.journal);validateHerbalCharmSkillJournal(d.journal);validateHallucinogenicJournal(d.journal);validateTranscendenceWillJournal(d.journal);validateEmeticShockJournal(d.journal);validateParalyticEnduranceJournal(d.journal);validateSoporificJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);assertActiveHerbVials(d);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
@@ -848,9 +849,9 @@ function campaignCalendarView(){
   !data.journal.some(r=>r.calendarHerbPotionComplete?.startId===j.id));
  const pendingAlchemy=pendingAlchemyPreparations(data.journal,campaignKey(clock));
  const alchemyHTML=`<section class="hc-calendar hc-wilderness"><details><summary>HMK 265–268 · Alchemy · kanonické elixíry (${pendingAlchemy.length} rozpracovaných)</summary>
- <p class="hc-hint">Create ML60+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution při výsledku končícím 5/0 je zatím bezpečně blokována, neboť musí dále navázat na originální Shock Roll (SHK 8) bez vymyšleného bojového kola. Výrobky zatím nejsou v inventáři ani použitelné.</p>
+ <p class="hc-hint">Create ML60+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Výrobky zatím nejsou v inventáři ani použitelné.</p>
  ${participants.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0,pend=pendingAlchemy.find(x=>x.characterId===c.id);
-  if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0)return '';
+  if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.combatState?.shock==='KIA')return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
   return `<form data-alchemy-start><strong>${esc(c.name)} · Alchemy ML ${ml} · Sunsign ${esc(sunsign||'NEVYPLNĚN')}</strong><input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}">
   <div class="hc-fields"><label>Kanonický elixír<select name="elixirName" required>${CANONICAL_ALCHEMY_ELIXIRS.map(x=>`<option value="${esc(x.name)}">${esc(x.name)} · ${esc(x.principle)} (${esc(x.convocation)})</option>`).join('')}</select></label>
@@ -866,8 +867,9 @@ function campaignCalendarView(){
  ${clock.minute<a.dueMinute?`<form data-alchemy-abort><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="startId" value="${esc(row.id)}"><label>Důvod přerušení / narušení koncentrace<input name="reason" minlength="3" maxlength="240" required></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje přerušení a zničení rozpracovaného elixíru</label><button type="submit">Ukončit a znehodnotit přípravu (bez posunu času)</button></form>`:''}
  ${clock.minute===a.dueMinute?proofs.map(proof=>{const t=proof.skillTestProof,r=t.a||t.result,sv=r.sv,count=sv>=5?Math.min(5,sv-4):0;
   const willML=availableMasteries(actor).find(x=>x.name==='Will')?.ml??0;
-  return `<form data-alchemy-finish data-alchemy-will-index="${Math.floor(willML/10)}"><input type="hidden" name="startId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="skillId" value="${esc(proof.id)}"><strong>Doložený Preparation Roll · SV ${sv} · d100 ${r.roll} · ${esc(r.level)} · až ${count} × d10</strong>
-  ${r.level==='CF'?`<div class="hc-fields"><label>Will SR d10 (Will Index ${Math.floor(willML/10)})<input type="number" name="cfWillD10" min="1" max="10" required></label><label>Pokud Will SR neuspěje: Alchemical Dissolution d100<input type="number" name="dissolutionD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-will>⚄ Generovat Will SR d10</button> <button type="button" class="hc-small" data-alchemy-roll-dissolution>⚄ Generovat Dissolution d100 (jen po neúspěšném Will SR)</button><p class="hc-hint">Will SR se vyhodnocuje před Dissolution. Pokud d100 Dissolution končí 5 nebo 0, aplikace neuloží neúplný výsledek bez následného Shock Roll proti SHK8.</p>`:''}
+  const shockML=availableMasteries(actor).find(x=>x.name==='Shock')?.ml??0;
+  return `<form data-alchemy-finish data-alchemy-will-index="${Math.floor(willML/10)}" data-alchemy-shock-ml="${shockML}"><input type="hidden" name="startId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="skillId" value="${esc(proof.id)}"><strong>Doložený Preparation Roll · SV ${sv} · d100 ${r.roll} · ${esc(r.level)} · až ${count} × d10</strong>
+  ${r.level==='CF'?`<div class="hc-fields"><label>Will SR d10 (Will Index ${Math.floor(willML/10)})<input type="number" name="cfWillD10" min="1" max="10" required></label><label>Pokud Will SR neuspěje: Alchemical Dissolution d100<input type="number" name="dissolutionD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-will>⚄ Generovat Will SR d10</button> <button type="button" class="hc-small" data-alchemy-roll-dissolution>⚄ Generovat Dissolution d100 (jen po neúspěšném Will SR)</button><div class="hc-fields"><label>Crucial Dissolution (d100 končí 5/0): skutečný Shock d100<input type="number" name="crucialShockD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-shock>⚄ Generovat Crucial Shock d100 (jen 5/0)</button><p class="hc-hint">Will SR → Dissolution d100 → případný Shock d100 proti ověřenému Shock ML ${shockML} − Fatigue (včetně nové Aural Weakness). SHK 8 upraví původní Shock SL. Při následném STN/INC/UNC zůstává povinný původní Shock Recovery.</p>`:''}
   <div class="hc-fields">${Array.from({length:count},(_,i)=>`<label>Augmentation d10 #${i+1} (TN ${a.workshopStars})<input type="number" name="aug${i}" min="1" max="10" ${r.level==='CF'?'':'required'}></label>`).join('')}</div>${count?'<button type="button" class="hc-small" data-alchemy-roll-augment>⚄ Generovat Augmentation d10</button>':''}<label class="hc-check"><input type="checkbox" name="gmContinuityConfirmed" required> GM potvrzuje skutečně nepřerušenou přípravu a koncentraci po celou požadovanou pracovní dobu</label><button type="submit">Zapsat Preparation Roll · bez vytvoření inventáře</button></form>`}).join('')||'<p class="hc-hint">Na konec přípravy musí být nový příslušný SV ve Skill Workbench; u GM modifieru zadejte Sunsign v uvedené hodnotě.</p>':''}</article>`}).join('')}
  ${data.journal.filter(x=>x.calendarCampaignId===campaignKey(clock)&&x.calendarAlchemyFinish).slice(-8).map(x=>{const a=x.calendarAlchemyFinish;return `<p class="hc-hint"><strong>${esc(a.elixirName)}</strong> · SV ${a.preparationSV} · ${esc(a.result)}${a.baseAS?' · base AS '+a.baseAS:''} · ${esc(displayCampaignMinute(a.minute))} · fyzická lahvička dosud nedoložena</p>`}).join('')}
  </details></section>`;
@@ -7762,14 +7764,17 @@ document.addEventListener('submit',e=>{
  }catch(err){alert('Great Poison: '+err.message)}
 },true);
 document.addEventListener('click',e=>{
- const target=e.target.closest?.('[data-alchemy-roll-time],[data-alchemy-roll-augment],[data-alchemy-roll-will],[data-alchemy-roll-dissolution]');if(!target)return;
+ const target=e.target.closest?.('[data-alchemy-roll-time],[data-alchemy-roll-augment],[data-alchemy-roll-will],[data-alchemy-roll-dissolution],[data-alchemy-roll-shock]');if(!target)return;
  const f=target.closest('form');if(!f)return;
  if(target.matches('[data-alchemy-roll-time]')){for(let i=0;i<3;i++){const x=f.elements.namedItem('timeD6'+i);x.value=String(secureHMKDie(6));x.dataset.alchemyGenerated=x.value;}}
  if(target.matches('[data-alchemy-roll-augment]')){for(const x of f.querySelectorAll('input[name^="aug"]')){x.value=String(secureHMKDie(10));x.dataset.alchemyGenerated=x.value;}}
- if(target.matches('[data-alchemy-roll-will]')){const w=f.elements.namedItem('cfWillD10'),d=f.elements.namedItem('dissolutionD100');w.value=String(secureHMKDie(10));w.dataset.alchemyGenerated=w.value;d.value='';delete d.dataset.alchemyGenerated;}
+ if(target.matches('[data-alchemy-roll-will]')){const w=f.elements.namedItem('cfWillD10'),d=f.elements.namedItem('dissolutionD100');w.value=String(secureHMKDie(10));w.dataset.alchemyGenerated=w.value;d.value='';delete d.dataset.alchemyGenerated;const sh=f.elements.namedItem('crucialShockD100');if(sh){sh.value='';delete sh.dataset.alchemyGenerated;}}
  if(target.matches('[data-alchemy-roll-dissolution]')){const w=f.elements.namedItem('cfWillD10'),d=f.elements.namedItem('dissolutionD100');
   if(!Number.isInteger(Number(w.value))||!w.value||Number(w.value)<=Number(f.dataset.alchemyWillIndex)||Number(w.value)>10){alert('Dissolution je dovolena až po neúspěšném Will SR.');return;}
-  d.value=String(secureHMKDie(100));d.dataset.alchemyGenerated=d.value;}
+  d.value=String(secureHMKDie(100));d.dataset.alchemyGenerated=d.value;const sh=f.elements.namedItem('crucialShockD100');if(sh){sh.value='';delete sh.dataset.alchemyGenerated;}}
+ if(target.matches('[data-alchemy-roll-shock]')){const w=Number(f.elements.namedItem('cfWillD10')?.value),d=Number(f.elements.namedItem('dissolutionD100')?.value);
+  if(!w||w<=Number(f.dataset.alchemyWillIndex)||!d||d<1||d>100||d%5!==0){alert('Crucial Shock lze házet jen po neúspěšném Will SR a Dissolution d100 končícím 5/0.');return;}
+  const sh=f.elements.namedItem('crucialShockD100');sh.value=String(secureHMKDie(100));sh.dataset.alchemyGenerated=sh.value;}
 },true);
 document.addEventListener('submit',e=>{
  const f=e.target;if(!f?.matches?.('[data-alchemy-start],[data-alchemy-finish],[data-alchemy-abort]'))return;
@@ -7782,7 +7787,7 @@ document.addEventListener('submit',e=>{
   if(f.matches('[data-alchemy-start]')){
    const who=character(actorId),actualML=availableMasteries(who).find(x=>x.name==='Alchemy')?.ml;
    if(!actualML||actualML!==Number(v.alchemyML))throw Error('Alchemy ML se změnilo; obnovte panel.');
-   if(who.hmk?.arcane?.auralShockLevels>0)throw Error('Alchemy je během Aural Shock zakázána (HMK 190, 267).');
+   if(who.hmk?.arcane?.auralShockLevels>0||who.hmk?.combatState?.shock==='KIA')throw Error('Alchemy nelze zahájit během Aural Shock ani po smrti postavy (HMK 169,190).');
    const actualSunsign=who.hmk?.sunsign||who.hmk?.creation?.computed?.sunsign||'';
    if(v.sunsign!==actualSunsign)throw Error('Sunsign se změnil; obnovte panel.');
    const time=[0,1,2].map(i=>dice('timeD6'+i));
@@ -7803,23 +7808,32 @@ document.addEventListener('submit',e=>{
    const who=character(actorId),willML=availableMasteries(who).find(x=>x.name==='Will')?.ml??null;
    const cfWill=r?.level==='CF'?dice('cfWillD10'):null;
    const willFailed=!!cfWill&&cfWill.value>Math.floor((willML??0)/10);
+   if(r?.level==='CF'&&!willFailed&&f.elements.namedItem('dissolutionD100')?.value)throw Error('Při úspěšném Will SR neházejte Dissolution.');
    const dissolution=willFailed?dice('dissolutionD100'):null;
+   const crucial=willFailed&&dissolution?.value%5===0;
+   if(!crucial&&f.elements.namedItem('crucialShockD100')?.value)throw Error('Shock d100 patří jen ke Crucial Dissolution 5/0.');
+   const shock=crucial?dice('crucialShockD100'):null;
+   const shockML=crucial?availableMasteries(who).find(x=>x.name==='Shock')?.ml??null:null;
+   const state=who.hmk?.combatState??initialCombatState();
+   const cfLevels=willFailed?(dissolution.value<=60?1:dissolution.value<=90?3:5):0;
+   const shockFatigue=crucial?combatFatigueTotals(state).total+5*cfLevels:null;
    const aug=Array.from({length:willFailed?0:count},(_,i)=>dice('aug'+i));
    const proof=createAlchemyFinish({journal:data.journal,campaignId,minute,actorId,startId:v.startId,skillId:v.skillId,
     gmContinuityConfirmed:!!v.gmContinuityConfirmed,augmentationD10:aug.map(x=>x.value),augmentationOrigins:aug.map(x=>x.origin),
     cfWillML:cfWill?willML:null,cfWillD10:cfWill?.value??null,cfWillOrigin:cfWill?.origin??null,
-    dissolutionD100:dissolution?.value??null,dissolutionOrigin:dissolution?.origin??null});
-   const eventId=uuid(),resolved=proof.result==='ruined-by-dissolution'?applyAlchemyNoncrucialDissolution({
-    state:who.hmk?.combatState??initialCombatState(),arcane:who.hmk?.arcane,proof,eventId}):null;
+    dissolutionD100:dissolution?.value??null,dissolutionOrigin:dissolution?.origin??null,
+    crucialShockML:shockML,crucialShockFatigue:shockFatigue,crucialShockD100:shock?.value??null,crucialShockOrigin:shock?.origin??null});
+   const eventId=uuid(),resolved=proof.result==='ruined-by-dissolution'?applyAlchemyDissolution({
+    state,arcane:who.hmk?.arcane,proof,eventId}):null;
    if(mutate(()=>{
     if(resolved){const c=character(actorId);c.hmk.combatState=resolved.state;c.hmk.arcane=resolved.arcane;
      data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:actorId,
       episodeId:eventId,eventId:uuid(),gmConfirmed:true});}
     data.journal.push({id:eventId,characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
     title:'Alchemy · '+proof.result+' · '+proof.elixirName,body:'HMK 267–268 · Preparation SV '+proof.preparationSV+
-     '; base AS '+(proof.baseAS??'—')+(resolved?'; Alchemical Dissolution Aural +'+resolved.auralShockAdded:'')+
+     '; base AS '+(proof.baseAS??'—')+(resolved?'; Alchemical Dissolution Aural +'+resolved.auralShockAdded+(resolved.shockState?'; Shock '+resolved.shockState:''):'')+
      '; bez inventárního předmětu',calendarAlchemyFinish:proof});
-   }))notice=resolved?'Alchemical Dissolution doložena · Aural Shock '+resolved.auralShockAdded+'; čas GM nezměněn.':'Alchemy Preparation Roll doložen; fyzický elixír čeká na inventář.';
+   }))notice=resolved?'Alchemical Dissolution doložena · Aural Shock '+resolved.auralShockAdded+(resolved.shockState?' · Shock '+resolved.shockState:'')+'; čas GM nezměněn.':'Alchemy Preparation Roll doložen; fyzický elixír čeká na inventář.';
   }
  }catch(err){alert('Alchemy: '+err.message)}
 },true);
