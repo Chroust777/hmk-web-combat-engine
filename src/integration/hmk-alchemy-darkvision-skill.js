@@ -11,14 +11,16 @@ export function darkvisionSkillContext({journal=[],campaignId,minute,actorId,vis
  requireTrue(typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&
   Number.isSafeInteger(minute)&&minute>=0&&minute<=1e9,'Darkvision: neplatný kontext kampaně či času');
  const active=activeDarkvision(journal,campaignId,actorId,minute);
- requireTrue(active.length<=1,'Darkvision: neuzavřený souběh elixírů; nelze bezpečně sečíst jejich účinky');
+ // Each source independently grants its own range; choose the greatest usable
+ // range, NEVER sum strengths or invent an additional EML bonus.
  const ill=journal.filter(j=>j.calendarCampaignId===campaignId&&j.campaignMinute<=minute&&
-  j.calendarAlchemyImbibing?.elixirName==='Darkvision'&&j.calendarAlchemyImbibing?.targetId===actorId&&
-  j.calendarAlchemyImbibing?.illEffect?.kind==='vision-light-penalty'&&j.calendarAlchemyImbibing.finalAS>0)
+  ((j.calendarAlchemyImbibing?.elixirName==='Darkvision'&&j.calendarAlchemyImbibing?.targetId===actorId&&
+    j.calendarAlchemyImbibing?.illEffect?.kind==='vision-light-penalty'&&j.calendarAlchemyImbibing.finalAS>0)||
+   (j.calendarAlchemyDarkvisionProfusionIll?.targetId===actorId&&j.calendarAlchemyDarkvisionProfusionIll?.illEffect?.kind==='vision-light-penalty')))
   .map(j=>darkvisionHealingState(journal,campaignId,j.id,minute))
   .filter(s=>!s.recovered);
- const a=active[0]??null,rangeFeet=a?a.state.currentAS*5:0;
- const sourceIds=[...(a?[a.useId]:[]),...ill.map(s=>s.useId)].filter((id,i,arr)=>arr.indexOf(id)===i);
+ const a=active.reduce((best,x)=>!best||x.state.currentAS>best.state.currentAS?x:best,null),rangeFeet=a?a.state.currentAS*5:0;
+ const sourceIds=[...active.map(x=>x.useId),...ill.map(s=>s.useId)].filter((id,i,arr)=>arr.indexOf(id)===i);
  if(!sourceIds.length)return {applies:false,modifier:0,sourceIds:[],rangeFeet:0};
  requireTrue(['sight','non-sight'].includes(visionUse),
   'Darkvision: GM musí určit, zda je konkrétní test založen na zraku, nebo jiném smyslu.');
@@ -38,7 +40,7 @@ export function darkvisionSkillContext({journal=[],campaignId,minute,actorId,vis
  }
  const penalty=light==='bright'?ill.reduce((sum,x)=>sum+x.activePenalty,0):0;
  return {applies:true,visionUse,light,checkedFeet,modifier:penalty?-penalty:0,lightPenalty:penalty,rangeFeet,
-  sourceIds,illEffectIds:ill.map(x=>x.useId),activeUseId:a?.useId??null,
+  sourceIds,illEffectIds:ill.map(x=>x.useId),activeUseId:a?.useId??null,activeUseIds:active.map(x=>x.useId),
   reason:penalty?'CF citlivost na světlo – postih jen při jasném/přímém světle':
    light==='pitch-black'&&a?'Vidění ve tmě v doloženém dosahu; žádný bonus k EML':
    'Bez zrakového postihu v doložených světelných podmínkách',sourcePages:[269,270,271]};

@@ -12,7 +12,11 @@ const req=(v,msg)=>{if(!v)throw Error(msg)};
 const int=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const originOK=x=>['manual','cryptographic-software-die'].includes(x);
 const useRow=(journal,campaignId,useId)=>{
- const use=journal.find(j=>j.id===useId&&j.calendarCampaignId===campaignId&&j.calendarAlchemyImbibing);
+ let use=journal.find(j=>j.id===useId&&j.calendarCampaignId===campaignId&&j.calendarAlchemyImbibing);
+ if(!use){const secondary=journal.find(j=>j.id===useId&&j.calendarCampaignId===campaignId&&j.calendarAlchemyDarkvisionProfusionIll);
+  if(secondary){const p=secondary.calendarAlchemyDarkvisionProfusionIll;use={...secondary,calendarAlchemyImbibing:{elixirName:'Darkvision',
+   targetId:p.targetId,asBefore:p.baseAS,finalAS:1,sl:'CF',illEffect:p.illEffect}};}
+ }
  req(use?.calendarAlchemyImbibing?.elixirName==='Darkvision'&&use.calendarAlchemyImbibing.illEffect?.kind==='vision-light-penalty'&&
   use.calendarAlchemyImbibing.sl==='CF'&&use.calendarAlchemyImbibing.finalAS>0,
   'Darkvision Healing: chybí skutečně účinný CF Imbibing a citlivost na světlo');
@@ -70,7 +74,8 @@ export function createDarkvisionHealingRoll({journal=[],campaignId,minute,useId,
   gmConfirmed:true,sourcePages:[185,270,271]};
 }
 export function pendingDarkvisionHealing(journal=[],campaignId,minute=1e9){
- return journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAlchemyImbibing?.illEffect?.kind==='vision-light-penalty'&&j.calendarAlchemyImbibing.finalAS>0)
+ return journal.filter(j=>j.calendarCampaignId===campaignId&&((j.calendarAlchemyImbibing?.illEffect?.kind==='vision-light-penalty'&&j.calendarAlchemyImbibing.finalAS>0)||
+  j.calendarAlchemyDarkvisionProfusionIll?.illEffect?.kind==='vision-light-penalty'))
  .map(j=>darkvisionHealingState(journal,campaignId,j.id,minute)).filter(s=>!s.recovered);
 }
 export function requireDarkvisionHealingGMTimeMayAdvance({journal=[],campaignId,beforeMinute,afterMinute}={}){

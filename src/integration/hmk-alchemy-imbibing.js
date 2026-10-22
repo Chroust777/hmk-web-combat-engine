@@ -4,7 +4,7 @@
  */
 import {alchemyElixirStrength} from './hmk-alchemy-decay.js';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
-import {successLevel,SL} from '../rules/tests.js';
+import {classifyProfusionImbibing} from './hmk-alchemy-profusion.js';
 export const ALCHEMY_IMBIBING_FORMAT='hmk-alchemy-imbibing-v1';
 const ok=(x,m)=>{if(!x)throw Error(m)};
 const whole=(n,lo,hi)=>Number.isSafeInteger(n)&&n>=lo&&n<=hi;
@@ -33,17 +33,13 @@ export function createAlchemyDarkvisionImbibing({journal=[],inventory=[],campaig
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Alchemy: dávku musí podat skutečný vlastník držené existující nádoby');
  const others=activeDarkvision(journal,campaignId,targetId,minute).length;
- ok(others===0,'Alchemy: další Darkvision během aktivního elixíru vyžaduje dosud neimplementované souběžné Ill Effects (Profusion)');
- let sl=successLevel(d100,ml),units=d100%10;
- // Profusion: changes F to CF only. Critical successes stay successes.
- const extra=others===0?[]:others===1?[3,5,8,0]:others===2?[2,3,5,7,8,0]:
-  others===3?[2,3,4,5,7,8,9,0]:null;
- if(sl===SL.F&&(extra===null||extra.includes(units)))sl=SL.CF;
- const level=['CF','F','S','CS'][sl],delta={CF:-2,F:-1,S:0,CS:1}[level];
+ const profusion=classifyProfusionImbibing(d100,ml,others);
+ const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
  return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,
   emptyId,vialId:vial.vialId,elixirName:'Darkvision',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',testSkill,ml,d100,origin,
-  otherActiveElixirs:others,profusionCF:sl===SL.CF&&successLevel(d100,ml)===SL.F,
+  otherActiveElixirs:others,profusionCF:profusion.profusionCF,
+  ...(others>0?{profusionIllEffects:level==='CF'&&finalAS>0?activeDarkvision(journal,campaignId,targetId,minute).map(a=>({sourceUseId:a.useId,kind:'vision-light-penalty',baseAS:a.asBefore,penalty:Math.round(a.asBefore*2.5)})):[]}:{}),
   sl:level,asBefore:state.currentAS,modifier:delta,finalAS,
   temporary:finalAS>0,darkvisionFeet:finalAS*5,
   // CF light sensitivity is a real adverse effect; do not invent a recovery roll.
@@ -80,5 +76,57 @@ export function assertAlchemyImbibingAppendOnly(before=[],after=[]){
  const map=new Map(after.map(x=>[x.id,x]));
  for(const j of before)if(j.calendarAlchemyImbibing)
   ok(JSON.stringify(map.get(j.id))===JSON.stringify(j),'Alchemy Imbibing: důkaz nelze upravovat ani odstranit');
+ return true;
+}
+
+/** On a CF with Profusion, EACH previously active Darkvision also induces
+ * its own Ill Effect (p.269). One auditable proof per source; recovery remains
+ * in the existing Darkvision Exposure Healing mechanism.
+ */
+export function createDarkvisionProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
+ const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
+ const p=trigger?.calendarAlchemyImbibing;
+ ok(p?.elixirName==='Darkvision'&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
+  'Profusion: chybí skutečný účinný Critical Failure Imbibing');
+ const known=p.profusionIllEffects?.find(x=>x.sourceUseId===sourceUseId);
+ ok(!!known&&sourceUseId!==triggerUseId,'Profusion: předchozí aktivní elixír nebyl v CF důkazu');
+ const earlier=journal.slice(0,journal.indexOf(trigger));
+ const active=activeDarkvision(earlier,campaignId,targetId,minute).find(x=>x.useId===sourceUseId);
+ ok(!!active&&active.asBefore===known.baseAS&&Math.round(active.asBefore*2.5)===known.penalty,
+  'Profusion: chybí platný aktivní zdroj Ill Effect');
+ ok(!journal.some(j=>j.calendarCampaignId===campaignId&&j.calendarAlchemyDarkvisionProfusionIll?.triggerUseId===triggerUseId&&
+  j.calendarAlchemyDarkvisionProfusionIll.sourceUseId===sourceUseId),
+  'Profusion: stejný Ill Effect nelze doložit dvakrát');
+ return {format:'hmk-darkvision-profusion-ill-v1',campaignId,minute,triggerUseId,sourceUseId,targetId,
+  elixirName:'Darkvision',baseAS:known.baseAS,illEffect:{kind:'vision-light-penalty',penalty:known.penalty,
+   healingPeriodDays:'d6',healingRate:5,recoveryPending:true},sourcePages:[269,270,271]};
+}
+export function validateDarkvisionProfusionJournal(journal=[]){
+ const before=[];
+ for(const row of journal){
+  const p=row.calendarAlchemyDarkvisionProfusionIll;
+  if(p){
+   ok(p.campaignId===row.calendarCampaignId&&p.minute===row.campaignMinute&&p.targetId===row.characterId,
+    'Profusion: poškozený kontext Ill Effect');
+   const expected=createDarkvisionProfusionIll({...p,journal:before});
+   ok(JSON.stringify(expected)===JSON.stringify(p),'Profusion: změněný historický důkaz');
+  }
+  before.push(row);
+ }
+ for(const row of journal){
+  const p=row.calendarAlchemyImbibing;
+  if(!p?.profusionIllEffects?.length)continue;
+  for(const x of p.profusionIllEffects){
+   const proofs=journal.filter(j=>j.calendarCampaignId===row.calendarCampaignId&&j.campaignMinute===row.campaignMinute&&
+    j.calendarAlchemyDarkvisionProfusionIll?.triggerUseId===row.id&&j.calendarAlchemyDarkvisionProfusionIll.sourceUseId===x.sourceUseId);
+   ok(proofs.length===1,'Profusion: CF musí obsahovat samostatný úplný důkaz Ill Effect každého aktivního elixíru');
+  }
+ }
+ return true;
+}
+export function assertDarkvisionProfusionAppendOnly(before=[],after=[]){
+ const map=new Map(after.map(x=>[x.id,x]));
+ for(const row of before)if(row.calendarAlchemyDarkvisionProfusionIll)
+  ok(JSON.stringify(map.get(row.id))===JSON.stringify(row),'Profusion: historický Ill Effect nelze změnit');
  return true;
 }
