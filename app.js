@@ -132,7 +132,7 @@ import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJou
 import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,inventionSVPenalty,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js';
 import {alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js';
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
-import {activeDarkvision,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js';
+import {activeDarkvision,createAlchemyPhysicImbibing,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js';
 import {darkvisionHealingState,pendingDarkvisionHealing,createDarkvisionHealingStart,createDarkvisionHealingRoll,requireDarkvisionHealingGMTimeMayAdvance,validateDarkvisionHealingJournal,assertDarkvisionHealingAppendOnly} from './src/integration/hmk-alchemy-darkvision-healing.js';
 import {darkvisionSkillContext} from './src/integration/hmk-alchemy-darkvision-skill.js';
 import {EXOTIC_POTIONS,herbAssessmentCandidates,herbDoseStatus,herbPotionReservationCandidates,createHerbPotency,createHerbPreservation,createHerbPotionStart,createHerbPotionComplete,validateHerbalJournal,assertHerbalJournalAppendOnly,potencyLabel} from './src/integration/hmk-herbal-concoctions.js';
@@ -218,7 +218,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.424';
+const APP_VERSION='93.425';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -923,7 +923,7 @@ function campaignCalendarView(){
  <p class="hc-hint">Každých 30 dní od dokončení: d10 proti aktuální AS; úspěch −1 AS, neúspěch −2 AS. Při AS 0 enchantment zaniká. Hody ukládají neměnný důkaz; GM musí zastavit společné hodiny na splatnosti. Samotná AS neimplikuje fyzickou lahvičku ani účinek. Naplnění vyžaduje zvláštní GM důkaz.</p>
  ${alchemyStates.map(x=>`<p class="hc-hint"><strong>${esc(x.elixirName)}</strong> · ${esc(character(x.actorId)?.name||x.actorId)} · dokončeno ${esc(displayCampaignMinute(x.completedMinute))} · AS ${x.initialAS} → <strong>${x.currentAS}</strong>${x.dispersed?' · obsah vyprázdněn':x.expires?' · ENCHANTMENT LOST':' · další d10 '+esc(displayCampaignMinute(x.nextDueMinute))} · ${x.period} kontrol</p>`).join('')}
  ${alchemyDecayDue.map(x=>clock.minute===x.nextDueMinute?`<form data-alchemy-decay><strong>Decay splatný · ${esc(x.elixirName)} · AS ${x.currentAS}</strong><input type="hidden" name="finishId" value="${esc(x.finishId)}"><input type="hidden" name="actorId" value="${esc(x.actorId)}"><label>Decay d10<input name="d10" type="number" min="1" max="10" required></label><button type="button" data-alchemy-roll-decay class="hc-small">⚄ Generovat d10</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečný hod při splatnosti</label><button type="submit">Zapsat Decay Roll (bez posunu času)</button></form>`:`<p class="hc-hint">POZOR: ${esc(x.elixirName)} má nevyřešený Decay Roll z ${esc(displayCampaignMinute(x.nextDueMinute))}. GM nesmí pokračovat, dokud se časový důkaz neopraví.</p>`).join('')}
- <h4>Alchemy · Darkvision Imbibing (HMK 269–271)</h4>
+ <h4>Alchemy · Darkvision / Physic Imbibing (HMK 269–273)</h4>
  <p class="hc-hint">První dokončená větev použití elixíru: Darkvision. Imbibing d100 používá skutečné Aura či Alchemy ML příjemce bez postihů za Fatigue a Impairment. F/CF upravuje AS. Profusion: u další dávky se rozšiřují neúspěšné CF výsledky; skutečné CF vyvolá samostatný Ill Effect každého aktivního Darkvision. Každý má vlastní HP d6 a zotavení. Při CF je doložena i citlivost na světlo (HR5, HP d6 dní); léčení vyžaduje skutečný d6 pro HP a v každém termínu d100 proti HB × HR podle existující Exposure Healing tabulky. Dočasný efekt zůstává po vypití v kalendáři a dále podléhá 30denním Decay Rolls. Žádný společný čas se neposouvá.</p>
  ${participants.map(c=>{const effects=activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute);return effects.map(x=>`<p class="hc-hint">${esc(c.name)} · Darkvision AS ${x.state.currentAS} · vidění i v úplné tmě do <strong>${x.state.currentAS*5} ft</strong> · původ ${esc(x.useId)}${x.illEffect?' · CF: citlivost na světlo; léčení v samostatném panelu':''}</p>`).join('')}).join('')}
 <h4>Darkvision · CF citlivost na světlo · HP d6 dní / HR5</h4>
@@ -937,6 +937,7 @@ function campaignCalendarView(){
   const a=x.calendarAlchemyFinish,bind=alchemyVialBinding(data.journal,campaignKey(clock),x.id),state=bind?alchemyVialState(data.journal,campaignKey(clock),x.id,clock.minute):null;
   if(bind){const target=data.inventory.find(v=>v.id===state?.vialId);
    return `<article class="hc-event"><strong>${esc(a.elixirName)} · AS ${alchemyStates.find(z=>z.finishId===x.id)?.currentAS??a.baseAS}</strong> · nádoba ${esc(state?.vialId)} · ${esc(character(state?.ownerId)?.name||state?.ownerId)} · ${esc(state?.slot)} · ${state?.full?'plná 0,5 lb':'vyprázdněná 0,25 lb'}
+    ${state?.full&&a.elixirName==='Physic'&&alchemyStates.find(z=>z.finishId===x.id)?.currentAS>0&&target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?participants.map(c=>{const candidates=availableMasteries(c).filter(m=>m.name==='Aura'||m.name==='Alchemy');return candidates.length?`<form data-alchemy-physic><input type="hidden" name="finishId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(state.ownerId)}"><input type="hidden" name="targetId" value="${esc(c.id)}"><strong>Vypít Physic · ${esc(c.name)}</strong><p>HMK 273: bez Profusion; výsledná AS se odečte od všech aktivních Darkvision příjemce. Běžné S/F/CS jsou automatizovány. CF (Aural Shock 1) zatím nelze uložit; nereinterpretujte hod.</p><label>Imbibing d100 proti Aura/Alchemy<select name="testSkill">${candidates.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} ML ${m.ml}</option>`).join('')}</select></label><label>Skutečný d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-alchemy-roll-imbibing>⚄ Generovat d100</button><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje úplné vypití nebo podání do jednoho kola, bez posunu kalendáře</label><button type="submit">Zapsat Physic a změny AS bez nového inventáře</button></form>`:''}).join(''):''}
     ${state?.full&&a.elixirName==='Darkvision'&&alchemyStates.find(z=>z.finishId===x.id)?.currentAS>0&&target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?participants.map(c=>{const candidates=availableMasteries(c).filter(m=>m.name==='Aura'||m.name==='Alchemy');return candidates.length?`<form data-alchemy-darkvision><input type="hidden" name="finishId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(state.ownerId)}"><input type="hidden" name="targetId" value="${esc(c.id)}"><strong>Vypít Darkvision · příjemce ${esc(c.name)}</strong><label>Imbibing Roll d100 proti Aura/Alchemy<select name="testSkill">${candidates.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} ML ${m.ml}</option>`).join('')}</select></label><label>Skutečný d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-alchemy-roll-imbibing>⚄ Generovat d100</button><label>CF jen při účinném elixíru: Healing Period d6 (HMK 271)<input name="healingD6" type="number" min="1" max="6"></label><button type="button" class="hc-small" data-darkvision-roll-hp>⚄ Generovat d6</button>${activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute).map(source=>`<label>Profusion CF · další HP d6 pro již aktivní Darkvision (${esc(source.useId)}, AS před vypitím ${source.asBefore})<input name="profusionHp_${esc(source.useId)}" type="number" min="1" max="6"></label><button type="button" class="hc-small" data-alchemy-roll-profusion data-roll-target="profusionHp_${esc(source.useId)}">⚄ d6</button>`).join('')}
     <p class="hc-hint">Profusion (HMK 269): další aktivní elixíry zvyšují riziko CF. Při skutečném CF a účinné AS musí být pro každý další aktivní Darkvision doložen samostatný Healing Period d6. Pokud hod není CF, tyto d6 se nepoužijí.</p>
     <label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje úplné užití: vlastní vypití 1 turn, podání jiné postavě 1 round (bez posunu společného času)</label><button type="submit">Zapsat Imbibing Roll a vyprázdnit existující nádobu</button></form>`:''}).join(''):''}
@@ -7918,6 +7919,32 @@ document.addEventListener('submit',e=>{
    title:start?'Darkvision · CF Healing Period':'Darkvision · CF Exposure Healing Roll',body:start?'HMK 271 · HP '+roll+' dní':'HMK 185, 271 · d100 '+roll+' · '+proof.sl+' · HR '+proof.hrBefore+' → '+proof.hrAfter,
    ...(start?{calendarAlchemyDarkvisionHealingStart:proof}:{calendarAlchemyDarkvisionHealingRoll:proof})})))notice=start?'CF Healing Period doložena · čas GM beze změny':proof.recovered?'Citlivost na světlo vyléčena · HR6':'Zotavení neúplné; další termín doložen.';
  }catch(err){alert('Darkvision Healing: '+err.message)}
+},true);
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-alchemy-physic]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(!data.campaignClock||combatInitiativeSequence)throw Error('Physic vyžaduje potvrzený GM kalendář mimo aktivní boj');
+  const v=Object.fromEntries(new FormData(form)),campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
+  const target=calendarMemberIds(data.campaignClock,data.characters).find(c=>c.id===v.targetId);
+  if(!target||!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===v.actorId))throw Error('Osoby musí být ve stejné kampani');
+  const actual=availableMasteries(target).find(m=>m.name===v.testSkill)?.ml;
+  if(!actual)throw Error('Chybí skutečné Aura/Alchemy ML příjemce');
+  const dieInput=form.elements.namedItem('d100'),die=Number(dieInput.value),origin=dieInput.dataset.alchemyGenerated===String(die)?'cryptographic-software-die':'manual';
+  const emptyId=uuid();
+  const proof=createAlchemyPhysicImbibing({journal:data.journal,inventory:data.inventory,campaignId,minute,
+   actorId:v.actorId,targetId:v.targetId,finishId:v.finishId,testSkill:v.testSkill,ml:actual,d100:die,origin,
+   emptyId,gmConfirmed:!!v.confirmed});
+  const empty=createAlchemyVialEmpty({journal:data.journal,inventory:data.inventory,campaignId,minute,
+   actorId:v.actorId,finishId:v.finishId,reason:'Physic consumed by '+target.name,confirmedByGM:true});
+  if(mutate(()=>{
+   data.journal.push({id:emptyId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
+    title:'Alchemy · prázdná nádoba Physic',body:'HMK 269/273 · zachována skutečná prázdná lahvička.',calendarAlchemyVialEmpty:empty});
+   data.journal.push({id:uuid(),characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
+    title:'Alchemy · Physic · Imbibing Roll',body:'HMK 273 · '+v.testSkill+' '+actual+' · d100 '+die+' ('+origin+'), '+proof.sl+', AS '+proof.asBefore+' → '+proof.finalAS+'; '+proof.physicEffects.map(x=>x.finishId+': '+x.asBefore+' → '+x.asAfter).join('; ')+'.',
+    calendarAlchemyImbibing:proof});
+  }))notice='Physic doložen: '+proof.physicEffects.length+' aktivních Darkvision ovlivněno. Čas GM nezměněn.';
+ }catch(err){alert('Physic: '+err.message)}
 },true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-alchemy-darkvision]'))return;
