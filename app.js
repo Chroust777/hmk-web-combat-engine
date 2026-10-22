@@ -129,7 +129,7 @@ import {previewTrekCorrection,createTrekCorrection,latestTrekCorrection,effectiv
 import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING_HABITATS,validateWildernessJournal,createTrackingProof,validateTrackingJournal,trekWatchfulness,trekSurpriseProcedure} from './src/integration/hmk-trekking-wilderness-tasks.js';
 import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,validateSupplyJournal,assertSupplyJournalAppendOnly,supplyBalances} from './src/integration/hmk-foraging-supply-ledger.js';
 import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJournal,assertMundaneHerbalAppendOnly} from './src/integration/hmk-herbal-mundane.js';
-import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js';
+import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyNoncrucialDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js';
 import {EXOTIC_POTIONS,herbAssessmentCandidates,herbDoseStatus,herbPotionReservationCandidates,createHerbPotency,createHerbPreservation,createHerbPotionStart,createHerbPotionComplete,validateHerbalJournal,assertHerbalJournalAppendOnly,potencyLabel} from './src/integration/hmk-herbal-concoctions.js';
 import {createHerbPotionAdministration,validateHerbAdministrationJournal,assertHerbAdministrationAppendOnly,availableHerbalPotions,herbPotionEffectAt} from './src/integration/hmk-herbal-administration.js';
 import {PRINTED_VIAL,createHerbVialBinding,createHerbVialDiscard,vialBinding,vialState,validateHerbVialJournal,assertHerbVialAppendOnly,assertActiveHerbVials} from './src/integration/hmk-herbal-vial-ledger.js';
@@ -213,7 +213,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.414';
+const APP_VERSION='93.415';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -263,7 +263,13 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateHerbVialJournal(d.journal);validateHerbAdministrationJournal(d.journal);validateHerbalPoisonExposureJournal(d.journal);validateGreatPoisonJournal(d.journal);validateHerbWeaponPasteJournal(d.journal);validateWeaponPoisonResistanceJournal(d.journal);assertActiveHerbWeaponPastes(d);validateStimulantInitiativeJournal(d.journal);validateHerbalCharmSkillJournal(d.journal);validateHallucinogenicJournal(d.journal);validateTranscendenceWillJournal(d.journal);validateEmeticShockJournal(d.journal);validateParalyticEnduranceJournal(d.journal);validateSoporificJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);assertActiveHerbVials(d);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
+ if(d?.journal){for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);for(const entry of d.journal){const proof=entry.calendarAlchemyFinish;
+ if(entry.calendarCampaignId!==campaignKey(d.campaignClock)||proof?.result!=='ruined-by-dissolution')continue;
+ const actor=d.characters.find(c=>c.id===entry.characterId);
+ if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===entry.id&&e.type==='hmk-alchemy-dissolution-aural'&&
+ e.details?.auralShock===proof.criticalFailure?.auralShockAdded&&e.details?.dissolutionD100===proof.criticalFailure?.dissolutionD100))
+ throw Error('Alchemy: Dissolution nemá nezměněný Aural/Combat State důkaz');}
+ validateHerbVialJournal(d.journal);validateHerbAdministrationJournal(d.journal);validateHerbalPoisonExposureJournal(d.journal);validateGreatPoisonJournal(d.journal);validateHerbWeaponPasteJournal(d.journal);validateWeaponPoisonResistanceJournal(d.journal);assertActiveHerbWeaponPastes(d);validateStimulantInitiativeJournal(d.journal);validateHerbalCharmSkillJournal(d.journal);validateHallucinogenicJournal(d.journal);validateTranscendenceWillJournal(d.journal);validateEmeticShockJournal(d.journal);validateParalyticEnduranceJournal(d.journal);validateSoporificJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);assertActiveHerbVials(d);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
@@ -842,9 +848,9 @@ function campaignCalendarView(){
   !data.journal.some(r=>r.calendarHerbPotionComplete?.startId===j.id));
  const pendingAlchemy=pendingAlchemyPreparations(data.journal,campaignKey(clock));
  const alchemyHTML=`<section class="hc-calendar hc-wilderness"><details><summary>HMK 265–268 · Alchemy · kanonické elixíry (${pendingAlchemy.length} rozpracovaných)</summary>
- <p class="hc-hint">Create ML60+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Critical Failure / Will / Dissolution a naplnění fyzických nádob jsou zatím uzavřeny proti automatickému vykazování úspěchu; elixíry nejsou automaticky zařazeny do inventáře ani použitelné.</p>
+ <p class="hc-hint">Create ML60+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution při výsledku končícím 5/0 je zatím bezpečně blokována, neboť musí dále navázat na originální Shock Roll (SHK 8) bez vymyšleného bojového kola. Výrobky zatím nejsou v inventáři ani použitelné.</p>
  ${participants.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0,pend=pendingAlchemy.find(x=>x.characterId===c.id);
-  if(ml<60||pend)return '';
+  if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0)return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
   return `<form data-alchemy-start><strong>${esc(c.name)} · Alchemy ML ${ml} · Sunsign ${esc(sunsign||'NEVYPLNĚN')}</strong><input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}">
   <div class="hc-fields"><label>Kanonický elixír<select name="elixirName" required>${CANONICAL_ALCHEMY_ELIXIRS.map(x=>`<option value="${esc(x.name)}">${esc(x.name)} · ${esc(x.principle)} (${esc(x.convocation)})</option>`).join('')}</select></label>
@@ -859,8 +865,10 @@ function campaignCalendarView(){
  return `<article class="hc-event"><strong>${esc(actor?.name||a.actorId)} · ${esc(a.elixirName)} · ${a.workshopStars} ★</strong><p>${a.durationDays} dní · zahájeno ${esc(displayCampaignMinute(a.minute))} · Preparation Roll přesně ${esc(displayCampaignMinute(a.dueMinute))} · Sunsign GM ${a.sunsignModifier>=0?'+':''}${a.sunsignModifier}. ${clock.minute<a.dueMinute?'Čeká na GM hodiny.':clock.minute>a.dueMinute?'CHYBA TERMÍNU: GM čas již přeskočil splatnost.':'Příprava splatná.'}</p>
  ${clock.minute<a.dueMinute?`<form data-alchemy-abort><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="startId" value="${esc(row.id)}"><label>Důvod přerušení / narušení koncentrace<input name="reason" minlength="3" maxlength="240" required></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje přerušení a zničení rozpracovaného elixíru</label><button type="submit">Ukončit a znehodnotit přípravu (bez posunu času)</button></form>`:''}
  ${clock.minute===a.dueMinute?proofs.map(proof=>{const t=proof.skillTestProof,r=t.a||t.result,sv=r.sv,count=sv>=5?Math.min(5,sv-4):0;
-  return r.level==='CF'?`<p class="hc-hint">Alchemy d100 ${r.roll} je Critical Failure – vyžaduje Will SR / případnou Dissolution. Záměrně nelze uzavřít jako úspěšný elixír.</p>`:`<form data-alchemy-finish><input type="hidden" name="startId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="skillId" value="${esc(proof.id)}"><strong>Doložený Preparation Roll · SV ${sv} · d100 ${r.roll} · ${esc(r.level)} · ${count} × d10</strong>
-  <div class="hc-fields">${Array.from({length:count},(_,i)=>`<label>Augmentation d10 #${i+1} (TN ${a.workshopStars})<input type="number" name="aug${i}" min="1" max="10" required></label>`).join('')}</div>${count?'<button type="button" class="hc-small" data-alchemy-roll-augment>⚄ Generovat Augmentation d10</button>':''}<label class="hc-check"><input type="checkbox" name="gmContinuityConfirmed" required> GM potvrzuje skutečně nepřerušenou přípravu a koncentraci po celou požadovanou pracovní dobu</label><button type="submit">Zapsat Preparation Roll · bez vytvoření inventáře</button></form>`}).join('')||'<p class="hc-hint">Na konec přípravy musí být nový příslušný SV ve Skill Workbench; u GM modifieru zadejte Sunsign v uvedené hodnotě.</p>':''}</article>`}).join('')}
+  const willML=availableMasteries(actor).find(x=>x.name==='Will')?.ml??0;
+  return `<form data-alchemy-finish data-alchemy-will-index="${Math.floor(willML/10)}"><input type="hidden" name="startId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="skillId" value="${esc(proof.id)}"><strong>Doložený Preparation Roll · SV ${sv} · d100 ${r.roll} · ${esc(r.level)} · až ${count} × d10</strong>
+  ${r.level==='CF'?`<div class="hc-fields"><label>Will SR d10 (Will Index ${Math.floor(willML/10)})<input type="number" name="cfWillD10" min="1" max="10" required></label><label>Pokud Will SR neuspěje: Alchemical Dissolution d100<input type="number" name="dissolutionD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-will>⚄ Generovat Will SR d10</button> <button type="button" class="hc-small" data-alchemy-roll-dissolution>⚄ Generovat Dissolution d100 (jen po neúspěšném Will SR)</button><p class="hc-hint">Will SR se vyhodnocuje před Dissolution. Pokud d100 Dissolution končí 5 nebo 0, aplikace neuloží neúplný výsledek bez následného Shock Roll proti SHK8.</p>`:''}
+  <div class="hc-fields">${Array.from({length:count},(_,i)=>`<label>Augmentation d10 #${i+1} (TN ${a.workshopStars})<input type="number" name="aug${i}" min="1" max="10" ${r.level==='CF'?'':'required'}></label>`).join('')}</div>${count?'<button type="button" class="hc-small" data-alchemy-roll-augment>⚄ Generovat Augmentation d10</button>':''}<label class="hc-check"><input type="checkbox" name="gmContinuityConfirmed" required> GM potvrzuje skutečně nepřerušenou přípravu a koncentraci po celou požadovanou pracovní dobu</label><button type="submit">Zapsat Preparation Roll · bez vytvoření inventáře</button></form>`}).join('')||'<p class="hc-hint">Na konec přípravy musí být nový příslušný SV ve Skill Workbench; u GM modifieru zadejte Sunsign v uvedené hodnotě.</p>':''}</article>`}).join('')}
  ${data.journal.filter(x=>x.calendarCampaignId===campaignKey(clock)&&x.calendarAlchemyFinish).slice(-8).map(x=>{const a=x.calendarAlchemyFinish;return `<p class="hc-hint"><strong>${esc(a.elixirName)}</strong> · SV ${a.preparationSV} · ${esc(a.result)}${a.baseAS?' · base AS '+a.baseAS:''} · ${esc(displayCampaignMinute(a.minute))} · fyzická lahvička dosud nedoložena</p>`}).join('')}
  </details></section>`;
  const herbalHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>HMK 74–75 · byliny, potence, konzervace a lektvary · ${herbCandidates.length} nálezů</summary>
@@ -7754,10 +7762,14 @@ document.addEventListener('submit',e=>{
  }catch(err){alert('Great Poison: '+err.message)}
 },true);
 document.addEventListener('click',e=>{
- const target=e.target.closest?.('[data-alchemy-roll-time],[data-alchemy-roll-augment]');if(!target)return;
+ const target=e.target.closest?.('[data-alchemy-roll-time],[data-alchemy-roll-augment],[data-alchemy-roll-will],[data-alchemy-roll-dissolution]');if(!target)return;
  const f=target.closest('form');if(!f)return;
  if(target.matches('[data-alchemy-roll-time]')){for(let i=0;i<3;i++){const x=f.elements.namedItem('timeD6'+i);x.value=String(secureHMKDie(6));x.dataset.alchemyGenerated=x.value;}}
  if(target.matches('[data-alchemy-roll-augment]')){for(const x of f.querySelectorAll('input[name^="aug"]')){x.value=String(secureHMKDie(10));x.dataset.alchemyGenerated=x.value;}}
+ if(target.matches('[data-alchemy-roll-will]')){const w=f.elements.namedItem('cfWillD10'),d=f.elements.namedItem('dissolutionD100');w.value=String(secureHMKDie(10));w.dataset.alchemyGenerated=w.value;d.value='';delete d.dataset.alchemyGenerated;}
+ if(target.matches('[data-alchemy-roll-dissolution]')){const w=f.elements.namedItem('cfWillD10'),d=f.elements.namedItem('dissolutionD100');
+  if(!Number.isInteger(Number(w.value))||!w.value||Number(w.value)<=Number(f.dataset.alchemyWillIndex)||Number(w.value)>10){alert('Dissolution je dovolena až po neúspěšném Will SR.');return;}
+  d.value=String(secureHMKDie(100));d.dataset.alchemyGenerated=d.value;}
 },true);
 document.addEventListener('submit',e=>{
  const f=e.target;if(!f?.matches?.('[data-alchemy-start],[data-alchemy-finish],[data-alchemy-abort]'))return;
@@ -7768,9 +7780,14 @@ document.addEventListener('submit',e=>{
   if(!calendarMemberIds(clock,data.characters).some(c=>c.id===actorId))throw Error('Postava není členem kampaně');
   const dice=(field)=>{const x=f.elements.namedItem(field),value=Number(x?.value);return {value,origin:x?.dataset.alchemyGenerated===String(value)?'cryptographic-software-die':'manual'};};
   if(f.matches('[data-alchemy-start]')){
+   const who=character(actorId),actualML=availableMasteries(who).find(x=>x.name==='Alchemy')?.ml;
+   if(!actualML||actualML!==Number(v.alchemyML))throw Error('Alchemy ML se změnilo; obnovte panel.');
+   if(who.hmk?.arcane?.auralShockLevels>0)throw Error('Alchemy je během Aural Shock zakázána (HMK 190, 267).');
+   const actualSunsign=who.hmk?.sunsign||who.hmk?.creation?.computed?.sunsign||'';
+   if(v.sunsign!==actualSunsign)throw Error('Sunsign se změnil; obnovte panel.');
    const time=[0,1,2].map(i=>dice('timeD6'+i));
-   const proof=createAlchemyStart({journal:data.journal,campaignId,minute,actorId,alchemyML:Number(v.alchemyML),elixirName:v.elixirName,
-    sunsign:v.sunsign,workshopSource:v.workshopSource,wealth:v.wealth===''?null:Number(v.wealth),workshopStars:Number(v.workshopStars),
+   const proof=createAlchemyStart({journal:data.journal,campaignId,minute,actorId,alchemyML:actualML,elixirName:v.elixirName,
+    sunsign:actualSunsign,workshopSource:v.workshopSource,wealth:who.hmk?.wealth??null,workshopStars:Number(v.workshopStars),
     workshopConfirmed:!!v.workshopConfirmed,timeD6:time.map(x=>x.value),timeOrigins:time.map(x=>x.origin)});
    if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
     title:'Alchemy · zahájení · '+proof.elixirName,body:'HMK 268 · 10+3d6='+proof.durationDays+' dní; splatnost '+proof.dueMinute+'; GM čas neposunut',calendarAlchemyStart:proof})))
@@ -7783,12 +7800,26 @@ document.addEventListener('submit',e=>{
    if(!start)throw Error('Chybí výroba');
    const r=data.journal.find(x=>x.id===v.skillId)?.skillTestProof?.a;
    const count=r?.sv>=5?Math.min(5,r.sv-4):0;
-   const aug=Array.from({length:count},(_,i)=>dice('aug'+i));
+   const who=character(actorId),willML=availableMasteries(who).find(x=>x.name==='Will')?.ml??null;
+   const cfWill=r?.level==='CF'?dice('cfWillD10'):null;
+   const willFailed=!!cfWill&&cfWill.value>Math.floor((willML??0)/10);
+   const dissolution=willFailed?dice('dissolutionD100'):null;
+   const aug=Array.from({length:willFailed?0:count},(_,i)=>dice('aug'+i));
    const proof=createAlchemyFinish({journal:data.journal,campaignId,minute,actorId,startId:v.startId,skillId:v.skillId,
-    gmContinuityConfirmed:!!v.gmContinuityConfirmed,augmentationD10:aug.map(x=>x.value),augmentationOrigins:aug.map(x=>x.origin)});
-   if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
-    title:'Alchemy · '+proof.result+' · '+proof.elixirName,body:'HMK 268 · Preparation SV '+proof.preparationSV+'; base AS '+(proof.baseAS??'—')+'; bez inventárního předmětu',calendarAlchemyFinish:proof})))
-    notice='Alchemy Preparation Roll doložen; fyzický elixír čeká na navazující inventární mechanismus.';
+    gmContinuityConfirmed:!!v.gmContinuityConfirmed,augmentationD10:aug.map(x=>x.value),augmentationOrigins:aug.map(x=>x.origin),
+    cfWillML:cfWill?willML:null,cfWillD10:cfWill?.value??null,cfWillOrigin:cfWill?.origin??null,
+    dissolutionD100:dissolution?.value??null,dissolutionOrigin:dissolution?.origin??null});
+   const eventId=uuid(),resolved=proof.result==='ruined-by-dissolution'?applyAlchemyNoncrucialDissolution({
+    state:who.hmk?.combatState??initialCombatState(),arcane:who.hmk?.arcane,proof,eventId}):null;
+   if(mutate(()=>{
+    if(resolved){const c=character(actorId);c.hmk.combatState=resolved.state;c.hmk.arcane=resolved.arcane;
+     data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:actorId,
+      episodeId:eventId,eventId:uuid(),gmConfirmed:true});}
+    data.journal.push({id:eventId,characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
+    title:'Alchemy · '+proof.result+' · '+proof.elixirName,body:'HMK 267–268 · Preparation SV '+proof.preparationSV+
+     '; base AS '+(proof.baseAS??'—')+(resolved?'; Alchemical Dissolution Aural +'+resolved.auralShockAdded:'')+
+     '; bez inventárního předmětu',calendarAlchemyFinish:proof});
+   }))notice=resolved?'Alchemical Dissolution doložena · Aural Shock '+resolved.auralShockAdded+'; čas GM nezměněn.':'Alchemy Preparation Roll doložen; fyzický elixír čeká na inventář.';
   }
  }catch(err){alert('Alchemy: '+err.message)}
 },true);
