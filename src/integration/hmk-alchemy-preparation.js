@@ -30,16 +30,74 @@ export function alchemySunsignModifier(sunsign,convocation){
  return Math.max(...signs.map(x=>SUNSIGN_MODIFIERS[SUNSIGNS.indexOf(x)][i]));
 }
 const campaignRows=(journal,campaignId)=>journal.filter(r=>r.calendarCampaignId===campaignId);
+// HMK p.267–268: unique elixirs retain a single, GM-witnessed formula per
+// campaign. Effect text is a *description* until a separate rule-backed
+// implementation can apply it; never evaluate it as a spell or code.
+const UNIQUE_NAME_LIMIT=100;
+const uniqueStarts=(journal,campaignId,title)=>campaignRows(journal,campaignId).filter(r=>
+ r.calendarAlchemyStart?.uniqueElixir?.title.toLocaleLowerCase()===title.toLocaleLowerCase());
+const sameFormula=(a,b)=>['title','principle','use','duration','effect'].every(k=>a?.[k]===b?.[k]);
+export function inventionSVPenalty({journal=[],campaignId,actorId,startId}={}){
+ const start=journal.find(r=>r.id===startId&&r.calendarCampaignId===campaignId)?.calendarAlchemyStart;
+ ok(start?.uniqueElixir,'Invent: nenalezen původní unikátní recept');
+ const starts=uniqueStarts(journal,campaignId,start.uniqueElixir.title);
+ ok(starts.length&&starts[0].calendarAlchemyStart.uniqueElixir.mode==='invent','Invent: chybí první vynálezce receptu');
+ const inventor=starts[0].characterId;
+ const successes=campaignRows(journal,campaignId).filter(r=>r.calendarAlchemyFinish?.result==='completed'&&
+  r.calendarAlchemyFinish?.uniqueElixir?.title===start.uniqueElixir.title&&
+  sameFormula(r.calendarAlchemyFinish.uniqueElixir,start.uniqueElixir));
+ return successes.some(r=>r.characterId===actorId)?0:actorId===inventor?-3:-1;
+}
+
 export function pendingAlchemyPreparations(journal=[],campaignId){
  return campaignRows(journal,campaignId).filter(r=>r.calendarAlchemyStart&&!campaignRows(journal,campaignId).some(x=>x.calendarAlchemyFinish?.startId===r.id||x.calendarAlchemyAbort?.startId===r.id));
 }
 export function createAlchemyStart({journal=[],campaignId,minute,actorId,alchemyML,elixirName,sunsign,
  workshopSource='private',wealth=null,workshopStars=null,workshopConfirmed=false,
- timeD6=[],timeOrigins=[]}={}){
+ timeD6=[],timeOrigins=[],uniqueElixir=null}={}){
  ok(typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&whole(minute,0,1e9),'Alchemy: chybí kampaň, postava nebo platný čas GM');
  ok(whole(alchemyML,60,1000),'Alchemy Create vyžaduje ML 60+');
- const elixir=CANONICAL_ALCHEMY_ELIXIRS.find(x=>x.name===elixirName);
- ok(elixir,'Alchemy: neznámý kanonický elixír (HMK 271–274)');
+ let elixir=CANONICAL_ALCHEMY_ELIXIRS.find(x=>x.name===elixirName);
+ let unique=null;
+ if(uniqueElixir!==null){
+  ok(uniqueElixir&&typeof uniqueElixir==='object'&&!Array.isArray(uniqueElixir),
+   'Invent: neplatné parametry unikátního elixíru');
+  const {mode,title,principle,use,duration,effect,knowledgeFinishId=null,gmConfirmed}=uniqueElixir;
+  ok((mode==='invent'||mode==='known')&&typeof title==='string'&&title===title.trim()&&
+   title.length>=3&&title.length<=UNIQUE_NAME_LIMIT&&title===elixirName&&
+   !CANONICAL_ALCHEMY_ELIXIRS.some(x=>x.name.toLocaleLowerCase()===title.toLocaleLowerCase()),
+   'Invent: unikátní název nesmí být kanonický nebo neplatný');
+  const core=CANONICAL_ALCHEMY_ELIXIRS.find(x=>x.principle===principle);
+  ok(core&&['imbibed','applied'].includes(use)&&['instantaneous','temporary'].includes(duration)&&
+   typeof effect==='string'&&effect===effect.trim()&&effect.length>=3&&effect.length<=1000,
+   'Invent: před výrobou musí být určen původní princip, způsob použití, trvání a efekt (HMK 268)');
+  ok(gmConfirmed===true,'Invent: všechny parametry před výrobou musí potvrdit GM');
+  const previous=uniqueStarts(journal,campaignId,title),first=previous[0];
+  if(mode==='invent'){
+   ok(whole(alchemyML,100,1000),'Invent vyžaduje Alchemy ML 100+ (HMK 267)');
+   ok(knowledgeFinishId===null,'Invent: autor receptu nesmí předstírat převzatou znalost');
+   ok(!first||first.characterId===actorId&&sameFormula(first.calendarAlchemyStart.uniqueElixir,
+    {title,principle,use,duration,effect}),
+    'Invent: tento recept již existuje; nesmí se změnit jeho autor ani parametry');
+  }else{
+   ok(first&&first.characterId!==actorId,'Invent: vlastní recept nelze vydávat za převzatý');
+   ok(sameFormula(first.calendarAlchemyStart.uniqueElixir,{title,principle,use,duration,effect}),
+    'Invent: parametry známého receptu musí přesně odpovídat originálu');
+   const source=journal.find(r=>r.id===knowledgeFinishId&&r.calendarCampaignId===campaignId);
+   const completed=source?.calendarAlchemyFinish;
+   ok(completed?.result==='completed'&&completed.uniqueElixir&&
+    sameFormula(completed.uniqueElixir,{title,principle,use,duration,effect})&&
+    // Privy knowledge requires an actually invented original, not an unsuccessful attempt.
+    campaignRows(journal,campaignId).some(r=>r.characterId===first.characterId&&
+     r.calendarAlchemyFinish?.result==='completed'&&
+     sameFormula(r.calendarAlchemyFinish.uniqueElixir,first.calendarAlchemyStart.uniqueElixir))&&
+    source.campaignMinute<=minute,
+    'Invent: jiný alchymista musí být obeznámen s prokazatelně úspěšně vynalezeným elixírem');
+  }
+  elixir={name:title,principle,convocation:core.convocation};
+  unique={mode,title,principle,use,duration,effect,knowledgeFinishId:mode==='known'?knowledgeFinishId:null,
+   gmConfirmed:true};
+ }else ok(elixir,'Alchemy: neznámý kanonický elixír (HMK 271–274)');
  ok(workshopConfirmed===true,'GM musí doložit dostupnou alchymistickou dílnu, nikoli polní laboratoř');
  ok(workshopSource==='private'||workshopSource==='chantry','Neznámý druh dílny');
  let stars;
@@ -60,7 +118,8 @@ export function createAlchemyStart({journal=[],campaignId,minute,actorId,alchemy
  return {format:ALCHEMY_START_FORMAT,campaignId,minute,actorId,alchemyML,elixirName,principle:elixir.principle,
   convocation:elixir.convocation,sunsign,sunsignModifier:alchemySunsignModifier(sunsign,elixir.convocation),
   workshopSource,wealth:workshopSource==='private'?wealth:null,workshopStars:stars,workshopConfirmed:true,
-  timeD6:[...timeD6],timeOrigins:[...timeOrigins],durationDays,dueMinute,inventoryCreated:false,sourcePages:[265,266,267,268]};
+  timeD6:[...timeD6],timeOrigins:[...timeOrigins],durationDays,dueMinute,inventoryCreated:false,
+  ...(unique?{uniqueElixir:unique}:{}),sourcePages:[265,266,267,268]};
 }
 export function requireAlchemyGMTimeMayAdvance({journal=[],campaignId,beforeMinute,afterMinute}={}){
  for(const row of pendingAlchemyPreparations(journal,campaignId)){
@@ -103,6 +162,7 @@ export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startI
   'Vyžadován nový originální Alchemy SV ve Skill Workbench s Herblore, Mineralogy a Mathematics SR (HMK 268)');
  ok(!journal.some(x=>x.calendarAlchemyFinish?.skillId===skillId),'Preparation Roll už byl použit');
  ok(r.ml>=60,'Alchemy Create ML pod 60');
+ if(start.uniqueElixir?.mode==='invent')ok(r.ml>=100,'Invent: skutečný Preparation Roll vyžaduje Alchemy ML 100+');
  const sm=r.secondary||[];
  ok(sm.length===2&&sm.every(x=>Number.isSafeInteger(x.index)&&x.modifier===secondaryModifier(x.index*10)),
   'Alchemy: Herblore/Mineralogy Secondary Modifiers neodpovídají původnímu Skill Testu');
@@ -169,7 +229,8 @@ export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startI
  }else ok(storedCriticalFailure===null&&cfWillML===null&&cfWillD10===null&&cfWillOrigin===null&&dissolutionD100===null&&dissolutionOrigin===null&&
   crucialShockML===null&&crucialShockFatigue===null&&crucialShockD100===null&&crucialShockOrigin===null,
   'Will SR a Dissolution smějí následovat pouze po Alchemy CF');
- const sv=r.sv,numberOfRolls=criticalFailure&&!criticalFailure.willSuccess?0:sv>=5?Math.min(5,sv-4):0;
+ const inventModifier=start.uniqueElixir?inventionSVPenalty({journal,campaignId,actorId,startId}):0;
+ const sv=r.sv+inventModifier,numberOfRolls=criticalFailure&&!criticalFailure.willSuccess?0:sv>=5?Math.min(5,sv-4):0;
  ok(Array.isArray(augmentationD10)&&augmentationD10.length===numberOfRolls&&augmentationD10.every(x=>whole(x,1,10))&&
    Array.isArray(augmentationOrigins)&&augmentationOrigins.length===numberOfRolls&&augmentationOrigins.every(validOrigin),
   'Alchemy: počet a původ Augmentation d10 musí odpovídat SV');
@@ -177,7 +238,8 @@ export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startI
  return {format:ALCHEMY_FINISH_FORMAT,campaignId,minute,actorId,startId,skillId,elixirName:start.elixirName,
   alchemyML:r.ml,gmContinuityConfirmed:true,primaryRoll:r.roll,primaryLevel:r.level,secondaryModifiers:sm.map(x=>x.modifier),
   mathRoll:sr.roll,mathTN:sr.tn,mathSuccess:sr.success,sunsignModifier:start.sunsignModifier,
-  preparationSV:sv,workshopStars:start.workshopStars,augmentationD10:[...augmentationD10],
+  preparationSV:sv,...(start.uniqueElixir?{rawPreparationSV:r.sv,inventionSVModifier:inventModifier,
+   uniqueElixir:structuredClone(start.uniqueElixir)}:{}),workshopStars:start.workshopStars,augmentationD10:[...augmentationD10],
   augmentationOrigins:[...augmentationOrigins],augmentationSuccesses,
   ...(criticalFailure?{criticalFailure}:{}),result:criticalFailure&&!criticalFailure.willSuccess?'ruined-by-dissolution':sv<=2?'ruined':'completed',
   baseAS:criticalFailure&&!criticalFailure.willSuccess||sv<=2?null:6+augmentationSuccesses,
