@@ -5,7 +5,6 @@
 import {alchemyElixirStrength} from './hmk-alchemy-decay.js';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
 import {classifyProfusionImbibing} from './hmk-alchemy-profusion.js';
-import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 export const ALCHEMY_IMBIBING_FORMAT='hmk-alchemy-imbibing-v1';
 const ok=(x,m)=>{if(!x)throw Error(m)};
 const whole=(n,lo,hi)=>Number.isSafeInteger(n)&&n>=lo&&n<=hi;
@@ -48,10 +47,12 @@ export function createAlchemyDarkvisionImbibing({journal=[],inventory=[],campaig
     healingPeriodDays:'d6',healingRate:5,recoveryPending:true}:null,
   consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,271]};
 }
-/** HMK v1.2 pp.269-270, 273: Physic never contributes to Profusion.
- * Only currently implemented targets (Darkvision) may be disenchanted.
- * CF is recorded with Aural Shock 1 in the existing Combat State, and
- * the entire journal/health operation must commit atomically.
+/** HMK v1.2 pp.269, 270, 273: Physic is an instantaneous imbibed
+ * elixir, exempt from Profusion. It lowers the current AS of every elixir
+ * presently affecting the recipient. Only mechanically implemented effects
+ * (Darkvision) can be resolved; CF is explicitly gated until its mandatory
+ * Aural Shock and simultaneous Ill Effects can be committed atomically.
+ * This is a genuine, safely bounded stage, not a simulated outcome.
  */
 export function createAlchemyPhysicImbibing({journal=[],inventory=[],campaignId,minute,actorId,targetId,finishId,
  testSkill,ml,d100,origin,emptyId,gmConfirmed=false}={}){
@@ -69,10 +70,12 @@ export function createAlchemyPhysicImbibing({journal=[],inventory=[],campaignId,
  ok(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot)&&
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Physic: nutná skutečná nesená fyzická lahvička');
- // The CF outcome is never rerolled or downgraded, regardless of existing
- // elixirs: Physic is explicitly exempt from Profusion (p.270).
+ // Physic never induces or contributes to Profusion, but a real ordinary CF
+ // has mandatory Aural Shock 1. Until that health bridge is complete, fail
+ // without consuming any dose or pretending a different roll took place.
  const level=classifyProfusionImbibing(d100,ml,0).adjusted;
- const delta={CF:-2,F:-1,S:0,CS:1}[level],finalAS=Math.max(0,state.currentAS+delta);
+ ok(level!=='CF','Physic: CF vyžaduje Aural Shock 1 a společný Combat State; tato větev není ještě bezpečně uzavřena');
+ const delta={F:-1,S:0,CS:1}[level],finalAS=Math.max(0,state.currentAS+delta);
  const affected=activeDarkvision(journal,campaignId,targetId,minute);
  ok(affected.every(x=>x.state.nextDueMinute>minute),
   'Physic: nejprve vyhodnoťte všechny splatné Darkvision Decay Rolls');
@@ -85,41 +88,7 @@ export function createAlchemyPhysicImbibing({journal=[],inventory=[],campaignId,
   emptyId,vialId:vial.vialId,elixirName:'Physic',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',
   testSkill,ml,d100,origin,otherActiveElixirs:0,profusionCF:false,
   sl:level,asBefore:state.currentAS,modifier:delta,finalAS,temporary:false,
-  physicEffects,
-  ...(level==='CF'&&finalAS>0&&affected.length?{profusionIllEffects:affected.map(a=>({sourceUseId:a.useId,kind:'vision-light-penalty',
-   baseAS:a.asBefore,penalty:Math.round(a.asBefore*2.5)}))}:{}),
-  illEffect:level==='CF'&&finalAS>0?{kind:'aural-shock',levels:1,weakness:5,recoveryPending:true}:null,
-  consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,273]};
-}
-/** Immutable Physic CF evidence is mirrored in the SAME shared Combat State
- * and arcane Aural Shock counters as spell and alchemical dissolution.
- * A schema round value is historical metadata, not an invented combat turn.
- */
-export function applyAlchemyPhysicAural({state=null,arcane=null,proof,eventId}={}){
- ok(proof?.format===ALCHEMY_IMBIBING_FORMAT&&proof.elixirName==='Physic'&&
-  proof.sl==='CF'&&whole(proof.ml,1,1000)&&whole(proof.d100,1,100)&&
-  originOK(proof.origin)&&classifyProfusionImbibing(proof.d100,proof.ml,0).adjusted==='CF'&&
-  whole(proof.asBefore,1,11)&&proof.modifier===-2&&
-  proof.finalAS===Math.max(0,proof.asBefore-2)&&proof.finalAS>0&&
-  proof.illEffect?.kind==='aural-shock'&&
-  proof.illEffect.levels===1&&proof.illEffect.weakness===5&&
-  typeof eventId==='string'&&eventId.length>=3,
-  'Physic CF: chybí doložený účinný Imbibing a Aural Shock 1');
- const s=structuredClone(state??initialCombatState()),a=structuredClone(arcane??{});
- validateCombatState(s);
- ok(s.shock!=='KIA'&&!s.events.some(e=>e.id===eventId),
-  'Physic CF: zemřelá postava nebo opakovaný historický důkaz');
- const before=a.auralShockLevels??0;
- ok(whole(before,0,98)&&whole(s.fatigue.otherWeakness,0,99994),
-  'Physic CF: Aural Shock/Weakness překročil limity');
- a.auralShockLevels=before+1;s.fatigue.otherWeakness+=5;
- s.events.push({id:eventId,type:'hmk-alchemy-physic-aural',round:Math.max(1,s.lastRound||1),
-  details:{sourceEventId:eventId,finishId:proof.finishId,targetId:proof.targetId,
-   calendarCampaignId:proof.campaignId,calendarMinute:proof.minute,imbibingD100:proof.d100,
-   diceOrigin:proof.origin,auralShock:1,weaknessAdded:5,auralBefore:before,
-   auralAfter:a.auralShockLevels,sourcePage:273,nonCombat:true}});
- validateCombatState(s);
- return {state:s,arcane:a,auralShockAdded:1,weaknessAdded:5};
+  physicEffects,illEffect:null,consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,273]};
 }
 export function validateAlchemyImbibingJournal(journal=[]){
  const prior=[];
@@ -154,15 +123,14 @@ export function assertAlchemyImbibingAppendOnly(before=[],after=[]){
  return true;
 }
 
-/** On any effective CF, EACH previously active Darkvision induces
- * its own Ill Effect (p.269), even when the trigger is exempt from Profusion
- * (Physic). One auditable proof per source; recovery remains
+/** On a CF with Profusion, EACH previously active Darkvision also induces
+ * its own Ill Effect (p.269). One auditable proof per source; recovery remains
  * in the existing Darkvision Exposure Healing mechanism.
  */
 export function createDarkvisionProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Physic'].includes(p?.elixirName)&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
+ ok(p?.elixirName==='Darkvision'&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
   'Profusion: chybí skutečný účinný Critical Failure Imbibing');
  const known=p.profusionIllEffects?.find(x=>x.sourceUseId===sourceUseId);
  ok(!!known&&sourceUseId!==triggerUseId,'Profusion: předchozí aktivní elixír nebyl v CF důkazu');

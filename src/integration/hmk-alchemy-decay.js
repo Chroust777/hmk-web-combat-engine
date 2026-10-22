@@ -32,9 +32,23 @@ export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9)
   const use=row.calendarAlchemyImbibing;
   if(use?.finishId===finishId){
    requireTrue(!imbibingId&&emptied&&as>0&&use.asBefore===as&&
-    use.finalAS===Math.max(0,as+use.modifier)&&use.temporary===(use.finalAS>0),
+    use.finalAS===Math.max(0,as+use.modifier)&&
+    use.temporary===(use.finalAS>0&&use.elixirName!=='Physic'),
     'Alchemy Decay: neplatná změna AS po vypití');
    as=use.finalAS;imbibingId=row.id;activeTemporary=use.temporary;
+  }
+  // Instantaneous Physic (HMK p.273) reduces AS of each already active
+  // Darkvision dose. The Physic imbibing receipt is replayed in append order;
+  // earlier Decay and Imbibing proofs are never edited or replaced.
+  if(use?.elixirName==='Physic'&&use.finishId!==finishId){
+   const effects=use.physicEffects??[];
+   const e=effects.find(x=>x.finishId===finishId);
+   if(e){
+    requireTrue(imbibingId===e.sourceUseId&&activeTemporary&&as>0&&
+     e.asBefore===as&&e.asAfter===Math.max(0,as-use.finalAS),
+     'Alchemy Physic: neplatné odčerpání AS cílové dávky');
+    as=e.asAfter;
+   }
   }
   if(row.calendarAlchemyVialEmpty?.finishId===finishId){
    requireTrue(!emptied,'Alchemy Decay: elixír lze vyprázdnit jen jednou');
