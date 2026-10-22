@@ -129,7 +129,7 @@ import {previewTrekCorrection,createTrekCorrection,latestTrekCorrection,effectiv
 import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING_HABITATS,validateWildernessJournal,createTrackingProof,validateTrackingJournal,trekWatchfulness,trekSurpriseProcedure} from './src/integration/hmk-trekking-wilderness-tasks.js';
 import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,validateSupplyJournal,assertSupplyJournalAppendOnly,supplyBalances} from './src/integration/hmk-foraging-supply-ledger.js';
 import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJournal,assertMundaneHerbalAppendOnly} from './src/integration/hmk-herbal-mundane.js';
-import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js';
+import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,inventionSVPenalty,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js';
 import {alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js';
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
 import {EXOTIC_POTIONS,herbAssessmentCandidates,herbDoseStatus,herbPotionReservationCandidates,createHerbPotency,createHerbPreservation,createHerbPotionStart,createHerbPotionComplete,validateHerbalJournal,assertHerbalJournalAppendOnly,potencyLabel} from './src/integration/hmk-herbal-concoctions.js';
@@ -215,7 +215,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.418';
+const APP_VERSION='93.419';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -852,8 +852,11 @@ function campaignCalendarView(){
  const pendingAlchemy=pendingAlchemyPreparations(data.journal,campaignKey(clock));
  const alchemyStates=alchemyElixirStates(data.journal,campaignKey(clock));
  const alchemyDecayDue=pendingAlchemyDecay(data.journal,campaignKey(clock),clock.minute);
- const alchemyHTML=`<section class="hc-calendar hc-wilderness"><details><summary>HMK 265–268 · Alchemy · kanonické elixíry (${pendingAlchemy.length} rozpracovaných)</summary>
- <p class="hc-hint">Create ML60+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Tekuté elixíry lze doloženě uložit do stávající Vial, 4 oz; plná nádoba má 0,5 lb v existujícím ENC. Účinky elixírů dosud nejsou aktivovány.</p>
+ const knownInventorElixirs=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyFinish?.result==='completed'&&
+  j.calendarAlchemyFinish?.uniqueElixir?.mode==='invent').filter((row,i,all)=>all.findIndex(other=>
+  other.calendarAlchemyFinish.uniqueElixir.title.toLocaleLowerCase()===row.calendarAlchemyFinish.uniqueElixir.title.toLocaleLowerCase())===i);
+ const alchemyHTML=`<section class="hc-calendar hc-wilderness"><details><summary>HMK 265–268 · Alchemy · Create a Invent (${pendingAlchemy.length} rozpracovaných)</summary>
+ <p class="hc-hint">Create ML60+, Invent ML100+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Tekuté elixíry lze doloženě uložit do stávající Vial, 4 oz; plná nádoba má 0,5 lb v existujícím ENC. Účinky elixírů dosud nejsou aktivovány.</p>
  ${participants.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0,pend=pendingAlchemy.find(x=>x.characterId===c.id);
   if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.combatState?.shock==='KIA')return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
@@ -866,10 +869,41 @@ function campaignCalendarView(){
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrzuje skutečný přístup k dílně a zajištěnou možnost nepřerušené přípravy</label>
   <button type="submit">Zahájit přípravu v čase GM (bez posunu)</button></form>`}).join('')}
+ <h4>Invent · unikátní elixíry (HMK 267–268)</h4>
+ <p class="hc-hint">Při ML100+ určete nový elixír před první přípravou: název, jeden z 35 principů, imbibed/applied, instantaneous/temporary a přesný popis účinku potvrzený GM. Nový vynálezce má −3 SV, dokud jej poprvé úspěšně nedokončí. Poučený alchymista má −1 SV do svého prvního úspěchu. Tyto postihy snižují až Preparation SV, <strong>nikoli Alchemy EML</strong>. Mechanické účinky unikátního elixíru zůstávají bez samostatně podložených pravidel neaktivní.</p>
+ ${participants.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0;
+  if(ml<100||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.combatState?.shock==='KIA')return '';
+  const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
+  return `<form data-alchemy-start data-alchemy-invent><strong>${esc(c.name)} · Invent ML ${ml} · nová receptura</strong>
+  <input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}"><input type="hidden" name="mode" value="invent">
+  <div class="hc-fields"><label>Název jedinečného elixíru<input name="elixirName" required minlength="3" maxlength="100"></label>
+  <label>Základní princip<select name="principle" required>${CANONICAL_ALCHEMY_ELIXIRS.map(x=>`<option value="${esc(x.principle)}">${esc(x.principle)} (${esc(x.convocation)})</option>`).join('')}</select></label>
+  <label>Použití<select name="use"><option value="imbibed">Imbibed</option><option value="applied">Applied</option></select></label>
+  <label>Trvání<select name="duration"><option value="instantaneous">Instantaneous</option><option value="temporary">Temporary</option></select></label></div>
+  <label>Definovaný efekt (GM; zatím bez automatické mechaniky)<textarea name="effect" required minlength="3" maxlength="1000" rows="2"></textarea></label>
+  <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry (GM doloží hvězdy)</option></select></label>
+  <label>Chantry stars<select name="workshopStars">${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
+  <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
+  <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
+  <label class="hc-check"><input type="checkbox" name="gmInventionConfirmed" required> GM potvrzuje parametry unikátního elixíru a jejich znalost výrobcem</label>
+  <label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrzuje vhodnou dílnu a nepřerušenou přípravu</label>
+  <button type="submit">Invent · zahájit výrobu (bez posunu času)</button></form>`;}).join('')}
+ ${knownInventorElixirs.map(source=>{const recipe=source.calendarAlchemyFinish.uniqueElixir;
+ return participants.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0;
+  if(c.id===source.characterId||ml<60||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.combatState?.shock==='KIA')return '';
+  const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
+  return `<form data-alchemy-start data-alchemy-known><strong>${esc(c.name)} · znalost unikátní receptury „${esc(recipe.title)}“ · ML ${ml}</strong>
+  <input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}"><input type="hidden" name="mode" value="known"><input type="hidden" name="elixirName" value="${esc(recipe.title)}"><input type="hidden" name="knowledgeFinishId" value="${esc(source.id)}">
+  <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry</option></select></label><label>Chantry stars<select name="workshopStars">${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
+  <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
+  <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
+  <label class="hc-check"><input type="checkbox" name="gmInventionConfirmed" required> GM potvrzuje přístup této postavy k doložené receptuře a veškerým parametrům</label>
+  <label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrzuje vhodnou dílnu a nepřerušenou přípravu</label>
+  <button type="submit">Připravit známý unikátní elixír (bez posunu času)</button></form>`;}).join('');}).join('')}
  ${pendingAlchemy.map(row=>{const a=row.calendarAlchemyStart,actor=character(a.actorId),proofs=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.characterId===a.actorId&&j.campaignMinute===a.dueMinute&&j.skillTestProof?.type==='secondary-mastery-value-test'&&j.skillTestProof.skills?.[0]==='Alchemy'&&j.skillTestProof.secondarySkills?.[0]==='Herblore'&&j.skillTestProof.secondarySkills?.[1]==='Mineralogy'&&j.skillTestProof.secondaryRollResult?.routineId==='alchemy-elixir'&&j.skillTestProof.gmModifiers?.[0]===a.sunsignModifier&&!data.journal.some(x=>x.calendarAlchemyFinish?.skillId===j.id));
  return `<article class="hc-event"><strong>${esc(actor?.name||a.actorId)} · ${esc(a.elixirName)} · ${a.workshopStars} ★</strong><p>${a.durationDays} dní · zahájeno ${esc(displayCampaignMinute(a.minute))} · Preparation Roll přesně ${esc(displayCampaignMinute(a.dueMinute))} · Sunsign GM ${a.sunsignModifier>=0?'+':''}${a.sunsignModifier}. ${clock.minute<a.dueMinute?'Čeká na GM hodiny.':clock.minute>a.dueMinute?'CHYBA TERMÍNU: GM čas již přeskočil splatnost.':'Příprava splatná.'}</p>
  ${clock.minute<a.dueMinute?`<form data-alchemy-abort><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="startId" value="${esc(row.id)}"><label>Důvod přerušení / narušení koncentrace<input name="reason" minlength="3" maxlength="240" required></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje přerušení a zničení rozpracovaného elixíru</label><button type="submit">Ukončit a znehodnotit přípravu (bez posunu času)</button></form>`:''}
- ${clock.minute===a.dueMinute?proofs.map(proof=>{const t=proof.skillTestProof,r=t.a||t.result,sv=r.sv,count=sv>=5?Math.min(5,sv-4):0;
+ ${clock.minute===a.dueMinute?proofs.map(proof=>{const t=proof.skillTestProof,r=t.a||t.result,sv=r.sv+(a.uniqueElixir?inventionSVPenalty({journal:data.journal,campaignId:campaignKey(clock),actorId:a.actorId,startId:row.id}):0),count=sv>=5?Math.min(5,sv-4):0;
   const willML=availableMasteries(actor).find(x=>x.name==='Will')?.ml??0;
   const shockML=availableMasteries(actor).find(x=>x.name==='Shock')?.ml??0;
   return `<form data-alchemy-finish data-alchemy-will-index="${Math.floor(willML/10)}" data-alchemy-shock-ml="${shockML}"><input type="hidden" name="startId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="skillId" value="${esc(proof.id)}"><strong>Doložený Preparation Roll · SV ${sv} · d100 ${r.roll} · ${esc(r.level)} · až ${count} × d10</strong>
@@ -7852,11 +7886,22 @@ document.addEventListener('submit',e=>{
    const actualSunsign=who.hmk?.sunsign||who.hmk?.creation?.computed?.sunsign||'';
    if(v.sunsign!==actualSunsign)throw Error('Sunsign se změnil; obnovte panel.');
    const time=[0,1,2].map(i=>dice('timeD6'+i));
+   let uniqueElixir=null;
+   if(f.hasAttribute('data-alchemy-invent')){
+    uniqueElixir={mode:'invent',title:v.elixirName,principle:v.principle,use:v.use,duration:v.duration,
+     effect:v.effect,gmConfirmed:!!v.gmInventionConfirmed};
+   }else if(f.hasAttribute('data-alchemy-known')){
+    const original=data.journal.find(j=>j.id===v.knowledgeFinishId&&j.calendarCampaignId===campaignId)?.calendarAlchemyFinish?.uniqueElixir;
+    if(!original)throw Error('Doložená znalost receptury neexistuje');
+    uniqueElixir={mode:'known',title:original.title,principle:original.principle,use:original.use,
+     duration:original.duration,effect:original.effect,knowledgeFinishId:v.knowledgeFinishId,
+     gmConfirmed:!!v.gmInventionConfirmed};
+   }
    const proof=createAlchemyStart({journal:data.journal,campaignId,minute,actorId,alchemyML:actualML,elixirName:v.elixirName,
     sunsign:actualSunsign,workshopSource:v.workshopSource,wealth:who.hmk?.wealth??null,workshopStars:Number(v.workshopStars),
-    workshopConfirmed:!!v.workshopConfirmed,timeD6:time.map(x=>x.value),timeOrigins:time.map(x=>x.origin)});
+    workshopConfirmed:!!v.workshopConfirmed,timeD6:time.map(x=>x.value),timeOrigins:time.map(x=>x.origin),uniqueElixir});
    if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
-    title:'Alchemy · zahájení · '+proof.elixirName,body:'HMK 268 · 10+3d6='+proof.durationDays+' dní; splatnost '+proof.dueMinute+'; GM čas neposunut',calendarAlchemyStart:proof})))
+    title:'Alchemy · '+(proof.uniqueElixir?'Invent':'Create')+' · zahájení · '+proof.elixirName,body:'HMK 267–268 · 10+3d6='+proof.durationDays+' dní; splatnost '+proof.dueMinute+'; GM čas neposunut',calendarAlchemyStart:proof})))
     notice='Alchemy zahájena · čas GM beze změny';
   }else if(f.matches('[data-alchemy-abort]')){
    const proof=createAlchemyAbort({journal:data.journal,campaignId,minute,actorId,startId:v.startId,reason:v.reason,gmConfirmed:!!v.gmConfirmed});
@@ -7865,7 +7910,8 @@ document.addEventListener('submit',e=>{
    const start=data.journal.find(x=>x.id===v.startId)?.calendarAlchemyStart;
    if(!start)throw Error('Chybí výroba');
    const r=data.journal.find(x=>x.id===v.skillId)?.skillTestProof?.a;
-   const count=r?.sv>=5?Math.min(5,r.sv-4):0;
+   const adjustedSV=(r?.sv??0)+(start.uniqueElixir?inventionSVPenalty({journal:data.journal,campaignId,actorId,startId:v.startId}):0);
+   const count=adjustedSV>=5?Math.min(5,adjustedSV-4):0;
    const who=character(actorId),willML=availableMasteries(who).find(x=>x.name==='Will')?.ml??null;
    const cfWill=r?.level==='CF'?dice('cfWillD10'):null;
    const willFailed=!!cfWill&&cfWill.value>Math.floor((willML??0)/10);
