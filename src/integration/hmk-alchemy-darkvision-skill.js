@@ -7,9 +7,11 @@ import {activeDarkvision} from './hmk-alchemy-imbibing.js';
 import {darkvisionHealingState} from './hmk-alchemy-darkvision-healing.js';
 
 const requireTrue=(v,message)=>{if(!v)throw Error(message)};
-export function darkvisionSkillContext({journal=[],campaignId,minute,actorId,visionUse='',light='',distanceFeet=null}={}){
+export function darkvisionSkillContext({journal=[],campaignId,minute,actorId,visionUse='',light='',distanceFeet=null,auralShockLevels=0}={}){
  requireTrue(typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&
   Number.isSafeInteger(minute)&&minute>=0&&minute<=1e9,'Darkvision: neplatný kontext kampaně či času');
+ requireTrue(Number.isSafeInteger(auralShockLevels)&&auralShockLevels>=0&&auralShockLevels<=99,
+  'Darkvision: neplatný Aural Shock; prospěch z elixíru nelze bezpečně vyhodnotit.');
  const active=activeDarkvision(journal,campaignId,actorId,minute);
  // Each source independently grants its own range; choose the greatest usable
  // range, NEVER sum strengths or invent an additional EML bonus.
@@ -19,17 +21,25 @@ export function darkvisionSkillContext({journal=[],campaignId,minute,actorId,vis
    (j.calendarAlchemyDarkvisionProfusionIll?.targetId===actorId&&j.calendarAlchemyDarkvisionProfusionIll?.illEffect?.kind==='vision-light-penalty')))
   .map(j=>darkvisionHealingState(journal,campaignId,j.id,minute))
   .filter(s=>!s.recovered);
- const a=active.reduce((best,x)=>!best||x.state.currentAS>best.state.currentAS?x:best,null),rangeFeet=a?a.state.currentAS*5:0;
+ // HMK p.270: Aural Shock suspends BENEFITS, not the enchantment,
+ // stored AS/Decay, Profusion exposure, or any concurrent CF Ill Effect.
+ // Do not filter activeDarkvision(): other systems must still see the dose.
+ const suspended=auralShockLevels>0&&active.length>0;
+ const a=suspended?null:active.reduce((best,x)=>!best||x.state.currentAS>best.state.currentAS?x:best,null);
+ const rangeFeet=a?a.state.currentAS*5:0;
  const sourceIds=[...active.map(x=>x.useId),...ill.map(s=>s.useId)].filter((id,i,arr)=>arr.indexOf(id)===i);
  if(!sourceIds.length)return {applies:false,modifier:0,sourceIds:[],rangeFeet:0};
  requireTrue(['sight','non-sight'].includes(visionUse),
   'Darkvision: GM musí určit, zda je konkrétní test založen na zraku, nebo jiném smyslu.');
  if(visionUse==='non-sight')return {applies:true,visionUse,light:null,modifier:0,rangeFeet,
-  sourceIds,lightPenalty:0,reason:'GM potvrdil činnost bez využití zraku',sourcePages:[269,270,271]};
+  sourceIds,lightPenalty:0,...(suspended?{suspendedByAuralShock:true,auralShockLevels,
+  suspendedUseIds:active.map(x=>x.useId)}:{}),
+  reason:'GM potvrdil činnost bez využití zraku',sourcePages:[269,270,271]};
  requireTrue(['pitch-black','dim-shadow','bright'].includes(light),
   'Darkvision: GM musí doložit úplnou tmu, stín/šero nebo jasné/přímé světlo.');
  let checkedFeet=null;
- if(light==='pitch-black'&&!a)throw Error(
+ if(light==='pitch-black'&&!a)throw Error(suspended?
+  'Darkvision: Aural Shock blokuje prospěch z elixíru (HMK 270). V úplné tmě je nutný jiný doložený zdroj vidění.':
   'Darkvision: elixír již neposkytuje vidění ve tmě; čistě zrakový test v úplné tmě vyžaduje jiný doložený zdroj vidění.');
  if(light==='pitch-black'&&a){
   requireTrue(distanceFeet!==null&&Number.isSafeInteger(distanceFeet)&&distanceFeet>=0&&distanceFeet<=100000,
@@ -40,8 +50,11 @@ export function darkvisionSkillContext({journal=[],campaignId,minute,actorId,vis
  }
  const penalty=light==='bright'?ill.reduce((sum,x)=>sum+x.activePenalty,0):0;
  return {applies:true,visionUse,light,checkedFeet,modifier:penalty?-penalty:0,lightPenalty:penalty,rangeFeet,
-  sourceIds,illEffectIds:ill.map(x=>x.useId),activeUseId:a?.useId??null,activeUseIds:active.map(x=>x.useId),
-  reason:penalty?'CF citlivost na světlo – postih jen při jasném/přímém světle':
+  sourceIds,illEffectIds:ill.map(x=>x.useId),activeUseId:a?.useId??null,
+  activeUseIds:suspended?[]:active.map(x=>x.useId),
+  ...(suspended?{suspendedByAuralShock:true,auralShockLevels,suspendedUseIds:active.map(x=>x.useId)}:{}),
+  reason:suspended?'Aural Shock: Darkvision bez prospěchu; případná CF citlivost platí dál':
+   penalty?'CF citlivost na světlo – postih jen při jasném/přímém světle':
    light==='pitch-black'&&a?'Vidění ve tmě v doloženém dosahu; žádný bonus k EML':
    'Bez zrakového postihu v doložených světelných podmínkách',sourcePages:[269,270,271]};
 }
