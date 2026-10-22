@@ -1,4 +1,4 @@
-"""Real Chromium, v93.425: consume Physic against an active Darkvision with no independent clock."""
+"""Real Chromium, v93.426: consume Physic against an active Darkvision with no independent clock."""
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 import os,json,subprocess
@@ -23,7 +23,7 @@ def new_page(browser,record):
  page.set_content('<!doctype html><html lang="cs"><head><meta charset="utf-8"></head><body><div id="app"></div></body></html>')
  page.evaluate('''fixture=>{const store=new Map([['hmk-keepers-ledger-v1',JSON.stringify(fixture)]]);const mock={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k),key:i=>[...store.keys()][i]??null,get length(){return store.size}};Object.defineProperty(window,'localStorage',{configurable:true,value:mock});Object.defineProperty(window,'sessionStorage',{configurable:true,value:mock});}''',record)
  page.add_script_tag(content=(root/'hmk-app.bundle.js').read_text());page.wait_for_timeout(180)
- assert 'v93.425' in page.locator('#app').inner_text(),('boot',errors,dialogs,page.locator('#app').inner_text()[:650])
+ assert 'v93.426' in page.locator('#app').inner_text(),('boot',errors,dialogs,page.locator('#app').inner_text()[:650])
  page.locator('[data-nav="calendar"]').first.click();page.wait_for_timeout(100)
  if page.locator('[data-calendar-open]').count():page.locator('[data-calendar-open]').first.click();page.wait_for_timeout(100)
  return page,errors,dialogs
@@ -50,17 +50,44 @@ with sync_playwright() as p:
   assert out['campaignClock']['minute']==minute,'GM clock changed'
   assert len([r for r in out['journal'] if r.get('calendarAlchemyVialEmpty')])==2,'physic vial not physically emptied'
   assert not page.locator('[data-alchemy-physic]').count(),'duplicate used Physic offered'
-  print('PASS Chromium v93.425:',expected,'Physic, physical vial, AS reduction, immutable receipt, unchanged GM clock')
+  print('PASS Chromium v93.426:',expected,'Physic, physical vial, AS reduction, immutable receipt, unchanged GM clock')
   page.close()
- # CF must fail closed without accidentally consuming the physical bottle.
+ # CF now commits its real Aural Shock and Weakness into the existing Combat State.
  page,errors,dialogs=new_page(browser,data)
  before=saved(page)
  f=page.locator('[data-alchemy-physic]').filter(has=page.locator('input[name="targetId"][value="B"]'))
  f.evaluate('el=>el.closest("details").open=true');f.locator('input[name="d100"]').fill('85');f.locator('input[name="confirmed"]').check()
- f.locator('button[type="submit"]').click();page.wait_for_timeout(160)
+ # CF must NOT consume dose without independent d6 HP for Darkvision.
+ f.locator('button[type="submit"]').click();page.wait_for_timeout(130)
+ assert dialogs and 'd6' in dialogs[-1],('missing HP accepted',dialogs)
+ assert saved(page)==before,'partial CF commit without HP'
+ dialogs.clear()
+ f.locator('input[name="physicHp_dark"]').fill('3')
+ f.locator('button[type="submit"]').click();page.wait_for_timeout(250)
  after=saved(page)
- assert dialogs and 'Aural Shock' in dialogs[-1],dialogs
- assert after==before,'CF guard changed saved journal or inventory'
- assert not errors,errors
- print('PASS Chromium v93.425: CF safely rejected without partial transaction; Aural Shock follow-up remains unimplemented')
- page.close();browser.close()
+ assert not dialogs and not errors,('CF unexpectedly rejected',dialogs,errors)
+ proofrows=[j for j in after['journal'] if j.get('calendarAlchemyImbibing',{}).get('elixirName')=='Physic']
+ assert len(proofrows)==1 and proofrows[0]['calendarAlchemyImbibing']['sl']=='CF',proofrows
+ assert proofrows[0]['calendarAlchemyImbibing']['illEffect']['levels']==1,proofrows
+ target=next(c for c in after['characters'] if c['id']=='B')
+ assert target['hmk']['arcane']['auralShockLevels']==1,target['hmk'].get('arcane')
+ assert target['hmk']['combatState']['fatigue']['otherWeakness']==5,target['hmk']['combatState']['fatigue']
+ assert any(e['id']==proofrows[0]['id'] and e['type']=='hmk-alchemy-physic-aural' for e in target['hmk']['combatState']['events'])
+ assert after['campaignClock']['minute']==minute and len(after['inventory'])==2,'clock/inventory mutated'
+ assert len([j for j in after['journal'] if j.get('calendarAlchemyVialEmpty')])==2,'missing physical use proof'
+ assert len(after['journal'])==len(before['journal'])+4,'atomic CF + Ill Effect + HP receipt missing'
+ ill=[j for j in after['journal'] if j.get('calendarAlchemyDarkvisionProfusionIll')]
+ hp=[j for j in after['journal'] if j.get('calendarAlchemyDarkvisionHealingStart')]
+ assert len(ill)==1 and len(hp)==1,(ill,hp)
+ assert ill[0]['calendarAlchemyDarkvisionProfusionIll']['sourceUseId']=='dark'
+ assert hp[0]['calendarAlchemyDarkvisionHealingStart']['useId']==ill[0]['id']
+ assert hp[0]['calendarAlchemyDarkvisionHealingStart']['hpD6']==3
+ # A fresh Chrome document must reconstruct the same immutable combat proof.
+ page.close()
+ reloaded,reload_errors,reload_dialogs=new_page(browser,after)
+ assert not reload_errors and not reload_dialogs,('CF persisted state rejected on load',reload_errors,reload_dialogs)
+ restored=saved(reloaded)
+ assert restored['characters'][2]['hmk']['arcane']['auralShockLevels']==1
+ assert not reloaded.locator('[data-alchemy-physic]').count(),'consumed bottle offered after reload'
+ print('PASS Chromium v93.426: Physic CF, Aural Shock 1, Weakness +5, persisted reload, no duplicate')
+ reloaded.close();browser.close()

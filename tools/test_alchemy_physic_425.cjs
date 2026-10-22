@@ -79,7 +79,7 @@ const b=setup();drinkDark(b);
 if(process.env.HMK_PHYSIC_FIXTURE==='1'){console.log(JSON.stringify({journal:b.j,inventory:b.inventory,minute:b.t}));process.exit(0)}
 const opts={journal:b.j,inventory:b.inventory,campaignId:'C',minute:b.t,actorId:'A1',targetId:'B',finishId:'finish1',
  testSkill:'Aura',ml:65,d100:85,origin:'manual',emptyId:'bad',gmConfirmed:true};
-fail(()=>I.createAlchemyPhysicImbibing(opts),/CF|Aural/);
+const cfLegacy=I.createAlchemyPhysicImbibing(opts);eq(cfLegacy.sl,'CF');eq(cfLegacy.modifier,-2);eq(cfLegacy.illEffect?.levels,cfLegacy.finalAS>0?1:undefined);
 fail(()=>I.createAlchemyPhysicImbibing({...opts,d100:0}),/d100/);
 fail(()=>I.createAlchemyPhysicImbibing({...opts,d100:101}),/d100/);
 fail(()=>I.createAlchemyPhysicImbibing({...opts,d100:42,actorId:'B'}),/lahvička/);
@@ -87,8 +87,8 @@ fail(()=>I.createAlchemyPhysicImbibing({...opts,d100:42,campaignId:'OTHER'}),/do
 fail(()=>I.createAlchemyPhysicImbibing({...opts,d100:42,gmConfirmed:false}),/GM/);
 fail(()=>I.createAlchemyPhysicImbibing({...opts,d100:42,minute:b.t+15*1440}),/Decay/);
 fail(()=>I.createAlchemyPhysicImbibing({...opts,d100:42,testSkill:'Skill'}),/Aura|Alchemy/);
-// CF must leave both inventory and history unmodified because app performs
-// all checks before its existing atomic mutate transaction.
+// Planning a CF must leave inventory and history unmodified: the real Combat State
+// transition and physical consumption are committed together at the application layer.
 eq(b.j.length,10);eq(b.inventory.length,2);
 const independent=I.createAlchemyPhysicImbibing({...opts,d100:42,targetId:'X'});
 eq(independent.physicEffects.length,0);
