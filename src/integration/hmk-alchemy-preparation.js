@@ -1,10 +1,12 @@
 /** HMK v1.2 pp.265–268. The initial canonical preparation stage.
  * Uses existing campaign journal, GM clock and Skill Workbench SV proof.
  * Deliberately NO duplicate inventory, magic effects, or timer authority.
- * CF / dissolution are withheld pending their actual Will/Shock witnesses.
+ * CF Will SR and non-crucial dissolution are committed with real dice.
+ * Crucial Dissolution needs the existing Shock authority and fails closed.
  */
 import {workshopQuality} from '../rules/craft-workshop-p121.js';
-import {secondaryModifier} from '../rules/tests.js';
+import {secondaryModifier,secondaryRoll,indexOf} from '../rules/tests.js';
+import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 import {STARTING_ELIXIR_NAMES} from './hmk-creation-starting-elixirs.js';
 export const ALCHEMY_START_FORMAT='hmk-alchemy-preparation-start-v1';
 export const ALCHEMY_FINISH_FORMAT='hmk-alchemy-preparation-finish-v1';
@@ -84,7 +86,8 @@ export function createAlchemyAbort({journal=[],campaignId,minute,actorId,startId
  return {format:ALCHEMY_ABORT_FORMAT,campaignId,minute,actorId,startId,reason:reason.trim(),
   gmConfirmed:true,result:'ruined-by-interruption',sourcePage:268};
 }
-export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startId,skillId,gmContinuityConfirmed=false,augmentationD10=[],augmentationOrigins=[]}={}){
+export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startId,skillId,gmContinuityConfirmed=false,augmentationD10=[],augmentationOrigins=[],
+ cfWillML=null,cfWillD10=null,cfWillOrigin=null,dissolutionD100=null,dissolutionOrigin=null,criticalFailure:storedCriticalFailure=null}={}){
  const src=journal.find(x=>x.id===startId&&x.calendarCampaignId===campaignId&&x.calendarAlchemyStart),start=src?.calendarAlchemyStart;
  ok(start&&start.actorId===actorId&&whole(minute,0,1e9)&&minute===start.dueMinute,'Alchemy: Preparation Roll je možný pouze přesně na konci doložené přípravy');
  ok(!campaignRows(journal,campaignId).some(x=>x.calendarAlchemyFinish?.startId===startId||x.calendarAlchemyAbort?.startId===startId),'Příprava už byla ukončena');
@@ -115,8 +118,39 @@ export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startI
  // rather than secretly adding it after the roll (that would change critical SL).
  ok(p.gmModifiers?.[0]===start.sunsignModifier,
   'Alchemy: GM modifier ve Skill Workbench musí přesně zahrnout Sunsign '+start.sunsignModifier+' (ostatní okolnosti zatím samostatně neřešíme)');
- ok(['S','CS','F'].includes(r.level),'Critical Failure vyžaduje Will SR a možnou Alchemical Dissolution; v této etapě nelze CF falešně dokončit');
- const sv=r.sv,numberOfRolls=sv>=5?Math.min(5,sv-4):0;
+ // Backwards-compatible replay: nested immutable CF evidence is used to
+ // reconstruct the original calculation, not trusted as an outcome.
+ if(storedCriticalFailure){
+  cfWillML??=storedCriticalFailure.willML;
+  cfWillD10??=storedCriticalFailure.willD10;
+  cfWillOrigin??=storedCriticalFailure.willOrigin;
+  dissolutionD100??=storedCriticalFailure.dissolutionD100;
+  dissolutionOrigin??=storedCriticalFailure.dissolutionOrigin;
+ }
+ let criticalFailure=null;
+ if(r.level==='CF'){
+  ok(whole(cfWillML,1,1000)&&whole(cfWillD10,1,10)&&validOrigin(cfWillOrigin),
+   'Critical Failure: vyžaduje skutečný Will SR d10, aktuální Will ML a původ hodu');
+  const willIndex=indexOf(cfWillML),willSuccess=secondaryRoll(cfWillD10,willIndex);
+  if(willSuccess)ok(dissolutionD100===null&&dissolutionOrigin===null,
+   'Při úspěšném Will SR nesmí vzniknout fiktivní Alchemical Dissolution');
+  else {
+   ok(whole(dissolutionD100,1,100)&&validOrigin(dissolutionOrigin),
+    'Critical Failure: neúspěšný Will SR vyžaduje skutečný d100 Alchemical Dissolution');
+   // HMK p.267: final digit 5/0 invokes a separate Shock Roll vs SHK 8.
+   // Until that existing Combat authority can witness a noncombat Shock and its
+   // follow-ups without fabricating rounds, do not store an incomplete event.
+   ok(dissolutionD100%5!==0,
+    'Crucial Dissolution (d100 končí 5/0): vyžaduje navazující Shock Roll proti SHK 8; tento případ nelze zatím bezpečně uzavřít');
+  }
+  const auralShockAdded=willSuccess?0:dissolutionD100<=60?1:dissolutionD100<=90?3:5;
+  criticalFailure={willML:cfWillML,willIndex,willD10:cfWillD10,willOrigin:cfWillOrigin,
+   willSuccess,dissolutionD100:willSuccess?null:dissolutionD100,
+   dissolutionOrigin:willSuccess?null:dissolutionOrigin,auralShockAdded,
+   weaknessAdded:5*auralShockAdded,crucialDissolution:false,sourcePages:[267,268,190]};
+ }else ok(storedCriticalFailure===null&&cfWillML===null&&cfWillD10===null&&cfWillOrigin===null&&dissolutionD100===null&&dissolutionOrigin===null,
+  'Will SR a Dissolution smějí následovat pouze po Alchemy CF');
+ const sv=r.sv,numberOfRolls=criticalFailure&&!criticalFailure.willSuccess?0:sv>=5?Math.min(5,sv-4):0;
  ok(Array.isArray(augmentationD10)&&augmentationD10.length===numberOfRolls&&augmentationD10.every(x=>whole(x,1,10))&&
    Array.isArray(augmentationOrigins)&&augmentationOrigins.length===numberOfRolls&&augmentationOrigins.every(validOrigin),
   'Alchemy: počet a původ Augmentation d10 musí odpovídat SV');
@@ -126,7 +160,8 @@ export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startI
   mathRoll:sr.roll,mathTN:sr.tn,mathSuccess:sr.success,sunsignModifier:start.sunsignModifier,
   preparationSV:sv,workshopStars:start.workshopStars,augmentationD10:[...augmentationD10],
   augmentationOrigins:[...augmentationOrigins],augmentationSuccesses,
-  result:sv<=2?'ruined':'completed',baseAS:sv<=2?null:6+augmentationSuccesses,
+  ...(criticalFailure?{criticalFailure}:{}),result:criticalFailure&&!criticalFailure.willSuccess?'ruined-by-dissolution':sv<=2?'ruined':'completed',
+  baseAS:criticalFailure&&!criticalFailure.willSuccess||sv<=2?null:6+augmentationSuccesses,
   physicalOutput:'not-yet-bound-to-inventory',sourcePages:[267,268]};
 }
 export function validateAlchemyJournal(journal=[]){
@@ -144,4 +179,34 @@ export function assertAlchemyAppendOnly(before=[],after=[]){const byId=new Map(a
  for(const r of before)if(r.calendarAlchemyStart||r.calendarAlchemyFinish||r.calendarAlchemyAbort)
   ok(JSON.stringify(byId.get(r.id))===JSON.stringify(r),'Alchemy: nelze smazat ani přepsat historický důkaz');
  return true;
+}
+
+/** Apply ONLY the p.267 non-crucial CF dissolution to existing Combat/Aural
+ * state. No invented combat round, initiative, health subsystem or clock tick.
+ * All dice are already immutable in the linked Alchemy Finish proof.
+ */
+export function applyAlchemyNoncrucialDissolution({state=null,arcane=null,proof,eventId}={}){
+ const cf=proof?.criticalFailure;
+ ok(proof?.format===ALCHEMY_FINISH_FORMAT&&proof.result==='ruined-by-dissolution'&&
+  cf&&!cf.willSuccess&&whole(cf.auralShockAdded,1,5)&&!cf.crucialDissolution&&
+  cf.weaknessAdded===cf.auralShockAdded*5&&
+  typeof eventId==='string'&&eventId.length>=3,
+  'Alchemy Dissolution: neexistuje ověřený nenásilný CF důkaz');
+ const s=structuredClone(state??initialCombatState()),a=structuredClone(arcane??{});
+ validateCombatState(s);
+ ok(s.shock!=='KIA'&&!s.events.some(e=>e.id===eventId),
+  'Alchemy Dissolution: postava zemřela nebo má duplicitní historický důkaz');
+ const before=a.auralShockLevels??0;
+ ok(whole(before,0,99)&&before+cf.auralShockAdded<=99&&
+  s.fatigue.otherWeakness+cf.weaknessAdded<=99999,
+  'Alchemy Dissolution: Aural Shock / Weakness mimo limit');
+ a.auralShockLevels=before+cf.auralShockAdded;
+ s.fatigue.otherWeakness+=cf.weaknessAdded;
+ // The calendar carries the true event minute; no fictional combat round is added.
+ s.events.push({id:eventId,type:'hmk-alchemy-dissolution-aural',round:Math.max(1,s.lastRound||1),
+  details:{sourceEventId:eventId,alchemyStartId:proof.startId,auralShock:cf.auralShockAdded,
+   weaknessAdded:cf.weaknessAdded,calendarMinute:proof.minute,dissolutionD100:cf.dissolutionD100,
+   auralBefore:before,auralAfter:a.auralShockLevels,sourcePage:267}});
+ validateCombatState(s);
+ return {state:s,arcane:a,auralShockAdded:cf.auralShockAdded};
 }
