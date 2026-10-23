@@ -87,7 +87,7 @@ export function createAlchemyVialBinding({journal=[],inventory=[],campaignId,min
   sealedAtCompletionConfirmed:true,liquidConfirmed:true,material,corkConfirmed:true,confirmedByGM:true,sourcePage:268};
 }
 export function createAlchemyVialEmpty({journal=[],inventory=[],campaignId,minute,actorId,finishId,
- reason='',confirmedByGM=false}={}){
+ reason='',confirmedByGM=false,shattered=false}={}){
  check(confirmedByGM===true&&validMinute(minute),'Alchemy Vial: GM musí potvrdit skutečné vyprázdnění');
  check(typeof reason==='string'&&reason.trim().length>=3&&reason.trim().length<=240,
   'Alchemy Vial: je nutný doložený důvod vyprázdnění (3–240 znaků)');
@@ -98,7 +98,7 @@ export function createAlchemyVialEmpty({journal=[],inventory=[],campaignId,minut
   'Alchemy Vial: před vyprázdněním chybí skutečná nádoba');
  return {format:ALCHEMY_VIAL_EMPTY_FORMAT,campaignId,minute,actorId,finishId,
   vialId:state.vialId,bindingId:state.bindingId,reason:reason.trim(),confirmedByGM:true,
-  emptyVialRetained:true,sourcePage:268};
+  emptyVialRetained:!shattered,...(shattered?{vialShattered:true,sourcePage:269}:{sourcePage:268})};
 }
 export function projectAlchemyVialInventory(inventory=[],journal=[],campaignId,minute){
  if(!campaignId||!validMinute(minute))return inventory;
@@ -134,7 +134,7 @@ export function validateAlchemyVialJournal(journal=[]){
    const inv=state?[{id:state.vialId,characterId:state.ownerId,sourceItemId:PRINTED_VIAL,
     quantity:1,slot:state.slot,snapshot:{properties:{weightLb:EMPTY_LB}}}]:[];
    const reproduced=createAlchemyVialEmpty({journal:earlier,inventory:inv,campaignId:e.campaignId,
-    minute:e.minute,actorId:e.actorId,finishId:e.finishId,reason:e.reason,confirmedByGM:e.confirmedByGM});
+    minute:e.minute,actorId:e.actorId,finishId:e.finishId,reason:e.reason,confirmedByGM:e.confirmedByGM,shattered:e.vialShattered===true});
    check(JSON.stringify(reproduced)===JSON.stringify(e),'Alchemy Vial: přepsaný důkaz vyprázdnění');
   }
   earlier.push(row);

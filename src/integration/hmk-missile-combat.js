@@ -66,7 +66,7 @@ export function resolveHMKMissileAttack(a={}){
    if(r.nearbyCheck&&a.nearbyTargetCount>0){
     if(a.nearbyD20==null)return {...resultBase,complete:false,pending:{type:'nearby-d20',die:'d20'},nearbyCheck:true};
     const near=nearbyMissileStrike({targetCount:a.nearbyTargetCount,d20:a.nearbyD20,d10:a.nearbyImpactD10??null});
-    if(!near.hit)return {...resultBase,complete:true,hit:false,nearby};
+    if(!near.hit)return {...resultBase,complete:true,hit:false,nearby:near};
     if(!near.complete)return {...resultBase,complete:false,pending:near.pending,nearbyCheck:true};
     impactTA=near.impactTA;chosenTargetIndex=a.nearbyD20;precisionTA=0;
    }else return {...resultBase,complete:true,hit:false,mishap:r.mishap??null,nearbyCheck:r.nearbyCheck};
