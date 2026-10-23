@@ -1,6 +1,6 @@
 # HMK Keeper’s Ledger · Bod 4 Alchemy · Priorita 1–15
 
-Stav po v93.440, auditní pokračování v93.441. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
+Stav po v93.442, auditní pokračování v93.441–v93.442. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
 
 Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, inventární a zdravotní kapitoly podle potřeby. „Částečně“ není „hotovo“. Každý bod bude uzavřen teprve po úplném mechanickém propojení, kontrole neměnných důkazů, testování obnovy dat a regresi.
 
@@ -12,7 +12,7 @@ Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, 
 | 4 | Další applied elixíry | Neuzavřeno | Především Mending a Object Aegis proti reálným předmětům. |
 | 5 | Plošné elixíry | Neuzavřeno | Eruption, Fumebomb, Weakness; skutečné terče a bojové důsledky. |
 | 6 | Profusion všech elixírů | **Částečně – v93.441 ověřeno pro existující aktivní Imbibed** | Centrální katalog 35/35 a atomické CF kombinace existují. Zbývá 22 dosud nepodporovaných neexemptních Imbibed účinků a jejich doložené konce, než lze tvrdit univerzální provoz. |
-| 7 | Aural Shock / Ill Effects | Částečně | Sdílená zdravotní návaznost všech dalších elixírů včetně léčení a restrikce benefitů. |
+| 7 | Aural Shock / Ill Effects | **Částečně – v93.442 kanonický katalog 35/35 a sjednocené důkazy pro 4 aktivní Imbibed** | Zbývají skutečné zdravotní a časové commity dosud nepodporovaných Imbibed elixírů; katalog sám neprovádí jejich účinky ani léčbu. |
 | 8 | Physic všechny účinky | Částečně | Redukce AS všech účinných Imbibed včetně zvláštních Instantaneous. |
 | 9 | AS / Decay | Částečně | Speciální čerpání a výjimky; bezpečná rekonstrukce dříve zmeškaných měsíčních hodů. |
 | 10 | Spell / Arcane provázání | Neuzavřeno | Detect/Reveal/Dispel, Negation, Attunement, Spirit Sensing, True Sight a příslušné soul stavy. |
@@ -154,3 +154,23 @@ Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, 
 3. Bod 8 (Physic), další trvání a Decay, esoterika, Invent, recovery, fyzická evidence, kalendář a závěrečná regrese zůstávají podle tabulky otevřené. Nic z toho se tímto vydáním automaticky neoznačuje hotovo.
 
 **Etapa v93.441 je ověřitelný mezistav bodu 6, nikoliv prohlášení o dokončení 6–15.**
+
+## v93.442 – společná návaznost č. 7: kanonické Ill Effects + webová verze
+
+**Bod 7 zůstává ČÁSTEČNĚ.** Bod 6 nadále zůstává ČÁSTEČNĚ a následující 8–15 nejsou uzavřeny. Nejsou povoleny další Imbibed elixíry ani zavedeny nové zdravotní, inventární nebo kalendářní registry.
+
+- **Autorita HMK 1.2:** pp.269–274 pro vyvolání a druh Ill Effects, p.270 pro base AS a pozastavení prospěchu při Aural Shock, p.190 pro 5 Weakness za každou úroveň a denní Will Recovery.
+- **Nový `src/integration/hmk-alchemy-ill-effects.js`:** úplná explicitní tabulka Ill Effect profilů **35/35** včetně šesti Applied (bez Imbibing CF), Quiescence/Poison (bez Ill Effect), běžných/odložených Aural Shock, weariness/weakness fatigue, permanentněji léčených penalizací a psyche impulse. Pravidlový `planAlchemyIllEffect` je **čistý nezapisující plán**; sám neprovádí nové elixíry, nehází d6 a neuděluje automatické vyléčení. Dreamwalk Aural Shock 3 vzniká až **po Reembodiment**, ne při vypití.
+- **Živá návaznost pro dosavadní čtyři podporované Imbibed:** `hmk-alchemy-imbibing.js` nyní odvozuje přesně stejnou původní podobu sekundárních CF důkazů Darkvision, Erudition, Footpad, Egosight z centrální klasifikace. Při aplikaci vlastních Aural Ill Effects je jejich počet úrovní ověřen proti téže pravidlové tabulce. Starší formát journalu, pořadí důkazů, struktura zranění, skutečné d100, fyzická lahvička a čas GM se nemění. Nepodporované účinky zůstávají odmítnuty **před atomickým zápisem**.
+- **Aural Shock není duplicitní zdravotní entita:** nadále výhradně existující `arcane.auralShockLevels`, `combatState.fatigue.otherWeakness`, `hmk-spell-aural-recovery.js` a standardní blokování benefitů Darkvision, Erudition, Footpad, Egosight. Více zdrojů tvoří jeden součet a ubývá standardním GM denním Will testem; stará historická fakta zůstávají neměnná.
+- **Verzování podle požadavku uživatele:** do **každého dalšího rozdílového ZIPu vždy `index.html`**, s novým číslem v titulku, boot textu, chybovém textu a všech cache-busting URL; současně `APP_VERSION` v `app.js`, aby **patička webu** ukazovala tutéž verzi. V93.442: všechny viditelné prvky a webové zdroje používají **93.442**; aplikace zůstává kompatibilní s GitHub Pages.
+
+### V93.442: skutečné kontroly
+
+- **PASS 69/69 Node.js testovacích souborů**: finální produkční sestavení znovu kompletně ověřeno v **šesti oddělených dávkách (12+12+12+12+12+9)**, bez chyby nebo timeoutu. Jeden předchozí hromadný běh vypršel a není započítán jako PASS. `test_alchemy_ill_effects_442.cjs`: **987 kontrol** kanonických profilů, zaokrouhlení, výjimek, defer, známých CF zdrojů a chybových vstupů. `test_alchemy_aural_multi_recovery_442.cjs`: **16 kontrol**, tři samostatné zdroje Aural Shock, snížení 3→1→0, Weakness 15→5→0, ochrana CAS a immutable zdrojové události.
+- **PASS Chromium** `browser_alchemy_profusion_four_sources_441.py`: všechna čtyři podání a jejich následný CF, chybějící HP d6 bez dílčího zápisu, čtyři různé sekundární důkazy, 4 Aural/20 Weakness, inventář, čas a nová instance kampaně s neměnným journalem.
+- **PASS Chromium** `browser_alchemy_release_version_442.py`: skutečný HTML obsah `index.html`, produkční bundle vložený do Chromium dokumentu, funkční webové UI, viditelná patička v93.442 a shodné asset URL. **Omezení:** přímá navigace Chromium na `file://`/místní HTTP je prostředím blokována (`ERR_BLOCKED_BY_ADMINISTRATOR`); nelze ji vykázat jako reálné síťové načtení GitHub Pages.
+
+### Otevřené závislosti
+
+Další Imbibed elixíry stále nemají své vlastní skutečné aplikační a zdravotní writery, povinné hody, trvání a konce. Připravená pravidlová klasifikace je podkladem pro implementaci až podle schváleného pořadí (včetně bodů 8–15). **Neznamená to uzavření bodu 7.**
