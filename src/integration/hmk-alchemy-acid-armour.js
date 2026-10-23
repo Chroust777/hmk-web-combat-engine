@@ -134,6 +134,7 @@ export function validateAcidArmourInventory(database){
  for(const row of database.journal){
   if(row.calendarAlchemyAcidArmourApply){const a=row.calendarAlchemyAcidArmourApply;put(a.targetItemId,a.targetLocation,a.initialDamage);}
   if(row.calendarAlchemyAcidArmourRound){const r=row.calendarAlchemyAcidArmourRound;put(r.targetItemId,r.targetLocation,r.damageAfter);}
+  if(row.calendarAlchemyMending)for(const t of row.calendarAlchemyMending.targets)if(t.armourDamageAfter)expected.set(t.itemId,{});
  }
  for(const item of database.inventory){
   const actual=item.acidAVDamageByLocation;

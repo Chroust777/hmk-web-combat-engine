@@ -102,6 +102,7 @@ export function validateAcidWeaponInventory(database){
  for(const row of database.journal){
   if(row.calendarAlchemyAcidWeaponApply)targets.set(row.calendarAlchemyAcidWeaponApply.targetItemId,row.calendarAlchemyAcidWeaponApply.initialWQ);
   if(row.calendarAlchemyAcidWeaponRound)targets.set(row.calendarAlchemyAcidWeaponRound.targetItemId,row.calendarAlchemyAcidWeaponRound.wqAfter);
+  if(row.calendarAlchemyMending)for(const t of row.calendarAlchemyMending.targets)if(Object.hasOwn(t,'wqAfter'))targets.set(t.itemId,t.wqAfter);
  }
  for(const [id,wq] of targets){const item=database.inventory.find(x=>x.id===id);
   if(item)check(item.snapshot?.category==='weapon'&&item.currentWQ===wq,'inventární WQ nesouhlasí s doloženým Acid (předmět '+id+')');
