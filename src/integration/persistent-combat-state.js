@@ -2,7 +2,7 @@
  * Pure, deliberately conservative persistent transitions. No inferred dice,
  * missing special-injury rulings, elapsed turns or unattended blood-loss rolls.
  */
-import {SHOCK_STATE,applyShockState,resolveStunnedRecovery,resolveShockReroll} from '../rules/shock.js';
+import {SHOCK_STATE,applyShockState,resolveStunnedRecovery,resolveShockReroll,calculateShockState} from '../rules/shock.js';
 import {PARALYSIS_LOCATIONS} from './hmk-paralysis-sequela.js';
 import {bloodLossAdvanceTransition,bloodStoppageResult,BLOOD_LOSS_PERIOD_ROUNDS} from '../rules/bleeding.js';
 import {SL,successLevel,effectiveMasteryLevel} from '../rules/tests.js';
@@ -478,6 +478,48 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
  else if(s.shock!==previousShock)installShockFollowup(s,{round,timelineId:adjudication.timelineId??null});
  record(s,eventId,'confirmed-hit',round,{targetId:characterId,location:draft.location,aspect:draft.aspect,kind:inj.kind,injury:inj.injury??null,woundId:wound?.id??null,shock:s.shock,bleeding:wound?.bleeding??false,compound:compound?{d10:adjudication.compoundD10,success:compound.success,affectedId:compound.compoundedInjuryId??null}:null,impact:draft.impactResult?.effectiveImpact??null,proposalId:draft.proposalId??null,amputation:amp?{affectedWoundId:ampFromOld?priorCompounded.id:wound?.id??null,severed:amp.severed,dead:amp.dead,sl:amp.slName,roll:amp.roll,forcedBleeder:amp.forceBleeder,shockTestModifier:amp.shockTestModifier}:null,injuryMishaps:wound?hmkInjuryMishaps(wound.location,wound.severity,bodyKind):[],moralePending:wound?.moralePending??false,impaled:wound?.impaled??false,source:'HMK 161–162, 167–170; verified special consequences'});
  return {state:s,wound};
+}
+/** HMK p271 direct Acid: successive successful rounds increase the SAME
+ * continuous f Burn wound's IL. This is not a second wound and does not
+ * randomly Compound with itself; every new IL gets its own Shock test.
+ * Imported here so the canonical Combat State remains the ONLY wound writer.
+ */
+export function applyConfirmedAcidBurnAdvance({state,characterId,applicationId,woundId,
+ round,eventId,newIL,locationShock,shockD100,shockEML,gmConfirmed=false}={}){
+ const s=ready(state,round,eventId);
+ requireCond(gmConfirmed===true&&typeof applicationId==='string'&&applicationId&&
+  typeof characterId==='string'&&characterId&&typeof woundId==='string'&&woundId&&
+  whole(newIL,2,5)&&whole(locationShock,1,10)&&whole(shockD100,1,100)&&Number.isSafeInteger(shockEML),
+  'Acid: chybí skutečné potvrzení zvýšení Burn IL a Shock');
+ requireCond(s.shock!=='KIA','Zemřelá postava nemůže obdržet další burn');
+ const w=s.wounds.find(x=>x.id===woundId);
+ requireCond(w&&!w.healed&&w.aspect==='fire'&&w.level===newIL-1,
+  'Acid: původní živá f Burn rána není ve správném IL');
+ const source=s.events.find(x=>x.id===w.originEventId);
+ requireCond(source?.details?.acidFlesh?.applicationId===applicationId&&
+  source.details.targetId===characterId,'Acid: chybí původ stejné popáleniny');
+ const sl=successLevel(shockD100,shockEML);
+ const sh=calculateShockState({locationShock,injuryShock:newIL,shockSL:sl});
+ const carry=REVERSE[applyShockState(SHOCK[s.shock],sh.state)];
+ requireCond(carry!==undefined,'Acid: neplatný Shock Carryover');
+ requireCond(!s.extendedShock||carry===s.shock||carry==='KIA',
+  'Acid během Extended Shock vyžaduje dokončit příslušný pravidlový postup');
+ const prevSeverity=w.severity;
+ w.level=newIL;w.severity=newIL===2||newIL===3?'S':'G';
+ if(prevSeverity==='M'&&w.severity==='S')w.moralePending=true;
+ if(prevSeverity!=='G'&&w.severity==='G'){
+  w.moralePending=true;s.mishaps??=[];
+  for(const kind of hmkInjuryMishaps(w.location,'G',w.bodyKind))
+   s.mishaps.push({id:`mishap:${eventId}:${kind}`,woundId:w.id,kind,resolved:false});
+ }
+ const previousShock=s.shock;s.shock=carry;applyShockProne(s);
+ if(s.shock!==previousShock)s.shockOriginRound=round;
+ if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.shockFollowup=null;for(const z of s.wounds)z.nextAdvanceRound=null;}
+ else if(s.shock!==previousShock)installShockFollowup(s,{round,timelineId:'alchemy-acid:'+applicationId});
+ record(s,eventId,'acid-burn-progression',round,{applicationId,characterId,woundId,
+  previousIL:newIL-1,newIL,shockD100,shockEML,shockSL:Object.keys(SL).find(k=>SL[k]===sl),
+  injuryShock:newIL,locationShock,previousShock,shock:s.shock,gmConfirmed:true,sourcePage:271});
+ validateCombatState(s);return {state:s,woundId,shockSL:Object.keys(SL).find(k=>SL[k]===sl),shockIL:newIL};
 }
 export function dueBloodLoss(state,round){validateCombatState(state);if(state.shock==='KIA')return [];return state.wounds.filter(w=>w.bleeding&&w.nextAdvanceRound!==null&&w.nextAdvanceRound<=round).map(w=>({woundId:w.id,location:w.location,dueRound:w.nextAdvanceRound,overdue:round>w.nextAdvanceRound})).sort((a,b)=>a.dueRound-b.dueRound);}
 export function applyConfirmedBloodLoss({state,round,eventId,woundId,sl}={}){

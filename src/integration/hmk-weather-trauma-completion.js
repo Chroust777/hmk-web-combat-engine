@@ -18,6 +18,8 @@ const isLimb=new Set(['sh','ua','el','fo','ha','th','kn','ca','ft']);
 const bodyShock=(()=>{const out={};for(let z=1;z<=10;z++)for(let l=1;l<=10;l++){
  const t=humanLocation(z,l);if(out[t.location]!==undefined&&out[t.location]!==t.locationShock)throw Error('Nekonzistentní HMK anatomie');
  out[t.location]=t.locationShock; }return Object.freeze(out);})();
+/** Verified HMK p167 human location's printed Shock factor (read-only). */
+export function verifiedHumanLocationShock(location){return bodyShock[location]??null;}
 const windMinutes=d=>d<=3?120:d<=17?60:30;
 const durationMinutes=d=>d<=12?60:d<=17?120:d<=19?180:240;
 const complexionTN=Object.freeze({'very-light':10,light:7,medium:4,dark:2,'very-dark':1});
