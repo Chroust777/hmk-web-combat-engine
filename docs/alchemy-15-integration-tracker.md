@@ -1,6 +1,6 @@
 # HMK Keeper’s Ledger · Bod 4 Alchemy · Priorita 1–15
 
-Stav po v93.439. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
+Stav po v93.440, auditní pokračování v93.441. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
 
 Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, inventární a zdravotní kapitoly podle potřeby. „Částečně“ není „hotovo“. Každý bod bude uzavřen teprve po úplném mechanickém propojení, kontrole neměnných důkazů, testování obnovy dat a regresi.
 
@@ -11,7 +11,7 @@ Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, 
 | 3 | Acid → Thrown Vial / Splash | **Dokončeno pro originální 4oz skleněnou lahvičku Acid** | Ověřený Missile/Throwing, Direct a Grenade s fyzickými odchylkami a Nearby, CF bez výhozu, rozbití s odpisem inventární lahvičky, 6palcový průměr (max. jedna lidská lokace), skutečné zásahy kůže/WQ/AV/objektu a jejich první d10 + Shock atomicky. Útok v aktivní Initiative spotřebovává Attack turn a používá Guided Combat checkpoint; GM posuzuje skutečnou geometrii splash. |
 | 4 | Další applied elixíry | Neuzavřeno | Především Mending a Object Aegis proti reálným předmětům. |
 | 5 | Plošné elixíry | Neuzavřeno | Eruption, Fumebomb, Weakness; skutečné terče a bojové důsledky. |
-| 6 | Profusion všech elixírů | Částečně | Rozšířit dosavadní Darkvision, Erudition, Footpad, Physic o každé další Imbibed a jeho výjimky, včetně kombinovaných CF. |
+| 6 | Profusion všech elixírů | **Částečně – v93.441 ověřeno pro existující aktivní Imbibed** | Centrální katalog 35/35 a atomické CF kombinace existují. Zbývá 22 dosud nepodporovaných neexemptních Imbibed účinků a jejich doložené konce, než lze tvrdit univerzální provoz. |
 | 7 | Aural Shock / Ill Effects | Částečně | Sdílená zdravotní návaznost všech dalších elixírů včetně léčení a restrikce benefitů. |
 | 8 | Physic všechny účinky | Částečně | Redukce AS všech účinných Imbibed včetně zvláštních Instantaneous. |
 | 9 | AS / Decay | Částečně | Speciální čerpání a výjimky; bezpečná rekonstrukce dříve zmeškaných měsíčních hodů. |
@@ -125,3 +125,32 @@ Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, 
 - Přímý HTTP `page.reload()` je v testovacím prostředí blokován (`ERR_BLOCKED_BY_ADMINISTRATOR`), nebyl označen PASS; funkčně ekvivalentní rehydratace novou Chromium stránkou z uloženého lokálního snapshotu **PASS**.
 
 **Bod 5 uvolněn pro rozdílové vydání v93.440.** Návaznosti 6–15 zatím nejsou součástí vydání a teprve potom se pokračuje dalšími kanonickými elixíry.
+
+
+## v93.441 – společná návaznost č. 6: Profusion (ověřený mezistav)
+
+**Bod 6 zůstává ČÁSTEČNĚ.** Tato etapa nerozšiřuje katalog o nové použitelné kanonické elixíry a nevytváří žádný zdravotní, inventární ani kalendářní subsystém.
+
+### Implementace / autoritativní pravidla HMK 1.2
+
+- `hmk-alchemy-profusion.js`: explicitní katalogový profil všech **35** tištěných elixírů (Use, Duration, Profusion exemption) podle HMK **str. 269–274**; 6 Applied se nezapočítává, ani když volající omylem předá typ `Imbibed`. Z 29 Imbibed jsou **Quiescence, Physic a Poison výjimkami**, celkem 26 přispívajících typů. Instantaneous ostatních se započítává **jen za trvání skutečného účinku**, nikdy z pouhé přítomnosti staré lahvičky či historického záznamu. Nepotvrzené údaje o typu/délce nesmějí předstírat kanonický elixír.
+- `hmk-alchemy-imbibing.js`: jeden `activeAlchemyProfusionCohort()` pro dosud funkční Darkvision, Erudition, Footpad a Egosight. Tento výčet se používá při všech pěti původních Imbibing operacích (včetně výjimečného Physic), ale pořadí původních doložených Ill Effects se **nemění** kvůli zpětnému historickému replay.
+- Pokud dříve uložený Imbibed důkaz patří dosud nepodporovanému účinku a ten ještě mohl trvat, nový Imbibing se **odmítne před spotřebou nádoby a před zdravotním zápisem**. Nesmí nastat falešný počet aktivních elixírů (např. ignorovaný Healing, Dreamwalk, Airtap). Pro tyto účinky nelze svévolně předpokládat vypršení; chybí pro ně ještě kanonické zdrojové/ukončovací důkazy a vlastní Ill Effects.
+- Imbibing d100 se nepřehazuje; v případě účinného CF u podporovaných zdrojů vznikají jednotlivé nezávislé doklady ve **stávajícím** Combat State, léčení a kalendářním journalu. Tabulka jednotek je stále HMK p.269: 0 aktivních 5/0; 1 aktivní 3/5/8/0; 2 aktivní 2/3/5/7/8/0; 3 aktivní 2/3/4/5/7/8/9/0; 4+ aktivní každé F → CF.
+
+### Dokončené testy v této pracovní kopii
+
+- **PASS** katalogová Node.js sada `test_alchemy_profusion_catalog_441.cjs`: 307 kontrol včetně všech 35 typů, výjimek, hranic 4+, oddělení kampaně/příjemce/času a odmítnutí neznámého otevřeného účinku. Reálně přidané chování oproti v93.440 se neomezuje jen na označení v UI.
+- **PASS** kompletní sekvenční Node.js regrese po prvním sestavení nové verze: 67/67 testovacích souborů (včetně starších Profusion/Mixed kombinací). Po dodatečném zpřísnění katalogové validace byla finální úplná regrese **znovu dokončena ve čtyřech nezávislých dávkách: 67/67 PASS, 0 FAIL a 0 TIMEOUT**. Dřívější hromadný pokus vypršel a není započten jako úspěšný.
+- **PASS Chromium** `browser_alchemy_profusion_424.py`: dvě fyzické Darkvision lahvičky a druhý CF včetně samostatného Darkvision Ill Effect.
+- **PASS Chromium** `browser_alchemy_mixed_429.py`: Erudition→Darkvision; Darkvision→Erudition; Erudition→Physic, atomické zdravotní následky a inventář.
+- **PASS Chromium** `browser_alchemy_profusion_reload_441.py`: nová instance aplikace z uložené kampaně, neměnný journal, 2 spotřebované původní lahvičky a stejná minuta GM.
+- **PASS Chromium** `browser_alchemy_profusion_four_sources_441.py`: čtyři současně platné různé zdroje (Darkvision, Erudition, Footpad, Egosight), následný d100 81 proti ML60 → CF při 4 aktivních. Vznikají všechny čtyři původem odlišné Ill Effect doklady a Aural Shock +4/Weakness +20. Pokud chybí poslední HP d6, **nulová částečná změna**, včetně inventory, journalu, Initiative/GM času. Poté úspěšné uložení a rehydratace nové Chromium instance se stejnou historií.
+
+### Neuzavřené závislosti a následující pořadí
+
+1. **Bod 6 není plně uzavřen pro 22 dalších neexemptních kanonických Imbibed elixírů**, které zatím samostatně nelze skutečně použít. Jsou v autoritativním katalogu, ale bez prováděcího zdravotního/časového účinku se nesmí vytvářet jejich aktivní zdroj jen kvůli Profusion. Bude nutné sladit původně schválené pořadí 6–15 se zákazem předčasné implementace dalších elixírů: obecný profil lze připravit předem, reálné end-to-end případy až po každém nově integrovaném účinku.
+2. Bod 7 (Aural Shock / Ill Effects) nadále vyžaduje obecné mapování všech kanonických Ill Effects na stávající Combat State / Healing, včetně benefit suspension. Pouhý katalog zatím tuto implementaci nenahrazuje.
+3. Bod 8 (Physic), další trvání a Decay, esoterika, Invent, recovery, fyzická evidence, kalendář a závěrečná regrese zůstávají podle tabulky otevřené. Nic z toho se tímto vydáním automaticky neoznačuje hotovo.
+
+**Etapa v93.441 je ověřitelný mezistav bodu 6, nikoliv prohlášení o dokončení 6–15.**
