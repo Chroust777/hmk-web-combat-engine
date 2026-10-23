@@ -4,7 +4,7 @@
  */
 import {alchemyElixirStrength} from './hmk-alchemy-decay.js';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
-import {classifyProfusionImbibing} from './hmk-alchemy-profusion.js';
+import {classifyProfusionImbibing,canonicalProfusionProfile} from './hmk-alchemy-profusion.js';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 export const ALCHEMY_IMBIBING_FORMAT='hmk-alchemy-imbibing-v1';
 const ok=(x,m)=>{if(!x)throw Error(m)};
@@ -46,6 +46,36 @@ function concurrentAlchemyIllEffects(sources){
   {sourceUseId:a.useId,kind:'aural-shock',levels:1,weakness:5,sourceElixir:'Footpad'}:
   {sourceUseId:a.useId,kind:'aural-shock',levels:1,weakness:5});
 }
+/** One view of the documented *active* profusion cohort (pp.269–270).
+ * The order is deliberately the same as the v93.440 individual finders,
+ * so historical imbibing evidence can be replayed byte-for-byte.
+ * Unknown/unimplemented imbibing sources are NEVER silently omitted from
+ * Profusion: until their effect end can be reconstructed from canonical
+ * journal evidence, a new imbibing action is blocked without consuming a vial.
+ */
+export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minute=1e9){
+ const live=[...activeDarkvision(journal,campaignId,targetId,minute),
+  ...activeErudition(journal,campaignId,targetId,minute),
+  ...activeFootpad(journal,campaignId,targetId,minute),
+  ...activeEgosight(journal,campaignId,targetId,minute)];
+ const seen=new Set(live.map(x=>x.useId));
+ ok(seen.size===live.length,'Profusion: duplicitní aktivní zdroj');
+ for(const row of journal){
+  const proof=row.calendarAlchemyImbibing;
+  if(row.calendarCampaignId!==campaignId||row.campaignMinute>minute||proof?.targetId!==targetId)continue;
+  const profile=canonicalProfusionProfile(proof.elixirName);
+  ok(profile.use==='Imbibed','Profusion: Applied elixír nesmí mít Imbibing důkaz');
+  if(profile.exempt||seen.has(row.id)||!(proof.finalAS>0))continue;
+  // A previously applied Instantaneous effect may still remain (Healing etc).
+  // Without its canonical lifetime/recovery evidence, NEVER assume it ended.
+  // A previous Temporary effect might have decayed/been dispelled; the four
+  // supported finders above do reconstruct those lifetimes from the journal.
+  if(['Darkvision','Erudition','Footpad','Egosight'].includes(proof.elixirName))continue;
+  throw Error('Profusion: účinek elixíru '+proof.elixirName+
+   ' nemá dosud doložené ukončení; nelze bezpečně vyhodnotit souběh ani CF');
+ }
+ return live;
+}
 /** HMK v1.2 p.272 Footpad: temporary sound-muffling enchantment. */
 export function activeFootpad(journal=[],campaignId,targetId,minute=1e9){
  return journal.filter(j=>relevant(j,campaignId)&&j.calendarAlchemyImbibing?.targetId===targetId&&
@@ -69,9 +99,7 @@ export function createAlchemyFootpadImbibing({journal=[],inventory=[],campaignId
  ok(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot)&&
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Footpad: chybí skutečná nesená lahvička ve vlastnictví podávajícího');
- const others=[...activeDarkvision(journal,campaignId,targetId,minute),
-  ...activeErudition(journal,campaignId,targetId,minute),...activeFootpad(journal,campaignId,targetId,minute),
-  ...activeEgosight(journal,campaignId,targetId,minute)];
+ const others=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
  ok(others.every(x=>x.state.nextDueMinute>minute),'Footpad: nejdříve vyřešte splatný Decay');
  const profusion=classifyProfusionImbibing(d100,ml,others.length);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
@@ -103,10 +131,7 @@ export function createAlchemyEgosightImbibing({journal=[],inventory=[],campaignI
  ok(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot)&&
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Egosight: chybí fyzická lahvička příslušného vlastníka');
- const others=[...activeDarkvision(journal,campaignId,targetId,minute),
-  ...activeErudition(journal,campaignId,targetId,minute),
-  ...activeFootpad(journal,campaignId,targetId,minute),
-  ...activeEgosight(journal,campaignId,targetId,minute)];
+ const others=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
  ok(others.every(x=>x.state.nextDueMinute>minute),'Egosight: nejprve vyhodnoťte splatný Decay');
  const profusion=classifyProfusionImbibing(d100,ml,others.length);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
@@ -163,10 +188,11 @@ export function createAlchemyEruditionImbibing({journal=[],inventory=[],campaign
  ok(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot)&&
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Erudition: dávku smí podat jen vlastník existující nesené lahvičky');
- const current=activeErudition(journal,campaignId,targetId,minute);
- const otherVision=activeDarkvision(journal,campaignId,targetId,minute);
- const footpadSources=activeFootpad(journal,campaignId,targetId,minute);
- const egosightSources=activeEgosight(journal,campaignId,targetId,minute);
+ const cohort=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
+ const current=cohort.filter(x=>x.elixirName==='Erudition');
+ const otherVision=cohort.filter(x=>x.elixirName==='Darkvision');
+ const footpadSources=cohort.filter(x=>x.elixirName==='Footpad');
+ const egosightSources=cohort.filter(x=>x.elixirName==='Egosight');
  const otherCount=current.length+otherVision.length+footpadSources.length+egosightSources.length;
  const profusion=classifyProfusionImbibing(d100,ml,otherCount);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
@@ -199,20 +225,20 @@ export function createAlchemyDarkvisionImbibing({journal=[],inventory=[],campaig
  ok(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot)&&
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Alchemy: dávku musí podat skutečný vlastník držené existující nádoby');
- const footpadSources=activeFootpad(journal,campaignId,targetId,minute);
- const egoSources=activeEgosight(journal,campaignId,targetId,minute);
- const others=activeDarkvision(journal,campaignId,targetId,minute).length+
-  activeErudition(journal,campaignId,targetId,minute).length+footpadSources.length+egoSources.length;
+ const cohort=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
+ const footpadSources=cohort.filter(x=>x.elixirName==='Footpad');
+ const egoSources=cohort.filter(x=>x.elixirName==='Egosight');
+ const others=cohort.length;
  const profusion=classifyProfusionImbibing(d100,ml,others);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
 
- const existingErudition=activeErudition(journal,campaignId,targetId,minute);
+ const existingErudition=cohort.filter(x=>x.elixirName==='Erudition');
  return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,
   emptyId,vialId:vial.vialId,elixirName:'Darkvision',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',testSkill,ml,d100,origin,
   otherActiveElixirs:others,profusionCF:profusion.profusionCF,
   ...(others>0?{profusionIllEffects:level==='CF'&&finalAS>0?[
-   ...concurrentAlchemyIllEffects([...activeDarkvision(journal,campaignId,targetId,minute),...existingErudition,...footpadSources,...egoSources])]:[]}:{}),
+   ...concurrentAlchemyIllEffects([...cohort.filter(x=>x.elixirName==='Darkvision'),...existingErudition,...footpadSources,...egoSources])]:[]}:{}),
   sl:level,asBefore:state.currentAS,modifier:delta,finalAS,
   temporary:finalAS>0,darkvisionFeet:finalAS*5,
   // CF light sensitivity is a real adverse effect; do not invent a recovery roll.
@@ -245,10 +271,7 @@ export function createAlchemyPhysicImbibing({journal=[],inventory=[],campaignId,
  // elixirs: Physic is explicitly exempt from Profusion (p.270).
  const level=classifyProfusionImbibing(d100,ml,0).adjusted;
  const delta={CF:-2,F:-1,S:0,CS:1}[level],finalAS=Math.max(0,state.currentAS+delta);
- const footpadSources=activeFootpad(journal,campaignId,targetId,minute);
-
- const affected=[...activeDarkvision(journal,campaignId,targetId,minute),...activeErudition(journal,campaignId,targetId,minute),...footpadSources,
-  ...activeEgosight(journal,campaignId,targetId,minute)];
+ const affected=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
  ok(affected.every(x=>x.state.nextDueMinute>minute),
   'Physic: nejprve vyhodnoťte všechny splatné alchymistické Decay Rolls');
  const physicEffects=finalAS>0?affected
