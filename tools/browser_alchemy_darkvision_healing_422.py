@@ -26,7 +26,7 @@ def new_page(browser,data):
  page.set_content('<!doctype html><html lang="cs"><head><meta charset="utf-8"></head><body><div id="app"></div></body></html>')
  page.evaluate('''fixture=>{const store=new Map([['hmk-keepers-ledger-v1',JSON.stringify(fixture)]]);const mock={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k),key:i=>[...store.keys()][i]??null,get length(){return store.size}};Object.defineProperty(window,'localStorage',{configurable:true,value:mock});Object.defineProperty(window,'sessionStorage',{configurable:true,value:mock});}''',data)
  page.add_script_tag(content=(root/'hmk-app.bundle.js').read_text());page.wait_for_timeout(120)
- assert 'v93.433' in page.locator('#app').inner_text(),('boot',errors,dialogs,page.locator('#app').inner_text()[:650])
+ assert 'v93.434' in page.locator('#app').inner_text(),('boot',errors,dialogs,page.locator('#app').inner_text()[:650])
  page.locator('[data-nav="calendar"]').first.click();page.wait_for_timeout(80)
  if page.locator('[data-calendar-open]').count():page.locator('[data-calendar-open]').first.click();page.wait_for_timeout(80)
  return page,errors,dialogs
@@ -84,8 +84,8 @@ with sync_playwright() as p:
    assert len(rolls)==1 and rolls[0]['hrAfter']==6 and rolls[0]['recovered'] is True,rolls
    assert healed['campaignClock']['minute']==minute+1440,'Recovery advanced GM clock'
    assert page.locator('[data-darkvision-healing-roll]').count()==0,'Still asks for recovery after HR6'
-   print('PASS Chromium v93.433: CF d6 onset + d100 exposure healing at GM due date, HR6 cured')
-  print('PASS Chromium v93.433: '+expected_level+' Imbibing Roll, physical empty vial, active Darkvision, immutable journal')
+   print('PASS Chromium v93.434: CF d6 onset + d100 exposure healing at GM due date, HR6 cured')
+  print('PASS Chromium v93.434: '+expected_level+' Imbibing Roll, physical empty vial, active Darkvision, immutable journal')
   page.close()
   if expected_level=='S':
    data['campaignClock']['minute']=minute+30*1440
@@ -98,6 +98,6 @@ with sync_playwright() as p:
    updated=saved(page)
    decay=[x['calendarAlchemyDecay'] for x in updated['journal'] if x.get('calendarAlchemyDecay')]
    assert len(decay)==1 and decay[0]['asBefore']==uses[0]['finalAS'] and decay[0]['asAfter']==uses[0]['finalAS']-1,decay
-   print('PASS Chromium v93.433: 30-day Decay continues AFTER imbibing at current effective AS')
+   print('PASS Chromium v93.434: 30-day Decay continues AFTER imbibing at current effective AS')
    page.close()
  browser.close()
