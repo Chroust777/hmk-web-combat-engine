@@ -85,9 +85,11 @@ const pp=I.createAlchemyPhysicImbibing({journal:merged,inventory:physic.inventor
  d100:42,origin:'manual',emptyId:'emptyPhysic',gmConfirmed:true});
 eq(pp.sl,'S');eq(pp.physicEffects.length,1);eq(pp.physicEffects[0].finishId,a.finishId);
 eq(pp.physicEffects[0].asAfter,Math.max(0,a.base-pp.finalAS));
-no(()=>I.createAlchemyPhysicImbibing({journal:merged,inventory:physic.inventory,campaignId:'C',
+const physicCF=I.createAlchemyPhysicImbibing({journal:merged,inventory:physic.inventory,campaignId:'C',
  minute:a.minute,actorId:'X',targetId:'B',finishId:physic.finishId,testSkill:'Aura',ml:80,
- d100:85,origin:'manual',emptyId:'emptyPhysic',gmConfirmed:true}),/Physic CF \+ Erudition/);
+ d100:85,origin:'manual',emptyId:'emptyPhysic',gmConfirmed:true});
+eq(physicCF.sl,'CF');eq(physicCF.profusionIllEffects.length,1);
+eq(physicCF.profusionIllEffects[0].kind,'aural-shock');
 // Changing an already documented imbibing d100 must fail immutable replay.
 no(()=>I.validateAlchemyImbibingJournal([...j.slice(0,-2),
  {...j.at(-2),calendarAlchemyImbibing:{...proof,d100:83}},j.at(-1)]),/změněn|neplatná|Profusion/);
