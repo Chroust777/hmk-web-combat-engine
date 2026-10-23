@@ -6,6 +6,12 @@ import {PRINTED_ARMOUR_ARTICLES_P118} from '../rules/armour-articles-printed.js'
 import {locationArmourValue} from '../rules/armour-options.js';
 import {HMK_BODY_LOCATIONS} from './armour-coverage-readiness.js';
 import {resolveCustomArmour} from './armour-custom-combat.js';
+const acidArmourDamage=(item,loc)=>{
+ const map=item?.acidAVDamageByLocation;
+ if(map===undefined)return 0;
+ if(!map||typeof map!=='object'||Array.isArray(map)||Object.values(map).some(x=>!Number.isSafeInteger(x)||x<0||x>999))return null;
+ return map[loc]===undefined?0:map[loc];
+};
 import {identifyWornPrintedSuit,resolvePrintedSuitProtection,selectPrintedSuitRigidStatus} from './printed-suit-combat.js';
 
 const catalogue=new Map(PRINTED_ARMOUR_ARTICLES_P118.map(a=>[a.id,a]));
@@ -74,6 +80,30 @@ export function resolveOwnedArmourArticle(item,{allowCarried=false}={}){
  return {ready:true,article:source};
 }
 
+/** Physical Acid AV damage is additional witnessed inventory state, NOT a
+ * modification of the verified p118 catalogue snapshot. The reduction is
+ * limited to the actual damaged article's original contribution in this zone
+ * and aspect; never reduces a total below zero. Directional custom layers
+ * use the set of articles which really participated in protection.
+ */
+function acidAdjustedProtection(base,worn,location,aspect,direction,activeInventoryIds){
+ let reduction=0;const sourceIds=[];
+ for(const item of worn){
+  const d=acidArmourDamage(item,location);
+  if(d===null)return {ready:false,reason:'Invalid acidAVDamage on owned armour article',requiresGMResolution:true};
+  if(d===0||!activeInventoryIds.includes(item.id))continue;
+  const p=item.snapshot?.properties||{};
+  const marker=p.coverageMarkers?.[location];
+  if(marker==='front-only'&&direction!=='front'||marker==='rear-only'&&direction!=='rear')continue;
+  const originalAV=p.locationProtection?.[location]?.[aspect];
+  if(!Number.isSafeInteger(originalAV)||originalAV<0)return {ready:false,reason:'Missing original article AV for Acid reduction',requiresGMResolution:true};
+  const loss=Math.min(d,originalAV);
+  if(loss){reduction+=loss;sourceIds.push(item.id);}
+ }
+ const actual=Math.min(base,reduction);
+ return {ready:true,armourValue:base-actual,acidAVReduction:actual,acidDamagedInventoryIds:sourceIds,
+  armourValueBeforeAcid:base};
+}
 /** Resolve the protection of a specified participant from the actual currently
  * worn items. 'auto': exact printed suit first, otherwise strictly audited
  * custom layering. 'custom': never substitute a suit or GM-entered sum.
@@ -96,8 +126,11 @@ export function resolveLiveCombatArmour({inventory,targetId,location,aspect,dire
   if(!p.ok)return fail(p.reason||'Printed suit AV unavailable');
   const rigid=selectPrintedSuitRigidStatus(p,rigidStatus);
   if(!rigid.ok)return fail(rigid.reason);
+  if(mode==='reference'&&worn.some(x=>x.acidAVDamageByLocation&&Object.values(x.acidAVDamageByLocation).some(d=>d>0)))return fail('Acid-damaged armour requires inventory-specific protection, not GM suit reference');
+  const adjusted=acidAdjustedProtection(p.av[aspect],worn,location,aspect,direction,mode==='reference'?[]:match.inventoryIds);
+  if(!adjusted.ready)return adjusted;
   return {ready:true,mode:mode==='reference'?'gm-reference':'exact-worn-suit',source:'HMK pp.113–116',targetId,location,aspect,direction,
-   armourValue:p.av[aspect],rigidArmour:rigid.status==='yes',rigidStatus:rigid.status,rigidSource:rigid.source,
+   ...adjusted,rigidArmour:rigid.status==='yes',rigidStatus:rigid.status,rigidSource:rigid.source,
    metalArmour:null, // Printed B/E/P/F alone cannot establish impact-specific metal protection.
    suitName:name,inventoryIds:mode==='reference'?[]:match.inventoryIds,
    extraEnc:null,bulkPenalty:null,requiresSeparateLoadAudit:true};
@@ -130,8 +163,11 @@ export function resolveLiveCombatArmour({inventory,targetId,location,aspect,dire
  if(!p.ready)return fail(p.reason,p.detail);
  const actual=p.rigidArmour?'yes':'no';
  if(rigidStatus!=='unknown'&&rigidStatus!==actual)return fail(`GM rigid selection contradicts audited p118 protection (${actual})`);
+ const adjusted=acidAdjustedProtection(p.armourValue,worn,location,aspect,direction,
+  worn.filter(x=>p.articleIds.some(id=>byId.get(id)?.id===x.id)).map(x=>x.id));
+ if(!adjusted.ready)return adjusted;
  return {ready:true,mode:'custom-worn',source:'HMK pp.117–119',targetId,location,aspect,direction,
-  armourValue:p.armourValue,rigidArmour:p.rigidArmour,rigidStatus:actual,rigidSource:'p118 verified marks',
+  ...adjusted,rigidArmour:p.rigidArmour,rigidStatus:actual,rigidSource:'p118 verified marks',
   metalArmour:p.metalArmour,inventoryIds:worn.map(x=>x.id),articleIds:p.articleIds,
   extraEnc:p.extraEnc,bulkPenalty:p.bulkPenalty,requiresSeparateLoadAudit:true,
   layeringStatus:p.layering.status,directionalContext:p.directionalContext};

@@ -34,7 +34,7 @@ export function createAlchemyAcidApplication({journal=[],inventory=[],campaignId
  fail(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot),
   'Acid musí být ve skutečné nesené lahvičce svého vlastníka');
  const item=physicalTarget(inventory,targetItemId);
- fail(item&&item.id!==vial.vialId&&item.sourceItemId!==dose.finishId,
+ fail(item&&!['armor','weapon'].includes(item.snapshot?.category)&&item.id!==vial.vialId&&item.sourceItemId!==dose.finishId,
   'nutný existující jednotlivý inventární předmět odlišný od lahvičky');
  fail(item.slot!=='chest','předmět uložený v truhlici nelze přímo zasáhnout bez vyzvednutí');
  return {format:ACID_APPLICATION_FORMAT,campaignId,minute,actorId,finishId,vialId:vial.vialId,
