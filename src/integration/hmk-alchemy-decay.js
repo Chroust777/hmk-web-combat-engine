@@ -38,7 +38,7 @@ export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9)
    as=use.finalAS;imbibingId=row.id;activeTemporary=use.temporary;
   }
   // Instantaneous Physic (HMK p.273) reduces AS of each already active
-  // Darkvision dose. The Physic imbibing receipt is replayed in append order;
+  // temporary imbibed dose (including Footpad). The receipt is replayed in append order;
   // earlier Decay and Imbibing proofs are never edited or replaced.
   if(use?.elixirName==='Physic'&&use.finishId!==finishId){
    const effects=use.physicEffects??[];

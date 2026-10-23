@@ -26,6 +26,69 @@ export function activeErudition(journal=[],campaignId,targetId,minute=1e9){
   .map(j=>({useId:j.id,...j.calendarAlchemyImbibing,state:alchemyElixirStrength(journal,campaignId,j.calendarAlchemyImbibing.finishId,minute)}))
   .filter(x=>x.state.currentAS>0&&x.state.activeTemporary&&x.state.imbibingId===x.useId);
 }
+/** HMK v1.2 p.272 Footpad: temporary sound-muffling enchantment. */
+export function activeFootpad(journal=[],campaignId,targetId,minute=1e9){
+ return journal.filter(j=>relevant(j,campaignId)&&j.calendarAlchemyImbibing?.targetId===targetId&&
+  j.calendarAlchemyImbibing?.elixirName==='Footpad'&&j.campaignMinute<=minute)
+  .map(j=>({useId:j.id,...j.calendarAlchemyImbibing,state:alchemyElixirStrength(journal,campaignId,j.calendarAlchemyImbibing.finishId,minute)}))
+  .filter(x=>x.state.currentAS>0&&x.state.activeTemporary&&x.state.imbibingId===x.useId);
+}
+/** Safety boundary: until mixed Footpad Ill Effects are supported atomically,
+ * an effective combined CF must never consume a vial or omit a secondary effect.
+ */
+export function createAlchemyFootpadImbibing({journal=[],inventory=[],campaignId,minute,actorId,targetId,finishId,
+ testSkill,ml,d100,origin,emptyId,gmConfirmed=false}={}){
+ ok(gmConfirmed===true,'Footpad: GM musí potvrdit úplné podání do jednoho kola');
+ ok(typeof campaignId==='string'&&campaignId&&whole(minute,0,1e9)&&typeof actorId==='string'&&actorId&&
+  typeof targetId==='string'&&targetId&&typeof emptyId==='string'&&emptyId,
+  'Footpad: neplatná kampaň, čas nebo postava');
+ ok(['Aura','Alchemy'].includes(testSkill)&&whole(ml,1,1000)&&whole(d100,1,100)&&originOK(origin),
+  'Footpad: nutný skutečný Aura/Alchemy d100 a původ hodu');
+ const state=alchemyElixirStrength(journal,campaignId,finishId,minute);
+ ok(state.elixirName==='Footpad'&&state.currentAS>0&&!state.dispersed&&!state.activeTemporary&&!state.expires&&
+  state.nextDueMinute>minute,'Footpad: chybí nepoužitá dávka nebo je splatný Decay');
+ const vial=alchemyVialState(journal,campaignId,finishId,minute);
+ ok(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot)&&
+  inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
+  'Footpad: chybí skutečná nesená lahvička ve vlastnictví podávajícího');
+ const others=[...activeDarkvision(journal,campaignId,targetId,minute),
+  ...activeErudition(journal,campaignId,targetId,minute),...activeFootpad(journal,campaignId,targetId,minute)];
+ ok(others.every(x=>x.state.nextDueMinute>minute),'Footpad: nejdříve vyřešte splatný Decay');
+ const profusion=classifyProfusionImbibing(d100,ml,others.length);
+ const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
+ const finalAS=Math.max(0,state.currentAS+delta);
+ ok(!(level==='CF'&&finalAS>0&&others.length),
+  'Footpad: kombinovaný CF s dalšími aktivními elixíry čeká na úplné atomické Ill Effects; hod se nesmí opakovat');
+ return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,
+  emptyId,vialId:vial.vialId,elixirName:'Footpad',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',
+  testSkill,ml,d100,origin,otherActiveElixirs:others.length,profusionCF:profusion.profusionCF,
+  sl:level,asBefore:state.currentAS,modifier:delta,finalAS,temporary:finalAS>0,
+  illEffect:level==='CF'&&finalAS>0?{kind:'aural-shock',levels:1,weakness:5,recoveryPending:true}:null,
+  consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,272]};
+}
+/** Use existing shared Aural Shock and Combat State; do not create a health subsystem. */
+export function applyAlchemyFootpadAural({state=null,arcane=null,proof,eventId}={}){
+ ok(proof?.format===ALCHEMY_IMBIBING_FORMAT&&proof.elixirName==='Footpad'&&proof.sl==='CF'&&
+  whole(proof.ml,1,1000)&&whole(proof.d100,1,100)&&originOK(proof.origin)&&
+  classifyProfusionImbibing(proof.d100,proof.ml,proof.otherActiveElixirs).adjusted==='CF'&&
+  proof.otherActiveElixirs===0&&whole(proof.asBefore,1,11)&&proof.modifier===-2&&
+  proof.finalAS===Math.max(0,proof.asBefore-2)&&proof.finalAS>0&&
+  proof.illEffect?.kind==='aural-shock'&&proof.illEffect.levels===1&&proof.illEffect.weakness===5&&
+  typeof eventId==='string'&&eventId.length>=3,'Footpad CF: neúplný původní důkaz');
+ const s=structuredClone(state??initialCombatState()),a=structuredClone(arcane??{});
+ validateCombatState(s);
+ ok(s.shock!=='KIA'&&!s.events.some(e=>e.id===eventId),'Footpad CF: KIA nebo duplicitní důkaz');
+ const before=a.auralShockLevels??0;
+ ok(whole(before,0,98)&&whole(s.fatigue.otherWeakness,0,99994),'Footpad CF: překročené hodnoty');
+ a.auralShockLevels=before+1;s.fatigue.otherWeakness+=5;
+ s.events.push({id:eventId,type:'hmk-alchemy-footpad-aural',round:Math.max(1,s.lastRound||1),
+  details:{sourceEventId:eventId,finishId:proof.finishId,targetId:proof.targetId,
+   calendarCampaignId:proof.campaignId,calendarMinute:proof.minute,imbibingD100:proof.d100,
+   diceOrigin:proof.origin,auralShock:1,weaknessAdded:5,auralBefore:before,
+   auralAfter:a.auralShockLevels,sourcePage:272,nonCombat:true}});
+ validateCombatState(s);
+ return {state:s,arcane:a,auralShockAdded:1,weaknessAdded:5};
+}
 /** First Erudition dose, HMK pp.269–271. Mixed-elixir CF is blocked until
  * every concurrent Ill Effect can be committed atomically. This is not a
  * reroll permission: no physical vial is consumed on a rejected operation.
@@ -48,10 +111,12 @@ export function createAlchemyEruditionImbibing({journal=[],inventory=[],campaign
   'Erudition: dávku smí podat jen vlastník existující nesené lahvičky');
  const current=activeErudition(journal,campaignId,targetId,minute);
  const otherVision=activeDarkvision(journal,campaignId,targetId,minute);
- const otherCount=current.length+otherVision.length;
+ const footpadSources=activeFootpad(journal,campaignId,targetId,minute);
+ const otherCount=current.length+otherVision.length+footpadSources.length;
  const profusion=classifyProfusionImbibing(d100,ml,otherCount);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
+ ok(!(level==='CF'&&finalAS>0&&footpadSources.length),'Erudition: kombinovaný CF s Footpad zatím vyžaduje nové Ill Effects');
  // A CF affects the newly swallowed Erudition AND every already active
  // enchantment. Each secondary effect gets an independently replayable proof.
  const affected=level==='CF'&&finalAS>0?[
@@ -81,11 +146,13 @@ export function createAlchemyDarkvisionImbibing({journal=[],inventory=[],campaig
  ok(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot)&&
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Alchemy: dávku musí podat skutečný vlastník držené existující nádoby');
+ const footpadSources=activeFootpad(journal,campaignId,targetId,minute);
  const others=activeDarkvision(journal,campaignId,targetId,minute).length+
-  activeErudition(journal,campaignId,targetId,minute).length;
+  activeErudition(journal,campaignId,targetId,minute).length+footpadSources.length;
  const profusion=classifyProfusionImbibing(d100,ml,others);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
+ ok(!(level==='CF'&&finalAS>0&&footpadSources.length),'Darkvision: kombinovaný CF s Footpad zatím vyžaduje nové Ill Effects');
  const existingErudition=activeErudition(journal,campaignId,targetId,minute);
  return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,
   emptyId,vialId:vial.vialId,elixirName:'Darkvision',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',testSkill,ml,d100,origin,
@@ -125,7 +192,9 @@ export function createAlchemyPhysicImbibing({journal=[],inventory=[],campaignId,
  // elixirs: Physic is explicitly exempt from Profusion (p.270).
  const level=classifyProfusionImbibing(d100,ml,0).adjusted;
  const delta={CF:-2,F:-1,S:0,CS:1}[level],finalAS=Math.max(0,state.currentAS+delta);
- const affected=[...activeDarkvision(journal,campaignId,targetId,minute),...activeErudition(journal,campaignId,targetId,minute)];
+ const footpadSources=activeFootpad(journal,campaignId,targetId,minute);
+ ok(!(level==='CF'&&finalAS>0&&footpadSources.length),'Physic: kombinovaný CF s Footpad zatím vyžaduje nové Ill Effects');
+ const affected=[...activeDarkvision(journal,campaignId,targetId,minute),...activeErudition(journal,campaignId,targetId,minute),...footpadSources];
  ok(affected.every(x=>x.state.nextDueMinute>minute),
   'Physic: nejprve vyhodnoťte všechny splatné alchymistické Decay Rolls');
  const physicEffects=finalAS>0?affected
@@ -217,7 +286,7 @@ export function validateAlchemyImbibingJournal(journal=[]){
    const state=alchemyVialState(beforeEmpty,p.campaignId,p.finishId,p.minute);
    const item=state&&{id:state.vialId,characterId:state.ownerId,slot:state.slot,quantity:1};
    ok(item&&item.characterId===p.actorId,'Alchemy Imbibing: nesprávný vlastník nádoby');
-   const create=p.elixirName==='Physic'?createAlchemyPhysicImbibing:p.elixirName==='Erudition'?createAlchemyEruditionImbibing:createAlchemyDarkvisionImbibing;
+   const create=p.elixirName==='Physic'?createAlchemyPhysicImbibing:p.elixirName==='Erudition'?createAlchemyEruditionImbibing:p.elixirName==='Footpad'?createAlchemyFootpadImbibing:createAlchemyDarkvisionImbibing;
    const reproduced=create({journal:beforeEmpty,inventory:[item],campaignId:p.campaignId,
     minute:p.minute,actorId:p.actorId,targetId:p.targetId,finishId:p.finishId,testSkill:p.testSkill,
     ml:p.ml,d100:p.d100,origin:p.origin,emptyId:p.emptyId,gmConfirmed:p.gmConfirmed});
