@@ -35,7 +35,7 @@ function validateCandidate(document,characterId){
   !arc.astralState&&!arc.spiritState&&!arc.possessed,
   'Aural Recovery: nevyřešené mentální povinnosti / spirit-astral souběh');
  // We only resolve cases with a committed spell-origin causal event.
- check(state.events.some(e=>['hmk-spell-misfire','hmk-spell-total-release','hmk-shaman-talisman-aural','hmk-astral-transcendence-aural','hmk-alchemy-dissolution-aural','hmk-alchemy-physic-aural','hmk-alchemy-erudition-aural'].includes(e.type)&&
+ check(state.events.some(e=>['hmk-spell-misfire','hmk-spell-total-release','hmk-shaman-talisman-aural','hmk-astral-transcendence-aural','hmk-alchemy-dissolution-aural','hmk-alchemy-physic-aural','hmk-alchemy-erudition-aural','hmk-alchemy-profusion-aural'].includes(e.type)&&
   whole(e.details?.auralShock,1,6)),
   'Aural Recovery: není doložen původ Aural Shock ze Spellfire ani Shaman Trance CF');
  const wil=person.hmk?.attributes?.wil;

@@ -52,14 +52,16 @@ export function createAlchemyEruditionImbibing({journal=[],inventory=[],campaign
  const profusion=classifyProfusionImbibing(d100,ml,otherCount);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
- // A mixed CF must create every previously active elixir's Ill Effect. No
- // arbitrary proxy Health state and no incomplete recorded roll are allowed.
- ok(level!=='CF'||finalAS===0||otherCount===0,
-  'Erudition CF + Profusion: současné Ill Effects vyžadují další pravidlovou návaznost; žádný důkaz ani spotřeba nejsou uloženy');
+ // A CF affects the newly swallowed Erudition AND every already active
+ // enchantment. Each secondary effect gets an independently replayable proof.
+ const affected=level==='CF'&&finalAS>0?[
+  ...otherVision.map(a=>({sourceUseId:a.useId,kind:'vision-light-penalty',baseAS:a.asBefore,penalty:Math.round(a.asBefore*2.5)})),
+  ...current.map(a=>({sourceUseId:a.useId,kind:'aural-shock',levels:1,weakness:5}))]:[];
  return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,
   emptyId,vialId:vial.vialId,elixirName:'Erudition',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',
   testSkill,ml,d100,origin,otherActiveElixirs:otherCount,profusionCF:profusion.profusionCF,
   sl:level,asBefore:state.currentAS,modifier:delta,finalAS,temporary:finalAS>0,
+  ...(affected.length?{profusionIllEffects:affected}:{}),
   illEffect:level==='CF'&&finalAS>0?{kind:'aural-shock',levels:1,weakness:5,recoveryPending:true}:null,
   consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,271]};
 }
@@ -84,12 +86,13 @@ export function createAlchemyDarkvisionImbibing({journal=[],inventory=[],campaig
  const profusion=classifyProfusionImbibing(d100,ml,others);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
- ok(level!=='CF'||finalAS===0||activeErudition(journal,campaignId,targetId,minute).length===0,
-  'Darkvision CF + Erudition: povinný souběžný Aural Shock Ill Effect není dosud atomicky uzavřen');
+ const existingErudition=activeErudition(journal,campaignId,targetId,minute);
  return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,
   emptyId,vialId:vial.vialId,elixirName:'Darkvision',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',testSkill,ml,d100,origin,
   otherActiveElixirs:others,profusionCF:profusion.profusionCF,
-  ...(others>0?{profusionIllEffects:level==='CF'&&finalAS>0?activeDarkvision(journal,campaignId,targetId,minute).map(a=>({sourceUseId:a.useId,kind:'vision-light-penalty',baseAS:a.asBefore,penalty:Math.round(a.asBefore*2.5)})):[]}:{}),
+  ...(others>0?{profusionIllEffects:level==='CF'&&finalAS>0?[
+   ...activeDarkvision(journal,campaignId,targetId,minute).map(a=>({sourceUseId:a.useId,kind:'vision-light-penalty',baseAS:a.asBefore,penalty:Math.round(a.asBefore*2.5)})),
+   ...existingErudition.map(a=>({sourceUseId:a.useId,kind:'aural-shock',levels:1,weakness:5}))]:[]}:{}),
   sl:level,asBefore:state.currentAS,modifier:delta,finalAS,
   temporary:finalAS>0,darkvisionFeet:finalAS*5,
   // CF light sensitivity is a real adverse effect; do not invent a recovery roll.
@@ -125,8 +128,6 @@ export function createAlchemyPhysicImbibing({journal=[],inventory=[],campaignId,
  const affected=[...activeDarkvision(journal,campaignId,targetId,minute),...activeErudition(journal,campaignId,targetId,minute)];
  ok(affected.every(x=>x.state.nextDueMinute>minute),
   'Physic: nejprve vyhodnoťte všechny splatné alchymistické Decay Rolls');
- ok(level!=='CF'||finalAS===0||activeErudition(journal,campaignId,targetId,minute).length===0,
-  'Physic CF + Erudition: povinný další Aural Shock Ill Effect není ještě atomicky uzavřen');
  const physicEffects=finalAS>0?affected
   .map(x=>({finishId:x.finishId,sourceUseId:x.useId,asBefore:x.state.currentAS,
    asAfter:Math.max(0,x.state.currentAS-finalAS)})) : [];
@@ -137,8 +138,9 @@ export function createAlchemyPhysicImbibing({journal=[],inventory=[],campaignId,
   testSkill,ml,d100,origin,otherActiveElixirs:0,profusionCF:false,
   sl:level,asBefore:state.currentAS,modifier:delta,finalAS,temporary:false,
   physicEffects,
-  ...(level==='CF'&&finalAS>0&&affected.length?{profusionIllEffects:affected.map(a=>({sourceUseId:a.useId,kind:'vision-light-penalty',
-   baseAS:a.asBefore,penalty:Math.round(a.asBefore*2.5)}))}:{}),
+  ...(level==='CF'&&finalAS>0&&affected.length?{profusionIllEffects:affected.map(a=>a.elixirName==='Erudition'?
+   {sourceUseId:a.useId,kind:'aural-shock',levels:1,weakness:5}:
+   {sourceUseId:a.useId,kind:'vision-light-penalty',baseAS:a.asBefore,penalty:Math.round(a.asBefore*2.5)})}:{}),
   illEffect:level==='CF'&&finalAS>0?{kind:'aural-shock',levels:1,weakness:5,recoveryPending:true}:null,
   consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,273]};
 }
@@ -179,7 +181,7 @@ export function applyAlchemyEruditionAural({state=null,arcane=null,proof,eventId
  ok(proof?.format===ALCHEMY_IMBIBING_FORMAT&&proof.elixirName==='Erudition'&&
   proof.sl==='CF'&&whole(proof.ml,1,1000)&&whole(proof.d100,1,100)&&originOK(proof.origin)&&
   classifyProfusionImbibing(proof.d100,proof.ml,proof.otherActiveElixirs).adjusted==='CF'&&
-  proof.otherActiveElixirs===0&&whole(proof.asBefore,1,11)&&proof.modifier===-2&&
+  whole(proof.otherActiveElixirs,0,100)&&whole(proof.asBefore,1,11)&&proof.modifier===-2&&
   proof.finalAS===Math.max(0,proof.asBefore-2)&&proof.finalAS>0&&
   proof.illEffect?.kind==='aural-shock'&&proof.illEffect.levels===1&&proof.illEffect.weakness===5&&
   typeof eventId==='string'&&eventId.length>=3,
@@ -240,7 +242,7 @@ export function assertAlchemyImbibingAppendOnly(before=[],after=[]){
 export function createDarkvisionProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Physic'].includes(p?.elixirName)&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
+ ok(['Darkvision','Physic','Erudition'].includes(p?.elixirName)&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
   'Profusion: chybí skutečný účinný Critical Failure Imbibing');
  const known=p.profusionIllEffects?.find(x=>x.sourceUseId===sourceUseId);
  ok(!!known&&sourceUseId!==triggerUseId,'Profusion: předchozí aktivní elixír nebyl v CF důkazu');
@@ -270,7 +272,7 @@ export function validateDarkvisionProfusionJournal(journal=[]){
  for(const row of journal){
   const p=row.calendarAlchemyImbibing;
   if(!p?.profusionIllEffects?.length)continue;
-  for(const x of p.profusionIllEffects){
+  for(const x of p.profusionIllEffects.filter(x=>x.kind==='vision-light-penalty')){
    const proofs=journal.filter(j=>j.calendarCampaignId===row.calendarCampaignId&&j.campaignMinute===row.campaignMinute&&
     j.calendarAlchemyDarkvisionProfusionIll?.triggerUseId===row.id&&j.calendarAlchemyDarkvisionProfusionIll.sourceUseId===x.sourceUseId);
    ok(proofs.length===1,'Profusion: CF musí obsahovat samostatný úplný důkaz Ill Effect každého aktivního elixíru');
@@ -282,5 +284,82 @@ export function assertDarkvisionProfusionAppendOnly(before=[],after=[]){
  const map=new Map(after.map(x=>[x.id,x]));
  for(const row of before)if(row.calendarAlchemyDarkvisionProfusionIll)
   ok(JSON.stringify(map.get(row.id))===JSON.stringify(row),'Profusion: historický Ill Effect nelze změnit');
+ return true;
+}
+
+
+/** HMK v1.2 pp.269–271: when an effective CF strikes a subject with
+ * an active Erudition, that prior elixir contributes its own Aural Shock 1.
+ * This is distinct from the new elixir's own CF and retains its source ID.
+ */
+export function createEruditionProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
+ const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
+ const p=trigger?.calendarAlchemyImbibing;
+ ok(['Darkvision','Erudition','Physic'].includes(p?.elixirName)&&p.targetId===targetId&&
+  p.sl==='CF'&&p.finalAS>0,'Erudition Profusion: chybí účinné CF Imbibing');
+ const known=p.profusionIllEffects?.filter(x=>x.sourceUseId===sourceUseId&&x.kind==='aural-shock')||[];
+ ok(known.length===1&&known[0].levels===1&&known[0].weakness===5&&sourceUseId!==triggerUseId,
+  'Erudition Profusion: chybí jednoznačný předchozí Aural Shock');
+ const earlier=journal.slice(0,journal.indexOf(trigger));
+ ok(!!activeErudition(earlier,campaignId,targetId,minute).find(x=>x.useId===sourceUseId),
+  'Erudition Profusion: zdroj již není účinný nebo patří jiné kampani');
+ ok(!journal.some(j=>j.calendarCampaignId===campaignId&&
+  j.calendarAlchemyEruditionProfusionIll?.triggerUseId===triggerUseId&&
+  j.calendarAlchemyEruditionProfusionIll.sourceUseId===sourceUseId),
+  'Erudition Profusion: opakovaný historický důkaz');
+ return {format:'hmk-erudition-profusion-ill-v1',campaignId,minute,triggerUseId,
+  sourceUseId,targetId,elixirName:'Erudition',illEffect:{kind:'aural-shock',levels:1,weakness:5,recoveryPending:true},
+  sourcePages:[269,270,271]};
+}
+/** Adds a genuine event to the EXISTING Combat State without starting a
+ * fictitious combat or calendar turn. Caller commits alongside consumption.
+ */
+export function applyEruditionProfusionAural({journal=[],state=null,arcane=null,proof,eventId}={}){
+ const expected=createEruditionProfusionIll({...proof,journal});
+ ok(JSON.stringify(expected)===JSON.stringify(proof)&&typeof eventId==='string'&&eventId.length>=3,
+  'Erudition Profusion: pozměněný důkaz');
+ const s=structuredClone(state??initialCombatState()),a=structuredClone(arcane??{});
+ validateCombatState(s);
+ ok(s.shock!=='KIA'&&!s.events.some(e=>e.id===eventId),'Erudition Profusion: KIA nebo duplicitní Aural event');
+ const before=a.auralShockLevels??0;
+ ok(whole(before,0,98)&&whole(s.fatigue.otherWeakness,0,99994),
+  'Erudition Profusion: překročené hodnoty Aural Shock');
+ a.auralShockLevels=before+1;s.fatigue.otherWeakness+=5;
+ s.events.push({id:eventId,type:'hmk-alchemy-profusion-aural',round:Math.max(1,s.lastRound||1),
+  details:{triggerUseId:proof.triggerUseId,sourceUseId:proof.sourceUseId,targetId:proof.targetId,
+   calendarCampaignId:proof.campaignId,calendarMinute:proof.minute,auralShock:1,
+   weaknessAdded:5,auralBefore:before,auralAfter:a.auralShockLevels,sourcePage:269,nonCombat:true}});
+ validateCombatState(s);
+ return {state:s,arcane:a,auralShockAdded:1,weaknessAdded:5};
+}
+export function validateEruditionProfusionJournal(journal=[]){
+ const prior=[];
+ for(const row of journal){
+  const p=row.calendarAlchemyEruditionProfusionIll;
+  if(p){
+   ok(p.campaignId===row.calendarCampaignId&&p.minute===row.campaignMinute&&
+    p.targetId===row.characterId,'Erudition Profusion: chybná kampaň či příjemce');
+   ok(JSON.stringify(createEruditionProfusionIll({...p,journal:prior}))===JSON.stringify(p),
+    'Erudition Profusion: historický důkaz se změnil');
+  }
+  prior.push(row);
+ }
+ for(const row of journal){
+  const p=row.calendarAlchemyImbibing;
+  if(!p?.profusionIllEffects?.length)continue;
+  for(const x of p.profusionIllEffects.filter(x=>x.kind==='aural-shock')){
+   const matching=journal.filter(j=>j.calendarCampaignId===row.calendarCampaignId&&
+    j.campaignMinute===row.campaignMinute&&j.calendarAlchemyEruditionProfusionIll?.triggerUseId===row.id&&
+    j.calendarAlchemyEruditionProfusionIll.sourceUseId===x.sourceUseId);
+   ok(matching.length===1,'Erudition Profusion: chybí povinný samostatný Aural důkaz');
+  }
+ }
+ return true;
+}
+export function assertEruditionProfusionAppendOnly(before=[],after=[]){
+ const byId=new Map(after.map(j=>[j.id,j]));
+ for(const row of before)if(row.calendarAlchemyEruditionProfusionIll)
+  ok(JSON.stringify(byId.get(row.id))===JSON.stringify(row),
+   'Erudition Profusion: nelze změnit ani vymazat Aural důkaz');
  return true;
 }
