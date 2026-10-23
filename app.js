@@ -229,8 +229,8 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
   return {id,definitionId,ownerId,locations,aq,destroyed};
 }
 
-// HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.439';
+// HMK Keeper’s Ledger v93.442 — visible release identification and cache-busted entry assets; user storage unchanged.
+const APP_VERSION='93.442';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
