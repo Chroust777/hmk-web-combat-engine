@@ -5,6 +5,7 @@
 import {alchemyElixirStrength} from './hmk-alchemy-decay.js';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
 import {classifyProfusionImbibing,canonicalProfusionProfile} from './hmk-alchemy-profusion.js';
+import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 export const ALCHEMY_IMBIBING_FORMAT='hmk-alchemy-imbibing-v1';
 const ok=(x,m)=>{if(!x)throw Error(m)};
@@ -38,14 +39,9 @@ export function activeEgosight(journal=[],campaignId,targetId,minute=1e9){
  * only for Footpad, preserving all v93.429 historical Erudition evidence unchanged.
  */
 function concurrentAlchemyIllEffects(sources){
- return sources.map(a=>a.elixirName==='Darkvision'?
-  {sourceUseId:a.useId,kind:'vision-light-penalty',baseAS:a.asBefore,penalty:Math.round(a.asBefore*2.5)}:
-  a.elixirName==='Egosight'?
-  {sourceUseId:a.useId,kind:'aural-shock',levels:1,weakness:5,sourceElixir:'Egosight'}:
-  a.elixirName==='Footpad'?
-  {sourceUseId:a.useId,kind:'aural-shock',levels:1,weakness:5,sourceElixir:'Footpad'}:
-  {sourceUseId:a.useId,kind:'aural-shock',levels:1,weakness:5});
+ return sources.map(supportedAlchemyConcurrentIllEffect);
 }
+
 /** One view of the documented *active* profusion cohort (pp.269–270).
  * The order is deliberately the same as the v93.440 individual finders,
  * so historical imbibing evidence can be replayed byte-for-byte.
@@ -152,7 +148,7 @@ export function applyAlchemyFootpadAural({state=null,arcane=null,proof,eventId}=
   classifyProfusionImbibing(proof.d100,proof.ml,proof.otherActiveElixirs).adjusted==='CF'&&
   whole(proof.otherActiveElixirs,0,100)&&whole(proof.asBefore,1,11)&&proof.modifier===-2&&
   proof.finalAS===Math.max(0,proof.asBefore-2)&&proof.finalAS>0&&
-  proof.illEffect?.kind==='aural-shock'&&proof.illEffect.levels===1&&proof.illEffect.weakness===5&&
+  proof.illEffect?.kind==='aural-shock'&&proof.illEffect.levels===planAlchemyIllEffect({elixirName:proof.elixirName,baseAS:proof.asBefore}).levels&&proof.illEffect.weakness===5&&
   typeof eventId==='string'&&eventId.length>=3,'Footpad CF: neúplný původní důkaz');
  const s=structuredClone(state??initialCombatState()),a=structuredClone(arcane??{});
  validateCombatState(s);
@@ -299,7 +295,7 @@ export function applyAlchemyPhysicAural({state=null,arcane=null,proof,eventId}={
   whole(proof.asBefore,1,11)&&proof.modifier===-2&&
   proof.finalAS===Math.max(0,proof.asBefore-2)&&proof.finalAS>0&&
   proof.illEffect?.kind==='aural-shock'&&
-  proof.illEffect.levels===1&&proof.illEffect.weakness===5&&
+  proof.illEffect.levels===planAlchemyIllEffect({elixirName:proof.elixirName,baseAS:proof.asBefore}).levels&&proof.illEffect.weakness===5&&
   typeof eventId==='string'&&eventId.length>=3,
   'Physic CF: chybí doložený účinný Imbibing a Aural Shock 1');
  const s=structuredClone(state??initialCombatState()),a=structuredClone(arcane??{});
@@ -327,7 +323,7 @@ export function applyAlchemyEruditionAural({state=null,arcane=null,proof,eventId
   classifyProfusionImbibing(proof.d100,proof.ml,proof.otherActiveElixirs).adjusted==='CF'&&
   whole(proof.otherActiveElixirs,0,100)&&whole(proof.asBefore,1,11)&&proof.modifier===-2&&
   proof.finalAS===Math.max(0,proof.asBefore-2)&&proof.finalAS>0&&
-  proof.illEffect?.kind==='aural-shock'&&proof.illEffect.levels===1&&proof.illEffect.weakness===5&&
+  proof.illEffect?.kind==='aural-shock'&&proof.illEffect.levels===planAlchemyIllEffect({elixirName:proof.elixirName,baseAS:proof.asBefore}).levels&&proof.illEffect.weakness===5&&
   typeof eventId==='string'&&eventId.length>=3,
   'Erudition CF: chybí úplný doklad o Aural Shock 1');
  const s=structuredClone(state??initialCombatState()),a=structuredClone(arcane??{});
@@ -352,7 +348,7 @@ export function applyAlchemyEgosightAural({state=null,arcane=null,proof,eventId}
   classifyProfusionImbibing(proof.d100,proof.ml,proof.otherActiveElixirs).adjusted==='CF'&&
   whole(proof.otherActiveElixirs,0,100)&&whole(proof.asBefore,1,11)&&proof.modifier===-2&&
   proof.finalAS===Math.max(0,proof.asBefore-2)&&proof.finalAS>0&&
-  proof.illEffect?.kind==='aural-shock'&&proof.illEffect.levels===1&&proof.illEffect.weakness===5&&
+  proof.illEffect?.kind==='aural-shock'&&proof.illEffect.levels===planAlchemyIllEffect({elixirName:proof.elixirName,baseAS:proof.asBefore}).levels&&proof.illEffect.weakness===5&&
   typeof eventId==='string'&&eventId.length>=3,'Egosight CF: nedoložený původní hod');
  const s=structuredClone(state??initialCombatState()),a=structuredClone(arcane??{});
  validateCombatState(s);
