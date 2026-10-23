@@ -60,9 +60,9 @@ eq(F.footpadSkillEvidence({journal:aged,campaignId:'C',minute:due,actorId:'B',sk
 const psychic=fixture('Physic','P','p1');const merged=[...u.journal,...psychic.journal];
 const physic=I.createAlchemyPhysicImbibing({journal:merged,inventory:psychic.inventory,campaignId:'C',minute:a.minute,actorId:'P',targetId:'B',finishId:psychic.finishId,testSkill:'Aura',ml:80,d100:42,origin:'manual',emptyId:'phys-empty',gmConfirmed:true});
 eq(physic.physicEffects.length,1);eq(physic.physicEffects[0].finishId,a.finishId);
-no(()=>I.createAlchemyPhysicImbibing({journal:merged,inventory:psychic.inventory,campaignId:'C',minute:a.minute,actorId:'P',targetId:'B',finishId:psychic.finishId,testSkill:'Aura',ml:80,d100:85,origin:'manual',emptyId:'phys-empty',gmConfirmed:true}),/Footpad/);
+const physicCF=I.createAlchemyPhysicImbibing({journal:merged,inventory:psychic.inventory,campaignId:'C',minute:a.minute,actorId:'P',targetId:'B',finishId:psychic.finishId,testSkill:'Aura',ml:80,d100:85,origin:'manual',emptyId:'phys-empty',gmConfirmed:true});eq(physicCF.profusionIllEffects[0].sourceElixir,'Footpad');
 const second=fixture('Footpad','X','x1');const mixed=[...u.journal,...second.journal];
-no(()=>I.createAlchemyFootpadImbibing({journal:mixed,inventory:second.inventory,campaignId:'C',minute:a.minute,actorId:'X',targetId:'B',finishId:second.finishId,testSkill:'Aura',ml:80,d100:83,origin:'manual',emptyId:'unused',gmConfirmed:true}),/kombinovaný CF/);
+const footCF=I.createAlchemyFootpadImbibing({journal:mixed,inventory:second.inventory,campaignId:'C',minute:a.minute,actorId:'X',targetId:'B',finishId:second.finishId,testSkill:'Aura',ml:80,d100:83,origin:'manual',emptyId:'unused',gmConfirmed:true});eq(footCF.sl,'CF');eq(footCF.profusionIllEffects[0].sourceElixir,'Footpad');
 const safe=I.createAlchemyFootpadImbibing({journal:mixed,inventory:second.inventory,campaignId:'C',minute:a.minute,actorId:'X',targetId:'B',finishId:second.finishId,testSkill:'Aura',ml:80,d100:42,origin:'manual',emptyId:'unused',gmConfirmed:true});eq(safe.otherActiveElixirs,1);
 eq(I.assertAlchemyImbibingAppendOnly(u.journal,structuredClone(u.journal)),true);
 no(()=>I.assertAlchemyImbibingAppendOnly(u.journal,u.journal.slice(0,-1)),/nelze/);
