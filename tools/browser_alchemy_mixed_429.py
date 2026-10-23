@@ -44,7 +44,7 @@ with sync_playwright() as p:
   page.set_content('<!doctype html><html lang="cs"><head><meta charset="utf-8"></head><body><div id="app"></div></body></html>')
   page.evaluate('''fixture=>{const store=new Map([['hmk-keepers-ledger-v1',JSON.stringify(fixture)]]);const mock={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k),key:i=>[...store.keys()][i]??null,get length(){return store.size}};Object.defineProperty(window,'localStorage',{configurable:true,value:mock});Object.defineProperty(window,'sessionStorage',{configurable:true,value:mock});}''',fixture(old,new))
   page.add_script_tag(content=(root/'hmk-app.bundle.js').read_text());page.wait_for_timeout(150)
-  assert 'v93.436' in page.locator('#app').inner_text(),('boot',errors,dialogs,page.locator('#app').inner_text()[:300])
+  assert 'v93.437' in page.locator('#app').inner_text(),('boot',errors,dialogs,page.locator('#app').inner_text()[:300])
   page.locator('[data-nav="calendar"]').first.click();page.wait_for_timeout(100)
   if page.locator('[data-calendar-open]').count():page.locator('[data-calendar-open]').first.click();page.wait_for_timeout(90)
   submit(page,old,'alpha-finish',42)
