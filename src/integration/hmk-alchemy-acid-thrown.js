@@ -12,6 +12,7 @@ import {calculateMissileEML,missileRange,grenadeDeviation as canonicalGrenadeDev
 import {successLevel,SL} from '../rules/tests.js';
 import {humanLocation} from './hmk-mounted-fall-injury-join.js';
 export const ACID_THROW_FORMAT='hmk-acid-thrown-vial-v1';
+export const ALCHEMY_AREA_THROW_FORMAT='hmk-alchemy-area-thrown-vial-v1';
 const ok=(yes,msg)=>{if(!yes)throw Error('Acid Thrown: '+msg);};
 const int=(v,lo,hi)=>Number.isSafeInteger(v)&&v>=lo&&v<=hi;
 const origin=o=>['manual','cryptographic-software-die'].includes(o);
@@ -27,7 +28,7 @@ function grenadeDeviation(distance,sl,die){
  ok(int(die,1,spec),'povinný skutečný hod d'+spec+' pro odchylku');
  return {distanceUnits:die,dieSides:spec};
 }
-export function createAcidThrownVial({journal=[],inventory=[],campaignId,minute,actorId,finishId,
+function createPhysicalThrownVial({journal=[],inventory=[],campaignId,minute,actorId,finishId,
  aimType='direct',distanceFt,throwingML,d100,rollOrigin='manual',targetMovement='still',
  aimedPreviousRound=false,windforce=0,crosswind=false,traumaPenalty=0,effectiveDodgeIndex=0,
  ceilingFeet=null,spoiledDisposition=null,spoiledD100=null,chargingThrow=false,str=null,
@@ -36,14 +37,14 @@ export function createAcidThrownVial({journal=[],inventory=[],campaignId,minute,
  zoneAim=1,zoneD=null,zoneOrigin=null,locationD10=null,locationOrigin=null,
  targetKind='ground',targetId=null,targetItemId=null,targetLocation=null,targetSide=null,
  splashDistanceInches=null,impactSurfaceFirmConfirmed=false,geometryConfirmed=false,
- humanConfirmed=false,gmConfirmed=false}={}){
+ humanConfirmed=false,gmConfirmed=false,expectedElixirName='Acid'}={}){
  ok(gmConfirmed&&['direct','grenade'].includes(aimType)&&int(minute,0,1e9)&&
  typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&
  int(distanceFt,1,120)&&int(throwingML,0,200)&&int(str,1,200)&&int(d100,1,100)&&origin(rollOrigin),
  'GM, kampaň, fyzické Throwing ML/d100 a vzdálenost 1–120 ft jsou povinné');
  ok(splashedTargetKind.includes(targetKind),'neznámý druh cíle');
  const dose=alchemyElixirStrength(journal,campaignId,finishId,minute);
- ok(dose.elixirName==='Acid'&&dose.currentAS>0&&!dose.dispersed&&!dose.imbibingId&&
+ ok(dose.elixirName===expectedElixirName&&dose.currentAS>0&&!dose.dispersed&&!dose.imbibingId&&
   (!dose.nextDueMinute||dose.nextDueMinute>minute),'chybí účinný Acid bez zmeškaného Decay');
  const vial=alchemyVialState(journal,campaignId,finishId,minute);
  ok(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot)&&
@@ -134,7 +135,8 @@ export function createAcidThrownVial({journal=[],inventory=[],campaignId,minute,
    'není doložen skutečný jediný zasažený inventární kus');
  }else ok(targetKind==='ground'||aimType==='direct'||splashDistanceInches===null||splashDistanceInches>3,
   'kontakt mimo šestipalcový kruh není dovoleno vyhlásit');
- return {format:ACID_THROW_FORMAT,campaignId,minute,actorId,finishId,vialId:vial.vialId,bindingId:vial.bindingId,
+ return {format:expectedElixirName==='Acid'?ACID_THROW_FORMAT:ALCHEMY_AREA_THROW_FORMAT,
+  ...(expectedElixirName==='Acid'?{}:{elixirName:expectedElixirName}),campaignId,minute,actorId,finishId,vialId:vial.vialId,bindingId:vial.bindingId,
   asAtImpact:dose.currentAS,aimType,distanceFt,throwingML,d100,rollOrigin,targetMovement,
   aimedPreviousRound,windforce,crosswind,traumaPenalty,effectiveDodgeIndex,ceilingFeet,
   chargingThrow,str,spoiledDisposition,spoiledD100,nearbyTargetCount,nearbyD20,nearbyImpactD10,nearbyTargetConfirmed,
@@ -144,8 +146,35 @@ export function createAcidThrownVial({journal=[],inventory=[],campaignId,minute,
   targetKind:hit?targetKind:'ground',targetId:hit?targetId:null,targetItemId:hit?targetItemId:null,
   targetLocation:hit?targetLocation:null,targetSide:hit?targetSide:null,
   humanConfirmed:hit&&targetKind==='flesh',splashDistanceInches,
-  splashDiameterInches:6,glassVialBroken:discharged,gmConfirmed:true,sourcePages:[110,163,164,269,271]};
+  ...(expectedElixirName==='Acid'?{splashDiameterInches:6}:{}),glassVialBroken:discharged,gmConfirmed:true,
+  sourcePages:expectedElixirName==='Acid'?[110,163,164,269,271]:[110,163,164,268,269,
+   {Eruption:271,Fumebomb:272,Weakness:274}[expectedElixirName]]};
 }
+/** Use the same HMK Throwing/Missile/ Grenade dice solver as physical Acid
+ * without claiming its 6-inch splash or its Acid-contact consequences.
+ * The actual detonation is a separate, all-target atomic combat operation.
+ * This physical source may NEVER be written alone as an Area effect.
+ */
+export function createAcidThrownVial(options={}){
+ return createPhysicalThrownVial({...options,expectedElixirName:'Acid'});
+}
+export function createAlchemicalAreaThrownVial(options={}){
+ const dose=alchemyElixirStrength(options.journal??[],options.campaignId,options.finishId,options.minute);
+ ok(['Eruption','Fumebomb','Weakness'].includes(dose.elixirName),
+  'Area: pouze kanonické plošné elixíry HMK');
+ ok((options.targetKind===undefined||options.targetKind==='ground')&&
+  (options.targetId===undefined||options.targetId===null)&&
+  (options.targetItemId===undefined||options.targetItemId===null)&&
+  (options.targetLocation===undefined||options.targetLocation===null)&&
+  (options.splashDistanceInches===undefined||options.splashDistanceInches===null),
+  'Area: nelze zaměnit jediný Acid cíl za úplnou skupinu Area');
+ ok(options.impactSurfaceFirmConfirmed===true&&options.geometryConfirmed===true,
+  'Area: skutečné násilné rozbití nádoby a geometrie musejí být potvrzeny GM');
+ return createPhysicalThrownVial({...options,expectedElixirName:dose.elixirName,
+  targetKind:'ground',targetId:null,targetItemId:null,targetLocation:null,
+  targetSide:null,splashDistanceInches:null,humanConfirmed:false});
+}
+
 export function validateAcidThrownJournal(journal=[]){
  const earlier=[];
  for(const row of journal){

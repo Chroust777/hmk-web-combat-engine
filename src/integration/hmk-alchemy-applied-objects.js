@@ -85,7 +85,7 @@ function repairLine(item,acidObjectDamage=0){
  const armourDamaged=Object.values(armourDamage).some(x=>x>0);
  const weaponDamaged=category==='weapon'&&validQuality&&currentWQ!==null&&currentWQ<catalogWQ;
  const notedDamage=plainCondition(item.condition);
- check(weaponDamaged||armourDamaged||notedDamage,'object is not demonstrably damaged/broken');
+ check(weaponDamaged||armourDamaged||notedDamage||acidObjectDamage>0,'object is not demonstrably damaged/broken');
  if(category==='weapon'&&currentWQ!==null)check(validQuality&&currentWQ<=catalogWQ,'unverified catalog WQ baseline');
  return {itemId:item.id,ownerId:item.characterId,itemName:item.snapshot.name,category,weightLb:itemWeight(item),
   conditionBefore:item.condition??'',conditionAfter:'',

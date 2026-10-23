@@ -10,12 +10,13 @@ import {resolveVerifiedAreaProtection,assertAreaProtectionUnchanged} from './hmk
 import {applyConfirmedAreaStrike} from './hmk-combat-aftereffects.js';
 import {liveSpatialEvade} from './hmk-spatial-evasion.js';
 import {projectGuidedSpatialPath} from './hmk-guided-spatial-actions.js';
+import {availableMasteries} from './hmk-skill-test-engine.js';
 const assert=(v,m)=>{if(!v)throw Error(m)};
 const valid=(v,lo,hi)=>Number.isSafeInteger(v)&&v>=lo&&v<=hi;
 const copy=structuredClone;
 const witness=v=>JSON.stringify(v);
 function verifiedML(character,name){
- const skills=character?.hmk?.skills?.filter(x=>String(x?.name||'').trim().toLowerCase()===name&&valid(x.ml,0,200));
+ const skills=availableMasteries(character).filter(x=>String(x?.name||'').trim().toLowerCase()===name&&valid(x.ml,0,200));
  assert(skills?.length===1,`Chybí jednoznačná živá ${name} ML`);
  return skills[0].ml;
 }

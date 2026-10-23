@@ -6,6 +6,8 @@
 import {awaitingPelahnBonus,persistPelahnExtraPass,persistPelahnExtraMove,persistPelahnTotalReleaseSource,preparePelahnBonusMelee,persistPelahnExtraMelee,preparePelahnBonusMissile,persistPelahnExtraMissile,persistPelahnBonusIncantStart} from './hmk-pelahn-live-initiative.js';
 import {prepareGuidedPyre,guidedPyreRequirement,submitGuidedPyreDie,persistGuidedPyre,persistGuidedPyreTotalReleaseSource} from './hmk-guided-pyre.js';
 import {prepareDoomFlameSource,doomFlameRequirement,submitDoomFlameDie,resolveDoomFlameCohort,persistGuidedDoomFlame,persistFailedDoomFlame,persistDoomFlameFormMisfire} from './hmk-guided-doom-flame.js';
+import {assertFumebombLineOfSight} from './hmk-alchemy-area-los.js';
+import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {prepareMountedRideBy,finalizeMountedRideBy,persistMountedRideBy} from './hmk-mounted-ride-by.js';
 import {prepareMountedSharedMove,finalizeMountedSharedMove,persistMountedSharedMove} from './hmk-mounted-shared-turn.js';
 import {guidedAttackRequirement,chooseGuidedAttack,submitGuidedAttackDie,advanceGuidedAttack,completeGuidedAttack} from './hmk-guided-attack-journey.js';
@@ -444,6 +446,10 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
    }
    if(f.id==='hmk-g04-area-start'){
     if(draft||!available())throw Error('Jiný bojový průvodce již probíhá');
+    // HMK p.227 Doom Flame has an explicit LOS range requirement.
+    assertFumebombLineOfSight({journal:document.journal,sequence:seq,
+     campaignId:campaignKey(document.campaignClock),fromId:v.casterId,
+     toPoint:{x:real(v.centerX),y:real(v.centerY)}});
     const stage=prepareDoomFlameSource({id:newId(),sequence:seq,document,casterId:v.casterId,
      center:{x:real(v.centerX),y:real(v.centerY)},seedFire:{x:real(v.seedX),y:real(v.seedY)},
      conditionsConfirmed:v.conditions==='yes',gmConfirmed:true});set({kind:'area',stage});return true;}

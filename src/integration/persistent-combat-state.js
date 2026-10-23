@@ -32,6 +32,53 @@ function applyShockProne(s){if(['INC','UNC'].includes(s.shock)){s.posture??={pro
 
 const copy=x=>structuredClone(x);
 export function initialCombatState(){return {format:'hmk-persistent-combat-v1',shock:'NONE',bloodLoss:{bp:0,weaknessFatigue:0},fatigue:{windedness:0,weariness:0,otherWeakness:0},wounds:[],events:[],lastRound:0,shockOriginRound:null,shockFollowup:null,extendedShock:null,coma:null,bloodShockPending:false,morale:{state:'steady',psycheStress:0,braveSince:null,braveTimelineId:null},mishaps:[],posture:{prone:false,dropPending:false,passNextTurn:false}};}
+/** HMK p.272: Fumebomb has its OWN Shock SL table, not the ordinary
+ * injury SHK index. This transition writes to the original persistent
+ * Shock State, its native recovery schedule, and its existing event list.
+ * The caller must attest the current real Shock ML of this same character.
+ */
+export function applyConfirmedAlchemyFumebombShock({state,round,eventId,sourceId,
+ timelineId=null,shockML,as,d100,origin='manual',gmConfirmed=false}={}){
+ const s=ready(state,round,eventId);
+ requireCond(gmConfirmed===true&&typeof sourceId==='string'&&sourceId.length>=3&&
+  typeof timelineId==='string'&&timelineId.length>0&&
+  whole(shockML,0,200)&&whole(as,1,100)&&whole(d100,1,100)&&
+  ['manual','cryptographic-software-die'].includes(origin),
+  'Fumebomb: vyžaduje původní Shock ML, AS, GM potvrzení a skutečný d100');
+ requireCond(s.shock!=='KIA'&&!s.extendedShock&&!s.coma?.active,
+  'Fumebomb při KIA, Extended Shock nebo Coma vyžaduje další pravidlovou návaznost');
+ const fatigue=fatigueTotalUnsafe(s),eml=shockML-fatigue-as*5;
+ const sl=successLevel(d100,eml);
+ const target={ [SL.CF]:SHOCK_STATE.UNC,[SL.F]:SHOCK_STATE.INC,
+  [SL.S]:SHOCK_STATE.STN,[SL.CS]:SHOCK_STATE.NONE }[sl];
+ const before=s.shock;
+ s.shock=REVERSE[applyShockState(SHOCK[before],target)];
+ applyShockProne(s);
+ if(s.shock!==before){s.shockOriginRound=round;installShockFollowup(s,{round,timelineId});}
+ record(s,eventId,'alchemy-fumebomb-shock',round,{sourceId,as,shockML,fatigue,eml,d100,origin,
+  sl:Object.keys(SL).find(k=>SL[k]===sl),before,incoming:REVERSE[target],after:s.shock,
+  timelineId,sourcePage:272});
+ validateCombatState(s);
+ return {state:s,result:{before,after:s.shock,eml,sl:Object.keys(SL).find(k=>SL[k]===sl),
+  incoming:REVERSE[target],dueRound:s.shockFollowup?.dueRound??null}};
+}
+/** HMK p.274: record the actual Strength reduction in the EXISTING
+ * Combat State event stream; it is an Attribute loss, NOT Fatigue or injury.
+ * There is no rule-based automatic recovery time to schedule here.
+ */
+export function applyConfirmedAlchemyWeakness({state,round,eventId,sourceId,timelineId,
+ as,strengthBefore,gmConfirmed=false}={}){
+ const s=ready(state,round,eventId);
+ const decrease=Math.round(as/2),strengthAfter=strengthBefore-decrease;
+ requireCond(gmConfirmed===true&&typeof sourceId==='string'&&sourceId.length>=3&&
+  typeof timelineId==='string'&&timelineId.length>0&&whole(as,1,100)&&
+  whole(strengthBefore,1,200)&&whole(strengthAfter,1,200)&&s.shock!=='KIA',
+  'Weakness: vyžaduje doložené původní STR, AS, časovou osu a cílový Combat State');
+ record(s,eventId,'alchemy-weakness-strength',round,{sourceId,timelineId,as,
+  strengthBefore,strengthAfter,decrease,shockPenaltyFromStrengthLoss:0,
+  duration:'instantaneous; no specified automatic STR recovery',sourcePage:274});
+ return {state:s,result:{strengthBefore,strengthAfter,decrease}};
+}
 export function combatFatigueTotals(state){validateCombatState(state);return {windedness:state.fatigue.windedness,weariness:state.fatigue.weariness,weakness:state.fatigue.otherWeakness+state.bloodLoss.weaknessFatigue,total:state.fatigue.windedness+state.fatigue.weariness+state.fatigue.otherWeakness+state.bloodLoss.weaknessFatigue};}
 export function validateCombatState(s){
  requireCond(s&&s.format==='hmk-persistent-combat-v1'&&!Array.isArray(s),'Neznámý formát bojového stavu');

@@ -66,17 +66,19 @@ const inventoryVial=(inventory,id,owner)=>inventory.find(x=>x.id===id&&x.charact
 /** The GM may make a later affidavit about storage at preparation completion;
  * no historical inventory/clock record is silently backdated. */
 export function createAlchemyVialBinding({journal=[],inventory=[],campaignId,minute,actorId,finishId,vialId,
- confirmedByGM=false,storageAtCompletionConfirmed=false,liquidConfirmed=false,material=null,corkConfirmed=false}={}){
+ confirmedByGM=false,storageAtCompletionConfirmed=false,liquidConfirmed=false,gasConfirmed=false,material=null,corkConfirmed=false}={}){
  check(confirmedByGM===true&&storageAtCompletionConfirmed===true,
   'GM musí potvrdit skutečnou nádobu i její uložení při dokončení elixíru');
- check(liquidConfirmed===true&&['glass','ceramic'].includes(material)&&corkConfirmed===true,
-  'HMK 268: GM musí potvrdit tekutý elixír, skleněnou/keramickou nádobu a korkovou zátku');
+ check((liquidConfirmed===true)!==(gasConfirmed===true)&&['glass','ceramic'].includes(material)&&corkConfirmed===true,
+  'HMK 268: GM musí potvrdit tekutý nebo plynný elixír, skleněnou/keramickou nádobu a korkovou zátku');
  check(typeof campaignId==='string'&&campaignId&&validMinute(minute)&&typeof actorId==='string'&&actorId&&
   typeof vialId==='string'&&vialId,'Alchemy Vial: chybí kampaň, čas nebo nádoba');
  const state=alchemyElixirStrength(journal,campaignId,finishId,minute);
  check(state.actorId===actorId&&minute>=state.completedMinute,
   'Alchemy Vial: výrobek nepatří postavě nebo zatím nebyl dokončen');
- check(state.elixirName!=='Fumebomb','HMK 268: Fumebomb je plynný elixír, nikoli běžná tekutina v 4 oz vial');
+ check(state.elixirName==='Fumebomb'?gasConfirmed===true&&liquidConfirmed===false:
+  liquidConfirmed===true&&gasConfirmed===false,
+  'HMK 268: Fumebomb musí být doložen jako plyn, ostatní současné elixíry jako tekutina');
  check(!alchemyVialBinding(journal,campaignId,finishId),'Alchemy Vial: výrobek již má doloženou fyzickou nádobu');
  const item=inventoryVial(inventory,vialId,actorId);
  check(item&&['carried','none'].includes(item.slot),'Alchemy Vial: nutná samostatná prázdná nesená Vial, 4 oz (1 ks)');
@@ -84,7 +86,8 @@ export function createAlchemyVialBinding({journal=[],inventory=[],campaignId,min
  return {format:ALCHEMY_VIAL_FORMAT,campaignId,minute,actorId,finishId,vialId,
   printedCatalogId:PRINTED_VIAL,quantity:1,initialSlot:item.slot,
   emptyWeightLb:EMPTY_LB,fullWeightLb:ALCHEMY_VIAL_FULL_LB,
-  sealedAtCompletionConfirmed:true,liquidConfirmed:true,material,corkConfirmed:true,confirmedByGM:true,sourcePage:268};
+  sealedAtCompletionConfirmed:true,liquidConfirmed:liquidConfirmed===true,
+  ...(gasConfirmed?{gasConfirmed:true}:{}),material,corkConfirmed:true,confirmedByGM:true,sourcePage:268};
 }
 export function createAlchemyVialEmpty({journal=[],inventory=[],campaignId,minute,actorId,finishId,
  reason='',confirmedByGM=false,shattered=false}={}){
@@ -124,7 +127,7 @@ export function validateAlchemyVialJournal(journal=[]){
    const reproduced=createAlchemyVialBinding({journal:earlier,inventory:inv,
     campaignId:b.campaignId,minute:b.minute,actorId:b.actorId,finishId:b.finishId,vialId:b.vialId,
     confirmedByGM:b.confirmedByGM,storageAtCompletionConfirmed:b.sealedAtCompletionConfirmed,
-    liquidConfirmed:b.liquidConfirmed,material:b.material,corkConfirmed:b.corkConfirmed});
+    liquidConfirmed:b.liquidConfirmed,gasConfirmed:b.gasConfirmed===true,material:b.material,corkConfirmed:b.corkConfirmed});
    check(JSON.stringify(reproduced)===JSON.stringify(b),'Alchemy Vial: přepsaný důkaz fyzické nádoby');
   }
   if(e){

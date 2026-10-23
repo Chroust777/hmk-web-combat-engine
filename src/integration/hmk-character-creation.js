@@ -1746,12 +1746,23 @@ export function assertCreationInvariants(character){
  for(const [name,value] of Object.entries(h.advancement?.attributes??{})){
   if(!ATTRIBUTES.includes(name)||!Number.isSafeInteger(value)||value<0||value>99||!c.attributeProof[name])throw Error('Neplatná pozdější změna atributu '+name);
  }
+ const weaknessRecords=h.alchemyWeaknessLosses??[];
+ if(!Array.isArray(weaknessRecords)||weaknessRecords.length>100||
+  weaknessRecords.some((x,i)=>!x||typeof x.sourceId!=='string'||x.sourceId.length<3||
+   !Number.isSafeInteger(x.decrease)||x.decrease<1||x.decrease>50||
+   !Number.isSafeInteger(x.strengthBefore)||x.strengthBefore<1||
+   !Number.isSafeInteger(x.strengthAfter)||x.strengthAfter!==x.strengthBefore-x.decrease||
+   !Number.isSafeInteger(x.round)||x.round<1||
+   weaknessRecords.findIndex(z=>z.sourceId===x.sourceId)!==i||
+   (i>0&&x.strengthBefore!==weaknessRecords[i-1].strengthAfter)))
+  throw Error('Weakness: poškozená neměnná řada snížení STR');
+ const weaknessLoss=weaknessRecords.reduce((sum,x)=>sum+x.decrease,0);
  for(const [name,proof] of Object.entries(c.attributeProof)){
   if(!ATTRIBUTES.includes(name))throw Error('Neznámý důkaz fyzického atributu');
   const actual=evaluateAttributeDice({name,ageGroup:h.ageGroup,folk:h.folk,kind:character.kind||'PC',dice:proof.rolls});
   const last=c.auditEvents.filter(e=>e.type==='attribute-dice'&&e.name===name).at(-1);
   if(!last||JSON.stringify(last.rolls)!==JSON.stringify(proof.rolls)||last.score!==proof.score||
-     JSON.stringify(actual)!==JSON.stringify(proof)||h.attributes?.[name]!==(h.advancement?.attributes?.[name]??actual.score))
+     JSON.stringify(actual)!==JSON.stringify(proof)||h.attributes?.[name]!==(h.advancement?.attributes?.[name]??actual.score)-(name==='str'?weaknessLoss:0))
    throw Error('Nesoulad uložených kostek a atributu '+name);
  }
  if(c.voiceProof){

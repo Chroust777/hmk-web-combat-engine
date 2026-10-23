@@ -6,6 +6,7 @@
  * reach, special traits, etc.) remain in the established full combat forms.
  */
 import {resolveCombatantLoad} from './combatant-load.js';
+import {availableMasteries} from './hmk-skill-test-engine.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {combatFatigueTotals,initialCombatState} from './persistent-combat-state.js';
 import {strengthImpactModifier,heftPenalty,twoHandedImpactBonus} from '../rules/weapon-modes.js';
@@ -30,6 +31,11 @@ const printedDie=x=>Number.isSafeInteger(x)?x:(typeof x==='string'&&/^d(?:4|6|8|
 const skill=(person,skillId)=>{
  const match=person?.hmk?.skills?.filter(s=>s.id===skillId)??[];
  must(match.length===1&&int(match[0].ml,0,200),`Postava ${person?.name||'?'} nemá jednoznačně doloženou dovednost ML`);
+ // A creation-owned skill's original ledger remains immutable: the active ML
+ // is rederived from its ACTUAL effective attributes (including Weakness).
+ // An imported/legacy skill remains its own authoritative actual ML.
+ const live=person?.hmk?.creation?availableMasteries(person).filter(x=>x.name===match[0].name):null;
+ if(live){must(live.length===1,'Chybí jediná živá ML pro '+match[0].name);return {...match[0],ml:live[0].ml};}
  return match[0];
 };
 function held(inventory,id,itemId){

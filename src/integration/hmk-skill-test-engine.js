@@ -9,7 +9,20 @@ const integer=(n,min,max,label)=>{if(!Number.isSafeInteger(n)||n<min||n>max)thro
 export function availableMasteries(character){
  const h=character?.hmk??{};const result=[],seen=new Set();
  function add(kind,name,ml){if(!name||!Number.isSafeInteger(ml)||ml<1||ml>1000||seen.has(name))return;seen.add(name);result.push({kind,name,ml,index:indexOf(ml)});}
- if(h.creation){for(const s of calculateSheetSkills(character))if(s.ml!==null&&s.sm>0)add('skill',s.name,s.ml);}
+ if(h.creation){
+  const skillList=calculateSheetSkills(character);
+  // Weakness p.274 weakens STR-dependent skills but must NOT induce an
+  // extra Shock-test penalty from lost STR (the torpor offsets the pain).
+  const totalWeakness=(h.alchemyWeaknessLosses??[]).reduce((n,x)=>n+x.decrease,0);
+  let naturalShock=null;
+  if(totalWeakness){
+   const unaffected=structuredClone(character);
+   unaffected.hmk.attributes.str+=totalWeakness;
+   naturalShock=calculateSheetSkills(unaffected).find(x=>x.name==='Shock')?.ml??null;
+  }
+  for(const s of skillList)if(s.ml!==null&&s.sm>0)
+   add('skill',s.name,s.name==='Shock'&&naturalShock!==null?naturalShock:s.ml);
+ }
  else for(const s of h.skills??[])add('skill',s.name,s.ml);
  for(const [key,label] of Object.entries(ATTRIBUTE_LABELS)){const x=h.attributes?.[key];if(Number.isSafeInteger(x)&&x>0)add('attribute',label,x*5);}
  return result.sort((a,b)=>a.name.localeCompare(b.name,'cs',{sensitivity:'base'})||a.kind.localeCompare(b.kind));
