@@ -1,4 +1,4 @@
-"""Real Chromium: v93.432 mixed Footpad critical failures and single atomic commit."""
+"""Real Chromium: v93.433 mixed Footpad critical failures and single atomic commit."""
 from pathlib import Path
 import re, subprocess, json
 from playwright.sync_api import sync_playwright
@@ -40,7 +40,7 @@ with sync_playwright() as p:
   page.set_content('<!doctype html><html lang="cs"><head><meta charset="utf-8"></head><body><div id="app"></div></body></html>')
   page.evaluate('''fixture=>{const store=new Map([['hmk-keepers-ledger-v1',JSON.stringify(fixture)]]);const mock={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k),key:i=>[...store.keys()][i]??null,get length(){return store.size}};Object.defineProperty(window,'localStorage',{configurable:true,value:mock});Object.defineProperty(window,'sessionStorage',{configurable:true,value:mock});}''',original)
   page.add_script_tag(content=(root/'hmk-app.bundle.js').read_text());page.wait_for_timeout(120)
-  assert 'v93.432' in page.locator('#app').inner_text(),('boot',errors,dialogs,page.locator('#app').inner_text()[:300])
+  assert 'v93.433' in page.locator('#app').inner_text(),('boot',errors,dialogs,page.locator('#app').inner_text()[:300])
   page.locator('[data-nav="calendar"]').first.click();page.wait_for_timeout(100)
   if page.locator('[data-calendar-open]').count():page.locator('[data-calendar-open]').first.click();page.wait_for_timeout(100)
   submit(page,older,'alpha-finish',42)
@@ -79,7 +79,7 @@ with sync_playwright() as p:
    reload.set_content('<!doctype html><html lang="cs"><head><meta charset="utf-8"></head><body><div id="app"></div></body></html>')
    reload.evaluate('''fixture=>{const store=new Map([['hmk-keepers-ledger-v1',JSON.stringify(fixture)]]);const mock={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k),key:i=>[...store.keys()][i]??null,get length(){return store.size}};Object.defineProperty(window,'localStorage',{configurable:true,value:mock});Object.defineProperty(window,'sessionStorage',{configurable:true,value:mock});}''',result)
    reload.add_script_tag(content=(root/'hmk-app.bundle.js').read_text());reload.wait_for_timeout(120)
-   assert not reload_errors and 'v93.432' in reload.locator('#app').inner_text(),('reloaded',reload_errors)
+   assert not reload_errors and 'v93.433' in reload.locator('#app').inner_text(),('reloaded',reload_errors)
    assert len(saved(reload)['journal'])==len(result['journal']),'reload altered permanent evidence'
    reload.close()
   print('PASS Chromium Footpad mixed CF',older,'→',newer,'Aural +'+str(levels),flush=True)
