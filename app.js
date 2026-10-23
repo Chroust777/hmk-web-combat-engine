@@ -132,7 +132,7 @@ import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJou
 import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,inventionSVPenalty,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js';
 import {alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js';
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
-import {activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js';
+import {activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js';
 import {darkvisionHealingState,pendingDarkvisionHealing,createDarkvisionHealingStart,createDarkvisionHealingRoll,requireDarkvisionHealingGMTimeMayAdvance,validateDarkvisionHealingJournal,assertDarkvisionHealingAppendOnly} from './src/integration/hmk-alchemy-darkvision-healing.js';
 import {darkvisionSkillContext} from './src/integration/hmk-alchemy-darkvision-skill.js';
 import {eruditionSkillEvidence,applyEruditionSkillResult} from './src/integration/hmk-alchemy-erudition-skill.js';
@@ -219,7 +219,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v47 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.428';
+const APP_VERSION='93.429';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -278,7 +278,18 @@ function validate(d){
   event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)
   throw Error('Erudition CF: chybí neměnný Combat State/Aural Shock důkaz');
  }
- validateDarkvisionProfusionJournal(d.journal);validateDarkvisionHealingJournal(d.journal);for(const entry of d.journal){const proof=entry.calendarAlchemyFinish;
+ validateDarkvisionProfusionJournal(d.journal);validateEruditionProfusionJournal(d.journal);
+ for(const row of d.journal){
+  const p=row.calendarAlchemyEruditionProfusionIll;
+  if(!p||row.calendarCampaignId!==campaignKey(d.campaignClock))continue;
+  const actor=d.characters.find(c=>c.id===p.targetId);
+  const event=actor?.hmk?.combatState?.events?.find(e=>e.id===row.id&&e.type==='hmk-alchemy-profusion-aural');
+  if(!event||event.details?.triggerUseId!==p.triggerUseId||event.details?.sourceUseId!==p.sourceUseId||
+    event.details?.targetId!==p.targetId||event.details?.calendarCampaignId!==p.campaignId||
+    event.details?.calendarMinute!==p.minute||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)
+   throw Error('Erudition Profusion: chybí neměnný Combat State důkaz sekundárního Aural Shock');
+ }
+ validateDarkvisionHealingJournal(d.journal);for(const entry of d.journal){const proof=entry.calendarAlchemyFinish;
  if(entry.calendarCampaignId!==campaignKey(d.campaignClock)||proof?.result!=='ruined-by-dissolution')continue;
  const actor=d.characters.find(c=>c.id===entry.characterId);
  if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===entry.id&&e.type==='hmk-alchemy-dissolution-aural'&&
@@ -503,7 +514,7 @@ let pendingTrekHandoff=null; // UI-only context; the journal proof is the author
 function mutate(fn,{gmClockAdvance=false}={}){
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(!automaticGenerationBusy)alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(!automaticGenerationBusy)alert('Změna nebyla uložena: '+e.message);return false}
 }
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
@@ -948,7 +959,7 @@ function campaignCalendarView(){
   if(bind){const target=data.inventory.find(v=>v.id===state?.vialId);
    return `<article class="hc-event"><strong>${esc(a.elixirName)} · AS ${alchemyStates.find(z=>z.finishId===x.id)?.currentAS??a.baseAS}</strong> · nádoba ${esc(state?.vialId)} · ${esc(character(state?.ownerId)?.name||state?.ownerId)} · ${esc(state?.slot)} · ${state?.full?'plná 0,5 lb':'vyprázdněná 0,25 lb'}
     ${state?.full&&a.elixirName==='Physic'&&alchemyStates.find(z=>z.finishId===x.id)?.currentAS>0&&target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?participants.map(c=>{const candidates=availableMasteries(c).filter(m=>m.name==='Aura'||m.name==='Alchemy');return candidates.length?`<form data-alchemy-physic><input type="hidden" name="finishId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(state.ownerId)}"><input type="hidden" name="targetId" value="${esc(c.id)}"><strong>Vypít Physic · ${esc(c.name)}</strong><p>HMK 273: bez Profusion; výsledná AS se odečte od všech aktivních Darkvision a Erudition příjemce. CF s účinnou AS zapisuje současně Aural Shock 1 a Weakness 5 do původního Combat State; příjemce čeká na standardní Aural Recovery.</p><label>Imbibing d100 proti Aura/Alchemy<select name="testSkill">${candidates.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} ML ${m.ml}</option>`).join('')}</select></label><label>Skutečný d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-alchemy-roll-imbibing>⚄ Generovat d100</button>${activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute).map(source=>`<label>CF · povinný HP d6 za aktivní Darkvision (${esc(source.useId)}, základní AS ${source.asBefore})<input name="physicHp_${esc(source.useId)}" type="number" min="1" max="6"></label><button type="button" class="hc-small" data-alchemy-roll-profusion data-roll-target="physicHp_${esc(source.useId)}">⚄ d6</button>`).join('')}<p class="hc-hint">CF s kladnou AS vyvolá Aural Shock 1 a také Ill Effects všech dříve aktivních Darkvision. Jejich vlastní Healing Period d6 jsou povinné pouze při CF.</p><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje úplné vypití nebo podání do jednoho kola, bez posunu kalendáře</label><button type="submit">Zapsat Physic a změny AS bez nového inventáře</button></form>`:''}).join(''):''}
-    ${state?.full&&a.elixirName==='Erudition'&&alchemyStates.find(z=>z.finishId===x.id)?.currentAS>0&&target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?participants.map(c=>{const candidates=availableMasteries(c).filter(m=>m.name==='Aura'||m.name==='Alchemy');return candidates.length?`<form data-alchemy-erudition><input type="hidden" name="finishId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(state.ownerId)}"><input type="hidden" name="targetId" value="${esc(c.id)}"><strong>Vypít Erudition · ${esc(c.name)}</strong><p>HMK 271: úspěšný Lore, Reasoning nebo Creativity test končící 3/5/8/0 → CS; účinek trvá do AS 0. CF bez souběžných účinků: Aural Shock 1. Souběžný CF bez kompletních Ill Effects se neuloží.</p><label>Aura / Alchemy<select name="testSkill">${candidates.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} ML ${m.ml}</option>`).join('')}</select></label><label>Skutečný Imbibing d100<input type="number" name="d100" min="1" max="100" required></label><button type="button" class="hc-small" data-alchemy-roll-imbibing>⚄ d100</button><label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje úplné podání během jednoho kola; bez posunu kalendáře</label><button type="submit">Zapsat Erudition</button></form>`:''}).join(''):''}
+    ${state?.full&&a.elixirName==='Erudition'&&alchemyStates.find(z=>z.finishId===x.id)?.currentAS>0&&target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?participants.map(c=>{const candidates=availableMasteries(c).filter(m=>m.name==='Aura'||m.name==='Alchemy');return candidates.length?`<form data-alchemy-erudition><input type="hidden" name="finishId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(state.ownerId)}"><input type="hidden" name="targetId" value="${esc(c.id)}"><strong>Vypít Erudition · ${esc(c.name)}</strong><p>HMK 271: úspěšný Lore, Reasoning nebo Creativity test končící 3/5/8/0 → CS; účinek trvá do AS 0. CF bez souběžných účinků: Aural Shock 1. Souběžný CF vyžaduje všechny Healing Period d6; další Erudition přidává samostatný Aural Shock.</p><label>Aura / Alchemy<select name="testSkill">${candidates.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} ML ${m.ml}</option>`).join('')}</select></label><label>Skutečný Imbibing d100<input type="number" name="d100" min="1" max="100" required></label><button type="button" class="hc-small" data-alchemy-roll-imbibing>⚄ d100</button>${activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute).map(source=>`<label>Erudition CF · HP d6 pro aktivní Darkvision (${esc(source.useId)})<input name="eruditionHp_${esc(source.useId)}" type="number" min="1" max="6"></label><button type="button" class="hc-small" data-alchemy-roll-profusion data-roll-target="eruditionHp_${esc(source.useId)}">⚄ d6</button>`).join('')}<label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje úplné podání během jednoho kola; bez posunu kalendáře</label><button type="submit">Zapsat Erudition</button></form>`:''}).join(''):''}
     ${state?.full&&a.elixirName==='Darkvision'&&alchemyStates.find(z=>z.finishId===x.id)?.currentAS>0&&target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?participants.map(c=>{const candidates=availableMasteries(c).filter(m=>m.name==='Aura'||m.name==='Alchemy');return candidates.length?`<form data-alchemy-darkvision><input type="hidden" name="finishId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(state.ownerId)}"><input type="hidden" name="targetId" value="${esc(c.id)}"><strong>Vypít Darkvision · příjemce ${esc(c.name)}</strong><label>Imbibing Roll d100 proti Aura/Alchemy<select name="testSkill">${candidates.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} ML ${m.ml}</option>`).join('')}</select></label><label>Skutečný d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-alchemy-roll-imbibing>⚄ Generovat d100</button><label>CF jen při účinném elixíru: Healing Period d6 (HMK 271)<input name="healingD6" type="number" min="1" max="6"></label><button type="button" class="hc-small" data-darkvision-roll-hp>⚄ Generovat d6</button>${activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute).map(source=>`<label>Profusion CF · další HP d6 pro již aktivní Darkvision (${esc(source.useId)}, AS před vypitím ${source.asBefore})<input name="profusionHp_${esc(source.useId)}" type="number" min="1" max="6"></label><button type="button" class="hc-small" data-alchemy-roll-profusion data-roll-target="profusionHp_${esc(source.useId)}">⚄ d6</button>`).join('')}
     <p class="hc-hint">Profusion (HMK 269): další aktivní elixíry zvyšují riziko CF. Při skutečném CF a účinné AS musí být pro každý další aktivní Darkvision doložen samostatný Healing Period d6. Pokud hod není CF, tyto d6 se nepoužijí.</p>
     <label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje úplné užití: vlastní vypití 1 turn, podání jiné postavě 1 round (bez posunu společného času)</label><button type="submit">Zapsat Imbibing Roll a vyprázdnit existující nádobu</button></form>`:''}).join(''):''}
@@ -7941,6 +7952,46 @@ document.addEventListener('submit',e=>{
    ...(start?{calendarAlchemyDarkvisionHealingStart:proof}:{calendarAlchemyDarkvisionHealingRoll:proof})})))notice=start?'CF Healing Period doložena · čas GM beze změny':proof.recovered?'Citlivost na světlo vyléčena · HR6':'Zotavení neúplné; další termín doložen.';
  }catch(err){alert('Darkvision Healing: '+err.message)}
 },true);
+/** HMK 269: prepare every concurrent CF Ill Effect BEFORE the first durable write.
+ * No parallel health state; separate Darkvision Exposure Healing and existing
+ * Combat State Aural Shock, all committed in the caller's single mutate().
+ */
+function prepareAlchemyConcurrentCF({journal,proof,useId,targetId,campaignId,minute,form,
+ hpPrefix,initialResolved=null,healthState=null,arcaneState=null}={}){
+ const triggerRow={id:useId,characterId:proof.actorId,calendarCampaignId:campaignId,campaignMinute:minute,
+  calendarAlchemyImbibing:proof};
+ const simulated=[...journal,triggerRow],rows=[];
+ let state=initialResolved?.state??healthState,arcane=initialResolved?.arcane??arcaneState;
+ let auralCount=0,visionCount=0;
+ for(const effect of proof.profusionIllEffects||[]){
+  const id=uuid();
+  if(effect.kind==='vision-light-penalty'){
+   const ill=createDarkvisionProfusionIll({journal:simulated,campaignId,minute,triggerUseId:useId,
+    sourceUseId:effect.sourceUseId,targetId});
+   const illRow={id,characterId:targetId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
+    title:'Alchemy CF · Darkvision Ill Effect',body:'HMK 269/271 · zdroj '+effect.sourceUseId+', postih −'+ill.illEffect.penalty,
+    calendarAlchemyDarkvisionProfusionIll:ill};
+   const input=form.elements.namedItem(hpPrefix+effect.sourceUseId),d6=Number(input?.value);
+   const hp=createDarkvisionHealingStart({journal:[...simulated,illRow],campaignId,minute,useId:id,
+    targetId,hpD6:d6,origin:input?.dataset.alchemyGenerated===String(d6)?'cryptographic-software-die':'manual',
+    gmConfirmed:true});
+   rows.push(illRow,{id:uuid(),characterId:targetId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
+    title:'Alchemy CF · Darkvision Healing Period',body:'HMK 269/271 · '+effect.sourceUseId+' · d6 '+d6+' dní',
+    calendarAlchemyDarkvisionHealingStart:hp});
+   simulated.push(illRow,rows.at(-1));visionCount++;
+  }else if(effect.kind==='aural-shock'){
+   const ill=createEruditionProfusionIll({journal:simulated,campaignId,minute,triggerUseId:useId,
+    sourceUseId:effect.sourceUseId,targetId});
+   const next=applyEruditionProfusionAural({journal:simulated,state,arcane,proof:ill,eventId:id});
+   state=next.state;arcane=next.arcane;auralCount++;
+   const row={id,characterId:targetId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
+    title:'Alchemy CF · Erudition Aural Shock',body:'HMK 269/271 · zdroj '+effect.sourceUseId+' · Aural Shock +1, Weakness +5',
+    calendarAlchemyEruditionProfusionIll:ill};
+   rows.push(row);simulated.push(row);
+  }else throw Error('Alchemy CF: neznámý nebo nedoložený druh Ill Effect');
+ }
+ return {rows,state,arcane,auralCount,visionCount,hasHealthChange:!!initialResolved||auralCount>0};
+}
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-alchemy-erudition]'))return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -7959,8 +8010,12 @@ document.addEventListener('submit',e=>{
    gmConfirmed:!!v.confirmed});
   const empty=createAlchemyVialEmpty({journal:data.journal,inventory:data.inventory,campaignId,minute,
    actorId:v.actorId,finishId:v.finishId,reason:'Erudition consumed by '+target.name,confirmedByGM:true});
-  const resolved=proof.illEffect?applyAlchemyEruditionAural({state:target.hmk?.combatState,arcane:target.hmk?.arcane,
+  const ownResolved=proof.illEffect?applyAlchemyEruditionAural({state:target.hmk?.combatState,arcane:target.hmk?.arcane,
    proof,eventId:useId}):null;
+  const secondary=prepareAlchemyConcurrentCF({journal:data.journal,proof,useId,targetId:v.targetId,
+   campaignId,minute,form,hpPrefix:'eruditionHp_',initialResolved:ownResolved,
+   healthState:target.hmk?.combatState,arcaneState:target.hmk?.arcane});
+  const resolved=secondary.hasHealthChange?secondary:null;
   if(mutate(()=>{
    if(resolved){const c=character(v.targetId);c.hmk.combatState=resolved.state;c.hmk.arcane=resolved.arcane;
     data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:v.targetId,
@@ -7970,6 +8025,7 @@ document.addEventListener('submit',e=>{
    data.journal.push({id:useId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
     title:'Alchemy · Erudition · Imbibing Roll',body:'HMK 271 · '+v.testSkill+' '+actual+' d100 '+roll+' ('+origin+'), '+proof.sl+', AS '+proof.asBefore+' → '+proof.finalAS+(resolved?'; Aural Shock 1':'')+'.',
     calendarAlchemyImbibing:proof});
+   data.journal.push(...secondary.rows);
   }))notice='Erudition doloženo · AS '+proof.finalAS+(resolved?' · Aural Shock 1':'')+'; čas GM nezměněn.';
  }catch(err){alert('Erudition: '+err.message)}
 },true);
@@ -7991,26 +8047,12 @@ document.addEventListener('submit',e=>{
   const empty=createAlchemyVialEmpty({journal:data.journal,inventory:data.inventory,campaignId,minute,
    actorId:v.actorId,finishId:v.finishId,reason:'Physic consumed by '+target.name,confirmedByGM:true});
   const resolved=proof.illEffect?applyAlchemyPhysicAural({state:target.hmk?.combatState,arcane:target.hmk?.arcane,proof,eventId:useId}):null;
-  // The source Darkvision CF Ill Effects must be individually rolled and
-  // fully validated before committing the physical consumption or health.
-  // Exemption from Profusion does NOT exempt Physic from p.269 CF Ill Effects.
-  const simulatedUse={id:useId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,calendarAlchemyImbibing:proof};
-  const simulatedJournal=[...data.journal,simulatedUse],extraCF=[];
-  for(const effect of proof.profusionIllEffects||[]){
-   const illId=uuid();
-   const ill=createDarkvisionProfusionIll({journal:simulatedJournal,campaignId,minute,triggerUseId:useId,
-    sourceUseId:effect.sourceUseId,targetId:v.targetId});
-   const illRow={id:illId,characterId:v.targetId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
-    title:'Physic CF · Darkvision Ill Effect',body:'HMK 269/271/273 · '+effect.sourceUseId+', světelný postih −'+ill.illEffect.penalty,
-    calendarAlchemyDarkvisionProfusionIll:ill};
-   const input=form.elements.namedItem('physicHp_'+effect.sourceUseId),hpD6=Number(input?.value);
-   const hp=createDarkvisionHealingStart({journal:[...simulatedJournal,illRow],campaignId,minute,useId:illId,
-    targetId:v.targetId,hpD6,origin:input?.dataset.alchemyGenerated===String(hpD6)?'cryptographic-software-die':'manual',
-    gmConfirmed:!!v.confirmed});
-   extraCF.push({illRow,hp});simulatedJournal.push(illRow);
-  }
+  const secondary=prepareAlchemyConcurrentCF({journal:data.journal,proof,useId,targetId:v.targetId,
+   campaignId,minute,form,hpPrefix:'physicHp_',initialResolved:resolved,
+   healthState:target.hmk?.combatState,arcaneState:target.hmk?.arcane});
+  const combined=secondary.hasHealthChange?secondary:null;
   if(mutate(()=>{
-   if(resolved){const c=character(v.targetId);c.hmk.combatState=resolved.state;c.hmk.arcane=resolved.arcane;
+   if(combined){const c=character(v.targetId);c.hmk.combatState=combined.state;c.hmk.arcane=combined.arcane;
     data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:v.targetId,
      episodeId:useId,eventId:uuid(),gmConfirmed:true});}
    data.journal.push({id:emptyId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
@@ -8018,13 +8060,8 @@ document.addEventListener('submit',e=>{
    data.journal.push({id:useId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
     title:'Alchemy · Physic · Imbibing Roll',body:'HMK 273 · '+v.testSkill+' '+actual+' · d100 '+die+' ('+origin+'), '+proof.sl+', AS '+proof.asBefore+' → '+proof.finalAS+'; '+proof.physicEffects.map(x=>x.finishId+': '+x.asBefore+' → '+x.asAfter).join('; ')+(resolved?'; Aural Shock +1, Weakness +5':'')+'.',
     calendarAlchemyImbibing:proof});
-   for(const {illRow,hp} of extraCF){
-    data.journal.push(illRow);
-    data.journal.push({id:uuid(),characterId:v.targetId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
-     title:'Physic CF · Darkvision Healing Period',body:'HMK 269/271 · původ '+illRow.calendarAlchemyDarkvisionProfusionIll.sourceUseId+' · d6 '+hp.hpD6+' dní',
-     calendarAlchemyDarkvisionHealingStart:hp});
-   }
-  }))notice='Physic doložen: '+proof.physicEffects.length+' aktivních Darkvision ovlivněno'+(resolved?', Aural Shock +1':'')+'. Čas GM nezměněn.';
+   data.journal.push(...secondary.rows);
+  }))notice='Physic doložen: '+proof.physicEffects.length+' aktivních elixírů ovlivněno'+(resolved?', Aural Shock +1':'')+'. Čas GM nezměněn.';
  }catch(err){alert('Physic: '+err.message)}
 },true);
 document.addEventListener('submit',e=>{
@@ -8046,37 +8083,21 @@ document.addEventListener('submit',e=>{
   const simulatedUse={id:useId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,calendarAlchemyImbibing:proof};
   const healingStart=proof.illEffect?createDarkvisionHealingStart({journal:[...data.journal,simulatedUse],campaignId,minute,useId,targetId:v.targetId,
    hpD6:healingDie,origin:hpInput.dataset.alchemyGenerated===String(healingDie)?'cryptographic-software-die':'manual',gmConfirmed:!!v.confirmed}):null;
-  const simulatedJournal=[...data.journal,simulatedUse];
-  const extraProfusions=[];
-  for(const effect of proof.profusionIllEffects||[]){
-   const profusionId=uuid();
-   const ill=createDarkvisionProfusionIll({journal:simulatedJournal,campaignId,minute,triggerUseId:useId,
-    sourceUseId:effect.sourceUseId,targetId:v.targetId});
-   const illRow={id:profusionId,characterId:v.targetId,calendarCampaignId:campaignId,campaignMinute:minute,
-    createdAt:stamp(),title:'Darkvision · Profusion CF · další Ill Effect',
-    body:'HMK 269–271 · profusion '+useId+' aktivuje Ill Effect '+effect.sourceUseId+' (postih −'+ill.illEffect.penalty+').',
-    calendarAlchemyDarkvisionProfusionIll:ill};
-   const input=form.elements.namedItem('profusionHp_'+effect.sourceUseId);
-   const die=Number(input?.value);
-   const hp=createDarkvisionHealingStart({journal:[...simulatedJournal,illRow],campaignId,minute,useId:profusionId,
-    targetId:v.targetId,hpD6:die,origin:input?.dataset.alchemyGenerated===String(die)?'cryptographic-software-die':'manual',gmConfirmed:!!v.confirmed});
-   extraProfusions.push({illRow,hp});simulatedJournal.push(illRow);
-  }
+  const secondary=prepareAlchemyConcurrentCF({journal:data.journal,proof,useId,targetId:v.targetId,
+   campaignId,minute,form,hpPrefix:'profusionHp_',healthState:target.hmk?.combatState,
+   arcaneState:target.hmk?.arcane});
   const empty=createAlchemyVialEmpty({journal:data.journal,inventory:data.inventory,campaignId,minute,
    actorId:v.actorId,finishId:v.finishId,reason:'Darkvision consumed by '+target.name,confirmedByGM:true});
   if(mutate(()=>{
+   if(secondary.hasHealthChange){const c=character(v.targetId);c.hmk.combatState=secondary.state;c.hmk.arcane=secondary.arcane;
+    data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:v.targetId,episodeId:useId,eventId:uuid(),gmConfirmed:true});}
    data.journal.push({id:emptyId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
     title:'Alchemy · lahvička po vypití',body:'HMK 269 · prázdná nádoba zůstává; aktivní dočasný elixír dále podléhá Decay.',calendarAlchemyVialEmpty:empty});
    data.journal.push({id:useId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
     title:'Alchemy · Darkvision · Imbibing Roll',body:'HMK 269–271 · '+v.testSkill+' ML '+actual+', d100 '+die+' ('+origin+'), '+proof.sl+', AS '+proof.asBefore+' → '+proof.finalAS+'; příjemce '+v.targetId+'.',calendarAlchemyImbibing:proof});
    if(healingStart)data.journal.push({id:uuid(),characterId:v.targetId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
     title:'Darkvision · CF Healing Period',body:'HMK 271 · HP '+healingStart.hpD6+' dní, HR5',calendarAlchemyDarkvisionHealingStart:healingStart});
-   for(const {illRow,hp} of extraProfusions){
-    data.journal.push(illRow);
-    data.journal.push({id:uuid(),characterId:v.targetId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
-     title:'Darkvision · Profusion CF Healing Period',body:'HMK 269/271 · zdroj '+illRow.calendarAlchemyDarkvisionProfusionIll.sourceUseId+' · HP '+hp.hpD6+' dní, HR5',
-     calendarAlchemyDarkvisionHealingStart:hp});
-   }
+   data.journal.push(...secondary.rows);
   }))notice='Darkvision použit · AS '+proof.finalAS+' · vidění '+proof.darkvisionFeet+' ft; čas GM beze změny.';
  }catch(err){alert('Alchemy Imbibing: '+err.message)}
 },true);
