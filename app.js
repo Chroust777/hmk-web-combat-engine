@@ -147,6 +147,7 @@ import {createAcidFleshApplication,acidFleshState,prepareAcidFleshRound,validate
 import {createAcidThrownVial,validateAcidThrownJournal,assertAcidThrownAppendOnly,validateAcidThrownInventory} from './src/integration/hmk-alchemy-acid-thrown.js';
 import {prepareAlchemyAreaAtomicBattle,validateAlchemyAreaJournal,validateAlchemyAreaCombatLinks,assertAlchemyAreaAppendOnly} from './src/integration/hmk-alchemy-area-atomic-plan.js';
 import {assertFumebombLineOfSight} from './src/integration/hmk-alchemy-area-los.js';
+import {alchemyArcaneTargetRegister} from './src/integration/hmk-alchemy-arcane-targets.js';
 import {EXOTIC_POTIONS,herbAssessmentCandidates,herbDoseStatus,herbPotionReservationCandidates,createHerbPotency,createHerbPreservation,createHerbPotionStart,createHerbPotionComplete,validateHerbalJournal,assertHerbalJournalAppendOnly,potencyLabel} from './src/integration/hmk-herbal-concoctions.js';
 import {createHerbPotionAdministration,validateHerbAdministrationJournal,assertHerbAdministrationAppendOnly,availableHerbalPotions,herbPotionEffectAt} from './src/integration/hmk-herbal-administration.js';
 import {PRINTED_VIAL,createHerbVialBinding,createHerbVialDiscard,vialBinding,vialState,validateHerbVialJournal,assertHerbVialAppendOnly,assertActiveHerbVials} from './src/integration/hmk-herbal-vial-ledger.js';
@@ -229,8 +230,8 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
   return {id,definitionId,ownerId,locations,aq,destroyed};
 }
 
-// HMK Keeper’s Ledger v93.444 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.444';
+// HMK Keeper’s Ledger v93.445 — visible release identification and cache-busted entry assets; user storage unchanged.
+const APP_VERSION='93.445';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -914,6 +915,7 @@ function campaignCalendarView(){
   !data.journal.some(r=>r.calendarHerbPotionComplete?.startId===j.id));
  const pendingAlchemy=pendingAlchemyPreparations(data.journal,campaignKey(clock));
  const alchemyStates=alchemyElixirStates(data.journal,campaignKey(clock));
+ const alchemyArcaneTargets=alchemyArcaneTargetRegister({journal:data.journal,inventory:data.inventory,campaignId:campaignKey(clock),minute:clock.minute});
  const alchemyDecayDue=pendingAlchemyDecay(data.journal,campaignKey(clock),clock.minute);
  const knownInventorElixirs=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyFinish?.result==='completed'&&
   j.calendarAlchemyFinish?.uniqueElixir?.mode==='invent').filter((row,i,all)=>all.findIndex(other=>
@@ -923,6 +925,12 @@ function campaignCalendarView(){
   return `<fieldset><legend>Alchemy Assistance · nejvýše 2 osoby (HMK 268)</legend><p class="hc-hint">Pomocníky určete před zahájením. ML40+ dovoluje asistovat, Index přispěje do EML jen při ML alespoň polovině výrobce (${alchemyML}); celkový strop +10. Na konci se musí shodovat s původním Skill Workbench SV.</p><div class="hc-fields">${[1,2].map(i=>`<label>Pomocník ${i}<select name="alchemyAssist${i}"><option value="">— nikdo —</option>${options.map(x=>`<option value="${esc(x.person.id)}">${esc(x.person.name)} · Alchemy ML ${x.ml}${x.ml*2>=alchemyML?' · Index +'+Math.floor(x.ml/10):' · bez EML bonusu'}</option>`).join('')}</select></label>`).join('')}</div></fieldset>`;
  };
  const alchemyHTML=`<section class="hc-calendar hc-wilderness"><details><summary>HMK 265–268 · Alchemy · Create a Invent (${pendingAlchemy.length} rozpracovaných)</summary>
+ <details><summary>Arcane · Detect / Reveal / Dispel / Negation · alchymistické zdroje (${alchemyArcaneTargets.filter(x=>x.dossier?.targetable).length})</summary>
+ <p class="hc-hint">Pouze pravidlová kontrola aktuálních cílů z originálního inventáře a kalendáře (HMK 251,254,263,270). Nejde o seslání kouzla ani jeho automatický úspěch. Dispel vyžaduje úspěšný Detect i Reveal téhož zdroje, vyřešenou ochranu Ward a skutečný casting; EML má postih −5 za každý aktuální AS. Soulcloak / True Sight / Spirit Sensing nejsou tímto přehledem automaticky aktivovány.</p>
+ ${alchemyArcaneTargets.map(x=>x.error?`<p class="hc-hint">⚠ ${esc(x.finishId)}: ${esc(x.error)} (bez zápisu)</p>`:
+  x.dossier.targetable?`<p class="hc-hint"><strong>${esc(x.dossier.elixirName)}</strong> · ${esc(x.dossier.phase==='stored'?'uložený fyzický kus':'aktivní Temporary na postavě')} · AS ${x.dossier.currentAS} · Dispel EML ${x.dossier.dispelEMLPenalty} · původ ${esc(x.dossier.sourceId||'')} · ${esc(x.dossier.targetId||'')}</p>`:
+  `<p class="hc-hint">${esc(x.dossier.elixirName)}: ${esc(x.dossier.reason||'nyní bez ověřeného magického cíle')}.</p>`).join('')||'<p class="hc-hint">Žádná dokončená alchymistická dávka v kampani.</p>'}
+ </details>
  <p class="hc-hint">Create ML60+, Invent ML100+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Tekuté elixíry lze doloženě uložit do stávající Vial, 4 oz; plná nádoba má 0,5 lb v existujícím ENC. Účinky elixírů dosud nejsou aktivovány.</p>
  ${participants.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0,pend=pendingAlchemy.find(x=>x.characterId===c.id);
   if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.combatState?.shock==='KIA')return '';
