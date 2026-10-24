@@ -9,6 +9,25 @@ const requireTrue=(x,message)=>{if(!x)throw Error(message)};
 const integer=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const originOK=o=>o==='manual'||o==='cryptographic-software-die';
 const relevant=(row,campaignId)=>row.calendarCampaignId===campaignId;
+/** Conservatively reject retrospective adjudication after any use or later
+ * evidence referencing this dose. An independent event may remain in place;
+ * an already consumed elixir cannot be silently made stronger or weaker.
+ * Journal rows are immutable; the repair itself is always recorded NOW.
+ */
+function requireSafeRetrospectiveDecay(journal,campaignId,finishId,dueMinute,recordedMinute,state){
+ requireTrue(!state.imbibingId&&!state.dispersed&&!state.activeTemporary,
+  'Alchemy Decay: zpětně lze doložit pouze dosud nepoužitý uložený elixír');
+ for(const row of journal){
+  if(!relevant(row,campaignId)||row.campaignMinute<dueMinute||row.campaignMinute>recordedMinute)continue;
+  // Previously reconstructed Decay proofs are allowed; they have already
+  // passed the same checks and have their own distinct, immutable due dates.
+  if(row.calendarAlchemyDecay?.finishId===finishId)continue;
+  if(Object.keys(row).some(key=>key.startsWith('calendarAlchemy')&&
+    JSON.stringify(row[key]).includes(JSON.stringify(finishId))))
+   throw Error('Alchemy Decay: zmeškaný termín má pozdější závislý důkaz; bezpečná rekonstrukce není možná');
+ }
+}
+
 function initialElixir(journal,campaignId,finishId){
  const finish=journal.find(r=>r.id===finishId&&relevant(r,campaignId)&&r.calendarAlchemyFinish);
  const p=finish?.calendarAlchemyFinish;
@@ -57,8 +76,8 @@ export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9)
   const d=row.calendarAlchemyDecay;
   if(!d||d.finishId!==finishId)continue;
   requireTrue(as>0&&(!emptied||activeTemporary),'Alchemy Decay: prázdný nebo zaniklý elixír nelze degradovat');
-  requireTrue(row.campaignMinute===d.minute&&row.campaignMinute===dueMinute,
-    'Alchemy Decay: hody musí být na přesné splatnosti');
+  requireTrue(row.campaignMinute===(d.reconstructed?d.recordedMinute:d.minute)&&d.minute===dueMinute,
+    'Alchemy Decay: hody musí zachovat původní splatnost a skutečný čas zápisu');
   requireTrue(d.period===period+1&&d.asBefore===as&&integer(d.d10,1,10)&&originOK(d.origin),
     'Alchemy Decay: nesouhlasí pořadí nebo původ hodu');
   const success=d.d10<=as,next=Math.max(0,as-(success?1:2));
@@ -88,16 +107,23 @@ export function alchemyElixirStates(journal=[],campaignId){
  return journal.filter(r=>relevant(r,campaignId)&&r.calendarAlchemyFinish?.result==='completed')
   .map(r=>alchemyElixirStrength(journal,campaignId,r.id));
 }
-export function createAlchemyDecay({journal=[],campaignId,minute,actorId,finishId,d10,origin,gmConfirmed=false}={}){
+export function createAlchemyDecay({journal=[],campaignId,minute,recordedMinute=minute,actorId,finishId,d10,origin,gmConfirmed=false,gmMissedConfirmed=false}={}){
  requireTrue(typeof campaignId==='string'&&campaignId&&typeof finishId==='string'&&finishId&&
-  integer(minute,0,1e9)&&integer(d10,1,10)&&originOK(origin),
+  integer(minute,0,1e9)&&integer(recordedMinute,minute,1e9)&&integer(d10,1,10)&&originOK(origin),
   'Alchemy Decay: nutná kampaň, splatný termín a doložený hod d10 s původem');
  requireTrue(gmConfirmed===true,'Alchemy Decay: skutečný hod a termín musí potvrdit GM');
  const state=alchemyElixirStrength(journal,campaignId,finishId);
  requireTrue(actorId===state.actorId&&minute===state.nextDueMinute,
   'Alchemy Decay: hod je možný jen pro původní dokončení přesně v termínu GM');
+ const reconstructed=recordedMinute>minute;
+ if(reconstructed){
+  requireTrue(gmMissedConfirmed===true,'Alchemy Decay: zmeškaný termín musí výslovně potvrdit GM');
+  requireSafeRetrospectiveDecay(journal,campaignId,finishId,minute,recordedMinute,state);
+ }
  const success=d10<=state.currentAS,after=Math.max(0,state.currentAS-(success?1:2));
- return {format:ALCHEMY_DECAY_FORMAT,campaignId,minute,actorId,finishId,period:state.period+1,
+ return {format:ALCHEMY_DECAY_FORMAT,campaignId,minute,
+  ...(reconstructed?{recordedMinute,reconstructed:true,gmMissedConfirmed:true}:{}),
+  actorId,finishId,period:state.period+1,
   dueMinute:minute,asBefore:state.currentAS,d10,origin,success,asAfter:after,
   enchantmentLost:after===0,gmConfirmed:true,sourcePage:268};
 }
@@ -116,10 +142,13 @@ export function validateAlchemyDecayJournal(journal=[]){
  for(const row of journal){
   const d=row.calendarAlchemyDecay;
   if(d){
-   requireTrue(d.campaignId===row.calendarCampaignId&&d.actorId===row.characterId&&d.minute===row.campaignMinute,
+   requireTrue(d.campaignId===row.calendarCampaignId&&d.actorId===row.characterId&&
+    (d.reconstructed===true?d.recordedMinute===row.campaignMinute&&d.minute<row.campaignMinute:
+     d.minute===row.campaignMinute&&!Object.hasOwn(d,'recordedMinute')&&!Object.hasOwn(d,'gmMissedConfirmed')), 
     'Alchemy Decay: neplatný kontext historického důkazu');
    const reproduced=createAlchemyDecay({journal:prior,campaignId:d.campaignId,minute:d.minute,
-    actorId:d.actorId,finishId:d.finishId,d10:d.d10,origin:d.origin,gmConfirmed:d.gmConfirmed});
+    actorId:d.actorId,finishId:d.finishId,d10:d.d10,origin:d.origin,gmConfirmed:d.gmConfirmed,
+    recordedMinute:row.campaignMinute,gmMissedConfirmed:d.gmMissedConfirmed===true});
    requireTrue(JSON.stringify(reproduced)===JSON.stringify(d),
     'Alchemy Decay: historický důkaz změněn nebo nekoherentní');
   }
