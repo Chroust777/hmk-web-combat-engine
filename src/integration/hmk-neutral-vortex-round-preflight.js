@@ -59,7 +59,7 @@ export function neutralVortexSpecialML(source){
 export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
  radiusFeet=2.5,sources,gmCompleteCensusConfirmed=false,
  selectedSourceId=null,gmRandomSelectionConfirmed=false,selectionProof=null,
- rolls=[]}={}){
+ suppressedProtectedSourceIds=[],rolls=[]}={}){
  check(whole(spellCL,1,6)&&whole(roundOffset,0,spellCL-1),
   'neplatný spell CL nebo fáze trvání Chaos Storm');
  check(at(origin)&&Number.isFinite(radiusFeet)&&radiusFeet>=2.5&&
@@ -69,6 +69,14 @@ export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
  check(Array.isArray(sources)&&gmCompleteCensusConfirmed===true,
   'vyžaduje úplný GM potvrzený soupis všech aktivních zdrojů');
  check(Array.isArray(rolls),'chybí původní d100/d20 hody');
+ // A Ward may remain active while its protected source is still temporarily
+ // suppressed by an EARLIER Vortex tick. The historical replay, not a GM
+ // assertion, must derive the exact identities in this set. Read-only only.
+ check(Array.isArray(suppressedProtectedSourceIds)&&
+  suppressedProtectedSourceIds.every(x=>typeof x==='string'&&x.length>0)&&
+  new Set(suppressedProtectedSourceIds).size===suppressedProtectedSourceIds.length,
+  'neplatné historicky potlačené zdroje');
+ const suppressedProtected=new Set(suppressedProtectedSourceIds);
  const ids=new Set();
  for(const s of sources){
   check(typeof s?.id==='string'&&s.id.length>0&&!ids.has(s.id)&&at(s)&&s.verified===true,
@@ -77,6 +85,8 @@ export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
   neutralVortexSpecialML(s);
  }
  const byId=new Map(sources.map(s=>[s.id,s]));
+ check([...suppressedProtected].every(id=>!byId.has(id)),
+  'dočasně potlačený zdroj nesmí současně figurovat mezi aktivními');
  for(const s of sources){
   if(s.protectedByWardId!=null){
    const ward=byId.get(s.protectedByWardId);
@@ -86,7 +96,8 @@ export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
   }
   if(s.category==='Active spell'&&s.spell==='Ward'){
    check(typeof s.protectsSourceId==='string'&&
-    byId.get(s.protectsSourceId)?.protectedByWardId===s.id,
+    (byId.get(s.protectsSourceId)?.protectedByWardId===s.id||
+     suppressedProtected.has(s.protectsSourceId)),
     'Ward bez původního doloženého chráněného zdroje');
   }
  }
@@ -146,6 +157,7 @@ export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
   selectionProof,roamingFeet,radiusBeforeFeet:radiusFeet,
   radiusNextFeet:grew?Math.min(roamingFeet,radiusFeet+5):radiusFeet,
   inRadiusSourceIds:Object.freeze(inside.map(s=>s.id)),
+  suppressedProtectedSourceIds:Object.freeze([...suppressedProtected].sort()),
   outcomes:Object.freeze(outcomes),wardBlockedSourceIds:Object.freeze(blocked),
   casterPsycheStress:outcomes.reduce((sum,r)=>sum+r.casterPsycheStress,0),
   mayCommit:false,

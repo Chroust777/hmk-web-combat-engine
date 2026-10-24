@@ -88,12 +88,18 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
     delete src.protectedByWardId;
   }
   const byId=new Map(active.map(s=>[s.id,s]));
+  const suppressedProtectedSourceIds=[];
   for(const src of active){
    if(src.spell==='Ward'&&src.protectsSourceId&&!byId.has(src.protectsSourceId)){
-    // A suppressed protected source still exists: it is not normally a target,
-    // but its active Ward must remain historically identifiable. No safe
-    // representation of that special case yet; fail before any write.
-    check(false,'aktivní Ward nad potlačeným zdrojem vyžaduje další historii');
+    // The original full census retains the target while suppressed. The
+    // Ward is active on that SAME physical source and can still be hit; the
+    // suppressed source itself cannot be retested before its expiry.
+    const target=tick.sources.find(x=>x.id===src.protectsSourceId);
+    check(inactiveIds.has(src.protectsSourceId)&&
+     target?.protectedByWardId===src.id&&location(target)&&
+     Math.hypot(target.x-src.x,target.y-src.y)<1e-7,
+     'obnovený Ward nemá doložený stále potlačený původní cíl');
+    suppressedProtectedSourceIds.push(src.protectsSourceId);
    }
   }
   const selection=neutralVortexSourceSelection({sources:active,origin,radiusFeet,
@@ -101,7 +107,7 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
   check(tick.selectedSourceId===selection.selectedSourceId,
    'vybraný střed neodpovídá původnímu fyzickému výběrovému hodu');
   const result=neutralVortexRoundPreflight({spellCL,roundOffset:step,origin,
-   radiusFeet,sources:active,gmCompleteCensusConfirmed:true,
+   radiusFeet,sources:active,suppressedProtectedSourceIds,gmCompleteCensusConfirmed:true,
    selectedSourceId:selection.selectedSourceId,
    gmRandomSelectionConfirmed:selection.selectionDie!==null,
    selectionProof:selection.selectionDie===null?null:
