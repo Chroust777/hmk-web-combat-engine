@@ -1,0 +1,25 @@
+const assert=require('node:assert/strict');const fs=require('node:fs'),path=require('node:path');const {pathToFileURL}=require('node:url');
+const root=path.resolve(__dirname,'..');let tests=0;const ok=(value,message)=>{assert.ok(value,message);tests++};
+(async()=>{
+const {automaticHMKFollowups}=await import(pathToFileURL(path.join(root,'src/integration/hmk-calendar-automatic-followups.js')).href);
+const actor={id:'honza',name:'Honza',hmk:{combatState:{wounds:[],shock:'NONE'}}};
+const clock={format:'hmk-campaign-calendar-v1',label:'Test',campaignId:'camp',minute:800,characterIds:['honza'],anchors:[],events:[{type:'init',id:'start',minute:800,reason:'GM potvrdil počátek kampaně'}]};
+const source={id:'source-cf',characterId:'honza',calendarCampaignId:'camp',skillTestProof:{type:'critical-followup',activity:'climb-easy',actorId:'honza',skill:'Climbing',result:{level:'CF'}}};
+let result=automaticHMKFollowups(clock,[actor],[source]);
+ok(result.unknown.length===1,'unknown fall once');
+ok(result.unknown[0].sourceId==='source-cf','actual proof identifier');
+ok(result.unknown[0].characterId==='honza'&&result.unknown[0].route==='skills','actor route');
+ok(result.unknown[0].reason.includes('minutu'),'missing time clearly stated');
+source.campaignMinute=700;result=automaticHMKFollowups(clock,[actor],[source]);
+ok(result.all.some(x=>x.kind==='skill-fall'&&x.sourceId==='source-cf'&&x.status==='due'),'timed original proof due');
+source.campaignMinute=undefined;
+const resolved={id:'resolved',characterId:'honza',skillTestProof:{type:'climbing-falling',sourceId:'source-cf'}};
+result=automaticHMKFollowups(clock,[actor],[source,resolved]);
+ok(!result.unknown.some(x=>x.kind==='skill-fall'),'resolved cannot remain pending');
+const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+for(const text of ['const APP_VERSION=\'93.473\'','openAutomaticGenerationPanel()','automaticGenerationCancelled','data-auto-generation-stop','maxAttempts=plan?6:4','data-cal-unknown-fall','data-cal-unknown-source','focusCalendarRuleAction(actor,\'skill-fall\',sourceId)'])ok(app.includes(text),'app guard '+text);
+ok(app.includes("case 'skill-fall':form=byHidden('form[data-climbing-fall-form]')"),'original rules form reused');
+ok(app.includes("const rollInput=kind==='skill-fall'?form.elements.namedItem('heightFt')"),'height focused');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');ok(html.includes('v93.473'),'html version');ok(html.includes('v=93.473'),'bundle url version');
+console.log(`PASS ${tests} version 93.473 generator bounds, cancel & calendar fall authority`);
+})().catch(e=>{console.error(e);process.exitCode=1});

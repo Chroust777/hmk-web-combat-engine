@@ -245,7 +245,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.472';
+const APP_VERSION='93.473';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1468,7 +1468,9 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const membersHTML=`<section class="hc-calendar hc-campaign-settings"><button type="button" class="hc-small" data-calendar-back="yes">‹ Všechny kalendáře</button><h3>Postavy kampaně · ${participants.length} zahrnutých</h3><p class="hc-hint">Stejnou postavu lze přidat do více kampaní. V každé se odděleně ukládají zranění, únava, časované magické účinky a inventář; původní datované události z jiného kalendáře se samy nepřesouvají.</p><form id="campaign-members-form"><fieldset><legend>Zahrnuté postavy</legend><div class="hc-characters">${data.characters.filter(c=>included.has(c.id)).map(c=>memberRow(c,true)).join('')||'<p>Bez účastníků</p>'}</div></fieldset><fieldset><legend>Nezahrnuté postavy · kliknutím přidat</legend><div class="hc-characters">${data.characters.filter(c=>!included.has(c.id)).map(c=>memberRow(c,false)).join('')||'<p>Všechny postavy již patří do kampaně.</p>'}</div></fieldset><button type="submit">Uložit účastníky kampaně</button></form><details><summary>Odstranění tohoto kalendáře</summary><p>Smazáním odstraníte jen tento kalendář a jeho GM události. Neaktivní kalendáře ani postavy se nemažou. Časové důkazy se zachovají.</p><button type="button" class="danger" data-calendar-delete="yes">Zálohovat a smazat tento kalendář</button></details></section>`;
  const legacyOriginPanel=!clock.trOrigin?`<details class="hc-advanced"><summary>Starší kalendář bez skutečného TR data – jednorázové přiřazení</summary><section class="panel"><form id="campaign-tr-origin-form" class="hc-inline"><label>Rok TR<input name="year" type="number" min="1" max="9999" value="720" required></label><label>Měsíc<select name="month">${TR_MONTHS.map((m,i)=>`<option value="${i+1}">${esc(m)}</option>`).join('')}</select></label><label>Den<input name="day" type="number" min="1" max="30" value="1" required></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje datum</label><button type="submit">Přiřadit skutečné TR datum</button></form></section></details>`:'';
  const calendarTabs=`<nav class="journal-book-subnav hc-calendar-tabs" aria-label="Sekce kalendáře">${CALENDAR_SECTIONS.map(([id,label])=>`<button type="button" data-calendar-section="${id}" class="${activeCalendarSection===id?'':'secondary'}" aria-current="${activeCalendarSection===id?'page':'false'}">${esc(label)}</button>`).join('')}</nav>`;
- const overviewHTML=`${board}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}</section><section class="panel"><h3>Nejbližší termíny · ${agenda.future.length}</h3>${agenda.future.slice(0,12).map(renderItem).join('')||'<p class="muted">Žádný nadcházející termín.</p>'}</section>`;
+ const fallUnknown=agenda.unknown.filter(x=>x.kind==='skill-fall'&&x.sourceId);
+ const unknownFallNotice=fallUnknown.length?`<section class="panel hc-calendar-unresolved"><h3>Vyžaduje vyřešení · Falling Routine</h3>${fallUnknown.map(x=>`<div class="hc-unknown-rule-link"><strong>${esc(x.name)}</strong> · ${esc(x.description)}<p class="muted">GM doplní skutečnou výšku (0–5 ft bez Injury Sequence; nad 5 ft pokračuje Impact a Jumping/Acrobatics test). Původní Skill CF se neopakuje.</p><button type="button" class="hc-small" data-cal-unknown-fall="${esc(x.characterId)}" data-cal-unknown-source="${esc(x.sourceId)}">Otevřít správné hody a výšku ↗</button></div>`).join('')}</section>`:'';
+ const overviewHTML=`${board}${unknownFallNotice}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}</section><section class="panel"><h3>Nejbližší termíny · ${agenda.future.length}</h3>${agenda.future.slice(0,12).map(renderItem).join('')||'<p class="muted">Žádný nadcházející termín.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
   activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${interruptionsHTML}`:
   activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionLedgerHTML(participants)}<details class="hc-provision-compact-extra"><summary>Podrobné osobní stavy členů družiny</summary>${partyProvisionCardsHTML(participants,true)}</details>${supplyHTML}<details class="hc-provision-rulebook"><summary>Denní automatika a zdravotní postupy družiny</summary>${nutritionHTML}${activityNeedsHTML}</details>`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
@@ -1479,7 +1481,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <section class="panel"><h3>Následující termíny · ${agenda.future.length}</h3>${agenda.future.length?agenda.future.slice(0,100).map(renderItem).join(''):'<p class="muted">Žádná další doložená splatnost.</p>'}</section>
  <section class="panel"><h3>Historické rány – potvrzení počátku · ${unresolved.length}</h3><p>Starší rány nepřevádíme automaticky z čísla bojového kola. Zadejte jejich skutečný věk v celých dnech a zbývajících hodinách/minutách.</p>${anchorOptions?`<form id="campaign-anchor-wound-form"><label>Rána<select name="wound" required>${anchorOptions}</select></label><div class="field-grid">${field('days','Počet uplynulých dní',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje doložený okamžik zranění</label><button type="submit">Ukotvit historickou ránu</button></form>`:'<p>Všechny existující otevřené rány mají doložený počátek.</p>'}</section>
  <section class="panel"><h3>Další historické procedury</h3>${timeOrigins.length?`<form id="campaign-anchor-procedure-form"><label>Procedura<select name="origin" required>${timeOrigins.map(x=>`<option value="${esc(x.kind+'::'+x.characterId+(x.episodeId?'::'+x.episodeId:''))}">${esc(x.label)} (${x.unit})</option>`).join('')}</select></label>${field('days','Skutečně uplynulé dny',0,'number')}${field('hours','Zbývající hodiny',0,'number')}${field('minutes','Zbývající minuty',0,'number')}<label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje počátek procedury</label><button type="submit">Ukotvit proceduru</button></form>`:'<p>Žádná další aktivní procedura nepotřebuje potvrzení počátku.</p>'}</section>
- <section class="panel"><h3>Nedoložené termíny · ${agenda.unknown.length}</h3>${agenda.unknown.map(x=>`<p class="notice">${esc(x.name)}: ${esc(x.description)} – ${esc(x.reason)}</p>`).join('')||'<p class="muted">Není evidován žádný neznámý počátek naplánované procedury.</p>'}</section>
+ <section class="panel"><h3>Nedoložené termíny · ${agenda.unknown.length}</h3>${agenda.unknown.map(x=>`<div class="notice hc-unknown-rule-link"><strong>${esc(x.name)}</strong> · ${esc(x.description)}<div>${esc(x.reason)}</div>${x.kind==='skill-fall'&&x.sourceId?`<button type="button" class="hc-small" data-cal-unknown-fall="${esc(x.characterId)}" data-cal-unknown-source="${esc(x.sourceId)}">Vyřešit Falling Routine · výška a hody ↗</button>`:''}</div>`).join('')||'<p class="muted">Není evidován žádný neznámý počátek naplánované procedury.</p>'}</section>
  <section class="panel"><details><summary>Časový audit a historie · ${clock.events.length} potvrzení</summary>${clock.events.slice(-150).map(e=>`<p><strong>${esc(displayCampaignMinute(e.minute))}</strong> · ${esc(e.type)} · ${esc(e.reason)}</p>`).join('')}</details></section></details>`;
  return journalShell(`${calendarTabs}${folioChapterSpread('Svět · Kalendář kampaně','Doložený čas, zásoby a procedury rozdělené do přehledných kapitol.',calendarPage,'journal-book--calendar')}`,`journal-book--chapter journal-book--calendar`,false);
 }
@@ -1522,7 +1524,30 @@ function resumeCreation(id){
  render();return true;
 }
 let automaticGenerationBusy=false;
+let automaticGenerationCancelled=false;
+let automaticGenerationPanel=null;
 const automaticGenerationDebug=false;
+function updateAutomaticGenerationPanel(message){
+ if(!automaticGenerationPanel)return;
+ const status=automaticGenerationPanel.querySelector('[data-auto-generation-progress]');
+ if(status)status.textContent=message;
+}
+function openAutomaticGenerationPanel(){
+ automaticGenerationCancelled=false;
+ automaticGenerationPanel=document.createElement('aside');
+ automaticGenerationPanel.className='hmk-auto-generation-overlay';
+ automaticGenerationPanel.setAttribute('role','status');
+ automaticGenerationPanel.setAttribute('aria-live','polite');
+ automaticGenerationPanel.innerHTML='<strong>Vytváření postavy · 14 kroků HMK</strong><span data-auto-generation-progress>Spouštím ověřenou tvorbu…</span><button type="button" data-auto-generation-stop>Zastavit generování</button>';
+ document.body.appendChild(automaticGenerationPanel);
+ automaticGenerationPanel.querySelector('[data-auto-generation-stop]').addEventListener('click',()=>{
+  automaticGenerationCancelled=true;
+  updateAutomaticGenerationPanel('Zastavuji a vracím nedokončený pokus…');
+  automaticGenerationPanel.querySelector('[data-auto-generation-stop]').disabled=true;
+ });
+}
+function closeAutomaticGenerationPanel(){automaticGenerationPanel?.remove();automaticGenerationPanel=null;}
+
 /** One click, with no user intervention, drives the real persisted 14-step
  * creation flow and the same validation as the manual wizard. Failed
  * candidates are deleted from storage; never expose a half-generated draft.
@@ -1533,6 +1558,7 @@ async function generateCharacterFullyAutomatically(mode='random',traitProfile='r
  const requestedName=String(preferences.name??'').trim();
  if(!requestedName||requestedName.length>120){alert('Nejdříve zadejte jméno postavy (1–120 znaků).');return false;}
  automaticGenerationBusy=true;
+ openAutomaticGenerationPanel();
  const originalView=view,originalSelected=selected;
  let finalError='';
  try{
@@ -1544,13 +1570,26 @@ async function generateCharacterFullyAutomatically(mode='random',traitProfile='r
   const plan=wanted?chooseOccupationTarget(wanted,preferences.folk||''):null;
   if(plan)generationPreferences.targetPlan=plan;
   if(mode==='traits'){overlay=null;render();}
-  for(let attempt=1;attempt<=(plan?24:12);attempt++){
+  // A failing set of dice must never trigger an unbounded, invisible retry loop.
+  // Keep attempts bounded and expose cancellation throughout the original wizard.
+  const maxAttempts=plan?6:4;
+  for(let attempt=1;attempt<=maxAttempts;attempt++){
+   if(automaticGenerationCancelled)throw Error('Generování přerušeno uživatelem. Žádný neúplný profil nebyl ponechán.');
+   updateAutomaticGenerationPanel(`Pravidlový pokus ${attempt}/${maxAttempts} · příprava…`);
+   await new Promise(resolve=>setTimeout(resolve,0));
    const id=uuid(),name=requestedName;
    if(!mutate(()=>data.characters.push({id,name,kind:'PC',occupation:'',description:'',portrait:'',hmk:{creation:defaultCreation(),skills:[],injuries:[],attributes:{}}})))throw Error('Nelze bezpečně založit profil v úložišti');
    selected=id;view='creation';render();
    const rejected=new Map();let ticks=0;
    try{
     while(ticks++<170){
+     if(automaticGenerationCancelled)throw Error('Generování přerušeno uživatelem');
+     if(ticks%2===1){
+      const stageNow=character(id)?.hmk?.creation;
+      updateAutomaticGenerationPanel(`Pokus ${attempt}/${maxAttempts} · krok ${stageNow?.step??'?'} / 14${stageNow?.step===12?' · dovednosti '+(stageNow?.skillStage??''):''}`);
+      await new Promise(resolve=>setTimeout(resolve,0));
+      if(automaticGenerationCancelled)throw Error('Generování přerušeno uživatelem');
+     }
      const target=character(id);if(!target)throw Error('Ztracen vytvořený profil');
      if(target.hmk?.creation?.status==='review-required'){
       if(!mutate(()=>{const t=character(id);const kit=prepareStartingKit(t,allCatalogItems(),uuid);
@@ -1599,10 +1638,11 @@ async function generateCharacterFullyAutomatically(mode='random',traitProfile='r
    const removed=mutate(()=>{data.characters=data.characters.filter(c=>c.id!==id);data.inventory=data.inventory.filter(x=>x.characterId!==id);data.journal=data.journal.filter(x=>x.characterId!==id)});
    if(!removed)throw Error('Automatická tvorba selhala a nepodařilo se bezpečně vrátit dílčí profil');
    selected=originalSelected;view='characters';render();
+   if(automaticGenerationCancelled)throw Error('Generování bylo zastaveno GM; rozpracovaná postava byla bezpečně odstraněna.');
   }
-  throw Error('Po '+(plan?24:12)+' interních pokusech nebylo možné dokončit postavu podle doložených pravidel. Poslední příčina: '+finalError);
+  throw Error('Po '+maxAttempts+' interních pokusech nebylo možné dokončit postavu podle doložených pravidel. Poslední příčina: '+finalError);
  }catch(err){selected=originalSelected;view=originalView;render();alert('Automatický generátor: '+err.message);return false}
- finally{automaticGenerationBusy=false;}
+ finally{automaticGenerationBusy=false;closeAutomaticGenerationPanel();}
 }
 // A character-specific action belongs exclusively to that character card;
 // never infer the target from the last selected or first available draft.
@@ -9585,8 +9625,17 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  default:break;
  }
  if(form){installCalendarDiceControls(form,kind,sourceId,actor.id);for(let parent=form.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+  if(kind==='skill-fall'){
+   const guide=form.querySelector('.hsk-falling-help');if(guide)guide.open=false;
+   if(!form.querySelector('[data-calendar-fall-handoff]')){
+    const hint=document.createElement('p');hint.className='notice tiny';hint.dataset.calendarFallHandoff='true';
+    hint.textContent=actor.name+': Nejprve skutečná výška, povrch a směr dopadu od GM. Pak ruční hody nebo ⚄ generování u každé kostky; původní Climbing CF neopakujte. Zdroj záznamu je vybraný automaticky.';
+    form.querySelector('.field-grid')?.before(hint);
+   }
+  }
   form.scrollIntoView({block:'center',behavior:'instant'});
-  const rollInput=form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"]');
+  const rollInput=kind==='skill-fall'?form.elements.namedItem('heightFt'):
+   form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"]');
   rollInput?.focus({preventScroll:true});
  }else if(['trek-weather-hazard','trek-direction-hazard','trek-encounter','trek-survival','trek-survival-test','trek-drover-test'].includes(kind)){
   const hazard=kind==='trek-weather-hazard'?'weather':kind==='trek-direction-hazard'?'direction':
@@ -9702,6 +9751,18 @@ document.addEventListener('submit',e=>{
  }catch(error){alert('Postavy nebyly změněny: '+error.message)}
 },true);
 document.addEventListener('click',e=>{
+ const trigger=e.target.closest?.('[data-cal-unknown-fall]');if(!trigger)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(view!=='calendar'||!data.campaignClock)return;
+ const actor=character(trigger.dataset.calUnknownFall),sourceId=trigger.dataset.calUnknownSource;
+ const agenda=campaignCalendarAgenda(data.campaignClock,data.characters,data.journal);
+ if(!actor||!agenda.unknown.some(x=>x.kind==='skill-fall'&&x.characterId===actor.id&&x.sourceId===sourceId))return;
+ const original=data.journal.find(x=>x.id===sourceId);
+ if(original?.skillTestProof?.type!=='critical-followup'||original.skillTestProof.actorId!==actor.id)return;
+ selected=actor.id;view='sheet';activeSheetSection='status';render();
+ focusCalendarRuleAction(actor,'skill-fall',sourceId);
+},true);
+document.addEventListener('click',e=>{
  const t=e.target.closest?.('[data-cal-day],[data-cal-hour],[data-cal-prefill],[data-cal-set-time],[data-cal-action],[data-cal-link],[data-cal-resolve],[data-cal-cancel]');
  if(!t)return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -9770,7 +9831,8 @@ document.addEventListener('click',e=>{
   pendingTrekHandoff=null;
   const target=character(t.dataset.calLink);if(!target)return alert('Postava již není v registru');
   selected=target.id;const destination=t.dataset.calDestination||'notes';
-  if(destination==='combat'||destination==='healing'){if(!combatInitiativeSequence)encounterSelection.add(target.id);view='encounter';}
+  if(t.dataset.calKind==='skill-fall'){activeSheetSection='status';view='sheet';}
+  else if(destination==='combat'||destination==='healing'){if(!combatInitiativeSequence)encounterSelection.add(target.id);view='encounter';}
   else if(destination==='skills'){view='skills';}
   else{activeSheetSection=destination==='inventory'?'inventory':destination==='hazards'?'hazards':destination==='status'?'status':'notes';view='sheet';}
   render();

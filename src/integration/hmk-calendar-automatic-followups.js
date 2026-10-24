@@ -12,7 +12,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
  const all=[],unknown=[];
  if(!clock)return {all,unknown};
  const push=(person,kind,sourceId,description,minute,route='combat',extra={})=>{
-  if(!safe(minute))return unknown.push({characterId:person.id,name:person.name,kind,description,reason:'Chybí doložený okamžik či lhůta'});
+  if(!safe(minute))return unknown.push({characterId:person.id,name:person.name,kind,sourceId,route,description,reason:kind==='skill-fall'?'Původní Skill Test nemá doloženou minutu. Falling Routine je třeba vyřešit podle skutečné výšky; původní test zůstává zachován.':'Chybí doložený okamžik či lhůta'});
   const id=key('automatic',kind,person.id,sourceId);
   if(all.some(x=>x.id===id))return;
   all.push({id,characterId:person.id,name:person.name,kind,sourceId,description,minute,
