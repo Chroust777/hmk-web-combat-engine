@@ -60,7 +60,7 @@ export function neutralVortexSourceSelection({sources,origin,radiusFeet,spellCL,
  * (six combat rounds per minute; p.160 and p.255).
  */
 export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
- ticks,document=null,gmFullSourceHistoryConfirmed=false}={}){
+ ticks,document=null,originCasterId=null,gmFullSourceHistoryConfirmed=false}={}){
  check(whole(spellCL,1,6)&&location(origin),'neplatný původní spell CL nebo pozice sesilatele');
  check(gmFullSourceHistoryConfirmed===true&&Array.isArray(sourceCensus)&&
   Array.isArray(ticks)&&ticks.length>=1&&ticks.length<=spellCL,
@@ -70,6 +70,25 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
  // simulation, and even WITH it other arcane categories remain unproven.
  const campaignCensusAudit=document===null?null:
   auditNeutralVortexAlchemyCensus({document,sourceCensus});
+ // The GM's origin coordinates are NOT automatically the original caster's
+ // coordinates. The Initiative checkpoint can prove them if (and only if)
+ // the caller names a real character on this exact combat timeline. This is
+ // a *first-tick* witness, not a replay of the caster's future movements.
+ let originalCasterOriginProof=null;
+ if(originCasterId!==null){
+  const seq=document?.combatRuntime?.sequence;
+  const matchingCharacters=document?.characters?.filter(c=>c.id===originCasterId);
+  const matchingUnits=seq?.spatialUnits?.filter(u=>u.id===originCasterId&&location(u));
+  check(typeof originCasterId==='string'&&originCasterId.length>0&&
+   matchingCharacters?.length===1&&seq?.order?.includes(originCasterId)&&
+   document?.combatRuntime?.timelineId===seq?.timelineId&&
+   typeof seq.timelineId==='string'&&seq.timelineId.length>0&&
+   matchingUnits?.length===1&&
+   Math.hypot(matchingUnits[0].x-origin.x,matchingUnits[0].y-origin.y)<1e-7,
+   'poloha sesilatele Vortexu nemá jediný původní důkaz Initiative na stejné časové ose');
+  originalCasterOriginProof=Object.freeze({casterId:originCasterId,
+   timelineId:seq.timelineId,round:seq.round,x:matchingUnits[0].x,y:matchingUnits[0].y});
+ }
  // A successful campaign census binds ONLY the initial positions of its
  // alchemical sources, original active Wards and native Raw Pèleáhn.
  // It cannot establish positions
@@ -170,7 +189,7 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
   spellCL,initialPosition:Object.freeze(clone(origin)),processedTicks:replay.length,
   nextRadiusFeet:radiusFeet,ticks:Object.freeze(replay),
   sourceIds:Object.freeze([...originals.keys()].sort()),
-  campaignCensusAudit,
+  campaignCensusAudit,originalCasterOriginProof,
   suppressions:Object.freeze(Object.fromEntries([...suppression])),
   mayCommit:false,requiresForCommit:Object.freeze([
    'authoritative Total Release and Spirit consequences',

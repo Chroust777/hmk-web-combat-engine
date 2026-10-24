@@ -64,6 +64,27 @@ export function auditNeutralVortexAlchemyCensus({document,sourceCensus}={}){
  // This does NOT imply that all other Raw Principle manifestations are known.
  const sequence=document.combatRuntime.sequence;
  const originalBursts=listPelahnBurstSources(sequence);
+ // Check the reverse provenance edge, even for sources whose lifetime has
+ // already expired: every original Total Release event must still have exactly
+ // one corresponding native registry entry, and each registry entry must
+ // still have its original Initiative event. Otherwise deleting a native Raw
+ // source from pelahnBursts could make the Vortex census look "complete".
+ // The journal can span older timelines, so the current Initiative log is
+ // authoritative for this bidirectional check (not a global journal count).
+ const rawEvents=(sequence.log??[]).filter(e=>e?.type==='pelahn-total-release-source');
+ const nativeIds=new Set(originalBursts.map(b=>b.id));
+ check(rawEvents.length===nativeIds.size&&
+  rawEvents.every(e=>typeof e.eventId==='string'&&nativeIds.has(e.eventId))&&
+  new Set(rawEvents.map(e=>e.eventId)).size===rawEvents.length,
+  'Raw Pèleáhn nemá původní Total Release nebo registr neodpovídá Initiative');
+ for(const burst of originalBursts){
+  const event=rawEvents.find(e=>e.eventId===burst.id);
+  check(event?.actorId===burst.casterId&&event.spell===burst.spell&&
+   event.complexity===burst.complexity&&
+   event.round===burst.startRound&&event.startRound===burst.startRound&&
+   event.endRound===burst.endRound&&samePlace(event.center,burst.center),
+   'Raw Pèleáhn má pozměněný původní Initiative Total Release');
+ }
  const rawBound=[];
  for(const burst of originalBursts){
   const active=sequence.round>=burst.startRound&&sequence.round<=burst.endRound;
