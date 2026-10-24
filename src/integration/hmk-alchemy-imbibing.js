@@ -72,6 +72,44 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
  }
  return live;
 }
+/** HMK v1.2 pp.270,273: Physic is NOT Profusion.  In particular,
+ * Poison and Quiescence are exempt from Profusion, yet Physic affects any
+ * elixir actually affecting the imbiber (including Poison's lingering
+ * enchantment).  Only four Temporary lifecycles can currently be verified
+ * end-to-end.  For any other imbibed source whose continuing effect cannot
+ * be established, fail BEFORE any vial, combat state, or journal mutation;
+ * never mistake a Profusion exemption for an immunity to Physic.
+ *
+ * This is intentionally a read-only projection of the existing journal.
+ * Future elixirs must gain their own proven active/end witnesses here; the
+ * mere existence of their catalog profile is not permission to dispel them.
+ */
+export function activeAlchemyPhysicTargets(journal=[],campaignId,targetId,minute=1e9){
+ ok(whole(minute,0,1e9)&&typeof campaignId==='string'&&campaignId&&
+  typeof targetId==='string'&&targetId,'Physic: neplatný kontext hledání účinků');
+ const live=[...activeDarkvision(journal,campaignId,targetId,minute),
+  ...activeErudition(journal,campaignId,targetId,minute),
+  ...activeFootpad(journal,campaignId,targetId,minute),
+  ...activeEgosight(journal,campaignId,targetId,minute)];
+ const knownNames=new Set(['Darkvision','Erudition','Footpad','Egosight']);
+ const seen=new Set();
+ for(const source of live){
+  ok(!seen.has(source.useId),'Physic: duplicitní účinný zdroj');
+  seen.add(source.useId);
+ }
+ for(const row of journal){
+  const proof=row.calendarAlchemyImbibing;
+  if(row.calendarCampaignId!==campaignId||row.campaignMinute>minute||
+   proof?.targetId!==targetId)continue;
+  const profile=canonicalProfusionProfile(proof.elixirName);
+  ok(profile.use==='Imbibed','Physic: Applied účinek nesmí mít důkaz požití');
+  if(proof.elixirName==='Physic'||!(proof.finalAS>0))continue;
+  if(knownNames.has(proof.elixirName))continue; // their AS/expiry is replayed above
+  throw Error('Physic: nelze ověřit trvání účinku '+proof.elixirName+
+   ' (včetně elixírů vyňatých z Profusion); není bezpečné odečíst AS všech účinků');
+ }
+ return live;
+}
 /** HMK v1.2 p.272 Footpad: temporary sound-muffling enchantment. */
 export function activeFootpad(journal=[],campaignId,targetId,minute=1e9){
  return journal.filter(j=>relevant(j,campaignId)&&j.calendarAlchemyImbibing?.targetId===targetId&&
@@ -243,7 +281,7 @@ export function createAlchemyDarkvisionImbibing({journal=[],inventory=[],campaig
   consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,271]};
 }
 /** HMK v1.2 pp.269-270, 273: Physic never contributes to Profusion.
- * Only currently implemented targets (Darkvision) may be disenchanted.
+ * Only currently implemented temporary target lifecycles may be disenchanted.
  * CF is recorded with Aural Shock 1 in the existing Combat State, and
  * the entire journal/health operation must commit atomically.
  */
@@ -267,7 +305,7 @@ export function createAlchemyPhysicImbibing({journal=[],inventory=[],campaignId,
  // elixirs: Physic is explicitly exempt from Profusion (p.270).
  const level=classifyProfusionImbibing(d100,ml,0).adjusted;
  const delta={CF:-2,F:-1,S:0,CS:1}[level],finalAS=Math.max(0,state.currentAS+delta);
- const affected=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
+ const affected=activeAlchemyPhysicTargets(journal,campaignId,targetId,minute);
  ok(affected.every(x=>x.state.nextDueMinute>minute),
   'Physic: nejprve vyhodnoťte všechny splatné alchymistické Decay Rolls');
  const physicEffects=finalAS>0?affected
