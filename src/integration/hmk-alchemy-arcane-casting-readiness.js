@@ -6,7 +6,8 @@
  */
 import {availableMasteries} from './hmk-skill-test-engine.js';
 import {validateStartingPvarSpells} from './hmk-creation-starting-pvar.js';
-import {indexOf} from '../rules/tests.js';
+import {indexOf,successLevel} from '../rules/tests.js';
+import {classifySpellMisfire} from './hmk-spell-misfire-effects.js';
 
 const SPELLS=Object.freeze({
  Detect:Object.freeze({id:'Neutral::Detect',complexity:1,time:'2 rounds',los:false,rangeMultiplier:5,sourcePage:251}),
@@ -45,9 +46,62 @@ export function alchemyArcaneCasterDossier(character){
   neutralML,si:indexOf(neutralML),verified:true,sourcePages:Object.freeze([54,198,211])});
 }
 
+/** Every Neutral spell has a Sunsign Modifier of 0 and CD=2 (pp.198,200).
+ * Pvârism ML is the Convocation ML, NOT the Spell ML. SI is specific to
+ * each spell's calculated ML. This is shared arithmetic, not spellfire.
+ */
+export function neutralSpellMastery(pvarismML,spell){
+ guard(Object.hasOwn(SPELLS,spell),'neznámé Neutral kouzlo');
+ guard(Number.isSafeInteger(pvarismML)&&pvarismML>=1&&pvarismML<=1000,
+  'chybí ověřený současný Pvârism ML');
+ const spec=SPELLS[spell],convocationDegree=2;
+ const difficulty=spec.complexity+convocationDegree;
+ const spellML=pvarismML-2*difficulty;
+ const spellSI=indexOf(spellML);
+ return Object.freeze({spell,convocation:'Neutral',convocationDegree,
+  sunsignModifier:0,convocationML:pvarismML,complexity:spec.complexity,
+  difficulty,spellML,spellSI,
+  rangeFeet:spellSI*spec.rangeMultiplier,sourcePages:Object.freeze([198,200,spec.sourcePage])});
+}
+
+/** Pure spellfire adjudication of the *known* Casting Roll / fatigue portion
+ * (pp.200–203). Requires an independently verified CURRENT full casting EML.
+ * This does not assert that spellstart, uninterrupted concentration, ward,
+ * target, LOS, initiative or fatigue payments have been fulfilled.
+ * A CF without its mandatory Misfire d100 is never reported as complete.
+ * Total Release additionally requires Spirit and Raw Principle adjudication.
+ */
+export function neutralSpellfireDice({spell,fullEML,castingD100,misfireD100=null}={}){
+ guard(Object.hasOwn(SPELLS,spell),'neznámé Neutral kouzlo');
+ guard(Number.isSafeInteger(fullEML)&&fullEML>=-1000&&fullEML<=1000,
+  'chybí doložený úplný Casting EML');
+ guard(Number.isSafeInteger(castingD100)&&castingD100>=1&&castingD100<=100,
+  'chybí fyzický Casting d100');
+ // The original tests.js is authoritative for S/CS/F/CF and EML clamping.
+ // Reuse its SL result, never classify CF from a new local dice system.
+ const sl=successLevel(castingD100,fullEML);
+ const level=['CF','F','S','CS'][sl];
+ const complexity=SPELLS[spell].complexity;
+ const complexityFatigue=complexity<=2?0:complexity<=4?5:10;
+ const baseFatigue={CF:10,F:5,S:5,CS:0}[level];
+ const misfire=level==='CF'&&Number.isSafeInteger(misfireD100)&&misfireD100>=1&&misfireD100<=100?
+  classifySpellMisfire(misfireD100,complexity):null;
+ guard(misfireD100===null||level==='CF'&&Number.isSafeInteger(misfireD100)&&misfireD100>=1&&misfireD100<=100,
+  'Misfire d100 se vyhodnocuje pouze po Casting CF');
+ const misfireRequired=level==='CF'&&misfire===null;
+ const otherPending=misfire?.totalRelease===true;
+ return Object.freeze({format:'hmk-neutral-spellfire-dice-v1',spell,complexity,
+  fullEML,castingD100,castingSL:level,castingFatigue:baseFatigue+complexityFatigue,
+  ...(misfire?{misfireD100,misfire}:{}),
+  additionalMisfireFatigue:misfire?.extraFatigue??0,
+  totalFatigue:baseFatigue+complexityFatigue+(misfire?.extraFatigue??0),
+  misfireRequired,totalReleaseNeedsSpiritAndRawPrinciple:otherPending,
+  mayCommit:false,complete:false,diceComplete:!misfireRequired&&!otherPending,
+  sourcePages:Object.freeze([200,202,203])});
+}
+
 /** Feasibility of an intended Neutral incantation, not spellfire adjudication.
- * A range measurement or a GM statement cannot substitute for a successful
- * Detect/Reveal receipt, Ward removal, and a casting/Concentration sequence.
+ * A range measurement or GM statement cannot substitute for prior receipts.
  */
 export function alchemyArcaneCastingPreflight({character,target,spell,distanceFeet=null,
  gmLOSConfirmed=false,gmWardAbsentConfirmed=false}={}){
@@ -55,33 +109,38 @@ export function alchemyArcaneCastingPreflight({character,target,spell,distanceFe
  guard(target&&typeof target.finishId==='string'&&typeof target.campaignId==='string',
   'chybí ověřený cílový dossier');
  const caster=alchemyArcaneCasterDossier(character),spec=SPELLS[spell];
+ const rules=caster.verified?neutralSpellMastery(caster.neutralML,spell):null;
  const blockers=[];
  if(!target.targetable||!['stored','active'].includes(target.phase)||
    !Number.isSafeInteger(target.currentAS)||target.currentAS<1)
   blockers.push('Cíl nemá doložené živé enchantment a aktuální AS');
  if(!caster.verified)blockers.push(caster.reason);
  if(!caster.known.includes(spec.id))blockers.push('Postava nemá původní důkaz znalosti '+spec.id);
+ const lost=character?.hmk?.arcane?.misfireLostSpells??[];
+ if(Array.isArray(lost)&&(lost.includes(spec.id)||lost.includes(spell)))
+  blockers.push('Crucial Misfire: kouzlo je ztracené, chybí nové Spell Research');
+ if((character?.hmk?.arcane?.auralShockLevels??0)>0)
+  blockers.push('Aural Shock znemožňuje sesílat kouzla (HMK 203)');
+ if(rules&&rules.spellML<1)blockers.push('Skutečné Spell ML nedovoluje seslat kouzlo');
  if(!Number.isFinite(distanceFeet)||distanceFeet<0||distanceFeet>1e6)
   blockers.push('Chybí skutečná nezáporná vzdálenost cíle ve stopách');
- const rangeFeet=caster.verified?caster.si*spec.rangeMultiplier:null;
+ const rangeFeet=rules?.rangeFeet??null;
  if(rangeFeet!==null&&Number.isFinite(distanceFeet)&&distanceFeet>rangeFeet)
   blockers.push('Cíl mimo dosah '+spell+' ('+rangeFeet+' ft)');
  if(spec.los&&!gmLOSConfirmed)blockers.push('Chybí potvrzené LOS při spellfire');
  if(!gmWardAbsentConfirmed)blockers.push('Není doloženo, že zdroj nemá aktivní Ward');
  if(spell==='Reveal'||spell==='Dispel')blockers.push('Chybí úspěšný, historicky ověřený Detect stejného zdroje');
  if(spell==='Dispel')blockers.push('Chybí úspěšný, historicky ověřený Reveal stejného zdroje');
- // No executor/receipt exists in this release. Explicitly keep this blocker,
- // even if all advisory geometry and confirmations above are supplied.
  blockers.push('Chybí původní Spellstart, koncentrace, casting d100, Misfire a Fatigue writer');
  const dispelPenalty=spell==='Dispel'&&target.targetable?-5*target.currentAS:0;
- return Object.freeze({format:'hmk-alchemy-arcane-spell-preflight-v1',
+ return Object.freeze({format:'hmk-alchemy-arcane-spell-preflight-v2',
   campaignId:target.campaignId,finishId:target.finishId,sourceId:target.sourceId,
   casterId:caster.casterId,spell,known:caster.known.includes(spec.id),
-  neutralML:caster.neutralML,si:caster.si,rangeFeet,castingTime:spec.time,
+  neutralML:caster.neutralML,si:rules?.spellSI??null,spellML:rules?.spellML??null,
+  complexity:spec.complexity,convocationDegree:2,rangeFeet,castingTime:spec.time,
   requiresLOS:spec.los,dispelEMLPenalty:dispelPenalty,
-  // This is ONLY the known part of EML; fatigue, environment, skill options
-  // and any Ward must not be silently treated as zero modifiers.
-  partialEML:caster.neutralML===null?null:caster.neutralML+dispelPenalty,
+  // Spell ML plus the known Dispel AS penalty is NOT full EML (p.201).
+  partialEML:rules===null?null:rules.spellML+dispelPenalty,
   complete:false,mayCommit:false,blockers:Object.freeze(blockers),
   sourcePages:Object.freeze([198,200,201,202,spec.sourcePage,270])});
 }
