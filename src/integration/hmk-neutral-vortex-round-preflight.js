@@ -94,9 +94,14 @@ export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
  const eligible=sources.filter(s=>dist(s,origin)+radiusFeet<=roamingFeet+1e-8);
  let centre=origin;
  if(eligible.length){
-  check(gmRandomSelectionConfirmed===true&&typeof selectionProof==='string'&&
-   selectionProof.trim().length>=3&&eligible.some(s=>s.id===selectedSourceId),
-   'náhodný cíl musí být doložen mezi všemi dostupnými zdroji');
+  if(eligible.length===1){
+   check(selectedSourceId===eligible[0].id,
+    'jediný dostupný zdroj musí být vybrán bez náhodného výběru');
+  }else{
+   check(gmRandomSelectionConfirmed===true&&typeof selectionProof==='string'&&
+    selectionProof.trim().length>=3&&eligible.some(s=>s.id===selectedSourceId),
+    'náhodný cíl musí být doložen mezi všemi dostupnými zdroji');
+  }
   centre=byId.get(selectedSourceId);
  }else{
   check(selectedSourceId===null&&selectionProof===null&&rolls.length===0,
