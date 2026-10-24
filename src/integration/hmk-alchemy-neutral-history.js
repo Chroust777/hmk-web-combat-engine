@@ -221,7 +221,7 @@ export function validateNeutralAlchemyCombatLinks(document){
 }
 export function assertNeutralAlchemyHistoryAppendOnly(before=[],after=[]){
  const newer=new Map(after.map(row=>[row.id,row]));
- for(const row of before)if(row.combatProof?.actionKind==='neutral-spellstart'||row.calendarAlchemyNeutralCast)
+ for(const row of before)if(row.combatProof?.actionKind==='neutral-spellstart'||row.calendarAlchemyNeutralCast||row.calendarNeutralTotalRelease)
   ok(js(newer.get(row.id))===js(row),'dřívější Neutral Spellstart/Spellfire není neměnný');
  return true;
 }

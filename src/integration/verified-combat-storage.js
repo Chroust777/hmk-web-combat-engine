@@ -4,6 +4,7 @@ import {assertCommittedMoralePsycheDebts} from './hmk-morale-psyche-bridge.js';
 import {assertCommittedFearTransitions} from './hmk-fear-write-invariant.js';
 import {assertCommittedShadeTransitions} from './hmk-shade-write-invariant.js';
 import {assertCommittedPelahnBurstSources} from './hmk-pelahn-burst-write-invariant.js';
+import {assertCommittedNeutralTotalRelease} from './hmk-neutral-total-release-invariant.js';
 /**
  * HMK Keeper's Ledger — verified single-record localStorage checkpoint.
  * Combat state, wounds, inventory, journal and Initiative are serialized
@@ -38,6 +39,7 @@ export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,g
    assertCommittedFearTransitions(old,next);
    assertCommittedShadeTransitions(old,next);
    assertCommittedPelahnBurstSources(old,next);
+   assertCommittedNeutralTotalRelease(old,next);
   }
  }catch(e){
   if(e?.message?.startsWith('Čas kampaně')||e?.message?.startsWith('Předchozí časové')||e?.message?.startsWith('Posun času'))return result(false,false,'gm-only-clock');
@@ -45,6 +47,7 @@ export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,g
   if(e?.message?.startsWith('Morale → Psyche:'))return result(false,true,'unresolved-morale-psyche');
   if(e?.message?.startsWith('Fear/Aberrance:'))return result(false,true,'unresolved-fear-aberrance');
   if(e?.message?.startsWith('Total Release Shade:'))return result(false,true,'invalid-shade-transition');
+  if(e?.message?.startsWith('Neutral Total Release persistence:'))return result(false,true,'invalid-neutral-total-release');
   if(e?.message?.startsWith('Raw Pèleáhn'))return result(false,true,'invalid-pelahn-source-transition');
   // A claimed structured checkpoint must never be accepted with invalid JSON.
   // Literal-string fixtures are used only by the storage adapter tests.
