@@ -238,7 +238,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.461';
+const APP_VERSION='93.462';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5348,7 +5348,7 @@ function neutralCombatCastingPanel(){
   campaignId:campaignKey(clock),finishId:x.finishId,sourceId:x.dossier.sourceId});
   return `${x.dossier.elixirName} · AS ${x.dossier.currentAS} · ${x.finishId}`+
    (w?` · chráněno Ward WL ${w.wardLevel}`:'');};
- return `<section class="panel wide"><h3>Neutral Spellcasting · HMK 200–203, 251, 254–255 · v93.461</h3>
+ return `<section class="panel wide"><h3>Neutral Spellcasting · HMK 200–203, 251, 254–255 · v93.462</h3>
  <p class="muted">Pouze ověřený běžný Incant, fyzické GM hody a původní Initiative. Ward vyžaduje dotyk a 60 kol. Dřívější Ward lze přebít jen vyšším Ward Level už při běžném S a s původním důkazem i výslovným GM potvrzením. Total Release 100 lze nyní uložit POUZE pro Detect CL I, bez Shade a bez přetrvávajícího potlačení (úplná fyzická historie). Ostatní případy a nedoložené modifikátory jsou blokovány. Dokončené kouzlo NENÍ pouhý Skill Test.</p>
  ${begin?`<form data-neutral-spellstart><strong>Spellstart · ${esc(caster.name)}, kolo ${q.round}</strong>
  <input type="hidden" name="casterId" value="${esc(casterId)}"><label>Neutral kouzlo<select name="spell"><option>Detect</option><option>Reveal</option><option>Dispel</option><option>Ward</option></select></label>
