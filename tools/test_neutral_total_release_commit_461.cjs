@@ -105,7 +105,7 @@ const edit=(fn,re)=>{const v=structuredClone(a2);fn(v);bad(()=>prepareNeutralTot
 edit(v=>v.gmNoOtherArcaneSourcesConfirmed=false,/historicky doložené|historicky doložené|zdroje a jejich pozice/);
 edit(v=>v.ticks[0].rolls[0].d100=55,/potlačení|d20/);
 edit(v=>{v.ticks[0].rolls[0].d100=55;v.ticks[0].rolls[0].d20=3},/potlačení/);
-edit(v=>v.ticks[0].rolls[0].d100=5,/CS stres/);
+edit(v=>{v.ticks[0].rolls[0].d100=5;v.ticks[0].rolls[0].d20=6},/d20 trvání/);
 edit(v=>{v.spiritD100=100;v.spiritLossD6=[]},/Spirit CF/);
 edit(v=>v.ticks[0].sources[0].x=100,/první tick/);
 edit(v=>v.ticks[0].physicalSelectionDie={faces:2,value:1,origin:'GM-physical-die'},/výběrový hod|jediný/);
