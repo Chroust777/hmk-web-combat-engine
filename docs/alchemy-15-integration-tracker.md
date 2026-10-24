@@ -512,3 +512,13 @@ V ověřeném deklarovaném rozsahu zůstávají #1 (Acid zbroj/oděvy), #2 (Aci
 - **PASS 20** nové kontroly rozdělené doby potlačení Ward/elixír, **PASS 29** původní replay kontroly a **PASS 62** jednorázové Vortex kontroly. Nejde o tři soubory navíc k regresi, jsou zahrnuty v jejích 85 souborech.
 - **PASS Chromium** `tools/browser_alchemy_neutral_ui_455.py`: klikací Detect CS → Reveal S → Dispel S; 2+6+6 kol, obnovení z kampaně, neměnnost inventáře a GM času. **PASS Chromium** `tools/browser_alchemy_release_version_455.py`: skutečný obsah index a vložený produkční bundle, viditelná patička v93.455, bez JS errors. Protože lokální HTTP/file navigaci runner blokuje, nejde o síťový GitHub Pages test.
 - Vydaný checkpoint v93.455 je **rozdílový vůči v93.454**; `index.html` je zahrnut a spolu s `app.js` a produkčním bundlem uvádí 93.455. Bod #10 trvá jako částečně dokončený, body #1–5 pouze ve svém původně vymezeném rozsahu; body #6–9 nadále částečné.
+
+
+## Kontrolní checkpoint v93.456 – Vortex: fyzický dN až po ověření úplného soupisu (24. 10. 2026)
+
+**Bod #10 stále ČÁSTEČNÝ, Total Release / Vortex zůstávají READ-ONLY.** Výchozí stav: uživatelem znovu nahraný kompletní archiv v93.455, v němž je potvrzená oprava kladných CL/TI/Runecraft SI v `hmk-neutral-vortex-round-preflight.js`. Nenahrazuje žádné nedostupné změny z původního pracovního checkpointu v93.460.
+
+- `src/integration/hmk-neutral-vortex-sequence.js`: exportovaná funkce `neutralVortexSourceSelection()` nyní před sestavením fyzického náhodného výběru dN kontroluje všechna ID (včetně vzdálených zdrojů), doklad `verified===true`, konečné souřadnice, šest platných kategorií a jejich pravidlové parametry, `spellCL` a růst geometrie. Chybný zdroj již nelze tiše vynechat z výběrového poolu.
+- `tools/test_neutral_vortex_selection_provenance_456.cjs`: 26 nových kontrol; mimo jiné chybné či chybějící souřadnice, nulová Runecraft SI a AS, duplicitní identita, neověřený vzdálený zdroj, nesprávná geometrie a počet stěn fyzické kostky; původní replay a historická vazba.
+- Vydání používá stejné číslo v `index.html`, `app.js` a znovu sestaveném `hmk-app.bundle.js` (cache bust). Žádné další soubory projektu nejsou v rozdílovém ZIPu potřeba.
+- **Není implementováno:** autentický šesticestný registr všech magických kategorií, fyzické změny a expirace v Initiative/Combat State, autoritativní atomický Misfire 100 → Spirit loss → Vortex writer, plná historická rehydratace a end-to-end klikací zkoušky takového writeru. U každého Vortex výsledku platí `mayCommit:false`.
