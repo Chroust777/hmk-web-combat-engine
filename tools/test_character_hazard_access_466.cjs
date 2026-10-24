@@ -1,0 +1,32 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+let n=0;function chk(msg,a,b){assert.deepEqual(a,b,msg);++n}
+(async()=>{
+ const m=await import('file://'+path.resolve(__dirname,'../src/integration/hmk-character-hazard-access.js'));
+ const f=m.characterHazardAccess;
+ chk('blank',f(null).active,false);
+ chk('normal healthy',f({}).active,false);
+ chk('nonhazard injury',f({events:[{id:'w',type:'confirmed-hit'}],shock:'STN',morale:{psycheStress:3}}).active,false);
+ chk('ordinary starvation is provisions/conditions',f({malnutritionEpisodes:[{status:'active',kind:'starvation'}]}).active,false);
+ for(const status of ['incubating','active'])chk('poison '+status,f({toxinCourses:[{status}]}).active,true);
+ chk('recovered poison not active',f({toxinCourses:[{status:'resolved'}]}).active,false);
+ for(const status of ['pending-profile','incubating','active'])chk('disease '+status,f({diseaseCourses:[{status}]}).active,true);
+ chk('past disease',f({diseaseCourses:[{status:'recovered'}]}).active,false);
+ chk('permanent condition',f({ailmentSequelae:[{active:true,condition:'blindness'}]}).sequelae,true);
+ chk('inactive sequelae',f({ailmentSequelae:[{active:false}]}).active,false);
+ chk('open smoke',f({events:[{id:'smk',type:'mundane-smoke-start'}]}).smoke,true);
+ chk('completed smoke',f({events:[{id:'smk',type:'mundane-smoke-start'},{id:'smk:complete',type:'mundane-smoke-complete'}]}).active,false);
+ chk('no fake smoke without source id',f({events:[{type:'mundane-smoke-start'}]}).active,false);
+ chk('awake for 24h',f({sleepDeprivation:{status:'awake',hoursAwake:24}}).sleep,true);
+ chk('slept',f({sleepDeprivation:{status:'slept'}}).active,false);
+ chk('coma pending',f({asphyxiaComaPending:{active:true}}).asphyxia,true);
+ chk('coma closed',f({asphyxiaComaPending:{active:false}}).active,false);
+ chk('mixed',f({toxinCourses:[{status:'active'}],diseaseCourses:[{status:'incubating'}]}).active,true);
+ const source=fs.readFileSync(path.resolve(__dirname,'../app.js'),'utf8');
+ chk('journal nav gating',source.includes("...(hazardTab?[['hazards','Nebezpečí / Trauma']]:[])"),true);
+ chk('calendar nav matches journal',source.includes('journal-book-subnav hc-calendar-tabs'),true);
+ chk('calendar nav outside spread',source.includes('journalShell(`${calendarTabs}${folioChapterSpread('),true);
+ chk('safe GM trigger',source.includes('hazardComposer={actorId:selected,kind};render();'),true);
+ chk('existing rule forms remain',source.includes('hskMundaneFireSmokePanel(actor.id)')&&source.includes('hskPoisonPanel(actor.id)')&&source.includes('hskDiseasePanel(actor.id)'),true);
+ console.log('PASS',n,'hazard visibility / calendar style checks');
+})().catch(e=>{console.error(e);process.exitCode=1});
