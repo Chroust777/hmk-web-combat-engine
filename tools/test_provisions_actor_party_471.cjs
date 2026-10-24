@@ -5,7 +5,7 @@ const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
 const css=fs.readFileSync(path.join(root,'book-templates.css'),'utf8');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 let n=0;const ok=(condition,message)=>{assert.ok(condition,message);n++};
-for(const text of ["const APP_VERSION='93.474'","provisionScope='person'",'function provisionScopeTabsHTML()',
+for(const text of ["const APP_VERSION='93.475'","provisionScope='person'",'function provisionScopeTabsHTML()',
  'function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clock)',
  'data-provision-scope="person"','data-provision-scope="party"',
  'data-provision-scope-actor="${esc(actorId)}"','name="nutritionActorIds" value="${esc(actorId)}"',
@@ -20,8 +20,8 @@ for(const text of ["const APP_VERSION='93.474'","provisionScope='person'",'funct
  'isPersonalNote(l)', 'data-hide-log', 'data-delete-log'])ok(app.includes(text),'app contains '+text);
 for(const selector of ['.hc-provision-scope-tabs','.hc-provision-scope-active','.hc-provision-personal-rules',
  '.journal-log-row--slim','.journal-log-small-actions','.journal-log-expand'])ok(css.includes(selector),'CSS contains '+selector);
-ok(html.includes('v93.474'),'index title version');
-ok(html.includes('hmk-app.bundle.js?v=93.474'),'bundle cache version');
+ok(html.includes('v93.475'),'index title version');
+ok(html.includes('hmk-app.bundle.js?v=93.475'),'bundle cache version');
 ok(app.includes("if(enabled&&f.get('foragingOnly')!=='yes')throw Error"),'original attestation gate');
 ok(app.includes('if(inventoryMode)for(const actorId of ids)'), 'original inventory evidence gate');
 ok(app.includes('mutate(()=>{data.journal.push(...stocks.map('),'original authoritative writer retained');

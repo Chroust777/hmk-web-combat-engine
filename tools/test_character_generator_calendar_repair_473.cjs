@@ -17,9 +17,9 @@ const resolved={id:'resolved',characterId:'honza',skillTestProof:{type:'climbing
 result=automaticHMKFollowups(clock,[actor],[source,resolved]);
 ok(!result.unknown.some(x=>x.kind==='skill-fall'),'resolved cannot remain pending');
 const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
-for(const text of ['const APP_VERSION=\'93.474\'','openAutomaticGenerationPanel()','automaticGenerationCancelled','data-auto-generation-stop','maxAttempts=plan?6:4','data-cal-unknown-fall','data-cal-unknown-source','focusCalendarRuleAction(actor,\'skill-fall\',sourceId)'])ok(app.includes(text),'app guard '+text);
+for(const text of ['const APP_VERSION=\'93.475\'','openAutomaticGenerationPanel()','automaticGenerationCancelled','data-auto-generation-stop','maxAttempts=plan?6:4','data-cal-unknown-fall','data-cal-unknown-source','focusCalendarRuleAction(actor,\'skill-fall\',sourceId)'])ok(app.includes(text),'app guard '+text);
 ok(app.includes("case 'skill-fall':form=byHidden('form[data-climbing-fall-form]')"),'original rules form reused');
 ok(app.includes("const rollInput=kind==='skill-fall'?form.elements.namedItem('heightFt')"),'height focused');
-const html=fs.readFileSync(path.join(root,'index.html'),'utf8');ok(html.includes('v93.474'),'html version');ok(html.includes('v=93.474'),'bundle url version');
-console.log(`PASS ${tests} version 93.474 generator bounds, cancel & calendar fall authority`);
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');ok(html.includes('v93.475'),'html version');ok(html.includes('v=93.475'),'bundle url version');
+console.log(`PASS ${tests} version 93.475 generator bounds, cancel & calendar fall authority`);
 })().catch(e=>{console.error(e);process.exitCode=1});

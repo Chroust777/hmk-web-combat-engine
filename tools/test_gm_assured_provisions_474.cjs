@@ -66,5 +66,5 @@ for(const key of ['data-provision-assure="yes"','data-provision-assure="no"','da
  if(key==='Sledovat dle HMK')continue;ok(app.includes(key),'UI '+key);
 }
 ok(css.includes('.hc-provision-simple-switch'));
-ok(fs.readFileSync(path.join(root,'index.html'),'utf8').includes('93.474'));
+ok(fs.readFileSync(path.join(root,'index.html'),'utf8').includes('93.475'));
 console.log('PASS',n,'GM coverage per-actor history, daily accounting, tamper protection, existing HMK day closes and UI');
