@@ -544,3 +544,15 @@ Vedle původních alchymistických zdrojů a Wardů je v `auditNeutralVortexAlch
 - **PASS 20** kontrol vazby prvního ticku na původní Initiative (skutečné alchymistické fixture včetně Ward); **PASS 29** kontrol původního Raw Pèleáhn / Total Release včetně syntetické konzistentní proof fixture a podvržených záznamů. Tyto testy jsou součástí 88 souborů, nikoli navíc. Tato Raw sada **není** end-to-end browserový test samotného Pèleáhn writeru.
 - **PASS** produkční Chromium HTML/bundle v93.457 bez JS chyb a **PASS** klikací Detect CS → Reveal S → Dispel S s následným obnovením kampaně a zamítnutím neúplných vstupů.
 - Původní již vyřešené větve alchymie i konzervativní `mayCommit:false` Vortex preflightu se nemění; bod #10 pokračuje dalšími blokátory.
+
+
+## Kontrolní checkpoint v93.458 – #10: nepřerušená historie Raw Pèleáhn a původ Vortexu
+
+**Stav #10: ČÁSTEČNÝ – toto není writer Vortexu ani deklarace dokončení magické integrace.**
+
+- `src/integration/hmk-neutral-vortex-census-audit.js`: obousměrná vazba původního `Initiative.log` ↔ `pelahnBursts` ověřuje i záznamy, jejichž Raw Principle už podle originálního kola vypršel. Ztracený historický zdroj, duplikované nebo osiřelé Total Release události a přepsaná identita/čas/poloha se nepovažují za úplný soupis. Do aktuálního Vortex census stále vstupují pouze **právě aktivní** zdroje; nebyl vytvořen druhý registr magie. Zápisy starších kampaní z jiných Initiative timeline se nedokazují pouhým počtem globálních journal řádků.
+- `src/integration/hmk-neutral-vortex-sequence.js`: volitelné, ale explicitní `originCasterId` nově ověřuje `origin` proti jediné živé pozici téhož účastníka v původní `Initiative.spatialUnits` a zároveň vyžaduje totožné `combatRuntime.timelineId`. Vracejí se původní údaje v `originalCasterOriginProof`; bez tohoto identifikátoru jde o GM-only souřadnice a null witness. **Nenahrazuje** důkaz Neutral Total Release, budoucích pohybů ani commit.
+- `tools/test_neutral_vortex_reverse_raw_458.cjs`: 18 kontrol, včetně vypršení, historické ztráty, osiřelých/duplicitních logů a manipulace časem/polohou.
+- `tools/test_neutral_vortex_origin_458.cjs`: 17 kontrol, včetně cizího aktéra, duplicitního svědka, jiné časové osy a změny x/y.
+- Primární pravidla HMK v1.2: str. 200–204 (Incant, misfire, Spirit, Raw Principle), str. 251 a 254–255 (Neutral Detect/Reveal/Dispel/Ward/Vortex), str. 160–163 (Initiative); elixírové vstupy str. 265–274.
+- Zůstává: autoritativní Neutral misfire 100/Spirit writer a atomické spuštění/potlačení Vortexu; úplné důkazy šesti kategorií, konkrétní činnosti invokovaných talentů/Negation, Soulcloak/True Sight/Spirit Sensing, následné pohyby, expirace a replay v živé kampani. `mayCommit:false` zůstává nezměněno.
