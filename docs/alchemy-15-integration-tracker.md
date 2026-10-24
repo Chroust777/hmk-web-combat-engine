@@ -1,6 +1,6 @@
 # HMK Keeper’s Ledger · Bod 4 Alchemy · Priorita 1–15
 
-Stav po v93.447; opravena pravidlová matematika Neutral spell ML/SI a doplněn nezapisující Casting d100/Misfire resolver; původní audit bodů 1–8 a navazující spellcasting preflight. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
+Průběžný tracker aktualizovaný do pracovní v93.455; opravena pravidlová matematika Neutral spell ML/SI a doplněn nezapisující Casting d100/Misfire resolver; původní audit bodů 1–8 a navazující spellcasting preflight. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
 
 Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, inventární a zdravotní kapitoly podle potřeby. „Částečně“ není „hotovo“. Každý bod bude uzavřen teprve po úplném mechanickém propojení, kontrole neměnných důkazů, testování obnovy dat a regresi.
 
@@ -491,3 +491,24 @@ Implementovat a ověřit *původní* spellstart, trvání a neporušenou koncent
 **Nejbližší blokátor:** autoritativní identita a poloha všech šesti kategorií zdrojů v živém Encounter a ověřená časová kontinuita dříve zapsaného Spellfire 100. Až následně lze provést jeden atomický commit a bezpečně odvozovat navazující ticky.
 
 **Finální ověření v93.454:** úplná dostupná Node.js regrese 84/84 testovacích souborů PASS v sériových dávkách; nové Vortex cílené 62 + 29 + 22 = 113 kontrol PASS; Chromium produkční index + bundle + viditelná v93.454 PASS; Chromium původní Detect CS → Reveal S → Dispel S skutečným klikáním a obnovením uložené kampaně PASS. Vortex E2E a Neutral Misfire 100 writer **NEBYLY** provedeny, protože ještě nejsou bezpečně dokončeny.
+
+
+## Pracovní v93.455 – #10: rozdílné trvání potlačení Ward / elixír (24. 10. 2026)
+
+**#10 NADÁLE NEUZAVŘEN; není zde atomický Total Release writer.** Výchozí stav je vydaná v93.454. Opraven čistě nezapisující případ, kdy Vortex na jednom ticku potlačí Ward na kratší dobu než jím chráněný elixír.
+
+- `hmk-neutral-vortex-sequence.js` ponechává v úplném soupisu oba originální zdroje a z jejich skutečně dříve vyhodnocených d20 rozpozná, že Ward je již aktivní, zatímco původní elixír je stále dočasně potlačený. Dříve tuto legální časovou kombinaci odmítal; nyní Ward může být samostatným aktivním cílem Vortexu a stále potlačený elixír se znovu netestuje. Po obnovení elixíru Ward znovu chrání zdroj bez ztráty AS.
+- `hmk-neutral-vortex-round-preflight.js` má explicitní read-only parametr `suppressedProtectedSourceIds`; vstup musí být disjunktní od všech aktivních zdrojů. Chronologický replay jej **vypočítává z předchozích výsledků** a předá až po kontrole původní identity Wardu, vazby na chráněný zdroj a totožné polohy. Nelze tak tiše vydávat již aktivní elixír za potlačený. Samostatný round resolver zůstává nezapisující a neprokazuje pravost libovolného GM seznamu.
+- Nový `tools/test_neutral_vortex_split_suppression_455.cjs`: samostatné intervaly potlačení, opětovná aktivace Wardu, vypršení potlačení elixíru, původní AS, celá časová návaznost, odmítnutí chybějícího původu a neslučitelného soupisu. **20 cílených kontrol PASS**; původní jedno-kolová sada 62 a vícekolová 29 PASS.
+- Beze změny: `mayCommit:false` u všech Vortex výsledků. Bez originálních dokladů šesti kategorií energie, přesunů, Spirit následků, CAS a historie **není dovoleno** zapsat Misfire 100 ani první tick.
+
+### Audit uzavření bodů 1–9 ve v93.455
+
+V ověřeném deklarovaném rozsahu zůstávají #1 (Acid zbroj/oděvy), #2 (Acid živý člověk), #3 (Acid vrh/splash), #4 (Mending/Object Aegis) a #5 (Eruption/Fumebomb/Weakness) **implementované**. Toto není deklarace univerzálního pokrytí všech druhů těl, zbrojí a magie. Body #6 (Profusion), #7 (Ill Effects/Aural Shock), #8 (Physic) a #9 (AS/Decay) jsou **částečné** z popsaných životních cyklů dalších kanonických elixírů. Bod #10 je částečný a má vlastní přesah do Initiative, Combat State, Spellfire, Ward a Arcane; celý projekt 1–15 není jen izolovaný alchymistický modul, nýbrž integrační práce na společných subsystémech.
+
+### v93.455 – konečné provedené regresní testy
+
+- **PASS 85/85 Node.js testovacích souborů**, pět samostatných dokončených dávek (17+17+17+17+17), bez FAIL a TIMEOUT. Výsledky: `/mnt/data/hmk_v93455_regression_{0_17,17_34,34_51,51_68,68_85}.json`.
+- **PASS 20** nové kontroly rozdělené doby potlačení Ward/elixír, **PASS 29** původní replay kontroly a **PASS 62** jednorázové Vortex kontroly. Nejde o tři soubory navíc k regresi, jsou zahrnuty v jejích 85 souborech.
+- **PASS Chromium** `tools/browser_alchemy_neutral_ui_455.py`: klikací Detect CS → Reveal S → Dispel S; 2+6+6 kol, obnovení z kampaně, neměnnost inventáře a GM času. **PASS Chromium** `tools/browser_alchemy_release_version_455.py`: skutečný obsah index a vložený produkční bundle, viditelná patička v93.455, bez JS errors. Protože lokální HTTP/file navigaci runner blokuje, nejde o síťový GitHub Pages test.
+- Vydaný checkpoint v93.455 je **rozdílový vůči v93.454**; `index.html` je zahrnut a spolu s `app.js` a produkčním bundlem uvádí 93.455. Bod #10 trvá jako částečně dokončený, body #1–5 pouze ve svém původně vymezeném rozsahu; body #6–9 nadále částečné.
