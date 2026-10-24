@@ -59,7 +59,7 @@ export function neutralVortexSpecialML(source){
 export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
  radiusFeet=2.5,sources,gmCompleteCensusConfirmed=false,
  selectedSourceId=null,gmRandomSelectionConfirmed=false,selectionProof=null,
- suppressedProtectedSourceIds=[],rolls=[]}={}){
+ suppressedProtectedSourceIds=[],hiddenSourceIds=[],rolls=[]}={}){
  check(whole(spellCL,1,6)&&whole(roundOffset,0,spellCL-1),
   'neplatný spell CL nebo fáze trvání Chaos Storm');
  check(at(origin)&&Number.isFinite(radiusFeet)&&radiusFeet>=2.5&&
@@ -84,6 +84,11 @@ export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
   ids.add(s.id);
   neutralVortexSpecialML(s);
  }
+ check(Array.isArray(hiddenSourceIds)&&hiddenSourceIds.every(id=>
+  typeof id==='string'&&ids.has(id))&&
+  new Set(hiddenSourceIds).size===hiddenSourceIds.length,
+  'skrytý zdroj musí být doložený a jedinečný v živém soupisu');
+ const hidden=new Set(hiddenSourceIds);
  const byId=new Map(sources.map(s=>[s.id,s]));
  check([...suppressedProtected].every(id=>!byId.has(id)),
   'dočasně potlačený zdroj nesmí současně figurovat mezi aktivními');
@@ -102,7 +107,11 @@ export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
   }
  }
  const roamingFeet=spellCL*10;
- const eligible=sources.filter(s=>dist(s,origin)+radiusFeet<=roamingFeet+1e-8);
+ // HMK p.255: one-round concentration hides on-/affecting-caster
+ // sources only from DESTINATION targeting. Any physical area effect around
+ // another centre is still separately tested; invisibility is not immunity.
+ const eligible=sources.filter(s=>!hidden.has(s.id)&&
+  dist(s,origin)+radiusFeet<=roamingFeet+1e-8);
  let centre=origin;
  if(eligible.length){
   if(eligible.length===1){
@@ -115,7 +124,10 @@ export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
   }
   centre=byId.get(selectedSourceId);
  }else{
-  check(selectedSourceId===null&&selectionProof===null&&rolls.length===0,
+  // No destination does NOT imply no arcane energy inside the unmoved
+  // origin-radius. Such sources still require their own d100 evidence; the
+  // later complete-area check enforces the exact roll list.
+  check(selectedSourceId===null&&selectionProof===null,
    'bez dosažitelného magického zdroje se Vortex nepřemisťuje');
  }
  const inside=sources.filter(s=>dist(s,centre)<=radiusFeet+1e-8);
@@ -158,6 +170,7 @@ export function neutralVortexRoundPreflight({spellCL,roundOffset,origin,
   radiusNextFeet:grew?Math.min(roamingFeet,radiusFeet+5):radiusFeet,
   inRadiusSourceIds:Object.freeze(inside.map(s=>s.id)),
   suppressedProtectedSourceIds:Object.freeze([...suppressedProtected].sort()),
+  hiddenFromCentreSelectionIds:Object.freeze([...hidden].sort()),
   outcomes:Object.freeze(outcomes),wardBlockedSourceIds:Object.freeze(blocked),
   casterPsycheStress:outcomes.reduce((sum,r)=>sum+r.casterPsycheStress,0),
   mayCommit:false,

@@ -21,7 +21,7 @@ const immutableSource=s=>{
  * A free-form text "random confirmed" is not by itself a usable die record.
  */
 export function neutralVortexSourceSelection({sources,origin,radiusFeet,spellCL,
- physicalSelectionDie=null}={}){
+ physicalSelectionDie=null,hiddenSourceIds=[]}={}){
  // Selection is an exported, independently callable read-only gate. Never
  // silently drop a malformed/unverified source from the random pool: that
  // would change the denominator of the physical dN and could hide magic.
@@ -37,7 +37,16 @@ export function neutralVortexSourceSelection({sources,origin,radiusFeet,spellCL,
   neutralVortexSpecialML(source);
   seen.add(source.id);
  }
- const choices=sources.filter(s=>Math.hypot(s.x-origin.x,s.y-origin.y)+radiusFeet<=spellCL*10+1e-8)
+ // HMK p.255: concentration may hide on-person / affecting-person magic
+ // from being TARGETED as a new centre for one round. This is NOT blanket
+ // immunity from every area test when the Vortex centres elsewhere.
+ check(Array.isArray(hiddenSourceIds)&&hiddenSourceIds.every(id=>
+  typeof id==='string'&&id.length>0&&seen.has(id))&&
+  new Set(hiddenSourceIds).size===hiddenSourceIds.length,
+  'skryté zdroje musí být jedinečné položky úplného soupisu');
+ const hidden=new Set(hiddenSourceIds);
+ const choices=sources.filter(s=>!hidden.has(s.id)&&
+  Math.hypot(s.x-origin.x,s.y-origin.y)+radiusFeet<=spellCL*10+1e-8)
   .map(s=>s.id).sort();
  if(!choices.length){check(physicalSelectionDie===null,'bez zdrojů neexistuje výběrový hod');
   return Object.freeze({choices:Object.freeze([]),selectedSourceId:null,selectionDie:null});}
@@ -155,12 +164,28 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
     suppressedProtectedSourceIds.push(src.protectsSourceId);
    }
   }
-  const selection=neutralVortexSourceSelection({sources:active,origin,radiusFeet,
-   spellCL,physicalSelectionDie:tick.physicalSelectionDie??null});
+  // A concentration receipt here is GM-ATTESTED and valid for one tick only.
+ // The existing Initiative has no canonical post-spellfire shield action,
+ // hence it cannot be upgraded to an authoritative saved effect.
+ let hiddenSourceIds=[];
+ if(tick.shielding!==undefined){
+  const sh=tick.shielding;
+  check(sh&&typeof originCasterId==='string'&&originCasterId&&
+   sh.casterId===originCasterId&&sh.gmConcentrationConfirmed===true&&
+   sh.gmOnOrAffectingCasterConfirmed===true&&
+   sh.mode===(step===0?'continue-after-spellfire':'one-round-action')&&
+   Array.isArray(sh.sourceIds)&&sh.sourceIds.length>0&&
+   sh.sourceIds.every(id=>typeof id==='string'&&originals.has(id)&&
+    !inactiveIds.has(id))&&new Set(sh.sourceIds).size===sh.sourceIds.length,
+   'skrytí zdrojů vyžaduje GM doložené soustředění sesilatele a aktivní zdroje');
+  hiddenSourceIds=[...sh.sourceIds].sort();
+ }
+ const selection=neutralVortexSourceSelection({sources:active,origin,radiusFeet,
+   spellCL,hiddenSourceIds,physicalSelectionDie:tick.physicalSelectionDie??null});
   check(tick.selectedSourceId===selection.selectedSourceId,
    'vybraný střed neodpovídá původnímu fyzickému výběrovému hodu');
   const result=neutralVortexRoundPreflight({spellCL,roundOffset:step,origin,
-   radiusFeet,sources:active,suppressedProtectedSourceIds,gmCompleteCensusConfirmed:true,
+   radiusFeet,sources:active,suppressedProtectedSourceIds,hiddenSourceIds,gmCompleteCensusConfirmed:true,
    selectedSourceId:selection.selectedSourceId,
    gmRandomSelectionConfirmed:selection.selectionDie!==null,
    selectionProof:selection.selectionDie===null?null:
@@ -183,6 +208,9 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
     [...originals.keys()].filter(id=>!originalPositionProofIds.has(id)).sort():
     [...originals.keys()].sort()),
    suppressedAtStart:Object.freeze([...inactiveIds].sort()),
+   // GM evidence only: no native Initiative shield-action log exists yet.
+   hiddenFromCentreSelectionIds:Object.freeze([...hiddenSourceIds]),
+   shieldingEvidence:tick.shielding===undefined?null:'GM-attested-only',
    outcome:result,suppressionUntilRound:Object.freeze(Object.fromEntries([...suppression]))}));
  }
  return Object.freeze({format:'hmk-neutral-vortex-sequence-preflight-v1',
@@ -196,5 +224,6 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
    'per-source evidence and verified movement chronology',
    'verified Initiative per caster turn and campaign-minute expiry',
    'historical source suppression in original spell/talent/elixir/rune subsystems',
-   'source census proof and physical randomness in immutable campaign history'])});
+   'source census proof and physical randomness in immutable campaign history',
+   'native Initiative evidence for optional one-round concentration shielding'])});
 }

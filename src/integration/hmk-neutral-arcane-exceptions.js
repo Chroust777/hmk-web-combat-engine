@@ -76,7 +76,7 @@ export function neutralChaosStormGeometry(spellCL){
  return Object.freeze({format:'hmk-neutral-chaos-storm-v1',
   spellCL,spellSI:spellCL,initialDiameterFeet:5,
   roamingRadiusFeet:10*spellCL,roamingDiameterFeet:20*spellCL,
-  durationRounds:spellCL,origin:'caster',casterMayShieldSources:false,
+  durationRounds:spellCL,origin:'caster',casterMayShieldSources:true,
   selection:'at end of each caster turn; GM must establish all sources and random target',
   wardBeforeProtectedSource:true,mayCommit:false,sourcePages:[204,255]});
 }
