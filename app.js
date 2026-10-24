@@ -244,7 +244,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.470';
+const APP_VERSION='93.471';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -268,6 +268,9 @@ function currentUiRoute(){
    calendarLanding:view==='calendar'?calendarLanding:null,
    calendarCreating:view==='calendar'?calendarCreating:null,
    calendarSection:view==='calendar'?activeCalendarSection:null,
+   provisionScope:view==='calendar'&&activeCalendarSection==='provisions'?provisionScope:null,
+   provisionActorId:view==='calendar'&&activeCalendarSection==='provisions'?provisionGuideActorId:null,
+   provisionRoute:view==='calendar'&&activeCalendarSection==='provisions'?provisionGuideRoute:null,
    calendarKey:view==='calendar'&&data.campaignClock?campaignKey(data.campaignClock):null,
    calendarUI:view==='calendar'&&calendarUI?{
     mode:calendarUI.mode,monthShift:calendarUI.monthShift,
@@ -285,6 +288,8 @@ function restoreUiRoute(route){
   calendarLanding=changed?true:!!route.calendarLanding;
   calendarCreating=changed?false:!!route.calendarCreating;
   activeCalendarSection=changed?'overview':route.calendarSection||'overview';
+  if(activeCalendarSection==='provisions'){provisionScope=!changed&&route.provisionScope==='party'?'party':'person';
+   provisionGuideActorId=!changed?route.provisionActorId:null;provisionGuideRoute=!changed?route.provisionRoute||'have':'have';}
   calendarUI=!changed&&route.calendarUI&&data.campaignClock?{
    ...calendarInitialUI(data.campaignClock),...route.calendarUI}:null;
  }
@@ -776,7 +781,7 @@ function refreshAllCalendarHealingFields(){
 }
 let calendarUI=null; // Presentation state only, never stored in character/campaign evidence.
 let activeCalendarSection='overview';
-let provisionGuideActorId=null,provisionGuideRoute='have';
+let provisionGuideActorId=null,provisionGuideRoute='have',provisionScope='person';
 const CALENDAR_SECTIONS=[['overview','Přehled a čas'],['travel','Cestování a hlídky'],['provisions','Zásoby a výživa'],['craft','Byliny a alchymie'],['administration','Správa a audit']];
 function provisionLastDayLabel(last){
  if(!last)return 'Bez uzavřeného nutričního dne';
@@ -823,10 +828,11 @@ function provisionGuideHTML(participants){
   forage:'Když není dostupné zásobování, zahajte Foraging v Cestování a hlídkách. Rozhoduje původní Survival a získané, doložené zdroje.',
   other:'Například pohostinnost, dar nebo ověřený zdroj vody. GM musí doložit skutečné převzetí a případně naplnění nádoby; pouhá volba zdroje žádný příděl nevytvoří.'
  }[route];
- const action=route==='buy'?`<button type="button" data-provision-go="shop">Otevřít nákup pro ${esc(actor.name)} ↗</button>`:
-  route==='forage'?'<button type="button" data-provision-go="forage">Otevřít Foraging ↗</button>':
-  `<button type="button" data-provision-go="evidence">Otevřít pravidlovou evidenci ↗</button>`;
- return `<section class="panel hc-provision-guide"><h3>Zajistit jídlo a pití</h3>
+ const action=route==='buy'?`<button type="button" data-provision-go="shop">Nakoupit pro ${esc(actor.name)} ↗</button>`:
+  route==='forage'?'<button type="button" data-provision-go="forage">Přejít na Foraging ↗</button>':
+  route==='other'?'<button type="button" data-provision-go="gear">Zapsat skutečně získané zásoby ↗</button>':
+  `<button type="button" data-provision-go="evidence">Nastavit denní zásobování této postavy ↗</button>`;
+ return `<section class="panel hc-provision-guide"><h3>Zajistit jídlo a pití jedné postavě</h3>
  <label class="hc-provision-picker">Pro koho?<select data-provision-actor>${participants.map(c=>`<option value="${esc(c.id)}" ${c.id===actor.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
  ${provisionCardHTML(actor,true)}
  <p class="hc-provision-question">Odkud postava získá další jídlo a vodu?</p>
@@ -836,6 +842,44 @@ function provisionGuideHTML(participants){
  </section>`;
 }
 
+/** v93.471 — UI scopes are strictly presentation state. Both variants submit
+ * the existing HMK nutrition writers; selecting a route grants no food/water.
+ * Personal forms bind exactly ONE actor (never an implicit campaign group).
+ */
+function provisionScopeTabsHTML(){
+ return `<nav class="hc-provision-scope-tabs" aria-label="Zásobování: rozsah účetnictví">
+ <button type="button" data-provision-scope="person" class="${provisionScope==='person'?'hc-provision-scope-active':'secondary'}" aria-pressed="${provisionScope==='person'}">Postava</button>
+ <button type="button" data-provision-scope="party" class="${provisionScope==='party'?'hc-provision-scope-active':'secondary'}" aria-pressed="${provisionScope==='party'}">Družina · společné zásoby</button>
+ </nav>`;
+}
+function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clock){
+ if(!actor)return '';
+ const actorId=actor.id,policy=policies.get(actorId)?.calendarNutritionPolicy;
+ const current=policy?.enabled?'Zapnutý':'Pozastavený / nezapnutý';
+ const fromInventory=provisionGuideRoute!=='forage';
+ const due=dueMalnutritionCases(data).filter(x=>x.characterId===actorId);
+ const day=dayCandidates.find(x=>x.row.characterId===actorId&&!dayPlans.some(j=>j.calendarNutritionConditions.policyId===x.row.id&&j.calendarNutritionConditions.startMinute===x.start));
+ const outstanding=dayPlans.filter(x=>x.characterId===actorId);
+ const policyForm=`<form data-nutrition-policy-form data-provision-scope-actor="${esc(actorId)}">
+ <input type="hidden" name="nutritionActorIds" value="${esc(actorId)}">
+ <input type="hidden" name="foodNeed" value="1"><input type="hidden" name="waterNeed" value="1">
+ <input type="hidden" name="autoNeeds" value="yes"><input type="hidden" name="policyAction" value="activate">
+ <input type="hidden" name="sourceMode" value="${fromInventory?'inventory':'foraging'}">
+ <p class="hc-provision-help">${fromInventory?'Pouze doložené příděly a skutečně naplněné nádoby + případné Foraging.':'Výhradně doložené nálezy Foraging; tento režim nelze zapnout, pokud postava zároveň čerpá inventární dávky či naplněné nádoby.'} Doba 24 h běží až při posunu času GM.</p>
+ <label class="hc-check"><input type="checkbox" name="foragingOnly" value="yes" required> GM potvrzuje úplnost skutečně dostupných zdrojů jídla a pití pro ${esc(actor.name)}.</label>
+ ${fromInventory?`<label class="hc-check"><input type="checkbox" name="inventoryWater" value="yes"> Započítat skutečně doloženou vodu v naplněných nádobách.</label>
+ <label class="hc-check"><input type="checkbox" name="freshRations" value="yes"> GM potvrzuje čerstvost nově zařazovaných přídělů; bez potvrzení je aplikace nepřidá.</label>`:''}
+ <button type="submit">Uložit režim pouze pro ${esc(actor.name)}</button></form>`;
+ const pause=policy?.enabled?`<form data-nutrition-policy-form data-provision-scope-actor="${esc(actorId)}" class="hc-provision-pauser"><input type="hidden" name="nutritionActorIds" value="${esc(actorId)}"><input type="hidden" name="foodNeed" value="1"><input type="hidden" name="waterNeed" value="1"><input type="hidden" name="policyAction" value="pause"><input type="hidden" name="sourceMode" value="foraging"><button class="secondary" type="submit">Pozastavit tento režim</button></form>`:'';
+ const conditions=day?`<details class="hc-person-provision-options"><summary>Celodenní odpočinek / horko · GM</summary>
+ <form data-nutrition-day-conditions><input type="hidden" name="actorId" value="${esc(actorId)}"><label>Skutečné podmínky na celých 24 hodin<select name="kind"><option value="rest-inactive">Úplný odpočinek a nečinnost</option><option value="rest">Úplný odpočinek</option><option value="inactive">Úplná nečinnost</option><option value="hot">Celodenní horko</option><option value="rest-hot">Úplný odpočinek v horku</option></select></label>
+ <label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje úplné podmínky a při změně plán zruší.</label><button type="submit">Zaznamenat podmínky · bez posunu času</button></form></details>`:'';
+ const cancellation=outstanding.map(x=>{const c=x.calendarNutritionConditions,already=data.journal.some(j=>j.calendarNutritionConditionsCancel?.planId===x.id);
+  if(already||clock.minute>=c.endMinute)return '';
+  return `<form data-nutrition-conditions-cancel class="hc-provision-pauser"><input type="hidden" name="sourceId" value="${esc(x.id)}"><label>Přerušit potvrzený plán (${esc(c.kind)})<input name="reason" minlength="3" required placeholder="Skutečný důvod přerušení"></label><button type="submit" class="secondary">Zrušit plán</button></form>`;}).join('');
+ const health=due.length?`<section class="hc-person-health"><h4>Starvation / Thirst · kontrola ${esc(actor.name)}</h4>${due.map(t=>`<form data-malnutrition-course><strong>${t.kind==='starvation'?'Starvation':'Thirst'} HR${t.hr} · ${t.mode==='healing'?'Healing':'Advance'} · ${esc(displayCampaignMinute(t.dueMinute))}</strong><input type="hidden" name="actorId" value="${esc(actorId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}"><label>Skutečný d100 (1–100)<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="secondary hc-small" data-malnutrition-die="yes">⚄ Vygenerovat d100</button><button type="submit" ${clock.minute<t.dueMinute?'disabled title="Termín ještě nenastal"':''}>Potvrdit zdravotní test</button></form>`).join('')}</section>`:'';
+ return `<section class="hc-person-provision-rules"><details class="hc-provision-personal-rules"><summary>Denní režim · ${esc(actor.name)} (${esc(current)})</summary><p class="hc-provision-caution">Přepínač pouze volí pravidlový režim. Neprohlašuje postavu automaticky za najedenou nebo napitou. Denní příjem potvrdí až skutečný výdej a uzávěrka.</p>${policyForm}${pause}</details>${conditions}${cancellation}${health}</section>`;
+}
 let calendarLanding=true; // Clicking the left navigation always opens the calendar chooser.
 let calendarCreating=false;
 function campaignCalendarView(){
@@ -1409,7 +1453,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const overviewHTML=`${board}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}</section><section class="panel"><h3>Nejbližší termíny · ${agenda.future.length}</h3>${agenda.future.slice(0,12).map(renderItem).join('')||'<p class="muted">Žádný nadcházející termín.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
   activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${interruptionsHTML}`:
-  activeCalendarSection==='provisions'?`${provisionGuideHTML(participants)}<details class="hc-provision-rulebook"><summary>Pravidlové zásobování, výdeje a Starvation / Thirst</summary>${nutritionHTML}${supplyHTML}${activityNeedsHTML}</details>`:
+  activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionCardsHTML(participants)}<details class="hc-provision-rulebook"><summary>Společné účetnictví · hromadný výdej a všechny postavy</summary>${supplyHTML}${nutritionHTML}${activityNeedsHTML}</details>`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
   activeCalendarSection==='craft'?`${herbalHTML}${alchemyHTML}`:
   `${membersHTML}${legacyOriginPanel}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
@@ -2770,7 +2814,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  const hidden=hiddenLogbookIds(data,c.id);
  const visible=visibleLogbookEntries(logs,hidden);
  const removed=logs.filter(l=>hidden.has(l.id));
- const renderLog=l=>`<div class="list-row journal-log-row" data-journal-entry="${esc(l.id)}"><div><b>${esc(l.title)}</b><div class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat poznámku</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Odstranit z osobního pohledu; nezmění původní hody ani účetnictví">Skrýt z logu</button>`}</div></div>`;
+ const renderLog=l=>`<div class="list-row journal-log-row journal-log-row--slim" data-journal-entry="${esc(l.id)}"><div class="journal-log-one-line"><b title="${esc(l.title)}">${esc(l.title)}</b><span class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</span></div><div class="actions journal-log-small-actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}" title="Upravit poznámku">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}" title="Smazat poznámku">Smazat</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Skrýt ze seznamu; pravidlový doklad se nemaže">Skrýt</button>`}</div><details class="journal-log-expand"><summary>Obsah záznamu</summary><p>${esc(l.body).replace(/\n/g,'<br>')}</p></details></div>`;
  const recent=visible.slice(0,10).map(renderLog).join('');
  const archived=visible.length>10?`<details class="journal-log-archive"><summary>Archiv · ${visible.length-10} starších záznamů</summary><div class="journal-log-archive-content">${visible.slice(10).map(renderLog).join('')}</div></details>`:'';
  const hiddenRecords=removed.length?`<details class="journal-log-archive journal-hidden-records"><summary>Skryté položky · ${removed.length} (obnovitelné)</summary>${removed.map(l=>`<div class="list-row"><span>${esc(l.title)}</span><button class="secondary" type="button" data-restore-log="${esc(l.id)}">Vrátit do logu</button></div>`).join('')}</details>`:'';
@@ -7861,6 +7905,8 @@ document.addEventListener('submit',e=>{
  try{
   const clock=data.campaignClock;if(!clock)throw Error('Není vybraná kampaň');
   const f=new FormData(form),ids=f.getAll('nutritionActorIds');
+  const activePerson=calendarMemberIds(clock,data.characters).find(c=>c.id===provisionGuideActorId)||calendarMemberIds(clock,data.characters)[0];
+  if(form.dataset.provisionScopeActor&& (ids.length!==1||ids[0]!==form.dataset.provisionScopeActor||form.dataset.provisionScopeActor!==activePerson?.id||view!=='calendar'||activeCalendarSection!=='provisions'||provisionScope!=='person'))throw Error('Individuální režim nepatří aktuálně vybrané postavě.');
   const allowed=new Set(calendarMemberIds(clock,data.characters).map(c=>c.id));
   if(!ids.length||ids.some(id=>!allowed.has(id))||new Set(ids).size!==ids.length)throw Error('Vyberte platné postavy současné kampaně');
   const enabled=f.get('policyAction')==='activate';
@@ -9799,6 +9845,13 @@ document.addEventListener('change',e=>{
  provisionGuideActorId=field.value;render();
 },true);
 document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-provision-scope]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(view!=='calendar'||activeCalendarSection!=='provisions')return;
+ const value=button.dataset.provisionScope;if(!['person','party'].includes(value))return;
+ provisionScope=value;render();
+},true);
+document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-provision-route],[data-provision-go]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
  if(button.dataset.provisionRoute){
@@ -9810,7 +9863,7 @@ document.addEventListener('click',e=>{
  if(route==='calendar'){
   const actorId=button.dataset.provisionActorId;
   if(!character(actorId)||!data.campaignClock)return;
-  provisionGuideActorId=actorId;activeCalendarSection='provisions';calendarLanding=false;calendarCreating=false;view='calendar';render();return;
+  provisionGuideActorId=actorId;provisionScope='person';activeCalendarSection='provisions';calendarLanding=false;calendarCreating=false;view='calendar';render();return;
  }
  if(view!=='calendar'||activeCalendarSection!=='provisions')return;
  if(route==='forage'){activeCalendarSection='travel';render();return;}
@@ -9819,8 +9872,12 @@ document.addEventListener('click',e=>{
   if(!actor)return;
   libraryRecipientId=actor.id;selected=actor.id;view='library';render();return;
  }
+ if(route==='gear'){
+  const actor=calendarMemberIds(data.campaignClock,data.characters).find(c=>c.id===provisionGuideActorId);
+  if(!actor)return;selected=actor.id;activeSheetSection='inventory';view='sheet';render();return;
+ }
  if(route==='evidence'){
-  const panel=document.querySelector('.hc-provision-rulebook');
+  const panel=document.querySelector(provisionScope==='person'?'.hc-provision-personal-rules':'.hc-provision-rulebook');
   if(panel){panel.open=true;panel.scrollIntoView({behavior:'auto',block:'start'});}
  }
 },true);

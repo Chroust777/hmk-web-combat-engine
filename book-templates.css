@@ -4375,3 +4375,28 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .hc-provision-rulebook>summary{cursor:pointer;font-weight:700;padding:4px}
 .journal-hidden-records .list-row{justify-content:space-between;gap:8px;margin:4px 0}
 .journal-hidden-records .list-row button{font-size:.75rem;flex-shrink:0}
+
+/* v93.471 — actor-first provisioning and distinct party accounting. */
+.content-calendar .hc-provision-scope-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 13px;padding-bottom:8px;border-bottom:1px solid rgba(107,75,41,.3)}
+.content-calendar .hc-provision-scope-tabs button{font-size:.84rem;min-height:39px;flex:1 1 150px;white-space:normal}
+.content-calendar .hc-provision-scope-active{background:#785632!important;color:#fffaf0!important;border:2px solid #634322!important}
+.content-calendar .hc-person-provision-rules{display:grid;gap:10px;margin:5px 0 10px}
+.content-calendar .hc-provision-personal-rules,.content-calendar .hc-person-provision-options,.content-calendar .hc-person-health{padding:9px 12px;border:1px solid rgba(121,88,53,.45);border-radius:8px;background:rgba(240,225,194,.25)}
+.content-calendar .hc-provision-personal-rules>summary,.content-calendar .hc-person-provision-options>summary{font-size:.87rem;font-weight:700;cursor:pointer;padding:5px 0}
+.content-calendar .hc-provision-personal-rules form{display:grid;gap:6px;margin:8px 0;padding:8px 2px;border:0}
+.content-calendar .hc-provision-personal-rules label.hc-check{font-size:.81rem;line-height:1.35}
+.content-calendar .hc-provision-personal-rules button,.content-calendar .hc-person-health button{min-height:34px;font-size:.8rem;justify-self:start}
+.content-calendar .hc-person-health h4{margin:5px 0}
+.content-calendar .hc-person-health form{display:grid;gap:6px;border-bottom:1px solid rgba(107,75,41,.2);padding-bottom:8px}
+.content-calendar .hc-provision-rulebook{margin-top:12px}
+/* v93.471 — one-line titles and actions; details only on demand. */
+.journal-log-row--slim{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center!important;column-gap:7px;row-gap:0;padding:4px 7px!important;min-width:0;font-size:.74rem!important;line-height:1.2!important}
+.journal-log-row--slim .journal-log-one-line{min-width:0;display:flex;gap:7px;align-items:baseline;overflow:hidden}
+.journal-log-row--slim .journal-log-one-line b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.75rem;font-weight:650}
+.journal-log-row--slim .journal-log-one-line span{font-size:.66rem;white-space:nowrap;opacity:.85;flex:0 0 auto}
+.journal-log-row--slim .journal-log-small-actions{display:flex!important;gap:3px!important;align-items:center;flex-wrap:nowrap!important;white-space:nowrap!important;min-width:max-content;justify-self:end}
+.journal-log-row--slim .journal-log-small-actions button{font-size:.67rem!important;line-height:1.1!important;padding:3px 5px!important;min-width:0!important;white-space:nowrap!important;margin:0!important}
+.journal-log-row--slim .journal-log-expand{grid-column:1 / -1;min-width:0;font-size:.69rem;color:#63533e}
+.journal-log-row--slim .journal-log-expand summary{cursor:pointer;line-height:1.35;padding:1px 0}
+.journal-log-row--slim .journal-log-expand p{white-space:normal;overflow-wrap:anywhere;margin:4px 0}
+@media(max-width:470px){.journal-log-row--slim .journal-log-one-line span{display:none}.journal-log-row--slim .journal-log-small-actions button{padding:3px 4px!important}}
