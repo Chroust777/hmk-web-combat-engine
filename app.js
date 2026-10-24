@@ -232,7 +232,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.446';
+const APP_VERSION='93.447';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -934,7 +934,7 @@ function campaignCalendarView(){
  <p class="hc-hint">Pouze pravidlová kontrola aktuálních cílů z originálního inventáře a kalendáře (HMK 251,254,263,270). Nejde o seslání kouzla ani jeho automatický úspěch. Dispel vyžaduje úspěšný Detect i Reveal téhož zdroje, vyřešenou ochranu Ward a skutečný casting; EML má postih −5 za každý aktuální AS. Soulcloak / True Sight / Spirit Sensing nejsou tímto přehledem automaticky aktivovány.</p>
  <p class="hc-hint"><strong>Shèk-Pvâr · skutečně doložená výchozí znalost</strong> (HMK 54,198,251,254): žádný výpis nezakládá spellfire ani dodatečné naučení kouzla.</p>
  ${alchemyArcaneCasters.map(x=>x.error?`<p class="hc-hint">⚠ ${esc(x.name)} · poškozený původ kouzel: ${esc(x.error)}.</p>`:
-  `<p class="hc-hint">${esc(x.name)} · ${esc(x.proof.known.filter(sp=>['Neutral::Detect','Neutral::Reveal','Neutral::Dispel'].includes(sp)).join(' / ')||'bez doložené trojice')} · ${x.proof.verified?`Pvârism ${x.proof.neutralML} · SI ${x.proof.si} · Detect ${x.proof.si*5} ft / Reveal ${x.proof.si} ft / Dispel ${x.proof.si*5} ft (LOS)`:esc(x.proof.reason)}.</p>`).join('')||'<p class="hc-hint">V kampani není doložený žádný znalec z trojice Neutral kouzel.</p>'}
+  `<p class="hc-hint">${esc(x.name)} · ${esc(x.proof.known.filter(sp=>['Neutral::Detect','Neutral::Reveal','Neutral::Dispel'].includes(sp)).join(' / ')||'bez doložené trojice')} · ${x.proof.verified?`Pvârism ${x.proof.neutralML} · Detect I ML ${x.proof.neutralML-6} / SI ${Math.floor((x.proof.neutralML-6)/10)} / ${Math.floor((x.proof.neutralML-6)/10)*5} ft · Reveal I ML ${x.proof.neutralML-6} / SI ${Math.floor((x.proof.neutralML-6)/10)} / ${Math.floor((x.proof.neutralML-6)/10)} ft · Dispel II ML ${x.proof.neutralML-8} / SI ${Math.floor((x.proof.neutralML-8)/10)} / ${Math.floor((x.proof.neutralML-8)/10)*5} ft (LOS)`:esc(x.proof.reason)}.</p>`).join('')||'<p class="hc-hint">V kampani není doložený žádný znalec z trojice Neutral kouzel.</p>'}
  ${alchemyArcaneTargets.map(x=>x.error?`<p class="hc-hint">⚠ ${esc(x.finishId)}: ${esc(x.error)} (bez zápisu)</p>`:
   x.dossier.targetable?`<p class="hc-hint"><strong>${esc(x.dossier.elixirName)}</strong> · ${esc(x.dossier.phase==='stored'?'uložený fyzický kus':'aktivní Temporary na postavě')} · AS ${x.dossier.currentAS} · Dispel EML ${x.dossier.dispelEMLPenalty} · původ ${esc(x.dossier.sourceId||'')} · ${esc(x.dossier.targetId||'')}</p>`:
   `<p class="hc-hint">${esc(x.dossier.elixirName)}: ${esc(x.dossier.reason||'nyní bez ověřeného magického cíle')}.</p>`).join('')||'<p class="hc-hint">Žádná dokončená alchymistická dávka v kampani.</p>'}
