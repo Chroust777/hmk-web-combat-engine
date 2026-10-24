@@ -70,6 +70,20 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
  // simulation, and even WITH it other arcane categories remain unproven.
  const campaignCensusAudit=document===null?null:
   auditNeutralVortexAlchemyCensus({document,sourceCensus});
+ // A successful campaign census binds ONLY the initial positions of its
+ // alchemical sources, original active Wards and native Raw Pèleáhn.
+ // It cannot establish positions
+ // of other magical categories, nor predict source movement in later rounds.
+ // A tick-0 location may not override that original Initiative snapshot.
+ const originalPositionProofIds=new Set();
+ if(campaignCensusAudit){
+  for(const source of campaignCensusAudit.verifiedAlchemy){
+   originalPositionProofIds.add(source.sourceId);
+   if(source.wardProofId)originalPositionProofIds.add(source.wardProofId);
+  }
+  for(const source of campaignCensusAudit.verifiedRawPelahn)
+   originalPositionProofIds.add(source.sourceId);
+ }
  const originals=new Map();
  for(const src of sourceCensus){
   check(typeof src?.id==='string'&&src.id&&!originals.has(src.id)&&
@@ -89,6 +103,15 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
    check(src?.verified===true&&location(src)&&originals.has(src.id)&&
     !originalIds.has(src.id)&&same(immutableSource(src),originals.get(src.id)),
     'změněný, vynechaný, podvržený nebo nový magický zdroj');
+   // Without this comparison, a GM tick could move a campaign-verified elixir
+   // or Ward in the FIRST round while still returning a historical proof for
+   // its unmodified position from sourceCensus. This check is only for the
+   // original tick; later movement requires separate original timeline data.
+   if(step===0&&originalPositionProofIds.has(src.id)){
+    const witnessed=sourceCensus.find(s=>s.id===src.id);
+    check(Math.abs(src.x-witnessed.x)<1e-7&&Math.abs(src.y-witnessed.y)<1e-7,
+     'první tick změnil původní polohu magického zdroje proti živé Initiative');
+   }
    originalIds.add(src.id);
   }
   const inactiveIds=new Set([...suppression.entries()]
@@ -133,6 +156,13 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
   }
   radiusFeet=result.radiusNextFeet;
   replay.push(Object.freeze({roundOffset:step,sourceSelection:selection,
+   // Only alchemy, its Ward and native Raw Pèleáhn at the first tick.
+   // No later tick is retrospectively authenticated by one LIVE snapshot.
+   originalCampaignPositionProofSourceIds:Object.freeze(step===0?
+    [...originalPositionProofIds].sort():[]),
+   gmOnlyPositionSourceIds:Object.freeze(step===0?
+    [...originals.keys()].filter(id=>!originalPositionProofIds.has(id)).sort():
+    [...originals.keys()].sort()),
    suppressedAtStart:Object.freeze([...inactiveIds].sort()),
    outcome:result,suppressionUntilRound:Object.freeze(Object.fromEntries([...suppression]))}));
  }
