@@ -175,6 +175,7 @@ import {createNutritionDayConditions,createNutritionConditionsCancel,nextNutriti
 import {pendingTrackingBearing} from './src/integration/hmk-tracking-bearing-handoff.js';
 import {provenCarriedRations,assertExclusiveForagingProven} from './src/integration/hmk-inventory-provisions.js';
 import {characterProvisionsOverview,partyProvisionsOverview} from './src/integration/hmk-character-provisions-overview.js';
+import {isPersonalNote,hiddenLogbookIds,visibleLogbookEntries,logbookHideEntry,logbookRestoreEntry,validateLogbookVisibility} from './src/integration/hmk-logbook-visibility.js';
 import {createFreshRationStocks,recordPhysicalRationHandoff,recordPhysicalRationLoss,availableRationLots,rationStockBalances,projectCampaignRationInventory,validatePhysicalRationJournal,assertPhysicalRationBacking,assertPhysicalRationAppendOnly} from './src/integration/hmk-physical-ration-ledger.js';
 import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
@@ -243,7 +244,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.469';
+const APP_VERSION='93.470';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -334,6 +335,7 @@ if(!storageReadOnly){
  }
 }
 function validate(d){
+ validateLogbookVisibility(d);
  if(d)validateCampaignPortfolio(d);
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
@@ -774,6 +776,7 @@ function refreshAllCalendarHealingFields(){
 }
 let calendarUI=null; // Presentation state only, never stored in character/campaign evidence.
 let activeCalendarSection='overview';
+let provisionGuideActorId=null,provisionGuideRoute='have';
 const CALENDAR_SECTIONS=[['overview','Přehled a čas'],['travel','Cestování a hlídky'],['provisions','Zásoby a výživa'],['craft','Byliny a alchymie'],['administration','Správa a audit']];
 function provisionLastDayLabel(last){
  if(!last)return 'Bez uzavřeného nutričního dne';
@@ -785,26 +788,52 @@ function provisionLastDayLabel(last){
 function provisionCardHTML(c,compact=false){
  const p=characterProvisionsOverview(data,c.id);
  if(!p.available)return `<article class="hc-provision-card"><h4>${esc(c.name)}</h4><p>${esc(p.reason)}</p></article>`;
- const state=p.nutritionEvidence==='not-monitored'?'Denní spotřeba není potvrzována GM':
-  p.nutritionEvidence==='awaiting-first-close'?'Denní režim aktivní, první 24h uzávěrka teprve nastane':provisionLastDayLabel(p.latestDay);
- const alerts=p.illness.map(x=>x.kind==='thirst'?'Aktivní Thirst HR'+x.hr:'Aktivní Starvation HR'+x.hr);
- const closure=p.policy?`Další 24h uzávěrka: ${displayCampaignMinute(p.policy.nextCloseMinute)} (za ${Math.max(0,Math.ceil((p.policy.nextCloseMinute-p.minute)/60))} h).`:'';
- const foodDetail=`${p.food.confirmedUnits} potvrzených food-days · ${p.food.daysAtCurrentBaseline} celých budoucích dnů při ${p.food.dailyBaseline} dávce/den`;
- const waterDetail=`${p.water.confirmedGallons} gal doložené pitné vody · ${p.water.daysAtCurrentBaseline} celých dnů při ${p.water.dailyBaseline} gal/den`;
- return `<article class="hc-provision-card${alerts.length?' hc-provision-card--alert':''}"><h4>${esc(c.name)}</h4>
- <dl><div><dt>Potrava</dt><dd>${esc(foodDetail)}</dd></div><div><dt>Pití</dt><dd>${esc(waterDetail)}</dd></div></dl>
- <p class="hc-provision-evidence">${esc(state)}${closure?`<span class="hc-provision-closure">${esc(closure)}</span>`:''}</p>
- ${alerts.length?`<p class="hc-provision-alert">${esc(alerts.join(' · '))}</p>`:''}
- ${compact?'':`<p class="hc-hint">${p.food.expiredUnits?`${esc(p.food.expiredUnits)} food-days už mimo potvrzenou trvanlivost. `:''}Dávky v inventáři bez potvrzení GM: ${esc(p.food.unconfirmedInventoryUnits)}; nejsou započítány jako dostupné. Nálezy družiny z Foraging nejsou automaticky jídlem této postavy.</p>${p.food.lots.length?`<details><summary>Potvrzené potravinové balíky</summary>${p.food.lots.map(l=>`<p class="hc-hint">${esc(l.name)} · ${esc(l.remaining)} food-days · trvanlivost do ${esc(displayCampaignMinute(l.expiresAt))}</p>`).join('')}</details>`:''}`}
+ const statusOf=(type)=>{
+  const last=p.latestDay?.[type];
+  if(!last)return {label:'Neověřeno',kind:'unknown'};
+  if(last.status==='full')return {label:'Potvrzeno za poslední uzavřený den',kind:'okay'};
+  return {label:last.status==='none'?'Nedoložena žádná dávka':'Doložena jen část dávky',kind:'risk'};
+ };
+ const food=statusOf('food'),water=statusOf('water');
+ const days=(n)=>n>0?`${n} ${n===1?'den':n<5?'dny':'dnů'}`:'Bez doložené plné denní rezervy';
+ const alerts=p.illness.map(x=>x.kind==='thirst'?'Thirst HR'+x.hr:'Starvation HR'+x.hr);
+ return `<article class="hc-provision-card hc-provision-card--compact${alerts.length?' hc-provision-card--alert':''}"><h4>${esc(c.name)}</h4>
+ <div class="hc-provision-indicators"><div class="hc-provision-indicator"><span class="hc-provision-mark hc-provision-mark--${food.kind}" aria-hidden="true"></span><div><strong>Jídlo · ${esc(food.label)}</strong><small>V zásobě: ${esc(days(p.food.daysAtCurrentBaseline))} · ${esc(p.food.confirmedUnits)} denních dávek</small></div></div>
+ <div class="hc-provision-indicator"><span class="hc-provision-mark hc-provision-mark--${water.kind}" aria-hidden="true"></span><div><strong>Pití · ${esc(water.label)}</strong><small>V zásobě: ${esc(days(p.water.daysAtCurrentBaseline))} · ${esc(p.water.confirmedGallons)} gal</small></div></div></div>
+ ${alerts.length?`<p class="hc-provision-alert">Aktivní následek: ${esc(alerts.join(' · '))}</p>`:''}
+ ${p.policy?`<p class="hc-provision-next">Další uzávěrka: ${esc(displayCampaignMinute(p.policy.nextCloseMinute))}</p>`:'<p class="hc-provision-next">Automatická denní spotřeba není zapnutá.</p>'}
+ ${compact?'':`<details class="hc-provision-source"><summary>Doklady a podrobnosti</summary><p>${esc(p.nutritionEvidence==='not-monitored'?'Neprobíhá denní kontrola příjmu.':p.nutritionEvidence==='awaiting-first-close'?'První 24h období ještě neskončilo.':'Stav se vztahuje pouze k poslednímu skutečně uzavřenému dni.')}</p><p>Nepotvrzené zásoby v inventáři: ${esc(p.food.unconfirmedInventoryUnits)} dávek. Prošlá trvanlivost: ${esc(p.food.expiredUnits)} dávek. Foraging družiny není automaticky osobní příděl.</p></details>`}
  </article>`;
 }
+
 function partyProvisionCardsHTML(participants,compact=false){
  const pool=partyProvisionsOverview(data).pooledForaging;
- return `<section class="panel hc-provisions-dashboard"><h3>Jídlo a pití postav · ${esc(participants.length)}</h3>
- <p class="hc-hint">Odhad zásob jsou pouze doložené a dosud použitelné osobní příděly. Neříká, zda už dnes postava jedla, ani kolik dní zbývá do lékařského nástupu Starvation/Thirst; to závisí na potvrzených 24h intervalech a GM.</p>
+ return `<section class="panel hc-provisions-dashboard"><h3>Jídlo a pití · ${esc(participants.length)} postav</h3>
  <div class="hc-provision-grid">${participants.map(c=>provisionCardHTML(c,compact)).join('')}</div>
- <p class="hc-hint">Společné nealokované zásoby Foraging: ${esc(pool?.foodDays??0)} food-days · ${esc(pool?.waterDays??0)} water-days. Nikomu se automaticky nepřičítají.</p>
- ${compact?'<button type="button" class="secondary" data-calendar-section="provisions">Otevřít zásoby, výdeje a Starvation / Thirst</button>':''}</section>`;
+ ${compact?'':`<p class="hc-provision-pool">Společné nálezy Foraging: ${esc(pool?.foodDays??0)} dávek jídla · ${esc(pool?.waterDays??0)} dávek vody. Výdej konkrétní postavě je samostatný krok.</p>`}</section>`;
+}
+function provisionGuideHTML(participants){
+ const actor=participants.find(c=>c.id===provisionGuideActorId)||participants[0];
+ if(!actor)return '<section class="panel"><p>Nejdříve přidejte postavu do této kampaně.</p></section>';
+ const options=[['have','Má vlastní zásoby'],['buy','Může nakoupit'],['forage','Musí opatřit v přírodě'],['other','Jiný zdroj / rozhodnutí GM']];
+ const route=options.some(([id])=>id===provisionGuideRoute)?provisionGuideRoute:'have';
+ const body={
+  have:'Zkontrolujte doložené jídlo a naplněné nádoby. Pro denní automatiku potvrďte skutečné zdroje a podmínky v rozšířeném postupu.',
+  buy:'Pokud GM potvrdil dostupnost obchodu, otevřete knihovnu vybavení a proveďte skutečný nákup. Příděly a vodu potom doložte původním postupem; výběr možnosti nic automaticky nepřidává.',
+  forage:'Když není dostupné zásobování, zahajte Foraging v Cestování a hlídkách. Rozhoduje původní Survival a získané, doložené zdroje.',
+  other:'Například pohostinnost, dar nebo ověřený zdroj vody. GM musí doložit skutečné převzetí a případně naplnění nádoby; pouhá volba zdroje žádný příděl nevytvoří.'
+ }[route];
+ const action=route==='buy'?`<button type="button" data-provision-go="shop">Otevřít nákup pro ${esc(actor.name)} ↗</button>`:
+  route==='forage'?'<button type="button" data-provision-go="forage">Otevřít Foraging ↗</button>':
+  `<button type="button" data-provision-go="evidence">Otevřít pravidlovou evidenci ↗</button>`;
+ return `<section class="panel hc-provision-guide"><h3>Zajistit jídlo a pití</h3>
+ <label class="hc-provision-picker">Pro koho?<select data-provision-actor>${participants.map(c=>`<option value="${esc(c.id)}" ${c.id===actor.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
+ ${provisionCardHTML(actor,true)}
+ <p class="hc-provision-question">Odkud postava získá další jídlo a vodu?</p>
+ <div class="hc-provision-choices">${options.map(([id,label])=>`<button type="button" class="${route===id?'hc-provision-choice-active':'secondary'}" data-provision-route="${id}" aria-pressed="${route===id}">${esc(label)}</button>`).join('')}</div>
+ <p class="hc-provision-help">${esc(body)}</p>${action}
+ <p class="hc-provision-caution">Stav najedení/napití dokládá poslední uzavřený 24h den; výdrž zásob není automatický odpočet do Starvation nebo Thirst.</p>
+ </section>`;
 }
 
 let calendarLanding=true; // Clicking the left navigation always opens the calendar chooser.
@@ -1380,7 +1409,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const overviewHTML=`${board}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}</section><section class="panel"><h3>Nejbližší termíny · ${agenda.future.length}</h3>${agenda.future.slice(0,12).map(renderItem).join('')||'<p class="muted">Žádný nadcházející termín.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
   activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${interruptionsHTML}`:
-  activeCalendarSection==='provisions'?`${partyProvisionCardsHTML(participants)}${supplyHTML}${activityNeedsHTML}${nutritionHTML}`:
+  activeCalendarSection==='provisions'?`${provisionGuideHTML(participants)}<details class="hc-provision-rulebook"><summary>Pravidlové zásobování, výdeje a Starvation / Thirst</summary>${nutritionHTML}${supplyHTML}${activityNeedsHTML}</details>`:
   activeCalendarSection==='craft'?`${herbalHTML}${alchemyHTML}`:
   `${membersHTML}${legacyOriginPanel}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
@@ -2734,14 +2763,18 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  if(isCharacterSpecialtySection(activeSheetSection))return '';
 
  if(activeSheetSection==='hazards')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Nebezpečí / Trauma</h3><p>GM procedury a následky postavy ${esc(c.name)} · HMK</p></header><div class="columns journal-tech-columns">${hazardsView(c.id)}</div></section>`,`journal-book--chapter journal-book--hazards`);
- if(activeSheetSection==='provisions')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Provisions · jídlo a pití</h3><p>${esc(c.name)} · doklady platné pouze pro aktivní kampaň</p></header><div class="columns journal-tech-columns">${partyProvisionCardsHTML([c],false)}<section class="panel wide"><h3>Co ukazatel znamená</h3><p>Jde o dostupné, GM potvrzené zásoby a poslední uzavřený 24h nutriční den, nikoli o odhad hladu podle prázdného batohu. Doložené zásoby Foraging jsou společné, dokud nejsou skutečně vydány.</p><p>Starvation HR5 a Thirst HR4 vznikají pouze z původních zapsaných nutričních intervalů, nikoli z tohoto přehledu. Zpracovávají se v původním Combat State.</p><button type="button" data-nav="calendar" class="secondary">Přejít do kalendáře a zásobování</button></section></div></section>`,`journal-book--chapter journal-book--provisions`);
+ if(activeSheetSection==='provisions')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Provisions · jídlo a pití</h3><p>${esc(c.name)} · přehled doložených zásob</p></header><div class="columns journal-tech-columns">${partyProvisionCardsHTML([c],false)}<section class="panel"><button type="button" data-provision-go="calendar" data-provision-actor-id="${esc(c.id)}">Zajistit jídlo a pití v kalendáři ↗</button></section></div></section>`,`journal-book--chapter journal-book--provisions`);
  if(activeSheetSection==='inventory')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Arsenal & Gear</h3><p>Inventář, výbava, zatížení a speciální efekty.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Inventář postavy</h3>${wealthInventoryPanel(c)}${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}${physicalWaterPanel(c)}</section>${foragingEvidenceInCharacterInventory(c.id)}${combatantLoadPanel(c)}${armourLoadoutPanel(inv,c)}<section class="panel wide hmk-inventory-add-panel">${journalAddInventoryForm()}</section>${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:''})()}</div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='status')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Combat & Conditions</h3><p>Aktuální stav, povinné procedury, zranění a návazné herní sekvence.</p></header><div class="columns journal-tech-columns">${hskPendingSkillPhysicalConsequences(c.id)}${hskHazardSummary(c.id)}${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section></div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='notes'){
- const renderLog=l=>`<div class="list-row journal-log-row" data-journal-entry="${esc(l.id)}"><div><b>${esc(l.title)}</b><div class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.cashReceipt||l.combatProof||l.skillTestProof||l.calendarChestTransfer||l.calendarInventoryWaterFill||l.calendarInventoryWaterUse?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`;
- const recent=logs.slice(0,10).map(renderLog).join('');
- const archived=logs.length>10?`<details class="journal-log-archive"><summary>Archiv · ${logs.length-10} starších záznamů</summary><div class="journal-log-archive-content">${logs.slice(10).map(renderLog).join('')}</div></details>`:'';
- return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${recent}${archived}</section>${auditPanel}</div></section>`,`journal-book--chapter`)}
+ const hidden=hiddenLogbookIds(data,c.id);
+ const visible=visibleLogbookEntries(logs,hidden);
+ const removed=logs.filter(l=>hidden.has(l.id));
+ const renderLog=l=>`<div class="list-row journal-log-row" data-journal-entry="${esc(l.id)}"><div><b>${esc(l.title)}</b><div class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat poznámku</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Odstranit z osobního pohledu; nezmění původní hody ani účetnictví">Skrýt z logu</button>`}</div></div>`;
+ const recent=visible.slice(0,10).map(renderLog).join('');
+ const archived=visible.length>10?`<details class="journal-log-archive"><summary>Archiv · ${visible.length-10} starších záznamů</summary><div class="journal-log-archive-content">${visible.slice(10).map(renderLog).join('')}</div></details>`:'';
+ const hiddenRecords=removed.length?`<details class="journal-log-archive journal-hidden-records"><summary>Skryté položky · ${removed.length} (obnovitelné)</summary>${removed.map(l=>`<div class="list-row"><span>${esc(l.title)}</span><button class="secondary" type="button" data-restore-log="${esc(l.id)}">Vrátit do logu</button></div>`).join('')}</details>`:'';
+ return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${recent}${archived}${hiddenRecords}</section>${auditPanel}</div></section>`,`journal-book--chapter`)}
  return '';
 }
 function sheetView(){
@@ -9756,6 +9789,57 @@ document.addEventListener('click',e=>{
  if(button.disabled)return;
  historyStep(button.dataset.uiHistory);
 },true);
+// v93.470 — UI-only choice of provenance. Does not assert possession,
+// trigger a test, change campaign time or allocate shared Foraging lots.
+document.addEventListener('change',e=>{
+ const field=e.target.closest?.('[data-provision-actor]');if(!field)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(view!=='calendar'||activeCalendarSection!=='provisions')return;
+ if(!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===field.value))return;
+ provisionGuideActorId=field.value;render();
+},true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-provision-route],[data-provision-go]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(button.dataset.provisionRoute){
+  if(view!=='calendar'||activeCalendarSection!=='provisions')return;
+  if(!['have','buy','forage','other'].includes(button.dataset.provisionRoute))return;
+  provisionGuideRoute=button.dataset.provisionRoute;render();return;
+ }
+ const route=button.dataset.provisionGo;
+ if(route==='calendar'){
+  const actorId=button.dataset.provisionActorId;
+  if(!character(actorId)||!data.campaignClock)return;
+  provisionGuideActorId=actorId;activeCalendarSection='provisions';calendarLanding=false;calendarCreating=false;view='calendar';render();return;
+ }
+ if(view!=='calendar'||activeCalendarSection!=='provisions')return;
+ if(route==='forage'){activeCalendarSection='travel';render();return;}
+ if(route==='shop'){
+  const actor=calendarMemberIds(data.campaignClock,data.characters).find(c=>c.id===provisionGuideActorId)||calendarMemberIds(data.campaignClock,data.characters)[0];
+  if(!actor)return;
+  libraryRecipientId=actor.id;selected=actor.id;view='library';render();return;
+ }
+ if(route==='evidence'){
+  const panel=document.querySelector('.hc-provision-rulebook');
+  if(panel){panel.open=true;panel.scrollIntoView({behavior:'auto',block:'start'});}
+ }
+},true);
+// Each log item can be removed from the personal view; HMK receipts remain
+// authoritative and restorable, with character-specific persisted selections.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-hide-log],[data-restore-log]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(view!=='sheet'||activeSheetSection!=='notes'||!selected)return;
+ const id=button.dataset.hideLog||button.dataset.restoreLog;
+ const actor=character(selected);
+ const current=data.journal.some(j=>j.id===id&&j.characterId===selected);
+ const account=data.campaignClock&&actor?.hmk?.campaignCashAccounts?.[campaignKey(data.campaignClock)];
+ const cash=id.startsWith('cash-purchase:')?(account?.purchases||[]).some(p=>'cash-purchase:'+p.id===id):
+  id.startsWith('cash-adjustment:')?(account?.adjustments||[]).some(p=>'cash-adjustment:'+p.id===id):false;
+ if(!current&&!cash)return alert('Položka nepatří vybrané postavě.');
+ if(button.dataset.hideLog){if(!ask('Skrýt tuto položku z osobního logu? Pravidlový důkaz zůstane uložen a položku lze vrátit.'))return;mutate(()=>logbookHideEntry(data,selected,id));}
+ else mutate(()=>logbookRestoreEntry(data,selected,id));
+},true);
 document.addEventListener('click',e=>{const t=e.target.closest('[data-action],[data-nav],[data-open],[data-copy],[data-archive],[data-remove-inv],[data-delete-log],[data-edit-item],[data-copy-item],[data-delete-item],[data-restore],[data-purge],[data-delete-character],[data-export-character]');if(!t)return;
 if(t.dataset.exportCharacter){if(storageReadOnly)return alert('Nečitelná data: použijte nouzovou zálohu.');try{const pkg=characterPackage(t.dataset.exportCharacter);downloadJSON(pkg,'hmk-postava-'+safeFilename(pkg.character.name)+'.json')}catch(err){alert(err.message)}return}
 if(t.dataset.action==='calendar-to-encounter'){view='encounter';render();return;}
@@ -9832,7 +9916,7 @@ if(t.dataset.removeInv){
  overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Doložit ztrátu: ${esc(x.snapshot.name)}</h2><form id="inventory-loss-form"><input type="hidden" name="itemId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(selected)}"><label>Počet kusů<input type="number" name="quantity" min="1" max="${esc(x.quantity)}" step="1" value="${esc(x.quantity)}" required></label><label>Skutečná příčina ztráty / vyřazení<input name="reason" maxlength="240" minlength="2" required placeholder="Např. ztraceno při přechodu řeky"></label><label><input type="checkbox" name="confirmedByGM" value="yes" required> GM potvrzuje, že ke ztrátě skutečně došlo</label><p class="tiny">Vlastnictví se sníží, historický důkaz zůstane. Akce neposouvá čas.</p><div class="actions"><button type="submit">Zapsat ztrátu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
  render();return;
 }
-if(t.dataset.deleteLog){if(data.journal.some(j=>j.id===t.dataset.deleteLog&&(j.combatProof||j.skillTestProof||j.calendarChestTransfer||j.calendarInventoryWaterFill||j.calendarInventoryWaterUse||j.calendarInventoryWaterTransfer||j.calendarInventoryWaterLoss||j.calendarInventoryRationLoss||j.calendarInventoryRationTransfer||j.calendarInventoryDisposition||j.calendarHerbVialBinding||j.calendarHerbVialDiscard||j.calendarHerbWeaponPaste||j.calendarHerbWeaponPasteHit||j.calendarHerbWeaponResistance||j.calendarHerbWeaponPasteDiscard||j.calendarHerbParalyticEndurance||j.calendarHerbSoporificEnd||j.calendarHerbSoporificEffect)))return alert('Ověřený bojový důkaz nelze smazat běžnou editací deníku.');if(ask('Smazat zápis?'))mutate(()=>data.journal=data.journal.filter(x=>x.id!==t.dataset.deleteLog));return}
+if(t.dataset.deleteLog){const row=data.journal.find(j=>j.id===t.dataset.deleteLog&&j.characterId===selected);if(!isPersonalNote(row))return alert('Pravidlový záznam nelze smazat z historie. Použijte Skrýt z logu.');if(ask('Trvale smazat vlastní poznámku?'))mutate(()=>{data.journal=data.journal.filter(x=>x.id!==row.id);logbookRestoreEntry(data,selected,row.id)});return}
 if(t.dataset.editItem){if(item(t.dataset.editItem)?.builtin)return alert('Vestavěné pravidlové definice nelze upravit.');editItem=t.dataset.editItem;const i=item(editItem);overlay=equipmentEditor('Upravit předmět',i);render();return}
 if(t.dataset.copyItem){const i=item(t.dataset.copyItem);if(i?.builtin)return alert('Vestavěné definice se nekopírují; vytvořte vlastní předmět.');mutate(()=>data.items.push({...structuredClone(i),id:uuid(),name:i.name+' (kopie)'}));return}
 if(t.dataset.deleteItem){if(item(t.dataset.deleteItem)?.builtin)return alert('Vestavěné pravidlové definice nelze odstranit.');if(ask('Odstranit předmět z knihovny? Existující inventáře zůstanou beze změny.'))mutate(()=>data.items=data.items.filter(x=>x.id!==t.dataset.deleteItem));return}
@@ -11714,8 +11798,8 @@ document.addEventListener('submit',e=>{
 // v11: Multi-line journal editor preserves timestamps and record identity.
 function journalEditForm(x){return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-log-title"><h2 id="edit-log-title">Upravit zápis deníku</h2><form id="journal-edit-form"><input type="hidden" name="journalId" value="${esc(x.id)}">${field('title','Nadpis',x.title||'')}${area('body','Text zápisu',x.body)}<div class="actions"><button type="submit">Uložit zápis</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`}
 
-document.addEventListener('click',e=>{const t=e.target.closest('[data-edit-log]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();const x=data.journal.find(x=>x.id===t.dataset.editLog&&x.characterId===selected);if(!x)return;if(x.combatProof||x.skillTestProof||x.calendarChestTransfer||x.calendarInventoryWaterFill||x.calendarInventoryWaterUse||x.calendarInventoryWaterTransfer||x.calendarInventoryWaterLoss||x.calendarInventoryRationLoss||x.calendarInventoryRationTransfer||x.calendarInventoryDisposition||x.calendarHerbEmeticShock||x.calendarHerbVialBinding||x.calendarHerbVialDiscard||x.calendarHerbWeaponPaste||x.calendarHerbWeaponPasteHit||x.calendarHerbWeaponResistance||x.calendarHerbWeaponPasteDiscard||x.calendarHerbParalyticEndurance||x.calendarHerbSoporificEnd||x.calendarHerbSoporificEffect)return alert('Potvrzený bojový důkaz je neměnný; opravujte pouze soukromé poznámky bez combatProof.');overlay=journalEditForm(x);render()},true);
-document.addEventListener('submit',e=>{if(e.target.getAttribute('id')!=='journal-edit-form')return;e.preventDefault();e.stopImmediatePropagation();const v=Object.fromEntries(new FormData(e.target));const x=data.journal.find(x=>x.id===v.journalId&&x.characterId===selected);if(!x)return alert('Zápis již neexistuje');if(x.combatProof||x.skillTestProof||x.calendarChestTransfer||x.calendarInventoryWaterFill||x.calendarInventoryWaterUse||x.calendarInventoryWaterTransfer||x.calendarInventoryWaterLoss||x.calendarInventoryRationLoss||x.calendarInventoryRationTransfer||x.calendarInventoryDisposition||x.calendarHerbVialBinding||x.calendarHerbVialDiscard||x.calendarHerbWeaponPaste||x.calendarHerbWeaponPasteHit||x.calendarHerbWeaponResistance||x.calendarHerbWeaponPasteDiscard||x.calendarHerbParalyticEndurance||x.calendarHerbSoporificEnd||x.calendarHerbSoporificEffect)return alert('Potvrzený bojový důkaz nelze ručně změnit.');if(mutate(()=>{const target=data.journal.find(row=>row.id===v.journalId&&row.characterId===selected);if(!target)throw Error('Zápis již neexistuje');if(target.combatProof||target.skillTestProof||target.calendarInventoryWaterLoss||target.calendarInventoryRationLoss||target.calendarHerbEmeticShock||target.calendarHerbWeaponPaste||target.calendarHerbWeaponPasteHit||target.calendarHerbWeaponResistance||target.calendarHerbWeaponPasteDiscard||target.calendarHerbSoporificEnd||target.calendarHerbSoporificEffect)throw Error('Potvrzený bojový důkaz nelze ručně změnit');target.title=v.title.trim()||'Bez názvu';target.body=v.body;target.updatedAt=stamp()})){overlay=null;render()}},true);
+document.addEventListener('click',e=>{const t=e.target.closest('[data-edit-log]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();const x=data.journal.find(x=>x.id===t.dataset.editLog&&x.characterId===selected);if(!x)return;if(!isPersonalNote(x))return alert('Pravidlový důkaz nelze ručně upravit.');if(x.combatProof||x.skillTestProof||x.calendarChestTransfer||x.calendarInventoryWaterFill||x.calendarInventoryWaterUse||x.calendarInventoryWaterTransfer||x.calendarInventoryWaterLoss||x.calendarInventoryRationLoss||x.calendarInventoryRationTransfer||x.calendarInventoryDisposition||x.calendarHerbEmeticShock||x.calendarHerbVialBinding||x.calendarHerbVialDiscard||x.calendarHerbWeaponPaste||x.calendarHerbWeaponPasteHit||x.calendarHerbWeaponResistance||x.calendarHerbWeaponPasteDiscard||x.calendarHerbParalyticEndurance||x.calendarHerbSoporificEnd||x.calendarHerbSoporificEffect)return alert('Potvrzený bojový důkaz je neměnný; opravujte pouze soukromé poznámky bez combatProof.');overlay=journalEditForm(x);render()},true);
+document.addEventListener('submit',e=>{if(e.target.getAttribute('id')!=='journal-edit-form')return;e.preventDefault();e.stopImmediatePropagation();const v=Object.fromEntries(new FormData(e.target));const x=data.journal.find(x=>x.id===v.journalId&&x.characterId===selected);if(!x)return alert('Zápis již neexistuje');if(!isPersonalNote(x))return alert('Pravidlový důkaz nelze ručně změnit.');if(x.combatProof||x.skillTestProof||x.calendarChestTransfer||x.calendarInventoryWaterFill||x.calendarInventoryWaterUse||x.calendarInventoryWaterTransfer||x.calendarInventoryWaterLoss||x.calendarInventoryRationLoss||x.calendarInventoryRationTransfer||x.calendarInventoryDisposition||x.calendarHerbVialBinding||x.calendarHerbVialDiscard||x.calendarHerbWeaponPaste||x.calendarHerbWeaponPasteHit||x.calendarHerbWeaponResistance||x.calendarHerbWeaponPasteDiscard||x.calendarHerbParalyticEndurance||x.calendarHerbSoporificEnd||x.calendarHerbSoporificEffect)return alert('Potvrzený bojový důkaz nelze ručně změnit.');if(mutate(()=>{const target=data.journal.find(row=>row.id===v.journalId&&row.characterId===selected);if(!target)throw Error('Zápis již neexistuje');if(!isPersonalNote(target))throw Error('Pravidlový záznam nelze upravit');if(target.combatProof||target.skillTestProof||target.calendarInventoryWaterLoss||target.calendarInventoryRationLoss||target.calendarHerbEmeticShock||target.calendarHerbWeaponPaste||target.calendarHerbWeaponPasteHit||target.calendarHerbWeaponResistance||target.calendarHerbWeaponPasteDiscard||target.calendarHerbSoporificEnd||target.calendarHerbSoporificEffect)throw Error('Potvrzený bojový důkaz nelze ručně změnit');target.title=v.title.trim()||'Bez názvu';target.body=v.body;target.updatedAt=stamp()})){overlay=null;render()}},true);
 
 // Edit existing records without destroying IDs or journal timestamps.
 

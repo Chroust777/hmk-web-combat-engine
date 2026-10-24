@@ -32,11 +32,11 @@ const assert=require('node:assert/strict');const path=require('node:path'),fs=re
  ok(!board.includes('esc(p.note)</p>'),'long technical notes removed from card body');
  ok(board.includes('data-cal-link='),'original guided destination preserved');
  const app=fs.readFileSync(path.resolve(__dirname,'../app.js'),'utf8');
- ok(app.includes("logs.slice(0,10).map(renderLog)"),'10 most recent logs');
- ok(app.includes('logs.slice(10).map(renderLog)'),'rest in archive');
+ ok(app.includes("visible.slice(0,10).map(renderLog)"),'10 most recent logs');
+ ok(app.includes('visible.slice(10).map(renderLog)'),'rest in archive');
  ok(app.includes('journal-log-archive'),'archive control');
  ok(app.includes('cashLogs=account?'),'campaign cash receipts appear only in character logbook');
  ok(app.includes("archive.open=true"),'deep links expand archive');
- ok(app.includes("const APP_VERSION='93.469'"),'new version');
+ ok(app.includes("const APP_VERSION='93.470'"),'new version');
  console.log('PASS '+n+' timeline filters, event layout, archive checks');
 })().catch(e=>{console.error(e);process.exitCode=1});

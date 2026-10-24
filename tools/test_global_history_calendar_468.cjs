@@ -23,7 +23,7 @@ ok(app.includes('data-ui-history="back"')&&app.includes('data-ui-history="forwar
 ok(app.includes('if(!uiNavigationRestoring)uiNavigation.visit(nextRoute'),'render-based route tracking');
 ok(app.includes('historyStep(button.dataset.uiHistory)'),'back and forward events');
 ok(!app.includes('const overviewHTML=`${board}${partyProvisionCardsHTML(participants,true)}'),'no duplicate provisions on calendar overview');
-ok(app.includes("activeCalendarSection==='provisions'?`${partyProvisionCardsHTML(participants)}"),'provisions tab retains personal evidence');
+ok(app.includes("activeCalendarSection==='provisions'?`${provisionGuideHTML(participants)}"),'provisions tab retains personal evidence');
 ok(!calendar.includes('Tuzyn Reckoning · kalendář</h2>'),'redundant heading removed');
 ok(!calendar.includes('Tuzyn Reckoning · přiřazení skutečného data</h3>'),'redundant date assignment removed');
 ok(!calendar.includes('Výchozí datum TR bylo GM potvrzeno'),'redundant TR confirmation removed');

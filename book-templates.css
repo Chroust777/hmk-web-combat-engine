@@ -4352,3 +4352,26 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-calendar .hc-entry--compact .hc-actions{width:auto;flex-wrap:nowrap;white-space:nowrap}
 .content-calendar .hc-entry--compact .hc-event-mark{font-weight:700;min-width:21px;padding:3px 5px}
 @media(max-width:720px){.content-calendar .hc-entry--compact .hc-actions{width:auto}}
+
+/* v93.470 — compact status-first nutrition and guided acquisition. */
+.hc-provision-guide{display:grid;gap:10px;padding:14px!important}
+.hc-provision-guide h3{margin:0}.hc-provision-guide .hc-provision-picker{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hc-provision-guide .hc-provision-picker select{max-width:310px}
+.hc-provision-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,255px),1fr));gap:9px}
+.hc-provision-card--compact{padding:11px 12px!important;border:1px solid rgba(115,84,42,.35);border-radius:9px;background:rgba(244,234,207,.40)}
+.hc-provision-card--compact h4{margin:0 0 9px}
+.hc-provision-indicators{display:grid;gap:9px}.hc-provision-indicator{display:flex;align-items:start;gap:9px}
+.hc-provision-indicator>div{min-width:0;display:grid;gap:3px}
+.hc-provision-indicator strong{font-size:.86rem}.hc-provision-indicator small{color:#695c48;font-size:.76rem;line-height:1.3}
+.hc-provision-mark{width:11px;height:11px;min-width:11px;margin-top:5px;border-radius:50%;background:#9b835c}
+.hc-provision-mark--okay{background:#3b8660}.hc-provision-mark--risk{background:#b06548}.hc-provision-mark--unknown{background:#b5a480}
+.hc-provision-next{margin:9px 0 0;font-size:.74rem;color:#67563c}
+.hc-provision-pool{font-size:.74rem;margin:6px 0}.hc-provision-question{font-weight:700;margin:3px 0}
+.hc-provision-choices{display:flex;flex-wrap:wrap;gap:7px}.hc-provision-choices>button{font-size:.78rem;flex:1 1 140px;min-height:37px}
+.hc-provision-choice-active{outline:2px solid #74603c;outline-offset:1px}
+.hc-provision-help{margin:2px 0;font-size:.82rem;line-height:1.4}
+.hc-provision-caution{font-size:.73rem;color:#5c523e;margin:1px 0}
+.hc-provision-rulebook{margin-top:10px;padding:10px 13px;border:1px solid #a48c66;border-radius:8px}
+.hc-provision-rulebook>summary{cursor:pointer;font-weight:700;padding:4px}
+.journal-hidden-records .list-row{justify-content:space-between;gap:8px;margin:4px 0}
+.journal-hidden-records .list-row button{font-size:.75rem;flex-shrink:0}
