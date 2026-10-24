@@ -522,3 +522,25 @@ V ověřeném deklarovaném rozsahu zůstávají #1 (Acid zbroj/oděvy), #2 (Aci
 - `tools/test_neutral_vortex_selection_provenance_456.cjs`: 26 nových kontrol; mimo jiné chybné či chybějící souřadnice, nulová Runecraft SI a AS, duplicitní identita, neověřený vzdálený zdroj, nesprávná geometrie a počet stěn fyzické kostky; původní replay a historická vazba.
 - Vydání používá stejné číslo v `index.html`, `app.js` a znovu sestaveném `hmk-app.bundle.js` (cache bust). Žádné další soubory projektu nejsou v rozdílovém ZIPu potřeba.
 - **Není implementováno:** autentický šesticestný registr všech magických kategorií, fyzické změny a expirace v Initiative/Combat State, autoritativní atomický Misfire 100 → Spirit loss → Vortex writer, plná historická rehydratace a end-to-end klikací zkoušky takového writeru. U každého Vortex výsledku platí `mayCommit:false`.
+
+
+## Kontrolní checkpoint v93.457 – #10: původní pozice při prvním Vortex ticku (24. 10. 2026)
+
+**Bod #10 stále ČÁSTEČNÝ, bez Vortex writeru.** Ověřená kontrola původních elixírů/Wardů v `hmk-neutral-vortex-census-audit.js` se nově nesmí obejít odlišnými souřadnicemi téhož zdroje v prvním skutečně vyhodnocovaném ticku `replayNeutralVortexSequence`. Původní `sourceCensus` se porovná s živými pozicemi `Initiative.spatialUnits`; pro první tick je nyní nutná totožná souřadnice každého historicky doloženého elixíru a jeho originálního Wardu. Vzdálené a cizí magické zdroje zůstávají pouze GM potvrzené a jsou výslovně označeny jako nehistoricky ověřené.
+
+Návrat každého ticku nyní explicitně rozlišuje `originalCampaignPositionProofSourceIds` a `gmOnlyPositionSourceIds`. Při dalších tickech se původní snapshot nesmí vydávat za ověření pohybu v budoucích kolech; vše se označí jako pouze GM potvrzené a `mayCommit:false`. Nevytváří se druhý magický registr a nedochází k zápisu do kampaně.
+
+Pravidla: **HMK v1.2 str. 203–204, 255** pro Chaos Storm / Vortex; **str. 251, 254–255, 269–270** pro magické zdroje, Ward a elixíry; původní Initiative zejména **str. 160–163**. Stránkové odkazy se vztahují k tištěnému číslování PDF (souhlasí s indexem PDF). Označení provenience a fail-closed striktnost jsou bezpečnostní integrací aplikace, nikoli dodatečnými hârnickými pravidly.
+
+Neuzavřené blokátory: autentické záznamy všech šesti kategorií magie, původní pohyby každého kola, Spell Misfire 100 / Spirit a Raw Principle, atomické potlačení s expirací a originální Initiative/Combat State/Journals, obecné arcane talent invocation a Negation/True Sight/Soulcloak/Spirit Sensing; následně historie, UI a regrese.
+
+### v93.457 – navazující identita Raw Pèleáhn Total Release (HMK 203–204, 255)
+
+Vedle původních alchymistických zdrojů a Wardů je v `auditNeutralVortexAlchemyCensus` nově ověřena **jedna existující původní nealchymistická kategorie**: aktivní Pèleáhn Hyper Burst z již uloženého `Initiative.pelahnBursts` (Raw Principle, ML 60 dle p.255). Ověření vyžaduje i původní `pelahn-total-release-source` log se skutečným d100 Misfire 100, související `total-release:` journal a jeden originální `hmk-spell-total-release` Combat State event s fyzickým Spirit hodem. Musí souhlasit stejné ID, časové okno, trvání a souřadnice; chybějící aktivní původní Raw nebo falešné znovuaktivování vypršelého Raw se odmítne. Výsledek `verifiedRawPelahn` je read-only a jeho původní pozice je ověřena také v prvním Vortex ticku. Jiné Raw Principle manifestace nejsou odvozovány z neúplných dat; zůstávají GM-only. Toto není nový Raw Principle writer ani uzavření celého bodu #10.
+
+### v93.457 – ověřené testy a rozsah vydání
+
+- **PASS 88/88** kompletních Node.js souborů `tools/test_*.cjs` po finálním sestavení (dvě paralelní omezené pracovní dávky, bez FAIL a TIMEOUT).
+- **PASS 20** kontrol vazby prvního ticku na původní Initiative (skutečné alchymistické fixture včetně Ward); **PASS 29** kontrol původního Raw Pèleáhn / Total Release včetně syntetické konzistentní proof fixture a podvržených záznamů. Tyto testy jsou součástí 88 souborů, nikoli navíc. Tato Raw sada **není** end-to-end browserový test samotného Pèleáhn writeru.
+- **PASS** produkční Chromium HTML/bundle v93.457 bez JS chyb a **PASS** klikací Detect CS → Reveal S → Dispel S s následným obnovením kampaně a zamítnutím neúplných vstupů.
+- Původní již vyřešené větve alchymie i konzervativní `mayCommit:false` Vortex preflightu se nemění; bod #10 pokračuje dalšími blokátory.
