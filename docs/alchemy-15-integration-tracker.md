@@ -1,16 +1,16 @@
 # HMK Keeper’s Ledger · Bod 4 Alchemy · Priorita 1–15
 
-Stav po v93.445, auditní pokračování v93.441–v93.445. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
+Stav po v93.446; nově opakovaný audit bodů 1–8 a navazující spellcasting preflight. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
 
 Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, inventární a zdravotní kapitoly podle potřeby. „Částečně“ není „hotovo“. Každý bod bude uzavřen teprve po úplném mechanickém propojení, kontrole neměnných důkazů, testování obnovy dat a regresi.
 
-| # | Společná návaznost | Stav v93.436 | Zbývá před uzavřením |
+| # | Společná návaznost | Aktuální stav v93.446 | Implementovaný rozsah / neuzavřené závislosti |
 |---:|---|---|---|
 | 1 | Acid → Armour/Clothing AV | **Dokončeno pro přímou aplikaci na ověřené p118 články** | Fyzická lahvička, konkrétní skutečný oděv včetně látkového oblečení, GM určená lokace, AV −1 při úspěšném d10, AS −1 v každém kole, původní inventární kus, anatomie, reálný výpočet vrstvené ochrany (včetně směru), perzistence a neměnná historie. Bez falešného AV u jiných, neověřených předmětů. Splash je úkol #3. |
 | 2 | Acid → Flesh / Burns / Shock | **Dokončeno pro přímé zasažení lidské anatomie** | Přímé nanesení na GM potvrzenou kůži, požití u 10-zónového člověka (smrt při IL2), skutečné rostoucí Fire Burn M1→S2→S3→G4→G5 v jedné původní ráně, Shock d100 při každém novém IL, původní Combat State a léčení, první Compound d10 se starší Fire/Frost ranou, pokračování skutečné časové osy bez automatického posunu, neměnné doklady a testy. Necertifikovaná anatomie jiných druhů vyžaduje GM; vržená lahvička je úkol #3. |
 | 3 | Acid → Thrown Vial / Splash | **Dokončeno pro originální 4oz skleněnou lahvičku Acid** | Ověřený Missile/Throwing, Direct a Grenade s fyzickými odchylkami a Nearby, CF bez výhozu, rozbití s odpisem inventární lahvičky, 6palcový průměr (max. jedna lidská lokace), skutečné zásahy kůže/WQ/AV/objektu a jejich první d10 + Shock atomicky. Útok v aktivní Initiative spotřebovává Attack turn a používá Guided Combat checkpoint; GM posuzuje skutečnou geometrii splash. |
-| 4 | Další applied elixíry | Neuzavřeno | Především Mending a Object Aegis proti reálným předmětům. |
-| 5 | Plošné elixíry | Neuzavřeno | Eruption, Fumebomb, Weakness; skutečné terče a bojové důsledky. |
+| 4 | Další applied elixíry | **Dokončeno v93.439 v rozsahu Mending/Object Aegis** | Skutečné inventární předměty, hmotnosti, Mending opravuje WQ/Acid AV, Aegis se váže na původní Skill Workbench důkazy. Obecná nová Spellcasting integrace je bod 10. |
+| 5 | Plošné elixíry | **Dokončeno v93.440 ve vydaném bojovém rozsahu** | Eruption, Fumebomb a Weakness; vrh a rozbití nádoby, všechny doložené cíle, Shock/Morale, Combat State, Initiative, historie, LOS a živé STR. Nevytváří obecný spellcasting (bod 10). |
 | 6 | Profusion všech elixírů | **Částečně – v93.441 ověřeno pro existující aktivní Imbibed** | Centrální katalog 35/35 a atomické CF kombinace existují. Zbývá 22 dosud nepodporovaných neexemptních Imbibed účinků a jejich doložené konce, než lze tvrdit univerzální provoz. |
 | 7 | Aural Shock / Ill Effects | **Částečně – v93.442 kanonický katalog 35/35 a sjednocené důkazy pro 4 aktivní Imbibed** | Zbývají skutečné zdravotní a časové commity dosud nepodporovaných Imbibed elixírů; katalog sám neprovádí jejich účinky ani léčbu. |
 | 8 | Physic všechny účinky | **Částečně – v93.443 bezpečné vyhodnocení všech doložených zdrojů; 4 aktivní druhy dokončeny** | Poison, Quiescence a ostatní dosud neimplementované Imbibed účinky vyžadují skutečné důkazy jejich začátku, trvání a konce; do té doby musí Physic před jakýmkoli zápisem odmítnout neúplný souběh. |
@@ -258,3 +258,42 @@ Skutečné Life-Cycle a writer důkazy pro nyní neimplementované Imbibed (zejm
 Žádný replayovatelný spellcasting a jeho GM/Skill Workbench doklad není touto verzí **vymyšlen ani nahrazen**. Pro úplné uzavření #10 je nutná původní magie: zdrojové Detect, Reveal, Dispel, Ward, range/LOS, Selhání/CF/Misfire, únavy, přerušení, skutečné ukončení enchantmentu (při zachování stejné historické AS), stejně jako Negation, Attunement, Spirit Sensing, True Sight a ochrana Soulcloak. Do té doby jsou nové informace **jen read-only**; neexistuje nové tlačítko, které by bez důkazů mohlo odpálit magii či odstranit elixír.
 
 **Instalace:** v93.445 je rozdílový checkpoint **proti projektu s aplikovanou v93.444**, nikoli kompletní distribuce ani prohlášení bodu #10 za uzavřený. Bod #11–15 zatím zůstává v plánu.
+
+
+## v93.446 – pokračování #10 a nezávislý audit #1–8 (24. 10. 2026)
+
+**Důležitý závěr:** #1–#8 nejsou všechny dokončené. Implementační oblasti **#1–#5 byly v tomto auditu znovu nalezeny ve zdrojovém kódu a prošly vybranými cílenými testy** ve výše uvedeném, výslovně omezeném rozsahu. **#6, #7 a #8 nadále zůstávají ČÁSTEČNĚ**, i přes úspěšné testy fungujících větví. Souhrnná tabulka nahoře nyní používá aktuální stav a opravuje zastaralá označení #4 a #5 z v93.436; historické kapitoly starších checkpointů níže jsou záměrně zachovány, nikoliv zpětně editovány.
+
+### Evidence jednotlivých bodů 1–8
+
+| Bod | Implementace v existujícím engine | Skutečně dokončený vybraný retest v93.446 | Auditní rozhodnutí |
+|---:|---|---|---|
+| 1 | `hmk-alchemy-acid-armour.js`, `live-combat-armour.js`, originální inventory/journal; GM potvrzuje necatalogové materiály | `test_alchemy_acid_armour_436.cjs` 42 PASS; `test_alchemy_acid_clothing_layers_437.cjs` 19 PASS | **Hotovo v ověřeném materiálovém a anatomickém rozsahu**, ne falešné AV pro neověřené oděvy |
+| 2 | `hmk-alchemy-acid-flesh.js` → původní `persistent-combat-state.js`, zranění, Shock a historie | `test_alchemy_acid_flesh_437.cjs` úspěšný; včetně G5 limitu a Compound 54 PASS | **Hotovo pro doloženou lidskou anatomii**, nikoli automaticky pro všechny jiné Folk |
+| 3 | `hmk-alchemy-acid-thrown.js`, původní Throwing, původní fyzická nádoba, Initiative | `test_alchemy_acid_thrown_438.cjs` 37 PASS | **Hotovo pro doložené originální Acid splash** |
+| 4 | `hmk-alchemy-applied-objects.js`, Mending, Object Aegis, WQ/AV, Skill Workbench provenance | `test_alchemy_applied_objects_439.cjs` 36 PASS | **Hotovo pro Mending/Object Aegis v rozsahu v93.439**. Obecný casting patří #10 |
+| 5 | `hmk-alchemy-area-atomic-plan.js`, `hmk-alchemy-area-los.js`, `hmk-alchemy-area-preflight.js`, `hmk-alchemy-area-thrown-source.js` | `test_alchemy_area_atomic_plan_440.cjs` PASS, `test_alchemy_area_los_440.cjs` 18 PASS, `test_alchemy_area_live_derivatives_440.cjs` 32 PASS | **Hotovo v bojovém rozsahu v93.440**. Souhrnný Chromium E2E všech tří elixírů je doložen ve v93.440; v93.446 nebyl celý opakován |
+| 6 | `hmk-alchemy-profusion.js`, společný cohort v `hmk-alchemy-imbibing.js` | `test_alchemy_profusion_catalog_441.cjs` 307 PASS | **ČÁSTEČNĚ**: 22 dalších neexemptních Imbibed účinků nemá skutečný lifecycle; nelze prohlásit univerzální Profusion |
+| 7 | `hmk-alchemy-ill-effects.js`, původní zdravotní stav / Aural Shock | `test_alchemy_ill_effects_442.cjs` 987 PASS | **ČÁSTEČNĚ**: katalog 35/35 není skutečný zdravotní writer pro všechny nepodporované elixíry |
+| 8 | `hmk-alchemy-imbibing.js`, Physic per-source AS přes historické důkazy | `test_alchemy_physic_targets_443.cjs` 84 PASS; `test_alchemy_physic_four_active_443.cjs` 37 PASS | **ČÁSTEČNĚ**: nelze bezpečně provést na dosud neimplementovaném Poison/Quiescence či jiném efektu bez originálního lifecycle |
+
+Testy neprokazují ničím neomezenou funkčnost mimo výslovně implementované situace. Místa, kde aplikace z bezpečnostních důvodů čeká na další kanonickou implementaci, nejsou chybějícími pravidly „automaticky dopočítána“.
+
+### #10: Shèk-Pvâr caster readiness (bez spekulativního kouzlení)
+
+- Nový `src/integration/hmk-alchemy-arcane-casting-readiness.js` spojuje **původní validovaný důkaz vybraných kouzel** z Character Creation s aktuálním `Pvârism` dostupným přes stávající `availableMasteries()` v Skill Workbench. Nevydává historickou počáteční ML za aktuální, nesouhlas originálního výběru se zdrojovou rekonstrukcí odmítá. Neutral nemá Sunsign modifier (HMK 198).
+- Pro skutečný cíl z `hmk-alchemy-arcane-targets.js` rozlišuje Detect I, Reveal I, Dispel II: **SI × 5 ft**, **SI ft**, **SI × 5 ft v LOS**; požadované doby seslání **2 kola / 1 minuta / 1 minuta** (HMK 251,254). Dispel počítá **−5 × aktuální AS** pouze jako **známou složku**, *nikoli* finální EML bez penalizací hluku, zranění, fatigue, Focus aj.
+- Kontrola výslovně identifikuje chybějící Ward adjudication, nezajištěné LOS, neexistující úspěšné Detect+Reveal stejného zdroje a obecný chybějící **Spellstart/Spellfire/Misfire/Fatigue writer** (HMK 200–203,251,254–255). `mayCommit` i `complete` jsou **vždy false** – žádné nové kouzlo, zranění, odstranění enchantmentu nebo magické trvání nelze z pouhého předvýpočtu uložit.
+- Produkční **GM Calendar → Alchemy** nyní read-only vypisuje ověřené původní znalosti Shèk-Pvâr, současné Pvârism ML, SI a dosahy kouzel vedle existujících zdrojových dossierů. Není zde tlačítko „kouzlit bez důkazu“. Zachovány originální Inventory, Combat State, Initiative a append-only journal.
+- `index.html` (title, loader + asset cache-busting), `app.js` (`APP_VERSION`) a `hmk-app.bundle.js` mají společné vydání **v93.446**.
+
+### Provedené testy v93.446
+
+- **PASS** `test_alchemy_arcane_cast_readiness_446.cjs` – **58 kontrol**, včetně výchozích známých Neutral kouzel, validace původu, SI/range, neúplných Detect/Reveal/Ward/LOS, odmítnutí změny historického důkazu a striktního `mayCommit=false` i při všech GM potvrzeních.
+- **PASS** kompletní dostupná Node.js regrese **74/74 testovacích souborů**, šest uložených nezávislých skupin 12+12+12+12+12+14, 0 FAIL, 0 TIMEOUT. Jeden přerušený souhrnný pokus dokončil jen úvodních 24; ten **není** připočten jako úplná regrese.
+- **PASS Chromium** `browser_alchemy_release_version_446.py` – skutečné HTML z `index.html`, produkční bundle, patička v93.446, žádné JavaScript chyby.
+- **PASS Chromium** `browser_alchemy_arcane_targets_446.py` – reálný původní archiv kampaně se skladovou Physic, aktivním Darkvision a doloženou postavou Shèk-Pvâr (Pvârism 70/SI7); zobrazeny cíle, Dispel EML −30 a dosahy Detect 35 ft, Reveal 7 ft, Dispel 35 ft; bezzápisovost a zachování LocalStorage. **Nejde o nové seslání**.
+- **PASS Chromium** `browser_alchemy_area_combat_446.py` – skutečný produkční UI Attack všech tří **Fumebomb, Weakness, Eruption**: fyzická spotřeba původní lahvičky, Combat State, dokončený tah, uložení a nová instance ze skutečného uloženého JSON, totožná historie a GM čas. Jde o verzi-test původního ověřeného E2E scénáře #5 upravený pouze pro skutečně zobrazovanou verzi v93.446. Původní skript v93.440 měl pevně zapsané očekávání starého čísla; jeho původní neúspěšný běh proto není selháním aktuální aplikace.
+- **NEOVĚŘENO v93.446**: nová úplná Chromium E2E regrese **všech** ostatních větví #1–#4 a #6–#8, síťové načtení GitHub Pages, skutečný casting/replay Detect→Reveal→Dispel; tyto výsledky nesmějí být tvrzeny jako PASS.
+
+**Závazné omezení:** bod #10 **ČÁSTEČNĚ, neuzavřen**. Pro provedení má nejprve vzniknout pravidlově úplná kanonická spellcasting větev (HMK str. 200–203) v původním Skill/Initiative/Combat State a následně atomické caster/ward/detect/reveal/dispel/negation důkazy. Bez tohoto kroku nelze předčasně odstranit elixír. #6–#8 zůstávají otevřené do reálné implementace dalších Imbibed lifecycle dle schváleného pořadí. v93.446 je **checkpoint DIFF proti v93.445**, nikoliv finální uzávěrka #10 ani #1–#15.
