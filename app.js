@@ -54,6 +54,10 @@ import {auditArmourLibraryConsistency} from './src/integration/armour-library-co
 import {assertLegacyMutationDoesNotChangeCombat} from './src/integration/active-combat-write-boundary.js';
 import {assertAlternateManeuverWriteAllowed} from './src/integration/hmk-alternate-maneuver-write-gate.js';
 import {persistVerifiedCombatSnapshot} from './src/integration/verified-combat-storage.js';
+import {prepareNeutralAlchemySpellstart,persistNeutralAlchemySpellstart} from './src/integration/hmk-alchemy-neutral-spellstart.js';
+import {activeAlchemyWard} from './src/integration/hmk-neutral-ward-lifecycle.js';
+import {prepareFailedNeutralSpellfire,persistFailedNeutralSpellfire,prepareCriticalNeutralSpellfire,persistCriticalNeutralSpellfire,prepareSuccessfulNeutralSpellfire,persistSuccessfulNeutralSpellfire} from './src/integration/hmk-alchemy-neutral-spellfire-commit.js';
+import {validateNeutralAlchemyHistory,validateNeutralAlchemyCombatLinks} from './src/integration/hmk-alchemy-neutral-history.js';
 import {linkNewMoralePsycheAccrual,journalNewMoralePsycheSources} from './src/integration/hmk-morale-psyche-bridge.js';
 import {persistFearExposure,persistFearSafeRecovery,persistFearEndTurnReaction} from './src/integration/hmk-fear-aberrance-persistence.js';
 import {createG04ActionWizards} from './src/integration/hmk-g04-guided-actions-ui.js';
@@ -232,7 +236,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.447';
+const APP_VERSION='93.452';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -282,7 +286,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
+ if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
  if(p?.elixirName!=='Erudition'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;
  const actor=d.characters.find(c=>c.id===p.targetId);
  const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-erudition-aural');
@@ -5317,6 +5321,67 @@ function hmkTemporalRecoveryPanel(chars){
  return pending.length?`<section class="panel hc-recovery" id="hmk-calendar-recovery"><h3>HMK · pravidlové časované obnovy</h3><p>Hody i výsledek jsou zapisovány přímo původním pravidlovým modulem. Software hod a ručně zadaný hod mají odlišný původ v auditu.</p>${pending.join('')}</section>`:'';
 }
 function calendarDiceControls(faces){return `<div class="field-grid"><label>Zdroj d${faces}<select name="diceOrigin"><option value="software">Automatický hod (bezpečný generátor)</option><option value="manual">Ruční zadání čísla</option></select></label><label>d${faces} při ručním zadání<input name="die" type="number" min="1" max="${faces}" step="1" placeholder="Auto = nechat prázdné"></label></div>`;}
+/** Authoritative bounded Neutral casting. Original Ward and Ward-target
+ * Detect/Reveal/Dispel are supported; Total Release and unverified casting
+ * variants remain fail-closed. */
+function neutralCombatCastingPanel(){
+ const q=combatInitiativeSequence,clock=data.campaignClock;
+ if(!q||!clock||q.cursor>=q.order.length)return '';
+ const casterId=q.order[q.cursor],caster=character(casterId);
+ if(!caster)return '';
+ const commitment=q.commitments?.[casterId];
+ const options=(()=>{try{return alchemyArcaneTargetRegister({journal:data.journal,inventory:data.inventory,
+  campaignId:campaignKey(clock),minute:clock.minute}).filter(x=>x.dossier?.targetable)}catch{return []}})();
+ const begin=q.active&&!q.interruptActiveId&&!q.pendingEndTurnAction&&
+  (!commitment||['completed','abandoned'].includes(commitment.status));
+ const fire=!q.active&&commitment?.status==='in-progress'&&commitment.completionRound===q.round;
+ if(!begin&&!fire)return '';
+ const spellstart=fire?data.journal.find(x=>x.combatProof?.actionKind==='neutral-spellstart'&&
+  x.combatProof.casterId===casterId&&x.combatProof.timelineId===q.timelineId&&
+  x.combatProof.startRound===commitment.startRound&&
+  x.combatProof.castingTimeRounds===commitment.durationRounds&&
+  !data.journal.some(j=>j.calendarAlchemyNeutralCast?.spellstartId===x.id)):null;
+ if(fire&&!spellstart)return '';
+ const labelTarget=x=>{const w=activeAlchemyWard({journal:data.journal,
+  campaignId:campaignKey(clock),finishId:x.finishId,sourceId:x.dossier.sourceId});
+  return `${x.dossier.elixirName} · AS ${x.dossier.currentAS} · ${x.finishId}`+
+   (w?` · chráněno Ward WL ${w.wardLevel}`:'');};
+ return `<section class="panel wide"><h3>Neutral Spellcasting · HMK 200–203, 251, 254–255 · v93.452</h3>
+ <p class="muted">Pouze ověřený běžný Incant, fyzické GM hody a původní Initiative. Ward vyžaduje dotyk a 60 kol. Dřívější Ward lze přebít jen vyšším Ward Level už při běžném S a s původním důkazem i výslovným GM potvrzením. Jiné případy včetně Total Release 100 a nepodložených modifikátorů jsou blokovány. Dokončené kouzlo NENÍ pouhý Skill Test.</p>
+ ${begin?`<form data-neutral-spellstart><strong>Spellstart · ${esc(caster.name)}, kolo ${q.round}</strong>
+ <input type="hidden" name="casterId" value="${esc(casterId)}"><label>Neutral kouzlo<select name="spell"><option>Detect</option><option>Reveal</option><option>Dispel</option><option>Ward</option></select></label>
+ <label>Skutečný alchymistický zdroj<select name="finishId" required>${options.map(x=>`<option value="${esc(x.finishId)}">${esc(labelTarget(x))}</option>`).join('')}</select></label>
+ <label>Co je přímým cílem? <select name="targetKind"><option value="Elixir">Elixír (pouze bez Wardu)</option><option value="Ward">Aktivní Ward chránící tento elixír</option></select></label>
+ <label>Vzdálenost zdroje v ft<input name="distanceFeet" type="number" min="0" step="0.01" required></label>
+ <label><input type="checkbox" name="gmCantGestureConfirmed" required> GM potvrzuje běžný hlasitý Cant a neomezená gesta</label>
+ <label><input type="checkbox" name="gmOrdinaryConditionsConfirmed" required> GM potvrdil běžné okolnosti bez dalších modifikátorů</label>
+ <label><input type="checkbox" name="gmWardAbsentConfirmed"> GM ověřil nepřítomnost Ward (Detect / Reveal / Dispel)</label>
+ <label><input type="checkbox" name="gmTouchConfirmed"> GM potvrdil dotyk magického zdroje (sesílání Ward)</label>
+ <label><input type="checkbox" name="gmSupersedeWardConfirmed"> GM potvrzuje původní Ward a silnější nový WL při přebití</label>
+ <label><input type="checkbox" name="gmWardTargetConfirmed"> GM ověřil přímé cílení na originální aktivní Ward (Detect / Reveal / Dispel Wardu)</label>
+ <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje současný vlastní Initiative tah a cíl</label>
+ <button type="submit" ${options.length?'':'disabled'}>Zapsat Spellstart a ukončit vlastní tah</button></form>`:''}
+ ${fire?`<form data-neutral-spellfire><strong>Spellfire · ${esc(caster.name)} · ${esc(spellstart.combatProof.spell)} · kolo ${q.round}</strong>
+ <input type="hidden" name="casterId" value="${esc(casterId)}"><input type="hidden" name="finishId" value="${esc(spellstart.combatProof.finishId)}"><input type="hidden" name="spell" value="${esc(spellstart.combatProof.spell)}"><input type="hidden" name="targetKind" value="${spellstart.combatProof.targetKind==='Ward'?'Ward':'Elixir'}">
+ <label>Skutečná vzdálenost cíle v ft<input name="distanceFeet" type="number" min="0" step="0.01" required></label>
+ <label>Fyzický Casting d100<input name="castingD100" type="number" min="1" max="100" step="1" required></label>
+ <label>Typ dosaženého SL (ověří se výpočtem, nesoulad se odmítne)<select name="resultFamily"><option value="success">Success S / CS</option><option value="failed">Failure F</option><option value="critical">Critical Failure CF</option></select></label>
+ <label>Fyzický Misfire d100 – POUZE pokud CF (100 = Total Release, zatím zablokováno)<input name="misfireD100" type="number" min="1" max="100" step="1"></label>
+ ${spellstart.combatProof.spell==='Detect'?`<p>Detect musí při úspěchu pokrýt VŠECHNY existující magické zdroje do dosahu, včetně nealchymistických.</p>
+ <label>Vzdálenosti všech známých alchymistických finishId (JSON mapa)<textarea name="distancesByFinishId" rows="2" required placeholder='{"finish-id":4}'></textarea></label>
+ <label>Ostatní zdroje magie (JSON pole ověřených identit, kategorií a vzdáleností)<textarea name="otherSources" rows="2">[]</textarea></label>
+ <label><input type="checkbox" name="gmAllSourcesConfirmed"> GM potvrzuje úplnost mapy všech zdrojů v dosahu</label>`:''}
+ ${spellstart.combatProof.spell==='Dispel'?`<label><input type="checkbox" name="gmLOSConfirmed" required> GM potvrdil živou přímou LOS bez kouře či překážek</label>`:''}
+ <label><input type="checkbox" name="gmConcentrationConfirmed" required> GM potvrzuje nepřerušenou koncentraci po předepsanou dobu</label>
+ <label><input type="checkbox" name="gmOrdinaryConditionsConfirmed" required> GM potvrdil skutečné Casting modifiers jako běžný režim</label>
+ <label><input type="checkbox" name="gmWardAbsentConfirmed"> GM znovu ověřil nepřítomnost Ward (Detect / Reveal / Dispel)</label>
+ <label><input type="checkbox" name="gmTouchConfirmed"> GM potvrdil dotyk po 60 kolech (sesílání Ward)</label>
+ <label><input type="checkbox" name="gmSupersedeWardConfirmed"> GM potvrzuje původní přebíjený Ward po 60 kolech</label>
+ <label><input type="checkbox" name="gmWardTargetConfirmed"> GM ověřil cílení originálního Wardu podle jeho historického ID (Detect / Reveal / Dispel Wardu)</label>
+ <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje všechny fyzické hody, identitu a atomický zápis</label>
+ <button type="submit">Vyhodnotit a trvale uložit jeden Spellfire</button></form>`:''}
+ </section>`;
+}
 function encounterView(){
  const chars=data.characters;
  const selectedChars=selectedEncounterCharacters();
@@ -5328,7 +5393,7 @@ function encounterView(){
  ${chars.length?`<div class="encounter-roster">${chars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues,...equippedCombatInputs(c).issues];return `<label class="encounter-entry"><input type="checkbox" data-encounter-character="${esc(c.id)}" ${encounterSelection.has(c.id)?'checked':''}><span><strong>${esc(c.name)}</strong><small>${esc(c.kind||'PC')} · ${warnings.length?warnings.length+' upozornění k údajům':'bez upozornění k úplnosti údajů'}</small></span></label>`}).join('')}</div>`:'<p class="muted">Nejprve vytvořte postavy v registru.</p>'}
  <div class="equipment-summary"><div><strong>Vybráno</strong><span>${count} postav</span></div><div><strong>Chybějící evidenční údaje</strong><span>${issues} upozornění</span></div></div>
  <div class="actions"><button type="button" data-action="encounter-all" ${chars.length?'':'disabled'}>Vybrat všechny</button><button type="button" class="secondary" data-action="encounter-clear" ${count?'':'disabled'}>Zrušit výběr</button><button type="button" data-action="encounter-export" ${count?'':'disabled'}>Exportovat podklady JSON</button></div></section>
- ${selectedChars.length?`<section class="panel"><h3>Kontrola účastníků</h3>${selectedChars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues.map(x=>'Výbava: '+x),...equippedCombatInputs(c).issues.map(x=>'Combat: '+x)];return `<details class="encounter-details"><summary>${esc(c.name)} · ${warnings.length} upozornění</summary>${warnings.length?`<ul class="audit-list">${warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="muted">Evidenční kontrola bez upozornění; pravidlová správnost není potvrzena.</p>'}</details>${armourCoveragePanel(c)}${combatantLoadPanel(c)}${equippedCombatInputsPanel(c)}`}).join('')}</section>`:''}${initiativeSequencePanel(selectedChars)}${guidedAttackPanel(selectedChars)}${combatClockPanel(selectedChars)}${taLedgerPanel(selectedChars)}${inClosePanel(selectedChars)}${specialStrikePreviewPanel(selectedChars)}${hmkMissilePanel(selectedChars)}${hmkSpecialBranchesPanel(selectedChars)}${encounterImpactPreviewPanel(selectedChars)}${combatPersistentStatePanel(selectedChars)}${hmkFearPanel(selectedChars)}${hmkLongtermHealingPanel(selectedChars)}${hmkTemporalRecoveryPanel(selectedChars)}${combatDraftHistoryPanel()}${combatContinuityPanel()}${combatReplayPanel()}${combatStateProjectionPanel()}${encounterShockFollowupPanel()}${encounterD100Panel()}${encounterShockMLPanel()}`,`journal-book--combat`);
+ ${selectedChars.length?`<section class="panel"><h3>Kontrola účastníků</h3>${selectedChars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues.map(x=>'Výbava: '+x),...equippedCombatInputs(c).issues.map(x=>'Combat: '+x)];return `<details class="encounter-details"><summary>${esc(c.name)} · ${warnings.length} upozornění</summary>${warnings.length?`<ul class="audit-list">${warnings.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="muted">Evidenční kontrola bez upozornění; pravidlová správnost není potvrzena.</p>'}</details>${armourCoveragePanel(c)}${combatantLoadPanel(c)}${equippedCombatInputsPanel(c)}`}).join('')}</section>`:''}${initiativeSequencePanel(selectedChars)}${guidedAttackPanel(selectedChars)}${combatClockPanel(selectedChars)}${taLedgerPanel(selectedChars)}${inClosePanel(selectedChars)}${specialStrikePreviewPanel(selectedChars)}${hmkMissilePanel(selectedChars)}${hmkSpecialBranchesPanel(selectedChars)}${encounterImpactPreviewPanel(selectedChars)}${combatPersistentStatePanel(selectedChars)}${hmkFearPanel(selectedChars)}${hmkLongtermHealingPanel(selectedChars)}${hmkTemporalRecoveryPanel(selectedChars)}${combatDraftHistoryPanel()}${combatContinuityPanel()}${combatReplayPanel()}${combatStateProjectionPanel()}${encounterShockFollowupPanel()}${encounterD100Panel()}${encounterShockMLPanel()}${neutralCombatCastingPanel()}`,`journal-book--combat`);
 }
 function editor(title,obj,kind){return `<div class="panel"><h2>${esc(title)}</h2><form id="${kind}-editor">${field('name','Název / jméno',obj.name||'')}${kind==='character'?`${field('occupation','Povolání',obj.occupation||'')}<label>Typ<select name="kind"><option>PC</option><option>NPC</option></select></label>${area('description','Popis',obj.description||'')}`:`<label>Kategorie<select name="category">${[['weapon','Zbraň'],['shield','Štít'],['armor','Zbroj'],['other','Ostatní předmět']].map(([v,l])=>`<option value="${v}" ${obj.category===v?'selected':''}>${l}</option>`).join('')}</select></label>${area('description','Popis',obj.description||'')}${field('source','Odkaz na zdroj (např. kapitola/strana)',obj.source||'')}${area('properties','Vlastní parametry JSON',JSON.stringify(obj.properties||{},null,2))}`}<div class="actions"><button type="submit">Uložit</button>${button('Zrušit','cancel-editor')}</div></form></div>`}
 let sheetEditingId=null; // only an ephemeral UI flag, never persisted
@@ -8026,6 +8091,66 @@ document.addEventListener('submit',e=>{
     skillTestProof:{type:'poison-onset',sourceId:result.course.sourceId,actorId:target.id,course:result.course,report:result.onsetReport}});
   });notice='Great Poison se projevil v doloženém bojovém kole. Původní Poison Course je aktivní; čas GM se neposunul.';render();
  }catch(err){alert('Great Poison: '+err.message)}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-neutral-spellstart],[data-neutral-spellfire]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(storageReadOnly||!data.campaignClock||!data.combatRuntime?.sequence||
+   !combatInitiativeSequence||JSON.stringify(combatInitiativeSequence)!==JSON.stringify(data.combatRuntime.sequence))
+   throw Error('Chybí živý a shodný trvalý Initiative checkpoint');
+  const v=new FormData(f),get=x=>String(v.get(x)??'');
+  const chosenSpell=get('spell'),chosenTargetKind=get('targetKind')||'Elixir';
+  const required=['gmOrdinaryConditionsConfirmed','gmConfirmed',
+   chosenTargetKind==='Ward'?'gmWardTargetConfirmed':
+    chosenSpell==='Ward'?'gmTouchConfirmed':'gmWardAbsentConfirmed',
+   ...(f.matches('[data-neutral-spellstart]')?['gmCantGestureConfirmed']:['gmConcentrationConfirmed'])];
+  for(const n of required)if(!v.has(n))throw Error('Chybí GM potvrzení: '+n);
+  const info={document:data,id:uuid(),casterId:get('casterId'),finishId:get('finishId'),
+   spell:get('spell'),targetKind:chosenTargetKind,gmWardTargetConfirmed:v.has('gmWardTargetConfirmed'),
+   gmSupersedeWardConfirmed:v.has('gmSupersedeWardConfirmed'),
+   distanceFeet:Number(get('distanceFeet')),gmConfirmed:true,
+   gmOrdinaryConditionsConfirmed:true,gmWardAbsentConfirmed:v.has('gmWardAbsentConfirmed'),
+   gmTouchConfirmed:v.has('gmTouchConfirmed'),createdAt:stamp()};
+  let stage,persist;
+  if(f.matches('[data-neutral-spellstart]')){
+   stage=prepareNeutralAlchemySpellstart({...info,gmCantGestureConfirmed:true});
+   persist=persistNeutralAlchemySpellstart;
+  }else{
+   const d100=Number(get('castingD100'));
+   if(!Number.isSafeInteger(d100)||d100<1||d100>100)throw Error('Casting vyžaduje skutečný d100');
+   const misfireRaw=get('misfireD100'),misfire=misfireRaw===''?null:Number(misfireRaw);
+   const family=get('resultFamily');
+   const args={...info,castingD100:d100,misfireD100:misfire,
+    gmConcentrationConfirmed:true,gmLOSConfirmed:v.has('gmLOSConfirmed')};
+   if(family==='failed'){
+    if(misfire!==null)throw Error('Běžné F nesmí zadat Misfire d100');
+    stage=prepareFailedNeutralSpellfire(args);persist=persistFailedNeutralSpellfire;
+   }else if(family==='critical'){
+    if(!Number.isSafeInteger(misfire)||misfire<1||misfire>100)
+     throw Error('CF vyžaduje další skutečný Misfire d100');
+    stage=prepareCriticalNeutralSpellfire(args);persist=persistCriticalNeutralSpellfire;
+   }else if(family==='success'){
+    if(misfire!==null)throw Error('S/CS nesmí zadat Misfire d100');
+    let distancesByFinishId=null,otherSources=[];
+    if(info.spell==='Detect'){
+     try{distancesByFinishId=JSON.parse(get('distancesByFinishId'));
+      otherSources=JSON.parse(get('otherSources')||'[]')}catch{throw Error('Detect potřebuje platnou JSON mapu všech magických zdrojů')}
+    }
+    stage=prepareSuccessfulNeutralSpellfire({...args,gmAllSourcesConfirmed:v.has('gmAllSourcesConfirmed'),
+     distancesByFinishId,otherSources});persist=persistSuccessfulNeutralSpellfire;
+   }else throw Error('Neplatný požadovaný typ casting úspěchu');
+  }
+  validate(stage.nextDocument);
+  const result=persist({stage,document:data,storage:localStorage,key:STORAGE,baseline:storageBaseline});
+  if(!result.ok){if(result.readOnly)storageReadOnly=true;
+   throw Error('Atomický zápis odmítnut ('+result.code+'); neopakujte hod naslepo');}
+  data=validate(result.document);storageBaseline=result.serialized;
+  mirrorInitiative(validateEncounterSequence(data.combatRuntime.sequence),data.combatRuntime.clock);
+  notice=f.matches('[data-neutral-spellstart]')?'Neutral Spellstart uložen; koncentrace zapsána ve vlastní Initiative.':
+   'Neutral Spellfire doložen: '+stage.nextDocument.journal.at(-1).calendarAlchemyNeutralCast.castingSL+'; původní historie zachována.';
+  render();
+ }catch(error){alert('Neutral casting: '+error.message)}
 },true);
 document.addEventListener('submit',e=>{
  const f=e.target;if(!f?.matches?.('[data-alchemy-area-thrown]'))return;
