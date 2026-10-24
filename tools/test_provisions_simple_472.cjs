@@ -36,11 +36,11 @@ const check=(a,b,label)=>{assert.deepEqual(a,b,label);passed++};
  check(portions.map(x=>x.disposition),['consumed','consumed']);
  check(shared.length,1); // original receipts not modified by allocator
  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');const css=fs.readFileSync(path.join(root,'book-templates.css'),'utf8');const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- for(const str of ["const APP_VERSION='93.473'",'function partyProvisionLedgerHTML(participants)','function personalProvisionQuickActionsHTML(actor)',
+ for(const str of ["const APP_VERSION='93.474'",'function partyProvisionLedgerHTML(participants)','function personalProvisionQuickActionsHTML(actor)',
  'data-provision-single-ration','data-provision-drop','allocateForagingRations','recordPhysicalRationLoss','recordPhysicalWaterLoss',
  'data-foraging-batch-rations','data-nutrition-policy-form']){assert.ok(app.includes(str),str);passed++}
  for(const str of ['.hc-provision-table','.hc-provision-carry-summary','.hc-provision-metrics','.hc-provision-compact-extra']){assert.ok(css.includes(str),str);passed++}
- check(html.includes('v93.473'),true);check(html.includes('hmk-app.bundle.js?v=93.473'),true);
- check(app.includes('Přidělení ze společného Foraging není vznik nového předmětu'),true); // no synthetic carried item
+ check(html.includes('v93.474'),true);check(html.includes('hmk-app.bundle.js?v=93.474'),true);
+ check(app.includes('Přidělení je denní spotřeba ze společných nálezů'),true); // no synthetic carried item
  console.log('PASS',passed,'provisions 472 calculations, physical mass, expiry, ownership and UI guards');
 })().catch(e=>{console.error(e.stack);process.exitCode=1});

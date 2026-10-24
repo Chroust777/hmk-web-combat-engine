@@ -4417,3 +4417,16 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 
 /* Physical-die controls remain visually paired, with one button beneath each number field. */
 .hsk-climb-fall input[type=number]+[data-hmk-calendar-auto-die]{display:block;margin:.4rem 0 0;max-width:100%;min-height:34px;}
+
+/* v93.474 — simple provisions surface, audited HMK procedures behind details */
+.hc-provision-simple-switch{display:grid;gap:8px;padding:11px 12px;border:1px solid rgba(94,72,41,.37);border-radius:10px;background:rgba(232,218,185,.32)}
+.hc-provision-simple-switch>strong{font-size:.93rem}
+.hc-provision-simple-switch>small{font-size:.77rem;line-height:1.35;color:#5a513e}
+.hc-provision-switch-actions{display:flex;flex-wrap:wrap;gap:8px}
+.hc-provision-switch-actions>button{flex:1 1 180px;min-height:39px;font-size:.84rem}
+.hc-provision-guide .hc-provision-compact-extra>summary{padding:5px 0}
+.hc-provision-guide .hc-provision-carry-summary{border:0;padding:6px 0}
+.hc-provision-guide .hc-provision-compact-extra{background:rgba(255,250,232,.25)}
+.hc-provision-guide .hc-provision-choices button{flex:1 1 125px;min-height:33px}
+.hc-person-provision-rules .hc-provision-personal-rules:not([open]){background:transparent}
+@media(max-width:580px){.hc-provision-switch-actions>button{flex:1 1 100%}}

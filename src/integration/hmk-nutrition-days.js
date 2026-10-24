@@ -26,15 +26,17 @@ export function activeNutritionPolicies(journal=[],campaignId,actorIds=null){
 /** Explicitly confirmed source restriction, activity and climate. A different
  * carried ration source is not inferable from the Foraging supply ledger.
  */
-export function createNutritionPolicy({campaignId,minute,actorId,foodNeed=1,waterNeed=1,foragingOnly=false,inventoryRations=false,inventoryWater=false,enabled=true,autoNeeds=false}={}){
+export function createNutritionPolicy({campaignId,minute,actorId,foodNeed=1,waterNeed=1,foragingOnly=false,inventoryRations=false,inventoryWater=false,enabled=true,autoNeeds=false,gmProvisioned=false}={}){
  check(typeof campaignId==='string'&&campaignId&&validMinute(minute),'Denní režim potřebuje doložený čas kampaně');
  check(typeof actorId==='string'&&actorId,'Denní režim musí mít konkrétní postavu');
  check(ration(foodNeed)&&[0.5,1,2].includes(waterNeed)&&foodNeed<=1,'HMK 186: neplatný denní příděl');
  check(typeof autoNeeds==='boolean'&&(!autoNeeds||(foodNeed===1&&waterNeed===1)),'Automatický den vyžaduje běžný výchozí příděl 1/1');
+ check(typeof gmProvisioned==='boolean'&&(!gmProvisioned||enabled===true),'GM zásobování může být jen aktivní režim');
+ check(!gmProvisioned||(!foragingOnly&&!inventoryRations&&!inventoryWater),'GM zajištěné zásoby nesmějí vytvářet inventární ani Foraging výdej');
  check(typeof enabled==='boolean'&&typeof inventoryWater==='boolean'&&(!inventoryWater||inventoryRations===true),'Neplatný režim pitné vody');
- check(!enabled||(foragingOnly===true)!==(inventoryRations===true),'Vyžadováno doložení právě jednoho režimu: výhradně Foraging nebo vlastní fyzické příděly + Foraging');
+ check(!enabled||gmProvisioned||(foragingOnly===true)!==(inventoryRations===true),'Vyžadováno doložení právě jednoho režimu: výhradně Foraging nebo vlastní fyzické příděly + Foraging');
  return {format:NUTRITION_POLICY_FORMAT,campaignId,minute,actorId,foodNeed,waterNeed,foragingOnly:enabled&&foragingOnly,enabled,
-  ...(inventoryRations?{inventoryRations:true}:{}),...(inventoryWater?{inventoryWater:true}:{}),...(autoNeeds?{autoNeeds:true}:{}),sourcePages:inventoryWater?[120,121,147,186]:inventoryRations?[120,147,186]:[147,186]};
+  ...(inventoryRations?{inventoryRations:true}:{}),...(inventoryWater?{inventoryWater:true}:{}),...(autoNeeds?{autoNeeds:true}:{}),...(gmProvisioned?{gmProvisioned:true}:{}),sourcePages:gmProvisioned?[186]:inventoryWater?[120,121,147,186]:inventoryRations?[120,147,186]:[147,186]};
 }
 const dayRecords=(journal,campaignId,actorId)=>journal.filter(x=>x.calendarCampaignId===campaignId&&x.characterId===actorId&&x.calendarNutritionDay?.format===NUTRITION_DAY_FORMAT);
 const consumeBeforeDay=(journal,actorId,campaignId,start,end,unit,includeStart=false)=>round(journal.filter(x=>x.characterId===actorId&&x.calendarCampaignId===campaignId&&x.calendarForagingSupplyUse?.unit===unit&&
@@ -94,6 +96,9 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
    if(availablePhysicalWater(database.journal,campaignId,actorId,end).length)throw Error('Výhradní Foraging není prokázán: postava nese doloženou pitnou vodu.');}
   const automatic=[],received={};
   for(const [unit,required] of [['foodDays',needs.foodNeed],['waterDays',needs.waterNeed]]){
+   // GM certifies continuous access to food and drinking water for the upcoming day.
+   // This is NOT carried inventory and must never debit or fabricate physical lots.
+   if(p.gmProvisioned===true){received[unit]=required;continue;}
    const manual=Math.min(required,consumeBeforeDay(database.journal,actorId,campaignId,start,end,unit,start===policy.campaignMinute));
    let remaining=round(required-manual);
    // Only a GM-attested, time-stamped physical ration stock can supply food.
@@ -139,10 +144,11 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
   const dayProof={format:NUTRITION_DAY_FORMAT,policyId:policy.id,actorId,campaignId,startMinute:start,endMinute:end,
    foodNeed:needs.foodNeed,waterNeed:needs.waterNeed,foodReceived:received.foodDays,waterReceived:received.waterDays,
    foodShortfall:round(needs.foodNeed-received.foodDays),waterShortfall:round(needs.waterNeed-received.waterDays),
-   automaticDebitIds:automatic.map(x=>x.id),medicalApplied:false,...(p.autoNeeds?{activityNeeds:needs}:{}),sourcePages:[186]};
+   automaticDebitIds:automatic.map(x=>x.id),medicalApplied:false,...(p.autoNeeds?{activityNeeds:needs}:{}),...(p.gmProvisioned?{gmProvisioned:true}:{}),sourcePages:[186]};
   const row={id:idFactory(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:end,createdAt:stamp(),
    title:'HMK · 24h zásobování · '+actor.name,
    body:`24h: potrava ${dayProof.foodReceived}/${needs.foodNeed}, voda ${dayProof.waterReceived}/${needs.waterNeed}; `+
+    (p.gmProvisioned?'GM potvrdil průběžně zajištěný přístup bez inventárního výdeje. ':'')+
     (dayProof.foodShortfall||dayProof.waterShortfall?'Nedostatek – přezkoumat Starvation/Thirst podle HMK 186.':'Denní dávky účetně doložené.')+
     ' Lékařský Course/Healing Roll se bez výsledku neprovádí.',
    calendarNutritionDay:dayProof};
@@ -180,18 +186,19 @@ export function validateNutritionJournal(journal=[]){
    d.startMinute===last.get(d.policyId)&&d.endMinute===d.startMinute+DAY&&row.campaignMinute===d.endMinute&&
    ration(d.foodNeed)&&[0.5,1,2].includes(d.waterNeed)&&d.foodNeed===(effective?.foodNeed??policy.foodNeed)&&d.waterNeed===(effective?.waterNeed??policy.waterNeed)&&
    (!policy.autoNeeds||JSON.stringify(d.activityNeeds)===JSON.stringify(effective))&&
+   (d.gmProvisioned===true)===(policy.gmProvisioned===true)&&
    [d.foodReceived,d.waterReceived,d.foodShortfall,d.waterShortfall].every(x=>Number.isFinite(x)&&x>=0&&Number.isInteger(x*2))&&
    round(d.foodReceived+d.foodShortfall)===d.foodNeed&&round(d.waterReceived+d.waterShortfall)===d.waterNeed&&
    d.medicalApplied===false&&JSON.stringify(d.sourcePages)==='[186]'&&!days.has(token),
    'Neplatná nebo duplicitní denní evidence HMK zásobování');
   const debitRows=seen.get(token)||[];
-  const expectedFood=round(Math.min(d.foodNeed,consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'foodDays',d.startMinute===policy.minute))+
+  const expectedFood=policy.gmProvisioned?d.foodNeed:round(Math.min(d.foodNeed,consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'foodDays',d.startMinute===policy.minute))+
    debitRows.filter(x=>x.calendarForagingSupplyUse?.unit==='foodDays').reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0)+
    debitRows.filter(x=>x.calendarInventoryRationUse?.unit==='foodDays').reduce((n,x)=>n+x.calendarInventoryRationUse.quantity,0));
-  const expectedWater=round(Math.min(d.waterNeed,consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'waterDays',d.startMinute===policy.minute))+
+  const expectedWater=policy.gmProvisioned?d.waterNeed:round(Math.min(d.waterNeed,consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'waterDays',d.startMinute===policy.minute))+
    debitRows.filter(x=>x.calendarForagingSupplyUse?.unit==='waterDays').reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0)+
    debitRows.filter(x=>x.calendarInventoryWaterUse?.unit==='waterDays').reduce((n,x)=>n+x.calendarInventoryWaterUse.quantity,0));
-  check(d.foodReceived===expectedFood&&d.waterReceived===expectedWater,'Doložená denní spotřeba neodpovídá výdejům');
+  check(d.foodReceived===expectedFood&&d.waterReceived===expectedWater&&(!policy.gmProvisioned||debitRows.length===0),'Doložená denní spotřeba neodpovídá výdejům nebo rozhodnutí GM');
   check(JSON.stringify(d.automaticDebitIds)===JSON.stringify(debitRows.map(x=>x.id))&&
    debitRows.every(x=>x.characterId===d.actorId&&x.calendarCampaignId===d.campaignId&&x.campaignMinute===d.endMinute),
    'Automatické denní dávky nemají souvislý audit původu');

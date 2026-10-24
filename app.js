@@ -245,7 +245,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.473';
+const APP_VERSION='93.474';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -794,21 +794,19 @@ function provisionLastDayLabel(last){
 function provisionCardHTML(c,compact=false){
  const p=characterProvisionsOverview(data,c.id);
  if(!p.available)return `<article class="hc-provision-card"><h4>${esc(c.name)}</h4><p>${esc(p.reason)}</p></article>`;
- const statusOf=(type)=>{
-  const last=p.latestDay?.[type];
-  if(!last)return {label:'Neověřeno',kind:'unknown'};
-  if(last.status==='full')return {label:'Potvrzeno za poslední uzavřený den',kind:'okay'};
-  return {label:last.status==='none'?'Nedoložena žádná dávka':'Doložena jen část dávky',kind:'risk'};
- };
- const food=statusOf('food'),water=statusOf('water');
- const days=(n)=>n>0?`${n} ${n===1?'den':n<5?'dny':'dnů'}`:'Bez doložené plné denní rezervy';
+ const carry=characterCarryProjection(data,c.id);
+ const policy=activeNutritionPolicies(data.journal,campaignKey(data.campaignClock),[c.id])[0]?.calendarNutritionPolicy;
+ const covered=policy?.gmProvisioned===true;
+ const food={label:covered?'Zajištěno GM':`${p.food.confirmedUnits} dávky`,kind:covered||p.food.confirmedUnits>0?'okay':'risk'};
+ const water={label:covered?'Zajištěno GM':`${p.water.confirmedGallons} gal`,kind:covered||p.water.confirmedGallons>0?'okay':'risk'};
+ const days=(n)=>n>0?`${n} ${n===1?'den':n<5?'dny':'dnů'}`:'0 dní';
  const alerts=p.illness.map(x=>x.kind==='thirst'?'Thirst HR'+x.hr:'Starvation HR'+x.hr);
  return `<article class="hc-provision-card hc-provision-card--compact${alerts.length?' hc-provision-card--alert':''}"><h4>${esc(c.name)}</h4>
- <div class="hc-provision-indicators"><div class="hc-provision-indicator"><span class="hc-provision-mark hc-provision-mark--${food.kind}" aria-hidden="true"></span><div><strong>Jídlo · ${esc(food.label)}</strong><small>V zásobě: ${esc(days(p.food.daysAtCurrentBaseline))} · ${esc(p.food.confirmedUnits)} denních dávek</small></div></div>
- <div class="hc-provision-indicator"><span class="hc-provision-mark hc-provision-mark--${water.kind}" aria-hidden="true"></span><div><strong>Pití · ${esc(water.label)}</strong><small>V zásobě: ${esc(days(p.water.daysAtCurrentBaseline))} · ${esc(p.water.confirmedGallons)} gal</small></div></div></div>
+ <div class="hc-provision-indicators"><div class="hc-provision-indicator"><span class="hc-provision-mark hc-provision-mark--${food.kind}" aria-hidden="true"></span><div><strong>Jídlo · ${esc(food.label)}</strong><small>Výdrž nesených: ${esc(days(p.food.daysAtCurrentBaseline))} · ${esc(carry.physicalFoodLb)} lb</small></div></div>
+ <div class="hc-provision-indicator"><span class="hc-provision-mark hc-provision-mark--${water.kind}" aria-hidden="true"></span><div><strong>Pití · ${esc(water.label)}</strong><small>Výdrž nesených: ${esc(days(p.water.daysAtCurrentBaseline))} · ${esc(carry.physicalWaterLb)} lb</small></div></div></div>
  ${alerts.length?`<p class="hc-provision-alert">Aktivní následek: ${esc(alerts.join(' · '))}</p>`:''}
- ${p.policy?`<p class="hc-provision-next">Další uzávěrka: ${esc(displayCampaignMinute(p.policy.nextCloseMinute))}</p>`:'<p class="hc-provision-next">Automatická denní spotřeba není zapnutá.</p>'}
- ${compact?'':`<details class="hc-provision-source"><summary>Doklady a podrobnosti</summary><p>${esc(p.nutritionEvidence==='not-monitored'?'Neprobíhá denní kontrola příjmu.':p.nutritionEvidence==='awaiting-first-close'?'První 24h období ještě neskončilo.':'Stav se vztahuje pouze k poslednímu skutečně uzavřenému dni.')}</p><p>Nepotvrzené zásoby v inventáři: ${esc(p.food.unconfirmedInventoryUnits)} dávek. Prošlá trvanlivost: ${esc(p.food.expiredUnits)} dávek. Foraging družiny není automaticky osobní příděl.</p></details>`}
+ ${covered?'<p class="hc-provision-next">GM zajišťuje průběžný přístup k jídlu a vodě. Nesené zásoby se tím nemění.</p>':p.policy?`<p class="hc-provision-next">Další uzávěrka: ${esc(displayCampaignMinute(p.policy.nextCloseMinute))}</p>`:''}
+ ${compact?'':`<details class="hc-provision-source"><summary>Historie poslední dávky a doklady</summary><p>${esc(p.nutritionEvidence==='not-monitored'?'Neprobíhá denní kontrola příjmu.':p.nutritionEvidence==='awaiting-first-close'?'První 24h období ještě neskončilo.':'Stav se vztahuje pouze k poslednímu skutečně uzavřenému dni.')}</p><p>Nepotvrzené zásoby v inventáři: ${esc(p.food.unconfirmedInventoryUnits)} dávek. Prošlá trvanlivost: ${esc(p.food.expiredUnits)} dávek. Foraging družiny není automaticky osobní příděl.</p></details>`}
  </article>`;
 }
 
@@ -824,7 +822,7 @@ function personalProvisionQuickActionsHTML(actor){
  const foodOptions=p.foodLots.filter(l=>l.remaining>=0.5).map(l=>`<option value="${esc(l.sourceId)}">${esc(l.name)} · ${l.remaining} dávek · ${l.remaining*3} lb</option>`).join('');
  const waterOptions=p.waterLots.filter(l=>l.remaining>=0.5).map(l=>`<option value="${esc(l.fillId)}">${l.remaining} gal · ${l.remaining*10} lb</option>`).join('');
  const discard=(unit,options)=>options?`<form data-provision-drop><input type="hidden" name="actorId" value="${esc(actor.id)}"><input type="hidden" name="unit" value="${unit}"><label>${unit==='food'?'Balík potravy':'Naplněná nádoba'}<select name="sourceId">${options}</select></label><label>Odložit množství<select name="quantity"><option value="0.5">0,5 ${unit==='food'?'dávky · 1,5 lb':'gal · 5 lb'}</option><option value="1">1 ${unit==='food'?'dávka · 3 lb':'gal · 10 lb'}</option></select></label><label>Důvod skutečného odložení<input name="reason" minlength="2" maxlength="160" required placeholder="Např. uloženo v táboře"></label><label class="hc-check"><input type="checkbox" name="confirmedByGM" value="yes" required> GM potvrzuje, že zásoba skutečně přestala být nesena.</label><button type="submit">Zapsat odložení · ${unit==='food'?'jídlo':'voda'}</button></form>`:'';
- const shared=(pool?.foodDays>0||pool?.waterDays>0)?`<details class="hc-provision-compact-extra"><summary>Vydat dávku z doložených společných nálezů</summary><form data-provision-single-ration><input name="actorId" type="hidden" value="${esc(actor.id)}"><div class="hc-provision-inline-fields"><label>Potrava<select name="foodEach"><option value="1">Celá dávka · 3 lb</option><option value="0.5">Půl dávky · 1,5 lb</option><option value="0">Bez potravy</option></select></label><label>Voda<select name="waterEach"><option value="1">1 gal · běžná potřeba</option><option value="0.5">0,5 gal · úplná nečinnost</option><option value="2">2 gal · horko</option><option value="0">Bez vody</option></select></label></div><label class="hc-check"><input type="checkbox" name="confirmedByGM" value="yes" required> GM potvrzuje skutečný výdej z Foraging pro tuto postavu.</label><button type="submit">Vydat pouze ${esc(actor.name)}</button></form><p class="hc-provision-help">Přidělení ze společného Foraging není vznik nového předmětu v inventáři; zdravotní uzávěrku neprovádí.</p></details>`:'';
+ const shared=(pool?.foodDays>0||pool?.waterDays>0)?`<details class="hc-provision-compact-extra"><summary>Vydat denní dávku ze společných nálezů</summary><form data-provision-single-ration><input name="actorId" type="hidden" value="${esc(actor.id)}"><div class="hc-provision-inline-fields"><label>Potrava<select name="foodEach"><option value="0">0 dávek</option><option value="0.5">½ dávky · 1,5 lb</option><option value="1" selected>1 dávka · 3 lb</option></select></label><label>Voda<select name="waterEach"><option value="0">0 gal</option><option value="0.5">½ gal</option><option value="1" selected>1 gal</option><option value="2">2 gal</option></select></label></div><input type="hidden" name="confirmedByGM" value="yes"><button type="submit">Vydat pouze ${esc(actor.name)}</button></form><p class="hc-provision-help">Přidělení je denní spotřeba ze společných nálezů, nikoli přidání váhy do batohu.</p></details>`:'';
  return `<div class="hc-provision-carry-summary"><strong>Aktuálně nesená doložená výživa</strong><div class="hc-provision-metrics"><div><span>Jídlo</span><b>${p.edibleFood} dávky</b><small>${supplyDurationText(p.foodMinutes)} ekvivalent · ${p.physicalFoodLb} lb${p.spoiledFood?' · '+p.spoiledFood+' prošlé':''}</small></div><div><span>Pití</span><b>${p.carriedWater} gal</b><small>${supplyDurationText(p.waterMinutes)} ekvivalent · ${p.physicalWaterLb} lb</small></div><div><span>Celkem</span><b>${p.totalPhysicalLb} lb</b><small>Jen jídlo + obsah nádob; vlastní nádoby se váží zvlášť.</small></div></div><small>Hodiny jsou pouze přepočet na standardní dávku, nikoli zdravotní odpočet. Hmotnost se skutečně změní až doloženou spotřebou, předáním nebo odložením. Starší potraviny mohou mezitím propadnout trvanlivosti.</small></div>
  ${foodOptions||waterOptions?`<details class="hc-provision-compact-extra"><summary>Odložit část nesených zásob · změna hmotnosti</summary><div class="hc-provision-drop-forms">${discard('food',foodOptions)}${discard('water',waterOptions)}</div><p class="hc-provision-help">Odložení je nevratný auditní odpis z osobní nesené zásoby v této kampani, nikoli automatické založení zásobníku tábora.</p></details>`:''}
  ${shared}`;
@@ -840,27 +838,24 @@ function partyProvisionLedgerHTML(participants){
 }
 function provisionGuideHTML(participants){
  const actor=participants.find(c=>c.id===provisionGuideActorId)||participants[0];
- if(!actor)return '<section class="panel"><p>Nejdříve přidejte postavu do této kampaně.</p></section>';
- const options=[['have','Má vlastní zásoby'],['buy','Může nakoupit'],['forage','Musí opatřit v přírodě'],['other','Jiný zdroj / rozhodnutí GM']];
+ if(!actor)return '<section class="panel"><p>Nejdříve přidejte postavu do kampaně.</p></section>';
+ const policy=activeNutritionPolicies(data.journal,campaignKey(data.campaignClock),[actor.id])[0]?.calendarNutritionPolicy;
+ const assured=policy?.gmProvisioned===true;
+ const options=[['have','Vlastní zásoby'],['buy','Nákup'],['forage','Příroda / Foraging'],['other','Jiný zdroj']];
  const route=options.some(([id])=>id===provisionGuideRoute)?provisionGuideRoute:'have';
- const body={
-  have:'Zbývající množství, váha a orientační výdrž se přebírají z inventáře a původních doložených výdejů. Zde nic není potřeba zaklikávat.',
-  buy:'Pokud GM potvrdil dostupnost obchodu, otevřete knihovnu vybavení a proveďte skutečný nákup. Příděly a vodu potom doložte původním postupem; výběr možnosti nic automaticky nepřidává.',
-  forage:'Když není dostupné zásobování, zahajte Foraging v Cestování a hlídkách. Rozhoduje původní Survival a získané, doložené zdroje.',
-  other:'Například pohostinnost, dar nebo ověřený zdroj vody. GM musí doložit skutečné převzetí a případně naplnění nádoby; pouhá volba zdroje žádný příděl nevytvoří.'
- }[route];
- const action=route==='buy'?`<button type="button" data-provision-go="shop">Nakoupit pro ${esc(actor.name)} ↗</button>`:
-  route==='forage'?'<button type="button" data-provision-go="forage">Přejít na Foraging ↗</button>':
-  route==='other'?'<button type="button" data-provision-go="gear">Zapsat skutečně získané zásoby ↗</button>':
-  `<button type="button" class="secondary" data-provision-go="evidence">Pokročilé denní sledování (volitelné) ↗</button>`;
- return `<section class="panel hc-provision-guide"><h3>Zajistit jídlo a pití jedné postavě</h3>
- <label class="hc-provision-picker">Pro koho?<select data-provision-actor>${participants.map(c=>`<option value="${esc(c.id)}" ${c.id===actor.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
+ const action=route==='buy'?`<button type="button" data-provision-go="shop">Otevřít nákup pro ${esc(actor.name)} ↗</button>`:
+  route==='forage'?'<button type="button" data-provision-go="forage">Otevřít Foraging ↗</button>':
+  route==='other'?'<button type="button" data-provision-go="gear">Zapsat získané jídlo / vodu ↗</button>':'';
+ return `<section class="panel hc-provision-guide"><h3>Zásoby a výživa · ${esc(actor.name)}</h3>
+ <label class="hc-provision-picker">Postava<select data-provision-actor>${participants.map(c=>`<option value="${esc(c.id)}" ${c.id===actor.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>
  ${provisionCardHTML(actor,true)}
- ${route==='have'?personalProvisionQuickActionsHTML(actor):''}
- <p class="hc-provision-question">Odkud postava získá další jídlo a vodu?</p>
- <div class="hc-provision-choices">${options.map(([id,label])=>`<button type="button" class="${route===id?'hc-provision-choice-active':'secondary'}" data-provision-route="${id}" aria-pressed="${route===id}">${esc(label)}</button>`).join('')}</div>
- <p class="hc-provision-help">${esc(body)}</p>${route==='have'?'':action}
- <p class="hc-provision-caution">Stav najedení/napití dokládá poslední uzavřený 24h den; výdrž zásob není automatický odpočet do Starvation nebo Thirst.</p>
+ <div class="hc-provision-simple-switch"><strong>Průběžné zásobování zajištěno GM</strong><div class="hc-provision-switch-actions">
+ <button type="button" class="${assured?'hc-provision-choice-active':'secondary'}" data-provision-assure="yes" data-actor-id="${esc(actor.id)}" aria-pressed="${assured}">Ano · neřešit nedostatek</button>
+ <button type="button" class="${!assured?'hc-provision-choice-active':'secondary'}" data-provision-assure="no" data-actor-id="${esc(actor.id)}" aria-pressed="${!assured}">Ne · řešit podle zásob</button></div>
+ <small>${assured?'GM potvrdil průběžný přístup k jídlu a pití. Denní uzávěrka bude plně pokrytá, bez odečítání inventáře.':'Bez zajištění GM se při dalším posunu času spotřebují doložené vlastní zásoby a společné příděly. Je-li jich nedostatek, HMK vyhodnotí hlad a žízeň.'}</small></div>
+ <div class="hc-provision-choices" role="group" aria-label="Jak získat zásoby">${options.map(([id,label])=>`<button type="button" class="${route===id?'hc-provision-choice-active':'secondary'}" data-provision-route="${id}" aria-pressed="${route===id}">${label}</button>`).join('')}</div>
+ ${route==='have'?`<details class="hc-provision-compact-extra"><summary>Nesené zásoby / výdej ½ nebo 1 dávky / odložení</summary>${personalProvisionQuickActionsHTML(actor)}<button type="button" data-provision-go="gear" class="secondary">Upravit fyzicky nesené zásoby v inventáři ↗</button></details>`:
+ route==='forage'?`<p class="hc-provision-caution">Zisk v přírodě musí doložit pravidlový Foraging nebo rozhodnutí GM; samotné kliknutí nevytváří dávky.</p>${action}`:route==='buy'?`<p class="hc-provision-caution">Zakoupené zásoby se zapíšou do vybavení; výdrž a hmotnost se přepočítají ze skutečného inventáře.</p>${action}`:action}
  </section>`;
 }
 
@@ -888,9 +883,9 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
  <input type="hidden" name="autoNeeds" value="yes"><input type="hidden" name="policyAction" value="activate">
  <input type="hidden" name="sourceMode" value="${fromInventory?'inventory':'foraging'}">
  <p class="hc-provision-help">${fromInventory?'Pouze doložené příděly a skutečně naplněné nádoby + případné Foraging.':'Výhradně doložené nálezy Foraging; tento režim nelze zapnout, pokud postava zároveň čerpá inventární dávky či naplněné nádoby.'} Doba 24 h běží až při posunu času GM.</p>
- <label class="hc-check"><input type="checkbox" name="foragingOnly" value="yes" required> GM potvrzuje úplnost skutečně dostupných zdrojů jídla a pití pro ${esc(actor.name)}.</label>
- ${fromInventory?`<label class="hc-check"><input type="checkbox" name="inventoryWater" value="yes"> Započítat skutečně doloženou vodu v naplněných nádobách.</label>
- <label class="hc-check"><input type="checkbox" name="freshRations" value="yes"> GM potvrzuje čerstvost nově zařazovaných přídělů; bez potvrzení je aplikace nepřidá.</label>`:''}
+ <input type="hidden" name="foragingOnly" value="yes">
+ ${fromInventory?` <label>Zdroj vody<select name="inventoryWater"><option value="no">Společné nálezy</option><option value="yes">Naplněné nádoby v inventáři</option></select></label>
+  <details><summary>Převzít dosud nezaúčtované čerstvé příděly (volitelné)</summary><label class="hc-check"><input type="checkbox" name="freshRations" value="yes"> GM potvrzuje nově převzaté čerstvé příděly</label></details>`:''}
  <button type="submit">Uložit režim pouze pro ${esc(actor.name)}</button></form>`;
  const pause=policy?.enabled?`<form data-nutrition-policy-form data-provision-scope-actor="${esc(actorId)}" class="hc-provision-pauser"><input type="hidden" name="nutritionActorIds" value="${esc(actorId)}"><input type="hidden" name="foodNeed" value="1"><input type="hidden" name="waterNeed" value="1"><input type="hidden" name="policyAction" value="pause"><input type="hidden" name="sourceMode" value="foraging"><button class="secondary" type="submit">Pozastavit tento režim</button></form>`:'';
  const conditions=day?`<details class="hc-person-provision-options"><summary>Celodenní odpočinek / horko · GM</summary>
@@ -900,7 +895,7 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
   if(already||clock.minute>=c.endMinute)return '';
   return `<form data-nutrition-conditions-cancel class="hc-provision-pauser"><input type="hidden" name="sourceId" value="${esc(x.id)}"><label>Přerušit potvrzený plán (${esc(c.kind)})<input name="reason" minlength="3" required placeholder="Skutečný důvod přerušení"></label><button type="submit" class="secondary">Zrušit plán</button></form>`;}).join('');
  const health=due.length?`<section class="hc-person-health"><h4>Starvation / Thirst · kontrola ${esc(actor.name)}</h4>${due.map(t=>`<form data-malnutrition-course><strong>${t.kind==='starvation'?'Starvation':'Thirst'} HR${t.hr} · ${t.mode==='healing'?'Healing':'Advance'} · ${esc(displayCampaignMinute(t.dueMinute))}</strong><input type="hidden" name="actorId" value="${esc(actorId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}"><label>Skutečný d100 (1–100)<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="secondary hc-small" data-malnutrition-die="yes">⚄ Vygenerovat d100</button><button type="submit" ${clock.minute<t.dueMinute?'disabled title="Termín ještě nenastal"':''}>Potvrdit zdravotní test</button></form>`).join('')}</section>`:'';
- return `<section class="hc-person-provision-rules"><details class="hc-provision-personal-rules"><summary>Denní režim · ${esc(actor.name)} (${esc(current)})</summary><p class="hc-provision-caution">Přepínač pouze volí pravidlový režim. Neprohlašuje postavu automaticky za najedenou nebo napitou. Denní příjem potvrdí až skutečný výdej a uzávěrka.</p>${policyForm}${pause}</details>${conditions}${cancellation}${health}</section>`;
+ return `<section class="hc-person-provision-rules"><details class="hc-provision-personal-rules"><summary>Pokročilé sledování spotřeby · ${esc(actor.name)} (${esc(current)})</summary><p class="hc-provision-caution">Přepínač pouze volí pravidlový režim. Neprohlašuje postavu automaticky za najedenou nebo napitou. Denní příjem potvrdí až skutečný výdej a uzávěrka.</p>${policyForm}${pause}</details>${conditions}${cancellation}${health}</section>`;
 }
 let calendarLanding=true; // Clicking the left navigation always opens the calendar chooser.
 let calendarCreating=false;
@@ -1043,12 +1038,12 @@ function campaignCalendarView(){
  const dayPlans=data.journal.filter(x=>x.calendarCampaignId===campaignKey(clock)&&x.calendarNutritionConditions&&
   currentAdaptiveDays.some(a=>a.row.id===x.calendarNutritionConditions.policyId&&a.start===x.calendarNutritionConditions.startMinute));
  const upcomingConditions=currentAdaptiveDays.filter(x=>x.start===clock.minute);
- const activityNeedsHTML=`<section class="hc-calendar"><details open><summary>HMK 186 · potřeby podle skutečné aktivity a počasí</summary>
+ const activityNeedsHTML=`<section class="hc-calendar"><details><summary>Výjimky HMK · klid, nečinnost a horko</summary>
  <p class="hc-hint">V adaptivním režimu je běžný doložený den 1 dávka potravy / 1 galon vody. Skutečně zaznamenaný Heat Hazard z Trekking automaticky znamená 2 galony vody. Poloviční množství nelze dovozovat pouze z osmihodinového spánku nebo čtyřhodinového odpočinku: vyžaduje GM potvrzený plán ÚPLNÉHO 24h odpočinku či nečinnosti. Přerušení plánu nejprve zrušte, než zapíšete další činnost. Hodiny se nikdy nemění tímto formulářem.</p>
  ${upcomingConditions.length?`<form data-nutrition-day-conditions><label>Postava<select name="actorId">${upcomingConditions.filter(a=>!dayPlans.some(j=>j.calendarNutritionConditions.policyId===a.row.id&&j.calendarNutritionConditions.startMinute===a.start)).map(a=>`<option value="${esc(a.row.characterId)}">${esc(character(a.row.characterId)?.name||a.row.characterId)} · den ${esc(displayCampaignMinute(a.start))}</option>`).join('')}</select></label><label>Úplné denní podmínky potvrzené GM<select name="kind"><option value="rest-inactive">24h úplný klid i nečinnost · 0,5 jídlo / 0,5 vody</option><option value="rest">24h úplný odpočinek · 0,5 jídlo / 1 vody</option><option value="inactive">24h úplná nečinnost · 1 jídlo / 0,5 vody</option><option value="hot">Celodenní horko · 1 jídlo / 2 vody</option><option value="rest-hot">Úplný odpočinek v horku · 0,5 jídlo / 2 vody</option></select></label><label class="hc-check"><input type="checkbox" name="confirmed" required>GM potvrzuje podmínky skutečně plánovaného celého 24hodinového dne; při jejich změně plán předem zruší.</label><button type="submit">Zaznamenat denní podmínky · bez posunu času</button></form>`:''}
  ${dayPlans.map(row=>{const p=row.calendarNutritionConditions,cancelled=data.journal.some(j=>j.calendarNutritionConditionsCancel?.planId===row.id);return `<p class="hc-hint">${esc(character(row.characterId)?.name||row.characterId)} · ${esc(displayCampaignMinute(p.startMinute))} · ${esc(p.kind)} · ${cancelled?'plán zrušen': 'plán platný'}${!cancelled&&clock.minute<p.endMinute?` <form data-nutrition-conditions-cancel><input type="hidden" name="sourceId" value="${esc(row.id)}"><label>Důvod přerušení<input name="reason" minlength="3" required placeholder="Doložená změna aktivity"></label><button type="submit">Zrušit plán před další činností</button></form>`:''}</p>`}).join('')}
  </details></section>`;
- const nutritionHTML=`<section class="hc-calendar hc-wilderness"><details open><summary>HMK 186 · automatické denní zásobování · ${dailyPolicies.length} postav</summary>
+ const nutritionHTML=`<section class="hc-calendar hc-wilderness"><details><summary>Podrobné denní režimy a zdravotní kontroly · ${dailyPolicies.length} postav</summary>
  <p class="hc-hint"><strong>Čas mění pouze GM.</strong> GM může potvrdit režim <strong>výhradně Foraging</strong> nebo <strong>doložené čerstvé inventární dávky + Foraging</strong>. Každých 24 hodin po skutečném posunu času GM se odečtou dostupné zdroje a zapíšou případné schodky. V obou režimech musí být skutečně vyloučeny další nezapsané zdroje potravy či vody; jinak režim nezapínejte. Při plně doloženém zásobování se Starvation/Thirst při nástupu zapíše automaticky. Navazující Advance/Healing d100 vyžaduje skutečný hod v termínu; nelze ho nahradit odhadem.</p>
  <form data-nutrition-policy-form><fieldset class="hc-expedition-actors"><legend>Postavy pro stejný denní režim</legend><div class="hc-characters">${participants.map(c=>{const current=dailyPolicyMap.get(c.id)?.calendarNutritionPolicy;return `<label class="hc-character"><input type="checkbox" name="nutritionActorIds" value="${esc(c.id)}"><span>${esc(c.name)}${current?' · aktivní režim '+current.foodNeed+' jídlo / '+current.waterNeed+' voda':''}</span></label>`}).join('')}</div></fieldset>
  <div class="hc-fields"><label>Denní potřeba potravy<select name="foodNeed"><option value="1">1 food-day · aktivní den</option><option value="0.5">0,5 food-day · úplný klid</option></select></label>
@@ -1073,20 +1068,20 @@ function campaignCalendarView(){
  const activeStockRows=participants.flatMap(c=>rationStockBalances(data.journal,campaignKey(clock),c.id).map(l=>({...l,character:c.name})));
  const carriedRations=participants.flatMap(c=>provenCarriedRations(activeRationInventory(),c.id).map(x=>({character:c.name,name:x.name,count:x.foodDays,weightLb:x.weightLb})));
  const physicalWaterSummary=participants.flatMap(c=>availablePhysicalWater(data.journal,campaignKey(clock),c.id,clock.minute).map(w=>`${esc(c.name)} · ${w.remaining} gal · +${w.remaining*10} lb · ${esc(w.itemId)}`));
- const supplyHTML=`<section class="hc-calendar hc-wilderness"><details class="hc-provision-rulebook"><summary>Hromadný výdej a pokročilý účetní audit</summary>
- <p class="hc-provision-help">Společné nálezy se přidělují konkrétním postavám. Hromadný výdej nic nepřidá do jejich inventáře ani automaticky nevyvolá Starvation/Thirst. Původní doklady zůstávají v deníku.</p>
+ const supplyHTML=`<section class="hc-calendar hc-wilderness"><details class="hc-provision-rulebook"><summary>Jediný hromadný výdej + účetní doklady</summary>
+ <p class="hc-provision-help">Jednorázově vydej z doložených společných nálezů vybraným postavám.</p>
  <form data-foraging-batch-rations><h4>Společný výdej denních dávek</h4>
  <p class="hc-hint">V jednom kroku vyber postavy a velikost skutečně vydaných dávek. Aplikace automaticky odečte nejstarší doložené nálezy a rozdělí výdej do jednotlivých postav. Standardní aktivita: 1 food-day + 1 water-day; úplný klid může vyžadovat polovinu a horko dvojnásobek vody (HMK 186). Nejde o automatické vyhodnocení Starvation/Thirst.</p>
  <fieldset class="hc-expedition-actors"><legend>Postavy, které skutečně dostávají dávky</legend><div class="hc-characters">${participants.map(c=>`<label class="hc-character"><input type="checkbox" name="rationActorIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset>
  <div class="hc-fields"><label>Potrava na postavu<select name="foodEach"><option value="1">1 food-day · plná dávka</option><option value="0.5">0,5 · poloviční dávka</option><option value="0">0 · žádná spotřeba</option></select></label>
  <label>Voda na postavu<select name="waterEach"><option value="1">1 water-day · obvyklá potřeba</option><option value="2">2 · horko / Heat Hazard</option><option value="0.5">0,5 · úplná nečinnost</option><option value="0">0 · žádná spotřeba</option></select></label></div>
  <button type="submit">Vydat zásoby všem vybraným · bez posunu času</button></form>
- ${supplyCards.map(l=>`<form data-foraging-supply-use><strong>${esc(l.unit==='foodDays'?'Potrava · food-days':l.unit==='waterDays'?'Voda · water-days':'Bylina · '+l.herbName)} · zbývá ${l.remaining}</strong>
+ <details class="hc-provision-compact-extra"><summary>Jednotlivé účetní zdroje a dávky (pokročilé)</summary>${supplyCards.map(l=>`<form data-foraging-supply-use><strong>${esc(l.unit==='foodDays'?'Potrava · food-days':l.unit==='waterDays'?'Voda · water-days':'Bylina · '+l.herbName)} · zbývá ${l.remaining}</strong>
  <input type="hidden" name="sourceId" value="${esc(l.sourceId)}"><input type="hidden" name="resultIndex" value="${l.resultIndex}"><input type="hidden" name="unit" value="${l.unit}">
  <div class="hc-fields"><label>Postava, která spotřebuje / převezme zásobu<select name="actorId">${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <label>Množství<input name="quantity" type="number" min="${l.unit==='herbDoses'?1:0.5}" step="${l.unit==='herbDoses'?1:0.5}" max="${l.remaining}" value="${Math.min(1,l.remaining)}" required></label>
  ${l.unit==='herbDoses'?`<label>Účel / připravovaná Concoction<input name="purpose" maxlength="120" required placeholder="Např. Coagulant · dávka pro Herbalism"></label>`:''}</div>
- <button type="submit">${l.unit==='herbDoses'?'Rezervovat skutečnou bylinnou ingredienci':'Zapsat spotřebu'} · bez posunu času</button></form>`).join('')||'<p class="hc-hint">Zatím nejsou k vydání doložené volné zásoby.</p>'}
+ <button type="submit">${l.unit==='herbDoses'?'Rezervovat skutečnou bylinnou ingredienci':'Zapsat spotřebu'} · bez posunu času</button></form>`).join('')||'<p class="hc-hint">Zatím nejsou k vydání doložené volné zásoby.</p>'}</details>
  </details></section>`;
  const herbCandidates=herbAssessmentCandidates(data.journal,campaignKey(clock));
  const herbalProofs=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarHerbPotency);
@@ -1473,7 +1468,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const overviewHTML=`${board}${unknownFallNotice}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}</section><section class="panel"><h3>Nejbližší termíny · ${agenda.future.length}</h3>${agenda.future.slice(0,12).map(renderItem).join('')||'<p class="muted">Žádný nadcházející termín.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
   activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${interruptionsHTML}`:
-  activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionLedgerHTML(participants)}<details class="hc-provision-compact-extra"><summary>Podrobné osobní stavy členů družiny</summary>${partyProvisionCardsHTML(participants,true)}</details>${supplyHTML}<details class="hc-provision-rulebook"><summary>Denní automatika a zdravotní postupy družiny</summary>${nutritionHTML}${activityNeedsHTML}</details>`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
+  activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionLedgerHTML(participants)}<details class="hc-provision-compact-extra"><summary>Podrobné osobní stavy členů družiny</summary>${partyProvisionCardsHTML(participants,true)}</details>${supplyHTML}<details class="hc-provision-rulebook"><summary>Pokročilá pravidla a zdravotní kontroly</summary>${nutritionHTML}${activityNeedsHTML}</details>`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
   activeCalendarSection==='craft'?`${herbalHTML}${alchemyHTML}`:
   `${membersHTML}${legacyOriginPanel}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
@@ -7987,6 +7982,28 @@ document.addEventListener('submit',e=>{
    body:p.enabled?`Od teď: ${p.autoNeeds?"adaptivní (výchozí 1/1)":p.foodNeed+" jídlo, "+p.waterNeed+" voda"} / 24 h, ${p.inventoryRations?'čerstvé inventární dávky + Foraging':'výhradně Foraging'}${p.inventoryWater?' + potvrzená voda z nádob':''}. Hodiny beze změny.`:'GM pozastavil automatické denní zásobování; čas se nemění.',
    calendarNutritionPolicy:p})));}))notice='Zásobovací režim a doložené fyzické zásoby byly uloženy; den se zúčtuje až po posunu GM.';
  }catch(err){alert('Režim výživy nebyl uložen: '+err.message)}
+},true);
+// GM's explicit continuous provisioning: no fake carried stock, no hidden checkboxes.
+// Only this actor is affected. Changing a mode starts at the current GM minute.
+document.addEventListener('click',e=>{
+ const b=e.target.closest('[data-provision-assure]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const clock=data.campaignClock,actorId=b.dataset.actorId,mode=b.dataset.provisionAssure;
+  if(!clock||view!=='calendar'||activeCalendarSection!=='provisions'||provisionScope!=='person'||!['yes','no'].includes(mode))throw Error('Neplatná volba zásobování');
+  const shown=calendarMemberIds(clock,data.characters).find(c=>c.id===provisionGuideActorId)||calendarMemberIds(clock,data.characters)[0];
+  if(!shown||shown.id!==actorId)throw Error('Změna by zasáhla jinou postavu než tu zobrazenou');
+  const old=activeNutritionPolicies(data.journal,campaignKey(clock),[actorId])[0]?.calendarNutritionPolicy;
+  if(mode==='no'&&!old?.gmProvisioned&&old?.enabled===true){notice='Pravidlové sledování spotřeby už je zapnuté.';render();return;}
+  if(mode==='yes'&&old?.gmProvisioned){notice='Průběžné zásobování GM už je zajištěno.';render();return;}
+  const p=createNutritionPolicy({campaignId:campaignKey(clock),minute:clock.minute,actorId,foodNeed:1,waterNeed:1,
+   enabled:true,autoNeeds:true,gmProvisioned:mode==='yes',inventoryRations:mode==='no',inventoryWater:mode==='no'});
+  if(!window.confirm(mode==='yes'?`GM potvrzuje, že ${shown.name} bude mít od této chvíle průběžný přístup k jídlu i pitné vodě? Žádné fyzické zásoby tím nevzniknou ani nezmizí.`:`Zapnout pro ${shown.name} běžnou denní spotřebu podle HMK? Použijí se jen doložené zásoby a společné příděly. Při nedostatku mohou vzniknout následky hladu či žízně.`))return;
+  if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,createdAt:stamp(),
+   title:mode==='yes'?'HMK · GM zajištěné zásobování':'HMK · konec zajištěného zásobování',
+   body:mode==='yes'?'GM doložil průběžný přístup k jídlu a pitné vodě. Nedochází k inventárnímu převodu.':'Zajištění GM skončilo; další denní potřeba se účetně ověří proti doloženým fyzickým a společným zásobám. Případný hlad vzniká podle HMK až po uzávěrce.',
+   calendarNutritionPolicy:p})))notice=mode==='yes'?'GM zajištěné zásobování bylo zapsáno.':'Denní spotřeba podle HMK je aktivní.';
+ }catch(err){alert('Zásobování nebylo změněno: '+err.message)}
 },true);
 // Single atomic ration issue for several characters. No clock movement.
 document.addEventListener('submit',e=>{
