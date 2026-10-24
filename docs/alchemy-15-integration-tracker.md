@@ -1,6 +1,6 @@
 # HMK Keeper’s Ledger · Bod 4 Alchemy · Priorita 1–15
 
-Stav po v93.442, auditní pokračování v93.441–v93.442. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
+Stav po v93.443, auditní pokračování v93.441–v93.443. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
 
 Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, inventární a zdravotní kapitoly podle potřeby. „Částečně“ není „hotovo“. Každý bod bude uzavřen teprve po úplném mechanickém propojení, kontrole neměnných důkazů, testování obnovy dat a regresi.
 
@@ -13,7 +13,7 @@ Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, 
 | 5 | Plošné elixíry | Neuzavřeno | Eruption, Fumebomb, Weakness; skutečné terče a bojové důsledky. |
 | 6 | Profusion všech elixírů | **Částečně – v93.441 ověřeno pro existující aktivní Imbibed** | Centrální katalog 35/35 a atomické CF kombinace existují. Zbývá 22 dosud nepodporovaných neexemptních Imbibed účinků a jejich doložené konce, než lze tvrdit univerzální provoz. |
 | 7 | Aural Shock / Ill Effects | **Částečně – v93.442 kanonický katalog 35/35 a sjednocené důkazy pro 4 aktivní Imbibed** | Zbývají skutečné zdravotní a časové commity dosud nepodporovaných Imbibed elixírů; katalog sám neprovádí jejich účinky ani léčbu. |
-| 8 | Physic všechny účinky | Částečně | Redukce AS všech účinných Imbibed včetně zvláštních Instantaneous. |
+| 8 | Physic všechny účinky | **Částečně – v93.443 bezpečné vyhodnocení všech doložených zdrojů; 4 aktivní druhy dokončeny** | Poison, Quiescence a ostatní dosud neimplementované Imbibed účinky vyžadují skutečné důkazy jejich začátku, trvání a konce; do té doby musí Physic před jakýmkoli zápisem odmítnout neúplný souběh. |
 | 9 | AS / Decay | Částečně | Speciální čerpání a výjimky; bezpečná rekonstrukce dříve zmeškaných měsíčních hodů. |
 | 10 | Spell / Arcane provázání | Neuzavřeno | Detect/Reveal/Dispel, Negation, Attunement, Spirit Sensing, True Sight a příslušné soul stavy. |
 | 11 | Invent unikátní recepty | Částečně | Mechanické provádění konkrétních GM-defined účinků; samotná výroba existuje. |
@@ -174,3 +174,33 @@ Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, 
 ### Otevřené závislosti
 
 Další Imbibed elixíry stále nemají své vlastní skutečné aplikační a zdravotní writery, povinné hody, trvání a konce. Připravená pravidlová klasifikace je podkladem pro implementaci až podle schváleného pořadí (včetně bodů 8–15). **Neznamená to uzavření bodu 7.**
+
+
+## v93.443 – společná návaznost č. 8: Physic nezaměňovat za Profusion
+
+**Stav: ČÁSTEČNĚ dokončeno.** Žádný nový kanonický elixír nebyl povolen k použití. Není vytvořen druhý inventář, zdravotní stav ani kalendář.
+
+### Autoritativní mechanika a nalezená chyba
+
+- HMK 1.2 **str. 270**: Physic redukuje AS všech elixírů právě ovlivňujících příjemce, i když mají *Instantaneous* účinek s přetrvávající magickou následností (výslovný příklad **Poison**). **Str. 273**: od každého takového účinku se odečte **výsledná AS Physic po Imbibing Rollu**, účinek zaniká při AS ≤ 0. Physic **neindukuje ani nezvyšuje Profusion**, CF účinné dávky však dává Aural Shock 1. Applied elixíry nemají po dokončení aplikace pokračující enchantment (p. 270).
+- Chyba v93.442: `createAlchemyPhysicImbibing()` sestavoval cíle voláním `activeAlchemyProfusionCohort()`. Ten úmyslně ignoruje Poison a Quiescence kvůli **výjimce z Profusion**, kterou ale nelze převzít jako výjimku z Physic. Případný doložený přetrvávající Poison mohl být takto tiše přehlédnut.
+- Oprava v `src/integration/hmk-alchemy-imbibing.js`: samostatný čistý `activeAlchemyPhysicTargets()` z původního journalu a čtyř skutečně podporovaných životních cyklů **Darkvision, Erudition, Footpad, Egosight**. Ověřuje i ostatní původní záznamy vypitých elixírů **včetně Poison a Quiescence**, bez ohledu na Profusion. Pokud chybí věrohodná rekonstrukce trvání a AS, **odmítne celé podání** před spotřebou lahvičky / změnou Combat State / Initiative / journalu. Nepřidává smyšlené důkazy ukončení Poison, Healing, Dreamwalk atd.
+- Pro podporované cíle zůstává přesný původní atomický zápis: každý původní `finishId` dostane samostatný `sourceUseId, asBefore, asAfter`, reálně ověřený `alchemyElixirStrength()` je přepočítán z neměnného journalu; nula ukončí enchantment. CF nadále používá původní Combat State/Aural Shock i vlastní Ill Effects všech dříve účinných zdrojů.
+- V kalendářním UI byl opraven chybný text uvádějící jen tři podporované cíle; doplněn Egosight a výslovná bezpečnostní podmínka u dosud nedoložených účinků.
+- `index.html` je opět **povinně zahrnut** do rozdílového archivu; titulek, boot/error text a cache-busting URL používají **93.443** a `app.js` má `APP_VERSION='93.443'`. Produkční bundle byl sestaven příkazem `node tools/build_bundle.cjs`.
+
+### Zbývající kroky před uzavřením bodu 8
+
+Skutečné Life-Cycle a writer důkazy pro nyní neimplementované Imbibed (zejména **Poison** a **Quiescence**, dále Instantaneous Healing, Mindsalve, Dreamwalk, Sustenance, Wakefulness a další Temporary) musí být napojeny do **téže** projekce `activeAlchemyPhysicTargets()` až při jejich samostatné implementaci v navazujícím pořadí. Katalogová klasifikace není důkazem, že účinek ještě trvá nebo už skončil. Částečné, neměřitelné nebo implicitně ignorované odečítání AS se nepřipouští.
+
+### v93.443 – provedené testy a jejich přesný rozsah
+
+- **PASS – kompletní Node.js regrese 71/71 testovacích souborů**, po finálním produkčním sestavení, v šesti oddělených sériových dávkách 12+12+12+12+12+11, bez FAIL a TIMEOUT. Předešlé verze měly 69 souborů; přibyly dvě nové sady pro Physic.
+- **PASS – `test_alchemy_physic_targets_443.cjs` (84 kontrol)**: rozlišení výjimek Profusion proti Physic, Poison, Quiescence a dalších doložených ale neimplementovaných účinků, cizí kampaň, jiný příjemce, budoucí čas, nulové AS, bezzápisové odmítnutí, nedotčený journal a inventář.
+- **PASS – `test_alchemy_physic_four_active_443.cjs` (37 kontrol)**: skutečné originální fyzické lahvičky čtyř podporovaných různých účinků a Physic, všechny AS a `sourceUseId`, neměnný původní journal, následný replay, důkaz o vynechané části odmítnutý validátorem.
+- **PASS – `browser_alchemy_physic_443.py` (4 případy)**: skutečné formuláře S/F/CS a CF; CF s povinným HP d6, původní inventář, Combat State/Aural Shock, znovunačtení kampaně do nové stránky.
+- **PASS – `browser_alchemy_physic_four_active_443.py` (2 hlavní scénáře)**: čtyři současně aktivní Darkvision, Erudition, Footpad a Egosight; Physic CF způsobuje vlastní a 3 další Aural Shock + Darkvision Ill Effect; chybějící poslední d6 nechává všechny údaje beze změny; po dodání všech hodů se uloží přesně čtyři redukce AS, 5 spotřebovaných obsahu původních lahviček, 4 samostatné Ill Effects, a obnovená instance má stejnou historii i GM čas.
+- **PASS – `browser_alchemy_release_version_443.py`**: skutečný obsah `index.html` a produkční bundle vložený do Chromium dokumentu, viditelná webová patička **v93.443**. **Není to síťový test GitHub Pages**; místní navigaci na `file://` / localhost runner omezuje.
+- **PASS – existující Chromium regrese** `browser_alchemy_profusion_four_sources_441.py` a `browser_alchemy_mixed_429.py`: čtyři souběžné zdroje s CF, smíšené Erudition/Darkvision/Physic kombinace, atomické následky, historie, inventář a rehydratace.
+
+**Výdej:** v93.443 je **kontrolní meziverze**, obsahuje jen rozdíly proti už vydané v93.442, nikoli celé základní dílo. Bod 8 není možné označit jako univerzálně dokončený, dokud neexistují mechanicky ověřené lifecycles dosud nepoužitelných kanonických elixírů. Společné návaznosti 9–15 nebyly touto etapou uzavřeny.
