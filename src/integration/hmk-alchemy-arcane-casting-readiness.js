@@ -8,11 +8,14 @@ import {availableMasteries} from './hmk-skill-test-engine.js';
 import {validateStartingPvarSpells} from './hmk-creation-starting-pvar.js';
 import {indexOf,successLevel} from '../rules/tests.js';
 import {classifySpellMisfire} from './hmk-spell-misfire-effects.js';
+import {neutralChaosStormGeometry} from './hmk-neutral-arcane-exceptions.js';
+import {combatFatigueTotals,validateCombatState} from './persistent-combat-state.js';
 
 const SPELLS=Object.freeze({
- Detect:Object.freeze({id:'Neutral::Detect',complexity:1,time:'2 rounds',los:false,rangeMultiplier:5,sourcePage:251}),
- Reveal:Object.freeze({id:'Neutral::Reveal',complexity:1,time:'1 minute',los:false,rangeMultiplier:1,sourcePage:254}),
- Dispel:Object.freeze({id:'Neutral::Dispel',complexity:2,time:'1 minute',los:true,rangeMultiplier:5,sourcePage:251})
+ Detect:Object.freeze({id:'Neutral::Detect',complexity:1,time:'2 rounds',timeRounds:2,los:false,rangeMultiplier:5,sourcePage:251}),
+ Reveal:Object.freeze({id:'Neutral::Reveal',complexity:1,time:'1 minute',timeRounds:6,los:false,rangeMultiplier:1,sourcePage:254}),
+ Dispel:Object.freeze({id:'Neutral::Dispel',complexity:2,time:'1 minute',timeRounds:6,los:true,rangeMultiplier:5,sourcePage:251}),
+ Ward:Object.freeze({id:'Neutral::Ward',complexity:2,time:'10 minutes',timeRounds:60,los:false,rangeMultiplier:0,sourcePage:255})
 });
 const guard=(test,message)=>{if(!test)throw Error('Alchemy Arcane Casting: '+message)};
 
@@ -64,6 +67,65 @@ export function neutralSpellMastery(pvarismML,spell){
   rangeFeet:spellSI*spec.rangeMultiplier,sourcePages:Object.freeze([198,200,spec.sourcePage])});
 }
 
+/** HMK pp.160,200–202: six 10-second combat rounds per minute. Casting
+ * starts using an Incant action, then requires uninterrupted concentration.
+ * No duration is inferred from the campaign clock or a GUI text field.
+ */
+export function neutralCastingTimeRounds(spell,{quicken=false}={}){
+ guard(Object.hasOwn(SPELLS,spell),'neznámé Neutral kouzlo');
+ guard(quicken===false,'Quicken musí mít zvláštní -20 EML a ověřený spellstart; zde není podporován');
+ return SPELLS[spell].timeRounds;
+}
+
+/** Canonical, intentionally bounded CURRENT casting EML. This calculation is
+ * limited to ordinary spoken cant, gesture with a KNOWN ENC and a confirmed
+ * quiet place; anything needing unavailable item, wound, joined, grimoire,
+ * focus or alternate-method proof fails rather than accepting a claimed EML.
+ * A complete arithmetic breakdown does not itself authorize a cast.
+ */
+export function neutralOrdinaryCastingEML({character,spell,target=null,
+ cant='spoken',gesture='normal',noise='quiet',otherModifiersConfirmedAbsent=false,
+ encumbrance=null,gmConfirmed=false}={}){
+ guard(gmConfirmed===true&&otherModifiersConfirmedAbsent===true,
+  'GM musí doložit nepřítomnost nedoložených casting modifikátorů');
+ guard(cant==='spoken'&&gesture==='normal'&&noise==='quiet',
+  'Tato větev nepodporuje silent/still, hlučné místo ani jiné techniky');
+ const caster=alchemyArcaneCasterDossier(character);
+ guard(caster.verified&&caster.known.includes(SPELLS[spell]?.id),
+  'chybí ověřená znalost Neutral kouzla a současné Pvârism');
+ const state=validateCombatState(character?.hmk?.combatState);
+ guard(state.shock==='NONE'&&!state.coma?.active&&
+  !['withdrawing','routed','catatonic'].includes(state.morale?.state)&&
+  !state.wounds.some(w=>w.healed!==true)&&
+  !character.hmk.arcane?.auralShockLevels&&
+  !character.hmk.arcane?.activeMisfireWarp&&
+  !character.hmk.arcane?.pendingPsycheTraitChoice&&
+  !(character.hmk.arcane?.misfireLostSpells??[]).includes(SPELLS[spell].id),
+  'Shock, Aural Shock, zranění, psychický následek nebo Crucial Misfire vyžaduje zvláštní posouzení');
+ guard(Number.isSafeInteger(encumbrance)&&encumbrance>=0&&encumbrance<=200&&
+  character.hmk.arcane?.verifiedGestureEncumbrance===encumbrance,
+  'Encumbrance musí odpovídat živému ověřenému výpočtu v původní postavě');
+ const mastery=neutralSpellMastery(caster.neutralML,spell);
+ guard(mastery.spellML>=1,'Spell ML nedovoluje kouzlit');
+ const fatigue=combatFatigueTotals(state).total;
+ const elixirPenalty=spell==='Dispel'?
+  (target?.targetKind==='Ward'&&target?.targetable===true&&
+   Number.isSafeInteger(target.wardLevel)&&target.wardLevel>=0?
+   -10*target.wardLevel:
+   target?.targetable===true&&Number.isSafeInteger(target.currentAS)&&target.currentAS>=1?
+   -5*target.currentAS:null):0;
+ guard(Number.isSafeInteger(elixirPenalty),
+  'Dispel vyžaduje doloženou současnou AS konkrétního cíle');
+ const eml=mastery.spellML-fatigue-encumbrance+elixirPenalty;
+ return Object.freeze({format:'hmk-neutral-ordinary-casting-eml-v1',
+  spell,spellML:mastery.spellML,spellSI:mastery.spellSI,
+  castingTimeRounds:neutralCastingTimeRounds(spell),
+  fatiguePenalty:-fatigue,gesturePenalty:-encumbrance,
+  objectPenalty:0,elixirPenalty,noisePenalty:0,cantPenalty:0,
+  eml,castingTestEML:Math.max(0,Math.min(100,eml)),
+  sourcePages:Object.freeze([160,200,201,202,251,254])});
+}
+
 /** Pure spellfire adjudication of the *known* Casting Roll / fatigue portion
  * (pp.200–203). Requires an independently verified CURRENT full casting EML.
  * This does not assert that spellstart, uninterrupted concentration, ward,
@@ -96,6 +158,11 @@ export function neutralSpellfireDice({spell,fullEML,castingD100,misfireD100=null
   additionalMisfireFatigue:misfire?.extraFatigue??0,
   totalFatigue:baseFatigue+complexityFatigue+(misfire?.extraFatigue??0),
   misfireRequired,totalReleaseNeedsSpiritAndRawPrinciple:otherPending,
+  ...(otherPending?{rawPrincipleGeometry:neutralChaosStormGeometry(complexity),
+   requiredEvidence:Object.freeze(['current Spirit ML and modifiers','Spirit d100',
+    '2d6/4d6/6d6 Spirit loss when applicable','all Vortex targets and random centre',
+    'separate d100/d20 source rolls','Ward resolution before protected source',
+    'ongoing round-by-round neutral storm history'])}:{}),
   mayCommit:false,complete:false,diceComplete:!misfireRequired&&!otherPending,
   sourcePages:Object.freeze([200,202,203])});
 }
@@ -137,7 +204,7 @@ export function alchemyArcaneCastingPreflight({character,target,spell,distanceFe
   campaignId:target.campaignId,finishId:target.finishId,sourceId:target.sourceId,
   casterId:caster.casterId,spell,known:caster.known.includes(spec.id),
   neutralML:caster.neutralML,si:rules?.spellSI??null,spellML:rules?.spellML??null,
-  complexity:spec.complexity,convocationDegree:2,rangeFeet,castingTime:spec.time,
+  complexity:spec.complexity,convocationDegree:2,rangeFeet,castingTime:spec.time,castingTimeRounds:spec.timeRounds,
   requiresLOS:spec.los,dispelEMLPenalty:dispelPenalty,
   // Spell ML plus the known Dispel AS penalty is NOT full EML (p.201).
   partialEML:rules===null?null:rules.spellML+dispelPenalty,

@@ -73,6 +73,28 @@ export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9)
    requireTrue(!emptied,'Alchemy Decay: elixír lze vyprázdnit jen jednou');
    emptied=true;
   }
+  // HMK pp.251,270: a completed Neutral Dispel ends the ACTUAL magic
+  // without destroying the physical glass vial or rewriting prior AS rolls.
+  // The immutable success receipt must carry the old live AS exactly.
+  const cast=row.calendarAlchemyNeutralCast;
+  if(cast?.finishId===finishId&&cast.spell==='Dispel'&&
+   cast.targetKind!=='Ward'&&cast.effect===true){
+   const e=cast.dispel;
+   requireTrue(row.combatProof?.actionKind==='neutral-spellfire-success'&&
+    row.combatProof.spellstartId===cast.spellstartId&&
+    row.combatProof.round===cast.spellfireRound&&
+    ['S','CS'].includes(cast.castingSL)&&e?.asBefore===as&&
+    e.asAfter===0&&as>0&&['stored','active'].includes(e.phaseBefore)&&
+    Array.isArray(e.originalRevealProofIds)&&e.originalRevealProofIds.length>0&&
+    e.originalRevealProofIds.every(id=>journal.some(j=>j.id===id&&
+     j.calendarAlchemyNeutralCast?.spell==='Reveal'&&
+     ['S','CS'].includes(j.calendarAlchemyNeutralCast.castingSL)&&
+     j.calendarAlchemyNeutralCast.effect===true&&
+     j.calendarAlchemyNeutralCast.casterId===cast.casterId&&
+     j.calendarAlchemyNeutralCast.finishId===finishId)),
+    'Alchemy Dispel: neplatný historický důkaz ukončení enchantmentu');
+   as=0;activeTemporary=false;
+  }
   const d=row.calendarAlchemyDecay;
   if(!d||d.finishId!==finishId)continue;
   requireTrue(as>0&&(!emptied||activeTemporary),'Alchemy Decay: prázdný nebo zaniklý elixír nelze degradovat');

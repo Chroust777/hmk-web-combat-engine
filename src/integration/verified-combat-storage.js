@@ -1,3 +1,4 @@
+import {validateNeutralAlchemyHistory,validateNeutralAlchemyCombatLinks,assertNeutralAlchemyHistoryAppendOnly} from './hmk-alchemy-neutral-history.js';
 import {assertGMOnlyCampaignTime} from './hmk-gm-clock-authority.js';
 import {assertCommittedMoralePsycheDebts} from './hmk-morale-psyche-bridge.js';
 import {assertCommittedFearTransitions} from './hmk-fear-write-invariant.js';
@@ -28,6 +29,11 @@ export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,g
    const old=JSON.parse(before),next=JSON.parse(serialized);
    if(old&&next&&Array.isArray(old.characters)&&Array.isArray(next.characters)&&!restoreBackup)
     assertGMOnlyCampaignTime(old,next,{gmClockAdvance});
+   if(old&&next&&Array.isArray(old.journal)&&Array.isArray(next.journal)){
+    assertNeutralAlchemyHistoryAppendOnly(old.journal,next.journal);
+    validateNeutralAlchemyHistory(next);
+    validateNeutralAlchemyCombatLinks(next);
+   }
    assertCommittedMoralePsycheDebts(old,next);
    assertCommittedFearTransitions(old,next);
    assertCommittedShadeTransitions(old,next);
@@ -35,6 +41,7 @@ export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,g
   }
  }catch(e){
   if(e?.message?.startsWith('Čas kampaně')||e?.message?.startsWith('Předchozí časové')||e?.message?.startsWith('Posun času'))return result(false,false,'gm-only-clock');
+  if(e?.message?.startsWith('Neutral history:'))return result(false,true,'invalid-neutral-history');
   if(e?.message?.startsWith('Morale → Psyche:'))return result(false,true,'unresolved-morale-psyche');
   if(e?.message?.startsWith('Fear/Aberrance:'))return result(false,true,'unresolved-fear-aberrance');
   if(e?.message?.startsWith('Total Release Shade:'))return result(false,true,'invalid-shade-transition');
