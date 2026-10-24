@@ -8,6 +8,7 @@
  */
 import {neutralVortexRoundPreflight,neutralVortexSpecialML} from './hmk-neutral-vortex-round-preflight.js';
 import {auditNeutralVortexAlchemyCensus} from './hmk-neutral-vortex-census-audit.js';
+import {projectNeutralVortexSuppressionLifecycle} from './hmk-neutral-vortex-suppression-lifecycle.js';
 const check=(condition,reason)=>{if(!condition)throw Error('Neutral Vortex sequence: '+reason)};
 const whole=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const clone=structuredClone;
@@ -213,11 +214,20 @@ export function replayNeutralVortexSequence({spellCL,origin,sourceCensus,
    shieldingEvidence:tick.shielding===undefined?null:'GM-attested-only',
    outcome:result,suppressionUntilRound:Object.freeze(Object.fromEntries([...suppression]))}));
  }
+ const startingRound=document?.combatRuntime?.sequence?.round??0;
+ const replayWitness={format:'hmk-neutral-vortex-sequence-preflight-v1',
+  spellCL,sourceIds:[...originals.keys()].sort(),processedTicks:replay.length,ticks:replay};
+ const suppressionLifecycle=projectNeutralVortexSuppressionLifecycle({
+  storm:replayWitness,startingRound});
+ check(same(suppressionLifecycle.intervals.reduce((acc,entry)=>{
+  acc[entry.sourceId]=entry.endRoundExclusive-startingRound;return acc;},{}),
+  Object.fromEntries([...suppression])),
+  'životní cyklus potlačení nesouhlasí s původním fyzickým d20');
  return Object.freeze({format:'hmk-neutral-vortex-sequence-preflight-v1',
   spellCL,initialPosition:Object.freeze(clone(origin)),processedTicks:replay.length,
   nextRadiusFeet:radiusFeet,ticks:Object.freeze(replay),
   sourceIds:Object.freeze([...originals.keys()].sort()),
-  campaignCensusAudit,originalCasterOriginProof,
+  campaignCensusAudit,originalCasterOriginProof,suppressionLifecycle,
   suppressions:Object.freeze(Object.fromEntries([...suppression])),
   mayCommit:false,requiresForCommit:Object.freeze([
    'authoritative Total Release and Spirit consequences',
