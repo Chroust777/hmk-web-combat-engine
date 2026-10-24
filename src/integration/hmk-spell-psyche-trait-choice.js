@@ -36,7 +36,9 @@ export function persistSpellPsycheTraitChoice({document,characterId,sourceEventI
   state.morale.psycheStress>=pending.levels,'Ztracený nebo změněný persistentní PSY stav');
  // Source must have been committed before an after-effect can be resolved.
  check((document.journal??[]).some(j=>j.combatProof?.sourceEventId===sourceEventId)||
-  (state.events??[]).some(e=>e.type==='hmk-spell-total-release'&&e.details?.sourceEventId===sourceEventId),
+  (state.events??[]).some(e=>
+   ['hmk-spell-total-release','hmk-vortex-caster-psyche'].includes(e.type)&&
+   e.details?.sourceEventId===sourceEventId),
   'Psyche Trait nesmí vzniknout bez autoritativně uloženého příčinného kouzla');
  const oldCases=arc.psycheTraumas??[];
  check(Array.isArray(oldCases)&&oldCases.every(z=>z&&typeof z.trait==='string'&&
@@ -76,7 +78,15 @@ export function persistSpellPsycheTraitChoice({document,characterId,sourceEventI
  }else next.psycheTraumas.push({trait,psycheLevels:pending.levels,intensity:'trait',
   permanent:false,manifested:false,manifestationPending:true,
   recoverySchedulePending:true,sourceEventIds:[sourceEventId],recovered:false});
- next.pendingPsycheTraitChoice=null;
+ const remaining=next.pendingPsycheTraitChoices??[];
+ check(Array.isArray(remaining)&&remaining.every(x=>
+  typeof x?.sourceEventId==='string'&&whole(x.levels,1,99999)),
+  'poškozená fronta oddělených Psyche traumat');
+ const promoted=remaining.shift();
+ next.pendingPsycheTraitChoice=promoted?
+  {sourceEventId:promoted.sourceEventId,levels:promoted.levels}:null;
+ if(Object.hasOwn(next,'pendingPsycheTraitChoices'))
+  next.pendingPsycheTraitChoices=remaining;
  validateCombatState(stateNext);
  const journalId='psyche-choice:'+sourceEventId;
  check(!(out.journal??[]).some(j=>j.id===journalId),'Duplicitní Psyche rozhodnutí');

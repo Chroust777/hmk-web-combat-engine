@@ -49,12 +49,20 @@ export function validateNeutralTotalReleaseHistory(document){
   insist(vortex?.ended===true&&vortex.roundOffset===0&&
    vortex.radiusBeforeFeet===2.5&&
    Array.isArray(vortex.continuingSuppressions)&&vortex.continuingSuppressions.length===0&&
-   Array.isArray(vortex.outcomes)&&vortex.outcomes.every(o=>o.successLevel==='S'&&o.suppressed===false)&&
+   Array.isArray(vortex.outcomes)&&vortex.outcomes.every(o=>['S','CS'].includes(o.successLevel)&&o.suppressed===false)&&
    Array.isArray(vortex.physicalRolls)&&Array.isArray(vortex.sourceIds)&&
    Array.isArray(vortex.wardBlockedSourceIds)&&
    vortex.outcomes.every(o=>vortex.physicalRolls.filter(r=>r.sourceId===o.sourceId&&
     r.d100===o.physicalD100).length===1),
    'Vortex není skutečně uzavřen nebo má nedoložené potlačení');
+  // HMK p.255 and p.188: each resisted critical success is its own
+  // incident of Psyche Stress, never combined with Total Release PSY 3.
+  const cs=vortex.outcomes.filter(x=>x.successLevel==='CS');
+  const debts=cs.map(o=>({sourceEventId:proof.sourceEventId+':vortex-cs:'+o.sourceId,
+   sourceId:o.sourceId,levels:1}));
+  insist((vortex.casterPsycheStress??0)===debts.length&&
+   js(vortex.additionalPsycheDebts??[])===js(debts),
+   'CS zdroje Vortexu nemá vlastní nezaměnitelné Psyche trauma');
   insist(vortex.gmNoOtherArcaneSourcesConfirmed===true&&
    Array.isArray(vortex.sourceCensus)&&Array.isArray(vortex.tickSources)&&
    js(vortex.sourceCensus)===js(vortex.tickSources)&&
@@ -90,9 +98,50 @@ export function validateNeutralTotalReleaseHistory(document){
     e.round===proof.round&&e.details?.sourceEventId===proof.sourceEventId&&
     e.details?.spiritD100===c.spirit.spiritD100&&
     e.details?.spiritMLLoss===c.spirit.spiritMLLoss);
-   insist(logs?.length===1&&events?.length===1,
-    'Initiative nebo Combat State ztratil originální Total Release');
+   const csEvents=actor?.hmk?.combatState?.events?.filter(e=>
+    e.type==='hmk-vortex-caster-psyche'&&e.details?.parentEventId===proof.sourceEventId);
+   insist(logs?.length===1&&events?.length===1&&csEvents?.length===debts.length&&
+    debts.every(d=>csEvents.filter(e=>e.id===d.sourceEventId&&
+     e.details?.sourceEventId===d.sourceEventId&&e.details?.sourceId===d.sourceId&&
+     e.details?.psycheStress===1&&e.details?.successLevel==='CS'&&
+     e.details?.physicalD100===cs.find(x=>x.sourceId===d.sourceId)?.physicalD100).length===1),
+    'Initiative nebo Combat State ztratil originální Total Release/CS Psyche důkaz');
   }
+ }
+ validateNeutralVortexPsycheDebts(document);
+ return true;
+}
+/** Psyche receipts are separate incidents. All unresolved choices form one
+ * strictly ordered queue: Misfire PSY3, then every Vortex CS PSY1. The
+ * existing single-choice UI resolves them one at a time through the normal
+ * Psyche Trait writer; forged deletion/reordering is not a recovery. */
+export function validateNeutralVortexPsycheDebts(document){
+ for(const j of receipts(document)){
+  const c=j.calendarNeutralTotalRelease,p=j.combatProof;
+  const actor=document.characters?.find(x=>x.id===c.casterId);
+  insist(actor,'chybí postava s originálním Vortex Psyche dluhem');
+  const arc=actor.hmk?.arcane;
+  const all=[{sourceEventId:p.sourceEventId,levels:3},
+   ...(c.vortex?.additionalPsycheDebts??[])];
+  const open=[];
+  for(const debt of all){
+   const choices=document.journal.filter(x=>x.id==='psyche-choice:'+debt.sourceEventId);
+   insist(choices.length<=1,'duplicitní Psyche Trait volba');
+   if(choices.length){
+    insist(choices[0].characterId===c.casterId&&
+     choices[0].combatProof?.actionKind==='spell-psyche-trait-choice'&&
+     choices[0].combatProof?.sourceEventId===debt.sourceEventId&&
+     choices[0].combatProof?.psycheLevels===debt.levels&&
+     arc?.psycheTraumas?.some(t=>t.sourceEventIds?.includes(debt.sourceEventId)),
+     'vyřešený Vortex Psyche dluh nemá vlastní Trait a originální Journal');
+   }else open.push(debt);
+  }
+  if(!open.length)continue;
+  insist(js(arc?.pendingPsycheTraitChoice&&{sourceEventId:arc.pendingPsycheTraitChoice.sourceEventId,
+    levels:arc.pendingPsycheTraitChoice.levels})===
+    js({sourceEventId:open[0].sourceEventId,levels:open[0].levels})&&
+   js(arc?.pendingPsycheTraitChoices??[])===js(open.slice(1)),
+   'nevypořádaný Vortex Psyche dluh nebo změněné pořadí jednotlivých Traumat');
  }
  return true;
 }
@@ -125,9 +174,12 @@ export function assertCommittedNeutralTotalRelease(before,after){
   (actor.hmk.arcane.auralShockLevels??0)===(original.hmk.arcane.auralShockLevels??0)+c.spirit.auralShock&&
   state.fatigue.windedness===oldState.fatigue.windedness+c.castingFatigue&&
   state.fatigue.otherWeakness===oldState.fatigue.otherWeakness+5*c.spirit.auralShock&&
-  state.morale.psycheStress===oldState.morale.psycheStress+3&&
+  state.morale.psycheStress===oldState.morale.psycheStress+3+
+   (c.vortex.casterPsycheStress??0)&&
   actor.hmk.arcane.pendingPsycheTraitChoice?.sourceEventId===id&&
   actor.hmk.arcane.pendingPsycheTraitChoice.levels===3&&
+  js(actor.hmk.arcane.pendingPsycheTraitChoices??[])===
+   js(c.vortex.additionalPsycheDebts??[])&&
   !(original.hmk.arcane.misfireLostSpells??[]).includes('Neutral::Detect')&&
   actor.hmk.arcane.misfireLostSpells?.includes('Neutral::Detect')&&
   p.physicalDice[0].value>=1,

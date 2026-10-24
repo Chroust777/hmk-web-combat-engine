@@ -1,6 +1,7 @@
 /** HMK v1.2 pp.200–204, 251,255. First NATIVE CAS Neutral Total Release
  * transaction. Deliberately limited to Neutral Detect (CL I), its ONE actual
  * Vortex tick, non-Shade Spirit, and a tick with no continuing suppression.
+ * Vortex source CS causes its own independent Psyche Stress trauma (p.188).
  * No GM-only nonalchemical sources or concentration shielding may be
  * laundered into an authoritative source/history claim. Unsupported cases
  * fail without writing any part of Spirit, Initiative or Journal.
@@ -31,10 +32,15 @@ export function prepareNeutralTotalReleaseCommit({document,createdAt=new Date().
   'všechny zdroje a jejich pozice musí být historicky doložené v Initiative');
  must(tick.shieldingEvidence===null&&tick.hiddenFromCentreSelectionIds.length===0,
   'chybí původní historický koncentrací skrývaný zdroj');
- must(tick.outcome.outcomes.every(e=>e.successLevel==='S'&&e.suppressed===false)&&
-  Object.keys(proof.storm.suppressions).length===0&&
-  tick.outcome.casterPsycheStress===0,
-  'potlačení, obnovení magie a CS stres vyžadují originální lifecycle writer');
+ must(tick.outcome.outcomes.every(e=>['S','CS'].includes(e.successLevel)&&e.suppressed===false)&&
+  Object.keys(proof.storm.suppressions).length===0,
+  'potlačení a obnovení magie vyžadují originální lifecycle writer');
+ const criticalSources=tick.outcome.outcomes.filter(e=>e.successLevel==='CS');
+ const additionalPsycheDebts=criticalSources.map(e=>({
+  sourceEventId:proof.eventId+':vortex-cs:'+e.sourceId,sourceId:e.sourceId,levels:1}));
+ must(tick.outcome.casterPsycheStress===additionalPsycheDebts.length&&
+  new Set(additionalPsycheDebts.map(x=>x.sourceEventId)).size===additionalPsycheDebts.length,
+  'každý CS zdroje musí založit vlastní Psyche trauma');
  must(!document.journal.some(j=>j.id==='neutral-total-release:'+proof.eventId||
   j.calendarNeutralTotalRelease?.spellstartId===proof.spellstartId),
   'Total Release nebo původní Spellstart již byly využity');
@@ -44,7 +50,7 @@ export function prepareNeutralTotalReleaseCommit({document,createdAt=new Date().
  must(Number.isSafeInteger(prior)&&prior>=0&&prior+shock<=99&&
   Number.isSafeInteger(state.fatigue.windedness)&&state.fatigue.windedness+proof.casting.castingFatigue<=99999&&
   Number.isSafeInteger(state.fatigue.otherWeakness)&&state.fatigue.otherWeakness+shock*5<=99999&&
-  Number.isSafeInteger(state.morale.psycheStress)&&state.morale.psycheStress+3<=99999&&
+  Number.isSafeInteger(state.morale.psycheStress)&&state.morale.psycheStress+3+additionalPsycheDebts.length<=99999&&
   !arc.pendingPsycheTraitChoice&&!(arc.misfireLostSpells??[]).includes('Neutral::Detect'),
   'nepřipravený Combat State, Psyche nebo ztracené kouzlo');
  const skill=actor.hmk.skills.filter(s=>String(s.name).trim().toLowerCase()==='spirit');
@@ -54,9 +60,14 @@ export function prepareNeutralTotalReleaseCommit({document,createdAt=new Date().
  arc.auralShockLevels=prior+shock;
  arc.misfireLostSpells??=[];arc.misfireLostSpells.push('Neutral::Detect');
  arc.pendingPsycheTraitChoice={sourceEventId:proof.eventId,levels:3};
+ must(!arc.pendingPsycheTraitChoices||
+  (Array.isArray(arc.pendingPsycheTraitChoices)&&arc.pendingPsycheTraitChoices.length===0),
+  'nevypořádaná fronta dřívějších Psyche traumat');
+ if(additionalPsycheDebts.length)
+  arc.pendingPsycheTraitChoices=cp(additionalPsycheDebts);
  state.fatigue.windedness+=proof.casting.castingFatigue;
  state.fatigue.otherWeakness+=shock*5;
- state.morale.psycheStress+=3;
+ state.morale.psycheStress+=3+additionalPsycheDebts.length;
  state.events.push({id:proof.eventId+':total-release',round:proof.spellfireRound,
   type:'hmk-spell-total-release',details:{spell:'Neutral::Detect',complexity:1,
    sourceEventId:proof.eventId,castingD100:proof.casting.castingD100,
@@ -64,6 +75,13 @@ export function prepareNeutralTotalReleaseCommit({document,createdAt=new Date().
    spiritD100:proof.spirit.spiritD100,spiritSL:proof.spirit.spiritSL,
    spiritLossDice:cp(proof.spirit.lossD6),spiritMLLoss:proof.spirit.spiritMLLoss,
    auralShock:shock,weaknessFatigue:shock*5,psycheStress:3}});
+ for(const debt of additionalPsycheDebts){
+  const outcome=criticalSources.find(o=>o.sourceId===debt.sourceId);
+  state.events.push({id:debt.sourceEventId,round:proof.spellfireRound,
+   type:'hmk-vortex-caster-psyche',details:{parentEventId:proof.eventId,
+    sourceEventId:debt.sourceEventId,sourceId:debt.sourceId,
+    physicalD100:outcome.physicalD100,successLevel:'CS',psycheStress:1}});
+ }
  state.lastRound=Math.max(state.lastRound,proof.spellfireRound);
  validateCombatState(state);
  const states=Object.fromEntries(out.characters.filter(c=>c.hmk?.combatState)
@@ -89,12 +107,15 @@ export function prepareNeutralTotalReleaseCommit({document,createdAt=new Date().
   selectedSourceId:tick.outcome.selectedSourceId,selectionDie:selection?cp(selection):null,
   physicalRolls:roundDice,outcomes:cp(tick.outcome.outcomes),
   wardBlockedSourceIds:cp(tick.outcome.wardBlockedSourceIds),
+  casterPsycheStress:additionalPsycheDebts.length,
+  additionalPsycheDebts:cp(additionalPsycheDebts),
   ended:true,continuingSuppressions:[]};
  sequence.log.push({type:'neutral-incant-spellfire-total-release',eventId:proof.eventId,
   actorId:proof.casterId,round:proof.spellfireRound,spell:'Detect',
   spellstartId:proof.spellstartId,castingSL:'CF',castingEML:proof.casting.castingEML,
   castingFatigue:proof.casting.castingFatigue,physicalDice:cp(dice),vortex:cp(vortex),
-  spiritSL:proof.spirit.spiritSL,spiritMLLoss:proof.spirit.spiritMLLoss});
+  spiritSL:proof.spirit.spiritSL,spiritMLLoss:proof.spirit.spiritMLLoss,
+  vortexPsycheStress:additionalPsycheDebts.length});
  sequence=finishEncounterTurn(sequence,states,{action:'incant',gmConfirmed:true});
  must(!sequence.pendingEndTurnAction,'nevyřešené povinnosti na konci Incant');
  out.combatRuntime.sequence=sequence;
