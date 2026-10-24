@@ -4,6 +4,7 @@ import {displayCampaignMinute,campaignCalendarAgenda} from './hmk-campaign-calen
 import {passiveHMKCalendarMilestones} from './hmk-calendar-campaign-lifecycle.js';
 import {historicalHMKCalendarEntries} from './hmk-calendar-history.js';
 import {calendarActorActivities} from './hmk-calendar-activities.js';
+import {calendarVisibleHistory,calendarVisibleActivities} from './hmk-calendar-timeline-visibility.js';
 const pad=(x)=>String(x).padStart(2,'0');
 const dayNumber=(m)=>Math.floor(m/1440)+1;
 const minDay=(n)=>Math.max(1,Math.min(n,694444));
@@ -31,20 +32,33 @@ function eventMark(p){return p.status==='resolved'?'✓':p.status==='cancelled'?
 function eventStatus(p){return p.status==='resolved'?(p.kind==='trek-preparation'?'Podklady zapsány':p.origin==='history'?'Vyhodnoceno':'Dokončeno'):p.status==='cancelled'?'Zrušeno':p.status==='due'?'K vyřízení':p.status==='elapsed'?'Proběhlo':p.status==='active'?'Probíhá':'Naplánováno';}
 function eventName(p){return p.title||p.description||'Událost';}
 function eventDestination(p){return p.destination==='healing'?'Healing · Combat':p.destination==='skills'?'Skill Tests':p.destination==='combat'?'Combat':p.destination==='inventory'?'Arsenal & Gear':p.destination==='hazards'?'Nebezpečí / Trauma':p.destination==='calendar'?'Kalendář · Starvation/Thirst':'Deník postavy';}
-function issueAction(p,esc){if(p.origin==='passive')return '<span class="hc-soft">Automatická časová změna · bez hodu</span>';const id=esc(p.id),isRule=p.origin==='hml'||p.origin==='history';
- return `${p.characterId?`<button type="button" class="hc-small" data-cal-link="${esc(p.characterId)}" data-cal-destination="${esc(p.destination||'healing')}" data-cal-kind="${esc(p.kind||'gm')}" data-cal-source="${esc(p.sourceId||p.woundId||'')}" data-cal-elapsed="${esc(p.elapsedMinutes??'')}" ${p.origin==='history'?`data-cal-history-id="${esc(p.sourceId)}"`:''}>Otevřít ${esc(eventDestination(p))} ↗</button>`:(!isRule?`<span class="hc-soft">${esc(p.place||'Celá kampaň')}</span>`:'')}
- ${!isRule&&!p.resolution?`<button type="button" class="hc-small" data-cal-resolve="${id}">GM: vyřídit</button><button type="button" class="hc-small" data-cal-cancel="${id}">Zrušit</button>`:''}`;
+function shortEventName(p){
+ // No duplicated HMK prefix, description or bookkeeping IDs in the timeline.
+ if(p.origin==='hml')return p.description||p.title||'Pravidlová kontrola';
+ if(p.origin==='history')return p.description||p.title||'Následek události';
+ if(p.origin==='activity')return p.kind==='foraging-stationary'?'Foraging':p.title||'Plánovaná činnost';
+ return p.title||p.description||'Událost světa';
+}
+function issueAction(p,esc){
+ if(p.origin==='passive')return '<span class="hc-soft">Automaticky</span>';
+ const id=esc(p.id),isRule=p.origin==='hml'||p.origin==='history';
+ const text=p.origin==='history'?'Deník ↗':p.origin==='activity'?'Činnost ↗':
+  p.origin==='gm'?'Otevřít ↗':'Kontrola ↗';
+ return `${p.characterId?`<button type="button" class="hc-small hc-event-link" title="${esc(eventDestination(p))}" data-cal-link="${esc(p.characterId)}" data-cal-destination="${esc(p.destination||'healing')}" data-cal-kind="${esc(p.kind||'gm')}" data-cal-source="${esc(p.sourceId||p.woundId||'')}" data-cal-elapsed="${esc(p.elapsedMinutes??'')}" ${p.origin==='history'?`data-cal-history-id="${esc(p.sourceId)}"`:''}>${esc(text)}</button>`:(!isRule?`<span class="hc-soft">${esc(p.place||'Celá kampaň')}</span>`:'')}
+ ${!isRule&&p.origin==='gm'&&!p.resolution?`<button type="button" class="hc-small hc-event-mark" title="GM: vyřídit událost" aria-label="GM: vyřídit událost" data-cal-resolve="${id}">✓</button><button type="button" class="hc-small hc-event-mark" title="Zrušit událost" aria-label="Zrušit událost" data-cal-cancel="${id}">×</button>`:''}`;
 }
 function renderAgendaEntry(p,esc,clock){
- const type=p.origin==='activity'?'HMK · činnost postavy':p.origin==='history'?'HMK · uložený pravidlový výsledek':p.origin==='passive'?'HMK · automatický konec časového účinku':p.origin==='hml'?'HMK · vyžaduje pravidlový průvodce':p.requiresAction?'GM · čeká na rozhodnutí':'GM · událost';
- return `<article class="hc-entry ${p.status==='due'?'hc-entry--due':''} ${['resolved','cancelled'].includes(p.status)?'hc-entry--done':''}"><div class="hc-entry-head"><strong>${esc(eventName(p))}</strong><span>${esc(displayCampaignMinute(p.dueMinute))}</span><span class="hc-status hc-status--${esc(p.status)}">${esc(eventStatus(p))}</span></div>
- <p class="hc-annotation">${esc(type)}${p.characterId&&p.name?' · postava: '+esc(p.name):''}${p.place?' · '+esc(p.place):''}${p.woundId?' · rána '+esc(p.woundId):''}</p>
- ${p.note?`<p>${esc(p.note)}</p>`:''}${p.resolution?`<p class="hc-annotation">${esc(p.status==='cancelled'?'Zrušeno':'Dokončeno')} ${esc(displayCampaignMinute(p.resolution.minute))}${p.resolution.note?' · '+esc(p.resolution.note):''}</p>`:''}${p.endMinute>p.minute?`<p class="hc-annotation">Trvání: ${esc(displayCampaignMinute(p.minute))} → ${esc(displayCampaignMinute(p.endMinute))}</p>`:''}
- <div class="hc-actions">${issueAction(p,esc)}</div></article>`;
+ const who=p.name||p.place||'Svět',due=esc(displayCampaignMinute(p.dueMinute));
+ const note=p.origin==='gm'?(p.note||p.resolution?.note||''):'',label=shortEventName(p);
+ const details=[p.woundId?`Rána ${p.woundId}`:'',note].filter(Boolean).join(' · ');
+ return `<article class="hc-entry hc-entry--compact ${p.status==='due'?'hc-entry--due':''} ${['resolved','cancelled'].includes(p.status)?'hc-entry--done':''}" ${details?`title="${esc(details)}"`:''}>
+ <div class="hc-event-line"><strong class="hc-event-person">${esc(who)}</strong><time>${due}</time><span class="hc-status hc-status--${esc(p.status)}">${esc(eventStatus(p))}</span></div>
+ <div class="hc-event-line hc-event-line--task"><span class="hc-event-description">${esc(label)}</span><span class="hc-actions">${issueAction(p,esc)}</span></div>
+ </article>`;
 }
 export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,escapeHTML}={}){
  const esc=escapeHTML,agenda=campaignCalendarAgenda(clock,characters,journal),custom=gmCalendarAgenda(clock);
- const all=[...agenda.all.map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...historicalHMKCalendarEntries(clock,characters,journal),...calendarActorActivities(clock,characters,journal),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
+ const all=[...agenda.all.map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities(calendarActorActivities(clock,characters,journal)),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
  all.sort((a,b)=>a.dueMinute-b.dueMinute||a.id.localeCompare(b.id));
  // Index immutable evidence once. The day/hour/minute views otherwise scan
  // the entire character audit once per cell (30 + 24 + 60 repeated scans).
@@ -58,13 +72,13 @@ export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,esc
  // seven rolling days. Historical completed events remain on their dates.
  const inWeek=p=>(p.dueMinute>=clock.minute&&p.dueMinute<=weekEnd)||
    (['gm','activity'].includes(p.origin)&&!p.resolution&&p.endMinute>clock.minute&&p.minute<=weekEnd);
- const weekRule=all.filter(p=>p.origin==='hml'&&inWeek(p));
- const weekGM=all.filter(p=>p.origin==='gm'&&inWeek(p));
- const weekActivities=all.filter(p=>p.origin==='activity'&&inWeek(p));
+ const actionable=all.filter(p=>(p.origin==='hml'||(p.origin==='gm'&&p.requiresAction))&&inWeek(p)&&p.status==='due');
+ const upcoming=all.filter(p=>inWeek(p)&&!actionable.includes(p)&&p.origin!=='history'&&p.origin!=='passive'&&
+  !['resolved','cancelled'].includes(p.status));
  const weeklyUnknown=agenda.unknown;
- const compactWeek=(rows,label)=>`<div class="hc-week-list">${rows.map(p=>renderAgendaEntry(p,esc,clock)).join('')||`<p>Žádné ${label} během následujících 7 dní.</p>`}</div>`;
- const badges=`<section class="hc-calendar hc-weekly"><h3>Přehled na 7 dní · ${esc(displayCampaignMinute(clock.minute))} až ${esc(displayCampaignMinute(weekEnd))}</h3><div class="hc-stats"><span>${esc(dayLabel(clock,today))}</span>${currentSign?`<span>Sunsign <b>${esc(currentSign.name)}</b>${currentSign.cusp?` · cusp ${esc(currentSign.cusp)}`:''}</span>`:''}</div>
- <div class="hc-week-tabs"><details open><summary>Činnosti postav · ${weekActivities.length}</summary>${compactWeek(weekActivities,'činnosti postav')}</details><details><summary>HMK · ${weekRule.length}</summary>${compactWeek(weekRule,'HMK termíny')}</details><details><summary>GM čekající · ${weekGM.filter(p=>p.status==='due'&&!p.resolution).length} · naplánované ${weekGM.length}</summary>${compactWeek(weekGM,'GM události')}</details><details><summary>Nedoložené · ${weeklyUnknown.length}</summary>${weeklyUnknown.map(x=>`<p class="hc-warning">${esc(x.name)} · ${esc(x.description)} — ${esc(x.reason)}</p>`).join('')||'<p>Žádné nedoložené termíny.</p>'}</details></div></section>`;
+ const compactWeek=(rows,label)=>`<div class="hc-week-list">${rows.map(p=>renderAgendaEntry(p,esc,clock)).join('')||`<p>Žádné ${label}.</p>`}</div>`;
+ const badges=`<section class="hc-calendar hc-weekly"><h3>Přehled na 7 dní</h3><p class="hc-hint">${esc(displayCampaignMinute(clock.minute))} – ${esc(displayCampaignMinute(weekEnd))} · jen rozhodnutí GM, události světa a otevřené povinnosti</p>
+ <div class="hc-week-tabs"><details open><summary>K vyřízení · ${actionable.length}</summary>${compactWeek(actionable,'splatné povinnosti')}</details><details><summary>Plánované události a činnosti · ${upcoming.length}</summary>${compactWeek(upcoming,'další termíny')}</details>${weeklyUnknown.length?`<details><summary>Vyžaduje upřesnění · ${weeklyUnknown.length}</summary>${weeklyUnknown.map(x=>`<p class="hc-warning">${esc(x.name)} · ${esc(x.description)} — ${esc(x.reason)}</p>`).join('')}</details>`:''}</div></section>`;
  const title=''; // The dated grid already carries the month and campaign time.
  let visualization='';
  if(ui.mode==='month'){
@@ -105,17 +119,10 @@ export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,esc
  }
  const scheduleAt=ui.prefillMinute??Math.max(clock.minute,(selected-1)*1440+ui.hour*60),planDay=dayNumber(scheduleAt),planHour=Math.floor(scheduleAt%1440/60),planMinute=scheduleAt%60;
  const charOptions=[['','— Celá kampaň —'],...characters.map(c=>[esc(c.id),esc(c.name)])];
- const weekVisible=all.filter(inWeek);
- const eventsHTML=`<section class="hc-calendar hc-plans"><h3>Časované události a pravidlové závazky</h3><p>Načasované HMK procedury se odvozují z potvrzených stavů postav. Ruční události GM jsou oddělené a nesmějí samy změnit úraz, stav či výsledek hodu.</p>
-  ${agenda.unknown.length?`<details><summary>Nedoložené nebo blokující procedury (${agenda.unknown.length})</summary>${agenda.unknown.map(x=>`<p class="hc-warning">${esc(x.name)} · ${esc(x.description)} — ${esc(x.reason)}</p>`).join('')}</details>`:''}
-  <details open><summary>Ke zpracování / čeká na hod (${weekVisible.filter(p=>p.status==='due').length})</summary><div class="hc-event-list">${weekVisible.filter(p=>p.status==='due').map(p=>renderAgendaEntry(p,esc,clock)).join('')||'<p>Žádné splatné události.</p>'}</div></details>
-  <details><summary>Budoucí události (${weekVisible.filter(p=>p.status==='future').length})</summary><div class="hc-event-list">${weekVisible.filter(p=>p.status==='future').map(p=>renderAgendaEntry(p,esc,clock)).join('')||'<p>Žádné budoucí události.</p>'}</div></details>
-  ${weekVisible.some(p=>p.origin==='gm'&&p.minute<clock.minute&&p.endMinute>clock.minute)?`<details><summary>Právě probíhající vícedenní GM události</summary><div class="hc-event-list">${weekVisible.filter(p=>p.origin==='gm'&&p.minute<clock.minute&&p.endMinute>clock.minute).map(p=>renderAgendaEntry(p,esc,clock)).join('')}</div></details>`:''}
-  <p class="hc-hint">Historii vyhodnocených událostí najdete přímo v minulých dnech a minutách. Souhrn výše ukazuje pouze termíny od nyní do +7 dní.</p></section>`;
  const create=`<section class="hc-calendar hc-planner" id="hc-planner"><h3>Přidat událost GM</h3><p>Trvání zahrnuje začátek a konec intervalu. Volbou „vyžaduje vyřízení“ zabráníte přeskočení termínu bez potvrzení GM.</p>
   <form id="campaign-plan-form"><div class="hc-fields"><label>Název události<input name="title" maxlength="160" required placeholder="Například příjezd posla"></label><label>Místo<input name="place" maxlength="160" placeholder="Pevnost, les, vesnice…"></label><label>Postava<select name="characterId">${opts(charOptions,'')}</select></label><label>Odkaz na část aplikace<select name="destination">${opts([['notes','Deník / poznámky'],['skills','Skill Tests'],['healing','Healing / Combat'],['hazards','Nebezpečí / Trauma'],['combat','Combat'],['inventory','Arsenal & Gear']],'notes')}</select></label>
   <label>Den kampaně<input name="day" required type="number" min="1" max="694444" value="${planDay}"></label><label>Hodina<input name="hour" required type="number" min="0" max="23" value="${planHour}"></label><label>Minuta<input name="minute" required type="number" min="0" max="59" value="${planMinute}"></label><label>Trvání · dny<input name="durationDays" type="number" min="0" max="10000" value="0"></label><label>Trvání · hodiny<input name="durationHours" type="number" min="0" max="23" value="0"></label><label>Trvání · minuty<input name="durationMinutes" type="number" min="0" max="59" value="0"></label><label>Požadovaný okamžik řešení<select name="trigger">${opts([['start','Na začátku'],['end','Na konci trvání']],'start')}</select></label></div>
   <label>Popis / instrukce / podmínky<textarea name="note" maxlength="2000" rows="3" placeholder="Co musí GM nebo hráč udělat…"></textarea></label><label class="hc-check"><input type="checkbox" name="requiresAction" value="yes"> Vyžaduje rozhodnutí / upozornění: nelze přeskočit termín</label><label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje plánovanou událost</label><button type="submit">Zapsat událost na časovou osu</button></form></section>`;
  return `${title}${badges}${visualization}<section class="hc-calendar hc-time-control"><h3>Řízení času kampaně</h3><p class="hc-hint">Čas lze nastavit přímo v jednotlivé minutě zvoleného dne tlačítkem „▶ Nastavit čas“. Již potvrzené minuty nelze vrátit zpět.</p><form id="campaign-quick-advance-form" class="hc-inline"><label>Posun o<select name="deltaMinutes">${opts([[1,'1 minutu'],[5,'5 minut'],[10,'10 minut'],[30,'30 minut'],[60,'1 hodinu'],[240,'4 hodiny'],[1440,'1 den'],[7200,'5 dní']],1)}</select></label><label>Důvod<input name="reason" maxlength="400" required value="Plynutí času ve hře"></label><label class="hc-check"><input name="gmConfirmed" value="yes" type="checkbox" required> Potvrzuji uplynutí času</label><button type="submit">Odmáčknout čas ›</button></form><p class="hc-hint">Není možné přeskočit nevyřízený doložený HMK termín ani závaznou událost GM. Každé splatné pravidlové vyhodnocení otevře původní pravidlový průvodce; nikdy nepoužívejte náhodné číslo bez zápisu jeho původu.</p></section>
- ${eventsHTML}${create}`;
+ ${create}`;
 }

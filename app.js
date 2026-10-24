@@ -243,7 +243,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.468';
+const APP_VERSION='93.469';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2737,7 +2737,11 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  if(activeSheetSection==='provisions')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Provisions · jídlo a pití</h3><p>${esc(c.name)} · doklady platné pouze pro aktivní kampaň</p></header><div class="columns journal-tech-columns">${partyProvisionCardsHTML([c],false)}<section class="panel wide"><h3>Co ukazatel znamená</h3><p>Jde o dostupné, GM potvrzené zásoby a poslední uzavřený 24h nutriční den, nikoli o odhad hladu podle prázdného batohu. Doložené zásoby Foraging jsou společné, dokud nejsou skutečně vydány.</p><p>Starvation HR5 a Thirst HR4 vznikají pouze z původních zapsaných nutričních intervalů, nikoli z tohoto přehledu. Zpracovávají se v původním Combat State.</p><button type="button" data-nav="calendar" class="secondary">Přejít do kalendáře a zásobování</button></section></div></section>`,`journal-book--chapter journal-book--provisions`);
  if(activeSheetSection==='inventory')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Arsenal & Gear</h3><p>Inventář, výbava, zatížení a speciální efekty.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Inventář postavy</h3>${wealthInventoryPanel(c)}${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}${physicalWaterPanel(c)}</section>${foragingEvidenceInCharacterInventory(c.id)}${combatantLoadPanel(c)}${armourLoadoutPanel(inv,c)}<section class="panel wide hmk-inventory-add-panel">${journalAddInventoryForm()}</section>${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:''})()}</div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='status')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Combat & Conditions</h3><p>Aktuální stav, povinné procedury, zranění a návazné herní sekvence.</p></header><div class="columns journal-tech-columns">${hskPendingSkillPhysicalConsequences(c.id)}${hskHazardSummary(c.id)}${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section></div></section>`,`journal-book--chapter`);
- if(activeSheetSection==='notes')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${logs.map(l=>`<div class="list-row journal-log-row" data-journal-entry="${esc(l.id)}"><div><b>${esc(l.title)}</b><div class="muted">${esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.combatProof||l.skillTestProof||l.calendarChestTransfer||l.calendarInventoryWaterFill||l.calendarInventoryWaterUse?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`).join('')}</section>${auditPanel}</div></section>`,`journal-book--chapter`);
+ if(activeSheetSection==='notes'){
+ const renderLog=l=>`<div class="list-row journal-log-row" data-journal-entry="${esc(l.id)}"><div><b>${esc(l.title)}</b><div class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</div><p>${esc(l.body).replace(/\n/g,'<br>')}</p></div><div class="actions">${l.cashReceipt||l.combatProof||l.skillTestProof||l.calendarChestTransfer||l.calendarInventoryWaterFill||l.calendarInventoryWaterUse?'<span class="muted">Ověřený záznam · pouze čtení</span>':`<button class="secondary" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}">Smazat</button>`}</div></div>`;
+ const recent=logs.slice(0,10).map(renderLog).join('');
+ const archived=logs.length>10?`<details class="journal-log-archive"><summary>Archiv · ${logs.length-10} starších záznamů</summary><div class="journal-log-archive-content">${logs.slice(10).map(renderLog).join('')}</div></details>`:'';
+ return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${recent}${archived}</section>${auditPanel}</div></section>`,`journal-book--chapter`)}
  return '';
 }
 function sheetView(){
@@ -2750,7 +2754,22 @@ function sheetView(){
  const inv=data.inventory.filter(x=>x.characterId===c.id);
  const sheetAudit=auditCharacterSheet(c,data.inventory);
  const auditPanel=`<section class="panel wide"><details><summary>Kontrola integrity Character Sheet · ${sheetAudit.ok?'bez nalezeného nesouladu':'vyžaduje pozornost'}</summary><p class="muted">Kontrola je pouze pro čtení a žádné hodnoty neopravuje ani nemaže. Zdroj: stávající HMK profil, Character Creation a inventář.</p>${sheetAudit.issues.map(x=>`<p class="notice error">${esc(x)}</p>`).join('')}${sheetAudit.notes.map(x=>`<p class="notice">${esc(x)}</p>`).join('')}${sheetAudit.ok?'<p>Promítnuté Skills a vybavení: kontrola prošla v rozsahu známých dat.</p>':''}</details></section>`;
- const logs=data.journal.filter(x=>x.characterId===c.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+ // Authoritative cash receipts are stored with the character, not in the journal.
+ // Expose them in the logbook as read-only projections without duplicating data.
+ const account=data.campaignClock&&c.hmk?.campaignCashAccounts?.[campaignKey(data.campaignClock)];
+ const cashLogs=account?[...(account.purchases||[]).map(p=>({
+  id:'cash-purchase:'+p.id,cashReceipt:true,characterId:c.id,
+  title:'Nákup · '+(p.label||'Předmět'),
+  body:'Cena '+p.amountPence+'d · čas kampaně '+displayCampaignMinute(p.campaignMinute),
+  campaignMinute:p.campaignMinute,createdAt:p.at||''})),
+  ...(account.adjustments||[]).map(p=>({
+  id:'cash-adjustment:'+p.id,cashReceipt:true,characterId:c.id,
+  title:'Úprava hotovosti GM',body:(p.deltaPence>0?'+':'')+p.deltaPence+'d · '+p.reason+
+   ' · čas kampaně '+displayCampaignMinute(p.campaignMinute),
+  campaignMinute:p.campaignMinute,createdAt:p.at||''}))]:[];
+ const logs=[...data.journal.filter(x=>x.characterId===c.id),...cashLogs].sort((a,b)=>
+  String(b.createdAt||'').localeCompare(String(a.createdAt||''))||
+  (b.campaignMinute??-1)-(a.campaignMinute??-1));
  return `${activeSheetSection==='overview'?characterJournalHero(c,inv,editing):sheetSupplementTabs(c,inv,editing,auditPanel,logs)}`
 }
 function catalogAuditEntry(i){
@@ -9658,7 +9677,7 @@ document.addEventListener('click',e=>{
   else if(destination==='skills'){view='skills';}
   else{activeSheetSection=destination==='inventory'?'inventory':destination==='hazards'?'hazards':destination==='status'?'status':'notes';view='sheet';}
   render();
-  if(t.dataset.calHistoryId){const row=[...document.querySelectorAll('[data-journal-entry]')].find(x=>x.dataset.journalEntry===t.dataset.calHistoryId);if(row){row.classList.add('calendar-history-focus');row.scrollIntoView({block:'center',behavior:'auto'});}return;}
+  if(t.dataset.calHistoryId){const row=[...document.querySelectorAll('[data-journal-entry]')].find(x=>x.dataset.journalEntry===t.dataset.calHistoryId);if(row){const archive=row.closest('details.journal-log-archive');if(archive)archive.open=true;row.classList.add('calendar-history-focus');row.scrollIntoView({block:'center',behavior:'auto'});}return;}
   // Locate the exact rule engine form by event kind AND its permanent source ID.
   // Prefill documented character/time facts only; never guess situational
   // anatomy, medical help, die results, or auto-check GM decisions.

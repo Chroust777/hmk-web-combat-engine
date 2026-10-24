@@ -4328,3 +4328,27 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .hc-expedition-dice-actor{margin:.55rem 0;padding:.65rem;border:1px solid var(--line,#8f7652);border-radius:8px;min-width:0}
 .hc-expedition-dice-actor legend{font-weight:700;padding:0 .4rem}
 .hc-expedition-dice-actor .hc-expedition-dice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:.5rem}
+
+/* v93.469 — concise campaign/world timeline and the personal-log archive. */
+.content-calendar .hc-entry--compact{flex:1 1 265px;min-width:0;padding:5px 9px;margin:2px 0;font-size:.76rem;line-height:1.2}
+.content-calendar .hc-entry--compact .hc-event-line{display:flex;align-items:center;flex-wrap:wrap;gap:3px 9px;min-width:0;min-height:20px}
+.content-calendar .hc-entry--compact .hc-event-line--task{justify-content:space-between;border-top:1px solid rgba(129,97,55,.13);padding-top:3px}
+.content-calendar .hc-event-person{max-width:37%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.content-calendar .hc-entry--compact time{font:normal .72rem/1.2 ui-monospace,monospace;color:#60492a;white-space:nowrap}
+.content-calendar .hc-entry--compact .hc-status{font-size:.66rem;padding:1px 4px;margin-left:auto;white-space:nowrap}
+.content-calendar .hc-entry--compact .hc-event-description{flex:1 1 115px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.content-calendar .hc-entry--compact .hc-actions{display:inline-flex;margin:0;gap:3px;flex:0 1 auto}
+.content-calendar .hc-entry--compact .hc-actions button{font-size:.68rem;padding:3px 7px;white-space:nowrap}
+.content-calendar .hc-week-tabs{grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));align-items:start}
+.journal-log-archive{margin-top:16px;border:1px solid #a58a62;border-radius:4px;background:rgba(157,125,76,.09);padding:9px 12px}
+.journal-log-archive>summary{cursor:pointer;font-weight:700;color:#513c23}
+.journal-log-archive-content{margin-top:10px;max-height:720px;overflow-y:auto;overscroll-behavior:contain}
+@media(max-width:720px){.content-calendar .hc-entry--compact .hc-event-line--task{align-items:flex-start}.content-calendar .hc-entry--compact .hc-actions{width:100%}.content-calendar .hc-week-tabs{grid-template-columns:1fr}}
+
+/* Keep each compact event to two visual rows even on narrow panels. */
+.content-calendar .hc-entry--compact .hc-event-line{display:grid;grid-template-columns:minmax(0,1fr) auto auto;column-gap:6px;row-gap:0;align-items:center}
+.content-calendar .hc-entry--compact .hc-event-line--task{grid-template-columns:minmax(0,1fr) auto}
+.content-calendar .hc-entry--compact .hc-event-person{max-width:none}
+.content-calendar .hc-entry--compact .hc-actions{width:auto;flex-wrap:nowrap;white-space:nowrap}
+.content-calendar .hc-entry--compact .hc-event-mark{font-weight:700;min-width:21px;padding:3px 5px}
+@media(max-width:720px){.content-calendar .hc-entry--compact .hc-actions{width:auto}}
