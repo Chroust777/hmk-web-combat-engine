@@ -1,6 +1,6 @@
 # HMK Keeper’s Ledger · Bod 4 Alchemy · Priorita 1–15
 
-Stav po v93.444, auditní pokračování v93.441–v93.444. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
+Stav po v93.445, auditní pokračování v93.441–v93.445. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
 
 Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, inventární a zdravotní kapitoly podle potřeby. „Částečně“ není „hotovo“. Každý bod bude uzavřen teprve po úplném mechanickém propojení, kontrole neměnných důkazů, testování obnovy dat a regresi.
 
@@ -15,7 +15,7 @@ Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, 
 | 7 | Aural Shock / Ill Effects | **Částečně – v93.442 kanonický katalog 35/35 a sjednocené důkazy pro 4 aktivní Imbibed** | Zbývají skutečné zdravotní a časové commity dosud nepodporovaných Imbibed elixírů; katalog sám neprovádí jejich účinky ani léčbu. |
 | 8 | Physic všechny účinky | **Částečně – v93.443 bezpečné vyhodnocení všech doložených zdrojů; 4 aktivní druhy dokončeny** | Poison, Quiescence a ostatní dosud neimplementované Imbibed účinky vyžadují skutečné důkazy jejich začátku, trvání a konce; do té doby musí Physic před jakýmkoli zápisem odmítnout neúplný souběh. |
 | 9 | AS / Decay | **Částečně – v93.444 konzervativní rekonstrukce zmeškaných hodů u nepoužitých uložených elixírů** | Zvláštní čerpání AS a rekonstrukce aktivních Temporary účinků s již závislými událostmi čekají na ověřené lifecycles. |
-| 10 | Spell / Arcane provázání | Neuzavřeno | Detect/Reveal/Dispel, Negation, Attunement, Spirit Sensing, True Sight a příslušné soul stavy. |
+| 10 | Spell / Arcane provázání | **Částečně – v93.445 ověřené read-only Arcane cíle + aktuální AS/Dispel EML** | Ještě není obecný casting/invocation writer s doloženými Detect → Reveal → Dispel, Ward, LOS, Negation, Soulcloak/True Sight, Spirit Sensing ani atomický zápis ukončení účinků. |
 | 11 | Invent unikátní recepty | Částečně | Mechanické provádění konkrétních GM-defined účinků; samotná výroba existuje. |
 | 12 | Alchemical Dissolution / Recovery | Částečně | Úplné end-to-end necombatové Recovery a zvláštní aplikované/intake stavy. |
 | 13 | Fyzická evidence | Částečně | Thrown, rozbití, předání, ukončení a případné skutečné vyřazení, bez paralelního inventáře. |
@@ -229,3 +229,32 @@ Skutečné Life-Cycle a writer důkazy pro nyní neimplementované Imbibed (zejm
 - Pro **aktivní Temporary účinky** s přeskočenou splatností zatím neexistuje bezpečná univerzální rekonstrukce. Pokud mohly v mezidobí ovlivnit souboje, atributy, dovednosti, Shock či jiné situace, nelze nové AS přidělit bez samostatného vyhodnocení návazností na tyto již neměnné události. Takový případ se **odmítne**, neodhadne.
 - Specifické čerpání AS při dalších kanonických efektech (např. Fate, Exsiccation, Ghostsight, Healing) lze napojovat až s jejich skutečně ověřenými účinky, fyzickými akcemi a důkazy, dle pořadí navazujících etap; tyto nyní implementovány nejsou. Pro dosud podporovaný Acid zůstává lokální kontaktní AS v původních atomických Acid aplikacích a kolech, nikoli v nové paralelní evidenci.
 - Společné návaznosti #6–8 nadále označeny částečně; #10–15 čekají dle schváleného pořadí. v93.444 je **kontrolní rozdílová verze proti v93.443**, ne deklarace uzavření všech 15 návazností.
+
+
+## v93.445 – návaznost #10: Arcane cíle, Detect / Reveal / Dispel / Negation (kontrolní etapa)
+
+**Stav bodu 10: ČÁSTEČNĚ.** Tato verze **nepředstírá skutečné sesílání kouzel**. V dodaném projektu není obecný zapisovatelný casting / invocation postup; výčet známých Shèk-Pvâr kouzel při tvorbě postavy nepředstavuje provedený spell cast.
+
+### Kanonické hranice (HMK v1.2)
+
+- **Str. 270:** Temporary elixíry podléhají Detect / Reveal / Dispel a Negation jak uložené, tak aktivní. Instantaneous elixíry jsou pro tyto zásahy magickým cílem pouze **před požitím / aplikací**. Po provedení účinku jim nelze přiřadit fiktivní trvající kouzlo.
+- **Str. 251:** Detect rozlišuje kategorii a umístění zdroje (neznamená automatické odhalení detailů). Reveal vyžaduje úspěšné předchozí Detect stejného zdroje (str. 254); Dispel vyžaduje **oba** úspěšné kroky a případný Ward musí být nejprve vyřešen. Dispel vůči elixíru má **EML postih −5 × jeho aktuální AS**. Detect CS umožňuje +20 bonus k pozdějšímu cílení stejného zdroje při Attune / Reveal / Dispel, ale tento bonus nelze přiznat bez konkrétního původního úspěchu.
+- **Str. 209, 263, 274:** True Sight a Spirit Sensing jsou samostatné mechaniky; Soulcloak a Aural Shock mohou bránit poznání True Form. Negation má vlastní prostorové a koncentrací/časem podmíněné provedení. Žádné z toho nelze vyrobit ze samotného katalogového elixíru ani z jeho známé AS.
+
+### Skutečná změna
+
+- Nový **nezapisující** `src/integration/hmk-alchemy-arcane-targets.js` rekonstruuje z původního `calendarAlchemyFinish`, `calendarAlchemyVialBinding`, `calendarAlchemyVialEmpty`, Imbibing, Physic a Decay skutečnou fázi každé dávky. U uložené dávky navíc kontroluje existenci **téže** fyzické nádoby v původním Inventory. U již použité Temporary vyžaduje potvrzený aktivní původní Imbibing receipt a doložitelný lifecycle. Bez dalších účinků jsou podporovány čtyři dříve implementované životní cykly Darkvision, Erudition, Footpad, Egosight. U nedefinovaného druhu nebo splatného nezapsaného d10 nepředstírá známou AS a cílový stav odmítne.
+- Stávající obrazovka **GM Calendar → Alchemy** má rozbalitelný přehled cílů Detekt/Reveal/Dispel/Negation. Ukazuje uložený / aktivní / skončený stav, fyzický či účinkový původ, aktuální AS a vypočtené Dispel EML. U chybějícího důkazu vypisuje upozornění, nevynechává chybný cíl mlčky. Žádná operace nečerpá AS, nepřepisuje journal, Inventory, soul/Combat State, Initiative ani čas kampaně.
+- **Vydání:** aktualizován `index.html` (včetně title, loaderu a cache-bustingu), `app.js` `APP_VERSION=93.445` a znovu sestaven produkční `hmk-app.bundle.js` pro GitHub Pages.
+
+### Provedené testy
+
+- **PASS – 73/73** dostupných Node.js testovacích souborů v sériovém běhu; všechna dokončená spuštění mají návratový kód 0. Celkem 172 kontrol v nové `test_alchemy_arcane_targets_445.cjs`, která používá skutečné požití Darkvision a fyzickou dávku Physic z existujícího testovacího journalu. Ověřeno 35 kanonických profilů pro skladový stav, kampaň, fyzický původ, změna AS, used Instantaneous, konec enchantment, splatný Decay, fail-closed a bezzápisovost.
+- **PASS Chromium** `browser_alchemy_release_version_445.py`: originální markup `index.html` a produkční bundle načteny v testovací stránce; viditelné **v93.445** v patičce, bez JS chyby. **Nejedná se o živý HTTP test GitHub Pages**.
+- **PASS Chromium** `browser_alchemy_arcane_targets_445.py`: skutečný kalendářový panel rozpoznal aktivní Darkvision a uloženou fyzickou lahvičku Physic, ukázal pro oba aktuální AS6 a Dispel EML −30. Otevření/zavření detailů nic nezapsalo do LocalStorage. Browser navigace k místnímu souboru/localhost není v prostředí povolena; injektován je ale identický produkční bundle a lokálně uložená skutečná testovací kampaň.
+
+### Zbývající závazná práce
+
+Žádný replayovatelný spellcasting a jeho GM/Skill Workbench doklad není touto verzí **vymyšlen ani nahrazen**. Pro úplné uzavření #10 je nutná původní magie: zdrojové Detect, Reveal, Dispel, Ward, range/LOS, Selhání/CF/Misfire, únavy, přerušení, skutečné ukončení enchantmentu (při zachování stejné historické AS), stejně jako Negation, Attunement, Spirit Sensing, True Sight a ochrana Soulcloak. Do té doby jsou nové informace **jen read-only**; neexistuje nové tlačítko, které by bez důkazů mohlo odpálit magii či odstranit elixír.
+
+**Instalace:** v93.445 je rozdílový checkpoint **proti projektu s aplikovanou v93.444**, nikoli kompletní distribuce ani prohlášení bodu #10 za uzavřený. Bod #11–15 zatím zůstává v plánu.
