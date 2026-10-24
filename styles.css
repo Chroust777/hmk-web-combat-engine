@@ -384,3 +384,19 @@ summary{cursor:pointer;color:#4a351d}
  .content-sheet .journal-book--calendar .hc-calendar-tabs.journal-book-subnav{margin:-14px 0 8px!important}
  .content-sheet .journal-book--calendar .hc-calendar-tabs.journal-book-subnav button{font-size:10px!important}
 }
+
+/* v93.467: Chronicle-style calendar obligation links and Character Creation's
+   manual numeric field / software-die button below the entry. */
+.hc-calendar-linked-row{display:flex;align-items:flex-start;justify-content:space-between;gap:.9rem;flex-wrap:wrap}
+.hc-calendar-row-action{display:flex;align-items:flex-end;flex-direction:column;gap:.35rem}
+.hc-calendar-row-action button{white-space:normal;text-align:center;max-width:14rem}
+.hc-uniform-dice{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;max-width:22rem;margin:.65rem 0}
+.hc-uniform-dice label{width:100%;display:flex;flex-direction:column;gap:.25rem}
+.hc-uniform-dice input[type="number"]{width:100%;max-width:14rem}
+.hc-uniform-dice-button{display:block;position:static;margin:.15rem 0 .2rem;min-height:34px}
+.hc-uniform-dice .hc-hint{font-size:.82rem;margin:0}
+/* For existing rule forms, inline enhancement buttons appear immediately
+   beneath the actual input, never in a neighboring unrelated field. */
+form label > button[data-hmk-general-auto-die],
+form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;max-width:100%;margin:.4rem 0 .15rem}
+@media(max-width:800px){.hc-calendar-row-action{align-items:flex-start;width:100%}.hc-calendar-linked-row{gap:.5rem}}

@@ -118,6 +118,7 @@ import {parseSpatialBarrierSegments,effectiveSpatialBarriers} from './src/integr
 import {recordEncounterFreeAction,encounterFreeActionAvailable,createEncounterSequence,validateEncounterSequence,startEncounterTurn,finishEncounterTurn,finalizeStagedEncounterTurn,nextEncounterRound,dueEncounterEvents,dueEndTurnEvents,currentEncounterActor,assertScheduledMeleeActor,resolveReadiedEncounterAction,cancelReadiedEncounterAction,completeReadiedEncounterAction,confirmAlertnessReaction,confirmConcentrationCompletion,abandonEncounterConcentration,ongoingEncounterConcentration,requireConcentrationCompatibleDefence,assertScheduledHitCanCommit,recordScheduledHitCommit,setEncounterTieOrder,configureInitialCrossbowPriority,requireInitialCrossbowShot} from './src/integration/encounter-turn-sequence.js';
 import {applyConfirmedTreatment,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock} from './src/integration/hmk-healing-persistence.js';
 import {calendarInitialUI,campaignCalendarBoardHTML} from './src/integration/hmk-campaign-calendar-ui.js';
+import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
 import {availableSpellAuralRecoveries,persistSpellAuralRecovery} from './src/integration/hmk-spell-aural-recovery.js';
@@ -241,7 +242,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.466';
+const APP_VERSION='93.467';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -486,9 +487,32 @@ function synchronizeAutomaticCalendarOrigins(before,after){
   }
  }
 }
+// The same numeric-field-first UI as Character Creation. A generated die is
+// attributed to software only while its exact field and value are unchanged.
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-hmk-recovery-generate]');if(!button)return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const form=button.closest('form'),input=form?.elements?.namedItem('die');
+ const faces=Number(button.dataset.hmkRecoveryGenerate);
+ if(!form||!(input instanceof HTMLInputElement)||![6,100].includes(faces)||Number(input.max)!==faces)return;
+ try{const value=secureAutoDie(faces);
+  input.value=String(value);calendarRecoveryGenerated.set(form,{faces,value});
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+  button.textContent='⚄ d'+faces+' = '+value;
+ }catch(error){alert('Automatický hod není dostupný: '+error.message);}
+},true);
+document.addEventListener('input',event=>{
+ const input=event.target;if(input?.matches?.('.hc-calendar-recovery-die input[name="die"]')){
+  calendarRecoveryGenerated.delete(input.form);
+  const button=input.closest('.hc-calendar-recovery-die')?.querySelector('[data-hmk-recovery-generate]');
+  if(button)button.textContent='⚄ Vygenerovat d'+button.dataset.hmkRecoveryGenerate;
+ }
+},true);
 // Software dice are offered only inside an opened, character-specific HMK
 // calendar follow-up. The source action still validates and commits its roll.
 const calendarGeneratedDice=new WeakMap();
+// Recovery form software-roll origin is held outside the DOM: manual edits invalidate it.
+const calendarRecoveryGenerated=new WeakMap();
 function calendarDiceWitnessForActiveForm(clock){
  const form=document.activeElement?.closest?.('form');
  if(!form||!form.dataset.hmkCalendarKind||!clock)return null;
@@ -537,13 +561,13 @@ function installCalendarDiceControls(form,kind,sourceId,actorId){
  for(const [name,permitted] of Object.entries(allowed)){
   const inputs=[...form.querySelectorAll('input[type="number"]')].filter(el=>el.name===name);
   inputs.forEach((input,occurrence)=>{
-   if(input.closest('[hidden]'))return;
+   if(input.closest('[hidden]')||input.closest('.hc-calendar-recovery-die'))return;
    const maximum=Number(input.max);
    const faces=Array.isArray(permitted)?(permitted.includes(maximum)?maximum:null):permitted;
    if(!faces)return;
    // Re-entering the same form should never accumulate duplicate dice buttons.
    const old=input.nextElementSibling;
-   if(old?.dataset?.hmkCalendarAutoDie==='true')old.remove();
+   if(old?.dataset?.hmkCalendarAutoDie==='true'||old?.dataset?.hmkGeneralAutoDie==='true')old.remove();
    input.addEventListener('input',()=>witnessed.delete(input));
    const b=document.createElement('button');b.type='button';b.className='hc-small';
    b.dataset.hmkCalendarAutoDie='true';
@@ -800,7 +824,7 @@ function campaignCalendarView(){
    arr.push({kind:'aural',name:'Aural Shock',unit:'hodiny',episodeId:'aural-legacy'});
   return arr.map(x=>({...x,characterId:c.id,label:c.name+' · '+x.name}));
  });
- const renderItem=x=>`<div class="list-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}${x.woundId?' · '+esc(x.woundId):''}</div></div><span>${x.status==='due'?'SPLATNÉ':'Čeká'}</span></div>`;
+ const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}${x.woundId?' · '+esc(x.woundId):''}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button></div></div>`;};
  if(!calendarUI)calendarUI=calendarInitialUI(clock);
  const selectedCalendarPeople=calendarMemberIds(clock,data.characters);
  const board=campaignCalendarBoardHTML({clock,characters:selectedCalendarPeople,journal:data.journal,ui:calendarUI,escapeHTML:esc});
@@ -5394,7 +5418,7 @@ function hmkTemporalRecoveryPanel(chars){
  }
  return pending.length?`<section class="panel hc-recovery" id="hmk-calendar-recovery"><h3>HMK · pravidlové časované obnovy</h3><p>Hody i výsledek jsou zapisovány přímo původním pravidlovým modulem. Software hod a ručně zadaný hod mají odlišný původ v auditu.</p>${pending.join('')}</section>`:'';
 }
-function calendarDiceControls(faces){return `<div class="field-grid"><label>Zdroj d${faces}<select name="diceOrigin"><option value="software">Automatický hod (bezpečný generátor)</option><option value="manual">Ruční zadání čísla</option></select></label><label>d${faces} při ručním zadání<input name="die" type="number" min="1" max="${faces}" step="1" placeholder="Auto = nechat prázdné"></label></div>`;}
+function calendarDiceControls(faces){return `<div class="hc-uniform-dice hc-calendar-recovery-die"><label>Výsledek d${faces} · GM může zadat ručně<input name="die" type="number" min="1" max="${faces}" step="1" required inputmode="numeric" placeholder="1–${faces}" autocomplete="off"></label><button type="button" class="hc-small hc-uniform-dice-button" data-hmk-recovery-generate="${faces}">⚄ Vygenerovat d${faces}</button><p class="hc-hint">Ruční číslo = fyzický hod GM. Tlačítko = softwarový hod zaznamenaný s vlastním původem.</p></div>`;}
 /** Authoritative bounded Neutral casting. Original Ward and Ward-target
  * Detect/Reveal/Dispel are supported; Total Release and unverified casting
  * variants remain fail-closed. */
@@ -5508,8 +5532,12 @@ function enhanceHMKDiceFields(){
  const app=document.getElementById('app');if(!app)return;
  const legal=new Set([4,6,8,10,12,20,30,100]);
  for(const input of app.querySelectorAll('form input[type="number"]')){
-  if(input.nextElementSibling?.dataset?.hmkGeneralAutoDie==='true'||input.disabled||input.closest('#campaign-expedition-form'))continue;
+  if(input.nextElementSibling?.dataset?.hmkGeneralAutoDie==='true'||input.disabled||input.closest('#campaign-expedition-form')||input.closest('.hc-calendar-recovery-die'))continue;
   const label=input.closest('label');if(!label)continue;
+  // Existing dedicated generators already know each rule's roll provenance.
+  // Never put a second general button next to them.
+  const sibling=label.nextElementSibling;
+  if(sibling?.tagName==='BUTTON'&&([...sibling.attributes].some(a=>a.name.startsWith('data-')&&/roll|die|dice|generate/i.test(a.name))||/⚄|generovat|hodit/i.test(sibling.textContent||'')))continue;
   const raw=label.textContent||'';
   const match=raw.match(/(?:^|[^a-zA-Z0-9])d(4|6|8|10|12|20|30|100)(?![0-9])/i);
   if(!match)continue;
@@ -7456,14 +7484,13 @@ document.addEventListener('submit',event=>{
  try{
   if(storageReadOnly||!data.campaignClock||combatInitiativeSequence)throw Error('Kalendář nebo bezpečný zápis nejsou připravené, případně probíhá Initiative');
   const v=Object.fromEntries(new FormData(form));
-  const characterId=v.characterId,trait=v.trait,diceOrigin=v.diceOrigin;
-  if(!['manual','software'].includes(diceOrigin))throw Error('Neplatná volba původu hodu');
+  const characterId=v.characterId,trait=v.trait;
   if(!character(characterId))throw Error('Postava nebyla nalezena');
   const sides=schedule?6:100,raw=String(v.die||'').trim();
-  if(diceOrigin==='software'&&raw)throw Error('Pro automatický hod nevyplňujte ruční číslo');
-  if(diceOrigin==='software'&&!globalThis.crypto?.getRandomValues)throw Error('Bezpečný automatický hod není v tomto prohlížeči dostupný; použijte ruční zadání');
-  if(diceOrigin==='manual'&&!/^\d+$/.test(raw))throw Error('Zadejte celé číslo ručního hodu');
-  const die=diceOrigin==='software'?secureAutoDie(sides):Number(raw);
+  if(!/^(?:[1-9][0-9]*)$/.test(raw))throw Error('Zadejte celé číslo hodu GM');
+  const generated=calendarRecoveryGenerated.get(form);
+  const diceOrigin=generated?.faces===sides&&String(generated.value)===raw?'software':'manual';
+  const die=Number(raw);
   if(!Number.isSafeInteger(die)||die<1||die>sides)throw Error('Hod mimo rozsah d'+sides);
   const clock=data.campaignClock,gameDay=Math.floor(clock.minute/DAY_MINUTES)+1;
   const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
@@ -9355,6 +9382,8 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  let form=null;
  const s=actor.hmk?.combatState,attrs=actor.hmk?.attributes||{};
  switch(kind){
+ case 'bleeding':form=document.getElementById('combat-blood-stoppage-form');choose(form,'wound',actor.id+'::'+sourceId);break;
+ case 'shock-followup':form=document.getElementById('combat-recovery-persistent-form');choose(form,'characterId',actor.id);break;
  case 'treatment':case 'healing':case 'infection':case 'grim':{
   form=document.getElementById(kind==='treatment'?'hmk-treatment-form':kind==='healing'?'hmk-healing-roll-form':kind==='infection'?'hmk-infection-course-form':'hmk-grim-shock-form');
   choose(form,'wound',actor.id+'::'+sourceId);
@@ -9425,8 +9454,8 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   }
   notice='Otevřen autoritativní '+choice+' test pro hlídku '+sourceId+'. Výsledek se uloží s vazbou na její konkrétní čas a kampaň.';
  }else if(['skill-fall','skill-critical','weather-course','treatment','healing','infection','grim','poison','disease','psyche-recovery','psyche-interval','aural-recovery','talisman-period'].includes(kind)){
-  notice='Kalendář otevřel správnou záložku, ale pravidlový formulář není v aktuálním stavu dostupný. Nejprve dokončete případné předchozí povinnosti.';
-  render();
+  const msg='Kalendář otevřel příslušnou oblast postavy '+actor.name+', ale pro tuto událost není v aktuálním stavu dostupný autoritativní pravidlový formulář. Žádný hod nebyl proveden; zkontrolujte předchozí povinnosti.';
+  notice=msg;const area=document.querySelector('main.content');if(area){const warning=document.createElement('p');warning.className='notice';warning.setAttribute('role','status');warning.textContent=msg;area.prepend(warning);}
  }
 }
 // A shared calendar watch must never silently choose the previous sheet actor.
@@ -9536,9 +9565,33 @@ document.addEventListener('click',e=>{
   if(action==='next-month'){calendarUI.monthShift=Math.min(240000,calendarUI.monthShift+1);}
   render();return;
  }
+ if(t.dataset.calLink&&t.dataset.calAgenda){
+  const ev=campaignCalendarAgenda(data.campaignClock,data.characters,data.journal).all.find(x=>x.id===t.dataset.calAgenda);
+  if(!ev||ev.characterId!==t.dataset.calLink||ev.kind!==t.dataset.calKind||
+    String(ev.sourceId||ev.woundId||'')!==String(t.dataset.calSource||''))return;
+  if(ev.status!=='due'){
+   const target=character(ev.characterId);if(!target)return;
+   selected=target.id;activeSheetSection='status';view='sheet';
+   const message='Událost '+ev.description+' pro '+target.name+' je naplánovaná až na '+displayCampaignMinute(ev.minute)+'. Nelze ji vyhodnotit před splatností.';
+   render();notice=message;const area=document.querySelector('main.content');
+   if(area){const warning=document.createElement('p');warning.className='notice';warning.setAttribute('role','status');warning.textContent=message;area.prepend(warning);}
+   return;
+  }
+ }
+ if(t.dataset.calLink&&t.dataset.calKind==='herbal-potion'){
+  const target=character(t.dataset.calLink);if(!target)return;
+  selected=target.id;calendarLanding=false;activeCalendarSection='craft';view='calendar';render();
+  const form=[...document.querySelectorAll('form[data-herb-complete]')].find(f=>f.elements.namedItem('startId')?.value===t.dataset.calSource);
+  if(form){for(let p=form.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;
+   form.scrollIntoView({block:'center',behavior:'auto'});form.elements.namedItem('shelfD6')?.focus({preventScroll:true});}
+  else {notice='Herblore: dokončení vyžaduje nový doložený Skill Value a skutečně splatný čas; příslušný formulář zatím není dostupný.';
+   const n=document.getElementById('app')?.querySelector('[role="status"]');if(n)n.textContent=notice;}
+  return;
+ }
  if(t.dataset.calLink&&t.dataset.calKind==='malnutrition-course'){
-  // This authoritative executor lives in the calendar, not in Combat.
-  calendarLanding=false;view='calendar';render();
+  // Nutrition's original executor moved into the Provisions calendar tab.
+  // Opening the overview would otherwise appear to have lost the roll form.
+  calendarLanding=false;activeCalendarSection='provisions';view='calendar';render();
   const matches=[...document.querySelectorAll('[data-malnutrition-course]')];
   const form=matches.find(f=>f.elements.namedItem('actorId')?.value===t.dataset.calLink&&
     f.elements.namedItem('episodeId')?.value===t.dataset.calSource);
@@ -9554,7 +9607,7 @@ document.addEventListener('click',e=>{
   selected=target.id;const destination=t.dataset.calDestination||'notes';
   if(destination==='combat'||destination==='healing'){if(!combatInitiativeSequence)encounterSelection.add(target.id);view='encounter';}
   else if(destination==='skills'){view='skills';}
-  else{activeSheetSection=destination==='inventory'?'inventory':destination==='hazards'?'hazards':'notes';view='sheet';}
+  else{activeSheetSection=destination==='inventory'?'inventory':destination==='hazards'?'hazards':destination==='status'?'status':'notes';view='sheet';}
   render();
   if(t.dataset.calHistoryId){const row=[...document.querySelectorAll('[data-journal-entry]')].find(x=>x.dataset.journalEntry===t.dataset.calHistoryId);if(row){row.classList.add('calendar-history-focus');row.scrollIntoView({block:'center',behavior:'auto'});}return;}
   // Locate the exact rule engine form by event kind AND its permanent source ID.

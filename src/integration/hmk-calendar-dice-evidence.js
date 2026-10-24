@@ -4,7 +4,7 @@
  * and never claim that a UI click was a committed rule result.
  */
 export const CALENDAR_DICE_FIELDS=Object.freeze({
- 'treatment':{roll:100},'healing':{roll:100},'infection':{roll:100},'grim':{roll:100},
+ 'treatment':{roll:100,physicianRoll:100},'healing':{roll:100},'infection':{roll:100},'grim':{roll:100},
  'blood-loss':{roll:100},'extended-shock':{roll:100},'coma':{roll:100,periodD10:10},
  'poison':{courseD100:100},
  'disease':{onsetD6:6,virulenceD20:20,courseD100:100,

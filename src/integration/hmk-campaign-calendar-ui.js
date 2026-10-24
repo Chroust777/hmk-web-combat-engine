@@ -1,4 +1,5 @@
 import {TR_MONTHS,campaignTRDate,formatTRDate,gmCalendarAgenda,campaignSunsignForDate} from './hmk-calendar-planner.js';
+import {calendarEventDestination} from './hmk-calendar-event-routing.js';
 import {displayCampaignMinute,campaignCalendarAgenda} from './hmk-campaign-calendar.js';
 import {passiveHMKCalendarMilestones} from './hmk-calendar-campaign-lifecycle.js';
 import {historicalHMKCalendarEntries} from './hmk-calendar-history.js';
@@ -43,7 +44,7 @@ function renderAgendaEntry(p,esc,clock){
 }
 export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,escapeHTML}={}){
  const esc=escapeHTML,agenda=campaignCalendarAgenda(clock,characters,journal),custom=gmCalendarAgenda(clock);
- const all=[...agenda.all.map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:['poison','disease','asphyxia','sleep-deprivation'].includes(p.kind)?'hazards':p.route==='skills'?'skills':p.route==='hazards'?'hazards':p.route==='calendar'?'calendar':['treatment','healing','infection','grim','blood-loss','coma','extended-shock'].includes(p.kind)?'healing':'combat'})),...passiveHMKCalendarMilestones(clock,characters),...historicalHMKCalendarEntries(clock,characters,journal),...calendarActorActivities(clock,characters,journal),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
+ const all=[...agenda.all.map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...historicalHMKCalendarEntries(clock,characters,journal),...calendarActorActivities(clock,characters,journal),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
  all.sort((a,b)=>a.dueMinute-b.dueMinute||a.id.localeCompare(b.id));
  // Index immutable evidence once. The day/hour/minute views otherwise scan
  // the entire character audit once per cell (30 + 24 + 60 repeated scans).
