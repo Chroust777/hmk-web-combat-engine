@@ -58,6 +58,8 @@ import {prepareNeutralAlchemySpellstart,persistNeutralAlchemySpellstart} from '.
 import {activeAlchemyWard} from './src/integration/hmk-neutral-ward-lifecycle.js';
 import {prepareFailedNeutralSpellfire,persistFailedNeutralSpellfire,prepareCriticalNeutralSpellfire,persistCriticalNeutralSpellfire,prepareSuccessfulNeutralSpellfire,persistSuccessfulNeutralSpellfire} from './src/integration/hmk-alchemy-neutral-spellfire-commit.js';
 import {validateNeutralAlchemyHistory,validateNeutralAlchemyCombatLinks} from './src/integration/hmk-alchemy-neutral-history.js';
+import {validateNeutralTotalReleaseHistory} from './src/integration/hmk-neutral-total-release-invariant.js';
+import {prepareNeutralTotalReleaseCommit,persistNeutralTotalReleaseCommit} from './src/integration/hmk-neutral-total-release-writer.js';
 import {linkNewMoralePsycheAccrual,journalNewMoralePsycheSources} from './src/integration/hmk-morale-psyche-bridge.js';
 import {persistFearExposure,persistFearSafeRecovery,persistFearEndTurnReaction} from './src/integration/hmk-fear-aberrance-persistence.js';
 import {createG04ActionWizards} from './src/integration/hmk-g04-guided-actions-ui.js';
@@ -236,7 +238,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.460';
+const APP_VERSION='93.461';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -286,7 +288,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
+ if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
  if(p?.elixirName!=='Erudition'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;
  const actor=d.characters.find(c=>c.id===p.targetId);
  const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-erudition-aural');
@@ -5340,14 +5342,14 @@ function neutralCombatCastingPanel(){
   x.combatProof.casterId===casterId&&x.combatProof.timelineId===q.timelineId&&
   x.combatProof.startRound===commitment.startRound&&
   x.combatProof.castingTimeRounds===commitment.durationRounds&&
-  !data.journal.some(j=>j.calendarAlchemyNeutralCast?.spellstartId===x.id)):null;
+  !data.journal.some(j=>j.calendarAlchemyNeutralCast?.spellstartId===x.id||j.calendarNeutralTotalRelease?.spellstartId===x.id)):null;
  if(fire&&!spellstart)return '';
  const labelTarget=x=>{const w=activeAlchemyWard({journal:data.journal,
   campaignId:campaignKey(clock),finishId:x.finishId,sourceId:x.dossier.sourceId});
   return `${x.dossier.elixirName} · AS ${x.dossier.currentAS} · ${x.finishId}`+
    (w?` · chráněno Ward WL ${w.wardLevel}`:'');};
- return `<section class="panel wide"><h3>Neutral Spellcasting · HMK 200–203, 251, 254–255 · v93.460</h3>
- <p class="muted">Pouze ověřený běžný Incant, fyzické GM hody a původní Initiative. Ward vyžaduje dotyk a 60 kol. Dřívější Ward lze přebít jen vyšším Ward Level už při běžném S a s původním důkazem i výslovným GM potvrzením. Jiné případy včetně Total Release 100 a nepodložených modifikátorů jsou blokovány. Dokončené kouzlo NENÍ pouhý Skill Test.</p>
+ return `<section class="panel wide"><h3>Neutral Spellcasting · HMK 200–203, 251, 254–255 · v93.461</h3>
+ <p class="muted">Pouze ověřený běžný Incant, fyzické GM hody a původní Initiative. Ward vyžaduje dotyk a 60 kol. Dřívější Ward lze přebít jen vyšším Ward Level už při běžném S a s původním důkazem i výslovným GM potvrzením. Total Release 100 lze nyní uložit POUZE pro Detect CL I, bez Shade a bez přetrvávajícího potlačení (úplná fyzická historie). Ostatní případy a nedoložené modifikátory jsou blokovány. Dokončené kouzlo NENÍ pouhý Skill Test.</p>
  ${begin?`<form data-neutral-spellstart><strong>Spellstart · ${esc(caster.name)}, kolo ${q.round}</strong>
  <input type="hidden" name="casterId" value="${esc(casterId)}"><label>Neutral kouzlo<select name="spell"><option>Detect</option><option>Reveal</option><option>Dispel</option><option>Ward</option></select></label>
  <label>Skutečný alchymistický zdroj<select name="finishId" required>${options.map(x=>`<option value="${esc(x.finishId)}">${esc(labelTarget(x))}</option>`).join('')}</select></label>
@@ -5365,12 +5367,25 @@ function neutralCombatCastingPanel(){
  <input type="hidden" name="casterId" value="${esc(casterId)}"><input type="hidden" name="finishId" value="${esc(spellstart.combatProof.finishId)}"><input type="hidden" name="spell" value="${esc(spellstart.combatProof.spell)}"><input type="hidden" name="targetKind" value="${spellstart.combatProof.targetKind==='Ward'?'Ward':'Elixir'}">
  <label>Skutečná vzdálenost cíle v ft<input name="distanceFeet" type="number" min="0" step="0.01" required></label>
  <label>Fyzický Casting d100<input name="castingD100" type="number" min="1" max="100" step="1" required></label>
- <label>Typ dosaženého SL (ověří se výpočtem, nesoulad se odmítne)<select name="resultFamily"><option value="success">Success S / CS</option><option value="failed">Failure F</option><option value="critical">Critical Failure CF</option></select></label>
- <label>Fyzický Misfire d100 – POUZE pokud CF (100 = Total Release, zatím zablokováno)<input name="misfireD100" type="number" min="1" max="100" step="1"></label>
+ <label>Typ dosaženého SL (ověří se výpočtem, nesoulad se odmítne)<select name="resultFamily"><option value="success">Success S / CS</option><option value="failed">Failure F</option><option value="critical">Critical Failure CF (Misfire 1–99)</option>${spellstart.combatProof.spell==='Detect'?'<option value="total-release">Neutral Total Release 100 – omezená ověřená větev</option>':''}</select></label>
+ <label>Fyzický Misfire d100 – pouze při CF (Total Release = 100)<input name="misfireD100" type="number" min="1" max="100" step="1"></label>
  ${spellstart.combatProof.spell==='Detect'?`<p>Detect musí při úspěchu pokrýt VŠECHNY existující magické zdroje do dosahu, včetně nealchymistických.</p>
  <label>Vzdálenosti všech známých alchymistických finishId (JSON mapa)<textarea name="distancesByFinishId" rows="2" required placeholder='{"finish-id":4}'></textarea></label>
  <label>Ostatní zdroje magie (JSON pole ověřených identit, kategorií a vzdáleností)<textarea name="otherSources" rows="2">[]</textarea></label>
  <label><input type="checkbox" name="gmAllSourcesConfirmed"> GM potvrzuje úplnost mapy všech zdrojů v dosahu</label>`:''}
+ ${spellstart.combatProof.spell==='Detect'?`<details><summary>Neutral Total Release 100 · pouze Detect CL I a uzavřený Vortex tick</summary>
+ <p>Vyplňte výhradně při volbě Total Release. GM musí zadat VŠECHNY fyzické hody a úplný soupis magických zdrojů; žádný výsledek F/CF potlačení ani CS stres při Vortex ticku zatím nelze trvale uložit. Neslučujte s jiným kouzlem.</p>
+ <label>Spirit fyzický d100<input name="spiritD100" type="number" min="1" max="100" step="1"></label>
+ <label>Spirit ztráta ML – fyzické d6 oddělené čárkou (podle SL)<input name="spiritLossD6" placeholder="1,2,3,4"></label>
+ <label>Ověřené další modifikátory Spirit EML<input name="spiritModifiers" type="number" step="1" value="0"></label>
+ <label>Skutečný střed sesilatele x (ft)<input name="originX" type="number" step="0.01"></label>
+ <label>Skutečný střed sesilatele y (ft)<input name="originY" type="number" step="0.01"></label>
+ <label>ÚPLNÝ soupis živých zdrojů Vortex (JSON pole s ID, category, x/y, verified a staty)<textarea name="vortexCensus" rows="4" placeholder='[{"id":"...","category":"Elixir","currentAS":6,"x":0,"y":0,"verified":true}]'></textarea></label>
+ <label>První a poslední tick (JSON objekt: sources, selectedSourceId, rolls, physicalSelectionDie)<textarea name="vortexTick" rows="4" placeholder='{"roundOffset":0,"sources":[],"selectedSourceId":null,"physicalSelectionDie":null,"rolls":[]}'></textarea></label>
+ <label><input type="checkbox" name="gmSpiritModifiersVerified"> GM potvrdil přesné ostatní modifikátory Spirit testu</label>
+ <label><input type="checkbox" name="gmFullSourceHistoryConfirmed"> GM ověřil úplný soupis všech magických zdrojů</label>
+ <label><input type="checkbox" name="gmNoOtherArcaneSourcesConfirmed"> GM výslovně potvrzuje nepřítomnost dalších nezapsaných druhů magie</label>
+ </details>`:''}
  ${spellstart.combatProof.spell==='Dispel'?`<label><input type="checkbox" name="gmLOSConfirmed" required> GM potvrdil živou přímou LOS bez kouře či překážek</label>`:''}
  <label><input type="checkbox" name="gmConcentrationConfirmed" required> GM potvrzuje nepřerušenou koncentraci po předepsanou dobu</label>
  <label><input type="checkbox" name="gmOrdinaryConditionsConfirmed" required> GM potvrdil skutečné Casting modifiers jako běžný režim</label>
@@ -8126,6 +8141,25 @@ document.addEventListener('submit',e=>{
    if(family==='failed'){
     if(misfire!==null)throw Error('Běžné F nesmí zadat Misfire d100');
     stage=prepareFailedNeutralSpellfire(args);persist=persistFailedNeutralSpellfire;
+   }else if(family==='total-release'){
+    if(info.spell!=='Detect'||chosenTargetKind!=='Elixir'||misfire!==100)
+     throw Error('Total Release writer je omezen na Neutral Detect s fyzickým Misfire 100');
+    if(!v.has('gmSpiritModifiersVerified')||!v.has('gmFullSourceHistoryConfirmed')||
+     !v.has('gmNoOtherArcaneSourcesConfirmed'))throw Error('Chybí potvrzení Spirit a úplnosti zdrojů');
+    let sources,tick,loss;
+    try{sources=JSON.parse(get('vortexCensus'));tick=JSON.parse(get('vortexTick'));
+     loss=get('spiritLossD6').trim()?get('spiritLossD6').split(',').map(n=>Number(n.trim())):[];
+    }catch{throw Error('Vortex/Spirit vyžaduje platné fyzické hody a JSON soupis')}
+    stage=prepareNeutralTotalReleaseCommit({document:data,id:info.id,casterId:info.casterId,
+     finishId:info.finishId,spell:'Detect',distanceFeet:info.distanceFeet,
+     castingD100:d100,misfireD100:100,spiritD100:Number(get('spiritD100')),
+     spiritLossD6:loss,verifiedSpiritOtherModifiers:Number(get('spiritModifiers')),
+     gmSpiritModifiersVerified:true,gmOrdinaryConditionsConfirmed:true,
+     gmWardAbsentConfirmed:info.gmWardAbsentConfirmed,gmConcentrationConfirmed:true,
+     gmFullSourceHistoryConfirmed:true,gmNoOtherArcaneSourcesConfirmed:true,
+     origin:{x:Number(get('originX')),y:Number(get('originY'))},
+     sourceCensus:sources,ticks:[tick],createdAt:info.createdAt});
+    persist=persistNeutralTotalReleaseCommit;
    }else if(family==='critical'){
     if(!Number.isSafeInteger(misfire)||misfire<1||misfire>100)
      throw Error('CF vyžaduje další skutečný Misfire d100');
@@ -8148,7 +8182,7 @@ document.addEventListener('submit',e=>{
   data=validate(result.document);storageBaseline=result.serialized;
   mirrorInitiative(validateEncounterSequence(data.combatRuntime.sequence),data.combatRuntime.clock);
   notice=f.matches('[data-neutral-spellstart]')?'Neutral Spellstart uložen; koncentrace zapsána ve vlastní Initiative.':
-   'Neutral Spellfire doložen: '+stage.nextDocument.journal.at(-1).calendarAlchemyNeutralCast.castingSL+'; původní historie zachována.';
+   'Neutral Spellfire doložen: '+(stage.nextDocument.journal.at(-1).calendarAlchemyNeutralCast?.castingSL??'CF / Total Release CL I')+'; původní historie zachována.';
   render();
  }catch(error){alert('Neutral casting: '+error.message)}
 },true);
