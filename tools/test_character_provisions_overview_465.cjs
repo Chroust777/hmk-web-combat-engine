@@ -1,0 +1,57 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');const path=require('node:path');const os=require('node:os');
+const {execFileSync}=require('node:child_process');
+const root=path.resolve(__dirname,'..');
+const dest=fs.mkdtempSync(path.join(os.tmpdir(),'hmk-provisions-'));
+const source=fs.readFileSync(path.join(root,'src/integration/hmk-character-provisions-overview.js'),'utf8');
+assert.match(source,/never/i);let passed=0;
+function ok(check){check();passed++;}
+(async()=>{
+ const mod=await import('file://'+path.join(root,'src/integration/hmk-character-provisions-overview.js'));
+ const {characterProvisionsOverview:snapshot,partyProvisionsOverview:party,conservativeRationDays:days}=mod;
+ const clock={campaignId:'c1',minute:0,characterIds:['a']};
+ const base={campaignClock:clock,characters:[{id:'a',name:'A',hmk:{}},{id:'b',name:'B'}],inventory:[],journal:[]};
+ ok(()=>assert.equal(snapshot(base,'a').nutritionEvidence,'not-monitored'));
+ ok(()=>assert.equal(snapshot(base,'b').available,false));
+ ok(()=>assert.equal(snapshot({...base,campaignClock:null},'a').available,false));
+ ok(()=>assert.equal(snapshot(base,'a').food.confirmedUnits,0));
+ ok(()=>assert.equal(snapshot(base,'a').water.confirmedGallons,0));
+ ok(()=>assert.equal(snapshot(base,'a').latestDay,null));
+ ok(()=>assert.equal(snapshot(base,'a').illness.length,0));
+ ok(()=>assert.equal(party(base).members.length,1));
+ ok(()=>assert.equal(party(base).pooledForaging.foodDays,0));
+ ok(()=>assert.equal(days([{remaining:2,minute:0,expiresAt:2880}],0,1),2));
+ ok(()=>assert.equal(days([{remaining:2,minute:0,expiresAt:2879}],0,1),1));
+ ok(()=>assert.equal(days([{remaining:1,minute:0,expiresAt:100}],0,1),0));
+ ok(()=>assert.equal(days([{remaining:0.5,minute:0,expiresAt:99999}],0,1),0));
+ ok(()=>assert.equal(days([{remaining:0.5,minute:0,expiresAt:99999},{remaining:0.5,minute:0,expiresAt:99999}],0,1),1));
+ ok(()=>assert.equal(days([{remaining:1,minute:1500,expiresAt:99999}],0,1),0));
+ ok(()=>assert.equal(days([{remaining:1,minute:0,expiresAt:99999}],0,0),0));
+ // Full policy + closed day, no physics needed: the dashboard is read only.
+ const pp={id:'p',characterId:'a',calendarCampaignId:'c1',campaignMinute:0,calendarNutritionPolicy:{format:'hmk-nutrition-policy-v1',enabled:true,foragingOnly:true,autoNeeds:true}};
+ const dd={characterId:'a',calendarCampaignId:'c1',calendarNutritionDay:{format:'hmk-nutrition-day-v1',policyId:'p',endMinute:1440,foodReceived:0,foodNeed:1,waterReceived:0.5,waterNeed:1}};
+ const db={...base,campaignClock:{...clock,minute:1440},journal:[pp,dd]};
+ ok(()=>assert.equal(snapshot(db,'a').nutritionEvidence,'last-closed-day'));
+ ok(()=>assert.equal(snapshot(db,'a').latestDay.food.status,'none'));
+ ok(()=>assert.equal(snapshot(db,'a').latestDay.water.status,'half'));
+ ok(()=>assert.equal(snapshot(db,'a').policy.nextCloseMinute,2880));
+ ok(()=>assert.equal(snapshot({...db,journal:[pp]},'a').nutritionEvidence,'awaiting-first-close'));
+ ok(()=>assert.equal(snapshot({...db,journal:[pp]},'a').latestDay,null));
+ ok(()=>assert.equal(snapshot({...db,campaignClock:{...clock,campaignId:'c2'}},'a').nutritionEvidence,'not-monitored'));
+ const ill={...db,characters:[{id:'a',name:'A',hmk:{combatState:{malnutritionEpisodes:[{campaignId:'c1',kind:'thirst',status:'active',hr:4,nextDueMinute:4320},{campaignId:'c2',kind:'starvation',status:'active',hr:5}]}}}]};
+ ok(()=>assert.deepEqual(snapshot(ill,'a').illness.map(x=>x.kind),['thirst']));
+ const ration={id:'ration1',characterId:'a',slot:'carried',quantity:2,sourceItemId:'hmk:gear:hmk-p120-027',snapshot:{id:'hmk:gear:hmk-p120-027',name:'Rations, standard',category:'other',properties:{weightLb:3}}};
+ const stock={id:'stock',characterId:'a',calendarCampaignId:'c1',campaignMinute:0,calendarInventoryRationStock:{format:'hmk-physical-ration-stock-v1',campaignId:'c1',actorId:'a',itemId:'ration1',sourceItemId:'hmk:gear:hmk-p120-027',name:'Rations, standard',quantity:2,minute:0,expiresAt:10*1440}};
+ const water={id:'water',characterId:'a',calendarCampaignId:'c1',campaignMinute:0,calendarInventoryWaterFill:{format:'hmk-physical-water-fill-v1',quantity:0.5,minute:0,itemId:'skin1'}};
+ const stocked={...base,inventory:[ration],journal:[stock,water]};
+ ok(()=>assert.equal(snapshot(stocked,'a').food.confirmedUnits,2));
+ ok(()=>assert.equal(snapshot(stocked,'a').food.daysAtCurrentBaseline,2));
+ ok(()=>assert.equal(snapshot(stocked,'a').food.unconfirmedInventoryUnits,0));
+ ok(()=>assert.equal(snapshot(stocked,'a').water.confirmedGallons,0.5));
+ ok(()=>assert.equal(snapshot(stocked,'a').water.daysAtCurrentBaseline,0));
+ ok(()=>assert.equal(snapshot({...stocked,campaignClock:{...clock,minute:11*1440}},'a').food.expiredUnits,2));
+ ok(()=>assert.equal(snapshot({...stocked,campaignClock:{...clock,campaignId:'c2'}},'a').food.confirmedUnits,0));
+ ok(()=>assert.equal(snapshot({...stocked,campaignClock:{...clock,campaignId:'c2'}},'a').water.confirmedGallons,0));
+
+ console.log('Provisions dashboard:',passed+'/'+passed,'PASS');
+})().catch(e=>{console.error(e);process.exitCode=1});
