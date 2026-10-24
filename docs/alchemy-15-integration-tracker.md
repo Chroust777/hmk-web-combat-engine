@@ -580,3 +580,12 @@ Vedle původních alchymistických zdrojů a Wardů je v `auditNeutralVortexAlch
 - **Úplná dostupná Node.js regrese: 92/92 testovacích souborů PASS**. Zdroje pravidel: HMK v1.2 tištěné str. 160–163, 200–204, 251 a 255; pro pozice/elixíry 268–270.
 
 **Další blocker pro #10:** atomický autoritativní Neutral Total Release + důsledky Spirit/Psyche/Raw Principle v jednom existujícím `Initiative + Combat State + Journal` CAS checkpointu a první/future Vortex tick writer včetně šestikategoriového evidence a expirace potlačení. Dokud tyto operace bezpečně neexistují, nezapisovat částečný Total Release.
+
+
+## Checkpoint v93.461 – omezený autoritativní Neutral Total Release / Vortex CL I (24. 10. 2026)
+
+**Bod #10 je NADÁLE OTEVŘENÝ.** Nový `hmk-neutral-total-release-writer.js` umožňuje jediný původní atomický zápis Total Release kouzla Neutral Detect (CL I), pouze pokud Spirit CF nevytvořilo Shade a první – současně poslední – Vortex tick nevyvolal žádné trvající potlačení ani CS Psyche Stress. Veškeré aktivní magické zdroje musí mít původní identitu i pozici v existující Initiative/Alchemy/Ward/Raw Pèleáhn historii; GM navíc samostatně dosvědčuje, že neexistují jiné magické zdroje. Nejde o nezávislý důkaz neexistence dalších kategorií.
+
+Zápis v jediném dokumentu zahrnuje původní Spellstart, fyzický Casting CF/Misfire 100, Spirit d100/d6, skutečnou Spirit ML loss, Aural Shock, Weakness, Windedness, Psyche Stress 3, Crucial ztrátu Neutral Detect a pending Trait, dokončení Initiative Incant, Vortex source census, selection dN, zdrojové d100 a samotné výsledky jednoho kola v původním Journal. Soubor `hmk-neutral-total-release-invariant.js` ověřuje propojení Journal/Initiative/Combat State, fyzické hody a zdrojový soupis při načtení i CAS, brání ztrátě/změně záznamů. Ovládání v UI přidáno jako zvláštní vysoce omezená volba Spellfire.
+
+**Stále nepokryto:** Spirit CF/Shade pro Neutral; Vortex F/CF source suppression, obnovení v čase a všechny další tick-y pro CL vyšší než I; úplná nativní evidence ostatních magických kategorií bez GM atestace; kouzla Reveal/Dispel/Ward Total Release; soustředění a přesuny v dalších kolech; komplexní Negation, True Sight, Spirit Sensing, Soulcloak; úplná magická E2E regrese. Nesmí se tvrdit, že obecný Vortex či bod #10 je hotov.
