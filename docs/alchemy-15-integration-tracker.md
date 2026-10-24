@@ -1,6 +1,6 @@
 # HMK Keeper’s Ledger · Bod 4 Alchemy · Priorita 1–15
 
-Stav po v93.443, auditní pokračování v93.441–v93.443. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
+Stav po v93.444, auditní pokračování v93.441–v93.444. Verze 93.437 dokončuje samostatné implementační oblasti #1 a #2 **v ověřeném rozsahu přímé aplikace**. Jejich návaznost na vrženou lahvičku patří do samostatného bodu #3. Mechanicky neověřené katalogové oblečení nelze automaticky považovat za zbroj s AV; engine je správně předá k posouzení GM. Nejde o domýšlení jejich ochrany. **Závazné pořadí:** nejprve uzavřít všech 15 společných návazností, teprve potom další kanonické elixíry. Předchozí doporučené verze v93.436–438 se nesmějí považovat za závazná čísla etap; jednotlivé práce jsou zahrnuty do bodů 1–15.
 
 Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, inventární a zdravotní kapitoly podle potřeby. „Částečně“ není „hotovo“. Každý bod bude uzavřen teprve po úplném mechanickém propojení, kontrole neměnných důkazů, testování obnovy dat a regresi.
 
@@ -14,7 +14,7 @@ Zdroj: HârnMaster v1.2, Alchemy strany 265–274; návazné zbrojní, bojové, 
 | 6 | Profusion všech elixírů | **Částečně – v93.441 ověřeno pro existující aktivní Imbibed** | Centrální katalog 35/35 a atomické CF kombinace existují. Zbývá 22 dosud nepodporovaných neexemptních Imbibed účinků a jejich doložené konce, než lze tvrdit univerzální provoz. |
 | 7 | Aural Shock / Ill Effects | **Částečně – v93.442 kanonický katalog 35/35 a sjednocené důkazy pro 4 aktivní Imbibed** | Zbývají skutečné zdravotní a časové commity dosud nepodporovaných Imbibed elixírů; katalog sám neprovádí jejich účinky ani léčbu. |
 | 8 | Physic všechny účinky | **Částečně – v93.443 bezpečné vyhodnocení všech doložených zdrojů; 4 aktivní druhy dokončeny** | Poison, Quiescence a ostatní dosud neimplementované Imbibed účinky vyžadují skutečné důkazy jejich začátku, trvání a konce; do té doby musí Physic před jakýmkoli zápisem odmítnout neúplný souběh. |
-| 9 | AS / Decay | Částečně | Speciální čerpání a výjimky; bezpečná rekonstrukce dříve zmeškaných měsíčních hodů. |
+| 9 | AS / Decay | **Částečně – v93.444 konzervativní rekonstrukce zmeškaných hodů u nepoužitých uložených elixírů** | Zvláštní čerpání AS a rekonstrukce aktivních Temporary účinků s již závislými událostmi čekají na ověřené lifecycles. |
 | 10 | Spell / Arcane provázání | Neuzavřeno | Detect/Reveal/Dispel, Negation, Attunement, Spirit Sensing, True Sight a příslušné soul stavy. |
 | 11 | Invent unikátní recepty | Částečně | Mechanické provádění konkrétních GM-defined účinků; samotná výroba existuje. |
 | 12 | Alchemical Dissolution / Recovery | Částečně | Úplné end-to-end necombatové Recovery a zvláštní aplikované/intake stavy. |
@@ -204,3 +204,28 @@ Skutečné Life-Cycle a writer důkazy pro nyní neimplementované Imbibed (zejm
 - **PASS – existující Chromium regrese** `browser_alchemy_profusion_four_sources_441.py` a `browser_alchemy_mixed_429.py`: čtyři souběžné zdroje s CF, smíšené Erudition/Darkvision/Physic kombinace, atomické následky, historie, inventář a rehydratace.
 
 **Výdej:** v93.443 je **kontrolní meziverze**, obsahuje jen rozdíly proti už vydané v93.442, nikoli celé základní dílo. Bod 8 není možné označit jako univerzálně dokončený, dokud neexistují mechanicky ověřené lifecycles dosud nepoužitelných kanonických elixírů. Společné návaznosti 9–15 nebyly touto etapou uzavřeny.
+
+## v93.444 – návaznost #9: AS / Decay, bezpečné zmeškané termíny
+
+**Stav bodu 9: ČÁSTEČNĚ.** Nejde o přidání dalších kanonických elixírů ani o jejich nové AS-spend writery.
+
+### Pravidla a rozsah
+
+- **HMK v1.2, str. 268:** počáteční uložená dávka d10 proti aktuální base AS každých **30 dní**; úspěch −1, neúspěch −2, minimum 0; při AS 0 enchantment zaniká. **Str. 270:** Imbibed Temporary pokračují s AS změněnou Imbibing Rollem; Imbibed Instantaneous po požití měsíční Decay nemají; Applied se rozkládají jen ve skladu a po použití končí. Zvláštní aktivace mohou navíc snižovat AS, ale to se nesmí automaticky připsat elixírům, jejichž vlastní efekty dosud nejsou implementovány.
+- Původní `hmk-alchemy-decay.js` již měl přesné opakované d10, pořadí událostí, Physic a standardní blokaci překročení splatnosti GM hodin. **Chyba / mezera:** historická kampaň s již přeskočeným termínem byla zaseklá; formulář ji neuměl opravit, protože trval pouze na `clock.minute===dueMinute`.
+- **Nová konzervativní rekonstrukce:** při pozdním termínu GM zadá skutečný d10 **nyní**, výslovně potvrdí retrospektivní adjudikaci a důkaz uloží s `dueMinute` (původní splatnost), `recordedMinute` (skutečný čas zápisu), `reconstructed:true` a `gmMissedConfirmed:true`. Původní záznamy **nejsou přepisovány ani zpětně datovány**. Jde o bezpečný postup opravy historické kampaně schválený GM, **nikoli o dodatečné pravidlo HMK na retroaktivní hody**. Jeden zmeškaný měsíc = jeden d10 a jedna atomická append událost; po AS 0 se další termíny nevytvářejí.
+- **Fail closed:** zpětnou opravu lze provést pouze pro dosud neimbibovaný a neaplikovaný **uložený** elixír. Jakýkoli závislý pozdější alchymistický důkaz pro stejný `finishId` před opravou ji zablokuje, stejně jako chybějící GM potvrzení, špatný d10, cizí kampaň či neplatné pořadí. Starší pohled na minulý čas se nezmění; aktuální AS se přepočítává z neměnného journalu. Návrat nezapisuje nový inventář, zdravotní stav ani změnu času GM.
+- **Kompatibilita:** existující řádné (včasné) `calendarAlchemyDecay` záznamy mají **identický starý tvar**. Validátor přehrává nový druh důkazu společně se starými a odmítá změnu `asAfter`, `dueMinute`, `recordedMinute`, odebrání či přesun. Historický kalendář výslovně ukazuje skutečný zápis a původní splatnost; webová verze `index.html` / `app.js` / produkční bundle je **v93.444**.
+
+### Provedené testy
+
+- **PASS 72/72 Node.js testovacích souborů** po finálním sestavení, šest sériových dávek po 12. Jeden původní dlouhý běh byl ukončen limitem po 24 PASS; tento neúplný běh není vykázán jako celá regrese. Původní test `test_alchemy_decay_417.cjs` zůstal zelený (57 kontrol).
+- **PASS `test_alchemy_decay_recovery_444.cjs`: 58 kontrol** tří zmeškaných měsíců; AS 6→4→2→0; zákaz pozdní korekce použitého elixíru či později souvisejících důkazů; odmítnutí neplatných hodnot a neautorizovaných oprav; replay starých i nových důkazů, append-only, izolace kampaně, nulové přepsání minulosti.
+- **PASS Chromium `browser_alchemy_decay_recovery_444.py`:** dva zmeškané termíny 6→4→2, povinné potvrzení GM, zachování původních souborů historie, žádný posun hodin či inventáře, nová instance z uložené kampaně; kontrola rehydratace (není to síťový HTTP reload GitHub Pages).
+- **PASS Chromium `browser_alchemy_release_version_444.py`:** produkční `index.html`, sestavený bundle a viditelná patička v93.444 bez JS chyb; stejně jako v předchozích etapách místní HTTP/file navigaci blokuje testovací prostředí, proto se skutečný HTML obsah vkládá do stránky.
+
+### Zbývá před úplným uzavřením bodu 9
+
+- Pro **aktivní Temporary účinky** s přeskočenou splatností zatím neexistuje bezpečná univerzální rekonstrukce. Pokud mohly v mezidobí ovlivnit souboje, atributy, dovednosti, Shock či jiné situace, nelze nové AS přidělit bez samostatného vyhodnocení návazností na tyto již neměnné události. Takový případ se **odmítne**, neodhadne.
+- Specifické čerpání AS při dalších kanonických efektech (např. Fate, Exsiccation, Ghostsight, Healing) lze napojovat až s jejich skutečně ověřenými účinky, fyzickými akcemi a důkazy, dle pořadí navazujících etap; tyto nyní implementovány nejsou. Pro dosud podporovaný Acid zůstává lokální kontaktní AS v původních atomických Acid aplikacích a kolech, nikoli v nové paralelní evidenci.
+- Společné návaznosti #6–8 nadále označeny částečně; #10–15 čekají dle schváleného pořadí. v93.444 je **kontrolní rozdílová verze proti v93.443**, ne deklarace uzavření všech 15 návazností.
