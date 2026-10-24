@@ -148,6 +148,7 @@ import {createAcidThrownVial,validateAcidThrownJournal,assertAcidThrownAppendOnl
 import {prepareAlchemyAreaAtomicBattle,validateAlchemyAreaJournal,validateAlchemyAreaCombatLinks,assertAlchemyAreaAppendOnly} from './src/integration/hmk-alchemy-area-atomic-plan.js';
 import {assertFumebombLineOfSight} from './src/integration/hmk-alchemy-area-los.js';
 import {alchemyArcaneTargetRegister} from './src/integration/hmk-alchemy-arcane-targets.js';
+import {alchemyArcaneCasterDossier} from './src/integration/hmk-alchemy-arcane-casting-readiness.js';
 import {EXOTIC_POTIONS,herbAssessmentCandidates,herbDoseStatus,herbPotionReservationCandidates,createHerbPotency,createHerbPreservation,createHerbPotionStart,createHerbPotionComplete,validateHerbalJournal,assertHerbalJournalAppendOnly,potencyLabel} from './src/integration/hmk-herbal-concoctions.js';
 import {createHerbPotionAdministration,validateHerbAdministrationJournal,assertHerbAdministrationAppendOnly,availableHerbalPotions,herbPotionEffectAt} from './src/integration/hmk-herbal-administration.js';
 import {PRINTED_VIAL,createHerbVialBinding,createHerbVialDiscard,vialBinding,vialState,validateHerbVialJournal,assertHerbVialAppendOnly,assertActiveHerbVials} from './src/integration/hmk-herbal-vial-ledger.js';
@@ -230,8 +231,8 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
   return {id,definitionId,ownerId,locations,aq,destroyed};
 }
 
-// HMK Keeper’s Ledger v93.445 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.445';
+// HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
+const APP_VERSION='93.446';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -916,6 +917,10 @@ function campaignCalendarView(){
  const pendingAlchemy=pendingAlchemyPreparations(data.journal,campaignKey(clock));
  const alchemyStates=alchemyElixirStates(data.journal,campaignKey(clock));
  const alchemyArcaneTargets=alchemyArcaneTargetRegister({journal:data.journal,inventory:data.inventory,campaignId:campaignKey(clock),minute:clock.minute});
+ const alchemyArcaneCasters=participants.flatMap(c=>{
+  try{const q=alchemyArcaneCasterDossier(c);return q.known.length?[{name:c.name,proof:q,error:null}]:[];}
+  catch(error){return [{name:c.name,proof:null,error:String(error.message||error)}];}
+ });
  const alchemyDecayDue=pendingAlchemyDecay(data.journal,campaignKey(clock),clock.minute);
  const knownInventorElixirs=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyFinish?.result==='completed'&&
   j.calendarAlchemyFinish?.uniqueElixir?.mode==='invent').filter((row,i,all)=>all.findIndex(other=>
@@ -927,6 +932,9 @@ function campaignCalendarView(){
  const alchemyHTML=`<section class="hc-calendar hc-wilderness"><details><summary>HMK 265–268 · Alchemy · Create a Invent (${pendingAlchemy.length} rozpracovaných)</summary>
  <details><summary>Arcane · Detect / Reveal / Dispel / Negation · alchymistické zdroje (${alchemyArcaneTargets.filter(x=>x.dossier?.targetable).length})</summary>
  <p class="hc-hint">Pouze pravidlová kontrola aktuálních cílů z originálního inventáře a kalendáře (HMK 251,254,263,270). Nejde o seslání kouzla ani jeho automatický úspěch. Dispel vyžaduje úspěšný Detect i Reveal téhož zdroje, vyřešenou ochranu Ward a skutečný casting; EML má postih −5 za každý aktuální AS. Soulcloak / True Sight / Spirit Sensing nejsou tímto přehledem automaticky aktivovány.</p>
+ <p class="hc-hint"><strong>Shèk-Pvâr · skutečně doložená výchozí znalost</strong> (HMK 54,198,251,254): žádný výpis nezakládá spellfire ani dodatečné naučení kouzla.</p>
+ ${alchemyArcaneCasters.map(x=>x.error?`<p class="hc-hint">⚠ ${esc(x.name)} · poškozený původ kouzel: ${esc(x.error)}.</p>`:
+  `<p class="hc-hint">${esc(x.name)} · ${esc(x.proof.known.filter(sp=>['Neutral::Detect','Neutral::Reveal','Neutral::Dispel'].includes(sp)).join(' / ')||'bez doložené trojice')} · ${x.proof.verified?`Pvârism ${x.proof.neutralML} · SI ${x.proof.si} · Detect ${x.proof.si*5} ft / Reveal ${x.proof.si} ft / Dispel ${x.proof.si*5} ft (LOS)`:esc(x.proof.reason)}.</p>`).join('')||'<p class="hc-hint">V kampani není doložený žádný znalec z trojice Neutral kouzel.</p>'}
  ${alchemyArcaneTargets.map(x=>x.error?`<p class="hc-hint">⚠ ${esc(x.finishId)}: ${esc(x.error)} (bez zápisu)</p>`:
   x.dossier.targetable?`<p class="hc-hint"><strong>${esc(x.dossier.elixirName)}</strong> · ${esc(x.dossier.phase==='stored'?'uložený fyzický kus':'aktivní Temporary na postavě')} · AS ${x.dossier.currentAS} · Dispel EML ${x.dossier.dispelEMLPenalty} · původ ${esc(x.dossier.sourceId||'')} · ${esc(x.dossier.targetId||'')}</p>`:
   `<p class="hc-hint">${esc(x.dossier.elixirName)}: ${esc(x.dossier.reason||'nyní bez ověřeného magického cíle')}.</p>`).join('')||'<p class="hc-hint">Žádná dokončená alchymistická dávka v kampani.</p>'}
