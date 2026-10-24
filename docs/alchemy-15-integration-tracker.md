@@ -321,3 +321,141 @@ Testy neprokazují ničím neomezenou funkčnost mimo výslovně implementované
 ### Další blokující závislost
 
 Implementovat a ověřit *původní* spellstart, trvání a neporušenou koncentraci, skutečný EML včetně všech použitých modifierů (fatigue, gesture, cant, injury, noise, grimoire, Focus aj.), sekvenční navázání Detect CS / Reveal / Ward / Dispel na **tentýž historický zdroj**, úplné Spell Misfire následky a jejich atomický commit do existujících Initiative, Combat State a historie. Teprve poté lze elixír skutečně dispelovat. Celý bod 10 a navazující 11–15 zůstávají otevřené; body 6–8 zůstávají dle výše uvedeného auditu částečné.
+
+
+## Pracovní v93.448 – #10 Native Neutral Spellstart / EML; **NENÍ VYDÁNÍ** (24. 10. 2026)
+
+**Bod 10 nadále NEUZAVŘEN. Rozdílový ZIP se nesmí prezentovat jako dokončená etapa.** V této pracovní kopii byla doplněna první zapisovatelná část sesílání Neutral kouzel.
+
+- `neutralCastingTimeRounds()` přebírá skutečné časy Detect 2 rounds, Reveal/Dispel 1 minute = 6 rounds (HMK 200–202, 251, 254). Quicken se bez zvláštního důkazu odmítá.
+- `neutralOrdinaryCastingEML()` odvozuje běžný EML z přepočteného Spell ML, aktuální skutečné únavy v Combat State, ověřeného encumbrance a případného Dispel postihu za aktuální AS. Zranění, abnormality, jiné modifikátory, silent/still, hluk, spojené seslání, Focus a grimoire nejsou při chybějících podkladech automaticky domýšleny.
+- `hmk-alchemy-neutral-spellstart.js` umí z originálního dossieru postavy, kampaně, lahvičky/účinku a živé Initiative připravit a atomicky zapsat **POUZE Spellstart** do původní koncentrace a společného historického journal. Replay zakazuje upravený vstup nebo podvržený plán; CAS odmítá souběžný i neověřený zápis. Žádný elixír ani AS není změněn, žádný úspěch Spellfire se nepředstírá.
+- `test_alchemy_neutral_spellstart_448.cjs`: **30 dokončených kontrol PASS**, včetně neplatných iniciativ, chybějícího Ward dokladu, chybějící původní gesture ENC, selhání ukládání, duplicitních zápisů, nulových side-effects a jednoduchého live casting EML.
+- Úplná **Node.js regrese 76/76 testovacích souborů PASS** v šesti dokončených dávkách 14+14+14+14+14+6 (včetně nové sady v její původní 23kontrolní podobě; po přidání sedmi dalších kontrol nová sada znovu samostatně 30 PASS).
+
+### Dosud chybí k uzavření #10
+
+1. Kompletní autoritativní Spellfire podle HMK (fyzické d100 a dle potřeby Misfire/Total Release/Abort, dodatečná únava, přerušení, správné modifikátory) přímo v původní Initiative; připojení Spellstartu do uživatelského rozhraní se nesmí zpřístupnit bez bezpečného dokončení.
+2. Historicky neměnný úspěch Detect všech zdrojů v oblasti, Reveal pro stejný zdroj, platný Ward a jeho vlastní Dispel, následný Dispel elixíru s aktuální AS, plná historická rekonstrukce při reloadu.
+3. Negation, Attunement, Spirit Sensing, True Sight/Soulcloak; jejich pravidlové původy a originální zdravotní/Spirit účinky.
+4. Skutečná Chromium end-to-end cesta přes UI a rehydrataci uložené kampaně pro celou sekvenci. Samostatný Chromium smoke test připravené stránky v93.448 a sestaveného bundle **PASS** (bez JS chyb, viditelná patička; nikoliv HTTP ani skutečný Spellfire).
+
+**Poznámka:** Nová implementace zatím nemá UI cestu; nedokončený spellstart není hotové seslání. Pro bod 10 tedy žádný dokončený v93.448 DIFF vydán nebyl.
+
+## Pracovní v93.449 – bod #10: atomický Neutral Spellfire a historická integrita (24. 10. 2026; **NEVYDÁNO**)
+
+**Bod #10 nadále NEUZAVŘEN.** Pracovní změny jsou založeny na nevydané v93.448; poslední distribuovaná verze je v93.447. `index.html`, `app.js` a produkční `hmk-app.bundle.js` mají pro případ budoucího vydání připravené v93.449, ale toto **není pokyn k distribuci ZIPu**.
+
+### Skutečně implementováno
+
+- `src/integration/hmk-alchemy-neutral-spellfire-commit.js`: atomické pokračování původního Spellstart a nezrušené koncentrace přes autentický `Initiative` checkpoint. Vyžaduje originálního kouzelníka, jeden relevantní Spellstart, přesné kolo a původní působící elixír, fyzický Casting d100, doložený spell ML / EML a správné GM podklady. Výsledek **F** zapisuje původní Casting Fatigue, spotřebuje vlastní IR, bez magického účinku. **CF s Misfire 01–99** zapisuje originální Windedness a podle tabulky Misfire Psyché Stress, Aural Shock, dodatečnou únavu a ztrátu kouzla po Crucial. **Misfire 100 / Total Release** zůstává blokován (vyžaduje Spirit a Raw Principle včetně Neutral Chaos Storm/Vortex), nepozorovaně se nesnižuje na CF.
+- Skutečné **Detect S/CS → Reveal S/CS → Dispel S/CS** nad týmž originálním zdrojem má ověřené dokončené spellfire výsledky; Detect vyžaduje GM doložený úplný inventář všech magických zdrojů v dosahu, včetně nealchymistických. Detect CS poskytuje +20 původnímu kouzelníkovi na Reveal/Dispel pro stejný zdroj. Reveal uchovává původní důkazy Detect a aktuální AS, Dispel vyžaduje doklady obou předchozích úspěchů a aktuální AS, LOS a výslovné vyřešení Ward. Při S/CS Dispel se enchantment historicky mění na AS0, **nikoli fyzický předmět / lahvička**. Nikdo nepřetáčí GM čas ani nepřepisuje původní deník.
+- `src/integration/hmk-alchemy-neutral-history.js` a `verified-combat-storage.js`: kontrola d100/SL, bonusu +20, původního Spellstart, Misfire únavy, pre-Dispel AS, neměnnosti historie. Dodatečná `validateNeutralAlchemyCombatLinks` vyžaduje pro aktuální bojovou časovou osu odpovídající původní **Combat State fatigue event a Initiative Spellstart/Spellfire log**. Vstupní validace záloh v `app.js` nově odmítá výměnu či odstranění těchto důkazů, aniž by se zapsalo cokoli.
+- Spellfire nyní odmítá zjednodušené / neúplné `combatRuntime` bez `version:1`, účastníků, odpovídající `timelineId` a živého kontrolního času. Izolovaná Node fixture byla opravena tak, aby obsahovala skutečný tvar Initiative checkpointu.
+
+### Testy této pracovní kopie (skutečně dokončené)
+
+- **PASS 77/77 Node.js testovacích souborů**, tři dokončené nezávislé dávky 27+27+23, 0 FAIL a 0 TIMEOUT po finálním sestavení a opětovném ověření včetně UI a LOS.
+- **PASS 122 cílených Node.js assertions** `tools/test_alchemy_neutral_spellfire_failed_449.cjs`: F, šest tříd Misfire 01–99, blokace Total Release 100, Detect CS s cizím zdrojem, šestikolový Reveal a Dispel, původní CAST únavy a CAS write, replay a ochrana před změnou AS/d100, odstraněním Combat a Initiative záznamu.
+- **PASS Chromium** `tools/browser_alchemy_neutral_proofs_449.py`: dvě skutečná oddělená načtení kampaně z kompletního lokálně uloženého JSON, kalendářní přehled a nulová změna historie/GM času. Dále tři záporné scénáře při načtení: pozměněný Casting d100, odebraný Combat Fatigue event, odebraný Initiative Spellfire event; všechny zamítnuty v read-only stavu a původní localStorage bytes zůstaly beze změny. Jde o injection skutečného bundle do Chromium dokumentu, **nikoli o přímou HTTP navigaci GitHub Pages**.
+- **PASS Chromium** `tools/browser_alchemy_release_version_449.py`: skutečné HTML + produkční bundle, patička v93.449, žádná JavaScriptová chyba.
+- **PASS Chromium** `tools/browser_alchemy_neutral_ui_449.py`: reálné klikání ve webu (Neutral Spellstart, Initiative hold, Spellfire) Detect CS → Reveal S → Dispel S, +20, AS=0, inventář beze změny; odmítnutí chybějícího GM výčtu zdrojů a opětovné načtení záznamů v novém Chromium kontextu.
+- **PASS** geometrická ochrana LOS Dispel před existujícím záznamem Fumebomb přes původní resolver `hmk-alchemy-area-los.js`. Požadované souřadnice a trvající kouř nejsou nahrazovány pouhým potvrzením GM.
+
+### Stále blokující závislosti (nezaměňovat s dokončením #10)
+
+1. **Odstraněno v pracovní v93.449:** skutečné tlačítko Neutral Spellstart a Spellfire je napojené do stávající záložky Combat. Ověřena plná interaktivní Chromium sekvence Detect CS → Reveal S → Dispel S přes 2+6+6 kol koncentrace, včetně zadání d100, bonusu +20, AS0, inventáře, historii, znovunačtení kampaně a selhání při neúplném census bez částečného zápisu. Nejde však o obecný neutral spellcasting pro všechny zvláštní casting varianty.
+2. Ward má zatím jen explicitní GM absence confirmation, ne původní životní cyklus Ward, jeho zjištění a magické odstranění. Pravidla Detect/Reveal/Dispel v plném rozsahu nemohou být prohlášena za hotová bez Ward výjimek.
+3. Total Release 100 musí podle HMK str. 203–204 v původních Arcane/Combat State řešit Spirit, Raw Principle a Neutral Chaos Storm / Vortex. Nevyvolávat bez kompletních zdrojů.
+4. Negation, samostatná Attunement / Natural Attunement, Spirit Sensing, True Sight a Soulcloak stále nemají plné autoritativní spell/arcane provedení, oporu o doklady a rehydrataci.
+5. Kompletní Spellcasting volby včetně všech modifikátorů (gesture, cant, noise, wound, Focus, grimoire, Quicken, atd.) nejsou podporovány; pouze důsledně ověřovaný běžný režim, ne univerzální sesílání. Změna kampaně / vypršený AS / nová překážka LOS vyžaduje novou adjudikaci.
+
+**Závěr:** pracuje se pouze v izolované v93.449, **žádný rozdílový ZIP #10 se nyní nevydává**. Nesmí se slibovat dokončení bez všeho výše uvedeného.
+
+
+## Pracovní v93.450 – bod #10: pravidlové výjimky Ward / Total Release / Neutral Chaos Storm (24. 10. 2026; **NEVYDÁNO**)
+
+**#10 ZŮSTÁVÁ NEUZAVŘEN.** Nejde o novou fungující funkci sesílání ani o dokončené nakládání s Ward nebo Vortex. Poslední veřejně distribuovanou verzí zůstává v93.447; změny v93.448–v93.450 jsou založeny na nevydaných pracovních kopiích.
+
+- Nový čistý modul `src/integration/hmk-neutral-arcane-exceptions.js` používá původní `src/rules/tests.js` pro skutečně zadaná d100. **Ward (HMK 255):** `Ward Level = half SI (CS +2)`, běžné zaokrouhlování HMK p.7, Dispel Wardu `−10 × WL`, Indefinite a přebití pouze vyšším WL, vyloučení Raw Principle z přímých zdrojů pro Ward. Chráněný zdroj není detekovatelný ani ovlivnitelný Reveal/Dispel před odstraněním Wardu; Ward samotný je Detectem nalezitelný. Zatím nelze ukládat Ward, protože chybí skutečný 10minutový Spellstart/Spellfire, dotyk a originální ward/detection journal writer.
+- **Total Release 100 (HMK 203):** fyzický Spirit d100 proti **doloženému** EML včetně −5 za každý CL; výsledky CF = fatal Shade transformation, F = Aural Shock 6 + šest fyzických d6 ztráty Spirit ML, S = Shock 4 + čtyři d6, CS = Shock 2 + dvě d6. Vždy PSY 3 a Crucial Misfire se ztrátou kouzla. Nedoložené živé Spirit modifikátory nebo chybějící d6 se odmítají; nevznikne žádné vymyšlené ML či hod.
+- **Neutral Chaos Storm / Vortex (HMK 204/255):** SI = původní spell CL (nikoli Pvârism SI), počáteční průměr 5 ft, roaming **radius** CL ×10 ft (příklad knihy CL IV = roaming diameter 80 ft), trvá CL kol. Výslovně chybí doložení celého výběru všech možných zdrojů, náhodného cíle, živé geometrie, Ward priority a všech navazujících hodů. Čistý resolver pro jeden prokázaný **Elixir/Ward** rozlišuje d100 S/CS (imunita 1 kolo; CS PSY +1) a F/CF (potlačení na fyzický d20 kol/hodin), **neodstraňuje trvale elixírovou AS**. Na neověřené ostatní kategorie nesahá.
+- `hmk-alchemy-arcane-casting-readiness.js` nyní při skutečném Misfire d100=100 přikládá pravidlovou geometrii a explicitní seznam zbývajících důkazů. `diceComplete:false`, `mayCommit:false` a již existující odmítnutí atomického Spellfire Misfire 100 zůstávají. **Toto nejsou paralelní Combat State, Initiative ani magická historie.**
+- `index.html`, `app.js`, `hmk-app.bundle.js` mají pouze pro pracovní sestavení připravené viditelné a cache-busting číslo **v93.450**. Nejde o distribuovaný ZIP.
+- **NUTNÉ pro uzavření #10:** původní a úplný Ward writer přes 10 minut; navazující Dispel Wardu před jeho elixírem; kompletní Spirit+Shade a časově postupující Vortex/Raw Principle v Initiative/Combat State; skutečná Negation, Attunement, Spirit Sensing, True Sight/Soulcloak, casting volby a široká Chromium end-to-end regrese. Výše uvedené kalkulace samy #10 neuzavírají. 
+
+### Skutečně dokončené kontroly pracovní v93.450
+
+- **PASS 142 cílených Node.js kontrol** `tools/test_neutral_arcane_exceptions_450.cjs`, včetně nových propojení `neutralSpellfireDice` → `neutralChaosStormGeometry`, všech čtyř Spirit SL, d6 požadavků, Ward Level a Vortex F/CF d20. Všechny funkce mají `mayCommit:false`.
+- **PASS kompletní dostupná Node.js regrese 78/78 testovacích `.cjs` souborů**, tři dokončené izolované dávky 26+26+26, 0 FAIL a 0 TIMEOUT, výsledky `/mnt/data/hmk_v93450_regression_*.json` (mimo distribuční projekt). Tato regrese ověřuje nezměněné fungující větve, **nikoli** dosud nedokončený autoritativní Ward a Total Release writer.
+- **PASS Chromium `browser_alchemy_release_version_450.py`**: skutečný obsah `index.html` a produkčního bundle vložený do Chromium, viditelná patička v93.450 a žádná JS chyba. Nejde o HTTP navigaci na GitHub Pages.
+- **PASS Chromium `browser_alchemy_neutral_ui_450.py`**: skutečné klikání Detect CS → Reveal S → Dispel S, 2+6+6 kol, ověřená AS0, lahvička zachována, rollback neúplných podkladů, další načtení uložené kampaně, nezměněný GM čas.
+- **PASS Chromium `browser_alchemy_neutral_proofs_450.py`**: dvě oddělené rehydratace kampaně a tři záporné scénáře podvržených důkazů; původní uložená data zůstala beze změny.
+- **NEPROVEDENO:** kompletní klikací E2E Ward, Total Release, Negation, Attunement, Spirit Sensing a True Sight, protože stále neexistuje nezbytný autoritativní mechanismus. Žádný ZIP v93.450 se nevydává, bod #10 je **NEUZAVŘEN**.
+
+### Závěrečná oprava a regrese po zásahu do skutečné Detect cesty
+
+- `hmk-alchemy-neutral-detection.js` nyní při `buildNeutralDetectCensus` odmítne GM deklarovaný Ward (označení `spell:'Ward'`, `wardLevel` či `protectsSourceId`) bez existujícího autentického Ward důkazu. Jinak by dosavadní všezahrnující Detect census falešně prozradil magický zdroj, který má HMK 251/255 chránit. Ochrana je **fail-closed**, nikoli dokončený Ward spellcasting; právo validně odhalit Ward samotný vyžaduje dokončení historického writeru.
+- **PASS nových 145/145 cílených assertions** v `test_neutral_arcane_exceptions_450.cjs`, včetně tří nových zakázaných detekčních vstupů s deklarovaným Wardem.
+- **PASS kompletní finální regrese 78/78 Node.js testovacích souborů**, 3 samostatné dokončené běhy po 26, výsledky `/mnt/data/hmk_v93450_regression_{0_26,26_52,52_78}.json`. První společný opakovaný pokus byl ukončen časovým limitem po úvodní dávce; nebyl započítán jako kompletní PASS.
+- **PASS finální Chromium po poslední opravě Detect:** `browser_alchemy_release_version_450.py`, `browser_alchemy_neutral_proofs_450.py` (2 nezávislé rehydratace, 3 odmítnutí podvržené historie), `browser_alchemy_neutral_ui_450.py` (klikací 2+6+6kolový Detect CS → Reveal S → Dispel S, předchozí bonus, AS0, inventář, GM čas a ochrana chybějícího vstupu). Testy používají skutečné HTML a JS v dokumentu Chromium, nikoliv HTTP navigaci na GitHub Pages. **Ward/Total Release se v Chromiu nevykonávaly, protože writer dosud neexistuje.**
+
+
+## Pracovní v93.451 – bod #10: autoritativní Ward pro dosud nechráněný elixír (24. 10. 2026; **NEVYDÁNO**)
+
+**#10 ZŮSTÁVÁ NEUZAVŘENÝ.** Poslední uživatelsky distribuovaná aktualizace je v93.447. Pracovní verze v93.448–v93.451 musí být při případném vydání spojeny do skutečného DIFF oproti ní, nikoli pouze zabalena poslední pracovní složka.
+
+- **HMK 200–203, 251, 255:** Přidáno doložené kouzlo `Neutral::Ward` (CL II, CD 2, běžný Spell ML, dotyk, 10 minut = **60 bojových kol**). V `hmk-alchemy-neutral-spellstart.js` již existující Initiative plánovač přijme jen ověřeně naučený Ward, GM potvrzený dotyk a dosah 0 ft. U již chráněného cíle novou operaci odmítne, dokud nebude doloženo odstranění nebo správné přebití.
+- `hmk-alchemy-neutral-spellfire-commit.js` přes stejný původní CAS writer vyhodnotí skutečný d100 (F, CF 01–99, S, CS), běžné Casting Fatigue, původní Combat State a dokončenou koncentraci. Při S/CS připojí k originálnímu Spellfire proof `ward.level = round(SI/2) + (CS?2:0)` a jednoznačné `protectedSourceId`; žádná fyzická lahvička ani elixírová AS se nemění. Původní pravidlový modul profilu Ward nadále zůstává čistý/neukládající. Misfire 100 je zablokován.
+- `hmk-neutral-ward-lifecycle.js` čte autentický originální historický Ward proof, nikoli paralelní seznam ochranných štítů. `hmk-alchemy-neutral-history.js` zpětně ověřuje skutečný dotyk, ML→SI→WL, vazbu na originální Spellstart, datum, casting d100, Fatigue, Initiative a neexistenci duplicitního Wardu. Obnovení/tampering původní historie je fail-closed.
+- `hmk-alchemy-neutral-detection.js` do GM potvrzeného Detect census promítá pravdivý **Ward jako detekovatelný Active spell**; původní chráněný elixír z census záměrně vynechává. Přímý Detect/Reveal/Dispel původního chráněného elixíru je i přes falešně zaškrtnutou GM absenci Ward odmítnutý; historická validace chrání i jiné zdroje v Detect census.
+- Existující Combat formular je rozšířen o Ward s checkboxem pro skutečný dotyk při Spellstart i Spellfire. Jiná kouzla dál vyžadují explicitní nepřítomnost Ward. `index.html`, `app.js` a produkční bundle uvádějí pracovní **v93.451**.
+
+### Dokončené testy v93.451
+
+- **PASS 29 cílených Node.js kontrol** `tools/test_alchemy_neutral_ward_451.cjs`: 60 kol, dotyk, Casting CS Ward Level 5, atomický journal/Combat/Initiative, chráněné zdroje, neprolomení Detect, neměnný inventář/GM čas, reload a odmítnutí podvržených dokladů a duplicity.
+- **PASS celková Node.js regrese 79/79** testovacích souborů v oddělených dávkách; unikátní PASS jsou potvrzené uloženými výsledky `/mnt/data/hmk_v93451_regression_*.json` mimo projekt. Hromadná dávka 26–52 se přerušila časovým limitem po 5 testech; tyto testy byly poté samostatně zopakovány a dokončeny. Žádný nedokončený běh není počítán jako PASS.
+- **PASS Chromium `browser_alchemy_neutral_ward_451.py`:** skutečné klikací Spellstart, 59 soustředěných HOLD tahů a následný 60. dokončený round + CS Spellfire, uložení WL5, rollback bez dotyku, historie a nový prohlížeč.
+- **PASS Chromium** `browser_alchemy_release_version_451.py` (paticka v93.451), `browser_alchemy_neutral_proofs_451.py` (2 rehydratace a 3 odmítnutí historických manipulací), `browser_alchemy_neutral_ui_451.py` (původní 2+6+6kolový Detect→Reveal→Dispel, +20, AS 0, rollback). Nešlo o HTTP GitHub Pages test, ale o skutečný lokální HTML/bundle načtený do Chromium dokumentu.
+
+### Nedořešené závislosti pro skutečné dokončení bodu #10
+
+1. Autentický **Detect/Reveal/Dispel samotného Wardu**, Ward Level ×10 penalty, odstranění Wardu jako původního historického zdroje a **teprve potom** ochranného elixíru. Přepis/přebití nižšího Wardu vyšším WL, ochrana před přerušením Wardu při výměně nebo použití elixíru, široké nealchymistické Ward cíle. Současná v93.451 dovoluje bezpečně vytvořit pouze Ward na dosud nechráněný prokázaný alchymistický zdroj.
+2. Atomický Misfire **100 / Total Release** s fyzickými Spirit/d6 a všemi cíli Vortexu, postupem kol, Raw Principle, případnou transformací, závislým zdravotním a historickým účinkem. Dosud jen nezapisující pravidlové preflighty.
+3. **Negation, Attunement, Spirit Sensing a True Sight/Soulcloak** bez paralelní magie; navázat na skutečné původní doklady, nikoli jen na katalog. Dále zvláštní casting varianty a široký E2E test všech dokončených operací.
+
+**Rozdílový ZIP se nevydává, dokud nejsou všechny výše uvedené závislosti bodu #10 skutečně dokončeny a otestovány.**
+
+
+### Dodatková implementace ve stejné pracovní v93.451 – skutečné odstranění Wardu
+
+- **Druhá ověřená cesta cílení `targetKind:'Ward'`**: originální aktivní Ward na jednom doloženém alchymistickém zdroji je sám magickým cílem. Původní Spellstart/Spellfire používají Wardův jednoznačný `wardProofId` místo ID chráněné magie a GM výslovně potvrzuje, že míří na Ward, nikoliv na elixír. Na původní elixír nadále nejde zaškrtnutím „Ward není přítomen“ cílit, když Ward aktivně chrání jeho AS.
+- **Detect Wardu:** úplné GM potvrzení detekovaných zdrojů, Ward v kategorii Active spell, chráněný elixír **není** součástí odhalení. Originální Detect CS přiznává +20 jen na tentýž historický Ward. **Reveal Wardu:** originální Detect a přesné doložené WL. **Dispel Wardu:** původní Detect+Reveal stejného Wardu, LOS, `−10×WL` v živém Casting EML a skutečné nové kolo; úspěch historicky označí **pouze Ward** za odstraněný. `alchemyElixirStrength` nyní neinterpretuje Dispel Wardu jako Dispel elixíru, takže fyzická lahvička i její stávající AS zůstávají beze změny.
+- `hmk-neutral-ward-lifecycle.js` umí rekonstruovat, kdy byl Ward vytvořen a kdy byl přes oprávněný `dispel.wardProofId` odstraněn. Historická validace `hmk-alchemy-neutral-history.js` ověřuje převod obou druhů cílů, fyzické d100, původní Detect CS, Revealed WL, Dispel WL, zdrojová ID, Fatigue a Initiative. Po skutečném Dispel Wardu lze elixír opět samostatně detekovat.
+- Combat UI dovoluje GM vybrat **Elixir nebo Ward jako přímý cíl** a vynucuje správné vzájemně odlišné GM potvrzení. Pro `Ward` casting stále vyžaduje 60 kol dotyku, pro `Ward` target Detect/Reveal/Dispel požadované 2/6/6 kol. Přetrvávající Ward nelze obejít implicitním přepnutím cílů.
+
+**Nové dokončené důkazy:**
+
+- **PASS 38 cílených Node.js kontrol** `tools/test_alchemy_neutral_ward_dispel_451.cjs`: kompletní Detect CS → Reveal S → Dispel S proti reálnému Wardu WL5, skutečný Dispel EML 27 včetně bonusu Detect CS a WL postihu −50, úspěšné odstranění Wardu, nenulová originální AS6 a zachovaná lahvička, potvrzený běžný Detect stejného elixíru po odstranění Wardu, CAS, podvržená historie.
+- **PASS Chromium** `tools/browser_alchemy_neutral_ward_dispel_451.py`: skutečné 2+6+6 kol klikáním na produkčním UI proti již vzniklému autentickému Wardu, stav Ward odstraněn / originální elixír zachován, inventář, GM čas a nezměněná historie po znovunačtení.
+- **PASS po posledních změnách všech 80/80 Node.js testovacích souborů** ve finálně dokončených sériových dávkách (části hromadných pokusů skončily timeoutem a nebyly započítány; chybějící testy byly zopakovány); unikátní výsledky v `/mnt/data/hmk_v93451_regression_*.json` mimo projekt.
+- **PASS Chromium** `tools/browser_alchemy_neutral_ward_451.py` (celých 60 klikacích kol, CS WL5, dotyk, rollback, reload), `browser_alchemy_neutral_ui_451.py` (původní Detect→Reveal→Dispel elixíru), `browser_alchemy_neutral_proofs_451.py` (dva reloady a tři záporné důkazy), `browser_alchemy_release_version_451.py` (produkční web v93.451). Síťový provoz přes skutečné GitHub Pages neověřován.
+
+**Stále otevřeno:** správné přebití existujícího Wardu silnějším WL včetně důkazů; Ward pro nealchymistické magické zdroje; oddělené životní cykly po transformaci chráněné dávky; kompletní Total Release 100/Spirit/Chaos Storm/Vortex; skutečné Negation, Attunement, Spirit Sensing a True Sight/Soulcloak; zvláštní způsoby sesílání, náročnější modifikátory a kompletní E2E těchto zatím nepodporovaných větví. **Bod #10 nadále NEUZAVŘEN – žádný distribuční ZIP.**
+
+
+## Mimořádný distribuční checkpoint v93.452 – bezpečné přebití Wardu (24. 10. 2026)
+
+**Bod 10 stále NEUZAVŘEN.** Tuto verzi vydáváme pouze na výslovné přání uživatele jako mimořádný **CHECKPOINT**, nikoliv jako dokončení Spell/Arcane. Rozdílový ZIP se počítá vůči poslední **skutečně distribuované** v93.447, protože pracovní verze v93.448–v93.451 dosud nebyly předány. Včetně všech potřebných zdrojů, aplikace a testů.
+
+- **HMK str. 255:** Ward na jednom prokázaném alchymistickém zdroji trvá neurčitě, dokud není dispellován nebo přebit Wardem s **vyšším WL**. Původní `neutralSpellMastery` a `neutralWardProfile` zůstávají autoritativními výpočty; běžný úspěch `S` má WL = zaokrouhlené SI/2, `CS` přidává 2.
+- Nově lze přes původní **Combat → Neutral Spellstart** zahájit 60kolový Ward nad dříve chráněným elixírem, **pouze když je už předem prokázáno, že nové WL při běžném S bude vyšší než staré**. CS-only přebití, kdy by S bylo příliš slabé, zůstává explicitně blokované před spotřebou tahu. Předejde se tomu, že by se nedostatečně silný Ward rozběhl a nebylo jej možné dokončit žádným atomickým zápisem.
+- GM potvrzuje živý dotyk i **přebití** při původním Spellstart a znovu při Spellfire. `combatProof` spellstartu obsahuje `priorWardProofId`, `priorWardLevel` a totožnost chráněného elixíru. Spellfire ověřuje, že ochrana během 60 kol nebyla změněna či odstraněna. Pokud byla, **odmítne zápis** a nemanipuluje s historií.
+- Úspěšný Spellfire zapíše novou ochranu do **stejného původního journalu**, stejné Initiative a Combat State; `ward.supersedesWardProofId` odkazuje na starý neměnný důkaz. `activeAlchemyWard` vrací jen poslední platnou ochranu, a její následný Dispel nemůže obnovit starší přebitý Ward. Inventář, AS a GM čas se nemění. `validateNeutralAlchemyHistory` přehrává přebití podle skutečného ML→SI→WL, starého proof ID, originálního Spellstart a Casting d100. Žádný druhý inventář, Ward registry ani nový zdravotní systém nevznikl.
+- **PASS cílený Node.js** `test_alchemy_neutral_ward_supersede_452.cjs`: 24 ověření včetně dvou různých kouzelníků, 60+60 skutečných kol, Ward WL3 → WL5, odmítnutí chybějícího GM potvrzení, CAS, reload, neměnný starší důkaz a tampering starého ID/WL/Spellstartu.
+- **PASS kompletní Node.js regrese 81/81 souborů**, dokončena ve čtyřech samostatných dávkách: `/mnt/data/hmk_v93452_regression_{0_27,27_54,54_68,68_81}.json`. Souhrnná dávka 54–90 byla předtím přerušena časovým limitem, **nezapočítává se**; chybějící běhy byly samostatně dokončeny.
+- **PASS Chromium** `browser_alchemy_neutral_ward_supersede_452.py`: skutečné klikání 60 kol, Ward WL3→WL5, rollback bez GM potvrzení při Spellstart i Spellfire, historické předchůdce, inventář, GM čas a nový prohlížeč s načtenými uloženými daty.
+- **PASS další samostatné Chromium retesty**: produkční viditelná verze `browser_alchemy_release_version_452.py`; původní 2+6+6 Detect→Reveal→Dispel `browser_alchemy_neutral_ui_452.py`; šedesátikolový původní Ward `browser_alchemy_neutral_ward_452.py`; Detect→Reveal→Dispel Wardu `browser_alchemy_neutral_ward_dispel_452.py`; dvě obnovení a tři odmítnuté manipulace s historií `browser_alchemy_neutral_proofs_452.py`. Při společném spuštění dvou Chromium scénářů došlo k časovému limitu; každý byl následně úspěšně dokončen samostatně. Skutečný síťový reload na GitHub Pages se zde netestoval.
+- `index.html`, `app.js` a znovu sestavený produkční `hmk-app.bundle.js` uvádějí **v93.452**; rozdílový archiv neobsahuje žádná odstranění.
+
+**Nadále neuzavřené:** autoritativní **Misfire 100 / Total Release** se Spirit loss a kompletním životním cyklem Neutral Chaos Storm / Vortex (náhodný nový střed, úplný soupis zdrojů, každý d100 a případný d20 v každém kole, Ward před chráněným zdrojem, trvání a historické přehrání). Existující `neutralTotalReleaseSpirit` a `neutralChaosStormGeometry` zůstávají **nezapisující**; nedokončenou Vortex transakci nelze zaměnit za dokončený bojový tah. Dále Negation, Attunement, Spirit Sensing, True Sight / Soulcloak a rozsáhlejší magické zdroje a varianty casting. **Bod 10 neoznačovat za hotový.**
