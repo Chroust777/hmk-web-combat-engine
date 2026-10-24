@@ -17,7 +17,7 @@ const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 /** HMK p.255 special source ML. Round computed fractions normally, p.7. */
 export function neutralVortexSpecialML(source){
  check(source&&categories.includes(source.category),'neověřená kategorie magické energie');
- const v=(n)=>whole(n,0,1000);
+ const v=(n)=>whole(n,1,1000);
  switch(source.category){
   case 'Active spell': {
    const cl=source.spell==='Ward'?source.wardLevel:source.complexityLevel;
