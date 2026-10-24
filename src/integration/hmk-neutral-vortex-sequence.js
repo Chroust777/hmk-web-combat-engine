@@ -22,12 +22,23 @@ const immutableSource=s=>{
  */
 export function neutralVortexSourceSelection({sources,origin,radiusFeet,spellCL,
  physicalSelectionDie=null}={}){
- check(Array.isArray(sources)&&origin&&Number.isFinite(origin.x)&&Number.isFinite(origin.y),
-  'chybí soupis zdrojů nebo geometrie');
+ // Selection is an exported, independently callable read-only gate. Never
+ // silently drop a malformed/unverified source from the random pool: that
+ // would change the denominator of the physical dN and could hide magic.
+ check(Array.isArray(sources)&&location(origin)&&whole(spellCL,1,6)&&
+  Number.isFinite(radiusFeet)&&radiusFeet>=2.5&&radiusFeet<=spellCL*10&&
+  (Number.isInteger((radiusFeet-2.5)/5)||radiusFeet===spellCL*10),
+  'chybí soupis zdrojů nebo platná geometrie Vortexu');
+ const seen=new Set();
+ for(const source of sources){
+  check(source&&typeof source.id==='string'&&source.id.length>0&&
+   !seen.has(source.id)&&source.verified===true&&location(source),
+   'neunikátní nebo neověřený zdroj v úplném soupisu Vortexu');
+  neutralVortexSpecialML(source);
+  seen.add(source.id);
+ }
  const choices=sources.filter(s=>Math.hypot(s.x-origin.x,s.y-origin.y)+radiusFeet<=spellCL*10+1e-8)
   .map(s=>s.id).sort();
- check(choices.every(s=>typeof s==='string'&&s.length>0)&&new Set(choices).size===choices.length,
-  'neplatné ID zdroje');
  if(!choices.length){check(physicalSelectionDie===null,'bez zdrojů neexistuje výběrový hod');
   return Object.freeze({choices:Object.freeze([]),selectedSourceId:null,selectionDie:null});}
  if(choices.length===1){check(physicalSelectionDie===null,
