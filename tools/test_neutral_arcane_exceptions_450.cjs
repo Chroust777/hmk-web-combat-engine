@@ -38,7 +38,7 @@ for(const [sl,roll,d6s,shock,loss] of [
 for(const cl of [1,2,3,4,5,6]){
  const s=E.neutralChaosStormGeometry(cl);
  eq(s.spellSI,cl);eq(s.durationRounds,cl);eq(s.roamingDiameterFeet,20*cl);
- eq(s.initialDiameterFeet,5);eq(s.casterMayShieldSources,false);
+ eq(s.initialDiameterFeet,5);eq(s.casterMayShieldSources,true);
 }
 bad(()=>E.neutralTotalReleaseSpirit({spellCL:2,spiritML:60,spiritD100:32,lossD6:[2,3]}),/modifikátory/);
 bad(()=>E.neutralTotalReleaseSpirit({spellCL:2,spiritML:60,verifiedOtherModifiers:0,
