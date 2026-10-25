@@ -431,3 +431,10 @@ form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;
 .hc-month-guide-list li{break-inside:avoid;padding:0 3px}
 .hc-month-guide-list .hc-month-current{font-weight:bold;background:#ead1a0;border-radius:3px}
 @media(max-width:760px){.hc-month-guide-list{left:0;transform:none}.hc-month-guide>.hc-month-guide-trigger{font-size:14px}}
+
+/* Private GitHub Cloud connectivity / cloud state; nonblocking navigation */
+.hmk-cloud-sidebar {background:transparent;border:1px solid rgba(160,132,85,.5);border-radius:6px;color:inherit;font:inherit;font-size:.74rem;padding:.24rem .5rem;cursor:pointer;max-width:100%;}
+.hmk-cloud-panel .field-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.75rem;align-items:end;}
+.hmk-cloud-panel input[type="password"] {width:100%;}
+.hmk-cloud-state {padding:.65rem .9rem;background:rgba(144,123,91,.1);border:1px solid rgba(144,123,91,.3);border-radius:7px;overflow-wrap:anywhere;}
+.hmk-cloud-panel .actions {display:flex;gap:.5rem;flex-wrap:wrap;}

@@ -30,7 +30,7 @@ let count=0;function ok(v,msg){assert.ok(v,msg);count++}
  }
  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
  const css=fs.readFileSync(path.join(root,'book-templates.css'),'utf8');
- for(const key of ['function provisionGuideHTML(participants)','data-provision-actor','data-provision-route','data-provision-go="shop"','data-provision-go="forage"','data-provision-assure="yes"','provisionCardHTML(actor,true)','hc-provision-rulebook','visibleLogbookEntries(logs,hidden)','data-restore-log','data-hide-log','isPersonalNote(row)','validateLogbookVisibility(d)','const APP_VERSION=\'93.475\''])ok(app.includes(key),'app includes '+key);
+ for(const key of ['function provisionGuideHTML(participants)','data-provision-actor','data-provision-route','data-provision-go="shop"','data-provision-go="forage"','data-provision-assure="yes"','provisionCardHTML(actor,true)','hc-provision-rulebook','visibleLogbookEntries(logs,hidden)','data-restore-log','data-hide-log','isPersonalNote(row)','validateLogbookVisibility(d)','const APP_VERSION=\'93.477\''])ok(app.includes(key),'app includes '+key);
  ok(!app.includes('if(ask(\'Smazat zápis?\'))mutate(()=>data.journal=data.journal.filter(x=>x.id!==t.dataset.deleteLog))'),'unsafe generic log deletion removed');
  ok(app.includes('if(!isPersonalNote(target))throw Error'),'immutable records cannot be edited in mutation');
  ok(app.includes('if(!isPersonalNote(x))return alert'),'immutable records cannot be edited by dialog');

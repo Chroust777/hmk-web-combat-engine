@@ -1,3 +1,4 @@
+import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js';
 import {heftPenalty,strengthImpactModifier,twoHandedImpactBonus} from './src/rules/weapon-modes.js';
 import {resolveCrossbowArcheryChoice} from './src/integration/hmk-crossbow-archery-choice.js';
 import {prepareSleeplessDay,prepareSleeplessNight,prepareSleeplessFourHourRest} from './src/integration/hmk-sleep-deprivation.js';
@@ -245,7 +246,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.475';
+const APP_VERSION='93.477';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -326,6 +327,49 @@ function persistEncounterDraft(){
  }catch{/* Private browsing or storage quota: in-memory selection remains usable. */}
 }
 let encounterSelection=new Set(); // Hydrate only after loading the character database.
+let cloudSync=null;
+function cloudStatusLabel(){
+ if(!cloudSync||!cloudSync.enabled)return 'Pouze v tomto zařízení';
+ return ({ready:'Cloud ✓ uloženo',pending:'Cloud · čeká na uložení',syncing:'Cloud · odesílání…',connecting:'Cloud · načítání…',locked:'Cloud · připojit',conflict:'Cloud · KONFLIKT', 'error-pending':'Cloud · chyba přenosu', 'needs-create':'Cloud · vytvořit úložiště','needs-choice':'Cloud · vyžaduje rozhodnutí'})[cloudSync.status]||'Cloud · '+cloudSync.status;
+}
+function cloudPanel(){
+ const c=cloudSync?.config||{};const enabled=cloudSync?.enabled;
+ return `<section class="panel hmk-cloud-panel"><h3>☁ GitHub Cloud · stejné postavy na všech zařízeních</h3>
+ <p class="muted">Kampaně a deníky se ukládají do <strong>soukromého</strong> repozitáře. Kód HMK a token se tam neukládají. Připojení je potřeba povolit zvlášť na každém zařízení.</p>
+ <p class="hmk-cloud-state" data-cloud-status><strong>${esc(cloudStatusLabel())}</strong>${cloudSync?.issue?' · '+esc(cloudSync.issue):''}</p>
+ <form id="hmk-cloud-connect-form" class="field-grid" autocomplete="off">
+ <label>GitHub uživatel / vlastník repozitáře<input name="owner" value="${esc(c.owner||'Chroust777')}" maxlength="39" required></label>
+ <label>Soukromý repozitář s kampaněmi<input name="repo" placeholder="např. hmk-campaign-private" value="${esc(c.repo||'')}" maxlength="100" required></label>
+ <label>Fine-grained access token (jen Contents: Read and write)<input type="password" name="token" placeholder="github_pat_…" autocomplete="new-password" required></label>
+ <div class="actions"><button type="submit">Připojit a načíst GitHub</button><button type="button" class="secondary" data-cloud-action="create">Vytvořit první cloudovou databázi</button></div></form>
+ <div class="actions"><button type="button" class="secondary" data-cloud-action="retry" ${enabled?'':'disabled'}>Odeslat čekající změny</button><button type="button" class="secondary" data-cloud-action="refresh" ${cloudSync?.status==='ready'?'':'disabled'}>Načíst aktualizaci z cloudu</button><button type="button" class="secondary" data-cloud-action="replace" ${enabled?'':'disabled'}>Převzít cloudový stav (zahodit místní rozdíly)</button><button type="button" class="secondary" data-cloud-action="disconnect" ${enabled?'':'disabled'}>Odpojit tento prohlížeč</button></div>
+ <p class="tiny">Přístupový token se drží jen v aktuální relaci prohlížeče (sessionStorage); není v repozitáři ani v trvalém nastavení. Při novém otevření prohlížeče může být potřeba jej zadat znovu. Po připojení se potvrzené změny ukládají automaticky; při chybě připojení zůstávají místně a jsou označené jako neodeslané. Současné úpravy ze dvou zařízení se nikdy tiše nesloučí ani nepřepíšou.</p></section>`;
+}
+function acceptCloudSnapshot(raw){
+ if(localStorage.getItem(STORAGE)!==storageBaseline)throw Error('Místní kampaň se mezitím změnila v jiné záložce.');
+ const incoming=validate(JSON.parse(raw));
+ localStorage.setItem(STORAGE,raw);storageBaseline=raw;data=incoming;
+ selected=null;view='characters';encounterSelection=new Set();
+ // Reload after the connected credentials have been stored by the caller.
+ setTimeout(()=>window.location.reload(),150);
+}
+const cloudStorage={
+ getItem(key){return localStorage.getItem(key)},
+ setItem(key,value){
+  if(key===STORAGE&&cloudSync&&!cloudSync.canWrite())throw Error('Nejprve připojte GitHub Cloud; tento prohlížeč nesmí zapsat starší stav.');
+  const previous=key===STORAGE?localStorage.getItem(key):null;
+  localStorage.setItem(key,value);
+  if(key===STORAGE&&cloudSync&&previous!==value)cloudSync.onLocalWrite(value);
+ },
+ removeItem(key){if(key===STORAGE&&cloudSync&&!cloudSync.canWrite())throw Error('GitHub Cloud není připojen.');localStorage.removeItem(key)}
+};
+cloudSync=createGitHubCloudSync({localStorage,sessionStorage,storageKey:STORAGE,
+ validate:incoming=>validate(incoming),
+ readLocal:()=>localStorage.getItem(STORAGE)||JSON.stringify(data),
+ applyRemote:acceptCloudSnapshot,
+ approveReplace:message=>window.confirm(message),
+ onStatus:()=>{const node=document.querySelector('[data-cloud-status]');if(node)node.textContent=cloudStatusLabel()+(cloudSync?.issue?' · '+cloudSync.issue:'');const side=document.querySelector('[data-cloud-sidebar]');if(side)side.textContent=cloudStatusLabel();const block=document.querySelector('[data-cloud-block-banner]');if(block)block.hidden=cloudSync?.canWrite()??true;}
+});
 let catalogStatus='all'; // presentation-only; never persisted
 let libraryTab='melee',libraryPage=0,libraryRecipientId=null; // presentation-only, not stored
 try{const saved=localStorage.getItem(STORAGE);if(saved)data=validate(JSON.parse(saved));storageBaseline=saved;}catch(e){storageReadOnly=true;notice='POZOR: Původní data se nepodařilo načíst. Zápisy jsou zablokovány, aby se nepřepsala. Zálohujte data prohlížeče a opravte úložiště.';console.error(e)}
@@ -467,11 +511,12 @@ function validate(d){
  return d
 }
 function save({gmClockAdvance=false,restoreBackup=false}={}){
+ if(cloudSync&&!cloudSync.canWrite()){notice='Cloudová kampaň není synchronizována. Přejděte do Cloud a zálohy.';return false;}
  if(storageReadOnly){notice='Zápis je zablokován: původní úložiště se nepodařilo načíst.';return false;}
  try{
   if(storageBaseline!==null)linkNewMoralePsycheAccrual(JSON.parse(storageBaseline),data);
   const serialized=JSON.stringify(data);
-  const r=persistVerifiedCombatSnapshot({storage:localStorage,key:STORAGE,baseline:storageBaseline,serialized,gmClockAdvance,restoreBackup});
+  const r=persistVerifiedCombatSnapshot({storage:cloudStorage,key:STORAGE,baseline:storageBaseline,serialized,gmClockAdvance,restoreBackup});
   if(r.ok){storageBaseline=serialized;notice='';return true;}
   if(r.readOnly){
    storageReadOnly=true;
@@ -640,6 +685,7 @@ function installCalendarDiceControls(form,kind,sourceId,actorId){
 }
 let pendingTrekHandoff=null; // UI-only context; the journal proof is the authority after save.
 function mutate(fn,{gmClockAdvance=false}={}){
+ if(cloudSync&&!cloudSync.canWrite()){alert('Nejdříve připojte GitHub Cloud v menu Cloud a zálohy.');return false;}
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
  try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(automaticGenerationBusy)lastAutomaticGenerationMutationError='Uložení do úložiště selhalo';else alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
@@ -691,7 +737,7 @@ function main(){
  if(view==='skills')body=skillWorkbenchView();
  if(view==='encounter')body=encounterView();
  const scene=activeVisualScene();
- const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['backup','▤','Zálohy'],['trash','♧','Archiv']];
+ const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['backup','☁','Cloud a zálohy'],['trash','♧','Archiv']];
  const characterButtons=data.characters.map(c=>{const ready=characterJournalReadiness(c).ready;return `<button type="button" class="castle-character ${c.id===selected?'active':''} ${ready?'':'castle-character--draft'}" ${ready?'data-open':'data-resume-creation'}="${esc(c.id)}" title="${ready?'Otevřít deník':'Pokračovat v pravidlové tvorbě'}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`;}).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
@@ -701,9 +747,9 @@ function main(){
   <div class="nav-section-label castle-character-section">POSTAVY <span>${data.characters.length}</span></div>
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character"><span class="castle-create-symbol" aria-hidden="true">✣</span><span class="castle-create-label">Vytvořit postavu</span><span class="castle-create-plus" aria-hidden="true">＋</span></button>
-  <div class="castle-sidebar-footer">⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
- </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter'].includes(view)?' content-sheet':''}"><nav class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></nav>${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
- <footer class="footer">HârnMaster Keeper’s Ledger · v${APP_VERSION} · offline aplikace pro GitHub Pages</footer></div>`;
+  <div class="castle-sidebar-footer"><button type="button" data-nav="backup" class="hmk-cloud-sidebar" data-cloud-sidebar title="Stav synchronizace">${esc(cloudStatusLabel())}</button><br>⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
+ </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter'].includes(view)?' content-sheet':''}"><nav class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></nav>${cloudSync?.enabled&&!cloudSync.canWrite()?`<div class="notice error" data-cloud-block-banner>⚠ ${esc(cloudStatusLabel())}: herní zápisy jsou do připojení zablokované. <button type="button" data-nav="backup">Přejít k připojení</button></div>`:''}${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
+ <footer class="footer">HârnMaster Keeper’s Ledger · v${APP_VERSION} · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace</footer></div>`;
 }
 
 /** Single GM-confirmed campaign clock; rounds and IR remain strictly encounter-local. */
@@ -3275,7 +3321,7 @@ function downloadRawStorage(){
  if(raw===null){alert('V tomto prohlížeči není původní záznam.');return}
  const blob=new Blob([raw],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='hmk-raw-emergency-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
-function backupView(){const summary={characters:data.characters.length,archived:data.trash.length,items:allCatalogItems().length,inventory:data.inventory.length,journal:data.journal.length};return `<h2>Zálohy a obnova</h2>${!storageReadOnly?inventoryProvenancePanel():''}${storageReadOnly?'<div class="notice error">Načtení úložiště selhalo. Standardní záloha je zablokována; nejdříve stáhněte nouzovou kopii původních dat.</div>':''}<div class="panel"><div class="equipment-summary"><strong>Kontrola místních záznamů</strong><div>Aktivní postavy: ${summary.characters} · archiv: ${summary.archived}</div><div>Celkem položek knihovny: ${summary.items} · vestavěné HMK: ${BUILTIN_ITEMS.length} · inventář: ${summary.inventory} · deník: ${summary.journal}</div><div>Stav zápisu: ${storageReadOnly?'ZABLOKOVÁN':'Připraven'}</div></div><p><strong>Datový formát:</strong> v1 (kompatibilní se staršími verzemi). Umístění vybavení je nepovinné pole; staré položky se zobrazí jako nezařazené.</p><p>Data se ukládají lokálně v tomto prohlížeči (localStorage). Pokud jsou otevřené dvě záložky, změna v druhé záložce zablokuje zápis, aby nedošlo k přepsání dat. Pro přenos mezi zařízeními je nutné exportovat a importovat JSON. Režim anonymního prohlížení, vymazání dat webu nebo změna zařízení mohou záznamy odstranit; pravidelně zálohujte.</p><div class="actions">${button('Stáhnout JSON zálohu','export')}${button('Export doménových dat HMK','export-kernel-all')}${button('Stáhnout diagnostiku','export-diagnostic')}${button('Nouzová kopie původního úložiště','export-raw')}<label>Importovat JSON zálohu<input type="file" id="import-file" accept=".json,application/json"></label><label>Přidat jednu postavu ze zálohy<input type="file" id="import-character-file" accept=".json,application/json"></label></div><div class="notice error">Import nahradí aktuální lokální data. Před importem si stáhněte zálohu.</div></div>`}
+function backupView(){const summary={characters:data.characters.length,archived:data.trash.length,items:allCatalogItems().length,inventory:data.inventory.length,journal:data.journal.length};return `<h2>Zálohy a obnova</h2>${cloudPanel()}${!storageReadOnly?inventoryProvenancePanel():''}${storageReadOnly?'<div class="notice error">Načtení úložiště selhalo. Standardní záloha je zablokována; nejdříve stáhněte nouzovou kopii původních dat.</div>':''}<div class="panel"><div class="equipment-summary"><strong>Kontrola místních záznamů</strong><div>Aktivní postavy: ${summary.characters} · archiv: ${summary.archived}</div><div>Celkem položek knihovny: ${summary.items} · vestavěné HMK: ${BUILTIN_ITEMS.length} · inventář: ${summary.inventory} · deník: ${summary.journal}</div><div>Stav zápisu: ${storageReadOnly?'ZABLOKOVÁN':'Připraven'}</div></div><p><strong>Datový formát:</strong> v1 (kompatibilní se staršími verzemi). Umístění vybavení je nepovinné pole; staré položky se zobrazí jako nezařazené.</p><p>Bez připojení GitHub Cloud se data ukládají jen lokálně v tomto prohlížeči (localStorage). Pokud jsou otevřené dvě záložky, změna v druhé záložce zablokuje zápis, aby nedošlo k přepsání dat. S připojeným GitHub Cloud se změny synchronizují online a bez ručního JSON importu. Režim anonymního prohlížení, vymazání dat webu nebo změna zařízení mohou záznamy odstranit; pravidelně zálohujte.</p><div class="actions">${button('Stáhnout JSON zálohu','export')}${button('Export doménových dat HMK','export-kernel-all')}${button('Stáhnout diagnostiku','export-diagnostic')}${button('Nouzová kopie původního úložiště','export-raw')}<label>Importovat JSON zálohu<input type="file" id="import-file" accept=".json,application/json"></label><label>Přidat jednu postavu ze zálohy<input type="file" id="import-character-file" accept=".json,application/json"></label></div><div class="notice error">Import nahradí aktuální lokální data. Před importem si stáhněte zálohu.</div></div>`}
 // Encounter preparation is deliberately non-destructive: no changes to character records or rules kernel.
 function selectedEncounterCharacters(){return data.characters.filter(c=>encounterSelection.has(c.id))}
 function encounterPayload(){
@@ -5725,7 +5771,7 @@ function editor(title,obj,kind){return `<div class="panel"><h2>${esc(title)}</h2
 let sheetEditingId=null; // only an ephemeral UI flag, never persisted
 let overlay=null;
 const g04Actions=createG04ActionWizards({getDocument:()=>data,getBaseline:()=>storageBaseline,
- getStorage:()=>localStorage,getStorageKey:()=>STORAGE,getSessionStorage:()=>sessionStorage,
+ getStorage:()=>cloudStorage,getStorageKey:()=>STORAGE,getSessionStorage:()=>sessionStorage,
  newId:()=>uuid(),onChange:()=>render(),available:()=>!storageReadOnly&&
   ![guidedAttackSession,guidedMountedSession,guidedTurnSession,guidedDeclaredSession,
    guidedSpatialSession,guidedTraumaSession,guidedBloodSession,guidedRecoverySession].some(Boolean)&&
@@ -5821,7 +5867,7 @@ document.addEventListener('submit',event=>{
  if(storageReadOnly){alert('Úložiště je v read-only stavu. Žádný fyzický hod neopakujte.');return}
  const v=Object.fromEntries(new FormData(form));
  try{
-  const args={document:data,characterId:v.characterId,eventId:uuid(),storage:localStorage,
+  const args={document:data,characterId:v.characterId,eventId:uuid(),storage:cloudStorage,
    key:STORAGE,baseline:storageBaseline,gmConfirmed:v.gmConfirmed==='on'};
   let result;
   if(form.id==='hmk-fear-exposure-form')result=persistFearExposure({...args,
@@ -7715,7 +7761,7 @@ document.addEventListener('submit',event=>{
   if(!agenda.due.some(x=>x.characterId===characterId&&x.kind===kind&&
    (aural||decodeURIComponent(x.sourceId.split(':')[0])===trait)))throw Error('Kalendář nyní tento test nepovoluje');
   const args={document:data,characterId,eventId:uuid(),diceOrigin,gmConfirmed:true,
-   storage:localStorage,key:STORAGE,baseline:storageBaseline};
+   storage:cloudStorage,key:STORAGE,baseline:storageBaseline};
   const result=aural?persistSpellAuralRecovery({...args,gameDay,d100:die,gmConfirmedDayElapsed:true}):
    schedule?persistSpellPsycheRecoverySchedule({...args,trait,periodStartDay:gameDay,d6:die,gmConfirmedStartDay:true}):
    persistSpellPsycheRecoveryRoll({...args,trait,gameDay,d100:die,gmConfirmedIntervalElapsed:true});
@@ -7735,7 +7781,7 @@ document.addEventListener('submit',e=>{
   if(!due.some(x=>x.kind==='psyche-manifestation'&&x.characterId===actorId&&x.trait===trait))throw Error('Nástup Psyche Traitu ještě není splatný');
   if(combatInitiativeSequence?.active)throw Error('Nejdříve dokončete probíhající Initiative');
   const result=persistSpellPsycheManifestation({document:data,characterId:actorId,trait,eventId:uuid(),
-   gmConfirmed:true,gmConfirmedTenMinutesElapsed:true,storage:localStorage,key:STORAGE,baseline:storageBaseline});
+   gmConfirmed:true,gmConfirmedTenMinutesElapsed:true,storage:cloudStorage,key:STORAGE,baseline:storageBaseline});
   if(!result.ok||!result.document)throw Error('Změnu nelze trvale uložit; stav postavy zůstává beze změny');
   data=validate(result.document);storageBaseline=result.serialized;
   notice='Nástup Psyche '+trait+' byl uložen do stavu postavy a její historie.';render();
@@ -8517,7 +8563,7 @@ document.addEventListener('submit',e=>{
    }else throw Error('Neplatný požadovaný typ casting úspěchu');
   }
   validate(stage.nextDocument);
-  const result=persist({stage,document:data,storage:localStorage,key:STORAGE,baseline:storageBaseline});
+  const result=persist({stage,document:data,storage:cloudStorage,key:STORAGE,baseline:storageBaseline});
   if(!result.ok){if(result.readOnly)storageReadOnly=true;
    throw Error('Atomický zápis odmítnut ('+result.code+'); neopakujte hod naslepo');}
   data=validate(result.document);storageBaseline=result.serialized;
@@ -13594,3 +13640,46 @@ document.addEventListener('focusout',event=>{
 },true);
 document.addEventListener('keydown',event=>{if(event.key==='Escape')hmkHideJournalTooltip();},true);
 document.addEventListener('scroll',()=>{if(hmkJournalTooltipTarget)hmkHideJournalTooltip();},true);
+
+// Private GitHub cloud controls. This UI never asks users to upload/download JSON.
+document.addEventListener('submit',async e=>{
+ if(e.target?.id!=='hmk-cloud-connect-form')return;
+ e.preventDefault();const form=e.target;
+ const owner=String(new FormData(form).get('owner')||'').trim();
+ const repo=String(new FormData(form).get('repo')||'').trim();
+ const token=String(new FormData(form).get('token')||'').trim();
+ const btn=form.querySelector('button[type=submit]');if(btn)btn.disabled=true;
+ try{const result=await cloudSync.connect({owner,repo,accessToken:token});
+  if(result.needsCreate)alert('Soukromý repozitář je dostupný, ale cloudová databáze neexistuje. Klikněte „Vytvořit první cloudovou databázi“.');
+  else if(result.conflict)alert('Konflikt dat: místní změny byly zachovány. Prohlédněte si stav v Cloud a zálohy.');
+  else if(result.ready){form.querySelector('[name=token]').value='';render();}
+ }catch(err){alert('GitHub Cloud: '+err.message)}
+ finally{if(btn)btn.disabled=false;const box=document.querySelector('[data-cloud-status]');if(box)box.textContent=cloudStatusLabel()+(cloudSync.issue?' · '+cloudSync.issue:'');}
+},true);
+document.addEventListener('click',async e=>{
+ const b=e.target.closest?.('[data-cloud-action]');if(!b)return;e.preventDefault();
+ const action=b.dataset.cloudAction;
+ try{
+  if(action==='create'){
+   const form=document.querySelector('#hmk-cloud-connect-form');
+   const values=new FormData(form);const owner=String(values.get('owner')||'').trim(),repo=String(values.get('repo')||'').trim(),token=String(values.get('token')||'').trim();
+   if(!confirm('Zapsat tento místní stav postav a kampaní do soukromého repozitáře '+owner+'/'+repo+'? Pouze pokud tam cloudová databáze dosud neexistuje.'))return;
+   const outcome=await cloudSync.connect({owner,repo,accessToken:token,createIfMissing:true});
+   if(outcome.ready)alert('Cloudové úložiště bylo vytvořeno. Otevřete stejný soukromý repozitář na druhém zařízení.');
+  }
+  if(action==='retry')await cloudSync.flush();
+  if(action==='refresh')await cloudSync.refresh();
+  if(action==='replace'){
+   if(!confirm('POZOR: místní neodeslané změny budou nahrazeny verzí uloženou na GitHubu. Chcete opravdu pokračovat?'))return;
+   await cloudSync.replaceWithCloud();
+  }
+  if(action==='disconnect'){
+   if(!confirm('Odpojit toto zařízení od cloudu? Další zápisy budou jen místní. Neodeslané změny se tím neodešlou.'))return;
+   cloudSync.disconnect();
+  }
+  render();
+ }catch(err){alert('GitHub Cloud: '+err.message);render()}
+},true);
+cloudSync.startup();
+setInterval(()=>{if(document.visibilityState==='visible')void cloudSync.refresh();},30000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void cloudSync.refresh()});
