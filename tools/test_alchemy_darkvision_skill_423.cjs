@@ -35,6 +35,10 @@ function make(c='C'){
 }
 const x=make();let query={journal:x.j,campaignId:'C',minute:x.minute,actorId:'B'};
 const at=(more={})=>K.darkvisionSkillContext({...query,...more});
+eq(K.darkvisionSkillEvidence(query),true);
+eq(K.darkvisionSkillEvidence({...query,actorId:'A'}),false);
+eq(K.darkvisionSkillEvidence({...query,campaignId:'OTHER'}),false);
+eq(K.darkvisionSkillEvidence({...query,minute:0}),false);
 const noEffect=K.darkvisionSkillContext({...query,actorId:'A'});
 eq(noEffect,{applies:false,modifier:0,sourceIds:[],rangeFeet:0});
 eq(K.darkvisionSkillContext({...query,campaignId:'OTHER'}).applies,false);

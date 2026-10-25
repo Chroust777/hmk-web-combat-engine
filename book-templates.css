@@ -4595,3 +4595,27 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-calendar .hc-provision-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
 .content-calendar .hc-provision-choices>button{min-height:32px;line-height:1.25;font-size:12px;flex:auto}
 @media(max-width:560px){.content-calendar .hc-provision-choices{grid-template-columns:1fr}}
+
+/* v93.481 – uniform vellum tables / legible EML across Secondary, SV and
+   Assistance. Override legacy dark skill-workbench declarations at every depth. */
+.content-sheet .journal-book--skills .folio-chapter-content :is(.hsk-test-card,.hsk-special-container,.hsk-calculation,.hsk-eml,.hsk-gm-controls,.hsk-sv-guide,.hsk-opposition-toggle,.hsk-secondary-timing,.hsk-sr-activity,.hsk-sv-extras,.hsk-verdict-section,.hsk-verdict-chip,.hsk-value-display,.hsk-result-slot,.hsk-special-commits) {
+ background:rgba(222,185,127,.075)!important;
+ border-color:rgba(120,82,40,.35)!important;
+ color:#46301f!important;
+ box-shadow:none!important;
+ text-shadow:none!important;
+}
+.content-sheet .journal-book--skills .folio-chapter-content :is(.hsk-test-card h3,.hsk-test-card h4,.hsk-special-container summary,.hsk-sv-guide strong,.hsk-gm-controls summary,.hsk-verdict-section h4,.hsk-verdict>h3,.hsk-special-commits h4){color:#613c24!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(min(100%,110px),1fr))!important;gap:0!important;border:1px solid rgba(120,82,40,.4)!important;border-right:0!important;border-bottom:0!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace :is(.hsk-eml-chip,.hsk-eml-total){display:flex!important;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0!important;max-width:none!important;margin:0!important;padding:8px 10px!important;gap:5px!important;border:0!important;border-bottom:1px solid rgba(120,82,40,.4)!important;border-right:1px solid rgba(120,82,40,.4)!important;border-radius:0!important;background:transparent!important;color:#1e405c!important;box-shadow:none!important;text-shadow:none!important;font:700 17px/1.2 Georgia,serif!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-total{background:rgba(223,196,151,.33)!important;color:#103a56!important;font-weight:800!important;white-space:normal!important;word-break:normal!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-total::first-line{color:#103a56!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-chip small{color:#633d23!important;font:600 12px/1.3 Georgia,serif!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-chip b{font:700 18px/1.2 Georgia,serif!important;color:#1a4465!important}
+.content-sheet .journal-book--skills .folio-chapter-content :is(.hsk-calculation,.hsk-sv-guide,.hsk-value-display,.hsk-result-slot,.hsk-opposition-toggle){border-radius:0!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-sv-outcomes{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr))!important;gap:0!important;border:1px solid rgba(120,82,40,.35)!important;border-bottom:0!important;border-right:0!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-sv-outcomes span{border-radius:0!important;background:transparent!important;border:0!important;border-bottom:1px solid rgba(120,82,40,.35)!important;border-right:1px solid rgba(120,82,40,.35)!important;color:#47301e!important;margin:0!important;padding:7px!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-tabs{gap:4px!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-tabs button{background:rgba(229,207,169,.6)!important;border:1px solid rgba(120,82,40,.4)!important;color:#54351f!important;box-shadow:none!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-tabs button[data-skill-active="yes"]{background:#bda078!important;color:#332012!important;font-weight:700!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-special-actor{margin:4px 0 9px!important;padding:6px 0;border-bottom:1px solid rgba(120,82,40,.25);color:#5b3a24!important;font-size:13px}

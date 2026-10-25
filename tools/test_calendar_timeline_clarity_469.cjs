@@ -37,6 +37,6 @@ const assert=require('node:assert/strict');const path=require('node:path'),fs=re
  ok(app.includes('journal-log-archive'),'archive control');
  ok(app.includes('cashLogs=account?'),'campaign cash receipts appear only in character logbook');
  ok(app.includes("archive.open=true"),'deep links expand archive');
- ok(app.includes("const APP_VERSION='93.480'"),'new version');
+ ok(app.includes("const APP_VERSION='93.481'"),'new version');
  console.log('PASS '+n+' timeline filters, event layout, archive checks');
 })().catch(e=>{console.error(e);process.exitCode=1});

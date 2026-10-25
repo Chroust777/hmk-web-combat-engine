@@ -7,6 +7,18 @@ import {activeDarkvision} from './hmk-alchemy-imbibing.js';
 import {darkvisionHealingState} from './hmk-alchemy-darkvision-healing.js';
 
 const requireTrue=(v,message)=>{if(!v)throw Error(message)};
+/** Only display Darkvision-specific GM controls if the selected character has
+ * a documented active dose or still-unrecovered CF effect. Never infer access
+ * from occupation or an unrelated character's journal entries. */
+export function darkvisionSkillEvidence({journal=[],campaignId,minute,actorId}={}){
+ if(!campaignId||!actorId||!Number.isSafeInteger(minute))return false;
+ if(activeDarkvision(journal,campaignId,actorId,minute).length)return true;
+ return journal.some(j=>j.calendarCampaignId===campaignId&&j.campaignMinute<=minute&&
+  ((j.calendarAlchemyImbibing?.elixirName==='Darkvision'&&j.calendarAlchemyImbibing?.targetId===actorId&&
+    j.calendarAlchemyImbibing?.illEffect?.kind==='vision-light-penalty'&&j.calendarAlchemyImbibing.finalAS>0)||
+   (j.calendarAlchemyDarkvisionProfusionIll?.targetId===actorId&&j.calendarAlchemyDarkvisionProfusionIll?.illEffect?.kind==='vision-light-penalty'))&&
+  !darkvisionHealingState(journal,campaignId,j.id,minute).recovered);
+}
 export function darkvisionSkillContext({journal=[],campaignId,minute,actorId,visionUse='',light='',distanceFeet=null,auralShockLevels=0}={}){
  requireTrue(typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&
   Number.isSafeInteger(minute)&&minute>=0&&minute<=1e9,'Darkvision: neplatný kontext kampaně či času');

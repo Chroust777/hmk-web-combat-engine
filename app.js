@@ -246,7 +246,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.480';
+const APP_VERSION='93.481';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -282,7 +282,7 @@ function currentUiRoute(){
 }
 function restoreUiRoute(route){
  view=route.view;selected=route.selected??selected;overlay=null;
- sheetEditingId=null;hazardComposer=null;lastCombatEvent=null;
+ sheetEditingId=null;hazardComposer={actorId:null,kind:null};lastCombatEvent=null;
  if(view==='sheet')activeSheetSection=route.sheetSection||'overview';
  if(view==='calendar'){
   // Switching an actual campaign is a persisted GM action, never navigation undo.
@@ -1977,7 +1977,7 @@ function hskSleeplessPanel(actorId){
 function hazardsView(actorId){
  const actor=character(actorId);if(!actor)return '<section class="panel wide"><p>Nejprve otevřete deník konkrétní postavy.</p></section>';
  const h=characterHazardAccess(persistentStateOf(actor));
- const mode=hazardComposer.actorId===actor.id?hazardComposer.kind:null;
+ const mode=hazardComposer?.actorId===actor.id?hazardComposer.kind:null;
  const triggers=[['fire','Oheň / kouř'],['poison','Nová otrava'],['disease','Nová nemoc'],['sleep','Nedostatek spánku']];
  return `<section class="panel wide panel--chapter"><h3>Nebezpečí a jejich následky · ${esc(actor.name)}</h3>
  <p class="notice">Tyto situace mohou nastat u jakékoli postavy, nezávisle na povolání. Bez doloženého nebezpečí se žádná nemoc, otrava ani trauma nezakládá. Kalendář hlídá termíny; zde se používá původní Combat State.</p>
@@ -1992,7 +1992,7 @@ function hazardsView(actorId){
 }
 function skillWorkbenchView(){
  const actor=character(selected)??data.characters[0];if(actor&&selected!==actor.id)selected=actor.id;if(!actor)return journalChapterShell('Skills','Skill testy ve stejném stylu deníku.',`<section class="panel"><h2>Skill Tests</h2><p>Nejprve vytvořte postavu.</p><button data-nav="characters">Přejít do registru</button></section>`,`journal-book--skills`);
- return journalChapterShell('Skills','Skill testy, výpočty a navazující následky v jednotném vzhledu Keeper’s Ledger.',skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null)+`<section class="panel wide"><h3>Navazující nehody a stavové následky</h3><p>Climbing, Swimming a jiné Skills mohou vyvolat nehodu. Oheň, kouř, otrava a nemoc však mohou nastat i bez Skill Testu, proto se vyhodnocují v záložce Nebezpečí / Trauma v deníku příslušné postavy. Výsledky se zapisují do Combat State a deníku postavy.</p><button type="button" data-nav="hazards">⚠ Otevřít Nebezpečí / Trauma v deníku postavy</button></section>`,`journal-book--skills`);
+ return journalChapterShell('Skills','Skill testy a výpočty vybrané postavy; skutečná nebezpečí a jejich následky se řeší výhradně v jejím deníku.',skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null,campaignKey(data.campaignClock)),`journal-book--skills`);
 }
 function charactersView(){
  const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));
