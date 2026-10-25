@@ -158,5 +158,22 @@
 .hsk-falling-help ol{padding-left:1.45rem;line-height:1.6}
 .hsk-falling-help li{margin:.4rem 0}
 .hsk-falling-guide{border:1px solid #a78d5f;border-left:4px solid #f1ce93;border-radius:6px;margin:.8rem 0;padding:.9rem;line-height:1.55}
-.hsk-fall-warning{color:#ffd4a0}
+.hsk-fall-warning{color:#211a11;background:#f6d9a0;border-radius:4px;padding:.1rem .35rem;line-height:1.65;display:inline-block}
 .hsk-falling-guide p{margin:.5rem 0}
+
+/* v93.484: rule-specific controls occupy stable rows, not misaligned labels. */
+.hsk-sensory-rules{margin:.6rem 0;border:1px solid #56675a;border-radius:7px;padding:.45rem .7rem}
+.hsk-sensory-rules summary{font-weight:650;cursor:pointer}
+.hsk-sensory-grid,.hsk-fall-row>.hsk-form-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.hsk-sensory-grid label,.hsk-fall-row label{min-width:0;overflow-wrap:anywhere;align-self:start}
+.hsk-fall-row{background:#25312c;border:1px solid #75826d;border-radius:8px;padding:.85rem;margin:.85rem 0}
+.hsk-fall-row legend{color:#f6e7be;font-weight:700;padding:0 .3rem}
+.hsk-climb-fall .hsk-form-grid label input,.hsk-climb-fall .hsk-form-grid label select{width:100%;min-width:0;box-sizing:border-box}
+.hsk-climb-fall .hsk-form-grid label .hc-small{display:block;margin-top:.3rem;width:100%;max-width:18rem}
+.hsk-skill-rule-explainer{font-size:.91rem;line-height:1.5;padding:.6rem .85rem;border:1px solid #7d7656;border-radius:7px;background:#263329;margin:.75rem 0 1rem}
+.hsk-skill-rule-explainer strong{color:#f0d5a3}
+.hsk-skill-rule-explainer p{margin:.35rem 0 0}
+.hsk-critical-next{border:1px solid #8a7a56;border-radius:7px;background:#233029;padding:.85rem;margin:.9rem 0}
+.hsk-critical-next>label{display:block;max-width:100%}
+.hsk-critical-next input[type=number],.hsk-critical-next select{width:100%;max-width:100%;box-sizing:border-box}
+@media(max-width:670px){.hsk-sensory-grid,.hsk-fall-row>.hsk-form-grid{grid-template-columns:minmax(0,1fr)}}

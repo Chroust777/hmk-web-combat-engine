@@ -114,12 +114,10 @@ export function prepareClimbingFallingSequence({actor,inventory,state,fallHeight
   const strikeImpact=step.strikeImpact;
   const armour={armourValue:step.armourValue};
   const eml=step.rawEML;
-  const physicalDice=[{faces:10,value:r.impactD10,source:'GM-entered-physical-die'},
-   {faces:10,value:r.zoneD10,source:'GM-entered-physical-die'},
-   {faces:10,value:r.locationD10,source:'GM-entered-physical-die'},
-   {faces:100,value:r.fallingD100,source:'GM-entered-physical-die'},
-   ...(r.shockD100==null?[]:[{faces:100,value:r.shockD100,source:'GM-entered-physical-die'}]),
-   ...(r.compoundD10==null?[]:[{faces:10,value:r.compoundD10,source:'GM-entered-physical-die'}])];
+  const rollProof=(key,faces)=>({faces,value:r[key],source:r.rollOrigins?.[key]==='cryptographic-software-die'?'cryptographic-software-die':'GM-entered-physical-die',field:key});
+  const physicalDice=[rollProof('impactD10',10),rollProof('zoneD10',10),rollProof('locationD10',10),rollProof('fallingD100',100),
+   ...(r.shockD100==null?[]:[rollProof('shockD100',100)]),
+   ...(r.compoundD10==null?[]:[rollProof('compoundD10',10)])];
   const result=woundFromFall({state:current,character:actor,round,timelineId,eventId:eventId+':impact:'+i,
    bodyKind:'human',location:loc.location,side:loc.side,locationShock:loc.locationShock,
    strikeImpact,AV:armour.armourValue,shockRoll:r.shockD100??null,compoundD10:r.compoundD10??null,

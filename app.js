@@ -246,7 +246,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.483';
+const APP_VERSION='93.484';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -853,7 +853,7 @@ function provisionCardHTML(c,compact=false){
  const water={label:covered?'Zajištěno GM':`${p.water.confirmedGallons} gal`,kind:covered||p.water.confirmedGallons>0?'okay':'risk'};
  const days=(n)=>n>0?`${n} ${n===1?'den':n<5?'dny':'dnů'}`:'0 dní';
  const alerts=p.illness.map(x=>x.kind==='thirst'?'Thirst HR'+x.hr:'Starvation HR'+x.hr);
- return `<article class="hc-provision-card hc-provision-card--compact${alerts.length?' hc-provision-card--alert':''}"><h4>${esc(c.name)}</h4>
+ return `<article class="hc-provision-card hc-provision-card--compact${alerts.length?' hc-provision-card--alert':''}"><h4>${compact?"Zásoby · jídlo a pití":esc(c.name)}</h4>
  <div class="hc-provision-indicators"><div class="hc-provision-indicator"><span class="hc-provision-mark hc-provision-mark--${food.kind}" aria-hidden="true"></span><div><strong>Jídlo · ${esc(food.label)}</strong><small>Výdrž nesených: ${esc(supplyDurationText(carry.foodMinutes))} · ${esc(carry.physicalFoodLb)} lb</small></div></div>
  <div class="hc-provision-indicator"><span class="hc-provision-mark hc-provision-mark--${water.kind}" aria-hidden="true"></span><div><strong>Pití · ${esc(water.label)}</strong><small>Výdrž nesených: ${esc(supplyDurationText(carry.waterMinutes))} · ${esc(carry.physicalWaterLb)} lb</small></div></div></div>
  ${alerts.length?`<p class="hc-provision-alert">Aktivní následek: ${esc(alerts.join(' · '))}</p>`:''}
@@ -906,18 +906,16 @@ function provisionQuickFoodFormHTML(actor,mode='buy'){
  ${bought?'<p class="hc-provision-quiet">Cena 2d / běžný den nebo 3d / trvanlivý den. Platba se odečte z hotovosti při potvrzení nákupu.</p>':`<label>Skutečný původ (potvrzuje GM)<input name="origin" maxlength="120" minlength="3" required placeholder="Např. zásoby ze statku"></label>`}
  <button type="submit">${bought?'Koupit a vložit do inventáře':'Potvrdit skutečné převzetí'}</button></form>`;
 }
-function provisionQuickWaterFormHTML(actor){
+function provisionQuickWaterFormHTML(actor,mode='buy'){
+ const bought=mode==='buy',cash=bought?cashForCharacter(actor):null;
  const clock=data.campaignClock,key=campaignKey(clock);
  const empty=data.inventory.filter(x=>x.characterId===actor.id&&x.slot==='carried'&&waterContainerCapacity(x)!==null&&
   waterskinBalances(data.journal,key,actor.id,clock.minute).filter(y=>y.itemId===x.id).reduce((sum,y)=>sum+y.remaining,0)===0);
  return `<section class="hc-provision-water-quick"><h4>Pitná voda · skutečně nesená</h4>
- <details class="hc-provision-vessel-purchase"><summary>Získat nádobu pro pitnou vodu</summary>
+ <details class="hc-provision-vessel-purchase"><summary><span>${bought?'Zakoupit':'Získat'} nádobu na pitnou vodu</span>${bought?`<small class="hc-provision-vessel-balance">Hotovost: <strong>${cash.ok?esc(cash.balance)+'d':'nelze ověřit'}</strong></small>`:''}</summary>
  <form data-provision-vessel-acquire class="hc-provision-quick-form"><input type="hidden" name="actorId" value="${esc(actor.id)}">
  <label>Nádoba podle katalogu HMK<select name="vesselId"><option value="hmk:gear:hmk-p120-040">Waterskin · 0,5 gal</option><option value="hmk:gear:hmk-p121-043">Jug · 1 gal</option></select></label>
- <label>Způsob získání<select name="acquisition" data-provision-vessel-mode><option value="buy">Koupit</option><option value="other">Získáno bez platby · doloží GM</option></select></label>
- <p class="hc-provision-cash" data-provision-vessel-cash>Hotovost: <strong>${(()=>{const cash=cashForCharacter(actor);return cash.ok?esc(cash.balance)+'d':'nelze ověřit';})()}</strong>. Cena se uplatní jen při nákupu.</p>
- <label data-provision-vessel-origin hidden>Skutečný původ získané nádoby<input name="origin" maxlength="120" placeholder="Např. dar od cestujícího"></label>
- <button type="submit">Získat fyzickou nádobu</button></form></details>
+ <button type="submit">${bought?'Zakoupit':'Převzít zdarma'} prázdnou nádobu</button></form></details>
  ${empty.length?`<form data-provision-water-quick class="hc-provision-quick-form"><input type="hidden" name="actorId" value="${esc(actor.id)}">
  <label>Prázdná nádoba<select name="itemId">${empty.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot.name)} · ${waterContainerCapacity(x)} gal / ${waterContainerCapacity(x)*10} lb vody</option>`).join('')}</select></label>
  <label>Skutečný zdroj pitné vody<input name="waterSource" minlength="2" maxlength="160" required placeholder="Např. hostinec, studna, potok"></label>
@@ -942,10 +940,10 @@ function provisionGuideHTML(participants){
  <button type="button" class="${!assured?'hc-provision-choice-active':'secondary'}" data-provision-assure="no" data-actor-id="${esc(actor.id)}" aria-pressed="${!assured}">Ne · řešit podle zásob</button></div>
  <small>${assured?'GM potvrdil průběžný přístup k jídlu a pití. Denní uzávěrka bude plně pokrytá, bez odečítání inventáře.':'Bez zajištění GM se při dalším posunu času spotřebují doložené vlastní zásoby a společné příděly. Je-li jich nedostatek, HMK vyhodnotí hlad a žízeň.'}</small></div>
  <div class="hc-provision-choices" role="group" aria-label="Jak získat zásoby">${options.map(([id,label])=>`<button type="button" class="${route===id?'hc-provision-choice-active':'secondary'}" data-provision-route="${id}" aria-pressed="${route===id}">${label}</button>`).join('')}</div>
- ${route==='have'?`<div class="hc-provision-compact-layout"><div class="hc-provision-single-summary">${personalProvisionQuickActionsHTML(actor)}</div><div class="hc-provision-compact-extra hc-provision-acquire-open">${provisionQuickFoodFormHTML(actor,'other')}${provisionQuickWaterFormHTML(actor)}</div></div>`:
+ ${route==='have'?`<div class="hc-provision-compact-layout"><div class="hc-provision-single-summary">${personalProvisionQuickActionsHTML(actor)}</div><div class="hc-provision-compact-extra hc-provision-acquire-open">${provisionQuickFoodFormHTML(actor,'other')}${provisionQuickWaterFormHTML(actor,'free')}</div></div>`:
  route==='forage'?`<p class="hc-provision-quiet">Získání potravy a pitné vody v přírodě určí Foraging nebo GM. Bez výsledku se zásoby nepřipíší.</p>${action}`:
- route==='buy'?`${provisionQuickFoodFormHTML(actor,'buy')}${provisionQuickWaterFormHTML(actor)}<p class="hc-provision-quiet">Cenu samotné vody HMK v katalogu neuvádí; případný poplatek určí GM. Nádoby se pořizují v Knihovně.</p><button type="button" data-provision-go="shop" class="secondary">Otevřít knihovnu vybavení ↗</button>`:
- `<p class="hc-provision-quiet">Jiný zdroj musí GM skutečně doložit. Žádné automatické vytvoření jídla ani vody.</p>${provisionQuickFoodFormHTML(actor,'other')}${provisionQuickWaterFormHTML(actor)}`}
+ route==='buy'?`${provisionQuickFoodFormHTML(actor,'buy')}${provisionQuickWaterFormHTML(actor,'buy')}<p class="hc-provision-quiet">Cenu samotné vody HMK v katalogu neuvádí; případný poplatek určí GM. Nádoby se pořizují v Knihovně.</p><button type="button" data-provision-go="shop" class="secondary">Otevřít knihovnu vybavení ↗</button>`:
+ `<p class="hc-provision-quiet">Jiný zdroj musí GM skutečně doložit v Knihovně. Žádné automatické vytvoření jídla, nádob ani vody.</p>${provisionQuickFoodFormHTML(actor,'other')}`}
  </section>`;
 }
 
@@ -2478,7 +2476,8 @@ function journalBodyLocationsHTML(c){
  const suit=identifyWornPrintedSuit(data.inventory,c.id);
  const coverage=armourCoverageReport(c);
  const state=persistentStateOf(c);
- const wounds=[...(c.hmk?.injuries||[]),...(state.wounds||[])].filter((w,i,all)=>!w?.id||all.findIndex(x=>x?.id===w.id)===i);
+ // Prefer the single authoritative Combat State record over its legacy display mirror.
+ const wounds=[...(state.wounds||[]),...(c.hmk?.injuries||[])].filter((w,i,all)=>!w?.id||all.findIndex(x=>x?.id===w.id)===i);
  const codes=JOURNAL_ANATOMICAL_LOCATIONS.map(([code,name,shock])=>({code,name,shock}));
  // Each location is independent: an invalid article on SK must not blank the
  // verified AV of a cloth tunic on TX/AB. Invalid / absent coverage stays unknown.
@@ -4537,8 +4536,8 @@ function hmkLongtermHealingPanel(chars){
   }catch(error){return [`<p class="tiny">Curative · ${esc(c.name)} / ${esc(w.id)}: ${esc(error.message)}. Zdravotní hod bude zastaven.</p>`]}
  })) .join(''):'';
  return `<section class="panel"><h3>HMK · dlouhodobé léčení zranění (str. 177–182)</h3>${herbHints}<p class="muted">Pro každou ránu samostatně. Léčení vyžaduje zastavené krvácení, ukončený Extended Shock, potvrzený den a skutečné hody. Další léčitel musí mít vyšší Physician Index. Aktivní infekce přerušuje Healing Rolls všech ran. Veškeré výsledky jsou trvale uloženy u postavy, nikoli odhadované podle bojových kol.</p>
- <div class="field-grid"><form id="hmk-treatment-form"><h4>Treatment Roll</h4>${fields}<label><input type="checkbox" name="untreated" value="yes"> Bez skutečného ošetření (vlastnosti CF; žádný vymyšlený d100)</label><label>Physician ML<input type="number" name="physicianML" min="0" max="200"></label><label>Physician Index<input type="number" name="physicianIndex" min="0" max="20"></label><label>Skutečný d100<input type="number" name="physicianRoll" min="1" max="100"></label><label>DEX Secondary Modifier při náročném Treatment<input type="number" name="dexSecondaryModifier" value="0" step="1"></label><label>Dostupné prostředky (vyberte pouze reálně přítomné)<select name="available" multiple size="4"><option value="water">Voda</option><option value="bandages">Obvazy</option><option value="needle-thread">Jehla a nit</option><option value="surgery-tools">Chirurgické nástroje</option></select></label><label><input type="checkbox" name="broadhead" value="yes"> Projectile Broadhead</label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil léčbu i dostupnost prostředků</label><button type="submit" ${woundOptions?'':'disabled'}>Potvrdit Treatment</button></form>
- <form id="hmk-healing-roll-form"><h4>Injury Healing Roll · každých 5 dní</h4>${fields}<label>Endurance<input type="number" name="endurance" min="1" max="40" required></label><label>Will<input type="number" name="will" min="1" max="40" required></label><label>Skutečný d100<input type="number" name="roll" min="1" max="100" required></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil splatnost pětidenního Healing Roll</label><button type="submit" ${woundOptions?'':'disabled'}>Trvale zapsat Healing Roll</button></form>
+ <div class="field-grid"><form id="hmk-treatment-form"><h4>Treatment Roll</h4>${fields}<label><input type="checkbox" name="untreated" value="yes"> Bez skutečného ošetření (vlastnosti CF; žádný vymyšlený d100)</label><label>Physician ML<input type="number" name="physicianML" min="0" max="200"></label><label>Physician Index<input type="number" name="physicianIndex" min="0" max="20"></label><label>Skutečný d100<input type="number" name="physicianRoll" min="1" max="100"></label><label>DEX Secondary Modifier při náročném Treatment<input type="number" name="dexSecondaryModifier" value="0" step="1"></label><label>Dostupné prostředky (vyberte pouze reálně přítomné)<select name="available" multiple size="4"><option value="water">Voda</option><option value="bandages">Obvazy</option><option value="needle-thread">Jehla a nit</option><option value="surgery-tools">Chirurgické nástroje</option></select></label><label><input type="checkbox" name="broadhead" value="yes"> Projectile Broadhead</label><button type="submit" ${woundOptions?'':'disabled'}>Potvrdit Treatment</button></form>
+ <form id="hmk-healing-roll-form"><h4>Injury Healing Roll · každých 5 dní</h4>${fields}<label>Endurance<input type="number" name="endurance" min="1" max="40" required></label><label>Will<input type="number" name="will" min="1" max="40" required></label><label>Skutečný d100<input type="number" name="roll" min="1" max="100" required></label><button type="submit" ${woundOptions?'':'disabled'}>Trvale zapsat Healing Roll</button></form>
  <form id="hmk-infection-course-form"><h4>Infection Course · každý den</h4>${infectionFields}${infectionResumptionFields}<label>Endurance<input type="number" name="endurance" min="1" max="40" required></label><label>Will<input type="number" name="will" min="1" max="40" required></label><label>Skutečný d100<input type="number" name="roll" min="1" max="100" required></label><label>Physician SV bonus<input type="number" name="physicianSV" value="0" step="1"></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil denní Course</label><button type="submit" ${woundOptions?'':'disabled'}>Trvale zapsat Infection Course</button></form>
  <form id="hmk-blood-regeneration-form"><h4>Blood Loss Regeneration · každých 10 dní</h4><label>Postava<select name="targetId">${chars.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>${field('daySinceBloodLoss','Dny od skutečné ztráty BP',10,'number')}${field('endurance','END',13,'number')}${field('roll','Skutečný d100','','number')}<label><input name="gmConfirmed" type="checkbox" value="yes" required> GM potvrdil časovou osu první ztráty BP a hody</label><button type="submit">Zapsat obnovu BP</button></form>
  <form id="hmk-grim-shock-form"><h4>Grim Wound · denní Location Shock</h4>${fields}${field('locationShock','Ověřený Location Shock',6,'number')}${field('shockML','Shock EML po Fatigue',60,'number')}${field('roll','Skutečný d100','','number')}<label><input name="gmConfirmed" type="checkbox" value="yes" required> GM ověřil denní Grim Wound Roll</label><button type="submit" ${woundOptions?'':'disabled'}>Trvale zapsat Grim Shock</button></form>
@@ -5875,7 +5874,7 @@ function enhanceHMKDiceFields(){
   const raw=label.textContent||'';
   const match=raw.match(/(?:^|[^a-zA-Z0-9])d(4|6|8|10|12|20|30|100)(?![0-9])/i);
   if(!match)continue;
-  const faces=Number(match[1]);if(!legal.has(faces)||Number(input.max)!==faces)continue;
+  const faces=Number(match[1]);if(!legal.has(faces)||(input.max!==''&&Number(input.max)!==faces))continue;
   const min=input.min===''?1:Number(input.min);if(!Number.isFinite(min)||min>1||min<0)continue;
   const b=document.createElement('button');b.type='button';b.className='hc-small';
   b.dataset.hmkGeneralAutoDie='true';b.dataset.hmkDieFaces=String(faces);
@@ -5888,10 +5887,16 @@ document.addEventListener('click',e=>{
  e.preventDefault();e.stopImmediatePropagation();
  const input=b.previousElementSibling,faces=Number(b.dataset.hmkDieFaces);
  if(!(input instanceof HTMLInputElement)||input.type!=='number'||input.disabled)return;
- try{const value=secureHMKDie(faces);input.value=String(value);
+ try{const value=secureHMKDie(faces);input.value=String(value);input.dataset.hmkAutoDice=input.value;
   input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
   b.textContent='⚄ d'+faces+' = '+value;
  }catch(err){alert('Automatický hod není dostupný: '+err.message);}
+},true);
+document.addEventListener('input',event=>{
+ const field=event.target;if(!(field instanceof HTMLInputElement)||field.type!=='number')return;
+ // User typing creates a trusted browser event; generated buttons dispatch an
+ // untrusted update after first marking the exact recorded value.
+ if(event.isTrusted&&field.dataset.hmkAutoDice)delete field.dataset.hmkAutoDice;
 },true);
 function render(){
  // Deny all paths to partially generated sheets, even routes that set view
@@ -6243,7 +6248,7 @@ function hskCriticalNextHTML(originalId,proof){
  }).join('');
 }
 function hskClimbingFallRow(i){
- return `<fieldset data-climb-fall-row class="hsk-fall-row"><legend>${i===0?'První dopad':'Opakovaný dopad po CF'} · HMK str. 67, kroky 1–4</legend><div class="field-grid">
+ return `<fieldset data-climb-fall-row class="hsk-fall-row"><legend>${i===0?'První dopad':'Opakovaný dopad po CF'} · HMK str. 67, kroky 1–4</legend><div class="hsk-form-grid">
  <label>d10 Impact<input type="number" name="impactD10" min="1" max="10" required></label>
  <label>d10 ZD – tělesná zóna<input type="number" name="zoneD10" min="1" max="10" required></label>
  <label>d10 LD – lokalita<input type="number" name="locationD10" min="1" max="10" required></label>
@@ -6265,7 +6270,6 @@ function hskClimbingFallForm(entry){
  <p>HMK str. 67 předepisuje výpočet zranění až pro pády <strong>nad 5 stop</strong>. Potvrď skutečnou výšku a polohu postavy; nevytváří se smyšlené zranění.</p>
  <div class="field-grid"><label>Výška (0–5 stop)<input name="heightFt" type="number" min="0" max="5" required></label>
  <label>Po dopadu je postava<select name="prone"><option value="yes">Prone – leží</option><option value="no">Stojí – GM potvrzeno</option></select></label></div>
- <label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil výšku a výslednou polohu postavy</label>
  <button type="submit">Uzavřít krátký pád bez zranění</button><output role="status" aria-live="polite"></output></form>
  <form class="hsk-climb-fall" data-climbing-fall-form>
  <input type="hidden" name="sourceId" value="${esc(entry.id)}">
@@ -6285,7 +6289,6 @@ function hskClimbingFallForm(entry){
  <div data-climb-fall-rows>${hskClimbingFallRow(0)}</div>
  <div data-climb-fall-guide class="hsk-falling-guide" role="status" aria-live="polite">Zadejte skutečnou výšku a první hody pro kontrolu povinných pokračování.</div>
  <button type="button" class="secondary" data-climb-fall-add>+ Další zranění, jestliže test dopadu skončil CF</button>
- <label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje výšku, povrch, anatomii, fyzické hody a skutečné vybavení postavy</label>
  <button type="submit">Vyhodnotit a trvale zapsat všechna zranění po pádu</button>
  <output class="hsk-followup-output" role="status" aria-live="polite"></output></form></div>`;
 }
@@ -6627,7 +6630,7 @@ function hskClimbingFallGuide(form){
     (step.stunnedPenalty?' (původně '+step.rolledSL+', při STN −1 Success Level podle HMK 169)':'')+'. '+
     'Lokalita '+esc(step.location)+(step.side?' / '+(step.side==='left'?'levá':'pravá'):'')+
     ', Impact '+step.strikeImpact+' − AV '+step.armourValue+' = <b>'+step.effectiveImpact+'</b>'+
-    ', zranění '+(step.injury||'žádné')+'.';
+    '. Klasifikace poranění se zobrazí až po potvrzení celé Falling Routine.';
    const requirements=[];
    if(step.needsShock){if(row.shockD100===null)requirements.push('POTŘEBA Shock d100');}
    else if(row.shockD100!==null)requirements.push('Shock d100 musí být prázdný – účinný Impact není kladný');
@@ -6650,7 +6653,7 @@ function hskClimbingFallGuide(form){
     if(i===fallRows.length-1)bits.push('<strong class="hsk-fall-warning">Test dopadu skončil CF: přidejte další CELÝ dopad (nové d10 Impact, ZD, LD a d100). Samotný Compound d10 nestačí.</strong>');
    }else{
     if(i<fallRows.length-1)bits.push('<strong class="hsk-fall-warning">Další řada je nadbytečná: poslední test nebyl CF. Odeberte ji.</strong>');
-    else bits.push('<strong>Všechny řady mají doložené hody; můžete potvrdit GM a uložit.</strong>');
+    else bits.push('<strong>Všechny povinné hody jsou doložené; úplné zranění uloží až tlačítko Vyhodnotit a trvale zapsat.</strong>');
     break;
    }
   }catch(error){bits.push(prefix+'<strong class="hsk-fall-warning">'+esc(error.message)+'</strong>');break;}
@@ -6667,7 +6670,7 @@ document.addEventListener('click',event=>{
  const add=event.target.closest('[data-climb-fall-add]');
  if(add){const form=add.closest('[data-climbing-fall-form]'),rows=form?.querySelector('[data-climb-fall-rows]');if(!rows)return;
   const n=rows.querySelectorAll('[data-climb-fall-row]').length;if(n>=20)return alert('Nejvýše 20 následných zranění; další zpracování vyžaduje GM');
-  rows.insertAdjacentHTML('beforeend',hskClimbingFallRow(n));hskClimbingFallGuide(form);return;}
+  rows.insertAdjacentHTML('beforeend',hskClimbingFallRow(n));enhanceHMKDiceFields();hskClimbingFallGuide(form);return;}
  const rem=event.target.closest('[data-climb-fall-remove]');if(rem){const form=rem.closest('[data-climbing-fall-form]');rem.closest('[data-climb-fall-row]')?.remove();hskClimbingFallGuide(form);}
 },true);
 document.addEventListener('submit',event=>{
@@ -6684,7 +6687,7 @@ document.addEventListener('submit',event=>{
    prone:form.elements.namedItem('prone').value==='yes',
    round:Math.max(1,combatClock.round||1,persistentStateOf(actor).lastRound||0),
    eventId:'climbing-fall:'+sourceId,timelineId:'skill-falling:'+sourceId,
-   gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
+   gmConfirmed:true});
   const details={type:'climbing-falling',sourceId,actorId:actor.id,originSkill:proof.skill,page:67,shortFall:true,
    fallHeightFt:fall.fallHeightFt,prone:fall.prone,proofs:[],physicalDice:[]};
   if(!mutate(()=>{synchronizeCombatInjuries(actor,fall.state);
@@ -6710,23 +6713,23 @@ document.addEventListener('submit',event=>{
   const rows=[...form.querySelectorAll('[data-climb-fall-row]')].map(row=>({
    impactD10:value(row,'impactD10',true),zoneD10:value(row,'zoneD10',true),locationD10:value(row,'locationD10',true),
    technique:row.querySelector('[name="technique"]').value,fallingD100:value(row,'fallingD100',true),
-   shockD100:value(row,'shockD100',true),compoundD10:value(row,'compoundD10',true)}));
+   shockD100:value(row,'shockD100',true),compoundD10:value(row,'compoundD10',true),rollOrigins:Object.fromEntries(['impactD10','zoneD10','locationD10','fallingD100','shockD100','compoundD10'].map(key=>{const field=row.querySelector('[name="'+key+'"]');return [key,field?.dataset.hmkAutoDice===field?.value?'cryptographic-software-die':'GM-entered-physical-die'];}))}));
   const id='climbing-fall:'+sourceId;
   const report=prepareClimbingFallingSequence({actor,inventory:data.inventory,state:persistentStateOf(actor),
    fallHeightFt:Number(form.elements.namedItem('heightFt').value),originSkill:follow.skill,surface:form.elements.namedItem('surface').value,
    slope:form.elements.namedItem('slope').value,
    direction:form.elements.namedItem('direction').value,rows,round:Math.max(1,combatClock.round||1,persistentStateOf(actor).lastRound||0),
-   timelineId:'skill-falling:'+sourceId,eventId:id,gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
+   timelineId:'skill-falling:'+sourceId,eventId:id,gmConfirmed:true});
   const body='Falling Routine HMK str. 67 · pád '+report.fallHeightFt+' ft · '+report.surface+' · '+report.slope+'\n'+
    report.proofs.map((p,i)=>'Dopad '+(i+1)+': '+p.location+', Impact '+p.impact+', AV '+p.armourValue+', efekt '+p.effectiveImpact+
     ', '+p.fallingTechnique+' d100 '+p.fallingD100+' / EML '+p.fallingEML+' → '+p.level+', Shock '+(p.shock||'—')).join('\n')+
    '\nProne: '+(report.prone?'ano':'ne');
   const evidence={type:'climbing-falling',sourceId,actorId:actor.id,originSkill:follow.skill,page:67,fallHeightFt:report.fallHeightFt,
-   surface:report.surface,slope:report.slope,direction:report.direction,proofs:report.proofs,prone:report.prone,physicalDice:report.physicalDice};
+   surface:report.surface,slope:report.slope,direction:report.direction,proofs:report.proofs,prone:report.prone,physicalDice:report.physicalDice,status:'committed'};
   if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='climbing-falling'&&x.skillTestProof.sourceId===sourceId))throw Error('Duplicitní pád');
    synchronizeCombatInjuries(actor,report.state);
    data.journal.push({id:uuid(),characterId:actor.id,title:'Pád po '+follow.skill+' · HMK str. 67',body,createdAt:stamp(),skillTestProof:evidence});}))throw Error('Transakce nebyla uložena');
-  const target=document.querySelector('[data-climbing-fall-form]');if(target)target.replaceWith(Object.assign(document.createElement('p'),{textContent:'Falling Routine byla potvrzena; zranění je nyní součástí Combat State a historie.'}));
+  const target=document.querySelector('[data-climbing-fall-form]');if(target)target.replaceWith(Object.assign(document.createElement('p'),{textContent:'Falling Routine dokončena a uložena. Potvrzená zranění najdete v Character Sheet → Combat & Conditions i v tabulce Body Locations.'}));
  }catch(error){if(out)out.textContent='Pád nebyl zapsán: '+error.message;}
 },true);
 document.addEventListener('submit',event=>{
@@ -10112,12 +10115,6 @@ document.addEventListener('submit',e=>{
 },true);
 // v93.483 — acquire ONLY the two witnessed HMK water vessels in the
 // original Library/inventory/cash ledger; an empty vessel is not drinking water.
-document.addEventListener('change',e=>{
- const field=e.target.closest?.('[data-provision-vessel-mode]');if(!field)return;
- const form=field.closest('form[data-provision-vessel-acquire]');const origin=form?.querySelector('[data-provision-vessel-origin]');
- if(origin){origin.hidden=field.value!=='other';const input=origin.querySelector('input');if(input)input.required=field.value==='other';}
- const cash=form?.querySelector('[data-provision-vessel-cash]');if(cash)cash.hidden=field.value!=='buy';
-},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-provision-vessel-acquire]'))return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -10126,14 +10123,14 @@ document.addEventListener('submit',e=>{
   const clock=data.campaignClock,actor=calendarMemberIds(clock,data.characters).find(c=>c.id===provisionGuideActorId)||calendarMemberIds(clock,data.characters)[0];
   const v=Object.fromEntries(new FormData(form));
   if(!actor||actor.id!==v.actorId)throw Error('Nádoba nepatří právě vybrané postavě');
-  const id=String(v.vesselId||''),mode=String(v.acquisition||''),reason=String(v.origin||'').trim();
-  if(!['hmk:gear:hmk-p120-040','hmk:gear:hmk-p121-043'].includes(id)||!['buy','other'].includes(mode))throw Error('Vyberte doloženou nádobu HMK');
-  if(mode==='other'&&(reason.length<3||reason.length>120))throw Error('GM musí uvést skutečný původ nádoby');
+  const id=String(v.vesselId||''),mode=provisionGuideRoute==='buy'?'buy':'other',reason='Vlastní zásoby · bezplatné převzetí';
+  if(!['have','buy','other'].includes(provisionGuideRoute)||!['hmk:gear:hmk-p120-040','hmk:gear:hmk-p121-043'].includes(id))throw Error('Vyberte doloženou nádobu HMK');
+  if(mode==='other'&&provisionGuideRoute==='other')throw Error('Jiný zdroj vyžaduje doložené převzetí v Knihovně; osobní Vlastní zásoby zůstávají zdarma');
   const source=item(id),offer=source&&libraryPurchaseOffer(source),cost=offer?.pricePence;
   const draft=source?{sourceItemId:id,snapshot:structuredClone(source),quantity:1,slot:'carried'}:null;
   if(!draft||waterContainerCapacity(draft)===null||!Number.isSafeInteger(cost)||offer.quantity!==1)throw Error('Nádoba nemá doložený katalog, hmotnost nebo cenu');
   if(mode==='buy')prepareLibraryPurchase(actor,cost,activeCampaignCashKey(actor));
-  if(!ask(mode==='buy'?`Koupit ${source.name} za ${cost}d pro ${actor.name}?`:`GM potvrzuje převzetí ${source.name} (${reason}) pro ${actor.name}?`))return;
+  if(!ask(mode==='buy'?`Koupit ${source.name} za ${cost}d pro ${actor.name}?`:`Převzít prázdnou nádobu ${source.name} zdarma do vlastních zásob ${actor.name}?`))return;
   if(mutate(()=>{
    const live=character(actor.id),campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
    if(!live||minute!==clock.minute||activeCampaignCashKey(live)===undefined||combatInitiativeSequence)throw Error('Změna kampaně či postavy');
@@ -11281,7 +11278,7 @@ document.addEventListener('submit',e=>{
   if(split<1)throw Error('Chybí platná rána');
   const c=character(raw.slice(0,split)),woundId=raw.slice(split+2);
   if(!c||!encounterSelection.has(c.id))throw Error('Postava není v aktuálním střetnutí');
-  const args={state:persistentStateOf(c),round:combatClock.round,eventId:uuid(),woundId,daySinceInjury:Number(v.daySinceInjury),gmConfirmed:v.gmConfirmed==='yes'};
+  const args={state:persistentStateOf(c),round:combatClock.round,eventId:uuid(),woundId,daySinceInjury:Number(v.daySinceInjury),gmConfirmed:f.id==='hmk-infection-course-form'?v.gmConfirmed==='yes':true};
   confirmCalendarWoundDay(c.id,woundId,args.daySinceInjury);
   // Historical Curative evidence is read from THIS calendar and THIS wound.
   // The health resolver validates it again before modifying the original EML.
@@ -11888,7 +11885,7 @@ document.addEventListener('change',async e=>{if(e.target.matches?.('form[data-li
 const HMK_ATTRIBUTES={PHYSICAL:[['str','Strength'],['end','Endurance'],['dex','Dexterity'],['agl','Agility'],['per','Perception'],['cml','Comeliness']],MENTAL:[['aur','Aura'],['wil','Will'],['rea','Reasoning'],['cre','Creativity'],['emp','Empathy'],['elo','Eloquence']]};
 const HMK_IDENTITY=[['folk','Folk'],['ageGroup','Age group'],['birthdate','Birthdate'],['sunsign','Sunsign'],['birthplace','Birthplace'],['society','Society'],['socialClass','Social class'],['familyOccupation','Parent occupation'],['background','Background'],['estrangement','Estrangement'],['morality','Morality'],['psyche','Psyche'],['home','Home'],['standing','Standing'],['complexion','Complexion'],['hair','Hair'],['eyes','Eyes'],['height','Height'],['weight','Weight'],['handedness','Handedness']];
 function numericField(key,label,val){return `<label>${esc(label)}<input type="number" step="1" min="0" max="999" name="${esc(key)}" value="${esc(val??'')}"></label>`}
-function hmkSheet(c){const h=c.hmk||{};return `<section class="panel wide"><h3>Zranění a stav postavy</h3><p class="muted">Záznamy jsou evidenční, nikoli výpočet šoku, krvácení nebo léčby. Ty musí zůstat pod kontrolou HMK jádra.</p>${(h.injuries||[]).map(x=>`<div class="list-row"><div><b>${esc(x.location)}</b> · ${esc(x.description)} <span class="muted">${esc(x.severity)}</span></div><div class="actions"><button class="secondary" data-edit-injury="${esc(x.id)}">Upravit</button><button class="danger" data-remove-injury="${esc(x.id)}">Odstranit</button></div></div>`).join('')}<form id="hmk-injury-form"><div class="field-grid">${field('location','Lokalita zásahu')}${field('severity','Závažnost / označení')}${field('description','Popis poranění')}</div><button type="submit">Zapsat zranění</button></form></section>`}
+function hmkSheet(c){const h=c.hmk||{},live=persistentStateOf(c),authoritative=new Set(live.wounds.map(w=>w.id));return `<section class="panel wide"><h3>Zranění a stav postavy · Combat State</h3><p class="muted">Autoritativní potvrzené rány z Combat State, včetně lokality, závažnosti, Shock, Bleeder a léčení. Rozpracované náhledy zde nejsou.</p><p><strong>Shock: ${esc(live.shock)}</strong> · Krvácení: ${live.wounds.filter(w=>w.bleeding&&!w.healed).length} · Potvrzených ran: ${live.wounds.length}</p>${live.wounds.map(w=>`<div class="list-row"><div><b>${esc(w.location.toUpperCase())}${w.side?' / '+esc(w.side):''} · ${esc(w.severity+w.level)}</b> · ${esc(w.aspect)} · ${w.bleeding?'Bleeder · ':''}${w.healed?'ZHOJENO':w.healing?.infected?'INFEKCE':w.healing?.treated?'léčeno · další den '+esc(w.healing.nextHealingDay??'—'):'čeká na Treatment'} <small>${esc(w.id)}</small></div></div>`).join('')||'<p>Žádná potvrzená fyzická rána.</p>'}<details><summary>Starší ruční evidenční záznamy · oddělené od Combat State</summary>${(h.injuries||[]).filter(x=>!authoritative.has(x.id)).map(x=>`<div class="list-row"><div><b>${esc(x.location)}</b> · ${esc(x.description)} <span class="muted">${esc(x.severity)}</span></div><div class="actions"><button class="secondary" data-edit-injury="${esc(x.id)}">Upravit</button><button class="danger" data-remove-injury="${esc(x.id)}">Odstranit</button></div></div>`).join('')||'<p>Žádné.</p>'}</details><form id="hmk-injury-form"><div class="field-grid">${field('location','Lokalita zásahu')}${field('severity','Závažnost / označení')}${field('description','Popis poranění')}</div><button type="submit">Zapsat zranění</button></form></section>`}
 function parseStructuredModes(raw){
  if(!String(raw||'').trim())return [];
  let x;try{x=JSON.parse(raw)}catch{throw Error('Režimy zbraně: neplatný JSON')}

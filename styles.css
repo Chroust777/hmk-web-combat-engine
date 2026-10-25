@@ -442,3 +442,9 @@ form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;
 .hmk-cloud-panel .hmk-cloud-remember{grid-column:1/-1;display:flex;align-items:flex-start;gap:.55rem;margin:.35rem 0 0;line-height:1.35;}
 .hmk-cloud-panel .hmk-cloud-remember input[type="checkbox"]{flex:0 0 auto;width:1.05rem;height:1.05rem;margin:.06rem 0 0;padding:0;accent-color:#aa8652;}
 .hmk-cloud-panel #hmk-cloud-connect-form>p.tiny{grid-column:1/-1;margin:.15rem 0 .35rem;line-height:1.5;}
+
+/* v93.484 · compact water-vessel acquisition header in both routes */
+.hc-provision-vessel-purchase{border:1px solid #b9a784;border-radius:7px;margin:.55rem 0;padding:.35rem .65rem}
+.hc-provision-vessel-purchase>summary{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.45rem;cursor:pointer;font-weight:700}
+.hc-provision-vessel-balance{white-space:nowrap;font-size:.9rem;font-weight:400;opacity:.9}
+.hc-provision-vessel-purchase>.hc-provision-quick-form{margin:.5rem 0 .3rem}
