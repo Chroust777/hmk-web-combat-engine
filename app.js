@@ -246,7 +246,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.481';
+const APP_VERSION='93.482';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -737,12 +737,13 @@ function main(){
  if(view==='creation')body=creationBookView();
  if(view==='library')body=libraryView();
  if(view==='trash')body=trashView();
+ if(view==='gmhistory')body=gmHistoryView();
  if(view==='backup')body=backupView();
  if(view==='calendar')body=campaignCalendarView();
  if(view==='skills')body=skillWorkbenchView();
  if(view==='encounter')body=encounterView();
  const scene=activeVisualScene();
- const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['backup','☁','Cloud a zálohy'],['trash','♧','Archiv']];
+ const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['gmhistory','▤','GM · Historie činností'],['backup','☁','Cloud a zálohy'],['trash','♧','Archiv']];
  const characterButtons=data.characters.map(c=>{const ready=characterJournalReadiness(c).ready;return `<button type="button" class="castle-character ${c.id===selected?'active':''} ${ready?'':'castle-character--draft'}" ${ready?'data-open':'data-resume-creation'}="${esc(c.id)}" title="${ready?'Otevřít deník':'Pokračovat v pravidlové tvorbě'}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`;}).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
@@ -753,7 +754,7 @@ function main(){
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character"><span class="castle-create-symbol" aria-hidden="true">✣</span><span class="castle-create-label">Vytvořit postavu</span><span class="castle-create-plus" aria-hidden="true">＋</span></button>
   <div class="castle-sidebar-footer"><button type="button" data-nav="backup" class="hmk-cloud-sidebar" data-cloud-sidebar title="Stav synchronizace">${esc(cloudStatusLabel())}</button><br>⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
- </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter','backup','trash'].includes(view)?' content-sheet':''}"><nav class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></nav>${cloudSync?.enabled&&!cloudSync.canWrite()?`<div class="notice error" data-cloud-block-banner>⚠ ${esc(cloudStatusLabel())}: herní zápisy jsou do připojení zablokované. <button type="button" data-nav="backup">Přejít k připojení</button></div>`:''}${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
+ </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter','backup','trash','gmhistory'].includes(view)?' content-sheet':''}"><nav class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></nav>${cloudSync?.enabled&&!cloudSync.canWrite()?`<div class="notice error" data-cloud-block-banner>⚠ ${esc(cloudStatusLabel())}: herní zápisy jsou do připojení zablokované. <button type="button" data-nav="backup">Přejít k připojení</button></div>`:''}${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
  <footer class="footer">HârnMaster Keeper’s Ledger · v${APP_VERSION} · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace</footer></div>`;
 }
 
@@ -870,12 +871,17 @@ function partyProvisionCardsHTML(participants,compact=false){
 function personalProvisionQuickActionsHTML(actor){
  const p=characterCarryProjection(data,actor.id),pool=partyProvisionsOverview(data).pooledForaging;
  if(!p.available)return '';
- const foodOptions=p.foodLots.filter(l=>l.remaining>=0.5).map(l=>`<option value="${esc(l.sourceId)}">${esc(l.name)} · ${l.remaining} dávek · ${l.remaining*3} lb</option>`).join('');
- const waterOptions=p.waterLots.filter(l=>l.remaining>=0.5).map(l=>`<option value="${esc(l.fillId)}">${l.remaining} gal · ${l.remaining*10} lb</option>`).join('');
- const discard=(unit,options)=>options?`<form data-provision-drop><input type="hidden" name="actorId" value="${esc(actor.id)}"><input type="hidden" name="unit" value="${unit}"><label>${unit==='food'?'Balík potravy':'Naplněná nádoba'}<select name="sourceId">${options}</select></label><label>Odložit množství<select name="quantity"><option value="0.5">0,5 ${unit==='food'?'dávky · 1,5 lb':'gal · 5 lb'}</option><option value="1">1 ${unit==='food'?'dávka · 3 lb':'gal · 10 lb'}</option></select></label><label>Důvod skutečného odložení<input name="reason" minlength="2" maxlength="160" required placeholder="Např. uloženo v táboře"></label><label class="hc-check"><input type="checkbox" name="confirmedByGM" value="yes" required> GM potvrzuje, že zásoba skutečně přestala být nesena.</label><button type="submit">Zapsat odložení · ${unit==='food'?'jídlo':'voda'}</button></form>`:'';
+ const foodLots=p.foodLots.filter(l=>l.remaining>=0.5),waterLots=p.waterLots.filter(l=>l.remaining>=0.5);
+ const discard=(unit,lots)=>{
+  if(!lots.length)return '';
+  const isFood=unit==='food';
+  const lotOptions=lots.map(l=>`<option value="${esc(isFood?l.sourceId:l.fillId)}" data-remaining="${esc(l.remaining)}">${esc(isFood?l.name:'Naplněná nádoba')} · ${l.remaining} ${isFood?'dávek':'gal'} · ${l.remaining*(isFood?3:10)} lb</option>`).join('');
+  const quantityOptions=(remaining)=>[0.5,1].filter(q=>q<=remaining).map(q=>`<option value="${q}">${q===0.5?'0,5':'1'} ${isFood?'dávky':'gal'} · ${q*(isFood?3:10)} lb</option>`).join('');
+  return `<form data-provision-drop><input type="hidden" name="actorId" value="${esc(actor.id)}"><input type="hidden" name="unit" value="${unit}"><label>${isFood?'Balík potravy':'Naplněná nádoba'}<select name="sourceId" data-provision-drop-source>${lotOptions}</select></label><label>Odložit množství<select name="quantity" data-provision-drop-quantity>${quantityOptions(lots[0].remaining)}</select></label><label>Důvod skutečného odložení<input name="reason" minlength="2" maxlength="160" required placeholder="Např. ponecháno v táboře"></label><button type="submit">Zapsat odložení · ${isFood?'jídlo':'voda'}</button></form>`;
+ };
  const shared=(pool?.foodDays>0||pool?.waterDays>0)?`<details class="hc-provision-compact-extra"><summary>Vydat denní dávku ze společných nálezů</summary><form data-provision-single-ration><input name="actorId" type="hidden" value="${esc(actor.id)}"><div class="hc-provision-inline-fields"><label>Potrava<select name="foodEach"><option value="0">0 dávek</option><option value="0.5">½ dávky · 1,5 lb</option><option value="1" selected>1 dávka · 3 lb</option></select></label><label>Voda<select name="waterEach"><option value="0">0 gal</option><option value="0.5">½ gal</option><option value="1" selected>1 gal</option><option value="2">2 gal</option></select></label></div><input type="hidden" name="confirmedByGM" value="yes"><button type="submit">Vydat pouze ${esc(actor.name)}</button></form><p class="hc-provision-help">Přidělení je denní spotřeba ze společných nálezů, nikoli přidání váhy do batohu.</p></details>`:'';
  return `<div class="hc-provision-actions-only"><div class="hc-provision-actions-caption">Odložení je skutečná změna nesené hmotnosti; převzetí společného přídělu se eviduje zvlášť.</div>
- ${foodOptions||waterOptions?`<details class="hc-provision-compact-extra"><summary>Odložit část nesených zásob · změna hmotnosti</summary><div class="hc-provision-drop-forms">${discard('food',foodOptions)}${discard('water',waterOptions)}</div><p class="hc-provision-help">Odložení je nevratný auditní odpis z osobní nesené zásoby v této kampani, nikoli automatické založení zásobníku tábora.</p></details>`:''}
+ ${foodLots.length||waterLots.length?`<details class="hc-provision-compact-extra"><summary>Odložit část nesených zásob · změna hmotnosti</summary><div class="hc-provision-drop-forms">${discard('food',foodLots)}${discard('water',waterLots)}</div><p class="hc-provision-help">Odložení je nevratný auditní odpis z osobní nesené zásoby v této kampani, nikoli automatické založení zásobníku tábora.</p></details>`:''}
  ${shared}</div>`;
 }
 function partyProvisionLedgerHTML(participants){
@@ -892,11 +898,12 @@ function partyProvisionLedgerHTML(participants){
  * ration receipts, never a detached nutrition counter or synthetic amount. */
 function provisionQuickFoodFormHTML(actor,mode='buy'){
  const bought=mode==='buy',typeLabel=bought?'Koupit příděly':'Doložit převzaté příděly';
+ const cash=bought?cashForCharacter(actor):null;
  return `<form data-provision-food-acquire class="hc-provision-quick-form"><input type="hidden" name="actorId" value="${esc(actor.id)}"><input type="hidden" name="mode" value="${mode}">
- <h4>${typeLabel} · ${esc(actor.name)}</h4><div class="hc-provision-inline-fields">
- <label>Druh přídělů<select name="rationType"><option value="hmk:gear:hmk-p120-027">Běžné · 2d / 3 lb</option><option value="hmk:gear:hmk-p120-026">Trvanlivé · 3d / 3 lb</option></select></label>
+ <h4>${typeLabel} · ${esc(actor.name)}</h4>${bought?`<p class="hc-provision-cash" data-provision-cash>Hotovost: <strong>${cash.ok?esc(cash.balance)+'d':'nelze ověřit'}</strong>${cash.ok?'':' · '+esc(cash.reason)}</p>`:''}<div class="hc-provision-inline-fields">
+ <label>Druh přídělů<select name="rationType"><option value="hmk:gear:hmk-p120-027">Běžné · ${bought?'2d / ':''}3 lb</option><option value="hmk:gear:hmk-p120-026">Trvanlivé · ${bought?'3d / ':''}3 lb</option></select></label>
  <label>Na kolik běžných dní?<select name="days">${[1,2,3,5,7].map(n=>`<option value="${n}">${n} d · ${n*24} h · ${n*3} lb jídla</option>`).join('')}</select></label></div>
- ${bought?'<p class="hc-provision-quiet">Nákup odečte tištěnou cenu z pokladny postavy a přidá skutečné balíky do inventáře.</p>':`<label>Skutečný původ (potvrzuje GM)<input name="origin" maxlength="120" minlength="3" required placeholder="Např. zásoby ze statku"></label>`}
+ ${bought?'<p class="hc-provision-quiet">Cena 2d / běžný den nebo 3d / trvanlivý den. Platba se odečte z hotovosti při potvrzení nákupu.</p>':`<label>Skutečný původ (potvrzuje GM)<input name="origin" maxlength="120" minlength="3" required placeholder="Např. zásoby ze statku"></label>`}
  <button type="submit">${bought?'Koupit a vložit do inventáře':'Potvrdit skutečné převzetí'}</button></form>`;
 }
 function provisionQuickWaterFormHTML(actor){
@@ -904,10 +911,17 @@ function provisionQuickWaterFormHTML(actor){
  const empty=data.inventory.filter(x=>x.characterId===actor.id&&x.slot==='carried'&&waterContainerCapacity(x)!==null&&
   waterskinBalances(data.journal,key,actor.id,clock.minute).filter(y=>y.itemId===x.id).reduce((sum,y)=>sum+y.remaining,0)===0);
  return `<section class="hc-provision-water-quick"><h4>Pitná voda · skutečně nesená</h4>
+ <details class="hc-provision-vessel-purchase"><summary>Získat nádobu pro pitnou vodu</summary>
+ <form data-provision-vessel-acquire class="hc-provision-quick-form"><input type="hidden" name="actorId" value="${esc(actor.id)}">
+ <label>Nádoba podle katalogu HMK<select name="vesselId"><option value="hmk:gear:hmk-p120-040">Waterskin · 0,5 gal</option><option value="hmk:gear:hmk-p121-043">Jug · 1 gal</option></select></label>
+ <label>Způsob získání<select name="acquisition" data-provision-vessel-mode><option value="buy">Koupit</option><option value="other">Získáno bez platby · doloží GM</option></select></label>
+ <p class="hc-provision-cash" data-provision-vessel-cash>Hotovost: <strong>${(()=>{const cash=cashForCharacter(actor);return cash.ok?esc(cash.balance)+'d':'nelze ověřit';})()}</strong>. Cena se uplatní jen při nákupu.</p>
+ <label data-provision-vessel-origin hidden>Skutečný původ získané nádoby<input name="origin" maxlength="120" placeholder="Např. dar od cestujícího"></label>
+ <button type="submit">Získat fyzickou nádobu</button></form></details>
  ${empty.length?`<form data-provision-water-quick class="hc-provision-quick-form"><input type="hidden" name="actorId" value="${esc(actor.id)}">
  <label>Prázdná nádoba<select name="itemId">${empty.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot.name)} · ${waterContainerCapacity(x)} gal / ${waterContainerCapacity(x)*10} lb vody</option>`).join('')}</select></label>
  <label>Skutečný zdroj pitné vody<input name="waterSource" minlength="2" maxlength="160" required placeholder="Např. hostinec, studna, potok"></label>
- <button type="submit">Potvrdit naplnění nádoby</button></form>`:`<p class="hc-provision-quiet">Žádná prázdná vhodná nádoba. Pořiď Waterskin (½ gal) či Jug (1 gal) v Knihovně, nebo spotřebuj již nesenou vodu.</p>`}
+ <button type="submit">Potvrdit naplnění nádoby</button></form>`:`<p class="hc-provision-quiet">Žádná prázdná vhodná nádoba. Vyberte nádobu výše, nebo spotřebujte již nesenou vodu.</p>`}
  <p class="hc-provision-quiet">Nádoba a voda jsou samostatné hmotnosti. Bez skutečného zdroje a nádoby se voda nepřidá.</p></section>`;
 }
 function provisionGuideHTML(participants){
@@ -928,7 +942,7 @@ function provisionGuideHTML(participants){
  <button type="button" class="${!assured?'hc-provision-choice-active':'secondary'}" data-provision-assure="no" data-actor-id="${esc(actor.id)}" aria-pressed="${!assured}">Ne · řešit podle zásob</button></div>
  <small>${assured?'GM potvrdil průběžný přístup k jídlu a pití. Denní uzávěrka bude plně pokrytá, bez odečítání inventáře.':'Bez zajištění GM se při dalším posunu času spotřebují doložené vlastní zásoby a společné příděly. Je-li jich nedostatek, HMK vyhodnotí hlad a žízeň.'}</small></div>
  <div class="hc-provision-choices" role="group" aria-label="Jak získat zásoby">${options.map(([id,label])=>`<button type="button" class="${route===id?'hc-provision-choice-active':'secondary'}" data-provision-route="${id}" aria-pressed="${route===id}">${label}</button>`).join('')}</div>
- ${route==='have'?`<div class="hc-provision-compact-layout"><div class="hc-provision-single-summary">${personalProvisionQuickActionsHTML(actor)}</div><details class="hc-provision-compact-extra"><summary>Doplnit doložené příděly postavy</summary>${provisionQuickFoodFormHTML(actor,'other')}${provisionQuickWaterFormHTML(actor)}</details></div>`:
+ ${route==='have'?`<div class="hc-provision-compact-layout"><div class="hc-provision-single-summary">${personalProvisionQuickActionsHTML(actor)}</div><div class="hc-provision-compact-extra hc-provision-acquire-open">${provisionQuickFoodFormHTML(actor,'other')}${provisionQuickWaterFormHTML(actor)}</div></div>`:
  route==='forage'?`<p class="hc-provision-quiet">Získání potravy a pitné vody v přírodě určí Foraging nebo GM. Bez výsledku se zásoby nepřipíší.</p>${action}`:
  route==='buy'?`${provisionQuickFoodFormHTML(actor,'buy')}${provisionQuickWaterFormHTML(actor)}<p class="hc-provision-quiet">Cenu samotné vody HMK v katalogu neuvádí; případný poplatek určí GM. Nádoby se pořizují v Knihovně.</p><button type="button" data-provision-go="shop" class="secondary">Otevřít knihovnu vybavení ↗</button>`:
  `<p class="hc-provision-quiet">Jiný zdroj musí GM skutečně doložit. Žádné automatické vytvoření jídla ani vody.</p>${provisionQuickFoodFormHTML(actor,'other')}${provisionQuickWaterFormHTML(actor)}`}
@@ -2965,7 +2979,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  const recent=visible.slice(0,10).map(renderLog).join('');
  const archived=visible.length>10?`<details class="journal-log-archive"><summary>Archiv · ${visible.length-10} starších záznamů</summary><div class="journal-log-archive-content">${visible.slice(10).map(renderLog).join('')}</div></details>`:'';
  const hiddenRecords=removed.length?`<details class="journal-log-archive journal-hidden-records"><summary>Skryté položky · ${removed.length} (obnovitelné)</summary>${removed.map(l=>`<div class="list-row"><span>${esc(l.title)}</span><button class="secondary" type="button" data-restore-log="${esc(l.id)}">Vrátit do logu</button></div>`).join('')}</details>`:'';
- return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${recent}${archived}${hiddenRecords}</section>${auditPanel}</div></section>`,`journal-book--chapter`)}
+ return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><button type="button" class="secondary" data-nav="gmhistory">▤ Společná historie GM ↗</button><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${recent}${archived}${hiddenRecords}</section>${auditPanel}</div></section>`,`journal-book--chapter`)}
  return '';
 }
 function sheetView(){
@@ -3301,6 +3315,28 @@ function libraryView(){
  ${selectedTab==='suits'?(suitRows.length?'':'<p class="empty">Nenalezen žádný komplet.</p>'):(list.rows.length?libraryPageBar(list):'<p class="empty">Žádné položky neodpovídají filtru.</p>')}
  <details class="library-rules-details"><summary>Správa vlastního katalogu · import / export</summary><p class="tiny muted">Import nemění již uložené inventáře ani definice HMK.</p><div class="actions">${button('Exportovat vlastní katalog JSON','export-catalog')}<label>Importovat katalog<input type="file" id="import-catalog-file" accept=".json,application/json"></label></div></details>`}
  </div>`,`journal-book--library`);
+}
+/** Read-only GM index over ORIGINAL authoritative evidence; no copy and no
+ * synthetic action history. Old entries and cash purchases are displayed
+ * with their original source paths; this page never writes game data. */
+function gmHistoryView(){
+ const names=new Map([...data.characters,...data.trash].map(c=>[c.id,c.name]));
+ const entries=(data.journal||[]).map(j=>({...j,origin:'journal'}));
+ for(const c of data.characters){
+  for(const account of Object.values(c.hmk?.campaignCashAccounts||{})){
+   for(const x of account.purchases||[])entries.push({id:'cash-purchase:'+x.id,characterId:c.id,createdAt:x.at||'',campaignMinute:x.campaignMinute,title:'Nákup · '+(x.label||'vybavení'),body:'−'+x.amountPence+'d',origin:'cash'});
+   for(const x of account.adjustments||[])entries.push({id:'cash-adjustment:'+x.id,characterId:c.id,createdAt:x.at||'',campaignMinute:x.campaignMinute,title:'Úprava hotovosti',body:(x.deltaPence>=0?'+':'')+x.deltaPence+'d · '+(x.reason||''),origin:'cash'});
+  }
+ }
+ entries.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))||(b.campaignMinute??-1)-(a.campaignMinute??-1));
+ const row=j=>{
+  const name=names.get(j.characterId)||'GM / svět',ref=!!names.get(j.characterId),proof=j.skillTestProof;
+  const procedure=proof?'skills':j.origin==='cash'?'gear':j.calendarInventoryRationStock||j.calendarInventoryWaterFill||j.calendarInventoryRationLoss||j.calendarInventoryWaterLoss||j.calendarNutritionPolicy||j.calendarForagingSupplyUse?'provisions':null;
+  return `<tr><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(j.title||'Událost')}</strong><details><summary>Podrobnosti</summary>${esc(j.body||'Bez popisu')}</details></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(j.characterId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(j.characterId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr>`;
+ };
+ const table=rows=>`<div class="hc-provision-table-scroll"><table class="hc-provision-table gm-history-table"><thead><tr><th>Čas</th><th>Postava</th><th>Událost</th><th>Otevřít</th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>`;
+ return journalChapterShell('GM · Historie činností',`${entries.length} doložených záznamů postav a kampaní`,
+ `<section class="panel"><h3>Společný přehled skutečných událostí</h3><p class="muted">Zobrazuje původní deníkové doklady všech postav a finanční historii. Nemaže je ani nevytváří nové. „Osobní záznam“ otevře konkrétní položku v Notes & Logbook; „Procedura“ je dostupná jen u rozpoznaného původního pravidlového záznamu.</p>${table(entries.slice(0,30))}${entries.length>30?`<details><summary>Starší události · ${entries.length-30}</summary>${table(entries.slice(30))}</details>`:''}</section>`,'journal-book--gm-history');
 }
 function trashView(){return journalChapterShell('Archiv postav','Archivované profily zůstávají zachované spolu s inventářem a historií.',`<section class="panel folio-archive-list"><h3>Archivované postavy</h3><p class="muted">Obnovení postavu vrátí do registru. Trvalé smazání vyžaduje samostatné potvrzení.</p>${data.trash.length?data.trash.map(c=>`<div class="folio-archive-row"><div class="folio-archive-identity"><b>${esc(c.name)}</b><span>${esc(c.occupation||'Bez povolání')}</span></div><div class="actions folio-archive-actions"><button data-restore="${esc(c.id)}">Obnovit</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-purge="${esc(c.id)}">Definitivně smazat</button></div></div>`).join(''):'<div class="empty">Archiv je prázdný.</div>'}</section><section class="panel folio-archive-info"><h3>Evidence archivu</h3><dl class="folio-archive-metrics"><div><dt>Archivované postavy</dt><dd>${data.trash.length}</dd></div><div><dt>Aktivní postavy</dt><dd>${data.characters.length}</dd></div></dl><p class="muted">Archivace nepřepisuje deník ani inventář postavy. Obnovení ji vrátí do registru.</p><button type="button" class="secondary" data-nav="characters">Otevřít registr postav</button></section>`,'journal-book--archive')}
 function readinessReport(c){
@@ -10066,6 +10102,43 @@ document.addEventListener('submit',e=>{
   if(committed)notice=`Postava ${actor.name} získala ${qty} fyzických dávek jídla (${qty*3} lb). Potvrzená spotřeba a čas zůstaly beze změny.`;
  }catch(err){alert('Pořízení zásob: '+err.message)}
 },true);
+// v93.482 — acquire ONLY the two witnessed HMK water vessels in the
+// original Library/inventory/cash ledger; an empty vessel is not drinking water.
+document.addEventListener('change',e=>{
+ const field=e.target.closest?.('[data-provision-vessel-mode]');if(!field)return;
+ const form=field.closest('form[data-provision-vessel-acquire]');const origin=form?.querySelector('[data-provision-vessel-origin]');
+ if(origin){origin.hidden=field.value!=='other';const input=origin.querySelector('input');if(input)input.required=field.value==='other';}
+ const cash=form?.querySelector('[data-provision-vessel-cash]');if(cash)cash.hidden=field.value!=='buy';
+},true);
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-provision-vessel-acquire]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(view!=='calendar'||activeCalendarSection!=='provisions'||provisionScope!=='person'||combatInitiativeSequence)throw Error('Nádobu pořizujte pro vybranou postavu mimo Initiative.');
+  const clock=data.campaignClock,actor=calendarMemberIds(clock,data.characters).find(c=>c.id===provisionGuideActorId)||calendarMemberIds(clock,data.characters)[0];
+  const v=Object.fromEntries(new FormData(form));
+  if(!actor||actor.id!==v.actorId)throw Error('Nádoba nepatří právě vybrané postavě');
+  const id=String(v.vesselId||''),mode=String(v.acquisition||''),reason=String(v.origin||'').trim();
+  if(!['hmk:gear:hmk-p120-040','hmk:gear:hmk-p121-043'].includes(id)||!['buy','other'].includes(mode))throw Error('Vyberte doloženou nádobu HMK');
+  if(mode==='other'&&(reason.length<3||reason.length>120))throw Error('GM musí uvést skutečný původ nádoby');
+  const source=item(id),offer=source&&libraryPurchaseOffer(source),cost=offer?.pricePence;
+  const draft=source?{sourceItemId:id,snapshot:structuredClone(source),quantity:1,slot:'carried'}:null;
+  if(!draft||waterContainerCapacity(draft)===null||!Number.isSafeInteger(cost)||offer.quantity!==1)throw Error('Nádoba nemá doložený katalog, hmotnost nebo cenu');
+  if(mode==='buy')prepareLibraryPurchase(actor,cost,activeCampaignCashKey(actor));
+  if(!ask(mode==='buy'?`Koupit ${source.name} za ${cost}d pro ${actor.name}?`:`GM potvrzuje převzetí ${source.name} (${reason}) pro ${actor.name}?`))return;
+  if(mutate(()=>{
+   const live=character(actor.id),campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
+   if(!live||minute!==clock.minute||activeCampaignCashKey(live)===undefined||combatInitiativeSequence)throw Error('Změna kampaně či postavy');
+   if(mode==='buy')prepareLibraryPurchase(live,cost,campaignId);
+   const actual=item(id),p=libraryPurchaseOffer(actual),invId=uuid(),txId=uuid(),createdAt=stamp();
+   if(!actual||p?.pricePence!==cost||waterContainerCapacity({sourceItemId:id,snapshot:actual,quantity:1})===null)throw Error('Předmět již neodpovídá katalogu HMK');
+   data.inventory.push({id:invId,characterId:actor.id,sourceItemId:id,snapshot:structuredClone(actual),quantity:1,currentWQ:null,condition:'',slot:'carried',acquisition:{mode:mode==='buy'?'buy':'free',transactionId:txId,at:createdAt,pricePence:mode==='buy'?cost:0,campaignId,campaignMinute:minute}});
+   if(mode==='buy')recordCampaignCashPurchase(live,{campaignId,minute,id:txId,at:createdAt,amountPence:cost,label:actual.name,inventoryIds:[invId],purchasedItems:[{inventoryId:invId,sourceItemId:id,quantity:1,snapshot:structuredClone(actual)}]});
+   data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignId,campaignMinute:minute,createdAt,
+    title:mode==='buy'?'HMK · nákup prázdné nádoby':'HMK · převzetí prázdné nádoby',body:`${actual.name} · ${mode==='buy'?cost+'d':'zdroj: '+reason}; bez vody a bez posunu času`});
+  }))notice=`Postava ${actor.name} získala prázdnou nádobu. Vodu musí doložit zvlášť.`;
+ }catch(err){alert('Pořízení nádoby: '+err.message)}
+},true);
 // Water stays a genuine vessel fill; no virtual water or guessed water prices.
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-provision-water-quick]'))return;
@@ -10118,13 +10191,26 @@ document.addEventListener('submit',e=>{
   const fd=new FormData(form),actorId=String(fd.get('actorId')||'');
   if(!member||member.id!==actorId)throw Error('Odložení se netýká právě zvolené postavy');
   const params={actorId,quantity:Number(fd.get('quantity')),eventId:uuid(),campaignId:campaignKey(clock),
-   minute:clock.minute,reason:String(fd.get('reason')||''),confirmedByGM:fd.get('confirmedByGM')==='yes',createdAt:stamp()};
+   minute:clock.minute,reason:String(fd.get('reason')||''),confirmedByGM:true,createdAt:stamp()};
   const unit=String(fd.get('unit')||''),sourceId=String(fd.get('sourceId')||'');
+  const current=characterCarryProjection(data,actorId);
+  const matching=(unit==='food'?current.foodLots:current.waterLots).find(l=>(unit==='food'?l.sourceId:l.fillId)===sourceId);
+  if(!matching||!Number.isFinite(params.quantity)||params.quantity<0.5||params.quantity>matching.remaining)throw Error('Odložené množství přesahuje skutečně nesené zásoby.');
+  if(!ask(`Opravdu odložit ${params.quantity} ${unit==='food'?'dávky jídla':'gal vody'} postavy ${member.name}? Tím klesne nesená hmotnost.`))return;
   const next=unit==='food'?recordPhysicalRationLoss(data,{...params,sourceId}):
    unit==='water'?recordPhysicalWaterLoss(data,{...params,fillId:sourceId}):null;
   if(!next)throw Error('Neznámý druh zásoby');
   if(mutate(()=>{data.journal=next.journal;}))notice='Doložená zásoba byla odložena, snížila se její projektovaná nesená hmotnost. Čas GM beze změny.';
  }catch(error){alert('Odložení se neprovedlo: '+error.message)}
+},true);
+// v93.482 — never offer a larger physical write-off than the selected lot holds.
+document.addEventListener('change',e=>{
+ const source=e.target.closest?.('[data-provision-drop-source]');if(!source)return;
+ const form=source.closest('form[data-provision-drop]'),quantity=form?.querySelector('[data-provision-drop-quantity]');if(!quantity)return;
+ const remaining=Number(source.selectedOptions[0]?.dataset.remaining||0),food=form.querySelector('[name="unit"]')?.value==='food';
+ const old=Number(quantity.value);quantity.replaceChildren();
+ for(const q of [0.5,1]){if(q>remaining)continue;const option=document.createElement('option');option.value=String(q);option.textContent=(q===0.5?'0,5':'1')+(food?' dávky · ':' gal · ')+(q*(food?3:10))+' lb';quantity.append(option);}
+ if([...quantity.options].some(o=>Number(o.value)===old))quantity.value=String(old);
 },true);
 // v93.470 — UI-only choice of provenance. Does not assert possession,
 // trigger a test, change campaign time or allocate shared Foraging lots.
@@ -10187,6 +10273,22 @@ document.addEventListener('click',e=>{
  if(!current&&!cash)return alert('Položka nepatří vybrané postavě.');
  if(button.dataset.hideLog){if(!ask('Skrýt tuto položku z osobního logu? Pravidlový důkaz zůstane uložen a položku lze vrátit.'))return;mutate(()=>logbookHideEntry(data,selected,id));}
  else mutate(()=>logbookRestoreEntry(data,selected,id));
+},true);
+document.addEventListener('click',e=>{
+ const t=e.target.closest?.('[data-gm-history-open],[data-gm-history-procedure]');if(!t)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const actorId=t.dataset.gmHistoryOpen||t.dataset.gmHistoryActor;
+ if(!character(actorId))return alert('Postava již není aktivní; historický záznam zůstává v přehledu GM.');
+ selected=actorId;
+ if(t.dataset.gmHistoryProcedure==='skills'){view='skills';activeSkillTab='secondary';render();return;}
+ if(t.dataset.gmHistoryProcedure==='gear'){view='sheet';activeSheetSection='inventory';render();return;}
+ if(t.dataset.gmHistoryProcedure==='provisions'){
+  if(!data.campaignClock||!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===actorId))return alert('Postava není členem právě otevřené kampaně.');
+  view='calendar';calendarLanding=false;activeCalendarSection='provisions';provisionScope='person';provisionGuideActorId=actorId;render();return;
+ }
+ view='sheet';activeSheetSection='notes';render();
+ const row=[...document.querySelectorAll('[data-journal-entry]')].find(el=>el.dataset.journalEntry===t.dataset.gmHistoryEntry);
+ if(row){for(let p=row.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;row.querySelector('details')?.setAttribute('open','');row.scrollIntoView({block:'center',behavior:'instant'});}
 },true);
 document.addEventListener('click',e=>{const t=e.target.closest('[data-action],[data-nav],[data-open],[data-copy],[data-archive],[data-remove-inv],[data-delete-log],[data-edit-item],[data-copy-item],[data-delete-item],[data-restore],[data-purge],[data-delete-character],[data-export-character]');if(!t)return;
 if(t.dataset.exportCharacter){if(storageReadOnly)return alert('Nečitelná data: použijte nouzovou zálohu.');try{const pkg=characterPackage(t.dataset.exportCharacter);downloadJSON(pkg,'hmk-postava-'+safeFilename(pkg.character.name)+'.json')}catch(err){alert(err.message)}return}

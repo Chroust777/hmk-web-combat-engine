@@ -4619,3 +4619,13 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .journal-book--skills .folio-chapter-content .hsk-tabs button{background:rgba(229,207,169,.6)!important;border:1px solid rgba(120,82,40,.4)!important;color:#54351f!important;box-shadow:none!important}
 .content-sheet .journal-book--skills .folio-chapter-content .hsk-tabs button[data-skill-active="yes"]{background:#bda078!important;color:#332012!important;font-weight:700!important}
 .content-sheet .journal-book--skills .folio-chapter-content .hsk-special-actor{margin:4px 0 9px!important;padding:6px 0;border-bottom:1px solid rgba(120,82,40,.25);color:#5b3a24!important;font-size:13px}
+
+/* v93.482: primary EML modifiers appear as distinct vellum cells, with a
+   visible equals sign before the computed, high-contrast EML result. */
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace{display:flex!important;flex-wrap:wrap!important;align-items:stretch!important;gap:5px!important;border:0!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip{flex:1 1 94px!important;min-width:90px!important;max-width:175px!important;border:1px solid rgba(117,77,38,.5)!important;border-radius:3px!important;background:rgba(248,224,178,.43)!important;padding:8px 10px!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-total{position:relative;flex:0 1 auto!important;min-width:110px!important;margin-left:22px!important;border:2px solid #805c2e!important;border-radius:3px!important;background:rgba(222,191,138,.6)!important;color:#123c5b!important;white-space:nowrap!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-total::before{content:'=';position:absolute;left:-21px;top:50%;transform:translateY(-50%);font:700 21px Georgia,serif;color:#5c3a1e}
+.gm-history-table td{vertical-align:top;font-size:13px}.gm-history-table td:nth-child(3){min-width:170px}.gm-history-table .gm-history-links{white-space:nowrap}.gm-history-links button{font-size:11px!important;padding:5px!important;margin:0 3px 3px 0!important}
+.hc-provision-cash{padding:8px;border:1px solid rgba(117,77,38,.38);background:rgba(233,205,161,.27)}
+.hc-provision-acquire-open{margin-top:9px}.hc-provision-vessel-purchase{margin:8px 0;border:1px solid rgba(117,77,38,.33);padding:7px}
