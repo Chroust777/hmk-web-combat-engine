@@ -6,6 +6,55 @@
 export const CLOUD_CONFIG_KEY='hmk-cloud-github-config-v1';
 export const CLOUD_PENDING_KEY='hmk-cloud-github-pending-v1';
 export const CLOUD_SESSION_KEY='hmk-cloud-github-session-v1';
+export const CLOUD_DEVICE_TOKEN_KEY='hmk-cloud-github-device-token-v1';
+const DEVICE_KEY_DB='hmk-github-device-token-key-v1';
+/**
+ * Browser-only, opt-in device credential. The ciphertext is in localStorage;
+ * a non-extractable AES-GCM CryptoKey is structured-cloned into IndexedDB.
+ * This prevents a localStorage export from exposing the token. Any malicious
+ * script executing on this origin could still use the key: this is NOT a
+ * replacement for secure origin, XSS prevention, or OAuth with a backend.
+ */
+export function createGitHubDeviceTokenVault({localStorage,indexedDBImpl=globalThis.indexedDB,cryptoImpl=globalThis.crypto}={}){
+ const format=1;
+ function has(){return !!localStorage.getItem(CLOUD_DEVICE_TOKEN_KEY)}
+ function clear(){localStorage.removeItem(CLOUD_DEVICE_TOKEN_KEY)}
+ function bytesB64(bytes){let t='';for(const b of bytes)t+=String.fromCharCode(b);return btoa(t)}
+ function b64Bytes(str){return Uint8Array.from(atob(str),ch=>ch.charCodeAt(0))}
+ function openDB(){return new Promise((resolve,reject)=>{
+  if(!indexedDBImpl||!cryptoImpl?.subtle||!cryptoImpl?.getRandomValues){reject(Error('Prohlížeč nepodporuje bezpečné uložení tokenu (IndexedDB / Web Crypto).'));return;}
+  let req;try{req=indexedDBImpl.open(DEVICE_KEY_DB,1)}catch(e){reject(e);return;}
+  req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('keys'))req.result.createObjectStore('keys');};
+  req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||Error('IndexedDB nelze otevřít'));
+ });}
+ async function getKey(create){
+  const db=await openDB();
+  try{
+   const key=await new Promise((resolve,reject)=>{const tx=db.transaction('keys','readonly');const r=tx.objectStore('keys').get('device');r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)});
+   if(key||!create)return key;
+   const fresh=await cryptoImpl.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+   await new Promise((resolve,reject)=>{const tx=db.transaction('keys','readwrite');tx.objectStore('keys').put(fresh,'device');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)});
+   return fresh;
+  }finally{db.close();}
+ }
+ async function save({owner,repo,token}){
+  if(typeof token!=='string'||!token.trim()||!validRepo(owner,repo))throw Error('Neplatné údaje tokenu.');
+  const key=await getKey(true),iv=cryptoImpl.getRandomValues(new Uint8Array(12));
+  const data=new TextEncoder().encode(token.trim());
+  const encrypted=new Uint8Array(await cryptoImpl.subtle.encrypt({name:'AES-GCM',iv,additionalData:new TextEncoder().encode(owner+'/'+repo)},key,data));
+  localStorage.setItem(CLOUD_DEVICE_TOKEN_KEY,JSON.stringify({v:format,owner,repo,iv:bytesB64(iv),ciphertext:bytesB64(encrypted)}));
+ }
+ async function restore(owner,repo){
+  const item=parse(localStorage.getItem(CLOUD_DEVICE_TOKEN_KEY));
+  if(!item||item.v!==format||item.owner!==owner||item.repo!==repo||typeof item.iv!=='string'||typeof item.ciphertext!=='string')return null;
+  try{
+   const key=await getKey(false);if(!key){clear();return null;}
+   const plaintext=await cryptoImpl.subtle.decrypt({name:'AES-GCM',iv:b64Bytes(item.iv),additionalData:new TextEncoder().encode(owner+'/'+repo)},key,b64Bytes(item.ciphertext));
+   return new TextDecoder().decode(plaintext);
+  }catch{clear();return null;}
+ }
+ return {has,save,restore,clear};
+}
 export const CLOUD_PATH='campaigns/hmk-ledger-cloud.json';
 const MAX_FILE_SIZE=900000;
 function parse(raw){try{return JSON.parse(raw)}catch{return null}}
@@ -32,7 +81,8 @@ export async function decodeCloudSnapshot(githubContent){
  if(envelope?.format!=='hmk-ledger-github-cloud-v1'||typeof envelope.payload!=='string')throw Error('Soubor na GitHubu není databáze HMK.');
  return new TextDecoder().decode(await decompressBytes(envelope));
 }
-export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,validate,applyRemote,readLocal,fetchImpl=fetch,onStatus=()=>{},approveReplace=()=>false,clock=()=>new Date().toISOString()}){
+export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,validate,applyRemote,readLocal,fetchImpl=fetch,onStatus=()=>{},approveReplace=()=>false,clock=()=>new Date().toISOString(),deviceVault=null}){
+ const vault=deviceVault||createGitHubDeviceTokenVault({localStorage});
  let config=parse(localStorage.getItem(CLOUD_CONFIG_KEY));
  if(!config||!validRepo(config.owner||'',config.repo||''))config=null;
  let token='';
@@ -68,7 +118,7 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
   if(scheduled!==null)clearTimeout(scheduled);
   scheduled=setTimeout(()=>{scheduled=null;void flush();},650);
  }
- async function connect({owner,repo,accessToken,createIfMissing=false}={}){
+ async function connect({owner,repo,accessToken,createIfMissing=false,rememberDevice}={}){
   if(!validRepo(owner||'',repo||''))throw Error('Zadejte vlastníka a název GitHub repozitáře.');
   if(typeof accessToken!=='string'||!accessToken.trim())throw Error('Zadejte fine-grained GitHub token pro soukromý repozitář.');
   if(working)throw Error('Synchronizace právě probíhá.');
@@ -95,13 +145,19 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
     }else if(local!==remote.raw){
      // All incoming snapshots are validated before replacing any local bytes.
      if(!approveReplace('Na GitHubu je jiný stav kampaní. Načíst jej do tohoto zařízení? Místní data se nahradí.')){
-      localStorage.setItem(CLOUD_CONFIG_KEY,JSON.stringify(config));sessionStorage.setItem(CLOUD_SESSION_KEY,JSON.stringify({owner,repo,token}));setStatus('needs-choice','Načtení cloudu bylo odmítnuto. Místní data se nezměnila.');return {needsChoice:true};}
+      localStorage.setItem(CLOUD_CONFIG_KEY,JSON.stringify(config));sessionStorage.setItem(CLOUD_SESSION_KEY,JSON.stringify({owner,repo,token}));
+      if(rememberDevice===true){try{await vault.save({owner,repo,token})}catch(e){setStatus('needs-choice','Token zůstane jen pro tuto relaci: '+e.message);return {needsChoice:true};}}
+      else if(rememberDevice===false)vault.clear();
+      setStatus('needs-choice','Načtení cloudu bylo odmítnuto. Místní data se nezměnila.');return {needsChoice:true};}
      applyRemote(remote.raw);clearPending();
     }else clearPending();
    }
    localStorage.setItem(CLOUD_CONFIG_KEY,JSON.stringify(config));
    sessionStorage.setItem(CLOUD_SESSION_KEY,JSON.stringify({owner,repo,token}));
-   setStatus(pending?'pending':'ready');
+   let vaultError='';
+   if(rememberDevice===true){try{await vault.save({owner,repo,token})}catch(e){vaultError='Připojeno, ale token nebylo možné zapamatovat na tomto zařízení: '+e.message;}}
+   else if(rememberDevice===false)vault.clear();
+   setStatus(pending?'pending':'ready',vaultError);
   }catch(err){config=old.config;token=old.token;sha=old.sha;setStatus(old.config?'locked':'local',err.message);throw err}
   finally{working=false;}
   if(pending)void flush();
@@ -149,17 +205,33 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
  function disconnect(){
   if(working||pending||isPending())throw Error('Nejprve bezpečně dokončete synchronizaci nebo vyřešte neodeslané změny.');
   if(scheduled!==null)clearTimeout(scheduled);scheduled=null;
-  localStorage.removeItem(CLOUD_CONFIG_KEY);sessionStorage.removeItem(CLOUD_SESSION_KEY);
+  localStorage.removeItem(CLOUD_CONFIG_KEY);sessionStorage.removeItem(CLOUD_SESSION_KEY);vault.clear();
   // Disconnection cannot silently remove unsynced snapshot protection.
   config=null;token='';sha=null;pending=false;dirty=null;localStorage.removeItem(CLOUD_PENDING_KEY);setStatus('local');
  }
- function startup(){const active=parse(sessionStorage.getItem(CLOUD_SESSION_KEY));
+ async function startup(){
   if(!config)return;
-  if(active?.owner===config.owner&&active?.repo===config.repo&&typeof active.token==='string'){
-   void connect({owner:config.owner,repo:config.repo,accessToken:active.token}).catch(()=>{});
-  }else setStatus('locked','Připojte tento prohlížeč ke GitHubu; místní zápisy jsou do té doby zablokované.');
+  const owner=config.owner,repo=config.repo,active=parse(sessionStorage.getItem(CLOUD_SESSION_KEY));
+  let saved=null;
+  if(active?.owner===owner&&active?.repo===repo&&typeof active.token==='string'&&active.token.trim())saved=active.token;
+  if(!saved){
+   setStatus('connecting','Obnovuji zabezpečené připojení…');
+   try{saved=await vault.restore(owner,repo);}catch{saved=null;}
+  }
+  if(!saved){setStatus('locked','Vložte nový GitHub token a připojte tento prohlížeč.');return;}
+  try{await connect({owner,repo,accessToken:saved});}
+  catch(e){
+   if(e.httpStatus===401){vault.clear();sessionStorage.removeItem(CLOUD_SESSION_KEY);
+    setStatus('locked','GitHub token vypršel nebo byl zrušen. Vytvořte nový token a vložte jej v Cloud a zálohy.');}
+   else setStatus('locked','Automatické připojení se nezdařilo: '+e.message+'. Můžete jej obnovit ručně.');
+  }
  }
+ async function rememberCurrentDevice(){
+  if(!config||!token||status!=='ready')throw Error('Nejdříve úspěšně připojte GitHub Cloud.');
+  await vault.save({owner:config.owner,repo:config.repo,token});notify();
+ }
+ function forgetDeviceToken(){vault.clear();notify();}
  function configView(){return {...config};}
  notify();
- return {get status(){return status},get issue(){return error},get config(){return configView()},get pending(){return pending||isPending()},get enabled(){return !!config},canWrite,onLocalWrite,connect,flush,refresh,replaceWithCloud,disconnect,startup};
+ return {get status(){return status},get issue(){return error},get config(){return configView()},get pending(){return pending||isPending()},get enabled(){return !!config},get remembered(){return vault.has()},canWrite,onLocalWrite,connect,flush,refresh,replaceWithCloud,disconnect,rememberCurrentDevice,forgetDeviceToken,startup};
 }
