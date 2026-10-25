@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict');const fs=require('fs'),path=require('path');
+const root=path.join(__dirname,'..'),app=fs.readFileSync(path.join(root,'app.js'),'utf8'),css=fs.readFileSync(path.join(root,'book-templates.css'),'utf8'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+let n=0;const ok=(a,msg)=>{assert.ok(a,msg);n++};
+ok(html.includes('v93.480'),'version UI');ok(app.includes("const APP_VERSION='93.480'"),'version JS');
+for(const text of ['data-provision-food-acquire','data-provision-water-quick','function provisionQuickFoodFormHTML','function provisionQuickWaterFormHTML','createFreshRationStocks','recordCampaignCashPurchase','prepareLibraryPurchase','createPotableWaterFill','data-provision-assure','data-provision-scope'])ok(app.includes(text),'required original writer '+text);
+ok(app.includes("[1,2,3,5,7].includes(qty)"),'valid portions');
+ok(app.includes('!combatInitiativeSequence')||app.includes('combatInitiativeSequence'),'Combat prohibition');
+ok(app.includes('minute:clock.minute'),'campaign time provenance');
+ok(app.includes('gmConfirmed:true,waterSource:origin'),'water source validation');
+ok(!app.includes('Pravidla nádob a ověření naplnění</summary>'),'removed redundant water prose');
+ok(css.includes('one coherent parchment surface'),'skill theme');
+ok(css.includes('.hsk-eml-total'),'EML result no dark tile');
+ok(css.includes('hc-provision-quick-form'),'compact provisioning');
+const x=require('fs').readFileSync(path.join(root,'hmk-app.bundle.js'),'utf8');ok(x.includes('93.480'),'bundle cache');
+console.log('PASS',n,'UI and native-ledger compatibility checks');
