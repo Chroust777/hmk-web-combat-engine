@@ -438,3 +438,7 @@ form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;
 .hmk-cloud-panel input[type="password"] {width:100%;}
 .hmk-cloud-state {padding:.65rem .9rem;background:rgba(144,123,91,.1);border:1px solid rgba(144,123,91,.3);border-radius:7px;overflow-wrap:anywhere;}
 .hmk-cloud-panel .actions {display:flex;gap:.5rem;flex-wrap:wrap;}
+/* GitHub Cloud – opt-in remembered device credential (v93.478). */
+.hmk-cloud-panel .hmk-cloud-remember{grid-column:1/-1;display:flex;align-items:flex-start;gap:.55rem;margin:.35rem 0 0;line-height:1.35;}
+.hmk-cloud-panel .hmk-cloud-remember input[type="checkbox"]{flex:0 0 auto;width:1.05rem;height:1.05rem;margin:.06rem 0 0;padding:0;accent-color:#aa8652;}
+.hmk-cloud-panel #hmk-cloud-connect-form>p.tiny{grid-column:1/-1;margin:.15rem 0 .35rem;line-height:1.5;}

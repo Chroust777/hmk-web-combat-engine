@@ -246,7 +246,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.477';
+const APP_VERSION='93.478';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -341,9 +341,14 @@ function cloudPanel(){
  <label>GitHub uživatel / vlastník repozitáře<input name="owner" value="${esc(c.owner||'Chroust777')}" maxlength="39" required></label>
  <label>Soukromý repozitář s kampaněmi<input name="repo" placeholder="např. hmk-campaign-private" value="${esc(c.repo||'')}" maxlength="100" required></label>
  <label>Fine-grained access token (jen Contents: Read and write)<input type="password" name="token" placeholder="github_pat_…" autocomplete="new-password" required></label>
+ <label class="hmk-cloud-remember"><input type="checkbox" name="rememberDevice" checked> Zapamatovat token na tomto zařízení a příště se připojit automaticky</label>
+ <p class="tiny">Jen pro vlastní nebo důvěryhodné zařízení. Token bude zašifrován v úložišti tohoto prohlížeče; ani tak není chráněn před škodlivým kódem spuštěným na stejné webové stránce. Token se neposílá do kampaně ani GitHub repozitáře.</p>
  <div class="actions"><button type="submit">Připojit a načíst GitHub</button><button type="button" class="secondary" data-cloud-action="create">Vytvořit první cloudovou databázi</button></div></form>
+ <p class="tiny">Token uložený na tomto zařízení: <strong>${cloudSync?.remembered?'Ano – automatické připojení':'Ne – pouze aktuální relace'}</strong></p>
+ <div class="actions"><button type="button" class="secondary" data-cloud-action="remember" ${cloudSync?.status==='ready'&&!cloudSync?.remembered?'':'disabled'}>Zapamatovat právě připojený token na tomto zařízení</button></div>
+ <div class="actions"><button type="button" class="secondary" data-cloud-action="forget" ${cloudSync?.remembered?'':'disabled'}>Odstranit uložený token ze zařízení</button></div>
  <div class="actions"><button type="button" class="secondary" data-cloud-action="retry" ${enabled?'':'disabled'}>Odeslat čekající změny</button><button type="button" class="secondary" data-cloud-action="refresh" ${cloudSync?.status==='ready'?'':'disabled'}>Načíst aktualizaci z cloudu</button><button type="button" class="secondary" data-cloud-action="replace" ${enabled?'':'disabled'}>Převzít cloudový stav (zahodit místní rozdíly)</button><button type="button" class="secondary" data-cloud-action="disconnect" ${enabled?'':'disabled'}>Odpojit tento prohlížeč</button></div>
- <p class="tiny">Přístupový token se drží jen v aktuální relaci prohlížeče (sessionStorage); není v repozitáři ani v trvalém nastavení. Při novém otevření prohlížeče může být potřeba jej zadat znovu. Po připojení se potvrzené změny ukládají automaticky; při chybě připojení zůstávají místně a jsou označené jako neodeslané. Současné úpravy ze dvou zařízení se nikdy tiše nesloučí ani nepřepíšou.</p></section>`;
+ <p class="tiny">Na tomto zařízení si můžeš token zapamatovat až do vypršení nebo ručního odstranění. Po jeho zrušení či vypršení vlož nový. Bez zapamatování zůstává jen v aktuální relaci prohlížeče. Neodeslané změny a konflikty se nezahazují; jiné zařízení je nemůže potichu přepsat.</p></section>`;
 }
 function acceptCloudSnapshot(raw){
  if(localStorage.getItem(STORAGE)!==storageBaseline)throw Error('Místní kampaň se mezitím změnila v jiné záložce.');
@@ -351,7 +356,7 @@ function acceptCloudSnapshot(raw){
  localStorage.setItem(STORAGE,raw);storageBaseline=raw;data=incoming;
  selected=null;view='characters';encounterSelection=new Set();
  // Reload after the connected credentials have been stored by the caller.
- setTimeout(()=>window.location.reload(),150);
+ setTimeout(()=>window.location.reload(),1200);
 }
 const cloudStorage={
  getItem(key){return localStorage.getItem(key)},
@@ -13648,8 +13653,9 @@ document.addEventListener('submit',async e=>{
  const owner=String(new FormData(form).get('owner')||'').trim();
  const repo=String(new FormData(form).get('repo')||'').trim();
  const token=String(new FormData(form).get('token')||'').trim();
+ const rememberDevice=!!form.querySelector('[name=rememberDevice]')?.checked;
  const btn=form.querySelector('button[type=submit]');if(btn)btn.disabled=true;
- try{const result=await cloudSync.connect({owner,repo,accessToken:token});
+ try{const result=await cloudSync.connect({owner,repo,accessToken:token,rememberDevice});
   if(result.needsCreate)alert('Soukromý repozitář je dostupný, ale cloudová databáze neexistuje. Klikněte „Vytvořit první cloudovou databázi“.');
   else if(result.conflict)alert('Konflikt dat: místní změny byly zachovány. Prohlédněte si stav v Cloud a zálohy.');
   else if(result.ready){form.querySelector('[name=token]').value='';render();}
@@ -13663,8 +13669,9 @@ document.addEventListener('click',async e=>{
   if(action==='create'){
    const form=document.querySelector('#hmk-cloud-connect-form');
    const values=new FormData(form);const owner=String(values.get('owner')||'').trim(),repo=String(values.get('repo')||'').trim(),token=String(values.get('token')||'').trim();
+   const rememberDevice=!!form.querySelector('[name=rememberDevice]')?.checked;
    if(!confirm('Zapsat tento místní stav postav a kampaní do soukromého repozitáře '+owner+'/'+repo+'? Pouze pokud tam cloudová databáze dosud neexistuje.'))return;
-   const outcome=await cloudSync.connect({owner,repo,accessToken:token,createIfMissing:true});
+   const outcome=await cloudSync.connect({owner,repo,accessToken:token,createIfMissing:true,rememberDevice});
    if(outcome.ready)alert('Cloudové úložiště bylo vytvořeno. Otevřete stejný soukromý repozitář na druhém zařízení.');
   }
   if(action==='retry')await cloudSync.flush();
@@ -13672,6 +13679,13 @@ document.addEventListener('click',async e=>{
   if(action==='replace'){
    if(!confirm('POZOR: místní neodeslané změny budou nahrazeny verzí uloženou na GitHubu. Chcete opravdu pokračovat?'))return;
    await cloudSync.replaceWithCloud();
+  }
+  if(action==='remember'){
+   await cloudSync.rememberCurrentDevice();
+  }
+  if(action==='forget'){
+   if(!confirm('Odstranit trvale zapamatovaný GitHub token z tohoto zařízení? Aktuální připojení zůstane aktivní do konce relace.'))return;
+   cloudSync.forgetDeviceToken();
   }
   if(action==='disconnect'){
    if(!confirm('Odpojit toto zařízení od cloudu? Další zápisy budou jen místní. Neodeslané změny se tím neodešlou.'))return;
