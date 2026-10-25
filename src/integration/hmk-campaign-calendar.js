@@ -183,6 +183,14 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
  }
  const automatic=automaticHMKFollowups(clock,characters,journal,getCampaignEpisodeAnchor);
  all.push(...automatic.all);unknown.push(...automatic.unknown);
+ // Some legacy Combat-time notices have the same canonical obligation as a
+ // live automatic entry. Render only the actionable event, retaining the
+ // same blocking rule: the original Combat proof must resolve it.
+ for(let i=unknown.length-1;i>=0;i--){
+  const x=unknown[i];
+  if(['bleeding','shock-followup'].includes(x.kind)&&
+   all.some(y=>y.kind===x.kind&&y.characterId===x.characterId))unknown.splice(i,1);
+ }
  // A potion remains due at exactly its ten-minute preparation deadline.
  // The GM may arrive at the deadline but not skip it without the Herblore result.
  const herbMembers=new Map(characters.map(c=>[c.id,c]));

@@ -147,7 +147,11 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    if(['climb-easy','climb-difficult','acro-balance','jumping-sv'].includes(p.activity)&&
       !journal.some(z=>['climbing-falling','skill-physical-consequence'].includes(z.skillTestProof?.type)&&z.skillTestProof.sourceId===e.id)){
     const actor=characters.find(c=>c.id===p.actorId);
-    if(actor)push(actor,'skill-fall',e.id,'CF navazujícího testu – ověřit výšku a Falling Routine (HMK 67)',e.campaignMinute,'skills');
+    if(actor){
+     const activity=criticalActivities(p.skill).find(a=>a.id===p.activity);
+     const context=[p.skill,activity?.label||p.activity,p.technique||'navazující test',p.result?.level].filter(Boolean).join(' · ');
+     push(actor,'skill-fall',e.id,`Pád po ${context}: určit skutečnou výšku a dokončit Falling Routine (HMK 67)`,e.campaignMinute,'skills');
+    }
    }
    if((p.activity==='fishing-sv'&&p.result?.level==='CF')||p.activity==='trek-survival-hazard'){
     if(!journal.some(z=>z.skillTestProof?.type==='skill-physical-consequence'&&z.skillTestProof.sourceId===e.id)){

@@ -51,7 +51,7 @@ function renderAgendaEntry(p,esc,clock){
  const who=p.name||p.place||'Svět',due=esc(displayCampaignMinute(p.dueMinute));
  const note=p.origin==='gm'?(p.note||p.resolution?.note||''):'',label=shortEventName(p);
  const details=[p.woundId?`Rána ${p.woundId}`:'',note].filter(Boolean).join(' · ');
- return `<article class="hc-entry hc-entry--compact ${p.status==='due'?'hc-entry--due':''} ${['resolved','cancelled'].includes(p.status)?'hc-entry--done':''}" ${details?`title="${esc(details)}"`:''}>
+ return `<article class="hc-entry hc-entry--compact ${['skill-fall','skill-critical','skill-injury'].includes(p.kind)?'hc-entry--rule-detail':''} ${p.status==='due'?'hc-entry--due':''} ${['resolved','cancelled'].includes(p.status)?'hc-entry--done':''}" ${details?`title="${esc(details)}"`:''}>
  <div class="hc-event-line"><strong class="hc-event-person">${esc(who)}</strong><time>${due}</time><span class="hc-status hc-status--${esc(p.status)}">${esc(eventStatus(p))}</span></div>
  <div class="hc-event-line hc-event-line--task"><span class="hc-event-description">${esc(label)}</span><span class="hc-actions">${issueAction(p,esc)}</span></div>
  </article>`;
