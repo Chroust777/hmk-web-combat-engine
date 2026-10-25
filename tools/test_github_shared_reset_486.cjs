@@ -54,9 +54,9 @@ let count=0;function eq(a,b,label){assert.deepEqual(a,b,label);count++}
  const offline=device(empty);await offline.connect();
  offline.source.setItem('DATA',populated);offline.sync.onLocalWrite(populated);eq(offline.sync.pending,true,'unsynced local saved');
  const third=device(empty);await third.connect();await third.reset();
- await offline.sync.flush();eq(offline.sync.status,'conflict','old SHA cannot overwrite reset');
- eq(offline.source.getItem('DATA'),populated,'pending local stays for manual resolution');
- await offline.sync.replaceWithCloud();eq(offline.source.getItem('DATA'),empty,'explicit remote restore clears stale');
+ await offline.sync.flush();eq(offline.sync.status,'ready','deliberate cloud reset supersedes obsolete pending edit');
+ eq(offline.source.getItem('DATA'),empty,'offline pending replaced by authoritative shared reset');
+ await offline.sync.replaceWithCloud();eq(offline.source.getItem('DATA'),empty,'explicit remote restore remains idempotent');
  // Previously a failed refresh became permanently stuck in error-pending.
  const recovering=device(empty);await recovering.connect();await third.reset();
  networkOffline=true;await recovering.sync.refresh();eq(recovering.sync.status,'error-pending','network outage reported');

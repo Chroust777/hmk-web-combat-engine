@@ -7,6 +7,9 @@ export const CLOUD_CONFIG_KEY='hmk-cloud-github-config-v1';
 export const CLOUD_PENDING_KEY='hmk-cloud-github-pending-v1';
 export const CLOUD_SESSION_KEY='hmk-cloud-github-session-v1';
 export const CLOUD_DEVICE_TOKEN_KEY='hmk-cloud-github-device-token-v1';
+// An in-memory armed page notices when F12 clears its localStorage. This marker
+// is not a credential and is never written to GitHub.
+export const CLOUD_LIVE_STORAGE_MARKER='hmk-cloud-github-live-storage-v1';
 const DEVICE_KEY_DB='hmk-github-device-token-key-v1';
 /**
  * Browser-only, opt-in device credential. The ciphertext is in localStorage;
@@ -68,25 +71,32 @@ async function decompressBytes(envelope){if(envelope.encoding==='utf8-base64')re
  if(envelope.encoding!=='gzip-base64'||typeof DecompressionStream!=='function')throw Error('Nepodporovaný komprimovaný cloudový formát');
  const stream=new Blob([fromBase64(envelope.payload)]).stream().pipeThrough(new DecompressionStream('gzip'));
  return new Uint8Array(await new Response(stream).arrayBuffer());}
-export async function encodeCloudSnapshot(serialized){
+export async function encodeCloudSnapshot(serialized,{resetId=null}={}){
  const bytes=new TextEncoder().encode(serialized);
  const compressed=await compressBytes(bytes);
- const envelope=JSON.stringify({format:'hmk-ledger-github-cloud-v1',encoding:compressed.encoding,payload:compressed.value});
+ const envelope=JSON.stringify({format:'hmk-ledger-github-cloud-v1',encoding:compressed.encoding,payload:compressed.value,...(resetId?{resetId}:{})});
  const file=new TextEncoder().encode(envelope);
  if(file.byteLength>MAX_FILE_SIZE)throw Error('Kampaň je pro tento režim GitHub Contents příliš velká (limit 900 KB komprimovaného souboru). Zápis neproběhl.');
  return toBase64(file);
 }
-export async function decodeCloudSnapshot(githubContent){
+export async function decodeCloudEnvelope(githubContent){
  const envelope=parse(new TextDecoder().decode(fromBase64(githubContent)));
- if(envelope?.format!=='hmk-ledger-github-cloud-v1'||typeof envelope.payload!=='string')throw Error('Soubor na GitHubu není databáze HMK.');
- return new TextDecoder().decode(await decompressBytes(envelope));
+ if(envelope?.format!=='hmk-ledger-github-cloud-v1'||typeof envelope.payload!=='string'||
+    (envelope.resetId!==undefined&&(typeof envelope.resetId!=='string'||envelope.resetId.length>128)))throw Error('Soubor na GitHubu není databáze HMK.');
+ return {raw:new TextDecoder().decode(await decompressBytes(envelope)),resetId:envelope.resetId||null};
 }
+export async function decodeCloudSnapshot(githubContent){return (await decodeCloudEnvelope(githubContent)).raw}
 export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,validate,applyRemote,readLocal,fetchImpl=fetch,onStatus=()=>{},approveReplace=()=>false,clock=()=>new Date().toISOString(),deviceVault=null}){
  const vault=deviceVault||createGitHubDeviceTokenVault({localStorage});
  let config=parse(localStorage.getItem(CLOUD_CONFIG_KEY));
  if(!config||!validRepo(config.owner||'',config.repo||''))config=null;
  let token='';
  let status=config?'locked':'local',error='',sha=null,pending=false,working=false,dirty=null,scheduled=null;
+ let cloudResetId=null,watchArmed=false;
+ const markerPresent=()=>localStorage.getItem(CLOUD_LIVE_STORAGE_MARKER)!==null;
+ const armStorageWatch=()=>{localStorage.setItem(CLOUD_LIVE_STORAGE_MARKER,'connected');watchArmed=true;};
+ const liveStorageWasCleared=()=>watchArmed&&!markerPresent();
+ const freshResetId=()=>clock()+'-'+Math.random().toString(36).slice(2);
  const pendingKey=()=>config?.owner+'/'+config?.repo;
  const savedPending=()=>parse(localStorage.getItem(CLOUD_PENDING_KEY));
  const isPending=()=>savedPending()?.repository===pendingKey();
@@ -112,12 +122,12 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
  async function getCloud(){
   try{const r=await request('GET',api('/contents/'+CLOUD_PATH));
    if(typeof r.sha!=='string'||typeof r.content!=='string'||r.encoding!=='base64')throw Error('Nepodporovaný cloudový soubor nebo překročený limit GitHub Contents.');
-   const raw=await decodeCloudSnapshot(r.content);validate(JSON.parse(raw));return {sha:r.sha,raw};
+   const {raw,resetId}=await decodeCloudEnvelope(r.content);validate(JSON.parse(raw));return {sha:r.sha,raw,resetId};
   }catch(err){if(err.httpStatus===404)return null;throw err}
  }
  function flagPending(serialized){localStorage.setItem(CLOUD_PENDING_KEY,JSON.stringify({repository:pendingKey(),sha,at:clock()}));pending=true;dirty=serialized;}
  function clearPending(){localStorage.removeItem(CLOUD_PENDING_KEY);pending=false;dirty=null;}
- function canWrite(){return !config||['ready','syncing','pending','error-pending'].includes(status);}
+ function canWrite(){return (!config||['ready','syncing','pending','error-pending'].includes(status))&&!liveStorageWasCleared();}
  function onLocalWrite(serialized){if(!config)return;
   if(!canWrite())throw Error('GitHub cloud není bezpečně připojen. Zápis je zablokován.');
   flagPending(serialized);setStatus('pending');
@@ -143,11 +153,16 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
     sha=result.content?.sha;if(!sha)throw Error('GitHub nepotvrdil SHA počátečního zápisu.');
     clearPending();
    }else{
-    sha=remote.sha;
+    sha=remote.sha;cloudResetId=remote.resetId;
     const local=readLocal(),hasPending=isPending();
     if(hasPending&&local!==remote.raw){
-     if(savedPending().sha!==sha){setStatus('conflict','Cloud má novější změny než neodeslaný místní zápis. Zvolte, kterou verzi zachovat.');return {conflict:true};}
-     dirty=local;pending=true;
+     if(remote.resetId){
+      // A deliberate shared reset has priority over an obsolete offline edit.
+      applyRemote(remote.raw);clearPending();
+     }else{
+      if(savedPending().sha!==sha){setStatus('conflict','Cloud má novější změny než neodeslaný místní zápis. Zvolte, kterou verzi zachovat.');return {conflict:true};}
+      dirty=local;pending=true;
+     }
     }else if(local!==remote.raw){
      // All incoming snapshots are validated before replacing any local bytes.
      if(!approveReplace('Na GitHubu je jiný stav kampaní. Načíst jej do tohoto zařízení? Místní data se nahradí.')){
@@ -164,6 +179,7 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
    if(rememberDevice===true){try{await vault.save({owner,repo,token})}catch(e){vaultError='Připojeno, ale token nebylo možné zapamatovat na tomto zařízení: '+e.message;}}
    else if(rememberDevice===false)vault.clear();
    setStatus(pending?'pending':'ready',vaultError);
+   armStorageWatch();
   }catch(err){config=old.config;token=old.token;sha=old.sha;setStatus(old.config?'locked':'local',err.message);throw err}
   finally{working=false;}
   if(pending)void flush();
@@ -176,9 +192,12 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
    while(pending){
     const snapshot=dirty||readLocal();setStatus('syncing');
     const remote=await getCloud();
+    if(remote?.resetId&&remote.resetId!==cloudResetId){
+     applyRemote(remote.raw);sha=remote.sha;cloudResetId=remote.resetId;clearPending();break;
+    }
     if(remote&&remote.raw===snapshot){sha=remote.sha;if(dirty===snapshot)clearPending();else continue;break;}
     if((remote?.sha||null)!==sha){setStatus('conflict','Jiné zařízení změnilo data. Místní neodeslané změny byly zachovány.');return;}
-    const result=await request('PUT',api('/contents/'+CLOUD_PATH),{message:'HMK: saved campaign '+clock(),content:await encodeCloudSnapshot(snapshot),...(sha?{sha}:{})});
+    const result=await request('PUT',api('/contents/'+CLOUD_PATH),{message:'HMK: saved campaign '+clock(),content:await encodeCloudSnapshot(snapshot,{resetId:cloudResetId}),...(sha?{sha}:{})});
     if(!result.content?.sha)throw Error('GitHub nevrátil SHA potvrzeného zápisu.');
     sha=result.content.sha;
     if(dirty===snapshot)clearPending();
@@ -190,13 +209,17 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
  }
  async function refresh(){
   // A transient offline GET must not permanently disable updates from other devices.
-  if(!config||!token||working||pending||isPending()||!['ready','error-pending'].includes(status))return;
+  if(!config||!token||working||liveStorageWasCleared()||!['ready','error-pending','pending','conflict'].includes(status))return;
   working=true;
   try{const remote=await getCloud();if(!remote){setStatus('conflict','Cloudový soubor byl odstraněn.');return;}
-   if(remote.sha!==sha){
+   const isFreshReset=!!remote.resetId&&remote.resetId!==cloudResetId;
+   if(isFreshReset){
+    if(readLocal()!==remote.raw)applyRemote(remote.raw);
+    sha=remote.sha;cloudResetId=remote.resetId;clearPending();setStatus('ready');
+   }else if(!(pending||isPending())&&remote.sha!==sha){
     const local=readLocal();
     if(local!==remote.raw)applyRemote(remote.raw);
-    sha=remote.sha;setStatus('ready');
+    sha=remote.sha;cloudResetId=remote.resetId;setStatus('ready');
    }
   }catch(e){setStatus('error-pending','Nelze ověřit GitHub: '+e.message);}
   finally{working=false;}
@@ -206,9 +229,9 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
   * connected devices pull the empty state; stale pending writes fail closed.
   * Local browser storage clearing never calls this operation.
   */
- async function resetSharedCampaign({owner,repo,accessToken,emptySnapshot,rememberDevice}={}){
+ async function resetSharedCampaign({owner,repo,accessToken,emptySnapshot,rememberDevice,developerMode=false,localStorageCleared=false}={}){
   if(!validRepo(owner||'',repo||''))throw Error('Vyberte platný soukromý repozitář.');
-  if(working||pending||savedPending())throw Error('Existují neodeslané změny nebo běžící synchronizace. Nejdříve je vyřešte; reset je nemůže potichu zahodit.');
+  if(working||(!developerMode&&(pending||savedPending())))throw Error('Existují neodeslané změny nebo běžící synchronizace. Nejdříve je vyřešte; reset je nemůže potichu zahodit.');
   if(typeof emptySnapshot!=='string'||!emptySnapshot.trim())throw Error('Chybí prázdná databáze aplikace.');
   const fresh=JSON.parse(emptySnapshot);
   validate(fresh);
@@ -220,7 +243,7 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
      !Array.isArray(fresh.journal)||fresh.journal.length||
      Object.keys(fresh).some(k=>!['schemaVersion','characters','items','inventory','trash','journal'].includes(k)))
    throw Error('Reset může publikovat pouze novou prázdnou databázi.');
-  const usingConnection=config?.owner===owner&&config?.repo===repo&&!!token&&status==='ready';
+  const usingConnection=config?.owner===owner&&config?.repo===repo&&!!token&&(status==='ready'||(developerMode&&['pending','error-pending','conflict'].includes(status)));
   const nextToken=typeof accessToken==='string'&&accessToken.trim()?accessToken.trim():(usingConnection?token:'');
   if(!nextToken)throw Error('Pro reset cloudu musíte vložit platný GitHub token nebo být připojeni.');
   const original={config,token,status,sha};
@@ -231,21 +254,22 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
    const current=await getCloudReference();
    // If the current device already tracks a cloud revision, do not erase someone
    // else's more recent revision without reconnecting and reviewing it first.
-   if(usingConnection&&(current?.sha||null)!==sha)throw Error('Repozitář se změnil na jiném zařízení. Nejprve načtěte aktuální stav a reset znovu potvrďte.');
+   if(!developerMode&&usingConnection&&(current?.sha||null)!==sha)throw Error('Repozitář se změnil na jiném zařízení. Nejprve načtěte aktuální stav a reset znovu potvrďte.');
+   const resetId=freshResetId();
    const result=await request('PUT',api('/contents/'+CLOUD_PATH),{
-    message:'HMK: explicit shared campaign reset '+clock(),
-    content:await encodeCloudSnapshot(emptySnapshot),...(current?{sha:current.sha}:{})
+    message:'HMK: shared campaign development reset '+clock(),
+    content:await encodeCloudSnapshot(emptySnapshot,{resetId}),...(current?{sha:current.sha}:{})
    });
    if(!result.content?.sha)throw Error('GitHub nevrátil SHA potvrzeného resetu.');
-   uploaded=true;sha=result.content.sha;
+   uploaded=true;sha=result.content.sha;cloudResetId=resetId;
    // Store credentials before applyRemote reloads the page.
    localStorage.setItem(CLOUD_CONFIG_KEY,JSON.stringify(config));
    sessionStorage.setItem(CLOUD_SESSION_KEY,JSON.stringify({owner,repo,token}));
    let vaultError='';
    if(rememberDevice===true){try{await vault.save({owner,repo,token})}catch(e){vaultError='Token se nepodařilo zapamatovat: '+e.message;}}
    else if(rememberDevice===false)vault.clear();
-   applyRemote(emptySnapshot);
-   clearPending();setStatus('ready',vaultError);
+   applyRemote(emptySnapshot,{allowClearedStorage:localStorageCleared});
+   clearPending();setStatus('ready',vaultError);armStorageWatch();
    return {ready:true,reset:true,sha};
   }catch(err){
    if(uploaded){setStatus('conflict','Cloud byl vyčištěn, ale místní zařízení nepotvrdilo nový stav. Neodesílejte starou kampaň; načtěte cloud znovu. '+err.message);}
@@ -253,12 +277,19 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
    throw err;
   }finally{working=false;}
  }
+ /** Development-only operation: one click, using the already connected token.
+  * F12 cannot be detected after the page has reloaded or lost its credentials.
+  */
+ async function resetDevelopmentCampaign({emptySnapshot}={}){
+  if(!config||!token||!['ready','pending','error-pending','conflict'].includes(status))throw Error('Cloud musí být připojen na tomto zařízení.');
+  return resetSharedCampaign({owner:config.owner,repo:config.repo,emptySnapshot,rememberDevice:true,developerMode:true,localStorageCleared:liveStorageWasCleared()});
+ }
  async function replaceWithCloud(){
   if(!config||!token)throw Error('Nejprve připojte GitHub.');
   if(working)throw Error('Synchronizace právě probíhá.');
   working=true;
   try{const remote=await getCloud();if(!remote)throw Error('Cloudový soubor neexistuje.');
-   applyRemote(remote.raw);sha=remote.sha;clearPending();setStatus('ready');}
+   applyRemote(remote.raw);sha=remote.sha;cloudResetId=remote.resetId;clearPending();setStatus('ready');armStorageWatch();}
   finally{working=false;}
  }
  function disconnect(){
@@ -266,7 +297,7 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
   if(scheduled!==null)clearTimeout(scheduled);scheduled=null;
   localStorage.removeItem(CLOUD_CONFIG_KEY);sessionStorage.removeItem(CLOUD_SESSION_KEY);vault.clear();
   // Disconnection cannot silently remove unsynced snapshot protection.
-  config=null;token='';sha=null;pending=false;dirty=null;localStorage.removeItem(CLOUD_PENDING_KEY);setStatus('local');
+  config=null;token='';sha=null;cloudResetId=null;watchArmed=false;pending=false;dirty=null;localStorage.removeItem(CLOUD_PENDING_KEY);localStorage.removeItem(CLOUD_LIVE_STORAGE_MARKER);setStatus('local');
  }
  async function startup(){
   if(!config)return;
@@ -292,5 +323,5 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
  function forgetDeviceToken(){vault.clear();notify();}
  function configView(){return {...config};}
  notify();
- return {get status(){return status},get issue(){return error},get config(){return configView()},get pending(){return pending||isPending()},get enabled(){return !!config},get remembered(){return vault.has()},canWrite,onLocalWrite,connect,flush,refresh,replaceWithCloud,resetSharedCampaign,disconnect,rememberCurrentDevice,forgetDeviceToken,startup};
+ return {get localStorageCleared(){return liveStorageWasCleared()},get status(){return status},get issue(){return error},get config(){return configView()},get pending(){return pending||isPending()},get enabled(){return !!config},get remembered(){return vault.has()},canWrite,onLocalWrite,connect,flush,refresh,replaceWithCloud,resetSharedCampaign,resetDevelopmentCampaign,disconnect,rememberCurrentDevice,forgetDeviceToken,startup};
 }
