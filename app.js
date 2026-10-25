@@ -246,7 +246,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.485';
+const APP_VERSION='93.486';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -348,6 +348,12 @@ function cloudPanel(){
  <div class="actions"><button type="button" class="secondary" data-cloud-action="remember" ${cloudSync?.status==='ready'&&!cloudSync?.remembered?'':'disabled'}>Zapamatovat právě připojený token na tomto zařízení</button></div>
  <div class="actions"><button type="button" class="secondary" data-cloud-action="forget" ${cloudSync?.remembered?'':'disabled'}>Odstranit uložený token ze zařízení</button></div>
  <div class="actions"><button type="button" class="secondary" data-cloud-action="retry" ${enabled?'':'disabled'}>Odeslat čekající změny</button><button type="button" class="secondary" data-cloud-action="refresh" ${cloudSync?.status==='ready'?'':'disabled'}>Načíst aktualizaci z cloudu</button><button type="button" class="secondary" data-cloud-action="replace" ${enabled?'':'disabled'}>Převzít cloudový stav (zahodit místní rozdíly)</button><button type="button" class="secondary" data-cloud-action="disconnect" ${enabled?'':'disabled'}>Odpojit tento prohlížeč</button></div>
+ <details class="hmk-cloud-reset"><summary>Nová prázdná kampaň na všech zařízeních (nevratná změna aktivních dat)</summary>
+ <p><strong>Vymazat sdílenou kampaň:</strong> nahradí aktuální data v soukromém cloudu prázdnou databází a vyčistí je v tomto prohlížeči. Ostatní připojená zařízení ji automaticky převezmou při nejbližší kontrole (obvykle do 30 sekund, pokud jsou online). Staré neodeslané změny budou zablokovány konfliktem.</p>
+ <p><strong>Nejdříve stáhněte JSON zálohu.</strong> Reset nesmaže starší commity z historie GitHub repozitáře a neodstraní uložené tokeny na ostatních zařízeních. Smazání localStorage přes F12 cloud nikdy nevymaže.</p>
+ <p class="tiny">Reset lze provést i po kompletním vymazání dat prohlížeče: nahoře vyplňte repozitář a token. Pokud už jste připojeni, můžete použít právě aktivní token; při zadávání jej nezobrazujeme.</p>
+ <div class="actions"><button type="button" class="danger" data-cloud-action="reset">Vymazat aktivní kampaně v cloudu a na zařízeních</button></div>
+ </details>
  <p class="tiny">Na tomto zařízení si můžeš token zapamatovat až do vypršení nebo ručního odstranění. Po jeho zrušení či vypršení vlož nový. Bez zapamatování zůstává jen v aktuální relaci prohlížeče. Neodeslané změny a konflikty se nezahazují; jiné zařízení je nemůže potichu přepsat.</p></section>`;
 }
 function acceptCloudSnapshot(raw){
@@ -361,6 +367,7 @@ function acceptCloudSnapshot(raw){
 const cloudStorage={
  getItem(key){return localStorage.getItem(key)},
  setItem(key,value){
+  if(key===STORAGE&&window.__hmkOutdatedBuild)throw Error('Byla vydána nová verze aplikace. Obnovte stránku, než uložíte další herní akci.');
   if(key===STORAGE&&cloudSync&&!cloudSync.canWrite())throw Error('Nejprve připojte GitHub Cloud; tento prohlížeč nesmí zapsat starší stav.');
   const previous=key===STORAGE?localStorage.getItem(key):null;
   localStorage.setItem(key,value);
@@ -516,6 +523,7 @@ function validate(d){
  return d
 }
 function save({gmClockAdvance=false,restoreBackup=false}={}){
+ if(window.__hmkOutdatedBuild){notice='Je dostupná nová verze aplikace. Obnovte stránku, než uložíte další herní akci.';return false;}
  if(cloudSync&&!cloudSync.canWrite()){notice='Cloudová kampaň není synchronizována. Přejděte do Cloud a zálohy.';return false;}
  if(storageReadOnly){notice='Zápis je zablokován: původní úložiště se nepodařilo načíst.';return false;}
  try{
@@ -13909,6 +13917,20 @@ document.addEventListener('click',async e=>{
    if(!confirm('Zapsat tento místní stav postav a kampaní do soukromého repozitáře '+owner+'/'+repo+'? Pouze pokud tam cloudová databáze dosud neexistuje.'))return;
    const outcome=await cloudSync.connect({owner,repo,accessToken:token,createIfMissing:true,rememberDevice});
    if(outcome.ready)alert('Cloudové úložiště bylo vytvořeno. Otevřete stejný soukromý repozitář na druhém zařízení.');
+  }
+  if(action==='reset'){
+   const form=document.querySelector('#hmk-cloud-connect-form');
+   const values=new FormData(form);const owner=String(values.get('owner')||'').trim();
+   const repo=String(values.get('repo')||'').trim();const accessToken=String(values.get('token')||'').trim();
+   const rememberDevice=!!form.querySelector('[name=rememberDevice]')?.checked;
+   if(!owner||!repo){alert('Před resetem vyberte soukromý GitHub repozitář.');return;}
+   if(!confirm('POZOR: vymazat AKTIVNÍ data všech kampaní v '+owner+'/'+repo+' pro VŠECHNA připojená zařízení? Tato akce nevrátí původní postavy ani deníky. Nejdřív si stáhněte JSON zálohu!'))return;
+   if(prompt('Bezpečnostní potvrzení: napište přesně název repozitáře '+repo+' pro reset VŠECH zařízení:')!==repo){alert('Reset zrušen: název repozitáře nesouhlasí.');return;}
+   b.disabled=true;
+   try{
+    const outcome=await cloudSync.resetSharedCampaign({owner,repo,accessToken,emptySnapshot:JSON.stringify(clean()),rememberDevice});
+    if(outcome.ready)alert('GitHub potvrdil novou prázdnou kampaň. Ostatní online zařízení ji převezmou při synchronizaci; zařízení s neodeslanými změnami se zastaví na konfliktu.');
+   }finally{b.disabled=false;}
   }
   if(action==='retry')await cloudSync.flush();
   if(action==='refresh')await cloudSync.refresh();

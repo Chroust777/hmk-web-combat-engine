@@ -471,3 +471,10 @@ form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;
 .content-calendar .hc-entry--compact.hc-entry--rule-detail .hc-event-description{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;font-size:.71rem;line-height:1.3;font-weight:600}
 .content-calendar .hc-entry--compact.hc-entry--rule-detail .hc-event-line--task{align-items:start}
 .content-calendar .hc-entry--compact.hc-entry--rule-detail .hc-actions{align-self:start}
+
+/* Explicit shared cloud reset (v93.486): destructive action stays visually separate. */
+.hmk-cloud-reset{border:1px solid #9c5146;background:rgba(125,45,39,.055);padding:.8rem 1rem;margin-top:1rem;border-radius:6px}
+.hmk-cloud-reset>summary{font-weight:700;color:#642d27;cursor:pointer}
+.hmk-cloud-reset p{margin:.7rem 0;line-height:1.5}
+.hmk-cloud-reset button.danger{background:#742d24;color:#fff;border:1px solid #60251f;font-weight:700}
+.hmk-cloud-reset button.danger:hover{background:#5f211b}

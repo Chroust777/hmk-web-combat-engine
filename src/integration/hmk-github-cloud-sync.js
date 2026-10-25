@@ -103,6 +103,12 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
   return result;
  }
  async function verifyPrivateRepository(){const r=await request('GET',api(''));if(r.private!==true)throw Error('Pro ukládání kampaní musí být vybraný GitHub repozitář SOUKROMÝ.');}
+ async function getCloudReference(){
+  try{const r=await request('GET',api('/contents/'+CLOUD_PATH));
+   if(typeof r.sha!=='string'||!r.sha)throw Error('GitHub nevrátil platné SHA cloudového souboru.');
+   return {sha:r.sha};
+  }catch(err){if(err.httpStatus===404)return null;throw err}
+ }
  async function getCloud(){
   try{const r=await request('GET',api('/contents/'+CLOUD_PATH));
    if(typeof r.sha!=='string'||typeof r.content!=='string'||r.encoding!=='base64')throw Error('Nepodporovaný cloudový soubor nebo překročený limit GitHub Contents.');
@@ -183,7 +189,8 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
   }finally{working=false;}
  }
  async function refresh(){
-  if(!config||!token||working||pending||isPending()||status!=='ready')return;
+  // A transient offline GET must not permanently disable updates from other devices.
+  if(!config||!token||working||pending||isPending()||!['ready','error-pending'].includes(status))return;
   working=true;
   try{const remote=await getCloud();if(!remote){setStatus('conflict','Cloudový soubor byl odstraněn.');return;}
    if(remote.sha!==sha){
@@ -193,6 +200,58 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
    }
   }catch(e){setStatus('error-pending','Nelze ověřit GitHub: '+e.message);}
   finally{working=false;}
+ }
+ /** Explicit shared reset: replace the canonical cloud document, never DELETE the file.
+  * An empty but valid snapshot is a new Git revision and GitHub SHA, so previously
+  * connected devices pull the empty state; stale pending writes fail closed.
+  * Local browser storage clearing never calls this operation.
+  */
+ async function resetSharedCampaign({owner,repo,accessToken,emptySnapshot,rememberDevice}={}){
+  if(!validRepo(owner||'',repo||''))throw Error('Vyberte platný soukromý repozitář.');
+  if(working||pending||savedPending())throw Error('Existují neodeslané změny nebo běžící synchronizace. Nejdříve je vyřešte; reset je nemůže potichu zahodit.');
+  if(typeof emptySnapshot!=='string'||!emptySnapshot.trim())throw Error('Chybí prázdná databáze aplikace.');
+  const fresh=JSON.parse(emptySnapshot);
+  validate(fresh);
+  // Never accept an arbitrary campaign as a "reset"; only the canonical empty document.
+  if(!Array.isArray(fresh.characters)||fresh.characters.length||
+     !Array.isArray(fresh.items)||fresh.items.length||
+     !Array.isArray(fresh.inventory)||fresh.inventory.length||
+     !Array.isArray(fresh.trash)||fresh.trash.length||
+     !Array.isArray(fresh.journal)||fresh.journal.length||
+     Object.keys(fresh).some(k=>!['schemaVersion','characters','items','inventory','trash','journal'].includes(k)))
+   throw Error('Reset může publikovat pouze novou prázdnou databázi.');
+  const usingConnection=config?.owner===owner&&config?.repo===repo&&!!token&&status==='ready';
+  const nextToken=typeof accessToken==='string'&&accessToken.trim()?accessToken.trim():(usingConnection?token:'');
+  if(!nextToken)throw Error('Pro reset cloudu musíte vložit platný GitHub token nebo být připojeni.');
+  const original={config,token,status,sha};
+  config={owner,repo};token=nextToken;working=true;setStatus('resetting');
+  let uploaded=false;
+  try{
+   await verifyPrivateRepository();
+   const current=await getCloudReference();
+   // If the current device already tracks a cloud revision, do not erase someone
+   // else's more recent revision without reconnecting and reviewing it first.
+   if(usingConnection&&(current?.sha||null)!==sha)throw Error('Repozitář se změnil na jiném zařízení. Nejprve načtěte aktuální stav a reset znovu potvrďte.');
+   const result=await request('PUT',api('/contents/'+CLOUD_PATH),{
+    message:'HMK: explicit shared campaign reset '+clock(),
+    content:await encodeCloudSnapshot(emptySnapshot),...(current?{sha:current.sha}:{})
+   });
+   if(!result.content?.sha)throw Error('GitHub nevrátil SHA potvrzeného resetu.');
+   uploaded=true;sha=result.content.sha;
+   // Store credentials before applyRemote reloads the page.
+   localStorage.setItem(CLOUD_CONFIG_KEY,JSON.stringify(config));
+   sessionStorage.setItem(CLOUD_SESSION_KEY,JSON.stringify({owner,repo,token}));
+   let vaultError='';
+   if(rememberDevice===true){try{await vault.save({owner,repo,token})}catch(e){vaultError='Token se nepodařilo zapamatovat: '+e.message;}}
+   else if(rememberDevice===false)vault.clear();
+   applyRemote(emptySnapshot);
+   clearPending();setStatus('ready',vaultError);
+   return {ready:true,reset:true,sha};
+  }catch(err){
+   if(uploaded){setStatus('conflict','Cloud byl vyčištěn, ale místní zařízení nepotvrdilo nový stav. Neodesílejte starou kampaň; načtěte cloud znovu. '+err.message);}
+   else{config=original.config;token=original.token;sha=original.sha;setStatus(original.status,err.message);}
+   throw err;
+  }finally{working=false;}
  }
  async function replaceWithCloud(){
   if(!config||!token)throw Error('Nejprve připojte GitHub.');
@@ -233,5 +292,5 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
  function forgetDeviceToken(){vault.clear();notify();}
  function configView(){return {...config};}
  notify();
- return {get status(){return status},get issue(){return error},get config(){return configView()},get pending(){return pending||isPending()},get enabled(){return !!config},get remembered(){return vault.has()},canWrite,onLocalWrite,connect,flush,refresh,replaceWithCloud,disconnect,rememberCurrentDevice,forgetDeviceToken,startup};
+ return {get status(){return status},get issue(){return error},get config(){return configView()},get pending(){return pending||isPending()},get enabled(){return !!config},get remembered(){return vault.has()},canWrite,onLocalWrite,connect,flush,refresh,replaceWithCloud,resetSharedCampaign,disconnect,rememberCurrentDevice,forgetDeviceToken,startup};
 }
