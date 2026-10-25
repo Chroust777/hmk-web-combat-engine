@@ -246,7 +246,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.482';
+const APP_VERSION='93.483';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1779,9 +1779,8 @@ function wealthInventoryPanel(c){
  const shownPurchases=account?.purchases??(!data.campaignClock?(h.cashLedger??[]):[]);
  const shownAdjustments=account?.adjustments??(!data.campaignClock?(h.coinAdjustments??[]):[]);
  const legacyReceipts=data.campaignClock?[...(h.cashLedger??[]),...(h.coinAdjustments??[])]:[];
- const kit=h.creation?.values?.autoStartingKit;
- const remaining=kit&&Number.isSafeInteger(kit.unspentPossessionsAllowancePence)?kit.unspentPossessionsAllowancePence:null;
- return `<div class="equipment-summary" role="group" aria-label="Hotovost a počáteční Wealth">${cash.ok?`<div><strong>Aktuální hotovost</strong><span>${esc(cash.balance)}d</span></div>`:`<p class="library-warning">Hotovost nelze bezpečně doložit: ${esc(cash.reason)} Nákupy jsou zablokované, zdarma lze věci převzít.</p>`}${kit?`<div><strong>Vybavení · počáteční hodnota</strong><span>${esc(kit.costPence)}d / ${esc(kit.budgetPence)}d</span></div><div><strong>Nevyčerpaný počáteční limit vybavení (nejsou mince)</strong><span>${esc(remaining??Math.max(0,kit.budgetPence-kit.costPence))}d</span></div>`:''}${cash.ok&&cash.adjustments?`<details><summary>Historie mincí · ${cash.adjustments} GM úprav</summary><ol>${shownAdjustments.map(t=>`<li>${esc(t.deltaPence>0?"+":"")}${esc(t.deltaPence)}d · ${esc(t.at)}</li>`).join('')}</ol></details>`:""}${cash.ok&&cash.transactions?`<details><summary>Historie nákupů · ${cash.transactions}</summary><ol>${shownPurchases.map(t=>`<li>${esc(t.label||'Předmět')} · −${esc(t.amountPence)}d <small>${esc(t.at||'datum neznámé')}</small></li>`).join('')}</ol></details>`:''}${legacyReceipts.length?`<details><summary>Starší finanční doklady (bez doložené kampaně) · ${legacyReceipts.length}</summary><ol>${legacyReceipts.map(t=>`<li>${esc(t.kind==='library-purchase'?'Nákup '+(t.label||'Předmět')+' · −'+t.amountPence+'d':'GM změna '+(t.deltaPence>0?'+':'')+t.deltaPence+'d')} · ${esc(t.at||'čas nezadán')}</li>`).join('')}</ol></details>`:''}<p class="tiny">${data.campaignClock?'Zůstatek platí pro aktuální kampaň. Starší neznačené transakce tvoří společný výchozí zůstatek; nebyly zpětně přiřazeny ke kalendáři.':'Režim bez kalendáře používá původní hotovost.'} HMK v1.2, str. 51: počáteční hotovost = Wealth × 10d; počáteční výbava má oddělený limit Wealth × 100d. Nákupy se odečítají z hotovosti prostřednictvím neměnné historie výdajů; Wealth se nákupem nemění.</p></div>`;
+
+ return `<div class="equipment-summary" role="group" aria-label="Hotovost a počáteční Wealth">${cash.ok?`<div><strong>Aktuální hotovost</strong><span>${esc(cash.balance)}d</span></div>`:`<p class="library-warning">Hotovost nelze bezpečně doložit: ${esc(cash.reason)} Nákupy jsou zablokované, zdarma lze věci převzít.</p>`}${cash.ok&&cash.adjustments?`<details><summary>Historie mincí · ${cash.adjustments} GM úprav</summary><ol>${shownAdjustments.map(t=>`<li>${esc(t.deltaPence>0?"+":"")}${esc(t.deltaPence)}d · ${esc(t.at)}</li>`).join('')}</ol></details>`:""}${cash.ok&&cash.transactions?`<details><summary>Historie nákupů · ${cash.transactions}</summary><ol>${shownPurchases.map(t=>`<li>${esc(t.label||'Předmět')} · −${esc(t.amountPence)}d <small>${esc(t.at||'datum neznámé')}</small></li>`).join('')}</ol></details>`:''}${legacyReceipts.length?`<details><summary>Starší finanční doklady (bez doložené kampaně) · ${legacyReceipts.length}</summary><ol>${legacyReceipts.map(t=>`<li>${esc(t.kind==='library-purchase'?'Nákup '+(t.label||'Předmět')+' · −'+t.amountPence+'d':'GM změna '+(t.deltaPence>0?'+':'')+t.deltaPence+'d')} · ${esc(t.at||'čas nezadán')}</li>`).join('')}</ol></details>`:''}<p class="tiny">${data.campaignClock?'Zůstatek platí pro aktuální kampaň. Starší neznačené transakce tvoří společný výchozí zůstatek; nebyly zpětně přiřazeny ke kalendáři.':'Režim bez kalendáře používá původní hotovost.'} Nákupy jsou doložené v neměnné historii výdajů; Wealth se nákupem nemění.</p></div>`;
 }
 let activeSkillTab='secondary';
 let activeSheetSection='overview';
@@ -2446,7 +2445,7 @@ function journalWeaponRows(inv,mode,c){
    printedLength.split('|')[gripOf(x)==='two'?1:0]:printedLength;
   const ta=taText(m.impactTAModifier??p.impactTAModifier,aspect);
   const modeList=[...(p.verifiedModes||[]),...(p.alternateStrikeModes||[])].map(t=>`${t.name||'Mode'}: ${t.length||p.length||'—'} / ${t.zoneDie||p.zoneDie||'—'} / ${t.impactDie||'—'}${Number.isFinite(t.impactModifier)?fmtSigned(t.impactModifier):''}${t.aspect||''}`).join('; ');
-  const extra=[name,x.snapshot?.description,x.snapshot?.source?`Zdroj: ${x.snapshot.source}`:'',`Umístění: ${slotLabel(x.slot)}`,
+  const extra=[name,/^Tištěná položka vybavení HMK, str\. \d+; výběr do počáteční výbavy je orientační, nikoli povinný\.$/.test(String(x.snapshot?.description||''))?'':x.snapshot?.description,x.snapshot?.source?`Zdroj: ${x.snapshot.source}`:'',`Umístění: ${slotLabel(x.slot)}`,
    visibleInventoryNote(x.condition)?`Stav: ${visibleInventoryNote(x.condition)}`:'',Number.isFinite(p.defenceModifier)?`Defence modifier: ${fmtSigned(p.defenceModifier)} (není finální DEF)`:null,
    Number.isFinite(p.blockModifier)?`Block modifier: ${fmtSigned(p.blockModifier)}`:null,
    p.verifiedTraits?.length?`Traits: ${p.verifiedTraits.join(', ')}`:null,
@@ -2597,9 +2596,7 @@ function foragingEvidenceInCharacterInventory(actorId){
 }
 function journalSectionNav(){
  const c=character(selected),specialties=c?characterSpecialtyChapters(c):[];
- const hazardAccess=c?characterHazardAccess(persistentStateOf(c)):null;
- const hazardTab=hazardAccess?.active||activeSheetSection==='hazards';
- const sections=[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['notes','Notes & Logbook'],...(hazardTab?[['hazards','Nebezpečí / Trauma']]:[]),['provisions','Provisions · jídlo a pití'],...specialties.map(x=>[x.id,x.label])];
+ const sections=[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['hazards','Nebezpečí / Trauma'],['provisions','Provisions · jídlo a pití'],...specialties.map(x=>[x.id,x.label]),['notes','Notes & Logbook']];
  return `<div class="journal-book-subnav">${sections.map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}<span class="journal-character-action-divider" aria-hidden="true"></span><button type="button" class="secondary journal-character-action" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="secondary journal-character-action" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`;
 }
 /** A page contains live DOM controls; the book decoration is the same for all folios.
@@ -2873,6 +2870,17 @@ function characterInventoryOverview(c,inv){
   ['Nesené / vybavené položky (lb)',onPerson.knownWeightLb.toFixed(1)+(onPerson.unknownWeight?' · neznámé váhy':'' )],['V Truhlici (lb)',stored.knownWeightLb.toFixed(1)+(stored.unknownWeight?' · neznámé váhy':'')],['ENC zbroje',load.armourENC!==null?number(load.armourENC):Number.isFinite(load.knownArmourENC)?`${load.knownArmourENC}${Number.isFinite(load.armourENCUpperBound)&&load.armourENCUpperBound!==load.knownArmourENC?'–'+load.armourENCUpperBound:''} (odhad rozsahu)`: 'nedoloženo'],['Gear ENC',number(load.gearENC)],['Upravené ENC',load.encReady?number(load.modifiedENC):Number.isFinite(load.knownMinimumENC)?`${load.knownMinimumENC}${Number.isFinite(load.knownMaximumENC)&&load.knownMaximumENC!==load.knownMinimumENC?'–'+load.knownMaximumENC:''} ${load.prohibitedOutfit?'(zakázané vrstvy)':'(rozsah)'}`:'neurčeno'],
   ['Bulk H / P / T / N',load.bulkReady?['head','arms','torso','legs'].map(z=>number(load.bulkByZone[z])).join(' / '):load.prohibitedOutfit?'zakázané vrstvy':'pořadí neurčeno'],
   ['Hotovost',cashForCharacter(c).ok?cashForCharacter(c).balance+' d':'neurčena']];
+ const invHelp={
+  'Předmětů':'Počet inventárních řádků postavy, včetně truhlice (nikoli součet kusů).',
+  'Zjištěná hodnota':'Součet ověřených katalogových cen. Neznámé ceny se nedopočítávají.',
+  'Hmotnost majetku (včetně Truhlice)':'Součet všech doložených fyzických hmotností, včetně uložených věcí.',
+  'Nesené / vybavené položky (lb)':'Hmotnost předmětů fyzicky u postavy, bez věcí v truhlici.',
+  'V Truhlici (lb)':'Hmotnost uložených věcí, která aktuálně nezvyšuje zatížení postavy.',
+  'ENC zbroje':'Zatížení zbroje vypočítané z ověřených vrstev a dílů; nesprávné vrstvy jsou blokované.',
+  'Gear ENC':'Za každých úplných 20 lb efektivní výbavy vzniká 5 ENC. Nepohodlné nesení a batoh upravují efektivní hmotnost podle HMK str. 122.',
+  'Upravené ENC':'Výsledné ENC podle zbroje, Gear ENC a Strength Modifieru; vstupuje do pohybu a fyzických testů.',
+  'Bulk H / P / T / N':'Bulk podle zbrojních vrstev pro hlavu, paže, trup a nohy; jde o místní postihy, nikoli čtyři další hmotnosti.',
+  'Hotovost':'Aktuální doložené denáry po nákupech a potvrzených úpravách.'};
  const viewRow=r=>{
   const x=r.item,p=x.snapshot?.properties||{};
   const potionInside=data.campaignClock&&x.sourceItemId===PRINTED_VIAL?
@@ -2892,7 +2900,7 @@ function characterInventoryOverview(c,inv){
   return `<tr><th scope="row">${esc(x.snapshot?.name||'Bezejmenný předmět')}${potionInside?`<span class="inv-item-kind">Naplněna · ${esc(potionInside.herbType)} (${esc(potencyLabel(potionInside.potency))}); obsah bez doložené hmotnosti</span>`:''}${alchemyInside?`<span class="inv-item-kind">Alchemy · ${esc(alchemyStrength?.elixirName||'elixír')} · AS ${alchemyStrength?.currentAS??'?'}${alchemyStrength?.dispersed?' · obsah vyprázdněn':alchemyStrength?.expires?' · enchantment zanikl':''} · plná 0,5 lb</span>`:''}<span class="inv-item-kind">${esc(x.snapshot?.category||'jiné')}${visibleInventoryNote(x.condition)?' · '+esc(visibleInventoryNote(x.condition)):''}${x.slot==='chest'?' · '+esc(x.chestLocation||'Truhlice'):''}${x.gearStowage==='backpack'?' · v batohu':x.gearStowage==='awkward'?' · nepohodlně neseno':''}${['main_hand','off_hand'].includes(x.slot)&&x.snapshot?.category==='weapon'?' · '+(gripOf(x)==='two'?'obouručně':'jednoručně'):''}</span></th><td>${esc(slotLabel(x.slot))}</td><td class="inv-number">${number(r.qty)}</td><td class="inv-number">${number(r.wq)}</td><td title="${esc(r.priceLabel)}">${esc(r.priceLabel)}${r.totalPrice===null?'':`<span class="inv-item-kind">Celkem ${r.totalPrice} d</span>`}</td><td class="inv-number">${r.weight===null?'—':r.weight.toFixed(1)}${r.totalWeight!==null&&r.qty!==1?`<span class="inv-item-kind">Celkem ${r.totalWeight.toFixed(1)}</span>`:''}</td><td>${esc(r.armourENC)}</td><td class="inv-key-spec">${details}</td><td><div class="inv-row-actions">${x._campaignRationReceipt?'':`<button type="button" class="secondary" data-edit-inv="${esc(x.id)}">Upravit</button>`}${x._campaignRationReceipt?'':`<button type="button" class="secondary" data-chest-move="${esc(x.id)}">${x.slot==='chest'?'Vyzvednout':'Do Truhlice'}</button>`}${rationLot?`<button type="button" class="secondary" data-transfer-ration="${esc(rationLot.sourceId)}">Předat příděly</button>`:''}${staleRationLot?`<button type="button" class="danger" data-loss-ration="${esc(staleRationLot.sourceId)}">Odpis přídělů</button>`:''}${!x._campaignRationReceipt&&data.characters.length>1?`<button type="button" class="secondary" data-transfer-inv="${esc(x.id)}">Předat</button>`:''}${x._campaignRationReceipt?'':`<button type="button" class="danger" data-remove-inv="${esc(x.id)}">Ztráta / vyřadit</button>`}</div></td></tr>`;
  };
  const table=(list,title)=>`<h4>${title} · ${list.length}</h4>${list.length?`<div class="inv-table-scroll"><table class="catalog-spec inv-ledger-table"><thead><tr><th>Předmět</th><th>Umístění</th><th>Ks</th><th>WQ</th><th>Cena</th><th>lb/ks</th><th>ENC zbroje</th><th>Vlastnosti / účinky</th><th>Akce</th></tr></thead><tbody>${list.map(viewRow).join('')}</tbody></table></div>`:'<p class="muted">Žádné položky.</p>'}`;
- return `<div class="inv-summary-grid">${cards.map(([name,value])=>`<div class="inv-summary-stat"><span>${esc(name)}</span><strong>${esc(value)}</strong></div>`).join('')}</div><p class="tiny muted">ENC výbavy se odvozuje z celkové efektivní hmotnosti a způsobu nesení. Nelze ho přidělovat každému předmětu zvlášť. Jednotkové ceny a váhy chybějících katalogových údajů nejsou odhadovány.</p>${table(rows.filter(r=>r.kind==='equipped'),'Nasazené a držené předměty')}${table(rows.filter(r=>r.kind==='carried'),'Nesené a nezařazené předměty')}${table(rows.filter(r=>r.kind==='chest'),'Truhlice · věci ponechané doma / v úschově')}<p class="tiny muted">Truhlice je místo uložení, nikoli nový předmět ani pravidlový bonus. Zůstává vlastníkem postavy, ale uložené věci nejsou dostupné na cestě a nezapočítávají se do ENC. Každé vyzvednutí nebo uložení vyžaduje potvrzenou fyzickou dostupnost u GM a nemění čas kampaně.</p><div class="inv-footer-totals"><strong>Celkem ${rows.length} položek</strong><span>Známá hodnota: ${totals.knownValue} d${totals.unknownValue?` (${totals.unknownValue} bez ceny)`:''}</span><span>Známá hmotnost: ${totals.knownWeightLb.toFixed(1)} lb${totals.unknownWeight?` (${totals.unknownWeight} bez hmotnosti)`:''}</span><span>Gear ENC: ${number(load.gearENC)} · Armour ENC: ${number(load.armourENC)}${Number.isFinite(load.knownArmourENC)&&!Number.isFinite(load.armourENC)?` (známé od ${load.knownArmourENC}${Number.isFinite(load.armourENCUpperBound)&&load.armourENCUpperBound!==load.knownArmourENC?' do '+load.armourENCUpperBound:''})`: ''} · Bulk: ${load.bulkReady?number(load.meleeBulkPenalty):load.prohibitedOutfit?'zakázaná sestava':'pořadí neurčeno'}</span></div>`;
+ return `<div class="inv-summary-grid">${cards.map(([name,value])=>`<div class="inv-summary-stat" data-hmk-help="${esc(invHelp[name]||name)}" tabindex="0" aria-label="${esc(name+': '+(invHelp[name]||name))}"><span>${esc(name)}</span><strong>${esc(value)}</strong></div>`).join('')}</div><p class="tiny muted">ENC výbavy se odvozuje z celkové efektivní hmotnosti a způsobu nesení. Nelze ho přidělovat každému předmětu zvlášť. Jednotkové ceny a váhy chybějících katalogových údajů nejsou odhadovány.</p>${table(rows.filter(r=>r.kind==='equipped'),'Nasazené a držené předměty')}${table(rows.filter(r=>r.kind==='carried'),'Nesené a nezařazené předměty')}${table(rows.filter(r=>r.kind==='chest'),'Truhlice · věci ponechané doma / v úschově')}<p class="tiny muted">Truhlice je místo uložení, nikoli nový předmět ani pravidlový bonus. Zůstává vlastníkem postavy, ale uložené věci nejsou dostupné na cestě a nezapočítávají se do ENC. Každé vyzvednutí nebo uložení vyžaduje potvrzenou fyzickou dostupnost u GM a nemění čas kampaně.</p><div class="inv-footer-totals"><strong>Celkem ${rows.length} položek</strong><span>Známá hodnota: ${totals.knownValue} d${totals.unknownValue?` (${totals.unknownValue} bez ceny)`:''}</span><span>Známá hmotnost: ${totals.knownWeightLb.toFixed(1)} lb${totals.unknownWeight?` (${totals.unknownWeight} bez hmotnosti)`:''}</span><span>Gear ENC: ${number(load.gearENC)} · Armour ENC: ${number(load.armourENC)}${Number.isFinite(load.knownArmourENC)&&!Number.isFinite(load.armourENC)?` (známé od ${load.knownArmourENC}${Number.isFinite(load.armourENCUpperBound)&&load.armourENCUpperBound!==load.knownArmourENC?' do '+load.armourENCUpperBound:''})`: ''} · Bulk: ${load.bulkReady?number(load.meleeBulkPenalty):load.prohibitedOutfit?'zakázaná sestava':'pořadí neurčeno'}</span></div>`;
 }
 function physicalWaterPanel(actor){
  const clock=data.campaignClock;const key=campaignKey(clock);
@@ -7361,7 +7369,7 @@ function hskSpecialRun(form){
  if(criticalWill)explanation+=' Ritual CF: následný Will d100 '+criticalWill.roll+' → '+criticalWill.level+'; úprava Benediction Modifier '+criticalBenedictionPenalty+'.';
  if(routine.id==='astral-rite-member')explanation+=' '+modifierDetails+'; bonus +2 TN pouze při Trance CS.';
  const body=routine.name+' · HMK '+routine.page+'\nSR '+routine.skill+' ML '+secondaryML+' → TN '+outcome.tn+'; hody '+(outcome.rolls.join(', ')||'žádné')+'; úspěchy '+outcome.successes+'\n'+explanation;
- return {body,proof:{type:'special-secondary-roll',actorId:actor.id,priestId:priest?.id??null,routineId:routine.id,routineName:routine.name,page:routine.page,skill:routine.skill,secondaryML,stars,style:styleInfo?.name??null,primaryResult,criticalWill,outcome,explanation,physicalDice:rolls.map(value=>({faces:10,value,source:form.elements.namedItem('specialDice')?.value?.trim()?'entered-number':'internal-software-die'})),campaignMinute:data.campaignClock?.minute??null,sourcePages:[62,routine.page]}};
+ return {body,proof:{type:'special-secondary-roll',actorId:actor.id,priestId:priest?.id??null,routineId:routine.id,routineName:routine.name,page:routine.page,skill:routine.skill,secondaryML,stars,style:styleInfo?.name??null,primaryResult,criticalWill,outcome,explanation,physicalDice:rolls.map(value=>({faces:10,value,source:form.elements.namedItem('specialDice')?.value?.trim()?(form.elements.namedItem('specialDice')?.dataset.hmkAutoDice===form.elements.namedItem('specialDice')?.value?'cryptographic-software-die':'entered-number'):'internal-software-die'})),campaignMinute:data.campaignClock?.minute??null,sourcePages:[62,routine.page]}};
 }
 function hskFields(form,side){return {
   secondary1:form.elements.namedItem(side==='A'?'secondary1':'defSecondary1')?.value||'',
@@ -7655,7 +7663,7 @@ function hskResolveSide({person,form,side,helpers=[]}){
  const footpad=data.campaignClock?footpadSkillEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),
   minute:data.campaignClock.minute,actorId:person.id,skill:info.primary,
   auralShockLevels:person.hmk?.arcane?.auralShockLevels??0,
-  silenceConfirmed:!!form.elements.namedItem('footpadQuiet'+side)?.checked}):null;
+  silenceConfirmed:false}):null;
  const effectiveMastery=footpad?footpadMastery(mastery,footpad):mastery;
  const resolved=skillResolvedResult({mastery:effectiveMastery,form,dieKey:'roll'+side,condition:ctx.condition,trauma:ctx.trauma,
   secondaryMLs:secs.map(x=>x.ml),assistants:helpers.map(x=>x.mastery.ml),gmModifier:hskGMModifier(form,side)});
@@ -7746,7 +7754,7 @@ document.addEventListener('submit',event=>{
    const footpad=data.campaignClock?footpadSkillEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),
     minute:data.campaignClock.minute,actorId:actor.id,skill:v.primary,
     auralShockLevels:actor.hmk?.arcane?.auralShockLevels??0,
-    silenceConfirmed:!!form.elements.namedItem('footpadQuietA')?.checked}):null;
+    silenceConfirmed:false}):null;
    const effectivePrimary=footpad?footpadMastery(primary,footpad):primary;
    const resolved=skillResolvedResult({mastery:effectivePrimary,form,dieKey:'rollA',condition:ctx.condition,trauma:ctx.trauma,assistants:helpers.map(x=>x.mastery.ml),gmModifier:hskGMModifier(form,'A')});
    const die=resolved.die,raw=hskApplySRResult(resolved.result,sr);
@@ -10102,7 +10110,7 @@ document.addEventListener('submit',e=>{
   if(committed)notice=`Postava ${actor.name} získala ${qty} fyzických dávek jídla (${qty*3} lb). Potvrzená spotřeba a čas zůstaly beze změny.`;
  }catch(err){alert('Pořízení zásob: '+err.message)}
 },true);
-// v93.482 — acquire ONLY the two witnessed HMK water vessels in the
+// v93.483 — acquire ONLY the two witnessed HMK water vessels in the
 // original Library/inventory/cash ledger; an empty vessel is not drinking water.
 document.addEventListener('change',e=>{
  const field=e.target.closest?.('[data-provision-vessel-mode]');if(!field)return;
@@ -10203,7 +10211,7 @@ document.addEventListener('submit',e=>{
   if(mutate(()=>{data.journal=next.journal;}))notice='Doložená zásoba byla odložena, snížila se její projektovaná nesená hmotnost. Čas GM beze změny.';
  }catch(error){alert('Odložení se neprovedlo: '+error.message)}
 },true);
-// v93.482 — never offer a larger physical write-off than the selected lot holds.
+// v93.483 — never offer a larger physical write-off than the selected lot holds.
 document.addEventListener('change',e=>{
  const source=e.target.closest?.('[data-provision-drop-source]');if(!source)return;
  const form=source.closest('form[data-provision-drop]'),quantity=form?.querySelector('[data-provision-drop-quantity]');if(!quantity)return;
@@ -12129,6 +12137,23 @@ document.addEventListener('submit',e=>{
 },true);
 
 // Explicit physical write-offs: append-only custody evidence, never a GM clock advance.
+ document.addEventListener('click',e=>{
+  const button=e.target.closest('[data-hsk-special-dice],[data-hsk-roll-d10]');if(!button)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  const form=button.closest('form');if(!form)return;
+  const input=button.hasAttribute('data-hsk-special-dice')?form.elements.namedItem('specialDice'):
+    form.elements.namedItem(button.dataset.hskRollD10);
+  if(!input||input.disabled)return;
+  const n=secureAutoDie(10);
+  if(input.name==='specialDice'){
+    const existing=String(input.value||'').trim();
+    input.value=existing?(existing+', '+n):String(n);
+  }else input.value=String(n);
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+  if(input.name==='specialDice')input.dataset.hmkAutoDice=input.value;
+ },true);
+document.addEventListener('input',e=>{ if(e.target?.name==='specialDice')delete e.target.dataset.hmkAutoDice; },true);
 document.addEventListener('click',e=>{
  const t=e.target.closest('[data-loss-ration]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();
  const clock=data.campaignClock;
@@ -12157,7 +12182,7 @@ document.addEventListener('click',e=>{
   .filter(x=>x.itemId===t.dataset.lossWater&&x.remaining>=0.5);
  if(!lots.length)return alert('Nádoba neobsahuje doloženou vodu.');
  const total=lots.reduce((v,x)=>v+x.remaining,0);
- overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Odpis skutečné pitné vody</h2><p class="tiny muted">Obsah nádoby ${esc(t.dataset.lossWater)}: ${total} gal. Odpis není vypití ani posun GM času.</p><form id="water-loss-form"><input name="actorId" type="hidden" value="${esc(selected)}"><label>Původní naplnění<select name="fillId" required>${lots.map(l=>`<option value="${esc(l.fillId)}">${esc(l.fillId)} · ${l.remaining} gal</option>`).join('')}</select></label><label>Ztracený objem (gal)<select name="quantity"><option value="0.5">0,5</option>${lots.some(l=>l.remaining>=1)?'<option value="1">1</option>':''}</select></label><label>Skutečný důvod ztráty<input name="reason" required minlength="2" maxlength="160" placeholder="Vylito, rozlito, kontaminace..."></label><label><input name="confirmedByGM" type="checkbox" value="yes" required> GM potvrzuje skutečnou ztrátu vody</label><div class="actions"><button type="submit">Zapsat odpis</button><button class="secondary" type="button" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
+ overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Odpis skutečné pitné vody</h2><p class="tiny muted">Obsah nádoby ${esc(t.dataset.lossWater)}: ${total} gal. Odpis není vypití ani posun GM času.</p><form id="water-loss-form"><input name="actorId" type="hidden" value="${esc(selected)}"><label>Vybrané naplnění<select name="fillId" required>${lots.map((l,i)=>`<option value="${esc(l.fillId)}">Naplnění ${i+1} · zbývá ${l.remaining} gal</option>`).join('')}</select></label><label>Ztracený objem (gal)<select name="quantity"><option value="0.5">0,5</option>${lots.some(l=>l.remaining>=1)?'<option value="1">1</option>':''}</select></label><label>Skutečný důvod ztráty<input name="reason" required minlength="2" maxlength="160" placeholder="Vylito, rozlito, kontaminace..."></label><label><input name="confirmedByGM" type="checkbox" value="yes" required> GM potvrzuje skutečnou ztrátu vody</label><div class="actions"><button type="submit">Zapsat odpis</button><button class="secondary" type="button" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
  render();
 },true);
 document.addEventListener('submit',e=>{

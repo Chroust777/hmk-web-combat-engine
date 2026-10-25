@@ -4629,3 +4629,7 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .gm-history-table td{vertical-align:top;font-size:13px}.gm-history-table td:nth-child(3){min-width:170px}.gm-history-table .gm-history-links{white-space:nowrap}.gm-history-links button{font-size:11px!important;padding:5px!important;margin:0 3px 3px 0!important}
 .hc-provision-cash{padding:8px;border:1px solid rgba(117,77,38,.38);background:rgba(233,205,161,.27)}
 .hc-provision-acquire-open{margin-top:9px}.hc-provision-vessel-purchase{margin:8px 0;border:1px solid rgba(117,77,38,.33);padding:7px}
+
+/* HMK v93.483: consistent manual / software die layout */
+.hsk-inline-die { display:block!important;width:max-content;max-width:100%;margin:5px 0 0!important;white-space:normal }
+.inv-summary-stat[title] { cursor:help }
