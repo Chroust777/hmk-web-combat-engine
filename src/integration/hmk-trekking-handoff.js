@@ -27,7 +27,8 @@ export function trekkingModeHardLimit(modes={}){
 export function trekkingSkillLinkForNewProof({pending,source,actorId,campaignId,minute,proof}={}){
  if(!pending||!source?.calendarTrekProof||source.id!==pending.sourceId||
     (pending.hazard==='tracking'?!(source.calendarTrekProof.partyModes?.memberIds??[source.characterId]).includes(actorId):
-      (pending.hazard==='drover'?source.calendarTrekProof.orienteeringContext?.droverId:source.characterId)!==actorId)||source.calendarCampaignId!==campaignId||
+      (pending.hazard==='drover'?source.calendarTrekProof.orienteeringContext?.droverId:
+       pending.hazard==='weather'?(source.calendarTrekProof.partyModes?.memberIds??[source.characterId]).includes(actorId)?actorId:null:source.characterId)!==actorId)||source.calendarCampaignId!==campaignId||
     !validMinute(minute)||minute<source.campaignMinute||
     !['weather','survival','direction','drover','tracking'].includes(pending.hazard))return null;
  const skills=TREK_TEST_SKILLS[pending.hazard];
@@ -44,10 +45,10 @@ export function trekkingSkillLinkForNewProof({pending,source,actorId,campaignId,
  return {format:'hmk-trek-linked-skill-v1',sourceId:source.id,hazard:pending.hazard,
    sourceMinute:source.campaignMinute,campaignId,actorId,skill:used};
 }
-export function hasFinishedLinkedTrekHazard(source,hazard,journal){
+export function hasFinishedLinkedTrekHazard(source,hazard,journal,actorId=source.characterId){
  const relevant=journal.filter(j=>j?.calendarTrekSkillSource?.format==='hmk-trek-linked-skill-v1'&&
   j.calendarTrekSkillSource.sourceId===source.id&&j.calendarTrekSkillSource.hazard===hazard&&
-  j.characterId===(hazard==='drover'?source.calendarTrekProof.orienteeringContext?.droverId:source.characterId)&&j.calendarCampaignId===source.calendarCampaignId&&
+  j.characterId===(hazard==='drover'?source.calendarTrekProof.orienteeringContext?.droverId:actorId)&&j.calendarCampaignId===source.calendarCampaignId&&
   validMinute(j.campaignMinute)&&j.campaignMinute>=source.campaignMinute);
  if(hazard==='drover')return relevant.length>0;
  if(hazard==='survival'){
@@ -65,8 +66,13 @@ export function hasFinishedLinkedTrekHazard(source,hazard,journal){
   });
  }
  if(hazard==='weather')return relevant.some(j=>journal.some(x=>x.skillTestProof?.type==='skill-weather-onset'&&
-  x.skillTestProof.sourceId===j.id&&x.characterId===source.characterId&&
-  x.calendarCampaignId===source.calendarCampaignId&&validMinute(x.campaignMinute)&&x.campaignMinute>=source.campaignMinute));
+  x.skillTestProof.sourceId===j.id&&x.characterId===actorId&&
+  ((x.calendarCampaignId===source.calendarCampaignId&&validMinute(x.campaignMinute)&&x.campaignMinute>=source.campaignMinute)||
+   // v93.508 and earlier omitted time/campaign on the final weather-onset
+   // journal row. Its unique parent d100 still proves source, campaign and
+   // minute; accept ONLY this explicitly linked legacy shape, do not guess a
+   // timestamp or rewrite archived evidence.
+   (x.calendarCampaignId===undefined&&x.campaignMinute===undefined))));
  return false;
 }
 export function validateTrekLinkedEvidence(journal=[]){

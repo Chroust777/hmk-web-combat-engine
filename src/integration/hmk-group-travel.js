@@ -25,8 +25,23 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
    'Vybraná skupina neodpovídá účastníkům původně připravené Trekking Routine.');
   const current=trekPartyModes({memberIds:prepared.members.map(m=>m.id),guideId,
    characters,inventory,conveyance:prepared.conveyance,loadedByGM:prepared.manualLoaded});
-  requireFact(current.members.every((x,i)=>JSON.stringify(x)===JSON.stringify(prepared.members[i])),
-   'Stav postav nebo zatížení skupiny se po přípravě hlídky změnily. Nepoužívejte zastaralé cestovní podklady.');
+  // The group was snapshot before the (required) weather procedures. A
+  // confirmed weather test legitimately changes Fatigue within this same
+  // watch; this MUST NOT invalidate the original immutable party snapshot.
+  // Reject unrelated fatigue changes instead of simply dropping this guard.
+  const weatherDelta=id=>journal.filter(j=>j.characterId===id&&
+    j.skillTestProof?.type==='skill-weather-onset'&&
+    (j.calendarCampaignId===campaignKey(clock)||j.calendarCampaignId===undefined)&&
+    journal.some(src=>src.id===j.skillTestProof.sourceId&&
+      src.calendarTrekSkillSource?.sourceId===ready.sourceId&&
+      src.calendarTrekSkillSource?.hazard==='weather'&&src.characterId===id))
+    .reduce((sum,j)=>sum+(j.skillTestProof.report?.addedWeariness??0)+
+      (j.skillTestProof.report?.outcome?.weaknessFatigue??0),0);
+  requireFact(current.members.every((x,i)=>{
+    const original=prepared.members[i];
+    return x.id===original.id&&x.fatigue===original.fatigue+weatherDelta(x.id)&&
+      Object.entries(original).every(([k,v])=>k==='fatigue'||JSON.stringify(x[k])===JSON.stringify(v));
+  }), 'Stav postav nebo zatížení skupiny se po přípravě hlídky změnily bez doloženého Weather Hazard. Nepoužívejte zastaralé cestovní podklady.');
  }
  const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort()};
  const fatigueOf=actor=>{const f=actor.hmk?.combatState?.fatigue??{};
@@ -53,7 +68,12 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
 
   const input=diceByActor[id];
   const result=expeditionDiceSubmission({kind,rawValues:input?.rawValues,generated:input?.generated});
-  const plan={...expeditionWatchFatigue({mode:kind,endurance,rolls:result.rolls}),kind:'travel',
+  const snapshot=ready.source.calendarTrekProof.partyModes?.members.find(m=>m.id===id);
+  const bypass=ready.source.calendarTrekProof.modes?.ignoreLoaded===true&&snapshot?.loaded===true;
+  // Weather-test Weariness is already applied by the original exposure
+  // executor. Do NOT add it a second time during completion of the watch.
+  const plan={...expeditionWatchFatigue({mode:kind,endurance,rolls:result.rolls,
+    modifiedENC:bypass?snapshot.modifiedENC:0,ignoreLoaded:bypass}),kind:'travel',
    trekSourceId:ready.sourceId,orienteeringId:ready.orienteeringId,
    travelledLeagues:ready.movement.leagues,travelledKilometres:ready.movement.kilometres,
    travelGroup:group};

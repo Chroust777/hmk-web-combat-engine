@@ -166,7 +166,13 @@ export function validateTrekkingJournalEvidence(document){
    validateTrekPartySnapshot(p.partyModes);
    assert(p.partyModes.guideId===entry.characterId&&p.partyModes.conveyance===p.conveyance&&
     p.modes.slow===p.modes.manualSlow+p.partyModes.forcedSlow+(p.weatherWatch?.slowMode?1:0)+(p.modes.orienteeringSlow??0)+(p.orienteeringContext?.stationaryForaging?0:(p.modes.foraging>0?1:0)+(p.modes.stalking??0))&&
-    p.modes.loaded===p.partyModes.loaded&&int(p.modes.manualSlow,0,20),
+    p.modes.loaded===(p.partyModes.loaded&&!p.modes.ignoreLoaded)&&
+    (p.modes.ignoreLoaded===undefined||typeof p.modes.ignoreLoaded==='boolean')&&
+    (!p.modes.ignoreLoaded||(
+      p.conveyance==='foot'&&p.partyModes.loaded&&!p.partyModes.loadUnresolved.length&&
+      p.partyModes.members.some(m=>m.loaded)&&
+      p.partyModes.members.filter(m=>m.loaded).every(m=>Number.isSafeInteger(m.modifiedENC))))&&
+    int(p.modes.manualSlow,0,20),
     'Skupinové postihy neodpovídají uloženému pohybu a počasí.');
   }
   const expectedDay=trekWeatherDay({season:p.season,climate:p.climate,landscape:p.landscape,

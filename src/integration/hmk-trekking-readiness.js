@@ -54,7 +54,9 @@ export function assessTrekkingReadiness({journal=[],characters=[],actorId,campai
  if((p.modes.foraging??0)>0)requireFact(journal.filter(j=>j.calendarTrekWildernessProof?.sourceId===source.id&&j.calendarCampaignId===campaignId).length===1,
   'Hlídka má Foraging Modes: nejprve proveďte a uložte všechny příslušné d10 z HMK 147.');
  const pending=trekkingOutstandingCases(characters,journal,campaignId)
-  .filter(x=>x.sourceId===source.id&&x.characterId===actorId);
+  .filter(x=>x.sourceId===source.id);
+ // Every exposed member must resolve their own Weather Hazard before the
+ // shared group watch may advance. Guide-only checking loses companions. 
  requireFact(pending.length===0,
   'Neuzavřená pravidlová povinnost před pokračováním cesty: '+pending.map(x=>x.description).join('; '));
  requireFact(!journal.some(j=>j.calendarExpeditionProof?.trekSourceId===source.id),

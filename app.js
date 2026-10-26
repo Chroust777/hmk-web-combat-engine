@@ -250,7 +250,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.508';
+const APP_VERSION='93.509';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1213,6 +1213,7 @@ function campaignCalendarView(){
  <label class="hc-check"><input name="alpine" type="checkbox" value="yes"> Alpine Vegetation / Ice (−4 teplota)</label>
  <label class="hc-check"><input name="aridDesert" type="checkbox" value="yes"> Arid Desert (zvláštní modifikátory)</label>
  <label class="hc-check"><input name="loaded" type="checkbox" value="yes"> Loaded Mode – pouze pokud není zatížení doložitelné z inventáře / případně naložené zvíře</label>
+ <label class="hc-check"><input name="ignoreLoaded" type="checkbox" value="yes"> HMK 145 · Ignorovat zpomalení Loaded Mode (pouze pěší skupina s doloženým ENC každého zatíženého člena): místo zpomalení +10 Weariness za každých úplných 10 ENC zatížené postavy. Připočte se až po uplynutí hlídky.</label>
  <label class="hc-check"><input name="doubleTime" type="checkbox" value="yes"> Double Time (jen bez Slow/Loaded)</label>
  <p class="hc-hint">Postihy celé skupiny (Wearied, Injured a doložený Loaded) se odvodí automaticky při uložení. Závažné zranění nebo chybějící údaje o výbavě se nebudou vykládat jako nulový postih. Kdo není v této hlídce, tomu se nepřipíše cestovní účinek.</p><button type="submit">Vyhodnotit a uložit podklady (bez posunu času)</button></form>
  <p class="tiny">Pokud vyjde Encounter, hazard či expozice, skutečné vyhodnocení otevřete v Combat / Skill Tests. Generování podkladů samo nezakládá zranění ani neprohlašuje následek za vyřízený.</p></details></section>`;
@@ -6709,18 +6710,24 @@ function hskSeriousAggravationForm(entry){
 
 function hskTrekkingWeatherForm(entry){
  const proof=entry?.skillTestProof,origin=proof?.a||proof?.result;
- const skill=proof?.skills?.[0]||proof?.skill;
- if(!['Endurance','Survival'].includes(skill)||!origin||!['CF','F','S','CS'].includes(origin.level)||
+ const skill=proof?.skills?.[0]||proof?.skill,link=entry?.calendarTrekSkillSource;
+ // Never advertise weather treatment for an unrelated Endurance/Survival roll.
+ const watch=data.journal.find(j=>j.id===link?.sourceId&&
+  j.calendarCampaignId===entry.calendarCampaignId)?.calendarTrekProof;
+ if(link?.format!=='hmk-trek-linked-skill-v1'||link.hazard!=='weather'||
+  !watch?.weatherWatch?.requiresWeatherHazardRoll||
+  !(watch.partyModes?.memberIds??[data.journal.find(j=>j.id===link.sourceId)?.characterId]).includes(entry.characterId)||
+  !['Endurance','Survival'].includes(skill)||!origin||!['CF','F','S','CS'].includes(origin.level)||
   !['secondary-mastery-value-test','secondary-mastery-test','assistance-success-test'].includes(proof.type))return '';
  if(data.journal.some(x=>x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===entry.id))return '';
- return `<details class="hsk-climb-fall"><summary>Trekking · Cold/Heat Hazard, Endurance (Survival) · HMK str.149,185</summary>
+ const kind=watch.weatherWatch.hazard;
+ if(!['cold','heat'].includes(kind))return '';
+ return `<details class="hsk-climb-fall"><summary>Trekking · ${kind==='cold'?'Cold':'Heat'} Hazard – ${esc(character(entry.characterId)?.name||'postava')} · HMK str.149,185</summary>
  <form data-skill-weather-onset><input type="hidden" name="sourceId" value="${esc(entry.id)}">
- <p>Jen pokud tento původní hod skutečně patřil do Trekking Weather Hazard. Neúspěch může vytvořit trvající Cold/Heat Exposure; CF navíc vyžaduje samostatné určení Frostbite/Sunburn. Původní d100 se nepřehazuje.</p>
- <div class="field-grid"><label>Počasí<select name="kind"><option value="cold">Cold Hazard</option><option value="heat">Heat Hazard</option></select></label>
- <label>Skutečné podmínky Cold Exposure<select name="coldCondition"><option value="dry">Sucho · HR5</option><option value="damp">Déšť / mokro · HR4</option><option value="coolWater">Chladná voda (vyžaduje samostatný Cold Shock)</option><option value="coldWater">Studená voda (Cold Shock)</option><option value="freezingWater">Ledová voda (Cold Shock)</option></select></label></div>
- <label><input type="checkbox" name="weatherHazardConfirmed" required> GM ověřil, že jde o Weather Hazard po předchozím Cold/Heat Hazard hodu dle str.149</label>
- <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje následky původního Endurance (Survival) testu</label>
- <button type="submit">Zapsat Trekking Weather Hazard do stavu</button><output role="status" aria-live="polite"></output>
+ <p>Zdroj hlídky, postava, typ počasí i původní Endurance/Survival výsledek jsou ověřené. Žádný nový d100 se nehází. GM doplní jen skutečné podmínky expozice.</p>
+ <input type="hidden" name="kind" value="${esc(kind)}">
+ ${kind==='cold'?`<label>Skutečné podmínky Cold Exposure<select name="coldCondition"><option value="dry">Sucho · HR5</option><option value="damp">Déšť / mokro · HR4</option><option value="coolWater">Chladná voda (vyžaduje samostatný Cold Shock)</option><option value="coldWater">Studená voda (Cold Shock)</option><option value="freezingWater">Ledová voda (Cold Shock)</option></select></label>`:''}
+ <button type="submit">Zapsat doložený Weather Hazard do stavu</button><output role="status" aria-live="polite"></output>
  </form></details>`;
 }
 function hskTrekkingColdShockForm(entry){
@@ -6842,7 +6849,7 @@ function recordSkillEvidence(title,body,proof,slotId=null){
    if(sourceLink.hazard==='weather'&&form){
     const origin=data.journal.find(j=>j.id===sourceLink.sourceId)?.calendarTrekProof;
     const kind=form.elements.namedItem('kind');if(kind)kind.value=origin?.weatherWatch?.hazard||'cold';
-    const confirmed=form.elements.namedItem('weatherHazardConfirmed');if(confirmed)confirmed.checked=true;
+    // The original trek and roll are already attested: no confirmation checkbox.
    }
    if(sourceLink.hazard==='survival'&&form){
     const activity=form.elements.namedItem('activity');
@@ -7216,16 +7223,28 @@ document.addEventListener('submit',event=>{
   if(!actor||src?.characterId!==actor.id||!['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill)||
    !['CF','F','S','CS'].includes(result?.level))throw Error('Chybí doložený původní test Endurance (Survival)');
   if(combatInitiativeSequence)throw Error('Během Initiative musí stav řídit Combat');
-  const kind=form.elements.namedItem('kind').value;
+  const link=src.calendarTrekSkillSource;
+  const watchEntry=data.journal.find(j=>j.id===link?.sourceId&&
+   j.calendarCampaignId===src.calendarCampaignId);
+  const watch=watchEntry?.calendarTrekProof;
+  if(link?.format!=='hmk-trek-linked-skill-v1'||link.hazard!=='weather'||
+     !watch?.weatherWatch?.requiresWeatherHazardRoll||
+     !(watch.partyModes?.memberIds??[watchEntry.characterId]).includes(actor.id)||
+     src.calendarCampaignId!==campaignKey(data.campaignClock)||
+     data.campaignClock.minute<src.campaignMinute)
+   throw Error('Test nepatří do této hlídky, postavy nebo kampaně');
+  const kind=watch.weatherWatch.hazard;
+  if(form.elements.namedItem('kind')?.value!==kind)throw Error('Typ Cold/Heat musí odpovídat doloženému počasí');
   const outcome=prepareTrekkingWeatherTest({state:persistentStateOf(actor),sourceId,
    round:Math.max(1,combatClock.round||1,persistentStateOf(actor).lastRound||0),kind,
-   originalSL:result.level,coldCondition:form.elements.namedItem('coldCondition').value,
-   weatherHazardConfirmed:form.elements.namedItem('weatherHazardConfirmed').checked,
-   gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
+   originalSL:result.level,coldCondition:form.elements.namedItem('coldCondition')?.value||'dry',
+   weatherHazardConfirmed:true,gmConfirmed:true});
   if(!mutate(()=>{
    if(data.journal.some(x=>x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===sourceId))throw Error('Dvojí zápis');
    synchronizeCombatInjuries(actor,outcome.state);
-   data.journal.push({id:uuid(),characterId:actor.id,title:'Trekking '+kind+' Hazard · HMK 149,185',
+   data.journal.push({id:uuid(),characterId:actor.id,
+    calendarCampaignId:src.calendarCampaignId,campaignMinute:data.campaignClock.minute,
+    title:'Trekking '+kind+' Hazard · HMK 149,185',
     body:'Původní '+result.level+' · HR '+(outcome.report.hr??'bez expozice')+
      ' · Weariness +'+outcome.report.addedWeariness+
      (outcome.report.skinPending?' · VYŽADUJE samostatné '+outcome.report.skinPending:''),createdAt:stamp(),
@@ -8265,6 +8284,11 @@ document.addEventListener('submit',e=>{
   const memberIds=[...new Set([...new FormData(form).getAll('trekMemberIds'),actor.id])];
   const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:data.characters,
    inventory:data.inventory,conveyance:v.conveyance,loadedByGM:v.loaded==='yes'});
+  const ignoreLoaded=v.ignoreLoaded==='yes';
+  if(ignoreLoaded&&(v.conveyance!=='foot'||!partyModes.loaded||
+      partyModes.loadUnresolved.length||!partyModes.members.some(m=>m.loaded)||
+      partyModes.members.filter(m=>m.loaded).some(m=>!Number.isSafeInteger(m.modifiedENC))))
+   throw Error('Ignorovat Loaded Mode lze jen pěšky, s úplným doloženým ENC zatížených členů; ne s odhadovanou nebo neznámou výbavou.');
   const manualSlow=qty('slow',20),orienteeringSlow=Number(v.orienteeringSlow==='yes');
   const lax=v.lax==='yes';
   const orienteeringContext=createOrienteeringContext({night:v.night==='yes',partySize:partyModes.memberIds.length,
@@ -8286,13 +8310,17 @@ document.addEventListener('submit',e=>{
   // yields the total remaining Progress allocation.
   const spare=Math.max(0,progress-slow),progressD10=Array.from({length:spare},()=>die(10,'Progress')); 
   const movement=trekWatchMovement({stationaryForaging,topography:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
-    progress,slow,loaded:partyModes.loaded,bearing,progressD10,continuousPrecipitation:wet.continuous,
+    progress,slow,loaded:partyModes.loaded&&!ignoreLoaded,bearing,progressD10,continuousPrecipitation:wet.continuous,
     doubleTime:v.doubleTime==='yes'});
   const directionD10=Array.from({length:movement.bearingDeficit},()=>die(10,'Direction Hazard'));
   const hazards=trekHazards({bearingDeficit:movement.bearingDeficit,directionD10});
-  const priorNightWatch=data.journal.find(j=>j.characterId===actor.id&&j.calendarCampaignId===campaignId&&
+  // Night watches belong to the travelling PARTY, not its current guide.
+  // A change of guide must not reset the every-second-watch encounter check.
+  const priorNightWatch=data.journal.find(j=>j.calendarCampaignId===campaignId&&
     j.campaignMinute===clock.minute-240&&j.calendarTrekProof?.area===area&&
-    j.calendarTrekProof?.night===true&&j.calendarTrekProof?.modes?.environ==='wilderness');
+    j.calendarTrekProof?.night===true&&j.calendarTrekProof?.modes?.environ==='wilderness'&&
+    JSON.stringify(j.calendarTrekProof?.partyModes?.memberIds??[j.characterId].sort())===
+    JSON.stringify(partyModes.memberIds));
   const wildernessNightWatches=String(v.wildernessNightWatches??'').trim()!==''?
     qty('wildernessNightWatches',10000):(priorNightWatch?.calendarTrekProof?.modes?.wildernessNightWatches??-1)+1;
   const encounterDue=!(v.environ==='wilderness'&&v.night==='yes'&&wildernessNightWatches%2===0);
@@ -8303,7 +8331,7 @@ document.addEventListener('submit',e=>{
     ...(hazards.direction&&hazards.direction!=='lost-time'?[`Direction Hazard: ${hazards.direction}`]:[]),
     ...(encounter.encounter?['Random Encounter – nutné vyhodnocení']:[])];
   const proof={format:'hmk-trekking-watch-evidence-v1',dayIndex,campaignMinute:clock.minute,area,
-    partyModes,orienteeringContext,modes:{progress,slow,manualSlow,orienteeringSlow,lax,loaded:partyModes.loaded,bearing,trackingForcedBearingSourceId:trackingBearing?.trackingId??null,foraging,stalking,vigilance,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
+    partyModes,orienteeringContext,modes:{progress,slow,manualSlow,orienteeringSlow,lax,loaded:partyModes.loaded&&!ignoreLoaded,ignoreLoaded,bearing,trackingForcedBearingSourceId:trackingBearing?.trackingId??null,foraging,stalking,vigilance,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
      environ:v.environ,wildernessNightWatches},
     season,climate:v.climate,landscape:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
     night:v.night==='yes',alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',weatherDay:day,
@@ -8314,7 +8342,7 @@ document.addEventListener('submit',e=>{
   if(hazards.direction==='lost-time')proof.unresolved=proof.unresolved.filter(x=>!x.startsWith('Direction Hazard:'));
  const summary=`${area} · ${season}/${v.climate} · ${wet.precipitation}${wet.continuous?' (continuous)':''}; `+
    `den ${day.temperatureD10}/${day.precipitationD10}${dayAlready?' (doložené počasí)':''}${trackingBearing?' · povinný Bearing po Tracking CF '+trackingBearing.trackingId:''}; `+
-   `skupina ${partyModes.memberIds.length}; automatické Slow ${partyModes.forcedSlow}; Loaded ${partyModes.loaded?'ano':'ne'}; LPW ${effectiveMovement.finalLPW}; ${effectiveMovement.leagues} leagues${stationaryForaging?' (Foraging na místě · +2 Orienteering SV)':''}${hazards.direction==='lost-time'?' (Lost Time → Slow +1, HMK 148)':''}; encounter ${encounter.checkDue?(encounter.encounter?'ANO':'ne'):'bez hodu'}`+
+   `skupina ${partyModes.memberIds.length}; automatické Slow ${partyModes.forcedSlow}; Loaded ${partyModes.loaded?(ignoreLoaded?'nahrazen únavou':'ano'):'ne'}; LPW ${effectiveMovement.finalLPW}; ${effectiveMovement.leagues} leagues${stationaryForaging?' (Foraging na místě · +2 Orienteering SV)':''}${hazards.direction==='lost-time'?' (Lost Time → Slow +1, HMK 148)':''}; encounter ${encounter.checkDue?(encounter.encounter?'ANO':'ne'):'bez hodu'}`+
    (unresolved.length?'; NAVAZUJÍCÍ PROCEDURY: '+unresolved.join(', '):'');
   // Submission is already the explicit confirmation of this reversible,
   // append-only preparation. Do not interrupt GM with a redundant modal.
@@ -10233,6 +10261,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   const hazard=kind==='trek-weather-hazard'?'weather':kind==='trek-direction-hazard'?'direction':
    kind==='trek-encounter'?'encounter':kind==='trek-drover-test'?'drover':'survival';
   const source=data.journal.find(j=>j.id===sourceId&&(j.characterId===actor.id||
+   (hazard==='weather'&&(j.calendarTrekProof?.partyModes?.memberIds??[j.characterId]).includes(actor.id))||
    (hazard==='drover'&&j.calendarTrekProof?.orienteeringContext?.droverId===actor.id))&&
    j.calendarCampaignId===campaignKey(data.campaignClock));
   if(!source?.calendarTrekProof){notice='Chybí originální důkaz cestovní hlídky.';render();return;}
@@ -10247,7 +10276,13 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   // Open original Skill Workbench; the next matching saved result becomes
   // linked to THIS source. No duplicate dice or independent EML formula.
   const known=TREK_TEST_SKILLS[hazard]||[];
-  const options=[...document.querySelectorAll('#skill-value-form [name="primary"] option')];
+  // Weather and other travel events may originate on the Hazards page.
+  // The actual dice executor lives in Skills: render it BEFORE resolving its
+  // mastery options, not after reading the previous page's empty DOM.
+  view='skills';
+  activeSkillTab=['survival','drover'].includes(hazard)?'value':'secondary';
+  render();
+  const options=[...document.querySelectorAll('#skill-value-form [name="primary"] option, #skill-secondary-form [name="primary"] option')];
   const applicable=hazard==='drover'?[source.calendarTrekProof.conveyance==='mount'?'Riding':'Animalcraft']:known;
   const choice=applicable.find(x=>options.some(o=>o.value===x));
   if(!choice){notice='Postava nemá osvojenou požadovanou dovednost ('+known.join(' / ')+'). Opravte skutečná Skills, nepočítejte fiktivní ML.';render();return;}

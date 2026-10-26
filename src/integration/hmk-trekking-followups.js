@@ -55,15 +55,21 @@ export function trekkingOutstandingCases(characters=[],journal=[],campaignId=nul
    (j.skillTestProof?.a||j.skillTestProof?.result)?.level==='CF'))triggers.push('survival');
   if(p.encounter?.encounter)triggers.push('encounter');
   for(const hazard of triggers){
-   const subjectId=hazard==='drover'?p.orienteeringContext?.droverId:entry.characterId;
-   if(!names.has(subjectId))continue;
-   const k=[entry.calendarCampaignId,subjectId,entry.id,hazard].join('|');
-   if(resolutions.has(k)||hasFinishedLinkedTrekHazard(entry,hazard,journal))continue;
-   const spec=KINDS[hazard];
-   cases.push({id:'trek:'+encodeURIComponent(entry.id)+':'+hazard,
-    characterId:subjectId,name:names.get(subjectId),sourceId:entry.id,
-    kind:spec.kind,description:spec.label,minute:entry.campaignMinute,route:spec.route,
-    hazard:hazard==='survival-test'?'survival':hazard,sourcePage:hazard==='encounter'?150:hazard==='weather'?144:hazard==='survival-test'||hazard==='drover'?145:148});
+   // HMK p.149: the weather hazard is assessed for every exposed member,
+   // NOT only the guide who prepared the shared watch.
+   const members=hazard==='weather'?
+     (p.partyModes?.memberIds??[entry.characterId]):
+     [hazard==='drover'?p.orienteeringContext?.droverId:entry.characterId];
+   for(const subjectId of members){
+    if(!names.has(subjectId))continue;
+    const k=[entry.calendarCampaignId,subjectId,entry.id,hazard].join('|');
+    if(resolutions.has(k)||hasFinishedLinkedTrekHazard(entry,hazard,journal,subjectId))continue;
+    const spec=KINDS[hazard];
+    cases.push({id:'trek:'+encodeURIComponent(entry.id)+':'+hazard+':'+encodeURIComponent(subjectId),
+     characterId:subjectId,name:names.get(subjectId),sourceId:entry.id,
+     kind:spec.kind,description:spec.label,minute:entry.campaignMinute,route:spec.route,
+     hazard:hazard==='survival-test'?'survival':hazard,sourcePage:hazard==='encounter'?150:hazard==='weather'?149:hazard==='survival-test'||hazard==='drover'?145:148});
+   }
   }
  }
  return cases;
