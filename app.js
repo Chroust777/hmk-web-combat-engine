@@ -130,6 +130,7 @@ import {pendingSpellPsycheManifestations,persistSpellPsycheManifestation} from '
 import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan} from './src/integration/hmk-calendar-planner.js';
 import {secureHMKDie,expeditionDiceSubmission,expeditionWatchFatigue,expeditionRestRecovery} from './src/integration/hmk-calendar-expedition.js';
 import {scheduleHMKActivity,finishDueHMKActivities,validateHMKActivityEvidence,assertHMKActivitiesAppendOnly,activeHMKActivities,interruptHMKActivity} from './src/integration/hmk-calendar-activities.js';
+import {nutritionRestActivity,interruptionForCancelledNutritionRest} from './src/integration/hmk-nutrition-rest-bridge.js';
 import {planHMKGroupWatch} from './src/integration/hmk-group-travel.js';
 import {trekPartyModes} from './src/integration/hmk-trekking-party-modes.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
@@ -247,7 +248,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.500';
+const APP_VERSION='93.501';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1026,6 +1027,13 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
  const due=dueMalnutritionCases(data).filter(x=>x.characterId===actorId);
  const day=dayCandidates.find(x=>x.row.characterId===actorId&&!dayPlans.some(j=>j.calendarNutritionConditions.policyId===x.row.id&&j.calendarNutritionConditions.startMinute===x.start));
  const outstanding=dayPlans.filter(x=>x.characterId===actorId);
+ const restStatus=outstanding.filter(x=>!data.journal.some(j=>j.calendarNutritionConditionsCancel?.planId===x.id)&&clock.minute<x.calendarNutritionConditions.endMinute).map(x=>{
+  const p=x.calendarNutritionConditions,hasRest=['rest','rest-inactive','rest-hot'].includes(p.kind);
+  const a=data.journal.find(j=>j.calendarActivityProof?.plan?.nutritionConditionsId===x.id);
+  const finished=a&&data.journal.some(j=>j.calendarExpeditionProof?.activityId===a.id);
+  const end=a?.calendarActivityProof?.endMinute;
+  return `<div class="hc-event hc-person-provision-interval"><strong>${esc(actor.name)} · ${hasRest?'Celodenní odpočinek':'Denní podmínky'} · ${esc(p.kind)}</strong><p class="hc-hint">Doložený interval: ${esc(displayCampaignMinute(p.startMinute))} – ${esc(displayCampaignMinute(p.endMinute))}. ${hasRest?(a?(finished?'Čtyřhodinový odpočinek dokončen; skutečný stav Fatigue je zapsán.':'Obnova Weariness po čtyřech hodinách: '+esc(displayCampaignMinute(end))+'.'):'Žádná další obnova Fatigue se neplánuje (již využitý odpočinek nebo zvláštní zdravotní stav).'):'Tento režim pouze upravuje denní spotřebu, nikoli Fatigue.'} Čas posouvá pouze GM.</p></div>`;
+ }).join('');
  const policyForm=`<form data-nutrition-policy-form data-provision-scope-actor="${esc(actorId)}">
  <input type="hidden" name="nutritionActorIds" value="${esc(actorId)}">
  <input type="hidden" name="foodNeed" value="1"><input type="hidden" name="waterNeed" value="1">
@@ -1037,9 +1045,9 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
   <details><summary>Převzít dosud nezaúčtované čerstvé potraviny (volitelné)</summary><label class="hc-check"><input type="checkbox" name="freshRations" value="yes"> GM potvrzuje nově převzaté čerstvé potraviny</label></details>`:''}
  <button type="submit">Uložit režim pouze pro ${esc(actor.name)}</button></form>`;
  const pause=policy?.enabled?`<form data-nutrition-policy-form data-provision-scope-actor="${esc(actorId)}" class="hc-provision-pauser"><input type="hidden" name="nutritionActorIds" value="${esc(actorId)}"><input type="hidden" name="foodNeed" value="1"><input type="hidden" name="waterNeed" value="1"><input type="hidden" name="policyAction" value="pause"><input type="hidden" name="sourceMode" value="foraging"><button class="secondary" type="submit">Pozastavit tento režim</button></form>`:'';
- const conditions=day?`<details class="hc-person-provision-options"><summary>Celodenní odpočinek / horko · GM</summary>
+ const conditions=day?`<details class="hc-person-provision-options"><summary>Celodenní podmínky · odpočinek / horko · GM</summary>
  <form data-nutrition-day-conditions><input type="hidden" name="actorId" value="${esc(actorId)}"><label>Skutečné podmínky na celých 24 hodin<select name="kind"><option value="rest-inactive">Úplný odpočinek a nečinnost</option><option value="rest">Úplný odpočinek</option><option value="inactive">Úplná nečinnost</option><option value="hot">Celodenní horko</option><option value="rest-hot">Úplný odpočinek v horku</option></select></label>
- <label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje úplné podmínky a při změně plán zruší.</label><button type="submit">Zaznamenat podmínky · bez posunu času</button></form></details>`:'';
+ <label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje úplné 24hodinové podmínky a při jejich změně plán zruší. Čtyřhodinová obnova Weariness se případně zapíše zvlášť po skutečně uplynulých čtyřech hodinách; spánek ani Weakness se automaticky neobnovují.</label><button type="submit">Zaznamenat podmínky · bez posunu času</button></form></details>`:'';
  const cancellation=outstanding.map(x=>{const c=x.calendarNutritionConditions,already=data.journal.some(j=>j.calendarNutritionConditionsCancel?.planId===x.id);
   if(already||clock.minute>=c.endMinute)return '';
   return `<form data-nutrition-conditions-cancel class="hc-provision-pauser"><input type="hidden" name="sourceId" value="${esc(x.id)}"><label>Přerušit potvrzený plán (${esc(c.kind)})<input name="reason" minlength="3" required placeholder="Skutečný důvod přerušení"></label><button type="submit" class="secondary">Zrušit plán</button></form>`;}).join('');
@@ -1048,9 +1056,9 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
  // or cancellation of a previously scheduled 24-hour conditions plan.
  if(policy?.gmProvisioned===true){
   if(!cancellation&&!health)return '';
-  return `<section class="hc-person-provision-rules hc-provision-remaining-duties">${cancellation}${health}</section>`;
+  return `<section class="hc-person-provision-rules hc-provision-remaining-duties">${restStatus}${cancellation}${health}</section>`;
  }
- return `<section class="hc-person-provision-rules"><details class="hc-provision-personal-rules"><summary>Pokročilé sledování spotřeby · ${esc(actor.name)} (${esc(current)})</summary><p class="hc-provision-caution">Přepínač pouze volí pravidlový režim. Neprohlašuje postavu automaticky za najedenou nebo napitou. Denní příjem potvrdí až skutečný výdej a uzávěrka.</p>${policyForm}${pause}</details>${conditions}${cancellation}${health}</section>`;
+ return `<section class="hc-person-provision-rules">${restStatus}<details class="hc-provision-personal-rules"><summary>Pokročilé sledování spotřeby · ${esc(actor.name)} (${esc(current)})</summary><p class="hc-provision-caution">Přepínač pouze volí pravidlový režim. Neprohlašuje postavu automaticky za najedenou nebo napitou. Denní příjem potvrdí až skutečný výdej a uzávěrka.</p>${policyForm}${pause}</details>${conditions}${cancellation}${health}</section>`;
 }
 let calendarLanding=true; // Clicking the left navigation always opens the calendar chooser.
 let calendarCreating=false;
@@ -8356,9 +8364,11 @@ document.addEventListener('submit',e=>{
   const actorId=String(f.get('actorId')||'');
   const policyRow=activeNutritionPolicies(data.journal,campaignKey(clock),calendarMemberIds(clock,data.characters).map(c=>c.id)).find(x=>x.characterId===actorId&&x.calendarNutritionPolicy.autoNeeds);
   const p=createNutritionDayConditions({journal:data.journal,policyRow,campaignId:campaignKey(clock),actorId,minute:clock.minute,kind:String(f.get('kind'))});
-  if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,createdAt:stamp(),
-    title:'HMK · plán úplných denních podmínek',body:`${p.kind}, den ${p.startMinute}–${p.endMinute}; doklad GM, bez posunu času.`,calendarNutritionConditions:p})))
-   notice='Celodenní podmínky byly zaznamenány. Čas se nezměnil.';
+  const conditionRow={id:uuid(),characterId:actorId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,createdAt:stamp(),
+   title:'HMK · plán úplných denních podmínek',body:`${p.kind}, den ${p.startMinute}–${p.endMinute}; doklad GM, bez posunu času.`,calendarNutritionConditions:p};
+  const rest=nutritionRestActivity({journal:data.journal,clock,actor:character(actorId),conditionRow,id:uuid()});
+  if(mutate(()=>{data.journal.push(conditionRow);if(rest)data.journal.push({...rest,createdAt:stamp()});}))
+   notice='Celodenní podmínky byly zaznamenány do kalendáře.'+(rest?' Obnova Weariness je naplánována po čtyřech hodinách.':' Fatigue nebyla automaticky změněna.');
  }catch(error){alert('Denní podmínky nebyly uloženy: '+error.message)}
 },true);
 document.addEventListener('submit',e=>{
@@ -8368,8 +8378,10 @@ document.addEventListener('submit',e=>{
   const f=new FormData(form),clock=data.campaignClock;
   const source=data.journal.find(x=>x.id===f.get('sourceId'));
   const p=createNutritionConditionsCancel({journal:data.journal,planRow:source,campaignId:campaignKey(clock),actorId:source?.characterId,minute:clock.minute,reason:String(f.get('reason')||'')});
-  if(mutate(()=>data.journal.push({id:uuid(),characterId:p.actorId,calendarCampaignId:p.campaignId,campaignMinute:p.minute,createdAt:stamp(),
-   title:'HMK · zrušení denního plánu',body:p.reason+'; bez posunu času.',calendarNutritionConditionsCancel:p})))notice='Plán byl auditovaně zrušen; čas se nezměnil.';
+  const stop=interruptionForCancelledNutritionRest({journal:data.journal,clock,planRow:source,reason:p.reason,id:uuid(),createdAt:stamp()});
+  if(mutate(()=>{data.journal.push({id:uuid(),characterId:p.actorId,calendarCampaignId:p.campaignId,campaignMinute:p.minute,createdAt:stamp(),
+   title:'HMK · zrušení denního plánu',body:p.reason+'; bez posunu času.',calendarNutritionConditionsCancel:p});
+   if(stop)data.journal.push(stop);}))notice='Plán byl auditovaně zrušen; případný nedokončený odpočinek nepřinesl žádnou obnovu.';
  }catch(error){alert('Zrušení podmínek selhalo: '+error.message)}
 },true);
 // A standing 24h food/water policy records attested assumptions only.
