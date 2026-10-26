@@ -4754,3 +4754,19 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .journal-book--chapter .inv-ledger-table .inv-row-actions button{
  min-height:29px!important;padding:3px 7px!important;font:700 11px/1.1 Georgia,serif!important;
 }
+
+/* v93.496 — four compact PC/NPC cards on a desktop folio. The original
+ * 820px *single-page* threshold never activated in a two-page spread. */
+@media (min-width: 1050px){
+ .content-sheet .journal-book--characters .character-registry-group .folio-character-list{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:5px!important;
+ }
+ .content-sheet .journal-book--characters .character-registry-group .character-card{
+  padding:5px!important;min-height:0!important;
+ }
+ .content-sheet .journal-book--characters .character-registry-group .character-card__crest{width:26px!important;height:26px!important;min-height:26px!important;font-size:14px!important}
+ .content-sheet .journal-book--characters .character-registry-group .character-card__body h3{font-size:12px!important}
+ .content-sheet .journal-book--characters .character-registry-group .character-card .pill{font-size:9px!important}
+ .content-sheet .journal-book--characters .character-registry-group .character-card__controls>button{font-size:10px!important;min-height:23px!important}
+}
