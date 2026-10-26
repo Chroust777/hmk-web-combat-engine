@@ -83,6 +83,25 @@ export function dailyNutritionNeeds({journal=[],campaignId,actorId,policyId,star
   completeRest:!!settings?.completeRest,completeInactivity:!!settings?.inactive,hot,
   conditionsId:active?plan.id:null,heatWatchIds:weather.map(x=>x.id),sourcePages:[144,186]};
 }
+/** Present original 24h nutrition conditions on the shared calendar timeline.
+ * Historical plans remain visible as evidence but never gain retroactive fatigue.
+ */
+export function calendarNutritionConditionActivities(clock,characters=[],journal=[]){
+ if(!clock)return [];
+ const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
+ const names=new Map(characters.map(c=>[c.id,c.name]));
+ const cancelled=new Set(journal.filter(j=>j.calendarNutritionConditionsCancel).map(j=>j.calendarNutritionConditionsCancel.planId));
+ const completed=new Set(journal.filter(j=>j.calendarNutritionDay?.activityNeeds?.conditionsId).map(j=>j.calendarNutritionDay.activityNeeds.conditionsId));
+ const titles={rest:'Celodenní odpočinek',inactive:'Celodenní nečinnost','rest-inactive':'Celodenní odpočinek a nečinnost',hot:'Celodenní horko','rest-hot':'Celodenní odpočinek v horku'};
+ return journal.filter(j=>j.calendarNutritionConditions?.format===NUTRITION_PLAN&&j.calendarCampaignId===campaignId&&names.has(j.characterId)).map(j=>{
+  const p=j.calendarNutritionConditions,isCancelled=cancelled.has(j.id),isDone=completed.has(j.id);
+  const status=isCancelled?'cancelled':isDone?'resolved':clock.minute>=p.endMinute?'due':clock.minute>=p.startMinute?'active':'future';
+  return {id:'nutrition-plan:'+j.id,sourceId:j.id,origin:'activity',kind:'nutrition-conditions',
+   name:names.get(j.characterId),characterId:j.characterId,title:titles[p.kind]||'Denní podmínky',description:'24hodinový režim výživy',
+   note:'Doložený interval mění spotřebu až při uzávěrce dne. Samotný záznam neobnovuje Fatigue; případná čtyřhodinová obnova je doložena samostatnou časovou činností.',
+   minute:p.startMinute,dueMinute:p.startMinute,endMinute:p.endMinute,status,destination:'notes'};
+ });
+}
 export function validateNutritionActivityJournal(journal=[]){
  const ids=new Map(),seenPlans=new Set(),cancelled=new Set(),closed=new Set();
  for(const row of journal){

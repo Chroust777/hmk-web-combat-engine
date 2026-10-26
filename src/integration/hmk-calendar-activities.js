@@ -128,8 +128,9 @@ export function calendarActorActivities(clock,characters=[],journal=[]){
  const done=scheduledHMKCompletionIds(journal),interrupts=new Map(journal.filter(row=>row.calendarActivityInterruptProof?.format===STOP).map(row=>[row.calendarActivityInterruptProof.activityId,row]));
  const activities=plannedHMKActivities(journal,campaignId).filter(row=>allowed.has(row.characterId)).map(row=>{
   const a=row.calendarActivityProof,finished=done.has(row.id),stop=interrupts.get(row.id),interrupted=!!stop,isStarted=a.startMinute<=clock.minute;
+  const labels={winded:'Klid · 10 minut',rest:'Odpočinek · 4 hodiny',sleep:'Spánek · 8 hodin',travel:'Cesta'};
   return {id:'activity:'+row.id,sourceId:row.id,origin:'activity',kind:a.kind,
-   name:allowed.get(row.characterId),characterId:row.characterId,title:'HMK · '+a.kind,
+   name:allowed.get(row.characterId),characterId:row.characterId,title:labels[a.kind]||'Činnost · '+a.kind,
    description:'Činnost postavy',note:interrupted?'GM přerušil činnost v minutě '+stop.campaignMinute+' ('+stop.calendarActivityInterruptProof.reason+'); bez automatického účinku.':finished?'Pravidlový výsledek byl dokončen a zapsán.':
     isStarted?'Činnost probíhá. Účinek se zapíše teprve po uplynutí intervalu a posunu času GM.':'Naplánovaná činnost.',
    minute:a.startMinute,dueMinute:a.startMinute,endMinute:interrupted?Math.max(a.startMinute,stop.campaignMinute):a.endMinute,
