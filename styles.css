@@ -478,3 +478,6 @@ form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;
 .hmk-cloud-reset p{margin:.7rem 0;line-height:1.5}
 .hmk-cloud-reset button.danger{background:#742d24;color:#fff;border:1px solid #60251f;font-weight:700}
 .hmk-cloud-reset button.danger:hover{background:#5f211b}
+/* v93.492 — quick links use the existing authoritative provisioning and chest workflows. */
+.hc-provision-direct-actions{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem;margin:.4rem 0 .15rem}
+.hc-provision-direct-actions button{font-size:.81rem;padding:.35rem .6rem;white-space:normal;border-radius:8px}
