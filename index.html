@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HMK Keeper’s Ledger · v93.505</title>
-<link rel="stylesheet" href="./styles.css?v=93.505-release-notice-fix">
-<link rel="stylesheet" href="./skill-workbench.css?v=93.505-release-notice-fix">
-<link rel="stylesheet" href="./library.css?v=93.505-release-notice-fix">
-<link rel="stylesheet" href="./book-templates.css?v=93.505-release-notice-fix">
+<title>HMK Keeper’s Ledger · v93.506</title>
+<link rel="stylesheet" href="./styles.css?v=93.506-rebuilt-from-503">
+<link rel="stylesheet" href="./skill-workbench.css?v=93.506-rebuilt-from-503">
+<link rel="stylesheet" href="./library.css?v=93.506-rebuilt-from-503">
+<link rel="stylesheet" href="./book-templates.css?v=93.506-rebuilt-from-503">
 <style>.hmk-boot-note{max-width:760px;margin:5rem auto;padding:1.5rem;border:1px solid #8f7652;border-radius:10px;background:#f3eddf;color:#332817;font:16px/1.6 system-ui,sans-serif}.hmk-boot-note code{font-size:90%;overflow-wrap:anywhere}</style>
 
 </head>
 <body>
-<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.505…</main></div>
+<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.506…</main></div>
 <script>
 (function(){
  var app=document.getElementById('app');
@@ -22,14 +22,14 @@
   if(reported||document.querySelector('#app .shell'))return;
   reported=true;
   var msg=String(detail||'Neznámá chyba načítání.');
-  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.505 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>hmk-app.bundle.js</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
+  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.506 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>hmk-app.bundle.js</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
  };
  window.addEventListener('error',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.message||('Nelze načíst '+(event.filename||'skript')));});
  window.addEventListener('unhandledrejection',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.reason?.message||String(event.reason));});
  window.addEventListener('load',function(){setTimeout(function(){if(!document.querySelector('#app .shell'))window.__hmkBootFailure('Produkční aplikace se nespustila nebo nebyl načten její JavaScript.');},4000);});
 })();
 </script>
-<script defer src="./hmk-app.bundle.js?v=93.505-release-notice-fix" onerror="window.__hmkBootFailure('HTTP chyba: chybí hmk-app.bundle.js nebo není dostupný na GitHub Pages.')"></script>
+<script defer src="./hmk-app.bundle.js?v=93.506-rebuilt-from-503" onerror="window.__hmkBootFailure('HTTP chyba: chybí hmk-app.bundle.js nebo není dostupný na GitHub Pages.')"></script>
 
 <script>
 (function(){

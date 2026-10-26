@@ -4797,9 +4797,10 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .hc-entry .hc-event-line--task .hc-actions {display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
 .hc-entry .hc-event-mark {min-width:2rem}
 
-/* v93.504 – authoritative time is prominent on every Calendar tab. */
-.hc-clock-banner{margin:6px 0 16px;padding:12px 18px;background:rgba(250,236,205,.8);border:1px solid rgba(107,75,41,.4);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#50341e}
-.hc-clock-banner>span{font-size:.9rem;font-weight:600}
-.hc-clock-banner>strong{font-size:clamp(1.2rem,2.4vw,1.85rem);line-height:1.2;font-variant-numeric:tabular-nums}
-.hc-provision-party-conditions details{border:1px solid rgba(107,75,41,.26);border-radius:9px;padding:12px}
-.hc-provision-party-conditions summary{font-weight:700;color:#5b3824}
+/* v93.506: calendar clock stays INSIDE left-page heading; navigation does not move. */
+.content-sheet .hc-clock-heading{display:flex;flex-direction:column;align-items:flex-start;gap:4px;clear:both;margin:12px 0 0;padding:10px 14px;border:1px solid rgba(117,78,41,.42);border-radius:8px;background:rgba(253,241,216,.88);color:#54331f;max-width:100%;box-sizing:border-box}
+.content-sheet .hc-clock-heading span{font-size:clamp(.76rem,1vw,.92rem);letter-spacing:.065em;font-weight:700}
+.content-sheet .hc-clock-heading strong{font-size:clamp(1.35rem,2vw,2rem);line-height:1.27;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.content-sheet .hc-clock-heading small{color:#75583d;font-size:.8rem;line-height:1.2}
+.content-sheet .hc-provision-party-conditions details{border:1px solid rgba(108,69,38,.3);border-radius:9px;padding:12px}
+.content-sheet .hc-provision-party-conditions summary{font-weight:700;color:#59391f}
