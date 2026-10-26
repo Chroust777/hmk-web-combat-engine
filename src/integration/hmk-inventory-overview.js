@@ -65,3 +65,31 @@ export function inventoryTotals(rows=[]){
  return {knownValue:value,knownWeightLb:weight,unknownValue,unknownWeight,count:rows.length,
   fullyValued:unknownValue===0,fullyWeighed:unknownWeight===0};
 }
+
+/** Presentation-only stacking of identical items. Never merge source inventory
+ * IDs or receipt-backed custody rows: each item remains independently editable.
+ * Damaged pieces, different WQ, contents, location or carrying mode stay apart.
+ */
+export function groupInventoryDisplayRows(rows=[]){
+ const grouped=new Map(),out=[];
+ const fingerprint=item=>{
+  // The underlying id and count describe custody, not physical properties.
+  const {id,quantity,characterId,...physical}=item;
+  const canonical=value=>Array.isArray(value)?value.map(canonical):
+   value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])):value;
+  return JSON.stringify(canonical({...physical,slot:physical.slot==='none'?'carried':physical.slot}));
+ };
+ for(const row of rows){
+  const key=fingerprint(row.item)+JSON.stringify([row.weight,row.wq,row.priceLabel]);
+  let group=grouped.get(key);
+  if(!group){
+   group={...row,itemIds:[],members:[],qty:0,totalPrice:0,totalWeight:0};
+   grouped.set(key,group);out.push(group);
+  }
+  group.itemIds.push(row.item.id);group.members.push(row);
+  group.qty=row.qty===null||group.qty===null?null:group.qty+row.qty;
+  group.totalPrice=row.totalPrice===null||group.totalPrice===null?null:group.totalPrice+row.totalPrice;
+  group.totalWeight=row.totalWeight===null||group.totalWeight===null?null:group.totalWeight+row.totalWeight;
+ }
+ return out;
+}

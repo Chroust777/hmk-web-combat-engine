@@ -13,7 +13,7 @@ export function rationEquivalentMinutes(units,dailyNeed=1){
 export function supplyDurationText(minutes){
  if(!Number.isSafeInteger(minutes)||minutes<0)return 'nelze doložit';
  const days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60),mins=minutes%60;
- return [days?days+' d':'',hours?hours+' h':'',mins?mins+' min':''].filter(Boolean).join(' ')||'0 h';
+ return [days?days+' '+(days===1?'den':days>=2&&days<=4?'dny':'dnů'):'',hours?hours+' '+(hours===1?'hodinu':hours>=2&&hours<=4?'hodiny':'hodin'):'',mins?mins+' '+(mins===1?'minutu':mins>=2&&mins<=4?'minuty':'minut'):''].filter(Boolean).join(' ')||'0 hodin';
 }
 export function characterCarryProjection(database,actorId){
  const status=characterProvisionsOverview(database,actorId);
