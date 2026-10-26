@@ -1,3 +1,4 @@
+import {assertOnlyCharacterWasDeleted} from './hmk-character-removal.js';
 import {validateNeutralAlchemyHistory,validateNeutralAlchemyCombatLinks,assertNeutralAlchemyHistoryAppendOnly} from './hmk-alchemy-neutral-history.js';
 import {assertGMOnlyCampaignTime} from './hmk-gm-clock-authority.js';
 import {assertCommittedMoralePsycheDebts} from './hmk-morale-psyche-bridge.js';
@@ -14,7 +15,7 @@ import {assertCommittedNeutralTotalRelease} from './hmk-neutral-total-release-in
  * This adapter makes NO game-rule decisions and rolls NO dice.
  */
 const result=(ok,readOnly,code)=>({ok,readOnly,code});
-export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,gmClockAdvance=false,restoreBackup=false}={}){
+export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,gmClockAdvance=false,restoreBackup=false,characterDeletionId=null}={}){
  if(!storage||typeof key!=='string'||!key||
     !(baseline===null||typeof baseline==='string')||typeof serialized!=='string')
   throw Error('Neplatný požadavek na trvalý kontrolní bod');
@@ -28,18 +29,24 @@ export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,g
  try{
   if(before!==null){
    const old=JSON.parse(before),next=JSON.parse(serialized);
-   if(old&&next&&Array.isArray(old.characters)&&Array.isArray(next.characters)&&!restoreBackup)
+   if(characterDeletionId){
+    // Scoped exception for the GM's explicit whole-character deletion only.
+    // The pure transformation proves every surviving character, receipt and
+    // non-character state is unchanged. Ordinary game writes stay immutable.
+    assertOnlyCharacterWasDeleted(old,next,characterDeletionId);
+   }
+   if(old&&next&&Array.isArray(old.characters)&&Array.isArray(next.characters)&&!restoreBackup&&!characterDeletionId)
     assertGMOnlyCampaignTime(old,next,{gmClockAdvance});
-   if(old&&next&&Array.isArray(old.journal)&&Array.isArray(next.journal)){
+   if(!characterDeletionId&&old&&next&&Array.isArray(old.journal)&&Array.isArray(next.journal)){
     assertNeutralAlchemyHistoryAppendOnly(old.journal,next.journal);
     validateNeutralAlchemyHistory(next);
     validateNeutralAlchemyCombatLinks(next);
    }
-   assertCommittedMoralePsycheDebts(old,next);
+   if(!characterDeletionId){assertCommittedMoralePsycheDebts(old,next);
    assertCommittedFearTransitions(old,next);
    assertCommittedShadeTransitions(old,next);
    assertCommittedPelahnBurstSources(old,next);
-   assertCommittedNeutralTotalRelease(old,next);
+   assertCommittedNeutralTotalRelease(old,next);}
   }
  }catch(e){
   if(e?.message?.startsWith('Čas kampaně')||e?.message?.startsWith('Předchozí časové')||e?.message?.startsWith('Posun času'))return result(false,false,'gm-only-clock');
