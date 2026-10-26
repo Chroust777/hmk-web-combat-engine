@@ -40,9 +40,21 @@ export function expeditionWatchFatigue({mode='walk',endurance,rolls,modifiedENC=
  assert(Array.isArray(rolls)&&rolls.length===(mode.startsWith('double-')?4:1),'Počet hodů END SR neodpovídá počtu časových intervalů');
  const riding=mode==='ride'||mode==='drive',double=mode.startsWith('double-');
  const base=double?(mode==='double-drover'?5:10):5;
- const extraLoad=!double&&mode==='walk'&&ignoreLoaded?Math.floor(modifiedENC/10)*10:0;
- const results=rolls.map(roll=>expeditionSecondaryRoll({endurance,roll,riding}));
- const accrual=results.reduce((a,r)=>a+Math.max(0,base+extraLoad-(r.success?5:0)),0)+weatherExtra;
+ // HMK p.145/149: ignoring a foot Loaded Mode costs +10 Weariness
+ // per FULL 10 ENC for the entire WATCH.  This still applies when the
+ // traveller undertakes Double Time: four hourly END SRs do not multiply
+ // the single watch load surcharge, nor cancel it.
+ assert(!ignoreLoaded||['walk','double-walk'].includes(mode),
+  'Ignorovat Loaded Mode smí pouze pěší cestovatel');
+ assert(!ignoreLoaded||modifiedENC>=10,
+  'Ignorovaný Loaded Mode vyžaduje doloženou hodnotu ENC alespoň 10');
+ assert(ignoreLoaded||modifiedENC===0,
+  'Bez ignorovaného Loaded Mode se zvláštní ENC nezadává');
+ const extraLoad=ignoreLoaded?Math.floor(modifiedENC/10)*10:0;
+ const results=rolls.map(roll=>expeditionSecondaryRoll({endurance,roll,
+  riding:riding||mode==='double-drover'}));
+ // Hourly Double Time is calculated before the ONCE-PER-WATCH surcharge.
+ const accrual=results.reduce((a,r)=>a+Math.max(0,base-(r.success?5:0)),0)+extraLoad+weatherExtra;
  return {durationMinutes:240,mode,accrual,rolls:results,base,extraLoad,weatherExtra,
   sourcePages:[62,149,150,176],requiresHazardResolution:true};
 }

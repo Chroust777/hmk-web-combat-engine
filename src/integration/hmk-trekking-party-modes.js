@@ -9,7 +9,7 @@ import {combatFatigueTotals} from './persistent-combat-state.js';
 const check=(v,msg)=>{if(!v)throw Error(msg);};
 const int=n=>Number.isSafeInteger(n)&&n>=0;
 const serious=w=>!w.healed&&['S','G'].includes(w.severity);
-export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],conveyance='foot',loadedByGM=false}={}){
+export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],conveyance='foot',loadedByGM=false,allowCertifiedWeatherAccrual=false}={}){
  check(Array.isArray(memberIds)&&memberIds.length&&memberIds.length===new Set(memberIds).size&&memberIds.every(x=>typeof x==='string'&&x),
   'Vyberte jedinečné účastníky hlídky.');
  check(memberIds.includes(guideId),'Průvodce musí být součástí skupiny.');
@@ -34,7 +34,11 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
    modifiedENC:enc,minimumENC:enc===null?minimum:null,loaded,loadUnresolved:conveyance==='foot'&&enc===null&&!loaded};
  });
  const tooTired=members.find(x=>x.fatigue>=40);
- check(!tooTired||['cart','wagon'].includes(conveyance),
+ // Only the ORIGINAL at-departure fatigue may disqualify a watch. A post-watch
+ // weather outcome can cross 40 after the party already travelled. The caller
+ // may suppress this check ONLY while verifying a saved party snapshot, which
+ // must then prove every subsequent fatigue increment against Weather evidence.
+ check(allowCertifiedWeatherAccrual||!tooTired||['cart','wagon'].includes(conveyance),
   tooTired?.name+': Fatigue ≥ 40 – nelze se samostatně přesouvat; vyžaduje převoz (HMK 145).');
  const immobile=members.find(x=>x.immobile);
  check(!immobile||['cart','wagon'].includes(conveyance),

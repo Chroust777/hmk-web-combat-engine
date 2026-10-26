@@ -24,7 +24,8 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   requireFact(memberIds.length===prepared.memberIds.length&&memberIds.every(id=>prepared.memberIds.includes(id)),
    'Vybraná skupina neodpovídá účastníkům původně připravené Trekking Routine.');
   const current=trekPartyModes({memberIds:prepared.members.map(m=>m.id),guideId,
-   characters,inventory,conveyance:prepared.conveyance,loadedByGM:prepared.manualLoaded});
+   characters,inventory,conveyance:prepared.conveyance,loadedByGM:prepared.manualLoaded,
+   allowCertifiedWeatherAccrual:true});
   // The group was snapshot before the (required) weather procedures. A
   // confirmed weather test legitimately changes Fatigue within this same
   // watch; this MUST NOT invalidate the original immutable party snapshot.
@@ -44,10 +45,18 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   }), 'Stav postav nebo zatížení skupiny se po přípravě hlídky změnily bez doloženého Weather Hazard. Nepoužívejte zastaralé cestovní podklady.');
  }
  const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort()};
- const fatigueOf=actor=>{const f=actor.hmk?.combatState?.fatigue??{};
-  return totalFatigue({windedness:f.windedness??0,weariness:f.weariness??0,weakness:f.otherWeakness??0});};
+ // Combat State also includes blood-loss Weakness. A partial fatigue sum can
+ // silently allow a prohibited trek when the true total already reaches 40.
+ const fatigueOf=actor=>{
+  const s=actor.hmk?.combatState, f=s?.fatigue??{};
+  const bloodWeakness=s?.bloodLoss?.weaknessFatigue??0;
+  return totalFatigue({windedness:f.windedness??0,weariness:f.weariness??0,
+   weakness:(f.otherWeakness??0)+bloodWeakness});
+ };
+ const atDepartureFatigue=id=>ready.source.calendarTrekProof.partyModes?.members
+   .find(member=>member.id===id)?.fatigue??fatigueOf(roster.get(id));
  if(kind==='walk'||kind==='double-walk')for(const id of memberIds){
-  const fatigue=fatigueOf(roster.get(id));
+  const fatigue=atDepartureFatigue(id);
   requireFact(fatigue<40,roster.get(id).name+': Fatigue '+fatigue+' dosahuje 40. Podle HMK 145 nemůže samostatně cestovat pěšky.');
  }
  // HMK p.145: a single wearied party member imposes one extra Slow Mode.
@@ -64,7 +73,7 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   // HMK p.145: a folk member at 40+ total Fatigue cannot trek on foot.
   // This check uses the ORIGINAL authoritative fatigue state, not the future
   // END result; a wagon passenger is deliberately not presumed to be walking.
-  const fatigue=fatigueOf(actor);
+  const fatigue=atDepartureFatigue(id);
 
   const input=diceByActor[id];
   const result=expeditionDiceSubmission({kind,rawValues:input?.rawValues,generated:input?.generated});
