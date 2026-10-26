@@ -4796,3 +4796,10 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  overflow-wrap:anywhere}
 .hc-entry .hc-event-line--task .hc-actions {display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
 .hc-entry .hc-event-mark {min-width:2rem}
+
+/* v93.504 – authoritative time is prominent on every Calendar tab. */
+.hc-clock-banner{margin:6px 0 16px;padding:12px 18px;background:rgba(250,236,205,.8);border:1px solid rgba(107,75,41,.4);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#50341e}
+.hc-clock-banner>span{font-size:.9rem;font-weight:600}
+.hc-clock-banner>strong{font-size:clamp(1.2rem,2.4vw,1.85rem);line-height:1.2;font-variant-numeric:tabular-nums}
+.hc-provision-party-conditions details{border:1px solid rgba(107,75,41,.26);border-radius:9px;padding:12px}
+.hc-provision-party-conditions summary{font-weight:700;color:#5b3824}

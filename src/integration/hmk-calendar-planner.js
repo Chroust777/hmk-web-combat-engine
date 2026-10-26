@@ -58,6 +58,7 @@ export function validateCalendarPlans(clock){
    typeof p.title==='string'&&p.title.trim().length>0&&p.title.length<=160&&
    typeof p.note==='string'&&p.note.length<=2000&&typeof p.place==='string'&&p.place.length<=160&&
    typeof p.characterId==='string'&&p.characterId.length<=200&&
+   (p.skill===undefined||(typeof p.skill==='string'&&p.skill.length<=120))&&
    integer(p.minute,0,1e9)&&integer(p.endMinute,p.minute,1e9)&&
    ['notes','skills','healing','hazards','combat','inventory'].includes(p.destination)&&
    typeof p.requiresAction==='boolean'&&['start','end'].includes(p.trigger),
@@ -86,11 +87,11 @@ export function setCampaignTROrigin(clock,{year,month,day,eventId,confirmed}={})
  append(next,eventId,'tr-origin',`GM přiřadil TR datum ${day}/${month}/${year} ke dni kampaně ${anchorDay}`);
  validateCalendarPlans(next);return next;
 }
-export function addGMCalendarPlan(clock,{id,eventId,title,note='',place='',characterId='',minute,endMinute=minute,destination='notes',requiresAction=false,trigger='start',confirmed=false}={}){
+export function addGMCalendarPlan(clock,{id,eventId,title,note='',place='',characterId='',skill='',minute,endMinute=minute,destination='notes',requiresAction=false,trigger='start',confirmed=false}={}){
  test(confirmed===true,'GM musí potvrdit událost');
  const next=structuredClone(clock);
  next.plans??=[];
- next.plans.push({id,title:String(title).trim(),note:String(note),place:String(place),characterId:String(characterId),minute,endMinute,destination,requiresAction:!!requiresAction,trigger});
+ next.plans.push({id,title:String(title).trim(),note:String(note),place:String(place),characterId:String(characterId),...(skill?{skill:String(skill)}:{}),minute,endMinute,destination,requiresAction:!!requiresAction,trigger});
  validateCalendarPlans(next);
  append(next,eventId,'plan',`GM naplánoval: ${String(title).trim()}`);
  return next;
