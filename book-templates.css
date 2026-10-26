@@ -4718,3 +4718,39 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  .content-sheet .journal-book--characters .character-registry-group .character-card__crest{width:30px!important;height:30px!important;min-height:30px!important}
  .content-sheet .journal-book--characters .character-registry-group .character-card__body h3{font-size:13px!important}
 }
+
+/* v93.494 — dense, column-aligned Arsenal & Gear ledger and single action picker. */
+.content-sheet .journal-book--chapter .inv-ledger-table{
+ width:100%!important;min-width:1090px!important;table-layout:fixed!important;
+ border-collapse:collapse!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table thead th,
+.content-sheet .journal-book--chapter .inv-ledger-table tbody :is(td,th){
+ padding:4px 5px!important;box-sizing:border-box!important;
+ vertical-align:middle!important;overflow-wrap:normal!important;word-break:normal!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table tbody th{
+ min-width:0!important;max-width:none!important;overflow-wrap:break-word!important;text-align:left!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table thead th:nth-child(n+3):nth-child(-n+7),
+.content-sheet .journal-book--chapter .inv-ledger-table tbody td:nth-child(n+3):nth-child(-n+7){
+ text-align:center!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(5),
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(5) .inv-item-kind,
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-money-total{white-space:nowrap!important;}
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(5) .inv-item-kind{display:block!important;}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-key-spec{min-width:0!important;max-width:none!important;overflow-wrap:break-word!important;}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-row-actions{
+ min-width:0!important;display:flex!important;flex-direction:row!important;gap:4px!important;
+ align-items:center!important;white-space:nowrap!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-row-actions select{
+ min-width:0!important;width:100%!important;max-width:100%!important;
+ height:30px!important;padding:3px 2px!important;border-radius:5px!important;
+ font:12px/1.2 Georgia,serif!important;color:#392819!important;background:#f3e7d0!important;
+ border:1px solid #ab8d63!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-row-actions button{
+ min-height:29px!important;padding:3px 7px!important;font:700 11px/1.1 Georgia,serif!important;
+}

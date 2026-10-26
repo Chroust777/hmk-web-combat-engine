@@ -247,7 +247,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.493';
+const APP_VERSION='93.494';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -884,7 +884,6 @@ function provisionCardHTML(c,compact=false){
  return `<article class="hc-provision-card hc-provision-card--compact${alerts.length?' hc-provision-card--alert':''}"><h4>${compact?"Zásoby · jídlo a pití":esc(c.name)}</h4>
  <div class="hc-provision-indicators"><div class="hc-provision-indicator"><span class="hc-provision-mark hc-provision-mark--${food.kind}" aria-hidden="true"></span><div><strong>Jídlo · ${esc(food.label)}</strong><small>Výdrž nesených: ${esc(supplyDurationText(carry.foodMinutes))} · ${esc(carry.physicalFoodLb)} lb</small></div></div>
  <div class="hc-provision-indicator"><span class="hc-provision-mark hc-provision-mark--${water.kind}" aria-hidden="true"></span><div><strong>Pití · ${esc(water.label)}</strong><small>Výdrž nesených: ${esc(supplyDurationText(carry.waterMinutes))} · voda ${esc(carry.physicalWaterLb)} lb (bez hmotnosti nádob)</small></div></div></div>
- <div class="hc-provision-direct-actions"><button type="button" class="secondary hc-small" data-provision-manage="discard" data-provision-actor-id="${esc(c.id)}">Odložit / zahodit zásoby</button><button type="button" class="secondary hc-small" data-provision-manage="chest" data-provision-actor-id="${esc(c.id)}">Uložit předmět do Truhlice</button></div>
  ${alerts.length?`<p class="hc-provision-alert">Aktivní následek: ${esc(alerts.join(' · '))}</p>`:''}
  ${covered?'<p class="hc-provision-next">GM zajišťuje průběžný přístup k jídlu a vodě. Nesené zásoby se tím nemění.</p>':p.policy?`<p class="hc-provision-next">Další uzávěrka: ${esc(displayCampaignMinute(p.policy.nextCloseMinute))}</p>`:''}
  ${compact?'':`<details class="hc-provision-source"><summary>Historie poslední dávky a doklady</summary><p>${esc(p.nutritionEvidence==='not-monitored'?'Neprobíhá denní kontrola příjmu.':p.nutritionEvidence==='awaiting-first-close'?'První 24h období ještě neskončilo.':'Stav se vztahuje pouze k poslednímu skutečně uzavřenému dni.')}</p><p>Nepotvrzené zásoby v inventáři: ${esc(p.food.unconfirmedInventoryUnits)} dávek. Prošlá trvanlivost: ${esc(p.food.expiredUnits)} dávek. Foraging družiny není automaticky osobní příděl.</p></details>`}
@@ -898,20 +897,11 @@ function partyProvisionCardsHTML(participants,compact=false){
  ${compact?'':`<p class="hc-provision-pool">Společné nálezy Foraging: ${esc(pool?.foodDays??0)} dávek jídla · ${esc(pool?.waterDays??0)} dávek vody. Výdej konkrétní postavě je samostatný krok.</p>`}</section>`;
 }
 function personalProvisionQuickActionsHTML(actor){
- const p=characterCarryProjection(data,actor.id),pool=partyProvisionsOverview(data).pooledForaging;
- if(!p.available)return '';
- const foodLots=p.foodLots.filter(l=>l.remaining>=0.5),waterLots=p.waterLots.filter(l=>l.remaining>=0.5);
- const discard=(unit,lots)=>{
-  if(!lots.length)return '';
-  const isFood=unit==='food';
-  const lotOptions=lots.map(l=>`<option value="${esc(isFood?l.sourceId:l.fillId)}" data-remaining="${esc(l.remaining)}">${esc(isFood?l.name:'Naplněná nádoba')} · ${l.remaining} ${isFood?'dávek':'gal'} · ${l.remaining*(isFood?3:10)} lb</option>`).join('');
-  const quantityOptions=(remaining)=>[0.5,1].filter(q=>q<=remaining).map(q=>`<option value="${q}">${q===0.5?'0,5':'1'} ${isFood?'dávky':'gal'} · ${q*(isFood?3:10)} lb</option>`).join('');
-  return `<form data-provision-drop><input type="hidden" name="actorId" value="${esc(actor.id)}"><input type="hidden" name="unit" value="${unit}"><label>${isFood?'Balík potravy':'Naplněná nádoba'}<select name="sourceId" data-provision-drop-source>${lotOptions}</select></label><label>Odložit množství<select name="quantity" data-provision-drop-quantity>${quantityOptions(lots[0].remaining)}</select></label><label>Důvod skutečného odložení<input name="reason" minlength="2" maxlength="160" required placeholder="Např. ponecháno v táboře"></label><button type="submit">Zapsat odložení · ${isFood?'jídlo':'voda'}</button></form>`;
- };
- const shared=(pool?.foodDays>0||pool?.waterDays>0)?`<details class="hc-provision-compact-extra"><summary>Vydat denní dávku ze společných nálezů</summary><form data-provision-single-ration><input name="actorId" type="hidden" value="${esc(actor.id)}"><div class="hc-provision-inline-fields"><label>Potrava<select name="foodEach"><option value="0">0 dávek</option><option value="0.5">½ dávky · 1,5 lb</option><option value="1" selected>1 dávka · 3 lb</option></select></label><label>Voda<select name="waterEach"><option value="0">0 gal</option><option value="0.5">½ gal</option><option value="1" selected>1 gal</option><option value="2">2 gal</option></select></label></div><input type="hidden" name="confirmedByGM" value="yes"><button type="submit">Vydat pouze ${esc(actor.name)}</button></form><p class="hc-provision-help">Přidělení je denní spotřeba ze společných nálezů, nikoli přidání váhy do batohu.</p></details>`:'';
- return `<div class="hc-provision-actions-only"><div class="hc-provision-actions-caption">Odložení je skutečná změna nesené hmotnosti; převzetí společného přídělu se eviduje zvlášť.</div>
- ${foodLots.length||waterLots.length?`<details class="hc-provision-compact-extra"><summary>Odložit část nesených zásob · změna hmotnosti</summary><div class="hc-provision-drop-forms">${discard('food',foodLots)}${discard('water',waterLots)}</div><p class="hc-provision-help">Odložení je nevratný auditní odpis z osobní nesené zásoby v této kampani, nikoli automatické založení zásobníku tábora.</p></details>`:''}
- ${shared}</div>`;
+ const pool=partyProvisionsOverview(data).pooledForaging;
+ // Personal disposal/chest actions live exclusively on each physical item in Arsenal & Gear.
+ // This remaining action issues SHARED Foraging allocations (not a physical inventory disposal).
+ if(!(pool?.foodDays>0||pool?.waterDays>0))return '';
+ return `<div class="hc-provision-actions-only"><details class="hc-provision-compact-extra"><summary>Vydat denní dávku ze společných nálezů</summary><form data-provision-single-ration><input name="actorId" type="hidden" value="${esc(actor.id)}"><div class="hc-provision-inline-fields"><label>Potrava<select name="foodEach"><option value="0">0 dávek</option><option value="0.5">½ dávky · 1,5 lb</option><option value="1" selected>1 dávka · 3 lb</option></select></label><label>Voda<select name="waterEach"><option value="0">0 gal</option><option value="0.5">½ gal</option><option value="1" selected>1 gal</option><option value="2">2 gal</option></select></label></div><input type="hidden" name="confirmedByGM" value="yes"><button type="submit">Vydat pouze ${esc(actor.name)}</button></form><p class="hc-provision-help">Přidělení společného nálezu není odložení neseného předmětu ani přidání váhy do inventáře.</p></details></div>`;
 }
 function partyProvisionLedgerHTML(participants){
  const p=partyCarryProjection(data,participants),pool=partyProvisionsOverview(data).pooledForaging;
@@ -2961,11 +2951,36 @@ function characterInventoryOverview(c,inv){
   const alchemyStrength=alchemyInside?alchemyElixirStates(data.journal,campaignKey(data.campaignClock)).find(a=>a.finishId===alchemyInside.calendarAlchemyVialBinding.finishId):null;
   const rationLot=availableRationLots(data.journal,campaignKey(data.campaignClock),c.id,data.campaignClock?.minute??0).find(l=>l.itemId===x.id);
   const staleRationLot=rationStockBalances(data.journal,campaignKey(data.campaignClock),c.id,data.campaignClock?.minute??0).find(l=>l.itemId===x.id&&l.minute<=(data.campaignClock?.minute??0)&&l.remaining>=0.5);
-  const details=r.keyFields.length||r.protection.length?`<details class="inv-spec-details"><summary>Parametry (${r.keyFields.length+r.protection.length})</summary>${r.keyFields.map(t=>`<div>${esc(t)}</div>`).join('')}${r.protection.length?`<div class="inv-av-scroll"><table class="catalog-spec"><thead><tr><th>Lokace</th><th>B</th><th>E</th><th>P</th><th>F</th></tr></thead><tbody>${r.protection.map(y=>`<tr><td>${esc(y.loc)}</td><td>${esc(y.b)}</td><td>${esc(y.e)}</td><td>${esc(y.p)}</td><td>${esc(y.f)}</td></tr>`).join('')}</tbody></table></div>`:''}</details>`:'<span class="muted">Bez dalších katalogových atributů</span>';
-  return `<tr><th scope="row">${esc(x.snapshot?.name||'Bezejmenný předmět')}${potionInside?`<span class="inv-item-kind">Naplněna · ${esc(potionInside.herbType)} (${esc(potencyLabel(potionInside.potency))}); obsah bez doložené hmotnosti</span>`:''}${alchemyInside?`<span class="inv-item-kind">Alchemy · ${esc(alchemyStrength?.elixirName||'elixír')} · AS ${alchemyStrength?.currentAS??'?'}${alchemyStrength?.dispersed?' · obsah vyprázdněn':alchemyStrength?.expires?' · enchantment zanikl':''} · plná 0,5 lb</span>`:''}<span class="inv-item-kind">${esc(x.snapshot?.category||'jiné')}${visibleInventoryNote(x.condition)?' · '+esc(visibleInventoryNote(x.condition)):''}${x.slot==='chest'?' · '+esc(x.chestLocation||'Truhlice'):''}${x.gearStowage==='backpack'?' · v batohu':x.gearStowage==='awkward'?' · nepohodlně neseno':''}${['main_hand','off_hand'].includes(x.slot)&&x.snapshot?.category==='weapon'?' · '+(gripOf(x)==='two'?'obouručně':'jednoručně'):''}</span></th><td>${esc(slotLabel(x.slot))}</td><td class="inv-number">${number(r.qty)}</td><td class="inv-number">${number(r.wq)}</td><td title="${esc(r.priceLabel)}">${esc(r.priceLabel)}${r.totalPrice===null?'':`<span class="inv-item-kind">Celkem ${r.totalPrice} d</span>`}</td><td class="inv-number">${r.weight===null?'—':r.weight.toFixed(1)}${r.totalWeight!==null&&r.qty!==1?`<span class="inv-item-kind">Celkem ${r.totalWeight.toFixed(1)}</span>`:''}</td><td>${esc(r.armourENC)}</td><td class="inv-key-spec">${details}</td><td><div class="inv-row-actions">${x._campaignRationReceipt?'':`<button type="button" class="secondary" data-edit-inv="${esc(x.id)}">Upravit</button>`}${x._campaignRationReceipt?'':`<button type="button" class="secondary" data-chest-move="${esc(x.id)}">${x.slot==='chest'?'Vyzvednout':'Do Truhlice'}</button>`}${rationLot?`<button type="button" class="secondary" data-transfer-ration="${esc(rationLot.sourceId)}">Předat příděly</button>`:''}${staleRationLot?`<button type="button" class="danger" data-loss-ration="${esc(staleRationLot.sourceId)}">Odpis přídělů</button>`:''}${!x._campaignRationReceipt&&data.characters.length>1?`<button type="button" class="secondary" data-transfer-inv="${esc(x.id)}">Předat</button>`:''}${x._campaignRationReceipt?'':`<button type="button" class="danger" data-remove-inv="${esc(x.id)}">Ztráta / vyřadit</button>`}</div></td></tr>`;
+  const extras=r.keyFields.filter(t=>!/^Tištěná položka vybavení HMK, str\. \d+; výběr do počáteční výbavy je orientační, nikoli povinný\.$/i.test(t.trim()));
+  const details=extras.length||r.protection.length?`<details class="inv-spec-details"><summary>Parametry (${extras.length+r.protection.length})</summary>${extras.map(t=>`<div>${esc(t)}</div>`).join('')}${r.protection.length?`<div class="inv-av-scroll"><table class="catalog-spec"><thead><tr><th>Lokace</th><th>B</th><th>E</th><th>P</th><th>F</th></tr></thead><tbody>${r.protection.map(y=>`<tr><td>${esc(y.loc)}</td><td>${esc(y.b)}</td><td>${esc(y.e)}</td><td>${esc(y.p)}</td><td>${esc(y.f)}</td></tr>`).join('')}</tbody></table></div>`:''}</details>`:'<span class="muted">Bez dalších katalogových atributů</span>';
+  return `<tr><th scope="row">${esc(x.snapshot?.name||'Bezejmenný předmět')}${potionInside?`<span class="inv-item-kind">Naplněna · ${esc(potionInside.herbType)} (${esc(potencyLabel(potionInside.potency))}); obsah bez doložené hmotnosti</span>`:''}${alchemyInside?`<span class="inv-item-kind">Alchemy · ${esc(alchemyStrength?.elixirName||'elixír')} · AS ${alchemyStrength?.currentAS??'?'}${alchemyStrength?.dispersed?' · obsah vyprázdněn':alchemyStrength?.expires?' · enchantment zanikl':''} · plná 0,5 lb</span>`:''}<span class="inv-item-kind">${esc(x.snapshot?.category||'jiné')}${visibleInventoryNote(x.condition)?' · '+esc(visibleInventoryNote(x.condition)):''}${x.slot==='chest'?' · '+esc(x.chestLocation||'Truhlice'):''}${x.gearStowage==='backpack'?' · v batohu':x.gearStowage==='awkward'?' · nepohodlně neseno':''}${['main_hand','off_hand'].includes(x.slot)&&x.snapshot?.category==='weapon'?' · '+(gripOf(x)==='two'?'obouručně':'jednoručně'):''}</span></th><td>${esc(slotLabel(x.slot))}</td><td class="inv-number">${number(r.qty)}</td><td class="inv-number">${number(r.wq)}</td><td title="${esc(r.priceLabel)}">${esc(r.priceLabel)}${r.totalPrice===null?'':`<span class="inv-item-kind inv-money-total">Celkem ${r.totalPrice} d</span>`}</td><td class="inv-number">${r.weight===null?'—':r.weight.toFixed(1)}${r.totalWeight!==null&&r.qty!==1?`<span class="inv-item-kind">Celkem ${r.totalWeight.toFixed(1)}</span>`:''}</td><td>${esc(r.armourENC)}</td><td class="inv-key-spec">${details}</td><td><div class="inv-row-actions" data-inv-action-menu>
+ <select aria-label="Akce s předmětem ${esc(x.snapshot?.name||'předmět')}" data-inv-action-select>
+ <option value="">Vybrat akci…</option>
+ ${x._campaignRationReceipt?'':`<option value="edit">Upravit</option>`}
+ ${x._campaignRationReceipt?'':`<option value="chest">${x.slot==='chest'?'Vyzvednout':'Do Truhlice'}</option>`}
+ ${rationLot?`<option value="ration-transfer" data-source-id="${esc(rationLot.sourceId)}">Předat příděly</option>`:''}
+ ${staleRationLot?`<option value="ration-loss" data-source-id="${esc(staleRationLot.sourceId)}">Odpis přídělů</option>`:''}
+ ${!x._campaignRationReceipt&&data.characters.length>1?`<option value="transfer">Předat předmět</option>`:''}
+ ${!x._campaignRationReceipt?`<option value="remove">Ztráta / vyřadit</option>`:''}
+ ${(staleRationLot||(!x._campaignRationReceipt&&x.slot!=='chest'&&data.campaignClock&&waterskinBalances(data.journal,campaignKey(data.campaignClock),c.id,data.campaignClock.minute).some(l=>l.itemId===x.id&&l.remaining>=0.5)))?`<option value="partial">Odložit část zásob</option>`:''}
+ </select><button type="button" class="secondary" data-inv-action-confirm data-inv-item-id="${esc(x.id)}">OK</button></div></td></tr>`;
  };
- const table=(list,title)=>`<h4>${title} · ${list.length}</h4>${list.length?`<div class="inv-table-scroll"><table class="catalog-spec inv-ledger-table"><thead><tr><th>Předmět</th><th>Umístění</th><th>Ks</th><th>WQ</th><th>Cena</th><th>lb/ks</th><th>ENC zbroje</th><th>Vlastnosti / účinky</th><th>Akce</th></tr></thead><tbody>${list.map(viewRow).join('')}</tbody></table></div>`:'<p class="muted">Žádné položky.</p>'}`;
+ const table=(list,title)=>`<h4>${title} · ${list.length}</h4>${list.length?`<div class="inv-table-scroll"><table class="catalog-spec inv-ledger-table"><colgroup><col style="width:21%"><col style="width:12%"><col style="width:4%"><col style="width:4%"><col style="width:11%"><col style="width:7%"><col style="width:9%"><col style="width:14%"><col style="width:18%"></colgroup><thead><tr><th>Předmět</th><th>Umístění</th><th>Ks</th><th>WQ</th><th>Cena</th><th>lb/ks</th><th>ENC zbroje</th><th>Vlastnosti / účinky</th><th>Akce</th></tr></thead><tbody>${list.map(viewRow).join('')}</tbody></table></div>`:'<p class="muted">Žádné položky.</p>'}`;
  return `<div class="inv-summary-grid">${cards.map(([name,value])=>`<div class="inv-summary-stat" data-hmk-help="${esc(invHelp[name]||name)}" tabindex="0" aria-label="${esc(name+': '+(invHelp[name]||name))}"><span>${esc(name)}</span><strong>${esc(value)}</strong></div>`).join('')}</div><p class="tiny muted">Hmotnost majetku zahrnuje také oblečené části oděvu/zbroje; Gear ENC počítá jen nesenou a drženou výbavu. Proto i při celkových 21,2 lb může být Gear ENC 0 (při efektivních 18 lb). ENC výbavy se odvozuje z celkové efektivní hmotnosti a způsobu nesení. Nelze ho přidělovat každému předmětu zvlášť. Jednotkové ceny a váhy chybějících katalogových údajů nejsou odhadovány.</p>${table(rows.filter(r=>r.kind==='equipped'),'Nasazené a držené předměty')}${table(rows.filter(r=>r.kind==='carried'),'Nesené a nezařazené předměty')}${table(rows.filter(r=>r.kind==='chest'),'Truhlice · věci ponechané doma / v úschově')}<p class="tiny muted">Truhlice je místo uložení, nikoli nový předmět ani pravidlový bonus. Zůstává vlastníkem postavy, ale uložené věci nejsou dostupné na cestě a nezapočítávají se do ENC. Každé vyzvednutí nebo uložení vyžaduje potvrzenou fyzickou dostupnost u GM a nemění čas kampaně.</p><div class="inv-footer-totals"><strong>Celkem ${rows.length} položek</strong><span>Známá hodnota: ${totals.knownValue} d${totals.unknownValue?` (${totals.unknownValue} bez ceny)`:''}</span><span>Známá hmotnost: ${totals.knownWeightLb.toFixed(1)} lb${totals.unknownWeight?` (${totals.unknownWeight} bez hmotnosti)`:''}</span><span>Gear ENC: ${number(load.gearENC)} · Armour ENC: ${number(load.armourENC)}${Number.isFinite(load.knownArmourENC)&&!Number.isFinite(load.armourENC)?` (známé od ${load.knownArmourENC}${Number.isFinite(load.armourENCUpperBound)&&load.armourENCUpperBound!==load.knownArmourENC?' do '+load.armourENCUpperBound:''})`: ''} · Bulk: ${load.bulkReady?number(load.meleeBulkPenalty):load.prohibitedOutfit?'zakázaná sestava':'pořadí neurčeno'}</span></div>`;
+}
+function inventoryPartialDropForm(x){
+ const clock=data.campaignClock,actorId=x?.characterId;
+ if(!clock||!x||x.slot==='chest')return '';
+ const key=campaignKey(clock),minute=clock.minute;
+ const food=rationStockBalances(data.journal,key,actorId,minute)
+  .filter(l=>l.itemId===x.id&&l.minute<=minute&&l.remaining>=0.5)
+  .map(l=>({kind:'food',sourceId:l.sourceId,remaining:l.remaining,label:`${l.name||x.snapshot?.name||'Potrava'} · ${l.remaining} dávky` }));
+ const water=waterskinBalances(data.journal,key,actorId,minute)
+  .filter(l=>l.itemId===x.id&&l.remaining>=0.5)
+  .map((l,i)=>({kind:'water',sourceId:l.fillId,remaining:l.remaining,label:`Naplnění ${i+1} · ${l.remaining} gal`}));
+ const lots=[...food,...water];
+ if(!lots.length)return '';
+ return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="partial-drop-title"><h2 id="partial-drop-title">Odložit část · ${esc(x.snapshot?.name||'zásoby')}</h2><p class="tiny muted">Skutečný odpis se zapíše do původních dokladů jídla nebo vody, upraví nesenou hmotnost. Není to vypití ani přemístění do Truhlice.</p><form id="inventory-partial-drop-form"><input name="actorId" type="hidden" value="${esc(actorId)}"><input name="itemId" type="hidden" value="${esc(x.id)}"><label>Doložená zásoba<select name="sourceId" data-inv-partial-lot required>${lots.map(l=>`<option value="${esc(l.sourceId)}" data-kind="${l.kind}" data-remaining="${l.remaining}">${esc(l.label)}</option>`).join('')}</select></label><label>Odložit množství<input name="quantity" type="number" min="0.5" max="${lots[0].remaining}" step="0.5" value="0.5" required data-inv-partial-quantity></label><label>Důvod skutečného odložení<input name="reason" minlength="2" maxlength="160" required placeholder="Např. poškozené zásoby, vylitá voda"></label><div class="actions"><button type="submit">Zapsat odložení</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
 }
 function physicalWaterPanel(actor){
  const clock=data.campaignClock;const key=campaignKey(clock);
@@ -10366,39 +10381,6 @@ document.addEventListener('submit',e=>{
     calendarForagingSupplyUse:proof})))}))notice='Doložený příděl byl vydán pouze zvolené postavě. Hodiny a zdravotní stav zůstaly beze změny.';
  }catch(error){alert('Osobní výdej se neprovedl: '+error.message)}
 },true);
-// Proof-linked stock loss: explicit GM disposal changes projected carried ENC,
-// but never rewrites original inventory or fabricates food/water consumption.
-document.addEventListener('submit',e=>{
- const form=e.target;if(!form?.matches?.('[data-provision-drop]'))return;
- e.preventDefault();e.stopImmediatePropagation();
- try{
-  if(!personalProvisionContext())throw Error('Odložení vyžaduje režim Postava');
-  const clock=data.campaignClock;if(!clock||combatInitiativeSequence)throw Error('Odložení během boje vyžaduje pravidlovou Combat akci');
-  const member=activeProvisionActor();
-  const fd=new FormData(form),actorId=String(fd.get('actorId')||'');
-  if(!member||member.id!==actorId)throw Error('Odložení se netýká právě zvolené postavy');
-  const params={actorId,quantity:Number(fd.get('quantity')),eventId:uuid(),campaignId:campaignKey(clock),
-   minute:clock.minute,reason:String(fd.get('reason')||''),confirmedByGM:true,createdAt:stamp()};
-  const unit=String(fd.get('unit')||''),sourceId=String(fd.get('sourceId')||'');
-  const current=characterCarryProjection(data,actorId);
-  const matching=(unit==='food'?current.foodLots:current.waterLots).find(l=>(unit==='food'?l.sourceId:l.fillId)===sourceId);
-  if(!matching||!Number.isFinite(params.quantity)||params.quantity<0.5||params.quantity>matching.remaining)throw Error('Odložené množství přesahuje skutečně nesené zásoby.');
-  if(!ask(`Opravdu odložit ${params.quantity} ${unit==='food'?'dávky jídla':'gal vody'} postavy ${member.name}? Tím klesne nesená hmotnost.`))return;
-  const next=unit==='food'?recordPhysicalRationLoss(data,{...params,sourceId}):
-   unit==='water'?recordPhysicalWaterLoss(data,{...params,fillId:sourceId}):null;
-  if(!next)throw Error('Neznámý druh zásoby');
-  if(mutate(()=>{data.journal=next.journal;}))notice='Doložená zásoba byla odložena, snížila se její projektovaná nesená hmotnost. Čas GM beze změny.';
- }catch(error){alert('Odložení se neprovedlo: '+error.message)}
-},true);
-// v93.483 — never offer a larger physical write-off than the selected lot holds.
-document.addEventListener('change',e=>{
- const source=e.target.closest?.('[data-provision-drop-source]');if(!source)return;
- const form=source.closest('form[data-provision-drop]'),quantity=form?.querySelector('[data-provision-drop-quantity]');if(!quantity)return;
- const remaining=Number(source.selectedOptions[0]?.dataset.remaining||0),food=form.querySelector('[name="unit"]')?.value==='food';
- const old=Number(quantity.value);quantity.replaceChildren();
- for(const q of [0.5,1]){if(q>remaining)continue;const option=document.createElement('option');option.value=String(q);option.textContent=(q===0.5?'0,5':'1')+(food?' dávky · ':' gal · ')+(q*(food?3:10))+' lb';quantity.append(option);}
- if([...quantity.options].some(o=>Number(o.value)===old))quantity.value=String(old);
-},true);
 // v93.470 — UI-only choice of provenance. Does not assert possession,
 // trigger a test, change campaign time or allocate shared Foraging lots.
 document.addEventListener('change',e=>{
@@ -10414,23 +10396,6 @@ document.addEventListener('click',e=>{
  if(view!=='calendar'||activeCalendarSection!=='provisions')return;
  const value=button.dataset.provisionScope;if(!['person','party'].includes(value))return;
  provisionScope=value;render();
-},true);
-document.addEventListener('click',e=>{
- const button=e.target.closest?.('[data-provision-manage]');if(!button)return;
- e.preventDefault();e.stopImmediatePropagation();
- const actorId=button.dataset.provisionActorId;
- const mode=button.dataset.provisionManage;
- if(!character(actorId)||!data.campaignClock||!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===actorId))return alert('Postava musí být součástí právě otevřené kampaně.');
- selected=actorId;
- if(mode==='discard'){
-  provisionGuideActorId=actorId;provisionGuideRoute='have';provisionScope='person';
-  activeCalendarSection='provisions';calendarLanding=false;calendarCreating=false;view='calendar';render();
-  // The receipt-backed disposal form remains the authoritative writer.
-  const detail=document.querySelector('.hc-provision-actions-only details');if(detail)detail.open=true;
- }else if(mode==='chest'){
-  activeSheetSection='inventory';view='sheet';render();
-  // Chest custody is an inventory-item transaction, never a disposal of water.
- }
 },true);
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-provision-route],[data-provision-go]');if(!button)return;
@@ -12207,6 +12172,63 @@ document.addEventListener('change',e=>{
   // The existing CAS writer persists inventory only; it does not rewrite actors.
   if(!mutate(()=>{data.inventory=updated.inventory;}))render();
  }catch(err){alert('Ruce nebyly změněny: '+err.message);render();}
+},true);
+// One compact inventory action picker. Dispatch to the pre-existing handlers,
+// not a second implementation of chest, transfer, edit, or item disposal.
+document.addEventListener('click',e=>{
+ const ok=e.target.closest?.('[data-inv-action-confirm]');if(!ok)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const menu=ok.closest('[data-inv-action-menu]'),select=menu?.querySelector('[data-inv-action-select]');
+ const option=select?.selectedOptions[0],kind=select?.value,id=ok.dataset.invItemId;
+ const x=data.inventory.find(i=>i.id===id&&i.characterId===selected);
+ if(!kind||!x||view!=='sheet'||activeSheetSection!=='inventory')return;
+ if(kind==='partial'){
+  if(combatInitiativeSequence)return alert('Během Initiative nelze zásoby odložit bez Combat akce.');
+  overlay=inventoryPartialDropForm(x);
+  if(!overlay)return alert('Na tomto předmětu není doložená odložitelná zásoba.');
+  render();return;
+ }
+ const attrs={edit:'data-edit-inv',chest:'data-chest-move','ration-transfer':'data-transfer-ration',
+  'ration-loss':'data-loss-ration',transfer:'data-transfer-inv',remove:'data-remove-inv'};
+ const attr=attrs[kind];if(!attr)return;
+ const target=(kind==='ration-transfer'||kind==='ration-loss')?option.dataset.sourceId:id;
+ if(!target)return;
+ const route=document.createElement('button');route.type='button';route.hidden=true;route.setAttribute(attr,target);
+ menu.append(route);
+ try{route.click();}finally{route.remove();}
+},true);
+document.addEventListener('change',e=>{
+ const pick=e.target.closest?.('[data-inv-partial-lot]');if(!pick)return;
+ const field=pick.closest('form')?.querySelector('[data-inv-partial-quantity]');if(!field)return;
+ const remaining=Number(pick.selectedOptions[0]?.dataset.remaining||0);
+ field.max=String(remaining);if(Number(field.value)>remaining||Number(field.value)<0.5)field.value='0.5';
+},true);
+document.addEventListener('submit',e=>{
+ if(e.target?.id!=='inventory-partial-drop-form')return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(view!=='sheet'||activeSheetSection!=='inventory'||combatInitiativeSequence)throw Error('Odložení není v aktuálním režimu dostupné.');
+  const fd=new FormData(e.target),clock=data.campaignClock,actorId=String(fd.get('actorId')||''),itemId=String(fd.get('itemId')||'');
+  if(!clock||actorId!==selected)throw Error('Změnila se postava nebo kampaň.');
+  const x=data.inventory.find(i=>i.id===itemId&&i.characterId===actorId&&i.slot!=='chest');
+  if(!x)throw Error('Předmět již není nesený touto postavou.');
+  const select=e.target.querySelector('[data-inv-partial-lot]'),chosen=select?.selectedOptions[0],kind=chosen?.dataset.kind;
+  const sourceId=String(fd.get('sourceId')||''),quantity=Number(fd.get('quantity'));
+  if(!Number.isFinite(quantity)||quantity<0.5||!Number.isSafeInteger(quantity*2))throw Error('Zvolte násobek půl dávky / 0,5 gal.');
+  const common={actorId,quantity,eventId:uuid(),campaignId:campaignKey(clock),minute:clock.minute,
+   reason:String(fd.get('reason')||''),confirmedByGM:true,createdAt:stamp()};
+  let next;
+  if(kind==='food'){
+   const lot=rationStockBalances(data.journal,common.campaignId,actorId,clock.minute).find(l=>l.sourceId===sourceId&&l.itemId===itemId&&l.remaining>=quantity);
+   if(!lot)throw Error('Doložený příděl již není v této položce dostupný.');
+   next=recordPhysicalRationLoss(data,{...common,sourceId});
+  }else if(kind==='water'){
+   const lot=waterskinBalances(data.journal,common.campaignId,actorId,clock.minute).find(l=>l.fillId===sourceId&&l.itemId===itemId&&l.remaining>=quantity);
+   if(!lot)throw Error('Doložené naplnění již v této nádobě není dostupné.');
+   next=recordPhysicalWaterLoss(data,{...common,fillId:sourceId});
+  }else throw Error('Neplatná zásoba.');
+  if(mutate(()=>{data.journal=next.journal;})){overlay=null;render();}
+ }catch(error){alert('Odložení nebylo uloženo: '+error.message)}
 },true);
 document.addEventListener('click',e=>{const t=e.target.closest('[data-edit-inv]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();const x=data.inventory.find(x=>x.id===t.dataset.editInv&&x.characterId===selected);if(!x)return;overlay=inventoryEditForm(x);render()},true);
 document.addEventListener('click',e=>{
