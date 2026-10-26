@@ -3,7 +3,7 @@
  * calculation is committed only after GM advances past the documented end.
  * This module does not infer activities for other party members.
  */
-import {commitExpeditionFatigue,expeditionRestRecovery} from './hmk-calendar-expedition.js';
+import {commitExpeditionFatigue,expeditionRestRecovery,expeditionCombatState} from './hmk-calendar-expedition.js';
 const check=(ok,msg)=>{if(!ok)throw Error(msg);};
 const min=x=>Number.isSafeInteger(x)&&x>=0&&x<=1e9;
 const F='hmk-calendar-actor-activity-v1';
@@ -105,9 +105,14 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
    check(!collision,actor.name+': během plánovaného odpočinku proběhla jiná doložená akce. '+
     'Před dalším posunem času GM nejprve přerušte činnost v jejím aktuálním čase.');
   }
+  // The actor might never have entered Combat.  Do not read the optional
+  // raw profile directly: its Fatigue authority is created at the FIRST
+  // completed activity, then kept by the ordinary persistent Combat State.
+  // A corrupted existing state is rejected rather than silently reset.
+  const state=expeditionCombatState(actor);
   const plan=activity.plan.kind==='travel'?activity.plan:
    expeditionRestRecovery({minute:activity.startMinute,kind:activity.kind,
-    current:actor.hmk.combatState.fatigue[activity.kind==='winded'?'windedness':'weariness'],
+    current:state.fatigue[activity.kind==='winded'?'windedness':'weariness'],
     claims:actor.hmk.expedition?.claims||{}});
   const proof=commitExpeditionFatigue(actor,plan,activity.endMinute,activity.origin,row.id);
   proof.activityId=row.id;

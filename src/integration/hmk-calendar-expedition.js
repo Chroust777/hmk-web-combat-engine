@@ -3,6 +3,7 @@
  * A watch is four hours; Double Time uses four separately rolled hourly SRs.
  */
 import {windednessRecovery,wearinessRecovery} from '../rules/fatigue.js';
+import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 const whole=(v,min=0,max=100000)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const assert=(v,msg)=>{if(!v)throw Error(msg);};
 const DAY=1440;
@@ -58,15 +59,32 @@ export function expeditionRestRecovery({minute,current,kind,startedMinutesAgo=0,
  return {kind,durationMinutes:duration,remaining:result.remaining,recovered:result.recovered,
   claimKey:kind==='winded'?'lastWinded':kind==='rest'?'lastFourHour':'lastEightHour',sourcePages:[150,176]};
 }
+/** The original Combat State is the single fatigue authority.  A generated
+ * character may not have visited Combat yet, so a first *committed* travel/
+ * rest event must initialize the same canonical state used by Combat.
+ * Never replace a malformed/non-empty saved Combat State with defaults. */
+export function expeditionCombatState(actor){
+ assert(actor&&typeof actor.id==='string'&&actor.id,'Chybí skutečná postava pro záznam únavy');
+ assert(actor.hmk===undefined||(actor.hmk&&typeof actor.hmk==='object'&&!Array.isArray(actor.hmk)),
+  'Poškozený HMK profil postavy');
+ actor.hmk??={};
+ if(actor.hmk.combatState===undefined||actor.hmk.combatState===null){
+  actor.hmk.combatState=initialCombatState();
+ }
+ validateCombatState(actor.hmk.combatState);
+ return actor.hmk.combatState;
+}
 /** Builds a durable, human-readable certified result; the existing combat
  * state remains the ONE authoritative fatigue calculator. */
 export function commitExpeditionFatigue(actor,plan,minute,origin,sourceId){
- assert(actor&&actor.id&&actor.hmk?.combatState?.fatigue,'Postava nemá založený trvalý HMK stav');
  assert(whole(minute,0,1e9)&&typeof sourceId==='string'&&sourceId,'Chybí čas či identita události');
- const current=actor.hmk.combatState, expedition=actor.hmk.expedition??={claims:{}};
+ const current=expeditionCombatState(actor), expedition=actor.hmk.expedition??={claims:{}};
+ expedition.claims??={};
+ assert(typeof expedition.claims==='object'&&!Array.isArray(expedition.claims),
+  'Neplatná evidence již vyčerpaného odpočinku');
  const target=plan.kind==='winded'?'windedness':'weariness';
  const before=current.fatigue[target];assert(whole(before,0,10000),'Neplatná výchozí únava');
- const delta=plan.kind==='travel'?plan.accrual:-plan.recovered;
+ const delta=plan.kind==='travel'?plan.accrual:(plan.recovered===0?0:-plan.recovered);
  const after=Math.max(0,before+delta);current.fatigue[target]=after;
  if(plan.claimKey&&plan.recovered>0)expedition.claims[plan.claimKey]=minute-plan.durationMinutes;
  const evidence={format:'hmk-expedition-time-v1',kind:plan.kind,sourceId,campaignMinute:minute,

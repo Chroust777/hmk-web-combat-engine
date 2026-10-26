@@ -4,13 +4,17 @@
  */
 import {NUTRITION_CONDITIONS} from './hmk-nutrition-activity.js';
 import {expeditionRestRecovery} from './hmk-calendar-expedition.js';
+import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 import {scheduleHMKActivity,interruptHMKActivity,scheduledHMKCompletionIds,interruptedHMKActivityIds} from './hmk-calendar-activities.js';
 export function nutritionRestActivity({journal=[],clock,actor,conditionRow,id}={}){
  const p=conditionRow?.calendarNutritionConditions,settings=NUTRITION_CONDITIONS[p?.kind];
  if(!settings?.completeRest)return null;
  if(!clock||p.startMinute!==clock.minute||p.actorId!==actor?.id)throw Error('Celodenní odpočinek musí začít v autoritativním čase postavy.');
- const state=actor.hmk?.combatState;
- if(!state?.fatigue)throw Error('Chybí autoritativní HMK Fatigue postavy.');
+ // Scheduling remains a non-writing preview. A character who has never
+ // entered Combat has no persisted state yet; its canonical initial fatigue
+ // is zero and will be created only when the timed rest is completed.
+ const state=actor.hmk?.combatState??initialCombatState();
+ validateCombatState(state);
  if(['KIA','INC','UNC'].includes(state.shock)||state.extendedShock||state.sleepDeprivation?.status==='awake'||state.environmentalHazards?.some(x=>x.active))
   return null; // Special recovery remains in its own verified health routine.
  const last=actor.hmk?.expedition?.claims?.lastFourHour;
