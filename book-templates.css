@@ -4770,3 +4770,12 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  .content-sheet .journal-book--characters .character-registry-group .character-card .pill{font-size:9px!important}
  .content-sheet .journal-book--characters .character-registry-group .character-card__controls>button{font-size:10px!important;min-height:23px!important}
 }
+
+/* v93.498 – individual inventory records, eight aligned columns (no Ks). */
+.content-sheet .journal-book--chapter .inv-ledger-table thead th:nth-child(n+3):nth-child(-n+6),
+.content-sheet .journal-book--chapter .inv-ledger-table tbody td:nth-child(n+3):nth-child(-n+6){text-align:center!important;}
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(4),
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(4) .inv-item-kind,
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(5){white-space:nowrap!important;}
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(4) .inv-item-kind{display:block!important;}
+.content-sheet .journal-book--chapter .inv-ledger-table tbody td:nth-child(7){text-align:left!important;}
