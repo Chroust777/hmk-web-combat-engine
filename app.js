@@ -247,7 +247,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.494';
+const APP_VERSION='93.495';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3273,23 +3273,23 @@ function armourMaterialsPanel(){return `<section class="panel" aria-label="Refer
 // The source objects remain untouched for the future combat engine.
 /** Short HMK rules help; titles work on hover and keyboard focus via native title. */
 const LIBRARY_FIELD_HELP=Object.freeze({
- 'WQ':'Weapon Quality: odolnost a kvalita zbraně či štítu; používá se při příslušných pravidlových kontrolách HMK.',
- 'WQ / typ':'WQ je kvalita zbraně, u střeliva je zde typ střely.',
- 'HFT / LNG':'HFT = Heft (ovladatelnost a nároky zbraně); LNG = Length (délka zbraně). Zobrazeno jako HFT / LNG.',
- 'Impact':'Základní kostka dopadu a modifikátor; písmeno b/e/p/f označuje Blunt/Edge/Point/Fire.',
+ 'WQ':'Weapon Quality (WQ) je základní jakost a odolnost zbraně nebo štítu. Používá se při Weapon Damage (poškození či zničení zbraně), nikoli jako přímý bonus k útoku. HMK str. 98, 191.',
+ 'WQ / typ':'WQ je odolnost zbraně při Weapon Damage; pokud je místo ní uveden typ střely, jde o druh použitého projektilu. HMK str. 108.',
+ 'HFT / LNG':'HFT (Heft): za každý bod STR pod vytištěnou HFT postih −5 ke Strike, Block a Throw. Obouruční držení snižuje HFT o 5, druhá ruka zvyšuje o 5. LNG (Length) plus velikostní modifikátor útočníka určuje Reach, tedy dosah v boji. Značka t u LNG označuje bodný způsob. HMK str. 98.',
+ 'Impact':'Impact je hod po zásahu určující sílu dopadu, např. d6+5b. Výsledek se dále porovnává s ochranou cíle při Injury Sequence. Písmena značí b=tupý, e=sečný, p=bodný, f=oheň/mráz; nejde o bonus k zásahovému hodu. HMK str. 98, 108, 169–171.',
  'Cena':'Cena v pencích (d), není-li výslovně uvedena jiná jednotka.',
  'Hmotnost':'Hmotnost v librách (lb); skutečné Gear ENC se určí z efektivní nesené zátěže.',
- 'Dostřel / střela':'Základní dostřel BR ve stopách nebo doložený typ střely.',
- 'Block':'Modifikátor blokování útoku při použití štítu.',
- 'Deflect':'Modifikátor odklonění útoku štítem.',
+ 'Dostřel / střela':'BR (Base Range) udává maximální vzdálenost přímého střeleckého útoku ve stopách; Volley používá násobek BR podle hmotnosti dříku projektilu. Je-li uveden druh střely, určuje používané střelivo. HMK str. 108, 163–164.',
+ 'Block':'Modifikátor obranného použití štítu při volbě Block; ovlivňuje příslušný obranný test, není to hodnota pohlceného zranění.',
+ 'Deflect':'Modifikátor obrany při odklonění (Deflect) pomocí štítu; nepředstavuje Armour Value ani přímé snížení Impact.',
  'Materiál':'Materiál zbroje; ovlivňuje její základní ochranné hodnoty.',
- 'ENC':'Příspěvek zbroje k Encumbrance, včetně případných podmíněných výjimek.',
+ 'ENC':'Armour Encumbrance (ENC) je postih za nošenou zbroj podle její konstrukce a pokrytí; může ovlivnit pohyb, AGL a dovednosti zahrnující AGL do Skill Base. Není totožný s celkovou váhou předmětu. HMK str. 112, 118.',
  'Ochrana b/e/p/f':'Ochrana proti tupému, sečnému, bodnému a ohnivému či mrazivému poškození.',
  'Typ':'Kategorie dané položky.',
  'Dovednost / užití':'Dovednost nebo účel, s nímž se předmět používá.',
- 'Kvalita':'Doložená kvalita předmětu, pokud je uvedena.',
- 'Area':'Rozsah anatomického pokrytí zbroje.',
- 'PER':'Postih Perception při nasazení daného kompletu zbroje.',
+ 'Kvalita':'Pokud katalog uvádí číselnou kvalitu, vyjadřuje kvalitu a stav konkrétního předmětu; bez zvláštního pravidla se nesmí zaměnit za Weapon Quality bojové zbraně.',
+ 'Area':'Rozsah pokrytí ochranného kompletu: které tělesné zóny a lokace kryje. Při zásahu se ochrana počítá jen na skutečně pokrytém místě. HMK str. 112–118.',
+ 'PER':'Postih k testům založeným na Perception z důvodu omezeného výhledu nebo smyslového vnímání například helmou. HMK str. 118.',
  'Režim':'Konkrétní způsob útoku či obrany, pokud je v pravidlech doložen.',
  'Nezobrazené parametry':'Další údaje daného režimu, které nejsou v základním řádku knihovny.',
  'Lokace':'Část těla, kterou daná ochrana pokrývá.',
@@ -3299,24 +3299,54 @@ const LIBRARY_FIELD_HELP=Object.freeze({
  'Fire/Frost':'Ochrana proti ohni nebo mrazu (f).',
  'Parametr':'Pravidlově evidovaná vlastnost, která není v krátkém přehledu předmětu.',
  'Hodnota':'Číselná nebo popisná hodnota evidovaného parametru.',
- 'Základní WQ':'Weapon Quality: odolnost a kvalita předmětu.',
- 'Heft':'Ovladatelnost či náročnost manipulace se zbraní (HFT).',
- 'Délka':'Délka zbraně (LNG), důležitá pro dosah.',
- 'Kostka zóny':'Kostka určení zóny zásahu těla.',
+ 'Základní WQ':'Weapon Quality: odolnost zbraně či štítu pro Weapon Damage, nikoli přímo útoková dovednost. HMK str. 98, 191.',
+ 'Heft':'HFT: za každý bod STR pod HFT postih −5 ke Strike, Block a Throw; obouručně HFT −5, druhou rukou +5. HMK str. 98.',
+ 'Délka':'LNG: délka zbraně. Po přičtení velikostního modifikátoru uživatele určuje Reach (dosah v boji); případné t označuje thrust. HMK str. 98.',
+ 'Kostka zóny':'ZD (Zone Die): kostka určující tělesnou zónu zásahu po úspěšném útoku; zóna je dalším krokem před určením konkrétní lokace. HMK Injury Sequence.',
  'Typ poškození':'Písmeno b/e/p/f: tupé, sečné, bodné, oheň/mráz.',
  'Zóna':'Zóna zásahu určená příslušným hodem.',
- 'Základní dostřel (ft)':'Základní dostřel BR ve stopách.',
- 'Obranný modifikátor':'Úprava obranného testu dané zbraně.',
- 'Modifikátor Impact':'Hodnota přičtená k základnímu hodu Impact.',
+ 'Základní dostřel (ft)':'Base Range BR: nejvzdálenější přímý útok ve stopách; střelba salvou může používat násobek BR podle pravidel střely. HMK str. 108, 163–164.',
+ 'Obranný modifikátor':'Úprava EML při obraně touto zbraní; nejde o hodnotu armour protection ani o automaticky blokované zranění.',
+ 'Modifikátor Impact':'Číslo přičtené nebo odečtené od hodu Impact v příslušném režimu; výsledný dopad se teprve pak vyhodnocuje proti ochraně.',
  'Alternativní útoky':'Další doložené způsoby použití zbraně, případně s jiným Impact.',
  'Vlastnosti':'Zvláštní pravidlové vlastnosti daného předmětu.',
  'Ochrana anatomických lokací':'Ochrana konkrétních částí těla dle typu poškození.',
  'Pokryté anatomické lokace':'Části těla chráněné danou zbrojí.',
- 'Úplné údaje':'Rozbalí jen parametry, které již nejsou vidět v krátkém přehledu.'
+ 'Úplné údaje':'Rozbalí další pravidlové vlastnosti předmětu, které nejsou uvedeny v krátkém řádku katalogu.'
+});
+// Vysvětlení specifických katalogových vlastností, ne obecný zástupný text.
+const LIBRARY_SPECIAL_HELP=Object.freeze({
+ 'Třída zbraně':'Zařazení mezi common, simple či chivalric určuje kulturní dostupnost a související pravidla ovládání zbraní (HMK str. 96–98).',
+ 'Modifikátor Impact TA':'Změna Impact při příslušném Tactical Advantage; použije se jen tehdy, když daný útok tuto podmínku splňuje.',
+ 'Modifikátor štítu':'Úprava obranného testu prováděného se štítem; není totožná s jeho kvalitou WQ.',
+ 'Odklonění (Deflect)': 'Úprava obranné akce Deflect pomocí štítu; není to ochranná hodnota zbroje.',
+ 'Skupina podmíněného ENC':'Označení skupiny zbrojních částí, u nichž se ENC projeví až při splnění společné podmínky, např. více dílů na pažích.',
+ 'Poznámky':'Specifická výjimka nebo doplňující vlastnost předmětu; používá se pouze v situaci popsané v poznámce.',
+ 'Použití':'Činnost či účel, pro který je předmět podle katalogu určen.',
+ 'Útok':'Zvláštní útočný režim nebo modifikátor předmětu, pokud existuje.',
+ 'Obrana':'Zvláštní obranný režim či modifikátor při použití tohoto předmětu.',
+ 'Vrstvy':'Povolené pořadí a kombinace zbrojních vrstev; nepovolené kombinace mohou způsobit Bulk (HMK str. 117).',
+ 'Ověřené vlastnosti':'Zvláštní zbraňové vlastnosti používající vlastní podmínky v pravidlech HMK.',
+ 'Útočné režimy':'Alternativní způsoby použití zbraně; každý může mít jiný Impact, typ zranění či modifikátor.',
+ 'Snížení ochrany zbroje':'Zvláštní mechanika měnící Armour Value pouze při uvedené podmínce; nepoužívat na všechny zásahy.',
+ 'Podmínka snížení ochrany':'Okolnost, která musí nastat před použitím snížení Armour Value.',
+ 'Modifikátor blokování':'Úprava obranné akce Block se štítem nebo zbraní.',
+ 'Modifikátor obrany protivníka':'Úprava obranného EML protivníka pouze při příslušném způsobu útoku.',
+ 'Bonus Impact proti štítu':'Dodatečný Impact účinný proti štítu za podmínky popsané u zbraně.',
+ 'Možný bonus Faeriecraft v boji':'Podmíněný bonus závislý na pravidlech Faeriecraft; není automatickou vlastností všech zbraní.',
+ 'Pomalé použití jednou rukou':'Zvláštní omezení rychlosti či dostupnosti akcí, pokud se zbraň používá jednou rukou.',
+ 'Poloviční meč bez ostrého ostří':'Zvláštní režim half-sword, který nevyužívá sečný účinek ostří.',
+ 'Podražení využívá délku zbraně':'Při manévru Trip se použije dosah daný délkou zbraně.',
+ 'Poznámka k pokrytí':'Výjimka či upřesnění anatomických lokalit chráněných touto částí zbroje.',
+ 'Varianty':'Alternativní konstrukce předmětu s vlastním pravidlovým použitím.',
+ 'Založená kopí (couched)':'Speciální způsob použití kopí při jízdě; závisí na pravidlech tohoto útoku.',
+ 'Zapletení / zachycení':'Zvláštní vlastnost entangle, která může omezit cíl při splnění pravidlových podmínek.',
+ 'Pomalá zbraň':'Specifické zpomalení útoků či manipulace; použije se dle traitu zbraně.',
+ 'Odebraná vlastnost':'V této variantě předmětu se označená vlastnost základního provedení neuplatňuje.'
 });
 function libraryFieldHelp(label){
  const k=String(label||'').trim();
- return LIBRARY_FIELD_HELP[k]||({quality:LIBRARY_FIELD_HELP.WQ,heft:'Heft: způsob držení a ovladatelnost zbraně.',length:'Length: délka zbraně.',zoneDie:'Kostka určení tělesné zóny zásahu.',baseRangeFt:'Základní dostřel zbraně ve stopách (ft).',impactDie:'Kostka Impact pro daný režim útoku.',impactModifier:'Modifikátor k hodu Impact.',aspect:'Typ způsobeného poškození.',material:LIBRARY_FIELD_HELP.Materiál,weightLb:LIBRARY_FIELD_HELP.Hmotnost,pricePence:LIBRARY_FIELD_HELP.Cena}[k]||'Doplňující doložený parametr podle knihovny HMK; detail a případné výjimky jsou v pravidlech předmětu.');
+ return LIBRARY_FIELD_HELP[k]||LIBRARY_SPECIAL_HELP[k]||({quality:LIBRARY_FIELD_HELP.WQ,heft:LIBRARY_FIELD_HELP.Heft,length:LIBRARY_FIELD_HELP.Délka,zoneDie:'Kostka určení tělesné zóny zásahu.',baseRangeFt:LIBRARY_FIELD_HELP['Základní dostřel (ft)'],impactDie:'Kostka Impact pro daný režim útoku.',impactModifier:'Modifikátor k hodu Impact.',aspect:'Typ způsobeného poškození.',material:LIBRARY_FIELD_HELP.Materiál,weightLb:LIBRARY_FIELD_HELP.Hmotnost,pricePence:LIBRARY_FIELD_HELP.Cena}[k]||'Tento specifický atribut nemá v katalogu ověřenou samostatnou definici; jeho použití určuje příslušné pravidlo daného předmětu.');
 }
 function catalogParameters(item){
  const p=item.properties||{};
