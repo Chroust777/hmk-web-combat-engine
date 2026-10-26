@@ -1,0 +1,16 @@
+const fs=require('fs');const assert=require('assert');const path=require('path');
+const root=path.resolve(__dirname,'..');
+const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+assert(app.includes("const APP_VERSION='93.492';"));
+assert(html.includes('v93.492'));
+assert(app.includes('Společné nálezy Foraging · voda (water-days)'));
+assert(app.includes('Společné nálezy Foraging nejsou voda v osobních nádobách'));
+assert(app.includes('data-provision-manage="discard"'));
+assert(app.includes('data-provision-manage="chest"'));
+assert(app.includes("if(mode==='discard')"));
+assert(app.includes("if(mutate(()=>{data.journal=next.journal;}))"),'original audit writer must remain');
+assert(app.includes("activeSheetSection='inventory';view='sheet';render();"));
+assert(app.includes('Podrobnosti: automatické následky nedostatku a zdravotní hody'));
+assert(app.includes('Při posunu času aplikace automaticky vyhodnotí doložené osobní zásoby'));
+console.log('PASS 11 v93.492 release/source checks (no claim of full browser coverage)');
