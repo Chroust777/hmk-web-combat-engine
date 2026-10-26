@@ -34,23 +34,38 @@ export function removeCharacterWithEvidence(database,id){
  out.inventory=(out.inventory||[]).filter(item=>item.characterId!==id);
  out.characters=out.characters.filter(c=>c.id!==id);
  out.trash=(out.trash||[]).filter(c=>c.id!==id);
+ // Old campaign calendars retain actor-specific evidence after a calendar is
+ // closed. A full GM deletion removes that actor there too; otherwise a new
+ // calendar could resurrect their archived medical/calendar/inventory proofs.
+ if(Array.isArray(out.calendarEvidenceArchives)){
+  out.calendarEvidenceArchives=out.calendarEvidenceArchives.map(archive=>{
+   const a=structuredClone(archive);
+   if(Array.isArray(a.characterIds))a.characterIds=a.characterIds.filter(actorId=>actorId!==id);
+   if(Array.isArray(a.anchors))a.anchors=a.anchors.filter(row=>row.characterId!==id&&!mentions(row,doomed));
+   if(Array.isArray(a.journalTimes))a.journalTimes=a.journalTimes.filter(row=>row.characterId!==id&&!doomed.has(row.id));
+   if(Array.isArray(a.medicalBranches))a.medicalBranches=a.medicalBranches.filter(row=>row.actorId!==id);
+   if(Array.isArray(a.waterInventoryBackings))a.waterInventoryBackings=a.waterInventoryBackings.filter(row=>row.characterId!==id&&!doomed.has(row.id));
+   if(Array.isArray(a.rationInventoryBackings))a.rationInventoryBackings=a.rationInventoryBackings.filter(row=>row.characterId!==id&&!doomed.has(row.id));
+   return a;
+  }).filter(a=>!Array.isArray(a.characterIds)||a.characterIds.length>0);
+ }
  for(const branches of Object.values(out.campaignActorBranches??{}))delete branches[id];
  for(const clock of [out.campaignClock,...(out.campaignClocks||[])]){
   if(!clock)continue;
-  const wasMember=Array.isArray(clock.characterIds)&&clock.characterIds.includes(id);
   if(Array.isArray(clock.characterIds))clock.characterIds=clock.characterIds.filter(actorId=>actorId!==id);
-  if(Array.isArray(clock.anchors))clock.anchors=clock.anchors.filter(a=>a.characterId!==id);
-  if(Array.isArray(clock.journalMinuteEvidence))clock.journalMinuteEvidence=clock.journalMinuteEvidence.filter(a=>a.characterId!==id);
+  if(Array.isArray(clock.anchors))clock.anchors=clock.anchors.filter(a=>a.characterId!==id&&!mentions(a,doomed));
+  if(Array.isArray(clock.journalMinuteEvidence))clock.journalMinuteEvidence=clock.journalMinuteEvidence.filter(a=>a.characterId!==id&&!doomed.has(a.id));
   if(Array.isArray(clock.plans)){
-   const removedPlans=new Set(clock.plans.filter(p=>p.characterId===id).map(p=>p.id));
+   const removedPlans=new Set(clock.plans.filter(p=>p.characterId===id||mentions(p,doomed)).map(p=>p.id));
    clock.plans=clock.plans.filter(p=>!removedPlans.has(p.id));
-   if(Array.isArray(clock.planResolutions))clock.planResolutions=clock.planResolutions.filter(p=>!removedPlans.has(p.planId));
+   if(Array.isArray(clock.planResolutions))clock.planResolutions=clock.planResolutions.filter(p=>!removedPlans.has(p.planId)&&!mentions(p,doomed));
   }
-  // A membership change is itself a GM calendar event. The time never moves.
-  if(Array.isArray(clock.events)&&clock.events.length&&clock.events.some(e=>e.type==='init')&&wasMember){
-   const eventId='character-deleted:'+id+':'+clock.events.length;
-   if(!clock.events.some(e=>e.id===eventId))clock.events.push({id:eventId,type:'membership',minute:clock.minute,reason:'GM definitivně odstranil postavu '+id+' z kampaně'});
-  }
+  if(Array.isArray(clock.events))clock.events=clock.events.filter(e=>
+   !mentions(e,doomed)&&!doomed.has(e.id)&&
+   !(typeof e.id==='string'&&e.id.startsWith('character-deleted:'+id+':')));
+  // No synthetic memorial record: the GM requested a full deletion, including
+  // its subsequent scheduled activity. Unrelated timeline records survive.
+
  }
  // An active initiative checkpoint cannot refer to an absent combatant.
  if(out.combatRuntime?.participants?.includes(id)||out.combatRuntime?.sequence?.order?.includes(id))out.combatRuntime=null;

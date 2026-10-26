@@ -142,7 +142,18 @@ export function assertCampaignActorTimeIsolation(before,after){
  const inventoryOf=(db,id)=>JSON.stringify((db.inventory??[]).filter(i=>i.characterId===id));
  for(const c of after.characters||[]){const old=oldPeople.get(c.id);
   if(!old||ids.has(c.id))continue;
-  if(signature(old)!==signature(c)||inventoryOf(before,c.id)!==inventoryOf(after,c.id))
+  // Character Creation is not a campaign-time action. When the automatic
+  // 14-step wizard finishes a newly created character, it commits the initial
+  //  HMK starting kit and its proof atomically. This specific transition must
+  //  work even before the GM enrols that character in an existing calendar.
+  //  Never relax combat, injury, magic or later inventory changes.
+  const initialKitCompletion=
+   old.hmk?.creation?.status==='review-required'&&
+   c.hmk?.creation?.status==='auto-generated'&&
+   c.hmk?.creation?.values?.autoStartingKit?.source&&
+   c.hmk?.creation?.values?.autoGeneration&&
+   !(before.inventory||[]).some(i=>i.characterId===c.id);
+  if(signature(old)!==signature(c)||(!initialKitCompletion&&inventoryOf(before,c.id)!==inventoryOf(after,c.id)))
    fail(`Postava ${c.name} není v právě otevřené kampani. Před změnou časově citlivého stavu či inventáře otevřete její kalendář.`);
  }
  return true;
