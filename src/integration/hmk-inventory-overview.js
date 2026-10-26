@@ -46,7 +46,7 @@ export function projectInventoryRows(inventory=[]){
    if(typeof p.craftSkill==='string'&&p.craftSkill)keyFields.push(`Řemeslo ${p.craftSkill}`);
    if(typeof p.effect==='string'&&p.effect)keyFields.push(`Účinek: ${p.effect}`);
    if(Number.isFinite(p.capacityLb))keyFields.push(`Kapacita ${p.capacityLb} lb`);
-   if(typeof item.snapshot?.description==='string'&&item.snapshot.description)keyFields.push(item.snapshot.description);
+   if(typeof item.snapshot?.description==='string'&&item.snapshot.description&&!/^Tištěná položka vybavení HMK, str\. \d+; výběr do počáteční výbavy je orientační, nikoli povinný\.$/i.test(item.snapshot.description.trim()))keyFields.push(item.snapshot.description);
   }
   // This is the item's own catalogue value, not the body's combined ENC.
   const printedEnc=p.printedEncCode??p.encumbrance;
