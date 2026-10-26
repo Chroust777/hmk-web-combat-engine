@@ -60,6 +60,39 @@ export function nutritionRisk(journal=[],campaignId,actorId){
  }
  return risks;
 }
+/** When a common pool cannot cover several characters for one day, its
+ * distribution is a GM choice, not something that follows from HMK or ID order.
+ * Existing manual provisions are counted first; private dated stock is reserved
+ * to its owner. Reject only a PARTIALLY sufficient common pool, not an empty
+ * one (all short) nor a full one (all supplied). This preflight is read-only. */
+function requireUnambiguousSharedAllocation(database,campaignId,cohort){
+ if(cohort.length<2)return;
+ const journal=database.journal;
+ for(const unit of ['foodDays','waterDays']){
+  const end=cohort[0].start+DAY;
+  const demands=[];
+  for(const c of cohort){
+   const p=c.policy.calendarNutritionPolicy,actorId=c.policy.characterId;
+   if(p.gmProvisioned===true)continue;
+   const need=p.autoNeeds===true?dailyNutritionNeeds({journal,campaignId,actorId,policyId:c.policy.id,startMinute:c.start,endMinute:end}):{foodNeed:p.foodNeed,waterNeed:p.waterNeed};
+   const required=unit==='foodDays'?need.foodNeed:need.waterNeed;
+   const manual=Math.min(required,consumeBeforeDay(journal,actorId,campaignId,c.start,end,unit,c.start===p.minute));
+   let leftover=round(required-manual);
+   const personal=unit==='foodDays'&&p.inventoryRations===true?
+     availableRationLots(journal,campaignId,actorId,end).reduce((n,l)=>n+l.remaining,0):
+     unit==='waterDays'&&p.inventoryWater===true?
+     availablePhysicalWater(journal,campaignId,actorId,end).reduce((n,l)=>n+l.remaining,0):0;
+   leftover=round(Math.max(0,leftover-Math.min(leftover,personal)));
+   if(leftover>0)demands.push({actorId,quantity:leftover});
+  }
+  if(demands.length<2)continue;
+  const total=round(demands.reduce((n,x)=>n+x.quantity,0));
+  const shared=round(availableSupplyLots(journal,campaignId).filter(l=>l.unit===unit&&l.minute<=end)
+    .reduce((n,l)=>n+l.remaining,0));
+  if(shared>0&&shared<total)throw Error('Společných zásob '+(unit==='waterDays'?'pitné vody':'potravy')+
+   ' je méně, než potřebují současně zásobované postavy. GM musí nejdříve přidělit dostupné dávky jednotlivým postavám ve Společném zásobování; nelze je automaticky přidělit podle pořadí ID.');
+ }
+}
 /** Called ONLY inside the confirmed GM clock mutation. Works for multi-day
  * jumps; no reruns or duplicate debits after reload. Avoid future lots and
  * count existing manually recorded food/water first. */
@@ -80,6 +113,7 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
  while(true){
   const due=cursors.filter(c=>c.start+DAY<=clock.minute).sort((a,b)=>(a.start-b.start)||a.policy.characterId.localeCompare(b.policy.characterId))[0];
   if(!due)break;
+  requireUnambiguousSharedAllocation(database,campaignId,cursors.filter(c=>c.start===due.start&&c.start+DAY<=clock.minute));
   check(++steps<=3660,'Příliš mnoho nutričních dnů v jediném posunu; rozdělte dlouhý časový skok GM');
   const {policy,start}=due,end=start+DAY,actorId=policy.characterId,p=policy.calendarNutritionPolicy;
   const needs=p.autoNeeds===true?dailyNutritionNeeds({journal:database.journal,campaignId,actorId,policyId:policy.id,startMinute:start,endMinute:end}):
