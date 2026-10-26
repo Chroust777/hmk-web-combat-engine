@@ -35,7 +35,8 @@ function check(test,description){assert.ok(test,description);passed++}
  check(s.includes("!/^(?:0|[1-9]\\d*)$/.test(givenWQ)"),'reject malformed numeric input');
  check(s.includes("if(element.hasAttribute('title'))element.removeAttribute('title')"),'custom tooltip strips duplicate native title');
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- check(html.includes('v93.498')&&html.includes('hmk-app.bundle.js?v=93.498'),'HTML release and cache name updated');
- check(s.includes("const APP_VERSION='93.498'"),'app version updated');
+ const ver=s.match(/const APP_VERSION='(\d+\.\d+)'/)?.[1];
+ check(Boolean(ver)&&html.includes('v'+ver)&&html.includes('hmk-app.bundle.js?v='+ver),'HTML release and cache name synchronized');
+ check(/^93\.\d+$/.test(ver),'app version format valid');
  console.log(`PASS ${passed} checks – individual inventory rows, water state, optional WQ and one tooltip`);
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -1,0 +1,22 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const root=path.resolve(__dirname,'..'),app=fs.readFileSync(path.join(root,'app.js'),'utf8'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+let count=0;function check(ok,description){assert.ok(ok,description);count++}
+const start=app.indexOf('function czCount('),end=app.indexOf('function partyProvisionCardsHTML(',start);
+check(start>0&&end>start,'Czech count helper exists');
+const inflect=vm.runInNewContext('('+app.slice(start,end).trim()+')');
+for(const [n,expected] of [[0,'0 záznamů'],[1,'1 záznam'],[2,'2 záznamy'],[3,'3 záznamy'],[4,'4 záznamy'],[5,'5 záznamů'],[11,'11 záznamů'],[21,'21 záznamů'],[22,'22 záznamů'],[100,'100 záznamů']])check(inflect(n,'záznam','záznamy','záznamů')===expected,`Czech count ${n}`);
+const guide=app.slice(app.indexOf('function provisionGuideHTML('),app.indexOf('function provisionScopeTabsHTML('));
+check(guide.includes("${assured?'':`<div class=\"hc-provision-choices\""),'Assured mode suppresses route selector');
+check(guide.includes("`}`}\n </section>`;")||guide.includes("`}`}\n </section>`;"),'Assured conditional is closed');
+check(guide.includes('data-provision-assure="yes"')&&guide.includes('data-provision-assure="no"'),'Both mode buttons remain');
+const health=app.slice(app.indexOf('function personalProvisionRulebookHTML('),app.indexOf('let calendarLanding=true'));
+check(health.includes('if(policy?.gmProvisioned===true)'),'Assured state suppresses advanced forms');
+check(health.includes('${cancellation}${health}'),'Outstanding health/plan obligations remain accessible');
+check(health.includes('data-malnutrition-course'),'Due malnutrition process preserved');
+check(app.includes('Druh potravin')&&app.includes('Koupit potraviny'),'Food renamed for user');
+check(app.includes('>Předat potraviny<')&&app.includes('>Odpis potravin<'),'Inventory actions renamed');
+check(app.includes("czCount(list.length,'záznam','záznamy','záznamů')"),'Inventory rows inflected');
+check(app.includes("czCount(entries.length,'doložený záznam','doložené záznamy','doložených záznamů')"),'GM history rows inflected');
+check(app.includes("const APP_VERSION='93.499'")&&html.includes('v93.499'),'App and HTML version aligned');
+console.log('PASS',count,'v93.499 provision UI and Czech labels assertions');
