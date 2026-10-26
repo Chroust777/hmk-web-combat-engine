@@ -7,6 +7,7 @@
 import {validateCalendarPlans,nextGMBlockingEvent,assertCalendarPlansAppendOnly} from './hmk-calendar-planner.js';
 import {automaticHMKFollowups} from './hmk-calendar-automatic-followups.js';
 import {projectedCalendarJournal} from './hmk-calendar-campaign-lifecycle.js';
+import {automaticAilmentOnset} from './hmk-calendar-automatic-onsets.js';
 export const DAY_MINUTES=1440;
 const validInt=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const ensure=(ok,msg)=>{if(!ok)throw Error(msg);};
@@ -219,7 +220,25 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
  const nextMinute=clock.minute+deltaMinutes;
  const gmBlocking=nextGMBlockingEvent(clock,nextMinute);
  if(gmBlocking)throw Error(`Nelze přeskočit nevyřízenou GM událost „${gmBlocking.title}“: ${displayCampaignMinute(gmBlocking.dueMinute)}.`);
- const blocked=agenda.all.find(x=>x.minute<nextMinute);
+ // A verified incubating Poison/Disease onset is deterministic: its initial
+ // HR and symptoms were committed at exposure/profile.  The executor applies
+ // its effects atomically during THIS clock change, at the actual onset minute.
+ // A subsequent d100 Course is mandatory; never jump past that deadline.
+ const blockers=[];
+ for(const event of agenda.all){
+  if(event.minute>=nextMinute)continue;
+  const automatic=automaticAilmentOnset(event,characters);
+  if(automatic){
+   if(automatic.nextCourseMinute<nextMinute){
+    blockers.push({minute:automatic.nextCourseMinute,name:event.name,
+     description:(event.kind==='poison'?'Poison':'Disease')+' Course d100 po automatickém nástupu'});
+   }
+   continue;
+  }
+  blockers.push(event);
+ }
+ blockers.sort((a,b)=>a.minute-b.minute);
+ const blocked=blockers[0];
  if(blocked)throw Error(`Nelze přeskočit povinný termín ${blocked.description} u ${blocked.name}: ${displayCampaignMinute(blocked.minute)}. Nejprve vyřešte událost.`);
  const next=structuredClone(clock);next.minute=nextMinute;
  next.events.push({id:eventId,type:'advance',minute:nextMinute,reason:reason.trim()});

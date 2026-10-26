@@ -186,6 +186,7 @@ import {createOrienteeringContext} from './src/integration/hmk-trekking-orientee
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
+import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
 import {applyConfirmedManeuverConsequence,verifiedManeuverConsequence,applyConfirmedGrabTakeTransfer} from './src/integration/hmk-maneuver-persistence.js';
 import {decideFreePress,applyAutomaticFreePress,decideDeclaredManeuver,applyAutomaticDeclaredManeuver,resolveTripAutomaticGrab,applyAutomaticGrabHoldRetest,applyAutomaticGrabTake} from './src/integration/hmk-automatic-decisions.js';
@@ -249,7 +250,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.507';
+const APP_VERSION='93.508';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10142,16 +10143,16 @@ document.addEventListener('submit',e=>{
 function applyDeterministicCalendarOnsets(){
  if(combatInitiativeSequence)throw Error('Nástup během Initiative musí vyhodnotit Combat');
  const clock=data.campaignClock;if(!clock)return;
- const due=campaignCalendarAgenda(clock,data.characters,data.journal).due;
- for(const event of due){
-  if(!['poison','disease'].includes(event.kind)||event.minute!==clock.minute)continue;
-  const actor=character(event.characterId);if(!actor)throw Error('Kalendář ztratil cílovou postavu');
+ const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
+ for(const onset of automaticAilmentOnsets(agenda,data.characters,clock.minute)){
+  const {event,actor,course}=onset;
   const state=persistentStateOf(actor);
-  const course=event.kind==='poison'?(state.toxinCourses??[]).find(t=>t.sourceId===event.sourceId):
-   (state.diseaseCourses??[]).find(t=>t.sourceId===event.sourceId);
-  if(course?.status!=='incubating')continue;
+  // Re-evaluate against the live state after any earlier onset in this jump.
+  // Competing exposures will be rejected by the original rules executor.
+  const active=(event.kind==='poison'?state.toxinCourses:state.diseaseCourses)?.find(t=>t.id===course.id);
+  if(active?.status!=='incubating')continue;
   const anchor=getCampaignEpisodeAnchor(clock,event.kind,actor.id,course.id);
-  if(!anchor||clock.minute!==anchor.minute+course.onsetMinutes)
+  if(!anchor||event.minute!==anchor.minute+course.onsetMinutes)
    throw Error('Nástup nemá jednoznačný doložený čas '+event.kind);
   const round=Math.max(1,combatClock.round||1,state.lastRound||0);
   const args={actor,state,sourceId:course.sourceId,round,
@@ -10159,8 +10160,9 @@ function applyDeterministicCalendarOnsets(){
   const result=event.kind==='poison'?preparePoisonOnset(args):prepareDiseaseOnset(args);
   synchronizeCombatInjuries(actor,result.state);
   data.journal.push({id:uuid(),characterId:actor.id,createdAt:stamp(),
+   calendarCampaignId:campaignKey(clock),campaignMinute:event.minute,
    title:(event.kind==='poison'?'Poison':'Disease')+' · automatický nástup · HMK 183–186',
-   body:'Doložený čas '+displayCampaignMinute(clock.minute)+'; zdroj '+course.sourceId+
+   body:'Doložený čas '+displayCampaignMinute(event.minute)+'; zdroj '+course.sourceId+
     '; HR'+result.report.hr+'; žádný hod při samotném nástupu.',
    skillTestProof:{type:event.kind+'-onset',sourceId:course.sourceId,
     actorId:actor.id,automaticFromAttestedCalendar:true,
@@ -10553,7 +10555,7 @@ document.addEventListener('submit',e=>{
    const next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:days*DAY_MINUTES+hours*60+minutes,
     reason:v.reason,eventId:uuid(),gmConfirmed:true,characters:data.characters,journal:data.journal});
    if(!window.confirm('Posunout celou kampaň na '+displayCampaignMinute(next.minute)+'? Splatné dokončené činnosti budou vyhodnoceny automaticky.'))return;
-   mutate(()=>{data.campaignClock=next;},{gmClockAdvance:true});return;
+   mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();},{gmClockAdvance:true});return;
   }
   const days=parse(v.days),hours=parse(v.hours),minutes=parse(v.minutes);
   if(![days,hours,minutes].every(Number.isSafeInteger)||hours>23||minutes>59)throw Error('Doložte počet dní a HH:MM');
