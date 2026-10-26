@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HMK Keeper’s Ledger · v93.504</title>
-<link rel="stylesheet" href="./styles.css?v=93.503-rest-sync-and-clock">
-<link rel="stylesheet" href="./skill-workbench.css?v=93.503-rest-sync-and-clock">
-<link rel="stylesheet" href="./library.css?v=93.503-rest-sync-and-clock">
-<link rel="stylesheet" href="./book-templates.css?v=93.503-rest-sync-and-clock">
+<title>HMK Keeper’s Ledger · v93.505</title>
+<link rel="stylesheet" href="./styles.css?v=93.505-release-notice-fix">
+<link rel="stylesheet" href="./skill-workbench.css?v=93.505-release-notice-fix">
+<link rel="stylesheet" href="./library.css?v=93.505-release-notice-fix">
+<link rel="stylesheet" href="./book-templates.css?v=93.505-release-notice-fix">
 <style>.hmk-boot-note{max-width:760px;margin:5rem auto;padding:1.5rem;border:1px solid #8f7652;border-radius:10px;background:#f3eddf;color:#332817;font:16px/1.6 system-ui,sans-serif}.hmk-boot-note code{font-size:90%;overflow-wrap:anywhere}</style>
 
 </head>
 <body>
-<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.504…</main></div>
+<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.505…</main></div>
 <script>
 (function(){
  var app=document.getElementById('app');
@@ -22,14 +22,14 @@
   if(reported||document.querySelector('#app .shell'))return;
   reported=true;
   var msg=String(detail||'Neznámá chyba načítání.');
-  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.503 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>hmk-app.bundle.js</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
+  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.505 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>hmk-app.bundle.js</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
  };
  window.addEventListener('error',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.message||('Nelze načíst '+(event.filename||'skript')));});
  window.addEventListener('unhandledrejection',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.reason?.message||String(event.reason));});
  window.addEventListener('load',function(){setTimeout(function(){if(!document.querySelector('#app .shell'))window.__hmkBootFailure('Produkční aplikace se nespustila nebo nebyl načten její JavaScript.');},4000);});
 })();
 </script>
-<script defer src="./hmk-app.bundle.js?v=93.503-rest-sync-and-clock" onerror="window.__hmkBootFailure('HTTP chyba: chybí hmk-app.bundle.js nebo není dostupný na GitHub Pages.')"></script>
+<script defer src="./hmk-app.bundle.js?v=93.505-release-notice-fix" onerror="window.__hmkBootFailure('HTTP chyba: chybí hmk-app.bundle.js nebo není dostupný na GitHub Pages.')"></script>
 
 <script>
 (function(){
@@ -183,10 +183,14 @@
  * This never accesses GitHub credentials and never modifies campaign data.
  */
 (function(){
- const runningVersion='93.503';
+ // Read the version from the very page that launched this tab, instead of
+ // duplicating a hard-coded number that can go stale during a release.
+ const runningVersion=(document.title.match(/\bv(\d+\.\d+)\b/)||[])[1]||null;
+ let checkInFlight=false;
  function isNewer(a,b){const x=a.split('.').map(Number),y=b.split('.').map(Number);return x[0]>y[0]||(x[0]===y[0]&&x[1]>y[1]);}
  async function checkRelease(){
-  if(document.visibilityState==='hidden'||window.__hmkOutdatedBuild)return;
+  if(!runningVersion||checkInFlight||document.visibilityState==='hidden'||window.__hmkOutdatedBuild)return;
+  checkInFlight=true;
   try{
    const r=await fetch('./index.html?hmk_release_check='+Date.now(),{cache:'no-store'});
    if(!r.ok)return;
@@ -200,6 +204,7 @@
    const button=document.createElement('button');button.type='button';button.textContent='Obnovit novou verzi';button.style.cssText='margin-left:12px;padding:6px 12px;font:inherit;cursor:pointer';
    button.onclick=()=>window.location.reload();bar.append(message,button);document.body.appendChild(bar);
   }catch{/* offline or blocked status check: do not infer that a newer release exists */}
+  finally{checkInFlight=false;}
  }
  window.addEventListener('focus',checkRelease);
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void checkRelease()});
