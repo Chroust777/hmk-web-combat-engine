@@ -247,7 +247,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.492';
+const APP_VERSION='93.493';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1110,7 +1110,7 @@ function campaignCalendarView(){
    arr.push({kind:'aural',name:'Aural Shock',unit:'hodiny',episodeId:'aural-legacy'});
   return arr.map(x=>({...x,characterId:c.id,label:c.name+' · '+x.name}));
  });
- const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}${x.woundId?' · '+esc(x.woundId):''}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button></div></div>`;};
+ const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button></div></div>`;};
  if(!calendarUI)calendarUI=calendarInitialUI(clock);
  const selectedCalendarPeople=calendarMemberIds(clock,data.characters);
  const board=campaignCalendarBoardHTML({clock,characters:selectedCalendarPeople,journal:data.journal,ui:calendarUI,escapeHTML:esc});
@@ -3048,7 +3048,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  const hidden=hiddenLogbookIds(data,c.id);
  const visible=visibleLogbookEntries(logs,hidden);
  const removed=logs.filter(l=>hidden.has(l.id));
- const renderLog=l=>`<div class="list-row journal-log-row journal-log-row--slim" data-journal-entry="${esc(l.id)}"><div class="journal-log-one-line"><b title="${esc(l.title)}">${esc(l.title)}</b><span class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</span></div><div class="actions journal-log-small-actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}" title="Upravit poznámku">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}" title="Smazat poznámku">Smazat</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Skrýt ze seznamu; pravidlový doklad se nemaže">Skrýt</button>`}</div><details class="journal-log-expand"><summary>Obsah záznamu</summary><p>${esc(l.body).replace(/\n/g,'<br>')}</p></details></div>`;
+ const renderLog=l=>`<div class="list-row journal-log-row journal-log-row--slim" data-journal-entry="${esc(l.id)}"><div class="journal-log-one-line"><b title="${esc(visibleEvidenceText(l.title))}">${esc(visibleEvidenceText(l.title))}</b><span class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</span></div><div class="actions journal-log-small-actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}" title="Upravit poznámku">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}" title="Smazat poznámku">Smazat</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Skrýt ze seznamu; pravidlový doklad se nemaže">Skrýt</button>`}</div><details class="journal-log-expand"><summary>Obsah záznamu</summary><p>${esc(visibleEvidenceText(l.body)).replace(/\n/g,'<br>')}</p></details></div>`;
  const recent=visible.slice(0,10).map(renderLog).join('');
  const archived=visible.length>10?`<details class="journal-log-archive"><summary>Archiv · ${visible.length-10} starších záznamů</summary><div class="journal-log-archive-content">${visible.slice(10).map(renderLog).join('')}</div></details>`:'';
  const hiddenRecords=removed.length?`<details class="journal-log-archive journal-hidden-records"><summary>Skryté položky · ${removed.length} (obnovitelné)</summary>${removed.map(l=>`<div class="list-row"><span>${esc(l.title)}</span><button class="secondary" type="button" data-restore-log="${esc(l.id)}">Vrátit do logu</button></div>`).join('')}</details>`:'';
@@ -3256,12 +3256,59 @@ function armourLayerReferencePanel(){return `<section class="panel wide"><h3>HMK
 function armourMaterialsPanel(){return `<section class="panel" aria-label="Referenční hodnoty materiálů zbroje"><h3>HMK · ochranné hodnoty materiálů zbroje</h3><p class="muted">Pevná referenční tabulka podle Armour Articles, tištěná strana 117. Hodnoty AV pro b (blunt), e (edge), p (point), f (fire/frost). Nejde o konkrétní kusy zbroje: jejich anatomické pokrytí, vrstvení a ENC se musí vyhodnotit zvlášť.</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left"><thead><tr><th>Materiál</th><th>Kód</th><th>b</th><th>e</th><th>p</th><th>f</th></tr></thead><tbody>${HMK_ARMOUR_MATERIALS.map(m=>`<tr><td>${esc(m.name)}</td><td>${m.code}</td><td>${m.b}</td><td>${m.e}</td><td>${m.p}</td><td>${m.f}</td></tr>`).join('')}</tbody></table></div><p class="tiny">Tyto hodnoty se nezapisují do localStorage a zatím se automaticky nepřičítají k ochraně postavy. U 21 vestavěných kusů zbroje je nově evidováno ENC podle tabulky str. 118 (včetně podmínky pro tři a více plátových dílů paží a postihu vnímání u Great Helm). Výpočet vrstvení, ENC a Bulk se nyní provádí z aktuálního inventáře; u tištěných kompletů je nutné potvrzení GM.</p></section>`}
 // v49: Human-readable rule data; never expose raw JSON or internal object keys.
 // The source objects remain untouched for the future combat engine.
+/** Short HMK rules help; titles work on hover and keyboard focus via native title. */
+const LIBRARY_FIELD_HELP=Object.freeze({
+ 'WQ':'Weapon Quality: odolnost a kvalita zbraně či štítu; používá se při příslušných pravidlových kontrolách HMK.',
+ 'WQ / typ':'WQ je kvalita zbraně, u střeliva je zde typ střely.',
+ 'HFT / LNG':'HFT = Heft (ovladatelnost a nároky zbraně); LNG = Length (délka zbraně). Zobrazeno jako HFT / LNG.',
+ 'Impact':'Základní kostka dopadu a modifikátor; písmeno b/e/p/f označuje Blunt/Edge/Point/Fire.',
+ 'Cena':'Cena v pencích (d), není-li výslovně uvedena jiná jednotka.',
+ 'Hmotnost':'Hmotnost v librách (lb); skutečné Gear ENC se určí z efektivní nesené zátěže.',
+ 'Dostřel / střela':'Základní dostřel BR ve stopách nebo doložený typ střely.',
+ 'Block':'Modifikátor blokování útoku při použití štítu.',
+ 'Deflect':'Modifikátor odklonění útoku štítem.',
+ 'Materiál':'Materiál zbroje; ovlivňuje její základní ochranné hodnoty.',
+ 'ENC':'Příspěvek zbroje k Encumbrance, včetně případných podmíněných výjimek.',
+ 'Ochrana b/e/p/f':'Ochrana proti tupému, sečnému, bodnému a ohnivému či mrazivému poškození.',
+ 'Typ':'Kategorie dané položky.',
+ 'Dovednost / užití':'Dovednost nebo účel, s nímž se předmět používá.',
+ 'Kvalita':'Doložená kvalita předmětu, pokud je uvedena.',
+ 'Area':'Rozsah anatomického pokrytí zbroje.',
+ 'PER':'Postih Perception při nasazení daného kompletu zbroje.',
+ 'Režim':'Konkrétní způsob útoku či obrany, pokud je v pravidlech doložen.',
+ 'Nezobrazené parametry':'Další údaje daného režimu, které nejsou v základním řádku knihovny.',
+ 'Lokace':'Část těla, kterou daná ochrana pokrývá.',
+ 'Blunt':'Ochrana proti tupému dopadu (b).',
+ 'Edge':'Ochrana proti sečnému zásahu (e).',
+ 'Point':'Ochrana proti bodnému zásahu (p).',
+ 'Fire/Frost':'Ochrana proti ohni nebo mrazu (f).',
+ 'Parametr':'Pravidlově evidovaná vlastnost, která není v krátkém přehledu předmětu.',
+ 'Hodnota':'Číselná nebo popisná hodnota evidovaného parametru.',
+ 'Základní WQ':'Weapon Quality: odolnost a kvalita předmětu.',
+ 'Heft':'Ovladatelnost či náročnost manipulace se zbraní (HFT).',
+ 'Délka':'Délka zbraně (LNG), důležitá pro dosah.',
+ 'Kostka zóny':'Kostka určení zóny zásahu těla.',
+ 'Typ poškození':'Písmeno b/e/p/f: tupé, sečné, bodné, oheň/mráz.',
+ 'Zóna':'Zóna zásahu určená příslušným hodem.',
+ 'Základní dostřel (ft)':'Základní dostřel BR ve stopách.',
+ 'Obranný modifikátor':'Úprava obranného testu dané zbraně.',
+ 'Modifikátor Impact':'Hodnota přičtená k základnímu hodu Impact.',
+ 'Alternativní útoky':'Další doložené způsoby použití zbraně, případně s jiným Impact.',
+ 'Vlastnosti':'Zvláštní pravidlové vlastnosti daného předmětu.',
+ 'Ochrana anatomických lokací':'Ochrana konkrétních částí těla dle typu poškození.',
+ 'Pokryté anatomické lokace':'Části těla chráněné danou zbrojí.',
+ 'Úplné údaje':'Rozbalí jen parametry, které již nejsou vidět v krátkém přehledu.'
+});
+function libraryFieldHelp(label){
+ const k=String(label||'').trim();
+ return LIBRARY_FIELD_HELP[k]||({quality:LIBRARY_FIELD_HELP.WQ,heft:'Heft: způsob držení a ovladatelnost zbraně.',length:'Length: délka zbraně.',zoneDie:'Kostka určení tělesné zóny zásahu.',baseRangeFt:'Základní dostřel zbraně ve stopách (ft).',impactDie:'Kostka Impact pro daný režim útoku.',impactModifier:'Modifikátor k hodu Impact.',aspect:'Typ způsobeného poškození.',material:LIBRARY_FIELD_HELP.Materiál,weightLb:LIBRARY_FIELD_HELP.Hmotnost,pricePence:LIBRARY_FIELD_HELP.Cena}[k]||'Doplňující doložený parametr podle knihovny HMK; detail a případné výjimky jsou v pravidlech předmětu.');
+}
 function catalogParameters(item){
  const p=item.properties||{};
  const labels={quality:'Základní WQ',heft:'Heft',length:'Délka',zoneDie:'Kostka zóny',weightLb:'Hmotnost (lb)',pricePence:'Cena (d)',weaponClass:'Třída zbraně',defenceModifier:'Obranný modifikátor',impactTAModifier:'Modifikátor Impact TA',shieldModifier:'Modifikátor štítu',deflect:'Odklonění (Deflect)',material:'Materiál',encumbrance:'ENC',perceptionPenalty:'Postih vnímání',armArticleEncGroup:'Skupina podmíněného ENC',coverage:'Pokryté lokace',protection:'Ochrana',baseRangeFt:'Základní dostřel (ft)',traits:'Vlastnosti',notes:'Poznámky',use:'Použití',value:'Hodnota',defense:'Obrana',attack:'Útok',impact:'Impact',layers:'Vrstvy',alternateStrikeModes:'Alternativní útoky',verifiedModes:'Útočné režimy',verifiedTraits:'Ověřené vlastnosti',armourReduction:'Snížení ochrany zbroje',armourReductionCondition:'Podmínka snížení ochrany',blockModifier:'Modifikátor blokování',opponentDefenceModifier:'Modifikátor obrany protivníka',shieldDamageImpactBonus:'Bonus Impact proti štítu',possibleFaeriecraftMeleeBonus:'Možný bonus Faeriecraft v boji',slowOneHand:'Pomalé použití jednou rukou',halfSwordNoSharpEdge:'Poloviční meč bez ostrého ostří',tripUsesWeaponLength:'Podražení využívá délku zbraně',coveredLocations:'Pokryté anatomické lokace',coverageNote:'Poznámka k pokrytí',variants:'Varianty',couched:'Založená kopí (couched)',entangle:'Zapletení / zachycení',slow:'Pomalá zbraň',removeTrait:'Odebraná vlastnost',locationProtection:'Ochrana anatomických lokací',b:'Blunt',e:'Edge',p:'Point',f:'Fire/Frost',B:'Blunt',E:'Edge',P:'Point',F:'Fire/Frost',impactDie:'Kostka Impact',impactModifier:'Modifikátor Impact',aspect:'Typ poškození',name:'Název',modifier:'Modifikátor'};
  const human=v=>v===null||v===undefined?'—':typeof v==='boolean'?(v?'Ano':'Ne'):String(v);
  const niceKey=k=>labels[k]||String(k).replace(/([a-z])([A-Z])/g,'$1 $2').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
- const table=(headers,rows)=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr>${headers.map(x=>`<th scope="col">${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(x=>`<td>${esc(human(x))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+ const table=(headers,rows)=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr>${headers.map(x=>`<th scope="col" title="${esc(libraryFieldHelp(x))}">${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map((x,i)=>`<td title="${esc(libraryFieldHelp(headers[0]==='Parametr'?row[0]:headers[i]))}">${esc(human(x))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
  const modeText=m=>String(m.impactDie||'—')+(Number.isFinite(m.impactModifier)?(m.impactModifier>=0?'+':'')+m.impactModifier:'');
  const primary=Array.isArray(p.verifiedModes)?p.verifiedModes:[];
  const alternate=Array.isArray(p.alternateStrikeModes)?p.alternateStrikeModes:[];
@@ -3330,7 +3377,7 @@ function catalogParameters(item){
  const remainingProtection=protection!==undefined&&!locRows.length?`<h4>Ochrana</h4>${describe(protection)}`:'';
  const categoryLabel={weapon:'Zbraň',shield:'Štít',armor:'Zbroj',other:'Ostatní předmět'}[item.category]||'Předmět';
  const noData=!Object.keys(p).length?'<p class="muted">U této položky zatím nejsou evidovány parametry.</p>':!scalarTable&&!modeTable&&!locTable&&!extras&&!remainingProtection?'<p class="muted">Všechny dostupné parametry jsou již uvedeny v řádku předmětu.</p>':'';
- return `<details class="catalog-parameters"><summary>⚙ Zobrazit parametry · ${esc(categoryLabel)}</summary><div class="catalog-parameters-inner">${scalarTable}${modeTable}${locTable}${extras}${remainingProtection}${noData}<p class="tiny muted">Zobrazeny jsou pouze evidované údaje, nikoliv vypočtené výsledky boje. Chybějící hodnoty se nedoplňují odhadem.</p></div></details>`;
+ return `<details class="catalog-parameters"><summary title="${esc(libraryFieldHelp('Úplné údaje'))}">⚙ Zobrazit parametry · ${esc(categoryLabel)}</summary><div class="catalog-parameters-inner">${scalarTable}${modeTable}${locTable}${extras}${remainingProtection}${noData}<p class="tiny muted">Zobrazeny jsou pouze evidované údaje, nikoliv vypočtené výsledky boje. Chybějící hodnoty se nedoplňují odhadem.</p></div></details>`;
 }
 function armourLibraryConsistencyPanel(){
  const a=auditArmourLibraryConsistency();
@@ -3380,7 +3427,7 @@ function libraryBrief(i){
  const weight=p.weightLb!==undefined?`${numeric(p.weightLb)} lb`:'—';
  if(i.category==='armor')return [esc(p.material||'—'),`ENC ${numeric(p.encumbrance)}${p.printedEncCode==='a'?' (podmíněné)':p.printedEncCode==='p'?' (PER)':''}`,summary,price,weight];
  if(i.category==='shield')return [numeric(p.quality),`Block ${numeric(p.shieldModifier??p.blockModifier)}`,`Deflect ${numeric(p.deflect)}`,price,weight];
- if(i.category==='weapon')return [numeric(p.quality),p.baseRangeFt!==undefined?`BR ${numeric(p.baseRangeFt)} ft`:`HFT ${numeric(p.heft)} · LNG ${numeric(p.length)}`,impact(firstMode),price,weight];
+ if(i.category==='weapon')return [numeric(p.quality),p.baseRangeFt!==undefined?`BR ${numeric(p.baseRangeFt)} ft`:`${numeric(p.heft)} / ${numeric(p.length)}`,impact(firstMode),price,weight];
  if(p.projectileKind)return [esc(p.projectileKind),esc(p.shaftWeight||p.slingProjectileForm||'—'),esc(p.impactDie||'—'),price,weight];
  return [esc(i.category),esc(p.skill||p.use||'—'),esc(p.quality||'—'),price,weight];
 }
@@ -3388,11 +3435,18 @@ function libraryPrintedPages(source){
  const m=String(source||'').match(/(?:pp?\.?|str\.?|page[s]?)\s*(\d+(?:\s*[–-]\s*\d+)?)/i);
  return m?'str. '+m[1].replaceAll(/\s+/g,''): 'strana neuvedena';
 }
+function libraryColumnHeadings(item){
+ const p=item.properties||{};
+ if(item.category==='armor')return ['Materiál','ENC','Ochrana b/e/p/f','Cena','Hmotnost'];
+ if(item.category==='shield')return ['WQ','Block','Deflect','Cena','Hmotnost'];
+ if(item.category==='weapon')return p.baseRangeFt!==undefined?['WQ','Dostřel / střela','Impact','Cena','Hmotnost']:['WQ','HFT / LNG','Impact','Cena','Hmotnost'];
+ return ['Typ','Dovednost / užití','Kvalita','Cena','Hmotnost'];
+}
 function libraryDataRows(rows){
  return rows.map(i=>{
- const b=libraryBrief(i);const audit=catalogAuditEntry(i);
+ const b=libraryBrief(i);const audit=catalogAuditEntry(i);const headings=libraryColumnHeadings(i);
  return `<tr data-library-item="${esc(i.id)}"><td class="library-item-title">${esc(i.name)}<small>${i.builtin?'Pravidla '+esc(libraryPrintedPages(i.source)):'Vlastní položka · '+esc(i.source||'zdroj neuveden')}</small></td>
- ${b.map(s=>`<td class="library-mini">${s}</td>`).join('')}
+ ${b.map((value,index)=>`<td class="library-mini" title="${esc(libraryFieldHelp(headings[index]))}" tabindex="0">${value}</td>`).join('')}
  <td class="library-details-cell">${catalogParameters(i)}${i.builtin?'':`<details><summary>Správa vlastní položky</summary><p class="tiny">${esc(i.description||'')}</p><div class="actions"><button data-edit-item="${esc(i.id)}">Upravit</button><button data-copy-item="${esc(i.id)}" class="secondary">Kopírovat</button><button data-delete-item="${esc(i.id)}" class="danger">Smazat</button></div></details>`}</td>
  <td>${libraryAssignForm(i.id,'item',true,libraryPurchaseOffer(i))}</td></tr>`;
  }).join('');
@@ -3422,7 +3476,7 @@ function libraryView(){
  `<div class="library-toolbar"><label>Hledat v této kategorii<input id="search" type="search" placeholder="Název, parametry, zdroj…" value="${esc(query)}" autocomplete="off"></label>${statusSelector}</div>
  <p class="library-results">${selectedTab==='suits'?`Zobrazeno ${suitRows.length} z ${PRINTED_ARMOUR_SUITS_P113_116.length} tištěných kompletů.`:`Zobrazeno ${list.rows.length} z ${list.total} odpovídajících položek.`} Volba Koupit odečítá skutečnou hotovost, Vzít zdarma nic neodečítá. Obojí přidává nesený předmět (ENC se přepočte dle jeho hmotnosti).</p>
  ${selectedTab==='suits'?`<p class="notice tiny">Tištěné komplety jsou referenční sestavy, nikoliv samostatný předmět. Převzetí nebo nákup vytvoří nezávislé kopie <b>všech</b> ověřených článků jako <b>nesené</b>; žádnou zbroj automaticky neobléká.</p>`:''}
- <div class="library-table-wrap"><table class="library-table"><thead><tr><th>Položka</th>${(selectedTab==='suits'?['ENC','PER','Area','Cena','Hmotnost']:({melee:['WQ','HFT / LNG','Impact','Cena','Hmotnost'],ranged:['WQ / typ','Dostřel / střela','Impact','Cena','Hmotnost'],shields:['WQ','Block','Deflect','Cena','Hmotnost'],armour:['Materiál','ENC','Ochrana b/e/p/f','Cena','Hmotnost'],other:['Typ','Dovednost / užití','Kvalita','Cena','Hmotnost']})[selectedTab]).map(x=>`<th>${x}</th>`).join('')}<th>Úplné údaje</th><th>Postava · koupit / vzít</th></tr></thead><tbody>${selectedTab==='suits'?librarySuitRows(suitRows):libraryDataRows(list.rows)}</tbody></table></div>
+ <div class="library-table-wrap"><table class="library-table"><thead><tr><th>Položka</th>${(selectedTab==='suits'?['ENC','PER','Area','Cena','Hmotnost']:({melee:['WQ','HFT / LNG','Impact','Cena','Hmotnost'],ranged:['WQ / typ','Dostřel / střela','Impact','Cena','Hmotnost'],shields:['WQ','Block','Deflect','Cena','Hmotnost'],armour:['Materiál','ENC','Ochrana b/e/p/f','Cena','Hmotnost'],other:['Typ','Dovednost / užití','Kvalita','Cena','Hmotnost']})[selectedTab]).map(x=>`<th title="${esc(libraryFieldHelp(x))}" tabindex="0">${x}</th>`).join('')}<th title="${esc(libraryFieldHelp('Úplné údaje'))}">Úplné údaje</th><th>Postava · koupit / vzít</th></tr></thead><tbody>${selectedTab==='suits'?librarySuitRows(suitRows):libraryDataRows(list.rows)}</tbody></table></div>
  ${selectedTab==='suits'?(suitRows.length?'':'<p class="empty">Nenalezen žádný komplet.</p>'):(list.rows.length?libraryPageBar(list):'<p class="empty">Žádné položky neodpovídají filtru.</p>')}
  <details class="library-rules-details"><summary>Správa vlastního katalogu · import / export</summary><p class="tiny muted">Import nemění již uložené inventáře ani definice HMK.</p><div class="actions">${button('Exportovat vlastní katalog JSON','export-catalog')}<label>Importovat katalog<input type="file" id="import-catalog-file" accept=".json,application/json"></label></div></details>`}
  </div>`,`journal-book--library`);
@@ -3430,6 +3484,16 @@ function libraryView(){
 /** Read-only GM index over ORIGINAL authoritative evidence; no copy and no
  * synthetic action history. Old entries and cash purchases are displayed
  * with their original source paths; this page never writes game data. */
+/** Hide internal UUIDs in display text, without altering evidentiary proofs or linked IDs. */
+function visibleEvidenceText(value){
+ const uuid=/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/ig;
+ return String(value??'').replace(uuid,identifier=>{
+  const item=data.inventory.find(x=>x.id.toLowerCase()===identifier.toLowerCase());
+  if(item)return item.snapshot?.name||'evidovaný předmět';
+  const owner=[...data.characters,...data.trash].find(c=>c.id.toLowerCase()===identifier.toLowerCase());
+  return owner?.name||'doložený záznam';
+ });
+}
 function gmHistoryView(){
  const names=new Map([...data.characters,...data.trash].map(c=>[c.id,c.name]));
  const entries=(data.journal||[]).map(j=>({...j,origin:'journal'}));
@@ -3456,7 +3520,7 @@ function gmHistoryView(){
  const row=j=>{
   const name=names.get(j.characterId)||'GM / svět',ref=!!names.get(j.characterId),proof=j.skillTestProof;
   const procedure=proof?'skills':j.origin==='cash'?'gear':j.calendarInventoryRationStock||j.calendarInventoryWaterFill||j.calendarInventoryRationLoss||j.calendarInventoryWaterLoss||j.calendarNutritionPolicy||j.calendarForagingSupplyUse?'provisions':null;
-  return `<tr><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(j.title||'Událost')}</strong><details class="gm-history-detail"><summary>Podrobnosti</summary><div>${esc(j.body||'Bez popisu')}</div></details></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(j.characterId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(j.characterId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr>`;
+  return `<tr><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(visibleEvidenceText(j.title||'Událost'))}</strong><details class="gm-history-detail"><summary>Podrobnosti</summary><div>${esc(visibleEvidenceText(j.body||'Bez popisu'))}</div></details></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(j.characterId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(j.characterId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr>`;
  };
  const table=rows=>`<div class="hc-provision-table-scroll"><table class="hc-provision-table gm-history-table"><thead><tr><th>Čas</th><th>Postava</th><th>Událost</th><th>Otevřít</th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>`;
  return journalChapterShell('GM · Historie činností',`${entries.length} doložených záznamů postav a kampaní`,
@@ -12007,7 +12071,7 @@ document.addEventListener('change',async e=>{if(e.target.matches?.('form[data-li
 const HMK_ATTRIBUTES={PHYSICAL:[['str','Strength'],['end','Endurance'],['dex','Dexterity'],['agl','Agility'],['per','Perception'],['cml','Comeliness']],MENTAL:[['aur','Aura'],['wil','Will'],['rea','Reasoning'],['cre','Creativity'],['emp','Empathy'],['elo','Eloquence']]};
 const HMK_IDENTITY=[['folk','Folk'],['ageGroup','Age group'],['birthdate','Birthdate'],['sunsign','Sunsign'],['birthplace','Birthplace'],['society','Society'],['socialClass','Social class'],['familyOccupation','Parent occupation'],['background','Background'],['estrangement','Estrangement'],['morality','Morality'],['psyche','Psyche'],['home','Home'],['standing','Standing'],['complexion','Complexion'],['hair','Hair'],['eyes','Eyes'],['height','Height'],['weight','Weight'],['handedness','Handedness']];
 function numericField(key,label,val){return `<label>${esc(label)}<input type="number" step="1" min="0" max="999" name="${esc(key)}" value="${esc(val??'')}"></label>`}
-function hmkSheet(c){const h=c.hmk||{},live=persistentStateOf(c),authoritative=new Set(live.wounds.map(w=>w.id));return `<section class="panel wide"><h3>Zranění a stav postavy · Combat State</h3><p class="muted">Autoritativní potvrzené rány z Combat State, včetně lokality, závažnosti, Shock, Bleeder a léčení. Rozpracované náhledy zde nejsou.</p><p><strong>Shock: ${esc(live.shock)}</strong> · Krvácení: ${live.wounds.filter(w=>w.bleeding&&!w.healed).length} · Potvrzených ran: ${live.wounds.length}</p>${live.wounds.map(w=>`<div class="list-row"><div><b>${esc(w.location.toUpperCase())}${w.side?' / '+esc(w.side):''} · ${esc(w.severity+w.level)}</b> · ${esc(w.aspect)} · ${w.bleeding?'Bleeder · ':''}${w.healed?'ZHOJENO':w.healing?.infected?'INFEKCE':w.healing?.treated?'léčeno · další den '+esc(w.healing.nextHealingDay??'—'):'čeká na Treatment'} <small>${esc(w.id)}</small></div></div>`).join('')||'<p>Žádná potvrzená fyzická rána.</p>'}<details><summary>Starší ruční evidenční záznamy · oddělené od Combat State</summary>${(h.injuries||[]).filter(x=>!authoritative.has(x.id)).map(x=>`<div class="list-row"><div><b>${esc(x.location)}</b> · ${esc(x.description)} <span class="muted">${esc(x.severity)}</span></div><div class="actions"><button class="secondary" data-edit-injury="${esc(x.id)}">Upravit</button><button class="danger" data-remove-injury="${esc(x.id)}">Odstranit</button></div></div>`).join('')||'<p>Žádné.</p>'}</details><form id="hmk-injury-form"><div class="field-grid">${field('location','Lokalita zásahu')}${field('severity','Závažnost / označení')}${field('description','Popis poranění')}</div><button type="submit">Zapsat zranění</button></form></section>`}
+function hmkSheet(c){const h=c.hmk||{},live=persistentStateOf(c),authoritative=new Set(live.wounds.map(w=>w.id));return `<section class="panel wide"><h3>Zranění a stav postavy · Combat State</h3><p class="muted">Autoritativní potvrzené rány z Combat State, včetně lokality, závažnosti, Shock, Bleeder a léčení. Rozpracované náhledy zde nejsou.</p><p><strong>Shock: ${esc(live.shock)}</strong> · Krvácení: ${live.wounds.filter(w=>w.bleeding&&!w.healed).length} · Potvrzených ran: ${live.wounds.length}</p>${live.wounds.map(w=>`<div class="list-row"><div><b>${esc(w.location.toUpperCase())}${w.side?' / '+esc(w.side):''} · ${esc(w.severity+w.level)}</b> · ${esc(w.aspect)} · ${w.bleeding?'Bleeder · ':''}${w.healed?'ZHOJENO':w.healing?.infected?'INFEKCE':w.healing?.treated?'léčeno · další den '+esc(w.healing.nextHealingDay??'—'):'čeká na Treatment'}</div></div>`).join('')||'<p>Žádná potvrzená fyzická rána.</p>'}<details><summary>Starší ruční evidenční záznamy · oddělené od Combat State</summary>${(h.injuries||[]).filter(x=>!authoritative.has(x.id)).map(x=>`<div class="list-row"><div><b>${esc(x.location)}</b> · ${esc(x.description)} <span class="muted">${esc(x.severity)}</span></div><div class="actions"><button class="secondary" data-edit-injury="${esc(x.id)}">Upravit</button><button class="danger" data-remove-injury="${esc(x.id)}">Odstranit</button></div></div>`).join('')||'<p>Žádné.</p>'}</details><form id="hmk-injury-form"><div class="field-grid">${field('location','Lokalita zásahu')}${field('severity','Závažnost / označení')}${field('description','Popis poranění')}</div><button type="submit">Zapsat zranění</button></form></section>`}
 function parseStructuredModes(raw){
  if(!String(raw||'').trim())return [];
  let x;try{x=JSON.parse(raw)}catch{throw Error('Režimy zbraně: neplatný JSON')}

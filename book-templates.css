@@ -4706,3 +4706,15 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .journal-book--characters .character-registry-group .folio-character-list{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important}
 @container character-folio (max-width:700px){.content-sheet .journal-book--characters .character-registry-group .folio-character-list{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @container character-folio (max-width:400px){.content-sheet .journal-book--characters .character-registry-group .folio-character-list{grid-template-columns:minmax(0,1fr)!important}}
+
+/* v93.493: four compact character cards per PC/NPC row when the folio is wide. */
+@container character-folio (min-width:820px){
+ .content-sheet .journal-book--characters .character-registry-group .folio-character-list{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:7px!important
+ }
+ .content-sheet .journal-book--characters .character-registry-group .character-card{
+  min-height:155px!important;padding:7px!important
+ }
+ .content-sheet .journal-book--characters .character-registry-group .character-card__crest{width:30px!important;height:30px!important;min-height:30px!important}
+ .content-sheet .journal-book--characters .character-registry-group .character-card__body h3{font-size:13px!important}
+}
