@@ -246,7 +246,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.487';
+const APP_VERSION='93.488';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -977,7 +977,12 @@ function personalProvisionContext(){
 function activeProvisionActor(){
  const clock=data.campaignClock;
  if(!clock||!personalProvisionContext())return null;
- return calendarMemberIds(clock,data.characters).find(c=>c.id===provisionContextActorId())||null;
+ const members=calendarMemberIds(clock,data.characters);
+ // Calendar's first visible character is the default even before the GM has
+ // touched the picker. The submitted hidden actorId must equal that visible
+ // actor; never read a stale/null calendar UI selection as game authority.
+ const current=members.find(c=>c.id===provisionContextActorId());
+ return current||(view==='calendar'?members[0]||null:null);
 }
 function characterProvisionActionsHTML(c){
  const clock=data.campaignClock;
@@ -3364,13 +3369,26 @@ function libraryView(){
 function gmHistoryView(){
  const names=new Map([...data.characters,...data.trash].map(c=>[c.id,c.name]));
  const entries=(data.journal||[]).map(j=>({...j,origin:'journal'}));
+ // Render original authoritative calendar advance events, not duplicate
+ // records in character journals. A single event ID yields one GM history row.
+ if(data.campaignClock?.events){
+  const clock=data.campaignClock;
+  let previousMinute=clock.events.find(e=>e.type==='init')?.minute??0;
+  for(const e of clock.events){
+   if(e.type==='advance')entries.push({id:'clock:'+e.id,characterId:null,
+    campaignMinute:e.minute,createdAt:'',origin:'calendar-clock',
+    title:'GM · Nastavení času kampaně',
+    body:`${displayCampaignMinute(previousMinute)} → ${displayCampaignMinute(e.minute)}\nDůvod GM: ${e.reason}`});
+   if(e.type==='advance'||e.type==='init')previousMinute=e.minute;
+  }
+ }
  for(const c of data.characters){
   for(const account of Object.values(c.hmk?.campaignCashAccounts||{})){
    for(const x of account.purchases||[])entries.push({id:'cash-purchase:'+x.id,characterId:c.id,createdAt:x.at||'',campaignMinute:x.campaignMinute,title:'Nákup · '+(x.label||'vybavení'),body:'−'+x.amountPence+'d',origin:'cash'});
    for(const x of account.adjustments||[])entries.push({id:'cash-adjustment:'+x.id,characterId:c.id,createdAt:x.at||'',campaignMinute:x.campaignMinute,title:'Úprava hotovosti',body:(x.deltaPence>=0?'+':'')+x.deltaPence+'d · '+(x.reason||''),origin:'cash'});
   }
  }
- entries.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))||(b.campaignMinute??-1)-(a.campaignMinute??-1));
+ entries.sort((a,b)=>(b.campaignMinute??-1)-(a.campaignMinute??-1)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
  const row=j=>{
   const name=names.get(j.characterId)||'GM / svět',ref=!!names.get(j.characterId),proof=j.skillTestProof;
   const procedure=proof?'skills':j.origin==='cash'?'gear':j.calendarInventoryRationStock||j.calendarInventoryWaterFill||j.calendarInventoryRationLoss||j.calendarInventoryWaterLoss||j.calendarNutritionPolicy||j.calendarForagingSupplyUse?'provisions':null;
@@ -3378,7 +3396,7 @@ function gmHistoryView(){
  };
  const table=rows=>`<div class="hc-provision-table-scroll"><table class="hc-provision-table gm-history-table"><thead><tr><th>Čas</th><th>Postava</th><th>Událost</th><th>Otevřít</th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>`;
  return journalChapterShell('GM · Historie činností',`${entries.length} doložených záznamů postav a kampaní`,
- `<section class="panel"><h3>Společný přehled skutečných událostí</h3><p class="muted">Zobrazuje původní deníkové doklady všech postav a finanční historii. Nemaže je ani nevytváří nové. „Osobní záznam“ otevře konkrétní položku v Notes & Logbook; „Procedura“ je dostupná jen u rozpoznaného původního pravidlového záznamu.</p>${table(entries.slice(0,30))}${entries.length>30?`<details><summary>Starší události · ${entries.length-30}</summary>${table(entries.slice(30))}</details>`:''}</section>`,'journal-book--gm-history');
+ `<section class="panel"><h3>Společný přehled skutečných událostí</h3><p class="muted">Zobrazuje původní deníkové doklady, finanční historii a potvrzené posuny času z autoritativního kalendáře. Nevytváří duplicitní herní záznamy. „Osobní záznam“ otevře konkrétní položku v Notes & Logbook; „Procedura“ je dostupná jen u rozpoznaného původního pravidlového záznamu.</p>${table(entries.slice(0,30))}${entries.length>30?`<details><summary>Starší události · ${entries.length-30}</summary>${table(entries.slice(30))}</details>`:''}</section>`,'journal-book--gm-history');
 }
 function trashView(){return journalChapterShell('Archiv postav','Archivované profily zůstávají zachované spolu s inventářem a historií.',`<section class="panel folio-archive-list"><h3>Archivované postavy</h3><p class="muted">Obnovení postavu vrátí do registru. Trvalé smazání vyžaduje samostatné potvrzení.</p>${data.trash.length?data.trash.map(c=>`<div class="folio-archive-row"><div class="folio-archive-identity"><b>${esc(c.name)}</b><span>${esc(c.occupation||'Bez povolání')}</span></div><div class="actions folio-archive-actions"><button data-restore="${esc(c.id)}">Obnovit</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-purge="${esc(c.id)}">Definitivně smazat</button></div></div>`).join(''):'<div class="empty">Archiv je prázdný.</div>'}</section><section class="panel folio-archive-info"><h3>Evidence archivu</h3><dl class="folio-archive-metrics"><div><dt>Archivované postavy</dt><dd>${data.trash.length}</dd></div><div><dt>Aktivní postavy</dt><dd>${data.characters.length}</dd></div></dl><p class="muted">Archivace nepřepisuje deník ani inventář postavy. Obnovení ji vrátí do registru.</p><button type="button" class="secondary" data-nav="characters">Otevřít registr postav</button></section>`,'journal-book--archive')}
 function readinessReport(c){
@@ -7676,6 +7694,7 @@ document.addEventListener('input',e=>{
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-skill-tab]');if(!t)return;
  activeSkillTab=t.dataset.skillTab;const root=t.closest('.hmk-skill-workbench');if(!root)return;
  for(const section of root.querySelectorAll('[data-skill-section]'))section.hidden=section.dataset.skillSection!==activeSkillTab;
+ for(const help of root.querySelectorAll('[data-skill-rule]'))help.hidden=help.dataset.skillRule!==activeSkillTab;
  for(const tab of root.querySelectorAll('[data-skill-tab]')){
   const on=tab.dataset.skillTab===activeSkillTab;tab.setAttribute('aria-pressed',on?'true':'false');
   if(on)tab.dataset.skillActive='yes';else delete tab.dataset.skillActive;}

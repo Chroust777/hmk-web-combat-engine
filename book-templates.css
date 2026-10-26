@@ -4633,3 +4633,68 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 /* HMK v93.483: consistent manual / software die layout */
 .hsk-inline-die { display:block!important;width:max-content;max-width:100%;margin:5px 0 0!important;white-space:normal }
 .inv-summary-stat[title] { cursor:help }
+
+/* v93.488 · Skill System: matching light manuscript explanatory panels.
+   The help section lives on the left folio; right-hand EML controls retain
+   their authoritative source data and a deliberately compact footprint. */
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-skill-rule-explainer {
+  display:block!important;
+  margin:9px 0 11px!important;
+  padding:12px 14px!important;
+  background:linear-gradient(180deg,rgba(248,235,209,.79),rgba(236,213,174,.38))!important;
+  color:#3c2a1a!important;
+  border:1px solid rgba(125,88,49,.42)!important;
+  border-radius:10px!important;
+  box-shadow:inset 0 1px rgba(255,249,231,.8);
+  font:14px/1.55 Georgia,serif!important;
+  overflow-wrap:break-word;
+}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-skill-rule-explainer .hsk-rule-panel[hidden] {display:none!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-skill-rule-explainer h3 {
+  margin:0 0 9px!important;padding:0 0 6px!important;
+  border-bottom:1px solid rgba(128,83,41,.3)!important;
+  background:none!important;color:#673b23!important;
+  font:700 17px/1.25 Georgia,serif!important;
+}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-skill-rule-explainer p {
+  margin:0 0 9px!important;color:#392c1e!important;
+  line-height:1.55!important;max-width:none!important;font-size:13px!important;
+}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-skill-rule-explainer p:last-child {margin-bottom:0!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-skill-rule-explainer b,
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-skill-rule-explainer strong {color:#634022!important;font-weight:700}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip {
+ flex:0 1 112px!important;min-width:103px!important;max-width:132px!important;
+ padding:7px 8px!important;border-radius:9px!important;
+ background:rgba(247,227,188,.57)!important;
+}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip small {
+ font:600 11px/1.24 Georgia,serif!important;overflow-wrap:normal!important;
+}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip b {
+ font:700 16px/1.2 Georgia,serif!important;
+}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-total {
+ min-width:104px!important;border-radius:9px!important;padding:7px 10px!important;
+}
+.content-sheet .journal-book--skills .folio-chapter-content :is(.hsk-calculation,.hsk-sv-guide,.hsk-value-display,.hsk-result-slot,.hsk-opposition-toggle,.hsk-verdict-chip) {
+ border-radius:9px!important;
+}
+
+/* v93.488 · Equipment library: one compact line of verified item statistics,
+   without modifying any underlying catalog or buy/free button handlers. */
+.content-sheet .journal-book--library .folio-catalog-list {gap:4px!important}
+.content-sheet .journal-book--library .folio-catalog-entry {padding:5px 7px!important}
+.content-sheet .journal-book--library .folio-catalog-heading {font-size:12px!important;padding-bottom:3px!important}
+.content-sheet .journal-book--library .folio-catalog-heading small {font-size:10px!important;margin-top:1px!important}
+.content-sheet .journal-book--library .folio-catalog-stats {
+ display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+ gap:3px 4px!important;margin:5px 0!important;
+}
+.content-sheet .journal-book--library .folio-catalog-field {gap:0!important}
+.content-sheet .journal-book--library .folio-catalog-field dt {font-size:9.5px!important;white-space:nowrap}
+.content-sheet .journal-book--library .folio-catalog-field dd {font-size:12px!important;line-height:1.15!important}
+.content-sheet .journal-book--library .folio-catalog-foot {padding-top:4px!important;gap:5px!important}
+@media(max-width:540px){
+ .content-sheet .journal-book--library .folio-catalog-stats {grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
