@@ -95,10 +95,12 @@ export function calendarNutritionConditionActivities(clock,characters=[],journal
  const titles={rest:'Celodenní odpočinek',inactive:'Celodenní nečinnost','rest-inactive':'Celodenní odpočinek a nečinnost',hot:'Celodenní horko','rest-hot':'Celodenní odpočinek v horku'};
  return journal.filter(j=>j.calendarNutritionConditions?.format===NUTRITION_PLAN&&j.calendarCampaignId===campaignId&&names.has(j.characterId)).map(j=>{
   const p=j.calendarNutritionConditions,isCancelled=cancelled.has(j.id),isDone=completed.has(j.id);
-  const status=isCancelled?'cancelled':isDone?'resolved':clock.minute>=p.endMinute?'due':clock.minute>=p.startMinute?'active':'future';
+  // An attested 24-hour condition is a time interval, not a new GM dice
+  // obligation. The authoritative daily closure runs in the clock mutation.
+  const status=isCancelled?'cancelled':isDone?'resolved':clock.minute>=p.endMinute?'elapsed':clock.minute>=p.startMinute?'active':'future';
   return {id:'nutrition-plan:'+j.id,sourceId:j.id,origin:'activity',kind:'nutrition-conditions',
    name:names.get(j.characterId),characterId:j.characterId,title:titles[p.kind]||'Denní podmínky',description:'24hodinový režim výživy',
-   note:'Doložený interval mění spotřebu až při uzávěrce dne. Samotný záznam neobnovuje Fatigue; případná čtyřhodinová obnova je doložena samostatnou časovou činností.',
+   note:'Informační časový interval. Denní dávky uzavírá systém automaticky při posunu času GM. Samotné podmínky neobnovují Fatigue; navázaný odpočinek má vlastní automaticky dokončovanou činnost. Nevyřešené zdravotní testy se zobrazují zvlášť.',
    minute:p.startMinute,dueMinute:p.startMinute,endMinute:p.endMinute,status,destination:'notes'};
  });
 }

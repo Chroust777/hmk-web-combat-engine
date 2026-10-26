@@ -132,9 +132,9 @@ export function calendarActorActivities(clock,characters=[],journal=[]){
   return {id:'activity:'+row.id,sourceId:row.id,origin:'activity',kind:a.kind,
    name:allowed.get(row.characterId),characterId:row.characterId,title:labels[a.kind]||'Činnost · '+a.kind,
    description:'Činnost postavy',note:interrupted?'GM přerušil činnost v minutě '+stop.campaignMinute+' ('+stop.calendarActivityInterruptProof.reason+'); bez automatického účinku.':finished?'Pravidlový výsledek byl dokončen a zapsán.':
-    isStarted?'Činnost probíhá. Účinek se zapíše teprve po uplynutí intervalu a posunu času GM.':'Naplánovaná činnost.',
+    clock.minute>=a.endMinute?'Čas činnosti uplynul; pravidlový zápis musí proběhnout při potvrzeném posunu času GM (bez dalšího tlačítka).':isStarted?'Činnost probíhá. Účinek se zapíše teprve po uplynutí intervalu a posunu času GM.':'Naplánovaná činnost.',
    minute:a.startMinute,dueMinute:a.startMinute,endMinute:interrupted?Math.max(a.startMinute,stop.campaignMinute):a.endMinute,
-   status:interrupted?'cancelled':finished?'resolved':isStarted?'active':'future',destination:'notes'};
+   status:interrupted?'cancelled':finished?'resolved':clock.minute>=a.endMinute?'elapsed':isStarted?'active':'future',destination:'notes'};
  });
  // A cancelled eight-hour rest stops at its documented interruption minute.
  // Record that exact minute as its own visible history event as well.

@@ -248,7 +248,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.501';
+const APP_VERSION='93.502';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -976,6 +976,21 @@ function provisionGuideHTML(participants){
  </section>`;
 }
 
+/** v93.502: A previously untouched actor uses the ordinary resource-tracked
+ * policy. This is an actual append-only policy receipt, not a UI-only button
+ * pretending that consumption has been enabled. It never invents supplies. */
+function ensurePersonalNutritionTracking(actorId){
+ const clock=data.campaignClock,actor=character(actorId);
+ if(!clock||!actor||(clock.characterIds??data.characters.map(x=>x.id)).includes(actorId)===false)return false;
+ if(activeNutritionPolicies(data.journal,campaignKey(clock),[actorId]).length)return false;
+ const policy=createNutritionPolicy({campaignId:campaignKey(clock),minute:clock.minute,actorId,
+  foodNeed:1,waterNeed:1,enabled:true,autoNeeds:true,inventoryRations:true,inventoryWater:true});
+ return mutate(()=>data.journal.push({id:uuid(),characterId:actorId,
+  calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,createdAt:stamp(),
+  title:'HMK · automatické sledování výživy',
+  body:'Výchozí režim: Ne · řešit podle skutečných zásob; bez připsání potravin, vody nebo posunu času.',
+  calendarNutritionPolicy:policy}));
+}
 /** v93.471 — UI scopes are strictly presentation state. Both variants submit
  * the existing HMK nutrition writers; selecting a route grants no food/water.
  * Personal forms bind exactly ONE actor (never an implicit campaign group).
@@ -1019,6 +1034,23 @@ function characterProvisionActionsHTML(c){
  return `${provisionGuideHTML([c])}${personalProvisionRulebookHTML(c,policyMap,upcoming,plans,clock)}
  <section class="panel hc-person-provision-link"><button type="button" class="secondary" data-provision-go="calendar" data-provision-actor-id="${esc(c.id)}">Otevřít kalendář kampaně ↗</button><p class="tiny muted">Zde i v kalendáři jde o tytéž fyzické položky, doklady a záznamy spotřeby.</p></section>`;
 }
+/** Shared fatigue planner, with exactly the same rule proof as Cestování a hlídky.
+ * The 24-hour nutrition plan remains separate: it NEVER implies eight-hour sleep. */
+function personalRestPlannerHTML(actor,clock){
+ if(!clock||!actor)return '';
+ const active=activeHMKActivities(data.journal,clock).filter(x=>x.characterId===actor.id);
+ const label={winded:'Klid (10 minut)',rest:'Odpočinek (4 hodiny)',sleep:'Spánek (8 hodin)',travel:'Cesta'};
+ const items=active.map(j=>{const a=j.calendarActivityProof;
+  return `<p class="hc-provision-help"><strong>${esc(label[a.kind]||'Činnost')}:</strong> ${esc(displayCampaignMinute(a.startMinute))} až ${esc(displayCampaignMinute(a.endMinute))}.
+  ${a.kind==='winded'?'Po dokončení Windedness −5.':a.kind==='rest'?'Po dokončení Weariness −5.':a.kind==='sleep'?'Po dokončení Weariness −15.':'Probíhající cestovní činnost.'} Účinek se automaticky zapíše při potvrzeném posunu času GM.</p>`;}).join('');
+ return `<section class="hc-person-rest-planner"><h4>Odpočinek a spánek · HMK str. 176</h4>
+  <p class="hc-provision-help">Stejný plán a stejné přepočty Fatigue jako v Kalendář → Cestování a hlídky. Činnost zde ani tam neposouvá čas sama; dokončení a případná obnova proběhnou automaticky při posunu času GM. Weakness se tím neléčí.</p>
+  ${items||'<p class="hc-provision-help">Momentálně není naplánovaná další časovaná činnost této postavy.</p>'}
+  <form data-provision-rest-planner><input name="actorId" type="hidden" value="${esc(actor.id)}">
+   <label>Plánovat od této minuty<select name="kind"><option value="winded">Klid 10 minut · Windedness −5</option><option value="rest">Odpočinek 4 hodiny · Weariness −5</option><option value="sleep">Spánek 8 hodin · Weariness −15</option></select></label>
+   <button type="submit">Naplánovat časovaný odpočinek</button></form>
+  <p class="hc-provision-help">Celodenní podmínky níže mění navíc denní potřebu jídla a vody. Jejich úplný odpočinek může již naplánovat stejný čtyřhodinový interval; druhý překrývající se odpočinek se nezaloží.</p></section>`;
+}
 function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clock){
  if(!actor)return '';
  const actorId=actor.id,policy=policies.get(actorId)?.calendarNutritionPolicy;
@@ -1027,6 +1059,7 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
  const due=dueMalnutritionCases(data).filter(x=>x.characterId===actorId);
  const day=dayCandidates.find(x=>x.row.characterId===actorId&&!dayPlans.some(j=>j.calendarNutritionConditions.policyId===x.row.id&&j.calendarNutritionConditions.startMinute===x.start));
  const outstanding=dayPlans.filter(x=>x.characterId===actorId);
+ const restPlanner=personalRestPlannerHTML(actor,clock);
  const restStatus=outstanding.filter(x=>!data.journal.some(j=>j.calendarNutritionConditionsCancel?.planId===x.id)&&clock.minute<x.calendarNutritionConditions.endMinute).map(x=>{
   const p=x.calendarNutritionConditions,hasRest=['rest','rest-inactive','rest-hot'].includes(p.kind);
   const a=data.journal.find(j=>j.calendarActivityProof?.plan?.nutritionConditionsId===x.id);
@@ -1045,7 +1078,7 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
   <details><summary>Převzít dosud nezaúčtované čerstvé potraviny (volitelné)</summary><label class="hc-check"><input type="checkbox" name="freshRations" value="yes"> GM potvrzuje nově převzaté čerstvé potraviny</label></details>`:''}
  <button type="submit">Uložit režim pouze pro ${esc(actor.name)}</button></form>`;
  const pause=policy?.enabled?`<form data-nutrition-policy-form data-provision-scope-actor="${esc(actorId)}" class="hc-provision-pauser"><input type="hidden" name="nutritionActorIds" value="${esc(actorId)}"><input type="hidden" name="foodNeed" value="1"><input type="hidden" name="waterNeed" value="1"><input type="hidden" name="policyAction" value="pause"><input type="hidden" name="sourceMode" value="foraging"><button class="secondary" type="submit">Pozastavit tento režim</button></form>`:'';
- const conditions=day?`<details class="hc-person-provision-options"><summary>Celodenní podmínky · odpočinek / horko · GM</summary>
+ const conditions=day?`<details class="hc-person-provision-options" open><summary>Celodenní podmínky · odpočinek / horko · GM</summary>
  <form data-nutrition-day-conditions><input type="hidden" name="actorId" value="${esc(actorId)}"><label>Skutečné podmínky na celých 24 hodin<select name="kind"><option value="rest-inactive">Úplný odpočinek a nečinnost</option><option value="rest">Úplný odpočinek</option><option value="inactive">Úplná nečinnost</option><option value="hot">Celodenní horko</option><option value="rest-hot">Úplný odpočinek v horku</option></select></label>
  <label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje úplné 24hodinové podmínky a při jejich změně plán zruší. Čtyřhodinová obnova Weariness se případně zapíše zvlášť po skutečně uplynulých čtyřech hodinách; spánek ani Weakness se automaticky neobnovují.</label><button type="submit">Zaznamenat podmínky · bez posunu času</button></form></details>`:'';
  const cancellation=outstanding.map(x=>{const c=x.calendarNutritionConditions,already=data.journal.some(j=>j.calendarNutritionConditionsCancel?.planId===x.id);
@@ -1055,10 +1088,10 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
  // Switching to assured supply hides optional setup forms, not already-due medical checks
  // or cancellation of a previously scheduled 24-hour conditions plan.
  if(policy?.gmProvisioned===true){
-  if(!cancellation&&!health)return '';
-  return `<section class="hc-person-provision-rules hc-provision-remaining-duties">${restStatus}${cancellation}${health}</section>`;
+  if(!cancellation&&!health)return restPlanner;
+  return `<section class="hc-person-provision-rules hc-provision-remaining-duties">${restPlanner}${restStatus}${cancellation}${health}</section>`;
  }
- return `<section class="hc-person-provision-rules">${restStatus}<details class="hc-provision-personal-rules"><summary>Pokročilé sledování spotřeby · ${esc(actor.name)} (${esc(current)})</summary><p class="hc-provision-caution">Přepínač pouze volí pravidlový režim. Neprohlašuje postavu automaticky za najedenou nebo napitou. Denní příjem potvrdí až skutečný výdej a uzávěrka.</p>${policyForm}${pause}</details>${conditions}${cancellation}${health}</section>`;
+ return `<section class="hc-person-provision-rules">${restPlanner}${restStatus}<details class="hc-provision-personal-rules" open><summary>Pokročilé sledování spotřeby · ${esc(actor.name)} (${esc(current)})</summary><p class="hc-provision-caution">Přepínač pouze volí pravidlový režim. Neprohlašuje postavu automaticky za najedenou nebo napitou. Denní příjem potvrdí až skutečný výdej a uzávěrka.</p>${policyForm}${pause}</details>${conditions}${cancellation}${health}</section>`;
 }
 let calendarLanding=true; // Clicking the left navigation always opens the calendar chooser.
 let calendarCreating=false;
@@ -1601,6 +1634,8 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <div class="hc-event-list">${data.journal.filter(j=>j.calendarTrekWildernessProof&&j.calendarCampaignId===campaignKey(clock)).slice(-12).reverse().map(j=>{const p=j.calendarTrekWildernessProof;return `<p class="hc-hint">${esc(character(j.characterId)?.name||j.characterId)} · ${esc(displayCampaignMinute(j.campaignMinute))} · jídlo ${p.totals.foodDays}, voda ${p.totals.waterDays}, byliny ${p.totals.herbDoses}</p>`}).join('')}</div></details></section>`;
  const expeditionHTML=`<section class="hc-calendar hc-expedition"><h3>HMK · časově doložený odpočinek a únava během cesty</h3>
  <p class="hc-hint">HMK str. 62, 145–150, 176. Odpočinek se plánuje pro jednu či více postav současně; společný čas kampaně nemění. Obnova Windedness/Weariness nastane až po uplynutí intervalu při posunu času GM. Jeden čtyřhodinový cestovní watch zapisuje Weariness a END Secondary Roll. <strong>Jde o časový/únavový díl Trekking Routine, nikoliv o náhradu chybějících testů Weather, Orienteering, Hazards a Encounter.</strong> Před cestováním nejprve vyhodnoťte tyto situace jejich pravidlovými průvodci.</p>
+ <div class="hc-provision-quiet"><strong>Celodenní podmínky a spotřeba:</strong> stejný odpočinek lze pro konkrétní postavu plánovat také v Zásobách a výživě, kde lze zvlášť doložit celý 24hodinový režim. Tato volba není automatickým osmihodinovým spánkem.</div>
+ <div class="hc-expedition-links">${participants.map(c=>`<button type="button" class="hc-small secondary" data-provision-go="calendar" data-provision-actor-id="${esc(c.id)}">${esc(c.name)} · denní podmínky a odpočinek ↗</button>`).join('')}</div>
  <form id="campaign-expedition-form"><fieldset class="hc-expedition-actors"><legend>Postavy – vyberte jednu nebo více současně</legend><div class="hc-characters">${participants.map((c,i)=>`<label class="hc-character"><input type="checkbox" name="characterIds" value="${esc(c.id)}" ${i===0?'checked':''}><span>${esc(c.name)}</span></label>`).join('')}</div><div class="hc-expedition-select-all"><button type="button" class="hc-small" data-expedition-select="all">Vybrat všechny</button><button type="button" class="hc-small" data-expedition-select="none">Zrušit výběr</button></div></fieldset><div class="hc-fields">
  <label data-expedition-guide-field hidden>Průvodce skupiny (doložený Orienteering SV)<select name="guideId">${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <label>Činnost<select name="kind"><option value="winded">Klid 10 minut · Windedness −5 (1× za hodinu)</option><option value="rest">Odpočinek 4 hodiny · Weariness −5 (1× za 24 h)</option><option value="sleep">Spánek 8 hodin · Weariness −15 (1× za 24 h)</option><option value="walk">Trekking 4 hodiny · pěšky (END SR)</option><option value="ride">Cesta 4 hodiny · v sedle (END SR +2 TN)</option><option value="drive">Cesta 4 hodiny · řidič (END SR +2 TN)</option><option value="double-walk">Double Time · 4× 1 hodina (4 END SR)</option><option value="double-drover">Double Time · pohánění zvířat 4× 1 hodina</option></select></label>
@@ -8354,6 +8389,25 @@ document.addEventListener('submit',e=>{
   }
  }catch(error){alert('Malnutrition Course nebyl uložen: '+error.message)}
 },true);
+// The personal Provision and travel/watch panels call the SAME rest rule engine.
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-provision-rest-planner]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const clock=data.campaignClock,fd=new FormData(form),actorId=String(fd.get('actorId')||''),kind=String(fd.get('kind')||'');
+  if(!clock||!['winded','rest','sleep'].includes(kind)||!calendarMemberIds(clock,data.characters).some(x=>x.id===actorId))throw Error('Odpočinek vyžaduje postavu aktivní kampaně.');
+  const actor=character(actorId),state=persistentStateOf(actor);
+  if(['KIA','INC','UNC'].includes(state.shock)||state.extendedShock||
+     (state.sleepDeprivation?.status==='awake'&&kind!=='winded')||
+     (state.environmentalHazards?.some(x=>x.active)&&kind!=='winded'))throw Error('Zdravotní stav vyžaduje samostatnou proceduru místo běžného odpočinku.');
+  const plan=expeditionRestRecovery({minute:clock.minute,kind,
+   current:kind==='winded'?state.fatigue.windedness:state.fatigue.weariness,
+   claims:actor.hmk?.expedition?.claims||{}});
+  const row=scheduleHMKActivity({journal:data.journal,clock,characterId:actor.id,name:actor.name,kind,plan,id:uuid(),origin:'none'});
+  if(mutate(()=>data.journal.push({...row,createdAt:stamp()})))
+   notice='Odpočinek byl uložen do jediné kalendářové evidence. Účinek se započte po uplynutí intervalu při posunu času GM.';
+ }catch(error){alert('Odpočinek nebyl naplánován: '+error.message)}
+},true);
 // A single GM attestation for a forthcoming whole day – NEVER moves time.
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-nutrition-day-conditions]'))return;
@@ -10148,7 +10202,12 @@ document.addEventListener('click',e=>{
  e.preventDefault();e.stopImmediatePropagation();
  const next=btn.dataset.calendarSection;
  if(view!=='calendar'||!CALENDAR_SECTIONS.some(([id])=>id===next))return;
- activeCalendarSection=next;render();
+ activeCalendarSection=next;
+ if(next==='provisions'&&provisionScope==='person'){
+  const actorId=provisionGuideActorId||calendarMemberIds(data.campaignClock,data.characters)[0]?.id;
+  if(actorId&&ensurePersonalNutritionTracking(actorId))return;
+ }
+ render();
 },true);
 // Calendar lifecycle is explicitly separate from ordinary append-only changes.
 document.addEventListener('click',e=>{
@@ -10484,14 +10543,19 @@ document.addEventListener('change',e=>{
  e.preventDefault();e.stopImmediatePropagation();
  if(view!=='calendar'||activeCalendarSection!=='provisions')return;
  if(!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===field.value))return;
- provisionGuideActorId=field.value;render();
+ provisionGuideActorId=field.value;
+ if(ensurePersonalNutritionTracking(field.value))return;
+ render();
 },true);
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-provision-scope]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
  if(view!=='calendar'||activeCalendarSection!=='provisions')return;
  const value=button.dataset.provisionScope;if(!['person','party'].includes(value))return;
- provisionScope=value;render();
+ provisionScope=value;
+ if(value==='person'){const id=provisionGuideActorId||calendarMemberIds(data.campaignClock,data.characters)[0]?.id;
+  if(id&&ensurePersonalNutritionTracking(id))return;}
+ render();
 },true);
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-provision-route],[data-provision-go]');if(!button)return;
@@ -10505,7 +10569,9 @@ document.addEventListener('click',e=>{
  if(route==='calendar'){
   const actorId=button.dataset.provisionActorId;
   if(!character(actorId)||!data.campaignClock)return;
-  provisionGuideActorId=actorId;provisionScope='person';activeCalendarSection='provisions';calendarLanding=false;calendarCreating=false;view='calendar';render();return;
+  provisionGuideActorId=actorId;provisionScope='person';activeCalendarSection='provisions';calendarLanding=false;calendarCreating=false;view='calendar';
+  if(ensurePersonalNutritionTracking(actorId))return;
+  render();return;
  }
  if(!personalProvisionContext())return;
  if(route==='forage'){activeCalendarSection='travel';render();return;}
@@ -11923,6 +11989,7 @@ document.addEventListener('click',e=>{
  if(isCharacterSpecialtySection(requested)&&!characterSpecialtyById(character(selected),requested))return;
  activeSheetSection=requested;
  if(activeSheetSection!=='overview')sheetEditingId=null;
+ if(requested==='provisions'&&selected&&ensurePersonalNutritionTracking(selected))return;
  render();
  if(oldTop!==null&&oldScroll>0){
   const currentNav=document.querySelector('.journal-book-subnav');

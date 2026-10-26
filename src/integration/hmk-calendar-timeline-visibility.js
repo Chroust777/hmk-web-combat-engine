@@ -41,6 +41,10 @@ export function calendarVisibleHistory(history=[],journal=[]){
   calendarWorldHistoryRelevant(source.get(event.sourceId)));
 }
 export function calendarVisibleActivities(activities=[]){
+ // Rest and 24-hour nutrition intervals are durable calendar activities.
+ // Keep their completed/cancelled marker at the ORIGINAL interval without
+ // turning them into another due obligation or repeating private log entries.
+ const historicallyVisible=new Set(['winded','rest','sleep','nutrition-conditions']);
  return activities.filter(event=>event.origin!=='activity'||
-  !['resolved','cancelled'].includes(event.status));
+  !['resolved','cancelled'].includes(event.status)||historicallyVisible.has(event.kind));
 }
