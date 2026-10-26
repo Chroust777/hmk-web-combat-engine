@@ -1,3 +1,4 @@
+import {weatherRollEvidence,validateTrekkingWeatherRollEvidence} from './hmk-trekking-weather-roll.js';
 /** HMK v1.2 pp.148-149: authoritative, source-bound travel follow-ups.
  * The travel roll is evidence; it is NOT itself a successful medical test.
  * No character, campaign or event can be inferred from an unrelated journal row.
@@ -24,7 +25,7 @@ export function trekkingModeHardLimit(modes={}){
  test(selected<=5,'Orienteering dovoluje nejvýše pět Advantage Modes (HMK str. 145)');
  return {selected,max:5,requiresAdjustedSurvivalSV:true};
 }
-export function trekkingSkillLinkForNewProof({pending,source,actorId,campaignId,minute,proof}={}){
+export function trekkingSkillLinkForNewProof({pending,source,actorId,campaignId,minute,proof,journal=[],legacyLinkedEvidence=false}={}){
  if(!pending||!source?.calendarTrekProof||source.id!==pending.sourceId||
     (pending.hazard==='tracking'?!(source.calendarTrekProof.partyModes?.memberIds??[source.characterId]).includes(actorId):
       (pending.hazard==='drover'?source.calendarTrekProof.orienteeringContext?.droverId:
@@ -34,7 +35,11 @@ export function trekkingSkillLinkForNewProof({pending,source,actorId,campaignId,
  const skills=TREK_TEST_SKILLS[pending.hazard];
  const used=proof?.skills?.[0]||proof?.skill;
  if(pending.hazard==='tracking'&&source.calendarTrekProof.modes?.stalking!==1)return null;
- if(pending.hazard==='weather'&&!source.calendarTrekProof.weatherWatch?.requiresWeatherHazardRoll)return null;
+ if(pending.hazard==='weather'){
+  if(!source.calendarTrekProof.weatherWatch?.requiresWeatherHazardRoll)return null;
+  const hazardDie=weatherRollEvidence(journal,source.id,actorId,campaignId);
+  if(!hazardDie?.calendarTrekWeatherRoll.exposed&&!legacyLinkedEvidence)return null;
+ }
  if(pending.hazard==='drover'&&(source.calendarTrekProof.conveyance==='foot'||
    used!==(source.calendarTrekProof.conveyance==='mount'?'Riding':'Animalcraft')))return null;
  if(pending.hazard==='direction'&&!['misdirection'].includes(source.calendarTrekProof.hazards?.direction))return null;
@@ -65,7 +70,10 @@ export function hasFinishedLinkedTrekHazard(source,hazard,journal,actorId=source
     validMinute(x.campaignMinute)&&x.campaignMinute>=source.campaignMinute);
   });
  }
- if(hazard==='weather')return relevant.some(j=>journal.some(x=>x.skillTestProof?.type==='skill-weather-onset'&&
+ if(hazard==='weather'){
+  const roll=weatherRollEvidence(journal,source.id,actorId,source.calendarCampaignId);
+  if(roll?.calendarTrekWeatherRoll.exposed===false)return true;
+  return relevant.some(j=>journal.some(x=>x.skillTestProof?.type==='skill-weather-onset'&&
   x.skillTestProof.sourceId===j.id&&x.characterId===actorId&&
   ((x.calendarCampaignId===source.calendarCampaignId&&validMinute(x.campaignMinute)&&x.campaignMinute>=source.campaignMinute)||
    // v93.508 and earlier omitted time/campaign on the final weather-onset
@@ -73,9 +81,11 @@ export function hasFinishedLinkedTrekHazard(source,hazard,journal,actorId=source
    // minute; accept ONLY this explicitly linked legacy shape, do not guess a
    // timestamp or rewrite archived evidence.
    (x.calendarCampaignId===undefined&&x.campaignMinute===undefined))));
+ }
  return false;
 }
 export function validateTrekLinkedEvidence(journal=[]){
+ validateTrekkingWeatherRollEvidence(journal);
  const byId=new Map(journal.map(x=>[x.id,x]));
  const seen=new Set();
  for(const entry of journal){
@@ -84,7 +94,8 @@ export function validateTrekLinkedEvidence(journal=[]){
    'Neplatná vazba testu na Trekking');
   const src=byId.get(p.sourceId),valid=trekkingSkillLinkForNewProof({
    pending:{sourceId:p.sourceId,hazard:p.hazard},source:src,actorId:entry.characterId,
-   campaignId:entry.calendarCampaignId,minute:entry.campaignMinute,proof:entry.skillTestProof});
+   campaignId:entry.calendarCampaignId,minute:entry.campaignMinute,proof:entry.skillTestProof,
+   journal,legacyLinkedEvidence:true});
   test(valid&&JSON.stringify(valid)===JSON.stringify(p),'Neplatný nebo cizí pravidlový důkaz Trekking');
   const key=[entry.calendarCampaignId,p.hazard==='tracking'?'watch':entry.characterId,p.sourceId,p.hazard].join('|');
   test(!seen.has(key),'Duplicitní původní test cestovního následku');seen.add(key);

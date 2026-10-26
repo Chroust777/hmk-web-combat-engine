@@ -1,3 +1,4 @@
+import {weatherRollEvidence} from './hmk-trekking-weather-roll.js';
 import {effectiveTrekSource} from './hmk-trekking-correction.js';
 import {hasFinishedLinkedTrekHazard} from './hmk-trekking-handoff.js';
 import {adjustedTrekkingMovement} from './hmk-trekking-routine.js';
@@ -6,7 +7,7 @@ import {adjustedTrekkingMovement} from './hmk-trekking-routine.js';
  */
 const whole=x=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const KINDS=Object.freeze({
- weather:{kind:'trek-weather-hazard',route:'hazards',label:'Weather Hazard – dokončit původní Cold/Heat proceduru'},
+ weather:{kind:'trek-weather-hazard',route:'hazards',label:'Weather Hazard – nejprve ochrana AV a d6/d10 nebo d4/d6/d10, potom případný Endurance (Survival) · HMK 149'},
  direction:{kind:'trek-direction-hazard',route:'skills',label:'Direction Hazard – vyhodnotit skutečné bloudění a jeho následky'},
  encounter:{kind:'trek-encounter',route:'combat',label:'Random Encounter – vyhodnotit Encounter Tables a následnou situaci'},
  survival:{kind:'trek-survival',route:'skills',label:'Survival Hazard – vyhodnotit CF a případný Accident'},
@@ -62,6 +63,9 @@ export function trekkingOutstandingCases(characters=[],journal=[],campaignId=nul
      [hazard==='drover'?p.orienteeringContext?.droverId:entry.characterId];
    for(const subjectId of members){
     if(!names.has(subjectId))continue;
+    // The hazard die can prove that no exposure occurred. In that case an
+    // Endurance/Survival test is NOT required (HMK p.149).
+    if(hazard==='weather'&&weatherRollEvidence(journal,entry.id,subjectId,entry.calendarCampaignId)?.calendarTrekWeatherRoll.exposed===false)continue;
     const k=[entry.calendarCampaignId,subjectId,entry.id,hazard].join('|');
     if(resolutions.has(k)||hasFinishedLinkedTrekHazard(entry,hazard,journal,subjectId))continue;
     const spec=KINDS[hazard];

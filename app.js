@@ -137,6 +137,7 @@ import {trekPartyModes} from './src/integration/hmk-trekking-party-modes.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
+import {certifyTrekkingWeatherRoll,weatherRollEvidence} from './src/integration/hmk-trekking-weather-roll.js';
 import {assessTrekkingReadiness} from './src/integration/hmk-trekking-readiness.js';
 import {previewTrekCorrection,createTrekCorrection,latestTrekCorrection,effectiveTrekSource} from './src/integration/hmk-trekking-correction.js';
 import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING_HABITATS,validateWildernessJournal,createTrackingProof,validateTrackingJournal,trekWatchfulness,trekSurpriseProcedure} from './src/integration/hmk-trekking-wilderness-tasks.js';
@@ -250,7 +251,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.509';
+const APP_VERSION='93.510';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6802,7 +6803,7 @@ function recordSkillEvidence(title,body,proof,slotId=null){
   const origin=pending&&data.journal.find(x=>x.id===pending.sourceId);
   const link=trekkingSkillLinkForNewProof({pending,source:origin,actorId:selected,
     campaignId:data.campaignClock?campaignKey(data.campaignClock):null,
-    minute:data.campaignClock?.minute,proof});
+    minute:data.campaignClock?.minute,proof,journal:data.journal});
   data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof,
     ...(data.campaignClock?{calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute}:{}),
     ...(gmLink?{calendarGMTestPlanId:gmLink}:{}),
@@ -7234,6 +7235,8 @@ document.addEventListener('submit',event=>{
      data.campaignClock.minute<src.campaignMinute)
    throw Error('Test nepatří do této hlídky, postavy nebo kampaně');
   const kind=watch.weatherWatch.hazard;
+  const die=weatherRollEvidence(data.journal,watchEntry.id,actor.id,src.calendarCampaignId);
+  if(die&&!die.calendarTrekWeatherRoll.exposed)throw Error('Bez expozice se Endurance test nesmí zapisovat');
   if(form.elements.namedItem('kind')?.value!==kind)throw Error('Typ Cold/Heat musí odpovídat doloženému počasí');
   const outcome=prepareTrekkingWeatherTest({state:persistentStateOf(actor),sourceId,
    round:Math.max(1,combatClock.round||1,persistentStateOf(actor).lastRound||0),kind,
@@ -10197,6 +10200,81 @@ function applyDeterministicCalendarOnsets(){
     report:structuredClone(result.report),originMinute:anchor.minute}});
  }
 }
+/** Step 7.3 is a physical AV roll BEFORE Endurance/Survival (HMK 149).
+ * The page asks for only undocumented environmental facts and a die; no GM
+ * confirmation checkbox can substitute for the source-linked witness. */
+function openCalendarWeatherRoll(actor,source){
+ const w=source.calendarTrekProof.weatherWatch;
+ const kind=w.hazard,continuous=kind==='cold'&&w.precipitation==='sleet'&&w.continuous===true;
+ view='calendar';activeCalendarSection='travel';render();
+ const main=document.querySelector('main.content')||document.getElementById('app');
+ if(!main)return;
+ main.querySelector('[data-weather-roll-panel]')?.remove();
+ const node=document.createElement('section');node.className='hc-panel';node.dataset.weatherRollPanel='true';
+ node.innerHTML=`<h3>${esc(actor.name)} · ${kind==='cold'?'Cold':'Heat'} Hazard Roll · HMK str. 149</h3>
+ <p>Nejdřív doložte ochranu AV a fyzický hod pro tuto postavu. Pokud se postava neocitne v expozici, kalendář událost uzavře bez testu Endurance. Jinak se otevře navazující Skill Test.</p>
+ <form data-trek-weather-roll><input type="hidden" name="sourceId" value="${esc(source.id)}"><input type="hidden" name="actorId" value="${esc(actor.id)}">
+ <input type="hidden" name="kind" value="${kind}">
+ <div class="field-grid"><label>Area AV skutečného oděvu / zbroje<input type="number" name="areaAV" min="0" max="99" step="1" required placeholder="Z doloženého vybavení"></label>
+ ${kind==='cold'?`<label>Ochrana bedroll / blanket / cloak<select name="gearAV"><option value="0">Bez bonusu +0</option><option value="1">Bedroll / blanket / cloak +1</option><option value="2">Heavy bedroll / padded cloak +2</option></select></label>
+ <label>Úkryt<select name="shelterAV"><option value="0">Žádný +0</option><option value="2">Stan +2</option><option value="3">Mělká jeskyně +3</option></select></label>
+ <label>Oheň (FS; bez ohně = 0)<input name="fireFS" type="number" min="0" max="20" value="0" step="1"></label>
+ <p>Kontinuální plískanice: ${continuous?'ano, povinný d10':'ne, povinný d6'}. Základ AV = min(Area AV, 4).</p>`:
+ `<label>Podmínky hlídky<select name="heatCondition"><option value="moving">Pohyb / bez odpočinku · d4</option><option value="resting">Klid bez pohybu · d6</option><option value="shade">Odpočinek ve stínu · d10</option></select></label>
+ <label>Původ ze subtropického nebo tropického klimatu<select name="native"><option value="no">Ne</option><option value="yes">Ano · vyšší kostka d6/d8/d12</option></select></label>
+ <p>Heat AV = max(Area AV, 1). Při hodu menším nebo rovném AV následuje Endurance.</p>`}
+ <label>Skutečný Weather Hazard hod<input name="roll" type="number" min="1" max="${kind==='cold'?(continuous?10:6):4}" step="1" required></label></div>
+ <button type="button" data-trek-weather-auto>⚄ Hodit d${kind==='cold'?(continuous?10:6):4}</button>
+ <button type="submit">Zapsat Weather Hazard Roll</button><output role="status" aria-live="polite"></output>
+ </form>`;
+ main.prepend(node);node.scrollIntoView({block:'start',behavior:'auto'});
+}
+function weatherFormSides(form){
+ const kind=form.elements.namedItem('kind').value;
+ if(kind==='cold'){const source=data.journal.find(x=>x.id===form.elements.namedItem('sourceId').value);
+  return source?.calendarTrekProof?.weatherWatch?.continuous===true&&source.calendarTrekProof.weatherWatch.precipitation==='sleet'?10:6;}
+ const rest=form.elements.namedItem('heatCondition')?.value,native=form.elements.namedItem('native')?.value==='yes';
+ return (rest==='shade'?10:rest==='resting'?6:4)+(native?2:0);
+}
+document.addEventListener('change',e=>{
+ const form=e.target.closest?.('form[data-trek-weather-roll]');if(!form||!['native','heatCondition'].includes(e.target.name))return;
+ const sides=weatherFormSides(form),die=form.elements.namedItem('roll');die.max=String(sides);die.value='';delete die.dataset.weatherAuto;
+ form.querySelector('[data-trek-weather-auto]').textContent='⚄ Hodit d'+sides;
+},true);
+document.addEventListener('input',e=>{if(e.target.matches?.('[data-trek-weather-roll] input[name="roll"]'))delete e.target.dataset.weatherAuto;},true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-trek-weather-auto]');if(!button)return;
+ e.preventDefault();const form=button.closest('form'),die=form?.elements.namedItem('roll');if(!die)return;
+ const sides=weatherFormSides(form),number=secureHMKDie(sides);die.max=String(sides);die.value=String(number);die.dataset.weatherAuto=String(number);
+ button.textContent='⚄ d'+sides+' = '+number;
+},true);
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-trek-weather-roll]'))return;
+ e.preventDefault();e.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  const fd=new FormData(form),source=data.journal.find(j=>j.id===fd.get('sourceId'));
+  const actor=character(fd.get('actorId'));
+  if(!actor||!source||!data.campaignClock)throw Error('Chybí skutečná postava, kampaň nebo zdroj hlídky');
+  const kind=fd.get('kind'),condition=fd.get('heatCondition')||'moving';
+  const roll=Number(fd.get('roll')),sides=weatherFormSides(form);
+  if(roll>sides)throw Error('Výsledek neodpovídá kostce d'+sides);
+  const input={kind,areaAV:Number(fd.get('areaAV')),roll,
+   origin:form.elements.namedItem('roll').dataset.weatherAuto===String(roll)?'cryptographic-software-die':'manual',
+   ...(kind==='cold'?{gearAV:Number(fd.get('gearAV')),shelterAV:Number(fd.get('shelterAV')),
+     fireFS:Number(fd.get('fireFS')),continuousSleet:source.calendarTrekProof.weatherWatch.continuous===true&&source.calendarTrekProof.weatherWatch.precipitation==='sleet'}:
+    {resting:condition!=='moving',shadedRest:condition==='shade',nativeHotClimate:fd.get('native')==='yes'})};
+  const saved=certifyTrekkingWeatherRoll({journal:data.journal,source,actorId:actor.id,
+   campaignId:campaignKey(data.campaignClock),minute:data.campaignClock.minute,input,entryId:uuid(),createdAt:stamp()});
+  if(!mutate(()=>{if(weatherRollEvidence(data.journal,source.id,actor.id,campaignKey(data.campaignClock)))throw Error('Weather Hazard již doložen');data.journal.push(saved);}))throw Error('Doklad se neuložil');
+  if(saved.calendarTrekWeatherRoll.exposed){
+   selected=actor.id;focusCalendarRuleAction(actor,'trek-weather-hazard',source.id);
+   notice=actor.name+': Weather Hazard překonal ochranu AV. Vyžaduje skutečný Endurance (Survival) d100; po jeho uložení navazuje zdravotní vyhodnocení.';
+  }else{
+   notice=actor.name+': Weather Hazard d'+saved.calendarTrekWeatherRoll.sides+' '+roll+' – bez expozice. Událost je doloženě vyřešená bez Endurance testu.';
+   render();
+  }
+ }catch(error){if(out)out.textContent='Weather Hazard nelze uložit: '+error.message;}
+},true);
 /** A calendar notification points to an actual existing rule executor. */
 function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  const q=selector=>[...document.querySelectorAll(selector)];
@@ -10265,6 +10343,26 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
    (hazard==='drover'&&j.calendarTrekProof?.orienteeringContext?.droverId===actor.id))&&
    j.calendarCampaignId===campaignKey(data.campaignClock));
   if(!source?.calendarTrekProof){notice='Chybí originální důkaz cestovní hlídky.';render();return;}
+  // A legacy v93.509 Endurance result may already be recorded without the
+  // newly introduced physical Weather AV witness. Never demand a NEW AV die
+  // *after* that historical result or overwrite the immutable record.
+  if(hazard==='weather'){
+   const legacy=data.journal.find(j=>j.characterId===actor.id&&
+    j.calendarCampaignId===source.calendarCampaignId&&
+    j.calendarTrekSkillSource?.sourceId===source.id&&
+    j.calendarTrekSkillSource?.hazard==='weather'&&
+    !data.journal.some(x=>x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===j.id));
+   if(legacy){view='sheet';activeSheetSection='status';render();
+    const f=[...document.querySelectorAll('form[data-skill-weather-onset]')].find(x=>x.elements.namedItem('sourceId')?.value===legacy.id);
+    if(f){for(let n=f.parentElement;n;n=n.parentElement)if(n.tagName==='DETAILS')n.open=true;
+     f.scrollIntoView({block:'center',behavior:'auto'});}
+    notice='Starší doložený Endurance test je zachován. Dokončete jeho původní zdravotní následky; nový Weather AV hod se zpětně nevymýšlí.';
+    return;
+   }
+  }
+  if(hazard==='weather'&&!weatherRollEvidence(data.journal,source.id,actor.id,campaignKey(data.campaignClock))){
+   openCalendarWeatherRoll(actor,source);return;
+  }
   if(hazard==='encounter'){
    notice='Setkání bylo vyvoláno hlídkou '+sourceId+'. Složení setkání není doloženo; určete jej podle Encounter Tables. Dokud není uložen autoritativní výsledek, povinnost zůstane otevřená.';
    render();return;
@@ -10272,6 +10370,9 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   if(hazard==='direction'&&source.calendarTrekProof.hazards?.direction==='lost'){
    notice='Lost (HMK 148): Awareness test se NEPROVÁDÍ. K rozpoznání chyby je potřebný nový zvláštní Bearing Mode. Trasa není v datech a nesmí být domyšlena.';
    render();return;
+  }
+  if(hazard==='weather'&&!weatherRollEvidence(data.journal,source.id,actor.id,campaignKey(data.campaignClock))?.calendarTrekWeatherRoll.exposed){
+   notice='Weather Hazard byl doložen bez expozice. Endurance se neprovádí.';render();return;
   }
   // Open original Skill Workbench; the next matching saved result becomes
   // linked to THIS source. No duplicate dice or independent EML formula.
