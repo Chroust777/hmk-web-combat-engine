@@ -2,7 +2,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const app=fs.readFileSync(path.resolve(__dirname,'../app.js'),'utf8');
 const esc=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const readFn=(start,end)=>vm.runInNewContext('('+app.slice(app.indexOf('function '+start+'('),app.indexOf('\nfunction '+end+'(')).trim()+')',{esc});
+const libraryFieldHelp=vm.runInNewContext(app.slice(app.indexOf('const LIBRARY_FIELD_HELP='),app.indexOf('function catalogParameters(item){'))+'\nlibraryFieldHelp;',{});
+const readFn=(start,end)=>vm.runInNewContext('('+app.slice(app.indexOf('function '+start+'('),app.indexOf('\nfunction '+end+'(')).trim()+')',{esc,libraryFieldHelp});
 const brief=readFn('libraryBrief','libraryPrintedPages');
 const details=readFn('catalogParameters','armourLibraryConsistencyPanel');
 let n=0;function ok(v,msg){assert.ok(v,msg);n++;}
