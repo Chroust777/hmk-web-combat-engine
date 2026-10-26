@@ -1,0 +1,26 @@
+'use strict';
+/** Isolated static/domain checks; never connects to live GitHub. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..');const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+let n=0;const check=(condition,message)=>{assert.ok(condition,message);n++};
+const app=read('app.js'),ui=read('src/integration/hmk-skill-workbench-ui.js'),cal=read('src/integration/hmk-campaign-calendar-ui.js');
+const style=read('book-templates.css'),html=read('index.html'),bundle=read('hmk-app.bundle.js');
+check(app.includes("const APP_VERSION='93.488'"),'version of source');
+check(html.includes('v93.488')&&html.includes('hmk-app.bundle.js?v=93.488'),'HTML publication and cache');
+check(bundle.includes('93.488'),'bundle fresh');
+check(cal.includes('Nastavit čas ›')&&!cal.includes('Odmáčknout čas ›'),'quick advance caption');
+check(app.includes("id:'clock:'+e.id")&&app.includes("e.type==='advance'"),'GM view reuses authoritative clock event IDs');
+check(app.includes('GM · Nastavení času kampaně')&&app.includes('Důvod GM:'),'time history readable');
+check(app.includes('calendar-clock')&&app.includes('campaignMinute:e.minute'),'history sorted by campaign minute');
+check(app.includes("return current||(view==='calendar'?members[0]||null:null)"),'calendar active actor matches rendered fallback');
+check(app.includes("if(!actor||actor.id!==v.actorId)throw Error('Nesprávná postava')"),'form verifies canonical identity');
+check(app.includes('createPotableWaterFill({inventory:data.inventory,journal:data.journal'),'canonical water writer unchanged');
+check(ui.includes('data-skill-rule="secondary"')&&ui.includes('data-skill-rule="value"')&&ui.includes('data-skill-rule="assistance"'),'three thematic rule panels');
+check(app.includes("help.hidden=help.dataset.skillRule!==activeSkillTab"),'tab actually switches its help panel');
+check(ui.includes('Index druhé předepsané dovednosti − 5'),'secondary formula HMK p62');
+check(ui.includes('součet')||ui.includes('Celkový příspěvek'),'assistance cap explained');
+check(style.includes('v93.488 · Skill System')&&style.includes('rgba(248,235,209,.79)'),'light parchment instead of dark block');
+check(style.includes('border-radius:9px!important')&&style.includes('font:600 11px/1.24 Georgia'),'rounded compact EML chips');
+check(style.includes('grid-template-columns:repeat(5,minmax(0,1fr))!important'),'compact five-column equipment stats');
+check(ui.includes('Secondary\\u00a02 (nezvoleno)'),'do not split Secondary and its number');
+console.log(`PASS ${n} v93.488 static version, clock, water, skill and equipment layout guards`);
