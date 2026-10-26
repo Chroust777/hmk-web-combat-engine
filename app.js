@@ -182,6 +182,7 @@ import {characterCarryProjection,partyCarryProjection,supplyDurationText} from '
 import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
+import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
 import {applyConfirmedManeuverConsequence,verifiedManeuverConsequence,applyConfirmedGrabTakeTransfer} from './src/integration/hmk-maneuver-persistence.js';
@@ -246,7 +247,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.488';
+const APP_VERSION='93.489';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -521,14 +522,14 @@ function validate(d){
  for(const c of ids){for(const slot of ['main_hand','off_hand']){if(d.inventory.filter(x=>x.characterId===c&&x.slot===slot).length>1)throw Error('Více předmětů v jednom slotu ruky')}}
  return d
 }
-function save({gmClockAdvance=false,restoreBackup=false}={}){
+function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null}={}){
  if(window.__hmkOutdatedBuild){notice='Je dostupná nová verze aplikace. Obnovte stránku, než uložíte další herní akci.';return false;}
  if(cloudSync&&!cloudSync.canWrite()){notice='Cloudová kampaň není synchronizována. Přejděte do Cloud a zálohy.';return false;}
  if(storageReadOnly){notice='Zápis je zablokován: původní úložiště se nepodařilo načíst.';return false;}
  try{
   if(storageBaseline!==null)linkNewMoralePsycheAccrual(JSON.parse(storageBaseline),data);
   const serialized=JSON.stringify(data);
-  const r=persistVerifiedCombatSnapshot({storage:cloudStorage,key:STORAGE,baseline:storageBaseline,serialized,gmClockAdvance,restoreBackup});
+  const r=persistVerifiedCombatSnapshot({storage:cloudStorage,key:STORAGE,baseline:storageBaseline,serialized,gmClockAdvance,restoreBackup,characterDeletionId});
   if(r.ok){storageBaseline=serialized;notice='';return true;}
   if(r.readOnly){
    storageReadOnly=true;
@@ -706,6 +707,25 @@ function mutate(fn,{gmClockAdvance=false}={}){
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
 function field(name,label,value='',type='text'){return `<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}"></label>`}
 function area(name,label,value=''){return `<label>${esc(label)}<textarea name="${name}">${esc(value)}</textarea></label>`}
+/** Destructive GM registry operation. This is not an individual in-game edit:
+ * water/health/skill evidence of the deleted character is removed together with
+ * the character. Ordinary mutate() retains append-only evidence protections. */
+function deleteCharacterEntirely(id){
+ if(storageReadOnly||cloudSync&&!cloudSync.canWrite()){alert('Nejdříve připojte aktuální Cloud, aby se smazání bezpečně synchronizovalo.');return false}
+ const original=structuredClone(data);
+ try{
+  const next=removeCharacterWithEvidence(original,id);
+  assertOnlyCharacterWasDeleted(original,next,id);
+  validate(next);
+  data=next;
+  if(!save({characterDeletionId:id})){data=original;render();alert('Smazání se nepodařilo uložit. Původní postava zůstala zachována.');return false}
+  // A deleted participant cannot remain in the active combat controller.
+  if(combatInitiativeSequence?.order?.includes(id)){
+   combatInitiativeSequence=null;pendingCombatActionHandoff=null;
+  }
+  return true;
+ }catch(error){data=original;render();alert('Postavu nelze bezpečně smazat: '+(error?.message||String(error)));return false}
+}
 function character(id){return data.characters.find(c=>c.id===id)}
 function activeCampaignCashKey(c){
  if(!data.campaignClock)return null;
@@ -1708,7 +1728,7 @@ async function generateCharacterFullyAutomatically(mode='random',traitProfile='r
    await new Promise(resolve=>setTimeout(resolve,0));
    const id=uuid(),name=requestedName;
    lastAutomaticGenerationMutationError='';
-   if(!mutate(()=>data.characters.push({id,name,kind:'PC',occupation:'',description:'',portrait:'',hmk:{creation:defaultCreation(),skills:[],injuries:[],attributes:{}}})))throw Error('Nelze bezpečně založit profil v úložišti'+(lastAutomaticGenerationMutationError?' · '+lastAutomaticGenerationMutationError:''));
+   if(!mutate(()=>data.characters.push({id,name,kind:generationPreferences.kind==='NPC'?'NPC':'PC',occupation:'',description:'',portrait:'',hmk:{creation:defaultCreation(),skills:[],injuries:[],attributes:{}}})))throw Error('Nelze bezpečně založit profil v úložišti'+(lastAutomaticGenerationMutationError?' · '+lastAutomaticGenerationMutationError:''));
    selected=id;view='creation';render();
    const rejected=new Map();let ticks=0;
    try{
@@ -1731,7 +1751,7 @@ async function generateCharacterFullyAutomatically(mode='random',traitProfile='r
       for(const [key,value] of Object.entries(appearance.values))t.hmk[key]=value;
       const appearanceCheck=verifyAppearance(t);
       if(!appearanceCheck.ok)throw Error('Appendix III Appearance: '+appearanceCheck.issues.join('; '));
-      if(data.inventory.some(x=>x.characterId===id))throw Error('Generátor nesmí nahradit existující inventář');data.inventory.push(...kit.items);labelAutoGeneratedProof(t,{profile:generatorProfile,mode,attempt});if(plan)t.hmk.creation.values.autoTargetPlan={occupation:plan.occupation,folk:plan.folk,region:plan.region,realm:plan.realm,parentClass:plan.socialClass,classMode:"software d20 candidate trials",regionMode:"explicit HMK p.24 selection",discardedClassRolls:plan.rejectedClassRolls.slice(),discardedTribeRolls:(plan.rejectedTribeRolls||[]).slice(),discardedParentRolls:plan.rejectedParentRolls.slice(),discardedRegionRolls:plan.rejectedRegionRolls.slice(),discardedTalentTrials:plan.rejectedTalentTrials};t.hmk.creation.values.autoGeneration.preferences={name:requestedName,folk:generationPreferences.folk||'',occupation:generationPreferences.occupation||'',traits:interpreted.traits,description:interpreted.description};t.hmk.creation.values.autoGeneration.semantic=mode==='traits'?{engine:interpreted.engine||'deterministic-czech-offline-v3',primary:interpreted.primary,ranking:interpreted.ranking,confidence:interpreted.confidence,occupationCandidates:interpreted.occupationCandidates,skillPreferences:interpreted.skillPreferences,folkPreference:interpreted.folkPreference,agePreference:interpreted.agePreference,narrativeTraits:interpreted.narrativeTraits,attributeAspirations:interpreted.attributeAspirations,moralityPreference:interpreted.moralityPreference,evidence:interpreted.evidence,disclaimer:interpreted.disclaimer,summary:interpreted.summary||'',uncertainties:interpreted.uncertainties||interpreted.contradictions||[]}:null;t.hmk.creation.values.autoStartingKit={...kit.summary,source:'HMK p.51 + tištěný katalog pp.99–121; pravidlově omezená návrhová výbava, ne pevný příděl'};if(mode==='traits'){const sem=t.hmk.creation.values.autoGeneration.semantic;sem.realizedOccupation=t.hmk.occupation||t.occupation||'';sem.unfulfilledOccupation=sem.occupationCandidates.length>0&&!sem.occupationCandidates.some(o=>sem.realizedOccupation===o||sem.realizedOccupation.startsWith(o+' ('));sem.realizedFolk=t.hmk.folk;sem.unfulfilledFolk=Boolean(sem.folkPreference&&sem.realizedFolk!==sem.folkPreference);sem.realizedAgeGroup=t.hmk.ageGroup;sem.unfulfilledAge=Boolean(sem.agePreference&&sem.realizedAgeGroup!==sem.agePreference);}t.hmk.creation.status='auto-generated';t.hmk.creation.reviewRequired=false;t.description=`Plně automatická tvorba · ${AUTO_TRAIT_PROFILES[generatorProfile].label}. Hody byly vygenerovány softwarem; nikoli fyzicky. Počáteční vybavení: ${kit.summary.itemCount} položek, ${kit.summary.costPence}d z limitu ${kit.summary.budgetPence}d. Hotovost: ${kit.summary.startingCoinsPence}d (nezávislá na limitu vybavení).${interpreted.description?' Charakter: '+interpreted.description:''}`;if(mode==='traits'){const sem=t.hmk.creation.values.autoGeneration.semantic;const cautions=[];if(sem.unfulfilledOccupation)cautions.push('profese z popisu nebyla podle pravidel dostupná');if(sem.unfulfilledFolk)cautions.push('Folk neodpovídá záměru');if(sem.unfulfilledAge)cautions.push('věk z popisu není pro tento Folk povolen');if(cautions.length)t.description+=' POZOR: '+cautions.join('; ')+'.';}}))throw Error('Nelze uložit důkaz automatického generování a počátečního vybavení');
+      if(data.inventory.some(x=>x.characterId===id))throw Error('Generátor nesmí nahradit existující inventář');data.inventory.push(...kit.items);labelAutoGeneratedProof(t,{profile:generatorProfile,mode,attempt});if(plan)t.hmk.creation.values.autoTargetPlan={occupation:plan.occupation,folk:plan.folk,region:plan.region,realm:plan.realm,parentClass:plan.socialClass,classMode:"software d20 candidate trials",regionMode:"explicit HMK p.24 selection",discardedClassRolls:plan.rejectedClassRolls.slice(),discardedTribeRolls:(plan.rejectedTribeRolls||[]).slice(),discardedParentRolls:plan.rejectedParentRolls.slice(),discardedRegionRolls:plan.rejectedRegionRolls.slice(),discardedTalentTrials:plan.rejectedTalentTrials};t.hmk.creation.values.autoGeneration.preferences={name:requestedName,folk:generationPreferences.folk||'',occupation:generationPreferences.occupation||'',traits:interpreted.traits,description:interpreted.description};t.hmk.creation.values.autoGeneration.semantic=mode==='traits'?{engine:interpreted.engine||'deterministic-czech-offline-v3',primary:interpreted.primary,ranking:interpreted.ranking,confidence:interpreted.confidence,occupationCandidates:interpreted.occupationCandidates,skillPreferences:interpreted.skillPreferences,folkPreference:interpreted.folkPreference,agePreference:interpreted.agePreference,narrativeTraits:interpreted.narrativeTraits,attributeAspirations:interpreted.attributeAspirations,moralityPreference:interpreted.moralityPreference,evidence:interpreted.evidence,disclaimer:interpreted.disclaimer,summary:interpreted.summary||'',uncertainties:interpreted.uncertainties||interpreted.contradictions||[]}:null;t.hmk.creation.values.autoStartingKit={...kit.summary,source:'HMK p.51 + tištěný katalog pp.99–121; pravidlově omezená návrhová výbava, ne pevný příděl'};if(mode==='traits'){const sem=t.hmk.creation.values.autoGeneration.semantic;sem.realizedOccupation=t.hmk.occupation||t.occupation||'';sem.unfulfilledOccupation=sem.occupationCandidates.length>0&&!sem.occupationCandidates.some(o=>sem.realizedOccupation===o||sem.realizedOccupation.startsWith(o+' ('));sem.realizedFolk=t.hmk.folk;sem.unfulfilledFolk=Boolean(sem.folkPreference&&sem.realizedFolk!==sem.folkPreference);sem.realizedAgeGroup=t.hmk.ageGroup;sem.unfulfilledAge=Boolean(sem.agePreference&&sem.realizedAgeGroup!==sem.agePreference);}t.hmk.creation.status='auto-generated';t.hmk.creation.reviewRequired=false;t.description=mode==='traits'?'Vygenerovaná postava podle rysů':'Čistě vygenerovaná postava';if(mode==='traits'){const sem=t.hmk.creation.values.autoGeneration.semantic;const cautions=[];if(sem.unfulfilledOccupation)cautions.push('profese z popisu nebyla podle pravidel dostupná');if(sem.unfulfilledFolk)cautions.push('Folk neodpovídá záměru');if(sem.unfulfilledAge)cautions.push('věk z popisu není pro tento Folk povolen');if(cautions.length)t.hmk.creation.values.autoGeneration.semantic.generatorWarnings=cautions;}}))throw Error('Nelze uložit důkaz automatického generování a počátečního vybavení');
       // A generated character must pass the same 14-step proof/revision gate
       // as a manually created character before it may enter the journal.
       const readiness=characterJournalReadiness(character(id));
@@ -1801,6 +1821,7 @@ function generatorConfigDialog(){
  return `<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" style="max-width:790px;max-height:90vh;overflow:auto"><h2>Generátor · původ, povolání a osobnost</h2>
  <p>Generování po jednom kliknutí bez ručních hodů. Popis se rozebírá <strong>výhradně ve vašem prohlížeči</strong> pomocí českého slovníku, pravidel pro zápor, kontextu vět a dohledatelných indicií. Neodesílá se na žádný AI server a není potřeba API klíč ani platba. Čistě náhodný režim je dostupný zvlášť v registru.</p><form id="hmk-generator-config">
  <label class="hmk-generator-name">Jméno postavy<input type="text" name="name" maxlength="120" minlength="1" required autocomplete="off" placeholder="Zadejte jméno postavy"></label>
+ <label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label>
  <div class="field-grid"><label>Folk (výchozí Human)<select name="folk"><option value="">Human (výchozí)</option>${GENERATOR_FOLKS.filter(x=>x!=='Náhodně podle HMK'&&x!=='Human').map(option).join('')}</select></label>
  <label>Preferované povolání<select name="occupation">${GENERATOR_OCCUPATION_PREFERENCES.map(v=>`<option value="${v==='Bez preference'?'':esc(v)}">${esc(v)}</option>`).join('')}</select></label>
  <label>Povahové zaměření<select name="profile"><option value="random">Odvodit z rysů a popisu</option>${Object.entries(AUTO_TRAIT_PROFILES).filter(([k])=>k!=='random').map(([k,v])=>`<option value="${esc(k)}">${esc(v.label)}</option>`).join('')}</select></label></div>
@@ -2049,7 +2070,7 @@ function charactersView(){
  const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));
  const completed=data.characters.filter(c=>characterJournalReadiness(c).ready).length;
  const inProgress=data.characters.length-completed;
- return `<section class="view-hero hero-characters"><div class="view-hero__stats registry-stats"><div><span>Aktivní profily</span><strong>${data.characters.length}</strong></div><div><span>Hotové deníky</span><strong>${completed}</strong></div><div><span>Rozpracovaná tvorba</span><strong>${inProgress}</strong></div></div></section><div class="registry-actions" role="group" aria-label="Vytvoření nové postavy">${button('+ Vytvořit postavu krok za krokem','new-character')}<button type="button" data-action="auto-random-character">⚄ Generovat náhodnou postavu</button><button type="button" data-action="open-generator-config">✦ Generovat podle rysů / Folk / povolání</button></div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards character-gallery">${list.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><div class="character-card__crest" aria-hidden="true">${esc((c.name||'?').trim().slice(0,1).toUpperCase())}</div><div class="character-card__body"><div class="character-card__tags"><span class="pill">${esc(c.kind)}</span>${c.hmk?.folk?`<span class="pill">${esc(c.hmk.folk)}</span>`:''}${c.hmk?.ageGroup?`<span class="pill">${esc(c.hmk.ageGroup)}</span>`:''}</div><h3>${esc(c.name)}</h3><div class="muted character-card__occupation">${esc(c.occupation||'Bez povolání')}</div><div class="muted character-card__description" title="${esc(c.description||'')}">${esc(c.description||'')}</div>${c.hmk?.creation?`<div class="muted character-card__progress">Character Creation · ${esc(characterJournalReadiness(c).ready?(c.hmk.creation.status==='auto-generated'?'Automaticky dokončeno':'14/14 · ke kontrole GM'):'nedokončeno · krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="character-card__controls">${characterJournalReadiness(c).ready?`<button type="button" class="character-card__open" data-open="${esc(c.id)}">Otevřít deník</button>${creationCardAction(c)}`:`<button type="button" class="character-card__continue" data-resume-creation="${esc(c.id)}">Pokračovat v tvorbě</button><button type="button" class="character-card__locked" disabled title="Nejprve dokončete všech 14 kroků a revizi">Deník zatím uzamčen</button>`}<details class="character-card__more"><summary>Další možnosti</summary><div class="character-card__more-actions"><button type="button" class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button type="button" class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button type="button" class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></details></div></div></article>`).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`
+ return `<section class="view-hero hero-characters"><div class="view-hero__stats registry-stats"><div><span>Aktivní profily</span><strong>${data.characters.length}</strong></div><div><span>Hotové deníky</span><strong>${completed}</strong></div><div><span>Rozpracovaná tvorba</span><strong>${inProgress}</strong></div></div></section><div class="registry-actions" role="group" aria-label="Vytvoření nové postavy">${button('+ Vytvořit postavu krok za krokem','new-character')}<button type="button" data-action="auto-random-character">⚄ Čistě vygenerovaná postava</button><button type="button" data-action="open-generator-config">✦ Vygenerovaná postava podle rysů</button></div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards character-gallery">${['PC','NPC'].map(kind=>{const group=list.filter(c=>(c.kind||'PC')===kind);return `<section class="character-registry-group" data-character-kind="${kind}"><h3 class="character-group-heading">${kind} <small>(${group.length})</small></h3><div class="folio-character-list">${group.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><div class="character-card__crest" aria-hidden="true">${esc((c.name||'?').trim().slice(0,1).toUpperCase())}</div><div class="character-card__body"><div class="character-card__tags"><span class="pill">${esc(c.kind)}</span>${c.hmk?.folk?`<span class="pill">${esc(c.hmk.folk)}</span>`:''}${c.hmk?.ageGroup?`<span class="pill">${esc(c.hmk.ageGroup)}</span>`:''}</div><h3>${esc(c.name)}</h3><div class="muted character-card__occupation">${esc(c.occupation||'Bez povolání')}</div><div class="muted character-card__description" title="${esc(c.hmk?.creation?.status==='auto-generated'?'':(c.description||''))}">${esc(c.hmk?.creation?.status==='auto-generated'?(c.hmk?.creation?.values?.autoGeneration?.semantic?'Vygenerovaná postava podle rysů':'Čistě vygenerovaná postava'):(c.description||''))}</div>${c.hmk?.creation?`<div class="muted character-card__progress">Character Creation · ${esc(characterJournalReadiness(c).ready?(c.hmk.creation.status==='auto-generated'?'Automaticky dokončeno':'14/14 · ke kontrole GM'):'nedokončeno · krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="character-card__controls">${characterJournalReadiness(c).ready?`<button type="button" class="character-card__open" data-open="${esc(c.id)}">Otevřít deník</button>${creationCardAction(c)}`:`<button type="button" class="character-card__continue" data-resume-creation="${esc(c.id)}">Pokračovat v tvorbě</button><button type="button" class="character-card__locked" disabled title="Nejprve dokončete všech 14 kroků a revizi">Deník zatím uzamčen</button>`}<details class="character-card__more"><summary>Další možnosti</summary><div class="character-card__more-actions"><button type="button" class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button type="button" class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button type="button" class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></details></div></div></article>`).join('')}</div></section>`;}).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`
 }
 function firstPresent(...values){for(const value of values){if(value===0)return '0';if(value!==undefined&&value!==null&&String(value).trim()!=='')return String(value);}return '—';}
 function listPresent(value){return Array.isArray(value)&&value.length?value.join(', '):'—';}
@@ -2697,11 +2718,12 @@ function folioChapterParts(body,kind=''){
  if(kind.includes('journal-book--characters')){
   const gallery=nodes.find(x=>x.classList.contains('character-gallery'));
   if(gallery){
-   const cards=[...gallery.children].map(x=>x.outerHTML);
+   const groups=[...gallery.querySelectorAll(':scope > .character-registry-group')];
+   const cards=groups.length?groups.flatMap(group=>[...group.querySelectorAll(':scope > .folio-character-list > .character-card')].map(card=>({kind:group.dataset.characterKind,html:card.outerHTML}))):[...gallery.children].map(card=>({kind:'PC',html:card.outerHTML}));
    const firstPageCount=Math.min(3,cards.length);
    const pre=nodes.filter(x=>x!==gallery).map(x=>x.outerHTML).join('');
-   return [pre+(firstPageCount?`<div class="folio-character-list">${cards.slice(0,firstPageCount).join('')}</div>`:''),
-    `<div class="folio-character-list">${cards.slice(firstPageCount).join('')}</div>`];
+   const groupedPage=entries=>['PC','NPC'].map(kind=>{const matches=entries.filter(c=>c.kind===kind);return matches.length?`<section class="character-registry-group" data-character-kind="${kind}"><h3 class="character-group-heading">${kind} <small>(${matches.length})</small></h3><div class="folio-character-list">${matches.map(c=>c.html).join('')}</div></section>`:'';}).join('');
+   return [pre+groupedPage(cards.slice(0,firstPageCount)),groupedPage(cards.slice(firstPageCount))];
   }
   return [nodes.filter(x=>!x.classList.contains('empty')).map(x=>x.outerHTML).join(''),
    nodes.filter(x=>x.classList.contains('empty')).map(x=>x.outerHTML).join('')];
@@ -10391,31 +10413,18 @@ if(t.dataset.nav){pendingTrekHandoff=null;lastCombatEvent=null;
  query='';overlay=null;render();return}if(t.dataset.open){openCharacterJournal(t.dataset.open);return}
 if(t.dataset.copy){if(combatInitiativeSequence)return alert('Během Initiative nelze kopírovat postavu včetně bojového stavu a inventáře.');const c=character(t.dataset.copy);mutate(()=>{const id=uuid();const copy={...structuredClone(c),id,name:c.name+' (kopie)'};if(copy.hmk){copy.hmk.skills=(copy.hmk.skills||[]).map(s=>({...s,id:uuid()}));copy.hmk.injuries=(copy.hmk.injuries||[]).map(i=>({...i,id:uuid()}))}data.characters.push(copy);const clonedInvIds=new Map();for(const x of data.inventory.filter(x=>x.characterId===c.id)){const newId=uuid();clonedInvIds.set(x.id,newId);data.inventory.push({...structuredClone(x),id:newId,characterId:id})}if(copy.hmk?.cashLedger){copy.hmk.cashLedger=copy.hmk.cashLedger.map(t=>({...t,id:uuid(),inventoryIds:t.inventoryIds.map(i=>clonedInvIds.get(i)??i)}))}if(copy.hmk?.campaignCashAccounts){for(const account of Object.values(copy.hmk.campaignCashAccounts)){account.purchases=account.purchases.map(t=>({...t,id:uuid(),inventoryIds:t.inventoryIds.map(i=>clonedInvIds.get(i)??i),purchasedItems:t.purchasedItems.map(x=>({...x,inventoryId:clonedInvIds.get(x.inventoryId)??x.inventoryId}))}));account.adjustments=account.adjustments.map(t=>({...t,id:uuid()}));}}for(const x of data.journal.filter(x=>x.characterId===c.id))data.journal.push({...structuredClone(x),id:uuid(),characterId:id});});return}
 if(t.dataset.deleteCharacter){
- if(combatInitiativeSequence)return alert('Během Initiative nelze definitivně odstranit postavu.');
- const c=character(t.dataset.deleteCharacter);
- if(!c)return;
- if(c.hmk?.arcane?.shade)return alert('Postavu s potvrzenou nevratnou proměnou Shade nelze definitivně odstranit z autoritativní evidence.');
- if(!ask(`Opravdu si přejete DEFINITIVNĚ smazat postavu „${c.name}“?\n\nSpolu s postavou se smaže její osobní deník, inventář a všechny uložené údaje. Akci nelze vrátit.\n\nPokračovat?`))return;
- const id=c.id;
- const wasSelected=selected===id,originalView=view,originalOverlay=overlay;
- const deleted=mutate(()=>{
-  data.characters=data.characters.filter(x=>x.id!==id);
-  data.inventory=data.inventory.filter(x=>x.characterId!==id);
-  data.journal=data.journal.filter(x=>x.characterId!==id);
-  data.campaignActorBranches=dropCampaignActorBranch(data,id).campaignActorBranches;
-  if(wasSelected){selected=null;view='characters';overlay=null}
- });
- if(!deleted){if(wasSelected){selected=id;view=originalView;overlay=originalOverlay;render()}return;}
- // Session pointers are UI hints, not authoritative character records. Clear
- // them only after the verified database checkpoint has committed.
+ const c=character(t.dataset.deleteCharacter);if(!c)return;
+ if(!ask(`Definitivně smazat postavu „${c.name}“ včetně jejího inventáře a pravidlové historie?\n\nSmazání nejde vrátit.`))return;
+ const id=c.id,wasSelected=selected===id;
+ const deleted=deleteCharacterEntirely(id);
+ if(!deleted)return;
+ if(wasSelected){selected=null;view='characters';overlay=null}
  try{if(sessionStorage.getItem(CREATION_LAST_ID)===id)sessionStorage.removeItem(CREATION_LAST_ID)}catch{}
- encounterSelection.delete(id);persistEncounterDraft();
- if(wasSelected)render();
- return;
+ encounterSelection.delete(id);persistEncounterDraft();render();return;
 }
 if(t.dataset.archive){if(combatInitiativeSequence)return alert('Během Initiative nelze archivovat postavu.');const c=character(t.dataset.archive);if(ask(`Archivovat postavu ${c.name}?`))mutate(()=>{data.campaignActorBranches??={};if(data.campaignClock){const b=data.campaignActorBranches[campaignKey(data.campaignClock)]??={};b[c.id]=captureCampaignActor(c,data.inventory);}data.characters=data.characters.filter(x=>x.id!==c.id);data.trash.push(c)});return}
 if(t.dataset.restore){if(combatInitiativeSequence)return alert('Během Initiative nelze obnovovat archivované postavy.');mutate(()=>{const c=data.trash.find(x=>x.id===t.dataset.restore);data.trash=data.trash.filter(x=>x.id!==c.id);data.characters.push(c)});return}
-if(t.dataset.purge){if(combatInitiativeSequence)return alert('V probíhající Initiative nelze odstranit postavu ani její bojový stav.');if(ask('DEFINITIVNĚ odstranit postavu, její deník a inventář? Tuto akci nelze vrátit.'))mutate(()=>{const id=t.dataset.purge;data.trash=data.trash.filter(x=>x.id!==id);data.inventory=data.inventory.filter(x=>x.characterId!==id);data.journal=data.journal.filter(x=>x.characterId!==id);data.campaignActorBranches=dropCampaignActorBranch(data,id).campaignActorBranches;});return}
+if(t.dataset.purge){const c=data.trash.find(x=>x.id===t.dataset.purge);if(!c)return;if(ask(`DEFINITIVNĚ smazat archivovanou postavu „${c.name}“ včetně deníku, inventáře a dokladů?`)){if(deleteCharacterEntirely(c.id)){encounterSelection.delete(c.id);persistEncounterDraft();render();}}return}
 if(t.dataset.reconcileInv){reconcileInventoryItem(t.dataset.reconcileInv);return}
 if(t.dataset.removeInv){
  if(combatInitiativeSequence)return alert('Během Initiative mění inventář jen dokončená Combat akce.');
@@ -10429,7 +10438,7 @@ if(t.dataset.deleteLog){const row=data.journal.find(j=>j.id===t.dataset.deleteLo
 if(t.dataset.editItem){if(item(t.dataset.editItem)?.builtin)return alert('Vestavěné pravidlové definice nelze upravit.');editItem=t.dataset.editItem;const i=item(editItem);overlay=equipmentEditor('Upravit předmět',i);render();return}
 if(t.dataset.copyItem){const i=item(t.dataset.copyItem);if(i?.builtin)return alert('Vestavěné definice se nekopírují; vytvořte vlastní předmět.');mutate(()=>data.items.push({...structuredClone(i),id:uuid(),name:i.name+' (kopie)'}));return}
 if(t.dataset.deleteItem){if(item(t.dataset.deleteItem)?.builtin)return alert('Vestavěné pravidlové definice nelze odstranit.');if(ask('Odstranit předmět z knihovny? Existující inventáře zůstanou beze změny.'))mutate(()=>data.items=data.items.filter(x=>x.id!==t.dataset.deleteItem));return}
-const a=t.dataset.action;if(a==='open-generator-config'){overlay=generatorConfigDialog();render();return}if(a==='auto-random-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="hmk-random-name-title"><h2 id="hmk-random-name-title">Generovat náhodnou postavu</h2><p>Nejprve pojmenujte postavu. Potom proběhne automaticky všech 14 kroků HMK s uložením softwarových hodů.</p><form id="hmk-random-name-form"><label>Jméno postavy<input type="text" name="name" maxlength="120" minlength="1" required autocomplete="off" autofocus placeholder="Zadejte jméno postavy"></label><div class="actions"><button type="submit">⚄ Vygenerovat postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>';render();return}if(a==='auto-trait-character'){overlay=generatorConfigDialog();render();return}if(a==='new-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog"><h2>Nová postava · Character Creation</h2><p>Nejdřív zadáte jméno. Potom vás průvodce provede čtrnácti kroky HMK v1.2, vždy pouze jedním aktuálním krokem.</p><form id="creation-new-form"><label>Jméno postavy<input name="name" required maxlength="120"></label><button type="submit">Založit rozpracovanou postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></form></section></div>';render()}if(a==='creation-open'){if(combatInitiativeSequence)return alert('Edit Character Creation není během aktivní Initiative povolen.');if(!selected||!character(selected))return;view='creation';overlay=null;render();return}if(a==='new-item'){editItem=null;category=({melee:'weapon',ranged:'weapon',armour:'armor',shields:'shield',other:'other'})[libraryTab]||'other';overlay=equipmentEditor('Nový předmět',{category});render()}if(a==='cancel-editor'){overlay=null;render()}if(a==='go-characters'){view='characters';query='';render()}if(a==='export'){if(storageReadOnly){alert('Původní data se nepodařilo načíst. Použijte nouzovou kopii původního úložiště, nikoliv standardní zálohu.');return}const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`hmk-ledger-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),5000)}
+const a=t.dataset.action;if(a==='open-generator-config'){overlay=generatorConfigDialog();render();return}if(a==='auto-random-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="hmk-random-name-title"><h2 id="hmk-random-name-title">Generovat náhodnou postavu</h2><p>Nejprve pojmenujte postavu. Potom proběhne automaticky všech 14 kroků HMK s uložením softwarových hodů.</p><form id="hmk-random-name-form"><label>Jméno postavy<input type="text" name="name" maxlength="120" minlength="1" required autocomplete="off" autofocus placeholder="Zadejte jméno postavy"></label><label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label><div class="actions"><button type="submit">⚄ Vygenerovat postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>';render();return}if(a==='auto-trait-character'){overlay=generatorConfigDialog();render();return}if(a==='new-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog"><h2>Nová postava · Character Creation</h2><p>Nejdřív zadáte jméno. Potom vás průvodce provede čtrnácti kroky HMK v1.2, vždy pouze jedním aktuálním krokem.</p><form id="creation-new-form"><label>Jméno postavy<input name="name" required maxlength="120"></label><label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label><button type="submit">Založit rozpracovanou postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></form></section></div>';render()}if(a==='creation-open'){if(combatInitiativeSequence)return alert('Edit Character Creation není během aktivní Initiative povolen.');if(!selected||!character(selected))return;view='creation';overlay=null;render();return}if(a==='new-item'){editItem=null;category=({melee:'weapon',ranged:'weapon',armour:'armor',shields:'shield',other:'other'})[libraryTab]||'other';overlay=equipmentEditor('Nový předmět',{category});render()}if(a==='cancel-editor'){overlay=null;render()}if(a==='go-characters'){view='characters';query='';render()}if(a==='export'){if(storageReadOnly){alert('Původní data se nepodařilo načíst. Použijte nouzovou kopii původního úložiště, nikoliv standardní zálohu.');return}const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`hmk-ledger-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),5000)}
 });
 document.addEventListener('submit',e=>{
  if(e.target.id!=='special-strike-preview-form')return;
@@ -13669,7 +13678,7 @@ document.addEventListener('submit',event=>{
  const v=Object.fromEntries(new FormData(form));
  if(form.id==='creation-new-form'){
   const name=String(v.name||'').trim();if(!name)return alert('Zadejte jméno postavy.');
-  const id=uuid();const success=mutate(()=>data.characters.push({id,name,kind:'PC',occupation:'',description:'',portrait:'',hmk:{creation:defaultCreation(),skills:[],injuries:[],attributes:{}}}));
+  const id=uuid();const success=mutate(()=>data.characters.push({id,name,kind:v.kind==='NPC'?'NPC':'PC',occupation:'',description:'',portrait:'',hmk:{creation:defaultCreation(),skills:[],injuries:[],attributes:{}}}));
   if(success){selected=id;view='creation';overlay=null;render();}return;
  }
  const original=character(selected);if(!original)return;
@@ -13837,17 +13846,17 @@ document.addEventListener('submit',e=>{
  if(e.target?.getAttribute('id')!=='hmk-random-name-form')return;
  e.preventDefault();e.stopImmediatePropagation();
  if(!e.target.reportValidity())return;
- const name=String(new FormData(e.target).get('name')||'').trim();
+ const values=new FormData(e.target);const name=String(values.get('name')||'').trim();
  if(!name){alert('Nejdříve zadejte jméno postavy.');return;}
  overlay=null;
- void generateCharacterFullyAutomatically('random','random',{name});
+ void generateCharacterFullyAutomatically('random','random',{name,kind:values.get('kind')==='NPC'?'NPC':'PC'});
 },true);
 document.addEventListener('submit',e=>{
  if(e.target?.getAttribute('id')!=='hmk-generator-config')return;
  e.preventDefault();e.stopImmediatePropagation();
  const v=new FormData(e.target);
  const traits=v.getAll('trait').map(String);
- const preferences={name:String(v.get('name')||'').trim(),folk:String(v.get('folk')||''),occupation:String(v.get('occupation')||''),traits,description:String(v.get('description')||'')};
+ const preferences={name:String(v.get('name')||'').trim(),kind:v.get('kind')==='NPC'?'NPC':'PC',folk:String(v.get('folk')||''),occupation:String(v.get('occupation')||''),traits,description:String(v.get('description')||'')};
  const profile=String(v.get('profile')||'random');
  void generateCharacterFullyAutomatically('traits',profile,preferences);
 },true);
