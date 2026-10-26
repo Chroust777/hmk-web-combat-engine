@@ -119,7 +119,8 @@ import {startGuidedCrossbowSpan,startGuidedMissileLoad,startGuidedMissileAim,per
 import {parseSpatialBarrierSegments,effectiveSpatialBarriers} from './src/integration/hmk-guided-spatial-barriers.js';
 import {recordEncounterFreeAction,encounterFreeActionAvailable,createEncounterSequence,validateEncounterSequence,startEncounterTurn,finishEncounterTurn,finalizeStagedEncounterTurn,nextEncounterRound,dueEncounterEvents,dueEndTurnEvents,currentEncounterActor,assertScheduledMeleeActor,resolveReadiedEncounterAction,cancelReadiedEncounterAction,completeReadiedEncounterAction,confirmAlertnessReaction,confirmConcentrationCompletion,abandonEncounterConcentration,ongoingEncounterConcentration,requireConcentrationCompatibleDefence,assertScheduledHitCanCommit,recordScheduledHitCommit,setEncounterTieOrder,configureInitialCrossbowPriority,requireInitialCrossbowShot} from './src/integration/encounter-turn-sequence.js';
 import {applyConfirmedTreatment,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock} from './src/integration/hmk-healing-persistence.js';
-import {calendarInitialUI,campaignCalendarBoardHTML} from './src/integration/hmk-campaign-calendar-ui.js';
+import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js';
+import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
@@ -248,7 +249,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.502';
+const APP_VERSION='93.503';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1663,7 +1664,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const calendarTabs=`<nav class="journal-book-subnav hc-calendar-tabs" aria-label="Sekce kalendáře">${CALENDAR_SECTIONS.map(([id,label])=>`<button type="button" data-calendar-section="${id}" class="${activeCalendarSection===id?'':'secondary'}" aria-current="${activeCalendarSection===id?'page':'false'}">${esc(label)}</button>`).join('')}</nav>`;
  const fallUnknown=agenda.unknown.filter(x=>x.kind==='skill-fall'&&x.sourceId);
  const unknownFallNotice=fallUnknown.length?`<section class="panel hc-calendar-unresolved"><h3>Vyžaduje vyřešení · Falling Routine</h3>${fallUnknown.map(x=>`<div class="hc-unknown-rule-link"><strong>${esc(x.name)}</strong> · ${esc(x.description)}<p class="muted">GM doplní skutečnou výšku (0–5 ft bez Injury Sequence; nad 5 ft pokračuje Impact a Jumping/Acrobatics test). Původní Skill CF se neopakuje.</p><button type="button" class="hc-small" data-cal-unknown-fall="${esc(x.characterId)}" data-cal-unknown-source="${esc(x.sourceId)}">Otevřít správné hody a výšku ↗</button></div>`).join('')}</section>`:'';
- const overviewHTML=`${board}${unknownFallNotice}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrdil skutečně uplynulý čas</label><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
+ const overviewHTML=`${board}${unknownFallNotice}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
   activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${interruptionsHTML}`:
   activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionLedgerHTML(participants)}${supplyHTML}<details class="hc-provision-rulebook"><summary>Podrobnosti: automatické následky nedostatku a zdravotní hody</summary>${nutritionHTML}${activityNeedsHTML}</details>`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
@@ -10027,7 +10028,7 @@ document.addEventListener('submit',e=>{
  const v=Object.fromEntries(new FormData(f)),n=x=>/^\d+$/.test(String(x??''))?Number(x):NaN;
  try{
   if(!data.campaignClock)throw Error('Nejdříve založte kampaň');
-  if(v.gmConfirmed!=='yes')throw Error('Akci musí potvrdit GM');
+  if(f.id!=='campaign-quick-advance-form'&&v.gmConfirmed!=='yes')throw Error('Akci musí potvrdit GM');
   if(f.id==='campaign-tr-origin-form'){
    const next=setCampaignTROrigin(data.campaignClock,{year:n(v.year),month:n(v.month),day:n(v.day),eventId:uuid(),confirmed:true});
    if(!window.confirm('Přiřadit '+formatTRDate(campaignTRDate(next,next.minute))+' ke skutečnému dni kampaně? Datum již nepůjde nenápadně změnit.'))return;
@@ -10209,6 +10210,50 @@ document.addEventListener('click',e=>{
  }
  render();
 },true);
+// v93.503: calendar event controls share their authoritative originals. A tick
+// is an audit acknowledgement, never an invented Medical/Combat dice result.
+// An X cancels a still-running original activity or hides an informational
+// marker from the *display*, never erasing a completed proof from history.
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-cal-event-check],[data-cal-event-remove]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(view!=='calendar'||!data.campaignClock)return;
+ const eventId=b.dataset.calEventCheck||b.dataset.calEventRemove;
+ const chosen=calendarBoardEvents({clock:data.campaignClock,characters:calendarMemberIds(data.campaignClock,data.characters),journal:data.journal}).find(x=>x.id===eventId);
+ if(!chosen)return alert('Událost již není dostupná v této kampani.');
+ const control=calendarEventControlKind(chosen),isRemove=b.hasAttribute('data-cal-event-remove');
+ try{
+  if(control==='rules'){
+   if(isRemove){alert('Povinný HMK test nelze prostým křížkem zrušit ani odstranit ze splatných kontrol. Je nutné vyřešit skutečný pravidlový následek v jeho původním formuláři.');return;}
+   const link=b.closest('.hc-actions')?.querySelector('[data-cal-link]');
+   if(link){link.click();return;}
+   notice='Tato povinná událost vyžaduje původní pravidlový formulář; neexistuje automatické potvrzení hodu.';render();return;
+  }
+  if(isRemove&&(control==='activity'||control==='nutrition')){
+   const reason=window.prompt('Proč je činnost skutečně přerušena? (nejméně 3 znaky)','Přerušení činnosti');
+   if(reason===null)return;
+   if(control==='activity'){
+    const proof=interruptHMKActivity({journal:data.journal,clock:data.campaignClock,activityId:chosen.sourceId,reason,id:uuid(),createdAt:stamp()});
+    if(mutate(()=>{data.journal.push(proof);})){notice='Činnost přerušena v aktuálním čase. Nedokončená regenerace nebyla přiznána.';}
+   }else{
+    const source=data.journal.find(row=>row.id===chosen.sourceId);
+    const p=createNutritionConditionsCancel({journal:data.journal,planRow:source,campaignId:campaignKey(data.campaignClock),actorId:source?.characterId,minute:data.campaignClock.minute,reason});
+    const stop=interruptionForCancelledNutritionRest({journal:data.journal,clock:data.campaignClock,planRow:source,reason:p.reason,id:uuid(),createdAt:stamp()});
+    if(mutate(()=>{data.journal.push({id:uuid(),characterId:p.actorId,calendarCampaignId:p.campaignId,campaignMinute:p.minute,createdAt:stamp(),title:'HMK · zrušení denních podmínek',body:p.reason,calendarNutritionConditionsCancel:p});if(stop)data.journal.push(stop);})){notice='Celodenní podmínky a nedokončený navázaný odpočinek byly přerušeny.';}
+   }
+   return;
+  }
+  const action=isRemove?'hide':'acknowledge';
+  const explanation=isRemove?
+   'Skrýt „'+(chosen.title||chosen.description)+'“ pouze z kalendáře? Historie, již provedené účinky a případné povinné testy zůstanou nedotčené.':
+   'Označit „'+(chosen.title||chosen.description)+'“ jako zkontrolovanou událost GM? Tím se nevytváří výsledek hodu ani neobnovuje Fatigue.';
+  if(!window.confirm(explanation))return;
+  const receipt=makeCalendarUIReceipt({journal:data.journal,campaignId:campaignKey(data.campaignClock),eventId:chosen.id,action,minute:data.campaignClock.minute});
+  const receiptActor=character(chosen.characterId)?chosen.characterId:calendarMemberIds(data.campaignClock,data.characters)[0]?.id;
+  if(!receiptActor)throw Error('Bez postavy v kampani nelze bezpečně uložit doklad do autoritativního deníku.');
+  mutate(()=>{data.journal.push({id:uuid(),characterId:receiptActor,calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute,createdAt:stamp(),title:'Kalendář · '+(action==='hide'?'skryta informační událost':'událost zkontrolována'),body:(chosen.title||chosen.description||'Událost')+'; autoritativní herní důkaz a povinnosti zachovány.',calendarUIReceipt:receipt});});
+ }catch(error){alert('Kalendářová událost nebyla změněna: '+error.message);}
+},true);
 // Calendar lifecycle is explicitly separate from ordinary append-only changes.
 document.addEventListener('click',e=>{
  const t=e.target.closest?.('[data-calendar-open],[data-calendar-new],[data-calendar-back]');if(!t)return;
@@ -10377,7 +10422,7 @@ document.addEventListener('submit',e=>{
  const v=Object.fromEntries(new FormData(f));
  const parse=(x)=>/^\d+$/.test(String(x??''))?Number(x):NaN;
  try{
-  if(v.gmConfirmed!=='yes')throw Error('GM musí potvrdit skutečný čas');
+  if(f.id!=='campaign-advance-form'&&v.gmConfirmed!=='yes')throw Error('GM musí potvrdit skutečný čas');
   if(f.id==='campaign-start-form'){
    if(data.campaignClock&&!calendarCreating)throw Error('Kalendář už existuje');
    const memberIds=new FormData(f).getAll('characterId').filter(id=>availableCampaignCharacters(data).some(c=>c.id===id));
