@@ -130,7 +130,7 @@ import {availableSpellPsycheRecoveries,persistSpellPsycheRecoverySchedule,persis
 import {pendingSpellPsycheManifestations,persistSpellPsycheManifestation} from './src/integration/hmk-spell-psyche-manifestation.js';
 import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan} from './src/integration/hmk-calendar-planner.js';
 import {secureHMKDie,expeditionDiceSubmission,expeditionWatchFatigue,expeditionRestRecovery} from './src/integration/hmk-calendar-expedition.js';
-import {scheduleHMKActivity,finishDueHMKActivities,validateHMKActivityEvidence,assertHMKActivitiesAppendOnly,activeHMKActivities,interruptHMKActivity} from './src/integration/hmk-calendar-activities.js';
+import {scheduleHMKActivity,finishDueHMKActivities,finishInterruptedHMKTravel,validateHMKActivityEvidence,assertHMKActivitiesAppendOnly,activeHMKActivities,interruptHMKActivity} from './src/integration/hmk-calendar-activities.js';
 import {nutritionRestActivity,interruptionForCancelledNutritionRest} from './src/integration/hmk-nutrition-rest-bridge.js';
 import {planHMKGroupWatch} from './src/integration/hmk-group-travel.js';
 import {trekPartyModes} from './src/integration/hmk-trekking-party-modes.js';
@@ -251,7 +251,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.511';
+const APP_VERSION='93.512';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1183,8 +1183,8 @@ function campaignCalendarView(){
  const trekPanel=`<section class="hc-calendar hc-trek-routine"><h3>HMK · Trekking Routine: počasí, pohyb, nebezpečí a setkání</h3>
  <p class="hc-hint">Pravidla HMK str. 141–150: počasí se určuje jednou za 24 hodin, srážky po čtyřhodinových hlídkách. Podklady pro další cestovní kroky se zaznamenají k vybrané postavě a konkrétní minutě; neprovádí se zde automatické zranění ani posun času. Orienteering, Cold/Heat Exposure a skutečný Encounter se vyhodnocují původními průvodci.</p>
  <details><summary>Vyhodnotit cestovní hlídku – pravidlové podklady</summary><form id="campaign-trekking-context-form">
- <fieldset class="hc-expedition-actors"><legend>Účastníci této cestovní hlídky (průvodce se přidá automaticky)</legend><div class="hc-characters">${participants.map((c,i)=>`<label class="hc-character"><input type="checkbox" name="trekMemberIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset><div class="hc-fields"><label>Postava / průvodce<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
- <label>Drover (vodič zvířat pro Riding/Animalcraft; při pěší cestě se nepoužije)<select name="droverId">${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+ <fieldset class="hc-expedition-actors"><legend>Účastníci této cestovní hlídky (průvodce se přidá automaticky)</legend><div class="hc-characters">${participants.map((c,i)=>`<label class="hc-character"><input type="checkbox" name="trekMemberIds" value="${esc(c.id)}"><span>${esc(c.name)} · ${esc(c.id)}</span></label>`).join('')}</div></fieldset><div class="hc-fields"><label>Postava / průvodce<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+ <label>Drover (vodič zvířat pro Riding/Animalcraft; také při pěší cestě s nákladním zvířetem)<select name="droverId">${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <label>Oblast / označení trasy<input name="area" maxlength="90" required placeholder="Např. Východní les u Tashalu"></label>
  <label>Roční období<select name="season"><option value="auto">Z data TR (je-li doloženo)</option>${[['spring','Jaro'],['summer','Léto'],['autumn','Podzim'],['winter','Zima']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
  <label>Klimatické pásmo<select name="climate"><option value="subpolar">Subpolar</option><option value="cool" selected>Cool Temperate</option><option value="warm">Warm Temperate</option><option value="subtropical">Subtropical</option><option value="dry-tropical">Dry Tropical</option><option value="wet-tropical">Wet Tropical</option></select></label>
@@ -1213,8 +1213,10 @@ function campaignCalendarView(){
  <label class="hc-check"><input name="night" type="checkbox" value="yes"> Noční watch</label>
  <label class="hc-check"><input name="alpine" type="checkbox" value="yes"> Alpine Vegetation / Ice (−4 teplota)</label>
  <label class="hc-check"><input name="aridDesert" type="checkbox" value="yes"> Arid Desert (zvláštní modifikátory)</label>
- <label class="hc-check"><input name="loaded" type="checkbox" value="yes"> Loaded Mode – pouze pokud není zatížení doložitelné z inventáře / případně naložené zvíře</label>
- <label class="hc-check"><input name="ignoreLoaded" type="checkbox" value="yes"> HMK 145 · Ignorovat zpomalení Loaded Mode (pouze pěší skupina s doloženým ENC každého zatíženého člena): místo zpomalení +10 Weariness za každých úplných 10 ENC zatížené postavy. Připočte se až po uplynutí hlídky.</label>
+ <label class="hc-check"><input name="loaded type="checkbox" value="yes"> Loaded Mode – pouze pokud není zatížení doložitelné z inventáře / případně naložené zvíře</label>
+ <label>Nákladní / tažná zvířata · každé na vlastním řádku: jméno ; ENC ; ID honáka<textarea name="drovingAnimals" rows="2" placeholder="Mezek 1 ; 25 ; P1"></textarea></label>
+ <p class="hc-hint">ENC zvířete se zadává jen jako doložený údaj, neodhaduje se z lidského inventáře. ID honáka je ID vybrané postavy. HMK 145: zvíře od 20 ENC spouští Loaded; při ignorování zpomalení dostává jeho honák +10 Weariness za každých úplných 20 ENC. Více zvířat evidujte odděleně.</p>
+ <label class="hc-check"><input name="ignoreLoaded" type="checkbox" value="yes"> HMK 145 · Ignorovat Loaded Mode: přesně doložené zatížení pěších členů nebo naložených zvířat, bez neznámého ENC. Zatížení pěšího člena: +10 Fatigue za 10 ENC; každé zvíře: +10 Fatigue honákovi za 20 ENC.</label>
  <label class="hc-check"><input name="doubleTime" type="checkbox" value="yes"> Double Time (jen bez Slow/Loaded)</label>
  <p class="hc-hint">Postihy celé skupiny (Wearied, Injured a doložený Loaded) se odvodí automaticky při uložení. Závažné zranění nebo chybějící údaje o výbavě se nebudou vykládat jako nulový postih. Kdo není v této hlídce, tomu se nepřipíše cestovní účinek.</p><button type="submit">Vyhodnotit a uložit podklady (bez posunu času)</button></form>
  <p class="tiny">Pokud vyjde Encounter, hazard či expozice, skutečné vyhodnocení otevřete v Combat / Skill Tests. Generování podkladů samo nezakládá zranění ani neprohlašuje následek za vyřízený.</p></details></section>`;
@@ -1675,7 +1677,10 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <div class="hc-expedition-links"><button type="button" class="hc-small" data-nav="skills">⚄ Skill Tests / Orienteering</button><label class="hc-hazard-calendar-target">Cíl nebezpečí<select data-calendar-hazard-actor aria-label="Postava pro nové nebezpečí">${participants.map(a=>`<option value="${esc(a.id)}" ${a.id===selected?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label><button type="button" class="hc-small" data-calendar-hazard-open>⚠ GM · nové nebezpečí</button><button type="button" class="hc-small" data-nav="encounter">⚔ Combat / Encounter</button></div></div>
  <p class="hc-hint">Činnost se pouze naplánuje do kalendáře; <strong>čas mění výhradně GM.</strong> Skupina cestuje ve stejné čtyřhodinové hlídce, používá společný doložený Trekking/Orienteering test svého průvodce, ale pro každou postavu provede a uloží její vlastní END SR. Únava se připíše až po uplynutí času GM. Časově splatný Healing či jiný test nelze provést před jeho řádným termínem – to je pravidlová podmínka, ne požadavek posunout hodiny při zadávání činnosti.</p><button type="submit">Naplánovat činnost vybraných postav (bez posunu času)</button></form></section>`;
  const activeActivities=activeHMKActivities(data.journal,clock).filter(row=>participants.some(c=>c.id===row.characterId));
- const interruptionsHTML=`<section class="hc-calendar hc-expedition"><details><summary>Probíhající a naplánované činnosti · přerušení (${activeActivities.length})</summary><p class="hc-hint">GM může ukončit nedokončený spánek, odpočinek nebo cestu například při přepadení. Přerušení čas neposune a za neúplný interval nepřizná automatickou obnovu. Případné zranění nebo částečnou cestovní únavu řeší původní pravidlový modul.</p><div class="hc-event-list">${activeActivities.map(row=>{const a=row.calendarActivityProof;return `<div class="hc-event"><strong>${esc(a.name)} · ${esc(a.kind)}</strong> · ${esc(displayCampaignMinute(a.startMinute))}–${esc(displayCampaignMinute(a.endMinute))}<label class="hc-check"><input type="checkbox" data-calendar-activity-selected="${esc(row.id)}" aria-label="Vybrat činnost postavy ${esc(a.name)}"> Vybrat</label><button type="button" class="hc-small" data-calendar-interrupt-activity="${esc(row.id)}">Přerušit činnost</button></div>`}).join('')||'<p>Žádné nedokončené činnosti.</p>'}</div>${activeActivities.length>1?'<button type="button" class="hc-small" data-calendar-interrupt-selected>Přerušit vybrané činnosti</button>':''}</details></section>`;
+ const interruptionsHTML=`<section class="hc-calendar hc-expedition"><details><summary>Probíhající a naplánované činnosti · přerušení (${activeActivities.length})</summary><p class="hc-hint">GM může ukončit nedokončený spánek, odpočinek nebo cestu například při přepadení. Přerušení čas neposune a za neúplný interval nepřizná automatickou obnovu. Cesta připíše dokončené celé hodiny Double Time automaticky. Neúplné hodiny nebo neúplnou běžnou hlídku musí vyhodnotit GM číslem Weariness. Přerušení celé cestovní skupiny je společné.</p><div class="hc-event-list">${activeActivities.map(row=>{const a=row.calendarActivityProof;return `<div class="hc-event"><strong>${esc(a.name)} · ${esc(a.kind)}</strong> · ${esc(displayCampaignMinute(a.startMinute))}–${esc(displayCampaignMinute(a.endMinute))}<label class="hc-check"><input type="checkbox" data-calendar-activity-selected="${esc(row.id)}" aria-label="Vybrat činnost postavy ${esc(a.name)}"> Vybrat</label>${a.plan.kind==='travel'&&clock.minute>a.startMinute&&clock.minute<a.endMinute?
+  `<label class="hc-hint">Dílčí Weariness GM (jen když nelze spočítat dokončené celé Double Time hodiny):
+   <input type="number" min="0" max="${a.plan.accrual}" step="1" data-calendar-partial-weariness="${esc(row.id)}" placeholder="Rozhodnutí GM · 0 až ${a.plan.accrual}"></label>`:''}
+ <button type="button" class="hc-small" data-calendar-interrupt-activity="${esc(row.id)}">Přerušit činnost</button></div>`}).join('')||'<p>Žádné nedokončené činnosti.</p>'}</div>${activeActivities.length>1?'<button type="button" class="hc-small" data-calendar-interrupt-selected>Přerušit vybrané činnosti</button>':''}</details></section>`;
  const included=new Set(participants.map(c=>c.id));
  const usedElsewhere=new Set();
  const memberRow=(c,checked)=>`<label class="hc-character"><input type="checkbox" name="characterId" value="${esc(c.id)}" ${checked?'checked':''}><span>${esc(c.name)}</span></label>`;
@@ -8285,19 +8290,24 @@ document.addEventListener('submit',e=>{
   const wet=trekWeatherWatch(day,{night:v.night==='yes',precipitationD6,pavedRoad:v.terrain==='paved-road'});
   const qty=(name,max)=>{const n=Number(v[name]);if(!Number.isSafeInteger(n)||n<0||n>max)throw Error('Neplatný počet '+name);return n;};
   const memberIds=[...new Set([...new FormData(form).getAll('trekMemberIds'),actor.id])];
+  const animals=String(v.drovingAnimals??'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean).map(line=>{
+   const parts=line.split(';').map(x=>x.trim());
+   if(parts.length!==3||!parts[0]||!/^\d+$/.test(parts[1]))throw Error('Naložená zvířata: zadejte Jméno ; celé ENC ; ID honáka (každé na vlastním řádku).');
+   return {id:parts[0],enc:Number(parts[1]),droverId:parts[2]};
+  });
   const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:data.characters,
-   inventory:data.inventory,conveyance:v.conveyance,loadedByGM:v.loaded==='yes'});
+   inventory:data.inventory,conveyance:v.conveyance,loadedByGM:v.loaded==='yes',drovingAnimals:animals});
   const ignoreLoaded=v.ignoreLoaded==='yes';
-  if(ignoreLoaded&&(v.conveyance!=='foot'||!partyModes.loaded||
-      partyModes.loadUnresolved.length||!partyModes.members.some(m=>m.loaded)||
+  if(ignoreLoaded&&(!partyModes.loaded||partyModes.manualLoaded||
+      partyModes.loadUnresolved.length||(!partyModes.members.some(m=>m.loaded)&&!partyModes.animals.some(a=>a.loaded))||
       partyModes.members.filter(m=>m.loaded).some(m=>!Number.isSafeInteger(m.modifiedENC))))
-   throw Error('Ignorovat Loaded Mode lze jen pěšky, s úplným doloženým ENC zatížených členů; ne s odhadovanou nebo neznámou výbavou.');
+   throw Error('Ignorovat Loaded Mode lze jen s doloženým ENC zatížených pěších členů nebo jednotlivých zvířat a potvrzeným honákem.');
   const manualSlow=qty('slow',20),orienteeringSlow=Number(v.orienteeringSlow==='yes');
   const lax=v.lax==='yes';
   const orienteeringContext=createOrienteeringContext({night:v.night==='yes',partySize:partyModes.memberIds.length,
    familiar:v.familiar==='yes',torchlight:v.torchlight==='yes',fullMoon:v.fullMoon==='yes',
    afterSnowfall:v.afterSnowfall==='yes',conveyance:v.conveyance,
-   droverId:v.conveyance==='foot'?null:v.droverId,stationaryForaging:v.stationaryForaging==='yes'});
+   droverId:v.conveyance==='foot'&&!animals.length?null:v.droverId,animalsPresent:animals.length>0,stationaryForaging:v.stationaryForaging==='yes'});
   if(orienteeringContext.droverId&&!memberIds.includes(orienteeringContext.droverId))
    throw Error('Drover musí být jedním z vybraných účastníků hlídky');
   const trackingBearing=pendingTrackingBearing({journal:data.journal,campaignId,minute:clock.minute,memberIds:partyModes.memberIds});
@@ -9971,9 +9981,20 @@ document.addEventListener('click',e=>{
    [...button.closest('details').querySelectorAll('[data-calendar-activity-selected]:checked')].map(x=>x.dataset.calendarActivitySelected):
    [button.dataset.calendarInterruptActivity];
   if(!ids.length||new Set(ids).size!==ids.length)throw Error('Vyberte alespoň jednu činnost bez duplicit.');
-  const proofs=ids.map(activityId=>interruptHMKActivity({journal:data.journal,clock:data.campaignClock,
-   activityId,reason,id:uuid(),createdAt:stamp()}));
-  if(mutate(()=>{data.journal.push(...proofs);}))notice=proofs.length+' činností přerušeno bez posunu času. Nedokončená obnova nebyla přiznána.';
+  const active=activeHMKActivities(data.journal,data.campaignClock);
+  for(const activityId of ids){
+   const chosen=active.find(row=>row.id===activityId)?.calendarActivityProof?.plan?.travelGroup;
+   if(chosen&&chosen.memberIds.length>1){
+    const groupRows=data.journal.filter(row=>row.calendarActivityProof?.plan?.travelGroup?.id===chosen.id);
+    if(groupRows.some(row=>!ids.includes(row.id)))throw Error('Skupinovou hlídku lze přerušit jen všem účastníkům najednou; pohyb družiny je společný.');
+   }
+  }
+  const proofs=ids.map(activityId=>{
+   const raw=button.closest('details').querySelector('[data-calendar-partial-weariness="'+activityId+'"]')?.value;
+   return interruptHMKActivity({journal:data.journal,clock:data.campaignClock,
+    activityId,reason,id:uuid(),createdAt:stamp(),partialWeariness:raw===undefined||raw===''?null:Number(raw)});
+  });
+  if(mutate(()=>{data.journal.push(...proofs);finishInterruptedHMKTravel(data,{idFactory:uuid,stamp});}))notice=proofs.length+' činností přerušeno: dokončená část cestovní únavy byla zapsána jednou do Combat State.';
  }catch(err){alert('Činnost nebyla přerušena: '+err.message)}
 },true);
 // Each travel roll is individually visible and may be entered by hand or
@@ -9999,7 +10020,7 @@ function updateExpeditionDiceFields(form,{reset=true}={}){
    row.dataset.expeditionActorDiceRow,[...row.querySelectorAll('input')].map(e=>e.value)]));
   container.innerHTML=travel?members.map(id=>{
    const actor=character(id),rolls=reset?[]:old.get(id)||[];
-   return `<fieldset class="hc-expedition-dice-actor" data-expedition-actor-dice-row="${esc(id)}"><legend>${esc(actor?.name||id)} · END SR</legend><div class="hc-expedition-dice-grid">${Array.from({length:count},(_,i)=>`<label>Hod ${i+1} · d10<input type="number" class="hc-expedition-die-input" inputmode="numeric" min="1" max="10" step="1" autocomplete="off" placeholder="1–10" value="${esc(rolls[i]||'')}" required></label>`).join('')}</div></fieldset>`;
+   return `<fieldset class="hc-expedition-dice-actor" data-expedition-actor-dice-row="${esc(id)}"><legend>${esc(actor?.name||id)} · END SR</legend><div class="hc-expedition-dice-grid">${Array.from({length:count},(_,i)=>`<label>Hod ${i+1} · d10<input type="number" class="hc-expedition-die-input" inputmode="numeric" min="1" max="10" step="1" autocomplete="off" placeholder="1–10" value="${esc(rolls[i]||'')}" required></label>`).join('')}</div><button type="button" class="hc-small" data-expedition-roll-actor="${esc(id)}">⚄ Hodit d10 pro tuto postavu</button></fieldset>`;
   }).join(''):'';
  }
  if(reset)expeditionGeneratedDice.delete(form);
@@ -10064,14 +10085,15 @@ document.addEventListener('input',e=>{
  if(info)info.textContent='Ruční zadání · zkontrolujte všechny zobrazené hody d10.';
 },true);
 document.addEventListener('click',e=>{
- const button=e.target.closest?.('#campaign-expedition-form [data-expedition-roll]');if(!button)return;
+ const button=e.target.closest?.('#campaign-expedition-form [data-expedition-roll],#campaign-expedition-form [data-expedition-roll-actor]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
  const form=button.closest('form');
  const kind=form?.elements.namedItem('kind')?.value??'';
  if(['winded','rest','sleep'].includes(kind))return;
  try{
-  const witnesses=new Map();
+  const witnesses=expeditionGeneratedDice.get(form)||new Map();
   for(const row of form.querySelectorAll('[data-expedition-actor-dice-row]')){
+   if(button.hasAttribute('data-expedition-roll-actor')&&row.dataset.expeditionActorDiceRow!==button.dataset.expeditionRollActor)continue;
    const inputs=[...row.querySelectorAll('input')],rolls=inputs.map(()=>secureHMKDie(10));
    inputs.forEach((input,i)=>{input.value=String(rolls[i]);});
    witnesses.set(row.dataset.expeditionActorDiceRow,{kind,rolls});
