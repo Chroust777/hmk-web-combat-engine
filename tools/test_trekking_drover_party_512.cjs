@@ -1,0 +1,33 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+let ts;try{ts=require('typescript')}catch{ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js')}
+const root=path.resolve(__dirname,'..'),old=require.extensions['.js'];
+require.extensions['.js']=(m,f)=>f.startsWith(path.join(root,'src')+path.sep)?m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{fileName:f,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,f):old(m,f);
+const A=require('../src/integration/hmk-calendar-activities.js'),P=require('../src/integration/hmk-trekking-party-modes.js'),R=require('../src/integration/hmk-trekking-readiness.js');
+const {initialCombatState}=require('../src/integration/persistent-combat-state.js');
+const ids=['guide','handler'];
+const members=ids.map(id=>({id,name:id,fatigue:0,injured:false,immobile:false,seriousWounds:[],modifiedENC:0,minimumENC:null,loaded:false,loadUnresolved:false}));
+const party={format:'hmk-trek-party-modes-v1',memberIds:ids,guideId:'guide',conveyance:'foot',members,animals:[{id:'mule',enc:20,droverId:'handler',loaded:true}],wearied:false,injured:false,loaded:true,forcedSlow:0,manualLoaded:false,loadUnresolved:[],sourcePages:[112,145,146,167]};
+assert(P.validateTrekPartySnapshot(party));
+const source={id:'watch',characterId:'guide',calendarCampaignId:'c512',campaignMinute:480,calendarTrekProof:{format:'hmk-trekking-watch-evidence-v1',partyModes:party,modes:{ignoreLoaded:true}}};
+const skill={id:'skill',characterId:'guide',calendarCampaignId:'c512',calendarTrekSkillSource:{sourceId:'watch',hazard:'survival'}};
+R.assessTrekkingReadiness=()=>({sourceId:'watch',source,orienteeringId:'skill',movement:{leagues:4,kilometres:16}});
+P.trekPartyModes=()=>party;
+const {planHMKGroupWatch}=require('../src/integration/hmk-group-travel.js');
+const actors=ids.map(id=>({id,name:id,hmk:{attributes:{end:10},combatState:initialCombatState()}}));
+const clock={minute:480,campaignId:'c512',characterIds:ids};let serial=0;
+const result=planHMKGroupWatch({journal:[source,skill],characters:actors,clock,guideId:'guide',memberIds:ids,kind:'double-walk',idFactory:()=>`n${++serial}`,
+ diceByActor:Object.fromEntries(ids.map(id=>[id,{rawValues:['10','10','10','10']}]))});
+assert.equal(result.plans.length,2);
+const byId=Object.fromEntries(result.plans.map(row=>[row.characterId,row.calendarActivityProof.plan]));
+assert.equal(byId.guide.mode,'double-walk');assert.equal(byId.guide.accrual,40);
+assert.equal(byId.handler.mode,'double-drover');assert.equal(byId.handler.accrual,30);
+assert.equal(byId.handler.animalExtraLoad,10);assert.equal(byId.guide.animalExtraLoad,0);
+assert(A.validateHMKActivityEvidence([source,skill,...result.plans]));
+const forged=structuredClone([source,skill,...result.plans]);
+forged.find(row=>row.characterId==='handler'&&row.calendarActivityProof).calendarActivityProof.plan.animalExtraLoad=0;
+assert.throws(()=>A.validateHMKActivityEvidence(forged),/ENC jednotlivých/);
+const wrongRole=structuredClone([source,skill,...result.plans]);
+wrongRole.find(row=>row.characterId==='handler'&&row.calendarActivityProof).calendarActivityProof.plan.mode='double-walk';
+assert.throws(()=>A.validateHMKActivityEvidence(wrongRole),/roli cestujícího/);
+console.log('PASS 10 foot pack-animal party role-specific Double Time, load surcharge only to drover, group proof invariant');

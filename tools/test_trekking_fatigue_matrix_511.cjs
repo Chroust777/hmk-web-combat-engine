@@ -10,7 +10,7 @@ const eq=(a,b,m)=>{assert.deepEqual(a,b,m);n++},yes=(x,m)=>{assert.ok(x,m);n++},
 for(const mode of ['walk','ride','drive','double-walk','double-drover']){
  const doubled=mode.startsWith('double-'),count=doubled?4:1,base=doubled?(mode==='double-drover'?5:10):5;
  for(const end of [2,6,10,18])for(const pattern of Array.from({length:2**count},(_,i)=>i)){
-  const tn=Math.floor(end/2)+(['ride','drive','double-drover'].includes(mode)?2:0);
+  const tn=Math.floor(end/2)+(['ride','drive'].includes(mode)?2:0);
   // Force success/failure by using roll 1 or 10, unless TN>=10.
   const rolls=Array.from({length:count},(_,i)=>(pattern>>i)&1?1:10);
   for(const weather of [0,5,10]){
