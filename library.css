@@ -53,3 +53,7 @@
 .library-table tbody tr:nth-child(2n){background:rgba(107,80,43,.06)}
 .library-warning,.library-purchase-hint{color:#62431d}
 .library-rules-details{background:linear-gradient(180deg,rgba(247,240,226,.94),rgba(233,221,198,.92));padding:.85rem 1rem;border-radius:16px;border:1px solid rgba(104,79,45,.16)}
+
+/* v93.497: consistent rules help in the Library's visible and expanded cells. */
+.library-table .catalog-parameter-tip,.folio-catalog-field .catalog-parameter-tip,.catalog-parameters .catalog-parameter-tip{cursor:help;text-decoration:underline dotted rgba(88,59,29,.55);text-underline-offset:2px}
+.catalog-parameter-tip:focus-visible{outline:2px solid #86613d;outline-offset:2px}
