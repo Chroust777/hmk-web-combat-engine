@@ -42,29 +42,77 @@ export function applyInventoryBatch(db,{ownerId,itemIds,action,location='',reaso
  }
  return next;
 }
-/** Simulate only the chest items at the confirmed location as available gear.
- * Do not actually change them until a specific, verified outfit is chosen.
+/** v93.528. The chest is an additional source, not a replacement for the
+ * equipment already worn/carried by this character. Simulate making exactly
+ * one attested chest location available, then prove an optimal outfit over all
+ * three eligible sources without mutating campaign data.
  */
 export function previewChestOutfit(db,{ownerId,location,mode}={}){
  check(current(db,ownerId)&&['armour','clothing'].includes(mode),'Neplatná postava nebo režim oblékání.');
  check(typeof location==='string'&&location.length>0,'Vyberte skutečné místo truhly.');
  const chest=db.inventory.filter(x=>x.characterId===ownerId&&x.slot==='chest'&&x.chestLocation===location);
  check(chest.length,'Na daném místě není žádné vybavení této postavy.');
- const inventory=db.inventory.map(x=>chest.includes(x)?{...x,slot:'carried'}:x);
- const ids=new Set(chest.map(x=>x.id));
- const preview=previewOptimalOutfit(inventory,ownerId,mode,ids);
+ const chestIds=new Set(chest.map(x=>x.id));
+ const inventory=db.inventory.map(x=>chestIds.has(x.id)?{...x,slot:'carried'}:x);
+ // No allowedIds restriction: already worn and carried articles are legitimate
+ // ingredients of the same globally optimised legal outfit.
+ const preview=previewOptimalOutfit(inventory,ownerId,mode);
  if(!preview.ready)return {ready:false,reason:preview.reason};
- const chosen=new Set(preview.equipIds),retrieved=chest.filter(x=>chosen.has(x.id));
- check(retrieved.length>0,'Nejlepší návrh z tohoto místa nepoužívá žádnou součást truhly.');
- return {ready:true,mode,location,preview,ids:retrieved.map(x=>x.id),names:retrieved.map(x=>x.snapshot.name),virtual:inventory};
+ const chosen=new Set(preview.placements.map(p=>p.id));
+ const retrieved=chest.filter(x=>chosen.has(x.id));
+ return {ready:true,mode,location,preview,ids:retrieved.map(x=>x.id),
+  names:retrieved.map(x=>x.snapshot.name),virtual:inventory};
 }
+/** Perform the *same* proved selection without recomputing a different
+ * optimisation universe after the physical withdrawals.
+ *
+ * The old code compared JSON.stringify of the two independent solver reports,
+ * although one report saw every chest item and the other only withdrawn items.
+ * Counts, provenance, search certificates and candidates could therefore
+ * change with no rule violation, aborting a valid 17-piece Plate & Mail suit.
+ *
+ * We first validate and apply the original proved outfit in the read-only
+ * virtual inventory, then atomically move only the selected chest pieces via
+ * the existing custody ledger, finally project the already proved worn/removed
+ * states onto these very same persistent item IDs. The unselected chest stays
+ * untouched, including its true location. A failed movement throws before
+ * any caller persists the result.
+ */
 export function applyChestOutfit(db,{ownerId,location,mode,confirmed=false,idFactory,createdAt}={}){
  check(confirmed===true,'GM musí potvrdit skutečný přístup do truhly a převlečení.');
  const plan=previewChestOutfit(db,{ownerId,location,mode});
  check(plan.ready,plan.reason||'Nedoložená sestava');
- const staged=applyInventoryBatch(db,{ownerId,itemIds:plan.ids,action:'retrieve',location,confirmed,idFactory,createdAt});
- const fresh=previewOptimalOutfit(staged.inventory,ownerId,mode,new Set(plan.ids));
- check(fresh.ready&&JSON.stringify(fresh)===JSON.stringify(plan.preview),'Po vyzvednutí už návrh neodpovídá původním článkům.');
- const inventory=applyOptimalOutfit(staged.inventory,ownerId,fresh,new Set(plan.ids));
- return {...staged,inventory,plan};
+ // Revalidates all catalogue articles, physical layer constraints and the
+ // exact solver result against the original virtual (non-mutated) inventory.
+ const wornPlan=applyOptimalOutfit(plan.virtual,ownerId,plan.preview);
+ const desired=new Map(wornPlan.filter(x=>x.characterId===ownerId&&x.snapshot?.category==='armor')
+  .map(x=>[x.id,x]));
+ const selectedChest=new Set(plan.ids);
+ const staged=selectedChest.size?applyInventoryBatch(db,{
+  ownerId,itemIds:plan.ids,action:'retrieve',location,confirmed,idFactory,createdAt
+ }):db;
+ check(selectedChest.size===plan.ids.length,'Duplicitní výběr z truhly');
+ for(const id of selectedChest){
+  const row=staged.inventory.find(x=>x.id===id&&x.characterId===ownerId);
+  check(row&&row.slot==='carried'&&row.quantity===1&&desired.get(id)?.slot==='worn',
+   'Vyzvednutá součást nemá původní vlastnictví, počet nebo ověřený výběr.');
+ }
+ const finalInventory=staged.inventory.map(item=>{
+  if(item.characterId!==ownerId||item.snapshot?.category!=='armor'||item.slot==='chest')return item;
+  const target=desired.get(item.id);
+  check(target,'Zvolený článek už není v původním inventáři.');
+  // Never modify money, journal, ownership, provenance or non-armour items.
+  // A weapon occupying a hand is deliberately not part of a clothing change.
+  if(!['carried','worn'].includes(item.slot))return item;
+  check(['carried','worn'].includes(target.slot),'Nesoulad cílového umístění zbroje.');
+  return {...item,slot:target.slot,gearStowage:target.gearStowage,
+   layerOrder:target.layerOrder,layerSlot:target.layerSlot,
+   bulkExceptionZones:structuredClone(target.bulkExceptionZones??[])};
+ });
+ for(const {id} of plan.preview.placements){
+  check(finalInventory.some(x=>x.id===id&&x.characterId===ownerId&&x.slot==='worn'),
+   'Některý vybraný článek nebyl správně oblečen.');
+ }
+ const changed=selectedChest.size>0||JSON.stringify(finalInventory)!==JSON.stringify(db.inventory);
+ return {...staged,inventory:finalInventory,plan,changed};
 }
