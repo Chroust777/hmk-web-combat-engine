@@ -5265,3 +5265,102 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 @media(max-width:780px){
  .content-sheet .journal-book--chapter .hsk-proof-columns{grid-template-columns:minmax(0,1fr)}
 }
+
+
+/* v93.551 — Inventory row striping: exactly the same subtle second-row
+   translucent wash as the Location armour table (styles.css, line 257).
+   Earlier inventory-specific transparent !important rows masked this.
+   Keep the parchment below visible and do not change error/warning states. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section
+.inv-ledger-table tbody tr:nth-child(odd) {
+  background:transparent!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section
+.inv-ledger-table tbody tr:nth-child(even) {
+  background:rgba(86,60,29,.05)!important;
+}
+/* Cell-level background in inventory intentionally remains transparent so the
+   evenly striped ROW can be seen through all eight columns, including item. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section
+.inv-ledger-table tbody tr > :is(th,td) {
+  background:transparent!important;
+  background-image:none!important;
+}
+/* Preserve explicitly signalled invalid/warning cells when a row has one. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section
+.inv-ledger-table :is(.error,.invalid,[aria-invalid="true"]) {
+  color:#9c2922!important;
+}
+
+/* v93.551 — A single book typography across the application's folios.
+   Change only font FAMILY on content; preserve font sizes, weight, number
+   colour, blue EML values, and the manuscript headings / alert semantics. */
+:root { --hmk-book-body-font: "Cormorant Garamond",Georgia,"Times New Roman",serif;
+        --hmk-book-title-font: "Cinzel",Georgia,serif; }
+.content-sheet .journal-book--chapter .folio-chapter-page .folio-chapter-content
+ :is(p,div,span,li,dt,dd,td,th,summary,label,small,em,strong,b,blockquote,fieldset) {
+  font-family:var(--hmk-book-body-font)!important;
+}
+/* Only title-like elements use the display face; explanatory headings in
+   Skills now match the rest of the book. */
+.content-sheet .journal-book--chapter .folio-chapter-page .folio-chapter-content
+ :is(h2,h3,h4,legend),
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-skill-rule-explainer h3 {
+  font-family:var(--hmk-book-title-font)!important;
+}
+/* Rules help and ENC / Bulk callouts formerly set a different Georgia face
+   with !important shorthands, so cover their descendants explicitly. */
+.content-sheet .journal-book--skills .folio-chapter-content
+ :is(.hsk-skill-rule-explainer,.hsk-rule-panel,.hsk-load-evidence,
+     .hsk-calculation,.hsk-eml-trace,.hsk-eml-chip,.hsk-eml-total)
+ :is(p,div,span,small,strong,b,em,li,summary),
+.content-sheet .journal-book--skills .folio-chapter-content
+ :is(.hsk-load-evidence,.hsk-skill-rule-explainer,.hsk-rule-panel) {
+  font-family:var(--hmk-book-body-font)!important;
+}
+/* EML number cells retain existing font size, weight and BLUE colour. */
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace
+ :is(.hsk-eml-chip,.hsk-eml-total,.hsk-negative,.hsk-positive,.hsk-zero) {
+  font-family:var(--hmk-book-body-font)!important;
+}
+/* Inventory action controls remain functional; item text and metadata use
+   the same face as the Location cells, while column labels remain Cinzel. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section
+.inv-ledger-table :is(.inv-select-row,.inv-item-name,.inv-item-kind,.inv-spec-details,.inv-spec-details summary) {
+  font-family:var(--hmk-book-body-font)!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section
+.inv-ledger-table thead th {
+  font-family:var(--hmk-book-title-font)!important;
+}
+/* Non-book surfaces (campaigns, character list, library, etc.) adopt the same
+   readable face on narrative text only. Do not touch mono code, die controls,
+   blue numbers or typography of interactive widgets. */
+main.content:not(.content-sheet) :is(p,li,dt,dd,table td,table tbody th,
+                                    summary,.muted,.tiny) {
+  font-family:var(--hmk-book-body-font)!important;
+}
+/* v93.551: high-specificity historical EML shorthand font declarations. */
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip :is(b,small),
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-total {
+  font-family:var(--hmk-book-body-font)!important;
+}
+/* Headings of Locations and item tables must be the same manuscript display font. */
+.content-sheet .journal-book--chapter .folio-chapter-page .folio-chapter-content
+ :is(.catalog-spec,.inv-ledger-table,.arm-layer-table,.hsk-table) thead th {
+  font-family:var(--hmk-book-title-font)!important;
+}
+/* User-entered labels and actions should not use a competing serif face. */
+.content-sheet .journal-book--chapter .folio-chapter-page .folio-chapter-content
+ :is(button,input,select,textarea) {
+  font-family:var(--hmk-book-body-font)!important;
+}
+/* Chapter-like archive / character overview pages which are not wrapped in the
+   newer chapter component get the same typography, without re-styling stats. */
+.content-sheet .journal-book:not(.journal-book--chapter)
+ :is(p,li,dt,dd,td,th,summary,label,small,em,blockquote) {
+  font-family:var(--hmk-book-body-font)!important;
+}
+.content-sheet .journal-book:not(.journal-book--chapter) :is(h2,h3,h4) {
+  font-family:var(--hmk-book-title-font)!important;
+}
