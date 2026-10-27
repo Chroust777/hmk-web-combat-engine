@@ -51,12 +51,11 @@ export function previewChestOutfit(db,{ownerId,location,mode}={}){
  const chest=db.inventory.filter(x=>x.characterId===ownerId&&x.slot==='chest'&&x.chestLocation===location);
  check(chest.length,'Na daném místě není žádné vybavení této postavy.');
  const inventory=db.inventory.map(x=>chest.includes(x)?{...x,slot:'carried'}:x);
- const preview=previewOptimalOutfit(inventory,ownerId,mode);
+ const ids=new Set(chest.map(x=>x.id));
+ const preview=previewOptimalOutfit(inventory,ownerId,mode,ids);
  if(!preview.ready)return {ready:false,reason:preview.reason};
  const chosen=new Set(preview.equipIds),retrieved=chest.filter(x=>chosen.has(x.id));
- // A true optimum may already be worn/carried. That is a valid mathematical
- // conclusion: do not force a worse chest article merely to use the chest.
- // The UI reports a no-op when there is no chest component to retrieve.
+ check(retrieved.length>0,'Nejlepší návrh z tohoto místa nepoužívá žádnou součást truhly.');
  return {ready:true,mode,location,preview,ids:retrieved.map(x=>x.id),names:retrieved.map(x=>x.snapshot.name),virtual:inventory};
 }
 export function applyChestOutfit(db,{ownerId,location,mode,confirmed=false,idFactory,createdAt}={}){
@@ -64,8 +63,8 @@ export function applyChestOutfit(db,{ownerId,location,mode,confirmed=false,idFac
  const plan=previewChestOutfit(db,{ownerId,location,mode});
  check(plan.ready,plan.reason||'Nedoložená sestava');
  const staged=applyInventoryBatch(db,{ownerId,itemIds:plan.ids,action:'retrieve',location,confirmed,idFactory,createdAt});
- const fresh=previewOptimalOutfit(staged.inventory,ownerId,mode);
+ const fresh=previewOptimalOutfit(staged.inventory,ownerId,mode,new Set(plan.ids));
  check(fresh.ready&&JSON.stringify(fresh)===JSON.stringify(plan.preview),'Po vyzvednutí už návrh neodpovídá původním článkům.');
- const inventory=applyOptimalOutfit(staged.inventory,ownerId,fresh);
+ const inventory=applyOptimalOutfit(staged.inventory,ownerId,fresh,new Set(plan.ids));
  return {...staged,inventory,plan};
 }
