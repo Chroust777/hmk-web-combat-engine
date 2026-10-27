@@ -7,6 +7,7 @@ import {commitExpeditionFatigue,expeditionRestRecovery,expeditionCombatState} fr
 import {trekRegisteredAnimalHealth} from './hmk-trekking-animal-health.js';
 import {validateAnimalWeariness,actualAnimalWeariness} from './hmk-trekking-animal-fatigue.js';
 import {animalDoubleTimeCutoff} from './hmk-trekking-animal-timeline.js';
+import {validateAnimalRestPlan,assertAnimalRestStillValid} from './hmk-trekking-animal-rest.js';
 const check=(ok,msg)=>{if(!ok)throw Error(msg);};
 const min=x=>Number.isSafeInteger(x)&&x>=0&&x<=1e9;
 const F='hmk-calendar-actor-activity-v1';
@@ -96,12 +97,38 @@ export function interruptHMKActivity({journal=[],clock,activityId,reason,id,crea
    (p.projectedShortTravel?' Orientační vzdálenost při nepřetržitém tempu '+p.projectedShortTravel.projectedLeagues+' leagues; skutečná trasa není automaticky potvrzena.':''),
   calendarActivityInterruptProof:p};
 }
+/** Animal travel is a real activity for the mount even if only human
+ * members own scheduled END rolls. Reserve its interval against animal rest. */
+function bookedAnimalIds(plan,journal){
+ if(plan?.animalRestPolicy)return [plan.animalRestPolicy.animalId];
+ if(plan?.kind!=='travel'||!plan?.trekSourceId)return [];
+ const trek=journal.find(j=>j.id===plan.trekSourceId)?.calendarTrekProof;
+ const ids=(trek?.partyModes?.animals??[]).filter(x=>x.health).map(x=>x.id);
+ return ids.length?ids:(plan.travelGroup?.animalWeariness??[]).map(x=>x.actorId);
+}
 export function scheduleHMKActivity({journal=[],clock,characterId,name='',kind,plan,id,origin='none'}={}){
  check(clock&&min(clock.minute)&&typeof characterId==='string'&&characterId&&typeof id==='string'&&id,'Činnost vyžaduje postavu, čas a jedinečné ID');
  check(plan&&min(plan.durationMinutes)&&plan.durationMinutes>0&&clock.minute+plan.durationMinutes<=1e9,'Neplatné trvání činnosti');
  check(!journal.some(row=>row.id===id),'Duplicitní identita činnosti');
  const campaignId=activeClockKey(clock),startMinute=clock.minute,endMinute=startMinute+plan.durationMinutes;
  const done=scheduledHMKCompletionIds(journal),stopped=interruptedHMKActivityIds(journal);
+ if(plan.animalRestPolicy){
+  validateAnimalRestPlan(plan,characterId);
+  check((clock.characterIds??[]).includes(characterId),
+   'Zvíře musí být v autoritativním seznamu členů této kampaně, jinak nelze měnit jeho Combat State.');
+ }
+ const occupiedAnimals=new Set(bookedAnimalIds(plan,journal));
+ for(const row of plannedHMKActivities(journal,campaignId)){
+  if(done.has(row.id)||stopped.has(row.id))continue;
+  const other=row.calendarActivityProof;
+  if(endMinute<=other.startMinute||startMinute>=other.endMinute)continue;
+  if(bookedAnimalIds(other.plan,journal).some(id=>occupiedAnimals.has(id))){
+   // Members of one shared travel group are NOT separate journeys.
+   const shared=plan.kind==='travel'&&other.plan.kind==='travel'&&
+    plan.travelGroup?.id&&plan.travelGroup.id===other.plan.travelGroup?.id;
+   check(shared,'Zvíře nelze zároveň nechat odpočívat a cestovat (ani dvakrát odpočívat).');
+  }
+ }
  // Only one pending activity per character can cover a given minute; other
  // characters remain independent and may sleep/travel in parallel.
  for(const row of plannedHMKActivities(journal,campaignId)){
@@ -231,6 +258,22 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
     'Zdravotní stav zvířete '+animal.id+' se během plánované hlídky změnil. GM musí cestu přerušit v čase události; nelze přiznat celou vzdálenost.');
   }
  }
+ // Full preflight before ANY state mutation: unhandled injury, weather,
+ // travel overlap or an invalid animal rest must not produce a half-completed batch.
+ for(const row of due){
+  const activity=row.calendarActivityProof;
+  if(!activity.plan.animalRestPolicy)continue;
+  const actor=database.characters.find(c=>c.id===activity.characterId);
+  check(actor,'Zvíře plánovaného odpočinku již není v registru.');
+  assertAnimalRestStillValid(activity.plan,actor);
+  const i=database.journal.findIndex(x=>x.id===row.id);
+  const collision=database.journal.slice(i+1).find(x=>x.characterId===actor.id&&
+   x.calendarCampaignId===campaignId&&Number.isSafeInteger(x.campaignMinute)&&
+   x.campaignMinute>=activity.startMinute&&x.campaignMinute<activity.endMinute&&
+   (x.combatProof||x.skillTestProof||x.calendarTrekProof||x.calendarTrekAnimalFatigueProof||
+    x.calendarWeatherProof||x.calendarExpeditionProof||x.calendarActivityInterruptProof));
+  check(!collision,'Zvíře během odpočinku podstoupilo jinou doloženou událost; GM musí přerušit odpočinek.');
+ }
  const completed=[];
  for(const row of due){
   const activity=row.calendarActivityProof;
@@ -261,6 +304,11 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
     claims:actor.hmk.expedition?.claims||{}});
   const proof=commitExpeditionFatigue(actor,plan,activity.endMinute,activity.origin,row.id);
   proof.activityId=row.id;
+  if(activity.plan.animalRestPolicy){
+   proof.animalRestProof={format:'hmk-calendar-animal-rest-completion-v1',
+    policy:structuredClone(activity.plan.animalRestPolicy),recovered:plan.recovered,
+    priorWeariness:proof.priorFatigue,finalWeariness:proof.finalFatigue};
+  }
   const result={id:idFactory(),characterId:actor.id,createdAt:stamp(),calendarCampaignId:campaignId,
    campaignMinute:activity.endMinute,title:'HMK · dokončeno · '+activity.kind+' · '+actor.name,
    body:'Dokončeno v minutě '+activity.endMinute+' na základě činnosti '+row.id+'. Změna únavy '+proof.delta+'.',
@@ -317,7 +365,7 @@ export function calendarActorActivities(clock,characters=[],journal=[]){
   const a=row.calendarActivityProof,finished=done.has(row.id),stop=interrupts.get(row.id),interrupted=!!stop,isStarted=a.startMinute<=clock.minute;
   const labels={winded:'Klid · 10 minut',rest:'Odpočinek · 4 hodiny',sleep:'Spánek · 8 hodin',travel:'Cesta'};
   return {id:'activity:'+row.id,sourceId:row.id,origin:'activity',kind:a.kind,
-   name:allowed.get(row.characterId),characterId:row.characterId,title:labels[a.kind]||'Činnost · '+a.kind,
+   name:allowed.get(row.characterId),characterId:row.characterId,title:a.plan.animalRestPolicy?'Zvíře · '+(labels[a.kind]||a.kind):labels[a.kind]||'Činnost · '+a.kind,
    description:'Činnost postavy',note:interrupted?'GM přerušil činnost v minutě '+stop.campaignMinute+' ('+stop.calendarActivityInterruptProof.reason+'); '+(stop.calendarActivityInterruptProof.partialTravel?'dokončený podíl cestovní únavy +'+stop.calendarActivityInterruptProof.partialTravel.accrual:'bez obnovy za neúplný odpočinek')+'.':finished?'Pravidlový výsledek byl dokončen a zapsán.':
     clock.minute>=a.endMinute?'Čas činnosti uplynul; pravidlový zápis musí proběhnout při potvrzeném posunu času GM (bez dalšího tlačítka).':isStarted?'Činnost probíhá. Účinek se zapíše teprve po uplynutí intervalu a posunu času GM.':'Naplánovaná činnost.',
    minute:a.startMinute,dueMinute:a.startMinute,endMinute:interrupted?Math.max(a.startMinute,stop.campaignMinute):a.endMinute,
@@ -364,6 +412,7 @@ export function validateHMKActivityEvidence(journal=[]){
   const a=row.calendarActivityProof;if(!a)continue;
   check(a.format===F&&a.id===row.id&&a.characterId===row.characterId&&min(a.startMinute)&&min(a.endMinute)&&a.endMinute>a.startMinute&&a.endMinute-a.startMinute===a.durationMinutes&&a.plan?.durationMinutes===a.durationMinutes&&row.campaignMinute===a.startMinute,
    'Poškozený časový interval činnosti');
+  if(a.plan.animalRestPolicy)validateAnimalRestPlan(a.plan,a.characterId);
   check(!ids.has(a.id),'Duplicitní činnost');ids.add(a.id);
  }
  // Audit every group as one atomic, time-synchronous watch. Never accept a
@@ -421,6 +470,21 @@ export function validateHMKActivityEvidence(journal=[]){
   check(grp.signature===signature&&!grp.members.has(a.characterId),'Nesoulad členů a časů skupinové cesty');
   grp.members.add(a.characterId);
  }
+ const planned=[...journal.filter(j=>j.calendarActivityProof)].map(j=>j.calendarActivityProof);
+ for(let i=0;i<planned.length;i++){
+  const a=planned[i];if(!a.plan.animalRestPolicy)continue;
+  for(let k=0;k<planned.length;k++){
+   if(i===k)continue;
+   const b=planned[k];if(a.startMinute>=b.endMinute||a.endMinute<=b.startMinute)continue;
+   if(a.characterId===b.characterId||bookedAnimalIds(b.plan,journal).includes(a.characterId)){
+    // A valid interruption may end either interval before the collision.
+    const endA=journal.find(j=>j.calendarActivityInterruptProof?.activityId===a.id)?.campaignMinute??a.endMinute;
+    const endB=journal.find(j=>j.calendarActivityInterruptProof?.activityId===b.id)?.campaignMinute??b.endMinute;
+    check(Math.min(a.endMinute,endA)<=b.startMinute||Math.min(b.endMinute,endB)<=a.startMinute,
+     'Uložený odpočinek zvířete se překrývá s jeho jinou činností.');
+   }
+  }
+ }
  for(const group of groups.values())check(group.members.size===group.expected.length&&
   group.expected.every(id=>group.members.has(id)), 'Skupinová cesta musí být uložena pro všechny vybrané postavy najednou');
  const stopped=new Set(),finished=new Set(),interruptRows=new Map();
@@ -455,6 +519,15 @@ export function validateHMKActivityEvidence(journal=[]){
     !stopped.has(p.activityId)&&a.endMinute===row.campaignMinute)&&
    (!a.plan.travelGroup||JSON.stringify(p.travelGroup)===JSON.stringify(a.plan.travelGroup)),
    'Výsledek činnosti nemá jednoznačný správný zdroj');
+  if(a.plan.animalRestPolicy){
+   const animal=p.animalRestProof;
+   check(animal?.format==='hmk-calendar-animal-rest-completion-v1'&&
+    JSON.stringify(animal.policy)===JSON.stringify(a.plan.animalRestPolicy)&&
+    animal.recovered===Math.max(0,-p.delta)&&animal.priorWeariness===p.priorFatigue&&
+    animal.finalWeariness===p.finalFatigue&&p.delta===-animal.recovered&&
+    p.durationMinutes===a.durationMinutes&&p.finalFatigue===Math.max(0,p.priorFatigue+p.delta),
+    'Zvířecí obnova nemá platný Combat State a pravidlový doklad.');
+  }
   finished.add(p.activityId);
  }
  // Each interrupted member of a group must attest the SAME animal

@@ -66,7 +66,13 @@ function renderAgendaEntry(p,esc,clock,events=[]){
 }
 export function calendarBoardEvents({clock,characters=[],journal=[]}={}){
  const agenda=campaignCalendarAgenda(clock,characters,journal),custom=gmCalendarAgenda(clock);
- const all=[...agenda.all.map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities([...calendarActorActivities(clock,characters,journal),...calendarNutritionConditionActivities(clock,characters,journal)]),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
+ // Animal recovery is a real calendar activity, but animals are NOT added
+ // to the human party roster or to nutrition / medical due calculations.
+ const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
+ const animalRestActors=journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarActivityProof?.plan?.animalRestPolicy)
+  .map(j=>({id:j.characterId,name:j.calendarActivityProof.name}));
+ const activitiesCharacters=[...characters,...animalRestActors.filter(a=>!characters.some(c=>c.id===a.id))];
+ const all=[...agenda.all.map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities([...calendarActorActivities(clock,activitiesCharacters,journal),...calendarNutritionConditionActivities(clock,characters,journal)]),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
  const receipts=calendarUIReceipts(journal,clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`);
  const visible=all.filter(p=>receipts.get(p.id)!=='hide').map(p=>({...p,uiAcknowledged:receipts.get(p.id)==='acknowledge'}));
  visible.sort((a,b)=>a.dueMinute-b.dueMinute||a.id.localeCompare(b.id));
