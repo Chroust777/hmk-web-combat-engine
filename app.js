@@ -261,7 +261,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.542';
+const APP_VERSION='93.543';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2770,6 +2770,132 @@ function journalConvocationsHTML(c){
  const pvar=projection.find(x=>x.name==='Pvârism');
  return `<section class="journal-book-section journal-convocations"><div class="journal-book-title">Convocation ML</div>${primary?`<p class="journal-minor">Primary: ${esc(primary)}${pvar&&Number.isFinite(pvar.ml)?` · Pvârism ${pvar.ml}`:''}</p>`:''}<div class="journal-convocation-list">${rows.map(([name,value])=>`<div><span>${esc(name)}${name===primary?' ★':''}</span><strong>${esc(value)}</strong></div>`).join('')}</div>${rows.every(x=>x[1]==='—')?'<p class="journal-minor">ML není v profilu samostatně evidováno; Pvârism ML nelze automaticky vydávat za ML jednotlivých convocations.</p>':''}</section>`;
 }
+/** v93.543: read-only projection from the currently selected character and GM
+ * calendar. Do not persist the prose, create dice, or infer a date of cure. */
+function chronicleRemainingTime(minutes){
+ if(!Number.isSafeInteger(minutes))return 'čas nelze doložit';
+ if(minutes<=0)return 'termín právě nastal nebo již uplynul';
+ const d=Math.floor(minutes/1440),h=Math.floor(minutes%1440/60),m=minutes%60;
+ return [d?d+' d':null,h?h+' h':null,m?m+' min':null].filter(Boolean).join(' ')||'méně než minutu';
+}
+function journalChronicleStatusHTML(c,state){
+ const clock=data.campaignClock;
+ const inCampaign=!!clock&&calendarMemberIds(clock,data.characters).some(x=>x.id===c.id);
+ const now=inCampaign&&Number.isSafeInteger(clock.minute)?clock.minute:null;
+ const lines=[];
+ const wounds=(state.wounds||[]).filter(w=>!w.healed);
+ const status=String(state.shock||'NONE');
+ const pos=state.posture||{};
+ const death=state.death;
+ const rawCause=death&&typeof death==='object'?death.cause||death.reason||death.description:null;
+ // Combat State records the death transition in its immutable event trail.
+ // Derive a cause only from a named, confirmed KIA-producing event; otherwise
+ // explicitly say that the cause is not documented. Never infer from wounds.
+ const fatal=(state.events||[]).slice().reverse().find(e=>e?.details&&(
+  e.details.dead===true||e.details.shock==='KIA'||e.details.after==='KIA'||
+  e.details.amputation?.dead===true));
+ const fatalCause=(()=>{
+  if(typeof rawCause==='string'&&rawCause.trim())return rawCause.trim();
+  if(!fatal)return null;
+  const d=fatal.details||{};
+  if(fatal.type==='extended-shock-course')return 'selhání Extended Shock při doloženém Course Roll';
+  if(fatal.type==='coma-course')return 'úmrtí během doloženého Coma Course';
+  if(fatal.type==='confirmed-hit'&&d.amputation?.dead)return 'smrtelný následek amputace po zásahu'+(d.location?' v oblasti '+d.location:'');
+  if(fatal.type==='confirmed-hit')return 'smrtelný následek zásahu'+(d.location?' v oblasti '+d.location:'');
+  if(fatal.type==='blood-loss-advance')return 'následky krvácení potvrzené Blood Loss Advance';
+  return typeof d.reason==='string'&&d.reason.trim()?d.reason.trim():null;
+ })();
+ if(status==='KIA'){
+  lines.push('Postava je mrtvá. '+(fatalCause?'Doložená příčina: '+fatalCause+'.':'Příčina smrti není v aktuálním zdravotním záznamu výslovně doložena.'));
+ }else{
+  if(state.coma?.active)lines.push('Postava je v kómatu a nemůže vykonávat běžné činnosti.');
+  else if(state.extendedShock)lines.push('Postava je v prodlouženém šoku a není schopna běžné činnosti.');
+  else if(status==='UNC'||state.unconscious)lines.push('Postava je v bezvědomí a není schopna jednat ani se samostatně pohybovat.');
+  else if(status==='INC')lines.push('Postava je vyřazena šokem (incapacitated) a nemůže běžně jednat.');
+  else if(status==='STN')lines.push('Postava je omráčená (stunned); její jednání omezuje Shock Sequence.');
+  if(pos.prone)lines.push('Postava leží na zemi (prone); vstávání vyžaduje příslušný postup.');
+  if(pos.passNextTurn)lines.push('Postava musí vynechat následující tah.');
+  if((state.toxinCourses||[]).some(t=>['incubating','active'].includes(t.status)))
+   lines.push('Postava má aktivní otravu nebo čeká na nástup jedu; další testy určuje doložený Poison Course.');
+  if((state.diseaseCourses||[]).some(t=>['pending-profile','incubating','active'].includes(t.status)))
+   lines.push('Postava má probíhající nemoc; další účinky určuje Disease Course.');
+  if(state.sleepDeprivation?.status==='awake')lines.push('Postava trpí nedostatkem spánku; sledujte povinné Endurance testy.');
+  if(wounds.length){
+   const name=w=>[String(w.location||'neurčená oblast').toUpperCase(),w.side?String(w.side):null,
+    w.severity&&w.level?String(w.severity)+String(w.level):null].filter(Boolean).join(' ');
+   lines.push('Postava je zraněná: '+wounds.slice(0,5).map(name).join(', ')+(wounds.length>5?' a dalších '+(wounds.length-5)+' ran':'')+'.');
+   if(wounds.some(w=>w.bleeding))lines.push('Probíhá krvácení a je nutné dokončit Blood Stoppage / Blood Loss.');
+   if(wounds.some(w=>w.healing?.infected))lines.push('Aktivní infekce pozastavuje běžné Healing Rolls.');
+   else if(wounds.some(w=>!w.healing||!w.healing.treated))lines.push('Některé rány čekají na rozhodnutí o Treatment.');
+  }
+  if(!wounds.length&&status==='NONE'&&!state.coma?.active&&!state.extendedShock&&!pos.prone&&!pos.passNextTurn&&
+   !(state.toxinCourses||[]).some(t=>['incubating','active'].includes(t.status))&&
+   !(state.diseaseCourses||[]).some(t=>['pending-profile','incubating','active'].includes(t.status))&&
+   state.sleepDeprivation?.status!=='awake')
+   lines.push('Postava je podle aktuálně doloženého Combat State schopna běžných činností.');
+  if(inCampaign){
+   const activities=activeHMKActivities(data.journal,clock).filter(row=>row.characterId===c.id);
+   if(activities.length){
+    const readable={rest:'odpočívá',sleep:'spí',travel:'cestuje'};
+    for(const row of activities.slice(0,3)){
+     const a=row.calendarActivityProof||{};
+     const word=readable[a.kind]||'provádí činnost '+String(a.kind||'');
+     if(now!==null&&Number.isSafeInteger(a.startMinute)&&a.startMinute>now){
+      lines.push('Postava má naplánovanou činnost '+String(a.kind||'')+' od '+displayCampaignMinute(a.startMinute)+
+       ' (za '+chronicleRemainingTime(a.startMinute-now)+').');
+     }else{
+      lines.push('Postava '+word+'. '+(Number.isSafeInteger(a.endMinute)&&now!==null?
+       'Plánovaný konec za '+chronicleRemainingTime(a.endMinute-now)+' ('+displayCampaignMinute(a.endMinute)+').':
+       'Termín není bezpečně doložen.'));
+     }
+    }
+   }
+   // Agenda is derived by the same healing/calendar engine used by the GM.
+   // Its deadline is the next ROLL, never a guessed total time until healing.
+   try{
+    const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
+    const relevant=(agenda.all||[]).filter(x=>x.characterId===c.id&&
+     ['healing','infection','grim','extended-shock','coma','blood-loss','treatment'].includes(x.kind)&&Number.isSafeInteger(x.minute))
+     .sort((a,b)=>a.minute-b.minute);
+    if(relevant.length){const e=relevant[0];lines.push('Další zdravotní kontrola ('+e.description+') '+
+     chronicleRemainingTime(e.minute-now)+'; '+displayCampaignMinute(e.minute)+'.');}
+    else if(wounds.length)lines.push('Přesnou zbývající dobu do úplného zhojení nelze bez dalších skutečných Healing Rolls určit.');
+    const missing=(agenda.unknown||[]).filter(x=>x.characterId===c.id&&
+      ['healing','infection','grim','extended-shock','coma','treatment','bleeding'].includes(x.kind));
+    if(missing.length)lines.push('Kalendář čeká na doložení termínu: '+missing.slice(0,2).map(x=>x.description||x.reason||x.kind).join('; ')+'.');
+   }catch(_err){lines.push('Časové zdravotní povinnosti zatím nelze ověřit z kalendáře.');}
+  }else if(wounds.length||state.extendedShock||state.coma?.active)
+   lines.push('Postava nemá doložený čas v aktivním kalendáři; délku léčení nelze odhadnout.');
+ }
+ return `<section class="journal-book-section journal-current-state" aria-live="polite" data-chronicle-character-status>
+ <div class="journal-book-title">Aktuální stav postavy</div>
+ <div class="journal-current-state__text">${lines.map(t=>`<p>${esc(t)}</p>`).join('')}</div>
+ <p class="journal-current-state__timestamp">${now===null?'Bez potvrzené časové osy v aktivní kampani':'Stav k '+esc(displayCampaignMinute(now))} · pouze doložené údaje</p>
+ </section>`;
+}
+/** One classification function for personal and GM histories. Classification is
+ * display-only: the original journal evidence remains untouched and immutable. */
+const JOURNAL_HISTORY_CATEGORIES=Object.freeze([
+ ['skills','Skill Tests a návaznosti'],['health','Boj, zranění a léčení'],
+ ['equipment','Předměty a inventář'],['calendar','Kalendář, události a činnosti'],
+ ['finance','Mince, nákupy a prodeje'],['notes','Osobní poznámky'],['other','Ostatní události']]);
+function journalHistoryCategory(entry){
+ const j=entry||{},title=String(j.title||'').toLocaleLowerCase('cs');
+ if(j.skillTestProof)return 'skills';
+ if(j.combatProof||/shock|treatment|healing|wound|injur|zraněn|léčen|krvác|coma|infection|chirurg/.test(title))return 'health';
+ if(j.origin==='cash'||j.cashReceipt||j.calendarCashProof||/mince|hotovost|nákup|prodej|platba/.test(title))return 'finance';
+ if(j.calendarInventoryDisposition||j.calendarChestTransfer||j.calendarInventoryRationTransfer||j.calendarInventoryWaterTransfer||j.calendarInventoryWaterFill||j.calendarInventoryRationLoss||j.calendarInventoryWaterLoss||j.calendarInventoryRationStock||j.calendarInventoryWaterUse||j.calendarInventoryWaterLoss||/inventář|předmět|truhlic|vybavení|přesun/.test(title))return 'equipment';
+ if(j.origin==='calendar-clock'||j.calendarActivityProof||j.calendarActivityInterruptProof||j.calendarExpeditionProof||j.calendarTrekProof||j.calendarGMTestPlanId||Object.keys(j).some(k=>k.startsWith('calendar')&&!['calendarCampaignId','calendarMinute'].includes(k)))return 'calendar';
+ if(isPersonalNote(j)||(j.origin==='journal'&&isPersonalNote(Object.fromEntries(Object.entries(j).filter(([key])=>key!=='origin')))))return 'notes';
+ return 'other';
+}
+function journalCategorySections(entries,renderer,{limit=25,detailsClass='journal-history-category'}={}){
+ return JOURNAL_HISTORY_CATEGORIES.map(([kind,label])=>{
+  const records=entries.filter(j=>journalHistoryCategory(j)===kind);
+  if(!records.length)return '';
+  return `<details class="${detailsClass}" data-history-kind="${kind}" open><summary>${esc(label)} <span>(${records.length})</span></summary><div class="journal-history-category__content">${renderer(records.slice(0,limit))}${records.length>limit?`<details class="journal-history-category__archive"><summary>Starší záznamy (${records.length-limit})</summary>${renderer(records.slice(limit))}</details>`:''}</div></details>`;
+ }).join('');
+}
 function journalConditionDetailsHTML(c,state,load){
  const h=c.hmk||{},fat=combatFatigueTotals(state),impact=[...(state.events||[])].reverse().find(x=>x.type==='confirmed-hit');
  const d=impact?.details||{};
@@ -3044,7 +3170,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.unconscious?'Yes':'No'],['Death Save',state.death?'Pending':'—']];
  const conditionRows=[['Poisoned',state.poisoned?'Yes':'No'],['Diseased',state.diseased?'Yes':'No'],['Cursed',state.cursed?'Yes':'No'],['Winded',state.winded?'Yes':'No'],['Weary',state.weary?'Yes':'No'],['Fatigued',combatFatigueTotals(state).total]];
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -3214,8 +3340,8 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  const visible=visibleLogbookEntries(logs,hidden);
  const removed=logs.filter(l=>hidden.has(l.id));
  const renderLog=l=>`<div class="list-row journal-log-row journal-log-row--slim" data-journal-entry="${esc(l.id)}"><div class="journal-log-one-line"><b title="${esc(visibleEvidenceText(l.title))}">${esc(visibleEvidenceText(l.title))}</b><span class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</span></div><div class="actions journal-log-small-actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}" title="Upravit poznámku">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}" title="Smazat poznámku">Smazat</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Skrýt ze seznamu; pravidlový doklad se nemaže">Skrýt</button>`}</div><details class="journal-log-expand"><summary>Obsah záznamu</summary>${l.skillTestProof?skillTestEvidenceHTML(l,esc):`<p>${esc(visibleEvidenceText(l.body)).replace(/\n/g,'<br>')}</p>`}</details></div>`;
- const recent=visible.slice(0,10).map(renderLog).join('');
- const archived=visible.length>10?`<details class="journal-log-archive"><summary>Archiv · ${czCount(visible.length-10,'starší záznam','starší záznamy','starších záznamů')}</summary><div class="journal-log-archive-content">${visible.slice(10).map(renderLog).join('')}</div></details>`:'';
+ const recent=journalCategorySections(visible,rows=>rows.map(renderLog).join(''),{limit:15});
+ const archived='';
  const hiddenRecords=removed.length?`<details class="journal-log-archive journal-hidden-records"><summary>Skryté položky · ${removed.length} (obnovitelné)</summary>${removed.map(l=>`<div class="list-row"><span>${esc(l.title)}</span><button class="secondary" type="button" data-restore-log="${esc(l.id)}">Vrátit do logu</button></div>`).join('')}</details>`:'';
  return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><button type="button" class="secondary" data-nav="gmhistory">▤ Společná historie GM ↗</button><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${recent}${archived}${hiddenRecords}</section>${auditPanel}</div></section>`,`journal-book--chapter`)}
  return '';
@@ -3744,7 +3870,7 @@ function gmHistoryView(){
  };
  const table=rows=>`<div class="hc-provision-table-scroll"><table class="hc-provision-table gm-history-table"><thead><tr><th>Čas</th><th>Postava</th><th>Událost</th><th>Otevřít</th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>`;
  return journalChapterShell('GM · Historie činností',`${czCount(entries.length,'doložený záznam','doložené záznamy','doložených záznamů')} postav a kampaní`,
- `<section class="panel"><h3>Společný přehled skutečných událostí</h3><p class="muted">Zobrazuje původní deníkové doklady, finanční historii a potvrzené posuny času z autoritativního kalendáře. Nevytváří duplicitní herní záznamy. „Osobní záznam“ otevře konkrétní položku v Notes & Logbook; „Procedura“ je dostupná jen u rozpoznaného původního pravidlového záznamu.</p>${table(entries.slice(0,30))}${entries.length>30?`<details><summary>Starší události · ${entries.length-30}</summary>${table(entries.slice(30))}</details>`:''}</section>`,'journal-book--gm-history');
+ `<section class="panel"><h3>Společný přehled skutečných událostí</h3><p class="muted">Zobrazuje původní deníkové doklady, finanční historii a potvrzené posuny času z autoritativního kalendáře. Nevytváří duplicitní herní záznamy. „Osobní záznam“ otevře konkrétní položku v Notes & Logbook; „Procedura“ je dostupná jen u rozpoznaného původního pravidlového záznamu.</p>${journalCategorySections(entries,table,{limit:30,detailsClass:'gm-history-category'})}</section>`,'journal-book--gm-history');
 }
 function trashView(){return journalChapterShell('Archiv postav','Archivované profily zůstávají zachované spolu s inventářem a historií.',`<section class="panel folio-archive-list"><h3>Archivované postavy</h3><p class="muted">Obnovení postavu vrátí do registru. Trvalé smazání vyžaduje samostatné potvrzení.</p>${data.trash.length?data.trash.map(c=>`<div class="folio-archive-row"><div class="folio-archive-identity"><b>${esc(c.name)}</b><span>${esc(c.occupation||'Bez povolání')}</span></div><div class="actions folio-archive-actions"><button data-restore="${esc(c.id)}">Obnovit</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-purge="${esc(c.id)}">Definitivně smazat</button></div></div>`).join(''):'<div class="empty">Archiv je prázdný.</div>'}</section><section class="panel folio-archive-info"><h3>Evidence archivu</h3><dl class="folio-archive-metrics"><div><dt>Archivované postavy</dt><dd>${data.trash.length}</dd></div><div><dt>Aktivní postavy</dt><dd>${data.characters.length}</dd></div></dl><p class="muted">Archivace nepřepisuje deník ani inventář postavy. Obnovení ji vrátí do registru.</p><button type="button" class="secondary" data-nav="characters">Otevřít registr postav</button></section>`,'journal-book--archive')}
 function readinessReport(c){

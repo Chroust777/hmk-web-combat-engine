@@ -5097,3 +5097,21 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .hsk-required-invalid-label, .editor-dialog .hsk-required-invalid-label {
  background:rgba(210,61,46,.12)!important;box-shadow:inset 3px 0 #ae3425!important;
 }
+
+/* v93.543 — Chronicle status fits the height of Family & Links on the left.
+   The underlying folio parchment remains unchanged. */
+.content-sheet .journal-book--overview .journal-left-mid{align-items:stretch!important}
+.content-sheet .journal-book--overview .journal-traits-status-column{display:flex;flex-direction:column;gap:3px;min-width:0;min-height:100%}
+.content-sheet .journal-book--overview .journal-traits-status-column>.journal-book-section{margin:0!important}
+.content-sheet .journal-book--overview .journal-current-state{flex:1 1 auto;min-height:120px;padding-bottom:8px!important}
+.content-sheet .journal-book--overview .journal-current-state__text{padding:2px 3px 4px;font:12px/1.36 Georgia,serif;color:#362819}
+.content-sheet .journal-book--overview .journal-current-state__text p{margin:0 0 7px;overflow-wrap:break-word}
+.content-sheet .journal-book--overview .journal-current-state__timestamp{border-top:1px solid rgba(137,94,45,.27);padding:5px 3px 1px;margin-top:auto;color:#715235;font:10px/1.3 Georgia,serif}
+/* Histories: meaningful collapsible groups, no duplicate source records. */
+.content-sheet .journal-book--chapter :is(.journal-history-category,.gm-history-category){display:block;margin:8px 0;border:1px solid rgba(137,94,45,.43);background:rgba(251,242,222,.28);min-width:0}
+.content-sheet .journal-book--chapter :is(.journal-history-category,.gm-history-category)>summary{cursor:pointer;padding:9px 10px;background:rgba(174,131,70,.17);font:700 13px/1.25 Georgia,serif;color:#583316}
+.content-sheet .journal-book--chapter :is(.journal-history-category,.gm-history-category)>summary span{font-size:11px;font-weight:normal;color:#795d3b}
+.content-sheet .journal-book--chapter .journal-history-category__content{padding:5px 7px 8px;min-width:0}
+.content-sheet .journal-book--chapter .journal-history-category__archive{margin:6px 0;padding:4px;border-top:1px solid rgba(137,94,45,.25)}
+.content-sheet .journal-book--chapter .journal-history-category__archive>summary{cursor:pointer;font-size:12px;color:#6d4d32}
+.content-sheet .journal-book--chapter .gm-history-category .hc-provision-table-scroll{max-width:100%;overflow-x:auto}
