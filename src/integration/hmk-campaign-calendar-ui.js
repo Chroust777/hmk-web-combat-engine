@@ -1,4 +1,5 @@
 import {TR_MONTHS,campaignTRDate,formatTRDate,gmCalendarAgenda,campaignSunsignForDate} from './hmk-calendar-planner.js';
+import {isCompletedSkillTest,skillTestEvidenceHTML} from './hmk-skill-result-evidence-529.js';
 import {calendarEventDestination} from './hmk-calendar-event-routing.js';
 import {displayCampaignMinute,campaignCalendarAgenda} from './hmk-campaign-calendar.js';
 import {passiveHMKCalendarMilestones} from './hmk-calendar-campaign-lifecycle.js';
@@ -53,15 +54,23 @@ function issueAction(p,esc){
  return `${route}${marks}`;
 }
 
-function renderAgendaEntry(p,esc,clock,events=[]){
+function renderAgendaEntry(p,esc,clock,events=[],journal=[]){
  const who=p.name||p.place||'Svět',due=esc(displayCampaignMinute(p.dueMinute));
  const note=p.origin==='gm'?(p.note||p.resolution?.note||''):'',label=shortEventName(p);
  const details=[note].filter(Boolean).join(' · ');
  const overlaps=calendarEventOverlaps(events,p);
  const overlapNotice=overlaps.length?`<div class="hc-calendar-overlap" title="${esc(overlaps.map(x=>(x.name?x.name+' · ':'')+eventName(x)).join('; '))}">↔ Časový překryv: ${esc(overlaps.length)} ${overlaps.length===1?'činnost':overlaps.length<5?'činnosti':'činností'} (${esc(overlaps.slice(0,2).map(x=>eventName(x)).join(', '))})</div>`:'';
+ // Calendar history uses the original Skill Test receipt, never a copy.
+ // An explicit GM plan shows the receipt inside the original appointment.
+ const skillReceipts=p.origin==='history'&&p.kind==='skill-result'
+  ?journal.filter(j=>j.id===p.sourceId&&isCompletedSkillTest(j))
+  :p.origin==='gm'
+  ?journal.filter(j=>j.calendarGMTestPlanId===p.id&&j.characterId===p.characterId&&isCompletedSkillTest(j))
+  :[];
+ const skillDetails=skillReceipts.map(j=>skillTestEvidenceHTML(j,esc)).join('');
  return `<article class="hc-entry hc-entry--compact ${['skill-fall','skill-critical','skill-injury'].includes(p.kind)?'hc-entry--rule-detail':''} ${p.status==='due'?'hc-entry--due':''} ${['resolved','cancelled'].includes(p.status)?'hc-entry--done':''}" ${details?`title="${esc(details)}"`:''}>
  <div class="hc-event-line"><strong class="hc-event-person">${esc(who)}</strong><time>${due}</time><span class="hc-status hc-status--${esc(p.status)}">${esc(eventStatus(p))}</span></div>
- <div class="hc-event-line hc-event-line--task"><span class="hc-event-description">${esc(label)}${p.uiAcknowledged?' · ✓ zkontrolováno GM':''}</span><span class="hc-actions">${issueAction(p,esc)}</span></div>${overlapNotice}
+ <div class="hc-event-line hc-event-line--task"><span class="hc-event-description">${esc(label)}${p.uiAcknowledged?' · ✓ zkontrolováno GM':''}</span><span class="hc-actions">${issueAction(p,esc)}</span></div>${overlapNotice}${skillDetails}
  </article>`;
 }
 export function calendarBoardEvents({clock,characters=[],journal=[]}={}){
@@ -97,9 +106,9 @@ export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,esc
  const upcoming=all.filter(p=>inWeek(p)&&!actionable.includes(p)&&p.origin!=='history'&&p.origin!=='passive'&&
   !['resolved','cancelled'].includes(p.status));
  const weeklyUnknown=agenda.unknown;
- const compactWeek=(rows,label)=>`<div class="hc-week-list">${rows.map(p=>renderAgendaEntry(p,esc,clock,all)).join('')||`<p>Žádné ${label}.</p>`}</div>`;
+ const compactWeek=(rows,label)=>`<div class="hc-week-list">${rows.map(p=>renderAgendaEntry(p,esc,clock,all,journal)).join('')||`<p>Žádné ${label}.</p>`}</div>`;
  const activeRest=all.filter(p=>p.origin==='activity'&&p.status==='active'&&p.endMinute>clock.minute);
- const restOverview=activeRest.length?`<section class="hc-calendar hc-active-actors"><h3>Právě probíhající činnosti · ${activeRest.length}</h3><p class="hc-hint">✓ znamená pouze kontrolu záznamu GM. × skutečně přeruší probíhající činnost podle jejího původního pravidlového mechanismu; nedokončené účinky se nepřiznají.</p><div class="hc-event-list">${activeRest.map(p=>renderAgendaEntry(p,esc,clock,all)).join('')}</div></section>`:'';
+ const restOverview=activeRest.length?`<section class="hc-calendar hc-active-actors"><h3>Právě probíhající činnosti · ${activeRest.length}</h3><p class="hc-hint">✓ znamená pouze kontrolu záznamu GM. × skutečně přeruší probíhající činnost podle jejího původního pravidlového mechanismu; nedokončené účinky se nepřiznají.</p><div class="hc-event-list">${activeRest.map(p=>renderAgendaEntry(p,esc,clock,all,journal)).join('')}</div></section>`:'';
  const badges=`<section class="hc-calendar hc-weekly"><h3>Přehled na 7 dní</h3><p class="hc-hint">${esc(displayCampaignMinute(clock.minute))} – ${esc(displayCampaignMinute(weekEnd))} · jen rozhodnutí GM, události světa a otevřené povinnosti</p>
  <div class="hc-week-tabs"><details open><summary>K vyřízení · ${actionable.length}</summary>${compactWeek(actionable,'splatné povinnosti')}</details><details><summary>Plánované události a činnosti · ${upcoming.length}</summary>${compactWeek(upcoming,'další termíny')}</details>${weeklyUnknown.length?`<details><summary>Vyžaduje upřesnění · ${weeklyUnknown.length}</summary>${weeklyUnknown.map(x=>`<p class="hc-warning">${esc(x.name)} · ${esc(x.description)} — ${esc(x.reason)}</p>`).join('')}</details>`:''}</div></section>`;
  const title=''; // The dated grid already carries the month and campaign time.
@@ -135,11 +144,22 @@ export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,esc
   const hourlyActors=activeThisHour.length?`<div class="hc-continuing hc-active-actors"><strong>Činnost postav v této hodině:</strong> ${activeThisHour.map(x=>`${esc(x.name)} · ${esc(eventName(x))} (${esc(displayCampaignMinute(x.minute))}–${esc(displayCampaignMinute(x.endMinute))})`).join(' · ')}</div>`:'';
   const byMinute=Array.from({length:60},(_,m)=>{
    const at=(selected-1)*1440+ui.hour*60+m, entries=minuteIndex.get(at)||[],now=at===clock.minute;
-   return `<div class="hc-minute ${now?'hc-minute--now':''}" id="hc-minute-${at}"><div class="hc-minute-commands"><button type="button" class="hc-minute-time" data-cal-prefill="${at}" title="Naplánovat událost na tuto minutu">${pad(ui.hour)}:${pad(m)} ${now?'◀ NYNÍ':'+'}</button>${at>clock.minute?`<button type="button" class="hc-minute-jump" data-cal-set-time="${at}" title="Posunout čas kampaně na ${pad(ui.hour)}:${pad(m)}">▶ Nastavit čas</button>`:''}</div><div class="hc-minute-events">${entries.length?entries.map(p=>renderAgendaEntry(p,esc,clock,all)).join(''):'<span class="hc-muted-tick">·</span>'}</div></div>`;
+   return `<div class="hc-minute ${now?'hc-minute--now':''}" id="hc-minute-${at}"><div class="hc-minute-commands"><button type="button" class="hc-minute-time" data-cal-prefill="${at}" title="Naplánovat událost na tuto minutu">${pad(ui.hour)}:${pad(m)} ${now?'◀ NYNÍ':'+'}</button>${at>clock.minute?`<button type="button" class="hc-minute-jump" data-cal-set-time="${at}" title="Posunout čas kampaně na ${pad(ui.hour)}:${pad(m)}">▶ Nastavit čas</button>`:''}</div><div class="hc-minute-events">${entries.length?entries.map(p=>renderAgendaEntry(p,esc,clock,all,journal)).join(''):'<span class="hc-muted-tick">·</span>'}</div></div>`;
   }).join('');
   visualization=`<section class="hc-calendar"><div class="hc-month-bar"><button type="button" class="hc-small" data-cal-action="month">‹ Zpět na měsíce</button><h3>${esc(dayLabel(clock,selected))}</h3><button type="button" class="hc-small" data-cal-action="today">Aktuální den</button></div>${continuing.length?`<div class="hc-continuing"><strong>Činnosti postav a probíhající vícedenní události:</strong> ${continuing.map(x=>`${esc(x.title)} (${esc(displayCampaignMinute(x.minute))}–${esc(displayCampaignMinute(x.endMinute))})`).join(' · ')}</div>`:''}<div class="hc-hours" aria-label="Hodiny dne">${hours}</div>
    <h4>Časová osa ${pad(ui.hour)}:00–${pad(ui.hour)}:59 · přesnost 1 minuta</h4>${hourlyActors}<div class="hc-minutes" role="region" aria-label="Minuty ${pad(ui.hour)}. hodiny">${byMinute}</div><p class="hc-hint">Vyberte hodinu a konkrétní minutu. „+“ připraví událost GM. Tlačítko „Nastavit čas“ posune autoritativní čas kampaně na tuto minutu, pouze dopředu a po kontrole nevyřešených HMK termínů. Minulé dny a vyhodnocené případy zůstávají čitelné.</p></section>`;
  }
+ const verifiedSkillRows=journal.filter(j=>isCompletedSkillTest(j)&&j.calendarCampaignId=== (clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`)&&
+  Number.isSafeInteger(j.campaignMinute)&&j.campaignMinute<=clock.minute)
+  .sort((a,b)=>b.campaignMinute-a.campaignMinute||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+ // A planned GM skill event carries its result directly in renderAgendaEntry.
+ // Unplanned/standalone rolls still need a dated home on the calendar.
+ const independentSkillRows=verifiedSkillRows.filter(j=>!j.calendarGMTestPlanId||
+  !clock.plans?.some(p=>p.id===j.calendarGMTestPlanId));
+ const skillHistory=independentSkillRows.length?`<details class="hc-calendar hc-skill-history"><summary>Doložené výsledky Skill Tests v kalendáři · ${independentSkillRows.length}</summary>
+  <p class="hc-hint">Původní výsledky z osobních deníků, se skutečným časem GM; žádný hod ani zdravotní následek se zde neopakuje.</p>
+  ${independentSkillRows.map(j=>`<article class="hc-entry hc-entry--done"><p><strong>${esc(characters.find(c=>c.id===j.characterId)?.name||'Postava')}</strong> · <time>${esc(displayCampaignMinute(j.campaignMinute))}</time></p>${skillTestEvidenceHTML(j,esc)}</article>`).join('')}
+ </details>`:'';
  const scheduleAt=ui.prefillMinute??Math.max(clock.minute,(selected-1)*1440+ui.hour*60),planDay=dayNumber(scheduleAt),planHour=Math.floor(scheduleAt%1440/60),planMinute=scheduleAt%60;
  const charOptions=[['','— Celá kampaň —'],...characters.map(c=>[esc(c.id),esc(c.name)])];
  const create=`<section class="hc-calendar hc-planner" id="hc-planner"><h3>Přidat událost GM</h3><p>Trvání zahrnuje začátek a konec intervalu. Volbou „vyžaduje vyřízení“ zabráníte přeskočení termínu bez potvrzení GM.</p>
@@ -147,6 +167,6 @@ export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,esc
   <label>Den kampaně<input name="day" required type="number" min="1" max="694444" value="${planDay}"></label><label>Hodina<input name="hour" required type="number" min="0" max="23" value="${planHour}"></label><label>Minuta<input name="minute" required type="number" min="0" max="59" value="${planMinute}"></label><label>Trvání · dny<input name="durationDays" type="number" min="0" max="10000" value="0"></label><label>Trvání · hodiny<input name="durationHours" type="number" min="0" max="23" value="0"></label><label>Trvání · minuty<input name="durationMinutes" type="number" min="0" max="59" value="0"></label><label>Požadovaný okamžik řešení<select name="trigger">${opts([['start','Na začátku'],['end','Na konci trvání']],'start')}</select></label></div>
   <label>Dovednost k předvyplnění (pouze pro Skill Tests a jednu postavu)<select name="skill"><option value="">— bez předvolby —</option></select></label>
   <label>Popis / instrukce / podmínky<textarea name="note" maxlength="2000" rows="3" placeholder="Co musí GM nebo hráč udělat…"></textarea></label><label class="hc-check"><input type="checkbox" name="requiresAction" value="yes"> Vyžaduje rozhodnutí / upozornění: nelze přeskočit termín</label><label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje plánovanou událost</label><button type="submit">Zapsat událost na časovou osu</button></form></section>`;
- return `${title}${restOverview}${badges}${visualization}<section class="hc-calendar hc-time-control"><h3>Řízení času kampaně</h3><p class="hc-hint">Čas lze nastavit přímo v jednotlivé minutě zvoleného dne tlačítkem „▶ Nastavit čas“. Již potvrzené minuty nelze vrátit zpět.</p><form id="campaign-quick-advance-form" class="hc-inline"><label>Posun o<select name="deltaMinutes">${opts([[1,'1 minutu'],[5,'5 minut'],[10,'10 minut'],[30,'30 minut'],[60,'1 hodinu'],[240,'4 hodiny'],[1440,'1 den'],[7200,'5 dní']],1)}</select></label><label>Důvod<input name="reason" maxlength="400" required value="Plynutí času ve hře"></label><button type="submit">Nastavit čas ›</button></form><p class="hc-hint">Není možné přeskočit nevyřízený doložený HMK termín ani závaznou událost GM. Každé splatné pravidlové vyhodnocení otevře původní pravidlový průvodce; nikdy nepoužívejte náhodné číslo bez zápisu jeho původu.</p></section>
+ return `${title}${restOverview}${badges}${visualization}${skillHistory}<section class="hc-calendar hc-time-control"><h3>Řízení času kampaně</h3><p class="hc-hint">Čas lze nastavit přímo v jednotlivé minutě zvoleného dne tlačítkem „▶ Nastavit čas“. Již potvrzené minuty nelze vrátit zpět.</p><form id="campaign-quick-advance-form" class="hc-inline"><label>Posun o<select name="deltaMinutes">${opts([[1,'1 minutu'],[5,'5 minut'],[10,'10 minut'],[30,'30 minut'],[60,'1 hodinu'],[240,'4 hodiny'],[1440,'1 den'],[7200,'5 dní']],1)}</select></label><label>Důvod<input name="reason" maxlength="400" required value="Plynutí času ve hře"></label><button type="submit">Nastavit čas ›</button></form><p class="hc-hint">Není možné přeskočit nevyřízený doložený HMK termín ani závaznou událost GM. Každé splatné pravidlové vyhodnocení otevře původní pravidlový průvodce; nikdy nepoužívejte náhodné číslo bez zápisu jeho původu.</p></section>
  ${create}`;
 }
