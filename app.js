@@ -252,7 +252,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.513';
+const APP_VERSION='93.514';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1676,6 +1676,9 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   <button type="button" class="hc-small hc-expedition-auto-button" data-expedition-roll>⚄ Vygenerovat d10 všem vybraným postavám</button>
   <p class="hc-expedition-dice-info" aria-live="polite">Ruční zadání bude označeno jako ruční hod.</p>
  </div>
+ <fieldset data-expedition-animal-policy hidden><legend>Volitelné rozhodnutí GM · Weariness jednotlivých zvířat</legend>
+ <p class="hc-hint">HMK str. 150 <strong>neurčuje samostatnou automatickou sazbu pro zvířata</strong>. Pokud GM stanoví vlastní sazbu, potvrdí ji zde pro každé registrované zvíře; systém pak Weariness jednou připíše do jeho skutečného Combat State po absolvovaném čase. Nejde o oficiální výpočet ani o automatický END SR zvířete.</p>
+ <div data-expedition-animal-rows></div></fieldset>
  <div class="hc-expedition-checks" data-expedition-readiness aria-live="polite"><strong>Pravidlové cestovní podklady</strong>
  <p class="hc-hint">Cestovní čas lze zapsat jen po uložení hlídky Trekking Routine, přímo navázaného Orienteering / Survival SV a všech skutečně povinných následků. Žádný checkbox ani opakovaný hod není potřeba.</p>
  <p class="hc-hint" data-expedition-readiness-result>Vyberte postavu a cestovní činnost.</p>
@@ -1686,6 +1689,8 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const interruptionsHTML=`<section class="hc-calendar hc-expedition"><details><summary>Probíhající a naplánované činnosti · přerušení (${activeActivities.length})</summary><p class="hc-hint">GM může ukončit nedokončený spánek, odpočinek nebo cestu například při přepadení. Přerušení čas neposune a za neúplný interval nepřizná automatickou obnovu. Cesta připíše dokončené celé hodiny Double Time automaticky. Neúplné hodiny nebo neúplnou běžnou hlídku musí vyhodnotit GM číslem Weariness. Přerušení celé cestovní skupiny je společné.</p><div class="hc-event-list">${activeActivities.map(row=>{const a=row.calendarActivityProof;return `<div class="hc-event"><strong>${esc(a.name)} · ${esc(a.kind)}</strong> · ${esc(displayCampaignMinute(a.startMinute))}–${esc(displayCampaignMinute(a.endMinute))}<label class="hc-check"><input type="checkbox" data-calendar-activity-selected="${esc(row.id)}" aria-label="Vybrat činnost postavy ${esc(a.name)}"> Vybrat</label>${a.plan.kind==='travel'&&clock.minute>a.startMinute&&clock.minute<a.endMinute?
   `<label class="hc-hint">Dílčí Weariness GM (jen když nelze spočítat dokončené celé Double Time hodiny):
    <input type="number" min="0" max="${a.plan.accrual}" step="1" data-calendar-partial-weariness="${esc(row.id)}" placeholder="Rozhodnutí GM · 0 až ${a.plan.accrual}"></label>`:''}
+ ${(a.plan.travelGroup?.animalWeariness??[]).map(policy=>`<label class="hc-hint">Zvíře ${esc(character(policy.actorId)?.name||policy.actorId)} · skutečná dílčí Weariness GM (0–${policy.period==='hour'?4*policy.rate:policy.rate}, násobky 5; dokončené celé hodiny se nesmějí ztratit)
+ <input type="number" min="0" max="${policy.period==='hour'?4*policy.rate:policy.rate}" step="5" data-calendar-animal-partial="${esc(row.id)}:${esc(policy.actorId)}" placeholder="Rozhodnutí GM · zvíře"></label>`).join('')}
  <button type="button" class="hc-small" data-calendar-interrupt-activity="${esc(row.id)}">Přerušit činnost</button></div>`}).join('')||'<p>Žádné nedokončené činnosti.</p>'}</div>${activeActivities.length>1?'<button type="button" class="hc-small" data-calendar-interrupt-selected>Přerušit vybrané činnosti</button>':''}</details></section>`;
  const included=new Set(participants.map(c=>c.id));
  const usedElsewhere=new Set();
@@ -9997,8 +10002,16 @@ document.addEventListener('click',e=>{
   }
   const proofs=ids.map(activityId=>{
    const raw=button.closest('details').querySelector('[data-calendar-partial-weariness="'+activityId+'"]')?.value;
+   const source=active.find(row=>row.id===activityId),policy=source?.calendarActivityProof?.plan?.travelGroup?.animalWeariness??[];
+   const animalPartialWeariness=policy.length?Object.fromEntries(policy.map(p=>{
+    const field=button.closest('details').querySelector('[data-calendar-animal-partial="'+activityId+':'+p.actorId+'"]');
+    const elapsed=Math.max(0,data.campaignClock.minute-source.calendarActivityProof.startMinute);
+    const auto=p.period==='hour'&&elapsed%60===0?Math.floor(elapsed/60)*p.rate:elapsed===0?0:null;
+    if((!field||field.value==='')&&auto===null)throw Error('Zadejte dílčí únavu GM pro zvíře '+p.actorId+'.');
+    return [p.actorId,field&&field.value!==''?Number(field.value):auto];
+   })):null;
    return interruptHMKActivity({journal:data.journal,clock:data.campaignClock,
-    activityId,reason,id:uuid(),createdAt:stamp(),partialWeariness:raw===undefined||raw===''?null:Number(raw)});
+    activityId,reason,id:uuid(),createdAt:stamp(),partialWeariness:raw===undefined||raw===''?null:Number(raw),animalPartialWeariness});
   });
   if(mutate(()=>{data.journal.push(...proofs);finishInterruptedHMKTravel(data,{idFactory:uuid,stamp});}))notice=proofs.length+' činností přerušeno: dokončená část cestovní únavy byla zapsána jednou do Combat State.';
  }catch(err){alert('Činnost nebyla přerušena: '+err.message)}
@@ -10034,6 +10047,7 @@ function updateExpeditionDiceFields(form,{reset=true}={}){
  if(info)info.textContent=travel?'Každá postava má vlastní ruční nebo automatické hody END SR.':'Odpočinek nepoužívá žádné kostky.';
  const button=form.querySelector('[data-expedition-roll]');
  if(button)button.textContent=count===4?'⚄ Vygenerovat 4 × d10 každé postavě':'⚄ Vygenerovat d10 každé postavě';
+ const animals=form.querySelector('[data-expedition-animal-policy]');if(animals&&!travel)animals.hidden=true;
  const checks=form.querySelector('.hc-expedition-checks');if(checks)checks.hidden=!travel;
  updateExpeditionReadiness(form);
 }
@@ -10054,10 +10068,24 @@ function updateExpeditionReadiness(form){
    if(ids.length!==expected.length||ids.some(id=>!expected.includes(id)))
     throw Error('Vybrané postavy neodpovídají členům připravené hlídky. V Trekking Routine zvolte skupinu před vyhodnocením.');
   }
+  const animalPanel=form.querySelector('[data-expedition-animal-policy]');
+  const animalContainer=form.querySelector('[data-expedition-animal-rows]');
+  const registered=(ok.source.calendarTrekProof.partyModes?.animals??[]).filter(a=>a.health&&(!clock.characterIds||clock.characterIds.includes(a.id)));
+  if(animalPanel&&animalContainer){
+   const previous=new Map([...animalContainer.querySelectorAll('[data-expedition-animal-id]')].map(el=>[
+    el.dataset.expeditionAnimalId,{enabled:!!el.querySelector('[data-animal-rate-enabled]')?.checked,
+     rate:el.querySelector('[data-animal-rate]')?.value||'5',reason:el.querySelector('[data-animal-reason]')?.value||''}]));
+   animalPanel.hidden=registered.length===0;
+   animalContainer.innerHTML=registered.map(a=>{
+    const value=previous.get(a.id)||{enabled:false,rate:'5',reason:''};
+    const per=kind.startsWith('double-')?'hodinu Double Time':'celou čtyřhodinovou hlídku';
+    return `<fieldset data-expedition-animal-id="${esc(a.id)}"><legend>${esc(character(a.id)?.name||a.id)}</legend><label class="hc-check"><input type="checkbox" data-animal-rate-enabled ${value.enabled?'checked':''}> GM stanovuje zvláštní zvířecí únavu</label><label>Weariness za ${per} (0–100, násobky 5)<input data-animal-rate type="number" min="0" max="100" step="5" value="${esc(value.rate)}"></label><label>Konkrétní rozhodnutí GM<input data-animal-reason maxlength="300" placeholder="Popište důvod sazby" value="${esc(value.reason)}"></label></fieldset>`;
+   }).join('');
+  }
   output.textContent='Ověřeno: průvodce '+character(guideId)?.name+' · hlídka '+ok.sourceId+
    ' · Survival SV '+ok.rawSV+' → upravený Orienteering SV '+ok.sv+' · '+ok.spentModes+'/'+ok.availableModes+' Advantage Modes. '+
    ids.length+' cestujících provede samostatný END SR; čas zůstane beze změny.';
- }catch(err){output.textContent='Čeká na doložení: '+err.message;}
+ }catch(err){const panel=form.querySelector('[data-expedition-animal-policy]');if(panel)panel.hidden=true;output.textContent='Čeká na doložení: '+err.message;}
 }
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('#campaign-expedition-form [data-expedition-open-trek]');if(!b)return;
@@ -10136,8 +10164,11 @@ document.addEventListener('submit',e=>{
     if(!row)throw Error('Chybí pole END SR postavy '+character(id)?.name);
     return [id,{rawValues:[...row.querySelectorAll('input')].map(input=>input.value),generated:expeditionGeneratedDice.get(form)?.get(id)}];
    }));
+   const animalWeariness=[...form.querySelectorAll('[data-expedition-animal-id]')].filter(el=>el.querySelector('[data-animal-rate-enabled]')?.checked).map(el=>({
+    actorId:el.dataset.expeditionAnimalId,rate:Number(el.querySelector('[data-animal-rate]').value),
+    reason:el.querySelector('[data-animal-reason]').value,gmConfirmed:true}));
    const group=planHMKGroupWatch({journal:data.journal,characters:data.characters,inventory:data.inventory,clock,
-    memberIds:ids,guideId,kind,diceByActor,idFactory:uuid});
+    memberIds:ids,guideId,kind,diceByActor,animalWeariness,idFactory:uuid});
    plans.push(...group.plans);
   }else{
    for(const id of ids){
