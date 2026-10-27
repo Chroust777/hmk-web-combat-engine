@@ -72,7 +72,20 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
   const sl=successLevel(physicianRoll,eml);
   const result=resolveTreatmentTable({aspect,injuryLevel:w.level,sl,physicianIndex,broadhead,area});
   if(result.result.kind==='edge-injury')throw Error('Amputation Treatment: výsledné nové Edge zranění vyžaduje samostatné vyhodnocení Injury Sequence a Shock před uložením');
-  const attempt={physicianIndex,physicianML,physicianRoll,rawEML:eml,sl,slName:Object.keys(SL).find(k=>SL[k]===sl),result:result.result,day:daySinceInjury};
+  // HMK p178: an EXT removes the embedded projectile for EVERY SL. A failed
+  // SUR treatment (F/CF), or EXT on a G projectile (F/CF), creates a new
+  // bleeder even when an earlier healer's better SL retains the healing HR.
+  // Procedural side effects belong to the individual attempt, not to the
+  // winning HR table cell. No new dice, wound, or elapsed minutes are invented.
+  const isFailed=sl===SL.F||sl===SL.CF;
+  const surgeryBleeder=isFailed&&(c.treatment==='sur'||(c.treatment==='ext'&&w.severity==='G'));
+  const projectileExtracted=c.treatment==='ext'&&w.impaled===true;
+  const procedureMinutes=c.treatment==='cln'?5*w.level:
+   ({sur:30,ext:30,amp:1,set:15,cmp:15,wrm:120})[c.treatment]??null;
+  const attempt={physicianIndex,physicianML,physicianRoll,rawEML:eml,sl,
+   slName:Object.keys(SL).find(k=>SL[k]===sl),result:result.result,
+   day:daySinceInjury,treatmentMethod:c.treatment,procedureMinutes,
+   surgeryBleeder,projectileExtracted};
   const treatments=[...previous,attempt];
   const winner=treatments.find(x=>x.sl===SL.CF)??treatments.slice().sort((a,b)=>b.sl-a.sl)[0];
   const treatment=resolveTreatmentTable({aspect,injuryLevel:w.level,sl:winner.sl,physicianIndex:winner.physicianIndex,broadhead,area});
@@ -85,9 +98,14 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
     infectionPossible:!!treatment.result.infectionPossible,permanentEligible:!!treatment.result.permanentImpairmentEligible,
     cauterised:prior.cauterised??w.cauterised??false,area,grimWound:!!treatment.grimWound,nextGrimShockDay:treatment.grimWound?Math.max(1,daySinceInjury+1):null,
     nextHealingDay:Math.floor(daySinceInjury/5)*5+5,healedDay:null};
-   if(treatment.result.bleeding&&!w.bleeding){w.bleeding=true;w.nextAdvanceRound=round+60;}
+   if((treatment.result.bleeding||surgeryBleeder)&&!w.bleeding){w.bleeding=true;w.nextAdvanceRound=round+60;}
   }
-  track(s,{eventId,round,type:'injury-treatment',details:{woundId,daySinceInjury,physicianIndex,roll:physicianRoll,sl:attempt.slName,source:'HMK p180'}});
+  // Extraction is complete regardless of Physician SL (HMK p178).
+  if(c.treatment==='ext')w.impaled=false;
+  track(s,{eventId,round,type:'injury-treatment',details:{woundId,daySinceInjury,
+   physicianIndex,roll:physicianRoll,sl:attempt.slName,treatmentMethod:c.treatment,
+   procedureMinutes,projectileExtracted,surgeryBleeder,
+   bleedingAfterTreatment:!!w.bleeding,source:'HMK pp178,180'}});
   return {state:s,healed:w.healed===true,treatment:w.healing};
  }
  // Untreated has the treatment properties of CF (p180), but does not entail a fictitious CF roll.
@@ -99,7 +117,13 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
   infectionPossible:!!result.result.infectionPossible,permanentEligible:!!result.result.permanentImpairmentEligible,
   grimWound:result.grimWound,nextGrimShockDay:result.grimWound?Math.max(1,daySinceInjury+1):null,area, nextHealingDay:Math.floor(daySinceInjury/5)*5+5,
   cauterised:w.cauterised??false,infectionWeakness:0};
- track(s,{eventId,round,type:'injury-untreated',details:{woundId,daySinceInjury,source:'HMK p180'}});
+ // Untreated injuries inherit ALL CF table characteristics (HMK p180),
+ // not just HR/infection. A CF cell with a bleeder enters the original
+ // Blood Loss Advance chain without a fictitious Physician roll.
+ const untreatedBleeder=!!result.result.bleeding;
+ if(untreatedBleeder&&!w.bleeding){w.bleeding=true;w.nextAdvanceRound=round+60;}
+ track(s,{eventId,round,type:'injury-untreated',details:{woundId,daySinceInjury,
+  untreatedBleeder,bleedingAfterTreatment:!!w.bleeding,source:'HMK pp178,180'}});
  return {state:s,healed:false,treatment:w.healing};
 }
 export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,herbalContext=null,gmConfirmed=false}={}){
