@@ -5013,3 +5013,23 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  background:var(--ill-paper)!important;background-image:none!important;
  box-shadow:none!important;
 }
+
+
+/* v93.529: the sticky item name has the same alternating row paper as the
+   inventory cells. Keep its opacity for horizontal scroll without introducing
+   a separate texture or changing the Location-table palette. */
+.content-sheet .journal-book--chapter .folio-chapter-content
+ .inv-ledger-table tbody tr:nth-child(odd) > th:first-child{
+ background:var(--ill-paper)!important;background-image:none!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content
+ .inv-ledger-table tbody tr:nth-child(even) > th:first-child{
+ background:linear-gradient(rgba(86,60,29,.05),rgba(86,60,29,.05)),var(--ill-paper)!important;
+ background-image:linear-gradient(rgba(86,60,29,.05),rgba(86,60,29,.05))!important;
+}
+.hsk-saved-proof{font:inherit;color:inherit;margin:.4rem 0;padding:.45rem .6rem;border:1px solid var(--folio-rule);background:rgba(255,255,255,.09)}
+.hsk-saved-proof__summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:.3rem .8rem}
+.hsk-saved-proof__summary span{font-size:.85em;font-weight:600}
+.hsk-saved-proof__details{margin-top:.25rem}
+.hsk-saved-proof__details summary{cursor:pointer}
+.hsk-saved-proof__details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.5;margin:.45rem 0 0;max-height:34rem;overflow:auto}

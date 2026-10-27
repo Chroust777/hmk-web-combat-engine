@@ -18,6 +18,7 @@ import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/h
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML} from './src/integration/hmk-skill-workbench-ui.js';
+import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
 import {criticalActivities,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep} from './src/integration/hmk-climbing-fall-sequence.js';
@@ -257,7 +258,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.528';
+const APP_VERSION='93.529';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3208,7 +3209,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  const hidden=hiddenLogbookIds(data,c.id);
  const visible=visibleLogbookEntries(logs,hidden);
  const removed=logs.filter(l=>hidden.has(l.id));
- const renderLog=l=>`<div class="list-row journal-log-row journal-log-row--slim" data-journal-entry="${esc(l.id)}"><div class="journal-log-one-line"><b title="${esc(visibleEvidenceText(l.title))}">${esc(visibleEvidenceText(l.title))}</b><span class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</span></div><div class="actions journal-log-small-actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}" title="Upravit poznámku">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}" title="Smazat poznámku">Smazat</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Skrýt ze seznamu; pravidlový doklad se nemaže">Skrýt</button>`}</div><details class="journal-log-expand"><summary>Obsah záznamu</summary><p>${esc(visibleEvidenceText(l.body)).replace(/\n/g,'<br>')}</p></details></div>`;
+ const renderLog=l=>`<div class="list-row journal-log-row journal-log-row--slim" data-journal-entry="${esc(l.id)}"><div class="journal-log-one-line"><b title="${esc(visibleEvidenceText(l.title))}">${esc(visibleEvidenceText(l.title))}</b><span class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</span></div><div class="actions journal-log-small-actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}" title="Upravit poznámku">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}" title="Smazat poznámku">Smazat</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Skrýt ze seznamu; pravidlový doklad se nemaže">Skrýt</button>`}</div><details class="journal-log-expand"><summary>Obsah záznamu</summary>${l.skillTestProof?skillTestEvidenceHTML(l,esc):`<p>${esc(visibleEvidenceText(l.body)).replace(/\n/g,'<br>')}</p>`}</details></div>`;
  const recent=visible.slice(0,10).map(renderLog).join('');
  const archived=visible.length>10?`<details class="journal-log-archive"><summary>Archiv · ${czCount(visible.length-10,'starší záznam','starší záznamy','starších záznamů')}</summary><div class="journal-log-archive-content">${visible.slice(10).map(renderLog).join('')}</div></details>`:'';
  const hiddenRecords=removed.length?`<details class="journal-log-archive journal-hidden-records"><summary>Skryté položky · ${removed.length} (obnovitelné)</summary>${removed.map(l=>`<div class="list-row"><span>${esc(l.title)}</span><button class="secondary" type="button" data-restore-log="${esc(l.id)}">Vrátit do logu</button></div>`).join('')}</details>`:'';
@@ -3735,7 +3736,7 @@ function gmHistoryView(){
  const row=j=>{
   const name=names.get(j.characterId)||'GM / svět',ref=!!names.get(j.characterId),proof=j.skillTestProof;
   const procedure=proof?'skills':j.origin==='cash'?'gear':j.calendarInventoryRationStock||j.calendarInventoryWaterFill||j.calendarInventoryRationLoss||j.calendarInventoryWaterLoss||j.calendarNutritionPolicy||j.calendarForagingSupplyUse?'provisions':null;
-  return `<tr><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(visibleEvidenceText(j.title||'Událost'))}</strong><details class="gm-history-detail"><summary>Podrobnosti</summary><div>${esc(visibleEvidenceText(j.body||'Bez popisu'))}</div></details></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(j.characterId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(j.characterId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr>`;
+  return `<tr><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(visibleEvidenceText(j.title||'Událost'))}</strong><details class="gm-history-detail"><summary>Podrobnosti</summary>${j.skillTestProof?skillTestEvidenceHTML(j,esc):`<div>${esc(visibleEvidenceText(j.body||'Bez popisu'))}</div>`}</details></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(j.characterId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(j.characterId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr>`;
  };
  const table=rows=>`<div class="hc-provision-table-scroll"><table class="hc-provision-table gm-history-table"><thead><tr><th>Čas</th><th>Postava</th><th>Událost</th><th>Otevřít</th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>`;
  return journalChapterShell('GM · Historie činností',`${czCount(entries.length,'doložený záznam','doložené záznamy','doložených záznamů')} postav a kampaní`,
