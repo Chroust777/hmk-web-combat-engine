@@ -21,6 +21,7 @@ import {skillWorkbenchHTML,sheetCombatActionHTML} from './src/integration/hmk-sk
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
 import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
+import {balanceNervesCandidate,resolveBalanceNerves} from './src/integration/hmk-skill-balance-547.js';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep} from './src/integration/hmk-climbing-fall-sequence.js';
 import {woundFromFall} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -261,7 +262,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.546';
+const APP_VERSION='93.547';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6901,6 +6902,51 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
   return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Pravidlový následek '+esc(x.result.level)+' · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Automatický další test není povinný jen podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+choices+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací fyzický d100 (povinný, pokud činnost vyžaduje nový hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><div data-animal-training-fields hidden><p>Animal Training CF · HMK 65. Výcvik skutečně trval šest měsíců; toto je dodatečné zdržení, nikoli nová Training Roll.</p><label>Skutečně cvičené zvíře<input name="trainedAnimal" maxlength="120"></label><label>Dodatečné měsíce · skutečný d3<input name="trainingD3" type="number" min="1" max="3" step="1"></label><label><input type="checkbox" name="trainingReduced"> Doložené zkrácení výcviku o 1 měsíc výměnou za bonusový Training Roll (jen SV ≥ 7, HMK 65)</label><label><input type="checkbox" name="animalTrainingConfirmed"> GM potvrzuje, že původní Animalcraft CF pochází z ukončené Animal Training Routine</label></div><div data-writing-routine-fields hidden><p>Writing Routine CF · HMK 132. Primární hod byl Language (Creativity SR), nikoli Script.</p><label>Rozsah písemnosti<select name="writingScope"><option value="missive">Missive · 10 minut</option><option value="tract">Tract · 5 dní</option><option value="treatise">Treatise · 1 měsíc</option><option value="disquisition">Disquisition · 4 měsíce</option></select></label><label><input type="checkbox" name="writingConfirmed"> GM potvrzuje doloženou Language Writing Routine a zvolený rozsah</label></div><button type="submit">Vyhodnotit pravidlový následek '+esc(x.result.level)+'</button><output class="hsk-followup-output" role="status"></output></form>';
  }).join('');
 }
+/** HMK 64: SV 3–4 Balance has a special Will chain even when the
+ * primary Acrobatics roll succeeded. The GM must certify the actual activity. */
+function hskBalanceNervesHTML(originalId,proof,{actorId=null}={}){
+ const source=balanceNervesCandidate(proof);
+ if(!source||!originalId||(actorId!==null&&source.actorId!==actorId)||
+   data.journal.some(x=>x.skillTestProof?.type==='balance-nerves-will'&&x.skillTestProof.originId===originalId))return '';
+ const lower=source.skill==='Acrobatics'?1:4,upper=source.skill==='Acrobatics'?3:6;
+ return '<form class="hsk-critical-next" data-skill-balance-nerves><input type="hidden" name="origin" value="'+esc(originalId)+'">'+
+ '<h4>Balance SV '+source.sv+' → Will · HMK str. 64</h4><p>Jen pokud tento původní SV opravdu vznikl při udržování rovnováhy (ne při gymnastice). Úspěšný Will umožní pohyb za 1 hvězdu (5 stop, nejvýše polovina Move), neúspěšný Will pohyb neumožní. Žádný pohyb se automaticky neprovede.</p>'+
+ '<label>Skutečná šířka cesty v palcích ('+lower+'–'+upper+')<input type="number" name="width" min="'+lower+'" max="'+upper+'" step="1" required></label>'+
+ '<label><input type="checkbox" name="balanceConfirmed" required> GM potvrzuje, že původní hod patřil k Balance</label>'+
+ (source.skill==='Acrobatics'?'<label><input type="checkbox" name="widthPenaltyConfirmed" required> Původní výsledné SV už zahrnuje −1 za každý palec šířky pod 4</label>':'')+
+ '<label>Will – skutečný fyzický d100<input type="number" name="willRoll" min="1" max="100" step="1" required></label>'+
+ '<button type="submit">Vyhodnotit a doložit Will</button><output role="status" aria-live="polite"></output></form>';
+}
+document.addEventListener('submit',event=>{
+ const f=event.target;if(!f?.matches?.('[data-skill-balance-nerves]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const output=f.querySelector('output');
+ try{
+  const originId=f.elements.namedItem('origin')?.value,original=data.journal.find(j=>j.id===originId);
+  const proof=original?.skillTestProof,source=balanceNervesCandidate(proof),actor=character(source?.actorId);
+  if(!source||!actor||actor.id!==selected||original.characterId!==actor.id)throw Error('Následný Will musí vyhodnotit původní postava.');
+  if(data.journal.some(j=>j.skillTestProof?.type==='balance-nerves-will'&&j.skillTestProof.originId===originId))throw Error('Balance Will byl již vyhodnocen.');
+  const mastery=skillActorMastery(actor,'Will'),ctx=skillAutoFor(actor,'Will');
+  if(ctx.condition?.applicability?.kind==='provisional-unresolved'||ctx.trauma?.unresolved)throw Error('Will EML je zatím neověřené.');
+  const modifier=(ctx.condition?.modifier||0)+(ctx.trauma?.modifier||0);
+  const raw=f.elements.namedItem('willRoll')?.value.trim();
+  if(!raw||!/^\d+$/.test(raw))throw Error('Zadejte skutečný fyzický d100.');
+  const result=resolveBalanceNerves({proof,originId,actorId:actor.id,
+   widthInches:Number(f.elements.namedItem('width').value),
+   activityConfirmed:f.elements.namedItem('balanceConfirmed').checked,
+   widthPenaltyConfirmed:!!f.elements.namedItem('widthPenaltyConfirmed')?.checked,
+   willML:mastery.ml,willEML:mastery.ml+modifier,willRoll:Number(raw)});
+  const body='HMK 64 · '+result.skill+' Balance · šířka '+result.widthInches+' palců · původní SV '+result.sourceSV+
+   '\nWill ML '+result.will.ml+' / EML '+result.will.eml+'; fyzický d100 '+result.will.roll+' → '+result.will.level+
+   '\nPohyb za '+result.moveStars+' hvězdu/hvězdy ('+result.moveFeetBeforeHalfMoveCap+' stop před omezením poloviny Move). Pohyb nebyl automaticky proveden.';
+  if(!mutate(()=>data.journal.push({id:uuid(),characterId:actor.id,title:'Balance · Will po SV '+source.sv,
+   body,createdAt:stamp(),calendarCampaignId:original.calendarCampaignId||null,
+   campaignMinute:Number.isSafeInteger(data.campaignClock?.minute)?data.campaignClock.minute:original.campaignMinute??null,
+   skillTestProof:result})))throw Error('Zápis následného Will nebyl potvrzen');
+  if(output)output.textContent=body;
+  f.querySelector('button[type="submit"]').disabled=true;
+ }catch(error){if(output)output.textContent='Následný Will nebyl zapsán: '+error.message;}
+},true);
 function hskClimbingFallRow(i){
  return `<fieldset data-climb-fall-row class="hsk-fall-row"><legend>${i===0?'První dopad':'Opakovaný dopad po CF'} · HMK str. 67, kroky 1–4</legend><div class="hsk-form-grid">
  <label>d10 Impact<input type="number" name="impactD10" min="1" max="10" required></label>
@@ -7109,7 +7155,7 @@ function hskPendingSkillPhysicalConsequences(actorId){
  const unresolved=data.journal.filter(x=>x.skillTestProof&&
   (x.characterId===actorId||x.skillTestProof.opponentId===actorId)&&
   !['critical-followup','climbing-falling','skill-physical-consequence','special-secondary-roll'].includes(x.skillTestProof.type));
- const originalForms=unresolved.map(x=>hskCriticalNextHTML(x.id,x.skillTestProof,{actorId})).join('');
+ const originalForms=unresolved.map(x=>hskCriticalNextHTML(x.id,x.skillTestProof,{actorId})+hskBalanceNervesHTML(x.id,x.skillTestProof,{actorId})).join('');
  const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskFishingGearForm(x)+hskSkillPhysicalImpactForm(x)).join('')+data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
  return html?'<section class="panel wide"><h3>Čekající pravidlové následky Skill Tests</h3><p class="muted">Nevyřešené kritické hody jsou dostupné i po obnovení stránky; původní hod se znovu nehází.</p>'+html+'</section>':'';
 }
@@ -7197,7 +7243,7 @@ function recordSkillEvidence(title,body,proof,slotId=null){
  }
  const slot=slotId||((proof?.type==='success-value-specific'||proof?.type==='secondary-mastery-value-test')?'hsk-result-value':proof?.type==='assistance-success-test'?'hsk-result-assistance':'hsk-result-secondary');
  const output=document.getElementById(slot);if(output){
-  output.innerHTML=hskResultRichHTML(proof,body)+hskCriticalNextHTML(savedId,proof,{includeAdvisory:true,actorId:selected})+hskSkillEnvironmentFollowup({id:savedId,skillTestProof:proof})+hskSeriousAggravationForm({id:savedId,skillTestProof:proof})+hskTrekkingWeatherForm({id:savedId,skillTestProof:proof});
+  output.innerHTML=hskResultRichHTML(proof,body)+hskCriticalNextHTML(savedId,proof,{includeAdvisory:true,actorId:selected})+hskBalanceNervesHTML(savedId,proof,{actorId:selected})+hskSkillEnvironmentFollowup({id:savedId,skillTestProof:proof})+hskSeriousAggravationForm({id:savedId,skillTestProof:proof})+hskTrekkingWeatherForm({id:savedId,skillTestProof:proof});
   if(proof?.type==='special-secondary-roll'){
    const details=output.closest('details');if(details)details.open=true;
    const selection=details?.querySelector('[name="specialRoutine"]');
