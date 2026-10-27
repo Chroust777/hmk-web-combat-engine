@@ -173,12 +173,44 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
     minute,anchorMinute:anchor.minute,status:minute<=clock.minute?'due':'future'});
   }
   const blocked=s.wounds?.some(w=>w.healing?.infected);
+  const validDueDay=(day)=>Number.isSafeInteger(day)&&day>=1&&day<=100000;
+  const unresolved=(w,kind,description,reason)=>unknown.push({characterId:c.id,name:c.name,
+   kind,woundId:w.id,description,reason});
   for(const w of s.wounds??[]){
-   if(w.healed)continue;
-   const h=w.healing;if(!h)continue;
-   if(h.infected&&Number.isSafeInteger(h.nextInfectionDay))add(c,'infection','Infection Course (denně)',h.nextInfectionDay,w.id);
-   if(h.grimWound&&Number.isSafeInteger(h.nextGrimShockDay))add(c,'grim','Grim Wound Shock (denně)',h.nextGrimShockDay,w.id);
-   if(h.treated&&!h.noMundaneHealing&&Number.isSafeInteger(h.nextHealingDay)){
+   const h=w.healing;
+   // Imported/partially migrated records must NEVER silently stop all
+   // healing or make a mandatory daily infection roll disappear.
+   if(w.healed){
+    if(h?.infected)unresolved(w,'infection','Zhojená rána je stále označena jako infikovaná',
+     'Nekonzistentní historický Combat State: GM musí doložit vyléčení infekce; neodhadovat d100 ani datum');
+    continue;
+   }
+   if(!h)continue;
+   if(!h.treated&&!h.infected){
+    unresolved(w,'treatment','Rána má neúplný záznam Treatment / Untreated',
+     'GM musí dokončit rozhodnutí o ošetření v původní zdravotní evidenci; záznam nesmí z kalendáře zmizet');
+    continue;
+   }
+   if(h.infected){
+    if(!validDueDay(h.nextInfectionDay)||!Number.isSafeInteger(h.infectionHR)||h.infectionHR<1||h.infectionHR>5){
+     unresolved(w,'infection','Aktivní infekce bez platného dalšího Infection Course / HR',
+      'Doložte aktuální Infection HR a termín denního Course v původní zdravotní evidenci; čas nelze bezpečně posunout');
+    }else add(c,'infection','Infection Course (denně)',h.nextInfectionDay,w.id);
+   }
+   if(h.grimWound){
+    if(!validDueDay(h.nextGrimShockDay))unresolved(w,'grim','Grim Wound bez platného denního Shock termínu',
+     'Doložte poslední Grim Shock a jeho další pravidlový den; automatický d100 se nevytváří');
+    else add(c,'grim','Grim Wound Shock (denně)',h.nextGrimShockDay,w.id);
+   }
+   if(h.treated&&h.noMundaneHealing){
+    // Horse fractures and other explicitly blocked mundane recovery are NOT
+    // silently assigned healing rolls, nor do they permanently block the
+    // unrelated campaign clock. Show a non-dice status for the GM.
+    suspended.push({characterId:c.id,name:c.name,kind:'healing-blocked',woundId:w.id,
+     description:'Běžné Healing Rolls nejsou pro tuto ránu dostupné',
+     reason:'Doložené omezení Healing Rate; rozhodnutí o zvláštním způsobu léčení vyžaduje GM (HMK str.354).'});
+   }
+   if(h.treated&&!h.noMundaneHealing){
     if(blocked){
      // Infection (HMK p.181) freezes every injury-healing schedule. The
      // stale pre-infection due day is NOT a new roll and must not block
@@ -187,6 +219,9 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
      suspended.push({characterId:c.id,name:c.name,kind:'healing',woundId:w.id,
       description:'Healing Roll pozastaven – aktivní Infection Course',
       reason:'HMK str.181: žádný nový Healing d100 před vyléčením všech infekcí; termín se určí podle potvrzeného aktuálního dne rány.'});
+    }else if(!validDueDay(h.nextHealingDay)||!Number.isSafeInteger(h.healingRate)||h.healingRate<1||h.healingRate>6){
+     unresolved(w,'healing','Ošetřená rána bez doloženého termínu Healing Roll / HR',
+      'Doložte Healing Rate a pětidení termín této rány; zmeškané hody nelze automaticky doplnit');
     }else add(c,'healing','Injury Healing Roll',h.nextHealingDay,w.id);
    }
   }
