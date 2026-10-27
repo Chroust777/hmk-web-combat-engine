@@ -257,7 +257,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.524';
+const APP_VERSION='93.526';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12900,7 +12900,7 @@ document.addEventListener('click',e=>{
  if(!preview.ready)return alert('Automatické oblečení nelze bezpečně určit: '+preview.reason);
  if(!preview.placements.length)return alert('Žádný vhodný předmět.');
  try{if(JSON.stringify(applyOptimalOutfit(data.inventory,ownerId,preview))===JSON.stringify(data.inventory))return alert('Postava už má tuto nejlepší ověřenou kombinaci oblečenou.');}catch(err){return alert('Návrh nelze ověřit: '+err.message);}
- const confirmText=(preview.authoritativePreset?'Přesně ověřený tištěný komplet '+preview.printedSuit+':\n':'Pravidlově ověřená kombinace:\n')+preview.names.join(', ')+'\n\nSoučet ochrany B/E/P/F: '+preview.totalAV+', rigidní lokace: '+preview.rigidLocations+'\nNově obléknout: '+preview.equipIds.length+', svléknout: '+preview.unequipIds.length+'\nBulk: '+preview.bulkPenalty+', extra ENC: '+(preview.extraEnc??'zahrnuto v ENC tištěného kompletu')+'\n'+preview.proof+'\n\nProvést?';
+ const confirmText=(preview.authoritativePreset?'Přesně ověřený tištěný komplet '+preview.printedSuit+':\n':'Pravidlově ověřená kombinace:\n')+preview.names.join(', ')+'\n\nSoučet ochrany B/E/P/F: '+preview.totalAV+', rigidní lokace: '+preview.rigidLocations+'\nMetal Armour (volitelně HMK s.133): Plate (Point i Edge) '+(preview.metalPointLocations??0)+' lokací; Mail/Scale/Plate (Edge) '+(preview.metalEdgeLocations??0)+' lokací\nNově obléknout: '+preview.equipIds.length+', svléknout: '+preview.unequipIds.length+'\nBulk: '+preview.bulkPenalty+', extra ENC: '+(preview.extraEnc??'zahrnuto v ENC tištěného kompletu')+'\n'+preview.proof+'\n\nProvést?';
  if(!ask(confirmText))return;
  try{
   const next=applyOptimalOutfit(data.inventory,ownerId,preview);
