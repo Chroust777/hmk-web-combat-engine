@@ -7,6 +7,7 @@ import {hmkHumanLocationSymbols} from './injury-special-hmk.js';
 import {resolveCombatantLoad} from './combatant-load.js';
 import {combatFatigueTotals} from './persistent-combat-state.js';
 import {trekRegisteredAnimalHealth,validateTrekAnimalHealthProof,assertTrekAnimalCanMove} from './hmk-trekking-animal-health.js';
+import {animalTrekLoad,validateAnimalTrekLoadProof} from './hmk-trekking-animal-load.js';
 const check=(v,msg)=>{if(!v)throw Error(msg);};
 const int=n=>Number.isSafeInteger(n)&&n>=0;
 const serious=w=>!w.healed&&['S','G'].includes(w.severity);
@@ -21,14 +22,16 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
  const animalIds=new Set();
  const animals=drovingAnimals.map(a=>{
   check(a&&typeof a.id==='string'&&a.id.trim().length>0&&!animalIds.has(a.id)&&
-   int(a.enc)&&typeof a.droverId==='string'&&memberIds.includes(a.droverId),
+   typeof a.droverId==='string'&&memberIds.includes(a.droverId),
    'Každé naložené zvíře potřebuje jedinečné jméno, doložené ENC a honáka ve skupině.');
   animalIds.add(a.id);
   check(!memberIds.includes(a.id),'Zvíře nesmí být zároveň vedeno jako pěší člen skupiny: '+a.id);
   const actor=characters.find(c=>c.id===a.id);
+  const load=animalTrekLoad({animal:a,actor});
   const health=actor?trekRegisteredAnimalHealth(actor):null;
   assertTrekAnimalCanMove(health);
-  return {id:a.id,enc:a.enc,droverId:a.droverId,loaded:a.enc>=20,...(health?{health}:{} )};
+  return {id:a.id,enc:load.enc,droverId:a.droverId,loaded:load.enc>=20,
+   ...(load.encCalculation?{encCalculation:load.encCalculation}:{}),...(health?{health}:{})};
  });
  const members=memberIds.map(id=>{
   const actor=characters.find(c=>c.id===id);
@@ -90,7 +93,9 @@ export function validateTrekPartySnapshot(p){
  check(Array.isArray(animals)&&new Set(animals.map(a=>a.id)).size===animals.length&&
   animals.every(a=>a&&typeof a.id==='string'&&a.id&&int(a.enc)&&
    typeof a.droverId==='string'&&p.memberIds.includes(a.droverId)&&!p.memberIds.includes(a.id)&&
-   a.loaded===(a.enc>=20)&&(a.health===undefined||validateTrekAnimalHealthProof(a.health,a.id))&&
+   a.loaded===(a.enc>=20)&&
+   (a.encCalculation===undefined||(a.health&&validateAnimalTrekLoadProof(a.encCalculation,a.enc,a.health.breed)))&&
+   (a.health===undefined||validateTrekAnimalHealthProof(a.health,a.id))&&
    (!a.health||(a.health.fatigue<40&&!a.health.immobile&&!a.health.comaActive&&
     !a.health.extendedShockActive&&a.health.shock==='NONE'))),
   'Naložení jednotlivých zvířat neodpovídá doloženému ENC.');

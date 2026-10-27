@@ -6,6 +6,7 @@
 import {commitExpeditionFatigue,expeditionRestRecovery,expeditionCombatState} from './hmk-calendar-expedition.js';
 import {trekRegisteredAnimalHealth} from './hmk-trekking-animal-health.js';
 import {validateAnimalWeariness,actualAnimalWeariness} from './hmk-trekking-animal-fatigue.js';
+import {animalDoubleTimeCutoff} from './hmk-trekking-animal-timeline.js';
 const check=(ok,msg)=>{if(!ok)throw Error(msg);};
 const min=x=>Number.isSafeInteger(x)&&x>=0&&x<=1e9;
 const F='hmk-calendar-actor-activity-v1';
@@ -191,6 +192,25 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
  const clock=database?.campaignClock;if(!clock)return [];
  check(typeof idFactory==='function'&&typeof stamp==='function','Chybí generátor auditních ID');
  const campaignId=activeClockKey(clock),done=scheduledHMKCompletionIds(database.journal),stopped=interruptedHMKActivityIds(database.journal);
+ // Even if the GM jumps only part of a watch (no completion due yet), do
+ // not silently pass a known Fatigue-40 threshold mid–Double Time. Preserve
+ // the previous minutes on transaction rollback and permit stopping exactly
+ // at the last completed, safe hour. Never fabricate a mode transition.
+ for(const row of plannedHMKActivities(database.journal,campaignId)){
+  if(done.has(row.id)||stopped.has(row.id))continue;
+  const act=row.calendarActivityProof,group=act.plan?.travelGroup;
+  if(!group?.animalWeariness?.length)continue;
+  const trek=database.journal.find(j=>j.id===act.plan.trekSourceId)?.calendarTrekProof;
+  for(const policy of group.animalWeariness){
+   if(policy.period!=='hour')continue;
+   const animal=trek?.partyModes?.animals?.find(a=>a.id===policy.actorId);
+   if(!animal?.health)continue;
+   const cutoff=animalDoubleTimeCutoff(act.startMinute,animal.health.fatigue,policy);
+   check(cutoff===null||clock.minute<=cutoff,
+    'Zvíře '+policy.actorId+' dosahuje Fatigue 40 v minutě '+cutoff+
+    '. Čas nesmí pokračovat bez přerušení této hlídky v doložené minutě a rozhodnutí GM (HMK 145).');
+  }
+ }
  const due=plannedHMKActivities(database.journal,campaignId).filter(row=>
   !done.has(row.id)&&!stopped.has(row.id)&&row.calendarActivityProof.endMinute<=clock.minute)
   .sort((a,b)=>a.calendarActivityProof.endMinute-b.calendarActivityProof.endMinute||a.id.localeCompare(b.id));

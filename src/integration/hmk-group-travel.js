@@ -9,6 +9,8 @@ import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {totalFatigue} from '../rules/fatigue.js';
 import {prepareAnimalWeariness} from './hmk-trekking-animal-fatigue.js';
 import {trekPartyModes} from './hmk-trekking-party-modes.js';
+import {animalTrekInputFromSnapshot} from './hmk-trekking-animal-load.js';
+import {animalDoubleTimeTimeline} from './hmk-trekking-animal-timeline.js';
 const requireFact=(ok,msg)=>{if(!ok)throw Error(msg);};
 export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,memberIds=[],guideId,kind,diceByActor={},animalWeariness=[],idFactory}={}){
  requireFact(clock&&Number.isSafeInteger(clock.minute)&&typeof idFactory==='function','Chybí potvrzený čas kampaně nebo generátor ID');
@@ -25,7 +27,7 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   requireFact(memberIds.length===prepared.memberIds.length&&memberIds.every(id=>prepared.memberIds.includes(id)),
    'Vybraná skupina neodpovídá účastníkům původně připravené Trekking Routine.');
   const current=trekPartyModes({memberIds:prepared.members.map(m=>m.id),guideId,
-   characters,inventory,conveyance:prepared.conveyance,loadedByGM:prepared.manualLoaded,drovingAnimals:(prepared.animals??[]).map(a=>({id:a.id,enc:a.enc,droverId:a.droverId})),
+   characters,inventory,conveyance:prepared.conveyance,loadedByGM:prepared.manualLoaded,drovingAnimals:(prepared.animals??[]).map(animalTrekInputFromSnapshot),
    allowCertifiedWeatherAccrual:true});
   // The group was snapshot before the (required) weather procedures. A
   // confirmed weather test legitimately changes Fatigue within this same
@@ -67,13 +69,16 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   if(otherAnimals.some(a=>ownAnimals.has(a.id)))
    requireFact(false,'Zvíře je již rezervováno v jiné souběžné cestovní hlídce.');
  }
- // In hourly Double Time the animal must not become immobile before the
- // final hour; p.145 forbids continuing once fatigue reaches 40. Applies to
- // both legacy confirmed GM rates and the optional automatic interpretation.
+ // Per-hour threshold checks must not reject a legal SHORTER trek. A full
+ // four-hour schedule can be interrupted at the exact hour when a beast
+ // reaches 40; the GM clock is guarded from skipping that decision below.
+ // Fatigue 20 supplies a Slow Mode only if the party chooses to travel in
+ // the NEXT watch (HMK p.149), never retroactively in this chosen watch.
  for(const policy of animalPolicies){
+  if(policy.period!=='hour')continue;
   const initial=ready.source.calendarTrekProof.partyModes.animals.find(a=>a.id===policy.actorId)?.health?.fatigue;
-  requireFact(policy.period!=='hour'||initial+3*policy.rate<40,
-   'Zvíře '+policy.actorId+' by během Double Time dosáhlo Fatigue 40 před koncem hlídky. Zkraťte hlídku nebo zvolte jiný režim.');
+  const timeline=animalDoubleTimeTimeline(initial,policy);
+  requireFact(timeline.firstImmobileHour!==0,'Zvíře '+policy.actorId+' nemůže zahájit Double Time s Fatigue 40.');
  }
 
  const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort(),planningKind:kind,...(animalPolicies.length?{animalWeariness:animalPolicies}:{})};
