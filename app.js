@@ -258,7 +258,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.535';
+const APP_VERSION='93.536';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6749,10 +6749,10 @@ function hskResultRichHTML(proof,body){
  if(proof.gmNarrative)html+='<section class="hsk-verdict-section hsk-verdict-narrative"><h4>Vyprávění pro GM</h4><p>'+esc(proof.gmNarrative)+'</p></section>';
  return html+'</div>';
 }
-function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false}={}){
+function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=null}={}){
  if(!originalId||!proof||proof.type==='critical-followup')return '';
  const sides=proof.a?[{id:proof.actorId,skill:proof.skills?.[0],result:proof.a,side:'A'},...(proof.b?[{id:proof.opponentId,skill:proof.skills?.[1],result:proof.b,side:'B'}]:[])]:[{id:proof.actorId,skill:proof.skill,result:proof.result,side:'A'}];
- return sides.filter(x=>['F','CF'].includes(x.result?.level)&&!x.result?.forcedCF&&
+ return sides.filter(x=>(actorId===null||x.id===actorId)&&['F','CF'].includes(x.result?.level)&&!x.result?.forcedCF&&
   !data.journal.some(j=>j.skillTestProof?.type==='critical-followup'&&j.skillTestProof.originId===originalId&&j.skillTestProof.side===x.side)).map(x=>{
   const options=skillFollowupActivities(x.skill,x.result.level);
   if(!options.length){if(!includeAdvisory)return '';const note=skillFailureGuidance(x.skill,x.result.level);return '<p class="hsk-followup-advisory"><strong>'+esc(x.skill)+' '+esc(x.result.level)+' · HMK '+(note?.page||60)+':</strong> '+esc(note?.text||'Další test není doložen.')+'</p>';}
@@ -6948,9 +6948,10 @@ function hskPendingSkillPhysicalConsequences(actorId){
  const pending=data.journal.filter(x=>x.skillTestProof?.type==='critical-followup'&&
   x.skillTestProof.actorId===actorId&&
   !data.journal.some(j=>['climbing-falling','skill-physical-consequence'].includes(j.skillTestProof?.type)&&j.skillTestProof.sourceId===x.id));
- const unresolved=data.journal.filter(x=>x.characterId===actorId&&x.skillTestProof&&
+ const unresolved=data.journal.filter(x=>x.skillTestProof&&
+  (x.characterId===actorId||x.skillTestProof.opponentId===actorId)&&
   !['critical-followup','climbing-falling','skill-physical-consequence','special-secondary-roll'].includes(x.skillTestProof.type));
- const originalForms=unresolved.map(x=>hskCriticalNextHTML(x.id,x.skillTestProof)).join('');
+ const originalForms=unresolved.map(x=>hskCriticalNextHTML(x.id,x.skillTestProof,{actorId})).join('');
  const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskSkillPhysicalImpactForm(x)).join('')+data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
  return html?'<section class="panel wide"><h3>Čekající pravidlové následky Skill Tests</h3><p class="muted">Nevyřešené kritické hody jsou dostupné i po obnovení stránky; původní hod se znovu nehází.</p>'+html+'</section>':'';
 }
@@ -7032,7 +7033,7 @@ function recordSkillEvidence(title,body,proof,slotId=null){
  }
  const slot=slotId||((proof?.type==='success-value-specific'||proof?.type==='secondary-mastery-value-test')?'hsk-result-value':proof?.type==='assistance-success-test'?'hsk-result-assistance':'hsk-result-secondary');
  const output=document.getElementById(slot);if(output){
-  output.innerHTML=hskResultRichHTML(proof,body)+hskCriticalNextHTML(savedId,proof,{includeAdvisory:true})+hskSkillEnvironmentFollowup({id:savedId,skillTestProof:proof})+hskSeriousAggravationForm({id:savedId,skillTestProof:proof})+hskTrekkingWeatherForm({id:savedId,skillTestProof:proof});
+  output.innerHTML=hskResultRichHTML(proof,body)+hskCriticalNextHTML(savedId,proof,{includeAdvisory:true,actorId:selected})+hskSkillEnvironmentFollowup({id:savedId,skillTestProof:proof})+hskSeriousAggravationForm({id:savedId,skillTestProof:proof})+hskTrekkingWeatherForm({id:savedId,skillTestProof:proof});
   if(proof?.type==='special-secondary-roll'){
    const details=output.closest('details');if(details)details.open=true;
    const selection=details?.querySelector('[name="specialRoutine"]');
@@ -7098,14 +7099,14 @@ document.addEventListener('submit',event=>{
  try{
   const originId=f.elements.namedItem('origin')?.value,side=f.elements.namedItem('side')?.value;
   const original=data.journal.find(x=>x.id===originId),proof=original?.skillTestProof;
-  if(!proof||original.characterId!==selected)throw Error('Původní test nebyl nalezen u této postavy');
+  if(!proof)throw Error('Původní test nebyl nalezen');
   if(data.journal.some(x=>x.skillTestProof?.type==='critical-followup'&&x.skillTestProof.originId===originId&&x.skillTestProof.side===side))throw Error('Tento následný test už byl uložen');
   const skill=side==='B'?proof.skills?.[1]:proof.skills?.[0]||proof.skill;
   const old=side==='B'?proof.b:proof.a||proof.result;
   const plan=criticalFollowupPlan(skill,f.elements.namedItem('activity')?.value,old);
   if(!plan)throw Error('Následný postup nelze doložit pro tuto činnost a CF');
   const actor=character(side==='B'?proof.opponentId:proof.actorId);
-  if(!actor)throw Error('Postava není dostupná');
+  if(!actor||actor.id!==selected)throw Error('Následný test musí vyhodnotit skutečná zasažená postava, nikoli vlastník původního záznamu');
   let result=null,technique=null,provisional=false;
   if(plan.requiresRoll){
    const allowed=plan.test==='Fumble'?['Dexterity','Legerdemain']:plan.test==='Stumble'?['Agility','Acrobatics']:[plan.test];
@@ -7130,7 +7131,10 @@ document.addEventListener('submit',event=>{
     state.events.push({id:'skill-prone:'+originId+':'+side,type:'skill-acrobatics-prone',round:Math.max(1,combatClock.round||1,state.lastRound||0),details:{originId,side,rulePage:64}});
     validateCombatState(state);synchronizeCombatInjuries(actor,state);
    }
-   data.journal.push({id:uuid(),characterId:selected,title:'Následek CF · '+skill,body,createdAt:stamp(),skillTestProof:appended});
+   data.journal.push({id:uuid(),characterId:actor.id,title:'Následek '+old.level+' · '+skill,body,createdAt:stamp(),
+    calendarCampaignId:data.campaignClock?campaignKey(data.campaignClock):null,
+    campaignMinute:Number.isSafeInteger(data.campaignClock?.minute)?data.campaignClock.minute:null,
+    skillTestProof:appended});
   }))throw Error('Navazující záznam nebyl potvrzen');
   const restoredSlot=proof.type==='secondary-mastery-value-test'?'hsk-result-value':proof.type==='assistance-success-test'?'hsk-result-assistance':'hsk-result-secondary';
   const refreshed=document.getElementById(restoredSlot);
@@ -7230,7 +7234,8 @@ document.addEventListener('submit',event=>{
   if(!mutate(()=>{synchronizeCombatInjuries(actor,fall.state);
    data.journal.push({id:uuid(),characterId:actor.id,title:'Krátký pád '+proof.skill+' · HMK 67',
     body:'Pád '+fall.fallHeightFt+' stop; bez pravidlové Injury Sequence; prone '+(fall.prone?'ano':'ne'),
-    createdAt:stamp(),skillTestProof:details});}))throw Error('Uložení krátkého pádu nebylo potvrzeno');
+    createdAt:stamp(),calendarCampaignId:data.campaignClock?campaignKey(data.campaignClock):null,
+    campaignMinute:Number.isSafeInteger(data.campaignClock?.minute)?data.campaignClock.minute:null,skillTestProof:details});}))throw Error('Uložení krátkého pádu nebylo potvrzeno');
  }catch(error){if(out)out.textContent='Pád nebyl zapsán: '+error.message;}
 },true);
 document.addEventListener('submit',event=>{
@@ -7265,7 +7270,8 @@ document.addEventListener('submit',event=>{
    surface:report.surface,slope:report.slope,direction:report.direction,proofs:report.proofs,prone:report.prone,physicalDice:report.physicalDice,status:'committed'};
   if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='climbing-falling'&&x.skillTestProof.sourceId===sourceId))throw Error('Duplicitní pád');
    synchronizeCombatInjuries(actor,report.state);
-   data.journal.push({id:uuid(),characterId:actor.id,title:'Pád po '+follow.skill+' · HMK str. 67',body,createdAt:stamp(),skillTestProof:evidence});}))throw Error('Transakce nebyla uložena');
+   data.journal.push({id:uuid(),characterId:actor.id,title:'Pád po '+follow.skill+' · HMK str. 67',body,createdAt:stamp(),calendarCampaignId:data.campaignClock?campaignKey(data.campaignClock):null,
+    campaignMinute:Number.isSafeInteger(data.campaignClock?.minute)?data.campaignClock.minute:null,skillTestProof:evidence});}))throw Error('Transakce nebyla uložena');
   const target=document.querySelector('[data-climbing-fall-form]');if(target)target.replaceWith(Object.assign(document.createElement('p'),{textContent:'Falling Routine dokončena a uložena. Potvrzená zranění najdete v Character Sheet → Combat & Conditions i v tabulce Body Locations.'}));
  }catch(error){if(out)out.textContent='Pád nebyl zapsán: '+error.message;}
 },true);
@@ -7308,6 +7314,8 @@ document.addEventListener('submit',event=>{
    if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===sourceId))throw Error('Duplicitní hazard');
     data.journal.push({id:uuid(),characterId:proof.actorId,title:'Survival Hazard · '+description,
      body:'Survival Hazard d10 '+hazardD10+' · '+description+' · žádné automatické zranění',createdAt:stamp(),
+     calendarCampaignId:data.campaignClock?campaignKey(data.campaignClock):null,
+     campaignMinute:Number.isSafeInteger(data.campaignClock?.minute)?data.campaignClock.minute:null,
      skillTestProof:{type:'skill-physical-consequence',sourceId,kind,nonInjuryHazard:true,hazardD10,rulePage:148}});
    }))throw Error('Hazard nelze uložit');
   }else{
@@ -7323,7 +7331,8 @@ document.addEventListener('submit',event=>{
       ', zranění '+(report.injury?report.injury.severity+report.injury.level+report.aspect:'bez rány')+', Shock '+(report.shock??'—'));
    if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===sourceId))throw Error('Duplicitní zranění');
     synchronizeCombatInjuries(target,report.state);
-    data.journal.push({id:uuid(),characterId:target.id,title:'Následek Skill Testu · '+kind,body,createdAt:stamp(),
+    data.journal.push({id:uuid(),characterId:target.id,title:'Následek Skill Testu · '+kind,body,createdAt:stamp(),calendarCampaignId:data.campaignClock?campaignKey(data.campaignClock):null,
+     campaignMinute:Number.isSafeInteger(data.campaignClock?.minute)?data.campaignClock.minute:null,
      skillTestProof:{type:'skill-physical-consequence',sourceId,kind,actorId:target.id,report:{...report,state:undefined}}});
    }))throw Error('Zranění nebylo uloženo');
   }
