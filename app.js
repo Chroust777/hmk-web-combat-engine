@@ -261,7 +261,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.544';
+const APP_VERSION='93.545';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6847,7 +6847,7 @@ function hskVerdictSide(label,who,result,sr,range=null){
  if(!result)return '';
  return '<section class="hsk-verdict-section"><h4>'+esc(label+' · '+(who||'Postava'))+'</h4><div class="hsk-verdict-grid">'+
  hskVerdictMetric('Primary ML',result.ml)+hskVerdictMetric('EML',range?range.low+'–'+range.high:result.eml,range?'rozsah možného ENC; nikoli potvrzený výsledek':'')+
- hskVerdictMetric('d100',result.roll??'CF bez hodu')+hskVerdictMetric('Success Level',result.level)+
+ hskVerdictMetric('d100',result.roll??'CF bez hodu')+hskVerdictMetric('Success Level',result.victoryLevel||result.level)+
  (sr?hskVerdictMetric('Secondary d10',sr.roll===null?'bez hodu':sr.roll,sr.name):'')+
  (sr?hskVerdictMetric('TN / SR',sr.tn+' / '+(sr.success?'S':'F'),'HMK str. '+sr.sourcePage):'')+'</div>'+
  (sr?'<p class="hsk-verdict-footnote">'+esc(sr.effect||'')+'</p>':'')+'</section>';
@@ -8231,12 +8231,14 @@ function hskApplySRResult(result,sr){
  if(!sr||result?.forcedCF)return result;
  let svExtra=sr.svBonus||0;
  if(sr.svBonusRequiresSuccess&&result.sl<2)svExtra=0;
- let sl=Math.min(3,result.sl+(sr.slBonus||0));
- if(sl===result.sl&&!svExtra)return result;
+ const victorySL=Math.min(3,(Number.isSafeInteger(result.victorySL)?result.victorySL:result.sl)+(sr.slBonus||0));
+ const sl=Math.max(0,victorySL);
+ if(sl===result.sl&&!svExtra&&victorySL===(result.victorySL??result.sl))return result;
  const extra=(result.svExtra||0)+svExtra;
  const sv=result.index+[-2,-1,0,1][sl]+extra;
  const stars=Math.max(0,Math.min(5,sv-4));
  return {...result,preSecondarySL:result.sl,preSecondaryLevel:result.level,sl,level:['CF','F','S','CS'][sl],
+  victorySL,victoryLevel:victorySL<0?'CF−'+(-victorySL):['CF','F','S','CS'][sl],
   sv,svExtra:extra,svTier:sv<=0?{label:'Žádná použitelná hodnota',stars:0}:sv<=2?{label:'Omezená hodnota',stars:0}:sv<=4?{label:'Základní hodnota',stars:0}:sv>=9?{label:'Výjimečná hodnota',stars:5}:{label:'Nadstandardní hodnota',stars},
   unopposedStars:sl===3?2:sl===2?1:0,preSecondaryCF:result.splitCF||null,splitCF:sl===0?result.splitCF:null,secondarySLBonus:sr.slBonus||0,secondarySVBonus:svExtra};
 }
@@ -8499,7 +8501,7 @@ function hskResultText(side,{person,mastery,secs,ctx,die,result,sr}){
   ctx.breakdown.map(x=>' '+hskSigned(x.value)+' '+x.label).join('')+' '+hskSigned(Number.isSafeInteger(result.gmModifier)?result.gmModifier-ctx.modifier:0)+' GM situace';
  const warnings=(ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+(ctx.armourIsProvisional?'\nPŘEDBĚŽNÝ výsledek: '+ctx.provisionalArmour.join('; '):'');
  return side+' · '+person.name+' / '+mastery.name+' | '+breakdown+' = EML '+(result.eml??'—')+
-  '\nPrimární '+(result.forcedCF?'vynucené CF bez hodu':'d100 '+result.roll+' ('+die.origin+')')+' → '+result.level+
+  '\nPrimární '+(result.forcedCF?'vynucené CF bez hodu':'d100 '+result.roll+' ('+die.origin+')')+' → '+(result.victoryLevel||result.level)+
   (result.splitCF?' ['+result.splitCF+(result.splitCF==='CF0'?' / potenciální Fumble':' / potenciální Stumble')+' – jen při předepsané činnosti]':'')+
   (result.footpadSourceIds?'\nFootpad (HMK 272) · Primary ML +'+result.footpadBonusML+' ('+result.footpadSourceIds.join(', ')+'); původní ML '+result.footpadBaseML+'.':'')+
   (result.eruditionSourceIds?'\nErudition (HMK 271) · doložené S → CS ('+result.eruditionSourceIds.join(', ')+'); původní d100 / EML zůstávají.':'')+
