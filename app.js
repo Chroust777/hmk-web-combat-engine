@@ -136,6 +136,7 @@ import {planHMKGroupWatch} from './src/integration/hmk-group-travel.js';
 import {trekPartyModes} from './src/integration/hmk-trekking-party-modes.js';
 import {trekRegisteredAnimalHealth} from './src/integration/hmk-trekking-animal-health.js';
 import {eligibleRestingAnimals,planAnimalRest} from './src/integration/hmk-trekking-animal-rest.js';
+import {ANIMAL_AREA_AV,weatherAnimalCandidates,prepareAnimalTrekkingWeather,validateAnimalWeatherJournal} from './src/integration/hmk-trekking-animal-weather.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
@@ -253,7 +254,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.517';
+const APP_VERSION='93.518';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -463,7 +464,7 @@ function validate(d){
  e.details?.auralShock===proof.criticalFailure?.auralShockAdded&&e.details?.dissolutionD100===proof.criticalFailure?.dissolutionD100&&
  (proof.criticalFailure?.crucialDissolution?JSON.stringify(e.details?.crucialShock)===JSON.stringify(proof.criticalFailure.shockRoll):!e.details?.crucialShock)))
  throw Error('Alchemy: Dissolution nemá nezměněný Aural/Combat State důkaz');}
- validateHerbVialJournal(d.journal);validateHerbAdministrationJournal(d.journal);validateHerbalPoisonExposureJournal(d.journal);validateGreatPoisonJournal(d.journal);validateHerbWeaponPasteJournal(d.journal);validateWeaponPoisonResistanceJournal(d.journal);assertActiveHerbWeaponPastes(d);validateStimulantInitiativeJournal(d.journal);validateHerbalCharmSkillJournal(d.journal);validateHallucinogenicJournal(d.journal);validateTranscendenceWillJournal(d.journal);validateEmeticShockJournal(d.journal);validateParalyticEnduranceJournal(d.journal);validateSoporificJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);assertActiveHerbVials(d);assertActiveAlchemyVials(d);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateHMKActivityEvidence(d.journal);}
+ validateHerbVialJournal(d.journal);validateHerbAdministrationJournal(d.journal);validateHerbalPoisonExposureJournal(d.journal);validateGreatPoisonJournal(d.journal);validateHerbWeaponPasteJournal(d.journal);validateWeaponPoisonResistanceJournal(d.journal);assertActiveHerbWeaponPastes(d);validateStimulantInitiativeJournal(d.journal);validateHerbalCharmSkillJournal(d.journal);validateHallucinogenicJournal(d.journal);validateTranscendenceWillJournal(d.journal);validateEmeticShockJournal(d.journal);validateParalyticEnduranceJournal(d.journal);validateSoporificJournal(d.journal);validateForagingWaterStorageJournal(d.journal);validatePhysicalRationJournal(d.journal,d.inventory,d);validatePhysicalWaterJournal(d.journal,d.inventory,d);validateChestTransferJournal(d.journal);validateInventoryDispositionJournal(d.journal);assertActiveHerbVials(d);assertActiveAlchemyVials(d);validateNutritionJournal(d.journal);validateNutritionActivityJournal(d.journal);validateMalnutritionEvidence(d);validateAnimalWeatherJournal(d.journal);validateHMKActivityEvidence(d.journal);}
  if(!d||d.schemaVersion!==1||!['characters','items','inventory','trash','journal'].every(k=>Array.isArray(d[k])))throw Error('Neplatný formát zálohy');
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
@@ -1664,6 +1665,17 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <div class="hc-event-list">${data.journal.filter(j=>j.calendarTrekWildernessProof&&j.calendarCampaignId===campaignKey(clock)).slice(-12).reverse().map(j=>{const p=j.calendarTrekWildernessProof;return `<p class="hc-hint">${esc(character(j.characterId)?.name||j.characterId)} · ${esc(displayCampaignMinute(j.campaignMinute))} · jídlo ${p.totals.foodDays}, voda ${p.totals.waterDays}, byliny ${p.totals.herbDoses}</p>`}).join('')}</div></details></section>`;
  const restingAnimals=eligibleRestingAnimals({characters:data.characters,journal:data.journal,clock});
  const animalRestActivities=activeHMKActivities(data.journal,clock).filter(row=>row.calendarActivityProof.plan.animalRestPolicy);
+ const animalWeatherPending=weatherAnimalCandidates({journal:data.journal,characters:data.characters,clock});
+ const animalWeatherHTML=`<section class="hc-calendar hc-expedition" id="hmk-animal-weather"><h3>Zvířata · Cold / Heat Weather Hazard (HMK 149, 185, 355)</h3>
+ <p class="hc-hint">GM-schválené rozšíření pravidel pro postavy, <strong>nikoliv vytištěná zvířecí Survival procedura</strong>. Area AV je automaticky z HMK 355 (*F-impact). Cold: expozice, když d6 (při continuous sleet d10) převýší AV. Heat: expozice, když d4 ≤ AV. Opravdový odpočinek / stín není kompatibilní s pohybem této hlídky. END (Survival) EML zvířat kniha neudává – GM potvrdí použité EML, až když skutečně nastane expozice. Samotná přítomnost počasí žádný zdravotní následek nepřiděluje.</p>
+ ${animalWeatherPending.map(({source,animal,areaAV,kind})=>{const wet=source.calendarTrekProof.weatherWatch,continuous=kind==='cold'&&wet.precipitation==='sleet'&&wet.continuous===true;return `<form data-trek-animal-weather class="hc-fields"><h4>${esc(animal.name||animal.id)} · ${esc(animal.hmk.verifiedMountedBreed)} · ${kind==='cold'?'Cold':'Heat'} · ${esc(displayCampaignMinute(source.campaignMinute))}</h4><input type="hidden" name="sourceId" value="${esc(source.id)}"><input type="hidden" name="animalId" value="${esc(animal.id)}"><input type="hidden" name="kind" value="${kind}">
+ <p>Area AV ${areaAV} (HMK 355). ${kind==='cold'?'Cold die d'+(continuous?10:6):'Heat die d4'}.</p>
+ ${kind==='cold'?`<label>Skutečná ochrana zvířete (GM potvrzuje ekvivalent přikrývky / výbavy)<select name="gearAV"><option value="0">Žádný doložený bonus +0</option><option value="1">Doložený ekvivalent +1</option><option value="2">Doložený ekvivalent +2</option></select></label><label>Skutečný úkryt<select name="shelterAV"><option value="0">Žádný +0</option><option value="2">Stan / rovnocenný kryt +2</option><option value="3">Mělká jeskyně +3</option></select></label><label>Oheň FS<input name="fireFS" type="number" min="0" max="20" value="0" required></label><label>Stav zvířete po dešti<select name="coldCondition"><option value="dry">Suché</option><option value="damp">Mokré (déšť)</option></select></label>`:
+ `<label>Původ zvířete ze subtropického / tropického klimatu <select name="nativeHot"><option value="no">Ne / nedoloženo</option><option value="yes">Ano, potvrdil GM</option></select></label>`}
+ <label>Skutečný hazard hod<input name="hazardRoll" type="number" min="1" max="${kind==='cold'?(continuous?10:6):4}" required></label><button type="button" class="hc-small" data-animal-weather-die="hazardRoll">⚄ Hazard d${kind==='cold'?(continuous?10:6):4}</button>
+ <label>GM potvrzené Endurance (Survival) EML <input name="endEML" type="number" min="1" max="200" placeholder="Jen pokud nastane expozice"></label><label>Skutečný d100 <input name="endD100" type="number" min="1" max="100" placeholder="Jen pokud nastane expozice"></label><button type="button" class="hc-small" data-animal-weather-die="endD100">⚄ Endurance d100</button>
+ <label class="hc-check"><input name="gmConfirmed" type="checkbox" value="yes" required> GM potvrzuje ochranu a zvířecí výklad testu; případné Frostbite/Sunburn vyřeší přes skutečnou zvířecí anatomii (nikoli lidské ZN).</label><button type="submit">Doložit Cold / Heat zvířete · bez posunu času</button><output role="status" aria-live="polite"></output></form>`}).join('')||'<p class="hc-hint">Není žádný nový Weather Hazard zvířete k doložení v aktuální hlídce.</p>'}
+ </section>`;
  const animalRestHTML=`<section class="hc-calendar hc-expedition" id="hmk-animal-rest"><h3>Zvířata · odpočinek a obnova Weariness</h3>
   <p class="hc-hint"><strong>Odvozené pravidlo (nikoliv výslovná sazba HMK pro zvířata):</strong> GM potvrdí nepřerušený klid zvířete, potom se využije existující obnova podle HMK str. 150 a 176: 4 h −5 Weariness, nebo při doložených 8 h skutečného spánku −15. Každý typ nejvýše jednou za 24 h. Bez hodu END a bez automatického spuštění spánku. Účinek nastane až při posunu času GM; Weakness ani Windedness se tím neléčí.</p>
   ${restingAnimals.length?`<form data-trek-animal-rest class="hc-fields"><label>Registrované zvíře kampaně<select name="animalId" required>${restingAnimals.map(c=>`<option value="${esc(c.id)}">${esc(c.name||c.id)} · ${esc(c.hmk.verifiedMountedBreed)} · Weariness ${esc(c.hmk.combatState?.fatigue?.weariness??'?')}</option>`).join('')}</select></label>
@@ -1716,7 +1728,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const unknownFallNotice=fallUnknown.length?`<section class="panel hc-calendar-unresolved"><h3>Vyžaduje vyřešení · Falling Routine</h3>${fallUnknown.map(x=>`<div class="hc-unknown-rule-link"><strong>${esc(x.name)}</strong> · ${esc(x.description)}<p class="muted">GM doplní skutečnou výšku (0–5 ft bez Injury Sequence; nad 5 ft pokračuje Impact a Jumping/Acrobatics test). Původní Skill CF se neopakuje.</p><button type="button" class="hc-small" data-cal-unknown-fall="${esc(x.characterId)}" data-cal-unknown-source="${esc(x.sourceId)}">Otevřít správné hody a výšku ↗</button></div>`).join('')}</section>`:'';
  const overviewHTML=`${board}${unknownFallNotice}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
-  activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${animalRestHTML}${interruptionsHTML}`:
+  activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${animalWeatherHTML}${animalRestHTML}${interruptionsHTML}`:
   activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionLedgerHTML(participants)}${partyNutritionConditionsHTML(participants,clock)}${supplyHTML}<details class="hc-provision-rulebook"><summary>Podrobnosti: automatické následky nedostatku a zdravotní hody</summary>${nutritionHTML}${activityNeedsHTML}</details>`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
   activeCalendarSection==='craft'?`${herbalHTML}${alchemyHTML}`:
   `${membersHTML}${legacyOriginPanel}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
@@ -6778,6 +6790,9 @@ function hskTrekkingColdShockForm(entry){
 function hskTrekkingSkinForms(actorId){
  const actor=character(actorId);if(!actor)return '';
  const hazards=(persistentStateOf(actor).environmentalHazards||[]).filter(h=>h.skinPending);
+ // Human Frostbite/Sunburn form is bound to p.167 human locations. Never
+ // expose that executor to an animal's p.355 anatomy or fake a complexion.
+ if(actor.hmk?.verifiedMountedBreed)return hazards.map(h=>`<div class="hc-event"><strong>GM: ${esc(h.skinPending)} u zvířete ${esc(actor.name)}</strong><p class="hc-hint">HMK 185 / 355: následek kritického Weather Hazard čeká na samostatné posouzení vystavených částí zvířecí anatomie. Lidský formulář zranění a tón pleti se zde nepoužije. Zdravotní stav Exposure zůstává zachován; zvířecí kožní zranění nebylo automaticky domyšleno.</p></div>`).join('');
  const locations='sk, fa, nk, sh, ua, el, fo, ha, tx, ab, pv, th, kn, ca, ft';
  return hazards.map(h=>`<details class="hsk-climb-fall"><summary>Dokončit ${h.skinPending==='frostbite'?'Frostbite':'Sunburn'} · jednotlivá zranění · HMK str.185</summary>
  <form data-skill-weather-skin><input name="sourceId" type="hidden" value="${esc(h.sourceId)}">
@@ -8376,7 +8391,7 @@ document.addEventListener('submit',e=>{
      environ:v.environ,wildernessNightWatches},
     season,climate:v.climate,landscape:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
     night:v.night==='yes',alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',weatherDay:day,
-    dayAlready,weatherWatch:wet,movement,hazards,encounter,rolls,unresolved,sourcePages:[141,144,145,146,148,149,150]};
+    dayAlready,weatherWatch:wet,...(wet.requiresWeatherHazardRoll&&partyModes.animals.some(a=>a.health)?{animalWeatherPolicy:'hmk-trek-animal-weather-analogy-v1'}:{}),movement,hazards,encounter,rolls,unresolved,sourcePages:[141,144,145,146,148,149,150]};
   if(hazards.direction==='lost-time'&&v.doubleTime==='yes')throw Error('Lost Time přidává Slow Mode, což nelze sloučit s Double Time. Nejprve přehodnoťte doložený režim pohybu pro danou hlídku.');
   const effectiveMovement=adjustedTrekkingMovement(proof);
   proof.effectiveMovement=effectiveMovement;
@@ -8513,6 +8528,45 @@ document.addEventListener('submit',e=>{
 },true);
 // Animal recovery shares the EXACT existing calendar/rest/Combat State authority.
 // It is a GM-confirmed analogy for species, never a background hourly healer.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('button[data-animal-weather-die]');if(!button)return;
+ e.preventDefault();const form=button.closest('form'),which=button.dataset.animalWeatherDie;
+ const f=form?.elements.namedItem(which);if(!f)return;
+ const source=data.journal.find(j=>j.id===form.elements.namedItem('sourceId').value);
+ const isCold=form.elements.namedItem('kind').value==='cold';
+ const sides=which==='endD100'?100:isCold?(source?.calendarTrekProof?.weatherWatch?.continuous&&source.calendarTrekProof.weatherWatch.precipitation==='sleet'?10:6):form.elements.namedItem('nativeHot')?.value==='yes'?6:4;
+ const n=secureHMKDie(sides);f.value=String(n);f.dataset.animalWeatherAuto=String(n);button.textContent='⚄ d'+sides+' = '+n;
+},true);
+document.addEventListener('input',e=>{
+ const t=e.target;if(t.matches?.('form[data-trek-animal-weather] input[name="hazardRoll"],form[data-trek-animal-weather] input[name="endD100"]'))delete t.dataset.animalWeatherAuto;
+},true);
+document.addEventListener('change',e=>{
+ const f=e.target.closest?.('form[data-trek-animal-weather]');if(!f||e.target.name!=='nativeHot')return;
+ const d=f.elements.namedItem('hazardRoll');d.value='';delete d.dataset.animalWeatherAuto;d.max=f.elements.namedItem('nativeHot').value==='yes'?'6':'4';
+ f.querySelector('[data-animal-weather-die="hazardRoll"]').textContent='⚄ Hazard d'+d.max;
+},true);
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-trek-animal-weather]'))return;
+ e.preventDefault();e.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  if(!data.campaignClock||combatInitiativeSequence||view!=='calendar')throw Error('Weather Hazard zvířete vyžaduje aktivní kalendář mimo boj.');
+  const f=new FormData(form),source=data.journal.find(j=>j.id===f.get('sourceId')),
+   actor=character(String(f.get('animalId')||'')),kind=String(f.get('kind')||'');
+  if(!actor||!(data.campaignClock.characterIds??[]).includes(actor.id))throw Error('Zvíře není součástí aktivní kampaně.');
+  const continuous=kind==='cold'&&source?.calendarTrekProof?.weatherWatch?.precipitation==='sleet'&&source.calendarTrekProof.weatherWatch.continuous===true;
+  const risk={kind,areaAV:ANIMAL_AREA_AV[actor.hmk?.verifiedMountedBreed],roll:Number(f.get('hazardRoll')),
+   origin:form.elements.namedItem('hazardRoll').dataset.animalWeatherAuto===String(f.get('hazardRoll'))?'cryptographic-software-die':'manual',...(kind==='cold'?{gearAV:Number(f.get('gearAV')),shelterAV:Number(f.get('shelterAV')),
+    fireFS:Number(f.get('fireFS')),continuousSleet:continuous}:{resting:false,shadedRest:false,nativeHotClimate:f.get('nativeHot')==='yes'})};
+  const preview=prepareAnimalTrekkingWeather({journal:data.journal,source,actor,campaignId:campaignKey(data.campaignClock),
+   minute:data.campaignClock.minute,risk,endEML:f.get('endEML')===''?null:Number(f.get('endEML')),
+   endD100:f.get('endD100')===''?null:Number(f.get('endD100')),
+   endOrigin:form.elements.namedItem('endD100').dataset.animalWeatherAuto===String(f.get('endD100'))?'cryptographic-software-die':'manual',
+   coldCondition:f.get('coldCondition')||'dry',gmConfirmed:f.get('gmConfirmed')==='yes',
+   entryId:uuid(),createdAt:stamp(),round:Math.max(1,persistentStateOf(actor).lastRound)});
+  if(mutate(()=>{if(data.journal.some(x=>x.calendarTrekAnimalWeatherProof?.sourceId===source.id&&x.characterId===actor.id&&x.calendarCampaignId===campaignKey(data.campaignClock)))throw Error('Duplicitní Weather Hazard zvířete');
+   synchronizeCombatInjuries(actor,preview.state);data.journal.push(preview.entry);})){notice=actor.name+': '+(kind==='cold'?'Cold':'Heat')+' doložen – '+(preview.proof.sl||'bez expozice')+'.'+(preview.report?.skinPending?' GM musí dořešit zvířecí '+preview.report.skinPending+'.':'');}
+ }catch(error){if(out)out.textContent='Weather Hazard zvířete nebyl uložen: '+error.message;}
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-trek-animal-rest]'))return;
  e.preventDefault();e.stopImmediatePropagation();
