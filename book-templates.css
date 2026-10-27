@@ -5054,3 +5054,32 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
   background-attachment:scroll,scroll!important;
   box-shadow:none!important;
 }
+
+
+/* v93.534 — Light character-folio wash over the SAME parchment image.
+   Apply it equally to EVERY inventory cell (including the sticky name cell):
+   no flat beige strip, no alternative texture, no scrolling registration trick.
+   Original item/row styling, sticky positioning and overflow are unchanged. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody tr > td,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody tr > th:first-child{
+  background-image:
+    linear-gradient(rgba(255,252,244,.25),rgba(255,252,244,.25)),
+    url('./assets/ui/book/clean_vellum.png')!important;
+  background-color:#f7eacc!important;
+  background-repeat:repeat,repeat!important;
+  background-size:100% 100%,440px 440px!important;
+  background-position:left top,left top!important;
+  background-attachment:scroll,scroll!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table thead tr > th,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table thead tr > th:first-child{
+  background-image:
+    linear-gradient(rgba(191,153,94,.09),rgba(191,153,94,.09)),
+    linear-gradient(rgba(255,252,244,.25),rgba(255,252,244,.25)),
+    url('./assets/ui/book/clean_vellum.png')!important;
+  background-color:#f7eacc!important;
+  background-repeat:repeat,repeat,repeat!important;
+  background-size:100% 100%,100% 100%,440px 440px!important;
+  background-position:left top,left top,left top!important;
+  background-attachment:scroll,scroll,scroll!important;
+}
