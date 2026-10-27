@@ -4985,11 +4985,16 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  .content-sheet .journal-book--chapter .inv-bulk-toolbar button{font-size:11px!important}
 }
 
-/* v93.527 — shared Location-table treatment for all three inventory lists.
-   The chapter page already carries the original vellum texture; do not paint
-   a second, darker vellum onto the scrollport or individual inventory cells. */
+/* v93.530 — Shared parchment surface for the inventory scrollport and its
+   pinned first column. Both sample the SAME original vellum image anchored
+   to the viewport; item-name cells no longer have a flat opaque fill. */
 .content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-table-scroll{
- background:rgba(255,250,238,.22)!important;
+ background-image:url('./assets/ui/components/vellum_master.png')!important;
+ background-color:transparent!important;
+ background-attachment:fixed!important;
+ background-repeat:repeat!important;
+ background-size:1024px 1024px!important;
+ background-position:center center!important;
  border:1px solid var(--folio-rule)!important;border-radius:0!important;
  padding:2px!important;
 }
@@ -5002,30 +5007,28 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  background:transparent!important;border-bottom:1px solid rgba(149,105,59,.25)!important;
  color:var(--folio-ink)!important;
 }
-/* Sticky item names need an opaque paper backing while other cells remain
-   as transparent as the existing Location table. Reuse the chapter paper
-   variable rather than a new texture or a dark, separately positioned tile. */
-.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table tbody th:first-child{
- background:var(--ill-paper)!important;background-image:none!important;
+/* The visible item names must conceal horizontally scrolling columns without
+   creating a flat beige stripe. The same fixed-position parchment texture is
+   painted on the pinned cells and the table scrollport. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table tbody tr > th:first-child{
+ background-image:url('./assets/ui/components/vellum_master.png')!important;
+ background-color:transparent!important;
+ background-attachment:fixed!important;
+ background-repeat:repeat!important;
+ background-size:1024px 1024px!important;
+ background-position:center center!important;
  box-shadow:none!important;
 }
-.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table thead th:first-child{
- background:var(--ill-paper)!important;background-image:none!important;
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table thead tr > th:first-child{
+ background-image:
+   linear-gradient(rgba(171,125,66,.16),rgba(171,125,66,.16)),
+   url('./assets/ui/components/vellum_master.png')!important;
+ background-color:transparent!important;
+ background-attachment:scroll,fixed!important;
+ background-repeat:repeat,repeat!important;
+ background-size:100% 100%,1024px 1024px!important;
+ background-position:center center,center center!important;
  box-shadow:none!important;
-}
-
-
-/* v93.529: the sticky item name has the same alternating row paper as the
-   inventory cells. Keep its opacity for horizontal scroll without introducing
-   a separate texture or changing the Location-table palette. */
-.content-sheet .journal-book--chapter .folio-chapter-content
- .inv-ledger-table tbody tr:nth-child(odd) > th:first-child{
- background:var(--ill-paper)!important;background-image:none!important;
-}
-.content-sheet .journal-book--chapter .folio-chapter-content
- .inv-ledger-table tbody tr:nth-child(even) > th:first-child{
- background:linear-gradient(rgba(86,60,29,.05),rgba(86,60,29,.05)),var(--ill-paper)!important;
- background-image:linear-gradient(rgba(86,60,29,.05),rgba(86,60,29,.05))!important;
 }
 .hsk-saved-proof{font:inherit;color:inherit;margin:.4rem 0;padding:.45rem .6rem;border:1px solid var(--folio-rule);background:rgba(255,255,255,.09)}
 .hsk-saved-proof__summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:.3rem .8rem}
