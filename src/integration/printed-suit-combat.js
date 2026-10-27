@@ -16,8 +16,9 @@ export function identifyWornPrintedSuit(inventory,characterId){
     x.bulkExceptionZones!==undefined&&x.bulkExceptionZones!==null&&
       (!Array.isArray(x.bulkExceptionZones)||x.bulkExceptionZones.length>0)))
   return {ok:false,reason:'Explicit article layering/Bulk overrides the printed suit preset; validate the actual p117 layers'};
- const actual=worn.map(x=>x.snapshot.name).sort();
- const matches=PRINTED_ARMOUR_SUITS_P113_116.filter(s=>s.articles.length===actual.length&&s.articles.slice().sort().every((name,i)=>name===actual[i]));
+ const normalize=name=>String(name||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/^great helm$/,'plate great helm');
+ const actual=worn.map(x=>normalize(x.snapshot.name)).sort();
+ const matches=PRINTED_ARMOUR_SUITS_P113_116.filter(s=>s.articles.length===actual.length&&s.articles.map(normalize).sort().every((name,i)=>name===actual[i]));
  return matches.length===1?{ok:true,name:matches[0].name,source:'exact-worn-inventory',inventoryIds:worn.map(x=>x.id)}:{ok:false,reason:matches.length?'Ambiguous printed suit':'Worn articles do not exactly match a printed suit'};
 }
 export function resolvePrintedSuitProtection(name,location,aspect){

@@ -2,6 +2,7 @@
  * A mathematically impossible stack is marked red even when the old inventory
  * has no layerOrder; an unknown but possible order remains explicitly unknown.
  */
+import {printedSuitAV} from '../rules/armour-all-suits-fixed.js';
 export const HMK_ARMOUR_LOCATIONS=Object.freeze({
  sk:'Lebka',fa:'Obličej',nk:'Krk',sh:'Rameno',ua:'Paže',el:'Loket',fo:'Předloktí',ha:'Ruka',
  tx:'Hrudník',ab:'Břicho',pv:'Pánev',th:'Stehno',kn:'Koleno',ca:'Lýtko',ft:'Chodidlo'
@@ -14,6 +15,14 @@ export function layerDisplayRows(report,inventory=[],load=null){
  const feasible=load?.layeringFeasibility?.zones||{};
  const bulk=load?.bulkByZone||{};
  return (report?.rows||[]).map(row=>{
+  if(load?.printedSuit&&load?.bulkReady){
+   const cells=Object.fromEntries(['b','e','p','f'].map(a=>{
+    const r=printedSuitAV(load.printedSuit,row.location,a);
+    return [a,r.ok&&r.covered?r.av:0];
+   }));
+   return {...row,protection:cells,status:'valid',detail:`Ověřený tištěný komplet ${load.printedSuit}: hodnoty ze samostatné tabulky HMK, nikoliv součet překrývajících se jednotlivých článků.`,
+    locationName:HMK_ARMOUR_LOCATIONS[row.location]||row.location,names:row.articles.map(a=>a.name).join(', '),zoneNames:'',bulk:null};
+  }
   const things=row.articles.map(a=>byId.get(a.id)).filter(Boolean);
   const zones=Object.entries(feasible).filter(([,z])=>z.locations?.[row.location]);
   const provenForbidden=zones.some(([,z])=>z.status==='forbidden');
@@ -39,7 +48,7 @@ export function layerDisplayRows(report,inventory=[],load=null){
 export function readableLayerIssues(load,inventory=[]){
  const items=new Map(inventory.filter(Boolean).map(x=>[x.id,x.snapshot?.name||'Neznámý předmět']));
  const output=[];
- const feas=load?.layeringFeasibility?.zones||{};
+ const feas=load?.printedSuit?{}:load?.layeringFeasibility?.zones||{};
  for(const [zone,info] of Object.entries(feas)){
   if(info.status==='forbidden')output.push(`${HMK_ARMOUR_ZONES[zone]}: nasazené materiály nelze ani přeuspořádat do pravidlově přípustné sestavy. Odeberte některý kus; automatický náhradní postih HMK nestanoví.`);
   else if(info.status==='bulk-exception-possible'&&!load?.bulkReady)

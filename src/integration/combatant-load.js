@@ -59,14 +59,18 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   if(!checked.ready){issues.push(`${item.snapshot?.name||item.id}: ${checked.reason}`);continue;}
   articles.push({item,article:checked.article});
  }
- const layeringFeasibility=articles.length===worn.length?assessArmourFeasibility(prepareArmourForFeasibility(articles)):null;
+ const match=identifyWornPrintedSuit(inventory,id);
+ // A FULL, unmodified printed suit is a separately validated p.113–116
+ // preset. The generic p.117 mix-and-match feasibility engine cannot override
+ // the explicitly printed set with a misleading 'forbidden' status.
+ const genericLayeringFeasibility=articles.length===worn.length?assessArmourFeasibility(prepareArmourForFeasibility(articles)):null;
+ const layeringFeasibility=match.ok?{status:'compatible',source:'exact-printed-suit-preset',name:match.name,zones:{}}:genericLayeringFeasibility;
  let armourENC=null,extraEnc=null,conditionalArmENC=null,perceptionPenalty=null;
  // Item ENC is independent of whether the player's chosen layer order is legal.
  // Conditional outer D/Q +5 cannot be presumed without a verified layer assignment.
  let knownArmourENC=null;let unknownExtraENC=false;
  let armourENCUpperBound=null;let armourArithmeticENC=null;
  let bulkReady=false,bulkByZone=null,bulkSource=null,armourSource=null,layering=null;
- const match=identifyWornPrintedSuit(inventory,id);
  if(worn.length===0){
   armourENC=0;knownArmourENC=0;extraEnc=0;conditionalArmENC=0;perceptionPenalty=0;
   bulkReady=true;bulkByZone=Object.fromEntries(ZONES.map(z=>[z,0]));bulkSource='unarmoured';armourSource='unarmoured';
@@ -207,7 +211,7 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
  if(!validSTR)issues.push('Character STR must be a recorded positive integer (1–200)');
  // A prohibited outfit has no *rules-valid* ENC, even though its known
  // component encumbrances are displayed. Never silently legalise it.
- const prohibitedOutfit=layeringFeasibility?.status==='forbidden';
+ const prohibitedOutfit=!match.ok&&layeringFeasibility?.status==='forbidden';
  const encReady=Number.isSafeInteger(armourENC)&&gearLoad!==null&&validSTR&&!prohibitedOutfit;
  const baseENC=encReady?armourENC+gearLoad.gearENC:null;
  const knownBaseENC=Number.isFinite(knownArmourENC)&&gearLoad!==null?knownArmourENC+gearLoad.gearENC:null;

@@ -6,10 +6,16 @@
 import {resolveOwnedArmourArticle} from './live-combat-armour.js';
 import {evaluateOrderedArmour} from './armour-layer-evaluation.js';
 import {arrangeStartingArmour} from './hmk-starting-armour-layout.js';
+import {PRINTED_ARMOUR_SUITS_P113_116} from '../rules/armour-suit-printed.js';
+import {printedSuitAV} from '../rules/armour-all-suits-fixed.js';
+import {printedSuitRigid} from '../rules/armour-suit-rigid-printed.js';
+import {HMK_BODY_LOCATIONS} from './armour-coverage-readiness.js';
 
 const ASPECTS=['b','e','p','f'];
 const MAX_STATES=24000;
 const fail=reason=>({ready:false,reason,optimal:false});
+const normalizePrintedName=name=>String(name||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
+ .replace(/^great helm$/,'plate great helm');
 const isCloth=x=>{const material=String(x?.snapshot?.properties?.material||'').toLowerCase();const name=String(x?.snapshot?.name||'').toLowerCase();return material==='c'||material==='cloth'||(material==='leather'&&/\b(boots|shoes)\b/.test(name));};
 const available=x=>['carried','worn'].includes(x.slot) && x.snapshot?.category==='armor' && !x.destroyed;
 const itemScore=(item,article)=>{
@@ -41,7 +47,83 @@ function candidatesFor(inventory,ownerId,mode){
   if(!check.ready)throw Error(`${x.snapshot?.name||'Předmět'}: ${check.reason}`);
   verified.push({item:x,article:check.article,quality:itemScore(x,check.article)});
  }
- return {owned,candidates:verified};
+ // Two copies of the same clothing article are not automatically layered on
+ // top of one another. The printed rules permit different layers, but do not
+ // prescribe automatically wearing duplicate trousers/shirts. A GM may still
+ // select that exceptional outfit manually. Choose the healthier copy first.
+ const grouped=new Map();
+ for(const row of verified){
+  const key=row.item.sourceItemId;
+  const prior=grouped.get(key);
+  const better=!prior||compare([row.quality.av,row.quality.rigidLocations.length,Number(row.item.slot==='worn')],[prior.quality.av,prior.quality.rigidLocations.length,Number(prior.item.slot==='worn')])>0;
+  if(better)grouped.set(key,row);
+ }
+ return {owned,candidates:[...grouped.values()]};
+}
+/** An exact published suit is a complete, separately verified HMK preset,
+ * not an arbitrary p.117 composite. In particular the 17-part Plate & Mail
+ * cannot be rejected solely because an exponential custom-layer solver caps its
+ * search. Never turn a PARTIAL bought suit into a complete printed suit.
+ */
+function printedSuitSelection(owned){
+ const viable=owned.filter(x=>available(x)&&x.quantity===1);
+ const groups=new Map();
+ // Group by actual library purchase receipt, not the user-visible costume name.
+ for(const x of viable){
+  const t=x.acquisition?.transactionId, name=x.printedSuitName;
+  if(typeof t!=='string'||!t||typeof name!=='string')continue;
+  const key=name+'|'+t;
+  if(!groups.has(key))groups.set(key,[]);
+  groups.get(key).push(x);
+ }
+ const out=[];
+ for(const [key,group] of groups){
+  const suit=PRINTED_ARMOUR_SUITS_P113_116.find(s=>key.startsWith(s.name+'|'));
+  if(!suit||group.length!==suit.articles.length)continue;
+  const remaining=[...group],selected=[];let okay=true;
+  for(const printed of suit.articles){
+   const name=normalizePrintedName(printed);
+   const i=remaining.findIndex(x=>normalizePrintedName(x.snapshot?.name)===name);
+   if(i<0){okay=false;break;}
+   const x=remaining.splice(i,1)[0];
+   const verified=resolveOwnedArmourArticle({...x,slot:'carried'},{allowCarried:true});
+   if(!verified.ready){okay=false;break;}
+   selected.push({item:x,article:verified.article,quality:itemScore(x,verified.article)});
+  }
+  if(okay&&remaining.length===0)out.push({suit,selected});
+ }
+ return out;
+}
+function printedSuitPreview(owned,{suit,selected}){
+ const keep=new Set(selected.map(c=>c.item.id));
+ const worn=owned.filter(x=>x.slot==='worn'&&x.snapshot?.category==='armor');
+ let totalAV=0;const rigids=new Set();
+ for(const location of HMK_BODY_LOCATIONS){
+  for(const aspect of ASPECTS){
+   const protection=printedSuitAV(suit.name,location,aspect);
+   if(!protection.ok)return fail('Chybí ověřená tištěná ochrana kompletu '+suit.name);
+   if(protection.covered){
+    // Same physical Acid reduction already used by live combat protection.
+    // Do not advertise the undamaged printed AV as the best outcome when
+    // purchased articles acquired damage since their receipt.
+    const reduction=selected.reduce((sum,{item})=>{
+     const d=item.acidAVDamageByLocation?.[location]??0;
+     const own=item.snapshot.properties.locationProtection?.[location]?.[aspect]??0;
+     return sum+Math.min(d,own);
+    },0);
+    totalAV+=Math.max(0,protection.av-Math.min(protection.av,reduction));
+   }
+   const marker=printedSuitRigid(suit.name,location,aspect);
+   if(!marker.ok)return fail('Chybí ověřená tuhost kompletu '+suit.name);
+   if(marker.rigid)rigids.add(location);
+  }
+ }
+ return {ready:true,optimal:false,authoritativePreset:true,mode:'armour',printedSuit:suit.name,
+  proof:'Přesný kompletní tištěný set HMK s. '+suit.page+' z jediné nákupní transakce. Ověřeno všech '+selected.length+' originálních součástí. Tištěné AV/rigidita a ENC mají vlastní autoritu; toto není tvrzení o globálním optimu při dalších volných článcích.',
+  placements:selected.map(c=>({id:c.item.id,layerOrder:null,layerSlot:null,bulkExceptionZones:[]})),
+  unequipIds:worn.filter(x=>!keep.has(x.id)).map(x=>x.id),equipIds:selected.filter(c=>c.item.slot!=='worn').map(c=>c.item.id),
+  names:selected.map(c=>c.item.snapshot.name),removedNames:worn.filter(x=>!keep.has(x.id)).map(x=>x.snapshot.name),
+  totalAV,rigidLocations:rigids.size,bulkPenalty:0,extraEnc:null,armourENC:suit.enc,sourcePages:[suit.page,117,118]};
 }
 function setup(ordered){
  const pieces=ordered.map((c,i)=>({...c.item,slot:'worn',layerOrder:i,layerSlot:null,bulkExceptionZones:[]}));
@@ -74,6 +156,16 @@ export function previewOptimalOutfit(inventory,ownerId,mode='armour'){
  try{source=candidatesFor(inventory,ownerId,mode);}catch(e){return fail(e.message);}
  const {owned,candidates}=source;
  if(!candidates.length)return fail(mode==='clothing'?'Žádný ověřený látkový článek HMK str. 118 není v neseném inventáři.':'Žádné dostupné ověřené články zbroje.');
+ // The printed suit path is especially important for p.116's 17-part set.
+ // Prefer the most protective exact purchased printed preset over attempting to
+ // search 17! physical arrangements. It does not claim custom-outfit optimality.
+ if(mode==='armour'){
+  const presets=printedSuitSelection(owned).map(p=>printedSuitPreview(owned,p)).filter(p=>p.ready);
+  if(presets.length){
+   presets.sort((a,b)=>b.totalAV-a.totalAV||b.rigidLocations-a.rigidLocations||b.armourENC-a.armourENC||a.printedSuit.localeCompare(b.printedSuit));
+   return presets[0];
+  }
+ }
  // Upper bound: with all positive, undamaged article AV and rigidity
  // contributions present, a completely wearable outfit is unbeatable.
  const fullCopies=candidates.map(c=>({...c.item,slot:'worn',layerOrder:null,layerSlot:null,bulkExceptionZones:[]}));
@@ -116,7 +208,7 @@ export function previewOptimalOutfit(inventory,ownerId,mode='armour'){
  * Chest, other owners, weapons, food and journal never change here.
  */
 export function applyOptimalOutfit(inventory,ownerId,preview){
- if(!preview?.ready||!preview.optimal||!['armour','clothing'].includes(preview.mode))throw Error('Neověřený návrh oblečení');
+ if(!preview?.ready||!(preview.optimal||preview.authoritativePreset)||!['armour','clothing'].includes(preview.mode))throw Error('Neověřený návrh oblečení');
  const fresh=previewOptimalOutfit(inventory,ownerId,preview.mode);
  if(!fresh.ready||JSON.stringify(fresh)!==JSON.stringify(preview))throw Error('Inventář se od výpočtu změnil; obnovte návrh.');
  const next=structuredClone(inventory),placement=new Map(preview.placements.map(p=>[p.id,p]));
