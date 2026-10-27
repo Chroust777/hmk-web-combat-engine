@@ -9,7 +9,7 @@ const css = fs.readFileSync(path.join(root, 'book-templates.css'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const checks = [
-  ['Version matches release', () => assert.match(html, /HMK Keeper’s Ledger · v93\.527/)],
+  ['Version matches release', () => assert.match(html, /HMK Keeper’s Ledger · v93\.530/)],
   ['Two established fieldset groups remain', () => {
     assert.match(app, /<fieldset class="hmk-outfit-action-group"><legend>Výbava u postavy<\/legend>/);
     assert.match(app, /<fieldset class="hmk-outfit-action-group"><legend>Převlékání z \/ do truhly<\/legend>/);
@@ -31,13 +31,14 @@ const checks = [
       'flex-direction:column!important', 'border:0!important', 'background:transparent!important'])
       assert.ok(rule.includes(expected), expected);
   }],
-  ['Inventory inherits shared Location-table background, not a second texture', () => {
-    const marker = css.indexOf('/* v93.527 — shared Location-table treatment');
+  ['Pinned item names share identical parchment with other cells', () => {
+    const marker = css.indexOf('/* v93.530 — Shared parchment surface');
     assert.ok(marker >= 0);
-    const last = css.slice(marker);
-    assert.match(last, /background:rgba\(255,250,238,\.22\)!important/);
-    assert.match(last, /background:rgba\(171,125,66,\.16\)!important/);
-    assert.doesNotMatch(last, /background:\s*url\(/i);
+    const last = css.slice(marker,css.indexOf('.hsk-saved-proof',marker));
+    assert.match(last,/inv-ledger-section \.inv-table-scroll\{[\s\S]*?vellum_master\.png/);
+    assert.match(last,/tbody tr > th:first-child\{[\s\S]*?vellum_master\.png/);
+    assert.match(last,/background-attachment:fixed!important/);
+    assert.doesNotMatch(last,/background:var\(--ill-paper\)/);
   }],
   ['Inventory retains table scroll and fixed item names', () => {
     assert.match(css, /\.inv-ledger-table tbody th:first-child\{position:sticky!important;left:0!important/);

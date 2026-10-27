@@ -40,8 +40,8 @@ ok(minuteBoard.includes('data-hmk-skill-proof="skill-result-2"'),'opposed proof 
 ok(JSON.stringify(journal)===untouched,'all three views remain read-only, no duplicate proof');
 ok((board.match(/data-hmk-skill-proof="skill-result-1"/g)||[]).length>=1,'skill proof uses same original journal id');
 const css=fs.readFileSync(path.join(root,'book-templates.css'),'utf8'),app=fs.readFileSync(path.join(root,'app.js'),'utf8'),idx=fs.readFileSync(path.join(root,'index.html'),'utf8');
-ok(css.includes('tbody tr:nth-child(even) > th:first-child'),'sticky alternating rows style');
+ok(css.includes('tbody tr > th:first-child')&&css.includes('background-attachment:fixed!important'),'sticky column uses continuous parchment');
 ok(app.includes('l.skillTestProof?skillTestEvidenceHTML(l,esc)'),'character log uses canonical proof');
 ok(app.includes('j.skillTestProof?skillTestEvidenceHTML(j,esc)'),'GM history uses canonical proof');
-ok(idx.includes('v93.529'),'version');
-console.log('PASS v93.529 ·',checks,'checks (Skill Tests, linked calendar, character and GM render bindings, inventory row style).');
+ok(idx.includes('v93.530'),'version');
+console.log('PASS v93.530 ·',checks,'checks (Skill Tests, linked calendar, character and GM render bindings, inventory row style).');
