@@ -4912,3 +4912,8 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 @container (max-width:370px){
  .content-calendar .hc-trek-routine .hmk-trek-grid{grid-template-columns:1fr}
 }
+
+/* v93.520: compact actions for the authoritative armour loadout. */
+.content-sheet .hmk-outfit-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 8px}
+.content-sheet .hmk-outfit-toolbar button{flex:1 1 185px;min-width:0;white-space:normal;font:600 13px/1.35 Georgia,serif;padding:9px 11px}
+@media(max-width:680px){.content-sheet .hmk-outfit-toolbar{display:grid;grid-template-columns:1fr}.content-sheet .hmk-outfit-toolbar button{width:100%}}
