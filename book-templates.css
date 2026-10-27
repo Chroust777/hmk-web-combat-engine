@@ -4917,3 +4917,56 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .hmk-outfit-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 8px}
 .content-sheet .hmk-outfit-toolbar button{flex:1 1 185px;min-width:0;white-space:normal;font:600 13px/1.35 Georgia,serif;padding:9px 11px}
 @media(max-width:680px){.content-sheet .hmk-outfit-toolbar{display:grid;grid-template-columns:1fr}.content-sheet .hmk-outfit-toolbar button{width:100%}}
+
+/* v93.522 — compact, owner-bound Arsenal ledger; item name stays visible
+   inside its own horizontal scrollport without hiding any technical data. */
+.content-sheet .journal-book--chapter .inv-ledger-section{min-width:0!important;margin-bottom:14px!important}
+.content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll{position:relative!important;overflow-x:auto!important;overscroll-behavior-x:contain!important}
+.content-sheet .journal-book--chapter .inv-ledger-table{
+ width:802px!important;min-width:802px!important;table-layout:fixed!important;border-collapse:separate!important;border-spacing:0!important
+}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(1){width:230px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(2){width:92px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(3){width:44px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(4){width:68px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(5){width:76px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(6){width:72px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(7){width:154px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:66px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table thead th:first-child{
+ position:sticky!important;left:0!important;z-index:5!important;
+ background:#e3d4b9!important;color:#342719!important;box-shadow:2px 0 5px rgba(50,35,23,.2)!important
+}
+.content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{
+ position:sticky!important;left:0!important;z-index:3!important;
+ background:#f4ead7!important;box-shadow:2px 0 5px rgba(50,35,23,.22)!important;
+ text-align:left!important;overflow-wrap:anywhere!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table tbody tr:nth-child(even) th:first-child{background:#e9ddc6!important}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-select-row{
+ display:flex!important;align-items:flex-start!important;gap:7px!important;
+ padding:0!important;margin:0!important;min-width:0!important;font-weight:700!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-bulk-checkbox{
+ flex:0 0 auto!important;width:15px!important;height:15px!important;min-width:15px!important;
+ margin:2px 0 0!important;accent-color:#654428!important
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-item-name{min-width:0!important;overflow-wrap:anywhere!important}
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(2),
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(3),
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(4),
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(5),
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(6){font-size:11px!important;line-height:1.25!important}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-edit-only{width:100%!important;min-width:0!important;white-space:nowrap!important;padding:4px 1px!important;font:700 11px Georgia,serif!important}
+.content-sheet .journal-book--chapter .inv-bulk-toolbar{
+ display:flex!important;flex-wrap:wrap!important;align-items:center!important;
+ gap:5px!important;margin:7px 0 4px!important;padding:8px!important;
+ border:1px solid #aa916f!important;background:rgba(244,233,209,.6)!important
+}
+.content-sheet .journal-book--chapter .inv-bulk-toolbar button{padding:5px 8px!important;min-height:30px!important;font:700 12px Georgia,serif!important}
+.content-sheet .journal-book--chapter .inv-select-all{display:flex!important;align-items:center!important;gap:5px!important;margin:0!important;font-size:12px!important}
+.content-sheet .journal-book--chapter .inv-bulk-count{margin-left:auto!important;font-size:11px!important;white-space:nowrap!important}
+@media(max-width:700px){
+ .content-sheet .journal-book--chapter .inv-ledger-table{width:802px!important;min-width:802px!important}
+ .content-sheet .journal-book--chapter .inv-bulk-toolbar button{font-size:11px!important}
+}

@@ -47,6 +47,7 @@ import {applyInventoryItemEdit,transferInventoryItem} from './src/integration/hm
 import {previewOptimalOutfit,applyOptimalOutfit,previewUndressOutfit,undressOutfit} from './src/integration/hmk-outfit-optimizer.js';
 import {recordInventoryDisposition,validateInventoryDispositionJournal,assertInventoryDispositionAppendOnly} from './src/integration/hmk-inventory-disposition.js';
 import {moveInventoryChest,chestRows,validateChestTransferJournal,assertChestTransferAppendOnly} from './src/integration/hmk-inventory-chest.js';
+import {applyInventoryBatch,previewChestOutfit,applyChestOutfit} from './src/integration/hmk-inventory-batch-522.js';
 import {createPotableWaterFill,recordPhysicalWaterTransfer,recordPhysicalWaterLoss,availablePhysicalWater,waterskinBalances,waterContainerCapacity,projectCampaignWaterInventory,validatePhysicalWaterJournal,assertWaterBacking,assertWaterAppendOnly} from './src/integration/hmk-physical-water-ledger.js';
 import {createForagingWaterStorage,validateForagingWaterStorageJournal} from './src/integration/hmk-foraging-water-storage.js';
 import {isHandheldItem,requiresTwoHands,gripOf,supportsSelectableTwoHandGrip,setWeaponGrip,validateHandInventory,equipInventoryHand} from './src/integration/hmk-hand-equipment.js';
@@ -255,13 +256,13 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.521';
+const APP_VERSION='93.522';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const stamp=()=>new Date().toISOString();
-const SLOTS=[['none','Neseno (starší záznam)'],['main_hand','Hlavní ruka'],['off_hand','Vedlejší ruka'],['worn','Oblečeno / nasazeno'],['carried','Neseno'],['chest','Truhlice (doma / úschova)']];
+const SLOTS=[['none','Neseno (starší záznam)'],['main_hand','Hlavní ruka'],['off_hand','Vedlejší ruka'],['worn','Oblečeno'],['carried','Neseno'],['chest','Truhlice (doma / úschova)']];
 const slotLabel=v=>!v||v==='none'?'Neseno':(SLOTS.find(s=>s[0]===v)||SLOTS[4])[1];
 const validSlotForCategory=(slot,cat)=>SLOTS.some(s=>s[0]===slot)&&(!(slot==='main_hand'||slot==='off_hand')||['weapon','shield','other'].includes(cat))&&(slot!=='worn'||cat==='armor');
 function handSlotAvailable(characterId,slot,exceptId=null){return !['main_hand','off_hand'].includes(slot)||!data.inventory.some(x=>x.characterId===characterId&&x.slot===slot&&x.id!==exceptId)}
@@ -3106,20 +3107,10 @@ function characterInventoryOverview(c,inv){
   // quantity instead of inventing a migration or silently reporting "1 ks".
   const lotNote=r.qty!==null&&r.qty!==1?`<span class="inv-item-kind">${r.qty} kusů v původním záznamu</span>`:'';
   const unitLabel=r.qty!==null&&r.qty!==1?'Celková hmotnost':'Hmotnost';
-  return `<tr><th scope="row">${esc(x.snapshot?.name||'Bezejmenný předmět')}${esc(waterStatus)}${lotNote}${potionInside?`<span class="inv-item-kind">Naplněna · ${esc(potionInside.herbType)} (${esc(potencyLabel(potionInside.potency))}); obsah bez doložené hmotnosti</span>`:''}${alchemyInside?`<span class="inv-item-kind">Alchemy · ${esc(alchemyStrength?.elixirName||'elixír')} · AS ${alchemyStrength?.currentAS??'?'}${alchemyStrength?.dispersed?' · obsah vyprázdněn':alchemyStrength?.expires?' · enchantment zanikl':''} · plná 0,5 lb</span>`:''}<span class="inv-item-kind">${esc(x.snapshot?.category||'jiné')}${visibleInventoryNote(x.condition)?' · '+esc(visibleInventoryNote(x.condition)):''}${x.slot==='chest'?' · '+esc(x.chestLocation||'Truhlice'):''}${x.gearStowage==='backpack'?' · v batohu':x.gearStowage==='awkward'?' · nepohodlně neseno':''}${['main_hand','off_hand'].includes(x.slot)&&x.snapshot?.category==='weapon'?' · '+(gripOf(x)==='two'?'obouručně':'jednoručně'):''}</span></th><td>${esc(slotLabel(x.slot))}</td><td class="inv-number">${number(r.wq)}</td><td class="inv-number inv-price">${r.totalPrice!==null?`${r.totalPrice} d`:esc(r.priceLabel.replace(/\s*\/\s*ks\b/gi,'').replace(/\s*d\s*\/\s*12\s*ks\b/gi,' d za 12 kusů'))}</td><td class="inv-number" title="${esc(unitLabel)}">${r.totalWeight===null?'—':`${r.totalWeight.toFixed(1)} lb`}</td><td>${esc(r.armourENC)}</td><td class="inv-key-spec">${details}</td><td><div class="inv-row-actions" data-inv-action-menu>
- <select aria-label="Akce s předmětem ${esc(x.snapshot?.name||'předmět')}" data-inv-action-select>
- <option value="">Vybrat akci…</option>
- ${x._campaignRationReceipt?'':`<option value="edit">Upravit</option>`}
- ${x._campaignRationReceipt?'':`<option value="chest">${x.slot==='chest'?'Vyzvednout':'Do Truhlice'}</option>`}
- ${rationLot?`<option value="ration-transfer" data-source-id="${esc(rationLot.sourceId)}">Předat potraviny</option>`:''}
- ${staleRationLot?`<option value="ration-loss" data-source-id="${esc(staleRationLot.sourceId)}">Odpis potravin</option>`:''}
- ${!x._campaignRationReceipt&&data.characters.length>1?`<option value="transfer">Předat předmět</option>`:''}
- ${!x._campaignRationReceipt?`<option value="remove">Ztráta / vyřadit</option>`:''}
- ${(staleRationLot||(!x._campaignRationReceipt&&x.slot!=='chest'&&data.campaignClock&&currentWater.some(l=>l.itemId===x.id&&l.remaining>=0.5)))?`<option value="partial">Odložit část zásob</option>`:''}
- </select><button type="button" class="secondary" data-inv-action-confirm data-inv-item-id="${esc(x.id)}">OK</button></div></td></tr>`;
+  return `<tr><th scope="row"><label class="inv-select-row"><input type="checkbox" class="inv-bulk-checkbox" data-inv-bulk-select ${x._campaignRationReceipt?'disabled title="Odvozený doklad nelze přesouvat jako fyzický předmět"':''} value="${esc(x.id)}" aria-label="Označit ${esc(x.snapshot?.name||'předmět')}"><span class="inv-item-name">${esc(x.snapshot?.name||'Bezejmenný předmět')}</span></label>${esc(waterStatus)}${lotNote}${potionInside?`<span class="inv-item-kind">Naplněna · ${esc(potionInside.herbType)} (${esc(potencyLabel(potionInside.potency))}); obsah bez doložené hmotnosti</span>`:''}${alchemyInside?`<span class="inv-item-kind">Alchemy · ${esc(alchemyStrength?.elixirName||'elixír')} · AS ${alchemyStrength?.currentAS??'?'}${alchemyStrength?.dispersed?' · obsah vyprázdněn':alchemyStrength?.expires?' · enchantment zanikl':''} · plná 0,5 lb</span>`:''}<span class="inv-item-kind">${esc(x.snapshot?.category||'jiné')}${visibleInventoryNote(x.condition)?' · '+esc(visibleInventoryNote(x.condition)):''}${x.slot==='chest'?' · '+esc(x.chestLocation||'Truhlice'):''}${x.gearStowage==='backpack'?' · v batohu':x.gearStowage==='awkward'?' · nepohodlně neseno':''}${['main_hand','off_hand'].includes(x.slot)&&x.snapshot?.category==='weapon'?' · '+(gripOf(x)==='two'?'obouručně':'jednoručně'):''}</span></th><td>${esc(slotLabel(x.slot))}</td><td class="inv-number">${number(r.wq)}</td><td class="inv-number inv-price">${r.totalPrice!==null?`${r.totalPrice} d`:esc(r.priceLabel.replace(/\s*\/\s*ks\b/gi,'').replace(/\s*d\s*\/\s*12\s*ks\b/gi,' d za 12 kusů'))}</td><td class="inv-number" title="${esc(unitLabel)}">${r.totalWeight===null?'—':`${r.totalWeight.toFixed(1)} lb`}</td><td>${esc(r.armourENC)}</td><td class="inv-key-spec">${details}</td><td><button type="button" class="secondary inv-edit-only" data-edit-inv="${esc(x.id)}" ${x._campaignRationReceipt?'disabled title="Doklad vydaných zásob nelze běžně editovat"':''}>Upravit</button></td></tr>`;
  };
- const table=(list,title)=>`<h4>${title} · ${czCount(list.length,'záznam','záznamy','záznamů')}</h4>${list.length?`<div class="inv-table-scroll"><table class="catalog-spec inv-ledger-table"><colgroup><col style="width:22%"><col style="width:12%"><col style="width:6%"><col style="width:12%"><col style="width:9%"><col style="width:8%"><col style="width:13%"><col style="width:18%"></colgroup><thead><tr><th>Předmět</th><th>Umístění</th><th>WQ</th><th>Cena</th><th>Hmotnost</th><th>ENC zbroje</th><th>Vlastnosti / účinky</th><th>Akce</th></tr></thead><tbody>${list.map(viewRow).join('')}</tbody></table></div>`:'<p class="muted">Žádné položky.</p>'}`;
- return `<div class="inv-summary-grid">${cards.map(([name,value])=>`<div class="inv-summary-stat" data-hmk-help="${esc(invHelp[name]||name)}" tabindex="0" aria-label="${esc(name+': '+(invHelp[name]||name))}"><span>${esc(name)}</span><strong>${esc(value)}</strong></div>`).join('')}</div><p class="tiny muted">Hmotnost majetku zahrnuje také oblečené části oděvu/zbroje; Gear ENC počítá jen nesenou a drženou výbavu. ENC výbavy se odvozuje z celkové efektivní hmotnosti a způsobu nesení. Nelze ho přidělovat každému předmětu zvlášť. Jednotkové ceny a váhy chybějících katalogových údajů nejsou odhadovány.</p>${table(rows.filter(r=>r.kind==='equipped'),'Nasazené a držené předměty')}${table(rows.filter(r=>r.kind==='carried'),'Nesené předměty')}${table(rows.filter(r=>r.kind==='chest'),'Truhlice · věci ponechané doma / v úschově')}<p class="tiny muted">Truhlice je místo uložení, nikoli nový předmět ani pravidlový bonus. Zůstává vlastníkem postavy, ale uložené věci nejsou dostupné na cestě a nezapočítávají se do ENC. Každé vyzvednutí nebo uložení vyžaduje potvrzenou fyzickou dostupnost u GM a nemění čas kampaně.</p><div class="inv-footer-totals"><strong>Celkem ${czCount(sourceRows.reduce((n,r)=>n+(r.qty||0),0),'kus','kusy','kusů')} v ${czCount(rows.length,'inventárním záznamu','inventárních záznamech','inventárních záznamech')}</strong><span>Známá hodnota: ${totals.knownValue} d${totals.unknownValue?` (${totals.unknownValue} bez ceny)`:''}</span><span>Známá hmotnost: ${totals.knownWeightLb.toFixed(1)} lb${totals.unknownWeight?` (${totals.unknownWeight} bez hmotnosti)`:''}</span><span>Gear ENC: ${number(load.gearENC)} · Armour ENC: ${number(load.armourENC)}${Number.isFinite(load.knownArmourENC)&&!Number.isFinite(load.armourENC)?` (známé od ${load.knownArmourENC}${Number.isFinite(load.armourENCUpperBound)&&load.armourENCUpperBound!==load.knownArmourENC?' do '+load.armourENCUpperBound:''})`: ''} · Bulk: ${load.bulkReady?number(load.meleeBulkPenalty):load.prohibitedOutfit?'zakázaná sestava':'pořadí neurčeno'}</span></div>`;
+ const table=(list,title,kind)=>`<section class="inv-ledger-section" data-inv-bulk-section="${kind}"><h4>${title} · ${czCount(list.length,'záznam','záznamy','záznamů')}</h4>${list.length?`<div class="inv-table-scroll"><table class="catalog-spec inv-ledger-table"><colgroup><col style="width:230px"><col style="width:92px"><col style="width:44px"><col style="width:68px"><col style="width:76px"><col style="width:72px"><col style="width:154px"><col style="width:66px"></colgroup><thead><tr><th>Předmět</th><th>Umístění</th><th>WQ</th><th>Cena</th><th>Hmotnost</th><th>ENC zbroje</th><th>Vlastnosti / účinky</th><th>Akce</th></tr></thead><tbody>${list.map(viewRow).join('')}</tbody></table></div><div class="inv-bulk-toolbar" role="group" aria-label="Hromadné akce: ${title}"><label class="inv-select-all"><input type="checkbox" data-inv-select-all> Označit vše</label>${kind==='chest'?`<button type="button" data-inv-bulk-action="retrieve" class="secondary">Vyzvednout z truhly</button>`:`<button type="button" data-inv-bulk-action="store" class="secondary">Uložit do truhly</button>`}<button type="button" data-inv-bulk-action="transfer" class="secondary">Předat</button>${kind==='chest'?'':`<button type="button" data-inv-bulk-action="ration-transfer" class="secondary">Předat potraviny</button><button type="button" data-inv-bulk-action="ration-loss" class="secondary">Odpis potravin</button><button type="button" data-inv-bulk-action="partial" class="secondary">Odložit část zásob</button>`}<button type="button" data-inv-bulk-action="loss" class="secondary">Ztráta / vyřadit</button><span class="inv-bulk-count" aria-live="polite">0 vybráno</span></div>`:'<p class="muted">Žádné položky.</p>'}</section>`;
+ return `<div class="inv-summary-grid">${cards.map(([name,value])=>`<div class="inv-summary-stat" data-hmk-help="${esc(invHelp[name]||name)}" tabindex="0" aria-label="${esc(name+': '+(invHelp[name]||name))}"><span>${esc(name)}</span><strong>${esc(value)}</strong></div>`).join('')}</div><p class="tiny muted">Hmotnost majetku zahrnuje také oblečené části oděvu/zbroje; Gear ENC počítá jen nesenou a drženou výbavu. ENC výbavy se odvozuje z celkové efektivní hmotnosti a způsobu nesení. Nelze ho přidělovat každému předmětu zvlášť. Jednotkové ceny a váhy chybějících katalogových údajů nejsou odhadovány.</p>${table(rows.filter(r=>r.kind==='equipped'),'Nasazené a držené předměty','equipped')}${table(rows.filter(r=>r.kind==='carried'),'Nesené předměty','carried')}${table(rows.filter(r=>r.kind==='chest'),'Truhlice · věci ponechané doma / v úschově','chest')}<p class="tiny muted">Hromadná práce: označte políčka vlevo od názvů a zvolte tlačítko pod příslušným seznamem. Přesun do/z truhly vyžaduje dostupné místo potvrzené GM. Předání a vyřazení vyžaduje aktivní kampaň; doložené příděly a vodu nelze nepozorovaně odstranit. Truhlice je místo uložení, nikoli nový předmět ani pravidlový bonus. Zůstává vlastníkem postavy, ale uložené věci nejsou dostupné na cestě a nezapočítávají se do ENC. Každé vyzvednutí nebo uložení vyžaduje potvrzenou fyzickou dostupnost u GM a nemění čas kampaně.</p><div class="inv-footer-totals"><strong>Celkem ${czCount(sourceRows.reduce((n,r)=>n+(r.qty||0),0),'kus','kusy','kusů')} v ${czCount(rows.length,'inventárním záznamu','inventárních záznamech','inventárních záznamech')}</strong><span>Známá hodnota: ${totals.knownValue} d${totals.unknownValue?` (${totals.unknownValue} bez ceny)`:''}</span><span>Známá hmotnost: ${totals.knownWeightLb.toFixed(1)} lb${totals.unknownWeight?` (${totals.unknownWeight} bez hmotnosti)`:''}</span><span>Gear ENC: ${number(load.gearENC)} · Armour ENC: ${number(load.armourENC)}${Number.isFinite(load.knownArmourENC)&&!Number.isFinite(load.armourENC)?` (známé od ${load.knownArmourENC}${Number.isFinite(load.armourENCUpperBound)&&load.armourENCUpperBound!==load.knownArmourENC?' do '+load.armourENCUpperBound:''})`: ''} · Bulk: ${load.bulkReady?number(load.meleeBulkPenalty):load.prohibitedOutfit?'zakázaná sestava':'pořadí neurčeno'}</span></div>`;
 }
 function inventoryPartialDropForm(x){
  const clock=data.campaignClock,actorId=x?.characterId;
@@ -3147,7 +3138,7 @@ function armourLoadoutPanel(inv,owner=null){
  const load=owner?resolveCombatantLoad({character:owner,inventory:activeRationInventory()}):null;
  const reorderPreview=load&&!load.bulkReady&&load.layeringFeasibility?.status!=='forbidden'?previewExistingArmourArrangement(inv):null;
  const rows=layerDisplayRows(report,inv,load).map(r=>`<tr class="arm-layer-row arm-layer-${r.status}"><th scope="row" title="${esc(r.names)}">${esc(r.location)} <span class="muted tiny">${esc(JOURNAL_ANATOMICAL_LOCATIONS.find(([code])=>code===r.location)?.[1]||r.locationName)}</span></th><td class="arm-layer-count ${r.status==='valid'?'':'arm-layer-alert'}" title="${esc(r.detail)}">${r.count}${r.status==='over-limit'?` <b>+${r.count-5}</b>`:''}</td><td>${r.protection.b}</td><td>${r.protection.e}</td><td>${r.protection.p}</td><td>${r.protection.f}</td><td class="arm-layer-explain">${r.status==='valid'?'—':esc(r.detail)}</td></tr>`).join('');
- return `<section class="panel wide"><h3>Worn Armour · Location Protection & Layers</h3><div class="hmk-outfit-toolbar" role="group" aria-label="Hromadné oblékání a svlékání"><button type="button" data-outfit-action="armour" ${!owner||combatInitiativeSequence?'disabled':''} title="Najít nejvyšší ověřenou ochranu B/E/P/F a poté rigiditu mezi vlastněnými články HMK. Respektuje legální vrstvení.">Obléknout nejlepší zbroj / kompletní set</button><button type="button" class="secondary" data-outfit-action="clothing" ${!owner||combatInitiativeSequence?'disabled':''} title="Sestavit nejlepší legální kombinaci látkových článků HMK. Ostatní zbroj se svlékne.">Obléknout běžný oděv</button><button type="button" class="secondary" data-outfit-action="undress" ${!owner||combatInitiativeSequence?'disabled':''} title="Svléknout všechny aktuálně oblečené články zbroje a látkového oděvu; přesunou se do nesené výbavy.">Svléknout</button></div><p class="tiny muted">Zbroj: u přesného zakoupeného kompletu se použije tištěná sestava a její ověřené hodnoty, bez umělého limitu 12 článků. U ostatních kombinací maximum součtu doložených B/E/P/F, poté rigidních lokací, následně nejmenší Bulk/ENC a hmotnost. Běžný oděv: látkové články a kožená obuv podle HMK s. 118; jiné textilie bez doložené anatomie se automaticky neoblékají. Před změnou se zobrazí kontrolovaný návrh. Během Initiative je změna zakázána.</p><p class="muted tiny">Zobrazené B/E/P/F jsou součty z předmětů, nikoli automatické potvrzení pravidlové ochrany. Červeně je prokázané překročení počtu vrstev či nepřípustná materiálová kombinace, jantarově neznámé fyzické pořadí.</p>${rows?`<div class="catalog-scroll"><table class="catalog-spec arm-layer-table"><thead><tr><th>Location</th><th>Layers</th><th>${journalTerm('b')}</th><th>${journalTerm('e')}</th><th>${journalTerm('p')}</th><th>${journalTerm('f')}</th><th>Kontrola</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p>Žádná nasazená zbroj.</p>'}${reorderPreview?.ready?`<div class="actions"><button type="button" class="secondary" data-armour-autolayer="${esc(owner.id)}">Uspořádat zbroj do přípustných vrstev</button><p class="tiny muted">Aplikace navrhne a zapíše doložené pořadí, nikoli nová pravidla ani nový postih. Nemění počet či vlastnictví předmětů.</p></div>`:''}${report.skipped.length?`<p class="notice">U ${report.skipped.length} položek chybí úplná anatomická data; ochrana je jen částečný součet.</p>`:''}</section>`;
+ return `<section class="panel wide"><h3>Worn Armour · Location Protection & Layers</h3><div class="hmk-outfit-toolbar" role="group" aria-label="Hromadné oblékání a svlékání"><button type="button" data-outfit-action="armour" ${!owner||combatInitiativeSequence?'disabled':''} title="Najít nejvyšší ověřenou ochranu B/E/P/F a poté rigiditu mezi vlastněnými články HMK. Respektuje legální vrstvení.">Obléknout nejlepší zbroj / kompletní set</button><button type="button" class="secondary" data-outfit-action="clothing" ${!owner||combatInitiativeSequence?'disabled':''} title="Sestavit nejlepší legální kombinaci látkových článků HMK. Ostatní zbroj se svlékne.">Obléknout běžný oděv</button><button type="button" class="secondary" data-chest-outfit="armour">Obléknout zbroj z truhly</button><button type="button" class="secondary" data-chest-outfit="clothing">Obléknout oděv z truhly</button><button type="button" class="secondary" data-outfit-action="undress-chest" title="Svléknout všechny oblečené zbrojní a látkové články a doloženě je uložit do truhly">Svléknout do truhly</button><button type="button" class="secondary" data-outfit-action="undress" ${!owner||combatInitiativeSequence?'disabled':''} title="Svléknout všechny aktuálně oblečené články zbroje a látkového oděvu; přesunou se do nesené výbavy.">Svléknout</button></div><p class="tiny muted">Zbroj: u přesného zakoupeného kompletu se použije tištěná sestava a její ověřené hodnoty, bez umělého limitu 12 článků. U ostatních kombinací maximum součtu doložených B/E/P/F, poté rigidních lokací, následně nejmenší Bulk/ENC a hmotnost. Běžný oděv: látkové články a kožená obuv podle HMK s. 118; jiné textilie bez doložené anatomie se automaticky neoblékají. Před změnou se zobrazí kontrolovaný návrh. Během Initiative je změna zakázána.</p><p class="muted tiny">Zobrazené B/E/P/F jsou součty z předmětů, nikoli automatické potvrzení pravidlové ochrany. Červeně je prokázané překročení počtu vrstev či nepřípustná materiálová kombinace, jantarově neznámé fyzické pořadí.</p>${rows?`<div class="catalog-scroll"><table class="catalog-spec arm-layer-table"><thead><tr><th>Location</th><th>Layers</th><th>${journalTerm('b')}</th><th>${journalTerm('e')}</th><th>${journalTerm('p')}</th><th>${journalTerm('f')}</th><th>Kontrola</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p>Žádná nasazená zbroj.</p>'}${reorderPreview?.ready?`<div class="actions"><button type="button" class="secondary" data-armour-autolayer="${esc(owner.id)}">Uspořádat zbroj do přípustných vrstev</button><p class="tiny muted">Aplikace navrhne a zapíše doložené pořadí, nikoli nová pravidla ani nový postih. Nemění počet či vlastnictví předmětů.</p></div>`:''}${report.skipped.length?`<p class="notice">U ${report.skipped.length} položek chybí úplná anatomická data; ochrana je jen částečný součet.</p>`:''}</section>`;
 }
 function combatantLoadPanel(c){
  const r=resolveCombatantLoad({character:c,inventory:activeRationInventory()});
@@ -12875,6 +12866,14 @@ document.addEventListener('click',e=>{
  const action=button.dataset.outfitAction,ownerId=selected;
  if(view!=='sheet'||activeSheetSection!=='inventory'||!character(ownerId))return;
  if(combatInitiativeSequence)return alert('Během Initiative se výbava mění pouze pravidlovou Combat akcí.');
+ if(action==='undress-chest'){
+  const worn=previewUndressOutfit(data.inventory,ownerId);
+  if(!worn.length)return alert('Postava nemá žádné oblečené zbrojní či oděvní články.');
+  const ids=worn.map(x=>x.id);
+  inventoryBulkDraft={ownerId,ids,kind:'equipped',action:'store',at:JSON.stringify(ids.map(id=>data.inventory.find(x=>x.id===id))),clock:JSON.stringify(data.campaignClock)};
+  overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Svléknout do truhly</h2><p>Svléknout a uložit všech ${worn.length} oblečených článků. Zbraně v rukou a ostatní nesené předměty zůstanou beze změny. Žádná zbroj se nesmaže.</p><form id="inventory-batch-form"><label>Skutečné místo truhly<input name="location" maxlength="160" required placeholder="Např. dům v Tashálu"></label><label><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje přítomnost na místě truhly a skutečné odložení celé sestavy</label><div class="actions"><button type="submit">Svléknout a uložit ${worn.length} článků</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
+  render();return;
+ }
  if(action==='undress'){
   const worn=previewUndressOutfit(data.inventory,ownerId);
   if(!worn.length)return alert('Postava nemá žádné oblečené zbrojní či látkové články.');
@@ -12899,6 +12898,86 @@ document.addEventListener('click',e=>{
    throw Error('Finální sestava neprošla kontrolou zatížení a vrstvení. '+(load.layeringStatus||''));
   if(mutate(()=>{data.inventory=next;})){render();}
  }catch(err){alert('Oblečení nebylo změněno: '+err.message);render();}
+},true);
+// Arsenal & Gear v93.522: checks and group actions always use the original IDs.
+// A preview is immutable until the user confirms; each batch is one CAS write.
+let inventoryBulkDraft=null;
+document.addEventListener('change',e=>{
+ const control=e.target?.closest?.('[data-inv-select-all]');if(!control)return;
+ const section=control.closest('[data-inv-bulk-section]');
+ for(const input of section.querySelectorAll('[data-inv-bulk-select]'))input.checked=control.checked;
+ const count=section.querySelector('.inv-bulk-count');if(count)count.textContent=section.querySelectorAll('[data-inv-bulk-select]:checked').length+' vybráno';
+},true);
+document.addEventListener('change',e=>{
+ if(!e.target?.matches?.('[data-inv-bulk-select]'))return;
+ const section=e.target.closest('[data-inv-bulk-section]'),all=[...section.querySelectorAll('[data-inv-bulk-select]')];
+ const header=section.querySelector('[data-inv-select-all]');if(header){header.checked=all.every(x=>x.checked);header.indeterminate=all.some(x=>x.checked)&&!header.checked;}
+ const count=section.querySelector('.inv-bulk-count');if(count)count.textContent=all.filter(x=>x.checked).length+' vybráno';
+},true);
+document.addEventListener('click',e=>{
+ const control=e.target?.closest?.('[data-inv-bulk-action]');if(!control)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(view!=='sheet'||activeSheetSection!=='inventory'||combatInitiativeSequence)return alert('Hromadné přesuny jsou dostupné jen mimo Initiative v inventáři postavy.');
+ const section=control.closest('[data-inv-bulk-section]'),kind=section?.dataset.invBulkSection;
+ const ids=[...section.querySelectorAll('[data-inv-bulk-select]:checked')].map(x=>x.value);
+ if(!ids.length)return alert('Nejprve označte předměty v tomto seznamu.');
+ const action=control.dataset.invBulkAction;
+ if(['ration-transfer','ration-loss','partial'].includes(action)){
+  if(ids.length!==1)return alert('Tato zásobovací operace vyžaduje právě jeden označený inventární záznam.');
+  const item=data.inventory.find(x=>x.id===ids[0]&&x.characterId===selected);
+  if(!item)return alert('Vybraná zásoba nebyla nalezena v původním inventáři.');
+  if(action==='partial'){
+   overlay=inventoryPartialDropForm(item);
+   if(!overlay)return alert('U této položky není doložená odložitelná zásoba.');
+   render();return;
+  }
+  const ck=data.campaignClock,k=campaignKey(ck),minute=ck?.minute??0;
+  const source=action==='ration-transfer'?availableRationLots(data.journal,k,selected,minute).find(l=>l.itemId===item.id)?.sourceId:
+   rationStockBalances(data.journal,k,selected,minute).find(l=>l.itemId===item.id&&l.minute<=minute&&l.remaining>=0.5)?.sourceId;
+  if(!source)return alert('Tento předmět nemá pro požadovanou akci platný zásobovací doklad.');
+  const route=document.createElement('button');route.hidden=true;route.type='button';route.setAttribute(action==='ration-transfer'?'data-transfer-ration':'data-loss-ration',source);section.append(route);
+  try{route.click();}finally{route.remove();}return;
+ }
+ if(!ids.every(id=>data.inventory.some(x=>x.id===id&&x.characterId===selected&&(kind==='chest'?x.slot==='chest':kind==='carried'?['none','carried'].includes(x.slot):['worn','main_hand','off_hand'].includes(x.slot)))))return alert('Výběr obsahuje položku mimo tento seznam.');
+ inventoryBulkDraft={ownerId:selected,ids,kind,action,at:JSON.stringify(ids.map(id=>data.inventory.find(x=>x.id===id))),clock:JSON.stringify(data.campaignClock)};
+ const chestPlaces=[...new Set(data.inventory.filter(x=>x.characterId===selected&&x.slot==='chest'&&ids.includes(x.id)).map(x=>x.chestLocation))];
+ const hasChest=kind==='chest';if(hasChest&&chestPlaces.length!==1)return alert('Vyberte předměty pouze z jednoho skutečného místa truhly.');
+ const members=data.campaignClock?(data.campaignClock.characterIds??data.characters.map(c=>c.id)):[];
+ const recipients=data.characters.filter(x=>x.id!==selected&&members.includes(x.id));
+ overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Hromadně: ${action==='store'?'Uložit do truhly':action==='retrieve'?'Vyzvednout z truhly':action==='transfer'?'Předat':'Ztráta / vyřadit'}</h2><p>Vybráno ${ids.length} samostatných záznamů. Vše bude potvrzeno a uloženo společně; jediná chyba operaci celou zruší.</p><form id="inventory-batch-form">${(action==='store'||hasChest)?`<label>Skutečné místo truhly<input name="location" maxlength="160" required ${hasChest?'readonly':''} value="${esc(hasChest?chestPlaces[0]:'')}" placeholder="Např. truhla v domě v Tashálu"></label>`:''}${action==='transfer'?`<label>Příjemce<select name="recipientId" required>${recipients.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>`:''}${['loss','transfer'].includes(action)?'<label>Skutečné okolnosti<input name="reason" minlength="2" maxlength="240" required placeholder="Doložená ztráta nebo předání"></label>':''}<label><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje skutečný přístup, fyzické předměty a provedení celé akce</label><div class="actions"><button type="submit">Provést pro ${ids.length} položek</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
+ render();
+},true);
+document.addEventListener('submit',e=>{
+ if(e.target?.id!=='inventory-batch-form')return;e.preventDefault();e.stopImmediatePropagation();
+ const draft=inventoryBulkDraft,v=Object.fromEntries(new FormData(e.target));
+ try{
+  if(!draft||view!=='sheet'||activeSheetSection!=='inventory'||draft.ownerId!==selected||combatInitiativeSequence)throw Error('Výběr ani postava už nejsou aktuální.');
+  if(draft.at!==JSON.stringify(draft.ids.map(id=>data.inventory.find(x=>x.id===id)))||draft.clock!==JSON.stringify(data.campaignClock))throw Error('Inventář nebo kampaň se od potvrzení změnily.');
+  const next=applyInventoryBatch(data,{ownerId:selected,itemIds:draft.ids,action:draft.action,location:v.location||'',recipientId:v.recipientId||null,reason:v.reason||'',confirmed:v.confirmed==='yes',idFactory:uuid,createdAt:stamp()});
+  if(mutate(()=>{data.inventory=next.inventory;data.journal=next.journal;})){inventoryBulkDraft=null;overlay=null;render();}
+ }catch(error){alert('Hromadná změna nebyla zapsána: '+error.message);}
+},true);
+document.addEventListener('click',e=>{
+ const b=e.target?.closest?.('[data-chest-outfit]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();
+ if(view!=='sheet'||activeSheetSection!=='inventory'||combatInitiativeSequence)return alert('Převlečení z truhly není dostupné během Initiative.');
+ const places=[...new Set(data.inventory.filter(x=>x.characterId===selected&&x.slot==='chest').map(x=>x.chestLocation).filter(Boolean))];
+ if(!places.length)return alert('Postava nemá dostupnou truhlu s doloženým umístěním.');
+ const mode=b.dataset.chestOutfit;
+ overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Obléknout ${mode==='armour'?'zbroj':'běžný oděv'} z truhly</h2><p>Nejprve vyberte skutečně dostupné místo. Přesuneme jen vybrané součásti sestavy; zbytek zůstane uložený.</p><form id="inventory-chest-outfit-form"><input type="hidden" name="actorId" value="${esc(selected)}"><input type="hidden" name="mode" value="${esc(mode)}"><label>Místo truhly<select name="location">${places.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></label><label><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje přístup na dané místo a čas na převlečení</label><div class="actions"><button type="submit">Vyhodnotit a obléknout</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;render();
+},true);
+document.addEventListener('submit',e=>{
+ if(e.target?.id!=='inventory-chest-outfit-form')return;e.preventDefault();e.stopImmediatePropagation();
+ const v=Object.fromEntries(new FormData(e.target));
+ if(view!=='sheet'||activeSheetSection!=='inventory'||String(v.actorId)!==selected||combatInitiativeSequence)return alert('Změnil se vlastník nebo režim Combat.');
+ try{
+  const plan=previewChestOutfit(data,{ownerId:selected,location:v.location,mode:v.mode});
+  if(!plan.ready)throw Error(plan.reason);
+  if(!ask('Vybraná sestava: '+plan.preview.names.join(', ')+'\nZ truhly vyzvednout '+plan.ids.length+' článků ('+plan.names.join(', ')+').\nDoložené pravidlo: '+plan.preview.proof+'\nProvést všechny přesuny a převlečení?'))return;
+  const result=applyChestOutfit(data,{ownerId:selected,location:v.location,mode:v.mode,confirmed:v.confirmed==='yes',idFactory:uuid,createdAt:stamp()});
+  const load=resolveCombatantLoad({character:character(selected),inventory:result.inventory});
+  if((load.layeringFeasibility?.status==='forbidden'&&!load.printedSuit)||load.layeringStatus==='violation'||load.bulkReady===false)throw Error('Výsledná ochrana/vrstvy nebyly pravidlově ověřeny.');
+  if(mutate(()=>{data.inventory=result.inventory;data.journal=result.journal;})){overlay=null;render();}
+ }catch(err){alert('Převlečení z truhly nebylo provedeno: '+err.message);}
 },true);
 document.addEventListener('click',e=>{
  const t=e.target.closest('[data-armour-autolayer]');if(!t)return;
@@ -12948,34 +13027,6 @@ document.addEventListener('change',e=>{
   // The existing CAS writer persists inventory only; it does not rewrite actors.
   if(!mutate(()=>{data.inventory=updated.inventory;}))render();
  }catch(err){alert('Ruce nebyly změněny: '+err.message);render();}
-},true);
-// One compact inventory action picker. Dispatch to the pre-existing handlers,
-// not a second implementation of chest, transfer, edit, or item disposal.
-document.addEventListener('click',e=>{
- const ok=e.target.closest?.('[data-inv-action-confirm]');if(!ok)return;
- e.preventDefault();e.stopImmediatePropagation();
- const menu=ok.closest('[data-inv-action-menu]'),select=menu?.querySelector('[data-inv-action-select]');
- const option=select?.selectedOptions[0],kind=select?.value,id=menu?.querySelector('[data-inv-member-select]')?.value||ok.dataset.invItemId;
- const x=data.inventory.find(i=>i.id===id&&i.characterId===selected);
- if(!kind||!x||view!=='sheet'||activeSheetSection!=='inventory')return;
- if(kind==='partial'){
-  if(combatInitiativeSequence)return alert('Během Initiative nelze zásoby odložit bez Combat akce.');
-  overlay=inventoryPartialDropForm(x);
-  if(!overlay)return alert('Na tomto předmětu není doložená odložitelná zásoba.');
-  render();return;
- }
- const attrs={edit:'data-edit-inv',chest:'data-chest-move','ration-transfer':'data-transfer-ration',
-  'ration-loss':'data-loss-ration',transfer:'data-transfer-inv',remove:'data-remove-inv'};
- const attr=attrs[kind];if(!attr)return;
- const key=campaignKey(data.campaignClock),minute=data.campaignClock?.minute??0;
- const source=kind==='ration-transfer'?availableRationLots(data.journal,key,selected,minute).find(l=>l.itemId===id)?.sourceId:
-  kind==='ration-loss'?rationStockBalances(data.journal,key,selected,minute).find(l=>l.itemId===id&&l.minute<=minute&&l.remaining>=0.5)?.sourceId:null;
- const target=kind==='ration-transfer'||kind==='ration-loss'?source:id;
- if((kind==='ration-transfer'||kind==='ration-loss')&&!target)return alert('Vybraný konkrétní kus nemá pro tuto akci dostupné doložené potraviny.');
- if(!target)return;
- const route=document.createElement('button');route.type='button';route.hidden=true;route.setAttribute(attr,target);
- menu.append(route);
- try{route.click();}finally{route.remove();}
 },true);
 document.addEventListener('change',e=>{
  const pick=e.target.closest?.('[data-inv-partial-lot]');if(!pick)return;
