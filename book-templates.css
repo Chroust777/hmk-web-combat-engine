@@ -4918,96 +4918,55 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .hmk-outfit-toolbar button{flex:1 1 185px;min-width:0;white-space:normal;font:600 13px/1.35 Georgia,serif;padding:9px 11px}
 @media(max-width:680px){.content-sheet .hmk-outfit-toolbar{display:grid;grid-template-columns:1fr}.content-sheet .hmk-outfit-toolbar button{width:100%}}
 
-/* v93.522 — compact, owner-bound Arsenal ledger; item name stays visible
-   inside its own horizontal scrollport without hiding any technical data. */
+/* v93.525 — Arsenal inventory tables align with Library parchment tables,
+   keep the first column visible, center bulk action bars and stay compact. */
 .content-sheet .journal-book--chapter .inv-ledger-section{min-width:0!important;margin-bottom:14px!important}
-.content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll{position:relative!important;overflow-x:auto!important;overscroll-behavior-x:contain!important}
-.content-sheet .journal-book--chapter .inv-ledger-table{
- width:802px!important;min-width:802px!important;table-layout:fixed!important;border-collapse:separate!important;border-spacing:0!important
-}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(1){width:230px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(2){width:92px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(3){width:44px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(4){width:68px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(5){width:76px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(6){width:72px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(7){width:154px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:66px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table thead th:first-child{
- position:sticky!important;left:0!important;z-index:5!important;
- background-image:url('./assets/ui/components/vellum_master.png')!important;background-size:1024px!important;color:inherit!important;box-shadow:2px 0 5px rgba(50,35,23,.2)!important
-}
-.content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{
- position:sticky!important;left:0!important;z-index:3!important;
- background-image:url('./assets/ui/components/vellum_master.png')!important;background-size:1024px!important;box-shadow:2px 0 5px rgba(50,35,23,.22)!important;
- text-align:left!important;overflow-wrap:anywhere!important;
-}
-
-.content-sheet .journal-book--chapter .inv-ledger-table .inv-select-row{
- display:flex!important;align-items:flex-start!important;gap:7px!important;
- padding:0!important;margin:0!important;min-width:0!important;font-weight:700!important;
-}
-.content-sheet .journal-book--chapter .inv-ledger-table .inv-bulk-checkbox{
- flex:0 0 auto!important;width:15px!important;height:15px!important;min-width:15px!important;
- margin:2px 0 0!important;accent-color:#654428!important
-}
-.content-sheet .journal-book--chapter .inv-ledger-table .inv-item-name{min-width:0!important;overflow-wrap:anywhere!important}
+.content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll{position:relative!important;overflow:auto!important;overscroll-behavior-x:contain!important;background:transparent!important;border:1px solid var(--folio-rule)!important;padding:0!important}
+.content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll.inv-15-rows{max-height:650px!important;scrollbar-gutter:stable!important}
+.content-sheet .journal-book--chapter .inv-ledger-table{width:742px!important;min-width:742px!important;table-layout:fixed!important;border-collapse:collapse!important;border-spacing:0!important;background:transparent!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(1){width:232px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(2){width:58px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(3){width:34px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(4){width:56px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(5){width:64px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(6){width:56px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(7){width:172px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:64px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table thead th,
+.content-sheet .journal-book--chapter .inv-ledger-table tbody :is(td,th){background:transparent!important}
+.content-sheet .journal-book--chapter .inv-ledger-table thead th{position:sticky!important;top:0!important;z-index:4!important;color:inherit!important;font-weight:700!important}
+.content-sheet .journal-book--chapter .inv-ledger-table thead th:first-child{left:0!important;z-index:8!important}
+.content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{position:sticky!important;left:0!important;z-index:3!important;text-align:left!important}
+.content-sheet .journal-book--chapter .inv-ledger-table thead th:first-child,
+.content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{background:url('./assets/ui/components/vellum_master.png') repeat center/1024px!important;box-shadow:none!important}
 .content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(2),
 .content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(3),
 .content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(4),
 .content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(5),
-.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(6){font-size:11px!important;line-height:1.25!important}
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(6){font-size:11px!important;line-height:1.2!important;text-align:center!important}
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(2){white-space:normal!important;padding-left:3px!important;padding-right:3px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-select-row{display:flex!important;align-items:flex-start!important;gap:7px!important;padding:0!important;margin:0!important;min-width:0!important;font-weight:700!important}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-bulk-checkbox{flex:0 0 auto!important;width:15px!important;height:15px!important;min-width:15px!important;margin:2px 0 0!important;accent-color:#654428!important}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-item-name{min-width:0!important;overflow-wrap:anywhere!important}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-key-spec{min-width:0!important;max-width:none!important;overflow-wrap:break-word!important;text-align:left!important}
 .content-sheet .journal-book--chapter .inv-ledger-table .inv-edit-only{width:100%!important;min-width:0!important;white-space:nowrap!important;padding:4px 1px!important;font:700 11px Georgia,serif!important}
-.content-sheet .journal-book--chapter .inv-bulk-toolbar{
- display:flex!important;flex-wrap:wrap!important;align-items:center!important;
- gap:5px!important;margin:7px 0 4px!important;padding:8px!important;
- border:1px solid #aa916f!important;background:rgba(244,233,209,.6)!important
-}
+.content-sheet .journal-book--chapter .inv-bulk-toolbar{display:flex!important;flex-wrap:wrap!important;justify-content:center!important;align-items:center!important;gap:6px!important;margin:7px auto 4px!important;padding:8px!important;border:1px solid #aa916f!important;background:rgba(244,233,209,.6)!important;text-align:center!important}
 .content-sheet .journal-book--chapter .inv-bulk-toolbar button{padding:5px 8px!important;min-height:30px!important;font:700 12px Georgia,serif!important}
-.content-sheet .journal-book--chapter .inv-select-all{display:flex!important;align-items:center!important;gap:5px!important;margin:0!important;font-size:12px!important}
-.content-sheet .journal-book--chapter .inv-bulk-count{margin-left:auto!important;font-size:11px!important;white-space:nowrap!important}
+.content-sheet .journal-book--chapter .inv-select-all{display:flex!important;align-items:center!important;gap:5px!important;margin:0 10px 0 0!important;font-size:12px!important}
+.content-sheet .journal-book--chapter .inv-bulk-count{margin-left:10px!important;font-size:11px!important;white-space:nowrap!important}
 @media(max-width:700px){
- .content-sheet .journal-book--chapter .inv-ledger-table{width:802px!important;min-width:802px!important}
+ .content-sheet .journal-book--chapter .inv-ledger-table{width:742px!important;min-width:742px!important}
  .content-sheet .journal-book--chapter .inv-bulk-toolbar button{font-size:11px!important}
 }
 
 /* v93.523 · Arsenal & Gear: two readable four-step wardrobe sequences */
-.content-sheet .hmk-outfit-toolbar{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;align-items:stretch!important}
-.content-sheet .hmk-outfit-action-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:7px!important;min-width:0!important;margin:0!important;padding:12px!important;border:1px solid #a78e6a!important;background:rgba(246,234,211,.42)!important}
-.content-sheet .hmk-outfit-action-group legend{font:700 14px Georgia,serif!important;padding:0 5px!important;color:#433020!important}
-.content-sheet .hmk-outfit-action-group button{width:100%!important;min-height:40px!important;flex:none!important;margin:0!important;white-space:normal!important}
-@media(max-width:700px){.content-sheet .hmk-outfit-toolbar{grid-template-columns:minmax(0,1fr)!important}}
-/* Exactly one scroll box per list, fifteen compact body rows at most.
-   Header remains visible while scrolling vertically; names stay fixed horizontally. */
-.content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll.inv-15-rows{
- max-height:650px;overflow-y:auto!important;overflow-x:auto!important;
- scrollbar-gutter:stable!important;border:1px solid rgba(110,86,56,.22)!important
-}
-.content-sheet .journal-book--chapter .inv-ledger-table{width:754px!important;min-width:754px!important;table-layout:fixed!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(1){width:222px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(2){width:70px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(3){width:40px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(4){width:62px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(5){width:72px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(6){width:62px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(7){width:158px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:68px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table thead th{position:sticky!important;top:0!important;z-index:4!important;background:var(--folio-paper,#efe3cb)!important;color:inherit!important}
-.content-sheet .journal-book--chapter .inv-ledger-table thead th:first-child{z-index:8!important;left:0!important;box-shadow:1px 0 1px rgba(55,40,25,.12)!important}
-/* Reuse the EXISTING Library parchment, never flat grey inventory stripes. */
-.content-sheet .journal-book--chapter .inv-ledger-table tbody td{background:transparent!important}
-.content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{box-shadow:1px 0 1px rgba(55,40,25,.13)!important}
-.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(2){white-space:nowrap!important;padding-left:4px!important;padding-right:3px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(3){padding-left:2px!important;padding-right:2px!important}
-.content-sheet .journal-book--chapter .inv-ledger-table :is(td,th){overflow-wrap:break-word!important}
-
-/* v93.524: reuse exact Library parchment/headers (same asset & palette). */
+/* v93.524–525: inventory tables use the same parchment base as Library tables. */
 .content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll{
  background:url('./assets/ui/components/vellum_master.png') repeat center/1024px!important;
 }
 .content-sheet .journal-book--chapter .inv-ledger-table thead th{
- background:#d0b887!important;color:#4c2817!important;
- font-family:Georgia,serif!important;border-bottom:2px solid #8a6037!important;
+ background:url('./assets/ui/components/vellum_master.png') repeat center/1024px!important;
+ color:inherit!important;font-family:Georgia,serif!important;border-bottom:1px solid var(--folio-rule)!important;
 }
 .content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{
  background:url('./assets/ui/components/vellum_master.png') repeat center/1024px!important;
