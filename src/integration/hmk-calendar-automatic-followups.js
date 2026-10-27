@@ -5,6 +5,7 @@
  */
 import {criticalActivities,skillFollowupActivities} from './hmk-skill-critical-activities.js';
 import {trekkingOutstandingCases} from './hmk-trekking-followups.js';
+import {pendingTrackingAwareness} from './hmk-tracking-awareness-537.js';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -172,6 +173,29 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    if(c)push(c,'skill-critical',e.id+'-'+x.side,`${x.skill} ${x.result.level} – GM ověří konkrétní činnost a případný navazující test (HMK ${skillFollowupActivities(x.skill,x.result.level)[0].page})`,e.campaignMinute,'skills',
     {originId:e.id,side:x.side,level:x.result.level,decisionRequired:true});
   }
+ }
+ // A real d3 Animal Training extension and a Will-based Writing delay
+ // cannot be assigned a calendar due minute without the ORIGINAL start/end
+ // plan. Surface the unresolved scheduling decision, not a fabricated date.
+ for(const event of journal){
+  if(event.calendarCampaignId!==clock.campaignId)continue;
+  const t=event.skillTestProof?.trainingExtension,w=event.skillTestProof?.writingExtension;
+  if(!t&&!w)continue;
+  const person=characters.find(c=>c.id===event.characterId);if(!person)continue;
+  const reason=t?'Původní datum výcviku není doloženo: GM musí odvodit termín podle kalendářních měsíců.':'Doba psaní vyžaduje doložený původní kalendářní plán a skutečný pracovní rytmus.';
+  const description=t?`Animal Training CF · ${t.animalName}: d3 ${t.dieD3} → +${t.additionalMonths} měsíce (HMK 65)`:
+   `Writing CF · ${w.scope}: ${w.completionTimeMultiplier*100} % původního času (HMK 132)`;
+  unknown.push({characterId:person.id,name:person.name,kind:t?'animal-training-date':'writing-completion-date',
+    sourceId:event.id,description,reason});
+ }
+ // Tracking SV 3–4 has a *conditional* p.147 Awareness check, not an
+ // unconditional extra d100. Restore this obligation from immutable journal.
+ for(const tracking of pendingTrackingAwareness(journal,clock.campaignId??null)){
+  const p=tracking.calendarTrekTrackingProof;
+  const actor=characters.find(c=>c.id===p.trackerId);
+  if(actor)push(actor,'tracking-awareness',tracking.id,
+   'Tracking SV '+p.score.adjustedSV+' → Awareness d100; úspěch = 1 Spoor star (HMK 147)',
+   tracking.campaignMinute,'skills',{trackingId:tracking.id,decisionRequired:true});
  }
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
  return {all,unknown};

@@ -14,7 +14,8 @@ export const CF_ACTIVITIES=Object.freeze({
  Jumping:Object.freeze([{id:'jumping-sv',label:'Jumping · skok SV',page:77,mode:'test',test:'Stumble'}]),
  Fishing:Object.freeze([{id:'fishing-sv',label:'Fishing · lov ryb SV',page:71,mode:'split-fishing'}]),
  Survival:Object.freeze([{id:'trek-survival-hazard',label:'Trekking · náhodný Survival Hazard',page:148,mode:'hazard'}]),
- Script:Object.freeze([{id:'writing-routine',label:'Writing Routine · autor textu',page:132,mode:'test',test:'Will'}]),
+ Language:Object.freeze([{id:'writing-routine',label:'Writing Routine · autor textu (Language + Creativity SR)',page:132,mode:'test',test:'Will'}]),
+ Animalcraft:Object.freeze([{id:'animal-training',label:'Animal Training · CF: dodatečný d3 měsíců',page:65,mode:'animal-training'}]),
  Lockcraft:Object.freeze([{id:'lock-picking',label:'Picking Locks · otevírání zámku',page:77,mode:'lock'}])
 });
 /** Failures are not universally rerolled. These are activity-specific F links. */
@@ -32,7 +33,7 @@ export function skillFollowupActivities(skill,level){
  if(level==='F')return FAILURE_ACTIVITIES[String(skill)]||[];
  return [];
 }
-export function criticalActivities(skill){const name=String(skill);return CF_ACTIVITIES[name]||(/^Script(?:\s|\(|:|$)/.test(name)?CF_ACTIVITIES.Script:[]);}
+export function criticalActivities(skill){const name=String(skill);return CF_ACTIVITIES[name]||(/^Language(?:\s|\(|:|$)/.test(name)||/\(Language\)$/.test(name)?CF_ACTIVITIES.Language:[]);}
 /** HMK p.60–61 gives no universal reroll on F/CF. Only source-backed
  * consequences are stated; separate activity subsystems remain authoritative.
  */
@@ -44,7 +45,8 @@ export function skillFailureGuidance(skill,level){
  if(base==='Stealth')return {page:84,kind:'stealth',text:level==='CF'?'Stealth CF: cíl o postavě ví; další hod není součástí tohoto testu.':'Stealth F: podezření; případný nový pokus při alertním cíli se řeší Opposed Stealth vs Awareness.'};
  if(base==='Tracking')return {page:147,kind:'trekking-tracking',text:level==='CF'?'Tracking CF při Stalking: další hlídka vyžaduje Bearing Mode; vyhodnocuje původní Trekking/Tracking ledger, ne nový d100.':'Tracking F při Stalking: zhodnoťte skutečné SV; Awareness se nabízí až při doloženém SV 3–4 (HMK str.147).'};
  if(base==='Lockcraft')return {page:78,kind:'lockcraft',text:level==='CF'?'Lockcraft CF: zámek neotevřen; na další pokusy kumulativní −20 ML.':'Lockcraft F: zámek neotevřen; pravidla dovolují další samostatný pokus.'};
- if(base==='Animalcraft'&&level==='CF')return {page:65,kind:'training',text:'Animalcraft CF při Training Routine: prodlužuje dobu výcviku o d3 měsíců; nejedná se o další Skill Test.'};
+ if(base==='Animalcraft'&&level==='CF')return {page:65,kind:'training',text:'Animalcraft CF při Training Routine: prodlužuje výcvik o d3 měsíců; skutečný d3 a zvíře doložte v navazující činnosti.'};
+ if((base==='Language'||/\(Language\)$/.test(String(skill)))&&level==='CF')return {page:132,kind:'writing',text:'Writing Routine CF je Language (Creativity SR) Success Value test a vyžaduje Will test. F/CF Will prodlužuje čas o 50/100 %. Samotné Script CF toto pravidlo nespouští.'};
  if(base==='Climbing'&&level==='F')return {page:67,kind:'activity-dependent',text:'Easy Climbing F: GM volí neúspěch po jednom turnu, nebo pokus po jednom roundu se Strength d100; Difficult Climbing F se vyhodnotí podle SV bez tohoto hodu.'};
  if(base==='Acrobatics')return {page:64,kind:'activity-dependent',text:'Acrobatics: při Gymnastics F následuje Strength Test; při CF se typ následku liší podle Balance/Gymnastics.'};
  if(criticalActivities(base).length&&level==='CF')return {page:criticalActivities(base)[0].page,kind:'activity-dependent',text:'CF může spustit konkrétní pravidlový následek. Vyberte skutečně prováděnou činnost v navazujícím formuláři.'};
@@ -57,6 +59,7 @@ export function criticalFollowupPlan(skill,activity,original){
  const t=r.mode==='split'||r.mode==='split-fishing'?(cf0?'Fumble':'Stumble'):r.test;
  if(r.mode==='decision')return {...r,requiresRoll:false,detail:r.id==='climb-easy-turn-failure'?'Easy Climbing F: lezení selhalo po jednom turnu, bez nového d100.':r.id==='climb-difficult-failure'?'Difficult Climbing F: pokračujte původním Success Value a jeho minutovou evidencí; žádný nový d100 nelze přidat automaticky.':'Balance F: bez zvláštního dalšího testu; GM vyhodnotí původní neúspěch a pohyb.'};
  if(r.mode==='prone')return {...r,requiresRoll:false,detail:'CF: manévr selhal; postava padá prone. Další hod pravidlo nevyžaduje.'};
+ if(r.mode==='animal-training')return {...r,requiresRoll:false,detail:'HMK 65: již provedená Animal Training Routine (6 měsíců při ~1 hodině denně) s CF prodlužuje výcvik o skutečný d3 měsíců. Potvrďte zvíře, výcvik a fyzický d3; přesný den dokončení vyžaduje skutečný kalendářní plán.'};
  if(r.mode==='hazard')return {...r,requiresRoll:false,detail:'CF Trekking: vyhodnoťte Survival Hazard d10 (1–3 Equipment, 4–6 Accident, 7–10 Complication). Accident vyžaduje Agility test náhodně určené postavy a při neúspěchu skutečné zranění d6+4b.'};
  if(r.mode==='lock')return {...r,requiresRoll:false,detail:'CF: zámek se neotevře; další pokusy mají kumulativní postih −20 ML. Bez dalšího d100.'};
  return {...r,requiresRoll:true,test:t,detail:t==='Fumble'?'Test Dexterity nebo doložené Legerdemain.':t==='Stumble'?'Test Agility nebo doložené Acrobatics.':`Následuje test ${t}.`};
