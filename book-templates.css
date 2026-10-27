@@ -4804,3 +4804,111 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .hc-clock-heading small{color:#75583d;font-size:.8rem;line-height:1.2}
 .content-sheet .hc-provision-party-conditions details{border:1px solid rgba(108,69,38,.3);border-radius:9px;padding:12px}
 .content-sheet .hc-provision-party-conditions summary{font-weight:700;color:#59391f}
+
+/* v93.519 — readable, evenly aligned Trekking Routine only; no rule changes. */
+.content-calendar .hc-trek-routine .hmk-trek-guide,
+.content-calendar .hc-trek-routine .hmk-trek-entry{
+  border:1px solid rgba(122,91,52,.43);
+  border-radius:7px;
+  margin:11px 0;
+  background:rgba(255,245,223,.17);
+  padding:9px 12px;
+}
+.content-calendar .hc-trek-routine .hmk-trek-guide>summary,
+.content-calendar .hc-trek-routine .hmk-trek-entry>summary{
+  cursor:pointer;
+  font:700 .96rem/1.45 Georgia,serif;
+  color:#4b321f;
+  margin:2px 0 10px;
+}
+.content-calendar .hc-trek-routine .hmk-trek-steps{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px 20px;
+  margin:10px 2px 12px;
+  padding-left:23px;
+  color:#46321f;
+  font:.83rem/1.48 Georgia,serif;
+}
+.content-calendar .hc-trek-routine .hmk-trek-steps>li{
+  margin:0;padding:6px 6px 6px 2px;
+  border-bottom:1px solid rgba(124,91,48,.22);
+  min-width:0;
+}
+.content-calendar .hc-trek-routine .hmk-trek-steps strong{display:block;margin-bottom:2px;color:#53321c}
+.content-calendar .hc-trek-routine .hmk-trek-section{
+  min-width:0;
+  box-sizing:border-box;
+  margin:13px 0;
+  padding:10px 12px 14px;
+  border:1px solid rgba(131,99,60,.40);
+  border-radius:6px;
+  background:rgba(248,230,192,.15);
+}
+.content-calendar .hc-trek-routine .hmk-trek-section>legend{
+  padding:2px 8px;
+  color:#4b321f;
+  font:700 .89rem/1.35 Georgia,serif;
+}
+.content-calendar .hc-trek-routine .hmk-trek-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px 15px;
+  align-items:start;
+}
+.content-calendar .hc-trek-routine .hmk-trek-grid>label:not(.hc-check){
+  margin:0!important;
+  padding:0!important;
+  min-width:0;
+  display:flex!important;
+  flex-direction:column;
+  justify-content:space-between;
+  gap:7px!important;
+  line-height:1.4!important;
+}
+.content-calendar .hc-trek-routine .hmk-trek-grid>label:not(.hc-check)>:is(input,select,textarea){
+  min-height:40px;
+  margin:0!important;
+  flex:0 0 auto;
+}
+.content-calendar .hc-trek-routine .hmk-trek-grid>label.hc-check{
+  padding:11px 9px;
+  margin:0!important;
+  min-height:40px;
+  box-sizing:border-box;
+  border:1px solid rgba(125,92,56,.32);
+  border-radius:5px;
+  background:rgba(255,250,234,.25);
+  display:flex!important;
+  align-items:center!important;
+}
+.content-calendar .hc-trek-routine .hmk-trek-grid>label.hc-check input{margin:0!important;align-self:center}
+.content-calendar .hc-trek-routine .hmk-trek-advanced>label:not(.hc-check){
+  display:flex;flex-direction:column;gap:8px;
+  max-width:100%;
+}
+.content-calendar .hc-trek-routine .hmk-trek-advanced>label:has(textarea){font-weight:650}
+.content-calendar .hc-trek-routine .hmk-trek-advanced>label textarea{min-height:68px}
+.content-calendar .hc-trek-routine [data-hmk-help]{cursor:help;text-decoration:underline dotted rgba(109,71,35,.48);text-underline-offset:3px}
+.content-calendar .hc-trek-routine [data-hmk-help]:focus-visible{outline:2px solid #92622f;outline-offset:3px}
+.content-calendar .hc-trek-routine label[data-hmk-help]:focus-within{outline-color:#92622f}
+@media (max-width:900px){
+ .content-calendar .hc-trek-routine .hmk-trek-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:620px){
+ .content-calendar .hc-trek-routine .hmk-trek-steps{grid-template-columns:1fr}
+ .content-calendar .hc-trek-routine .hmk-trek-grid{grid-template-columns:1fr}
+ .content-calendar .hc-trek-routine .hmk-trek-guide,
+ .content-calendar .hc-trek-routine .hmk-trek-entry{padding:8px}
+ .content-calendar .hc-trek-routine .hmk-trek-section{padding:8px}
+}
+
+/* Adapt to the book column width, not the overall screen width. */
+.content-calendar .hc-trek-routine{container-type:inline-size}
+@container (max-width:750px){
+ .content-calendar .hc-trek-routine .hmk-trek-steps{grid-template-columns:1fr}
+ .content-calendar .hc-trek-routine .hmk-trek-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@container (max-width:370px){
+ .content-calendar .hc-trek-routine .hmk-trek-grid{grid-template-columns:1fr}
+}

@@ -254,7 +254,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.518';
+const APP_VERSION='93.519';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1184,32 +1184,43 @@ function campaignCalendarView(){
  const selectedCalendarPeople=calendarMemberIds(clock,data.characters);
  const board=campaignCalendarBoardHTML({clock,characters:selectedCalendarPeople,journal:data.journal,ui:calendarUI,escapeHTML:esc});
  const animalRoster=data.characters.filter(c=>c?.hmk?.verifiedMountedBreed).map(c=>{
-  try{const h=trekRegisteredAnimalHealth(c);return `${esc(c.id)} (${esc(c.name||c.id)}, ${esc(h.breed)}): Fatigue ${h.fatigue}, Shock ${esc(h.shock)}, ${h.injured?'zraněné':'bez Serious/Grievous zranění'}`;}
-  catch(e){return `${esc(c.id)}: ${esc(e.message)}`;}
+  try{const h=trekRegisteredAnimalHealth(c);return `${esc(c.name||'Nepojmenované zvíře')} (${esc(h.breed)}): Fatigue ${h.fatigue}, Shock ${esc(h.shock)}, ${h.injured?'zraněné':'bez Serious/Grievous zranění'}`;}
+  catch(e){return `${esc(c.name||'Nepojmenované zvíře')}: ${esc(e.message)}`;}
  });
  const trekPanel=`<section class="hc-calendar hc-trek-routine"><h3>HMK · Trekking Routine: počasí, pohyb, nebezpečí a setkání</h3>
  <p class="hc-hint">Pravidla HMK str. 141–150: počasí se určuje jednou za 24 hodin, srážky po čtyřhodinových hlídkách. Podklady pro další cestovní kroky se zaznamenají k vybrané postavě a konkrétní minutě; neprovádí se zde automatické zranění ani posun času. Orienteering, Cold/Heat Exposure a skutečný Encounter se vyhodnocují původními průvodci.</p>
- <details><summary>Vyhodnotit cestovní hlídku – pravidlové podklady</summary><form id="campaign-trekking-context-form">
- <fieldset class="hc-expedition-actors"><legend>Účastníci této cestovní hlídky (průvodce se přidá automaticky)</legend><div class="hc-characters">${participants.map((c,i)=>`<label class="hc-character"><input type="checkbox" name="trekMemberIds" value="${esc(c.id)}"><span>${esc(c.name)} · ${esc(c.id)}</span></label>`).join('')}</div></fieldset><div class="hc-fields"><label>Postava / průvodce<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
- <label>Drover (vodič zvířat pro Riding/Animalcraft; také při pěší cestě s nákladním zvířetem)<select name="droverId">${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+ <details class="hmk-trek-guide" open><summary>Jak postupovat při cestování – krok za krokem</summary>
+ <ol class="hmk-trek-steps">
+ <li><strong>Vyberte družinu a průvodce.</strong> Zvolte účastníky společné hlídky, oblasti a případné honáky či jezdecká zvířata.</li>
+ <li><strong>Určete čas a počasí.</strong> Zkontrolujte datum TR, klimatické pásmo a krajinu. Denní počasí platí 24 hodin; srážky se vyhodnocují po čtyřhodinových hlídkách.</li>
+ <li><strong>Stanovte trasu a náklad.</strong> Zvolte terén, způsob dopravy, zatížení a okolnosti pohybu. Překážky a zvláštní režimy musí odpovídat skutečné situaci.</li>
+ <li><strong>Vyhodnoťte Orienteering.</strong> Použijte skutečný Survival test průvodce; se zvířaty případně také Riding/Animalcraft Drover Test. Teprve z upraveného SV určete přípustné Progress, Bearing, Lax nebo Slow Mode.</li>
+ <li><strong>Vyhodnoťte činnost hlídky.</strong> Uplatněte Foraging, Stalking a Vigilance, poté odpovídající hody Progress, Direction Hazard a Encounter.</li>
+ <li><strong>Zpracujte nebezpečí.</strong> Skutečný Cold/Heat Exposure, překážky nebo setkání se vyřeší v příslušných průvodcích; samotné uložení podkladů nezpůsobuje zranění.</li>
+ <li><strong>Naplánujte cestu a potřebné END hody.</strong> Běžná hlídka je čtyřhodinová; Double Time se vyhodnocuje po hodinách. Zkontrolujte Loaded, Wearied, Fatigue a zdravotní stav lidí i zvířat.</li>
+ <li><strong>Čas posune GM.</strong> Započte se jen skutečně absolvovaná doba, vzdálenost a dokončené následky. Ověřte Combat State, kalendář, historii, navazující odpočinek a další hlídku.</li>
+ </ol><p class="hc-hint"><strong>Pořadí v aplikaci:</strong> tyto podklady → povinné testy a události → plán pohybu → posun času GM → zdravotní a kalendářová evidence. U rozpracovaného rozhodnutí pokračujte v příslušném průvodci, nikoli druhým zápisem téže hlídky.</p></details>
+ <details class="hmk-trek-entry"><summary>Vyhodnotit cestovní hlídku – pravidlové podklady</summary><form id="campaign-trekking-context-form">
+ <fieldset class="hc-expedition-actors"><legend>Účastníci této cestovní hlídky (průvodce se přidá automaticky)</legend><div class="hc-characters">${participants.map(c=>`<label class="hc-character"><input type="checkbox" name="trekMemberIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset><fieldset class="hmk-trek-section"><legend>1 · Kdo cestuje a kam</legend><div class="hmk-trek-grid"><label>Postava / průvodce<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+ <label>Honák / Drover<select name="droverId">${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <label>Oblast / označení trasy<input name="area" maxlength="90" required placeholder="Např. Východní les u Tashalu"></label>
- <label>Roční období<select name="season"><option value="auto">Z data TR (je-li doloženo)</option>${[['spring','Jaro'],['summer','Léto'],['autumn','Podzim'],['winter','Zima']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
- <label>Klimatické pásmo<select name="climate"><option value="subpolar">Subpolar</option><option value="cool" selected>Cool Temperate</option><option value="warm">Warm Temperate</option><option value="subtropical">Subtropical</option><option value="dry-tropical">Dry Tropical</option><option value="wet-tropical">Wet Tropical</option></select></label>
- <label>Krajina<select name="landscape"><option value="flat">Flat</option><option value="rough">Rough / Hilly</option><option value="mountain">Mountainous</option></select></label>
+ </div></fieldset><fieldset class="hmk-trek-section"><legend>2 · Prostředí a cesta</legend><div class="hmk-trek-grid"><label>Roční období<select name="season"><option value="auto">Z data TR (je-li doloženo)</option>${[['spring','Jaro'],['summer','Léto'],['autumn','Podzim'],['winter','Zima']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
+ <label>Klimatické pásmo<select name="climate"><option value="subpolar">Subpolární</option><option value="cool" selected>Mírné chladné</option><option value="warm">Mírné teplé</option><option value="subtropical">Subtropické</option><option value="dry-tropical">Tropické suché</option><option value="wet-tropical">Tropické vlhké</option></select></label>
+ <label>Krajina<select name="landscape"><option value="flat">Rovina</option><option value="rough">Zvlněná / kopcovitá</option><option value="mountain">Horská</option></select></label>
  <label>Terén / cesta<select name="terrain">${[['paved-road','Paved Road'],['unpaved-road','Unpaved Road'],['rural-track','Rural Track'],['wilderness-trail','Wilderness Trail'],['cropland-grassland','Cropland / Grassland'],['mixed-woodland','Mixed Woodland'],['cold-woodland','Cold Woodland'],['heath-moor','Heath / Moor'],['needleleaf-forest','Needleleaf Forest'],['mixed-forest','Mixed Forest'],['dunes','Dunes'],['wetlands','Wetlands'],['alpine-vegetation','Alpine Vegetation'],['ice-snow-rockfield','Ice / Snow / Rockfield']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
- <label>Doprava<select name="conveyance"><option value="foot">Foot</option><option value="mount">Mount</option><option value="cart">Cart</option><option value="wagon">Wagon</option></select></label>
- <label>Environ pro Encounter<select name="environ"><option value="highway">Highway</option><option value="rural">Rural</option><option value="wilderness">Wilderness</option><option value="underworld">Underworld</option></select></label>
- <label>Progress Modes (z upraveného Orienteering SV)<input name="progress" type="number" min="0" max="10" value="0"></label>
- <label>Další Slow Modes (jen jiné potvrzené příčiny; Foraging, Stalking, zranění, únava a srážky se přičítají automaticky)<input name="slow" type="number" min="0" max="20" value="0"></label>
- <label>Vlastní Bearing Modes (z Orienteering SV; +1 po doloženém Tracking CF přidá systém)<input name="bearing" type="number" min="0" max="20" value="0"></label>
- <label class="hc-check"><input name="stationaryForaging" type="checkbox" value="yes"> Celá hlídka Foraging na místě: +2 SV; první dva Advantage Modes na Foraging; vzdálenost 0; bez Progress/Bearing (HMK 145)</label>
- <label>Foraging Modes (HMK 145, 147; při pohybu společně +1 Slow, na místě bez pohybu)<input name="foraging" type="number" min="0" max="5" value="0"></label>
- <label class="hc-check"><input name="stalking" type="checkbox" value="yes"> Stalking (nejvýše 1; automaticky +1 Slow; možnost Tracking SV)</label>
- <label class="hc-check"><input name="vigilance" type="checkbox" value="yes"> Vigilance (nejvýše 1; účinek při Encounter/Surprise)</label>
- <label>Starší nedoložené noční hlídky v divočině (volitelné, jinak automaticky)<input name="wildernessNightWatches" type="number" min="0" max="10000" placeholder="Automaticky z doložených hlídek"></label>
- <label>Kostky<select name="diceOrigin"><option value="software">Automatické kryptografické hody</option><option value="manual">Ruční zápis (v pořadí: denní teplota, denní srážky, případné watch srážky, Progress, Direction, Encounter)</option></select></label>
- <label>Ruční d10/d6 řada oddělená čárkami<input name="rolls" placeholder="Např. 4,2,1,7" maxlength="120"></label>
- </div><fieldset><legend>Orienteering · doložené okolnosti (HMK 145)</legend>
+ <label>Doprava<select name="conveyance"><option value="foot">Pěšky</option><option value="mount">V sedle</option><option value="cart">Kára</option><option value="wagon">Vůz</option></select></label>
+ <label>Prostředí setkání (Environ)<select name="environ"><option value="highway">Hlavní cesta</option><option value="rural">Venkov</option><option value="wilderness">Divočina</option><option value="underworld">Podzemí</option></select></label>
+ </div></fieldset><fieldset class="hmk-trek-section"><legend>3 · Pohybové režimy</legend><div class="hmk-trek-grid"><label>Progress Modes<input name="progress" type="number" min="0" max="10" value="0"></label>
+ <label>Další Slow Modes<input name="slow" type="number" min="0" max="20" value="0"></label>
+ <label>Vlastní Bearing Modes<input name="bearing" type="number" min="0" max="20" value="0"></label>
+ </div></fieldset><fieldset class="hmk-trek-section"><legend>4 · Činnosti během hlídky</legend><div class="hmk-trek-grid"><label class="hc-check"><input name="stationaryForaging" type="checkbox" value="yes"> Foraging na místě (celá hlídka)</label>
+ <label>Foraging Modes<input name="foraging" type="number" min="0" max="5" value="0"></label>
+ <label class="hc-check"><input name="stalking" type="checkbox" value="yes"> Stalking</label>
+ <label class="hc-check"><input name="vigilance" type="checkbox" value="yes"> Vigilance</label>
+ <label>Nedoložené noční hlídky v divočině<input name="wildernessNightWatches" type="number" min="0" max="10000" placeholder="Automaticky z doložených hlídek"></label>
+ </div></fieldset><fieldset class="hmk-trek-section"><legend>5 · Hody kostkami</legend><div class="hmk-trek-grid"><label>Kostky<select name="diceOrigin"><option value="software">Automatické kryptografické hody</option><option value="manual">Ruční zápis (v pořadí: denní teplota, denní srážky, případné watch srážky, Progress, Direction, Encounter)</option></select></label>
+ <label>Ruční hody d10/d6 (čárkami)<input name="rolls" placeholder="Např. 4,2,1,7" maxlength="120"></label>
+ </div></fieldset><fieldset class="hmk-trek-section"><legend>6 · Orienteering – doložené okolnosti (HMK 145)</legend>
  <label class="hc-check"><input name="familiar" type="checkbox" value="yes"> Průvodce zná oblast (+1 SV)</label>
  <label class="hc-check"><input name="torchlight" type="checkbox" value="yes"> Noční světlo: lucerna / pochodeň (+1 proti nočnímu postihu)</label>
  <label class="hc-check"><input name="fullMoon" type="checkbox" value="yes"> Úplněk (+1 proti nočnímu postihu)</label>
@@ -1217,16 +1228,16 @@ function campaignCalendarView(){
  <label class="hc-check"><input name="lax" type="checkbox" value="yes"> Lax Mode podle výsledného SV (při SV ≤ 0 povinný)</label>
  <label class="hc-check"><input name="orienteeringSlow" type="checkbox" value="yes"> Slow Mode podle výsledného SV (při SV ≤ 0 povinný)</label>
  <p class="hc-hint">Po uložení skutečného Survival testu se automaticky vypočte upravený SV. Pokud je cesta se zvířaty, vyžaduje se navíc skutečný Riding/Animalcraft Drover Test. Výběr Lax/Slow a režimů se musí shodovat s výsledkem; do té doby nejsou uznány.</p></fieldset>
- <label class="hc-check"><input name="night" type="checkbox" value="yes"> Noční watch</label>
+ <fieldset class="hmk-trek-section"><legend>7 · Výjimky, zvířata a zatížení</legend><div class="hmk-trek-advanced"><label class="hc-check"><input name="night" type="checkbox" value="yes"> Noční watch</label>
  <label class="hc-check"><input name="alpine" type="checkbox" value="yes"> Alpine Vegetation / Ice (−4 teplota)</label>
  <label class="hc-check"><input name="aridDesert" type="checkbox" value="yes"> Arid Desert (zvláštní modifikátory)</label>
  <label class="hc-check"><input name="loaded" type="checkbox" value="yes"> Loaded Mode – pouze pokud není zatížení doložitelné z inventáře / případně naložené zvíře</label>
- <label>Jezdecká / nákladní / tažná zvířata · ID ; lb:hmotnost[/neobratná část] ; ID honáka (doporučeno), nebo ID ; enc:výsledné ENC ; ID honáka<textarea name="drovingAnimals" rows="2" placeholder="mule-1 ; lb:280 ; P1"></textarea></label>
- <p class="hc-hint">Při lb: lze např. zadat lb:300 nebo lb:300/40 (40 lb neobratně uloženého nákladu se započte dvakrát). Počítá se 5 ENC za každých úplných 20 lb, STR modifikátor a mezkům navíc −20 ENC (HMK s.112, 122, 354). Zahrňte jezdce, sedlo, postroj a veškerý náklad. Při enc: zadejte již konečné ENC: nikdy se znovu nesnižuje. Registrovaná zvířata (přesné ID, nikoli přezdívka): ${animalRoster.length?animalRoster.join(' · '):'žádné ověřené zvíře v registru'}. Zvíře s odpovídajícím ID používá vlastní existující Combat State pro Fatigue, Shock a zranění; neregistrované jméno je jen evidencí nákladu bez automatické zdravotní kontroly. HMK 150 neurčuje samostatný přírůstek Trekking Fatigue zvířatům.</p>
- <p class="hc-hint">Při zadání hmotnosti se výsledné ENC dopočítá z ověřeného STR a plemene zvířete; při zadání enc: jde o již vypočtenou hodnotu, nikoli odhad z lidského inventáře. ID honáka je ID vybrané postavy. HMK 145: zvíře od 20 ENC spouští Loaded; při ignorování zpomalení dostává jeho honák +10 Weariness za každých úplných 20 ENC. Více zvířat evidujte odděleně.</p>
+ <label>Jezdecká, nákladní a tažná zvířata (hmotnost / ENC / honák)<textarea name="drovingAnimals" rows="2" placeholder="Mezek Blesk ; lb:280 ; Petr"></textarea></label>
+ <p class="hc-hint">Při lb: lze např. zadat lb:300 nebo lb:300/40 (40 lb neobratně uloženého nákladu se započte dvakrát). Počítá se 5 ENC za každých úplných 20 lb, STR modifikátor a mezkům navíc −20 ENC (HMK s.112, 122, 354). Zahrňte jezdce, sedlo, postroj a veškerý náklad. Při enc: zadejte již konečné ENC: nikdy se znovu nesnižuje. Registrovaná zvířata (jednoznačné jméno): ${animalRoster.length?animalRoster.join(' · '):'žádné ověřené zvíře v registru'}. Zvíře s jednoznačně rozpoznaným jménem používá vlastní existující Combat State pro Fatigue, Shock a zranění; neregistrované jméno je jen evidencí nákladu bez automatické zdravotní kontroly. HMK 150 neurčuje samostatný přírůstek Trekking Fatigue zvířatům.</p>
+ <p class="hc-hint">Při zadání hmotnosti se výsledné ENC dopočítá z ověřeného STR a plemene zvířete; při zadání enc: jde o již vypočtenou hodnotu, nikoli odhad z lidského inventáře. Honáka určete jednoznačným jménem vybrané postavy. HMK 145: zvíře od 20 ENC spouští Loaded; při ignorování zpomalení dostává jeho honák +10 Weariness za každých úplných 20 ENC. Více zvířat evidujte odděleně.</p>
  <label class="hc-check"><input name="ignoreLoaded" type="checkbox" value="yes"> HMK 145 · Ignorovat Loaded Mode: přesně doložené zatížení pěších členů nebo naložených zvířat, bez neznámého ENC. Zatížení pěšího člena: +10 Fatigue za 10 ENC; každé zvíře: +10 Fatigue honákovi za 20 ENC.</label>
  <label class="hc-check"><input name="doubleTime" type="checkbox" value="yes"> Double Time (jen bez Slow/Loaded)</label>
- <p class="hc-hint">Postihy celé skupiny (Wearied, Injured a doložený Loaded) se odvodí automaticky při uložení. Závažné zranění nebo chybějící údaje o výbavě se nebudou vykládat jako nulový postih. Kdo není v této hlídce, tomu se nepřipíše cestovní účinek.</p><button type="submit">Vyhodnotit a uložit podklady (bez posunu času)</button></form>
+ </div></fieldset><p class="hc-hint">Postihy celé skupiny (Wearied, Injured a doložený Loaded) se odvodí automaticky při uložení. Závažné zranění nebo chybějící údaje o výbavě se nebudou vykládat jako nulový postih. Kdo není v této hlídce, tomu se nepřipíše cestovní účinek.</p><button type="submit">Vyhodnotit a uložit podklady (bez posunu času)</button></form>
  <p class="tiny">Pokud vyjde Encounter, hazard či expozice, skutečné vyhodnocení otevřete v Combat / Skill Tests. Generování podkladů samo nezakládá zranění ani neprohlašuje následek za vyřízený.</p></details></section>`;
  const repairAssessments=data.journal.filter(j=>j.calendarTrekProof&&j.calendarCampaignId===campaignKey(clock)&&participants.some(c=>c.id===j.characterId)&&!latestTrekCorrection(j,data.journal)).map(j=>{
   try{const preview=previewTrekCorrection(j,data.journal);
@@ -6290,6 +6301,108 @@ document.addEventListener('input',event=>{
  // untrusted update after first marking the exact recorded value.
  if(event.isTrusted&&field.dataset.hmkAutoDice)delete field.dataset.hmkAutoDice;
 },true);
+// v93.519 · Presentation-only guidance. Never modifies IDs, journal proofs or submitted values.
+const TREKKING_FIELD_HELP=Object.freeze({
+ trekMemberIds:'Vyberte všechny postavy, které se skutečně účastní stejné cestovní hlídky. Průvodce se zahrne automaticky. Nevybrané postavy neobdrží cestovní Fatigue ani události této hlídky.',
+ characterId:'Průvodce zvolený pro Orienteering; jeho Survival test a upravený Success Value rozhodují o směru a výhodách pohybu (HMK s. 145).',
+ droverId:'Osoba vedoucí jezdecká nebo nákladní zvířata. Podle skutečné dopravy řeší Riding nebo Animalcraft a případné příplatky Fatigue za ignorovaný Loaded Mode (HMK s. 145, 150).',
+ area:'Srozumitelné označení skutečné oblasti či úseku trasy. Použije se k dohledání stejné hlídky v historii, hazardech a kalendáři; nepřidává pravidlový modifikátor.',
+ season:'Roční období podle doloženého data TR; pokud není dostupné, určí jej GM. Spolu s klimatickým pásmem ovlivňuje počasí (HMK s. 141–144).',
+ climate:'Klimatické pásmo oblasti; vstup do tabulek teplot a dalších počasových podmínek. Volí se podle prostředí kampaně, ne podle automatického odhadu (HMK s. 141–144).',
+ landscape:'Charakter terénního reliéfu (rovina, kopce, hory), který ovlivňuje podmínky počasí a cestování (HMK s. 141–146).',
+ terrain:'Přesný druh podloží, lesa nebo cesty. S dopravou určuje základní vzdálenost, kterou lze během hlídky urazit (HMK s. 145–146).',
+ conveyance:'Způsob pohybu skupiny: pěšky, v sedle, kára či vůz. Ovlivňuje tabulkové cestovní vzdálenosti a případné řízení zvířat (HMK s. 145–146).',
+ environ:'Druh prostředí pro Random Encounter a Surprise: hlavní cesta, venkov, divočina nebo podzemí. Nezaměňujte s typem podloží pro pohyb (HMK s. 148–150).',
+ progress:'Počet Progress Modes, který dovoluje skutečně vyhodnocený Orienteering SV. Upravuje rychlost podle tabulky cestování. Nezadávejte ho předem jako odhad (HMK s. 145–146).',
+ slow:'Jen dodatečné, GM doložené Slow Modes, které systém ještě nezahrnul. Foraging, Stalking, srážky, zranění a únava se započtou automaticky; zde je nezdvojujte (HMK s. 145–146).',
+ bearing:'Vlastní Bearing Modes vyplývající z ověřeného Orienteering SV. Ovlivňují odchylku směru; zvláštní Tracking CF přidá systém sám (HMK s. 145–146).',
+ stationaryForaging:'Celou čtyřhodinovou hlídku družina zůstává na místě a sbírá potravu či vodu. Má +2 SV a první dva Advantage Modes použije na Foraging; vzdálenost je nulová, Progress a Bearing se neuplatní (HMK s. 145, 147).',
+ foraging:'Počet Foraging Modes věnovaných shánění zásob. Při současném pohybu přidávají společně Slow Mode; při sběru na místě se vzdálenost nepočítá (HMK s. 145, 147).',
+ stalking:'Opatrné sledování či skrývání družiny. Nejvýše jeden Stalking Mode; automaticky přidá jeden Slow Mode a může vyžadovat navazující Tracking test (HMK s. 145–147).',
+ vigilance:'Pozorné sledování okolí. Nejvýše jeden Vigilance Mode; používá se pro situace Encounter a Surprise, nikoli jako samostatná rychlost (HMK s. 145, 148–150).',
+ wildernessNightWatches:'Doplňkové číslo jen pro starší noční hlídky v divočině bez průkazného časového záznamu. Pokud existují doložené hlídky, systém jejich počet spočítá sám; nevkládejte duplicity.',
+ diceOrigin:'Zvolte původ hodů. Automatický režim generuje kostky, ruční režim zaznamená skutečně padlé hodnoty. Původ se ukládá k důkazům a nemění se při opakovaném zobrazení.',
+ rolls:'Pouze při volbě ručních kostek: vložte výsledky d10/d6 oddělené čárkami přesně v požadovaném pořadí (denní teplota, denní a případné hlídkové srážky, Progress, Direction Hazard, Encounter). Nuly ani hodnoty mimo danou kostku nejsou platné.',
+ familiar:'Průvodce zná skutečnou oblast. Započtěte +1 Orienteering SV jen při doložené znalosti terénu (HMK s. 145).',
+ torchlight:'Lucerna nebo pochodeň při nočním Orienteering snižuje pravidlový noční postih o 1. Potvrďte dostupné světlo (HMK s. 145).',
+ fullMoon:'Úplněk skutečně osvětluje trasu; používá se při úpravě nočního Orienteering postihu (HMK s. 145).',
+ afterSnowfall:'Doložená čerstvá souvislá sněhová pokrývka zlepšuje orientaci; přidá +1 proti nočnímu postihu, není-li pravidlově vyloučena (HMK s. 145).',
+ lax:'Lax Mode je rozhodnutí po vyhodnocení Orienteering SV. Při příslušně nízkém SV může být povinný; režim potvrďte podle skutečného testu (HMK s. 145).',
+ orienteeringSlow:'Slow Mode vyplývající z Orienteering SV. Nezaměňujte s ručně přidávanými Slow Modes ani s únavou zraněných; správnou volbu ověří navazující test (HMK s. 145).',
+ night:'Označuje skutečnou noční hlídku; ovlivňuje Orienteering, teplotu i nebezpečí a setkání (HMK s. 141–150).',
+ alpine:'Skutečné alpské prostředí nebo ledové/sněhové pole. V odpovídajícím výpočtu počasí se teplota upravuje o −4 (HMK s. 141–144).',
+ aridDesert:'Potvrzená suchá poušť. Použijí se zvláštní modifikátory teploty a srážek podle HMK; neoznačujte automaticky každý horký kraj za poušť (HMK s. 141–144).',
+ loaded:'Ruční Loaded Mode používejte pouze tehdy, když zatížení nelze spolehlivě určit z existujícího inventáře nebo přesně popsaných naložených zvířat. Zabraňte dvojímu započtení (HMK s. 145).',
+ drovingAnimals:'Pro každé zvíře samostatný řádek: jednoznačné jméno zvířete ; lb:hmotnost[/neobratná část] nebo enc:hotové ENC ; jednoznačné jméno honáka. Interní identifikátor aplikace dohledá bez jeho zobrazování. Při shodných jménech nelze bezpečně rozhodnout a je třeba postavy rozlišit. HMK s. 112, 122, 145, 354.',
+ ignoreLoaded:'GM výslovně rozhodne ignorovat zpomalení Loaded Mode. Aplikace přidá příslušnou Weariness pěším osobám nebo honákům podle doložené ENC; neznámou zátěž nepovažujte za nulovou (HMK s. 145).',
+ doubleTime:'Zrychlená cesta Double Time je přípustná jen bez Slow/Loaded Mode při volbě hlídky. Používá hodinové END Secondary Rolls a jiné tempo získávání Weariness. Při přerušení se neúčtuje neabsolvovaný čas (HMK s. 146, 150).'
+});
+const TREKKING_SECTION_HELP=Object.freeze({
+ '1 · Kdo cestuje a kam':'Identita a skutečná sestava družiny pro jedinou hlídku. Výběr postav určuje, kdo může obdržet cestovní následky.',
+ '2 · Prostředí a cesta':'Poloha, roční období, klima, terén a způsob dopravy určují tabulkové počasí, rychlost pohybu a setkání (HMK s. 141–150).',
+ '3 · Pohybové režimy':'Advantage/Progress, Slow a Bearing vycházejí z Orienteering a ostatních doložených okolností. Automatické přídavky nikdy znovu ručně nezapisujte.',
+ '4 · Činnosti během hlídky':'Shánění zásob, plížení a pozornost ovlivňují cestu a navazující Survival, Tracking nebo Encounter postupy (HMK s. 145–150).',
+ '5 · Hody kostkami':'Režim a průkazné hodnoty náhodných hodů pro konkrétní hlídku; zde se připraví podklady, nikoli přidělí zranění.',
+ '6 · Orienteering – doložené okolnosti (HMK 145)':'Potvrzené okolnosti, které upravují Survival Orienteering SV a přípustné volby pohybového režimu (HMK s. 145).',
+ '7 · Výjimky, zvířata a zatížení':'Noční cestování, zvláštní krajina, registrovaná zvířata a rozhodnutí o Loaded/Double Time. Vliv na únavu musí být doložen (HMK s. 145–150).'
+});
+function decorateTrekkingRoutineUI(root){
+ const host=root.querySelector('.hc-trek-routine');if(!host)return;
+ const form=host.querySelector('#campaign-trekking-context-form');if(!form)return;
+ for(const label of form.querySelectorAll('label')){
+  const control=label.querySelector('input[name],select[name],textarea[name]');
+  const help=TREKKING_FIELD_HELP[control?.name];
+  if(!help)continue;
+  label.setAttribute('data-hmk-help',help);
+  label.tabIndex=0;
+ }
+ for(const legend of form.querySelectorAll('legend')){
+  const help=TREKKING_SECTION_HELP[legend.textContent.trim()]||'V této části vyplňte pouze skutečně doložené podklady konkrétní cestovní hlídky.';
+  legend.setAttribute('data-hmk-help',help);
+  legend.tabIndex=0;
+ }
+ for(const summary of host.querySelectorAll('summary')){
+  summary.setAttribute('data-hmk-help',summary.closest('.hmk-trek-guide')?'Pořadí kroků od přípravy trasy až po dokončení hlídky, zdravotní dopady a zápisy v kalendáři.':'Otevře formulář podkladů pro jednu cestovní hlídku; nijak neposouvá čas ani neuděluje zdravotní následky.');
+ }
+ for(const item of host.querySelectorAll('.hmk-trek-steps li')){
+  item.setAttribute('data-hmk-help',item.textContent.trim());item.tabIndex=0;
+ }
+ const submit=form.querySelector('button[type="submit"]');
+ if(submit)submit.setAttribute('data-hmk-help','Zaznamená pravidlové podklady jedné hlídky do historie a kalendáře, ale neprovede posun času, END testy ani automatické zranění. Na následné povinnosti navazují samostatní průvodci.');
+ host.querySelector('h3')?.setAttribute('data-hmk-help','Trekking Routine spojuje pravidla počasí, orientace, pohybu a nebezpečí. Příprava hlídky, skutečné hody, posun času a zdravotní následky jsou oddělené navazující kroky (HMK s. 141–150).');
+}
+// Visible identifiers are presentation data, never authoritative storage keys.
+// Work only on rendered text (not input values, textarea contents, data-* or option values).
+function hideVisibleTechnicalUUIDs(root){
+ const chars=new Map((data?.characters??[]).filter(c=>typeof c?.id==='string').map(c=>[c.id.toLowerCase(),c.name||'Nepojmenovaná postava']));
+ const uuid=/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+ const clean=t=>{
+  if(!uuid.test(t))return t;
+  uuid.lastIndex=0;
+  const ids=[...new Set([...t.matchAll(uuid)].map(m=>m[0]))];
+  let value=t;
+  for(const id of ids){
+   const literal=id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+   const name=chars.get(id.toLowerCase());
+   if(name){
+    // The old UI often appended a character's raw UUID after a visible name.
+    value=value.replace(new RegExp('\\s*[·–—]\\s*'+literal+'\\b','gi'),'');
+    value=value.replace(new RegExp('\\b'+literal+'\\s*\\(([^)]*)\\)','gi'),(_m,inside)=>inside);
+    value=value.replace(new RegExp('\\b'+literal+'\\b','gi'),name);
+   }else value=value.replace(new RegExp('\\b'+literal+'\\b','gi'),'interní záznam');
+  }
+  return value;
+ };
+ const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),nodes=[];
+ while(walker.nextNode())nodes.push(walker.currentNode);
+ for(const node of nodes){
+  if(node.parentElement?.closest('script,style,textarea,pre,code,[contenteditable="true"]'))continue;
+  const next=clean(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;
+ }
+ for(const el of root.querySelectorAll('[title],[aria-label]')){
+  for(const key of ['title','aria-label']){const orig=el.getAttribute(key);if(orig){const next=clean(orig);if(next!==orig)el.setAttribute(key,next);}}
+ }
+}
 function render(){
  // Deny all paths to partially generated sheets, even routes that set view
  // directly without clicking a registry card (import, skill link, wizard exit).
@@ -6310,6 +6423,8 @@ function render(){
  if(!uiNavigationRestoring)uiNavigation.visit(nextRoute,{scrollY:window.scrollY});
  writeGuidedDraft();
  app.innerHTML=main()+(overlay||'');
+ hideVisibleTechnicalUUIDs(app);
+ decorateTrekkingRoutineUI(app);
  const sidebar=app.querySelector('.layout>.nav');
  if(sidebar)sidebar.scrollTop=sidebarPosition;
  refreshAllCalendarHealingFields();
@@ -8288,6 +8403,18 @@ document.addEventListener('submit',e=>{
   notice='Nástup Psyche '+trait+' byl uložen do stavu postavy a její historie.';render();
  }catch(error){if(output?.isConnected)output.textContent=error.message;else alert(error.message)}
 },true);
+// Human-readable entry only. Exact internal actor IDs are still stored in proofs.
+// Duplicate character names are rejected rather than linked to the wrong Combat State.
+function trekResolveActorToken(token,{unregisteredAllowed=false}={}){
+ const value=String(token||'').trim();
+ if(!value)throw Error('Jméno zvířete nebo honáka nesmí být prázdné.');
+ if(data.characters.some(c=>c.id===value))return value; // old proof/input compatibility
+ const matches=data.characters.filter(c=>String(c.name||'').trim().toLocaleLowerCase('cs')===value.toLocaleLowerCase('cs'));
+ if(matches.length>1)throw Error(`Jméno „${value}“ patří více postavám. Nejdříve jim dejte různá jména; technické ID se nezobrazuje.`);
+ if(matches.length===1)return matches[0].id;
+ if(unregisteredAllowed)return value; // legacy nonregistered cargo animal
+ throw Error(`Honák „${value}“ nebyl nalezen mezi postavami kampaně.`);
+}
 /** Environment stage of the printed Trekking Routine; ALL actual rolls and
  * geography are in the journal, never guessed from modern date or location. */
 document.addEventListener('submit',e=>{
@@ -8332,11 +8459,11 @@ document.addEventListener('submit',e=>{
   const memberIds=[...new Set([...new FormData(form).getAll('trekMemberIds'),actor.id])];
   const animals=String(v.drovingAnimals??'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean).map(line=>{
    const parts=line.split(';').map(x=>x.trim());
-   if(parts.length!==3||!parts[0]||!parts[2])throw Error('Zvíře: ID ; lb:hmotnost (nebo enc:výsledné ENC) ; ID honáka.');
+   if(parts.length!==3||!parts[0]||!parts[2])throw Error('Zvíře: jméno ; lb:hmotnost (nebo enc:výsledné ENC) ; jméno honáka.');
    const match=/^(lb|enc):\s*(\d+)(?:\/(\d+))?$/i.exec(parts[1]);
    if(!match&&!/^\d+$/.test(parts[1]))throw Error('Použijte lb:300 nebo lb:300/40 (neobratná část), případně enc:20 pro již modifikované ENC.');
    if(match?.[1].toLowerCase()==='enc'&&match[3]!==undefined)throw Error('Výsledné ENC neobsahuje údaj o neobratném nákladu.');
-   return {id:parts[0],droverId:parts[2],...(match?.[1].toLowerCase()==='lb'?{loadLb:Number(match[2]),...(match[3]===undefined?{}:{awkwardLb:Number(match[3])})}:{enc:Number(match?.[2]??parts[1])})};
+   return {id:trekResolveActorToken(parts[0],{unregisteredAllowed:true}),droverId:trekResolveActorToken(parts[2]),...(match?.[1].toLowerCase()==='lb'?{loadLb:Number(match[2]),...(match[3]===undefined?{}:{awkwardLb:Number(match[3])})}:{enc:Number(match?.[2]??parts[1])})};
   });
   const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:data.characters,
    inventory:data.inventory,conveyance:v.conveyance,loadedByGM:v.loaded==='yes',drovingAnimals:animals});
@@ -14630,7 +14757,7 @@ document.addEventListener('submit',e=>{
 let hmkJournalTooltip=null,hmkJournalTooltipTarget=null;
 function hmkHideJournalTooltip(){if(hmkJournalTooltip)hmkJournalTooltip.hidden=true;hmkJournalTooltipTarget=null;}
 function hmkShowJournalTooltip(element){
- if(!element||!element.isConnected||!element.closest('.journal-book'))return;
+ if(!element||!element.isConnected||!element.closest('.journal-book, .hc-trek-routine'))return;
  const explanation=element.getAttribute('data-hmk-help');if(!explanation)return;
  // The custom help bubble is authoritative; the native browser title
  // would display a second (white) bubble with the same explanation.
