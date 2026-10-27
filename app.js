@@ -38,7 +38,7 @@ import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEl
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES,specialSecondaryById,resolveSpecialSR} from './src/integration/hmk-special-secondary-routines.js';
 import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,validateSpecialEffectEvidence} from './src/integration/hmk-special-outcome-commit.js';
 import {applyTalismanBestowal,projectTalismanStatus,validateTalismanEvidence,activeShamanSkillModifier,reconcileTalismanPossession} from './src/integration/hmk-shaman-talisman-state.js';
-import {HMK_OPPOSED_ACTIONS,opposedActionOptions,opposedPairIsPrinted} from './src/integration/hmk-opposed-skill-pairs.js';
+import {HMK_OPPOSED_ACTIONS,opposedActionOptions,opposedPairIsPrinted,resolveOpposedDefenderMastery} from './src/integration/hmk-opposed-skill-pairs.js';
 import {skillNarrativeSolo,skillNarrativeOpposed,skillNarrativeTiebreak} from './src/integration/hmk-skill-narrative.js';
 import {automaticSkillContext} from './src/integration/hmk-skill-auto-context.js';
 import {resolveSkillConditions,skillConditionAvailability} from './src/integration/hmk-skill-context.js';
@@ -261,7 +261,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.539';
+const APP_VERSION='93.540';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1748,7 +1748,8 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const calendarTabs=`<nav class="journal-book-subnav hc-calendar-tabs" aria-label="Sekce kalendáře">${CALENDAR_SECTIONS.map(([id,label])=>`<button type="button" data-calendar-section="${id}" class="${activeCalendarSection===id?'':'secondary'}" aria-current="${activeCalendarSection===id?'page':'false'}">${esc(label)}</button>`).join('')}</nav>`;
  const fallUnknown=agenda.unknown.filter(x=>x.kind==='skill-fall'&&x.sourceId);
  const unknownFallNotice=fallUnknown.length?`<section class="panel hc-calendar-unresolved"><h3>Vyžaduje vyřešení · Falling Routine</h3>${fallUnknown.map(x=>`<div class="hc-unknown-rule-link"><strong>${esc(x.name)}</strong> · ${esc(x.description)}<p class="muted">GM doplní skutečnou výšku (0–5 ft bez Injury Sequence; nad 5 ft pokračuje Impact a Jumping/Acrobatics test). Původní Skill CF se neopakuje.</p><button type="button" class="hc-small" data-cal-unknown-fall="${esc(x.characterId)}" data-cal-unknown-source="${esc(x.sourceId)}">Otevřít správné hody a výšku ↗</button></div>`).join('')}</section>`:'';
- const overviewHTML=`${board}${unknownFallNotice}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
+ const suspendedHealingHTML=agenda.suspended?.length?`<section class="panel hc-calendar" data-suspended-healing><h3>Pozastavené Healing Rolls · ${agenda.suspended.length}</h3><p class="hc-hint">Aktivní infekce přerušuje všechny Injury Healing Rolls (HMK 181). Probíhají pouze doložené denní Infection Course; nové pětidenní lhůty začnou až po ukončení poslední infekce.</p>${agenda.suspended.map(x=>`<p class="hc-hint"><strong>${esc(x.name)}</strong> · rána ${esc(x.woundId)} · ${esc(x.description)}</p>`).join('')}</section>`:'';
+ const overviewHTML=`${board}${unknownFallNotice}${suspendedHealingHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
   activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${animalWeatherHTML}${animalRestHTML}${interruptionsHTML}`:
   activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionLedgerHTML(participants)}${partyNutritionConditionsHTML(participants,clock)}${supplyHTML}<details class="hc-provision-rulebook"><summary>Podrobnosti: automatické následky nedostatku a zdravotní hody</summary>${nutritionHTML}${activityNeedsHTML}</details>`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
@@ -1978,11 +1979,7 @@ function wealthInventoryPanel(c){
  const h=c.hmk||{},wealth=Number(h.wealth),coins=Number(h.coinsPence),cash=cashForCharacter(c);
  const cashKey=activeCampaignCashKey(c);
  const account=cashKey&&h.campaignCashAccounts?.[cashKey];
- const shownPurchases=account?.purchases??(!data.campaignClock?(h.cashLedger??[]):[]);
- const shownAdjustments=account?.adjustments??(!data.campaignClock?(h.coinAdjustments??[]):[]);
- const legacyReceipts=data.campaignClock?[...(h.cashLedger??[]),...(h.coinAdjustments??[])]:[];
-
- return `<div class="equipment-summary" role="group" aria-label="Hotovost a počáteční Wealth">${cash.ok?`<div><strong>Aktuální hotovost</strong><span>${esc(cash.balance)}d</span></div>`:`<p class="library-warning">Hotovost nelze bezpečně doložit: ${esc(cash.reason)} Nákupy jsou zablokované, zdarma lze věci převzít.</p>`}${cash.ok&&cash.adjustments?`<details><summary>Historie mincí · ${cash.adjustments} GM úprav</summary><ol>${shownAdjustments.map(t=>`<li>${esc(t.deltaPence>0?"+":"")}${esc(t.deltaPence)}d · ${esc(t.at)}</li>`).join('')}</ol></details>`:""}${cash.ok&&cash.transactions?`<details><summary>Historie nákupů · ${cash.transactions}</summary><ol>${shownPurchases.map(t=>`<li>${esc(t.label||'Předmět')} · −${esc(t.amountPence)}d <small>${esc(t.at||'datum neznámé')}</small></li>`).join('')}</ol></details>`:''}${legacyReceipts.length?`<details><summary>Starší finanční doklady (bez doložené kampaně) · ${legacyReceipts.length}</summary><ol>${legacyReceipts.map(t=>`<li>${esc(t.kind==='library-purchase'?'Nákup '+(t.label||'Předmět')+' · −'+t.amountPence+'d':'GM změna '+(t.deltaPence>0?'+':'')+t.deltaPence+'d')} · ${esc(t.at||'čas nezadán')}</li>`).join('')}</ol></details>`:''}<p class="tiny">${data.campaignClock?'Zůstatek platí pro aktuální kampaň. Starší neznačené transakce tvoří společný výchozí zůstatek; nebyly zpětně přiřazeny ke kalendáři.':'Režim bez kalendáře používá původní hotovost.'} Nákupy jsou doložené v neměnné historii výdajů; Wealth se nákupem nemění.</p></div>`;
+ return `<div class="equipment-summary" role="group" aria-label="Hotovost a počáteční Wealth">${cash.ok?`<div><strong>Aktuální hotovost</strong><span>${esc(cash.balance)}d</span></div>`:`<p class="library-warning">Hotovost nelze bezpečně doložit: ${esc(cash.reason)} Nákupy jsou zablokované, zdarma lze věci převzít.</p>`}<p class="tiny">${data.campaignClock?'Zůstatek platí pro aktuální kampaň. Starší neznačené transakce tvoří společný výchozí zůstatek.':'Režim bez kalendáře používá původní hotovost.'} Úpravy mincí a nákupy zůstávají trvale doloženy v GM logu; Wealth se nákupem nemění.</p></div>`;
 }
 let activeSkillTab='secondary';
 let activeSheetSection='overview';
@@ -8136,6 +8133,12 @@ function hskPreviewFor(form,person,field,side){
   node.innerHTML=hskTrace(person,mastery,ctx,secs,assist,hskGMModifier(form,side));
  }catch(err){node.innerHTML='<div class="hsk-calculation hsk-unready"><b>Pravidlová kontrola:</b> '+esc(err.message)+'<p class="tiny muted">Test není zrušen: lze vyřešit stav v inventáři, nebo doložit rozhodnutí GM pro chybějící hodnoty ENC / Bulk / PER. Nedoložený postih nelze automaticky považovat za nulu.</p></div>';}
 }
+function hskOpposedNotice(form,message='',invalid=false){
+ const output=form.querySelector('[data-opposed-selection-notice]');
+ if(output){output.textContent=message;output.hidden=!message;output.classList.toggle('hsk-opposed-warning',invalid);}
+ const defender=form.elements.namedItem('opponentSkill');
+ if(defender){defender.setCustomValidity(invalid?message:'');defender.setAttribute('aria-invalid',invalid?'true':'false');}
+}
 function hskRefreshOpposedAction(form){
  const field=form.elements.namedItem('opposedAction');if(!field)return;
  const name=form.elements.namedItem('primary')?.value||'',options=opposedActionOptions(name);
@@ -8144,13 +8147,25 @@ function hskRefreshOpposedAction(form){
  field.innerHTML='<option value="">— jiná dvojice podle rozhodnutí GM —</option>'+options.map(([action,def,page],i)=>'<option value="'+i+'">'+esc(action)+' → '+esc(def)+(page?' · HMK '+page:'')+'</option>').join('');
  if(samePrimary&&[...field.options].some(x=>x.value===before))field.value=before;
  const guidance=form.querySelector('[data-opposed-rule-guidance]');
- if(guidance)guidance.textContent=options.length?'Pravidlově doložené možnosti jsou nabídnuty. GM může zvolit jinou protidovednost podle skutečné situace.':'HMK pro tuto obecnou dovednost neurčuje univerzální protidovednost. GM výslovně zvolí dovednost obránce a situaci; žádný hod se nevymýšlí automaticky.';
+ if(guidance)guidance.textContent=options.length?'Návrhy odpovídají HMK pro danou činnost. Obránce musí mít vlastní doložené ML. Dlouhodobá debata se vyhodnocuje přes Success Value.':'HMK pro tuto obecnou dovednost neurčuje univerzální protidovednost. GM výslovně zvolí dovednost obránce a situaci; žádný hod se nevymýšlí automaticky.';
+ hskOpposedNotice(form);
 }
 function hskApplyOpposedAction(form){
  const primary=form.elements.namedItem('primary')?.value,action=form.elements.namedItem('opposedAction')?.value;
- if(action===''||action==null)return;
- const row=opposedActionOptions(primary)[Number(action)];if(!row)return;
- const defender=form.elements.namedItem('opponentSkill');if(defender&&[...defender.options].some(x=>x.value===row[1]))defender.value=row[1];
+ const defender=form.elements.namedItem('opponentSkill');
+ if(action===''||action==null){hskOpposedNotice(form);return;}
+ const row=opposedActionOptions(primary)[Number(action)];if(!row){hskOpposedNotice(form);return;}
+ const other=character(form.elements.namedItem('opponentId')?.value);
+ const matching=resolveOpposedDefenderMastery(row[1],other?availableMasteries(other):[]);
+ if(defender)defender.value=matching.name;
+ if(matching.status==='exact'||matching.status==='specialised'){
+  hskOpposedNotice(form,matching.status==='specialised'?'Zvolená specializace obránce: '+matching.name+'. GM ověří vhodný smysl či zaměření.':'');
+ }else{
+  const text=matching.status==='ambiguous'
+   ?'Obránce má více ověřených specializací '+row[1]+': '+matching.matches.join(', ')+'. Vyberte správnou Primary obránce.'
+   :'Obránce '+(other?.name||'')+' nemá doloženou dovednost '+row[1]+' s ML. Zvolte jiného obránce, nebo nejprve doplňte platnou dovednost jeho postavy.';
+  hskOpposedNotice(form,text,true);
+ }
 }
 function hskRebuildOpponent(form){
  const other=character(form.elements.namedItem('opponentId')?.value),wrap=form.querySelector('[data-opponent-skill-wrap]');
@@ -8160,6 +8175,7 @@ function hskRebuildOpponent(form){
  for(const name of ['defSecondary1','defSecondary2','defSecondaryRoll']){const el=form.elements.namedItem(name);if(!el)continue;el.outerHTML=opt(name,true);}
  hskApplyOpposedAction(form);
 }
+
 // HTML constraint validation includes hidden fields unless they are explicitly disabled.
 // A solo test must never depend on a previously selected/invalid defender skill.
 function hskSyncDefenderFields(form){
@@ -8281,7 +8297,16 @@ document.addEventListener('change',e=>{
  if(e.target.name==='primary'&&form.id!=='skill-secondary-form')hskConfigureSR(form,'A');
  if(e.target.name==='srActivityA')hskApplySRSelection(form,'A');
  if(e.target.name==='srActivityB')hskApplySRSelection(form,'B');
- if(e.target.name==='opponentSkill')hskConfigureSR(form,'B');
+ if(e.target.name==='opponentSkill'){
+  const a=form.elements.namedItem('opposedAction'),suggested=a?.value!==''&&a?.value!=null
+   ?opposedActionOptions(form.elements.namedItem('primary')?.value)[Number(a.value)]?.[1]:null;
+  if(suggested){const other=character(form.elements.namedItem('opponentId')?.value);
+   const resolved=resolveOpposedDefenderMastery(suggested,other?availableMasteries(other):[]);
+   if(e.target.value!==resolved.name){a.value='';hskOpposedNotice(form,'GM zvolil vlastní protidovednost obránce; předchozí návrh není použit.');}
+   else hskOpposedNotice(form);
+  }else hskOpposedNotice(form);
+  hskConfigureSR(form,'B');
+ }
  if(e.target.name==='opposedAction'){hskApplyOpposedAction(form);hskConfigureSR(form,'B');}
  refreshSkillAutoPreview(form);
 });

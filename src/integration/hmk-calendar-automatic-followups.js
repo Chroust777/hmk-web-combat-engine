@@ -57,7 +57,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // Every committed injury without a resolved initial treatment decision
   // needs routing into the existing Treatment/Untreated workflow. No roll is
   // fabricated and the GM may explicitly record that treatment was absent.
-  for(const w of s?.wounds??[])if(!w.healed&&!w.healing)
+  for(const w of s?.wounds??[])if(!w.healed&&!w.healing&&!s?.extendedShock&&!(s?.wounds??[]).some(x=>x.bleeding))
    push(c,'treatment',w.id,'Nová rána – Treatment nebo doložené bez ošetření (HMK 178–179)',clock.minute,'combat',{woundId:w.id});
   if(s?.shockFollowup){
    const pending=s.shockFollowup;

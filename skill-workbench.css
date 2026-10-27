@@ -177,3 +177,7 @@
 .hsk-critical-next>label{display:block;max-width:100%}
 .hsk-critical-next input[type=number],.hsk-critical-next select{width:100%;max-width:100%;box-sizing:border-box}
 @media(max-width:670px){.hsk-sensory-grid,.hsk-fall-row>.hsk-form-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* v93.540: explicit opponent-mastery selection failure, not silent fallback */
+.hsk-opposed-warning{display:block!important;padding:5px 7px;margin-top:4px;border:1px solid #ac4c34;background:rgba(255,224,205,.75);color:#7b251e;font-weight:bold}
+.hmk-skill-workbench select[name="opponentSkill"][aria-invalid="true"]{outline:2px solid #ac4c34;outline-offset:1px}

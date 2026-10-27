@@ -9,7 +9,7 @@ const appSource=fs.readFileSync(path.join(root,'app.js'),'utf8');
 const htmlSource=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const appVersion=appSource.match(/const APP_VERSION\s*=\s*['"](\d+\.\d+)['"]/);
 const titleVersion=htmlSource.match(/<title>[^<]*?v(\d+\.\d+)<\/title>/);
-const assetVersion=htmlSource.match(/hmk-app\.bundle\.js\?v=(\d+\.\d+)/);
+const assetVersion=htmlSource.match(/(?:hmk-app\.bundle|app)\.js\?v=(\d+\.\d+)/);
 if(!appVersion||!titleVersion||!assetVersion||appVersion[1]!==titleVersion[1]||appVersion[1]!==assetVersion[1]){
  throw Error(`Release version mismatch: app.js=${appVersion?.[1]||'missing'}, index title=${titleVersion?.[1]||'missing'}, bundle URL=${assetVersion?.[1]||'missing'}`);
 }

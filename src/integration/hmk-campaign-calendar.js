@@ -125,11 +125,11 @@ export function recordCampaignResolution(clock,{eventId,sourceEventId,characterI
  * Procedure validation/physical dice remain with their EXISTING engines.
  */
 export function campaignCalendarAgenda(clock,characters=[],journal=[]){
- if(!clock)return {due:[],future:[],unknown:[],all:[]};
+ if(!clock)return {due:[],future:[],unknown:[],all:[],suspended:[]};
  validateCampaignCalendar(clock);
  characters=Array.isArray(clock.characterIds)?characters.filter(c=>clock.characterIds.includes(c.id)):characters;
  journal=projectedCalendarJournal(clock,journal);
- const all=[],unknown=[];
+ const all=[],unknown=[],suspended=[];
  const add=(c,kind,description,daysOrHours,woundId=null,unit='days')=>{
   const anchor=getCampaignAnchor(clock,kind==='healing'||kind==='infection'||kind==='grim'?'wound':kind,c.id,woundId);
   if(!anchor){unknown.push({characterId:c.id,name:c.name,kind,woundId,description,reason:'Chybí potvrzený okamžik začátku'});return;}
@@ -178,8 +178,17 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
    const h=w.healing;if(!h)continue;
    if(h.infected&&Number.isSafeInteger(h.nextInfectionDay))add(c,'infection','Infection Course (denně)',h.nextInfectionDay,w.id);
    if(h.grimWound&&Number.isSafeInteger(h.nextGrimShockDay))add(c,'grim','Grim Wound Shock (denně)',h.nextGrimShockDay,w.id);
-   if(h.treated&&!blocked&&!h.noMundaneHealing&&Number.isSafeInteger(h.nextHealingDay))
-    add(c,'healing','Injury Healing Roll',h.nextHealingDay,w.id);
+   if(h.treated&&!h.noMundaneHealing&&Number.isSafeInteger(h.nextHealingDay)){
+    if(blocked){
+     // Infection (HMK p.181) freezes every injury-healing schedule. The
+     // stale pre-infection due day is NOT a new roll and must not block
+     // calendar progress; after the LAST infection is defeated, the
+     // original healing engine reschedules each wound from certified days.
+     suspended.push({characterId:c.id,name:c.name,kind:'healing',woundId:w.id,
+      description:'Healing Roll pozastaven – aktivní Infection Course',
+      reason:'HMK str.181: žádný nový Healing d100 před vyléčením všech infekcí; termín se určí podle potvrzeného aktuálního dne rány.'});
+    }else add(c,'healing','Injury Healing Roll',h.nextHealingDay,w.id);
+   }
   }
  }
  const automatic=automaticHMKFollowups(clock,characters,journal,getCampaignEpisodeAnchor);
@@ -204,7 +213,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
    minute:h.dueMinute,anchorMinute:h.minute,status:h.dueMinute<=clock.minute?'due':'future'});
  }
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
- return {due:all.filter(x=>x.status==='due'),future:all.filter(x=>x.status==='future'),unknown,all};
+ return {due:all.filter(x=>x.status==='due'),future:all.filter(x=>x.status==='future'),unknown,all,suspended};
 }
 export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmConfirmed,characters=[],journal=[]}={}){
  validateCampaignCalendar(clock);
