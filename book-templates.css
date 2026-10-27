@@ -5115,3 +5115,69 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .journal-book--chapter .journal-history-category__archive{margin:6px 0;padding:4px;border-top:1px solid rgba(137,94,45,.25)}
 .content-sheet .journal-book--chapter .journal-history-category__archive>summary{cursor:pointer;font-size:12px;color:#6d4d32}
 .content-sheet .journal-book--chapter .gm-history-category .hc-provision-table-scroll{max-width:100%;overflow-x:auto}
+
+
+/* v93.549 — Inventory/Arsenal tables follow the light Locations table style.
+   Fluid columns fit normal folio spread widths; horizontal scrolling is only
+   used on genuinely narrow screens. No duplicate per-cell parchment texture. */
+.content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll{
+ width:100%!important;max-width:100%!important;min-width:0!important;
+ box-sizing:border-box!important;overflow-x:auto!important;overflow-y:auto!important;
+ scrollbar-gutter:auto!important;border:0!important;border-radius:0!important;
+ background:transparent!important;padding:0!important;margin:4px 0 8px!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-section .inv-ledger-table{
+ width:100%!important;min-width:635px!important;table-layout:fixed!important;
+ border-collapse:collapse!important;border-spacing:0!important;
+ background:transparent!important;font:12px/1.25 Georgia,serif!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(1){width:22%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(2){width:12%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(3){width:6%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(4){width:10%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(5){width:11%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(6){width:9%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(7){width:20%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:10%!important}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table thead tr > th,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table thead tr > th:first-child{
+ position:static!important;background:rgba(171,125,66,.10)!important;
+ background-image:none!important;color:#583316!important;
+ border:0!important;border-bottom:1px solid #987344!important;
+ text-align:left!important;padding:4px 3px!important;
+ font:700 10px/1.18 Georgia,serif!important;white-space:normal!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody tr > th:first-child,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody tr > td{
+ position:static!important;background:transparent!important;
+ background-image:none!important;background-color:transparent!important;
+ border:0!important;border-bottom:1px solid rgba(149,105,59,.26)!important;
+ box-shadow:none!important;padding:3px 3px!important;vertical-align:top!important;
+ font:12px/1.2 Georgia,serif!important;min-width:0!important;
+ overflow-wrap:break-word!important;word-break:normal!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody tr > th:first-child{
+ text-align:left!important;font-weight:700!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-select-row{
+ gap:5px!important;align-items:start!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-bulk-checkbox{
+ width:13px!important;min-width:13px!important;height:13px!important;
+ margin:1px 0 0!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-item-kind{
+ font:10px/1.12 Georgia,serif!important;margin-top:1px!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-spec-details>summary{
+ font:700 11px/1.2 Georgia,serif!important;white-space:normal!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-edit-only{
+ padding:2px 1px!important;min-height:24px!important;font:700 10px/1.1 Georgia,serif!important;
+}
+/* Keep a minimum readable grid ONLY when the viewport truly cannot fit it. */
+@media (max-width:700px){
+ .content-sheet .journal-book--chapter .inv-ledger-section .inv-ledger-table{
+   min-width:690px!important;width:690px!important;
+ }
+}
