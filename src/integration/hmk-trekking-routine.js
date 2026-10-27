@@ -157,7 +157,7 @@ export function validateTrekkingJournalEvidence(document){
    const c=createOrienteeringContext(p.orienteeringContext);
    assert(JSON.stringify(c)===JSON.stringify(p.orienteeringContext)&&c.night===p.night&&
     c.partySize===(p.partyModes?.memberIds?.length??1)&&c.conveyance===p.conveyance&&
-    (c.conveyance==='foot'||p.partyModes?.memberIds?.includes(c.droverId)),
+    (!c.droverId||p.partyModes?.memberIds?.includes(c.droverId)),
     'Orienteering context neodpovídá doložené hlídce');
    assert(typeof p.modes?.lax==='boolean'&&[0,1].includes(p.modes.orienteeringSlow),
     'Chybí doložený Lax/Slow z Orienteering');
@@ -169,8 +169,8 @@ export function validateTrekkingJournalEvidence(document){
     p.modes.loaded===(p.partyModes.loaded&&!p.modes.ignoreLoaded)&&
     (p.modes.ignoreLoaded===undefined||typeof p.modes.ignoreLoaded==='boolean')&&
     (!p.modes.ignoreLoaded||(
-      p.conveyance==='foot'&&p.partyModes.loaded&&!p.partyModes.loadUnresolved.length&&
-      p.partyModes.members.some(m=>m.loaded)&&
+      p.partyModes.loaded&&!p.partyModes.manualLoaded&&!p.partyModes.loadUnresolved.length&&
+      (p.partyModes.members.some(m=>m.loaded)||(p.partyModes.animals??[]).some(a=>a.loaded))&&
       p.partyModes.members.filter(m=>m.loaded).every(m=>Number.isSafeInteger(m.modifiedENC))))&&
     int(p.modes.manualSlow,0,20),
     'Skupinové postihy neodpovídají uloženému pohybu a počasí.');
@@ -224,10 +224,17 @@ export function validateTrekkingJournalEvidence(document){
   const validPartyMember=source?.characterId===entry.characterId||
    (group?.format==='hmk-group-watch-v1'&&group.guideId===source?.characterId&&
     group.memberIds?.includes(entry.characterId));
+  const movement=p?.effectiveMovement??p?.movement;
+  // HMK p.146: a short trek records only its actually completed fraction;
+  // original 4h watches retain exact legacy movement and timestamp checks.
+  const scale=e.interrupted===true?e.durationMinutes/240:1;
+  const scaled=v=>Math.round(v*scale*1000)/1000;
+  const expectedLeagues=e.interrupted===true?scaled(movement?.leagues):movement?.leagues;
+  const expectedKilometres=e.interrupted===true?scaled(movement?.kilometres):movement?.kilometres;
   assert(p&&!p.orienteeringContext?.stationaryForaging&&p.format==='hmk-trekking-watch-evidence-v1'&&validPartyMember&&
    source.calendarCampaignId===entry.calendarCampaignId&&
    source.campaignMinute+e.durationMinutes===entry.campaignMinute&&
-   e.travelledLeagues===(p.effectiveMovement??p.movement).leagues&&e.travelledKilometres===(p.effectiveMovement??p.movement).kilometres,
+   e.travelledLeagues===expectedLeagues&&e.travelledKilometres===expectedKilometres,
    'Cestovní únava nemá doloženou stejnou trasu, kampaň a čas');
   // From 93.371 onward the END entry retains a witness to the *specific*
   // Orienteering Success Value that certified this source watch. Legacy
@@ -241,7 +248,7 @@ export function validateTrekkingJournalEvidence(document){
     j.calendarCampaignId===entry.calendarCampaignId);
    const droverResult=droverRow?.skillTestProof?.a??droverRow?.skillTestProof?.result;
    const adjusted=p.orienteeringContext?adjustedOrienteeringSV({baseSV:test?.sv,
-    context:p.orienteeringContext,droverResult:p.conveyance==='foot'?null:droverResult}):null;
+    context:p.orienteeringContext,droverResult:p.conveyance==='foot'&&!p.orienteeringContext?.animalsPresent?null:droverResult}):null;
    if(adjusted)assertOrienteeringModes({adjustment:adjusted,modes:p.modes});
    const stars=adjusted?adjusted.advantageModes:Number.isSafeInteger(test?.sv)?Math.max(0,Math.min(5,test.sv-4)):NaN;
    assert(roll&&link?.format==='hmk-trek-linked-skill-v1'&&link.hazard==='survival'&&

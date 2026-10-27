@@ -33,10 +33,10 @@ export function expeditionSecondaryRoll({endurance,roll,riding=false}={}){
  const tn=Math.floor(endurance/2)+(riding?2:0);
  return {tn,roll,success:roll<=tn,sourcePage:62};
 }
-export function expeditionWatchFatigue({mode='walk',endurance,rolls,modifiedENC=0,ignoreLoaded=false,weatherExtra=0}={}){
+export function expeditionWatchFatigue({mode='walk',endurance,rolls,modifiedENC=0,ignoreLoaded=false,weatherExtra=0,animalExtraLoad=0}={}){
  assert(['walk','ride','drive','double-walk','double-drover'].includes(mode),'Neznámý cestovní režim');
  assert(whole(modifiedENC,0,10000)&&[0,5,10].includes(weatherExtra),'ENC nebo weather hazard nemá doloženou hodnotu');
- assert(typeof ignoreLoaded==='boolean','Neplatná volba Loaded Mode');
+ assert(typeof ignoreLoaded==='boolean'&&whole(animalExtraLoad,0,10000)&&animalExtraLoad%10===0,'Neplatný doložený příplatek za naložená zvířata');
  assert(Array.isArray(rolls)&&rolls.length===(mode.startsWith('double-')?4:1),'Počet hodů END SR neodpovídá počtu časových intervalů');
  const riding=mode==='ride'||mode==='drive',double=mode.startsWith('double-');
  const base=double?(mode==='double-drover'?5:10):5;
@@ -52,10 +52,10 @@ export function expeditionWatchFatigue({mode='walk',endurance,rolls,modifiedENC=
   'Bez ignorovaného Loaded Mode se zvláštní ENC nezadává');
  const extraLoad=ignoreLoaded?Math.floor(modifiedENC/10)*10:0;
  const results=rolls.map(roll=>expeditionSecondaryRoll({endurance,roll,
-  riding:riding||mode==='double-drover'}));
+  riding})); // Drover on foot is NOT a rider/driver (+2 applies only to riders/drivers).
  // Hourly Double Time is calculated before the ONCE-PER-WATCH surcharge.
- const accrual=results.reduce((a,r)=>a+Math.max(0,base-(r.success?5:0)),0)+extraLoad+weatherExtra;
- return {durationMinutes:240,mode,accrual,rolls:results,base,extraLoad,weatherExtra,
+ const accrual=results.reduce((a,r)=>a+Math.max(0,base-(r.success?5:0)),0)+extraLoad+animalExtraLoad+weatherExtra;
+ return {durationMinutes:240,mode,accrual,rolls:results,base,extraLoad,animalExtraLoad,weatherExtra,
   sourcePages:[62,149,150,176],requiresHazardResolution:true};
 }
 export function expeditionRestRecovery({minute,current,kind,startedMinutesAgo=0,claims={}}={}){

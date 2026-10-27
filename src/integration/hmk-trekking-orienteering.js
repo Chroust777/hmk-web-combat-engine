@@ -6,19 +6,19 @@ const requireFact=(yes,message)=>{if(!yes)throw Error(message);};
 const isBool=x=>typeof x==='boolean';
 export const ORIENTEERING_FORMAT='hmk-trek-orienteering-context-v1';
 export function createOrienteeringContext({night=false,partySize,familiar=false,
- torchlight=false,fullMoon=false,afterSnowfall=false,conveyance='foot',droverId=null,stationaryForaging=false}={}){
+ torchlight=false,fullMoon=false,afterSnowfall=false,conveyance='foot',droverId=null,stationaryForaging=false,animalsPresent=false}={}){
  requireFact(Number.isSafeInteger(partySize)&&partySize>=1&&partySize<=10000,'Neplatný počet členů cestovní družiny');
- requireFact([night,familiar,torchlight,fullMoon,afterSnowfall,stationaryForaging].every(isBool),
+ requireFact([night,familiar,torchlight,fullMoon,afterSnowfall,stationaryForaging,animalsPresent].every(isBool),
   'Neplatné doložené podmínky Orienteering');
  requireFact(['foot','mount','cart','wagon'].includes(conveyance),'Neplatná doprava Orienteering');
- requireFact(conveyance==='foot'?droverId===null:typeof droverId==='string'&&droverId.length>0,
+ requireFact(conveyance==='foot'&&!animalsPresent?droverId===null:typeof droverId==='string'&&droverId.length>0,
   'Cesta se zvířaty vyžaduje konkrétního drovera ze skupiny');
  // Artificial light, full moon and previous continuous snowfall offset night,
  // but do not confer free bonuses during daylight (printed p.145).
  requireFact(night||!(torchlight||fullMoon||afterSnowfall),
   'Noční zdroje světla lze použít jen při noční hlídce');
  return {format:ORIENTEERING_FORMAT,night,partySize,familiar,torchlight,fullMoon,
-  afterSnowfall,conveyance,droverId,...(stationaryForaging?{stationaryForaging:true}:{}),sourcePage:145};
+  afterSnowfall,conveyance,droverId,...(animalsPresent?{animalsPresent:true}:{}),...(stationaryForaging?{stationaryForaging:true}:{}),sourcePage:145};
 }
 export function adjustedOrienteeringSV({baseSV,context,droverResult=null}={}){
  requireFact(Number.isSafeInteger(baseSV)&&baseSV>=-100&&baseSV<=100,
@@ -26,7 +26,7 @@ export function adjustedOrienteeringSV({baseSV,context,droverResult=null}={}){
  requireFact(context?.format===ORIENTEERING_FORMAT,'Chybí doložené okolnosti Orienteering');
  const c=createOrienteeringContext(context);
  requireFact(JSON.stringify(c)===JSON.stringify(context),'Pozměněný důkaz okolností Orienteering');
- if(c.conveyance==='foot')requireFact(droverResult===null,'Pěší cesta nepotřebuje Drover Test');
+ if(c.conveyance==='foot'&&!c.animalsPresent)requireFact(droverResult===null,'Cesta bez zvířat nepotřebuje Drover Test');
  else requireFact(droverResult&&['CF','F','S','CS'].includes(droverResult.level),
    'Cesta se zvířaty vyžaduje propojený Riding/Animalcraft Drover Test');
  const nightPenalty=c.night?-3+Number(c.torchlight)+Number(c.fullMoon)+Number(c.afterSnowfall):0;

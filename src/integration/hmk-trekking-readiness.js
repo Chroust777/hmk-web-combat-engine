@@ -38,9 +38,9 @@ export function assessTrekkingReadiness({journal=[],characters=[],actorId,campai
   const drover=journal.filter(j=>j.calendarTrekSkillSource?.sourceId===source.id&&
    j.calendarTrekSkillSource.hazard==='drover'&&j.calendarCampaignId===campaignId&&
    j.characterId===p.orienteeringContext.droverId&&j.campaignMinute>=minute);
-  requireFact(p.conveyance==='foot'||drover.length===1,
+  requireFact((p.conveyance==='foot'&&!p.orienteeringContext.animalsPresent)||drover.length===1,
    'Chybí doložený Riding/Animalcraft Drover Test pro tuto hlídku.');
-  const droverResult=p.conveyance==='foot'?null:(drover[0].skillTestProof?.a||drover[0].skillTestProof?.result);
+  const droverResult=p.conveyance==='foot'&&!p.orienteeringContext.animalsPresent?null:(drover[0].skillTestProof?.a||drover[0].skillTestProof?.result);
   const adjustment=adjustedOrienteeringSV({baseSV:result.sv,context:p.orienteeringContext,droverResult});
   const certified=assertOrienteeringModes({adjustment,modes:p.modes});
   available=certified.available;spent=certified.spent;verifiedSV=certified.adjustedSV;

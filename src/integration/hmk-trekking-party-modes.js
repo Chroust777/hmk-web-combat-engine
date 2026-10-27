@@ -9,11 +9,22 @@ import {combatFatigueTotals} from './persistent-combat-state.js';
 const check=(v,msg)=>{if(!v)throw Error(msg);};
 const int=n=>Number.isSafeInteger(n)&&n>=0;
 const serious=w=>!w.healed&&['S','G'].includes(w.severity);
-export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],conveyance='foot',loadedByGM=false,allowCertifiedWeatherAccrual=false}={}){
+export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],conveyance='foot',loadedByGM=false,allowCertifiedWeatherAccrual=false,drovingAnimals=[]}={}){
  check(Array.isArray(memberIds)&&memberIds.length&&memberIds.length===new Set(memberIds).size&&memberIds.every(x=>typeof x==='string'&&x),
   'Vyberte jedinečné účastníky hlídky.');
  check(memberIds.includes(guideId),'Průvodce musí být součástí skupiny.');
  check(['foot','mount','cart','wagon'].includes(conveyance),'Nepodporovaný způsob cesty.');
+ // Animal ENC is never inferred from a folk inventory. Only explicitly
+ // identified, measured droving animals can cancel Loaded in exchange for fatigue.
+ check(Array.isArray(drovingAnimals),'Naložená zvířata musí být doložena jednotlivě.');
+ const animalIds=new Set();
+ const animals=drovingAnimals.map(a=>{
+  check(a&&typeof a.id==='string'&&a.id.trim().length>0&&!animalIds.has(a.id)&&
+   int(a.enc)&&typeof a.droverId==='string'&&memberIds.includes(a.droverId),
+   'Každé naložené zvíře potřebuje jedinečné jméno, doložené ENC a honáka ve skupině.');
+  animalIds.add(a.id);
+  return {id:a.id,enc:a.enc,droverId:a.droverId,loaded:a.enc>=20};
+ });
  const members=memberIds.map(id=>{
   const actor=characters.find(c=>c.id===id);
   check(actor?.hmk?.combatState,'Postava není připravena: '+id);
@@ -46,12 +57,12 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
  const unresolved=members.filter(x=>x.loadUnresolved);
  check(conveyance!=='foot'||!unresolved.length||loadedByGM===true,
   'Zatížení nelze bezpečně vypočítat ('+unresolved.map(x=>x.name).join(', ')+'). Doplňte STR/váhy inventáře nebo potvrďte Loaded Mode (konzervativní varianta).');
- check(!(conveyance==='foot'&&loadedByGM===true&&!unresolved.length&&!members.some(x=>x.loaded)),
+ check(!(loadedByGM===true&&!unresolved.length&&!members.some(x=>x.loaded)&&!animals.some(x=>x.loaded)&&!['mount','cart','wagon'].includes(conveyance)),
   'Všechny hodnoty ENC jsou doložené pod hranicí Loaded; ruční Loaded Mode nelze přidat bez pravidlového důvodu.');
  const wearied=members.some(x=>x.fatigue>=20),injured=members.some(x=>x.injured);
- const loaded=conveyance==='foot'?(members.some(x=>x.loaded)||loadedByGM===true):loadedByGM===true;
+ const loaded=members.some(x=>x.loaded)||animals.some(x=>x.loaded)||loadedByGM===true;
  const forcedSlow=Number(wearied)+Number(injured);
- return {format:'hmk-trek-party-modes-v1',memberIds:[...memberIds].sort(),guideId,conveyance,
+ return {format:'hmk-trek-party-modes-v1',memberIds:[...memberIds].sort(),guideId,conveyance,animals,
   members,wearied,injured,loaded,forcedSlow,manualLoaded:loadedByGM===true,
   loadUnresolved:unresolved.map(x=>x.id),sourcePages:[112,145,146,167]};
 }
@@ -67,15 +78,20 @@ export function validateTrekPartySnapshot(p){
   Array.isArray(m.seriousWounds)&&m.seriousWounds.every(w=>typeof w.id==='string'&&w.id&&
    ['S','G'].includes(w.severity)&&hmkHumanLocationSymbols(w.location)?.zone===w.zone)),
  'Nekonzistentní doklad členství a stavu cestovní skupiny.');
+ const animals=p.animals??[]; // Legacy v93.511 watches have no animal records.
+ check(Array.isArray(animals)&&new Set(animals.map(a=>a.id)).size===animals.length&&
+  animals.every(a=>a&&typeof a.id==='string'&&a.id&&int(a.enc)&&
+   typeof a.droverId==='string'&&p.memberIds.includes(a.droverId)&&a.loaded===(a.enc>=20)),
+  'Naložení jednotlivých zvířat neodpovídá doloženému ENC.');
  check(p.wearied===p.members.some(m=>m.fatigue>=20)&&p.injured===p.members.some(m=>m.injured)&&
   p.forcedSlow===Number(p.wearied)+Number(p.injured)&&
   p.members.every(m=>m.injured===m.seriousWounds.some(w=>['head','torso','legs'].includes(w.zone))&&
    m.immobile===m.seriousWounds.some(w=>w.severity==='G'&&['head','torso','legs'].includes(w.zone))&&
    m.loaded===(p.conveyance==='foot'&&(m.modifiedENC!==null?m.modifiedENC>=10:m.minimumENC!==null&&m.minimumENC>=10))&&
    m.loadUnresolved===(p.conveyance==='foot'&&m.modifiedENC===null&&!m.loaded))&&
-  typeof p.manualLoaded==='boolean'&&p.loaded===(p.manualLoaded||p.members.some(m=>m.loaded))&&
+  typeof p.manualLoaded==='boolean'&&p.loaded===(p.manualLoaded||p.members.some(m=>m.loaded)||animals.some(a=>a.loaded))&&
   !(p.conveyance!=='foot'&&p.members.some(m=>m.loaded))&&
-  !(p.conveyance==='foot'&&p.manualLoaded&&!p.loadUnresolved.length&&!p.members.some(m=>m.loaded))&&
+  !(p.conveyance==='foot'&&p.manualLoaded&&!p.loadUnresolved.length&&!p.members.some(m=>m.loaded)&&!animals.some(a=>a.loaded))&&
   !(p.members.some(m=>m.immobile||m.fatigue>=40)&&!['cart','wagon'].includes(p.conveyance))&&
   JSON.stringify(p.loadUnresolved)===JSON.stringify(p.members.filter(m=>m.loadUnresolved).map(m=>m.id)),
   'Změněné doložené postihy skupiny.');

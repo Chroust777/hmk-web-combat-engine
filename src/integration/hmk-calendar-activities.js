@@ -20,7 +20,34 @@ export function activeHMKActivities(journal=[],clock){
 }
 /** GM records an interruption; it never moves campaign time, alters a past
  * activity, or awards recovery for an incomplete rest. */
-export function interruptHMKActivity({journal=[],clock,activityId,reason,id,createdAt}={}){
+/** Printed p.146 scales actual distance for short treks; p.150 establishes
+ * per-HOUR Double Time END rolls. HMK gives no automatic fractional-hour
+ * fatigue or fractional Loaded surcharge: GM must explicitly adjudicate it.
+ * Existing full-hour rolls are never discarded or rerolled.
+ */
+export function interruptedTrekOutcome(plan,elapsedMinutes,partialWeariness=null){
+ check(plan?.kind==='travel'&&min(elapsedMinutes)&&elapsedMinutes<plan.durationMinutes,
+  'Přerušená cesta musí být kratší než skutečně plánovaný interval.');
+ const doubled=['double-walk','double-drover'].includes(plan.mode);
+ const fullHours=doubled?Math.floor(elapsedMinutes/60):0;
+ const partialHourMinutes=doubled?elapsedMinutes%60:elapsedMinutes;
+ const completedHourRolls=doubled?plan.rolls.slice(0,fullHours):[];
+ const earned=completedHourRolls.reduce((sum,r)=>sum+Math.max(0,plan.base-(r.success?5:0)),0);
+ const automatic=elapsedMinutes===0||(doubled&&partialHourMinutes===0&&
+  !(plan.extraLoad||plan.animalExtraLoad||plan.weatherExtra));
+ check(automatic||Number.isSafeInteger(partialWeariness),
+  'Částečná cestovní únava vyžaduje rozhodnutí GM: zadejte Weariness za skutečně absolvovaný interval.');
+ const accrual=automatic?earned:partialWeariness;
+ check(Number.isSafeInteger(accrual)&&accrual>=earned&&accrual<=plan.accrual,
+  'Únava při přerušení musí zahrnout již dokončené hodinové END testy a nesmí převýšit celou hlídku.');
+ const round=x=>Math.round(x*1000)/1000;
+ return {format:'hmk-interrupted-travel-accounting-v1',elapsedMinutes,fullHours,partialHourMinutes,
+  completedHourRolls,earnedByFullHours:earned,accrual,gmDecision:automatic?null:partialWeariness,
+  travelledLeagues:round(plan.travelledLeagues*elapsedMinutes/plan.durationMinutes),
+  travelledKilometres:round(plan.travelledKilometres*elapsedMinutes/plan.durationMinutes),
+  sourcePages:[145,146,150]};
+}
+export function interruptHMKActivity({journal=[],clock,activityId,reason,id,createdAt,partialWeariness=null}={}){
  check(clock&&min(clock.minute)&&typeof id==='string'&&id&&!journal.some(row=>row.id===id),'Neplatné potvrzení přerušení');
  check(typeof reason==='string'&&reason.trim().length>=3&&reason.trim().length<=400,'Doložte důvod přerušení');
  const source=plannedHMKActivities(journal,activeClockKey(clock)).find(row=>row.id===activityId);
@@ -29,11 +56,13 @@ export function interruptHMKActivity({journal=[],clock,activityId,reason,id,crea
  check(!scheduledHMKCompletionIds(journal).has(source.id)&&!interruptedHMKActivityIds(journal).has(source.id),
   'Tato činnost už byla dokončena nebo přerušena');
  check(clock.minute<activity.endMinute,'Nelze zpětně přerušit již ukončenou činnost');
+ const elapsed=Math.max(0,clock.minute-activity.startMinute);
+ const partial=activity.plan.kind==='travel'?interruptedTrekOutcome(activity.plan,elapsed,partialWeariness):null;
  const p={format:STOP,activityId:source.id,characterId:activity.characterId,
   campaignId:activeClockKey(clock),startMinute:activity.startMinute,
   minute:clock.minute,elapsedMinutes:Math.max(0,clock.minute-activity.startMinute),
-  reason:reason.trim(),awardFatigue:false,
-  ...(activity.plan.kind==='travel'&&Number.isFinite(activity.plan.travelledLeagues)&&Number.isFinite(activity.plan.travelledKilometres)?{
+  reason:reason.trim(),awardFatigue:false,...(partial?{partialTravel:partial}:{}),
+  ...(!partial&&activity.plan.kind==='travel'&&Number.isFinite(activity.plan.travelledLeagues)&&Number.isFinite(activity.plan.travelledKilometres)?{
    // Printed short-trek ratio p.146: provisional distance only. END SR is
    // NEVER prorated from a four-hour test or awarded for an incomplete watch.
    projectedShortTravel:{format:'hmk-interrupted-short-trek-v1',
@@ -43,7 +72,7 @@ export function interruptHMKActivity({journal=[],clock,activityId,reason,id,crea
     confirmedDistance:false,sourcePage:146}}:{})};
  return {id,createdAt,characterId:source.characterId,calendarCampaignId:source.calendarCampaignId,
   campaignMinute:clock.minute,title:'HMK · přerušeno · '+activity.kind+' · '+activity.name,
-  body:'Přerušeno: '+reason.trim()+'. Nedokončená činnost nepřiznává automatickou obnovu ani cestovní únavu. Nedokončené následky je nutné vyhodnotit podle pravidel.'+
+  body:'Přerušeno: '+reason.trim()+'. Nedokončený odpočinek neobnovuje únavu. '+(partial?'Doložená částečná cesta: '+partial.elapsedMinutes+' minut, '+partial.travelledLeagues+' leagues, Weariness +'+partial.accrual+'.':'Další zdravotní následky vyhodnocuje GM.')+
    (p.projectedShortTravel?' Orientační vzdálenost při nepřetržitém tempu '+p.projectedShortTravel.projectedLeagues+' leagues; skutečná trasa není automaticky potvrzena.':''),
   calendarActivityInterruptProof:p};
 }
@@ -124,6 +153,40 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
  }
  return completed;
 }
+/** Commit interrupted travel at the actual stop minute, exactly once; never
+ * award the missing future part of the watch. Legacy interruptions (v93.511)
+ * stay historical and are NOT silently recalculated on import.
+ */
+export function finishInterruptedHMKTravel(database,{idFactory,stamp}={}){
+ const clock=database?.campaignClock;if(!clock)return [];
+ check(typeof idFactory==='function'&&typeof stamp==='function','Chybí generátor důkazů');
+ const campaignId=activeClockKey(clock),done=scheduledHMKCompletionIds(database.journal);
+ const results=[];
+ for(const stop of [...database.journal]){
+  const p=stop.calendarActivityInterruptProof,part=p?.partialTravel;
+  if(p?.format!==STOP||!part||stop.calendarCampaignId!==campaignId||
+    stop.campaignMinute>clock.minute||done.has(p.activityId))continue;
+  const source=database.journal.find(row=>row.id===p.activityId);
+  check(source?.calendarActivityProof?.plan?.kind==='travel','Chybí původní cestovní aktivita');
+  const a=source.calendarActivityProof,actor=database.characters.find(c=>c.id===a.characterId);
+  check(actor,'Neznámá postava přerušené cesty');
+  check(JSON.stringify(interruptedTrekOutcome(a.plan,p.elapsedMinutes,part.gmDecision))===JSON.stringify(part),
+   'Nesouhlasí přerušený čas, END ani únava.');
+  const plan={...a.plan,durationMinutes:p.elapsedMinutes,accrual:part.accrual,
+   travelledLeagues:part.travelledLeagues,travelledKilometres:part.travelledKilometres,
+   rolls:part.completedHourRolls};
+  const proof=commitExpeditionFatigue(actor,plan,p.minute,a.origin,source.id);
+  proof.activityId=source.id;proof.interrupted=true;proof.interruptionId=stop.id;
+  const result={id:idFactory(),createdAt:stamp(),characterId:actor.id,
+   calendarCampaignId:campaignId,campaignMinute:p.minute,
+   title:'HMK · dílčí cesta · '+actor.name,
+   body:'Přerušení po '+p.elapsedMinutes+' min: '+part.travelledLeagues+
+    ' leagues, Weariness +'+part.accrual+' (nedokončená část hlídky bez účinku).',
+   calendarExpeditionProof:proof};
+  database.journal.push(result);done.add(source.id);results.push(result);
+ }
+ return results;
+}
 /** Read-only timeline: individual actions remain visible through the entire
  * activity interval and in the original history. No duplicate state is stored.
  */
@@ -136,7 +199,7 @@ export function calendarActorActivities(clock,characters=[],journal=[]){
   const labels={winded:'Klid · 10 minut',rest:'Odpočinek · 4 hodiny',sleep:'Spánek · 8 hodin',travel:'Cesta'};
   return {id:'activity:'+row.id,sourceId:row.id,origin:'activity',kind:a.kind,
    name:allowed.get(row.characterId),characterId:row.characterId,title:labels[a.kind]||'Činnost · '+a.kind,
-   description:'Činnost postavy',note:interrupted?'GM přerušil činnost v minutě '+stop.campaignMinute+' ('+stop.calendarActivityInterruptProof.reason+'); bez automatického účinku.':finished?'Pravidlový výsledek byl dokončen a zapsán.':
+   description:'Činnost postavy',note:interrupted?'GM přerušil činnost v minutě '+stop.campaignMinute+' ('+stop.calendarActivityInterruptProof.reason+'); '+(stop.calendarActivityInterruptProof.partialTravel?'dokončený podíl cestovní únavy +'+stop.calendarActivityInterruptProof.partialTravel.accrual:'bez obnovy za neúplný odpočinek')+'.':finished?'Pravidlový výsledek byl dokončen a zapsán.':
     clock.minute>=a.endMinute?'Čas činnosti uplynul; pravidlový zápis musí proběhnout při potvrzeném posunu času GM (bez dalšího tlačítka).':isStarted?'Činnost probíhá. Účinek se zapíše teprve po uplynutí intervalu a posunu času GM.':'Naplánovaná činnost.',
    minute:a.startMinute,dueMinute:a.startMinute,endMinute:interrupted?Math.max(a.startMinute,stop.campaignMinute):a.endMinute,
    status:interrupted?'cancelled':finished?'resolved':clock.minute>=a.endMinute?'elapsed':isStarted?'active':'future',destination:'notes'};
@@ -149,7 +212,7 @@ export function calendarActorActivities(clock,characters=[],journal=[]){
     id:'activity-stop:'+row.id,sourceId:row.id,origin:'activity',kind:'activity-interruption',
     characterId:row.characterId,name:allowed.get(row.characterId),
     title:'HMK · přerušení činnosti',description:'Přerušení činnosti postavy',
-    note:row.calendarActivityInterruptProof.reason+' · neúplný interval bez automatické obnovy.',
+    note:row.calendarActivityInterruptProof.reason+' · '+(row.calendarActivityInterruptProof.partialTravel?'částečná cesta vyhodnocena dle absolvovaného času':'neúplný odpočinek bez automatické obnovy')+'.',
     minute:row.campaignMinute,dueMinute:row.campaignMinute,status:'cancelled',destination:'notes'
   }));
  // A stationary Foraging watch covers four hours in one hex. It is not a
@@ -214,7 +277,25 @@ export function validateHMKActivityEvidence(journal=[]){
    g.memberIds.includes(g.guideId)&&typeof a.plan.trekSourceId==='string'&&
    typeof a.plan.orienteeringId==='string','Poškozený skupinový cestovní důkaz');
   const signature=JSON.stringify([g,row.calendarCampaignId,a.startMinute,a.endMinute,
-   a.plan.trekSourceId,a.plan.orienteeringId,a.plan.mode]);
+   a.plan.trekSourceId,a.plan.orienteeringId,g.planningKind??a.plan.mode]);
+  if(g.planningKind){
+   const party=trek?.calendarTrekProof?.partyModes;
+   check(party&&['walk','ride','drive','double-walk','double-drover'].includes(g.planningKind),
+    'Chybí pravidlový původ skupiny.');
+   const animalDrover=(party.animals??[]).some(x=>x.droverId===a.characterId);
+   const expected=g.planningKind==='double-walk'&&animalDrover?'double-drover':g.planningKind;
+   check(a.plan.mode===expected,'Hodinová únava neodpovídá roli cestujícího / honáka.');
+   const bypass=trek.calendarTrekProof.modes?.ignoreLoaded===true;
+   const animalCharge=bypass?(party.animals??[]).filter(x=>x.loaded&&x.droverId===a.characterId)
+    .reduce((sum,x)=>sum+Math.floor(x.enc/20)*10,0):0;
+   const member=party.members.find(x=>x.id===a.characterId);
+   const folkCharge=bypass&&member?.loaded?Math.floor(member.modifiedENC/10)*10:0;
+   check(a.plan.animalExtraLoad===animalCharge&&a.plan.extraLoad===folkCharge&&
+    a.plan.ignoreLoaded===undefined&&Number.isSafeInteger(a.plan.accrual)&&
+    a.plan.accrual===a.plan.rolls.reduce((sum,x)=>sum+Math.max(0,a.plan.base-(x.success?5:0)),0)+
+     folkCharge+animalCharge+a.plan.weatherExtra,
+    'Fatigue skupiny neodpovídá END SR a doloženému ENC jednotlivých cestujících a zvířat.');
+  }
   if(!groups.has(g.id))groups.set(g.id,{signature,members:new Set(),expected:g.memberIds});
   const grp=groups.get(g.id);
   check(grp.signature===signature&&!grp.members.has(a.characterId),'Nesoulad členů a časů skupinové cesty');
@@ -222,14 +303,14 @@ export function validateHMKActivityEvidence(journal=[]){
  }
  for(const group of groups.values())check(group.members.size===group.expected.length&&
   group.expected.every(id=>group.members.has(id)), 'Skupinová cesta musí být uložena pro všechny vybrané postavy najednou');
- const stopped=new Set(),finished=new Set();
+ const stopped=new Set(),finished=new Set(),interruptRows=new Map();
  for(const row of journal){const p=row.calendarActivityInterruptProof;if(!p)continue;
   const source=all.get(p.activityId),a=source?.calendarActivityProof;
   check(p.format===STOP&&a&&p.characterId===a.characterId&&row.characterId===a.characterId&&
    p.campaignId===source.calendarCampaignId&&row.calendarCampaignId===source.calendarCampaignId&&
    min(p.minute)&&p.minute===row.campaignMinute&&p.minute<a.endMinute&&
    p.startMinute===a.startMinute&&p.elapsedMinutes===Math.max(0,p.minute-a.startMinute)&&
-   p.awardFatigue===false&&(!p.projectedShortTravel||(
+   p.awardFatigue===false&&(!p.partialTravel||JSON.stringify(interruptedTrekOutcome(a.plan,p.elapsedMinutes,p.partialTravel.gmDecision))===JSON.stringify(p.partialTravel))&&(!p.projectedShortTravel||(
     p.projectedShortTravel.format==='hmk-interrupted-short-trek-v1'&&
     p.projectedShortTravel.confirmedDistance===false&&
     p.projectedShortTravel.elapsedMinutes===p.elapsedMinutes&&
@@ -238,11 +319,18 @@ export function validateHMKActivityEvidence(journal=[]){
     p.projectedShortTravel.projectedKilometres===Math.round(a.plan.travelledKilometres*p.elapsedMinutes/a.durationMinutes*1000)/1000))&&
    typeof p.reason==='string'&&p.reason.length>=3&&!stopped.has(p.activityId),
    'Přerušení činnosti nemá jednoznačný platný zdroj');
-  stopped.add(p.activityId);
+  stopped.add(p.activityId);interruptRows.set(p.activityId,row);
  }
  for(const row of journal){const p=row.calendarExpeditionProof;if(!p?.activityId)continue;
   const source=all.get(p.activityId),a=source?.calendarActivityProof;
-  check(a&&a.characterId===row.characterId&&source.calendarCampaignId===row.calendarCampaignId&&a.endMinute===row.campaignMinute&&p.campaignMinute===row.campaignMinute&&!finished.has(p.activityId)&&!stopped.has(p.activityId)&&
+  const stop=interruptRows.get(p.activityId),partial=stop?.calendarActivityInterruptProof?.partialTravel;
+  check(a&&a.characterId===row.characterId&&source.calendarCampaignId===row.calendarCampaignId&&
+   p.campaignMinute===row.campaignMinute&&!finished.has(p.activityId)&&
+   (p.interrupted===true?!!partial&&p.interruptionId===stop.id&&
+     row.campaignMinute===stop.campaignMinute&&p.durationMinutes===partial.elapsedMinutes&&
+     p.delta===partial.accrual&&p.travelledLeagues===partial.travelledLeagues&&
+     p.travelledKilometres===partial.travelledKilometres:
+    !stopped.has(p.activityId)&&a.endMinute===row.campaignMinute)&&
    (!a.plan.travelGroup||JSON.stringify(p.travelGroup)===JSON.stringify(a.plan.travelGroup)),
    'Výsledek činnosti nemá jednoznačný správný zdroj');
   finished.add(p.activityId);

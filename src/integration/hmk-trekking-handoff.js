@@ -40,7 +40,7 @@ export function trekkingSkillLinkForNewProof({pending,source,actorId,campaignId,
   const hazardDie=weatherRollEvidence(journal,source.id,actorId,campaignId);
   if(!hazardDie?.calendarTrekWeatherRoll.exposed&&!legacyLinkedEvidence)return null;
  }
- if(pending.hazard==='drover'&&(source.calendarTrekProof.conveyance==='foot'||
+ if(pending.hazard==='drover'&&(source.calendarTrekProof.conveyance==='foot'&&!source.calendarTrekProof.orienteeringContext?.animalsPresent||
    used!==(source.calendarTrekProof.conveyance==='mount'?'Riding':'Animalcraft')))return null;
  if(pending.hazard==='direction'&&!['misdirection'].includes(source.calendarTrekProof.hazards?.direction))return null;
  if(!skills.includes(used)||!['secondary-mastery-test','secondary-mastery-value-test',

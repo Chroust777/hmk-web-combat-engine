@@ -24,7 +24,7 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   requireFact(memberIds.length===prepared.memberIds.length&&memberIds.every(id=>prepared.memberIds.includes(id)),
    'Vybraná skupina neodpovídá účastníkům původně připravené Trekking Routine.');
   const current=trekPartyModes({memberIds:prepared.members.map(m=>m.id),guideId,
-   characters,inventory,conveyance:prepared.conveyance,loadedByGM:prepared.manualLoaded,
+   characters,inventory,conveyance:prepared.conveyance,loadedByGM:prepared.manualLoaded,drovingAnimals:(prepared.animals??[]).map(a=>({id:a.id,enc:a.enc,droverId:a.droverId})),
    allowCertifiedWeatherAccrual:true});
   // The group was snapshot before the (required) weather procedures. A
   // confirmed weather test legitimately changes Fatigue within this same
@@ -44,7 +44,7 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
       Object.entries(original).every(([k,v])=>k==='fatigue'||JSON.stringify(x[k])===JSON.stringify(v));
   }), 'Stav postav nebo zatížení skupiny se po přípravě hlídky změnily bez doloženého Weather Hazard. Nepoužívejte zastaralé cestovní podklady.');
  }
- const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort()};
+ const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort(),planningKind:kind};
  // Combat State also includes blood-loss Weakness. A partial fatigue sum can
  // silently allow a prohibited trek when the true total already reaches 40.
  const fatigueOf=actor=>{
@@ -75,14 +75,22 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   // END result; a wagon passenger is deliberately not presumed to be walking.
   const fatigue=atDepartureFatigue(id);
 
+  // A drover leading pack animals on foot incurs 5/hour rather than
+  // a walking traveller's 10/hour under Double Time (printed p.150).
+  const hasPackAnimals=(ready.source.calendarTrekProof.partyModes?.animals??[])
+   .some(a=>a.droverId===id);
+  const actorMode=kind==='double-walk'&&hasPackAnimals?'double-drover':kind;
   const input=diceByActor[id];
   const result=expeditionDiceSubmission({kind,rawValues:input?.rawValues,generated:input?.generated});
   const snapshot=ready.source.calendarTrekProof.partyModes?.members.find(m=>m.id===id);
-  const bypass=ready.source.calendarTrekProof.modes?.ignoreLoaded===true&&snapshot?.loaded===true;
+  const bypass=ready.source.calendarTrekProof.modes?.ignoreLoaded===true;
+  const animals=ready.source.calendarTrekProof.partyModes?.animals??[];
+  const animalExtraLoad=bypass?animals.filter(a=>a.loaded&&a.droverId===id)
+   .reduce((sum,a)=>sum+Math.floor(a.enc/20)*10,0):0;
   // Weather-test Weariness is already applied by the original exposure
   // executor. Do NOT add it a second time during completion of the watch.
-  const plan={...expeditionWatchFatigue({mode:kind,endurance,rolls:result.rolls,
-    modifiedENC:bypass?snapshot.modifiedENC:0,ignoreLoaded:bypass}),kind:'travel',
+  const plan={...expeditionWatchFatigue({mode:actorMode,endurance,rolls:result.rolls,
+    modifiedENC:bypass&&snapshot?.loaded?snapshot.modifiedENC:0,ignoreLoaded:bypass&&snapshot?.loaded,animalExtraLoad}),kind:'travel',
    trekSourceId:ready.sourceId,orienteeringId:ready.orienteeringId,
    travelledLeagues:ready.movement.leagues,travelledKilometres:ready.movement.kilometres,
    travelGroup:group};

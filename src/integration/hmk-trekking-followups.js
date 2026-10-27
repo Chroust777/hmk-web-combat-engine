@@ -47,7 +47,7 @@ export function trekkingOutstandingCases(characters=[],journal=[],campaignId=nul
   if(!journal.some(j=>j.calendarTrekSkillSource?.format==='hmk-trek-linked-skill-v1'&&
     j.calendarTrekSkillSource.sourceId===entry.id&&j.calendarTrekSkillSource.hazard==='survival'&&
     j.characterId===entry.characterId&&j.calendarCampaignId===entry.calendarCampaignId))triggers.push('survival-test');
-  if(p.orienteeringContext&&p.conveyance!=='foot')triggers.push('drover');
+  if(p.orienteeringContext&&(p.conveyance!=='foot'||p.orienteeringContext.animalsPresent))triggers.push('drover');
   if(p.weatherWatch?.requiresWeatherHazardRoll)triggers.push('weather');
   if(p.hazards?.direction&&!(p.hazards.direction==='lost-time'&&p.effectiveMovement&&
    JSON.stringify(p.effectiveMovement)===JSON.stringify(adjustedTrekkingMovement(p))))triggers.push('direction');
