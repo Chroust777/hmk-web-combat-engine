@@ -134,6 +134,7 @@ import {scheduleHMKActivity,finishDueHMKActivities,finishInterruptedHMKTravel,va
 import {nutritionRestActivity,interruptionForCancelledNutritionRest} from './src/integration/hmk-nutrition-rest-bridge.js';
 import {planHMKGroupWatch} from './src/integration/hmk-group-travel.js';
 import {trekPartyModes} from './src/integration/hmk-trekking-party-modes.js';
+import {trekRegisteredAnimalHealth} from './src/integration/hmk-trekking-animal-health.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
@@ -251,7 +252,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.512';
+const APP_VERSION='93.513';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1180,6 +1181,10 @@ function campaignCalendarView(){
  if(!calendarUI)calendarUI=calendarInitialUI(clock);
  const selectedCalendarPeople=calendarMemberIds(clock,data.characters);
  const board=campaignCalendarBoardHTML({clock,characters:selectedCalendarPeople,journal:data.journal,ui:calendarUI,escapeHTML:esc});
+ const animalRoster=data.characters.filter(c=>c?.hmk?.verifiedMountedBreed).map(c=>{
+  try{const h=trekRegisteredAnimalHealth(c);return `${esc(c.id)} (${esc(c.name||c.id)}, ${esc(h.breed)}): Fatigue ${h.fatigue}, Shock ${esc(h.shock)}, ${h.injured?'zraněné':'bez Serious/Grievous zranění'}`;}
+  catch(e){return `${esc(c.id)}: ${esc(e.message)}`;}
+ });
  const trekPanel=`<section class="hc-calendar hc-trek-routine"><h3>HMK · Trekking Routine: počasí, pohyb, nebezpečí a setkání</h3>
  <p class="hc-hint">Pravidla HMK str. 141–150: počasí se určuje jednou za 24 hodin, srážky po čtyřhodinových hlídkách. Podklady pro další cestovní kroky se zaznamenají k vybrané postavě a konkrétní minutě; neprovádí se zde automatické zranění ani posun času. Orienteering, Cold/Heat Exposure a skutečný Encounter se vyhodnocují původními průvodci.</p>
  <details><summary>Vyhodnotit cestovní hlídku – pravidlové podklady</summary><form id="campaign-trekking-context-form">
@@ -1214,7 +1219,8 @@ function campaignCalendarView(){
  <label class="hc-check"><input name="alpine" type="checkbox" value="yes"> Alpine Vegetation / Ice (−4 teplota)</label>
  <label class="hc-check"><input name="aridDesert" type="checkbox" value="yes"> Arid Desert (zvláštní modifikátory)</label>
  <label class="hc-check"><input name="loaded type="checkbox" value="yes"> Loaded Mode – pouze pokud není zatížení doložitelné z inventáře / případně naložené zvíře</label>
- <label>Nákladní / tažná zvířata · každé na vlastním řádku: jméno ; ENC ; ID honáka<textarea name="drovingAnimals" rows="2" placeholder="Mezek 1 ; 25 ; P1"></textarea></label>
+ <label>Jezdecká / nákladní / tažná zvířata · každé na vlastním řádku: ID zvířete ; ENC ; ID honáka<textarea name="drovingAnimals" rows="2" placeholder="Mezek 1 ; 25 ; P1"></textarea></label>
+ <p class="hc-hint">Registrovaná zvířata (zadejte přesné ID, nikoli přezdívku): ${animalRoster.length?animalRoster.join(' · '):'žádné ověřené zvíře v registru'}. Zvíře s odpovídajícím ID používá vlastní existující Combat State pro Fatigue, Shock a zranění; neregistrované jméno je jen evidencí nákladu bez automatické zdravotní kontroly. HMK 150 neurčuje samostatný přírůstek Trekking Fatigue zvířatům.</p>
  <p class="hc-hint">ENC zvířete se zadává jen jako doložený údaj, neodhaduje se z lidského inventáře. ID honáka je ID vybrané postavy. HMK 145: zvíře od 20 ENC spouští Loaded; při ignorování zpomalení dostává jeho honák +10 Weariness za každých úplných 20 ENC. Více zvířat evidujte odděleně.</p>
  <label class="hc-check"><input name="ignoreLoaded" type="checkbox" value="yes"> HMK 145 · Ignorovat Loaded Mode: přesně doložené zatížení pěších členů nebo naložených zvířat, bez neznámého ENC. Zatížení pěšího člena: +10 Fatigue za 10 ENC; každé zvíře: +10 Fatigue honákovi za 20 ENC.</label>
  <label class="hc-check"><input name="doubleTime" type="checkbox" value="yes"> Double Time (jen bez Slow/Loaded)</label>
