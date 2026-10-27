@@ -1,0 +1,56 @@
+'use strict';
+const assert=require('node:assert/strict');
+(async()=>{
+ const {applyInventoryBatch,previewChestOutfit,applyChestOutfit}=await import('../src/integration/hmk-inventory-batch-522.js');
+ const {validateChestTransferJournal}=await import('../src/integration/hmk-inventory-chest.js');
+ const {validateInventoryDispositionJournal}=await import('../src/integration/hmk-inventory-disposition.js');
+ const {PRINTED_ARMOUR_SUITS_P113_116}=await import('../src/rules/armour-suit-printed.js');
+ const {missingPrintedArmourCatalogEntries}=await import('../src/integration/armour-article-catalog.js');
+ const {resolveCombatantLoad}=await import('../src/integration/combatant-load.js');
+ const list=missingPrintedArmourCatalogEntries([]);let n=0;
+ const ids=()=>`id-${++n}`;
+ const make=(name,slot='carried',owner='P1',suit=null)=>{
+  const entry=list.find(x=>x.name.toLowerCase()===(name.toLowerCase()==='great helm'?'plate great helm':name.toLowerCase()));
+  assert.ok(entry,'catalog '+name);
+  return {id:ids(),sourceItemId:entry.id,characterId:owner,snapshot:structuredClone(entry),slot,quantity:1,gearStowage:'normal',layerOrder:slot==='worn'?0:null,layerSlot:null,bulkExceptionZones:[],condition:'',...(slot==='chest'?{chestLocation:'Dům v Tashálu'}:{}),...(suit?{printedSuitName:suit,acquisition:{mode:'buy',transactionId:'suit-receipt-1'}}:{})};
+ };
+ const suite=PRINTED_ARMOUR_SUITS_P113_116.find(x=>x.name==='Plate & Mail');assert.equal(suite.articles.length,17);
+ const armour=suite.articles.map(x=>make(x,'chest','P1',suite.name));
+ const tunic=make('Cloth Tunic','worn'),pants=make('Cloth Breeches','worn');
+ const sword={id:ids(),characterId:'P1',slot:'main_hand',quantity:1,snapshot:{category:'weapon',name:'Broadsword'}};
+ const other=make('Cloth Shirt','carried','P2');
+ const template=()=>({characters:[{id:'P1',name:'Jaroslav',hmk:{attributes:{str:14}}},{id:'P2',name:'Petr'}],inventory:[...structuredClone(armour),structuredClone(tunic),structuredClone(pants),structuredClone(sword),structuredClone(other)],journal:[],campaignClock:{campaignId:'A',minute:240,characterIds:['P1','P2']}});
+ const common={ownerId:'P1',idFactory:ids,createdAt:'2026-10-27T12:00:00Z',confirmed:true};
+ // Worn -> chest and back, respecting owner and hand slots.
+ let db=template();const src=JSON.stringify(db);
+ db=applyInventoryBatch(db,{...common,itemIds:[tunic.id,pants.id],action:'store',location:'Dům v Tashálu'});
+ assert.equal(JSON.stringify(template()),src);
+ assert.equal(db.inventory.find(x=>x.id===tunic.id).slot,'chest');
+ assert.equal(db.inventory.find(x=>x.id===sword.id).slot,'main_hand');
+ assert.equal(db.journal.length,2);validateChestTransferJournal(db.journal);
+ db=applyInventoryBatch(db,{...common,itemIds:[tunic.id,pants.id],action:'retrieve',location:'Dům v Tashálu'});
+ assert.equal(db.inventory.find(x=>x.id===tunic.id).slot,'carried');assert.equal(db.journal.length,4);
+ assert.throws(()=>applyInventoryBatch(db,{...common,itemIds:[tunic.id,'NONEXISTENT'],action:'store',location:'Dům v Tashálu'}),/chybějící/);
+ assert.throws(()=>applyInventoryBatch(db,{...common,itemIds:[tunic.id,tunic.id],action:'store',location:'Dům v Tashálu'}),/jedinečný/);
+ assert.throws(()=>applyInventoryBatch(db,{...common,itemIds:[other.id],action:'store',location:'Dům v Tashálu'}),/chybějící/);
+ const gone=applyInventoryBatch(db,{...common,itemIds:[tunic.id,pants.id],action:'loss',reason:'Zničené při požáru'});
+ assert.equal(gone.inventory.some(x=>x.id===tunic.id),false);assert.equal(gone.journal.filter(x=>x.calendarInventoryDisposition).length,2);validateInventoryDispositionJournal(gone.journal);
+ const fromChest=applyInventoryBatch(template(),{...common,itemIds:[armour[0].id],action:'loss',reason:'Ztraceno při požáru domu',location:'Dům v Tashálu'});
+ assert.equal(fromChest.journal.length,2);validateInventoryDispositionJournal(fromChest.journal);validateChestTransferJournal(fromChest.journal);
+ const toP2=applyInventoryBatch(db,{...common,itemIds:[tunic.id],action:'transfer',recipientId:'P2',reason:'Darováno na cestě'});
+ assert.equal(toP2.inventory.find(x=>x.id===tunic.id).characterId,'P2');
+ // Full printed suite can be dressed straight from the physical chest.
+ const pre=previewChestOutfit(template(),{ownerId:'P1',location:'Dům v Tashálu',mode:'armour'});
+ assert.equal(pre.ready,true,pre.reason);assert.equal(pre.ids.length,17);assert.equal(pre.preview.printedSuit,'Plate & Mail');
+ const after=applyChestOutfit(template(),{...common,location:'Dům v Tashálu',mode:'armour'});
+ assert.equal(after.inventory.filter(x=>x.characterId==='P1'&&x.slot==='worn').length,17);
+ assert.equal(after.inventory.find(x=>x.id===tunic.id).slot,'carried');
+ assert.equal(after.inventory.find(x=>x.id===pants.id).slot,'carried');
+ assert.equal(after.inventory.find(x=>x.id===sword.id).slot,'main_hand');
+ assert.equal(after.inventory.find(x=>x.id===other.id).characterId,'P2');
+ assert.equal(after.journal.length,17);validateChestTransferJournal(after.journal);
+ const load=resolveCombatantLoad({character:after.characters[0],inventory:after.inventory});
+ assert.equal(load.armourENC,40);assert.equal(load.printedSuit,'Plate & Mail');
+ assert.throws(()=>applyChestOutfit(template(),{...common,location:'Daleko',mode:'armour'}),/Na daném místě/);
+ console.log('PASS v93.522: atomic multi-store/retrieve, disposal (including chest), transfer, owner/hand guards, proof validation, and 17-piece Plate & Mail from chest');
+})().catch(e=>{console.error(e.stack);process.exitCode=1});
