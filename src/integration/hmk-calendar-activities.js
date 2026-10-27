@@ -5,6 +5,7 @@
  */
 import {commitExpeditionFatigue,expeditionRestRecovery,expeditionCombatState} from './hmk-calendar-expedition.js';
 import {trekRegisteredAnimalHealth} from './hmk-trekking-animal-health.js';
+import {validateAnimalWeariness,actualAnimalWeariness} from './hmk-trekking-animal-fatigue.js';
 const check=(ok,msg)=>{if(!ok)throw Error(msg);};
 const min=x=>Number.isSafeInteger(x)&&x>=0&&x<=1e9;
 const F='hmk-calendar-actor-activity-v1';
@@ -48,7 +49,7 @@ export function interruptedTrekOutcome(plan,elapsedMinutes,partialWeariness=null
   travelledKilometres:round(plan.travelledKilometres*elapsedMinutes/plan.durationMinutes),
   sourcePages:[145,146,150]};
 }
-export function interruptHMKActivity({journal=[],clock,activityId,reason,id,createdAt,partialWeariness=null}={}){
+export function interruptHMKActivity({journal=[],clock,activityId,reason,id,createdAt,partialWeariness=null,animalPartialWeariness=null}={}){
  check(clock&&min(clock.minute)&&typeof id==='string'&&id&&!journal.some(row=>row.id===id),'Neplatné potvrzení přerušení');
  check(typeof reason==='string'&&reason.trim().length>=3&&reason.trim().length<=400,'Doložte důvod přerušení');
  const source=plannedHMKActivities(journal,activeClockKey(clock)).find(row=>row.id===activityId);
@@ -59,10 +60,22 @@ export function interruptHMKActivity({journal=[],clock,activityId,reason,id,crea
  check(clock.minute<activity.endMinute,'Nelze zpětně přerušit již ukončenou činnost');
  const elapsed=Math.max(0,clock.minute-activity.startMinute);
  const partial=activity.plan.kind==='travel'?interruptedTrekOutcome(activity.plan,elapsed,partialWeariness):null;
+ const animalPolicies=activity.plan.travelGroup?.animalWeariness??[];
+ if(animalPolicies.length){
+  check(animalPartialWeariness&&typeof animalPartialWeariness==='object'&&!Array.isArray(animalPartialWeariness)&&
+   Object.keys(animalPartialWeariness).length===animalPolicies.length,
+   'Přerušení vyžaduje samostatný výsledek každého registrovaného zvířete.');
+  for(const decision of animalPolicies){
+   check(Object.hasOwn(animalPartialWeariness,decision.actorId),'Chybí rozhodnutí GM pro zvíře '+decision.actorId);
+   check(actualAnimalWeariness(decision,elapsed,animalPartialWeariness[decision.actorId])===animalPartialWeariness[decision.actorId],
+    'Zvířecí Weariness musí odpovídat skutečně absolvované části hlídky.');
+  }
+ }
  const p={format:STOP,activityId:source.id,characterId:activity.characterId,
   campaignId:activeClockKey(clock),startMinute:activity.startMinute,
   minute:clock.minute,elapsedMinutes:Math.max(0,clock.minute-activity.startMinute),
   reason:reason.trim(),awardFatigue:false,...(partial?{partialTravel:partial}:{}),
+  ...(animalPolicies.length?{animalPartialWeariness:structuredClone(animalPartialWeariness)}:{}),
   ...(!partial&&activity.plan.kind==='travel'&&Number.isFinite(activity.plan.travelledLeagues)&&Number.isFinite(activity.plan.travelledKilometres)?{
    // Printed short-trek ratio p.146: provisional distance only. END SR is
    // NEVER prorated from a four-hour test or awarded for an incomplete watch.
@@ -105,6 +118,65 @@ export function scheduleHMKActivity({journal=[],clock,characterId,name='',kind,p
   title:'HMK · '+kind+' · '+name,
   body:'Naplánovaná činnost '+name+' · '+kind+' · '+startMinute+'–'+endMinute+' min. Únava bude změněna až po posunu času GM.',
   calendarActivityProof:activity};
+}
+/** A single group completion posts the GM-approved animal weariness once.
+ * All travellers must have genuine completed activity proofs first.
+ */
+function finishApprovedAnimalWeariness(database,{idFactory,stamp,campaignId}){
+ const activities=plannedHMKActivities(database.journal,campaignId);
+ const groups=new Map();
+ for(const row of activities){
+  const group=row.calendarActivityProof.plan?.travelGroup;
+  if(group?.animalWeariness?.length){
+   if(!groups.has(group.id))groups.set(group.id,[]);
+   groups.get(group.id).push(row);
+  }
+ }
+ const output=[];
+ for(const rows of groups.values()){
+  const plan=rows[0].calendarActivityProof.plan,group=plan.travelGroup;
+  if(rows.length!==group.memberIds.length)continue;
+  const results=rows.map(row=>database.journal.find(j=>j.calendarExpeditionProof?.activityId===row.id));
+  if(results.some(r=>!r))continue;
+  const interrupts=results.map(r=>r.calendarExpeditionProof.interrupted===true);
+  check(interrupts.every(v=>v===interrupts[0]),'Skupina nemá shodný stav přerušení.');
+  check(results.every(r=>JSON.stringify(r.calendarExpeditionProof.animalPartialWeariness??null)===
+   JSON.stringify(results[0].calendarExpeditionProof.animalPartialWeariness??null)),
+   'Přerušení celé družiny vyžaduje shodné zdravotní rozhodnutí GM pro každé zvíře.');
+  const elapsed=results[0].calendarExpeditionProof.durationMinutes;
+  check(results.every(r=>r.calendarExpeditionProof.durationMinutes===elapsed&&
+   r.campaignMinute===results[0].campaignMinute), 'Zvířecí únava vyžaduje společnou dokončenou dobu cesty.');
+  const already=new Set(database.journal.filter(j=>j.calendarTrekAnimalFatigueProof?.groupId===group.id).map(j=>j.characterId));
+  const trek=database.journal.find(j=>j.id===plan.trekSourceId)?.calendarTrekProof;
+  check(trek?.partyModes,'Zvířecí únava nemá původní Trekking Routine.');
+  validateAnimalWeariness(trek.partyModes.animals??[],group.animalWeariness,group.planningKind);
+  // Preflight all animal decisions before a single animal is altered.
+  const work=group.animalWeariness.filter(policy=>!already.has(policy.actorId)).map(policy=>{
+   const actor=database.characters.find(c=>c.id===policy.actorId);
+   check(actor?.hmk?.combatState,'Chybí původní Combat State zvířete '+policy.actorId);
+   const partial=interrupts[0]?results[0].calendarExpeditionProof.animalPartialWeariness?.[policy.actorId]:null;
+   const delta=actualAnimalWeariness(policy,elapsed,partial??null);
+   if(!interrupts[0]){
+    const atStart=(trek.partyModes.animals??[]).find(x=>x.id===policy.actorId)?.health;
+    check(atStart&&JSON.stringify(trekRegisteredAnimalHealth(actor))===JSON.stringify(atStart),
+     'Zdravotní stav zvířete se změnil; GM musí doložit okamžik přerušení.');
+   }
+   return {policy,actor,delta};
+  });
+  for(const {policy,actor,delta} of work){
+   const proof=commitExpeditionFatigue(actor,{kind:'travel',accrual:delta,durationMinutes:elapsed,sourcePages:[145,150,176]},
+    results[0].campaignMinute,'gm-adjudication',group.id+':'+policy.actorId);
+   database.journal.push({id:idFactory(),characterId:policy.actorId,createdAt:stamp(),calendarCampaignId:campaignId,
+    campaignMinute:results[0].campaignMinute,title:'HMK · zvíře · Weariness · '+(actor.name||actor.id),
+    body:'Rozhodnutí GM ('+policy.reason+'), skutečně '+elapsed+' minut, Weariness +'+delta+'.',
+    calendarTrekAnimalFatigueProof:{format:'hmk-calendar-animal-fatigue-v1',groupId:group.id,
+     trekSourceId:plan.trekSourceId,animalId:policy.actorId,elapsedMinutes:elapsed,delta,
+     gmPolicy:structuredClone(policy),priorFatigue:proof.priorFatigue,finalFatigue:proof.finalFatigue,
+     sourcePages:[145,150,176]}});
+   output.push(database.journal[database.journal.length-1]);
+  }
+ }
+ return output;
 }
 /** Called atomically from the GM clock advance mutation, never on form submit.
  * Each completed action produces an append-only authoritative rule proof.
@@ -169,6 +241,7 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
    calendarExpeditionProof:proof};
   database.journal.push(result);completed.push(result);
  }
+ completed.push(...finishApprovedAnimalWeariness(database,{idFactory,stamp,campaignId}));
  return completed;
 }
 /** Commit interrupted travel at the actual stop minute, exactly once; never
@@ -195,6 +268,7 @@ export function finishInterruptedHMKTravel(database,{idFactory,stamp}={}){
    rolls:part.completedHourRolls};
   const proof=commitExpeditionFatigue(actor,plan,p.minute,a.origin,source.id);
   proof.activityId=source.id;proof.interrupted=true;proof.interruptionId=stop.id;
+  if(p.animalPartialWeariness)proof.animalPartialWeariness=structuredClone(p.animalPartialWeariness);
   const result={id:idFactory(),createdAt:stamp(),characterId:actor.id,
    calendarCampaignId:campaignId,campaignMinute:p.minute,
    title:'HMK · dílčí cesta · '+actor.name,
@@ -203,6 +277,7 @@ export function finishInterruptedHMKTravel(database,{idFactory,stamp}={}){
    calendarExpeditionProof:proof};
   database.journal.push(result);done.add(source.id);results.push(result);
  }
+ results.push(...finishApprovedAnimalWeariness(database,{idFactory,stamp,campaignId}));
  return results;
 }
 /** Read-only timeline: individual actions remain visible through the entire
@@ -300,6 +375,7 @@ export function validateHMKActivityEvidence(journal=[]){
    const party=trek?.calendarTrekProof?.partyModes;
    check(party&&['walk','ride','drive','double-walk','double-drover'].includes(g.planningKind),
     'Chybí pravidlový původ skupiny.');
+   if(g.animalWeariness)validateAnimalWeariness(party.animals??[],g.animalWeariness,g.planningKind);
    const animalDrover=(party.animals??[]).some(x=>x.droverId===a.characterId);
    const expected=g.planningKind==='double-walk'&&animalDrover?'double-drover':g.planningKind;
    check(a.plan.mode===expected,'Hodinová únava neodpovídá roli cestujícího / honáka.');
@@ -328,7 +404,9 @@ export function validateHMKActivityEvidence(journal=[]){
    p.campaignId===source.calendarCampaignId&&row.calendarCampaignId===source.calendarCampaignId&&
    min(p.minute)&&p.minute===row.campaignMinute&&p.minute<a.endMinute&&
    p.startMinute===a.startMinute&&p.elapsedMinutes===Math.max(0,p.minute-a.startMinute)&&
-   p.awardFatigue===false&&(!p.partialTravel||JSON.stringify(interruptedTrekOutcome(a.plan,p.elapsedMinutes,p.partialTravel.gmDecision))===JSON.stringify(p.partialTravel))&&(!p.projectedShortTravel||(
+   p.awardFatigue===false&&(!a.plan.travelGroup?.animalWeariness?.length||
+    (p.animalPartialWeariness&&a.plan.travelGroup.animalWeariness.every(policy=>
+      p.animalPartialWeariness[policy.actorId]===actualAnimalWeariness(policy,p.elapsedMinutes,p.animalPartialWeariness[policy.actorId]))))&&(!p.partialTravel||JSON.stringify(interruptedTrekOutcome(a.plan,p.elapsedMinutes,p.partialTravel.gmDecision))===JSON.stringify(p.partialTravel))&&(!p.projectedShortTravel||(
     p.projectedShortTravel.format==='hmk-interrupted-short-trek-v1'&&
     p.projectedShortTravel.confirmedDistance===false&&
     p.projectedShortTravel.elapsedMinutes===p.elapsedMinutes&&
@@ -353,6 +431,39 @@ export function validateHMKActivityEvidence(journal=[]){
    'Výsledek činnosti nemá jednoznačný správný zdroj');
   finished.add(p.activityId);
  }
+ // Each interrupted member of a group must attest the SAME animal
+ // amounts: otherwise one member could forge a later partial outcome.
+ const interruptedGroupDecisions=new Map();
+ for(const row of journal){
+  const result=row.calendarExpeditionProof;
+  if(!result?.interrupted||!result.activityId)continue;
+  const source=all.get(result.activityId),group=source?.calendarActivityProof?.plan?.travelGroup;
+  if(!group?.animalWeariness?.length)continue;
+  const signature=JSON.stringify(result.animalPartialWeariness??null);
+  check(!interruptedGroupDecisions.has(group.id)||interruptedGroupDecisions.get(group.id)===signature,
+   'Členové přerušené družiny mají rozdílná GM rozhodnutí o zvířecí únavě.');
+  interruptedGroupDecisions.set(group.id,signature);
+ }
+ // One animal result per group/animal and only after every group member has finished.
+ const animalKeys=new Set();
+ for(const row of journal){
+  const p=row.calendarTrekAnimalFatigueProof;if(!p)continue;
+  const key=p.groupId+':'+p.animalId;
+  const rows=journal.filter(j=>j.calendarActivityProof?.plan?.travelGroup?.id===p.groupId);
+  check(p.format==='hmk-calendar-animal-fatigue-v1'&&p.animalId===row.characterId&&
+   !animalKeys.has(key)&&rows.length>0&&rows.length===rows[0].calendarActivityProof.plan.travelGroup.memberIds.length,
+   'Duplicitní nebo osiřelá zvířecí únava.');
+  animalKeys.add(key);
+  const policy=rows[0].calendarActivityProof.plan.travelGroup.animalWeariness?.find(x=>x.actorId===p.animalId);
+  check(policy&&JSON.stringify(policy)===JSON.stringify(p.gmPolicy)&&
+   rows.every(r=>journal.some(j=>j.calendarExpeditionProof?.activityId===r.id&&
+    j.campaignMinute===row.campaignMinute&&j.calendarExpeditionProof.durationMinutes===p.elapsedMinutes))&&
+   p.delta===actualAnimalWeariness(policy,p.elapsedMinutes,
+    journal.find(j=>j.calendarExpeditionProof?.activityId===rows[0].id)?.calendarExpeditionProof?.animalPartialWeariness?.[p.animalId]??null)&&
+   p.finalFatigue===p.priorFatigue+p.delta&&row.calendarCampaignId===rows[0].calendarCampaignId&&
+   row.campaignMinute===rows[0].calendarActivityProof.startMinute+p.elapsedMinutes,
+   'Zvířecí zdravotní doklad neodpovídá času, rozhodnutí GM nebo Combat State.');
+ }
  return true;
 }
 
@@ -360,7 +471,7 @@ export function validateHMKActivityEvidence(journal=[]){
 export function assertHMKActivitiesAppendOnly(previous=[],next=[]){
  const current=new Map(next.map(row=>[row.id,row]));
  for(const row of previous){
-  if(!row.calendarActivityProof&&!row.calendarExpeditionProof?.activityId&&!row.calendarActivityInterruptProof)continue;
+  if(!row.calendarActivityProof&&!row.calendarExpeditionProof?.activityId&&!row.calendarActivityInterruptProof&&!row.calendarTrekAnimalFatigueProof)continue;
   check(current.has(row.id)&&JSON.stringify(current.get(row.id))===JSON.stringify(row),
    'Dříve uloženou časovanou činnost nebo její výsledek nelze přepsat ani odstranit.');
  }

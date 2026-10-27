@@ -7,9 +7,10 @@ import {expeditionDiceSubmission,expeditionWatchFatigue} from './hmk-calendar-ex
 import {scheduleHMKActivity} from './hmk-calendar-activities.js';
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {totalFatigue} from '../rules/fatigue.js';
+import {prepareAnimalWeariness} from './hmk-trekking-animal-fatigue.js';
 import {trekPartyModes} from './hmk-trekking-party-modes.js';
 const requireFact=(ok,msg)=>{if(!ok)throw Error(msg);};
-export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,memberIds=[],guideId,kind,diceByActor={},idFactory}={}){
+export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,memberIds=[],guideId,kind,diceByActor={},animalWeariness=[],idFactory}={}){
  requireFact(clock&&Number.isSafeInteger(clock.minute)&&typeof idFactory==='function','Chybí potvrzený čas kampaně nebo generátor ID');
  requireFact(['walk','ride','drive','double-walk','double-drover'].includes(kind),'Nepodporovaná cestovní činnost');
  requireFact(Array.isArray(memberIds)&&memberIds.length>0&&new Set(memberIds).size===memberIds.length,
@@ -49,7 +50,30 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
       Object.entries(original).every(([k,v])=>k==='fatigue'||JSON.stringify(x[k])===JSON.stringify(v));
   }), 'Stav postav nebo zatížení skupiny se po přípravě hlídky změnily bez doloženého Weather Hazard. Nepoužívejte zastaralé cestovní podklady.');
  }
- const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort(),planningKind:kind};
+ const animalPolicies=prepareAnimalWeariness(ready.source.calendarTrekProof.partyModes?.animals??[],animalWeariness,kind);
+ requireFact(animalPolicies.every(p=>!clock.characterIds||clock.characterIds.includes(p.actorId)),
+  'Zdravotní stav zvířete lze měnit pouze tehdy, je-li zvíře členem aktivní kampaně. Přidejte je do kalendáře.');
+ // A beast may not be committed to two concurrent travel groups. The
+ // existing human per-actor scheduling guard cannot enforce this on its own.
+ const ownAnimals=new Set((ready.source.calendarTrekProof.partyModes?.animals??[]).map(a=>a.id));
+ for(const pending of journal.filter(j=>j.calendarActivityProof?.plan?.travelGroup)){
+  const activity=pending.calendarActivityProof,g=activity.plan.travelGroup;
+  if(pending.calendarCampaignId!==campaignKey(clock)||g.id===ready.sourceId||
+   activity.endMinute<=clock.minute||activity.startMinute>=clock.minute+240)continue;
+  if((g.animalWeariness??[]).some(p=>ownAnimals.has(p.actorId))||
+   animalPolicies.some(p=>(journal.find(x=>x.id===activity.plan.trekSourceId)?.calendarTrekProof?.partyModes?.animals??[])
+     .some(a=>a.id===p.actorId)))
+   requireFact(false,'Registrované zvíře je již rezervováno v jiné souběžné cestovní hlídce.');
+ }
+ // In hourly Double Time the animal must not become immobile before the
+ // final hour; p.145 forbids continuing once fatigue reaches 40.
+ for(const policy of animalPolicies){
+  const initial=ready.source.calendarTrekProof.partyModes.animals.find(a=>a.id===policy.actorId)?.health?.fatigue;
+  requireFact(policy.period!=='hour'||initial+3*policy.rate<40,
+   'Zvíře '+policy.actorId+' by při sazbě GM dosáhlo Fatigue 40 před poslední hodinou Double Time. Rozdělte cestu a rozhodněte o dřívějším zastavení.');
+ }
+
+ const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort(),planningKind:kind,...(animalPolicies.length?{animalWeariness:animalPolicies}:{})};
  // Combat State also includes blood-loss Weakness. A partial fatigue sum can
  // silently allow a prohibited trek when the true total already reaches 40.
  const fatigueOf=actor=>{
