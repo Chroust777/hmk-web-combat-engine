@@ -4913,10 +4913,36 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  .content-calendar .hc-trek-routine .hmk-trek-grid{grid-template-columns:1fr}
 }
 
-/* v93.520: compact actions for the authoritative armour loadout. */
-.content-sheet .hmk-outfit-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 8px}
-.content-sheet .hmk-outfit-toolbar button{flex:1 1 185px;min-width:0;white-space:normal;font:600 13px/1.35 Georgia,serif;padding:9px 11px}
-@media(max-width:680px){.content-sheet .hmk-outfit-toolbar{display:grid;grid-template-columns:1fr}.content-sheet .hmk-outfit-toolbar button{width:100%}}
+/* v93.527 — restore the proven four-button vertical wardrobe layout.
+   Reuse the chapter's existing parchment and action buttons. No coloured
+   framing or independent panel backgrounds around these controls. */
+.content-sheet .hmk-outfit-toolbar{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ align-items:start!important;gap:14px!important;margin:12px 0 8px!important;
+ padding:0!important;background:none!important;border:0!important;
+ box-shadow:none!important;outline:0!important;
+}
+.content-sheet .hmk-outfit-action-group{
+ display:flex!important;flex-direction:column!important;align-items:stretch!important;
+ gap:6px!important;min-width:0!important;margin:0!important;
+ padding:0!important;border:0!important;background:transparent!important;
+ box-shadow:none!important;outline:0!important;border-radius:0!important;
+}
+.content-sheet .hmk-outfit-action-group legend{
+ padding:0 0 5px!important;margin:0 0 6px!important;
+ color:var(--folio-ink)!important;font:700 14px/1.3 Georgia,serif!important;
+ border:0!important;border-bottom:1px solid var(--folio-rule)!important;
+ width:100%!important;
+}
+.content-sheet .hmk-outfit-action-group button{
+ display:block!important;box-sizing:border-box!important;width:100%!important;
+ flex:none!important;margin:0!important;min-width:0!important;
+ min-height:36px!important;white-space:normal!important;
+ font:600 13px/1.35 Georgia,serif!important;padding:7px 9px!important;
+}
+@media(max-width:700px){
+ .content-sheet .hmk-outfit-toolbar{grid-template-columns:minmax(0,1fr)!important}
+}
 
 /* v93.525 — Arsenal inventory tables align with Library parchment tables,
    keep the first column visible, center bulk action bars and stay compact. */
@@ -4959,15 +4985,31 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  .content-sheet .journal-book--chapter .inv-bulk-toolbar button{font-size:11px!important}
 }
 
-/* v93.523 · Arsenal & Gear: two readable four-step wardrobe sequences */
-/* v93.524–525: inventory tables use the same parchment base as Library tables. */
-.content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll{
- background:url('./assets/ui/components/vellum_master.png') repeat center/1024px!important;
+/* v93.527 — shared Location-table treatment for all three inventory lists.
+   The chapter page already carries the original vellum texture; do not paint
+   a second, darker vellum onto the scrollport or individual inventory cells. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-table-scroll{
+ background:rgba(255,250,238,.22)!important;
+ border:1px solid var(--folio-rule)!important;border-radius:0!important;
+ padding:2px!important;
 }
-.content-sheet .journal-book--chapter .inv-ledger-table thead th{
- background:url('./assets/ui/components/vellum_master.png') repeat center/1024px!important;
- color:inherit!important;font-family:Georgia,serif!important;border-bottom:1px solid var(--folio-rule)!important;
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table thead th{
+ background:rgba(171,125,66,.16)!important;color:#583316!important;
+ border-bottom:1px solid #987344!important;
+ font:700 11px/1.2 "Cinzel",Georgia,serif!important;
 }
-.content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{
- background:url('./assets/ui/components/vellum_master.png') repeat center/1024px!important;
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table tbody :is(td,th){
+ background:transparent!important;border-bottom:1px solid rgba(149,105,59,.25)!important;
+ color:var(--folio-ink)!important;
+}
+/* Sticky item names need an opaque paper backing while other cells remain
+   as transparent as the existing Location table. Reuse the chapter paper
+   variable rather than a new texture or a dark, separately positioned tile. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table tbody th:first-child{
+ background:var(--ill-paper)!important;background-image:none!important;
+ box-shadow:none!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table thead th:first-child{
+ background:var(--ill-paper)!important;background-image:none!important;
+ box-shadow:none!important;
 }
