@@ -60,17 +60,20 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   const activity=pending.calendarActivityProof,g=activity.plan.travelGroup;
   if(pending.calendarCampaignId!==campaignKey(clock)||g.id===ready.sourceId||
    activity.endMinute<=clock.minute||activity.startMinute>=clock.minute+240)continue;
-  if((g.animalWeariness??[]).some(p=>ownAnimals.has(p.actorId))||
-   animalPolicies.some(p=>(journal.find(x=>x.id===activity.plan.trekSourceId)?.calendarTrekProof?.partyModes?.animals??[])
-     .some(a=>a.id===p.actorId)))
-   requireFact(false,'Registrované zvíře je již rezervováno v jiné souběžné cestovní hlídce.');
+  // A beast is a real physical travel participant even when the GM selects
+  // the 'no optional animal fatigue' policy. It cannot be in two simultaneous
+  // parties. Do not limit this guard to parties with animal fatigue policies.
+  const otherAnimals=journal.find(x=>x.id===activity.plan.trekSourceId)?.calendarTrekProof?.partyModes?.animals??[];
+  if(otherAnimals.some(a=>ownAnimals.has(a.id)))
+   requireFact(false,'Zvíře je již rezervováno v jiné souběžné cestovní hlídce.');
  }
  // In hourly Double Time the animal must not become immobile before the
- // final hour; p.145 forbids continuing once fatigue reaches 40.
+ // final hour; p.145 forbids continuing once fatigue reaches 40. Applies to
+ // both legacy confirmed GM rates and the optional automatic interpretation.
  for(const policy of animalPolicies){
   const initial=ready.source.calendarTrekProof.partyModes.animals.find(a=>a.id===policy.actorId)?.health?.fatigue;
   requireFact(policy.period!=='hour'||initial+3*policy.rate<40,
-   'Zvíře '+policy.actorId+' by při sazbě GM dosáhlo Fatigue 40 před poslední hodinou Double Time. Rozdělte cestu a rozhodněte o dřívějším zastavení.');
+   'Zvíře '+policy.actorId+' by během Double Time dosáhlo Fatigue 40 před koncem hlídky. Zkraťte hlídku nebo zvolte jiný režim.');
  }
 
  const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort(),planningKind:kind,...(animalPolicies.length?{animalWeariness:animalPolicies}:{})};

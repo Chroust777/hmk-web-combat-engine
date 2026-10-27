@@ -62,13 +62,18 @@ export function interruptHMKActivity({journal=[],clock,activityId,reason,id,crea
  const partial=activity.plan.kind==='travel'?interruptedTrekOutcome(activity.plan,elapsed,partialWeariness):null;
  const animalPolicies=activity.plan.travelGroup?.animalWeariness??[];
  if(animalPolicies.length){
-  check(animalPartialWeariness&&typeof animalPartialWeariness==='object'&&!Array.isArray(animalPartialWeariness)&&
-   Object.keys(animalPartialWeariness).length===animalPolicies.length,
-   'Přerušení vyžaduje samostatný výsledek každého registrovaného zvířete.');
+  // Derived policy needs no GM fields; legacy GM rates still do.
+  const provided=animalPartialWeariness??{};
+  check(provided&&typeof provided==='object'&&!Array.isArray(provided)&&
+   Object.keys(provided).every(id=>animalPolicies.some(p=>p.actorId===id)),
+   'Neznámá dílčí únava zvířete.');
+  animalPartialWeariness={};
   for(const decision of animalPolicies){
-   check(Object.hasOwn(animalPartialWeariness,decision.actorId),'Chybí rozhodnutí GM pro zvíře '+decision.actorId);
-   check(actualAnimalWeariness(decision,elapsed,animalPartialWeariness[decision.actorId])===animalPartialWeariness[decision.actorId],
-    'Zvířecí Weariness musí odpovídat skutečně absolvované části hlídky.');
+   const supplied=Object.hasOwn(provided,decision.actorId)?provided[decision.actorId]:null;
+   const delta=actualAnimalWeariness(decision,elapsed,supplied);
+   check(decision.gmConfirmed===false||supplied!==null,
+    'Chybí rozhodnutí GM pro zvíře '+decision.actorId);
+   animalPartialWeariness[decision.actorId]=delta;
   }
  }
  const p={format:STOP,activityId:source.id,characterId:activity.characterId,
@@ -168,7 +173,8 @@ function finishApprovedAnimalWeariness(database,{idFactory,stamp,campaignId}){
     results[0].campaignMinute,'gm-adjudication',group.id+':'+policy.actorId);
    database.journal.push({id:idFactory(),characterId:policy.actorId,createdAt:stamp(),calendarCampaignId:campaignId,
     campaignMinute:results[0].campaignMinute,title:'HMK · zvíře · Weariness · '+(actor.name||actor.id),
-    body:'Rozhodnutí GM ('+policy.reason+'), skutečně '+elapsed+' minut, Weariness +'+delta+'.',
+    body:(policy.gmConfirmed?'Rozhodnutí GM':'Odvozený automatický režim')+
+     ' ('+policy.reason+'), skutečně '+elapsed+' minut, Weariness +'+delta+'.',
     calendarTrekAnimalFatigueProof:{format:'hmk-calendar-animal-fatigue-v1',groupId:group.id,
      trekSourceId:plan.trekSourceId,animalId:policy.actorId,elapsedMinutes:elapsed,delta,
      gmPolicy:structuredClone(policy),priorFatigue:proof.priorFatigue,finalFatigue:proof.finalFatigue,
