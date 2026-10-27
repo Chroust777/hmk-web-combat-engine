@@ -4985,13 +4985,15 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  .content-sheet .journal-book--chapter .inv-bulk-toolbar button{font-size:11px!important}
 }
 
-/* v93.530 — Shared parchment surface for the inventory scrollport and its
-   pinned first column. Both sample the SAME original vellum image anchored
-   to the viewport; item-name cells no longer have a flat opaque fill. */
+/* v93.531 — Restore the simple parchment look for the pinned first column.
+   The column remains sticky so item names stay visible, but it now uses the
+   same warm vellum texture as the rest of the inventory table instead of the
+   darker fixed-surface treatment. Visual continuity during horizontal scroll
+   is not forced; readability and matching parchment tone take priority. */
 .content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-table-scroll{
  background-image:url('./assets/ui/components/vellum_master.png')!important;
  background-color:transparent!important;
- background-attachment:fixed!important;
+ background-attachment:scroll!important;
  background-repeat:repeat!important;
  background-size:1024px 1024px!important;
  background-position:center center!important;
@@ -4999,35 +5001,17 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  padding:2px!important;
 }
 .content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table thead th{
- background:rgba(171,125,66,.16)!important;color:#583316!important;
- border-bottom:1px solid #987344!important;
+ background:rgba(171,125,66,.12)!important;color:#583316!important;
+ border-bottom:1px solid rgba(149,105,59,.35)!important;
  font:700 11px/1.2 "Cinzel",Georgia,serif!important;
 }
 .content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table tbody :is(td,th){
  background:transparent!important;border-bottom:1px solid rgba(149,105,59,.25)!important;
  color:var(--folio-ink)!important;
 }
-/* The visible item names must conceal horizontally scrolling columns without
-   creating a flat beige stripe. The same fixed-position parchment texture is
-   painted on the pinned cells and the table scrollport. */
-.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table tbody tr > th:first-child{
- background-image:url('./assets/ui/components/vellum_master.png')!important;
- background-color:transparent!important;
- background-attachment:fixed!important;
- background-repeat:repeat!important;
- background-size:1024px 1024px!important;
- background-position:center center!important;
- box-shadow:none!important;
-}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table tbody tr > th:first-child,
 .content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-table thead tr > th:first-child{
- background-image:
-   linear-gradient(rgba(171,125,66,.16),rgba(171,125,66,.16)),
-   url('./assets/ui/components/vellum_master.png')!important;
- background-color:transparent!important;
- background-attachment:scroll,fixed!important;
- background-repeat:repeat,repeat!important;
- background-size:100% 100%,1024px 1024px!important;
- background-position:center center,center center!important;
+ background:url('./assets/ui/components/vellum_master.png') repeat center/1024px!important;
  box-shadow:none!important;
 }
 .hsk-saved-proof{font:inherit;color:inherit;margin:.4rem 0;padding:.45rem .6rem;border:1px solid var(--folio-rule);background:rgba(255,255,255,.09)}
