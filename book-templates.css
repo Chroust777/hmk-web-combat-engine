@@ -4935,14 +4935,14 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:66px!important}
 .content-sheet .journal-book--chapter .inv-ledger-table thead th:first-child{
  position:sticky!important;left:0!important;z-index:5!important;
- background:#e3d4b9!important;color:#342719!important;box-shadow:2px 0 5px rgba(50,35,23,.2)!important
+ background-image:url('./assets/ui/components/vellum_master.png')!important;background-size:1024px!important;color:inherit!important;box-shadow:2px 0 5px rgba(50,35,23,.2)!important
 }
 .content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{
  position:sticky!important;left:0!important;z-index:3!important;
- background:#f4ead7!important;box-shadow:2px 0 5px rgba(50,35,23,.22)!important;
+ background-image:url('./assets/ui/components/vellum_master.png')!important;background-size:1024px!important;box-shadow:2px 0 5px rgba(50,35,23,.22)!important;
  text-align:left!important;overflow-wrap:anywhere!important;
 }
-.content-sheet .journal-book--chapter .inv-ledger-table tbody tr:nth-child(even) th:first-child{background:#e9ddc6!important}
+
 .content-sheet .journal-book--chapter .inv-ledger-table .inv-select-row{
  display:flex!important;align-items:flex-start!important;gap:7px!important;
  padding:0!important;margin:0!important;min-width:0!important;font-weight:700!important;
@@ -4994,12 +4994,21 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:68px!important}
 .content-sheet .journal-book--chapter .inv-ledger-table thead th{position:sticky!important;top:0!important;z-index:4!important;background:var(--folio-paper,#efe3cb)!important;color:inherit!important}
 .content-sheet .journal-book--chapter .inv-ledger-table thead th:first-child{z-index:8!important;left:0!important;box-shadow:1px 0 1px rgba(55,40,25,.12)!important}
-/* The locked name column uses precisely the same parchment as its row. */
-.content-sheet .journal-book--chapter .inv-ledger-table tbody tr:nth-child(odd)>th,
-.content-sheet .journal-book--chapter .inv-ledger-table tbody tr:nth-child(odd)>td{background:#f4ead7!important}
-.content-sheet .journal-book--chapter .inv-ledger-table tbody tr:nth-child(even)>th,
-.content-sheet .journal-book--chapter .inv-ledger-table tbody tr:nth-child(even)>td{background:#e9ddc6!important}
+/* Reuse the EXISTING Library parchment, never flat grey inventory stripes. */
+.content-sheet .journal-book--chapter .inv-ledger-table tbody td{background:transparent!important}
 .content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{box-shadow:1px 0 1px rgba(55,40,25,.13)!important}
 .content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(2){white-space:nowrap!important;padding-left:4px!important;padding-right:3px!important}
 .content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(3){padding-left:2px!important;padding-right:2px!important}
 .content-sheet .journal-book--chapter .inv-ledger-table :is(td,th){overflow-wrap:break-word!important}
+
+/* v93.524: reuse exact Library parchment/headers (same asset & palette). */
+.content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll{
+ background:url('./assets/ui/components/vellum_master.png') repeat center/1024px!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table thead th{
+ background:#d0b887!important;color:#4c2817!important;
+ font-family:Georgia,serif!important;border-bottom:2px solid #8a6037!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{
+ background:url('./assets/ui/components/vellum_master.png') repeat center/1024px!important;
+}
