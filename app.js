@@ -184,6 +184,8 @@ import {curativeHealingEvidence} from './src/integration/hmk-herbal-healing-brid
 import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,validateNutritionJournal,assertNutritionJournalAppendOnly,nutritionRisk} from './src/integration/hmk-nutrition-days.js';
 import {createNutritionDayConditions,createNutritionConditionsCancel,nextNutritionDayStart,validateNutritionActivityJournal,assertNutritionActivityAppendOnly,dailyNutritionNeeds} from './src/integration/hmk-nutrition-activity.js';
 import {pendingTrackingBearing} from './src/integration/hmk-tracking-bearing-handoff.js';
+import {trackingAwarenessFromSkill,pendingTrackingAwareness,validateTrackingAwarenessJournal} from './src/integration/hmk-tracking-awareness-537.js';
+import {validateSkillActivityTimeProofs} from './src/integration/hmk-skill-activity-timeproof-537.js';
 import {provenCarriedRations,assertExclusiveForagingProven} from './src/integration/hmk-inventory-provisions.js';
 import {characterProvisionsOverview,partyProvisionsOverview} from './src/integration/hmk-character-provisions-overview.js';
 import {isPersonalNote,hiddenLogbookIds,visibleLogbookEntries,logbookHideEntry,logbookRestoreEntry,validateLogbookVisibility} from './src/integration/hmk-logbook-visibility.js';
@@ -258,7 +260,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.536';
+const APP_VERSION='93.537';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -413,7 +415,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
+ if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateTrackingAwarenessJournal(d.journal);validateSkillActivityTimeProofs(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
  if(p?.elixirName!=='Erudition'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;
  const actor=d.characters.find(c=>c.id===p.targetId);
  const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-erudition-aural');
@@ -708,6 +710,7 @@ function installCalendarDiceControls(form,kind,sourceId,actorId){
  }
 }
 let pendingTrekHandoff=null; // UI-only context; the journal proof is the authority after save.
+let pendingTrackingAwarenessId=null; // UI navigation only; the persisted source link is authoritative.
 function mutate(fn,{gmClockAdvance=false}={}){
  if(cloudSync&&!cloudSync.canWrite()){alert('Nejdříve připojte GitHub Cloud v menu Cloud a zálohy.');return false;}
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
@@ -1672,6 +1675,9 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <input type="hidden" name="origin" value="manual"><button type="submit">Uložit skutečný výsledek Foraging · čas se nemění</button></form>`).join('')||'<p class="hc-hint">Žádná doložená hlídka s Foraging Modes nečeká na hody. Stalking/Vigilance se uplatňují jen při navazujícím pravidlovém testu.</p>'}
  <h4>Stalking → Tracking (HMK 147)</h4><p class="hc-hint">Tracking je samostatný skutečný Skill Test. Vyberte člena hlídky a použijte původní Skill Workbench; již provedený hod se zde nebude opakovat. Po výsledku se uplatní doložené podmínky Tracking SV.</p>
  ${stalkingRows.map(({j,req})=>{const link=data.journal.find(x=>x.calendarTrekSkillSource?.sourceId===j.id&&x.calendarTrekSkillSource.hazard==='tracking');const completed=data.journal.find(x=>x.calendarTrekTrackingProof?.sourceId===j.id);return `<div class="hc-event"><strong>${esc(j.calendarTrekProof.area)}</strong> · ${esc(displayCampaignMinute(j.campaignMinute))}${completed?`<p>Tracking SV ${completed.calendarTrekTrackingProof.score.adjustedSV}; spoor stars ${completed.calendarTrekTrackingProof.score.spoorStars}${completed.calendarTrekTrackingProof.score.nextWatchBearingOnCF?' · příští hlídka Bearing Mode':''}</p>`:link?`<form data-trek-tracking-context><input type="hidden" name="sourceId" value="${esc(j.id)}"><input type="hidden" name="skillId" value="${esc(link.id)}"><label>Počet sledovaných osob<input name="partyTracked" type="number" min="0" max="10000" value="0"></label><label>Povrch stopy<select name="road"><option value="none">Mimo silnici</option><option value="unpaved">Unpaved Road</option><option value="paved">Paved Road</option></select></label><label><input name="continuousSnow" type="checkbox" value="yes"> Souvislý sníh (+4 SV)</label><label><input name="continuousRain" type="checkbox" value="yes"> Souvislý déšť (−1 SV)</label><label><input name="twilight" type="checkbox" value="yes"> Twilight (−1 SV)</label><label><input name="night" type="checkbox" value="yes"> Night-time (−3 SV)</label><label><input name="alpine" type="checkbox" value="yes"> Alpine Vegetation (−1 SV)</label><button type="submit">Doložit výsledný Tracking SV (bez nového hodu)</button></form>`:`<div><label>Člen hlídky pro Tracking<select data-trek-tracker>${req.groupIds.map(id=>`<option value="${esc(id)}">${esc(character(id)?.name||id)}</option>`).join('')}</select></label><button type="button" class="hc-small" data-trek-tracking-source="${esc(j.id)}">Otevřít Tracking Skill Test</button></div>`}</div>`}).join('')||'<p class="hc-hint">Žádná doložená hlídka se Stalking Mode.</p>'}
+ <h4>Tracking SV 3–4 → následný Awareness (HMK 147)</h4>
+ <p class="hc-hint">Úspěšný Awareness přidá jedinou Spoor star. Původní Tracking d100 se neopakuje; neúspěch Awareness stopu nevytvoří. Test může provést jen původní tracker.</p>
+ ${data.journal.filter(x=>x.calendarCampaignId===campaignKey(clock)&&x.calendarTrekTrackingProof?.score?.awarenessNeeded).map(x=>{const a=data.journal.find(y=>y.calendarCampaignId===campaignKey(clock)&&y.calendarTrekTrackingAwarenessProof?.trackingId===x.id);return `<div class="hc-event"><strong>${esc(character(x.calendarTrekTrackingProof.trackerId)?.name||'Tracker')} · Tracking SV ${x.calendarTrekTrackingProof.score.adjustedSV}</strong>${a?`<p>Awareness ${esc(a.calendarTrekTrackingAwarenessProof.level)} · d100 ${esc(a.calendarTrekTrackingAwarenessProof.roll??'automatické CF')} → ${a.calendarTrekTrackingAwarenessProof.resultSpoorStars} Spoor star</p>`:`<p>Čeká na doložený Awareness test.</p><button type="button" data-tracking-awareness-source="${esc(x.id)}">Otevřít původní Awareness Skill Test</button>`}</div>`}).join('')||'<p class="hc-hint">Žádný Tracking SV 3–4 v této kampani.</p>'}
  <h4>Encounter · automatická volba procedury Surprise (HMK 150)</h4><p class="hc-hint">Není-li doložena protivníkova bdělost, aplikace nesmí předpokládat, že má automaticky překvapení. Původní Skill Workbench provede až případný potřebný Stealth/Awareness test.</p>
  ${data.journal.filter(j=>j.calendarTrekProof?.encounter?.encounter&&j.calendarCampaignId===campaignKey(clock)).map(j=>{
   const p=effectiveTrekSource(j,data.journal).calendarTrekProof,m=trekWatchfulness({modes:p.modes,conveyance:p.conveyance});
@@ -6642,7 +6648,7 @@ function skillAutoFor(actor,name,form=null,prefix='A'){
   ctx.breakdown.push({label:'Ancestor Rite/Talisman · overlapping MB',value:shamanBoost,source:'confirmed-shaman-rite-talisman-p302'});}
  // HMK p.75: a currently ingested Stimulant modifies Initiative and all
  // three Awareness sensory subskills; it does not alter PRIMARY ML or SV Index.
- if(name==='Initiative'||/^Awareness(?:\s*\(|$)/i.test(name)){
+ if(name==='Initiative'||/^Awareness(?:\s*\(|\s*:|$)/i.test(name)){
   const stim=stimulantEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),
    minute:data.campaignClock?.minute??0,targetId:actor.id});
   if(stim.bonus){ctx.condition.modifier+=stim.bonus;ctx.modifier+=stim.bonus;
@@ -6757,7 +6763,7 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
   const options=skillFollowupActivities(x.skill,x.result.level);
   if(!options.length){if(!includeAdvisory)return '';const note=skillFailureGuidance(x.skill,x.result.level);return '<p class="hsk-followup-advisory"><strong>'+esc(x.skill)+' '+esc(x.result.level)+' · HMK '+(note?.page||60)+':</strong> '+esc(note?.text||'Další test není doložen.')+'</p>';}
   const choices=options.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+' · HMK str. '+a.page+'</option>').join('');
-  return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Pravidlový následek '+esc(x.result.level)+' · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Automatický další test není povinný jen podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+choices+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací d100 (prázdné = automatický hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><button type="submit">Vyhodnotit pravidlový následek '+esc(x.result.level)+'</button><output class="hsk-followup-output" role="status"></output></form>';
+  return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Pravidlový následek '+esc(x.result.level)+' · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Automatický další test není povinný jen podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+choices+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací d100 (prázdné = automatický hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><div data-animal-training-fields hidden><p>Animal Training CF · HMK 65. Výcvik skutečně trval šest měsíců; toto je dodatečné zdržení, nikoli nová Training Roll.</p><label>Skutečně cvičené zvíře<input name="trainedAnimal" maxlength="120"></label><label>Dodatečné měsíce · skutečný d3<input name="trainingD3" type="number" min="1" max="3" step="1"></label><button type="button" class="secondary" data-animal-training-die>⚄ d3</button><label><input type="checkbox" name="trainingReduced"> Doložené zkrácení výcviku o 1 měsíc výměnou za bonusový Training Roll (jen SV ≥ 7, HMK 65)</label><label><input type="checkbox" name="animalTrainingConfirmed"> GM potvrzuje, že původní Animalcraft CF pochází z ukončené Animal Training Routine</label></div><div data-writing-routine-fields hidden><p>Writing Routine CF · HMK 132. Primární hod byl Language (Creativity SR), nikoli Script.</p><label>Rozsah písemnosti<select name="writingScope"><option value="missive">Missive · 10 minut</option><option value="tract">Tract · 5 dní</option><option value="treatise">Treatise · 1 měsíc</option><option value="disquisition">Disquisition · 4 měsíce</option></select></label><label><input type="checkbox" name="writingConfirmed"> GM potvrzuje doloženou Language Writing Routine a zvolený rozsah</label></div><button type="submit">Vyhodnotit pravidlový následek '+esc(x.result.level)+'</button><output class="hsk-followup-output" role="status"></output></form>';
  }).join('');
 }
 function hskClimbingFallRow(i){
@@ -6966,6 +6972,10 @@ function recordSkillEvidence(title,body,proof,slotId=null){
     (proof?.skill===gm.skill||proof?.skills?.[0]===gm.skill)&&
     data.campaignClock.minute>=(gmPlan.trigger==='end'?gmPlan.endMinute:gmPlan.minute)&&
     !data.journal.some(j=>j.calendarGMTestPlanId===gmPlan.id)?gmPlan.id:null;
+  const trackingOrigin=pendingTrackingAwarenessId&&data.journal.find(j=>j.id===pendingTrackingAwarenessId);
+  const trackingAwareness=trackingOrigin?trackingAwarenessFromSkill({trackingRow:trackingOrigin,
+   skillProof:proof,actorId:selected,campaignId:campaignKey(data.campaignClock),
+   minute:data.campaignClock?.minute,journal:data.journal}):null;
   const pending=pendingTrekHandoff;
   const origin=pending&&data.journal.find(x=>x.id===pending.sourceId);
   const link=trekkingSkillLinkForNewProof({pending,source:origin,actorId:selected,
@@ -6973,6 +6983,7 @@ function recordSkillEvidence(title,body,proof,slotId=null){
     minute:data.campaignClock?.minute,proof,journal:data.journal});
   data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof,
     ...(data.campaignClock?{calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute}:{}),
+    ...(trackingAwareness?{calendarTrekTrackingAwarenessProof:trackingAwareness}:{}),
     ...(gmLink?{calendarGMTestPlanId:gmLink}:{}),
     ...(link?{calendarTrekSkillSource:link,calendarCampaignId:link.campaignId,
       campaignMinute:data.campaignClock.minute}:{} )});
@@ -7003,6 +7014,7 @@ function recordSkillEvidence(title,body,proof,slotId=null){
    }
   }
  }))throw Error('Záznam nebyl uložen; nepovažujte tento hod za uložený.');
+ if(data.journal.some(j=>j.id===savedId&&j.calendarTrekTrackingAwarenessProof))pendingTrackingAwarenessId=null;
  const sourceLink=data.journal.find(x=>x.id===savedId)?.calendarTrekSkillSource;
  if(sourceLink){
   pendingTrekHandoff=null;
@@ -7084,6 +7096,14 @@ document.addEventListener('change',event=>{
  }
  if(wrap)wrap.hidden=!plan?.requiresRoll;
  const field=f.elements.namedItem('followRoll');if(field){field.disabled=!plan?.requiresRoll||!selectable.length;field.value='';}
+ for(const [which,id] of [['animal','animal-training'],['writing','writing-routine']]){
+  const block=f.querySelector('[data-'+(which==='animal'?'animal-training':'writing-routine')+'-fields]');
+  if(block){block.hidden=plan?.id!==id;for(const el of block.querySelectorAll('input,select,button')){
+   el.disabled=plan?.id!==id;
+   if(el.name==='trainingD3'||el.name==='trainedAnimal'||el.name==='animalTrainingConfirmed'||el.name==='writingConfirmed')el.required=plan?.id===id;
+  }}
+ }
+
  const submit=f.querySelector('button[type="submit"]');if(submit)submit.disabled=!!plan?.requiresRoll&&!selectable.length;
  hskCriticalTechniqueNote(f);
  f.querySelector('.hsk-followup-guidance').textContent=plan?plan.detail:'Vyberte konkrétní činnost.';
@@ -7091,6 +7111,15 @@ document.addEventListener('change',event=>{
 document.addEventListener('change',event=>{
  const f=event.target?.closest?.('[data-skill-critical-form]');
  if(f&&event.target.name==='technique')hskCriticalTechniqueNote(f);
+},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-animal-training-die]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const f=b.closest('[data-skill-critical-form]'),input=f?.elements.namedItem('trainingD3');
+ if(input){input.value=String(secureHMKDie(3));input.dataset.origin='cryptographic-software-die';}
+},true);
+document.addEventListener('input',e=>{
+ if(e.target?.name==='trainingD3'&&e.isTrusted)e.target.dataset.origin='manual';
 },true);
 document.addEventListener('submit',event=>{
  const f=event.target;if(!f?.matches?.('[data-skill-critical-form]'))return;
@@ -7105,6 +7134,8 @@ document.addEventListener('submit',event=>{
   const old=side==='B'?proof.b:proof.a||proof.result;
   const plan=criticalFollowupPlan(skill,f.elements.namedItem('activity')?.value,old);
   if(!plan)throw Error('Následný postup nelze doložit pro tuto činnost a CF');
+  if(['animal-training','writing-routine'].includes(plan.id)&&(!Number.isSafeInteger(data.campaignClock?.minute)||original.calendarCampaignId!==campaignKey(data.campaignClock)))
+   throw Error('Dlouhodobá činnost vyžaduje otevřenou původní kampaň a doloženou minutu Skill Testu.');
   const actor=character(side==='B'?proof.opponentId:proof.actorId);
   if(!actor||actor.id!==selected)throw Error('Následný test musí vyhodnotit skutečná zasažená postava, nikoli vlastník původního záznamu');
   let result=null,technique=null,provisional=false;
@@ -7120,9 +7151,32 @@ document.addEventListener('submit',event=>{
    result=criticalFollowupResult(plan,roll,eml);
    provisional=!!ctx.armourIsProvisional;
   }
+  let trainingExtension=null,writingExtension=null;
+  if(plan.id==='animal-training'){
+   const name=f.elements.namedItem('trainedAnimal')?.value.trim()||'';
+   const extra=Number(f.elements.namedItem('trainingD3')?.value);
+   if(name.length<2||name.length>120||![1,2,3].includes(extra)||!f.elements.namedItem('animalTrainingConfirmed')?.checked)
+    throw Error('Animal Training CF: potvrďte skutečně dokončený výcvik, konkrétní zvíře a fyzický d3.');
+   const reduced=f.elements.namedItem('trainingReduced')?.checked?1:0;
+   if(reduced&&(!Number.isSafeInteger(old?.sv)||old.sv<7))throw Error('Zkrácení o měsíc vyžaduje doložené původní Animalcraft SV ≥ 7 a obětovaný Training Roll (HMK 65).');
+   trainingExtension={format:'hmk-animal-training-cf-delay-p65-v1',animalName:name,dieD3:extra,
+    dieOrigin:f.elements.namedItem('trainingD3').dataset.origin||'manual',timeReductionMonths:reduced,baseMonths:6-reduced,
+    additionalMonths:extra,totalMonths:6-reduced+extra,requiresCalendarDate:true,sourcePage:65};
+  }
+  if(plan.id==='writing-routine'){
+   if(!f.elements.namedItem('writingConfirmed')?.checked)throw Error('Writing CF vyžaduje potvrzenou Language (Creativity SR) Writing Routine.');
+   const scope=f.elements.namedItem('writingScope')?.value;
+   if(!['missive','tract','treatise','disquisition'].includes(scope))throw Error('Neověřený rozsah Writing Routine.');
+   const factor=result?.level==='CF'?2:result?.level==='F'?1.5:1;
+   writingExtension={format:'hmk-writing-cf-delay-p132-v1',scope,
+    completionTimeMultiplier:factor,requiresOriginalCalendarPlan:true,sourcePage:132};
+  }
   const explanation=plan.requiresRoll?result.effect:plan.detail;
-  const body='Následek '+skill+' · '+plan.label+' (HMK '+plan.page+')'+(result?'\n'+technique+' d100 '+result.roll+' / EML '+result.eml+' → '+result.level:'')+'\n'+explanation+(provisional?'\nVýsledek následného testu předběžný kvůli neověřenému zatížení.':'');
-  const appended={type:'critical-followup',actorId:actor.id,originId,side,skill,activity:plan.id,page:plan.page,technique,result,effect:explanation,preliminaryArmour:provisional,originalRoll:old.roll,originalLevel:old.level};
+  const body='Následek '+skill+' · '+plan.label+' (HMK '+plan.page+')'+(result?'\n'+technique+' d100 '+result.roll+' / EML '+result.eml+' → '+result.level:'')+'\n'+explanation+(provisional?'\nVýsledek následného testu předběžný kvůli neověřenému zatížení.':'')+
+   (trainingExtension?'\nAnimal Training · '+trainingExtension.animalName+'; d3 '+trainingExtension.dieD3+' → +'+trainingExtension.additionalMonths+' měsíce; celkem '+trainingExtension.totalMonths+' měsíců; kalendářní datum musí potvrdit GM.':'')+
+   (writingExtension?'\nWriting '+writingExtension.scope+'; podle Will '+(writingExtension.completionTimeMultiplier*100)+' % původního pracovního času; skutečné kalendářní dokončení se musí přepočítat z původního plánu.':'');
+  const appended={type:'critical-followup',actorId:actor.id,originId,side,skill,activity:plan.id,page:plan.page,technique,result,effect:explanation,preliminaryArmour:provisional,originalRoll:old.roll,originalLevel:old.level,
+   ...(trainingExtension?{trainingExtension}:{}),...(writingExtension?{writingExtension}:{})};
   if(!mutate(()=>{
    if(plan.id==='acro-gymnastics'||(plan.id==='acro-gymnastics-failure'&&['F','CF'].includes(result?.level))){
     if(combatInitiativeSequence)throw Error('Během Initiative se Prone zapisuje výhradně přes bojový systém');
@@ -8180,7 +8234,7 @@ document.addEventListener('submit',e=>{
  catch(error){if(out)out.textContent='Zvláštní SR nelze dokončit: '+error.message;}
 },true);
 document.addEventListener('change',e=>{
- if(e.target?.matches?.('[data-skill-actor]')){pendingTrekHandoff=null;selected=e.target.value;render();return;}
+ if(e.target?.matches?.('[data-skill-actor]')){pendingTrackingAwarenessId=null;pendingTrekHandoff=null;selected=e.target.value;render();return;}
  const form=e.target?.form;
  if(!['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id))return;
  if(e.target.name==='opposed'){
@@ -8576,6 +8630,23 @@ document.addEventListener('click',e=>{
   input.value='Tracking';input.dispatchEvent(new Event('change',{bubbles:true}));
   form.scrollIntoView({block:'center',behavior:'auto'});
  }else notice='Vybraná postava nemá Tracking. Pravidlový hod nebyl vytvořen.';
+},true);
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-tracking-awareness-source]');if(!btn)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const row=data.journal.find(j=>j.id===btn.dataset.trackingAwarenessSource);
+ const p=row?.calendarTrekTrackingProof;
+ if(!p?.score?.awarenessNeeded||row.calendarCampaignId!==campaignKey(data.campaignClock)||
+   data.journal.some(j=>j.calendarTrekTrackingAwarenessProof?.trackingId===row.id))
+  return alert('Tracking Awareness již byl vyhodnocen nebo chybí platný původní SV 3–4.');
+ const actor=character(p.trackerId);
+ if(!actor||!availableMasteries(actor).some(m=>/^Awareness(?:\s*\(|\s*:|$)/i.test(m.name)&&m.ml>0))
+  return alert('Tracker nemá doloženou dostupnou dovednost Awareness; GM musí ověřit pravidla postavy.');
+ pendingTrekHandoff=null;pendingTrackingAwarenessId=row.id;
+ selected=actor.id;view='skills';activeSkillTab='value';render();
+ const form=document.getElementById('skill-value-form'),input=form?.elements.namedItem('primary');
+ const option=[...(input?.options||[])].find(x=>/^Awareness(?:\s*\(|\s*:|$)/i.test(x.value));
+ if(input&&option){input.value=option.value;input.dispatchEvent(new Event('change',{bubbles:true}));form.scrollIntoView({block:'center',behavior:'auto'});}
 },true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-trek-tracking-context]'))return;
@@ -11256,7 +11327,7 @@ if(t.dataset.action==='export-diagnostic'){downloadJSON(diagnosticReport(),'hmk-
 if(t.dataset.action==='export-raw'){downloadRawStorage();return}
 if(t.dataset.action==='export-kernel-character'){const c=character(selected);if(c)downloadJSON(kernelExport([c]),'hmk-character-'+safeFilename(c.name)+'.json');return}
 if(t.dataset.action==='export-kernel-all'){downloadJSON(kernelExport(data.characters),'hmk-domain-export.json');return}
-if(t.dataset.nav){pendingTrekHandoff=null;lastCombatEvent=null;
+if(t.dataset.nav){pendingTrackingAwarenessId=null;pendingTrekHandoff=null;lastCombatEvent=null;
  if(t.dataset.nav==='hazards'){
   const actor=character(selected)??data.characters[0];
   if(!actor){view='characters';overlay=null;render();return}
