@@ -56,10 +56,16 @@ export function resolveOpposedTests(a,b,{breakTie=false,finalD10A=null,finalD10B
  // when measuring opposing victory stars (e.g. S vs stunned CF−1 = 3).
  const levelA=Number.isSafeInteger(a.victorySL)?a.victorySL:a.sl;
  const levelB=Number.isSafeInteger(b.victorySL)?b.victorySL:b.sl;
- if(levelA<SL.S&&levelB<SL.S&&!(persuasion&&levelA===levelB))return {winner:null,stars:0,bothFailed:true}; // p.138: persuasion alone breaks failed ties.
+ // HMK p.138 is an explicit exception to p.61's usual double-failure
+ // no-victor rule. Opposed Persuasion ALWAYS yields a signed star margin:
+ // a better F defeats CF; even equal failures are broken separately.
+ if(levelA<SL.S&&levelB<SL.S){
+  if(!persuasion)return {winner:null,stars:0,bothFailed:true};
+  if(levelA!==levelB)return {winner:levelA>levelB?'a':'b',stars:Math.abs(levelA-levelB),persuasionMargin:true,sourcePage:138};
+ }
  // Base engine uses actual primary ML for its final tie check; p.61.
  const outcome=opposed({a:{sl:levelA,roll:a.roll,ml:a.ml},b:{sl:levelB,roll:b.roll,ml:b.ml},tie:breakTie?'break':'none',finalD10A,finalD10B});
- return persuasion&&a.sl===b.sl?{...outcome,persuasionTie:true,sourcePage:138}:outcome;
+ return persuasion&&levelA===levelB?{...outcome,persuasionTie:true,sourcePage:138}:outcome;
 }
 /** HMK p.61: a tiebreak is an optional follow-up only to equal successful
  * levels (S/S or CS/CS). Original opposed tests remain immutable.

@@ -261,7 +261,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.545';
+const APP_VERSION='93.546';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6836,7 +6836,7 @@ function skillResolvedResult({mastery,form,dieKey,gmModifier=0,condition,trauma,
 }
 function skillConsequenceText(x){return x.type==='none'?'Žádný zvláštní následek':x.type==='combat-handoff'?'Combat Mishap: '+x.mishap+'; předat do existujícího Combat průvodce':x.reason;}
 function skillPendingText(p){return p?.events?.length?'\nNevyřešené existující Combat události: '+p.events.map(e=>e.type+' ['+e.id+']').join(', '):'';}
-function skillDie(form,key,sides){const str=form.elements.namedItem(key)?.value?.trim()??'';if(str==='')return {roll:secureAutoDie(sides),origin:'software'};
+function skillDie(form,key,sides){const str=form.elements.namedItem(key)?.value?.trim()??'';if(str==='')throw Error('Zadejte skutečný fyzický hod d'+sides+' (1–'+sides+'). Aplikace za hráče nehází.');
  const roll=Number(str);if(!Number.isSafeInteger(roll)||roll<1||roll>sides)throw Error('Hod d'+sides+' musí být celé číslo od 1 do '+sides);
  return {roll,origin:'manually-entered'};
 }
@@ -6898,7 +6898,7 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
   const options=skillFollowupActivities(x.skill,x.result.level);
   if(!options.length){if(!includeAdvisory)return '';const note=skillFailureGuidance(x.skill,x.result.level);return '<p class="hsk-followup-advisory"><strong>'+esc(x.skill)+' '+esc(x.result.level)+' · HMK '+(note?.page||60)+':</strong> '+esc(note?.text||'Další test není doložen.')+'</p>';}
   const choices=options.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+' · HMK str. '+a.page+'</option>').join('');
-  return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Pravidlový následek '+esc(x.result.level)+' · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Automatický další test není povinný jen podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+choices+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací d100 (prázdné = automatický hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><div data-animal-training-fields hidden><p>Animal Training CF · HMK 65. Výcvik skutečně trval šest měsíců; toto je dodatečné zdržení, nikoli nová Training Roll.</p><label>Skutečně cvičené zvíře<input name="trainedAnimal" maxlength="120"></label><label>Dodatečné měsíce · skutečný d3<input name="trainingD3" type="number" min="1" max="3" step="1"></label><button type="button" class="secondary" data-animal-training-die>⚄ d3</button><label><input type="checkbox" name="trainingReduced"> Doložené zkrácení výcviku o 1 měsíc výměnou za bonusový Training Roll (jen SV ≥ 7, HMK 65)</label><label><input type="checkbox" name="animalTrainingConfirmed"> GM potvrzuje, že původní Animalcraft CF pochází z ukončené Animal Training Routine</label></div><div data-writing-routine-fields hidden><p>Writing Routine CF · HMK 132. Primární hod byl Language (Creativity SR), nikoli Script.</p><label>Rozsah písemnosti<select name="writingScope"><option value="missive">Missive · 10 minut</option><option value="tract">Tract · 5 dní</option><option value="treatise">Treatise · 1 měsíc</option><option value="disquisition">Disquisition · 4 měsíce</option></select></label><label><input type="checkbox" name="writingConfirmed"> GM potvrzuje doloženou Language Writing Routine a zvolený rozsah</label></div><button type="submit">Vyhodnotit pravidlový následek '+esc(x.result.level)+'</button><output class="hsk-followup-output" role="status"></output></form>';
+  return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Pravidlový následek '+esc(x.result.level)+' · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Automatický další test není povinný jen podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+choices+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací fyzický d100 (povinný, pokud činnost vyžaduje nový hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><div data-animal-training-fields hidden><p>Animal Training CF · HMK 65. Výcvik skutečně trval šest měsíců; toto je dodatečné zdržení, nikoli nová Training Roll.</p><label>Skutečně cvičené zvíře<input name="trainedAnimal" maxlength="120"></label><label>Dodatečné měsíce · skutečný d3<input name="trainingD3" type="number" min="1" max="3" step="1"></label><label><input type="checkbox" name="trainingReduced"> Doložené zkrácení výcviku o 1 měsíc výměnou za bonusový Training Roll (jen SV ≥ 7, HMK 65)</label><label><input type="checkbox" name="animalTrainingConfirmed"> GM potvrzuje, že původní Animalcraft CF pochází z ukončené Animal Training Routine</label></div><div data-writing-routine-fields hidden><p>Writing Routine CF · HMK 132. Primární hod byl Language (Creativity SR), nikoli Script.</p><label>Rozsah písemnosti<select name="writingScope"><option value="missive">Missive · 10 minut</option><option value="tract">Tract · 5 dní</option><option value="treatise">Treatise · 1 měsíc</option><option value="disquisition">Disquisition · 4 měsíce</option></select></label><label><input type="checkbox" name="writingConfirmed"> GM potvrzuje doloženou Language Writing Routine a zvolený rozsah</label></div><button type="submit">Vyhodnotit pravidlový následek '+esc(x.result.level)+'</button><output class="hsk-followup-output" role="status"></output></form>';
  }).join('');
 }
 function hskClimbingFallRow(i){
@@ -7296,7 +7296,9 @@ document.addEventListener('submit',event=>{
    technique=f.elements.namedItem('technique')?.value||'';
    if(!allowed.includes(technique))throw Error('Vyberte osvojenou dovednost pro tento následný hod.');
    const mastery=skillActorMastery(actor,technique),ctx=skillAutoFor(actor,technique),raw=f.elements.namedItem('followRoll')?.value?.trim()||'';
-   const roll=raw?Number(raw):secureAutoDie(100);
+   if(!raw)throw Error('Navazující Skill Test vyžaduje doložený fyzický d100.');
+   const roll=Number(raw);
+   if(!Number.isSafeInteger(roll)||roll<1||roll>100)throw Error('Následný fyzický d100 musí být celé číslo 1–100.');
    // Same validated mechanics as primary tests, but never replace the original critical test.
    const modifier=(ctx.condition?.modifier||0)+(ctx.trauma?.modifier||0);
    const eml=effectiveMasteryLevel(mastery.ml+modifier);
@@ -8077,8 +8079,8 @@ function hskSpecialRefresh(form){
 function hskSpecialNumericDice(form,count){
  const raw=form.elements.namedItem('specialDice')?.value?.trim()||'';
  if(!raw){
-  if(form.dataset.hmkCalendarKind==='talisman-period')throw Error('Pro kalendářový Spirit SR zadejte hod d10 nebo použijte tlačítko pro automatický hod.');
-  return Array.from({length:count},()=>secureAutoDie(10));
+  if(count===0)return [];
+  throw Error('Zadejte všech '+count+' skutečných fyzických hodů d10. Aplikace je negeneruje.');
  }
  if(!/^(?:10|[1-9])(?:\s*,\s*(?:10|[1-9]))*$/.test(raw))throw Error('Hody d10 zadejte oddělené čárkou, každý od 1 do 10');
  const parts=raw.split(',').map(x=>Number(x.trim()));
@@ -8231,16 +8233,20 @@ function hskApplySRResult(result,sr){
  if(!sr||result?.forcedCF)return result;
  let svExtra=sr.svBonus||0;
  if(sr.svBonusRequiresSuccess&&result.sl<2)svExtra=0;
- const victorySL=Math.min(3,(Number.isSafeInteger(result.victorySL)?result.victorySL:result.sl)+(sr.slBonus||0));
- const sl=Math.max(0,victorySL);
+ // HMK p.61: modifiers can increase or decrease a numerical Success Level
+ // without limiting the resulting victory stars. Keep a 4-way categorical SL
+ // for activity-specific CF/F/S/CS consequences and standard SV, but retain
+ // the unbounded level for opposed/unopposed victory margin.
+ const victorySL=(Number.isSafeInteger(result.victorySL)?result.victorySL:result.sl)+(sr.slBonus||0);
+ const sl=Math.max(0,Math.min(3,victorySL));
  if(sl===result.sl&&!svExtra&&victorySL===(result.victorySL??result.sl))return result;
  const extra=(result.svExtra||0)+svExtra;
  const sv=result.index+[-2,-1,0,1][sl]+extra;
  const stars=Math.max(0,Math.min(5,sv-4));
  return {...result,preSecondarySL:result.sl,preSecondaryLevel:result.level,sl,level:['CF','F','S','CS'][sl],
-  victorySL,victoryLevel:victorySL<0?'CF−'+(-victorySL):['CF','F','S','CS'][sl],
+  victorySL,victoryLevel:victorySL<0?'CF−'+(-victorySL):victorySL>3?'CS+'+(victorySL-3):['CF','F','S','CS'][sl],
   sv,svExtra:extra,svTier:sv<=0?{label:'Žádná použitelná hodnota',stars:0}:sv<=2?{label:'Omezená hodnota',stars:0}:sv<=4?{label:'Základní hodnota',stars:0}:sv>=9?{label:'Výjimečná hodnota',stars:5}:{label:'Nadstandardní hodnota',stars},
-  unopposedStars:sl===3?2:sl===2?1:0,preSecondaryCF:result.splitCF||null,splitCF:sl===0?result.splitCF:null,secondarySLBonus:sr.slBonus||0,secondarySVBonus:svExtra};
+  unopposedStars:Math.max(0,victorySL-1),preSecondaryCF:result.splitCF||null,splitCF:sl===0?result.splitCF:null,secondarySLBonus:sr.slBonus||0,secondarySVBonus:svExtra};
 }
 function hskScene(form){return {objective:String(form.elements.namedItem('gmObjective')?.value||'').trim().slice(0,240),scene:String(form.elements.namedItem('gmScene')?.value||'').trim().slice(0,240)};}
 function hskNarrativeBlock(narrative){return '\n\nPŘÍBĚH PRO GM (návrh, bez dalších automatických postihů):\n'+narrative;}
@@ -13582,23 +13588,6 @@ document.addEventListener('submit',e=>{
 },true);
 
 // Explicit physical write-offs: append-only custody evidence, never a GM clock advance.
- document.addEventListener('click',e=>{
-  const button=e.target.closest('[data-hsk-special-dice],[data-hsk-roll-d10]');if(!button)return;
-  e.preventDefault();e.stopImmediatePropagation();
-  const form=button.closest('form');if(!form)return;
-  const input=button.hasAttribute('data-hsk-special-dice')?form.elements.namedItem('specialDice'):
-    form.elements.namedItem(button.dataset.hskRollD10);
-  if(!input||input.disabled)return;
-  const n=secureAutoDie(10);
-  if(input.name==='specialDice'){
-    const existing=String(input.value||'').trim();
-    input.value=existing?(existing+', '+n):String(n);
-  }else input.value=String(n);
-  input.dispatchEvent(new Event('input',{bubbles:true}));
-  input.dispatchEvent(new Event('change',{bubbles:true}));
-  if(input.name==='specialDice')input.dataset.hmkAutoDice=input.value;
- },true);
-document.addEventListener('input',e=>{ if(e.target?.name==='specialDice')delete e.target.dataset.hmkAutoDice; },true);
 document.addEventListener('click',e=>{
  const t=e.target.closest('[data-loss-ration]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();
  const clock=data.campaignClock;

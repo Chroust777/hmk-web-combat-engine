@@ -314,7 +314,16 @@ export function calculateSheetSkills(character){
 if(perceptionMode(character)==='subattributes')for(const [name,primary] of [['Sight','eye'],['Sound','hrg'],['Odour','sml']])inherited.push({name,parent:'Awareness',primary,secondary:'wil',group:'Physical'});
  return [...normal,...inherited.map(x=>{
   const source=SKILL_DEFINITIONS.find(d=>d.name===x.parent);
-  const sourceAlloc={};for(const [stage,points] of Object.entries(creation.skillDP??{}))sourceAlloc[stage]={[x.name]:points[x.parent]??0};
+  const parent=normal.find(row=>row.name===x.parent);
+  // HMK p.49: Shock, Dodge and sensory Awareness use the parent's ENTIRE
+  // development, including post-creation advancement and mastery boosts.
+  // The original creation.skillDP alone is insufficient after a GM upgrade.
+  if(!parent)throw Error('Chybí rodičovská dovednost pro subskill '+x.name);
+  const sourceAlloc={};
+  for(const entry of parent.dp){
+   const stage=entry.stage==='Native Language / Religion'?'Native Proficiencies':entry.stage;
+   (sourceAlloc[stage]??={})[x.name]=entry.dp;
+  }
   return {...calculateSkill({group:x.group??'Combat',name:x.name,primary:x.primary,secondary:x.secondary,baseSM:source.baseSM,sourcePage:x.parent==='Awareness'?57:49},attrs,sourceAlloc),subskillOf:x.parent};
  })];
 }
