@@ -252,7 +252,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.515';
+const APP_VERSION='93.516';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1218,10 +1218,10 @@ function campaignCalendarView(){
  <label class="hc-check"><input name="night" type="checkbox" value="yes"> Noční watch</label>
  <label class="hc-check"><input name="alpine" type="checkbox" value="yes"> Alpine Vegetation / Ice (−4 teplota)</label>
  <label class="hc-check"><input name="aridDesert" type="checkbox" value="yes"> Arid Desert (zvláštní modifikátory)</label>
- <label class="hc-check"><input name="loaded type="checkbox" value="yes"> Loaded Mode – pouze pokud není zatížení doložitelné z inventáře / případně naložené zvíře</label>
- <label>Jezdecká / nákladní / tažná zvířata · každé na vlastním řádku: ID zvířete ; ENC ; ID honáka<textarea name="drovingAnimals" rows="2" placeholder="Mezek 1 ; 25 ; P1"></textarea></label>
- <p class="hc-hint">Registrovaná zvířata (zadejte přesné ID, nikoli přezdívku): ${animalRoster.length?animalRoster.join(' · '):'žádné ověřené zvíře v registru'}. Zvíře s odpovídajícím ID používá vlastní existující Combat State pro Fatigue, Shock a zranění; neregistrované jméno je jen evidencí nákladu bez automatické zdravotní kontroly. HMK 150 neurčuje samostatný přírůstek Trekking Fatigue zvířatům.</p>
- <p class="hc-hint">ENC zvířete se zadává jen jako doložený údaj, neodhaduje se z lidského inventáře. ID honáka je ID vybrané postavy. HMK 145: zvíře od 20 ENC spouští Loaded; při ignorování zpomalení dostává jeho honák +10 Weariness za každých úplných 20 ENC. Více zvířat evidujte odděleně.</p>
+ <label class="hc-check"><input name="loaded" type="checkbox" value="yes"> Loaded Mode – pouze pokud není zatížení doložitelné z inventáře / případně naložené zvíře</label>
+ <label>Jezdecká / nákladní / tažná zvířata · ID ; lb:hmotnost[/neobratná část] ; ID honáka (doporučeno), nebo ID ; enc:výsledné ENC ; ID honáka<textarea name="drovingAnimals" rows="2" placeholder="mule-1 ; lb:280 ; P1"></textarea></label>
+ <p class="hc-hint">Při lb: lze např. zadat lb:300 nebo lb:300/40 (40 lb neobratně uloženého nákladu se započte dvakrát). Počítá se 5 ENC za každých úplných 20 lb, STR modifikátor a mezkům navíc −20 ENC (HMK s.112, 122, 354). Zahrňte jezdce, sedlo, postroj a veškerý náklad. Při enc: zadejte již konečné ENC: nikdy se znovu nesnižuje. Registrovaná zvířata (přesné ID, nikoli přezdívka): ${animalRoster.length?animalRoster.join(' · '):'žádné ověřené zvíře v registru'}. Zvíře s odpovídajícím ID používá vlastní existující Combat State pro Fatigue, Shock a zranění; neregistrované jméno je jen evidencí nákladu bez automatické zdravotní kontroly. HMK 150 neurčuje samostatný přírůstek Trekking Fatigue zvířatům.</p>
+ <p class="hc-hint">Při zadání hmotnosti se výsledné ENC dopočítá z ověřeného STR a plemene zvířete; při zadání enc: jde o již vypočtenou hodnotu, nikoli odhad z lidského inventáře. ID honáka je ID vybrané postavy. HMK 145: zvíře od 20 ENC spouští Loaded; při ignorování zpomalení dostává jeho honák +10 Weariness za každých úplných 20 ENC. Více zvířat evidujte odděleně.</p>
  <label class="hc-check"><input name="ignoreLoaded" type="checkbox" value="yes"> HMK 145 · Ignorovat Loaded Mode: přesně doložené zatížení pěších členů nebo naložených zvířat, bez neznámého ENC. Zatížení pěšího člena: +10 Fatigue za 10 ENC; každé zvíře: +10 Fatigue honákovi za 20 ENC.</label>
  <label class="hc-check"><input name="doubleTime" type="checkbox" value="yes"> Double Time (jen bez Slow/Loaded)</label>
  <p class="hc-hint">Postihy celé skupiny (Wearied, Injured a doložený Loaded) se odvodí automaticky při uložení. Závažné zranění nebo chybějící údaje o výbavě se nebudou vykládat jako nulový postih. Kdo není v této hlídce, tomu se nepřipíše cestovní účinek.</p><button type="submit">Vyhodnotit a uložit podklady (bez posunu času)</button></form>
@@ -8305,8 +8305,11 @@ document.addEventListener('submit',e=>{
   const memberIds=[...new Set([...new FormData(form).getAll('trekMemberIds'),actor.id])];
   const animals=String(v.drovingAnimals??'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean).map(line=>{
    const parts=line.split(';').map(x=>x.trim());
-   if(parts.length!==3||!parts[0]||!/^\d+$/.test(parts[1]))throw Error('Naložená zvířata: zadejte Jméno ; celé ENC ; ID honáka (každé na vlastním řádku).');
-   return {id:parts[0],enc:Number(parts[1]),droverId:parts[2]};
+   if(parts.length!==3||!parts[0]||!parts[2])throw Error('Zvíře: ID ; lb:hmotnost (nebo enc:výsledné ENC) ; ID honáka.');
+   const match=/^(lb|enc):\s*(\d+)(?:\/(\d+))?$/i.exec(parts[1]);
+   if(!match&&!/^\d+$/.test(parts[1]))throw Error('Použijte lb:300 nebo lb:300/40 (neobratná část), případně enc:20 pro již modifikované ENC.');
+   if(match?.[1].toLowerCase()==='enc'&&match[3]!==undefined)throw Error('Výsledné ENC neobsahuje údaj o neobratném nákladu.');
+   return {id:parts[0],droverId:parts[2],...(match?.[1].toLowerCase()==='lb'?{loadLb:Number(match[2]),...(match[3]===undefined?{}:{awkwardLb:Number(match[3])})}:{enc:Number(match?.[2]??parts[1])})};
   });
   const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:data.characters,
    inventory:data.inventory,conveyance:v.conveyance,loadedByGM:v.loaded==='yes',drovingAnimals:animals});
@@ -8368,7 +8371,7 @@ document.addEventListener('submit',e=>{
   if(hazards.direction==='lost-time')proof.unresolved=proof.unresolved.filter(x=>!x.startsWith('Direction Hazard:'));
  const summary=`${area} · ${season}/${v.climate} · ${wet.precipitation}${wet.continuous?' (continuous)':''}; `+
    `den ${day.temperatureD10}/${day.precipitationD10}${dayAlready?' (doložené počasí)':''}${trackingBearing?' · povinný Bearing po Tracking CF '+trackingBearing.trackingId:''}; `+
-   `skupina ${partyModes.memberIds.length}; automatické Slow ${partyModes.forcedSlow}; Loaded ${partyModes.loaded?(ignoreLoaded?'nahrazen únavou':'ano'):'ne'}; LPW ${effectiveMovement.finalLPW}; ${effectiveMovement.leagues} leagues${stationaryForaging?' (Foraging na místě · +2 Orienteering SV)':''}${hazards.direction==='lost-time'?' (Lost Time → Slow +1, HMK 148)':''}; encounter ${encounter.checkDue?(encounter.encounter?'ANO':'ne'):'bez hodu'}`+
+   `skupina ${partyModes.memberIds.length}; zvířata ${partyModes.animals.map(a=>a.id+':'+a.enc+' ENC'+(a.encCalculation?' (z '+a.encCalculation.loadLb+' lb'+(a.encCalculation.awkwardLb?'/'+a.encCalculation.awkwardLb+' neobratně':'')+')':' (již výsledné)')).join(', ')||'žádná'}; automatické Slow ${partyModes.forcedSlow}; Loaded ${partyModes.loaded?(ignoreLoaded?'nahrazen únavou':'ano'):'ne'}; LPW ${effectiveMovement.finalLPW}; ${effectiveMovement.leagues} leagues${stationaryForaging?' (Foraging na místě · +2 Orienteering SV)':''}${hazards.direction==='lost-time'?' (Lost Time → Slow +1, HMK 148)':''}; encounter ${encounter.checkDue?(encounter.encounter?'ANO':'ne'):'bez hodu'}`+
    (unresolved.length?'; NAVAZUJÍCÍ PROCEDURY: '+unresolved.join(', '):'');
   // Submission is already the explicit confirmation of this reversible,
   // append-only preparation. Do not interrupt GM with a redundant modal.
