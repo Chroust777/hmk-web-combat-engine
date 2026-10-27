@@ -4,6 +4,7 @@
  * This module does not infer activities for other party members.
  */
 import {commitExpeditionFatigue,expeditionRestRecovery,expeditionCombatState} from './hmk-calendar-expedition.js';
+import {trekRegisteredAnimalHealth} from './hmk-trekking-animal-health.js';
 const check=(ok,msg)=>{if(!ok)throw Error(msg);};
 const min=x=>Number.isSafeInteger(x)&&x>=0&&x<=1e9;
 const F='hmk-calendar-actor-activity-v1';
@@ -115,6 +116,23 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
  const due=plannedHMKActivities(database.journal,campaignId).filter(row=>
   !done.has(row.id)&&!stopped.has(row.id)&&row.calendarActivityProof.endMinute<=clock.minute)
   .sort((a,b)=>a.calendarActivityProof.endMinute-b.calendarActivityProof.endMinute||a.id.localeCompare(b.id));
+ // Preflight ALL due travel activities before ANY actor receives Fatigue.
+ // A mount/pack beast injured or exhausted since scheduling cannot secretly
+ // complete an unchanged 4-hour trek. The GM must interrupt the group at the
+ // actual incident minute; only then is a partial distance/fatigue warranted.
+ for(const row of due){
+  const proof=row.calendarActivityProof?.plan;
+  if(proof?.kind!=='travel'||!proof.trekSourceId)continue;
+  const trek=database.journal.find(j=>j.id===proof.trekSourceId)?.calendarTrekProof;
+  for(const animal of trek?.partyModes?.animals??[]){
+   if(!animal.health)continue; // v93.512 text-only animals have no fabricated state.
+   const actor=database.characters.find(c=>c.id===animal.id);
+   check(actor,'Registrované cestovní zvíře '+animal.id+' již není v autoritativním registru. GM musí rozhodnout o přerušení cesty.');
+   const current=trekRegisteredAnimalHealth(actor);
+   check(JSON.stringify(current)===JSON.stringify(animal.health),
+    'Zdravotní stav zvířete '+animal.id+' se během plánované hlídky změnil. GM musí cestu přerušit v čase události; nelze přiznat celou vzdálenost.');
+  }
+ }
  const completed=[];
  for(const row of due){
   const activity=row.calendarActivityProof;

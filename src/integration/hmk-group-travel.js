@@ -38,6 +38,11 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
       src.calendarTrekSkillSource?.hazard==='weather'&&src.characterId===id))
     .reduce((sum,j)=>sum+(j.skillTestProof.report?.addedWeariness??0)+
       (j.skillTestProof.report?.outcome?.weaknessFatigue??0),0);
+  // Detect changes in verified animal health between preparation and advance.
+  // Unlike human Weather Hazard, no automatic animal trekking exposure or
+  // healing transition is asserted by HMK 150. GM must reprepare the watch.
+  requireFact(JSON.stringify(current.animals??[])===JSON.stringify(prepared.animals??[]),
+   'Stav registrovaného zvířete nebo jeho zatížení se od přípravy hlídky změnil. Připravte aktuální hlídku bez přepisu historie.');
   requireFact(current.members.every((x,i)=>{
     const original=prepared.members[i];
     return x.id===original.id&&x.fatigue===original.fatigue+weatherDelta(x.id)&&

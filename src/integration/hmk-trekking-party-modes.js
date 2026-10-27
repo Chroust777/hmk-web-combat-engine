@@ -6,6 +6,7 @@
 import {hmkHumanLocationSymbols} from './injury-special-hmk.js';
 import {resolveCombatantLoad} from './combatant-load.js';
 import {combatFatigueTotals} from './persistent-combat-state.js';
+import {trekRegisteredAnimalHealth,validateTrekAnimalHealthProof,assertTrekAnimalCanMove} from './hmk-trekking-animal-health.js';
 const check=(v,msg)=>{if(!v)throw Error(msg);};
 const int=n=>Number.isSafeInteger(n)&&n>=0;
 const serious=w=>!w.healed&&['S','G'].includes(w.severity);
@@ -23,7 +24,11 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
    int(a.enc)&&typeof a.droverId==='string'&&memberIds.includes(a.droverId),
    'Každé naložené zvíře potřebuje jedinečné jméno, doložené ENC a honáka ve skupině.');
   animalIds.add(a.id);
-  return {id:a.id,enc:a.enc,droverId:a.droverId,loaded:a.enc>=20};
+  check(!memberIds.includes(a.id),'Zvíře nesmí být zároveň vedeno jako pěší člen skupiny: '+a.id);
+  const actor=characters.find(c=>c.id===a.id);
+  const health=actor?trekRegisteredAnimalHealth(actor):null;
+  assertTrekAnimalCanMove(health);
+  return {id:a.id,enc:a.enc,droverId:a.droverId,loaded:a.enc>=20,...(health?{health}:{} )};
  });
  const members=memberIds.map(id=>{
   const actor=characters.find(c=>c.id===id);
@@ -59,12 +64,15 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
   'Zatížení nelze bezpečně vypočítat ('+unresolved.map(x=>x.name).join(', ')+'). Doplňte STR/váhy inventáře nebo potvrďte Loaded Mode (konzervativní varianta).');
  check(!(loadedByGM===true&&!unresolved.length&&!members.some(x=>x.loaded)&&!animals.some(x=>x.loaded)&&!['mount','cart','wagon'].includes(conveyance)),
   'Všechny hodnoty ENC jsou doložené pod hranicí Loaded; ruční Loaded Mode nelze přidat bez pravidlového důvodu.');
- const wearied=members.some(x=>x.fatigue>=20),injured=members.some(x=>x.injured);
+ // Registered animals contribute their LIVE, separately recorded fatigue and injuries
+ // to group Slow Modes. No trekking fatigue is generated for animals (HMK 150).
+ const wearied=members.some(x=>x.fatigue>=20)||animals.some(a=>a.health?.fatigue>=20);
+ const injured=members.some(x=>x.injured)||animals.some(a=>a.health?.injured);
  const loaded=members.some(x=>x.loaded)||animals.some(x=>x.loaded)||loadedByGM===true;
  const forcedSlow=Number(wearied)+Number(injured);
  return {format:'hmk-trek-party-modes-v1',memberIds:[...memberIds].sort(),guideId,conveyance,animals,
   members,wearied,injured,loaded,forcedSlow,manualLoaded:loadedByGM===true,
-  loadUnresolved:unresolved.map(x=>x.id),sourcePages:[112,145,146,167]};
+  loadUnresolved:unresolved.map(x=>x.id),sourcePages:[112,145,146,150,167,176,355]};
 }
 /** Verifies internal consistency of immutable party snapshots without comparing
  * later actor wounds, encumbrance or fatigue against an old time. */
@@ -81,9 +89,13 @@ export function validateTrekPartySnapshot(p){
  const animals=p.animals??[]; // Legacy v93.511 watches have no animal records.
  check(Array.isArray(animals)&&new Set(animals.map(a=>a.id)).size===animals.length&&
   animals.every(a=>a&&typeof a.id==='string'&&a.id&&int(a.enc)&&
-   typeof a.droverId==='string'&&p.memberIds.includes(a.droverId)&&a.loaded===(a.enc>=20)),
+   typeof a.droverId==='string'&&p.memberIds.includes(a.droverId)&&!p.memberIds.includes(a.id)&&
+   a.loaded===(a.enc>=20)&&(a.health===undefined||validateTrekAnimalHealthProof(a.health,a.id))&&
+   (!a.health||(a.health.fatigue<40&&!a.health.immobile&&!a.health.comaActive&&
+    !a.health.extendedShockActive&&a.health.shock==='NONE'))),
   'Naložení jednotlivých zvířat neodpovídá doloženému ENC.');
- check(p.wearied===p.members.some(m=>m.fatigue>=20)&&p.injured===p.members.some(m=>m.injured)&&
+ check(p.wearied===(p.members.some(m=>m.fatigue>=20)||animals.some(a=>a.health?.fatigue>=20))&&
+  p.injured===(p.members.some(m=>m.injured)||animals.some(a=>a.health?.injured))&&
   p.forcedSlow===Number(p.wearied)+Number(p.injured)&&
   p.members.every(m=>m.injured===m.seriousWounds.some(w=>['head','torso','legs'].includes(w.zone))&&
    m.immobile===m.seriousWounds.some(w=>w.severity==='G'&&['head','torso','legs'].includes(w.zone))&&
