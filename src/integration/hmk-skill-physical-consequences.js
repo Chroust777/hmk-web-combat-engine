@@ -9,11 +9,14 @@ import {resolveCombatantLoad} from './combatant-load.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {combatFatigueTotals,validateCombatState} from './persistent-combat-state.js';
 import {successLevel} from '../rules/tests.js';
+import {availableMasteries} from './hmk-skill-test-engine.js';
 const must=(ok,msg)=>{if(!ok)throw Error(msg)};
 const die=(v,max)=>Number.isSafeInteger(v)&&v>=1&&v<=max;
 function rollProof(...rows){return rows.map(([faces,value])=>({faces,value,source:'GM-entered-physical-die'}));}
 const mastery=(actor,name)=>{
- const a=(actor.hmk?.skills||[]).filter(x=>String(x.name||'').toLowerCase()===name.toLowerCase());
+ // HMK p.61: attributes are legitimate primary test masteries (score × 5).
+ // Character Creation stores Agility as hmk.attributes.agl, NOT as a Skill.
+ const a=availableMasteries(actor).filter(x=>x.name.toLowerCase()===name.toLowerCase());
  must(a.length===1&&Number.isSafeInteger(a[0].ml)&&a[0].ml>0,`Není doloženo ML ${name} cílové postavy`);
  return a[0].ml;
 };

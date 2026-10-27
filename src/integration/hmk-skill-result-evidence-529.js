@@ -14,7 +14,7 @@ export function skillTestEvidenceHTML(row,esc){
    Number.isInteger(a?.eml)?'EML '+a.eml:'',Number.isInteger(a?.roll)?'d100 '+a.roll:''].filter(Boolean);
   return `<section class="hsk-saved-proof" data-hmk-skill-proof="${esc(row.id||'')}"><div class="hsk-saved-proof__summary"><strong>${esc(row.title||kind)}</strong><span>${esc(badges.join(' · '))}</span></div><details class="hsk-saved-proof__details"><summary>Pravidlový následek · skutečné hody a zápis pro GM</summary><pre>${esc(String(row.body||p.effect||'Výsledek je doložen původním zdravotním záznamem.'))}</pre></details></section>`;
  }
- const comparison=p.comparison, level=a?.level ?? p.originalLevels?.[0] ?? '—';
+ const comparison=p.comparison, level=a?.victoryLevel ?? a?.level ?? p.originalLevels?.[0] ?? '—';
  const stars=comparison?.stars ?? p.stars ?? (p.type.includes('value')?a?.svTier?.stars:a?.unopposedStars);
  const outcome=p.type==='opposed-tiebreak' ? 'Rozstřel · vítěz určen'
   :comparison?(comparison.tie?'Remíza':comparison.bothFailed?'Obě strany neuspěly':comparison.winner==='a'?'Vítězí aktivní strana':comparison.winner==='b'?'Vítězí protistrana':'Nerozhodnuto')
@@ -24,7 +24,7 @@ export function skillTestEvidenceHTML(row,esc){
  if(Number.isFinite(stars))badges.push(`${stars} ★`);
  if(Number.isInteger(a?.eml))badges.push(`EML ${a.eml}`);
  if(Number.isInteger(a?.roll))badges.push(`d100 ${a.roll}`);
- if(b){badges.push(`Protistrana ${b.level||'—'}`);if(Number.isInteger(b.eml))badges.push(`EML ${b.eml}`);if(Number.isInteger(b.roll))badges.push(`d100 ${b.roll}`);}
+ if(b){badges.push(`Protistrana ${b.victoryLevel||b.level||'—'}`);if(Number.isInteger(b.eml))badges.push(`EML ${b.eml}`);if(Number.isInteger(b.roll))badges.push(`d100 ${b.roll}`);}
  // Every original journal body already contains the witnessed EML computation,
  // dice origin, opposed margin, success levels and GM narrative. Display the
  // source directly; do not re-derive a possibly contradictory second result.

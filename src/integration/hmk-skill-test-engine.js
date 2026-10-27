@@ -51,16 +51,23 @@ export function resolveSkillTest({ml,roll,gmModifier=0,secondaryMLs=[],assistant
 export function successValueTier(sv){if(!Number.isSafeInteger(sv))throw Error('SV není celé číslo');return sv<=0?{label:'Žádná použitelná hodnota',stars:0}:sv<=2?{label:'Omezená hodnota',stars:0}:sv<=4?{label:'Základní hodnota',stars:0}:sv>=9?{label:'Výjimečná hodnota',stars:5}:{label:'Nadstandardní hodnota',stars:sv-4};}
 export function resolveOpposedTests(a,b,{breakTie=false,finalD10A=null,finalD10B=null,persuasion=false}={}){
  if(!a||!b||!Number.isInteger(a.sl)||!Number.isInteger(b.sl))throw Error('Chybějí dva vyhodnocené Success Tests');
- if(a.sl<SL.S&&b.sl<SL.S&&!(persuasion&&a.sl===b.sl))return {winner:null,stars:0,bothFailed:true}; // HMK p.61 general; p.138 persuasion breaks failed ties.
+ // p.61: a modifier may lower the *numerical* Success Level beneath CF.
+ // Keep CF for the four-way outcome and SV, but retain the unbounded level
+ // when measuring opposing victory stars (e.g. S vs stunned CF−1 = 3).
+ const levelA=Number.isSafeInteger(a.victorySL)?a.victorySL:a.sl;
+ const levelB=Number.isSafeInteger(b.victorySL)?b.victorySL:b.sl;
+ if(levelA<SL.S&&levelB<SL.S&&!(persuasion&&levelA===levelB))return {winner:null,stars:0,bothFailed:true}; // p.138: persuasion alone breaks failed ties.
  // Base engine uses actual primary ML for its final tie check; p.61.
- const outcome=opposed({a:{sl:a.sl,roll:a.roll,ml:a.ml},b:{sl:b.sl,roll:b.roll,ml:b.ml},tie:breakTie?'break':'none',finalD10A,finalD10B});
+ const outcome=opposed({a:{sl:levelA,roll:a.roll,ml:a.ml},b:{sl:levelB,roll:b.roll,ml:b.ml},tie:breakTie?'break':'none',finalD10A,finalD10B});
  return persuasion&&a.sl===b.sl?{...outcome,persuasionTie:true,sourcePage:138}:outcome;
 }
 /** HMK p.61: a tiebreak is an optional follow-up only to equal successful
  * levels (S/S or CS/CS). Original opposed tests remain immutable.
  */
 export function canResolveOpposedTie(a,b,{persuasion=false}={}){
- return !!(a&&b&&Number.isInteger(a.sl)&&(a.sl>=SL.S||persuasion)&&a.sl===b.sl&&
+ const la=Number.isSafeInteger(a?.victorySL)?a.victorySL:a?.sl;
+ const lb=Number.isSafeInteger(b?.victorySL)?b.victorySL:b?.sl;
+ return !!(a&&b&&Number.isInteger(la)&&(la>=SL.S||persuasion)&&la===lb&&
    Number.isInteger(a.roll)&&Number.isInteger(b.roll)&&
    Number.isInteger(a.ml)&&Number.isInteger(b.ml));
 }
@@ -84,7 +91,10 @@ export function adjustSkillResultForTrauma(result,{slPenalty=0}={}){
  integer(slPenalty,0,1,'Shock SL penalty');
  if(!slPenalty)return result;
  if(!result||!Number.isSafeInteger(result.sl)||!Number.isSafeInteger(result.ml))throw Error('Chybí primární Success Test');
- const sl=Math.max(SL.CF,result.sl-slPenalty),sv=successValue({ml:result.ml,sl,extra:result.svExtra??0});
- return {...result,preTraumaSL:result.sl,preTraumaLevel:result.level,sl,level:SUCCESS_LEVEL_NAMES[sl],sv,svTier:successValueTier(sv),
+ const victorySL=(Number.isSafeInteger(result.victorySL)?result.victorySL:result.sl)-slPenalty;
+ const sl=Math.max(SL.CF,victorySL),sv=successValue({ml:result.ml,sl,extra:result.svExtra??0});
+ return {...result,preTraumaSL:result.sl,preTraumaLevel:result.level,sl,level:SUCCESS_LEVEL_NAMES[sl],
+  victorySL,victoryLevel:victorySL<SL.CF?'CF−'+(-victorySL):SUCCESS_LEVEL_NAMES[sl],
+  sv,svTier:successValueTier(sv),
   unopposedStars:sl===SL.S?1:sl===SL.CS?2:0,traumaSLPenalty:slPenalty};
 }
