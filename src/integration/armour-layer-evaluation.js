@@ -230,3 +230,88 @@ export function evaluateOrderedArmour(articles,options={}){
  if(!best)return first;
  return {...best.outcome,bulkAutoApplied:true,notes:[...(best.outcome.notes||[]),'Automatic p.117 Cloth/Padded Bulk exception; GM approval not required']};
 }
+
+/** Exact local NECESSARY condition for any globally legal arrangement.
+ * This does not declare a suit legal. It rejects only those article sets for
+ * which even ONE body location cannot be layered in ANY printed HMK p.117
+ * material order, including the single Cloth/Padded Bulk exception per zone.
+ */
+export function locallyPossibleArmourArticles(articles){
+ if(!Array.isArray(articles))return false;
+ const checkPermutations=(parts,zone)=>{
+  if(parts.length<=1)return true;
+  if(parts.length>5)return false;
+  const ordered=[],used=new Set();
+  const recurse=()=>{
+   if(ordered.length===parts.length)return matchesFor(ordered,zone).length>0;
+   for(const p of parts){if(used.has(p.id))continue;used.add(p.id);ordered.push(p);
+    if(recurse())return true;
+    ordered.pop();used.delete(p.id);
+   }
+   return false;
+  };
+  return recurse();
+ };
+ const prepared=articles.map(a=>({...a,code:code(a.material)}));
+ for(const zone of BODY_ZONES){
+  const all=prepared.filter(a=>articleCoversZone(a,zone));
+  if(all.length>6)return false;
+  const locs=zoneLocations(prepared,zone);
+  if(!locs.length)continue;
+  // No exception, or a single C/D article excused in this Body Zone.
+  const possible=[null,...all.filter(a=>['C','D'].includes(a.code))];
+  let zonePossible=false;
+  for(const except of possible){
+   const standard=all.filter(a=>a.id!==except?.id);
+   if(standard.length>5||standard.filter(a=>['D','Q'].includes(a.code)).length>1)continue;
+   if(locs.every(loc=>checkPermutations(standard.filter(a=>articleCoversZoneLocation(a,zone,loc)),zone))){zonePossible=true;break;}
+  }
+  if(!zonePossible)return false;
+ }
+ return true;
+}
+
+/** Exact local-order constraint generator for the printed p.117 material table.
+ * A feasible GLOBAL order must induce one of these local total orders at every
+ * covered location. Inference may thus reject whole inventories without
+ * enumerating all permutations of geographically disjoint armour articles.
+ */
+export function localArmourOrderDomains(articles){
+ if(!Array.isArray(articles))return [];
+ const pre=articles.map(a=>({...a,code:code(a.material)}));
+ const tasks=[];
+ for(const zone of BODY_ZONES){
+  const zoneArticles=pre.filter(a=>articleCoversZone(a,zone));
+  if(!zoneArticles.length)continue;
+  if(zoneArticles.length>6)return null;
+  const locations=zoneLocations(pre,zone);
+  const exceptions=[null,...zoneArticles.filter(a=>['C','D'].includes(a.code))];
+  const options=[];
+  for(const except of exceptions){
+   const standard=zoneArticles.filter(a=>a.id!==except?.id);
+   if(standard.length>5||standard.filter(a=>['D','Q'].includes(a.code)).length>1)continue;
+   const subtasks=[];
+   let bad=false;
+   for(const loc of locations){
+    const parts=standard.filter(a=>articleCoversZoneLocation(a,zone,loc));
+    const orders=[];const selected=[],used=new Set();
+    const visit=()=>{
+     if(selected.length===parts.length){
+      if(matchesFor(selected,zone).length)orders.push(selected.map(x=>x.id));
+      return;
+     }
+     for(const p of parts){if(used.has(p.id))continue;
+      used.add(p.id);selected.push(p);visit();selected.pop();used.delete(p.id);
+     }
+    };
+    visit();
+    if(!orders.length){bad=true;break;}
+    subtasks.push(orders);
+   }
+   if(!bad)options.push({except:except?.id??null,subtasks});
+  }
+  if(!options.length)return null;
+  tasks.push({zone,options});
+ }
+ return tasks;
+}

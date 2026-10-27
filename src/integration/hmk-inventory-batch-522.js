@@ -54,7 +54,9 @@ export function previewChestOutfit(db,{ownerId,location,mode}={}){
  const preview=previewOptimalOutfit(inventory,ownerId,mode);
  if(!preview.ready)return {ready:false,reason:preview.reason};
  const chosen=new Set(preview.equipIds),retrieved=chest.filter(x=>chosen.has(x.id));
- check(retrieved.length>0,'Nejlepší návrh z tohoto místa nepoužívá žádnou součást truhly.');
+ // A true optimum may already be worn/carried. That is a valid mathematical
+ // conclusion: do not force a worse chest article merely to use the chest.
+ // The UI reports a no-op when there is no chest component to retrieve.
  return {ready:true,mode,location,preview,ids:retrieved.map(x=>x.id),names:retrieved.map(x=>x.snapshot.name),virtual:inventory};
 }
 export function applyChestOutfit(db,{ownerId,location,mode,confirmed=false,idFactory,createdAt}={}){
