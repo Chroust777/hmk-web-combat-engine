@@ -11,6 +11,7 @@ import {prepareAnimalWeariness} from './hmk-trekking-animal-fatigue.js';
 import {trekPartyModes} from './hmk-trekking-party-modes.js';
 import {animalTrekInputFromSnapshot} from './hmk-trekking-animal-load.js';
 import {animalDoubleTimeTimeline} from './hmk-trekking-animal-timeline.js';
+import {assertCertifiedAnimalWeatherTransition} from './hmk-trekking-animal-weather.js';
 const requireFact=(ok,msg)=>{if(!ok)throw Error(msg);};
 export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,memberIds=[],guideId,kind,diceByActor={},animalWeariness=[],idFactory}={}){
  requireFact(clock&&Number.isSafeInteger(clock.minute)&&typeof idFactory==='function','Chybí potvrzený čas kampaně nebo generátor ID');
@@ -44,8 +45,10 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   // Detect changes in verified animal health between preparation and advance.
   // Unlike human Weather Hazard, no automatic animal trekking exposure or
   // healing transition is asserted by HMK 150. GM must reprepare the watch.
-  requireFact(JSON.stringify(current.animals??[])===JSON.stringify(prepared.animals??[]),
-   'Stav registrovaného zvířete nebo jeho zatížení se od přípravy hlídky změnil. Připravte aktuální hlídku bez přepisu historie.');
+  assertCertifiedAnimalWeatherTransition({journal,sourceId:ready.sourceId,campaignId:campaignKey(clock),
+   prepared:prepared.animals??[],current:current.animals??[],
+   mandatory:ready.source.calendarTrekProof.animalWeatherPolicy==='hmk-trek-animal-weather-analogy-v1'&&
+    ready.source.calendarTrekProof.weatherWatch?.requiresWeatherHazardRoll===true});
   requireFact(current.members.every((x,i)=>{
     const original=prepared.members[i];
     return x.id===original.id&&x.fatigue===original.fatigue+weatherDelta(x.id)&&
