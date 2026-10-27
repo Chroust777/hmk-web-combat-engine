@@ -4970,3 +4970,36 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  .content-sheet .journal-book--chapter .inv-ledger-table{width:802px!important;min-width:802px!important}
  .content-sheet .journal-book--chapter .inv-bulk-toolbar button{font-size:11px!important}
 }
+
+/* v93.523 · Arsenal & Gear: two readable four-step wardrobe sequences */
+.content-sheet .hmk-outfit-toolbar{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;align-items:stretch!important}
+.content-sheet .hmk-outfit-action-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:7px!important;min-width:0!important;margin:0!important;padding:12px!important;border:1px solid #a78e6a!important;background:rgba(246,234,211,.42)!important}
+.content-sheet .hmk-outfit-action-group legend{font:700 14px Georgia,serif!important;padding:0 5px!important;color:#433020!important}
+.content-sheet .hmk-outfit-action-group button{width:100%!important;min-height:40px!important;flex:none!important;margin:0!important;white-space:normal!important}
+@media(max-width:700px){.content-sheet .hmk-outfit-toolbar{grid-template-columns:minmax(0,1fr)!important}}
+/* Exactly one scroll box per list, fifteen compact body rows at most.
+   Header remains visible while scrolling vertically; names stay fixed horizontally. */
+.content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll.inv-15-rows{
+ max-height:650px;overflow-y:auto!important;overflow-x:auto!important;
+ scrollbar-gutter:stable!important;border:1px solid rgba(110,86,56,.22)!important
+}
+.content-sheet .journal-book--chapter .inv-ledger-table{width:754px!important;min-width:754px!important;table-layout:fixed!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(1){width:222px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(2){width:70px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(3){width:40px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(4){width:62px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(5){width:72px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(6){width:62px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(7){width:158px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:68px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table thead th{position:sticky!important;top:0!important;z-index:4!important;background:var(--folio-paper,#efe3cb)!important;color:inherit!important}
+.content-sheet .journal-book--chapter .inv-ledger-table thead th:first-child{z-index:8!important;left:0!important;box-shadow:1px 0 1px rgba(55,40,25,.12)!important}
+/* The locked name column uses precisely the same parchment as its row. */
+.content-sheet .journal-book--chapter .inv-ledger-table tbody tr:nth-child(odd)>th,
+.content-sheet .journal-book--chapter .inv-ledger-table tbody tr:nth-child(odd)>td{background:#f4ead7!important}
+.content-sheet .journal-book--chapter .inv-ledger-table tbody tr:nth-child(even)>th,
+.content-sheet .journal-book--chapter .inv-ledger-table tbody tr:nth-child(even)>td{background:#e9ddc6!important}
+.content-sheet .journal-book--chapter .inv-ledger-table tbody th:first-child{box-shadow:1px 0 1px rgba(55,40,25,.13)!important}
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(2){white-space:nowrap!important;padding-left:4px!important;padding-right:3px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table td:nth-child(3){padding-left:2px!important;padding-right:2px!important}
+.content-sheet .journal-book--chapter .inv-ledger-table :is(td,th){overflow-wrap:break-word!important}
