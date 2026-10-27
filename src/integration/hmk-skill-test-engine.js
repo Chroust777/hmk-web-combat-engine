@@ -39,7 +39,7 @@ export function secondaryMastery(ml,{kind='modifier',roll=null,tnAdjust=0}={}){
 export function resolveSkillTest({ml,roll,gmModifier=0,secondaryMLs=[],assistants=[],svExtra=0,exceptional=false}={}){
  integer(ml,1,1000,'Primární ML');integer(roll,1,100,'d100');integer(gmModifier,-1000,1000,'GM modifier');integer(svExtra,-50,50,'SV modifier');
  if(!Array.isArray(secondaryMLs)||secondaryMLs.length>6)throw Error('Nejvýše 6 sekundárních modifikátorů');
- if(!Array.isArray(assistants)||assistants.length>4)throw Error('Nejvýše 4 pomocníci v panelu');
+ if(!Array.isArray(assistants))throw Error('Pomocníci musí být pole doložených ML');
  const secondary=secondaryMLs.map(m=>secondaryMastery(m));
  const assistantChecks=assistants.map(value=>{integer(value,1,1000,'Assistance ML');return {ml:value,index:indexOf(value),eligible:value*2>=ml};});
  const assistance=Math.min(10,assistantChecks.filter(x=>x.eligible).reduce((s,x)=>s+x.index,0));

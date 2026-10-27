@@ -1,3 +1,6 @@
+import {fishingCatchCandidate} from './hmk-fishing-catch-548.js';
+import {animalTrainingCandidate} from './hmk-animal-training-548.js';
+import {engineeringDesignCandidate,ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
 /** Skill Workbench v93.274: clearer HMK pp.60–62 separation.
  * Secondary Mastery is no longer a standalone d10-only gadget.
  */
@@ -29,7 +32,7 @@ function svQuickGuide(character,selected){
  return `<div class="hsk-sv-guide"><strong>Primary ML ${ml} → Index ${idx}</strong><p class="tiny muted">Index z původního ML, nikoli z EML. Hod d100 určí CF / F / S / CS a tím úpravu SV.</p><div class="hsk-sv-outcomes">${levels.map(([lv,mod])=>{const sv=idx+mod;return `<span><b>${lv}</b> ${mod>0?'+':''}${mod} → SV ${sv} · ${stars(Math.max(0,Math.min(5,sv-4)))}</span>`;}).join('')}</div></div>`;
 }
 function actorsOptions(roster,selected){return roster.map(x=>`<option value="${E(x.id)}" ${x.id===selected?'selected':''}>${E(x.name)}</option>`).join('');}
-function helpers(actors){return Array.from({length:4},(_,i)=>`<label>Pomocník ${i+1}<select name="assist${i+1}"><option value="">— bez pomocníka —</option>${actors.map(x=>`<option value="${E(x.id)}">${E(x.name)}</option>`).join('')}</select></label>`).join('');}
+function helpers(actors){return Array.from({length:Math.max(4,actors.length)},(_,i)=>`<label>Pomocník ${i+1}<select name="assist${i+1}"><option value="">— bez pomocníka —</option>${actors.map(x=>`<option value="${E(x.id)}">${E(x.name)}</option>`).join('')}</select></label>`).join('');}
 
 export function sheetCombatActionHTML(character,roster){
  const rivals=roster.filter(c=>c.id!==character.id);
@@ -79,6 +82,87 @@ function specialSRPanel(roster,selected,journal=[],minute=null,inventory=[]){
  <div class="hsk-form-grid" data-special-festival hidden><label>Odchylka od nejbližší Orthodox MOR podle náboženství<input name="moralityDifference" type="number" min="0" max="20" step="1" placeholder="povinné, pokud není v profilu doloženo"></label></div>
  <p class="tiny muted" data-special-description aria-live="polite"></p><button type="submit">Vyhodnotit zvláštní Secondary Roll</button></form><div id="hsk-special-result" role="status" aria-live="polite"></div><section class="hsk-special-commits"><h4>Čekající následky · oddělený potvrzený zápis</h4><p class="tiny muted">Po hodu se zde objeví převod do trvalého stavu. Vyžaduje potvrzený Kalendář, správnou postavu a nelze jej provést dvakrát. Když není doložen cíl/čas, výsledek zůstane pouze v deníku.</p>${specialCommitUI||'<p class="tiny muted">Žádný dosud neuzavřený SR.</p>'}</section>${talismanPanel}</details>`;
 }
+/** An SV by itself does not catch fish: p.71 requires independent physical
+ * conditions d100 and 0/2/4 catch d10 rolls, plus an attested 4h interval.
+ * The Fishing CF equipment/injury branch remains a separate pending event. */
+function fishingCatchNextHTML(journal,actorId,campaignId){
+ const pending=journal.filter(j=>j.characterId===actorId&&(!campaignId||j.calendarCampaignId===campaignId)&&
+   fishingCatchCandidate(j.skillTestProof)&&
+   !journal.some(q=>q.skillTestProof?.type==='fishing-catch'&&q.skillTestProof.originId===j.id));
+ if(!pending.length)return '';
+ return '<section class="hsk-special-commits"><h3>Fishing · úlovek ze skutečného SV (HMK 71)</h3>'+pending.map(j=>{
+ const c=fishingCatchCandidate(j.skillTestProof),extra=c.level==='CF'?' · CF vyžaduje ještě samostatné vyhodnocení vybavení/zranění':'';
+ return `<form data-hmk-fishing-catch class="hsk-critical-next"><input type="hidden" name="origin" value="${E(j.id)}"><h4>Fishing SV ${c.sv} · d100 ${c.roll}${E(extra)}</h4>
+ <p>Čtyřhodinová činnost. Vyplňte skutečné podmínky (d100) a všechny předepsané d10 úlovku; počet je 0, 2 nebo 4 podle upraveného SV. Pokud GM použil jiné než doložené Secondary Modifiers, nelze výsledek domyslet.</p>
+ <div class="hsk-form-grid"><label>Technika<select name="technique"><option value="line">Hook and line</option><option value="bare">Bare Hands · Fishing (Dexterity), −2 SV</option><option value="net">Net · úlovek ×2</option><option value="spear">Spear · Fishing (Melee/Dexterity)</option></select></label>
+ <label>Podmínky · způsob určení<select name="conditionsMode"><option value="roll">Fyzický d100</option><option value="gm">GM zvolil konkrétní podmínky</option></select></label>
+ <label>Podmínky · fyzický d100 (jen pokud se hází)<input name="conditionsD100" type="number" min="1" max="100" step="1"></label>
+ <label>Podmínky · GM volba (jen bez hodu)<select name="gmCondition"><option value="">— podle d100 —</option><option value="Poor">Poor · TN1</option><option value="Fair">Fair · TN3</option><option value="Average">Average · TN5</option><option value="Good">Good · TN7</option><option value="Excellent">Excellent · TN9</option></select></label>
+ <label>GM snížení Conditions TN kvůli přeplněnému revíru (0–100)<input name="saturation" type="number" min="0" max="100" value="0" step="1" required></label>
+ <label>d10 úlovku · všechny hody oddělené čárkou; při SV ≤0 prázdné<input name="catchD10" placeholder="např. 2, 4, 8, 10"></label></div>
+ <label><input type="checkbox" name="saltWater"> Salt water · při původním CS další +1 SV místo standardního +1</label>
+ <label><input type="checkbox" name="offshore"> Offshore · úlovek ×2 (navíc k síti)</label>
+ <label><input type="checkbox" name="periodConfirmed" required> GM potvrzuje skutečné uplynutí čtyř hodin rybolovu</label>
+ <label><input type="checkbox" name="baseSVConfirmed" required> GM potvrzuje, že v původním SV není už započten postih Bare Hands ani bonus za slanou vodu (žádné dvojí započtení)</label>
+ <button type="submit">Vyhodnotit úlovek a uložit důkaz</button><output role="status" aria-live="polite"></output></form>`;
+ }).join('')+'</section>';
+}
+/** HMK p65 Animal Training must not become a generic Animalcraft SV without the
+ * follow-on d10 rolls, CRE limit or actual time, and it cannot affect combat ML
+ * until the GM has identified/updated the real creature. */
+function animalTrainingNextHTML(journal,actorId,campaignId){
+ const pending=journal.filter(j=>j.characterId===actorId&&(!campaignId||j.calendarCampaignId===campaignId)&&
+  animalTrainingCandidate(j.skillTestProof)&&
+  !journal.some(q=>q.skillTestProof?.type==='animal-training'&&q.skillTestProof.originId===j.id));
+ if(!pending.length)return '';
+ return '<section class="hsk-special-commits"><h3>Animalcraft · Animal Training (HMK 65)</h3>'+pending.map(j=>{
+  const c=animalTrainingCandidate(j.skillTestProof);
+  return `<form data-hmk-animal-training class="hsk-critical-next"><input type="hidden" name="origin" value="${E(j.id)}"><h4>Animalcraft SV ${c.sv} · d100 ${c.roll}</h4>
+  <p>Výcvik trvá 6 měsíců (asi 1 hodinu denně); výsledné SV: −1 není-li zvíře čerstvě narozené, −1 bylo-li divoké. Při SV 5+ následuje 1–5 skutečných d10 proti REA zvířete; případné zkrácení o 1 měsíc spotřebuje jeden d10. Opakovaný výcvik dává nové hody jen při dosažení alespoň předchozího nejlepšího hvězdného výsledku. Tato evidence sama nepřepisuje ML zvířete.</p>
+  <div class="hsk-form-grid"><label>Identita cvičeného zvířete<input name="animalName" maxlength="120" required></label>
+  <label>REA zvířete (skutečný atribut)<input name="reasoning" type="number" min="1" max="100" step="1" required></label>
+  <label>CRE zvířete (skutečný atribut)<input name="creativity" type="number" min="1" max="100" step="1" required></label>
+  <label>Nejlepší předchozí počet hvězd (0–5)<input name="previousBestStars" type="number" min="0" max="5" step="1" value="0" required></label>
+  <label>Dosavadní Mastery Boosty zvířete<input name="previousMasteryBoosts" type="number" min="0" max="50" step="1" value="0" required></label>
+  <label>Skutečné d10 Training Rolls (oddělené čárkami)<input name="trainingD10" placeholder="např. 2, 7"></label>
+  <label>Dodatečné měsíce · skutečný d3 jen při CF<input name="criticalD3" type="number" min="1" max="3" step="1"></label></div>
+  <label><input type="checkbox" name="notNewborn"> Zvíře nebylo nedávno narozené (−1 SV)</label>
+  <label><input type="checkbox" name="wasWild"> Zvíře bylo divoké (−1 SV)</label>
+  <label><input type="checkbox" name="shorten"> Vyměnit jeden existující d10 za zkrácení výcviku o jeden měsíc</label>
+  <label><input type="checkbox" name="periodConfirmed" required> GM potvrzuje dokončený výcvik, jeho čas a skutečné zvíře</label>
+  <label><input type="checkbox" name="baseSVConfirmed" required> V původním SV dosud nejsou započtené postihy věku/divokosti</label>
+  <button type="submit">Vyhodnotit Training Rolls a uložit důkaz</button><output role="status" aria-live="polite"></output></form>`;
+ }).join('')+'</section>';
+}
+/** HMK p70 Engineering Design: independent Maths d10, capped Construction bonus,
+ * and real designers/builders. The actual Construction Roll is another test. */
+function engineeringDesignNextHTML(journal,actorId,campaignId){
+ const pending=journal.filter(j=>j.characterId===actorId&&(!campaignId||j.calendarCampaignId===campaignId)&&
+  engineeringDesignCandidate(j.skillTestProof)&&
+  !journal.some(q=>q.skillTestProof?.type==='engineering-design'&&q.skillTestProof.originId===j.id));
+ if(!pending.length)return '';
+ return '<section class="hsk-special-commits"><h3>Engineering · Design Roll (HMK 70)</h3>'+pending.map(j=>{
+  const c=engineeringDesignCandidate(j.skillTestProof);
+  return `<form data-hmk-engineering-design class="hsk-critical-next"><input type="hidden" name="origin" value="${E(j.id)}"><h4>Engineering SV ${c.sv} · d100 ${c.roll}</h4>
+  <p>Podle SV vznikne 0–5 hvězd. Za každou se hodí skutečný d10 proti Mathematics Index. První dva úspěchy dávají nejvýše +2 SV do následujícího Construction Rollu; další úspěchy zkracují dobu projektování. Náhodný časový rozptyl ±20 % je volitelný a vyžaduje dva skutečné d3.</p>
+  <div class="hsk-form-grid"><label>Dílo<select name="edifice" required>${Object.entries(ENGINEERING_DESIGN_DAYS).map(([name,days])=>`<option value="${E(name)}">${E(name)} · ${days} dní</option>`).join('')}</select></label>
+  <label>Design d10 dle hvězd · oddělené čárkami<input name="designD10" placeholder="např. 4, 7, 1"></label>
+  <label>První d3 pro volitelný rozptyl času<input name="timeD3A" type="number" min="1" max="3" step="1"></label>
+  <label>Druhý d3 pro volitelný rozptyl času<input name="timeD3B" type="number" min="1" max="3" step="1"></label></div>
+  <label><input type="checkbox" name="randomizeTime"> GM používá volitelný náhodný rozptyl projektování ±20 %</label>
+  <label><input type="checkbox" name="constructionConfirmed" required> GM potvrzuje skutečného konstruktéra i budoucí stavitele (oba přímo zapojeni do projektu)</label>
+  <label><input type="checkbox" name="baseSVConfirmed" required> Původní Engineering SV nemá již započtený výsledný design bonus do Construction Rollu</label>
+  <button type="submit">Spočítat Design Roll a předat Construction bonus</button><output role="status" aria-live="polite"></output></form>`;
+ }).join('')+'</section>';
+}
+/** The latest source SV can open its specific next step immediately after
+ * recording, without requiring tab navigation or repeating a primary d100. */
+export function skillSpecificNextHTML(journal,actorId,campaignId,originId=null){
+ const subset=originId?journal.filter(j=>j.id===originId||j.skillTestProof?.originId===originId):journal;
+ return fishingCatchNextHTML(subset,actorId,campaignId)+
+  animalTrainingNextHTML(subset,actorId,campaignId)+
+  engineeringDesignNextHTML(subset,actorId,campaignId);
+}
 export function skillWorkbenchHTML(character,roster,inventory=[],journal=[],activeTab='secondary',calendarMinute=null,campaignId=null){
  const entries=availableMasteries(character),rivals=roster.filter(c=>c.id!==character.id),first=rivals[0],firstSkill=entries[0]?.name??'';
  const last=[...journal].filter(x=>x.characterId===character.id&&x.skillTestProof&&['success-value-test','success-value-specific','secondary-mastery-value-test'].includes(x.skillTestProof.type)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
@@ -116,6 +200,6 @@ export function skillWorkbenchHTML(character,roster,inventory=[],journal=[],acti
  <div data-hsk-defender hidden><fieldset class="hsk-defender-fields" data-hsk-defender-fields disabled><h4>Protistrana (B)</h4>${first?`<div class="hsk-form-grid"><label>Postava obránce<select name="opponentId">${actorsOptions(rivals,first.id)}</select></label><label class="hsk-check"><input type="checkbox" name="seductionConfirmed" value="yes"> GM potvrzuje, že jde o Charm (seduction) – u protistrany lze uplatnit Aphrodisiac (p.75). Bez potvrzení se postih neuplatní.</label><label>Konkrétní akce / protidovednost<select name="opposedAction"><option value="">— volba GM / bez předpisu —</option></select><small data-opposed-rule-guidance>U každé dovednosti lze výslovně zvolit dovednost protistrany. Předdefinované jsou jen doložené dvojice HMK.</small><small data-opposed-selection-notice role="status" aria-live="polite" hidden></small></label><label>Primary obránce <span data-opponent-skill-wrap>${masteries(first,'opponentSkill')}</span></label><label>Secondary Modifier 1 ${optional(first,'defSecondary1')}</label><label>Secondary Modifier 2 ${optional(first,'defSecondary2')}</label><label>Skutečný fyzický d100 obránce<input name="rollB" type="number" min="1" max="100" step="1"></label></div>${secondaryActivityPicker('B','success',availableMasteries(first)[0]?.name||'',first)}${armourDecision('B',{actor:first,journal,minute:calendarMinute,campaignId})}<div data-auto-preview="b">${automaticPreview(first,inventory,availableMasteries(first)[0]?.name)}</div>`:'<p>Pro Opposed Test je třeba druhá uložená postava.</p>'}</fieldset></div>
  <div class="hsk-secondary-timing">SR/TN se doplní pouze po výběru doložené činnosti. Při Opposed má každá strana vlastní činnost a d10; bez nich proběhnou pouze d100.</div><button type="submit">Vyhodnotit test${first?' / Opposed':''}</button></form>${result('hsk-result-secondary')}${breakHTML}</section>
  <section class="hsk-test-card" data-skill-section="value" ${activeTab==='value'?'':'hidden'}><h3>2. Success Value · dlouhodobá činnost</h3><p class="muted">HMK str. 61: <strong>SV = Index původního Primary ML + CF (−2), F (−1), S (0) nebo CS (+1)</strong>. Úpravy EML mění šanci na úspěch d100, nikoli původní Index. Kritické selhání může mít zvláštní následky dle konkrétní dovednosti.</p><form id="skill-value-form"><div class="hsk-form-grid"><label>Primary Skill ${masteries(character,'primary')}</label><label>Skutečný fyzický d100 (povinný kromě pravidlového CF)<input name="rollA" type="number" min="1" max="100" step="1"></label></div><div data-sv-guide>${svQuickGuide(character,firstSkill)}</div>${secondaryActivityPicker('A','value',firstSkill,character)}<fieldset data-alchemy-sv-helpers hidden><legend>Alchemy · Assistant ML40+ (HMK 268)</legend><p class="tiny muted">Nejvýše dvě skutečné postavy; bonus Index pouze při jejich ML alespoň polovině Alchemy ML výrobce; součet nejvýše +10 EML. Vyberte přesně ty, kteří byli doloženi při zahájení přípravy v kalendáři.</p><div class="hsk-form-grid">${Array.from({length:2},(_,i)=>`<label>Pomocník ${i+1}<select name="assist${i+1}"><option value="">— bez pomocníka —</option>${rivals.filter(x=>(availableMasteries(x).find(y=>y.name==='Alchemy')?.ml??0)>=40).map(x=>`<option value="${E(x.id)}">${E(x.name)} · Alchemy ML ${availableMasteries(x).find(y=>y.name==='Alchemy').ml}</option>`).join('')}</select></label>`).join('')}</div></fieldset><details class="hsk-sv-extras"><summary>Rozšířená pravidla konkrétní činnosti (jen pokud je HMK vyžaduje)</summary><p class="tiny muted">Secondary Modifiers se použijí, jen když je požaduje činnost. Při výběru doložené činnosti se povinné dovednosti nastaví automaticky. Secondary Roll TN/d10 se zobrazuje pouze u takto označené činnosti.</p><div class="hsk-form-grid"><label>Secondary Modifier 1 ${optional(character,'secondary1')}</label><label>Secondary Modifier 2 ${optional(character,'secondary2')}</label></div></details>${armourDecision('A',{actor:character,journal,minute:calendarMinute,campaignId})}<div data-auto-preview="a">${automaticPreview(character,inventory,firstSkill,calendarMinute)}</div><button type="submit">Vyhodnotit Success Value</button></form>${result('hsk-result-value')}<h4>Poslední uložený SV test</h4><div id="hsk-value-summary" class="hsk-value-display">${prior?`<b>${E(last.title)}</b><p>SV ${E(prior.sv)} · ${E(prior.svTier?.label)} · ${E(prior.level)}</p><div class="hsk-bigstars">${stars(prior.svTier?.stars??0)}</div>`:'Dosud žádný uložený SV test.'}</div></section>
- <section class="hsk-test-card" data-skill-section="assistance" ${activeTab==='assistance'?'':'hidden'}><h3>3. Assistance · skutečné vyhodnocení</h3><p class="tiny muted">HMK str. 60: pomocník musí mít ML alespoň polovinu testerova ML. Přispívá Indexem svého ML; součet bonusů Assistance nejvýše +10. Pomocníci se hodnotí ve stejné dovednosti.</p><form id="skill-assistance-form"><div class="hsk-form-grid"><label>Primární Skill ${masteries(character,'primary')}</label><label>Skutečný fyzický d100 (povinný kromě pravidlového CF)<input type="number" name="rollA" min="1" max="100" step="1"></label>${helpers(rivals)}</div>${secondaryActivityPicker('A','success',firstSkill,character)}${armourDecision('A',{actor:character,journal,minute:calendarMinute,campaignId})}<div data-auto-preview="a">${automaticPreview(character,inventory,firstSkill,calendarMinute)}</div><button type="submit">Vyhodnotit test s Assistance</button></form>${result('hsk-result-assistance')}</section></div>${specialSRPanel(roster,character.id,journal,calendarMinute,inventory)}`:'<p class="notice">Postava nemá ověřené ML. Dokončete Character Creation.</p>'}
+ <section class="hsk-test-card" data-skill-section="assistance" ${activeTab==='assistance'?'':'hidden'}><h3>3. Assistance · skutečné vyhodnocení</h3><p class="tiny muted">HMK str. 60: pomocník musí mít ML alespoň polovinu testerova ML. Přispívá Indexem svého ML; součet bonusů Assistance nejvýše +10. Pomocníci se hodnotí ve stejné dovednosti.</p><form id="skill-assistance-form"><div class="hsk-form-grid"><label>Primární Skill ${masteries(character,'primary')}</label><label>Skutečný fyzický d100 (povinný kromě pravidlového CF)<input type="number" name="rollA" min="1" max="100" step="1"></label>${helpers(rivals)}</div><label class="hsk-check"><input type="checkbox" name="helpersFeasible" required> GM potvrzuje, že všichni vybraní pomocníci mohli skutečně pomáhat při této činnosti (HMK 60).</label>${secondaryActivityPicker('A','success',firstSkill,character)}${armourDecision('A',{actor:character,journal,minute:calendarMinute,campaignId})}<div data-auto-preview="a">${automaticPreview(character,inventory,firstSkill,calendarMinute)}</div><button type="submit">Vyhodnotit test s Assistance</button></form>${result('hsk-result-assistance')}</section></div>${skillSpecificNextHTML(journal,character.id,campaignId)}${specialSRPanel(roster,character.id,journal,calendarMinute,inventory)}`:'<p class="notice">Postava nemá ověřené ML. Dokončete Character Creation.</p>'}
  <p class="tiny muted">CF končící nulou = CF0, pětkou = CF5. Fumble / Stumble nastane jen tam, kde to konkrétní pravidlo vyžaduje (zejména Combat). Samotné CF0/CF5 mimo takovou činnost není automatickým pádem.</p></section>`;
 }
