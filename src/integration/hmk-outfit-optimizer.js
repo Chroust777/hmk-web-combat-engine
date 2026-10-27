@@ -31,19 +31,34 @@ export const isCloth=x=>{
  return false;
 };
 const available=x=>['carried','worn'].includes(x.slot) && x.snapshot?.category==='armor' && !x.destroyed;
-const itemScore=(item,article)=>{
- let av=0;const rigidLocations=[];
- for(const loc of article.coveredLocations){
+// White/grey/black outlines all establish Rigid Armour (pp.111, 168).
+// Grey and black additionally distinguish the OPTIONAL Metal Armour rule
+// (p.133): scale/mail convert severe EDGE; plate converts EDGE and POINT.
+// Track specific covered locations, not the presence of a generic rigid flag.
+const metalKinds=new Set(['mail','scale','plate']);
+const effectLocations=(article)=>{
+ const rigid=new Set(),metalEdge=new Set(),metalPoint=new Set();
+ for(const loc of article.coveredLocations||[]){
   const marker=article.coverageMarkers?.[loc];
+  const active=marker==='rigid'||(article.rigid&&['front-only','rear-only'].includes(marker));
+  if(!active)continue;
+  rigid.add(loc);
+  if(metalKinds.has(article.material))metalEdge.add(loc);
+  if(article.material==='plate')metalPoint.add(loc);
+ }
+ return {rigidLocations:[...rigid],metalEdgeLocations:[...metalEdge],metalPointLocations:[...metalPoint]};
+};
+const itemScore=(item,article)=>{
+ let av=0;
+ for(const loc of article.coveredLocations){
   for(const a of ASPECTS){
    const value=item.snapshot.properties.locationProtection?.[loc]?.[a];
    const damage=item.acidAVDamageByLocation?.[loc]??0;
    if(!Number.isSafeInteger(value)||value<0||!Number.isSafeInteger(damage)||damage<0)throw Error('Neověřené AV nebo poškození kyselinou');
    av+=Math.max(0,value-Math.min(value,damage));
   }
-  if(marker==='rigid'||(article.rigid&&['front-only','rear-only'].includes(marker)))rigidLocations.push(loc);
  }
- return {av,rigidLocations};
+ return {av,...effectLocations(article)};
 };
 const compare=(a,b)=>{for(let i=0;i<a.length;i++)if(a[i]!==b[i])return a[i]-b[i];return 0;};
 function candidatesFor(inventory,ownerId,mode,allowedIds=null){
@@ -111,6 +126,8 @@ function printedSuitSelection(owned,allowedIds=null){
 }
 function printedSuitPreview(owned,{suit,selected}){
  const keep=new Set(selected.map(c=>c.item.id));
+ const metalPoint=new Set(selected.flatMap(c=>c.quality.metalPointLocations));
+ const metalEdge=new Set(selected.flatMap(c=>c.quality.metalEdgeLocations));
  const worn=owned.filter(x=>x.slot==='worn'&&x.snapshot?.category==='armor');
  let totalAV=0;const rigids=new Set();
  for(const location of HMK_BODY_LOCATIONS){
@@ -138,7 +155,8 @@ function printedSuitPreview(owned,{suit,selected}){
   placements:selected.map(c=>({id:c.item.id,layerOrder:null,layerSlot:null,bulkExceptionZones:[]})),
   unequipIds:worn.filter(x=>!keep.has(x.id)).map(x=>x.id),equipIds:selected.filter(c=>c.item.slot!=='worn').map(c=>c.item.id),
   names:selected.map(c=>c.item.snapshot.name),removedNames:worn.filter(x=>!keep.has(x.id)).map(x=>x.snapshot.name),
-  totalAV,rigidLocations:rigids.size,bulkPenalty:0,extraEnc:null,armourENC:suit.enc,sourcePages:[suit.page,117,118]};
+  totalAV,rigidLocations:rigids.size,metalPointLocations:metalPoint.size,metalEdgeLocations:metalEdge.size,
+  bulkPenalty:0,extraEnc:null,armourENC:suit.enc,sourcePages:[111,suit.page,117,118,133,168]};
 }
 function setup(ordered){
  const pieces=ordered.map((c,i)=>({...c.item,slot:'worn',layerOrder:i,layerSlot:null,bulkExceptionZones:[]}));
@@ -150,8 +168,13 @@ function setup(ordered){
 function score(ordered,check){
  const total=ordered.reduce((s,c)=>s+c.quality.av,0);
  const rigid=new Set(ordered.flatMap(c=>c.quality.rigidLocations)).size;
+ const metalPoint=new Set(ordered.flatMap(c=>c.quality.metalPointLocations)).size;
+ const metalEdge=new Set(ordered.flatMap(c=>c.quality.metalEdgeLocations)).size;
  const weight=ordered.reduce((s,c)=>s+c.article.weightLb,0);
- return [total,rigid,check.bulkPenalty,-check.extraEnc,-Math.round(weight*10),-ordered.length];
+ // Lexicographic policy: real protection first, rigid coverage second, then
+ // the OPTIONAL p133 plate (black) / mail-scale (grey) protections. Bulk is
+ // negative for penalties; maximizing it prefers zero to -5/-10, correctly.
+ return [total,rigid,metalPoint,metalEdge,check.bulkPenalty,-check.extraEnc,-Math.round(weight*10),-ordered.length];
 }
 function buildPreview(owned,selected,mode,proof){
  const worn=owned.filter(x=>x.slot==='worn'&&x.snapshot?.category==='armor');
@@ -164,7 +187,8 @@ function buildPreview(owned,selected,mode,proof){
   unequipIds:removing.map(x=>x.id),equipIds:adding.map(x=>x.item.id),
   names:selected.map(x=>x.item.snapshot.name),removedNames:removing.map(x=>x.snapshot.name),
   totalAV:score(selected,arranged.check)[0],rigidLocations:score(selected,arranged.check)[1],
-  bulkPenalty:arranged.check.bulkPenalty,extraEnc:arranged.check.extraEnc,sourcePages:[117,118,119]};
+  metalPointLocations:score(selected,arranged.check)[2],metalEdgeLocations:score(selected,arranged.check)[3],
+  bulkPenalty:arranged.check.bulkPenalty,extraEnc:arranged.check.extraEnc,sourcePages:[111,117,118,119,133,168]};
 }
 /** Exhaustive branch-and-bound outfit solver.
  * Branches over each distinct article type (include/exclude) and every legal
@@ -178,86 +202,86 @@ function buildPreview(owned,selected,mode,proof){
 function exactCustomOutfit(owned,candidates,mode,presetIncumbent=null){
  const items=[...candidates].sort((a,b)=>b.quality.av-a.quality.av||
    b.quality.rigidLocations.length-a.quality.rigidLocations.length||a.item.id.localeCompare(b.item.id));
- const n=items.length;
- const zones=['head','arms','torso','legs'];
+ const n=items.length,zones=['head','arms','torso','legs'];
  const remainingAV=new Array(n+1).fill(0);
- const remainingRigidByZone=Object.fromEntries(zones.map(z=>[z,new Array(n+1).fill(0)]));
+ const suffixRigid=Array.from({length:n+1},()=>new Set());
+ const suffixPoint=Array.from({length:n+1},()=>new Set());
+ const suffixEdge=Array.from({length:n+1},()=>new Set());
+ // Cache all four zone-specific top-six sums for every suffix. The old code
+ // sorted every remaining suffix again at every branch, a major slowdown.
+ const zoneUpper=Object.fromEntries(zones.map(z=>[z,new Array(n+1)]));
+ for(const z of zones)zoneUpper[z][n]={outside:0,top:[],inside:[0,0,0,0,0,0,0]};
  for(let i=n-1;i>=0;i--){
-  remainingAV[i]=remainingAV[i+1]+items[i].quality.av;
-  for(const zone of zones){
-   const bonus=(items[i].article.bodyZones||[]).includes(zone)&&items[i].quality.rigidLocations.length?1:0;
-   remainingRigidByZone[zone][i]=remainingRigidByZone[zone][i+1]+bonus;
+  const c=items[i],q=c.quality;
+  remainingAV[i]=remainingAV[i+1]+q.av;
+  suffixRigid[i]=new Set([...suffixRigid[i+1],...q.rigidLocations]);
+  suffixPoint[i]=new Set([...suffixPoint[i+1],...q.metalPointLocations]);
+  suffixEdge[i]=new Set([...suffixEdge[i+1],...q.metalEdgeLocations]);
+  for(const z of zones){
+   const prior=zoneUpper[z][i+1];
+   if(c.article.bodyZones?.includes(z)){
+    const vals=[...prior.top,q.av].sort((a,b)=>b-a).slice(0,6);
+    const pref=[0];for(let k=0;k<6;k++)pref.push(pref[k]+(vals[k]||0));
+    zoneUpper[z][i]={outside:prior.outside,top:vals,inside:pref};
+   }else zoneUpper[z][i]={outside:prior.outside+q.av,top:prior.top,inside:prior.inside};
   }
  }
  let best=presetIncumbent;
- let bestRank=presetIncumbent?[best.totalAV,best.rigidLocations,best.bulkPenalty??0,
-   -(best.extraEnc??0),-Math.round((best.armourWeightLb??0)*10),-best.names.length]:null;
+ let bestRank=presetIncumbent?[best.totalAV,best.rigidLocations,best.metalPointLocations??0,best.metalEdgeLocations??0,
+   best.bulkPenalty??0,-(best.extraEnc??0),-Math.round((best.armourWeightLb??0)*10),-best.names.length]:null;
  let branches=0,orderedChecks=0;
  const zoneCount=Object.fromEntries(zones.map(z=>[z,0]));
- const selected=[];
- const rigidCovered=new Set();
- const orderCache=new Map();
- function rigidUpper(i){
-  let total=rigidCovered.size;
-  for(const zone of zones)total+=Math.min(6-zoneCount[zone],remainingRigidByZone[zone][i]);
-  return total;
- }
+ const selected=[],rigidCovered=new Set(),pointCovered=new Set(),edgeCovered=new Set();
+ function unionCount(prefix,suffix){let value=prefix.size;for(const loc of suffix)if(!prefix.has(loc))value++;return value;}
  function optimisticRank(i,sum){
   let avUpper=sum+remainingAV[i];
-  for(const zone of zones){
-   const free=6-zoneCount[zone];
-   const inside=[],outside=[];
-   for(let k=i;k<n;k++){
-    const c=items[k];
-    (c.article.bodyZones?.includes(zone)?inside:outside).push(c.quality.av);
-   }
-   inside.sort((a,b)=>b-a);
-   const relaxed=sum+outside.reduce((a,b)=>a+b,0)+inside.slice(0,free).reduce((a,b)=>a+b,0);
-   avUpper=Math.min(avUpper,relaxed);
+  for(const z of zones){
+   const state=zoneUpper[z][i],free=Math.max(0,6-zoneCount[z]);
+   avUpper=Math.min(avUpper,sum+state.outside+state.inside[free]);
   }
-  return [avUpper,rigidUpper(i),0,0,0,0];
+  // CRITICAL: each armour article can give multiple rigid locations. A
+  // 'one rigid location per remaining layer' bound UNDERCOUNTS and may prune
+  // Mail Leggings (four rigid locations) before comparing it to Padded.
+  // Set unions are provably admissible, even for overlapping articles.
+  return [avUpper,unionCount(rigidCovered,suffixRigid[i]),
+   unionCount(pointCovered,suffixPoint[i]),unionCount(edgeCovered,suffixEdge[i]),
+   0,0,0,0];
  }
- function validOrder(subset){
-  const key=subset.map(c=>c.item.id).sort().join('|');
-  if(orderCache.has(key))return orderCache.get(key);
-  const found=findExactArmourOrder(subset);orderedChecks++;
-  const result=found?{list:found.ordered,rank:score(found.ordered,found.check)}:null;
-  orderCache.set(key,result);
-  return result;
- }
- function enumerate(i,sum){
+ function visit(i,sum){
   branches++;
-  if(bestRank&&compare(optimisticRank(i,sum),bestRank)<=0)return;
+  if(bestRank&&compare(optimisticRank(i,sum),bestRank)<0)return;
   if(i===n){
    if(!selected.length)return;
-   const local=validOrder(selected);
-   if(local&&(!bestRank||compare(local.rank,bestRank)>0)){
-    const preview=buildPreview(owned,local.list,mode,'Úplný důkaz optimality: všechny zlepšující podmnožiny článků a jejich pravidlově přípustná pořadí byly prohledány.');
-    if(preview.ready){best=preview;bestRank=local.rank;}
+   const found=findExactArmourOrder(selected);orderedChecks++;
+   if(!found)return;
+   const rank=score(found.ordered,found.check);
+   if(!bestRank||compare(rank,bestRank)>0){
+    const candidate=buildPreview(owned,found.ordered,mode,
+     'Všechny zlepšující legální kombinace prošly přesným prohledáním dle HMK 117–119.');
+    if(candidate.ready){best=candidate;bestRank=rank;}
    }
    return;
   }
-  const candidate=items[i];
-  const itemRigidAdds=[];
-  const okZone=(candidate.article.bodyZones||[]).every(z=>zoneCount[z]<6);
-  if(okZone){
-   selected.push(candidate);
-   for(const z of candidate.article.bodyZones||[])zoneCount[z]++;
-   for(const loc of candidate.quality.rigidLocations){
-    if(!rigidCovered.has(loc)){rigidCovered.add(loc);itemRigidAdds.push(loc);}
+  const c=items[i];
+  if((c.article.bodyZones||[]).every(z=>zoneCount[z]<6)){
+   selected.push(c);
+   for(const z of c.article.bodyZones||[])zoneCount[z]++;
+   const inserts=[];
+   for(const [set,locs] of [[rigidCovered,c.quality.rigidLocations],
+    [pointCovered,c.quality.metalPointLocations],[edgeCovered,c.quality.metalEdgeLocations]]){
+    const added=[];for(const loc of locs)if(!set.has(loc)){set.add(loc);added.push(loc);}inserts.push([set,added]);
    }
-   enumerate(i+1,sum+candidate.quality.av);
-   for(const z of candidate.article.bodyZones||[])zoneCount[z]--;
-   for(const loc of itemRigidAdds)rigidCovered.delete(loc);
+   visit(i+1,sum+c.quality.av);
+   for(const [set,added] of inserts)for(const loc of added)set.delete(loc);
+   for(const z of c.article.bodyZones||[])zoneCount[z]--;
    selected.pop();
   }
-  enumerate(i+1,sum);
+  visit(i+1,sum);
  }
- enumerate(0,0);
+ visit(0,0);
  if(!best)return fail('Z dostupných článků nevznikla ověřená přípustná sestava.');
  return {...best,optimal:true,proof:(best.proof||'')+
-  ' Matematické vyhledávání dokončeno: '+branches+' větví výběru a '+orderedChecks+' kontrol vrstev; bez umělého limitu položek.',
-  examinedBranches:branches};
+  ' Úplné matematické vyhledávání: '+branches+' větví, '+orderedChecks+' kontrol vrstev.',examinedBranches:branches};
 }
 export function previewOptimalOutfit(inventory,ownerId,mode='armour',allowedIds=null){
  let source;
@@ -276,6 +300,7 @@ export function previewOptimalOutfit(inventory,ownerId,mode='armour',allowedIds=
   // evaluator does not model the publication-specific placement of 17 pieces.
   const presets=printedSuitSelection(owned,allowedIds).map(p=>printedSuitPreview(owned,p)).filter(p=>p.ready);
   presets.sort((a,b)=>b.totalAV-a.totalAV||b.rigidLocations-a.rigidLocations||
+   b.metalPointLocations-a.metalPointLocations||b.metalEdgeLocations-a.metalEdgeLocations||
    a.printedSuit.localeCompare(b.printedSuit));
   incumbent=presets[0]??null;
   if(incumbent){
@@ -285,7 +310,7 @@ export function previewOptimalOutfit(inventory,ownerId,mode='armour',allowedIds=
  }
  if(incumbent){
   const sum=candidates.reduce((v,c)=>v+c.quality.av,0);
-  if(candidates.every(c=>c.quality.av>0)&&sum<=incumbent.totalAV){
+  if(candidates.every(c=>c.quality.av>0)&&sum<incumbent.totalAV){
    return {...incumbent,optimal:true,proof:incumbent.proof+
     ' Globální optimalita prokázána horní mezí součtu AV všech dostupných článků ('+sum+'); žádný jiný výběr nemůže dosáhnout vyšší primární ochrany.',examinedBranches:0};
   }
