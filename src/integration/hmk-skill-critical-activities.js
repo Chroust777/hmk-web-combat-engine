@@ -19,7 +19,13 @@ export const CF_ACTIVITIES=Object.freeze({
 });
 /** Failures are not universally rerolled. These are activity-specific F links. */
 export const FAILURE_ACTIVITIES=Object.freeze({
- Acrobatics:Object.freeze([{id:'acro-gymnastics-failure',label:'Gymnastics · F vyžaduje Strength, jinak prone',page:64,mode:'test',test:'Strength'}])
+ Acrobatics:Object.freeze([
+  {id:'acro-gymnastics-failure',label:'Gymnastics · F: Strength, při neúspěchu prone',page:64,mode:'test',test:'Strength'},
+  {id:'acro-balance-failure',label:'Balance · F: bez zvláštního pokračovacího hodu',page:64,mode:'decision'}]),
+ Climbing:Object.freeze([
+  {id:'climb-easy-strength-failure',label:'Easy Climbing · F: 1 round + Strength test',page:67,mode:'test',test:'Strength'},
+  {id:'climb-easy-turn-failure',label:'Easy Climbing · F: neúspěch po 1 turn (bez hodu)',page:67,mode:'decision'},
+  {id:'climb-difficult-failure',label:'Difficult Climbing · F: výsledek SV bez nového testu',page:67,mode:'decision'}])
 });
 export function skillFollowupActivities(skill,level){
  if(level==='CF')return criticalActivities(skill);
@@ -36,8 +42,10 @@ export function skillFailureGuidance(skill,level){
  if(['Charm','Command','Discourse','Guile','Theatrics'].includes(base))
   return {page:138,kind:'persuasion',text:level==='CF'?'Persuasion CF: cíl nebyl přesvědčen, pokus nelze opakovat; GM posoudí možnou nepřátelskou reakci. Bez automatického nového Skill Testu.':'Persuasion F: nepřesvědčeno; případné opakování GM může vést jako nový Opposed Test, nikoli jako automatický dodatečný hod.'};
  if(base==='Stealth')return {page:84,kind:'stealth',text:level==='CF'?'Stealth CF: cíl o postavě ví; další hod není součástí tohoto testu.':'Stealth F: podezření; případný nový pokus při alertním cíli se řeší Opposed Stealth vs Awareness.'};
+ if(base==='Tracking')return {page:147,kind:'trekking-tracking',text:level==='CF'?'Tracking CF při Stalking: další hlídka vyžaduje Bearing Mode; vyhodnocuje původní Trekking/Tracking ledger, ne nový d100.':'Tracking F při Stalking: zhodnoťte skutečné SV; Awareness se nabízí až při doloženém SV 3–4 (HMK str.147).'};
  if(base==='Lockcraft')return {page:78,kind:'lockcraft',text:level==='CF'?'Lockcraft CF: zámek neotevřen; na další pokusy kumulativní −20 ML.':'Lockcraft F: zámek neotevřen; pravidla dovolují další samostatný pokus.'};
  if(base==='Animalcraft'&&level==='CF')return {page:65,kind:'training',text:'Animalcraft CF při Training Routine: prodlužuje dobu výcviku o d3 měsíců; nejedná se o další Skill Test.'};
+ if(base==='Climbing'&&level==='F')return {page:67,kind:'activity-dependent',text:'Easy Climbing F: GM volí neúspěch po jednom turnu, nebo pokus po jednom roundu se Strength d100; Difficult Climbing F se vyhodnotí podle SV bez tohoto hodu.'};
  if(base==='Acrobatics')return {page:64,kind:'activity-dependent',text:'Acrobatics: při Gymnastics F následuje Strength Test; při CF se typ následku liší podle Balance/Gymnastics.'};
  if(criticalActivities(base).length&&level==='CF')return {page:criticalActivities(base)[0].page,kind:'activity-dependent',text:'CF může spustit konkrétní pravidlový následek. Vyberte skutečně prováděnou činnost v navazujícím formuláři.'};
  return {page:60,kind:'gm-context',text:'HMK nepředepisuje univerzální další d100 za F/CF u této dovednosti. GM musí ověřit konkrétní činnost či její samostatnou rutinu; bez takového předpisu nový hod nevzniká.'};
@@ -47,6 +55,7 @@ export function criticalFollowupPlan(skill,activity,original){
  const r=skillFollowupActivities(skill,original.level).find(x=>x.id===activity);if(!r)return null;
  const unit=original.roll%10,cf0=unit===0,cf5=unit===5;
  const t=r.mode==='split'||r.mode==='split-fishing'?(cf0?'Fumble':'Stumble'):r.test;
+ if(r.mode==='decision')return {...r,requiresRoll:false,detail:r.id==='climb-easy-turn-failure'?'Easy Climbing F: lezení selhalo po jednom turnu, bez nového d100.':r.id==='climb-difficult-failure'?'Difficult Climbing F: pokračujte původním Success Value a jeho minutovou evidencí; žádný nový d100 nelze přidat automaticky.':'Balance F: bez zvláštního dalšího testu; GM vyhodnotí původní neúspěch a pohyb.'};
  if(r.mode==='prone')return {...r,requiresRoll:false,detail:'CF: manévr selhal; postava padá prone. Další hod pravidlo nevyžaduje.'};
  if(r.mode==='hazard')return {...r,requiresRoll:false,detail:'CF Trekking: vyhodnoťte Survival Hazard d10 (1–3 Equipment, 4–6 Accident, 7–10 Complication). Accident vyžaduje Agility test náhodně určené postavy a při neúspěchu skutečné zranění d6+4b.'};
  if(r.mode==='lock')return {...r,requiresRoll:false,detail:'CF: zámek se neotevře; další pokusy mají kumulativní postih −20 ML. Bez dalšího d100.'};
@@ -58,6 +67,7 @@ export function criticalFollowupResult(plan,roll,eml){
  const sl=successLevel(roll,eml),level=['CF','F','S','CS'][sl];
  let effect='';
  switch(plan.id){
+ case 'climb-easy-strength-failure':effect=sl<SL.S?'Strength F/CF: Easy Climbing selhalo po jednom roundu; pád z výšky není pouhým F doložen.':'Strength S/CS: Easy Climbing uspělo po jednom roundu.';break;
  case 'acro-gymnastics-failure':effect=sl<SL.S?'Strength selhal: postava padá prone.':'Strength uspěl: gymnastický manévr selhal, ale postava se udržela na nohou.';break;
  case 'acro-balance':effect=sl<SL.S?'Postava spadne.':sl===SL.S?'Příští tah obnovuje rovnováhu, nepohybuje se.':'Rovnováha udržena bez dalšího následku.';break;
  case 'acro-gymnastics':effect='Postava spadne prone.';break;

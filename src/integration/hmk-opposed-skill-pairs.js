@@ -10,10 +10,12 @@ export const HMK_OPPOSED_ACTIONS=Object.freeze({
  Guile:[['Bluffing / lying','Intrigue',138]],
  Theatrics:[['Acting','Intrigue',138],['Disguise','Awareness',138],['Mimicry','Awareness',138]],
  Stealth:[['Alert observer','Awareness',84],['Active observer','Perception',93]],
- Awareness:[['Detect Stealth','Stealth',66]],
+ Awareness:[['Detect Stealth','Stealth',66],['Notice sleight of hand','Legerdemain',77],['Recognize disguise / mimicry','Theatrics',138]],
  Perception:[['Notice active Stealth','Stealth',82]],
  Legerdemain:[['Sleight of hand / pickpocket','Awareness',77]],
- Intrigue:[['Detect Guile','Guile',76],['Detect Theatrics','Theatrics',76]],
+ Intrigue:[['Detect Guile','Guile',138],['Detect Theatrics','Theatrics',138]],
+ Will:[['Resist seduction / Charm','Charm',138],['Resist authority / Command','Command',138]],
+ Initiative:[['Resist intimidation','Command',138]],
  Melee:[['Block (Combat only)','Melee',61],['Dodge (Combat only)','Dodge',61]],
  Eloquence:[['Opposed speech','Eloquence',61]]
 });

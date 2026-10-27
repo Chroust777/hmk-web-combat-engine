@@ -3,7 +3,7 @@
  * Skill Test. Calendar date is authoritative; combat rounds are not minutes.
  * HMK v1.2 pp.62,67,71,148,169,175–190.
  */
-import {criticalActivities} from './hmk-skill-critical-activities.js';
+import {criticalActivities,skillFollowupActivities} from './hmk-skill-critical-activities.js';
 import {trekkingOutstandingCases} from './hmk-trekking-followups.js';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
@@ -139,11 +139,13 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
  }
  // A critical failure has *activity-dependent* consequences: request the
  // existing follow-up workflow, never fabricate a fall, injury or date.
- const byId=new Map(journal.map(e=>[e.id,e]));
  for(const e of journal){
   const p=e?.skillTestProof;if(!p)continue;
+  if(e.calendarCampaignId&&clock.campaignId&&e.calendarCampaignId!==clock.campaignId)continue;
   if(p.type==='critical-followup'){
-   if(!['CF','F'].includes(p.result?.level))continue;
+   // A non-dice Survival Hazard follows the original Trekking CF. It has no
+   // secondary SL at all, but still requires actual hazard dice / GM routing.
+   if(!['CF','F'].includes(p.result?.level)&&p.activity!=='trek-survival-hazard')continue;
    if(['climb-easy','climb-difficult','acro-balance','jumping-sv'].includes(p.activity)&&
       !journal.some(z=>['climbing-falling','skill-physical-consequence'].includes(z.skillTestProof?.type)&&z.skillTestProof.sourceId===e.id)){
     const actor=characters.find(c=>c.id===p.actorId);
@@ -161,12 +163,14 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    }
    continue;
   }
-  if(!['success-value-test','success-value-specific','secondary-mastery-value-test','secondary-mastery-test','assistance-success-test','opposed-success-test'].includes(p.type))continue;
+  if(!['success-value-test','success-value-specific','secondary-mastery-value-test','secondary-mastery-test','assistance-success-test','opposed-success-test','success-test'].includes(p.type))continue;
   const sides=p.a?[{id:p.actorId,skill:p.skills?.[0],result:p.a,side:'A'},...(p.b?[{id:p.opponentId,skill:p.skills?.[1],result:p.b,side:'B'}]:[])]:[{id:p.actorId,skill:p.skill,result:p.result,side:'A'}];
-  for(const x of sides){if(x.result?.level!=='CF'||x.result.forcedCF||!criticalActivities(x.skill).length)continue;
+  for(const x of sides){
+   if(!['F','CF'].includes(x.result?.level)||x.result.forcedCF||!skillFollowupActivities(x.skill,x.result.level).length)continue;
    if(journal.some(z=>z.skillTestProof?.type==='critical-followup'&&z.skillTestProof.originId===e.id&&z.skillTestProof.side===x.side))continue;
    const c=characters.find(c=>c.id===x.id);
-   if(c)push(c,'skill-critical',e.id+'-'+x.side,`${x.skill} CF – zvolit skutečnou činnost a navazující pravidlový test`,e.campaignMinute,'skills');
+   if(c)push(c,'skill-critical',e.id+'-'+x.side,`${x.skill} ${x.result.level} – GM ověří konkrétní činnost a případný navazující test (HMK ${skillFollowupActivities(x.skill,x.result.level)[0].page})`,e.campaignMinute,'skills',
+    {originId:e.id,side:x.side,level:x.result.level,decisionRequired:true});
   }
  }
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
