@@ -49,28 +49,29 @@ export function resolveSkillTest({ml,roll,gmModifier=0,secondaryMLs=[],assistant
  return {kind:'hmk-skill-test-v1',sourcePages:[60,61,62],ml,index:indexOf(ml),roll,gmModifier,secondary,assistantChecks,assistance,rawEML,eml,exceptional,sl,level:SUCCESS_LEVEL_NAMES[sl],sv,svExtra,svTier:successValueTier(sv),unopposedStars:sl===SL.S?1:sl===SL.CS?2:0,splitCF:sl===SL.CF?(roll%10===0?'CF0':'CF5'):null};
 }
 export function successValueTier(sv){if(!Number.isSafeInteger(sv))throw Error('SV není celé číslo');return sv<=0?{label:'Žádná použitelná hodnota',stars:0}:sv<=2?{label:'Omezená hodnota',stars:0}:sv<=4?{label:'Základní hodnota',stars:0}:sv>=9?{label:'Výjimečná hodnota',stars:5}:{label:'Nadstandardní hodnota',stars:sv-4};}
-export function resolveOpposedTests(a,b,{breakTie=false,finalD10A=null,finalD10B=null}={}){
+export function resolveOpposedTests(a,b,{breakTie=false,finalD10A=null,finalD10B=null,persuasion=false}={}){
  if(!a||!b||!Number.isInteger(a.sl)||!Number.isInteger(b.sl))throw Error('Chybějí dva vyhodnocené Success Tests');
- if(a.sl<SL.S&&b.sl<SL.S)return {winner:null,stars:0,bothFailed:true}; // HMK p.61: no tiebreak of two failures.
+ if(a.sl<SL.S&&b.sl<SL.S&&!(persuasion&&a.sl===b.sl))return {winner:null,stars:0,bothFailed:true}; // HMK p.61 general; p.138 persuasion breaks failed ties.
  // Base engine uses actual primary ML for its final tie check; p.61.
- return opposed({a:{sl:a.sl,roll:a.roll,ml:a.ml},b:{sl:b.sl,roll:b.roll,ml:b.ml},tie:breakTie?'break':'none',finalD10A,finalD10B});
+ const outcome=opposed({a:{sl:a.sl,roll:a.roll,ml:a.ml},b:{sl:b.sl,roll:b.roll,ml:b.ml},tie:breakTie?'break':'none',finalD10A,finalD10B});
+ return persuasion&&a.sl===b.sl?{...outcome,persuasionTie:true,sourcePage:138}:outcome;
 }
 /** HMK p.61: a tiebreak is an optional follow-up only to equal successful
  * levels (S/S or CS/CS). Original opposed tests remain immutable.
  */
-export function canResolveOpposedTie(a,b){
- return !!(a&&b&&Number.isInteger(a.sl)&&a.sl>=SL.S&&a.sl===b.sl&&
+export function canResolveOpposedTie(a,b,{persuasion=false}={}){
+ return !!(a&&b&&Number.isInteger(a.sl)&&(a.sl>=SL.S||persuasion)&&a.sl===b.sl&&
    Number.isInteger(a.roll)&&Number.isInteger(b.roll)&&
    Number.isInteger(a.ml)&&Number.isInteger(b.ml));
 }
-export function resolveOptionalOpposedTie(a,b,{d10A=null,d10B=null}={}){
- if(!canResolveOpposedTie(a,b))throw Error('Rozstřel je dovolen pouze při shodném S/S nebo CS/CS s doloženými původními hody');
+export function resolveOptionalOpposedTie(a,b,{d10A=null,d10B=null,persuasion=false}={}){
+ if(!canResolveOpposedTie(a,b,{persuasion}))throw Error('Rozstřel vyžaduje doložené shodné úrovně; neúspěšné remízy se rozhodují pouze v Persuasion (HMK str.138).');
  if((d10A!==null&&!Number.isInteger(d10A))||(d10B!==null&&!Number.isInteger(d10B))||
    (d10A!==null&&(d10A<1||d10A>10))||(d10B!==null&&(d10B<1||d10B>10)))throw Error('Rozhodující d10 musí být 1–10');
  const d10Needed=a.roll===b.roll&&a.ml===b.ml;
- const result=resolveOpposedTests(a,b,{breakTie:true,finalD10A:d10Needed?d10A:null,finalD10B:d10Needed?d10B:null});
+ const result=resolveOpposedTests(a,b,{breakTie:true,finalD10A:d10Needed?d10A:null,finalD10B:d10Needed?d10B:null,persuasion});
  return {...result,d10Needed,method:!d10Needed?(a.roll!==b.roll?'higher-d100':'higher-ml'):'d10',
-   sourcePage:61,requiresAnotherD10:d10Needed&&(!result.winner||result.needsFinalD10)};
+   sourcePage:persuasion?138:61,requiresAnotherD10:d10Needed&&(!result.winner||result.needsFinalD10)};
 }
 export function testSecondaryRoll({ml,roll,tnAdjust=0}={}){
  if(ml===null||ml===undefined||ml===0)return {kind:'secondary-roll',tn:0,success:false,reason:'Není osvojeno – sekundární hod neuspěl.'};

@@ -17,10 +17,34 @@ export const CF_ACTIVITIES=Object.freeze({
  Script:Object.freeze([{id:'writing-routine',label:'Writing Routine · autor textu',page:132,mode:'test',test:'Will'}]),
  Lockcraft:Object.freeze([{id:'lock-picking',label:'Picking Locks · otevírání zámku',page:77,mode:'lock'}])
 });
+/** Failures are not universally rerolled. These are activity-specific F links. */
+export const FAILURE_ACTIVITIES=Object.freeze({
+ Acrobatics:Object.freeze([{id:'acro-gymnastics-failure',label:'Gymnastics · F vyžaduje Strength, jinak prone',page:64,mode:'test',test:'Strength'}])
+});
+export function skillFollowupActivities(skill,level){
+ if(level==='CF')return criticalActivities(skill);
+ if(level==='F')return FAILURE_ACTIVITIES[String(skill)]||[];
+ return [];
+}
 export function criticalActivities(skill){const name=String(skill);return CF_ACTIVITIES[name]||(/^Script(?:\s|\(|:|$)/.test(name)?CF_ACTIVITIES.Script:[]);}
+/** HMK p.60–61 gives no universal reroll on F/CF. Only source-backed
+ * consequences are stated; separate activity subsystems remain authoritative.
+ */
+export function skillFailureGuidance(skill,level){
+ if(!['F','CF'].includes(level))return null;
+ const base=String(skill||'').split(' (')[0].trim();
+ if(['Charm','Command','Discourse','Guile','Theatrics'].includes(base))
+  return {page:138,kind:'persuasion',text:level==='CF'?'Persuasion CF: cíl nebyl přesvědčen, pokus nelze opakovat; GM posoudí možnou nepřátelskou reakci. Bez automatického nového Skill Testu.':'Persuasion F: nepřesvědčeno; případné opakování GM může vést jako nový Opposed Test, nikoli jako automatický dodatečný hod.'};
+ if(base==='Stealth')return {page:84,kind:'stealth',text:level==='CF'?'Stealth CF: cíl o postavě ví; další hod není součástí tohoto testu.':'Stealth F: podezření; případný nový pokus při alertním cíli se řeší Opposed Stealth vs Awareness.'};
+ if(base==='Lockcraft')return {page:78,kind:'lockcraft',text:level==='CF'?'Lockcraft CF: zámek neotevřen; na další pokusy kumulativní −20 ML.':'Lockcraft F: zámek neotevřen; pravidla dovolují další samostatný pokus.'};
+ if(base==='Animalcraft'&&level==='CF')return {page:65,kind:'training',text:'Animalcraft CF při Training Routine: prodlužuje dobu výcviku o d3 měsíců; nejedná se o další Skill Test.'};
+ if(base==='Acrobatics')return {page:64,kind:'activity-dependent',text:'Acrobatics: při Gymnastics F následuje Strength Test; při CF se typ následku liší podle Balance/Gymnastics.'};
+ if(criticalActivities(base).length&&level==='CF')return {page:criticalActivities(base)[0].page,kind:'activity-dependent',text:'CF může spustit konkrétní pravidlový následek. Vyberte skutečně prováděnou činnost v navazujícím formuláři.'};
+ return {page:60,kind:'gm-context',text:'HMK nepředepisuje univerzální další d100 za F/CF u této dovednosti. GM musí ověřit konkrétní činnost či její samostatnou rutinu; bez takového předpisu nový hod nevzniká.'};
+}
 export function criticalFollowupPlan(skill,activity,original){
- if(!original||original.level!=='CF'||original.forcedCF===true)return null;
- const r=criticalActivities(skill).find(x=>x.id===activity);if(!r)return null;
+ if(!original||!['CF','F'].includes(original.level)||original.forcedCF===true)return null;
+ const r=skillFollowupActivities(skill,original.level).find(x=>x.id===activity);if(!r)return null;
  const unit=original.roll%10,cf0=unit===0,cf5=unit===5;
  const t=r.mode==='split'||r.mode==='split-fishing'?(cf0?'Fumble':'Stumble'):r.test;
  if(r.mode==='prone')return {...r,requiresRoll:false,detail:'CF: manévr selhal; postava padá prone. Další hod pravidlo nevyžaduje.'};
@@ -34,6 +58,7 @@ export function criticalFollowupResult(plan,roll,eml){
  const sl=successLevel(roll,eml),level=['CF','F','S','CS'][sl];
  let effect='';
  switch(plan.id){
+ case 'acro-gymnastics-failure':effect=sl<SL.S?'Strength selhal: postava padá prone.':'Strength uspěl: gymnastický manévr selhal, ale postava se udržela na nohou.';break;
  case 'acro-balance':effect=sl<SL.S?'Postava spadne.':sl===SL.S?'Příští tah obnovuje rovnováhu, nepohybuje se.':'Rovnováha udržena bez dalšího následku.';break;
  case 'acro-gymnastics':effect='Postava spadne prone.';break;
  case 'climb-easy':case 'climb-difficult':effect=sl<SL.S?'Následný Mishap selhal: postava padá; případné zranění se určí podle pravidel pádu, str. 67.':'Mishap odvrácen; základní Climbing CF se tím nemění.';break;
