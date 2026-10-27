@@ -257,7 +257,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.526';
+const APP_VERSION='93.528';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -13026,11 +13026,13 @@ document.addEventListener('submit',e=>{
  try{
   const plan=previewChestOutfit(data,{ownerId:selected,location:v.location,mode:v.mode});
   if(!plan.ready)throw Error(plan.reason);
-  if(!plan.ids.length)throw Error('Matematicky nejlepší ověřená kombinace již vzniká z oblečených a nesených předmětů; nic z této truhly ji nezlepší. Vybavení zůstává beze změny.');
+  if(!plan.ids.length&&!plan.preview.equipIds.length&&!plan.preview.unequipIds.length)
+   throw Error('Nejlepší přípustná kombinace už je oblečená; přesun z této truhly by ochranu ani vrstvení nezlepšil.');
   if(!ask('Vybraná sestava: '+plan.preview.names.join(', ')+'\nZ truhly vyzvednout '+plan.ids.length+' článků ('+plan.names.join(', ')+').\nDoložené pravidlo: '+plan.preview.proof+'\nProvést všechny přesuny a převlečení?'))return;
   const result=applyChestOutfit(data,{ownerId:selected,location:v.location,mode:v.mode,confirmed:v.confirmed==='yes',idFactory:uuid,createdAt:stamp()});
   const load=resolveCombatantLoad({character:character(selected),inventory:result.inventory});
   if((load.layeringFeasibility?.status==='forbidden'&&!load.printedSuit)||load.layeringStatus==='violation'||load.bulkReady===false)throw Error('Výsledná ochrana/vrstvy nebyly pravidlově ověřeny.');
+  if(!result.changed){overlay=null;render();alert('Původní sestava je již optimální; žádná položka nebyla přesunuta.');return;}
   if(mutate(()=>{data.inventory=result.inventory;data.journal=result.journal;})){overlay=null;render();}
  }catch(err){alert('Převlečení z truhly nebylo provedeno: '+err.message);}
 },true);
