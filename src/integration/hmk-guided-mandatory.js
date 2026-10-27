@@ -15,6 +15,7 @@ import {validateCombatState,combatFatigueTotals,
  applyConfirmedShockRecovery} from './persistent-combat-state.js';
 import {createManualDiceQueue,recordManualDie,nextManualDie,completedManualDice} from './hmk-manual-dice-queue.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
+import {verifiedMountedShockML} from './hmk-mounted-live-animal-falling.js';
 import {coagulantBleedingEvidence} from './hmk-herbal-bleeding-bridge.js';
 import {narcoticEvidence} from './hmk-herbal-narcotic.js';
 
@@ -88,7 +89,8 @@ export function guidedMandatoryMastery({kind,character,mishapKind=null,abe=null,
   assert(ml!==null,'Blood Loss: chybí Strength; zvířata potřebují ověřený druh');
  }else if(kind==='shock-recovery'){
   ml=skillML(character,'shock');
-  assert(integer(ml,0,200),'Shock: postava nemá doloženou dovednost Shock ML');
+  if(ml==null)ml=verifiedMountedShockML(character); // HMK 355: only confirmed animal breed
+  assert(integer(ml,0,200),'Shock: postava ani ověřené plemeno nemají doložené Shock ML');
  }else if(kind==='injury-morale'){
   ml=skillML(character,'initiative');
   assert(integer(ml,0,200),'Morale: postava nemá doloženou dovednost Initiative ML');

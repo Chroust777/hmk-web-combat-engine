@@ -2,6 +2,7 @@
  * Pure preview: no storage, invented dice or character mutations.
  * The caller commits the returned state and proof in one verified transaction.
  */
+import {prepareAnimalSurvivalAccident} from './hmk-skill-animal-survival-539.js';
 import {humanLocation,woundFromFall} from './hmk-mounted-fall-injury-join.js';
 import {resolveLiveCombatArmour} from './live-combat-armour.js';
 import {resolveCombatantLoad} from './combatant-load.js';
@@ -23,8 +24,15 @@ export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,
  must(gmConfirmed===true&&actor?.id&&Array.isArray(inventory)&&state&&typeof sourceId==='string'&&sourceId&&
   die(round,9999),'Nutné potvrzení GM, cílová postava, aktuální Combat State a zdroj události');
  validateCombatState(state);
+ if(actor.kind==='Animal'&&!actor.hmk?.verifiedMountedBreed)
+  throw Error('Neověřené zvíře nemůže použít lidskou anatomii; je nutný registr s plemenem HMK 355');
+ if(kind==='fishing-cf'&&actor.hmk?.verifiedMountedBreed)
+  throw Error('Rybářské CF fyzické následky nepatří na zvířecí profil');
+ if(kind==='survival-accident'&&actor.hmk?.verifiedMountedBreed)
+  return prepareAnimalSurvivalAccident({actor,state,inventory,sourceId,round,gmConfirmed,
+   impactDie,zoneD10,locationD10,shockD100,compoundD10,hazardD10,agilityD100,randomVictimConfirmed});
  const evt='skill-injury:'+kind+':'+sourceId;
- must(!state.events.some(x=>x.id===evt),'Tento následek už je trvale zapsán');
+ must(!state.events.some(x=>x.id===evt||x.id===evt+':complete'),'Tento následek už je trvale zapsán');
  const limit=kind==='fishing-cf'?10:6;
  let sl=null,eml=null;
  if(kind==='survival-accident'){

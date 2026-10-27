@@ -20,6 +20,11 @@ const info={
  charger:{table:'C',maxZN:20,b:5,shockML:65},
  destrier:{table:'C',maxZN:20,b:6,shockML:75}
 };
+/** Breed-verified printed Shock ML for the original animal, never a GM guess. */
+export function verifiedMountedShockML(animal){
+ const breed=animal?.hmk?.verifiedMountedBreed;
+ return Object.hasOwn(info,breed)?info[breed].shockML:null;
+}
 const leg=new Set(['flg','hlg']);
 function locationFor(spec,zn,ld){
  const b=spec.table==='B';

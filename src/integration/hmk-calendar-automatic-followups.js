@@ -6,6 +6,7 @@
 import {criticalActivities,skillFollowupActivities} from './hmk-skill-critical-activities.js';
 import {trekkingOutstandingCases} from './hmk-trekking-followups.js';
 import {pendingTrackingAwareness} from './hmk-tracking-awareness-537.js';
+import {dueInjuryMorale,unresolvedInjuryMishaps} from './persistent-combat-state.js';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -43,13 +44,40 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // All these are current unresolved obligations, not new fabricated time intervals.
   for(const w of s?.wounds??[])if(w.bleeding&&!w.healed)
    push(c,'bleeding',w.id,'Aktivní Bleeder – Blood Stoppage / Blood Loss Advance (HMK 177–178)',clock.minute,'combat',{woundId:w.id});
+  // Skill-generated Serious/Grievous injuries use the SAME mandatory
+  // Injury Morale and Mishap queue as a weapon hit (HMK pp.161–162,170).
+  // Previously, a Skill Accident outside active Initiative could leave them
+  // hidden even though Treatment/Healing were already displayed.
+  if(s?.format==='hmk-persistent-combat-v1'){
+   for(const m of unresolvedInjuryMishaps(s))push(c,'injury-mishap',m.id,
+    'Nevyřízený Injury Mishap – původní Combat průvodce (HMK 161,170)',clock.minute,'combat',{woundId:m.woundId});
+   for(const m of dueInjuryMorale(s))push(c,'injury-morale',m.woundId,
+    'Povinný Morale po Serious/Grievous zranění (HMK 162)',clock.minute,'combat',{woundId:m.woundId});
+  }
   // Every committed injury without a resolved initial treatment decision
   // needs routing into the existing Treatment/Untreated workflow. No roll is
   // fabricated and the GM may explicitly record that treatment was absent.
   for(const w of s?.wounds??[])if(!w.healed&&!w.healing)
    push(c,'treatment',w.id,'Nová rána – Treatment nebo doložené bez ošetření (HMK 178–179)',clock.minute,'combat',{woundId:w.id});
-  if(s?.shockFollowup)push(c,'shock-followup',s.shockFollowup.originRound??'shock',
-   'Povinný Shock Follow-up – dokončit v bojovém průvodci (HMK 169)',clock.minute,'combat');
+  if(s?.shockFollowup){
+   const pending=s.shockFollowup;
+   if(pending.kind==='UNC'&&pending.phase==='after-ten-minutes'){
+    // HMK p169: an unconscious subject rerolls after ten actual minutes.
+    // Use only the ORIGINAL wound-time anchor, never the current clock
+    // (which otherwise creates a deadlock before the ten minutes can elapse).
+    const origins=(s.wounds??[]).filter(w=>w.recordedRound===pending.originRound&&
+      (!pending.timelineId||w.timelineId===pending.timelineId));
+    const matches=origins.flatMap(w=>(clock.anchors??[]).filter(a=>a.kind==='wound'&&
+      a.characterId===c.id&&a.woundId===w.id));
+    const unique=[...new Set(matches.map(a=>a.minute))];
+    if(unique.length===1)push(c,'shock-followup',pending.originRound,
+      'UNC Shock Reroll po 10 minutách od potvrzeného zranění (HMK 169)',unique[0]+10,'combat');
+    else unknown.push({characterId:c.id,name:c.name,kind:'shock-followup',
+      description:'UNC Shock Reroll po 10 minutách (HMK 169)',
+      reason:'Chybí jednoznačná časová kotva původního zranění; GM musí potvrdit okamžik vzniku Shock'});
+   }else push(c,'shock-followup',pending.originRound??'shock',
+    'Povinný Shock Follow-up – dokončit v bojovém průvodci (HMK 169)',clock.minute,'combat');
+  }
   if(s?.bloodShockPending)push(c,'blood-shock','pending','Povinný Blood Loss Shock (HMK 177)',clock.minute,'combat');
   if(s?.asphyxiaComaPending?.active)push(c,'asphyxia','pending','Asphyxia / Coma – dokončit doložené následky (HMK 183)',clock.minute,'hazards');
   if(c.hmk?.arcane?.pendingPsycheTraitChoice)push(c,'psyche-choice','pending',

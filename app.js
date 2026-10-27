@@ -261,7 +261,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.538';
+const APP_VERSION='93.539';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6839,11 +6839,11 @@ function hskSkillPhysicalImpactForm(entry){
  const actor=character(proof.actorId);
  if(!actor)return '';
  const id=survival?'survival-accident':'fishing-cf';
- const targets=survival?data.characters.filter(x=>!x.archived&&!x.hmk?.verifiedMountedBreed&&x.kind!=='Animal').map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(''):'';
+ const targets=survival?data.characters.filter(x=>!x.archived&&(x.kind!=='Animal'||!!x.hmk?.verifiedMountedBreed)).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(''):'';
  return `<form class="hsk-climb-fall" data-skill-physical-impact>
  <input type="hidden" name="sourceId" value="${esc(entry.id)}"><input type="hidden" name="kind" value="${id}">
  <h4>${survival?'Survival Hazard · Accident (str. 148)':'Fishing · náhodné zranění d10e (str. 71)'}</h4>
- <p>${survival?'CF v Trekking vyvolá Survival Hazard. Pokud padne 4–6, náhodně určená postava testuje Agility; F/CF vede k nárazu d6+4b, při CF navíc +5. Při jiném výsledku Hazard GM vyhodnotí Equipment nebo Complication.':'Následné CF rybářského Dexterity/Agility testu způsobí skutečný Impact d10e do náhodné tělesné lokace. Zbraň ani zbroj se nesmějí domýšlet.'}</p>
+ <p>${survival?'CF v Trekking vyvolá Survival Hazard. Pokud padne 4–6, náhodně určená postava či ověřené zvíře testuje Agility; F/CF vede k nárazu d6+4b, při CF navíc +5. Při jiném výsledku Hazard GM vyhodnotí Equipment nebo Complication.':'Následné CF rybářského Dexterity/Agility testu způsobí skutečný Impact d10e do náhodné tělesné lokace. Zbraň ani zbroj se nesmějí domýšlet.'}</p>
  <div class="field-grid">
  ${survival?`<label>Survival Hazard d10 (1–10)<input type="number" name="hazardD10" min="1" max="10" required></label><label>Náhodně určená postižená postava<select name="targetId">${targets}</select></label><label>Agility d100 (jen Accident 4–6)<input type="number" name="agilityD100" min="1" max="100"></label>`:''}
  <label>${survival?'Impact d6 (jen neúspěšný Accident)':'Impact d10e'}<input type="number" name="impactDie" min="1" max="${survival?6:10}" ${survival?'':'required'}></label>
@@ -7391,7 +7391,7 @@ document.addEventListener('submit',event=>{
      !(data.campaignClock.characterIds??data.characters.map(c=>c.id)).includes(target.id))
     throw Error('Následek Survival Hazard musí zasáhnout účastníka stejné aktivní kampaně');
   }
-  if(target.hmk?.verifiedMountedBreed||target.kind==='Animal')throw Error('Zvířecí anatomii nelze vyhodnotit lidskou tabulkou. Použijte zvířecí Injury Sequence.');
+  if(target.kind==='Animal'&&!target.hmk?.verifiedMountedBreed)throw Error('Neověřené zvíře nelze zranit lidskou tabulkou; nejprve založte ověřený zvířecí profil.');
   const hazardD10=optional('hazardD10');
   const round=Math.max(1,combatClock.round||1,persistentStateOf(target).lastRound||0);
   // Non-accident branches are GM follow-ups, not invented injuries.
@@ -7412,7 +7412,7 @@ document.addEventListener('submit',event=>{
     impactDie:optional('impactDie'),zoneD10:optional('zoneD10'),locationD10:optional('locationD10'),
     direction:raw('direction'),shockD100:optional('shockD100'),compoundD10:optional('compoundD10'),
     hazardD10,agilityD100:optional('agilityD100'),randomVictimConfirmed:form.elements.namedItem('randomVictimConfirmed')?.checked===true});
-   const body='HMK str. '+(kind==='fishing-cf'?'71':'148')+' · '+kind+' · '+target.name+
+   const body='HMK str. '+(kind==='fishing-cf'?'71':'148')+' · '+kind+' · '+target.name+(report.bodyKind==='horse'?' · zvířecí anatomie B/C '+report.breed:'')+
     (report.sl?' · Agility '+report.sl+' / EML '+report.eml:'')+
     (report.avoided?' · nehoda odvrácena':' · Impact '+report.impact+report.aspect+
       ', lokalita '+report.location+', AV '+report.armourValue+', účinný Impact '+report.effectiveImpact+
@@ -10721,6 +10721,8 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  let form=null;
  const s=actor.hmk?.combatState,attrs=actor.hmk?.attributes||{};
  switch(kind){
+ case 'injury-morale':form=document.getElementById('combat-injury-morale-form');choose(form,'wound',actor.id+'::'+sourceId);break;
+ case 'injury-mishap':form=document.getElementById('combat-injury-mishap-form');choose(form,'mishap',actor.id+'::'+sourceId);break;
  case 'bleeding':form=document.getElementById('combat-blood-stoppage-form');choose(form,'wound',actor.id+'::'+sourceId);break;
  case 'shock-followup':form=document.getElementById('combat-recovery-persistent-form');choose(form,'characterId',actor.id);break;
  case 'treatment':case 'healing':case 'infection':case 'grim':{
@@ -10831,7 +10833,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
    field.focus({preventScroll:true});
   }
   notice='Otevřen autoritativní '+choice+' test pro hlídku '+sourceId+'. Výsledek se uloží s vazbou na její konkrétní čas a kampaň.';
- }else if(['skill-fall','skill-critical','skill-injury','weather-course','weather-skin','treatment','healing','infection','grim','poison','disease','psyche-recovery','psyche-interval','psyche-manifestation','aural-recovery','talisman-period','blood-shock','shock-followup','bleeding','blood-loss','asphyxia','sleep-deprivation','psyche-choice'].includes(kind)){
+ }else if(['skill-fall','skill-critical','skill-injury','weather-course','weather-skin','treatment','healing','injury-morale','injury-mishap','infection','grim','poison','disease','psyche-recovery','psyche-interval','psyche-manifestation','aural-recovery','talisman-period','blood-shock','shock-followup','bleeding','blood-loss','asphyxia','sleep-deprivation','psyche-choice'].includes(kind)){
   const msg='Kalendář otevřel příslušnou oblast postavy '+actor.name+', ale pro tuto událost není v aktuálním stavu dostupný autoritativní pravidlový formulář. Žádný hod nebyl proveden; zkontrolujte předchozí povinnosti.';
   notice=msg;const area=document.querySelector('main.content');if(area){const warning=document.createElement('p');warning.className='notice';warning.setAttribute('role','status');warning.textContent=msg;area.prepend(warning);}
  }else{
