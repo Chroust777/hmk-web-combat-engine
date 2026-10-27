@@ -17,11 +17,14 @@ import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} f
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
-import {skillWorkbenchHTML,sheetCombatActionHTML} from './src/integration/hmk-skill-workbench-ui.js';
+import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
 import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
 import {balanceNervesCandidate,resolveBalanceNerves} from './src/integration/hmk-skill-balance-547.js';
+import {fishingCatchCandidate,resolveFishingCatch} from './src/integration/hmk-fishing-catch-548.js';
+import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
+import {engineeringDesignCandidate,resolveEngineeringDesign} from './src/integration/hmk-engineering-design-548.js';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep} from './src/integration/hmk-climbing-fall-sequence.js';
 import {woundFromFall} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -262,7 +265,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.547';
+const APP_VERSION='93.548';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6763,7 +6766,7 @@ document.addEventListener('click',e=>{
 // HMK p.60–62 Skill Workbench: read from the authoritative character, append one journal proof.
 function skillActorMastery(actor,name){const row=availableMasteries(actor).find(x=>x.name===name);if(!row)throw Error('Zvolená dovednost nemá ověřené ML: '+name);return row;}
 function skillAssistantMLs(form,primaryName){
- const ids=Array.from({length:4},(_,i)=>form.elements.namedItem('assist'+(i+1))?.value||'').filter(Boolean);
+ const ids=[...form.querySelectorAll('select[name^="assist"]')].map(x=>x.value).filter(Boolean);
  if(new Set(ids).size!==ids.length)throw Error('Stejný pomocník je uveden vícekrát');
  return ids.map(id=>{const other=character(id);if(!other||id===selected)throw Error('Neplatný pomocník');return {actor:other,mastery:skillActorMastery(other,primaryName)}});
 }
@@ -6895,6 +6898,7 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
  if(!originalId||!proof||proof.type==='critical-followup')return '';
  const sides=proof.a?[{id:proof.actorId,skill:proof.skills?.[0],result:proof.a,side:'A'},...(proof.b?[{id:proof.opponentId,skill:proof.skills?.[1],result:proof.b,side:'B'}]:[])]:[{id:proof.actorId,skill:proof.skill,result:proof.result,side:'A'}];
  return sides.filter(x=>(actorId===null||x.id===actorId)&&['F','CF'].includes(x.result?.level)&&!x.result?.forcedCF&&
+  !(x.skill==='Animalcraft'&&data.journal.some(j=>j.skillTestProof?.type==='animal-training'&&j.skillTestProof.originId===originalId))&&
   !data.journal.some(j=>j.skillTestProof?.type==='critical-followup'&&j.skillTestProof.originId===originalId&&j.skillTestProof.side===x.side)).map(x=>{
   const options=skillFollowupActivities(x.skill,x.result.level);
   if(!options.length){if(!includeAdvisory)return '';const note=skillFailureGuidance(x.skill,x.result.level);return '<p class="hsk-followup-advisory"><strong>'+esc(x.skill)+' '+esc(x.result.level)+' · HMK '+(note?.page||60)+':</strong> '+esc(note?.text||'Další test není doložen.')+'</p>';}
@@ -6902,6 +6906,118 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
   return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Pravidlový následek '+esc(x.result.level)+' · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Automatický další test není povinný jen podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+choices+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací fyzický d100 (povinný, pokud činnost vyžaduje nový hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><div data-animal-training-fields hidden><p>Animal Training CF · HMK 65. Výcvik skutečně trval šest měsíců; toto je dodatečné zdržení, nikoli nová Training Roll.</p><label>Skutečně cvičené zvíře<input name="trainedAnimal" maxlength="120"></label><label>Dodatečné měsíce · skutečný d3<input name="trainingD3" type="number" min="1" max="3" step="1"></label><label><input type="checkbox" name="trainingReduced"> Doložené zkrácení výcviku o 1 měsíc výměnou za bonusový Training Roll (jen SV ≥ 7, HMK 65)</label><label><input type="checkbox" name="animalTrainingConfirmed"> GM potvrzuje, že původní Animalcraft CF pochází z ukončené Animal Training Routine</label></div><div data-writing-routine-fields hidden><p>Writing Routine CF · HMK 132. Primární hod byl Language (Creativity SR), nikoli Script.</p><label>Rozsah písemnosti<select name="writingScope"><option value="missive">Missive · 10 minut</option><option value="tract">Tract · 5 dní</option><option value="treatise">Treatise · 1 měsíc</option><option value="disquisition">Disquisition · 4 měsíce</option></select></label><label><input type="checkbox" name="writingConfirmed"> GM potvrzuje doloženou Language Writing Routine a zvolený rozsah</label></div><button type="submit">Vyhodnotit pravidlový následek '+esc(x.result.level)+'</button><output class="hsk-followup-output" role="status"></output></form>';
  }).join('');
 }
+/** HMK 71 Fishing SV: catch is independent of any CF mishap.
+ * Actual dice are entered by GM and the original test is immutable. */
+document.addEventListener('submit',event=>{
+ const f=event.target;if(!f?.matches?.('[data-hmk-fishing-catch]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const out=f.querySelector('output');
+ try{
+  const originId=f.elements.namedItem('origin')?.value,original=data.journal.find(j=>j.id===originId);
+  const proof=original?.skillTestProof,source=fishingCatchCandidate(proof),actor=character(source?.actorId);
+  if(!source||!actor||actor.id!==selected||original.characterId!==actor.id)throw Error('Úlovek patří původní postavě');
+  if(data.journal.some(j=>j.skillTestProof?.type==='fishing-catch'&&j.skillTestProof.originId===originId))throw Error('Úlovek tohoto SV již byl uložen');
+  if(original.calendarCampaignId&&original.calendarCampaignId!==campaignKey(data.campaignClock))throw Error('Původní test je z jiné kampaně');
+  if(Number.isSafeInteger(original.campaignMinute)&&Number.isSafeInteger(data.campaignClock?.minute)&&data.campaignClock.minute<original.campaignMinute)throw Error('Nelze zapsat úlovek před původním SV');
+  const fields=f.elements,raw=fields.namedItem('catchD10').value.trim();
+  const dice=raw?raw.split(',').map(x=>{if(!/^\s*(?:[1-9]|10)\s*$/.test(x))throw Error('Všechny d10 musí být celé hody 1–10');return Number(x.trim());}):[];
+  const result=resolveFishingCatch({proof,originId,actorId:actor.id,
+   technique:fields.namedItem('technique').value,
+   conditionsMode:fields.namedItem('conditionsMode').value,
+   conditionsD100:fields.namedItem('conditionsD100').value.trim()===''?null:Number(fields.namedItem('conditionsD100').value),
+   gmCondition:fields.namedItem('gmCondition').value||null,
+   gmSaturationPenalty:Number(fields.namedItem('saturation').value),foodD10:dice,
+   saltWater:fields.namedItem('saltWater').checked,offshore:fields.namedItem('offshore').checked,
+   periodConfirmed:fields.namedItem('periodConfirmed').checked,
+   baseSVNotPreAdjusted:fields.namedItem('baseSVConfirmed').checked});
+  const body='HMK 71 · Fishing · původní SV '+result.sourceSV+' / upravené '+result.adjustedSV+
+   '\nConditions '+(result.conditions.roll===null?'volba GM':('d100 '+result.conditions.roll))+' ('+result.conditions.condition+', TN '+result.conditions.tn+')'+
+   '\nCatch d10 ['+result.physicalFoodDice.join(', ')+'] → '+result.successes+' úspěchů; hvězdný základ '+result.starFoodDays+
+   '\nCelkem '+result.foodDays+' food-days ('+result.totalFishPounds+' lb ryb, z toho '+result.ediblePounds+' lb jedlé části).'+
+   '\nZásoby ani herní čas se automaticky nemění.'+
+   (result.criticalFailureHandoffRequired?'\nPOZOR: původní CF má oddělený povinný následek vybavení / případného zranění.':'');
+  recordSkillEvidence('Fishing · doložený úlovek',body,result,null);
+  if(out)out.textContent=body;
+  f.querySelector('button[type=submit]').disabled=true;
+ }catch(error){if(out)out.textContent='Úlovek nebyl potvrzen: '+error.message;}
+},true);
+/** HMK p65: evidence-backed Animalcraft six-month Training Routine. */
+document.addEventListener('submit',event=>{
+ const f=event.target;if(!f?.matches?.('[data-hmk-animal-training]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const out=f.querySelector('output');
+ try{
+  const els=f.elements,originId=els.namedItem('origin')?.value,original=data.journal.find(j=>j.id===originId);
+  const proof=original?.skillTestProof,source=animalTrainingCandidate(proof),actor=character(source?.actorId);
+  if(!source||!actor||actor.id!==selected||original.characterId!==actor.id)throw Error('Výcvik musí navazovat na skutečný Animalcraft SV stejného trenéra.');
+  if(data.journal.some(j=>j.skillTestProof?.type==='animal-training'&&j.skillTestProof.originId===originId))throw Error('Výcvik tohoto SV byl již doložen.');
+  const existingCF=data.journal.find(j=>j.skillTestProof?.type==='critical-followup'&&j.skillTestProof.originId===originId&&j.skillTestProof.activity==='animal-training')?.skillTestProof?.trainingExtension||null;
+  if(original.calendarCampaignId&&original.calendarCampaignId!==campaignKey(data.campaignClock))throw Error('Původní SV je z jiné kampaně.');
+  const raw=els.namedItem('trainingD10').value.trim(),trainingD10=raw?raw.split(',').map(x=>{
+   if(!/^\s*(?:[1-9]|10)\s*$/.test(x))throw Error('Každý Training Roll musí být skutečný d10 (1–10).');return Number(x.trim());
+  }):[];
+  const d3raw=els.namedItem('criticalD3').value.trim();
+  const result=resolveAnimalTraining({proof,originId,actorId:actor.id,
+   animalName:els.namedItem('animalName').value,
+   reasoning:Number(els.namedItem('reasoning').value),creativity:Number(els.namedItem('creativity').value),
+   newborn:!els.namedItem('notNewborn').checked,wasWild:els.namedItem('wasWild').checked,
+   previousBestStars:Number(els.namedItem('previousBestStars').value),
+   previousMasteryBoosts:Number(els.namedItem('previousMasteryBoosts').value),
+   shortenByOneMonth:els.namedItem('shorten').checked,trainingD10,
+   criticalD3:d3raw===''?null:Number(d3raw),
+   periodConfirmed:els.namedItem('periodConfirmed').checked,
+   baseSVNotPreAdjusted:els.namedItem('baseSVConfirmed').checked});
+  if(existingCF){
+   if(existingCF.dieD3!==result.criticalD3||existingCF.animalName!==result.animalName||
+      existingCF.timeReductionMonths!==(result.shortenByOneMonth?1:0))
+    throw Error('Dřívější CF Animal Training už má potvrzené zvíře, d3 a zkrácení; výsledky se nesmějí lišit ani házet znovu.');
+  }
+  const body='HMK 65 · Animal Training · '+result.animalName+'; SV '+result.sourceSV+' → '+result.adjustedSV+
+   ' ('+result.status+'); '+result.months+' měsíců'+
+   '\nTraining d10 ['+result.physicalTrainingDice.join(', ')+'] proti REA '+result.reasoning+
+   ' → '+result.trainingSuccesses+' úspěchů, +'+result.awardedBoosts+' MB (celkem '+result.finalBoosts+
+   ' / CRE limit '+result.masteryBoostCap+')'+
+   '\nPři SV ≤2 je Control SR −1. Boosty lze po ověření zvířete přidat Initiative, Shock, přirozeným melee dovednostem, Dodge a Press.'+
+   '\nTento doklad sám nemění skutečné ML zvířete ani neposouvá čas.';
+  recordSkillEvidence('Animalcraft · doložený výcvik',body,result,null);
+  if(out)out.textContent=body;
+  f.querySelector('button[type=submit]').disabled=true;
+ }catch(e){if(out)out.textContent='Výcvik nebyl potvrzen: '+e.message;}
+},true);
+/** HMK p70 Engineering Design Roll; do not fabricate Construction result. */
+document.addEventListener('submit',event=>{
+ const f=event.target;if(!f?.matches?.('[data-hmk-engineering-design]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const out=f.querySelector('output');
+ try{
+  const els=f.elements,originId=els.namedItem('origin')?.value,original=data.journal.find(j=>j.id===originId);
+  const source=engineeringDesignCandidate(original?.skillTestProof),actor=character(source?.actorId);
+  if(!source||!actor||actor.id!==selected||original.characterId!==actor.id)throw Error('Design Roll vyžaduje původní Engineering SV dané postavy.');
+  if(data.journal.some(j=>j.skillTestProof?.type==='engineering-design'&&j.skillTestProof.originId===originId))throw Error('Design Roll tohoto SV již byl uložen.');
+  if(original.calendarCampaignId&&original.calendarCampaignId!==campaignKey(data.campaignClock))throw Error('Design Roll a původní SV patří rozdílným kampaním.');
+  const raw=els.namedItem('designD10').value.trim();
+  const dice=raw?raw.split(',').map(x=>{if(!/^\s*(?:[1-9]|10)\s*$/.test(x))throw Error('Design Rolls vyžadují fyzické d10 v rozsahu 1–10.');return Number(x.trim());}):[];
+  const rand=els.namedItem('randomizeTime').checked;
+  const t1=els.namedItem('timeD3A').value.trim(),t2=els.namedItem('timeD3B').value.trim();
+  const mathML=availableMasteries(actor).find(x=>x.name==='Mathematics')?.ml??0;
+  const result=resolveEngineeringDesign({proof:original.skillTestProof,originId,actorId:actor.id,
+   edifice:els.namedItem('edifice').value,mathematicsML:mathML,designD10:dice,
+   randomizeTime:rand,timeD3A:t1===''?null:Number(t1),timeD3B:t2===''?null:Number(t2),
+   gmConfirmsConstructionParticipation:els.namedItem('constructionConfirmed').checked,
+   gmConfirmsNoPreviousModifiers:els.namedItem('baseSVConfirmed').checked});
+  const body='HMK 70 · Engineering Design · '+result.edifice+' (SV '+result.sourceSV+')'+
+   '\nMathematics ML '+result.mathematicsML+' / Index '+result.mathematicsIndex+
+   '; d10 ['+result.physicalDesignDice.join(', ')+'] → '+result.successes+' úspěchů.'+
+   '\nBudoucí Construction Roll '+(result.constructionSVModifier>=0?'+':'')+result.constructionSVModifier+' SV.'+
+   '\nDesign '+result.baseDays+' základních dní, Maths zkrácení '+result.extraTimeReductionPercent+' %, GM rozptyl '+result.randomTimePercent+' %.'+
+   (result.combinedTimeNeedsGM?'\nKombinace obou časových procent není výslovně uspořádána v HMK; konečnou délku určí GM.':
+    '\nDoba projektování '+(result.extraTimeReductionPercent?result.timeAfterMathOnly:result.timeAfterRandomOnly)+' dní.')+
+   '\nKonstrukční hod, výdaj materiálů ani herní čas se automaticky neprovádí.';
+  recordSkillEvidence('Engineering · doložený Design Roll',body,result,null);
+  if(out)out.textContent=body;
+  f.querySelector('button[type=submit]').disabled=true;
+ }catch(e){if(out)out.textContent='Design Roll nebyl potvrzen: '+e.message;}
+},true);
 /** HMK 64: SV 3–4 Balance has a special Will chain even when the
  * primary Acrobatics roll succeeded. The GM must certify the actual activity. */
 function hskBalanceNervesHTML(originalId,proof,{actorId=null}={}){
@@ -7243,7 +7359,7 @@ function recordSkillEvidence(title,body,proof,slotId=null){
  }
  const slot=slotId||((proof?.type==='success-value-specific'||proof?.type==='secondary-mastery-value-test')?'hsk-result-value':proof?.type==='assistance-success-test'?'hsk-result-assistance':'hsk-result-secondary');
  const output=document.getElementById(slot);if(output){
-  output.innerHTML=hskResultRichHTML(proof,body)+hskCriticalNextHTML(savedId,proof,{includeAdvisory:true,actorId:selected})+hskBalanceNervesHTML(savedId,proof,{actorId:selected})+hskSkillEnvironmentFollowup({id:savedId,skillTestProof:proof})+hskSeriousAggravationForm({id:savedId,skillTestProof:proof})+hskTrekkingWeatherForm({id:savedId,skillTestProof:proof});
+  output.innerHTML=hskResultRichHTML(proof,body)+hskCriticalNextHTML(savedId,proof,{includeAdvisory:true,actorId:selected})+hskBalanceNervesHTML(savedId,proof,{actorId:selected})+skillSpecificNextHTML(data.journal,selected,data.campaignClock?campaignKey(data.campaignClock):null,savedId)+hskSkillEnvironmentFollowup({id:savedId,skillTestProof:proof})+hskSeriousAggravationForm({id:savedId,skillTestProof:proof})+hskTrekkingWeatherForm({id:savedId,skillTestProof:proof});
   if(proof?.type==='special-secondary-roll'){
    const details=output.closest('details');if(details)details.open=true;
    const selection=details?.querySelector('[name="specialRoutine"]');
@@ -7332,6 +7448,7 @@ document.addEventListener('submit',event=>{
   const old=side==='B'?proof.b:proof.a||proof.result;
   const plan=criticalFollowupPlan(skill,f.elements.namedItem('activity')?.value,old);
   if(!plan)throw Error('Následný postup nelze doložit pro tuto činnost a CF');
+  if(plan.id==='animal-training'&&data.journal.some(j=>j.skillTestProof?.type==='animal-training'&&j.skillTestProof.originId===originId))throw Error('Animal Training CF už byl doložen v kompletním výcviku; neházejte druhý d3.');
   if(['animal-training','writing-routine'].includes(plan.id)&&(!Number.isSafeInteger(data.campaignClock?.minute)||original.calendarCampaignId!==campaignKey(data.campaignClock)))
    throw Error('Dlouhodobá činnost vyžaduje otevřenou původní kampaň a doloženou minutu Skill Testu.');
   const actor=character(side==='B'?proof.opponentId:proof.actorId);
@@ -8639,6 +8756,7 @@ document.addEventListener('submit',event=>{
   const actor=character(selected);if(!actor)throw Error('Postava není otevřená');
   if(form.id==='skill-assistance-form'){
    const v=Object.fromEntries(new FormData(form)),primary=skillActorMastery(actor,v.primary),helpers=skillAssistantMLs(form,v.primary);
+   if(form.elements.namedItem('helpersFeasible')?.checked!==true)throw Error('GM musí potvrdit fyzickou a pravidlovou přípustnost pomoci.');
    const checks=helpers.map(x=>({name:x.actor.name,ml:x.mastery.ml,index:x.mastery.index,eligible:x.mastery.ml*2>=primary.ml}));
    const bonus=Math.min(10,checks.filter(x=>x.eligible).reduce((s,x)=>s+x.index,0));
    const ctx=skillAutoFor(actor,v.primary,form,'A');
