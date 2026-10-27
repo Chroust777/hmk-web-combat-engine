@@ -266,7 +266,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.549';
+const APP_VERSION='93.550';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3872,7 +3872,9 @@ function gmHistoryView(){
  const row=j=>{
   const name=names.get(j.characterId)||'GM / svět',ref=!!names.get(j.characterId),proof=j.skillTestProof;
   const procedure=proof?'skills':j.origin==='cash'?'gear':j.calendarInventoryRationStock||j.calendarInventoryWaterFill||j.calendarInventoryRationLoss||j.calendarInventoryWaterLoss||j.calendarNutritionPolicy||j.calendarForagingSupplyUse?'provisions':null;
-  return `<tr><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(visibleEvidenceText(j.title||'Událost'))}</strong><details class="gm-history-detail"><summary>Podrobnosti</summary>${j.skillTestProof?skillTestEvidenceHTML(j,esc):`<div>${esc(visibleEvidenceText(j.body||'Bez popisu'))}</div>`}</details></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(j.characterId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(j.characterId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr>`;
+  // Full-width evidence lives in the following cell spanning all four columns.
+  // It remains visually attached to its own event and never changes the journal.
+  return `<tr class="gm-history-event-row"><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(visibleEvidenceText(j.title||'Událost'))}</strong></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(j.characterId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(j.characterId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr><tr class="gm-history-expanded-row"><td colspan="4"><details class="gm-history-detail"><summary>Podrobnosti události</summary>${j.skillTestProof?skillTestEvidenceHTML(j,esc):`<div>${esc(visibleEvidenceText(j.body||'Bez popisu'))}</div>`}</details></td></tr>`;
  };
  const table=rows=>`<div class="hc-provision-table-scroll"><table class="hc-provision-table gm-history-table"><thead><tr><th>Čas</th><th>Postava</th><th>Událost</th><th>Otevřít</th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>`;
  return journalChapterShell('GM · Historie činností',`${czCount(meaningfulEntries.length,'doložený záznam','doložené záznamy','doložených záznamů')} postav a kampaní`,
@@ -8408,7 +8410,7 @@ function hskApplySRResult(result,sr){
   unopposedStars:Math.max(0,victorySL-1),preSecondaryCF:result.splitCF||null,splitCF:sl===0?result.splitCF:null,secondarySLBonus:sr.slBonus||0,secondarySVBonus:svExtra};
 }
 function hskScene(form){return {objective:String(form.elements.namedItem('gmObjective')?.value||'').trim().slice(0,240),scene:String(form.elements.namedItem('gmScene')?.value||'').trim().slice(0,240)};}
-function hskNarrativeBlock(narrative){return '\n\nPŘÍBĚH PRO GM (návrh, bez dalších automatických postihů):\n'+narrative;}
+function hskNarrativeBlock(narrative){return '\n\nPŘÍBĚH PRO GM:\n'+narrative;}
 function hskActionName(form,primary){
  const n=form.elements.namedItem('opposedAction')?.value;
  return n==null||n===''?'':opposedActionOptions(primary)[Number(n)]?.[0]||'';
@@ -8666,11 +8668,11 @@ function hskResultText(side,{person,mastery,secs,ctx,die,result,sr}){
   ctx.breakdown.map(x=>' '+hskSigned(x.value)+' '+x.label).join('')+' '+hskSigned(Number.isSafeInteger(result.gmModifier)?result.gmModifier-ctx.modifier:0)+' GM situace';
  const warnings=(ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+(ctx.armourIsProvisional?'\nPŘEDBĚŽNÝ výsledek: '+ctx.provisionalArmour.join('; '):'');
  return side+' · '+person.name+' / '+mastery.name+' | '+breakdown+' = EML '+(result.eml??'—')+
-  '\nPrimární '+(result.forcedCF?'vynucené CF bez hodu':'d100 '+result.roll+' ('+die.origin+')')+' → '+(result.victoryLevel||result.level)+
+  '\nPrimární '+(result.forcedCF?'vynucené CF bez hodu':'d100 ('+result.roll+') ['+die.origin+']')+' → '+(result.victoryLevel||result.level)+
   (result.splitCF?' ['+result.splitCF+(result.splitCF==='CF0'?' / potenciální Fumble':' / potenciální Stumble')+' – jen při předepsané činnosti]':'')+
   (result.footpadSourceIds?'\nFootpad (HMK 272) · Primary ML +'+result.footpadBonusML+' ('+result.footpadSourceIds.join(', ')+'); původní ML '+result.footpadBaseML+'.':'')+
   (result.eruditionSourceIds?'\nErudition (HMK 271) · doložené S → CS ('+result.eruditionSourceIds.join(', ')+'); původní d100 / EML zůstávají.':'')+
-  (sr?'\nSecondary Roll '+sr.name+' · TN '+sr.tn+' (HMK str. '+sr.sourcePage+') · '+(sr.roll===null?'bez hodu, dovednost neosvojena':'d10 '+sr.roll)+' → '+(sr.success?'S':'F')+'; '+sr.effect:'')+warnings;
+  (sr?'\nSecondary Roll '+sr.name+' · TN '+sr.tn+' (HMK str. '+sr.sourcePage+') · '+(sr.roll===null?'bez hodu, dovednost neosvojena':'d10 ('+sr.roll+')')+' → '+(sr.success?'S':'F')+'; '+sr.effect:'')+warnings;
 }
 // Voluntary, append-only HMK p.61 tiebreak. Never reroll/overwrite original d100 proof.
 let hskTieDiceOrigin=null,hskTieDiceAttempts=[];
@@ -8773,7 +8775,7 @@ document.addEventListener('submit',event=>{
    const consequence=classifySkillConsequence({actor,skill:v.primary,result,trauma:ctx.trauma,context:'general'});
    const consequenceProof=skillConsequenceProof({eventId:uuid(),actorId:actor.id,skill:v.primary,result,consequence,rollOrigin:die.origin});
    const body='Assistance · HMK p.60 · '+actor.name+' / '+v.primary+' ML '+primary.ml+'\n'+checks.map(x=>x.name+' ML '+x.ml+' → '+(x.eligible?'+'+x.index:'nesplňuje poloviční ML')).join('\n')+
-    '\nBonus Assistance '+hskSigned(bonus)+' (strop +10); stav '+hskSigned(ctx.modifier)+'; GM situace '+hskSigned(hskGMModifier(form,'A'))+'; EML '+result.eml+'\nFootpad ML bonus '+(footpad?.modifier||0)+' (HMK 272)'+ '\nd100 '+result.roll+' → '+result.level+(result.splitCF?' '+result.splitCF:'')+' · '+result.unopposedStars+' Victory Stars'+(sr?'\nPředepsaný SR '+sr.name+' d10 '+sr.roll+' / TN '+sr.tn+' → '+(sr.success?'S':'F')+'; '+sr.effect:'')+
+    '\nBonus Assistance '+hskSigned(bonus)+' (strop +10); stav '+hskSigned(ctx.modifier)+'; GM situace '+hskSigned(hskGMModifier(form,'A'))+'; EML '+result.eml+'\nFootpad ML bonus '+(footpad?.modifier||0)+' (HMK 272)'+ '\nd100 ('+result.roll+') → '+result.level+(result.splitCF?' '+result.splitCF:'')+' · '+result.unopposedStars+' Victory Stars'+(sr?'\nPředepsaný SR '+sr.name+' d10 ('+sr.roll+') / TN '+sr.tn+' → '+(sr.success?'S':'F')+'; '+sr.effect:'')+
     (ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+(ctx.armourIsProvisional?'\nPŘEDBĚŽNÝ zbrojní kontext: '+ctx.provisionalArmour.join('; '):'')+'\nNásledek: '+skillConsequenceText(consequence)+hskNarrativeBlock(skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}));
    recordSkillEvidence('Assistance · '+v.primary,body,{type:'assistance-success-test',actorId:actor.id,skill:v.primary,
     preliminaryArmour:ctx.armourIsProvisional,stimulant:ctx.stimulant??null,herbalCharmA:ctx.herbalCharm??null,darkvisionA:ctx.darkvision??null,eruditionA:erudition??null,footpadA:footpad??null,secondaryRollResult:sr,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',

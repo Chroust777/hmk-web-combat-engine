@@ -5181,3 +5181,87 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
    min-width:690px!important;width:690px!important;
  }
 }
+
+
+/* v93.550 — same transparent Location-row surface on INVENTORY; no inset
+   repeated vellum, shaded rows, sticky-col parchment or distinct header wash. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-table-scroll{
+ background:transparent!important;background-image:none!important;box-shadow:none!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-table-scroll{
+ border:1px solid var(--folio-rule)!important;padding:2px!important;overflow-x:auto!important;
+ background:rgba(255,250,238,.22)!important;max-height:650px!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table{
+ background:transparent!important;background-image:none!important;
+ font:12px/1.25 'Cormorant Garamond',Georgia,serif!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tr,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table thead{
+ background:transparent!important;background-image:none!important;box-shadow:none!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody tr > :is(td,th),
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody tr > th:first-child{
+ background:transparent!important;background-image:none!important;background-color:transparent!important;
+ color:var(--folio-ink)!important;box-shadow:none!important;
+ border-bottom:1px solid rgba(149,105,59,.25)!important;
+ font:12px/1.25 'Cormorant Garamond',Georgia,serif!important;
+ padding:3px 5px!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody tr > th:first-child{
+ font-weight:700!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table thead tr > :is(th,td),
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table thead tr > th:first-child{
+ background:rgba(171,125,66,.16)!important;background-image:none!important;
+ color:#583316!important;border-bottom:1px solid #987344!important;
+ font:700 11px/1.2 'Cinzel',Georgia,serif!important;padding:4px 5px!important;
+}
+/* v93.550 — the GM event keeps compact columns, its evidence spans four. */
+.content-sheet .journal-book--gm-history .gm-history-table{
+ width:100%!important;table-layout:fixed!important;min-width:0!important;
+}
+.content-sheet .journal-book--gm-history .gm-history-table th:nth-child(1){width:15%!important}
+.content-sheet .journal-book--gm-history .gm-history-table th:nth-child(2){width:20%!important}
+.content-sheet .journal-book--gm-history .gm-history-table th:nth-child(3){width:43%!important}
+.content-sheet .journal-book--gm-history .gm-history-table th:nth-child(4){width:22%!important}
+.content-sheet .journal-book--gm-history .gm-history-table td{white-space:normal!important;
+ overflow-wrap:break-word!important;min-width:0!important;vertical-align:top!important}
+.content-sheet .journal-book--gm-history .gm-history-table .gm-history-expanded-row>td{
+ padding:0 5px 8px!important;border-bottom:1px solid rgba(149,105,59,.38)!important;
+}
+.content-sheet .journal-book--gm-history .gm-history-expanded-row .gm-history-detail{
+ width:100%;max-width:100%;min-width:0;margin:0;
+}
+.content-sheet .journal-book--gm-history .gm-history-expanded-row .gm-history-detail>summary{
+ color:#704a28;cursor:pointer;padding:3px 5px;font:600 12px/1.3 Georgia,serif;
+}
+.content-sheet .journal-book--chapter .hsk-proof-columns{
+ display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);
+ gap:10px;width:100%;min-width:0;align-items:start;
+}
+.content-sheet .journal-book--chapter .hsk-proof-columns>section{
+ min-width:0;overflow-wrap:break-word;
+}
+.content-sheet .journal-book--chapter .hsk-proof-columns h5{
+ margin:3px 0 5px;font:700 13px/1.25 Georgia,serif;color:#674225;
+}
+.content-sheet .journal-book--chapter .hsk-proof-columns pre{
+ display:block;max-height:340px;min-width:0;width:100%;
+ white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;
+ overflow-y:auto;overflow-x:hidden;margin:0;padding:6px;
+ font:12px/1.5 Georgia,serif!important;
+}
+.content-sheet .journal-book--chapter .hsk-proof-columns .hsk-proof-story p{
+ margin:0;padding:2px 3px;line-height:1.55;white-space:normal;
+ font:13px/1.55 Georgia,serif!important;overflow-wrap:break-word;
+}
+.content-sheet .journal-book--chapter .hsk-saved-proof{
+ max-width:100%;min-width:0;margin:6px 0;
+}
+.content-sheet .journal-book--chapter .hsk-saved-proof__details{max-width:100%;min-width:0;}
+@media(max-width:780px){
+ .content-sheet .journal-book--chapter .hsk-proof-columns{grid-template-columns:minmax(0,1fr)}
+}

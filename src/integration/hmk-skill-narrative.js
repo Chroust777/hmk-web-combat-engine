@@ -101,34 +101,65 @@ const ACTION_INTENTS=Object.freeze({
 });
 const normalize=s=>String(s??'').trim().slice(0,240);
 function intent(skill,action){if(ACTION_INTENTS[action])return ACTION_INTENTS[action];if(INTENTS[skill])return INTENTS[skill];const base=Object.keys(INTENTS).find(k=>skill.startsWith(k+' (')||skill.startsWith(k+':')||skill.startsWith(k+' '));return INTENTS[base]||'pokouší se splnit zvolenou činnost ('+skill+')';}
-function detail({objective='',scene=''}){return (normalize(objective)?' Záměr GM: '+normalize(objective)+'.':'')+(normalize(scene)?' Okolnosti: '+normalize(scene)+'.':'');}
-function soloLevel(level,skill){
- if(level==='CS')return skill==='Lockcraft'?'Mechanismus se podařilo zvládnout mimořádně jistě; jakékoli další výhody určuje situace.':'Pokus se vydařil mimořádně dobře; GM může zdůraznit jistotu, přesnost či dobrý dojem.';
- if(level==='S')return skill==='Guile'?'Protistrana přijala podanou lest, pokud nemá nárok na samostatný odpor.':'Pokus uspěl v zamýšleném rozsahu.';
- if(level==='F')return skill==='Lockcraft'?'Zvolený postup nestačil; zámek zatím nepovolil.':'Pokus nedosáhl zamýšleného cíle; situace zůstává otevřená.';
- return skill==='Lockcraft'?'Práce se zámkem výrazně selhala. Zda přitom došlo k hluku či poškození, určí konkrétní pravidlo nebo GM.':'Pokus selhal kriticky. Konkrétní komplikaci určí pravidlo činnosti nebo GM; žádný postih navíc se automaticky nepřidává.';
+function sceneContext({objective='',scene=''}){
+ const parts=[];
+ if(normalize(scene))parts.push('Děj se odehrává za okolností, které GM popsal takto: '+normalize(scene)+'.');
+ if(normalize(objective))parts.push('Záměrem je '+normalize(objective).replace(/[.!?]+$/,'')+'.');
+ return parts.join(' ');
+}
+function soloOutcome(level,skill){
+ if(level==='CS')return 'Výsledek hodu je kritickým úspěchem. Počínání působí mimořádně jistě a zvolený záměr se podařilo naplnit; případné zvláštní účinky však závisejí na pravidlech konkrétní činnosti.';
+ if(level==='S')return 'Po vyhodnocení hodu je zřejmé, že se činnost zdařila. Zamýšlený úkol se tak podařilo splnit v rozsahu odpovídajícím použité dovednosti.';
+ if(level==='F')return 'Pokus tentokrát nestačil k dosažení cíle. Úsilí nepřineslo zamýšlený výsledek a další vývoj zůstává na rozhodnutí účastníků scény.';
+ return 'Pokus končí kritickým neúspěchem. Průběh činnosti se nevydařil; zda vznikne další komplikace, určí výhradně konkrétní pravidlo nebo rozhodnutí GM, nikoliv samotné vyprávění.';
+}
+const perceptionVersusStealth=(primary,defender)=>
+ (primary==='Awareness'&&defender==='Stealth')||(primary==='Stealth'&&defender==='Awareness');
+function opposedMeaning(primary,defenderSkill,winnerA,a,b){
+ if(perceptionVersusStealth(primary,defenderSkill)){
+  const observer=primary==='Awareness'?a:b,hidden=primary==='Stealth'?a:b;
+  const observerWon=primary==='Awareness'?winnerA:!winnerA;
+  return observerWon?`${observer} si při pozorování povšimne toho, co se ${hidden} snažil skrýt. Ve střetu všímavosti a nenápadnosti tak převážil pozorovatel.`:`${hidden} se dokáže vyhnout pozornosti ${observer}. Pokus odhalit jeho přítomnost se v tomto porovnání dovedností neprosadil.`;
+ }
+ if(primary==='Guile')return winnerA?`${a} dokázal svou lest prosadit navzdory odporu ${b}. Z hlediska tohoto střetu druhého přesvědčil.`:`${b} se nenechal lstí ${a} přesvědčit. Zamýšlený klam v tomto porovnání neobstál.`;
+ if(primary==='Command')return winnerA?`${a} dokázal svůj požadavek ve střetu prosadit.`:`${b} dokázal požadavku ${a} odolat.`;
+ if(primary==='Theatrics')return winnerA?`Výkon ${a} ve střetu obstál a zamýšlený dojem se podařilo udržet.`:`${b} předvedenou roli nepřijal v zamýšlené podobě.`;
+ return winnerA?`${a} dokázal svůj záměr v tomto střetu prosadit navzdory jednání ${b}.`:`${b} odolal záměru ${a} a v porovnání dovedností získal převahu.`;
 }
 export function skillNarrativeSolo({actorName,skill,level,mode='success',sv=null,svTier=null,objective='',scene='',assistance=false}={}){
- const subject=normalize(actorName)||'Postava';
- const opener=subject+' '+intent(String(skill||''),null)+'.';
- let outcome=soloLevel(level,skill);
- if(mode==='value')outcome='Dlouhodobá činnost dosáhla SV '+sv+' ('+(svTier?.label||'výsledek dle tabulky')+'). '+(level==='CF'?'Kritické selhání může mít zvláštní následek pouze podle příslušného pravidla.':'Kvalitu hotové práce popiš podle této hodnoty; délku, cenu či materiální následky tím samotný hod neurčuje.');
- if(assistance)outcome='Při pokusu pomáhali další účastníci. '+outcome;
- return opener+detail({objective,scene})+' '+outcome;
+ const a=normalize(actorName)||'Postava';
+ const sentences=[`${a} ${intent(String(skill||''),null)}.`];
+ if(scene||objective)sentences.push(sceneContext({objective,scene}));
+ if(assistance)sentences.push('Na jeho úsilí se podílejí i další pomocníci; jejich vliv je již započten do výsledku testu.');
+ if(mode==='value')sentences.push(`Rozhodující test určil hodnotu úspěchu SV ${sv} (${svTier?.label||'výsledek podle příslušné tabulky'}). Tato hodnota popisuje kvalitu či pokrok daného úkonu, ale sama o sobě nemění cenu, čas ani spotřebované zdroje.`);
+ else sentences.push(soloOutcome(level,skill));
+ sentences.push('Tím se však celý děj nemusí uzavírat. Další kroky budou vycházet z toho, co se skutečně odehrává kolem postavy.');
+ return sentences.filter(Boolean).join(' ');
 }
-export function skillNarrativeOpposed({attackerName,defenderName,primary,defenderSkill,action='',comparison,levelA,levelB,objective='',scene='' }={}){
- const a=normalize(attackerName)||'Aktivní postava',b=normalize(defenderName)||'Protistrana';
- const opening=a+' '+intent(String(primary||''),action)+'; '+b+' reaguje pomocí '+String(defenderSkill||'své dovednosti')+'.';
- const extra=detail({objective,scene});
- if(comparison.bothFailed)return opening+extra+' Ani jeden nezvládl svůj test. Žádná strana svůj záměr neprosadila; GM vyloží, co ve scéně znamenají dva neúspěchy.';
- if(comparison.tie)return opening+extra+' Obě strany dosáhly '+levelA+', ale žádná nezískala převahu (0 ★). Původní stav trvá; pokud konkrétní činnost potřebuje vítěze, může GM použít rozstřel.';
- const margin=comparison.stars>=3?'výrazně':comparison.stars===2?'zřetelně':'těsně';
- if(comparison.winner==='a'){
-  const special=primary==='Guile'?'Lest přesvědčila protistranu.':primary==='Stealth'?'Pohyb unikl pozornosti protistrany.':primary==='Command'?'Aktivní postava prosadila svou výzvu.':primary==='Theatrics'?'Předstíraná role obstála před prověřením.':'Aktivní strana dosáhla převahy ve sledované činnosti.';
-  return opening+extra+' '+a+' vítězí '+margin+' ('+comparison.stars+' ★). '+special+' Konkrétní důsledky určuje GM podle scény.';
- }
- const special=primary==='Guile'?'Protistrana lsti neuvěřila nebo ji rozpoznala.':primary==='Stealth'?'Pozorovatel si všiml toho, co mělo zůstat skryté.':primary==='Command'?'Protistrana odolala nátlaku.':primary==='Theatrics'?'Předstírání protistranu nepřesvědčilo.':'Protistrana zmařila nebo překonala aktivní záměr.';
- return opening+extra+' '+b+' vítězí '+margin+' ('+comparison.stars+' ★). '+special+' Konkrétní důsledky určuje GM podle scény.';
+export function skillNarrativeOpposed({attackerName,defenderName,primary,defenderSkill,action='',comparison,levelA,levelB,objective='',scene=''}={}){
+ const a=normalize(attackerName)||'První postava',b=normalize(defenderName)||'Druhá postava';
+ const watchVsHide=perceptionVersusStealth(primary,defenderSkill);
+ const lines=watchVsHide?(()=>{
+  const observer=primary==='Awareness'?a:b,hidden=primary==='Stealth'?a:b;
+  return [`${observer} pozorně sleduje okolí a snaží se zachytit i drobné známky něčí přítomnosti.`,
+   `${hidden} se zatím pokouší zůstat nenápadný a nevzbudit pozornost. Z jejich protichůdných snah vzniká tichý střet, v němž rozhoduje všímavost proti opatrnosti.`];
+ })():[`${a} ${intent(String(primary||''),action)}.`,
+  `${b} na jeho pokus reaguje vlastní dovedností ${String(defenderSkill||'své schopnosti')}. Každý z nich v této chvíli sleduje jiný cíl, a právě na jejich střetu závisí výsledek.`];
+ if(scene||objective)lines.push(sceneContext({objective,scene}));
+ if(comparison?.tie){
+  lines.push('Oba výsledky jsou v tomto střetu vyrovnané; ani jeden účastník nezískal převahu.');
+  lines.push(comparison.persuasionTie?'Pravidla příslušného přesvědčování vyžadují rozhodnutí remízy, než bude možné vyhlásit vítěze.':'Pokud je pro další průběh potřeba vítěz, může následovat pravidlově přípustný rozstřel.');
+ }else if(comparison?.bothFailed){
+  const winner=comparison.winner==='a'?a:comparison.winner==='b'?b:null;
+  lines.push('Ani jeden z obou pokusů neskončil úspěchem; zamýšlené cíle proto nebyly dosaženy.');
+  lines.push(winner?`V pravidlovém porovnání však ${winner} vychází z neúspěchu lépe a získává převahu; to samo o sobě neznamená naplnění jeho původního záměru.`:'Ani jedna postava nezískává převahu a jejich snahy zatím zůstávají nerozhodnuté.');
+ }else if(comparison?.winner==='a'||comparison?.winner==='b'){
+  const winnerA=comparison.winner==='a',winner=winnerA?a:b,margin=comparison.stars>=3?'výraznou':comparison.stars===2?'zřetelnou':'těsnou';
+  lines.push(`Nakonec ${winner} získává ${margin} převahu. Rozdíl mezi jejich úsilím se tak projevil právě ve chvíli, kdy bylo třeba rozhodnout o výsledku.`);
+  lines.push(opposedMeaning(String(primary||''),String(defenderSkill||''),winnerA,a,b));
+ }else lines.push('O výsledku zatím nelze prohlásit žádnou ze stran za vítěze.');
+ lines.push('Co z této převahy vzejde, se ukáže v dalších okamžicích jejich setkání.');
+ return lines.filter(Boolean).join(' ');
 }
 export function skillNarrativeTiebreak({winnerName,method,attackerName,defenderName,primary}={}){
  const reason=method==='higher-d100'?'vyšší původní hod d100':method==='higher-ml'?'vyšší původní Primary ML':'rozhodující dodatečný d10';
