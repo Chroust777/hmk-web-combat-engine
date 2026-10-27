@@ -5023,3 +5023,34 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .hsk-saved-proof__details{margin-top:.25rem}
 .hsk-saved-proof__details summary{cursor:pointer}
 .hsk-saved-proof__details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.5;margin:.45rem 0 0;max-height:34rem;overflow:auto}
+
+/* v93.533 — inventory uses one identical, real parchment texture in EVERY
+   visible table cell (including the pinned item-name column). Older chapter
+   overrides used a flat overlay for the moving cells and an independently
+   shaded texture for the sticky column. Their backgrounds were never equal.
+   Do not optimize for seamless image registration while scrolling; the user
+   prefers the same visibly textured parchment on both sides. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-table-scroll,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table{
+  background:transparent!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody tr > td,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody tr > th:first-child{
+  background-image:url('./assets/ui/book/clean_vellum.png')!important;
+  background-color:#f5e4c4!important;
+  background-repeat:repeat!important;
+  background-size:440px 440px!important;
+  background-position:left top!important;
+  background-attachment:scroll!important;
+  box-shadow:none!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table thead tr > th,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table thead tr > th:first-child{
+  background-image:linear-gradient(rgba(171,125,66,.12),rgba(171,125,66,.12)),url('./assets/ui/book/clean_vellum.png')!important;
+  background-color:#f5e4c4!important;
+  background-repeat:repeat,repeat!important;
+  background-size:100% 100%,440px 440px!important;
+  background-position:left top,left top!important;
+  background-attachment:scroll,scroll!important;
+  box-shadow:none!important;
+}
