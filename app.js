@@ -135,6 +135,7 @@ import {nutritionRestActivity,interruptionForCancelledNutritionRest} from './src
 import {planHMKGroupWatch} from './src/integration/hmk-group-travel.js';
 import {trekPartyModes} from './src/integration/hmk-trekking-party-modes.js';
 import {trekRegisteredAnimalHealth} from './src/integration/hmk-trekking-animal-health.js';
+import {eligibleRestingAnimals,planAnimalRest} from './src/integration/hmk-trekking-animal-rest.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
@@ -252,7 +253,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.516';
+const APP_VERSION='93.517';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1661,6 +1662,17 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   return `<div class="hc-event"><strong>${esc(j.calendarTrekProof.area)} · ${esc(character(j.characterId)?.name||j.characterId)}</strong><p>Vlastní bdělost: <b>${esc(m.effective)}</b>${m.demoted?' · snížena jízdou či poháněním zvířat':''}; podle situace se používá ${esc(m.skills.join(' nebo '))}.</p><div class="hc-fields">${['lax','normal','alert'].map(foe=>{const proc=trekSurpriseProcedure({party:m,foe});return `<div class="hc-hint">Protivník ${foe}: <strong>${proc.kind}</strong> ${proc.automaticWinner?'· automaticky '+proc.automaticWinner:'· vyžaduje původní dovednostní test'}</div>`}).join('')}</div></div>`;
  }).join('')||'<p class="hc-hint">Žádné čekající doložené Encounter v této kampani.</p>'}
  <div class="hc-event-list">${data.journal.filter(j=>j.calendarTrekWildernessProof&&j.calendarCampaignId===campaignKey(clock)).slice(-12).reverse().map(j=>{const p=j.calendarTrekWildernessProof;return `<p class="hc-hint">${esc(character(j.characterId)?.name||j.characterId)} · ${esc(displayCampaignMinute(j.campaignMinute))} · jídlo ${p.totals.foodDays}, voda ${p.totals.waterDays}, byliny ${p.totals.herbDoses}</p>`}).join('')}</div></details></section>`;
+ const restingAnimals=eligibleRestingAnimals({characters:data.characters,journal:data.journal,clock});
+ const animalRestActivities=activeHMKActivities(data.journal,clock).filter(row=>row.calendarActivityProof.plan.animalRestPolicy);
+ const animalRestHTML=`<section class="hc-calendar hc-expedition" id="hmk-animal-rest"><h3>Zvířata · odpočinek a obnova Weariness</h3>
+  <p class="hc-hint"><strong>Odvozené pravidlo (nikoliv výslovná sazba HMK pro zvířata):</strong> GM potvrdí nepřerušený klid zvířete, potom se využije existující obnova podle HMK str. 150 a 176: 4 h −5 Weariness, nebo při doložených 8 h skutečného spánku −15. Každý typ nejvýše jednou za 24 h. Bez hodu END a bez automatického spuštění spánku. Účinek nastane až při posunu času GM; Weakness ani Windedness se tím neléčí.</p>
+  ${restingAnimals.length?`<form data-trek-animal-rest class="hc-fields"><label>Registrované zvíře kampaně<select name="animalId" required>${restingAnimals.map(c=>`<option value="${esc(c.id)}">${esc(c.name||c.id)} · ${esc(c.hmk.verifiedMountedBreed)} · Weariness ${esc(c.hmk.combatState?.fatigue?.weariness??'?')}</option>`).join('')}</select></label>
+   <label>Činnost<select name="kind"><option value="rest">4 hodiny klidu · Weariness −5</option><option value="sleep">8 hodin skutečného spánku · Weariness −15</option></select></label>
+   <label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje vhodné a bezpečné podmínky pro zvolený nepřerušený odpočinek; u spánku skutečných 8 hodin.</label>
+   <button type="submit">Naplánovat odpočinek zvířete · bez posunu času</button></form>`:'<p class="hc-hint">Žádné ověřené zvíře přidružené k této kampani. Zvíře nejprve výslovně zařaďte mezi členy tohoto kalendáře (Nastavení kampaně) a ověřte jeho plemeno a Combat State. Pouhá zmínka v Trekking Routine nestačí k úpravě zdraví jiného kalendáře.</p>'}
+  ${animalRestActivities.length?`<div class="hc-event-list">${animalRestActivities.map(j=>{const a=j.calendarActivityProof;return `<div class="hc-event"><strong>${esc(a.name)} · ${a.kind==='sleep'?'spánek':'odpočinek'}</strong> · ${esc(displayCampaignMinute(a.startMinute))}–${esc(displayCampaignMinute(a.endMinute))}. Čeká na dokončení při posunu času GM; případné přerušení je v seznamu činností níže.</div>`}).join('')}</div>`:''}
+  <p class="hc-hint">Zápis zdravotního stavu se provede pouze do původního Combat State zvířete a do společné historie kampaně. Pokud mezi plánováním a koncem dojde k pohybu, zranění, Exposure nebo jinému zásahu do zdraví, musí GM odpočinek přerušit v odpovídající minutě; neúplný odpočinek neposkytne obnovu.</p>
+  </section>`;
  const expeditionHTML=`<section class="hc-calendar hc-expedition"><h3>HMK · časově doložený odpočinek a únava během cesty</h3>
  <p class="hc-hint">HMK str. 62, 145–150, 176. Odpočinek se plánuje pro jednu či více postav současně; společný čas kampaně nemění. Obnova Windedness/Weariness nastane až po uplynutí intervalu při posunu času GM. Jeden čtyřhodinový cestovní watch zapisuje Weariness a END Secondary Roll. <strong>Jde o časový/únavový díl Trekking Routine, nikoliv o náhradu chybějících testů Weather, Orienteering, Hazards a Encounter.</strong> Před cestováním nejprve vyhodnoťte tyto situace jejich pravidlovými průvodci.</p>
  <div class="hc-provision-quiet"><strong>Celodenní podmínky a spotřeba:</strong> stejný odpočinek lze pro konkrétní postavu plánovat také v Zásobách a výživě, kde lze zvlášť doložit celý 24hodinový režim. Tato volba není automatickým osmihodinovým spánkem.</div>
@@ -1685,7 +1697,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <button type="button" class="hc-small" data-expedition-open-trek>Přejít na Trekking Routine</button></div>
  <div class="hc-expedition-links"><button type="button" class="hc-small" data-nav="skills">⚄ Skill Tests / Orienteering</button><label class="hc-hazard-calendar-target">Cíl nebezpečí<select data-calendar-hazard-actor aria-label="Postava pro nové nebezpečí">${participants.map(a=>`<option value="${esc(a.id)}" ${a.id===selected?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label><button type="button" class="hc-small" data-calendar-hazard-open>⚠ GM · nové nebezpečí</button><button type="button" class="hc-small" data-nav="encounter">⚔ Combat / Encounter</button></div></div>
  <p class="hc-hint">Činnost se pouze naplánuje do kalendáře; <strong>čas mění výhradně GM.</strong> Skupina cestuje ve stejné čtyřhodinové hlídce, používá společný doložený Trekking/Orienteering test svého průvodce, ale pro každou postavu provede a uloží její vlastní END SR. Únava se připíše až po uplynutí času GM. Časově splatný Healing či jiný test nelze provést před jeho řádným termínem – to je pravidlová podmínka, ne požadavek posunout hodiny při zadávání činnosti.</p><button type="submit">Naplánovat činnost vybraných postav (bez posunu času)</button></form></section>`;
- const activeActivities=activeHMKActivities(data.journal,clock).filter(row=>participants.some(c=>c.id===row.characterId));
+ const activeActivities=activeHMKActivities(data.journal,clock).filter(row=>participants.some(c=>c.id===row.characterId)||!!row.calendarActivityProof.plan.animalRestPolicy);
  const interruptionsHTML=`<section class="hc-calendar hc-expedition"><details><summary>Probíhající a naplánované činnosti · přerušení (${activeActivities.length})</summary><p class="hc-hint">GM může ukončit nedokončený spánek, odpočinek nebo cestu například při přepadení. Přerušení čas neposune a za neúplný interval nepřizná automatickou obnovu. Cesta připíše dokončené celé hodiny Double Time automaticky. Neúplné hodiny nebo neúplnou běžnou hlídku musí vyhodnotit GM číslem Weariness. Přerušení celé cestovní skupiny je společné.</p><div class="hc-event-list">${activeActivities.map(row=>{const a=row.calendarActivityProof;return `<div class="hc-event"><strong>${esc(a.name)} · ${esc(a.kind)}</strong> · ${esc(displayCampaignMinute(a.startMinute))}–${esc(displayCampaignMinute(a.endMinute))}<label class="hc-check"><input type="checkbox" data-calendar-activity-selected="${esc(row.id)}" aria-label="Vybrat činnost postavy ${esc(a.name)}"> Vybrat</label>${a.plan.kind==='travel'&&clock.minute>a.startMinute&&clock.minute<a.endMinute?
   `<label class="hc-hint">Dílčí Weariness GM (jen když nelze spočítat dokončené celé Double Time hodiny):
    <input type="number" min="0" max="${a.plan.accrual}" step="1" data-calendar-partial-weariness="${esc(row.id)}" placeholder="Rozhodnutí GM · 0 až ${a.plan.accrual}"></label>`:''}
@@ -1704,7 +1716,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const unknownFallNotice=fallUnknown.length?`<section class="panel hc-calendar-unresolved"><h3>Vyžaduje vyřešení · Falling Routine</h3>${fallUnknown.map(x=>`<div class="hc-unknown-rule-link"><strong>${esc(x.name)}</strong> · ${esc(x.description)}<p class="muted">GM doplní skutečnou výšku (0–5 ft bez Injury Sequence; nad 5 ft pokračuje Impact a Jumping/Acrobatics test). Původní Skill CF se neopakuje.</p><button type="button" class="hc-small" data-cal-unknown-fall="${esc(x.characterId)}" data-cal-unknown-source="${esc(x.sourceId)}">Otevřít správné hody a výšku ↗</button></div>`).join('')}</section>`:'';
  const overviewHTML=`${board}${unknownFallNotice}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
-  activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${interruptionsHTML}`:
+  activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${animalRestHTML}${interruptionsHTML}`:
   activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionLedgerHTML(participants)}${partyNutritionConditionsHTML(participants,clock)}${supplyHTML}<details class="hc-provision-rulebook"><summary>Podrobnosti: automatické následky nedostatku a zdravotní hody</summary>${nutritionHTML}${activityNeedsHTML}</details>`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
   activeCalendarSection==='craft'?`${herbalHTML}${alchemyHTML}`:
   `${membersHTML}${legacyOriginPanel}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
@@ -8498,6 +8510,25 @@ document.addEventListener('submit',e=>{
   if(mutate(()=>data.journal.push({...row,createdAt:stamp()})))
    notice='Odpočinek byl uložen do jediné kalendářové evidence. Účinek se započte po uplynutí intervalu při posunu času GM.';
  }catch(error){alert('Odpočinek nebyl naplánován: '+error.message)}
+},true);
+// Animal recovery shares the EXACT existing calendar/rest/Combat State authority.
+// It is a GM-confirmed analogy for species, never a background hourly healer.
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-trek-animal-rest]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(!data.campaignClock||combatInitiativeSequence)throw Error('Odpočinek zvířete vyžaduje aktivní kalendář mimo boj.');
+  const fd=new FormData(form),animalId=String(fd.get('animalId')||''),kind=String(fd.get('kind')||'');
+  const allowed=eligibleRestingAnimals({characters:data.characters,journal:data.journal,clock:data.campaignClock});
+  const actor=allowed.find(c=>c.id===animalId);
+  if(!actor)throw Error('Zvíře není ověřenou součástí této kampaně.');
+  const plan=planAnimalRest({actor,kind,minute:data.campaignClock.minute,
+   gmConfirmed:fd.get('gmConfirmed')==='yes',claims:actor.hmk?.expedition?.claims||{}});
+  const row=scheduleHMKActivity({journal:data.journal,clock:data.campaignClock,characterId:actor.id,
+   name:actor.name||actor.id,kind,plan,id:uuid(),origin:'gm-confirmed-animal-analogy'});
+  if(mutate(()=>data.journal.push({...row,createdAt:stamp()})))
+   notice='Odpočinek zvířete byl naplánován v původní kalendářové evidenci; Combat State se změní po dokončení celého intervalu.';
+ }catch(err){alert('Odpočinek zvířete nebyl naplánován: '+err.message)}
 },true);
 // Selected co-located party members share conditions, not an evidence table.
 document.addEventListener('submit',e=>{
