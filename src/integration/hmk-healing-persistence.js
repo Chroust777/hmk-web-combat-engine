@@ -8,6 +8,9 @@ import {treatmentContract,canPerformTreatment,resolveTreatmentTable,treatmentRol
  severityFromInjuryLevel,permanentHealingImpairment,infectionInitialHR,infectionCourseEML,
  resolveInfectionCourse,infectionWeaknessFatigue} from '../rules/healing.js';
 import {validateCombatState,initialCombatState} from './persistent-combat-state.js';
+import {hmkHumanLocationSymbols,hmkAmputationAssessment,hmkInjuryMishaps} from './injury-special-hmk.js';
+import {calculateShockState,applyShockState,SHOCK_STATE} from '../rules/shock.js';
+import {treatmentDurationMinutes} from '../rules/healing.js';
 import {curativeHealingEvidence} from './hmk-herbal-healing-bridge.js';
 const int=(x,lo=0,hi=999999)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
 const requireRule=(ok,message)=>{if(!ok)throw Error(message);};
@@ -52,7 +55,7 @@ function setInfectionWeakness(s,w,next){const prior=w.healing?.infectionWeakness
  s.fatigue.otherWeakness+=next-prior;w.healing.infectionWeakness=next;
 }
 export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInjury,physicianML=null,physicianIndex=null,
- physicianRoll=null,dexSecondaryModifier=0,available=[],untreated=false,area=false,broadhead=false,gmConfirmed=false}={}){
+ physicianRoll=null,dexSecondaryModifier=0,available=[],untreated=false,area=false,broadhead=false,procedureTime=null,gmConfirmed=false}={}){
  const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId);verifyWoundDay(s,woundId,daySinceInjury);
  requireRule(gmConfirmed===true,'GM musí potvrdit podmínky léčení');
  requireRule(!s.wounds.some(x=>x.bleeding)&&!s.extendedShock,'HMK str.180: nejprve musí skončit veškeré krvácení a Extended Shock');
@@ -77,6 +80,15 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
   // bleeder even when an earlier healer's better SL retains the healing HR.
   // Procedural side effects belong to the individual attempt, not to the
   // winning HR table cell. No new dice, wound, or elapsed minutes are invented.
+  // Treatment time is factual campaign evidence, NEVER implicit elapsed time.
+  const requiredMinutes=treatmentDurationMinutes({treatment:c.treatment,injuryLevel:w.level});
+  if(procedureTime!==null){
+   requireRule(int(procedureTime.startMinute,0,1000000000)&&int(procedureTime.endMinute,0,1000000000)&&
+    procedureTime.endMinute>procedureTime.startMinute&&procedureTime.gmConfirmed===true&&
+    (procedureTime.endMinute-procedureTime.startMinute>=requiredMinutes||
+     (typeof procedureTime.varianceReason==='string'&&procedureTime.varianceReason.trim().length>=6)),
+    'Čas zákroku: doložte skutečný počátek/konec; kratší dobu než orientačních '+requiredMinutes+' minut musí GM zdůvodnit');
+  }
   const isFailed=sl===SL.F||sl===SL.CF;
   const surgeryBleeder=isFailed&&(c.treatment==='sur'||(c.treatment==='ext'&&w.severity==='G'));
   const projectileExtracted=c.treatment==='ext'&&w.impaled===true;
@@ -84,7 +96,7 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
    ({sur:30,ext:30,amp:1,set:15,cmp:15,wrm:120})[c.treatment]??null;
   const attempt={physicianIndex,physicianML,physicianRoll,rawEML:eml,sl,
    slName:Object.keys(SL).find(k=>SL[k]===sl),result:result.result,
-   day:daySinceInjury,treatmentMethod:c.treatment,procedureMinutes,
+   day:daySinceInjury,treatmentMethod:c.treatment,procedureMinutes,procedureTime:procedureTime?{...procedureTime}:null,
    surgeryBleeder,projectileExtracted};
   const treatments=[...previous,attempt];
   const winner=treatments.find(x=>x.sl===SL.CF)??treatments.slice().sort((a,b)=>b.sl-a.sl)[0];
@@ -104,9 +116,26 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
   if(c.treatment==='ext')w.impaled=false;
   track(s,{eventId,round,type:'injury-treatment',details:{woundId,daySinceInjury,
    physicianIndex,roll:physicianRoll,sl:attempt.slName,treatmentMethod:c.treatment,
-   procedureMinutes,projectileExtracted,surgeryBleeder,
+   procedureMinutes,procedureTime:procedureTime?{...procedureTime}:null,projectileExtracted,surgeryBleeder,
    bleedingAfterTreatment:!!w.bleeding,source:'HMK pp178,180'}});
   return {state:s,healed:w.healed===true,treatment:w.healing};
+ }
+ // HMK p178: G Frost on a non-amputatable body part has NO Treatment.
+ // This is a grim wound; do not materialize a fictional Edge result or HR.
+ if(aspectKey(w)==='frost'&&w.severity==='G'){
+  const site=String(w.location).toLowerCase();
+  const anatomical=hmkHumanLocationSymbols(site);
+  const eligible=['fa','face','ua','el','fo','ha','th','kn','ca','ft',
+   'upper arm','elbow','forearm','hand','thigh','knee','calf','foot'].includes(site);
+  requireRule(!eligible&&!!anatomical&&(w.bodyKind===undefined||w.bodyKind==='human'),
+   'Frost G: končetina / obličej vyžaduje samostatný Amputation Treatment, ne fiktivní CF z tabulky');
+  requireRule(untreated===true&&!w.healing?.treated,'Frost G mimo amputovatelné lokace nelze ošetřit běžným Treatment');
+  w.healing={...(w.healing??{}),treated:true,untreated:true,noMundaneHealing:true,
+   grimWound:true,nextGrimShockDay:Math.max(1,daySinceInjury+1),
+   nextHealingDay:null,healingRate:null,blockedReason:'grievous-frost-no-treatment'};
+  track(s,{eventId,round,type:'frost-grim-untreatable',details:{woundId,
+   daySinceInjury,location:w.location,source:'HMK pp178,180; no treatment for G Frost at this location'}});
+  return {state:s,healed:false,treatment:w.healing};
  }
  // Untreated has the treatment properties of CF (p180), but does not entail a fictitious CF roll.
  requireRule(!w.healing?.treated,'Treatment already confirmed');
@@ -126,12 +155,20 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
   untreatedBleeder,bleedingAfterTreatment:!!w.bleeding,source:'HMK pp178,180'}});
  return {state:s,healed:false,treatment:w.healing};
 }
-export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,herbalContext=null,gmConfirmed=false}={}){
+export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,herbalContext=null,historicalEvidence=null,gmConfirmed=false}={}){
  const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing;verifyWoundDay(s,woundId,daySinceInjury);
  requireRule(gmConfirmed===true&&h?.treated&&int(h.healingRate,1,6),'Rána nemá potvrzenou léčbu ani Healing Rate');
  requireRule(!h.noMundaneHealing&&!(w.bodyKind==='horse'&&['flg','hlg'].includes(w.location)&&h.healingRate<=2),
   'HMK str.354: HR koně po zlomenině nohy ≤2, bez esoteriky se rána nemůže hojit');
  requireRule(!s.wounds.some(x=>x.healing?.infected),'HMK str.181: jakákoli aktivní infekce přerušuje všechny Injury Healing Rolls');
+ if(historicalEvidence!==null){
+  requireRule(gmConfirmed===true&&historicalEvidence.gmConfirmed===true&&
+   int(historicalEvidence.recordedAtDay,daySinceInjury+1,100000)&&
+   historicalEvidence.noBonusConfirmed===true&&typeof historicalEvidence.origin==='string'&&historicalEvidence.origin.trim().length>=6&&
+   historicalEvidence.origin.trim().length<=500,
+   'Historický Healing Roll vyžaduje doložený původ původního d100, GM potvrzení a aktuální den');
+  requireRule(herbalContext===null,'Zpětný Healing Roll nesmí převzít dnešní bylinný bonus jako historický');
+ }
  requireRule(daySinceInjury===h.nextHealingDay,'Healing Roll je splatný přesně podle pětideního intervalu: den '+h.nextHealingDay);
  requireRule(int(roll,1,100),'Povinný skutečný d100');
  const herb=herbalContext?curativeHealingEvidence({...herbalContext,woundId}):{bonus:0,sourceIds:[]};
@@ -146,7 +183,7 @@ export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinc
   if(w.severity==='M'&&h.daysToMinor==null){h.daysToMinor=daySinceInjury;h.permanentImpairment=permanentHealingImpairment({daysToMinor:daySinceInjury,eligible:!!h.permanentEligible});}
  }
  if(!w.healed&&!result.infected)h.nextHealingDay=daySinceInjury+5;
- track(s,{eventId,round,type:'injury-healing-roll',details:{woundId,daySinceInjury,hb,hr:h.healingRate,rawEML,herbalBonus:herb.bonus,herbalSourceIds:herb.sourceIds,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:w.healed?'healed':w.severity+w.level,infected:!!result.infected}});
+ track(s,{eventId,round,type:'injury-healing-roll',details:{woundId,daySinceInjury,hb,hr:h.healingRate,rawEML,herbalBonus:herb.bonus,herbalSourceIds:herb.sourceIds,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:w.healed?'healed':w.severity+w.level,infected:!!result.infected,historicalEvidence:historicalEvidence?{...historicalEvidence,sourceDay:daySinceInjury}:null}});
  return {state:s,healed:!!w.healed,infected:!!h.infected,result};
 }
 /** HMK p181: Infection suspends ALL injury healing. The day index of an
@@ -239,4 +276,95 @@ export function applyConfirmedGrimWoundShock({state,round,eventId,woundId,daySin
  w.healing.nextGrimShockDay=daySinceInjury+1;
  track(s,{eventId,round,type:'grim-wound-shock',details:{woundId,daySinceInjury,locationShock,shockML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),index,newShock:s.shock}});
  return {state:s,shock:s.shock,index};
+}
+
+/** HMK pp178,180: G Frost treatment is AMP and ALWAYS produces a NEW Edge
+ * injury of level 2..5. No row can be committed until the complete physical
+ * Injury/Shock evidence is supplied. This is not a generic replay of combat. */
+export function applyConfirmedFrostAmputation({state,round,eventId,woundId,daySinceInjury,
+ physicianML,physicianIndex,physicianRoll,dexSecondaryModifier=0,
+ locationShock,shockML,shockRoll,amputationStrengthML=null,amputationRoll=null,
+ procedureTime=null,gmConfirmed=false}={}){
+ const s=begin(state,{round,eventId,daySinceInjury});const source=wound(s,woundId);
+ verifyWoundDay(s,woundId,daySinceInjury);
+ const symbols=hmkHumanLocationSymbols(source.location);
+ const limb=['ua','el','fo','ha','th','kn','ca','ft','upper arm','elbow','forearm','hand','thigh','knee','calf','foot'];
+ const site=String(source.location).toLowerCase();
+ requireRule(gmConfirmed===true&&source.bodyKind!=='horse'&&
+  ['frost'].includes(aspectKey(source))&&source.severity==='G'&&source.level>=4&&
+  !!symbols&&(source.bodyKind===undefined||source.bodyKind==='human')&&
+  (limb.includes(site)||['fa','face'].includes(site)),
+  'Frost G Amputation: ověřená lidská končetina nebo obličej (HMK str.178)');
+ requireRule(!s.extendedShock&&!s.wounds.some(x=>x.bleeding),
+  'Před zákrokem musí skončit Extended Shock a veškeré krvácení');
+ requireRule(!source.healing?.treated&& !s.wounds.some(x=>x.id!==source.id&&!x.healed&&
+  x.location===source.location&&['e','edge'].includes(aspectKey(x))),
+  'Frost amputace vyžaduje neošetřenou frost ránu; staré Edge zranění ve stejné lokaci vyžaduje samostatné Compound');
+ if(limb.includes(site))requireRule(['left','right'].includes(source.side),
+  'Amputace končetiny vyžaduje doloženou pravou nebo levou stranu');
+ requireRule(int(physicianIndex,0,20)&&int(physicianML,0,200)&&int(physicianRoll,1,100)&&
+  int(dexSecondaryModifier,-100,100)&&int(locationShock,0,10)&&
+  int(shockML,0,200)&&int(shockRoll,1,100),
+  'Amputace vyžaduje Physician Index/ML, d100, Location Shock a skutečný Shock d100');
+ if(procedureTime!==null)requireRule(procedureTime.gmConfirmed===true&&
+  int(procedureTime.startMinute,0,1000000000)&&int(procedureTime.endMinute,0,1000000000)&&
+  procedureTime.endMinute>=procedureTime.startMinute+1,'AMP vyžaduje doloženou minutu zákroku');
+ const eml=treatmentRollEMLFromInjury({physicianML,aspect:'frost',injuryLevel:source.level,
+  daysSinceInjury:daySinceInjury,dexSecondaryModifier});
+ const sl=successLevel(physicianRoll,eml);
+ const resolution=resolveTreatmentTable({aspect:'frost',injuryLevel:source.level,sl,physicianIndex});
+ const effect=resolution.result;
+ requireRule(effect.kind==='edge-injury'&&int(effect.injuryLevel,2,5),
+  'Frost amputace musí vytvořit fyzické Edge zranění dle tabulky s.180');
+ const severity=effect.injuryLevel>=4?'G':'S';
+ let amp=null;
+ if(effect.injuryLevel===5&&symbols.triangle!==null){
+  amp=hmkAmputationAssessment({location:source.location,aspect:'e',level:5,severity:'G',
+   strengthML:amputationStrengthML,roll:amputationRoll,isFolk:true});
+ }
+ const fatigue=s.fatigue.windedness+s.fatigue.weariness+s.fatigue.otherWeakness+s.bloodLoss.weaknessFatigue;
+ const shockEML=shockML-fatigue-(amp?.shockTestModifier===-20?20:0);
+ const shockSL=successLevel(shockRoll,shockEML);
+ const impact=calculateShockState({locationShock,injuryShock:effect.injuryLevel,shockSL});
+ const names={none:'NONE',stunned:'STN',incapacitated:'INC',unconscious:'UNC',killed:'KIA'};
+ const next=names[applyShockState(SHOCK_STATE[s.shock],impact.state)];
+ requireRule(!!next,'Neznámý Shock Carryover po Amputation Treatment');
+ const bleed=!!effect.bleeding||amp?.forceBleeder===true;
+ const edgeWound={id:'wound:'+eventId,location:source.location,severity,level:effect.injuryLevel,aspect:'e',
+  bleeding:bleed,nextAdvanceRound:bleed&&next!=='KIA'?round+60:null,
+  recordedRound:round,originEventId:eventId,bodyKind:'human',side:source.side??null,
+  shockSL:Object.keys(SL).find(x=>SL[x]===shockSL),moralePending:severity==='S'||severity==='G',
+  // The AMP procedure itself removes the frost-affected limb/feature,
+  // irrespective of the new Edge injury's severity or its later healing.
+  amputation:{severed:true,viaTreatment:true,sourceFrostWoundId:source.id,
+   triangleModifier:symbols.triangle,sl:amp?.slName??null,
+   roll:amp?.roll??null,strengthML:amp?.strengthML??null,
+   shockTestModifier:amp?.shockTestModifier??0},
+  fromFrostWoundId:source.id};
+ // The excised frost-affected part is no longer treated as a separately
+ // healing physical wound; the newly inflicted Edge wound MUST be healed.
+ source.healed=true;source.bleeding=false;source.nextAdvanceRound=null;
+ source.healing={...(source.healing??{}),treated:true,frostAmputated:true,healedDay:daySinceInjury,
+  amputationResult:edgeWound.id,physicianIndex,physicianRoll,physicianEML:eml};
+ s.wounds.push(edgeWound);
+ const originalShock=s.shock;
+ if(next!==originalShock||amp?.dead)s.shockOriginRound=round;
+ s.shock=amp?.dead?'KIA':next;
+ if(['INC','UNC'].includes(s.shock))s.posture.prone=true;
+ if(s.shock==='KIA'){
+  s.extendedShock=null;s.coma=null;s.shockFollowup=null;
+  for(const w of s.wounds)w.nextAdvanceRound=null;
+ }else if(s.shock!==originalShock&&['STN','INC','UNC'].includes(s.shock)){
+  s.shockFollowup={kind:s.shock,originRound:round,dueRound:round+(s.shock==='UNC'?120:1),
+   phase:s.shock==='UNC'?'after-ten-minutes':'end-next-turn',timelineId:s.encounterTimelineId??null};
+ }
+ s.mishaps??=[];
+ for(const kind of hmkInjuryMishaps(edgeWound.location,edgeWound.severity,'human'))
+  s.mishaps.push({id:`mishap:${eventId}:${kind}`,woundId:edgeWound.id,kind,resolved:false});
+ track(s,{eventId,round,type:'frost-amputation-treatment',details:{woundId:source.id,newWoundId:edgeWound.id,
+  daySinceInjury,physicianML,physicianIndex,physicianRoll,eml,sl:Object.keys(SL).find(x=>SL[x]===sl),
+  edgeLevel:edgeWound.level,bleeding:edgeWound.bleeding,locationShock,shockML,shockRoll,shockEML,
+  shockSL:edgeWound.shockSL,shock:s.shock,amputation:amp,procedureMinutes:1,
+  procedureTime:procedureTime?{...procedureTime}:null,source:'HMK pp178,180,168–169'}});
+ return {state:s,edgeWound,shock:s.shock};
 }
