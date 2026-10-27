@@ -1,0 +1,42 @@
+'use strict';
+const assert=require('node:assert/strict');
+(async()=>{
+ const {fishingGearDue,commitFishingGear}=await import('../src/integration/hmk-fishing-cf-gear-538.js');
+ let i=0;const newid=()=>`fishing-538-${++i}`;
+ const actor={id:'A',name:'Fisher'};
+ const item={id:'hook',characterId:'A',quantity:1,slot:'carried',sourceItemId:'cat-hook',snapshot:{id:'cat-hook',name:'Hook and line',category:'other'},condition:'intact'};
+ const source={id:'first',characterId:'A',calendarCampaignId:'camp',campaignMinute:240,skillTestProof:{type:'secondary-mastery-value-test',skill:'Fishing',actorId:'A',result:{level:'CF',roll:90}}};
+ const follow={id:'follow',characterId:'A',calendarCampaignId:'camp',campaignMinute:240,skillTestProof:{type:'critical-followup',originId:'first',actorId:'A',skill:'Fishing',activity:'fishing-sv',technique:'Dexterity',result:{level:'F',roll:91,eml:45}}};
+ const initial=()=>({characters:[actor],inventory:[structuredClone(item)],journal:[structuredClone(source),structuredClone(follow)],campaignClock:{campaignId:'camp',minute:240,characterIds:['A']}});
+ const opts={sourceId:'follow',actorId:'A',itemId:'hook',outcome:'lost',reason:'hook washed away',eventId:newid(),dispositionId:newid(),createdAt:'2026-10-27T18:30:00Z',confirmedByGM:true};
+ const root=initial();assert.equal(fishingGearDue(root.journal,follow),true);
+ assert.throws(()=>commitFishingGear(root,{...opts,itemId:'unknown'}));
+ assert.throws(()=>commitFishingGear(root,{...opts,confirmedByGM:false}));
+ assert.throws(()=>commitFishingGear({...root,campaignClock:{...root.campaignClock,campaignId:'other'}},opts));
+ assert.throws(()=>commitFishingGear(root,{...opts,reason:''}));
+ const lost=commitFishingGear(root,opts);
+ assert.equal(root.inventory.length,1,'immutable input');
+ assert.equal(lost.inventory.length,0,'physical loss');
+ assert.equal(lost.journal.length,4,'inventory loss plus linked skill receipt');
+ assert.equal(lost.journal.at(-1).skillTestProof.outcome,'lost');
+ assert.equal(lost.journal.at(-1).calendarCampaignId,'camp');
+ assert.equal(fishingGearDue(JSON.parse(JSON.stringify(lost.journal)),follow),false);
+ assert.throws(()=>commitFishingGear(lost,opts),'duplicate');
+ const damaged=commitFishingGear(initial(),{...opts,outcome:'damaged',eventId:newid(),dispositionId:newid()});
+ assert.equal(damaged.inventory.length,1);assert.match(damaged.inventory[0].condition,/poškozeno/);
+ assert.equal(damaged.journal.length,3);assert.equal(damaged.journal.at(-1).skillTestProof.outcome,'damaged');
+ assert.equal(damaged.inventory[0].currentWQ,undefined,'no fabricated WQ');
+ for(const level of ['S','CS']){
+  const safe=initial();safe.journal[1].skillTestProof.result.level=level;
+  assert.equal(fishingGearDue(safe.journal,safe.journal[1]),false);
+  assert.throws(()=>commitFishingGear(safe,opts));
+ }
+ const tamper=initial();tamper.journal[0].skillTestProof.result.level='S';assert.throws(()=>commitFishingGear(tamper,opts));
+ const opposition=initial();opposition.journal[0].skillTestProof={type:'opposed-success-test',skills:['Awareness','Fishing'],actorId:'OTHER',opponentId:'A',a:{level:'S',roll:24},b:{level:'CF',roll:90}};
+ opposition.journal[1].skillTestProof.side='B';
+ const opponentProof=commitFishingGear(opposition,{...opts,outcome:'damaged',eventId:newid(),dispositionId:newid()});
+ assert.equal(opponentProof.journal.at(-1).skillTestProof.actorId,'A','defender keeps own inventory and receipt');
+ const chest=initial();chest.inventory[0].slot='chest';assert.throws(()=>commitFishingGear(chest,opts));
+ const stock=initial();stock.journal.push({id:'stock',calendarInventoryRationStock:{itemId:'hook'}});assert.throws(()=>commitFishingGear(stock,opts));
+ console.log('PASS Fishing CF p71: F loss/damage, CF scope, source, calendar, inventory receipts, duplicates, protections.');
+})();

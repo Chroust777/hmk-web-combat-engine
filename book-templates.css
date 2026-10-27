@@ -5083,3 +5083,17 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
   background-position:left top,left top,left top!important;
   background-attachment:scroll,scroll,scroll!important;
 }
+
+/* v93.538 — required Skill Tests match the Character Creation error cue. */
+.content-sheet .folio-chapter-content .hsk-required-invalid,
+.content-sheet .folio-chapter-content .hsk-required-invalid:focus {border:2px solid #b62f26!important;background:#fff0df!important;outline:2px solid #d34b2f!important;outline-offset:2px!important;}
+.content-sheet .folio-chapter-content .hsk-required-invalid-label {background:rgba(210,61,46,.12)!important;box-shadow:inset 3px 0 #ae3425!important;}
+
+/* Invalid mandatory values in all activities (Creation keeps its own cue). */
+.content-sheet .hsk-required-invalid, .content-sheet .hsk-required-invalid:focus,
+.editor-dialog .hsk-required-invalid, .editor-dialog .hsk-required-invalid:focus {
+ border:2px solid #b62f26!important;background:#fff0df!important;outline:2px solid #d34b2f!important;outline-offset:2px!important;
+}
+.content-sheet .hsk-required-invalid-label, .editor-dialog .hsk-required-invalid-label {
+ background:rgba(210,61,46,.12)!important;box-shadow:inset 3px 0 #ae3425!important;
+}

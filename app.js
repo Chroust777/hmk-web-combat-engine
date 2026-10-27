@@ -47,6 +47,7 @@ import {automaticCriticalFailure,classifySkillConsequence,skillConsequenceProof,
 import {applyInventoryItemEdit,transferInventoryItem} from './src/integration/hmk-inventory-edit.js';
 import {previewOptimalOutfit,applyOptimalOutfit,previewUndressOutfit,undressOutfit} from './src/integration/hmk-outfit-optimizer.js';
 import {recordInventoryDisposition,validateInventoryDispositionJournal,assertInventoryDispositionAppendOnly} from './src/integration/hmk-inventory-disposition.js';
+import {fishingGearDue,commitFishingGear} from './src/integration/hmk-fishing-cf-gear-538.js';
 import {moveInventoryChest,chestRows,validateChestTransferJournal,assertChestTransferAppendOnly} from './src/integration/hmk-inventory-chest.js';
 import {applyInventoryBatch,previewChestOutfit,applyChestOutfit} from './src/integration/hmk-inventory-batch-522.js';
 import {applyInventorySale} from './src/integration/hmk-inventory-sale-523.js';
@@ -260,7 +261,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.537';
+const APP_VERSION='93.538';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6811,10 +6812,27 @@ function hskClimbingFallForm(entry){
  <button type="submit">Vyhodnotit a trvale zapsat všechna zranění po pádu</button>
  <output class="hsk-followup-output" role="status" aria-live="polite"></output></form></div>`;
 }
+function hskFishingGearForm(entry){
+ if(!fishingGearDue(data.journal,entry))return '';
+ const p=entry.skillTestProof,actor=character(p.actorId);if(!actor)return '';
+ const available=data.inventory.filter(x=>x.characterId===actor.id&&x.slot!=='chest'&&x.quantity===1&&
+  !data.journal.some(j=>j.calendarInventoryRationStock?.itemId===x.id||j.calendarInventoryWaterFill?.itemId===x.id));
+ return `<form class="hsk-climb-fall hsk-required-followup" data-skill-fishing-gear>
+ <input type="hidden" name="sourceId" value="${esc(entry.id)}">
+ <h4>Fishing CF · ${esc(p.result.level)} → ztráta/poškození výbavy (HMK s. 71)</h4>
+ <p>Následný ${esc(p.technique||'Dexterity/Agility')} d100 ${esc(p.result.roll)} / EML ${esc(p.result.eml)} skončil ${esc(p.result.level)}. GM určí skutečně zasažený kus. Při CF navíc následuje samostatná Injury Sequence d10e.</p>
+ <div class="field-grid"><label>Poškozený nebo ztracený kus<select name="itemId" required><option value="">— vyberte konkrétní předmět —</option>${available.map(i=>`<option value="${esc(i.id)}">${esc(i.snapshot.name)}</option>`).join('')}</select></label>
+ <label>Materiální následek<select name="outcome" required><option value="">— vyberte —</option><option value="lost">Ztracen / vyřazen</option><option value="damaged">Poškozen / ponechán</option></select></label>
+ <label>Skutečný druh poškození / okolnosti ztráty<input name="reason" maxlength="240" minlength="2" required placeholder="GM popíše událost"></label></div>
+ <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje předmět a fyzický následek</label>
+ <p class="tiny">HMK neurčuje konkrétní WQ nebo AV postih: poškození je zaznamenáno jako stav inventárního kusu, mechanický postih musí potvrdit GM.</p>
+ <button type="submit">Zapsat materiální následek Fishing CF</button><output role="status" aria-live="polite"></output></form>`;
+}
 function hskSkillPhysicalImpactForm(entry){
  const proof=entry.skillTestProof;
  if(proof?.type!=='critical-followup')return '';
  const fishing=proof.skill==='Fishing'&&proof.activity==='fishing-sv'&&proof.result?.level==='CF';
+ if(fishing&&fishingGearDue(data.journal,entry))return '';
  const survival=proof.skill==='Survival'&&proof.activity==='trek-survival-hazard';
  if(!fishing&&!survival)return '';
  if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===entry.id))return '';
@@ -6958,7 +6976,7 @@ function hskPendingSkillPhysicalConsequences(actorId){
   (x.characterId===actorId||x.skillTestProof.opponentId===actorId)&&
   !['critical-followup','climbing-falling','skill-physical-consequence','special-secondary-roll'].includes(x.skillTestProof.type));
  const originalForms=unresolved.map(x=>hskCriticalNextHTML(x.id,x.skillTestProof,{actorId})).join('');
- const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskSkillPhysicalImpactForm(x)).join('')+data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
+ const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskFishingGearForm(x)+hskSkillPhysicalImpactForm(x)).join('')+data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
  return html?'<section class="panel wide"><h3>Čekající pravidlové následky Skill Tests</h3><p class="muted">Nevyřešené kritické hody jsou dostupné i po obnovení stránky; původní hod se znovu nehází.</p>'+html+'</section>':'';
 }
 let pendingCalendarGMTest=null;
@@ -7192,8 +7210,23 @@ document.addEventListener('submit',event=>{
   }))throw Error('Navazující záznam nebyl potvrzen');
   const restoredSlot=proof.type==='secondary-mastery-value-test'?'hsk-result-value':proof.type==='assistance-success-test'?'hsk-result-assistance':'hsk-result-secondary';
   const refreshed=document.getElementById(restoredSlot);
-  if(refreshed){const committed=data.journal.find(x=>x.skillTestProof?.type==='critical-followup'&&x.skillTestProof.originId===originId&&x.skillTestProof.side===side);refreshed.innerHTML=hskResultRichHTML(proof,original.body)+'<section class="hsk-verdict-section hsk-critical-resolved"><h4>Následný hod · uložený výsledek</h4><p>'+esc(body).replaceAll('\n','<br>')+'</p></section>'+(committed?hskClimbingFallForm(committed)+hskSkillPhysicalImpactForm(committed):'');}
+  if(refreshed){const committed=data.journal.find(x=>x.skillTestProof?.type==='critical-followup'&&x.skillTestProof.originId===originId&&x.skillTestProof.side===side);refreshed.innerHTML=hskResultRichHTML(proof,original.body)+'<section class="hsk-verdict-section hsk-critical-resolved"><h4>Následný hod · uložený výsledek</h4><p>'+esc(body).replaceAll('\n','<br>')+'</p></section>'+(committed?hskClimbingFallForm(committed)+hskFishingGearForm(committed)+hskSkillPhysicalImpactForm(committed):'');}
  }catch(error){output.textContent='Následek nebyl uložen: '+error.message;}
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-skill-fishing-gear]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  const val=n=>form.elements.namedItem(n)?.value?.trim()||'';
+  const source=data.journal.find(x=>x.id===val('sourceId'));
+  if(!source||source.skillTestProof?.actorId!==selected)throw Error('Následek nepatří otevřené postavě');
+  for(const n of ['itemId','outcome','reason'])if(!val(n)){hskHighlightRequired(form,n,'Vyplňte nebo vyberte povinnou hodnotu.');return;}
+  if(!form.elements.namedItem('gmConfirmed').checked){hskHighlightRequired(form,'gmConfirmed','GM musí potvrdit výsledek.');return;}
+  const updated=commitFishingGear(data,{sourceId:source.id,actorId:selected,itemId:val('itemId'),outcome:val('outcome'),
+   reason:val('reason'),confirmedByGM:true,eventId:uuid(),dispositionId:uuid(),createdAt:stamp()});
+  if(!mutate(()=>{data.inventory=updated.inventory;data.journal=updated.journal;}))throw Error('Zápis se nepodařilo uložit');
+  render();
+ }catch(err){if(out)out.textContent='Fishing materiální následek nebyl uložen: '+err.message;}
 },true);
 /** Inline falling ledger: show requirements before committing any physical result.
  * Previews operate exclusively on cloned Combat State and never generate dice.
@@ -7341,6 +7374,7 @@ document.addEventListener('submit',event=>{
     (kind==='fishing-cf'&&!(proof.skill==='Fishing'&&proof.activity==='fishing-sv'&&proof.result?.level==='CF'))||
     (kind==='survival-accident'&&!(proof.skill==='Survival'&&proof.activity==='trek-survival-hazard')))
    throw Error('Nedoložený původní CF a následný test');
+  if(kind==='fishing-cf'&&fishingGearDue(data.journal,origin))throw Error('Nejprve dokončete ztrátu nebo poškození konkrétní výbavy.');
   if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===sourceId))
    throw Error('Tato událost už byla potvrzena');
   if(combatInitiativeSequence)throw Error('Aktivní Initiative vyžaduje autoritativní bojové pořadí');
@@ -8343,6 +8377,27 @@ document.addEventListener('submit',event=>{
    diceAttempts:requiresD10?hskTieDiceAttempts.map(x=>({...x})):[],gmNarrative:narrative,result:decision,sourcePage:proof.comparison.persuasionTie?138:61},'hsk-result-secondary');
   hskTieDiceOrigin=null;hskTieDiceAttempts=[];
  }catch(err){if(slot)slot.textContent='Rozstřel nebyl uložen: '+err.message;else alert(err.message);}
+},true);
+function hskHighlightRequired(form,name,message){
+ const field=form?.elements?.namedItem(name);if(!field?.classList)return false;
+ for(const el of form.querySelectorAll('.hsk-required-invalid')){el.classList.remove('hsk-required-invalid');el.removeAttribute('aria-invalid');el.closest('label')?.classList.remove('hsk-required-invalid-label');}
+ field.classList.add('hsk-required-invalid');field.setAttribute('aria-invalid','true');
+ field.closest('label')?.classList.add('hsk-required-invalid-label');
+ (field.closest('label')||field).scrollIntoView({block:'center',behavior:'smooth'});
+ try{field.focus({preventScroll:true})}catch{}
+ const out=form.querySelector('output');if(out)out.textContent='Doplňte pole „'+(field.closest('label')?.textContent?.trim()||name)+'“. '+message;
+ return true;
+}
+for(const type of ['input','change'])document.addEventListener(type,event=>{
+ const field=event.target;if(field?.classList?.contains('hsk-required-invalid')){
+  field.classList.remove('hsk-required-invalid');field.removeAttribute('aria-invalid');
+  field.closest('label')?.classList.remove('hsk-required-invalid-label');
+ }
+},true);
+document.addEventListener('invalid',event=>{
+ const control=event.target,form=control?.form;
+ if(!form||form.matches?.('#creation-step-form'))return; // Character Creation has its own established red-field validation
+ if(!form.querySelector('.hsk-required-invalid'))hskHighlightRequired(form,control.name,'Povinný údaj chybí nebo je mimo povolený rozsah.');
 },true);
 document.addEventListener('invalid',event=>{
  const control=event.target,form=control?.form;
@@ -11361,7 +11416,7 @@ if(t.dataset.deleteLog){const row=data.journal.find(j=>j.id===t.dataset.deleteLo
 if(t.dataset.editItem){if(item(t.dataset.editItem)?.builtin)return alert('Vestavěné pravidlové definice nelze upravit.');editItem=t.dataset.editItem;const i=item(editItem);overlay=equipmentEditor('Upravit předmět',i);render();return}
 if(t.dataset.copyItem){const i=item(t.dataset.copyItem);if(i?.builtin)return alert('Vestavěné definice se nekopírují; vytvořte vlastní předmět.');mutate(()=>data.items.push({...structuredClone(i),id:uuid(),name:i.name+' (kopie)'}));return}
 if(t.dataset.deleteItem){if(item(t.dataset.deleteItem)?.builtin)return alert('Vestavěné pravidlové definice nelze odstranit.');if(ask('Odstranit předmět z knihovny? Existující inventáře zůstanou beze změny.'))mutate(()=>data.items=data.items.filter(x=>x.id!==t.dataset.deleteItem));return}
-const a=t.dataset.action;if(a==='open-generator-config'){overlay=generatorConfigDialog();render();return}if(a==='auto-random-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="hmk-random-name-title"><h2 id="hmk-random-name-title">Generovat náhodnou postavu</h2><p>Nejprve pojmenujte postavu. Potom proběhne automaticky všech 14 kroků HMK s uložením softwarových hodů.</p><form id="hmk-random-name-form"><label>Jméno postavy<input type="text" name="name" maxlength="120" minlength="1" required autocomplete="off" autofocus placeholder="Zadejte jméno postavy"></label><label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label><div class="actions"><button type="submit">⚄ Vygenerovat postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>';render();return}if(a==='auto-trait-character'){overlay=generatorConfigDialog();render();return}if(a==='new-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog"><h2>Nová postava · Character Creation</h2><p>Nejdřív zadáte jméno. Potom vás průvodce provede čtrnácti kroky HMK v1.2, vždy pouze jedním aktuálním krokem.</p><form id="creation-new-form"><label>Jméno postavy<input name="name" required maxlength="120"></label><label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label><button type="submit">Založit rozpracovanou postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></form></section></div>';render()}if(a==='creation-open'){if(combatInitiativeSequence)return alert('Edit Character Creation není během aktivní Initiative povolen.');if(!selected||!character(selected))return;view='creation';overlay=null;render();return}if(a==='new-item'){editItem=null;category=({melee:'weapon',ranged:'weapon',armour:'armor',shields:'shield',other:'other'})[libraryTab]||'other';overlay=equipmentEditor('Nový předmět',{category});render()}if(a==='cancel-editor'){overlay=null;render()}if(a==='go-characters'){view='characters';query='';render()}if(a==='export'){if(storageReadOnly){alert('Původní data se nepodařilo načíst. Použijte nouzovou kopii původního úložiště, nikoliv standardní zálohu.');return}const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`hmk-ledger-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),5000)}
+const a=t.dataset.action;if(a==='open-generator-config'){overlay=generatorConfigDialog();render();const name=document.querySelector('#hmk-generator-config [name="name"]');if(name){name.value='';name.setAttribute('autocomplete','new-password');}return}if(a==='auto-random-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="hmk-random-name-title"><h2 id="hmk-random-name-title">Generovat náhodnou postavu</h2><p>Nejprve pojmenujte postavu. Potom proběhne automaticky všech 14 kroků HMK s uložením softwarových hodů.</p><form id="hmk-random-name-form"><label>Jméno postavy<input type="text" name="name" maxlength="120" minlength="1" required autocomplete="off" autofocus placeholder="Zadejte jméno postavy"></label><label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label><div class="actions"><button type="submit">⚄ Vygenerovat postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>';render();const name=document.querySelector('#hmk-random-name-form [name="name"]');if(name){name.value='';name.setAttribute('autocomplete','new-password');}return}if(a==='auto-trait-character'){overlay=generatorConfigDialog();render();return}if(a==='new-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog"><h2>Nová postava · Character Creation</h2><p>Nejdřív zadáte jméno. Potom vás průvodce provede čtrnácti kroky HMK v1.2, vždy pouze jedním aktuálním krokem.</p><form id="creation-new-form"><label>Jméno postavy<input name="name" required maxlength="120"></label><label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label><button type="submit">Založit rozpracovanou postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></form></section></div>';render();const name=document.querySelector('#creation-new-form [name="name"]');if(name){name.value='';name.setAttribute('autocomplete','new-password');}}if(a==='creation-open'){if(combatInitiativeSequence)return alert('Edit Character Creation není během aktivní Initiative povolen.');if(!selected||!character(selected))return;view='creation';overlay=null;render();return}if(a==='new-item'){editItem=null;category=({melee:'weapon',ranged:'weapon',armour:'armor',shields:'shield',other:'other'})[libraryTab]||'other';overlay=equipmentEditor('Nový předmět',{category});render()}if(a==='cancel-editor'){overlay=null;render()}if(a==='go-characters'){view='characters';query='';render()}if(a==='export'){if(storageReadOnly){alert('Původní data se nepodařilo načíst. Použijte nouzovou kopii původního úložiště, nikoliv standardní zálohu.');return}const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`hmk-ledger-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),5000)}
 });
 document.addEventListener('submit',e=>{
  if(e.target.id!=='special-strike-preview-form')return;
