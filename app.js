@@ -20,7 +20,7 @@ import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
-import {criticalActivities,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
+import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep} from './src/integration/hmk-climbing-fall-sequence.js';
 import {woundFromFall} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -38,7 +38,7 @@ import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEl
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES,specialSecondaryById,resolveSpecialSR} from './src/integration/hmk-special-secondary-routines.js';
 import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,validateSpecialEffectEvidence} from './src/integration/hmk-special-outcome-commit.js';
 import {applyTalismanBestowal,projectTalismanStatus,validateTalismanEvidence,activeShamanSkillModifier,reconcileTalismanPossession} from './src/integration/hmk-shaman-talisman-state.js';
-import {HMK_OPPOSED_ACTIONS} from './src/integration/hmk-opposed-skill-pairs.js';
+import {HMK_OPPOSED_ACTIONS,opposedActionOptions,opposedPairIsPrinted} from './src/integration/hmk-opposed-skill-pairs.js';
 import {skillNarrativeSolo,skillNarrativeOpposed,skillNarrativeTiebreak} from './src/integration/hmk-skill-narrative.js';
 import {automaticSkillContext} from './src/integration/hmk-skill-auto-context.js';
 import {resolveSkillConditions,skillConditionAvailability} from './src/integration/hmk-skill-context.js';
@@ -258,7 +258,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.530';
+const APP_VERSION='93.535';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6735,7 +6735,7 @@ function hskResultRichHTML(proof,body){
   if(b)html+=hskVerdictSide('Protistrana',opponent?.name,b,proof.secondaryRollResultB,proof.emlRangeB);
   let winner='—',stars=0,summary='';
   if(comparison){winner=comparison.winner==='a'?actor?.name:comparison.winner==='b'?opponent?.name:comparison.bothFailed?'Nikdo (oba neuspěli)':'Remíza';stars=comparison.stars||0;
-   summary=comparison.tie?'Rozstřel lze použít jen při shodném S/S nebo CS/CS, pokud je potřeba rozhodnout vítěze.':'';}
+   summary=comparison.tie?(comparison.persuasionTie?'Persuasion · HMK str.138: rozhodnout remízu i při F/F či CF/CF, bez opakování původních d100.':'Rozstřel lze použít jen při shodném S/S nebo CS/CS, pokud je potřeba rozhodnout vítěze.'):'';}
   else if(type==='assistance-success-test'){winner=a?.level||'—';stars=a?.unopposedStars||0;summary='Bonus pomocníků se započítává do EML (nejvýše +10).';}
   else if(type.includes('value')){winner=a?.level||'—';stars=a?.svTier?.stars||0;summary='SV '+(a?.sv??'—')+' · '+(a?.svTier?.label||'');}
   else{winner=a?.level||'—';stars=a?.unopposedStars||0;}
@@ -6749,13 +6749,15 @@ function hskResultRichHTML(proof,body){
  if(proof.gmNarrative)html+='<section class="hsk-verdict-section hsk-verdict-narrative"><h4>Vyprávění pro GM</h4><p>'+esc(proof.gmNarrative)+'</p></section>';
  return html+'</div>';
 }
-function hskCriticalNextHTML(originalId,proof){
+function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false}={}){
  if(!originalId||!proof||proof.type==='critical-followup')return '';
  const sides=proof.a?[{id:proof.actorId,skill:proof.skills?.[0],result:proof.a,side:'A'},...(proof.b?[{id:proof.opponentId,skill:proof.skills?.[1],result:proof.b,side:'B'}]:[])]:[{id:proof.actorId,skill:proof.skill,result:proof.result,side:'A'}];
- return sides.filter(x=>x.result?.level==='CF'&&!x.result?.forcedCF&&criticalActivities(x.skill).length&&
+ return sides.filter(x=>['F','CF'].includes(x.result?.level)&&!x.result?.forcedCF&&
   !data.journal.some(j=>j.skillTestProof?.type==='critical-followup'&&j.skillTestProof.originId===originalId&&j.skillTestProof.side===x.side)).map(x=>{
-  const options=criticalActivities(x.skill).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+' · HMK str. '+a.page+'</option>').join('');
-  return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Kritický neúspěch · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Pravidlový následek nelze určit pouze podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+options+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací d100 (prázdné = automatický hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><button type="submit">Vyhodnotit pravidlový následek CF</button><output class="hsk-followup-output" role="status"></output></form>';
+  const options=skillFollowupActivities(x.skill,x.result.level);
+  if(!options.length){if(!includeAdvisory)return '';const note=skillFailureGuidance(x.skill,x.result.level);return '<p class="hsk-followup-advisory"><strong>'+esc(x.skill)+' '+esc(x.result.level)+' · HMK '+(note?.page||60)+':</strong> '+esc(note?.text||'Další test není doložen.')+'</p>';}
+  const choices=options.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+' · HMK str. '+a.page+'</option>').join('');
+  return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Pravidlový následek '+esc(x.result.level)+' · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Automatický další test není povinný jen podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+choices+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací d100 (prázdné = automatický hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><button type="submit">Vyhodnotit pravidlový následek '+esc(x.result.level)+'</button><output class="hsk-followup-output" role="status"></output></form>';
  }).join('');
 }
 function hskClimbingFallRow(i){
@@ -7030,7 +7032,7 @@ function recordSkillEvidence(title,body,proof,slotId=null){
  }
  const slot=slotId||((proof?.type==='success-value-specific'||proof?.type==='secondary-mastery-value-test')?'hsk-result-value':proof?.type==='assistance-success-test'?'hsk-result-assistance':'hsk-result-secondary');
  const output=document.getElementById(slot);if(output){
-  output.innerHTML=hskResultRichHTML(proof,body)+hskCriticalNextHTML(savedId,proof)+hskSkillEnvironmentFollowup({id:savedId,skillTestProof:proof})+hskSeriousAggravationForm({id:savedId,skillTestProof:proof})+hskTrekkingWeatherForm({id:savedId,skillTestProof:proof});
+  output.innerHTML=hskResultRichHTML(proof,body)+hskCriticalNextHTML(savedId,proof,{includeAdvisory:true})+hskSkillEnvironmentFollowup({id:savedId,skillTestProof:proof})+hskSeriousAggravationForm({id:savedId,skillTestProof:proof})+hskTrekkingWeatherForm({id:savedId,skillTestProof:proof});
   if(proof?.type==='special-secondary-roll'){
    const details=output.closest('details');if(details)details.open=true;
    const selection=details?.querySelector('[name="specialRoutine"]');
@@ -7041,6 +7043,12 @@ function recordSkillEvidence(title,body,proof,slotId=null){
  if(['success-value-test','success-value-specific','secondary-mastery-value-test'].includes(proof?.type)){
   const summary=document.getElementById('hsk-value-summary');if(summary){const r=proof.result;
    summary.textContent='SV '+r.sv+' · '+r.svTier.label+' · '+(r.svTier.stars?'★'.repeat(Math.min(10,r.svTier.stars)):'—')+' · Success '+r.level;}}
+ if(proof?.comparison?.persuasionTie&&view==='skills'){
+  // HMK p.138: all persuasion ties, even F/F or CF/CF, must be broken.
+  // The receipt has already been committed; re-render exposes the required
+  // tiebreak without changing or rerolling its original d100 evidence.
+  render();document.getElementById('skill-tiebreak-form')?.scrollIntoView({block:'nearest',behavior:'auto'});
+ }
 }
 
 // CF alternative choices come from the CURRENT actor sheet, not from a hard-coded
@@ -7115,7 +7123,7 @@ document.addEventListener('submit',event=>{
   const body='Následek '+skill+' · '+plan.label+' (HMK '+plan.page+')'+(result?'\n'+technique+' d100 '+result.roll+' / EML '+result.eml+' → '+result.level:'')+'\n'+explanation+(provisional?'\nVýsledek následného testu předběžný kvůli neověřenému zatížení.':'');
   const appended={type:'critical-followup',actorId:actor.id,originId,side,skill,activity:plan.id,page:plan.page,technique,result,effect:explanation,preliminaryArmour:provisional,originalRoll:old.roll,originalLevel:old.level};
   if(!mutate(()=>{
-   if(plan.id==='acro-gymnastics'){
+   if(plan.id==='acro-gymnastics'||(plan.id==='acro-gymnastics-failure'&&['F','CF'].includes(result?.level))){
     if(combatInitiativeSequence)throw Error('Během Initiative se Prone zapisuje výhradně přes bojový systém');
     const state=structuredClone(persistentStateOf(actor));
     state.posture.prone=true;
@@ -8005,7 +8013,7 @@ function hskScene(form){return {objective:String(form.elements.namedItem('gmObje
 function hskNarrativeBlock(narrative){return '\n\nPŘÍBĚH PRO GM (návrh, bez dalších automatických postihů):\n'+narrative;}
 function hskActionName(form,primary){
  const n=form.elements.namedItem('opposedAction')?.value;
- return n==null||n===''?'':(HMK_OPPOSED_ACTIONS[primary]||[])[Number(n)]?.[0]||'';
+ return n==null||n===''?'':opposedActionOptions(primary)[Number(n)]?.[0]||'';
 }
 function hskSigned(n){return n>=0?'+'+n:String(n);}
 function hskGMModifier(form,side){
@@ -8033,21 +8041,24 @@ function hskPreviewFor(form,person,field,side){
 }
 function hskRefreshOpposedAction(form){
  const field=form.elements.namedItem('opposedAction');if(!field)return;
- const name=form.elements.namedItem('primary')?.value||'', options=HMK_OPPOSED_ACTIONS[name]||[];
- const before=field.value;
- field.innerHTML='<option value="">— výběr GM / bez pravidlové dvojice —</option>'+options.map(([action,def],i)=>'<option value="'+i+'">'+esc(action)+' → '+esc(def)+'</option>').join('');
- if([...field.options].some(x=>x.value===before))field.value=before;
+ const name=form.elements.namedItem('primary')?.value||'',options=opposedActionOptions(name);
+ const samePrimary=form.dataset.hskOpposedPrimary===name,before=samePrimary?field.value:'';
+ form.dataset.hskOpposedPrimary=name;
+ field.innerHTML='<option value="">— jiná dvojice podle rozhodnutí GM —</option>'+options.map(([action,def,page],i)=>'<option value="'+i+'">'+esc(action)+' → '+esc(def)+(page?' · HMK '+page:'')+'</option>').join('');
+ if(samePrimary&&[...field.options].some(x=>x.value===before))field.value=before;
+ const guidance=form.querySelector('[data-opposed-rule-guidance]');
+ if(guidance)guidance.textContent=options.length?'Pravidlově doložené možnosti jsou nabídnuty. GM může zvolit jinou protidovednost podle skutečné situace.':'HMK pro tuto obecnou dovednost neurčuje univerzální protidovednost. GM výslovně zvolí dovednost obránce a situaci; žádný hod se nevymýšlí automaticky.';
 }
 function hskApplyOpposedAction(form){
  const primary=form.elements.namedItem('primary')?.value,action=form.elements.namedItem('opposedAction')?.value;
  if(action===''||action==null)return;
- const row=(HMK_OPPOSED_ACTIONS[primary]||[])[Number(action)];if(!row)return;
+ const row=opposedActionOptions(primary)[Number(action)];if(!row)return;
  const defender=form.elements.namedItem('opponentSkill');if(defender&&[...defender.options].some(x=>x.value===row[1]))defender.value=row[1];
 }
 function hskRebuildOpponent(form){
  const other=character(form.elements.namedItem('opponentId')?.value),wrap=form.querySelector('[data-opponent-skill-wrap]');
  if(!wrap||!other)return;
- const names=availableMasteries(other),opt=(name,withBlank)=>'<select name="'+name+'">'+(withBlank?'<option value="">— žádný —</option>':'')+names.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+' · ML '+x.ml+'</option>').join('')+'</select>';
+ const names=availableMasteries(other),opt=(name,withBlank)=>'<select name="'+name+'"><option value="">'+(withBlank?'— žádný —':'— vyberte protidovednost —')+'</option>'+names.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+' · ML '+x.ml+'</option>').join('')+'</select>';
  wrap.innerHTML=opt('opponentSkill',false);
  for(const name of ['defSecondary1','defSecondary2','defSecondaryRoll']){const el=form.elements.namedItem(name);if(!el)continue;el.outerHTML=opt(name,true);}
  hskApplyOpposedAction(form);
@@ -8166,10 +8177,10 @@ document.addEventListener('change',e=>{
  if(e.target.name==='opposed'){
   hskSyncDefenderFields(form);
   hskConfigureSR(form,'B');
-  if(e.target.checked){hskRefreshOpposedAction(form);hskApplyOpposedAction(form);}
+  if(e.target.checked){hskRefreshOpposedAction(form);hskRebuildOpponent(form);}
  }
  if(e.target.name==='opponentId'){hskRebuildOpponent(form);hskConfigureSR(form,'B');}
- if(e.target.name==='primary'&&form.id==='skill-secondary-form'){hskRefreshOpposedAction(form);hskApplyOpposedAction(form);hskConfigureSR(form,'A');}
+ if(e.target.name==='primary'&&form.id==='skill-secondary-form'){const f=form.elements.namedItem('opponentSkill');if(f)f.value='';hskRefreshOpposedAction(form);hskApplyOpposedAction(form);hskConfigureSR(form,'A');hskConfigureSR(form,'B');}
  if(e.target.name==='primary'&&form.id!=='skill-secondary-form')hskConfigureSR(form,'A');
  if(e.target.name==='srActivityA')hskApplySRSelection(form,'A');
  if(e.target.name==='srActivityB')hskApplySRSelection(form,'B');
@@ -8246,27 +8257,27 @@ document.addEventListener('submit',event=>{
   const saved=data.journal.find(x=>x.id===originId&&x.characterId===selected&&x.skillTestProof?.type==='opposed-success-test');
   if(!saved)throw Error('Původní Opposed Test nebyl nalezen v historii aktuální postavy.');
   const proof=saved.skillTestProof;
-  if(!proof?.comparison?.tie||!canResolveOpposedTie(proof.a,proof.b))throw Error('HMK str. 61: rozstřel jen při shodě úspěchů S/S nebo CS/CS.');
+  if(!proof?.comparison?.tie||!canResolveOpposedTie(proof.a,proof.b,{persuasion:!!proof.comparison.persuasionTie}))throw Error('HMK str.61/138: rozstřel jen při doložené remíze; F/F a CF/CF pouze u Persuasion.');
   if(data.journal.some(x=>x.skillTestProof?.type==='opposed-tiebreak'&&x.skillTestProof.originSkillTestId===originId))throw Error('Tato remíza již byla rozhodnuta.');
   const opponent=character(proof.opponentId);if(!opponent)throw Error('Protistrana již není dostupná.');
   if(hskTieDiceOrigin!==originId){hskTieDiceOrigin=originId;hskTieDiceAttempts=[];}
   const requiresD10=proof.a.roll===proof.b.roll&&proof.a.ml===proof.b.ml;
   const da=requiresD10?skillDie(form,'tieD10A',10):null;
   const db=requiresD10?skillDie(form,'tieD10B',10):null;
-  const decision=resolveOptionalOpposedTie(proof.a,proof.b,{d10A:da?.roll??null,d10B:db?.roll??null});
+  const decision=resolveOptionalOpposedTie(proof.a,proof.b,{d10A:da?.roll??null,d10B:db?.roll??null,persuasion:!!proof.comparison.persuasionTie});
   if(requiresD10)hskTieDiceAttempts.push({d10A:da.roll,d10B:db.roll,originA:da.origin,originB:db.origin});
   if(decision.requiresAnotherD10){if(slot)slot.textContent='D10 '+da.roll+' a '+db.roll+' se shodují. Obě strany musí hodit d10 znovu; původní d100 zůstává beze změny.';return;}
   const winner=decision.winner==='a'?character(selected):opponent;
   const methodText=decision.method==='higher-d100'?'vyšší původní d100':decision.method==='higher-ml'?'vyšší původní Primary ML':'dodatečné hody d10';
   const narrative=skillNarrativeTiebreak({winnerName:winner.name,method:decision.method,attackerName:character(selected).name,defenderName:opponent.name,primary:proof.skills?.[0]||'Skill'});
-  const body='Dobrovolný rozstřel · HMK str. 61\nPůvodní Opposed Test: '+saved.title+' ['+originId+']'+
+  const body=(proof.comparison.persuasionTie?'Povinný rozstřel Persuasion · HMK str. 138':'Dobrovolný rozstřel · HMK str. 61')+'\nPůvodní Opposed Test: '+saved.title+' ['+originId+']'+
    '\nPůvodní výsledky: '+proof.a.level+' / '+proof.b.level+'; d100 '+proof.a.roll+' / '+proof.b.roll+'; ML '+proof.a.ml+' / '+proof.b.ml+
    '\nRozhodlo: '+methodText+(requiresD10?' ('+hskTieDiceAttempts.map(x=>x.d10A+':'+x.d10B).join(', ')+')':'')+
    '\nVítěz: '+winner.name+' · Victory Stars: 1 ★'+hskNarrativeBlock(narrative);
   recordSkillEvidence('Opposed · rozstřel · '+(proof.skills?.[0]||'Skill Test'),body,{type:'opposed-tiebreak',actorId:selected,
    opponentId:proof.opponentId,originSkillTestId:originId,originalRolls:[proof.a.roll,proof.b.roll],originalMLs:[proof.a.ml,proof.b.ml],
    originalLevels:[proof.a.level,proof.b.level],method:decision.method,winnerId:winner.id,stars:1,sourcePage:61,
-   diceAttempts:requiresD10?hskTieDiceAttempts.map(x=>({...x})):[],gmNarrative:narrative,result:decision},'hsk-result-secondary');
+   diceAttempts:requiresD10?hskTieDiceAttempts.map(x=>({...x})):[],gmNarrative:narrative,result:decision,sourcePage:proof.comparison.persuasionTie?138:61},'hsk-result-secondary');
   hskTieDiceOrigin=null;hskTieDiceAttempts=[];
  }catch(err){if(slot)slot.textContent='Rozstřel nebyl uložen: '+err.message;else alert(err.message);}
 },true);
@@ -8324,16 +8335,21 @@ document.addEventListener('submit',event=>{
   const sv=form.id==='skill-value-form',opposed=form.id==='skill-secondary-form'&&form.elements.namedItem('opposed')?.checked;
   let body=hskResultText('A',a),b=null,comparison=null;
   if(opposed){
+   if(!form.elements.namedItem('opponentSkill')?.value)throw Error('U Opposed Testu vyberte dovednost protistrany; bez pravidlové dvojice je volba rozhodnutím GM.');
    const other=character(form.elements.namedItem('opponentId')?.value);
    if(!other||other.id===actor.id)throw Error('Vyberte jinou postavu jako protistranu');
    b=hskResolveSide({person:other,form,side:'B'});
-   comparison=resolveOpposedTests(a.result,b.result,{breakTie:false});
+   const persuasionAction=['Charm','Command','Discourse','Guile','Theatrics'].some(x=>a.info.primary===x||a.info.primary.startsWith(x+' ('));
+   comparison=resolveOpposedTests(a.result,b.result,{breakTie:false,persuasion:persuasionAction});
    const winner=comparison.winner==='a'?actor.name:comparison.winner==='b'?other.name:comparison.bothFailed?'Nikdo (oba testy neuspěly)':'Nikdo (remíza)';
    body+='\n\n'+hskResultText('B',b)+'\n\nVítěz: '+winner+' · Victory Stars: '+comparison.stars+' '+(comparison.stars?'★'.repeat(Math.min(10,comparison.stars)):'—')+
-     '\nRozstřel: dostupný jen při shodném S/S nebo CS/CS, pokud činnost vyžaduje vítěze.';
+     (comparison.persuasionTie?'\nPersuasion: HMK str.138 vyžaduje rozhodnout i neúspěšnou remízu F/F nebo CF/CF.':'\nRozstřel: dostupný jen při shodném S/S nebo CS/CS, pokud činnost vyžaduje vítěze.');
   }else if(sv){if(a.helpers.length)body+='\nAlchemy Assistance · '+a.helpers.map(x=>x.actor.name+' ML '+x.mastery.ml).join('; ')+' · bonus EML +'+a.result.assistance;body+='\n\nIndex Primary ML '+a.result.index+' + SL modifier '+({'CF':-2,'F':-1,'S':0,'CS':1}[a.result.level])+
     ' + předepsaný SR bonus '+(a.result.secondarySVBonus||0)+' = SV '+a.result.sv+' · '+a.result.svTier.label+' · '+a.result.svTier.stars+' SV ★ '+(a.result.svTier.stars?'★'.repeat(Math.min(10,a.result.svTier.stars)):'—')+(a.result.level==='CF'?'\nPozor: CF může podle konkrétní činnosti způsobit další následek bez ohledu na hodnotu SV.':'');
   }else body+='\nUnopposed Victory Stars: '+a.result.unopposedStars+' '+(a.result.unopposedStars?'★'.repeat(a.result.unopposedStars):'—');
+  const followA=skillFailureGuidance(a.info.primary,a.result.level),followB=b?skillFailureGuidance(b.info.primary,b.result.level):null;
+  if(followA)body+='\nGM pokračování A · HMK '+followA.page+': '+followA.text;
+  if(followB)body+='\nGM pokračování B · HMK '+followB.page+': '+followB.text;
   body+='\nNásledek A: '+skillConsequenceText(a.consequence)+(b?'\nNásledek B: '+skillConsequenceText(b.consequence):'')+
     skillPendingText(a.consequence.pending)+(b?skillPendingText(b.consequence.pending):'');
   const scene=hskScene(form),actionName=opposed?hskActionName(form,a.info.primary):'';
