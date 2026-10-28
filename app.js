@@ -284,7 +284,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.579';
+const APP_VERSION='93.580';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3693,6 +3693,32 @@ function withArmourAnnotations(entry){
 }
 // Rules definitions are bundled with the application, never written into localStorage.
 // Stable IDs are version-independent; user-owned items remain snapshots with independent WQ.
+// HMK p.122: one physical item definition, usable even without owning an animal.
+// Its inventory ID remains unchanged if later fitted to a particular animal.
+const STABLE_GEAR_HELP_580=Object.freeze({
+ 'Bit & bridle':'Udidlo a uzda k vedení a ovládání koně; nejde o nákladní postroj.',
+ 'Blanket, horse':'Koňská deka. Využití jako ochrany proti počasí vyžaduje skutečné ověření.',
+ 'Cart, 2-wheel':'Dvoukolejná kára; tažený náklad se počítá odděleně od hřbetu zvířete.',
+ 'Collar, horse':'Tažný chomout pro koně, součást správného zapřažení.',
+ 'Harness, horse':'Tažný postroj pro koně; sám o sobě nevytváří nosnost pro soumarský náklad.',
+ 'Harness, ox':'Tažný postroj pro vola; sám o sobě nevytváří nosnost pro soumarský náklad.',
+ 'Horseshoes, 4':'Sada čtyř podkov; kování nezpůsobuje automatické zvýšení Move.',
+ 'Pack harness':'Soumarský postroj; náklad nejvýše 20 % doložené hmotnosti vhodného zvířete.',
+ 'Saddle bags, 15 lb':'Sedlové brašny s nákladní kapacitou 15 lb; vlastní hmotnost se počítá zvlášť.',
+ 'Saddle, riding':'Jezdecké sedlo; jeho hmotnost se zahrnuje do zátěže zvířete.',
+ 'Saddle, war':'Válečné sedlo; zvláštní jezdecké účinky platí pouze při pravidlově správném použití.',
+ 'Sled':'Saně určené k tažení po sněhu; nejde o předmět nesený na hřbetě.',
+ 'Wagon, 4-wheel':'Čtyřkolový vůz pro vhodné tažné spřežení; náklad je oddělen od hřbetu.',
+ 'Wheel':'Náhradní kolo k vozidlu; samo o sobě není dopravním prostředkem.'
+});
+const STABLE_GEAR_CATALOG_580=Object.freeze(VEHICLES_TACK_P122.map(t=>deepFreeze({
+ id:'hmk:stable-gear:'+t.id,name:t.name,category:'other',builtin:true,
+ source:'HMK 1.2, p. 122 · Vehicles & Tack',description:STABLE_GEAR_HELP_580[t.name]||'Výstroj podle tabulky HMK str. 122.',
+ properties:{weightLb:t.weightLb,pricePence:t.priceD,skill:t.skill,
+  use:'Výstroj zvířete / vozidlo · HMK 122',stableTackId:t.id}
+})));
+function stableStatHelp580(k){return ({STR:'Strength: fyzická síla.',END:'Endurance: výdrž a odolnost.',AGL:'Agility: pohyblivost a reflexy.',PER:'Perception: vnímání a smysly.',AUR:'Aura: duchovní nadání.',WIL:'Will: síla vůle.',REA:'Reasoning: úsudek a paměť.',CRE:'Creativity: představivost.',Awareness:'Všímavost.',Scent:'Čich a stopování.',Stealth:'Nenápadný pohyb.',Spirit:'Duchovní dovednost.',Initiative:'Iniciativa a reakce v boji.'})[k]||k;}
+function stableGearDescription580(item){return STABLE_GEAR_HELP_580[item?.name]||'Předmět a jeho parametry podle HMK str. 122.';}
 const BUILTIN_ITEMS=Object.freeze([
  ...PRINTED_PROJECTILES_P108_110.map(x=>deepFreeze({...structuredClone(x),builtin:true})),
  ...PRINTED_MISSILE_WEAPONS_P109_110.map(x=>deepFreeze({...structuredClone(x),builtin:true})),
@@ -3704,6 +3730,7 @@ const BUILTIN_ITEMS=Object.freeze([
  ...HMK_SWORDS_P105.items.map((entry,index)=>deepFreeze({...structuredClone(entry),id:'hmk:swords:p105:'+String(index+1).padStart(2,'0'),builtin:true})),
  ...HMK_SHIELDS_P104.items.map((entry,index)=>deepFreeze({...structuredClone(entry),id:'hmk:shields:p104:'+String(index+1).padStart(2,'0'),builtin:true})),
  ...PRINTED_STARTER_GEAR_P120,
+ ...STABLE_GEAR_CATALOG_580,
  ...HMK_ARMOUR_ARTICLES_P118.map(withArmourAnnotations),
  ...HMK_ARMOUR_ARTICLES_P118_MORE.map(withArmourAnnotations)
 ]);
@@ -4218,10 +4245,11 @@ function stableHubAnimalHTML(a,campaignId){
  const encounters=encounterBeastHistory(data,campaignId).filter(x=>x.ownerAnimalId===a.id&&x.ownerId===a.ownerId);
  const last=encounters.at(-1),health=last?animalHealthProjection567(data.journal,campaignId,last.id):null;
  const training=data.journal.filter(j=>j.livestockTraining?.animalId===a.id&&j.calendarCampaignId===campaignId);
- const rows=(array,kind)=>array.map(e=>`<tr><td>${esc(kind!=='cargo'?VEHICLES_TACK_P122.find(t=>t.id===e.itemId)?.name||'Předmět':e.name)}</td><td>${e.weightLb} lb</td><td>${esc(e.reason)}</td><td>${dead?'—':`<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="${kind}-remove"><input type="hidden" name="entryId" value="${esc(e.entryId)}"><input type="hidden" name="reason" value="${kind==='tack'?'Sejmuto a vyřazeno ze stájového vybavení':kind==='vehicle'?'Vozidlo fyzicky vyřazeno ze stáje':'Náklad fyzicky vyložen ze zvířete'}"><button class="secondary hc-small">${kind==='tack'?'Sejmout / vyřadit':kind==='vehicle'?'Vyřadit vozidlo':'Vyložit'}</button></form>`}</td></tr>`).join('');
+ const rows=(array,kind)=>array.map(e=>`<tr><td>${esc(kind!=='cargo'?VEHICLES_TACK_P122.find(t=>t.id===e.itemId)?.name||'Předmět':e.name)}</td><td>${e.weightLb} lb</td><td>${esc(e.reason)}</td><td>${dead?'—':`<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="${e.inventoryId?'inventory-gear-detach':kind+'-remove'}"><input type="hidden" name="inventoryId" value="${esc(e.inventoryId||'')}"><input type="hidden" name="entryId" value="${esc(e.entryId)}"><input type="hidden" name="reason" value="${e.inventoryId?'Vrácení vlastněné výstroje do inventáře postavy':kind==='tack'?'Sejmuto a vyřazeno ze stájového vybavení':kind==='vehicle'?'Vozidlo fyzicky vyřazeno ze stáje':'Náklad fyzicky vyložen ze zvířete'}"><button class="secondary hc-small">${e.inventoryId?'Sundat do inventáře':kind==='tack'?'Sejmout / vyřadit':kind==='vehicle'?'Vyřadit vozidlo':'Vyložit'}</button></form>`}</td></tr>`).join('');
  const options=VEHICLES_TACK_P122.filter(x=>!['Wheel','Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(x.name));
  const z=stableAnimalZones575(data,campaignId,a,health);
  const trainingState=stableTraining575(data,campaignId,a);
+ const looseGear=data.inventory.filter(i=>i.characterId===a.ownerId&&['carried','none'].includes(i.slot)&&i.quantity===1&&VEHICLES_TACK_P122.some(t=>t.id===i.snapshot?.properties?.stableTackId&&t.name!=='Wheel'));
  const userItems=data.inventory.filter(i=>i.characterId===a.ownerId&&['carried','none'].includes(i.slot)&&
    Number.isSafeInteger(i.quantity)&&i.quantity>0&&Number.isFinite(i.snapshot?.properties?.weightLb)&&i.snapshot.properties.weightLb>0);
  const vesselLots=availablePhysicalWater(data.journal,campaignId,a.ownerId,data.campaignClock?.minute??0);
@@ -4229,10 +4257,11 @@ function stableHubAnimalHTML(a,campaignId){
  const family=verifiedLivestock(data,campaignId).filter(b=>b.id!==a.id&&b.spec?.breed);
  const activeVehicles=p.vehicles.filter(v=>['Cart, 2-wheel','Wagon, 4-wheel','Sled'].includes(VEHICLES_TACK_P122.find(x=>x.id===v.itemId)?.name));
  const statNames={str:'STR',end:'END',agl:'AGL',per:'PER',aur:'AUR',wil:'WIL',rea:'REA',cre:'CRE',aware:'Awareness',scent:'Scent',stealth:'Stealth',spirit:'Spirit',initiative:'Initiative'};
+ const statHelp={str:'Strength (STR): tělesná síla; upravuje zatížení.',end:'Endurance (END): odolnost a výdrž.',agl:'Agility (AGL): pohyblivost a reflexy.',per:'Perception (PER): vnímání a smysly.',aur:'Aura (AUR): duchovní a magické nadání.',wil:'Will (WIL): vůle a odhodlání.',rea:'Reasoning (REA): úsudek a paměť.',cre:'Creativity (CRE): představivost.',aware:'Awareness: všímavost a rozpoznání nebezpečí.',scent:'Scent: stopování a vnímání pachů.',stealth:'Stealth: skrytý pohyb.',spirit:'Spirit: odolnost a práce s duchovní silou.',initiative:'Initiative: reakce v boji.'};
  return `<details class="panel hmk-stable-animal-card" ${dead?'':'open'}><summary><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ${esc(character(a.ownerId)?.name||'—')} · ${dead?(p.exit.type==='sale'?'PRODÁNO':'OPUŠTĚNO'):'AKTIVNÍ'}</summary>
  <div class="hc-fields">
  <section class="hmk-stable-block"><h4>Identita · parametry · historie</h4><p><strong>Trvalé ID:</strong> <code>${esc(a.id)}</code> · HMK 122, ${esc(a.spec.bestiaryPage??'355')} · ${a.mode==='buy'?`zakoupeno ${a.priceD}d`:'převzato bezplatně'} · limit výcviku ${a.maxMB} MB</p>
- <div class="catalog-scroll"><table class="catalog-spec"><tbody><tr><th>Velikost / váha</th><td>${esc(a.spec.size??'—')} / ${a.spec.bodyWeightLb??'neznámá'} lb</td><th>Move</th><td>${a.spec.move??'neznámý'} ${last?'(před následky; ověřte zdraví)':''}</td></tr>${Object.entries(statNames).map(([k,label],i,all)=>`<tr><th>${esc(label)}</th><td>${a.spec[k]??'—'}</td>${i===0?'<th>Útoky</th><td rowspan="'+all.length+'">'+esc(a.spec.attack||'Viz profil bestiáře')+'</td>':''}</tr>`).join('')}</tbody></table></div>
+ <div class="catalog-scroll"><table class="catalog-spec"><tbody><tr><th>Velikost / váha</th><td>${esc(a.spec.size??'—')} / ${a.spec.bodyWeightLb??'neznámá'} lb</td><th>Move</th><td>${a.spec.move??'neznámý'} ${last?'(před následky; ověřte zdraví)':''}</td></tr>${Object.entries(statNames).map(([k,label],i,all)=>`<tr><th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="${esc(statHelp[k])}">${esc(label)} ⓘ</th><td>${a.spec[k]??'—'}</td>${i===0?'<th>Útoky</th><td rowspan="'+all.length+'">'+esc(a.spec.attack||'Viz profil bestiáře')+'</td>':''}</tr>`).join('')}</tbody></table></div>
  <div class="hmk-stable-zones"><h4>Mapa anatomických zón · HMK ${z.sourcePage??'—'}</h4>
  ${z.table?`<p>Zásahová tabulka <b>${esc(z.table.toUpperCase())}</b> · ZN 1–${z.maxZN}. Následují všechny lokality druhu; označení levé/pravé strany je závislé na skutečném Location Die. Zdravotní doklad se vede pro stejné zvíře napříč encountery.</p>
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Lokace</th><th>ZN / LN</th><th>SHK</th><th>Rány v historii</th><th>Stav nyní</th></tr></thead><tbody>
@@ -4241,7 +4270,7 @@ function stableHubAnimalHTML(a,campaignId){
  <p><strong>Shock:</strong> ${esc(health?.shock??'neexistuje zdravotní doklad')} · ${health?.wounds?.filter(w=>!w.healed).length??0} aktivních ran. ${health?'Uzdravené rány a amputace zůstávají v historii.':'Bez encounteru zatím nelze potvrdit, že zvíře není zraněno.'}</p></div>
  <p>Výcvik: ${training.length} identitou propojených dokladů · encountery: ${encounters.length} · ${health?`aktivní rány ${health.wounds.filter(w=>!w.healed).length} · Shock ${esc(health.shock)} · Blood loss ${health.bloodLoss.bp} BP`:'žádný doložený zdravotní stav (nikoli automaticky zdravé zvíře)'}</p>
  ${last?`<p>Poslední encounter: ${esc(last.name)} · ID ${esc(last.id)}. Zdravotní historie pokračuje pod trvalou identitou.</p>`:''}
- <div class="actions"><button type="button" class="secondary hc-small" data-hmk-bestiary-open>Otevřít Bestiář / boj / zranění</button><button type="button" class="secondary hc-small" data-hmk-stable-go-travel>Otevřít cestovní hlídku</button></div></section>
+ <div class="actions"><button type="button" class="secondary hc-small" data-hmk-stable-go-travel>Otevřít cestovní hlídku</button></div></section>
  <section class="hmk-stable-block"><h4>Výstroj, náklad a nosnost · HMK 122</h4>
  <p><b>Na zvířeti:</b> postroje a výstroj ${p.tackLb} lb + náklad ${p.cargoLb} lb = <strong>${p.minimumLb} lb</strong> (bez hmotnosti jezdce a dalšího externího vybavení). ${p.capacity===null?'Kapacita nákladního postroje není doložena.':`Fyzický prostor pro náklad ${p.capacity} lb; volné ${Math.max(0,p.capacity-p.cargoLb)} lb.`}</p>
  <p>ENC pro evidované minimum: ${p.baseENC??'—'} před STR · ${p.adjustedENC??'—'} po STR${a.spec.breed==='mule'?' a −20 pro mezka':''}; PF ${p.pf??'—'}. <em>Jezdce, odlišné postroje či náklad mimo tento registr vždy započítejte v cestovní hlídce.</em></p>
@@ -4250,14 +4279,16 @@ function stableHubAnimalHTML(a,campaignId){
  <p><b>Vozidla:</b> jsou vedená jako samostatný majetek zvířete, <em>nikoli jako náklad na jeho hřbetě</em>. Hmotnost vozu se nepřičítá k nesené hmotnosti; tažný režim a požadovaného druhého tahouna potvrzuje GM v cestovní hlídce.</p>
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Vozidlo · HMK 122</th><th>Hmotnost</th><th>Zdroj</th><th>Akce</th></tr></thead><tbody>${rows(p.vehicles,'vehicle')||'<tr><td colspan="4">Zatím žádný vůz ani saně</td></tr>'}</tbody></table></div>
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Fyzický náklad</th><th>Váha</th><th>Zdroj</th><th>Akce</th></tr></thead><tbody>${rows(p.cargo,'cargo')||'<tr><td colspan="4">Žádný naložený náklad</td></tr>'}</tbody></table></div>
+ <h4>Nasadit výstroj pořízenou v Knihovně</h4>
+ ${!dead&&looseGear.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="inventory-gear-attach"><input type="hidden" name="reason" value="Přímé nasazení vlastněné výstroje na zvíře"><label>Skutečně vlastněný předmět<select name="inventoryId" data-hmk-stable-gear-select>${looseGear.map(i=>{const item=VEHICLES_TACK_P122.find(t=>t.id===i.snapshot.properties.stableTackId);return `<option value="${esc(i.id)}" title="${esc(stableGearDescription580(item))}">${esc(item.name)} · ${item.weightLb} lb · ${esc(i.id.slice(0,8))}</option>`}).join('')}</select></label><button type="submit" data-hmk-help="Přesune jeden skutečně zakoupený nebo nalezený předmět z inventáře postavy na zvíře. Další peníze se neodečtou.">Nasadit vlastněnou výstroj</button></form>`:'<p class="hmk-stable-ref-small">Výstroj lze získat i bez zvířete v Knihovně → Ostatní vybavení. Po pořízení se zde nabídne k nasazení.</p>'}
  <h4>Propojení s inventářem postavy · fyzické přesuny</h4><p>Přesun skutečné inventární položky, nikoli její kopie. Naložené věci nejsou na postavě dostupné, dokud je nevyložíte. Fyzické potraviny a nádoby s vodou zůstávají spojeny se svými původními skladovými doklady.</p>
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Inventární předmět</th><th>lb</th><th>Akce</th></tr></thead><tbody>${p.inventoryItems.map(q=>`<tr><td>${esc(q.name)} · ${esc(q.inventoryId.slice(0,8))}</td><td>${q.weightLb}</td><td>${dead?'—':`<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="inventory-unload"><input type="hidden" name="inventoryId" value="${esc(q.inventoryId)}"><input type="hidden" name="reason" value="Skutečné předání původního inventárního předmětu zpět majiteli"><button class="secondary hc-small">Vrátit postavě</button></form>`}</td></tr>`).join('')||'<tr><td colspan="3">Žádný přenesený inventář</td></tr>'}</tbody></table></div>
- ${!dead&&userItems.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="inventory-load"><label>Skutečný předmět vlastníka<select name="inventoryId">${userItems.map(i=>`<option value="${esc(i.id)}">${esc(i.snapshot.name)} · ${i.snapshot.properties.weightLb*i.quantity} lb · ${esc(i.id.slice(0,8))}</option>`).join('')}</select></label><label>Ověření převodu GM<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Přenést inventární předmět na zvíře</button></form>`:''}
+ ${!dead&&userItems.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="inventory-load"><label>Skutečný předmět vlastníka<select name="inventoryId">${userItems.map(i=>`<option value="${esc(i.id)}">${esc(i.snapshot.name)} · ${i.snapshot.properties.weightLb*i.quantity} lb · ${esc(i.id.slice(0,8))}</option>`).join('')}</select></label><input type="hidden" name="reason" value="Přímé naložení existujícího předmětu vlastníkem zvířete"><button type="submit">Přenést inventární předmět na zvíře</button></form>`:''}
  <h4>Tažený náklad vozidla (oddělený od hřbetu zvířete)</h4>
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Náklad / vozidlo</th><th>Váha</th><th>Akce</th></tr></thead><tbody>${p.vehicleCargo.map(q=>`<tr><td>${esc(q.name)} · ${esc(q.vehicleId.slice(0,8))}</td><td>${q.weightLb} lb</td><td>${dead?'—':`<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-cargo-remove"><input type="hidden" name="entryId" value="${esc(q.entryId)}"><input type="hidden" name="reason" value="Skutečně vyloženo z taženého vozidla"><button class="secondary hc-small">Vyložit z vozu</button></form>`}</td></tr>`).join('')||'<tr><td colspan="3">Vozidlo nemá zaevidovaný náklad</td></tr>'}</tbody></table></div>
  ${!dead&&activeVehicles.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-cargo-add"><label>Vozidlo<select name="vehicleId">${activeVehicles.map(q=>`<option value="${esc(q.entryId)}">${esc(VEHICLES_TACK_P122.find(t=>t.id===q.itemId)?.name)}</option>`).join('')}</select></label><label>Náklad ve voze<input name="name" minlength="2" maxlength="90" required></label><label>Skutečná hmotnost (lb)<input name="weightLb" type="number" min="1" max="1000000" step="1" required></label><label>Potvrzení GM<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Zapsat náklad vozidla</button></form>`:''}
- ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="tack-add"><label>Pořídit / vybavit zvíře<select name="itemId" required>${options.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} · ${t.weightLb} lb · ${t.priceD}d${a.spec.breed==='elephant'?' (slon ×5 u odpovídající výstroje)':''}</option>`).join('')}</select></label><label>Pořízení<select name="mode"><option value="buy">Koupit za cenu HMK</option><option value="gift">Bezplatně (GM potvrdí zdroj)</option></select></label><label>Zdroj / potvrzení GM<input name="reason" required minlength="3" maxlength="240" placeholder="Prodejce, dar, nalezené vybavení"></label><button type="submit">Přidat ověřenou výstroj</button></form>
- <form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-add"><label>Pořídit vozidlo / saně (nejsou to nesené brašny)<select name="itemId">${VEHICLES_TACK_P122.filter(t=>['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(t.name)).map(t=>`<option value="${esc(t.id)}">${esc(t.name)} · ${t.priceD}d · ${t.weightLb} lb konstrukce</option>`).join('')}</select></label><label>Pořízení<select name="mode"><option value="buy">Koupit za cenu HMK</option><option value="gift">Bezplatně, skutečný zdroj</option></select></label><label>Zdroj / doložený původ<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Zařadit vozidlo do stáje</button></form>
+ ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="tack-add"><label>Pořídit / vybavit zvíře<select name="itemId" required data-hmk-stable-gear-select data-hmk-help="${esc(stableGearDescription580(options[0]))}">${options.map(t=>`<option value="${esc(t.id)}" title="${esc(stableGearDescription580(t))}">${esc(t.name)} · ${t.weightLb} lb · ${t.priceD}d${a.spec.breed==='elephant'?' (slon ×5 u odpovídající výstroje)':''}</option>`).join('')}</select></label><label>Pořízení<select name="mode"><option value="buy">Koupit za cenu HMK</option><option value="gift">Bezplatně (GM potvrdí zdroj)</option></select></label><label>Zdroj / potvrzení GM<input name="reason" required minlength="3" maxlength="240" placeholder="Prodejce, dar, nalezené vybavení"></label><button type="submit">Přidat ověřenou výstroj</button></form>
+ <form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-add"><label>Pořídit vozidlo / saně (nejsou to nesené brašny)<select name="itemId" data-hmk-stable-gear-select data-hmk-help="${esc(stableGearDescription580(VEHICLES_TACK_P122.find(t=>t.name==='Cart, 2-wheel')))}">${VEHICLES_TACK_P122.filter(t=>['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(t.name)).map(t=>`<option value="${esc(t.id)}" title="${esc(stableGearDescription580(t))}">${esc(t.name)} · ${t.priceD}d · ${t.weightLb} lb konstrukce</option>`).join('')}</select></label><label>Pořízení<select name="mode"><option value="buy">Koupit za cenu HMK</option><option value="gift">Bezplatně, skutečný zdroj</option></select></label><label>Zdroj / doložený původ<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Zařadit vozidlo do stáje</button></form>
  <form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="cargo-add"><label>Položka nákladu (samostatný fyzický předmět, nikoli kopie inventáře postavy)<input name="name" required minlength="2" maxlength="90" placeholder="Např. pytel zrní"></label><label>Skutečná hmotnost položky (lb)<input name="weightLb" type="number" min="1" max="1000000" step="1" required></label><label>Původ / potvrzení GM<input name="reason" required minlength="3" maxlength="240" placeholder="Kde a jak bylo skutečně naloženo"></label><button type="submit">Naložit do evidovaného prostoru</button></form>`:''}</section>
  <section class="hmk-stable-block"><h4>Krmení, voda a péče</h4><p>HMK zde neuvádí pevnou univerzální denní dávku podle druhu. Protokol zaznamenává skutečně provedenou péči a hmotnost vydané potravy či vody. Bez potvrzení zdroje se zásoby nevytvářejí, čas se neposouvá.</p>
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="care"><label>Úkon<select name="kind"><option value="food">Nakrmilo se</option><option value="water">Napojilo se</option><option value="grooming">Ošetření srsti / kopyt</option><option value="shelter">Ustájení / přístřeší</option><option value="veterinary">Veterinární úkon GM (bez automatického léčení)</option><option value="other">Jiná péče</option></select></label><label>Skutečné množství (lb; povinné pro jídlo/vodu)<input name="amount" type="number" min="0" step="0.1" placeholder="Např. 8"></label><label>Odkud pochází krmivo/voda a co se stalo<input name="reason" required minlength="3" maxlength="240" placeholder="Např. napájelo se u doloženého potoka"></label><button type="submit">Zapsat skutečnou péči</button></form>`:''}
@@ -4281,7 +4312,7 @@ function livestockAcquisitionHTML({location='library'}={}){
  const beasts=BEASTS_P122.filter(b=>livestockOffer(b.id));
  const acquisition=`<h3>Stáj · pořízení zvířete</h3><p class="hc-trek-explainer">HMK str. 122 a 354–355. V katalogu jsou ověřené ceny a limity výcviku. Nákup vytvoří záznam vlastnictví, kupní doklad a odečte peníze z kampaně; bezplatné převzetí hotovost nemění; <strong>nezakládá automaticky Combat State ani nesimuluje výcvik</strong>. Při cestování se použije doložená tělesná hmotnost a základní STR.</p>
  ${clock&&options?`<form data-hmk-livestock-acquire class="hc-livestock-acquire"><label>Druh zvířete<select name="beastId" required>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<option value="${esc(b.id)}">${esc(b.name)} · ${b.priceD}d · STR ${sp.str??'neuvedeno'} · ${sp.bodyWeightLb??'?'} lb · MB max. ${b.maxMasteryBoosts}</option>`}).join('')}</select></label><label>Jméno zvířete<input name="beastName" maxlength="60" required placeholder="Např. Blesk"></label><label>Majitel / platící postava<select name="ownerId" required>${options}</select></label><div class="hc-livestock-actions"><button type="submit" name="acquisition" value="buy">Koupit za cenu HMK</button><button type="submit" name="acquisition" value="free" class="secondary">Převzít zdarma (potvrdí GM)</button></div></form>`:'<p>Pro nákup je nutná aktivní kampaň a alespoň jedna postava.</p>'}
- <section class="hmk-stable-reference-tables"><h4>Ověřené referenční tabulky HMK</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Cena</th><th>Max MB</th><th>Hmotnost</th><th>STR</th><th>Move</th><th>Využití</th></tr></thead><tbody>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<tr><td>${esc(b.name)}</td><td>${b.priceD}d</td><td>${b.maxMasteryBoosts}</td><td>${sp.bodyWeightLb??'—'} lb</td><td>${sp.str??'—'}</td><td>${sp.move??'—'}</td><td>${esc(sp.role)}</td></tr>`}).join('')}</tbody></table></div><h4>Bestiář HMK · základní atributy a dovednosti (str. 355)</h4><p class="hmk-stable-table-hint">Širokou tabulku lze vodorovně posunout; každý řádek odpovídá jednomu druhu.</p><div class="catalog-scroll hmk-stable-stats-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Velikost</th><th>END</th><th>AGL</th><th>PER</th><th>AUR</th><th>WIL</th><th>REA</th><th>CRE</th><th>Awareness</th><th>Scent</th><th>Stealth</th><th>Spirit</th><th>Initiative</th></tr></thead><tbody>${beasts.filter(x=>livestockOffer(x.id).size).map(x=>{const a=livestockOffer(x.id);return `<tr><td>${esc(x.name)}</td>${['size','end','agl','per','aur','wil','rea','cre','aware','scent','stealth','spirit','initiative'].map(k=>`<td>${esc(a[k]??'—')}</td>`).join('')}</tr>`}).join('')}</tbody></table></div><h4>Přirozené útoky (jen referenční popis)</h4>${beasts.filter(x=>livestockOffer(x.id).attack).map(x=>`<p class="hc-trek-explainer"><strong>${esc(x.name)}:</strong> ${esc(livestockOffer(x.id).attack)}</p>`).join('')}<p>Tištěné hodnoty ukazují výchozí domestikaci, nikoli výsledky výcviku. Tyto referenční útoky nejsou automaticky vytvářené bojové akce; zvířecí zdravotní a bojový profil se eviduje samostatně.</p><p>Vybavení se kupuje samostatně: pack harness 24d/10 lb (správně uložený náklad nejvýše 20 % hmotnosti zvířete), postroj pro koně 20d, postroj pro vola 20d, kára 84d, vůz 220d. Vůz typicky táhnou dva voli (8000 lb) nebo dva tažní koně (6400 lb). Kára jeden vůl (2500 lb) nebo jeden tažný kůň (2000 lb). Vůl přidává vlastní Slow Mode (HMK 122, 145).</p></section>
+ <section class="hmk-stable-reference-tables"><h4>Ověřené referenční tabulky HMK</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Cena</th><th>Max MB</th><th>Hmotnost</th><th>STR</th><th>Move</th><th>Využití</th></tr></thead><tbody>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<tr><td>${esc(b.name)}</td><td>${b.priceD}d</td><td>${b.maxMasteryBoosts}</td><td>${sp.bodyWeightLb??'—'} lb</td><td>${sp.str??'—'}</td><td>${sp.move??'—'}</td><td>${esc(sp.role)}</td></tr>`}).join('')}</tbody></table></div><h4>Bestiář HMK · základní atributy a dovednosti (str. 355)</h4><p class="hmk-stable-table-hint">Širokou tabulku lze vodorovně posunout; každý řádek odpovídá jednomu druhu.</p><div class="catalog-scroll hmk-stable-stats-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Velikost</th>${['END','AGL','PER','AUR','WIL','REA','CRE','Awareness','Scent','Stealth','Spirit','Initiative'].map(k=>`<th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="${esc(stableStatHelp580(k))}">${esc(k)} ⓘ</th>`).join('')}</tr></thead><tbody>${beasts.filter(x=>livestockOffer(x.id).size).map(x=>{const a=livestockOffer(x.id);return `<tr><td>${esc(x.name)}</td>${['size','end','agl','per','aur','wil','rea','cre','aware','scent','stealth','spirit','initiative'].map(k=>`<td>${esc(a[k]??'—')}</td>`).join('')}</tr>`}).join('')}</tbody></table></div><h4>Přirozené útoky (jen referenční popis)</h4>${beasts.filter(x=>livestockOffer(x.id).attack).map(x=>`<p class="hc-trek-explainer"><strong>${esc(x.name)}:</strong> ${esc(livestockOffer(x.id).attack)}</p>`).join('')}<p class="hmk-stable-ref-small">Tištěné hodnoty ukazují výchozí domestikaci, nikoli výsledky výcviku. Tyto referenční útoky nejsou automaticky vytvářené bojové akce; zvířecí zdravotní a bojový profil se eviduje samostatně.</p><p class="hmk-stable-ref-small">Vybavení se kupuje samostatně: pack harness 24d/10 lb (správně uložený náklad nejvýše 20 % hmotnosti zvířete), postroj pro koně 20d, postroj pro vola 20d, kára 84d, vůz 220d. Vůz typicky táhnou dva voli (8000 lb) nebo dva tažní koně (6400 lb). Kára jeden vůl (2500 lb) nebo jeden tažný kůň (2000 lb). Vůl přidává vlastní Slow Mode (HMK 122, 145).</p></section>
 `;
  if(location==='split'){
   const marker='<section class="hmk-stable-reference-tables">',i=acquisition.indexOf(marker);
@@ -4312,7 +4343,7 @@ function characterStableView(owner){
  }catch(error){console.error('HMK stable owner:',error);folioLeft=`<p role="alert" class="notice error">Kartu zvířete nelze bezpečně otevřít: ${esc(error?.message||String(error))}</p>`;}
  const trainingHTML=animalTrainingNextHTML(data.journal,owner.id,cid);
  const secondary=`<details class="hmk-stable-accordion"><summary>Animalcraft · úplný výcvik dle HMK 65</summary><div class="hmk-stable-reference"><p>Výcvik vyžaduje doložený Skill Value, skutečný hod a časovou podmínku; nová hodnota nevzniká otevřením karty.</p>${trainingHTML||'<p>Nejdříve proveďte doložený Animalcraft Skill Test postavy.</p>'}</div></details>
- <details class="hmk-stable-accordion" ${stableEncounterExpanded?'open':''}><summary>Zdraví · boj · encountery</summary><div class="hmk-stable-reference">${stableEncounterExpanded?bestiaryEncounterPanel({combat:true,stableOnly:true,ownerId:owner.id}):'<p>Zdravotní historie a anatomie jsou zobrazeny vlevo. Rozšířené bojové nástroje otevřete následujícím tlačítkem.</p>'}<button type="button" class="secondary" data-hmk-stable-health-toggle>${stableEncounterExpanded?'Sbalit':'Rozbalit'} úplný zdravotní a bojový panel</button></div></details>`;
+`;
  const spread=`<div class="journal-book-spread folio-chapter-spread hmk-owner-stable-spread" id="hmk-livestock-catalog" data-hmk-stable-owner="${esc(owner.id)}">
  <section class="journal-book-page journal-book-page--left folio-chapter-page hmk-owner-stable-page" aria-label="Levá stránka: anatomie a zdravotní stav ${esc(selectedAnimal.name)}">
  <header class="folio-chapter-heading"><h3>Stáj · ${esc(owner.name)}</h3><p>Trvalá identita, statistiky, anatomie a zranění.</p></header>
@@ -4366,7 +4397,7 @@ function libraryColumnHeadings(item){
 function libraryDataRows(rows){
  return rows.map(i=>{
  const b=libraryBrief(i);const audit=catalogAuditEntry(i);const headings=libraryColumnHeadings(i);
- return `<tr data-library-item="${esc(i.id)}"><td class="library-item-title">${esc(i.name)}<small>${i.builtin?'Pravidla '+esc(libraryPrintedPages(i.source)):'Vlastní položka · '+esc(i.source||'zdroj neuveden')}</small></td>
+ return `<tr data-library-item="${esc(i.id)}"><td class="library-item-title" ${i.properties?.stableTackId?`data-hmk-help="${esc(i.description)}" tabindex="0"`:``}>${esc(i.name)}<small>${i.builtin?'Pravidla '+esc(libraryPrintedPages(i.source)):'Vlastní položka · '+esc(i.source||'zdroj neuveden')}</small></td>
  ${b.map((value,index)=>`<td class="library-mini catalog-parameter-tip" data-hmk-help="${esc(libraryFieldHelp(headings[index]))}" tabindex="0">${value}</td>`).join('')}
  <td class="library-details-cell">${catalogParameters(i)}${i.builtin?'':`<details><summary>Správa vlastní položky</summary><p class="tiny">${esc(i.description||'')}</p><div class="actions"><button data-edit-item="${esc(i.id)}">Upravit</button><button data-copy-item="${esc(i.id)}" class="secondary">Kopírovat</button><button data-delete-item="${esc(i.id)}" class="danger">Smazat</button></div></details>`}</td>
  <td>${libraryAssignForm(i.id,'item',true,libraryPurchaseOffer(i))}</td></tr>`;
@@ -7151,6 +7182,48 @@ function hideVisibleTechnicalUUIDs(root){
   for(const key of ['title','aria-label','data-hmk-help','aria-description','alt']){const orig=el.getAttribute(key);if(orig){const next=clean(orig);if(next!==orig)el.setAttribute(key,next);}}
  }
 }
+// Stable help follows the same floating tooltip as Chronicle Spread, not a
+// browser-native white title. Applies only to stable folios; preserves text.
+function decorateStableUI580(root){
+ const scope=root.querySelector('.hmk-owner-stable-spread');if(!scope)return;
+ const help={
+  inventoryId:'Skutečný fyzický inventární předmět tohoto vlastníka; nezakládá se žádná kopie ani druhý nákup.',
+  itemId:'Výstroj podle tabulky HMK str. 122. Po výběru zobrazí její účel; hmotnost se započítá do zátěže.',
+  vehicleId:'Skutečně evidovaná kára, vůz nebo saně. Tažený náklad není nákladem na hřbetě.',
+  mode:'Koupit odečte doloženou cenu, bezplatné převzetí vyžaduje skutečný původ.',
+  type:'Prodej nebo opuštění zvířete zachová historické doklady; předem je nutné vyložit majetek.',
+  priceD:'Skutečná sjednaná cena v denárech (d); nepředpokládá se automaticky původní kupní cena.',
+  reason:'Stručný popis skutečného zdroje či průběhu operace pro trvalý doklad v deníku.',
+  weightLb:'Skutečná hmotnost v librách (lb), která vstupuje do kontroly nosnosti.',
+  name:'Jméno či popis fyzického nákladu; nejde o další kopii předmětu z inventáře.',
+  kind:'Druh skutečně provedené péče o zvíře. Léčba sama o sobě nemění zdravotní systém.',
+  sourceId:'Původní zásoba jídla nebo vody; výdej se odečte z jediného společného skladu.',
+  amount:'Skutečně vydané množství. Bez doloženého zdroje nelze vytvářet nové zásoby.',
+  trainingProofId:'Původní doklad Animalcraft výcviku, nikoliv nový volný bonus.',
+  startMinute:'Skutečný začátek výcviku v herních minutách kampaně.',
+  endMinute:'Skutečný konec výcviku v herních minutách; musí odpovídat pravidlovému trvání.'
+ };
+ for(const label of scope.querySelectorAll('form[data-hmk-stable-event] label')){
+  const control=label.querySelector('select[name],input[name],textarea[name]');if(!control)continue;
+  const hint=help[control.name];if(hint&&!label.hasAttribute('data-hmk-help')){
+   label.setAttribute('data-hmk-help',hint);label.tabIndex=0;
+  }
+ }
+ const headers={
+  'ZN / LN':'Zone Number a Location Number pro skutečný hod na anatomické tabulce.',
+  SHK:'Location Shock: pravidlová hodnota Shock dané anatomické lokality.',
+  'Rány v historii':'Všechny doložené rány této lokality včetně zahojených a amputací.',
+  'Stav nyní':'Současné aktivní rány a trvalé následky z původních zdravotních dokladů.',
+  ENC:'Encumbrance: zátěž; zahrnuje výstroj i aktuální náklad.',
+  'lb':'Libry, jednotka hmotnosti podle HMK.',
+  'Váha':'Hmotnost fyzického předmětu v librách (lb).',
+  'Akce':'Přímé naložení či sundání předmětu; ověřuje se kapacita a zachovává historie.'
+ };
+ for(const cell of scope.querySelectorAll('th')){
+  if(cell.hasAttribute('data-hmk-help'))continue;
+  const hint=headers[cell.textContent.trim()];if(hint){cell.setAttribute('data-hmk-help',hint);cell.tabIndex=0;}
+ }
+}
 function render(){
  // Deny all paths to partially generated sheets, even routes that set view
  // directly without clicking a registry card (import, skill link, wizard exit).
@@ -7173,6 +7246,7 @@ function render(){
  app.innerHTML=main()+(overlay||'');
  hideVisibleTechnicalUUIDs(app);
  enrichAnimalTrainingForms(app);
+ decorateStableUI580(app);
  // Fit precisely fifteen actual item rows, regardless of wrapped item labels.
  for(const container of app.querySelectorAll('.inv-table-scroll.inv-15-rows')){
   const table=container.querySelector('table'),rows=[...(table?.tBodies?.[0]?.rows||[])];
@@ -12690,11 +12764,32 @@ document.addEventListener('submit',e=>{
    if(!item||!['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(item.name)||!['buy','gift'].includes(raw.mode))throw Error('Vozidlo nemá ověřenou cenu a původ.');
    Object.assign(event,{entryId:uuid(),itemId:item.id,mode:raw.mode,weightLb:item.weightLb,priceD:item.priceD,transactionId:uuid()});
    if(raw.mode==='buy')cashDelta=-event.priceD;
+  }else if(type==='inventory-gear-attach'){
+   const item=data.inventory.find(i=>i.id===raw.inventoryId&&i.characterId===animal.ownerId);
+   const gear=VEHICLES_TACK_P122.find(t=>t.id===item?.snapshot?.properties?.stableTackId);
+   if(!item||!gear||gear.name==='Wheel'||item.sourceItemId!=='hmk:stable-gear:'+gear.id||!['carried','none'].includes(item.slot)||item.quantity!==1||
+    item.snapshot.properties.weightLb!==gear.weightLb)throw Error('Výstroj není jediný fyzický kus z Knihovny v inventáři vlastníka.');
+   const role=['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(gear.name)?'vehicle':'tack';
+   if(!animal.spec.breed&&['Pack harness','Saddle bags, 15 lb'].includes(gear.name))throw Error('Tento druh nemá doloženou nosnou funkci.');
+   const weightLb=animal.spec.breed==='elephant'&&role==='tack'?gear.weightLb*5:gear.weightLb;
+   if(weightLb!==item.snapshot.properties.weightLb)throw Error('Výstroj vyžadující úpravu hmotnosti musí mít samostatný doložený předmět.');
+   Object.assign(event,{entryId:uuid(),inventoryId:item.id,itemId:gear.id,role,name:gear.name,quantity:1,weightLb});
+  }else if(type==='inventory-gear-detach'){
+   const found=[...p.tack,...p.vehicles].find(g=>g.entryId===raw.entryId&&g.inventoryId===raw.inventoryId);
+   if(!found)throw Error('Zvolená výstroj již není na zvířeti.');
+   const role=p.tack.some(g=>g.entryId===found.entryId)?'tack':'vehicle';
+   if(role==='vehicle'&&p.vehicleCargo.some(q=>q.vehicleId===found.entryId))throw Error('Před sejmutím vozu nejprve vyložte náklad.');
+   if(role==='tack'){
+    const names=p.tack.filter(t=>t.entryId!==found.entryId).map(t=>VEHICLES_TACK_P122.find(y=>y.id===t.itemId)?.name);
+    const cap=names.includes('Pack harness')?Math.floor(animal.spec.bodyWeightLb*.2):names.filter(n=>n==='Saddle bags, 15 lb').length*15;
+    if(p.cargoLb>cap)throw Error('Před sejmutím brašen či postroje nejprve vyložte náklad.');
+   }
+   Object.assign(event,{entryId:found.entryId,inventoryId:found.inventoryId,role});
   }else if(type==='inventory-load'){
    const item=data.inventory.find(i=>i.id===raw.inventoryId&&i.characterId===animal.ownerId);
    if(!item||!['carried','none'].includes(item.slot)||!Number.isSafeInteger(item.quantity)||item.quantity<1||!(item.snapshot?.properties?.weightLb>0))throw Error('Naložit lze jen existující vlastní nevázaný předmět s doloženou hmotností; rozdělení balíku vyžaduje původní inventární postup.');
    const weightLb=item.snapshot.properties.weightLb*item.quantity;
-   if(p.capacity===null||p.cargoLb+weightLb>p.capacity)throw Error('Předmět se nevejde do skutečných brašen nebo nákladního postroje.');
+   if(p.capacity===null||p.cargoLb+weightLb>p.capacity)throw Error('Zvíře je plně naložené: zbývá '+Math.max(0,(p.capacity??0)-p.cargoLb)+' lb a předmět potřebuje '+weightLb+' lb. Vyložte náklad nebo zajistěte větší doloženou kapacitu.');
    Object.assign(event,{entryId:uuid(),inventoryId:item.id,name:item.snapshot.name,quantity:item.quantity,weightLb});
   }else if(type==='inventory-unload'){
    const item=p.inventoryItems.find(i=>i.inventoryId===raw.inventoryId);
@@ -12717,7 +12812,7 @@ document.addEventListener('submit',e=>{
   }else if(type==='cargo-add'){
    const name=String(raw.name||'').trim(),weightLb=asInt(raw.weightLb,'hmotnost nákladu');
    if(name.length<2||name.length>90||weightLb<1)throw Error('Náklad musí být fyzický pojmenovaný předmět s doloženou kladnou hmotností v lb.');
-   const capacity=p.capacity;if(capacity===null||p.cargoLb+weightLb>capacity)throw Error('Není doložen dostatečný prostor v sedlových brašnách (15 lb) nebo nákladním postroji (20 % tělesné váhy).');
+   const capacity=p.capacity;if(capacity===null||p.cargoLb+weightLb>capacity)throw Error('Zvíře je plně naložené nebo nemá odpovídající postroj: pro další náklad '+weightLb+' lb zbývá '+Math.max(0,(capacity??0)-p.cargoLb)+' lb.');
    Object.assign(event,{entryId:uuid(),name,weightLb});
   }else if(type==='cargo-remove'||type==='tack-remove'||type==='vehicle-remove'){
    const available=type==='cargo-remove'?p.cargo:type==='vehicle-remove'?p.vehicles:p.tack;
@@ -12755,8 +12850,8 @@ document.addEventListener('submit',e=>{
    if(type==='sale'){event.transactionId=uuid();cashDelta=event.priceD;}
   }else throw Error('Neznámý úkon správy zvířete.');
   if(cashDelta<0)prepareLibraryPurchase(owner,-cashDelta,campaignId);
-  const label={sale:'prodej',release:'opuštění / darování','tack-add':'převzetí výstroje','tack-remove':'sejmutí výstroje','vehicle-add':'pořízení vozidla','vehicle-remove':'vyřazení vozidla','cargo-add':'naložení','cargo-remove':'vyložení','inventory-load':'převod z inventáře','inventory-unload':'vrácení do inventáře','vehicle-cargo-add':'naložení vozu','vehicle-cargo-remove':'vyložení vozu','training-activate':'aktivace výcviku',care:'péče'}[type];
-  if(!ask(`Stáj · ${animal.name}: GM potvrzuje ${label}?\n${reason}${cashDelta?'\nZměna hotovosti '+cashDelta+'d':''}`))return;
+  const label={sale:'prodej',release:'opuštění / darování','tack-add':'převzetí výstroje','tack-remove':'sejmutí výstroje','vehicle-add':'pořízení vozidla','vehicle-remove':'vyřazení vozidla','cargo-add':'naložení','cargo-remove':'vyložení','inventory-load':'převod z inventáře','inventory-unload':'vrácení do inventáře','inventory-gear-attach':'nasazení vlastněné výstroje','inventory-gear-detach':'sejmutí vlastněné výstroje','vehicle-cargo-add':'naložení vozu','vehicle-cargo-remove':'vyložení vozu','training-activate':'aktivace výcviku',care:'péče'}[type];
+  if(!['inventory-load','inventory-unload','inventory-gear-attach','inventory-gear-detach'].includes(type)&&!ask(`Stáj · ${animal.name}: GM potvrzuje ${label}?\n${reason}${cashDelta?'\nZměna hotovosti '+cashDelta+'d':''}`))return;
   if(mutate(()=>{
    const key=campaignKey(data.campaignClock),live=character(animal.ownerId);
    if(key!==campaignId||data.campaignClock.minute!==minute||combatInitiativeSequence||!live||activeCampaignCashKey(live)===undefined)
@@ -12766,10 +12861,10 @@ document.addEventListener('submit',e=>{
    const at=stamp();
    if(cashDelta)recordCampaignCoinAdjustment(live,{campaignId:key,minute,id:event.transactionId,at,deltaPence:cashDelta,
     reason:'HMK Stáj · '+label+' · '+animal.name+' · '+reason});
-   if(type==='inventory-load'||type==='inventory-unload'){
+   if(['inventory-load','inventory-unload','inventory-gear-attach','inventory-gear-detach'].includes(type)){
     const actual=data.inventory.find(i=>i.id===event.inventoryId&&i.characterId===animal.ownerId);
     if(!actual)throw Error('Inventární předmět byl mezitím změněn.');
-    if(type==='inventory-load'){
+    if(type==='inventory-load'||type==='inventory-gear-attach'){
      if(!['carried','none'].includes(actual.slot)||actual.quantity!==event.quantity||actual.snapshot?.properties?.weightLb*actual.quantity!==event.weightLb)throw Error('Předmět, počet nebo váha se změnily.');
      actual.slot='stable';actual.stableAnimalId=animal.id;
     }else{
@@ -12784,6 +12879,14 @@ document.addEventListener('submit',e=>{
     body:reason+(cashDelta?' · '+(cashDelta>=0?'+':'')+cashDelta+'d':''),stableHub574:{...event},...careUse});
   }))notice=`Stáj · ${animal.name}: ${label} byl(a) uložen(a) jako neměnný doklad.`;
  }catch(err){alert('Stáj: '+err.message);}
+},true);
+document.addEventListener('change',e=>{
+ const select=e.target?.closest?.('select[data-hmk-stable-gear-select]');if(!select)return;
+ const gear=VEHICLES_TACK_P122.find(t=>t.id===select.value)||
+  null;
+ const inv=data.inventory.find(i=>i.id===select.value);
+ const item=gear||VEHICLES_TACK_P122.find(t=>t.id===inv?.snapshot?.properties?.stableTackId);
+ if(item){select.setAttribute('data-hmk-help',stableGearDescription580(item));hmkHideJournalTooltip();}
 },true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-stable-go-travel]'))return;
  e.preventDefault();e.stopImmediatePropagation();view='calendar';render();},true);

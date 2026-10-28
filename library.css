@@ -254,3 +254,43 @@
 /* Manuscript table/font standard for new journal and library folios. */
 .journal-book .catalog-spec{font-family:'Palatino Linotype','Book Antiqua',Georgia,serif!important;background:transparent;}
 .journal-book .catalog-scroll{background:transparent;}
+
+/* v93.580: same compact Chronicle Spread typography in both animal folios. */
+.content-library .journal-book--stable .hmk-stable-library-reference .hmk-stable-ref-small,
+.content-library .journal-book--stable .hmk-stable-library-reference .hc-trek-explainer,
+.content-library .journal-book--stable .hmk-stable-catalog-column>.hc-trek-explainer,
+.content-library .journal-book--stable .hmk-stable-catalog-column>p,
+.content-library .journal-book--stable .hmk-stable-library-reference>p,
+.content-library .journal-book--stable .hmk-stable-library-reference .hmk-stable-ref-small {
+ font-family:'Palatino Linotype','Book Antiqua',Georgia,serif!important;
+ font-size:12px!important;line-height:1.43!important;font-weight:400!important;
+ color:#573e25!important;margin:.32rem 0 .52rem!important;
+}
+.content-library .journal-book--stable .hmk-stable-library-reference h4{font-size:13px!important;line-height:1.35!important}
+.content-sheet .journal-book--personal-stable .hmk-stable-stat-tip,
+.content-library .journal-book--stable .hmk-stable-stat-tip{cursor:help;text-decoration:underline dotted #8d6a43;text-underline-offset:3px}
+/* Every pair of controls shares the same baseline even when one caption wraps. */
+.content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));
+ align-items:stretch;gap:9px 10px!important;
+}
+.content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields > label:not(.hc-check):not(:has(input[type="checkbox"])),
+.content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields > label:not(.hc-check):not(:has(input[type="checkbox"])):has(select){
+ display:flex!important;flex-direction:column;justify-content:flex-end;
+ gap:4px;margin:0;min-width:0;align-self:stretch;
+ font-size:12px!important;line-height:1.35!important;
+}
+.content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields > label > input,
+.content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields > label > select,
+.content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields > label > textarea{
+ width:100%!important;box-sizing:border-box!important;margin-top:auto!important;
+ font:12px/1.35 'Palatino Linotype','Book Antiqua',Georgia,serif!important;
+ min-height:33px;
+}
+.content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields > button{
+ align-self:end!important;min-height:33px;line-height:1.35!important;
+}
+.content-sheet .journal-book--personal-stable .hmk-stable-ref-small{font-size:12px!important;line-height:1.43!important}
+@media(max-width:650px){
+ .content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields{grid-template-columns:minmax(0,1fr)!important}
+}
