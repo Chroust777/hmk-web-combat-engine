@@ -121,7 +121,7 @@ import {renderFullCreatureStats565} from './src/integration/hmk-bestiary-native-
 import {creatureIntro569,creatureSource569} from './src/integration/hmk-bestiary-intro-569.js';
 import {previewCreatureSpecial569} from './src/integration/hmk-bestiary-special-569.js';
 import {creatureCombatSheet565,previewCreatureSkillRoll565,previewCreatureMelee565} from './src/integration/hmk-bestiary-combat-565.js';
-import {animalHealthProjection567,prepareAnimalHit567,prepareAnimalBlood567,prepareAnimalInfectionCourse567,prepareAnimalBloodHealing567,prepareAnimalTreatment567,prepareAnimalHealing567,prepareAnimalShockRecovery567,prepareAnimalExtendedCourse567,prepareAnimalComaCourse568,prepareAnimalGrimShock568,validateAnimalTraumaJournal567,assertAnimalTraumaAppendOnly567,requireAnimalMedicalGMTimeMayAdvance567} from './src/integration/hmk-bestiary-trauma-567.js';
+import {animalHealthProjection567,prepareAnimalHit567,prepareAnimalBlood567,prepareAnimalInfectionCourse567,prepareAnimalBloodHealing567,prepareAnimalTreatment567,prepareAnimalHealing567,prepareAnimalShockRecovery567,prepareAnimalExtendedCourse567,prepareAnimalComaCourse568,prepareAnimalGrimShock568,prepareAnimalFrostInjury571,prepareAnimalFrostAmputation571,validateAnimalTraumaJournal567,assertAnimalTraumaAppendOnly567,requireAnimalMedicalGMTimeMayAdvance567} from './src/integration/hmk-bestiary-trauma-567.js';
 import {ANIMAL_ANATOMIES_566,ANIMAL_WEAPON_DICE_566,creatureAnatomyReadiness566,previewAnimalContact566} from './src/integration/hmk-bestiary-anatomy-566.js';
 import {BESTIARY_ENTRIES_564,bestiaryEntry564,createBespokeEncounterProof564,validateFullBestiaryJournal564 as validateBestiaryJournal,bestiaryEncounterStatus564} from './src/integration/hmk-bestiary-runtime-564.js';
 import { ARMOUR_LAYER_COLUMNS, ARMOUR_LAYER_NOTES } from './src/rules/armour-layer-reference.js';
@@ -279,7 +279,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.570';
+const APP_VERSION='93.571';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3979,6 +3979,43 @@ function bestiaryCalendarDuePanel567(clock){
  <p class="hc-hint">Stejný herní čas jako hlavní kalendář. Termíny jsou odvozeny z neměnných dokladů; žádný hod se neprovádí automaticky. Zdravotní formuláře jsou v Combat → Bestiář.</p>
  <div class="hc-event-list">${events.map(e=>`<div class="hc-event"><strong>${esc(e.name)}</strong> · ${esc(e.what)}<p>${esc(label(e.due))}${e.due!==null?(minute>e.due?' · po termínu':minute===e.due?' · právě splatné':' · čeká na termín'):''}${e.blocked?' · vyžaduje rozhodnutí GM':''}</p></div>`).join('')}</div></section>`;
 }
+/** Grievous Frost: text-native evidence / surgical AMP, not a human hit table. */
+function bestiaryFrostSourceForm571(actor,health){
+ const readiness=creatureAnatomyReadiness566(actor.profile);
+ if(!readiness.ready||health.shock!=='none')return '';
+ return `<details class="hmk-bestiary-wide hmk-beast-frost-571"><summary>Nové Grievous Frost · doložit G4f / G5f (HMK 178, 185)</summary>
+ <p class="hc-hint">Pouze pro již pravidlově doloženou omrzlinu/zásah Frost. Zadej skutečné ZN a LD příslušné zvířecí tabulky; tento formulář sám negeneruje počasí ani frostbite. Pokud již existuje rána ve stejné lokalitě, výpočet se zastaví do samostatného ověření Compound. Hlava není automaticky obličej.</p>
+ <form data-hmk-beast-frost-source-571 class="hc-fields"><input type="hidden" name="targetId" value="${esc(actor.id)}">
+ <label>Zdroj již vyhodnoceného Frost<select name="source"><option value="weather">Frostbite · počasí / HMK 185</option><option value="spell">Frost · magický / jiný pravidlový účinek</option><option value="other">Jiný doložený zdroj</option></select></label>
+ <label>Úroveň zranění<select name="level"><option value="4">G4f</option><option value="5">G5f</option></select></label>
+ <label>Zone Number · 1–${readiness.maxZN}<input type="number" name="zoneNumber" min="1" max="${readiness.maxZN}" step="1" required></label>
+ <label>Location d10 · skutečný hod<input type="number" name="locationD10" min="1" max="10" step="1" required></label>
+ <label class="hmk-bestiary-wide">Doložený původ Frost (pravidlový krok, hody a účinek)<textarea name="sourceDetails" rows="2" maxlength="300" minlength="5" required></textarea></label>
+ <label class="hmk-bestiary-wide">Pouze u lokality Head: konkrétní zasažená část obličeje potvrzená GM (jinak nechat prázdné)<input name="facialFeature" maxlength="80" placeholder="Např. nos / čenich; celá hlava není amputovatelný obličej"></label>
+ <label class="hmk-bestiary-wide hc-check"><input name="wingAsLimbConfirmed" type="checkbox"> Pouze u lokality Wing: GM potvrzuje, že křídlo daného druhu je zde amputovatelná končetina; jinak standardní AMP není automaticky přípustná.</label>
+ <label>Skutečný Shock d100<input type="number" name="shockRoll" min="1" max="100" required></label>
+ <label>Potvrzená Fatigue pro Shock<input type="number" name="shockFatigue" min="0" max="300" step="5" value="0" required></label>
+ <label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="confirmed" required> GM potvrzuje skutečně vzniklé G4f/G5f, zónu, lokalitu, zdroj a hod Shock (neprobíhá nový hod na vznik Frost).</label>
+ <button type="submit">Doložit Frost zranění do zdravotní historie</button></form></details>`;
+}
+function bestiaryFrostAmputationForm571(actor,w,health,minute){
+ if(w.aspect!=='frost'||w.healed)return '';
+ if(!w.frostSite?.eligible)return `<p class="hc-hint"><strong>Grievous Frost · nelze amputovat:</strong> HMK 178. Zranění v lokalitě ${esc(w.locationName)} nemá běžné ošetření a je Grim Wound (denní Shock podle HMK 180). Není dovoleno jej léčit běžnou Surgery.</p>`;
+ if(health.shock!=='none'||w.treatment)return '<p class="hc-hint">Frost Amputation lze provést až po vyřešení Shock / Coma a případného krvácení.</p>';
+ return `<details class="hmk-bestiary-wide hmk-beast-frost-amp-571"><summary>AMP · odstranit omrzlou část (${esc(w.frostSite.site)}${w.frostSite.side?' · '+esc(w.frostSite.side):''})</summary>
+ <p class="hc-hint">HMK 178, 180: nejméně 1 minuta; Physician + DEX Secondary, skutečný d100. Výsledek založí nové S2e–G5e, případně Bleeder. Odstraněná část zůstává TRVALE ztracena, i když se nové Edge zranění zahojí. Při G5e s anatomickou amputační značkou se navíc zadává příslušný Strength/Amputation d100 (str.168).</p>
+ <form data-hmk-beast-frost-amp-571 class="hc-fields"><input type="hidden" name="targetId" value="${esc(actor.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}">
+ <label>Physician ML<input name="physicianML" type="number" min="1" max="300" required></label>
+ <label>Physician Index<input name="physicianIndex" type="number" min="1" max="30" required></label>
+ <label>DEX Secondary Modifier<input name="dexSecondaryModifier" type="number" min="-100" max="100" step="5" value="0" required></label>
+ <label>Skutečný Treatment d100<input name="physicianRoll" type="number" min="1" max="100" required></label>
+ <label>Shock d100 nového Edge zranění<input name="shockRoll" type="number" min="1" max="100" required></label>
+ <label>Fatigue pro Shock<input name="shockFatigue" type="number" min="0" max="300" step="5" value="0" required></label>
+ <label>Amputation d100 (jen vznikne-li G5e s trojúhelníkem)<input name="amputationRoll" type="number" min="1" max="100" placeholder="Jinak prázdné"></label>
+ <label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="procedureConfirmed" required> GM potvrzuje fyzické odstranění části těla a uplynutí nejméně jedné herní minuty.</label>
+ <label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="confirmed" required> GM potvrzuje vybavení, Physician, skutečné hody, stranu a návaznost Shock / krvácení.</label>
+ <button type="submit" ${minute<w.minute+1?'disabled title="Amputace nejdříve po jedné herní minutě"':''}>Provést Frost Amputation · vytvořit nové Edge zranění</button></form></details>`;
+}
 function bestiaryHealthPanel567(active,cid,minute){
  const display=due=>Number.isSafeInteger(due)?displayCampaignMinute(due):'čeká na další pravidlové rozhodnutí';
  return `<section class="hmk-bestiary-health"><h4>Stav tvorů · Injury / Shock / Healing / Calendar</h4>
@@ -3987,7 +4024,8 @@ function bestiaryHealthPanel567(active,cid,minute){
  const pending=health.records.filter(r=>r.bestiaryTrauma.kind==='hit').at(-1)?.bestiaryTrauma;
  return `<details class="hmk-beast-health-actor" ${health.records.length?'open':''}><summary>${esc(a.name)} · Shock: ${esc(health.shock)} · ${wounds.filter(w=>!w.healed).length} otevřených ran</summary>
  <div class="hmk-beast-health-grid">${wounds.map(w=>`<article class="hmk-beast-wound"><strong>${esc(w.locationName)} · ${esc(w.id.slice(0,8))}</strong>
- ${w.amputation?.severed?`<p class="hc-hint"><strong>TRVALÁ ZTRÁTA:</strong> ${esc(w.locationName)}${w.amputation.side?' · '+esc(w.amputation.side):''} · ${esc(w.amputation.sl)} d100 (${w.amputation.roll}) · HMK 168. Zhojení pahýlu končetinu neobnoví.</p>`:''}<p>${esc(w.healed?'Zhojeno':w.infected?'Infekce: vyžaduje Infection Course':w.bleeding?'Bleeder: neodkladně Blood Loss / Blood Stoppage':('IL '+w.level+' '+w.aspect))}</p>
+ ${w.amputation?.severed?`<p class="hc-hint"><strong>TRVALÁ ZTRÁTA:</strong> ${esc(w.locationName)}${w.amputation.side?' · '+esc(w.amputation.side):''} · ${w.amputation.viaTreatment?'AMP · HMK 178/180':esc(w.amputation.sl)+' d100 ('+esc(w.amputation.roll)+') · HMK 168'}. Zhojení pahýlu končetinu neobnoví.</p>`:''}<p>${esc(w.healed?'Zhojeno':w.infected?'Infekce: vyžaduje Infection Course':w.bleeding?'Bleeder: neodkladně Blood Loss / Blood Stoppage':('IL '+w.level+' '+w.aspect))}</p>
+ ${bestiaryFrostAmputationForm571(a,w,health,minute)}
  ${w.projectileRemoved?'<p class="hc-hint">Extraction: projektil byl odstraněn; následné krvácení a hojení se sleduje samostatně.</p>':''}${w.permanentImpairment?`<p class="hc-hint">Trvalé Impairment: ${w.permanentImpairment} (podle doby do M1; HMK 182). Ztráta části těla se sleduje zvlášť.</p>`:''}
  <p>Další termín: ${esc(display(w.nextDueMinute))}${w.nextDueMinute!=null&&minute>w.nextDueMinute?' · PO TERMÍNU':''}</p>
  ${w.bleeding&&health.shock!=='killed'?`<form data-hmk-beast-blood-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}">
@@ -4003,7 +4041,7 @@ function bestiaryHealthPanel567(active,cid,minute){
  <label>Fatigue mimo nemoc<input type="number" min="0" max="300" step="5" name="fatigue" value="0" required></label>
  <label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="confirmed" required> GM potvrzuje skutečný jednodenní Course</label>
  <button type="submit" ${minute!==w.infectionDueMinute?'disabled':''}>Vyhodnotit Infection Course (HMK 181)</button></form>`:''}
- ${!w.healed&&!w.infected&&!w.bleeding&&!w.treatment&&health.shock==='none'?`<form data-hmk-beast-treat-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}">
+ ${!w.healed&&w.aspect!=='frost'&&!w.infected&&!w.bleeding&&!w.treatment&&health.shock==='none'?`<form data-hmk-beast-treat-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}">
  <label>Ověřené Physician ML<input type="number" name="physicianML" min="1" max="300" required></label>
  <label>Physician Index<input type="number" name="physicianIndex" min="1" max="30" required></label>
  <label>Skutečné Treatment d100<input type="number" name="roll" min="1" max="100" required></label>
@@ -4011,6 +4049,7 @@ function bestiaryHealthPanel567(active,cid,minute){
  <label class="hmk-bestiary-wide hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje povolený zákrok, vybavení a jeho skutečné provedení</label><button type="submit">Doložit ošetření (HMK 180)</button></form>`:''}
  ${!w.healed&&!w.infected&&w.treatment&&!w.bleeding&&!health.wounds.some(z=>!z.healed&&z.infected)&&health.shock==='none'?`<form data-hmk-beast-heal-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}"><label>Skutečný Healing d100<input type="number" min="1" max="100" name="roll" required></label><label class="hmk-bestiary-wide hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje pětidení interval a platný Healing Roll</label><button type="submit" ${minute!==w.nextDueMinute?'disabled title="Healing je dovolen pouze přesně v doloženém čase"':''}>Provést Healing Roll</button></form>`:''}
  </article>`).join('')||'<p>Žádná zranění tohoto tvora nejsou doložena.</p>'}</div>
+ ${bestiaryFrostSourceForm571(a,health)}
  ${health.bloodLoss?.bp>0&&health.shock!=='killed'?`<p class="hc-hint"><strong>Blood Loss:</strong> BP ${health.bloodLoss.bp} · Weakness ${health.bloodLoss.weaknessFatigue} · regenerace ${esc(display(health.bloodHealingDueMinute))}</p>
  <form data-hmk-beast-blood-healing-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}">
  <label>Skutečný END d100<input name="roll" type="number" min="1" max="100" required></label>
@@ -12080,6 +12119,38 @@ document.addEventListener('submit',e=>{
    data.journal.push({id:uuid(),characterId:null,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
     title:'Bestiář · Coma Course: '+actor.name,body:'HMK 179 · d100 ('+v.roll+') · '+proof.sl+' · HR '+proof.afterHR,bestiaryTrauma:proof});});
  }catch(error){alert('Bestiář · Coma: '+error.message)}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-hmk-beast-frost-source-571],[data-hmk-beast-frost-amp-571]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const v=Object.fromEntries(new FormData(f)),cid=campaignKey(data.campaignClock),minute=data.campaignClock?.minute;
+ try{
+  const actor=encounterBeastHistory(data,cid).find(x=>x.id===v.targetId&&x.active);
+  if(!actor)throw Error('Tvor není aktivním účastníkem encounteru.');
+  const previous=animalHealthProjection567(data.journal,cid,actor.id),eventId=uuid();
+  const frost=f.matches('[data-hmk-beast-frost-source-571]');
+  const p=frost?prepareAnimalFrostInjury571({profile:{...actor.profile,id:actor.id},previous,
+   minute,eventId,zoneNumber:Number(v.zoneNumber),locationD10:Number(v.locationD10),level:Number(v.level),
+   source:v.source,sourceDetails:v.sourceDetails,facialFeature:String(v.facialFeature||'').trim(),
+   wingAsLimbConfirmed:v.wingAsLimbConfirmed==='on',
+   shockRoll:Number(v.shockRoll),shockFatigue:Number(v.shockFatigue),gmConfirmed:v.confirmed==='on'}):
+   prepareAnimalFrostAmputation571({profile:{...actor.profile,id:actor.id},previous,
+    wound:previous.wounds.find(w=>w.id===v.woundId),minute,eventId,
+    physicianML:Number(v.physicianML),physicianIndex:Number(v.physicianIndex),physicianRoll:Number(v.physicianRoll),
+    dexSecondaryModifier:Number(v.dexSecondaryModifier),shockRoll:Number(v.shockRoll),
+    shockFatigue:Number(v.shockFatigue),amputationRoll:v.amputationRoll?Number(v.amputationRoll):null,
+    procedureConfirmed:v.procedureConfirmed==='on',gmConfirmed:v.confirmed==='on'});
+  p.format='hmk-bestiary-trauma-567-v1';p.campaignId=cid;
+  if(!ask(frost?`Doložit Grievous Frost ${v.level} pro ${actor.name}?`:
+   `Provést AMP u ${actor.name}? Trvalá ztráta + nové ${p.edgeLevel>=4?'G':'S'}${p.edgeLevel}e${p.bleeding?' s krvácením':''}; změnu nelze vrátit.`))return;
+  mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock?.minute!==minute)
+    throw Error('Herní čas se mezitím změnil.');
+   data.journal.push({id:eventId,characterId:null,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+    title:'Bestiář · '+(frost?'Grievous Frost: ':'Frost Amputation: ')+actor.name,
+    body:frost?`HMK 178/185 · ${p.location.name} · G${p.level}f · Shock ${p.shock.after}`:
+     `HMK 178/180 · AMP ${p.permanentLoss.site} → ${p.edgeLevel>=4?'G':'S'}${p.edgeLevel}e${p.bleeding?' · Bleeder':''} · Shock ${p.shock.after}`,
+    bestiaryTrauma:p});});
+ }catch(error){alert('Bestiář · Grievous Frost: '+error.message);}
 },true);
 document.addEventListener('submit',e=>{
  const f=e.target;if(!f?.matches?.('[data-hmk-beast-treat-567],[data-hmk-beast-heal-567]'))return;
