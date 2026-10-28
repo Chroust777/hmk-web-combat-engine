@@ -5594,3 +5594,13 @@ main.content:not(.content-sheet) :is(.hc-hint,.tiny,.muted){font-size:12px!impor
 .content-sheet .journal-book--gm-history .gm-history-person>summary span{font-weight:400;font-size:12px;color:#795d3b;}
 .content-sheet .journal-book--gm-history .gm-history-person__content{padding:6px 10px 12px;min-width:0;}
 .content-sheet .journal-book--gm-history .gm-history-person[hidden]{display:none!important;}
+
+/* v93.556: uniform helper text in the Provisions food/water panels,
+   including the empty-vessel message, on both calendar and sheet routes. */
+main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
+ .hc-provision-help,.hc-provision-caution,.hc-provision-next,
+ .hc-provision-pool,.hc-provision-ledger > small,
+ .hc-provision-carry-summary > small){
+ font-family:var(--hmk-book-body-font),Georgia,serif!important;
+ font-size:12px!important;line-height:1.35!important;
+}
