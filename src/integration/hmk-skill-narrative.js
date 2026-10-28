@@ -148,7 +148,7 @@ export function skillNarrativeOpposed({attackerName,defenderName,primary,defende
  if(scene||objective)lines.push(sceneContext({objective,scene}));
  if(comparison?.tie){
   lines.push('Oba výsledky jsou v tomto střetu vyrovnané; ani jeden účastník nezískal převahu.');
-  lines.push(comparison.persuasionTie?'Pravidla příslušného přesvědčování vyžadují rozhodnutí remízy, než bude možné vyhlásit vítěze.':'Pokud je pro další průběh potřeba vítěz, může následovat pravidlově přípustný rozstřel.');
+  lines.push(comparison.persuasionTie?'Pravidla příslušného přesvědčování vyžadují rozhodnutí remízy, než bude možné vyhlásit vítěze.':'Dokud se nerozhodne o dalším postupu, žádný z obou účastníků nemůže svou převahu prohlásit za rozhodující.');
  }else if(comparison?.bothFailed){
   const winner=comparison.winner==='a'?a:comparison.winner==='b'?b:null;
   lines.push('Ani jeden z obou pokusů neskončil úspěchem; zamýšlené cíle proto nebyly dosaženy.');

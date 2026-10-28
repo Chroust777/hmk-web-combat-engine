@@ -5459,3 +5459,26 @@ main.content :is(.field-grid,.hsk-form-grid,.hc-form-grid,.hmk-form-grid,.hsk-se
 /* Compact helper text in non-folio views as well, without touching the
    character-creation step prompts or the numerical result displays. */
 main.content:not(.content-sheet) :is(.hc-hint,.tiny,.muted){font-size:12px!important;line-height:1.35!important}
+
+/* v93.553 — permanent record contents, only the rule witnesses expand. */
+.content-sheet .journal-book--chapter .journal-log-content {
+ grid-column:1 / -1;min-width:0;width:100%;overflow-wrap:anywhere;
+ font:inherit;color:inherit;
+}
+.content-sheet .journal-book--chapter .journal-log-content > p,
+.content-sheet .journal-book--gm-history .gm-history-plain-body {
+ margin:4px 0;line-height:1.45;overflow-wrap:anywhere;
+}
+.content-sheet .journal-book--chapter .hsk-saved-proof__story p {
+ margin:6px 0;white-space:normal;line-height:1.5;overflow-wrap:break-word;
+ font:inherit;
+}
+.content-sheet .journal-book--chapter .hsk-saved-proof__details {
+ margin:7px 0 0;min-width:0;
+}
+.content-sheet .journal-book--chapter .hsk-saved-proof__details > summary {
+ font-weight:600;line-height:1.4;cursor:pointer;
+}
+.content-sheet .journal-book--chapter .hsk-saved-proof__details pre {
+ font:inherit;white-space:pre-wrap;overflow-wrap:anywhere;max-height:34rem;overflow:auto;
+}

@@ -266,7 +266,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.552';
+const APP_VERSION='93.553';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3343,7 +3343,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  const hidden=hiddenLogbookIds(data,c.id);
  const visible=visibleLogbookEntries(logs,hidden).filter(j=>!isRoutineInventoryHistory(j));
  const removed=logs.filter(l=>hidden.has(l.id)&&!isRoutineInventoryHistory(l));
- const renderLog=l=>`<div class="list-row journal-log-row journal-log-row--slim" data-journal-entry="${esc(l.id)}"><div class="journal-log-one-line"><b title="${esc(visibleEvidenceText(l.title))}">${esc(visibleEvidenceText(l.title))}</b><span class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</span></div><div class="actions journal-log-small-actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}" title="Upravit poznámku">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}" title="Smazat poznámku">Smazat</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Skrýt ze seznamu; pravidlový doklad se nemaže">Skrýt</button>`}</div><details class="journal-log-expand"><summary>Obsah záznamu</summary>${l.skillTestProof?skillTestEvidenceHTML(l,esc):`<p>${esc(visibleEvidenceText(l.body)).replace(/\n/g,'<br>')}</p>`}</details></div>`;
+ const renderLog=l=>`<div class="list-row journal-log-row journal-log-row--slim" data-journal-entry="${esc(l.id)}"><div class="journal-log-one-line"><b title="${esc(visibleEvidenceText(l.title))}">${esc(visibleEvidenceText(l.title))}</b><span class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</span></div><div class="actions journal-log-small-actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}" title="Upravit poznámku">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}" title="Smazat poznámku">Smazat</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Skrýt ze seznamu; pravidlový doklad se nemaže">Skrýt</button>`}</div><div class="journal-log-content">${l.skillTestProof?skillTestEvidenceHTML(l,esc,{nameById:id=>character(id)?.name}):`<p>${esc(visibleEvidenceText(l.body)).replace(/\n/g,'<br>')}</p>`}</div></div>`;
  const recent=journalCategorySections(visible,rows=>rows.map(renderLog).join(''),{limit:15});
  const archived='';
  const hiddenRecords=removed.length?`<details class="journal-log-archive journal-hidden-records"><summary>Skryté položky · ${removed.length} (obnovitelné)</summary>${removed.map(l=>`<div class="list-row"><span>${esc(l.title)}</span><button class="secondary" type="button" data-restore-log="${esc(l.id)}">Vrátit do logu</button></div>`).join('')}</details>`:'';
@@ -3874,7 +3874,7 @@ function gmHistoryView(){
   const procedure=proof?'skills':j.origin==='cash'?'gear':j.calendarInventoryRationStock||j.calendarInventoryWaterFill||j.calendarInventoryRationLoss||j.calendarInventoryWaterLoss||j.calendarNutritionPolicy||j.calendarForagingSupplyUse?'provisions':null;
   // Full-width evidence lives in the following cell spanning all four columns.
   // It remains visually attached to its own event and never changes the journal.
-  return `<tr class="gm-history-event-row"><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(visibleEvidenceText(j.title||'Událost'))}</strong></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(j.characterId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(j.characterId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr><tr class="gm-history-expanded-row"><td colspan="4"><details class="gm-history-detail"><summary>Podrobnosti události</summary>${j.skillTestProof?skillTestEvidenceHTML(j,esc):`<div>${esc(visibleEvidenceText(j.body||'Bez popisu'))}</div>`}</details></td></tr>`;
+  return `<tr class="gm-history-event-row"><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(visibleEvidenceText(j.title||'Událost'))}</strong></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(j.characterId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(j.characterId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr><tr class="gm-history-expanded-row"><td colspan="4"><div class="gm-history-detail">${j.skillTestProof?skillTestEvidenceHTML(j,esc,{nameById:id=>names.get(id)}):`<div class="gm-history-plain-body">${esc(visibleEvidenceText(j.body||'Bez popisu')).replace(/\n/g,'<br>')}</div>`}</div></td></tr>`;
  };
  const table=rows=>`<div class="hc-provision-table-scroll"><table class="hc-provision-table gm-history-table"><thead><tr><th>Čas</th><th>Postava</th><th>Událost</th><th>Otevřít</th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>`;
  return journalChapterShell('GM · Historie činností',`${czCount(meaningfulEntries.length,'doložený záznam','doložené záznamy','doložených záznamů')} postav a kampaní`,
@@ -6874,11 +6874,11 @@ function hskResultRichHTML(proof,body){
    hskVerdictMetric('Vítěz',winner?.name||'—')+hskVerdictMetric('Victory Stars','1 ★')+
    hskVerdictMetric('Rozhodující kritérium',proof.method==='higher-d100'?'Vyšší d100':proof.method==='higher-ml'?'Vyšší ML':'Rozhodující d10')+'</div></section>';
  }else{
-  html+=hskVerdictSide('Aktivní strana',actor?.name,a,proof.secondaryRollResult,proof.emlRangeA);
-  if(b)html+=hskVerdictSide('Protistrana',opponent?.name,b,proof.secondaryRollResultB,proof.emlRangeB);
+  html+=hskVerdictSide('Postava',actor?.name,a,proof.secondaryRollResult,proof.emlRangeA);
+  if(b)html+=hskVerdictSide('Oponent',opponent?.name,b,proof.secondaryRollResultB,proof.emlRangeB);
   let winner='—',stars=0,summary='';
   if(comparison){winner=comparison.winner==='a'?actor?.name:comparison.winner==='b'?opponent?.name:comparison.bothFailed?'Nikdo (oba neuspěli)':'Remíza';stars=comparison.stars||0;
-   summary=comparison.tie?(comparison.persuasionTie?'Persuasion · HMK str.138: rozhodnout remízu i při F/F či CF/CF, bez opakování původních d100.':'Rozstřel lze použít jen při shodném S/S nebo CS/CS, pokud je potřeba rozhodnout vítěze.'):'';}
+   summary=comparison.tie&&comparison.persuasionTie?'Persuasion · HMK str.138: remízu je nutné pravidlově rozhodnout, bez opakování původních d100.':'';}
   else if(type==='assistance-success-test'){winner=a?.level||'—';stars=a?.unopposedStars||0;summary='Bonus pomocníků se započítává do EML (nejvýše +10).';}
   else if(type.includes('value')){winner=a?.level||'—';stars=a?.svTier?.stars||0;summary='SV '+(a?.sv??'—')+' · '+(a?.svTier?.label||'');}
   else{winner=a?.level||'—';stars=a?.unopposedStars||0;}
@@ -8668,7 +8668,7 @@ function hskResultText(side,{person,mastery,secs,ctx,die,result,sr}){
   ctx.breakdown.map(x=>' '+hskSigned(x.value)+' '+x.label).join('')+' '+hskSigned(Number.isSafeInteger(result.gmModifier)?result.gmModifier-ctx.modifier:0)+' GM situace';
  const warnings=(ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+(ctx.armourIsProvisional?'\nPŘEDBĚŽNÝ výsledek: '+ctx.provisionalArmour.join('; '):'');
  return side+' · '+person.name+' / '+mastery.name+' | '+breakdown+' = EML '+(result.eml??'—')+
-  '\nPrimární '+(result.forcedCF?'vynucené CF bez hodu':'d100 ('+result.roll+') ['+die.origin+']')+' → '+(result.victoryLevel||result.level)+
+  '\nPrimární '+(result.forcedCF?'vynucené CF bez hodu':'d100 ('+result.roll+')')+' → '+(result.victoryLevel||result.level)+
   (result.splitCF?' ['+result.splitCF+(result.splitCF==='CF0'?' / potenciální Fumble':' / potenciální Stumble')+' – jen při předepsané činnosti]':'')+
   (result.footpadSourceIds?'\nFootpad (HMK 272) · Primary ML +'+result.footpadBonusML+' ('+result.footpadSourceIds.join(', ')+'); původní ML '+result.footpadBaseML+'.':'')+
   (result.eruditionSourceIds?'\nErudition (HMK 271) · doložené S → CS ('+result.eruditionSourceIds.join(', ')+'); původní d100 / EML zůstávají.':'')+
@@ -8687,7 +8687,7 @@ document.addEventListener('submit',event=>{
   const proof=saved.skillTestProof;
   if(!proof?.comparison?.tie||!canResolveOpposedTie(proof.a,proof.b,{persuasion:!!proof.comparison.persuasionTie}))throw Error('HMK str.61/138: rozstřel jen při doložené remíze; F/F a CF/CF pouze u Persuasion.');
   if(data.journal.some(x=>x.skillTestProof?.type==='opposed-tiebreak'&&x.skillTestProof.originSkillTestId===originId))throw Error('Tato remíza již byla rozhodnuta.');
-  const opponent=character(proof.opponentId);if(!opponent)throw Error('Protistrana již není dostupná.');
+  const opponent=character(proof.opponentId);if(!opponent)throw Error('Oponent již není dostupný.');
   if(hskTieDiceOrigin!==originId){hskTieDiceOrigin=originId;hskTieDiceAttempts=[];}
   const requiresD10=proof.a.roll===proof.b.roll&&proof.a.ml===proof.b.ml;
   const da=requiresD10?skillDie(form,'tieD10A',10):null;
@@ -8793,7 +8793,7 @@ document.addEventListener('submit',event=>{
    comparison=resolveOpposedTests(a.result,b.result,{breakTie:false,persuasion:persuasionAction});
    const winner=comparison.winner==='a'?actor.name:comparison.winner==='b'?other.name:comparison.bothFailed?'Nikdo (oba testy neuspěly)':'Nikdo (remíza)';
    body+='\n\n'+hskResultText('B',b)+'\n\nVítěz: '+winner+' · Victory Stars: '+comparison.stars+' '+(comparison.stars?'★'.repeat(Math.min(10,comparison.stars)):'—')+
-     (comparison.persuasionTie?'\nPersuasion: HMK str.138 vyžaduje rozhodnout i neúspěšnou remízu F/F nebo CF/CF.':'\nRozstřel: dostupný jen při shodném S/S nebo CS/CS, pokud činnost vyžaduje vítěze.');
+     (comparison.persuasionTie?'\nPersuasion: HMK str.138 vyžaduje rozhodnout i neúspěšnou remízu F/F nebo CF/CF.':'');
   }else if(sv){if(a.helpers.length)body+='\nAlchemy Assistance · '+a.helpers.map(x=>x.actor.name+' ML '+x.mastery.ml).join('; ')+' · bonus EML +'+a.result.assistance;body+='\n\nIndex Primary ML '+a.result.index+' + SL modifier '+({'CF':-2,'F':-1,'S':0,'CS':1}[a.result.level])+
     ' + předepsaný SR bonus '+(a.result.secondarySVBonus||0)+' = SV '+a.result.sv+' · '+a.result.svTier.label+' · '+a.result.svTier.stars+' SV ★ '+(a.result.svTier.stars?'★'.repeat(Math.min(10,a.result.svTier.stars)):'—')+(a.result.level==='CF'?'\nPozor: CF může podle konkrétní činnosti způsobit další následek bez ohledu na hodnotu SV.':'');
   }else body+='\nUnopposed Victory Stars: '+a.result.unopposedStars+' '+(a.result.unopposedStars?'★'.repeat(a.result.unopposedStars):'—');
