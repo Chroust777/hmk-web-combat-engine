@@ -4,11 +4,12 @@
  * transition is deliberately blocked rather than producing an invented outcome.
  */
 import {previewAnimalContact566} from './hmk-bestiary-anatomy-566.js';
+import {resolveAnimalAmputation570} from './hmk-bestiary-amputation-570.js';
 import {SL,successLevel} from '../rules/tests.js';
 import {calculateShockState,applyShockState,shockRecoverySchedule,resolveShockReroll} from '../rules/shock.js';
 import {injuryFromEffectiveImpact} from '../rules/injury.js';
 import {bloodStoppageResult,applyBloodLoss} from '../rules/bleeding.js';
-import {healingBase,treatmentContract,treatmentRollEMLFromInjury,resolveTreatmentTable,
+import {healingBase,treatmentContract,treatmentRollEMLFromInjury,resolveTreatmentTable,permanentHealingImpairment,
  resolveInjuryHealingRoll,healingFailureIsCritical,treatmentDurationMinutes,infectionInitialHR,resolveInfectionCourse,resolveBloodLossHealing} from '../rules/healing.js';
 
 const valid=(x,msg)=>{if(!x)throw Error(msg)};
@@ -44,12 +45,13 @@ export function animalHealthProjection567(journal,campaignId,encounterId){
    if(p.injury){valid(!byId(wounds,p.woundId),'Duplicitní rána tvora.');
     wounds.push({id:p.woundId,sourceId:row.id,location:p.location.id,locationName:p.location.name,
      level:p.injury.level,aspect:p.aspect,bleeding:p.bleeding,minute:p.minute,
-     treatment:null,infected:false,healed:false,staunchBonus:0,nextDueMinute:p.bleeding?p.minute+5:null,
+     treatment:null,infected:false,healed:false,permanentImpairment:0,projectileRemoved:false,amputation:p.amputation?.severed?p.amputation:null,
+     staunchBonus:0,nextDueMinute:p.bleeding?p.minute+5:null,
      grimDueMinute:p.injury.level>=4?p.minute+1440:null});}
   }else if(p.kind==='blood'){
    const wound=byId(wounds,p.woundId);valid(wound&&wound.bleeding&&!wound.healed,'Blood Stoppage / Loss bez aktivního Bleeder.');
    wound.bleeding=!p.stopped;wound.staunchBonus=p.nextStaunchBonus;
-   wound.nextDueMinute=p.stopped?null:p.minute+5;
+   wound.nextDueMinute=p.stopped?(wound.treatment?Math.max(wound.minute+7200,p.minute):null):p.minute+5;
    if(p.bp>bloodLoss.bp&&bloodLoss.bp===0)bloodHealingDueMinute=p.minute+14400;
    bloodLoss={bp:p.bp,weaknessFatigue:p.bp*5};
    if(p.after!==shock){shockOriginMinute=p.minute;shockDueMinute=p.after==='unconscious'?p.minute+10:null;}
@@ -80,12 +82,17 @@ export function animalHealthProjection567(journal,campaignId,encounterId){
   }else if(p.kind==='treatment'){
    const w=byId(wounds,p.woundId);valid(w&&!w.healed&&!w.treatment,'Neplatné opakované ošetření.');
    valid(!w.bleeding,'Krvácející rána musí být nejprve pravidlově zastavena.');
-   w.treatment={hr:p.healingRate,method:p.method,treatedAt:p.minute,possibleInfection:p.possibleInfection};
+   w.treatment={hr:p.healingRate,method:p.method,treatedAt:p.minute,possibleInfection:p.possibleInfection,
+    permanentImpairmentEligible:!!p.permanentImpairmentEligible};
+   if(p.surgicalBleeding)w.bleeding=true;
+   if(p.projectileRemoved)w.projectileRemoved=true;
    if(p.healed){w.healed=true;w.level=0;w.nextDueMinute=null;w.grimDueMinute=null;}
-   else {w.nextDueMinute=w.minute+7200;w.grimDueMinute=p.grimWound?p.minute+1440:null;} // 5 days after original injury (HMK p181)
+   else {w.nextDueMinute=p.surgicalBleeding?p.minute+5:w.minute+7200;w.grimDueMinute=p.grimWound?w.minute+1440:null;} // HMK pp178–181
   }else if(p.kind==='healing'){
    const w=byId(wounds,p.woundId);valid(w&&!w.healed&&w.treatment&&!w.infected,'Healing Roll bez aktivní ošetřené rány.');
-   w.level=p.afterLevel;w.healed=w.level===0;w.infected=p.infected;
+   const beforeLevel=w.level;w.level=p.afterLevel;w.healed=w.level===0;w.infected=p.infected;
+   if(beforeLevel>1&&w.level<=1&&w.treatment?.permanentImpairmentEligible)
+    w.permanentImpairment=permanentHealingImpairment({eligible:true,daysToMinor:Math.floor((p.minute-w.minute)/1440)});
    if(w.level<4)w.grimDueMinute=null;
    if(p.infected){w.infectionHR=infectionInitialHR(w.treatment.hr);w.infectionDueMinute=p.minute+1440;}
    w.nextDueMinute=w.healed||w.infected?null:p.minute+7200;
@@ -102,7 +109,8 @@ export function animalHealthProjection567(journal,campaignId,encounterId){
  }
  infectionDueMinute=wounds.reduce((due,w)=>w.infected&&w.infectionDueMinute!==null?Math.min(due,w.infectionDueMinute):due,Infinity);
  if(infectionDueMinute===Infinity)infectionDueMinute=null;
- return {wounds,shock,bloodLoss,bloodHealingDueMinute,infectionDueMinute,records,lastMinute,shockOriginMinute,shockDueMinute,extendedShockDueMinute,extendedShock,coma,comaDueMinute,comaStartMinute,comaWeariness};
+ return {wounds,permanentLosses:wounds.filter(w=>w.amputation?.severed).map(w=>({id:w.id,location:w.location,side:w.amputation.side,sourcePage:168})),
+  shock,bloodLoss,bloodHealingDueMinute,infectionDueMinute,records,lastMinute,shockOriginMinute,shockDueMinute,extendedShockDueMinute,extendedShock,coma,comaDueMinute,comaStartMinute,comaWeariness};
 }
 /** Requires a fully confirmed physical hit; automatically derives only the parts
  * that are valid without untranscribed Bleeding/Amputation symbols. */
@@ -140,15 +148,19 @@ export function prepareAnimalHit567({attacker,defender,inputs,previous,minute,ev
  }else valid(inputs.compoundD10===null||inputs.compoundD10===undefined,
    'Compound d10 zadávej pouze při skutečném opakovaném zranění téže lokality.');
  if(!medical.injury&& !medical.glancing)throw Error('Není zdravotní účinek.');
- // Exotic anatomical symbols need validated GM rulings; do not infer amputation.
- if(medical.injury?.level===5&&contact.aspect==='e')throw Error('G5e: Amputation Sequence se zatím nesmí nahradit čestným potvrzením. Zdravotní zápis je blokován.');
+ // p168: amputation symbols are read from the animal-specific ZN/LN table.
+ // Do not change the anatomical location proof object: old journals use it.
+ const amputation=resolveAnimalAmputation570({location:contact.location,
+  injuryLevel:medical.injury?.level,aspect:contact.aspect,roll:inputs.amputationD100??null});
+ if(medical.injury?.level===5&&contact.aspect==='e')
+  valid(inputs.bleeding===true,'G5e v tabulkách zvířat má krvácivou značku: následuje Blood Loss Sequence.');
  const printedShock=defender.profile.combat?.shock;
  valid(int(printedShock,1,300),'Cíl nemá ověřený Shock ML.');
- const eml=printedShock-inputs.shockFatigue+(medical.shockTestModifier||0),sl=successLevel(inputs.shockRoll,eml);
+ const eml=printedShock-inputs.shockFatigue+(medical.shockTestModifier||0)+(amputation?.shockPenalty||0),sl=successLevel(inputs.shockRoll,eml);
  const injuryShock=compound?.success?compound.injuryShock:medical.injuryShock;
  const shk=calculateShockState({locationShock:contact.location.locationShock,injuryShock,shockSL:sl});
- const total=applyShockState(previous?.shock||'none',shk.state);
- const due=total==='unconscious'?minute+10:inputs.bleeding?minute+5:null;
+ const total=amputation?.lethalNeck?'killed':applyShockState(previous?.shock||'none',shk.state);
+ const due=total==='killed'?null:total==='unconscious'?minute+10:inputs.bleeding?minute+5:null;
  return {format:ANIMAL_TRAUMA_FORMAT_567,kind:'hit',campaignId:inputs.campaignId,targetId:defender.id,
   sourceId:attacker.id,woundId:medical.injury?eventId:null,minute,
   contactInputs:{weaponIndex:inputs.weaponIndex,aimZN:inputs.aimZN,zdRoll:inputs.zdRoll,
@@ -156,7 +168,8 @@ export function prepareAnimalHit567({attacker,defender,inputs,previous,minute,ev
   location:contact.location,aspect:contact.aspect,strikeImpact:contact.strikeImpact,
   effectiveImpact:contact.effectiveImpact,armourValue:contact.armourValue,
   injury:medical.injury?clone(medical.injury):null,glancing:medical.glancing,bleeding:inputs.bleeding,...(compound?{compound}:{}),
-  rigidArmour:inputs.rigidArmour==='yes',specialsReviewed:true,amputationResolved:inputs.amputationResolved===true,
+  ...(amputation?{amputation}:{}),
+  rigidArmour:inputs.rigidArmour==='yes',specialsReviewed:true,amputationResolved:!!amputation||inputs.amputationResolved===true,
   shock:{ml:printedShock,fatigue:inputs.shockFatigue,eml,roll:inputs.shockRoll,
    level:names[sl],location:contact.location.locationShock,injury:injuryShock,
    index:shk.index,incoming:shk.state,after:total,followup:shockRecoverySchedule(total)},
@@ -295,28 +308,41 @@ export function prepareAnimalGrimShock568({profile,previous,wound,minute,roll,fa
   minute,roll,fatigue,ml,eml,sl:names[sl],locationShock,injuryLevel:wound.level,index:result.index,
   incoming:result.state,after,sourcePage:180};
 }
-/** Treatment table is identical across human and animal wounds, but exotic
- * interventions (frost G, amputation, new bleeder, infection) are blocked. */
-export function prepareAnimalTreatment567({wound,profile,previous,minute,physicianML,physicianIndex,roll,gmConfirmed}={}){
+/** HMK pp178–180: ordinary dressings and surgical SUR/EXT treatments.
+ * Surgical CF/F may open a new Bleeder, with a five-minute follow-up.
+ * Frost AMP is a distinct operation, not silently treated as SUR. */
+export function prepareAnimalTreatment567({wound,profile,previous,minute,physicianML,physicianIndex,roll,
+ dexSecondaryModifier=0,surgeryEquipmentConfirmed=false,gmConfirmed}={}){
  valid(wound&&!wound.healed&&!wound.bleeding&&!wound.treatment,'Rána není připravena k prvnímu ošetření.');
  if(previous)valid(previous.shock==='none'&&!previous.extendedShock?.active&&!previous.coma?.active,'Nejdříve vyřeš Shock/Extended Shock/Coma.');
  valid(gmConfirmed===true,'GM musí potvrdit skutečného léčitele, vybavení a zákrok podle HMK str.178–180.');
  valid(int(minute,wound.minute,1e10)&&int(physicianML,1,300)&&int(physicianIndex,1,30)&&int(roll,1,100),'Neplatný čas, Physician nebo d100.');
  const days=Math.floor((minute-wound.minute)/1440),aspect=({b:'blunt',e:'edge',p:'point',f:'fire'}[wound.aspect]||wound.aspect);
  const c=treatmentContract({aspect,injuryLevel:wound.level});
- valid(!['amp','sur','ext'].includes(c.treatment),'Chirurgický zákrok vyžaduje vlastní navazující proceduru.');
+ valid(c.treatment!=='amp','Amputation jako frost treatment vyžaduje samostatnou doloženou proceduru.');
+ const surgical=['sur','ext'].includes(c.treatment);
+ if(surgical){valid(surgeryEquipmentConfirmed===true,
+  'Surgery / Extraction vyžaduje doložené chirurgické nástroje a materiál podle HMK str.178.');
+  valid(int(dexSecondaryModifier,-100,100),'Zadej přesný DEX Secondary Modifier léčitele.');}
+ else valid(dexSecondaryModifier===0&&!surgeryEquipmentConfirmed,'DEX a chirurgické nástroje patří jen k SUR/EXT.');
  valid(minute-wound.minute>=treatmentDurationMinutes({treatment:c.treatment,injuryLevel:wound.level}),
   'Neuplynula doložená minimální doba zákroku podle HMK str.178.');
- const eml=treatmentRollEMLFromInjury({physicianML,aspect,injuryLevel:wound.level,daysSinceInjury:days});
+ const eml=treatmentRollEMLFromInjury({physicianML,aspect,injuryLevel:wound.level,daysSinceInjury:days,
+  dexSecondaryModifier});
  const sl=successLevel(roll,eml),result=resolveTreatmentTable({aspect,injuryLevel:wound.level,sl,physicianIndex});
- valid(result.available&&['hr','heal'].includes(result.result.kind)&&!result.result.bleeding&&!result.grimWound,
-  'Tato kombinace ošetření má zvláštní zdravotní efekt nebo Grim Wound a potřebuje zvláštní proceduru.');
+ valid(result.available&&['hr','heal'].includes(result.result.kind)&&
+  (!result.result.bleeding||surgical)&&(!result.grimWound||surgical),
+  'Tato kombinace vyžaduje jinou, samostatně doloženou léčebnou proceduru.');
  const rate=result.result.healingRate??0;
  valid(result.result.immediateHeal||int(rate,1,6),'Nelze bezpečně určit Healing Rate.');
  return {format:ANIMAL_TRAUMA_FORMAT_567,kind:'treatment',targetId:profile.id,woundId:wound.id,
   minute,method:c.treatment,physicianML,physicianIndex,roll,sl:names[sl],eml,
   healingRate:rate,possibleInfection:!!result.result.infectionPossible,
-  healed:!!result.result.immediateHeal,sourcePage:180};
+  healed:!!result.result.immediateHeal,
+  ...(surgical?{dexSecondaryModifier,surgeryEquipmentConfirmed:true,
+   surgicalBleeding:!!result.result.bleeding,grimWound:!!result.grimWound,
+   projectileRemoved:c.treatment==='ext',
+   permanentImpairmentEligible:!!result.result.permanentImpairmentEligible}:{}),sourcePage:180};
 }
 export function prepareAnimalHealing567({wound,profile,previous,minute,roll,gmConfirmed}={}){
  valid(wound&&!wound.healed&&!wound.infected&&wound.treatment&&!wound.bleeding,'Healing Roll vyžaduje aktivní ošetřenou neinfikovanou ránu.');
@@ -351,7 +377,8 @@ export function validateAnimalTraumaJournal567(data){
     defender:{id:target.id,profile:target.profile},minute:t.minute,eventId:row.id,previous:prior,
     inputs:{...t.contactInputs,aimConfirmed:true,specialsReviewed:true,bleedingReviewed:true,
      bleeding:t.bleeding,rigidArmour:t.rigidArmour?'yes':'no',shockRoll:t.shock.roll,
-     shockFatigue:t.shock.fatigue,compoundD10:t.compound?.roll??null,amputationResolved:t.amputationResolved,campaignId:t.campaignId}});
+     shockFatigue:t.shock.fatigue,compoundD10:t.compound?.roll??null,amputationD100:t.amputation?.roll??null,
+     amputationResolved:t.amputationResolved,campaignId:t.campaignId}});
   }else if(t.kind==='blood'){
    const wound=byId(prior.wounds,t.woundId);
    expected=prepareAnimalBlood567({profile,previous:prior,wound,minute:t.minute,
@@ -380,7 +407,8 @@ export function validateAnimalTraumaJournal567(data){
   }else if(t.kind==='treatment'){
    const wound=byId(prior.wounds,t.woundId);
    expected=prepareAnimalTreatment567({wound,profile,previous:prior,minute:t.minute,physicianML:t.physicianML,
-    physicianIndex:t.physicianIndex,roll:t.roll,gmConfirmed:true});expected.campaignId=t.campaignId;
+    physicianIndex:t.physicianIndex,roll:t.roll,dexSecondaryModifier:t.dexSecondaryModifier??0,
+    surgeryEquipmentConfirmed:t.surgeryEquipmentConfirmed===true,gmConfirmed:true});expected.campaignId=t.campaignId;
   }else if(t.kind==='healing'){
    const wound=byId(prior.wounds,t.woundId);
    expected=prepareAnimalHealing567({wound,profile,previous:prior,minute:t.minute,roll:t.roll,gmConfirmed:true});
