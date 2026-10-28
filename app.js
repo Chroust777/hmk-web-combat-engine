@@ -19,6 +19,7 @@ import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOppose
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
+import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
 import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
 import {balanceNervesCandidate,resolveBalanceNerves} from './src/integration/hmk-skill-balance-547.js';
@@ -266,7 +267,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.554';
+const APP_VERSION='93.555';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3343,7 +3344,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  const hidden=hiddenLogbookIds(data,c.id);
  const visible=visibleLogbookEntries(logs,hidden).filter(j=>!isRoutineInventoryHistory(j));
  const removed=logs.filter(l=>hidden.has(l.id)&&!isRoutineInventoryHistory(l));
- const renderLog=l=>`<div class="list-row journal-log-row journal-log-row--slim" data-journal-entry="${esc(l.id)}"><div class="journal-log-one-line"><b title="${esc(visibleEvidenceText(l.title))}">${esc(visibleEvidenceText(l.title))}</b><span class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</span></div><div class="actions journal-log-small-actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}" title="Upravit poznámku">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}" title="Smazat poznámku">Smazat</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Skrýt ze seznamu; pravidlový doklad se nemaže">Skrýt</button>`}</div><div class="journal-log-content">${l.skillTestProof?skillTestEvidenceHTML(l,esc,{nameById:id=>character(id)?.name}):`<p>${esc(visibleEvidenceText(l.body)).replace(/\n/g,'<br>')}</p>`}</div></div>`;
+ const renderLog=l=>`<div class="list-row journal-log-row journal-log-row--slim" data-journal-entry="${esc(l.id)}"><div class="journal-log-one-line"><b title="${esc(visibleEvidenceText(historyDisplayTitle(l,id=>character(id)?.name)))}">${esc(visibleEvidenceText(historyDisplayTitle(l,id=>character(id)?.name)))}</b><span class="muted">${l.cashReceipt?esc(displayCampaignMinute(l.campaignMinute)):esc(new Date(l.createdAt).toLocaleString('cs-CZ'))}</span></div><div class="actions journal-log-small-actions">${isPersonalNote(l)?`<button class="secondary" data-edit-log="${esc(l.id)}" title="Upravit poznámku">Upravit</button><button class="danger" data-delete-log="${esc(l.id)}" title="Smazat poznámku">Smazat</button>`:`<button class="secondary" data-hide-log="${esc(l.id)}" title="Skrýt ze seznamu; pravidlový doklad se nemaže">Skrýt</button>`}</div><div class="journal-log-content">${l.skillTestProof?skillTestEvidenceHTML(l,esc,{nameById:id=>character(id)?.name}):`<p>${esc(visibleEvidenceText(l.body)).replace(/\n/g,'<br>')}</p>`}</div></div>`;
  const recent=journalCategorySections(visible,rows=>rows.map(renderLog).join(''),{limit:15});
  const archived='';
  const hiddenRecords=removed.length?`<details class="journal-log-archive journal-hidden-records"><summary>Skryté položky · ${removed.length} (obnovitelné)</summary>${removed.map(l=>`<div class="list-row"><span>${esc(l.title)}</span><button class="secondary" type="button" data-restore-log="${esc(l.id)}">Vrátit do logu</button></div>`).join('')}</details>`:'';
@@ -3373,7 +3374,7 @@ function sheetView(){
   title:'Úprava hotovosti GM',body:(p.deltaPence>0?'+':'')+p.deltaPence+'d · '+p.reason+
    ' · čas kampaně '+displayCampaignMinute(p.campaignMinute),
   campaignMinute:p.campaignMinute,createdAt:p.at||''}))]:[];
- const logs=[...data.journal.filter(x=>x.characterId===c.id),...cashLogs].sort((a,b)=>
+ const logs=[...data.journal.filter(x=>historyBelongsToCharacter(x,c.id)),...cashLogs].sort((a,b)=>
   String(b.createdAt||'').localeCompare(String(a.createdAt||''))||
   (b.campaignMinute??-1)-(a.campaignMinute??-1));
  return `${activeSheetSection==='overview'?characterJournalHero(c,inv,editing):sheetSupplementTabs(c,inv,editing,auditPanel,logs)}`
@@ -3869,16 +3870,22 @@ function gmHistoryView(){
  // Presentation only. Never remove original custody or physical-water evidence.
  const meaningfulEntries=entries.filter(j=>!isRoutineInventoryHistory(j));
  meaningfulEntries.sort((a,b)=>(b.campaignMinute??-1)-(a.campaignMinute??-1)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
- const row=j=>{
-  const name=names.get(j.characterId)||'GM / svět',ref=!!names.get(j.characterId),proof=j.skillTestProof;
+ const row=(j,viewCharacterId=null)=>{
+  const ownerId=viewCharacterId||j.characterId;
+  const name=names.get(ownerId)||'GM / svět',ref=!!names.get(ownerId),proof=j.skillTestProof;
   const procedure=proof?'skills':j.origin==='cash'?'gear':j.calendarInventoryRationStock||j.calendarInventoryWaterFill||j.calendarInventoryRationLoss||j.calendarInventoryWaterLoss||j.calendarNutritionPolicy||j.calendarForagingSupplyUse?'provisions':null;
   // Full-width evidence lives in the following cell spanning all four columns.
   // It remains visually attached to its own event and never changes the journal.
-  return `<tr class="gm-history-event-row"><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(visibleEvidenceText(j.title||'Událost'))}</strong></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(j.characterId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(j.characterId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr><tr class="gm-history-expanded-row"><td colspan="4"><div class="gm-history-detail">${j.skillTestProof?skillTestEvidenceHTML(j,esc,{nameById:id=>names.get(id)}):`<div class="gm-history-plain-body">${esc(visibleEvidenceText(j.body||'Bez popisu')).replace(/\n/g,'<br>')}</div>`}</div></td></tr>`;
+  return `<tr class="gm-history-event-row"><td>${esc(j.campaignMinute==null?(j.createdAt||'—'):displayCampaignMinute(j.campaignMinute))}</td><td>${esc(name)}</td><td><strong>${esc(visibleEvidenceText(historyDisplayTitle(j,id=>names.get(id))))}</strong></td><td class="gm-history-links">${ref?`<button type="button" class="secondary" data-gm-history-open="${esc(ownerId)}" data-gm-history-entry="${esc(j.id)}">Osobní záznam ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(ownerId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr><tr class="gm-history-expanded-row"><td colspan="4"><div class="gm-history-detail">${j.skillTestProof?skillTestEvidenceHTML(j,esc,{nameById:id=>names.get(id)}):`<div class="gm-history-plain-body">${esc(visibleEvidenceText(j.body||'Bez popisu')).replace(/\n/g,'<br>')}</div>`}</div></td></tr>`;
  };
- const table=rows=>`<div class="hc-provision-table-scroll"><table class="hc-provision-table gm-history-table"><thead><tr><th>Čas</th><th>Postava</th><th>Událost</th><th>Otevřít</th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table></div>`;
+ const table=(rows,personId)=>`<div class="hc-provision-table-scroll"><table class="hc-provision-table gm-history-table"><thead><tr><th>Čas</th><th>Postava</th><th>Událost</th><th>Otevřít</th></tr></thead><tbody>${rows.map(j=>row(j,personId)).join('')}</tbody></table></div>`;
+ const characters=[...data.characters,...data.trash].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'cs')||String(a.id).localeCompare(String(b.id)));
+ const grouped=groupHistoryByCharacter(meaningfulEntries,characters);
+ const groupSection=(person)=>`<details class="gm-history-person" data-gm-history-person="${esc(person.id)}"><summary>${esc(person.name)} <span>(${person.entries.length})</span></summary><div class="gm-history-person__content">${journalCategorySections(person.entries,rows=>table(rows,person.id),{limit:30,detailsClass:'gm-history-category'})}</div></details>`;
+ const unassigned=grouped.unassigned.length?groupSection({id:'__world__',name:'GM / svět a nezařazené záznamy',entries:grouped.unassigned}):'';
+ const filter=grouped.groups.length||grouped.unassigned.length?`<label class="gm-history-person-filter">Vyhledat historii postavy<select data-gm-history-person-filter><option value="">Všechny postavy</option>${grouped.groups.map(p=>`<option value="${esc(p.id)}">${esc(p.name)} (${p.entries.length})</option>`).join('')}${grouped.unassigned.length?'<option value="__world__">GM / svět</option>':''}</select></label>`:'';
  return journalChapterShell('GM · Historie činností',`${czCount(meaningfulEntries.length,'doložený záznam','doložené záznamy','doložených záznamů')} postav a kampaní`,
- `<section class="panel"><h3>Společný přehled skutečných událostí</h3><p class="muted">Zobrazuje původní deníkové doklady, finanční historii a potvrzené posuny času z autoritativního kalendáře. Nevytváří duplicitní herní záznamy. „Osobní záznam“ otevře konkrétní položku v Notes & Logbook; „Procedura“ je dostupná jen u rozpoznaného původního pravidlového záznamu.</p>${journalCategorySections(meaningfulEntries,table,{limit:30,detailsClass:'gm-history-category'})}</section>`,'journal-book--gm-history');
+ `<section class="panel"><h3>Historie rozdělená podle postav</h3><p class="muted">Vyberte postavu, pak typ události. Opposed Test je v přehledu obou účastníků, ale zůstává jediným původním pravidlovým záznamem; souhrnný počet proto uvádí jedinečné události. „Osobní záznam“ otevře odpovídající log postavy.</p>${filter}<div class="gm-history-person-groups">${grouped.groups.map(groupSection).join('')}${unassigned}</div></section>`,'journal-book--gm-history');
 }
 function trashView(){return journalChapterShell('Archiv postav','Archivované profily zůstávají zachované spolu s inventářem a historií.',`<section class="panel folio-archive-list"><h3>Archivované postavy</h3><p class="muted">Obnovení postavu vrátí do registru. Trvalé smazání vyžaduje samostatné potvrzení.</p>${data.trash.length?data.trash.map(c=>`<div class="folio-archive-row"><div class="folio-archive-identity"><b>${esc(c.name)}</b><span>${esc(c.occupation||'Bez povolání')}</span></div><div class="actions folio-archive-actions"><button data-restore="${esc(c.id)}">Obnovit</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-purge="${esc(c.id)}">Definitivně smazat</button></div></div>`).join(''):'<div class="empty">Archiv je prázdný.</div>'}</section><section class="panel folio-archive-info"><h3>Evidence archivu</h3><dl class="folio-archive-metrics"><div><dt>Archivované postavy</dt><dd>${data.trash.length}</dd></div><div><dt>Aktivní postavy</dt><dd>${data.characters.length}</dd></div></dl><p class="muted">Archivace nepřepisuje deník ani inventář postavy. Obnovení ji vrátí do registru.</p><button type="button" class="secondary" data-nav="characters">Otevřít registr postav</button></section>`,'journal-book--archive')}
 function readinessReport(c){
@@ -11651,6 +11658,17 @@ document.addEventListener('click',e=>{
   if(panel){panel.open=true;panel.scrollIntoView({behavior:'auto',block:'start'});}
  }
 },true);
+// GM history filter is view-only and never removes or duplicates journal events.
+document.addEventListener('change',event=>{
+ const picker=event.target.closest?.('[data-gm-history-person-filter]');if(!picker)return;
+ const selectedPerson=picker.value;
+ for(const group of document.querySelectorAll('[data-gm-history-person]')){
+  const visible=!selectedPerson||group.dataset.gmHistoryPerson===selectedPerson;
+  group.hidden=!visible;
+  group.style.display=visible?'':'none';
+  if(selectedPerson&&visible)group.open=true;
+ }
+},true);
 // Each log item can be removed from the personal view; HMK receipts remain
 // authoritative and restorable, with character-specific persisted selections.
 document.addEventListener('click',e=>{
@@ -11659,7 +11677,7 @@ document.addEventListener('click',e=>{
  if(view!=='sheet'||activeSheetSection!=='notes'||!selected)return;
  const id=button.dataset.hideLog||button.dataset.restoreLog;
  const actor=character(selected);
- const current=data.journal.some(j=>j.id===id&&j.characterId===selected);
+ const current=data.journal.some(j=>j.id===id&&historyBelongsToCharacter(j,selected));
  const account=data.campaignClock&&actor?.hmk?.campaignCashAccounts?.[campaignKey(data.campaignClock)];
  const cash=id.startsWith('cash-purchase:')?(account?.purchases||[]).some(p=>'cash-purchase:'+p.id===id):
   id.startsWith('cash-adjustment:')?(account?.adjustments||[]).some(p=>'cash-adjustment:'+p.id===id):false;

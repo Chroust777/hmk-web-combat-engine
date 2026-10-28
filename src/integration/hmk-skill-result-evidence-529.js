@@ -1,4 +1,5 @@
 import {skillNarrativeSolo,skillNarrativeOpposed} from './hmk-skill-narrative.js';
+import {historyDisplayTitle} from './hmk-opposed-history-555.js';
 /** Journal presentation only: never changes the original test, rolls or event. */
 export const isCompletedSkillTest = row => Boolean(row?.skillTestProof &&
  ['secondary-mastery-test','secondary-mastery-value-test','success-value-test','success-value-specific','special-secondary-roll','assistance-success-test','opposed-success-test','opposed-tiebreak','success-test','critical-followup','climbing-falling','skill-physical-consequence','balance-nerves-will'].includes(row.skillTestProof.type));
@@ -58,7 +59,7 @@ export function skillTestEvidenceHTML(row,esc,options={}){
    Number.isInteger(p.will?.eml)?'EML '+p.will.eml:Number.isInteger(a?.eml)?'EML '+a.eml:'',Number.isInteger(p.will?.roll)?'d100 ('+p.will.roll+')':Number.isInteger(a?.roll)?'d100 ('+a.roll+')':''].filter(Boolean);
   const body=readableSkillEvidence(String(row.body||p.effect||'Výsledek je doložen původním zdravotním záznamem.'));
   const description=readableSkillEvidence(String(p.effect||row.body||'').split('\n')[0]);
-  return `<section class="hsk-saved-proof" data-hmk-skill-proof="${esc(row.id||'')}"><div class="hsk-saved-proof__summary"><strong>${esc(row.title||kind)}</strong><span>${esc(badges.join(' · '))}</span></div>${proofLayout(esc,{narration:description,calculation:body},'Pravidlové doklady · skutečné hody a návaznosti')}</section>`;
+  return `<section class="hsk-saved-proof" data-hmk-skill-proof="${esc(row.id||'')}"><div class="hsk-saved-proof__summary"><strong>${esc(historyDisplayTitle(row,options.nameById))}</strong><span>${esc(badges.join(' · '))}</span></div>${proofLayout(esc,{narration:description,calculation:body},'Pravidlové doklady · skutečné hody a návaznosti')}</section>`;
  }
  const comparison=p.comparison,level=a?.victoryLevel??a?.level??p.originalLevels?.[0]??'—';
  const stars=comparison?.stars??p.stars??(p.type.includes('value')?a?.svTier?.stars:a?.unopposedStars);
@@ -68,12 +69,19 @@ export function skillTestEvidenceHTML(row,esc,options={}){
  const outcome=p.type==='opposed-tiebreak'?`Rozstřel · vítěz ${winner||'neuveden'}`:
    comparison?(comparison.tie?'Remíza':comparison.bothFailed?(winner?'Převaha: '+winner:'Oba neuspěli'):winner?'Vítězí '+winner:'Nerozhodnuto'):level;
  const badges=[`Výsledek: ${outcome}`];
- if(Number.isFinite(stars))badges.push(`${stars} ★`);
+ if(b)badges.push(`Aktivní${actor?' '+actor:''}: ${a?.victoryLevel||a?.level||'—'}`);
+ if(p.type==='opposed-tiebreak'&&Array.isArray(p.originalLevels)){
+  badges.push(`Aktivní${actor?' '+actor:''}: ${p.originalLevels[0]||'—'}`);
+  if(Number.isInteger(p.originalRolls?.[0]))badges.push(`původní d100 (${p.originalRolls[0]})`);
+  badges.push(`Oponent${opponent?' '+opponent:''}: ${p.originalLevels[1]||'—'}`);
+  if(Number.isInteger(p.originalRolls?.[1]))badges.push(`původní d100 (${p.originalRolls[1]})`);
+ }
  if(Number.isInteger(a?.eml))badges.push(`EML ${a.eml}`);
  if(Number.isInteger(a?.roll))badges.push(`d100 (${a.roll})`);
  if(b){badges.push(`Oponent${opponent?' '+opponent:''}: ${b.victoryLevel||b.level||'—'}`);
   if(Number.isInteger(b.eml))badges.push(`EML ${b.eml}`);
   if(Number.isInteger(b.roll))badges.push(`d100 (${b.roll})`);}
+ if(Number.isFinite(stars))badges.push(`${stars} ★`);
  const fallback=!calculation?`Primární výsledek ${signed(a?.level)}; EML ${signed(a?.eml)}; d100 (${signed(a?.roll)}).`:calculation;
- return `<section class="hsk-saved-proof" data-hmk-skill-proof="${esc(row.id||'')}"><div class="hsk-saved-proof__summary"><strong>${esc(row.title||'Skill Test')}</strong><span>${esc(badges.join(' · '))}</span></div>${proofLayout(esc,{narration,calculation:fallback},'Pravidlové doklady · výpočet a hody')}</section>`;
+ return `<section class="hsk-saved-proof" data-hmk-skill-proof="${esc(row.id||'')}"><div class="hsk-saved-proof__summary"><strong>${esc(historyDisplayTitle(row,options.nameById))}</strong><span>${esc(badges.join(' · '))}</span></div>${proofLayout(esc,{narration,calculation:fallback},'Pravidlové doklady · výpočet a hody')}</section>`;
 }

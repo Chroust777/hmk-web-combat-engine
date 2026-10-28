@@ -5585,3 +5585,12 @@ main.content:not(.content-sheet) :is(.hc-hint,.tiny,.muted){font-size:12px!impor
   grid-template-rows:auto auto auto!important;
  }
 }
+
+/* v93.555: Character-first GM history navigation, without duplicating receipts. */
+.content-sheet .journal-book--gm-history .gm-history-person-filter{display:block;max-width:370px;margin:12px 0 16px;font-size:14px;}
+.content-sheet .journal-book--gm-history .gm-history-person-filter select{display:block;width:100%;max-width:100%;margin-top:5px;}
+.content-sheet .journal-book--gm-history .gm-history-person{display:block;margin:8px 0;border:1px solid rgba(137,94,45,.43);background:rgba(251,242,222,.19);min-width:0;}
+.content-sheet .journal-book--gm-history .gm-history-person>summary{cursor:pointer;padding:10px 12px;font-size:15px;font-weight:700;color:#583316;background:rgba(174,131,70,.11);}
+.content-sheet .journal-book--gm-history .gm-history-person>summary span{font-weight:400;font-size:12px;color:#795d3b;}
+.content-sheet .journal-book--gm-history .gm-history-person__content{padding:6px 10px 12px;min-width:0;}
+.content-sheet .journal-book--gm-history .gm-history-person[hidden]{display:none!important;}
