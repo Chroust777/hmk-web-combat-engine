@@ -3,6 +3,7 @@
  * Owned livestock is NOT carried equipment. Stable/receipt are separate.
  */
 import {BEASTS_P122} from '../rules/conveyance-printed-p122.js';
+import {bestiaryForLivestock} from './hmk-bestiary-563.js';
 const stats=Object.freeze({
  'Bovine (Oxen)':{breed:'bovine',bodyWeightLb:1500,str:32,move:80,role:'Vůl · náklad / tah'},
  Camel:{breed:'camel',bodyWeightLb:1100,str:28,move:120,role:'Velbloud · náklad / jízda'},
@@ -34,7 +35,21 @@ export const DOMESTICATED_BEAST_BASE_P355=Object.freeze({
  charger:{size:'b',end:11,agl:11,per:17,aur:4,wil:11,rea:4,cre:4,aware:70,scent:4,stealth:56,spirit:21,initiative:40,attack:'Kick · 62/62 · d6+6b; Bite · 55/55 · d4+4p'},
  destrier:{size:'b',end:12,agl:10,per:17,aur:4,wil:12,rea:5,cre:5,aware:70,scent:4,stealth:52,spirit:24,initiative:53,attack:'Kick · 68/68 · d6+7b; Bite · 62/62 · d4+5p'}
 });
-export function livestockOffer(beastId){const b=BEASTS_P122.find(x=>x.id===beastId);return b&&stats[b.name]?{...stats[b.name],...(DOMESTICATED_BEAST_BASE_P355[stats[b.name].breed]||{}),name:b.name,priceD:b.priceD,maxMB:b.maxMasteryBoosts,id:b.id}:null}
+export function livestockOffer(beastId){
+ const b=BEASTS_P122.find(x=>x.id===beastId);
+ if(!b||!stats[b.name])return null;
+ const baseline=stats[b.name],source=bestiaryForLivestock({...baseline,name:b.name});
+ // The original purchase/owner evidence is unchanged. Correct baseline
+ // abilities come directly from the 355 / 357 species table, NOT from cost.
+ return {...baseline,...(DOMESTICATED_BEAST_BASE_P355[baseline.breed]||{}),
+  ...(source?{bodyWeightLb:source.weightLb,str:source.attributes.str,move:source.move,
+    size:source.size,end:source.attributes.end,agl:source.attributes.agl,per:source.attributes.per,
+    aur:source.attributes.aur,wil:source.attributes.wil,rea:source.attributes.rea,cre:source.attributes.cre,
+    aware:source.skills.awareness,scent:source.skills.scent,stealth:source.skills.stealth,
+    spirit:source.skills.spirit,initiative:source.skills.initiative,
+    bestiaryId:source.id,bestiaryPage:source.page}:{}),
+  name:b.name,priceD:b.priceD,maxMasteryBoosts:b.maxMasteryBoosts,id:b.id};
+}
 export function verifiedLivestock(data,campaignId){
  if(!campaignId)return [];
  const out=[];

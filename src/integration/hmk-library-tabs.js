@@ -7,6 +7,7 @@ export const LIBRARY_TABS=Object.freeze([
  {id:'armour',name:'Části zbroje'},
  {id:'suits',name:'Hotové komplety'},
  {id:'other',name:'Ostatní vybavení'},
+ {id:'bestiary',name:'Bestiář a encountery'},
  {id:'rules',name:'Pravidla a audit'}
 ]);
 export const LIBRARY_PAGE_SIZE=24;
