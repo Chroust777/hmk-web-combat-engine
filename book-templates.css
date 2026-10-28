@@ -5612,3 +5612,17 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .journal-condition-status>span{min-width:0;overflow-wrap:anywhere}
 .journal-condition-status>strong{color:#243951;font-size:11px;text-align:right;overflow-wrap:anywhere}
 @media(max-width:600px){.journal-condition-statuses{grid-template-columns:1fr}}
+
+/* v93.558: health progression and exact due times within Chronicle Spread.
+   Keep the sheet's reading typeface and alternating vellum table tones. */
+.content-sheet .journal-book--overview .journal-health-courses{margin:9px 2px 7px;min-width:0;border:1px solid rgba(108,72,36,.24);border-radius:3px;overflow:hidden;font:12px/1.34 var(--font-body, "Cormorant Garamond",Georgia,serif)}
+.content-sheet .journal-book--overview .journal-health-courses__caption{padding:7px 9px;font-weight:700;border-bottom:1px solid rgba(108,72,36,.25);background:rgba(94,65,28,.07)}
+.content-sheet .journal-book--overview .journal-health-course{padding:8px 9px;border-bottom:1px solid rgba(108,72,36,.2);min-width:0}
+.content-sheet .journal-book--overview .journal-health-course:last-child{border-bottom:none}
+.content-sheet .journal-book--overview .journal-health-course:nth-child(odd){background:rgba(86,60,29,.05)}
+.content-sheet .journal-book--overview .journal-health-course__identity{display:flex;gap:7px;flex-wrap:wrap;align-items:baseline;justify-content:space-between}
+.content-sheet .journal-book--overview .journal-health-course__identity span{font-weight:700;color:#293f59;text-decoration:underline dotted;cursor:help}
+.content-sheet .journal-book--overview .journal-health-course__impact{color:#54371d}
+.content-sheet .journal-book--overview .journal-health-course__due{margin-top:3px;font-weight:700}
+.content-sheet .journal-book--overview .journal-health-course__detail{margin-top:4px;font-size:11px;color:#6c5137;overflow-wrap:anywhere}
+.content-sheet .journal-book--overview .journal-health-course__warning{padding:7px 9px;border-top:1px solid rgba(108,72,36,.25);font-weight:700}
