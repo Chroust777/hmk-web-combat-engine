@@ -9,7 +9,7 @@ import {strengthEncumbranceModifier} from '../rules/encumbrance.js';
 import {filledWaterForItem} from './hmk-physical-water-ledger.js';
 import {rationStockBalances} from './hmk-physical-ration-ledger.js';
 export const STABLE_HUB_FORMAT_574='hmk-stable-hub-574';
-const types=new Set(['sale','release','tack-add','tack-remove','vehicle-add','vehicle-remove','cargo-add','cargo-remove','inventory-load','inventory-unload','vehicle-cargo-add','vehicle-cargo-remove','training-activate','care']);
+const types=new Set(['sale','release','tack-add','tack-remove','vehicle-add','vehicle-remove','cargo-add','cargo-remove','inventory-load','inventory-unload','inventory-gear-attach','inventory-gear-detach','vehicle-cargo-add','vehicle-cargo-remove','training-activate','care']);
 export const STABLE_VEHICLES_P122=Object.freeze(VEHICLES_TACK_P122.filter(x=>['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(x.name)));
 const isId=x=>typeof x==='string'&&x.length>0&&x.length<=128;
 const nonnegative=x=>Number.isSafeInteger(x)&&x>=0&&x<=1000000;
@@ -23,10 +23,10 @@ export function stableHubProjection(data,campaignId,animalId){
  const events=stableHubEvents(data,campaignId,animalId);const tack=new Map(),vehicles=new Map(),cargo=new Map(),inventoryItems=new Map(),vehicleCargo=new Map(),care=[];let exit=null;
  for(const j of events){const x=j.stableHub574;
   if(x.type==='sale'||x.type==='release'){exit={type:x.type,priceD:x.priceD??0,minute:j.campaignMinute,id:j.id,reason:x.reason};continue;}
-  if(x.type==='tack-add')tack.set(x.entryId,{...x,proofId:j.id});
-  if(x.type==='tack-remove')tack.delete(x.entryId);
-  if(x.type==='vehicle-add')vehicles.set(x.entryId,{...x,proofId:j.id});
-  if(x.type==='vehicle-remove')vehicles.delete(x.entryId);
+  if(x.type==='tack-add'||x.type==='inventory-gear-attach'&&x.role==='tack')tack.set(x.entryId,{...x,proofId:j.id});
+  if(x.type==='tack-remove'||x.type==='inventory-gear-detach'&&x.role==='tack')tack.delete(x.entryId);
+  if(x.type==='vehicle-add'||x.type==='inventory-gear-attach'&&x.role==='vehicle')vehicles.set(x.entryId,{...x,proofId:j.id});
+  if(x.type==='vehicle-remove'||x.type==='inventory-gear-detach'&&x.role==='vehicle')vehicles.delete(x.entryId);
   if(x.type==='cargo-add')cargo.set(x.entryId,{...x,proofId:j.id});
   if(x.type==='cargo-remove')cargo.delete(x.entryId);
   if(x.type==='inventory-load')inventoryItems.set(x.inventoryId,{...x,proofId:j.id});
@@ -82,13 +82,13 @@ export function validateStableHub(data,offerForId=null){
   const animal=animals.get(x.animalId);
   requireValid(animal&&j.calendarCampaignId===animal.campaignId&&j.characterId===animal.ownerId&&x.ownerId===animal.ownerId&&
    Number.isSafeInteger(j.campaignMinute)&&j.campaignMinute>=animal.minute&&j.campaignMinute>=0,'nesoulad identity, kampaně nebo času');
-  const state=snapshots.get(x.animalId)||{exit:false,tack:new Map(),vehicles:new Map(),cargo:new Map(),inventory:new Map(),vehicleCargo:new Map(),lastMinute:animal.minute};
+  const state=snapshots.get(x.animalId)||{exit:false,tack:new Map(),vehicles:new Map(),cargo:new Map(),inventory:new Map(),gear:new Map(),vehicleCargo:new Map(),lastMinute:animal.minute};
   requireValid(j.campaignMinute>=state.lastMinute&&!state.exit,'zápis po prodeji nebo zpětně v čase');state.lastMinute=j.campaignMinute;
   if(x.type==='sale'||x.type==='release'){
    requireValid(x.type!=='sale'||nonnegative(x.priceD),'neplatná prodejní cena');
    requireValid(narrative(x.reason),'prodej/opouštění vyžaduje podklad GM');
    requireValid(x.type!=='release'||x.priceD===0,'opuštění nesmí přidávat peníze');
-   requireValid(!state.tack.size&&!state.vehicles.size&&!state.cargo.size&&!state.inventory.size&&!state.vehicleCargo.size,'před vyřazením zvířete se musí vyložit náklad a oddělit výstroj/vozidla');
+   requireValid(!state.tack.size&&!state.vehicles.size&&!state.cargo.size&&!state.inventory.size&&!state.gear.size&&!state.vehicleCargo.size,'před vyřazením zvířete se musí vyložit náklad a oddělit výstroj/vozidla');
    state.exit=true;
   }else if(x.type==='tack-add'){
    const item=VEHICLES_TACK_P122.find(t=>t.id===x.itemId),factor=x.elephantMultiplier===5?5:1;
@@ -111,6 +111,29 @@ export function validateStableHub(data,offerForId=null){
    entryIds.add(x.entryId);state.cargo.set(x.entryId,x);
   }else if(x.type==='cargo-remove'){
    requireValid(state.cargo.has(x.entryId)&&narrative(x.reason),'vyložení neexistujícího nákladu');state.cargo.delete(x.entryId);
+  }else if(x.type==='inventory-gear-attach'){
+   const gear=VEHICLES_TACK_P122.find(t=>t.id===x.itemId),item=(data.inventory||[]).find(i=>i.id===x.inventoryId);
+   const role=['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(gear?.name)?'vehicle':'tack';
+   const isStillAttached=item?.slot==='stable'&&item.stableAnimalId===x.animalId;
+   requireValid(gear&&gear.name!=='Wheel'&&x.role===role&&isId(x.entryId)&&!entryIds.has(x.entryId)&&isId(x.inventoryId)&&
+    x.weightLb===gear.weightLb&&x.name===gear.name&&x.quantity===1&&narrative(x.reason)&&
+    (!item||item.characterId===animal.ownerId)&&(!isStillAttached||
+     item.sourceItemId==='hmk:stable-gear:'+gear.id&&item.snapshot?.properties?.stableTackId===gear.id&&item.snapshot?.properties?.weightLb===gear.weightLb&&item.quantity===1)&&
+    !state.inventory.has(x.inventoryId)&&!state.gear.has(x.inventoryId)&&
+    ![...snapshots.entries()].some(([otherId,z])=>animals.get(otherId)?.campaignId===animal.campaignId&&
+      (z.inventory.has(x.inventoryId)||z.gear.has(x.inventoryId))),
+    'výstroj z knihovny nemá jedinou původní inventární identitu nebo již byla použita');
+   entryIds.add(x.entryId);state.gear.set(x.inventoryId,x);
+   if(role==='vehicle')state.vehicles.set(x.entryId,x);else state.tack.set(x.entryId,x);
+  }else if(x.type==='inventory-gear-detach'){
+   const prior=state.gear.get(x.inventoryId);
+   requireValid(prior&&prior.entryId===x.entryId&&prior.role===x.role&&narrative(x.reason),
+     'nelze sejmout výstroj, která na zvířeti nebyla');
+   if(prior.role==='vehicle'){
+    requireValid(![...state.vehicleCargo.values()].some(q=>q.vehicleId===prior.entryId),'ve voze zůstal náklad');
+    state.vehicles.delete(prior.entryId);
+   }else state.tack.delete(prior.entryId);
+   state.gear.delete(x.inventoryId);
   }else if(x.type==='inventory-load'){
    const item=(data.inventory||[]).find(i=>i.id===x.inventoryId);
    // After a witnessed unload, future legitimate inventory edits may change
@@ -119,7 +142,7 @@ export function validateStableHub(data,offerForId=null){
    requireValid((!item||item.characterId===animal.ownerId)&&(!currentLocation||
     item.snapshot?.name===x.name&&item.quantity===x.quantity&&item.snapshot?.properties?.weightLb*x.quantity===x.weightLb)&&
     Number.isFinite(x.weightLb)&&x.weightLb>0&&Number.isSafeInteger(x.quantity)&&x.quantity>0&&isId(x.inventoryId)&&typeof x.name==='string'&&x.name.length>=1&&x.name.length<=160&&narrative(x.reason)&&isId(x.entryId)&&!entryIds.has(x.entryId)&&
-    ![...snapshots.entries()].some(([otherId,s])=>animals.get(otherId)?.campaignId===animal.campaignId&&s.inventory.has(x.inventoryId))&&!state.inventory.has(x.inventoryId),
+    ![...snapshots.entries()].some(([otherId,s])=>animals.get(otherId)?.campaignId===animal.campaignId&&(s.inventory.has(x.inventoryId)||s.gear.has(x.inventoryId)))&&!state.inventory.has(x.inventoryId)&&!state.gear.has(x.inventoryId),
     'inventární náklad nemá doloženou identitu, váhu nebo je již naložen');
    entryIds.add(x.entryId);state.inventory.set(x.inventoryId,x);
   }else if(x.type==='inventory-unload'){
@@ -179,7 +202,7 @@ export function validateStableHub(data,offerForId=null){
  // Entire live inventory is projected from the immutable transfers. Manual
  // editing, selling or slot-changing a loaded object cannot bypass its proof.
  const loaded=new Map(),activeCampaign=data?.campaignClock?.campaignId??null;
- for(const [animalId,state] of snapshots)if(!activeCampaign||animals.get(animalId)?.campaignId===activeCampaign)for(const [id,proof] of state.inventory){
+ for(const [animalId,state] of snapshots)if(!activeCampaign||animals.get(animalId)?.campaignId===activeCampaign)for(const [id,proof] of [...state.inventory,...state.gear]){
   requireValid(!loaded.has(id),'inventární předmět je současně na více zvířatech');loaded.set(id,animalId);
  }
  for(const id of loaded.keys())requireValid((data.inventory||[]).some(i=>i.id===id),'naložený inventární předmět byl smazán');
@@ -200,8 +223,8 @@ export function validateStableHub(data,offerForId=null){
  // Only an animal-care issue explicitly backed by the original lot may use it.
  const custody=new Map(),rationSource=new Map(),waterSource=new Map();
  for(const row of data?.journal||[]){const x=row.stableHub574;
-  if(x?.type==='inventory-load')custody.set(row.calendarCampaignId+'|'+x.inventoryId,x.animalId);
-  if(x?.type==='inventory-unload')custody.delete(row.calendarCampaignId+'|'+x.inventoryId);
+  if(x?.type==='inventory-load'||x?.type==='inventory-gear-attach')custody.set(row.calendarCampaignId+'|'+x.inventoryId,x.animalId);
+  if(x?.type==='inventory-unload'||x?.type==='inventory-gear-detach')custody.delete(row.calendarCampaignId+'|'+x.inventoryId);
   if(row.calendarInventoryRationStock)rationSource.set(row.id,row.calendarInventoryRationStock.itemId);
   if(row.calendarInventoryRationTransfer)rationSource.set(row.id,row.calendarInventoryRationTransfer.receivedItemId);
   if(row.calendarInventoryWaterFill)waterSource.set(row.id,row.calendarInventoryWaterFill.itemId);

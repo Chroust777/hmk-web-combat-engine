@@ -247,7 +247,7 @@ function isApprovedStableRelocation575(before,after,id,a,b){
   ['inventory-load','inventory-unload'].includes(j.stableHub574.type));
  if(records.length!==1)return false;
  const x=records[0].stableHub574;
- if(x.type==='inventory-load')return (a.slot==='carried'||a.slot==='none')&&b.slot==='stable'&&
+ if(x.type==='inventory-load'||x.type==='inventory-gear-attach')return (a.slot==='carried'||a.slot==='none')&&b.slot==='stable'&&
   a.stableAnimalId===undefined&&b.stableAnimalId===x.animalId&&b.characterId===x.ownerId;
  return a.slot==='stable'&&a.stableAnimalId===x.animalId&&b.slot==='carried'&&
   b.stableAnimalId===undefined&&b.characterId===x.ownerId;
