@@ -7,7 +7,7 @@ const RATIONS=Object.freeze({
  'hmk:gear:hmk-p120-027':'Rations, standard'
 });
 export function provenCarriedRations(inventory=[],actorId){
- return inventory.filter(x=>x.characterId===actorId&&x.slot!=='chest'&&
+ return inventory.filter(x=>x.characterId===actorId&&x.slot!=='chest'&&x.slot!=='stable'&&
   RATIONS[x.sourceItemId]===x.snapshot?.name&&x.snapshot?.id===x.sourceItemId&&
   x.snapshot?.category==='other'&&x.snapshot?.properties?.weightLb===3&&
   Number.isSafeInteger(x.quantity*2)&&x.quantity>0)
@@ -19,7 +19,7 @@ export function provenCarriedRations(inventory=[],actorId){
  * medically actionable shortage rather than silently declare starvation.
  */
 export function assertExclusiveForagingProven({inventory=[],actorId}={}){
- const present=provenCarriedRations(inventory,actorId);
+ const present=provenCarriedRations(inventory.map(x=>x.slot==='stable'?{...x,slot:'carried'}:x),actorId);
  if(present.length)throw Error('Postava '+actorId+' nese '+present.reduce((n,p)=>n+p.foodDays,0)+
   ' doložených potravinových dávek v inventáři (HMK 120). Výhradní Foraging není prokázán. '+
   'Před automatickým zdravotním vyhodnocením je třeba doložit skutečný výdej či jiný režim zásob.');

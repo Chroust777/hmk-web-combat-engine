@@ -75,3 +75,9 @@
 #hmk-livestock-catalog .hmk-stable-health-workspace,#hmk-livestock-catalog .hmk-stable-training-workspace{background:rgba(247,239,222,.94);color:#302316;border:1px solid #ad946e;border-radius:14px;padding:1rem}
 #hmk-livestock-catalog .hmk-stable-health-workspace>summary,#hmk-livestock-catalog .hmk-stable-training-workspace>summary{font-weight:700;cursor:pointer}
 @media(max-width:740px){#hmk-livestock-catalog .hmk-stable-animal-card>.hc-fields{grid-template-columns:minmax(0,1fr)}#hmk-livestock-catalog .hmk-stable-block{padding:.7rem}}
+
+/* v93.575 · Animal anatomies and persistent stable cargo */
+.hmk-stable-zones{width:100%;min-width:0;padding:.75rem;border:1px solid var(--line, #786f62);border-radius:.5rem;margin:.75rem 0}
+.hmk-stable-zone-hurt{background:rgba(161,42,37,.12)}
+.hmk-stable-zone-loss{background:rgba(175,113,34,.1)}
+.hmk-stable-zones .catalog-spec th,.hmk-stable-zones .catalog-spec td{vertical-align:top}

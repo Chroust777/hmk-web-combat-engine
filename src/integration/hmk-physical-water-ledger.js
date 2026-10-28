@@ -237,10 +237,26 @@ export function projectCampaignWaterInventory(inventory=[],journal=[],campaignId
   return volume>0?{...item,waterContentsLb:volume*10}:item;
  });
 }
+
+function isApprovedStableRelocation575(before,after,id,a,b){
+ if(!a||!b)return false;
+ const strip=v=>{const copy={...v};delete copy.slot;delete copy.stableAnimalId;return copy;};
+ if(JSON.stringify(strip(a))!==JSON.stringify(strip(b)))return false;
+ const prev=new Set((before.journal||[]).map(j=>j.id));
+ const records=(after.journal||[]).filter(j=>!prev.has(j.id)&&j.stableHub574?.inventoryId===id&&
+  ['inventory-load','inventory-unload'].includes(j.stableHub574.type));
+ if(records.length!==1)return false;
+ const x=records[0].stableHub574;
+ if(x.type==='inventory-load')return (a.slot==='carried'||a.slot==='none')&&b.slot==='stable'&&
+  a.stableAnimalId===undefined&&b.stableAnimalId===x.animalId&&b.characterId===x.ownerId;
+ return a.slot==='stable'&&a.stableAnimalId===x.animalId&&b.slot==='carried'&&
+  b.stableAnimalId===undefined&&b.characterId===x.ownerId;
+}
+
 export function assertWaterBacking(before,after,campaignId=null){
  const locked=new Set((after.journal||[]).filter(j=>j.calendarInventoryWaterFill&&(campaignId===null||j.calendarCampaignId===campaignId)).map(j=>j.calendarInventoryWaterFill.itemId));
  const old=new Map((before.inventory||[]).map(i=>[i.id,i])),now=new Map((after.inventory||[]).map(i=>[i.id,i]));
- for(const id of locked)if(old.has(id))check(now.has(id)&&JSON.stringify(old.get(id))===JSON.stringify(now.get(id)),
+ for(const id of locked)if(old.has(id))check(now.has(id)&&(JSON.stringify(old.get(id))===JSON.stringify(now.get(id))||isApprovedStableRelocation575(before,after,id,old.get(id),now.get(id))),
   'Doloženou nádobu s vodou nelze přepsat nebo odebrat z inventáře mimo auditní proces');
  return true;
 }

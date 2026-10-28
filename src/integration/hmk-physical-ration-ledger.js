@@ -165,7 +165,9 @@ export function validatePhysicalRationJournal(journal=[],inventory=null,database
     const archive=database?.calendarEvidenceArchives?.find(a=>a.sourceCampaignId===s.campaignId);
     const source=database?(active?database.inventory:
       database.campaignActorBranches?.[s.campaignId]?.[s.actorId]?.inventory??archive?.rationInventoryBackings):inventory;
-    const backing=provenCarriedRations(source??[],s.actorId).find(x=>x.itemId===s.itemId);
+    // Stable custody is a location change, not deletion of the original physical stock.
+    // validateStableHub separately proves every 'stable' slot has a matching receipt.
+    const backing=provenCarriedRations((source??[]).map(i=>i.slot==='stable'?{...i,slot:'carried'}:i),s.actorId).find(x=>x.itemId===s.itemId);
     check(backing&&backing.sourceItemId===s.sourceItemId&&backing.name===s.name&&backing.foodDays===s.quantity,
      'Doložený inventární balík již neodpovídá původnímu zdroji, vlastníkovi ani počtu kusů');
    }
@@ -246,6 +248,22 @@ export function projectCampaignRationInventory(inventory=[],journal=[],campaignI
 }
 /** Stock-bound inventory IDs stay unchanged in the shared BASELINE. Otherwise
  * an edit, transfer, deletion or restack would make evidence untraceable. */
+
+function isApprovedStableRelocation575(before,after,id,a,b){
+ if(!a||!b)return false;
+ const strip=v=>{const copy={...v};delete copy.slot;delete copy.stableAnimalId;return copy;};
+ if(JSON.stringify(strip(a))!==JSON.stringify(strip(b)))return false;
+ const prev=new Set((before.journal||[]).map(j=>j.id));
+ const records=(after.journal||[]).filter(j=>!prev.has(j.id)&&j.stableHub574?.inventoryId===id&&
+  ['inventory-load','inventory-unload'].includes(j.stableHub574.type));
+ if(records.length!==1)return false;
+ const x=records[0].stableHub574;
+ if(x.type==='inventory-load')return (a.slot==='carried'||a.slot==='none')&&b.slot==='stable'&&
+  a.stableAnimalId===undefined&&b.stableAnimalId===x.animalId&&b.characterId===x.ownerId;
+ return a.slot==='stable'&&a.stableAnimalId===x.animalId&&b.slot==='carried'&&
+  b.stableAnimalId===undefined&&b.characterId===x.ownerId;
+}
+
 export function assertPhysicalRationBacking(before,after){
  const active=after.campaignClock?.campaignId||
   (after.campaignClock?`legacy:${after.campaignClock.events?.[0]?.id||''}`:null);
@@ -255,7 +273,7 @@ export function assertPhysicalRationBacking(before,after){
  const next=new Map((after.inventory||[]).map(x=>[x.id,x]));
  for(const id of ids){
   const a=prev.get(id),b=next.get(id);
-  if(a&&JSON.stringify(a)!==JSON.stringify(b))fail('Doloženou zásobu nelze upravit, odebrat ani převést mimo kampaňový účet. Nové příděly přidejte jako samostatný inventární stack.');
+  if(a&&JSON.stringify(a)!==JSON.stringify(b)&&!isApprovedStableRelocation575(before,after,id,a,b))fail('Doloženou zásobu nelze upravit, odebrat ani převést mimo kampaňový účet. Nové příděly přidejte jako samostatný inventární stack.');
  }
  return true;
 }
