@@ -5789,3 +5789,40 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hmk-bestiary-quickcombat output{display:block;padding:.45rem 0;font-size:12px}
 
 .hmk-printed-block{white-space:pre;line-height:1.0;overflow-wrap:normal}
+
+/* v93.567: compact, accessible bestiary with deliberately closed categories. */
+.hmk-combat-topline{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.hmk-combat-quick-links{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap}
+.hmk-bestiary-category{display:block;min-width:0;border:1px solid rgba(93,62,33,.23);margin:.55rem 0;border-radius:4px;padding:0;background:transparent}
+.hmk-bestiary-category>summary{cursor:pointer;font-weight:700;padding:.6rem .8rem;border-bottom:1px solid transparent}
+.hmk-bestiary-category[open]>summary{border-bottom-color:rgba(93,62,33,.23)}
+.hmk-bestiary-category>.hmk-bestiary-card-grid{padding:.7rem}
+.hmk-beast-count{font-size:12px;font-weight:400;margin-left:.5rem;opacity:.75}
+.hmk-bestiary-card-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr))}
+.hmk-bestiary-species-card{gap:.55rem;padding:.65rem}
+.hmk-beast-card-head{display:flex;flex-direction:column;gap:.2rem}
+.hmk-beast-stat-strip{display:flex;gap:.35rem;flex-wrap:wrap;font-size:12px}
+.hmk-beast-stat-strip>span{border:1px solid rgba(95,64,36,.18);padding:.2rem .4rem;border-radius:3px;white-space:nowrap}
+.hmk-bestiary-card-actions{align-items:center;justify-content:space-between}
+.hmk-bestiary-stats-details{flex:1 1 160px;min-width:0}
+.hmk-bestiary-stats-details[open]{flex-basis:100%}
+.hmk-bestiary-native-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.hmk-bestiary-native-grid table{width:100%;font-size:12px}
+.hmk-bestiary-native-grid td,.hmk-bestiary-native-grid th{padding:.18rem .32rem}
+.hmk-beast-subdetails{max-width:100%;border-top:1px solid rgba(88,63,39,.2);padding:.45rem 0}
+.hmk-beast-subdetails>summary{cursor:pointer;font-weight:700;font-size:12px}
+.hmk-bestiary-native-stats .catalog-scroll{max-width:100%;overflow-x:auto}
+@media(max-width:580px){.hmk-bestiary-native-grid{grid-template-columns:1fr}}
+
+/* HMK 93.567 – health ledger: compact evidence panels and campaign due items */
+.hmk-bestiary-health{border-top:1px solid rgba(103,73,42,.26);margin:1rem 0;padding:.75rem 0;min-width:0}
+.hmk-bestiary-health>h4{margin:.1rem 0 .45rem}
+.hmk-beast-health-actor{border:1px solid rgba(92,64,39,.2);margin:.4rem 0;padding:.55rem;border-radius:4px;min-width:0}
+.hmk-beast-health-actor>summary{font-weight:700;cursor:pointer}
+.hmk-beast-health-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:.55rem;margin-top:.7rem}
+.hmk-beast-wound{padding:.6rem;border:1px solid rgba(105,75,42,.23);border-radius:4px;min-width:0;background:rgba(85,59,33,.035)}
+.hmk-beast-wound>p{font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+.hmk-bestiary-health form.hc-fields{min-width:0;max-width:100%;margin-top:.6rem;grid-template-columns:repeat(2,minmax(0,1fr))}
+.hmk-bestiary-health form.hc-fields>button,.hmk-bestiary-health form.hc-fields>.hmk-bestiary-wide{grid-column:1/-1}
+.hmk-bestiary-calendar-due .hc-event{overflow-wrap:anywhere}
+@media(max-width:600px){.hmk-bestiary-health form.hc-fields{grid-template-columns:1fr}}

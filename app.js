@@ -117,9 +117,9 @@ import { EXPEDITION_EQUIPMENT_P120, CRAFT_ITEMS_TOOLS_P121, WORKSHOP_QUALITY_P12
 import { BEASTS_P122, VEHICLES_TACK_P122, CONVEYANCE_RULES_P122 } from './src/rules/conveyance-printed-p122.js';
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
 import {BESTIARY_ANIMALS_563,livestockMatcher,newEncounterBeastProof,encounterBeastHistory,validateLivestockTrainingRefs,assertBestiaryAppendOnly} from './src/integration/hmk-bestiary-563.js';
-import {BESTIARY_PAGES_564} from './src/integration/hmk-bestiary-pages-564.js';
-import {renderFullCreatureStats565,renderPrintedBestiaryPage565} from './src/integration/hmk-bestiary-native-ui-565.js';
+import {renderFullCreatureStats565} from './src/integration/hmk-bestiary-native-ui-565.js';
 import {creatureCombatSheet565,previewCreatureSkillRoll565,previewCreatureMelee565} from './src/integration/hmk-bestiary-combat-565.js';
+import {animalHealthProjection567,prepareAnimalHit567,prepareAnimalBlood567,prepareAnimalInfectionCourse567,prepareAnimalBloodHealing567,prepareAnimalTreatment567,prepareAnimalHealing567,prepareAnimalShockRecovery567,prepareAnimalExtendedCourse567,validateAnimalTraumaJournal567,assertAnimalTraumaAppendOnly567,requireAnimalMedicalGMTimeMayAdvance567} from './src/integration/hmk-bestiary-trauma-567.js';
 import {ANIMAL_ANATOMIES_566,ANIMAL_WEAPON_DICE_566,creatureAnatomyReadiness566,previewAnimalContact566} from './src/integration/hmk-bestiary-anatomy-566.js';
 import {BESTIARY_ENTRIES_564,bestiaryEntry564,createBespokeEncounterProof564,validateFullBestiaryJournal564 as validateBestiaryJournal,bestiaryEncounterStatus564} from './src/integration/hmk-bestiary-runtime-564.js';
 import { ARMOUR_LAYER_COLUMNS, ARMOUR_LAYER_NOTES } from './src/rules/armour-layer-reference.js';
@@ -277,7 +277,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.566';
+const APP_VERSION='93.567';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -432,6 +432,7 @@ function validate(d){
  validateLogbookVisibility(d);
  validateLivestockEvidence(d);
  validateBestiaryJournal(d);
+ validateAnimalTraumaJournal567(d);
  validateLivestockTrainingRefs(d);
  if(d)validateCampaignPortfolio(d);
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
@@ -499,7 +500,7 @@ function validate(d){
  for(const i of d.items){if(typeof i.id==='string'&&i.id.startsWith('hmk:'))throw Error('Kolize s vestavěnou definicí HMK');if(typeof i.name!=='string'||!['weapon','shield','armor','other'].includes(i.category)||!i.properties||typeof i.properties!=='object'||Array.isArray(i.properties))throw Error('Neplatná položka knihovny')}
  for(const c of [...d.characters,...d.trash]){if(c.hmk!==undefined){if(!c.hmk||typeof c.hmk!=='object'||Array.isArray(c.hmk))throw Error('Neplatný HMK profil');for(const k of ['skills','injuries']){if(c.hmk[k]!==undefined){if(!Array.isArray(c.hmk[k]))throw Error('Neplatný seznam '+k);const unique=new Set();for(const r of c.hmk[k]){if(!r||typeof r.id!=='string'||!r.id||unique.has(r.id))throw Error('Duplicitní HMK ID: '+k);unique.add(r.id)}}}if(c.hmk.combatState){validateCombatState(c.hmk.combatState);for(const w of c.hmk.combatState.wounds){const i=c.hmk.injuries?.find(i=>i.id===w.id&&i.combatRecord===true);if(!i||i.location!==w.location||i.severity!==w.severity||i.bleeding!==w.bleeding)throw Error('Nesoulad evidované rány a trvalého bojového stavu');}}}}
  for(const c of [...d.characters,...d.trash])if(c.hmk?.creation)assertCreationInvariants(c);
- if(d.inventory.some(x=>!ids.has(x.characterId)||!x.snapshot||typeof x.snapshot.name!=='string'||!['weapon','shield','armor','other'].includes(x.snapshot.category)||!Number.isSafeInteger(x.quantity)||x.quantity<1||x.quantity>999999||(x.slot!==undefined&&!SLOTS.some(s=>s[0]===x.slot)))||d.journal.some(x=>!ids.has(x.characterId)||typeof x.body!=='string'))throw Error('Záloha obsahuje osiřelé nebo poškozené záznamy');
+ if(d.inventory.some(x=>!ids.has(x.characterId)||!x.snapshot||typeof x.snapshot.name!=='string'||!['weapon','shield','armor','other'].includes(x.snapshot.category)||!Number.isSafeInteger(x.quantity)||x.quantity<1||x.quantity>999999||(x.slot!==undefined&&!SLOTS.some(s=>s[0]===x.slot)))||d.journal.some(x=>(!ids.has(x.characterId)&&!(x.characterId===null&&((x.bestiaryEncounter&&x.calendarCampaignId===x.bestiaryEncounter.campaignId)||(x.bestiaryTrauma&&x.calendarCampaignId===x.bestiaryTrauma.campaignId))))||typeof x.body!=='string'))throw Error('Záloha obsahuje osiřelé nebo poškozené záznamy');
  for(const x of d.inventory){if(x.sourceItemId!==undefined&&x.sourceItemId!==null&&typeof x.sourceItemId!=='string')throw Error('Neplatný odkaz na knihovnu');if(x.condition!==undefined&&typeof x.condition!=='string')throw Error('Neplatný stav předmětu');if(x.currentWQ!==undefined&&x.currentWQ!==null&&(!Number.isSafeInteger(x.currentWQ)||x.currentWQ<0||x.currentWQ>999))throw Error('Neplatná aktuální kvalita WQ předmětu');if(x.slot!==undefined&&!validSlotForCategory(x.slot,x.snapshot.category))throw Error('Neplatná kombinace slotu a kategorie předmětu');if(['main_hand','off_hand','worn'].includes(x.slot)&&x.quantity!==1)throw Error('Vybavený předmět musí představovat právě jeden kus');if(x.layerOrder!==undefined&&x.layerOrder!==null&&(!Number.isSafeInteger(x.layerOrder)||x.layerOrder<0||x.layerOrder>99||x.snapshot.category!=='armor'))throw Error('Neplatné pořadí vrstvy');if(x.layerSlot!==undefined&&x.layerSlot!==null&&(!['underFar','underNear','base','overNear','overFar'].includes(x.layerSlot)||x.snapshot.category!=='armor'))throw Error('Neplatný sloupec vrstvy')}
  if(d.combatRuntime!==undefined&&d.combatRuntime!==null){
   const r=d.combatRuntime;
@@ -737,7 +738,8 @@ function mutate(fn,{gmClockAdvance=false}={}){
  if(cloudSync&&!cloudSync.canWrite()){alert('Nejdříve připojte GitHub Cloud v menu Cloud a zálohy.');return false;}
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertBestiaryAppendOnly(previous,data);assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(automaticGenerationBusy)lastAutomaticGenerationMutationError='Uložení do úložiště selhalo';else alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute)
+  requireAnimalMedicalGMTimeMayAdvance567({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(automaticGenerationBusy)lastAutomaticGenerationMutationError='Uložení do úložiště selhalo';else alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(automaticGenerationBusy)lastAutomaticGenerationMutationError=String(e.message||e);else alert('Změna nebyla uložena: '+e.message);return false}
 }
 function button(label,action,cls='secondary'){return `<button class="${cls}" data-action="${action}">${esc(label)}</button>`}
@@ -1834,7 +1836,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const fallUnknown=agenda.unknown.filter(x=>x.kind==='skill-fall'&&x.sourceId);
  const unknownFallNotice=fallUnknown.length?`<section class="panel hc-calendar-unresolved"><h3>Vyžaduje vyřešení · Falling Routine</h3>${fallUnknown.map(x=>`<div class="hc-unknown-rule-link"><strong>${esc(x.name)}</strong> · ${esc(x.description)}<p class="muted">GM doplní skutečnou výšku (0–5 ft bez Injury Sequence; nad 5 ft pokračuje Impact a Jumping/Acrobatics test). Původní Skill CF se neopakuje.</p><button type="button" class="hc-small" data-cal-unknown-fall="${esc(x.characterId)}" data-cal-unknown-source="${esc(x.sourceId)}">Otevřít správné hody a výšku ↗</button></div>`).join('')}</section>`:'';
  const suspendedHealingHTML=agenda.suspended?.length?`<section class="panel hc-calendar" data-suspended-healing><h3>Pozastavené / nedostupné Healing Rolls · ${agenda.suspended.length}</h3><p class="hc-hint">Infekce pozastavuje Injury Healing Rolls všech ran (HMK 181); běžné léčení může být u konkrétní rány také pravidlově nedostupné (HMK 354). Žádný d100 ani datum se nedoplňuje bez skutečného dokladu.</p>${agenda.suspended.map(x=>`<p class="hc-hint"><strong>${esc(x.name)}</strong> · rána ${esc(x.woundId)} · ${esc(x.description)} · ${esc(x.reason||'')}</p>`).join('')}</section>`:'';
- const overviewHTML=`${board}${unknownFallNotice}${suspendedHealingHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
+ const overviewHTML=`${board}${bestiaryCalendarDuePanel567(clock)}${unknownFallNotice}${suspendedHealingHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
   activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${animalWeatherHTML}${animalRestHTML}${interruptionsHTML}`:
   activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionWizardHTML(participants,clock,{supplyHTML,nutritionHTML,activityNeedsHTML})}`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
@@ -3942,6 +3944,72 @@ function enrichAnimalTrainingForms(root){
  }
 }
 
+function bestiaryCalendarDuePanel567(clock){
+ const cid=campaignKey(clock),minute=clock.minute;
+ const animals=encounterBeastHistory(data,cid).filter(x=>x.active);
+ const events=[];
+ for(const a of animals){const h=animalHealthProjection567(data.journal,cid,a.id);
+  if(h.infectionDueMinute!==null)events.push({due:h.infectionDueMinute,name:a.name,what:'Infection Course'});
+  if(h.bloodHealingDueMinute!==null)events.push({due:h.bloodHealingDueMinute,name:a.name,what:'Blood Loss · regenerace END'});
+  for(const w of h.wounds){if(w.healed)continue;
+   if(w.bleeding)events.push({due:w.nextDueMinute,name:a.name,what:'Krvácení · '+w.locationName,blocked:true});
+   else if(w.infected)events.push({due:null,name:a.name,what:'Infection Course · '+w.locationName,blocked:true});
+   else if(w.treatment&&w.nextDueMinute!==null)events.push({due:w.nextDueMinute,name:a.name,what:'Healing Roll · '+w.locationName});
+   else events.push({due:null,name:a.name,what:'První ošetření · '+w.locationName,blocked:true});
+  }
+  if(h.shock==='unconscious'&&h.shockDueMinute!==null)events.push({due:h.shockDueMinute,name:a.name,what:'Shock Reroll (UNC)'});
+  if(h.shock==='stunned'||h.shock==='incapacitated')events.push({due:null,name:a.name,what:'Shock Recovery · konec dalšího tahu',blocked:true});
+  if(h.extendedShock?.active)events.push({due:h.extendedShockDueMinute,name:a.name,what:'Extended Shock · čtyřhodinový Course'});
+  if(h.coma?.active)events.push({due:null,name:a.name,what:'Coma · vyžaduje samostatnou proceduru',blocked:true});
+ }
+ if(!events.length)return '';
+ events.sort((a,b)=>(a.due??Infinity)-(b.due??Infinity));
+ const label=due=>Number.isSafeInteger(due)?displayCampaignMinute(due):'bez přesného času – rozhodnutí GM';
+ return `<section class="panel hmk-bestiary-calendar-due"><h3>Bestiář · zdravotní termíny tvorů (${events.length})</h3>
+ <p class="hc-hint">Stejný herní čas jako hlavní kalendář. Termíny jsou odvozeny z neměnných dokladů; žádný hod se neprovádí automaticky. Zdravotní formuláře jsou v Combat → Bestiář.</p>
+ <div class="hc-event-list">${events.map(e=>`<div class="hc-event"><strong>${esc(e.name)}</strong> · ${esc(e.what)}<p>${esc(label(e.due))}${e.due!==null?(minute>e.due?' · po termínu':minute===e.due?' · právě splatné':' · čeká na termín'):''}${e.blocked?' · vyžaduje rozhodnutí GM':''}</p></div>`).join('')}</div></section>`;
+}
+function bestiaryHealthPanel567(active,cid,minute){
+ const display=due=>Number.isSafeInteger(due)?displayCampaignMinute(due):'čeká na další pravidlové rozhodnutí';
+ return `<section class="hmk-bestiary-health"><h4>Stav tvorů · Injury / Shock / Healing / Calendar</h4>
+ <p class="hc-hint">Každý tvor má vlastní neměnnou evidenci. Zdravotní postup nepoužívá lidskou anatomii. Žádný termín ani kostka nevzniká bez doloženého pravidla nebo hodu. Speciality druhu, krvácení a nevyřešený Extended Shock jsou označené jako blokující.</p>
+ ${active.map(a=>{const health=animalHealthProjection567(data.journal,cid,a.id),wounds=health.wounds;
+ const pending=health.records.filter(r=>r.bestiaryTrauma.kind==='hit').at(-1)?.bestiaryTrauma;
+ return `<details class="hmk-beast-health-actor" ${health.records.length?'open':''}><summary>${esc(a.name)} · Shock: ${esc(health.shock)} · ${wounds.filter(w=>!w.healed).length} otevřených ran</summary>
+ <div class="hmk-beast-health-grid">${wounds.map(w=>`<article class="hmk-beast-wound"><strong>${esc(w.locationName)} · ${esc(w.id.slice(0,8))}</strong>
+ <p>${esc(w.healed?'Zhojeno':w.infected?'Infekce: vyžaduje Infection Course':w.bleeding?'Bleeder: neodkladně Blood Loss / Blood Stoppage':('IL '+w.level+' '+w.aspect))}</p>
+ <p>Další termín: ${esc(display(w.nextDueMinute))}${w.nextDueMinute!=null&&minute>w.nextDueMinute?' · PO TERMÍNU':''}</p>
+ ${w.bleeding&&health.shock!=='killed'?`<form data-hmk-beast-blood-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}">
+ <label>Zastavení krvácení<select name="method"><option value="none">Bez zásahu léčitele</option><option value="staunch">Staunch · tlak a obvaz</option><option value="cauterisation">Cauterisation · žhavý kov (+30)</option></select></label>
+ <label>Physician ML (jen při zákroku)<input name="physicianML" type="number" min="1" max="300"></label>
+ <label>Skutečný Blood Stoppage d100 (při zákroku)<input name="stoppageRoll" type="number" min="1" max="100"></label>
+ <label>Skutečný Blood Loss d100 (kromě CS Stoppage)<input name="lossRoll" type="number" min="1" max="100"></label>
+ <label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="confirmed" required> GM potvrzuje uplynutí pěti minut, metodu a skutečné hody</label>
+ <button type="submit" ${minute!==w.nextDueMinute?'disabled title="Blood Loss až v doloženém pětiminutovém termínu"':''}>Vyhodnotit krvácení a Blood Loss (HMK 178)</button></form>`:''}
+ ${w.infected&&health.shock!=='killed'?`<form data-hmk-beast-infection-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}">
+ <label>Infection HR ${w.infectionHR??'?'} · skutečné d100<input type="number" min="1" max="100" name="roll" required></label>
+ <label>Fatigue mimo nemoc<input type="number" min="0" max="300" step="5" name="fatigue" value="0" required></label>
+ <label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="confirmed" required> GM potvrzuje skutečný jednodenní Course</label>
+ <button type="submit" ${minute!==w.infectionDueMinute?'disabled':''}>Vyhodnotit Infection Course (HMK 181)</button></form>`:''}
+ ${!w.healed&&!w.infected&&!w.bleeding&&!w.treatment&&health.shock==='none'?`<form data-hmk-beast-treat-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}">
+ <label>Ověřené Physician ML<input type="number" name="physicianML" min="1" max="300" required></label>
+ <label>Physician Index<input type="number" name="physicianIndex" min="1" max="30" required></label>
+ <label>Skutečné Treatment d100<input type="number" name="roll" min="1" max="100" required></label>
+ <label class="hmk-bestiary-wide hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje povolený zákrok, vybavení a jeho skutečné provedení</label><button type="submit">Doložit ošetření (HMK 180)</button></form>`:''}
+ ${!w.healed&&!w.infected&&w.treatment&&!w.bleeding&&!health.wounds.some(z=>!z.healed&&z.infected)&&health.shock==='none'?`<form data-hmk-beast-heal-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}"><label>Skutečný Healing d100<input type="number" min="1" max="100" name="roll" required></label><label class="hmk-bestiary-wide hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje pětidení interval a platný Healing Roll</label><button type="submit" ${minute!==w.nextDueMinute?'disabled title="Healing je dovolen pouze přesně v doloženém čase"':''}>Provést Healing Roll</button></form>`:''}
+ </article>`).join('')||'<p>Žádná zranění tohoto tvora nejsou doložena.</p>'}</div>
+ ${health.bloodLoss?.bp>0&&health.shock!=='killed'?`<p class="hc-hint"><strong>Blood Loss:</strong> BP ${health.bloodLoss.bp} · Weakness ${health.bloodLoss.weaknessFatigue} · regenerace ${esc(display(health.bloodHealingDueMinute))}</p>
+ <form data-hmk-beast-blood-healing-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}">
+ <label>Skutečný END d100<input name="roll" type="number" min="1" max="100" required></label>
+ <label>Jiná Weakness než anémie<input name="otherWeakness" type="number" min="0" step="5" max="300" value="0" required></label>
+ <label class="hmk-bestiary-wide hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje desetidenní interval; anémie se do EML testu nepřičítá</label>
+ <button type="submit" ${minute!==health.bloodHealingDueMinute?'disabled':''}>Regenerovat krev (HMK 181)</button></form>`:''}
+ ${['stunned','incapacitated','unconscious'].includes(health.shock)&&!health.extendedShock?`<form data-hmk-beast-shock-recovery-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><strong>Shock Recovery · ${esc(health.shock)}</strong><label>Skutečný Shock d100<input type="number" min="1" max="100" name="roll" required></label><label>Fatigue pro test<input type="number" min="0" max="300" step="5" name="fatigue" value="0" required></label><label class="hmk-bestiary-wide hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje konec příslušného tahu (UNC až po 10 minutách)</label><button type="submit">Vyhodnotit Shock Recovery</button></form>`:''}
+ ${health.extendedShock?.active&&!health.coma?.active?`<form data-hmk-beast-extended-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><strong>Extended Shock HR ${health.extendedShock.hr}</strong><label>Skutečné Course d100<input type="number" min="1" max="100" name="roll" required></label><label>Fatigue pro Course<input type="number" min="0" max="300" step="5" name="fatigue" value="0" required></label><label class="hmk-bestiary-wide hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje uplynulé čtyři hodiny a platnost Course</label><button type="submit">Vyhodnotit Extended Shock Course</button></form>`:''}
+ ${health.coma?.active?'<p class="hc-hint">Coma: nutný samostatný d10denní Course. Automatický postup dosud není dokončen.</p>':''}
+ ${pending?.shock?.followup?`<p class="hc-hint">Shock Follow-up: ${esc(pending.shock.followup.timing||'vyžaduje další hod')} · nový Shock stav se automaticky neruší.</p>`:''}
+ </details>`}).join('')}</section>`;
+}
 function bestiaryEncounterPanel({combat=false}={}){
  const clock=data.campaignClock,cid=clock?campaignKey(clock):null,animals=bestiaryKnownAnimals();
  const existing=cid?encounterBeastHistory(data,cid):[],active=existing.filter(x=>x.active);
@@ -3952,6 +4020,7 @@ function bestiaryEncounterPanel({combat=false}={}){
  return `<section class="panel hmk-bestiary-roster" id="hmk-bestiary-encounter"><h3>${combat?'Bestiář · účastníci encounteru':'Generátor dočasných tvorů'}</h3>
  <p class="hc-hint">Vytvoření samostatného dočasného tvora <strong>není</strong> založením PC/NPC. Základní statistiky a všechny originální tabulky jsou dostupné v Bestiáři. Náhodné generování speciálních variant vyžaduje skutečné hody dle originálu; aplikace si je nevymýšlí. Výběr neprovádí útok ani nezakládá zranění.</p>
  ${table}
+ ${active.length?bestiaryHealthPanel567(active,cid,clock?.minute??null):''}
  ${clock?`<form data-hmk-beast-spawn class="hc-fields hmk-bestiary-generator" id="hmk-bestiary-generator"><label>Zdroj účastníka<select name="source"><option value="new">Nový dočasný tvor</option>${stable.map(a=>`<option value="stable:${esc(a.id)}">Vlastněné zvíře · ${esc(a.name)} (${esc(a.spec.name)})</option>`).join('')}</select></label>
  <label>Druh / příklad z bestiáře<select name="templateId">${opts}</select></label>
  <label>Jméno nebo označení skupiny<input name="name" maxlength="90" placeholder="Např. Vlk z lesní smečky"></label>
@@ -3969,7 +4038,7 @@ function bestiaryEncounterPanel({combat=false}={}){
  <button type="submit">Ověřit úroveň hodu</button>
  </form><output data-hmk-beast-skill-out aria-live="polite"></output></section>`:''}
  ${active.length>=2?`<section class="hmk-bestiary-quickcombat"><h4>Anatomie zásahu a předběžné Injury · HMK str. 167–169, 352, 355, 357</h4>
- <p class="hc-hint">Samostatný výpočet <strong>až po skutečně ověřeném zásahu</strong>. Volba Aim, dosah, zvláštní schopnosti, TA, kryt a Strike Mode musí být předem rozhodnuty podle boje. Vstupní hody se nikdy negenerují automaticky. Nepřidává zranění ani nemění zdravotní stav.</p>
+ <p class="hc-hint">Náhled <strong>až po skutečně ověřeném zásahu</strong>. Volba Aim, dosah, zvláštní schopnosti, TA, kryt a Strike Mode musí být předem rozhodnuty podle boje. Vstupní hody se nikdy negenerují automaticky. Samotný náhled nemění zdravotní stav; teprve výslovné potvrzení v rozbalené zdravotní části zapíše doklad.</p>
  <form data-hmk-beast-contact-566 class="hc-fields">
  <label>Útočník<select name="attackerId">${active.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label>
  <label>Zasažený tvor<select name="defenderId">${active.map((x,i)=>`<option value="${esc(x.id)}" ${i===1?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
@@ -3980,6 +4049,14 @@ function bestiaryEncounterPanel({combat=false}={}){
  <label>Skutečný Impact Die<input type="number" name="impactDieRoll" min="1" step="1" required></label>
  <label>Jiné již ověřené modifikátory Impact (součet)<input type="number" name="extraImpact" value="0" step="1" min="-200" max="200" required></label>
  <label class="hmk-bestiary-wide"><input type="checkbox" name="aimConfirmed" value="yes" required> GM již ověřil platný zásah, Aim, dosah a všechna nutná omezení</label>
+ <details class="hmk-bestiary-wide hmk-beast-confirm-health"><summary>Potvrdit zdravotní následek · skutečný Shock Roll a druhová kontrola</summary>
+ <p class="hc-hint">Zápis je povolen jen po úplně vyřešeném zásahu a potvrzení krvácivých/amputačních značek podle příslušné anatomie. Na opakované zásahy do stejné lokality, zvláštní útoky a nepřipravené profily se zatím nevztahuje automatický zápis.</p>
+ <label>Rigid Armour na dané lokalitě<select name="rigidArmour"><option value="unknown">Neověřeno</option><option value="no">Ne</option><option value="yes">Ano</option></select></label>
+ <label>Skutečná Fatigue cíle pro Shock<input name="shockFatigue" type="number" min="0" max="300" step="5" value="0"></label>
+ <label>Skutečný Shock d100<input name="shockRoll" type="number" min="1" max="100"></label>
+ <label>Vzniká Bleeder?<select name="bleeding"><option value="unknown">Zatím neověřeno</option><option value="no">Ne, podle druhu zranění a lokality</option><option value="yes">Ano, podle pravidel</option></select></label>
+ <label class="hmk-bestiary-wide hc-check"><input name="specialsReviewed" type="checkbox"> GM ověřil značky krvácení, amputace, Compound, mimořádné zásahy a případné Mishaps</label>
+ <button type="submit" data-hmk-beast-save-hit="yes">Potvrdit zranění a Shock do zdravotního deníku tvora</button></details>
  <button type="submit">Zobrazit lokalitu, AV a předběžné zranění</button></form>
  <output data-hmk-beast-contact-out-566 aria-live="polite" class="hc-hint"></output>
  <p class="hc-hint">Pouze pro druhy se strukturovanou tabulkou a–m. Chybí ověření všech značek krvácení/amputace, Compound, Shock roll, perzistence a Healing: proto nevytváří zdravotní záznam.</p></section>`:''}
@@ -3998,22 +4075,15 @@ function bestiaryEncounterPanel({combat=false}={}){
 }
 function bestiaryCompleteCatalogView({includeGenerator=true}={}){
  const groups=[...new Set(BESTIARY_ENTRIES_564.map(x=>x.group))];
- const rows=groups.map(group=>`<section class="hmk-bestiary-category"><h4>${esc(group)} (${BESTIARY_ENTRIES_564.filter(e=>e.group===group).length})</h4><div class="hmk-bestiary-card-grid">${BESTIARY_ENTRIES_564.filter(p=>p.group===group).map(p=>`
+ const rows=groups.map(group=>`<details class="hmk-bestiary-category" data-bestiary-category><summary>${esc(group)} <span class="hmk-beast-count">${BESTIARY_ENTRIES_564.filter(x=>x.group===group).length} tvorů</span></summary><div class="hmk-bestiary-card-grid">${BESTIARY_ENTRIES_564.filter(p=>p.group===group).map(p=>`
  <article class="hmk-bestiary-species-card" data-hmk-beast-name="${esc((p.name+' '+group).toLocaleLowerCase('cs'))}">
- <strong>${esc(p.name)}</strong><small>HMK str. ${p.page} · ${p.generation==='variable'?'proměnlivý druh / postup':p.generation==='printed-animal'?'tabulkový profil':'pevný profil nebo ukázková postava'}</small>
- <p>${p.attributes&&Object.keys(p.attributes).length?Object.entries(p.attributes).slice(0,7).map(([k,v])=>k.toUpperCase()+' '+(v??'—')).join(' · '):'Statistiky a generovací postup najdeš na příslušné straně níže.'}</p>
- <details class="hmk-bestiary-stats-details"><summary>Všechny dostupné statistiky, ochrana a útoky</summary>${renderFullCreatureStats565(p)}</details>
- <div class="hmk-bestiary-card-actions"><button type="button" class="hc-small secondary" data-hmk-bestiary-viewpage="${p.statPage||p.page}">Pravidla / tabulky</button><button type="button" class="hc-small secondary" data-hmk-bestiary-pick="${esc(p.id)}">Vybrat do generátoru</button></div></article>`).join('')}</div></section>`).join('');
- const page=355;
- return `${includeGenerator?bestiaryEncounterPanel():''}<section class="panel hmk-bestiary-complete" id="hmk-bestiary-complete"><h3>Bestiář HMK 1.2 · datové tabulky a generátor</h3>
- <p>Všechny stránky kapitoly 7 (351–401) jsou převedeny přímo do <strong>výběrového textu, tabulek a číselných dat</strong> této aplikace. Nejsou použity obrázky stránek. Číselné hodnoty jsou propojené s kartami, zatímco složité nebo proměnlivé postupy jsou přístupné jako text pravidel pro GM.</p>
- <p class="hc-hint">Dočasný tvor není běžná PC/NPC. Přímo z profilu lze použít doložené atributy, dovednosti, ochranu, přirozené útoky a pomocný výpočet d100. Kompletní Combat Outcome, mimořádné schopnosti, zásahová anatomie, perzistentní zranění a Healing musí mít vlastní ověřenou pravidlovou návaznost; žádná není domyšlena.</p>
- <div class="hmk-bestiary-search"><label>Hledat druh, variantu nebo skupinu<input type="search" data-hmk-bestiary-filter placeholder="vlk, drak, gargún, duch…"></label></div>
- ${rows}
- <details class="hmk-bestiary-facsimile" id="hmk-bestiary-facsimile" open><summary>Kompletní pravidla bestiáře – text a HTML tabulky (51 stran)</summary>
- <nav class="hmk-bestiary-page-nav" aria-label="Strany bestiáře">${BESTIARY_PAGES_564.map(x=>`<button type="button" class="hc-small secondary" data-hmk-bestiary-viewpage="${x.page}" title="${esc(x.group)}">${x.page}</button>`).join('')}</nav>
- <div data-hmk-bestiary-native-page>${renderPrintedBestiaryPage565(page)}</div>
- </details></section>`;
+ <div class="hmk-beast-card-head"><strong>${esc(p.name)}</strong><small>HMK ${p.page} · ${p.generation==='variable'?'generace GM':p.generation==='printed-animal'?'tabulková zvířata':'profil druhu'}</small></div>
+ <div class="hmk-beast-stat-strip">${Object.entries(p.attributes||{}).slice(0,4).map(([k,v])=>`<span><b>${esc(k.toUpperCase())}</b> ${esc(v)}</span>`).join('')||'<span>Číselný profil zatím neúplný</span>'}${p.combat?.shock!=null?`<span><b>SHOCK</b> ${p.combat.shock}</span>`:''}${p.move!=null?`<span><b>MOVE</b> ${p.move}</span>`:''}</div>
+ <div class="hmk-bestiary-card-actions"><details class="hmk-bestiary-stats-details"><summary>Statistiky a anatomie</summary>${renderFullCreatureStats565(p)}</details><button type="button" class="hc-small secondary" data-hmk-bestiary-pick="${esc(p.id)}">Vybrat do generátoru</button></div></article>`).join('')}</div></details>`).join('');
+ return `${includeGenerator?bestiaryEncounterPanel():''}<section class="panel hmk-bestiary-complete" id="hmk-bestiary-complete"><h3>Bestiář · tvorové a encountery</h3>
+ <p class="hc-hint">Vyber skupinu, poté konkrétního tvora. Atributy, útoky, ochrana a anatomie jsou přímo v kartě, není potřeba otevírat kopie stránek pravidel. Nedoložené údaje a mimořádné schopnosti se nevymýšlejí.</p>
+ <div class="hmk-bestiary-search"><label>Najít tvora<input type="search" data-hmk-bestiary-filter placeholder="Vlk, Gârgún, drak…"></label><span>Skupiny jsou zprvu sbalené; hledání otevře pouze skupiny s výsledky.</span></div>
+ ${rows}</section>`;
 }
 function livestockAcquisitionHTML({location='library'}={}){
  const clock=data.campaignClock, campaignId=clock?campaignKey(clock):null;
@@ -6646,14 +6716,13 @@ function neutralCombatCastingPanel(){
 function encounterView(){
  if(combatBestiaryExpanded)return journalChapterShell('Combat · Bestiář',
   'Tvorové, pravidlové tabulky, schopnosti a generátor dočasných účastníků',
-  `<div class="hmk-bestiary-combat-nav"><button type="button" data-hmk-combat-bestiary-toggle aria-expanded="true">Zpět na Combat</button></div>${bestiaryCompleteCatalogView()}`,
+  `<div class="hmk-bestiary-combat-nav"><button type="button" data-hmk-combat-bestiary-toggle aria-expanded="true">‹ Zpět na Combat</button></div>${bestiaryCompleteCatalogView()}`,
   'journal-book--combat');
  const chars=data.characters;
  const selectedChars=selectedEncounterCharacters();
  const count=selectedChars.length;
  const issues=selectedChars.reduce((sum,c)=>sum+readinessReport(c).length+encounterEquipmentPreflight(c).issues.length+equippedCombatInputs(c).issues.length,0);
- return journalChapterShell('Combat','Příprava střetnutí, Initiative a bojové procedury ve stejné knižní grafice.',`<div class="topline"><h2>Příprava bojového střetnutí</h2></div>
- <div class="hmk-bestiary-combat-nav"><button type="button" data-hmk-combat-bestiary-toggle aria-expanded="${combatBestiaryExpanded?'true':'false'}">${combatBestiaryExpanded?'Zavřít bestiář':'Bestiář · tvorové a generátor'}</button><span>HMK 1.2 · pravidla, tabulky, generátor dočasných účastníků</span></div>
+ return journalChapterShell('Combat','Příprava střetnutí, Initiative a bojové procedury ve stejné knižní grafice.',`<div class="topline hmk-combat-topline"><h2>Příprava bojového střetnutí</h2><nav class="hmk-combat-quick-links" aria-label="Rychlé nástroje Combat"><button type="button" data-hmk-combat-bestiary-toggle aria-expanded="false">Bestiář · generátor</button></nav></div>
  <div class="notice">Tato obrazovka připravuje výběr účastníků a jejich evidované HMK údaje. Nově lze exportovat ověřený návrh jedné bojové události bez změny postavy. Hody zadává GM; Missile a Melee lze ověřit v samostatných formulářích. Nabízí výpočet Impact, úrovně zranění a Shock State z ručně zadaného výsledku Shock Roll, bez změn stavu postavy. Výběr před začátkem boje zůstává pracovní v této záložce; při aktivní Initiative se jeho soupis ukládá společně s trvalým kontrolním bodem pro bezpečné obnovení.</div>
  <section class="panel"><h3>Účastníci (${count})</h3>
  ${chars.length?`<div class="encounter-roster">${chars.map(c=>{const warnings=[...readinessReport(c),...encounterEquipmentPreflight(c).issues,...equippedCombatInputs(c).issues];return `<label class="encounter-entry"><input type="checkbox" data-encounter-character="${esc(c.id)}" ${encounterSelection.has(c.id)?'checked':''}><span><strong>${esc(c.name)}</strong><small>${esc(c.kind||'PC')} · ${warnings.length?warnings.length+' upozornění k údajům':'bez upozornění k úplnosti údajů'}</small></span></label>`}).join('')}</div>`:'<p class="muted">Nejprve vytvořte postavy v registru.</p>'}
@@ -11881,15 +11950,6 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const toggle=e.target.closest?.('[data-hmk-combat-bestiary-toggle]');
  if(toggle){e.preventDefault();e.stopImmediatePropagation();combatBestiaryExpanded=!combatBestiaryExpanded;render();return;}
- const page=e.target.closest?.('[data-hmk-bestiary-viewpage]');
- if(page){e.preventDefault();e.stopImmediatePropagation();const n=Number(page.dataset.hmkBestiaryViewpage);
-  if(!BESTIARY_PAGES_564.some(x=>x.page===n))return;
-  const container=page.closest('.hmk-bestiary-complete')||document.querySelector('.hmk-bestiary-complete');
-  if(!container)return;
-  const target=container.querySelector('[data-hmk-bestiary-native-page]');
-  const detail=container.querySelector('.hmk-bestiary-facsimile');
-  if(target)target.innerHTML=renderPrintedBestiaryPage565(n);
-  if(detail){detail.open=true;detail.scrollIntoView({behavior:'smooth',block:'start'});}return;}
  const pick=e.target.closest?.('[data-hmk-bestiary-pick]');
  if(pick){e.preventDefault();e.stopImmediatePropagation();const root=pick.closest('.journal-book')||document;
   const select=root.querySelector('.hmk-bestiary-generator [name="templateId"]')||document.querySelector('.hmk-bestiary-generator [name="templateId"]');
@@ -11900,8 +11960,91 @@ document.addEventListener('input',e=>{
  const root=e.target.closest('.hmk-bestiary-complete');if(!root)return;
  const term=e.target.value.trim().toLocaleLowerCase('cs');
  for(const card of root.querySelectorAll('.hmk-bestiary-species-card'))card.hidden=!!term&&!card.dataset.hmkBeastName.includes(term);
- for(const category of root.querySelectorAll('.hmk-bestiary-category'))category.hidden=!category.querySelector('.hmk-bestiary-species-card:not([hidden])');
+ for(const category of root.querySelectorAll('.hmk-bestiary-category')){const visible=!!category.querySelector('.hmk-bestiary-species-card:not([hidden])');category.hidden=!visible;if(term&&visible)category.open=true;}
 });
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-hmk-beast-infection-567],[data-hmk-beast-blood-healing-567]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const v=Object.fromEntries(new FormData(f)),cid=campaignKey(data.campaignClock),minute=data.campaignClock?.minute;
+  const actor=encounterBeastHistory(data,cid).find(x=>x.id===v.targetId&&x.active);
+  if(!actor)throw Error('Tvor není aktivní.');
+  const health=animalHealthProjection567(data.journal,cid,actor.id);
+  const infection=f.matches('[data-hmk-beast-infection-567]');
+  const proof=infection?prepareAnimalInfectionCourse567({profile:{...actor.profile,id:actor.id},previous:health,
+    wound:health.wounds.find(x=>x.id===v.woundId),minute,roll:Number(v.roll),fatigue:Number(v.fatigue),gmConfirmed:v.confirmed==='on'}):
+    prepareAnimalBloodHealing567({profile:{...actor.profile,id:actor.id},previous:health,
+    minute,roll:Number(v.roll),otherWeakness:Number(v.otherWeakness),gmConfirmed:v.confirmed==='on'});
+  proof.campaignId=cid;
+  if(!ask('Potvrdit skutečný d100 ('+v.roll+') a '+(infection?'Infection Course':'Blood Loss Healing')+' pro '+actor.name+'?'))return;
+  mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock?.minute!==minute)throw Error('Čas se změnil.');
+   data.journal.push({id:uuid(),characterId:null,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+    title:'Bestiář · '+(infection?'Infection Course':'Blood Loss Healing')+': '+actor.name,
+    body:'HMK 181 · d100 ('+v.roll+') → '+proof.sl,bestiaryTrauma:proof});});
+ }catch(err){alert('Bestiář · rekonvalescence: '+err.message)}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-hmk-beast-blood-567]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const v=Object.fromEntries(new FormData(f)),cid=campaignKey(data.campaignClock),minute=data.campaignClock?.minute;
+  const actor=encounterBeastHistory(data,cid).find(x=>x.id===v.targetId&&x.active);
+  if(!actor)throw Error('Tvor není v encounteru aktivní.');
+  const health=animalHealthProjection567(data.journal,cid,actor.id),wound=health.wounds.find(x=>x.id===v.woundId);
+  const proof=prepareAnimalBlood567({profile:{...actor.profile,id:actor.id},previous:health,wound,minute,
+   method:v.method,physicianML:v.physicianML===''?null:Number(v.physicianML),
+   stoppageRoll:v.stoppageRoll===''?null:Number(v.stoppageRoll),
+   lossRoll:v.lossRoll===''?null:Number(v.lossRoll),gmConfirmed:v.confirmed==='on'});
+  proof.campaignId=cid;
+  if(!ask('Potvrdit krvácení pro '+actor.name+'; BP '+proof.bp+' a Shock '+proof.after+'?'))return;
+  mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock?.minute!==minute)throw Error('Herní čas se změnil.');
+   data.journal.push({id:uuid(),characterId:null,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+    title:'Bestiář · Blood Loss/Stoppage: '+actor.name,body:'HMK 178 · BP '+proof.bp+' · Shock '+proof.after,
+    bestiaryTrauma:proof});});
+ }catch(err){alert('Bestiář · krvácení: '+err.message)}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-hmk-beast-shock-recovery-567],[data-hmk-beast-extended-567]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const v=Object.fromEntries(new FormData(f)),cid=campaignKey(data.campaignClock),minute=data.campaignClock?.minute;
+  const actor=encounterBeastHistory(data,cid).find(x=>x.id===v.targetId&&x.active);
+  if(!actor)throw Error('Tvor už není aktivní v encounteru.');
+  const health=animalHealthProjection567(data.journal,cid,actor.id);
+  const extended=f.matches('[data-hmk-beast-extended-567]');
+  const proof=extended?prepareAnimalExtendedCourse567({profile:{...actor.profile,id:actor.id},previous:health,minute,
+   roll:Number(v.roll),fatigue:Number(v.fatigue),gmConfirmed:v.confirmed==='on'}):
+   prepareAnimalShockRecovery567({profile:{...actor.profile,id:actor.id},previous:health,minute,
+   roll:Number(v.roll),fatigue:Number(v.fatigue),nextTurnConfirmed:v.confirmed==='on'});
+  proof.campaignId=cid;
+  if(!ask('Potvrdit skutečné d100 ('+v.roll+') a Shock stav '+proof.after+' pro '+actor.name+'?'))return;
+  mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock?.minute!==minute)throw Error('Mezitím se změnil herní čas.');
+   data.journal.push({id:uuid(),characterId:null,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+    title:'Bestiář · '+(extended?'Extended Shock Course':'Shock Recovery')+': '+actor.name,
+    body:'HMK '+(extended?'179':'169')+' · d100 ('+v.roll+') → '+proof.sl+' · '+proof.after,bestiaryTrauma:proof});});
+ }catch(err){alert('Bestiář · Shock: '+err.message)}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-hmk-beast-treat-567],[data-hmk-beast-heal-567]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const v=Object.fromEntries(new FormData(f)),cid=campaignKey(data.campaignClock),minute=data.campaignClock?.minute;
+ try{
+  const actor=encounterBeastHistory(data,cid).find(x=>x.id===v.targetId&&x.active);
+  if(!actor)throw Error('Tvor již není aktivní v encounteru.');
+  const health=animalHealthProjection567(data.journal,cid,actor.id),wound=health.wounds.find(x=>x.id===v.woundId);
+  if(!wound)throw Error('Chybí identita původní rány.');
+  if(health.shock!=='none')throw Error('Nejprve vyřeš Shock, Extended Shock či Coma samostatnou procedurou.');
+  const healing=f.matches('[data-hmk-beast-heal-567]');
+  const p=healing?prepareAnimalHealing567({wound,profile:{...actor.profile,id:actor.id},previous:health,minute,roll:Number(v.roll),gmConfirmed:v.confirmed==='on'}):
+   prepareAnimalTreatment567({wound,profile:{...actor.profile,id:actor.id},previous:health,minute,physicianML:Number(v.physicianML),physicianIndex:Number(v.physicianIndex),roll:Number(v.roll),gmConfirmed:v.confirmed==='on'});
+  p.campaignId=cid;
+  if(!ask('Zapsat '+(healing?'Healing Roll':'Treatment Roll')+' pro '+actor.name+' se skutečným d100 ('+v.roll+')?'))return;
+  mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock?.minute!==minute)throw Error('Herní čas se mezitím změnil.');
+   data.journal.push({id:uuid(),characterId:null,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+    title:'Bestiář · '+(healing?'Healing':'Treatment')+': '+actor.name,body:'HMK '+(healing?'181':'180')+' · '+actor.name+' · d100 ('+v.roll+') → '+p.sl,
+    bestiaryTrauma:p});});
+ }catch(err){alert('Bestiář · zranění: '+err.message)}
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-hmk-beast-contact-566]'))return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -11911,6 +12054,21 @@ document.addEventListener('submit',e=>{
   const cid=campaignKey(data.campaignClock),active=encounterBeastHistory(data,cid).filter(x=>x.active);
   const a=active.find(x=>x.id===v.attackerId),b=active.find(x=>x.id===v.defenderId);
   if(!a||!b||a.id===b.id)throw Error('Vyber dva různé účastníky právě probíhajícího encounteru.');
+  if(e.submitter?.dataset.hmkBeastSaveHit==='yes'){
+   const eventId=uuid(),previous=animalHealthProjection567(data.journal,cid,b.id);
+   const input={weaponIndex:Number(v.attackIndex),aimZN:Number(v.aimZN),zdRoll:Number(v.zdRoll),
+    locationD10:Number(v.locationD10),impactDieRoll:Number(v.impactDieRoll),extraImpact:Number(v.extraImpact),
+    aimConfirmed:v.aimConfirmed==='yes',specialsReviewed:v.specialsReviewed==='on',bleedingReviewed:v.bleeding!=='unknown',
+    bleeding:v.bleeding==='yes',rigidArmour:v.rigidArmour,shockFatigue:Number(v.shockFatigue),
+    shockRoll:v.shockRoll===''?null:Number(v.shockRoll),campaignId:cid};
+   const proof=prepareAnimalHit567({attacker:a,defender:b,inputs:input,previous,minute:data.campaignClock.minute,eventId});
+   if(!ask('Zapsat skutečné '+(proof.injury?'zranění '+proof.injury.severity+proof.injury.level:'Glancing Blow')+' a Shock '+proof.shock.after+' pro '+b.name+'?'))return;
+   const ok=mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock.minute!==proof.minute)throw Error('Mezitím se změnil herní čas.');
+    data.journal.push({id:eventId,characterId:null,calendarCampaignId:cid,campaignMinute:proof.minute,createdAt:stamp(),
+    title:'Bestiář · zranění: '+b.name,body:'HMK 167–169 · '+proof.location.name+' · '+(proof.injury?'IL '+proof.injury.level:'Glancing Blow')+' · Shock '+proof.shock.after,bestiaryTrauma:proof});});
+   if(out)out.textContent=ok?'Zranění a Shock zapsány v jediném autoritativním dokladu.':'Zápis nebyl přijat.';
+   return;
+  }
   const x=previewAnimalContact566({attackerProfile:a.profile,defenderProfile:b.profile,
    weaponIndex:Number(v.attackIndex),aimZN:Number(v.aimZN),zdRoll:Number(v.zdRoll),
    locationD10:Number(v.locationD10),impactDieRoll:Number(v.impactDieRoll),extraImpact:Number(v.extraImpact),
