@@ -4,6 +4,7 @@
  * This does not auto-create a Frostbite/weather outcome or use human anatomy.
  */
 import {animalLocation566,creatureAnatomyReadiness566} from './hmk-bestiary-anatomy-566.js';
+import {resolveBeastFrostbite572} from './hmk-bestiary-frostbite-572.js';
 import {animalAmputationMark570,resolveAnimalAmputation570} from './hmk-bestiary-amputation-570.js';
 import {SL,successLevel} from '../rules/tests.js';
 import {calculateShockState,applyShockState,shockRecoverySchedule} from '../rules/shock.js';
@@ -37,7 +38,7 @@ function certified(profile,prev,minute){
  check(int(minute,0,1e10),'Chybí platný herní čas.');
 }
 export function prepareAnimalFrostInjury571({profile,previous,minute,eventId,zoneNumber,locationD10,
- level,source,sourceDetails,facialFeature='',wingAsLimbConfirmed=false,shockRoll,shockFatigue=0,gmConfirmed=false}={}){
+ level,source,sourceDetails,frostbite=null,facialFeature='',wingAsLimbConfirmed=false,shockRoll,shockFatigue=0,gmConfirmed=false}={}){
  certified(profile,previous,minute);
  check(gmConfirmed===true&&typeof eventId==='string'&&eventId.length>=4,
   'GM musí potvrdit zdroj Grievous Frost a identitu zápisu.');
@@ -50,6 +51,16 @@ export function prepareAnimalFrostInjury571({profile,previous,minute,eventId,zon
  const location=animalLocation566({table,zoneNumber,locationD10});
  check(!previous.wounds.some(w=>!w.healed&&w.location===location.id),
   'V této lokalitě je aktivní rána; pro Frost/Compound je nutný samostatně ověřený postup.');
+ // Weather p.185 is a genuine dice-driven path; legacy GM-certified
+ // reports without a machine-readable weather proof remain readable.
+ let frostbiteProof=null;
+ if(frostbite!==null){
+  check(source==='weather','Frostbite d20 patří pouze zdroji počasí.');
+  const innateAV=profile.combat?.av?.f;
+  frostbiteProof=resolveBeastFrostbite572({...frostbite,innateAV});
+  check(frostbiteProof.injuryLevel===level&&level>=4,
+   'Skutečný Frostbite podle d20 a AV nedal požadované G4f/G5f (HMK 185).');
+ }
  const site=frostAmputationSite571({location,facialFeature,wingAsLimbConfirmed});
  if(wingAsLimbConfirmed)check(location.id==='wng','Zvláštní potvrzení přední končetiny je pouze pro křídlo.');
  if(facialFeature)check(location.id==='hd'&&site.eligible,
@@ -60,7 +71,7 @@ export function prepareAnimalFrostInjury571({profile,previous,minute,eventId,zon
  const impact=calculateShockState({locationShock:location.locationShock,injuryShock:level,shockSL:sl});
  const after=applyShockState(previous.shock,impact.state);
  return {format:'hmk-bestiary-trauma-567-v1',kind:'frost',targetId:profile.id,woundId:eventId,minute,location,
-  level,aspect:'frost',source,sourceDetails:details,facialFeature:site.kind==='facial-feature'?facialFeature:'',
+  level,aspect:'frost',source,sourceDetails:details,...(frostbiteProof?{frostbite:frostbiteProof}:{}),facialFeature:site.kind==='facial-feature'?facialFeature:'',
   wingAsLimbConfirmed:wingAsLimbConfirmed===true,site,
   shock:{ml,fatigue:shockFatigue,eml,roll:shockRoll,sl:slName[sl],location:location.locationShock,
    injury:level,index:impact.index,incoming:impact.state,after,followup:shockRecoverySchedule(after)},

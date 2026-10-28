@@ -122,6 +122,8 @@ import {creatureIntro569,creatureSource569} from './src/integration/hmk-bestiary
 import {previewCreatureSpecial569} from './src/integration/hmk-bestiary-special-569.js';
 import {creatureCombatSheet565,previewCreatureSkillRoll565,previewCreatureMelee565} from './src/integration/hmk-bestiary-combat-565.js';
 import {animalHealthProjection567,prepareAnimalHit567,prepareAnimalBlood567,prepareAnimalInfectionCourse567,prepareAnimalBloodHealing567,prepareAnimalTreatment567,prepareAnimalHealing567,prepareAnimalShockRecovery567,prepareAnimalExtendedCourse567,prepareAnimalComaCourse568,prepareAnimalGrimShock568,prepareAnimalFrostInjury571,prepareAnimalFrostAmputation571,validateAnimalTraumaJournal567,assertAnimalTraumaAppendOnly567,requireAnimalMedicalGMTimeMayAdvance567} from './src/integration/hmk-bestiary-trauma-567.js';
+import {resolveBeastFrostbite572} from './src/integration/hmk-bestiary-frostbite-572.js';
+import {animalLossCapabilities572,assertAnimalAttackCapability572} from './src/integration/hmk-bestiary-loss-effects-572.js';
 import {ANIMAL_ANATOMIES_566,ANIMAL_WEAPON_DICE_566,creatureAnatomyReadiness566,previewAnimalContact566} from './src/integration/hmk-bestiary-anatomy-566.js';
 import {BESTIARY_ENTRIES_564,bestiaryEntry564,createBespokeEncounterProof564,validateFullBestiaryJournal564 as validateBestiaryJournal,bestiaryEncounterStatus564} from './src/integration/hmk-bestiary-runtime-564.js';
 import { ARMOUR_LAYER_COLUMNS, ARMOUR_LAYER_NOTES } from './src/rules/armour-layer-reference.js';
@@ -279,7 +281,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.571';
+const APP_VERSION='93.572';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3984,10 +3986,18 @@ function bestiaryFrostSourceForm571(actor,health){
  const readiness=creatureAnatomyReadiness566(actor.profile);
  if(!readiness.ready||health.shock!=='none')return '';
  return `<details class="hmk-bestiary-wide hmk-beast-frost-571"><summary>Nové Grievous Frost · doložit G4f / G5f (HMK 178, 185)</summary>
- <p class="hc-hint">Pouze pro již pravidlově doloženou omrzlinu/zásah Frost. Zadej skutečné ZN a LD příslušné zvířecí tabulky; tento formulář sám negeneruje počasí ani frostbite. Pokud již existuje rána ve stejné lokalitě, výpočet se zastaví do samostatného ověření Compound. Hlava není automaticky obličej.</p>
+ <p class="hc-hint">Pro Frostbite z počasí zadej skutečné d20 větru a expozice (HMK 185) a ochranu lokality. Pro magický či jiný zdroj dolož samostatný pravidlový výsledek. Zadej skutečné ZN a LD příslušné zvířecí tabulky; tento formulář sám negeneruje počasí ani frostbite. Pokud již existuje rána ve stejné lokalitě, výpočet se zastaví do samostatného ověření Compound. Hlava není automaticky obličej.</p>
  <form data-hmk-beast-frost-source-571 class="hc-fields"><input type="hidden" name="targetId" value="${esc(actor.id)}">
  <label>Zdroj již vyhodnoceného Frost<select name="source"><option value="weather">Frostbite · počasí / HMK 185</option><option value="spell">Frost · magický / jiný pravidlový účinek</option><option value="other">Jiný doložený zdroj</option></select></label>
  <label>Úroveň zranění<select name="level"><option value="4">G4f</option><option value="5">G5f</option></select></label>
+ <details class="hmk-bestiary-wide" open><summary>Frostbite z počasí · výpočet podle d20 a ochrany (HMK 185)</summary>
+ <p class="hc-hint">Pro zdroj „počasí“ jsou následující hody povinné. Vítr: 1–3 = 2 h, 4–17 = 1 h, 18–20 = 30 min. Expozice: 1–12 = 1 h, 13–17 = 2 h, 18–19 = 3 h, 20 = 4 h. AV0: IL za každé období; AV1–3: IL za dvě období; AV4+: bez Frostbite. Formulář ukládá <strong>jednu doloženou lokalitu</strong>; další vystavená místa je nutné rozhodnout zvlášť.</p>
+ <label>Vítr · skutečný d20<input name="windD20" type="number" min="1" max="20"></label>
+ <label>Délka expozice · skutečný d20<input name="durationD20" type="number" min="1" max="20"></label>
+ <label>Potvrzená ochrana AV této lokality (včetně přirozené a vybavení; min. přirozená ${actor.profile.combat?.av?.f??'—'})<input name="locationAV" type="number" min="${Math.max(0,actor.profile.combat?.av?.f??0)}" max="100" value="${Math.max(0,actor.profile.combat?.av?.f??0)}"></label>
+ <label class="hc-check"><input type="checkbox" name="freezingAirConfirmed"> GM potvrzuje skutečný mrazivý vzduch</label>
+ <label class="hc-check"><input type="checkbox" name="siteExposedConfirmed"> GM potvrzuje vystavení této konkrétní lokality</label>
+ <output data-hmk-frostbite-out-572 class="hc-hint hmk-bestiary-wide" aria-live="polite">Vyplň dvě d20 a AV pro kontrolu výsledného IL.</output></details>
  <label>Zone Number · 1–${readiness.maxZN}<input type="number" name="zoneNumber" min="1" max="${readiness.maxZN}" step="1" required></label>
  <label>Location d10 · skutečný hod<input type="number" name="locationD10" min="1" max="10" step="1" required></label>
  <label class="hmk-bestiary-wide">Doložený původ Frost (pravidlový krok, hody a účinek)<textarea name="sourceDetails" rows="2" maxlength="300" minlength="5" required></textarea></label>
@@ -3995,7 +4005,7 @@ function bestiaryFrostSourceForm571(actor,health){
  <label class="hmk-bestiary-wide hc-check"><input name="wingAsLimbConfirmed" type="checkbox"> Pouze u lokality Wing: GM potvrzuje, že křídlo daného druhu je zde amputovatelná končetina; jinak standardní AMP není automaticky přípustná.</label>
  <label>Skutečný Shock d100<input type="number" name="shockRoll" min="1" max="100" required></label>
  <label>Potvrzená Fatigue pro Shock<input type="number" name="shockFatigue" min="0" max="300" step="5" value="0" required></label>
- <label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="confirmed" required> GM potvrzuje skutečně vzniklé G4f/G5f, zónu, lokalitu, zdroj a hod Shock (neprobíhá nový hod na vznik Frost).</label>
+ <label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="confirmed" required> GM potvrzuje zónu, lokalitu, zdroj, ochranu, skutečné hody a Shock. Při zdroji počasí se G4f/G5f ověří z d20; při ostatních zdrojích musí být IL doloženo pravidlem.</label>
  <button type="submit">Doložit Frost zranění do zdravotní historie</button></form></details>`;
 }
 function bestiaryFrostAmputationForm571(actor,w,health,minute){
@@ -4022,7 +4032,9 @@ function bestiaryHealthPanel567(active,cid,minute){
  <p class="hc-hint">Každý tvor má vlastní neměnnou evidenci. Zdravotní postup nepoužívá lidskou anatomii. Žádný termín ani kostka nevzniká bez doloženého pravidla nebo hodu. Speciality druhu, krvácení a nevyřešený Extended Shock jsou označené jako blokující.</p>
  ${active.map(a=>{const health=animalHealthProjection567(data.journal,cid,a.id),wounds=health.wounds;
  const pending=health.records.filter(r=>r.bestiaryTrauma.kind==='hit').at(-1)?.bestiaryTrauma;
+ const capability=animalLossCapabilities572(health);
  return `<details class="hmk-beast-health-actor" ${health.records.length?'open':''}><summary>${esc(a.name)} · Shock: ${esc(health.shock)} · ${wounds.filter(w=>!w.healed).length} otevřených ran</summary>
+ ${capability.reasons.length?`<aside class="hc-hint"><strong>Trvalá funkční omezení:</strong> ${capability.reasons.map(t=>esc(t)).join(' ')} Zranění nelze považovat za odstraněné uzdravením.</aside>`:''}
  <div class="hmk-beast-health-grid">${wounds.map(w=>`<article class="hmk-beast-wound"><strong>${esc(w.locationName)} · ${esc(w.id.slice(0,8))}</strong>
  ${w.amputation?.severed?`<p class="hc-hint"><strong>TRVALÁ ZTRÁTA:</strong> ${esc(w.locationName)}${w.amputation.side?' · '+esc(w.amputation.side):''} · ${w.amputation.viaTreatment?'AMP · HMK 178/180':esc(w.amputation.sl)+' d100 ('+esc(w.amputation.roll)+') · HMK 168'}. Zhojení pahýlu končetinu neobnoví.</p>`:''}<p>${esc(w.healed?'Zhojeno':w.infected?'Infekce: vyžaduje Infection Course':w.bleeding?'Bleeder: neodkladně Blood Loss / Blood Stoppage':('IL '+w.level+' '+w.aspect))}</p>
  ${bestiaryFrostAmputationForm571(a,w,health,minute)}
@@ -4108,6 +4120,7 @@ function bestiaryEncounterPanel({combat=false}={}){
  <label>Skutečná Fatigue cíle pro Shock<input name="shockFatigue" type="number" min="0" max="300" step="5" value="0"></label>
  <label>Skutečný Shock d100<input name="shockRoll" type="number" min="1" max="100"></label><label>Amputation d100 (pouze G5 Edge v lokalitě s trojúhelníkem)<input name="amputationD100" type="number" min="1" max="100" placeholder="Dle zóny a pravidel HMK 168"></label><label>Compound d10 (jen při již zraněné stejné lokalitě)<input name="compoundD10" type="number" min="1" max="10" step="1" placeholder="Prázdné, pokud nevzniká"></label>
  <label>Vzniká Bleeder?<select name="bleeding"><option value="unknown">Zatím neověřeno</option><option value="no">Ne, podle druhu zranění a lokality</option><option value="yes">Ano, podle pravidel</option></select></label>
+ <label class="hmk-bestiary-wide hc-check"><input name="limbUseConfirmed" type="checkbox"> Po předchozí amputaci GM potvrzuje, že pro vybraný Kick / Claw / Wing / Grab / Bite / Trample zůstává použitelná skutečně zachovaná končetina. Bez potvrzení se takový útok zablokuje.</label>
  <label class="hmk-bestiary-wide hc-check"><input name="specialsReviewed" type="checkbox"> GM ověřil krvácení, anatomické značky, Compound, mimořádné zásahy a případné Mishaps</label>
  <button type="submit" data-hmk-beast-save-hit="yes">Potvrdit zranění a Shock do zdravotního deníku tvora</button></details>
  <button type="submit">Zobrazit lokalitu, AV a předběžné zranění</button></form>
@@ -9362,6 +9375,18 @@ document.addEventListener('submit',e=>{
    const id=String(v['trekStableAnimal'+ix]??'').trim();if(!id)continue;
    const st=stable.find(x=>x.id===id);
    if(!st||stableIds.has(id)||!st.spec.str)throw Error('Vyberte jedinečné ověřené zvíře se známým STR ze stáje.');
+   // A purchased animal is the SAME living animal across encounters.
+   // A grievous Frost wound / lost leg cannot be ignored by a fresh travel
+   // snapshot with the species' healthy printed Move.
+   const visits=encounterBeastHistory(data,campaignId).filter(x=>x.ownerAnimalId===st.id&&x.ownerId===st.ownerId);
+   if(visits.length){
+    const state=animalHealthProjection567(data.journal,campaignId,visits.at(-1).id);
+    const effect=animalLossCapabilities572(state);
+    if(state.shock==='killed'||['incapacitated','unconscious'].includes(state.shock)||
+       state.wounds.some(w=>!w.healed&&(w.bleeding||(w.aspect==='frost'&&w.level>=4)))||
+       effect.requiresMobilityRuling)
+     throw Error('Zvíře '+st.name+' má přetrvávající Grievous Frost / Shock, krvácení nebo amputovanou končetinu. Nelze automaticky použít zdravé Move a připravit cestovní hlídku; rozhodnutí GM o mobilitě chybí.');
+   }
    stableIds.add(id);
    const droverId=String(v['trekStableDrover'+ix]??''),lbs=String(v['trekStableLb'+ix]??'').trim(),awk=String(v['trekStableAwkward'+ix]??'').trim();
    if(!memberIds.includes(droverId)||!/^\d+$/.test(lbs)||!/^\d+$/.test(awk||'0'))throw Error('Zvíře potřebuje honáka v hlídce a celou skutečnou hmotnost v lb.');
@@ -12120,6 +12145,22 @@ document.addEventListener('submit',e=>{
     title:'Bestiář · Coma Course: '+actor.name,body:'HMK 179 · d100 ('+v.roll+') · '+proof.sl+' · HR '+proof.afterHR,bestiaryTrauma:proof});});
  }catch(error){alert('Bestiář · Coma: '+error.message)}
 },true);
+document.addEventListener('input',e=>{
+ const f=e.target.closest?.('[data-hmk-beast-frost-source-571]');if(!f)return;
+ const out=f.querySelector('[data-hmk-frostbite-out-572]');if(!out)return;
+ const v=Object.fromEntries(new FormData(f));
+ if(v.source!=='weather'){out.textContent='Magický nebo jiný zdroj: skutečný IL musí být doložen samostatným pravidlovým výpočtem.';return;}
+ const actor=encounterBeastHistory(data,campaignKey(data.campaignClock)).find(x=>x.id===v.targetId&&x.active);
+ const innateAV=actor?.profile?.combat?.av?.f;
+ if(!v.windD20||!v.durationD20||!Number.isSafeInteger(innateAV)){
+  out.textContent='Vyplň skutečné d20, ochranu lokality a dolož mrazivý vzduch.';return;
+ }
+ try{const result=resolveBeastFrostbite572({windD20:Number(v.windD20),durationD20:Number(v.durationD20),
+  locationAV:Number(v.locationAV),innateAV,freezingAirConfirmed:true,siteExposedConfirmed:true});
+  out.textContent='Vítr: '+result.periodMinutes+' min · expozice: '+result.durationMinutes+' min · přímé Frost IL '+result.injuryLevel+
+   (result.injuryLevel<4?' — toto není Grievous Frost; nelze zapsat do formuláře G4/G5.':result.injuryLevel===Number(v.level)?' · odpovídá zvolené G'+v.level+'f.':' · změň zvolenou závažnost.');
+ }catch(error){out.textContent=error.message;}
+},true);
 document.addEventListener('submit',e=>{
  const f=e.target;if(!f?.matches?.('[data-hmk-beast-frost-source-571],[data-hmk-beast-frost-amp-571]'))return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -12133,6 +12174,9 @@ document.addEventListener('submit',e=>{
    minute,eventId,zoneNumber:Number(v.zoneNumber),locationD10:Number(v.locationD10),level:Number(v.level),
    source:v.source,sourceDetails:v.sourceDetails,facialFeature:String(v.facialFeature||'').trim(),
    wingAsLimbConfirmed:v.wingAsLimbConfirmed==='on',
+   frostbite:v.source==='weather'?{windD20:Number(v.windD20),durationD20:Number(v.durationD20),
+    locationAV:Number(v.locationAV),freezingAirConfirmed:v.freezingAirConfirmed==='on',
+    siteExposedConfirmed:v.siteExposedConfirmed==='on'}:null,
    shockRoll:Number(v.shockRoll),shockFatigue:Number(v.shockFatigue),gmConfirmed:v.confirmed==='on'}):
    prepareAnimalFrostAmputation571({profile:{...actor.profile,id:actor.id},previous,
     wound:previous.wounds.find(w=>w.id===v.woundId),minute,eventId,
@@ -12185,14 +12229,14 @@ document.addEventListener('submit',e=>{
   const a=active.find(x=>x.id===v.attackerId),b=active.find(x=>x.id===v.defenderId);
   if(!a||!b||a.id===b.id)throw Error('Vyber dva různé účastníky právě probíhajícího encounteru.');
   if(e.submitter?.dataset.hmkBeastSaveHit==='yes'){
-   const eventId=uuid(),previous=animalHealthProjection567(data.journal,cid,b.id);
+   const eventId=uuid(),previous=animalHealthProjection567(data.journal,cid,b.id),attackerPrevious=animalHealthProjection567(data.journal,cid,a.id);
    const input={weaponIndex:Number(v.attackIndex),aimZN:Number(v.aimZN),zdRoll:Number(v.zdRoll),
     locationD10:Number(v.locationD10),impactDieRoll:Number(v.impactDieRoll),extraImpact:Number(v.extraImpact),
     aimConfirmed:v.aimConfirmed==='yes',specialsReviewed:v.specialsReviewed==='on',bleedingReviewed:v.bleeding!=='unknown',
     bleeding:v.bleeding==='yes',rigidArmour:v.rigidArmour,shockFatigue:Number(v.shockFatigue),
     shockRoll:v.shockRoll===''?null:Number(v.shockRoll),compoundD10:v.compoundD10?Number(v.compoundD10):null,
-    amputationD100:v.amputationD100?Number(v.amputationD100):null,campaignId:cid};
-   const proof=prepareAnimalHit567({attacker:a,defender:b,inputs:input,previous,minute:data.campaignClock.minute,eventId});
+    amputationD100:v.amputationD100?Number(v.amputationD100):null,limbUseConfirmed:v.limbUseConfirmed==='on',campaignId:cid};
+   const proof=prepareAnimalHit567({attacker:a,defender:b,inputs:input,previous,attackerPrevious,minute:data.campaignClock.minute,eventId});
    if(!ask('Zapsat skutečné '+(proof.injury?'zranění '+proof.injury.severity+proof.injury.level:'Glancing Blow')+' a Shock '+proof.shock.after+' pro '+b.name+'?'))return;
    const ok=mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock.minute!==proof.minute)throw Error('Mezitím se změnil herní čas.');
     data.journal.push({id:eventId,characterId:null,calendarCampaignId:cid,campaignMinute:proof.minute,createdAt:stamp(),
@@ -12200,6 +12244,8 @@ document.addEventListener('submit',e=>{
    if(out)out.textContent=ok?'Zranění a Shock zapsány v jediném autoritativním dokladu.':'Zápis nebyl přijat.';
    return;
   }
+  assertAnimalAttackCapability572({health:animalHealthProjection567(data.journal,cid,a.id),
+   weaponName:a.profile.weapons?.[Number(v.attackIndex)]?.name,weaponSpecial:a.profile.weapons?.[Number(v.attackIndex)]?.special,gmRemainingLimbConfirmed:v.limbUseConfirmed==='on'});
   const x=previewAnimalContact566({attackerProfile:a.profile,defenderProfile:b.profile,
    weaponIndex:Number(v.attackIndex),aimZN:Number(v.aimZN),zdRoll:Number(v.zdRoll),
    locationD10:Number(v.locationD10),impactDieRoll:Number(v.impactDieRoll),extraImpact:Number(v.extraImpact),
