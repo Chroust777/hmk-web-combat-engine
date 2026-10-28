@@ -57,3 +57,21 @@
 /* v93.497: consistent rules help in the Library's visible and expanded cells. */
 .library-table .catalog-parameter-tip,.folio-catalog-field .catalog-parameter-tip,.catalog-parameters .catalog-parameter-tip{cursor:help;text-decoration:underline dotted rgba(88,59,29,.55);text-underline-offset:2px}
 .catalog-parameter-tip:focus-visible{outline:2px solid #86613d;outline-offset:2px}
+
+/* v93.574 — unified, campaign-bound stable, outfitting and care workspace. */
+#hmk-livestock-catalog{display:grid;gap:1rem}
+#hmk-livestock-catalog .hmk-stable-animal-card{padding:1rem 1.15rem;border-radius:16px;border:1px solid rgba(109,78,41,.36);background:linear-gradient(180deg,rgba(249,244,231,.98),rgba(234,222,199,.98));color:#302316}
+#hmk-livestock-catalog .hmk-stable-animal-card>summary{font-weight:600;font-size:1.06rem;padding:.4rem;cursor:pointer;line-height:1.5}
+#hmk-livestock-catalog .hmk-stable-animal-card>.hc-fields{margin-top:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));align-items:start;gap:1rem}
+#hmk-livestock-catalog .hmk-stable-block{border:1px solid rgba(108,78,44,.23);border-radius:12px;padding:1rem;background:rgba(255,253,246,.65);min-width:0}
+#hmk-livestock-catalog .hmk-stable-block h4{margin:0 0 .65rem;color:#59401f}
+#hmk-livestock-catalog .hmk-stable-block p{margin:.5rem 0;line-height:1.55}
+#hmk-livestock-catalog .hmk-stable-block .hc-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:.65rem;border-top:1px solid rgba(88,63,30,.18);margin-top:.9rem;padding-top:.8rem}
+#hmk-livestock-catalog .hmk-stable-block .hc-fields button{align-self:end}
+#hmk-livestock-catalog .hmk-stable-block .catalog-scroll{margin:.65rem 0;max-width:100%}
+#hmk-livestock-catalog .hmk-stable-block .catalog-spec{font-size:.82rem}
+#hmk-livestock-catalog .hmk-stable-block form[data-hmk-stable-event]{max-width:100%}
+#hmk-livestock-catalog .hmk-stable-block .catalog-spec td form{display:inline-flex;margin:0}
+#hmk-livestock-catalog .hmk-stable-health-workspace,#hmk-livestock-catalog .hmk-stable-training-workspace{background:rgba(247,239,222,.94);color:#302316;border:1px solid #ad946e;border-radius:14px;padding:1rem}
+#hmk-livestock-catalog .hmk-stable-health-workspace>summary,#hmk-livestock-catalog .hmk-stable-training-workspace>summary{font-weight:700;cursor:pointer}
+@media(max-width:740px){#hmk-livestock-catalog .hmk-stable-animal-card>.hc-fields{grid-template-columns:minmax(0,1fr)}#hmk-livestock-catalog .hmk-stable-block{padding:.7rem}}

@@ -4,6 +4,7 @@
  */
 import {BEASTS_P122} from '../rules/conveyance-printed-p122.js';
 import {bestiaryForLivestock} from './hmk-bestiary-563.js';
+import {stableHubProjection} from './hmk-stable-hub-574.js';
 const stats=Object.freeze({
  'Bovine (Oxen)':{breed:'bovine',bodyWeightLb:1500,str:32,move:80,role:'Vůl · náklad / tah'},
  Camel:{breed:'camel',bodyWeightLb:1100,str:28,move:120,role:'Velbloud · náklad / jízda'},
@@ -57,7 +58,7 @@ export function verifiedLivestock(data,campaignId){
   if(owner.archived)continue;
   for(const r of owner.hmk?.livestock||[]){
    const spec=livestockOffer(r.beastId);
-   if(r.campaignId===campaignId&&spec&&r.ownerId===owner.id&&typeof r.name==='string'&&r.name)
+   if(r.campaignId===campaignId&&spec&&r.ownerId===owner.id&&typeof r.name==='string'&&r.name&&!stableHubProjection(data,campaignId,r.id).exit)
     out.push({...r,spec});
   }
  }
