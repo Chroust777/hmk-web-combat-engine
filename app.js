@@ -279,7 +279,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.569';
+const APP_VERSION='93.570';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3987,7 +3987,8 @@ function bestiaryHealthPanel567(active,cid,minute){
  const pending=health.records.filter(r=>r.bestiaryTrauma.kind==='hit').at(-1)?.bestiaryTrauma;
  return `<details class="hmk-beast-health-actor" ${health.records.length?'open':''}><summary>${esc(a.name)} · Shock: ${esc(health.shock)} · ${wounds.filter(w=>!w.healed).length} otevřených ran</summary>
  <div class="hmk-beast-health-grid">${wounds.map(w=>`<article class="hmk-beast-wound"><strong>${esc(w.locationName)} · ${esc(w.id.slice(0,8))}</strong>
- <p>${esc(w.healed?'Zhojeno':w.infected?'Infekce: vyžaduje Infection Course':w.bleeding?'Bleeder: neodkladně Blood Loss / Blood Stoppage':('IL '+w.level+' '+w.aspect))}</p>
+ ${w.amputation?.severed?`<p class="hc-hint"><strong>TRVALÁ ZTRÁTA:</strong> ${esc(w.locationName)}${w.amputation.side?' · '+esc(w.amputation.side):''} · ${esc(w.amputation.sl)} d100 (${w.amputation.roll}) · HMK 168. Zhojení pahýlu končetinu neobnoví.</p>`:''}<p>${esc(w.healed?'Zhojeno':w.infected?'Infekce: vyžaduje Infection Course':w.bleeding?'Bleeder: neodkladně Blood Loss / Blood Stoppage':('IL '+w.level+' '+w.aspect))}</p>
+ ${w.projectileRemoved?'<p class="hc-hint">Extraction: projektil byl odstraněn; následné krvácení a hojení se sleduje samostatně.</p>':''}${w.permanentImpairment?`<p class="hc-hint">Trvalé Impairment: ${w.permanentImpairment} (podle doby do M1; HMK 182). Ztráta části těla se sleduje zvlášť.</p>`:''}
  <p>Další termín: ${esc(display(w.nextDueMinute))}${w.nextDueMinute!=null&&minute>w.nextDueMinute?' · PO TERMÍNU':''}</p>
  ${w.bleeding&&health.shock!=='killed'?`<form data-hmk-beast-blood-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}">
  <label>Zastavení krvácení<select name="method"><option value="none">Bez zásahu léčitele</option><option value="staunch">Staunch · tlak a obvaz</option><option value="cauterisation">Cauterisation · žhavý kov (+30)</option></select></label>
@@ -4006,6 +4007,7 @@ function bestiaryHealthPanel567(active,cid,minute){
  <label>Ověřené Physician ML<input type="number" name="physicianML" min="1" max="300" required></label>
  <label>Physician Index<input type="number" name="physicianIndex" min="1" max="30" required></label>
  <label>Skutečné Treatment d100<input type="number" name="roll" min="1" max="100" required></label>
+ ${(w.level>=4&&['b','e','p'].includes(w.aspect))||(w.aspect==='projectile'&&w.level>=3)?`<details class="hmk-bestiary-wide"><summary>Surgery / Extraction · chirurgické požadavky</summary><p class="hc-hint">HMK 178–180: pro SUR a EXT jsou nutné chirurgické nástroje, voda/obvazy dle zákroku a 30 minut; k Physician se přidává DEX Secondary Modifier. Při F/CF vzniká nový Bleeder, který se musí řešit v pěti minutách.</p><label>DEX Secondary Modifier léčitele (např. −5, 0, +5)<input name="dexSecondaryModifier" type="number" min="-100" max="100" step="5" value="0"></label><label class="hc-check"><input type="checkbox" name="surgeryEquipmentConfirmed"> GM ověřil chirurgické nástroje, čistící materiál a dokončení zákroku</label></details>`:''}
  <label class="hmk-bestiary-wide hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje povolený zákrok, vybavení a jeho skutečné provedení</label><button type="submit">Doložit ošetření (HMK 180)</button></form>`:''}
  ${!w.healed&&!w.infected&&w.treatment&&!w.bleeding&&!health.wounds.some(z=>!z.healed&&z.infected)&&health.shock==='none'?`<form data-hmk-beast-heal-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}"><label>Skutečný Healing d100<input type="number" min="1" max="100" name="roll" required></label><label class="hmk-bestiary-wide hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje pětidení interval a platný Healing Roll</label><button type="submit" ${minute!==w.nextDueMinute?'disabled title="Healing je dovolen pouze přesně v doloženém čase"':''}>Provést Healing Roll</button></form>`:''}
  </article>`).join('')||'<p>Žádná zranění tohoto tvora nejsou doložena.</p>'}</div>
@@ -4062,16 +4064,16 @@ function bestiaryEncounterPanel({combat=false}={}){
  <label>Jiné již ověřené modifikátory Impact (součet)<input type="number" name="extraImpact" value="0" step="1" min="-200" max="200" required></label>
  <label class="hmk-bestiary-wide"><input type="checkbox" name="aimConfirmed" value="yes" required> GM již ověřil platný zásah, Aim, dosah a všechna nutná omezení</label>
  <details class="hmk-bestiary-wide hmk-beast-confirm-health"><summary>Potvrdit zdravotní následek · skutečný Shock Roll a druhová kontrola</summary>
- <p class="hc-hint">Zápis je povolen jen po úplně vyřešeném zásahu a potvrzení krvácivých/amputačních značek podle příslušné anatomie. Na opakované zásahy do stejné lokality, zvláštní útoky a nepřipravené profily se zatím nevztahuje automatický zápis.</p>
+ <p class="hc-hint">Zápis vyžaduje potvrzený zásah a skutečné hody. Při G5 Edge v lokalitě s trojúhelníkem je povinný Amputation d100 (HMK 168); G5 Edge také zakládá Bleeder. Compound d10 se zadává jen při dalším zásahu do stejné lokality. Mimořádné útoky zůstávají samostatnou kontrolou GM.</p>
  <label>Rigid Armour na dané lokalitě<select name="rigidArmour"><option value="unknown">Neověřeno</option><option value="no">Ne</option><option value="yes">Ano</option></select></label>
  <label>Skutečná Fatigue cíle pro Shock<input name="shockFatigue" type="number" min="0" max="300" step="5" value="0"></label>
- <label>Skutečný Shock d100<input name="shockRoll" type="number" min="1" max="100"></label><label>Compound d10 (jen při již zraněné stejné lokalitě)<input name="compoundD10" type="number" min="1" max="10" step="1" placeholder="Prázdné, pokud nevzniká"></label>
+ <label>Skutečný Shock d100<input name="shockRoll" type="number" min="1" max="100"></label><label>Amputation d100 (pouze G5 Edge v lokalitě s trojúhelníkem)<input name="amputationD100" type="number" min="1" max="100" placeholder="Dle zóny a pravidel HMK 168"></label><label>Compound d10 (jen při již zraněné stejné lokalitě)<input name="compoundD10" type="number" min="1" max="10" step="1" placeholder="Prázdné, pokud nevzniká"></label>
  <label>Vzniká Bleeder?<select name="bleeding"><option value="unknown">Zatím neověřeno</option><option value="no">Ne, podle druhu zranění a lokality</option><option value="yes">Ano, podle pravidel</option></select></label>
- <label class="hmk-bestiary-wide hc-check"><input name="specialsReviewed" type="checkbox"> GM ověřil značky krvácení, amputace, Compound, mimořádné zásahy a případné Mishaps</label>
+ <label class="hmk-bestiary-wide hc-check"><input name="specialsReviewed" type="checkbox"> GM ověřil krvácení, anatomické značky, Compound, mimořádné zásahy a případné Mishaps</label>
  <button type="submit" data-hmk-beast-save-hit="yes">Potvrdit zranění a Shock do zdravotního deníku tvora</button></details>
  <button type="submit">Zobrazit lokalitu, AV a předběžné zranění</button></form>
  <output data-hmk-beast-contact-out-566 aria-live="polite" class="hc-hint"></output>
- <p class="hc-hint">Pouze pro druhy se strukturovanou tabulkou a–m. Chybí ověření všech značek krvácení/amputace, Compound, Shock roll, perzistence a Healing: proto nevytváří zdravotní záznam.</p></section>`:''}
+ <p class="hc-hint">Pouze pro druhy s doloženou anatomií a–m. Samotný náhled nic nezapisuje; potvrzený G5e, Amputation d100, Shock a krvácení se ukládají samostatným zdravotním dokladem. Nadpřirozené a nestandardní útoky nejsou nahrazeny výchozími lidskými pravidly.</p></section>`:''}
  ${active.length>=2?`<section class="hmk-bestiary-quickcombat"><h4>Melee · výsledek základní matice HMK str. 166</h4>
  <p class="hc-hint">Vstupují pouze skutečné hody a doložené ML. Výsledek používá společné jádro Melee; je to pracovní kontrola bez automatického zásahu, zranění a bez změny Initiative.</p>
  <form data-hmk-beast-melee-preview class="hc-fields">
@@ -12091,12 +12093,14 @@ document.addEventListener('submit',e=>{
   if(health.shock!=='none')throw Error('Nejprve vyřeš Shock, Extended Shock či Coma samostatnou procedurou.');
   const healing=f.matches('[data-hmk-beast-heal-567]');
   const p=healing?prepareAnimalHealing567({wound,profile:{...actor.profile,id:actor.id},previous:health,minute,roll:Number(v.roll),gmConfirmed:v.confirmed==='on'}):
-   prepareAnimalTreatment567({wound,profile:{...actor.profile,id:actor.id},previous:health,minute,physicianML:Number(v.physicianML),physicianIndex:Number(v.physicianIndex),roll:Number(v.roll),gmConfirmed:v.confirmed==='on'});
+   prepareAnimalTreatment567({wound,profile:{...actor.profile,id:actor.id},previous:health,minute,physicianML:Number(v.physicianML),physicianIndex:Number(v.physicianIndex),roll:Number(v.roll),
+   dexSecondaryModifier:v.dexSecondaryModifier?Number(v.dexSecondaryModifier):0,
+   surgeryEquipmentConfirmed:v.surgeryEquipmentConfirmed==='on',gmConfirmed:v.confirmed==='on'});
   p.campaignId=cid;
   if(!ask('Zapsat '+(healing?'Healing Roll':'Treatment Roll')+' pro '+actor.name+' se skutečným d100 ('+v.roll+')?'))return;
   mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock?.minute!==minute)throw Error('Herní čas se mezitím změnil.');
    data.journal.push({id:uuid(),characterId:null,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
-    title:'Bestiář · '+(healing?'Healing':'Treatment')+': '+actor.name,body:'HMK '+(healing?'181':'180')+' · '+actor.name+' · d100 ('+v.roll+') → '+p.sl,
+    title:'Bestiář · '+(healing?'Healing':'Treatment')+': '+actor.name,body:'HMK '+(healing?'181':'180')+' · '+actor.name+' · d100 ('+v.roll+') → '+p.sl+(p.surgicalBleeding?' · Surgery/Extraction: vznikl nový Bleeder':'')+(p.grimWound?' · Grim Wound':'')+(p.projectileRemoved?' · projektil odstraněn':''),
     bestiaryTrauma:p});});
  }catch(err){alert('Bestiář · zranění: '+err.message)}
 },true);
@@ -12115,12 +12119,13 @@ document.addEventListener('submit',e=>{
     locationD10:Number(v.locationD10),impactDieRoll:Number(v.impactDieRoll),extraImpact:Number(v.extraImpact),
     aimConfirmed:v.aimConfirmed==='yes',specialsReviewed:v.specialsReviewed==='on',bleedingReviewed:v.bleeding!=='unknown',
     bleeding:v.bleeding==='yes',rigidArmour:v.rigidArmour,shockFatigue:Number(v.shockFatigue),
-    shockRoll:v.shockRoll===''?null:Number(v.shockRoll),compoundD10:v.compoundD10?Number(v.compoundD10):null,campaignId:cid};
+    shockRoll:v.shockRoll===''?null:Number(v.shockRoll),compoundD10:v.compoundD10?Number(v.compoundD10):null,
+    amputationD100:v.amputationD100?Number(v.amputationD100):null,campaignId:cid};
    const proof=prepareAnimalHit567({attacker:a,defender:b,inputs:input,previous,minute:data.campaignClock.minute,eventId});
    if(!ask('Zapsat skutečné '+(proof.injury?'zranění '+proof.injury.severity+proof.injury.level:'Glancing Blow')+' a Shock '+proof.shock.after+' pro '+b.name+'?'))return;
    const ok=mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock.minute!==proof.minute)throw Error('Mezitím se změnil herní čas.');
     data.journal.push({id:eventId,characterId:null,calendarCampaignId:cid,campaignMinute:proof.minute,createdAt:stamp(),
-    title:'Bestiář · zranění: '+b.name,body:'HMK 167–169 · '+proof.location.name+' · '+(proof.injury?'IL '+proof.injury.level:'Glancing Blow')+' · Shock '+proof.shock.after,bestiaryTrauma:proof});});
+    title:'Bestiář · zranění: '+b.name,body:'HMK 167–169 · '+proof.location.name+' · '+(proof.injury?'IL '+proof.injury.level:'Glancing Blow')+(proof.amputation?' · Amputation '+proof.amputation.sl+(proof.amputation.severed?' (trvalá ztráta)':' (bez odseknutí)'):'')+' · Shock '+proof.shock.after,bestiaryTrauma:proof});});
    if(out)out.textContent=ok?'Zranění a Shock zapsány v jediném autoritativním dokladu.':'Zápis nebyl přijat.';
    return;
   }
