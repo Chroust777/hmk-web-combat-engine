@@ -118,6 +118,8 @@ import { BEASTS_P122, VEHICLES_TACK_P122, CONVEYANCE_RULES_P122 } from './src/ru
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
 import {BESTIARY_ANIMALS_563,livestockMatcher,newEncounterBeastProof,encounterBeastHistory,validateLivestockTrainingRefs,assertBestiaryAppendOnly} from './src/integration/hmk-bestiary-563.js';
 import {renderFullCreatureStats565} from './src/integration/hmk-bestiary-native-ui-565.js';
+import {creatureIntro569,creatureSource569} from './src/integration/hmk-bestiary-intro-569.js';
+import {previewCreatureSpecial569} from './src/integration/hmk-bestiary-special-569.js';
 import {creatureCombatSheet565,previewCreatureSkillRoll565,previewCreatureMelee565} from './src/integration/hmk-bestiary-combat-565.js';
 import {animalHealthProjection567,prepareAnimalHit567,prepareAnimalBlood567,prepareAnimalInfectionCourse567,prepareAnimalBloodHealing567,prepareAnimalTreatment567,prepareAnimalHealing567,prepareAnimalShockRecovery567,prepareAnimalExtendedCourse567,prepareAnimalComaCourse568,prepareAnimalGrimShock568,validateAnimalTraumaJournal567,assertAnimalTraumaAppendOnly567,requireAnimalMedicalGMTimeMayAdvance567} from './src/integration/hmk-bestiary-trauma-567.js';
 import {ANIMAL_ANATOMIES_566,ANIMAL_WEAPON_DICE_566,creatureAnatomyReadiness566,previewAnimalContact566} from './src/integration/hmk-bestiary-anatomy-566.js';
@@ -277,7 +279,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.567';
+const APP_VERSION='93.569';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4086,15 +4088,16 @@ function bestiaryEncounterPanel({combat=false}={}){
 function bestiaryCompleteCatalogView({includeGenerator=true}={}){
  const groups=[...new Set(BESTIARY_ENTRIES_564.map(x=>x.group))];
  const rows=groups.map(group=>`<details class="hmk-bestiary-category" data-bestiary-category><summary>${esc(group)} <span class="hmk-beast-count">${BESTIARY_ENTRIES_564.filter(x=>x.group===group).length} tvorů</span></summary><div class="hmk-bestiary-card-grid">${BESTIARY_ENTRIES_564.filter(p=>p.group===group).map(p=>`
- <article class="hmk-bestiary-species-card" data-hmk-beast-name="${esc((p.name+' '+group).toLocaleLowerCase('cs'))}">
- <div class="hmk-beast-card-head"><strong>${esc(p.name)}</strong><small>HMK ${p.page} · ${p.generation==='variable'?'generace GM':p.generation==='printed-animal'?'tabulková zvířata':'profil druhu'}</small></div>
- <div class="hmk-beast-stat-strip">${Object.entries(p.attributes||{}).slice(0,4).map(([k,v])=>`<span><b>${esc(k.toUpperCase())}</b> ${esc(v)}</span>`).join('')||'<span>Číselný profil zatím neúplný</span>'}${p.combat?.shock!=null?`<span><b>SHOCK</b> ${p.combat.shock}</span>`:''}${p.move!=null?`<span><b>MOVE</b> ${p.move}</span>`:''}</div>
- <div class="hmk-bestiary-card-actions"><details class="hmk-bestiary-stats-details"><summary>Statistiky a anatomie</summary>${renderFullCreatureStats565(p)}</details><button type="button" class="hc-small secondary" data-hmk-bestiary-pick="${esc(p.id)}">Vybrat do generátoru</button></div></article>`).join('')}</div></details>`).join('');
+ <article class="hmk-bestiary-species-card" data-hmk-beast-name="${esc((p.name+' '+group+' '+creatureIntro569(p)).toLocaleLowerCase('cs'))}">
+ <header class="hmk-beast-card-head"><strong>${esc(p.name)}</strong><p class="hmk-beast-description">${esc(creatureIntro569(p))}</p><small>${esc(creatureSource569(p))} · ${p.generation==='variable'?'proměnlivý druh / GM':p.generation==='printed-animal'?'tištěný zvířecí profil':'ukázkový / druhový profil'}</small></header>
+ <div class="hmk-beast-stat-strip">${Object.entries(p.attributes||{}).slice(0,5).map(([k,v])=>`<span><b>${esc(k.toUpperCase())}</b> ${esc(v)}</span>`).join('')||'<span>Úplný číselný profil dosud není doložen</span>'}${p.combat?.shock!=null?`<span><b>SHOCK</b> ${p.combat.shock}</span>`:''}${p.move!=null?`<span><b>MOVE</b> ${p.move}</span>`:''}</div>
+ <div class="hmk-bestiary-card-actions"><details class="hmk-bestiary-stats-details"><summary>Otevřít kompletní kartu · statistiky, útoky a anatomie</summary>${renderFullCreatureStats565(p)}</details><button type="button" class="hc-small secondary" data-hmk-bestiary-pick="${esc(p.id)}">Vybrat do generátoru</button></div></article>`).join('')}</div></details>`).join('');
  return `${includeGenerator?bestiaryEncounterPanel():''}<section class="panel hmk-bestiary-complete" id="hmk-bestiary-complete"><h3>Bestiář · tvorové a encountery</h3>
- <p class="hc-hint">Vyber skupinu, poté konkrétního tvora. Atributy, útoky, ochrana a anatomie jsou přímo v kartě, není potřeba otevírat kopie stránek pravidel. Nedoložené údaje a mimořádné schopnosti se nevymýšlejí.</p>
- <div class="hmk-bestiary-search"><label>Najít tvora<input type="search" data-hmk-bestiary-filter placeholder="Vlk, Gârgún, drak…"></label><span>Skupiny jsou zprvu sbalené; hledání otevře pouze skupiny s výsledky.</span></div>
+ <p class="hc-hint">Jednotlivé druhy se rozbalují přes celou šířku. Rozdělení na atributy, dovednosti, boj, ochranu, útoky a anatomii zachovává dostupné tištěné hodnoty HMK; chybějící profily a nadpřirozené účinky se nepředstírají.</p>
+ <div class="hmk-bestiary-search"><label>Najít tvora<input type="search" data-hmk-bestiary-filter placeholder="Vlk, Gârgún, drak…"></label><span>Kategorie jsou zprvu sbalené. Vyhledávání otevře skupinu s odpovídajícími druhy.</span></div>
  ${rows}</section>`;
 }
+
 function livestockAcquisitionHTML({location='library'}={}){
  const clock=data.campaignClock, campaignId=clock?campaignKey(clock):null;
  const active=verifiedLivestock(data,campaignId);
@@ -12128,6 +12131,22 @@ document.addEventListener('submit',e=>{
   if(out)out.textContent=x.miss?`ZD mimo tělo (${x.actualZN} > ${x.maxZN}) · zásah do lokality nenastal. Žádné zranění.`:
    `${a.name} → ${b.name}: ${x.weapon}, ${x.printedImpact}, Impact die (${x.impactDieRoll}) → Strike Impact ${x.strikeImpact}. ZN ${x.actualZN}, LD (${x.locationD10}) → ${x.location.name} (${x.location.id}), SHK ${x.location.locationShock}. Ochrana ${x.aspect} ${x.armourValue}, výsledný Impact ${x.effectiveImpact}. Předběžná závažnost: ${x.preliminaryInjury?.severity??'žádná'} (IL ${x.preliminaryInjury?.level??0}). Čeká: ${x.unresolved.join('; ')}. Nenastala zdravotní změna.`;
  }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
+},true);
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-hmk-beast-special-form]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const out=form.querySelector('.hmk-beast-special-output');
+ try{
+  const d=Object.fromEntries(new FormData(form));
+  const p=previewCreatureSpecial569({templateId:d.templateId,key:d.key,confirmed:d.confirmed==='on',
+   roll:d.roll==null||d.roll===''?null:Number(d.roll),light:d.light||'none'});
+  const r=p.result;
+  if(out)out.textContent=(r.impactBonus!==undefined?`Doložený podmíněný Impact bonus: +${r.impactBonus}.`:
+   r.actionTA!==undefined?`Skutečné d10 (${r.roll}) ${r.success?'≤':'>'} TN ${r.tn}: ${r.success?'Action TA; obrana pouze Dodge':'Action TA nevzniká'}.`:
+   r.dryBite!==undefined?`d100 (${r.roll}): ${r.dryBite?'suché kousnutí – jed nevypuštěn':'jed vypuštěn, následuje samostatný postup Poison'}.`:
+   r.initiativeModifier!==undefined?`Initiative / Morale: ${r.initiativeModifier>=0?'+':''}${r.initiativeModifier} při těchto světelných podmínkách.`:'Doložený náhled.')+
+   ' Pouze ověřený náhled; následný Combat/Poison musí být proveden samostatně.';
+ }catch(err){if(out)out.textContent='Náhled nelze vyhodnotit: '+err.message;}
 },true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-hmk-beast-melee-preview]'))return;
