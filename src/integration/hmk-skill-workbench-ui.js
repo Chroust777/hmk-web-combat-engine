@@ -110,7 +110,7 @@ function fishingCatchNextHTML(journal,actorId,campaignId){
 /** HMK p65 Animal Training must not become a generic Animalcraft SV without the
  * follow-on d10 rolls, CRE limit or actual time, and it cannot affect combat ML
  * until the GM has identified/updated the real creature. */
-function animalTrainingNextHTML(journal,actorId,campaignId){
+export function animalTrainingNextHTML(journal,actorId,campaignId){
  const pending=journal.filter(j=>j.characterId===actorId&&(!campaignId||j.calendarCampaignId===campaignId)&&
   animalTrainingCandidate(j.skillTestProof)&&
   !journal.some(q=>q.skillTestProof?.type==='animal-training'&&q.skillTestProof.originId===j.id));

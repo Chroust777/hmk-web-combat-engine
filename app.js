@@ -17,7 +17,7 @@ import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} f
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
-import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
+import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
@@ -284,7 +284,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.576';
+const APP_VERSION='93.577';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -299,6 +299,7 @@ let storageReadOnly=false;
 let storageBaseline=null; // exact bytes last observed; prevents stale-tab overwrites
 let data=clean(),view='characters',selected=null,editItem=null,query='',category='weapon',notice='';
 let combatBestiaryExpanded=false; // only presentation state, never the stored campaign
+let stableEncounterExpanded=false; // presentation only; render costly combat interface on demand
 
 // Presentation-only navigation history: never stores/restores Character, Inventory,
 // Journal or the authoritative campaign clock. A roll/commit is never undone.
@@ -792,7 +793,6 @@ function activeVisualScene(){
  if(view==='characters')return 'hall';
  if(view==='sheet')return 'study';
  if(view==='creation')return 'study';
- if(view==='stable')return 'warroom';
  if(view==='library'){
   if(['melee','ranged','shields','armour','suits'].includes(tab))return 'armory';
   if(['rules','bestiary','stable'].includes(tab))return 'warroom';
@@ -812,7 +812,6 @@ function main(){
  if(view==='sheet')body=sheetView();
  if(view==='creation')body=creationBookView();
  if(view==='library')body=libraryView();
- if(view==='stable')body=stableWorkspaceView();
  if(view==='trash')body=trashView();
  if(view==='gmhistory')body=gmHistoryView();
  if(view==='backup')body=backupView();
@@ -820,7 +819,7 @@ function main(){
  if(view==='skills')body=skillWorkbenchView();
  if(view==='encounter')body=encounterView();
  const scene=activeVisualScene();
- const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['stable','♞','Stáj · zvířata'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['gmhistory','▤','GM · Historie činností'],['backup','☁','Cloud a zálohy'],['trash','♧','Archiv']];
+ const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['gmhistory','▤','GM · Historie činností'],['backup','☁','Cloud a zálohy'],['trash','♧','Archiv']];
  const characterButtons=data.characters.map(c=>{const ready=characterJournalReadiness(c).ready;return `<button type="button" class="castle-character ${c.id===selected?'active':''} ${ready?'':'castle-character--draft'}" ${ready?'data-open':'data-resume-creation'}="${esc(c.id)}" title="${ready?'Otevřít deník':'Pokračovat v pravidlové tvorbě'}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`;}).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
@@ -831,7 +830,7 @@ function main(){
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character"><span class="castle-create-symbol" aria-hidden="true">✣</span><span class="castle-create-label">Vytvořit postavu</span><span class="castle-create-plus" aria-hidden="true">＋</span></button>
   <div class="castle-sidebar-footer"><button type="button" data-nav="backup" class="hmk-cloud-sidebar" data-cloud-sidebar title="Stav synchronizace">${esc(cloudStatusLabel())}</button><br>⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
- </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','stable','encounter','backup','trash','gmhistory'].includes(view)?' content-sheet':''}"><nav class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></nav>${cloudSync?.enabled&&!cloudSync.canWrite()?`<div class="notice error" data-cloud-block-banner>⚠ ${esc(cloudStatusLabel())}: herní zápisy jsou do připojení zablokované. <button type="button" data-nav="backup">Přejít k připojení</button></div>`:''}${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
+ </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter','backup','trash','gmhistory'].includes(view)?' content-sheet':''}"><nav class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></nav>${cloudSync?.enabled&&!cloudSync.canWrite()?`<div class="notice error" data-cloud-block-banner>⚠ ${esc(cloudStatusLabel())}: herní zápisy jsou do připojení zablokované. <button type="button" data-nav="backup">Přejít k připojení</button></div>`:''}${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
  <footer class="footer">HârnMaster Keeper’s Ledger · v${APP_VERSION} · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace</footer></div>`;
 }
 
@@ -4282,12 +4281,12 @@ function livestockAcquisitionHTML({location='library'}={}){
  ${clock&&options?`<form data-hmk-livestock-acquire class="hc-livestock-acquire"><label>Druh zvířete<select name="beastId" required>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<option value="${esc(b.id)}">${esc(b.name)} · ${b.priceD}d · STR ${sp.str??'neuvedeno'} · ${sp.bodyWeightLb??'?'} lb · MB max. ${b.maxMasteryBoosts}</option>`}).join('')}</select></label><label>Jméno zvířete<input name="beastName" maxlength="60" required placeholder="Např. Blesk"></label><label>Majitel / platící postava<select name="ownerId" required>${options}</select></label><div class="hc-livestock-actions"><button type="submit" name="acquisition" value="buy">Koupit za cenu HMK</button><button type="submit" name="acquisition" value="free" class="secondary">Převzít zdarma (potvrdí GM)</button></div></form>`:'<p>Pro nákup je nutná aktivní kampaň a alespoň jedna postava.</p>'}
  <details><summary>Přehled parametrů a pravidel pro zvířata</summary><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Cena</th><th>Max MB</th><th>Hmotnost</th><th>STR</th><th>Move</th><th>Využití</th></tr></thead><tbody>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<tr><td>${esc(b.name)}</td><td>${b.priceD}d</td><td>${b.maxMasteryBoosts}</td><td>${sp.bodyWeightLb??'—'} lb</td><td>${sp.str??'—'}</td><td>${sp.move??'—'}</td><td>${esc(sp.role)}</td></tr>`}).join('')}</tbody></table></div><h4>Bestiář HMK · základní atributy a dovednosti (str. 355)</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Velikost</th><th>END</th><th>AGL</th><th>PER</th><th>AUR</th><th>WIL</th><th>REA</th><th>CRE</th><th>Awareness</th><th>Scent</th><th>Stealth</th><th>Spirit</th><th>Initiative</th></tr></thead><tbody>${beasts.filter(x=>livestockOffer(x.id).size).map(x=>{const a=livestockOffer(x.id);return `<tr><td>${esc(x.name)}</td>${['size','end','agl','per','aur','wil','rea','cre','aware','scent','stealth','spirit','initiative'].map(k=>`<td>${esc(a[k]??'—')}</td>`).join('')}</tr>`}).join('')}</tbody></table></div><h4>Přirozené útoky (jen referenční popis)</h4>${beasts.filter(x=>livestockOffer(x.id).attack).map(x=>`<p class="hc-trek-explainer"><strong>${esc(x.name)}:</strong> ${esc(livestockOffer(x.id).attack)}</p>`).join('')}<p>Tištěné hodnoty ukazují výchozí domestikaci, nikoli výsledky výcviku. Tyto referenční útoky nejsou automaticky vytvářené bojové akce; zvířecí zdravotní a bojový profil se eviduje samostatně.</p><p>Vybavení se kupuje samostatně: pack harness 24d/10 lb (správně uložený náklad nejvýše 20 % hmotnosti zvířete), postroj pro koně 20d, postroj pro vola 20d, kára 84d, vůz 220d. Vůz typicky táhnou dva voli (8000 lb) nebo dva tažní koně (6400 lb). Kára jeden vůl (2500 lb) nebo jeden tažný kůň (2000 lb). Vůl přidává vlastní Slow Mode (HMK 122, 145).</p></details>
  <h4>Registr a kompletní péče o zvířata</h4><p>Veškeré operace se zapisují jako neměnné doklady ke konkrétnímu zvířeti, nikoli do druhé tabulky deníku postavy.</p>
- ${data.characters.flatMap(owner=>(owner.hmk?.livestock||[]).filter(r=>r.campaignId===campaignId).map(r=>({...r,spec:livestockOffer(r.beastId)}))).filter(a=>a.spec).length?data.characters.flatMap(owner=>(owner.hmk?.livestock||[]).filter(r=>r.campaignId===campaignId).map(r=>({...r,spec:livestockOffer(r.beastId)}))).filter(a=>a.spec).map(a=>stableHubAnimalHTML(a,campaignId)).join(''):'<p>V této kampani dosud nejsou zvířata. Pořídit je lze formulářem nahoře.</p>'}
+ ${data.characters.flatMap(owner=>(owner.hmk?.livestock||[]).filter(r=>r.campaignId===campaignId).map(r=>({...r,spec:livestockOffer(r.beastId)}))).filter(a=>a.spec).length?data.characters.flatMap(owner=>(owner.hmk?.livestock||[]).filter(r=>r.campaignId===campaignId).map(r=>({...r,spec:livestockOffer(r.beastId)}))).filter(a=>a.spec).map(a=>{try{return stableHubAnimalHTML(a,campaignId)}catch(error){console.error('HMK stable: cannot display animal',a.id,error);return `<section class="panel hmk-stable-animal-error" role="alert"><h4>${esc(a.name)} · chyba zobrazení</h4><p>Historie zvířete zůstala beze změny. Kartu nelze bezpečně vykreslit: ${esc(error?.message||String(error))}</p></section>`}}).join(''):'<p>V této kampani dosud nejsou zvířata. Pořídit je lze formulářem nahoře.</p>'}
  <details class="hmk-stable-training-workspace"><summary>Animalcraft · kompletní pravidlový výcvik zvířat (HMK 65)</summary>
  <p>Na jednotlivý výcvik je nutný skutečný předchozí Animalcraft Skill Value. Časová podmínka 6 měsíců je povinná; žádný bod MB zde nevzniká bez dokončeného postupu.</p>
  ${data.characters.filter(c=>!c.archived).map(c=>animalTrainingNextHTML(data.journal,c.id,campaignId)).filter(Boolean).join('')||'<p>Žádný připravený Animalcraft SV. Proveďte nejdříve doložený Animalcraft Skill Test; tento registr pak nabídne výcvik.</p>'}
  </details>
- <details class="hmk-stable-health-workspace"><summary>Rozbalit zdravotní, bojové a encounter funkce vlastněných zvířat</summary>${bestiaryEncounterPanel({combat:true,stableOnly:true})}</details>
+ <section class="hmk-stable-health-workspace"><button type="button" class="secondary" data-hmk-stable-health-toggle aria-expanded="${stableEncounterExpanded?'true':'false'}">${stableEncounterExpanded?'Sbalit':'Rozbalit'} zdravotní, bojové a encounter funkce vlastněných zvířat</button>${stableEncounterExpanded?bestiaryEncounterPanel({combat:true,stableOnly:true}):''}</section>
  </section>`;
 }
 function printedPossessionsPanel(){const table=(title,rows)=>`<h4>${title} (${rows.length} položek)</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Předmět</th><th>Zdroj / dovednost</th><th>lb</th><th>Cena v originálu</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.skill)}</td><td>${x.weightLb}</td><td>${esc(x.pricePrinted)}</td></tr>`).join('')}</tbody></table></div>`;return `<section class="panel wide"><h3>HMK · Gear & Craft Items (str. 120–121)</h3><p class="muted">Strukturovaný přepis tištěných tabulek. Ceny včetně zvláštních symbolů zůstávají ve zdrojovém zápisu; pravidlové účinky zatím nejsou automaticky zapojeny do inventáře.</p>${table('Expedition Equipment · str. 120',EXPEDITION_EQUIPMENT_P120)}${table('Craft Items & Tools · str. 121',CRAFT_ITEMS_TOOLS_P121)}<h4>Beasts · str. 122 (${BEASTS_P122.length})</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Beast</th><th>Max MB</th><th>Price (d)</th></tr></thead><tbody>${BEASTS_P122.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.maxMasteryBoosts}</td><td>${x.priceD}d</td></tr>`).join('')}</tbody></table></div><h4>Vehicles &amp; Tack · str. 122 (${VEHICLES_TACK_P122.length})</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Item</th><th>Skill</th><th>lb</th><th>Price (d)</th></tr></thead><tbody>${VEHICLES_TACK_P122.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.skill)}</td><td>${x.weightLb}</td><td>${x.priceD}d</td></tr>`).join('')}</tbody></table></div><p class="tiny muted">Str. 122: horse/bovine +5 ENC per 20 full lb; camel per 40 lb; elephant per 80 lb. Training prices per MB: dog 12d, hawk 60d, horse/camel 80d, elephant 240d. Source reference only; mount fatigue, riding and hauling are not automatically executed.</p><h4>Workshops · str. 121</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Quality</th><th>State</th><th>Wealth</th><th>Alchemy Wealth</th></tr></thead><tbody>${WORKSHOP_QUALITY_P121.map(x=>`<tr><td>${x.quality}</td><td>${esc(x.state)}</td><td>${esc(x.wealth)}</td><td>${esc(x.alchemyWealth)}</td></tr>`).join('')}</tbody></table></div><h4>Water weight by volume</h4><p>${WATER_WEIGHT_P121.map(x=>`${esc(x[0])}: ${x[1]} lb`).join(' · ')}</p><h4>Mundane fire damage · str. 121</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>FS</th><th>Amount</th><th>Diameter</th><th>Target</th><th>Impact</th></tr></thead><tbody>${MUNDANE_FIRE_P121.map(x=>`<tr><td>${x.fs}</td><td>${esc(x.amount)}</td><td>${esc(x.diameter)}</td><td>${x.target}</td><td>${x.impact}</td></tr>`).join('')}</tbody></table></div><p class="tiny muted">Další pravidlové poznámky (balení, světlo, chlad, dílny a oheň) vyžadují samostatnou mechanickou implementaci a kontrolu.</p></section>`;}
@@ -4348,12 +4347,16 @@ function librarySuitRows(suits){
    <td>${libraryAssignForm(s.name,'suit',resolved.ok,{pricePence:suitPurchasePrice(s),quantity:1})}</td></tr>`;
  }).join('');
 }
-function stableWorkspaceView(){
- return journalShell(`<div class="hmk-stable-workspace" aria-label="Stáj a správa zvířat"><header class="folio-chapter-heading"><h2>Stáj · zvířata</h2><p>Vlastnictví, výbava, péče, přeprava a zdraví zvířat v jedné evidenci.</p></header>${livestockAcquisitionHTML()}</div>`, 'journal-book--stable',false);
+function libraryTabsHTML(selectedTab){
+ return `<nav class="library-navigation" aria-label="Sekce knihovny" role="tablist">${LIBRARY_TABS.map(t=>`<button type="button" role="tab" data-library-tab="${t.id}" aria-selected="${selectedTab===t.id}" tabindex="${selectedTab===t.id?'0':'-1'}">${esc(t.name)}</button>`).join('')}</nav>`;
 }
 function libraryView(){
  const selectedTab=LIBRARY_TABS.some(t=>t.id===libraryTab)?libraryTab:'melee';
- if(selectedTab==='stable')return stableWorkspaceView();
+ if(selectedTab==='stable'){
+  // Do not use the book's generic two-column folio splitter for complex forms.
+  // Keep library tabs visible so users can both enter and leave this section.
+  return journalShell(`<div class="hmk-stable-workspace" aria-label="Stáj a správa zvířat"><header class="folio-chapter-heading"><h2>Knihovna · Stáj · zvířata</h2><p>Vlastnictví, výbava, péče, přeprava a zdraví zvířat v jedné evidenci.</p></header>${libraryTabsHTML(selectedTab)}${livestockAcquisitionHTML()}</div>`, 'journal-book--stable',false);
+ }
  const counts=Object.fromEntries(LIBRARY_TABS.filter(t=>!['suits','rules','bestiary','stable'].includes(t.id)).map(t=>[t.id,allCatalogItems().filter(i=>libraryTabsForItem(i).includes(t.id)).length]));
  const searchLower=query.toLocaleLowerCase('cs');
  const suitRows=PRINTED_ARMOUR_SUITS_P113_116.filter(s=>(s.name+' '+s.articles.join(' ')).toLocaleLowerCase('cs').includes(searchLower));
@@ -4361,8 +4364,8 @@ function libraryView(){
  if(list)libraryPage=list.page;
  const statusSelector=['rules','suits','bestiary','stable'].includes(selectedTab)?'':`<label>Úplnost evidence<select id="catalog-status"><option value="all" ${catalogStatus==='all'?'selected':''}>Všechny</option><option value="ready" ${catalogStatus==='ready'?'selected':''}>Bez upozornění</option><option value="missing" ${catalogStatus==='missing'?'selected':''}>K doplnění</option></select></label>`;
  return journalChapterShell('Knihovna','Katalog vybavení, referenční tabulky a přidávání předmětů ve vzhledu Keeper’s Ledger.',`<div class="topline"><div><h2>Knihovna vybavení</h2><p class="muted">Vyberte kategorii, otevřete údaje předmětu a případně jej přímo přidejte do inventáře postavy.</p></div>${button('+ Nový předmět','new-item')}</div>
- <nav class="library-navigation" aria-label="Sekce knihovny" role="tablist">${LIBRARY_TABS.map(t=>`<button type="button" role="tab" data-library-tab="${t.id}" aria-selected="${selectedTab===t.id}" ${selectedTab===t.id?'tabindex="0"':'tabindex="-1"'}>${esc(t.name)}${['rules','bestiary','stable'].includes(t.id)?'':` (${t.id==='suits'?PRINTED_ARMOUR_SUITS_P113_116.length:counts[t.id]})`}</button>`).join('')}</nav>
- ${selectedTab==='bestiary'?bestiaryCompleteCatalogView():selectedTab==='stable'?livestockAcquisitionHTML():selectedTab==='rules'?`<section class="panel"><h3>Pravidlové tabulky, zdroje a audit</h3><p class="muted">Tyto podklady jsou pouze k nahlédnutí a nepřekážejí při výběru běžných předmětů.</p>${[['Materiály zbroje a povolené vrstvy',armourMaterialsPanel()+armourLayerReferencePanel()],['Tištěné části zbroje · podrobné referenční značky',printedArmourArticlesPanel()],['Předměty, zvířata a dílny',printedPossessionsPanel()+workshopMechanicsPanel()],['Výprava, encumbrance a pravidlové účinky',expeditionEffectsPanel()+printedGearRulesPanel()],['Audit, konzistence a pokrytí',armourLibraryConsistencyPanel()+suitArticleCrosswalkPanel()+armourCoverageReadinessPanel()+catalogCoveragePanel()+catalogAuditPanel()]].map(([title,body])=>`<details class="library-rules-details"><summary>${esc(title)}</summary>${body}</details>`).join('')}</section>`:
+ ${libraryTabsHTML(selectedTab)}
+ ${selectedTab==='bestiary'?bestiaryCompleteCatalogView():selectedTab==='rules'?`<section class="panel"><h3>Pravidlové tabulky, zdroje a audit</h3><p class="muted">Tyto podklady jsou pouze k nahlédnutí a nepřekážejí při výběru běžných předmětů.</p>${[['Materiály zbroje a povolené vrstvy',armourMaterialsPanel()+armourLayerReferencePanel()],['Tištěné části zbroje · podrobné referenční značky',printedArmourArticlesPanel()],['Předměty, zvířata a dílny',printedPossessionsPanel()+workshopMechanicsPanel()],['Výprava, encumbrance a pravidlové účinky',expeditionEffectsPanel()+printedGearRulesPanel()],['Audit, konzistence a pokrytí',armourLibraryConsistencyPanel()+suitArticleCrosswalkPanel()+armourCoverageReadinessPanel()+catalogCoveragePanel()+catalogAuditPanel()]].map(([title,body])=>`<details class="library-rules-details"><summary>${esc(title)}</summary>${body}</details>`).join('')}</section>`:
  `<div class="library-toolbar"><label>Hledat v této kategorii<input id="search" type="search" placeholder="Název, parametry, zdroj…" value="${esc(query)}" autocomplete="off"></label>${statusSelector}</div>
  <p class="library-results">${selectedTab==='suits'?`Zobrazeno ${suitRows.length} z ${PRINTED_ARMOUR_SUITS_P113_116.length} tištěných kompletů.`:`Zobrazeno ${list.rows.length} z ${list.total} odpovídajících položek.`} Volba Koupit odečítá skutečnou hotovost, Vzít zdarma nic neodečítá. Obojí přidává nesený předmět (ENC se přepočte dle jeho hmotnosti).</p>
  ${selectedTab==='suits'?`<p class="notice tiny">Tištěné komplety jsou referenční sestavy, nikoliv samostatný předmět. Převzetí nebo nákup vytvoří nezávislé kopie <b>všech</b> ověřených článků jako <b>nesené</b>; žádnou zbroj automaticky neobléká.</p>`:''}
@@ -12528,7 +12531,32 @@ document.addEventListener('submit',e=>{
  }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
 },true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-bestiary-open]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='bestiary';render();},true);
-document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-open-stable]'))return;e.preventDefault();e.stopImmediatePropagation();view='stable';overlay=null;render();},true);
+document.addEventListener('click',e=>{
+ const tab=e.target.closest?.('button[data-library-tab]');if(!tab)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(!LIBRARY_TABS.some(t=>t.id===tab.dataset.libraryTab))return;
+ const previous={view,libraryTab,libraryPage,query,overlay};
+ view='library';libraryTab=tab.dataset.libraryTab;libraryPage=0;query='';overlay=null;
+ try{render()}catch(error){
+  console.error('HMK Library tab render failed',error);
+  ({view,libraryTab,libraryPage,query,overlay}=previous);
+  // A visible diagnostic, not a discarded click. Preserve the old DOM so
+  // that navigation and the saved campaign remain accessible.
+  const host=document.querySelector('main.content')||document.getElementById('app');
+  if(host){const block=document.createElement('div');block.className='notice error';block.setAttribute('role','alert');block.textContent='Knihovna / Stáj: nelze vykreslit tuto záložku. '+String(error?.message||error);host.prepend(block);}
+ }
+},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-hmk-stable-health-toggle]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ stableEncounterExpanded=!stableEncounterExpanded;
+ try{render()}catch(error){
+  stableEncounterExpanded=false;
+  console.error('HMK stable encounter preview could not be opened',error);
+  b.insertAdjacentHTML('afterend',`<p class="notice error" role="alert">Zdravotní/bojový náhled nelze vykreslit: ${esc(error?.message||String(error))}</p>`);
+ }
+},true);
+document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-open-stable]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='stable';overlay=null;render();},true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-hmk-beast-dismiss]');if(!btn)return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -14445,8 +14473,6 @@ document.addEventListener('submit',e=>{const f=e.target;if(!['character-editor',
  const currentWQ=givenWQ!==''?requestedWQ:(Number.isSafeInteger(baseQuality)&&baseQuality>=0&&baseQuality<=999?baseQuality:null);
  const nextItem={id:uuid(),currentWQ,characterId:selected,sourceItemId:i.id,snapshot:structuredClone(i),quantity,condition:v.condition||'',slot:v.slot||'carried'};try{if(['main_hand','off_hand'].includes(v.slot)){if(!isHandheldItem(nextItem))throw Error('Tento předmět nelze držet v ruce');validateHandInventory([...data.inventory,nextItem],selected);}}catch(err){return alert(err.message)}mutate(()=>data.inventory.push(nextItem));return}if(f.id==='journal-form'){if(!v.title.trim()&&!v.body.trim())return;mutate(()=>data.journal.push({id:uuid(),characterId:selected,title:v.title.trim()||'Bez názvu',body:v.body,createdAt:stamp()}))}});
 document.addEventListener('click',e=>{
- const tab=e.target.closest('[data-library-tab]');
- if(tab){e.preventDefault();if(tab.dataset.libraryTab==='stable'){view='stable';overlay=null;}else{libraryTab=tab.dataset.libraryTab;}libraryPage=0;query='';render();return}
  const page=e.target.closest('[data-library-page]');
  if(page){e.preventDefault();libraryPage=Math.max(0,Number(page.dataset.libraryPage)||0);render();return}
 });

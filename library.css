@@ -88,3 +88,9 @@
 .journal-book--stable .hmk-stable-workspace .hmk-stable-animal-card { min-width:0; }
 .journal-book--stable .hmk-stable-workspace .catalog-scroll { max-width:100%; overflow-x:auto; }
 .journal-stable-shortcut { border:1px solid currentColor; font-weight:700; white-space:nowrap; }
+
+/* 93.577: stable is a true Library tab; controls remain clickable above folio decor. */
+.content-library .journal-book--stable .library-navigation {position:relative;z-index:20;pointer-events:auto;isolation:isolate;}
+.content-library .journal-book--stable .library-navigation button {position:relative;z-index:1;cursor:pointer;pointer-events:auto;}
+.content-library .journal-book--stable .hmk-stable-workspace {position:relative;z-index:2;width:100%;min-width:0;max-width:100%;box-sizing:border-box;}
+.content-library .journal-book--stable .hmk-stable-health-workspace > button {max-width:100%;white-space:normal;cursor:pointer;}
