@@ -2,11 +2,20 @@
  * comparison using shared HMK Skill Test mathematics, NOT a combat outcome
  * (the latter must use the Melee/Missile/Impact/Injury sequences). */
 import {SL,successLevel,effectiveMasteryLevel} from '../rules/tests.js';
+import {bestiaryEntry564} from './hmk-bestiary-runtime-564.js';
 const labels=['CF','F','S','CS'];
 const number=(n,low,high,field)=>{if(!Number.isSafeInteger(n)||n<low||n>high)throw Error(`${field}: neplatná celočíselná hodnota`);return n;};
 export function creatureCombatSheet565(proof){
  const p=proof?.profile;if(!p)return null;
- const attacks=(p.weapons||[]).filter(w=>Number.isInteger(w.attack)).map(w=>({name:w.name,attack:w.attack,defence:w.defence??null,impact:w.impact??null,special:w.special??''}));
+ // For v564 proofs the immutable snapshot intentionally contains no weapons.
+ // A non-mutating lookup is allowed only if its full printed attribute/skill
+ // snapshot still matches the CURRENT source. Legacy gryphon profiles do not
+ // silently acquire the corrected combat profile.
+ const canonical=bestiaryEntry564(proof.templateId);
+ const compatible=canonical&&JSON.stringify(p.attributes||{})===JSON.stringify(canonical.attributes||{})&&
+   JSON.stringify(p.skills||{})===JSON.stringify(canonical.skills||{});
+ const weapons=(p.weapons?.length?p.weapons:compatible?canonical.weapons:[])||[];
+ const attacks=weapons.filter(w=>Number.isInteger(w.attack)).map(w=>({name:w.name,attack:w.attack,defence:w.defence??null,impact:w.impact??null,special:w.special??''}));
  return {encounterId:proof.id,ownerAnimalId:proof.ownerAnimalId??null,name:proof.name,templateId:proof.templateId,
   attributes:structuredClone(p.attributes||{}),skills:structuredClone(p.skills||{}),
   move:p.move??null,fly:p.fly??null,bodyTable:p.combat?.bodyTable??null,

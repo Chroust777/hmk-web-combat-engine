@@ -8,6 +8,7 @@ export const BESTIARY_ENTRIES_564=Object.freeze([
  ...BESTIARY_SPECIAL_ENTRIES_564
 ]);
 export const bestiaryEntry564=id=>BESTIARY_ENTRIES_564.find(p=>p.id===id)||null;
+const LEGACY_GRYPHON_568={"id":"gryphon-griffin-marenu-390","group":"Mythic Creatures","name":"Gryphon / Griffin (Mârenu)","page":390,"sourcePages":[385,390],"generation":"fixed","attributes":{"str":17,"end":13,"agl":14,"per":19,"snt":3,"aur":7,"wil":13,"rea":8,"cre":7},"skills":{"awareness":80,"initiative":62,"shock":66,"spirit":40,"stealth":80},"move":70};
 const expect=(condition,msg)=>{if(!condition)throw Error(msg)};
 const validText=(text,max)=>typeof text==='string'&&text.trim().length>=2&&text.trim().length<=max;
 // Deterministic corruption witness. Runtime append-only checks remain the primary protection.
@@ -52,7 +53,20 @@ export function validateFullBestiaryJournal564(data){
    const source=BESTIARY_SPECIAL_ENTRIES_564.find(x=>x.id===p.templateId);
    expect(!!source,'Chybí tištěný zdroj z bestiáře.');
    const expected=createBespokeEncounterProof564({id:p.id,templateId:p.templateId,name:p.name,campaignId:p.campaignId,campaignMinute:p.campaignMinute,gmNotes:p.gmNotes});
-   expect(JSON.stringify(p)===JSON.stringify({...expected,action:'create'}),'Pozměněný zdroj, variantní doklad nebo profil tvora.');
+   const normal=JSON.stringify(p)===JSON.stringify({...expected,action:'create'});
+   // Old records created by the 93.568 profile correction remain legal and
+   // immutable. Only the exact formerly published snapshot is accepted.
+   let legacy=false;
+   if(!normal&&p.templateId==='gryphon-griffin-marenu-390'){
+    const oldProfile={id:LEGACY_GRYPHON_568.id,name:LEGACY_GRYPHON_568.name,group:LEGACY_GRYPHON_568.group,page:LEGACY_GRYPHON_568.page,
+     sourcePages:[...LEGACY_GRYPHON_568.sourcePages],generation:LEGACY_GRYPHON_568.generation,
+     attributes:{...(LEGACY_GRYPHON_568.attributes||{})},skills:{...(LEGACY_GRYPHON_568.skills||{})},
+     move:LEGACY_GRYPHON_568.move??null,fly:LEGACY_GRYPHON_568.fly??null,combat:LEGACY_GRYPHON_568.combat?structuredClone(LEGACY_GRYPHON_568.combat):null,
+     statPage:LEGACY_GRYPHON_568.statPage??LEGACY_GRYPHON_568.page,statsComplete:false,
+     sourceVerification:'Printed HMK pages; some rules and anatomy require checking the facsimiles'};
+    legacy=JSON.stringify(p)===JSON.stringify({...expected,profile:oldProfile,action:'create'});
+   }
+   expect(normal||legacy,'Pozměněný zdroj, variantní doklad nebo profil tvora.');
    expect(row.calendarCampaignId===p.campaignId&&row.campaignMinute===p.campaignMinute&&
       row.title==='Bestiář · příchod do encounteru: '+p.name,'Chybí herní čas nebo titul události tvora.');
   }else if(p.action==='dismiss'){
