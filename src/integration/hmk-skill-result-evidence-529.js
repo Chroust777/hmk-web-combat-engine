@@ -4,11 +4,15 @@ import {historyDisplayTitle} from './hmk-opposed-history-555.js';
 export const isCompletedSkillTest = row => Boolean(row?.skillTestProof &&
  ['secondary-mastery-test','secondary-mastery-value-test','success-value-test','success-value-specific','special-secondary-roll','assistance-success-test','opposed-success-test','opposed-tiebreak','success-test','critical-followup','climbing-falling','skill-physical-consequence','balance-nerves-will'].includes(row.skillTestProof.type));
 const signed = value => Number.isFinite(value) ? String(value) : '—';
+/** Explicit comparator makes the numeric d100 decision visible; SL still carries critical endings. */
+export const emlDieComparison=(eml,roll)=>Number.isInteger(eml)&&Number.isInteger(roll)?`d100 (${roll}) ${roll<=eml?(roll===eml?'=':'<'):'>'} EML ${eml}`:null;
+
 const oldDelimiter=/\n\nPŘÍBĚH PRO GM(?: \(návrh, bez dalších automatických postihů\))?:\n/i;
 // Readability filter: the stored evidentiary record and provenance remain untouched.
 export function readableSkillEvidence(text){
  return String(text??'')
   .replace(/\b(d(?:100|20|12|10|8|6|4|3|2))\s+(\d{1,3})(?![\d)])/g,'$1 ($2)')
+  .replace(/\bEML\s+(-?\d+)\s*[·;]\s*d100\s*\((\d{1,3})\)/gi,(_,eml,roll)=>`d100 (${roll}) ${Number(roll)===Number(eml)?'=':Number(roll)<Number(eml)?'<':'>'} EML ${eml}`)
   .replace(/\s*\[(?:manually-entered|automatic|auto-generated|cryptographic-software-die)\]/gi,'')
   .replace(/\s*\((?:manually-entered|automatic)\)/gi,'')
   .replace(/^Rozstřel: dostupný jen[^\n]*(?:\n|$)/gmi,'')
@@ -56,7 +60,7 @@ export function skillTestEvidenceHTML(row,esc,options={}){
   const kind=p.type==='balance-nerves-will'?'Balance SV 3–4 → Will (HMK 64)':p.type==='critical-followup'?'Následek '+(p.originalLevel||'Skill Testu'):
    p.type==='climbing-falling'?'Falling / Injury Sequence':'Zdravotní následek Skill Activity';
   const badges=[kind,p.skill||p.kind||'',p.technique||'',p.will?.level||a?.level||'',
-   Number.isInteger(p.will?.eml)?'EML '+p.will.eml:Number.isInteger(a?.eml)?'EML '+a.eml:'',Number.isInteger(p.will?.roll)?'d100 ('+p.will.roll+')':Number.isInteger(a?.roll)?'d100 ('+a.roll+')':''].filter(Boolean);
+   emlDieComparison(p.will?.eml??a?.eml,p.will?.roll??a?.roll)||''].filter(Boolean);
   const body=readableSkillEvidence(String(row.body||p.effect||'Výsledek je doložen původním zdravotním záznamem.'));
   const description=readableSkillEvidence(String(p.effect||row.body||'').split('\n')[0]);
   return `<section class="hsk-saved-proof" data-hmk-skill-proof="${esc(row.id||'')}"><div class="hsk-saved-proof__summary"><strong>${esc(historyDisplayTitle(row,options.nameById))}</strong><span>${esc(badges.join(' · '))}</span></div>${proofLayout(esc,{narration:description,calculation:body},'Pravidlové doklady · skutečné hody a návaznosti')}</section>`;
@@ -76,11 +80,11 @@ export function skillTestEvidenceHTML(row,esc,options={}){
   badges.push(`Oponent${opponent?' '+opponent:''}: ${p.originalLevels[1]||'—'}`);
   if(Number.isInteger(p.originalRolls?.[1]))badges.push(`původní d100 (${p.originalRolls[1]})`);
  }
- if(Number.isInteger(a?.eml))badges.push(`EML ${a.eml}`);
- if(Number.isInteger(a?.roll))badges.push(`d100 (${a.roll})`);
+ if(emlDieComparison(a?.eml,a?.roll))badges.push(emlDieComparison(a.eml,a.roll));
+ else {if(Number.isInteger(a?.eml))badges.push(`EML ${a.eml}`);if(Number.isInteger(a?.roll))badges.push(`d100 (${a.roll})`);}
  if(b){badges.push(`Oponent${opponent?' '+opponent:''}: ${b.victoryLevel||b.level||'—'}`);
-  if(Number.isInteger(b.eml))badges.push(`EML ${b.eml}`);
-  if(Number.isInteger(b.roll))badges.push(`d100 (${b.roll})`);}
+  if(emlDieComparison(b.eml,b.roll))badges.push(emlDieComparison(b.eml,b.roll));
+  else {if(Number.isInteger(b.eml))badges.push(`EML ${b.eml}`);if(Number.isInteger(b.roll))badges.push(`d100 (${b.roll})`);}}
  if(Number.isFinite(stars))badges.push(`${stars} ★`);
  const fallback=!calculation?`Primární výsledek ${signed(a?.level)}; EML ${signed(a?.eml)}; d100 (${signed(a?.roll)}).`:calculation;
  return `<section class="hsk-saved-proof" data-hmk-skill-proof="${esc(row.id||'')}"><div class="hsk-saved-proof__summary"><strong>${esc(historyDisplayTitle(row,options.nameById))}</strong><span>${esc(badges.join(' · '))}</span></div>${proofLayout(esc,{narration,calculation:fallback},'Pravidlové doklady · výpočet a hody')}</section>`;

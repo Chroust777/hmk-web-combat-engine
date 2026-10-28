@@ -5604,3 +5604,11 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
  font-family:var(--hmk-book-body-font),Georgia,serif!important;
  font-size:12px!important;line-height:1.35!important;
 }
+
+/* v93.557: Chronicle conditions are READ-ONLY health statuses, not fake checkboxes. */
+.journal-condition-hint{font-size:11px;line-height:1.25;margin:2px 0 5px;color:#5c4938}
+.journal-condition-statuses{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px}
+.journal-condition-status{display:flex;justify-content:space-between;align-items:baseline;gap:5px;min-width:0;padding:3px 4px;border-bottom:1px solid rgba(119,89,55,.19);font-size:11px;line-height:1.24}
+.journal-condition-status>span{min-width:0;overflow-wrap:anywhere}
+.journal-condition-status>strong{color:#243951;font-size:11px;text-align:right;overflow-wrap:anywhere}
+@media(max-width:600px){.journal-condition-statuses{grid-template-columns:1fr}}
