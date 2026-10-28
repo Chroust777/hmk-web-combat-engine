@@ -5626,3 +5626,52 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .content-sheet .journal-book--overview .journal-health-course__due{margin-top:3px;font-weight:700}
 .content-sheet .journal-book--overview .journal-health-course__detail{margin-top:4px;font-size:11px;color:#6c5137;overflow-wrap:anywhere}
 .content-sheet .journal-book--overview .journal-health-course__warning{padding:7px 9px;border-top:1px solid rgba(108,72,36,.25);font-weight:700}
+
+
+/* v93.560 — party provisions as four accessible, evidence-safe steps. */
+.content-calendar .hc-party-guide{display:grid;gap:13px;min-width:0}
+.content-calendar .hc-party-intro,.content-calendar .hc-party-step,.content-calendar .hc-party-advanced{min-width:0;border:1px solid rgba(106,73,38,.35);border-radius:9px;padding:13px 15px;background:rgba(255,250,234,.16)}
+.content-calendar .hc-party-intro{background:rgba(112,80,43,.07)}
+.content-calendar .hc-party-intro h2{margin:0 0 7px;font-size:1.18rem}
+.content-calendar .hc-party-intro p{margin:5px 0;font-size:12px;line-height:1.48}
+.content-calendar .hc-party-step{display:grid;gap:12px}
+.content-calendar .hc-party-step-head{display:grid;grid-template-columns:34px minmax(0,1fr);gap:11px;align-items:start}
+.content-calendar .hc-party-step-number{display:grid;place-items:center;width:31px;height:31px;border:1px solid rgba(106,73,38,.56);border-radius:50%;font-weight:bold;background:rgba(118,89,50,.12)}
+.content-calendar .hc-party-step h3{margin:0 0 4px;font-size:1.04rem}
+.content-calendar .hc-party-step h4{font-size:.91rem;margin:0 0 6px}
+.content-calendar .hc-party-step-head p,.content-calendar .hc-party-step>small,.content-calendar .hc-party-step .hc-party-form>small,
+.content-calendar .hc-party-status,.content-calendar .hc-party-preview,.content-calendar .hc-party-health-row p,
+.content-calendar .hc-party-advanced>p{font-size:12px;line-height:1.45;margin:3px 0;color:#604b34}
+.content-calendar .hc-party-table-wrap{max-width:100%;overflow-x:auto}
+.content-calendar .hc-party-status-table{width:100%;border-collapse:collapse;font-size:12px;min-width:460px}
+.content-calendar .hc-party-status-table th,.content-calendar .hc-party-status-table td{border-bottom:1px solid rgba(106,73,38,.28);padding:7px 8px;text-align:left;vertical-align:top}
+.content-calendar .hc-party-status-table thead{background:rgba(112,80,43,.11)}
+.content-calendar .hc-party-status-table tbody tr:nth-child(even){background:rgba(86,60,29,.05)}
+.content-calendar .hc-party-form{display:grid;gap:10px;margin:0}
+.content-calendar .hc-party-form fieldset{margin:0;padding:9px 10px;min-width:0;border:1px solid rgba(106,73,38,.27)}
+.content-calendar .hc-party-form legend{font-weight:700;font-size:13px}
+.content-calendar .hc-party-form .hc-characters{display:flex;flex-wrap:wrap;gap:6px 13px}
+.content-calendar .hc-party-form>label{display:grid;gap:5px;font-size:13px}
+.content-calendar .hc-party-form button,.content-calendar .hc-party-next{justify-self:start;max-width:100%;white-space:normal;min-height:36px}
+.content-calendar .hc-party-pool{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.content-calendar .hc-party-pool>div{display:grid;gap:4px;padding:9px 10px;background:rgba(112,80,43,.08);border:1px solid rgba(106,73,38,.22);border-radius:7px}
+.content-calendar .hc-party-pool span{font-size:12px;color:#604b34}
+.content-calendar .hc-party-pool strong{font-size:1.04rem}
+.content-calendar .hc-party-extra,.content-calendar .hc-party-advanced{min-width:0}
+.content-calendar .hc-party-extra>summary,.content-calendar .hc-party-advanced>summary{font-size:13px;font-weight:700;cursor:pointer;line-height:1.45}
+.content-calendar .hc-party-extra .hc-provision-ledger{margin-top:10px}
+.content-calendar .hc-party-health{display:grid;gap:9px}
+.content-calendar .hc-party-health-row{display:grid;grid-template-columns:minmax(140px,1fr) minmax(72px,100px) auto auto;gap:9px;align-items:end;padding:8px;border-bottom:1px solid rgba(106,73,38,.22);margin:0}
+.content-calendar .hc-party-health-row label{display:grid;gap:4px;font-size:12px}
+.content-calendar .hc-party-health-row input{min-width:0;width:100%}
+.content-calendar .hc-party-health-row button{min-height:33px;white-space:normal}
+.content-calendar .hc-party-advanced>section{margin:9px 0}
+@media(max-width:740px){.content-calendar .hc-party-health-row{grid-template-columns:minmax(0,1fr) minmax(65px,100px)}.content-calendar .hc-party-pool{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:490px){.content-calendar .hc-party-intro,.content-calendar .hc-party-step,.content-calendar .hc-party-advanced{padding:10px}.content-calendar .hc-party-pool{grid-template-columns:1fr}.content-calendar .hc-party-health-row{grid-template-columns:1fr 1fr}.content-calendar .hc-party-health-row>div{grid-column:1/-1}}
+.content-calendar .hc-party-form .hc-provision-inline-fields>label{display:grid;gap:5px;font-size:12px;min-width:0}
+.content-calendar .hc-party-form .hc-provision-inline-fields select{width:100%;max-width:100%;min-width:0}
+.content-calendar .hc-party-form .hc-characters .hc-character{display:inline-flex;align-items:center;gap:7px;white-space:normal;padding:3px 5px}
+.content-calendar .hc-party-form .hc-characters .hc-character input{margin:0;flex:none}
+
+.content-calendar .hc-party-resource-links{display:flex;gap:8px;flex-wrap:wrap}
+.content-calendar .hc-party-resource-links button{min-height:34px;font-size:12px;white-space:normal}

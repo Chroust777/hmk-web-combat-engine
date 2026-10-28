@@ -270,7 +270,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.559';
+const APP_VERSION='93.560';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1080,17 +1080,67 @@ function partyNutritionConditionsHTML(participants,clock){
  const campaign=campaignKey(clock),policies=activeNutritionPolicies(data.journal,campaign,participants.map(c=>c.id));
  const eligible=participants.filter(actor=>{
   const policy=policies.find(row=>row.characterId===actor.id);
-  if(!policy)return true; // A never-configured actor can be enrolled by this very party decision.
-  if(!policy.calendarNutritionPolicy?.enabled||!policy.calendarNutritionPolicy?.autoNeeds)return false;
-  return nextNutritionDayStart(data.journal,policy)===clock.minute&&
+  return policy?.calendarNutritionPolicy?.enabled===true&&policy.calendarNutritionPolicy.autoNeeds===true&&
+   !policy.calendarNutritionPolicy.gmProvisioned&&nextNutritionDayStart(data.journal,policy)===clock.minute&&
    !data.journal.some(j=>j.calendarCampaignId===campaign&&j.calendarNutritionConditions?.policyId===policy.id&&j.calendarNutritionConditions?.startMinute===clock.minute);
  });
- return `<section class="hc-calendar hc-provision-party-conditions"><details open><summary>Společné 24hodinové podmínky vybraných členů družiny</summary>
- <p class="hc-provision-help">Pro postavy skutečně cestující spolu nastaví GM stejný režim najednou. Každá postava má vlastní časový záznam, regeneraci a spotřebu. Samostatně cestující postavy lze nastavit v záložce Postava. Společná voda z Foraging zůstává ve fondu družiny.</p>
- ${eligible.length?`<form data-nutrition-party-conditions><fieldset><legend>Postavy přítomné ve stejné skupině</legend><div class="hc-characters">${eligible.map(c=>`<label class="hc-character"><input type="checkbox" name="actorIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset>
- <label>Stejné podmínky na celých 24 hodin<select name="kind"><option value="rest-inactive">Úplný odpočinek a nečinnost</option><option value="rest">Úplný odpočinek</option><option value="inactive">Úplná nečinnost</option><option value="hot">Celodenní horko</option><option value="rest-hot">Odpočinek v horku</option></select></label>
- <button type="submit">Zaznamenat podmínky vybraným postavám</button></form>`:'<p class="hc-hint">Žádný člen družiny právě nemá dostupný začátek nového 24hodinového plánu. Zásobovací režim a jeho počátek se nastavují v osobním panelu.</p>'}</details></section>`;
+ const pending=participants.filter(c=>data.journal.some(j=>j.calendarCampaignId===campaign&&j.characterId===c.id&&
+  j.calendarNutritionConditions&&j.calendarNutritionConditions.startMinute<=clock.minute&&j.calendarNutritionConditions.endMinute>clock.minute&&
+  !data.journal.some(cancel=>cancel.calendarNutritionConditionsCancel?.planId===j.id)));
+ return `<section class="hc-party-step" id="hc-party-step-conditions"><header class="hc-party-step-head"><span class="hc-party-step-number">3</span><div><h3>Platí dnes nějaká výjimka?</h3><p>Běžný aktivní den nevyžaduje žádné zvláštní nastavení: 1 denní dávka jídla a 1 galon vody na postavu. Doložený Heat Hazard se započítá automaticky.</p></div></header>
+ ${pending.length?`<p class="hc-party-status">Potvrzený celodenní plán: ${esc(pending.map(c=>c.name).join(', '))}. Jeho přerušení najdete v pokročilých postupech níže.</p>`:''}
+ ${eligible.length?`<form data-nutrition-party-conditions class="hc-party-form"><fieldset><legend>Pro koho platí stejné podmínky po celých 24 hodin?</legend><div class="hc-characters">${eligible.map(c=>`<label class="hc-character"><input type="checkbox" name="actorIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset>
+ <label>Výjimečné podmínky<select name="kind" required><option value="" selected disabled>— Bez výjimky: nic neukládat —</option><option value="rest-inactive">24 hodin úplný klid i nečinnost · ½ jídla / ½ vody</option><option value="rest">24 hodin úplný odpočinek · ½ jídla / 1 vody</option><option value="inactive">24 hodin úplná nečinnost · 1 jídlo / ½ vody</option><option value="hot">24 hodin v horku · 1 jídlo / 2 vody</option><option value="rest-hot">Úplný odpočinek v horku · ½ jídla / 2 vody</option></select></label>
+ <button type="submit">Potvrdit výjimku vybraným postavám</button><small>Potvrzení pouze zaznamená GM plán. Čas ani zásoby se tím nemění. Jakmile se podmínky změní, plán je třeba přerušit.</small></form>`:
+ '<p class="hc-party-status">Pro tuto minutu nelze zahájit nový společný celodenní plán. Běžné potřeby se dále počítají podle aktivního režimu a skutečných událostí.</p>'}
+ </section>`;
 }
+
+/** v93.560: A guided PRESENTATION over the original append-only HMK receipts.
+ * No automatic ration creation, day advancement, or medical roll lives here. */
+function partyProvisionWizardHTML(participants,clock,{supplyHTML,nutritionHTML,activityNeedsHTML}={}){
+ const campaign=campaignKey(clock),pool=partyProvisionsOverview(data).pooledForaging;
+ const policies=activeNutritionPolicies(data.journal,campaign,participants.map(c=>c.id));
+ const policyFor=id=>policies.find(p=>p.characterId===id);
+ const newcomers=participants.filter(c=>!policyFor(c.id));
+ const rows=participants.map(c=>{
+  const row=policyFor(c.id),p=row?.calendarNutritionPolicy;
+  const status=!p?'Sledování dosud nezapnuto':p.gmProvisioned?'Zajišťuje GM':!p.enabled?'Pozastaveno':'Sledováno podle zásob';
+  const last=characterProvisionsOverview(data,c.id).latestDay;
+  const next=p?.enabled&&p?.autoNeeds&&!p.gmProvisioned?nextNutritionDayStart(data.journal,row):null;
+  return `<tr><th scope="row">${esc(c.name)}</th><td>${esc(status)}</td><td>${last?esc(provisionLastDayLabel(last)):'Čeká se na první uzavřený den'}</td><td>${next!=null?esc(displayCampaignMinute(next+1440)):'—'}</td></tr>`;
+ }).join('');
+ const food=Number(pool?.foodDays??0),water=Number(pool?.waterDays??0),herbs=Number(pool?.herbDoses??0);
+ const havePool=food>0||water>0;
+ const due=dueMalnutritionCases(data).filter(t=>participants.some(c=>c.id===t.characterId));
+ const ready=participants.filter(c=>{const p=policyFor(c.id)?.calendarNutritionPolicy;return p?.enabled&&p.autoNeeds&&!p.gmProvisioned;});
+ const alerts=due.filter(t=>clock.minute>=t.dueMinute);
+ const dueLine=(t)=>`${t.kind==='starvation'?'Hlad':'Žízeň'} · HR${t.hr} · ${t.mode==='healing'?'Healing':'Advance'} · ${displayCampaignMinute(t.dueMinute)}`;
+ return `<section class="hc-party-guide" aria-label="Průvodce zásobováním družiny">
+ <div class="hc-party-intro"><h2>Zásoby družiny · den po dni</h2><p>Stačí rozhodnout, <strong>kdo spotřebovává zásoby</strong>, případně rozdělit skutečné nálezy a potvrdit výjimky. Denní spotřebu vyhodnotí kalendář při posunu času GM. Žádný krok sám nepřidává jídlo, vodu ani hody.</p><p><strong>Teď je:</strong> ${esc(displayCampaignMinute(clock.minute))} · ${esc(czCount(participants.length,'postava','postavy','postav'))}</p></div>
+ <section class="hc-party-step" id="hc-party-step-people"><header class="hc-party-step-head"><span class="hc-party-step-number">1</span><div><h3>Kdo má sledovanou výživu?</h3><p>Stav všech členů je vidět hned. Běžné sledování stačí zapnout jednou; další dny se opakuje automaticky.</p></div></header>
+ <div class="hc-party-table-wrap"><table class="hc-party-status-table"><thead><tr><th>Postava</th><th>Režim</th><th>Poslední den</th><th>Další 24h uzávěrka*</th></tr></thead><tbody>${rows||'<tr><td colspan="4">V kampani zatím nejsou žádné postavy.</td></tr>'}</tbody></table></div>
+ ${newcomers.length?`<form data-provision-party-start class="hc-party-form"><fieldset><legend>Zapnout běžné sledování také pro</legend><div class="hc-characters">${newcomers.map(c=>`<label class="hc-character"><input type="checkbox" name="actorIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset><button type="submit">Zapnout sledování vybraným</button><small>Pouze evidenční režim 1 denní dávka jídla a vody. Žádná zásoba ani uplynulý den se tím nezakládá.</small></form>`:
+ '<p class="hc-party-status">Všichni členové již mají zavedený režim. Pokud je u někoho pozastaven nebo zajištěn GM, změňte jej v záložce Postava.</p>'}
+ <small>* Uzávěrka je vypočtena z aktuálního doloženého začátku dne; nevytváří nový časový závazek.</small></section>
+ <section class="hc-party-step" id="hc-party-step-rations"><header class="hc-party-step-head"><span class="hc-party-step-number">2</span><div><h3>Chcete rozdělit společné nálezy?</h3><p>Společné nálezy Foraging jsou oddělené od jídla v batozích a vody v nádobách. Pokud nic rozdělit nechcete, krok přeskočte.</p></div></header>
+ <div class="hc-party-pool"><div><span>Jídlo</span><strong>${esc(food)} dáv.</strong></div><div><span>Voda z Foraging</span><strong>${esc(water)} dáv.</strong></div><div><span>Byliny</span><strong>${esc(herbs)} dáv.</strong></div></div>
+ ${havePool?`<form data-foraging-batch-rations class="hc-party-form" data-party-food-available="${esc(food)}" data-party-water-available="${esc(water)}"><fieldset><legend>Vyberte příjemce</legend><div class="hc-characters">${participants.map(c=>`<label class="hc-character"><input type="checkbox" name="rationActorIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset>
+ <div class="hc-provision-inline-fields"><label>Jídlo každému<select name="foodEach"><option value="0" ${food<.5?'selected':''}>0 dávek</option>${food>=.5?`<option value="0.5" ${food<1?'selected':''}>½ dávky</option>`:''}${food>=1?'<option value="1" selected>1 dávka</option>':''}</select></label><label>Voda každému<select name="waterEach"><option value="0" ${water<.5?'selected':''}>0 dávek</option>${water>=.5?`<option value="0.5" ${water<1?'selected':''}>½ dávky</option>`:''}${water>=1?'<option value="1" selected>1 dávka</option>':''}${water>=2?'<option value="2">2 dávky</option>':''}</select></label></div>
+ <p class="hc-party-preview" data-party-ration-preview aria-live="polite">Vyberte postavy. Přehled před výdejem ukáže společnou potřebu a dostupné dávky.</p><button type="submit" disabled>Vydat vybraným postavám</button><small>Skutečné množství musí být ve společném fondu; pravidlová kontrola zabrání překročení zásob. Výdej neposouvá herní čas a nevkládá nic do batohu.</small></form>`:
+ '<p class="hc-party-status">Momentálně nejsou žádné společné dávky jídla ani vody k rozdělení. Osobní zásoby se stále spotřebovávají podle svých dokladů. Nové společné nálezy vznikají až po skutečném Foraging.</p>'}
+ <div class="hc-party-resource-links"><button type="button" class="secondary hc-small" data-calendar-section="travel">Získat zásoby v přírodě · Foraging ↗</button><button type="button" class="secondary hc-small" data-provision-scope="person">Osobní jídlo a nádoby · Postava ↗</button></div>
+ <details class="hc-party-extra"><summary>Zobrazit inventární zásoby a účetnictví celé družiny</summary>${partyProvisionLedgerHTML(participants)}</details>
+ </section>
+ ${partyNutritionConditionsHTML(participants,clock)}
+ <section class="hc-party-step" id="hc-party-step-close"><header class="hc-party-step-head"><span class="hc-party-step-number">4</span><div><h3>Vyhodnoťte zdravotní následky a posuňte čas</h3><p>Hlad a žízeň se vyhodnocují až po skutečně uplynulých obdobích. Splatný zdravotní hod se nikdy neodhaduje a neprovádí automaticky.</p></div></header>
+ ${ready.length?`<p class="hc-party-status">Běžná spotřeba je aktivní pro ${esc(czCount(ready.length,'postavu','postavy','postav'))}. Při posunu času se použijí doložené osobní i přidělené společné dávky.</p>`:''}
+ ${due.length?`<div class="hc-party-health"><h4>Hlad a žízeň · ${due.length} aktivních kontrol${alerts.length?` · ${alerts.length} splatných`:''}</h4>${due.map(t=>`<form data-malnutrition-course class="hc-party-health-row"><div><strong ${journalHelp('HR',HR_HELP_558)}>${esc(character(t.characterId)?.name||t.actorName||t.characterId)}</strong><p>${esc(dueLine(t))}${clock.minute<t.dueMinute?' · zatím nenastalo':' · splatné'}</p></div><input type="hidden" name="actorId" value="${esc(t.characterId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}"><label>d100<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="secondary hc-small" data-malnutrition-die="yes" ${clock.minute<t.dueMinute?'disabled title="Hod lze provést až v termínu"':''}>⚄ d100</button><button type="submit" ${clock.minute<t.dueMinute?'disabled title="Termín ještě nenastal"':''}>Zapsat ${t.mode==='healing'?'Healing':'Advance'}</button></form>`).join('')}</div>`:'<p class="hc-party-status">Žádná aktuálně evidovaná kontrola hladu ani žízně.</p>'}
+ <button type="button" class="hc-party-next" data-calendar-section="overview">Otevřít posun herního času a ostatní termíny ↗</button><small>Čas mění jen GM v přehledu kalendáře. Nevyřešené povinné termíny mohou posun zablokovat.</small></section>
+ <details class="hc-party-advanced"><summary>Pokročilé možnosti · původní doklady, zvláštní režimy, byliny a audit</summary><p>Pro výjimky nebo starší režimy zůstávají k dispozici původní pravidlové formuláře a doklady. Používejte je jen při skutečně doložených okolnostech.</p>${supplyHTML||''}${nutritionHTML||''}${activityNeedsHTML||''}</details>
+ </section>`;
+}
+
 function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clock){
  if(!actor)return '';
  const actorId=actor.id,policy=policies.get(actorId)?.calendarNutritionPolicy;
@@ -1761,7 +1811,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const overviewHTML=`${board}${unknownFallNotice}${suspendedHealingHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
   activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${animalWeatherHTML}${animalRestHTML}${interruptionsHTML}`:
-  activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionLedgerHTML(participants)}${partyNutritionConditionsHTML(participants,clock)}${supplyHTML}<details class="hc-provision-rulebook"><summary>Podrobnosti: automatické následky nedostatku a zdravotní hody</summary>${nutritionHTML}${activityNeedsHTML}</details>`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
+  activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionWizardHTML(participants,clock,{supplyHTML,nutritionHTML,activityNeedsHTML})}`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
   activeCalendarSection==='craft'?`${herbalHTML}${alchemyHTML}`:
   `${membersHTML}${legacyOriginPanel}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
@@ -9276,6 +9326,28 @@ document.addEventListener('submit',e=>{
    notice='Odpočinek zvířete byl naplánován v původní kalendářové evidenci; Combat State se změní po dokončení celého intervalu.';
  }catch(err){alert('Odpočinek zvířete nebyl naplánován: '+err.message)}
 },true);
+// v93.560: explicit one-time enrollment for multiple members; never creates
+// supplies, backdates a day, or supersedes a paused/GM-assured regime.
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-provision-party-start]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const clock=data.campaignClock;
+  if(!clock||view!=='calendar'||activeCalendarSection!=='provisions'||provisionScope!=='party'||combatInitiativeSequence)
+   throw Error('Skupinové sledování lze zapnout jen v aktivním kalendáři mimo boj.');
+  const ids=new FormData(form).getAll('actorIds').map(String),members=calendarMemberIds(clock,data.characters);
+  const known=new Set(members.map(c=>c.id)),existing=activeNutritionPolicies(data.journal,campaignKey(clock),ids);
+  if(!ids.length||new Set(ids).size!==ids.length||ids.some(id=>!known.has(id)))throw Error('Vyberte konkrétní postavy z aktuální kampaně.');
+  if(existing.length)throw Error('Jedna ze zvolených postav již režim má; pro změnu použijte její osobní zásobování.');
+  const rows=ids.map(id=>{const policy=createNutritionPolicy({campaignId:campaignKey(clock),minute:clock.minute,actorId:id,foodNeed:1,waterNeed:1,
+   enabled:true,autoNeeds:true,inventoryRations:true,inventoryWater:true});
+   return {id:uuid(),characterId:id,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,createdAt:stamp(),
+    title:'HMK · zahájení běžného sledování družiny',body:'GM aktivoval denní sledování výživy podle doložených osobních a společných zásob, bez přidání zdrojů nebo posunu času.',calendarNutritionPolicy:policy};});
+  if(!window.confirm('Zapnout běžné sledování jídla a pití pro '+ids.length+' vybraných postav? Zásoby ani herní čas se nezmění.'))return;
+  if(mutate(()=>{if(data.campaignClock?.minute!==clock.minute||activeNutritionPolicies(data.journal,campaignKey(clock),ids).length)
+    throw Error('Během potvrzení se změnil stav kalendáře nebo zásobování.');data.journal.push(...rows);})){notice='Denní sledování družiny bylo zapnuto pro '+ids.length+' postav.';}
+ }catch(error){alert('Sledování družiny nebylo zapnuto: '+error.message)}
+},true);
 // Selected co-located party members share conditions, not an evidence table.
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-nutrition-party-conditions]'))return;
@@ -9285,6 +9357,7 @@ document.addEventListener('submit',e=>{
   if(!clock||view!=='calendar'||activeCalendarSection!=='provisions'||provisionScope!=='party'||combatInitiativeSequence)
    throw Error('Společné podmínky lze zadat jen pro aktivní družinu mimo boj.');
   const fd=new FormData(form),ids=fd.getAll('actorIds').map(String),kind=String(fd.get('kind')||'');
+  if(!kind)throw Error('Pro běžný den žádnou výjimku nezapisujte.');
   const allowed=new Set(calendarMemberIds(clock,data.characters).map(c=>c.id));
   if(!ids.length||new Set(ids).size!==ids.length||ids.some(id=>!allowed.has(id)))throw Error('Vyberte skutečně přítomné postavy z tohoto kalendáře.');
   const policies=activeNutritionPolicies(data.journal,campaignKey(clock),ids);
@@ -9400,6 +9473,25 @@ document.addEventListener('click',e=>{
    body:mode==='yes'?'GM doložil průběžný přístup k jídlu a pitné vodě. Nedochází k inventárnímu převodu.':'Zajištění GM skončilo; další denní potřeba se účetně ověří proti doloženým fyzickým a společným zásobám. Případný hlad vzniká podle HMK až po uzávěrce.',
    calendarNutritionPolicy:p})))notice=mode==='yes'?'GM zajištěné zásobování bylo zapsáno.':'Denní spotřeba podle HMK je aktivní.';
  }catch(err){alert('Zásobování nebylo změněno: '+err.message)}
+},true);
+// Preview is read-only UI and never substitutes the authoritative Foraging ledger.
+function updatePartyRationPreview(form){
+ if(!form?.hasAttribute?.('data-party-food-available'))return;
+ const label=form.querySelector('[data-party-ration-preview]');if(!label)return;
+ const count=form.querySelectorAll('input[name="rationActorIds"]:checked').length;
+ const foodEach=Number(form.elements.namedItem('foodEach')?.value||0),waterEach=Number(form.elements.namedItem('waterEach')?.value||0);
+ const food=count*foodEach,water=count*waterEach;
+ const maxFood=Number(form.dataset.partyFoodAvailable),maxWater=Number(form.dataset.partyWaterAvailable);
+ const valid=count>0&&(food>0||water>0)&&food<=maxFood+1e-8&&water<=maxWater+1e-8;
+ const qty=n=>Number.isInteger(n)?czCount(n,'dávka','dávky','dávek'):String(n).replace('.',',')+' dávky';
+ label.textContent=count?`Celkem pro ${czCount(count,'postavu','postavy','postav')}: ${qty(food)} jídla z ${qty(maxFood)} a ${qty(water)} vody z ${qty(maxWater)}. `+
+  (food>maxFood||water>maxWater?'Nedostatek společných zásob – snižte dávku nebo počet příjemců.':food===0&&water===0?'Zvolte alespoň jednu nenulovou dávku.':'Při potvrzení se použijí skutečné účetní doklady.'):
+  'Vyberte postavy, kterým chcete společné nálezy přidělit.';
+ const submit=form.querySelector('button[type="submit"]');if(submit)submit.disabled=!valid;
+}
+document.addEventListener('change',e=>{
+ const form=e.target.closest?.('[data-foraging-batch-rations][data-party-food-available]');
+ if(form)updatePartyRationPreview(form);
 },true);
 // Single atomic ration issue for several characters. No clock movement.
 document.addEventListener('submit',e=>{
