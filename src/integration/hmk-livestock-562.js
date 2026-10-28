@@ -83,7 +83,7 @@ export function validateLivestockEvidence(data){
     r.ownerId!==owner.id||typeof r.name!=='string'||r.name.trim().length<2||r.name.length>60||
     !['buy','free'].includes(r.mode)||!Number.isSafeInteger(r.minute)||r.minute<0||
     typeof r.campaignId!=='string'||!r.campaignId||
-    r.priceD!==spec.priceD||r.maxMB!==spec.maxMB||typeof r.transactionId!=='string'||!r.transactionId)
+    r.priceD!==spec.priceD||r.maxMB!==spec.maxMasteryBoosts||typeof r.transactionId!=='string'||!r.transactionId)
     throw Error('Stáj: neplatný nebo změněný údaj o pořízeném zvířeti.');
    ids.add(r.id);
    const proofs=(data.journal||[]).filter(j=>j.livestockAcquisition?.animalId===r.id);
