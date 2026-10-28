@@ -11,7 +11,7 @@ export function animalLossCapabilities572(health){
  const has=part=>losses.some(x=>x.part===part);
  const legs=losses.filter(x=>['flg','hlg','leg'].includes(x.part));
  const facialLoss=losses.some(x=>x.kind==='facial-feature'||x.part==='ear');
- return {losses,legs,requiresMobilityRuling:legs.length>0,
+ return {losses,legs,requiresMobilityRuling:legs.length>0||has('wng'),
   flightProhibited:has('wng'),tailActionProhibited:has('tl'),
   wingActionNeedsRuling:has('wng'),facialSenseOrBiteNeedsRuling:facialLoss,
   reasons:[...(legs.length?['Chybí končetina: tištěné Move nelze bez rozhodnutí GM považovat za nezměněné.']:[]),

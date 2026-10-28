@@ -7,6 +7,7 @@ import {previewAnimalContact566} from './hmk-bestiary-anatomy-566.js';
 import {resolveAnimalAmputation570} from './hmk-bestiary-amputation-570.js';
 import {prepareAnimalFrostInjury571,prepareAnimalFrostAmputation571} from './hmk-bestiary-frost-571.js';
 import {assertAnimalAttackCapability572} from './hmk-bestiary-loss-effects-572.js';
+import {prepareAnimalFrostSequence573,prepareAnimalMobilityRuling573,latestMobilityRuling573} from './hmk-bestiary-frost-sequences-573.js';
 export {prepareAnimalFrostInjury571,prepareAnimalFrostAmputation571} from './hmk-bestiary-frost-571.js';
 import {SL,successLevel} from '../rules/tests.js';
 import {calculateShockState,applyShockState,shockRecoverySchedule,resolveShockReroll} from '../rules/shock.js';
@@ -59,6 +60,22 @@ export function animalHealthProjection567(journal,campaignId,encounterId){
     level:p.level,aspect:'frost',bleeding:false,minute:p.minute,frostSite:p.site,
     treatment:null,infected:false,healed:false,permanentImpairment:0,projectileRemoved:false,
     amputation:null,staunchBonus:0,nextDueMinute:null,grimDueMinute:p.grimDueMinute});
+  }else if(p.kind==='frost-sequence-573'){
+   const oldShock=shock;
+   for(const site of p.sites){
+    if(site.level===0)continue;
+    valid(!byId(wounds,site.woundId),'Duplicitní Frost Area rána.');
+    wounds.push({id:site.woundId,sourceId:row.id,location:site.location.id,
+     locationName:site.location.name,siteSide:site.side,
+     level:site.level,aspect:'frost',bleeding:false,minute:p.minute,frostSite:site.site,
+     area:p.origin==='breath',treatment:null,infected:false,healed:false,permanentImpairment:0,
+     projectileRemoved:false,amputation:null,staunchBonus:0,nextDueMinute:null,
+     grimDueMinute:site.grimDueMinute});
+   }
+   shock=p.shockAfter;
+   if(shock!==oldShock){shockOriginMinute=p.minute;shockDueMinute=shock==='unconscious'?p.minute+10:null;}
+  }else if(p.kind==='mobility-ruling-573'){
+   // A ruling never heals an injury or alters the printed species profile.
   }else if(p.kind==='frost-amputation'){
    const original=byId(wounds,p.woundId);
    valid(original&&!original.healed&&!original.treatment&&original.aspect==='frost',
@@ -152,7 +169,7 @@ export function prepareAnimalHit567({attacker,defender,inputs,previous,attackerP
  valid(int(inputs.shockRoll,1,100)&&int(inputs.shockFatigue,0,300)&&inputs.shockFatigue%5===0, 'Vyžaduje skutečné Shock d100 a ověřenou Fatigue.');
  valid(['yes','no'].includes(inputs.rigidArmour),'Potvrď Rigid Armour na konkrétní lokaci.');
  valid(typeof inputs.bleeding==='boolean','Potvrď možnost krvácení pro danou lokalitu, aspekt a IL.');
- assertAnimalAttackCapability572({health:attackerPrevious,weaponName:attacker.profile.weapons?.[inputs.weaponIndex]?.name,weaponSpecial:attacker.profile.weapons?.[inputs.weaponIndex]?.special,gmRemainingLimbConfirmed:inputs.limbUseConfirmed===true});
+ assertAnimalAttackCapability572({health:attackerPrevious,weaponName:attacker.profile.weapons?.[inputs.weaponIndex]?.name,weaponSpecial:attacker.profile.weapons?.[inputs.weaponIndex]?.special,gmRemainingLimbConfirmed:inputs.limbUseConfirmed===true||latestMobilityRuling573(attackerPrevious)?.attackIndices?.includes(inputs.weaponIndex)===true});
  valid(!previous||!['incapacitated','unconscious','killed'].includes(previous.shock),
   'Před dalším zraněním nejdříve vyřeš původní INC/UNC/KIA a související časový postup.');
  const contact=previewAnimalContact566({attackerProfile:attacker.profile,defenderProfile:defender.profile,
@@ -330,7 +347,8 @@ export function prepareAnimalGrimShock568({profile,previous,wound,minute,roll,fa
   'Potvrď skutečný Shock d100, Fatigue a stav živého tvora.');
  const ml=profile?.combat?.shock;
  valid(int(ml,1,300),'Pro tento druh není doloženo Shock ML.');
- const locationShock=previous.records.find(r=>r.id===wound.sourceId)?.bestiaryTrauma?.location?.locationShock;
+ const origin=previous.records.find(r=>r.id===wound.sourceId)?.bestiaryTrauma;
+ const locationShock=origin?.sites?.find(s=>s.woundId===wound.id)?.location?.locationShock??origin?.location?.locationShock;
  valid(int(locationShock,0,15),'Původní rána nemá jednoznačný Location Shock.');
  const eml=ml-fatigue,sl=successLevel(roll,eml);
  const result=calculateShockState({locationShock,injuryShock:wound.level,shockSL:sl});
@@ -343,7 +361,7 @@ export function prepareAnimalGrimShock568({profile,previous,wound,minute,roll,fa
  * Surgical CF/F may open a new Bleeder, with a five-minute follow-up.
  * Frost AMP is a distinct operation, not silently treated as SUR. */
 export function prepareAnimalTreatment567({wound,profile,previous,minute,physicianML,physicianIndex,roll,
- dexSecondaryModifier=0,surgeryEquipmentConfirmed=false,gmConfirmed}={}){
+ dexSecondaryModifier=0,surgeryEquipmentConfirmed=false,warmingConditionsConfirmed=false,gmConfirmed}={}){
  valid(wound&&!wound.healed&&!wound.bleeding&&!wound.treatment,'Rána není připravena k prvnímu ošetření.');
  if(previous)valid(previous.shock==='none'&&!previous.extendedShock?.active&&!previous.coma?.active,'Nejdříve vyřeš Shock/Extended Shock/Coma.');
  valid(gmConfirmed===true,'GM musí potvrdit skutečného léčitele, vybavení a zákrok podle HMK str.178–180.');
@@ -351,6 +369,8 @@ export function prepareAnimalTreatment567({wound,profile,previous,minute,physici
  const days=Math.floor((minute-wound.minute)/1440),aspect=({b:'blunt',e:'edge',p:'point',f:'fire'}[wound.aspect]||wound.aspect);
  const c=treatmentContract({aspect,injuryLevel:wound.level});
  valid(c.treatment!=='amp','Amputation jako frost treatment vyžaduje samostatnou doloženou proceduru.');
+ if(c.treatment==='wrm')valid(warmingConditionsConfirmed===true,'Warming vyžaduje skutečné odstranění z chladu a doložené podmínky zahřívání.');
+ else valid(!warmingConditionsConfirmed,'Warming se nepoužije na jiný typ zranění.');
  const surgical=['sur','ext'].includes(c.treatment);
  if(surgical){valid(surgeryEquipmentConfirmed===true,
   'Surgery / Extraction vyžaduje doložené chirurgické nástroje a materiál podle HMK str.178.');
@@ -359,7 +379,7 @@ export function prepareAnimalTreatment567({wound,profile,previous,minute,physici
  valid(minute-wound.minute>=treatmentDurationMinutes({treatment:c.treatment,injuryLevel:wound.level}),
   'Neuplynula doložená minimální doba zákroku podle HMK str.178.');
  const eml=treatmentRollEMLFromInjury({physicianML,aspect,injuryLevel:wound.level,daysSinceInjury:days,
-  dexSecondaryModifier});
+  dexSecondaryModifier,area:wound.area===true});
  const sl=successLevel(roll,eml),result=resolveTreatmentTable({aspect,injuryLevel:wound.level,sl,physicianIndex});
  valid(result.available&&['hr','heal'].includes(result.result.kind)&&
   (!result.result.bleeding||surgical)&&(!result.grimWound||surgical),
@@ -368,6 +388,7 @@ export function prepareAnimalTreatment567({wound,profile,previous,minute,physici
  valid(result.result.immediateHeal||int(rate,1,6),'Nelze bezpečně určit Healing Rate.');
  return {format:ANIMAL_TRAUMA_FORMAT_567,kind:'treatment',targetId:profile.id,woundId:wound.id,
   minute,method:c.treatment,physicianML,physicianIndex,roll,sl:names[sl],eml,
+  ...(wound.area===true?{area:true}:{}),...(c.treatment==='wrm'?{warmingConditionsConfirmed:true}:{}),
   healingRate:rate,possibleInfection:!!result.result.infectionPossible,
   healed:!!result.result.immediateHeal,
   ...(surgical?{dexSecondaryModifier,surgeryEquipmentConfirmed:true,
@@ -383,11 +404,12 @@ export function prepareAnimalHealing567({wound,profile,previous,minute,roll,gmCo
   'Healing Roll musí proběhnout v doloženém pětidením termínu se skutečným d100.');
  const a=profile?.attributes||{};valid(int(a.end,1,100)&&int(a.wil,1,100),'Cíl nemá ověřené END a WIL pro Healing Base.');
  const hb=healingBase({endurance:a.end,will:a.wil});let sl=successLevel(roll,hb*wound.treatment.hr);
- if(sl===SL.F&&healingFailureIsCritical({roll}))sl=SL.CF;
+ if(sl===SL.F&&healingFailureIsCritical({roll,area:wound.area===true}))sl=SL.CF;
  const result=resolveInjuryHealingRoll({injuryLevel:wound.level,sl,infectionPossible:wound.treatment.possibleInfection});
  return {format:ANIMAL_TRAUMA_FORMAT_567,kind:'healing',targetId:profile.id,woundId:wound.id,
   minute,roll,hb,hr:wound.treatment.hr,eml:hb*wound.treatment.hr,sl:names[sl],
-  beforeLevel:wound.level,afterLevel:result.injuryLevel,infected:result.infected,sourcePage:181};
+  beforeLevel:wound.level,afterLevel:result.injuryLevel,infected:result.infected,
+  ...(wound.area===true?{area:true}:{}),sourcePage:181};
 }
 export function validateAnimalTraumaJournal567(data){
  const journal=data?.journal||[];
@@ -396,7 +418,7 @@ export function validateAnimalTraumaJournal567(data){
   if(p?.action==='create')encounters.set(p.id,p);
   const t=row.bestiaryTrauma;if(!t){past.push(row);continue;}
   valid(t.format===ANIMAL_TRAUMA_FORMAT_567&&
-   ['hit','frost','frost-amputation','blood','shock-recovery','extended-course','treatment','healing','infection-course','blood-healing','coma-course','grim-shock'].includes(t.kind),'Neplatný zdravotní doklad tvora.');
+   ['hit','frost','frost-amputation','blood','shock-recovery','extended-course','treatment','healing','infection-course','blood-healing','coma-course','grim-shock','frost-sequence-573','mobility-ruling-573'].includes(t.kind),'Neplatný zdravotní doklad tvora.');
   const target=encounters.get(t.targetId),prior=animalHealthProjection567(past,t.campaignId,t.targetId);
   valid(target&&target.campaignId===t.campaignId&&row.calendarCampaignId===t.campaignId&&
    row.campaignMinute===t.minute&&row.characterId===null,'Zdravotní doklad neodpovídá původnímu tvorovi/času.');
@@ -419,6 +441,35 @@ export function validateAnimalTraumaJournal567(data){
      locationAV:t.frostbite.locationAV,freezingAirConfirmed:true,siteExposedConfirmed:true}:null,facialFeature:t.facialFeature,wingAsLimbConfirmed:t.wingAsLimbConfirmed,
     shockRoll:t.shock.roll,shockFatigue:t.shock.fatigue,gmConfirmed:true});
    expected.campaignId=t.campaignId;
+  }else if(t.kind==='frost-sequence-573'){
+   if(t.origin==='weather-watch'){
+    valid(target.ownerAnimalId&&target.ownerId,
+     'Cestovní Frost musí mít skutečného vlastníka a stabilní ID zvířete.');
+    valid(!past.some(pr=>{
+     const q=pr.bestiaryTrauma;
+     if(q?.kind!=='frost-sequence-573'||q.origin!=='weather-watch'||
+        q.source?.watchSourceId!==t.source?.watchSourceId)return false;
+     const original=encounters.get(q.targetId);
+     return original?.ownerAnimalId===target.ownerAnimalId&&original.ownerId===target.ownerId;
+    }), 'Tatáž Cold hlídka již byla tomuto zvířeti zdravotně zaúčtována.');
+   }
+   const source=t.origin==='weather-watch'?past.find(x=>x.id===t.source?.watchSourceId):null;
+   expected=prepareAnimalFrostSequence573({profile,previous:prior,minute:t.minute,
+    eventId:row.id,campaignId:t.campaignId,origin:t.origin,
+    windD20:t.windD20??null,durationD20:t.durationD20??null,
+    watchSource:source,ownerAnimalId:target.ownerAnimalId??null,
+    hazard:t.origin==='weather-watch'?{roll:t.source.hazard.roll,
+     gearAV:t.source.hazard.gearAV,shelterAV:t.source.hazard.shelterAV,fireFS:t.source.hazard.fireFS,
+     endEML:t.source.endEML,endD100:t.source.endD100}:null,
+    magic:t.origin==='weather-watch'?null:t.source.magic,
+    sites:t.sites.map(s=>({locationId:s.location.id,side:s.side,
+      av:t.origin==='weather-watch'?s.proof?.av:s.proof?.armourValue,
+      shockRoll:s.shock?.roll??null,fatigue:s.shock?.fatigue??null})),
+    allExposedConfirmed:t.allExposedConfirmed===true,gmConfirmed:true});
+  }else if(t.kind==='mobility-ruling-573'){
+   expected=prepareAnimalMobilityRuling573({profile,previous:prior,minute:t.minute,eventId:row.id,
+    campaignId:t.campaignId,travelAllowed:t.travelAllowed,adjustedMove:t.adjustedMove,attackIndices:t.attackIndices,
+    reason:t.reason,gmConfirmed:true});
   }else if(t.kind==='frost-amputation'){
    valid(t.newWoundId==='wound:'+row.id,'AMP Edge rána nemá neměnnou identitu události.');
    expected=prepareAnimalFrostAmputation571({profile,previous:prior,
@@ -457,7 +508,8 @@ export function validateAnimalTraumaJournal567(data){
    const wound=byId(prior.wounds,t.woundId);
    expected=prepareAnimalTreatment567({wound,profile,previous:prior,minute:t.minute,physicianML:t.physicianML,
     physicianIndex:t.physicianIndex,roll:t.roll,dexSecondaryModifier:t.dexSecondaryModifier??0,
-    surgeryEquipmentConfirmed:t.surgeryEquipmentConfirmed===true,gmConfirmed:true});expected.campaignId=t.campaignId;
+    surgeryEquipmentConfirmed:t.surgeryEquipmentConfirmed===true,
+    warmingConditionsConfirmed:t.warmingConditionsConfirmed===true,gmConfirmed:true});expected.campaignId=t.campaignId;
   }else if(t.kind==='healing'){
    const wound=byId(prior.wounds,t.woundId);
    expected=prepareAnimalHealing567({wound,profile,previous:prior,minute:t.minute,roll:t.roll,gmConfirmed:true});

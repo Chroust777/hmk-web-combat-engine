@@ -89,8 +89,12 @@ export function prepareAnimalFrostAmputation571({profile,previous,wound,minute,e
   'Frost AMP je dovolena pouze u původního neošetřeného G4f/G5f.');
  check(wound.frostSite?.eligible===true,
   'HMK str.178: Grievous Frost v této lokalitě nemá AMP treatment; jde o Grim Wound.');
- check(!previous.wounds.some(w=>w.id!==wound.id&&!w.healed&&w.location===wound.location),
-  'Ve stejné lokalitě je jiná aktivní rána: nutno samostatně rozhodnout Compound.');
+ // Parallel left/right limbs are distinct anatomical targets. An active
+ // wound on the opposite documented limb must not block the procedure.
+ const woundSide=x=>x.siteSide||x.frostSite?.side||x.amputation?.side||null;
+ check(!previous.wounds.some(w=>w.id!==wound.id&&!w.healed&&w.location===wound.location&&
+  (!woundSide(wound)||!woundSide(w)||woundSide(wound)===woundSide(w))),
+  'Na stejné straně anatomické lokality je další aktivní rána: nutno ověřit Compound.');
  check(gmConfirmed===true&&procedureConfirmed===true&&typeof eventId==='string'&&eventId.length>=4,
   'GM musí potvrdit fyzické odstranění části těla a čas zákroku.');
  check(int(physicianML,1,300)&&int(physicianIndex,1,30)&&int(physicianRoll,1,100)&&
@@ -105,9 +109,11 @@ export function prepareAnimalFrostAmputation571({profile,previous,wound,minute,e
  const result=resolved.result;
  check(result.kind==='edge-injury'&&int(result.injuryLevel,2,5),'AMP musí vytvořit nové S2–G5 Edge zranění.');
  const oldHit=previous.records.find(r=>r.id===wound.sourceId)?.bestiaryTrauma;
- check(oldHit?.kind==='frost'&&oldHit?.location?.id===wound.location,
+ const sourceLocation=oldHit?.kind==='frost-sequence-573'
+  ?oldHit.sites.find(s=>s.woundId===wound.id)?.location:oldHit?.location;
+ check(['frost','frost-sequence-573'].includes(oldHit?.kind)&&sourceLocation?.id===wound.location,
   'Chybí nezměněný originální doklad lokalizace původního Frost zranění.');
- const loc=oldHit.location;
+ const loc=sourceLocation;
  const mark=animalAmputationMark570(loc);
  const ampCheck=resolveAnimalAmputation570({location:loc,injuryLevel:result.injuryLevel,
   aspect:'e',roll:amputationRoll});
