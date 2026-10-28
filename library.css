@@ -81,3 +81,10 @@
 .hmk-stable-zone-hurt{background:rgba(161,42,37,.12)}
 .hmk-stable-zone-loss{background:rgba(175,113,34,.1)}
 .hmk-stable-zones .catalog-spec th,.hmk-stable-zones .catalog-spec td{vertical-align:top}
+
+/* 93.576 – Stable lives in a full-width workspace. Never split forms across folios. */
+.journal-book--stable .hmk-stable-workspace { position:relative; width:100%; min-width:0; padding:clamp(12px,2vw,28px); box-sizing:border-box; }
+.journal-book--stable .hmk-stable-workspace > .hc-livestock-catalog { width:100%; max-width:none; }
+.journal-book--stable .hmk-stable-workspace .hmk-stable-animal-card { min-width:0; }
+.journal-book--stable .hmk-stable-workspace .catalog-scroll { max-width:100%; overflow-x:auto; }
+.journal-stable-shortcut { border:1px solid currentColor; font-weight:700; white-space:nowrap; }
