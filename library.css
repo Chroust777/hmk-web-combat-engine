@@ -94,3 +94,41 @@
 .content-library .journal-book--stable .library-navigation button {position:relative;z-index:1;cursor:pointer;pointer-events:auto;}
 .content-library .journal-book--stable .hmk-stable-workspace {position:relative;z-index:2;width:100%;min-width:0;max-width:100%;box-sizing:border-box;}
 .content-library .journal-book--stable .hmk-stable-health-workspace > button {max-width:100%;white-space:normal;cursor:pointer;}
+
+/* 93.578: Restore an actual pair of book pages to the Stable library tab.
+ * Each form and animal belongs to a page; never cross the central gutter. */
+.content-library .journal-book--stable .hmk-stable-spread{display:grid;grid-template-columns:minmax(0,45.5fr) minmax(0,54.5fr);align-items:stretch;min-width:0;width:100%;}
+.content-library .journal-book--stable .hmk-stable-page{min-width:0;width:100%;box-sizing:border-box;overflow-wrap:break-word;}
+.content-library .journal-book--stable .hmk-stable-column{min-width:0;max-width:100%;width:100%;box-sizing:border-box;overflow-wrap:anywhere;}
+.content-library .journal-book--stable .hmk-stable-page .folio-chapter-heading{min-width:0;max-width:100%;}
+.content-library .journal-book--stable .hmk-stable-page .library-navigation{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;min-width:0;max-width:100%;}
+.content-library .journal-book--stable .hmk-stable-page .library-navigation button{min-height:30px;padding:5px 6px;white-space:normal;overflow-wrap:anywhere;font-size:clamp(10px,.78vw,13px);}
+.content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-column>*,
+.content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-column>form,
+.content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-animal-card{max-width:100%;min-width:0;box-sizing:border-box;}
+.content-library .journal-book--stable #hmk-livestock-catalog .hc-livestock-acquire,
+.content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-block .hc-fields,
+.content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-animal-card>.hc-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0;max-width:100%;}
+.content-library .journal-book--stable #hmk-livestock-catalog label,
+.content-library .journal-book--stable #hmk-livestock-catalog input,
+.content-library .journal-book--stable #hmk-livestock-catalog select,
+.content-library .journal-book--stable #hmk-livestock-catalog textarea,
+.content-library .journal-book--stable #hmk-livestock-catalog button{max-width:100%;min-width:0;box-sizing:border-box;}
+.content-library .journal-book--stable #hmk-livestock-catalog .hc-livestock-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.content-library .journal-book--stable #hmk-livestock-catalog .catalog-scroll,
+.content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-zones{width:100%;max-width:100%;min-width:0;overflow-x:auto;box-sizing:border-box;}
+.content-library .journal-book--stable #hmk-livestock-catalog details{max-width:100%;min-width:0;box-sizing:border-box;}
+.content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-block{padding:.6rem;}
+@media(max-width:1160px){
+ .content-library .journal-book--stable .hmk-stable-spread{grid-template-columns:minmax(0,1fr);}
+ .content-library .journal-book--stable #hmk-livestock-catalog .hc-livestock-acquire,
+ .content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-block .hc-fields{grid-template-columns:minmax(0,1fr);}
+}
+@media(max-width:550px){
+ .content-library .journal-book--stable #hmk-livestock-catalog .hc-livestock-acquire,
+ .content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-animal-card>.hc-fields{grid-template-columns:minmax(0,1fr);}
+}
+/* On one book page a stable record needs the entire page width.  Two
+ * adjacent 240px subpanels made the characteristics unreadable. */
+.content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-animal-card>.hc-fields{grid-template-columns:minmax(0,1fr);}
+.content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-animal-card .hmk-stable-block{max-width:100%;min-width:0;}
