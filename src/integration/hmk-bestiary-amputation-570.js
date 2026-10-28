@@ -25,7 +25,11 @@ export function resolveAnimalAmputation570({location,injuryLevel,aspect,roll=nul
   const severed=sl===SL.CF||sl===SL.F;
   const paired=['flg','hlg','leg','wng','ear'].includes(location.id);
   // HMK p352: for a paired limb or wing, odd LD = left, even LD = right.
-  const side=paired?((location.ld%2)?'left':'right'):null;
+  // Freezing air/Area attacks never roll a Location Die. Their proven side
+  // is a location fact, not a fabricated odd/even die.
+  const side=paired?(Number.isInteger(location.ld)&&location.ld>=1&&location.ld<=10?
+   (location.ld%2?'left':'right'):['left','right'].includes(location.side)?location.side:null):null;
+  if(paired&&!side)throw Error('Amputace párové části vyžaduje původně doloženou stranu.');
   return Object.freeze({shade:mark.shade,ml:mark.ml,modifier:mark.modifier,roll,
     sl:sl===SL.CF?'CF':sl===SL.F?'F':sl===SL.S?'S':'CS',severed,
     side,permanentLoss:severed?location.id:null,lethalNeck:severed&&location.id==='nk',

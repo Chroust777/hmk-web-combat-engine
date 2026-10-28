@@ -11,7 +11,7 @@ export function animalLossCapabilities572(health){
  const has=part=>losses.some(x=>x.part===part);
  const legs=losses.filter(x=>['flg','hlg','leg'].includes(x.part));
  const facialLoss=losses.some(x=>x.kind==='facial-feature'||x.part==='ear');
- return {losses,legs,requiresMobilityRuling:legs.length>0||has('wng'),
+ return {losses,legs,requiresMobilityRuling:losses.length>0,
   flightProhibited:has('wng'),tailActionProhibited:has('tl'),
   wingActionNeedsRuling:has('wng'),facialSenseOrBiteNeedsRuling:facialLoss,
   reasons:[...(legs.length?['Chybí končetina: tištěné Move nelze bez rozhodnutí GM považovat za nezměněné.']:[]),
@@ -22,23 +22,28 @@ export function animalLossCapabilities572(health){
 }
 /** Guard only capabilities that have a clear physical dependency; do not
  * invent a numerical modifier for limp, impaired flight or attacks. */
-export function assertAnimalAttackCapability572({health,weaponName,weaponSpecial='',gmRemainingLimbConfirmed=false}={}){
+/** A saved, anatomy-fingerprinted GM ruling is compulsory for every later
+ * natural attack once a physical part is permanently lost. In particular a
+ * one-off checkbox cannot silently override a previous amputation. */
+export function assertAnimalAttackCapability572({health,weaponName,weaponSpecial='',
+ weaponIndex=null,mobilityRuling=null,gmRemainingLimbConfirmed=false,historicalReplay=false}={}){
  const c=animalLossCapabilities572(health),n=String(weaponName||'').toLowerCase(),special=String(weaponSpecial||'').toLowerCase();
  if(!c.losses.length)return true;
  if(/tail/.test(n)&&c.tailActionProhibited)throw Error('Tail Strike nelze provést po ztrátě ocasu.');
  if(c.flightProhibited&&/dive|flying|wing.pounce/.test(special))
-  throw Error('Doložený střemhlavý/letový útok není možný s amputovaným křídlem.');
- if(c.facialSenseOrBiteNeedsRuling&&/bite/.test(n)&&!gmRemainingLimbConfirmed)
-  throw Error('Bite po ztrátě části obličeje vyžaduje GM potvrzení použitelnosti čelistí.');
+  throw Error('Letový útok není možný s amputovaným křídlem.');
+ if(c.facialSenseOrBiteNeedsRuling&&/bite/.test(n)&&!mobilityRuling)
+  throw Error('Bite po ztrátě části obličeje vyžaduje trvalý GM doklad.');
  if(/wing/.test(n)&&c.losses.filter(x=>x.part==='wng').some(x=>x.side==='left')&&c.losses.filter(x=>x.part==='wng').some(x=>x.side==='right'))
-  throw Error('Obě křídla jsou amputovaná: Wing Strike nelze provést.');
+  throw Error('Wing Strike není možný bez obou křídel.');
  if(/kick|hoof|trample/.test(n)&&['hlg','leg'].some(p=>c.legs.some(x=>x.part===p&&x.side==='left')&&c.legs.some(x=>x.part===p&&x.side==='right')))
-  throw Error('Obě příslušné zadní končetiny jsou amputované: Kick/Hoof/Trample není možný.');
- if(/wing/.test(n)&&c.wingActionNeedsRuling&&!gmRemainingLimbConfirmed)
-  throw Error('Wing Strike po ztrátě křídla vyžaduje GM potvrzení použitelného zbývajícího křídla.');
- if(/kick|hoof|trample/.test(n)&&c.legs.length&&!gmRemainingLimbConfirmed)
-  throw Error('Kick/Hoof/Trample po amputaci končetiny vyžaduje GM rozhodnutí a potvrzení použitelného pohybu.');
- if(/claw|grab|pounce/.test(n)&&c.legs.length&&!gmRemainingLimbConfirmed)
-  throw Error('Claw/Grab/Pounce po ztrátě končetiny vyžaduje GM potvrzení použitelné zbývající končetiny.');
+  throw Error('Obě příslušné končetiny chybí: Kick/Hoof/Trample není možný.');
+ // Old v93.572 journal proofs may have been committed with the then-valid
+ // one-action GM checkbox. This exception is READ-ONLY during validation;
+ // new commands never pass historicalReplay.
+ if(historicalReplay===true)return true;
+ if(!mobilityRuling||!Array.isArray(mobilityRuling.attackIndices)||
+  !Number.isInteger(weaponIndex)||!mobilityRuling.attackIndices.includes(weaponIndex))
+  throw Error('Po trvalé amputaci je tento přirozený útok blokován do uloženého, aktuálního GM rozhodnutí. Jednorázové potvrzení nestačí.');
  return true;
 }

@@ -12,6 +12,7 @@ import {evaluateTrekkingWeatherRoll} from './hmk-trekking-weather-roll.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {calculateShockState,applyShockState} from '../rules/shock.js';
 import {injuryFromEffectiveImpact} from '../rules/injury.js';
+import {assertAnimalAttackCapability572} from './hmk-bestiary-loss-effects-572.js';
 const requireProof=(ok,msg)=>{if(!ok)throw Error(msg)};
 const int=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const label=Object.fromEntries(Object.entries(SL).map(([a,b])=>[b,a]));
@@ -35,8 +36,15 @@ function buildSites({profile,previous,sites,minute,eventId,injuryFor,areaAttack=
  const ml=profile.combat?.shock;
  requireProof(int(ml,1,300),'Chybí druhová Shock ML.');
  for(let ix=0;ix<sites.length;ix++){
-  const input=sites[ix];const loc=locFor(profile,input.locationId,input.side||'none');
-  if(areaAttack){loc.locationShock=6;loc.area=true;loc.zoneId='area';}
+  const input=sites[ix];let loc;
+  if(areaAttack){
+   requireProof(sites.length===1&&input.locationId==='area'&&(input.side||'none')==='none',
+    'HMK 167/180: plošný Frost je JEDNA Area Injury s Area AV; nesmí se rozdělovat na anatomické lokality.');
+   const anatomy=animalAnatomyTable566(profile?.combat?.bodyTable);
+   requireProof(anatomy,'Druh nemá doloženou zvířecí anatomii.');
+   loc={table:anatomy.id,sourcePage:anatomy.sourcePage,id:'area',name:'Area Frost',
+    locationShock:6,zoneId:'area',side:'none',area:true};
+  }else loc=locFor(profile,input.locationId,input.side||'none');
   if(boltLocationShock!==null){
    requireProof(int(boltLocationShock,1,20),'Cold Bolt postrádá tištěnou Shock hodnotu lokality.');
    loc.locationShock=boltLocationShock;loc.area=false;loc.zoneId='bolt';
@@ -58,15 +66,21 @@ function buildSites({profile,previous,sites,minute,eventId,injuryFor,areaAttack=
     index:idx.index,incoming:idx.state,after};
   }else requireProof(input.shockRoll===null&&input.fatigue===null,
    'Bez Frost Injury se nehází Shock na danou lokaci.');
-  const frostSite=frostAmputationSite571({location:loc});
+  requireProof(!input.facialFeature||loc.id==='hd','Výslovná část obličeje patří pouze do Head.');
+  requireProof(!input.wingAsLimbConfirmed||loc.id==='wng',
+   'Potvrzení Wing jako končetiny lze zadat pouze pro křídlo.');
+  const frostSite=frostAmputationSite571({location:loc,facialFeature:input.facialFeature||'',
+   wingAsLimbConfirmed:input.wingAsLimbConfirmed===true});
   if(PAIRS.has(loc.id))frostSite.side=loc.side;
   out.push({woundId:eventId+':'+ix,location:loc,side:loc.side,
-   level,site:frostSite,shock,proof:injury.proof||null,grimDueMinute:level>=4?minute+1440:null});
+   level,site:frostSite,shock,proof:injury.proof||null,
+   ...(input.facialFeature?{facialFeature:input.facialFeature}:{}),
+   ...(input.wingAsLimbConfirmed?{wingAsLimbConfirmed:true}:{}),grimDueMinute:level>=4?minute+1440:null});
  }
  requireProof(out.some(x=>x.level>0),'Nevzniká žádná Frost rána; nevytvářej umělý zdravotní zápis.');
  return {sites:out,shockAfter:after};
 }
-function weatherSource({source,profile,ownerAnimalId,campaignId,minute,hazard}){
+function weatherSource({source,profile,ownerAnimalId,campaignId,minute,hazard,weatherEvidence=null}){
  requireProof(source?.calendarTrekProof?.format==='hmk-trekking-watch-evidence-v1'&&
   source.calendarCampaignId===campaignId&&source.campaignMinute<=minute&&
   minute<=source.campaignMinute+240&&
@@ -75,6 +89,28 @@ function weatherSource({source,profile,ownerAnimalId,campaignId,minute,hazard}){
   typeof ownerAnimalId==='string'&&ownerAnimalId.length>0&&
   source.calendarTrekProof.partyModes?.animals?.some(x=>x.id===ownerAnimalId),
   'Zvolená Cold hlídka neobsahuje konkrétní vlastněné zvíře a doložený Cold Hazard.');
+ const participant=source.calendarTrekProof.partyModes.animals.find(x=>x.id===ownerAnimalId);
+ // Registered animal Combat State already has a separate, immutable Weather
+ // Hazard proof. Reuse it instead of making up a SECOND exposure test.
+ if(participant.health){
+  const row=weatherEvidence,proof=row?.calendarTrekAnimalWeatherProof;
+  requireProof(proof?.format==='hmk-trek-animal-weather-analogy-v1'&&
+   row.characterId===ownerAnimalId&&row.calendarCampaignId===campaignId&&
+   row.campaignMinute===source.campaignMinute&&proof.sourceId===source.id&&
+   proof.actorId===ownerAnimalId&&proof.kind==='cold'&&proof.sl==='CF'&&
+   proof.report?.skinPending==='frostbite'&&proof.risk?.exposed===true&&
+   proof.risk.continuousSleet===(source.calendarTrekProof.weatherWatch.precipitation==='sleet'&&source.calendarTrekProof.weatherWatch.continuous===true),
+   'Registrované zvíře vyžaduje původní nezměněný Cold Weather Hazard / CF Endurance doklad; nesmí se házet znovu.');
+  const result=evaluateTrekkingWeatherRoll(proof.risk);
+  requireProof(JSON.stringify(result)===JSON.stringify(proof.risk)&&
+   int(proof.endEML,1,200)&&int(proof.endD100,1,100)&&
+   label[successLevel(proof.endD100,proof.endEML)]==='CF',
+   'Původní zvířecí Cold Hazard neodpovídá skutečným hodům nebo ochraně.');
+  return {watchSourceId:source.id,watchMinute:source.campaignMinute,
+   weatherEvidenceId:row.id,coldExposureAuthority:'registered-animal-combat-state',
+   hazard:result,endEML:proof.endEML,endD100:proof.endD100,endSL:'CF',ownerAnimalId};
+ }
+ requireProof(weatherEvidence===null,'Neregistrovaný stable animal nemůže přebrat doklad jiné registrované identity.');
  requireProof(int(hazard?.endEML,1,300)&&int(hazard?.endD100,1,100),
   'Vyžaduje doložené Endurance (Survival) EML a skutečný d100.');
  const w=source.calendarTrekProof.weatherWatch;
@@ -85,6 +121,7 @@ function weatherSource({source,profile,ownerAnimalId,campaignId,minute,hazard}){
  requireProof(base.exposed&&label[successLevel(hazard.endD100,hazard.endEML)]==='CF',
   'Frostbite HMK 185 navazuje na skutečně exponovaný Cold Hazard s kritickým neúspěchem Endurance.');
  return {watchSourceId:source.id,watchMinute:source.campaignMinute,hazard:base,
+  coldExposureAuthority:'separate-gm-followup-required',coldExposurePending:true,
   endEML:hazard.endEML,endD100:hazard.endD100,endSL:'CF',ownerAnimalId};
 }
 function common({profile,previous,campaignId,minute,eventId,gmConfirmed}){
@@ -94,7 +131,7 @@ function common({profile,previous,campaignId,minute,eventId,gmConfirmed}){
   typeof campaignId==='string'&&campaignId&&int(minute,0,1e10),'Vyžadováno GM potvrzení, čas kampaně a ID události.');
 }
 export function prepareAnimalFrostSequence573({profile,previous,campaignId,minute,eventId,
- origin,sites,windD20=null,durationD20=null,watchSource=null,ownerAnimalId=null,hazard=null,
+ origin,sites,windD20=null,durationD20=null,watchSource=null,ownerAnimalId=null,hazard=null,weatherEvidence=null,
  magic=null,allExposedConfirmed=false,gmConfirmed=false}={}){
  common({profile,previous,campaignId,minute,eventId,gmConfirmed});
  requireProof(['weather-watch','breath','cold-bolt'].includes(origin),'Neplatný zdroj Frost.');
@@ -103,15 +140,27 @@ export function prepareAnimalFrostSequence573({profile,previous,campaignId,minut
  let source=null,impact=null,boltLocationShock=null;
  if(origin==='weather-watch'){
   requireProof(allExposedConfirmed===true,'GM musí potvrdit, že soupis obsahuje VŠECHNY exponované lokality včetně stran.');
-  source=weatherSource({source:watchSource,profile,ownerAnimalId,campaignId,minute,hazard});
+  source=weatherSource({source:watchSource,profile,ownerAnimalId,campaignId,minute,hazard,weatherEvidence});
  }else{
   requireProof(magic?.spellfireConfirmed===true&&magic?.targetAffectedConfirmed===true,
    'GM musí doložit úspěšné spellfire/talent a skutečný zasažený cíl.');
+  requireProof(int(magic.sourceML,10,300)&&int(magic.testEML,1,300)&&
+   int(magic.testD100,1,100)&&typeof magic.caster==='string'&&
+   magic.caster.trim().length>=2&&magic.caster.trim().length<=100,
+   'Magický útok potřebuje identitu původce, skutečný d100 a doložené ML/EML seslání.');
+  const castSL=label[successLevel(magic.testD100,magic.testEML)];
+  requireProof(['S','CS'].includes(castSL)&&magic.cs===(castSL==='CS'),
+   'Magický Frost nemůže působit po neúspěšném hodu; CS musí vycházet ze skutečného d100.');
+  requireProof(magic.index<=Math.floor(magic.sourceML/10),
+   'Index nesmí překročit ML / 10 (vyšší index vyžaduje samostatný doložený účinek, např. Amplification).');
   requireProof(int(magic.d4,1,4)&&int(magic.index,1,30)&&typeof magic.cs==='boolean',
    'Cold Bolt / Breath vyžaduje skutečný d4, potvrzený Index a CS.');
   if(origin==='breath'){
    requireProof(magic.physicalOption8===true&&['front','back'].includes(magic.position)&&
     allExposedConfirmed===true,'Breath p.244: vyžaduje doloženou fyzickou variantu 8 a přední/zadní polovinu kužele.');
+   requireProof(sites?.length===1&&sites[0]?.locationId==='area'&&
+    (sites[0]?.side||'none')==='none',
+    'Breath je jedno plošné Frost zranění, nikoli sada lokálních ran; zadej area;none;AreaAV;Shock;Fatigue.');
    impact=magic.d4+(magic.position==='front'?magic.index:Math.floor(magic.index/2));
   }else{
    requireProof(sites?.length===1,'Cold Elemental Bolt p.261 zasahuje jednu, nikoli všechny lokality.');
@@ -128,6 +177,8 @@ export function prepareAnimalFrostSequence573({profile,previous,campaignId,minut
   requireProof(int(magic.areaAV,Math.max(0,innateAV),100),'Frost Area AV / lokalizovaná ochrana nesmí být nižší než tištěná přirozená ochrana.');
   source={magic:{spell:origin==='breath'?'Odívshè Breath VIII':'Elemental Cold Bolt',
    d4:magic.d4,index:magic.index,cs:magic.cs,impact,areaAV:magic.areaAV,
+   caster:magic.caster.trim(),sourceML:magic.sourceML,testEML:magic.testEML,
+   testD100:magic.testD100,testSL:castSL,
    ...(origin==='breath'?{position:magic.position,physicalOption8:true}:{zoneNumber:magic.zoneNumber,locationD10:magic.locationD10}),
    spellfireConfirmed:true,targetAffectedConfirmed:true},sourcePage:origin==='breath'?244:261};
  }
@@ -138,9 +189,8 @@ export function prepareAnimalFrostSequence573({profile,previous,campaignId,minut
     freezingAirConfirmed:true,siteExposedConfirmed:true});
    return {level:r.injuryLevel,proof:{av:input.av,period:r.periodMinutes,duration:r.durationMinutes}};
   }
-  requireProof(int(input.av,Math.max(0,innateAV),100)&&
-   (origin==='breath'||input.av===magic.areaAV),
-   'Magický Frost vyžaduje ověřené skutečné AV konkrétní lokality (Bolt: právě jedinou AV).');
+  requireProof(int(input.av,Math.max(0,innateAV),100)&&input.av===magic.areaAV,
+   'Magický Frost vyžaduje přesnou doloženou ochranu: Area AV pro Breath, AV jediné lokality pro Cold Bolt.');
   const result=injuryFromEffectiveImpact({effectiveImpact:impact-input.av,aspect:'f',rigidArmour:false});
   return {level:result.injury?.level||0,proof:{strikeImpact:impact,armourValue:input.av,effectiveImpact:impact-input.av}};
  };
@@ -166,12 +216,18 @@ export function prepareAnimalMobilityRuling573({profile,previous,campaignId,minu
  requireProof(gmConfirmed===true&&int(minute,0,1e10)&&typeof eventId==='string'&&eventId.length>=4,
   'Chybí potvrzený GM záznam a jeho identita.');
  const natural=profile?.move??profile?.combat?.move??profile?.attributes?.move;
- requireProof(int(natural,0,200),'Tištěná Move není doložená; postup vyžaduje samostatné rozhodnutí GM.');
+ requireProof(int(natural,0,1000),'Tištěná Move není doložená; postup vyžaduje samostatné rozhodnutí GM.');
  requireProof(typeof travelAllowed==='boolean'&&int(adjustedMove,0,natural)&&(!travelAllowed||adjustedMove>=1),
   'GM musí určit fyzicky možný Move v mezích 0 až původní Move; 0 znamená nemožnost cestovat.');
  requireProof(Array.isArray(attackIndices)&&attackIndices.length<=20&&attackIndices.every((n,i)=>
   int(n,0,(profile?.weapons?.length||0)-1)&&(i===0||attackIndices[i-1]<n)),
   'Povolené přirozené útoky musí být unikátní platné vzestupné indexy z profilu.');
+ // An authorization is not allowed to revive a physically absent attack.
+ for(const index of attackIndices){
+  const weapon=profile.weapons[index];
+  assertAnimalAttackCapability572({health:previous,weaponName:weapon.name,weaponSpecial:weapon.special,
+   weaponIndex:index,mobilityRuling:{attackIndices:[index]}});
+ }
  requireProof(typeof reason==='string'&&reason.trim().length>=8&&reason.trim().length<=300,
   'Uveď zdůvodnění GM (8–300 znaků).');
  const wingLost=(previous.wounds||[]).some(w=>w.amputation?.severed&&w.location==='wng');

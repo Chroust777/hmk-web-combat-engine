@@ -3987,9 +3987,9 @@ function bestiaryFrostSourceForm571(actor,health){
  const readiness=creatureAnatomyReadiness566(actor.profile);
  if(!readiness.ready||health.shock!=='none')return '';
  return `<details class="hmk-bestiary-wide hmk-beast-frost-571"><summary>Nové Grievous Frost · doložit G4f / G5f (HMK 178, 185)</summary>
- <p class="hc-hint">Pro Frostbite z počasí zadej skutečné d20 větru a expozice (HMK 185) a ochranu lokality. Pro magický či jiný zdroj dolož samostatný pravidlový výsledek. Zadej skutečné ZN a LD příslušné zvířecí tabulky; tento formulář sám negeneruje počasí ani frostbite. Pokud již existuje rána ve stejné lokalitě, výpočet se zastaví do samostatného ověření Compound. Hlava není automaticky obličej.</p>
+ <p class="hc-hint">Archivní jednorázový zápis slouží výhradně k jinému již nezávisle ověřenému Grievous Frost. <strong>Pro počasí a konkrétní kouzla použij výhradně Frost Sequence 93.573</strong>, která kontroluje cestovní hlídku, hody i všechny exponované lokality. Tento formulář nesmí předstírat nový Weather Hazard ani seslání kouzla. Zadej původní ZN a LD jen pokud skutečně existují. Aktivní Compound Injury vyžaduje samostatné ověření.</p>
  <form data-hmk-beast-frost-source-571 class="hc-fields"><input type="hidden" name="targetId" value="${esc(actor.id)}">
- <label>Zdroj již vyhodnoceného Frost<select name="source"><option value="weather">Frostbite · počasí / HMK 185</option><option value="spell">Frost · magický / jiný pravidlový účinek</option><option value="other">Jiný doložený zdroj</option></select></label>
+ <label>Zdroj již vyhodnoceného Frost<select name="source"><option value="other">Jiný nezávisle doložený zdroj (GM)</option></select></label>
  <label>Úroveň zranění<select name="level"><option value="4">G4f</option><option value="5">G5f</option></select></label>
  <details class="hmk-bestiary-wide" open><summary>Frostbite z počasí · výpočet podle d20 a ochrany (HMK 185)</summary>
  <p class="hc-hint">Pro zdroj „počasí“ jsou následující hody povinné. Vítr: 1–3 = 2 h, 4–17 = 1 h, 18–20 = 30 min. Expozice: 1–12 = 1 h, 13–17 = 2 h, 18–19 = 3 h, 20 = 4 h. AV0: IL za každé období; AV1–3: IL za dvě období; AV4+: bez Frostbite. Formulář ukládá <strong>jednu doloženou lokalitu</strong>; další vystavená místa je nutné rozhodnout zvlášť.</p>
@@ -4042,7 +4042,7 @@ function bestiaryFrostCompletionPanel573(actor,health,cid,minute){
  const loss=animalLossCapabilities572(health),mobility=latestMobilityRuling573(health);
  return `<section class="hmk-bestiary-wide hmk-beast-frost-573">
  ${health.shock==='none'&&!health.wounds.some(w=>w.bleeding)?`<details><summary>Frost 93.573 · všechny exponované lokality / magické zásahy</summary>
- <p class="hc-hint">HMK str. 149, 167–169, 185, 244 a 261. Frostbite z počasí vyžaduje doloženou <strong>Cold hlídku se stejným zvířetem</strong>, skutečný Weather Hazard, CF Endurance a společné d20. Každá exponovaná anatomická lokace má své AV, IL a případný skutečný Shock. <strong>Area Frost nevyužívá Zone/Location Dice.</strong> Magický Cold Bolt má naopak jednu cílenou ZN a skutečný Location d10. Všechny hody zadává GM.</p>
+ <p class="hc-hint">HMK str. 149, 167–169, 180, 185, 244 a 261. <strong>Frostbite z počasí</strong> vyžaduje doloženou Cold hlídku, skutečný Weather Hazard, CF Endurance a společné d20; každá exponovaná anatomická lokalita má své AV, IL a Shock. U registrovaného zvířete se původní Weather Hazard znovu nehází. <strong>Magický Breath</strong> je oproti tomu JEDNA plošná rána s Area AV a jediným Shock (SHK 6), bez jakýchkoli Zone/Location Dice; platí zvláštní léčba Area Injury. <strong>Cold Bolt</strong> má jedinou konkrétní lokalitu, zvolenou ZN a skutečný LD. Všechny hody zadává GM.</p>
  <form class="hc-fields" data-hmk-beast-frost-sequence-573><input type="hidden" name="targetId" value="${esc(actor.id)}">
  <label>Pravidlový zdroj<select name="origin"><option value="weather-watch">Frostbite · doložená Cold cestovní hlídka</option><option value="breath">Odívshè Breath · fyzická Area Frost (opce 8)</option><option value="cold-bolt">Elemental Cold Bolt · jediná lokalita</option></select></label>
  <label>Cold hlídka (povinná pouze pro Weather)<select name="watchSourceId"><option value="">— žádný doložený zdroj —</option>${sourceList.map(j=>`<option value="${esc(j.id)}">${esc(displayCampaignMinute(j.campaignMinute))} · ${esc(j.calendarTrekProof.area||'Cold hlídka')} · ${esc(j.id.slice(0,9))}</option>`).join('')}</select></label>
@@ -4054,6 +4054,10 @@ function bestiaryFrostCompletionPanel573(actor,health,cid,minute){
  <label>Wind d20<input name="windD20" type="number" min="1" max="20"></label><label>Exposure d20<input name="durationD20" type="number" min="1" max="20"></label></details>
  <details class="hmk-bestiary-wide"><summary>Magie · ověřený Spellfire / Talent a Impact</summary>
  <p class="hc-hint">Cold Bolt p. 261: d4 + Talent Index, při CS dalších +5; volená ZN a skutečné Location d10. Breath p. 244 opce 8: přední polovina d4 + Spell Index, zadní polovina d4 + polovina SI. Žádná jiná magická schopnost není touto kalkulací předstírána.</p>
+ <label>Jméno / identita vyvolávače či mága<input name="magicCaster" minlength="2" maxlength="100" placeholder="Kdo skutečně použil schopnost"></label>
+ <label>Doložená Talent / Spell ML (pro výpočet indexu)<input name="magicSourceML" type="number" min="10" max="300"></label>
+ <label>Skutečná Talent / Casting EML po modifikátorech<input name="magicTestEML" type="number" min="1" max="300"></label>
+ <label>Skutečný Talent / Casting d100<input name="magicTestD100" type="number" min="1" max="100"></label>
  <label>Skutečný magický Impact d4<input name="magicD4" type="number" min="1" max="4"></label><label>Talent / Spell Index<input name="magicIndex" type="number" min="1" max="30"></label>
  <label class="hc-check"><input name="magicCS" type="checkbox"> CS (význam pouze pro Cold Bolt)</label>
  <label>Breath – umístění<select name="magicPosition"><option value="front">Přední polovina</option><option value="back">Zadní polovina</option></select></label>
@@ -4062,9 +4066,9 @@ function bestiaryFrostCompletionPanel573(actor,health,cid,minute){
  <label>Cold Bolt – skutečné Location d10<input name="magicLD" type="number" min="1" max="10"></label>
  <label class="hc-check"><input name="spellfireConfirmed" type="checkbox"> GM ověřil účinné Spellfire / Talent</label>
  <label class="hc-check"><input name="targetAffectedConfirmed" type="checkbox"> GM ověřil cíl a dosah (včetně fyzické opce 8 pro Breath)</label></details>
- <label class="hmk-bestiary-wide">ÚPLNÝ soupis zasažených/exponovaných lokalit, každá na řádek: <code>lokace;strana;AV;Shock d100;Fatigue</code>
+ <label class="hmk-bestiary-wide">Frostbite z počasí: ÚPLNÝ soupis exponovaných lokalit; Cold Bolt: přesně jedna lokace; Breath: přesně jeden řádek <code>area;none;Area AV;Shock d100;Fatigue</code>. Formát <code>lokace;strana;AV;Shock d100;Fatigue[;subsite]</code>
  <textarea name="sites" rows="5" spellcheck="false" placeholder="flg;left;2;15;0&#10;flg;right;2;72;0&#10;hd;none;4;;" required></textarea>
- <small>Lokace např. hd/nk/flg/hlg/tx/ab/wng. Strana left/right u párových částí, jinak none. Nezraněná lokace má prázdný Shock i Fatigue. Breath může mít jiné doložené AV u každé lokality; Cold Bolt musí odpovídat jediné AV výše. Srážku s existující ranou a IL nad G5 systém bezpečně zastaví.</small></label>
+ <small>Počasí: lokace hd/nk/flg/hlg/tx/ab/wng, strana left/right u párových a none u ostatních. Breath: POUZE <code>area;none;AV;Shock d100;Fatigue</code>, AV se musí rovnat Area AV uvedené v sekci magie; nikdy nepřidávat více tělesných lokalit. Cold Bolt: jedna skutečně zasažená lokace s LD a ověřenou AV. Nezraněná lokace má prázdný Shock a Fatigue. Volitelný 6. údaj: Head = jmenovitá část obličeje, Wing = wing-limb potvrzený GM. Compound a IL nad G5 systém bezpečně blokuje.</small></label>
  <label class="hc-check hmk-bestiary-wide"><input name="allExposedConfirmed" type="checkbox" required> GM potvrzuje kompletnost exponovaných míst (u Bolt přesně jedinou lokaci) a případné druhové výjimky</label>
  <label class="hc-check hmk-bestiary-wide"><input name="gmConfirmed" type="checkbox" required> GM potvrzuje všechny skutečné hody a okamžik zápisu; výsledky budou trvalé a nezměnitelné</label>
  <button type="submit">Vyhodnotit a uložit Frost Sequence · vše atomicky</button><output role="status" aria-live="polite"></output></form></details>`:'<p class="hc-hint">Nová Frost Sequence je blokovaná, dokud není vyřešen Shock a krvácení.</p>'}
@@ -12227,20 +12231,28 @@ document.addEventListener('submit',e=>{
     adjustedMove:Number(v.adjustedMove),attackIndices,reason:String(v.reason||''),gmConfirmed:v.gmConfirmed==='on'});
   }else{
    const sites=String(v.sites||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).map(line=>{
-    const cols=line.split(';').map(x=>x.trim());if(cols.length!==5)throw Error('Každá lokace musí mít přesně pět položek oddělených středníkem.');
+    const cols=line.split(';').map(x=>x.trim());if(![5,6].includes(cols.length))throw Error('Každá lokace musí mít 5 nebo 6 položek oddělených středníkem.');
+    if(cols[5]&&cols[0].toLowerCase()!=='hd'&&!(cols[0].toLowerCase()==='wng'&&cols[5]==='wing-limb'))
+     throw Error('Subsite se zadává jen u Head nebo jako wing-limb pro Wing.');
     return {locationId:cols[0].toLowerCase(),side:cols[1].toLowerCase(),
      av:cols[2]===''?null:Number(cols[2]),shockRoll:cols[3]===''?null:Number(cols[3]),
-     fatigue:cols[4]===''?null:Number(cols[4])};
+     fatigue:cols[4]===''?null:Number(cols[4]),
+     facialFeature:cols[0].toLowerCase()==='hd'?(cols[5]||''):'',
+     wingAsLimbConfirmed:cols[0].toLowerCase()==='wng'&&cols[5]==='wing-limb'};
    });
    const weather=v.origin==='weather-watch';
    const watchSource=weather?data.journal.find(x=>x.id===v.watchSourceId):null;
+   const weatherEvidence=weather?data.journal.find(x=>x.calendarTrekAnimalWeatherProof?.sourceId===watchSource?.id&&
+    x.calendarTrekAnimalWeatherProof?.actorId===actor.ownerAnimalId&&x.calendarCampaignId===cid)??null:null;
    p=prepareAnimalFrostSequence573({profile:{...actor.profile,id:actor.id},previous,campaignId:cid,
     minute,eventId,origin:v.origin,sites,allExposedConfirmed:v.allExposedConfirmed==='on',
-    gmConfirmed:v.gmConfirmed==='on',watchSource,ownerAnimalId:actor.ownerAnimalId||null,
+    gmConfirmed:v.gmConfirmed==='on',watchSource,weatherEvidence,ownerAnimalId:actor.ownerAnimalId||null,
     ...(weather?{windD20:Number(v.windD20),durationD20:Number(v.durationD20),
      hazard:{roll:Number(v.hazardRoll),gearAV:Number(v.gearAV),shelterAV:Number(v.shelterAV),
       fireFS:Number(v.fireFS),endEML:Number(v.endEML),endD100:Number(v.endD100)}}:
-     {magic:{d4:Number(v.magicD4),index:Number(v.magicIndex),cs:v.magicCS==='on',
+     {magic:{caster:String(v.magicCaster||''),sourceML:Number(v.magicSourceML),
+      testEML:Number(v.magicTestEML),testD100:Number(v.magicTestD100),
+      d4:Number(v.magicD4),index:Number(v.magicIndex),cs:v.magicCS==='on',
       areaAV:Number(v.magicAreaAV),zoneNumber:Number(v.magicZN),locationD10:Number(v.magicLD),
       position:v.magicPosition,physicalOption8:v.origin==='breath',
       spellfireConfirmed:v.spellfireConfirmed==='on',targetAffectedConfirmed:v.targetAffectedConfirmed==='on'}})});
@@ -12285,6 +12297,7 @@ document.addEventListener('submit',e=>{
   if(!actor)throw Error('Tvor není aktivním účastníkem encounteru.');
   const previous=animalHealthProjection567(data.journal,cid,actor.id),eventId=uuid();
   const frost=f.matches('[data-hmk-beast-frost-source-571]');
+  if(frost&&v.source!=='other')throw Error('Nový Frostbite z cestování ani magické Cold efekty nelze zapsat přes archivní formulář; použij Frost Sequence 93.573.');
   const p=frost?prepareAnimalFrostInjury571({profile:{...actor.profile,id:actor.id},previous,
    minute,eventId,zoneNumber:Number(v.zoneNumber),locationD10:Number(v.locationD10),level:Number(v.level),
    source:v.source,sourceDetails:v.sourceDetails,facialFeature:String(v.facialFeature||'').trim(),
@@ -12361,8 +12374,8 @@ document.addEventListener('submit',e=>{
    return;
   }
   assertAnimalAttackCapability572({health:animalHealthProjection567(data.journal,cid,a.id),
-   weaponName:a.profile.weapons?.[Number(v.attackIndex)]?.name,weaponSpecial:a.profile.weapons?.[Number(v.attackIndex)]?.special,gmRemainingLimbConfirmed:v.limbUseConfirmed==='on'||
-    latestMobilityRuling573(animalHealthProjection567(data.journal,cid,a.id))?.attackIndices?.includes(Number(v.attackIndex))===true});
+   weaponName:a.profile.weapons?.[Number(v.attackIndex)]?.name,weaponSpecial:a.profile.weapons?.[Number(v.attackIndex)]?.special,
+    weaponIndex:Number(v.attackIndex),mobilityRuling:latestMobilityRuling573(animalHealthProjection567(data.journal,cid,a.id))});
   const x=previewAnimalContact566({attackerProfile:a.profile,defenderProfile:b.profile,
    weaponIndex:Number(v.attackIndex),aimZN:Number(v.aimZN),zdRoll:Number(v.zdRoll),
    locationD10:Number(v.locationD10),impactDieRoll:Number(v.impactDieRoll),extraImpact:Number(v.extraImpact),

@@ -169,7 +169,8 @@ export function prepareAnimalHit567({attacker,defender,inputs,previous,attackerP
  valid(int(inputs.shockRoll,1,100)&&int(inputs.shockFatigue,0,300)&&inputs.shockFatigue%5===0, 'Vyžaduje skutečné Shock d100 a ověřenou Fatigue.');
  valid(['yes','no'].includes(inputs.rigidArmour),'Potvrď Rigid Armour na konkrétní lokaci.');
  valid(typeof inputs.bleeding==='boolean','Potvrď možnost krvácení pro danou lokalitu, aspekt a IL.');
- assertAnimalAttackCapability572({health:attackerPrevious,weaponName:attacker.profile.weapons?.[inputs.weaponIndex]?.name,weaponSpecial:attacker.profile.weapons?.[inputs.weaponIndex]?.special,gmRemainingLimbConfirmed:inputs.limbUseConfirmed===true||latestMobilityRuling573(attackerPrevious)?.attackIndices?.includes(inputs.weaponIndex)===true});
+ assertAnimalAttackCapability572({health:attackerPrevious,weaponName:attacker.profile.weapons?.[inputs.weaponIndex]?.name,weaponSpecial:attacker.profile.weapons?.[inputs.weaponIndex]?.special,weaponIndex:inputs.weaponIndex,mobilityRuling:latestMobilityRuling573(attackerPrevious),
+  historicalReplay:inputs.historicalReplay===true});
  valid(!previous||!['incapacitated','unconscious','killed'].includes(previous.shock),
   'Před dalším zraněním nejdříve vyřeš původní INC/UNC/KIA a související časový postup.');
  const contact=previewAnimalContact566({attackerProfile:attacker.profile,defenderProfile:defender.profile,
@@ -211,6 +212,9 @@ export function prepareAnimalHit567({attacker,defender,inputs,previous,attackerP
  const due=total==='killed'?null:total==='unconscious'?minute+10:inputs.bleeding?minute+5:null;
  return {format:ANIMAL_TRAUMA_FORMAT_567,kind:'hit',campaignId:inputs.campaignId,targetId:defender.id,
   sourceId:attacker.id,woundId:medical.injury?eventId:null,minute,
+  ...((attackerPrevious?.wounds||[]).some(w=>w.amputation?.severed)&&inputs.historicalReplay!==true?
+   {capabilityPolicy:'persistent-anatomy-ruling-573',
+    capabilityFingerprint:latestMobilityRuling573(attackerPrevious)?.lossFingerprint}:{}),
   contactInputs:{weaponIndex:inputs.weaponIndex,aimZN:inputs.aimZN,zdRoll:inputs.zdRoll,
    locationD10:inputs.locationD10,impactDieRoll:inputs.impactDieRoll,extraImpact:inputs.extraImpact},
   location:contact.location,aspect:contact.aspect,strikeImpact:contact.strikeImpact,
@@ -431,7 +435,8 @@ export function validateAnimalTraumaJournal567(data){
     inputs:{...t.contactInputs,aimConfirmed:true,specialsReviewed:true,bleedingReviewed:true,
      bleeding:t.bleeding,rigidArmour:t.rigidArmour?'yes':'no',shockRoll:t.shock.roll,
      shockFatigue:t.shock.fatigue,compoundD10:t.compound?.roll??null,amputationD100:t.amputation?.roll??null,
-     amputationResolved:t.amputationResolved,limbUseConfirmed:t.limbUseConfirmed===true,campaignId:t.campaignId},
+     amputationResolved:t.amputationResolved,limbUseConfirmed:t.limbUseConfirmed===true,campaignId:t.campaignId,
+     historicalReplay:t.capabilityPolicy===undefined},
     attackerPrevious:animalHealthProjection567(past,t.campaignId,source.id)});
   }else if(t.kind==='frost'){
    valid(t.woundId===row.id,'Frost Injury nemá původní identitu.');
@@ -454,17 +459,22 @@ export function validateAnimalTraumaJournal567(data){
     }), 'Tatáž Cold hlídka již byla tomuto zvířeti zdravotně zaúčtována.');
    }
    const source=t.origin==='weather-watch'?past.find(x=>x.id===t.source?.watchSourceId):null;
+   const weatherEvidence=t.origin==='weather-watch'&&t.source?.weatherEvidenceId?
+    past.find(x=>x.id===t.source.weatherEvidenceId):null;
+   if(t.origin==='weather-watch')valid((t.source?.weatherEvidenceId??null)===(weatherEvidence?.id??null),
+    'Frost weather doklad byl odebrán nebo přepsán.');
    expected=prepareAnimalFrostSequence573({profile,previous:prior,minute:t.minute,
     eventId:row.id,campaignId:t.campaignId,origin:t.origin,
     windD20:t.windD20??null,durationD20:t.durationD20??null,
-    watchSource:source,ownerAnimalId:target.ownerAnimalId??null,
+    watchSource:source,ownerAnimalId:target.ownerAnimalId??null,weatherEvidence,
     hazard:t.origin==='weather-watch'?{roll:t.source.hazard.roll,
      gearAV:t.source.hazard.gearAV,shelterAV:t.source.hazard.shelterAV,fireFS:t.source.hazard.fireFS,
      endEML:t.source.endEML,endD100:t.source.endD100}:null,
     magic:t.origin==='weather-watch'?null:t.source.magic,
     sites:t.sites.map(s=>({locationId:s.location.id,side:s.side,
       av:t.origin==='weather-watch'?s.proof?.av:s.proof?.armourValue,
-      shockRoll:s.shock?.roll??null,fatigue:s.shock?.fatigue??null})),
+      shockRoll:s.shock?.roll??null,fatigue:s.shock?.fatigue??null,
+      facialFeature:s.facialFeature||'',wingAsLimbConfirmed:s.wingAsLimbConfirmed===true})),
     allExposedConfirmed:t.allExposedConfirmed===true,gmConfirmed:true});
   }else if(t.kind==='mobility-ruling-573'){
    expected=prepareAnimalMobilityRuling573({profile,previous:prior,minute:t.minute,eventId:row.id,
