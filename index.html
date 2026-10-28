@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HMK Keeper’s Ledger · v93.558</title>
-<link rel="stylesheet" href="./styles.css?v=93.558-inventory-folio">
-<link rel="stylesheet" href="./skill-workbench.css?v=93.558-inventory-folio">
-<link rel="stylesheet" href="./library.css?v=93.558-inventory-folio">
-<link rel="stylesheet" href="./book-templates.css?v=93.558-inventory-folio">
+<title>HMK Keeper’s Ledger · v93.559</title>
+<link rel="stylesheet" href="./styles.css?v=93.559-inventory-folio">
+<link rel="stylesheet" href="./skill-workbench.css?v=93.559-inventory-folio">
+<link rel="stylesheet" href="./library.css?v=93.559-inventory-folio">
+<link rel="stylesheet" href="./book-templates.css?v=93.559-inventory-folio">
 <style>.hmk-boot-note{max-width:760px;margin:5rem auto;padding:1.5rem;border:1px solid #8f7652;border-radius:10px;background:#f3eddf;color:#332817;font:16px/1.6 system-ui,sans-serif}.hmk-boot-note code{font-size:90%;overflow-wrap:anywhere}</style>
 
 </head>
 <body>
-<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.558…</main></div>
+<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.559…</main></div>
 <script>
 (function(){
  var app=document.getElementById('app');
@@ -22,18 +22,19 @@
   if(reported||document.querySelector('#app .shell'))return;
   reported=true;
   var msg=String(detail||'Neznámá chyba načítání.');
-  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.558 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>app.js</code> a podsložku <code>src/</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
+  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.559 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>app.js</code> a podsložku <code>src/</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
  };
  window.addEventListener('error',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.message||('Nelze načíst '+(event.filename||'skript')));});
  window.addEventListener('unhandledrejection',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.reason?.message||String(event.reason));});
  window.addEventListener('load',function(){setTimeout(function(){if(!document.querySelector('#app .shell'))window.__hmkBootFailure('Produkční aplikace se nespustila nebo nebyl načten její JavaScript.');},4000);});
 })();
 </script>
-<script type="module" src="./app.js?v=93.558-inventory-folio" onerror="window.__hmkBootFailure('HTTP chyba: chybí app.js nebo některý z importovaných modulů není dostupný na GitHub Pages.')"></script>
+<script type="module" src="./app.js?v=93.559-inventory-folio" onerror="window.__hmkBootFailure('HTTP chyba: chybí app.js nebo některý z importovaných modulů není dostupný na GitHub Pages.')"></script>
 
 <script>
 (function(){
-  const GENERATOR_KEY='hmk-ledger-generator-config-v1';
+  // v2 starts clean: older drafts could still contain checked traits from completed generations.
+  const GENERATOR_KEY='hmk-ledger-generator-config-v2';
   const CREATION_KEY='hmk-ledger-creation-draft-v1';
   const LAST_CREATION_ID='hmk-ledger-last-creation-character-v1';
 
@@ -140,12 +141,13 @@
     if(snapshot) restoreForm(form,snapshot,{preferExisting:true});
     form.dataset.hmkDraftReady='1';
   }
-  function persistGeneratorDraft(form){ const draft=serializeForm(form);delete draft.name;safeSet(GENERATOR_KEY,JSON.stringify(draft)); }
+  function persistGeneratorDraft(form){safeSet(GENERATOR_KEY,JSON.stringify(serializeForm(form)));}
   function restoreGeneratorDraft(form){
     if(form.dataset.hmkDraftReady==='1') return;
     const snapshot=parseJSON(safeGet(GENERATOR_KEY),null);
-    if(snapshot){delete snapshot.name;restoreForm(form,snapshot,{preferExisting:false});}
+    if(snapshot)restoreForm(form,snapshot,{preferExisting:false});
     form.dataset.hmkDraftReady='1';
+    if(snapshot)form.dispatchEvent(new Event('change',{bubbles:true}));
   }
   function enhance(){
     const creationForm=document.getElementById('creation-step-form');
@@ -153,6 +155,26 @@
     const generatorForm=document.getElementById('hmk-generator-config');
     if(generatorForm) restoreGeneratorDraft(generatorForm);
   }
+  // Only an explicit reset may clear an unfinished trait selection. Save the
+  // cleared snapshot immediately so rerender/browser form restoration cannot
+  // re-check the boxes after the user leaves and reopens the dialog.
+  document.addEventListener('click',event=>{
+    const button=event.target?.closest?.('[data-generator-reset-traits]');
+    const form=button?.closest?.('#hmk-generator-config');
+    if(!form)return;
+    event.preventDefault();
+    form.querySelectorAll('input[type="checkbox"][name="trait"]').forEach(input=>{
+      input.checked=false;
+      input.defaultChecked=false;
+    });
+    persistGeneratorDraft(form);
+    form.dispatchEvent(new Event('change',{bubbles:true}));
+  },true);
+  // A completed character must not seed a later character's trait choices.
+  // Cancelled or failed generation keeps its editable in-progress draft.
+  document.addEventListener('hmk-generator-created',()=>{
+    try{sessionStorage.removeItem(GENERATOR_KEY)}catch{}
+  });
   document.addEventListener('input',event=>{
     const generatorForm=event.target?.closest?.('#hmk-generator-config');
     if(generatorForm) persistGeneratorDraft(generatorForm);
