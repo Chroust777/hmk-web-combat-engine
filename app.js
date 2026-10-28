@@ -270,7 +270,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.560';
+const APP_VERSION='93.561';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1129,7 +1129,7 @@ function partyProvisionWizardHTML(participants,clock,{supplyHTML,nutritionHTML,a
  <div class="hc-provision-inline-fields"><label>Jídlo každému<select name="foodEach"><option value="0" ${food<.5?'selected':''}>0 dávek</option>${food>=.5?`<option value="0.5" ${food<1?'selected':''}>½ dávky</option>`:''}${food>=1?'<option value="1" selected>1 dávka</option>':''}</select></label><label>Voda každému<select name="waterEach"><option value="0" ${water<.5?'selected':''}>0 dávek</option>${water>=.5?`<option value="0.5" ${water<1?'selected':''}>½ dávky</option>`:''}${water>=1?'<option value="1" selected>1 dávka</option>':''}${water>=2?'<option value="2">2 dávky</option>':''}</select></label></div>
  <p class="hc-party-preview" data-party-ration-preview aria-live="polite">Vyberte postavy. Přehled před výdejem ukáže společnou potřebu a dostupné dávky.</p><button type="submit" disabled>Vydat vybraným postavám</button><small>Skutečné množství musí být ve společném fondu; pravidlová kontrola zabrání překročení zásob. Výdej neposouvá herní čas a nevkládá nic do batohu.</small></form>`:
  '<p class="hc-party-status">Momentálně nejsou žádné společné dávky jídla ani vody k rozdělení. Osobní zásoby se stále spotřebovávají podle svých dokladů. Nové společné nálezy vznikají až po skutečném Foraging.</p>'}
- <div class="hc-party-resource-links"><button type="button" class="secondary hc-small" data-calendar-section="travel">Získat zásoby v přírodě · Foraging ↗</button><button type="button" class="secondary hc-small" data-provision-scope="person">Osobní jídlo a nádoby · Postava ↗</button></div>
+ <div class="hc-party-resource-links"><button type="button" class="secondary hc-small" data-provision-go="forage">Získat zásoby v přírodě · Foraging ↗</button><button type="button" class="secondary hc-small" data-provision-scope="person">Osobní jídlo a nádoby · Postava ↗</button></div>
  <details class="hc-party-extra"><summary>Zobrazit inventární zásoby a účetnictví celé družiny</summary>${partyProvisionLedgerHTML(participants)}</details>
  </section>
  ${partyNutritionConditionsHTML(participants,clock)}
@@ -1280,8 +1280,10 @@ function campaignCalendarView(){
  </div></fieldset><fieldset class="hmk-trek-section"><legend>3 · Pohybové režimy</legend><div class="hmk-trek-grid"><label>Progress Modes<input name="progress" type="number" min="0" max="10" value="0"></label>
  <label>Další Slow Modes<input name="slow" type="number" min="0" max="20" value="0"></label>
  <label>Vlastní Bearing Modes<input name="bearing" type="number" min="0" max="20" value="0"></label>
- </div></fieldset><fieldset class="hmk-trek-section"><legend>4 · Činnosti během hlídky</legend><div class="hmk-trek-grid"><label class="hc-check"><input name="stationaryForaging" type="checkbox" value="yes"> Foraging na místě (celá hlídka)</label>
- <label>Foraging Modes<input name="foraging" type="number" min="0" max="5" value="0"></label>
+ </div></fieldset><fieldset class="hmk-trek-section" id="hmk-foraging-watch-fields"><legend>4 · Činnosti během hlídky</legend>
+ <p class="hc-foraging-jump-help" data-foraging-jump-help hidden><strong>Foraging – tady nastavte sběr zásob.</strong> Nejdříve vyberte výše průvodce, účastníky a prostředí hlídky. Potom zvolte počet <strong>Foraging Modes</strong>, případně sběr na místě. Hlídku uložte původním tlačítkem níže; skutečné cíle sběru a hody d10 následně vyhodnoťte v části <strong>Wilderness Tasks · Foraging</strong>. Nic se nepřičítá bez doloženého výsledku.</p>
+ <div class="hmk-trek-grid"><label class="hc-check" data-foraging-jump-field><input name="stationaryForaging" type="checkbox" value="yes"> Foraging na místě (celá hlídka)</label>
+ <label data-foraging-jump-field>Foraging Modes<input name="foraging" type="number" min="0" max="5" value="0"></label>
  <label class="hc-check"><input name="stalking" type="checkbox" value="yes"> Stalking</label>
  <label class="hc-check"><input name="vigilance" type="checkbox" value="yes"> Vigilance</label>
  <label>Nedoložené noční hlídky v divočině<input name="wildernessNightWatches" type="number" min="0" max="10000" placeholder="Automaticky z doložených hlídek"></label>
@@ -3069,6 +3071,23 @@ function creationReachableStep(actor,creation){
 }
 function folioChapterParts(body,kind=''){
  const nodes=folioHTMLNodes(body);
+ // v93.561: In Calendar > Provisions > Party the guided workflow must START
+ // directly beneath the scope buttons on the LEFT page. Split at actual
+ // semantic step boundaries; keep all live forms and original event handlers.
+ if(kind.includes('journal-book--calendar')){
+  const nav=nodes.find(el=>el.classList.contains('hc-provision-scope-tabs'));
+  const guide=nodes.find(el=>el.classList.contains('hc-party-guide'));
+  if(nav&&guide){
+   const children=[...guide.children];
+   const firstPart=children.filter(el=>
+    el.classList.contains('hc-party-intro')||el.id==='hc-party-step-people'||el.id==='hc-party-step-rations');
+   const secondPart=children.filter(el=>!firstPart.includes(el));
+   if(firstPart.length===3&&secondPart.length){
+    const wrap=inner=>`<section class="hc-party-guide" aria-label="Průvodce zásobováním družiny">${inner.map(el=>el.outerHTML).join('')}</section>`;
+    return [nav.outerHTML+wrap(firstPart),wrap(secondPart)];
+   }
+  }
+ }
  if(kind.includes('journal-book--sheet-inventory')){
   // Arsenal has a fixed split. The load summary and its complete add-item form
   // always stay on the right folio regardless of inventory length.
@@ -11789,6 +11808,24 @@ document.addEventListener('click',e=>{
   if(id&&ensurePersonalNutritionTracking(id))return;}
  render();
 },true);
+// Foraging shortcut: pure presentation. Unfold the verified trekking form,
+// highlight the actual modes and scroll there; NEVER prefill or store any proof.
+function revealForagingWatchOptions(){
+ requestAnimationFrame(()=>{
+  if(view!=='calendar'||activeCalendarSection!=='travel')return;
+  const fieldset=document.getElementById('hmk-foraging-watch-fields');
+  if(!fieldset)return;
+  const parent=fieldset.closest('details.hmk-trek-entry');
+  if(parent)parent.open=true;
+  const note=fieldset.querySelector('[data-foraging-jump-help]');
+  if(note)note.hidden=false;
+  fieldset.classList.add('hc-foraging-jump-target');
+  fieldset.querySelectorAll('[data-foraging-jump-field]').forEach(el=>el.classList.add('hc-foraging-jump-input'));
+  fieldset.scrollIntoView({block:'center',behavior:'smooth'});
+  // Do not shift focus into a numeric input: that could change its value with
+  // a wheel event, and the GM must explicitly choose the mode count.
+ });
+}
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-provision-route],[data-provision-go]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -11798,6 +11835,11 @@ document.addEventListener('click',e=>{
   provisionGuideRoute=button.dataset.provisionRoute;render();return;
  }
  const route=button.dataset.provisionGo;
+ if(route==='forage'){
+  if(!data.campaignClock||!((view==='calendar'&&activeCalendarSection==='provisions')||personalProvisionContext()))return;
+  view='calendar';calendarLanding=false;activeCalendarSection='travel';
+  render();revealForagingWatchOptions();return;
+ }
  if(route==='calendar'){
   const actorId=button.dataset.provisionActorId;
   if(!character(actorId)||!data.campaignClock)return;
@@ -11806,7 +11848,7 @@ document.addEventListener('click',e=>{
   render();return;
  }
  if(!personalProvisionContext())return;
- if(route==='forage'){activeCalendarSection='travel';render();return;}
+
  if(route==='shop'){
   const actor=activeProvisionActor();
   if(!actor)return;

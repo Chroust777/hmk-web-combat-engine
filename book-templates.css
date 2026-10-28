@@ -5675,3 +5675,33 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 
 .content-calendar .hc-party-resource-links{display:flex;gap:8px;flex-wrap:wrap}
 .content-calendar .hc-party-resource-links button{min-height:34px;font-size:12px;white-space:normal}
+
+/* v93.561 — contextual Foraging shortcut from the party provisioning guide.
+   The alert is presentation-only; it never selects modes or performs dice rolls. */
+.content-calendar #hmk-foraging-watch-fields.hc-foraging-jump-target{
+ border:2px solid #a22c20!important;
+ border-radius:8px;
+ background:rgba(170,33,24,.055)!important;
+ padding:12px!important;
+ scroll-margin-top:95px;
+}
+.content-calendar .hc-foraging-jump-help:not([hidden]){
+ display:block;
+ margin:5px 0 12px;
+ padding:9px 11px;
+ border-left:4px solid #a22c20;
+ background:rgba(178,45,29,.09);
+ color:#61291d;
+ font-size:12px;
+ line-height:1.5;
+}
+.content-calendar .hc-foraging-jump-input{
+ outline:2px solid #ba3124!important;
+ outline-offset:1px;
+ border-radius:5px;
+ background:rgba(181,40,27,.10)!important;
+ padding:6px!important;
+ min-width:0;
+}
+.content-calendar .hc-foraging-jump-input input[type=number]{width:100%;min-width:0}
+@media(prefers-reduced-motion:reduce){.content-calendar #hmk-foraging-watch-fields{scroll-behavior:auto}}
