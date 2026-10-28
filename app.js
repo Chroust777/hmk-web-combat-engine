@@ -119,7 +119,7 @@ import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestock
 import {BESTIARY_ANIMALS_563,livestockMatcher,newEncounterBeastProof,encounterBeastHistory,validateLivestockTrainingRefs,assertBestiaryAppendOnly} from './src/integration/hmk-bestiary-563.js';
 import {renderFullCreatureStats565} from './src/integration/hmk-bestiary-native-ui-565.js';
 import {creatureCombatSheet565,previewCreatureSkillRoll565,previewCreatureMelee565} from './src/integration/hmk-bestiary-combat-565.js';
-import {animalHealthProjection567,prepareAnimalHit567,prepareAnimalBlood567,prepareAnimalInfectionCourse567,prepareAnimalBloodHealing567,prepareAnimalTreatment567,prepareAnimalHealing567,prepareAnimalShockRecovery567,prepareAnimalExtendedCourse567,validateAnimalTraumaJournal567,assertAnimalTraumaAppendOnly567,requireAnimalMedicalGMTimeMayAdvance567} from './src/integration/hmk-bestiary-trauma-567.js';
+import {animalHealthProjection567,prepareAnimalHit567,prepareAnimalBlood567,prepareAnimalInfectionCourse567,prepareAnimalBloodHealing567,prepareAnimalTreatment567,prepareAnimalHealing567,prepareAnimalShockRecovery567,prepareAnimalExtendedCourse567,prepareAnimalComaCourse568,prepareAnimalGrimShock568,validateAnimalTraumaJournal567,assertAnimalTraumaAppendOnly567,requireAnimalMedicalGMTimeMayAdvance567} from './src/integration/hmk-bestiary-trauma-567.js';
 import {ANIMAL_ANATOMIES_566,ANIMAL_WEAPON_DICE_566,creatureAnatomyReadiness566,previewAnimalContact566} from './src/integration/hmk-bestiary-anatomy-566.js';
 import {BESTIARY_ENTRIES_564,bestiaryEntry564,createBespokeEncounterProof564,validateFullBestiaryJournal564 as validateBestiaryJournal,bestiaryEncounterStatus564} from './src/integration/hmk-bestiary-runtime-564.js';
 import { ARMOUR_LAYER_COLUMNS, ARMOUR_LAYER_NOTES } from './src/rules/armour-layer-reference.js';
@@ -785,7 +785,7 @@ function activeVisualScene(){
  if(view==='creation')return 'study';
  if(view==='library'){
   if(['melee','ranged','shields','armour','suits'].includes(tab))return 'armory';
-  if(['rules','bestiary'].includes(tab))return 'warroom';
+  if(['rules','bestiary','stable'].includes(tab))return 'warroom';
   return 'study';
  }
  if(view==='calendar')return 'valley';
@@ -3043,7 +3043,7 @@ function foragingEvidenceInCharacterInventory(actorId){
 }
 function journalSectionNav(){
  const c=character(selected),specialties=c?characterSpecialtyChapters(c):[];
- const sections=[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['hazards','Nebezpečí / Trauma'],['provisions','Provisions · jídlo a pití'],...specialties.map(x=>[x.id,x.label]),['notes','Notes & Logbook']];
+ const sections=[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],...(c&&bestiaryKnownAnimals().some(a=>a.ownerId===c.id)?[['animals','Zvířata a doprovod']]:[]),['status','Combat & Conditions'],['hazards','Nebezpečí / Trauma'],['provisions','Provisions · jídlo a pití'],...specialties.map(x=>[x.id,x.label]),['notes','Notes & Logbook']];
  return `<div class="journal-book-subnav">${sections.map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}<span class="journal-character-action-divider" aria-hidden="true"></span><button type="button" class="secondary journal-character-action" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="secondary journal-character-action" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`;
 }
 /** A page contains live DOM controls; the book decoration is the same for all folios.
@@ -3491,6 +3491,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  }
  if(isCharacterSpecialtySection(activeSheetSection))return '';
 
+ if(activeSheetSection==='animals')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Zvířata a doprovod · ${esc(c.name)}</h3><p>Vlastnictví, výcvik, účast ve scéně a trvalá historie zranění napříč encountery.</p></header><div class="columns journal-tech-columns">${ownedAnimalsChronicle(c)}<section class="panel wide"><button type="button" class="secondary" data-hmk-open-stable>Otevřít Stáj v Knihovně</button><button type="button" class="secondary" data-hmk-bestiary-open>Otevřít Combat · Bestiář</button></section></div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='hazards')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Nebezpečí / Trauma</h3><p>GM procedury a následky postavy ${esc(c.name)} · HMK</p></header><div class="columns journal-tech-columns">${hazardsView(c.id)}</div></section>`,`journal-book--chapter journal-book--hazards`);
  if(activeSheetSection==='provisions')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Provisions · jídlo a pití</h3><p>${esc(c.name)} · přehled doložených zásob</p></header><div class="columns journal-tech-columns">${characterProvisionActionsHTML(c)}</div></section>`,`journal-book--chapter journal-book--provisions`);
  if(activeSheetSection==='inventory')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Arsenal & Gear</h3><p>Inventář, výbava, zatížení a speciální efekty.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Inventář postavy</h3>${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}${physicalWaterPanel(c)}</section>${foragingEvidenceInCharacterInventory(c.id)}${combatantLoadPanel(c)}${ownedAnimalsChronicle(c)}${armourLoadoutPanel(inv,c)}<section class="panel wide hmk-inventory-add-panel">${journalAddInventoryForm()}</section>${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:''})()}</div></section>`,`journal-book--chapter`);
@@ -3920,7 +3921,10 @@ function ownedAnimalsChronicle(c){
  const encounter=encounterBeastHistory(data,campaignKey(data.campaignClock));
  return `<section class="journal-book-section hmk-owned-animal-chronicle"><div class="journal-book-title">Zvířata a doprovod</div>${active.map(a=>{
   const training=data.journal.filter(j=>j.livestockTraining?.animalId===a.id),inEncounter=encounter.some(b=>b.ownerAnimalId===a.id&&b.active);
-  return `<p><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · HMK ${a.spec.bestiaryPage??'—'} · STR ${a.spec.str??'—'}, Move ${a.spec.move??'—'} · ${inEncounter?'ve scéně':'mimo aktuální scénu'} · ${training.length?'doložené výcviky '+training.length:'výcvik nepřipojen'}. ${data.characters.some(x=>x.id===a.id&&x.hmk?.combatState)?'Combat State evidován':'Combat State není doložen; zranění ani únavu nelze automaticky odvozovat.'}</p>`;
+  const witness=encounter.filter(x=>x.ownerAnimalId===a.id).at(-1);
+  const health=witness?animalHealthProjection567(data.journal,campaignKey(data.campaignClock),witness.id):null;
+  const wounds=health?.wounds?.filter(w=>!w.healed).length??0;
+  return `<p><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · HMK ${a.spec.bestiaryPage??'—'} · STR ${a.spec.str??'—'}, Move ${a.spec.move??'—'} · ${inEncounter?'ve scéně':'mimo aktuální scénu'} · ${training.length?'doložené výcviky '+training.length:'výcvik nepřipojen'}. ${health?`Zdraví: ${wounds} aktivních ran, Shock ${esc(health.shock)}, BP ${health.bloodLoss.bp}. Léčebná historie zůstává zachována i mezi encountery.`:'Zdravotní historie ještě nebyla vytvořena; neznamená to automatické uzdravení.'}</p>`;
  }).join('')}<button type="button" class="hc-small secondary" data-hmk-bestiary-open>Otevřít bestiář a soupisku</button></section>`;
 }
 function enrichAnimalTrainingForms(root){
@@ -3946,9 +3950,13 @@ function enrichAnimalTrainingForms(root){
 
 function bestiaryCalendarDuePanel567(clock){
  const cid=campaignKey(clock),minute=clock.minute;
- const animals=encounterBeastHistory(data,cid).filter(x=>x.active);
+ const all=encounterBeastHistory(data,cid), latestStable=new Map();
+ for(const a of all)if(a.ownerAnimalId)latestStable.set(a.ownerAnimalId,a.id);
+ const animals=all.filter(a=>a.ownerAnimalId?latestStable.get(a.ownerAnimalId)===a.id:a.active);
  const events=[];
  for(const a of animals){const h=animalHealthProjection567(data.journal,cid,a.id);
+  if(h.coma?.active&&h.comaDueMinute!==null)events.push({due:h.comaDueMinute,name:a.name,what:'Coma Course'});
+  for(const w of h.wounds)if(!w.healed&&w.grimDueMinute!==null)events.push({due:w.grimDueMinute,name:a.name,what:'Grim Wound Shock'});
   if(h.infectionDueMinute!==null)events.push({due:h.infectionDueMinute,name:a.name,what:'Infection Course'});
   if(h.bloodHealingDueMinute!==null)events.push({due:h.bloodHealingDueMinute,name:a.name,what:'Blood Loss · regenerace END'});
   for(const w of h.wounds){if(w.healed)continue;
@@ -3986,6 +3994,7 @@ function bestiaryHealthPanel567(active,cid,minute){
  <label>Skutečný Blood Loss d100 (kromě CS Stoppage)<input name="lossRoll" type="number" min="1" max="100"></label>
  <label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="confirmed" required> GM potvrzuje uplynutí pěti minut, metodu a skutečné hody</label>
  <button type="submit" ${minute!==w.nextDueMinute?'disabled title="Blood Loss až v doloženém pětiminutovém termínu"':''}>Vyhodnotit krvácení a Blood Loss (HMK 178)</button></form>`:''}
+ ${w.grimDueMinute!==null&&health.shock!=='killed'?`<form data-hmk-beast-grim-568 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}"><strong>Grim Wound · denní Shock (HMK 180)</strong><label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required></label><label>Fatigue<input name="fatigue" type="number" min="0" max="300" value="0" step="5" required></label><label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="confirmed" required> GM potvrzuje splatný den a skutečný hod</label><button type="submit" ${minute!==w.grimDueMinute?'disabled':''}>Vyhodnotit Grim Shock</button></form>`:''}
  ${w.infected&&health.shock!=='killed'?`<form data-hmk-beast-infection-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><input type="hidden" name="woundId" value="${esc(w.id)}">
  <label>Infection HR ${w.infectionHR??'?'} · skutečné d100<input type="number" min="1" max="100" name="roll" required></label>
  <label>Fatigue mimo nemoc<input type="number" min="0" max="300" step="5" name="fatigue" value="0" required></label>
@@ -4004,9 +4013,10 @@ function bestiaryHealthPanel567(active,cid,minute){
  <label>Jiná Weakness než anémie<input name="otherWeakness" type="number" min="0" step="5" max="300" value="0" required></label>
  <label class="hmk-bestiary-wide hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje desetidenní interval; anémie se do EML testu nepřičítá</label>
  <button type="submit" ${minute!==health.bloodHealingDueMinute?'disabled':''}>Regenerovat krev (HMK 181)</button></form>`:''}
- ${['stunned','incapacitated','unconscious'].includes(health.shock)&&!health.extendedShock?`<form data-hmk-beast-shock-recovery-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><strong>Shock Recovery · ${esc(health.shock)}</strong><label>Skutečný Shock d100<input type="number" min="1" max="100" name="roll" required></label><label>Fatigue pro test<input type="number" min="0" max="300" step="5" name="fatigue" value="0" required></label><label class="hmk-bestiary-wide hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje konec příslušného tahu (UNC až po 10 minutách)</label><button type="submit">Vyhodnotit Shock Recovery</button></form>`:''}
- ${health.extendedShock?.active&&!health.coma?.active?`<form data-hmk-beast-extended-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><strong>Extended Shock HR ${health.extendedShock.hr}</strong><label>Skutečné Course d100<input type="number" min="1" max="100" name="roll" required></label><label>Fatigue pro Course<input type="number" min="0" max="300" step="5" name="fatigue" value="0" required></label><label class="hmk-bestiary-wide hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje uplynulé čtyři hodiny a platnost Course</label><button type="submit">Vyhodnotit Extended Shock Course</button></form>`:''}
- ${health.coma?.active?'<p class="hc-hint">Coma: nutný samostatný d10denní Course. Automatický postup dosud není dokončen.</p>':''}
+ ${['stunned','incapacitated','unconscious'].includes(health.shock)&&!health.extendedShock?`<form data-hmk-beast-shock-recovery-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><strong>Shock Recovery · ${esc(health.shock)}</strong><label>Skutečný Shock d100<input type="number" min="1" max="100" name="roll" required></label><label>Fatigue pro test<input type="number" min="0" max="300" step="5" name="fatigue" value="0" required></label><label>UNC + CF: první skutečný d10 dnů do Coma Course (jen při vzniku komatu)<input type="number" name="comaIntervalD10" min="1" max="10" step="1"></label><label class="hmk-bestiary-wide hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje konec příslušného tahu (UNC až po 10 minutách)</label><button type="submit">Vyhodnotit Shock Recovery</button></form>`:''}
+ ${health.extendedShock?.active?`<form data-hmk-beast-extended-567 class="hc-fields"><input type="hidden" name="targetId" value="${esc(a.id)}"><strong>Extended Shock HR ${health.extendedShock.hr}</strong><label>Skutečné Course d100<input type="number" min="1" max="100" name="roll" required></label><label>Fatigue pro Course<input type="number" min="0" max="300" step="5" name="fatigue" value="0" required></label><label class="hmk-bestiary-wide hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje uplynulé čtyři hodiny a platnost Course</label><button type="submit">Vyhodnotit Extended Shock Course</button></form>`:''}
+ ${health.coma?.active?`<div class="hc-hint"><strong>Coma HR ${health.coma.currentHR}</strong> · nezávislá na Extended Shock. Další doložený d10denní termín: ${esc(display(health.comaDueMinute))}</div>
+ ${health.comaDueMinute!==null?`<form class="hc-fields" data-hmk-beast-coma-568><input type="hidden" name="targetId" value="${esc(a.id)}"><label>Coma Course · skutečné d100<input name="roll" type="number" min="1" max="100" required></label><label>Fatigue<input name="fatigue" type="number" min="0" max="300" value="0" required></label><label>Prostředí<select name="sheltered"><option value="yes">Klidné a chráněné</option><option value="no">Nechráněné (−20)</option></select></label><label>Další skutečný d10 dnů (při pokračování komatu)<input name="nextD10" type="number" min="1" max="10"></label><label class="hc-check hmk-bestiary-wide"><input type="checkbox" name="confirmed" required> GM potvrzuje skutečný d100 a doložený termín</label><button type="submit" ${minute!==health.comaDueMinute?'disabled':''}>Provést Coma Course</button></form>`:'<p class="hc-hint">Starší Coma bez doloženého prvního d10: termín nelze bezpečně automaticky dopočítat.</p>'}`:''}
  ${pending?.shock?.followup?`<p class="hc-hint">Shock Follow-up: ${esc(pending.shock.followup.timing||'vyžaduje další hod')} · nový Shock stav se automaticky neruší.</p>`:''}
  </details>`}).join('')}</section>`;
 }
@@ -4053,7 +4063,7 @@ function bestiaryEncounterPanel({combat=false}={}){
  <p class="hc-hint">Zápis je povolen jen po úplně vyřešeném zásahu a potvrzení krvácivých/amputačních značek podle příslušné anatomie. Na opakované zásahy do stejné lokality, zvláštní útoky a nepřipravené profily se zatím nevztahuje automatický zápis.</p>
  <label>Rigid Armour na dané lokalitě<select name="rigidArmour"><option value="unknown">Neověřeno</option><option value="no">Ne</option><option value="yes">Ano</option></select></label>
  <label>Skutečná Fatigue cíle pro Shock<input name="shockFatigue" type="number" min="0" max="300" step="5" value="0"></label>
- <label>Skutečný Shock d100<input name="shockRoll" type="number" min="1" max="100"></label>
+ <label>Skutečný Shock d100<input name="shockRoll" type="number" min="1" max="100"></label><label>Compound d10 (jen při již zraněné stejné lokalitě)<input name="compoundD10" type="number" min="1" max="10" step="1" placeholder="Prázdné, pokud nevzniká"></label>
  <label>Vzniká Bleeder?<select name="bleeding"><option value="unknown">Zatím neověřeno</option><option value="no">Ne, podle druhu zranění a lokality</option><option value="yes">Ano, podle pravidel</option></select></label>
  <label class="hmk-bestiary-wide hc-check"><input name="specialsReviewed" type="checkbox"> GM ověřil značky krvácení, amputace, Compound, mimořádné zásahy a případné Mishaps</label>
  <button type="submit" data-hmk-beast-save-hit="yes">Potvrdit zranění a Shock do zdravotního deníku tvora</button></details>
@@ -4093,7 +4103,7 @@ function livestockAcquisitionHTML({location='library'}={}){
  return `<section class="hc-livestock-catalog" id="hmk-livestock-catalog"><h3>Stáj · zvířata, nákup a tažná výbava</h3><p class="hc-trek-explainer">HMK str. 122 a 354–355. V katalogu jsou ověřené ceny a limity výcviku. Nákup vytvoří záznam vlastnictví, kupní doklad a odečte peníze z kampaně; bezplatné převzetí hotovost nemění; <strong>nezakládá automaticky Combat State ani nesimuluje výcvik</strong>. Při cestování se použije doložená tělesná hmotnost a základní STR.</p>
  ${clock&&options?`<form data-hmk-livestock-acquire class="hc-livestock-acquire"><label>Druh zvířete<select name="beastId" required>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<option value="${esc(b.id)}">${esc(b.name)} · ${b.priceD}d · STR ${sp.str??'neuvedeno'} · ${sp.bodyWeightLb??'?'} lb · MB max. ${b.maxMasteryBoosts}</option>`}).join('')}</select></label><label>Jméno zvířete<input name="beastName" maxlength="60" required placeholder="Např. Blesk"></label><label>Majitel / platící postava<select name="ownerId" required>${options}</select></label><div class="hc-livestock-actions"><button type="submit" name="acquisition" value="buy">Koupit za cenu HMK</button><button type="submit" name="acquisition" value="free" class="secondary">Převzít zdarma (potvrdí GM)</button></div></form>`:'<p>Pro nákup je nutná aktivní kampaň a alespoň jedna postava.</p>'}
  <details><summary>Přehled parametrů a pravidel pro zvířata</summary><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Cena</th><th>Max MB</th><th>Hmotnost</th><th>STR</th><th>Move</th><th>Využití</th></tr></thead><tbody>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<tr><td>${esc(b.name)}</td><td>${b.priceD}d</td><td>${b.maxMasteryBoosts}</td><td>${sp.bodyWeightLb??'—'} lb</td><td>${sp.str??'—'}</td><td>${sp.move??'—'}</td><td>${esc(sp.role)}</td></tr>`}).join('')}</tbody></table></div><h4>Bestiář HMK · základní atributy a dovednosti (str. 355)</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Velikost</th><th>END</th><th>AGL</th><th>PER</th><th>AUR</th><th>WIL</th><th>REA</th><th>CRE</th><th>Awareness</th><th>Scent</th><th>Stealth</th><th>Spirit</th><th>Initiative</th></tr></thead><tbody>${beasts.filter(x=>livestockOffer(x.id).size).map(x=>{const a=livestockOffer(x.id);return `<tr><td>${esc(x.name)}</td>${['size','end','agl','per','aur','wil','rea','cre','aware','scent','stealth','spirit','initiative'].map(k=>`<td>${esc(a[k]??'—')}</td>`).join('')}</tr>`}).join('')}</tbody></table></div><h4>Přirozené útoky (jen referenční popis)</h4>${beasts.filter(x=>livestockOffer(x.id).attack).map(x=>`<p class="hc-trek-explainer"><strong>${esc(x.name)}:</strong> ${esc(livestockOffer(x.id).attack)}</p>`).join('')}<p>Tištěné hodnoty ukazují výchozí domestikaci, nikoli výsledky výcviku. Tyto referenční útoky nejsou automaticky vytvářené bojové akce; zvířecí zdravotní a bojový profil se eviduje samostatně.</p><p>Vybavení se kupuje samostatně: pack harness 24d/10 lb (správně uložený náklad nejvýše 20 % hmotnosti zvířete), postroj pro koně 20d, postroj pro vola 20d, kára 84d, vůz 220d. Vůz typicky táhnou dva voli (8000 lb) nebo dva tažní koně (6400 lb). Kára jeden vůl (2500 lb) nebo jeden tažný kůň (2000 lb). Vůl přidává vlastní Slow Mode (HMK 122, 145).</p></details>
- <h4>Vlastněná zvířata této kampaně</h4>${active.length?`<div class="hc-livestock-owned">${active.map(a=>{const training=data.journal.filter(j=>j.skillTestProof?.type==='animal-training'&&j.skillTestProof.animalName===a.name);return `<p><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ${esc(character(a.ownerId)?.name||'Majitel neznámý')} · STR ${a.spec.str??'?'}, Move ${a.spec.move??'?'}, ${a.spec.bodyWeightLb??'?'} lb · ${a.mode==='buy'?a.priceD+'d':'převzato zdarma'} · bestiář str. ${a.spec.bestiaryPage??'—'} · ${training.length?'Existuje '+training.length+' souvisejících zápisů výcviku (nutno potvrdit identitu)':'Výcvik nedoložen'} · živý zdravotní a bojový profil ${data.characters.some(c=>c.id===a.id&&c.hmk?.combatState)?'evidován':'není založen'}</p>`}).join('')}</div>`:'<p>Žádná pořízená zvířata.</p>'}</section>`;
+ <h4>Vlastněná zvířata této kampaně</h4>${active.length?`<div class="hc-livestock-owned">${active.map(a=>{const training=data.journal.filter(j=>j.skillTestProof?.type==='animal-training'&&j.skillTestProof.animalName===a.name);return `<p><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ${esc(character(a.ownerId)?.name||'Majitel neznámý')} · STR ${a.spec.str??'?'}, Move ${a.spec.move??'?'}, ${a.spec.bodyWeightLb??'?'} lb · ${a.mode==='buy'?a.priceD+'d':'převzato zdarma'} · bestiář str. ${a.spec.bestiaryPage??'—'} · ${training.length?'Existuje '+training.length+' souvisejících zápisů výcviku (nutno potvrdit identitu)':'Výcvik nedoložen'} · ${(()=>{const encounter=encounterBeastHistory(data,campaignId).filter(e=>e.ownerAnimalId===a.id).at(-1);const h=encounter?animalHealthProjection567(data.journal,campaignId,encounter.id):null;return h?`zdraví: ${h.wounds.filter(w=>!w.healed).length} nezhojených ran · Shock ${esc(h.shock)} · BP ${h.bloodLoss.bp}`:'zdravotní doklady dosud nevznikly';})()}</p>`}).join('')}</div>`:'<p>Žádná pořízená zvířata.</p>'}</section>`;
 }
 function printedPossessionsPanel(){const table=(title,rows)=>`<h4>${title} (${rows.length} položek)</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Předmět</th><th>Zdroj / dovednost</th><th>lb</th><th>Cena v originálu</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.skill)}</td><td>${x.weightLb}</td><td>${esc(x.pricePrinted)}</td></tr>`).join('')}</tbody></table></div>`;return `<section class="panel wide"><h3>HMK · Gear & Craft Items (str. 120–121)</h3><p class="muted">Strukturovaný přepis tištěných tabulek. Ceny včetně zvláštních symbolů zůstávají ve zdrojovém zápisu; pravidlové účinky zatím nejsou automaticky zapojeny do inventáře.</p>${table('Expedition Equipment · str. 120',EXPEDITION_EQUIPMENT_P120)}${table('Craft Items & Tools · str. 121',CRAFT_ITEMS_TOOLS_P121)}<h4>Beasts · str. 122 (${BEASTS_P122.length})</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Beast</th><th>Max MB</th><th>Price (d)</th></tr></thead><tbody>${BEASTS_P122.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.maxMasteryBoosts}</td><td>${x.priceD}d</td></tr>`).join('')}</tbody></table></div><h4>Vehicles &amp; Tack · str. 122 (${VEHICLES_TACK_P122.length})</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Item</th><th>Skill</th><th>lb</th><th>Price (d)</th></tr></thead><tbody>${VEHICLES_TACK_P122.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.skill)}</td><td>${x.weightLb}</td><td>${x.priceD}d</td></tr>`).join('')}</tbody></table></div><p class="tiny muted">Str. 122: horse/bovine +5 ENC per 20 full lb; camel per 40 lb; elephant per 80 lb. Training prices per MB: dog 12d, hawk 60d, horse/camel 80d, elephant 240d. Source reference only; mount fatigue, riding and hauling are not automatically executed.</p><h4>Workshops · str. 121</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Quality</th><th>State</th><th>Wealth</th><th>Alchemy Wealth</th></tr></thead><tbody>${WORKSHOP_QUALITY_P121.map(x=>`<tr><td>${x.quality}</td><td>${esc(x.state)}</td><td>${esc(x.wealth)}</td><td>${esc(x.alchemyWealth)}</td></tr>`).join('')}</tbody></table></div><h4>Water weight by volume</h4><p>${WATER_WEIGHT_P121.map(x=>`${esc(x[0])}: ${x[1]} lb`).join(' · ')}</p><h4>Mundane fire damage · str. 121</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>FS</th><th>Amount</th><th>Diameter</th><th>Target</th><th>Impact</th></tr></thead><tbody>${MUNDANE_FIRE_P121.map(x=>`<tr><td>${x.fs}</td><td>${esc(x.amount)}</td><td>${esc(x.diameter)}</td><td>${x.target}</td><td>${x.impact}</td></tr>`).join('')}</tbody></table></div><p class="tiny muted">Další pravidlové poznámky (balení, světlo, chlad, dílny a oheň) vyžadují samostatnou mechanickou implementaci a kontrolu.</p></section>`;}
 function catalogCoveragePanel(){const coverage=catalogCoverage(allCatalogItems());return `<section class="panel wide"><h3>Pokrytí vybavení podle PDF HMK</h3><p class="muted">Tato kontrola nezaměňuje počet evidovaných položek za úplnost pravidlových tabulek. Hotové komplety vyžadují samostatnou strukturovanou definici; pouhý název nestačí.</p><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Oblast</th><th>Strany HMK</th><th>Evidováno</th><th>Stav</th></tr></thead><tbody>${coverage.sections.map(x=>`<tr><td>${esc(x.label)}</td><td>${esc(x.pages)}</td><td>${x.count===null?'—':esc(x.count)}</td><td>${x.complete?'Strukturované minimum splněno':'Neověřeno / nedokončeno'}</td></tr>`).join('')}</tbody></table></div><p class="tiny muted">U kompletů je cílové minimum 12. U ostatních oblastí není celkový počet bezpečně stanoven; stav zůstává neověřený.</p><div class="actions">${button('Exportovat přehled pokrytí JSON','export-catalog-coverage')}</div></section>`;}
@@ -4155,15 +4165,15 @@ function librarySuitRows(suits){
 }
 function libraryView(){
  const selectedTab=LIBRARY_TABS.some(t=>t.id===libraryTab)?libraryTab:'melee';
- const counts=Object.fromEntries(LIBRARY_TABS.filter(t=>!['suits','rules','bestiary'].includes(t.id)).map(t=>[t.id,allCatalogItems().filter(i=>libraryTabsForItem(i).includes(t.id)).length]));
+ const counts=Object.fromEntries(LIBRARY_TABS.filter(t=>!['suits','rules','bestiary','stable'].includes(t.id)).map(t=>[t.id,allCatalogItems().filter(i=>libraryTabsForItem(i).includes(t.id)).length]));
  const searchLower=query.toLocaleLowerCase('cs');
  const suitRows=PRINTED_ARMOUR_SUITS_P113_116.filter(s=>(s.name+' '+s.articles.join(' ')).toLocaleLowerCase('cs').includes(searchLower));
- const list=['suits','rules','bestiary'].includes(selectedTab)?null:libraryVisiblePage(allCatalogItems(),selectedTab,query,catalogStatus,i=>catalogAuditEntry(i).ready,libraryPage);
+ const list=['suits','rules','bestiary','stable'].includes(selectedTab)?null:libraryVisiblePage(allCatalogItems(),selectedTab,query,catalogStatus,i=>catalogAuditEntry(i).ready,libraryPage);
  if(list)libraryPage=list.page;
- const statusSelector=['rules','suits','bestiary'].includes(selectedTab)?'':`<label>Úplnost evidence<select id="catalog-status"><option value="all" ${catalogStatus==='all'?'selected':''}>Všechny</option><option value="ready" ${catalogStatus==='ready'?'selected':''}>Bez upozornění</option><option value="missing" ${catalogStatus==='missing'?'selected':''}>K doplnění</option></select></label>`;
+ const statusSelector=['rules','suits','bestiary','stable'].includes(selectedTab)?'':`<label>Úplnost evidence<select id="catalog-status"><option value="all" ${catalogStatus==='all'?'selected':''}>Všechny</option><option value="ready" ${catalogStatus==='ready'?'selected':''}>Bez upozornění</option><option value="missing" ${catalogStatus==='missing'?'selected':''}>K doplnění</option></select></label>`;
  return journalChapterShell('Knihovna','Katalog vybavení, referenční tabulky a přidávání předmětů ve vzhledu Keeper’s Ledger.',`<div class="topline"><div><h2>Knihovna vybavení</h2><p class="muted">Vyberte kategorii, otevřete údaje předmětu a případně jej přímo přidejte do inventáře postavy.</p></div>${button('+ Nový předmět','new-item')}</div>
- <nav class="library-navigation" aria-label="Sekce knihovny" role="tablist">${LIBRARY_TABS.map(t=>`<button type="button" role="tab" data-library-tab="${t.id}" aria-selected="${selectedTab===t.id}" ${selectedTab===t.id?'tabindex="0"':'tabindex="-1"'}>${esc(t.name)}${['rules','bestiary'].includes(t.id)?'':` (${t.id==='suits'?PRINTED_ARMOUR_SUITS_P113_116.length:counts[t.id]})`}</button>`).join('')}</nav>
- ${selectedTab==='bestiary'?bestiaryCompleteCatalogView():selectedTab==='rules'?`${livestockAcquisitionHTML()}<section class="panel"><h3>Pravidlové tabulky, zdroje a audit</h3><p class="muted">Tyto podklady jsou pouze k nahlédnutí a nepřekážejí při výběru běžných předmětů.</p>${[['Materiály zbroje a povolené vrstvy',armourMaterialsPanel()+armourLayerReferencePanel()],['Tištěné části zbroje · podrobné referenční značky',printedArmourArticlesPanel()],['Předměty, zvířata a dílny',printedPossessionsPanel()+workshopMechanicsPanel()],['Výprava, encumbrance a pravidlové účinky',expeditionEffectsPanel()+printedGearRulesPanel()],['Audit, konzistence a pokrytí',armourLibraryConsistencyPanel()+suitArticleCrosswalkPanel()+armourCoverageReadinessPanel()+catalogCoveragePanel()+catalogAuditPanel()]].map(([title,body])=>`<details class="library-rules-details"><summary>${esc(title)}</summary>${body}</details>`).join('')}</section>`:
+ <nav class="library-navigation" aria-label="Sekce knihovny" role="tablist">${LIBRARY_TABS.map(t=>`<button type="button" role="tab" data-library-tab="${t.id}" aria-selected="${selectedTab===t.id}" ${selectedTab===t.id?'tabindex="0"':'tabindex="-1"'}>${esc(t.name)}${['rules','bestiary','stable'].includes(t.id)?'':` (${t.id==='suits'?PRINTED_ARMOUR_SUITS_P113_116.length:counts[t.id]})`}</button>`).join('')}</nav>
+ ${selectedTab==='bestiary'?bestiaryCompleteCatalogView():selectedTab==='stable'?livestockAcquisitionHTML():selectedTab==='rules'?`<section class="panel"><h3>Pravidlové tabulky, zdroje a audit</h3><p class="muted">Tyto podklady jsou pouze k nahlédnutí a nepřekážejí při výběru běžných předmětů.</p>${[['Materiály zbroje a povolené vrstvy',armourMaterialsPanel()+armourLayerReferencePanel()],['Tištěné části zbroje · podrobné referenční značky',printedArmourArticlesPanel()],['Předměty, zvířata a dílny',printedPossessionsPanel()+workshopMechanicsPanel()],['Výprava, encumbrance a pravidlové účinky',expeditionEffectsPanel()+printedGearRulesPanel()],['Audit, konzistence a pokrytí',armourLibraryConsistencyPanel()+suitArticleCrosswalkPanel()+armourCoverageReadinessPanel()+catalogCoveragePanel()+catalogAuditPanel()]].map(([title,body])=>`<details class="library-rules-details"><summary>${esc(title)}</summary>${body}</details>`).join('')}</section>`:
  `<div class="library-toolbar"><label>Hledat v této kategorii<input id="search" type="search" placeholder="Název, parametry, zdroj…" value="${esc(query)}" autocomplete="off"></label>${statusSelector}</div>
  <p class="library-results">${selectedTab==='suits'?`Zobrazeno ${suitRows.length} z ${PRINTED_ARMOUR_SUITS_P113_116.length} tištěných kompletů.`:`Zobrazeno ${list.rows.length} z ${list.total} odpovídajících položek.`} Volba Koupit odečítá skutečnou hotovost, Vzít zdarma nic neodečítá. Obojí přidává nesený předmět (ENC se přepočte dle jeho hmotnosti).</p>
  ${selectedTab==='suits'?`<p class="notice tiny">Tištěné komplety jsou referenční sestavy, nikoliv samostatný předmět. Převzetí nebo nákup vytvoří nezávislé kopie <b>všech</b> ověřených článků jako <b>nesené</b>; žádnou zbroj automaticky neobléká.</p>`:''}
@@ -11929,6 +11939,13 @@ document.addEventListener('submit',e=>{
   const notes=String(v.gmNotes||'').trim();
   if(notes.length>600)throw Error('Příliš dlouhá poznámka GM.');
   if(stable&&encounterBeastHistory(data,cid).some(x=>x.active&&x.ownerAnimalId===stable.id))throw Error('Stejné zvíře už je v encounteru.');
+  if(stable){
+   const priorVisits=encounterBeastHistory(data,cid).filter(x=>x.ownerAnimalId===stable.id);
+   if(priorVisits.length){
+    const history=animalHealthProjection567(data.journal,cid,priorVisits.at(-1).id);
+    if(history.shock==='killed')throw Error('Toto zvíře podle trvalých zdravotních dokladů zemřelo. Nelze je znovu zařadit do encounteru.');
+   }
+  }
   const proofs=Array.from({length:count},(_,i)=>{
    const name=count===1?prefix:prefix+' '+(i+1),id=uuid();
    return fromStable?newEncounterBeastProof({id,templateId,name,campaignId:cid,campaignMinute:minute,
@@ -12015,7 +12032,7 @@ document.addEventListener('submit',e=>{
   const proof=extended?prepareAnimalExtendedCourse567({profile:{...actor.profile,id:actor.id},previous:health,minute,
    roll:Number(v.roll),fatigue:Number(v.fatigue),gmConfirmed:v.confirmed==='on'}):
    prepareAnimalShockRecovery567({profile:{...actor.profile,id:actor.id},previous:health,minute,
-   roll:Number(v.roll),fatigue:Number(v.fatigue),nextTurnConfirmed:v.confirmed==='on'});
+   roll:Number(v.roll),fatigue:Number(v.fatigue),nextTurnConfirmed:v.confirmed==='on',comaIntervalD10:v.comaIntervalD10?Number(v.comaIntervalD10):null});
   proof.campaignId=cid;
   if(!ask('Potvrdit skutečné d100 ('+v.roll+') a Shock stav '+proof.after+' pro '+actor.name+'?'))return;
   mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock?.minute!==minute)throw Error('Mezitím se změnil herní čas.');
@@ -12023,6 +12040,41 @@ document.addEventListener('submit',e=>{
     title:'Bestiář · '+(extended?'Extended Shock Course':'Shock Recovery')+': '+actor.name,
     body:'HMK '+(extended?'179':'169')+' · d100 ('+v.roll+') → '+proof.sl+' · '+proof.after,bestiaryTrauma:proof});});
  }catch(err){alert('Bestiář · Shock: '+err.message)}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-hmk-beast-grim-568]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const v=Object.fromEntries(new FormData(f)),cid=campaignKey(data.campaignClock),minute=data.campaignClock?.minute;
+  const actor=encounterBeastHistory(data,cid).find(x=>x.id===v.targetId&&x.active);
+  if(!actor)throw Error('Zvíře musí být zařazeno do aktuálního encounteru.');
+  const previous=animalHealthProjection567(data.journal,cid,actor.id);
+  const proof=prepareAnimalGrimShock568({profile:{...actor.profile,id:actor.id},previous,
+   wound:previous.wounds.find(w=>w.id===v.woundId),minute,roll:Number(v.roll),fatigue:Number(v.fatigue),gmConfirmed:v.confirmed==='on'});
+  proof.campaignId=cid;
+  if(!ask('Potvrdit denní Grim Wound Shock pro '+actor.name+'?'))return;
+  mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock?.minute!==minute)throw Error('Čas se změnil.');
+   data.journal.push({id:uuid(),characterId:null,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+    title:'Bestiář · Grim Wound Shock: '+actor.name,body:'HMK 180 · d100 ('+v.roll+') → '+proof.sl+' · '+proof.after,bestiaryTrauma:proof});});
+ }catch(err){alert('Bestiář · Grim: '+err.message)}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-hmk-beast-coma-568]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const v=Object.fromEntries(new FormData(f)),cid=campaignKey(data.campaignClock),minute=data.campaignClock?.minute;
+  const actor=encounterBeastHistory(data,cid).find(x=>x.id===v.targetId&&x.active);
+  if(!actor)throw Error('Nejdříve vrať zvíře do encounteru; zdravotní historie se při tom zachová.');
+  const previous=animalHealthProjection567(data.journal,cid,actor.id);
+  const proof=prepareAnimalComaCourse568({profile:{...actor.profile,id:actor.id},previous,minute,
+   roll:Number(v.roll),fatigue:Number(v.fatigue),sheltered:v.sheltered==='yes',
+   nextD10:v.nextD10?Number(v.nextD10):null,gmConfirmed:v.confirmed==='on'});
+  proof.campaignId=cid;
+  if(!ask('Potvrdit Coma Course d100 ('+v.roll+') pro '+actor.name+'?'))return;
+  mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock?.minute!==minute)throw Error('Změněný čas kampaně.');
+   data.journal.push({id:uuid(),characterId:null,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+    title:'Bestiář · Coma Course: '+actor.name,body:'HMK 179 · d100 ('+v.roll+') · '+proof.sl+' · HR '+proof.afterHR,bestiaryTrauma:proof});});
+ }catch(error){alert('Bestiář · Coma: '+error.message)}
 },true);
 document.addEventListener('submit',e=>{
  const f=e.target;if(!f?.matches?.('[data-hmk-beast-treat-567],[data-hmk-beast-heal-567]'))return;
@@ -12060,7 +12112,7 @@ document.addEventListener('submit',e=>{
     locationD10:Number(v.locationD10),impactDieRoll:Number(v.impactDieRoll),extraImpact:Number(v.extraImpact),
     aimConfirmed:v.aimConfirmed==='yes',specialsReviewed:v.specialsReviewed==='on',bleedingReviewed:v.bleeding!=='unknown',
     bleeding:v.bleeding==='yes',rigidArmour:v.rigidArmour,shockFatigue:Number(v.shockFatigue),
-    shockRoll:v.shockRoll===''?null:Number(v.shockRoll),campaignId:cid};
+    shockRoll:v.shockRoll===''?null:Number(v.shockRoll),compoundD10:v.compoundD10?Number(v.compoundD10):null,campaignId:cid};
    const proof=prepareAnimalHit567({attacker:a,defender:b,inputs:input,previous,minute:data.campaignClock.minute,eventId});
    if(!ask('Zapsat skutečné '+(proof.injury?'zranění '+proof.injury.severity+proof.injury.level:'Glancing Blow')+' a Shock '+proof.shock.after+' pro '+b.name+'?'))return;
    const ok=mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock.minute!==proof.minute)throw Error('Mezitím se změnil herní čas.');
@@ -12106,6 +12158,7 @@ document.addEventListener('submit',e=>{
  }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
 },true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-bestiary-open]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='bestiary';render();},true);
+document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-open-stable]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='stable';render();},true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-hmk-beast-dismiss]');if(!btn)return;
  e.preventDefault();e.stopImmediatePropagation();
