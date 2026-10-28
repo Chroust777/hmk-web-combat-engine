@@ -5766,3 +5766,26 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hmk-bestiary-generator>button{justify-self:start;grid-column:1/-1}
 .hmk-bestiary-species-card[hidden],.hmk-bestiary-category[hidden]{display:none!important}
 @media(max-width:650px){.hmk-bestiary-generator{grid-template-columns:1fr}.hmk-bestiary-generator .hmk-bestiary-wide{grid-column:1}.hmk-bestiary-species-card{font-size:12px}.hmk-bestiary-combat-nav{align-items:stretch}}
+
+/* v93.565 · native searchable HMK bestiary; no scanned page images */
+.hmk-bestiary-stats-details{margin:.3rem 0;min-width:0}
+.hmk-bestiary-stats-details>summary{font-weight:700;cursor:pointer}
+.hmk-bestiary-native-stats{min-width:0;display:grid;gap:.6rem;margin:.5rem 0;overflow-wrap:anywhere}
+.hmk-bestiary-native-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:.5rem}
+.hmk-bestiary-native-stats h5,.hmk-native-source-table h5{margin:.2rem 0;font-size:13px}
+.hmk-native-data-table,.hmk-native-source-table table{width:100%;border-collapse:collapse;font-size:12px}
+.hmk-native-data-table th,.hmk-native-data-table td,.hmk-native-source-table td{padding:.23rem .35rem;border-bottom:1px solid rgba(100,65,35,.19);overflow-wrap:anywhere}
+.hmk-native-data-table tr:nth-child(even),.hmk-native-source-table tr:nth-child(even){background:rgba(86,60,29,.05)}
+.hmk-native-data-table th{white-space:normal;text-align:left}
+.hmk-bestiary-native-stats>section{min-width:0;overflow-x:auto}
+.hmk-bestiary-page-text{min-width:0}
+.hmk-printed-scroll{max-width:100%;overflow-x:auto;border:1px solid rgba(91,58,28,.28);margin:.6rem 0;background:rgba(255,255,248,.24)}
+.hmk-printed-sheet{width:612px;height:792px;position:relative;font-family:Georgia,serif;color:#463224;box-sizing:border-box}
+.hmk-printed-block{position:absolute;white-space:pre-wrap;overflow-wrap:normal;font-size:10.3px;line-height:1.18}
+.hmk-native-table-scroll{overflow-x:auto;max-width:100%}
+.hmk-native-source-table{margin:.65rem 0;min-width:0}
+.hmk-native-source-table td{min-width:32px;vertical-align:top}
+.hmk-bestiary-quickcombat{border-top:1px solid rgba(80,50,20,.25);margin-top:1rem;padding-top:.5rem}
+.hmk-bestiary-quickcombat output{display:block;padding:.45rem 0;font-size:12px}
+
+.hmk-printed-block{white-space:pre;line-height:1.0;overflow-wrap:normal}

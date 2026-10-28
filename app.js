@@ -118,6 +118,8 @@ import { BEASTS_P122, VEHICLES_TACK_P122, CONVEYANCE_RULES_P122 } from './src/ru
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
 import {BESTIARY_ANIMALS_563,livestockMatcher,newEncounterBeastProof,encounterBeastHistory,validateLivestockTrainingRefs,assertBestiaryAppendOnly} from './src/integration/hmk-bestiary-563.js';
 import {BESTIARY_PAGES_564} from './src/integration/hmk-bestiary-pages-564.js';
+import {renderFullCreatureStats565,renderPrintedBestiaryPage565} from './src/integration/hmk-bestiary-native-ui-565.js';
+import {creatureCombatSheet565,previewCreatureSkillRoll565,previewCreatureMelee565} from './src/integration/hmk-bestiary-combat-565.js';
 import {BESTIARY_ENTRIES_564,bestiaryEntry564,createBespokeEncounterProof564,validateFullBestiaryJournal564 as validateBestiaryJournal,bestiaryEncounterStatus564} from './src/integration/hmk-bestiary-runtime-564.js';
 import { ARMOUR_LAYER_COLUMNS, ARMOUR_LAYER_NOTES } from './src/rules/armour-layer-reference.js';
 import { auditArmourLoadout } from './src/integration/armour-loadout-audit.js';
@@ -3956,30 +3958,45 @@ function bestiaryEncounterPanel({combat=false}={}){
  <label class="hmk-bestiary-wide">Doložená varianta, skutečné hody nebo poznámka GM (není automatický výpočet)<textarea name="gmNotes" rows="2" maxlength="600" placeholder="Např. vygenerováno pomocí tabulky Ívashù Generation, str. 376"></textarea></label>
  <p class="hc-hint hmk-bestiary-wide">Vybereš-li zvíře ze stáje, použije se jeho existující identita a jméno; počet musí být 1. Pro bytosti bez pevného profilu je nutno nejprve určit hodnoty z originálního pravidlového postupu.</p>
  <button type="submit" ${combatInitiativeSequence?'disabled title="Během Initiative nelze měnit soupisku"':''}>Vytvořit dočasného účastníka / skupinu</button></form>`:'<p>Pro vytvoření encounteru nejprve aktivuj herní kalendář.</p>'}
- <p class="hc-hint">Koupené zvíře má stejnou identitu ve stáji, při cestování i v encounteru. Úplný Combat State, zranění a zvláštní schopnosti se musejí ověřeně napojit; tato evidence sama o sobě je nenahrazuje.</p></section>`;
+ ${active.length?`<section class="hmk-bestiary-quickcombat"><h4>Combat · tištěné dovednosti tvora (doložený d100)</h4>
+ <p class="hc-hint">Tento samostatný výpočet používá společné jádro HMK pro Success Level. Sám neprovádí útok, nevyhodnocuje tabulku Melee Outcome ani nezapisuje zranění. Použij ho pro ověření skutečného hodu před pravidlovým řešením situace.</p>
+ <form data-hmk-beast-skill-preview class="hc-fields">
+ <label>Účastník<select name="creatureId">${active.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('')}</select></label>
+ <label>Dovednost / použití<select name="ability"><option value="initiative">Initiative</option><option value="dodge">Dodge</option><option value="shock">Shock</option><option value="attack">Přirozený útok (první doložený)</option></select></label>
+ <label>Skutečný d100<input name="roll" type="number" min="1" max="100" required></label>
+ <label>GM modifikátor EML<input name="modifier" type="number" min="-200" max="200" value="0" required></label>
+ <button type="submit">Ověřit úroveň hodu</button>
+ </form><output data-hmk-beast-skill-out aria-live="polite"></output></section>`:''}
+ ${active.length>=2?`<section class="hmk-bestiary-quickcombat"><h4>Melee · výsledek základní matice HMK str. 166</h4>
+ <p class="hc-hint">Vstupují pouze skutečné hody a doložené ML. Výsledek používá společné jádro Melee; je to pracovní kontrola bez automatického zásahu, zranění a bez změny Initiative.</p>
+ <form data-hmk-beast-melee-preview class="hc-fields">
+ <label>Útočník<select name="attackerId">${active.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label>
+ <label>Obránce<select name="defenderId">${active.map((x,i)=>`<option value="${esc(x.id)}" ${i===1?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
+ <label>Obrana<select name="defence"><option value="dodge">Dodge</option><option value="ignore">Ignore</option><option value="block">Block (přirozená zbraň)</option><option value="counterstrike">Counterstrike (přirozená zbraň)</option></select></label>
+ <label>d100 útočníka<input type="number" name="attackerD100" min="1" max="100" required></label>
+ <label>d100 obránce (bez Ignore)<input type="number" name="defenderD100" min="1" max="100"></label>
+ <label>GM EML útočníka<input type="number" name="attackerModifier" min="-200" max="200" value="0"></label>
+ <label>GM EML obránce<input type="number" name="defenderModifier" min="-200" max="200" value="0"></label>
+ <button type="submit">Vypočítat základní Melee výsledek</button></form><output data-hmk-beast-melee-out aria-live="polite"></output></section>`:''}
+ <p class="hc-hint">Koupené zvíře má stejnou identitu ve stáji, při cestování i v encounteru. Kompletní Combat State, zranění a zvláštní schopnosti stále vyžadují ověřenou návaznost.</p></section>`;
 }
 function bestiaryCompleteCatalogView({includeGenerator=true}={}){
  const groups=[...new Set(BESTIARY_ENTRIES_564.map(x=>x.group))];
- const rows=groups.map(group=>`<section class="hmk-bestiary-category"><h4>${esc(group)} (${BESTIARY_ENTRIES_564.filter(e=>e.group===group).length})</h4><div class="hmk-bestiary-card-grid">${BESTIARY_ENTRIES_564.filter(p=>p.group===group).map(p=>{
-  const a=p.attributes||{},skills=p.skills||{},c=p.combat||{};
-  const animal=p.generation==='printed-animal';
-  return `<article class="hmk-bestiary-species-card" data-hmk-beast-name="${esc((p.name+' '+group).toLocaleLowerCase('cs'))}"><strong>${esc(p.name)}</strong><small>HMK str. ${p.page}${p.statPage&&p.statPage!==p.page?' (statistiky '+p.statPage+')':''} · ${animal?'zvíře / tištěná tabulka':p.generation==='variable'?'variabilní postup':'referenční druh / příklad'}</small>
-  <p>${['str','end','dex','agl','per','aur','wil','rea','cre','abe'].filter(k=>a[k]!==undefined).map(k=>k.toUpperCase()+' '+(a[k]??'—')).join(' · ')||'Statistiky / další pravidla viz originální strana'}</p>
-  <p>${['initiative','shock','awareness','spirit'].filter(k=>skills[k]!==undefined).map(k=>k+' '+skills[k]).join(' · ')}${p.move!==undefined?' · Move '+p.move:''}${p.fly!==undefined?' · Fly '+p.fly:''}</p>
-  ${c.av?`<p>AV b/e/p/f: ${['b','e','p','f'].map(k=>c.av[k]).join(' / ')} · TAR ${c.tar??'—'}${c.bodyTable?' · Body '+esc(c.bodyTable):''}</p>`:''}
-  <div class="hmk-bestiary-card-actions"><button type="button" class="hc-small secondary" data-hmk-bestiary-viewpage="${p.statPage||p.page}">Zobrazit originální tabulku</button><button type="button" class="hc-small secondary" data-hmk-bestiary-pick="${esc(p.id)}">Vybrat do generátoru</button></div></article>`;
- }).join('')}</div></section>`).join('');
- const pageno=355;
- return `${includeGenerator?bestiaryEncounterPanel():''}<section class="panel hmk-bestiary-complete" id="hmk-bestiary-complete"><h3>Kompletní referenční bestiář · HMK 1.2</h3>
- <p>Celá kapitola 7 včetně <strong>původních pravidlových tabulek, anatomie, zvláštních schopností a generovacích postupů</strong> je k dispozici jako obrazové stránky přímo z přiloženého PDF (str. 351–401). Rejstřík má ${BESTIARY_ENTRIES_564.length} položek. Číselné profilové karty ukazují jen výslovně ověřené hodnoty; původní stránka zůstává rozhodující.</p>
- <p class="hc-hint">Generátor vytváří samostatné identity tvorů pro encounter. <strong>Neběží automatická zvířecí Initiative, Injury Sequence, Healing ani nestandardní schopnosti bez pravidlově doloženého provedení.</strong> Při proměnlivé generaci si otevři příslušnou původní tabulku a zaznamenej skutečné hody.</p>
- <div class="hmk-bestiary-search"><label>Hledat druh, variantu nebo skupinu<input type="search" data-hmk-bestiary-filter placeholder="vlk, drak, gargún, duch…"></label><span>Domácí i divoká zvířata, folk, elementálové, gârgún, ívashù, môrvrin, mytické bytosti a duchové.</span></div>
+ const rows=groups.map(group=>`<section class="hmk-bestiary-category"><h4>${esc(group)} (${BESTIARY_ENTRIES_564.filter(e=>e.group===group).length})</h4><div class="hmk-bestiary-card-grid">${BESTIARY_ENTRIES_564.filter(p=>p.group===group).map(p=>`
+ <article class="hmk-bestiary-species-card" data-hmk-beast-name="${esc((p.name+' '+group).toLocaleLowerCase('cs'))}">
+ <strong>${esc(p.name)}</strong><small>HMK str. ${p.page} · ${p.generation==='variable'?'proměnlivý druh / postup':p.generation==='printed-animal'?'tabulkový profil':'pevný profil nebo ukázková postava'}</small>
+ <p>${p.attributes&&Object.keys(p.attributes).length?Object.entries(p.attributes).slice(0,7).map(([k,v])=>k.toUpperCase()+' '+(v??'—')).join(' · '):'Statistiky a generovací postup najdeš na příslušné straně níže.'}</p>
+ <details class="hmk-bestiary-stats-details"><summary>Všechny dostupné statistiky, ochrana a útoky</summary>${renderFullCreatureStats565(p)}</details>
+ <div class="hmk-bestiary-card-actions"><button type="button" class="hc-small secondary" data-hmk-bestiary-viewpage="${p.statPage||p.page}">Pravidla / tabulky</button><button type="button" class="hc-small secondary" data-hmk-bestiary-pick="${esc(p.id)}">Vybrat do generátoru</button></div></article>`).join('')}</div></section>`).join('');
+ const page=355;
+ return `${includeGenerator?bestiaryEncounterPanel():''}<section class="panel hmk-bestiary-complete" id="hmk-bestiary-complete"><h3>Bestiář HMK 1.2 · datové tabulky a generátor</h3>
+ <p>Všechny stránky kapitoly 7 (351–401) jsou převedeny přímo do <strong>výběrového textu, tabulek a číselných dat</strong> této aplikace. Nejsou použity obrázky stránek. Číselné hodnoty jsou propojené s kartami, zatímco složité nebo proměnlivé postupy jsou přístupné jako text pravidel pro GM.</p>
+ <p class="hc-hint">Dočasný tvor není běžná PC/NPC. Přímo z profilu lze použít doložené atributy, dovednosti, ochranu, přirozené útoky a pomocný výpočet d100. Kompletní Combat Outcome, mimořádné schopnosti, zásahová anatomie, perzistentní zranění a Healing musí mít vlastní ověřenou pravidlovou návaznost; žádná není domyšlena.</p>
+ <div class="hmk-bestiary-search"><label>Hledat druh, variantu nebo skupinu<input type="search" data-hmk-bestiary-filter placeholder="vlk, drak, gargún, duch…"></label></div>
  ${rows}
- <details class="hmk-bestiary-facsimile" id="hmk-bestiary-facsimile" open><summary>Originální pravidla a tištěné tabulky – všech 51 stran</summary>
- <p class="hc-hint">Zvolená strana se zobrazí jako přesná kopie jejího rozložení v HMK. Obsahuje i tabulky, které nemají bezpečný strojový přepis. Lze zobrazit obrázek samostatně ve větší velikosti.</p>
+ <details class="hmk-bestiary-facsimile" id="hmk-bestiary-facsimile" open><summary>Kompletní pravidla bestiáře – text a HTML tabulky (51 stran)</summary>
  <nav class="hmk-bestiary-page-nav" aria-label="Strany bestiáře">${BESTIARY_PAGES_564.map(x=>`<button type="button" class="hc-small secondary" data-hmk-bestiary-viewpage="${x.page}" title="${esc(x.group)}">${x.page}</button>`).join('')}</nav>
- <p><strong>HMK strana <span data-hmk-bestiary-current-page>${pageno}</span></strong> · <a data-hmk-bestiary-original-link href="assets/bestiary-hmk12/p${pageno}.jpg" target="_blank" rel="noopener">Otevřít obrázek ve větší velikosti</a></p>
- <img data-hmk-bestiary-page-image src="assets/bestiary-hmk12/p${pageno}.jpg" alt="Originální pravidlová strana bestiáře HMK ${pageno}" loading="lazy">
+ <div data-hmk-bestiary-native-page>${renderPrintedBestiaryPage565(page)}</div>
  </details></section>`;
 }
 function livestockAcquisitionHTML({location='library'}={}){
@@ -11853,10 +11870,9 @@ document.addEventListener('click',e=>{
   if(!BESTIARY_PAGES_564.some(x=>x.page===n))return;
   const container=page.closest('.hmk-bestiary-complete')||document.querySelector('.hmk-bestiary-complete');
   if(!container)return;
-  const img=container.querySelector('[data-hmk-bestiary-page-image]');const source=container.querySelector('[data-hmk-bestiary-original-link]');
-  const label=container.querySelector('[data-hmk-bestiary-current-page]');const detail=container.querySelector('.hmk-bestiary-facsimile');
-  if(img){img.src='assets/bestiary-hmk12/p'+n+'.jpg';img.alt='Originální stránka HMK '+n;}
-  if(source)source.href='assets/bestiary-hmk12/p'+n+'.jpg';if(label)label.textContent=String(n);
+  const target=container.querySelector('[data-hmk-bestiary-native-page]');
+  const detail=container.querySelector('.hmk-bestiary-facsimile');
+  if(target)target.innerHTML=renderPrintedBestiaryPage565(n);
   if(detail){detail.open=true;detail.scrollIntoView({behavior:'smooth',block:'start'});}return;}
  const pick=e.target.closest?.('[data-hmk-bestiary-pick]');
  if(pick){e.preventDefault();e.stopImmediatePropagation();const root=pick.closest('.journal-book')||document;
@@ -11870,6 +11886,34 @@ document.addEventListener('input',e=>{
  for(const card of root.querySelectorAll('.hmk-bestiary-species-card'))card.hidden=!!term&&!card.dataset.hmkBeastName.includes(term);
  for(const category of root.querySelectorAll('.hmk-bestiary-category'))category.hidden=!category.querySelector('.hmk-bestiary-species-card:not([hidden])');
 });
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-hmk-beast-melee-preview]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const out=form.parentElement?.querySelector('[data-hmk-beast-melee-out]');
+ try{
+  const v=Object.fromEntries(new FormData(form));const cid=campaignKey(data.campaignClock),list=encounterBeastHistory(data,cid).filter(x=>x.active);
+  const a=list.find(x=>x.id===v.attackerId),b=list.find(x=>x.id===v.defenderId);
+  const result=previewCreatureMelee565({attacker:a,defender:b,attackD100:Number(v.attackerD100),
+    defenceD100:v.defenderD100===''?null:Number(v.defenderD100),defence:v.defence,
+    attackerModifier:Number(v.attackerModifier),defenderModifier:Number(v.defenderModifier)});
+  const r=result.outcome;
+  if(out)out.textContent=`${result.attacker} ${result.attackerProof.sl} d100 (${result.attackerProof.roll}) · ${result.defender} ${result.defenderProof?.level??'Ignore'} ${result.defenderProof?'d100 ('+result.defenderProof.roll+')':''}. ${r.needsFinalD10?'Čeká na rozstřel':r.winner?'Vyhrává '+(r.winner==='attacker'?result.attacker:result.defender)+' · '+r.stars+' ★':'Bez vítěze'}. Zásah a Injury nejsou provedeny.`;
+ }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
+},true);
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-hmk-beast-skill-preview]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const out=form.parentElement?.querySelector('[data-hmk-beast-skill-out]');
+ try{
+  const input=Object.fromEntries(new FormData(form));
+  const cid=campaignKey(data.campaignClock);
+  const entry=encounterBeastHistory(data,cid).find(x=>x.id===input.creatureId&&x.active);
+  if(!entry)throw Error('Tvor není v aktuálním encounteru.');
+  const actor=creatureCombatSheet565(entry);
+  const result=previewCreatureSkillRoll565({actor,kind:input.ability,roll:Number(input.roll),gmModifier:Number(input.modifier)});
+  if(out)out.textContent=`${result.name} · ${result.ability}: ${result.sl} · d100 (${result.roll}) ${result.roll<=result.eml?'≤':'>'} EML ${result.eml} (tištěné ML ${result.ml})${result.attackImpact?' · základní Impact '+result.attackImpact:''}. Jen kontrolní výpočet; nikoli rozhodnutí Combat Outcome či zranění.`;
+ }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
+},true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-bestiary-open]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='bestiary';render();},true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-hmk-beast-dismiss]');if(!btn)return;
