@@ -120,6 +120,7 @@ import {BESTIARY_ANIMALS_563,livestockMatcher,newEncounterBeastProof,encounterBe
 import {BESTIARY_PAGES_564} from './src/integration/hmk-bestiary-pages-564.js';
 import {renderFullCreatureStats565,renderPrintedBestiaryPage565} from './src/integration/hmk-bestiary-native-ui-565.js';
 import {creatureCombatSheet565,previewCreatureSkillRoll565,previewCreatureMelee565} from './src/integration/hmk-bestiary-combat-565.js';
+import {ANIMAL_ANATOMIES_566,ANIMAL_WEAPON_DICE_566,creatureAnatomyReadiness566,previewAnimalContact566} from './src/integration/hmk-bestiary-anatomy-566.js';
 import {BESTIARY_ENTRIES_564,bestiaryEntry564,createBespokeEncounterProof564,validateFullBestiaryJournal564 as validateBestiaryJournal,bestiaryEncounterStatus564} from './src/integration/hmk-bestiary-runtime-564.js';
 import { ARMOUR_LAYER_COLUMNS, ARMOUR_LAYER_NOTES } from './src/rules/armour-layer-reference.js';
 import { auditArmourLoadout } from './src/integration/armour-loadout-audit.js';
@@ -276,7 +277,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.563';
+const APP_VERSION='93.566';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3967,6 +3968,21 @@ function bestiaryEncounterPanel({combat=false}={}){
  <label>GM modifikátor EML<input name="modifier" type="number" min="-200" max="200" value="0" required></label>
  <button type="submit">Ověřit úroveň hodu</button>
  </form><output data-hmk-beast-skill-out aria-live="polite"></output></section>`:''}
+ ${active.length>=2?`<section class="hmk-bestiary-quickcombat"><h4>Anatomie zásahu a předběžné Injury · HMK str. 167–169, 352, 355, 357</h4>
+ <p class="hc-hint">Samostatný výpočet <strong>až po skutečně ověřeném zásahu</strong>. Volba Aim, dosah, zvláštní schopnosti, TA, kryt a Strike Mode musí být předem rozhodnuty podle boje. Vstupní hody se nikdy negenerují automaticky. Nepřidává zranění ani nemění zdravotní stav.</p>
+ <form data-hmk-beast-contact-566 class="hc-fields">
+ <label>Útočník<select name="attackerId">${active.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label>
+ <label>Zasažený tvor<select name="defenderId">${active.map((x,i)=>`<option value="${esc(x.id)}" ${i===1?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
+ <label>Útok z tištěného profilu (pořadí)<select name="attackIndex"><option value="0">První útok</option><option value="1">Druhý útok</option></select></label>
+ <label>Výchozí Aim ZN<input type="number" name="aimZN" min="1" max="40" step="1" value="1" required></label>
+ <label>Skutečný Zone Die (ZD)<input type="number" name="zdRoll" min="1" step="1" required></label>
+ <label>Skutečný Location d10 (LD)<input type="number" name="locationD10" min="1" max="10" step="1" required></label>
+ <label>Skutečný Impact Die<input type="number" name="impactDieRoll" min="1" step="1" required></label>
+ <label>Jiné již ověřené modifikátory Impact (součet)<input type="number" name="extraImpact" value="0" step="1" min="-200" max="200" required></label>
+ <label class="hmk-bestiary-wide"><input type="checkbox" name="aimConfirmed" value="yes" required> GM již ověřil platný zásah, Aim, dosah a všechna nutná omezení</label>
+ <button type="submit">Zobrazit lokalitu, AV a předběžné zranění</button></form>
+ <output data-hmk-beast-contact-out-566 aria-live="polite" class="hc-hint"></output>
+ <p class="hc-hint">Pouze pro druhy se strukturovanou tabulkou a–m. Chybí ověření všech značek krvácení/amputace, Compound, Shock roll, perzistence a Healing: proto nevytváří zdravotní záznam.</p></section>`:''}
  ${active.length>=2?`<section class="hmk-bestiary-quickcombat"><h4>Melee · výsledek základní matice HMK str. 166</h4>
  <p class="hc-hint">Vstupují pouze skutečné hody a doložené ML. Výsledek používá společné jádro Melee; je to pracovní kontrola bez automatického zásahu, zranění a bez změny Initiative.</p>
  <form data-hmk-beast-melee-preview class="hc-fields">
@@ -11886,6 +11902,23 @@ document.addEventListener('input',e=>{
  for(const card of root.querySelectorAll('.hmk-bestiary-species-card'))card.hidden=!!term&&!card.dataset.hmkBeastName.includes(term);
  for(const category of root.querySelectorAll('.hmk-bestiary-category'))category.hidden=!category.querySelector('.hmk-bestiary-species-card:not([hidden])');
 });
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-hmk-beast-contact-566]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const out=form.parentElement?.querySelector('[data-hmk-beast-contact-out-566]');
+ try{
+  const v=Object.fromEntries(new FormData(form));
+  const cid=campaignKey(data.campaignClock),active=encounterBeastHistory(data,cid).filter(x=>x.active);
+  const a=active.find(x=>x.id===v.attackerId),b=active.find(x=>x.id===v.defenderId);
+  if(!a||!b||a.id===b.id)throw Error('Vyber dva různé účastníky právě probíhajícího encounteru.');
+  const x=previewAnimalContact566({attackerProfile:a.profile,defenderProfile:b.profile,
+   weaponIndex:Number(v.attackIndex),aimZN:Number(v.aimZN),zdRoll:Number(v.zdRoll),
+   locationD10:Number(v.locationD10),impactDieRoll:Number(v.impactDieRoll),extraImpact:Number(v.extraImpact),
+   aimConfirmed:v.aimConfirmed==='yes'});
+  if(out)out.textContent=x.miss?`ZD mimo tělo (${x.actualZN} > ${x.maxZN}) · zásah do lokality nenastal. Žádné zranění.`:
+   `${a.name} → ${b.name}: ${x.weapon}, ${x.printedImpact}, Impact die (${x.impactDieRoll}) → Strike Impact ${x.strikeImpact}. ZN ${x.actualZN}, LD (${x.locationD10}) → ${x.location.name} (${x.location.id}), SHK ${x.location.locationShock}. Ochrana ${x.aspect} ${x.armourValue}, výsledný Impact ${x.effectiveImpact}. Předběžná závažnost: ${x.preliminaryInjury?.severity??'žádná'} (IL ${x.preliminaryInjury?.level??0}). Čeká: ${x.unresolved.join('; ')}. Nenastala zdravotní změna.`;
+ }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-hmk-beast-melee-preview]'))return;
  e.preventDefault();e.stopImmediatePropagation();
