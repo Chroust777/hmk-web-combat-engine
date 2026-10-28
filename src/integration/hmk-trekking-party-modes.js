@@ -28,7 +28,7 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
   check(!memberIds.includes(a.id),'Zvíře nesmí být zároveň vedeno jako pěší člen skupiny: '+a.id);
   const actor=characters.find(c=>c.id===a.id);
   const load=animalTrekLoad({animal:a,actor});
-  const health=actor?trekRegisteredAnimalHealth(actor):null;
+  const health=actor&&!actor.hmk?.livestockBreed?trekRegisteredAnimalHealth(actor):null;
   assertTrekAnimalCanMove(health);
   return {id:a.id,enc:load.enc,droverId:a.droverId,loaded:load.enc>=20,
    ...(load.encCalculation?{encCalculation:load.encCalculation}:{}),...(health?{health}:{})};
@@ -72,9 +72,13 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
  const wearied=members.some(x=>x.fatigue>=20)||animals.some(a=>a.health?.fatigue>=20);
  const injured=members.some(x=>x.injured)||animals.some(a=>a.health?.injured);
  const loaded=members.some(x=>x.loaded)||animals.some(x=>x.loaded)||loadedByGM===true;
- const forcedSlow=Number(wearied)+Number(injured);
+ // HMK p.122: oxen pulling a cart/wagon add ONE inherent Slow Mode.
+ // Not assumed from an unidentified animal with only a legacy final ENC.
+ const bovineSlow=['cart','wagon'].includes(conveyance)&&animals.some(a=>
+  (a.encCalculation?.breed??a.health?.breed)==='bovine');
+ const forcedSlow=Number(wearied)+Number(injured)+Number(bovineSlow);
  return {format:'hmk-trek-party-modes-v1',memberIds:[...memberIds].sort(),guideId,conveyance,animals,
-  members,wearied,injured,loaded,forcedSlow,manualLoaded:loadedByGM===true,
+  members,wearied,injured,loaded,bovineSlow,forcedSlow,manualLoaded:loadedByGM===true,
   loadUnresolved:unresolved.map(x=>x.id),sourcePages:[112,145,146,150,167,176,355]};
 }
 /** Verifies internal consistency of immutable party snapshots without comparing
@@ -94,14 +98,18 @@ export function validateTrekPartySnapshot(p){
   animals.every(a=>a&&typeof a.id==='string'&&a.id&&int(a.enc)&&
    typeof a.droverId==='string'&&p.memberIds.includes(a.droverId)&&!p.memberIds.includes(a.id)&&
    a.loaded===(a.enc>=20)&&
-   (a.encCalculation===undefined||(a.health&&validateAnimalTrekLoadProof(a.encCalculation,a.enc,a.health.breed)))&&
+   (a.encCalculation===undefined||validateAnimalTrekLoadProof(a.encCalculation,a.enc,a.health?.breed??a.encCalculation.breed))&&
    (a.health===undefined||validateTrekAnimalHealthProof(a.health,a.id))&&
    (!a.health||(a.health.fatigue<40&&!a.health.immobile&&!a.health.comaActive&&
     !a.health.extendedShockActive&&a.health.shock==='NONE'))),
   'Naložení jednotlivých zvířat neodpovídá doloženému ENC.');
  check(p.wearied===(p.members.some(m=>m.fatigue>=20)||animals.some(a=>a.health?.fatigue>=20))&&
   p.injured===(p.members.some(m=>m.injured)||animals.some(a=>a.health?.injured))&&
-  p.forcedSlow===Number(p.wearied)+Number(p.injured)&&
+  // Missing bovineSlow belongs to pre-v93.562 immutable snapshots: preserve
+  // their recorded travel evidence without silently retroactive penalties.
+  (p.bovineSlow===undefined||(typeof p.bovineSlow==='boolean'&&p.bovineSlow===
+    (['cart','wagon'].includes(p.conveyance)&&animals.some(a=>(a.encCalculation?.breed??a.health?.breed)==='bovine'))))&&
+  p.forcedSlow===Number(p.wearied)+Number(p.injured)+Number(p.bovineSlow===true)&&
   p.members.every(m=>m.injured===m.seriousWounds.some(w=>['head','torso','legs'].includes(w.zone))&&
    m.immobile===m.seriousWounds.some(w=>w.severity==='G'&&['head','torso','legs'].includes(w.zone))&&
    m.loaded===(p.conveyance==='foot'&&(m.modifiedENC!==null?m.modifiedENC>=10:m.minimumENC!==null&&m.minimumENC>=10))&&

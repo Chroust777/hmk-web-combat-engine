@@ -20,21 +20,23 @@ export function animalTrekLoad({animal,actor}={}){
  check(!Object.hasOwn(animal,'enc'),'Zvolte buď výsledné ENC, nebo hmotnost v librách, ne obojí.');
  check(whole(animal.loadLb)&&whole(animal.awkwardLb??0)&&(animal.awkwardLb??0)<=animal.loadLb,
   'Hmotnost zvířecího nákladu a neobratné části musí být doložena v celých librách.');
- const breed=actor?.hmk?.verifiedMountedBreed,str=actor?.hmk?.attributes?.str;
+ const breed=actor?.hmk?.verifiedMountedBreed??actor?.hmk?.livestockBreed,str=actor?.hmk?.attributes?.str;
  check(breed&&Number.isSafeInteger(str)&&str>0,
   'Automatický výpočet zatížení vyžaduje registrované zvíře, ověřené plemeno a STR.');
- const baseENC=gearEncumbrance(animal.loadLb,{awkwardWeightLb:animal.awkwardLb??0});
+ const loadStepLb=breed==='camel'?40:breed==='elephant'?80:20;
+ const baseENC=loadStepLb===20?gearEncumbrance(animal.loadLb,{awkwardWeightLb:animal.awkwardLb??0}):Math.floor((animal.loadLb+(animal.awkwardLb??0))/loadStepLb)*5;
  const strengthMod=strengthEncumbranceModifier(str);
  const breedMod=breed==='mule'?-20:0;
  const enc=Math.max(0,baseENC+strengthMod+breedMod);
  return {enc,encCalculation:{format:ANIMAL_TREK_LOAD_FORMAT,loadLb:animal.loadLb,
-  awkwardLb:animal.awkwardLb??0,baseENC,str,breed,strengthMod,breedMod,enc,
+  awkwardLb:animal.awkwardLb??0,baseENC,loadStepLb,str,breed,strengthMod,breedMod,enc,
   sourcePages:[112,122,145,354,355]}};
 }
 export function validateAnimalTrekLoadProof(proof,enc,breed){
  check(proof?.format===ANIMAL_TREK_LOAD_FORMAT&&whole(proof.loadLb)&&whole(proof.awkwardLb)&&
   proof.awkwardLb<=proof.loadLb&&Number.isSafeInteger(proof.str)&&proof.str>0&&
-  proof.breed===breed&&proof.baseENC===gearEncumbrance(proof.loadLb,{awkwardWeightLb:proof.awkwardLb})&&
+  proof.breed===breed&&proof.baseENC===(proof.loadStepLb===undefined?gearEncumbrance(proof.loadLb,{awkwardWeightLb:proof.awkwardLb}):Math.floor((proof.loadLb+proof.awkwardLb)/proof.loadStepLb)*5)&&
+  (proof.loadStepLb===undefined||proof.loadStepLb===(breed==='camel'?40:breed==='elephant'?80:20))&&
   proof.strengthMod===strengthEncumbranceModifier(proof.str)&&proof.breedMod===(breed==='mule'?-20:0)&&
   proof.enc===Math.max(0,proof.baseENC+proof.strengthMod+proof.breedMod)&&enc===proof.enc&&
   JSON.stringify(proof.sourcePages)===JSON.stringify([112,122,145,354,355]),

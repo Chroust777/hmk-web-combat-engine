@@ -5705,3 +5705,33 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 }
 .content-calendar .hc-foraging-jump-input input[type=number]{width:100%;min-width:0}
 @media(prefers-reduced-motion:reduce){.content-calendar #hmk-foraging-watch-fields{scroll-behavior:auto}}
+/* v93.562 · Chronicle trekking: concise steps, accessible rule hints, readable livestock. */
+.content-calendar .hc-party-status-table .hc-help-term,
+.content-calendar .hc-trek-routine .hc-help-term{cursor:help;text-decoration:underline dotted rgba(105,60,32,.65);text-underline-offset:3px}
+.content-calendar .hc-trek-routine .hc-trek-explainer,
+.content-calendar .hc-trek-routine .hc-trek-legacy p,
+.hc-livestock-catalog .hc-trek-explainer{
+ font-size:12px!important;line-height:1.5!important;color:var(--ink-soft,#654b31);margin:10px 0!important;
+}
+.content-calendar .hc-trek-routine .hc-trek-legacy,
+.hc-livestock-catalog details{
+ padding:9px 12px;margin:10px 0;border:1px solid rgba(120,88,48,.28);border-radius:4px;background:rgba(255,249,234,.17)
+}
+.content-calendar .hc-trek-routine .hc-trek-legacy summary,
+.hc-livestock-catalog details summary{cursor:pointer;font-weight:650;font-size:13px;line-height:1.35}
+.content-calendar .hc-trek-routine .hc-trek-legacy label{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.content-calendar .hc-trek-routine .hc-trek-stable{min-width:0;border:1px solid rgba(115,82,45,.3);padding:10px;margin:11px 0;border-radius:5px}
+.content-calendar .hc-trek-routine .hc-trek-stable h4{margin:1px 0 6px;font-size:15px}
+.content-calendar .hc-trek-routine .hc-trek-stable-row{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1.2fr) repeat(2,minmax(0,.8fr));gap:8px;padding:9px 0;border-top:1px solid rgba(115,82,45,.23)}
+.content-calendar .hc-trek-routine .hc-trek-stable-row>label{display:flex;flex-direction:column;gap:6px;font-size:12px;min-width:0}
+.content-calendar .hc-trek-routine .hc-trek-stable-row :is(input,select){width:100%;min-width:0;min-height:38px;box-sizing:border-box}
+.content-calendar .hc-trek-routine .hc-trek-stable>small{display:block;margin-top:8px;font-size:11px;line-height:1.45}
+.hc-livestock-catalog{padding:14px;margin:13px 0;border:1px solid rgba(112,76,40,.35);border-radius:5px;min-width:0}
+.hc-livestock-catalog h3{margin:0 0 8px}
+.hc-livestock-catalog .hc-livestock-acquire{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 13px}
+.hc-livestock-catalog .hc-livestock-acquire>label{display:flex;flex-direction:column;min-width:0;gap:6px;font-size:12px}
+.hc-livestock-catalog .hc-livestock-acquire :is(input,select){min-width:0;width:100%;box-sizing:border-box;min-height:39px}
+.hc-livestock-catalog .hc-livestock-actions{display:flex;align-items:end;flex-wrap:wrap;gap:8px}
+.hc-livestock-catalog .hc-livestock-owned>p{margin:5px 0;padding:6px;border-bottom:1px solid rgba(115,82,45,.19);font-size:12px}
+@media(max-width:980px){.content-calendar .hc-trek-routine .hc-trek-stable-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.content-calendar .hc-trek-routine .hc-trek-stable-row,.hc-livestock-catalog .hc-livestock-acquire{grid-template-columns:1fr}}
