@@ -132,3 +132,125 @@
  * adjacent 240px subpanels made the characteristics unreadable. */
 .content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-animal-card>.hc-fields{grid-template-columns:minmax(0,1fr);}
 .content-library .journal-book--stable #hmk-livestock-catalog .hmk-stable-animal-card .hmk-stable-block{max-width:100%;min-width:0;}
+
+/* 93.579 · Project parchment standard: Chronicle Spread typography and
+ * translucent parchment data tables are used for BOTH stable contexts.
+ * The Library tab owns acquisitions only; each character owns operations. */
+.content-library .journal-book .library-navigation.journal-book-subnav{
+ display:flex!important;flex-wrap:wrap;justify-content:center;align-items:center;gap:5px!important;
+ margin:-25px 20px 10px!important;position:relative;z-index:21!important;width:auto;
+ padding:1px 10px!important;background:transparent!important;
+}
+.content-library .journal-book .library-navigation.journal-book-subnav button{
+ flex:0 1 auto;min-height:28px!important;max-width:none;white-space:normal;
+ padding:4px 9px!important;border-radius:2px 2px 7px 7px!important;
+ font:11px/1.15 'Palatino Linotype','Book Antiqua',Georgia,serif!important;
+ font-variant:small-caps;letter-spacing:.02em!important;
+ border:1px solid #ae7945!important;box-shadow:inset 0 1px #f3e6c4,0 2px 4px #0006!important;
+ background:linear-gradient(180deg,#b88749,#ddbb81)!important;color:#342318!important;
+}
+.content-library .journal-book .library-navigation.journal-book-subnav button[aria-selected="true"]{
+ background:linear-gradient(180deg,#324a66,#142941)!important;
+ border-color:#b99051!important;color:#ffe1a6!important;font-weight:700!important;
+}
+.content-library .journal-book--stable .hmk-stable-library-intro,
+.content-sheet .journal-book--personal-stable .hmk-stable-reference{
+ border:1px solid rgba(129,90,46,.36);padding:.5rem .7rem;
+ background:rgba(208,167,104,.075);border-radius:5px;
+}
+/* Uniform font scale: reference paragraphs should not inherit the oversized
+ * travel introduction font. All new stable headings and tables remain legible. */
+.content-library .journal-book--stable .hc-trek-explainer,
+.content-library .journal-book--stable .hc-livestock-catalog p,
+.content-library .journal-book--stable .hmk-stable-library-intro p,
+.content-sheet .journal-book--personal-stable p,
+.content-sheet .journal-book--personal-stable label,
+.content-sheet .journal-book--personal-stable summary{
+ font:12px/1.48 'Palatino Linotype','Book Antiqua',Georgia,serif!important;
+ color:#3c2b1b!important;
+}
+.content-library .journal-book--stable h4,
+.content-sheet .journal-book--personal-stable h4{font:700 13px/1.3 'Palatino Linotype','Book Antiqua',Georgia,serif!important;color:#443019!important}
+/* No opaque white cells: match the low-contrast manuscript tables of Chronicle Spread. */
+.content-library .journal-book--stable .catalog-scroll,
+.content-sheet .journal-book--personal-stable .catalog-scroll{max-width:100%;overflow-x:auto;min-width:0;}
+.content-library .journal-book--stable .catalog-spec,
+.content-sheet .journal-book--personal-stable .catalog-spec{
+ background:transparent!important;color:#352419!important;border:0!important;
+ border-collapse:collapse!important;font:11px/1.4 'Palatino Linotype','Book Antiqua',Georgia,serif!important;
+}
+.content-library .journal-book--stable .catalog-spec th,
+.content-library .journal-book--stable .catalog-spec td,
+.content-sheet .journal-book--personal-stable .catalog-spec th,
+.content-sheet .journal-book--personal-stable .catalog-spec td{
+ color:#352419!important;background:transparent!important;
+ border-bottom:1px solid rgba(142,103,51,.31)!important;
+ padding:5px 6px!important;
+}
+.content-library .journal-book--stable .catalog-spec thead th,
+.content-sheet .journal-book--personal-stable .catalog-spec thead th{background:rgba(156,111,49,.16)!important;color:#453119!important;font-weight:700!important;}
+.content-library .journal-book--stable .catalog-spec tbody tr:nth-child(even),
+.content-sheet .journal-book--personal-stable .catalog-spec tbody tr:nth-child(even){background:rgba(152,108,45,.05)!important;}
+.content-library .journal-book--stable .hc-livestock-catalog,
+.content-library .journal-book--stable #hmk-livestock-catalog{min-width:0;max-width:100%;}
+.content-library .journal-book--stable .hc-livestock-acquire{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:9px;}
+.content-library .journal-book--stable .hc-livestock-acquire label,
+.content-library .journal-book--stable .hc-livestock-acquire input,
+.content-library .journal-book--stable .hc-livestock-acquire select{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+.content-library .journal-book--stable .hc-livestock-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.content-library .journal-book--stable .hc-livestock-acquire button{font:12px/1.3 Georgia,serif;white-space:normal;}
+.content-sheet .journal-book--personal-stable .hmk-owner-stable-spread{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-width:0;width:100%;align-items:stretch;}
+.content-sheet .journal-book--personal-stable .hmk-owner-stable-page,
+.content-sheet .journal-book--personal-stable .hmk-stable-owner-column{min-width:0;max-width:100%;width:100%;overflow-wrap:anywhere;box-sizing:border-box;}
+.content-sheet .journal-book--personal-stable .hmk-stable-block{
+ margin:.5rem 0;border:1px solid rgba(139,94,41,.37)!important;border-radius:5px;
+ box-shadow:inset 0 0 0 1px rgba(242,221,173,.4);
+ background:rgba(190,145,78,.07)!important;min-width:0;max-width:100%;padding:.65rem .7rem;
+}
+.content-sheet .journal-book--personal-stable .hmk-stable-block>.hc-fields,
+.content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;min-width:0;}
+.content-sheet .journal-book--personal-stable input,
+.content-sheet .journal-book--personal-stable select,
+.content-sheet .journal-book--personal-stable textarea,
+.content-sheet .journal-book--personal-stable button{max-width:100%;box-sizing:border-box;min-width:0;}
+.content-sheet .journal-book--personal-stable .hmk-stable-zones{background:transparent!important;padding:.3rem 0;border:0!important}
+.content-sheet .journal-book--personal-stable .hmk-stable-zone-hurt{background:rgba(153,33,30,.13)!important}
+.content-sheet .journal-book--personal-stable .hmk-stable-zone-loss{background:rgba(154,102,33,.1)!important}
+.content-sheet .journal-book--personal-stable .hmk-stable-animal-switcher{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0 11px;padding:3px 0;border-bottom:1px solid #ad87567a;}
+.content-sheet .journal-book--personal-stable .hmk-stable-animal-switcher button{
+ font:11px/1.3 Georgia,serif;min-height:27px;padding:4px 7px;
+ border:1px solid #a77b43;border-radius:4px;color:#3b281b;background:#d6b98766;}
+.content-sheet .journal-book--personal-stable .hmk-stable-animal-switcher button[aria-pressed="true"]{background:#37475f;color:#ffe8bd;}
+.content-sheet .journal-book--personal-stable .hmk-stable-accordion{
+ border:1px solid rgba(129,90,46,.4);border-radius:5px;margin:.4rem 0 .65rem;
+ background:rgba(192,151,84,.07);overflow:hidden;max-width:100%;min-width:0;}
+.content-sheet .journal-book--personal-stable .hmk-stable-accordion>summary{
+ padding:8px 10px;font-weight:700!important;font-size:12px!important;
+ color:#51371b!important;background:rgba(175,128,60,.12);cursor:pointer;}
+.content-sheet .journal-book--personal-stable .hmk-stable-accordion>.hmk-stable-block,
+.content-sheet .journal-book--personal-stable .hmk-stable-accordion>.hmk-stable-reference{border:0!important;margin:0!important;border-radius:0!important;}
+.content-sheet .journal-book--personal-stable .hmk-stable-owner-column>p{margin:.4rem 0;}
+@media(max-width:1160px){
+ .content-sheet .journal-book--personal-stable .hmk-owner-stable-spread{grid-template-columns:minmax(0,1fr)!important}
+ .content-library .journal-book--stable .hc-livestock-acquire{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:650px){.content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields{grid-template-columns:minmax(0,1fr);}}
+
+/* Always-visible purchase/catalog folios. No tabular record is hidden behind
+ * a details disclosure in the Library's animal reference. */
+.content-library .journal-book--stable .hmk-stable-catalog-spread{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);width:100%;min-width:0;align-items:stretch;}
+.content-library .journal-book--stable .hmk-stable-catalog-page,
+.content-library .journal-book--stable .hmk-stable-catalog-column{width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow-wrap:anywhere;}
+.content-library .journal-book--stable .hmk-stable-library-reference{background:rgba(188,143,77,.04);margin:.6rem 0;min-width:0;max-width:100%;}
+.content-library .journal-book--stable .hmk-stable-library-reference .catalog-scroll{width:100%;max-width:100%;overflow-x:auto;}
+.content-library .journal-book--stable .hmk-stable-library-reference>p{margin:.35rem 0 .55rem!important;}
+.content-library .journal-book--stable .hmk-stable-library-reference h4{margin:.55rem 0 .35rem!important;}
+.content-library .journal-book--stable .hmk-stable-catalog-column>h3{font-size:15px!important;color:#56371b;margin:.4rem 0 .25rem!important}
+@media(max-width:1160px){.content-library .journal-book--stable .hmk-stable-catalog-spread{grid-template-columns:minmax(0,1fr)!important;}}
+
+.content-library .journal-book--stable .hmk-stable-stats-scroll .catalog-spec{min-width:850px!important;}
+.content-library .journal-book--stable .hmk-stable-table-hint{font-size:10px!important;font-style:italic;color:#675039!important;margin:.15rem 0 .35rem!important;}
+/* Manuscript table/font standard for new journal and library folios. */
+.journal-book .catalog-spec{font-family:'Palatino Linotype','Book Antiqua',Georgia,serif!important;background:transparent;}
+.journal-book .catalog-scroll{background:transparent;}

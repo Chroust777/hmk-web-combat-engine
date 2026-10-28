@@ -284,7 +284,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.578';
+const APP_VERSION='93.579';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -299,6 +299,7 @@ let storageReadOnly=false;
 let storageBaseline=null; // exact bytes last observed; prevents stale-tab overwrites
 let data=clean(),view='characters',selected=null,editItem=null,query='',category='weapon',notice='';
 let combatBestiaryExpanded=false; // only presentation state, never the stored campaign
+let stableOwnerFocusedId=null; // Presentation-only selected animal in the current character journal
 let stableEncounterExpanded=false; // presentation only; render costly combat interface on demand
 
 // Presentation-only navigation history: never stores/restores Character, Inventory,
@@ -3056,9 +3057,9 @@ function foragingEvidenceInCharacterInventory(actorId){
 }
 function journalSectionNav(){
  const c=character(selected),specialties=c?characterSpecialtyChapters(c):[];
- const sections=[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['hazards','Nebezpečí / Trauma'],['provisions','Provisions · jídlo a pití'],...specialties.map(x=>[x.id,x.label]),['notes','Notes & Logbook']];
- const stableCount=c?bestiaryKnownAnimals().filter(a=>a.ownerId===c.id).length:0;
- return `<div class="journal-book-subnav">${sections.map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}${stableCount?`<button type="button" class="secondary journal-stable-shortcut" data-hmk-open-stable aria-label="Otevřít stáj: ${stableCount} vlastněných zvířat">♞ Stáj (${stableCount})</button>`:''}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}<span class="journal-character-action-divider" aria-hidden="true"></span><button type="button" class="secondary journal-character-action" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="secondary journal-character-action" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`;
+ const stableCount=c?bestiaryKnownAnimals().filter(a=>a.ownerId===c.id&&!stableBurden(data,campaignKey(data.campaignClock),a).exit).length:0;
+ const sections=[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['hazards','Nebezpečí / Trauma'],['provisions','Provisions · jídlo a pití'],...(stableCount?[['stable','♞ Stáj ('+stableCount+')']]:[]),...specialties.map(x=>[x.id,x.label]),['notes','Notes & Logbook']];
+ return `<div class="journal-book-subnav">${sections.map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}<span class="journal-character-action-divider" aria-hidden="true"></span><button type="button" class="secondary journal-character-action" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="secondary journal-character-action" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`;
 }
 /** A page contains live DOM controls; the book decoration is the same for all folios.
  * Character-only navigation never belongs to World, Combat, Skills or Library.
@@ -3506,6 +3507,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  if(isCharacterSpecialtySection(activeSheetSection))return '';
 
  if(activeSheetSection==='animals'){activeSheetSection='overview';}
+ if(activeSheetSection==='stable')return characterStableView(c);
 
  if(activeSheetSection==='hazards')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Nebezpečí / Trauma</h3><p>GM procedury a následky postavy ${esc(c.name)} · HMK</p></header><div class="columns journal-tech-columns">${hazardsView(c.id)}</div></section>`,`journal-book--chapter journal-book--hazards`);
  if(activeSheetSection==='provisions')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Provisions · jídlo a pití</h3><p>${esc(c.name)} · přehled doložených zásob</p></header><div class="columns journal-tech-columns">${characterProvisionActionsHTML(c)}</div></section>`,`journal-book--chapter journal-book--provisions`);
@@ -4132,10 +4134,10 @@ function bestiaryHealthPanel567(active,cid,minute){
  ${pending?.shock?.followup?`<p class="hc-hint">Shock Follow-up: ${esc(pending.shock.followup.timing||'vyžaduje další hod')} · nový Shock stav se automaticky neruší.</p>`:''}
  </details>`}).join('')}</section>`;
 }
-function bestiaryEncounterPanel({combat=false,stableOnly=false}={}){
+function bestiaryEncounterPanel({combat=false,stableOnly=false,ownerId=null}={}){
  const clock=data.campaignClock,cid=clock?campaignKey(clock):null,animals=bestiaryKnownAnimals();
- const existing=cid?encounterBeastHistory(data,cid):[],active=existing.filter(x=>x.active&&(!stableOnly||!!x.ownerAnimalId));
- const stable=animals.filter(x=>x.spec.bestiaryId);
+ const existing=cid?encounterBeastHistory(data,cid):[],active=existing.filter(x=>x.active&&(!stableOnly||!!x.ownerAnimalId)&&(!ownerId||x.ownerId===ownerId));
+ const stable=animals.filter(x=>x.spec.bestiaryId&&(!ownerId||x.ownerId===ownerId));
  const groups=[...new Set(BESTIARY_ENTRIES_564.map(x=>x.group))];
  const opts=groups.map(g=>`<optgroup label="${esc(g)}">${BESTIARY_ENTRIES_564.filter(p=>p.group===g).map(p=>`<option value="${esc(p.id)}">${esc(p.name)} · HMK ${p.page}${p.generation==='variable'?' · GM generuje podle tabulky':''}</option>`).join('')}</optgroup>`).join('');
  const table=active.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Účastník</th><th>Druh / varianta</th><th>STR / END / AGL / PER</th><th>Move</th><th>Pravidlový podklad</th><th>Akce</th></tr></thead><tbody>${active.map(x=>{const p=x.profile||{},a=p.attributes||{},status=bestiaryEncounterStatus564(x);return `<tr><td><strong>${esc(x.name)}</strong></td><td>${esc(p.name||'neznámý')}</td><td>${[a.str,a.end,a.agl,a.per].map(v=>v??'—').join(' / ')}</td><td>${p.move??'—'}</td><td>str. ${p.page??'—'} · ${x.ownerAnimalId?'stáj':'dočasný'} · ${status.profiled?'základní statistiky':'generace dle příslušné tabulky'}${x.gmNotes?' · GM: '+esc(x.gmNotes):''}</td><td><button type="button" class="hc-small secondary" data-hmk-beast-dismiss="${esc(x.id)}">Ukončit účast</button></td></tr>`}).join('')}</tbody></table></div>`:'<p>V této kampani nejsou zařazeni žádní dočasní tvorové.</p>';
@@ -4277,21 +4279,52 @@ function livestockAcquisitionHTML({location='library'}={}){
  const active=verifiedLivestock(data,campaignId);
  const options=data.characters.filter(c=>!c.archived&&!c.hmk?.verifiedMountedBreed).map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${esc(cashForCharacter(c).ok?cashForCharacter(c).balance+'d':'hotovost nedoložena')}</option>`).join('');
  const beasts=BEASTS_P122.filter(b=>livestockOffer(b.id));
- const acquisition=`<h3>Stáj · zvířata, nákup a tažná výbava</h3><p class="hc-trek-explainer">HMK str. 122 a 354–355. V katalogu jsou ověřené ceny a limity výcviku. Nákup vytvoří záznam vlastnictví, kupní doklad a odečte peníze z kampaně; bezplatné převzetí hotovost nemění; <strong>nezakládá automaticky Combat State ani nesimuluje výcvik</strong>. Při cestování se použije doložená tělesná hmotnost a základní STR.</p>
+ const acquisition=`<h3>Stáj · pořízení zvířete</h3><p class="hc-trek-explainer">HMK str. 122 a 354–355. V katalogu jsou ověřené ceny a limity výcviku. Nákup vytvoří záznam vlastnictví, kupní doklad a odečte peníze z kampaně; bezplatné převzetí hotovost nemění; <strong>nezakládá automaticky Combat State ani nesimuluje výcvik</strong>. Při cestování se použije doložená tělesná hmotnost a základní STR.</p>
  ${clock&&options?`<form data-hmk-livestock-acquire class="hc-livestock-acquire"><label>Druh zvířete<select name="beastId" required>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<option value="${esc(b.id)}">${esc(b.name)} · ${b.priceD}d · STR ${sp.str??'neuvedeno'} · ${sp.bodyWeightLb??'?'} lb · MB max. ${b.maxMasteryBoosts}</option>`}).join('')}</select></label><label>Jméno zvířete<input name="beastName" maxlength="60" required placeholder="Např. Blesk"></label><label>Majitel / platící postava<select name="ownerId" required>${options}</select></label><div class="hc-livestock-actions"><button type="submit" name="acquisition" value="buy">Koupit za cenu HMK</button><button type="submit" name="acquisition" value="free" class="secondary">Převzít zdarma (potvrdí GM)</button></div></form>`:'<p>Pro nákup je nutná aktivní kampaň a alespoň jedna postava.</p>'}
- <details><summary>Přehled parametrů a pravidel pro zvířata</summary><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Cena</th><th>Max MB</th><th>Hmotnost</th><th>STR</th><th>Move</th><th>Využití</th></tr></thead><tbody>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<tr><td>${esc(b.name)}</td><td>${b.priceD}d</td><td>${b.maxMasteryBoosts}</td><td>${sp.bodyWeightLb??'—'} lb</td><td>${sp.str??'—'}</td><td>${sp.move??'—'}</td><td>${esc(sp.role)}</td></tr>`}).join('')}</tbody></table></div><h4>Bestiář HMK · základní atributy a dovednosti (str. 355)</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Velikost</th><th>END</th><th>AGL</th><th>PER</th><th>AUR</th><th>WIL</th><th>REA</th><th>CRE</th><th>Awareness</th><th>Scent</th><th>Stealth</th><th>Spirit</th><th>Initiative</th></tr></thead><tbody>${beasts.filter(x=>livestockOffer(x.id).size).map(x=>{const a=livestockOffer(x.id);return `<tr><td>${esc(x.name)}</td>${['size','end','agl','per','aur','wil','rea','cre','aware','scent','stealth','spirit','initiative'].map(k=>`<td>${esc(a[k]??'—')}</td>`).join('')}</tr>`}).join('')}</tbody></table></div><h4>Přirozené útoky (jen referenční popis)</h4>${beasts.filter(x=>livestockOffer(x.id).attack).map(x=>`<p class="hc-trek-explainer"><strong>${esc(x.name)}:</strong> ${esc(livestockOffer(x.id).attack)}</p>`).join('')}<p>Tištěné hodnoty ukazují výchozí domestikaci, nikoli výsledky výcviku. Tyto referenční útoky nejsou automaticky vytvářené bojové akce; zvířecí zdravotní a bojový profil se eviduje samostatně.</p><p>Vybavení se kupuje samostatně: pack harness 24d/10 lb (správně uložený náklad nejvýše 20 % hmotnosti zvířete), postroj pro koně 20d, postroj pro vola 20d, kára 84d, vůz 220d. Vůz typicky táhnou dva voli (8000 lb) nebo dva tažní koně (6400 lb). Kára jeden vůl (2500 lb) nebo jeden tažný kůň (2000 lb). Vůl přidává vlastní Slow Mode (HMK 122, 145).</p></details>
+ <section class="hmk-stable-reference-tables"><h4>Ověřené referenční tabulky HMK</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Cena</th><th>Max MB</th><th>Hmotnost</th><th>STR</th><th>Move</th><th>Využití</th></tr></thead><tbody>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<tr><td>${esc(b.name)}</td><td>${b.priceD}d</td><td>${b.maxMasteryBoosts}</td><td>${sp.bodyWeightLb??'—'} lb</td><td>${sp.str??'—'}</td><td>${sp.move??'—'}</td><td>${esc(sp.role)}</td></tr>`}).join('')}</tbody></table></div><h4>Bestiář HMK · základní atributy a dovednosti (str. 355)</h4><p class="hmk-stable-table-hint">Širokou tabulku lze vodorovně posunout; každý řádek odpovídá jednomu druhu.</p><div class="catalog-scroll hmk-stable-stats-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Velikost</th><th>END</th><th>AGL</th><th>PER</th><th>AUR</th><th>WIL</th><th>REA</th><th>CRE</th><th>Awareness</th><th>Scent</th><th>Stealth</th><th>Spirit</th><th>Initiative</th></tr></thead><tbody>${beasts.filter(x=>livestockOffer(x.id).size).map(x=>{const a=livestockOffer(x.id);return `<tr><td>${esc(x.name)}</td>${['size','end','agl','per','aur','wil','rea','cre','aware','scent','stealth','spirit','initiative'].map(k=>`<td>${esc(a[k]??'—')}</td>`).join('')}</tr>`}).join('')}</tbody></table></div><h4>Přirozené útoky (jen referenční popis)</h4>${beasts.filter(x=>livestockOffer(x.id).attack).map(x=>`<p class="hc-trek-explainer"><strong>${esc(x.name)}:</strong> ${esc(livestockOffer(x.id).attack)}</p>`).join('')}<p>Tištěné hodnoty ukazují výchozí domestikaci, nikoli výsledky výcviku. Tyto referenční útoky nejsou automaticky vytvářené bojové akce; zvířecí zdravotní a bojový profil se eviduje samostatně.</p><p>Vybavení se kupuje samostatně: pack harness 24d/10 lb (správně uložený náklad nejvýše 20 % hmotnosti zvířete), postroj pro koně 20d, postroj pro vola 20d, kára 84d, vůz 220d. Vůz typicky táhnou dva voli (8000 lb) nebo dva tažní koně (6400 lb). Kára jeden vůl (2500 lb) nebo jeden tažný kůň (2000 lb). Vůl přidává vlastní Slow Mode (HMK 122, 145).</p></section>
 `;
- const registry=`<h4>Registr a kompletní péče o zvířata</h4><p>Veškeré operace se zapisují jako neměnné doklady ke konkrétnímu zvířeti, nikoli do druhé tabulky deníku postavy.</p>
- ${data.characters.flatMap(owner=>(owner.hmk?.livestock||[]).filter(r=>r.campaignId===campaignId).map(r=>({...r,spec:livestockOffer(r.beastId)}))).filter(a=>a.spec).length?data.characters.flatMap(owner=>(owner.hmk?.livestock||[]).filter(r=>r.campaignId===campaignId).map(r=>({...r,spec:livestockOffer(r.beastId)}))).filter(a=>a.spec).map(a=>{try{return stableHubAnimalHTML(a,campaignId)}catch(error){console.error('HMK stable: cannot display animal',a.id,error);return `<section class="panel hmk-stable-animal-error" role="alert"><h4>${esc(a.name)} · chyba zobrazení</h4><p>Historie zvířete zůstala beze změny. Kartu nelze bezpečně vykreslit: ${esc(error?.message||String(error))}</p></section>`}}).join(''):'<p>V této kampani dosud nejsou zvířata. Pořídit je lze formulářem nahoře.</p>'}
- <details class="hmk-stable-training-workspace"><summary>Animalcraft · kompletní pravidlový výcvik zvířat (HMK 65)</summary>
- <p>Na jednotlivý výcvik je nutný skutečný předchozí Animalcraft Skill Value. Časová podmínka 6 měsíců je povinná; žádný bod MB zde nevzniká bez dokončeného postupu.</p>
- ${data.characters.filter(c=>!c.archived).map(c=>animalTrainingNextHTML(data.journal,c.id,campaignId)).filter(Boolean).join('')||'<p>Žádný připravený Animalcraft SV. Proveďte nejdříve doložený Animalcraft Skill Test; tento registr pak nabídne výcvik.</p>'}
- </details>
- <section class="hmk-stable-health-workspace"><button type="button" class="secondary" data-hmk-stable-health-toggle aria-expanded="${stableEncounterExpanded?'true':'false'}">${stableEncounterExpanded?'Sbalit':'Rozbalit'} zdravotní, bojové a encounter funkce vlastněných zvířat</button>${stableEncounterExpanded?bestiaryEncounterPanel({combat:true,stableOnly:true}):''}</section>
-`;
- if(location==='spread')return {acquisition,registry};
- return `<section class="hc-livestock-catalog" id="hmk-livestock-catalog">${acquisition}${registry}</section>`;
+ if(location==='split'){
+  const marker='<section class="hmk-stable-reference-tables">',i=acquisition.indexOf(marker);
+  if(i<0)throw Error('Katalog zvířat postrádá pravidlové tabulky');
+  return {purchase:acquisition.slice(0,i),reference:acquisition.slice(i)};
+ }
+ return `<section class="hc-livestock-catalog" id="hmk-livestock-catalog">${acquisition}</section>`;
 }
+
+/** Single source of truth: the character stable renders the SAME animal proof
+ * and action forms as the historical shared stable. No copied ownership or HP.
+ * Both folios are assembled from the immutable animal's original forms. */
+function characterStableView(owner){
+ const clock=data.campaignClock,cid=clock?campaignKey(clock):null;
+ const animals=cid?bestiaryKnownAnimals().filter(a=>a.ownerId===owner.id):[];
+ const active=animals.filter(a=>!stableBurden(data,cid,a).exit);
+ if(!active.length)return journalChapterShell('Stáj · '+owner.name,'Žádné právě vlastněné zvíře',`<p class="hmk-stable-note">Zvíře lze pořídit v Knihovně → Stáj · zvířata.</p>`,'journal-book--personal-stable');
+ const selectedAnimal=active.find(a=>a.id===stableOwnerFocusedId)||active[0];
+ const activeButtons=active.map(a=>`<button type="button" class="${a.id===selectedAnimal.id?'':'secondary'}" data-hmk-stable-pick-animal="${esc(a.id)}" aria-pressed="${a.id===selectedAnimal.id}">${esc(a.name)} · ${esc(a.spec.name)}</button>`).join('');
+ let folioLeft='',folioRight='';
+ try{
+  const card=folioHTMLNodes(stableHubAnimalHTML(selectedAnimal,cid))[0];
+  const sections=[...(card?.querySelector(':scope > .hc-fields')?.children||[])];
+  if(sections.length!==4)throw Error('Karta zvířete nemá všechny čtyři části');
+  folioLeft=sections[0].outerHTML;
+  const headings=['Výstroj, náklad a vozidla','Krmení, voda a péče','Výcvik, kalendář a vlastnictví'];
+  folioRight=sections.slice(1).map((sec,i)=>`<details class="hmk-stable-accordion" ${i===0?'open':''}><summary>${headings[i]}</summary>${sec.outerHTML}</details>`).join('');
+ }catch(error){console.error('HMK stable owner:',error);folioLeft=`<p role="alert" class="notice error">Kartu zvířete nelze bezpečně otevřít: ${esc(error?.message||String(error))}</p>`;}
+ const trainingHTML=animalTrainingNextHTML(data.journal,owner.id,cid);
+ const secondary=`<details class="hmk-stable-accordion"><summary>Animalcraft · úplný výcvik dle HMK 65</summary><div class="hmk-stable-reference"><p>Výcvik vyžaduje doložený Skill Value, skutečný hod a časovou podmínku; nová hodnota nevzniká otevřením karty.</p>${trainingHTML||'<p>Nejdříve proveďte doložený Animalcraft Skill Test postavy.</p>'}</div></details>
+ <details class="hmk-stable-accordion" ${stableEncounterExpanded?'open':''}><summary>Zdraví · boj · encountery</summary><div class="hmk-stable-reference">${stableEncounterExpanded?bestiaryEncounterPanel({combat:true,stableOnly:true,ownerId:owner.id}):'<p>Zdravotní historie a anatomie jsou zobrazeny vlevo. Rozšířené bojové nástroje otevřete následujícím tlačítkem.</p>'}<button type="button" class="secondary" data-hmk-stable-health-toggle>${stableEncounterExpanded?'Sbalit':'Rozbalit'} úplný zdravotní a bojový panel</button></div></details>`;
+ const spread=`<div class="journal-book-spread folio-chapter-spread hmk-owner-stable-spread" id="hmk-livestock-catalog" data-hmk-stable-owner="${esc(owner.id)}">
+ <section class="journal-book-page journal-book-page--left folio-chapter-page hmk-owner-stable-page" aria-label="Levá stránka: anatomie a zdravotní stav ${esc(selectedAnimal.name)}">
+ <header class="folio-chapter-heading"><h3>Stáj · ${esc(owner.name)}</h3><p>Trvalá identita, statistiky, anatomie a zranění.</p></header>
+ <nav class="hmk-stable-animal-switcher" aria-label="Vlastněná zvířata postavy">${activeButtons}</nav>
+ <div class="folio-chapter-content hmk-stable-owner-column">${folioLeft}</div>
+ </section><section class="journal-book-page journal-book-page--right folio-chapter-page hmk-owner-stable-page" aria-label="Pravá stránka: kompletní péče o ${esc(selectedAnimal.name)}">
+ <header class="folio-chapter-heading"><h3>${esc(selectedAnimal.name)} · správa</h3><p>Výstroj, náklad, zásoby, výcvik, cestování a historie.</p></header>
+ <div class="folio-chapter-content hmk-stable-owner-column">${folioRight}${secondary}</div>
+ </section></div>`;
+ return journalShell(spread,'journal-book--chapter journal-book--personal-stable',true);
+}
+
 function printedPossessionsPanel(){const table=(title,rows)=>`<h4>${title} (${rows.length} položek)</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Předmět</th><th>Zdroj / dovednost</th><th>lb</th><th>Cena v originálu</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.skill)}</td><td>${x.weightLb}</td><td>${esc(x.pricePrinted)}</td></tr>`).join('')}</tbody></table></div>`;return `<section class="panel wide"><h3>HMK · Gear & Craft Items (str. 120–121)</h3><p class="muted">Strukturovaný přepis tištěných tabulek. Ceny včetně zvláštních symbolů zůstávají ve zdrojovém zápisu; pravidlové účinky zatím nejsou automaticky zapojeny do inventáře.</p>${table('Expedition Equipment · str. 120',EXPEDITION_EQUIPMENT_P120)}${table('Craft Items & Tools · str. 121',CRAFT_ITEMS_TOOLS_P121)}<h4>Beasts · str. 122 (${BEASTS_P122.length})</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Beast</th><th>Max MB</th><th>Price (d)</th></tr></thead><tbody>${BEASTS_P122.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.maxMasteryBoosts}</td><td>${x.priceD}d</td></tr>`).join('')}</tbody></table></div><h4>Vehicles &amp; Tack · str. 122 (${VEHICLES_TACK_P122.length})</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Item</th><th>Skill</th><th>lb</th><th>Price (d)</th></tr></thead><tbody>${VEHICLES_TACK_P122.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.skill)}</td><td>${x.weightLb}</td><td>${x.priceD}d</td></tr>`).join('')}</tbody></table></div><p class="tiny muted">Str. 122: horse/bovine +5 ENC per 20 full lb; camel per 40 lb; elephant per 80 lb. Training prices per MB: dog 12d, hawk 60d, horse/camel 80d, elephant 240d. Source reference only; mount fatigue, riding and hauling are not automatically executed.</p><h4>Workshops · str. 121</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Quality</th><th>State</th><th>Wealth</th><th>Alchemy Wealth</th></tr></thead><tbody>${WORKSHOP_QUALITY_P121.map(x=>`<tr><td>${x.quality}</td><td>${esc(x.state)}</td><td>${esc(x.wealth)}</td><td>${esc(x.alchemyWealth)}</td></tr>`).join('')}</tbody></table></div><h4>Water weight by volume</h4><p>${WATER_WEIGHT_P121.map(x=>`${esc(x[0])}: ${x[1]} lb`).join(' · ')}</p><h4>Mundane fire damage · str. 121</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>FS</th><th>Amount</th><th>Diameter</th><th>Target</th><th>Impact</th></tr></thead><tbody>${MUNDANE_FIRE_P121.map(x=>`<tr><td>${x.fs}</td><td>${esc(x.amount)}</td><td>${esc(x.diameter)}</td><td>${x.target}</td><td>${x.impact}</td></tr>`).join('')}</tbody></table></div><p class="tiny muted">Další pravidlové poznámky (balení, světlo, chlad, dílny a oheň) vyžadují samostatnou mechanickou implementaci a kontrolu.</p></section>`;}
 function catalogCoveragePanel(){const coverage=catalogCoverage(allCatalogItems());return `<section class="panel wide"><h3>Pokrytí vybavení podle PDF HMK</h3><p class="muted">Tato kontrola nezaměňuje počet evidovaných položek za úplnost pravidlových tabulek. Hotové komplety vyžadují samostatnou strukturovanou definici; pouhý název nestačí.</p><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Oblast</th><th>Strany HMK</th><th>Evidováno</th><th>Stav</th></tr></thead><tbody>${coverage.sections.map(x=>`<tr><td>${esc(x.label)}</td><td>${esc(x.pages)}</td><td>${x.count===null?'—':esc(x.count)}</td><td>${x.complete?'Strukturované minimum splněno':'Neověřeno / nedokončeno'}</td></tr>`).join('')}</tbody></table></div><p class="tiny muted">U kompletů je cílové minimum 12. U ostatních oblastí není celkový počet bezpečně stanoven; stav zůstává neověřený.</p><div class="actions">${button('Exportovat přehled pokrytí JSON','export-catalog-coverage')}</div></section>`;}
 function armourCoverageReadinessPanel(){const a=auditArmourCoverage();return `<section class="panel wide"><h3>HMK · ověření anatomického pokrytí</h3><p><b>${a.ready} / ${a.total}</b> položek připravených pro pravidlový výpočet · ${a.pending} vyžaduje vizuální přepis pokrytí z PDF.</p><p class="muted">Bez ověřených míst zásahu, zón, směrových omezení a příznaku pevné zbroje je výpočet zablokován. Propojení ${a.matched}/${a.suitParts} součástí kompletů potvrzuje pouze identitu položek, nikoli ochranu.</p></section>`;}
@@ -4351,26 +4384,35 @@ function librarySuitRows(suits){
  }).join('');
 }
 function libraryTabsHTML(selectedTab){
- return `<nav class="library-navigation" aria-label="Sekce knihovny" role="tablist">${LIBRARY_TABS.map(t=>`<button type="button" role="tab" data-library-tab="${t.id}" aria-selected="${selectedTab===t.id}" tabindex="${selectedTab===t.id?'0':'-1'}">${esc(t.name)}</button>`).join('')}</nav>`;
+ return `<nav class="library-navigation journal-book-subnav" aria-label="Sekce knihovny" role="tablist">${LIBRARY_TABS.map(t=>`<button type="button" class="${selectedTab===t.id?'':'secondary'}" role="tab" data-library-tab="${t.id}" aria-selected="${selectedTab===t.id}" tabindex="${selectedTab===t.id?'0':'-1'}">${esc(t.name)}</button>`).join('')}</nav>`;
+}
+function withLibraryFolioMenu(bookHTML,tab){
+ const mark='<div class="journal-book-spread';
+ if(!bookHTML.includes(mark))throw Error('Chybí dvoustránková sazba Knihovny');
+ return bookHTML.replace(mark,libraryTabsHTML(tab)+mark);
 }
 function libraryView(){
  const selectedTab=LIBRARY_TABS.some(t=>t.id===libraryTab)?libraryTab:'melee';
  if(selectedTab==='stable'){
-  // Genuine book folios. Every form, table and animal card belongs to exactly
-  // one page rather than floating across the parchment centre gutter.
-  const parts=livestockAcquisitionHTML({location:'spread'});
-  const spread=`<div class="journal-book-spread folio-chapter-spread hmk-stable-spread" id="hmk-livestock-catalog" aria-label="Stáj a správa zvířat">
-   <section class="journal-book-page journal-book-page--left folio-chapter-page hmk-stable-page hmk-stable-page--acquisition" aria-label="Levá stránka: pořízení a katalog zvířat">
-    <header class="folio-chapter-heading"><h3>Knihovna · Stáj · zvířata</h3><p>Pořízení zvířat a referenční pravidla HMK.</p></header>
-    ${libraryTabsHTML(selectedTab)}
-    <div class="folio-chapter-content hmk-stable-column">${parts.acquisition}</div>
+  const parts=livestockAcquisitionHTML({location:'split'});
+  // The tables are always VISIBLE in the library and remain read-only. Each
+  // part is placed in exactly one folio, never across the centre book gutter.
+  const reference=folioHTMLNodes(parts.reference)[0];
+  if(!reference)throw Error('Nelze sestavit pravidlové tabulky zvířat');
+  const entries=[...reference.children];
+  const quick=entries.slice(0,2).map(x=>x.outerHTML).join('');
+  const detailed=entries.slice(2).map(x=>x.outerHTML).join('');
+  const spread=`<div class="journal-book-spread folio-chapter-spread hmk-stable-catalog-spread" id="hmk-livestock-catalog">
+   <section class="journal-book-page journal-book-page--left folio-chapter-page hmk-stable-catalog-page" aria-label="Levá stránka: pořízení a ceny zvířat">
+    <header class="folio-chapter-heading"><h3>Knihovna · Stáj · zvířata</h3><p>Nákup, bezplatné převzetí a referenční ceny.</p></header>
+    <div class="folio-chapter-content hmk-stable-catalog-column">${parts.purchase}<section class="hmk-stable-library-reference">${quick}</section></div>
    </section>
-   <section class="journal-book-page journal-book-page--right folio-chapter-page hmk-stable-page hmk-stable-page--registry" aria-label="Pravá stránka: registr a péče o zvířata">
-    <header class="folio-chapter-heading"><h3>Registr · vlastněná zvířata</h3><p>Výstroj, náklad, péče, zranění, výcvik a historie.</p></header>
-    <div class="folio-chapter-content folio-chapter-content--right hmk-stable-column">${parts.registry}</div>
+   <section class="journal-book-page journal-book-page--right folio-chapter-page hmk-stable-catalog-page" aria-label="Pravá stránka: statistiky a přirozené útoky zvířat">
+    <header class="folio-chapter-heading"><h3>Parametry a přirozené útoky</h3><p>Tištěné druhové hodnoty HMK; výcvik ani zdravotní stav se zde nemění.</p></header>
+    <div class="folio-chapter-content hmk-stable-catalog-column"><section class="hmk-stable-library-reference">${detailed}</section></div>
    </section>
   </div>`;
-  return journalShell(spread,'journal-book--chapter journal-book--stable',false);
+  return withLibraryFolioMenu(journalShell(spread,'journal-book--chapter journal-book--stable',false),selectedTab);
  }
 
  const counts=Object.fromEntries(LIBRARY_TABS.filter(t=>!['suits','rules','bestiary','stable'].includes(t.id)).map(t=>[t.id,allCatalogItems().filter(i=>libraryTabsForItem(i).includes(t.id)).length]));
@@ -4379,8 +4421,7 @@ function libraryView(){
  const list=['suits','rules','bestiary','stable'].includes(selectedTab)?null:libraryVisiblePage(allCatalogItems(),selectedTab,query,catalogStatus,i=>catalogAuditEntry(i).ready,libraryPage);
  if(list)libraryPage=list.page;
  const statusSelector=['rules','suits','bestiary','stable'].includes(selectedTab)?'':`<label>Úplnost evidence<select id="catalog-status"><option value="all" ${catalogStatus==='all'?'selected':''}>Všechny</option><option value="ready" ${catalogStatus==='ready'?'selected':''}>Bez upozornění</option><option value="missing" ${catalogStatus==='missing'?'selected':''}>K doplnění</option></select></label>`;
- return journalChapterShell('Knihovna','Katalog vybavení, referenční tabulky a přidávání předmětů ve vzhledu Keeper’s Ledger.',`<div class="topline"><div><h2>Knihovna vybavení</h2><p class="muted">Vyberte kategorii, otevřete údaje předmětu a případně jej přímo přidejte do inventáře postavy.</p></div>${button('+ Nový předmět','new-item')}</div>
- ${libraryTabsHTML(selectedTab)}
+ return withLibraryFolioMenu(journalChapterShell('Knihovna','Katalog vybavení, referenční tabulky a přidávání předmětů ve vzhledu Keeper’s Ledger.',`<div class="topline"><div><h2>Knihovna vybavení</h2><p class="muted">Vyberte kategorii, otevřete údaje předmětu a případně jej přímo přidejte do inventáře postavy.</p></div>${button('+ Nový předmět','new-item')}</div>
  ${selectedTab==='bestiary'?bestiaryCompleteCatalogView():selectedTab==='rules'?`<section class="panel"><h3>Pravidlové tabulky, zdroje a audit</h3><p class="muted">Tyto podklady jsou pouze k nahlédnutí a nepřekážejí při výběru běžných předmětů.</p>${[['Materiály zbroje a povolené vrstvy',armourMaterialsPanel()+armourLayerReferencePanel()],['Tištěné části zbroje · podrobné referenční značky',printedArmourArticlesPanel()],['Předměty, zvířata a dílny',printedPossessionsPanel()+workshopMechanicsPanel()],['Výprava, encumbrance a pravidlové účinky',expeditionEffectsPanel()+printedGearRulesPanel()],['Audit, konzistence a pokrytí',armourLibraryConsistencyPanel()+suitArticleCrosswalkPanel()+armourCoverageReadinessPanel()+catalogCoveragePanel()+catalogAuditPanel()]].map(([title,body])=>`<details class="library-rules-details"><summary>${esc(title)}</summary>${body}</details>`).join('')}</section>`:
  `<div class="library-toolbar"><label>Hledat v této kategorii<input id="search" type="search" placeholder="Název, parametry, zdroj…" value="${esc(query)}" autocomplete="off"></label>${statusSelector}</div>
  <p class="library-results">${selectedTab==='suits'?`Zobrazeno ${suitRows.length} z ${PRINTED_ARMOUR_SUITS_P113_116.length} tištěných kompletů.`:`Zobrazeno ${list.rows.length} z ${list.total} odpovídajících položek.`} Volba Koupit odečítá skutečnou hotovost, Vzít zdarma nic neodečítá. Obojí přidává nesený předmět (ENC se přepočte dle jeho hmotnosti).</p>
@@ -4388,7 +4429,7 @@ function libraryView(){
  <div class="library-table-wrap"><table class="library-table"><thead><tr><th>Položka</th>${(selectedTab==='suits'?['ENC','PER','Area','Cena','Hmotnost']:({melee:['WQ','HFT / LNG','Impact','Cena','Hmotnost'],ranged:['WQ / typ','Dostřel / střela','Impact','Cena','Hmotnost'],shields:['WQ','Block','Deflect','Cena','Hmotnost'],armour:['Materiál','ENC','Ochrana b/e/p/f','Cena','Hmotnost'],other:['Typ','Dovednost / užití','Kvalita','Cena','Hmotnost']})[selectedTab]).map(x=>`<th class="catalog-parameter-tip" data-hmk-help="${esc(libraryFieldHelp(x))}" tabindex="0">${esc(x)}</th>`).join('')}<th title="${esc(libraryFieldHelp('Úplné údaje'))}">Úplné údaje</th><th>Postava · koupit / vzít</th></tr></thead><tbody>${selectedTab==='suits'?librarySuitRows(suitRows):libraryDataRows(list.rows)}</tbody></table></div>
  ${selectedTab==='suits'?(suitRows.length?'':'<p class="empty">Nenalezen žádný komplet.</p>'):(list.rows.length?libraryPageBar(list):'<p class="empty">Žádné položky neodpovídají filtru.</p>')}
  <details class="library-rules-details"><summary>Správa vlastního katalogu · import / export</summary><p class="tiny muted">Import nemění již uložené inventáře ani definice HMK.</p><div class="actions">${button('Exportovat vlastní katalog JSON','export-catalog')}<label>Importovat katalog<input type="file" id="import-catalog-file" accept=".json,application/json"></label></div></details>`}
- </div>`,`journal-book--library`);
+ </div>`,`journal-book--library`),selectedTab);
 }
 /** Read-only GM index over ORIGINAL authoritative evidence; no copy and no
  * synthetic action history. Old entries and cash purchases are displayed
@@ -12572,7 +12613,13 @@ document.addEventListener('click',e=>{
   b.insertAdjacentHTML('afterend',`<p class="notice error" role="alert">Zdravotní/bojový náhled nelze vykreslit: ${esc(error?.message||String(error))}</p>`);
  }
 },true);
-document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-open-stable]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='stable';overlay=null;render();},true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-hmk-stable-pick-animal]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(!bestiaryKnownAnimals().some(a=>a.id===button.dataset.hmkStablePickAnimal&&a.ownerId===selected&&!stableBurden(data,campaignKey(data.campaignClock),a).exit))return;
+ stableOwnerFocusedId=button.dataset.hmkStablePickAnimal;render();
+},true);
+document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-open-stable]'))return;e.preventDefault();e.stopImmediatePropagation();view='sheet';activeSheetSection='stable';overlay=null;render();},true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-hmk-beast-dismiss]');if(!btn)return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -14376,6 +14423,7 @@ document.addEventListener('click',e=>{
  // Never trust an injected data-sheet-section attribute: actual entitlement
  // comes from the saved character's authoritative proof and skill projection.
  if(isCharacterSpecialtySection(requested)&&!characterSpecialtyById(character(selected),requested))return;
+ if(requested==='stable'&&!bestiaryKnownAnimals().some(a=>a.ownerId===selected&&!stableBurden(data,campaignKey(data.campaignClock),a).exit))return;
  activeSheetSection=requested;
  if(activeSheetSection!=='overview')sheetEditingId=null;
  if(requested==='provisions'&&selected&&ensurePersonalNutritionTracking(selected))return;
