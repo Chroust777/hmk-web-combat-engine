@@ -6418,3 +6418,62 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-assisted-intake form input:not([type="checkbox"]),.hc-assisted-intake form textarea{width:100%;box-sizing:border-box;max-width:100%;margin-top:4px}
 .hc-assisted-intake form textarea{min-height:64px;resize:vertical}
 .hc-assisted-intake form button{justify-self:start;white-space:normal}
+
+/* v93.606 — Fix assisted-intake checkboxes on both folios and at small widths.
+   Old generic form/input rules made checkboxes as wide as the form, pushing
+   label text into a 1-character strip. Only this GM evidence form is scoped. */
+.hc-provision-guide .hc-assisted-intake,
+.hc-provision-guide .hc-assisted-intake form {min-width:0;max-width:100%;box-sizing:border-box}
+.hc-provision-guide .hc-assisted-intake form label.hc-assisted-choice {
+ display:grid!important;
+ grid-template-columns:18px minmax(0,1fr)!important;
+ align-items:start!important;
+ justify-content:start!important;
+ gap:9px!important;
+ margin:0!important;
+ padding:7px 9px!important;
+ min-width:0!important;
+ width:100%!important;
+ max-width:100%!important;
+ box-sizing:border-box!important;
+ text-align:left!important;
+ background:rgba(251,241,217,.26);
+ border:1px solid rgba(119,89,51,.24);
+ border-radius:5px;
+ white-space:normal!important;
+ line-height:1.4!important;
+}
+.hc-provision-guide .hc-assisted-intake form label.hc-assisted-choice input[type="checkbox"]{
+ grid-column:1!important;
+ flex:none!important;
+ width:18px!important;
+ height:18px!important;
+ min-width:18px!important;
+ max-width:18px!important;
+ min-height:18px!important;
+ max-height:18px!important;
+ margin:2px 0 0!important;
+ padding:0!important;
+ box-sizing:border-box!important;
+ align-self:start!important;
+ justify-self:start!important;
+}
+.hc-provision-guide .hc-assisted-intake .hc-assisted-choice-text{
+ grid-column:2!important;
+ min-width:0!important;
+ max-width:100%!important;
+ overflow-wrap:break-word!important;
+ word-break:normal!important;
+ white-space:normal!important;
+ line-height:1.4;
+}
+.hc-provision-guide .hc-assisted-intake form > label:not(.hc-assisted-choice){
+ width:100%;max-width:100%;min-width:0;box-sizing:border-box;
+}
+.hc-provision-guide .hc-assisted-intake form > label:not(.hc-assisted-choice) > :is(input,textarea){
+ display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;
+}
+.hc-provision-guide .hc-assisted-intake form > button[type="submit"]{
+ max-width:100%;width:auto;min-width:0;white-space:normal;
+ overflow-wrap:break-word;
+}

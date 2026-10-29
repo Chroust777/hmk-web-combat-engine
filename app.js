@@ -289,7 +289,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.605';
+const APP_VERSION='93.606';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1161,8 +1161,8 @@ function assistedIntakeFormHTML(actor){
  <p class="hc-provision-help">Příští 24hodinová uzávěrka: ${esc(displayCampaignMinute(start))} – ${esc(displayCampaignMinute(end))}. Rozhodnutí GM musí odpovídat skutečnostem tohoto herního dne; při pokračující neschopnosti je nutné další den doložit znovu.</p>
  ${proof?`<p class="hc-provision-help"><strong>GM již doložil:</strong> potrava ${proof.foodAccepted?'skutečně přijata, pokud existuje zásoba':'nepřijata'} · pitná voda ${proof.waterAccepted?'skutečně přijata, pokud existuje zásoba':'nepřijata'} · péče ${esc(proof.caregiver)}. Doklad nelze přepsat.</p>`:
  `<form data-provision-assisted-intake><input type="hidden" name="actorId" value="${esc(actor.id)}"><input type="hidden" name="startMinute" value="${start}">
- <label class="hc-check"><input type="checkbox" name="foodAccepted" value="yes"> GM potvrzuje skutečné podání a přijetí dostupné potravy v tomto dni</label>
- <label class="hc-check"><input type="checkbox" name="waterAccepted" value="yes"> GM potvrzuje skutečné podání a přijetí dostupné pitné vody v tomto dni</label>
+ <label class="hc-check hc-assisted-choice"><input type="checkbox" name="foodAccepted" value="yes"><span class="hc-assisted-choice-text">GM potvrzuje skutečné podání a přijetí dostupné potravy v tomto dni</span></label>
+ <label class="hc-check hc-assisted-choice"><input type="checkbox" name="waterAccepted" value="yes"><span class="hc-assisted-choice-text">GM potvrzuje skutečné podání a přijetí dostupné pitné vody v tomto dni</span></label>
  <label>Pečující / skutečný způsob podání<input name="caregiver" minlength="2" maxlength="160" required placeholder="Např. druh z družiny"></label>
  <label>Okolnosti (včetně nepodaných dávek)<textarea name="reason" minlength="3" maxlength="400" required placeholder="Co se skutečně stalo, kdo pomohl, co nebylo přijato"></textarea></label>
  <p class="hc-provision-help">Nezaškrtnuté = skutečný příjem nebyl potvrzen; systém pro něj nesmí automaticky odečíst zásobu. Zaškrtnutí nevytváří zásoby ani nezaručuje plnou dávku: skutečné množství určí až existující doklady a denní uzávěrka. Před více denními posuny řešte každý takový den zvlášť.</p>
