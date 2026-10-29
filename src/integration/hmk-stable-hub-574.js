@@ -166,9 +166,22 @@ export function validateStableHub(data,offerForId=null){
    // Snapshot body-weight evidence, so later changes to Appearance do not
    // invalidate a valid historic mounting event.
    const documented=x.riderBodyLb??null;
-   requireValid((documented===null||Number.isSafeInteger(documented)&&documented>0)&&person&&animal.ownerId===x.ownerId&&animal.campaignId===j.calendarCampaignId&&
-    !state.rider&&isId(x.riderId)&&Number.isSafeInteger(x.riderWeightLb)&&x.riderWeightLb>0&&x.riderWeightLb<=1000000&&
-    (documented===null||x.riderWeightLb>=documented)&&narrative(x.reason)&&
+   const auto=x.riderWeightSource==='inventory-auto-584';
+   const round=n=>Math.round(n*1000)/1000;
+   const items=auto&&Array.isArray(x.riderItems)?x.riderItems:null;
+   const unique=items&&new Set(items.map(i=>i.inventoryId));
+   const validItems=items&&unique.size===items.length&&items.every(i=>
+    typeof i.inventoryId==='string'&&i.inventoryId.length>0&&
+    typeof i.quantity==='number'&&Number.isFinite(i.quantity)&&i.quantity>0&&
+    Number.isFinite(i.unitWeightLb)&&i.unitWeightLb>=0&&
+    Number.isFinite(i.contentsLb)&&i.contentsLb>=0);
+   const validAuto=!auto||(Number.isFinite(x.riderBodyLb)&&x.riderBodyLb>0&&
+    Number.isFinite(x.riderGearLb)&&x.riderGearLb>=0&&validItems&&
+    round(items.reduce((sum,i)=>sum+i.unitWeightLb*i.quantity+i.contentsLb,0))===x.riderGearLb&&
+    round(x.riderBodyLb+x.riderGearLb)===x.riderWeightLb);
+   requireValid((documented===null||Number.isFinite(documented)&&documented>0)&&person&&animal.ownerId===x.ownerId&&animal.campaignId===j.calendarCampaignId&&
+    !state.rider&&isId(x.riderId)&&Number.isFinite(x.riderWeightLb)&&x.riderWeightLb>0&&x.riderWeightLb<=1000000&&
+    (documented===null||x.riderWeightLb>=documented)&&validAuto&&narrative(x.reason)&&
     ![...snapshots.entries()].some(([otherId,other])=>otherId!==x.animalId&&animals.get(otherId)?.campaignId===animal.campaignId&&other.rider?.characterId===x.riderId),
     'jezdec nemá platný záznam, váhu nebo již sedí na jiném zvířeti');
    state.rider={characterId:x.riderId,weightLb:x.riderWeightLb};
