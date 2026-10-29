@@ -54,7 +54,7 @@ export function projectInventoryRows(inventory=[]){
    Number.isFinite(printedEnc)?String(printedEnc):typeof printedEnc==='string'?`podm. ${printedEnc}`:'nedoloženo':'—';
   const protection=isArmour&&p.locationProtection&&typeof p.locationProtection==='object'?
    Object.entries(p.locationProtection).filter(([,v])=>v&&typeof v==='object').map(([loc,v])=>({loc,b:v.b,e:v.e,p:v.p,f:v.f})):[];
-  const kind=item.slot==='chest'?'chest':item.slot==='worn'||item.slot==='main_hand'||item.slot==='off_hand'?'equipped':'carried';
+  const kind=item.slot==='chest'?'chest':item.slot==='stable'?'stable':item.slot==='worn'||item.slot==='main_hand'||item.slot==='off_hand'?'equipped':'carried';
   return {item,qty,priceLabel:price.label,totalPrice,weight,totalWeight,wq,keyFields,armourENC,protection,kind};
  });
 }
