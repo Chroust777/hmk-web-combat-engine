@@ -6048,3 +6048,45 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .library-other-top-controls>.library-other-filters{flex-wrap:nowrap;overflow-x:auto;min-width:0;max-width:min(40vw,420px);margin:0;scrollbar-width:thin;overscroll-behavior-x:contain;}
 .library-other-top-controls>.library-other-filters button{flex:none;white-space:nowrap;}
 @media(max-width:980px){.library-other-top-controls{justify-content:flex-start;width:100%;}.library-other-top-controls>.library-other-filters{max-width:min(100%,420px);}}
+
+
+/* v93.589 inventory/stable layout polish */
+.content-sheet .journal-book--chapter .inv-ledger-section--chest,
+.content-sheet .journal-book--sheet-inventory .inv-ledger-section--chest{
+ margin-top:12px!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-section + .inv-ledger-section h4,
+.content-sheet .journal-book--sheet-inventory .inv-ledger-section + .inv-ledger-section h4{
+ margin-top:6px!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-section .inv-table-scroll,
+.content-sheet .journal-book--sheet-inventory .inv-ledger-section .inv-table-scroll{
+ border-bottom:1px solid var(--folio-rule)!important;
+}
+.content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(1),
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(1){width:20%!important}
+.content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(2),
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(2){width:10%!important}
+.content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(3),
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(3){width:6%!important}
+.content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(4),
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(4){width:8%!important}
+.content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(5),
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(5){width:13%!important}
+.content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(6),
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(6){width:7%!important}
+.content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(7),
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(7){width:20%!important}
+.content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(8),
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:16%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-edit-only,
+.content-sheet .journal-book--sheet-inventory .inv-ledger-table .inv-edit-only{
+ width:100%!important;
+}
+.content-sheet .journal-book--chapter .inv-group-totals--stable,
+.content-sheet .journal-book--sheet-inventory .inv-group-totals--stable,
+.content-sheet .journal-book--chapter .inv-group-totals--stable-detail,
+.content-sheet .journal-book--sheet-inventory .inv-group-totals--stable-detail{
+ border-color:rgba(82,87,52,.55)!important;
+ background:rgba(229,232,209,.46)!important;
+}
