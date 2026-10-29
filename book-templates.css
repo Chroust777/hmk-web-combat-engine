@@ -6405,3 +6405,16 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-malnutrition-results th:nth-child(2),.hc-malnutrition-results td:nth-child(2){width:17%}
 .hc-malnutrition-results th:nth-child(3),.hc-malnutrition-results td:nth-child(3){width:29%}
 .hc-malnutrition-results th:nth-child(4),.hc-malnutrition-results td:nth-child(4){width:33%}
+
+/* v93.605 — GM's dated evidence of actually ingested meals for a disabled
+   patient. Same parchment palette as Provisions / Chronicle. */
+.hc-assisted-intake{margin:11px 0;padding:11px 13px;border:1px solid rgba(112,84,47,.39);border-radius:7px;background:rgba(234,217,183,.32);min-width:0;overflow-wrap:anywhere}
+.hc-assisted-intake h4{margin:0 0 6px;color:#503b26}
+.hc-assisted-intake .hc-provision-help{margin:5px 0 9px;line-height:1.48;white-space:normal}
+.hc-assisted-intake form{display:grid;gap:8px;min-width:0}
+.hc-assisted-intake form label{display:block;min-width:0;color:#4a3525}
+.hc-assisted-intake form label.hc-check{display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+.hc-assisted-intake form label.hc-check input{flex:0 0 auto;align-self:flex-start;margin-top:5px}
+.hc-assisted-intake form input:not([type="checkbox"]),.hc-assisted-intake form textarea{width:100%;box-sizing:border-box;max-width:100%;margin-top:4px}
+.hc-assisted-intake form textarea{min-height:64px;resize:vertical}
+.hc-assisted-intake form button{justify-self:start;white-space:normal}

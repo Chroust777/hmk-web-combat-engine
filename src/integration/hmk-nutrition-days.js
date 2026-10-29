@@ -11,6 +11,7 @@ import {availableRationLots,createPhysicalRationUse,projectCampaignRationInvento
 import {availablePhysicalWater,createPhysicalWaterUse} from './hmk-physical-water-ledger.js';
 import {dailyNutritionNeeds} from './hmk-nutrition-activity.js';
 import {animalAccessForDay,animalLoadedItemAt,ANIMAL_USE_FORMAT} from './hmk-nutrition-animal-access.js';
+import {needsAssistedIntake,assistedIntakeForDay} from './hmk-nutrition-assisted-intake.js';
 export const NUTRITION_POLICY_FORMAT='hmk-nutrition-policy-v1';
 export const NUTRITION_DAY_FORMAT='hmk-nutrition-day-v1';
 const DAY=1440;
@@ -162,6 +163,12 @@ function requireUnambiguousSharedAllocation(database,campaignId,cohort){
    if(p.gmProvisioned===true)continue;
    const need=p.autoNeeds===true?dailyNutritionNeeds({journal,campaignId,actorId,policyId:c.policy.id,startMinute:c.start,endMinute:end}):{foodNeed:p.foodNeed,waterNeed:p.waterNeed};
    const required=unit==='foodDays'?need.foodNeed:need.waterNeed;
+   const actor=database.characters.find(a=>a.id===actorId);
+   if(needsAssistedIntake(actor)){
+    const assistance=assistedIntakeForDay(journal,campaignId,actorId,c.start,end);
+    check(assistance,'Postava '+(actor?.name||actorId)+' se nemůže sama stravovat. GM musí v Zásobování potvrdit skutečné podání i přijetí jídla a vody pro '+(c.start/DAY+1)+'. den před jeho uzávěrkou.');
+    if(!(unit==='foodDays'?assistance.calendarNutritionAssistedIntake.foodAccepted:assistance.calendarNutritionAssistedIntake.waterAccepted))continue;
+   }
    const manual=Math.min(required,consumeBeforeDay(journal,actorId,campaignId,c.start,end,unit,c.start===p.minute));
    let leftover=round(required-manual);
    const personal=unit==='foodDays'&&p.inventoryRations===true?
@@ -212,6 +219,12 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
   // A dead character cannot keep consuming supplies and cannot be forced
   // into a new ration-source decision merely by a later GM clock advance.
   if(actor.hmk?.combatState?.shock==='KIA'){due.start=clock.minute;continue;}
+  // A disabled character may possess food but cannot be assumed to ingest
+  // it. This GM attestation is factual, not a new HMK rule or a die roll.
+  const assistance=needsAssistedIntake(actor)?assistedIntakeForDay(database.journal,campaignId,actorId,start,end):null;
+  if(needsAssistedIntake(actor))check(assistance,
+   'Postava '+actor.name+' je neschopná samostatného příjmu. V Zásobování potvrďte GM skutečné podání/přijetí jídla a vody pro 24 hodin '+start+'–'+end+'; bez doložení nelze tento den automaticky uzavřít.');
+  const assisted=assistance?.calendarNutritionAssistedIntake;
   // Character-specific purchased/owned rations invalidate a former
   // Foraging-only claim, unless all of that CAMPAIGN's physical stock has
   // really been debited in the immutable physical ration ledger.
@@ -219,10 +232,13 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
    if(availablePhysicalWater(database.journal,campaignId,actorId,end).length)throw Error('Výhradní Foraging není prokázán: postava nese doloženou pitnou vodu.');}
   const automatic=[],received={};
   for(const [unit,required] of [['foodDays',needs.foodNeed],['waterDays',needs.waterNeed]]){
-   // GM certifies continuous access to food and drinking water for the upcoming day.
-   // This is NOT carried inventory and must never debit or fabricate physical lots.
-   if(p.gmProvisioned===true){received[unit]=required;continue;}
+   const permitted=!assisted||(unit==='foodDays'?assisted.foodAccepted:assisted.waterAccepted);
    const manual=Math.min(required,consumeBeforeDay(database.journal,actorId,campaignId,start,end,unit,start===policy.campaignMinute));
+   check(permitted||manual===0,'U postavy '+actor.name+' je ručně evidována spotřeba, přestože GM pro tento den výslovně nepotvrdil skutečné přijetí '+(unit==='foodDays'?'jídla':'vody')+'.');
+   // A GM-certified source means resources exist, not that an unconscious
+   // person swallowed them. It bypasses physical inventory, never care.
+   if(p.gmProvisioned===true){received[unit]=permitted?required:0;continue;}
+   if(!permitted){received[unit]=0;continue;}
    let remaining=round(required-manual);
    // Only a GM-attested, time-stamped physical ration stock can supply food.
    // Expired lots are NOT consumed, and carried waterskins do not imply water.
@@ -276,7 +292,7 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
   const dayProof={format:NUTRITION_DAY_FORMAT,policyId:policy.id,actorId,campaignId,startMinute:start,endMinute:end,
    foodNeed:needs.foodNeed,waterNeed:needs.waterNeed,foodReceived:received.foodDays,waterReceived:received.waterDays,
    foodShortfall:round(needs.foodNeed-received.foodDays),waterShortfall:round(needs.waterNeed-received.waterDays),
-   automaticDebitIds:automatic.map(x=>x.id),medicalApplied:false,...(p.autoNeeds?{activityNeeds:needs}:{}),...(p.gmProvisioned?{gmProvisioned:true}:{}),sourcePages:[186]};
+   automaticDebitIds:automatic.map(x=>x.id),medicalApplied:false,...(assistance?{assistedIntakeId:assistance.id}:{}),...(p.autoNeeds?{activityNeeds:needs}:{}),...(p.gmProvisioned?{gmProvisioned:true}:{}),sourcePages:[186]};
   const row={id:idFactory(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:end,createdAt:stamp(),
    title:'HMK · 24h zásobování · '+actor.name,
    body:`24h: potrava ${dayProof.foodReceived}/${needs.foodNeed}, voda ${dayProof.waterReceived}/${needs.waterNeed}; `+
@@ -317,6 +333,14 @@ export function validateNutritionJournal(journal=[]){
   check(!nextPolicy||d.endMinute<=nextPolicy.campaignMinute,
    'Denní spotřeba překračuje doloženou změnu zásobovacího režimu');
   const effective=policy?.autoNeeds?dailyNutritionNeeds({journal:prior,campaignId:d.campaignId,actorId:d.actorId,policyId:d.policyId,startMinute:d.startMinute,endMinute:d.endMinute}):null;
+  const assistance=d.assistedIntakeId?prior.find(x=>x.id===d.assistedIntakeId):null;
+  if(d.assistedIntakeId)check(assistance?.calendarNutritionAssistedIntake?.format==='hmk-nutrition-assisted-intake-v1'&&
+   assistance.calendarCampaignId===d.campaignId&&assistance.characterId===d.actorId&&
+   assistance.calendarNutritionAssistedIntake.startMinute===d.startMinute&&
+   assistance.calendarNutritionAssistedIntake.endMinute===d.endMinute,
+   'Denní vyúčtování má neplatný či cizí doklad asistovaného příjmu.');
+  const allowedFood=assistance?.calendarNutritionAssistedIntake.foodAccepted!==false;
+  const allowedWater=assistance?.calendarNutritionAssistedIntake.waterAccepted!==false;
   const token=`${d.policyId}:${d.endMinute}`;
   check(d.format===NUTRITION_DAY_FORMAT&&policy?.enabled===true&&d.actorId===row.characterId&&d.actorId===policy.actorId&&
    d.campaignId===row.calendarCampaignId&&d.campaignId===policy.campaignId&&
@@ -329,13 +353,15 @@ export function validateNutritionJournal(journal=[]){
    d.medicalApplied===false&&JSON.stringify(d.sourcePages)==='[186]'&&!days.has(token),
    'Neplatná nebo duplicitní denní evidence HMK zásobování');
   const debitRows=seen.get(token)||[];
-  const expectedFood=policy.gmProvisioned?d.foodNeed:round(Math.min(d.foodNeed,consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'foodDays',d.startMinute===policy.minute))+
+  const expectedFood=policy.gmProvisioned?(allowedFood?d.foodNeed:0):round(Math.min(d.foodNeed,consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'foodDays',d.startMinute===policy.minute))+
    debitRows.filter(x=>x.calendarForagingSupplyUse?.unit==='foodDays').reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0)+
    debitRows.filter(x=>x.calendarInventoryRationUse?.unit==='foodDays').reduce((n,x)=>n+x.calendarInventoryRationUse.quantity,0));
-  const expectedWater=policy.gmProvisioned?d.waterNeed:round(Math.min(d.waterNeed,consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'waterDays',d.startMinute===policy.minute))+
+  const expectedWater=policy.gmProvisioned?(allowedWater?d.waterNeed:0):round(Math.min(d.waterNeed,consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'waterDays',d.startMinute===policy.minute))+
    debitRows.filter(x=>x.calendarForagingSupplyUse?.unit==='waterDays').reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0)+
    debitRows.filter(x=>x.calendarInventoryWaterUse?.unit==='waterDays').reduce((n,x)=>n+x.calendarInventoryWaterUse.quantity,0));
-  check(d.foodReceived===expectedFood&&d.waterReceived===expectedWater&&(!policy.gmProvisioned||debitRows.length===0),'Doložená denní spotřeba neodpovídá výdejům nebo rozhodnutí GM');
+  check(d.foodReceived===expectedFood&&d.waterReceived===expectedWater&&(!policy.gmProvisioned||debitRows.length===0)&&
+   (allowedFood||d.foodReceived===0)&&(allowedWater||d.waterReceived===0),
+   'Doložená denní spotřeba neodpovídá výdejům nebo skutečnému příjmu potvrzenému GM');
   check(JSON.stringify(d.automaticDebitIds)===JSON.stringify(debitRows.map(x=>x.id))&&
    debitRows.every(x=>x.characterId===d.actorId&&x.calendarCampaignId===d.campaignId&&x.campaignMinute===d.endMinute),
    'Automatické denní dávky nemají souvislý audit původu');
