@@ -6300,3 +6300,52 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
  .inv-ledger-section .inv-table-scroll.inv-15-rows{
   scrollbar-gutter:auto!important;
 }
+
+/* v93.595 · Skill Tests: original left navigation and explanation; selected executor on right. */
+.content-sheet .journal-book--skills .hmk-skill-context-595,
+.content-sheet .journal-book--skills .hmk-skill-actions-595{
+  min-width:0!important;width:100%!important;box-sizing:border-box!important;
+  background:transparent!important;color:#352618!important;
+}
+.content-sheet .journal-book--skills .hmk-skill-context-595 .topline{
+  display:flex!important;align-items:flex-start!important;flex-wrap:wrap!important;gap:8px!important;
+  padding:0 0 10px!important;margin:0 0 12px!important;border-bottom:1px solid rgba(107,71,38,.38)!important;
+}
+.content-sheet .journal-book--skills .hmk-skill-context-595 .hsk-actor-chooser{
+  margin:0 0 12px!important;
+}
+.content-sheet .journal-book--skills .hmk-skill-context-595 .hsk-tabs{
+  display:grid!important;grid-template-columns:1fr!important;gap:6px!important;margin:10px 0 15px!important;
+}
+.content-sheet .journal-book--skills .hmk-skill-context-595 .hsk-tabs button{
+  width:100%!important;text-align:left!important;min-width:0!important;padding:9px 12px!important;
+}
+.content-sheet .journal-book--skills .hmk-skill-context-595 .hsk-skill-rule-explainer{
+  display:block!important;width:100%!important;min-width:0!important;margin:12px 0!important;
+}
+.content-sheet .journal-book--skills .hmk-skill-context-595 .hsk-skill-rule-explainer[hidden]{display:none!important}
+.content-sheet .journal-book--skills .hmk-skill-actions-595 > .hsk-separated-tests{
+  display:block!important;min-width:0!important;width:100%!important;
+}
+.content-sheet .journal-book--skills .hmk-skill-actions-595 .hsk-test-card{
+  width:100%!important;min-width:0!important;box-sizing:border-box!important;
+}
+.content-sheet .journal-book--skills .hmk-skill-actions-595 .hsk-test-card[hidden]{display:none!important}
+.content-sheet .journal-book--skills .hsk-sv-picker-595,
+.content-sheet .journal-book--skills .hsk-sv-placeholder-595{
+  margin:14px 0!important;padding:12px!important;border:1px solid rgba(115,75,37,.55)!important;
+  border-radius:5px!important;background:rgba(231,205,165,.33)!important;color:#3c2b1b!important;
+  font:13px/1.45 Georgia,serif!important;
+}
+.content-sheet .journal-book--skills .hsk-sv-picker-595 h3{margin:0 0 8px!important;color:#56351e!important;font-size:17px!important}
+.content-sheet .journal-book--skills .hsk-sv-choice-block-595{
+  display:grid!important;grid-template-columns:1fr!important;gap:7px!important;
+  margin:11px 0!important;padding:10px!important;border:1px solid rgba(120,82,40,.34)!important;
+  border-radius:4px!important;background:rgba(251,234,202,.32)!important;
+}
+.content-sheet .journal-book--skills .hsk-sv-choice-block-595 label{display:grid!important;gap:4px!important;min-width:0!important;font-weight:700!important}
+.content-sheet .journal-book--skills .hsk-sv-choice-block-595 select{width:100%!important;min-width:0!important;max-width:100%!important}
+.content-sheet .journal-book--skills .hsk-sv-choice-block-595 button{justify-self:start!important;max-width:100%!important;white-space:normal!important}
+.content-sheet .journal-book--skills .hsk-sv-project-note-595{margin:10px 0!important;padding:9px 11px!important;border-left:3px solid #946c3e!important;background:rgba(221,193,151,.33)!important;font:13px/1.45 Georgia,serif!important}
+.content-sheet .journal-book--skills .hmk-skill-actions-595 .hsk-timed-project-591{margin:0 0 15px!important;padding:12px!important}
+.content-sheet .journal-book--skills .hmk-skill-actions-595 .hsk-writing-finish-591{margin:0 0 15px!important}

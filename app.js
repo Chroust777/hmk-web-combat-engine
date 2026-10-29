@@ -285,7 +285,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.594';
+const APP_VERSION='93.595';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2162,6 +2162,8 @@ function generatorConfigDialog(){
  <div class="notice tiny" id="generator-semantic-preview" aria-live="polite">Analýza popisu se objeví při psaní. Náhodné hodnoty atributů, sociální třída a Wealth se nemění.</div><div class="actions"><button type="submit">✦ Vygenerovat bez dalších dotazů</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
 }
 let activeSkillTab='secondary';
+// Pure UI selection, never a new skill roll or calendar ledger.
+let skillSVChoice595=null;
 let activeSheetSection='overview';
 // GM-only, nonpersistent presentation selection; never fabricates exposure or trauma.
 let hazardComposer={actorId:null,kind:null};
@@ -2447,12 +2449,12 @@ function refreshWritingWork591(root){
   const submit=f.querySelector('[type="submit"]');if(submit)submit.disabled=(sv<5&&start.scope!=='missive')||due===null||data.campaignClock.minute<due||insightExpected>0&&!subject;
  }
 }
-function timedSkillProjectsPanel591(actor){
+function timedSkillProjectsPanel591(actor,{kind=null}={}){
  if(!data.campaignClock)return '<section class="hsk-timed-project-591"><p>Časované projekty vyžadují aktivní kampaň s kalendářem.</p></section>';
- const now=data.campaignClock.minute,pending=pendingSkillProjects591(actor.id);
+ const now=data.campaignClock.minute,pending=pendingSkillProjects591(actor.id).filter(j=>!kind||j.calendarSkillProjectStart591.kind===kind);
  return `<section class="hsk-timed-project-591 hsk-critical-next"><h3>Časované projekty · Engineering / Writing (HMK 70, 132)</h3><p class="hsk-project-classification">Patří do <strong>Success Value</strong>. Vlevo se zakládá projekt a sleduje herní čas; vpravo se v běžném panelu <strong>Success Value</strong> provede jeho původní d100. Následné Design d10 / Insight d10 mají navazující doklady, nikoli druhý SV hod.</p><button type="button" class="secondary hc-small" data-skill-tab="value">Otevřít Success Value vpravo</button>
  <p>Nejdříve zapiš skutečný začátek projektu do kalendáře. Základní čas podle pravidel lze později zkrátit jen doloženým výsledkem, ne libovolným GM odhadem. Hody se neprovádějí před nejčasnějším možným termínem; dokončení nastane až po výpočtu skutečného výsledku. Běžný Skill Test mimo tento projekt zůstává samostatnou činností.</p>
- <form data-hmk-project-start-591 class="hsk-form-grid"><label>Činnost<select name="kind"><option value="engineering">Engineering Design · HMK 70</option><option value="writing">Writing Routine · HMK 132</option></select></label>
+ <form data-hmk-project-start-591 class="hsk-form-grid"><label>Činnost<select name="kind">${kind==='writing'?'<option value="writing">Writing Routine · HMK 132</option>':'<option value="engineering">Engineering Design · HMK 70</option>'}</select></label>
  <label>Konkrétní dílo / předmět práce<input name="projectName" required minlength="2" maxlength="120" placeholder="Např. návrh malé pevnosti"></label>
  <label>Rozsah nebo stavba<select name="scope" required>${Object.entries(ENGINEERING_DESIGN_DAYS).map(([name,days])=>`<option value="${esc(name)}">${esc(name)} · ${days} dnů</option>`).join('')}</select></label>
  <p class="hsk-project-time-preview" data-hmk-project-time-preview-591></p><button type="submit" class="secondary">Zapsat zahájení do kalendáře</button></form>
@@ -2479,22 +2481,53 @@ function decorateTimedSkillProject591(root){
   update();
  }
  const primary=root.querySelector('#skill-value-form');if(!primary||!data.campaignClock||!selected)return;
- let label=primary.querySelector('[data-hmk-timed-source-591]');
- if(!label){label=document.createElement('label');label.dataset.hmkTimedSource591='';label.textContent='Časovaný projekt (jen při skutečném dokončování projektu)';const sel=document.createElement('select');sel.name='timedProjectId';label.appendChild(sel);const submit=primary.querySelector('button[type="submit"]');submit?.before(label);}
- const picker=label.querySelector('select');if(!picker)return;
+ const label=primary.querySelector('[data-hmk-timed-source-591]');
+ const picker=label?.querySelector('select');if(!picker)return;
+ const isTimed=view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&['engineering','writing'].includes(skillSVChoice595.value);
+ label.hidden=!isTimed;
+ if(!isTimed){picker.value='';return;}
  const current=picker.value,skill=primary.elements.namedItem('primary')?.value||'';
  const matches=pendingSkillProjects591(selected).filter(j=>!data.journal.some(x=>x.calendarSkillProjectSV591?.startId===j.id)&&
  (j.calendarSkillProjectStart591.kind==='engineering'?skill==='Engineering':/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill)));
- picker.innerHTML='<option value="">— běžný Skill Test, bez časovaného projektu —</option>'+matches.map(j=>{const p=j.calendarSkillProjectStart591;return `<option value="${esc(j.id)}">${esc(p.projectName)} · ${esc(p.scope)} · test nejdříve ${esc(displayCampaignMinute(p.earliestMinute))}</option>`;}).join('');
- if(matches.some(j=>j.id===current))picker.value=current;
+ const signature=JSON.stringify(matches.map(j=>[j.id,j.calendarSkillProjectStart591.earliestMinute]));
+ if(picker.dataset.optionsSignature!==signature){
+  picker.innerHTML='<option value="">— vyberte doložený projekt —</option>'+matches.map(j=>{const p=j.calendarSkillProjectStart591;return `<option value="${esc(j.id)}">${esc(p.projectName)} · ${esc(p.scope)} · test nejdříve ${esc(displayCampaignMinute(p.earliestMinute))}</option>`;}).join('');
+  picker.dataset.optionsSignature=signature;
+ }
+ const selectedProject=matches.some(j=>j.id===current)?current:matches[0]?.id||'';
+ if(picker.value!==selectedProject)picker.value=selectedProject;
  label.hidden=!matches.length;
  const due=matches.find(j=>j.id===picker.value)?.calendarSkillProjectStart591;
  let note=label.querySelector('small');if(!note){note=document.createElement('small');label.appendChild(note);}
  note.textContent=due?(data.campaignClock.minute<due.earliestMinute?'Ještě nelze provést tento test: '+chronicleRemainingTime(due.earliestMinute-data.campaignClock.minute)+' do nejčasnějšího termínu.':'Časové podmínky prvního SV jsou splněny; konečné datum práce se ověří podle výsledku.'):'Projekt se neváže na běžný Skill Test. Pro časovanou práci vyber skutečný projekt.';
 }
+function skillSVPicker595(actor){
+ const c=skillSVChoice595?.actorId===actor?.id?skillSVChoice595:null;
+ const skills=actor?availableMasteries(actor):[];
+ const choices=[['engineering','Engineering Design · HMK 70'],['writing','Writing Routine · HMK 132'],['fishing','Fishing · čtyřhodinový postup HMK 71'],['animal','Animal Training · výcvik HMK 65']];
+ return `<section class="hsk-sv-picker-595" aria-label="Výběr konkrétního Success Value">
+  <h3>Success Value · vyberte postup</h3>
+  <p class="tiny">Výběr zde neprovádí žádný hod ani zápis do kalendáře. Každý postup má vlastní správné vstupy; formulář se zobrazí až po stisknutí tlačítka.</p>
+  <div class="hsk-sv-choice-block-595"><label>Časované projekty<select data-hmk-sv-choice-type="timed">${choices.map(([v,label])=>`<option value="${v}" ${c?.kind==='timed'&&c.value===v?'selected':''}>${esc(label)}</option>`).join('')}</select></label><button type="button" class="secondary" data-hmk-sv-open-595="timed">Otevřít časovaný projekt</button></div>
+  <div class="hsk-sv-choice-block-595"><label>Ostatní Success Value<select data-hmk-sv-choice-type="ordinary">${skills.map(x=>`<option value="${esc(x.name)}" ${c?.kind==='ordinary'&&c.value===x.name?'selected':''}>${esc(x.name)} · ML ${x.ml}</option>`).join('')}</select></label><button type="button" class="secondary" data-hmk-sv-open-595="ordinary" ${skills.length?'':'disabled'}>Otevřít Success Value test</button></div>
+  ${c?`<p class="tiny hsk-sv-choice-status-595">Vybráno: ${esc(c.kind==='timed'?'Časovaný projekt · '+(choices.find(x=>x[0]===c.value)?.[1]||c.value):'Běžný Success Value · '+c.value)}.</p>`:''}
+ </section>`;
+}
+function applySelectedSV595(root){
+ if(view!=='skills'||activeSkillTab!=='value')return;
+ const choice=skillSVChoice595?.actorId===selected?skillSVChoice595:null;
+ const form=root.querySelector('#skill-value-form'),primary=form?.elements.namedItem('primary');
+ if(!primary||!choice)return;
+ const wanted=choice.kind==='ordinary'?choice.value:choice.value==='engineering'?'Engineering':choice.value==='fishing'?'Fishing':null;
+ const options=[...primary.options];
+ const target=wanted?options.find(x=>x.value===wanted):options.find(x=>/^Language(?:\s|\(|:|$)/.test(x.value)||/\(Language\)$/.test(x.value));
+ if(target&&primary.value!==target.value)primary.value=target.value;
+}
 function skillWorkbenchView(){
- const actor=character(selected)??data.characters[0];if(actor&&selected!==actor.id)selected=actor.id;if(!actor)return journalChapterShell('Skills','Skill testy ve stejném stylu deníku.',`<section class="panel"><h2>Skill Tests</h2><p>Nejprve vytvořte postavu.</p><button data-nav="characters">Přejít do registru</button></section>`,`journal-book--skills`);
- return journalChapterShell('Skills','Skill testy a výpočty vybrané postavy; skutečná nebezpečí a jejich následky se řeší výhradně v jejím deníku.',timedSkillProjectsPanel591(actor)+pendingWritingWorkHTML591(actor)+skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null,campaignKey(data.campaignClock)),`journal-book--skills`);
+ const actor=character(selected)??data.characters[0];if(actor&&selected!==actor.id)selected=actor.id;
+ if(actor&&activeSkillTab==='value'&&(pendingStableAnimalcraftId||pendingTrekHandoff||pendingTrackingAwarenessId||pendingCalendarGMTest)&&skillSVChoice595?.kind==='timed')skillSVChoice595=null;
+ if(!actor)return journalChapterShell('Skills','Skill testy ve stejném stylu deníku.',`<section class="panel"><h2>Skill Tests</h2><p>Nejprve vytvořte postavu.</p><button data-nav="characters">Přejít do registru</button></section>`,`journal-book--skills`);
+ return journalChapterShell('Skills','Skill testy a výpočty vybrané postavy; skutečná nebezpečí a jejich následky se řeší výhradně v jejím deníku.',skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null,campaignKey(data.campaignClock)),`journal-book--skills`);
 }
 function charactersView(){
  const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));
@@ -3427,13 +3460,34 @@ function folioChapterParts(body,kind=''){
  if(kind.includes('journal-book--skills')){
   const workbench=nodes.find(x=>x.classList.contains('hmk-skill-workbench'));
   if(workbench){
-   // Project management is a calendar-linked context for Success Value,
-   // not a replacement for the three standard Skill Test modes.
-   // Preserve the full workbench, its tab navigation and all field handlers
-   // on the RIGHT page; no cloning or fresh dice/event ledger is created.
-   const left=nodes.filter(x=>x!==workbench).map(x=>x.outerHTML).join('');
-   const right=workbench.outerHTML.replace(' id="hmk-skill-workbench"','');
-   return [left,right];
+   // Reuse the ORIGINAL forms and handlers: only split the live DOM by meaning.
+   const leftItems=[...workbench.children].filter(x=>x.matches('.topline,.hsk-actor-chooser,.hsk-tabs,.hsk-skill-rule-explainer'));
+   const rightItems=[...workbench.children].filter(x=>!leftItems.includes(x));
+   const actor=character(selected);
+   const left=`<section class="hmk-skill-context-595">${leftItems.map(x=>x.outerHTML).join('')}${activeSkillTab==='value'?skillSVPicker595(actor):''}</section>`;
+   let right=rightItems.map(x=>x.outerHTML).join('');
+   const choice=skillSVChoice595?.actorId===selected?skillSVChoice595:null;
+   if(activeSkillTab==='value'){
+    if(!choice&&!pendingStableAnimalcraftId&&!pendingTrekHandoff&&!pendingTrackingAwarenessId&&!pendingCalendarGMTest){
+     right=right.replace(/(<section class="hsk-test-card" data-skill-section="value")/, '$1 hidden');
+     right='<section class="hsk-sv-placeholder-595">Vyberte vlevo časovaný projekt nebo ostatní Success Value a potvrďte výběr. Do té doby se žádný hod nepřipravuje.</section>'+right;
+    }else if(choice.kind==='timed'){
+     if(choice.value==='engineering'||choice.value==='writing'){
+      const pending=pendingSkillProjects591(selected).filter(j=>j.calendarSkillProjectStart591.kind===choice.value&&
+       !data.journal.some(x=>x.calendarSkillProjectSV591?.startId===j.id));
+      if(!pending.length)right=right.replace(/(<section class="hsk-test-card" data-skill-section="value")/, '$1 hidden');
+      right=timedSkillProjectsPanel591(actor,{kind:choice.value})+(choice.value==='writing'?pendingWritingWorkHTML591(actor):'')+
+       (pending.length?'<p class="hsk-sv-project-note-595">Po uplynutí nejčasnějšího termínu použijte původní Success Value vpravo. Výsledný hod bude svázán s vybraným projektem; bez uzavření času nebude přijat.</p>':'<p class="hsk-sv-project-note-595">Nejprve zahajte projekt níže. Základní Success Value se zpřístupní až při otevřené, doložené práci.</p>')+right;
+     }else if(choice.value==='fishing'){
+      right='<section class="hsk-sv-project-note-595">Fishing (HMK 71): zahajte čtyřhodinový rybolov tlačítkem níže, potvrďte skutečný čas v kalendáři a teprve potom proveďte původní Fishing SV. Následné Catch d10 čerpají výsledek z jediného SV dokladu.</section>'+right;
+     }else if(choice.value==='animal'){
+      right=right.replace(/(<section class="hsk-test-card" data-skill-section="value")/, '$1 hidden');
+      const active=verifiedLivestock(data,campaignKey(data.campaignClock)).filter(a=>a.ownerId===selected&&!stableBurden(data,campaignKey(data.campaignClock),a).exit);
+      right=`<section class="hsk-timed-project-591"><h3>Animal Training · HMK 65</h3><p>Šestiměsíční výcvik se zahajuje v osobní stáji konkrétního zvířete. Po uplynutí doby otevřete původní Animalcraft SV; navazující Training d10 a aktivace MB zůstávají svázané s původním zvířetem a kalendářem.</p>${active.map(a=>`<button type="button" class="secondary" data-hmk-sv-training-animal="${esc(a.id)}">Animalcraft SV pro ${esc(a.name)}</button>`).join('')||'<p>Postava v aktuální kampani nevlastní žádné aktivní zvíře.</p>'}<p class="tiny">Zahájení a případné prodloužení výcviku se zapisuje výhradně do osobní stáje; zde se nesmí vytvořit paralelní událost.</p></section>`+right;
+     }
+    }
+   }
+   return [left,`<section class="hmk-skill-actions-595">${right}</section>`];
   }
  }
  if(kind.includes('journal-book--creation')){
@@ -8015,6 +8069,7 @@ function render(){
  writeGuidedDraft();
  app.innerHTML=main()+(overlay||'');
  hideVisibleTechnicalUUIDs(app);
+ applySelectedSV595(app);
  enrichAnimalTrainingForms(app);
  decorateSkillContinuationHelp(app);
  updateFollowupDiceGuides(app);
@@ -8852,6 +8907,7 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
  const isSV=proof?.type==='secondary-mastery-value-test';
  const timedId=isSV?document.querySelector('#skill-value-form [name="timedProjectId"]')?.value:null;
  const timedStart=timedId?data.journal.find(j=>j.id===timedId&&j.calendarSkillProjectStart591):null;
+ if(view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&['engineering','writing'].includes(skillSVChoice595.value)&&!timedId)throw Error('Časovaný projekt vyžaduje doložený začátek, správnou dovednost a uplynulý nejčasnější termín. Nelze uložit obecný SV jako dokončení projektu.');
  if(timedId){
   const p=timedStart?.calendarSkillProjectStart591,skill=proof?.skills?.[0]||proof?.skill;
   if(!p||p.actorId!==selected||timedStart.calendarCampaignId!==campaignKey(data.campaignClock)||
@@ -8869,13 +8925,15 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
     (proof?.skill===gm.skill||proof?.skills?.[0]===gm.skill)&&
     data.campaignClock.minute>=(gmPlan.trigger==='end'?gmPlan.endMinute:gmPlan.minute)&&
     !data.journal.some(j=>j.calendarGMTestPlanId===gmPlan.id)?gmPlan.id:null;
-  const fishingSkill=proof?.type==='secondary-mastery-value-test'&&(proof?.skills?.[0]||proof?.skill)==='Fishing';
+  if(view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&skillSVChoice595.value==='fishing'&&(proof?.skills?.[0]||proof?.skill)!=='Fishing')throw Error('Časovaný Fishing vyžaduje původní Fishing Success Value; jiné dovednosti tento termín nemohou dokončit.');
+ const fishingSkill=proof?.type==='secondary-mastery-value-test'&&(proof?.skills?.[0]||proof?.skill)==='Fishing';
   const fishingCampaign=campaignKey(data.campaignClock);
   const fishingStarts=fishingSkill?data.journal.filter(j=>j.characterId===selected&&j.calendarCampaignId===fishingCampaign&&j.calendarFishingStart590):[];
   const usedFishingStart=new Set(data.journal.filter(j=>j.calendarFishingSVStart590).map(j=>j.calendarFishingSVStart590.startId));
   const fishingStart=fishingStarts.findLast(j=>!usedFishingStart.has(j.id));
   if(fishingStart&&data.campaignClock.minute<fishingStart.calendarFishingStart590.dueMinute)
    throw Error('Fishing: čtyřhodinový interval zatím neskončil; další Success Value hod nelze uložit.');
+  if(view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&skillSVChoice595.value==='fishing'&&!fishingStart)throw Error('Časovaný Fishing: před SV nejprve založte skutečné 4 hodiny rybolovu v kalendáři.');
   const fishingLink=fishingStart?{startId:fishingStart.id,dueMinute:fishingStart.calendarFishingStart590.dueMinute}:null;
   const trackingOrigin=pendingTrackingAwarenessId&&data.journal.find(j=>j.id===pendingTrackingAwarenessId);
   const trackingAwareness=trackingOrigin?trackingAwarenessFromSkill({trackingRow:trackingOrigin,
@@ -10227,14 +10285,30 @@ document.addEventListener('input',e=>{
  const form=e.target?.form;
  if(['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id)&&/^(gmENC|gmBulk|gmPer|gmModifier|tn|roll10)/.test(e.target?.name||''))refreshSkillAutoPreview(form);
 });
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-hmk-sv-training-animal]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(view!=='skills'||activeSkillTab!=='value'||!data.campaignClock)return;
+ const animal=verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===b.getAttribute('data-hmk-sv-training-animal')&&a.ownerId===selected);
+ if(!animal)return;
+ pendingStableAnimalcraftId=animal.id;
+ skillSVChoice595={actorId:selected,kind:'ordinary',value:'Animalcraft'};
+ render();
+},true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-hmk-sv-open-595]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const kind=button.getAttribute('data-hmk-sv-open-595');
+ const select=button.closest('.hsk-sv-picker-595')?.querySelector(`[data-hmk-sv-choice-type="${kind}"]`);
+ if(view!=='skills'||activeSkillTab!=='value'||!select?.value)return;
+ skillSVChoice595={actorId:selected,kind,value:select.value};
+ render();
+},true);
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-skill-tab]');if(!t)return;
- activeSkillTab=t.dataset.skillTab;const root=t.closest('.hmk-skill-workbench');if(!root)return;
- for(const section of root.querySelectorAll('[data-skill-section]'))section.hidden=section.dataset.skillSection!==activeSkillTab;
- for(const help of root.querySelectorAll('[data-skill-rule]'))help.hidden=help.dataset.skillRule!==activeSkillTab;
- for(const tab of root.querySelectorAll('[data-skill-tab]')){
-  const on=tab.dataset.skillTab===activeSkillTab;tab.setAttribute('aria-pressed',on?'true':'false');
-  if(on)tab.dataset.skillActive='yes';else delete tab.dataset.skillActive;}
- const thisForm=root.querySelector(activeSkillTab==='value'?'#skill-value-form':activeSkillTab==='assistance'?'#skill-assistance-form':'#skill-secondary-form');
+ activeSkillTab=t.dataset.skillTab;if(!t.closest('.hmk-skill-workbench'))return;
+ render();
+ const root=document.getElementById('hmk-skill-workbench');
+ const thisForm=root?.querySelector(activeSkillTab==='value'?'#skill-value-form':activeSkillTab==='assistance'?'#skill-assistance-form':'#skill-secondary-form');
  if(thisForm){hskConfigureSR(thisForm,'A');if(thisForm.id==='skill-secondary-form')hskConfigureSR(thisForm,'B');refreshSkillAutoPreview(thisForm);}
 });
 function hskAlchemySVHelpers(form,primary){
