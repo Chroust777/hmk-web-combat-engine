@@ -5860,3 +5860,37 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hmk-bestiary-complete .hmk-beast-special-output{display:block;padding:.35rem 0;font-size:12px;flex:1 0 100%}
 @media(max-width:760px){.hmk-bestiary-complete .hmk-beast-facts-grid{grid-template-columns:minmax(0,1fr)}.hmk-bestiary-complete .hmk-bestiary-species-card{padding:.65rem}.hmk-bestiary-complete .hmk-beast-keyvalues{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:390px){.hmk-bestiary-complete .hmk-beast-keyvalues{grid-template-columns:1fr}}
+
+/* v93.582 · Chronicle Spread: uniformly fine lines, readable numerical ML/
+   attributes and black text for all read-only Condition/Fatigue values. */
+.content-sheet .journal-book--overview .journal-condition-status>strong,
+.content-sheet .journal-book--overview .journal-fatigue-state .journal-mini-stats strong{
+ color:#1c1711!important;
+}
+/* Use a single 1px rule per shared edge, not two 1px borders from
+   neighbouring groups. All groups (including Nature) are identical. */
+.content-sheet .journal-book--overview .journal-book-section--skills .journal-book-skills{
+ border-top:1px solid rgba(137,94,45,.44)!important;
+ border-left:1px solid rgba(137,94,45,.44)!important;
+ gap:0!important;
+}
+.content-sheet .journal-book--overview .journal-book-section--skills .journal-book-skills .journal-skill-family{
+ border:0!important;
+ border-radius:0!important;
+ box-shadow:inset -1px 0 rgba(137,94,45,.44),inset 0 -1px rgba(137,94,45,.44)!important;
+ min-width:0;
+}
+.content-sheet .journal-book--overview .journal-book-section--skills .journal-skill-family h4{
+ border-bottom:1px solid rgba(137,94,45,.44)!important;
+}
+/* Match the digit height of the Skills ML columns, regardless of a late
+   legacy 11px sacred/attribute override; keep six values in each cluster. */
+.content-sheet .journal-book--overview .journal-attributes-row .journal-stat-box strong{
+ font:700 12px/1.2 Georgia,serif!important;
+ font-variant-numeric:tabular-nums!important;
+ overflow-wrap:anywhere;
+}
+.content-sheet .journal-book--overview .journal-attributes-row .journal-stat-box input.journal-stat-input{
+ font:700 12px/1.2 Georgia,serif!important;
+ font-variant-numeric:tabular-nums!important;
+}

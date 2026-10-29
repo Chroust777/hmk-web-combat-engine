@@ -2397,7 +2397,7 @@ const JOURNAL_HELP=Object.freeze({
  'Death Save':'Evidovaný smrtelný následek či jeho ověřování dle pravidel poranění.',
  'Fatigue':'Únava se podle stupně projeví na bojových i jiných fyzických činnostech.',
  'Stress':'Psyche Stress: psychické zatížení postavy.',
- 'Wounds':'Počet aktuálně evidovaných ran postavy.',
+ 'Wounds':'Počet všech zaznamenaných ran v Combat State včetně již zahojených; počet dosud nezahojených zobrazuje samostatné pole Injuries.',
  'Psyche':'Psychická stavová veličina používaná v příslušných pravidlech strachu či Morality.',
  'Morality':'Morality (MOR): morální charakteristika dle HMK str. 39; samostatná od Grace.',
  'Fate':'Fate Points: pravidlové body osudu postavy dle příslušných situací.',
@@ -2408,7 +2408,8 @@ const JOURNAL_HELP=Object.freeze({
  'PF':'Personal Fatigue: osobní únava podle příslušné činnosti a času.',
  'END SR (TN)':'Endurance Secondary Roll: pomocný d10 proti Target Number.',
  'Current':'Aktuální evidovaná hodnota daného stavu.',
- 'Recorded Hits':'Počet potvrzených zásahových událostí v historii.',
+ 'Poslední Impact':'Číselná hodnota Impact uložená v posledním potvrzeném zásahu (confirmed-hit) této postavy. Jde o historický výsledek útoku, nikoli aktuální bonus nebo součet zranění; bez potvrzeného zásahu se ukazuje pomlčka.',
+ 'Recorded Hits':'Počet skutečně potvrzených zásahů (confirmed-hit) z neměnné historie bojového stavu postavy. Nejde o počet aktivních ran: jeden zásah může vést k jinému počtu zranění a zahojení tento počet nesnižuje.',
  'Extended HR':'Healing Rate dlouhodobého šoku, pokud je evidován.',
  'Coma HR':'Healing Rate stavu Coma, je-li doložen.',
  'Weary':'Stupeň únavy Weary.',
@@ -2565,6 +2566,64 @@ const JOURNAL_SKILL_HELP=Object.freeze({
  'Shock':'Dovednost související s odolností vůči následkům zásahu; použití dle Shock pravidel.',
  'Unarmed':'Boj beze zbraně; útok a obrana bez držené zbraně.',
 });
+// v93.582: Chronicle Spread has a tooltip for every displayed section,
+// attribute abbreviation, descriptive field and derived status. Each note
+// distinguishes source input from a live value calculated elsewhere.
+const CHRONICLE_FIELD_HELP_582=Object.freeze({
+ 'Name':'Jméno postavy uložené v registru postav; změny se provádějí v jejím deníku.',
+ 'Race / Folk':'Folk (původ) postavy, určený při tvorbě; některé druhy mají vlastní úpravy atributů a pravidla (HMK str. 20).',
+ 'Age group':'Věková skupina Young, Mature nebo Old ovlivňuje tvorbu fyzických atributů (HMK str. 21, 38).',
+ 'Birthdate':'Datum narození podle kalendáře Tuzyn Reckoning; spolu s měsícem určuje znamení (HMK str. 22).',
+ 'Sunsign':'Astrologické znamení postavy; určuje Sunsign Modifiers a Development Points, nikoli přímý bonus ke každému d100 testu (HMK str. 22–23).',
+ 'Birthplace':'Místo narození postavy odvozené z regionu a konkrétního sídla (HMK str. 24).',
+ 'Social Class':'Společenská vrstva rodiny, například Free, Guilded či Noble; je výsledkem původu a společnosti (HMK str. 26).',
+ 'Background':'Městské nebo venkovské zázemí postavy; ovlivňuje výchozí rozvoj dovedností (HMK str. 33).',
+ 'Height':'Výška postavy podle jejího popisu; jde o uložený údaj, nikoli odvozený Move.',
+ 'Weight':'Tělesná hmotnost postavy v lb. Nejde o celkovou váhu s výbavou; ta se sleduje v inventáři.',
+ 'Hair':'Vzhled vlasů postavy z potvrzeného popisu.',
+ 'Eyes':'Barva nebo vzhled očí postavy z potvrzeného popisu.',
+ 'Complexion':'Vzhled pleti postavy z potvrzeného popisu.',
+ 'Handedness':'Dominantní ruka; může ovlivnit jednoruční manipulaci a postih vedlejší ruky.',
+ 'Deportment':'Způsob držení těla a vystupování; popisný údaj postavy.',
+ 'Society':'Typ společnosti původu (Feudal, Imperial, Tribal či Tributary) ovlivňující tvorbu postavy (HMK str. 25).',
+ 'Settlement':'Osada nebo město spojené s postavou, pokud byly doloženy.',
+ 'Wealth':'Majetková a společenská úroveň postavy; není to počet peněz v peněžní knize.',
+ 'Coins':'Aktuálně doložená hotovost postavy v denárech (d); nákupy a prodeje se zapisují do finanční historie.',
+ 'Estrangement':'Postavení postavy vůči rodině a klanu; určuje mimo jiné Kinship Roll (HMK str. 34).',
+ 'Pantheon':'Náboženský okruh postavy; sám o sobě neposkytuje automatický účinek.',
+ 'Region':'Zeměpisný region původu postavy v rámci světa Kèthîra.',
+ 'Languages':'Známé jazyky a případná jazyková kompetence doložená v profilu.',
+ 'Armour':'ENC opotřebené zbroje; odvíjí se z konkrétně nasazených vrstev v inventáři.',
+ 'Enc':'Upravená zátěž (ENC) po kombinaci výbavy, zbroje a příslušného modifikátoru síly.',
+ 'Initiative':'Úroveň iniciativy postavy z potvrzené dovednosti. Situace v encounteru mohou výsledné EML změnit.',
+ 'Awareness':'Všímavost a rozpoznání okolních jevů; živé ML pochází z evidence Skills.',
+ 'Shield':'Znalost boje se štítem; aktuální použitelnost závisí na skutečně drženém štítu.',
+ 'Melee':'Dovednost bojovat v kontaktním boji; konečné EML se mění podle zbraně a okolností.',
+ 'Missile':'Dovednost střelby nebo vrhání; konkrétní druh zbraně, dostřel a munice se ověřují v boji.',
+ 'Mounted':'Jízda na zvířeti (Riding); skutečné nasednutí a stav zvířete se sledují zvlášť.',
+ 'Grace':'Body Divine Grace z doloženého náboženského profilu (HMK str. 40 a Divine Mysteries).',
+ 'Piety':'Aktuální míra zbožnosti, včetně doložených změn vyvolaných náboženskými účinky.',
+ 'Fate Roll':'Potvrzená hodnota Fate Roll z vývoje postavy; nezaměňovat s body FP.',
+ 'Fate Points':'Doložený počet bodů Fate Points použitelných pouze v odpovídajících pravidlových situacích.',
+ 'Total':'Součet právě uvedených složek; v bloku Fatigue jde o Windedness + Weariness + Weakness.',
+ 'Current Shock':'Aktuální Shock State z trvalého Combat State, nikoli ručně přepsaná poznámka.',
+ 'Sunsign Modifier':'Změna příslušné skupiny daná znamením; nepřičítá se automaticky k běžným Skill Checks (HMK str. 22).',
+ 'Traits & Character':'Osobnostní rysy, povahové zvláštnosti a charakterové poznámky; většina je popisná, nikoli číselným bonusem.',
+ 'ZN':'Zone Number: první hod pro určení zasažené tělesné zóny (HMK str. 165–167).',
+ 'LN':'Location Number: navazující hod pro přesné určení místa zásahu v tělesné zóně (HMK str. 165–167).',
+ 'STR':'Strength: tělesná síla; určuje mimo jiné modifikátory zatížení a některé účinky úderu.',
+ 'END':'Endurance: tělesná výdrž; souvisí s odolností a zotavením.',
+ 'DEX':'Dexterity: jemná koordinace rukou.',
+ 'AGL':'Agility: pohyblivost a reflexy.',
+ 'PER':'Perception: vnímání smysly.',
+ 'CML':'Comeliness: tělesný vzhled a atraktivita.',
+ 'AUR':'Aura: duchovní a magická síla.',
+ 'WIL':'Will: vůle a psychická odolnost.',
+ 'REA':'Reasoning: rozum a paměť.',
+ 'CRE':'Creativity: tvořivost a představivost.',
+ 'EMP':'Empathy: porozumění druhým.',
+ 'ELO':'Eloquence: schopnost výstižného projevu.'
+});
 const JOURNAL_NUMERIC_HELP=Object.freeze({
  ML:'Mastery Level (ML): aktuální stupeň ovládání dovednosti. Při Skill Checku se proti Effective Mastery Level (EML) provádí d100; EML může být upraveno okolnostmi (HMK str. 46, 60–62).',
  SB:'Skill Base (SB): základ odvozený z primárního a sekundárního atributu; slouží k výpočtu počátečního ML i limitů rozvoje (HMK str. 46).',
@@ -2573,11 +2632,11 @@ const JOURNAL_NUMERIC_HELP=Object.freeze({
  EML:'Effective Mastery Level (EML): modifikovaná cílová hodnota d100 Success Testu; počítá se z ML a pravidlových modifikátorů (HMK str. 60–62).',
 });
 function journalHelp(label,override=null){
- const text=override||JOURNAL_HELP[label]||JOURNAL_SKILL_HELP[label]||JOURNAL_GROUP_HELP[label]||JOURNAL_NUMERIC_HELP[label];
+ const text=override||JOURNAL_HELP[label]||JOURNAL_SKILL_HELP[label]||JOURNAL_GROUP_HELP[label]||JOURNAL_NUMERIC_HELP[label]||CHRONICLE_FIELD_HELP_582[label];
  return text?` data-hmk-help="${esc(text)}" tabindex="0" aria-label="${esc(label+': '+text)}"`:'';
 }
 function journalHelpData(label,override=null){
- const text=override||JOURNAL_HELP[label]||JOURNAL_SKILL_HELP[label]||JOURNAL_GROUP_HELP[label]||JOURNAL_NUMERIC_HELP[label];
+ const text=override||JOURNAL_HELP[label]||JOURNAL_SKILL_HELP[label]||JOURNAL_GROUP_HELP[label]||JOURNAL_NUMERIC_HELP[label]||CHRONICLE_FIELD_HELP_582[label];
  return text?` data-hmk-help="${esc(text)}"`:'';
 }
 function journalTerm(label,explanation=null){return `<span${journalHelp(label,explanation)}>${esc(label)}</span>`;}
@@ -3042,7 +3101,7 @@ function journalConditionDetailsHTML(c,state,load){
  const endSR=Number.isFinite(h.attributes?.end)?Math.floor(h.attributes.end/2):'—';
  const pf=Number.isFinite(load.personalFatiguePerPeriod)?load.personalFatiguePerPeriod:'—';
  const block=(title,items,cl='')=>`<section class="journal-book-section ${cl}">${journalRuleTitle(title)}<div class="journal-mini-stats">${items.map(([a,b])=>`<div><span>${journalTerm(a,CHRONICLE_FATIGUE_HELP[a]||null)}</span><strong${journalHelp(a,CHRONICLE_FATIGUE_HELP[a]||null)}>${esc(b)}</strong></div>`).join('')}</div></section>`;
- return `<div class="journal-condition-detail-grid">${block('Impact',[['Poslední Impact',impactValue],['Recorded Hits',(state.events||[]).filter(x=>x.type==='confirmed-hit').length]])}${block('Shock State',[['Current',shock],['Extended HR',state.extendedShock?.hr??'—'],['Coma HR',state.coma?.hr??'—']],'journal-shock-state')}${block('Stress',[['Psyche',stress],['Aural Shock',auraShock],['Shadow',shadow]])}${block('Fatigue',[['Winded',fat.windedness],['Weary',fat.weariness],['Weak',fat.weakness],['Total',fat.total],['PF',pf],['END SR (TN)',endSR]])}</div>`;
+ return `<div class="journal-condition-detail-grid">${block('Impact',[['Poslední Impact',impactValue],['Recorded Hits',(state.events||[]).filter(x=>x.type==='confirmed-hit').length]])}${block('Shock State',[['Current',shock],['Extended HR',state.extendedShock?.hr??'—'],['Coma HR',state.coma?.hr??'—']],'journal-shock-state')}${block('Stress',[['Psyche',stress],['Aural Shock',auraShock],['Shadow',shadow]])}${block('Fatigue',[['Winded',fat.windedness],['Weary',fat.weariness],['Weak',fat.weakness],['Total',fat.total],['PF',pf],['END SR (TN)',endSR]],'journal-fatigue-state')}</div>`;
 }
 function journalSimpleChecklist(title,rows){return `<section class="journal-book-section">${journalRuleTitle(title)}<p class="journal-condition-hint">Aktuální stav z doložených účinků; není to formulář pro ruční zaškrtnutí.</p><div class="journal-condition-statuses">${rows.map(([label,value,explanation])=>`<div class="journal-condition-status"${journalHelp(label,explanation)}><span>${journalTerm(label,explanation)}</span><strong>${esc(firstPresent(value,'—'))}</strong></div>`).join('')}</div></section>`;}
 function foragingEvidenceInCharacterInventory(actorId){
@@ -3346,7 +3405,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.shock==='UNC'?'Ano':state.shock==='KIA'?'KIA':'Ne'],['Death Save',state.shock==='KIA'?'KIA':'—']];
  const conditionRows=projectChronicleConditions(state,{campaignId:data.campaignClock?campaignKey(data.campaignClock):null,auralShockLevels:h.arcane?.auralShockLevels});
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section"><div class="journal-book-title">Traits & Character</div>${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card"><div class="journal-book-title">Notes</div><p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -4286,7 +4345,7 @@ function stableHubAnimalHTML(a,campaignId){
  ${last?`<p>Poslední encounter: ${esc(last.name)} · ID ${esc(last.id)}. Zdravotní historie pokračuje pod trvalou identitou.</p>`:''}
  <div class="actions"><button type="button" class="secondary hc-small" data-hmk-stable-go-travel>Otevřít cestovní hlídku</button></div></section>
  <section class="hmk-stable-block"><h4>Jezdec · nasednutí a sesednutí (HMK 122)</h4>
- <p class="hmk-stable-ref-small">Hmotnost nesená zvířetem zahrnuje celé tělo jezdce, jeho oblečenou zbroj i nesenou výstroj. Zapsaná hmotnost se započítá do ENC/PF a jako minimální zátěž cestovní hlídky. Změní-li jezdec výstroj, aktualizujte skutečnou celkovou hmotnost sesednutím a novým nasednutím.</p>
+ <p class="hmk-stable-ref-small">Hmotnost nesená zvířetem zahrnuje celé tělo jezdce, jeho oblečenou zbroj i nesenou výstroj. Zapsaná hmotnost se započítá do ENC/PF a jako minimální zátěž cestovní hlídky. Hmotnost jezdce je doložená při nasednutí a během jízdy zůstává započtena bez ohledu na přesuny předmětů. Změní se až po sesednutí a novém nasednutí; přeložený náklad zvířete se eviduje zvlášť.</p>
  ${p.rider?`<p><strong>Nasedl:</strong> ${esc(character(p.rider.characterId)?.name||'postava')} · <strong>${p.rider.weightLb} lb</strong> (včetně neseného vybavení).</p>
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="rider-dismount"><input type="hidden" name="riderId" value="${esc(p.rider.characterId)}"><input type="hidden" name="reason" value="Jezdec skutečně sesedl ze zvířete"><button type="submit">Sesednout</button></form>`:''}`:
  !dead&&a.spec.breed&&a.spec.str?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="rider-mount"><input type="hidden" name="reason" value="Jezdec skutečně nasedl, celková hmotnost včetně výstroje"><label>Jezdec<select name="riderId" data-hmk-stable-rider-select>${riderChoices.map(c=>{const suggested=stableRiderSuggestion581(c);return `<option value="${esc(c.id)}" ${c.id===a.ownerId?'selected':''} data-rider-weight="${suggested?.suggestedLb??''}">${esc(c.name)}</option>`}).join('')}</select></label><label>Celková skutečná hmotnost jezdce včetně výstroje (lb)<input name="riderWeightLb" type="number" min="1" max="1000000" step="1" value="${initialRider?.suggestedLb??''}" required placeholder="Váha těla + nesená výstroj"></label><button type="submit">Nasednout a započítat hmotnost</button></form>`:
