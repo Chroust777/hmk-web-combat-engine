@@ -6355,3 +6355,10 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hmk-skill-context-595 .hsk-tabs button{display:block!important;visibility:visible!important;width:100%!important;min-height:36px!important;white-space:normal!important;}
 
 .hsk-fishing-specific-597 .hsk-sv-extras,.hsk-fishing-specific-597 [data-alchemy-sv-helpers]{display:none!important}
+
+/* v93.598 · independent, confirmation-gated Skill Test follow-up selector */
+.hsk-followup-choice-display-598{padding:.85rem;margin:.65rem 0;border:1px solid #9c8055;border-radius:9px;background:rgba(229,207,164,.26);color:#302217;min-width:0}
+.hsk-followup-choice-display-598 form{margin:.5rem 0;max-width:100%}
+.hsk-rule-panel [data-hmk-followup-choice-598]{width:100%;min-width:0;max-width:100%;margin:.35rem 0}
+.hsk-rule-panel [data-hmk-followup-open-598]{margin-top:.35rem;white-space:normal}
+.hsk-followup-choice-display-598 h3{font-size:1rem;line-height:1.3}
