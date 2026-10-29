@@ -28,7 +28,14 @@ export function layerDisplayRows(report,inventory=[],load=null){
   const provenForbidden=zones.some(([,z])=>z.status==='forbidden');
   const impossibleLocal=zones.some(([,z])=>z.locations[row.location]?.prohibited);
   const locationIssue=(audited?.locationReports||[]).find(x=>x.location===row.location&&x.status==='violation');
-  const lackingOrder=things.length>1&&things.some(x=>!Number.isSafeInteger(x.layerOrder));
+  // A shared anatomical location may belong to different p.117 Body Zones.
+  // For instance, Cloth Tunic (Torso) and Cloth Breeches (Legs) overlap on
+  // Pelvis, but this is NOT an unordered two-article stack within one zone.
+  // Likewise, a feasibility proof that EVERY relevant physical order works
+  // does not require a player to record a meaningless order for that location.
+  const orderDependentHere=zones.length===0||zones.some(([,z])=>
+   (z.locations?.[row.location]?.count??0)>1&&!z.orderInvariant);
+  const lackingOrder=orderDependentHere&&things.length>1&&things.some(x=>!Number.isSafeInteger(x.layerOrder));
   const forcedBulk=zones.filter(([zone])=>bulk[zone]===-5).map(([zone])=>HMK_ARMOUR_ZONES[zone]);
   const potentialBulk=zones.some(([,z])=>z.status==='bulk-exception-possible');
   const status=provenForbidden||impossibleLocal||locationIssue?'forbidden':row.count>5?'over-limit':
@@ -37,7 +44,7 @@ export function layerDisplayRows(report,inventory=[],load=null){
    status==='forbidden'?`Zakázaná kombinace materiálů nebo více zbrojních kusů v jedné tělesné zóně; nelze ji legalizovat pouhým Bulk.`:
    status==='bulk'?`Povolená dodatečná vrstva C/D, Bulk −5 za zónu ${forcedBulk.join(', ')}.`:
    status==='unverified'?`Položky mají možné pravidlové uspořádání, ale skutečné pořadí zevnitř ven není zaznamenáno.`:
-   'Materiály a doložené vrstvy odpovídají evidenci';
+   'Kombinace je přípustná podle pravidel jednotlivých Body Zones; nepovolená vrstva ani Bulk nebyly doloženy.';
   // A zone-level prohibition can exist even if no individual location has >5.
   if(provenForbidden&&row.count<=5)detail='V příslušné tělesné zóně nelze sestavit žádné dovolené pořadí; viz seznam nasazených kusů.';
   return {...row,status,detail,locationName:HMK_ARMOUR_LOCATIONS[row.location]||row.location,
