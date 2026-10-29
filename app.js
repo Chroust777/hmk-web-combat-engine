@@ -289,7 +289,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.609';
+const APP_VERSION='93.610';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3664,8 +3664,11 @@ function folioChapterParts(body,kind=''){
   const workbench=nodes.find(x=>x.classList.contains('hmk-skill-workbench'));
   if(workbench){
    // Reuse the ORIGINAL forms and handlers: only split the live DOM by meaning.
-   const leftItems=[...workbench.children].filter(x=>x.matches('.topline,.hsk-actor-chooser,.hsk-tabs,.hsk-skill-rule-explainer'));
-   const rightItems=[...workbench.children].filter(x=>!leftItems.includes(x)&&
+   // v93.610: tabs belong to the full-width top book navigation, not the
+   // left folio. Keep the original buttons and their data-skill-tab handlers.
+   const skillTabs=workbench.querySelector(':scope > .hsk-tabs');
+   const leftItems=[...workbench.children].filter(x=>x.matches('.topline,.hsk-actor-chooser,.hsk-skill-rule-explainer'));
+   const rightItems=[...workbench.children].filter(x=>x!==skillTabs&&!leftItems.includes(x)&&
     (activeSkillTab==='secondary'||activeSkillTab==='assistance'||activeSkillTab==='value'? !x.classList.contains('hsk-special-container') : true));
    const actor=character(selected);
    const left=`<section class="hmk-skill-context-595">${leftItems.map(x=>x.outerHTML).join('')}${activeSkillTab==='value'?skillSVPicker595(actor):''}</section>`;
@@ -3702,7 +3705,8 @@ function folioChapterParts(body,kind=''){
      }
     }
    }
-   return [left,`<section class="hmk-skill-actions-595">${right}</section>`];
+   return [left,`<section class="hmk-skill-actions-595">${right}</section>`,
+    skillTabs?skillTabs.outerHTML.replace('class="hsk-tabs"','class="hsk-tabs journal-book-subnav hsk-top-tabs-610"'):''];
   }
  }
  if(kind.includes('journal-book--creation')){
@@ -3789,11 +3793,13 @@ function folioChapterParts(body,kind=''){
  return folioBalancedParts(root);
 }
 function folioChapterSpread(title,subtitle,body,kind=''){
- const [left,right]=folioChapterParts(body,kind);
+ const [left,right,skillTabs]=folioChapterParts(body,kind);
  const header=`<header class="folio-chapter-heading"><h3>${esc(title)}</h3>${subtitle?`<p>${esc(subtitle)}</p>`:''}</header>`;
  const pages=`<section class="journal-book-page journal-book-page--left folio-chapter-page" aria-label="Levá stránka: ${esc(title)}">${header}<div class="folio-chapter-content">${left}</div></section><section class="journal-book-page journal-book-page--right folio-chapter-page" aria-label="Pravá stránka: ${esc(title)}"><div class="folio-chapter-content folio-chapter-content--right">${right}</div></section>`;
  // Skill tab controls need the same .hmk-skill-workbench ancestor as before.
- return `<div class="journal-book-spread folio-chapter-spread${kind.includes('journal-book--skills')?' hmk-skill-workbench':''}"${kind.includes('journal-book--skills')?' id="hmk-skill-workbench"':''}>${pages}</div>`;
+ // Keep tab navigation inside the existing workbench ancestor so event
+ // delegation, actor switching, and existing forms behave exactly as before.
+ return `<div class="journal-book-spread folio-chapter-spread${kind.includes('journal-book--skills')?' hmk-skill-workbench':''}"${kind.includes('journal-book--skills')?' id="hmk-skill-workbench"':''}>${skillTabs||''}${pages}</div>`;
 }
 function journalShell(inner,extraClass='',showSubnav=true){
  if(extraClass.includes('journal-book--chapter')&&showSubnav){

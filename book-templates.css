@@ -6522,3 +6522,75 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .content-calendar .hc-party-health-actions input{width:100%;box-sizing:border-box}
 .content-calendar .hc-party-health-actions button{flex:0 1 auto;max-width:100%}
 @media(max-width:490px){.content-calendar .hc-party-health-row{grid-template-columns:minmax(0,1fr)}.content-calendar .hc-party-health-actions button{white-space:normal}.hc-active-rest-stop{width:100%}}
+
+
+/* v93.610 · Skill Tests mode navigation matches Chronicle Spread: one
+   horizontal row above BOTH book folios, never a column on the left page.
+   The rules table consequently starts immediately beneath actor selection. */
+.content-sheet .journal-book--skills .hsk-top-tabs-610 {
+  grid-column:1 / -1!important;
+  display:flex!important;
+  position:relative!important;
+  z-index:8!important;
+  align-items:stretch!important;
+  justify-content:center!important;
+  flex-wrap:wrap!important;
+  gap:5px!important;
+  margin:-15px 24px 9px!important;
+  padding:0!important;
+  min-width:0!important;
+  max-width:calc(100% - 48px)!important;
+  border:0!important;
+  background:transparent!important;
+}
+.content-sheet .journal-book--skills .hsk-top-tabs-610 button {
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex:0 1 auto!important;
+  width:auto!important;
+  max-width:100%!important;
+  min-width:0!important;
+  min-height:29px!important;
+  margin:0!important;
+  padding:5px 10px!important;
+  text-align:center!important;
+  white-space:normal!important;
+  overflow-wrap:normal!important;
+  font:700 12px/1.18 Georgia,serif!important;
+  font-variant:small-caps!important;
+  letter-spacing:.02em!important;
+  border:1px solid #ae7945!important;
+  border-radius:2px 2px 7px 7px!important;
+  box-shadow:inset 0 1px #f3e6c4,0 2px 4px #0006!important;
+  background:linear-gradient(180deg,#b88749,#ddbb81)!important;
+  color:#342318!important;
+}
+.content-sheet .journal-book--skills .hsk-top-tabs-610 button[data-skill-active="yes"] {
+  background:linear-gradient(180deg,#324a66,#142941)!important;
+  border-color:#b99051!important;
+  color:#ffe1a6!important;
+  box-shadow:inset 0 1px #d9ad6c,0 2px 4px #0006!important;
+}
+.content-sheet .journal-book--skills .hsk-top-tabs-610 button:focus-visible {
+  outline:2px solid #173e66!important;outline-offset:2px!important;
+}
+@media(max-width:800px){
+  .content-sheet .journal-book--skills .hsk-top-tabs-610 {
+    margin:-13px 6px 10px!important;
+    max-width:calc(100% - 12px)!important;
+    gap:4px!important;
+  }
+  .content-sheet .journal-book--skills .hsk-top-tabs-610 button {
+    flex:1 1 115px!important;font-size:11px!important;padding:5px 6px!important;
+  }
+}
+@media(max-width:550px){
+  .content-sheet .journal-book--skills .hsk-top-tabs-610 {
+    margin:-8px 1px 8px!important;
+    max-width:calc(100% - 2px)!important;
+  }
+  .content-sheet .journal-book--skills .hsk-top-tabs-610 button {
+    flex:1 1 105px!important;font-size:10px!important;
+  }
+}
