@@ -6256,3 +6256,47 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 @media(max-width:750px){
  .content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section{padding:7px!important;margin-bottom:18px!important}
 }
+
+
+/* v93.594 · Arsenal & Gear: inventory grid uses its entire parchment frame.
+   Location labels are not broken in mid-word; action is compact and right-aligned.
+   Keep a fixed, validated eight-column layout (100% total) with only one scrollbar
+   on narrow displays. Earlier v93.593 chapter overrides are intentionally superseded. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table {
+ width:100%!important;min-width:0!important;max-width:100%!important;
+ table-layout:fixed!important;border-collapse:collapse!important;
+}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(1){width:22%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(2){width:15%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(3){width:5%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(4){width:8%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(5){width:11%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(6){width:6%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(7){width:21%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:12%!important}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table tbody td:nth-child(2) {
+ white-space:nowrap!important;overflow-wrap:normal!important;word-break:keep-all!important;
+ text-align:left!important;font-size:11px!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table th:last-child,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table td:last-child{
+ padding-right:2px!important;text-align:right!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table .inv-edit-only{
+ display:inline-block!important;float:right!important;
+ width:auto!important;min-width:65px!important;max-width:100%!important;
+ padding:3px 7px!important;margin:0!important;
+ white-space:nowrap!important;word-break:normal!important;
+ font:700 11px/1.15 Georgia,serif!important;
+}
+@media(max-width:700px){
+ .content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table{
+  min-width:650px!important;width:650px!important;max-width:none!important;
+ }
+}
+/* v93.594: prior inventory rule reserved permanent scrollbar space at the
+   right even for short tables; do not steal the Action column width. */
+.content-sheet .journal-book--chapter .folio-chapter-content
+ .inv-ledger-section .inv-table-scroll.inv-15-rows{
+  scrollbar-gutter:auto!important;
+}
