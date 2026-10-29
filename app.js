@@ -289,7 +289,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.608';
+const APP_VERSION='93.609';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1220,12 +1220,22 @@ function personalRestPlannerHTML(actor,clock){
  if(!clock||!actor)return '';
  const active=activeHMKActivities(data.journal,clock).filter(x=>x.characterId===actor.id);
  const label={winded:'Klid (10 minut)',rest:'Odpočinek (4 hodiny)',sleep:'Spánek (8 hodin)',travel:'Cesta'};
- const items=active.map(j=>{const a=j.calendarActivityProof;
-  return `<p class="hc-provision-help"><strong>${esc(label[a.kind]||'Činnost')}:</strong> ${esc(displayCampaignMinute(a.startMinute))} až ${esc(displayCampaignMinute(a.endMinute))}.
-  ${a.kind==='winded'?'Po dokončení Windedness −5.':a.kind==='rest'?'Po dokončení Weariness −5.':a.kind==='sleep'?'Po dokončení Weariness −15.':'Probíhající cestovní činnost.'} Účinek se automaticky zapíše při potvrzeném posunu času GM.</p>`;}).join('');
+ const items=active.filter(j=>['winded','rest','sleep'].includes(j.calendarActivityProof?.kind)).map(j=>{
+  const a=j.calendarActivityProof,started=clock.minute>=a.startMinute;
+  const status=started?'Právě probíhá':'Naplánováno';
+  return `<div class="hc-active-rest" role="status"><div class="hc-active-rest-main">
+   <strong>${esc(actor.name)} · ${esc(status)}: ${esc(label[a.kind])}</strong>
+   <span>Od ${esc(displayCampaignMinute(a.startMinute))} do ${esc(displayCampaignMinute(a.endMinute))} · ${started?'uplynulo '+Math.max(0,clock.minute-a.startMinute)+' min':'čeká na začátek'}.</span>
+   <small>${a.kind==='winded'?'Windedness −5':a.kind==='rest'?'Weariness −5':'Weariness −15'} pouze po dokončení celého intervalu a posunu času GM.</small>
+  </div><button type="button" class="secondary hc-active-rest-stop" data-provision-rest-cancel="${esc(j.id)}" title="Přerušit právě tuto činnost v aktuální herní minutě">Zrušit ${a.kind==='sleep'?'spánek':a.kind==='winded'?'klid':'odpočinek'}</button></div>`;
+ }).join('');
+ const latestStop=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.characterId===actor.id&&j.calendarActivityInterruptProof)
+  .filter(j=>{const source=data.journal.find(x=>x.id===j.calendarActivityInterruptProof.activityId);return ['winded','rest','sleep'].includes(source?.calendarActivityProof?.kind)})
+  .at(-1);
+ const stop=latestStop&&clock.minute-latestStop.campaignMinute<=DAY_MINUTES?`<p class="hc-rest-stopped"><strong>Poslední odpočinek přerušen:</strong> ${esc(displayCampaignMinute(latestStop.campaignMinute))}. Bez automatické obnovy za nedokončený interval. Záznam i přesný konec najdete v kalendáři.</p>`:'';
  return `<section class="hc-person-rest-planner"><h4>Odpočinek a spánek · HMK str. 176</h4>
   <p class="hc-provision-help">Stejný plán a stejné přepočty Fatigue jako v Kalendář → Cestování a hlídky. Činnost zde ani tam neposouvá čas sama; dokončení a případná obnova proběhnou automaticky při posunu času GM. Weakness se tím neléčí.</p>
-  ${items||'<p class="hc-provision-help">Momentálně není naplánovaná další časovaná činnost této postavy.</p>'}
+  ${items||'<p class="hc-provision-help">Právě neprobíhá žádný časovaný odpočinek ani spánek této postavy.</p>'}${stop}
   <form data-provision-rest-planner><input name="actorId" type="hidden" value="${esc(actor.id)}">
    <label>Plánovat od této minuty<select name="kind"><option value="winded">Klid 10 minut · Windedness −5</option><option value="rest">Odpočinek 4 hodiny · Weariness −5</option><option value="sleep">Spánek 8 hodin · Weariness −15</option></select></label>
    <button type="submit">Naplánovat časovaný odpočinek</button></form>
@@ -1275,6 +1285,7 @@ function partyProvisionWizardHTML(participants,clock,{supplyHTML,nutritionHTML,a
  const dueLine=(t)=>`${t.kind==='starvation'?'Hlad':'Žízeň'} · HR${t.hr} · slabost ${t.weakness} · od ${displayCampaignMinute(t.originMinute)} · ${t.mode==='healing'?'Healing':t.mode==='advance'?'Advance':'další test dle dávky'} ${displayCampaignMinute(t.dueMinute)} · poslední dávka ${t.latestRation==='full'?'plná':t.latestRation==='half'?'poloviční':t.latestRation==='none'?'žádná':'neúplná / nedoložená'}`;
  return `<section class="hc-party-guide" aria-label="Průvodce zásobováním družiny">
  <div class="hc-party-intro"><h2>Zásoby družiny · den po dni</h2><p>Stačí rozhodnout, <strong>kdo spotřebovává zásoby</strong>, případně rozdělit skutečné nálezy a potvrdit výjimky. Denní spotřebu vyhodnotí kalendář při posunu času GM. Žádný krok sám nepřidává jídlo, vodu ani hody.</p><p><strong>Teď je:</strong> ${esc(displayCampaignMinute(clock.minute))} · ${esc(czCount(participants.length,'postava','postavy','postav'))}</p></div>
+ ${partyProvisionLedgerHTML(participants)}
  <section class="hc-party-step" id="hc-party-step-people"><header class="hc-party-step-head"><span class="hc-party-step-number">1</span><div><h3>Kdo má sledovanou výživu?</h3><p>Stav všech členů je vidět hned. Běžné sledování stačí zapnout jednou; další dny se opakuje automaticky.</p></div></header>
  <div class="hc-party-table-wrap"><table class="hc-party-status-table"><thead><tr><th>Postava</th><th>Režim</th><th>Poslední den</th><th><span tabindex="0" class="hc-help-term" data-hmk-help="Uzávěrka je vypočtena z doloženého začátku dne. Je to předpokládaná 24hodinová hranice pro denní spotřebu, nikoli nový kalendářní závazek.">Další 24h uzávěrka ⓘ</span></th></tr></thead><tbody>${rows||'<tr><td colspan="4">V kampani zatím nejsou žádné postavy.</td></tr>'}</tbody></table></div>
  ${newcomers.length?`<form data-provision-party-start class="hc-party-form"><fieldset><legend>Zapnout běžné sledování také pro</legend><div class="hc-characters">${newcomers.map(c=>`<label class="hc-character"><input type="checkbox" name="actorIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset><button type="submit">Zapnout sledování vybraným</button><small>Pouze evidenční režim 1 denní dávka jídla a vody. Žádná zásoba ani uplynulý den se tím nezakládá.</small></form>`:
@@ -1287,12 +1298,11 @@ function partyProvisionWizardHTML(participants,clock,{supplyHTML,nutritionHTML,a
  <p class="hc-party-preview" data-party-ration-preview aria-live="polite">Vyberte postavy. Přehled před výdejem ukáže společnou potřebu a dostupné dávky.</p><button type="submit" disabled>Vydat vybraným postavám</button><small>Skutečné množství musí být ve společném fondu; pravidlová kontrola zabrání překročení zásob. Výdej neposouvá herní čas a nevkládá nic do batohu.</small></form>`:
  '<p class="hc-party-status">Momentálně nejsou žádné společné dávky jídla ani vody k rozdělení. Osobní zásoby se stále spotřebovávají podle svých dokladů. Nové společné nálezy vznikají až po skutečném Foraging.</p>'}
  <div class="hc-party-resource-links"><button type="button" class="secondary hc-small" data-provision-go="forage">Získat zásoby v přírodě · Foraging ↗</button><button type="button" class="secondary hc-small" data-provision-scope="person">Osobní jídlo a nádoby · Postava ↗</button></div>
- <details class="hc-party-extra"><summary>Zobrazit inventární zásoby a účetnictví celé družiny</summary>${partyProvisionLedgerHTML(participants)}</details>
  </section>
  ${partyNutritionConditionsHTML(participants,clock)}
  <section class="hc-party-step" id="hc-party-step-close"><header class="hc-party-step-head"><span class="hc-party-step-number">4</span><div><h3>Vyhodnoťte zdravotní následky a posuňte čas</h3><p>Hlad a žízeň se vyhodnocují až po skutečně uplynulých obdobích. Splatný zdravotní hod se nikdy neodhaduje a neprovádí automaticky.</p></div></header>
  ${ready.length?`<p class="hc-party-status">Běžná spotřeba je aktivní pro ${esc(czCount(ready.length,'postavu','postavy','postav'))}. Při posunu času se použijí doložené osobní i přidělené společné dávky.</p>`:''}
- ${due.length?`<div class="hc-party-health"><h4>Hlad a žízeň · ${due.length} aktivních kontrol${alerts.length?` · ${alerts.length} splatných`:''}</h4>${due.map(t=>`<form data-malnutrition-course class="hc-party-health-row"><div><strong ${journalHelp('HR',HR_HELP_558)}>${esc(character(t.characterId)?.name||t.actorName||t.characterId)}</strong><div class="hc-medical-detail">${esc(dueLine(t))}${malnutritionLastRollHTML(t.characterId,t.kind,t.episodeId)}${clock.minute<t.dueMinute?' · zatím nenastalo':' · splatné'}</div></div><input type="hidden" name="actorId" value="${esc(t.characterId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}"><label>d100<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="hc-small hc-provision-generate" data-malnutrition-die="yes" ${clock.minute<t.dueMinute?'disabled title="Hod lze provést až v termínu"':''}>⚄ Generovat d100</button><button type="submit" ${clock.minute<t.dueMinute?'disabled title="Termín ještě nenastal"':''}>Zapsat ${t.mode==='healing'?'Healing':'Advance'}</button></form>`).join('')}</div>`:'<p class="hc-party-status">Žádná aktuálně evidovaná kontrola hladu ani žízně.</p>'}
+ ${due.length?`<div class="hc-party-health"><h4>Hlad a žízeň · ${due.length} aktivních kontrol${alerts.length?` · ${alerts.length} splatných`:''}</h4>${due.map(t=>`<form data-malnutrition-course class="hc-party-health-row"><div class="hc-party-health-description"><strong ${journalHelp('HR',HR_HELP_558)}>${esc(character(t.characterId)?.name||t.actorName||t.characterId)}</strong><div class="hc-medical-detail">${esc(dueLine(t))}${malnutritionLastRollHTML(t.characterId,t.kind,t.episodeId)}${clock.minute<t.dueMinute?' · zatím nenastalo':' · splatné'}</div></div><input type="hidden" name="actorId" value="${esc(t.characterId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}"><div class="hc-party-health-actions"><label>d100<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="hc-small hc-provision-generate" data-malnutrition-die="yes" ${clock.minute<t.dueMinute?'disabled title="Hod lze provést až v termínu"':''}>⚄ d100</button><button type="submit" ${clock.minute<t.dueMinute?'disabled title="Termín ještě nenastal"':''}>Zapsat ${t.mode==='healing'?'Healing':'Advance'}</button></div></form>`).join('')}</div>`:'<p class="hc-party-status">Žádná aktuálně evidovaná kontrola hladu ani žízně.</p>'}
  ${partyMalnutritionHistoryHTML(participants)}
  <button type="button" class="hc-party-next" data-calendar-section="overview">Otevřít posun herního času a ostatní termíny ↗</button><small>Čas mění jen GM v přehledu kalendáře. Nevyřešené povinné termíny mohou posun zablokovat.</small></section>
  <details class="hc-party-advanced"><summary>Pokročilé možnosti · původní doklady, zvláštní režimy, byliny a audit</summary><p>Pro výjimky nebo starší režimy zůstávají k dispozici původní pravidlové formuláře a doklady. Používejte je jen při skutečně doložených okolnostech.</p>${supplyHTML||''}${nutritionHTML||''}${activityNeedsHTML||''}</details>
@@ -1534,7 +1544,7 @@ function campaignCalendarView(){
  <li><strong>Naplánujte cestu a potřebné END hody.</strong> Běžná hlídka je čtyřhodinová; Double Time se vyhodnocuje po hodinách. Zkontrolujte Loaded, Wearied, Fatigue a zdravotní stav lidí i zvířat.</li>
  <li><strong>Čas posune GM.</strong> Započte se jen skutečně absolvovaná doba, vzdálenost a dokončené následky. Ověřte Combat State, kalendář, historii, navazující odpočinek a další hlídku.</li>
  </ol><p class="hc-hint"><strong>Pořadí v aplikaci:</strong> tyto podklady → povinné testy a události → plán pohybu → posun času GM → zdravotní a kalendářová evidence. U rozpracovaného rozhodnutí pokračujte v příslušném průvodci, nikoli druhým zápisem téže hlídky.</p></details>
- <details class="hmk-trek-entry"><summary>Vyhodnotit cestovní hlídku – pravidlové podklady</summary><form id="campaign-trekking-context-form">
+ <details class="hmk-trek-entry" open><summary>Vyhodnotit cestovní hlídku – pravidlové podklady</summary><form id="campaign-trekking-context-form">
  <fieldset class="hc-expedition-actors"><legend>Účastníci této cestovní hlídky (průvodce se přidá automaticky)</legend><div class="hc-characters">${participants.map(c=>`<label class="hc-character"><input type="checkbox" name="trekMemberIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset><fieldset class="hmk-trek-section"><legend>1 · Kdo cestuje a kam</legend><div class="hmk-trek-grid"><label>Postava / průvodce<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <label>Honák / Drover<select name="droverId">${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <label>Oblast / označení trasy<input name="area" maxlength="90" required placeholder="Např. Východní les u Tashalu"></label>
@@ -3600,7 +3610,7 @@ function folioChapterParts(body,kind=''){
   if(nav&&guide){
    const children=[...guide.children];
    const firstPart=children.filter(el=>
-    el.classList.contains('hc-party-intro')||el.id==='hc-party-step-people'||el.id==='hc-party-step-rations');
+    el.classList.contains('hc-party-intro')||el.classList.contains('hc-provision-ledger')||el.id==='hc-party-step-people');
    const secondPart=children.filter(el=>!firstPart.includes(el));
    if(firstPart.length===3&&secondPart.length){
     const wrap=inner=>`<section class="hc-party-guide" aria-label="Průvodce zásobováním družiny">${inner.map(el=>el.outerHTML).join('')}</section>`;
@@ -11297,6 +11307,22 @@ document.addEventListener('submit',e=>{
   if(mutate(()=>data.journal.push({...row,createdAt:stamp()})))
    notice='Odpočinek byl uložen do jediné kalendářové evidence. Účinek se započte po uplynutí intervalu při posunu času GM.';
  }catch(error){alert('Odpočinek nebyl naplánován: '+error.message)}
+},true);
+// Personal rest uses the existing append-only calendar interruption authority.
+// It never erases the original plan or grants fatigue recovery for an incomplete interval.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('button[data-provision-rest-cancel]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(combatInitiativeSequence)throw Error('Nejdříve dokončete probíhající Initiative.');
+  const clock=data.campaignClock,id=button.dataset.provisionRestCancel;
+  const row=activeHMKActivities(data.journal,clock).find(j=>j.id===id);
+  if(!row||!['winded','rest','sleep'].includes(row.calendarActivityProof?.kind))throw Error('Odpočinek není aktivní nebo již skončil.');
+  const reason=window.prompt('Důvod přerušení odpočinku (nejméně 3 znaky):','Odpočinek přerušen událostí ve hře');
+  if(reason===null)return;
+  const proof=interruptHMKActivity({journal:data.journal,clock,activityId:id,reason,id:uuid(),createdAt:stamp()});
+  if(mutate(()=>data.journal.push(proof)))notice='Odpočinek ukončen přesně v '+displayCampaignMinute(clock.minute)+'. Původní plán i přerušení zůstávají v kalendáři; neúplný interval neobnovuje Fatigue.';
+ }catch(error){alert('Odpočinek se nepodařilo přerušit: '+error.message)}
 },true);
 // Animal recovery shares the EXACT existing calendar/rest/Combat State authority.
 // It is a GM-confirmed analogy for species, never a background hourly healer.

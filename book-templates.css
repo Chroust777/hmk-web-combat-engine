@@ -6504,3 +6504,21 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-provision-action-blocked{padding:9px 12px;border-left:3px solid #8f633b;background:#e7d3af55;color:#4a3220;line-height:1.5}
 
 .hmk-journal-floating-tooltip.hmk-trek-dice-outcomes:not([hidden]){white-space:pre-line!important;font-size:13px!important;max-height:82vh!important;}
+
+/* v93.609 · Prominent rest/cancellation directly beside the character's plan. */
+.content-calendar .hc-active-rest,.journal-book--sheet-chapter .hc-active-rest{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;margin:10px 0;border:1px solid rgba(82,106,60,.55);border-left:5px solid #617c49;border-radius:7px;background:rgba(205,223,177,.22);min-width:0}
+.hc-active-rest-main{display:grid;gap:4px;flex:1 1 210px;min-width:0;line-height:1.4;overflow-wrap:anywhere}
+.hc-active-rest-main strong{font-size:1rem;color:#34512c}
+.hc-active-rest-main span{font-size:.86rem}
+.hc-active-rest-main small{font-size:.76rem;color:#68573e}
+.hc-active-rest-stop{flex:none;max-width:100%;white-space:normal}
+.hc-rest-stopped{margin:9px 0;padding:8px 11px;border:1px solid rgba(115,78,47,.4);border-radius:5px;background:rgba(142,109,71,.08);font-size:.84rem}
+/* Give the actual malnutrition description the entire book-page width. Inputs are a separate row. */
+.content-calendar .hc-party-health-row{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:stretch;width:100%;max-width:100%;min-width:0}
+.content-calendar .hc-party-health-description{grid-column:1/-1;width:100%;min-width:0;max-width:100%;overflow-wrap:break-word}
+.content-calendar .hc-party-health-description>.hc-medical-detail{width:100%;min-width:0;max-width:100%;overflow-wrap:anywhere;line-height:1.5}
+.content-calendar .hc-party-health-actions{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;min-width:0}
+.content-calendar .hc-party-health-actions label{flex:0 1 110px;min-width:75px}
+.content-calendar .hc-party-health-actions input{width:100%;box-sizing:border-box}
+.content-calendar .hc-party-health-actions button{flex:0 1 auto;max-width:100%}
+@media(max-width:490px){.content-calendar .hc-party-health-row{grid-template-columns:minmax(0,1fr)}.content-calendar .hc-party-health-actions button{white-space:normal}.hc-active-rest-stop{width:100%}}
