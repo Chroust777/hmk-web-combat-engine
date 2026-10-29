@@ -3,6 +3,7 @@
  * Existing unscheduled historical skill tests are unchanged.
  */
 import {ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
+import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600} from './hmk-skill-crafts-600.js';
 const assert=(condition,message)=>{if(!condition)throw Error(message)};
 export const WRITING_WORK_MINUTES_591=Object.freeze({missive:10,tract:5*1440,treatise:30*1440,disquisition:120*1440});
 export const SKILL_TIMED_WORK_FORMAT_591='hmk-skill-timed-work-591-v1';
@@ -37,6 +38,7 @@ export const TIMED_CRAFT_ITEMS_599=Object.freeze({
 export const TIMED_CRAFT_LABELS_599=Object.freeze({glassworking:'Glassworking · HMK 73',woodworking:'Woodworking · HMK 91'});
 
 export function timedSkillBaseMinutes591(kind,scope){
+ if(CRAFT_WORK_600[kind])return CRAFT_WORK_600[kind][scope]?.hours*60??null;
  if(kind==='engineering')return Number.isFinite(ENGINEERING_DESIGN_DAYS[scope])?ENGINEERING_DESIGN_DAYS[scope]*1440:null;
  if(kind==='writing')return WRITING_WORK_MINUTES_591[scope]??null;
  if(kind==='drawing'){const area=Number(scope);return Number.isInteger(area*4)&&area>=0.25&&area<=10?area*240:null;}
@@ -68,8 +70,20 @@ export function validateSkillTimedWork591(data){
    p.actorId===row.characterId&&data.characters?.some(c=>c.id===p.actorId)&&
    typeof row.calendarCampaignId==='string'&&row.calendarCampaignId.length>0&&
    Number.isSafeInteger(p.startMinute)&&p.startMinute>=0&&p.startMinute===row.campaignMinute&&
-   p.baseMinutes===base&&p.earliestMinute===p.startMinute+skillTimedEarliest591(p.kind,base)&&
-   p.baseDueMinute===p.startMinute+base&&!starts.has(row.id)&&
+   p.baseMinutes===base&&
+   (CRAFT_WORK_600[p.kind]?(()=>{
+    const t=projectTiming600(p.kind,p.scope,p.startMinute,{agingRolls:p.craftAgingRolls});
+    const reference=confirmCraftStart600(p.kind,p.scope,p.startMinute,p.craftAgingRolls);
+    return t&&p.earliestMinute===t.dueMinute&&p.baseDueMinute===t.dueMinute&&
+     p.craftItemName===reference.craftItemName&&p.craftItemCostD===reference.craftItemCostD&&
+     p.craftSourcePage===reference.craftSourcePage&&p.craftDayResolution===reference.craftDayResolution&&
+     JSON.stringify(p.craftAgingRolls)===JSON.stringify(reference.craftAgingRolls)&&
+     p.craftAgingDays===reference.craftAgingDays&&p.craftReadyMinute===reference.craftReadyMinute&&
+     p.materialSourceConfirmed===true;})():
+    (p.calendarDayEligibility600===true?
+     (p.kind==='glassworking'&&base%1440===0&&p.earliestMinute===Math.floor((p.startMinute+base)/1440)*1440&&p.baseDueMinute===p.earliestMinute):
+     (p.earliestMinute===p.startMinute+skillTimedEarliest591(p.kind,base)&&p.baseDueMinute===p.startMinute+base)))&&
+   !starts.has(row.id)&&
    (!TIMED_CRAFT_ITEMS_599[p.kind]||(
      p.craftItemPriceD===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.priceD&&
      p.craftItemWeightLb===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.weightLb&&
@@ -87,8 +101,9 @@ export function validateSkillTimedWork591(data){
    Number.isSafeInteger(row.campaignMinute)&&row.campaignMinute>=s.p.earliestMinute&&
    proof?.type==='secondary-mastery-value-test'&&
    (s.p.kind==='writing'?/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill):
-    skill===({engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking'})[s.p.kind])&&
-   (!TIMED_CRAFT_ITEMS_599[s.p.kind]||row.campaignMinute>=s.p.baseDueMinute),
+    skill===({engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind])&&
+   (!TIMED_CRAFT_ITEMS_599[s.p.kind]||row.campaignMinute>=s.p.baseDueMinute)&&
+   (!CRAFT_WORK_600[s.p.kind]||row.campaignMinute>=s.p.earliestMinute),
    'Časovaný Skill Test: původní SV nesouhlasí s časem, postavou ani projektem.');
   linked.add(link.startId);
  }
@@ -134,12 +149,26 @@ export function validateSkillTimedWork591(data){
   }
   completed.add(done.startId);
  }
+ // Brewing has two separate deadlines: the confirmed quality SV after work,
+ // then the calendar DAY of consumption. Neither opens a new SV roll.
+ const ready=new Set();
+ for(const row of journal){
+  const r=row.calendarSkillBrewReady600;if(!r)continue;
+  const s=starts.get(r.startId),p=s?.p;
+  assert(p?.kind==='brewing'&&!ready.has(r.startId)&&
+   row.characterId===p.actorId&&row.calendarCampaignId===s.row.calendarCampaignId&&
+   linked.has(r.startId)&&Number.isSafeInteger(row.campaignMinute)&&
+   row.campaignMinute>=p.craftReadyMinute&&r.readyMinute===p.craftReadyMinute&&
+   r.agingDays===p.craftAgingDays&&r.confirmed===true,
+   'Brewing: zralost či čas neodpovídají původním kostkám a kalendáři.');
+  ready.add(r.startId);
+ }
  return true;
 }
 export function assertSkillTimedAppendOnly591(before,after){
- const next=new Map((after?.journal||[]).filter(j=>j.calendarSkillProjectStart591||j.calendarSkillProjectSV591||j.calendarSkillProjectComplete591).map(j=>[j.id,j]));
+ const next=new Map((after?.journal||[]).filter(j=>j.calendarSkillProjectStart591||j.calendarSkillProjectSV591||j.calendarSkillProjectComplete591||j.calendarSkillBrewReady600).map(j=>[j.id,j]));
  for(const old of before?.journal||[]){
-  if(!(old.calendarSkillProjectStart591||old.calendarSkillProjectSV591||old.calendarSkillProjectComplete591))continue;
+  if(!(old.calendarSkillProjectStart591||old.calendarSkillProjectSV591||old.calendarSkillProjectComplete591||old.calendarSkillBrewReady600))continue;
   assert(next.has(old.id)&&JSON.stringify(next.get(old.id))===JSON.stringify(old),
    'Časovaný Skill Test: neměnný kalendářní doklad byl upraven nebo vymazán.');
  }
