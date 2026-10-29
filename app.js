@@ -284,7 +284,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.585';
+const APP_VERSION='93.586';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -300,6 +300,7 @@ let storageBaseline=null; // exact bytes last observed; prevents stale-tab overw
 let data=clean(),view='characters',selected=null,editItem=null,query='',category='weapon',notice='';
 let combatBestiaryExpanded=false; // only presentation state, never the stored campaign
 let stableOwnerFocusedId=null; // Presentation-only selected animal in the current character journal
+let pendingStableAnimalcraftId=null; // Only UI focus, never a recorded animal training result
 let stableEncounterExpanded=false; // presentation only; render costly combat interface on demand
 
 // Presentation-only navigation history: never stores/restores Character, Inventory,
@@ -4043,6 +4044,8 @@ function enrichAnimalTrainingForms(root){
    if(a){name.value=a.name;if(rea)rea.value=String(a.spec.rea);if(cre)cre.value=String(a.spec.cre);}
    else{name.value='';if(rea)rea.value='';if(cre)cre.value='';}
   });
+  const preferred=candidates.find(a=>a.id===pendingStableAnimalcraftId&&a.ownerId===selected);
+  if(preferred){select.value=preferred.id;select.dispatchEvent(new Event('change'));}
  }
 }
 
@@ -4227,16 +4230,37 @@ function bestiaryHealthPanel567(active,cid,minute){
  ${pending?.shock?.followup?`<p class="hc-hint">Shock Follow-up: ${esc(pending.shock.followup.timing||'vyžaduje další hod')} · nový Shock stav se automaticky neruší.</p>`:''}
  </details>`}).join('')}</section>`;
 }
+// HMK 160: a living, owned animal's actual saddle/cargo/rider burden
+// modifies Move and Agility-based combat tests. Personal Fatigue is an
+// accrual rate, never a penalty until actual Fatigue is recorded.
+function combatStableEncumbrance586(actor,cid){
+ if(!actor?.ownerAnimalId||!cid)return 0;
+ const animal=verifiedLivestock(data,cid).find(a=>a.id===actor.ownerAnimalId&&a.ownerId===actor.ownerId);
+ if(!animal)return 0;
+ const enc=stableBurden(data,cid,animal).adjustedENC;
+ return Number.isSafeInteger(enc)&&enc>=0?enc:0;
+}
+function combatStableEMLModifier586(gmModifier,enc){
+ return Math.max(-200,Math.min(200,gmModifier-enc));
+}
 function bestiaryEncounterPanel({combat=false,stableOnly=false,ownerId=null}={}){
  const clock=data.campaignClock,cid=clock?campaignKey(clock):null,animals=bestiaryKnownAnimals();
  const existing=cid?encounterBeastHistory(data,cid):[],active=existing.filter(x=>x.active&&(!stableOnly||!!x.ownerAnimalId)&&(!ownerId||x.ownerId===ownerId));
  const stable=animals.filter(x=>x.spec.bestiaryId&&(!ownerId||x.ownerId===ownerId));
  const groups=[...new Set(BESTIARY_ENTRIES_564.map(x=>x.group))];
  const opts=groups.map(g=>`<optgroup label="${esc(g)}">${BESTIARY_ENTRIES_564.filter(p=>p.group===g).map(p=>`<option value="${esc(p.id)}">${esc(p.name)} · HMK ${p.page}${p.generation==='variable'?' · GM generuje podle tabulky':''}</option>`).join('')}</optgroup>`).join('');
- const table=active.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Účastník</th><th>Druh / varianta</th><th>STR / END / AGL / PER</th><th>Move</th><th>Pravidlový podklad</th><th>Akce</th></tr></thead><tbody>${active.map(x=>{const p=x.profile||{},a=p.attributes||{},status=bestiaryEncounterStatus564(x);return `<tr><td><strong>${esc(x.name)}</strong></td><td>${esc(p.name||'neznámý')}</td><td>${[a.str,a.end,a.agl,a.per].map(v=>v??'—').join(' / ')}</td><td>${p.move??'—'}</td><td>str. ${p.page??'—'} · ${x.ownerAnimalId?'stáj':'dočasný'} · ${status.profiled?'základní statistiky':'generace dle příslušné tabulky'}${x.gmNotes?' · GM: '+esc(x.gmNotes):''}</td><td><button type="button" class="hc-small secondary" data-hmk-beast-dismiss="${esc(x.id)}">Ukončit účast</button></td></tr>`}).join('')}</tbody></table></div>`:'<p>V této kampani nejsou zařazeni žádní dočasní tvorové.</p>';
+ const stableCombatLoad=active.filter(x=>x.ownerAnimalId).map(x=>{
+  const owned=verifiedLivestock(data,cid).find(a=>a.id===x.ownerAnimalId&&a.ownerId===x.ownerId);
+  if(!owned)return '';
+  const b=stableBurden(data,cid,owned);
+  const move=Number.isFinite(x.profile?.move)?x.profile.move:owned.spec.move;
+  const preFatigueMove=Number.isFinite(move)&&Number.isFinite(b.adjustedENC)?Math.max(0,move-b.adjustedENC):null;
+  return `<p class="hc-hint"><strong>${esc(x.name)} · aktuální zátěž ze stáje: ${b.minimumLb} lb</strong> (jezdec ${b.riderWeightLb} lb + výstroj a náklad ${b.gearAndCargoLb} lb). Upravená ENC ${b.adjustedENC??'—'}; <strong>Move po ENC ${preFatigueMove??'—'}</strong> (před skutečně utrpěnou Fatigue a Impairment, HMK 160). PF pro cestování ${b.pf??'—'}. Bojové náhledy útoku a obrany níže odečítají ENC od EML; nejde ještě o plný Combat Outcome ani o automatický zápis zranění. PF není automaticky již utrpěná Fatigue.</p>`;
+ }).filter(Boolean).join('');
+ const table=active.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Účastník</th><th>Druh / varianta</th><th>STR / END / AGL / PER</th><th>Move</th><th>Pravidlový podklad</th><th>Akce</th></tr></thead><tbody>${active.map(x=>{const p=x.profile||{},a=p.attributes||{},status=bestiaryEncounterStatus564(x),enc=combatStableEncumbrance586(x,cid),move=Number.isFinite(p.move)?Math.max(0,p.move-enc):null;return `<tr><td><strong>${esc(x.name)}</strong></td><td>${esc(p.name||'neznámý')}</td><td>${[a.str,a.end,a.agl,a.per].map(v=>v??'—').join(' / ')}</td><td>${move??'—'}${enc?' (po ENC '+enc+')':''}</td><td>str. ${p.page??'—'} · ${x.ownerAnimalId?'stáj':'dočasný'} · ${status.profiled?'základní statistiky':'generace dle příslušné tabulky'}${x.gmNotes?' · GM: '+esc(x.gmNotes):''}</td><td><button type="button" class="hc-small secondary" data-hmk-beast-dismiss="${esc(x.id)}">Ukončit účast</button></td></tr>`}).join('')}</tbody></table></div>`:'<p>V této kampani nejsou zařazeni žádní dočasní tvorové.</p>';
  return `<section class="panel hmk-bestiary-roster" id="hmk-bestiary-encounter"><h3>${combat?'Bestiář · účastníci encounteru':'Generátor dočasných tvorů'}</h3>
  <p class="hc-hint">Vytvoření samostatného dočasného tvora <strong>není</strong> založením PC/NPC. Základní statistiky a všechny originální tabulky jsou dostupné v Bestiáři. Náhodné generování speciálních variant vyžaduje skutečné hody dle originálu; aplikace si je nevymýšlí. Výběr neprovádí útok ani nezakládá zranění.</p>
- ${table}
+ ${stableCombatLoad}${table}
  ${active.length?bestiaryHealthPanel567(active,cid,clock?.minute??null):''}
  ${clock&&(!stableOnly||stable.length)?`<form data-hmk-beast-spawn class="hc-fields hmk-bestiary-generator" id="hmk-bestiary-generator"><label>Zdroj účastníka<select name="source">${stableOnly?'':'<option value="new">Nový dočasný tvor</option>'}${stable.map(a=>`<option value="stable:${esc(a.id)}">Vlastněné zvíře · ${esc(a.name)} (${esc(a.spec.name)})</option>`).join('')}</select></label>
  <label>Druh / příklad z bestiáře<select name="templateId">${opts}</select></label>
@@ -4357,7 +4381,7 @@ function stableHubAnimalHTML(a,campaignId){
  return `<details class="panel hmk-stable-animal-card" ${dead?'':'open'}><summary><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ${esc(character(a.ownerId)?.name||'—')} · ${dead?(p.exit.type==='sale'?'PRODÁNO':'OPUŠTĚNO'):'AKTIVNÍ'}</summary>
  <div class="hc-fields">
  <section class="hmk-stable-block"><h4>Identita · parametry · historie</h4><p><strong>Pravidla:</strong> HMK str. 122, ${esc(a.spec.bestiaryPage??'355')} · ${a.mode==='buy'?`zakoupeno ${a.priceD}d`:'převzato bezplatně'} · <span class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="MB = Mastery Boost. HMK 65: po doloženém výcviku 6 měsíců a testu Animalcraft se hází jednotlivé d10 proti REA zvířete. Každý úspěch přináší 1 MB do Initiative, Shock, Dodge, Press a přirozených útoků; výsledné zvýšení ML určuje tabulka Mastery Boost (HMK 46). Limit druhu je maximum MB, nikoliv automatický bonus.">limit výcviku ${a.maxMB} MB</span></p>
- <div class="catalog-scroll"><table class="catalog-spec"><tbody><tr><th>Velikost / váha</th><td>${esc(a.spec.size??'—')} / ${a.spec.bodyWeightLb??'neznámá'} lb</td><th>Move</th><td>${a.spec.move??'neznámý'} ${last?'(před následky; ověřte zdraví)':''}</td></tr>${Object.entries(statNames).map(([k,label],i,all)=>`<tr><th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="${esc(statHelp[k])}">${esc(label)}</th><td>${a.spec[k]??'—'}</td>${i===0?'<th>Útoky</th><td rowspan="'+all.length+'">'+esc(a.spec.attack||'Viz profil bestiáře')+'</td>':''}</tr>`).join('')}</tbody></table></div>
+ <div class="catalog-scroll"><table class="catalog-spec hmk-stable-identity-stats"><tbody><tr><th>Velikost / váha</th><td>${esc(a.spec.size??'—')} / ${a.spec.bodyWeightLb??'neznámá'} lb</td></tr><tr><th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="Výchozí Move druhu dle bestiáře; skutečné omezení mohou přidat zranění, amputace a zatížení. Není to automaticky již přepočtená bojová rychlost.">Move</th><td>${a.spec.move??'neznámý'} ${last?'(před následky; ověřte zdraví)':''}</td></tr>${Object.entries(statNames).map(([k,label])=>`<tr><th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="${esc(statHelp[k])}">${esc(label)}</th><td>${a.spec[k]??'—'}</td></tr>`).join('')}<tr><th>Útoky</th><td>${esc(a.spec.attack||'Viz profil bestiáře')}</td></tr></tbody></table></div>
  <div class="hmk-stable-zones"><h4>Mapa anatomických zón · HMK ${z.sourcePage??'—'}</h4>
  ${z.table?`<p>Zásahová tabulka <b>${esc(z.table.toUpperCase())}</b> · ZN 1–${z.maxZN}. Následují všechny lokality druhu; označení levé/pravé strany je závislé na skutečném Location Die. Zdravotní doklad se vede pro stejné zvíře napříč encountery.</p>
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Lokace</th><th>ZN / LN</th><th>SHK</th><th>Rány v historii</th><th>Stav nyní</th></tr></thead><tbody>
@@ -4369,14 +4393,14 @@ function stableHubAnimalHTML(a,campaignId){
  <div class="actions"><button type="button" class="secondary hc-small" data-hmk-stable-go-travel>Otevřít cestovní hlídku</button></div></section>
  <section class="hmk-stable-block"><h4>Jezdec · nasednutí a sesednutí (HMK 122)</h4>
  <p class="hmk-stable-ref-small">Hmotnost nesená zvířetem zahrnuje celé tělo jezdce, jeho oblečenou zbroj i nesenou výstroj. Zapsaná hmotnost se započítá do ENC/PF a jako minimální zátěž cestovní hlídky. Hmotnost se při nasednutí automaticky vypočítá z doložené tělesné váhy a aktuálního inventáře včetně vody; během jízdy zůstává započtena bez ohledu na přesuny předmětů. Změní se až po sesednutí a novém nasednutí; přeložený náklad zvířete se eviduje zvlášť.</p>
- ${p.rider?`<p><strong>Nasedl:</strong> ${esc(character(p.rider.characterId)?.name||'postava')} · <strong>${p.rider.weightLb} lb</strong> (včetně neseného vybavení).</p>
+ ${p.rider?`<p><strong>Nasedl:</strong> ${esc(character(p.rider.characterId)?.name||'postava')} · jezdec včetně jeho výstroje <strong>${p.riderWeightLb} lb</strong> · <strong>celková zátěž zvířete ${p.minimumLb} lb</strong> (jezdec + postroje + naložené předměty). Tato celková hmotnost vstupuje do ENC, PF a cestování; po přesunu nákladu se znovu zobrazí aktuální součet.</p>
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="rider-dismount"><input type="hidden" name="riderId" value="${esc(p.rider.characterId)}"><input type="hidden" name="reason" value="Jezdec skutečně sesedl ze zvířete"><button type="submit">Sesednout</button></form>`:''}`:
  !dead&&a.spec.breed&&a.spec.str?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="rider-mount"><input type="hidden" name="reason" value="Jezdec skutečně nasedl, celková hmotnost včetně výstroje"><label>Jezdec<select name="riderId" data-hmk-stable-rider-select>${riderChoices.map(c=>{const weight=stableRiderWeight584(c);return `<option value="${esc(c.id)}" ${c.id===a.ownerId?'selected':''} data-rider-weight="${weight.ready?weight.totalLb:''}">${esc(c.name)}${weight.ready?' · '+weight.totalLb+' lb':' · váha nedoložena'}</option>`}).join('')}</select></label><p class="hmk-stable-ref-small" data-hmk-stable-rider-weight aria-live="polite">${(()=>{const chosen=riderChoices.find(c=>c.id===a.ownerId)||riderChoices[0],w=stableRiderWeight584(chosen);return w.ready?`Automatický součet: tělo ${w.bodyLb} lb + nesené oblečení, zbroj, výstroj a zásoby ${w.gearLb} lb = <strong>${w.totalLb} lb</strong>. Hmotnost se uloží při nasednutí.`:`Hmotnost zatím nelze vypočítat: ${esc(w.reason)}`})()}</p><button type="submit">Nasednout a započítat skutečnou hmotnost</button></form>`:
  '<p class="hmk-stable-ref-small">Pro tento druh není ověřený jezdecký profil; nasednutí se bez doložení nepovoluje.</p>'}
  </section>
  <section class="hmk-stable-block"><h4>Výstroj, náklad a nosnost · HMK 122</h4>
- <p><b>Na zvířeti:</b> postroje a výstroj ${p.tackLb} lb + náklad ${p.cargoLb} lb${p.rider?` + jezdec ${p.riderWeightLb} lb`:''} = <strong>${p.minimumLb} lb</strong>${p.rider?' včetně zapsaného jezdce':' bez jezdce'}.  ${p.capacity===null?'Kapacita nákladního postroje není doložena.':`Fyzický prostor pro náklad ${p.capacity} lb; volné ${Math.max(0,p.capacity-p.cargoLb)} lb.`}</p>
- <p>ENC pro evidované minimum: ${p.baseENC??'—'} před STR · ${p.adjustedENC??'—'} po STR${a.spec.breed==='mule'?' a −20 pro mezka':''}; PF ${p.pf??'—'}. <em>Jezdec nasednutý ve stáji je už v tomto ENC. Další nesenou hmotnost, která v záznamu chybí, připočítejte v cestovní hlídce.</em></p>
+ <p><b>Na zvířeti:</b> postroje a výstroj ${p.tackLb} lb + náklad ${p.cargoLb} lb${p.rider?` + jezdec ${p.riderWeightLb} lb`:''} = <strong>${p.minimumLb} lb</strong>${p.rider?' včetně zapsaného jezdce':' bez jezdce'}.  ${p.capacity===null?'Kapacita nákladního postroje není doložena.':`Prostor vyhrazený pro náklad ${p.capacity} lb; v nákladním prostoru zbývá ${Math.max(0,p.capacity-p.cargoLb)} lb.`} <em>Limit brašen nebo pack harness není celkovou nosností koně; hmotnost jezdce a výstroje se přitom vždy započítává do ENC/PF.</em></p>
+ <p>ENC pro evidované minimum: ${p.baseENC??'—'} před STR · ${p.adjustedENC??'—'} po STR${a.spec.breed==='mule'?' a −20 pro mezka':''}; PF ${p.pf??'—'}. <strong>Move po ENC: ${Number.isFinite(a.spec.move)&&Number.isFinite(p.adjustedENC)?Math.max(0,a.spec.move-p.adjustedENC):'—'}</strong> (HMK str. 160; před skutečně vzniklou Fatigue a zraněními). <em>Jezdec nasednutý ve stáji je už v tomto ENC. Další nesenou hmotnost, která v záznamu chybí, připočítejte v cestovní hlídce.</em></p>
  ${p.cargoOverflow?'<p class="library-warning">Náklad překročil doloženou kapacitu. Hlídka vyžaduje nápravu.</p>':''}
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zakoupené / přijaté postroje</th><th>Váha</th><th>Zdroj</th><th>Akce</th></tr></thead><tbody>${rows(p.tack,'tack')||'<tr><td colspan="4">Zatím žádná výstroj</td></tr>'}</tbody></table></div>
  <p><b>Vozidla:</b> jsou vedená jako samostatný majetek zvířete, <em>nikoli jako náklad na jeho hřbetě</em>. Hmotnost vozu se nepřičítá k nesené hmotnosti; tažný režim a požadovaného druhého tahouna potvrzuje GM v cestovní hlídce.</p>
@@ -4450,7 +4474,7 @@ function characterStableView(owner){
   ?bestiaryHealthPanel567([lastVisit],cid,clock?.minute??0)
   :`<div class="hmk-stable-reference"><p>${healthDetails?`Zdravotní historie je zachována: ${healthDetails.wounds.filter(w=>!w.healed).length} aktivních ran · Shock ${esc(healthDetails.shock)}. Pro nové léčebné úkony musí být tentýž tvor aktivní v Combat; zde se žádný encounter nezakládá.`:'Zdravotní doklad zatím není založen. To neznamená automaticky zdravé zvíře.'}</p></div>`;
  const trainingHTML=animalTrainingNextHTML(data.journal,owner.id,cid);
- const secondary=`<details class="hmk-stable-accordion"><summary>Zdraví · zranění, léčení a Shock (bez bojového menu)</summary>${healthOnly}</details><details class="hmk-stable-accordion"><summary>Animalcraft · úplný výcvik dle HMK 65</summary><div class="hmk-stable-reference"><p>Výcvik vyžaduje doložený Skill Value, skutečný hod a časovou podmínku; nová hodnota nevzniká otevřením karty.</p>${trainingHTML||'<p>Nejdříve proveďte doložený Animalcraft Skill Test postavy.</p>'}</div></details>
+ const secondary=`<details class="hmk-stable-accordion"><summary>Zdraví · zranění, léčení a Shock (bez bojového menu)</summary>${healthOnly}</details><details class="hmk-stable-accordion"><summary>Animalcraft · úplný výcvik dle HMK 65</summary><div class="hmk-stable-reference"><p>Výcvik vyžaduje doložený Skill Value, skutečný hod a časovou podmínku; nová hodnota nevzniká otevřením karty.</p><button type="button" class="secondary hc-small" data-hmk-stable-animalcraft="${esc(selectedAnimal.id)}">Otevřít Skill Tests · Animalcraft (${esc(owner.name)})</button>${trainingHTML||'<p>Nejdříve proveďte doložený Animalcraft Skill Test postavy.</p>'}</div></details>
 `;
  const spread=`<div class="journal-book-spread folio-chapter-spread hmk-owner-stable-spread" id="hmk-livestock-catalog" data-hmk-stable-owner="${esc(owner.id)}">
  <section class="journal-book-page journal-book-page--left folio-chapter-page hmk-owner-stable-page" aria-label="Levá stránka: anatomie a zdravotní stav ${esc(selectedAnimal.name)}">
@@ -9478,7 +9502,7 @@ document.addEventListener('submit',e=>{
  catch(error){if(out)out.textContent='Zvláštní SR nelze dokončit: '+error.message;}
 },true);
 document.addEventListener('change',e=>{
- if(e.target?.matches?.('[data-skill-actor]')){pendingTrackingAwarenessId=null;pendingTrekHandoff=null;selected=e.target.value;render();return;}
+ if(e.target?.matches?.('[data-skill-actor]')){pendingTrackingAwarenessId=null;pendingTrekHandoff=null;pendingStableAnimalcraftId=null;selected=e.target.value;render();return;}
  const form=e.target?.form;
  if(!['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id))return;
  if(e.target.name==='opposed'){
@@ -12827,11 +12851,13 @@ document.addEventListener('submit',e=>{
  try{
   const v=Object.fromEntries(new FormData(form));const cid=campaignKey(data.campaignClock),list=encounterBeastHistory(data,cid).filter(x=>x.active);
   const a=list.find(x=>x.id===v.attackerId),b=list.find(x=>x.id===v.defenderId);
-  const result=previewCreatureMelee565({attacker:effectiveStableBeast575(data,campaignKey(data.campaignClock),a),defender:effectiveStableBeast575(data,campaignKey(data.campaignClock),b),attackD100:Number(v.attackerD100),
+  const attackerENC=combatStableEncumbrance586(a,cid),defenderENC=v.defence==='ignore'?0:combatStableEncumbrance586(b,cid);
+  const result=previewCreatureMelee565({attacker:effectiveStableBeast575(data,cid,a),defender:effectiveStableBeast575(data,cid,b),attackD100:Number(v.attackerD100),
     defenceD100:v.defenderD100===''?null:Number(v.defenderD100),defence:v.defence,
-    attackerModifier:Number(v.attackerModifier),defenderModifier:Number(v.defenderModifier)});
+    attackerModifier:combatStableEMLModifier586(Number(v.attackerModifier),attackerENC),
+    defenderModifier:combatStableEMLModifier586(Number(v.defenderModifier),defenderENC)});
   const r=result.outcome;
-  if(out)out.textContent=`${result.attacker} ${result.attackerProof.sl} d100 (${result.attackerProof.roll}) · ${result.defender} ${result.defenderProof?.level??'Ignore'} ${result.defenderProof?'d100 ('+result.defenderProof.roll+')':''}. ${r.needsFinalD10?'Čeká na rozstřel':r.winner?'Vyhrává '+(r.winner==='attacker'?result.attacker:result.defender)+' · '+r.stars+' ★':'Bez vítěze'}. Zásah a Injury nejsou provedeny.`;
+  if(out)out.textContent=`${result.attacker} ${result.attackerProof.sl} d100 (${result.attackerProof.roll}) · ${result.defender} ${result.defenderProof?.level??'Ignore'} ${result.defenderProof?'d100 ('+result.defenderProof.roll+')':''}. ${attackerENC?'Útok ENC −'+attackerENC+'; ':''}${defenderENC?'obrana ENC −'+defenderENC+'; ':''}${r.needsFinalD10?'Čeká na rozstřel':r.winner?'Vyhrává '+(r.winner==='attacker'?result.attacker:result.defender)+' · '+r.stars+' ★':'Bez vítěze'}. Zásah a Injury nejsou provedeny.`;
  }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
 },true);
 document.addEventListener('submit',e=>{
@@ -12844,8 +12870,10 @@ document.addEventListener('submit',e=>{
   const entry=encounterBeastHistory(data,cid).find(x=>x.id===input.creatureId&&x.active);
   if(!entry)throw Error('Tvor není v aktuálním encounteru.');
   const actor=creatureCombatSheet565(entry);
-  const result=previewCreatureSkillRoll565({actor:effectiveStableBeast575(data,campaignKey(data.campaignClock),actor),kind:input.ability,roll:Number(input.roll),gmModifier:Number(input.modifier)});
-  if(out)out.textContent=`${result.name} · ${result.ability}: ${result.sl} · d100 (${result.roll}) ${result.roll<=result.eml?'≤':'>'} EML ${result.eml} (tištěné ML ${result.ml})${result.attackImpact?' · základní Impact '+result.attackImpact:''}. Jen kontrolní výpočet; nikoli rozhodnutí Combat Outcome či zranění.`;
+  const enc=['attack','dodge'].includes(input.ability)?combatStableEncumbrance586(entry,cid):0;
+  const result=previewCreatureSkillRoll565({actor:effectiveStableBeast575(data,cid,actor),kind:input.ability,roll:Number(input.roll),
+   gmModifier:combatStableEMLModifier586(Number(input.modifier),enc)});
+  if(out)out.textContent=`${result.name} · ${result.ability}: ${result.sl} · d100 (${result.roll}) ${result.roll<=result.eml?'≤':'>'} EML ${result.eml} (tištěné ML ${result.ml}${enc?' · zátěž ENC −'+enc:''})${result.attackImpact?' · základní Impact '+result.attackImpact:''}. Jen kontrolní výpočet; nikoli rozhodnutí Combat Outcome či zranění.`;
  }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
 },true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-bestiary-open]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='bestiary';render();},true);
@@ -12879,6 +12907,24 @@ document.addEventListener('click',e=>{
  e.preventDefault();e.stopImmediatePropagation();
  if(!bestiaryKnownAnimals().some(a=>a.id===button.dataset.hmkStablePickAnimal&&a.ownerId===selected&&!stableBurden(data,campaignKey(data.campaignClock),a).exit))return;
  stableOwnerFocusedId=button.dataset.hmkStablePickAnimal;render();
+},true);
+// Stable -> existing authoritative Success Value Skill Test. No die, SV, or training award is forged.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-hmk-stable-animalcraft]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const animal=bestiaryKnownAnimals().find(a=>a.id===button.dataset.hmkStableAnimalcraft&&a.ownerId===selected&&!stableBurden(data,campaignKey(data.campaignClock),a).exit);
+ const actor=animal&&character(animal.ownerId);
+ if(!actor){alert('Zvíře nepatří právě otevřené postavě nebo již není aktivní.');return;}
+ const animalcraft=availableMasteries(actor).find(m=>m.name==='Animalcraft'&&m.ml>0);
+ if(!animalcraft){alert(actor.name+' nemá doloženou dovednost Animalcraft. Skill Test nelze předvyplnit bez ověřeného ML.');return;}
+ view='skills';selected=actor.id;activeSkillTab='value';overlay=null;pendingStableAnimalcraftId=animal.id;
+ render();
+ const form=document.getElementById('skill-value-form'),input=form?.elements.namedItem('primary');
+ if(!input||![...input.options].some(o=>o.value==='Animalcraft')){alert('Animalcraft není dostupný v aktuálním Skill Workbench.');return;}
+ input.value='Animalcraft';input.dispatchEvent(new Event('change',{bubbles:true}));
+ const root=document.getElementById('hmk-skill-workbench');
+ if(root){const note=document.createElement('p');note.className='hc-hint';note.setAttribute('role','status');note.textContent='Výcvik pro '+animal.name+' · trenér '+actor.name+'. Proveďte skutečný Animalcraft d100; následné Training Rolls a půlroční čas se evidují samostatně. Žádný hod nebyl proveden automaticky.';form.before(note);}
+ form.scrollIntoView({block:'center',behavior:'auto'});
 },true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-open-stable]'))return;e.preventDefault();e.stopImmediatePropagation();view='sheet';activeSheetSection='stable';overlay=null;render();},true);
 document.addEventListener('click',e=>{
