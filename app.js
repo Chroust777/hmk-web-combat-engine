@@ -284,7 +284,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.587';
+const APP_VERSION='93.590';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -438,7 +438,64 @@ if(!storageReadOnly){
   persistEncounterDraft();
  }
 }
+function validateAnimalTrainingCalendar590(d){
+ const journal=d?.journal||[],starts=new Map(),linked=new Set(),animals=new Map();
+ for(const owner of d?.characters||[])for(const animal of owner.hmk?.livestock||[])animals.set(animal.id,animal);
+ for(const row of journal){
+  const proof=row.calendarAnimalTrainingStart590;if(!proof)continue;
+  const animal=animals.get(proof.animalId);
+  if(proof.format!=='animal-training-start-590'||!animal||animal.ownerId!==proof.ownerId||
+     row.characterId!==proof.ownerId||row.calendarCampaignId!==animal.campaignId||
+     !Number.isSafeInteger(proof.startMinute)||proof.startMinute<animal.minute||
+     row.campaignMinute!==proof.startMinute||proof.requiredDays!==180||
+     proof.dueMinute!==proof.startMinute+180*1440||starts.has(row.id))
+   throw Error('Animalcraft: nepřípustná změna kalendářního dokladu zahájení výcviku.');
+  starts.set(row.id,{row,proof});
+ }
+ const fishingStarts=new Map(),fishingUsed=new Set();
+ for(const row of journal){
+  const x=row.calendarFishingStart590;if(!x)continue;
+  if(x.format!=='fishing-start-590'||x.actorId!==row.characterId||
+     !d.characters.some(c=>c.id===x.actorId&&!c.archived)||
+     !Number.isSafeInteger(x.startMinute)||x.startMinute<0||
+     row.campaignMinute!==x.startMinute||x.dueMinute!==x.startMinute+240||
+     typeof row.calendarCampaignId!=='string'||!row.calendarCampaignId)
+   throw Error('Fishing: neplatný počáteční kalendářní doklad čtyřhodinové činnosti.');
+  fishingStarts.set(row.id,{row,x});
+ }
+ for(const row of journal){
+  const link=row.calendarFishingSVStart590;if(!link)continue;
+  const start=fishingStarts.get(link.startId),p=row.skillTestProof;
+  if(!start||fishingUsed.has(link.startId)||row.characterId!==start.row.characterId||
+     row.calendarCampaignId!==start.row.calendarCampaignId||
+     !Number.isSafeInteger(row.campaignMinute)||row.campaignMinute<start.x.dueMinute||
+     link.dueMinute!==start.x.dueMinute||
+     p?.type!=='secondary-mastery-value-test'||(p.skills?.[0]||p.skill)!=='Fishing')
+   throw Error('Fishing: výsledek SV nesouhlasí se čtyřhodinovým dokladem ani s herním časem.');
+  fishingUsed.add(link.startId);
+ }
+ for(const row of journal){
+  const link=row.calendarAnimalTraining590;if(!link)continue;
+  const start=starts.get(link.startId),animal=animals.get(link.animalId),training=row.skillTestProof;
+  if(!start||!animal||link.animalId!==start.proof.animalId||
+     row.characterId!==animal.ownerId||row.calendarCampaignId!==animal.campaignId||
+     row.livestockTraining?.animalId!==animal.id||training?.type!=='animal-training'||
+     link.dueMinute!==start.proof.startMinute+(training.months||0)*30*1440||
+     !Number.isSafeInteger(row.campaignMinute)||row.campaignMinute<link.dueMinute||
+     linked.has(link.startId))
+   throw Error('Animalcraft: datum, identita nebo jedinečnost dokončeného výcviku nesouhlasí s kalendářem.');
+  linked.add(link.startId);
+ }
+ return true;
+}
+function assertAnimalTrainingCalendarAppendOnly590(before,after){
+ const next=new Map((after?.journal||[]).filter(j=>j.calendarAnimalTrainingStart590||j.calendarAnimalTraining590||j.calendarFishingStart590||j.calendarFishingSVStart590).map(j=>[j.id,j]));
+ for(const old of before?.journal||[]){if(!old.calendarAnimalTrainingStart590&&!old.calendarAnimalTraining590&&!old.calendarFishingStart590&&!old.calendarFishingSVStart590)continue;
+  if(!next.has(old.id)||JSON.stringify(next.get(old.id))!==JSON.stringify(old))
+   throw Error('Animalcraft: kalendářní doklad nelze změnit ani odstranit.');}
+}
 function validate(d){
+ validateAnimalTrainingCalendar590(d);
  validateLogbookVisibility(d);
  validateLivestockEvidence(d);
  validateStableHub(d,livestockOffer);
@@ -750,7 +807,7 @@ function mutate(fn,{gmClockAdvance=false}={}){
  if(cloudSync&&!cloudSync.canWrite()){alert('Nejdříve připojte GitHub Cloud v menu Cloud a zálohy.');return false;}
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute)
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertAnimalTrainingCalendarAppendOnly590(previous,data);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute)
   requireAnimalMedicalGMTimeMayAdvance567({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(automaticGenerationBusy)lastAutomaticGenerationMutationError='Uložení do úložiště selhalo';else alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(automaticGenerationBusy)lastAutomaticGenerationMutationError=String(e.message||e);else alert('Změna nebyla uložena: '+e.message);return false}
 }
@@ -1851,7 +1908,23 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const fallUnknown=agenda.unknown.filter(x=>x.kind==='skill-fall'&&x.sourceId);
  const unknownFallNotice=fallUnknown.length?`<section class="panel hc-calendar-unresolved"><h3>Vyžaduje vyřešení · Falling Routine</h3>${fallUnknown.map(x=>`<div class="hc-unknown-rule-link"><strong>${esc(x.name)}</strong> · ${esc(x.description)}<p class="muted">GM doplní skutečnou výšku (0–5 ft bez Injury Sequence; nad 5 ft pokračuje Impact a Jumping/Acrobatics test). Původní Skill CF se neopakuje.</p><button type="button" class="hc-small" data-cal-unknown-fall="${esc(x.characterId)}" data-cal-unknown-source="${esc(x.sourceId)}">Otevřít správné hody a výšku ↗</button></div>`).join('')}</section>`:'';
  const suspendedHealingHTML=agenda.suspended?.length?`<section class="panel hc-calendar" data-suspended-healing><h3>Pozastavené / nedostupné Healing Rolls · ${agenda.suspended.length}</h3><p class="hc-hint">Infekce pozastavuje Injury Healing Rolls všech ran (HMK 181); běžné léčení může být u konkrétní rány také pravidlově nedostupné (HMK 354). Žádný d100 ani datum se nedoplňuje bez skutečného dokladu.</p>${agenda.suspended.map(x=>`<p class="hc-hint"><strong>${esc(x.name)}</strong> · rána ${esc(x.woundId)} · ${esc(x.description)} · ${esc(x.reason||'')}</p>`).join('')}</section>`:'';
- const overviewHTML=`${board}${bestiaryCalendarDuePanel567(clock)}${unknownFallNotice}${suspendedHealingHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
+ const timedSkillPending590=(()=>{
+  const cid=campaignKey(clock),completedAnimal=new Set(data.journal.filter(j=>j.calendarAnimalTraining590).map(j=>j.calendarAnimalTraining590.startId));
+  const completedFishing=new Set(data.journal.filter(j=>j.calendarFishingSVStart590).map(j=>j.calendarFishingSVStart590.startId));
+  const starts=data.journal.filter(j=>j.calendarCampaignId===cid).flatMap(j=>{
+   if(j.calendarAnimalTrainingStart590&&!completedAnimal.has(j.id)){
+    const a=j.calendarAnimalTrainingStart590,owner=data.characters.find(c=>c.id===a.ownerId),animal=owner?.hmk?.livestock?.find(x=>x.id===a.animalId);
+    return [{name:'Animal Training · '+(animal?.name||'zvíře'),actor:owner?.name||'Postava',start:a.startMinute,due:a.dueMinute,details:'6 měsíců, asi hodina denně; případný CF d3 prodlužuje dobu (HMK 65)'}];
+   }
+   if(j.calendarFishingStart590&&!completedFishing.has(j.id)){
+    const f=j.calendarFishingStart590,actor=data.characters.find(c=>c.id===f.actorId);
+    return [{name:'Fishing · čtyřhodinová činnost',actor:actor?.name||'Postava',start:f.startMinute,due:f.dueMinute,details:'Fishing Success Value až po čtyřech hodinách (HMK 71)'}];
+   }
+   return [];
+  }).sort((a,b)=>a.due-b.due);
+  return starts.length?`<section class="panel hc-calendar hsk-calendar-timed-skills"><h3>Časované Skill Tests · ${starts.length}</h3><p class="hc-hint">Skutečně zahájené činnosti; zobrazované termíny jsou odvozené z neměnných zápisů. Hod lze provést až po splnění pravidlové doby.</p>${starts.map(a=>`<p class="hsk-calendar-timed-row"><strong>${esc(a.name)}</strong> · ${esc(a.actor)} · ${esc(displayCampaignMinute(a.start))} → <strong>${esc(displayCampaignMinute(a.due))}</strong> · ${a.due>clock.minute?'zbývá '+esc(chronicleRemainingTime(a.due-clock.minute)):'základní termín dosažen'}<small>${esc(a.details)}</small></p>`).join('')}</section>`:'';
+ })();
+ const overviewHTML=`${board}${timedSkillPending590}${bestiaryCalendarDuePanel567(clock)}${unknownFallNotice}${suspendedHealingHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?overviewHTML:
   activeCalendarSection==='travel'?`${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${animalWeatherHTML}${animalRestHTML}${interruptionsHTML}`:
   activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionWizardHTML(participants,clock,{supplyHTML,nutritionHTML,activityNeedsHTML})}`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
@@ -4126,7 +4199,7 @@ function updateAnimalTrainingPendingExplanation(form){
  if(!out)return;
  const source=data.journal.find(j=>j.id===form.elements.namedItem('origin')?.value);
  const candidate=animalTrainingCandidate(source?.skillTestProof);
- if(!candidate){out.textContent='Původní Animalcraft SV není dostupný: další hody nelze určit.';return;}
+ if(!candidate){out.textContent='Původní Animalcraft SV není dostupný: další hody nelze určit.';form.dataset.hmkDiceCount='0';return;}
  const flag=n=>!!form.elements.namedItem(n)?.checked;
  const adjusted=candidate.sv-(flag('notNewborn')?1:0)-(flag('wasWild')?1:0);
  const stars=Math.min(5,Math.max(0,adjusted-4));
@@ -4134,6 +4207,9 @@ function updateAnimalTrainingPendingExplanation(form){
  const previouslyTrained=previous>0,qualifies=!previouslyTrained||stars>=previous;
  const shortened=flag('shorten');
  const expected=qualifies?Math.max(0,stars-(shortened?1:0)):0;
+ form.dataset.hmkDiceCount=String(expected);
+ const dice=form.elements.namedItem('trainingD10');if(dice){dice.placeholder=expected?`Zadejte přesně ${expected} d10 (1–10)`:'Žádné d10 nejsou požadovány';dice.required=expected>0;}
+ const rollAll=form.querySelector('[data-hmk-followup-roll-all]');if(rollAll){rollAll.disabled=expected===0;rollAll.textContent=`⚄ Vygenerovat ${expected}× d10`;}
  const cre=Number(form.elements.namedItem('creativity')?.value);
  const cap=Number.isFinite(cre)&&cre>0?Math.ceil(cre/2):null;
  out.textContent='Odvození: uložený SV '+candidate.sv+'; věk '+(flag('notNewborn')?'−1':'0')+', divokost '+(flag('wasWild')?'−1':'0')+
@@ -4520,7 +4596,9 @@ function stableHubAnimalHTML(a,campaignId){
  ${!dead&&vesselLots.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="care"><input type="hidden" name="kind" value="water"><input type="hidden" name="sourceKind" value="water"><input type="hidden" name="amount" value="5"><label>Odečíst 0,5 gal (5 lb) ze skutečné vody<select name="sourceId">${vesselLots.map(q=>`<option value="${esc(q.fillId)}">${esc(q.fillId.slice(0,8))} · zbývá ${q.remaining} gal</option>`).join('')}</select></label><label>Skutečné napojení / potvrzení GM<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Napojit a odečíst vodu</button></form>`:''}
  <p class="hc-hint">Použití ze skladu vyžaduje dostupný fyzický lot původního majitele. Externí krmení/pití (pastva, potok) zůstává samostatným GM potvrzením bez odpisu skladu.</p>
 <details><summary>Záznamy péče (${p.care.length})</summary>${p.care.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Čas (min)</th><th>Úkon</th><th>Množství</th><th>Doklad</th></tr></thead><tbody>${p.care.map(j=>`<tr><td>${j.minute}</td><td>${esc(j.kind)}</td><td>${j.amount===null?'—':j.amount+' '+j.unit}</td><td>${esc(j.reason)}</td></tr>`).join('')}</tbody></table></div>`:'<p>Dosud není doložena žádná péče.</p>'}</details></section>
- <section class="hmk-stable-block"><h4>Výcvik, cesta, zdravotní historie a kalendář</h4><p>Animalcraft (HMK 65): základní ML zvířete neznamená automaticky získaný MB. Výcvik vyžaduje původní SV, skutečné hody a pravidlový čas. ${training.length?`Potvrzené doklady: ${training.map(t=>esc(t.title)).join(' · ')}`:'Výcvik zatím není pro tuto identitu doložen.'}</p>
+ <section class="hmk-stable-block"><h4>Výcvik, cesta, zdravotní historie a kalendář</h4>
+ ${!dead?`<div class="hsk-training-calendar-panel"><p class="tiny">Pravidlový postup: nejprve zahájit šestiměsíční výcvik; po skutečném uplynutí doby v kalendáři provést Animalcraft SV a pokračující Training d10. Kalendář se sám neposouvá.</p><button type="button" class="secondary hc-small" data-hmk-training-start-animal="${esc(a.id)}">Zahájit šestiměsíční výcvik · HMK 65</button>${data.journal.filter(j=>j.calendarCampaignId===cid&&j.calendarAnimalTrainingStart590?.animalId===a.id).slice(-2).map(j=>`<p class="tiny hsk-training-date">Výcvik začal ${esc(displayCampaignMinute(j.calendarAnimalTrainingStart590.startMinute))}, základní termín ${esc(displayCampaignMinute(j.calendarAnimalTrainingStart590.dueMinute))}${data.campaignClock.minute<j.calendarAnimalTrainingStart590.dueMinute?' · zbývá '+esc(chronicleRemainingTime(j.calendarAnimalTrainingStart590.dueMinute-data.campaignClock.minute)):' · základní doba uplynula'}</p>`).join('')}</div>`:''}
+ <p>Animalcraft (HMK 65): základní ML zvířete neznamená automaticky získaný MB. Výcvik vyžaduje původní SV, skutečné hody a pravidlový čas. ${training.length?`Potvrzené doklady: ${training.map(t=>esc(t.title)).join(' · ')}`:'Výcvik zatím není pro tuto identitu doložen.'}</p>
  <p><strong>Skutečně aktivovaný výcvik:</strong> ${trainingState.boosts} MB · ${trainingState.sourceId?'doklad '+esc(trainingState.sourceId.slice(0,8)):'žádný úplný kalendářní doklad'}. Zvlášť se ověřuje uplynutí alespoň ${training.length?'příslušného počtu':'šesti'} měsíců; až pak se MB používají v bojových náhledech.</p>
  ${!dead&&training.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="training-activate"><label>Dokončený výcvik<select name="trainingProofId">${training.map(t=>`<option value="${esc(t.id)}">${esc(t.id.slice(0,8))} · ${t.skillTestProof?.finalBoosts??0} MB · ${t.skillTestProof?.months??6} měs.</option>`).join('')}</select></label><label>Skutečný začátek (minuta kampaně)<input name="startMinute" type="number" min="0" step="1" required></label><label>Skutečný konec (minuta kampaně)<input name="endMinute" type="number" min="0" step="1" required></label><label>Doložený kalendářní podklad<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Aktivovat již dokončený výcvik v boji</button></form>`:''}
  ${p.events.length?`<details><summary>Kompletní časový registr stáje (${p.events.length})</summary><ol>${p.events.map(j=>`<li>minuta ${j.campaignMinute} · ${esc(j.stableHub574.type)} · ${esc(j.stableHub574.reason)}</li>`).join('')}</ol></details>`:''}
@@ -4764,7 +4842,7 @@ function libraryView(){
   ?allCatalogItems().filter(i=>!libraryTabsForItem(i).includes('other')||libraryItemKind(i)===libraryOtherFilter)
   :allCatalogItems();
  const list=['suits','rules','bestiary','stable'].includes(selectedTab)?null:libraryVisiblePage(catalogItems,selectedTab,query,catalogStatus,i=>catalogAuditEntry(i).ready,libraryPage);
- const otherFilterBar=selectedTab==='other'?`<nav class="library-other-filters" aria-label="Filtrovat ostatní vybavení podle typu">${[['all','Vše'],...otherKinds.map(k=>[k,k])].map(([k,label])=>`<button type="button" class="${libraryOtherFilter===k?'':'secondary'}" data-library-other-filter="${esc(k)}" aria-pressed="${libraryOtherFilter===k}">${esc(label)}${k==='all'?'':` (${otherItems.filter(i=>libraryItemKind(i)===k).length})`}</button>`).join('')}</nav>`:'';
+ const otherFilterBar=selectedTab==='other'?`<label class="library-other-filter-select">Typ vybavení<select data-library-other-filter-select aria-label="Vybrat typ ostatního vybavení">${[['all','Všechny předměty'],...otherKinds.map(k=>[k,`${k} (${otherItems.filter(i=>libraryItemKind(i)===k).length})`])].map(([k,label])=>`<option value="${esc(k)}" ${libraryOtherFilter===k?'selected':''}>${esc(label)}</option>`).join('')}</select></label>`:'';
  if(list)libraryPage=list.page;
  const statusSelector=['rules','suits','bestiary','stable'].includes(selectedTab)?'':`<label>Úplnost evidence<select id="catalog-status"><option value="all" ${catalogStatus==='all'?'selected':''}>Všechny</option><option value="ready" ${catalogStatus==='ready'?'selected':''}>Bez upozornění</option><option value="missing" ${catalogStatus==='missing'?'selected':''}>K doplnění</option></select></label>`;
  return withLibraryFolioMenu(journalChapterShell('Knihovna','Katalog vybavení, referenční tabulky a přidávání předmětů ve vzhledu Keeper’s Ledger.',`<div class="topline"><div><h2>Knihovna vybavení</h2><p class="muted">Vyberte kategorii, otevřete údaje předmětu a případně jej přímo přidejte do inventáře postavy.</p></div><div class="library-other-top-controls">${otherFilterBar}${button('+ Nový předmět','new-item')}</div></div>
@@ -7602,6 +7680,164 @@ const SKILL_FOLLOWUP_FIELD_HELP=Object.freeze({
  impactDie:'Skutečná kostka Impact podle vzniklého fyzického následku.',
  gmConfirmed:'GM potvrzuje skutečný materiální následek, nikoli udělení nového libovolného bonusu.'
 });
+function animalTrainingCalendarEligibility(form){
+ if(!form?.matches?.('form[data-hmk-animal-training]'))return {ready:true};
+ const selectedId=form.elements.namedItem('stableAnimalId')?.value;
+ if(!selectedId)return {ready:true,reason:'Zvíře mimo stáj: časový doklad musí doložit GM; automatické ověření kalendáře není dostupné.'};
+ const origin=data.journal.find(j=>j.id===form.elements.namedItem('origin')?.value);
+ const animal=bestiaryKnownAnimals().find(a=>a.id===selectedId);
+ if(!animal||!origin)return {ready:false,reason:'Chybí původní doklad zvířete nebo Skill Testu.'};
+ const cid=campaignKey(data.campaignClock),now=data.campaignClock?.minute;
+ const latest=data.journal.filter(j=>j.calendarCampaignId===cid&&j.calendarAnimalTrainingStart590?.animalId===animal.id&&
+   j.calendarAnimalTrainingStart590.ownerId===animal.ownerId).at(-1);
+ if(!latest)return {ready:false,reason:'Nejprve založte časový záznam zahájení výcviku v osobní stáji. Pak musí uběhnout šest měsíců.'};
+ const start=latest.calendarAnimalTrainingStart590;
+ const c=animalTrainingCandidate(origin.skillTestProof),shorten=!!form.elements.namedItem('shorten')?.checked;
+ const d3Text=form.elements.namedItem('criticalD3')?.value.trim()||'';
+ const d3=c?.level==='CF'&&/^[1-3]$/.test(d3Text)?Number(d3Text):0;
+ const requiredMonths=6-(shorten?1:0)+(c?.level==='CF'?d3:0),due=start.startMinute+requiredMonths*30*1440;
+ if(c?.level==='CF'&&!d3)return {ready:false,startId:latest.id,reason:'Po CF musí být nejprve doložen skutečný d3 pro počet dalších měsíců; dokud není znám, termín výcviku není uzavřen.'};
+ if(!Number.isSafeInteger(now))return {ready:false,startId:latest.id,reason:'Chybí platný kalendářní čas.'};
+ if(now<due)return {ready:false,startId:latest.id,due,reason:'Zbývá '+chronicleRemainingTime(due-now)+' do termínu '+displayCampaignMinute(due)+'. Training d10 jsou do té doby zamčené.'};
+ if(!Number.isSafeInteger(origin.campaignMinute)||origin.campaignMinute<start.startMinute||origin.campaignMinute<start.dueMinute-30*1440*(shorten?1:0))
+  return {ready:false,startId:latest.id,due,reason:'Původní Animalcraft SV nebyl doložen po uplynutí předepsaného výcviku. Proveďte nový SV po termínu.'};
+ return {ready:true,startId:latest.id,due,reason:'Kalendář ověřil výcvik od '+displayCampaignMinute(start.startMinute)+' do '+displayCampaignMinute(due)+'.'};
+}
+function updateFollowupDiceGuides(root){
+ if(!root)return;
+ for(const form of root.querySelectorAll('form[data-hmk-animal-training],form[data-hmk-engineering-design],form[data-hmk-fishing-catch]')){
+  const kind=form.matches('[data-hmk-animal-training]')?'animal':form.matches('[data-hmk-engineering-design]')?'design':'fishing';
+  const field=form.elements.namedItem(kind==='animal'?'trainingD10':kind==='design'?'designD10':'catchD10');
+  if(!field)continue;
+  if(!form.querySelector('[data-hmk-followup-roll-all]')){
+   const b=document.createElement('button');b.type='button';b.className='secondary hc-small';b.dataset.hmkFollowupRollAll='yes';
+   field.closest('label')?.insertAdjacentElement('afterend',b);
+  }
+  if(!form.querySelector('[data-hmk-followup-count]')){
+   const p=document.createElement('p');p.className='hsk-followup-count';p.dataset.hmkFollowupCount='';p.setAttribute('role','status');p.setAttribute('aria-live','polite');
+   field.closest('label')?.insertAdjacentElement('afterend',p);
+  }
+  let expected=null,why='';
+  const origin=data.journal.find(j=>j.id===form.elements.namedItem('origin')?.value);
+  if(kind==='animal'){
+   updateAnimalTrainingPendingExplanation(form);
+   expected=Number(form.dataset.hmkDiceCount||0);
+   why='Počet vychází ze skutečného Animalcraft SV, věku, divokosti, předchozích hvězd a volby zkrácení (HMK 65).';
+  }else if(kind==='design'){
+   const c=engineeringDesignCandidate(origin?.skillTestProof);
+   if(c){expected=Math.min(5,Math.max(0,c.sv-4));why='Za každou hvězdu ověřeného Engineering SV je jeden d10 proti Mathematics Indexu (HMK 70).';}
+  }else{
+   const c=fishingCatchCandidate(origin?.skillTestProof);
+   if(c){const adjusted=c.sv+(form.elements.namedItem('technique')?.value==='bare'?-2:0)+(form.elements.namedItem('saltWater')?.checked&&c.level==='CS'?1:0);
+    expected=adjusted<=0?0:adjusted<=2?2:4;
+    why='Počet je určen upraveným Fishing SV, technikou a slanou vodou: 0 / 2 / 4 d10 (HMK 71).';}
+  }
+  const timing=kind==='animal'?animalTrainingCalendarEligibility(form):null;
+  const p=form.querySelector('[data-hmk-followup-count]'),b=form.querySelector('[data-hmk-followup-roll-all]');
+  const current=field.value.trim()?field.value.split(',').map(x=>x.trim()).filter(Boolean).length:0;
+  form.dataset.hmkDiceCount=expected===null?'':String(expected);
+  if(p)p.textContent=(expected===null?'Nejdříve je nutné ověřit původní SV.':`Požadováno přesně ${expected}× d10. Zapsáno ${current}/${expected}. ${why}`)+(timing?' '+timing.reason:'');
+  if(b){b.disabled=expected===null||expected===0||(timing&&!timing.ready);b.textContent=expected===null?'⚄ Počet hodů není doložen':`⚄ Vygenerovat ${expected}× d10`;}
+  field.required=expected!==null&&expected>0;
+  field.placeholder=expected===null?'Neověřený počet d10':`Přesně ${expected} hodů d10 oddělených čárkami`;
+ }
+}
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-hmk-followup-roll-all]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=b.closest('form'),n=Number(form?.dataset.hmkDiceCount);
+ if(!form||!Number.isSafeInteger(n)||n<1||n>5)return;
+ const field=form.querySelector('[name="trainingD10"],[name="designD10"],[name="catchD10"]');if(!field)return;
+ try{field.value=Array.from({length:n},()=>secureHMKDie(10)).join(', ');
+  field.dataset.hmkAutoDice='cryptographic-software-d10';
+  updateFollowupDiceGuides(form.parentElement);}
+ catch(err){alert('Hod d10 nelze bezpečně vygenerovat: '+err.message);}
+},true);
+document.addEventListener('input',e=>{
+ if(e.target.matches?.('[name="trainingD10"],[name="designD10"],[name="catchD10"]')&&e.isTrusted)
+  delete e.target.dataset.hmkAutoDice;
+},true);
+document.addEventListener('change',e=>{
+ const f=e.target.closest?.('form[data-hmk-animal-training],form[data-hmk-engineering-design],form[data-hmk-fishing-catch]');
+ if(f)updateFollowupDiceGuides(f.parentElement);
+},true);
+function stableAnimalcraftSVTimeGate590(form){
+ if(!form||view!=='skills'||!pendingStableAnimalcraftId)return {ready:true};
+ const selectedSkill=form.elements.namedItem('primary')?.value;
+ if(selectedSkill!=='Animalcraft')return {ready:true};
+ const animal=bestiaryKnownAnimals().find(a=>a.id===pendingStableAnimalcraftId&&a.ownerId===selected);
+ if(!animal||!data.campaignClock)return {ready:false,reason:'Zvíře ze stáje nebo kampaň není k dispozici.'};
+ const cid=campaignKey(data.campaignClock),now=data.campaignClock.minute;
+ const starts=data.journal.filter(j=>j.calendarCampaignId===cid&&j.calendarAnimalTrainingStart590?.animalId===animal.id);
+ const completed=new Set(data.journal.filter(j=>j.calendarAnimalTraining590?.animalId===animal.id).map(j=>j.calendarAnimalTraining590.startId));
+ const pending=starts.filter(j=>!completed.has(j.id)).at(-1);
+ if(!pending)return {ready:false,reason:'Výcvik '+animal.name+': nejprve ve stáji potvrďte zahájení šesti měsíců práce. Samostatný běžný Animalcraft Test tím není omezen.'};
+ const due=pending.calendarAnimalTrainingStart590.dueMinute;
+ if(now<due)return {ready:false,reason:'Animalcraft SV pro výcvik '+animal.name+' je možný až '+displayCampaignMinute(due)+'. Zbývá '+chronicleRemainingTime(due-now)+'.'};
+ return {ready:true,reason:'Výcvik '+animal.name+': šest měsíců již uplynulo. Animalcraft SV nyní lze provést; případný CF d3 může prodloužit další výcvik.'};
+}
+function refreshStableAnimalcraftSVGate590(root){
+ if(view!=='skills'||!root)return;
+ const form=root.querySelector('#skill-value-form');if(!form)return;
+ const submit=form.querySelector('button[type="submit"]');if(!submit)return;
+ const state=stableAnimalcraftSVTimeGate590(form);
+ let note=form.querySelector('[data-hmk-stable-animalcraft-time-gate]');
+ if(!note){note=document.createElement('p');note.className='hsk-followup-count';note.dataset.hmkStableAnimalcraftTimeGate='';note.setAttribute('role','status');form.querySelector('[name="rollA"]')?.closest('label')?.insertAdjacentElement('afterend',note);}
+ note.hidden=!pendingStableAnimalcraftId||form.elements.namedItem('primary')?.value!=='Animalcraft';
+ if(!note.hidden)note.textContent=state.reason||'';
+ if(submit.dataset.hmkAnimalcraftGate590==='yes'||!state.ready){submit.disabled=!state.ready;if(!state.ready)submit.dataset.hmkAnimalcraftGate590='yes';else delete submit.dataset.hmkAnimalcraftGate590;}
+}
+function decorateFishingCalendarStart590(root){
+ if(view!=='skills'||!root||!character(selected)||!data.campaignClock)return;
+ const actor=character(selected);
+ if(!availableMasteries(actor).some(x=>x.name==='Fishing'&&x.ml>0))return;
+ const target=root.querySelector('#skill-value-form');if(!target)return;
+ const cid=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
+ const starts=data.journal.filter(j=>j.characterId===actor.id&&j.calendarCampaignId===cid&&j.calendarFishingStart590);
+ const completed=new Set(data.journal.filter(j=>j.characterId===actor.id&&j.calendarFishingSVStart590).map(j=>j.calendarFishingSVStart590.startId));
+ const pending=starts.filter(j=>!completed.has(j.id)).at(-1);
+ const panel=document.createElement('div');panel.className='hsk-fishing-calendar hsk-critical-next';
+ panel.innerHTML='<h4>Fishing · čtyřhodinová činnost (HMK 71)</h4><p>Po zahájení kalendář eviduje konec čtyřhodinové činnosti. Až potom proveďte Fishing Success Value d100 a následné Catch d10. Čas posouvá GM, nikoliv tlačítko.</p>'+
+ (pending?`<p>Začátek ${esc(displayCampaignMinute(pending.calendarFishingStart590.startMinute))} · termín ${esc(displayCampaignMinute(pending.calendarFishingStart590.dueMinute))} · ${minute<pending.calendarFishingStart590.dueMinute?'zbývá '+esc(chronicleRemainingTime(pending.calendarFishingStart590.dueMinute-minute)):'čas uplynul; proveďte SV'}</p>`:
+ '<button type="button" class="secondary hc-small" data-hmk-fishing-start-590>Zahájit 4 hodiny rybolovu</button>');
+ target.before(panel);
+ refreshFishingCalendarGate590(root);
+}
+function refreshFishingCalendarGate590(root){
+ const form=root.querySelector('#skill-value-form');if(!form||view!=='skills'||!data.campaignClock)return;
+ const primary=form.elements.namedItem('primary');if(!primary)return;
+ const submit=form.querySelector('button[type="submit"]');if(!submit)return;
+ let note=form.querySelector('[data-hmk-fishing-time-gate]');
+ if(!note){note=document.createElement('p');note.dataset.hmkFishingTimeGate='';note.className='hsk-followup-count';form.querySelector('[name="rollA"]')?.closest('label')?.insertAdjacentElement('afterend',note);}
+ const enabled=primary.value==='Fishing';if(note)note.hidden=!enabled;
+ if(!enabled){if(submit.dataset.hmkFishingGate590==='yes'){submit.disabled=false;delete submit.dataset.hmkFishingGate590;}return;}
+ const cid=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
+ const starts=data.journal.filter(j=>j.characterId===selected&&j.calendarCampaignId===cid&&j.calendarFishingStart590);
+ const completed=new Set(data.journal.filter(j=>j.calendarFishingSVStart590&&j.characterId===selected).map(j=>j.calendarFishingSVStart590.startId));
+ const pending=starts.filter(j=>!completed.has(j.id)).at(-1);
+ const notDue=!!pending&&minute<pending.calendarFishingStart590.dueMinute;
+ if(submit.dataset.hmkFishingGate590==='yes'||notDue){submit.disabled=notDue;if(notDue)submit.dataset.hmkFishingGate590='yes';else delete submit.dataset.hmkFishingGate590;}
+ if(note)note.textContent=notDue?`Fishing SV až v ${displayCampaignMinute(pending.calendarFishingStart590.dueMinute)} – zbývá ${chronicleRemainingTime(pending.calendarFishingStart590.dueMinute-minute)}. Dříve hod není povolen.`:
+  pending?'Kalendář potvrzuje nejméně 4 hodiny od zahájení. Následující Fishing SV bude navázán na tento záznam.':'Pro pravidlový čtyřhodinový Fishing SV nejprve zahajte činnost záznamem nahoře; bez něj lze test provést jen pro jiné GM doložené použití dovednosti.';
+}
+document.addEventListener('change',e=>{if(e.target.matches?.('#skill-value-form [name="primary"]')){const root=document.getElementById('app');refreshFishingCalendarGate590(root);refreshStableAnimalcraftSVGate590(root);}},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-hmk-fishing-start-590]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(view!=='skills'||!character(selected)||!data.campaignClock||combatInitiativeSequence)throw Error('Rybolov vyžaduje aktivní postavu, kampaň a klid mimo Initiative.');
+  const actor=character(selected),cid=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
+  if(!availableMasteries(actor).some(x=>x.name==='Fishing'&&x.ml>0))throw Error('Postava nemá ověřenou dovednost Fishing.');
+  const pending=data.journal.filter(j=>j.characterId===actor.id&&j.calendarCampaignId===cid&&j.calendarFishingStart590).filter(j=>!data.journal.some(x=>x.calendarFishingSVStart590?.startId===j.id));
+  if(pending.length)throw Error('Již běží nezakončená čtyřhodinová činnost.');
+  if(!ask('Zapsat začátek skutečného čtyřhodinového rybolovu do kalendáře? Čas se neposune.'))return;
+  mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock.minute!==minute)throw Error('Herní čas se změnil.');
+   data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+    title:'HMK 71 · Začátek rybolovu · '+actor.name,body:'Čtyři hodiny rybolovu od '+displayCampaignMinute(minute)+' do '+displayCampaignMinute(minute+240)+'. Fishing SV se má provést až po uplynutí doby.',
+    calendarFishingStart590:{format:'fishing-start-590',actorId:actor.id,startMinute:minute,dueMinute:minute+240}});
+  });
+ }catch(err){alert('Časovaný Fishing: '+err.message);}
+},true);
 function decorateSkillContinuationHelp(root){
  if(!root)return;
  const selector='form[data-hmk-animal-training],form[data-hmk-fishing-catch],form[data-hmk-engineering-design],form[data-skill-critical-form],form[data-skill-balance-nerves],form[data-skill-swimming-aftermath],form[data-skill-aggravation-aftermath],form[data-skill-weather-course],form[data-skill-weather-onset],form[data-skill-weather-skin],form[data-skill-cold-shock],form[data-climbing-fall-form],form[data-climbing-short-fall],form[data-skill-fishing-gear],form[data-skill-physical-impact],form[data-skill-serious-aggravation],form[data-skill-trekking-weather],form[data-skill-trekking-cold-shock],form[data-skill-trekking-skin],form[data-skill-trekking-weather-course]';
@@ -7612,8 +7848,8 @@ function decorateSkillContinuationHelp(root){
    const meaning=SKILL_FOLLOWUP_FIELD_HELP[field.name]||
     ('Tato hodnota patří k následnému postupu: '+label.textContent.trim().replace(/\s+/g,' ')+'. Vyplňte doložený skutečný údaj; předvyplnění je pouze návrh a neprokazuje nový hod.');
    if(!label.hasAttribute('data-hmk-help'))label.setAttribute('data-hmk-help',meaning);
-   label.title=meaning;
-   if(!field.hasAttribute('title'))field.title=meaning;
+   // Only one parchment tooltip; suppress the duplicate browser-native white tooltip.
+   label.removeAttribute('title');field.removeAttribute('title');
    if(!label.hasAttribute('tabindex'))label.tabIndex=0;
   }
  }
@@ -7641,6 +7877,9 @@ function render(){
  hideVisibleTechnicalUUIDs(app);
  enrichAnimalTrainingForms(app);
  decorateSkillContinuationHelp(app);
+ updateFollowupDiceGuides(app);
+ decorateFishingCalendarStart590(app);
+ refreshStableAnimalcraftSVGate590(app);
  decorateStableUI580(app);
  // Fit precisely fifteen actual item rows, regardless of wrapped item labels.
  for(const container of app.querySelectorAll('.inv-table-scroll.inv-15-rows')){
@@ -7663,7 +7902,7 @@ function render(){
 const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
   node.matches?.('form,section,div')||node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form]')))))
-   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);}
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
 // On narrow layouts the navigation joins the page scroll instead of using
@@ -8007,6 +8246,12 @@ document.addEventListener('submit',event=>{
   if(Number.isSafeInteger(original.campaignMinute)&&Number.isSafeInteger(data.campaignClock?.minute)&&data.campaignClock.minute<original.campaignMinute)throw Error('Nelze zapsat úlovek před původním SV');
   const fields=f.elements,raw=fields.namedItem('catchD10').value.trim();
   const dice=raw?raw.split(',').map(x=>{if(!/^\s*(?:[1-9]|10)\s*$/.test(x))throw Error('Všechny d10 musí být celé hody 1–10');return Number(x.trim());}):[];
+  const fishingStart=original.calendarFishingSVStart590?data.journal.find(j=>j.id===original.calendarFishingSVStart590.startId):null;
+  if(original.calendarFishingSVStart590&&(!fishingStart||
+    fishingStart.calendarFishingStart590?.actorId!==actor.id||
+    original.calendarFishingSVStart590.dueMinute!==fishingStart.calendarFishingStart590.dueMinute||
+    data.campaignClock?.minute<fishingStart.calendarFishingStart590.dueMinute))
+   throw Error('Fishing: čtyřhodinový časový interval není dokončen nebo je poškozen jeho doklad.');
   const result=resolveFishingCatch({proof,originId,actorId:actor.id,
    technique:fields.namedItem('technique').value,
    conditionsMode:fields.namedItem('conditionsMode').value,
@@ -8045,6 +8290,8 @@ document.addEventListener('submit',event=>{
   const d3raw=els.namedItem('criticalD3').value.trim();
   const selectedStableId=els.namedItem('stableAnimalId')?.value||null;
   const selectedStable=selectedStableId?bestiaryKnownAnimals().find(x=>x.id===selectedStableId):null;
+  const calendarEligibility=selectedStable?animalTrainingCalendarEligibility(f):{ready:true,startId:null};
+  if(!calendarEligibility.ready)throw Error(calendarEligibility.reason);
   if(selectedStableId&&!selectedStable)throw Error('Vybrané zvíře už není ve stáji.');
   if(selectedStable&&(els.namedItem('animalName').value!==selectedStable.name||Number(els.namedItem('reasoning').value)!==selectedStable.spec.rea||Number(els.namedItem('creativity').value)!==selectedStable.spec.cre))throw Error('Identita a atributy zvířete neodpovídají stáji a bestiáři.');
   if(selectedStable){
@@ -8078,7 +8325,10 @@ document.addEventListener('submit',event=>{
    '\nPři SV ≤2 je Control SR −1. Boosty lze po ověření zvířete přidat Initiative, Shock, přirozeným melee dovednostem, Dodge a Press.'+
    '\nTento doklad sám nemění skutečné ML zvířete ani neposouvá čas.';
   if(f.closest('#hmk-livestock-catalog'))selected=actor.id;
-   recordSkillEvidence('Animalcraft · doložený výcvik',body,result,null,selectedStable?{livestockTraining:{animalId:selectedStable.id,ownerId:selectedStable.ownerId,beastId:selectedStable.beastId,name:selectedStable.name,reasoning:selectedStable.spec.rea,creativity:selectedStable.spec.cre}}:null);
+   recordSkillEvidence('Animalcraft · doložený výcvik',body,result,null,selectedStable?{
+    livestockTraining:{animalId:selectedStable.id,ownerId:selectedStable.ownerId,beastId:selectedStable.beastId,name:selectedStable.name,reasoning:selectedStable.spec.rea,creativity:selectedStable.spec.cre},
+    calendarAnimalTraining590:{startId:calendarEligibility.startId,dueMinute:calendarEligibility.due,animalId:selectedStable.id}}
+    :null);
   if(out)out.textContent=body;
   f.querySelector('button[type=submit]').disabled=true;
  }catch(e){if(out)out.textContent='Výcvik nebyl potvrzen: '+e.message;}
@@ -8385,6 +8635,14 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
     (proof?.skill===gm.skill||proof?.skills?.[0]===gm.skill)&&
     data.campaignClock.minute>=(gmPlan.trigger==='end'?gmPlan.endMinute:gmPlan.minute)&&
     !data.journal.some(j=>j.calendarGMTestPlanId===gmPlan.id)?gmPlan.id:null;
+  const fishingSkill=proof?.type==='secondary-mastery-value-test'&&(proof?.skills?.[0]||proof?.skill)==='Fishing';
+  const fishingCampaign=campaignKey(data.campaignClock);
+  const fishingStarts=fishingSkill?data.journal.filter(j=>j.characterId===selected&&j.calendarCampaignId===fishingCampaign&&j.calendarFishingStart590):[];
+  const usedFishingStart=new Set(data.journal.filter(j=>j.calendarFishingSVStart590).map(j=>j.calendarFishingSVStart590.startId));
+  const fishingStart=fishingStarts.findLast(j=>!usedFishingStart.has(j.id));
+  if(fishingStart&&data.campaignClock.minute<fishingStart.calendarFishingStart590.dueMinute)
+   throw Error('Fishing: čtyřhodinový interval zatím neskončil; další Success Value hod nelze uložit.');
+  const fishingLink=fishingStart?{startId:fishingStart.id,dueMinute:fishingStart.calendarFishingStart590.dueMinute}:null;
   const trackingOrigin=pendingTrackingAwarenessId&&data.journal.find(j=>j.id===pendingTrackingAwarenessId);
   const trackingAwareness=trackingOrigin?trackingAwarenessFromSkill({trackingRow:trackingOrigin,
    skillProof:proof,actorId:selected,campaignId:campaignKey(data.campaignClock),
@@ -8396,6 +8654,7 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
     minute:data.campaignClock?.minute,proof,journal:data.journal});
   data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof,...(extra||{}),
     ...(data.campaignClock?{calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute}:{}),
+    ...(fishingLink?{calendarFishingSVStart590:fishingLink}:{}),
     ...(trackingAwareness?{calendarTrekTrackingAwarenessProof:trackingAwareness}:{}),
     ...(gmLink?{calendarGMTestPlanId:gmLink}:{}),
     ...(link?{calendarTrekSkillSource:link,calendarCampaignId:link.campaignId,
@@ -9893,6 +10152,9 @@ document.addEventListener('submit',event=>{
    recordSkillEvidence('Assistance · '+v.primary,body,{type:'assistance-success-test',actorId:actor.id,skill:v.primary,
     preliminaryArmour:ctx.armourIsProvisional,stimulant:ctx.stimulant??null,herbalCharmA:ctx.herbalCharm??null,darkvisionA:ctx.darkvision??null,eruditionA:erudition??null,footpadA:footpad??null,secondaryRollResult:sr,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',
     rollOrigin:die.origin,gmNarrative:skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}),scene:hskScene(form),consequence,consequenceProof},slot);return;
+  }
+  if(form.id==='skill-value-form'&&form.elements.namedItem('primary')?.value==='Animalcraft'&&pendingStableAnimalcraftId){
+   const gate=stableAnimalcraftSVTimeGate590(form);if(!gate.ready)throw Error(gate.reason);
   }
   const a=hskResolveSide({person:actor,form,side:'A'});
   const sv=form.id==='skill-value-form',opposed=form.id==='skill-secondary-form'&&form.elements.namedItem('opposed')?.checked;
@@ -13078,6 +13340,10 @@ document.addEventListener('submit',e=>{
  }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
 },true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-bestiary-open]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='bestiary';render();},true);
+document.addEventListener('change',e=>{
+ const control=e.target.closest?.('select[data-library-other-filter-select]');if(!control)return;
+ libraryOtherFilter=control.value||'all';libraryPage=0;render();
+},true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('button[data-library-other-filter]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -13174,6 +13440,28 @@ document.addEventListener('submit',e=>{
    data.journal.push({id:uuid(),characterId:ownerId,calendarCampaignId:cid,campaignMinute:minute,createdAt:at,title:'HMK 122 · '+(mode==='buy'?'nákup zvířete':'převzetí zvířete'),body:beast.name+' · '+name+' · '+(mode==='buy'?beast.priceD+'d':'bezplatně')+'; registr stáje; žádný automatický výcvik ani zdravotní stav',livestockAcquisition:{animalId:id,ownerId,beastId,name,priceD:beast.priceD,mode,transactionId:txId}});
   }))notice=`Do stáje bylo zařazeno ${name} (${beast.name}).`;
  }catch(err){alert('Pořízení zvířete: '+err.message)}
+},true);
+// v93.590: actual training starts at the current GM campaign clock; no retroactive fake interval.
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-hmk-training-start-animal]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(combatInitiativeSequence||!data.campaignClock)throw Error('Výcvik nelze začínat v Initiative ani bez kalendáře kampaně.');
+  const cid=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
+  const animal=verifiedLivestock(data,cid).find(x=>x.id===b.dataset.hmkTrainingStartAnimal&&x.ownerId===selected);
+  if(!animal)throw Error('Výcvik může začít pouze aktivní vlastník tohoto zvířete.');
+  const starts=data.journal.filter(j=>j.calendarCampaignId===cid&&j.calendarAnimalTrainingStart590?.animalId===animal.id);
+  const completed=new Set(data.journal.filter(j=>j.livestockTraining?.animalId===animal.id&&j.skillTestProof?.type==='animal-training').map(j=>j.calendarAnimalTraining590?.startId).filter(Boolean));
+  if(starts.some(j=>!completed.has(j.id)))throw Error('Zvíře již má zahájený, dosud neuzavřený výcvik.');
+  if(!ask('Zahájit skutečný výcvik '+animal.name+' právě nyní? Je třeba asi 1 hodinu denně po 6 měsíců (HMK 65). Čas posouvá GM.'))return;
+  mutate(()=>{
+   if(campaignKey(data.campaignClock)!==cid||data.campaignClock.minute!==minute)throw Error('Kalendář se mezitím změnil.');
+   const dueMinute=minute+6*30*1440;
+   data.journal.push({id:uuid(),characterId:animal.ownerId,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+    title:'HMK 65 · Zahájení výcviku · '+animal.name,body:'Doložený počátek: '+displayCampaignMinute(minute)+'; základní konec: '+displayCampaignMinute(dueMinute)+'. Pravidlový Animalcraft SV následuje po uplynutí času. Žádný hod nebyl proveden.',
+    calendarAnimalTrainingStart590:{format:'animal-training-start-590',animalId:animal.id,ownerId:animal.ownerId,startMinute:minute,dueMinute,requiredDays:180}});
+  });
+ }catch(err){alert('Zahájení výcviku: '+err.message);}
 },true);
 // v93.574: stable ownership lifecycle, original-price tack, physical cargo and care.
 // Every successful operation is an append-only, actor-bound and clock-bound proof.
