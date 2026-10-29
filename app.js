@@ -285,7 +285,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.595';
+const APP_VERSION='93.596';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2164,6 +2164,8 @@ function generatorConfigDialog(){
 let activeSkillTab='secondary';
 // Pure UI selection, never a new skill roll or calendar ledger.
 let skillSVChoice595=null;
+// Transient route state; never a change to saved skills or proof history.
+let lastRenderedSkillRoute596=null;
 let activeSheetSection='overview';
 // GM-only, nonpersistent presentation selection; never fabricates exposure or trauma.
 let hazardComposer={actorId:null,kind:null};
@@ -2527,7 +2529,10 @@ function skillWorkbenchView(){
  const actor=character(selected)??data.characters[0];if(actor&&selected!==actor.id)selected=actor.id;
  if(actor&&activeSkillTab==='value'&&(pendingStableAnimalcraftId||pendingTrekHandoff||pendingTrackingAwarenessId||pendingCalendarGMTest)&&skillSVChoice595?.kind==='timed')skillSVChoice595=null;
  if(!actor)return journalChapterShell('Skills','Skill testy ve stejném stylu deníku.',`<section class="panel"><h2>Skill Tests</h2><p>Nejprve vytvořte postavu.</p><button data-nav="characters">Přejít do registru</button></section>`,`journal-book--skills`);
- return journalChapterShell('Skills','Skill testy a výpočty vybrané postavy; skutečná nebezpečí a jejich následky se řeší výhradně v jejím deníku.',skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null,campaignKey(data.campaignClock)),`journal-book--skills`);
+ const choice=skillSVChoice595?.actorId===actor.id&&activeSkillTab==='value'?skillSVChoice595:null;
+ const nextKind=choice?.kind==='timed'?choice.value:choice?.kind==='ordinary'?choice.value.toLowerCase():pendingStableAnimalcraftId?'animal':null;
+ const followup=nextKind==='animal'||nextKind==='animalcraft'?'animal':nextKind==='fishing'?'fishing':nextKind==='engineering'?'engineering':'none';
+ return journalChapterShell('Skills','Skill testy a výpočty vybrané postavy; skutečná nebezpečí a jejich následky se řeší výhradně v jejím deníku.',skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null,campaignKey(data.campaignClock),followup),`journal-book--skills`);
 }
 function charactersView(){
  const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));
@@ -3462,7 +3467,8 @@ function folioChapterParts(body,kind=''){
   if(workbench){
    // Reuse the ORIGINAL forms and handlers: only split the live DOM by meaning.
    const leftItems=[...workbench.children].filter(x=>x.matches('.topline,.hsk-actor-chooser,.hsk-tabs,.hsk-skill-rule-explainer'));
-   const rightItems=[...workbench.children].filter(x=>!leftItems.includes(x));
+   const rightItems=[...workbench.children].filter(x=>!leftItems.includes(x)&&
+    (activeSkillTab==='secondary'||activeSkillTab==='assistance'||activeSkillTab==='value'? !x.classList.contains('hsk-special-container') : true));
    const actor=character(selected);
    const left=`<section class="hmk-skill-context-595">${leftItems.map(x=>x.outerHTML).join('')}${activeSkillTab==='value'?skillSVPicker595(actor):''}</section>`;
    let right=rightItems.map(x=>x.outerHTML).join('');
@@ -3471,7 +3477,7 @@ function folioChapterParts(body,kind=''){
     if(!choice&&!pendingStableAnimalcraftId&&!pendingTrekHandoff&&!pendingTrackingAwarenessId&&!pendingCalendarGMTest){
      right=right.replace(/(<section class="hsk-test-card" data-skill-section="value")/, '$1 hidden');
      right='<section class="hsk-sv-placeholder-595">Vyberte vlevo časovaný projekt nebo ostatní Success Value a potvrďte výběr. Do té doby se žádný hod nepřipravuje.</section>'+right;
-    }else if(choice.kind==='timed'){
+    }else if(choice?.kind==='timed'){
      if(choice.value==='engineering'||choice.value==='writing'){
       const pending=pendingSkillProjects591(selected).filter(j=>j.calendarSkillProjectStart591.kind===choice.value&&
        !data.journal.some(x=>x.calendarSkillProjectSV591?.startId===j.id));
@@ -7982,7 +7988,11 @@ function refreshStableAnimalcraftSVGate590(root){
  if(submit.dataset.hmkAnimalcraftGate590==='yes'||!state.ready){submit.disabled=!state.ready;if(!state.ready)submit.dataset.hmkAnimalcraftGate590='yes';else delete submit.dataset.hmkAnimalcraftGate590;}
 }
 function decorateFishingCalendarStart590(root){
- if(view!=='skills'||!root||!character(selected)||!data.campaignClock)return;
+ if(view!=='skills'||activeSkillTab!=='value'||!root||!character(selected)||!data.campaignClock)return;
+ const choice=skillSVChoice595?.actorId===selected?skillSVChoice595:null;
+ // Never append the Fishing panel to Animalcraft, Engineering, Writing, or a
+ // different Success Value. The Fishing form has its own explicit selection.
+ if(!(choice?.kind==='timed'&&choice.value==='fishing'||choice?.kind==='ordinary'&&choice.value==='Fishing'))return;
  const actor=character(selected);
  if(!availableMasteries(actor).some(x=>x.name==='Fishing'&&x.ml>0))return;
  const target=root.querySelector('#skill-value-form');if(!target)return;
@@ -8049,6 +8059,15 @@ function decorateSkillContinuationHelp(root){
  }
 }
 function render(){
+ // Every return from another screen starts with an operational Skill Tests
+ // selector. Direct handoffs from a stable or a calendar retain their requested
+ // test, but cannot inherit an unrelated stale Success Value selection.
+ if(view==='skills'&&lastRenderedSkillRoute596!==null&&lastRenderedSkillRoute596!=='skills'){
+  skillSVChoice595=null;
+  const linked=!!(pendingStableAnimalcraftId||pendingTrekHandoff||pendingTrackingAwarenessId);
+  activeSkillTab=linked?'value':'secondary';
+ }
+ lastRenderedSkillRoute596=view;
  // Deny all paths to partially generated sheets, even routes that set view
  // directly without clicking a registry card (import, skill link, wizard exit).
  if(view==='sheet'){
@@ -8854,6 +8873,11 @@ document.addEventListener('submit',event=>{
  }catch(err){alert('Časovaný projekt: '+err.message);}
 },true);
 document.addEventListener('change',e=>{
+ if(e.target.matches?.('#skill-value-form [name="primary"]')&&view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected){
+  // The visible Success Value form represents the specific procedure chosen
+  // on the left. A change to another skill must start with a new selection.
+  applySelectedSV595(document.getElementById('app'));
+ }
  if(e.target.closest?.('#skill-value-form')&&['primary','timedProjectId'].includes(e.target.name))decorateTimedSkillProject591(document.getElementById('app'));
 },true);
 document.addEventListener('change',e=>{if(e.target.closest?.('[data-hmk-writing-finish-591]'))refreshWritingWork591(document.getElementById('app'));},true);
@@ -8905,6 +8929,10 @@ document.addEventListener('submit',event=>{
 function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
  const savedId=uuid();
  const isSV=proof?.type==='secondary-mastery-value-test';
+ const currentChoice=view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected?skillSVChoice595:null;
+ const actualSkill=proof?.skills?.[0]||proof?.skill;
+ if(isSV&&currentChoice?.kind==='ordinary'&&actualSkill!==currentChoice.value)
+  throw Error('Tento Success Value test patří k '+currentChoice.value+'. Pro jinou dovednost ji nejprve vyberte vlevo.');
  const timedId=isSV?document.querySelector('#skill-value-form [name="timedProjectId"]')?.value:null;
  const timedStart=timedId?data.journal.find(j=>j.id===timedId&&j.calendarSkillProjectStart591):null;
  if(view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&['engineering','writing'].includes(skillSVChoice595.value)&&!timedId)throw Error('Časovaný projekt vyžaduje doložený začátek, správnou dovednost a uplynulý nejčasnější termín. Nelze uložit obecný SV jako dokončení projektu.');
@@ -10255,7 +10283,7 @@ document.addEventListener('submit',e=>{
  catch(error){if(out)out.textContent='Zvláštní SR nelze dokončit: '+error.message;}
 },true);
 document.addEventListener('change',e=>{
- if(e.target?.matches?.('[data-skill-actor]')){pendingTrackingAwarenessId=null;pendingTrekHandoff=null;pendingStableAnimalcraftId=null;selected=e.target.value;render();return;}
+ if(e.target?.matches?.('[data-skill-actor]')){pendingTrackingAwarenessId=null;pendingTrekHandoff=null;pendingStableAnimalcraftId=null;skillSVChoice595=null;selected=e.target.value;render();return;}
  const form=e.target?.form;
  if(!['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id))return;
  if(e.target.name==='opposed'){
@@ -10305,10 +10333,18 @@ document.addEventListener('click',e=>{
  render();
 },true);
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-skill-tab]');if(!t)return;
- activeSkillTab=t.dataset.skillTab;if(!t.closest('.hmk-skill-workbench'))return;
+ if(!t.closest('.hmk-skill-workbench'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const next=t.dataset.skillTab;
+ if(!['secondary','value','assistance','situational','followups'].includes(next))return;
+ // Clicking the currently selected tab opens it anew; after leaving a tab,
+ // never re-open a stale skill, animal or timed project implicitly.
+ skillSVChoice595=null;
+ pendingStableAnimalcraftId=null;
+ activeSkillTab=next;
  render();
  const root=document.getElementById('hmk-skill-workbench');
- const thisForm=root?.querySelector(activeSkillTab==='value'?'#skill-value-form':activeSkillTab==='assistance'?'#skill-assistance-form':'#skill-secondary-form');
+ const thisForm=root?.querySelector(activeSkillTab==='value'?'#skill-value-form':activeSkillTab==='assistance'?'#skill-assistance-form':activeSkillTab==='secondary'?'#skill-secondary-form':'[data-skill-section="none"]');
  if(thisForm){hskConfigureSR(thisForm,'A');if(thisForm.id==='skill-secondary-form')hskConfigureSR(thisForm,'B');refreshSkillAutoPreview(thisForm);}
 });
 function hskAlchemySVHelpers(form,primary){
@@ -12860,6 +12896,11 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   choose(form,'elapsedMinutes',elapsedText);break;
  }
  case 'talisman-period':{
+  // The situational executor has its own tab; calendar handoffs must open it
+  // before selecting the actual SR, not silently target a hidden old panel.
+  if(view!=='skills'||activeSkillTab!=='situational'){
+   selected=actor.id;view='skills';activeSkillTab='situational';skillSVChoice595=null;render();
+  }
   form=document.getElementById('hsk-special-sr-form');
   choose(form,'specialRoutine','astral-talisman');
   if(form)hskSpecialRefresh(form);
@@ -14216,7 +14257,13 @@ if(t.dataset.action==='export-diagnostic'){downloadJSON(diagnosticReport(),'hmk-
 if(t.dataset.action==='export-raw'){downloadRawStorage();return}
 if(t.dataset.action==='export-kernel-character'){const c=character(selected);if(c)downloadJSON(kernelExport([c]),'hmk-character-'+safeFilename(c.name)+'.json');return}
 if(t.dataset.action==='export-kernel-all'){downloadJSON(kernelExport(data.characters),'hmk-domain-export.json');return}
-if(t.dataset.nav){pendingTrackingAwarenessId=null;pendingTrekHandoff=null;lastCombatEvent=null;
+if(t.dataset.nav){
+ // Each explicit entry into Skill Tests starts a clean picker. A previous
+ // choice must never leak across navigation into another procedure.
+ if(view==='skills'||t.dataset.nav==='skills'){
+  skillSVChoice595=null;activeSkillTab='secondary';pendingStableAnimalcraftId=null;
+ }
+ pendingTrackingAwarenessId=null;pendingTrekHandoff=null;lastCombatEvent=null;
  if(t.dataset.nav==='hazards'){
   const actor=character(selected)??data.characters[0];
   if(!actor){view='characters';overlay=null;render();return}
