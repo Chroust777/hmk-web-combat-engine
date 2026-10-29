@@ -9,7 +9,7 @@ import {strengthEncumbranceModifier} from '../rules/encumbrance.js';
 import {filledWaterForItem} from './hmk-physical-water-ledger.js';
 import {rationStockBalances} from './hmk-physical-ration-ledger.js';
 export const STABLE_HUB_FORMAT_574='hmk-stable-hub-574';
-const types=new Set(['sale','release','tack-add','tack-remove','vehicle-add','vehicle-remove','cargo-add','cargo-remove','inventory-load','inventory-unload','inventory-gear-attach','inventory-gear-detach','vehicle-cargo-add','vehicle-cargo-remove','training-activate','care']);
+const types=new Set(['sale','release','tack-add','tack-remove','vehicle-add','vehicle-remove','cargo-add','cargo-remove','inventory-load','inventory-unload','inventory-gear-attach','inventory-gear-detach','vehicle-cargo-add','vehicle-cargo-remove','training-activate','care','rider-mount','rider-dismount']);
 export const STABLE_VEHICLES_P122=Object.freeze(VEHICLES_TACK_P122.filter(x=>['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(x.name)));
 const isId=x=>typeof x==='string'&&x.length>0&&x.length<=128;
 const nonnegative=x=>Number.isSafeInteger(x)&&x>=0&&x<=1000000;
@@ -20,7 +20,7 @@ export function stableHubEvents(data,campaignId,animalId){
  return (data?.journal||[]).filter(j=>j.stableHub574?.format===STABLE_HUB_FORMAT_574&&j.calendarCampaignId===campaignId&&j.stableHub574.animalId===animalId);
 }
 export function stableHubProjection(data,campaignId,animalId){
- const events=stableHubEvents(data,campaignId,animalId);const tack=new Map(),vehicles=new Map(),cargo=new Map(),inventoryItems=new Map(),vehicleCargo=new Map(),care=[];let exit=null;
+ const events=stableHubEvents(data,campaignId,animalId);const tack=new Map(),vehicles=new Map(),cargo=new Map(),inventoryItems=new Map(),vehicleCargo=new Map(),care=[];let exit=null,rider=null;
  for(const j of events){const x=j.stableHub574;
   if(x.type==='sale'||x.type==='release'){exit={type:x.type,priceD:x.priceD??0,minute:j.campaignMinute,id:j.id,reason:x.reason};continue;}
   if(x.type==='tack-add'||x.type==='inventory-gear-attach'&&x.role==='tack')tack.set(x.entryId,{...x,proofId:j.id});
@@ -34,13 +34,15 @@ export function stableHubProjection(data,campaignId,animalId){
   if(x.type==='vehicle-cargo-add')vehicleCargo.set(x.entryId,{...x,proofId:j.id});
   if(x.type==='vehicle-cargo-remove')vehicleCargo.delete(x.entryId);
   if(x.type==='care')care.push({id:j.id,minute:j.campaignMinute,...x});
+  if(x.type==='rider-mount')rider={characterId:x.riderId,weightLb:x.riderWeightLb,minute:j.campaignMinute,proofId:j.id};
+  if(x.type==='rider-dismount')rider=null;
  }
  const tackRows=[...tack.values()],vehicleRows=[...vehicles.values()],cargoRows=[...cargo.values()],inventoryRows=[...inventoryItems.values()],vehicleCargoRows=[...vehicleCargo.values()];
  const tackLb=tackRows.reduce((n,e)=>n+e.weightLb,0),cargoLb=cargoRows.reduce((n,e)=>n+e.weightLb,0)+inventoryRows.reduce((n,e)=>n+e.weightLb,0);
  const gearNames=tackRows.map(t=>VEHICLES_TACK_P122.find(i=>i.id===t.itemId)?.name||'');
  const isPack=gearNames.includes('Pack harness');
  const bags=gearNames.filter(n=>n==='Saddle bags, 15 lb').length;
- return {events,tack:tackRows,vehicles:vehicleRows,cargo:cargoRows,inventoryItems:inventoryRows,vehicleCargo:vehicleCargoRows,care,exit,tackLb,cargoLb,
+ return {events,tack:tackRows,vehicles:vehicleRows,cargo:cargoRows,inventoryItems:inventoryRows,vehicleCargo:vehicleCargoRows,care,exit,rider,tackLb,cargoLb,
    capacityType:isPack?'pack':bags?'saddle-bags':'none',packHarness:isPack,bags};
 }
 export function stableCargoCapacity(projection,spec){
@@ -63,13 +65,15 @@ export function stableBurden(data,campaignId,animal){
   return {...entry,currentWeightLb:Math.max(0,base)+added};
  });
  const cargoLb=p.cargoLb+moved.reduce((sum,e)=>sum+e.currentWeightLb-e.weightLb,0);
- const minimumLb=p.tackLb+cargoLb;
+ const gearAndCargoLb=p.tackLb+cargoLb;
+ const riderWeightLb=p.rider?.weightLb??0;
+ const minimumLb=gearAndCargoLb+riderWeightLb;
  const capacity=stableCargoCapacity(p,spec);
  const usesAnimalLoad=!!(spec.str&&spec.breed),loadKind=spec.breed==='camel'?'camel':spec.breed==='elephant'?'elephant':spec.breed==='bovine'?'bovine':'horse';
  const base=usesAnimalLoad?mountLoadENC(minimumLb,{kind:loadKind}):null;
  const adjusted=base===null?null:Math.max(0,base+strengthEncumbranceModifier(spec.str)+(spec.breed==='mule'?-20:0));
- return {...p,inventoryItems:moved,cargoLb,minimumLb,capacity,baseENC:base,adjustedENC:adjusted,
-  pf:adjusted===null?null:mountPersonalFatigue(adjusted),requiresAdditionalRiderWeight:true,
+ return {...p,inventoryItems:moved,cargoLb,gearAndCargoLb,riderWeightLb,minimumLb,capacity,baseENC:base,adjustedENC:adjusted,
+  pf:adjusted===null?null:mountPersonalFatigue(adjusted),requiresAdditionalRiderWeight:!p.rider,
   cargoOverflow:capacity!==null&&cargoLb>capacity};
 }
 export function validateStableHub(data,offerForId=null){
@@ -82,13 +86,13 @@ export function validateStableHub(data,offerForId=null){
   const animal=animals.get(x.animalId);
   requireValid(animal&&j.calendarCampaignId===animal.campaignId&&j.characterId===animal.ownerId&&x.ownerId===animal.ownerId&&
    Number.isSafeInteger(j.campaignMinute)&&j.campaignMinute>=animal.minute&&j.campaignMinute>=0,'nesoulad identity, kampaně nebo času');
-  const state=snapshots.get(x.animalId)||{exit:false,tack:new Map(),vehicles:new Map(),cargo:new Map(),inventory:new Map(),gear:new Map(),vehicleCargo:new Map(),lastMinute:animal.minute};
+  const state=snapshots.get(x.animalId)||{exit:false,tack:new Map(),vehicles:new Map(),cargo:new Map(),inventory:new Map(),gear:new Map(),vehicleCargo:new Map(),rider:null,lastMinute:animal.minute};
   requireValid(j.campaignMinute>=state.lastMinute&&!state.exit,'zápis po prodeji nebo zpětně v čase');state.lastMinute=j.campaignMinute;
   if(x.type==='sale'||x.type==='release'){
    requireValid(x.type!=='sale'||nonnegative(x.priceD),'neplatná prodejní cena');
    requireValid(narrative(x.reason),'prodej/opouštění vyžaduje podklad GM');
    requireValid(x.type!=='release'||x.priceD===0,'opuštění nesmí přidávat peníze');
-   requireValid(!state.tack.size&&!state.vehicles.size&&!state.cargo.size&&!state.inventory.size&&!state.gear.size&&!state.vehicleCargo.size,'před vyřazením zvířete se musí vyložit náklad a oddělit výstroj/vozidla');
+   requireValid(!state.tack.size&&!state.vehicles.size&&!state.cargo.size&&!state.inventory.size&&!state.gear.size&&!state.vehicleCargo.size&&!state.rider,'před vyřazením zvířete se musí vyložit náklad a oddělit výstroj/vozidla');
    state.exit=true;
   }else if(x.type==='tack-add'){
    const item=VEHICLES_TACK_P122.find(t=>t.id===x.itemId),factor=x.elephantMultiplier===5?5:1;
@@ -155,6 +159,22 @@ export function validateStableHub(data,offerForId=null){
    entryIds.add(x.entryId);state.vehicleCargo.set(x.entryId,x);
   }else if(x.type==='vehicle-cargo-remove'){
    requireValid(state.vehicleCargo.has(x.entryId)&&narrative(x.reason),'náklad není ve vozidle');state.vehicleCargo.delete(x.entryId);
+  }else if(x.type==='rider-mount'){
+   // A rider is a real campaign character, and their full weight must be
+   // recorded once; this is NOT a pack-harness cargo-capacity test.
+   const person=(data.characters||[]).find(c=>c.id===x.riderId&&!c.archived);
+   // Snapshot body-weight evidence, so later changes to Appearance do not
+   // invalidate a valid historic mounting event.
+   const documented=x.riderBodyLb??null;
+   requireValid((documented===null||Number.isSafeInteger(documented)&&documented>0)&&person&&animal.ownerId===x.ownerId&&animal.campaignId===j.calendarCampaignId&&
+    !state.rider&&isId(x.riderId)&&Number.isSafeInteger(x.riderWeightLb)&&x.riderWeightLb>0&&x.riderWeightLb<=1000000&&
+    (documented===null||x.riderWeightLb>=documented)&&narrative(x.reason)&&
+    ![...snapshots.entries()].some(([otherId,other])=>otherId!==x.animalId&&animals.get(otherId)?.campaignId===animal.campaignId&&other.rider?.characterId===x.riderId),
+    'jezdec nemá platný záznam, váhu nebo již sedí na jiném zvířeti');
+   state.rider={characterId:x.riderId,weightLb:x.riderWeightLb};
+  }else if(x.type==='rider-dismount'){
+   requireValid(state.rider&&state.rider.characterId===x.riderId&&narrative(x.reason),'sesedá jiný nebo neexistující jezdec');
+   state.rider=null;
   }else if(x.type==='training-activate'){
    const training=(data.journal||[]).find(t=>t.id===x.trainingProofId&&t.calendarCampaignId===animal.campaignId&&t.livestockTraining?.animalId===animal.id);
    const p=training?.skillTestProof;
