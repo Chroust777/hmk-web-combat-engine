@@ -215,6 +215,7 @@ import {isRoutineInventoryHistory} from './src/integration/hmk-routine-history-f
 import {createFreshRationStocks,recordPhysicalRationHandoff,recordPhysicalRationLoss,availableRationLots,rationStockBalances,projectCampaignRationInventory,validatePhysicalRationJournal,assertPhysicalRationBacking,assertPhysicalRationAppendOnly} from './src/integration/hmk-physical-ration-ledger.js';
 import {characterCarryProjection,partyCarryProjection,supplyDurationText} from './src/integration/hmk-provisions-simple-view.js';
 import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js';
+import {malnutritionPrognosis,malnutritionStateLabel} from './src/integration/hmk-malnutrition-prognosis.js';
 import {nutritionAnimals,createAnimalAccess,animalLoadedItemAt,validateNutritionAnimalAccess,assertNutritionAnimalAppendOnly} from './src/integration/hmk-nutrition-animal-access.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
@@ -287,7 +288,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.603';
+const APP_VERSION='93.604';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1162,7 +1163,7 @@ function characterProvisionActionsHTML(c){
   adaptive.some(a=>a.row.id===x.calendarNutritionConditions.policyId&&a.start===x.calendarNutritionConditions.startMinute));
  const upcoming=adaptive.filter(x=>x.start===clock.minute);
  return `${provisionGuideHTML([c])}${personalProvisionRulebookHTML(c,policyMap,upcoming,plans,clock)}
- <section class="panel hc-person-provision-link"><button type="button" class="secondary" data-provision-go="calendar" data-provision-actor-id="${esc(c.id)}">Otevřít kalendář kampaně ↗</button><p class="tiny muted">Zde i v kalendáři jde o tytéž fyzické položky, doklady a záznamy spotřeby.</p></section>`;
+`;
 }
 /** Shared fatigue planner, with exactly the same rule proof as Cestování a hlídky.
  * The 24-hour nutrition plan remains separate: it NEVER implies eight-hour sleep. */
@@ -1271,6 +1272,38 @@ function malnutritionLastRollHTML(actorId,kind,episodeId=null){
  const outcome=p.afterHR===6?'vyléčeno':p.afterHR===0?'smrt':p.afterHR>p.beforeHR?'zlepšení':p.afterHR<p.beforeHR?'zhoršení':'bez změny HR';
  return `<div class="hc-medical-roll-result" aria-label="Poslední vyhodnocený hod"><strong>Poslední ${p.phase==='healing'?'Healing':'Advance'}:</strong> d100 <strong>${p.roll}</strong> / EML ${p.eml} · ${esc(p.sl)} (${esc(level)}) · HR ${p.beforeHR} → <strong>${p.afterHR}</strong> · ${esc(outcome)} · Weakness ${p.weaknessAfter} · ${esc(displayCampaignMinute(p.resolvedMinute))}</div>`;
 }
+/** v93.604: read-only HB/HR prognóza přímo u postavy. Není to hod ani
+ * samostatná léčba; průběh zapisuje výhradně původní medical writer. */
+function malnutritionPrognosisHTML(t,actor,clock){
+ const state=actor?.hmk?.combatState;
+ const episode=(state?.malnutritionEpisodes||[]).find(x=>x.id===t.episodeId);
+ const dueReceipt=(data.journal||[]).find(j=>j.calendarCampaignId===campaignKey(clock)&&j.characterId===actor?.id&&j.calendarNutritionDay?.endMinute===t.dueMinute);
+ const day=dueReceipt?.calendarNutritionDay;
+ const got=day?.[t.kind==='starvation'?'foodReceived':'waterReceived'];
+ const need=day?.[t.kind==='starvation'?'foodNeed':'waterNeed'];
+ const expected=malnutritionPrognosis({kind:t.kind,hr:t.hr,mode:t.mode,
+  dueMinute:t.dueMinute,nowMinute:clock.minute,attr:actor?.hmk?.attributes,
+  rest:day?.foodNeed===0.5,half:need>0&&got===need/2});
+ const status=t.hr>=6?'Vyléčen':t.hr===0?'Zemřel':malnutritionStateLabel(t.hr);
+ const horizon=t.mode==='pending'?'Při doložené plné dávce Healing; při nedostatku Advance.':
+  t.mode==='healing'?'Doložená plná dávka: Healing.':'Doložený nedostatek: Advance.';
+ const special=t.hr===1?'Postava je v bezvědomí: sama si jídlo ani vodu nevezme. GM musí doložit skutečné podání a přijetí plných dávek; samotná dostupnost zásob nebo péče bez příjmu nestačí. Bez toho pokračuje Advance.':
+  t.hr===2?'Postava je neschopná činnosti; potřebuje pomoc s přístupem k dávkám. Plný skutečně přijatý příděl umožní Healing.':
+  t.hr===3?'Postava je omráčená (Stunned); vyhodnoťte omezení v Combat & Conditions. Plné přijaté dávky umožní Healing.':
+  t.hr<=0?'Smrt při HR0: běžný Healing Roll již neprobíhá.':
+  'Jestliže nedostatek pokračuje, Advance může stav zhoršit. Obnovené plné dávky umožní Healing, ale neodstraní následky automaticky.';
+ const branches=expected.branches.map(b=>`<div class="hc-malnutrition-branch"><strong>${b.mode==='healing'?'Healing (plné dávky)':'Advance (nedostatek)'} · ${b.eml===null?'EML čeká na END/WIL':'EML '+b.eml}</strong>
+ <table class="hc-malnutrition-results"><thead><tr><th>Možný d100 SL</th><th>HR po hodu</th><th>Stav postavy</th><th>Další test</th></tr></thead><tbody>
+ ${b.results.map(r=>`<tr><td>${esc(r.label)}</td><td>${t.hr} → <strong>${r.nextHR}</strong></td><td>${esc(r.state)}</td><td>${r.nextDueMinute===null?'Žádný (konečný stav)':esc(displayCampaignMinute(r.nextDueMinute))}${r.skipNext?' · přeskočen jeden termín':''}</td></tr>`).join('')}
+ </tbody></table></div>`).join('');
+ return `<div class="hc-malnutrition-prognosis"><strong>Aktuální následek: ${esc(status)}</strong>
+ <p>Další pravidlový zdravotní hod: <strong>${esc(displayCampaignMinute(t.dueMinute))}</strong> · ${t.mode==='pending'?'čeká na doložení dávky':t.mode==='healing'?'Healing Roll':'Advance Roll'} · ${clock.minute<t.dueMinute?'ještě nenastal':clock.minute===t.dueMinute?'nyní splatný':'PO TERMÍNU'}. ${esc(horizon)}</p>
+ <p>${esc(special)}</p>
+ <p class="hc-malnutrition-care">Co dělat: zajistit a doložit skutečné <strong>plné denní dávky</strong> jídla / vody pro příslušnou epizodu. Pak se místo zhoršovacího Advance vyhodnocuje <strong>každý den Healing Roll (HB × 5)</strong>. Při S získá +1 HR, při CS +2 HR; HR6 znamená uzdravení. Nedostatek vede k Advance (HB × aktuální HR). Jde o zdravotní hod, nikoli běžný Skill Test ani automatickou léčbu Physician. Ostatní zranění či Shock se řeší samostatně.</p>
+ <details class="hc-malnutrition-outcomes"><summary>Možné výsledky příštího hodu a další termíny · HMK 184–186</summary>
+ <p class="hc-medical-detail">Následující hodnoty jsou pouze pravidlové možnosti, <strong>nikoli provedené hody</strong>. Termín po dalším hodu předpokládá stejné dávky a aktivitu jako v aktuální větvi; jejich změna může změnit plán. CF/CS mohou jeden termín přeskočit podle tabulky.</p>${branches}
+ <p class="hc-medical-detail">Stupnice: HR5 = Weakness 5, HR4 = Weakness 10, HR3 = Stunned, HR2 = Incapacitated, HR1 = Unconscious, HR0 = smrt, HR6 = uzdravení. Při změně HR se předchozí účinek této epizody nahrazuje novým (HMK 184).</p></details></div>`;
+}
 function malnutritionRecentClosedHTML(actorId){
  const campaign=data.campaignClock?campaignKey(data.campaignClock):null;
  const cases=Object.values(data.journal.filter(j=>j.characterId===actorId&&j.calendarCampaignId===campaign&&
@@ -1316,7 +1349,7 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
  const cancellation=outstanding.map(x=>{const c=x.calendarNutritionConditions,already=data.journal.some(j=>j.calendarNutritionConditionsCancel?.planId===x.id);
   if(already||clock.minute>=c.endMinute)return '';
   return `<form data-nutrition-conditions-cancel class="hc-provision-pauser"><input type="hidden" name="sourceId" value="${esc(x.id)}"><label>Přerušit potvrzený plán (${esc(c.kind)})<input name="reason" minlength="3" required placeholder="Skutečný důvod přerušení"></label><button type="submit" class="secondary">Zrušit plán</button></form>`;}).join('');
- const health=due.length?`<section class="hc-person-health"><h4>Starvation / Thirst · kontrola ${esc(actor.name)}</h4>${due.map(t=>`<form data-malnutrition-course><strong ${journalHelp('HR',HR_HELP_558)}>${t.kind==='starvation'?'Starvation':'Thirst'} HR${t.hr} · Weakness ${t.weakness} · ${t.mode==='healing'?'Healing':t.mode==='advance'?'Advance':'čeká na doklad dávky'} · ${esc(displayCampaignMinute(t.dueMinute))}</strong><p class="hc-medical-detail">Vznik: ${esc(displayCampaignMinute(t.originMinute))} · poslední zúčtování: ${t.latestRation==='full'?'plné dávky':t.latestRation==='half'?'poloviční dávky':t.latestRation==='none'?'bez dávek':'bez přesného dokladu'} · ${esc(t.provisionMode)}. Následek zůstává do úspěšného Healing (HMK 185–186).</p>${malnutritionLastRollHTML(actorId,t.kind,t.episodeId)}<input type="hidden" name="actorId" value="${esc(actorId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}"><label>Skutečný d100 (1–100)<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="secondary hc-small" data-malnutrition-die="yes">⚄ Vygenerovat d100</button><button type="submit" ${clock.minute<t.dueMinute||t.mode==='pending'?'disabled title="Zdravotní test vyžaduje splatnost a doloženou dávku"':''}>Potvrdit zdravotní test</button></form>`).join('')}</section>`:'';
+ const health=due.length?`<section class="hc-person-health"><h4>Starvation / Thirst · kontrola ${esc(actor.name)}</h4>${due.map(t=>`<form data-malnutrition-course><strong ${journalHelp('HR',HR_HELP_558)}>${t.kind==='starvation'?'Starvation':'Thirst'} HR${t.hr} · Weakness ${t.weakness} · ${t.mode==='healing'?'Healing':t.mode==='advance'?'Advance':'čeká na doklad dávky'} · ${esc(displayCampaignMinute(t.dueMinute))}</strong><p class="hc-medical-detail">Vznik: ${esc(displayCampaignMinute(t.originMinute))} · poslední zúčtování: ${t.latestRation==='full'?'plné dávky':t.latestRation==='half'?'poloviční dávky':t.latestRation==='none'?'bez dávek':'bez přesného dokladu'} · ${esc(t.provisionMode)}. Následek této epizody se mění až podle skutečných Healing Rolls; uzdravení nastává při HR6 (HMK 184–186).</p>${malnutritionLastRollHTML(actorId,t.kind,t.episodeId)}${malnutritionPrognosisHTML(t,actor,clock)}<input type="hidden" name="actorId" value="${esc(actorId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}"><label>Skutečný d100 (1–100)<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="secondary hc-small" data-malnutrition-die="yes">⚄ Vygenerovat d100</button><button type="submit" ${clock.minute<t.dueMinute||t.mode==='pending'?'disabled title="Zdravotní test vyžaduje splatnost a doloženou dávku"':''}>Potvrdit zdravotní test</button></form>`).join('')}</section>`:'';
  const history=malnutritionRecentClosedHTML(actorId);
  // Switching to assured supply hides optional setup forms, not already-due medical checks
  // or cancellation of a previously scheduled 24-hour conditions plan.

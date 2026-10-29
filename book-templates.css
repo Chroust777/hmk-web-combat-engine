@@ -6385,3 +6385,23 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-provision-animal form label{flex:1 1 250px;min-width:0}
 .hc-provision-animal input{max-width:100%;box-sizing:border-box}
 .hc-medical-roll-result{padding:7px 9px;margin:6px 0;background:rgba(207,221,188,.3);border-left:3px solid #66805d;border-radius:3px;color:#3c3b2d;font-size:.88rem;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
+
+/* v93.604 — HMK 184–186 prognosis beside the immutable medical roll. */
+.hc-malnutrition-prognosis{min-width:0;margin:8px 0 12px;padding:10px 12px;border:1px solid rgba(111,86,57,.38);border-radius:7px;background:rgba(236,222,196,.4);color:#40301f;font-size:.86rem;line-height:1.52}
+.hc-malnutrition-prognosis>strong{font-size:.95rem}
+.hc-malnutrition-prognosis p{margin:6px 0;overflow-wrap:anywhere}
+.hc-malnutrition-care{border-top:1px solid rgba(115,88,58,.25);padding-top:7px}
+.hc-malnutrition-outcomes{margin-top:10px;border-top:1px solid rgba(115,88,58,.25);padding-top:7px}
+.hc-malnutrition-outcomes summary{font-weight:700;cursor:pointer;color:#4f402e;white-space:normal}
+.hc-malnutrition-branch{margin:9px 0 11px;overflow-x:auto;max-width:100%}
+.hc-malnutrition-results{width:100%;border-collapse:collapse;min-width:530px;font-size:.81rem;margin-top:5px}
+.hc-malnutrition-results th,.hc-malnutrition-results td{padding:5px 7px;text-align:left;vertical-align:top;border-bottom:1px solid rgba(115,88,58,.24);white-space:normal}
+.hc-malnutrition-results th{background:rgba(116,96,62,.11)}
+.hc-person-health form .hc-malnutrition-prognosis{max-width:100%}
+/* Keep every future outcome and next date legible on narrow folios. */
+.hc-malnutrition-results{min-width:0;table-layout:fixed}
+.hc-malnutrition-results th,.hc-malnutrition-results td{overflow-wrap:anywhere;word-break:normal}
+.hc-malnutrition-results th:nth-child(1),.hc-malnutrition-results td:nth-child(1){width:21%}
+.hc-malnutrition-results th:nth-child(2),.hc-malnutrition-results td:nth-child(2){width:17%}
+.hc-malnutrition-results th:nth-child(3),.hc-malnutrition-results td:nth-child(3){width:29%}
+.hc-malnutrition-results th:nth-child(4),.hc-malnutrition-results td:nth-child(4){width:33%}
