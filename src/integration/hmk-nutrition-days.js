@@ -39,6 +39,73 @@ export function createNutritionPolicy({campaignId,minute,actorId,foodNeed=1,wate
   ...(inventoryRations?{inventoryRations:true}:{}),...(inventoryWater?{inventoryWater:true}:{}),...(autoNeeds?{autoNeeds:true}:{}),...(gmProvisioned?{gmProvisioned:true}:{}),sourcePages:gmProvisioned?[186]:inventoryWater?[120,121,147,186]:inventoryRations?[120,147,186]:[147,186]};
 }
 const dayRecords=(journal,campaignId,actorId)=>journal.filter(x=>x.calendarCampaignId===campaignId&&x.characterId===actorId&&x.calendarNutritionDay?.format===NUTRITION_DAY_FORMAT);
+/** A policy change is a dated source transition, not permission to erase
+ * the unfinished old day's consumption or to reopen an already closed day.
+ * HMK 186 has no arbitrary fractions of a 24-hour nutrition day. */
+export function assertNutritionPolicyBoundary(journal=[],campaignId,actorId,atMinute){
+ const previous=policyEntries(journal,campaignId).filter(x=>x.characterId===actorId).at(-1);
+ if(!previous||previous.calendarNutritionPolicy.enabled===false)return true;
+ const last=dayRecords(journal,campaignId,actorId).filter(x=>x.calendarNutritionDay.policyId===previous.id).at(-1);
+ const start=last?.calendarNutritionDay.endMinute??previous.campaignMinute;
+ check(atMinute===start || (atMinute>start&&(atMinute-start)%DAY===0),
+  'Změnu zásobovacího režimu potvrďte na 24h hranici sledovaného dne; rozpracovaný den nelze zahodit.');
+ return true;
+}
+/** First activation at a confirmed clock advance: existing character/campaign
+ * policy decisions (including paused policies) are never overridden. No
+ * inventory or medical result is fabricated by enrolling a member. */
+export function enrollUnmonitoredNutrition(database,{fromMinute,idFactory,stamp}={}){
+ const clock=database?.campaignClock;if(!clock)return [];
+ check(validMinute(fromMinute)&&fromMinute<=clock.minute&&typeof idFactory==='function'&&typeof stamp==='function',
+  'Automatické sledování potřebuje potvrzený výchozí čas');
+ const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
+ const registered=new Set(policyEntries(database.journal,campaignId).map(x=>x.characterId));
+ const allowed=new Set(clock.characterIds??database.characters.map(x=>x.id));const added=[];
+ for(const actor of database.characters.filter(x=>allowed.has(x.id)&&!registered.has(x.id))){
+  const proof=createNutritionPolicy({campaignId,minute:fromMinute,actorId:actor.id,
+   autoNeeds:true,inventoryRations:true,inventoryWater:true});
+  const row={id:idFactory(),characterId:actor.id,calendarCampaignId:campaignId,
+   campaignMinute:fromMinute,createdAt:stamp(),title:'HMK · automatické sledování výživy',
+   body:'Zahájeno při potvrzeném posunu času GM. Pouze skutečně doložené zdroje; bez fiktivního jídla či vody.',
+   calendarNutritionPolicy:proof};
+  database.journal.push(row);added.push(row);
+ }
+ return added;
+}
+/** Only genuinely carried assets are automatically reachable. Stock stored
+ * on a stable animal or inside a chest remains owned but cannot be eaten
+ * merely because the owner and the container exist in the same campaign.
+ * Attested hand-off receipts are carried until explicitly relocated. */
+function itemSlotAtMinute(database,campaignId,item,atMinute){
+ // The inventory field is the CURRENT custody snapshot. Reconstruct an
+ // earlier day's custody from immutable load/unload receipts, not from that
+ // current snapshot (which might already reflect a later relocation).
+ const events=(database.journal??[]).filter(j=>j.calendarCampaignId===campaignId&&
+  j.stableHub574?.inventoryId===item.id&&
+  ['inventory-load','inventory-unload'].includes(j.stableHub574.type));
+ const recent=events.filter(j=>j.campaignMinute<=atMinute).at(-1);
+ if(recent)return recent.stableHub574.type==='inventory-load'?'stable':'carried';
+ const earliest=events.find(j=>j.campaignMinute>atMinute);
+ if(earliest)return earliest.stableHub574.type==='inventory-load'?'carried':'stable';
+ return item.slot;
+}
+function reachableFoodLots(database,campaignId,actorId,atMinute){
+ const inventory=new Map((database.inventory??[]).map(x=>[x.id,x]));
+ return availableRationLots(database.journal,campaignId,actorId,atMinute).filter(l=>{
+  const item=inventory.get(l.itemId);
+  return item?item.characterId===actorId&&['carried','main_hand','off_hand'].includes(itemSlotAtMinute(database,campaignId,item,atMinute)):
+   database.journal.some(j=>j.id===l.sourceId&&j.calendarCampaignId===campaignId&&
+    j.calendarInventoryRationTransfer?.recipientId===actorId&&j.calendarInventoryRationTransfer?.receivedItemId===l.itemId);
+ });
+}
+function reachableWaterLots(database,campaignId,actorId,atMinute){
+ const inventory=new Map((database.inventory??[]).map(x=>[x.id,x]));
+ return availablePhysicalWater(database.journal,campaignId,actorId,atMinute).filter(l=>{
+  const item=inventory.get(l.itemId);
+  return item&&item.characterId===actorId&&itemSlotAtMinute(database,campaignId,item,atMinute)==='carried';
+ });
+}
+
 const consumeBeforeDay=(journal,actorId,campaignId,start,end,unit,includeStart=false)=>round(journal.filter(x=>x.characterId===actorId&&x.calendarCampaignId===campaignId&&x.calendarForagingSupplyUse?.unit===unit&&
  x.calendarForagingSupplyUse?.disposition==='consumed'&&x.calendarForagingSupplyUse?.nutritionDayId===undefined&&
  (includeStart?x.campaignMinute>=start:x.campaignMinute>start)&&x.campaignMinute<=end).reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0));
@@ -79,9 +146,9 @@ function requireUnambiguousSharedAllocation(database,campaignId,cohort){
    const manual=Math.min(required,consumeBeforeDay(journal,actorId,campaignId,c.start,end,unit,c.start===p.minute));
    let leftover=round(required-manual);
    const personal=unit==='foodDays'&&p.inventoryRations===true?
-     availableRationLots(journal,campaignId,actorId,end).reduce((n,l)=>n+l.remaining,0):
+     reachableFoodLots(database,campaignId,actorId,end).reduce((n,l)=>n+l.remaining,0):
      unit==='waterDays'&&p.inventoryWater===true?
-     availablePhysicalWater(journal,campaignId,actorId,end).reduce((n,l)=>n+l.remaining,0):0;
+     reachableWaterLots(database,campaignId,actorId,end).reduce((n,l)=>n+l.remaining,0):0;
    leftover=round(Math.max(0,leftover-Math.min(leftover,personal)));
    if(leftover>0)demands.push({actorId,quantity:leftover});
   }
@@ -101,19 +168,22 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
  check(typeof idFactory==='function'&&typeof stamp==='function','Nutriční účetnictví vyžaduje auditní identifikátory');
  const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
  const members=new Set(clock.characterIds??database.characters.map(c=>c.id));
- const policies=activeNutritionPolicies(database.journal,campaignId,[...members]).sort((a,b)=>a.characterId.localeCompare(b.characterId));
+ const policies=policyEntries(database.journal,campaignId).filter(x=>members.has(x.characterId));
  const completed=[];
- // Process in CHRONOLOGICAL order across all actors, not each actor's entire
- // history first: the first hungry person cannot claim a future resource.
- const cursors=policies.map(policy=>{
+ // Preserve every historically effective policy, even if a later GM decision
+ // replaced or paused it. Process by day-end across all actors; no old policy
+ // can spend supplies that became available only after a later timestamp.
+ const cursors=policies.filter(x=>x.calendarNutritionPolicy.enabled!==false).map(policy=>{
   const last=dayRecords(database.journal,campaignId,policy.characterId).filter(x=>x.calendarNutritionDay.policyId===policy.id).at(-1);
-  return {policy,start:last?.calendarNutritionDay.endMinute??policy.campaignMinute};
+  const successor=policies.slice(policies.indexOf(policy)+1).find(x=>x.characterId===policy.characterId);
+  return {policy,start:last?.calendarNutritionDay.endMinute??policy.campaignMinute,
+   limit:Math.min(clock.minute,successor?.campaignMinute??clock.minute)};
  });
  let steps=0;
  while(true){
-  const due=cursors.filter(c=>c.start+DAY<=clock.minute).sort((a,b)=>(a.start-b.start)||a.policy.characterId.localeCompare(b.policy.characterId))[0];
+  const due=cursors.filter(c=>c.start+DAY<=c.limit).sort((a,b)=>(a.start-b.start)||a.policy.characterId.localeCompare(b.policy.characterId))[0];
   if(!due)break;
-  requireUnambiguousSharedAllocation(database,campaignId,cursors.filter(c=>c.start===due.start&&c.start+DAY<=clock.minute));
+  requireUnambiguousSharedAllocation(database,campaignId,cursors.filter(c=>c.start===due.start&&c.start+DAY<=c.limit));
   check(++steps<=3660,'Příliš mnoho nutričních dnů v jediném posunu; rozdělte dlouhý časový skok GM');
   const {policy,start}=due,end=start+DAY,actorId=policy.characterId,p=policy.calendarNutritionPolicy;
   const needs=p.autoNeeds===true?dailyNutritionNeeds({journal:database.journal,campaignId,actorId,policyId:policy.id,startMinute:start,endMinute:end}):
@@ -139,7 +209,7 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
    // Expired lots are NOT consumed, and carried waterskins do not imply water.
    if(unit==='foodDays'&&p.inventoryRations===true){
     while(remaining>0){
-     const lot=availableRationLots(database.journal,campaignId,actorId,end)[0];
+     const lot=reachableFoodLots(database,campaignId,actorId,end)[0];
      if(!lot)break;
      const quantity=Math.min(remaining,lot.remaining);
      const proof=createPhysicalRationUse({journal:database.journal,campaignId,actorId,minute:end,sourceId:lot.sourceId,quantity});
@@ -152,7 +222,7 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
    }
    if(unit==='waterDays'&&p.inventoryWater===true){
     while(remaining>=0.5){
-     const bottle=availablePhysicalWater(database.journal,campaignId,actorId,end)[0];if(!bottle)break;
+     const bottle=reachableWaterLots(database,campaignId,actorId,end)[0];if(!bottle)break;
      const proof=createPhysicalWaterUse({journal:database.journal,campaignId,actorId,minute:end,fillId:bottle.fillId});
      proof.nutritionDayId=`${policy.id}:${end}`;
      const row={id:idFactory(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:end,createdAt:stamp(),
@@ -174,6 +244,13 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
     database.journal.push(row);automatic.push(row);remaining=round(remaining-quantity);
    }
    received[unit]=round(required-remaining);
+   // HMK 186 specifies 0, half and full daily rations; a quarter or
+   // three-quarter ration cannot silently reset a Starvation/Thirst course.
+   // Require a GM source/dose decision instead of inventing a rule.
+   const fraction=required>0?received[unit]/required:0;
+   check(fraction===0||fraction===0.5||fraction===1,
+    'HMK 186 neurčuje zdravotní účinek čtvrtinových ani jiných nestandardních dávek '+
+    (unit==='waterDays'?'vody':'potravy')+'. GM musí doložit plný, poloviční nebo nulový příděl.');
   }
   const dayProof={format:NUTRITION_DAY_FORMAT,policyId:policy.id,actorId,campaignId,startMinute:start,endMinute:end,
    foodNeed:needs.foodNeed,waterNeed:needs.waterNeed,foodReceived:received.foodDays,waterReceived:received.waterDays,
@@ -213,6 +290,11 @@ export function validateNutritionJournal(journal=[]){
   const d=row.calendarNutritionDay;
   if(!d){prior.push(row);continue;}
   const policy=known.get(d.policyId)?.calendarNutritionPolicy;
+  const nextPolicy=journal.find(x=>x.calendarNutritionPolicy&&x.calendarCampaignId===d.campaignId&&
+   x.characterId===d.actorId&&x.id!==d.policyId&&x.campaignMinute>=policy?.minute&&
+   journal.indexOf(x)>journal.findIndex(y=>y.id===d.policyId));
+  check(!nextPolicy||d.endMinute<=nextPolicy.campaignMinute,
+   'Denní spotřeba překračuje doloženou změnu zásobovacího režimu');
   const effective=policy?.autoNeeds?dailyNutritionNeeds({journal:prior,campaignId:d.campaignId,actorId:d.actorId,policyId:d.policyId,startMinute:d.startMinute,endMinute:d.endMinute}):null;
   const token=`${d.policyId}:${d.endMinute}`;
   check(d.format===NUTRITION_DAY_FORMAT&&policy?.enabled===true&&d.actorId===row.characterId&&d.actorId===policy.actorId&&

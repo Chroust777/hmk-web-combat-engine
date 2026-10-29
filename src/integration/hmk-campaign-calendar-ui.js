@@ -73,6 +73,39 @@ function renderAgendaEntry(p,esc,clock,events=[],journal=[]){
  <div class="hc-event-line hc-event-line--task"><span class="hc-event-description">${esc(label)}${p.uiAcknowledged?' · ✓ zkontrolováno GM':''}</span><span class="hc-actions">${issueAction(p,esc)}</span></div>${overlapNotice}${skillDetails}
  </article>`;
 }
+/** Several immutable receipts (daily ration, Starvation onset, Thirst onset)
+ * may carry the exact same actor/time. A single calendar card links to the
+ * unchanged personal logbook, where every original receipt remains separate.
+ * Only presentation is coalesced; medical obligations are never coalesced. */
+function compactNutritionTimelineEvents(events,journal){
+ const lookup=new Map(journal.map(j=>[j.id,j]));
+ const grouped=new Map();const passthrough=[];
+ for(const event of events){
+  if(event.origin!=='history'||!['nutrition-day','malnutrition-result'].includes(event.kind)){
+   passthrough.push(event);continue;
+  }
+  const k=event.characterId+'\u0000'+event.dueMinute;
+  if(!grouped.has(k))grouped.set(k,[]);
+  grouped.get(k).push(event);
+ }
+ for(const group of grouped.values()){
+  if(group.length===1){passthrough.push(group[0]);continue;}
+  const parts=[],ids=[];
+  for(const x of group){
+   const j=lookup.get(x.sourceId);if(!j){parts.push(x.title);continue;}
+   ids.push(j.id);
+   const d=j.calendarNutritionDay,m=j.calendarMalnutritionMedical;
+   if(d)parts.push('Denní výživa: potrava '+d.foodReceived+'/'+d.foodNeed+', voda '+d.waterReceived+'/'+d.waterNeed);
+   if(m)parts.push((m.kind==='thirst'?'Thirst':'Starvation')+' · '+
+    (m.phase==='onset'?'nástup HR'+m.hr:m.phase==='healing'?'Healing HR'+m.afterHR:'Advance HR'+m.afterHR));
+  }
+  const primary=group.find(x=>x.kind==='nutrition-day')||group[0],title=parts.join(' · ');
+  passthrough.push({...primary,id:'history:nutrition-group:'+encodeURIComponent(primary.characterId)+':'+primary.dueMinute,
+   kind:'nutrition-summary',title,description:title,relatedJournalIds:ids,
+   note:'Souhrn '+group.length+' původních samostatných dokladů. Žádný zdravotní hod ani doklad se nemaže; vše je v osobním deníku.'});
+ }
+ return passthrough;
+}
 export function calendarBoardEvents({clock,characters=[],journal=[]}={}){
  const agenda=campaignCalendarAgenda(clock,characters,journal),custom=gmCalendarAgenda(clock);
  // Animal recovery is a real calendar activity, but animals are NOT added
@@ -83,7 +116,8 @@ export function calendarBoardEvents({clock,characters=[],journal=[]}={}){
  const activitiesCharacters=[...characters,...animalRestActors.filter(a=>!characters.some(c=>c.id===a.id))];
  const all=[...agenda.all.map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities([...calendarActorActivities(clock,activitiesCharacters,journal),...calendarNutritionConditionActivities(clock,characters,journal)]),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
  const receipts=calendarUIReceipts(journal,clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`);
- const visible=all.filter(p=>receipts.get(p.id)!=='hide').map(p=>({...p,uiAcknowledged:receipts.get(p.id)==='acknowledge'}));
+ const visible=compactNutritionTimelineEvents(all.filter(p=>receipts.get(p.id)!=='hide').map(p=>({...p,uiAcknowledged:receipts.get(p.id)==='acknowledge'})),journal)
+  .filter(p=>receipts.get(p.id)!=='hide').map(p=>({...p,uiAcknowledged:p.uiAcknowledged||receipts.get(p.id)==='acknowledge'}));
  visible.sort((a,b)=>a.dueMinute-b.dueMinute||a.id.localeCompare(b.id));
  return visible;
 }

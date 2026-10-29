@@ -65,7 +65,7 @@ export function applyDueMalnutritionOnsets(database,{idFactory,stamp}={}){
    for(const j of history){const d=j.calendarNutritionDay;
     if(d.endMinute<=previousOnset)continue;
     const policy=database.journal.find(x=>x.id===d.policyId)?.calendarNutritionPolicy;
-    check(policy?.enabled===true&&(policy.foragingOnly===true||policy.inventoryRations===true),
+    check(policy?.enabled===true&&(policy.foragingOnly===true||policy.inventoryRations===true||policy.gmProvisioned===true),
      'Malnutrition: chybí doložený úplný režim účtování zásob');
     const r=rationStatus(d,kind);
     if(r==='full'){zero=0;halves=0;}
@@ -127,8 +127,15 @@ export function dueMalnutritionCases(database){
  return database.characters.filter(c=>members.has(c.id)).flatMap(c=>episodes(c).filter(e=>e.campaignId===campaignId&&e.status==='active').map(e=>{
   const days=entries(database.journal,campaignId,c.id),last=days.find(x=>x.calendarNutritionDay.endMinute===e.nextDueMinute);
   const status=last?rationStatus(last.calendarNutritionDay,e.kind):'unknown';
-  const mode=status==='full'?'healing':'advance';
+  const mode=status==='full'?'healing':status==='unknown'?'pending':'advance';
+  const recent=days.filter(x=>x.calendarNutritionDay.endMinute<=clock.minute).at(-1);
+  const latestRation=recent?rationStatus(recent.calendarNutritionDay,e.kind):'unknown';
+  const policies=database.journal.filter(j=>j.calendarCampaignId===campaignId&&j.characterId===c.id&&j.calendarNutritionPolicy);
+  const policy=policies.at(-1)?.calendarNutritionPolicy;
+  const provisionMode=policy?.gmProvisioned?'GM doložené externí zásobování':policy?.enabled===false?'sledování pozastaveno':
+   policy?.inventoryRations?'fyzické a společné zásoby':policy?.foragingOnly?'výhradní Foraging':'bez aktivního režimu';
   return {characterId:c.id,actorName:c.name,episodeId:e.id,kind:e.kind,hr:e.hr,
+   weakness:e.weaknessApplied,originMinute:e.originMinute,latestRation,provisionMode,
    dueMinute:e.nextDueMinute,mode,foodStatus:status,overdue:clock.minute>e.nextDueMinute};
  })).sort((a,b)=>a.dueMinute-b.dueMinute);
 }
