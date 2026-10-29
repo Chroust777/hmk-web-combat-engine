@@ -9,6 +9,8 @@ export const SKILL_TIMED_WORK_FORMAT_591='hmk-skill-timed-work-591-v1';
 export function timedSkillBaseMinutes591(kind,scope){
  if(kind==='engineering')return Number.isFinite(ENGINEERING_DESIGN_DAYS[scope])?ENGINEERING_DESIGN_DAYS[scope]*1440:null;
  if(kind==='writing')return WRITING_WORK_MINUTES_591[scope]??null;
+ if(kind==='drawing'){const area=Number(scope);return Number.isInteger(area*4)&&area>=0.25&&area<=10?area*240:null;}
+ if(kind==='cookery'){const diners=Number(scope);return Number.isInteger(diners)&&diners>=5&&diners<=100&&diners%5===0?(diners/5)*60:null;}
  return null;
 }
 export function skillTimedEarliest591(kind,baseMinutes){
@@ -16,7 +18,7 @@ export function skillTimedEarliest591(kind,baseMinutes){
  // first two reduce Engineering design time by 30%. Up to 5 SV stars may
  // reduce Writing Routine by 50%. This is only an earliest possible TEST,
  // not permission to claim the project is completed.
- return Math.ceil(baseMinutes*(kind==='engineering'?0.7:0.5));
+ return Math.ceil(baseMinutes*(kind==='engineering'?0.7:kind==='writing'?0.5:1));
 }
 export function validateSkillTimedWork591(data){
  const starts=new Map(),linked=new Set(),completed=new Set(),journal=data?.journal||[];
@@ -42,8 +44,8 @@ export function validateSkillTimedWork591(data){
    row.characterId===s.p.actorId&&row.calendarCampaignId===s.row.calendarCampaignId&&
    Number.isSafeInteger(row.campaignMinute)&&row.campaignMinute>=s.p.earliestMinute&&
    proof?.type==='secondary-mastery-value-test'&&
-   (s.p.kind==='engineering'?skill==='Engineering':
-    /^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill)),
+   (s.p.kind==='writing'?/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill):
+    skill===({engineering:'Engineering',drawing:'Drawing',cookery:'Cookery'})[s.p.kind]),
    'Časovaný Skill Test: původní SV nesouhlasí s časem, postavou ani projektem.');
   linked.add(link.startId);
  }
