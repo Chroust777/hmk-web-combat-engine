@@ -289,7 +289,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.606';
+const APP_VERSION='93.607';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1352,7 +1352,6 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
  if(!actor)return '';
  const actorId=actor.id,policy=policies.get(actorId)?.calendarNutritionPolicy;
  const current=policy?.enabled?'Zapnutý':'Pozastavený / nezapnutý';
- const fromInventory=provisionGuideRoute!=='forage';
  const due=dueMalnutritionCases(data).filter(x=>x.characterId===actorId);
  const day=dayCandidates.find(x=>x.row.characterId===actorId&&!dayPlans.some(j=>j.calendarNutritionConditions.policyId===x.row.id&&j.calendarNutritionConditions.startMinute===x.start));
  const outstanding=dayPlans.filter(x=>x.characterId===actorId);
@@ -1364,17 +1363,18 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
   const end=a?.calendarActivityProof?.endMinute;
   return `<div class="hc-event hc-person-provision-interval"><strong>${esc(actor.name)} · ${hasRest?'Celodenní odpočinek':'Denní podmínky'} · ${esc(p.kind)}</strong><p class="hc-hint">Doložený interval: ${esc(displayCampaignMinute(p.startMinute))} – ${esc(displayCampaignMinute(p.endMinute))}. ${hasRest?(a?(finished?'Čtyřhodinový odpočinek dokončen; skutečný stav Fatigue je zapsán.':'Obnova Weariness po čtyřech hodinách: '+esc(displayCampaignMinute(end))+'.'):'Žádná další obnova Fatigue se neplánuje (již využitý odpočinek nebo zvláštní zdravotní stav).'):'Tento režim pouze upravuje denní spotřebu, nikoli Fatigue.'} Čas posouvá pouze GM.</p></div>`;
  }).join('');
- const policyForm=`<form data-nutrition-policy-form data-provision-scope-actor="${esc(actorId)}">
+ const fromInventory=policy?.inventoryRations!==false;
+ const policyForm=`<form data-nutrition-policy-form data-provision-scope-actor="${esc(actorId)}" class="hc-provision-source-form">
  <input type="hidden" name="nutritionActorIds" value="${esc(actorId)}">
  <input type="hidden" name="foodNeed" value="1"><input type="hidden" name="waterNeed" value="1">
  <input type="hidden" name="autoNeeds" value="yes"><input type="hidden" name="policyAction" value="activate">
- <input type="hidden" name="sourceMode" value="${fromInventory?'inventory':'foraging'}">
- <p class="hc-provision-help">${fromInventory?'Pouze doložené potraviny a skutečně naplněné nádoby + případné Foraging.':'Výhradně doložené nálezy Foraging; tento režim nelze zapnout, pokud postava zároveň čerpá inventární dávky či naplněné nádoby.'} Doba 24 h běží až při posunu času GM.</p>
  <input type="hidden" name="foragingOnly" value="yes">
- ${fromInventory?` <label>Zdroj pro denní spotřebu této postavy<select name="inventoryWater"><option value="no">Přidělená voda ze společných nálezů družiny</option><option value="yes">Pitná voda v osobních nádobách</option></select></label>
-  <details><summary>Převzít dosud nezaúčtované čerstvé potraviny (volitelné)</summary><label class="hc-check"><input type="checkbox" name="freshRations" value="yes"> GM potvrzuje nově převzaté čerstvé potraviny</label></details>`:''}
- <button type="submit">Uložit režim pouze pro ${esc(actor.name)}</button></form>`;
- const pause=policy?.enabled?`<form data-nutrition-policy-form data-provision-scope-actor="${esc(actorId)}" class="hc-provision-pauser"><input type="hidden" name="nutritionActorIds" value="${esc(actorId)}"><input type="hidden" name="foodNeed" value="1"><input type="hidden" name="waterNeed" value="1"><input type="hidden" name="policyAction" value="pause"><input type="hidden" name="sourceMode" value="foraging"><button class="secondary" type="submit">Pozastavit tento režim</button></form>`:'';
+ <p class="hc-provision-help">Běžně nic nenastavujte: hlavní přepínač výše již aktivuje skutečnou automatickou spotřebu. Tady pouze pro výjimečný případ určete, které fyzicky doložené zdroje se mohou použít. Změna vytvoří auditovaný doklad a platí od aktuálního času GM.</p>
+ <label>Odkud se smějí čerpat dávky<select name="sourceMode"><option value="inventory" ${fromInventory?'selected':''}>Nesené jídlo + přidělené Foraging (vodu z nádob povolte níže)</option><option value="foraging" ${!fromInventory?'selected':''}>Výhradně přidělené Foraging (bez inventáře)</option></select></label>
+ <label class="hc-check"><input type="checkbox" name="inventoryWater" value="yes" ${policy?.inventoryWater?'checked':''}> Používat skutečně naplněné osobní nádoby při inventárním režimu</label>
+ <details><summary>Nově převzaté čerstvé potraviny (jen pokud nejsou dosud zaúčtované)</summary><label class="hc-check"><input type="checkbox" name="freshRations" value="yes"> GM potvrzuje čerstvé dosud nezaúčtované fyzické dávky.</label></details>
+ <button type="submit" class="secondary">Uložit pouze nastavení zdrojů</button></form>`;
+ const pause=policy?.enabled?`<form data-nutrition-policy-form data-provision-scope-actor="${esc(actorId)}" class="hc-provision-pauser"><input type="hidden" name="nutritionActorIds" value="${esc(actorId)}"><input type="hidden" name="foodNeed" value="1"><input type="hidden" name="waterNeed" value="1"><input type="hidden" name="policyAction" value="pause"><input type="hidden" name="sourceMode" value="foraging"><button class="secondary" type="submit">Pozastavit automatické uzávěrky (výjimka)</button></form>`:'';
  const conditions=day?`<details class="hc-person-provision-options" open><summary>Celodenní podmínky · odpočinek / horko · GM</summary>
  <form data-nutrition-day-conditions><input type="hidden" name="actorId" value="${esc(actorId)}"><label>Skutečné podmínky na celých 24 hodin<select name="kind"><option value="rest-inactive">Úplný odpočinek a nečinnost</option><option value="rest">Úplný odpočinek</option><option value="inactive">Úplná nečinnost</option><option value="hot">Celodenní horko</option><option value="rest-hot">Úplný odpočinek v horku</option></select></label>
  <p class="hc-provision-help">Uložením GM potvrzuje podmínky na celých 24 hodin. Při jejich změně je třeba plán přerušit před posunem času. Čtyřhodinová regenerace se zapíše pouze po skutečně dokončeném odpočinku.</p><button type="submit">Zaznamenat podmínky · bez posunu času</button></form></details>`:'';
@@ -1389,10 +1389,15 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
   if(!cancellation&&!health&&!history)return restPlanner;
   return `<section class="hc-person-provision-rules hc-provision-remaining-duties">${restPlanner}${restStatus}${cancellation}${health}${history}</section>`;
  }
- return `<section class="hc-person-provision-rules">${restPlanner}${restStatus}<details class="hc-provision-personal-rules" open><summary>Pokročilé sledování spotřeby · ${esc(actor.name)} (${esc(current)})</summary><p class="hc-provision-caution">Přepínač pouze volí pravidlový režim. Neprohlašuje postavu automaticky za najedenou nebo napitou. Denní příjem potvrdí až skutečný výdej a uzávěrka.</p>${policyForm}${pause}</details>${conditions}${cancellation}${health}${history}</section>`;
+ return `<section class="hc-person-provision-rules">${restPlanner}${restStatus}<details class="hc-provision-personal-rules"><summary>Nastavení konkrétních zdrojů a mimořádné pozastavení · ${esc(actor.name)} (${esc(current)})</summary>${policyForm}${pause}</details>${conditions}${cancellation}${health}${history}</section>`;
 }
 let calendarLanding=true; // Clicking the left navigation always opens the calendar chooser.
 let calendarCreating=false;
+/** Explicit trekking dice: every number is one independently attributed die. */
+function trekDiceFieldHTML(name,label,notation,description,faces){
+ return `<div class="hc-trek-die-row" data-trek-die-row><label><span class="hc-help-term" tabindex="0" data-hmk-help="${esc(description)}">${esc(label)} (${notation})</span><input name="${name}" type="number" min="1" max="${faces}" step="1" inputmode="numeric" placeholder="1–${faces}" autocomplete="off" aria-label="${esc(label)} ${notation}"></label><button type="button" class="secondary hc-small" data-trek-die-generate="${name}" data-trek-die-faces="${faces}">⚄ Generovat</button></div>`;
+}
+
 function campaignCalendarView(){
  const clocks=allCampaignClocks(data);
  if(calendarLanding&&clocks.length){
@@ -1491,12 +1496,22 @@ function campaignCalendarView(){
  </div></fieldset><fieldset class="hmk-trek-section" id="hmk-foraging-watch-fields"><legend>4 · Činnosti během hlídky</legend>
  <p class="hc-foraging-jump-help" data-foraging-jump-help hidden><strong>Foraging – tady nastavte sběr zásob.</strong> Nejdříve vyberte výše průvodce, účastníky a prostředí hlídky. Potom zvolte počet <strong>Foraging Modes</strong>, případně sběr na místě. Hlídku uložte původním tlačítkem níže; skutečné cíle sběru a hody d10 následně vyhodnoťte v části <strong>Wilderness Tasks · Foraging</strong>. Nic se nepřičítá bez doloženého výsledku.</p>
  <div class="hmk-trek-grid"><label class="hc-check" data-foraging-jump-field><input name="stationaryForaging" type="checkbox" value="yes"> Foraging na místě (celá hlídka)</label>
- <label data-foraging-jump-field>Foraging Modes <span tabindex="0" class="hc-help-term" data-hmk-help="Jedna získaná výhoda (★) z Orienteering při SV 5+ dovolí vybrat jeden Foraging Mode. Počet určuje počet SAMOSTATNÝCH d10 při pozdějším hledání jídla/vody nebo bylin. 0 = bez hledání; 1 = jeden hod; 2 = dva hody atd. Všechny Foraging Modes při současné cestě způsobí společně JEDEN Slow Mode, nikoli jeden za každý hod. Při hledání celou hlídku na místě se povinně použijí první dvě výhody na Foraging (HMK 145 a 147).">ⓘ Co znamená číslo?</span><input name="foraging" type="number" min="0" max="5" value="0"></label>
+ <label data-foraging-jump-field>Foraging Modes <span tabindex="0" class="hc-help-term" data-hmk-help="Jedna získaná výhoda (★) z Orienteering při SV 5+ dovolí vybrat jeden Foraging Mode. Počet určuje počet SAMOSTATNÝCH d10 při pozdějším hledání jídla/vody nebo bylin. 0 = bez hledání; 1 = jeden hod; 2 = dva hody atd. Všechny Foraging Modes při současné cestě způsobí společně JEDEN Slow Mode, nikoli jeden za každý hod. Při hledání celou hlídku na místě se povinně použijí první dvě výhody na Foraging (HMK 145 a 147).">Foraging Modes</span><input name="foraging" type="number" min="0" max="5" value="0"></label>
  <label class="hc-check"><input name="stalking" type="checkbox" value="yes"> Stalking</label>
  <label class="hc-check"><input name="vigilance" type="checkbox" value="yes"> Vigilance</label>
- </div><p class="hc-trek-explainer">Foraging Modes vznikají až z ověřeného <strong>Survival Orienteering SV</strong>: při SV 5/6/7/8/9+ má průvodce 1/2/3/4/5 výhod (★), které rozděluje také mezi Bearing, Progress, Stalking a Vigilance. Každý Foraging Mode znamená jeden následný d10 v části Wilderness Tasks. Pokud skupina pouze sbírá na místě, stráví tím celou čtyřhodinovou hlídku a první dvě výhody musí přidělit Foraging (HMK 145–147).</p></fieldset><fieldset class="hmk-trek-section"><legend>5 · Hody kostkami</legend><div class="hmk-trek-grid"><label>Kostky<select name="diceOrigin"><option value="software">Automatické kryptografické hody</option><option value="manual">Ruční hody · pomocí nápovědy ⓘ</option></select></label>
- <label>Ruční hody d10/d6 (čárkami) <span tabindex="0" class="hc-help-term" data-hmk-help="Zadejte jen skutečně padlé výsledky, oddělené čárkami. Pořadí: ① D10 teplota a d10 denní srážky jen při prvním použití dne; ② d6 pro srážky této 4h hlídky, ale JEN pokud denní test potvrdil srážky (1 = nepřetržité); ③ jeden d10 pro každý Progress Mode zbývající po zrušení Slow (úspěch při hodu ≤ 2×LPW přidává maximálně +1 LPW celkem); ④ jeden d10 za každý chybějící Bearing, pro Direction Hazard; ⑤ d10 pro Random Encounter, pokud je kontrola splatná. Neházejte nepoužité kostky. Jednotlivé hozené výsledky se vyhodnotí podle příslušné tabulky, ne jako společný součet. HMK 144–149.">ⓘ Kdy a jak házet?</span><input name="rolls" placeholder="Jen skutečné hody, např. 4,2,1,7" maxlength="120"></label>
- </div><p class="hc-trek-explainer">Běžně nechte <strong>Automatické hody</strong>. Pro vlastní kostky přepněte na <strong>Ruční zápis</strong>. Hody se doplňují pouze pro skutečně potřebné testy: denní d10 + d10, podmíněný srážkový d6, d10 Progress, d10 Direction a d10 Encounter. Význam cílových čísel i všech výjimek otevřete přes ⓘ.</p>
+ </div><p class="hc-trek-explainer">Foraging Modes vznikají až z ověřeného <strong>Survival Orienteering SV</strong>: při SV 5/6/7/8/9+ má průvodce 1/2/3/4/5 výhod (★), které rozděluje také mezi Bearing, Progress, Stalking a Vigilance. Každý Foraging Mode znamená jeden následný d10 v části Wilderness Tasks. Pokud skupina pouze sbírá na místě, stráví tím celou čtyřhodinovou hlídku a první dvě výhody musí přidělit Foraging (HMK 145–147).</p></fieldset><fieldset class="hmk-trek-section"><legend>5 · Hody kostkami</legend>
+ <p class="hc-trek-explainer">Každý skutečně potřebný hod má vlastní pole. Můžete zapsat výsledek fyzických kostek nebo u konkrétního pole kliknout na <strong>⚄ Generovat</strong>. Není potřeba přepínat původ hodů: uloží se zvlášť u každé kostky. Neprovedené či nepoužité hody nevyplňujte.</p>
+ <div class="hc-trek-dice-groups">
+ <section class="hc-trek-dice-section" data-trek-dice-section="weather"><h4>Denní počasí · pouze první hlídka dne</h4>
+ ${trekDiceFieldHTML('trekDieTemperature','Denní teplota','d10','Porovnává se s klimatickou tabulkou Cold/Heat pro sezonu a oblast.',10)}
+ ${trekDiceFieldHTML('trekDieDailyPrecipitation','Denní srážky','d10','Určuje, zda během dne vůbec prší nebo sněží. Pokud existuje denní doklad, znovu se nehází.',10)}</section>
+ <section class="hc-trek-dice-section" data-trek-dice-section="watch"><h4>Počasí této čtyřhodinové hlídky</h4>
+ ${trekDiceFieldHTML('trekDieWatchPrecipitation','Srážky během hlídky','d6','Pouze pokud denní hod potvrdil srážky. Výsledek 1 = nepřetržité.',6)}</section>
+ <section class="hc-trek-dice-section" data-trek-dice-section="progress"><h4>Progress · samostatné d10</h4><p>Jeden hod za každý Progress Mode zbývající po Slow. Úspěch při d10 ≤ 2×LPW poskytne nejvýše +1 LPW celkem.</p><div data-trek-dice-list="progress">${trekDiceFieldHTML('trekDieProgress1','Progress č. 1','d10','Pro první Progress zbývající po započtení Slow Modes.',10)}</div><button type="button" class="secondary hc-small" data-trek-dice-add="progress">+ Další d10 Progress</button></section>
+ <section class="hc-trek-dice-section" data-trek-dice-section="direction"><h4>Direction Hazard · samostatné d10</h4><p>Jeden hod za každý chybějící Bearing. Uplatní se nejvyšší hod: 1–4 Lost Time, 5–9 Misdirection, 10 Lost.</p><div data-trek-dice-list="direction">${trekDiceFieldHTML('trekDieDirection1','Direction Hazard č. 1','d10','Pro první chybějící Bearing.',10)}</div><button type="button" class="secondary hc-small" data-trek-dice-add="direction">+ Další d10 Direction</button></section>
+ <section class="hc-trek-dice-section" data-trek-dice-section="encounter"><h4>Random Encounter</h4>
+ ${trekDiceFieldHTML('trekDieEncounter','Setkání','d10','Jen když je pro tuto hlídku kontrola splatná; hod ≤ hranice prostředí znamená setkání.',10)}</section>
+ </div><p class="hc-hint">Při vyhodnocení se každé pole čte pouze tehdy, když pravidla daný hod skutečně vyžadují. Chybějící hod vyvolá upozornění s názvem a pořadím. Dodatečné nevyužité hodnoty nevznikají jako herní události.</p>
  <details class="hc-trek-legacy"><summary>Přesný význam jednotlivých hodů · HMK 144, 146, 148, 150</summary>
  <p><strong>Denní teplota (d10):</strong> číslo se po úpravách terénu porovná s tabulkovou hranicí Cold/Heat pro zvolenou sezónu a klimatické pásmo. <strong>Denní srážky (d10):</strong> hod do tabulkové hranice znamená srážky; při suchu už žádné srážkové d6 není. Oba hody se pro stejnou oblast a den opakovat nesmějí.</p>
  <p><strong>Srážky v hlídce (d6):</strong> pouze v deštivém/sněživém dni; 1 = nepřetržité srážky, 2–6 = nikoli nepřetržité. Nepřetržité srážky obvykle přidají Slow Mode s pravidlovou výjimkou pro déšť na zpevněné cestě.</p>
@@ -1519,15 +1534,13 @@ function campaignCalendarView(){
  <label class="hc-check"><input name="loaded" type="checkbox" value="yes"> Loaded Mode – pouze pokud není zatížení doložitelné z inventáře / případně naložené zvíře</label>
  <div class="hc-trek-stable"><h4>Vlastněná zvířata · náklad a honák</h4><p class="hc-trek-explainer">Použijte jen pokud opravdu cestujete se zvířetem. Nákup a evidence jsou v knihovně; samotná volba zvířete nezakládá náklad ani hod.</p>
  <button type="button" class="secondary hc-small" data-trek-go-stable>Pořídit / koupit zvíře v Knihovně ↗</button>
- ${verifiedLivestock(data,campaignKey(clock)).some(a=>a.spec.breed&&a.spec.str)?`<details class="hc-trek-legacy"><summary>Vybrat zvířata ze stáje · ${verifiedLivestock(data,campaignKey(clock)).filter(a=>a.spec.breed&&a.spec.str).length} dostupných</summary><p>U každého zvířete zvolte honáka a potvrďte skutečnou celkovou hmotnost. Výstroj a náklad jsou předvyplněny ze stáje jako nezmenšitelné minimum; přidejte jezdce, další výstroj a další doloženou zátěž. Neobratnou část vyplňte jen tehdy, když skutečně existuje.</p>
+ ${verifiedLivestock(data,campaignKey(clock)).some(a=>a.spec.breed&&a.spec.str)?`<details class="hc-trek-legacy"><summary>Vybrat zvířata ze stáje · ${verifiedLivestock(data,campaignKey(clock)).filter(a=>a.spec.breed&&a.spec.str).length} dostupných</summary><p>U každého zvířete zvolte honáka. Náklad, výstroj i zapsaný jezdec se berou automaticky ze Stáje; změny hmotnosti provádějte jen v původní fyzické evidenci.</p>
  <label>Skutečně tažené vozidlo (jen pro režim Kára/Vůz; bez registrace ponechte prázdné)<select name="trekVehicleId"><option value="">— bez přiřazeného stájového vozidla —</option>${verifiedLivestock(data,campaignKey(clock)).flatMap(a=>stableHubProjection(data,campaignKey(clock),a.id).vehicles.map(q=>({a,q,item:VEHICLES_TACK_P122.find(t=>t.id===q.itemId)}))).filter(e=>['Cart, 2-wheel','Wagon, 4-wheel','Sled'].includes(e.item?.name)).map(e=>`<option value="${esc(e.a.id+':'+e.q.entryId)}">${esc(e.a.name)} · ${esc(e.item.name)} · ${esc(e.q.entryId.slice(0,8))}</option>`).join('')}</select></label>
  <label>Druhý tahoun vozu nebo saní (u káry prázdné)<select name="trekVehiclePartner"><option value="">— pouze jeden tahoun —</option>${verifiedLivestock(data,campaignKey(clock)).filter(a=>a.spec.breed&&a.spec.str).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
  <label class="hc-check"><input type="checkbox" name="trekSledOnSnow" value="yes"> Saně: GM potvrzuje souvislou sněhovou pokrývku (HMK 122; rychlost káry)</label>
- ${verifiedLivestock(data,campaignKey(clock)).filter(a=>a.spec.breed&&a.spec.str).map((a,i)=>`<div class="hc-trek-stable-row" data-trek-stable-row><label class="hc-check"><span>Zařadit zvíře</span><span><input type="checkbox" name="trekStableAnimal${i+1}" value="${esc(a.id)}"> <strong>${esc(a.name)}</strong> · ${esc(a.spec.name)}</span></label><label>Honák / vodič<select name="trekStableDrover${i+1}"><option value="">Vyberte postavu</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><label>Nesená hmotnost (lb)<input name="trekStableLb${i+1}" type="number" min="${stableBurden(data,campaignKey(clock),a).minimumLb}" max="1000000" step="1" value="${stableBurden(data,campaignKey(clock),a).minimumLb}" placeholder="Včetně případného nezapsaného vybavení"></label><label>Neobratná část (lb)<input name="trekStableAwkward${i+1}" type="number" min="0" max="1000000" step="1" value="0"></label></div>`).join('')}</details>`:'<p class="hc-trek-explainer">Ve stáji zatím není žádné zvíře s ověřeným STR vhodné pro výpočet zatížení.</p>'}
+ ${verifiedLivestock(data,campaignKey(clock)).filter(a=>a.spec.breed&&a.spec.str).map((a,i)=>`<div class="hc-trek-stable-row" data-trek-stable-row><label class="hc-check"><span>Zařadit zvíře</span><span><input type="checkbox" name="trekStableAnimal${i+1}" value="${esc(a.id)}"> <strong>${esc(a.name)}</strong> · ${esc(a.spec.name)}</span></label><label>Honák / vodič<select name="trekStableDrover${i+1}"><option value="">Vyberte postavu</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><div class="hc-trek-stable-load"><strong>Automaticky podle stáje</strong><span>${stableBurden(data,campaignKey(clock),a).minimumLb} lb · ENC ${stableBurden(data,campaignKey(clock),a).adjustedENC??"neurčeno"}</span></div></div>`).join('')}</details>`:'<p class="hc-trek-explainer">Ve stáji zatím není žádné zvíře s ověřeným STR vhodné pro výpočet zatížení.</p>'}
  <small>Vlastnictví samo ještě neznamená ověřený Combat State. Zdraví, Fatigue a zranění zvířete vyžadují zvlášť doložený stav.</small></div>
- <details class="hc-trek-legacy"><summary>Pokročilé · starší ruční záznamy zatížení zvířat</summary><label>Ručně doložená zvířata (starý formát)<textarea name="drovingAnimals" rows="2" placeholder="Mezek Blesk ; enc:20 ; Petr"></textarea></label><p>Jen pokud není zvíře v registru. Pro každé zvíře jeden řádek: jméno ; <code>enc:20</code> (již konečné ENC) ; jméno honáka. Pro zápis podle hmotnosti je vyžadován ověřený profil a jeho STR. Hodnoty z knihovny a ruční záznam stejného zvířete nekombinujte.</p></details>
- <details class="hc-trek-legacy"><summary>Jak se počítá zatížení zvířat? · HMK 122, 145, 354</summary><p>Pro každých dokončených 20 lb (kůň a skot), 40 lb (velbloud) vzniká 5 ENC. Zohlední se STR a plemeno (mezek má další −20 ENC). Nevhodně uložený náklad má pro výpočet dvojnásobnou hmotnost. Zvíře od 20 ENC způsobí Loaded Mode. GM může místo snížení tempa potvrdit přídavnou Weariness honákovi podle pravidel. Sedlo, postroj, jezdec i vybavení musí být ve skutečné zátěži. Nákladní postroj unese správně rozložený náklad do 20 % tělesné hmotnosti zvířete; tažený náklad káry či vozu je zvláštní případ (str. 122).</p></details>
- <label class="hc-check" data-hmk-help="Pouze pokud všechna ENC přesně znáte. Místo snížení rychlosti přibude osobám na nohou +10 Weariness za každých plných 10 ENC a honákům +10 za každých 20 ENC u zvířat (HMK 145)."><input name="ignoreLoaded" type="checkbox" value="yes"> Ignorovat zpomalení Loaded a přijmout únavu ⓘ</label>
+ <label class="hc-check" data-hmk-help="Pouze pokud všechna ENC přesně znáte. Místo snížení rychlosti přibude osobám na nohou +10 Weariness za každých plných 10 ENC a honákům +10 za každých 20 ENC u zvířat (HMK 145)."><input name="ignoreLoaded" type="checkbox" value="yes"> <span class="hc-help-term" tabindex="0" data-hmk-help="Pouze pokud jsou všechna ENC doložená. Místo snížení rychlosti přibude Weariness podle HMK 145.">Ignorovat zpomalení Loaded a přijmout únavu</span></label>
  <label class="hc-check"><input name="doubleTime" type="checkbox" value="yes"> Double Time (jen bez Slow/Loaded)</label>
  </div></fieldset><p class="hc-hint">Postihy celé skupiny (Wearied, Injured a doložený Loaded) se odvodí automaticky při uložení. Závažné zranění nebo chybějící údaje o výbavě se nebudou vykládat jako nulový postih. Kdo není v této hlídce, tomu se nepřipíše cestovní účinek.</p><button type="submit">Vyhodnotit a uložit podklady (bez posunu času)</button></form>
  <p class="tiny">Pokud vyjde Encounter, hazard či expozice, skutečné vyhodnocení otevřete v Combat / Skill Tests. Generování podkladů samo nezakládá zranění ani neprohlašuje následek za vyřízený.</p></details></section>`;
@@ -1573,39 +1586,16 @@ function campaignCalendarView(){
  ${upcomingConditions.length?`<form data-nutrition-day-conditions><label>Postava<select name="actorId">${upcomingConditions.filter(a=>!dayPlans.some(j=>j.calendarNutritionConditions.policyId===a.row.id&&j.calendarNutritionConditions.startMinute===a.start)).map(a=>`<option value="${esc(a.row.characterId)}">${esc(character(a.row.characterId)?.name||a.row.characterId)} · den ${esc(displayCampaignMinute(a.start))}</option>`).join('')}</select></label><label>Úplné denní podmínky potvrzené GM<select name="kind"><option value="rest-inactive">24h úplný klid i nečinnost · 0,5 jídlo / 0,5 vody</option><option value="rest">24h úplný odpočinek · 0,5 jídlo / 1 vody</option><option value="inactive">24h úplná nečinnost · 1 jídlo / 0,5 vody</option><option value="hot">Celodenní horko · 1 jídlo / 2 vody</option><option value="rest-hot">Úplný odpočinek v horku · 0,5 jídlo / 2 vody</option></select></label><p class="hc-provision-help">Zápis podmínek je rozhodnutím GM. Přerušení je nutné zaznamenat, pokud se počasí nebo denní činnost během intervalu změní.</p><button type="submit">Zaznamenat denní podmínky · bez posunu času</button></form>`:''}
  ${dayPlans.map(row=>{const p=row.calendarNutritionConditions,cancelled=data.journal.some(j=>j.calendarNutritionConditionsCancel?.planId===row.id);return `<p class="hc-hint">${esc(character(row.characterId)?.name||row.characterId)} · ${esc(displayCampaignMinute(p.startMinute))} · ${esc(p.kind)} · ${cancelled?'plán zrušen': 'plán platný'}${!cancelled&&clock.minute<p.endMinute?` <form data-nutrition-conditions-cancel><input type="hidden" name="sourceId" value="${esc(row.id)}"><label>Důvod přerušení<input name="reason" minlength="3" required placeholder="Doložená změna aktivity"></label><button type="submit">Zrušit plán před další činností</button></form>`:''}</p>`}).join('')}
  </details></section>`;
- const nutritionHTML=`<section class="hc-calendar hc-wilderness"><details><summary>Podrobné denní režimy a zdravotní kontroly · ${dailyPolicies.length} postav</summary>
- <p class="hc-hint"><strong>Čas mění pouze GM.</strong> GM může potvrdit režim <strong>výhradně Foraging</strong> nebo <strong>doložené čerstvé inventární dávky + Foraging</strong>. Každých 24 hodin po skutečném posunu času GM se odečtou dostupné zdroje a zapíšou případné schodky. V obou režimech musí být skutečně vyloučeny další nezapsané zdroje potravy či vody; jinak režim nezapínejte. Při plně doloženém zásobování se Starvation/Thirst při nástupu zapíše automaticky. Navazující Advance/Healing d100 vyžaduje skutečný hod v termínu; nelze ho nahradit odhadem.</p>
- <form data-nutrition-policy-form><fieldset class="hc-expedition-actors"><legend>Postavy pro stejný denní režim</legend><div class="hc-characters">${participants.map(c=>{const current=dailyPolicyMap.get(c.id)?.calendarNutritionPolicy;return `<label class="hc-character"><input type="checkbox" name="nutritionActorIds" value="${esc(c.id)}"><span>${esc(c.name)}${current?' · aktivní režim '+current.foodNeed+' jídlo / '+current.waterNeed+' voda':''}</span></label>`}).join('')}</div></fieldset>
- <div class="hc-fields"><label>Denní potřeba potravy<select name="foodNeed"><option value="1">1 food-day · aktivní den</option><option value="0.5">0,5 food-day · úplný klid</option></select></label>
- <label>Denní potřeba vody<select name="waterNeed"><option value="1">1 water-day · běžná aktivita</option><option value="2">2 water-days · horko / Heat Hazard</option><option value="0.5">0,5 water-day · úplná nečinnost</option></select></label></div>
- <label class="hc-check"><input type="checkbox" name="autoNeeds" value="yes" checked> Automaticky vyhodnocovat každý den podle doložené aktivity a počasí (HMK 186). Čísla výše slouží jen pro historický pevný režim.</label>
- <label>Akce<select name="policyAction"><option value="activate">Aktivovat / změnit režim</option><option value="pause">Pozastavit automatický výdej</option></select></label>
- <label>Zdroje potravy<select name="sourceMode"><option value="foraging">Pouze prokazatelné nálezy Foraging</option><option value="inventory">Doložené potraviny v inventáři + Foraging</option></select></label>
- <label class="hc-check"><input type="checkbox" name="foragingOnly" value="yes"> Potvrzuji: v režimu pouze Foraging nejsou žádné jiné využitelné zdroje potravy či vody; v režimu inventáře jsou všechny další dostupné zdroje řádně doložené a voda pochází z doložených nálezů Foraging nebo ze skutečně naplněných inventárních nádob, pokud je tento zdroj níže zapnut. Nezaznamenané nákupy/voda znamenají, že tento režim nelze bezpečně zapnout.</label>
- <label class="hc-check"><input type="checkbox" name="inventoryWater" value="yes"> Používat potvrzenou pitnou vodu z Waterskin, 2 quart (0,5 gal) a Jug, 1 gallon (1 gal). Objem a hmotnost se sledují v jednotlivých kampaních; jiné typy nádob se nezapočítávají.</label>
- <label class="hc-check"><input type="checkbox" name="freshRations" value="yes"> Při novém převzetí inventárních dávek výslovně potvrzuji, že jsou DNES čerstvé a skutečně dostupné této postavě v této kampani; standardní vydrží 10 dní, iron 30 dní (HMK 120). Bez potvrzení nelze nové balíky použít.</label>
- <button type="submit">Uložit režim · čas se nemění</button></form>
- <h4>Starvation / Thirst · HR a Course Rolls (HMK 184–186)</h4>
- <p class="hc-hint">Po doložené celodenní ztrátě dávky (nebo dvou dnech s poloviční dávkou) se automaticky založí skutečná Starvation HR5 nebo Thirst HR4 do Combat State a přičte se příslušná Weakness. Další Advance/Healing je samostatný d100 test splatný až podle pravidel. <strong>Čas mění pouze GM.</strong> Externí Shock z jiného zdroje nesmí být přepsán.</p>
- ${dueMalnutritionCases(data).map(t=>`<article class="hc-hint"><strong ${journalHelp('HR',HR_HELP_558)}>${esc(t.actorName)} · ${t.kind==='starvation'?'Starvation':'Thirst'} HR${t.hr}</strong> · ${t.mode==='healing'?'Healing':'Advance'} · splatnost ${esc(displayCampaignMinute(t.dueMinute))}${t.overdue?' · PO TERMÍNU':''}${malnutritionLastRollHTML(t.characterId,t.kind,t.episodeId)}
- <form data-malnutrition-course><input type="hidden" name="actorId" value="${esc(t.characterId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}">
- <label>Skutečný d100 (1–100)<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-malnutrition-die="yes">⚄ Vygenerovat d100</button>
- 
- <button type="submit" ${clock.minute<t.dueMinute?'disabled title="Ještě není splatné"':''}>Trvale zapsat ${t.mode==='healing'?'Healing':'Advance'} Roll</button></form></article>`).join('')||'<p class="hc-hint">Žádná aktivní splatná ani budoucí Starvation/Thirst epizoda.</p>'}
- <h4>Poslední dokončené 24h intervaly</h4>
- ${recentNutritionDays.map(j=>{const p=j.calendarNutritionDay,short=p.foodShortfall||p.waterShortfall;const risk=nutritionRisk(data.journal,campaignKey(clock),j.characterId);return `<p class="hc-hint"><strong>${esc(character(j.characterId)?.name||j.characterId)}</strong> · ${esc(displayCampaignMinute(p.endMinute))} · potrava ${p.foodReceived}/${p.foodNeed}, voda ${p.waterReceived}/${p.waterNeed}${short?' · <strong>NEDOSTATEK · kontrola Starvation/Thirst</strong>':''}${(risk.starvation||risk.thirst)?' · nutná medicínská kontrola':''}</p>`}).join('')||'<p class="hc-hint">Čeká se na první dokončené 24hodinové období od potvrzení režimu.</p>'}
+ const nutritionHTML=`<section class="hc-calendar hc-wilderness"><details><summary>Historie posledních denních uzávěrek · ${recentNutritionDays.length}</summary>
+ <p class="hc-hint">Aktivace běžné spotřeby a zdroje se nastavují u konkrétní postavy jediným hlavním přepínačem zásobování. Tato historie je jen přehled již uložených dokladů.</p>
+ ${recentNutritionDays.map(j=>{const p=j.calendarNutritionDay,short=p.foodShortfall||p.waterShortfall;return `<p class="hc-hint"><strong>${esc(character(j.characterId)?.name||j.characterId)}</strong> · ${esc(displayCampaignMinute(p.endMinute))} · potrava ${p.foodReceived}/${p.foodNeed}, voda ${p.waterReceived}/${p.waterNeed}${short?' · <strong>NEDOSTATEK</strong>':''}</p>`}).join('')||'<p class="hc-hint">Žádný dokončený den od posledního potvrzení GM.</p>'}
  </details></section>`;
  const activeStockRows=participants.flatMap(c=>rationStockBalances(data.journal,campaignKey(clock),c.id).map(l=>({...l,character:c.name})));
  const carriedRations=participants.flatMap(c=>provenCarriedRations(activeRationInventory(),c.id).map(x=>({character:c.name,name:x.name,count:x.foodDays,weightLb:x.weightLb})));
  const physicalWaterSummary=participants.flatMap(c=>availablePhysicalWater(data.journal,campaignKey(clock),c.id,clock.minute).map(w=>`${esc(c.name)} · ${w.remaining} gal · +${w.remaining*10} lb · ${esc(w.itemId)}`));
  const supplyHTML=`<section class="hc-calendar hc-wilderness"><details class="hc-provision-rulebook"><summary>Rozdělit společné nálezy Foraging</summary>
  <p class="hc-provision-help">Jednorázově vydej z doložených společných nálezů vybraným postavám.</p>
- <form data-foraging-batch-rations><h4>Společný výdej denních dávek</h4>
- <p class="hc-hint">Výdej spotřebuje společné nálezy Foraging. Nenavyšuje osobní inventář a neposouvá čas.</p>
- <fieldset class="hc-expedition-actors"><legend>Postavy, které skutečně dostávají dávky</legend><div class="hc-characters">${participants.map(c=>`<label class="hc-character"><input type="checkbox" name="rationActorIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset>
- <div class="hc-fields"><label>Potrava na postavu<select name="foodEach"><option value="1">1 food-day · plná dávka</option><option value="0.5">0,5 · poloviční dávka</option><option value="0">0 · žádná spotřeba</option></select></label>
- <label>Voda na postavu<select name="waterEach"><option value="1">1 water-day · obvyklá potřeba</option><option value="2">2 · horko / Heat Hazard</option><option value="0.5">0,5 · úplná nečinnost</option><option value="0">0 · žádná spotřeba</option></select></label></div>
- <button type="submit">Vydat zásoby všem vybraným · bez posunu času</button></form>
+ <p class="hc-provision-help">Běžné rozdělení společných nálezů používejte výhradně v kroku 2. Zde jsou dostupné jen původní jednotlivé účetní doklady a rezervace bylin.</p>
  <details class="hc-provision-compact-extra"><summary>Původní účetní doklady (pokročilé)</summary>${supplyCards.map(l=>`<form data-foraging-supply-use><strong>${esc(l.unit==='foodDays'?'Potrava · food-days':l.unit==='waterDays'?'Voda · water-days':'Bylina · '+l.herbName)} · zbývá ${l.remaining}</strong>
  <input type="hidden" name="sourceId" value="${esc(l.sourceId)}"><input type="hidden" name="resultIndex" value="${l.resultIndex}"><input type="hidden" name="unit" value="${l.unit}">
  <div class="hc-fields"><label>Postava, která spotřebuje / převezme zásobu<select name="actorId">${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
@@ -7856,8 +7846,6 @@ const TREKKING_FIELD_HELP=Object.freeze({
  stalking:'Opatrné sledování či skrývání družiny. Nejvýše jeden Stalking Mode; automaticky přidá jeden Slow Mode a může vyžadovat navazující Tracking test (HMK s. 145–147).',
  vigilance:'Pozorné sledování okolí. Nejvýše jeden Vigilance Mode; používá se pro situace Encounter a Surprise, nikoli jako samostatná rychlost (HMK s. 145, 148–150).',
  wildernessNightWatches:'Vynechte pro běžné hraní. V divočině se v noci kontroluje Random Encounter každou druhou 4h hlídku (HMK 148). Počet evidovaných nočních hlídek aplikace odvozuje; zde lze doplnit pouze skutečné starší hlídky bez uložených dokladů.',
- diceOrigin:'Zvolte původ hodů. Automatický režim generuje kostky, ruční režim zaznamená skutečně padlé hodnoty. Původ se ukládá k důkazům a nemění se při opakovaném zobrazení.',
- rolls:'Ruční hody se zapisují ve skutečně potřebném pořadí: denní teplota d10 a srážky d10 (jednou denně); d6 jen při denních srážkách (1 = continuous); d10 za zbývající Progress po Slow (úspěch při ≤2×LPW); d10 za chybějící Bearing (Direction Hazard); případný d10 Encounter. Hodnoty 1–10 resp. 1–6, nic neházíme navíc (HMK 144–149).',
  familiar:'Průvodce zná skutečnou oblast. Započtěte +1 Orienteering SV jen při doložené znalosti terénu (HMK s. 145).',
  torchlight:'Lucerna nebo pochodeň při nočním Orienteering snižuje pravidlový noční postih o 1. Potvrďte dostupné světlo (HMK s. 145).',
  fullMoon:'Úplněk skutečně osvětluje trasu; používá se při úpravě nočního Orienteering postihu (HMK s. 145).',
@@ -7868,7 +7856,6 @@ const TREKKING_FIELD_HELP=Object.freeze({
  alpine:'Skutečné alpské prostředí nebo ledové/sněhové pole. V odpovídajícím výpočtu počasí se teplota upravuje o −4 (HMK s. 141–144).',
  aridDesert:'Potvrzená suchá poušť. Použijí se zvláštní modifikátory teploty a srážek podle HMK; neoznačujte automaticky každý horký kraj za poušť (HMK s. 141–144).',
  loaded:'Ruční Loaded Mode používejte pouze tehdy, když zatížení nelze spolehlivě určit z existujícího inventáře nebo přesně popsaných naložených zvířat. Zabraňte dvojímu započtení (HMK s. 145).',
- drovingAnimals:'Pro každé zvíře samostatný řádek: jednoznačné jméno zvířete ; lb:hmotnost[/neobratná část] nebo enc:hotové ENC ; jednoznačné jméno honáka. Interní identifikátor aplikace dohledá bez jeho zobrazování. Při shodných jménech nelze bezpečně rozhodnout a je třeba postavy rozlišit. HMK s. 112, 122, 145, 354.',
  ignoreLoaded:'GM výslovně rozhodne ignorovat zpomalení Loaded Mode. Aplikace přidá příslušnou Weariness pěším osobám nebo honákům podle doložené ENC; neznámou zátěž nepovažujte za nulovou (HMK s. 145).',
  doubleTime:'Zrychlená cesta Double Time je přípustná jen bez Slow/Loaded Mode při volbě hlídky. Používá hodinové END Secondary Rolls a jiné tempo získávání Weariness. Při přerušení se neúčtuje neabsolvovaný čas (HMK s. 146, 150).'
 });
@@ -10867,11 +10854,44 @@ function trekResolveActorToken(token,{unregisteredAllowed=false}={}){
 }
 /** Environment stage of the printed Trekking Routine; ALL actual rolls and
  * geography are in the journal, never guessed from modern date or location. */
+
+function trekAddDieSlot(form,group){
+ const list=form?.querySelector('[data-trek-dice-list="'+group+'"]');if(!list)return;
+ const count=list.querySelectorAll('[data-trek-die-row]').length,max=group==='progress'?10:20;
+ if(count>=max)return;
+ list.insertAdjacentHTML('beforeend',trekDiceFieldHTML('trekDie'+(group==='progress'?'Progress':'Direction')+(count+1),
+  (group==='progress'?'Progress':'Direction Hazard')+' č. '+(count+1),'d10',
+  group==='progress'?'Každý další Progress d10 má vlastní skutečný výsledek.':'Každý chybějící Bearing vyžaduje samostatný Direction d10.',10));
+}
+document.addEventListener('click',e=>{
+ const form=e.target.closest?.('#campaign-trekking-context-form');if(!form)return;
+ initialiseTrekDiceFields();
+ const add=e.target.closest?.('[data-trek-dice-add]');
+ if(add){e.preventDefault();trekAddDieSlot(form,add.dataset.trekDiceAdd);return;}
+ const b=e.target.closest?.('[data-trek-die-generate]');if(!b)return;
+ e.preventDefault();
+ const input=form.elements.namedItem(b.dataset.trekDieGenerate),faces=Number(b.dataset.trekDieFaces);
+ if(!input||![6,10].includes(faces))return;
+ const value=secureHMKDie(faces);
+ input.value=String(value);input.dataset.trekGenerated=String(value);
+ input.dispatchEvent(new Event('change',{bubbles:true}));
+},true);
+document.addEventListener('input',e=>{
+ if(!e.target?.closest?.('#campaign-trekking-context-form')||!e.target?.matches?.('[name^="trekDie"]'))return;
+ if(e.target.dataset.trekGenerated!==e.target.value)delete e.target.dataset.trekGenerated;
+},true);
+// Show a single initial slot in each repeatable category; the GM expands only
+// when the actual watch needs more dice. Slots contain no simulated rolls.
+function initialiseTrekDiceFields(){
+ const f=document.getElementById('campaign-trekking-context-form');if(!f)return;
+ for(const group of ['progress','direction'])if(!f.querySelector('[data-trek-dice-list="'+group+'"] [data-trek-die-row]'))trekAddDieSlot(f,group);
+}
 document.addEventListener('submit',e=>{
  const form=e.target;if(form?.id!=='campaign-trekking-context-form')return;
  e.preventDefault();e.stopImmediatePropagation();
  try{
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Vyžaduje aktivní kalendář bez běžící Initiative');
+  initialiseTrekDiceFields();
   const v=Object.fromEntries(new FormData(form)),clock=data.campaignClock;
   const actor=character(v.characterId);
   if(!actor||(clock.characterIds&&!clock.characterIds.includes(actor.id)))throw Error('Postava není v této kampani');
@@ -10890,14 +10910,21 @@ document.addEventListener('submit',e=>{
     j.calendarTrekProof?.dayIndex===dayIndex&&j.calendarTrekProof?.season===season&&j.calendarTrekProof?.climate===v.climate&&
     j.calendarTrekProof?.landscape===v.landscape&&j.calendarTrekProof?.alpine===(v.alpine==='yes')&&
     j.calendarTrekProof?.aridDesert===(v.aridDesert==='yes'))?.calendarTrekProof?.weatherDay;
-  const diceOrigin=v.diceOrigin==='manual'?'manual':'cryptographic-software-die';
-  let supplied=v.diceOrigin==='manual'?String(v.rolls||'').split(',').map(x=>x.trim()).filter(Boolean).map(Number):[];
-  let draw=(faces)=>{
-   if(diceOrigin!=='manual')return secureHMKDie(faces);
-   const n=supplied.shift();if(!Number.isSafeInteger(n)||n<1||n>faces)throw Error(`Chybí platný ruční hod d${faces} ve správném pořadí`);
-   return n;
+  const dieCounts=new Map();
+  const rolls=[];
+  const die=(faces,label)=>{
+   const kind=label==='Daily Temperature'?'trekDieTemperature':label==='Daily Precipitation'?'trekDieDailyPrecipitation':
+    label==='Precipitation per Watch'?'trekDieWatchPrecipitation':label==='Random Encounter'?'trekDieEncounter':
+    label==='Progress'?'trekDieProgress'+((dieCounts.get(label)||0)+1):
+    label==='Direction Hazard'?'trekDieDirection'+((dieCounts.get(label)||0)+1):null;
+   dieCounts.set(label,(dieCounts.get(label)||0)+1);
+   const input=kind?form.elements.namedItem(kind):null;
+   const raw=String(input?.value??'').trim(),value=Number(raw);
+   if(!input||!/^\d+$/.test(raw)||!Number.isSafeInteger(value)||value<1||value>faces)
+    throw Error('Doplňte skutečný hod '+label+' '+(dieCounts.get(label)>1?'č. '+dieCounts.get(label):'')+' (d'+faces+'). Každé pole lze vyplnit ručně nebo vygenerovat samostatným tlačítkem.');
+   const origin=input.dataset.trekGenerated===raw?'cryptographic-software-die':'manual';
+   rolls.push({faces,value,label,origin});return value;
   };
-  const rolls=[];const die=(faces,label)=>{const value=draw(faces);rolls.push({faces,value,label,origin:diceOrigin});return value;};
   const day=previous||trekWeatherDay({season,climate:v.climate,landscape:v.landscape,
     alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',
     temperatureD10:die(10,'Daily Temperature'),precipitationD10:die(10,'Daily Precipitation')});
@@ -10907,14 +10934,9 @@ document.addEventListener('submit',e=>{
   const wet=trekWeatherWatch(day,{night:v.night==='yes',precipitationD6,pavedRoad:v.terrain==='paved-road'});
   const qty=(name,max)=>{const n=Number(v[name]);if(!Number.isSafeInteger(n)||n<0||n>max)throw Error('Neplatný počet '+name);return n;};
   const memberIds=[...new Set([...new FormData(form).getAll('trekMemberIds'),actor.id])];
-  const animals=String(v.drovingAnimals??'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean).map(line=>{
-   const parts=line.split(';').map(x=>x.trim());
-   if(parts.length!==3||!parts[0]||!parts[2])throw Error('Zvíře: jméno ; lb:hmotnost (nebo enc:výsledné ENC) ; jméno honáka.');
-   const match=/^(lb|enc):\s*(\d+)(?:\/(\d+))?$/i.exec(parts[1]);
-   if(!match&&!/^\d+$/.test(parts[1]))throw Error('Použijte lb:300 nebo lb:300/40 (neobratná část), případně enc:20 pro již modifikované ENC.');
-   if(match?.[1].toLowerCase()==='enc'&&match[3]!==undefined)throw Error('Výsledné ENC neobsahuje údaj o neobratném nákladu.');
-   return {id:trekResolveActorToken(parts[0],{unregisteredAllowed:true}),droverId:trekResolveActorToken(parts[2]),...(match?.[1].toLowerCase()==='lb'?{loadLb:Number(match[2]),...(match[3]===undefined?{}:{awkwardLb:Number(match[3])})}:{enc:Number(match?.[2]??parts[1])})};
-  });
+  // Legacy manual animal entries are read only for historic journal snapshots.
+  // New watches derive every live beast from the verified physical stable.
+  const animals=[];
   const stable=verifiedLivestock(data,campaignId),eligibleStable=stable.filter(a=>a.spec.breed&&a.spec.str),stableIds=new Set();
   const damagedTravel=[];
   for(let ix=1;ix<=eligibleStable.length;ix++){
@@ -10942,10 +10964,10 @@ document.addEventListener('submit',e=>{
    if(burden.rider&&!memberIds.includes(burden.rider.characterId))throw Error('Nasedlý jezdec '+(character(burden.rider.characterId)?.name||'')+' musí být členem této cestovní hlídky, nebo musí nejprve sesednout.');
    if(burden.cargoOverflow)throw Error('Zvíře '+st.name+' má vyšší náklad než doloženou kapacitu.');
    stableIds.add(id);
-   const droverId=String(v['trekStableDrover'+ix]??''),lbs=String(v['trekStableLb'+ix]??'').trim(),awk=String(v['trekStableAwkward'+ix]??'').trim();
-   if(!memberIds.includes(droverId)||!/^\d+$/.test(lbs)||!/^\d+$/.test(awk||'0'))throw Error('Zvíře potřebuje honáka v hlídce a celou skutečnou hmotnost v lb.');
-   if(Number(lbs)<burden.minimumLb)throw Error('Zvíře '+st.name+': deklarovaná cestovní hmotnost nesmí být nižší než postroje, náklad a případného zapsaného jezdce v registru stáje ('+burden.minimumLb+' lb).');
-   animals.push({id,droverId,loadLb:Number(lbs),awkwardLb:Number(awk||0)});
+   const droverId=String(v['trekStableDrover'+ix]??'');
+   if(!memberIds.includes(droverId))throw Error('Zvíře potřebuje honáka v této hlídce.');
+   if(!Number.isFinite(burden.minimumLb)||burden.minimumLb<0)throw Error('V evidenci stáje chybí ověřená celková hmotnost zvířete '+st.name+'.');
+   animals.push({id,droverId,loadLb:burden.minimumLb,awkwardLb:0});
   }
   const livestockActors=livestockTravelActors(stable);
   const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:[...data.characters,...livestockActors],
@@ -11016,7 +11038,6 @@ document.addEventListener('submit',e=>{
   const encounterDue=!(v.environ==='wilderness'&&v.night==='yes'&&wildernessNightWatches%2===0);
   const encounter=trekEncounterCheck({environ:v.environ,night:v.night==='yes',
     elapsedWildernessNightWatches:wildernessNightWatches,roll:encounterDue?die(10,'Random Encounter'):null});
-  if(supplied.length)throw Error('Ruční řada obsahuje nadbytečné hody. Nic nebylo uloženo.');
   const unresolved=[...(wet.requiresWeatherHazardRoll?[`Weather Hazard: ${wet.hazard}`]:[]),
     ...(hazards.direction&&hazards.direction!=='lost-time'?[`Direction Hazard: ${hazards.direction}`]:[]),
     ...(encounter.encounter?['Random Encounter – nutné vyhodnocení']:[])];
@@ -11387,11 +11408,8 @@ document.addEventListener('submit',e=>{
   if(enabled&&!inventoryMode)for(const actorId of ids){assertExclusiveForagingProven({inventory:activeRationInventory(),actorId});
    if(availablePhysicalWater(data.journal,campaignKey(clock),actorId,clock.minute).length)throw Error('Postava má doloženou vodu v naplněné nádobě: výhradní Foraging není prokázán.');}
   const stocks=inventoryMode?ids.flatMap(actorId=>createFreshRationStocks({inventory:data.inventory,journal:data.journal,campaignId:campaignKey(clock),actorId,minute:clock.minute,freshConfirmed:f.get('freshRations')==='yes'})):[];
-  if(inventoryMode)for(const actorId of ids){
-   const old=rationStockBalances(data.journal,campaignKey(clock),actorId).filter(x=>x.remaining>0);
-   if(!stocks.some(x=>x.actorId===actorId)&&!old.length&&
-    !(inventoryWater&&availablePhysicalWater(data.journal,campaignKey(clock),actorId,clock.minute).length))throw Error('Postava nemá doložené fyzické dávky ani pitnou vodu v této kampani.');
-  }
+  // Selecting an inventory source does not require stock to be present NOW:
+  // an empty physical inventory is an actual shortage, never fictitious food.
   for(const actorId of ids)assertNutritionPolicyBoundary(data.journal,campaignKey(clock),actorId,clock.minute);
   const proofs=ids.map(actorId=>createNutritionPolicy({campaignId:campaignKey(clock),minute:clock.minute,actorId,
    foodNeed:f.get('autoNeeds')==='yes'?1:Number(f.get('foodNeed')),waterNeed:f.get('autoNeeds')==='yes'?1:Number(f.get('waterNeed')),autoNeeds:f.get('autoNeeds')==='yes'&&enabled,foragingOnly:enabled&&!inventoryMode,inventoryRations:inventoryMode,inventoryWater,enabled}));
@@ -14442,7 +14460,7 @@ function revealForagingWatchOptions(){
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-trek-go-stable]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
- view='library';libraryTab='rules';render();
+ view='library';libraryTab='stable';render();
  requestAnimationFrame(()=>document.getElementById('hmk-livestock-catalog')?.scrollIntoView({block:'center',behavior:'smooth'}));
 },true);
 document.addEventListener('click',e=>{

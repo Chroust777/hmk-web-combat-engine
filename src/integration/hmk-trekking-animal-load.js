@@ -7,6 +7,8 @@
 import {gearEncumbrance,strengthEncumbranceModifier} from '../rules/encumbrance.js';
 const check=(ok,msg)=>{if(!ok)throw Error(msg)};
 const whole=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000;
+// Verified physical inventory may contain fractional pounds; only ENC and dice require integers.
+const weight=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=1000000;
 export const ANIMAL_TREK_LOAD_FORMAT='hmk-trek-animal-load-lb-v1';
 export function animalTrekLoad({animal,actor}={}){
  check(animal&&typeof animal==='object','Chybí záznam zatížení zvířete.');
@@ -18,8 +20,8 @@ export function animalTrekLoad({animal,actor}={}){
   return {enc:animal.enc}; // backward compatibility; do not apply mule −20 twice
  }
  check(!Object.hasOwn(animal,'enc'),'Zvolte buď výsledné ENC, nebo hmotnost v librách, ne obojí.');
- check(whole(animal.loadLb)&&whole(animal.awkwardLb??0)&&(animal.awkwardLb??0)<=animal.loadLb,
-  'Hmotnost zvířecího nákladu a neobratné části musí být doložena v celých librách.');
+ check(weight(animal.loadLb)&&weight(animal.awkwardLb??0)&&(animal.awkwardLb??0)<=animal.loadLb,
+  'Hmotnost zvířecího nákladu a neobratné části musí být doložena v doložených librách.');
  const breed=actor?.hmk?.verifiedMountedBreed??actor?.hmk?.livestockBreed,str=actor?.hmk?.attributes?.str;
  check(breed&&Number.isSafeInteger(str)&&str>0,
   'Automatický výpočet zatížení vyžaduje registrované zvíře, ověřené plemeno a STR.');
@@ -33,7 +35,7 @@ export function animalTrekLoad({animal,actor}={}){
   sourcePages:[112,122,145,354,355]}};
 }
 export function validateAnimalTrekLoadProof(proof,enc,breed){
- check(proof?.format===ANIMAL_TREK_LOAD_FORMAT&&whole(proof.loadLb)&&whole(proof.awkwardLb)&&
+ check(proof?.format===ANIMAL_TREK_LOAD_FORMAT&&weight(proof.loadLb)&&weight(proof.awkwardLb)&&
   proof.awkwardLb<=proof.loadLb&&Number.isSafeInteger(proof.str)&&proof.str>0&&
   proof.breed===breed&&proof.baseENC===(proof.loadStepLb===undefined?gearEncumbrance(proof.loadLb,{awkwardWeightLb:proof.awkwardLb}):Math.floor((proof.loadLb+proof.awkwardLb)/proof.loadStepLb)*5)&&
   (proof.loadStepLb===undefined||proof.loadStepLb===(breed==='camel'?40:breed==='elephant'?80:20))&&

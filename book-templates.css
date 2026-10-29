@@ -6477,3 +6477,17 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
  max-width:100%;width:auto;min-width:0;white-space:normal;
  overflow-wrap:break-word;
 }
+
+/* v93.607: explicit per-die trekking controls and uncluttered proven animal load. */
+.content-calendar .hc-trek-routine .hc-trek-dice-groups{display:grid;gap:12px;min-width:0}
+.content-calendar .hc-trek-routine .hc-trek-dice-section{border:1px solid rgba(126,92,50,.32);border-radius:8px;padding:10px;min-width:0;background:rgba(255,249,234,.26)}
+.content-calendar .hc-trek-routine .hc-trek-dice-section h4{margin:0 0 6px;font-size:.92rem;color:#49321f}
+.content-calendar .hc-trek-routine .hc-trek-dice-section p{margin:5px 0 9px;line-height:1.4;font-size:.81rem}
+.content-calendar .hc-trek-routine .hc-trek-die-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;margin:7px 0;min-width:0}
+.content-calendar .hc-trek-routine .hc-trek-die-row>label{min-width:0;display:grid;gap:4px;margin:0!important;font-size:.81rem}
+.content-calendar .hc-trek-routine .hc-trek-die-row input{box-sizing:border-box;width:100%;min-width:0;max-width:130px;min-height:38px}
+.content-calendar .hc-trek-routine .hc-trek-die-row button{min-height:38px;white-space:normal}
+.content-calendar .hc-trek-routine .hc-trek-dice-section [data-trek-dice-add]{margin-top:5px;min-height:34px}
+.content-calendar .hc-trek-routine .hc-trek-stable-load{padding:6px 8px;border-radius:6px;border:1px solid rgba(132,100,59,.28);display:grid;gap:4px;align-content:center;font-size:.79rem}
+.content-calendar .hc-trek-routine .hc-trek-stable-load strong{font-size:.77rem}
+@media(max-width:420px){.content-calendar .hc-trek-routine .hc-trek-die-row{grid-template-columns:minmax(0,1fr)}.content-calendar .hc-trek-routine .hc-trek-die-row button{justify-self:start}}
