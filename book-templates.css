@@ -5971,3 +5971,67 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
  }
  .content-sheet .journal-book--chapter .inv-ledger-table .inv-edit-only{white-space:normal!important;min-width:0!important}
 }
+
+/* v93.587 – Arsenal & Gear: folio-width table and separate parchment totals. */
+@media (min-width:701px){
+ .content-sheet .journal-book--sheet-inventory .folio-chapter-content .inv-ledger-section .inv-table-scroll,
+ .content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-table-scroll{
+  width:100%!important;max-width:100%!important;box-sizing:border-box!important;
+  padding:0!important;margin:0!important;overflow-x:auto!important;
+ }
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-section .inv-ledger-table,
+ .content-sheet .journal-book--chapter .inv-ledger-section .inv-ledger-table{
+  width:100%!important;min-width:0!important;table-layout:fixed!important;
+ }
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(1),
+ .content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(1){width:21%!important}
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(2),
+ .content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(2){width:10%!important}
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(3),
+ .content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(3){width:7%!important}
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(4),
+ .content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(4){width:8%!important}
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(5),
+ .content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(5){width:14%!important}
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(6),
+ .content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(6){width:7%!important}
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(7),
+ .content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(7){width:21%!important}
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-table col:nth-child(8),
+ .content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:12%!important}
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-table thead th,
+ .content-sheet .journal-book--chapter .inv-ledger-table thead th{
+  white-space:nowrap!important;word-break:keep-all!important;overflow-wrap:normal!important;
+  hyphens:none!important;font:700 10px/1.25 Georgia,serif!important;
+ }
+ .content-sheet .journal-book--chapter .inv-ledger-table .inv-edit-only,
+ .content-sheet .journal-book--sheet-inventory .inv-ledger-table .inv-edit-only{
+  white-space:nowrap!important;font-size:10px!important;padding:3px 1px!important;
+ }
+}
+.content-sheet .journal-book--chapter .inv-ledger-table .inv-item-kind,
+.content-sheet .journal-book--sheet-inventory .inv-ledger-table .inv-item-kind{
+ color:#21190e!important;opacity:1!important;
+}
+.content-sheet .journal-book--chapter .inv-group-totals,
+.content-sheet .journal-book--sheet-inventory .inv-group-totals{
+ display:flex;flex-wrap:wrap;gap:3px 12px;padding:7px 10px;margin:0 0 8px;
+ background:rgba(246,230,199,.38)!important;border:1px solid rgba(135,94,45,.50);
+ color:#24190c!important;font:12px/1.3 Georgia,serif!important;
+}
+.content-sheet .journal-book--chapter .inv-group-totals strong,
+.content-sheet .journal-book--sheet-inventory .inv-group-totals strong{font-weight:700!important;color:#23170c!important}
+.content-sheet .journal-book--chapter .inv-group-totals--load,
+.content-sheet .journal-book--chapter .inv-group-totals--chest{
+ border-color:rgba(112,72,32,.65);background:rgba(239,219,177,.46)!important;
+}
+
+/* Final header restraint in the actual folio content; override older chapter-specific wrap rules. */
+@media(min-width:701px){
+ .content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table thead th,
+ .content-sheet .journal-book--sheet-inventory .folio-chapter-content .inv-ledger-section .inv-ledger-table thead th{
+  white-space:nowrap!important;word-break:normal!important;overflow-wrap:normal!important;
+  hyphens:none!important;padding-left:2px!important;padding-right:2px!important;
+  font:700 10px/1.2 Georgia,serif!important;
+ }
+}
