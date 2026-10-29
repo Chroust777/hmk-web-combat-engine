@@ -294,3 +294,24 @@
 @media(max-width:650px){
  .content-sheet .journal-book--personal-stable .hmk-stable-block form.hc-fields{grid-template-columns:minmax(0,1fr)!important}
 }
+
+/* 93.581 · Medical management returns to the owner's stable without a
+   Combat/Encounter navigation menu. Keep the Chronicle parchment standard. */
+.content-sheet .journal-book--personal-stable .hmk-bestiary-health{
+ background:transparent!important;min-width:0;max-width:100%;padding:.45rem 0;
+ font:12px/1.43 'Palatino Linotype','Book Antiqua',Georgia,serif!important;
+}
+.content-sheet .journal-book--personal-stable .hmk-beast-health-actor,
+.content-sheet .journal-book--personal-stable .hmk-beast-wound{
+ background:rgba(181,133,70,.075)!important;
+ border:1px solid rgba(133,89,44,.3)!important;color:#382719!important;
+ min-width:0;max-width:100%;box-sizing:border-box;
+}
+.content-sheet .journal-book--personal-stable .hmk-bestiary-health form.hc-fields{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0;max-width:100%;
+}
+@media(max-width:650px){
+ .content-sheet .journal-book--personal-stable .hmk-bestiary-health form.hc-fields{
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+}
