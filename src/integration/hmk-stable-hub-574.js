@@ -8,6 +8,7 @@ import {mountLoadENC,mountPersonalFatigue} from '../rules/gear-load.js';
 import {strengthEncumbranceModifier} from '../rules/encumbrance.js';
 import {filledWaterForItem} from './hmk-physical-water-ledger.js';
 import {rationStockBalances} from './hmk-physical-ration-ledger.js';
+import {animalAccessForDay,animalLoadedItemAt,ANIMAL_USE_FORMAT} from './hmk-nutrition-animal-access.js';
 export const STABLE_HUB_FORMAT_574='hmk-stable-hub-574';
 const types=new Set(['sale','release','tack-add','tack-remove','vehicle-add','vehicle-remove','cargo-add','cargo-remove','inventory-load','inventory-unload','inventory-gear-attach','inventory-gear-detach','vehicle-cargo-add','vehicle-cargo-remove','training-activate','care','rider-mount','rider-dismount']);
 export const STABLE_VEHICLES_P122=Object.freeze(VEHICLES_TACK_P122.filter(x=>['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(x.name)));
@@ -252,8 +253,9 @@ export function validateStableHub(data,offerForId=null){
   if(spec){const b=stableBurden(data,a.campaignId,{...a,spec});
    requireValid(!b.cargoOverflow,'aktuální náklad včetně skutečně naplněné vody překračuje nosnost');}
  }
- // A provision carried in a pack is not available for PERSONAL consumption.
- // Only an animal-care issue explicitly backed by the original lot may use it.
+ // A packed provision requires original-stock debit and dated GM proof of
+ // access to THIS animal. Unattested personal issues remain prohibited;
+ // animal-care issues keep their separate original-stock authorization.
  const custody=new Map(),rationSource=new Map(),waterSource=new Map();
  for(const row of data?.journal||[]){const x=row.stableHub574;
   if(x?.type==='inventory-load'||x?.type==='inventory-gear-attach')custody.set(row.calendarCampaignId+'|'+x.inventoryId,x.animalId);
@@ -264,8 +266,13 @@ export function validateStableHub(data,offerForId=null){
   for(const [proof,source] of [[row.calendarInventoryRationUse,rationSource],[row.calendarInventoryWaterUse,waterSource]]){
    if(!proof)continue;
    const holder=custody.get(row.calendarCampaignId+'|'+source.get(proof.sourceId??proof.fillId));
-   requireValid(!holder||x?.type==='care'&&x.animalId===holder&&x.sourceId===(proof.sourceId??proof.fillId),
-    'jídlo či voda uložené na zvířeti byly vydány mimo jeho péči');
+   const a=row.calendarNutritionAnimalUse;
+   const approved=a?.format===ANIMAL_USE_FORMAT&&a.animalId===holder&&a.inventoryId===source.get(proof.sourceId??proof.fillId)&&
+    proof.nutritionDayId&&a.actorId===row.characterId&&
+    animalLoadedItemAt(data,row.calendarCampaignId,row.characterId,a.inventoryId,row.campaignMinute,row.id)?.animalId===holder&&
+    animalAccessForDay(data,row.calendarCampaignId,row.characterId,holder,row.campaignMinute-1440,row.campaignMinute)?.id===a.accessId;
+   requireValid(!holder||x?.type==='care'&&x.animalId===holder&&x.sourceId===(proof.sourceId??proof.fillId)||approved,
+    'jídlo či voda uložené na zvířeti byly vydány bez doložené dostupnosti nebo mimo jeho péči');
   }
  }
  return true;

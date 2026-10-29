@@ -6377,3 +6377,11 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
   .content-calendar .hc-entry--compact .hc-event-line--task{grid-template-columns:1fr}
   .content-calendar .hc-entry--compact .hc-actions{justify-content:flex-start;flex-wrap:wrap;white-space:normal}
 }
+
+/* v93.603 · attested pack-animal availability and immutable medical outcome. */
+.hc-provision-animal{border:1px solid rgba(122,91,58,.42);border-radius:7px;padding:8px 10px;background:rgba(240,225,194,.25)}
+.hc-provision-animal summary{cursor:pointer;font-weight:700;color:#584128}
+.hc-provision-animal form{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 0;border-top:1px solid rgba(107,75,41,.22)}
+.hc-provision-animal form label{flex:1 1 250px;min-width:0}
+.hc-provision-animal input{max-width:100%;box-sizing:border-box}
+.hc-medical-roll-result{padding:7px 9px;margin:6px 0;background:rgba(207,221,188,.3);border-left:3px solid #66805d;border-radius:3px;color:#3c3b2d;font-size:.88rem;line-height:1.5;white-space:normal;overflow-wrap:anywhere}

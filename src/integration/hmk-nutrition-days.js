@@ -10,6 +10,7 @@ import {assertExclusiveForagingProven} from './hmk-inventory-provisions.js';
 import {availableRationLots,createPhysicalRationUse,projectCampaignRationInventory} from './hmk-physical-ration-ledger.js';
 import {availablePhysicalWater,createPhysicalWaterUse} from './hmk-physical-water-ledger.js';
 import {dailyNutritionNeeds} from './hmk-nutrition-activity.js';
+import {animalAccessForDay,animalLoadedItemAt,ANIMAL_USE_FORMAT} from './hmk-nutrition-animal-access.js';
 export const NUTRITION_POLICY_FORMAT='hmk-nutrition-policy-v1';
 export const NUTRITION_DAY_FORMAT='hmk-nutrition-day-v1';
 const DAY=1440;
@@ -89,20 +90,38 @@ function itemSlotAtMinute(database,campaignId,item,atMinute){
  if(earliest)return earliest.stableHub574.type==='inventory-load'?'carried':'stable';
  return item.slot;
 }
-function reachableFoodLots(database,campaignId,actorId,atMinute){
+function rationCustody(data,campaignId,actorId,itemId,start,end){
+ const item=(data.inventory||[]).find(i=>i.id===itemId&&i.characterId===actorId);
+ if(item&&['carried','main_hand','off_hand'].includes(itemSlotAtMinute(data,campaignId,item,end)))return null;
+ const loaded=animalLoadedItemAt(data,campaignId,actorId,itemId,end);
+ if(!loaded)return undefined;
+ const access=animalAccessForDay(data,campaignId,actorId,loaded.animalId,start,end);
+ return access?{animalId:loaded.animalId,loadId:loaded.loadId,accessId:access.id}:undefined;
+}
+function reachableFoodLots(database,campaignId,actorId,start,end){
  const inventory=new Map((database.inventory??[]).map(x=>[x.id,x]));
- return availableRationLots(database.journal,campaignId,actorId,atMinute).filter(l=>{
+ return availableRationLots(database.journal,campaignId,actorId,end).flatMap(l=>{
   const item=inventory.get(l.itemId);
-  return item?item.characterId===actorId&&['carried','main_hand','off_hand'].includes(itemSlotAtMinute(database,campaignId,item,atMinute)):
-   database.journal.some(j=>j.id===l.sourceId&&j.calendarCampaignId===campaignId&&
-    j.calendarInventoryRationTransfer?.recipientId===actorId&&j.calendarInventoryRationTransfer?.receivedItemId===l.itemId);
+  if(!item)return database.journal.some(j=>j.id===l.sourceId&&j.calendarCampaignId===campaignId&&
+    j.calendarInventoryRationTransfer?.recipientId===actorId&&j.calendarInventoryRationTransfer?.receivedItemId===l.itemId)?[{...l}]:[];
+  if(item.characterId!==actorId)return [];
+  const slot=itemSlotAtMinute(database,campaignId,item,end);
+  if(['carried','main_hand','off_hand'].includes(slot))return [{...l}];
+  if(slot!=='stable')return [];
+  const animal=rationCustody(database,campaignId,actorId,l.itemId,start,end);
+  return animal?[{...l,animal}]:[];
  });
 }
-function reachableWaterLots(database,campaignId,actorId,atMinute){
+function reachableWaterLots(database,campaignId,actorId,start,end){
  const inventory=new Map((database.inventory??[]).map(x=>[x.id,x]));
- return availablePhysicalWater(database.journal,campaignId,actorId,atMinute).filter(l=>{
+ return availablePhysicalWater(database.journal,campaignId,actorId,end).flatMap(l=>{
   const item=inventory.get(l.itemId);
-  return item&&item.characterId===actorId&&itemSlotAtMinute(database,campaignId,item,atMinute)==='carried';
+  if(!item||item.characterId!==actorId)return [];
+  const slot=itemSlotAtMinute(database,campaignId,item,end);
+  if(slot==='carried')return [{...l}];
+  if(slot!=='stable')return [];
+  const animal=rationCustody(database,campaignId,actorId,l.itemId,start,end);
+  return animal?[{...l,animal}]:[];
  });
 }
 
@@ -146,9 +165,9 @@ function requireUnambiguousSharedAllocation(database,campaignId,cohort){
    const manual=Math.min(required,consumeBeforeDay(journal,actorId,campaignId,c.start,end,unit,c.start===p.minute));
    let leftover=round(required-manual);
    const personal=unit==='foodDays'&&p.inventoryRations===true?
-     reachableFoodLots(database,campaignId,actorId,end).reduce((n,l)=>n+l.remaining,0):
+     reachableFoodLots(database,campaignId,actorId,c.start,end).reduce((n,l)=>n+l.remaining,0):
      unit==='waterDays'&&p.inventoryWater===true?
-     reachableWaterLots(database,campaignId,actorId,end).reduce((n,l)=>n+l.remaining,0):0;
+     reachableWaterLots(database,campaignId,actorId,c.start,end).reduce((n,l)=>n+l.remaining,0):0;
    leftover=round(Math.max(0,leftover-Math.min(leftover,personal)));
    if(leftover>0)demands.push({actorId,quantity:leftover});
   }
@@ -209,25 +228,27 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
    // Expired lots are NOT consumed, and carried waterskins do not imply water.
    if(unit==='foodDays'&&p.inventoryRations===true){
     while(remaining>0){
-     const lot=reachableFoodLots(database,campaignId,actorId,end)[0];
+     const lot=reachableFoodLots(database,campaignId,actorId,start,end)[0];
      if(!lot)break;
      const quantity=Math.min(remaining,lot.remaining);
      const proof=createPhysicalRationUse({journal:database.journal,campaignId,actorId,minute:end,sourceId:lot.sourceId,quantity});
      proof.nutritionDayId=`${policy.id}:${end}`;
      const row={id:idFactory(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:end,createdAt:stamp(),
       title:'HMK · automatická fyzická potrava',body:`${quantity} food-days · ${actor.name} · inventární stack ${lot.itemId}; bez posunu času`,
-      calendarInventoryRationUse:proof};
+      calendarInventoryRationUse:proof,
+      ...(lot.animal?{calendarNutritionAnimalUse:{format:ANIMAL_USE_FORMAT,actorId,inventoryId:lot.itemId,...lot.animal}}:{})};
      database.journal.push(row);automatic.push(row);remaining=round(remaining-quantity);
     }
    }
    if(unit==='waterDays'&&p.inventoryWater===true){
     while(remaining>=0.5){
-     const bottle=reachableWaterLots(database,campaignId,actorId,end)[0];if(!bottle)break;
+     const bottle=reachableWaterLots(database,campaignId,actorId,start,end)[0];if(!bottle)break;
      const proof=createPhysicalWaterUse({journal:database.journal,campaignId,actorId,minute:end,fillId:bottle.fillId});
      proof.nutritionDayId=`${policy.id}:${end}`;
      const row={id:idFactory(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:end,createdAt:stamp(),
       title:'HMK · automatický výdej pitné vody',body:`0,5 gal pitné vody · ${actor.name} · Waterskin ${bottle.itemId}; bez posunu času`,
-      calendarInventoryWaterUse:proof};
+      calendarInventoryWaterUse:proof,
+      ...(bottle.animal?{calendarNutritionAnimalUse:{format:ANIMAL_USE_FORMAT,actorId,inventoryId:bottle.itemId,...bottle.animal}}:{})};
      database.journal.push(row);automatic.push(row);remaining=round(remaining-0.5);
     }
    }
