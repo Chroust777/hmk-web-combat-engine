@@ -49,7 +49,7 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
  for(const x of owned){
   if(!x||typeof x.id!=='string'||!x.id.trim()||seen.has(x.id))issues.push('Invalid or duplicate inventory ID');
   else seen.add(x.id);
-  if(!['worn','carried','main_hand','off_hand','none','chest',undefined,null].includes(x.slot))issues.push(`Unknown equipment slot: ${x.id}`);
+  if(!['worn','carried','main_hand','off_hand','none','chest','stable',undefined,null].includes(x.slot))issues.push(`Unknown equipment slot: ${x.id}`);
  }
  const worn=owned.filter(x=>x.slot==='worn');
  if(worn.some(x=>x.snapshot?.category!=='armor'))issues.push('Non-armour item in worn slot');
