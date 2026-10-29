@@ -285,7 +285,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.592';
+const APP_VERSION='93.593';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2450,7 +2450,7 @@ function refreshWritingWork591(root){
 function timedSkillProjectsPanel591(actor){
  if(!data.campaignClock)return '<section class="hsk-timed-project-591"><p>Časované projekty vyžadují aktivní kampaň s kalendářem.</p></section>';
  const now=data.campaignClock.minute,pending=pendingSkillProjects591(actor.id);
- return `<section class="hsk-timed-project-591 hsk-critical-next"><h3>Časované projekty · Engineering / Writing (HMK 70, 132)</h3>
+ return `<section class="hsk-timed-project-591 hsk-critical-next"><h3>Časované projekty · Engineering / Writing (HMK 70, 132)</h3><p class="hsk-project-classification">Patří do <strong>Success Value</strong>. Vlevo se zakládá projekt a sleduje herní čas; vpravo se v běžném panelu <strong>Success Value</strong> provede jeho původní d100. Následné Design d10 / Insight d10 mají navazující doklady, nikoli druhý SV hod.</p><button type="button" class="secondary hc-small" data-skill-tab="value">Otevřít Success Value vpravo</button>
  <p>Nejdříve zapiš skutečný začátek projektu do kalendáře. Základní čas podle pravidel lze později zkrátit jen doloženým výsledkem, ne libovolným GM odhadem. Hody se neprovádějí před nejčasnějším možným termínem; dokončení nastane až po výpočtu skutečného výsledku. Běžný Skill Test mimo tento projekt zůstává samostatnou činností.</p>
  <form data-hmk-project-start-591 class="hsk-form-grid"><label>Činnost<select name="kind"><option value="engineering">Engineering Design · HMK 70</option><option value="writing">Writing Routine · HMK 132</option></select></label>
  <label>Konkrétní dílo / předmět práce<input name="projectName" required minlength="2" maxlength="120" placeholder="Např. návrh malé pevnosti"></label>
@@ -3427,13 +3427,13 @@ function folioChapterParts(body,kind=''){
  if(kind.includes('journal-book--skills')){
   const workbench=nodes.find(x=>x.classList.contains('hmk-skill-workbench'));
   if(workbench){
-   const workChildren=[...workbench.children];
-   const split=workChildren.findIndex(x=>x.classList.contains('hsk-separated-tests'));
-   if(split!==-1){
-    const head=workChildren.slice(0,split).map(x=>x.outerHTML).join('');
-    const tests=workChildren.slice(split).map(x=>x.outerHTML).join('');
-    return [head+nodes.filter(x=>x!==workbench).map(x=>x.outerHTML).join(''),tests];
-   }
+   // Project management is a calendar-linked context for Success Value,
+   // not a replacement for the three standard Skill Test modes.
+   // Preserve the full workbench, its tab navigation and all field handlers
+   // on the RIGHT page; no cloning or fresh dice/event ledger is created.
+   const left=nodes.filter(x=>x!==workbench).map(x=>x.outerHTML).join('');
+   const right=workbench.outerHTML.replace(' id="hmk-skill-workbench"','');
+   return [left,right];
   }
  }
  if(kind.includes('journal-book--creation')){
@@ -4681,7 +4681,7 @@ function stableHubAnimalHTML(a,campaignId){
  const z=stableAnimalZones575(data,campaignId,a,health);
  const trainingState=stableTraining575(data,campaignId,a);
  const looseGear=data.inventory.filter(i=>i.characterId===a.ownerId&&['carried','none'].includes(i.slot)&&i.quantity===1&&VEHICLES_TACK_P122.some(t=>t.id===i.snapshot?.properties?.stableTackId&&t.name!=='Wheel'));
- const userItems=data.inventory.filter(i=>i.characterId===a.ownerId&&['carried','none'].includes(i.slot)&&
+ const userItems=data.inventory.filter(i=>i.characterId===a.ownerId&&['carried','none','main_hand','off_hand'].includes(i.slot)&&
    Number.isSafeInteger(i.quantity)&&i.quantity>0&&Number.isFinite(i.snapshot?.properties?.weightLb)&&i.snapshot.properties.weightLb>0);
  const vesselLots=availablePhysicalWater(data.journal,campaignId,a.ownerId,data.campaignClock?.minute??0);
  const foodLots=availableRationLots(data.journal,campaignId,a.ownerId,data.campaignClock?.minute??0);
@@ -13761,7 +13761,7 @@ document.addEventListener('submit',e=>{
    Object.assign(event,{entryId:found.entryId,inventoryId:found.inventoryId,role});
   }else if(type==='inventory-load'){
    const item=data.inventory.find(i=>i.id===raw.inventoryId&&i.characterId===animal.ownerId);
-   if(!item||!['carried','none'].includes(item.slot)||!Number.isSafeInteger(item.quantity)||item.quantity<1||!(item.snapshot?.properties?.weightLb>0))throw Error('Naložit lze jen existující vlastní nevázaný předmět s doloženou hmotností; rozdělení balíku vyžaduje původní inventární postup.');
+   if(!item||!['carried','none','main_hand','off_hand'].includes(item.slot)||!Number.isSafeInteger(item.quantity)||item.quantity<1||!(item.snapshot?.properties?.weightLb>0))throw Error('Naložit lze jen existující vlastní předmět (včetně předmětu drženého v ruce) s doloženou hmotností; rozdělení balíku vyžaduje původní inventární postup.');
    const weightLb=item.snapshot.properties.weightLb*item.quantity;
    if(p.capacity===null||p.cargoLb+weightLb>p.capacity)throw Error('Zvíře je plně naložené: zbývá '+Math.max(0,(p.capacity??0)-p.cargoLb)+' lb a předmět potřebuje '+weightLb+' lb. Vyložte náklad nebo zajistěte větší doloženou kapacitu.');
    Object.assign(event,{entryId:uuid(),inventoryId:item.id,name:item.snapshot.name,quantity:item.quantity,weightLb});
@@ -13839,7 +13839,7 @@ document.addEventListener('submit',e=>{
     const actual=data.inventory.find(i=>i.id===event.inventoryId&&i.characterId===animal.ownerId);
     if(!actual)throw Error('Inventární předmět byl mezitím změněn.');
     if(type==='inventory-load'||type==='inventory-gear-attach'){
-     if(!['carried','none'].includes(actual.slot)||actual.quantity!==event.quantity||actual.snapshot?.properties?.weightLb*actual.quantity!==event.weightLb)throw Error('Předmět, počet nebo váha se změnily.');
+     if(!(type==='inventory-load'?['carried','none','main_hand','off_hand']:['carried','none']).includes(actual.slot)||actual.quantity!==event.quantity||actual.snapshot?.properties?.weightLb*actual.quantity!==event.weightLb)throw Error('Předmět, umístění, počet nebo váha se změnily.');
      actual.slot='stable';actual.stableAnimalId=animal.id;
     }else{
      if(actual.slot!=='stable'||actual.stableAnimalId!==animal.id)throw Error('Předmět už není na zvířeti.');

@@ -6151,3 +6151,108 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .content-sheet .journal-book--skills .hsk-project-pending-list{
  margin-top:8px;
 }
+
+
+/* v93.593 – canonical folio inventory layout (loaded LAST, overrides older chapter CSS).
+   All four locations share the Chronicle Spread parchment; sections have
+   independent rhythm instead of stacked touching frames. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section {
+  box-sizing:border-box!important;
+  min-width:0!important;
+  margin:16px 0 25px!important;
+  padding:11px 12px 12px!important;
+  border:1px solid rgba(125,88,49,.52)!important;
+  border-radius:7px!important;
+  background:rgba(242,222,189,.23)!important;
+  box-shadow:0 2px 5px rgba(83,52,24,.06)!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section h4 {
+  margin:0 0 10px!important;
+  padding:0 0 7px!important;
+  color:#492e1b!important;
+  font:700 15px/1.3 Palatino,'Book Antiqua',Georgia,serif!important;
+  border-bottom:1px solid rgba(135,94,45,.42)!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-table-scroll {
+  width:100%!important;min-width:0!important;max-width:100%!important;
+  margin:0 0 9px!important;padding:0!important;
+  border:1px solid rgba(119,82,44,.45)!important;
+  border-bottom:1px solid rgba(119,82,44,.65)!important;
+  border-radius:3px!important;box-sizing:border-box!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table {
+  width:100%!important;min-width:0!important;table-layout:fixed!important;
+}
+/* The final column must actually consume the remaining folio width. */
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(1){width:20%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(2){width:10%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(3){width:6%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(4){width:8%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(5){width:13%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(6){width:7%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(7){width:16%!important}
+.content-sheet .journal-book--chapter .inv-ledger-table col:nth-child(8){width:20%!important}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table td:last-child {
+  width:auto!important;padding:3px 2px!important;text-align:right!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-ledger-table .inv-edit-only {
+  width:100%!important;max-width:100%!important;min-width:0!important;
+  box-sizing:border-box!important;margin:0!important;white-space:nowrap!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-group-totals {
+  margin:8px 0!important;padding:10px 11px!important;
+  background:rgba(237,214,174,.34)!important;
+  border:1px solid rgba(122,82,38,.46)!important;
+  border-radius:5px!important;
+  color:#2e2113!important;
+  gap:5px 13px!important;
+  font:12px/1.35 Palatino,'Book Antiqua',Georgia,serif!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-group-totals--stable,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-group-totals--stable-detail {
+  background:rgba(237,214,174,.34)!important;
+  border-color:rgba(122,82,38,.46)!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-bulk-toolbar {
+  box-sizing:border-box!important;display:flex!important;flex-wrap:wrap!important;
+  align-items:center!important;gap:6px 7px!important;
+  margin:12px 0 0!important;padding:10px!important;
+  border:1px solid rgba(125,87,46,.42)!important;
+  border-radius:5px!important;
+  background:rgba(240,221,187,.24)!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-bulk-toolbar button {
+  font-family:Palatino,'Book Antiqua',Georgia,serif!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section .inv-stable-hint {
+  color:#46321d!important;margin:10px 2px 2px!important;font-size:12px!important;
+}
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section--stable,
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section--chest {
+  margin-top:26px!important;
+}
+/* Clear physical separation from the individual inventory sections. */
+.content-sheet .journal-book--chapter .folio-chapter-content .inv-group-totals--load {
+  box-sizing:border-box!important;margin:17px 0 19px!important;
+  background:rgba(231,203,155,.45)!important;
+  border:1px solid rgba(115,77,38,.57)!important;border-radius:5px!important;
+  padding:11px 12px!important;
+}
+/* Skills: timed Success Value context on LEFT, original three-tab workbench on RIGHT. */
+.content-sheet .journal-book--skills .journal-book-page--left .folio-chapter-content > .hsk-timed-project-591 {
+  margin:9px 0 17px!important;
+}
+.content-sheet .journal-book--skills .journal-book-page--right .folio-chapter-content > .hmk-skill-workbench {
+  display:block!important;min-width:0!important;width:100%!important;
+  background:transparent!important;border:0!important;box-shadow:none!important;
+  padding:0!important;margin:0!important;
+}
+.content-sheet .journal-book--skills .hsk-project-classification {
+  margin:8px 0 12px!important;padding:8px 10px!important;
+  border-left:3px solid rgba(129,83,42,.70)!important;
+  background:rgba(234,205,161,.36)!important;
+  font-size:12px!important;
+}
+@media(max-width:750px){
+ .content-sheet .journal-book--chapter .folio-chapter-content .inv-ledger-section{padding:7px!important;margin-bottom:18px!important}
+}
