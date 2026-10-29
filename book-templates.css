@@ -6349,3 +6349,9 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .content-sheet .journal-book--skills .hsk-sv-project-note-595{margin:10px 0!important;padding:9px 11px!important;border-left:3px solid #946c3e!important;background:rgba(221,193,151,.33)!important;font:13px/1.45 Georgia,serif!important}
 .content-sheet .journal-book--skills .hmk-skill-actions-595 .hsk-timed-project-591{margin:0 0 15px!important;padding:12px!important}
 .content-sheet .journal-book--skills .hmk-skill-actions-595 .hsk-writing-finish-591{margin:0 0 15px!important}
+
+/* v93.597 Skill Tests: all five independent mode buttons visible on left folio */
+.hmk-skill-context-595 .hsk-tabs{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;overflow:visible!important;max-height:none!important;}
+.hmk-skill-context-595 .hsk-tabs button{display:block!important;visibility:visible!important;width:100%!important;min-height:36px!important;white-space:normal!important;}
+
+.hsk-fishing-specific-597 .hsk-sv-extras,.hsk-fishing-specific-597 [data-alchemy-sv-helpers]{display:none!important}
