@@ -6491,3 +6491,16 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .content-calendar .hc-trek-routine .hc-trek-stable-load{padding:6px 8px;border-radius:6px;border:1px solid rgba(132,100,59,.28);display:grid;gap:4px;align-content:center;font-size:.79rem}
 .content-calendar .hc-trek-routine .hc-trek-stable-load strong{font-size:.77rem}
 @media(max-width:420px){.content-calendar .hc-trek-routine .hc-trek-die-row{grid-template-columns:minmax(0,1fr)}.content-calendar .hc-trek-routine .hc-trek-die-row button{justify-self:start}}
+
+/* v93.608: preserve primary navy dice buttons and long context outcome tooltip. */
+.content-calendar .hc-trek-routine .hc-trek-die-row .hc-trek-generate,
+:is(.content-calendar,.content-sheet) .hc-provision-generate{
+ background:#213e5b!important;color:#fff7e6!important;border:1px solid #45617a!important;
+ border-radius:4px!important;font-weight:700!important;box-shadow:0 2px 4px #32261c33!important;
+}
+.content-calendar .hc-trek-routine .hc-trek-die-row .hc-trek-generate:hover:not(:disabled),
+:is(.content-calendar,.content-sheet) .hc-provision-generate:hover:not(:disabled){background:#315978!important}
+.hmk-journal-floating-tooltip:not([hidden]){max-width:min(520px,calc(100vw - 20px))!important;max-height: min(70vh,580px)!important;overflow-y:auto!important;white-space:normal!important}
+.hc-provision-action-blocked{padding:9px 12px;border-left:3px solid #8f633b;background:#e7d3af55;color:#4a3220;line-height:1.5}
+
+.hmk-journal-floating-tooltip.hmk-trek-dice-outcomes:not([hidden]){white-space:pre-line!important;font-size:13px!important;max-height:82vh!important;}
