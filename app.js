@@ -290,7 +290,7 @@ const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.ran
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const stamp=()=>new Date().toISOString();
-const SLOTS=[['none','Neseno (starší záznam)'],['main_hand','Hlavní ruka'],['off_hand','Vedlejší ruka'],['worn','Oblečeno'],['carried','Neseno'],['chest','Truhlice (doma / úschova)'],['stable','Naloženo na zvířeti (pouze stáj)']];
+const SLOTS=[['none','Neseno (starší záznam)'],['main_hand','Hlavní ruka'],['off_hand','Vedlejší ruka'],['worn','Oblečeno'],['carried','Neseno'],['chest','Truhlice (doma / úschova)'],['stable','Naloženo na zvířeti']];
 const slotLabel=v=>!v||v==='none'?'Neseno':(SLOTS.find(s=>s[0]===v)||SLOTS[4])[1];
 const validSlotForCategory=(slot,cat)=>SLOTS.some(s=>s[0]===slot)&&(!(slot==='main_hand'||slot==='off_hand')||['weapon','shield','other'].includes(cat))&&(slot!=='worn'||cat==='armor');
 function handSlotAvailable(characterId,slot,exceptId=null){return !['main_hand','off_hand'].includes(slot)||!data.inventory.some(x=>x.characterId===characterId&&x.slot===slot&&x.id!==exceptId)}
@@ -425,7 +425,7 @@ cloudSync=createGitHubCloudSync({localStorage,sessionStorage,storageKey:STORAGE,
  onStatus:()=>{const node=document.querySelector('[data-cloud-status]');if(node)node.textContent=cloudStatusLabel()+(cloudSync?.issue?' · '+cloudSync.issue:'');const side=document.querySelector('[data-cloud-sidebar]');if(side)side.textContent=cloudStatusLabel();const block=document.querySelector('[data-cloud-block-banner]');if(block)block.hidden=cloudSync?.canWrite()??true;}
 });
 let catalogStatus='all'; // presentation-only; never persisted
-let libraryTab='melee',libraryPage=0,libraryRecipientId=null; // presentation-only, not stored
+let libraryTab='melee',libraryPage=0,libraryRecipientId=null,libraryOtherFilter='all'; // presentation-only, not stored
 try{const saved=localStorage.getItem(STORAGE);if(saved)data=validate(JSON.parse(saved));storageBaseline=saved;}catch(e){storageReadOnly=true;notice='POZOR: Původní data se nepodařilo načíst. Zápisy jsou zablokovány, aby se nepřepsala. Zálohujte data prohlížeče a opravte úložiště.';console.error(e)}
 // Restore the encounter draft only after character IDs are available.
 // On unreadable database data, do not rehydrate potentially stale selections.
@@ -3827,7 +3827,7 @@ const HMK_ARMOUR_MATERIALS=Object.freeze([
  ['S','Scale',4,8,5,5],['M','Mail',2,8,7,3],
  ['P','Plate',6,11,9,5]
 ].map(([code,name,b,e,p,f])=>Object.freeze({code,name,b,e,p,f})));
-function armourLayerReferencePanel(){return `<section class="panel wide"><h3>HMK · povolené vrstvy (referenční tabulka, str. 117)</h3><p class="muted">Doslovné kódy sloupců tabulky Armour Layers. Nejde o automatické schválení kombinace: rozhoduje i anatomické pokrytí, pořadí, typ oděvu a výjimky.</p><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Materiál</th><th>Pod 2</th><th>Pod 1</th><th>Základ</th><th>Nad 1</th><th>Nad 2</th></tr></thead><tbody>${ARMOUR_LAYER_COLUMNS.map(x=>`<tr><td>${esc(x.code)}</td><td>${esc(x.underFar)}</td><td>${esc(x.underNear)}</td><td>${esc(x.base)}</td><td>${esc(x.overNear)}</td><td>${esc(x.overFar)}</td></tr>`).join('')}</tbody></table></div><p class="muted">${esc(ARMOUR_LAYER_NOTES.join(' · '))}</p></section>`;}
+function armourLayerReferencePanel(){return `<section class="panel wide"><h3>HMK · povolené vrstvy (referenční tabulka, str. 117)</h3><p class="muted">Doslovné kódy sloupců tabulky Armour Layers. Nejde o automatické schválení kombinace: rozhoduje i anatomické pokrytí, pořadí, typ oděvu a výjimky.</p><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Materiál</th><th>Pod 2</th><th>Pod 1</th><th>Základ</th><th>Nad 1</th><th>Nad 2</th></tr></thead><tbody>${ARMOUR_LAYER_COLUMNS.map(x=>`<tr><td>${esc(displayArmourMaterial(x.code))}</td><td>${esc(x.underFar)}</td><td>${esc(x.underNear)}</td><td>${esc(x.base)}</td><td>${esc(x.overNear)}</td><td>${esc(x.overFar)}</td></tr>`).join('')}</tbody></table></div><p class="muted">${esc(ARMOUR_LAYER_NOTES.join(' · '))}</p></section>`;}
 function armourMaterialsPanel(){return `<section class="panel" aria-label="Referenční hodnoty materiálů zbroje"><h3>HMK · ochranné hodnoty materiálů zbroje</h3><p class="muted">Pevná referenční tabulka podle Armour Articles, tištěná strana 117. Hodnoty AV pro b (blunt), e (edge), p (point), f (fire/frost). Nejde o konkrétní kusy zbroje: jejich anatomické pokrytí, vrstvení a ENC se musí vyhodnotit zvlášť.</p><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left"><thead><tr><th>Materiál</th><th>Kód</th><th>b</th><th>e</th><th>p</th><th>f</th></tr></thead><tbody>${HMK_ARMOUR_MATERIALS.map(m=>`<tr><td>${esc(m.name)}</td><td>${m.code}</td><td>${m.b}</td><td>${m.e}</td><td>${m.p}</td><td>${m.f}</td></tr>`).join('')}</tbody></table></div><p class="tiny">Tyto hodnoty se nezapisují do localStorage a zatím se automaticky nepřičítají k ochraně postavy. U 21 vestavěných kusů zbroje je nově evidováno ENC podle tabulky str. 118 (včetně podmínky pro tři a více plátových dílů paží a postihu vnímání u Great Helm). Výpočet vrstvení, ENC a Bulk se nyní provádí z aktuálního inventáře; u tištěných kompletů je nutné potvrzení GM.</p></section>`}
 // v49: Human-readable rule data; never expose raw JSON or internal object keys.
 // The source objects remain untouched for the future combat engine.
@@ -3938,7 +3938,7 @@ function catalogNoteInCzech(label,value){
  const labels={draw:'Draw',drawStrength:'Draw',drw:'DRW',shaftWeight:'Shaft Weight',volleyMultiplier:'VM',rangeMultiplier:'VM',quality:'Základní WQ',heft:'Heft',length:'Délka',zoneDie:'Kostka zóny',weightLb:'Hmotnost (lb)',pricePence:'Cena (d)',weaponClass:'Třída zbraně',defenceModifier:'Obranný modifikátor',impactTAModifier:'Modifikátor Impact TA',shieldModifier:'Modifikátor štítu',deflect:'Odklonění (Deflect)',material:'Materiál',encumbrance:'ENC',perceptionPenalty:'Postih vnímání',armArticleEncGroup:'Skupina podmíněného ENC',coverage:'Pokryté lokace',protection:'Ochrana',baseRangeFt:'Základní dostřel (ft)',traits:'Vlastnosti',notes:'Poznámky',use:'Použití',value:'Hodnota',defense:'Obrana',attack:'Útok',impact:'Impact',layers:'Vrstvy',alternateStrikeModes:'Alternativní útoky',verifiedModes:'Útočné režimy',verifiedTraits:'Ověřené vlastnosti',armourReduction:'Snížení ochrany zbroje',armourReductionCondition:'Podmínka snížení ochrany',blockModifier:'Modifikátor blokování',opponentDefenceModifier:'Modifikátor obrany protivníka',shieldDamageImpactBonus:'Bonus Impact proti štítu',possibleFaeriecraftMeleeBonus:'Možný bonus Faeriecraft v boji',slowOneHand:'Pomalé použití jednou rukou',halfSwordNoSharpEdge:'Poloviční meč bez ostrého ostří',tripUsesWeaponLength:'Podražení využívá délku zbraně',coveredLocations:'Pokryté anatomické lokace',coverageNote:'Poznámka k pokrytí',variants:'Varianty',couched:'Založená kopí (couched)',entangle:'Zapletení / zachycení',slow:'Pomalá zbraň',removeTrait:'Odebraná vlastnost',locationProtection:'Ochrana anatomických lokací',b:'Blunt',e:'Edge',p:'Point',f:'Fire/Frost',B:'Blunt',E:'Edge',P:'Point',F:'Fire/Frost',impactDie:'Kostka Impact',impactModifier:'Modifikátor Impact',aspect:'Typ poškození',name:'Název',modifier:'Modifikátor'};
  const human=v=>v===null||v===undefined?'—':typeof v==='boolean'?(v?'Ano':'Ne'):String(v);
  const niceKey=k=>labels[k]||String(k).replace(/([a-z])([A-Z])/g,'$1 $2').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
- const table=(headers,rows)=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr>${headers.map(x=>`<th scope="col" class="catalog-parameter-tip" tabindex="0" data-hmk-help="${esc(libraryFieldHelp(x))}">${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map((x,i)=>`<${headers[0]==='Parametr'&&i===0?'th scope="row"':'td'} class="${headers[0]==='Parametr'&&i===0?'catalog-property-name':'catalog-property-value'}" tabindex="0" data-hmk-help="${esc(libraryFieldHelp(headers[0]==='Parametr'?row[0]:headers[i]))}" title="${esc(libraryFieldHelp(headers[0]==='Parametr'?row[0]:headers[i]))}">${esc(human(headers[0]==='Parametr'?catalogNoteInCzech(row[0],x):x))}</${headers[0]==='Parametr'&&i===0?'th':'td'}>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+ const table=(headers,rows)=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr>${headers.map(x=>`<th scope="col" class="catalog-parameter-tip" tabindex="0" data-hmk-help="${esc(libraryFieldHelp(x))}">${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map((x,i)=>`<${headers[0]==='Parametr'&&i===0?'th scope="row"':'td'} class="${headers[0]==='Parametr'&&i===0?'catalog-property-name':'catalog-property-value'}" tabindex="0" data-hmk-help="${esc(libraryFieldHelp(headers[0]==='Parametr'?row[0]:headers[i]))}" title="${esc(libraryFieldHelp(headers[0]==='Parametr'?row[0]:headers[i]))}">${esc(human(headers[0]==='Parametr'?(row[0]==='Materiál'?displayArmourMaterial(x):catalogNoteInCzech(row[0],x)):x))}</${headers[0]==='Parametr'&&i===0?'th':'td'}>`).join('')}</tr>`).join('')}</tbody></table></div>`;
  const modeText=m=>String(m.impactDie||'—')+(Number.isFinite(m.impactModifier)?(m.impactModifier>=0?'+':'')+m.impactModifier:'');
  const primary=Array.isArray(p.verifiedModes)?p.verifiedModes:[];
  const alternate=Array.isArray(p.alternateStrikeModes)?p.alternateStrikeModes:[];
@@ -3986,7 +3986,7 @@ function catalogNoteInCzech(label,value){
   visible.add(p.skill?'skill':'use');visible.add('quality');
  }
  const scalar=Object.entries(p).filter(([key,v])=>!visible.has(key)&&v!==null&&v!==undefined&&typeof v!=='object');
- const scalarTable=scalar.length?table(['Parametr','Hodnota'],scalar.map(([k,v])=>[niceKey(k),v])):'';
+ const scalarTable=scalar.length?table(['Parametr','Hodnota'],scalar.map(([k,v])=>[niceKey(k),k==='material'?displayArmourMaterial(v):v])):'';
  // Recursive structured-data renderer for custom equipment: text and tables only.
  // Bound depth avoids infinite recursion for malformed user-provided objects.
  const describe=(v,depth=0)=>{
@@ -4053,14 +4053,61 @@ function enrichAnimalTrainingForms(root){
    const a=candidates.find(x=>x.id===select.value);
    const rea=f.elements.namedItem('reasoning'),cre=f.elements.namedItem('creativity');
    for(const input of [name,rea,cre]){if(input)input.readOnly=!!a;}
-   if(a){name.value=a.name;if(rea)rea.value=String(a.spec.rea);if(cre)cre.value=String(a.spec.cre);}
-   else{name.value='';if(rea)rea.value='';if(cre)cre.value='';}
+   const best=f.elements.namedItem('previousBestStars'),boosts=f.elements.namedItem('previousMasteryBoosts');
+   for(const el of [best,boosts]){if(el)el.readOnly=!!a;}
+   if(a){
+    name.value=a.name;if(rea)rea.value=String(a.spec.rea);if(cre)cre.value=String(a.spec.cre);
+    // Never use another creature's training, nor treat an empty ledger as an estimate.
+    const proofs=data.journal.filter(j=>j.calendarCampaignId===campaignKey(data.campaignClock)&&
+      j.livestockTraining?.animalId===a.id&&j.skillTestProof?.type==='animal-training'&&
+      j.livestockTraining?.ownerId===a.ownerId);
+    if(best)best.value=String(proofs.reduce((m,j)=>Math.max(m,Number(j.skillTestProof?.bestStarsAfter)||0),0));
+    if(boosts)boosts.value=String(proofs.reduce((m,j)=>Math.max(m,Number(j.skillTestProof?.finalBoosts)||0),0));
+    const provenance=f.querySelector('[data-animal-training-provenance]');
+    if(provenance)provenance.textContent='Převzato ze stáje: '+a.name+' · REA '+a.spec.rea+', CRE '+a.spec.cre+
+     ' (druhové atributy HMK); '+proofs.length+' starších doložených výcviků. Nejlepší ★ a MB jsou odvozeny pouze z těchto dokladů. Hodnoty jsou pro toto zvíře uzamčené.';
+   }else{
+    name.value='';if(rea)rea.value='';if(cre)cre.value='';
+    if(best)best.value='0';if(boosts)boosts.value='0';
+    const provenance=f.querySelector('[data-animal-training-provenance]');
+    if(provenance)provenance.textContent='Bez výběru zvířete ze stáje: REA, CRE, předchozí ★ a MB musí být doloženy z odpovídajícího záznamu. Výchozí nula neprokazuje absenci dřívějšího výcviku.';
+   }
   });
   const preferred=candidates.find(a=>a.id===pendingStableAnimalcraftId&&a.ownerId===selected);
   if(preferred){select.value=preferred.id;select.dispatchEvent(new Event('change'));}
+  updateAnimalTrainingPendingExplanation(f);
  }
 }
 
+// Live explanation is only a preview. The actual results are still computed
+// and validated by resolveAnimalTraining on submitting the immutable proof.
+function updateAnimalTrainingPendingExplanation(form){
+ if(!form?.matches?.('form[data-hmk-animal-training]'))return;
+ let out=form.querySelector('[data-animal-training-dice-guide]');
+ if(!out){out=document.createElement('p');out.className='tiny hsk-followup-provenance';out.setAttribute('data-animal-training-dice-guide','');form.querySelector('[name="trainingD10"]')?.closest('label')?.insertAdjacentElement('afterend',out);}
+ if(!out)return;
+ const source=data.journal.find(j=>j.id===form.elements.namedItem('origin')?.value);
+ const candidate=animalTrainingCandidate(source?.skillTestProof);
+ if(!candidate){out.textContent='Původní Animalcraft SV není dostupný: další hody nelze určit.';return;}
+ const flag=n=>!!form.elements.namedItem(n)?.checked;
+ const adjusted=candidate.sv-(flag('notNewborn')?1:0)-(flag('wasWild')?1:0);
+ const stars=Math.min(5,Math.max(0,adjusted-4));
+ const previous=Number(form.elements.namedItem('previousBestStars')?.value||0);
+ const previouslyTrained=previous>0,qualifies=!previouslyTrained||stars>=previous;
+ const shortened=flag('shorten');
+ const expected=qualifies?Math.max(0,stars-(shortened?1:0)):0;
+ const cre=Number(form.elements.namedItem('creativity')?.value);
+ const cap=Number.isFinite(cre)&&cre>0?Math.ceil(cre/2):null;
+ out.textContent='Odvození: uložený SV '+candidate.sv+'; věk '+(flag('notNewborn')?'−1':'0')+', divokost '+(flag('wasWild')?'−1':'0')+
+  ' → SV '+adjusted+', '+stars+' ★. Předchozí nejlepší '+previous+' ★'+(qualifies?' · podmínka opakování splněna':' · opakovaný výcvik nepřináší nové hody')+
+  '. Vyžadováno '+expected+' skutečných d10'+(shortened?' (jeden Training Roll spotřebován zkrácením o měsíc)':'')+
+  (cap===null?' · CRE není doloženo.':'; CRE limit '+cap+' MB.')+
+  (candidate.level==='CF'?' Původní CF: navíc povinný skutečný d3 pro prodloužení času.':' d3 se bez CF nevyplňuje.');
+}
+document.addEventListener('change',event=>{
+ const form=event.target.closest?.('form[data-hmk-animal-training]');
+ if(form)updateAnimalTrainingPendingExplanation(form);
+},true);
 function bestiaryCalendarDuePanel567(clock){
  const cid=campaignKey(clock),minute=clock.minute;
  const all=encounterBeastHistory(data,cid), latestStable=new Map();
@@ -4589,6 +4636,9 @@ function libraryItemPurpose(i){
  };
  return (roles[role]||'Předmět výbavy.')+' '+(generic?'HMK '+libraryPrintedPages(i.source)+'. ':'')+'Pro konkrétní další účinky jsou rozhodující doložená pravidla předmětu.';
 }
+// Read-only expansion of printed HMK armour material codes (p.117–118).
+const ARMOUR_MATERIAL_DISPLAY=Object.freeze({C:'Cloth',L:'Leather',D:'Padded',Q:'Quilted',G:'Gambeson',K:'Kûrbúl',S:'Scale',M:'Mail',P:'Plate'});
+function displayArmourMaterial(value){const raw=String(value??'').trim();return ARMOUR_MATERIAL_DISPLAY[raw]||raw||'—';}
 function libraryBrief(i){
  const p=i.properties||{},numeric=v=>v===null||v===undefined||v===''?'—':esc(v);
  const impact=m=>m?`${esc(m.impactDie??'—')}${Number.isFinite(m.impactModifier)?(m.impactModifier>=0?'+':'')+m.impactModifier:''}${m.aspect?' '+esc(m.aspect):''}`:'—';
@@ -4597,7 +4647,7 @@ function libraryBrief(i){
  const summary=armourValue?`b${numeric(armourValue.b)} e${numeric(armourValue.e)} p${numeric(armourValue.p)} f${numeric(armourValue.f)}`:'—';
  const price=p.pricePence!==undefined?`${numeric(p.pricePence)} d`:p.pricePerDozenPence!==undefined?`${numeric(p.pricePerDozenPence)} d/12`:'—';
  const weight=p.weightLb!==undefined?`${numeric(p.weightLb)} lb`:'—';
- if(i.category==='armor')return [esc(p.material||'—'),`${numeric(p.encumbrance)}${p.printedEncCode==='a'?' (podmíněné)':p.printedEncCode==='p'?' (PER)':''}`,summary,price,weight];
+ if(i.category==='armor')return [esc(displayArmourMaterial(p.material)),`${numeric(p.encumbrance)}${p.printedEncCode==='a'?' (podmíněné)':p.printedEncCode==='p'?' (PER)':''}`,summary,price,weight];
  if(i.category==='shield')return [numeric(p.quality),`Block ${numeric(p.shieldModifier??p.blockModifier)}`,`Deflect ${numeric(p.deflect)}`,price,weight];
  if(i.category==='weapon')return [numeric(p.quality),p.baseRangeFt!==undefined?`BR ${numeric(p.baseRangeFt)} ft`:`${numeric(p.heft)} / ${numeric(p.length)}`,impact(firstMode),price,weight];
  if(p.projectileKind)return [esc(p.projectileKind),esc(p.shaftWeight||p.slingProjectileForm||'—'),esc(p.impactDie||'—'),price,weight];
@@ -4669,10 +4719,17 @@ function libraryView(){
  const counts=Object.fromEntries(LIBRARY_TABS.filter(t=>!['suits','rules','bestiary','stable'].includes(t.id)).map(t=>[t.id,allCatalogItems().filter(i=>libraryTabsForItem(i).includes(t.id)).length]));
  const searchLower=query.toLocaleLowerCase('cs');
  const suitRows=PRINTED_ARMOUR_SUITS_P113_116.filter(s=>(s.name+' '+s.articles.join(' ')).toLocaleLowerCase('cs').includes(searchLower));
- const list=['suits','rules','bestiary','stable'].includes(selectedTab)?null:libraryVisiblePage(allCatalogItems(),selectedTab,query,catalogStatus,i=>catalogAuditEntry(i).ready,libraryPage);
+ const otherItems=allCatalogItems().filter(i=>libraryTabsForItem(i).includes('other'));
+ const otherKinds=[...new Set(otherItems.map(libraryItemKind))].sort((a,b)=>a.localeCompare(b,'cs'));
+ if(selectedTab==='other'&&libraryOtherFilter!=='all'&&!otherKinds.includes(libraryOtherFilter))libraryOtherFilter='all';
+ const catalogItems=selectedTab==='other'&&libraryOtherFilter!=='all'
+  ?allCatalogItems().filter(i=>!libraryTabsForItem(i).includes('other')||libraryItemKind(i)===libraryOtherFilter)
+  :allCatalogItems();
+ const list=['suits','rules','bestiary','stable'].includes(selectedTab)?null:libraryVisiblePage(catalogItems,selectedTab,query,catalogStatus,i=>catalogAuditEntry(i).ready,libraryPage);
+ const otherFilterBar=selectedTab==='other'?`<nav class="library-other-filters" aria-label="Filtrovat ostatní vybavení podle typu">${[['all','Vše'],...otherKinds.map(k=>[k,k])].map(([k,label])=>`<button type="button" class="${libraryOtherFilter===k?'':'secondary'}" data-library-other-filter="${esc(k)}" aria-pressed="${libraryOtherFilter===k}">${esc(label)}${k==='all'?'':` (${otherItems.filter(i=>libraryItemKind(i)===k).length})`}</button>`).join('')}</nav>`:'';
  if(list)libraryPage=list.page;
  const statusSelector=['rules','suits','bestiary','stable'].includes(selectedTab)?'':`<label>Úplnost evidence<select id="catalog-status"><option value="all" ${catalogStatus==='all'?'selected':''}>Všechny</option><option value="ready" ${catalogStatus==='ready'?'selected':''}>Bez upozornění</option><option value="missing" ${catalogStatus==='missing'?'selected':''}>K doplnění</option></select></label>`;
- return withLibraryFolioMenu(journalChapterShell('Knihovna','Katalog vybavení, referenční tabulky a přidávání předmětů ve vzhledu Keeper’s Ledger.',`<div class="topline"><div><h2>Knihovna vybavení</h2><p class="muted">Vyberte kategorii, otevřete údaje předmětu a případně jej přímo přidejte do inventáře postavy.</p></div>${button('+ Nový předmět','new-item')}</div>
+ return withLibraryFolioMenu(journalChapterShell('Knihovna','Katalog vybavení, referenční tabulky a přidávání předmětů ve vzhledu Keeper’s Ledger.',`<div class="topline"><div><h2>Knihovna vybavení</h2><p class="muted">Vyberte kategorii, otevřete údaje předmětu a případně jej přímo přidejte do inventáře postavy.</p></div><div class="library-other-top-controls">${otherFilterBar}${button('+ Nový předmět','new-item')}</div></div>
  ${selectedTab==='bestiary'?bestiaryCompleteCatalogView():selectedTab==='rules'?`<section class="panel"><h3>Pravidlové tabulky, zdroje a audit</h3><p class="muted">Tyto podklady jsou pouze k nahlédnutí a nepřekážejí při výběru běžných předmětů.</p>${[['Materiály zbroje a povolené vrstvy',armourMaterialsPanel()+armourLayerReferencePanel()],['Tištěné části zbroje · podrobné referenční značky',printedArmourArticlesPanel()],['Předměty, zvířata a dílny',printedPossessionsPanel()+workshopMechanicsPanel()],['Výprava, encumbrance a pravidlové účinky',expeditionEffectsPanel()+printedGearRulesPanel()],['Audit, konzistence a pokrytí',armourLibraryConsistencyPanel()+suitArticleCrosswalkPanel()+armourCoverageReadinessPanel()+catalogCoveragePanel()+catalogAuditPanel()]].map(([title,body])=>`<details class="library-rules-details"><summary>${esc(title)}</summary>${body}</details>`).join('')}</section>`:
  `<div class="library-toolbar"><label>Hledat v této kategorii<input id="search" type="search" placeholder="Název, parametry, zdroj…" value="${esc(query)}" autocomplete="off"></label>${statusSelector}</div>
  <p class="library-results">${selectedTab==='suits'?`Zobrazeno ${suitRows.length} z ${PRINTED_ARMOUR_SUITS_P113_116.length} tištěných kompletů.`:`Zobrazeno ${list.rows.length} z ${list.total} odpovídajících položek.`} Volba Koupit odečítá skutečnou hotovost, Vzít zdarma nic neodečítá. Obojí přidává nesený předmět (ENC se přepočte dle jeho hmotnosti).</p>
@@ -7446,6 +7503,83 @@ function decorateStableUI580(root){
   const hint=headers[cell.textContent.trim()];if(hint){cell.setAttribute('data-hmk-help',hint);cell.tabIndex=0;}
  }
 }
+// Contextual help for every follow-on Skill Test field, including dynamically
+// inserted CF/SV forms. These attributes never change a roll or a proof.
+const SKILL_FOLLOWUP_FIELD_HELP=Object.freeze({
+ animalName:'Jméno skutečně cvičeného zvířete. U zvířete vybraného ze stáje se načte automaticky z jeho trvalého záznamu.',
+ stableAnimalId:'Vyberte konkrétní zvíře z evidence postavy. Odtud se převezme identita, REA, CRE a doložená historie výcviku.',
+ reasoning:'REA (Reasoning) cvičeného zvířete. Každý skutečný Training d10 ≤ REA přinese úspěch; ze stáje se automaticky převezme ověřená druhová hodnota, nikoli nová náhodná volba. HMK 65.',
+ creativity:'CRE (Creativity) cvičeného zvířete. Maximální počet Mastery Boostů je zaokrouhlená polovina CRE nahoru. Ze stáje se načte podle druhu. HMK 65.',
+ previousBestStars:'Nejvyšší dřívější počet hvězd v dokončeném výcviku tohoto konkrétního zvířete. Nové Training Rolls při opakovaném výcviku lze získat až při dosažení alespoň stejného počtu. Ze stájové historie se vypočítá automaticky; u jiného zvířete doložte historii. HMK 65.',
+ previousMasteryBoosts:'Dosud skutečně získané MB z doložených výcviků tohoto zvířete. Nedoplňuje se libovolný odhad; součet nesmí přesáhnout limit odvozený z CRE. HMK 65.',
+ trainingD10:'Zapište všechny nově skutečně hozené d10 oddělené čárkami. Počet určuje upravený SV a počet hvězd, opakovaný výcvik a volba zkrácení. Žádné hody se nesmějí domýšlet. HMK 65.',
+ criticalD3:'Vyplňte skutečný d3 pouze pokud původní Animalcraft SV test skončil CF. Výsledek přidá tolik měsíců výcviku. Jinak nechte prázdné. HMK 65.',
+ notNewborn:'Zaškrtněte pouze tehdy, pokud zvíře nebylo čerstvě narozené. Upravený SV se sníží o 1. HMK 65.',
+ wasWild:'Zaškrtněte u doloženě divokého zvířete; další postih −1 SV. HMK 65.',
+ shorten:'Rozhodnutí zkrátit celý výcvik o měsíc výměnou za jeden existující Training Roll; není to bonusový hod. HMK 65.',
+ periodConfirmed:'Potvrzuje skutečně dokončený čas činnosti v kalendáři, nikoli jen to, že test právě proběhl.',
+ baseSVConfirmed:'Kontrola proti dvojímu započtení: původní SV nesmí již zahrnovat tyto následné úpravy.',
+ technique:'Volba konkrétní pravidlové techniky; u následného testu musí jít o použitelnou dovednost postavy.',
+ conditionsMode:'Vyberte, zda podmínky určil skutečný d100, nebo konkrétní doložená volba GM.',
+ conditionsD100:'Skutečný hod d100 pro podmínky rybolovu; zadá se jen při volbě hodu. HMK 71.',
+ gmCondition:'Pokud GM podmínky stanovil přímo, vyberte skutečnou kategorii; při fyzickém d100 nechte bez výběru. HMK 71.',
+ saturation:'Skutečné doložené snížení TN pro přeplněný nebo vyčerpaný rybolovný revír; 0 znamená žádný takový postih.',
+ catchD10:'Skutečné d10 pro úlovek, oddělené čárkou. Počet vychází z upraveného Fishing SV, nikoli zvolený libovolně. HMK 71.',
+ saltWater:'Použijte pouze při skutečném rybolovu ve slané vodě podle HMK 71.',
+ offshore:'Použijte pouze při skutečném rybolovu offshore, pokud se tato zvláštní násobící podmínka uplatní. HMK 71.',
+ edifice:'Skutečně navrhovaný typ stavby. Nabídka a čas vycházejí z tabulky Engineering Design HMK 70.',
+ designD10:'Za každou dosaženou hvězdu Engineering SV hoďte skutečný d10 proti Mathematics Index návrháře. HMK 70.',
+ timeD3A:'První skutečný d3 jen pro volitelný časový rozptyl ±20 %; bez této volby nechte prázdné. HMK 70.',
+ timeD3B:'Druhý skutečný d3 pouze pro volitelný časový rozptyl; není to opakování původního Engineering testu. HMK 70.',
+ randomizeTime:'GM zde aktivuje pouze výslovně volitelný náhodný rozptyl času návrhu. HMK 70.',
+ constructionConfirmed:'Potvrzení, že navrhující i realizující osoby odpovídají skutečnému projektu, nikoli automatický Construction hod.',
+ origin:'Interní odkaz na již uložený původní test; automaticky přenesený a neupravovaný.',
+ side:'Strana původního testu A/B; automaticky převzata z jeho dokladu.',
+ activity:'Vyberte skutečně prováděnou činnost, pro kterou HMK ukládá následek F/CF; samotná dovednost nestačí.',
+ followRoll:'Nový skutečný fyzický d100 pouze vyžaduje-li ho vybraná pokračovací činnost; původní d100 se znovu nehází.',
+ trainedAnimal:'Jméno zvířete, jehož dokončeného šest měsíců trvajícího výcviku se původní CF týkal.',
+ trainingD3:'Samostatný skutečný d3 určující zdržení po CF Animal Training; nezaměňujte za Training d10.',
+ trainingReduced:'Zkrácení výcviku vyžaduje pravidlové SV a spotřebování jednoho bonusového Training Rollu. HMK 65.',
+ animalTrainingConfirmed:'Potvrďte, že původní CF skutečně pochází z dokončené Animal Training Routine, ne z libovolného Animalcraft testu.',
+ writingScope:'Vyberte skutečný typ písemnosti; zvolený rozsah určuje základní čas Writing Routine podle HMK 132.',
+ writingConfirmed:'Potvrzení existující Writing Routine, nikoli vytvoření nového testu zpětně.',
+ width:'Skutečná šířka překážky/balancovací plochy v palcích; ovlivňuje podmínku Balance podle HMK 64.',
+ willRoll:'Nový skutečný d100 proti Will EML pro Balance; dřívější Acrobatics SV se neopakuje.',
+ impactD10:'Skutečný d10 pro Impact jednotlivého pádu podle HMK 67.',
+ zoneD10:'Skutečný hod pro Body Zone u zásahu / pádu; dle konkrétní sekvence HMK.',
+ locationD10:'Skutečný d10 pro konkrétní anatomickou lokaci ve zvolené zóně.',
+ shockD100:'Skutečný d100 pro Shock jen při zranění, pro které ho pravidla vyžadují.',
+ compoundD10:'Skutečný d10 jen při novém kompatibilním zásahu do již zraněné lokality.',
+ heightFt:'Skutečná výška pádu ve stopách; rozhoduje o použité Falling Routine. HMK 67.',
+ surface:'Skutečný povrch dopadu; v pravidlech mění Impact. HMK 67.',
+ slope:'Skutečný sklon svahu při pádu podle HMK 67.',
+ direction:'Reálný směr nárazu/útoku potřebný pro výběr pokrývající zbroje.',
+ sourceId:'Odkaz na již doložený výsledek, ze kterého tento následek vzniká; není nový hod.',
+ itemId:'Vyberte skutečný existující inventární předmět, který postihl doložený následek.',
+ outcome:'Vyberte skutečný výsledek pro vybavení podle události; nevyvozujte mechanický postih bez pravidla.',
+ reason:'Popište konkrétní doložené okolnosti nebo rozhodnutí GM, které vedlo k uvedené hodnotě.',
+ hazardD10:'Skutečný d10 pro vyhodnocení Survival Hazard, ne původní Survival d100. HMK 148.',
+ targetId:'Skutečně určená postižená postava či tvor; nesmí být zvolen jen pro výhodnější výsledek.',
+ agilityD100:'Skutečný nový d100 Agility jen při Accident podle pravidlového výsledku.',
+ impactDie:'Skutečná kostka Impact podle vzniklého fyzického následku.',
+ gmConfirmed:'GM potvrzuje skutečný materiální následek, nikoli udělení nového libovolného bonusu.'
+});
+function decorateSkillContinuationHelp(root){
+ if(!root)return;
+ const selector='form[data-hmk-animal-training],form[data-hmk-fishing-catch],form[data-hmk-engineering-design],form[data-skill-critical-form],form[data-skill-balance-nerves],form[data-skill-swimming-aftermath],form[data-skill-aggravation-aftermath],form[data-skill-weather-course],form[data-skill-weather-onset],form[data-skill-weather-skin],form[data-skill-cold-shock],form[data-climbing-fall-form],form[data-climbing-short-fall],form[data-skill-fishing-gear],form[data-skill-physical-impact],form[data-skill-serious-aggravation],form[data-skill-trekking-weather],form[data-skill-trekking-cold-shock],form[data-skill-trekking-skin],form[data-skill-trekking-weather-course]';
+ for(const form of root.querySelectorAll(selector)){
+  for(const field of form.querySelectorAll('input[name],select[name],textarea[name]')){
+   if(field.type==='hidden')continue;
+   const label=field.closest('label');if(!label)continue;
+   const meaning=SKILL_FOLLOWUP_FIELD_HELP[field.name]||
+    ('Tato hodnota patří k následnému postupu: '+label.textContent.trim().replace(/\s+/g,' ')+'. Vyplňte doložený skutečný údaj; předvyplnění je pouze návrh a neprokazuje nový hod.');
+   if(!label.hasAttribute('data-hmk-help'))label.setAttribute('data-hmk-help',meaning);
+   label.title=meaning;
+   if(!field.hasAttribute('title'))field.title=meaning;
+   if(!label.hasAttribute('tabindex'))label.tabIndex=0;
+  }
+ }
+}
 function render(){
  // Deny all paths to partially generated sheets, even routes that set view
  // directly without clicking a registry card (import, skill link, wizard exit).
@@ -7468,6 +7602,7 @@ function render(){
  app.innerHTML=main()+(overlay||'');
  hideVisibleTechnicalUUIDs(app);
  enrichAnimalTrainingForms(app);
+ decorateSkillContinuationHelp(app);
  decorateStableUI580(app);
  // Fit precisely fifteen actual item rows, regardless of wrapped item labels.
  for(const container of app.querySelectorAll('.inv-table-scroll.inv-15-rows')){
@@ -7485,6 +7620,14 @@ function render(){
  enhanceHMKDiceFields();
  updateExpeditionDiceFields(app.querySelector('#campaign-expedition-form'),{reset:false});
 }
+// Follow-up panels may appear after a skill proof is appended without a full render.
+// Observe only added DOM nodes; attribute edits from help decoration do not loop.
+const skillFollowupObserver=new MutationObserver(records=>{
+ if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
+  node.matches?.('form,section,div')||node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form]')))))
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);}
+});
+skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
 // On narrow layouts the navigation joins the page scroll instead of using
 // its own scroll container. Keep the viewport at the same position on sidebar
 // clicks, rather than allowing focus/scroll anchoring to jump to page top.
@@ -7866,6 +8009,14 @@ document.addEventListener('submit',event=>{
   const selectedStable=selectedStableId?bestiaryKnownAnimals().find(x=>x.id===selectedStableId):null;
   if(selectedStableId&&!selectedStable)throw Error('Vybrané zvíře už není ve stáji.');
   if(selectedStable&&(els.namedItem('animalName').value!==selectedStable.name||Number(els.namedItem('reasoning').value)!==selectedStable.spec.rea||Number(els.namedItem('creativity').value)!==selectedStable.spec.cre))throw Error('Identita a atributy zvířete neodpovídají stáji a bestiáři.');
+  if(selectedStable){
+   const prior=data.journal.filter(j=>j.calendarCampaignId===campaignKey(data.campaignClock)&&
+    j.livestockTraining?.animalId===selectedStable.id&&j.livestockTraining?.ownerId===selectedStable.ownerId&&j.skillTestProof?.type==='animal-training');
+   const realStars=prior.reduce((m,j)=>Math.max(m,Number(j.skillTestProof?.bestStarsAfter)||0),0);
+   const realBoosts=prior.reduce((m,j)=>Math.max(m,Number(j.skillTestProof?.finalBoosts)||0),0);
+   if(Number(els.namedItem('previousBestStars').value)!==realStars||Number(els.namedItem('previousMasteryBoosts').value)!==realBoosts)
+    throw Error('Předchozí hvězdy a MB se změnily oproti doložené historii zvířete; nelze je ručně přepsat. Obnovte formulář.');
+  }
   const result=resolveAnimalTraining({proof,originId,actorId:actor.id,
    animalName:els.namedItem('animalName').value,
    reasoning:Number(els.namedItem('reasoning').value),creativity:Number(els.namedItem('creativity').value),
@@ -12889,6 +13040,12 @@ document.addEventListener('submit',e=>{
  }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
 },true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-bestiary-open]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='bestiary';render();},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('button[data-library-other-filter]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ libraryOtherFilter=b.dataset.libraryOtherFilter||'all';libraryPage=0;
+ render();
+},true);
 document.addEventListener('click',e=>{
  const tab=e.target.closest?.('button[data-library-tab]');if(!tab)return;
  e.preventDefault();e.stopImmediatePropagation();
