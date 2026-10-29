@@ -284,7 +284,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.583';
+const APP_VERSION='93.584';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3361,7 +3361,14 @@ function characterJournalHero(c,inv,editing=false){
  const lineageRows=[['Name',c.name],['Race / Folk',bio('folk')],['Age group',bio('ageGroup')],['Birthdate',bio('birthdate')],['Sunsign',bio('sunsign')],['Birthplace',bio('birthplace')],['Social Class',bio('socialClass')],['Background',bio('background')]];
  const appearanceRows=[['Height',bio('height')],['Weight',bio('weight')],['Hair',bio('hair')],['Eyes',bio('eyes')],['Complexion',bio('complexion')],['Handedness',bio('handedness')],['Deportment',bio('deportment')]];
  const familyRows=[['Society',bio('society')],['Family',bio('familyOccupation')],['Occupation',firstPresent(c.occupation,bio('occupation'))],['Home',bio('home')],['Realm',bio('realm')],['Settlement',bio('settlement')],['Wealth',bio('wealth')],['Coins',cashForCharacter(c).ok?cashForCharacter(c).balance:bio('coins')],['Estrangement',bio('estrangement')],['Pantheon',bio('pantheon')],['Region',bio('birthRegion')],['Languages',h.regionalLanguages?.length?listPresent(h.regionalLanguages):bio('nativeLanguage')]];
- const traitValues=[bio('psyche'),bio('estrangement'),bio('pantheon'),creation.autoGeneration?.semantic?.summary,c.description].filter(v=>v&&v!=='—');
+ const traitEntries=[
+  {value:bio('psyche'),help:'Psyche (HMK str. 40, 188): psychický rys, impuls nebo porucha. None znamená, že při tvorbě nevznikl žádný takový rys; není to zákaz budoucího psychického traumatu.'},
+  {value:bio('estrangement'),help:'Estrangement (HMK str. 34): vztah postavy k rodině a klanu. Popular znamená oblíbeného člena rodiny; připojené číslo je hodnota Estrangement pro případný Kinship Roll d100, nikoli počet rodinných příslušníků.'},
+  {value:bio('pantheon'),help:'Pantheon (HMK str. 313–314 a regionální tabulky): náboženský okruh přidělený podle původu. Název, například Mafáni, označuje daný okruh; sám o sobě nepřidává statistický bonus ani neurčuje konkrétní osobní víru.'},
+  {value:creation.autoGeneration?.semantic?.summary,help:'Shrnutí automatického generování: popisné odůvodnění nebo výklad zadaných rysů; nezakládá další pravidlové modifikátory.'},
+  {value:c.description,help:'Popis postavy: vlastní slovní poznámka nebo zadání při tvorbě. Není to automaticky nová dovednost ani pravidlový bonus.'}
+ ].filter(t=>t.value&&String(t.value).trim()&&t.value!=='—');
+ const traitValues=traitEntries.map(t=>t.value);
  const move=Number.isFinite(attrs.agl)&&Number.isFinite(attrs.str)?baseMove({agility:attrs.agl,strength:attrs.str,folk:String(h.folk||'').toLowerCase().includes('kuzhai')?'kuzhai':'human-sized'}):null;
  const load=resolveCombatantLoad({character:c,inventory:activeRationInventory()});
  const combatSkills=[['Initiative',skillValueForJournal(c,['Initiative'])],['Awareness',skillValueForJournal(c,['Awareness'])],['Dodge',skillValueForJournal(c,['Dodge'])],['Shield',skillValueForJournal(c,['Shield'])],['Melee',skillValueForJournal(c,['Sword','Melee','Axe','Spear'])],['Missile',skillValueForJournal(c,['Archery','Missile','Bow'])],['Mounted',skillValueForJournal(c,['Riding'])],['Unarmed',skillValueForJournal(c,['Unarmed'])]];
@@ -3405,7 +3412,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.shock==='UNC'?'Ano':state.shock==='KIA'?'KIA':'Ne'],['Death Save',state.shock==='KIA'?'KIA':'—']];
  const conditionRows=projectChronicleConditions(state,{campaignId:data.campaignClock?campaignKey(data.campaignClock):null,auralShockLevels:h.arcane?.auralShockLevels});
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitValues.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitEntries.map(t=>`<li data-hmk-help="${esc(t.help+' Aktuální záznam: '+t.value)}" tabindex="0" aria-label="${esc(t.help+' Aktuální záznam: '+t.value)}">${esc(t.value)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -4297,17 +4304,33 @@ function bestiaryCompleteCatalogView({includeGenerator=true}={}){
  ${rows}</section>`;
 }
 
-// v93.581 · appearance Weight is a verified body-only input; the total
-// riding weight is explicitly recorded by the player and must include gear.
-function stableRiderSuggestion581(actor){
- const value=actor?.hmk?.appearanceProof?.values?.weight;
- const body=typeof value==='string'&&/^\d+ lb$/.test(value)?Number(value.slice(0,-3)):null;
- if(!Number.isSafeInteger(body)||body<=0)return null;
- const carried=data.inventory.filter(i=>i.characterId===actor.id&&
-  ['none','carried','main_hand','off_hand','worn'].includes(i.slot)&&Number.isSafeInteger(i.quantity)&&i.quantity>0&&
-  Number.isFinite(i.snapshot?.properties?.weightLb)&&i.snapshot.properties.weightLb>=0)
-  .reduce((sum,i)=>sum+i.snapshot.properties.weightLb*i.quantity,0);
- return {bodyLb:body,suggestedLb:Math.ceil(body+carried)};
+// v93.584 · Mount weight is computed exclusively from the actual character's
+// recorded body weight and currently carried/equipped physical inventory.
+// It is frozen in the immutable mounting proof until dismount/re-mount.
+function stableRiderWeight584(actor){
+ if(!actor||actor.archived)return {ready:false,reason:'Vyberte existující aktivní postavu.'};
+ const proof=actor.hmk?.appearanceProof;
+ if(proof){
+  const verified=verifyAppearance(actor);
+  if(!verified.ok)return {ready:false,reason:'Důkaz tělesné hmotnosti v Character Creation / Appearance není platný: '+verified.issues.join('; ')};
+ }
+ const source=proof?.values?.weight??actor.hmk?.weight;
+ const match=/^\s*(\d+(?:[.,]\d+)?)\s*lb\s*$/i.exec(String(source??''));
+ const bodyLb=match?Number(match[1].replace(',','.')):NaN;
+ if(!Number.isFinite(bodyLb)||bodyLb<=0||bodyLb>1000000)
+  return {ready:false,reason:'Postava nemá doloženou tělesnou hmotnost v Character Creation → Appearance. Nejprve dokončete její záznam.'};
+ const physical=activeRationInventory().filter(i=>i.characterId===actor.id&&
+  ['none','carried','main_hand','off_hand','worn'].includes(i.slot)&&Number(i.quantity)>0);
+ const unknown=physical.filter(i=>!Number.isFinite(i.snapshot?.properties?.weightLb)||i.snapshot.properties.weightLb<0||
+  !Number.isFinite(i.quantity)||!Number.isFinite(i.waterContentsLb??0)||i.waterContentsLb<0);
+ if(unknown.length)return {ready:false,reason:'V aktuálním inventáři chybí doložená hmotnost: '+unknown.map(i=>i.snapshot?.name||'neznámý předmět').join(', ')};
+ const items=physical.map(i=>({inventoryId:i.id,quantity:i.quantity,unitWeightLb:i.snapshot.properties.weightLb,
+  contentsLb:i.waterContentsLb??0}));
+ const gearLb=items.reduce((sum,i)=>sum+i.unitWeightLb*i.quantity+i.contentsLb,0);
+ const round=n=>Math.round(n*1000)/1000;
+ const totalLb=round(bodyLb+gearLb);
+ if(!Number.isFinite(totalLb)||totalLb>1000000)return {ready:false,reason:'Hmotnost jezdce je mimo povolený rozsah.'};
+ return {ready:true,bodyLb:round(bodyLb),gearLb:round(gearLb),totalLb,items};
 }
 // v93.574 · Stable is the single animal-management workspace; the journal
 // keeps immutable proofs, not a second editable animal overview.
@@ -4328,7 +4351,7 @@ function stableHubAnimalHTML(a,campaignId){
  const family=verifiedLivestock(data,campaignId).filter(b=>b.id!==a.id&&b.spec?.breed);
  const activeVehicles=p.vehicles.filter(v=>['Cart, 2-wheel','Wagon, 4-wheel','Sled'].includes(VEHICLES_TACK_P122.find(x=>x.id===v.itemId)?.name));
  const riderChoices=data.characters.filter(c=>!c.archived);
- const initialRider=stableRiderSuggestion581(character(a.ownerId));
+
  const statNames={str:'STR',end:'END',agl:'AGL',per:'PER',aur:'AUR',wil:'WIL',rea:'REA',cre:'CRE',aware:'Awareness',scent:'Scent',stealth:'Stealth',spirit:'Spirit',initiative:'Initiative'};
  const statHelp={str:'Strength (STR): tělesná síla; upravuje zatížení.',end:'Endurance (END): odolnost a výdrž.',agl:'Agility (AGL): pohyblivost a reflexy.',per:'Perception (PER): vnímání a smysly.',aur:'Aura (AUR): duchovní a magické nadání.',wil:'Will (WIL): vůle a odhodlání.',rea:'Reasoning (REA): úsudek a paměť.',cre:'Creativity (CRE): představivost.',aware:'Awareness: všímavost a rozpoznání nebezpečí.',scent:'Scent: stopování a vnímání pachů.',stealth:'Stealth: skrytý pohyb.',spirit:'Spirit: odolnost a práce s duchovní silou.',initiative:'Initiative: reakce v boji.'};
  return `<details class="panel hmk-stable-animal-card" ${dead?'':'open'}><summary><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ${esc(character(a.ownerId)?.name||'—')} · ${dead?(p.exit.type==='sale'?'PRODÁNO':'OPUŠTĚNO'):'AKTIVNÍ'}</summary>
@@ -4345,10 +4368,10 @@ function stableHubAnimalHTML(a,campaignId){
  ${last?`<p>Poslední encounter: ${esc(last.name)} · ID ${esc(last.id)}. Zdravotní historie pokračuje pod trvalou identitou.</p>`:''}
  <div class="actions"><button type="button" class="secondary hc-small" data-hmk-stable-go-travel>Otevřít cestovní hlídku</button></div></section>
  <section class="hmk-stable-block"><h4>Jezdec · nasednutí a sesednutí (HMK 122)</h4>
- <p class="hmk-stable-ref-small">Hmotnost nesená zvířetem zahrnuje celé tělo jezdce, jeho oblečenou zbroj i nesenou výstroj. Zapsaná hmotnost se započítá do ENC/PF a jako minimální zátěž cestovní hlídky. Hmotnost jezdce je doložená při nasednutí a během jízdy zůstává započtena bez ohledu na přesuny předmětů. Změní se až po sesednutí a novém nasednutí; přeložený náklad zvířete se eviduje zvlášť.</p>
+ <p class="hmk-stable-ref-small">Hmotnost nesená zvířetem zahrnuje celé tělo jezdce, jeho oblečenou zbroj i nesenou výstroj. Zapsaná hmotnost se započítá do ENC/PF a jako minimální zátěž cestovní hlídky. Hmotnost se při nasednutí automaticky vypočítá z doložené tělesné váhy a aktuálního inventáře včetně vody; během jízdy zůstává započtena bez ohledu na přesuny předmětů. Změní se až po sesednutí a novém nasednutí; přeložený náklad zvířete se eviduje zvlášť.</p>
  ${p.rider?`<p><strong>Nasedl:</strong> ${esc(character(p.rider.characterId)?.name||'postava')} · <strong>${p.rider.weightLb} lb</strong> (včetně neseného vybavení).</p>
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="rider-dismount"><input type="hidden" name="riderId" value="${esc(p.rider.characterId)}"><input type="hidden" name="reason" value="Jezdec skutečně sesedl ze zvířete"><button type="submit">Sesednout</button></form>`:''}`:
- !dead&&a.spec.breed&&a.spec.str?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="rider-mount"><input type="hidden" name="reason" value="Jezdec skutečně nasedl, celková hmotnost včetně výstroje"><label>Jezdec<select name="riderId" data-hmk-stable-rider-select>${riderChoices.map(c=>{const suggested=stableRiderSuggestion581(c);return `<option value="${esc(c.id)}" ${c.id===a.ownerId?'selected':''} data-rider-weight="${suggested?.suggestedLb??''}">${esc(c.name)}</option>`}).join('')}</select></label><label>Celková skutečná hmotnost jezdce včetně výstroje (lb)<input name="riderWeightLb" type="number" min="1" max="1000000" step="1" value="${initialRider?.suggestedLb??''}" required placeholder="Váha těla + nesená výstroj"></label><button type="submit">Nasednout a započítat hmotnost</button></form>`:
+ !dead&&a.spec.breed&&a.spec.str?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="rider-mount"><input type="hidden" name="reason" value="Jezdec skutečně nasedl, celková hmotnost včetně výstroje"><label>Jezdec<select name="riderId" data-hmk-stable-rider-select>${riderChoices.map(c=>{const weight=stableRiderWeight584(c);return `<option value="${esc(c.id)}" ${c.id===a.ownerId?'selected':''} data-rider-weight="${weight.ready?weight.totalLb:''}">${esc(c.name)}${weight.ready?' · '+weight.totalLb+' lb':' · váha nedoložena'}</option>`}).join('')}</select></label><p class="hmk-stable-ref-small" data-hmk-stable-rider-weight aria-live="polite">${(()=>{const chosen=riderChoices.find(c=>c.id===a.ownerId)||riderChoices[0],w=stableRiderWeight584(chosen);return w.ready?`Automatický součet: tělo ${w.bodyLb} lb + nesené oblečení, zbroj, výstroj a zásoby ${w.gearLb} lb = <strong>${w.totalLb} lb</strong>. Hmotnost se uloží při nasednutí.`:`Hmotnost zatím nelze vypočítat: ${esc(w.reason)}`})()}</p><button type="submit">Nasednout a započítat skutečnou hmotnost</button></form>`:
  '<p class="hmk-stable-ref-small">Pro tento druh není ověřený jezdecký profil; nasednutí se bez doložení nepovoluje.</p>'}
  </section>
  <section class="hmk-stable-block"><h4>Výstroj, náklad a nosnost · HMK 122</h4>
@@ -12839,12 +12862,13 @@ document.addEventListener('submit',e=>{
   const asInt=(v,name)=>{if(!/^\d+$/.test(String(v??'')))throw Error('Vyplňte celé nezáporné číslo: '+name);const num=Number(v);if(!Number.isSafeInteger(num)||num>1000000)throw Error('Neplatný rozsah: '+name);return num;};
   let cashDelta=0;
   if(type==='rider-mount'){
-   const rider=character(raw.riderId),weight=asInt(raw.riderWeightLb,'celková hmotnost jezdce');
-   const documented=stableRiderSuggestion581(rider)?.bodyLb;
-   if(!rider||rider.archived||p.rider||!animal.spec.breed||!animal.spec.str||weight<=0||
-    documented!==undefined&&weight<documented)throw Error('Jezdec a jeho skutečná hmotnost nejsou doloženy nebo zvíře již nese jezdce.');
+   const rider=character(raw.riderId),weightProof=stableRiderWeight584(rider);
+   if(!weightProof.ready)throw Error(weightProof.reason);
+   if(!rider||rider.archived||p.rider||!animal.spec.breed||!animal.spec.str)
+    throw Error('Jezdec není platný nebo zvíře již nese jezdce.');
    if(verifiedLivestock(data,campaignId).some(other=>other.id!==animal.id&&stableBurden(data,campaignId,other).rider?.characterId===rider.id))throw Error('Tato postava již sedí na jiném zvířeti.');
-   Object.assign(event,{riderId:rider.id,riderWeightLb:weight,riderBodyLb:documented??null});
+   Object.assign(event,{riderId:rider.id,riderWeightLb:weightProof.totalLb,riderBodyLb:weightProof.bodyLb,
+    riderGearLb:weightProof.gearLb,riderItems:weightProof.items,riderWeightSource:'inventory-auto-584'});
   }else if(type==='rider-dismount'){
    if(!p.rider||p.rider.characterId!==raw.riderId)throw Error('Jezdec na tomto zvířeti nesedí.');
    event.riderId=raw.riderId;
@@ -12980,8 +13004,12 @@ document.addEventListener('submit',e=>{
 },true);
 document.addEventListener('change',e=>{
  const select=e.target?.closest?.('select[data-hmk-stable-rider-select]');if(!select)return;
- const input=select.closest('form')?.querySelector('input[name="riderWeightLb"]');
- if(input)input.value=select.selectedOptions[0]?.dataset.riderWeight||'';
+ const out=select.closest('form')?.querySelector('[data-hmk-stable-rider-weight]');
+ if(out){
+  const rider=character(select.value),weight=stableRiderWeight584(rider);
+  out.innerHTML=weight.ready?`Automatický součet: tělo ${weight.bodyLb} lb + nesené oblečení, zbroj, výstroj a zásoby ${weight.gearLb} lb = <strong>${weight.totalLb} lb</strong>. Hmotnost se uloží při nasednutí.`:
+   `Hmotnost zatím nelze vypočítat: ${esc(weight.reason)}`;
+ }
 },true);
 document.addEventListener('change',e=>{
  const select=e.target?.closest?.('select[data-hmk-stable-gear-select]');if(!select)return;
