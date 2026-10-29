@@ -6,11 +6,48 @@ import {ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
 const assert=(condition,message)=>{if(!condition)throw Error(message)};
 export const WRITING_WORK_MINUTES_591=Object.freeze({missive:10,tract:5*1440,treatise:30*1440,disquisition:120*1440});
 export const SKILL_TIMED_WORK_FORMAT_591='hmk-skill-timed-work-591-v1';
+
+// HMK 1.2 pp. 73, 91. Printed, non-weapon, individually priced items only.
+// The cost is a reference for a prospective work period, NOT an automatic
+// acquisition, workshop confirmation, or material expense.
+export const TIMED_CRAFT_ITEMS_599=Object.freeze({
+ glassworking:Object.freeze({
+  beads12:Object.freeze({name:'Beads, 12',priceD:12,weightLb:1}),
+  bottle2p:Object.freeze({name:'Bottle, 2 pints',priceD:6,weightLb:2}),
+  jar1p:Object.freeze({name:'Jar, 1 pint',priceD:6,weightLb:0.75}),
+  flask1p:Object.freeze({name:'Flask, 1 pint',priceD:6,weightLb:1}),
+  hourglass:Object.freeze({name:'Hourglass',priceD:150,weightLb:0.3}),
+  inkwell:Object.freeze({name:'Inkwell, 2 oz',priceD:30,weightLb:1}),
+  lenses:Object.freeze({name:'Lenses',priceD:120,weightLb:0.1}),
+  stainedWindow:Object.freeze({name:'Window, stained, ft²',priceD:12,weightLb:4})
+ }),
+ woodworking:Object.freeze({
+  barrel10:Object.freeze({name:'Barrel, 10 gal',priceD:12,weightLb:30}),
+  barrel50:Object.freeze({name:'Barrel, 50 gal',priceD:36,weightLb:90}),
+  bedSingle:Object.freeze({name:'Bed, single',priceD:48,weightLb:85}),
+  bench:Object.freeze({name:'Bench',priceD:18,weightLb:22}),
+  cup:Object.freeze({name:'Cup',priceD:3,weightLb:1}),
+  ladder8:Object.freeze({name:'Ladder, 8 ft',priceD:6,weightLb:19}),
+  chair:Object.freeze({name:'Chair',priceD:12,weightLb:7}),
+  chest:Object.freeze({name:'Chest, 1×2×2 ft',priceD:18,weightLb:24}),
+  table:Object.freeze({name:'Table, 4×2×6 ft',priceD:36,weightLb:47}),
+  wheelbarrow:Object.freeze({name:'Wheelbarrow',priceD:10,weightLb:24})
+ })
+});
+export const TIMED_CRAFT_LABELS_599=Object.freeze({glassworking:'Glassworking · HMK 73',woodworking:'Woodworking · HMK 91'});
+
 export function timedSkillBaseMinutes591(kind,scope){
  if(kind==='engineering')return Number.isFinite(ENGINEERING_DESIGN_DAYS[scope])?ENGINEERING_DESIGN_DAYS[scope]*1440:null;
  if(kind==='writing')return WRITING_WORK_MINUTES_591[scope]??null;
  if(kind==='drawing'){const area=Number(scope);return Number.isInteger(area*4)&&area>=0.25&&area<=10?area*240:null;}
  if(kind==='cookery'){const diners=Number(scope);return Number.isInteger(diners)&&diners>=5&&diners<=100&&diners%5===0?(diners/5)*60:null;}
+ if(kind==='glassworking'||kind==='woodworking'){
+  const item=TIMED_CRAFT_ITEMS_599[kind]?.[scope];
+  if(!item)return null;
+  // Glassworking: approximately one 24h day per 6d (only exact day
+  // multiples are offered). Woodworking: 10 working hours per 3d.
+  return kind==='glassworking'?(item.priceD/6)*1440:(item.priceD/3)*600;
+ }
  return null;
 }
 export function skillTimedEarliest591(kind,baseMinutes){
@@ -32,7 +69,12 @@ export function validateSkillTimedWork591(data){
    typeof row.calendarCampaignId==='string'&&row.calendarCampaignId.length>0&&
    Number.isSafeInteger(p.startMinute)&&p.startMinute>=0&&p.startMinute===row.campaignMinute&&
    p.baseMinutes===base&&p.earliestMinute===p.startMinute+skillTimedEarliest591(p.kind,base)&&
-   p.baseDueMinute===p.startMinute+base&&!starts.has(row.id),
+   p.baseDueMinute===p.startMinute+base&&!starts.has(row.id)&&
+   (!TIMED_CRAFT_ITEMS_599[p.kind]||(
+     p.craftItemPriceD===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.priceD&&
+     p.craftItemWeightLb===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.weightLb&&
+     p.craftItemName===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.name&&
+     p.materialSourceConfirmed===true)),
    'Časovaný Skill Test: začátek projektu nebo pravidlová doba byly pozměněny.');
   starts.set(row.id,{row,p});
  }
@@ -45,7 +87,8 @@ export function validateSkillTimedWork591(data){
    Number.isSafeInteger(row.campaignMinute)&&row.campaignMinute>=s.p.earliestMinute&&
    proof?.type==='secondary-mastery-value-test'&&
    (s.p.kind==='writing'?/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill):
-    skill===({engineering:'Engineering',drawing:'Drawing',cookery:'Cookery'})[s.p.kind]),
+    skill===({engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking'})[s.p.kind])&&
+   (!TIMED_CRAFT_ITEMS_599[s.p.kind]||row.campaignMinute>=s.p.baseDueMinute),
    'Časovaný Skill Test: původní SV nesouhlasí s časem, postavou ani projektem.');
   linked.add(link.startId);
  }
