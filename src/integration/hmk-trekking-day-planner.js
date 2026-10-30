@@ -4,6 +4,7 @@
  * Historical Trekking/END evidence remains the single source of actual events.
  */
 export const TREK_DAY_PLAN_FORMAT='hmk-trekking-day-plan-v1';
+export const TREK_WATCH_CANCEL_FORMAT='hmk-trekking-watch-intent-cancel-v1';
 const validText=(v,n=90)=>typeof v==='string'&&v.trim().length>0&&v.trim().length<=n;
 const oneOf=(v,items)=>items.includes(v);
 export function validateTrekDayPlan(value){
@@ -31,6 +32,47 @@ export function trekDayPlans(journal=[],campaignId,dayIndex){
 }
 export function latestTrekDayPlan(journal=[],campaignId,dayIndex){
  return trekDayPlans(journal,campaignId,dayIndex).at(-1)??null;
+}
+/** The last confirmed daily plan is the only authority for currently planned
+ * slots. Cancellations refer to that exact immutable plan ID, never the day
+ * number alone, so new explicitly confirmed revisions cannot be silently
+ * modified by old cancellations. */
+export function latestTrekDayPlanRecord(journal=[],campaignId,dayIndex){
+ return journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarTrekDayPlan?.format===TREK_DAY_PLAN_FORMAT&&
+ j.calendarTrekDayPlan.dayIndex===dayIndex).at(-1)??null;
+}
+export function cancelledTrekWatchIntents(journal=[],campaignId,planRecord){
+ if(!planRecord)return new Map();
+ const result=new Map();
+ for(const row of journal){const c=row.calendarTrekWatchCancel;
+  if(c?.format!==TREK_WATCH_CANCEL_FORMAT||row.calendarCampaignId!==campaignId||c.planId!==planRecord.id)continue;
+  result.set(c.watchIndex,{...c,receiptId:row.id});
+ }
+ return result;
+}
+export function effectiveTrekWatchIntents(journal=[],campaignId,planRecord){
+ const raw=planRecord?.calendarTrekDayPlan?.watchIntents??Array(6).fill('none');
+ const cancelled=cancelledTrekWatchIntents(journal,campaignId,planRecord);
+ return raw.map((name,index)=>cancelled.has(index)?'none':name);
+}
+export function validateTrekWatchCancelRecord(row,journal=[]){
+ const c=row?.calendarTrekWatchCancel;
+ if(!c||c.format!==TREK_WATCH_CANCEL_FORMAT||typeof row.id!=='string'||!row.id||
+  !Number.isSafeInteger(c.dayIndex)||c.dayIndex<0||!Number.isInteger(c.watchIndex)||c.watchIndex<0||c.watchIndex>5||
+  typeof c.planId!=='string'||!c.planId||typeof row.calendarCampaignId!=='string'||!row.calendarCampaignId||
+  typeof row.characterId!=='string'||!row.characterId||!Number.isSafeInteger(row.campaignMinute)||
+  row.campaignMinute!==c.effectiveMinute||Math.floor(row.campaignMinute/1440)!==c.dayIndex||
+  !validText(c.reason,240)||c.reason.trim().length<3)throw Error('Zrušení hlídky nemá platný čas, důvod nebo vazbu na kampaň.');
+ const source=journal.find(j=>j.id===c.planId);
+ if(!source||source.calendarCampaignId!==row.calendarCampaignId||
+  source.calendarTrekDayPlan?.format!==TREK_DAY_PLAN_FORMAT||source.calendarTrekDayPlan.dayIndex!==c.dayIndex||
+  source.characterId!==row.characterId||
+  source.calendarTrekDayPlan.watchIntents?.[c.watchIndex]==='none'||
+  !source.calendarTrekDayPlan.watchIntents?.[c.watchIndex]||
+  !Number.isSafeInteger(source.campaignMinute)||source.campaignMinute>row.campaignMinute||
+  row.campaignMinute >= c.dayIndex*1440+(c.watchIndex+1)*240)
+  throw Error('Zrušení musí odkazovat na existující dosud platný plán, a to nejpozději před koncem hlídky.');
+ return true;
 }
 export function previousTrekContext(journal=[],campaignId,minute){
  const previous=journal.filter(j=>j.calendarCampaignId===campaignId&&j.campaignMinute<=minute&&j.calendarTrekProof?.format==='hmk-trekking-watch-evidence-v1').at(-1);
@@ -77,6 +119,17 @@ export function validateTrekDayHistory(journal=[]){
    throw Error('Denní cestovní plán není navázán na původní čas, kampaň a průvodce.');
   ids.add(row.id);
  }
+ const canceledKeys=new Set();
+ const idsAll=new Set();
+ for(const row of journal){
+  if(row?.id&&idsAll.has(row.id)&&row.calendarTrekWatchCancel)throw Error('Duplicitní ID dokladu zrušení hlídky.');
+  if(row?.id)idsAll.add(row.id);
+  if(!row?.calendarTrekWatchCancel)continue;
+  validateTrekWatchCancelRecord(row,journal);
+  const key=JSON.stringify([row.calendarCampaignId,row.calendarTrekWatchCancel.planId,row.calendarTrekWatchCancel.watchIndex]);
+  if(canceledKeys.has(key))throw Error('Stejná hlídka už má potvrzené zrušení.');
+  canceledKeys.add(key);
+ }
  return true;
 }
 export function assertTrekDayAppendOnly(before=[],after=[]){
@@ -85,6 +138,12 @@ export function assertTrekDayAppendOnly(before=[],after=[]){
   const row=current.get(old.id);
   if(!row||JSON.stringify(row)!==JSON.stringify(old))
    throw Error('Potvrzený denní plán není možné změnit ani smazat. Vytvořte nový potvrzený doklad.');
+ }
+ const cancellations=new Map(after.filter(j=>j?.calendarTrekWatchCancel).map(j=>[j.id,j]));
+ for(const old of before){if(!old?.calendarTrekWatchCancel)continue;
+  const row=cancellations.get(old.id);
+  if(!row||JSON.stringify(row)!==JSON.stringify(old))
+   throw Error('Historický doklad zrušení hlídky nelze změnit ani smazat.');
  }
  return true;
 }
