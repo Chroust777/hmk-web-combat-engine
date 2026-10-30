@@ -6713,3 +6713,14 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 @media(max-width:900px){.content-calendar .hc-trek-day-activity-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:450px){.content-calendar .hc-trek-day-activity-grid{grid-template-columns:1fr}}
 .content-calendar .hc-trek-watch-slot button{font-size:.74rem;padding:5px 8px;min-height:30px;margin-top:auto;align-self:flex-start;white-space:normal}
+
+/* v93.613 · cancel a single confirmed *intention*, never the executed activity */
+.content-calendar .hc-trek-cancel-watch{margin-top:7px;border-top:1px solid rgba(112,83,48,.28);padding-top:7px;min-width:0}
+.content-calendar .hc-trek-cancel-watch>summary{font:700 .81rem/1.4 Georgia,serif;color:#7d3325;cursor:pointer;overflow-wrap:anywhere}
+.content-calendar .hc-trek-cancel-watch form{margin-top:8px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.content-calendar .hc-trek-cancel-watch label{display:flex;flex-direction:column;gap:5px;font-size:.79rem;font-weight:650;min-width:0}
+.content-calendar .hc-trek-cancel-watch input{width:100%;box-sizing:border-box;min-width:0;max-width:100%;font:inherit}
+.content-calendar .hc-trek-cancel-watch .hc-trek-cancel-confirm{width:100%;max-width:100%;white-space:normal;background:#273e58;color:#fbe6bd;border-color:#273e58}
+.content-calendar .hc-trek-cancel-note{font:.75rem/1.4 Georgia,serif;color:#804530;overflow-wrap:anywhere}
+.content-calendar .hc-trek-watch-cancelled{border-left:4px solid #99583f;background:rgba(189,139,108,.12)}
+.content-calendar .hmk-trek-guide .hmk-trek-steps li{line-height:1.52;margin-bottom:8px}
