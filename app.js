@@ -290,7 +290,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.613';
+const APP_VERSION='93.614';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1658,10 +1658,10 @@ function campaignCalendarView(){
  </div></fieldset><fieldset class="hmk-trek-section" id="hmk-foraging-watch-fields"><legend>4 · Činnosti během hlídky</legend>
  <p class="hc-foraging-jump-help" data-foraging-jump-help hidden><strong>Foraging – tady nastavte sběr zásob.</strong> Nejdříve vyberte výše průvodce, účastníky a prostředí hlídky. Potom zvolte počet <strong>Foraging Modes</strong>, případně sběr na místě. Hlídku uložte původním tlačítkem níže; skutečné cíle sběru a hody d10 následně vyhodnoťte v části <strong>Wilderness Tasks · Foraging</strong>. Nic se nepřičítá bez doloženého výsledku.</p>
  <div class="hmk-trek-grid"><label class="hc-check" data-foraging-jump-field><input name="stationaryForaging" type="checkbox" value="yes"> Foraging na místě (celá hlídka)</label>
- <label data-foraging-jump-field>Foraging Modes <span tabindex="0" class="hc-help-term" data-hmk-help="Jedna získaná výhoda (★) z Orienteering při SV 5+ dovolí vybrat jeden Foraging Mode. Počet určuje počet SAMOSTATNÝCH d10 při pozdějším hledání jídla/vody nebo bylin. 0 = bez hledání; 1 = jeden hod; 2 = dva hody atd. Všechny Foraging Modes při současné cestě způsobí společně JEDEN Slow Mode, nikoli jeden za každý hod. Při hledání celou hlídku na místě se povinně použijí první dvě výhody na Foraging (HMK 145 a 147).">Foraging Modes</span><input name="foraging" type="number" min="0" max="5" value="0"></label>
+ <label data-foraging-jump-field>Foraging Modes<input name="foraging" type="number" min="0" max="5" value="0"></label>
  <label class="hc-check"><input name="stalking" type="checkbox" value="yes"> Stalking</label>
  <label class="hc-check"><input name="vigilance" type="checkbox" value="yes"> Vigilance</label>
- </div><p class="hc-trek-explainer">Foraging Modes vznikají až z ověřeného <strong>Survival Orienteering SV</strong>: při SV 5/6/7/8/9+ má průvodce 1/2/3/4/5 výhod (★), které rozděluje také mezi Bearing, Progress, Stalking a Vigilance. Každý Foraging Mode znamená jeden následný d10 v části Wilderness Tasks. Pokud skupina pouze sbírá na místě, stráví tím celou čtyřhodinovou hlídku a první dvě výhody musí přidělit Foraging (HMK 145–147).</p></fieldset><fieldset class="hmk-trek-section"><legend>5 · Hody kostkami</legend>
+ </div></fieldset><fieldset class="hmk-trek-section"><legend>5 · Hody kostkami</legend>
  <p class="hc-trek-explainer">Každý skutečně potřebný hod má vlastní pole. Můžete zapsat výsledek fyzických kostek nebo u konkrétního pole kliknout na <strong>⚄ Generovat</strong>. Není potřeba přepínat původ hodů: uloží se zvlášť u každé kostky. Neprovedené či nepoužité hody nevyplňujte.</p>
  <div class="hc-trek-dice-groups">
  <section class="hc-trek-dice-section" data-trek-dice-section="weather"><h4>Denní počasí · pouze první hlídka dne</h4>
@@ -8036,31 +8036,47 @@ function trekGuideClearError(form){
 }
 function trekGuideInvalid(form,control,message){
  const element=typeof control==='string'?form.elements.namedItem(control):control;
- const field=element instanceof Element?element:form.querySelector('input[name="area"]');
+ const field=element instanceof Element?element:form.querySelector('[data-trek-readiness]');
  if(field){field.classList.add('hc-trek-invalid');field.setAttribute('aria-invalid','true');
   for(let parent=field;parent&&parent!==form;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
-  field.scrollIntoView({block:'center',behavior:'smooth'});field.focus({preventScroll:true});}
+  field.scrollIntoView({block:'center',behavior:'smooth'});if(!field.matches('input,select,textarea,button'))field.tabIndex=-1;field.focus({preventScroll:true});}
  const label=field?.closest('label')?.textContent?.replace(/\s+/g,' ').trim()||'';
  const msg=form.querySelector('[data-trek-form-error],[data-trek-day-error]')??form.querySelector('[data-trek-readiness]');
  if(msg){msg.hidden=false;msg.textContent=(label?label+': ':'')+message;msg.classList.add('hc-trek-form-error');}
  return false;
 }
+function trekUserFriendlyError(message){
+ let text=String(message||'Neplatné podklady cestovní hlídky.');
+ // Internal storage IDs must never be part of an ordinary GM validation error.
+ for(const c of data?.characters??[])if(typeof c?.id==='string'&&c.id.length>=6)
+  text=text.split(c.id).join(c.name||'vybraná postava');
+ text=text.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,'')
+  .replace(/\bid-\d{10,}-[a-z0-9]{4,}\b/gi,'');
+ if(/^Postava není připravena:/i.test(text))
+  return 'Postava nemá založený bojový stav. Pro čistý výchozí stav použijte standardní výchozí hodnoty; nevyžaduje se žádná samostatná příprava.';
+ return text;
+}
 function trekGuideFieldFromMessage(msg,form){
  const text=String(msg||'').toLowerCase();
  const progressNumber=text.match(/progress[^\d]*č\.?\s*(\d+)/),directionNumber=text.match(/direction[^\d]*č\.?\s*(\d+)/);
+ if(text.includes('neplatný počet')){const count=text.match(/počet\s+(progress|bearing|slow|foraging|wildernessnightwatches)/);if(count)return form.elements.namedItem(count[1]);}
  if(text.includes('progress'))return form.elements.namedItem('trekDieProgress'+(progressNumber?.[1]||1))??form.elements.namedItem('progress');
  if(text.includes('direction')||text.includes('bearing'))return form.elements.namedItem('trekDieDirection'+(directionNumber?.[1]||1))??form.elements.namedItem('bearing');
+ if(text.includes('daily precipitation')||text.includes('denní srážk'))return form.elements.namedItem('trekDieDailyPrecipitation');
  if(text.includes('precipitation per watch')||text.includes('srážk'))return form.elements.namedItem('trekDieWatchPrecipitation');
  if(text.includes('temperature')||text.includes('teplot'))return form.elements.namedItem('trekDieTemperature');
- if(text.includes('daily precipitation'))return form.elements.namedItem('trekDieDailyPrecipitation');
  if(text.includes('encounter')||text.includes('setkán'))return form.elements.namedItem('trekDieEncounter');
  if(text.includes('drover')||text.includes('honák'))return form.elements.namedItem('droverId');
+ if(text.includes('postava')||text.includes('průvodce')||text.includes('fatigue')||text.includes('grievous')||text.includes('účastník'))return form.elements.namedItem('characterId');
+ if(text.includes('foraging'))return form.elements.namedItem('foraging');
+ if(text.includes('stalking'))return form.elements.namedItem('stalking');
+ if(text.includes('vigilance'))return form.elements.namedItem('vigilance');
  if(text.includes('sezón')||text.includes('datum tr'))return form.elements.namedItem('season');
  if(text.includes('zvíře')||text.includes('stáj'))return form.querySelector('[data-trek-stable-row] input');
- if(text.includes('loaded')||text.includes('enc'))return form.elements.namedItem('loaded');
+ if(text.includes('loaded')||text.includes('enc')||text.includes('zatížení')||text.includes('inventář')||text.includes('výbavy'))return form.elements.namedItem('loaded');
  if(text.includes('slow')||text.includes('pohyb'))return form.elements.namedItem('slow');
  if(text.includes('oblast')||text.includes('tras'))return form.elements.namedItem('area');
- return form.querySelector('[name="area"]');
+ return form.querySelector('[data-trek-readiness]');
 }
 function trekGuidedLayout(form){
  if(form.dataset.trekGuided==='yes')return;form.dataset.trekGuided='yes';form.noValidate=true;
@@ -8082,7 +8098,6 @@ function trekGuidedLayout(form){
  sequence.forEach((originalIndex,i)=>{
   const section=sections[originalIndex];
   const legend=section.querySelector('legend');if(legend){legend.textContent=names[i];legend.setAttribute('data-hmk-help',descriptions[i]);legend.tabIndex=0;}
-  const paragraph=document.createElement('p');paragraph.className='hc-trek-stage-description';paragraph.textContent=descriptions[i];legend?.after(paragraph);
   form.insertBefore(section,before);
  });
  const msg=document.createElement('p');msg.className='hc-trek-form-error';msg.hidden=true;
@@ -11259,8 +11274,9 @@ document.addEventListener('click',event=>{
  const btn=event.target.closest?.('#campaign-trekking-context-form [data-trek-preflight]');if(!btn)return;
  event.preventDefault();event.stopImmediatePropagation();const form=btn.closest('form');trekGuideClearError(form);
  try{const issue=trekGuideBasicCheck(form);if(issue){trekGuideInvalid(form,issue.field,issue.message);return;}
-  const panel=form.querySelector('[data-trek-readiness] p');if(panel)panel.textContent='Základní vstupy a povinné denní hody jsou připraveny. Potvrzení provede i úplnou kontrolu všech režimů, nákladu a podmíněných d10. Teprve pak vznikne doklad.';
- }catch(err){trekGuideInvalid(form,trekGuideFieldFromMessage(err.message,form),err.message);}
+  buildTrekWatchEvidence(form);
+  const panel=form.querySelector('[data-trek-readiness] p');if(panel)panel.textContent='ÚPLNÁ KONTROLA PROŠLA: družina, stav postav, zvířata, zatížení, pohybové režimy a všechny právě povinné hody odpovídají podkladům. Potvrzení uloží právě tyto údaje; samo neposouvá čas.';
+ }catch(err){const message=trekUserFriendlyError(err?.message);trekGuideInvalid(form,trekGuideFieldFromMessage(message,form),message);}
 },true);
 for(const type of ['input','change'])document.addEventListener(type,event=>{
  const field=event.target;
@@ -11322,10 +11338,11 @@ function initialiseTrekDiceFields(){
  const f=document.getElementById('campaign-trekking-context-form');if(!f)return;
  for(const group of ['progress','direction'])if(!f.querySelector('[data-trek-dice-list="'+group+'"] [data-trek-die-row]'))trekAddDieSlot(f,group);
 }
-document.addEventListener('submit',e=>{
- const form=e.target;if(form?.id!=='campaign-trekking-context-form')return;
- e.preventDefault();e.stopImmediatePropagation();
- try{
+/** v93.614: One side-effect-free source of truth for both buttons. Preview never
+ * appends a journal row, consumes stock, changes a character, rolls dice or advances time.
+ * Missing pre-combat state of an existing campaign actor means the standard
+ * untouched baseline, as elsewhere in the Calendar; do not persist it here. */
+function buildTrekWatchEvidence(form){
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Vyžaduje aktivní kalendář bez běžící Initiative');
   initialiseTrekDiceFields();
   const v=Object.fromEntries(new FormData(form)),clock=data.campaignClock;
@@ -11406,7 +11423,7 @@ document.addEventListener('submit',e=>{
    animals.push({id,droverId,loadLb:burden.minimumLb,awkwardLb:0});
   }
   const livestockActors=livestockTravelActors(stable);
-  const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:[...data.characters,...livestockActors],
+  const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:[...data.characters.map(c=>({...c,hmk:{...(c.hmk??{}),combatState:persistentStateOf(c)}})),...livestockActors],
    inventory:data.inventory,conveyance:v.conveyance,loadedByGM:v.loaded==='yes',drovingAnimals:animals});
   let stableVehicle575=null;
   if(v.trekVehicleId){
@@ -11492,12 +11509,18 @@ document.addEventListener('submit',e=>{
    `den ${day.temperatureD10}/${day.precipitationD10}${dayAlready?' (doložené počasí)':''}${trackingBearing?' · povinný Bearing po Tracking CF '+trackingBearing.trackingId:''}; `+
    `skupina ${partyModes.memberIds.length}; zvířata ${partyModes.animals.map(a=>a.id+':'+a.enc+' ENC'+(a.encCalculation?' (z '+a.encCalculation.loadLb+' lb'+(a.encCalculation.awkwardLb?'/'+a.encCalculation.awkwardLb+' neobratně':'')+')':' (již výsledné)')).join(', ')||'žádná'}; automatické Slow ${partyModes.forcedSlow}; Loaded ${partyModes.loaded?(ignoreLoaded?'nahrazen únavou':'ano'):'ne'}; LPW ${effectiveMovement.finalLPW}; ${effectiveMovement.leagues} leagues${stationaryForaging?' (Foraging na místě · +2 Orienteering SV)':''}${hazards.direction==='lost-time'?' (Lost Time → Slow +1, HMK 148)':''}; encounter ${encounter.checkDue?(encounter.encounter?'ANO':'ne'):'bez hodu'}`+
    (unresolved.length?'; NAVAZUJÍCÍ PROCEDURY: '+unresolved.join(', '):'');
-  // Submission is already the explicit confirmation of this reversible,
-  // append-only preparation. Do not interrupt GM with a redundant modal.
+  return {actor,clock,campaignId,proof,summary};
+}
+document.addEventListener('submit',e=>{
+ const form=e.target;if(form?.id!=='campaign-trekking-context-form')return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const {actor,clock,campaignId,proof,summary}=buildTrekWatchEvidence(form);
+  // Only a real click on Confirm creates the immutable historical evidence.
   if(mutate(()=>{data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignId,
    campaignMinute:clock.minute,createdAt:stamp(),title:'HMK Trekking Routine · počasí / pohyb / setkání',
    body:summary,calendarTrekProof:proof});}))notice='Doložené podklady Trekking byly zapsány. Nejdříve doložte Orienteering Survival SV v kalendáři: bez jeho modifikátorů zatím nelze potvrdit oprávněnost zvolených Advantage Modes. Následky se otevírají v původních testech.';
- }catch(error){trekGuideInvalid(form,trekGuideFieldFromMessage(error.message,form),'Trekking Routine nebyla uložena: '+error.message)}
+ }catch(error){const message=trekUserFriendlyError(error?.message);trekGuideInvalid(form,trekGuideFieldFromMessage(message,form),'Trekking Routine nebyla uložena: '+message)}
 },true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-trek-tracking-source]');if(!btn)return;
