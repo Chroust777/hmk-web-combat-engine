@@ -167,6 +167,7 @@ import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence,assertTrekDailyWeatherAppendOnly} from './src/integration/hmk-trekking-routine.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
 import {TREK_WEATHER_VOID_FORMAT,activeAreaWeather,activeWeatherAreas,canVoidWeather,validateWeatherLifecycle,assertWeatherVoidAppendOnly,weatherAreaKey} from './src/integration/hmk-trekking-weather-lifecycle.js';
+import {WEATHER_SHIFT_FORMAT,latestWeatherShift,createWeatherShift,validateWeatherShifts,assertWeatherShiftAppendOnly} from './src/integration/hmk-trekking-weather-shift.js';
 import {TREK_DAY_PLAN_FORMAT,validateTrekDayPlan,latestTrekDayPlan,previousTrekContext,trekDailyWatchSlots,trekDayWeatherSummary,validateTrekDayHistory,assertTrekDayAppendOnly,latestTrekDayPlanRecord,cancelledTrekWatchIntents,effectiveTrekWatchIntents,reactivatedTrekWatchConfiguration,validateTrekWatchCancelRecord,TREK_WATCH_CANCEL_FORMAT,validateTrekWatchReactivateRecord,TREK_WATCH_REACTIVATE_FORMAT} from './src/integration/hmk-trekking-day-planner.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
 import {certifyTrekkingWeatherRoll,weatherRollEvidence} from './src/integration/hmk-trekking-weather-roll.js';
@@ -292,7 +293,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.620';
+const APP_VERSION='93.621';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -519,7 +520,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTrekDayHistory(d.journal);validateWeatherLifecycle(d.journal);validateEncounterGMJournal(d.journal);validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateTrackingAwarenessJournal(d.journal);validateSkillActivityTimeProofs(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
+ if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTrekDayHistory(d.journal);validateWeatherLifecycle(d.journal);validateWeatherShifts(d.journal);validateEncounterGMJournal(d.journal);validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateTrackingAwarenessJournal(d.journal);validateSkillActivityTimeProofs(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
  if(p?.elixirName!=='Erudition'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;
  const actor=d.characters.find(c=>c.id===p.targetId);
  const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-erudition-aural');
@@ -819,7 +820,7 @@ function mutate(fn,{gmClockAdvance=false}={}){
  if(cloudSync&&!cloudSync.canWrite()){alert('Nejdříve připojte GitHub Cloud v menu Cloud a zálohy.');return false;}
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});enrollUnmonitoredNutrition(data,{fromMinute:previous.campaignClock.minute,idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertTrekDayAppendOnly(previous.journal,data.journal);assertTrekDailyWeatherAppendOnly(previous.journal,data.journal);assertWeatherVoidAppendOnly(previous.journal,data.journal);assertEncounterGMAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertAssistedIntakeAppendOnly(previous.journal,data.journal);assertNutritionAnimalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertAnimalTrainingCalendarAppendOnly590(previous,data);assertSkillTimedAppendOnly591(previous,data);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute)
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});enrollUnmonitoredNutrition(data,{fromMinute:previous.campaignClock.minute,idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertTrekDayAppendOnly(previous.journal,data.journal);assertTrekDailyWeatherAppendOnly(previous.journal,data.journal);assertWeatherVoidAppendOnly(previous.journal,data.journal);assertWeatherShiftAppendOnly(previous.journal,data.journal);assertEncounterGMAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertAssistedIntakeAppendOnly(previous.journal,data.journal);assertNutritionAnimalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertAnimalTrainingCalendarAppendOnly590(previous,data);assertSkillTimedAppendOnly591(previous,data);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute)
   requireAnimalMedicalGMTimeMayAdvance567({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);if(!save({gmClockAdvance})){data=previous;render();if(automaticGenerationBusy)lastAutomaticGenerationMutationError='Uložení do úložiště selhalo';else alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}render();return true}
  catch(e){data=previous;render();if(automaticGenerationBusy)lastAutomaticGenerationMutationError=String(e.message||e);else alert('Změna nebyla uložena: '+e.message);return false}
 }
@@ -1512,7 +1513,13 @@ function trekDailyWeatherFormHTML(clock){
  <output role="status" aria-live="polite"></output></form>
  <h4>Potvrzené oblasti · do konce dne zbývá ${hours} h ${mins} min</h4>
  ${rows.map(j=>{const w=j.calendarTrekDayWeather,allowed=canVoidWeather(data.journal,j.id,id,clock.minute);
-  return `<div class="hc-trek-weather-record"><strong>${esc(w.area)}</strong> · ${esc(displayCampaignMinute(j.campaignMinute))} · platí do ${esc(displayCampaignMinute(end))} (zbývá ${hours} h ${mins} min).<p>${trekWeatherDetailsHTML(w.weatherDay)}</p><p class="hc-hint">Teplota d10 (${w.weatherDay.temperatureD10}), srážky d10 (${w.weatherDay.precipitationD10}); klima ${esc(w.climate)}, krajina ${esc(w.landscape)}.</p>${allowed.ok?`<button type="button" class="hc-small secondary" data-trek-weather-void="${esc(j.id)}">Zrušit počasí oblasti</button>`:`<p class="hc-hint">Změna uzamčena: ${esc(allowed.reason)}</p>`}</div>`;}).join('')||'<p class="hc-hint">Pro dnešní den zatím není potvrzené žádné počasí. Potvrzení proběhne pouze tlačítkem výše.</p>'}
+  return `<div class="hc-trek-weather-record"><strong>${esc(w.area)}</strong> · ${esc(displayCampaignMinute(j.campaignMinute))} · platí do ${esc(displayCampaignMinute(end))} (zbývá ${hours} h ${mins} min).<p>${trekWeatherDetailsHTML(w.weatherDay)}</p><p class="hc-hint">Teplota d10 (${w.weatherDay.temperatureD10}), srážky d10 (${w.weatherDay.precipitationD10}); klima ${esc(w.climate)}, krajina ${esc(w.landscape)}.</p>${(()=>{const shift=latestWeatherShift(data.journal,id,clock.minute,w.area);return shift?`<p><strong>Aktuálně od ${esc(displayCampaignMinute(shift.campaignMinute))} platí změna GM:</strong> ${trekWeatherDetailsHTML(shift.calendarTrekWeatherShift.weatherDay)} · do konce dne nebo další potvrzené změny.</p>`:'';})()}${allowed.ok?`<button type="button" class="hc-small secondary" data-trek-weather-void="${esc(j.id)}">Zrušit počasí oblasti</button>`:`<p class="hc-hint">Změna uzamčena: ${esc(allowed.reason)}</p>`}</div>`;}).join('')||'<p class="hc-hint">Pro dnešní den zatím není potvrzené žádné počasí. Potvrzení proběhne pouze tlačítkem výše.</p>'}
+ ${rows.length?`<details class="hc-trek-gm-weather-change"><summary>GM · změnit počasí v průběhu dne (od aktuální minuty)</summary>
+ <p class="hc-hint">Volitelné rozhodnutí GM mimo standardní denní tabulku HMK 144. Základní denní hody i již proběhlé účinky zůstávají v historii. Nové podmínky platí od nynějška pro oblast až do konce dne nebo další potvrzené změny, i když družina zrovna necestuje.</p>
+ <form data-trek-global-shift><div class="hmk-trek-grid"><label>Potvrzená oblast<select name="sourceId">${rows.map(j=>`<option value="${esc(j.id)}">${esc(j.calendarTrekDayWeather.area)}</option>`).join('')}</select></label>
+ <div class="hc-trek-shift-control"><label>Nová teplota d10<input type="number" min="1" max="10" name="trekWeatherShiftTemperature" required></label><button type="button" class="hc-small hc-trek-generate" data-trek-shift-die="trekWeatherShiftTemperature">⚄ d10</button></div>
+ <div class="hc-trek-shift-control"><label>Nové srážky d10<input type="number" min="1" max="10" name="trekWeatherShiftPrecipitation" required></label><button type="button" class="hc-small hc-trek-generate" data-trek-shift-die="trekWeatherShiftPrecipitation">⚄ d10</button></div></div>
+ <button type="submit">Potvrdit nové počasí GM od nynější minuty</button><output role="status" aria-live="polite"></output></form></details>`:''}
  </details></section>`;
 }
 function trekDieOutcomeHelp(name,form){
@@ -1771,10 +1778,17 @@ function campaignCalendarView(){
  <label>Terén / cesta<select name="terrain">${[['paved-road','Paved Road'],['unpaved-road','Unpaved Road'],['rural-track','Rural Track'],['wilderness-trail','Wilderness Trail'],['cropland-grassland','Cropland / Grassland'],['mixed-woodland','Mixed Woodland'],['cold-woodland','Cold Woodland'],['heath-moor','Heath / Moor'],['needleleaf-forest','Needleleaf Forest'],['mixed-forest','Mixed Forest'],['dunes','Dunes'],['wetlands','Wetlands'],['alpine-vegetation','Alpine Vegetation'],['ice-snow-rockfield','Ice / Snow / Rockfield']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
  <label>Doprava<select name="conveyance"><option value="foot">Pěšky</option><option value="mount">V sedle</option><option value="cart">Kára</option><option value="wagon">Vůz</option></select></label>
  <label>Prostředí setkání (Environ)<select name="environ"><option value="highway">Hlavní cesta</option><option value="rural">Venkov</option><option value="wilderness">Divočina</option><option value="underworld">Podzemí</option></select></label>
- </div></fieldset><fieldset class="hmk-trek-section"><legend>3 · Pohybové režimy</legend><div class="hmk-trek-grid"><label>Progress Modes<input name="progress" type="number" min="0" max="10" value="0"></label>
+ </div></fieldset><fieldset class="hmk-trek-section"><legend>Počasí · časová změna GM v této hlídce (volitelně)</legend>
+ <label class="hc-check"><input name="weatherShift" type="checkbox" value="yes"> <span class="hc-help-term" tabindex="0" data-hmk-help="HMK 144 stanovuje základní počasí na den. GM může rozhodnout o změně od skutečné herní minuty; nové dva d10 jsou volitelnou odchylkou GM. Starší doklady a hody se nemění; navazující hlídky v této oblasti používají nový stav do konce dne nebo další změny.">GM mění počasí nyní pro tuto oblast (od aktuální minuty dále)</span></label>
+ <div class="hmk-trek-grid"><div class="hc-trek-shift-control"><label>Nová teplota · d10<input name="trekWeatherShiftTemperature" type="number" min="1" max="10" placeholder="1–10"></label><button class="hc-small hc-trek-generate" type="button" data-trek-shift-die="trekWeatherShiftTemperature">⚄ d10</button></div>
+ <div class="hc-trek-shift-control"><label>Nové srážky · d10<input name="trekWeatherShiftPrecipitation" type="number" min="1" max="10" placeholder="1–10"></label><button class="hc-small hc-trek-generate" type="button" data-trek-shift-die="trekWeatherShiftPrecipitation">⚄ d10</button></div></div>
+ <p class="hc-hint">Změna není pravidlový automatický meteorologický hod HMK, ale rozhodnutí GM. Vyžaduje existující denní počasí; ovlivní pouze nově potvrzené cestovní úseky od této chvíle. Při probíhající cestě nejprve potvrďte přerušení v aktuální minutě. Nový doklad změny vznikne až s potvrzením hlídky.</p>
+ </fieldset><fieldset class="hmk-trek-section"><legend>3 · Pohybové režimy</legend><div class="hmk-trek-grid"><label>Progress Modes<input name="progress" type="number" min="0" max="10" value="0"></label>
  <label>Další Slow Modes<input name="slow" type="number" min="0" max="20" value="0"></label>
  <label>Vlastní Bearing Modes<input name="bearing" type="number" min="0" max="20" value="0"></label>
- </div></fieldset><fieldset class="hmk-trek-section" id="hmk-foraging-watch-fields"><legend>4 · Činnosti během hlídky</legend>
+ </div><div class="hc-trek-auto-mode"><label class="hc-check"><input type="checkbox" name="autoAllocate" value="yes" checked> <span class="hc-help-term" tabindex="0" data-hmk-help="Až průvodce provede Survival/Orienteering, skutečné SV určí počet Advantage Modes. Aplikace automaticky přednostně pokryje nutný Bearing, poté GM zvolenou činnost a zbytek dá do Progress. Nízké SV automaticky použije Slow jako opatrnou volbu. Neznamená to další nový hod." >Automaticky přidělit Progress, Bearing, Slow a výhody po Orienteering SV</span></label>
+ <label>Cíl průvodce (automatické priority)<select name="autoPriority"><option value="pace">Bezpečná cesta a postup (Bearing → Progress)</option><option value="forage">Hledání potravy (Bearing → Foraging → Progress)</option><option value="stealth">Nenápadný pohyb (Bearing → Stalking → Progress)</option><option value="vigilance">Ostražitost (Bearing → Vigilance → Progress)</option></select></label>
+ <p class="hc-hint">Číselná pole výše jsou jen pro pokročilou ruční volbu, pokud automatiku vypnete. Při automatice se z nich nepřebírají domyšlené výsledky; skutečný počet režimů se doloží teprve po Survival SV.</p></div></fieldset><fieldset class="hmk-trek-section" id="hmk-foraging-watch-fields"><legend>4 · Činnosti během hlídky</legend>
  <p class="hc-foraging-jump-help" data-foraging-jump-help hidden><strong>Foraging – tady nastavte sběr zásob.</strong> Nejdříve vyberte výše průvodce, účastníky a prostředí hlídky. Potom zvolte počet <strong>Foraging Modes</strong>, případně sběr na místě. Hlídku uložte původním tlačítkem níže; skutečné cíle sběru a hody d10 následně vyhodnoťte v části <strong>Wilderness Tasks · Foraging</strong>. Nic se nepřičítá bez doloženého výsledku.</p>
  <div class="hmk-trek-grid"><label class="hc-check" data-foraging-jump-field><input name="stationaryForaging" type="checkbox" value="yes"> Foraging na místě (celá hlídka)</label>
  <label data-foraging-jump-field>Foraging Modes<input name="foraging" type="number" min="0" max="5" value="0"></label>
@@ -8275,6 +8289,11 @@ function previousTrekPartySegment(form,minute){
 }
 function trekGuidePreview(form){
  if(!form||!data.campaignClock)return;
+ const automaticModes=form.elements.namedItem('autoAllocate')?.checked;
+ for(const name of ['progress','bearing','foraging','stalking','vigilance','lax','orienteeringSlow']){
+  const el=form.elements.namedItem(name);if(el)el.disabled=!!automaticModes;
+ }
+ const priorityField=form.elements.namedItem('autoPriority');if(priorityField)priorityField.disabled=!automaticModes;
  const v=Object.fromEntries(new FormData(form)),clock=data.campaignClock,area=String(v.area||'').trim(),dayIndex=Math.floor(clock.minute/1440);
  const campaignId=campaignKey(clock);
  let season=v.season,seasonKnown=true;
@@ -8286,7 +8305,18 @@ function trekGuidePreview(form){
   j.calendarTrekProof.dayIndex===dayIndex&&j.calendarTrekProof.season===season&&j.calendarTrekProof.climate===v.climate&&
   j.calendarTrekProof.landscape===v.landscape&&j.calendarTrekProof.alpine===(v.alpine==='yes')&&
   j.calendarTrekProof.aridDesert===(v.aridDesert==='yes'))?.calendarTrekProof?.weatherDay;
- let day=prior||activeAreaWeather(data.journal,campaignId,dayIndex,area)?.calendarTrekDayWeather?.weatherDay;
+ const baseDay=prior||activeAreaWeather(data.journal,campaignId,dayIndex,area)?.calendarTrekDayWeather?.weatherDay;
+ const activeShift=latestWeatherShift(data.journal,campaignId,clock.minute,area);
+ const gmShift=form.elements.namedItem('weatherShift')?.checked;
+ const tempShift=form.elements.namedItem('trekWeatherShiftTemperature');
+ const precipShift=form.elements.namedItem('trekWeatherShiftPrecipitation');
+ for(const field of [tempShift,precipShift])if(field)field.disabled=!gmShift;
+ let day=activeShift?.calendarTrekWeatherShift?.weatherDay??baseDay;
+ if(gmShift&&seasonKnown){const temp=Number(tempShift?.value),precip=Number(precipShift?.value);
+  if(Number.isInteger(temp)&&temp>=1&&temp<=10&&Number.isInteger(precip)&&precip>=1&&precip<=10){
+   try{day=trekWeatherDay({season,climate:v.climate,landscape:v.landscape,
+    alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',temperatureD10:temp,precipitationD10:precip});}catch{}
+  }}
  const t=Number(v.trekDieTemperature),d=Number(v.trekDieDailyPrecipitation);
  if(!day&&seasonKnown&&[t,d].every(n=>Number.isSafeInteger(n)&&n>=1&&n<=10)){
   try{day=trekWeatherDay({season,climate:v.climate,landscape:v.landscape,alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',temperatureD10:t,precipitationD10:d});}catch{}
@@ -8294,7 +8324,7 @@ function trekGuidePreview(form){
  const continuation=previousTrekSegmentForForm(form,clock.minute,area,season,v.climate,v.landscape,v.alpine==='yes',v.aridDesert==='yes');
  const weather=form.querySelector('[data-trek-dice-section="weather"]'),wet=form.querySelector('[data-trek-dice-section="watch"]');
  if(weather){weather.classList.toggle('hc-trek-not-required',!!day);weather.querySelector('h4').textContent=day?'Denní počasí · již doloženo pro oblast, NEHÁZET znovu':'Denní počasí · dva skutečné d10, jen jednou za 24 h';for(const name of ['trekDieTemperature','trekDieDailyPrecipitation']){const el=form.elements.namedItem(name);if(el)el.disabled=!!day;}}
- if(wet){const skip=!!continuation||!!day&&!day.hasPrecipitation;wet.classList.toggle('hc-trek-not-required',skip);const field=form.elements.namedItem('trekDieWatchPrecipitation');if(field)field.disabled=skip;wet.querySelector('h4').textContent=continuation?'Srážky · d6 převzat z původního úseku stejné hlídky':day?(day.hasPrecipitation?'Srážky této hlídky · d6 povinný':'Srážky hlídky · bez hodu, suchý den'):'Srážky hlídky · závisí na denním počasí';}
+ if(wet){const reuse=!!continuation&&!gmShift&&continuation.calendarTrekProof.weatherShiftId===(activeShift?.id??null);const skip=reuse||!!day&&!day.hasPrecipitation;wet.classList.toggle('hc-trek-not-required',skip);const field=form.elements.namedItem('trekDieWatchPrecipitation');if(field)field.disabled=skip;wet.querySelector('h4').textContent=reuse?'Srážky · d6 převzat z původního úseku stejné hlídky':day?(day.hasPrecipitation?'Srážky této hlídky · d6 povinný':'Srážky hlídky · bez hodu, suchý den'):'Srážky hlídky · závisí na denním počasí';}
  const previousEncounter=previousTrekPartySegment(form,clock.minute);
  const memberIdsPreview=[...new Set([...new FormData(form).getAll('trekMemberIds'),v.characterId])].sort();
  const priorNightWatch=data.journal.find(j=>j.calendarCampaignId===campaignId&&j.campaignMinute===clock.minute-240&&
@@ -8311,7 +8341,16 @@ function trekGuidePreview(form){
  let base=null;
  try{base=trekMovement({topography:v.landscape,terrain:v.terrain,conveyance:v.conveyance,progress:0,slow:0,loaded:false,bearing:0,progressD10:[]});}catch{}
  const progress=Number(v.progress)||0,bearing=Number(v.bearing)||0,foraging=Number(v.foraging)||0;
+ const automatic=form.elements.namedItem('autoAllocate')?.checked;
+ for(const group of ['progress','direction']){
+  const section=form.querySelector(`[data-trek-dice-section="${group}"]`);
+  if(section){section.classList.toggle('hc-trek-not-required',!!automatic);
+   section.querySelectorAll('[data-trek-die-row] input').forEach(input=>{input.disabled=!!automatic;});
+   const h=section.querySelector('h4');if(h&&automatic)h.textContent=group==='progress'?'Progress – hod až po doloženém Survival SV':'Direction Hazard – hod až po doloženém Survival SV';
+  }
+ }
  const spent=progress+bearing+foraging+Number(v.stalking==='yes')+Number(v.vigilance==='yes');
+ const autoAlloc=v.autoAllocate==='yes',priority=v.autoPriority||'pace';
  const forced=data.journal.find(j=>j.calendarCampaignId===campaignId&&j.characterId===v.characterId&&
   j.campaignMinute===clock.minute&&j.calendarTrekProof);
  const svProof=forced&&data.journal.find(j=>j.calendarTrekSkillSource?.sourceId===forced.id&&j.calendarTrekSkillSource.hazard==='survival');
@@ -8320,7 +8359,7 @@ function trekGuidePreview(form){
   const help=(label,text)=>`<span class="hc-help-term" tabindex="0" data-hmk-help="${esc(text)}">${label}</span>`;
   preview.innerHTML=`<strong>Živý náhled – bez zápisu</strong><div class="hc-trek-preview-items"><p>Rychlost: ${base?base.baseLPW:'neznámá kombinace'} ${help('LPW','Leagues Per Watch: počet lig za čtyřhodinovou hlídku; 1 liga = 4 km. Základní rychlost je z tabulky terénu HMK 146.')}. `+
   `Potřeba ${help('Bearing','Výhoda z Orienteering určená pro udržení směru. Pokud chybí, musí následovat Direction Hazard d10 (HMK 146, 148).')}: <strong>${base?base.requiredBearing:'nelze určit'}</strong>. `+
-  `Zvolených ${help('Advantage Modes','Dostupné výhody vznikají až z doloženého Survival SV průvodce (HMK 145).')}: <strong>${spent}</strong> (zatím návrh).</p>`+
+  `${autoAlloc?`<strong>Automatické přidělení po SV:</strong> požadovaný Bearing ${base?base.requiredBearing:'?'}, pak ${esc({pace:'Progress',forage:'Foraging',stealth:'Stalking',vigilance:'Vigilance'}[priority]||'Progress')} a zbývající Progress. Čísla vzniknou až z doloženého výsledku Survival; předem se nehádají.`:`Zvolených ${help('Advantage Modes','Dostupné výhody vznikají až z doloženého Survival SV průvodce (HMK 145).')}: <strong>${spent}</strong> (ruční návrh).`}</p>`+
   `<p>Počasí: ${prior?'převzato z historického dokladu':day?'oba skutečné d10 vyplněné':'chybí skutečné denní d10'}. `+
   `${help('Orienteering SV','Success Value skutečného Survival testu průvodce. Rozhoduje o možných Progress/Bearing/Foraging/Stalking/Vigilance; po potvrzení podkladů se dokládá jako samostatný Skill Test.')} `+
   `${svProof?'je již doložen':'se připojí po potvrzení podkladů hlídky'}. `+
@@ -8352,13 +8391,21 @@ function trekGuideBasicCheck(form,{focus=true}={}){
  const continuation=previousTrekSegmentForForm(form,clock.minute,String(v.area).trim(),season,v.climate,v.landscape,v.alpine==='yes',v.aridDesert==='yes');
  function dieCheck(name,faces,why){const field=form.elements.namedItem(name),raw=String(field?.value??'').trim(),n=Number(raw);
   return !/^\d+$/.test(raw)||!Number.isSafeInteger(n)||n<1||n>faces?{field:name,message:why+' · vyplňte skutečný d'+faces+' (1–'+faces+').'}:null;}
- let day=prior;
+ const shiftOn=v.weatherShift==='yes',lastShift=latestWeatherShift(data.journal,campaignId,clock.minute,String(v.area).trim());
+ if(shiftOn&&!prior)return {field:'area',message:'Změna počasí vyžaduje předem doložené denní počasí oblasti.'};
+ if(shiftOn){for(const [field,label] of [['trekWeatherShiftTemperature','Nová teplota GM'],['trekWeatherShiftPrecipitation','Nové srážky GM']]){
+  const error=dieCheck(field,10,label);if(error)return error;
+ }}
+ let day=shiftOn?trekWeatherDay({season,climate:v.climate,landscape:v.landscape,alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',
+  temperatureD10:Number(v.trekWeatherShiftTemperature),precipitationD10:Number(v.trekWeatherShiftPrecipitation)}):
+  lastShift?.calendarTrekWeatherShift?.weatherDay??prior;
  if(!day){
   const temperature=dieCheck('trekDieTemperature',10,'Denní teplota');if(temperature)return temperature;
   const precipitation=dieCheck('trekDieDailyPrecipitation',10,'Denní srážky');if(precipitation)return precipitation;
   day=trekWeatherDay({season,climate:v.climate,landscape:v.landscape,alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',temperatureD10:Number(v.trekDieTemperature),precipitationD10:Number(v.trekDieDailyPrecipitation)});
  }
- if(day.hasPrecipitation&&!continuation){const wet=dieCheck('trekDieWatchPrecipitation',6,'Srážky ve čtyřhodinové hlídce');if(wet)return wet;}
+ if(day.hasPrecipitation&&(!continuation||shiftOn||continuation.calendarTrekProof.weatherShiftId!==(lastShift?.id??null))){
+  const wet=dieCheck('trekDieWatchPrecipitation',6,'Srážky ve čtyřhodinové hlídce');if(wet)return wet;}
  const source=data.journal.find(j=>j.calendarCampaignId===campaignId&&j.characterId===guide&&j.campaignMinute===clock.minute&&j.calendarTrekProof);
  if(source)return {field:'characterId',message:'Tento čas a průvodce už mají doloženou Trekking Routine. Chcete-li pokračovat po přerušení, nejdříve vyřešte její povinné testy a posuňte čas GM do skutečného okamžiku pokračování; staré hody nelze přepsat.'};
  return null;
@@ -11564,6 +11611,7 @@ document.addEventListener('focusin',refreshTrekDieOutcome,true);
 // when the actual watch needs more dice. Slots contain no simulated rolls.
 function initialiseTrekDiceFields(){
  const f=document.getElementById('campaign-trekking-context-form');if(!f)return;
+ if(f.elements.namedItem('autoAllocate')?.checked){for(const n of ['progress','bearing','foraging','stalking','vigilance','lax','orienteeringSlow']){const el=f.elements.namedItem(n);if(el)el.disabled=true;}}
  for(const group of ['progress','direction'])if(!f.querySelector('[data-trek-dice-list="'+group+'"] [data-trek-die-row]'))trekAddDieSlot(f,group);
 }
 /** v93.614: One side-effect-free source of truth for both buttons. Preview never
@@ -11603,15 +11651,27 @@ function buildTrekWatchEvidence(form){
    const origin=input.dataset.trekGenerated===raw?'cryptographic-software-die':'manual';
    rolls.push({faces,value,label,origin});return value;
   };
-  const day=previous||trekWeatherDay({season,climate:v.climate,landscape:v.landscape,
-    alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',
-    temperatureD10:die(10,'Daily Temperature'),precipitationD10:die(10,'Daily Precipitation')});
-  const dayAlready=!!previous;
-  // For already proven daily weather, new d10s must NOT be rolled.
   const continuation=previousTrekSegmentForForm(form,clock.minute,area,season,v.climate,v.landscape,v.alpine==='yes',v.aridDesert==='yes');
   const priorSegment=previousTrekPartySegment(form,clock.minute);
-  const precipitationD6=day.hasPrecipitation?(continuation?continuation.calendarTrekProof.weatherWatch.precipitationD6:die(6,'Precipitation per Watch')):null;
-  const wet=trekWeatherWatch(day,{night:v.night==='yes',precipitationD6,pavedRoad:v.terrain==='paved-road',continuation:!!continuation});
+  const weatherShiftRequested=v.weatherShift==='yes';
+  if(weatherShiftRequested&&!previous)throw Error('Nejprve potvrďte výchozí denní počasí této oblasti.');
+  const currentShift=latestWeatherShift(data.journal,campaignId,clock.minute,area);
+  let pendingWeatherShift=null,weatherShiftId=currentShift?.id??null;
+  if(weatherShiftRequested){
+   const tempField=form.elements.namedItem('trekWeatherShiftTemperature'),rainField=form.elements.namedItem('trekWeatherShiftPrecipitation');
+   const origins=[tempField,rainField].map(el=>el?.dataset?.trekGenerated===el?.value?'cryptographic-software-die':'manual');
+   pendingWeatherShift=createWeatherShift({journal:data.journal,campaignId,minute:clock.minute,area,
+    season,climate:v.climate,landscape:v.landscape,alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',
+    temperatureD10:Number(tempField?.value),precipitationD10:Number(rainField?.value),diceOrigins:origins});
+   weatherShiftId=uuid();
+  }
+  const day=pendingWeatherShift?.weatherDay??currentShift?.calendarTrekWeatherShift?.weatherDay??previous??
+   trekWeatherDay({season,climate:v.climate,landscape:v.landscape,alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',
+    temperatureD10:die(10,'Daily Temperature'),precipitationD10:die(10,'Daily Precipitation')});
+  const dayAlready=!!previous;
+  const reusePrecipitation=!!continuation&&!weatherShiftRequested&&continuation.calendarTrekProof.weatherShiftId===weatherShiftId;
+  const precipitationD6=day.hasPrecipitation?(reusePrecipitation?continuation.calendarTrekProof.weatherWatch.precipitationD6:die(6,'Precipitation per Watch')):null;
+  const wet=trekWeatherWatch(day,{night:v.night==='yes',precipitationD6,pavedRoad:v.terrain==='paved-road',continuation:reusePrecipitation});
   const qty=(name,max)=>{const n=Number(v[name]);if(!Number.isSafeInteger(n)||n<0||n>max)throw Error('Neplatný počet '+name);return n;};
   const memberIds=[...new Set([...new FormData(form).getAll('trekMemberIds'),actor.id])];
   // Legacy manual animal entries are read only for historic journal snapshots.
@@ -11679,10 +11739,11 @@ function buildTrekWatchEvidence(form){
       partyModes.loadUnresolved.length||(!partyModes.members.some(m=>m.loaded)&&!partyModes.animals.some(a=>a.loaded))||
       partyModes.members.filter(m=>m.loaded).some(m=>!Number.isSafeInteger(m.modifiedENC))))
    throw Error('Ignorovat Loaded Mode lze jen s doloženým ENC zatížených pěších členů nebo jednotlivých zvířat a potvrzeným honákem.');
-  const manualSlow=qty('slow',20),orienteeringSlow=Number(v.orienteeringSlow==='yes');
+  const autoAllocate=v.autoAllocate==='yes';
+  const manualSlow=qty('slow',20),orienteeringSlow=autoAllocate?0:Number(v.orienteeringSlow==='yes');
   if(damagedTravel.some(x=>x.ruling.adjustedMove<x.ruling.printedMove)&&manualSlow<1)
    throw Error('Amputované zvíře má GM Move nižší než zdravý profil: doplň odpovídající GM Slow Mode (ruční), bez univerzální smyšlené formule HMK.');
-  const lax=v.lax==='yes';
+  const lax=!autoAllocate&&v.lax==='yes';
   const orienteeringContext=createOrienteeringContext({night:v.night==='yes',partySize:partyModes.memberIds.length,
    familiar:v.familiar==='yes',torchlight:v.torchlight==='yes',fullMoon:v.fullMoon==='yes',
    afterSnowfall:v.afterSnowfall==='yes',conveyance:v.conveyance,
@@ -11690,8 +11751,12 @@ function buildTrekWatchEvidence(form){
   if(orienteeringContext.droverId&&!memberIds.includes(orienteeringContext.droverId))
    throw Error('Drover musí být jedním z vybraných účastníků hlídky');
   const trackingBearing=pendingTrackingBearing({journal:data.journal,campaignId,minute:clock.minute,memberIds:partyModes.memberIds});
-  const progress=qty('progress',10),bearing=qty('bearing',20)+Number(!!trackingBearing),foraging=qty('foraging',5),
-   stalking=Number(v.stalking==='yes'),vigilance=Number(v.vigilance==='yes');
+  const autoPriority=['pace','forage','stealth','vigilance'].includes(v.autoPriority)?v.autoPriority:'pace';
+  // Before SV, auto mode prepares only mandatory witnesses; allocation is
+  // calculated from the *recorded* skill test, never an assumed SV.
+  const progress=autoAllocate?0:qty('progress',10),bearing=(autoAllocate?0:qty('bearing',20))+Number(!!trackingBearing),
+   foraging=autoAllocate?(v.stationaryForaging==='yes'?2:0):qty('foraging',5),
+   stalking=autoAllocate?0:Number(v.stalking==='yes'),vigilance=autoAllocate?0:Number(v.vigilance==='yes');
   const stationaryForaging=v.stationaryForaging==='yes';
   if(stationaryForaging&&trackingBearing)throw Error('Tracking CF ukládá další hlídce Bearing; nelze jej bez rozhodnutí GM ztratit stacionárním Foraging');
   if(stationaryForaging&&(progress>0||bearing>0||v.doubleTime==='yes'))throw Error('Stacionární Foraging vyžaduje 0 Progress, 0 Bearing a bez Double Time');
@@ -11704,8 +11769,11 @@ function buildTrekWatchEvidence(form){
   const movement=trekWatchMovement({stationaryForaging,topography:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
     progress,slow,loaded:partyModes.loaded&&!ignoreLoaded,bearing,progressD10,continuousPrecipitation:wet.continuous,
     doubleTime:v.doubleTime==='yes'});
-  const directionD10=Array.from({length:movement.bearingDeficit},()=>die(10,'Direction Hazard'));
-  const hazards=trekHazards({bearingDeficit:movement.bearingDeficit,directionD10});
+  // Automatic allocation can only know the Bearing deficit AFTER the real
+  // Orienteering SV. Do not roll a speculative Direction d10 beforehand.
+  const directionD10=autoAllocate?[]:Array.from({length:movement.bearingDeficit},()=>die(10,'Direction Hazard'));
+  const hazards=autoAllocate?{direction:null,survival:null,deferredDirection:true,sourcePage:148}:
+   trekHazards({bearingDeficit:movement.bearingDeficit,directionD10});
   // Night watches belong to the travelling PARTY, not its current guide.
   // A change of guide must not reset the every-second-watch encounter check.
   const priorNightWatch=data.journal.find(j=>j.calendarCampaignId===campaignId&&
@@ -11722,9 +11790,10 @@ function buildTrekWatchEvidence(form){
     ...(hazards.direction&&hazards.direction!=='lost-time'?[`Direction Hazard: ${hazards.direction}`]:[]),
     ...(encounter.encounter?['Random Encounter – nutné vyhodnocení']:[])];
   const proof={format:'hmk-trekking-watch-evidence-v1',dayIndex,campaignMinute:clock.minute,area,
+    ...(weatherShiftId?{weatherShiftId}:{}),
     ...(continuation?{continuationOf:continuation.id}:{}),
     ...(priorSegment?{encounterContinuationOf:priorSegment.id}:{}),
-    partyModes,...(stableVehicle575?{stableVehicle575}:{}),orienteeringContext,modes:{progress,slow,manualSlow,orienteeringSlow,lax,loaded:partyModes.loaded&&!ignoreLoaded,ignoreLoaded,bearing,trackingForcedBearingSourceId:trackingBearing?.trackingId??null,foraging,stalking,vigilance,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
+    partyModes,...(stableVehicle575?{stableVehicle575}:{}),orienteeringContext,modes:{progress,slow,manualSlow,orienteeringSlow,lax,autoAllocate,autoPriority,loaded:partyModes.loaded&&!ignoreLoaded,ignoreLoaded,bearing,trackingForcedBearingSourceId:trackingBearing?.trackingId??null,foraging,stalking,vigilance,progressD10,directionD10,doubleTime:v.doubleTime==='yes',
      environ:v.environ,wildernessNightWatches},
     season,climate:v.climate,landscape:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
     night:v.night==='yes',alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',
@@ -11738,15 +11807,38 @@ function buildTrekWatchEvidence(form){
    `den ${day.temperatureD10}/${day.precipitationD10}${dayAlready?' (doložené počasí)':''}${trackingBearing?' · povinný Bearing po Tracking CF '+trackingBearing.trackingId:''}; `+
    `skupina ${partyModes.memberIds.length}; zvířata ${partyModes.animals.map(a=>a.id+':'+a.enc+' ENC'+(a.encCalculation?' (z '+a.encCalculation.loadLb+' lb'+(a.encCalculation.awkwardLb?'/'+a.encCalculation.awkwardLb+' neobratně':'')+')':' (již výsledné)')).join(', ')||'žádná'}; automatické Slow ${partyModes.forcedSlow}; Loaded ${partyModes.loaded?(ignoreLoaded?'nahrazen únavou':'ano'):'ne'}; LPW ${effectiveMovement.finalLPW}; ${effectiveMovement.leagues} leagues${stationaryForaging?' (Foraging na místě · +2 Orienteering SV)':''}${hazards.direction==='lost-time'?' (Lost Time → Slow +1, HMK 148)':''}; encounter ${encounter.checkDue?(encounter.encounter?'ANO':'ne'):'bez hodu'}`+
    (unresolved.length?'; NAVAZUJÍCÍ PROCEDURY: '+unresolved.join(', '):'');
-  return {actor,clock,campaignId,proof,summary};
+  return {actor,clock,campaignId,proof,summary,pendingWeatherShift,weatherShiftId};
 }
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-trek-shift-die]');if(!btn)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const f=btn.closest('form'),field=f?.elements.namedItem(btn.dataset.trekShiftDie);
+ if(!field)return;
+ field.value=String(secureHMKDie(10));field.dataset.trekGenerated=field.value;
+ field.dispatchEvent(new Event('input',{bubbles:true}));
+},true);
+document.addEventListener('change',e=>{
+ const f=e.target?.closest?.('#campaign-trekking-context-form');
+ if(!f||!['autoAllocate','autoPriority','stationaryForaging','weatherShift'].includes(e.target.name))return;
+ const auto=f.elements.namedItem('autoAllocate')?.checked;
+ for(const name of ['progress','bearing','foraging','stalking','vigilance','lax','orienteeringSlow']){
+  const field=f.elements.namedItem(name);if(!field)continue;
+  field.disabled=!!auto;
+ }
+ const priority=f.elements.namedItem('autoPriority');if(priority)priority.disabled=!auto;
+ trekGuidePreview(f);
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(form?.id!=='campaign-trekking-context-form')return;
  e.preventDefault();e.stopImmediatePropagation();
  try{
-  const {actor,clock,campaignId,proof,summary}=buildTrekWatchEvidence(form);
+  const {actor,clock,campaignId,proof,summary,pendingWeatherShift,weatherShiftId}=buildTrekWatchEvidence(form);
   // Only a real click on Confirm creates the immutable historical evidence.
-  if(mutate(()=>{data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignId,
+  if(mutate(()=>{if(pendingWeatherShift)data.journal.push({id:weatherShiftId,characterId:actor.id,calendarCampaignId:campaignId,
+    campaignMinute:clock.minute,createdAt:stamp(),title:'HMK · změna počasí GM · '+proof.area,
+    body:'Nová dvojice d10 platí od této minuty do konce dne nebo další změny. Původní denní doklad zůstává zachován.',
+    calendarTrekWeatherShift:pendingWeatherShift});
+   data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignId,
    campaignMinute:clock.minute,createdAt:stamp(),title:'HMK Trekking Routine · počasí / pohyb / setkání',
    body:summary,calendarTrekProof:proof});}))notice='Doložené podklady Trekking byly zapsány. Nejdříve doložte Orienteering Survival SV v kalendáři: bez jeho modifikátorů zatím nelze potvrdit oprávněnost zvolených Advantage Modes. Následky se otevírají v původních testech.';
  }catch(error){const message=trekUserFriendlyError(error?.message);trekGuideInvalid(form,trekGuideFieldFromMessage(message,form),'Trekking Routine nebyla uložena: '+message)}
@@ -13898,6 +13990,30 @@ document.addEventListener('submit',e=>{
    calendarTrekEncounterGM:{format:TREK_ENCOUNTER_GM_FORMAT,sourceId:source.id,minute:clock.minute,disposition,note}};
   if(mutate(()=>data.journal.push(row)))notice='Encounter uzavřen rozhodnutím GM. Povinný termín byl vyřízen; čas se sám neposunul.';
  }catch(err){alert('Setkání nebylo uzavřeno: '+(err.message||err));}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-trek-global-shift]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const out=f.querySelector('output');
+ try{
+  const clock=data.campaignClock;if(!clock||combatInitiativeSequence)throw Error('Potřebujete aktivní kampaň mimo Initiative.');
+  const cid=campaignKey(clock),source=data.journal.find(j=>j.id===f.elements.namedItem('sourceId').value&&j.calendarCampaignId===cid);
+  const baseline=source?.calendarTrekDayWeather;
+  if(!baseline||baseline.dayIndex!==Math.floor(clock.minute/1440)||activeAreaWeather(data.journal,cid,baseline.dayIndex,baseline.area)?.id!==source.id)
+   throw Error('Vyberte skutečně potvrzené aktivní denní počasí této oblasti.');
+  const t=f.elements.namedItem('trekWeatherShiftTemperature'),r=f.elements.namedItem('trekWeatherShiftPrecipitation');
+  const origins=[t,r].map(el=>el.dataset.trekGenerated===el.value?'cryptographic-software-die':'manual');
+  const change=createWeatherShift({journal:data.journal,campaignId:cid,minute:clock.minute,
+   area:baseline.area,season:baseline.season,climate:baseline.climate,landscape:baseline.landscape,
+   alpine:baseline.alpine,aridDesert:baseline.aridDesert,temperatureD10:Number(t.value),precipitationD10:Number(r.value),diceOrigins:origins});
+  if(!window.confirm('GM potvrzuje změnu počasí oblasti '+baseline.area+' od '+displayCampaignMinute(clock.minute)+'? Již odehrané úseky zůstanou beze změny.'))return;
+  const row={id:uuid(),characterId:source.characterId,calendarCampaignId:cid,campaignMinute:clock.minute,
+   createdAt:stamp(),title:'HMK · počasí změněno GM · '+baseline.area,
+   body:'GM potvrdil nové podmínky od aktuální minuty; dvě skutečné d10. Do konce dne nebo další změny.',
+   calendarTrekWeatherShift:change};
+  if(!mutate(()=>data.journal.push(row)))throw Error('Změna nebyla uložena.');
+  notice='Nové počasí platí od této minuty pro navazující hlídky. Starší doklady zůstaly beze změny.';
+ }catch(err){if(out){out.textContent=err.message;out.style.color='#922b22';}else alert(err.message);}
 },true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-trek-global-weather]'))return;

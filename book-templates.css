@@ -6800,3 +6800,11 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .content-calendar form[data-trek-encounter-gm] label{display:flex;flex-direction:column;gap:4px;min-width:0;}
 .content-calendar form[data-trek-encounter-gm] :is(input,select){max-width:100%;min-width:0;box-sizing:border-box;}
 .content-calendar .hc-trek-not-required input:disabled,.content-calendar .hc-trek-not-required button:disabled{opacity:.55;cursor:not-allowed;}
+
+/* v93.621 – parchment-native automatic modes and GM weather change. */
+.hc-trek-auto-mode{margin:.6rem 0;padding:.8rem;border:1px solid #b59a71;border-radius:5px;background:rgba(226,207,169,.17)}
+.hc-trek-auto-mode>label{min-width:0;max-width:100%}
+.hc-trek-shift-control{min-width:0;display:flex;gap:.55rem;align-items:end;flex-wrap:wrap}
+.hc-trek-shift-control>label{flex:1 1 9rem;min-width:0}
+.hc-trek-shift-control>.hc-trek-generate{flex:0 0 auto;white-space:nowrap}
+.hc-trek-not-required{opacity:.67}
