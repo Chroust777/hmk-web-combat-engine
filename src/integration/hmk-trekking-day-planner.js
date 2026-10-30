@@ -158,13 +158,14 @@ export function trekDailyWatchSlots(journal=[],campaignId,dayIndex,currentMinute
      movement:j.calendarTrekProof.effectiveMovement??j.calendarTrekProof.movement,
      encounter:j.calendarTrekProof.encounter,weather:j.calendarTrekProof.weatherWatch,
      unresolved:j.calendarTrekProof.unresolved??[],
-     survivalRecorded:journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarTrekSkillSource?.sourceId===j.id&&x.calendarTrekSkillSource?.hazard==='survival')}))};
+     survivalRecorded:journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarTrekSkillSource?.sourceId===j.id&&x.calendarTrekSkillSource?.hazard==='survival'),
+     survivalSV:(()=>{const row=journal.find(x=>x.calendarCampaignId===campaignId&&x.calendarTrekSkillSource?.sourceId===j.id&&x.calendarTrekSkillSource?.hazard==='survival');return Number.isFinite(row?.skillTestProof?.a?.sv)?row.skillTestProof.a.sv:Number.isFinite(row?.skillTestProof?.result?.sv)?row.skillTestProof.result.sv:null;})()}))};
  });
 }
 export function trekDayWeatherSummary(journal=[],campaignId,dayIndex){
- const rows=journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarTrekProof?.dayIndex===dayIndex);
+ const rows=journal.filter(j=>j.calendarCampaignId===campaignId&&(j.calendarTrekProof?.dayIndex===dayIndex||j.calendarTrekDayWeather?.dayIndex===dayIndex));
  const unique=new Map();
- for(const j of rows){const p=j.calendarTrekProof;const key=JSON.stringify([p.area,p.climate,p.season,p.landscape,p.alpine,p.aridDesert]);
+ for(const j of rows){const p=j.calendarTrekDayWeather??j.calendarTrekProof;const key=JSON.stringify([p.area,p.climate,p.season,p.landscape,p.alpine,p.aridDesert]);
   if(!unique.has(key))unique.set(key,{area:p.area,weather:p.weatherDay});}
  return [...unique.values()];
 }

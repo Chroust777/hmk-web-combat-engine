@@ -139,10 +139,41 @@ export function trekEncounterCheck({environ,night=false,roll,elapsedWildernessNi
 /** Strict import/save gate for NEW trekking preparations. Existing legacy
  * journal entries remain accepted unchanged. The same area/day/context
  * cannot acquire a second independent pair of weather d10 rolls. */
+/** Global weather is journal history, not a mutable weather cache. */
+export function assertTrekDailyWeatherAppendOnly(before=[],after=[]){
+ const later=new Map(after.filter(x=>x.calendarTrekDayWeather).map(x=>[x.id,x]));
+ for(const prior of before){
+  if(!prior.calendarTrekDayWeather)continue;
+  const current=later.get(prior.id);
+  assert(current&&JSON.stringify(current)===JSON.stringify(prior),
+   'Doložené denní počasí nelze přepsat ani smazat.');
+ }
+ return true;
+}
 export function validateTrekkingJournalEvidence(document){
  const days=new Map();
  const priorRows=[];
  for(const entry of document?.journal??[]){
+  // New standalone HMK 144 climate evidence is authoritative for later watches.
+  const global=entry.calendarTrekDayWeather;
+  if(global){
+   assert(global.format==='hmk-trek-daily-weather-v1'&&typeof global.area==='string'&&
+    global.area.length>0&&global.area.length<=90&&int(entry.campaignMinute,0,1e9)&&
+    global.dayIndex===Math.floor(entry.campaignMinute/1440)&&
+    Array.isArray(global.diceOrigins)&&global.diceOrigins.length===2&&
+    global.diceOrigins.every(x=>['manual','cryptographic-software-die'].includes(x))&&
+    typeof entry.calendarCampaignId==='string'&&entry.calendarCampaignId,'Neplatný doklad denního počasí.');
+   const day=trekWeatherDay({season:global.season,climate:global.climate,landscape:global.landscape,
+    alpine:global.alpine,aridDesert:global.aridDesert,
+    temperatureD10:global.weatherDay?.temperatureD10,precipitationD10:global.weatherDay?.precipitationD10});
+   assert(JSON.stringify(day)===JSON.stringify(global.weatherDay),'Denní počasí neodpovídá skutečným hodům d10.');
+   const key=JSON.stringify([entry.calendarCampaignId,global.dayIndex,global.area,global.season,
+    global.climate,global.landscape,global.alpine,global.aridDesert]);
+   assert(!days.has(key),'Denní počasí bylo pro stejnou oblast a podmínky už potvrzeno.');
+   days.set(key,day);
+   priorRows.push(entry);
+   continue;
+  }
   const p=entry.calendarTrekProof;if(!p){priorRows.push(entry);continue;}
   assertTrackingBearingWatch(entry,priorRows);
   priorRows.push(entry);
