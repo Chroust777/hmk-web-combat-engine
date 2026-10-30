@@ -59,10 +59,27 @@ export function cancelledTrekWatchIntents(journal=[],campaignId,planRecord){
  }
  return result;
 }
+/** v93.617: A watch restored with revised parameters uses its own confirmed
+ * immutable configuration. Legacy reactivations (without it) remain readable. */
+export function reactivatedTrekWatchConfiguration(journal=[],campaignId,planRecord,watchIndex){
+ if(!planRecord||cancelledTrekWatchIntents(journal,campaignId,planRecord).has(watchIndex))return null;
+ const latest=[...journal].reverse().find(row=>row.calendarCampaignId===campaignId&&
+  row.calendarTrekWatchReactivate?.format===TREK_WATCH_REACTIVATE_FORMAT&&
+  row.calendarTrekWatchReactivate.planId===planRecord.id&&
+  row.calendarTrekWatchReactivate.watchIndex===watchIndex);
+ return latest?.calendarTrekWatchReactivate?.watchContext??null;
+}
 export function effectiveTrekWatchIntents(journal=[],campaignId,planRecord){
  const raw=planRecord?.calendarTrekDayPlan?.watchIntents??Array(6).fill('none');
  const cancelled=cancelledTrekWatchIntents(journal,campaignId,planRecord);
- return raw.map((name,index)=>cancelled.has(index)?'none':name);
+ return raw.map((name,index)=>{
+  if(cancelled.has(index))return 'none';
+  const latest=[...journal].reverse().find(row=>row.calendarCampaignId===campaignId&&
+   row.calendarTrekWatchReactivate?.format===TREK_WATCH_REACTIVATE_FORMAT&&
+   row.calendarTrekWatchReactivate.planId===planRecord?.id&&
+   row.calendarTrekWatchReactivate.watchIndex===index);
+  return latest?.calendarTrekWatchReactivate?.watchIntent??name;
+ });
 }
 export function validateTrekWatchCancelRecord(row,journal=[]){
  const c=row?.calendarTrekWatchCancel;
@@ -99,6 +116,16 @@ export function validateTrekWatchReactivateRecord(row,journal=[]){
   throw Error('Opětovná aktivace je možná pouze pro budoucí hlídku a platný čas kampaně.');
  const plan=journal.find(j=>j.id===r.planId);
  const cancel=journal.find(j=>j.id===r.cancelId);
+ // Pre-v93.617 receipts did not contain revised watch details; preserve them.
+ // New reactivations must provide BOTH the chosen activity and a complete,
+ // validated watch-specific context rather than silently reviving old values.
+ if(r.watchIntent!==undefined||r.watchContext!==undefined){
+  if(!['travel','rest','sleep','foraging','watch','other'].includes(r.watchIntent)||
+   !r.watchContext||typeof r.watchContext!=='object'||Array.isArray(r.watchContext))
+   throw Error('Pro obnovení hlídky nejdříve vyberte novou činnost a vyplňte její nastavení.');
+  validateTrekDayPlan({format:TREK_DAY_PLAN_FORMAT,dayIndex:r.dayIndex,
+   ...r.watchContext,watchIntents:Array(6).fill('none')});
+ }
  if(!plan||plan.calendarCampaignId!==row.calendarCampaignId||
   plan.calendarTrekDayPlan?.format!==TREK_DAY_PLAN_FORMAT||
   plan.calendarTrekDayPlan.dayIndex!==r.dayIndex||plan.characterId!==row.characterId||
