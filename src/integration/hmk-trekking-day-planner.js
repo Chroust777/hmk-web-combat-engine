@@ -3,6 +3,7 @@
  * roll, travel proof, medical event, time commitment or permission to spend.
  * Historical Trekking/END evidence remains the single source of actual events.
  */
+import {effectiveTrekSource} from './hmk-trekking-correction.js';
 export const TREK_DAY_PLAN_FORMAT='hmk-trekking-day-plan-v1';
 export const TREK_WATCH_CANCEL_FORMAT='hmk-trekking-watch-intent-cancel-v1';
 export const TREK_WATCH_REACTIVATE_FORMAT='hmk-trekking-watch-intent-reactivate-v1';
@@ -155,7 +156,9 @@ export function trekDailyWatchSlots(journal=[],campaignId,dayIndex,currentMinute
    area:prepared.at(-1)?.calendarTrekProof?.area??null,
    actualEvents:completed.length,
    preparedEvidence:prepared.map(j=>({id:j.id,guideId:j.characterId,area:j.calendarTrekProof.area,
-     movement:j.calendarTrekProof.effectiveMovement??j.calendarTrekProof.movement,
+     movement:(()=>{const p=effectiveTrekSource(j,journal).calendarTrekProof;return p.effectiveMovement??p.movement;})(),
+     modes:effectiveTrekSource(j,journal).calendarTrekProof.modes,
+     appliedGMWeather:!!j.calendarTrekProof.weatherShiftId,
      encounter:j.calendarTrekProof.encounter,weather:j.calendarTrekProof.weatherWatch,
      unresolved:(j.calendarTrekProof.unresolved??[]).filter(u=>!String(u).startsWith('Random Encounter')||!journal.some(r=>r.calendarCampaignId===campaignId&&r.calendarTrekEncounterGM?.sourceId===j.id)),
      encounterResolved:journal.some(r=>r.calendarCampaignId===campaignId&&r.calendarTrekEncounterGM?.sourceId===j.id),

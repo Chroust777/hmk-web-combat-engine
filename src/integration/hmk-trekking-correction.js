@@ -23,17 +23,51 @@ export function certifyTrekOrienteering(source,journal){
  const drover=journal.filter(j=>j.calendarTrekSkillSource?.sourceId===source.id&&
   j.calendarTrekSkillSource.hazard==='drover'&&j.calendarCampaignId===source.calendarCampaignId&&
   j.characterId===p.orienteeringContext.droverId&&j.campaignMinute>=source.campaignMinute);
- ok(p.conveyance==='foot'||drover.length===1,'Chybí původní Riding/Animalcraft test vodiče');
- const droverResult=p.conveyance==='foot'?null:(drover[0].skillTestProof?.a??drover[0].skillTestProof?.result);
+ const requiresDrover=p.conveyance!=='foot'||p.orienteeringContext.animalsPresent===true;
+ ok(!requiresDrover||drover.length===1,'Chybí původní Riding/Animalcraft test vodiče');
+ const droverResult=requiresDrover?(drover[0].skillTestProof?.a??drover[0].skillTestProof?.result):null;
  const adjustment=adjustedOrienteeringSV({baseSV:r.sv,context:p.orienteeringContext,droverResult});
  return {orienteeringId:linked[0].id,droverId:drover[0]?.id??null,adjustment};
+}
+/** Automatic default policy chosen by the GM as an OBJECTIVE, never by guessed dice.
+ * Survival SV grants the budget; required Bearing first, then optional task,
+ * then Progress. This is a documented allocation preference, not HMK's
+ * prescribed unique optimal allocation: the GM can use manual advanced modes.
+ */
+export function allocateTrekModes(prepared,adjustment,{requiredBearing=0}={}){
+ ok(prepared?.autoAllocate===true,'Automatické režimy nebyly zvoleny.');
+ ok(Number.isSafeInteger(requiredBearing)&&requiredBearing>=0&&requiredBearing<=2,'Neplatná potřeba Bearing z terénu.');
+ const goal=prepared.autoPriority||'pace';
+ ok(['pace','forage','stealth','vigilance'].includes(goal),'Neznámý cíl automatického rozdělení.');
+ const forced=prepared.trackingForcedBearingSourceId?1:0;
+ let budget=adjustment.advantageModes;
+ const output={...prepared,progress:0,bearing:forced,foraging:0,stalking:0,vigilance:0};
+ if(adjustment.stationaryForaging){output.foraging=Math.min(2,budget);budget-=output.foraging;}
+ else{
+  const needed=Math.max(0,requiredBearing-forced),safe=Math.min(needed,budget);
+  output.bearing+=safe;budget-=safe;
+  if(goal==='forage'&&budget>0){output.foraging=Math.min(2,budget);budget-=output.foraging;}
+  if(goal==='stealth'&&budget>0){output.stalking=1;budget--;}
+  if(goal==='vigilance'&&budget>0){output.vigilance=1;budget--;}
+  output.progress=budget;
+ }
+ const sv=adjustment.adjustedSV;
+ // SV 1–2 permits a GM choice; conservative automatic default is Slow.
+ output.lax=sv<=0;
+ output.orienteeringSlow=sv<=2?1:0;
+ output.slow=prepared.slow-(prepared.orienteeringSlow??0)-(prepared.foraging>0&&!adjustment.stationaryForaging?1:0)
+  -(prepared.stalking??0)+output.orienteeringSlow+(output.foraging>0&&!adjustment.stationaryForaging?1:0)+output.stalking;
+ ok(Number.isInteger(output.slow)&&output.slow>=0,'Nelze automaticky doložit výsledný Slow.');
+ assertOrienteeringModes({adjustment,modes:output});
+ return output;
 }
 /** Preserve bearing first (it protects the original route), then other modes.
  * Excess Progress is discarded first. The preselected travel intent remains
  * documented by the original watch, while this projection uses only certified
  * modes. Lax vs Slow at SV 1-2 defaults to Slow, conservatively.
  */
-export function correctedModes(prepared,adjustment,{lowChoice=null}={}){
+export function correctedModes(prepared,adjustment,{lowChoice=null,requiredBearing=0}={}){
+ if(prepared?.autoAllocate===true)return allocateTrekModes(prepared,adjustment,{requiredBearing});
  const original={progress:prepared.progress,bearing:prepared.bearing,...extras(prepared)};
  ok(Object.values(original).every(x=>Number.isSafeInteger(x)&&x>=0)&&
   original.stalking<=1&&original.vigilance<=1,'Neplatné připravené režimy hlídky');
@@ -63,7 +97,7 @@ export function correctedModes(prepared,adjustment,{lowChoice=null}={}){
 export function previewTrekCorrection(source,journal,{lowChoice=null}={}){
  const {orienteeringId,droverId,adjustment}=certifyTrekOrienteering(source,journal);
  const p=source.calendarTrekProof,old=p.modes;
- const modes=correctedModes(old,adjustment,{lowChoice});
+ const modes=correctedModes(old,adjustment,{lowChoice,requiredBearing:p.movement.requiredBearing});
  const neededProgress=Math.max(0,modes.progress-modes.slow),oldProgress=old.progressD10.length;
  const additionalProgress=Math.max(0,neededProgress-oldProgress);
  const movementBase=trekWatchMovement({stationaryForaging:!!p.orienteeringContext?.stationaryForaging,topography:p.landscape,terrain:p.terrain,conveyance:p.conveyance,
@@ -74,7 +108,8 @@ export function previewTrekCorrection(source,journal,{lowChoice=null}={}){
  ok(!(modes.doubleTime&&(modes.slow>0||modes.loaded)),
   'Oprava by změnila přípustnost Double Time. Vyžaduje samostatné rozhodnutí GM o režimu cesty.');
  return {orienteeringId,droverId,adjustment,modes,additionalProgress,additionalDirection,
-  alreadyValid:modeTotal(old)<=adjustment.advantageModes&&old.lax===modes.lax&&
+  alreadyValid:!(p.hazards?.deferredDirection&&movementBase.bearingDeficit>0)&&
+   modeTotal(old)<=adjustment.advantageModes&&old.lax===modes.lax&&
    old.orienteeringSlow===modes.orienteeringSlow&&old.slow===modes.slow&&modeTotal(old)===modeTotal(modes)};
 }
 export function createTrekCorrection({source,journal,additionalRolls=[],origin='manual',lowChoice=null}={}){

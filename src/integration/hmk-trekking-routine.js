@@ -216,8 +216,9 @@ export function validateTrekkingJournalEvidence(document){
     original.calendarTrekProof.alpine===p.alpine&&original.calendarTrekProof.aridDesert===p.aridDesert&&
     JSON.stringify((original.calendarTrekProof.partyModes?.memberIds??[]).slice().sort())===
     JSON.stringify((p.partyModes?.memberIds??[]).slice().sort())&&
-    original.calendarTrekProof.weatherWatch.precipitationD6===p.weatherWatch.precipitationD6,
-    'Pokračující úsek musí navazovat na již doložené počasí a stejnou skupinu v jedné čtyřhodinové hlídce.');
+    (original.calendarTrekProof.weatherShiftId!==p.weatherShiftId||
+     original.calendarTrekProof.weatherWatch.precipitationD6===p.weatherWatch.precipitationD6),
+    'Pokračující úsek musí navazovat na doloženou skupinu a počasí; nový GM přechod smí mít vlastní srážkový hod.');
   }
   if(p.encounterContinuationOf){
    const earlier=priorRows.find(j=>j.id===p.encounterContinuationOf);
@@ -233,11 +234,20 @@ export function validateTrekkingJournalEvidence(document){
   assert(JSON.stringify(expectedDay)===JSON.stringify(p.weatherDay),'Nesouhlasí uložené klimatické vyhodnocení');
   const key=JSON.stringify([entry.calendarCampaignId,p.dayIndex,p.area,p.season,p.climate,p.landscape,p.alpine,p.aridDesert]);
   const prior=days.get(key);
-  assert(!prior||JSON.stringify(prior)===JSON.stringify(p.weatherDay),'Duplicitní odlišné počasí v jedné oblasti a jednom dni');
+  const shift=p.weatherShiftId?priorRows.find(x=>x.id===p.weatherShiftId)?.calendarTrekWeatherShift:null;
+  if(p.weatherShiftId){
+   assert(shift?.format==='hmk-trek-gm-weather-shift-v1'&&
+    shift.fromMinute<=p.campaignMinute&&shift.dayIndex===p.dayIndex&&
+    shift.area.toLocaleLowerCase('cs')===p.area.toLocaleLowerCase('cs')&&
+    JSON.stringify(shift.weatherDay)===JSON.stringify(expectedDay),
+    'Hlídka nemá platný časový doklad změny počasí GM.');
+  }else assert(!prior||JSON.stringify(prior)===JSON.stringify(p.weatherDay),'Duplicitní odlišné počasí v jedné oblasti a jednom dni');
   assert(p.dayAlready===!!prior,'Chybné použití opakovaného denního počasí');
-  days.set(key,p.weatherDay);
+  if(!shift)days.set(key,p.weatherDay);
+  const earlier=p.continuationOf?priorRows.find(x=>x.id===p.continuationOf)?.calendarTrekProof:null;
+  const reuseWatch=!!earlier&&earlier.weatherShiftId===p.weatherShiftId;
   const watch=trekWeatherWatch(expectedDay,{night:p.night,pavedRoad:p.terrain==='paved-road',
-   precipitationD6:p.weatherWatch?.precipitationD6,continuation:!!p.continuationOf});
+   precipitationD6:p.weatherWatch?.precipitationD6,continuation:reuseWatch});
   assert(JSON.stringify(watch)===JSON.stringify(p.weatherWatch),'Nesouhlasí výsledek srážek pro hlídku');
   const movement=trekWatchMovement({stationaryForaging:p.orienteeringContext?.stationaryForaging===true,topography:p.landscape,terrain:p.terrain,conveyance:p.conveyance,
    progress:p.modes?.progress,slow:p.modes?.slow,loaded:p.modes?.loaded,bearing:p.modes?.bearing,
@@ -246,7 +256,12 @@ export function validateTrekkingJournalEvidence(document){
   assert(JSON.stringify(movement)===JSON.stringify(p.movement),'Nesouhlasí vypočítaný pohyb');
   if(p.effectiveMovement)assert(JSON.stringify(adjustedTrekkingMovement(p))===JSON.stringify(p.effectiveMovement),
    'Doložené zkrácení trasy v Direction Lost Time neodpovídá HMK 148');
-  const hazards=trekHazards({bearingDeficit:movement.bearingDeficit,directionD10:p.modes?.directionD10});
+  const hazards=p.modes?.autoAllocate===true&&p.hazards?.deferredDirection===true?
+   {direction:null,survival:null,deferredDirection:true,sourcePage:148}:
+   trekHazards({bearingDeficit:movement.bearingDeficit,directionD10:p.modes?.directionD10});
+  if(p.hazards?.deferredDirection===true)assert(p.modes?.autoAllocate===true&&
+   Array.isArray(p.modes?.directionD10)&&p.modes.directionD10.length===0,
+   'Odložený Direction Hazard patří výhradně automatickému Orienteering a nemá předčasné hody.');
   assert(JSON.stringify(hazards)===JSON.stringify(p.hazards),'Nesouhlasí uložení Direction Hazard');
   const encounter=trekEncounterCheck({environ:p.modes?.environ,night:p.night,
    roll:p.encounter?.roll,elapsedWildernessNightWatches:p.modes?.wildernessNightWatches,continuation:!!p.encounterContinuationOf});
@@ -256,7 +271,7 @@ export function validateTrekkingJournalEvidence(document){
    expectedRolls.push([10,'Daily Temperature',expectedDay.temperatureD10],
     [10,'Daily Precipitation',expectedDay.precipitationD10]);
   }
-  if(expectedDay.hasPrecipitation&&!p.continuationOf)expectedRolls.push([6,'Precipitation per Watch',watch.precipitationD6]);
+  if(expectedDay.hasPrecipitation&&!reuseWatch)expectedRolls.push([6,'Precipitation per Watch',watch.precipitationD6]);
   for(const value of p.modes.progressD10)expectedRolls.push([10,'Progress',value]);
   for(const value of p.modes.directionD10)expectedRolls.push([10,'Direction Hazard',value]);
   if(encounter.checkDue)expectedRolls.push([10,'Random Encounter',encounter.roll]);
