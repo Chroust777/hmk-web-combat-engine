@@ -1,3 +1,4 @@
+import {validatedTrekOrientationReuse,mayReuseTrekMovement} from './hmk-trekking-orienteering-continuation.js';
 import {weatherVoidedIds} from './hmk-trekking-weather-lifecycle.js';
 import {validateTrekCorrections,effectiveTrekSource} from './hmk-trekking-correction.js';
 /** HârnMaster Kèthîra v1.2, printed pp. 141–150.
@@ -207,6 +208,13 @@ export function validateTrekkingJournalEvidence(document){
     int(p.modes.manualSlow,0,20),
     'Skupinové postihy neodpovídají uloženému pohybu a počasí.');
   }
+  if(p.orienteeringReuse)validatedTrekOrientationReuse(entry,priorRows);
+  if(p.reusedModeRollsFrom){
+   const earlier=priorRows.find(x=>x.id===p.reusedModeRollsFrom);
+   assert(earlier&&p.orienteeringReuse?.sourceId===earlier.id&&mayReuseTrekMovement({earlier:{...earlier,calendarTrekProof:effectiveTrekSource(earlier,priorRows).calendarTrekProof},current:entry})&&
+    JSON.stringify(p.modes)===JSON.stringify(effectiveTrekSource(earlier,priorRows).calendarTrekProof.modes),
+    'Převzaté Progress/Direction hody neodpovídají doložené původní části hlídky.');
+  }
   if(p.continuationOf){
    const original=priorRows.find(j=>j.id===p.continuationOf);
    assert(original?.calendarTrekProof&&Math.floor(original.campaignMinute/240)===Math.floor(entry.campaignMinute/240)&&
@@ -272,8 +280,10 @@ export function validateTrekkingJournalEvidence(document){
     [10,'Daily Precipitation',expectedDay.precipitationD10]);
   }
   if(expectedDay.hasPrecipitation&&!reuseWatch)expectedRolls.push([6,'Precipitation per Watch',watch.precipitationD6]);
-  for(const value of p.modes.progressD10)expectedRolls.push([10,'Progress',value]);
-  for(const value of p.modes.directionD10)expectedRolls.push([10,'Direction Hazard',value]);
+  if(!p.reusedModeRollsFrom){
+   for(const value of p.modes.progressD10)expectedRolls.push([10,'Progress',value]);
+   for(const value of p.modes.directionD10)expectedRolls.push([10,'Direction Hazard',value]);
+  }
   if(encounter.checkDue)expectedRolls.push([10,'Random Encounter',encounter.roll]);
   assert(Array.isArray(p.rolls)&&p.rolls.length===expectedRolls.length&&
    p.rolls.every((r,i)=>r.faces===expectedRolls[i][0]&&r.label===expectedRolls[i][1]&&
@@ -310,7 +320,8 @@ export function validateTrekkingJournalEvidence(document){
    const roll=byId.get(e.orienteeringId),link=roll?.calendarTrekSkillSource;
    const test=roll?.skillTestProof?.a??roll?.skillTestProof?.result;
    const selected=p.modes?.progress+p.modes?.bearing-(p.modes?.trackingForcedBearingSourceId?1:0)+(p.modes?.foraging??0)+(p.modes?.stalking??0)+(p.modes?.vigilance??0);
-   const droverRow=document.journal.find(j=>j.calendarTrekSkillSource?.sourceId===source.id&&
+   const inherited=p.orienteeringReuse?validatedTrekOrientationReuse(source,document.journal):null;
+   const droverRow=inherited?.drover??document.journal.find(j=>j.calendarTrekSkillSource?.sourceId===source.id&&
     j.calendarTrekSkillSource.hazard==='drover'&&j.characterId===p.orienteeringContext?.droverId&&
     j.calendarCampaignId===entry.calendarCampaignId);
    const droverResult=droverRow?.skillTestProof?.a??droverRow?.skillTestProof?.result;
@@ -319,9 +330,9 @@ export function validateTrekkingJournalEvidence(document){
    if(adjusted)assertOrienteeringModes({adjustment:adjusted,modes:p.modes});
    const stars=adjusted?adjusted.advantageModes:Number.isSafeInteger(test?.sv)?Math.max(0,Math.min(5,test.sv-4)):NaN;
    assert(roll&&link?.format==='hmk-trek-linked-skill-v1'&&link.hazard==='survival'&&
-    link.sourceId===source.id&&roll.characterId===source.characterId&&
+    (link.sourceId===source.id||inherited?.survival.id===roll.id)&&roll.characterId===source.characterId&&
     roll.calendarCampaignId===entry.calendarCampaignId&&
-    Number.isSafeInteger(roll.campaignMinute)&&roll.campaignMinute>=source.campaignMinute&&
+    Number.isSafeInteger(roll.campaignMinute)&&(inherited?roll.campaignMinute>=p.orienteeringReuse.sourceMinute:roll.campaignMinute>=source.campaignMinute)&&
     roll.campaignMinute<=entry.campaignMinute&&
     ['secondary-mastery-value-test','success-value-specific'].includes(roll.skillTestProof?.type)&&
     Number.isSafeInteger(selected)&&selected<=stars&&

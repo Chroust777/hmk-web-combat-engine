@@ -3,6 +3,7 @@ import {weatherRollEvidence} from './hmk-trekking-weather-roll.js';
 import {effectiveTrekSource} from './hmk-trekking-correction.js';
 import {hasFinishedLinkedTrekHazard} from './hmk-trekking-handoff.js';
 import {adjustedTrekkingMovement} from './hmk-trekking-routine.js';
+import {validatedTrekOrientationReuse} from './hmk-trekking-orienteering-continuation.js';
 /** Evidence-only Trekking hazards → calendar obligations. HMK v1.2 pp.148–150.
  * A weather/route/encounter roll is a trigger, NOT an inferred injury.
  */
@@ -44,17 +45,18 @@ export function trekkingOutstandingCases(characters=[],journal=[],campaignId=nul
   if(!p||p.format!=='hmk-trekking-watch-evidence-v1'||!entry.id||!names.has(entry.characterId)||
    !entry.calendarCampaignId||(campaignId&&entry.calendarCampaignId!==campaignId)||
    !whole(entry.campaignMinute)||entry.campaignMinute!==p.campaignMinute)continue;
+  const inherited=p.orienteeringReuse?validatedTrekOrientationReuse(entry,journal):null;
   const triggers=[];
-  if(!journal.some(j=>j.calendarTrekSkillSource?.format==='hmk-trek-linked-skill-v1'&&
+  if(!inherited&&!journal.some(j=>j.calendarTrekSkillSource?.format==='hmk-trek-linked-skill-v1'&&
     j.calendarTrekSkillSource.sourceId===entry.id&&j.calendarTrekSkillSource.hazard==='survival'&&
     j.characterId===entry.characterId&&j.calendarCampaignId===entry.calendarCampaignId))triggers.push('survival-test');
-  if(p.orienteeringContext&&(p.conveyance!=='foot'||p.orienteeringContext.animalsPresent))triggers.push('drover');
+  if(!inherited&&p.orienteeringContext&&(p.conveyance!=='foot'||p.orienteeringContext.animalsPresent))triggers.push('drover');
   if(p.weatherWatch?.requiresWeatherHazardRoll)triggers.push('weather');
-  if(p.hazards?.direction&&!(p.hazards.direction==='lost-time'&&p.effectiveMovement&&
+  if(!p.reusedModeRollsFrom&&p.hazards?.direction&&!(p.hazards.direction==='lost-time'&&p.effectiveMovement&&
    JSON.stringify(p.effectiveMovement)===JSON.stringify(adjustedTrekkingMovement(p))))triggers.push('direction');
-  if(p.hazards?.survival||journal.some(j=>j.calendarTrekSkillSource?.sourceId===entry.id&&
+  if(!inherited&&(p.hazards?.survival||journal.some(j=>j.calendarTrekSkillSource?.sourceId===entry.id&&
    j.calendarTrekSkillSource.hazard==='survival'&&
-   (j.skillTestProof?.a||j.skillTestProof?.result)?.level==='CF'))triggers.push('survival');
+   (j.skillTestProof?.a||j.skillTestProof?.result)?.level==='CF')))triggers.push('survival');
   if(p.encounter?.encounter)triggers.push('encounter');
   for(const hazard of triggers){
    // HMK p.149: the weather hazard is assessed for every exposed member,

@@ -3,6 +3,7 @@
  * correction is an additional, source-linked, replayable proof.
  */
 import {adjustedOrienteeringSV,assertOrienteeringModes} from './hmk-trekking-orienteering.js';
+import {validatedTrekOrientationReuse} from './hmk-trekking-orienteering-continuation.js';
 import {trekWatchMovement,trekHazards,adjustedTrekkingMovement} from './hmk-trekking-routine.js';
 const ok=(condition,message)=>{if(!condition)throw Error(message);};
 const isD10=x=>Number.isSafeInteger(x)&&x>=1&&x<=10;
@@ -12,22 +13,27 @@ export const modeTotal=m=>m.progress+m.bearing-(m.trackingForcedBearingSourceId?
 export function certifyTrekOrienteering(source,journal){
  const p=source?.calendarTrekProof;
  ok(p?.format==='hmk-trekking-watch-evidence-v1','Chybí původní cestovní hlídka');
+ const reused=p.orienteeringReuse?validatedTrekOrientationReuse(source,journal):null;
  const linked=journal.filter(j=>j.calendarTrekSkillSource?.format==='hmk-trek-linked-skill-v1'&&
   j.calendarTrekSkillSource.sourceId===source.id&&j.calendarTrekSkillSource.hazard==='survival'&&
   j.calendarCampaignId===source.calendarCampaignId&&j.characterId===source.characterId&&
   j.campaignMinute>=source.campaignMinute);
- ok(linked.length===1,'Chybí jeden autoritativní Orienteering / Survival test pro tuto hlídku');
- const r=linked[0].skillTestProof?.a??linked[0].skillTestProof?.result;
+ ok(reused||linked.length===1,'Chybí jeden autoritativní Orienteering / Survival test pro tuto hlídku');
+ ok(!reused||linked.length===0,'Pokračování nesmí obsahovat druhý Survival test.');
+ const survival=reused?.survival??linked[0];
+ const r=survival.skillTestProof?.a??survival.skillTestProof?.result;
  ok(Number.isSafeInteger(r?.sv)&&['CF','F','S','CS'].includes(r?.level),'Neplatný doložený Survival SV');
  ok(p.orienteeringContext,'Starší hlídka bez situačního kontextu nemůže být automaticky opravena');
  const drover=journal.filter(j=>j.calendarTrekSkillSource?.sourceId===source.id&&
   j.calendarTrekSkillSource.hazard==='drover'&&j.calendarCampaignId===source.calendarCampaignId&&
   j.characterId===p.orienteeringContext.droverId&&j.campaignMinute>=source.campaignMinute);
  const requiresDrover=p.conveyance!=='foot'||p.orienteeringContext.animalsPresent===true;
- ok(!requiresDrover||drover.length===1,'Chybí původní Riding/Animalcraft test vodiče');
- const droverResult=requiresDrover?(drover[0].skillTestProof?.a??drover[0].skillTestProof?.result):null;
+ ok(!requiresDrover||reused?.drover||drover.length===1,'Chybí původní Riding/Animalcraft test vodiče');
+ ok(!reused||drover.length===0,'Pokračování nesmí opakovat původní Drover test.');
+ const actualDrover=reused?.drover??drover[0];
+ const droverResult=requiresDrover?(actualDrover.skillTestProof?.a??actualDrover.skillTestProof?.result):null;
  const adjustment=adjustedOrienteeringSV({baseSV:r.sv,context:p.orienteeringContext,droverResult});
- return {orienteeringId:linked[0].id,droverId:drover[0]?.id??null,adjustment};
+ return {orienteeringId:survival.id,droverId:actualDrover?.id??null,adjustment,reused:!!reused};
 }
 /** Automatic default policy chosen by the GM as an OBJECTIVE, never by guessed dice.
  * Survival SV grants the budget; required Bearing first, then optional task,

@@ -4,6 +4,7 @@
  * Historical Trekking/END evidence remains the single source of actual events.
  */
 import {effectiveTrekSource} from './hmk-trekking-correction.js';
+import {validatedTrekOrientationReuse} from './hmk-trekking-orienteering-continuation.js';
 export const TREK_DAY_PLAN_FORMAT='hmk-trekking-day-plan-v1';
 export const TREK_WATCH_CANCEL_FORMAT='hmk-trekking-watch-intent-cancel-v1';
 export const TREK_WATCH_REACTIVATE_FORMAT='hmk-trekking-watch-intent-reactivate-v1';
@@ -162,8 +163,9 @@ export function trekDailyWatchSlots(journal=[],campaignId,dayIndex,currentMinute
      encounter:j.calendarTrekProof.encounter,weather:j.calendarTrekProof.weatherWatch,
      unresolved:(j.calendarTrekProof.unresolved??[]).filter(u=>!String(u).startsWith('Random Encounter')||!journal.some(r=>r.calendarCampaignId===campaignId&&r.calendarTrekEncounterGM?.sourceId===j.id)),
      encounterResolved:journal.some(r=>r.calendarCampaignId===campaignId&&r.calendarTrekEncounterGM?.sourceId===j.id),
-     survivalRecorded:journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarTrekSkillSource?.sourceId===j.id&&x.calendarTrekSkillSource?.hazard==='survival'),
-     survivalSV:(()=>{const row=journal.find(x=>x.calendarCampaignId===campaignId&&x.calendarTrekSkillSource?.sourceId===j.id&&x.calendarTrekSkillSource?.hazard==='survival');return Number.isFinite(row?.skillTestProof?.a?.sv)?row.skillTestProof.a.sv:Number.isFinite(row?.skillTestProof?.result?.sv)?row.skillTestProof.result.sv:null;})()}))};
+     survivalInherited:!!j.calendarTrekProof.orienteeringReuse,
+     survivalRecorded:!!j.calendarTrekProof.orienteeringReuse||journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarTrekSkillSource?.sourceId===j.id&&x.calendarTrekSkillSource?.hazard==='survival'),
+     survivalSV:(()=>{const row=j.calendarTrekProof.orienteeringReuse?validatedTrekOrientationReuse(j,journal)?.survival:journal.find(x=>x.calendarCampaignId===campaignId&&x.calendarTrekSkillSource?.sourceId===j.id&&x.calendarTrekSkillSource?.hazard==='survival');return Number.isFinite(row?.skillTestProof?.a?.sv)?row.skillTestProof.a.sv:Number.isFinite(row?.skillTestProof?.result?.sv)?row.skillTestProof.result.sv:null;})()}))};
  });
 }
 export function trekDayWeatherSummary(journal=[],campaignId,dayIndex){
