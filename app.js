@@ -173,6 +173,7 @@ import {TREK_DAY_PLAN_FORMAT,validateTrekDayPlan,latestTrekDayPlan,previousTrekC
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
 import {certifyTrekkingWeatherRoll,weatherRollEvidence} from './src/integration/hmk-trekking-weather-roll.js';
 import {assessTrekkingReadiness} from './src/integration/hmk-trekking-readiness.js';
+import {eligibleTrekOrientationReuse,mayReuseTrekMovement} from './src/integration/hmk-trekking-orienteering-continuation.js';
 import {previewTrekCorrection,createTrekCorrection,latestTrekCorrection,effectiveTrekSource} from './src/integration/hmk-trekking-correction.js';
 import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING_HABITATS,validateWildernessJournal,createTrackingProof,validateTrackingJournal,trekWatchfulness,trekSurpriseProcedure} from './src/integration/hmk-trekking-wilderness-tasks.js';
 import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,validateSupplyJournal,assertSupplyJournalAppendOnly,supplyBalances} from './src/integration/hmk-foraging-supply-ledger.js';
@@ -294,7 +295,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.623';
+const APP_VERSION='93.624';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1706,7 +1707,7 @@ function trekDayPlannerHTML(clock,participants){
  return `<section class="hc-trek-day-planner" data-trek-day-planner>
  <div class="hc-trek-day-title"><div><h3>Den cestování · 24 hodin</h3><p>Den ${dayIndex+1} · ${esc(formatTRDate(campaignTRDate(clock,clock.minute)))} · GM ${esc(displayCampaignMinute(clock.minute))}</p></div><span class="hc-trek-day-chip">HMK 141–150 · den / hlídky</span></div>
  <p class="hc-hint">Nejdříve potvrďte společné údaje dne. Budoucí naplánované hlídky lze zrušit bez zdůvodnění a obnovit až po vyplnění nových údajů; žádný skutečně provedený následek se tím neruší. Každá ze šesti čtyřhodinových hlídek má vlastní skutečné hody a následky. Nevyplněný plán ani neplánovaná hlídka neblokují čas. Zápis vzniká <strong>pouze potvrzením</strong>.</p>
- ${weatherSplitNow.length?`<div class="hc-trek-auto-split-note" role="status"><strong>Počasí změněno · běžící cesta rozdělena v ${esc(displayCampaignMinute(clock.minute))}</strong><p>Skutečný absolvovaný úsek (${weatherSplitNow.length} účastníků) má doloženou dílčí vzdálenost a Fatigue. Pro zbývajících ${240-clock.minute%240} minut připravte nový úsek s převzatými údaji a nyní platným počasím. Nové požadované hody / Survival se vyhodnocují teprve po potvrzení.</p></div>`:''}
+ ${weatherSplitNow.length?`<div class="hc-trek-auto-split-note" role="status"><strong>Počasí změněno · běžící cesta rozdělena v ${esc(displayCampaignMinute(clock.minute))}</strong><p>Skutečný absolvovaný úsek (${weatherSplitNow.length} účastníků) má doloženou dílčí vzdálenost a Fatigue. Pro zbývajících ${240-clock.minute%240} minut připravte nový úsek s převzatými údaji a nyní platným počasím. Platný Orienteering SV se při stejných podmínkách automaticky převezme; nový hod je potřeba pouze při doložené změně podmínek.</p></div>`:''}
  <div class="hc-trek-quick-links"><button type="button" class="secondary hc-small" data-trek-open-current>Otevřít aktuální hlídku ↓</button></div>
  ${trekDayGuideHTML()}
  <datalist id="hmk-confirmed-weather-areas">${confirmedWeatherAreaOptions(clock)}</datalist>
@@ -1727,7 +1728,7 @@ function trekDayPlannerHTML(clock,participants){
  <p class="hc-trek-form-error" data-trek-day-error hidden role="alert"></p></form></details>
  <section class="hc-trek-day-weather"><h4>Počasí dne · doložené výsledky</h4>${weather.length?weather.map(x=>`<p><strong>${esc(x.area)}</strong>: teplota d10 ${x.weather.temperatureD10}, srážky d10 ${x.weather.precipitationD10} · ${x.weather.hasPrecipitation?'srážky nastaly':'bez srážek'} · den ${x.weather.daylightHazard||'bez hazardu'}, noc ${x.weather.nightHazard||'bez hazardu'}</p>`).join(''):'<p>Ještě nejsou doložené oba denní d10. Vyhodnotí se při první potvrzené hlídce v příslušné oblasti; nenahrazují je odhady.</p>'}</section>
  <h4>2 · Přehled čtyřhodinových hlídek</h4><div class="hc-trek-watch-slots">${slots.map(x=>`<div class="hc-trek-watch-slot hc-trek-watch-${x.phase}${cancellations.has(x.index)?' hc-trek-watch-cancelled':''}${x.atCurrent?' hc-trek-watch-current':''}" data-trek-watch-slot="${x.index}" tabindex="0" data-hmk-help="Čtyřhodinový úsek dne ${dayIndex+1}, ${hr(x.from)}–${hr(x.to)}. ${cancellations.has(x.index)?'Plán této hlídky je zrušen.':phaseLabel[x.phase]}. Doklad hlídky se vytváří pouze při skutečném vyhodnocení v aktuálním čase GM."><strong>${x.index+1}. hlídka</strong><span>${hr(x.from)}–${hr(x.to)}</span><small>${cancellations.has(x.index)?'ZRUŠENO · od '+esc(displayCampaignMinute(cancellations.get(x.index).effectiveMinute))+' · ':intents[x.index]!=='none'?'Plán: '+intentLabels[intents[x.index]]+' · ':''}${cancellations.has(x.index)?'Zrušeno':phaseLabel[x.phase]}${x.preparedCount?` · ${x.preparedCount} podkladů`:''}${x.completedCount?` · ${x.completedCount} dokončení`:''}</small>${trekSlotActions(x)}${x.atCurrent&&!cancellations.has(x.index)?'<button type="button" class="hc-small secondary" data-trek-open-current>Otevřít aktuální hlídku ↓</button>':''}</div>`).join('')}</div>
- <div class="hc-trek-day-results"><h4>3 · Doložené výsledky dne a jednotlivých hlídek</h4><div class="hc-trek-day-table-scroll"><table><thead><tr><th>Hlídka</th><th>Podklady</th><th>Pohyb</th><th>Setkání</th><th>Navazující postup</th></tr></thead><tbody>${slots.map(x=>x.preparedEvidence.length?x.preparedEvidence.map(ev=>`<tr><td>${x.index+1}. · ${hr(x.from)}–${hr(x.to)}</td><td>${esc(ev.area)} · ${ev.survivalRecorded?'Survival SV doložen'+(ev.survivalSV!==null?' ('+esc(ev.survivalSV)+')':''):'čeká Survival SV'}</td><td>${esc(ev.movement?.finalLPW??'—')} LPW · ${esc(ev.movement?.kilometres??'—')} km <small>připravený výpočet${x.actualEvents?' · dokončení v historii':' · čas ještě nemusel uplynout'}</small></td><td>${ev.encounter?.checkDue?(ev.encounter.encounter?(ev.encounterResolved?'Setkání · uzavřeno GM':'Setkání · čeká na GM'):'Bez setkání'):'Bez hodu'}</td><td>${ev.unresolved.length?esc(ev.unresolved.join('; ')):'Bez označeného hazardu'}${x.actualEvents?' · '+x.actualEvents+' dokladů dokončení':''}</td></tr>`).join(''):`<tr><td>${x.index+1}. · ${hr(x.from)}–${hr(x.to)}</td><td colspan="4">${cancellations.has(x.index)?`<strong>ZRUŠENÝ PLÁN</strong> · od ${esc(displayCampaignMinute(cancellations.get(x.index).effectiveMinute))}${cancellations.get(x.index).reason?.trim()?` · ${esc(cancellations.get(x.index).reason)}`:""}. Žádné nové cestovní účinky.`:"Bez potvrzené cestovní hlídky. Žádná chybějící fiktivní akce se nevytváří."}</td></tr>`).join('')}</tbody></table></div></div>
+ <div class="hc-trek-day-results"><h4>3 · Doložené výsledky dne a jednotlivých hlídek</h4><div class="hc-trek-day-table-scroll"><table><thead><tr><th>Hlídka</th><th>Podklady</th><th>Pohyb</th><th>Setkání</th><th>Navazující postup</th></tr></thead><tbody>${slots.map(x=>x.preparedEvidence.length?x.preparedEvidence.map(ev=>`<tr><td>${x.index+1}. · ${hr(x.from)}–${hr(x.to)}</td><td>${esc(ev.area)} · ${ev.survivalRecorded?(ev.survivalInherited?'Survival SV převzat z této hlídky':'Survival SV doložen')+(ev.survivalSV!==null?' ('+esc(ev.survivalSV)+')':''):'čeká Survival SV'}</td><td>${esc(ev.movement?.finalLPW??'—')} LPW · ${esc(ev.movement?.kilometres??'—')} km <small>připravený výpočet${x.actualEvents?' · dokončení v historii':' · čas ještě nemusel uplynout'}</small></td><td>${ev.encounter?.checkDue?(ev.encounter.encounter?(ev.encounterResolved?'Setkání · uzavřeno GM':'Setkání · čeká na GM'):'Bez setkání'):'Bez hodu'}</td><td>${ev.unresolved.length?esc(ev.unresolved.join('; ')):'Bez označeného hazardu'}${x.actualEvents?' · '+x.actualEvents+' dokladů dokončení':''}</td></tr>`).join(''):`<tr><td>${x.index+1}. · ${hr(x.from)}–${hr(x.to)}</td><td colspan="4">${cancellations.has(x.index)?`<strong>ZRUŠENÝ PLÁN</strong> · od ${esc(displayCampaignMinute(cancellations.get(x.index).effectiveMinute))}${cancellations.get(x.index).reason?.trim()?` · ${esc(cancellations.get(x.index).reason)}`:""}. Žádné nové cestovní účinky.`:"Bez potvrzené cestovní hlídky. Žádná chybějící fiktivní akce se nevytváří."}</td></tr>`).join('')}</tbody></table></div></div>
  <section class="hc-trek-dependencies"><h4>4 · Připravenost a návaznosti před posunem času</h4>${readiness.length?readiness.map(r=>`<p class="${r.ok?'hc-trek-dependency-ok':'hc-trek-dependency-wait'}"><strong>${r.slot}. hlídka · ${esc(r.area)} · ${r.ok?'PŘIPRAVENO':'ČEKÁ NA DOPLNĚNÍ'}</strong><span>${esc(r.reason)}</span></p>`).join(''):'<p>Pro tento den dosud není potvrzená žádná cestovní hlídka. Neplánovaná cesta sama o sobě nevytváří žádné překážky posunu času.</p>'}
  <p class="hc-hint">Nejde o automatický souhlas s přeskočením zdravotních, zásobovacích nebo jiných skutečně splatných následků. Výpis ukazuje známé chybějící podklady konkrétních hlídek předem.</p></section>
  <p class="hc-hint">Rozvrh je navigační přehled, nikoli šest automatických cest. Můžete spát, odpočívat či vykonávat jinou činnost; konkrétní hlídku potvrzujete teprve ve skutečném čase GM.</p>
@@ -1820,12 +1821,13 @@ function campaignCalendarView(){
  <label class="hc-check"><input name="weatherShift" type="checkbox" value="yes"> <span class="hc-help-term" tabindex="0" data-hmk-help="HMK 144 stanovuje základní počasí na den. GM může rozhodnout o změně od skutečné herní minuty; nové dva d10 jsou volitelnou odchylkou GM. Starší doklady a hody se nemění; navazující hlídky v této oblasti používají nový stav do konce dne nebo další změny.">GM mění počasí nyní pro tuto oblast (od aktuální minuty dále)</span></label>
  <div class="hmk-trek-grid"><div class="hc-trek-shift-control"><label>Nová teplota · d10<input name="trekWeatherShiftTemperature" type="number" min="1" max="10" placeholder="1–10"></label><button class="hc-small hc-trek-generate" type="button" data-trek-shift-die="trekWeatherShiftTemperature">⚄ d10</button></div>
  <div class="hc-trek-shift-control"><label>Nové srážky · d10<input name="trekWeatherShiftPrecipitation" type="number" min="1" max="10" placeholder="1–10"></label><button class="hc-small hc-trek-generate" type="button" data-trek-shift-die="trekWeatherShiftPrecipitation">⚄ d10</button></div></div>
- <p class="hc-hint">Volitelná změna GM mimo standardní denní hody HMK 144. Při potvrzení se probíhající cesta ve stejné oblasti <strong>automaticky rozdělí v aktuální herní minutě</strong>: uplynulé minuty se uzavřou s poměrnou únavou a vzdáleností, zbývající úsek se připraví podle nového počasí. Nový Survival, END a případné hazardní hody se nevymýšlejí a vyžadují zvláštní doložení. Pouhé zaškrtnutí nic neukládá.</p>
+ <p class="hc-hint">Volitelná změna GM mimo standardní denní hody HMK 144. Při potvrzení se probíhající cesta ve stejné oblasti <strong>automaticky rozdělí v aktuální herní minutě</strong>: uplynulé minuty se uzavřou s poměrnou únavou a vzdáleností, zbývající úsek se připraví podle nového počasí. Dřívější platný Survival SV se převezme, pokud zůstaly podmínky orientace shodné. Nový END a skutečně potřebné hazardní hody se dál dokládají. Pouhé zaškrtnutí nic neukládá.</p>
  </fieldset><fieldset class="hmk-trek-section"><legend>3 · Pohybové režimy</legend><div class="hmk-trek-grid"><label>Progress Modes<input name="progress" type="number" min="0" max="10" value="0"></label>
  <label>Další Slow Modes<input name="slow" type="number" min="0" max="20" value="0"></label>
  <label>Vlastní Bearing Modes<input name="bearing" type="number" min="0" max="20" value="0"></label>
  </div><div class="hc-trek-auto-mode"><label class="hc-check"><input type="checkbox" name="autoAllocate" value="yes" checked> <span class="hc-help-term" tabindex="0" data-hmk-help="Až průvodce provede Survival/Orienteering, skutečné SV určí počet Advantage Modes. Aplikace automaticky přednostně pokryje nutný Bearing, poté GM zvolenou činnost a zbytek dá do Progress. Nízké SV automaticky použije Slow jako opatrnou volbu. Neznamená to další nový hod." >Automaticky přidělit Progress, Bearing, Slow a výhody po Orienteering SV</span></label>
  <label>Cíl průvodce (automatické priority)<select name="autoPriority"><option value="pace">Bezpečná cesta a postup (Bearing → Progress)</option><option value="forage">Hledání potravy (Bearing → Foraging → Progress)</option><option value="stealth">Nenápadný pohyb (Bearing → Stalking → Progress)</option><option value="vigilance">Ostražitost (Bearing → Vigilance → Progress)</option></select></label>
+ <label class="hc-check"><input type="checkbox" name="forceNewOrienteering" value="yes"> <span class="hc-help-term" tabindex="0" data-hmk-help="Při pokračování ve stejné čtyřhodinové hlídce se již doložený Survival SV automaticky převezme, pokud se nezměnil průvodce, členové družiny, trasa, terén ani okolnosti orientace. Zaškrtněte jen tehdy, když GM skutečně rozhodl o novém Orienteering; výsledek bude vyžadovat nový doložený Skill Test. Vykonaný hod se nepřepisuje.">GM · vyžadovat nový Orienteering i při jinak shodné pokračující hlídce</span></label>
  <p class="hc-hint">Číselná pole výše jsou jen pro pokročilou ruční volbu, pokud automatiku vypnete. Při automatice se z nich nepřebírají domyšlené výsledky; skutečný počet režimů se doloží teprve po Survival SV.</p></div></fieldset><fieldset class="hmk-trek-section" id="hmk-foraging-watch-fields"><legend>4 · Činnosti během hlídky</legend>
  <p class="hc-foraging-jump-help" data-foraging-jump-help hidden><strong>Foraging – tady nastavte sběr zásob.</strong> Nejdříve vyberte výše průvodce, účastníky a prostředí hlídky. Potom zvolte počet <strong>Foraging Modes</strong>, případně sběr na místě. Hlídku uložte původním tlačítkem níže; skutečné cíle sběru a hody d10 následně vyhodnoťte v části <strong>Wilderness Tasks · Foraging</strong>. Nic se nepřičítá bez doloženého výsledku.</p>
  <div class="hmk-trek-grid"><label class="hc-check" data-foraging-jump-field><input name="stationaryForaging" type="checkbox" value="yes"> Foraging na místě (celá hlídka)</label>
@@ -8294,7 +8296,7 @@ function trekGuidedLayout(form){
  }
  if(seed?.area)weatherAreaAutofill(form,seed.area);
  const heading=document.createElement('div');heading.className='hc-trek-stage-banner';
- heading.innerHTML='<h4>3 · Aktuální čtyřhodinová hlídka</h4><p>Číselné režimy jsou předvyplněné jen jako návrh z předchozí skutečné hlídky; nový Survival SV je musí znovu potvrdit. Každá změna pole pouze přepočte nezávazný náhled. Doklady, hody, čas, únava ani inventář se neukládají až do potvrzení.</p>';
+ heading.innerHTML='<h4>3 · Aktuální čtyřhodinová hlídka</h4><p>Číselné režimy jsou jen návrh. Při pokračování téže čtyřhodinové hlídky se platný Survival SV a již provedené hody přebírají, pokud zůstaly relevantní podmínky stejné; při změně podmínek se vyžádají jen nové potřebné hody. Každá změna pole pouze přepočte nezávazný náhled. Doklady, hody, čas, únava ani inventář se neukládají až do potvrzení.</p>';
  form.querySelector('.hmk-trek-section')?.before(heading);
  const note=document.createElement('div');note.className='hc-trek-live-preview';note.setAttribute('data-trek-live-preview','');note.setAttribute('role','status');
  form.querySelector('[data-trek-readiness]')?.before(note);
@@ -11812,13 +11814,32 @@ function buildTrekWatchEvidence(form){
   trekkingModeHardLimit({progress,bearing,foraging,stalking,vigilance,trackingForcedBearingSourceId:trackingBearing?.trackingId??null});
   // Progress dice require the original LPW. A zero-dice dry preview first
   // yields the total remaining Progress allocation.
-  const spare=Math.max(0,progress-slow),progressD10=Array.from({length:spare},()=>die(10,'Progress')); 
+  // Manual mode and route unchanged: the Progress/Direction dice belong to
+  // the original 4h watch. Do not consume new input fields or duplicate dice.
+  const inheritedRaw=priorSegment&&v.forceNewOrienteering!=='yes'?{
+   ...priorSegment,calendarTrekProof:effectiveTrekSource(priorSegment,data.journal).calendarTrekProof}:null;
+  const manualPreview={id:'trek-manual-continuation-preview',characterId:actor.id,calendarCampaignId:campaignId,
+   campaignMinute:clock.minute,calendarTrekProof:{area,terrain:v.terrain,landscape:v.landscape,
+    conveyance:v.conveyance,night:v.night==='yes',orienteeringContext,partyModes,
+    orienteeringReuse:{},weatherWatch:wet,modes:{manualSlow,autoPriority,loaded:partyModes.loaded&&!ignoreLoaded,doubleTime:v.doubleTime==='yes',
+     trackingForcedBearingSourceId:trackingBearing?.trackingId??null}}};
+  const oldManual=inheritedRaw?.calendarTrekProof.modes;
+  const sameManual=!autoAllocate&&oldManual?.autoAllocate===false&&
+   ['progress','bearing','foraging','stalking','vigilance','slow','manualSlow','orienteeringSlow','lax'].every(key=>
+    oldManual[key]===({progress,bearing,foraging,stalking,vigilance,slow,manualSlow,orienteeringSlow,lax})[key]);
+  const manualReuse=!!sameManual&&
+   !!eligibleTrekOrientationReuse({earlier:inheritedRaw,current:manualPreview,journal:data.journal})&&
+   mayReuseTrekMovement({earlier:inheritedRaw,current:manualPreview})&&
+   oldManual.environ===v.environ;
+  const spare=Math.max(0,progress-slow),progressD10=manualReuse?[...oldManual.progressD10]:
+   Array.from({length:spare},()=>die(10,'Progress')); 
   const movement=trekWatchMovement({stationaryForaging,topography:v.landscape,terrain:v.terrain,conveyance:v.conveyance,
     progress,slow,loaded:partyModes.loaded&&!ignoreLoaded,bearing,progressD10,continuousPrecipitation:wet.continuous,
     doubleTime:v.doubleTime==='yes'});
   // Automatic allocation can only know the Bearing deficit AFTER the real
   // Orienteering SV. Do not roll a speculative Direction d10 beforehand.
-  const directionD10=autoAllocate?[]:Array.from({length:movement.bearingDeficit},()=>die(10,'Direction Hazard'));
+  const directionD10=autoAllocate?[]:manualReuse?[...oldManual.directionD10]:
+   Array.from({length:movement.bearingDeficit},()=>die(10,'Direction Hazard'));
   const hazards=autoAllocate?{direction:null,survival:null,deferredDirection:true,sourcePage:148}:
    trekHazards({bearingDeficit:movement.bearingDeficit,directionD10});
   // Night watches belong to the travelling PARTY, not its current guide.
@@ -11846,6 +11867,29 @@ function buildTrekWatchEvidence(form){
     night:v.night==='yes',alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',
     ...(damagedTravel.length?{animalMobilityRulings:damagedTravel.map(x=>({name:x.name,lossFingerprint:x.ruling.lossFingerprint,move:x.ruling.adjustedMove,printedMove:x.ruling.printedMove}))}:{}),weatherDay:day,
     dayAlready,weatherWatch:wet,...(wet.requiresWeatherHazardRoll&&partyModes.animals.some(a=>a.health)?{animalWeatherPolicy:'hmk-trek-animal-weather-analogy-v1'}:{}),movement,hazards,encounter,rolls,unresolved,sourcePages:[141,144,145,146,148,149,150]};
+  // A real interrupted watch can inherit the SAME certified Orienteering,
+  // not a new fictitious Survival roll. This does not cross 4h boundaries,
+  // guides, terrain, party, route or situational SV modifiers.
+  if(priorSegment&&v.forceNewOrienteering!=='yes'){
+   const parent={...priorSegment,calendarTrekProof:effectiveTrekSource(priorSegment,data.journal).calendarTrekProof};
+   const candidate={id:'trek-continuation-preview',characterId:actor.id,calendarCampaignId:campaignId,
+    campaignMinute:clock.minute,calendarTrekProof:proof};
+   const reuse=eligibleTrekOrientationReuse({earlier:parent,current:candidate,journal:data.journal});
+   if(reuse){
+    proof.orienteeringReuse=reuse;
+    if(mayReuseTrekMovement({earlier:parent,current:candidate})&&
+       parent.calendarTrekProof.modes?.autoAllocate===autoAllocate&&
+       parent.calendarTrekProof.modes?.environ===v.environ&&
+       parent.calendarTrekProof.modes?.wildernessNightWatches===wildernessNightWatches){
+     // Exact earlier dice remain SOURCE evidence, never new generated values.
+     proof.modes=structuredClone(parent.calendarTrekProof.modes);
+     proof.movement=structuredClone(parent.calendarTrekProof.movement);
+     proof.hazards=structuredClone(parent.calendarTrekProof.hazards);
+     proof.effectiveMovement=structuredClone(parent.calendarTrekProof.effectiveMovement??parent.calendarTrekProof.movement);
+     proof.reusedModeRollsFrom=priorSegment.id;
+    }
+   }
+  }
   if(hazards.direction==='lost-time'&&v.doubleTime==='yes')throw Error('Lost Time přidává Slow Mode, což nelze sloučit s Double Time. Nejprve přehodnoťte doložený režim pohybu pro danou hlídku.');
   const effectiveMovement=adjustedTrekkingMovement(proof);
   proof.effectiveMovement=effectiveMovement;
@@ -11886,9 +11930,23 @@ document.addEventListener('submit',e=>{
     campaignMinute:clock.minute,createdAt:stamp(),title:'HMK · změna počasí GM · '+proof.area,
     body:'Nová dvojice d10 platí od této minuty do konce dne nebo další změny. Původní denní doklad zůstává zachován.',
     calendarTrekWeatherShift:pendingWeatherShift});}
-   data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignId,
+   const next={id:uuid(),characterId:actor.id,calendarCampaignId:campaignId,
    campaignMinute:clock.minute,createdAt:stamp(),title:'HMK Trekking Routine · počasí / pohyb / setkání',
-   body:summary,calendarTrekProof:proof});}))notice=(affected?'Při změně počasí byla běžící cesta '+affected+' účastníků automaticky ukončena v aktuální minutě a dílčí únava byla zapsána. ':'')+'Doložené nové podklady Trekking byly zapsány. Nyní doložte Orienteering Survival SV a skutečné END SR pro navazující cestu; čas se neposunul.';
+   body:summary,calendarTrekProof:proof};
+   data.journal.push(next);
+   if(proof.orienteeringReuse&&!proof.reusedModeRollsFrom){
+    const projection=previewTrekCorrection(next,data.journal);
+    if(!projection.alreadyValid){
+     const dice=Array.from({length:projection.additionalProgress+projection.additionalDirection},()=>secureHMKDie(10));
+     const correction=createTrekCorrection({source:next,journal:data.journal,additionalRolls:dice,
+      origin:'cryptographic-software-die'});
+     data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignId,
+      campaignMinute:clock.minute,createdAt:stamp(),title:'HMK Trekking · režimy pokračování z původního SV',
+      body:'Survival SV převzato z doložené části téže hlídky; nově potřebné pohybové d10: '+dice.length,
+      calendarTrekCorrection:correction});
+    }
+   }
+  }))notice=(affected?'Při změně počasí byla běžící cesta '+affected+' účastníků automaticky ukončena v aktuální minutě a dílčí únava byla zapsána. ':'')+'Doložené podklady Trekking byly zapsány. '+(proof.orienteeringReuse?'Platný Orienteering SV převzat z předchozí části téže hlídky; nové hody Survival se nepožadují. ':'Nyní doložte Orienteering Survival SV. ')+'Potvrďte skutečné END SR navazující cesty; čas se neposunul.';
  }catch(error){const message=trekUserFriendlyError(error?.message);trekGuideInvalid(form,trekGuideFieldFromMessage(message,form),'Trekking Routine nebyla uložena: '+message)}
 },true);
 document.addEventListener('click',e=>{
