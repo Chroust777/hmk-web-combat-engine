@@ -191,7 +191,17 @@ function finishApprovedAnimalWeariness(database,{idFactory,stamp,campaignId}){
    const actor=database.characters.find(c=>c.id===policy.actorId);
    check(actor?.hmk?.combatState,'Chybí původní Combat State zvířete '+policy.actorId);
    const partial=interrupts[0]?results[0].calendarExpeditionProof.animalPartialWeariness?.[policy.actorId]:null;
-   const delta=actualAnimalWeariness(policy,elapsed,partial??null,{proportional:group.timeScaling==='gm-proportional-floor-v1'});
+   // A full 240-minute watch may be INTERRUPTED part-way through. Its
+   // original group therefore has no short-watch timeScaling flag, but the
+   // v2 interruption record explicitly authorizes GM proportional/floor
+   // accounting. Without this branch, the interrupted beast would be checked
+   // against the old completed-period formula and the entire weather change
+   // could be rejected after correctly splitting the people.
+   const modernStop=interrupts[0]&&database.journal.some(stop=>
+    stop.calendarActivityInterruptProof?.activityId===rows[0].id&&
+    stop.calendarActivityInterruptProof.partialTravel?.format==='hmk-interrupted-travel-accounting-v2');
+   const delta=actualAnimalWeariness(policy,elapsed,partial??null,{
+    proportional:group.timeScaling==='gm-proportional-floor-v1'||modernStop});
    if(!interrupts[0]){
     const atStart=(trek.partyModes.animals??[]).find(x=>x.id===policy.actorId)?.health;
     check(atStart&&JSON.stringify(trekRegisteredAnimalHealth(actor))===JSON.stringify(atStart),
@@ -565,7 +575,10 @@ export function validateHMKActivityEvidence(journal=[]){
    rows.every(r=>journal.some(j=>j.calendarExpeditionProof?.activityId===r.id&&
     j.campaignMinute===row.campaignMinute&&j.calendarExpeditionProof.durationMinutes===p.elapsedMinutes))&&
    p.delta===actualAnimalWeariness(policy,p.elapsedMinutes,
-    journal.find(j=>j.calendarExpeditionProof?.activityId===rows[0].id)?.calendarExpeditionProof?.animalPartialWeariness?.[p.animalId]??null)&&
+    journal.find(j=>j.calendarExpeditionProof?.activityId===rows[0].id)?.calendarExpeditionProof?.animalPartialWeariness?.[p.animalId]??null,
+    {proportional:rows[0].calendarActivityProof.plan.travelGroup.timeScaling==='gm-proportional-floor-v1'||
+      journal.some(stop=>stop.calendarActivityInterruptProof?.activityId===rows[0].id&&
+       stop.calendarActivityInterruptProof.partialTravel?.format==='hmk-interrupted-travel-accounting-v2')})&&
    p.finalFatigue===p.priorFatigue+p.delta&&row.calendarCampaignId===rows[0].calendarCampaignId&&
    row.campaignMinute===rows[0].calendarActivityProof.startMinute+p.elapsedMinutes,
    'Zvířecí zdravotní doklad neodpovídá času, rozhodnutí GM nebo Combat State.');
