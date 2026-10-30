@@ -165,7 +165,7 @@ import {eligibleRestingAnimals,planAnimalRest} from './src/integration/hmk-trekk
 import {ANIMAL_AREA_AV,weatherAnimalCandidates,prepareAnimalTrekkingWeather,validateAnimalWeatherJournal} from './src/integration/hmk-trekking-animal-weather.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence} from './src/integration/hmk-trekking-routine.js';
-import {TREK_DAY_PLAN_FORMAT,validateTrekDayPlan,latestTrekDayPlan,previousTrekContext,trekDailyWatchSlots,trekDayWeatherSummary,validateTrekDayHistory,assertTrekDayAppendOnly,latestTrekDayPlanRecord,cancelledTrekWatchIntents,effectiveTrekWatchIntents,validateTrekWatchCancelRecord,TREK_WATCH_CANCEL_FORMAT} from './src/integration/hmk-trekking-day-planner.js';
+import {TREK_DAY_PLAN_FORMAT,validateTrekDayPlan,latestTrekDayPlan,previousTrekContext,trekDailyWatchSlots,trekDayWeatherSummary,validateTrekDayHistory,assertTrekDayAppendOnly,latestTrekDayPlanRecord,cancelledTrekWatchIntents,effectiveTrekWatchIntents,validateTrekWatchCancelRecord,TREK_WATCH_CANCEL_FORMAT,validateTrekWatchReactivateRecord,TREK_WATCH_REACTIVATE_FORMAT} from './src/integration/hmk-trekking-day-planner.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
 import {certifyTrekkingWeatherRoll,weatherRollEvidence} from './src/integration/hmk-trekking-weather-roll.js';
 import {assessTrekkingReadiness} from './src/integration/hmk-trekking-readiness.js';
@@ -290,7 +290,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.615';
+const APP_VERSION='93.616';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1504,7 +1504,7 @@ function trekDayGuideHTML(){
  <p class="hc-hint"><strong>Nejdřív 24hodinový přehled, potom jednotlivé hlídky.</strong> Potvrzení denního plánu je pouze záměr: nehází kostkami, neposouvá čas a nepřidává Fatigue, jídlo ani zdravotní následky. Skutečné cestování se vyhodnocuje po jedné čtyřhodinové hlídce (HMK 141–150).</p>
  <ol class="hmk-trek-steps">
  <li><strong>Denní nastavení – část „1 · Denní nastavení družiny a prostředí“ nahoře.</strong> Vyberte datum TR, oblast, průvodce, členy, klima, terén a způsob dopravy. Co lze věrohodně převzít z minulého dokladu, je předvyplněné. Zkontrolujte změny a stiskněte <strong>Potvrdit denní nastavení</strong>. Dokud to nepotvrdíte, nic se neukládá.</li>
- <li><strong>Rozvrh šesti úseků.</strong> U každé z šesti čtyřhodinových hlídek určete záměr: cesta, odpočinek, spánek, Foraging, ostraha nebo jiná činnost. Nemusíte vyplnit všechny úseky. Potvrzený záměr lze později <strong>zrušit samostatně u dané hlídky</strong> s důvodem GM. Zrušení plánu není zrušení již provedené cesty.</li>
+ <li><strong>Rozvrh šesti úseků.</strong> U každé z šesti čtyřhodinových hlídek určete záměr: cesta, odpočinek, spánek, Foraging, ostraha nebo jiná činnost. Nemusíte vyplnit všechny úseky. Budoucí hlídku lze <strong>zrušit bez udání důvodu a znovu aktivovat</strong>. Všechny změny vyžadují výslovné potvrzení a zůstávají v historii. Zrušení plánu není zrušení již provedené cesty.</li>
  <li><strong>Vyberte aktuální hlídku.</strong> V přehledu úseků otevřete aktuální čtyřhodinovou hlídku. Zkontrolujte převzatou oblast, účastníky, náklad z původního inventáře a skutečný zdravotní stav. Hlídku lze vyhodnotit jen v příslušném herním čase.</li>
  <li><strong>Počasí a povinné podklady hlídky.</strong> Teplota d10 a denní srážky d10 se určují pouze jednou za 24 hodin pro odpovídající oblast a podmínky. Další hlídky používají tentýž doložený výsledek. Srážkový d6, Progress d10, Direction Hazard a Encounter se požadují jen při pravidlové potřebě. Význam hodnot ukazují nápovědy u polí.</li>
  <li><strong>Orienteering a rozdělení výhod.</strong> Průvodce provede skutečný ${'<span class="hc-help-term" tabindex="0" data-hmk-help="Orienteering je postup orientace s testem Survival. Výsledný SV (Success Value) určuje použitelné výhody pohybu." >Survival / Orienteering</span>'} test ve Skill Tests; při cestě se zvířaty případně také Drover. Získaný ${'<span class="hc-help-term" tabindex="0" data-hmk-help="SV = Success Value, výsledek dovednostního testu po pravidlových úpravách." >SV</span>'} omezuje ${'<span class="hc-help-term" tabindex="0" data-hmk-help="Progress zlepšuje postup nebo ruší Slow; Bearing zajišťuje udržení směru; Slow zpomaluje; jednotlivé režimy se nesmějí zadávat jako odhad." >Progress / Bearing / Slow</span>'} a Foraging, Stalking a Vigilance. Ukládací kontrola nepovolí nedoložené režimy; dříve připravené podklady případně opravte samostatným auditovaným dokladem.</li>
@@ -1550,10 +1550,33 @@ function trekDayPlannerHTML(clock,participants){
 
  const phaseLabel={completed:'Dokončeno',prepared:'Podklady připraveny',elapsed:'Bez záznamu',future:'Čeká',open:'Aktuální úsek'};
  const intentLabels={none:'— žádná naplánovaná činnost —',travel:'Cestování',rest:'Klid / odpočinek',sleep:'Spánek',foraging:'Foraging na místě',watch:'Hlídka / ostraha',other:'Jiná činnost'};
+ const trekSlotActions=slot=>{
+  const index=slot.index;
+  const cancellation=cancellations.get(index);
+  const future=clock.minute<slot.from;
+  const hasEvidence=slot.preparedCount||slot.completedCount||slotHasActivity(index);
+  if(cancellation){
+   const note=cancellation.reason?.trim()?`<span class="hc-trek-cancel-note" title="${esc(cancellation.reason)}">GM: ${esc(cancellation.reason)}</span>`:'';
+   return `${note}${future&&!hasEvidence?`<form class="hc-trek-reactivate-watch" data-trek-watch-reactivate-form novalidate>
+    <input type="hidden" name="planId" value="${esc(planRecord.id)}"><input type="hidden" name="watchIndex" value="${index}">
+    <button type="submit" class="hc-small hc-trek-reactivate-confirm">Znovu aktivovat ${index+1}. hlídku</button>
+    <p class="hc-trek-form-error" data-trek-day-error hidden role="alert"></p></form>`:''}`;
+  }
+  if(planRecord&&intents[index]!=='none'&&clock.minute<slot.to&&!hasEvidence){
+   return `<details class="hc-trek-cancel-watch"><summary>Zrušit plán ${index+1}. hlídky</summary>
+    <form data-trek-watch-cancel-form novalidate><input type="hidden" name="planId" value="${esc(planRecord.id)}">
+    <input type="hidden" name="watchIndex" value="${index}">
+    <p class="hc-hint">${future?'Hlídka dosud nezačala. Plán lze zrušit bez důvodu a později znovu aktivovat.':'Probíhající úsek: zrušení plánu neukončuje skutečnou činnost. Tu je třeba přerušit samostatně.'}</p>
+    ${future?'':'<label>Důvod rozhodnutí GM<input name="reason" minlength="3" maxlength="240" required placeholder="Důvod změny plánu"></label>'}
+    <button type="submit" class="hc-small hc-trek-cancel-confirm">Potvrdit zrušení hlídky</button>
+    <p class="hc-trek-form-error" data-trek-day-error hidden role="alert"></p></form></details>`;
+  }
+  return hasEvidence?'<span class="hc-trek-cancel-note">Existují skutečné podklady/činnost: použijte původní postup přerušení, nikoliv zrušení plánu.</span>':'';
+ };
  const intents=currentIntents;
  return `<section class="hc-trek-day-planner" data-trek-day-planner>
  <div class="hc-trek-day-title"><div><h3>Den cestování · 24 hodin</h3><p>Den ${dayIndex+1} · ${esc(formatTRDate(campaignTRDate(clock,clock.minute)))} · GM ${esc(displayCampaignMinute(clock.minute))}</p></div><span class="hc-trek-day-chip">HMK 141–150 · den / hlídky</span></div>
- <p class="hc-hint">Nejdříve potvrďte společné údaje dne. Jednotlivé potvrzené plánované úseky lze samostatně zrušit bez zásahu do již uskutečněných činností. Každá ze šesti čtyřhodinových hlídek má vlastní skutečné hody a následky. Nevyplněný plán ani neplánovaná hlídka neblokují čas. Zápis vzniká <strong>pouze potvrzením</strong>.</p>
+ <p class="hc-hint">Nejdříve potvrďte společné údaje dne. Budoucí naplánované hlídky lze zrušit bez zdůvodnění a znovu aktivovat; žádný skutečně provedený následek se tím neruší. Každá ze šesti čtyřhodinových hlídek má vlastní skutečné hody a následky. Nevyplněný plán ani neplánovaná hlídka neblokují čas. Zápis vzniká <strong>pouze potvrzením</strong>.</p>
  <div class="hc-trek-quick-links"><button type="button" class="secondary hc-small" data-trek-open-guide>Jak postupovat krok za krokem ↓</button><button type="button" class="secondary hc-small" data-trek-open-current>Otevřít aktuální hlídku ↓</button></div>
  ${trekDayGuideHTML()}
  <details class="hc-trek-day-setup" ${plan?'':'open'}><summary>1 · Denní nastavení družiny a prostředí ${plan?'· doloženo':'· připravit'}</summary>
@@ -1571,8 +1594,8 @@ function trekDayPlannerHTML(clock,participants){
  <div class="hc-trek-day-actions"><button type="submit">Potvrdit denní nastavení · bez posunu času</button><span>Další změna vytvoří nový doklad. Starší se nepřepisují.</span></div>
  <p class="hc-trek-form-error" data-trek-day-error hidden role="alert"></p></form></details>
  <section class="hc-trek-day-weather"><h4>Počasí dne · doložené výsledky</h4>${weather.length?weather.map(x=>`<p><strong>${esc(x.area)}</strong>: teplota d10 ${x.weather.temperatureD10}, srážky d10 ${x.weather.precipitationD10} · ${x.weather.hasPrecipitation?'srážky nastaly':'bez srážek'} · den ${x.weather.daylightHazard||'bez hazardu'}, noc ${x.weather.nightHazard||'bez hazardu'}</p>`).join(''):'<p>Ještě nejsou doložené oba denní d10. Vyhodnotí se při první potvrzené hlídce v příslušné oblasti; nenahrazují je odhady.</p>'}</section>
- <h4>2 · Přehled čtyřhodinových hlídek</h4><div class="hc-trek-watch-slots">${slots.map(x=>`<div class="hc-trek-watch-slot hc-trek-watch-${x.phase}${cancellations.has(x.index)?' hc-trek-watch-cancelled':''}${x.atCurrent?' hc-trek-watch-current':''}" data-trek-watch-slot="${x.index}" tabindex="0" data-hmk-help="Čtyřhodinový úsek dne ${dayIndex+1}, ${hr(x.from)}–${hr(x.to)}. ${cancellations.has(x.index)?'Plán této hlídky je zrušen.':phaseLabel[x.phase]}. Doklad hlídky se vytváří pouze při skutečném vyhodnocení v aktuálním čase GM."><strong>${x.index+1}. hlídka</strong><span>${hr(x.from)}–${hr(x.to)}</span><small>${cancellations.has(x.index)?'ZRUŠENO · od '+esc(displayCampaignMinute(cancellations.get(x.index).effectiveMinute))+' · ':intents[x.index]!=='none'?'Plán: '+intentLabels[intents[x.index]]+' · ':''}${cancellations.has(x.index)?'Zrušeno':phaseLabel[x.phase]}${x.preparedCount?` · ${x.preparedCount} podkladů`:''}${x.completedCount?` · ${x.completedCount} dokončení`:''}</small>${cancellations.has(x.index)?`<span class="hc-trek-cancel-note" title="${esc(cancellations.get(x.index).reason)}">GM: ${esc(cancellations.get(x.index).reason)}</span>`:planRecord&&intents[x.index]!=='none'&&clock.minute<x.to&&!x.preparedCount&&!x.completedCount&&!slotHasActivity(x.index)?`<details class="hc-trek-cancel-watch"><summary>Zrušit plán ${x.index+1}. hlídky</summary><form data-trek-watch-cancel-form novalidate><input type="hidden" name="planId" value="${esc(planRecord.id)}"><input type="hidden" name="watchIndex" value="${x.index}"><p class="hc-hint">Zruší se pouze dosud neprovedený záměr od aktuálního času GM. Původní doklady se nemažou. Pokud už činnost běží, použijte přerušení činností.</p><label>Důvod rozhodnutí GM<input name="reason" minlength="3" maxlength="240" required placeholder="Např. přepadení, změna trasy"></label><button type="submit" class="hc-small hc-trek-cancel-confirm">Potvrdit zrušení hlídky</button><p class="hc-trek-form-error" data-trek-day-error hidden role="alert"></p></form></details>`:x.preparedCount||x.completedCount||slotHasActivity(x.index)?'<span class="hc-trek-cancel-note">Existují skutečné podklady/činnost: použijte původní postup přerušení, nikoliv zrušení plánu.</span>':''}${x.atCurrent&&!cancellations.has(x.index)?'<button type="button" class="hc-small secondary" data-trek-open-current>Otevřít aktuální hlídku ↓</button>':''}</div>`).join('')}</div>
- <div class="hc-trek-day-results"><h4>3 · Doložené výsledky dne a jednotlivých hlídek</h4><div class="hc-trek-day-table-scroll"><table><thead><tr><th>Hlídka</th><th>Podklady</th><th>Pohyb</th><th>Setkání</th><th>Navazující postup</th></tr></thead><tbody>${slots.map(x=>x.preparedEvidence.length?x.preparedEvidence.map(ev=>`<tr><td>${x.index+1}. · ${hr(x.from)}–${hr(x.to)}</td><td>${esc(ev.area)} · ${ev.survivalRecorded?'Survival SV doložen':'čeká Survival SV'}</td><td>${esc(ev.movement?.finalLPW??'—')} LPW · ${esc(ev.movement?.kilometres??'—')} km <small>připravený výpočet${x.actualEvents?' · dokončení v historii':' · čas ještě nemusel uplynout'}</small></td><td>${ev.encounter?.checkDue?(ev.encounter.encounter?'Setkání nastalo':'Bez setkání'):'Bez hodu'}</td><td>${ev.unresolved.length?esc(ev.unresolved.join('; ')):'Bez označeného hazardu'}${x.actualEvents?' · '+x.actualEvents+' dokladů dokončení':''}</td></tr>`).join(''):`<tr><td>${x.index+1}. · ${hr(x.from)}–${hr(x.to)}</td><td colspan="4">${cancellations.has(x.index)?`<strong>ZRUŠENÝ PLÁN</strong> · od ${esc(displayCampaignMinute(cancellations.get(x.index).effectiveMinute))} · ${esc(cancellations.get(x.index).reason)}. Žádné nové cestovní účinky.`:"Bez potvrzené cestovní hlídky. Žádná chybějící fiktivní akce se nevytváří."}</td></tr>`).join('')}</tbody></table></div></div>
+ <h4>2 · Přehled čtyřhodinových hlídek</h4><div class="hc-trek-watch-slots">${slots.map(x=>`<div class="hc-trek-watch-slot hc-trek-watch-${x.phase}${cancellations.has(x.index)?' hc-trek-watch-cancelled':''}${x.atCurrent?' hc-trek-watch-current':''}" data-trek-watch-slot="${x.index}" tabindex="0" data-hmk-help="Čtyřhodinový úsek dne ${dayIndex+1}, ${hr(x.from)}–${hr(x.to)}. ${cancellations.has(x.index)?'Plán této hlídky je zrušen.':phaseLabel[x.phase]}. Doklad hlídky se vytváří pouze při skutečném vyhodnocení v aktuálním čase GM."><strong>${x.index+1}. hlídka</strong><span>${hr(x.from)}–${hr(x.to)}</span><small>${cancellations.has(x.index)?'ZRUŠENO · od '+esc(displayCampaignMinute(cancellations.get(x.index).effectiveMinute))+' · ':intents[x.index]!=='none'?'Plán: '+intentLabels[intents[x.index]]+' · ':''}${cancellations.has(x.index)?'Zrušeno':phaseLabel[x.phase]}${x.preparedCount?` · ${x.preparedCount} podkladů`:''}${x.completedCount?` · ${x.completedCount} dokončení`:''}</small>${trekSlotActions(x)}${x.atCurrent&&!cancellations.has(x.index)?'<button type="button" class="hc-small secondary" data-trek-open-current>Otevřít aktuální hlídku ↓</button>':''}</div>`).join('')}</div>
+ <div class="hc-trek-day-results"><h4>3 · Doložené výsledky dne a jednotlivých hlídek</h4><div class="hc-trek-day-table-scroll"><table><thead><tr><th>Hlídka</th><th>Podklady</th><th>Pohyb</th><th>Setkání</th><th>Navazující postup</th></tr></thead><tbody>${slots.map(x=>x.preparedEvidence.length?x.preparedEvidence.map(ev=>`<tr><td>${x.index+1}. · ${hr(x.from)}–${hr(x.to)}</td><td>${esc(ev.area)} · ${ev.survivalRecorded?'Survival SV doložen':'čeká Survival SV'}</td><td>${esc(ev.movement?.finalLPW??'—')} LPW · ${esc(ev.movement?.kilometres??'—')} km <small>připravený výpočet${x.actualEvents?' · dokončení v historii':' · čas ještě nemusel uplynout'}</small></td><td>${ev.encounter?.checkDue?(ev.encounter.encounter?'Setkání nastalo':'Bez setkání'):'Bez hodu'}</td><td>${ev.unresolved.length?esc(ev.unresolved.join('; ')):'Bez označeného hazardu'}${x.actualEvents?' · '+x.actualEvents+' dokladů dokončení':''}</td></tr>`).join(''):`<tr><td>${x.index+1}. · ${hr(x.from)}–${hr(x.to)}</td><td colspan="4">${cancellations.has(x.index)?`<strong>ZRUŠENÝ PLÁN</strong> · od ${esc(displayCampaignMinute(cancellations.get(x.index).effectiveMinute))}${cancellations.get(x.index).reason?.trim()?` · ${esc(cancellations.get(x.index).reason)}`:""}. Žádné nové cestovní účinky.`:"Bez potvrzené cestovní hlídky. Žádná chybějící fiktivní akce se nevytváří."}</td></tr>`).join('')}</tbody></table></div></div>
  <section class="hc-trek-dependencies"><h4>4 · Připravenost a návaznosti před posunem času</h4>${readiness.length?readiness.map(r=>`<p class="${r.ok?'hc-trek-dependency-ok':'hc-trek-dependency-wait'}"><strong>${r.slot}. hlídka · ${esc(r.area)} · ${r.ok?'PŘIPRAVENO':'ČEKÁ NA DOPLNĚNÍ'}</strong><span>${esc(r.reason)}</span></p>`).join(''):'<p>Pro tento den dosud není potvrzená žádná cestovní hlídka. Neplánovaná cesta sama o sobě nevytváří žádné překážky posunu času.</p>'}
  <p class="hc-hint">Nejde o automatický souhlas s přeskočením zdravotních, zásobovacích nebo jiných skutečně splatných následků. Výpis ukazuje známé chybějící podklady konkrétních hlídek předem.</p></section>
  <p class="hc-hint">Rozvrh je navigační přehled, nikoli šest automatických cest. Můžete spát, odpočívat či vykonávat jinou činnost; konkrétní hlídku potvrzujete teprve ve skutečném čase GM.</p>
@@ -8185,7 +8208,7 @@ function trekGuideBasicCheck(form,{focus=true}={}){
  const planForWatch=latestTrekDayPlanRecord(data.journal,campaignIdForPlan,dayIndexForPlan);
  const slotForWatch=Math.floor((clock.minute%1440)/240);
  if(cancelledTrekWatchIntents(data.journal,campaignIdForPlan,planForWatch).has(slotForWatch))
-  return {field:'area',message:'Plán této čtyřhodinové hlídky byl GM zrušen. Nové cestovní podklady nelze uložit, dokud výslovně nepotvrdíte nový denní plán s obnovenou činností v tomto úseku.'};
+  return {field:'area',message:'Plán této hlídky byl zrušen. Je-li její začátek ještě v budoucnosti, můžete ji znovu aktivovat přímo v denním přehledu; jinak vytvořte nový potvrzený plán.'};
  if(!String(v.area||'').trim())return {field:'area',message:'Uveďte skutečnou oblast / trasu.'};
  if(v.season==='auto'&&!campaignTRDate(clock,clock.minute))return {field:'season',message:'Není doloženo datum TR – vyberte roční období.'};
  const guide=v.characterId;
@@ -11224,14 +11247,14 @@ document.addEventListener('submit',event=>{
   if(!clock||combatInitiativeSequence)throw Error('Zrušení vyžaduje aktivní kalendář bez Initiative.');
   const fd=new FormData(form),campaignId=campaignKey(clock),dayIndex=Math.floor(clock.minute/1440);
   const watchIndex=Number(fd.get('watchIndex')),planId=String(fd.get('planId')||'');
-  const reason=String(fd.get('reason')||'').trim();
   if(!Number.isInteger(watchIndex)||watchIndex<0||watchIndex>5)throw Error('Vyberte platnou čtyřhodinovou hlídku.');
-  if(reason.length<3||reason.length>240)throw Error('Uveďte skutečný důvod zrušení (3–240 znaků).');
   const planRow=latestTrekDayPlanRecord(data.journal,campaignId,dayIndex);
   if(!planRow||planRow.id!==planId)throw Error('Denní plán byl mezitím nahrazen; obnovte přehled.');
   if(cancelledTrekWatchIntents(data.journal,campaignId,planRow).has(watchIndex))throw Error('Tato hlídka už byla zrušena.');
   const from=dayIndex*1440+watchIndex*240,to=from+240;
   if(clock.minute>=to)throw Error('Ukončenou nebo minulou hlídku nelze zpětně rušit.');
+  const reason=clock.minute<from?'':String(fd.get('reason')||'').trim();
+  if(clock.minute>=from&&(reason.length<3||reason.length>240))throw Error('Uveďte skutečný důvod zrušení (3–240 znaků).');
   const slots=trekDailyWatchSlots(data.journal,campaignId,dayIndex,clock.minute);
   if(slots[watchIndex].preparedCount||slots[watchIndex].completedCount)throw Error('Hlídka už má skutečné cestovní podklady nebo dokončení. Přerušte původní činnost, nikoliv denní záměr.');
   const overlap=activeHMKActivities(data.journal,clock).some(row=>{
@@ -11242,15 +11265,47 @@ document.addEventListener('submit',event=>{
   const row={id:uuid(),characterId:planRow.characterId,calendarCampaignId:campaignId,
    campaignMinute:clock.minute,createdAt:stamp(),title:'Trekking · zrušena '+(watchIndex+1)+'. plánovaná hlídka',
    body:'Původní plán '+planId+'; interval '+displayCampaignMinute(from)+'–'+displayCampaignMinute(to)+
-    '; zrušeno od '+displayCampaignMinute(clock.minute)+'; důvod GM: '+reason+'. Žádné dokončené účinky nejsou zpětně rušeny.',
+    '; zrušeno od '+displayCampaignMinute(clock.minute)+(reason?'; důvod GM: '+reason:'')+'. Žádné dokončené účinky nejsou zpětně rušeny.',
    calendarTrekWatchCancel:payload};
   validateTrekWatchCancelRecord(row,[...data.journal,row]);
-  if(mutate(()=>data.journal.push(row)))notice='Zrušen pouze plán '+(watchIndex+1)+'. hlídky. Původní záměr i důvod jsou v historii; čas, kostky a dokončené účinky zůstaly nezměněné.';
+  if(mutate(()=>data.journal.push(row)))notice='Zrušen pouze plán '+(watchIndex+1)+'. hlídky. Lze jej znovu aktivovat před začátkem hlídky. Čas, kostky ani dokončené účinky se nezměnily.';
  }catch(err){
   const text=err?.message||String(err);const field=form.querySelector('[name="reason"]');
   const msg=form.querySelector('[data-trek-day-error]');if(msg){msg.hidden=false;msg.textContent=text;}
   if(/důvod/i.test(text)&&field){field.classList.add('hc-trek-invalid');field.focus();}
  }
+},true);
+// Explicit reactivation of a not-yet-started intention: an append-only receipt,
+// no actual travel, dice, inventory, medical or clock effects.
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-trek-watch-reactivate-form]'))return;
+ event.preventDefault();event.stopImmediatePropagation();trekGuideClearError(form);
+ try{
+  const clock=data.campaignClock;
+  if(!clock||combatInitiativeSequence)throw Error('Aktivace vyžaduje aktivní kalendář bez Initiative.');
+  const fd=new FormData(form),campaignId=campaignKey(clock),dayIndex=Math.floor(clock.minute/1440);
+  const watchIndex=Number(fd.get('watchIndex')),planId=String(fd.get('planId')||'');
+  if(!Number.isInteger(watchIndex)||watchIndex<0||watchIndex>5)throw Error('Vyberte platnou hlídku.');
+  const from=dayIndex*1440+watchIndex*240,to=from+240;
+  if(clock.minute>=from)throw Error('Hlídku lze znovu aktivovat jen před jejím začátkem.');
+  const planRow=latestTrekDayPlanRecord(data.journal,campaignId,dayIndex);
+  if(!planRow||planRow.id!==planId)throw Error('Denní plán byl mezitím nahrazen; obnovte přehled.');
+  const cancelled=cancelledTrekWatchIntents(data.journal,campaignId,planRow).get(watchIndex);
+  if(!cancelled)throw Error('Tato hlídka není zrušená, proto ji nelze znovu aktivovat.');
+  const slot=trekDailyWatchSlots(data.journal,campaignId,dayIndex,clock.minute)[watchIndex];
+  if(slot.preparedCount||slot.completedCount)throw Error('Hlídka již má skutečné cestovní podklady.');
+  if(activeHMKActivities(data.journal,clock).some(row=>{
+   const a=row.calendarActivityProof;return a&&a.startMinute<to&&a.endMinute>from;
+  }))throw Error('V tomto úseku existuje skutečná činnost, kterou nelze aktivací plánu přepsat.');
+  const payload={format:TREK_WATCH_REACTIVATE_FORMAT,dayIndex,watchIndex,planId,cancelId:cancelled.receiptId,effectiveMinute:clock.minute};
+  const row={id:uuid(),characterId:planRow.characterId,calendarCampaignId:campaignId,
+   campaignMinute:clock.minute,createdAt:stamp(),title:'Trekking · znovu aktivována '+(watchIndex+1)+'. plánovaná hlídka',
+   body:'Opětovná aktivace původního záměru '+(watchIndex+1)+'. hlídky na interval '+displayCampaignMinute(from)+'–'+displayCampaignMinute(to)+
+    '. Původní doklad zrušení zůstává v historii. Nenastaly žádné účinky cestování ani posun času.',
+   calendarTrekWatchReactivate:payload};
+  validateTrekWatchReactivateRecord(row,[...data.journal,row]);
+  if(mutate(()=>data.journal.push(row)))notice=(watchIndex+1)+'. hlídka byla znovu aktivována podle původního potvrzeného plánu. Čas ani pravidlové následky se nezměnily.';
+ }catch(error){const msg=form.querySelector('[data-trek-day-error]');if(msg){msg.hidden=false;msg.textContent=error.message||String(error);}}
 },true);
 document.addEventListener('submit',event=>{
  const form=event.target;if(form?.id!=='hmk-trek-day-plan-form')return;

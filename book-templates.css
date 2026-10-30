@@ -6740,3 +6740,7 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .content-calendar .hc-trek-jump-target{outline:2px solid #86622d;outline-offset:3px;scroll-margin-top:25px}
 .content-calendar .hc-trek-jump-target > summary{color:#253e59!important}
 @media (max-width:500px){.content-calendar .hc-trek-quick-links{flex-direction:column;align-items:stretch}.content-calendar .hc-trek-quick-links button{width:100%}}
+
+/* v93.616 · explicit future-watch reactivation */
+.content-calendar .hc-trek-reactivate-watch{margin-top:8px;min-width:0}
+.content-calendar .hc-trek-reactivate-watch .hc-trek-reactivate-confirm{width:100%;max-width:100%;white-space:normal;background:#273e58;color:#fbe6bd;border-color:#273e58}
