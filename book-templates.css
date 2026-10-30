@@ -6724,3 +6724,19 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .content-calendar .hc-trek-cancel-note{font:.75rem/1.4 Georgia,serif;color:#804530;overflow-wrap:anywhere}
 .content-calendar .hc-trek-watch-cancelled{border-left:4px solid #99583f;background:rgba(189,139,108,.12)}
 .content-calendar .hmk-trek-guide .hmk-trek-steps li{line-height:1.52;margin-bottom:8px}
+
+
+/* v93.615 — current travel guide visible where the day begins; the jump
+   highlights a real, opened details heading instead of an invisible form. */
+.content-calendar .hc-trek-day-planner .hmk-trek-guide{border:1px solid rgba(122,91,52,.55);border-radius:7px;margin:10px 0 14px;background:rgba(255,245,223,.28);padding:10px 12px;min-width:0}
+.content-calendar .hc-trek-day-planner .hmk-trek-guide > summary{font:700 .99rem/1.4 Georgia,serif;color:#49321f;cursor:pointer;margin:0 0 8px}
+.content-calendar .hc-trek-day-planner .hmk-trek-guide .hmk-trek-steps{display:grid;grid-template-columns:1fr;gap:5px;margin:6px 0 9px;padding-left:24px;font:.82rem/1.45 Georgia,serif}
+.content-calendar .hc-trek-day-planner .hmk-trek-guide .hmk-trek-steps li{padding:4px 2px;border-bottom:1px solid rgba(124,91,48,.2)}
+.content-calendar .hc-trek-day-planner .hmk-trek-guide .hmk-trek-steps strong{display:block;margin-bottom:2px;color:#53321c}
+.content-calendar .hc-trek-quick-links{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 12px}
+.content-calendar .hc-trek-quick-links button{min-height:36px;white-space:normal;background:#263e5a;color:#ffe4b8;border:1px solid #ae864b}
+.content-calendar .hc-trek-day-setup .hmk-trek-grid .hc-trek-field-heading{display:inline-flex;align-items:baseline;gap:5px;flex-wrap:wrap;min-height:1.55em;line-height:1.5}
+.content-calendar .hc-trek-day-setup .hc-trek-field-heading .hc-help-term{display:inline-block;flex:0 0 auto;line-height:1;white-space:nowrap}
+.content-calendar .hc-trek-jump-target{outline:2px solid #86622d;outline-offset:3px;scroll-margin-top:25px}
+.content-calendar .hc-trek-jump-target > summary{color:#253e59!important}
+@media (max-width:500px){.content-calendar .hc-trek-quick-links{flex-direction:column;align-items:stretch}.content-calendar .hc-trek-quick-links button{width:100%}}
