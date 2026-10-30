@@ -227,7 +227,36 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
   }
  }
  const automatic=automaticHMKFollowups(clock,characters,journal,getCampaignEpisodeAnchor);
- all.push(...automatic.all);unknown.push(...automatic.unknown);
+ // A saved Trekking Routine is only a PREPARATION. It does not by itself
+ // start a journey or expose the party to its possible hazards. Preserve its
+ // skill/hazard navigation as nonblocking preparation until an authenticated
+ // scheduled travel activity actually uses that source.
+ // If an activity was cancelled at elapsed minute 0, it never started.
+ // An interrupted activity with positive elapsed time remains a real event.
+ const startedSources=new Set();
+ const calendarId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
+ const interrupts=new Map(journal.filter(j=>j.calendarActivityInterruptProof?.activityId)
+  .map(j=>[j.calendarActivityInterruptProof.activityId,j.calendarActivityInterruptProof]));
+ for(const row of journal){
+  const a=row.calendarActivityProof;
+  if(!a?.plan?.trekSourceId||row.calendarCampaignId!==calendarId)continue;
+  const stopped=interrupts.get(row.id);
+  if(!stopped||stopped.elapsedMinutes>0)startedSources.add(a.plan.trekSourceId);
+ }
+ for(const row of journal){
+  if(row.calendarCampaignId!==calendarId)continue;
+  if(row.calendarExpeditionProof?.trekSourceId&&
+   (!row.calendarExpeditionProof.interrupted||row.calendarExpeditionProof.durationMinutes>0))
+   startedSources.add(row.calendarExpeditionProof.trekSourceId);
+  if(row.calendarTrekWildernessProof?.sourceId)startedSources.add(row.calendarTrekWildernessProof.sourceId);
+ }
+ const prepared=[];
+ for(const item of automatic.all){
+  if(item.kind.startsWith('trek-')&&!startedSources.has(item.sourceId))
+   prepared.push({...item,status:'preparation'});
+  else all.push(item);
+ }
+ unknown.push(...automatic.unknown);
  // Some legacy Combat-time notices have the same canonical obligation as a
  // live automatic entry. Render only the actionable event, retaining the
  // same blocking rule: the original Combat proof must resolve it.
@@ -248,7 +277,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
    minute:h.dueMinute,anchorMinute:h.minute,status:h.dueMinute<=clock.minute?'due':'future'});
  }
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
- return {due:all.filter(x=>x.status==='due'),future:all.filter(x=>x.status==='future'),unknown,all,suspended};
+ return {due:all.filter(x=>x.status==='due'),future:all.filter(x=>x.status==='future'),unknown,all,suspended,prepared};
 }
 export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmConfirmed,characters=[],journal=[]}={}){
  validateCampaignCalendar(clock);

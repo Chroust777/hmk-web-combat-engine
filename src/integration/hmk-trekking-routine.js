@@ -288,8 +288,7 @@ export function validateTrekkingJournalEvidence(document){
   assert(Array.isArray(p.rolls)&&p.rolls.length===expectedRolls.length&&
    p.rolls.every((r,i)=>r.faces===expectedRolls[i][0]&&r.label===expectedRolls[i][1]&&
      r.value===expectedRolls[i][2]&&int(r.value,1,r.faces)&&
-     ['manual','cryptographic-software-die'].includes(r.origin))&&
-   (p.rolls.length===0||new Set(p.rolls.map(r=>r.origin)).size===1),
+     ['manual','cryptographic-software-die'].includes(r.origin)),
    'Uložené hody nesouhlasí s vyhodnocenými kostkami a jejich původem');
  }
  validateTrekCorrections(document?.journal??[]);

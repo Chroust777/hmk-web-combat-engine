@@ -118,10 +118,13 @@ export function previewTrekCorrection(source,journal,{lowChoice=null}={}){
    modeTotal(old)<=adjustment.advantageModes&&old.lax===modes.lax&&
    old.orienteeringSlow===modes.orienteeringSlow&&old.slow===modes.slow&&modeTotal(old)===modeTotal(modes)};
 }
-export function createTrekCorrection({source,journal,additionalRolls=[],origin='manual',lowChoice=null}={}){
+export function createTrekCorrection({source,journal,additionalRolls=[],origin='manual',origins=null,lowChoice=null}={}){
  const preview=previewTrekCorrection(source,journal,{lowChoice}),p=source.calendarTrekProof;
  ok(!preview.alreadyValid,'Hlídka již odpovídá doloženému Orienteering SV. Oprava není potřebná.');
- ok(['manual','cryptographic-software-die'].includes(origin),'Neplatný původ nových kostek');
+ ok(['manual','cryptographic-software-die'].includes(origin)&&
+  (origins===null||Array.isArray(origins)&&origins.length===additionalRolls.length&&
+   origins.every(x=>['manual','cryptographic-software-die'].includes(x))),
+  'Neplatný původ nových kostek');
  ok(Array.isArray(additionalRolls)&&additionalRolls.length===preview.additionalProgress+preview.additionalDirection&&
   additionalRolls.every(isD10),'Nesouhlasí počet doplňkových d10 hodů');
  const modes={...preview.modes};let cursor=0;
@@ -136,8 +139,9 @@ export function createTrekCorrection({source,journal,additionalRolls=[],origin='
  const effectiveMovement=hazards.direction==='lost-time'?adjustedTrekkingMovement(adapted):movement;
  ok(!(modes.doubleTime&&hazards.direction==='lost-time'),
   'Nový Direction Hazard znamená Lost Time; Double Time nelze automaticky potvrdit.');
- const rolls=[...additionalRolls.slice(0,preview.additionalProgress).map(value=>({faces:10,label:'Oprava Progress',value,origin})),
-  ...additionalRolls.slice(preview.additionalProgress).map(value=>({faces:10,label:'Oprava Direction Hazard',value,origin}))];
+ const rolls=additionalRolls.map((value,i)=>({faces:10,
+  label:i<preview.additionalProgress?'Oprava Progress':'Oprava Direction Hazard',
+  value,origin:origins?.[i]??origin}));
  return {format:TREK_CORRECTION_FORMAT,sourceId:source.id,sourceMinute:source.campaignMinute,
   orienteeringId:preview.orienteeringId,droverId:preview.droverId,
   adjustedSV:preview.adjustment.adjustedSV,lowChoice,modes,movement,hazards,effectiveMovement,rolls,sourcePage:145};
@@ -162,9 +166,10 @@ export function validateTrekCorrections(journal=[]){
    source.calendarCampaignId===row.calendarCampaignId&&row.campaignMinute>=source.campaignMinute&&
    c.sourceMinute===source.campaignMinute,'Oprava nepatří do této kampaně, hlídky nebo postavě');
   const documented=c.rolls??[];
-  ok(documented.every(x=>x.faces===10&&isD10(x.value)&&['manual','cryptographic-software-die'].includes(x.origin))&&
-   new Set(documented.map(x=>x.origin)).size<=1,'Neplatné důkazy doplňkových hodů');
-  const restored=createTrekCorrection({source,journal,additionalRolls:documented.map(x=>x.value),origin:documented[0]?.origin??'manual',lowChoice:c.lowChoice??null});
+  ok(documented.every(x=>x.faces===10&&isD10(x.value)&&['manual','cryptographic-software-die'].includes(x.origin)),
+   'Neplatné důkazy doplňkových hodů');
+  const restored=createTrekCorrection({source,journal,additionalRolls:documented.map(x=>x.value),origin:documented[0]?.origin??'manual',
+   origins:documented.map(x=>x.origin),lowChoice:c.lowChoice??null});
   ok(JSON.stringify(restored)===JSON.stringify(c),'Pozměněný výsledek opravy hlídky');
   ok(!journal.some(j=>j.calendarExpeditionProof?.trekSourceId===source.id&&j.campaignMinute<row.campaignMinute),
    'Opravu nelze zpětně zavést po dokončeném cestovním intervalu');
