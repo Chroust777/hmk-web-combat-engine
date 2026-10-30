@@ -29,7 +29,7 @@ export function activeHMKActivities(journal=[],clock){
  * fatigue or fractional Loaded surcharge: GM must explicitly adjudicate it.
  * Existing full-hour rolls are never discarded or rerolled.
  */
-export function interruptedTrekOutcome(plan,elapsedMinutes,partialWeariness=null){
+export function interruptedTrekOutcome(plan,elapsedMinutes,partialWeariness=null,{legacy=false}={}){
  check(plan?.kind==='travel'&&min(elapsedMinutes)&&elapsedMinutes<plan.durationMinutes,
   'Přerušená cesta musí být kratší než skutečně plánovaný interval.');
  const doubled=['double-walk','double-drover'].includes(plan.mode);
@@ -37,16 +37,19 @@ export function interruptedTrekOutcome(plan,elapsedMinutes,partialWeariness=null
  const partialHourMinutes=doubled?elapsedMinutes%60:elapsedMinutes;
  const completedHourRolls=doubled?plan.rolls.slice(0,fullHours):[];
  const earned=completedHourRolls.reduce((sum,r)=>sum+Math.max(0,plan.base-(r.success?5:0)),0);
- const automatic=elapsedMinutes===0||(doubled&&partialHourMinutes===0&&
-  !(plan.extraLoad||plan.animalExtraLoad||plan.weatherExtra));
+ const automatic=legacy?(elapsedMinutes===0||(doubled&&partialHourMinutes===0&&
+  !(plan.extraLoad||plan.animalExtraLoad||plan.weatherExtra))):partialWeariness===null;
  check(automatic||Number.isSafeInteger(partialWeariness),
-  'Částečná cestovní únava vyžaduje rozhodnutí GM: zadejte Weariness za skutečně absolvovaný interval.');
- const accrual=automatic?earned:partialWeariness;
+  'Částečná cestovní únava vyžaduje platný doložený výsledek.');
+ // GM policy for incomplete watches, not a printed fractional END rule.
+ // Completed Double Time hours are still authoritative and never lost.
+ const accrual=automatic?(legacy?earned:Math.max(earned,Math.floor(plan.accrual*elapsedMinutes/plan.durationMinutes))):partialWeariness;
  check(Number.isSafeInteger(accrual)&&accrual>=earned&&accrual<=plan.accrual,
   'Únava při přerušení musí zahrnout již dokončené hodinové END testy a nesmí převýšit celou hlídku.');
  const round=x=>Math.round(x*1000)/1000;
- return {format:'hmk-interrupted-travel-accounting-v1',elapsedMinutes,fullHours,partialHourMinutes,
+ return {format:legacy?'hmk-interrupted-travel-accounting-v1':'hmk-interrupted-travel-accounting-v2',elapsedMinutes,fullHours,partialHourMinutes,
   completedHourRolls,earnedByFullHours:earned,accrual,gmDecision:automatic?null:partialWeariness,
+  ...(!legacy?{timeScaling:'gm-proportional-floor-v1'}:{}),
   travelledLeagues:round(plan.travelledLeagues*elapsedMinutes/plan.durationMinutes),
   travelledKilometres:round(plan.travelledKilometres*elapsedMinutes/plan.durationMinutes),
   sourcePages:[145,146,150]};
@@ -72,7 +75,7 @@ export function interruptHMKActivity({journal=[],clock,activityId,reason,id,crea
   animalPartialWeariness={};
   for(const decision of animalPolicies){
    const supplied=Object.hasOwn(provided,decision.actorId)?provided[decision.actorId]:null;
-   const delta=actualAnimalWeariness(decision,elapsed,supplied);
+   const delta=actualAnimalWeariness(decision,elapsed,supplied,{proportional:activity.plan.kind==='travel'});
    check(decision.gmConfirmed===false||supplied!==null,
     'Chybí rozhodnutí GM pro zvíře '+decision.actorId);
    animalPartialWeariness[decision.actorId]=delta;
@@ -82,7 +85,7 @@ export function interruptHMKActivity({journal=[],clock,activityId,reason,id,crea
   campaignId:activeClockKey(clock),startMinute:activity.startMinute,
   minute:clock.minute,elapsedMinutes:Math.max(0,clock.minute-activity.startMinute),
   reason:reason.trim(),awardFatigue:false,...(partial?{partialTravel:partial}:{}),
-  ...(animalPolicies.length?{animalPartialWeariness:structuredClone(animalPartialWeariness)}:{}),
+  ...(animalPolicies.length?{animalPartialWeariness:structuredClone(animalPartialWeariness),partialAnimalTimeScaling:'gm-proportional-floor-v1'}:{}),
   ...(!partial&&activity.plan.kind==='travel'&&Number.isFinite(activity.plan.travelledLeagues)&&Number.isFinite(activity.plan.travelledKilometres)?{
    // Printed short-trek ratio p.146: provisional distance only. END SR is
    // NEVER prorated from a four-hour test or awarded for an incomplete watch.
@@ -188,7 +191,7 @@ function finishApprovedAnimalWeariness(database,{idFactory,stamp,campaignId}){
    const actor=database.characters.find(c=>c.id===policy.actorId);
    check(actor?.hmk?.combatState,'Chybí původní Combat State zvířete '+policy.actorId);
    const partial=interrupts[0]?results[0].calendarExpeditionProof.animalPartialWeariness?.[policy.actorId]:null;
-   const delta=actualAnimalWeariness(policy,elapsed,partial??null);
+   const delta=actualAnimalWeariness(policy,elapsed,partial??null,{proportional:group.timeScaling==='gm-proportional-floor-v1'});
    if(!interrupts[0]){
     const atStart=(trek.partyModes.animals??[]).find(x=>x.id===policy.actorId)?.health;
     check(atStart&&JSON.stringify(trekRegisteredAnimalHealth(actor))===JSON.stringify(atStart),
@@ -335,7 +338,7 @@ export function finishInterruptedHMKTravel(database,{idFactory,stamp}={}){
   check(source?.calendarActivityProof?.plan?.kind==='travel','Chybí původní cestovní aktivita');
   const a=source.calendarActivityProof,actor=database.characters.find(c=>c.id===a.characterId);
   check(actor,'Neznámá postava přerušené cesty');
-  check(JSON.stringify(interruptedTrekOutcome(a.plan,p.elapsedMinutes,part.gmDecision))===JSON.stringify(part),
+  check(JSON.stringify(interruptedTrekOutcome(a.plan,p.elapsedMinutes,part.gmDecision,{legacy:part.format==='hmk-interrupted-travel-accounting-v1'}))===JSON.stringify(part),
    'Nesouhlasí přerušený čas, END ani únava.');
   const plan={...a.plan,durationMinutes:p.elapsedMinutes,accrual:part.accrual,
    travelledLeagues:part.travelledLeagues,travelledKilometres:part.travelledKilometres,
@@ -461,8 +464,12 @@ export function validateHMKActivityEvidence(journal=[]){
    const folkCharge=bypass&&member?.loaded?Math.floor(member.modifiedENC/10)*10:0;
    check(a.plan.animalExtraLoad===animalCharge&&a.plan.extraLoad===folkCharge&&
     a.plan.ignoreLoaded===undefined&&Number.isSafeInteger(a.plan.accrual)&&
-    a.plan.accrual===a.plan.rolls.reduce((sum,x)=>sum+Math.max(0,a.plan.base-(x.success?5:0)),0)+
-     folkCharge+animalCharge+a.plan.weatherExtra,
+    a.plan.accrual=== (a.plan.timeScaling==='gm-proportional-floor-v1'?
+      (a.plan.mode.startsWith('double-')?a.plan.rolls.reduce((sum,r,i)=>
+        sum+Math.floor(Math.max(0,a.plan.base-(r.success?5:0))*Math.min(60,Math.max(0,a.durationMinutes-i*60))/60),0):
+        Math.floor(a.plan.rolls.reduce((sum,r)=>sum+Math.max(0,a.plan.base-(r.success?5:0)),0)*a.durationMinutes/240)) +
+        Math.floor((folkCharge+animalCharge+a.plan.weatherExtra)*a.durationMinutes/240):
+      a.plan.rolls.reduce((sum,x)=>sum+Math.max(0,a.plan.base-(x.success?5:0)),0)+folkCharge+animalCharge+a.plan.weatherExtra),
     'Fatigue skupiny neodpovídá END SR a doloženému ENC jednotlivých cestujících a zvířat.');
   }
   if(!groups.has(g.id))groups.set(g.id,{signature,members:new Set(),expected:g.memberIds});
@@ -496,7 +503,7 @@ export function validateHMKActivityEvidence(journal=[]){
    p.startMinute===a.startMinute&&p.elapsedMinutes===Math.max(0,p.minute-a.startMinute)&&
    p.awardFatigue===false&&(!a.plan.travelGroup?.animalWeariness?.length||
     (p.animalPartialWeariness&&a.plan.travelGroup.animalWeariness.every(policy=>
-      p.animalPartialWeariness[policy.actorId]===actualAnimalWeariness(policy,p.elapsedMinutes,p.animalPartialWeariness[policy.actorId]))))&&(!p.partialTravel||JSON.stringify(interruptedTrekOutcome(a.plan,p.elapsedMinutes,p.partialTravel.gmDecision))===JSON.stringify(p.partialTravel))&&(!p.projectedShortTravel||(
+      p.animalPartialWeariness[policy.actorId]===actualAnimalWeariness(policy,p.elapsedMinutes,p.animalPartialWeariness[policy.actorId],{proportional:p.partialAnimalTimeScaling==='gm-proportional-floor-v1'}))))&&(!p.partialTravel||JSON.stringify(interruptedTrekOutcome(a.plan,p.elapsedMinutes,p.partialTravel.gmDecision,{legacy:p.partialTravel.format==='hmk-interrupted-travel-accounting-v1'}))===JSON.stringify(p.partialTravel))&&(!p.projectedShortTravel||(
     p.projectedShortTravel.format==='hmk-interrupted-short-trek-v1'&&
     p.projectedShortTravel.confirmedDistance===false&&
     p.projectedShortTravel.elapsedMinutes===p.elapsedMinutes&&

@@ -13,9 +13,11 @@ import {animalTrekInputFromSnapshot} from './hmk-trekking-animal-load.js';
 import {animalDoubleTimeTimeline} from './hmk-trekking-animal-timeline.js';
 import {assertCertifiedAnimalWeatherTransition} from './hmk-trekking-animal-weather.js';
 const requireFact=(ok,msg)=>{if(!ok)throw Error(msg);};
-export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,memberIds=[],guideId,kind,diceByActor={},animalWeariness=[],idFactory}={}){
+export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,memberIds=[],guideId,kind,diceByActor={},animalWeariness=[],durationMinutes=240,idFactory}={}){
  requireFact(clock&&Number.isSafeInteger(clock.minute)&&typeof idFactory==='function','Chybí potvrzený čas kampaně nebo generátor ID');
  requireFact(['walk','ride','drive','double-walk','double-drover'].includes(kind),'Nepodporovaná cestovní činnost');
+ requireFact(Number.isSafeInteger(durationMinutes)&&durationMinutes>=1&&durationMinutes<=240&&
+  clock.minute+durationMinutes<=Math.floor(clock.minute/240)*240+240,'Kratší cesta musí skončit nejpozději na hranici současné čtyřhodinové hlídky.');
  requireFact(Array.isArray(memberIds)&&memberIds.length>0&&new Set(memberIds).size===memberIds.length,
   'Vyberte jedinečné postavy skupiny');
  requireFact(memberIds.includes(guideId),'Průvodce musí cestovat společně se skupinou');
@@ -64,7 +66,7 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
  for(const pending of journal.filter(j=>j.calendarActivityProof?.plan?.travelGroup)){
   const activity=pending.calendarActivityProof,g=activity.plan.travelGroup;
   if(pending.calendarCampaignId!==campaignKey(clock)||g.id===ready.sourceId||
-   activity.endMinute<=clock.minute||activity.startMinute>=clock.minute+240)continue;
+   activity.endMinute<=clock.minute||activity.startMinute>=clock.minute+durationMinutes)continue;
   // A beast is a real physical travel participant even when the GM selects
   // the 'no optional animal fatigue' policy. It cannot be in two simultaneous
   // parties. Do not limit this guard to parties with animal fatigue policies.
@@ -84,7 +86,9 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   requireFact(timeline.firstImmobileHour!==0,'Zvíře '+policy.actorId+' nemůže zahájit Double Time s Fatigue 40.');
  }
 
- const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort(),planningKind:kind,...(animalPolicies.length?{animalWeariness:animalPolicies}:{})};
+ const group={format:'hmk-group-watch-v1',id:idFactory(),guideId,memberIds:[...memberIds].sort(),planningKind:kind,
+  ...(durationMinutes<240?{timeScaling:'gm-proportional-floor-v1'}:{}),
+  ...(animalPolicies.length?{animalWeariness:animalPolicies}:{})};
  // Combat State also includes blood-loss Weakness. A partial fatigue sum can
  // silently allow a prohibited trek when the true total already reaches 40.
  const fatigueOf=actor=>{
@@ -121,7 +125,7 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
    .some(a=>a.droverId===id);
   const actorMode=kind==='double-walk'&&hasPackAnimals?'double-drover':kind;
   const input=diceByActor[id];
-  const result=expeditionDiceSubmission({kind,rawValues:input?.rawValues,generated:input?.generated});
+  const result=expeditionDiceSubmission({kind,rawValues:input?.rawValues,generated:input?.generated,durationMinutes});
   const snapshot=ready.source.calendarTrekProof.partyModes?.members.find(m=>m.id===id);
   const bypass=ready.source.calendarTrekProof.modes?.ignoreLoaded===true;
   const animals=ready.source.calendarTrekProof.partyModes?.animals??[];
@@ -130,9 +134,10 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
   // Weather-test Weariness is already applied by the original exposure
   // executor. Do NOT add it a second time during completion of the watch.
   const plan={...expeditionWatchFatigue({mode:actorMode,endurance,rolls:result.rolls,
-    modifiedENC:bypass&&snapshot?.loaded?snapshot.modifiedENC:0,ignoreLoaded:bypass&&snapshot?.loaded,animalExtraLoad}),kind:'travel',
+    modifiedENC:bypass&&snapshot?.loaded?snapshot.modifiedENC:0,ignoreLoaded:bypass&&snapshot?.loaded,animalExtraLoad,durationMinutes}),kind:'travel',
    trekSourceId:ready.sourceId,orienteeringId:ready.orienteeringId,
-   travelledLeagues:ready.movement.leagues,travelledKilometres:ready.movement.kilometres,
+   travelledLeagues:Math.round(ready.movement.leagues*durationMinutes/240*1000)/1000,
+   travelledKilometres:Math.round(ready.movement.kilometres*durationMinutes/240*1000)/1000,
    travelGroup:group};
   const proof=scheduleHMKActivity({journal:staged,clock,characterId:id,name:actor.name,
    kind,plan,id:idFactory(),origin:result.origin});

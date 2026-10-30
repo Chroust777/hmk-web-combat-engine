@@ -43,10 +43,16 @@ export function validateAnimalWeariness(animals,policies,kind){
  check(JSON.stringify(policies)===JSON.stringify(normalized),'Změněný doklad únavy zvířat.');
  return true;
 }
-export function actualAnimalWeariness(policy,elapsedMinutes,partialDecision=null){
+export function actualAnimalWeariness(policy,elapsedMinutes,partialDecision=null,{proportional=false}={}){
  check([ANIMAL_TREK_ANALOGY,'hmk-animal-trek-gm-rate-v1'].includes(policy?.format)&&
   Number.isSafeInteger(elapsedMinutes)&&elapsedMinutes>=0&&elapsedMinutes<=240,
   'Neplatná doba nebo zdravotní rozhodnutí pro zvíře.');
+ if(proportional){
+  const full=policy.period==='hour'?4*policy.rate:policy.rate;
+  const computed=Math.floor(full*elapsedMinutes/240);
+  check(partialDecision===null||partialDecision===computed,'Pozměněný poměrný výpočet únavy zvířete.');
+  return computed;
+ }
  if(policy.format===ANIMAL_TREK_ANALOGY){
   // Completed-time only. 90min Double Time -> 1 hour; 120min normal ->
   // no completed watch. No GM prompt or invented fractional-hour fatigue.

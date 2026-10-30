@@ -18,9 +18,10 @@ export function secureHMKDie(sides){
  * A cryptographic provenance claim survives only if all visible values still
  * match this form's generated witness for the currently chosen travel mode.
  */
-export function expeditionDiceSubmission({kind,rawValues,generated=null}={}){
+export function expeditionDiceSubmission({kind,rawValues,generated=null,durationMinutes=240}={}){
  assert(['walk','ride','drive','double-walk','double-drover'].includes(kind),'Hody jsou pouze pro cestovní END SR');
- const count=kind.startsWith('double-')?4:1;
+ const count=kind.startsWith('double-')?Math.ceil(durationMinutes/60):1;
+ assert(whole(durationMinutes,1,240),'Trvání cesty musí být 1–240 minut');
  assert(Array.isArray(rawValues)&&rawValues.length===count,'Nesoulad počtu polí pro END SR');
  const rolls=rawValues.map(value=>String(value??'').trim()===''?NaN:Number(value));
  assert(rolls.every(x=>whole(x,1,10)),'Vyplňte '+count+' platný hod(y) d10 (1 až 10)');
@@ -33,11 +34,12 @@ export function expeditionSecondaryRoll({endurance,roll,riding=false}={}){
  const tn=Math.floor(endurance/2)+(riding?2:0);
  return {tn,roll,success:roll<=tn,sourcePage:62};
 }
-export function expeditionWatchFatigue({mode='walk',endurance,rolls,modifiedENC=0,ignoreLoaded=false,weatherExtra=0,animalExtraLoad=0}={}){
+export function expeditionWatchFatigue({mode='walk',endurance,rolls,modifiedENC=0,ignoreLoaded=false,weatherExtra=0,animalExtraLoad=0,durationMinutes=240}={}){
  assert(['walk','ride','drive','double-walk','double-drover'].includes(mode),'Neznámý cestovní režim');
  assert(whole(modifiedENC,0,10000)&&[0,5,10].includes(weatherExtra),'ENC nebo weather hazard nemá doloženou hodnotu');
  assert(typeof ignoreLoaded==='boolean'&&whole(animalExtraLoad,0,10000)&&animalExtraLoad%10===0,'Neplatný doložený příplatek za naložená zvířata');
- assert(Array.isArray(rolls)&&rolls.length===(mode.startsWith('double-')?4:1),'Počet hodů END SR neodpovídá počtu časových intervalů');
+ assert(whole(durationMinutes,1,240),'Cesta může trvat 1–240 minut');
+ assert(Array.isArray(rolls)&&rolls.length===(mode.startsWith('double-')?Math.ceil(durationMinutes/60):1),'Počet hodů END SR neodpovídá počtu časových intervalů');
  const riding=mode==='ride'||mode==='drive',double=mode.startsWith('double-');
  const base=double?(mode==='double-drover'?5:10):5;
  // HMK p.145/149: ignoring a foot Loaded Mode costs +10 Weariness
@@ -54,8 +56,14 @@ export function expeditionWatchFatigue({mode='walk',endurance,rolls,modifiedENC=
  const results=rolls.map(roll=>expeditionSecondaryRoll({endurance,roll,
   riding})); // Drover on foot is NOT a rider/driver (+2 applies only to riders/drivers).
  // Hourly Double Time is calculated before the ONCE-PER-WATCH surcharge.
- const accrual=results.reduce((a,r)=>a+Math.max(0,base-(r.success?5:0)),0)+extraLoad+animalExtraLoad+weatherExtra;
- return {durationMinutes:240,mode,accrual,rolls:results,base,extraLoad,animalExtraLoad,weatherExtra,
+ const surcharge=extraLoad+animalExtraLoad+weatherExtra;
+ const fullPeriod=results.reduce((a,r)=>a+Math.max(0,base-(r.success?5:0)),0);
+ const proportional=durationMinutes<240;
+ const actualPeriod=double?results.reduce((sum,r,i)=>{const minutes=Math.min(60,Math.max(0,durationMinutes-i*60));return sum+Math.floor(Math.max(0,base-(r.success?5:0))*minutes/60);},0):
+  Math.floor(fullPeriod*durationMinutes/240);
+ const accrual=(proportional?actualPeriod+Math.floor(surcharge*durationMinutes/240):fullPeriod+surcharge);
+ return {durationMinutes,mode,accrual,rolls:results,base,extraLoad,animalExtraLoad,weatherExtra,
+  ...(proportional?{timeScaling:'gm-proportional-floor-v1'}:{}),
   sourcePages:[62,149,150,176],requiresHazardResolution:true};
 }
 export function expeditionRestRecovery({minute,current,kind,startedMinutesAgo=0,claims={}}={}){

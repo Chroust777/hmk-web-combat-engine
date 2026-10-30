@@ -34,7 +34,7 @@ export function trekWeatherDay({season,climate,temperatureD10,precipitationD10,l
   daylightHazard:hazard(base),nightHazard:hazard(base+NIGHT[c]),
   sourcePages:[144]};
 }
-export function trekWeatherWatch(day,{night=false,precipitationD6=null,pavedRoad=false}={}){
+export function trekWeatherWatch(day,{night=false,precipitationD6=null,pavedRoad=false,continuation=false}={}){
  assert(day?.format==='hmk-trekking-weather-day-v1'&&typeof night==='boolean'&&typeof pavedRoad==='boolean','Neplatný doložený výsledek počasí');
  assert(!day.hasPrecipitation||int(precipitationD6,1,6),'Za dne se srážkami je nutný d6 pro každou hlídku');
  assert(day.hasPrecipitation||precipitationD6===null,'Při suchu se d6 na srážky nehází');
@@ -44,7 +44,7 @@ export function trekWeatherWatch(day,{night=false,precipitationD6=null,pavedRoad
  return {hazard,precipitation,precipitationD6,continuous,slowMode:continuous&&!(pavedRoad&&precipitation==='rain'),
   // The resulting Cold/Heat Hazard Roll requires clothing AV, equipment and
   // actual location. This is NOT sufficient evidence to inflict exposure.
-  requiresWeatherHazardRoll:hazard!==null,sourcePage:144};
+  requiresWeatherHazardRoll:hazard!==null&&!continuation,sourcePage:144};
 }
 const MOVE={
  flat:{'paved-road':[5,10,5,5],'unpaved-road':[5,9,5,4],'rural-track':[5,9,4,3],
@@ -127,14 +127,14 @@ export function trekHazards({bearingDeficit=0,directionD10=[],survivalCriticalFa
   // rules executors. Only the trigger is established by these dice.
   sourcePage:148};
 }
-export function trekEncounterCheck({environ,night=false,roll,elapsedWildernessNightWatches=0}={}){
+export function trekEncounterCheck({environ,night=false,roll,elapsedWildernessNightWatches=0,continuation=false}={}){
  const tn={highway:[2,1],rural:[4,1],wilderness:[1,1],underworld:[9,9]}[environ];
  assert(tn&&typeof night==='boolean'&&int(elapsedWildernessNightWatches,0,100000),'Neplatná kontrola náhodného setkání');
  // Wilderness night encounters are only checked every *second* watch.
- const checkDue=!(environ==='wilderness'&&night&&elapsedWildernessNightWatches%2===0);
+ const checkDue=!continuation&&!(environ==='wilderness'&&night&&elapsedWildernessNightWatches%2===0);
  assert(checkDue?int(roll,1,10):roll===null,'Při povinné kontrole vyžaduje HMK d10, mimo ni se nehází');
  return {tn:tn[night?1:0],roll,checkDue,encounter:checkDue&&roll<=tn[night?1:0],
-  note:checkDue?'Druhy a počet účastníků určuje skutečná situace / Encounter Tables.':'V noci v divočině se kontroluje jen jednou za dvě hlídky.',sourcePage:150};
+  note:continuation?'Setkání se pro tento čtyřhodinový úsek již kontrolovalo v původní části.':checkDue?'Druhy a počet účastníků určuje skutečná situace / Encounter Tables.':'V noci v divočině se kontroluje jen jednou za dvě hlídky.',sourcePage:150};
 }
 /** Strict import/save gate for NEW trekking preparations. Existing legacy
  * journal entries remain accepted unchanged. The same area/day/context
@@ -206,6 +206,26 @@ export function validateTrekkingJournalEvidence(document){
     int(p.modes.manualSlow,0,20),
     'Skupinové postihy neodpovídají uloženému pohybu a počasí.');
   }
+  if(p.continuationOf){
+   const original=priorRows.find(j=>j.id===p.continuationOf);
+   assert(original?.calendarTrekProof&&Math.floor(original.campaignMinute/240)===Math.floor(entry.campaignMinute/240)&&
+    original.campaignMinute<entry.campaignMinute&&original.calendarCampaignId===entry.calendarCampaignId&&
+    original.calendarTrekProof.area===p.area&&original.calendarTrekProof.season===p.season&&
+    original.calendarTrekProof.climate===p.climate&&original.calendarTrekProof.landscape===p.landscape&&
+    original.calendarTrekProof.alpine===p.alpine&&original.calendarTrekProof.aridDesert===p.aridDesert&&
+    JSON.stringify((original.calendarTrekProof.partyModes?.memberIds??[]).slice().sort())===
+    JSON.stringify((p.partyModes?.memberIds??[]).slice().sort())&&
+    original.calendarTrekProof.weatherWatch.precipitationD6===p.weatherWatch.precipitationD6,
+    'Pokračující úsek musí navazovat na již doložené počasí a stejnou skupinu v jedné čtyřhodinové hlídce.');
+  }
+  if(p.encounterContinuationOf){
+   const earlier=priorRows.find(j=>j.id===p.encounterContinuationOf);
+   assert(earlier?.calendarTrekProof&&earlier.calendarCampaignId===entry.calendarCampaignId&&
+    earlier.campaignMinute<entry.campaignMinute&&Math.floor(earlier.campaignMinute/240)===Math.floor(entry.campaignMinute/240)&&
+    JSON.stringify((earlier.calendarTrekProof.partyModes?.memberIds??[]).slice().sort())===
+    JSON.stringify((p.partyModes?.memberIds??[]).slice().sort()),
+    'Kontrola setkání u pokračujícího úseku nemá doloženou původní hlídku skupiny.');
+  }
   const expectedDay=trekWeatherDay({season:p.season,climate:p.climate,landscape:p.landscape,
    alpine:p.alpine,aridDesert:p.aridDesert,temperatureD10:p.weatherDay?.temperatureD10,
    precipitationD10:p.weatherDay?.precipitationD10});
@@ -216,7 +236,7 @@ export function validateTrekkingJournalEvidence(document){
   assert(p.dayAlready===!!prior,'Chybné použití opakovaného denního počasí');
   days.set(key,p.weatherDay);
   const watch=trekWeatherWatch(expectedDay,{night:p.night,pavedRoad:p.terrain==='paved-road',
-   precipitationD6:p.weatherWatch?.precipitationD6});
+   precipitationD6:p.weatherWatch?.precipitationD6,continuation:!!p.continuationOf});
   assert(JSON.stringify(watch)===JSON.stringify(p.weatherWatch),'Nesouhlasí výsledek srážek pro hlídku');
   const movement=trekWatchMovement({stationaryForaging:p.orienteeringContext?.stationaryForaging===true,topography:p.landscape,terrain:p.terrain,conveyance:p.conveyance,
    progress:p.modes?.progress,slow:p.modes?.slow,loaded:p.modes?.loaded,bearing:p.modes?.bearing,
@@ -228,14 +248,14 @@ export function validateTrekkingJournalEvidence(document){
   const hazards=trekHazards({bearingDeficit:movement.bearingDeficit,directionD10:p.modes?.directionD10});
   assert(JSON.stringify(hazards)===JSON.stringify(p.hazards),'Nesouhlasí uložení Direction Hazard');
   const encounter=trekEncounterCheck({environ:p.modes?.environ,night:p.night,
-   roll:p.encounter?.roll,elapsedWildernessNightWatches:p.modes?.wildernessNightWatches});
+   roll:p.encounter?.roll,elapsedWildernessNightWatches:p.modes?.wildernessNightWatches,continuation:!!p.encounterContinuationOf});
   assert(JSON.stringify(encounter)===JSON.stringify(p.encounter),'Nesouhlasí Encounter Roll');
   const expectedRolls=[];
   if(!prior){
    expectedRolls.push([10,'Daily Temperature',expectedDay.temperatureD10],
     [10,'Daily Precipitation',expectedDay.precipitationD10]);
   }
-  if(expectedDay.hasPrecipitation)expectedRolls.push([6,'Precipitation per Watch',watch.precipitationD6]);
+  if(expectedDay.hasPrecipitation&&!p.continuationOf)expectedRolls.push([6,'Precipitation per Watch',watch.precipitationD6]);
   for(const value of p.modes.progressD10)expectedRolls.push([10,'Progress',value]);
   for(const value of p.modes.directionD10)expectedRolls.push([10,'Direction Hazard',value]);
   if(encounter.checkDue)expectedRolls.push([10,'Random Encounter',encounter.roll]);
@@ -243,7 +263,7 @@ export function validateTrekkingJournalEvidence(document){
    p.rolls.every((r,i)=>r.faces===expectedRolls[i][0]&&r.label===expectedRolls[i][1]&&
      r.value===expectedRolls[i][2]&&int(r.value,1,r.faces)&&
      ['manual','cryptographic-software-die'].includes(r.origin))&&
-   new Set(p.rolls.map(r=>r.origin)).size===1,
+   (p.rolls.length===0||new Set(p.rolls.map(r=>r.origin)).size===1),
    'Uložené hody nesouhlasí s vyhodnocenými kostkami a jejich původem');
  }
  validateTrekCorrections(document?.journal??[]);
