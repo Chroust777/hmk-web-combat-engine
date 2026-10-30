@@ -1,3 +1,4 @@
+import {encounterGMResolution} from './hmk-trekking-encounter-gm.js';
 import {weatherRollEvidence} from './hmk-trekking-weather-roll.js';
 import {effectiveTrekSource} from './hmk-trekking-correction.js';
 import {hasFinishedLinkedTrekHazard} from './hmk-trekking-handoff.js';
@@ -67,7 +68,7 @@ export function trekkingOutstandingCases(characters=[],journal=[],campaignId=nul
     // Endurance/Survival test is NOT required (HMK p.149).
     if(hazard==='weather'&&weatherRollEvidence(journal,entry.id,subjectId,entry.calendarCampaignId)?.calendarTrekWeatherRoll.exposed===false)continue;
     const k=[entry.calendarCampaignId,subjectId,entry.id,hazard].join('|');
-    if(resolutions.has(k)||hasFinishedLinkedTrekHazard(entry,hazard,journal,subjectId))continue;
+    if(resolutions.has(k)||hasFinishedLinkedTrekHazard(entry,hazard,journal,subjectId)||hazard==='encounter'&&encounterGMResolution(journal,entry.id,entry.calendarCampaignId))continue;
     const spec=KINDS[hazard];
     cases.push({id:'trek:'+encodeURIComponent(entry.id)+':'+hazard+':'+encodeURIComponent(subjectId),
      characterId:subjectId,name:names.get(subjectId),sourceId:entry.id,

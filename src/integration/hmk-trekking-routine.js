@@ -1,3 +1,4 @@
+import {weatherVoidedIds} from './hmk-trekking-weather-lifecycle.js';
 import {validateTrekCorrections,effectiveTrekSource} from './hmk-trekking-correction.js';
 /** HârnMaster Kèthîra v1.2, printed pp. 141–150.
  * Non-mutating, evidence-driven parts of the nine-step Trekking Routine.
@@ -152,6 +153,7 @@ export function assertTrekDailyWeatherAppendOnly(before=[],after=[]){
 }
 export function validateTrekkingJournalEvidence(document){
  const days=new Map();
+ const voided=weatherVoidedIds(document?.journal??[]);
  const priorRows=[];
  for(const entry of document?.journal??[]){
   // New standalone HMK 144 climate evidence is authoritative for later watches.
@@ -169,8 +171,7 @@ export function validateTrekkingJournalEvidence(document){
    assert(JSON.stringify(day)===JSON.stringify(global.weatherDay),'Denní počasí neodpovídá skutečným hodům d10.');
    const key=JSON.stringify([entry.calendarCampaignId,global.dayIndex,global.area,global.season,
     global.climate,global.landscape,global.alpine,global.aridDesert]);
-   assert(!days.has(key),'Denní počasí bylo pro stejnou oblast a podmínky už potvrzeno.');
-   days.set(key,day);
+   if(!voided.has(entry.id)){assert(!days.has(key),'Denní počasí bylo pro stejnou oblast a podmínky už potvrzeno.');days.set(key,day);}
    priorRows.push(entry);
    continue;
   }
