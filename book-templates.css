@@ -6763,3 +6763,27 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .content-calendar .hc-trek-watch-slot:has(.hc-trek-reactivate-watch[open]) .hc-trek-reactivate-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 @media(max-width:760px){.content-calendar .hc-trek-watch-slot:has(.hc-trek-reactivate-watch[open]) .hc-trek-reactivate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:470px){.content-calendar .hc-trek-watch-slot:has(.hc-trek-reactivate-watch[open]) .hc-trek-reactivate-grid{grid-template-columns:1fr}}
+
+/* v93.618 – calendar weather belongs INSIDE the folio, never above the book. */
+.content-calendar .hc-trek-weather-roll-panel,
+.content-calendar .hc-trek-global-weather{max-width:100%;min-width:0;box-sizing:border-box;
+ margin:14px 0;padding:12px;border:1px solid #bda479;border-radius:7px;background:rgba(241,226,193,.33);}
+.content-calendar .hc-trek-global-weather>details>summary{cursor:pointer;font-weight:700;font-family:Georgia,serif;}
+.content-calendar .hc-trek-weather-roll-panel .field-grid,
+.content-calendar .hc-trek-global-weather .hmk-trek-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;}
+.content-calendar .hc-trek-weather-roll-panel label,
+.content-calendar .hc-trek-global-weather label{display:flex;flex-direction:column;min-width:0;max-width:100%;gap:5px;overflow-wrap:normal;word-break:normal;}
+.content-calendar .hc-trek-global-weather label.hc-check{display:flex;flex-direction:row;align-items:center;gap:8px;}
+.content-calendar .hc-trek-global-weather input[type="checkbox"]{flex:0 0 18px;width:18px;height:18px;margin:0;}
+.content-calendar .hc-trek-weather-roll-panel input,
+.content-calendar .hc-trek-weather-roll-panel select,
+.content-calendar .hc-trek-global-weather input:not([type="checkbox"]),
+.content-calendar .hc-trek-global-weather select{min-width:0;max-width:100%;box-sizing:border-box;}
+.content-calendar .hc-trek-weather-roll-panel button,
+.content-calendar .hc-trek-global-weather button{background:#213b5c;color:#fff0d1;border:1px solid #9c7848;}
+.content-calendar .hc-trek-weather-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;}
+.content-calendar .hc-trek-global-weather output{display:block;margin-top:8px;font-weight:600;}
+@media(max-width:700px){
+ .content-calendar .hc-trek-weather-roll-panel .field-grid,
+ .content-calendar .hc-trek-global-weather .hmk-trek-grid{grid-template-columns:minmax(0,1fr);}
+}
