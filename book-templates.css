@@ -6594,3 +6594,53 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
     flex:1 1 105px!important;font-size:10px!important;
   }
 }
+
+/* v93.611 · Scoped book-interface fixes. Medical evidence remains immutable. */
+.hc-medical-roll-result.hc-medical-roll--improved{background:rgba(189,220,164,.40);border-left:4px solid #427b44;color:#2c492d}
+.hc-medical-roll-result.hc-medical-roll--worsened{background:rgba(236,175,161,.37);border-left:4px solid #ad4539;color:#652820}
+.hc-medical-roll-result.hc-medical-roll--unchanged{background:rgba(220,206,178,.38);border-left:4px solid #9c855d;color:#483b30}
+.hc-malnutrition-results :is(th,td):nth-child(2){text-align:center!important;font-variant-numeric:tabular-nums}
+.hc-medical-roll-result [data-hmk-help],.hc-malnutrition-prognosis [data-hmk-help],.hc-party-health [data-hmk-help],.hc-person-health [data-hmk-help]{cursor:help;text-decoration:underline dotted rgba(90,67,38,.50);text-underline-offset:3px}
+.content-calendar .hc-person-health form .hc-person-health-roll-actions,
+.journal-book .hc-person-health form .hc-person-health-roll-actions{display:flex!important;align-items:flex-end!important;flex-wrap:wrap!important;gap:8px 10px!important;min-width:0!important;width:100%!important}
+.hc-person-health-roll-actions>label{flex:0 1 170px;min-width:110px;display:grid;gap:3px;margin:0}
+.hc-person-health-roll-actions>label input{width:100%;box-sizing:border-box}
+.hc-person-health-roll-actions>button{flex:0 0 auto;align-self:flex-end;min-height:36px!important;margin:0!important;white-space:normal!important;max-width:100%}
+@media(max-width:480px){.hc-person-health-roll-actions>button[type=submit]{flex:1 1 175px}}
+/* The book's spine/metallic ornament must not obscure the five mode tabs.
+   Position the tabs OVER the upper dark leather bar, and keep each button
+   legible/accessible even over the centre seam. */
+.content-sheet .journal-book--skills .journal-book-spread.folio-chapter-spread{overflow:visible!important;isolation:isolate}
+.content-sheet .journal-book--skills .journal-book-spread::before,
+.content-sheet .journal-book--skills .journal-book-spread::after{z-index:2!important;pointer-events:none!important}
+.content-sheet .journal-book--skills .hsk-top-tabs-610{
+ z-index:90!important;isolation:isolate!important;position:relative!important;
+ margin-top:-33px!important;margin-bottom:14px!important;
+ padding:4px 14px!important;
+ max-width:calc(100% - 32px)!important;
+ filter:drop-shadow(0 2px 2px rgba(29,17,10,.34));
+}
+.content-sheet .journal-book--skills .hsk-top-tabs-610>button{position:relative!important;z-index:91!important}
+.content-sheet .journal-book--skills .folio-chapter-page{z-index:1!important}
+.content-sheet .journal-book--skills .hsk-opposition-toggle{display:flex!important;align-items:center!important;gap:10px!important;font-weight:800!important;font-size:clamp(16px,1.45vw,20px)!important;line-height:1.35!important;letter-spacing:.005em!important}
+.content-sheet .journal-book--skills .hsk-opposition-toggle span{flex:1 1 auto;min-width:0;font:800 clamp(16px,1.45vw,20px)/1.35 Georgia,serif!important;color:#3a291b!important}
+.content-sheet .journal-book--skills .hsk-opposition-toggle input[type=checkbox]{flex:0 0 19px!important;width:19px!important;height:19px!important;margin:0!important}
+/* Cloud form: prevent the generic full-width input style from stretching
+   the checkbox across the whole folio and squeezing its label. */
+.content-sheet .journal-book--backup .hmk-cloud-panel .field-grid .hmk-cloud-remember,
+.hmk-cloud-panel .field-grid .hmk-cloud-remember{display:flex!important;flex-direction:row!important;align-items:flex-start!important;gap:10px!important;grid-column:1/-1!important;width:100%!important;min-width:0!important;white-space:normal!important;line-height:1.45!important}
+.content-sheet .journal-book--backup .hmk-cloud-panel .hmk-cloud-remember input[type=checkbox],
+.hmk-cloud-panel .hmk-cloud-remember input[type=checkbox]{display:block!important;box-sizing:border-box!important;flex:0 0 18px!important;width:18px!important;min-width:18px!important;max-width:18px!important;height:18px!important;min-height:18px!important;max-height:18px!important;padding:0!important;margin:3px 0 0!important;position:static!important}
+.hmk-cloud-panel .hmk-cloud-remember span{display:block!important;flex:1 1 auto!important;min-width:0!important;overflow-wrap:normal!important;word-break:normal!important;white-space:normal!important}
+@media(max-width:800px){.content-sheet .journal-book--skills .hsk-top-tabs-610{margin-top:-23px!important;max-width:calc(100% - 12px)!important;padding:4px 3px!important}}
+@media(max-width:550px){.content-sheet .journal-book--skills .hsk-top-tabs-610{margin-top:-13px!important;max-width:100%!important}}
+
+/* v93.611 · Tabs must be on top of the frame leather and top metal rail,
+   not merely above the folio pages (the frame has its own stacking layers). */
+.content-sheet .journal-book--skills .journal-book-frame{overflow:visible!important}
+.content-sheet .journal-book--skills .journal-book-frame::after{z-index:1!important;pointer-events:none!important}
+.content-sheet .journal-book--skills .journal-book-frame>.hmk-book-decor{pointer-events:none!important}
+.content-sheet .journal-book--skills .journal-book-frame>.journal-book-spread{position:relative!important;z-index:50!important}
+
+/* Closed episodes use neutral wrappers; the inner roll alone bears outcome color. */
+.hc-medical-history-item{margin:8px 0;padding:5px 7px;border:1px solid rgba(118,91,56,.27);background:transparent;border-radius:4px;min-width:0}
