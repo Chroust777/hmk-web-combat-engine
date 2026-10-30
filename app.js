@@ -168,6 +168,7 @@ import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekMovement,trekWat
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
 import {TREK_WEATHER_VOID_FORMAT,activeAreaWeather,activeWeatherAreas,canVoidWeather,validateWeatherLifecycle,assertWeatherVoidAppendOnly,weatherAreaKey} from './src/integration/hmk-trekking-weather-lifecycle.js';
 import {WEATHER_SHIFT_FORMAT,latestWeatherShift,createWeatherShift,validateWeatherShifts,assertWeatherShiftAppendOnly} from './src/integration/hmk-trekking-weather-shift.js';
+import {runningTravelForWeatherChange,splitRunningTravelOnWeatherChange} from './src/integration/hmk-trekking-weather-travel-split.js';
 import {TREK_DAY_PLAN_FORMAT,validateTrekDayPlan,latestTrekDayPlan,previousTrekContext,trekDailyWatchSlots,trekDayWeatherSummary,validateTrekDayHistory,assertTrekDayAppendOnly,latestTrekDayPlanRecord,cancelledTrekWatchIntents,effectiveTrekWatchIntents,reactivatedTrekWatchConfiguration,validateTrekWatchCancelRecord,TREK_WATCH_CANCEL_FORMAT,validateTrekWatchReactivateRecord,TREK_WATCH_REACTIVATE_FORMAT} from './src/integration/hmk-trekking-day-planner.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
 import {certifyTrekkingWeatherRoll,weatherRollEvidence} from './src/integration/hmk-trekking-weather-roll.js';
@@ -293,7 +294,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.622';
+const APP_VERSION='93.623';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1513,7 +1514,7 @@ function trekDailyWeatherFormHTML(clock){
  <output role="status" aria-live="polite"></output></form>
  <h4>Potvrzené oblasti · do konce dne zbývá ${hours} h ${mins} min</h4>
  ${rows.map(j=>{const w=j.calendarTrekDayWeather,allowed=canVoidWeather(data.journal,j.id,id,clock.minute);
-  return `<div class="hc-trek-weather-record"><strong>${esc(w.area)}</strong> · ${esc(displayCampaignMinute(j.campaignMinute))} · platí do ${esc(displayCampaignMinute(end))} (zbývá ${hours} h ${mins} min).<p>${trekWeatherDetailsHTML(w.weatherDay)}</p><p class="hc-hint">Teplota d10 (${w.weatherDay.temperatureD10}), srážky d10 (${w.weatherDay.precipitationD10}); klima ${esc(w.climate)}, krajina ${esc(w.landscape)}.</p>${(()=>{const shift=latestWeatherShift(data.journal,id,clock.minute,w.area);return shift?`<p><strong>Aktuálně od ${esc(displayCampaignMinute(shift.campaignMinute))} platí změna GM:</strong> ${trekWeatherDetailsHTML(shift.calendarTrekWeatherShift.weatherDay)} · do konce dne nebo další potvrzené změny.</p>`:'';})()}${allowed.ok?`<button type="button" class="hc-small secondary" data-trek-weather-void="${esc(j.id)}">Zrušit počasí oblasti</button>`:`<p class="hc-hint">Změna uzamčena: ${esc(allowed.reason)}</p>`}</div>`;}).join('')||'<p class="hc-hint">Pro dnešní den zatím není potvrzené žádné počasí. Potvrzení proběhne pouze tlačítkem výše.</p>'}
+  return `<div class="hc-trek-weather-record"><strong>${esc(w.area)}</strong> · ${esc(displayCampaignMinute(j.campaignMinute))} · platí do ${esc(displayCampaignMinute(end))} (zbývá ${hours} h ${mins} min).<p>${trekWeatherDetailsHTML(w.weatherDay)}</p><p class="hc-hint">Teplota d10 (${w.weatherDay.temperatureD10}), srážky d10 (${w.weatherDay.precipitationD10}); klima ${esc(w.climate)}, krajina ${esc(w.landscape)}.</p>${(()=>{const shift=latestWeatherShift(data.journal,id,clock.minute,w.area);return shift?`<p><strong>Aktuálně od ${esc(displayCampaignMinute(shift.campaignMinute))} platí změna GM:</strong> ${trekWeatherDetailsHTML(shift.calendarTrekWeatherShift.weatherDay)} · do konce dne nebo další potvrzené změny.</p>${shift.campaignMinute===clock.minute&&data.journal.some(stop=>stop.calendarCampaignId===id&&stop.campaignMinute===clock.minute&&stop.calendarActivityInterruptProof?.reason?.includes('GM změnil počasí v oblasti '+w.area))?'<button type="button" class="hc-small" data-weather-shift-go-travel>Pokračovat ve zbývajícím úseku ↗</button>':''}`:'';})()}${allowed.ok?`<button type="button" class="hc-small secondary" data-trek-weather-void="${esc(j.id)}">Zrušit počasí oblasti</button>`:`<p class="hc-hint">Změna uzamčena: ${esc(allowed.reason)}</p>`}</div>`;}).join('')||'<p class="hc-hint">Pro dnešní den zatím není potvrzené žádné počasí. Potvrzení proběhne pouze tlačítkem výše.</p>'}
  ${rows.length?`<details class="hc-trek-gm-weather-change"><summary>GM · změnit počasí v průběhu dne (od aktuální minuty)</summary>
  <p class="hc-hint">Volitelné rozhodnutí GM mimo standardní denní tabulku HMK 144. Základní denní hody i již proběhlé účinky zůstávají v historii. Nové podmínky platí od nynějška pro oblast až do konce dne nebo další potvrzené změny, i když družina zrovna necestuje.</p>
  <form data-trek-global-shift><div class="hmk-trek-grid"><label>Potvrzená oblast<select name="sourceId">${rows.map(j=>`<option value="${esc(j.id)}">${esc(j.calendarTrekDayWeather.area)}</option>`).join('')}</select></label>
@@ -1644,6 +1645,8 @@ function trekDayPlannerHTML(clock,participants){
  const select=(name,options,fallback)=>`<select name="${name}">${options.map(([value,title])=>`<option value="${esc(value)}" ${String(seed[name]??fallback)===value?'selected':''}>${esc(title)}</option>`).join('')}</select>`;
  const slots=trekDailyWatchSlots(data.journal,campaignId,dayIndex,clock.minute);
  const runningActivities=activeHMKActivities(data.journal,clock);
+ const weatherSplitNow=data.journal.filter(j=>j.calendarCampaignId===campaignId&&
+  j.campaignMinute===clock.minute&&j.calendarActivityInterruptProof?.reason?.startsWith('GM změnil počasí v oblasti '));
  const slotHasActivity=index=>runningActivities.some(row=>{const a=row.calendarActivityProof;return a&&a.startMinute<(first+(index+1)*240)&&a.endMinute>(first+index*240);});
  const weather=trekDayWeatherSummary(data.journal,campaignId,dayIndex);
  const hr=minute=>`${String(Math.floor((minute-first)/60)).padStart(2,'0')}:00`;
@@ -1703,6 +1706,7 @@ function trekDayPlannerHTML(clock,participants){
  return `<section class="hc-trek-day-planner" data-trek-day-planner>
  <div class="hc-trek-day-title"><div><h3>Den cestování · 24 hodin</h3><p>Den ${dayIndex+1} · ${esc(formatTRDate(campaignTRDate(clock,clock.minute)))} · GM ${esc(displayCampaignMinute(clock.minute))}</p></div><span class="hc-trek-day-chip">HMK 141–150 · den / hlídky</span></div>
  <p class="hc-hint">Nejdříve potvrďte společné údaje dne. Budoucí naplánované hlídky lze zrušit bez zdůvodnění a obnovit až po vyplnění nových údajů; žádný skutečně provedený následek se tím neruší. Každá ze šesti čtyřhodinových hlídek má vlastní skutečné hody a následky. Nevyplněný plán ani neplánovaná hlídka neblokují čas. Zápis vzniká <strong>pouze potvrzením</strong>.</p>
+ ${weatherSplitNow.length?`<div class="hc-trek-auto-split-note" role="status"><strong>Počasí změněno · běžící cesta rozdělena v ${esc(displayCampaignMinute(clock.minute))}</strong><p>Skutečný absolvovaný úsek (${weatherSplitNow.length} účastníků) má doloženou dílčí vzdálenost a Fatigue. Pro zbývajících ${240-clock.minute%240} minut připravte nový úsek s převzatými údaji a nyní platným počasím. Nové požadované hody / Survival se vyhodnocují teprve po potvrzení.</p></div>`:''}
  <div class="hc-trek-quick-links"><button type="button" class="secondary hc-small" data-trek-open-current>Otevřít aktuální hlídku ↓</button></div>
  ${trekDayGuideHTML()}
  <datalist id="hmk-confirmed-weather-areas">${confirmedWeatherAreaOptions(clock)}</datalist>
@@ -1816,7 +1820,7 @@ function campaignCalendarView(){
  <label class="hc-check"><input name="weatherShift" type="checkbox" value="yes"> <span class="hc-help-term" tabindex="0" data-hmk-help="HMK 144 stanovuje základní počasí na den. GM může rozhodnout o změně od skutečné herní minuty; nové dva d10 jsou volitelnou odchylkou GM. Starší doklady a hody se nemění; navazující hlídky v této oblasti používají nový stav do konce dne nebo další změny.">GM mění počasí nyní pro tuto oblast (od aktuální minuty dále)</span></label>
  <div class="hmk-trek-grid"><div class="hc-trek-shift-control"><label>Nová teplota · d10<input name="trekWeatherShiftTemperature" type="number" min="1" max="10" placeholder="1–10"></label><button class="hc-small hc-trek-generate" type="button" data-trek-shift-die="trekWeatherShiftTemperature">⚄ d10</button></div>
  <div class="hc-trek-shift-control"><label>Nové srážky · d10<input name="trekWeatherShiftPrecipitation" type="number" min="1" max="10" placeholder="1–10"></label><button class="hc-small hc-trek-generate" type="button" data-trek-shift-die="trekWeatherShiftPrecipitation">⚄ d10</button></div></div>
- <p class="hc-hint">Změna není pravidlový automatický meteorologický hod HMK, ale rozhodnutí GM. Vyžaduje existující denní počasí; ovlivní pouze nově potvrzené cestovní úseky od této chvíle. Při probíhající cestě nejprve potvrďte přerušení v aktuální minutě. Nový doklad změny vznikne až s potvrzením hlídky.</p>
+ <p class="hc-hint">Volitelná změna GM mimo standardní denní hody HMK 144. Při potvrzení se probíhající cesta ve stejné oblasti <strong>automaticky rozdělí v aktuální herní minutě</strong>: uplynulé minuty se uzavřou s poměrnou únavou a vzdáleností, zbývající úsek se připraví podle nového počasí. Nový Survival, END a případné hazardní hody se nevymýšlejí a vyžadují zvláštní doložení. Pouhé zaškrtnutí nic neukládá.</p>
  </fieldset><fieldset class="hmk-trek-section"><legend>3 · Pohybové režimy</legend><div class="hmk-trek-grid"><label>Progress Modes<input name="progress" type="number" min="0" max="10" value="0"></label>
  <label>Další Slow Modes<input name="slow" type="number" min="0" max="20" value="0"></label>
  <label>Vlastní Bearing Modes<input name="bearing" type="number" min="0" max="20" value="0"></label>
@@ -11877,13 +11881,14 @@ document.addEventListener('submit',e=>{
  try{
   const {actor,clock,campaignId,proof,summary,pendingWeatherShift,weatherShiftId}=buildTrekWatchEvidence(form);
   // Only a real click on Confirm creates the immutable historical evidence.
-  if(mutate(()=>{if(pendingWeatherShift)data.journal.push({id:weatherShiftId,characterId:actor.id,calendarCampaignId:campaignId,
+  const affected=pendingWeatherShift?runningTravelForWeatherChange(data,proof.area).length:0;
+  if(mutate(()=>{if(pendingWeatherShift){splitRunningTravelOnWeatherChange(data,{area:proof.area,idFactory:uuid,stamp});data.journal.push({id:weatherShiftId,characterId:actor.id,calendarCampaignId:campaignId,
     campaignMinute:clock.minute,createdAt:stamp(),title:'HMK · změna počasí GM · '+proof.area,
     body:'Nová dvojice d10 platí od této minuty do konce dne nebo další změny. Původní denní doklad zůstává zachován.',
-    calendarTrekWeatherShift:pendingWeatherShift});
+    calendarTrekWeatherShift:pendingWeatherShift});}
    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignId,
    campaignMinute:clock.minute,createdAt:stamp(),title:'HMK Trekking Routine · počasí / pohyb / setkání',
-   body:summary,calendarTrekProof:proof});}))notice='Doložené podklady Trekking byly zapsány. Nejdříve doložte Orienteering Survival SV v kalendáři: bez jeho modifikátorů zatím nelze potvrdit oprávněnost zvolených Advantage Modes. Následky se otevírají v původních testech.';
+   body:summary,calendarTrekProof:proof});}))notice=(affected?'Při změně počasí byla běžící cesta '+affected+' účastníků automaticky ukončena v aktuální minutě a dílčí únava byla zapsána. ':'')+'Doložené nové podklady Trekking byly zapsány. Nyní doložte Orienteering Survival SV a skutečné END SR pro navazující cestu; čas se neposunul.';
  }catch(error){const message=trekUserFriendlyError(error?.message);trekGuideInvalid(form,trekGuideFieldFromMessage(message,form),'Trekking Routine nebyla uložena: '+message)}
 },true);
 document.addEventListener('click',e=>{
@@ -14034,6 +14039,12 @@ document.addEventListener('submit',e=>{
   if(mutate(()=>data.journal.push(row)))notice='Encounter uzavřen rozhodnutím GM. Povinný termín byl vyřízen; čas se sám neposunul.';
  }catch(err){alert('Setkání nebylo uzavřeno: '+(err.message||err));}
 },true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-weather-shift-go-travel]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ view='calendar';calendarLanding=false;activeCalendarSection='travel';render();
+ const target=document.getElementById('hmk-current-trek-watch');if(target){target.open=true;target.scrollIntoView({block:'start',behavior:'smooth'});} 
+},true);
 document.addEventListener('submit',e=>{
  const f=e.target;if(!f?.matches?.('[data-trek-global-shift]'))return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -14049,13 +14060,15 @@ document.addEventListener('submit',e=>{
   const change=createWeatherShift({journal:data.journal,campaignId:cid,minute:clock.minute,
    area:baseline.area,season:baseline.season,climate:baseline.climate,landscape:baseline.landscape,
    alpine:baseline.alpine,aridDesert:baseline.aridDesert,temperatureD10:Number(t.value),precipitationD10:Number(r.value),diceOrigins:origins});
-  if(!window.confirm('GM potvrzuje změnu počasí oblasti '+baseline.area+' od '+displayCampaignMinute(clock.minute)+'? Již odehrané úseky zůstanou beze změny.'))return;
+  const running=runningTravelForWeatherChange(data,baseline.area);
+  if(!window.confirm('GM potvrzuje změnu počasí '+baseline.area+' od '+displayCampaignMinute(clock.minute)+'? '+(running.length?'Probíhající cesta ('+running.length+' účastníků) se automaticky rozdělí: absolvovaný úsek se nyní vyúčtuje, zbývající čas bude vyžadovat nové doložené podklady.':'Původní doklady zůstanou nedotčené.') ))return;
   const row={id:uuid(),characterId:source.characterId,calendarCampaignId:cid,campaignMinute:clock.minute,
    createdAt:stamp(),title:'HMK · počasí změněno GM · '+baseline.area,
    body:'GM potvrdil nové podmínky od aktuální minuty; dvě skutečné d10. Do konce dne nebo další změny.',
    calendarTrekWeatherShift:change};
-  if(!mutate(()=>data.journal.push(row)))throw Error('Změna nebyla uložena.');
-  notice='Nové počasí platí od této minuty pro navazující hlídky. Starší doklady zůstaly beze změny.';
+  const activeTravel=runningTravelForWeatherChange(data,baseline.area);
+  if(!mutate(()=>{splitRunningTravelOnWeatherChange(data,{area:baseline.area,idFactory:uuid,stamp});data.journal.push(row);}))throw Error('Změna nebyla uložena.');
+  notice='Počasí oblasti '+baseline.area+' platí od '+displayCampaignMinute(clock.minute)+'. '+(activeTravel.length?'Probíhající cesta '+activeTravel.length+' účastníků se v této minutě automaticky rozdělila a dílčí Fatigue byla vyúčtována. Dále vyhodnoťte zbývající úsek v Cestování a hlídkách; původní hody zůstávají zachované.':'Žádná probíhající cesta v této oblasti nevyžadovala rozdělení.');
  }catch(err){if(out){out.textContent=err.message;out.style.color='#922b22';}else alert(err.message);}
 },true);
 document.addEventListener('submit',e=>{
