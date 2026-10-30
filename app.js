@@ -225,6 +225,7 @@ import {malnutritionPrognosis,malnutritionStateLabel} from './src/integration/hm
 import {nutritionAnimals,createAnimalAccess,animalLoadedItemAt,validateNutritionAnimalAccess,assertNutritionAnimalAppendOnly} from './src/integration/hmk-nutrition-animal-access.js';
 import {needsAssistedIntake,assistedIntakeForDay,createAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAppendOnly} from './src/integration/hmk-nutrition-assisted-intake.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
+import {trekkingDayLedger,trekkingLedgerDays} from './src/integration/hmk-trekking-day-ledger.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js';
@@ -295,7 +296,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.625';
+const APP_VERSION='93.626';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1734,6 +1735,75 @@ function trekDayPlannerHTML(clock,participants){
  <p class="hc-hint">Rozvrh je navigační přehled, nikoli šest automatických cest. Můžete spát, odpočívat či vykonávat jinou činnost; konkrétní hlídku potvrzujete teprve ve skutečném čase GM.</p>
  </section>`;
 }
+/** Read-only manuscript projection; every line is linked to existing original
+ * calendar evidence. Does not award Fatigue, roll, heal or change time. */
+const TREK_ACCOUNT_HELP_626={
+ 'SV':'Success Value: úroveň úspěchu po skutečném Skill Testu; teprve z ní se odvozují dostupné výhody.',
+ 'END':'Endurance: výdrž postavy. Cestující má svůj vlastní Secondary Roll; jeho únavu nelze převzít od průvodce.',
+ 'Weariness':'Dlouhodobá únava v původním Combat State. Výpis pouze ukazuje již zapsanou změnu.',
+ 'LPW':'Leagues per Watch: počet league za běžnou čtyřhodinovou cestovní hlídku; nejedná se o skutečnou vzdálenost, dokud není cesta dokončena.',
+ '★':'Hvězdička: výsledek příslušné HMK procedury (např. výhody Orienteering nebo Spoor Stars); není to další hod.',
+ 'Bearing':'Výhoda použitá k udržení směru; její nedostatek může vyvolat Direction Hazard.',
+ 'Progress':'Výhoda použita na rychlejší postup; případné samostatné d10 se provádí jen když zbývá po Slow.',
+ 'Foraging':'Shánění potravy, vody a bylin během hlídky. Zdroje se čerpají z jednoho původního dokladu, ne z tohoto přehledu.',
+ 'Weather Hazard':'Individuální hod při skutečné expozici chladu/horku. Následky se zobrazují z původních zdravotních důkazů.',
+ 'Encounter':'Náhodné setkání za hlídku. Neznamená automaticky boj a lze jej doloženě uzavřít jako bez následků.',
+ 'd6':'Šestistěnná kostka. Zápis (d6: 5) znamená skutečně doložený hod pět.',
+ 'd10':'Desetistěnná kostka. Zápis (d10: 7) znamená již doložený skutečný hod sedm.',
+ 'd100':'Stostěnná kostka použitá při Skill Testech; zobrazený hod je převzat ze skutečného dokladu.'
+};
+function trekAccountHelp626(label){return `tabindex="0" data-hmk-help="${esc(TREK_ACCOUNT_HELP_626[label]||label)}" title="${esc(TREK_ACCOUNT_HELP_626[label]||label)}"`;}
+function trekAccountTime626(minute){return `${String(Math.floor(minute%1440/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`;}
+function trekAccountEvent626(e){
+ const rolls=e.rolls?.length?` <span class="hc-trek-account-dice">${e.rolls.map(r=>{const die=r.match(/^\(d(\d+):/),help=die?` ${trekAccountHelp626('d'+die[1])}`:'';return `<span${help}>${esc(r)}</span>`;}).join(' · ')}</span>`:'';
+ const stars=Number.isFinite(e.stars)?` <span class="hc-trek-account-stars" ${trekAccountHelp626('★')}>${e.stars} ${e.stars<=12?'★'.repeat(Math.max(0,e.stars)):'★'}</span>`:'';
+ const role=e.role?`<span class="hc-trek-account-role">${esc(e.role)}</span>`:'';
+ return `<li class="hc-trek-account-event hc-trek-account-event--${esc(e.type)}">${role}<p>${esc(e.text)}${rolls}${stars}</p>${e.status?`<small>${esc(e.status)}</small>`:''}${e.proofId?`<small class="hc-trek-account-source" title="Původní neměnný doklad v GM historii">Doklad ${esc(e.proofId.slice(0,9))} · <button type="button" class="hc-trek-account-link" data-nav="gmhistory" title="Zobrazit původní GM historii">Otevřít historii</button></small>`:''}</li>`;
+}
+function trekDayAccountHTML626(clock,{personalId=null,limitDays=6}={}){
+ if(!clock)return '';
+ const cid=campaignKey(clock);
+ const relevant=trekkingLedgerDays({journal:data.journal,campaignId:cid,now:clock.minute,maxDays:limitDays});
+ const actor=personalId?character(personalId):null;
+ const days=relevant.map(day=>trekkingDayLedger({journal:data.journal,characters:data.characters,campaignId:cid,dayIndex:day}));
+ const currentDay=Math.floor(clock.minute/1440);
+ const pages=days.map((ledger,index)=>{
+  const participant=personalId?ledger.people.find(p=>p.id===personalId):null;
+  if(personalId&&!participant)return '';
+  const watchCards=ledger.watches.map(w=>{
+   const attended=personalId?w.sources.some(s=>s.members.some(x=>x.id===personalId)||s.animals.some(x=>x.id===personalId)):true;
+   const personalEvents=personalId?w.events.filter(e=>e.actorId===personalId||attended&&e.actorId===null):w.events;
+   if(personalId&&!attended&&!personalEvents.length)return '';
+   const km=w.distances.reduce((sum,e)=>sum+e.km,0);
+   const headline=w.sources.map(s=>`${s.area} · ${s.guide}`).join(' / ');
+   return `<details class="hc-trek-account-watch" ${w.index===Math.floor(clock.minute%1440/240)&&ledger.dayIndex===currentDay?'open':''}>
+    <summary><strong>${trekAccountTime626(w.startMinute)}–${trekAccountTime626(w.endMinute)}</strong>
+    <span>${esc(headline||'Bez cestovního podkladu')}</span>
+    <small>${w.distances.length?`${Math.round(km*1000)/1000} km doloženo`:(w.sources.length?'pouze příprava':'bez cestovní vzdálenosti')}</small></summary>
+    <div class="hc-trek-account-watch-body">
+    ${w.sources.map(s=>`<div class="hc-trek-account-context"><b>${esc(s.area)}</b> · průvodce ${esc(s.guide)} · ${esc(s.terrain||'terén nedoložen')} · ${esc(s.precipitation||'srážky nedoloženy')}${s.continuous?' (nepřetržité)':''}<p>Účastníci: ${esc(s.members.map(x=>x.name).join(', ')||'nikdo')}${s.animals.length?' · zvířata: '+esc(s.animals.map(x=>x.name).join(', ')):''}</p>${s.weatherConfirmed?`<p>Teplotní hazard: den ${esc(s.dayTemperature||'bez hazardu')}, noc ${esc(s.nightTemperature||'bez hazardu')}</p>`:''}</div>`).join('')}
+    ${personalEvents.length?`<ol class="hc-trek-account-events">${personalEvents.map(trekAccountEvent626).join('')}</ol>`:'<p class="hc-hint">Dosud žádné doložené výsledky pro tento úsek. Plán ještě není skutečně absolvovaná cesta.</p>'}
+    </div></details>`;
+  }).join('');
+  const people=personalId?[participant].filter(Boolean):ledger.people;
+  const peopleRows=people.map(p=>{const f=p.fatigue,has=f.count>0;return `<tr><td>${esc(p.name)}${p.kind==='Animal'?' · zvíře':''}</td><td>${p.watches.length?esc(p.watches.map(n=>`${String(n*4).padStart(2,'0')}:00`).join(', ')):'—'}</td><td>${has?`${f.delta>=0?'+':''}${f.delta}`:'—'}</td><td>${has&&f.first!==null?`${f.first} → ${f.last}`:'—'}</td><td>${p.events.filter(e=>e.type==='skill').length}</td></tr>`;}).join('');
+  return `<details class="hc-trek-account-day" ${ledger.dayIndex===currentDay||index===0?'open':''}>
+   <summary>Den ${ledger.dayIndex+1} · ${ledger.completedWatches}/6 s doloženým cestováním · ${ledger.km} km ${personalId?'· osobní výpis':''}</summary>
+   <div class="hc-trek-account-day-body"><p class="hc-hint">Připravené hlídky nezvyšují únavu ani vzdálenost. Vzdálenost je společná za družinu; změna ${'<span '+trekAccountHelp626('Weariness')+'>Weariness</span>'} za cestování a odpočinek se ukazuje zvlášť u každého účastníka. Další zdravotní přírůstky (např. Weather Hazard) jsou uvedené ve svých událostech a nejsou zahrnuté do této dílčí sumy.</p>
+   <div class="hc-trek-account-watches">${watchCards||'<p>Postava v tomto dni nemá cestovní podklady.</p>'}</div>
+   ${peopleRows?`<div class="hc-trek-account-table-scroll"><table class="hc-trek-account-table"><thead><tr><th>Účastník</th><th>Začátek hlídek</th><th ${trekAccountHelp626('Weariness')}>Δ při cestě / odpočinku</th><th>Stav před → po</th><th>Skill Tests</th></tr></thead><tbody>${peopleRows}</tbody></table></div>`:''}
+   ${!personalId&&people.length?`<details class="hc-trek-account-people"><summary>Osobní záznamy účastníků a zvířat (${people.length})</summary><div class="hc-trek-account-people-grid">${people.map(p=>`<details class="hc-trek-account-person"><summary>${esc(p.name)}${p.kind==='Animal'?' · zvíře':''} · ${p.events.length} doložených událostí</summary>${p.events.length?`<ol class="hc-trek-account-events">${p.events.map(e=>`<li><strong>${String(e.index*4).padStart(2,'0')}:00</strong> · ${esc(e.text)}${e.rolls?.length?' '+e.rolls.map(esc).join(' · '):''}${Number.isFinite(e.stars)?` · ${e.stars} ★`:''}</li>`).join('')}</ol>`:'<p>Dosud bez individuálních výsledků.</p>'}</details>`).join('')}</div></details>`:''}
+   <p class="hc-hint">Zdroj: původní Trekking Routine, dokončené činnosti, Skill Tests a související doklady. Souhrn nic nezapisuje a nenahrazuje inventář, zdravotní stav ani rozhodnutí GM.</p>
+   </div></details>`;
+ }).filter(Boolean).join('');
+ return `<section class="hc-calendar hc-trek-account" data-trek-account="${personalId?'character':'campaign'}">
+ <details ${personalId?'open':'open'}><summary><strong>${personalId?'Cestování · osobní účet '+esc(actor?.name||'postavy'):'Denní účet cestování · šest hlídek'}</strong></summary>
+ <div class="hc-trek-account-intro"><p>${personalId?'Zde jsou cestovní události týkající se této postavy či zvířete. Společné události družiny se zobrazují jako kontext, osobní Weariness je vlastní doložený výsledek.':'Časová kronika pro GM: šest čtyřhodinových hlídek, průvodce, skutečné hody, ★ výsledky, vzdálenost a osobní následky. Čtením se nic nepotvrzuje.'}</p>
+ <p><span ${trekAccountHelp626('SV')}>SV</span> · <span ${trekAccountHelp626('END')}>END</span> · <span ${trekAccountHelp626('LPW')}>LPW</span> · <span ${trekAccountHelp626('Bearing')}>Bearing</span> · <span ${trekAccountHelp626('Progress')}>Progress</span> · <span ${trekAccountHelp626('Foraging')}>Foraging</span> · <span ${trekAccountHelp626('Encounter')}>Encounter</span> · <span ${trekAccountHelp626('Weather Hazard')}>Weather Hazard</span> · <span ${trekAccountHelp626('★')}>★</span>. Klepnutím nebo najetím zobrazíte vysvětlení.</p></div>
+ ${pages||'<p class="hc-hint">Zatím není doložen žádný cestovní výsledek této postavy. Plány nejsou výsledky.</p>'}
+ </details></section>`;
+}
+
 function campaignCalendarView(){
  const clocks=allCampaignClocks(data);
  if(calendarLanding&&clocks.length){
@@ -2385,7 +2455,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  })();
  const overviewHTML=`${board}${timedSkillPending590}${bestiaryCalendarDuePanel567(clock)}${unknownFallNotice}${suspendedHealingHTML}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?`${trekDailyWeatherFormHTML(clock)}${overviewHTML}`:
-  activeCalendarSection==='travel'?`${trekDayPlannerHTML(clock,participants)}${trekDailyWeatherFormHTML(clock)}${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${animalWeatherHTML}${animalRestHTML}${interruptionsHTML}`:
+  activeCalendarSection==='travel'?`${trekDayAccountHTML626(clock)}${trekDayPlannerHTML(clock,participants)}${trekDailyWeatherFormHTML(clock)}${trekPanel}${repairPanel}${wildernessHTML}${expeditionHTML}${animalWeatherHTML}${animalRestHTML}${interruptionsHTML}`:
   activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionWizardHTML(participants,clock,{supplyHTML,nutritionHTML,activityNeedsHTML})}`:`${provisionGuideHTML(participants)}${personalProvisionRulebookHTML(participants.find(c=>c.id===provisionGuideActorId)||participants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
   activeCalendarSection==='craft'?`${herbalHTML}${alchemyHTML}`:
   `${membersHTML}${legacyOriginPanel}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
@@ -4403,7 +4473,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  const recent=journalCategorySections(visible,rows=>rows.map(renderLog).join(''),{limit:15});
  const archived='';
  const hiddenRecords=removed.length?`<details class="journal-log-archive journal-hidden-records"><summary>Skryté položky · ${removed.length} (obnovitelné)</summary>${removed.map(l=>`<div class="list-row"><span>${esc(l.title)}</span><button class="secondary" type="button" data-restore-log="${esc(l.id)}">Vrátit do logu</button></div>`).join('')}</details>`:'';
- return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><button type="button" class="secondary" data-nav="gmhistory">▤ Společná historie GM ↗</button><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${recent}${archived}${hiddenRecords}</section>${auditPanel}</div></section>`,`journal-book--chapter`)}
+ return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Osobní zápisník a auditní stopy navázané na character sheet.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Osobní zápisník</h3><button type="button" class="secondary" data-nav="gmhistory">▤ Společná historie GM ↗</button><form id="journal-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form>${trekDayAccountHTML626(data.campaignClock,{personalId:c.id,limitDays:12})}${recent}${archived}${hiddenRecords}</section>${auditPanel}</div></section>`,`journal-book--chapter`)}
  return '';
 }
 function sheetView(){

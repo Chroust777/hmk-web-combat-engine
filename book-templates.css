@@ -6820,3 +6820,43 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 /* v93.623: acknowledged automatic midwatch weather split, no modal blocking. */
 .hc-trek-auto-split-note{border:1px solid #7b966f;border-left:4px solid #607a51;border-radius:6px;background:rgba(118,143,95,.11);padding:.75rem 1rem;margin:.75rem 0;overflow-wrap:anywhere}
 .hc-trek-auto-split-note p{margin:.3rem 0 0;line-height:1.45}
+
+/* v93.626 · read-only six-watch travel account, shared and personal chapters. */
+.hc-trek-account{min-width:0;max-width:100%;color:#382819;overflow-wrap:anywhere;}
+.hc-trek-account>details{border:1px solid rgba(112,79,42,.6);border-radius:6px;background:rgba(243,224,188,.28);padding:12px;min-width:0;}
+.hc-trek-account>details>summary{cursor:pointer;font:700 1.1rem/1.4 Georgia,serif;color:#553820;}
+.hc-trek-account-intro{font:.9rem/1.48 Georgia,serif;max-width:100%;}
+.hc-trek-account-intro [data-hmk-help],.hc-trek-account-day [data-hmk-help]{cursor:help;border-bottom:1px dotted #997447;}
+.hc-trek-account-day{border:1px solid rgba(116,80,38,.42);border-radius:4px;background:rgba(250,235,207,.46);margin:11px 0;min-width:0;}
+.hc-trek-account-day>summary{font:700 .92rem/1.45 Georgia,serif;cursor:pointer;padding:10px 12px;background:rgba(183,139,85,.13);}
+.hc-trek-account-day-body{padding:9px;display:grid;gap:10px;min-width:0;}
+.hc-trek-account-watches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0;}
+.hc-trek-account-watch{border:1px solid rgba(110,75,41,.36);border-radius:4px;min-width:0;background:rgba(255,246,227,.38);}
+.hc-trek-account-watch>summary{display:grid;gap:3px;cursor:pointer;padding:10px;line-height:1.35;min-width:0;}
+.hc-trek-account-watch>summary strong{color:#59361b;font:700 1rem Georgia,serif;}
+.hc-trek-account-watch>summary span{font-size:.86rem;min-width:0;overflow-wrap:anywhere;}
+.hc-trek-account-watch>summary small{font-size:.76rem;font-weight:500;color:#735637;}
+.hc-trek-account-watch-body{border-top:1px solid rgba(116,80,38,.25);padding:10px;min-width:0;}
+.hc-trek-account-context{border-left:3px solid #a78a5a;padding-left:8px;margin:7px 0;font-size:.84rem;line-height:1.48;}
+.hc-trek-account-context p{margin:3px 0;}
+.hc-trek-account-events{list-style:none;margin:9px 0;padding:0;display:grid;gap:7px;}
+.hc-trek-account-event{padding:8px 10px;background:rgba(240,218,184,.38);border-left:2px solid rgba(134,97,60,.55);font:.84rem/1.45 Georgia,serif;min-width:0;}
+.hc-trek-account-event p{margin:3px 0;}
+.hc-trek-account-event small{display:block;color:#674c31;font-size:.75rem;}
+.hc-trek-account-role{font-weight:700;color:#5d3f22;font-size:.74rem;}
+.hc-trek-account-dice{font-weight:700;white-space:normal;color:#493019;}
+.hc-trek-account-stars{font-weight:700;color:#77501b;white-space:normal;}
+.hc-trek-account-link{display:inline!important;padding:0!important;margin:0!important;background:transparent!important;color:#60401f!important;font:inherit!important;text-decoration:underline!important;border:0!important;min-height:0!important;}
+.hc-trek-account-table-scroll{overflow-x:auto;max-width:100%;}
+.hc-trek-account-table{width:100%;border-collapse:collapse;font:.81rem Georgia,serif;}
+.hc-trek-account-table th,.hc-trek-account-table td{border-bottom:1px solid rgba(110,75,41,.27);padding:7px 6px;text-align:left;}
+.hc-trek-account-table th{font-weight:700;color:#573d21;}
+.journal-book .hc-trek-account{width:100%;}
+@media(max-width:1050px){.hc-trek-account-watches{grid-template-columns:1fr;}}
+@media(max-width:540px){.hc-trek-account>details{padding:8px;}.hc-trek-account-day-body{padding:6px;}.hc-trek-account-day>summary{padding:9px;}.hc-trek-account-watch>summary{padding:8px;}.hc-trek-account-table{font-size:.73rem;}.hc-trek-account-table th,.hc-trek-account-table td{padding:5px 3px;}}
+.hc-trek-account-people{padding:10px;border:1px solid rgba(115,83,49,.4);border-radius:4px;min-width:0;}
+.hc-trek-account-people>summary,.hc-trek-account-person>summary{cursor:pointer;font:700 .88rem Georgia,serif;}
+.hc-trek-account-people-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px;}
+.hc-trek-account-person{border:1px solid rgba(115,83,49,.32);padding:8px;min-width:0;}
+.hc-trek-account-person li{font-size:.8rem;line-height:1.4;margin:6px 0;}
+@media(max-width:1050px){.hc-trek-account-people-grid{grid-template-columns:1fr;}}
