@@ -6791,3 +6791,12 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 /* v93.619: keep optional minute-length row hidden for rest/sleep. */
 .content-calendar #campaign-expedition-form [data-expedition-short-duration][hidden]{display:none!important}
 .content-calendar #campaign-expedition-form [data-expedition-short-duration]{min-width:0}
+
+/* v93.620 – Daily climate records are confirmed, readable historic evidence. */
+.content-calendar .hc-trek-global-weather .hc-trek-weather-record{border:1px solid rgba(116,87,52,.4);border-left:4px solid #697b53;border-radius:7px;padding:11px 13px;margin:10px 0;background:rgba(246,234,203,.45);overflow-wrap:anywhere;}
+.content-calendar .hc-trek-global-weather .hc-trek-weather-record p{margin:.4rem 0;line-height:1.5;}
+.content-calendar .hc-trek-global-weather .hc-trek-weather-record button{width:auto;max-width:100%;white-space:normal;}
+.content-calendar form[data-trek-encounter-gm]{margin:12px 0;padding:12px;border:1px solid rgba(109,83,54,.45);border-radius:7px;display:grid;gap:9px;min-width:0;}
+.content-calendar form[data-trek-encounter-gm] label{display:flex;flex-direction:column;gap:4px;min-width:0;}
+.content-calendar form[data-trek-encounter-gm] :is(input,select){max-width:100%;min-width:0;box-sizing:border-box;}
+.content-calendar .hc-trek-not-required input:disabled,.content-calendar .hc-trek-not-required button:disabled{opacity:.55;cursor:not-allowed;}
