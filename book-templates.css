@@ -6644,3 +6644,72 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 
 /* Closed episodes use neutral wrappers; the inner roll alone bears outcome color. */
 .hc-medical-history-item{margin:8px 0;padding:5px 7px;border:1px solid rgba(118,91,56,.27);background:transparent;border-radius:4px;min-width:0}
+
+/* v93.612 – HMK Trekking day / four-hour watches: one authoritative journal */
+.content-calendar .hc-trek-day-planner{border:1px solid #a38156;border-radius:10px;background:rgba(255,243,212,.26);padding:15px;margin:12px 0 20px;min-width:0;box-sizing:border-box;color:#46301d}
+.content-calendar .hc-trek-day-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.content-calendar .hc-trek-day-title h3{font:700 1.24rem/1.3 Georgia,serif;margin:0 0 5px}
+.content-calendar .hc-trek-day-title p{font-size:.88rem;margin:0 0 8px}
+.content-calendar .hc-trek-day-chip{border:1px solid #957047;border-radius:7px;padding:5px 9px;font-size:.76rem;background:rgba(245,224,180,.5)}
+.content-calendar .hc-trek-day-setup{border:1px solid rgba(124,89,49,.45);border-radius:8px;padding:12px;margin:12px 0;background:rgba(255,245,222,.2)}
+.content-calendar .hc-trek-day-setup>summary{font:700 1rem Georgia,serif;cursor:pointer;line-height:1.4;margin-bottom:12px}
+.content-calendar .hc-trek-day-setup .hmk-trek-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 13px}
+.content-calendar .hc-trek-day-setup .hmk-trek-grid label{display:flex;flex-direction:column;gap:6px;min-width:0;font-weight:650;font-size:.85rem}
+.content-calendar .hc-trek-day-setup .hmk-trek-grid :is(input,select){width:100%;min-width:0;box-sizing:border-box;font:inherit;min-height:38px}
+.content-calendar .hc-trek-day-setup fieldset{border:1px solid rgba(123,92,53,.32);margin-top:13px;padding:10px;min-width:0}
+.content-calendar .hc-trek-day-setup .hc-character{min-width:0}
+.content-calendar .hc-trek-day-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-start;margin:14px 0 7px}
+.content-calendar .hc-trek-day-actions button{max-width:100%;white-space:normal}
+.content-calendar .hc-trek-day-actions>span{font-size:.8rem;color:#67523c}
+.content-calendar .hc-trek-day-weather{padding:10px 12px;border:1px solid rgba(130,103,63,.35);border-radius:8px;background:rgba(235,221,192,.25);margin:12px 0}
+.content-calendar .hc-trek-day-weather h4,.content-calendar .hc-trek-day-planner>h4{font:700 .97rem Georgia,serif;margin:7px 0 8px}
+.content-calendar .hc-trek-day-weather p{font-size:.86rem;line-height:1.5;margin:5px 0}
+.content-calendar .hc-trek-watch-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:9px 0}
+.content-calendar .hc-trek-watch-slot{border:1px solid rgba(114,84,44,.42);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:4px;min-width:0;min-height:82px;background:rgba(245,233,208,.29);box-sizing:border-box}
+.content-calendar .hc-trek-watch-slot strong{font:.91rem Georgia,serif;color:#382818}
+.content-calendar .hc-trek-watch-slot span{font-size:.85rem}
+.content-calendar .hc-trek-watch-slot small{font-size:.74rem;overflow-wrap:anywhere;color:#665039}
+.content-calendar .hc-trek-watch-current{border:2px solid #2e5770;background:rgba(120,163,174,.12)}
+.content-calendar .hc-trek-watch-completed{border-left:4px solid #568453}
+.content-calendar .hc-trek-watch-prepared{border-left:4px solid #a47a30}
+.content-calendar .hc-trek-routine .hc-trek-stage-banner{margin:13px 0 7px;padding:11px 13px;border-left:4px solid #284d69;background:rgba(216,207,187,.27)}
+.content-calendar .hc-trek-stage-banner h4{font:700 1rem Georgia,serif;margin:0 0 5px}
+.content-calendar .hc-trek-stage-banner p{margin:0;font-size:.85rem;line-height:1.45}
+.content-calendar .hc-trek-routine .hc-trek-stage-description{font:.85rem/1.5 Georgia,serif;color:#5a442d;margin:3px 0 12px}
+.content-calendar .hc-trek-routine .hc-trek-live-preview{border:1px solid rgba(59,87,96,.42);border-radius:7px;background:rgba(215,228,227,.28);padding:12px;margin:14px 0;font:.86rem/1.6 Georgia,serif;overflow-wrap:anywhere}
+.content-calendar .hc-trek-routine .hc-trek-readiness{border:1px solid rgba(119,93,55,.4);border-radius:8px;padding:12px;margin:12px 0;background:rgba(247,232,197,.34)}
+.content-calendar .hc-trek-routine .hc-trek-readiness>strong{font:700 .96rem Georgia,serif}
+.content-calendar .hc-trek-routine .hc-trek-readiness>p{margin:7px 0 0;font-size:.85rem;line-height:1.5}
+.content-calendar .hc-trek-routine .hc-trek-not-required{opacity:.65}
+.content-calendar .hc-trek-routine .hc-trek-not-required input{background:rgba(199,189,170,.2)}
+.content-calendar .hc-trek-invalid,.content-calendar .hc-trek-routine .hc-trek-invalid,
+.content-calendar .hc-trek-day-planner .hc-trek-invalid{border:2px solid #b52626!important;background:#ffe3df!important;box-shadow:0 0 0 3px rgba(178,28,27,.22)!important;outline:1px solid #a51919!important}
+.content-calendar .hc-trek-form-error:not([hidden]){display:block;color:#8e211e;background:#fff0e5;border:1px solid #b83c32;border-radius:6px;padding:10px 12px;font-weight:700;font-size:.85rem;line-height:1.5;margin:10px 0}
+.content-calendar .hc-trek-day-planner .hc-help-term{cursor:help;text-decoration:underline dotted #77532d}
+@media(max-width:900px){.content-calendar .hc-trek-day-setup .hmk-trek-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:610px){.content-calendar .hc-trek-day-setup .hmk-trek-grid{grid-template-columns:1fr}.content-calendar .hc-trek-watch-slots{grid-template-columns:repeat(2,minmax(0,1fr))}.content-calendar .hc-trek-day-planner{padding:9px}}
+@media(max-width:380px){.content-calendar .hc-trek-watch-slots{grid-template-columns:1fr}}
+.content-calendar .hc-trek-day-results{margin:14px 0;padding:10px;border:1px solid rgba(117,83,45,.36);border-radius:8px}
+.content-calendar .hc-trek-day-results h4{margin:0 0 9px;font:700 .95rem Georgia,serif}
+.content-calendar .hc-trek-day-table-scroll{max-width:100%;overflow-x:auto}
+.content-calendar .hc-trek-day-results table{width:100%;border-collapse:collapse;font:.81rem/1.45 Georgia,serif}
+.content-calendar .hc-trek-day-results :is(th,td){border-bottom:1px solid rgba(110,77,38,.24);padding:8px;text-align:left;vertical-align:top;min-width:90px}
+.content-calendar .hc-trek-day-results th{background:rgba(116,90,53,.15);font-weight:700}
+.content-calendar .hc-trek-day-results td small{display:block;font-size:.75rem;margin-top:4px}
+.content-calendar .hc-trek-live-preview p{margin:5px 0}
+.content-calendar .hc-trek-live-preview .hc-help-term{cursor:help;text-decoration:underline dotted #785b30;text-underline-offset:2px}
+.content-calendar .hc-trek-dependencies{border:1px solid rgba(112,84,47,.37);padding:11px;border-radius:8px;margin:14px 0;background:rgba(255,247,222,.19)}
+.content-calendar .hc-trek-dependencies h4{font:700 .97rem Georgia,serif;margin:0 0 7px}
+.content-calendar .hc-trek-dependencies p{font:.84rem/1.5 Georgia,serif;margin:7px 0}
+.content-calendar .hc-trek-dependencies p:is(.hc-trek-dependency-ok,.hc-trek-dependency-wait){border-left:4px solid #9b7734;padding:6px 10px;background:rgba(243,226,190,.22)}
+.content-calendar .hc-trek-dependencies p.hc-trek-dependency-ok{border-color:#487847}
+.content-calendar .hc-trek-dependencies p span{display:block;overflow-wrap:anywhere;margin-top:3px}
+.content-calendar .hc-trek-day-activity-plan{border:1px solid rgba(120,90,54,.34);padding:10px 12px;border-radius:7px;margin:14px 0;background:rgba(229,215,183,.23)}
+.content-calendar .hc-trek-day-activity-plan h4{font:700 .93rem Georgia,serif;margin:0 0 5px}
+.content-calendar .hc-trek-day-activity-plan p{font:.82rem/1.45 Georgia,serif;margin:5px 0 11px}
+.content-calendar .hc-trek-day-activity-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.content-calendar .hc-trek-day-activity-grid label{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:.8rem}
+.content-calendar .hc-trek-day-activity-grid label select{min-height:38px;width:100%;min-width:0;box-sizing:border-box}
+@media(max-width:900px){.content-calendar .hc-trek-day-activity-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:450px){.content-calendar .hc-trek-day-activity-grid{grid-template-columns:1fr}}
+.content-calendar .hc-trek-watch-slot button{font-size:.74rem;padding:5px 8px;min-height:30px;margin-top:auto;align-self:flex-start;white-space:normal}
