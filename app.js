@@ -293,7 +293,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.621';
+const APP_VERSION='93.622';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1507,9 +1507,9 @@ function trekDailyWeatherFormHTML(clock){
  <label>Krajina / nadmořská výška<select name="landscape"><option value="flat">Rovina</option><option value="rough">Kopce</option><option value="mountain">Hory</option></select></label>
  <label class="hc-check"><input type="checkbox" name="alpine" value="yes"> Alpská nadmořská poloha (−4)</label>
  <label class="hc-check"><input type="checkbox" name="aridDesert" value="yes"> Suchá poušť (+2 srážkový hod; v létě +4 teplota)</label>
- <label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní teplota d10 se srovnává s tabulkou počasí (HMK 144) podle ročního období, klimatu a výšky. Nejde o °C; výsledkem je Cold / Heat Hazard nebo bez hazardu. Noc má vlastní teplotní postih bez nového denního d10.">Teplota dne · d10</span><input type="number" name="temperature" min="1" max="10" required placeholder="1–10"></label>
- <label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní srážky d10 určují, zda v této oblasti a dni srážky nastanou. Druh může být déšť, sníh nebo plískanice podle teplotního hazardu. Zda jsou nepřetržité, určuje až d6 konkrétní čtyřhodinové hlídky (HMK 144).">Srážky dne · d10</span><input type="number" name="precipitation" min="1" max="10" required placeholder="1–10"></label></div>
- <div class="hc-trek-weather-actions"><button type="button" class="hc-small" data-trek-global-die="temperature">⚄ d10 teplota</button><button type="button" class="hc-small" data-trek-global-die="precipitation">⚄ d10 srážky</button><button type="submit">Potvrdit denní počasí</button></div>
+ <div class="hc-trek-shift-control hc-trek-global-die-control"><label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní teplota d10 se srovnává s tabulkou počasí (HMK 144) podle ročního období, klimatu a výšky. Nejde o °C; výsledkem je Cold / Heat Hazard nebo bez hazardu. Noc má vlastní teplotní postih bez nového denního d10.">Teplota dne · d10</span><input type="number" name="temperature" min="1" max="10" required placeholder="1–10"></label><button type="button" class="hc-small hc-trek-generate" data-trek-global-die="temperature" title="Kryptograficky hodit jednu d10 pro teplotu dne">⚄ d10</button></div>
+ <div class="hc-trek-shift-control hc-trek-global-die-control"><label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní srážky d10 určují, zda v této oblasti a dni srážky nastanou. Druh může být déšť, sníh nebo plískanice podle teplotního hazardu. Zda jsou nepřetržité, určuje až d6 konkrétní čtyřhodinové hlídky (HMK 144).">Srážky dne · d10</span><input type="number" name="precipitation" min="1" max="10" required placeholder="1–10"></label><button type="button" class="hc-small hc-trek-generate" data-trek-global-die="precipitation" title="Kryptograficky hodit jednu d10 pro srážky dne">⚄ d10</button></div></div>
+ <div class="hc-trek-weather-actions"><button type="submit">Potvrdit denní počasí</button></div>
  <output role="status" aria-live="polite"></output></form>
  <h4>Potvrzené oblasti · do konce dne zbývá ${hours} h ${mins} min</h4>
  ${rows.map(j=>{const w=j.calendarTrekDayWeather,allowed=canVoidWeather(data.journal,j.id,id,clock.minute);
@@ -1583,19 +1583,50 @@ function trekDayGuideHTML(){
 /* 93.612: the six four-hour windows are a READ-ONLY projection of the one
  * authoritative calendar/journal. A day plan is an optional, explicitly
  * confirmed intention; it never rolls dice, advances time or commits rest. */
+/** Areas are a HISTORY catalog; only the current day's active weather can be
+ * reused as a roll. A historic area offers its geographic settings, never its dice. */
+function trekWeatherAreaCatalog(clock){
+ if(!clock)return [];
+ const campaignId=campaignKey(clock),dayIndex=Math.floor(clock.minute/1440);
+ const current=activeWeatherAreas(data.journal,campaignId,dayIndex);
+ const byName=new Map();
+ const push=(area,source,validToday)=>{
+  if(!area||!String(area).trim())return;
+  const key=weatherAreaKey(area),old=byName.get(key);
+  if(!old||(validToday&&!old.validToday)){
+   if(old?.validToday&&!validToday)return;
+   byName.set(key,{area:String(area).trim(),source,validToday});
+  }
+ };
+ // Newest-to-oldest for geographic defaults; latest known area always listed.
+ for(const j of [...data.journal].reverse()){
+  if(j.calendarCampaignId!==campaignId)continue;
+  if(j.calendarTrekDayWeather)push(j.calendarTrekDayWeather.area,j.calendarTrekDayWeather,false);
+  if(j.calendarTrekProof)push(j.calendarTrekProof.area,j.calendarTrekProof,false);
+ }
+ for(const j of current)push(j.calendarTrekDayWeather.area,j.calendarTrekDayWeather,true);
+ return [...byName.values()].sort((a,b)=>Number(b.validToday)-Number(a.validToday)||a.area.localeCompare(b.area,'cs'));
+}
 function confirmedWeatherAreaOptions(clock){
- const rows=activeWeatherAreas(data.journal,campaignKey(clock),Math.floor(clock.minute/1440));
- return rows.map(j=>`<option value="${esc(j.calendarTrekDayWeather.area)}"></option>`).join('');
+ return trekWeatherAreaCatalog(clock).map(x=>`<option value="${esc(x.area)}" label="${x.validToday?'dnešní potvrzené počasí':'starší oblast · pro dnešek nutné nové počasí'}"></option>`).join('');
+}
+function trekWeatherAreaPickerHTML(clock,currentArea=''){
+ const areas=trekWeatherAreaCatalog(clock),wanted=weatherAreaKey(currentArea);
+ return `<label class="hc-trek-weather-area-picker"><span class="hc-help-term" tabindex="0" data-hmk-help="Zde jsou všechny doložené oblasti kampaně, i z minulých dnů. Platné počasí se přebere pouze pro aktuální den. Starší oblast převezme klimatické nastavení, ale pro dnešek vyžaduje dva nové hody d10; vlastní novou oblast napište do textového pole vedle nebo pod seznamem.">Vybrat doloženou oblast</span><select name="weatherAreaPicker"><option value="">— Nová oblast / ruční název —</option>${areas.map(x=>`<option value="${esc(x.area)}" ${weatherAreaKey(x.area)===wanted?'selected':''}>${esc(x.area)} · ${x.validToday?'dnešní počasí platí':'dnes bez doloženého počasí'}</option>`).join('')}</select><small data-trek-area-weather-status>${areas.find(x=>weatherAreaKey(x.area)===wanted)?.validToday?'Dnešní počasí je doložené; denní d10 se neopakují.':wanted?'Pro tuto oblast dnešní počasí není doloženo.':'Novou oblast lze pojmenovat ručně.'}</small></label>`;
 }
 function weatherAreaAutofill(form,area){
  const clock=data.campaignClock;if(!clock||!area)return false;
- const row=activeAreaWeather(data.journal,campaignKey(clock),Math.floor(clock.minute/1440),area);
- if(!row)return false;
- const w=row.calendarTrekDayWeather;
- for(const k of ['climate','landscape']){const el=form.elements.namedItem(k);if(el)el.value=w[k];}
+ const campaignId=campaignKey(clock),dayIndex=Math.floor(clock.minute/1440);
+ const active=activeAreaWeather(data.journal,campaignId,dayIndex,area);
+ const historical=trekWeatherAreaCatalog(clock).find(x=>weatherAreaKey(x.area)===weatherAreaKey(area));
+ const w=active?.calendarTrekDayWeather||historical?.source;
+ if(!w){const status=form.querySelector('[data-trek-area-weather-status]');if(status)status.textContent='Nová oblast: pro dnešek budou potřeba dvě nové d10. Zvolte skutečné klima a prostředí.';return false;}
+ for(const k of ['climate','landscape']){const el=form.elements.namedItem(k);if(el&&w[k])el.value=w[k];}
  for(const k of ['alpine','aridDesert']){const el=form.elements.namedItem(k);if(el)el.checked=!!w[k];}
- const season=form.elements.namedItem('season');if(season)season.value=w.season;
- return true;
+ const season=form.elements.namedItem('season');if(season)season.value=active?w.season:'auto';
+ const status=form.querySelector('[data-trek-area-weather-status]');
+ if(status)status.textContent=active?'Dnešní počasí této oblasti je potvrzené: denní d10 se neopakují.':'Oblast byla doložena dříve. Převzato klima, nikoli staré kostky; dnes je potřeba nové počasí.';
+ return !!active;
 }
 function trekDayPlannerHTML(clock,participants){
  const campaignId=campaignKey(clock),dayIndex=Math.floor(clock.minute/1440),first=dayIndex*1440;
@@ -1643,6 +1674,7 @@ function trekDayPlannerHTML(clock,participants){
     <p class="hc-hint">Dřívější údaje se zobrazují jen jako <strong>upravitelný návrh</strong>. Výběrem potvrzené oblasti se načte její počasí; nová hlídka vznikne pouze po výslovném potvrzení. Kostky ani zdravotní účinky se nekopírují.</p>
     <div class="hc-trek-reactivate-grid">
      ${pick('watchIntent','Nová plánovaná činnost',Object.entries(intentLabels).filter(([v])=>v!=='none'))}
+     ${trekWeatherAreaPickerHTML(clock,suggested?.area??'')}
      <label>Nová oblast / trasa<input name="area" list="hmk-confirmed-weather-areas" type="text" maxlength="90" required placeholder="Vyberte potvrzenou oblast" value="${esc(suggested?.area??'')}"></label>
      ${pick('guideId','Průvodce',participants.map(c=>[c.id,c.name]))}
      ${pick('season','Roční období',[['auto','Z doloženého data TR'],['spring','Jaro'],['summer','Léto'],['autumn','Podzim'],['winter','Zima']])}
@@ -1676,6 +1708,7 @@ function trekDayPlannerHTML(clock,participants){
  <datalist id="hmk-confirmed-weather-areas">${confirmedWeatherAreaOptions(clock)}</datalist>
  <details class="hc-trek-day-setup" ${plan?'':'open'}><summary>1 · Denní nastavení družiny a prostředí ${plan?'· doloženo':'· připravit'}</summary>
  <form id="hmk-trek-day-plan-form" novalidate><div class="hmk-trek-grid">
+ ${trekWeatherAreaPickerHTML(clock,seed.area)}
  <label><span class="hc-trek-field-heading">Oblast a výchozí trasa <span class="hc-help-term" tabindex="0" data-hmk-help="Skutečné označení oblasti; nevytváří domyšlenou zeměpisnou polohu. Trasa se přenese do nové hlídky, dokud ji GM nezmění.">?</span></span><input name="area" list="hmk-confirmed-weather-areas" required maxlength="90" placeholder="Vyberte potvrzenou oblast nebo pojmenujte novou" value="${esc(seed.area||'')}"></label>
  <label>Průvodce${select('guideId',participants.map(c=>[c.id,c.name]),guide)}</label>
  <label>Sezóna${select('season',[['auto','Automaticky z doloženého data TR'],['spring','Jaro'],['summer','Léto'],['autumn','Podzim'],['winter','Zima']],'auto')}</label>
@@ -1771,6 +1804,7 @@ function campaignCalendarView(){
  <details class="hmk-trek-entry" id="hmk-current-trek-watch" open><summary tabindex="-1">Vyhodnotit cestovní hlídku – pravidlové podklady</summary><form id="campaign-trekking-context-form">
  <fieldset class="hc-expedition-actors"><legend>Účastníci této cestovní hlídky (průvodce se přidá automaticky)</legend><div class="hc-characters">${participants.map(c=>`<label class="hc-character"><input type="checkbox" name="trekMemberIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset><fieldset class="hmk-trek-section"><legend>1 · Kdo cestuje a kam</legend><div class="hmk-trek-grid"><label>Postava / průvodce<select name="characterId" required>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <label>Honák / Drover<select name="droverId">${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+ ${trekWeatherAreaPickerHTML(clock,(latestTrekDayPlan(data.journal,campaignKey(clock),Math.floor(clock.minute/1440))??previousTrekContext(data.journal,campaignKey(clock),clock.minute))?.area??'')}
  <label>Oblast / označení trasy<input name="area" list="hmk-confirmed-weather-areas" maxlength="90" required placeholder="Vyberte oblast s doloženým počasím"></label>
  </div></fieldset><fieldset class="hmk-trek-section"><legend>2 · Prostředí a cesta</legend><div class="hmk-trek-grid"><label>Roční období<select name="season"><option value="auto">Z data TR (je-li doloženo)</option>${[['spring','Jaro'],['summer','Léto'],['autumn','Podzim'],['winter','Zima']].map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
  <label>Klimatické pásmo<select name="climate"><option value="subpolar">Subpolární</option><option value="cool" selected>Mírné chladné</option><option value="warm">Mírné teplé</option><option value="subtropical">Subtropické</option><option value="dry-tropical">Tropické suché</option><option value="wet-tropical">Tropické vlhké</option></select></label>
@@ -8323,8 +8357,8 @@ function trekGuidePreview(form){
  }
  const continuation=previousTrekSegmentForForm(form,clock.minute,area,season,v.climate,v.landscape,v.alpine==='yes',v.aridDesert==='yes');
  const weather=form.querySelector('[data-trek-dice-section="weather"]'),wet=form.querySelector('[data-trek-dice-section="watch"]');
- if(weather){weather.classList.toggle('hc-trek-not-required',!!day);weather.querySelector('h4').textContent=day?'Denní počasí · již doloženo pro oblast, NEHÁZET znovu':'Denní počasí · dva skutečné d10, jen jednou za 24 h';for(const name of ['trekDieTemperature','trekDieDailyPrecipitation']){const el=form.elements.namedItem(name);if(el)el.disabled=!!day;}}
- if(wet){const reuse=!!continuation&&!gmShift&&continuation.calendarTrekProof.weatherShiftId===(activeShift?.id??null);const skip=reuse||!!day&&!day.hasPrecipitation;wet.classList.toggle('hc-trek-not-required',skip);const field=form.elements.namedItem('trekDieWatchPrecipitation');if(field)field.disabled=skip;wet.querySelector('h4').textContent=reuse?'Srážky · d6 převzat z původního úseku stejné hlídky':day?(day.hasPrecipitation?'Srážky této hlídky · d6 povinný':'Srážky hlídky · bez hodu, suchý den'):'Srážky hlídky · závisí na denním počasí';}
+ if(weather){weather.classList.toggle('hc-trek-not-required',!!day);weather.querySelector('h4').textContent=day?'Denní počasí · již doloženo pro oblast, NEHÁZET znovu':'Denní počasí · dva skutečné d10, jen jednou za 24 h';for(const name of ['trekDieTemperature','trekDieDailyPrecipitation']){const el=form.elements.namedItem(name);if(el){el.disabled=!!day;const button=el.closest('[data-trek-die-row]')?.querySelector('button[data-trek-die-generate]');if(button)button.disabled=!!day;}}}
+ if(wet){const reuse=!!continuation&&!gmShift&&continuation.calendarTrekProof.weatherShiftId===(activeShift?.id??null);const skip=reuse||!!day&&!day.hasPrecipitation;wet.classList.toggle('hc-trek-not-required',skip);const field=form.elements.namedItem('trekDieWatchPrecipitation');if(field){field.disabled=skip;const button=field.closest('[data-trek-die-row]')?.querySelector('button[data-trek-die-generate]');if(button)button.disabled=skip;}wet.querySelector('h4').textContent=reuse?'Srážky · d6 převzat z původního úseku stejné hlídky':day?(day.hasPrecipitation?'Srážky této hlídky · d6 povinný':'Srážky hlídky · bez hodu, suchý den'):'Srážky hlídky · závisí na denním počasí';}
  const previousEncounter=previousTrekPartySegment(form,clock.minute);
  const memberIdsPreview=[...new Set([...new FormData(form).getAll('trekMemberIds'),v.characterId])].sort();
  const priorNightWatch=data.journal.find(j=>j.calendarCampaignId===campaignId&&j.campaignMinute===clock.minute-240&&
@@ -11228,7 +11262,16 @@ function hskHighlightRequired(form,name,message){
 }
 for(const type of ['input','change'])document.addEventListener(type,event=>{
  const field=event.target;
- if(type==='change'&&field?.name==='area'&&field.closest?.('#campaign-trekking-context-form,#hmk-trek-day-plan-form,[data-trek-watch-reactivate-form]')){weatherAreaAutofill(field.form,field.value.trim());}if(field?.classList?.contains('hsk-required-invalid')){
+ if(type==='change'&&field?.name==='weatherAreaPicker'&&field.closest?.('#campaign-trekking-context-form,#hmk-trek-day-plan-form,[data-trek-watch-reactivate-form]')){
+  const form=field.form,chosen=field.value,areaInput=form?.elements.namedItem('area');
+  if(areaInput&&chosen){areaInput.value=chosen;weatherAreaAutofill(form,chosen);}
+  if(form?.id==='campaign-trekking-context-form')trekGuidePreview(form);
+ }
+ if(type==='change'&&field?.name==='area'&&field.closest?.('#campaign-trekking-context-form,#hmk-trek-day-plan-form,[data-trek-watch-reactivate-form]')){
+  const form=field.form,chosen=field.value.trim(),picker=form?.elements.namedItem('weatherAreaPicker');
+  if(picker)picker.value=[...picker.options].some(o=>o.value===chosen)?chosen:'';
+  weatherAreaAutofill(form,chosen);if(form?.id==='campaign-trekking-context-form')trekGuidePreview(form);
+ }if(field?.classList?.contains('hsk-required-invalid')){
   field.classList.remove('hsk-required-invalid');field.removeAttribute('aria-invalid');
   field.closest('label')?.classList.remove('hsk-required-invalid-label');
  }
