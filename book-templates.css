@@ -6744,3 +6744,22 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 /* v93.616 · explicit future-watch reactivation */
 .content-calendar .hc-trek-reactivate-watch{margin-top:8px;min-width:0}
 .content-calendar .hc-trek-reactivate-watch .hc-trek-reactivate-confirm{width:100%;max-width:100%;white-space:normal;background:#273e58;color:#fbe6bd;border-color:#273e58}
+
+/* v93.617 · restoring a watch opens an editable new plan, not an automatic undo */
+.content-calendar .hc-trek-day-planner .hmk-trek-guide > summary{font-size:.92rem;line-height:1.4}
+.content-calendar .hc-trek-reactivate-watch{border-top:1px solid rgba(114,83,47,.36);padding-top:7px}
+.content-calendar .hc-trek-reactivate-watch > summary{cursor:pointer;font:700 .81rem/1.45 Georgia,serif;color:#263e5a;overflow-wrap:anywhere}
+.content-calendar .hc-trek-reactivate-watch form{margin-top:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.content-calendar .hc-trek-reactivate-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
+.content-calendar .hc-trek-reactivate-grid label{display:flex;flex-direction:column;gap:4px;font:.79rem/1.4 Georgia,serif;min-width:0;overflow-wrap:normal}
+.content-calendar .hc-trek-reactivate-grid :is(select,input){width:100%;max-width:100%;min-width:0;box-sizing:border-box;font:inherit;min-height:35px}
+.content-calendar .hc-trek-reactivate-watch fieldset{min-width:0;margin:5px 0;padding:7px;border:1px solid rgba(122,91,52,.45)}
+.content-calendar .hc-trek-reactivate-watch .hc-characters{display:flex;flex-wrap:wrap;gap:5px}
+.content-calendar .hc-trek-reactivate-watch .hc-character input[type=checkbox]{width:17px;min-width:17px;height:17px}
+@media(max-width:720px){.content-calendar .hc-trek-reactivate-grid{grid-template-columns:1fr}}
+/* Expanded reconfiguration needs full width, not a narrow watch tile. */
+.content-calendar .hc-trek-watch-slots > .hc-trek-watch-slot:has(.hc-trek-reactivate-watch[open]){grid-column:1 / -1}
+.content-calendar .hc-trek-watch-slot:has(.hc-trek-reactivate-watch[open]) .hc-trek-reactivate-watch{width:100%}
+.content-calendar .hc-trek-watch-slot:has(.hc-trek-reactivate-watch[open]) .hc-trek-reactivate-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media(max-width:760px){.content-calendar .hc-trek-watch-slot:has(.hc-trek-reactivate-watch[open]) .hc-trek-reactivate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:470px){.content-calendar .hc-trek-watch-slot:has(.hc-trek-reactivate-watch[open]) .hc-trek-reactivate-grid{grid-template-columns:1fr}}
