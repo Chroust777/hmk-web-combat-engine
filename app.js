@@ -300,7 +300,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.641';
+const APP_VERSION='93.642';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -20223,12 +20223,18 @@ function episodeStartSkillRequest(field,skill,actorId){
  if(!episodeEvaluationRequested||!clock||!character(actorId))return false;
  const previous=episodePendingSkillRequest;
  if(previous?.status==='waiting'&&previous.episodeEpoch===episodeDraftEpoch){
-  if(previous.field!==field||previous.skill!==skill||previous.actorId!==actorId){
-   alert('Nejdříve dokončete požadovaný '+previous.skill+' test postavy '+(character(previous.actorId)?.name||previous.actorId)+'.');return false;
+  if(previous.field===field&&previous.skill===skill&&previous.actorId===actorId){
+   episodeActiveSkillRequestId=previous.id;episodeSkillReturnPending=true;
+   selected=actorId;view='skills';activeSkillTab='value';
+   skillSVChoice595={actorId,kind:'ordinary',value:skill};render();return true;
   }
-  episodeActiveSkillRequestId=previous.id;episodeSkillReturnPending=true;
-  selected=actorId;view='skills';activeSkillTab='value';
-  skillSVChoice595={actorId,kind:'ordinary',value:skill};render();return true;
+  // Two independently required tests can be performed in either order. A
+  // handoff which has not produced a journal receipt can be superseded: its
+  // one-use request ID is cancelled, NOT reassigned to the next test. The
+  // uncompleted task remains in the episode checklist and can be reopened.
+  // A late submission using that cancelled request can never be captured.
+  previous.status='superseded';
+  if(episodeActiveSkillRequestId===previous.id)episodeActiveSkillRequestId=null;
  }
  if(episodePinnedSkillFields.has(field))return false;
  const request={id:uuid(),episodeEpoch:episodeDraftEpoch,field,skill,actorId,campaignId:campaignKey(clock),minute:clock.minute,status:'waiting',completedId:null};
@@ -20856,7 +20862,7 @@ function renderEpisodeEndStatus(form,result,weather){
  const tasks=episodeEndTasks(result),checklist=root.querySelector('[data-episode-checklist]');
  episodeOutstandingSkillTasks=tasks.filter(t=>t.skill&&t.actorId&&!form.elements.namedItem(t.action)?.value);
  if(!form.elements.namedItem('confirmed')?.checked)tasks.push({name:'Potvrzení GM',detail:'Po dokončení všech výsledků potvrďte skutečný průběh a čas na levé stránce.',action:'confirmed'});
- if(checklist)checklist.innerHTML=tasks.length?'<p class="hc-episode-task-lead">Před dokončením zbývá '+tasks.length+' vyhodnocení:</p>'+tasks.map((t,i)=>
+ if(checklist)checklist.innerHTML=tasks.length?'<p class="hc-episode-task-lead">Před dokončením zbývá '+tasks.length+' vyhodnocení. Nezávislé úkoly můžete řešit v libovolném pořadí:</p>'+tasks.map((t,i)=>
    '<div class="hc-episode-task"><span class="hc-task-number">'+(i+1)+'</span><div><b>'+esc(t.name)+'</b><p>'+esc(t.detail)+'</p>'+
     (t.action?'<button type="button" class="secondary" data-episode-jump="'+esc(t.action)+'">Doplnit související pole</button> ':'')+
     (t.skill?'<button type="button" data-episode-skill-task="'+esc(t.skill)+'" data-episode-skill-field="'+esc(t.action)+'" data-episode-skill-actor="'+esc(t.actorId)+'">Otevřít '+esc(t.skill)+' Skill Test</button>':'')+
@@ -20923,7 +20929,7 @@ function renderEpisodeEndError(form,message){
  const list=root.querySelector('[data-episode-checklist]');
  if(list){
   const actorName=character(issue.actorId)?.name||'vybraná postava';
-  list.innerHTML='<p class="hc-episode-task-lead">Čeká '+planned.length+' aktuálně zjistitelných úkolů. Další následky se přidají po skutečných hodech.</p>'+planned.map(episodePlannedTaskHTML).join('');
+  list.innerHTML='<p class="hc-episode-task-lead">Čeká '+planned.length+' aktuálně zjistitelných úkolů. Nezávislé hody lze řešit v libovolném pořadí; případné následky se přidají až po jejich příčině.</p>'+planned.map(episodePlannedTaskHTML).join('');
  }
  const proof=root.querySelector('[data-episode-evidence]');
  if(proof){
@@ -21501,8 +21507,18 @@ document.addEventListener('submit',e=>{
     outcome,skin,sourceMinute:clock.minute});
   }
   const gmMessage=`${result.kind} · ${result.minutes} minut · ${weather.area}`;
+  // The same witnessed Survival CF must not produce TWO hazards: the
+  // Orienteering branch already verified the actual Survival Hazard before
+  // we reached this point. This transient certificate is used only for clock
+  // preflight; it is NEVER written to history. An unresolved or independent
+  // CF keeps its original calendar blocker.
+  const scopedSurvivalCF=result.orientation?.sourceMode==='new'&&
+   result.orientation.level==='CF'&&result.survivalHazard&&
+   result.hazardDetails?.length&&result.hazardDetails.every(h=>!h.requiresGMCompletion)?
+   [{calendarScopedCriticalResolution:{originId:result.orientation.skillId,
+     campaignId:campaignKey(clock)}}]:[];
   const next=advanceCampaignCalendar(clock,{deltaMinutes:result.minutes,eventId:uuid(),reason:'GM časová epizoda: '+gmMessage,gmConfirmed:true,
-   characters:data.characters,journal:data.journal});
+   characters:data.characters,journal:[...data.journal,...scopedSurvivalCF]});
   const name=result.memberIds.map(id=>character(id)?.name||id).join(', '),sourceId=uuid();
   if(!window.confirm('Potvrdit činnost '+name+' od '+displayCampaignMinute(result.startMinute)+' do '+displayCampaignMinute(result.endMinute)+' a posunout skutečný herní čas?'))return;
   const members=result.memberIds.map(id=>character(id));
