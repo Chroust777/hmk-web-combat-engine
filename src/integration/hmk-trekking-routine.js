@@ -20,6 +20,12 @@ const WEATHER={
  autumn:[[2,null,4],[1,null,3],[-3,null,4],[null,null,3],[null,8,2],[null,8,6]],
  winter:[[7,null,6],[3,null,5],[2,null,5],[null,null,4],[null,9,2],[null,9,4]]};
 const NIGHT=[-3,-2,-2,-1,-4,-4];
+/** Read-only reference using the SAME lookup as trekWeatherDay (HMK p.144). */
+export function trekWeatherReference(season,climate){
+ const i=TREK_CLIMATES.indexOf(climate);assert(TREK_SEASONS.includes(season)&&i>=0,'Neplatné klima/období');
+ const [coldTN,hotTN,precipitationTN]=WEATHER[season][i];
+ return {coldTN,hotTN,precipitationTN,nightDelta:NIGHT[i],sourcePage:144};
+}
 export function trekSeasonFromMonth(month){assert(int(month,1,12),'Neplatný měsíc Tuzyn Reckoning');return TREK_SEASONS[Math.floor((month-1)/3)];}
 export function trekWeatherDay({season,climate,temperatureD10,precipitationD10,landscape='flat',alpine=false,aridDesert=false}={}){
  const c=TREK_CLIMATES.indexOf(climate);

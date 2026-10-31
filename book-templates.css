@@ -6910,3 +6910,37 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-settings [data-episode-orientation-new] label,.hc-episode-settings [data-episode-tracking] label{margin:.4rem 0}
 .hc-episode-settings [hidden],.hc-episode-settings label[hidden],.hc-episode-settings div[hidden]{display:none!important}
 .hc-episode-settings .hc-help-term{border-bottom:1px dotted #926d45;cursor:help}
+
+/* v93.630: one full folio for inputs, one full folio for results. */
+.hc-episode-spread-left,.hc-episode-spread-right{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+.hc-episode-spread-left .hc-episode-editor,.hc-episode-spread-right .hc-episode-result{width:100%;box-sizing:border-box}
+.hc-episode-spread-left .hc-episode-head{margin:0 0 12px}
+.hc-episode-spread-left .hc-episode-head p{margin:.5rem 0;font-size:.86rem;line-height:1.45}
+.hc-episode-spread-right .hc-episode-result{position:sticky;top:16px}
+.hc-episode-spread-left .hc-episode-editor{padding:clamp(9px,1.4vw,17px)}
+.hc-episode-spread-right .hc-episode-result{padding:clamp(9px,1.4vw,17px)}
+.hc-episode-spread-left .hc-episode-settings [hidden],
+.hc-episode-spread-left [hidden],
+.hc-episode-spread-right [hidden]{display:none!important}
+.hc-episode-spread-left .hc-episode-settings .hmk-trek-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.hc-episode-help{display:inline-flex;align-items:center;justify-content:center;min-height:0!important;min-width:25px;height:25px;width:25px!important;margin:2px 6px!important;border-radius:50%;font:700 13px Georgia,serif!important;cursor:pointer;border:1px solid #8b6543;background:#e7d5b0;color:#4a2a17;vertical-align:middle;padding:0!important}
+.hc-episode-help:hover,.hc-episode-help:focus-visible{background:#765339;color:white;outline:2px solid #d0a65e}
+.hc-episode-reference{margin:10px 0;padding:8px;border:1px solid #aa8860;border-radius:5px;background:rgba(244,233,207,.5)}
+.hc-episode-reference>summary{cursor:pointer;font-weight:bold;line-height:1.35;font-size:.86rem}
+.hc-episode-reference p{font-size:.76rem;line-height:1.45}
+.hc-episode-table-scroll{overflow:auto;max-width:100%}
+.hc-episode-reference table{width:100%;border-collapse:collapse;font:.72rem/1.35 Georgia,serif}
+.hc-episode-reference th,.hc-episode-reference td{border:1px solid rgba(120,80,39,.3);padding:5px 6px;text-align:left;vertical-align:top;white-space:normal}
+.hc-episode-reference td small{display:block;line-height:1.5}
+.hc-episode-table-scroll table{min-width:650px}
+.hc-episode-tracking-conditions{margin:10px 0}
+.hc-episode-rule-dialog{position:fixed;max-width:min(550px,calc(100vw - 28px));width:min(550px,calc(100vw - 28px));max-height:80vh;overflow:auto;box-sizing:border-box;margin:auto;padding:20px;background:#f5e9cb;color:#3c2b1c;border:3px double #79502f;border-radius:10px;box-shadow:0 18px 60px rgba(21,13,4,.5);font:16px/1.55 Georgia,serif}
+.hc-episode-rule-dialog::backdrop{background:rgba(18,13,9,.62)}
+.hc-episode-rule-dialog header{display:flex;align-items:start;justify-content:space-between;gap:15px}
+.hc-episode-rule-dialog header h3{margin:0 0 12px;font-size:1.18rem}
+.hc-episode-rule-dialog [data-episode-help-close]{cursor:pointer;border:1px solid #a3825c;padding:6px 12px;background:#ede0c5;color:#3d2919;border-radius:4px}
+.hc-episode-rule-dialog .hc-episode-help-content{white-space:pre-line;margin:8px 0 20px}
+@media(max-width:900px){.hc-episode-spread-right .hc-episode-result{position:static}}
+@media(max-width:540px){.hc-episode-spread-left .hc-episode-settings .hmk-trek-grid{grid-template-columns:minmax(0,1fr)}}
+
+.hc-episode-watch-warning{border-left:3px solid #975425;background:rgba(181,117,51,.14);padding:8px 10px!important;font-size:.88rem;line-height:1.45}
