@@ -300,7 +300,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.640';
+const APP_VERSION='93.641';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1833,6 +1833,69 @@ let episodeActiveSkillRequestId=null;
 let episodeSkillReturnPending=false;
 let episodeDraftEpoch=uuid();
 let timeEpisodeDraftCampaign=null;
+// A prepared episode has two phases. Skill rolls are NOT prerequisites for
+// pressing "Vyhodnotit epizodu"; they become resolution tasks afterwards.
+let episodeOutstandingSkillTasks=[];
+const episodePinnedSkillFields=new Map();
+function episodeOpenActorRequest(actorId){
+ if(!actorId||!episodeEvaluationRequested)return null;
+ const clock=data.campaignClock,cid=clock?campaignKey(clock):null;
+ const pending=episodePendingSkillRequest;
+ if(pending?.status==='waiting'&&pending.episodeEpoch===episodeDraftEpoch&&
+    pending.campaignId===cid&&pending.minute===clock?.minute&&pending.actorId===actorId)return pending;
+ const task=episodeOutstandingSkillTasks.find(t=>t.actorId===actorId);
+ return task?{...task,status:'queued'}:null;
+}
+function episodeSkillAuthorized(actorId,skill){
+ const r=episodePendingSkillRequest;
+ return !!(r?.status==='waiting'&&r.id===episodeActiveSkillRequestId&&
+  r.episodeEpoch===episodeDraftEpoch&&r.campaignId===campaignKey(data.campaignClock)&&
+  r.minute===data.campaignClock?.minute&&r.actorId===actorId&&r.skill===skill&&
+  view==='skills'&&activeSkillTab==='value'&&selected===actorId&&
+  skillSVChoice595?.kind==='ordinary'&&skillSVChoice595?.value===skill);
+}
+function episodeConfigureSkillGate(root){
+ if(view!=='skills')return;
+ const pending=episodeOpenActorRequest(selected);
+ for(const option of root.querySelectorAll('[data-skill-actor] option')){
+  const requirement=episodeOpenActorRequest(option.value);
+  if(requirement&&!option.textContent.includes('Cestování'))
+   option.textContent+=' · nevyřešený test z Cestování';
+ }
+ if(!pending)return;
+ const allowed=episodeSkillAuthorized(selected,pending.skill);
+ const host=root.querySelector('.hmk-skill-context-595')||root.querySelector('#skill-value-form')?.parentElement;
+ if(host){const note=document.createElement('aside');note.className='hc-episode-skill-lock';note.setAttribute('role','status');
+  note.innerHTML='<strong>🔒 '+(character(selected)?.name||'Postava')+' · nevyřešený '+
+   esc(pending.skill)+' test z Cestování</strong><p>'+(allowed?
+    'Je povolen pouze tento konkrétně vyžádaný test. Po uložení se výsledek uzamkne k epizodě.':
+    'Samostatné testy této postavy jsou pozastavené. Vraťte se do Cestování a otevřete příslušný požadavek.')+'</p>';
+  host.prepend(note);}
+ if(!allowed){
+  for(const form of root.querySelectorAll('#skill-value-form,#skill-secondary-form,#skill-assistance-form'))
+   for(const input of form.querySelectorAll('input,select,textarea,button'))input.disabled=true;
+ }
+}
+function episodeSetupIssue(form){
+ const v=episodeFormSnapshot(form),number=Number(v.minutes);
+ if(!Number.isSafeInteger(number)||number<1)return {field:'minutes',message:'Zadejte platnou délku epizody v celých minutách.'};
+ if(!v.memberIds?.length)return {field:'memberIds',message:'Vyberte alespoň jednu postavu.'};
+ if(['travel','tracking'].includes(v.kind)&&!v.memberIds.includes(v.guideId))
+  return {field:'guideId',message:'Průvodce musí být vybrán z účastníků epizody.'};
+ if(!v.weatherSource)return {field:'weatherSource',message:'Vyberte globální počasí nebo vlastní počasí epizody.'};
+ if(v.weatherSource==='local'&&!String(v.area||'').trim())
+  return {field:'area',message:'Pojmenujte oblast, pro kterou platí počasí epizody.'};
+ if(v.kind==='travel'&&(!Number.isFinite(Number(v.mapScale))||Number(v.mapScale)<=0))
+  return {field:'mapScale',message:'Měřítko mapy musí být kladné.'};
+ return null;
+}
+function episodeShowSetupError(form,error){
+ const panel=document.querySelector('.hc-episode-spread-right');
+ if(panel){const list=panel.querySelector('[data-episode-checklist]');
+  if(list)list.innerHTML='<div class="hc-episode-task"><strong>Nedokončené nastavení</strong><p>'+esc(error.message)+'</p><button type="button" data-episode-jump="'+esc(error.field)+'">Přejít na údaj</button></div>';}
+ episodeMarkField(form,error.field,{focus:true});
+}
+
 function episodeRecentRows(clock){return episodeTimeline(data.journal,campaignKey(clock));}
 function episodeNumber(d,n=0){const x=Number(d);return Number.isFinite(x)?x:n;}
 function timeEpisodeWeatherOptions(clock){
@@ -2095,12 +2158,10 @@ function timeEpisodePageHTML(clock,participants){
  </fieldset>
  <div class="hc-episode-route-actions"><button type="button" class="secondary" data-episode-nav="skills" title="Otevře původní Skill Tests. Doložené hody a hvězdičky zůstanou v původní historii.">Otevřít Skill Tests ↗</button><button type="button" class="secondary" data-episode-nav="encounter" title="Otevře původní vyhodnocení střetnutí.">Combat / Encounter ↗</button></div>
 
- <details class="hc-episode-skill-links" data-episode-skill-links><summary>Navázat skutečné Skill Tests provedené v této minutě</summary><p class="hc-hint">Vyberte pouze skutečně provedené a uložené testy. Hody, SV a ★ se převezmou z jejich původního dokladu.</p>
- ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&j.skillTestProof).slice(-25).map(j=>`<label class="hc-check"><input type="checkbox" name="skillProofIds" value="${esc(j.id)}">${esc(character(j.characterId)?.name||'Postava')} · ${esc(j.title||'Skill Test')}</label>`).join('')||'<p>Zatím žádné skutečně doložené Skill Tests z aktuální minuty. Otevřete původní Skill Tests a uložte výsledky.</p>'}</details>
- <p class="hc-hint">Survival, Tracking, Foraging, Weather Hazard a další skutečné hody se řeší původními průvodci. Výsledek kostky zde nehraje roli automatického Skill Testu. Při změně činnosti GM může kdykoliv vytvořit další epizodu a rozhodnout o novém hodu.</p>
+ <p class="hc-hint" data-episode-skill-links>Uložené Skill Tests jsou k této epizodě přiřazovány výhradně jejich vlastním požadavkem. Nezávislé testy se nepřebírají.</p>
  </details>
  <label>Popis pro kroniku GM<textarea name="narrative" rows="2" maxlength="400" placeholder="Družina se vydala podél lesa, déšť sílil…"></textarea></label>
- <label class="hc-check"><input type="checkbox" name="confirmed" required> Potvrzuji správnost zadání</label>
+ <label class="hc-check" data-episode-final-confirm><input type="checkbox" name="confirmed" required> Potvrzuji skutečně vyhodnocené podklady pro uzavření epizody</label>
  <button type="button" class="hc-episode-evaluate" data-episode-evaluate>Vyhodnotit epizodu →</button>
  </form></section>
  <aside class="hc-episode-result" aria-live="polite"><h3>Vyhodnocení a dokončení</h3><div class="hc-episode-overview" data-episode-overview></div><section class="hc-episode-evidence"><h4>Pravidlové výsledky a doklady</h4><div data-episode-evidence>Dosud žádný doložený výsledek.</div></section><section class="hc-episode-checklist"><h4>Úkoly před dokončením</h4><div data-episode-checklist>Vyplňte délku a skutečné podmínky.</div></section><button type="submit" form="hmk-time-episode-form" class="hc-episode-confirm" data-episode-finalize disabled>Dokončit a zapsat celou epizodu</button><details class="hc-episode-result-details"><summary>Podrobný pravidlový výpočet a hody</summary><div data-episode-preview><p>Zvolte činnost, čas a podmínky; zde se objeví skutečná vypočtená vzdálenost a únavové podklady. Výsledek se uloží až po potvrzení.</p></div></details><div class="hc-episode-latest"><h4>Poslední dokončená epizoda</h4>${latest?`<p><strong>${esc(displayCampaignMinute(latest.startMinute))}–${esc(displayCampaignMinute(latest.endMinute))}</strong> · ${esc(latest.kind)} · ${latest.minutes} min · ${latest.distanceMeters} m</p><p>${esc(latest.narrative||'Záznam uložen.')}</p>`:'<p>Zatím žádná. Historické doklady zůstávají zachované v původním deníku.</p>'}<button type="button" class="secondary" data-episode-chronicle>Přejít do kroniky ↗</button></div></aside></div>
@@ -9303,6 +9364,7 @@ function render(){
  if(!uiNavigationRestoring)uiNavigation.visit(nextRoute,{scrollY:window.scrollY});
  writeGuidedDraft();
  app.innerHTML=main()+(overlay||'');
+ episodeConfigureSkillGate(app);
  stableTrainingJump597=false;
  hideVisibleTechnicalUUIDs(app);
  hydrateSkillFollowupChoices598(app);
@@ -10180,6 +10242,11 @@ document.addEventListener('submit',event=>{
 },true);
 function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
  const savedId=uuid();
+ const skill=proof?.skills?.[0]||proof?.skill||'';
+ const activeEpisode=episodeOpenActorRequest(selected);
+ if(activeEpisode&&(proof?.type!=='secondary-mastery-value-test'||!episodeSkillAuthorized(selected,skill)))
+  throw Error('Postava '+(character(selected)?.name||selected)+' má nevyřešený '+activeEpisode.skill+
+   ' test z Cestování. Samostatný test není nyní povolen; otevřete úkol z epizody.');
  const isSV=proof?.type==='secondary-mastery-value-test';
  const currentChoice=view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected?skillSVChoice595:null;
  const actualSkill=proof?.skills?.[0]||proof?.skill;
@@ -20046,6 +20113,7 @@ function episodeAutoBindSkillReceipt(){
  // to reassign a test before the epizoda is committed.
  if(timeEpisodeDraft[request.field]&&timeEpisodeDraft[request.field]!==old.id)return;
  timeEpisodeDraft[request.field]=old.id;
+ episodePinnedSkillFields.set(request.field,old.id);
  if(request.field.startsWith('whProof_')){
   const tail=request.field.slice('whProof_'.length);
   timeEpisodeDraft['whEnd_'+tail]=(old.skillTestProof.a||old.skillTestProof.result)?.level||'';
@@ -20099,6 +20167,8 @@ function episodeIssue(message,form){
  const forage=message.match(/Foraging Mode\s+(\d+)/i);
  if(forage)return {field:'travelForageD10_'+(Number(forage[1])-1),skill:null,actorId:null};
  if(/Foraging vyžaduje skutečný d10/i.test(message))return {field:'forageD10',skill:null,actorId:null};
+ const unscoped=message.match(/Skill Test ([A-Za-z0-9_]+) nebyl vyžádán touto epizodou/i);
+ if(unscoped)return {field:unscoped[1],skill:null,actorId:null};
  const weather=message.match(/Weather Hazard\s+([^/\s]+)\/(cold|heat)/i);
  if(weather)return {field:'whProof_'+weather[2]+'_'+weather[1],skill:'Endurance',actorId:weather[1]};
  const encounter=message.match(/(?:Encounter|Setkání)\s*#(\d+)/i);
@@ -20150,7 +20220,17 @@ function episodeMarkField(form,name,{focus=false}={}){
 }
 function episodeStartSkillRequest(field,skill,actorId){
  const clock=data.campaignClock;
- if(!clock||!character(actorId))return false;
+ if(!episodeEvaluationRequested||!clock||!character(actorId))return false;
+ const previous=episodePendingSkillRequest;
+ if(previous?.status==='waiting'&&previous.episodeEpoch===episodeDraftEpoch){
+  if(previous.field!==field||previous.skill!==skill||previous.actorId!==actorId){
+   alert('Nejdříve dokončete požadovaný '+previous.skill+' test postavy '+(character(previous.actorId)?.name||previous.actorId)+'.');return false;
+  }
+  episodeActiveSkillRequestId=previous.id;episodeSkillReturnPending=true;
+  selected=actorId;view='skills';activeSkillTab='value';
+  skillSVChoice595={actorId,kind:'ordinary',value:skill};render();return true;
+ }
+ if(episodePinnedSkillFields.has(field))return false;
  const request={id:uuid(),episodeEpoch:episodeDraftEpoch,field,skill,actorId,campaignId:campaignKey(clock),minute:clock.minute,status:'waiting',completedId:null};
  episodePendingSkillRequest=request;episodeActiveSkillRequestId=request.id;episodeSkillReturnPending=true;
  timeEpisodeDraft={...timeEpisodeDraft,[field]:''};
@@ -20238,8 +20318,21 @@ function episodeWeatherSkinProof(v,clock,w,baseState){
   allLocationsReviewed:!!v['whSkinReviewed_'+key]});
  return {...resolved,sourceId:originalSourceId,actorId:w.id,kind:w.kind};
 }
+function episodeAssertScopedSkillInputs(v){
+ if(!episodeEvaluationRequested)return;
+ for(const [field,id] of Object.entries(v)){
+  if(!/^(orientationProofId|trackingProofId|trackingAwarenessProofId|droverProofId|hazardEvidenceId|hazardDirectionProofId|hazardCompProof_.+|evPartyProof_\d+|whProof_.+)$/.test(field)||!id)continue;
+  // Reuse is a separately validated, explicit route; this is only for NEW tests.
+  if(field==='orientationProofId'&&v.orientationUse==='reuse')continue;
+  const row=data.journal.find(j=>j.id===id),link=row?.calendarEpisodeSkillLink;
+  if(!link||link.episodeEpoch!==episodeDraftEpoch||link.field!==field||
+    episodePinnedSkillFields.get(field)!==id)
+   throw Error('Skill Test '+field+' nebyl vyžádán touto epizodou. Otevřete jeho vlastní tlačítko ve výsledcích; samostatné hody nelze převzít.');
+ }
+}
 function episodePreviewFromForm(form,clock){
  const v=episodeFormSnapshot(form),members=v.memberIds||[],people=members.map(character);
+ episodeAssertScopedSkillInputs(v);
  if(!people.length)throw Error('Vyberte aspoň jednu postavu.');
  const kind=v.kind,minutes=Number(v.minutes),guideId=v.guideId;
  const animals=(v.animalIds||[]).map(id=>character(id));
@@ -20761,6 +20854,7 @@ function renderEpisodeEndStatus(form,result,weather){
   proofList.innerHTML=episodeLinkedProofHTML(form)+proofList.innerHTML;
  }
  const tasks=episodeEndTasks(result),checklist=root.querySelector('[data-episode-checklist]');
+ episodeOutstandingSkillTasks=tasks.filter(t=>t.skill&&t.actorId&&!form.elements.namedItem(t.action)?.value);
  if(!form.elements.namedItem('confirmed')?.checked)tasks.push({name:'Potvrzení GM',detail:'Po dokončení všech výsledků potvrďte skutečný průběh a čas na levé stránce.',action:'confirmed'});
  if(checklist)checklist.innerHTML=tasks.length?'<p class="hc-episode-task-lead">Před dokončením zbývá '+tasks.length+' vyhodnocení:</p>'+tasks.map((t,i)=>
    '<div class="hc-episode-task"><span class="hc-task-number">'+(i+1)+'</span><div><b>'+esc(t.name)+'</b><p>'+esc(t.detail)+'</p>'+
@@ -20773,21 +20867,63 @@ function renderEpisodeEndStatus(form,result,weather){
    '<p class="hc-episode-all-clear">✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.</p>';
  const button=root.querySelector('[data-episode-finalize]');if(button)button.disabled=!!tasks.length;
 }
+/** Independent of sequential rule-engine errors: show all already knowable
+ * requirements at the first evaluation. Dependent CF/Hazard/Encounter tasks
+ * are added only once their original roll is known. */
+function episodePlannedTasks(form){
+ const v=episodeFormSnapshot(form),tasks=[];
+ const add=(name,detail,field,skill=null,actorId=null)=>{
+  if(!form.elements.namedItem(field)||String(v[field]||'').trim())return;
+  tasks.push({name,detail,field,skill,actorId});
+ };
+ if(v.weatherSource==='local'){
+  add('Počasí · teplota','Doložte první skutečný meteorologický d10.','temperatureD10');
+  add('Počasí · srážky','Doložte druhý meteorologický d10.','precipitationD10');
+ }
+ if(v.kind==='travel'&&v.orientationUse!=='reuse')
+  add('Orienteering · Survival · '+(character(v.guideId)?.name||'průvodce'),
+   'Vykonejte a uložte skutečný Survival Success Value test průvodce.',
+   'orientationProofId','Survival',v.guideId);
+ if(v.kind==='tracking'&&v.trackingUse==='new')
+  add('Tracking · '+(character(v.guideId)?.name||'průvodce'),
+   'Vykonejte samostatný Tracking Success Value pro aktuální stopu.',
+   'trackingProofId','Tracking',v.guideId);
+ if(v.kind==='travel')for(const id of v.memberIds||[])
+  add('Únava · END d10 · '+(character(id)?.name||id),
+   'Doložte skutečný individuální END d10.', 'end_'+id);
+ if(v.kind==='forage')add('Foraging · d10','Doložte skutečný hod shánění potravy.','forageD10');
+ if(v.checkEncounter&&['travel','tracking','forage','watch'].includes(v.kind))
+  add('Encounter · d100','Doložte skutečný hod minutového výskytu setkání.','encounterD100');
+ return tasks;
+}
+function episodePlannedTaskHTML(t,i){
+ return '<div class="hc-episode-task"><span class="hc-task-number">'+(i+1)+'</span><div><strong>'+esc(t.name)+'</strong>'+ 
+  '<p>'+esc(t.detail)+'</p><button type="button" class="secondary" data-episode-jump="'+esc(t.field)+'">Doplnit pole</button> '+
+  (t.skill&&t.actorId?'<button type="button" data-episode-skill-task="'+esc(t.skill)+'" data-episode-skill-field="'+esc(t.field)+'" data-episode-skill-actor="'+esc(t.actorId)+'">Otevřít '+esc(t.skill)+' Skill Test</button>':'')+'</div></div>';
+}
 function renderEpisodeEndError(form,message){
  const root=document.querySelector('.hc-episode-spread-right')||form.closest('.hc-episode-shell');
  if(!root)return;
  const issue=episodeIssue(message,form),needsSkill=!!issue.skill;
+ const planned=episodePlannedTasks(form);
+ const taskName=issue.field==='survivalD10'?'Survival CF · navazující Hazard':
+  issue.field?.startsWith('whProof_')?'Klimatický následek · Endurance':
+  issue.field?.startsWith('evD4_')?'Encounter · vzdálenost':
+  issue.field?.startsWith('progressD10')?'Pohyb · Progress':
+  needsSkill?(issue.skill+' · '+(character(issue.actorId)?.name||issue.actorId)):'Chybějící vstup';
+ if(issue.field&&!planned.some(t=>t.field===issue.field))
+  planned.unshift({name:taskName,
+   detail:message,field:issue.field,skill:issue.skill,actorId:issue.actorId});
+ episodeOutstandingSkillTasks=planned.filter(t=>t.skill&&t.actorId);
  form.dataset.episodeProblem=message;
  form.dataset.episodeProblemField=issue.field||'';
  if(episodeEvaluationRequested)episodeMarkField(form,issue.field);
  const summary=root.querySelector('[data-episode-overview]');
- if(summary)summary.innerHTML='<p>Epizoda zatím není zapsaná. '+(needsSkill?'Následuje skutečný Skill Test.':'Opravte označený vstup vlevo.')+'</p>';
+ if(summary)summary.innerHTML='<p><strong>2 · Vyhodnocení epizody</strong></p><p>Herní čas se zatím nemění. Požadované hody a návazné testy vyřešte pomocí připravených úkolů.</p>';
  const list=root.querySelector('[data-episode-checklist]');
  if(list){
   const actorName=character(issue.actorId)?.name||'vybraná postava';
-  list.innerHTML='<div class="hc-episode-task"><span class="hc-task-number">1</span><div><strong>'+esc(needsSkill?issue.skill+' · '+actorName:'Chybějící vstup')+'</strong><p>'+esc(message)+'</p>'+
-   (issue.field?'<button type="button" class="secondary" data-episode-jump="'+esc(issue.field)+'">Ukázat a označit pole</button>':'')+
-   (needsSkill&&!form.elements.namedItem(issue.field)?.value?'<button type="button" data-episode-skill-task="'+esc(issue.skill)+'" data-episode-skill-field="'+esc(issue.field)+'" data-episode-skill-actor="'+esc(issue.actorId||'')+'">Otevřít '+esc(issue.skill)+' Skill Test</button>':'')+'</div></div>';
+  list.innerHTML='<p class="hc-episode-task-lead">Čeká '+planned.length+' aktuálně zjistitelných úkolů. Další následky se přidají po skutečných hodech.</p>'+planned.map(episodePlannedTaskHTML).join('');
  }
  const proof=root.querySelector('[data-episode-evidence]');
  if(proof){
@@ -20838,9 +20974,9 @@ function updateEpisodePreview(form){
  show('[data-episode-weather-geography]',true);
  show('[data-episode-manual-season]',!campaignTRDate(data.campaignClock,data.campaignClock.minute));
  show('[data-episode-section="skills"]',isTravel||isTracking);
- show('[data-episode-weather-roll]',true);
+ show('[data-episode-weather-roll]',episodeEvaluationRequested);
  // Other indoor activities still display the chosen global/local weather without irrelevant terrain choices.
- show('[data-episode-section="rolls"]',isTravel||isTracking||kind==='forage'||kind==='watch');
+ show('[data-episode-section="rolls"]',episodeEvaluationRequested&&(isTravel||isTracking||kind==='forage'||kind==='watch'));
  const rollsSummary=form.querySelector('[data-episode-section="rolls"]>summary');
  if(rollsSummary)rollsSummary.textContent=travel?'5 · Pohyb, únava a náhodná setkání':
   kind==='forage'?'5 · Foraging a volitelná setkání':
@@ -20848,8 +20984,11 @@ function updateEpisodePreview(form){
  show('[data-episode-travel-rolls]',isTravel);
  show('[data-episode-orientation-use]',isTravel);
  show('[data-episode-orientation-new]',isTravel&&v.orientationUse==='new');
+ const orientProofField=form.elements.namedItem('orientationProofId');
+ if(orientProofField)orientProofField.closest('label').hidden=!episodeEvaluationRequested;
  show('[data-episode-manual-modes]',isTravel&&v.orientationUse==='new'&&v.orientationAllocation==='manual');
- show('[data-episode-skill-links]',outdoor);
+ show('[data-episode-skill-links]',episodeEvaluationRequested&&outdoor);
+ show('[data-episode-final-confirm]',episodeEvaluationRequested);
  show('[data-episode-navigation]',isTravel);
  const orientProof=data.journal.find(j=>j.id===v.orientationProofId);
  const survivalCF=travel&&v.orientationUse==='new'&&
@@ -20878,11 +21017,11 @@ function updateEpisodePreview(form){
  }
 
  const tools=form.querySelector('.hc-episode-route-actions');
- if(tools){const skillButton=tools.querySelector('[data-episode-nav="skills"]'),combatButton=tools.querySelector('[data-episode-nav="encounter"]');if(skillButton)skillButton.hidden=!outdoor;if(combatButton)combatButton.hidden=!v.checkEncounter&&!survivalCF;}
+ if(tools){const skillButton=tools.querySelector('[data-episode-nav="skills"]'),combatButton=tools.querySelector('[data-episode-nav="encounter"]');if(skillButton)skillButton.hidden=!episodeEvaluationRequested||!outdoor;if(combatButton)combatButton.hidden=!episodeEvaluationRequested||(!v.checkEncounter&&!survivalCF);}
 
  for(const node of form.querySelectorAll('[data-episode-orientation-new]'))node.hidden=!isTravel||v.orientationUse!=='new';
  for(const node of form.querySelectorAll('[data-episode-tracking]'))node.hidden=!isTracking;
- for(const node of form.querySelectorAll('[data-episode-tracking-new]'))node.hidden=v.trackingUse!=='new';
+ for(const node of form.querySelectorAll('[data-episode-tracking-new]'))node.hidden=!episodeEvaluationRequested||v.trackingUse!=='new';
  for(const node of form.querySelectorAll('[data-episode-drover]'))node.hidden=v.conveyance==='foot';
 
  const navigationPrev=lastEpisodeBefore(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute);
@@ -20987,7 +21126,7 @@ function updateEpisodePreview(form){
      '';
    }
   }
-  show('[data-episode-weather-details]',!!result.weatherHazards?.length&&!v.weatherSafeShelter);
+  show('[data-episode-weather-details]',episodeEvaluationRequested&&!!result.weatherHazards?.length&&!v.weatherSafeShelter);
   for(const label of form.querySelectorAll('[data-episode-cold-condition]'))label.hidden=label.closest('[data-episode-weather-kind]')?.dataset.episodeWeatherKind!=='cold';
   for(const node of form.querySelectorAll('[data-episode-weather-kind]'))
    node.hidden=!result.weatherHazards?.includes(node.dataset.episodeWeatherKind);
@@ -21049,6 +21188,25 @@ function updateEpisodePreview(form){
     ${result.encounter?`<p><b>Encounter · minutový přepočet</b> · d100 ${result.encounter.d100}${result.encounter.d100Sub?' + upřesňující d100 '+result.encounter.d100Sub:''}, zdrojové TN d10 ${result.encounter.tn} (${result.encounter.night?'noc':'den / soumrak'}); pravděpodobnost alespoň jednoho setkání ${(result.encounter.chance*100).toLocaleString('cs-CZ',{maximumFractionDigits:2})} %, skutečný počet ${result.encounter.count}.</p>`:''}
     <p class="hc-hint">Jídlo a pití vyúčtuje původní časový účet výživy. Nezakládá se druhá spotřeba.</p>`;
  }catch(err){const low=form.querySelector('[data-episode-low-choice]');if(low)low.hidden=true;renderEpisodeEndError(form,err.message);out.innerHTML='<p class="hc-episode-await">K dokončení chybí: '+esc(err.message)+'</p>';}
+ // The setup phase never requests Skill Tests, dice or a GM confirmation.
+ // All mechanically necessary resolutions are requested AFTER Evaluate.
+ if(!episodeEvaluationRequested){
+  episodeOutstandingSkillTasks=[];
+  const stage=document.querySelector('.hc-episode-spread-right');
+  const overview=stage?.querySelector('[data-episode-overview]');
+  if(overview)overview.innerHTML='<p><strong>1 · Nastavení</strong></p><p>Vyberte činnost, účastníky a podmínky; poté stiskněte Vyhodnotit epizodu vlevo.</p>';
+  const checklist=stage?.querySelector('[data-episode-checklist]');
+  if(checklist)checklist.innerHTML='<p>Po vyhodnocení zde vznikne seznam všech potřebných hodů a navazujících situací.</p>';
+  const evidence=stage?.querySelector('[data-episode-evidence]');
+  if(evidence)evidence.innerHTML='<p>Výsledky se zobrazí až po vyhodnocení.</p>';
+  const details=stage?.querySelector('.hc-episode-result-details');if(details)details.hidden=true;
+  const finalize=stage?.querySelector('[data-episode-finalize]');if(finalize)finalize.disabled=true;
+  delete form.dataset.episodeProblem;delete form.dataset.episodeProblemField;
+  for(const node of form.querySelectorAll('.hc-episode-needs-input'))node.classList.remove('hc-episode-needs-input');
+ }else{
+  const details=document.querySelector('.hc-episode-spread-right .hc-episode-result-details');if(details)details.hidden=false;
+ }
+
 }
 function episodeCarrySettingsFromLast(){
  const clock=data.campaignClock,last=clock?lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute):null;
@@ -21127,10 +21285,19 @@ function initializeTimeEpisodeForm(form){
   const element=form.elements.namedItem(name),label=element?.closest?.('label');
   if(label&&!label.dataset.hmkHelp){label.classList.add('hc-episode-hover-help');label.dataset.hmkHelp=description;label.tabIndex=0;}
  }
- if(timeEpisodeDraftCampaign!==campaignKey(data.campaignClock)){timeEpisodeDraft={};timeEpisodeDraftCampaign=campaignKey(data.campaignClock);}
+ if(timeEpisodeDraftCampaign!==campaignKey(data.campaignClock)){
+  timeEpisodeDraft={};timeEpisodeDraftCampaign=campaignKey(data.campaignClock);
+  episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];
+  episodeEvaluationRequested=false;episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;
+  episodeDraftEpoch=uuid();
+ }
  if(!Object.keys(timeEpisodeDraft).length)timeEpisodeDraft=episodeCarrySettingsFromLast();
  episodeAutoBindSkillReceipt();
  episodeFormRestore(form,timeEpisodeDraft);
+ for(const [field,id] of episodePinnedSkillFields){
+  const input=form.elements.namedItem(field);
+  if(input){input.value=id;input.disabled=true;input.title='Vyřešený doklad epizody je uzamčen a nelze jej přepsat.';}
+ }
  const reuseInput=form.elements.namedItem('orientationReuse');
  if(reuseInput&&timeEpisodeDraft.orientationUse==='reuse')reuseInput.checked=true;
  const weather=form.elements.namedItem('weatherSource');
@@ -21177,10 +21344,14 @@ document.addEventListener('click',e=>{
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-episode-evaluate]');if(!btn)return;
  e.preventDefault();const form=btn.closest('form');if(!form)return;
+ const setup=episodeSetupIssue(form);
+ if(setup){episodeEvaluationRequested=false;timeEpisodeDraft=episodeFormSnapshot(form);
+  updateEpisodePreview(form);episodeShowSetupError(form,setup);return;}
  episodeEvaluationRequested=true;
  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
  const issue=form.dataset.episodeProblemField;
- if(form.dataset.episodeProblem&&issue&&episodeMarkField(form,issue,{focus:true}))return;
+ if(form.dataset.episodeProblem&&issue&&!episodeIssue(form.dataset.episodeProblem,form).skill&&
+    episodeSetupIssue(form)&&episodeMarkField(form,issue,{focus:true}))return;
  const panel=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
  if(panel){panel.scrollIntoView({block:'center',behavior:'smooth'});panel.setAttribute('tabindex','-1');panel.focus({preventScroll:true});}
 },true);
@@ -21196,11 +21367,22 @@ function episodeOpenRequestedSkill(button){
  const field=button.dataset.episodeSkillField;
  // A completed evidence is immutable for this draft. Reopening the skill
  // workbench, including for the same actor and skill, is always standalone.
- if(form?.elements.namedItem(field)?.value)return false;
+ if(episodePinnedSkillFields.has(field))return false;
+ const input=form?.elements.namedItem(field);if(input&&input.value){input.value='';}
  if(form)timeEpisodeDraft=episodeFormSnapshot(form);
  return episodeStartSkillRequest(field,button.dataset.episodeSkillTask,
   button.dataset.episodeSkillActor);
 }
+// Deny unrelated submissions BEFORE generic Skill Tests handlers can write a proof.
+// The gate is also enforced in recordSkillEvidence for non-form entry points.
+document.addEventListener('submit',e=>{
+ if(view!=='skills'||!e.target?.closest?.('.layout'))return;
+ const pending=episodeOpenActorRequest(selected);if(!pending)return;
+ const authorized=e.target.id==='skill-value-form'&&episodeSkillAuthorized(selected,pending.skill);
+ if(!authorized){e.preventDefault();e.stopImmediatePropagation();
+  alert((character(selected)?.name||'Postava')+' má nevyřešený test z Cestování: '+pending.skill+
+   '. Samostatné testy lze obnovit až po dořešení požadavku.');}
+},true);
 // Pointer navigation is done before blur/change can replace its source button.
 // Click remains for keyboard and accessibility activation.
 document.addEventListener('pointerdown',e=>{
@@ -21232,7 +21414,7 @@ document.addEventListener('click',e=>{
  if(b.dataset.episodeNav==='skills'&&b.dataset.episodeSkill&&b.dataset.episodeField){
   episodeStartSkillRequest(b.dataset.episodeField,b.dataset.episodeSkill,b.dataset.episodeActor||selected);return;
  }
- if(b.dataset.episodeNav==='skills'&&form?.dataset.episodeProblem){
+ if(b.dataset.episodeNav==='skills'&&episodeEvaluationRequested&&form?.dataset.episodeProblem){
   const issue=episodeIssue(form.dataset.episodeProblem,form);
   if(issue.skill&&episodeStartSkillRequest(issue.field,issue.skill,issue.actorId))return;
  }
@@ -21263,8 +21445,12 @@ document.addEventListener('submit',e=>{
  const form=e.target;if(form?.id!=='hmk-time-episode-form')return;
  e.preventDefault();e.stopImmediatePropagation();
  try{
+  if(!episodeEvaluationRequested)throw Error('Nejdříve nastavte podmínky a stiskněte Vyhodnotit epizodu.');
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Kampaň musí být otevřená mimo boj.');
   if(episodePendingEncounter(data.campaignClock))throw Error('Cesta je přerušena setkáním. Nejprve uzavřete Encounter; další herní čas se nesmí posunout.');
+  for(const [field,id] of episodePinnedSkillFields)
+   if(form.elements.namedItem(field)&&form.elements.namedItem(field).value!==id)
+    throw Error('Doklad '+field+' už byl přiřazen k této epizodě a nesmí být změněn.');
   const clock=data.campaignClock,{result,weather,precipitation,v}=episodePreviewFromForm(form,clock);
   if(!v.confirmed)throw Error('GM musí potvrdit skutečný průběh epizody.');
   // The entire selected interval is one transaction. Events retain their relative
@@ -21359,11 +21545,8 @@ document.addEventListener('submit',e=>{
       weatherAdded:climate?.delta??0,weatherCarry:climate?.carryOut??null});
     }
    }
-   const skillLinks=[...form.querySelectorAll('[name="skillProofIds"]:checked')].map(input=>{
-    const j=data.journal.find(x=>x.id===input.value&&x.calendarCampaignId===campaignKey(clock)&&x.campaignMinute===clock.minute&&x.skillTestProof);
-    if(!j)throw Error('Skill Test již neodpovídá aktuální minutě ani kampani.');
-    return {id:j.id,actorId:j.characterId,title:j.title,body:j.body||''};
-   });
+   const skillLinks=episodeLinkedProofRows(form).map(j=>({id:j.id,actorId:j.characterId,
+    title:j.title,body:j.body||'',requestId:j.calendarEpisodeSkillLink.requestId}));
    for(const memo of [result.orientation,result.trackingMemory])if(memo&&!skillLinks.some(x=>x.id===memo.skillId)){
     const original=data.journal.find(j=>j.id===memo.skillId);
     if(original)skillLinks.push({id:original.id,actorId:original.characterId,title:original.title,
@@ -21422,6 +21605,7 @@ document.addEventListener('submit',e=>{
   },{gmClockAdvance:true})){
    notice='Celá epizoda dokončena · '+result.minutes+' minut, '+result.distanceMeters+' metrů. Kronika a zdravotní stavy byly aktualizovány.';
    episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;episodeSkillReturnPending=false;episodeDraftEpoch=uuid();
+   episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];episodeEvaluationRequested=false;
    timeEpisodeDraft=v.rememberSettings?episodeClearDiceDraft(v):episodeFreshDraft();
    render();
   }
