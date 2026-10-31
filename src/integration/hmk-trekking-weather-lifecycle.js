@@ -1,6 +1,6 @@
-/** v93.620 Daily-weather lifecycle. Append-only cancellation is permitted only
- * before any actual Trekking proof relies upon the original day's weather.
- * The historical roll itself is never deleted or modified. */
+/** Daily-weather lifecycle: GM may withdraw an active area's forecast at
+ * any point in its day. The old roll and all completed travel remain in the
+ * append-only ledger; only future segments select a replacement. */
 const key=s=>String(s??'').trim().toLocaleLowerCase('cs');
 export const TREK_WEATHER_VOID_FORMAT='hmk-trek-weather-void-v1';
 export function weatherAreaKey(area){return key(area)}
@@ -31,9 +31,6 @@ export function canVoidWeather(journal=[],sourceId,campaignId,minute){
  const w=row.calendarTrekDayWeather;
  if(weatherVoidedIds(journal,campaignId).has(sourceId))return {ok:false,reason:'Počasí již bylo zrušeno.'};
  if(Math.floor(minute/1440)!==w.dayIndex)return {ok:false,reason:'Po skončení dne nelze historické počasí zrušit.'};
- if(journal.some(j=>j.calendarCampaignId===campaignId&&j.calendarTrekProof?.dayIndex===w.dayIndex&&
-   key(j.calendarTrekProof.area)===key(w.area)))
-  return {ok:false,reason:'Z tohoto počasí už vycházejí potvrzené cestovní hody. Původní počasí nelze změnit; zohledněte nové podmínky v navazující hlídce.'};
  return {ok:true,reason:''};
 }
 export function validateWeatherLifecycle(journal=[]){

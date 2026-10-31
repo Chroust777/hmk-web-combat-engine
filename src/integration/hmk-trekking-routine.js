@@ -154,7 +154,9 @@ export function assertTrekDailyWeatherAppendOnly(before=[],after=[]){
 }
 export function validateTrekkingJournalEvidence(document){
  const days=new Map();
- const voided=weatherVoidedIds(document?.journal??[]);
+ // Walk forward in time. A later GM cancellation cannot retroactively
+ // remove the base weather from an earlier Trekking watch.
+ const voided=new Set();
  const priorRows=[];
  for(const entry of document?.journal??[]){
   // New standalone HMK 144 climate evidence is authoritative for later watches.
@@ -175,6 +177,17 @@ export function validateTrekkingJournalEvidence(document){
    if(!voided.has(entry.id)){assert(!days.has(key),'Denní počasí bylo pro stejnou oblast a podmínky už potvrzeno.');days.set(key,day);}
    priorRows.push(entry);
    continue;
+  }
+  if(entry.calendarTrekWeatherVoid){
+   const original=priorRows.find(j=>j.id===entry.calendarTrekWeatherVoid.sourceId)?.calendarTrekDayWeather;
+   if(original){
+    for(const k of [...days.keys()]){
+     try{const parts=JSON.parse(k);if(parts[0]===entry.calendarCampaignId&&parts[1]===original.dayIndex&&
+      String(parts[2]).trim().toLocaleLowerCase('cs')===original.area.trim().toLocaleLowerCase('cs'))days.delete(k);}catch{}
+    }
+    voided.add(entry.calendarTrekWeatherVoid.sourceId);
+   }
+   priorRows.push(entry);continue;
   }
   const p=entry.calendarTrekProof;if(!p){priorRows.push(entry);continue;}
   assertTrackingBearingWatch(entry,priorRows);

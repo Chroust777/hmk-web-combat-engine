@@ -90,9 +90,7 @@ export function validateTrekWatchCancelRecord(row,journal=[]){
   typeof c.planId!=='string'||!c.planId||typeof row.calendarCampaignId!=='string'||!row.calendarCampaignId||
   typeof row.characterId!=='string'||!row.characterId||!Number.isSafeInteger(row.campaignMinute)||
   row.campaignMinute!==c.effectiveMinute||Math.floor(row.campaignMinute/1440)!==c.dayIndex||
-  (row.campaignMinute<c.dayIndex*1440+c.watchIndex*240
-   ? typeof c.reason!=='string'||c.reason.length>240
-   : !validText(c.reason,240)||c.reason.trim().length<3))throw Error('Zrušení hlídky nemá platný čas, důvod nebo vazbu na kampaň.');
+  typeof c.reason!=='string'||c.reason.length>240)throw Error('Zrušení hlídky nemá platný čas, důvod nebo vazbu na kampaň.');
  const source=journal.find(j=>j.id===c.planId);
  if(!source||source.calendarCampaignId!==row.calendarCampaignId||
   source.calendarTrekDayPlan?.format!==TREK_DAY_PLAN_FORMAT||source.calendarTrekDayPlan.dayIndex!==c.dayIndex||
@@ -104,7 +102,7 @@ export function validateTrekWatchCancelRecord(row,journal=[]){
   throw Error('Zrušení musí odkazovat na existující dosud platný plán, a to nejpozději před koncem hlídky.');
  return true;
 }
-/** Re-activation is allowed only before the planned four-hour watch begins.
+/** Re-activation is allowed during the still-open four-hour watch as well as before it.
  * It never rewrites earlier history and does not commit any activity. */
 export function validateTrekWatchReactivateRecord(row,journal=[]){
  const r=row?.calendarTrekWatchReactivate;
@@ -114,8 +112,8 @@ export function validateTrekWatchReactivateRecord(row,journal=[]){
   typeof row.calendarCampaignId!=='string'||!row.calendarCampaignId||
   typeof row.characterId!=='string'||!row.characterId||!Number.isSafeInteger(row.campaignMinute)||
   row.campaignMinute!==r.effectiveMinute||Math.floor(row.campaignMinute/1440)!==r.dayIndex||
-  row.campaignMinute>=r.dayIndex*1440+r.watchIndex*240)
-  throw Error('Opětovná aktivace je možná pouze pro budoucí hlídku a platný čas kampaně.');
+  row.campaignMinute>=r.dayIndex*1440+(r.watchIndex+1)*240)
+  throw Error('Obnova vyžaduje čas uvnitř dosud neukončené hlídky.');
  const plan=journal.find(j=>j.id===r.planId);
  const cancel=journal.find(j=>j.id===r.cancelId);
  // Pre-v93.617 receipts did not contain revised watch details; preserve them.
