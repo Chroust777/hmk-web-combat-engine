@@ -109,7 +109,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   encounterRoll===null?null:{roll:encounterRoll,tn:target,night:encounterNight,found:encounterRoll<=target,
   resolved:!!encounterResolved};
  return {format:EPISODE_FORMAT,startMinute:minute,endMinute:minute+minutes,minutes,kind,
-  memberIds:[...memberIds],terrain,topography,conveyance,motion,
+  memberIds:[...memberIds],terrain,topography,conveyance,mapScale,motion,
   distanceMeters,distanceKilometres:distanceMeters/1000,
   ...(kind==='travel'?{distanceFractionIn:previousDistanceFraction,distanceFractionOut}:{}),
   mapCentimetres:Math.round(distanceMeters*100000/mapScale)/1000,
@@ -442,7 +442,21 @@ export function validateTimeEpisodes(journal=[]){
   if(e.encounter?.format==='hmk-episode-encounter-minute-v1'){
    const expected={...episodeEncounterByMinutes({minutes:e.minutes,environ:e.encounter.environ,
     night:e.encounter.night,d100:e.encounter.d100,lightMinutes:e.encounter.lightMinutes??null}),resolved:!!e.encounter.resolved};
-   must(JSON.stringify(expected)===JSON.stringify(e.encounter),
+   if(e.interruption?.kind==='encounter'){
+    must(e.interruption.format==='hmk-episode-interruption-v1'&&
+     e.interruption.atMinute===e.endMinute&&e.interruption.offsetMinutes===e.minutes&&
+     e.interruption.remainingMinutes===e.encounter.originallyPlannedMinutes-e.minutes&&
+     e.encounter.originallyPlannedMinutes>e.minutes&&
+     e.encounter.stoppedAtMinute===e.minutes&&e.encounter.count===1&&e.encounter.found&&
+     e.encounter.d100===e.interruption.originalEncounterRoll&&e.encounter.resolved===false&&
+     e.encounter.otherPotentialEventsUncommitted===true,
+     'Pozastavení nemá původní hod, okamžik nebo zachovaný zbývající čas.');
+    const original=episodeEncounterByMinutes({minutes:e.encounter.originallyPlannedMinutes,
+     environ:e.encounter.environ,night:e.encounter.night,d100:e.encounter.d100,
+     lightMinutes:e.encounter.lightMinutes??null});
+    must(original.count===e.encounter.originalEncounterCount&&original.found,
+     'Pozastavené setkání neodpovídá původnímu doloženému d100.');
+   }else must(JSON.stringify(expected)===JSON.stringify(e.encounter),
     'Minutové riziko setkání musí odpovídat doloženému d100, prostředí a délce epizody.');
   }
   if(e.survivalHazard!==undefined){
@@ -463,15 +477,19 @@ export function validateTimeEpisodes(journal=[]){
    must(Array.isArray(e.encounterDetails)&&e.encounter?.found&&
     e.encounterDetails.length===e.encounter.count,'Každé setkání vyžaduje vlastní detail.');
    for(const [i,record] of e.encounterDetails.entries()){
-    must(record.i===i&&whole(record.offset,0,e.minutes-1)&&record.pending===false,
+    must(record.i===i&&whole(record.offset,0,e.interruption?.kind==='encounter'?e.minutes:e.minutes-1)&&record.pending===false,
      'Encounter: chybí skutečný čas výskytu nebo dokončení.');
     const d=record.distance;
     const distance=episodeEncounterDistance({terrain:d.terrain,d4:d.d4,period:d.period,
      moon:d.moon,hearingD10:d.hearingD10});
     must(JSON.stringify(distance)===JSON.stringify(d),'Encounter Distance nesouhlasí s d4, světlem nebo terénem.');
-    if(e.daylight){const at=e.startMinute+record.offset;
+    if(e.daylight&&!(e.interruption?.kind==='encounter'&&record.offset===e.minutes)){const at=e.startMinute+record.offset;
      const segment=e.daylight.segments.find(x=>x.start<=at&&at<x.end);
      must(segment?.period===d.period,'Encounter použil špatné světlo pro čas události.');}
+    if(e.interruption?.kind==='encounter'&&record.awaitingFollowup===true){
+     // Surprise is resolved at the actual event time, never pre-rolled for a future minute.
+     continue;
+    }
     if(record.nonhostile){must(record.surprise===null,'Pokojné setkání nemá Surprise test.');continue;}
     const t=record.surprise;
     must(t?.verified&&t.decision,'Encounter Surprise není rozhodnuto.');
@@ -481,7 +499,9 @@ export function validateTimeEpisodes(journal=[]){
      foeLevel:t.foeLevel,decision:t.decision});
     must(JSON.stringify(expected)===JSON.stringify(t),'Surprise neodpovídá pravidlové tabulce.');
    }
-   must(e.encounter.resolved===true,'Encounter má nevyřešené jednotlivé události.');
+   must(e.encounter.resolved===true||e.interruption?.kind==='encounter'&&e.encounter.resolved===false&&
+    e.encounterDetails.length===1&&e.encounterDetails[0].awaitingFollowup===true,
+    'Encounter má nevyřešené jednotlivé události.');
   }
   if(e.trackingFollowup){
    const t=e.trackingFollowup,m=e.trackingMemory;
@@ -523,7 +543,15 @@ export function validateTimeEpisodes(journal=[]){
     const expected=episodeWeatherExposure({kind:w.kind,areaAV:w.areaAV,roll:w.roll,
      protection:w.protection,fireStrength:w.fireStrength,continuousSleet:w.continuousSleet,
      resting:w.resting,shade:w.shade,tropicalNative:w.tropicalNative,endLevel:w.endLevel});
-    must(JSON.stringify(w)===JSON.stringify({id:w.id,...expected})&&
+    if(w.proofId!==undefined&&w.exposed){
+     const linked=journal.find(x=>x.id===w.proofId);
+     must(!!linked&&(episodeSkillProof(linked,'Endurance',w.id,j.calendarCampaignId,e.startMinute)||
+      episodeSkillProof(linked,'Survival',w.id,j.calendarCampaignId,e.startMinute))?.level===w.endLevel,
+      'Weather Hazard nemá skutečný doložený Endurance/Survival test.');
+    }
+    const newProof=w.proofId!==undefined;
+    must(JSON.stringify(w)===JSON.stringify(newProof?{id:w.id,...expected,proofId:w.exposed?w.proofId:null,
+     coldCondition:w.kind==='cold'?w.coldCondition||'dry':null}:{id:w.id,...expected})&&
      !['pending','pending-endurance'].includes(w.effect),'Pozměněný nebo neúplný Weather Hazard.');
    }
   }

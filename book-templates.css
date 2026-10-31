@@ -6944,3 +6944,14 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 @media(max-width:540px){.hc-episode-spread-left .hc-episode-settings .hmk-trek-grid{grid-template-columns:minmax(0,1fr)}}
 
 .hc-episode-watch-warning{border-left:3px solid #975425;background:rgba(181,117,51,.14);padding:8px 10px!important;font-size:.88rem;line-height:1.45}
+/* v93.633 · uncommitted travel time remains visible until the event is resolved. */
+.hc-episode-spread-left .hc-episode-interruption{
+  margin:.65rem 0 1rem;padding:1rem;border:2px solid rgba(121,67,30,.62);
+  border-radius:9px;background:rgba(255,239,196,.72);
+}
+.hc-episode-spread-left .hc-episode-interruption h3{margin:0 0 .5rem;color:#663719}
+.hc-episode-spread-left .hc-episode-interruption form{display:grid;gap:.65rem;margin-top:.7rem}
+.hc-episode-spread-left .hc-episode-interruption label{display:grid;gap:.25rem}
+.hc-episode-spread-left .hc-episode-interruption textarea,
+.hc-episode-spread-left .hc-episode-interruption select{width:100%;box-sizing:border-box}
+.hc-episode-spread-left .hc-episode-interruption .hc-check{display:flex;align-items:flex-start;gap:.4rem}

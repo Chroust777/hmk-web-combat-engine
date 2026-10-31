@@ -40,7 +40,7 @@ function applyStatus(s,h,newHR){
  return x;
 }
 export function prepareTrekkingWeatherTest({state,sourceId,round=1,kind,originalSL,coldCondition='dry',
- weatherHazardConfirmed=false,gmConfirmed=false}={}){
+ weatherHazardConfirmed=false,gmConfirmed=false,fatigueAccountedExternally=false}={}){
  const id=nextId(sourceId,kind),s=prepared(state,round,sourceId,id,gmConfirmed);
  need(['cold','heat'].includes(kind)&&slText.includes(originalSL),'Nepodložená meteorologická zkouška');
  need(weatherHazardConfirmed===true,'GM musí potvrdit předcházející Weather Hazard z Trekking str.149');
@@ -67,6 +67,7 @@ export function prepareTrekkingWeatherTest({state,sourceId,round=1,kind,original
   sequence:0,treatmentStarted:false};
  const outcome=hazard?applyStatus(s,hazard,hr):null;
  if(hazard)s.environmentalHazards.push(hazard);
+ if(fatigueAccountedExternally)addedWeariness=0;
  s.fatigue.weariness+=addedWeariness;
  s.events.push({id,type:'skill-trekking-weather-hazard',round,
   details:{sourceId,kind,originalSL,coldCondition,hr,periodMinutes,skinPending,
