@@ -196,6 +196,22 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   const sides=p.a?[{id:p.actorId,skill:p.skills?.[0],result:p.a,side:'A'},...(p.b?[{id:p.opponentId,skill:p.skills?.[1],result:p.b,side:'B'}]:[])]:[{id:p.actorId,skill:p.skill,result:p.result,side:'A'}];
   for(const x of sides){
    if(!['F','CF'].includes(x.result?.level)||x.result.forcedCF||!skillFollowupActivities(x.skill,x.result.level).length)continue;
+   // An Orienteering Survival CF already has its mandatory p.148 Survival
+   // Hazard resolved by the *same* confirmed travel episode. Do not create a
+   // second, generic calendar CF for the identical d100. During atomic episode
+   // completion, the caller supplies an in-memory (never persisted) preflight
+   // certificate. Once committed, the durable episode result is the proof.
+   // Before either exists the original CF still blocks unrelated time jumps.
+   const episodeOrienteeringCF=x.skill==='Survival'&&x.result.level==='CF'&&
+    e.calendarEpisodeSkillLink?.field==='orientationProofId';
+   const episodeAlreadyHandled=episodeOrienteeringCF&&journal.some(z=>
+    (z.calendarScopedCriticalResolution?.originId===e.id&&
+     z.calendarScopedCriticalResolution.campaignId===e.calendarCampaignId)||
+    (z.calendarCampaignId===e.calendarCampaignId&&
+     z.calendarTimeEpisode?.orientation?.skillId===e.id&&
+     !!z.calendarTimeEpisode.survivalHazard&&
+     (z.calendarTimeEpisode.hazardDetails||[]).every(h=>!h.requiresGMCompletion)));
+   if(episodeAlreadyHandled)continue;
    if(journal.some(z=>z.skillTestProof?.type==='critical-followup'&&z.skillTestProof.originId===e.id&&z.skillTestProof.side===x.side))continue;
    const c=characters.find(c=>c.id===x.id);
    if(c)push(c,'skill-critical',e.id+'-'+x.side,`${x.skill} ${x.result.level} – GM ověří konkrétní činnost a případný navazující test (HMK ${skillFollowupActivities(x.skill,x.result.level)[0].page})`,e.campaignMinute,'skills',
