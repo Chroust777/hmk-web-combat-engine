@@ -6860,3 +6860,43 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-trek-account-person{border:1px solid rgba(115,83,49,.32);padding:8px;min-width:0;}
 .hc-trek-account-person li{font-size:.8rem;line-height:1.4;margin:6px 0;}
 @media(max-width:1050px){.hc-trek-account-people-grid{grid-template-columns:1fr;}}
+/* v93.628 – an episode instead of six parallel watch planners. */
+.hc-episode-shell{max-width:100%;overflow:visible}
+.hc-episode-head{margin-bottom:1rem}
+.hc-episode-head h2{margin:0 0 .5rem;font-size:clamp(1.35rem,2vw,1.7rem)}
+.hc-episode-head p{font-size:.94rem;line-height:1.48;max-width:75ch}
+.hc-episode-columns{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(250px,.78fr);gap:1.05rem;align-items:start}
+.hc-episode-editor,.hc-episode-result,.hc-episode-history{min-width:0;padding:1rem;background:rgba(255,249,232,.48);border:1px solid rgba(118,74,26,.3);border-radius:9px}
+.hc-episode-editor h3,.hc-episode-result h3{font-size:1.2rem;margin:0 0 .8rem}
+.hc-episode-editor label{display:flex;flex-direction:column;gap:.3rem;font-size:.9rem;min-width:0}
+.hc-episode-editor input,.hc-episode-editor select,.hc-episode-editor textarea{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+.hc-episode-editor fieldset{border:1px solid rgba(118,74,26,.27);border-radius:6px;padding:.65rem;margin:.7rem 0}
+.hc-episode-editor legend{font-weight:bold}
+.hc-episode-members{display:flex;gap:.8rem;flex-wrap:wrap;margin:.35rem 0 .7rem}
+.hc-episode-members label,.hc-episode-editor label.hc-check{flex-direction:row;align-items:center;gap:.45rem}
+.hc-episode-editor .hc-check input{width:auto}
+.hc-episode-settings{margin:.75rem 0;padding:.55rem .65rem;border:1px solid rgba(118,74,26,.26);border-radius:7px}
+.hc-episode-settings>summary{font-weight:700;cursor:pointer;margin:.1rem 0 .6rem}
+.hc-episode-settings .hmk-trek-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.hc-episode-die{display:flex;align-items:stretch;gap:.3rem}
+.hc-episode-die input{flex:1;min-width:0}
+.hc-episode-die button{width:auto;white-space:nowrap;padding:.35rem .55rem;font-size:.83rem}
+.hc-episode-dice-by-person{border-top:1px solid rgba(118,74,26,.22);margin:.6rem 0;padding:.6rem 0}
+.hc-episode-dice-by-person label{margin:.5rem 0}
+.hc-episode-dice-by-person p{font-size:.85rem;line-height:1.4}
+.hc-episode-encounter{padding:.6rem 0;border-top:1px solid rgba(118,74,26,.22)}
+.hc-episode-route-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin:.6rem 0}
+.hc-episode-route-actions button{flex:1 1 150px;font-size:.85rem}
+.hc-episode-confirm{width:100%;font-weight:bold;margin-top:.55rem}
+.hc-episode-result{position:sticky;top:1rem}
+.hc-episode-result [data-episode-preview]>p{line-height:1.5;padding:.3rem .1rem;border-bottom:1px solid rgba(118,74,26,.13)}
+.hc-episode-latest{border-top:1px solid rgba(118,74,26,.32);margin-top:1rem;padding-top:.75rem}
+.hc-episode-inactive{opacity:.65}
+.hc-episode-await{color:#8f321f;font-weight:600}
+.hc-episode-history{margin:.65rem 0}
+.hc-episode-history header{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.hc-episode-history p{line-height:1.45;margin:.5rem 0}
+.hc-episode-person-results{padding:.4rem .6rem;background:rgba(134,100,52,.07);border-radius:6px}
+.hc-episode-local-weather[hidden],.hc-episode-encounter [hidden],[data-episode-end-person][hidden]{display:none!important}
+@media(max-width:900px){.hc-episode-columns{grid-template-columns:minmax(0,1fr)}.hc-episode-result{position:static}.hc-episode-editor,.hc-episode-result{padding:.8rem}}
+@media(max-width:490px){.hc-episode-settings .hmk-trek-grid{grid-template-columns:minmax(0,1fr)}.hc-episode-head h2{font-size:1.3rem}.hc-episode-editor label{font-size:.88rem}}

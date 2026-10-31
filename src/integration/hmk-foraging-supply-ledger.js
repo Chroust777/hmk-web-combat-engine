@@ -7,10 +7,10 @@ const requireIt=(value,message)=>{if(!value)throw Error(message)};
 const units=['foodDays','waterDays','herbDoses'];
 export const FORAGING_SUPPLY_USE_FORMAT='hmk-foraging-supply-use-v1';
 function lotsFromProof(row){
- const p=row.calendarTrekWildernessProof;if(!p)return [];
+ const p=row.calendarTrekWildernessProof||row.calendarTimeEpisode?.foraging;if(!p)return [];
  return p.results.flatMap((r,i)=>units.filter(unit=>r[unit]>0).map(unit=>({
   key:row.id+':'+i+':'+unit,sourceId:row.id,resultIndex:i,
-  campaignId:row.calendarCampaignId,minute:row.campaignMinute,
+  campaignId:row.calendarCampaignId,minute:row.calendarTimeEpisode?.endMinute??row.campaignMinute,
   unit,herbName:unit==='herbDoses'?r.herbName:null,quantity:r[unit]
  })));
 }
@@ -48,16 +48,16 @@ export function createSupplyUse({journal=[],campaignId,minute,sourceId,resultInd
  requireIt(typeof purpose==='string'&&purpose.length<=120&&(disposition!=='ingredient-reserved'||purpose.trim()),
   'Rezervace bylin potřebuje označení zamýšlené Concoction (nenahrazuje její výrobu)');
  const origin=journal.find(j=>j.id===sourceId);
- requireIt(origin?.calendarTrekWildernessProof&&origin.calendarCampaignId===campaignId&&
-  origin.campaignMinute<=minute,'Zdroj není doložen v této kampani a minulosti');
- const result=origin.calendarTrekWildernessProof.results[resultIndex];
+ requireIt((origin?.calendarTrekWildernessProof||origin?.calendarTimeEpisode?.foraging)&&origin.calendarCampaignId===campaignId&&
+  (origin.calendarTimeEpisode?.endMinute??origin.campaignMinute)<=minute,'Zdroj není doložen v této kampani a minulosti');
+ const result=(origin.calendarTrekWildernessProof||origin.calendarTimeEpisode?.foraging).results[resultIndex];
  requireIt(result&&result[unit]>0,'Původní Foraging neobsahuje tuto zásobu');
  const available=availableSupplyLots(journal,campaignId).find(l=>
   l.sourceId===sourceId&&l.resultIndex===resultIndex&&l.unit===unit);
  requireIt(available?.remaining>=quantity,'Zásoba byla již vydána nebo nestačí');
  return {format:FORAGING_SUPPLY_USE_FORMAT,sourceId,resultIndex,unit,quantity,actorId,
   disposition,purpose:disposition==='ingredient-reserved'?purpose.trim():'',
-  herbName:unit==='herbDoses'?result.herbName:null,sourceMinute:origin.campaignMinute,
+  herbName:unit==='herbDoses'?result.herbName:null,sourceMinute:origin.calendarTimeEpisode?.endMinute??origin.campaignMinute,
   minute,sourcePages:unit==='herbDoses'?[74,147]:[147,186],
   ...(disposition==='stored-in-container'?{containerFillId}:{})};
 }
@@ -120,7 +120,7 @@ export function allocateForagingRations({journal=[],campaignId,minute,actorIds=[
 export function assertSupplyJournalAppendOnly(previous=[],next=[]){
  const byId=new Map(next.map(row=>[row.id,row]));
  for(const row of previous){
-  if(!row.calendarForagingSupplyUse&&!row.calendarTrekWildernessProof)continue;
+  if(!row.calendarForagingSupplyUse&&!row.calendarTrekWildernessProof&&!row.calendarTimeEpisode?.foraging)continue;
   requireIt(byId.has(row.id)&&JSON.stringify(byId.get(row.id))===JSON.stringify(row),
    'Doložený nález nebo výdej zásob nelze změnit ani smazat přes běžný zápisník');
  }
