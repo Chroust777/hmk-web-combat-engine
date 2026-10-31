@@ -47,7 +47,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
  enduranceByActor={},endRollByActor={},memberIds=[],weather=null,encounterRoll=null,encounterEnviron='rural',
  encounterResolved=false,encounterNight=false,encounterPercentile=null,encounterSubPercentile=null,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
  survivalCriticalFailure=false,survivalD10=null,doubleTime=false,loadBypass=false,encByActor={},dunesSlow=false,
-  forcedBearing=0,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null}={}){
+  forcedBearing=0,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null,inactiveByActor={}}={}){
  must(whole(minute,0,1e9)&&whole(minutes,1,10080)&&minute+minutes<=1e9,'Epizoda potřebuje 1–10 080 skutečných minut.');
  must(EPISODE_KINDS.includes(kind),'Neznámý druh epizody');
  if(movementMinutes===null)movementMinutes=minutes;
@@ -87,6 +87,35 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   var distanceFractionOut=Math.min(0.9999999999,Math.max(0,exactMetres-distanceMeters));
   actors=memberIds.map(id=>{
    const end=enduranceByActor[id],roll=endRollByActor[id];
+   const inactive=inactiveByActor[id];
+   if(inactive){
+    const carryIn=previousCarry[id]??0;
+    must(whole(carryIn,0,239)&&Number.isSafeInteger(inactive.minute)&&
+     inactive.minute>=minute&&inactive.minute<=minute+minutes&&
+     ['INC','UNC','KIA'].includes(inactive.shock),
+     'Nesplnitelný END test vyžaduje doložený zdravotní stav a minutu vzniku.');
+    const priorMovement=Math.min(movementMinutes,inactive.minute-minute);
+    const earlyIncapacity={minute:inactive.minute,shock:inactive.shock,sourceKey:inactive.sourceKey,
+     activeMovementMinutes:priorMovement};
+    if(priorMovement>0){
+     // END attests fatigue ALREADY accumulated before the medical crisis,
+     // not an impossible active action AFTER the character became unconscious.
+     must(whole(end,0,50)&&whole(roll,1,10),
+      'Doložte END d10 pro minuty, které postava skutečně prošla před zdravotní neschopností.');
+     const sr=expeditionSecondaryRoll({endurance:end,roll,
+      riding:conveyance==='mount'||conveyance==='cart'||conveyance==='wagon'});
+     const enc=encByActor[id]??0;must(whole(enc,0,100),'Neplatná ENC postavy.');
+     const extraFatigue=loadBypass?Math.floor(enc/(conveyance==='foot'?10:20))*10:0;
+     const duneFatigue=terrain==='dunes'&&conveyance==='foot'&&!dunesSlow?5:0;
+     const rate=(doubleTime?(conveyance==='foot'?40:20)-(sr.success?20:0):(sr.success?0:5))+extraFatigue+duneFatigue;
+     const units=carryIn+priorMovement*rate;
+     return {id,endurance:end,roll,sr,rate,delta:Math.floor(units/240),carryIn,
+      carryOut:units%240,enc,extraFatigue,duneFatigue,earlyIncapacity};
+    }
+    return {id,endurance:end,roll:null,sr:null,rate:0,delta:0,carryIn,carryOut:carryIn,
+     enc:encByActor[id]??0,extraFatigue:0,duneFatigue:0,earlyIncapacity,
+     endNotRequired:{minute:inactive.minute,shock:inactive.shock,sourceKey:inactive.sourceKey}};
+   }
    must(whole(end,0,50)&&whole(roll,1,10),'Každá cestující postava potřebuje skutečný END SR d10.');
    const sr=expeditionSecondaryRoll({endurance:end,roll,riding:conveyance==='mount'||conveyance==='cart'||conveyance==='wagon'});
    const enc=encByActor[id]??0;
@@ -666,10 +695,31 @@ export function validateTimeEpisodes(journal=[]){
    const units=episodeWeatherFatigueUnits({weather:e.weather,exposure:e.weatherExposure,
     minutes:e.minutes,dayMinutes,nightMinutes:e.minutes-dayMinutes});
    for(const a of e.actors){
-    const expected=units[a.id]||0,total=a.carryIn+(e.travelDelay?.movementMinutes??e.minutes)*a.rate+expected;
+    const expected=units[a.id]||0,activeMinutes=a.earlyIncapacity?.activeMovementMinutes??
+     (e.movementMinutes??e.travelDelay?.movementMinutes??e.minutes),
+     total=a.carryIn+activeMinutes*a.rate+expected;
     must(a.weatherFatigueUnits===expected&&a.delta===Math.floor(total/240)&&a.carryOut===total%240,
      'Minutová únava způsobená počasím neodpovídá doloženému Cold/Heat Hazard.');
    }
+  }
+  if(e.kind==='travel')for(const a of e.actors||[])if(a.earlyIncapacity){
+   const med=a.earlyIncapacity,witness=e.timedMedical?.find(x=>x.actorId===a.id&&
+    x.dueMinute===med.minute&&x.shockAfter===med.shock);
+   const expectedMinutes=Math.min(e.movementMinutes,med.minute-e.startMinute);
+   must(witness&&['INC','UNC','KIA'].includes(witness.shockAfter)&&
+    med.activeMovementMinutes===expectedMinutes&&
+    (expectedMinutes===0||a.sr!==null&&whole(a.roll,1,10))&&
+    a.delta===Math.floor((a.carryIn+expectedMinutes*a.rate+(a.weatherFatigueUnits||0))/240)&&
+    a.carryOut===(a.carryIn+expectedMinutes*a.rate+(a.weatherFatigueUnits||0))%240,
+    'Částečná únava postavy před zdravotní neschopností nemá pravidlový doklad.');
+  }
+  if(e.kind==='travel')for(const a of e.actors||[])if(a.endNotRequired){
+   const witness=e.timedMedical?.find(x=>x.actorId===a.id&&
+    x.dueMinute===a.endNotRequired.minute&&x.shockAfter===a.endNotRequired.shock);
+   must(witness&&['INC','UNC','KIA'].includes(witness.shockAfter)&&
+    a.roll===null&&a.sr===null&&a.rate===0&&
+    a.carryOut===(a.carryIn+(a.weatherFatigueUnits||0))%240&&Number.isSafeInteger(a.endNotRequired.minute),
+    'Vynechaný END d10 nemá doloženou neschopnost ze zdravotní kontroly.');
   }
   if(e.travelDelay!==undefined){
    must(e.kind==='travel','Zdržení lze přenášet jen mezi cestovními epizodami.');
@@ -677,8 +727,18 @@ export function validateTimeEpisodes(journal=[]){
    const expected=episodeMinuteDelay({minutes:e.minutes,
     incoming:d.method==='gm-current-episode-only-v2'?0:lastEpisodeTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute),
     current:d.current,future:d.future,persistCarry:d.method!=='gm-current-episode-only-v2'});
-   must(JSON.stringify(expected)===JSON.stringify(d)&&e.movementMinutes===d.movementMinutes,
+   must(JSON.stringify(expected)===JSON.stringify(d)&&
+    (e.medicalTravelStop?e.movementMinutes<=d.movementMinutes:e.movementMinutes===d.movementMinutes),
     'Zdržení nebo přenesené minuty neodpovídají předchozí cestě.');
+   if(e.medicalTravelStop){
+    const stop=e.medicalTravelStop;
+    must(e.incapacitationDecision==='stop'&&Number.isSafeInteger(stop.minute)&&
+     stop.minute>=e.startMinute&&stop.minute<=e.endMinute&&
+     Number.isSafeInteger(stop.movementMinutes)&&stop.movementMinutes===e.movementMinutes&&
+     stop.movementMinutes>=0&&stop.movementMinutes<=stop.minute-e.startMinute&&
+     e.timedMedical?.some(x=>x.dueMinute===stop.minute&&['INC','UNC','KIA'].includes(x.shockAfter)),
+     'Zastavený pochod nemá doložený čas ani zdravotní příčinu.');
+   }
    const hazard=e.hazardDetails?.find(h=>h.hazard==='equipment'||h.hazard==='complication');
    const outcome=hazard?.result;
    const mandatoryNext=['short-delay','long-delay','irreparable'].includes(outcome);
@@ -687,7 +747,7 @@ export function validateTimeEpisodes(journal=[]){
     'Dlouhá komplikace musí zohlednit i čas ztracený v aktuální epizodě.');
   }
   if(e.travelDelay&&Array.isArray(e.animals)){
-   for(const a of e.animals){const units=a.carryIn+e.travelDelay.movementMinutes*a.rate;
+   for(const a of e.animals){const units=a.carryIn+(e.movementMinutes??e.travelDelay.movementMinutes)*a.rate;
     must(a.delta===Math.floor(units/240)&&a.carryOut===units%240,
      'Únava zvířat nebyla přepočtena na skutečný čas pohybu.');
    }
@@ -695,7 +755,7 @@ export function validateTimeEpisodes(journal=[]){
   if(e.distanceFractionIn!==undefined){
    must(e.kind==='travel'&&Math.abs(e.distanceFractionIn-lastTimeEpisodeDistanceFraction(prior,j.calendarCampaignId,e.startMinute))<1e-7,
     'Ztracený nebo cizí zlomek cestovní vzdálenosti.');
-   const meters=e.motion.finalLPW*4000*(e.travelDelay?.movementMinutes??e.minutes)/240+e.distanceFractionIn;
+   const meters=e.motion.finalLPW*4000*(e.movementMinutes??e.travelDelay?.movementMinutes??e.minutes)/240+e.distanceFractionIn;
    must(e.distanceMeters===Math.floor(meters+1e-10)&&Math.abs(e.distanceFractionOut-Math.max(0,meters-e.distanceMeters))<1e-7,
     'Minutové metry nebo přenesený zlomek neodpovídají rychlosti.');
   }

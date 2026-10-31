@@ -1,3 +1,4 @@
+import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js';
 import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js';
 import {heftPenalty,strengthImpactModifier,twoHandedImpactBonus} from './src/rules/weapon-modes.js';
 import {resolveCrossbowArcheryChoice} from './src/integration/hmk-crossbow-archery-choice.js';
@@ -154,7 +155,7 @@ import {availableSpellAuralRecoveries,persistSpellAuralRecovery} from './src/int
 import {pendingTranscendenceWill,createTranscendenceWill,applyTranscendenceWill,requireTranscendenceWillGMTimeMayAdvance,validateTranscendenceWillJournal,assertTranscendenceWillAppendOnly} from './src/integration/hmk-herbal-transcendence-will.js';
 import {availableSpellPsycheRecoveries,persistSpellPsycheRecoverySchedule,persistSpellPsycheRecoveryRoll} from './src/integration/hmk-spell-psyche-recovery.js';
 import {pendingSpellPsycheManifestations,persistSpellPsycheManifestation} from './src/integration/hmk-spell-psyche-manifestation.js';
-import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan} from './src/integration/hmk-calendar-planner.js';
+import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan,gmCalendarAgenda} from './src/integration/hmk-calendar-planner.js';
 import {secureHMKDie,expeditionDiceSubmission,expeditionWatchFatigue,expeditionRestRecovery,commitExpeditionFatigue} from './src/integration/hmk-calendar-expedition.js';
 import {scheduleHMKActivity,finishDueHMKActivities,finishInterruptedHMKTravel,validateHMKActivityEvidence,assertHMKActivitiesAppendOnly,activeHMKActivities,interruptHMKActivity} from './src/integration/hmk-calendar-activities.js';
 import {nutritionRestActivity,interruptionForCancelledNutritionRest} from './src/integration/hmk-nutrition-rest-bridge.js';
@@ -301,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.643';
+const APP_VERSION='93.644';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1974,6 +1975,7 @@ function episodeEncounterEventsHTML(count,terrain,period){
  <label>Minuta výskytu od začátku epizody<input name="evOffset_${i}" type="number" min="0" max="10080" placeholder="0–délka epizody"></label>
  <p class="hc-hint">Minuta výskytu a d4 určují okolnosti setkání v rámci epizody. Surprise, případný Combat a další následky se dořeší před jediným závěrečným zápisem celé epizody. Čas kampaně se při jednotlivých hodech neposouvá.</p>
  <label class="hc-check"><input name="evNonhostile_${i}" type="checkbox"> Nehrozí nepřátelství · Surprise se nevyhodnocuje</label>
+ <label class="hc-check" data-episode-medical-review hidden><input name="evInactiveReviewed_${i}" type="checkbox"> GM vyřešil setkání bez aktivní postavy (pouze pokud v minutě setkání nikdo není schopen jednat)</label>
  <label>d4 vzdálenosti<span class="hc-episode-die"><input name="evD4_${i}" type="number" min="1" max="4"><button type="button" data-episode-die="evD4_${i}" data-episode-faces="4">⚄ d4</button></span></label>
  <input type="hidden" name="evPeriod_${i}" value="day">
  <label>Fáze Měsíce (v noci)<select name="evMoon_${i}">${[['dark','Tmavý'],['quarter','Čtvrtina'],['bright','Jasný']].map(x=>option(...x)).join('')}</select></label>
@@ -2017,6 +2019,10 @@ function timeEpisodePageHTML(clock,participants){
  ${!pendingEncounter&&lastResolvedPause?`<p class="hc-hint" role="status">Předchozí cesta byla pozastavena; její nevyhodnocený zbytek byl ${lastResolvedPause.calendarTimeEpisode.interruption.remainingMinutes} minut. Zda pokračovat po vyřešeném setkání, rozhoduje GM podle aktuální situace.</p>`:''}
  <div class="hc-episode-columns"><section class="hc-episode-editor"><h3>1 · Nastavit epizodu</h3>
 <form id="hmk-time-episode-form" novalidate>
+ <input type="hidden" name="episodeTimedRollsJson" value="{}">
+ <input type="hidden" name="episodeIncapChoice" value="">
+ <input type="hidden" name="episodeIncapMoveMinutes" value="">
+ <input type="hidden" name="episodeGMReviewedJson" value="{}">
  <div class="hmk-trek-grid"><label>Činnost<select name="kind">${[['travel','Cestování / pochod'],['rest','Odpočinek'],['sleep','Spánek'],['winded','Krátký klid (Windedness)'],['forage','Shánění potravy'],['tracking','Sledování stop'],['watch','Ostraha / vigilance'],['other','Jiná činnost']].map(([v,l])=>option(v,l)).join('')}</select></label>
  <label>Délka · skutečné minuty<input name="minutes" type="number" min="1" max="10080" value="${esc(String(d.minutes||60))}" required title="Skutečná délka epizody v minutách (nejvýše sedm dní v jednom zápisu)."></label></div>
  <p class="hc-episode-clockline"><strong>Začátek:</strong> ${esc(start)} · <span data-episode-end>Konec po zadání minut</span>. Vyhodnocení na konci intervalu; čas se do té doby neposouvá.</p>
@@ -20287,7 +20293,7 @@ function episodeCurrentWeather(form,clock,{mandatory=true}={}){
  return {weather:trekWeatherDay({season,climate,landscape:topography,alpine,aridDesert:desert,temperatureD10:t,precipitationD10:r}),
   area:String(v.area).trim(),sourceId:null,origin:'episode-only'};
 }
-function episodeAccidentMedicalProof(v,clock,members,animals){
+function episodeAccidentMedicalProof(v,clock,members,animals,stateOverride=null){
  const roster=[...members,...animals.map(x=>x.id)].filter((id,i,arr)=>arr.indexOf(id)===i);
  const raw=k=>String(v[k]??'').trim();
  const number=k=>raw(k)?Number(raw(k)):null;
@@ -20296,7 +20302,7 @@ function episodeAccidentMedicalProof(v,clock,members,animals){
   throw Error('Accident: doložte fyzický los oběti d'+roster.length+' (1–'+roster.length+').');
  const victim=character(roster[chosen-1]);
  if(!victim)throw Error('Accident: vybraná oběť již není v kampani.');
- const state=persistentStateOf(victim);
+ const state=stateOverride||persistentStateOf(victim);
  const report=prepareSkillPhysicalInjury({kind:'survival-accident',actor:victim,inventory:data.inventory,state,
   sourceId:'episode:'+campaignKey(clock)+':'+clock.minute+':survival-accident',
   round:Math.max(1,combatClock.round||1,state.lastRound||0),gmConfirmed:true,
@@ -20445,6 +20451,9 @@ function episodePreviewFromForm(form,clock){
  if(encounterEnabled&&v.encounterFine&&(!String(v.encounterD100Sub||'').trim()||!Number.isSafeInteger(encounterD100Sub)||encounterD100Sub<1||encounterD100Sub>100))
   throw Error('Jemný Encounter vyžaduje dvě skutečné d100: základní a upřesňující.');
  if(encounterEnabled&&(!Number.isSafeInteger(encounterD100)||encounterD100<1||encounterD100>100))throw Error('Minutový Encounter vyžaduje skutečný d100 (1–100).');
+ const medAtEnd=episodeEvaluationRequested?episodeTimedMedical(form):null;
+ const inactiveByActor=Object.fromEntries((medAtEnd?.incapacitations||[]).filter(x=>members.includes(x.actorId))
+  .map(x=>[x.actorId,x]));
  const result=calculateTimeEpisode({minute:clock.minute,minutes,kind,topography:v.topography,terrain:v.terrain,
   conveyance:v.conveyance,progress:modes.progress,bearing:modes.bearing,extraSlow:Number(v.extraSlow||0)+Number(modes.orienteeringSlow||0)+taskSlow,
   wearied,injured,loaded:!!v.loaded,continuousPrecipitation:!!precipitation?.slowMode,
@@ -20457,7 +20466,7 @@ function episodePreviewFromForm(form,clock){
   doubleTime:!!v.doubleTime,loadBypass:!!v.loadBypass,dunesSlow:!!v.dunesSlow,
   encByActor:Object.fromEntries(members.map(id=>[id,Number(v['enc_'+id]||0)])),forcedBearing,
   previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute),
-  encounterLightMinutes:lightMinutes});
+  encounterLightMinutes:lightMinutes,inactiveByActor});
  result.orientation=orientation;
  result.trackingMemory=trackingMemory;
  result.daylight=autoLight;
@@ -20560,15 +20569,27 @@ function episodePreviewFromForm(form,clock){
 
     if(outcome==='no-delay'&&now)throw Error('Úspěch CS nezpůsobuje zdržení. Opravte minuty.');
    }
-   result.travelDelay=delay;result.movementMinutes=delay.movementMinutes;
-   const metres=result.motion.finalLPW*4000*delay.movementMinutes/240+result.distanceFractionIn;
+   const previewIncap=episodeEvaluationRequested?episodeTimedMedical(form)?.incapacitations||[]:[];
+   const confirmedStop=v.episodeIncapChoice==='stop'&&previewIncap.length>0;
+   const moveLimit=Number(v.episodeIncapMoveMinutes);
+   if(confirmedStop&&(!/^(?:0|[1-9]\d*)$/.test(String(v.episodeIncapMoveMinutes||''))||
+     moveLimit>Math.min(...previewIncap.map(x=>x.minute))-clock.minute))
+    throw Error('Zastavený pochod: doložte skutečné minuty pohybu v pravé části.');
+   result.travelDelay=delay;
+   result.movementMinutes=confirmedStop?Math.min(delay.movementMinutes,moveLimit):delay.movementMinutes;
+   result.medicalTravelStop=confirmedStop?{minute:Math.min(...previewIncap.map(x=>x.minute)),
+    movementMinutes:result.movementMinutes}:null;
+   const metres=result.motion.finalLPW*4000*result.movementMinutes/240+result.distanceFractionIn;
    result.distanceMeters=Math.floor(metres+1e-10);
    result.distanceKilometres=result.distanceMeters/1000;
    result.distanceFractionOut=Math.min(.9999999999,Math.max(0,metres-result.distanceMeters));
    result.mapCentimetres=Math.round(result.distanceMeters*100000/Number(v.mapScale))/1000;
    result.actors=result.actors.map(a=>{
-    const units=a.carryIn+delay.movementMinutes*a.rate;
-    return {...a,delta:Math.floor(units/240),carryOut:units%240};
+    const actorMinutes=a.earlyIncapacity?Math.min(result.movementMinutes,a.earlyIncapacity.minute-clock.minute):
+     result.movementMinutes;
+    const units=a.carryIn+actorMinutes*a.rate;
+    return {...a,delta:Math.floor(units/240),carryOut:units%240,
+     ...(a.earlyIncapacity?{earlyIncapacity:{...a.earlyIncapacity,activeMovementMinutes:actorMinutes}}:{})};
    });
   }
  const weatherPeriods=autoLight?.minutesByPeriod||null;
@@ -20600,11 +20621,19 @@ function episodePreviewFromForm(form,clock){
     coldCondition:hazard==='cold'?field('whCold')||'dry':null});
   }
  }
- // All medical previews are sequenced in one temporary Combat State, not written now.
- // A later hazard can compound an earlier wound in the SAME episode.
+ // Timed health events are provisionally resolved at their due minute.
+ // Their results are combined with the later episode-local trauma, never
+ // replaced by a stale copy of the initial health state.
+ const timedMedical=episodeEvaluationRequested?episodeTimedMedical(form):null;
+ result.timedIncapacitations=timedMedical?.incapacitations||[];
  const previewStates=new Map();
+ if(timedMedical?.complete)for(const c of timedMedical.characters){
+  if((result.memberIds||[]).includes(c.id)&&c.hmk?.combatState)
+   previewStates.set(c.id,c.hmk.combatState);
+ }
  for(const hazard of result.hazardDetails||[])if(hazard.hazard==='accident'&&!hazard.requiresGMCompletion){
-  const staged=episodeAccidentMedicalProof(v,clock,members,animals);
+  const actorId=[...members,...animals.map(x=>x.id)][Number(v.hazardVictimD)-1];
+  const staged=episodeAccidentMedicalProof(v,clock,members,animals,previewStates.get(actorId));
   previewStates.set(staged.victim.id,staged.report.state);
  }
  result.weatherSkinDetails=[];
@@ -20638,7 +20667,7 @@ function episodePreviewFromForm(form,clock){
    exposure:result.weatherExposure,minutes,dayMinutes,nightMinutes});
   result.actors=result.actors.map(actor=>{
    const extra=weatherUnits[actor.id]||0;
-   const units=actor.carryIn+(result.movementMinutes??minutes)*actor.rate+extra;
+   const units=actor.carryIn+(actor.earlyIncapacity?.activeMovementMinutes??(result.movementMinutes??minutes))*actor.rate+extra;
    return {...actor,weatherFatigueUnits:extra,delta:Math.floor(units/240),carryOut:units%240};
   });
  }
@@ -20662,6 +20691,20 @@ function episodePreviewFromForm(form,clock){
    const partyActorId=value('evPartyActor')||members[0];
    if(memberProof&&(!partyEvidence||!members.includes(memberProof.characterId)||memberProof.characterId!==partyActorId))
     throw Error('Encounter #'+(i+1)+': zvolený doklad není dovednost člena družiny v aktuální kampani a minutě.');
+   const incapacitatedAtEvent=(id)=>(medAtEnd?.incapacitations||[]).some(x=>x.actorId===id&&x.minute<=clock.minute+actualOffset)||
+    !episodeActorCanAct(persistentStateOf(character(id)));
+   const canAct=members.filter(id=>!incapacitatedAtEvent(id));
+   // A party Surprise cannot be performed by an unconscious actor. First ask
+   // for another capable participant. Only with nobody capable can the GM
+   // explicitly attest the unopposed scene, not fabricate an Awareness SL.
+   if(!nonhostile&&incapacitatedAtEvent(partyActorId)){
+    const gmReviewed=canAct.length===0&&!!v['evInactiveReviewed_'+i];
+    result.encounterDetails.push({i,offset:actualOffset,nonhostile:false,distance,surprise:null,
+     partySkill:value('evPartySkill')||'Awareness',partyActorId,partySkillEvidenceId:null,
+     medicallyUnavailable:true,medicalGMReviewed:gmReviewed,availableActors:canAct,
+     pending:!gmReviewed});
+    continue;
+   }
    const surprise=nonhostile?null:episodeEncounterSurprise({partyModes:orientation?.modes||(kind==='watch'?{vigilance:1}:{}),conveyance:v.conveyance,
     foeWatchfulness:value('evFoe')||'normal',foeIsBeast:!!v['evBeast_'+i],
     partySkill:value('evPartySkill')||'Awareness',foeSkill:value('evFoeSkill')||'Awareness',
@@ -20752,6 +20795,15 @@ function episodeEndTasks(result){
   for(let i=0;i<result.encounter.count;i++){
    const event=result.encounterDetails?.find(x=>x.i===i);
    if(!event||event.pending){
+    if(event?.medicallyUnavailable){
+     if(event.availableActors?.length) add('Encounter #'+(i+1)+' · vyberte schopného účastníka',
+      'Původní postava není v okamžiku setkání schopná jednat. Vyberte jinou způsobilou postavu; nedokládejte nemožný Awareness.',
+      'evPartyActor_'+i);
+     else add('Encounter #'+(i+1)+' · rozhodnutí GM',
+      'V okamžiku setkání žádný člen družiny nemůže jednat. Doložte GM uzavření tohoto setkání; nevynucujte nemožný Skill Test.',
+      'evInactiveReviewed_'+i);
+     continue;
+    }
     const s=event?.surprise,requiresParty=!event?.nonhostile&&s&&
      (s.procedure==='opposed'||s.procedure==='unopposed'&&s.preferred==='party')&&
      !event.partySkillEvidenceId;
@@ -20898,6 +20950,48 @@ function episodeIndependentDeadlines(form){
   !['poison','disease'].includes(item.kind));}
  catch{return [];}
 }
+/** Recompute the medical timeline from immutable original evidence on every
+ * evaluation. A draft roll is only a proposal; it cannot alter the real clock.
+ */
+function episodeTimedRolls(form){
+ try{const v=JSON.parse(form.elements.namedItem('episodeTimedRollsJson')?.value||'{}');
+  return v&&typeof v==='object'&&!Array.isArray(v)?v:{};
+ }catch{return {};}
+}
+function episodeTimedMedical(form,{strict=false}={}){
+ const duration=Number(form.elements.namedItem('minutes')?.value),clock=data.campaignClock;
+ if(!clock||!Number.isSafeInteger(duration)||duration<1||duration>10080)return null;
+ try{return episodeTimedMedicalPreview(data,{endMinute:clock.minute+duration,rolls:episodeTimedRolls(form)});}
+ catch(err){if(strict)throw err;return {error:err.message,requirements:[],changes:[],incapacitations:[],complete:false};}
+}
+/** GM memo reminders are reviewable without fabricated skill or health dice.
+ * Real skills, wounds, timers and poisons stay mandatory in their own engine.
+ * IDs and deadline must match the original pre-existing plan exactly. */
+function episodeGMReviewData(form){
+ try{const raw=JSON.parse(form.elements.namedItem('episodeGMReviewedJson')?.value||'{}');
+  return raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};
+ }catch{return {};}
+}
+function episodeGMReviews(form){
+ const clock=data.campaignClock,duration=Number(form.elements.namedItem('minutes')?.value);
+ if(!clock||!Number.isSafeInteger(duration)||duration<1||duration>10080)return {pending:[],reviewed:[]};
+ const values=episodeGMReviewData(form),start=clock.minute,end=start+duration;
+ const agenda=gmCalendarAgenda(clock).filter(p=>p.requiresAction&&!p.resolution&&p.dueMinute>=start&&p.dueMinute<end);
+ return {pending:agenda.filter(p=>p.destination!=='notes'||!values[p.id]||values[p.id]!==p.dueMinute),
+  reviewed:agenda.filter(p=>p.destination==='notes'&&values[p.id]===p.dueMinute)};
+}
+function episodeOtherTimedTasks(form){return episodeIndependentDeadlines(form).filter(x=>x.kind!=='malnutrition-course');}
+function episodeGMStagedClock(clock,reviewed){
+ if(!reviewed.length)return clock;
+ const next={...clock,planResolutions:[...(clock.planResolutions||[])]};
+ for(const p of reviewed){
+  if(p.destination!=='notes'||!p.requiresAction||p.resolution||!clock.plans?.some(x=>x.id===p.id&&x.trigger===p.trigger&&
+   (x.trigger==='end'?x.endMinute:x.minute)===p.dueMinute))throw Error('Neplatné potvrzení časované události GM.');
+  next.planResolutions.push({id:'travel-gm-review:'+clock.minute+':'+p.id,planId:p.id,minute:p.dueMinute,
+   kind:'resolved',note:'GM zkontroloval časovanou připomínku během cestovní epizody.'});
+ }
+ return next;
+}
 function showEpisodeIndependentDeadlines(form){
  const panel=document.querySelector('.hc-episode-spread-right');if(!panel)return;
  let box=panel.querySelector('[data-episode-independent-due]');
@@ -20905,15 +20999,58 @@ function showEpisodeIndependentDeadlines(form){
   box.setAttribute('data-episode-independent-due','');
   panel.querySelector('[data-episode-checklist]')?.parentElement?.after(box);}
  if(!box)return;
- const tasks=episodeEvaluationRequested?episodeIndependentDeadlines(form):[];
- box.hidden=!tasks.length;
- if(tasks.length){
-  box.innerHTML='<h4>Časovaný závazek během intervalu · '+tasks.length+'</h4>'+tasks.map(x=>
-   '<div class="hc-episode-task"><div><b>'+esc(x.name||x.characterId||'Postava')+
-   ' · '+esc(displayCampaignMinute(x.minute))+'</b><p>'+esc(x.description||x.kind)+
-   '</p><p>Jde o samostatný dříve naplánovaný termín. Nejde o nový výsledek Cestování. '+
-   'Tento zdravotní/pravidlový krok zatím nelze zpracovat v rozepsané epizodě při zmrazeném čase; '+
-   'závěrečný časový zápis je zablokován, aby termín nebyl přeskočen.</p></div></div>').join('');
+ const other=episodeEvaluationRequested?episodeOtherTimedTasks(form):[];
+ const medical=episodeEvaluationRequested?episodeTimedMedical(form):null;
+ const gm=episodeEvaluationRequested?episodeGMReviews(form):{pending:[],reviewed:[]};
+ const relevant=other.length||medical?.changes.length||medical?.requirements.length||medical?.error||medical?.incapacitations.length||gm.pending.length||gm.reviewed.length;
+ box.hidden=!relevant;
+ if(!episodeEvaluationRequested)return;
+ const rolls=episodeTimedRolls(form);
+ const medicalRows=(medical?.changes||[]).map(c=>'<div class="hc-episode-proof hc-episode-proof-done"><strong>✓ '+
+  esc(character(c.actorId)?.name||c.actorId)+' · '+esc(c.kind)+' · '+esc(displayCampaignMinute(c.dueMinute))+
+  '</strong><p>Vyřešeno · d100 '+c.roll+' · '+esc(c.sl)+' · HR '+c.beforeHR+' → '+c.afterHR+
+  (c.shockAfter!=='NONE'?' · '+esc(c.shockAfter):'')+'</p></div>').join('');
+ const missingRows=(medical?.requirements||[]).map(r=>{
+  const actor=character(r.characterId)?.name||r.characterId;
+  if(r.mode==='pending')return '<div class="hc-episode-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
+   '</strong><p>'+esc(r.reason)+'</p><p>Nejdříve doložte příděly v původní evidenci stravy a vody; bez nich nelze zdravotní d100 správně vypočítat.</p>'+ 
+   '<button type="button" class="secondary" data-episode-nav="inventory">Otevřít inventář a zásoby</button></div></div>';
+  const val=rolls[r.key]??'';
+  const key=encodeURIComponent(r.key);
+  return '<div class="hc-episode-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
+   '</strong><p>'+esc(r.reason)+'</p><label class="hc-episode-medical-roll-label">Skutečný d100 (1–100)'+
+   '<input data-episode-medical-key="'+esc(key)+'" type="number" min="1" max="100" value="'+esc(val)+'" aria-label="Zdravotní d100 '+esc(actor)+'"></label> '+
+   '<button type="button" class="secondary" data-episode-medical-die="'+esc(key)+'">⚄ d100</button></div></div>';
+ }).join('');
+ const incap=medical?.incapacitations||[];
+ const blocked=incap.length>0;
+ const first=incap.reduce((a,b)=>!a||b.minute<a.minute?b:a,null);
+ const choice=form.elements.namedItem('episodeIncapChoice')?.value||'';
+ const incapHTML=blocked?'<div class="hc-episode-task"><div><strong>GM · změna schopnosti cestovat</strong><p>'+esc(character(first.actorId)?.name||first.actorId)+
+  ' od '+esc(displayCampaignMinute(first.minute))+' není schopný aktivní účasti ('+esc(first.shock)+'). '+
+  'Pozdější aktivní úkony této postavy se nesmí vyžadovat jako nemožné hody. Zdravotní kontroly zůstávají povinné.</p>'+ 
+  '<button type="button" data-episode-incap="stop" class="secondary" aria-pressed="'+(choice==='stop')+'">'+(choice==='stop'?'✓ ':'')+'Družina zastaví pohyb</button> '+
+  '<button type="button" data-episode-incap="continue" class="secondary" aria-pressed="'+(choice==='continue')+'">'+(choice==='continue'?'✓ ':'')+'GM rozhodl o pokračování / nesení</button>'+ 
+  (choice==='stop'?'<label>Skutečné minuty pohybu před zastavením (0–'+(first.minute-data.campaignClock.minute)+')'+
+   '<input type="number" data-episode-incap-move="yes" min="0" max="'+(first.minute-data.campaignClock.minute)+
+   '" value="'+esc(form.elements.namedItem('episodeIncapMoveMinutes')?.value||'')+'" placeholder="Doložte skutečný pohyb"></label>':'')+
+  (choice==='continue'?'<p>U pokračování GM upraví zatížení a případné zpomalení v levé části. Stav postižené postavy se nemění.</p>':'')+'</div></div>':'';
+ const gmRows=[...gm.pending,...gm.reviewed].map(p=>{
+  const reviewed=gm.reviewed.some(x=>x.id===p.id),safeKey=encodeURIComponent(p.id);
+  return '<div class="hc-episode-task"><div><strong>'+esc(p.title)+' · '+esc(displayCampaignMinute(p.dueMinute))+
+   '</strong><p>'+esc(p.note||'Časovaná událost GM')+'</p>'+
+   (p.destination!=='notes'?'<p>Tato událost vyžaduje původní pravidlový modul. Potvrzení nenahrazuje skutečný test.</p>':
+    '<label class="hc-episode-gm-review"><input type="checkbox" data-episode-gm-review="'+esc(safeKey)+'" '+(reviewed?'checked':'')+
+    '> Zkontrolováno GM</label>')+'</div></div>';
+ }).join('');
+ const others=other.map(x=>'<div class="hc-episode-task"><div><b>'+esc(x.name||x.characterId||'Postava')+
+  ' · '+esc(displayCampaignMinute(x.minute))+'</b><p>'+esc(x.description||x.kind)+'</p>'+ 
+  '<p>Tento pravidlový termín zatím vyžaduje původní autoritativní modul; nelze jej odškrtnutím obejít.</p>'+ 
+  '<button type="button" class="secondary" data-episode-nav="'+esc(calendarEventDestination(x)==='calendar'?'skills':calendarEventDestination(x))+'">Otevřít příslušný modul</button></div></div>').join('');
+ box.innerHTML='<h4>Časované kontroly a následky během epizody</h4>'+
+  (medical?.error?'<p class="notice error">'+esc(medical.error)+'</p>':'')+
+  medicalRows+missingRows+incapHTML+gmRows+others;
+ if(other.length||gm.pending.length||medical?.error||medical?.requirements.length||(blocked&&(!choice||(choice==='stop'&&!/^\d+$/.test(form.elements.namedItem('episodeIncapMoveMinutes')?.value||''))))){
   const finalize=panel.querySelector('[data-episode-finalize]');if(finalize)finalize.disabled=true;
  }
 }
@@ -20935,8 +21072,10 @@ function episodePlannedTasks(form){
   add('Tracking · '+(character(v.guideId)?.name||'průvodce'),
    'Vykonejte samostatný Tracking Success Value pro aktuální stopu.',
    'trackingProofId','Tracking',v.guideId);
- if(v.kind==='travel')for(const id of v.memberIds||[])
+ const incap=new Map((episodeTimedMedical(form)?.incapacitations||[]).map(x=>[x.actorId,x]));
+ if(v.kind==='travel')for(const id of v.memberIds||[])if(!incap.has(id)||incap.get(id).minute>data.campaignClock?.minute)
   add('Únava · END d10 · '+(character(id)?.name||id),
+   incap.has(id)?'END pro skutečně ušlé minuty PŘED zdravotní neschopností; po ní se žádný další aktivní test neprovádí.':
    'Doložte skutečný individuální END d10.', 'end_'+id);
  if(v.kind==='forage')add('Foraging · d10','Doložte skutečný hod shánění potravy.','forageD10');
  if(v.checkEncounter&&['travel','tracking','forage','watch'].includes(v.kind))
@@ -21142,6 +21281,11 @@ function updateEpisodePreview(form){
   delete form.dataset.episodeProblem;delete form.dataset.episodeProblemField;
   for(const node of form.querySelectorAll('.hc-episode-needs-input'))node.classList.remove('hc-episode-needs-input');
   renderEpisodeEndStatus(form,result,weather);
+  for(const row of form.querySelectorAll('[data-episode-encounter-row]')){
+   const i=Number(row.dataset.episodeEncounterRow),event=result.encounterDetails?.find(x=>x.i===i);
+   const review=row.querySelector('[data-episode-medical-review]');
+   if(review)review.hidden=!(event?.medicallyUnavailable&&!(event.availableActors?.length));
+  }
   const hz=form.querySelector('[data-episode-hazard-details]');if(hz){
    const types=(result.hazardDetails||[]).map(x=>x.hazard),kind=types.join(' + ');
    hz.hidden=!travel||!types.length;
@@ -21214,7 +21358,8 @@ function updateEpisodePreview(form){
     <p><strong>Čas pohybu:</strong> ${result.movementMinutes??result.minutes} z ${result.minutes} minut${result.travelDelay?.applied?', zdržení '+result.travelDelay.applied+' minut':''}.</p>
     <p><strong>Uraženo:</strong> ${result.distanceMeters} m (${(result.distanceMeters/1000).toLocaleString('cs-CZ',{maximumFractionDigits:3})} km)</p>
     <p><strong>Na mapě:</strong> ${result.mapCentimetres} cm.</p>
-    ${result.actors.map(a=>`<p>${esc(character(a.id)?.name||a.id)}: END (d10: ${a.roll}), TN ${a.sr.tn} · ${a.sr.success?'úspěch':'neúspěch'}; Weariness +${a.delta}${a.weatherFatigueUnits?' (včetně počasí '+(a.weatherFatigueUnits/240).toFixed(2)+' bodu)':''}${a.carryOut?' (přenáší se nevyčerpaný zlomek)':''}.</p>`).join('')}${result.animals?.length?result.animals.map(a=>`<p>Zvíře ${esc(character(a.id)?.name||a.id)}: Weariness +${a.delta} · GM analogie.</p>`).join(''):''}`:
+    ${result.actors.map(a=>`<p>${esc(character(a.id)?.name||a.id)}: ${a.endNotRequired?'END se neprovádí · zdravotní neschopnost od '+esc(displayCampaignMinute(a.endNotRequired.minute)):
+    'END (d10: '+a.roll+'), TN '+a.sr.tn+' · '+(a.sr.success?'úspěch':'neúspěch')}; Weariness +${a.delta}${a.weatherFatigueUnits?' (včetně počasí '+(a.weatherFatigueUnits/240).toFixed(2)+' bodu)':''}${a.carryOut?' (přenáší se nevyčerpaný zlomek)':''}.</p>`).join('')}${result.animals?.length?result.animals.map(a=>`<p>Zvíře ${esc(character(a.id)?.name||a.id)}: Weariness +${a.delta} · GM analogie.</p>`).join(''):''}`:
    `${result.recoveryPreview?.length?result.recoveryPreview.map(p=>{const w=result.weatherRestFatigue?.find(x=>x.id===p.id);return `<p>${esc(character(p.id)?.name||p.id)} · zotavení ${p.recovered} bodů, klimatická únava +${w?.delta||0} bodů${w?.addedUnits?' (minutově '+w.addedUnits+' jednotek; převod zbytku '+w.carryOut+')':''}. ${p.next.carry?'Nevyčerpaná část zotavení přenesena.':''}</p>`;}).join(''):'<p>Bez přesunu. Příslušné testy se řeší v původních Skill Tests.</p>'}`;
   out.innerHTML=`<p><b>${esc(displayCampaignMinute(result.startMinute))}–${esc(displayCampaignMinute(result.endMinute))}</b> · ${result.minutes} minut</p>
     ${travelText}
@@ -21268,13 +21413,13 @@ function episodeCarrySettingsFromLast(){
   navigationRecovered:false,checkEncounter:false};
 }
 function episodeFreshDraft(){return {rememberSettings:false,orientationUse:'new',trackingUse:'new',confirmed:false,
- memberIds:[],animalIds:[],orientationProofId:'',trackingProofId:'',progressD10:'',directionD10:'',checkEncounter:false};}
+ memberIds:[],animalIds:[],orientationProofId:'',trackingProofId:'',progressD10:'',directionD10:'',checkEncounter:false,episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
 function episodeClearDiceDraft(draft){
  const saved={...draft,confirmed:false,orientationProofId:'',trackingProofId:'',droverProofId:'',encounterD100Sub:'',
   progressD10:'',directionD10:'',survivalD10:'',precipitationD6:'',encounterD100:'',forageD10:'',
   temperatureD10:'',precipitationD10:'',
   checkEncounter:false,encounterResolution:'',navigationRecovered:false,orientationUse:'new',trackingUse:'new',
-  skillProofIds:[]};
+  skillProofIds:[],episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};
  for(const k of Object.keys(saved))if(k.startsWith('end_'))saved[k]='';
  return saved;
 }
@@ -21389,6 +21534,42 @@ document.addEventListener('click',e=>{
  }catch(err){alert('Hod nebyl proveden: '+err.message)}
 },true);
 document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-episode-medical-die],[data-episode-incap]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
+ if(b.dataset.episodeIncap){form.elements.namedItem('episodeIncapChoice').value=b.dataset.episodeIncap;
+  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);return;}
+ const key=decodeURIComponent(b.dataset.episodeMedicalDie);
+ try{const rolls=episodeTimedRolls(form);rolls[key]=secureHMKDie(100);
+  form.elements.namedItem('episodeTimedRollsJson').value=JSON.stringify(rolls);
+  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
+ }catch(err){alert('Zdravotní hod nebyl proveden: '+err.message);}
+},true);
+document.addEventListener('change',e=>{
+ const input=e.target.closest?.('[data-episode-incap-move]');if(!input)return;
+ const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
+ form.elements.namedItem('episodeIncapMoveMinutes').value=input.value;
+ timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
+},true);
+document.addEventListener('change',e=>{
+ const input=e.target.closest?.('[data-episode-medical-key]');if(!input)return;
+ const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
+ const key=decodeURIComponent(input.dataset.episodeMedicalKey),rolls=episodeTimedRolls(form);
+ if(String(input.value).trim())rolls[key]=String(input.value).trim();else delete rolls[key];
+ form.elements.namedItem('episodeTimedRollsJson').value=JSON.stringify(rolls);
+ timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
+},true);
+document.addEventListener('change',e=>{
+ const input=e.target.closest?.('[data-episode-gm-review]');if(!input)return;
+ const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
+ const id=decodeURIComponent(input.dataset.episodeGmReview),clock=data.campaignClock;
+ const p=gmCalendarAgenda(clock).find(x=>x.id===id);
+ if(!p||p.destination!=='notes'||!p.requiresAction||p.resolution){input.checked=false;return;}
+ const reviews=episodeGMReviewData(form);if(input.checked)reviews[id]=p.dueMinute;else delete reviews[id];
+ form.elements.namedItem('episodeGMReviewedJson').value=JSON.stringify(reviews);
+ timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
+},true);
+document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-episode-evaluate]');if(!btn)return;
  e.preventDefault();const form=btn.closest('form');if(!form)return;
  const setup=episodeSetupIssue(form);
@@ -21498,8 +21679,19 @@ document.addEventListener('submit',e=>{
   for(const [field,id] of episodePinnedSkillFields)
    if(form.elements.namedItem(field)&&form.elements.namedItem(field).value!==id)
     throw Error('Doklad '+field+' už byl přiřazen k této epizodě a nesmí být změněn.');
-  const timed=episodeIndependentDeadlines(form);
-  if(timed.length)throw Error('Časovaný termín uvnitř epizody ('+timed.map(x=>(x.name||x.characterId)+' · '+displayCampaignMinute(x.minute)).join('; ')+') není možné přeskočit. Nejprve musí být pravidlově vyřešen v původním čase.');
+  const timed=episodeOtherTimedTasks(form);
+  const gm=episodeGMReviews(form);
+  if(gm.pending.length)throw Error('Nevyřízené povinné události GM: '+gm.pending.map(x=>x.title).join(', ')+'.');
+  if(timed.length)throw Error('Povinný časovaný postup vyžaduje autoritativní vyhodnocení: '+timed.map(x=>(x.name||x.characterId)+' · '+displayCampaignMinute(x.minute)).join('; ')+'.');
+  const stagedTimed=episodeTimedMedical(form,{strict:true});
+  if(stagedTimed?.requirements.length)throw Error('Nejdříve vyhodnoťte všechny splatné zdravotní d100 v pravém panelu.');
+  if(stagedTimed?.incapacitations.length&&!form.elements.namedItem('episodeIncapChoice')?.value)throw Error('Postava ztratila schopnost pokračovat: doložte rozhodnutí GM na pravé stránce.');
+  if(stagedTimed?.incapacitations.length&&form.elements.namedItem('episodeIncapChoice')?.value==='stop'){
+   const first=Math.min(...stagedTimed.incapacitations.map(x=>x.minute));
+   const movement=Number(form.elements.namedItem('episodeIncapMoveMinutes')?.value);
+   if(!/^\d+$/.test(form.elements.namedItem('episodeIncapMoveMinutes')?.value||'')||movement>first-data.campaignClock.minute)
+    throw Error('Při zastavení pochodu doložte skutečné minuty pohybu před ztrátou schopnosti pokračovat.');
+  }
   const clock=data.campaignClock,{result,weather,precipitation,v}=episodePreviewFromForm(form,clock);
   if(!v.confirmed)throw Error('GM musí potvrdit skutečný průběh epizody.');
   // The entire selected interval is one transaction. Events retain their relative
@@ -21518,13 +21710,18 @@ document.addEventListener('submit',e=>{
   if(active.length)throw Error('Před začátkem nové epizody ukončete starší stále aktivní činnost: '+active.map(a=>a.calendarActivityProof.name).join(', ')+'.');
   if(result.weatherHazard&&result.weatherExposure?.some(x=>x.pending||['pending','pending-endurance'].includes(x.effect)))
    throw Error('Weather Hazard: každá postava musí mít doloženou ochrannou AV, skutečný hod a případný END (Survival).');
+  const medicalStates=new Map();
+  const timedStates=new Map((stagedTimed?.characters||[]).filter(c=>c.hmk?.combatState).map(c=>[c.id,c.hmk.combatState]));
   const accidentMedical=[];
   for(const h of result.hazardDetails||[])if(h.hazard==='accident'){
-   const prepared=episodeAccidentMedicalProof(v,clock,result.memberIds,(result.animals||[]).map(a=>character(a.id)).filter(Boolean));
+   const roster=[...result.memberIds,...(result.animals||[]).map(a=>a.id)];
+   const victimId=roster[Number(v.hazardVictimD)-1];
+   const prepared=episodeAccidentMedicalProof(v,clock,result.memberIds,(result.animals||[]).map(a=>character(a.id)).filter(Boolean),medicalStates.get(victimId)||timedStates.get(victimId));
+   medicalStates.set(prepared.victim.id,prepared.report.state);
    if(h.victimId!==prepared.victim.id||h.requiresGMCompletion)throw Error('Accident: neúplný autoritativní výsledek Injury Sequence.');
    accidentMedical.push(prepared);
   }
-  const stagedMedicalStates=new Map(accidentMedical.map(x=>[x.victim.id,x.report.state]));
+  const stagedMedicalStates=medicalStates;
   const weatherMedical=[];
   for(const w of result.weatherExposure||[]){
    if(w.exposed!==true)continue;
@@ -21533,7 +21730,7 @@ document.addEventListener('submit',e=>{
    const proof=episodeSkillProof(original,'Endurance',w.id,campaignKey(clock),clock.minute)||
     episodeSkillProof(original,'Survival',w.id,campaignKey(clock),clock.minute);
    if(!actor||!proof||proof.level!==w.endLevel)throw Error('Weather Hazard: chybí autoritativní navazující Skill Test '+w.id+'.');
-   const state=stagedMedicalStates.get(w.id)||persistentStateOf(actor),sourceId=original.id+':episode:'+clock.minute+':'+w.kind;
+   const state=stagedMedicalStates.get(w.id)||timedStates.get(w.id)||persistentStateOf(actor),sourceId=original.id+':episode:'+clock.minute+':'+w.kind;
    const outcome=prepareTrekkingWeatherTest({state,sourceId,
     round:Math.max(1,combatClock.round||1,state.lastRound||0),kind:w.kind,
     originalSL:proof.level,coldCondition:w.coldCondition||'dry',weatherHazardConfirmed:true,
@@ -21560,22 +21757,30 @@ document.addEventListener('submit',e=>{
    result.hazardDetails?.length&&result.hazardDetails.every(h=>!h.requiresGMCompletion)?
    [{calendarScopedCriticalResolution:{originId:result.orientation.skillId,
      campaignId:campaignKey(clock)}}]:[];
-  const next=advanceCampaignCalendar(clock,{deltaMinutes:result.minutes,eventId:uuid(),reason:'GM časová epizoda: '+gmMessage,gmConfirmed:true,
-   characters:data.characters,journal:[...data.journal,...scopedSurvivalCF]});
+  const gmClock=episodeGMStagedClock(clock,gm.reviewed);
+  const next=advanceCampaignCalendar(gmClock,{deltaMinutes:result.minutes,eventId:uuid(),reason:'GM časová epizoda: '+gmMessage,gmConfirmed:true,
+   characters:stagedTimed?.characters||data.characters,journal:[...(stagedTimed?.generatedJournal?.length?data.journal.concat(stagedTimed.generatedJournal):data.journal),...scopedSurvivalCF]});
   const name=result.memberIds.map(id=>character(id)?.name||id).join(', '),sourceId=uuid();
   if(!window.confirm('Potvrdit činnost '+name+' od '+displayCampaignMinute(result.startMinute)+' do '+displayCampaignMinute(result.endMinute)+' a posunout skutečný herní čas?'))return;
   const members=result.memberIds.map(id=>character(id));
   if(mutate(()=>{
-   // Commit all validated injuries/exposures first. Fatigue accrual and recovery then
-   // operate on those updated original states and are never overwritten by medical previews.
+   // Medical courses were evaluated on a private virtual clock at their
+   // exact due minute. Commit only here, atomically with the one travel interval.
+   if(stagedTimed?.generatedJournal?.length)data.journal.push(...stagedTimed.generatedJournal);
+   for(const [id,state] of timedStates){const actor=character(id);
+    if(actor&&JSON.stringify(actor.hmk?.combatState)!==JSON.stringify(state)){
+     actor.hmk??={};actor.hmk.combatState=state;
+    }
+   }
    for(const [id,state] of stagedMedicalStates)synchronizeCombatInjuries(character(id),state);
    const actors=result.actors.map(a=>{
     const c=character(a.id),before=persistentStateOf(c).fatigue.weariness;
     const input=form.elements.namedItem('end_'+a.id);
     const origin=input?.dataset.episodeGenerated===input?.value?'cryptographic-software-die':'manual';
     const evidence=commitExpeditionFatigue(c,{kind:'travel',accrual:a.delta,durationMinutes:result.minutes,
-     rolls:[{roll:a.roll,tn:a.sr.tn,success:a.sr.success}],sourcePages:[62,145,146,150],mode:v.conveyance==='foot'?'walk':v.conveyance==='mount'?'ride':'drive'},result.endMinute,origin,sourceId+':'+a.id);
-    return {...a,origin,before,after:evidence.finalFatigue};
+     rolls:a.endNotRequired?[]:[{roll:a.roll,tn:a.sr.tn,success:a.sr.success}],sourcePages:[62,145,146,150],mode:v.conveyance==='foot'?'walk':v.conveyance==='mount'?'ride':'drive'},result.endMinute,
+     a.endNotRequired?'gm-inactive-no-end-roll':origin,sourceId+':'+a.id);
+    return {...a,origin:a.endNotRequired?'not-performed-medical':origin,before,after:evidence.finalFatigue};
    });
    const animals=(result.animals||[]).map(a=>{
     const c=character(a.id),evidence=commitExpeditionFatigue(c,{kind:'travel',accrual:a.delta,
@@ -21655,7 +21860,8 @@ document.addEventListener('submit',e=>{
      skillTestProof:{type:'episode-weather-skin',sourceId:medical.sourceId,
       actorId:medical.id,report:medical.skin.report,autoFromTimeEpisode:sourceId,rulePage:185}});
    }
-   const p={...result,actors,animals,skillLinks,area:weather.area,weatherOrigin:weather.origin,weatherSourceId:weather.sourceId,
+   const p={...result,actors,animals,skillLinks,timedMedical:(stagedTimed?.changes||[]).map(x=>({actorId:x.actorId,dueMinute:x.dueMinute,kind:x.kind,roll:x.roll,sl:x.sl,beforeHR:x.beforeHR,afterHR:x.afterHR,shockAfter:x.shockAfter})),
+    incapacitationDecision:v.episodeIncapChoice||null,gmReviews:gm.reviewed.map(p=>({id:p.id,title:p.title,dueMinute:p.dueMinute})),area:weather.area,weatherOrigin:weather.origin,weatherSourceId:weather.sourceId,
     precipitation,settings:{...v,confirmed:undefined},narrative:v.narrative||'',mapScale:Number(v.mapScale),recovery};
    data.journal.push({id:sourceId,characterId:v.guideId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
     createdAt:stamp(),title:'HMK · epizoda · '+(v.area||weather.area)+' · '+result.minutes+' min',

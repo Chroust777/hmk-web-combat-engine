@@ -7124,3 +7124,26 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-skill-lock p{margin:.2rem 0 0}
 .hc-episode-spread-right .hc-episode-task button{line-height:1.3}
 .hc-episode-spread-left .hc-episode-needs-input{outline:2px solid #ae4734;outline-offset:3px;border-radius:3px;background:rgba(194,57,41,.09)}
+
+/* v93.644: time-specific medical checks and GM acknowledgements in Travel. */
+.hc-episode-spread-right [data-episode-medical-key],
+.hc-episode-spread-right [data-episode-incap-move]{
+  border:2px solid #a4251e!important;
+  border-radius:5px;
+  box-shadow:0 0 0 2px rgba(164,37,30,.10);
+  scroll-margin-block:6rem;
+  font-size:.82rem;
+}
+.hc-episode-spread-right .hc-episode-gm-review{
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+  margin:.35rem 0;
+  padding:.4rem .55rem;
+  font-size:.81rem;
+  line-height:1.35;
+  border:1px solid rgba(112,76,43,.28);
+  border-radius:5px;
+  background:rgba(252,242,225,.6);
+}
+.hc-episode-spread-right .hc-episode-gm-review input{flex:0 0 auto}

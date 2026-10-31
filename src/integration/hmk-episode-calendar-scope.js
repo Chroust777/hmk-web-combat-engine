@@ -8,7 +8,7 @@ export function isTravelEpisodeReceipt(row){
  if(!row || typeof row!=='object')return false;
  const proof=row.skillTestProof;
  return !!(row.calendarEpisodeSkillLink||row.calendarEpisodeEquipmentHazard||
-  row.calendarTimeEpisode||row.calendarEpisodeInterruptionResolution||
+  row.calendarTimeEpisode||row.calendarEpisodeInterruptionResolution||row.calendarEpisodeTimedMedical||
   proof?.autoFromTimeEpisode||
   ['episode-weather-health-aftercare','episode-weather-skin'].includes(proof?.type));
 }
