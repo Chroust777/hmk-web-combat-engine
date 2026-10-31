@@ -21,11 +21,12 @@ export const EPISODE_KINDS=['travel','rest','sleep','winded','forage','tracking'
  * encounters can occur during long episodes. This is a transparent GM variant,
  * not the printed HMK d10 test. Wilderness night has half the density.
  */
-export function episodeEncounterByMinutes({minutes,environ='rural',night=false,d100,lightMinutes=null}={}){
+export function episodeEncounterByMinutes({minutes,environ='rural',night=false,d100,d100Sub=null,lightMinutes=null}={}){
  must(whole(minutes,1,10080),'Encounter vyžaduje délku epizody v minutách');
  const tn={highway:[2,1],rural:[4,1],wilderness:[1,1],underworld:[9,9]}[environ]?.[night?1:0];
  must(tn!==undefined&&typeof night==='boolean','Encounter: neplatné prostředí či denní doba');
  must(whole(d100,1,100),'Minutový Encounter vyžaduje skutečný d100 (1–100).');
+ must(d100Sub===null||whole(d100Sub,1,100),'Upřesňující Encounter vyžaduje druhý skutečný d100 (1–100).');
  const referenceMinutes=night&&environ==='wilderness'?480:240;
  if(lightMinutes!==null)must(whole(lightMinutes.day,0,minutes)&&whole(lightMinutes.night,0,minutes)&&lightMinutes.day+lightMinutes.night===minutes,
   'Encounter: délka denního a nočního světla musí přesně odpovídat minutám epizody.');
@@ -33,10 +34,10 @@ export function episodeEncounterByMinutes({minutes,environ='rural',night=false,d
   -Math.log1p(-({highway:2,rural:4,wilderness:1,underworld:9}[environ])/10)*lightMinutes.day/240
   -Math.log1p(-({highway:1,rural:1,wilderness:1,underworld:9}[environ])/10)*lightMinutes.night/(environ==='wilderness'?480:240);
  // Percentile midpoint provides an unbiased, reproducible finite d100 draw.
- const target=(d100-.5)/100;
+ const target=d100Sub===null?(d100-.5)/100:((d100-1)*100+(d100Sub-.5))/10000;
  let probability=Math.exp(-intensity),cumulative=probability,count=0;
  while(cumulative<target&&count<10000){count++;probability*=intensity/count;cumulative+=probability;}
- return {format:'hmk-episode-encounter-minute-v1',d100,tn,environ,night,minutes,
+ return {format:'hmk-episode-encounter-minute-v1',d100,...(d100Sub===null?{}:{d100Sub}),tn,environ,night,minutes,
   ...(lightMinutes===null?{}:{lightMinutes}),count,found:count>0,chance:1-Math.exp(-intensity),resolved:false,
   procedure:'gm-minute-poisson-from-hmk-d10-density',sourcePage:150};
 }
@@ -44,7 +45,7 @@ export function episodeEncounterByMinutes({minutes,environ='rural',night=false,d
 export function calculateTimeEpisode({minute,minutes,kind='travel',topography='flat',terrain='paved-road',conveyance='foot',
  progress=0,bearing=0,extraSlow=0,wearied=false,injured=false,loaded=false,continuousPrecipitation=false,progressD10=[],directionD10=[],
  enduranceByActor={},endRollByActor={},memberIds=[],weather=null,encounterRoll=null,encounterEnviron='rural',
- encounterResolved=false,encounterNight=false,encounterPercentile=null,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
+ encounterResolved=false,encounterNight=false,encounterPercentile=null,encounterSubPercentile=null,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
  survivalCriticalFailure=false,survivalD10=null,doubleTime=false,loadBypass=false,encByActor={},dunesSlow=false,
   forcedBearing=0,previousDistanceFraction=0,encounterLightMinutes=null}={}){
  must(whole(minute,0,1e9)&&whole(minutes,1,10080)&&minute+minutes<=1e9,'Epizoda potřebuje 1–10 080 skutečných minut.');
@@ -105,7 +106,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
  must(typeof encounterNight==='boolean','Encounter: neplatný den/noc');
  if(encounterRoll!==null){must(whole(encounterRoll,1,10),'Encounter vyžaduje skutečný hod d10');}
  const encounter=encounterPercentile!==null?
-  {...episodeEncounterByMinutes({minutes,environ:encounterEnviron,night:encounterNight,d100:encounterPercentile,lightMinutes:encounterLightMinutes}),resolved:!!encounterResolved}:
+  {...episodeEncounterByMinutes({minutes,environ:encounterEnviron,night:encounterNight,d100:encounterPercentile,d100Sub:encounterSubPercentile,lightMinutes:encounterLightMinutes}),resolved:!!encounterResolved}:
   encounterRoll===null?null:{roll:encounterRoll,tn:target,night:encounterNight,found:encounterRoll<=target,
   resolved:!!encounterResolved};
  return {format:EPISODE_FORMAT,startMinute:minute,endMinute:minute+minutes,minutes,kind,
@@ -441,7 +442,7 @@ export function validateTimeEpisodes(journal=[]){
   }
   if(e.encounter?.format==='hmk-episode-encounter-minute-v1'){
    const expected={...episodeEncounterByMinutes({minutes:e.minutes,environ:e.encounter.environ,
-    night:e.encounter.night,d100:e.encounter.d100,lightMinutes:e.encounter.lightMinutes??null}),resolved:!!e.encounter.resolved};
+    night:e.encounter.night,d100:e.encounter.d100,d100Sub:e.encounter.d100Sub??null,lightMinutes:e.encounter.lightMinutes??null}),resolved:!!e.encounter.resolved};
    if(e.interruption?.kind==='encounter'){
     must(e.interruption.format==='hmk-episode-interruption-v1'&&
      e.interruption.atMinute===e.endMinute&&e.interruption.offsetMinutes===e.minutes&&
@@ -452,7 +453,7 @@ export function validateTimeEpisodes(journal=[]){
      e.encounter.otherPotentialEventsUncommitted===true,
      'Pozastavení nemá původní hod, okamžik nebo zachovaný zbývající čas.');
     const original=episodeEncounterByMinutes({minutes:e.encounter.originallyPlannedMinutes,
-     environ:e.encounter.environ,night:e.encounter.night,d100:e.encounter.d100,
+     environ:e.encounter.environ,night:e.encounter.night,d100:e.encounter.d100,d100Sub:e.encounter.d100Sub??null,
      lightMinutes:e.encounter.lightMinutes??null});
     must(original.count===e.encounter.originalEncounterCount&&original.found,
      'Pozastavené setkání neodpovídá původnímu doloženému d100.');
