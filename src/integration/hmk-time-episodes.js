@@ -126,13 +126,13 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
 /** GM minute adaptation of HMK pp.148–149: time lost to an obstacle is
  * still elapsed campaign time, but not moving time. Unspent delays survive
  * other activities and are consumed once by subsequent travel episodes. */
-export function episodeMinuteDelay({minutes,incoming=0,current=0,future=0}={}){
+export function episodeMinuteDelay({minutes,incoming=0,current=0,future=0,persistCarry=true}={}){
  must(whole(minutes,1,10080)&&whole(incoming,0,10000000)&&whole(current,0,10080)&&
   whole(future,0,10080),'Zdržení: potřebujeme skutečné celé minuty (nikoli odhadovaný hod).');
- const blocked=incoming+current,applied=Math.min(minutes,blocked);
- return {format:'hmk-episode-minute-delay-v1',incoming,current,future,applied,
-  movementMinutes:minutes-applied,carryOut:blocked-applied+future,sourcePages:[148,149],
-  method:'gm-documented-minutes-not-printed-watch-length'};
+ const blocked=(persistCarry?incoming:0)+current,applied=Math.min(minutes,blocked);
+ return {format:'hmk-episode-minute-delay-v1',incoming:persistCarry?incoming:0,current,future:persistCarry?future:0,applied,
+  movementMinutes:minutes-applied,carryOut:persistCarry?blocked-applied+future:0,sourcePages:[148,149],
+  method:persistCarry?'gm-documented-minutes-not-printed-watch-length':'gm-current-episode-only-v2'};
 }
 export function lastEpisodeTravelDelayCarry(journal=[],campaignId,minute=Infinity){
  for(let i=journal.length-1;i>=0;i--){const row=journal[i],ep=row.calendarTimeEpisode;
@@ -672,15 +672,15 @@ export function validateTimeEpisodes(journal=[]){
    must(e.kind==='travel','Zdržení lze přenášet jen mezi cestovními epizodami.');
    const d=e.travelDelay;
    const expected=episodeMinuteDelay({minutes:e.minutes,
-    incoming:lastEpisodeTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute),
-    current:d.current,future:d.future});
+    incoming:d.method==='gm-current-episode-only-v2'?0:lastEpisodeTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute),
+    current:d.current,future:d.future,persistCarry:d.method!=='gm-current-episode-only-v2'});
    must(JSON.stringify(expected)===JSON.stringify(d)&&e.movementMinutes===d.movementMinutes,
     'Zdržení nebo přenesené minuty neodpovídají předchozí cestě.');
    const hazard=e.hazardDetails?.find(h=>h.hazard==='equipment'||h.hazard==='complication');
    const outcome=hazard?.result;
    const mandatoryNext=['short-delay','long-delay','irreparable'].includes(outcome);
-   must(!mandatoryNext||d.future>0,'Zdržení po hazardu musí mít doložené minuty do další cesty.');
-   must(!(hazard?.hazard==='complication'&&['long-delay','irreparable'].includes(outcome))||d.current>0,
+   must(d.method==='gm-current-episode-only-v2'||!mandatoryNext||d.future>0,'Zdržení po hazardu musí mít doložené minuty do další cesty.');
+   must(d.method==='gm-current-episode-only-v2'||!(hazard?.hazard==='complication'&&['long-delay','irreparable'].includes(outcome))||d.current>0,
     'Dlouhá komplikace musí zohlednit i čas ztracený v aktuální epizodě.');
   }
   if(e.travelDelay&&Array.isArray(e.animals)){

@@ -7045,3 +7045,54 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-spread-right .hc-episode-overview,.hc-episode-spread-right .hc-episode-evidence,.hc-episode-spread-right .hc-episode-checklist{margin-bottom:1rem}
 .hc-episode-spread-left .hc-episode-help{display:none!important}
 @media(max-width:760px){.hc-episode-spread-right .hc-episode-proof{grid-template-columns:1fr}}
+
+/* v93.637 · Compact, book-consistent travel activity controls */
+.hc-episode-spread-left .hc-episode-editor{font-size:.88rem;line-height:1.38}
+.hc-episode-spread-left .hc-episode-editor h3,
+.hc-episode-spread-right .hc-episode-result h3{font-size:1.05rem;line-height:1.3;margin:.2rem 0 .6rem}
+.hc-episode-spread-left .hc-episode-settings,
+.hc-episode-spread-left .hc-episode-editor fieldset{
+ margin:.65rem 0;padding:.62rem .68rem;border-radius:7px;min-width:0
+}
+.hc-episode-spread-left .hc-episode-settings>summary,
+.hc-episode-spread-left .hc-episode-editor legend{font-size:.91rem;line-height:1.35;font-weight:700;letter-spacing:0;margin:0}
+.hc-episode-spread-left .hc-episode-settings[open]>summary{padding-bottom:.35rem;margin-bottom:.65rem}
+.hc-episode-spread-left .hc-episode-editor label,
+.hc-episode-spread-left .hc-episode-editor label.hc-check,
+.hc-episode-spread-left .hc-episode-editor .hc-hint,
+.hc-episode-spread-left .hc-episode-editor p{font-size:.81rem;line-height:1.39}
+.hc-episode-spread-left .hmk-trek-grid{gap:.54rem .62rem;align-items:start}
+.hc-episode-spread-left .hc-episode-editor input:not([type=checkbox]),
+.hc-episode-spread-left .hc-episode-editor select,
+.hc-episode-spread-left .hc-episode-editor textarea{
+ font-size:.84rem;min-height:1.94rem;padding:.26rem .43rem;border-radius:4px
+}
+.hc-episode-spread-left .hc-episode-editor label.hc-check{
+ display:flex;flex-direction:row;align-items:flex-start;gap:.42rem;
+ margin:.25rem 0;padding:.23rem 0;min-width:0
+}
+.hc-episode-spread-left .hc-episode-editor label.hc-check input[type=checkbox]{
+ flex:0 0 15px;width:15px;height:15px;margin:.12rem .15rem 0 0;min-height:0
+}
+.hc-episode-spread-left .hc-episode-members{display:flex;flex-wrap:wrap;gap:.4rem .8rem;margin:.35rem 0 .55rem}
+.hc-episode-spread-left .hc-episode-members label.hc-check{padding:.16rem .25rem;margin:0}
+.hc-episode-sky-strip{grid-column:1/-1;display:flex;flex-wrap:wrap;justify-content:space-between;
+ align-items:center;gap:.4rem;border-bottom:1px solid rgba(105,75,45,.23);padding:.15rem 0 .48rem}
+.hc-episode-sky-strip strong{font-size:.78rem;font-weight:600;color:#795137}
+.hc-episode-weather-outcome{grid-column:1/-1;font-size:.78rem!important;color:#69482e;margin:.25rem 0 0!important}
+.hc-episode-spread-left .hc-episode-local-weather{padding-top:.5rem;margin-top:.55rem}
+.hc-episode-spread-left .hc-episode-brief{color:#72533b;margin:.25rem 0 .5rem}
+.hc-episode-spread-left .hc-episode-manual-modes .hc-hint{grid-column:1/-1}
+.hc-episode-spread-left .hc-episode-label-explain[hidden]{display:none!important}
+.hc-episode-spread-left [hidden]{display:none!important}
+.hc-episode-spread-left .hc-episode-evaluate{font-size:.89rem;min-height:2.15rem;padding:.53rem .6rem}
+.hc-episode-spread-right .hc-episode-result h4{font-size:.94rem}
+.hc-episode-spread-right .hc-episode-result p,
+.hc-episode-spread-right .hc-episode-result .hc-episode-proof{font-size:.81rem;line-height:1.42}
+.hc-episode-spread-right .hc-episode-task{padding:.48rem 0}
+.hc-episode-spread-right .hc-episode-task b{font-size:.84rem}
+.hc-episode-spread-right .hc-episode-task p{font-size:.8rem}
+@media(max-width:540px){.hc-episode-sky-strip{display:block}.hc-episode-sky-strip strong{display:block;margin-top:.3rem}}
+
+.hc-episode-spread-left .hc-episode-clockline{margin:.55rem 0 .7rem!important;color:#694d32;font-size:.79rem!important}
+.hc-episode-spread-left legend.hc-episode-hover-help{cursor:help;text-decoration:underline dotted rgba(98,66,34,.5)}
