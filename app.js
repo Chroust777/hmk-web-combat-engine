@@ -302,12 +302,24 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.648';
+const APP_VERSION='93.649';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const stamp=()=>new Date().toISOString();
+// Dialogs are display surfaces too. IDs stay exact in the underlying errors,
+// records and button values; only the modal message is human readable.
+function userFacingDialogMessage(message){
+ const names=new Map([...(data?.characters||[]),...(data?.trash||[]),...(data?.items||[]),...(data?.inventory||[])].filter(x=>typeof x?.id==='string')
+  .map(x=>[x.id.toLowerCase(),x.name||x.snapshot?.name||'doložený záznam']));
+ return String(message??'').replace(/\b(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|id-\d{10,}-[a-z0-9]{4,})\b/gi,
+  id=>names.get(id.toLowerCase())||'interní záznam');
+}
+const uiAlert=message=>globalThis.alert(userFacingDialogMessage(message));
+const uiConfirm=message=>globalThis.confirm(userFacingDialogMessage(message));
+const alert=uiAlert,confirm=uiConfirm;
+
 const SLOTS=[['none','Neseno (starší záznam)'],['main_hand','Hlavní ruka'],['off_hand','Vedlejší ruka'],['worn','Oblečeno'],['carried','Neseno'],['chest','Truhlice (doma / úschova)'],['stable','Naloženo na zvířeti']];
 const slotLabel=v=>!v||v==='none'?'Neseno':(SLOTS.find(s=>s[0]===v)||SLOTS[4])[1];
 const validSlotForCategory=(slot,cat)=>SLOTS.some(s=>s[0]===slot)&&(!(slot==='main_hand'||slot==='off_hand')||['weapon','shield','other'].includes(cat))&&(slot!=='worn'||cat==='armor');
@@ -2536,11 +2548,11 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
     `<form data-alchemy-area-thrown><strong>${esc(a.elixirName)} · plošná vržená lahvička · HMK 163–164, ${a.elixirName==='Eruption'?271:a.elixirName==='Fumebomb'?272:274}</strong>
      <input type="hidden" name="finishId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(state.ownerId)}"><input type="hidden" name="elixirName" value="${esc(a.elixirName)}">
      <p>Skutečný Throwing d100, odchylka a místo rozbití v souřadnicích Initiative (ft). Všechny zasažené cíle a příslušné fyzické hody je nutné zadat současně. CF neodhazuje lahvičku, ale využije útok. Operace se zapíše jako jediný bojový krok, nebo se nezapíše nic.</p>
-     <p>Polohy účastníků: ${esc((combatInitiativeSequence.spatialUnits||[]).map(u=>u.id+' ('+u.x+', '+u.y+')').join('; ')||'CHYBÍ — nelze vyhodnotit výbuch')}</p>
+     <p>Polohy účastníků: ${esc((combatInitiativeSequence.spatialUnits||[]).map((u,i)=>(character(u.id)?.name||'Účastník '+(i+1))+' ('+u.x+', '+u.y+')').join('; ')||'CHYBÍ — nelze vyhodnotit výbuch')}</p>
      <div class="hc-fields"><label>Mířený bod X ft<input name="aimX" type="number" step="any" required></label><label>Mířený bod Y ft<input name="aimY" type="number" step="any" required></label><label>Skutečný bod rozbití X ft<input name="centerX" type="number" step="any" required></label><label>Skutečný bod rozbití Y ft<input name="centerY" type="number" step="any" required></label><label>Vzdálenost od vrhače (ft, 1–120)<input name="distanceFt" type="number" min="1" max="120" required></label><label>Skutečný Throwing d100<input name="d100" type="number" min="1" max="100" required></label></div>
      <div class="hc-fields"><label>Skutečná grenade deviation kostka (jen když vyžaduje SL)<input name="grenadeD" type="number" min="1" max="6"></label><label>Směr odchylky d8 (jen při nenulové odchylce)<input name="deviationD8" type="number" min="1" max="8"></label><label>Windforce<input name="windforce" type="number" min="0" max="4" value="0"></label><label>Trauma penalty<input name="traumaPenalty" type="number" max="0" value="0"></label><label>Dodge Index<input name="dodgeIndex" type="number" min="0" max="30" value="0"></label></div>
      <label><input type="checkbox" name="aimedPreviousRound"> Předchozí skutečný Aim</label><label><input type="checkbox" name="crosswind"> Boční vítr</label>
-     <label>Pokročilý vstup: výsledky pro jednotlivé oběti v JSON (vnitřní klíče z uloženého střetnutí). Fumebomb např. {"B":{"shockD100":41,"origin":"manual"}}; Weakness např. {"B":{}}; Eruption zahrnuje Area Strike Shock/Compound/Evade dle pravidel.<textarea name="rollsByTarget" rows="3" required>{}</textarea></label>
+     <label>Pokročilé výsledky obětí v JSON (použijte odkazy @P1, @P2 z přehledu postav). Fumebomb např. {"@P1":{"shockD100":41,"origin":"manual"}}; Weakness např. {"@P1":{}}; Eruption zahrnuje Area Strike Shock/Compound/Evade dle pravidel.<textarea name="rollsByTarget" rows="3" required>{}</textarea></label>
      ${a.elixirName==='Eruption'?`<label>Fire Impact – skutečný d4<input name="impactD4" type="number" min="1" max="4"></label><label>Všichni blízcí ohrožení protivníci pro Morale (pokročilý JSON soupis, i mimo výbuch)<textarea name="threatenedIds" rows="2" required>[]</textarea></label><label>Morale všech ohrožených (pokročilé JSON podklady: initiativeD100, origin:manual, aberrance)<textarea name="moraleByOpponent" rows="3" required>{}</textarea></label><label><input type="checkbox" name="threatGeometryConfirmed"> GM potvrdil úplný výběr ohrožených protivníků, i mimo výbuch.</label>`:''}
      <label><input type="checkbox" name="confirmed" required> GM ověřil úplnou geometrii, skutečné všechny hody, fyzické rozbití a jednu atomickou bojovou transakci.</label>
      <button type="submit">Vyhodnotit ${esc(a.elixirName)} v existujícím Combat State a inventáři</button></form>`:''}
@@ -5754,7 +5766,7 @@ function stableHubAnimalHTML(a,campaignId){
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Inventární předmět</th><th>lb</th><th>Akce</th></tr></thead><tbody>${p.inventoryItems.map(q=>`<tr><td>${esc(q.name)}</td><td>${q.weightLb}</td><td>${dead?'—':`<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="inventory-unload"><input type="hidden" name="inventoryId" value="${esc(q.inventoryId)}"><input type="hidden" name="reason" value="Skutečné předání původního inventárního předmětu zpět majiteli"><button class="secondary hc-small">Vrátit postavě</button></form>`}</td></tr>`).join('')||'<tr><td colspan="3">Žádný přenesený inventář</td></tr>'}</tbody></table></div>
  ${!dead&&userItems.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="inventory-load"><label>Skutečný předmět vlastníka<select name="inventoryId">${userItems.map(i=>`<option value="${esc(i.id)}">${esc(i.snapshot.name)} · ${i.snapshot.properties.weightLb*i.quantity} lb</option>`).join('')}</select></label><input type="hidden" name="reason" value="Přímé naložení existujícího předmětu vlastníkem zvířete"><button type="submit">Přenést inventární předmět na zvíře</button></form>`:''}
  <h4>Tažený náklad vozidla (oddělený od hřbetu zvířete)</h4>
- <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Náklad / vozidlo</th><th>Váha</th><th>Akce</th></tr></thead><tbody>${p.vehicleCargo.map(q=>`<tr><td>${esc(q.name)} · ${esc(q.vehicleId.slice(0,8))}</td><td>${q.weightLb} lb</td><td>${dead?'—':`<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-cargo-remove"><input type="hidden" name="entryId" value="${esc(q.entryId)}"><input type="hidden" name="reason" value="Skutečně vyloženo z taženého vozidla"><button class="secondary hc-small">Vyložit z vozu</button></form>`}</td></tr>`).join('')||'<tr><td colspan="3">Vozidlo nemá zaevidovaný náklad</td></tr>'}</tbody></table></div>
+ <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Náklad / vozidlo</th><th>Váha</th><th>Akce</th></tr></thead><tbody>${p.vehicleCargo.map(q=>`<tr><td>${esc(q.name)} · položka ${p.vehicleCargo.indexOf(q)+1}</td><td>${q.weightLb} lb</td><td>${dead?'—':`<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-cargo-remove"><input type="hidden" name="entryId" value="${esc(q.entryId)}"><input type="hidden" name="reason" value="Skutečně vyloženo z taženého vozidla"><button class="secondary hc-small">Vyložit z vozu</button></form>`}</td></tr>`).join('')||'<tr><td colspan="3">Vozidlo nemá zaevidovaný náklad</td></tr>'}</tbody></table></div>
  ${!dead&&activeVehicles.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-cargo-add"><label>Vozidlo<select name="vehicleId">${activeVehicles.map(q=>`<option value="${esc(q.entryId)}">${esc(VEHICLES_TACK_P122.find(t=>t.id===q.itemId)?.name)}</option>`).join('')}</select></label><label>Náklad ve voze<input name="name" minlength="2" maxlength="90" required></label><label>Skutečná hmotnost (lb)<input name="weightLb" type="number" min="1" max="1000000" step="1" required></label><label>Potvrzení GM<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Zapsat náklad vozidla</button></form>`:''}
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="tack-add"><label>Pořídit / vybavit zvíře<select name="itemId" required data-hmk-stable-gear-select data-hmk-help="${esc(stableGearDescription580(options[0]))}">${options.map(t=>`<option value="${esc(t.id)}" title="${esc(stableGearDescription580(t))}">${esc(t.name)} · ${t.weightLb} lb · ${t.priceD}d${a.spec.breed==='elephant'?' (slon ×5 u odpovídající výstroje)':''}</option>`).join('')}</select></label><label>Pořízení<select name="mode"><option value="buy">Koupit za cenu HMK</option><option value="gift">Bezplatně (GM potvrdí zdroj)</option></select></label><label>Zdroj / potvrzení GM<input name="reason" required minlength="3" maxlength="240" placeholder="Prodejce, dar, nalezené vybavení"></label><button type="submit">Přidat ověřenou výstroj</button></form>
  <form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-add"><label>Pořídit vozidlo / saně (nejsou to nesené brašny)<select name="itemId" data-hmk-stable-gear-select data-hmk-help="${esc(stableGearDescription580(VEHICLES_TACK_P122.find(t=>t.name==='Cart, 2-wheel')))}">${VEHICLES_TACK_P122.filter(t=>['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(t.name)).map(t=>`<option value="${esc(t.id)}" title="${esc(stableGearDescription580(t))}">${esc(t.name)} · ${t.priceD}d · ${t.weightLb} lb konstrukce</option>`).join('')}</select></label><label>Pořízení<select name="mode"><option value="buy">Koupit za cenu HMK</option><option value="gift">Bezplatně, skutečný zdroj</option></select></label><label>Zdroj / doložený původ<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Zařadit vozidlo do stáje</button></form>
@@ -5762,13 +5774,13 @@ function stableHubAnimalHTML(a,campaignId){
  <section class="hmk-stable-block"><h4>Krmení, voda a péče</h4><p>HMK zde neuvádí pevnou univerzální denní dávku podle druhu. Protokol zaznamenává skutečně provedenou péči a hmotnost vydané potravy či vody. Bez potvrzení zdroje se zásoby nevytvářejí, čas se neposouvá.</p>
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="care"><label>Úkon<select name="kind"><option value="food">Nakrmilo se</option><option value="water">Napojilo se</option><option value="grooming">Ošetření srsti / kopyt</option><option value="shelter">Ustájení / přístřeší</option><option value="veterinary">Veterinární úkon GM (bez automatického léčení)</option><option value="other">Jiná péče</option></select></label><label>Skutečné množství (lb; povinné pro jídlo/vodu)<input name="amount" type="number" min="0" step="0.1" placeholder="Např. 8"></label><label>Odkud pochází krmivo/voda a co se stalo<input name="reason" required minlength="3" maxlength="240" placeholder="Např. napájelo se u doloženého potoka"></label><button type="submit">Zapsat skutečnou péči</button></form>`:''}
  ${!dead&&foodLots.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="care"><input type="hidden" name="kind" value="food"><input type="hidden" name="sourceKind" value="ration"><label>Vydat ze skutečných zásob jídla<select name="sourceId">${foodLots.map(q=>`<option value="${esc(q.sourceId)}">${esc(q.name)} · zbývá ${q.remaining*3} lb · expirace ${q.expiresAt}</option>`).join('')}</select></label><label>Množství v lb (kroky po 1,5 lb)<input name="amount" type="number" step="1.5" min="1.5" required></label><label>Skutečné nakrmení GM<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Nakrmít a odečíst původní sklad</button></form>`:''}
- ${!dead&&vesselLots.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="care"><input type="hidden" name="kind" value="water"><input type="hidden" name="sourceKind" value="water"><input type="hidden" name="amount" value="5"><label>Odečíst 0,5 gal (5 lb) ze skutečné vody<select name="sourceId">${vesselLots.map(q=>`<option value="${esc(q.fillId)}">${esc(q.fillId.slice(0,8))} · zbývá ${q.remaining} gal</option>`).join('')}</select></label><label>Skutečné napojení / potvrzení GM<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Napojit a odečíst vodu</button></form>`:''}
+ ${!dead&&vesselLots.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="care"><input type="hidden" name="kind" value="water"><input type="hidden" name="sourceKind" value="water"><input type="hidden" name="amount" value="5"><label>Odečíst 0,5 gal (5 lb) ze skutečné vody<select name="sourceId">${vesselLots.map((q,i)=>`<option value="${esc(q.fillId)}">Nádoba ${i+1} · zbývá ${q.remaining} gal</option>`).join('')}</select></label><label>Skutečné napojení / potvrzení GM<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Napojit a odečíst vodu</button></form>`:''}
  <p class="hc-hint">Použití ze skladu vyžaduje dostupný fyzický lot původního majitele. Externí krmení/pití (pastva, potok) zůstává samostatným GM potvrzením bez odpisu skladu.</p>
 <details><summary>Záznamy péče (${p.care.length})</summary>${p.care.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Čas (min)</th><th>Úkon</th><th>Množství</th><th>Doklad</th></tr></thead><tbody>${p.care.map(j=>`<tr><td>${j.minute}</td><td>${esc(j.kind)}</td><td>${j.amount===null?'—':j.amount+' '+j.unit}</td><td>${esc(j.reason)}</td></tr>`).join('')}</tbody></table></div>`:'<p>Dosud není doložena žádná péče.</p>'}</details></section>
  <section class="hmk-stable-block"><h4>Výcvik, cesta, zdravotní historie a kalendář</h4>
  ${!dead?`<div class="hsk-training-calendar-panel"><p class="tiny">Pravidlový postup: nejprve zahájit šestiměsíční výcvik; po skutečném uplynutí doby v kalendáři provést Animalcraft SV a pokračující Training d10. Kalendář se sám neposouvá.</p><button type="button" class="secondary hc-small" data-hmk-training-start-animal="${esc(a.id)}">Zahájit šestiměsíční výcvik · HMK 65</button>${data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAnimalTrainingStart590?.animalId===a.id).slice(-2).map(j=>`<p class="tiny hsk-training-date">Výcvik začal ${esc(displayCampaignMinute(j.calendarAnimalTrainingStart590.startMinute))}, základní termín ${esc(displayCampaignMinute(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)))}${j.calendarAnimalTrainingStart590.calendarDayEligibility600?' · od začátku tohoto dne':''}${data.campaignClock.minute<trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)?' · zbývá '+esc(chronicleRemainingTime(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)-data.campaignClock.minute)):' · základní doba uplynula'}</p>`).join('')}</div>`:''}
  <p>Animalcraft (HMK 65): základní ML zvířete neznamená automaticky získaný MB. Výcvik vyžaduje původní SV, skutečné hody a pravidlový čas. ${training.length?`Potvrzené doklady: ${training.map(t=>esc(t.title)).join(' · ')}`:'Výcvik zatím není pro tuto identitu doložen.'}</p>
- <p><strong>Skutečně aktivovaný výcvik:</strong> ${trainingState.boosts} MB · ${trainingState.sourceId?'doklad '+esc(trainingState.sourceId.slice(0,8)):'žádný úplný kalendářní doklad'}. Zvlášť se ověřuje uplynutí alespoň ${training.length?'příslušného počtu':'šesti'} měsíců; až pak se MB používají v bojových náhledech.</p>
+ <p><strong>Skutečně aktivovaný výcvik:</strong> ${trainingState.boosts} MB · ${trainingState.sourceId?'ověřený kalendářní doklad':'žádný úplný kalendářní doklad'}. Zvlášť se ověřuje uplynutí alespoň ${training.length?'příslušného počtu':'šesti'} měsíců; až pak se MB používají v bojových náhledech.</p>
  ${!dead&&training.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="training-activate"><label>Dokončený výcvik<select name="trainingProofId">${training.map((t,i)=>`<option value="${esc(t.id)}">Výcvik ${i+1} · ${t.skillTestProof?.finalBoosts??0} MB · ${t.skillTestProof?.months??6} měs.</option>`).join('')}</select></label><label>Skutečný začátek (minuta kampaně)<input name="startMinute" type="number" min="0" step="1" required></label><label>Skutečný konec (minuta kampaně)<input name="endMinute" type="number" min="0" step="1" required></label><label>Doložený kalendářní podklad<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Aktivovat již dokončený výcvik v boji</button></form>`:''}
  ${p.events.length?`<details><summary>Kompletní časový registr stáje (${p.events.length})</summary><ol>${p.events.map(j=>`<li>minuta ${j.campaignMinute} · ${esc(j.stableHub574.type)} · ${esc(j.stableHub574.reason)}</li>`).join('')}</ol></details>`:''}
  <p>Veterinární rány, Shock, léčení, Frostbite a amputace se nezdvojují: jsou propojené s originálními doklady v Combat · Bestiář.</p>
@@ -8286,7 +8298,7 @@ function continueGuidedTurn(){
   const moraleState=states[guidedTurnSession.actorId]?.morale?.state;
   const mustConfirmFlight=guidedTurnSession.action==='pass'&&
    ['routed','withdrawing'].includes(moraleState)&&!seq.entryForcedPass&&seq.entryAlertness!=='confused';
-  if(mustConfirmFlight&&!window.confirm('HMK str.162: potvrdí GM, že pro tuto postavu není možný útěk/ústup a proto skutečně musí Pass?'))return;
+  if(mustConfirmFlight&&!uiConfirm('HMK str.162: potvrdí GM, že pro tuto postavu není možný útěk/ústup a proto skutečně musí Pass?'))return;
   const threat=guidedTurnSession.action==='pass'&&moraleState==='routed'&&
    !states[guidedTurnSession.actorId]?.morale?.surrender?.active?
     confirmRoutedThreatForPass(character(guidedTurnSession.actorId)?.name||guidedTurnSession.actorId):null;
@@ -8416,17 +8428,17 @@ function offerGuidedMissilePreparation(seq,states,actorId){
   const ammoId=picked.id;
   if(!ammo.some(x=>x.id===ammoId))throw Error('Vybrané střelivo není doložené');
   if(kind==='free'){
-   if(!window.confirm('Free Load podle HMK str.163: přesně jedna střela je již DRŽENA v druhé ruce a nebyl vyžadován další DEX/Missile test. Potvrdit skutečnost?'))return 'cancelled';
+   if(!uiConfirm('Free Load podle HMK str.163: přesně jedna střela je již DRŽENA v druhé ruce a nebyl vyžadován další DEX/Missile test. Potvrdit skutečnost?'))return 'cancelled';
    result=performGuidedFreeMissileLoad({id,sequence:seq,states,inventory:data.inventory,
     actorId,weaponId,ammoId,character:actor});
   }else if(kind==='nearby'||kind==='nearby-test'){
-   if(!window.confirm('HMK str.163: GM potvrzuje, že tento konkrétní VOLNĚ LEŽÍCÍ projektil je bezprostředně v dosahu střelce (nikoli v jeho toulci nebo batohu). Pokračovat?'))return 'cancelled';
+   if(!uiConfirm('HMK str.163: GM potvrzuje, že tento konkrétní VOLNĚ LEŽÍCÍ projektil je bezprostředně v dosahu střelce (nikoli v jeho toulci nebo batohu). Pokračovat?'))return 'cancelled';
    if(kind==='nearby'){
-    if(!window.confirm('GM potvrzuje, že DEX/Missile test v této situaci NENÍ potřeba.'))return 'cancelled';
+    if(!uiConfirm('GM potvrzuje, že DEX/Missile test v této situaci NENÍ potřeba.'))return 'cancelled';
     result=performGuidedNearbyFreeMissileLoad({id,sequence:seq,states,inventory:data.inventory,
      actorId,weaponId,ammoId,character:actor,reachableConfirmed:true,noTestRequiredConfirmed:true});
    }else{
-    if(!window.confirm('GM potvrzuje, že situace vyžaduje úspěšný DEX nebo Missile test (HMK str.163).'))return 'cancelled';
+    if(!uiConfirm('GM potvrzuje, že situace vyžaduje úspěšný DEX nebo Missile test (HMK str.163).'))return 'cancelled';
     const methodInput=window.prompt('Střelec volí test: dex nebo missile','dex');
     if(methodInput===null)return 'cancelled';
     const method=methodInput.trim().toLowerCase();
@@ -8449,7 +8461,7 @@ function offerGuidedMissilePreparation(seq,states,actorId){
     result=performGuidedTestedNearbyFreeMissileLoad({...tested,physicalD100:Number(dieInput.trim())});
    }
   }else{
-   if(!window.confirm('GM potvrzuje skutečně přístupný toulec/brašnu na šípy či šipky, nebo váček pro kameny. Nejde o předmět uložený v batohu?'))return 'cancelled';
+   if(!uiConfirm('GM potvrzuje skutečně přístupný toulec/brašnu na šípy či šipky, nebo váček pro kameny. Nejde o předmět uložený v batohu?'))return 'cancelled';
    result=startGuidedMissileLoad({id,sequence:seq,states,inventory:data.inventory,
     actorId,weaponId,ammoId,character:actor,containerConfirmed:true});
   }
@@ -8514,13 +8526,13 @@ function neutralCombatCastingPanel(){
  if(fire&&!spellstart)return '';
  const labelTarget=x=>{const w=activeAlchemyWard({journal:data.journal,
   campaignId:campaignKey(clock),finishId:x.finishId,sourceId:x.dossier.sourceId});
-  return `${x.dossier.elixirName} · AS ${x.dossier.currentAS} · ${x.finishId}`+
+  return `${x.dossier.elixirName} · AS ${x.dossier.currentAS}`+
    (w?` · chráněno Ward WL ${w.wardLevel}`:'');};
  return `<section class="panel wide"><h3>Neutral Spellcasting · HMK 200–203, 251, 254–255 · v93.463</h3>
  <p class="muted">Pouze ověřený běžný Incant, fyzické GM hody a původní Initiative. Ward vyžaduje dotyk a 60 kol. Dřívější Ward lze přebít jen vyšším Ward Level už při běžném S a s původním důkazem i výslovným GM potvrzením. Total Release 100 lze nyní uložit POUZE pro Detect CL I, bez Shade a bez přetrvávajícího potlačení (úplná fyzická historie). Ostatní případy a nedoložené modifikátory jsou blokovány. Dokončené kouzlo NENÍ pouhý Skill Test.</p>
  ${begin?`<form data-neutral-spellstart><strong>Spellstart · ${esc(caster.name)}, kolo ${q.round}</strong>
  <input type="hidden" name="casterId" value="${esc(casterId)}"><label>Neutral kouzlo<select name="spell"><option>Detect</option><option>Reveal</option><option>Dispel</option><option>Ward</option></select></label>
- <label>Skutečný alchymistický zdroj<select name="finishId" required>${options.map(x=>`<option value="${esc(x.finishId)}">${esc(labelTarget(x))}</option>`).join('')}</select></label>
+ <label>Skutečný alchymistický zdroj<select name="finishId" required>${options.map((x,i)=>`<option value="${esc(x.finishId)}">Zdroj ${i+1} · ${esc(labelTarget(x))}</option>`).join('')}</select></label>
  <label>Co je přímým cílem? <select name="targetKind"><option value="Elixir">Elixír (pouze bez Wardu)</option><option value="Ward">Aktivní Ward chránící tento elixír</option></select></label>
  <label>Vzdálenost zdroje v ft<input name="distanceFeet" type="number" min="0" step="0.01" required></label>
  <label><input type="checkbox" name="gmCantGestureConfirmed" required> GM potvrzuje běžný hlasitý Cant a neomezená gesta</label>
@@ -8538,8 +8550,8 @@ function neutralCombatCastingPanel(){
  <label>Typ dosaženého SL (ověří se výpočtem, nesoulad se odmítne)<select name="resultFamily"><option value="success">Success S / CS</option><option value="failed">Failure F</option><option value="critical">Critical Failure CF (Misfire 1–99)</option>${spellstart.combatProof.spell==='Detect'?'<option value="total-release">Neutral Total Release 100 – omezená ověřená větev</option>':''}</select></label>
  <label>Fyzický Misfire d100 – pouze při CF (Total Release = 100)<input name="misfireD100" type="number" min="1" max="100" step="1"></label>
  ${spellstart.combatProof.spell==='Detect'?`<p>Detect musí při úspěchu pokrýt VŠECHNY existující magické zdroje do dosahu, včetně nealchymistických.</p>
- <label>Vzdálenosti všech známých alchymistických finishId (JSON mapa)<textarea name="distancesByFinishId" rows="2" required placeholder='{"finish-id":4}'></textarea></label>
- <label>Ostatní zdroje magie (JSON pole ověřených identit, kategorií a vzdáleností)<textarea name="otherSources" rows="2">[]</textarea></label>
+ <label>Vzdálenosti doložených alchymistických zdrojů (JSON mapa s odkazy z přehledu)<textarea name="distancesByFinishId" rows="2" required placeholder='{"@Z1":4}'></textarea></label>
+ <label>Ostatní magické zdroje (JSON pole doložených záznamů, kategorií a vzdáleností)<textarea name="otherSources" rows="2">[]</textarea></label>
  <label><input type="checkbox" name="gmAllSourcesConfirmed"> GM potvrzuje úplnost mapy všech zdrojů v dosahu</label>`:''}
  ${spellstart.combatProof.spell==='Detect'?`<details><summary>Neutral Total Release 100 · pouze Detect CL I a uzavřený Vortex tick</summary>
  <p>Vyplňte výhradně při volbě Total Release. GM musí zadat VŠECHNY fyzické hody a úplný soupis magických zdrojů; žádný výsledek F/CF potlačení ani CS stres při Vortex ticku zatím nelze trvale uložit. Neslučujte s jiným kouzlem.</p>
@@ -8548,8 +8560,8 @@ function neutralCombatCastingPanel(){
  <label>Ověřené další modifikátory Spirit EML<input name="spiritModifiers" type="number" step="1" value="0"></label>
  <label>Skutečný střed sesilatele x (ft)<input name="originX" type="number" step="0.01"></label>
  <label>Skutečný střed sesilatele y (ft)<input name="originY" type="number" step="0.01"></label>
- <label>Pokročilý Vortex JSON (zdroje, category, x/y, verified a statistiky)<textarea name="vortexCensus" rows="4" placeholder='[{"id":"...","category":"Elixir","currentAS":6,"x":0,"y":0,"verified":true}]'></textarea></label>
- <label>První a poslední tick (JSON objekt: sources, selectedSourceId, rolls, physicalSelectionDie)<textarea name="vortexTick" rows="4" placeholder='{"roundOffset":0,"sources":[],"selectedSourceId":null,"physicalSelectionDie":null,"rolls":[]}'></textarea></label>
+ <label>Pokročilý Vortex JSON (zdroje z přehledu, category, x/y, verified a statistiky)<textarea name="vortexCensus" rows="4" placeholder='[{"id":"...","category":"Elixir","currentAS":6,"x":0,"y":0,"verified":true}]'></textarea></label>
+ <label>První a poslední tick (JSON objekt: sources, vybraný zdroj, rolls, physicalSelectionDie)<textarea name="vortexTick" rows="4" placeholder='{"roundOffset":0,"sources":[],"selectedSourceId":null,"physicalSelectionDie":null,"rolls":[]}'></textarea></label>
  <label><input type="checkbox" name="gmSpiritModifiersVerified"> GM potvrdil přesné ostatní modifikátory Spirit testu</label>
  <label><input type="checkbox" name="gmFullSourceHistoryConfirmed"> GM ověřil úplný soupis všech magických zdrojů</label>
  <label><input type="checkbox" name="gmNoOtherArcaneSourcesConfirmed"> GM výslovně potvrzuje nepřítomnost dalších nezapsaných druhů magie</label>
@@ -8968,6 +8980,73 @@ function decorateTrekkingRoutineUI(root){
  host.querySelector('h3')?.setAttribute('data-hmk-help','Trekking Routine spojuje pravidla počasí, orientace, pohybu a nebezpečí. Příprava hlídky, skutečné hody, posun času a zdravotní následky jsou oddělené navazující kroky (HMK s. 141–150).');
  trekGuidedLayout(form);
 }
+/** Short, session-local UI references for advanced JSON inputs.
+ * Only display names and aliases to the GM. Every submitted JSON reference is
+ * resolved back to its original UNIQUE ID in a transient FormData object.
+ * Existing IDs, hashes, campaign proofs and identities are never rewritten.
+ */
+function decorateHumanJSONReferences(root){
+ for(const form of root.querySelectorAll('form[data-alchemy-area-thrown],form[data-neutral-spellfire]')){
+  if(form.__hmkJSONReferences)continue;
+  const byAlias=new Map(),byId=new Map(),entries=[];
+  const add=(prefix,id,label)=>{
+   if(typeof id!=='string'||!id||byId.has(id))return;
+   const alias='@'+prefix+([ ...byAlias.keys() ].filter(a=>a.startsWith('@'+prefix)).length+1);
+   byAlias.set(alias,id);byId.set(id,alias);entries.push({alias,label});
+  };
+  if(form.matches('[data-alchemy-area-thrown]')){
+   for(const [i,c] of selectedEncounterCharacters().entries())add('P',c.id,(c.name||'Postava')+' · účastník '+(i+1));
+   for(const [i,u] of (combatInitiativeSequence?.spatialUnits||[]).entries()){
+    if(!byId.has(u.id))add('P',u.id,(character(u.id)?.name||'Účastník '+(i+1))+' · bojová poloha');
+   }
+  }else{
+   let sources=[];
+   try{sources=alchemyArcaneTargetRegister({journal:data.journal,inventory:data.inventory,
+    campaignId:campaignKey(data.campaignClock),minute:data.campaignClock?.minute}).filter(x=>x.dossier?.targetable);}catch{/* no unverified source generated */}
+   for(const [i,item] of sources.entries())add('Z',item.finishId,
+    'Zdroj '+(i+1)+' · '+(item.dossier.elixirName||'elixír')+' · AS '+item.dossier.currentAS);
+   const own=form.elements.namedItem('finishId')?.value;
+   if(own&&!byId.has(own))add('Z',own,'Původní doložený zdroj kouzla');
+  }
+  form.__hmkJSONReferences={byAlias,byId};
+  const advanced=form.querySelector('textarea[name="rollsByTarget"],textarea[name="distancesByFinishId"]');
+  if(advanced){
+   const legend=document.createElement('details');legend.className='hc-episode-reference hmk-json-reference-list';
+   legend.open=true;
+   const heading=document.createElement('summary');heading.textContent='Odkazy pro tento formulář – bez technických ID';legend.append(heading);
+   const info=document.createElement('p');info.className='hc-hint';
+   info.textContent='Do JSON zadejte pouze uvedené odkazy (např. "@P1" či "@Z1"). Při potvrzení je aplikace interně převede na přesná původní ID. Odkazy platí jen pro aktuální formulář.';
+   legend.append(info);
+   const list=document.createElement('ul');
+   for(const entry of entries){const li=document.createElement('li');const key=document.createElement('code');key.textContent=entry.alias;
+    li.append(key,document.createTextNode(' · '+entry.label));list.append(li);}
+   if(!entries.length){const p=document.createElement('p');p.textContent='Zatím není dostupný žádný jednoznačně ověřený zdroj. Nevkládejte odhadovanou identitu.';legend.append(p);}
+   else legend.append(list);
+   advanced.closest('label')?.before(legend);
+  }
+  // No source ID is echoed in the editor even for existing, prefilled JSON.
+  for(const input of form.querySelectorAll('textarea')){
+   if(!['rollsByTarget','threatenedIds','moraleByOpponent','distancesByFinishId','otherSources','vortexCensus','vortexTick'].includes(input.name))continue;
+   const conceal=()=>{
+    let next=input.value;
+    for(const [id,alias] of byId)next=next.replaceAll('"'+id+'"','"'+alias+'"');
+    if(next!==input.value)input.value=next;
+   };
+   conceal();input.addEventListener('blur',conceal);
+  }
+ }
+}
+document.addEventListener('formdata',event=>{
+ const form=event.target,refs=form?.__hmkJSONReferences;
+ if(!refs)return;
+ for(const name of ['rollsByTarget','threatenedIds','moraleByOpponent','distancesByFinishId','otherSources','vortexCensus','vortexTick']){
+  if(!event.formData.has(name))continue;
+  const input=String(event.formData.get(name)||'');
+  const result=input.replace(/"(@[PZ]\d+)"/g,(full,alias)=>refs.byAlias.has(alias)?JSON.stringify(refs.byAlias.get(alias)):full);
+  event.formData.set(name,result);
+ }
+},true);
+
 // Visible identifiers are presentation data, never authoritative storage keys.
 // Work only on rendered text (not input values, textarea contents, data-* or option values).
 function hideVisibleTechnicalUUIDs(root){
@@ -8998,7 +9077,7 @@ function hideVisibleTechnicalUUIDs(root){
   const next=clean(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;
  }
  for(const el of root.querySelectorAll('[title],[aria-label],[data-hmk-help],[aria-description],[alt]')){
-  for(const key of ['title','aria-label','data-hmk-help','aria-description','alt']){const orig=el.getAttribute(key);if(orig){const next=clean(orig);if(next!==orig)el.setAttribute(key,next);}}
+  for(const key of ['title','aria-label','data-hmk-help','aria-description','alt','placeholder']){const orig=el.getAttribute(key);if(orig){const next=clean(orig);if(next!==orig)el.setAttribute(key,next);}}
  }
 }
 // Stable help follows the same floating tooltip as Chronicle Spread, not a
@@ -9306,8 +9385,7 @@ function hydrateSkillFollowupChoices598(root){
   form.setAttribute('data-hmk-followup-entry-598',String(i));
   const kind=form.closest('.hsk-special-commits, .panel, details')?.querySelector('h3,h4,summary')?.textContent?.trim()||'';
   const label=form.querySelector('h4,legend')?.textContent?.trim()||form.querySelector('button[type="submit"]')?.textContent?.trim()||form.id||'Navazující hod';
-  const original=form.querySelector('[name="origin"],[name="sourceId"],[name="startId"]')?.value||'';
-  const text=[kind,label,original?original.slice(0,8):''].filter(Boolean).join(' · ').replace(/\s+/g,' ').slice(0,180);
+  const text=[`Úkol ${i+1}`,kind,label].filter(Boolean).join(' · ').replace(/\s+/g,' ').slice(0,180);
   select.add(new Option(text,String(i)));
  });
  if(count)count.textContent=forms.length?`${forms.length} samostatných čekajících formulářů. Každý vyhodnoťte vlastní potvrzovací akcí.`:'Žádné neuzavřené navazující hody pro tuto postavu.';
@@ -9381,6 +9459,7 @@ function render(){
  episodeConfigureSkillGate(app);
  stableTrainingJump597=false;
  hideVisibleTechnicalUUIDs(app);
+ decorateHumanJSONReferences(app);
  hydrateSkillFollowupChoices598(app);
  applySelectedSV595(app);
  enrichAnimalTrainingForms(app);
@@ -9413,7 +9492,7 @@ function render(){
 const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
   node.matches?.('form,section,div')||node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form]')))))
-   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hideVisibleTechnicalUUIDs(root);}
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
 // On narrow layouts the navigation joins the page scroll instead of using
@@ -9428,7 +9507,7 @@ document.addEventListener('click',e=>{
   }
  });
 },true);
-function ask(msg){return window.confirm(msg)}
+function ask(msg){return uiConfirm(msg)}
 // HMK p.187: independent Fear/Aberrance form, ONE existing full-record CAS.
 document.addEventListener('submit',event=>{
  const form=event.target;
@@ -9523,7 +9602,7 @@ document.addEventListener('click',e=>{
   if(action==='initiative-next-round')persistInitiativeSequence(nextEncounterRound(seq,combatSequenceStates()));
   if(action==='initiative-complete-concentration'){
    const actorId=btn.dataset.ownerId,task=seq.commitments?.[actorId]?.task;
-   if(!window.confirm('GM potvrdil nepřerušenou koncentraci po celý předepsaný čas?'))return;
+   if(!uiConfirm('GM potvrdil nepřerušenou koncentraci po celý předepsaný čas?'))return;
    if(['missile-span','missile-load','missile-aim'].includes(task?.kind)){
     const actor=character(actorId),eventId=uuid();
     if(!actor)throw Error('Příprava Missile: postava již neexistuje');
@@ -9552,20 +9631,20 @@ document.addEventListener('click',e=>{
    }else persistInitiativeSequence(confirmConcentrationCompletion(seq,combatSequenceStates(),{actorId,gmConfirmed:true}));
   }
   if(action==='initiative-abandon-concentration'){
-   if(!window.confirm('GM potvrzuje přerušení/opuštění vícekolové akce?'))return;
+   if(!uiConfirm('GM potvrzuje přerušení/opuštění vícekolové akce?'))return;
    persistInitiativeSequence(abandonEncounterConcentration(seq,{actorId:btn.dataset.ownerId,gmConfirmed:true}));
   }
   if(action==='initiative-finish-readied'){
    if(seq.readied[seq.interruptActiveId]?.kind!=='attack')throw Error('Readied Move a Grope vyžadují skutečný ověřený výsledek, nikoli ruční potvrzení');
-   if(!window.confirm('GM potvrzuje, že připravená akce opravdu proběhla a její výsledky byly vyhodnoceny?'))return;
+   if(!uiConfirm('GM potvrzuje, že připravená akce opravdu proběhla a její výsledky byly vyhodnoceny?'))return;
    persistInitiativeSequence(completeReadiedEncounterAction(seq,{gmConfirmed:true}));
   }
   if(action==='initiative-cancel-readied'){
-   if(!window.confirm('GM potvrzuje zrušení nevyužité připravené akce?'))return;
+   if(!uiConfirm('GM potvrzuje zrušení nevyužité připravené akce?'))return;
    persistInitiativeSequence(cancelReadiedEncounterAction(seq,{actorId:btn.dataset.ownerId,gmConfirmed:true}));
   }
   if(action==='initiative-end-session'){
-   if(!window.confirm('Ukončit pouze pracovní pořadí tahů? Postavy a potvrzená zranění zůstanou zachována.'))return;
+   if(!uiConfirm('Ukončit pouze pracovní pořadí tahů? Postavy a potvrzená zranění zůstanou zachována.'))return;
    persistInitiativeSequence(null);
   }
   if(action==='initiative-export')downloadJSON({format:'hmk-initiative-session-v1',state:seq,confirmedCharacterStates:combatSequenceStates()},'hmk-initiative-turns.json');
@@ -12597,7 +12676,7 @@ document.addEventListener('submit',e=>{
   const proof=createAssistedIntake({campaignId:campaignKey(clock),actorId,minute:clock.minute,startMinute,
    foodAccepted:f.get('foodAccepted')==='yes',waterAccepted:f.get('waterAccepted')==='yes',
    caregiver:String(f.get('caregiver')||''),reason:String(f.get('reason')||'')});
-  if(!window.confirm('GM potvrzuje skutečný příjem potravy: '+(proof.foodAccepted?'ANO':'NE')+', pitné vody: '+(proof.waterAccepted?'ANO':'NE')+' pro toto 24h období? Doklad je trvalý a není to hod Healing.'))return;
+  if(!uiConfirm('GM potvrzuje skutečný příjem potravy: '+(proof.foodAccepted?'ANO':'NE')+', pitné vody: '+(proof.waterAccepted?'ANO':'NE')+' pro toto 24h období? Doklad je trvalý a není to hod Healing.'))return;
   if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,createdAt:stamp(),
    title:'HMK · asistované podání dávek · '+actor.name,
    body:'GM: potrava '+(proof.foodAccepted?'skutečně přijata':'nepřijata')+', voda '+(proof.waterAccepted?'skutečně přijata':'nepřijata')+'; pečující '+proof.caregiver+'; '+proof.reason,
@@ -12614,7 +12693,7 @@ document.addEventListener('submit',e=>{
   const animalId=String(f.get('animalId')||''),accessible=f.get('accessible')==='yes';
   assertNutritionPolicyBoundary(data.journal,campaignKey(clock),actorId,clock.minute);
   const proof=createAnimalAccess(data,{actorId,animalId,accessible,reason:String(f.get('reason')||''),minute:clock.minute});
-  if(!window.confirm(accessible?'GM potvrzuje, že uvedené zvíře je fyzicky u postavy a jeho náklad je dostupný až do odvolání?':'GM potvrzuje ukončení přístupu k uvedenému zvířeti?'))return;
+  if(!uiConfirm(accessible?'GM potvrzuje, že uvedené zvíře je fyzicky u postavy a jeho náklad je dostupný až do odvolání?':'GM potvrzuje ukončení přístupu k uvedenému zvířeti?'))return;
   if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
    createdAt:stamp(),title:accessible?'HMK · zvíře a zásoby dostupné':'HMK · konec dostupnosti zvířete',
    body:proof.reason,calendarNutritionAnimalAccess:proof})))notice=accessible?'Přístup k doloženému zvířeti je aktivní.':'Přístup ke zvířeti byl ukončen.';
@@ -12752,7 +12831,7 @@ document.addEventListener('submit',e=>{
    enabled:true,autoNeeds:true,inventoryRations:true,inventoryWater:true});
    return {id:uuid(),characterId:id,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,createdAt:stamp(),
     title:'HMK · zahájení běžného sledování družiny',body:'GM aktivoval denní sledování výživy podle doložených osobních a společných zásob, bez přidání zdrojů nebo posunu času.',calendarNutritionPolicy:policy};});
-  if(!window.confirm('Zapnout běžné sledování jídla a pití pro '+ids.length+' vybraných postav? Zásoby ani herní čas se nezmění.'))return;
+  if(!uiConfirm('Zapnout běžné sledování jídla a pití pro '+ids.length+' vybraných postav? Zásoby ani herní čas se nezmění.'))return;
   if(mutate(()=>{if(data.campaignClock?.minute!==clock.minute||activeNutritionPolicies(data.journal,campaignKey(clock),ids).length)
     throw Error('Během potvrzení se změnil stav kalendáře nebo zásobování.');data.journal.push(...rows);})){notice='Denní sledování družiny bylo zapnuto pro '+ids.length+' postav.';}
  }catch(error){alert('Sledování družiny nebylo zapnuto: '+error.message)}
@@ -12793,7 +12872,7 @@ document.addEventListener('submit',e=>{
    draftJournal.push(conditionRow);planned.push(conditionRow);
    if(rest){draftJournal.push(rest);planned.push({...rest,createdAt:stamp()});}
   }
-  if(!window.confirm('Uložit 24hodinové podmínky pro '+ids.length+' vybraných postav?'))return;
+  if(!uiConfirm('Uložit 24hodinové podmínky pro '+ids.length+' vybraných postav?'))return;
   if(mutate(()=>{if(data.campaignClock?.minute!==clock.minute)throw Error('Mezitím se změnil čas kampaně.');data.journal.push(...planned);}))
    notice='Společné podmínky zapsány pro '+ids.length+' postav; čas kampaně se nezměnil.';
  }catch(error){alert('Společné podmínky nebyly uloženy: '+error.message);}
@@ -12879,7 +12958,7 @@ document.addEventListener('click',e=>{
   const proof=base?createNutritionProvisionSwitch({campaignId:cid,actorId,minute:clock.minute,provisioned:next}):null;
   const policy=base?null:createNutritionPolicy({campaignId:cid,minute:clock.minute,actorId,foodNeed:1,waterNeed:1,
    enabled:true,autoNeeds:true,gmProvisioned:next,inventoryRations:!next,inventoryWater:!next});
-  if(!window.confirm(next?`GM potvrzuje průběžný přístup ${shown.name} k jídlu a vodě od ${displayCampaignMinute(clock.minute)}? Část dne před změnou zůstane zachována.`:`Od ${displayCampaignMinute(clock.minute)} ukončit GM zajištěný přístup pro ${shown.name}? Zbývající potřeba se uhradí jen doloženými zdroji.`))return;
+  if(!uiConfirm(next?`GM potvrzuje průběžný přístup ${shown.name} k jídlu a vodě od ${displayCampaignMinute(clock.minute)}? Část dne před změnou zůstane zachována.`:`Od ${displayCampaignMinute(clock.minute)} ukončit GM zajištěný přístup pro ${shown.name}? Zbývající potřeba se uhradí jen doloženými zdroji.`))return;
   if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
    title:next?'HMK · zásobování GM od této minuty':'HMK · konec zásobování GM',
    body:'Rozhodnutí platí od '+displayCampaignMinute(clock.minute)+'; předchozí část dne se nemění, spotřeba se vyúčtuje po 24 hodinách v půldenních dávkách.',
@@ -14522,7 +14601,7 @@ function explainAndOpenBlockedCalendarTerm(err,targetMinute){
   .sort((a,b)=>a.minute-b.minute)[0];
  if(!due)return false;
  const actor=character(due.characterId);
- window.alert('Čas nebyl změněn. Povinná kontrola: '+(actor?.name||due.name)+' · '+due.description+' · '+displayCampaignMinute(due.minute)+'. Po zavření tohoto okna se otevře správný formulář.');
+ uiAlert('Čas nebyl změněn. Povinná kontrola: '+(actor?.name||due.name)+' · '+due.description+' · '+displayCampaignMinute(due.minute)+'. Po zavření tohoto okna se otevře správný formulář.');
  if(actor&&due.sourceId&&due.kind){
   selected=actor.id;
   if(['skill-critical','skill-fall','skill-injury','weather-course','weather-skin'].includes(due.kind)){
@@ -14548,13 +14627,13 @@ document.addEventListener('submit',e=>{
   if(f.id!=='campaign-quick-advance-form'&&v.gmConfirmed!=='yes')throw Error('Akci musí potvrdit GM');
   if(f.id==='campaign-tr-origin-form'){
    const next=setCampaignTROrigin(data.campaignClock,{year:n(v.year),month:n(v.month),day:n(v.day),eventId:uuid(),confirmed:true});
-   if(!window.confirm('Přiřadit '+formatTRDate(campaignTRDate(next,next.minute))+' ke skutečnému dni kampaně? Datum již nepůjde nenápadně změnit.'))return;
+   if(!uiConfirm('Přiřadit '+formatTRDate(campaignTRDate(next,next.minute))+' ke skutečnému dni kampaně? Datum již nepůjde nenápadně změnit.'))return;
    mutate(()=>{data.campaignClock=next;});return;
   }
   if(f.id==='campaign-quick-advance-form'){
    if(combatInitiativeSequence)throw Error('Při aktivním Initiative nelze samostatně posouvat čas kampaně');
    const delta=n(v.deltaMinutes),next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:delta,eventId:uuid(),reason:v.reason,gmConfirmed:true,characters:data.characters,journal:data.journal});
-   if(!window.confirm('Potvrdit skutečné plynutí času do '+displayCampaignMinute(next.minute)+'? Nástup bez hodu se automaticky zapíše; splatné hody se samy nevynechají.'))return;
+   if(!uiConfirm('Potvrdit skutečné plynutí času do '+displayCampaignMinute(next.minute)+'? Nástup bez hodu se automaticky zapíše; splatné hody se samy nevynechají.'))return;
    mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();},{gmClockAdvance:true});return;
   }
   const minute=(n(v.day)-1)*DAY_MINUTES+n(v.hour)*60+n(v.minute), duration=n(v.durationDays)*DAY_MINUTES+n(v.durationHours)*60+n(v.durationMinutes);
@@ -14565,7 +14644,7 @@ document.addEventListener('submit',e=>{
   if(skill&&(v.destination!=='skills'||!v.characterId||!availableMasteries(character(v.characterId)).some(m=>m.name===skill&&m.ml>0)))
    throw Error('Předvolená dovednost není doložena u vybrané postavy nebo nevede do Skill Tests.');
   const next=addGMCalendarPlan(data.campaignClock,{id:uuid(),eventId:uuid(),title:v.title,note:v.note||'',place:v.place||'',characterId:v.characterId||'',skill,minute,endMinute:minute+duration,destination:v.destination,requiresAction:v.requiresAction==='yes',trigger:v.trigger,confirmed:true});
-  if(!window.confirm('Zapsat událost „'+v.title+'“ na '+displayCampaignMinute(minute)+'?'))return;
+  if(!uiConfirm('Zapsat událost „'+v.title+'“ na '+displayCampaignMinute(minute)+'?'))return;
   if(mutate(()=>{data.campaignClock=next;}))calendarUI.prefillMinute=null;
  }catch(err){const v=Object.fromEntries(new FormData(f));
   const delta=Number(v.deltaMinutes)||0;if(f.id!=='campaign-quick-advance-form'||!explainAndOpenBlockedCalendarTerm(err,data.campaignClock.minute+delta))alert('Kalendář nebyl změněn: '+err.message)}
@@ -14623,7 +14702,7 @@ document.addEventListener('click',e=>{
  const allowed=canVoidWeather(data.journal,sourceId,cid,clock.minute);
  if(!allowed.ok){alert(allowed.reason);return;}
  const source=data.journal.find(j=>j.id===sourceId);
- if(!window.confirm('Zrušit dnešní počasí oblasti '+source.calendarTrekDayWeather.area+'? Původní hody zůstanou v historii. Nové počasí bude vyžadovat nové potvrzené d10.'))return;
+ if(!uiConfirm('Zrušit dnešní počasí oblasti '+source.calendarTrekDayWeather.area+'? Původní hody zůstanou v historii. Nové počasí bude vyžadovat nové potvrzené d10.'))return;
  const row={id:uuid(),characterId:source.characterId,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
   title:'HMK · zrušení denního počasí · '+source.calendarTrekDayWeather.area,
   body:'GM odvolal počasí pro další úseky od aktuální minuty. Původní doklad a absolvované účinky zůstávají zachovány; čas se nemění.',
@@ -14642,7 +14721,7 @@ document.addEventListener('submit',e=>{
   if(encounterGMResolution(data.journal,source.id,cid))throw Error('Setkání už bylo uzavřeno.');
   const disposition=String(fd.get('disposition')),note=String(fd.get('note')||'').trim();
   if(!['no-further-action','adjudicated'].includes(disposition)||note.length>500)throw Error('Neplatné rozhodnutí GM.');
-  if(!window.confirm('Uzavřít tuto konkrétní událost setkání? Původní hod i historie zůstanou zachované.'))return;
+  if(!uiConfirm('Uzavřít tuto konkrétní událost setkání? Původní hod i historie zůstanou zachované.'))return;
   const row={id:uuid(),characterId:source.characterId,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
    title:'HMK · setkání uzavřeno GM',body:disposition==='no-further-action'?'Bez navazujícího účinku. '+note:'Navazující situace vyřešena. '+note,
    calendarTrekEncounterGM:{format:TREK_ENCOUNTER_GM_FORMAT,sourceId:source.id,minute:clock.minute,disposition,note}};
@@ -14671,7 +14750,7 @@ document.addEventListener('submit',e=>{
    area:baseline.area,season:baseline.season,climate:baseline.climate,landscape:baseline.landscape,
    alpine:baseline.alpine,aridDesert:baseline.aridDesert,temperatureD10:Number(t.value),precipitationD10:Number(r.value),diceOrigins:origins});
   const running=runningTravelForWeatherChange(data,baseline.area);
-  if(!window.confirm('GM potvrzuje změnu počasí '+baseline.area+' od '+displayCampaignMinute(clock.minute)+'? '+(running.length?'Probíhající cesta ('+running.length+' účastníků) se automaticky rozdělí: absolvovaný úsek se nyní vyúčtuje, zbývající čas bude vyžadovat nové doložené podklady.':'Původní doklady zůstanou nedotčené.') ))return;
+  if(!uiConfirm('GM potvrzuje změnu počasí '+baseline.area+' od '+displayCampaignMinute(clock.minute)+'? '+(running.length?'Probíhající cesta ('+running.length+' účastníků) se automaticky rozdělí: absolvovaný úsek se nyní vyúčtuje, zbývající čas bude vyžadovat nové doložené podklady.':'Původní doklady zůstanou nedotčené.') ))return;
   const row={id:uuid(),characterId:source.characterId,calendarCampaignId:cid,campaignMinute:clock.minute,
    createdAt:stamp(),title:'HMK · počasí změněno GM · '+baseline.area,
    body:'GM potvrdil nové podmínky od aktuální minuty; dvě skutečné d10. Do konce dne nebo další změny.',
@@ -14696,7 +14775,7 @@ document.addEventListener('submit',e=>{
   const weatherDay=trekWeatherDay({season,climate,landscape,alpine,aridDesert,temperatureD10,precipitationD10});
   if(activeAreaWeather(data.journal,campaignId,dayIndex,area))throw Error('Pro tuto oblast už dnes platí denní počasí. Chcete-li nové, potvrďte časovou změnu GM nebo nejprve odvolejte aktivní výhled.');
   const origins=['temperature','precipitation'].map(name=>{const field=form.elements.namedItem(name);return field.dataset.cryptographicValue===field.value?'cryptographic-software-die':'manual';});
-  if(!window.confirm('Zapsat nezměnitelné denní počasí pro '+area+'? d10 teplota '+temperatureD10+', srážky '+precipitationD10+'.'))return;
+  if(!uiConfirm('Zapsat nezměnitelné denní počasí pro '+area+'? d10 teplota '+temperatureD10+', srážky '+precipitationD10+'.'))return;
   const entry={id:uuid(),characterId:calendarMemberIds(clock,data.characters)[0]?.id||'',calendarCampaignId:campaignId,campaignMinute:clock.minute,
    createdAt:stamp(),title:'HMK · Denní počasí · '+area,body:'Teplota d10 '+temperatureD10+', srážky d10 '+precipitationD10+'; HMK 144',
    calendarTrekDayWeather:{format:'hmk-trek-daily-weather-v1',dayIndex,area,season,climate,landscape,alpine,aridDesert,weatherDay,
@@ -15004,7 +15083,7 @@ document.addEventListener('click',e=>{
   const explanation=isRemove?
    'Skrýt „'+(chosen.title||chosen.description)+'“ pouze z kalendáře? Historie, již provedené účinky a případné povinné testy zůstanou nedotčené.':
    'Označit „'+(chosen.title||chosen.description)+'“ jako zkontrolovanou událost GM? Tím se nevytváří výsledek hodu ani neobnovuje Fatigue.';
-  if(!window.confirm(explanation))return;
+  if(!uiConfirm(explanation))return;
   const receipt=makeCalendarUIReceipt({journal:data.journal,campaignId:campaignKey(data.campaignClock),eventId:chosen.id,action,minute:data.campaignClock.minute});
   const receiptActor=character(chosen.characterId)?chosen.characterId:calendarMemberIds(data.campaignClock,data.characters)[0]?.id;
   if(!receiptActor)throw Error('Bez postavy v kampani nelze bezpečně uložit doklad do autoritativního deníku.');
@@ -15090,7 +15169,7 @@ document.addEventListener('click',e=>{
    const reason=window.prompt('Důvod přesunu na '+displayCampaignMinute(target)+':','Plynutí času ve hře');
    if(reason===null)return;
    const next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:delta,eventId:uuid(),reason,gmConfirmed:true,characters:data.characters,journal:data.journal});
-   if(!window.confirm('Nastavit čas kampaně na '+displayCampaignMinute(target)+'? Nevyřízené termíny se nesmějí přeskočit.'))return;
+   if(!uiConfirm('Nastavit čas kampaně na '+displayCampaignMinute(target)+'? Nevyřízené termíny se nesmějí přeskočit.'))return;
    mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();},{gmClockAdvance:true});
   }catch(error){if(!explainAndOpenBlockedCalendarTerm(error,Number(t.dataset.calSetTime)))alert('Čas nebyl změněn: '+error.message);}
   return;
@@ -15185,7 +15264,7 @@ document.addEventListener('click',e=>{
   }
   const note=window.prompt(cancel?'Důvod zrušení (nepovinné):':'Zápis výsledku rozhodnutí GM (nenahrazuje pravidlový test):','');
   if(note===null)return;
-  if(!window.confirm((cancel?'Zrušit':'Potvrdit vyřízení')+' událost „'+plan.title+'“? Zápis zůstane v auditní historii.'))return;
+  if(!uiConfirm((cancel?'Zrušit':'Potvrdit vyřízení')+' událost „'+plan.title+'“? Zápis zůstane v auditní historii.'))return;
   try{
    const next=completeGMCalendarPlan(data.campaignClock,{id:uuid(),planId,note,kind:cancel?'cancelled':'resolved',confirmed:true});
    mutate(()=>{data.campaignClock=next;
@@ -15214,7 +15293,7 @@ document.addEventListener('submit',e=>{
    assertCompatibleLiveEffectTimeAxis(next,data.calendarEvidenceArchives??[],data.characters,memberIds,{identicalDayAxis:v.sameDayAxis==='yes'});
    const restored=recoverCalendarEvidence(next,data.calendarEvidenceArchives??[],memberIds,{identicalDayAxis:v.sameDayAxis==='yes',idFactory:uuid});
    next=restored.clock;validateCampaignCalendar(next);
-   if(!window.confirm('Založit kalendář '+displayCampaignMinute(next.minute)+' pro '+memberIds.length+' postav? Obnovené časové počátky: '+restored.recovered+'. Neurčitelné časy: '+restored.unmapped+'.'))return;
+   if(!uiConfirm('Založit kalendář '+displayCampaignMinute(next.minute)+' pro '+memberIds.length+' postav? Obnovené časové počátky: '+restored.recovered+'. Neurčitelné časy: '+restored.unmapped+'.'))return;
    if(mutate(()=>{const created=beginAdditionalCalendar(data,next);data.campaignClock=created.campaignClock;data.campaignClocks=created.campaignClocks;data.campaignActorBranches=created.campaignActorBranches;data.characters=created.characters;data.inventory=created.inventory;})){calendarUI=null;calendarCreating=false;calendarLanding=false;render();}return;
   }
   if(!data.campaignClock)throw Error('Kalendář ještě nebyl založen');
@@ -15224,7 +15303,7 @@ document.addEventListener('submit',e=>{
    if(![days,hours,minutes].every(Number.isSafeInteger)||hours>23||minutes>59)throw Error('Zadejte celé dny a HH:MM');
    const next=advanceCampaignCalendar(data.campaignClock,{deltaMinutes:days*DAY_MINUTES+hours*60+minutes,
     reason:v.reason,eventId:uuid(),gmConfirmed:true,characters:data.characters,journal:data.journal});
-   if(!window.confirm('Posunout celou kampaň na '+displayCampaignMinute(next.minute)+'? Splatné dokončené činnosti budou vyhodnoceny automaticky.'))return;
+   if(!uiConfirm('Posunout celou kampaň na '+displayCampaignMinute(next.minute)+'? Splatné dokončené činnosti budou vyhodnoceny automaticky.'))return;
    mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();},{gmClockAdvance:true});return;
   }
   const days=parse(v.days),hours=parse(v.hours),minutes=parse(v.minutes);
@@ -15241,7 +15320,7 @@ document.addEventListener('submit',e=>{
   }
   const next=anchorCampaignOrigin(data.campaignClock,{kind,characterId,woundId,episodeId,elapsedMinutes,
    gmConfirmed:true,eventId:uuid()});
-  if(!window.confirm('Trvale potvrdit počátek '+kind+' před '+elapsedMinutes+' minutami?'))return;
+  if(!uiConfirm('Trvale potvrdit počátek '+kind+' před '+elapsedMinutes+' minutami?'))return;
   mutate(()=>{data.campaignClock=next;});
  }catch(err){alert('Kalendář nebyl změněn: '+err.message);}
 },true);
@@ -16322,7 +16401,7 @@ document.addEventListener('submit',e=>{
    if(stimulantProofs.length)seq.stimulantInitiativeSnapshot={campaignId:campaignKey(data.campaignClock),
     minute:data.campaignClock.minute,proofs:stimulantProofs};
    const geom=window.prompt('Skutečně známé neprůchodné úsečky mapy (HMK, souřadnice v ft).\n'+
-     'Formát door:ID:x1,y1:x2,y2 nebo wall:ID:x1,y1:x2,y2; více úseček oddělte středníkem.\n'+
+     'Formát door:označení:x1,y1:x2,y2 nebo wall:označení:x1,y1:x2,y2; více úseček oddělte středníkem.\n'+
      'Prázdné = GM potvrzuje, že nejsou doloženy žádné takové překážky. Zrušit = boj nezahajovat.','');
    if(geom===null)return;
    seq.spatialBarriers=parseSpatialBarrierSegments(geom);
@@ -16335,7 +16414,7 @@ document.addEventListener('submit',e=>{
     x.snapshot?.category==='weapon'&&['main_hand','off_hand'].includes(x.slot)&&
     liveMissileWeaponType(x)==='crossbow'&&!x.destroyed&&x.quantity===1);
    for(const crossbow of crossbows){
-    if(!window.confirm('HMK str.161: Má '+(character(crossbow.characterId)?.name||crossbow.characterId)+
+    if(!uiConfirm('HMK str.161: Má '+(character(crossbow.characterId)?.name||crossbow.characterId)+
      ' už PŘED ZAHÁJENÍM střetnutí skutečně nataženou a nabitou kuši '+crossbow.snapshot.name+' ('+crossbow.id+')?\n'+
      'Ne = zůstane nenabitá; Ano = vyberete skutečnou šipku z inventáře.'))continue;
     const bolts=initialInventory.filter(x=>x.characterId===crossbow.characterId&&
@@ -16361,7 +16440,7 @@ document.addEventListener('submit',e=>{
    const actorsWithCrossbows=[...new Set(candidates.map(x=>x.actorId))];
    for(const actorId of actorsWithCrossbows){
     const options=candidates.filter(x=>x.actorId===actorId);
-    if(!window.confirm('HMK str.161: chce '+(character(actorId)?.name||actorId)+
+    if(!uiConfirm('HMK str.161: chce '+(character(actorId)?.name||actorId)+
      ' využít přednostní výstřel z PŘED BOJEM nabité kuše ještě před řádným IR?'+
      '\nAno = vystřelí ze zvolené kuše a spotřebuje svůj jediný tah prvního kola.'))continue;
     let proof=options[0];
@@ -16375,7 +16454,7 @@ document.addEventListener('submit',e=>{
    }
    initialSequence=configureInitialCrossbowPriority(initialSequence,
     {shooters:openingShooters,gmConfirmed:true});
-   if(!window.confirm('GM potvrzuje zahájení Initiative sekvence pro '+chars.length+' postav v kole '+seq.round+
+   if(!uiConfirm('GM potvrzuje zahájení Initiative sekvence pro '+chars.length+' postav v kole '+seq.round+
     '; předem nabitých kuší: '+initiallyLoaded.length+'?'))return;
    // A new encounter must never inherit Action/Setup TA or pairwise In Close
    // from an earlier per-tab draft. Reset them in the SAME durable setup write.
@@ -16453,7 +16532,7 @@ document.addEventListener('submit',e=>{
     const promptText=kind==='shield'?'GM potvrzuje, že konkrétní štít je skutečně zavěšený a dosažitelný?':
      kind==='weapon'?'GM potvrzuje skutečnou pochvu nebo závěs umožňující bezpečné uložení této zbraně?':
      'GM potvrzuje běžné nalezení tohoto známého předmětu v batohu (bez mimořádného testu)? Činnost potrvá jedno celé kolo.';
-    if(!window.confirm(promptText))return;
+    if(!uiConfirm(promptText))return;
     const id=uuid(),outcome=kind==='shield'?resolveGuidedShieldUnsling({id,sequence:seq,states,
      inventory:data.inventory,actorId,itemId,hand,character:actor,slungConfirmed:true}):
      kind==='weapon'?resolveGuidedWeaponStow({id,sequence:seq,states,inventory:data.inventory,
@@ -16483,7 +16562,7 @@ document.addEventListener('submit',e=>{
    const moraleState=states[session.actorId]?.morale?.state;
    const mustConfirmFlight=session.action==='pass'&&
     ['routed','withdrawing'].includes(moraleState)&&!seq.entryForcedPass&&seq.entryAlertness!=='confused';
-   if(mustConfirmFlight&&!window.confirm('HMK str.162: potvrdí GM, že pro tuto postavu není možný útěk/ústup a proto skutečně musí Pass?'))return;
+   if(mustConfirmFlight&&!uiConfirm('HMK str.162: potvrdí GM, že pro tuto postavu není možný útěk/ústup a proto skutečně musí Pass?'))return;
    const threat=session.action==='pass'&&moraleState==='routed'&&
     !states[session.actorId]?.morale?.surrender?.active?
      confirmRoutedThreatForPass(character(session.actorId)?.name||session.actorId):null;
@@ -16494,7 +16573,7 @@ document.addEventListener('submit',e=>{
    const result=completeGuidedTurnAction({session,sequence:seq,states,
     movementImpossibleConfirmed:mustConfirmFlight||forcedImpossible,threatenedConfirmed:threat});
    if(result.action==='concentrate-start'&&session.durationRounds===1&&
-      window.confirm('HMK 191: Jde o 1 kolo koncentrace pro cílený Deadly Melee proti konkrétnímu bezbrannému cíli?')){
+      uiConfirm('HMK 191: Jde o 1 kolo koncentrace pro cílený Deadly Melee proti konkrétnímu bezbrannému cíli?')){
     const targets=selectedEncounterCharacters().filter(c=>c.id!==result.actorId&&
       verifiedDeadlyHelplessReason(persistentStateOf(c)));
     if(!targets.length)throw Error('Deadly aim: není doložen žádný bezbranný cíl v Initiative');
@@ -16504,7 +16583,7 @@ document.addEventListener('submit',e=>{
    }
    const actor=character(result.actorId);
    if(!actor)throw Error('Jednající postava již není dostupná');
-   if(!window.confirm('Potvrdit pravidlově ověřenou akci '+result.action+' postavy '+actor.name+'?'))return;
+   if(!uiConfirm('Potvrdit pravidlově ověřenou akci '+result.action+' postavy '+actor.name+'?'))return;
    commitGuidedTransition(result.sequence,()=>{
     if(data.journal.some(j=>j.combatProof?.sourceEventId===session.id))throw Error('Duplicitní dokončení tahu');
     if(result.mandatoryAftermath||result.surrenderEventId)synchronizeCombatInjuries(actor,result.states[actor.id]);
@@ -16515,7 +16594,7 @@ document.addEventListener('submit',e=>{
    });
   }else{
    const seq=liveInitiativeSequence();
-   if(!window.confirm('GM potvrdil skutečný okamžik vyvolání připravené akce?'))return;
+   if(!uiConfirm('GM potvrdil skutečný okamžik vyvolání připravené akce?'))return;
    persistInitiativeSequence(resolveReadiedEncounterAction(seq,{actorId:v.actorId,
     interruptIR:Number(v.interruptIR),states:combatSequenceStates(),
     moveHalfConfirmed:v.moveHalfConfirmed==='yes',gmConfirmed:true}));
@@ -16553,7 +16632,7 @@ document.addEventListener('submit',e=>{
    const chars=selectedEncounterCharacters();if(!chars.length)throw Error('Vyberte účastníky nového střetnutí');
    // Preflight the entire roster before writing even one participant.
    const planned=chars.map(c=>({id:c.id,after:beginConfirmedEncounter({state:persistentStateOf(c),eventId:`encounter:${combatInjuryTimelineId}:${c.id}`,timelineId:combatInjuryTimelineId,gmConfirmed:true}).state}));
-   if(!window.confirm('Potvrdit nový boj pro '+chars.length+' postav? Staré rány a Fatigue zůstanou zachovány.'))return;
+   if(!uiConfirm('Potvrdit nový boj pro '+chars.length+' postav? Staré rány a Fatigue zůstanou zachovány.'))return;
    if(mutate(()=>{for(const x of planned){const actual=character(x.id);if(!actual)throw Error('Účastník zmizel před zápisem');synchronizeCombatInjuries(actual,x.after);}})){lastCombatEvent=null;if(combatInitiativeSequence)persistInitiativeSequence(null);}
   }catch(err){alert('Nové střetnutí nebylo zahájeno: '+err.message)}
   return;
@@ -16627,7 +16706,7 @@ document.addEventListener('submit',e=>{
    else if(f.id==='combat-coma-course-form'){confirmCalendarElapsed(c.id,'coma',(persistentStateOf(c).coma?.elapsedDays+Number(v.daysElapsed))*DAY_MINUTES);transition=applyComaCourse({state:persistentStateOf(c),round,eventId,healingBase:Number(v.healingBase),roll:Number(v.roll),periodD10:Number(v.periodD10),daysElapsed:Number(v.daysElapsed),restfulShelter:v.restfulShelter==='yes',arcaneBonus:Number(v.arcaneBonus),gmConfirmed:v.gmConfirmed==='yes'});}
    else transition=applyConfirmedFatigue({state:persistentStateOf(c),round,eventId,kind:v.kind,delta:Number(v.delta)});
   }
-  if(!window.confirm(`Opravdu trvale zapsat ${f.id==='confirm-combat-hit-form'?'zásah':f.id==='combat-blood-loss-form'?'ztrátu krve':f.id==='combat-blood-stoppage-form'?'ošetření':f.id==='combat-recovery-persistent-form'?'zotavení':f.id==='combat-extended-course-form'?'Extended Shock Course':f.id==='combat-coma-course-form'?'Coma Course':'únavu'} postavě ${c.name} v kole ${round}?`))return;
+  if(!uiConfirm(`Opravdu trvale zapsat ${f.id==='confirm-combat-hit-form'?'zásah':f.id==='combat-blood-loss-form'?'ztrátu krve':f.id==='combat-blood-stoppage-form'?'ošetření':f.id==='combat-recovery-persistent-form'?'zotavení':f.id==='combat-extended-course-form'?'Extended Shock Course':f.id==='combat-coma-course-form'?'Coma Course':'únavu'} postavě ${c.name} v kole ${round}?`))return;
   const freePressMatches=f.id==='confirm-combat-hit-form'&&!!pendingAutomaticFreePress&&
    pendingAutomaticFreePress.proposalId===lastCombatEvent?.proposalId;
   // Injury and the Initiative hit token MUST form one persistent transaction.
@@ -17075,7 +17154,7 @@ document.addEventListener('submit',e=>{
   if(f.id==='hmk-wq-form'){
    const item=data.inventory.find(x=>x.id===v.itemId);if(!item||!encounterSelection.has(item.characterId))throw Error('Předmět není u aktuálního účastníka');
    const r=applyConfirmedWeaponWQ({inventory:data.inventory,targetInventoryId:v.itemId,strikeImpact:n('strikeImpact'),csTiebreak:v.csTiebreak==='yes',targetIsShield:item.snapshot.category==='shield',thrust:v.thrust==='yes',sourceNatural:v.sourceNatural==='yes',targetArmed:true,gmConfirmed:true});
-   if(!window.confirm(`Zapsat Weapon Damage na ${item.snapshot.name}: WQ ${r.before} → ${r.after}${r.destroyed?', zničeno':''}?`))return;
+   if(!uiConfirm(`Zapsat Weapon Damage na ${item.snapshot.name}: WQ ${r.before} → ${r.after}${r.destroyed?', zničeno':''}?`))return;
    if(!mutate(()=>{data.inventory=r.inventory;const c=character(item.characterId),s=structuredClone(persistentStateOf(c));s.events.push({id,type:'weapon-damage',round,details:{itemId:v.itemId,before:r.before,after:r.after,destroyed:r.destroyed,effectiveImpact:r.effectiveImpact}});s.lastRound=Math.max(s.lastRound,round);validateCombatState(s);synchronizeCombatInjuries(c,s)}))return;
    msg=`Weapon Damage: ${item.snapshot.name} WQ ${r.before} → ${r.after}${r.destroyed?' · Destroyed':''}`;
   }else{
@@ -17092,7 +17171,7 @@ document.addEventListener('submit',e=>{
    else if(f.id==='hmk-mount-control-form')r=applyConfirmedMountedControl({...a,ridingML:n('ridingML'),mountInitiativeML:n('mountInitiativeML'),roll:n('roll'),retestRoll:n('retestRoll')});
    else if(f.id==='hmk-mount-charge-form')r=applyConfirmedMountedCharge({...a,mountRiderImpact:n('mountRiderImpact'),straightDistanceFt:n('straightDistanceFt')});
    else throw Error('Nepovolená alternativní zapisovací cesta');
-   if(!window.confirm('Trvale zapsat '+f.id+' pro '+target.name+' podle skutečných hodů HMK?'))return;
+   if(!uiConfirm('Trvale zapsat '+f.id+' pro '+target.name+' podle skutečných hodů HMK?'))return;
    if(!mutate(()=>{if(r.inventory)data.inventory=r.inventory;synchronizeCombatInjuries(target,r.state)}))return;
    msg=`Uloženo: ${f.id}. ${JSON.stringify(r.effect??r.outcome??r.result??{margin:r.margin,continued:r.continued})}`;
   }
@@ -17119,7 +17198,7 @@ document.addEventListener('submit',e=>{
     if(days===null||days!==args.daySinceBloodLoss)throw Error('Kalendář: Blood Loss vyžaduje doložený počátek a aktuální '+days+' dní.');}
    r=applyConfirmedBloodLossHealing(args);
   }
-  if(!window.confirm('Uložit doložené dlouhodobé léčení postavy '+c.name+'?'))return;
+  if(!uiConfirm('Uložit doložené dlouhodobé léčení postavy '+c.name+'?'))return;
   mutate(()=>{synchronizeCombatInjuries(c,r.state);logCalendarCombatResolution(c,r.state,f.id);});
  }catch(err){alert('Léčba nebyla uložena: '+err.message);}
 },true);
@@ -17196,7 +17275,7 @@ document.addEventListener('submit',e=>{
     otherWoundDays[other.id]=n;
    }
    t=applyConfirmedInfectionCourse({...args,endurance:Number(v.endurance),will:Number(v.will),roll:Number(v.roll),physicianSV:Number(v.physicianSV),otherWoundDays,herbalContext});}
-  if(!window.confirm('Trvale zapsat léčení '+c.name+' podle doložených dnů a hodů?'))return;
+  if(!uiConfirm('Trvale zapsat léčení '+c.name+' podle doložených dnů a hodů?'))return;
   mutate(()=>{synchronizeCombatInjuries(c,t.state);logCalendarCombatResolution(c,t.state,f.id);});
  }catch(err){alert('Léčení nebylo zapsáno: '+err.message);}
 },true);
@@ -18439,7 +18518,7 @@ document.addEventListener('click',e=>{
  const t=e.target.closest('[data-edit-skill],[data-edit-injury]');if(!t)return;
  const id=t.dataset.editSkill||t.dataset.editInjury;
  const c=character(selected);if(!c)return;
- if(t.dataset.editSkill){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}if(combatInitiativeSequence)return alert('Během Initiative nelze mimo Combat měnit ML postavy.');const x=(c.hmk?.skills||[]).find(x=>x.id===id);if(!x)return;const name=prompt('Dovednost',x.name);if(name===null)return;if(!name.trim())return alert('Název je povinný');const sb=prompt('SB (prázdné = nezadáno)',x.sb??'');if(sb===null)return;const ml=prompt('ML (prázdné = nezadáno)',x.ml??'');if(ml===null)return;const parse=v=>v.trim()===''?null:Number(v);if([parse(sb),parse(ml)].some(n=>n!==null&&(!Number.isSafeInteger(n)||n<0||n>999)))return alert('SB a ML musí být celá nezáporná čísla');if(x.creationDerived&&!window.confirm('Jde o automaticky vypočtený Skill. Ruční úprava bude evidována jako GM override a původní pravidlový výpočet zůstane na kartě dohledatelný. Pokračovat?'))return;
+ if(t.dataset.editSkill){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}if(combatInitiativeSequence)return alert('Během Initiative nelze mimo Combat měnit ML postavy.');const x=(c.hmk?.skills||[]).find(x=>x.id===id);if(!x)return;const name=prompt('Dovednost',x.name);if(name===null)return;if(!name.trim())return alert('Název je povinný');const sb=prompt('SB (prázdné = nezadáno)',x.sb??'');if(sb===null)return;const ml=prompt('ML (prázdné = nezadáno)',x.ml??'');if(ml===null)return;const parse=v=>v.trim()===''?null:Number(v);if([parse(sb),parse(ml)].some(n=>n!==null&&(!Number.isSafeInteger(n)||n<0||n>999)))return alert('SB a ML musí být celá nezáporná čísla');if(x.creationDerived&&!uiConfirm('Jde o automaticky vypočtený Skill. Ruční úprava bude evidována jako GM override a původní pravidlový výpočet zůstane na kartě dohledatelný. Pokračovat?'))return;
  mutate(()=>{if(x.creationDerived){x.manualOverride={source:'GM Edit',priorSB:x.sb,priorML:x.ml,confirmedAt:stamp()};x.creationDerived=false;if(c.hmk?.creation)c.hmk.creation.status='review-required';}
  x.name=name.trim();x.sb=parse(sb);x.ml=parse(ml)});return}
  if(t.dataset.editInjury){if(combatInitiativeSequence)return alert('Během Initiative nelze měnit žádné zranění mimo Combat průvodce.');const x=(c.hmk?.injuries||[]).find(x=>x.id===id);if(!x)return;if(x.combatRecord===true)return alert('Potvrzenou bojovou ránu lze upravit jen pravidlovým přechodem, ne ručně v deníku.');const location=prompt('Lokalita zásahu',x.location);if(location===null)return;if(!location.trim())return alert('Lokalita je povinná');const severity=prompt('Závažnost',x.severity||'');if(severity===null)return;const description=prompt('Popis poranění',x.description||'');if(description===null)return;mutate(()=>{x.location=location.trim();x.severity=severity;x.description=description})}
@@ -18452,18 +18531,18 @@ document.addEventListener('submit',e=>{const f=e.target;if(!['hmk-profile-form',
  }
  const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties:props};if(mutate(()=>{if(current)Object.assign(current,record);else data.items.push(record)})){overlay=null;render()}return}const c=character(selected);if(!c)return;const h=structuredClone(c.hmk||{});if(f.id==='hmk-profile-form'){try{assertLegacyMutationAllowed(c,'profile')}catch(err){return alert(err.message)}if(combatInitiativeSequence)return alert('Během Initiative se atributy bojovníka nemění mimo ověřený pravidlový průvodce.');const a={...(h.attributes||{})};for(const [k,val] of Object.entries(v)){if(k==='bio_creatureSizeReachModifier'){if(val==='')delete h.creatureSizeReachModifier;else if(!/^-?\d+$/.test(String(val))||!Number.isSafeInteger(Number(val)))return alert('Neplatný modifikátor Creature Size');else h.creatureSizeReachModifier=Number(val);}else if(k.startsWith('bio_'))h[k.slice(4)]=val;if(k.startsWith('attr_')){if(val==='')delete a[k.slice(5)];else{const n=Number(val);if(!Number.isSafeInteger(n)||n<0||n>(k==='attr_aberrance'?200:999))return alert('Neplatná charakteristika / Aberrance');a[k.slice(5)]=n}}}if(h.creation){
   if(h.folk!==c.hmk?.folk||h.ageGroup!==c.hmk?.ageGroup){
-    if(!window.confirm('Edit Folk/Age Group zneplatní původní soubory fyzických hodů Attributes. Pokračovat?'))return;
+    if(!uiConfirm('Edit Folk/Age Group zneplatní původní soubory fyzických hodů Attributes. Pokračovat?'))return;
     h.creation.attributeProof={};h.creation.skillDP={};h.creation.status='in-progress';
     for(let n=10;n<=14;n++)delete h.creation.completed[n];
     for(const key of ATTRIBUTES)delete a[key];
   }
   const changed=ATTRIBUTES.filter(key=>a[key]!==h.attributes?.[key]);
-  if(changed.length&&!window.confirm('Edit změní '+changed.join(', ')+' a zruší důkazy fyzických hodů v Character Creation. Pokračovat?'))return;
+  if(changed.length&&!uiConfirm('Edit změní '+changed.join(', ')+' a zruší důkazy fyzických hodů v Character Creation. Pokračovat?'))return;
   for(const key of changed)delete h.creation.attributeProof?.[key];
   if(changed.length){h.creation.status='in-progress';delete h.creation.completed[10];delete h.creation.completed[12];delete h.creation.completed[14];}
  }mutate(()=>{c.hmk={...h,attributes:a};syncCreationSkills(c.hmk,uuid)});return}if(f.id==='hmk-skill-form'){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}if(combatInitiativeSequence)return alert('Během Initiative nelze měnit dovednosti mimo Combat průvodce.');if(!String(v.name||'').trim())return alert('Zadejte název dovednosti');const skill={id:uuid(),group:v.group,name:v.name.trim(),sb:v.sb===''?null:Number(v.sb),ml:v.ml===''?null:Number(v.ml)};if([skill.sb,skill.ml].some(n=>n!==null&&(!Number.isSafeInteger(n)||n<0||n>999)))return alert('Neplatné SB/ML');mutate(()=>{c.hmk={...h,skills:[...(h.skills||[]),skill]}});return}if(f.id==='hmk-injury-form'){if(combatInitiativeSequence)return alert('Během Initiative nelze mimo Combat zapisovat nové rány.');if(!String(v.location||'').trim())return alert('Zadejte lokalitu');mutate(()=>{c.hmk={...h,injuries:[...(h.injuries||[]),{id:uuid(),location:v.location,description:v.description||'',severity:v.severity||''}]}})}},true);
 document.addEventListener('change',e=>{const id=e.target?.dataset?.encounterCharacter;if(!id)return;if(combatInitiativeSequence){e.target.checked=encounterSelection.has(id);return alert('Nejprve ukončete Initiative sekvenci; účastníky v jejím průběhu nelze tiše změnit.');}if(!data.characters.some(c=>c.id===id))return;if(!stagedEncounterSelection)stagedEncounterSelection=new Set(encounterSelection);if(e.target.checked)stagedEncounterSelection.add(id);else stagedEncounterSelection.delete(id);render()});
-document.addEventListener('click',e=>{const t=e.target.closest('[data-remove-skill],[data-remove-injury]');if(!t)return;const c=character(selected);if(!c||!window.confirm('Odstranit tento záznam?'))return;if(t.dataset.removeSkill){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}}const key=t.dataset.removeSkill?'skills':'injuries';const id=t.dataset.removeSkill||t.dataset.removeInjury;if(combatInitiativeSequence)return alert('Během Initiative se nemohou ručně mazat dovednosti ani zranění.');if(key==='injuries'&&c.hmk?.combatState?.wounds?.some(w=>w.id===id))return alert('Potvrzenou bojovou ránu nelze vymazat mimo pravidlové zotavení.');mutate(()=>{c.hmk=c.hmk||{};c.hmk[key]=(c.hmk[key]||[]).filter(x=>x.id!==id)})});
+document.addEventListener('click',e=>{const t=e.target.closest('[data-remove-skill],[data-remove-injury]');if(!t)return;const c=character(selected);if(!c||!uiConfirm('Odstranit tento záznam?'))return;if(t.dataset.removeSkill){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}}const key=t.dataset.removeSkill?'skills':'injuries';const id=t.dataset.removeSkill||t.dataset.removeInjury;if(combatInitiativeSequence)return alert('Během Initiative se nemohou ručně mazat dovednosti ani zranění.');if(key==='injuries'&&c.hmk?.combatState?.wounds?.some(w=>w.id===id))return alert('Potvrzenou bojovou ránu nelze vymazat mimo pravidlové zotavení.');mutate(()=>{c.hmk=c.hmk||{};c.hmk[key]=(c.hmk[key]||[]).filter(x=>x.id!==id)})});
 
 // v21: independent catalogue exchange. Never import character data or overwrite definitions.
 // Canonical fingerprint: JSON object key order does not change a definition's identity.
@@ -18682,7 +18761,7 @@ document.addEventListener('submit',e=>{
      throw Error('Postava nemá aktivní doloženou kapitulaci');
     const reason=window.prompt('Co se ve skutečnosti změnilo, že kapitulace skončila? (nejméně 5 znaků)','');
     if(reason===null)return;
-    if(!window.confirm('GM potvrzuje faktické ukončení kapitulace; Morale State se tím automaticky nemění?'))return;
+    if(!uiConfirm('GM potvrzuje faktické ukončení kapitulace; Morale State se tím automaticky nemění?'))return;
     const eventId=uuid(),outcome=recordConfirmedSurrenderRelease({state:persistentStateOf(target),
      round:seq.round,timelineId:seq.timelineId,eventId,reason,gmConfirmed:true});
     const next=validateEncounterSequence(seq);
@@ -18715,7 +18794,7 @@ document.addEventListener('submit',e=>{
     if(flag===null)return;
     if(!['ano','ne'].includes(flag.trim().toLowerCase()))throw Error('Zadejte ano/ne');
     const active=flag.trim().toLowerCase()==='ano';
-    if(!window.confirm('GM potvrzuje, že skutečný výsledek neschopnosti pohybu či agresivní akce je doložen. U disarmament GM určil, že jde o funkční Vanquished.'))return;
+    if(!uiConfirm('GM potvrzuje, že skutečný výsledek neschopnosti pohybu či agresivní akce je doložen. U disarmament GM určil, že jde o funkční Vanquished.'))return;
     const participants=seq.order.map(id=>({character:character(id),state:persistentStateOf(character(id))}));
     const eventId=uuid(),outcome=recordGuidedFunctionalVanquished({sequence:seq,participants,
      targetId:target.id,active,category:category.trim(),reason,eventId,gmConfirmed:true});
@@ -18831,9 +18910,9 @@ document.addEventListener('submit',e=>{
      const commandML=uniqueSkill(actor,'command'),initiativeML=uniqueSkill(target,'initiative');
      const threat=window.prompt('Skutečná vyslovená nebo přímo předvedená hrozba (HMK pp.67,137–138)','');
      if(threat===null)return;
-     const foe=window.confirm('GM: tato postava je skutečný protivník a zastrašování je právě teď vhodná bezprostřední volná akce?');
+     const foe=uiConfirm('GM: tato postava je skutečný protivník a zastrašování je právě teď vhodná bezprostřední volná akce?');
      if(!foe)return;
-     const heard=window.confirm('GM: cíl hrozbu skutečně viděl nebo slyšel a je schopen ji vnímat?');
+     const heard=uiConfirm('GM: cíl hrozbu skutečně viděl nebo slyšel a je schopen ji vnímat?');
      if(!heard)return;
      const parseModifier=(label)=>{
       const raw=window.prompt(label+' (celé číslo −100 až +100; 0 = žádný potvrzený modifikátor)','0');
@@ -18887,11 +18966,11 @@ document.addEventListener('submit',e=>{
      if(raw===null)return;objectId=raw.trim();
      const typ=window.prompt('Druh objektu: door / trunk','door');
      if(typ===null)return;objectKind=typ.trim().toLowerCase();
-     objectClosedConfirmed=window.confirm('Je tento KONKRÉTNÍ objekt právě zavřený?');
+     objectClosedConfirmed=uiConfirm('Je tento KONKRÉTNÍ objekt právě zavřený?');
      if(!objectClosedConfirmed)return;
-     objectUnlockedConfirmed=window.confirm('Je tento objekt odemčený (HMK str.161)?');
+     objectUnlockedConfirmed=uiConfirm('Je tento objekt odemčený (HMK str.161)?');
      if(!objectUnlockedConfirmed)return;
-     objectInReachConfirmed=window.confirm('Je tento objekt ve skutečném dosahu postavy?');
+     objectInReachConfirmed=uiConfirm('Je tento objekt ve skutečném dosahu postavy?');
      if(!objectInReachConfirmed)return;
      if(objectKind==='door'&&!seq.spatialBarriers?.some(b=>b.id===objectId)){
       const raw=window.prompt('Doložte skutečný úsek otevřených dveří v mapě: x1,y1:x2,y2 (ft).\n'+
@@ -18911,9 +18990,9 @@ document.addEventListener('submit',e=>{
      recipientIds=indexes.map(i=>recipients[i-1].id);
      spokenWords=window.prompt('Skutečný krátký vyslovený příkaz (žádný automatický Morale nebo Command efekt):','');
      if(spokenWords===null)return;
-     recipientsAlliesConfirmed=window.confirm('GM potvrzuje, že všichni jmenovaní příjemci jsou skutečnými spojenci velící postavy.');
+     recipientsAlliesConfirmed=uiConfirm('GM potvrzuje, že všichni jmenovaní příjemci jsou skutečnými spojenci velící postavy.');
      if(!recipientsAlliesConfirmed)return;
-     recipientsHearConfirmed=window.confirm('GM potvrzuje, že všichni uvedení spojenci příkaz opravdu slyšeli. Příkaz sám NEMĚNÍ jejich stav.');
+     recipientsHearConfirmed=uiConfirm('GM potvrzuje, že všichni uvedení spojenci příkaz opravdu slyšeli. Příkaz sám NEMĚNÍ jejich stav.');
      if(!recipientsHearConfirmed)return;
     }else if(kind==='five-foot-step'){
      effectiveMove=liveSpatialProfile(actor).effectiveMove;
@@ -18934,9 +19013,9 @@ document.addEventListener('submit',e=>{
      const h=window.prompt('Cílová skutečně volná ruka: main_hand nebo off_hand','main_hand');
      if(h===null)return;
      hand=h.trim();
-     sourceConfirmed=window.confirm(kind==='draw-weapon'?'Je zbraň skutečně v pochvě nebo za pásem a připravená k tasení?':'Je drobný předmět skutečně v kapse a připravený k vytažení?');
+     sourceConfirmed=uiConfirm(kind==='draw-weapon'?'Je zbraň skutečně v pochvě nebo za pásem a připravená k tasení?':'Je drobný předmět skutečně v kapse a připravený k vytažení?');
      if(!sourceConfirmed)return;
-     accessibleConfirmed=window.confirm('Je předmět okamžitě dostupný bez hledání v batohu a cílová ruka je skutečně volná?');
+     accessibleConfirmed=uiConfirm('Je předmět okamžitě dostupný bez hledání v batohu a cílová ruka je skutečně volná?');
      if(!accessibleConfirmed)return;
     }
     const id=uuid();
@@ -19098,7 +19177,7 @@ document.addEventListener('submit',e=>{
      if(!['ano','ne'].includes(answer.trim().toLowerCase()))throw Error('Pro Coma je nutné výslovně ano/ne');
      restfulShelter=answer.trim().toLowerCase()==='ano';
     }
-    if(!window.confirm('Potvrzujete skutečné uplynutí požadovaného času a správnost podmínek Course podle HMK p.179?'))return;
+    if(!uiConfirm('Potvrzujete skutečné uplynutí požadovaného času a správnost podmínek Course podle HMK p.179?'))return;
     guidedTraumaSession=createGuidedTraumaCourse({state:persistentStateOf(patient),character:patient,
      eventId:uuid(),round:combatClock.round,timelineId:combatInjuryTimelineId,kind:readiness.kind,
      elapsedHoursSinceOnset,daysElapsed,physicianStars,arcaneBonus,restfulShelter,timeConfirmed:true});
@@ -21932,7 +22011,7 @@ document.addEventListener('submit',e=>{
   const next=advanceCampaignCalendar(gmClock,{deltaMinutes:result.minutes,eventId:uuid(),reason:'GM časová epizoda: '+gmMessage,gmConfirmed:true,
    characters:stagedTimed?.characters||data.characters,journal:[...(stagedTimed?.generatedJournal?.length?data.journal.concat(stagedTimed.generatedJournal):data.journal),...scopedSurvivalCF]});
   const name=result.memberIds.map(id=>character(id)?.name||id).join(', '),sourceId=uuid();
-  if(!window.confirm('Potvrdit činnost '+name+' od '+displayCampaignMinute(result.startMinute)+' do '+displayCampaignMinute(result.endMinute)+' a posunout skutečný herní čas?'))return;
+  if(!uiConfirm('Potvrdit činnost '+name+' od '+displayCampaignMinute(result.startMinute)+' do '+displayCampaignMinute(result.endMinute)+' a posunout skutečný herní čas?'))return;
   const members=result.memberIds.map(id=>character(id));
   if(mutate(()=>{
    // Medical courses were evaluated on a private virtual clock at their
