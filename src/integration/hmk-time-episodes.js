@@ -9,6 +9,7 @@ import {createOrienteeringContext,adjustedOrienteeringSV} from './hmk-trekking-o
 import {allocateTrekModes} from './hmk-trekking-correction.js';
 import {assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 import {trackingModifiers,trackingOutcome} from './hmk-trekking-wilderness-tasks.js';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js';
 export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -20,19 +21,23 @@ export const EPISODE_KINDS=['travel','rest','sleep','winded','forage','tracking'
  * encounters can occur during long episodes. This is a transparent GM variant,
  * not the printed HMK d10 test. Wilderness night has half the density.
  */
-export function episodeEncounterByMinutes({minutes,environ='rural',night=false,d100}={}){
+export function episodeEncounterByMinutes({minutes,environ='rural',night=false,d100,lightMinutes=null}={}){
  must(whole(minutes,1,10080),'Encounter vyžaduje délku epizody v minutách');
  const tn={highway:[2,1],rural:[4,1],wilderness:[1,1],underworld:[9,9]}[environ]?.[night?1:0];
  must(tn!==undefined&&typeof night==='boolean','Encounter: neplatné prostředí či denní doba');
  must(whole(d100,1,100),'Minutový Encounter vyžaduje skutečný d100 (1–100).');
  const referenceMinutes=night&&environ==='wilderness'?480:240;
- const intensity=-Math.log1p(-tn/10)*minutes/referenceMinutes;
+ if(lightMinutes!==null)must(whole(lightMinutes.day,0,minutes)&&whole(lightMinutes.night,0,minutes)&&lightMinutes.day+lightMinutes.night===minutes,
+  'Encounter: délka denního a nočního světla musí přesně odpovídat minutám epizody.');
+ const intensity=lightMinutes===null?-Math.log1p(-tn/10)*minutes/referenceMinutes:
+  -Math.log1p(-({highway:2,rural:4,wilderness:1,underworld:9}[environ])/10)*lightMinutes.day/240
+  -Math.log1p(-({highway:1,rural:1,wilderness:1,underworld:9}[environ])/10)*lightMinutes.night/(environ==='wilderness'?480:240);
  // Percentile midpoint provides an unbiased, reproducible finite d100 draw.
  const target=(d100-.5)/100;
  let probability=Math.exp(-intensity),cumulative=probability,count=0;
  while(cumulative<target&&count<10000){count++;probability*=intensity/count;cumulative+=probability;}
  return {format:'hmk-episode-encounter-minute-v1',d100,tn,environ,night,minutes,
-  count,found:count>0,chance:1-Math.exp(-intensity),resolved:false,
+  ...(lightMinutes===null?{}:{lightMinutes}),count,found:count>0,chance:1-Math.exp(-intensity),resolved:false,
   procedure:'gm-minute-poisson-from-hmk-d10-density',sourcePage:150};
 }
 
@@ -40,25 +45,30 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
  progress=0,bearing=0,extraSlow=0,wearied=false,injured=false,loaded=false,continuousPrecipitation=false,progressD10=[],directionD10=[],
  enduranceByActor={},endRollByActor={},memberIds=[],weather=null,encounterRoll=null,encounterEnviron='rural',
  encounterResolved=false,encounterNight=false,encounterPercentile=null,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
- survivalCriticalFailure=false,survivalD10=null}={}){
+ survivalCriticalFailure=false,survivalD10=null,doubleTime=false,loadBypass=false,encByActor={},dunesSlow=false,
+  forcedBearing=0,previousDistanceFraction=0,encounterLightMinutes=null}={}){
  must(whole(minute,0,1e9)&&whole(minutes,1,10080)&&minute+minutes<=1e9,'Epizoda potřebuje 1–10 080 skutečných minut.');
  must(EPISODE_KINDS.includes(kind),'Neznámý druh epizody');
  must(Array.isArray(memberIds)&&memberIds.length>0&&new Set(memberIds).size===memberIds.length,'Vyberte jedinečné účastníky');
  must(whole(mapScale,100,10000000),'Neplatné měřítko mapy');
- const slow=extraSlow+Number(wearied)+Number(injured)+Number(continuousPrecipitation);
- must(whole(extraSlow,0,20)&&whole(progress,0,10)&&whole(bearing,0,20),'Neplatné pohybové režimy');
+ const slow=extraSlow+Number(wearied)+Number(injured)+Number(continuousPrecipitation)+Number(dunesSlow);
+ must(whole(extraSlow,0,20)&&whole(progress,0,10)&&whole(bearing,0,20)&&whole(forcedBearing,0,1)&&
+  typeof doubleTime==='boolean'&&typeof loadBypass==='boolean'&&typeof dunesSlow==='boolean'&&
+  typeof previousDistanceFraction==='number'&&previousDistanceFraction>=0&&previousDistanceFraction<1,
+  'Neplatné pohybové režimy nebo přenos zlomku vzdálenosti.');
+ must(!(loaded&&loadBypass),'Zrušený Loaded Mode nelze současně započítat jako zpomalení.');
  if(kind!=='travel')must(!survivalCriticalFailure&&survivalD10===null,'Survival Hazard platí pouze pro aktivní cestování.');
  let motion=null,distanceMeters=0,actors=[],direction=null,survivalHazard=null;
  if(kind==='travel'){
   // HMK printed rate is leagues per four-hour WATCH.  A freely timed GM episode
   // uses that rate as a speed; no fictional hour-based dice are rolled.
   motion=trekMovement({topography,terrain,conveyance,progress,slow,loaded,bearing,progressD10,
-   continuousPrecipitation,doubleTime:false,hours:4});
-  must(Array.isArray(directionD10)&&directionD10.length===motion.bearingDeficit&&directionD10.every(x=>whole(x,1,10)),
-   'Chybí '+motion.bearingDeficit+' platný Direction Hazard d10 (HMK 148).');
-  const hazards=trekHazards({bearingDeficit:motion.bearingDeficit,directionD10,survivalCriticalFailure,survivalD10});
+   continuousPrecipitation,doubleTime,hours:4});
+  must(Array.isArray(directionD10)&&directionD10.length===motion.bearingDeficit+forcedBearing&&directionD10.every(x=>whole(x,1,10)),
+   'Chybí '+(motion.bearingDeficit+forcedBearing)+' platný Direction Hazard d10 (HMK 148).');
+  const hazards=trekHazards({bearingDeficit:motion.bearingDeficit+forcedBearing,directionD10,survivalCriticalFailure,survivalD10});
   survivalHazard=hazards.survival;
-  if(motion.bearingDeficit){
+  if(motion.bearingDeficit+forcedBearing){
    direction={...hazards,rolls:[...directionD10]};
    if(direction.direction==='lost-time'){
     // Printed Lost Time adds one Slow. One of the previously spare Progress
@@ -69,16 +79,24 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
     motion.directionLostTime=true;
    }
   }
-  distanceMeters=Math.floor((motion.finalLPW*4000*minutes)/240+1e-10);
+  const exactMetres=motion.finalLPW*4000*minutes/240+previousDistanceFraction;
+  distanceMeters=Math.floor(exactMetres+1e-10);
+  var distanceFractionOut=Math.min(0.9999999999,Math.max(0,exactMetres-distanceMeters));
   actors=memberIds.map(id=>{
    const end=enduranceByActor[id],roll=endRollByActor[id];
    must(whole(end,0,50)&&whole(roll,1,10),'Každá cestující postava potřebuje skutečný END SR d10.');
    const sr=expeditionSecondaryRoll({endurance:end,roll,riding:conveyance==='mount'||conveyance==='cart'||conveyance==='wagon'});
-   const rate=sr.success?0:5; // GM time-scaled analogue of normal watch
+   const enc=encByActor[id]??0;
+   must(whole(enc,0,100),'Nenastavená nebo neplatná ENC postavy.');
+   const extraFatigue=loadBypass?(Math.floor(enc/(conveyance==='foot'?10:20))*10):0;
+   const duneFatigue=terrain==='dunes'&&conveyance==='foot'&&!dunesSlow?5:0;
+   const rate=(doubleTime?(conveyance==='foot'?40:20)-(sr.success?20:0):(sr.success?0:5))+extraFatigue+duneFatigue;
+   // rate represents weariness per reference interval, scaled to actual minutes;
+   // Double Time rates are per hour and are therefore multiplied by four.
    const carryIn=previousCarry[id]??0;
    must(whole(carryIn,0,239),'Neplatný zbytek poměrné únavy.');
    const units=carryIn+minutes*rate,delta=Math.floor(units/240),carryOut=units%240;
-   return {id,endurance:end,roll,sr,rate,delta,carryIn,carryOut};
+   return {id,endurance:end,roll,sr,rate,delta,carryIn,carryOut,enc,extraFatigue,duneFatigue};
   });
  }
  if(weather){must(weather.format==='hmk-trekking-weather-day-v1','Neplatný doklad počasí');}
@@ -87,17 +105,36 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
  must(typeof encounterNight==='boolean','Encounter: neplatný den/noc');
  if(encounterRoll!==null){must(whole(encounterRoll,1,10),'Encounter vyžaduje skutečný hod d10');}
  const encounter=encounterPercentile!==null?
-  {...episodeEncounterByMinutes({minutes,environ:encounterEnviron,night:encounterNight,d100:encounterPercentile}),resolved:!!encounterResolved}:
+  {...episodeEncounterByMinutes({minutes,environ:encounterEnviron,night:encounterNight,d100:encounterPercentile,lightMinutes:encounterLightMinutes}),resolved:!!encounterResolved}:
   encounterRoll===null?null:{roll:encounterRoll,tn:target,night:encounterNight,found:encounterRoll<=target,
   resolved:!!encounterResolved};
  return {format:EPISODE_FORMAT,startMinute:minute,endMinute:minute+minutes,minutes,kind,
   memberIds:[...memberIds],terrain,topography,conveyance,motion,
   distanceMeters,distanceKilometres:distanceMeters/1000,
+  ...(kind==='travel'?{distanceFractionIn:previousDistanceFraction,distanceFractionOut}:{}),
   mapCentimetres:Math.round(distanceMeters*100000/mapScale)/1000,
   actors,encounter,direction,survivalHazard,weather,slow,progress,bearing,loaded,
+  ...(kind==='travel'?{doubleTime,loadBypass,dunesSlow,forcedBearing}:{}),
   weatherHazard:weather?weather.daylightHazard:null,
   consumption:'stávající časově doložený 24hodinový účet výživy',
   gmTimeScale:'gm-arbitrary-episode-proportional-carry-v1',sourcePages:[144,145,146,149,150]};
+}
+/** Fractional metre accounting follows the last journey, even across rest. */
+export function lastTimeEpisodeDistanceFraction(journal=[],campaignId,minute=Infinity){
+ for(let i=journal.length-1;i>=0;i--){const row=journal[i],ep=row.calendarTimeEpisode;
+  if(row.calendarCampaignId!==campaignId||!ep||ep.startMinute>=minute||ep.kind!=='travel')continue;
+  return ep.distanceFractionOut??0;
+ }return 0;
+}
+/** A Tracking CF imposes Bearing on the next actual travelling episode,
+ * not the next generic event. That obligation is consumed once, not repeated. */
+export function pendingTrackingCFBearing(journal=[],campaignId,minute=Infinity){
+ const episodes=journal.filter(row=>row.calendarCampaignId===campaignId&&row.calendarTimeEpisode&&
+  row.calendarTimeEpisode.startMinute<minute).sort((a,b)=>b.calendarTimeEpisode.startMinute-a.calendarTimeEpisode.startMinute);
+ for(const row of episodes){const ep=row.calendarTimeEpisode;
+  if(ep.kind==='travel')return ep.trackingMemory?.level==='CF'&&ep.trackingMemory?.sourceMode==='new'?1:0;
+  if(ep.trackingMemory?.level==='CF'&&ep.trackingMemory?.sourceMode==='new')return 1;
+ }return 0;
 }
 export function lastTimeEpisodeCarry(journal=[],campaignId,actorId){
  for(let i=journal.length-1;i>=0;i--){const j=journal[i];
@@ -404,7 +441,7 @@ export function validateTimeEpisodes(journal=[]){
   }
   if(e.encounter?.format==='hmk-episode-encounter-minute-v1'){
    const expected={...episodeEncounterByMinutes({minutes:e.minutes,environ:e.encounter.environ,
-    night:e.encounter.night,d100:e.encounter.d100}),resolved:!!e.encounter.resolved};
+    night:e.encounter.night,d100:e.encounter.d100,lightMinutes:e.encounter.lightMinutes??null}),resolved:!!e.encounter.resolved};
    must(JSON.stringify(expected)===JSON.stringify(e.encounter),
     'Minutové riziko setkání musí odpovídat doloženému d100, prostředí a délce epizody.');
   }
@@ -413,6 +450,101 @@ export function validateTimeEpisodes(journal=[]){
    const d=e.settings?.survivalD10;
    const expected=critical?trekHazards({survivalCriticalFailure:true,survivalD10:Number(d)}).survival:null;
    must(e.survivalHazard===expected,'Survival Hazard neodpovídá CF ani doloženému d10.');
+  }
+  // New detailed receipts are checked against the exact witnessed inputs.
+  // Older historical episodes legitimately have no detail fields.
+  if(e.daylight){
+   const d=e.daylight,expected=episodeLightIntervals({startMinute:e.startMinute,minutes:e.minutes,
+    latitudeBand:d.latitudeBand,season:d.season,sunriseMinute:d.sunriseMinute,
+    twilightMinutes:d.twilightMinutes});
+   must(JSON.stringify(d)===JSON.stringify(expected),'Pozměněný čas denního světla.');
+  }
+  if(e.encounterDetails!==undefined){
+   must(Array.isArray(e.encounterDetails)&&e.encounter?.found&&
+    e.encounterDetails.length===e.encounter.count,'Každé setkání vyžaduje vlastní detail.');
+   for(const [i,record] of e.encounterDetails.entries()){
+    must(record.i===i&&whole(record.offset,0,e.minutes-1)&&record.pending===false,
+     'Encounter: chybí skutečný čas výskytu nebo dokončení.');
+    const d=record.distance;
+    const distance=episodeEncounterDistance({terrain:d.terrain,d4:d.d4,period:d.period,
+     moon:d.moon,hearingD10:d.hearingD10});
+    must(JSON.stringify(distance)===JSON.stringify(d),'Encounter Distance nesouhlasí s d4, světlem nebo terénem.');
+    if(e.daylight){const at=e.startMinute+record.offset;
+     const segment=e.daylight.segments.find(x=>x.start<=at&&at<x.end);
+     must(segment?.period===d.period,'Encounter použil špatné světlo pro čas události.');}
+    if(record.nonhostile){must(record.surprise===null,'Pokojné setkání nemá Surprise test.');continue;}
+    const t=record.surprise;
+    must(t?.verified&&t.decision,'Encounter Surprise není rozhodnuto.');
+    const expected=episodeEncounterSurprise({partyModes:e.orientation?.modes||{},conveyance:e.conveyance,
+     foeWatchfulness:t.foeWatchfulness,foeIsBeast:t.foeIsBeast,
+     partySkill:t.partySkill,foeSkill:t.foeSkill,partyLevel:t.partyLevel,
+     foeLevel:t.foeLevel,decision:t.decision});
+    must(JSON.stringify(expected)===JSON.stringify(t),'Surprise neodpovídá pravidlové tabulce.');
+   }
+   must(e.encounter.resolved===true,'Encounter má nevyřešené jednotlivé události.');
+  }
+  if(e.trackingFollowup){
+   const t=e.trackingFollowup,m=e.trackingMemory;
+   must(m&&t.adjustedSV===m.score.adjustedSV,'Tracking navazující test ztratil původní SV.');
+   const expected=episodeTrackingFollowup({adjustedSV:t.adjustedSV,criticalFailure:m.level==='CF',
+    awarenessLevel:t.awarenessLevel,spoorSpent:t.spoorSpent});
+   const skill=t.awarenessSkillId?journal.find(x=>x.id===t.awarenessSkillId):null;
+   const aw=skill?episodeSkillProof(skill,'Awareness',m.guideId,j.calendarCampaignId,e.startMinute):null;
+   must(t.awarenessLevel===(aw?.level||null)&&
+    JSON.stringify(t)===JSON.stringify({...expected,awarenessSkillId:t.awarenessSkillId}),
+    'Tracking Awareness/Spoor neodpovídá skutečnému Skill Testu.');
+  }
+  if(e.hazardDetails!==undefined){
+   must(Array.isArray(e.hazardDetails),'Neplatný seznam hazardů.');
+   const types=[e.survivalHazard,e.direction?.direction].filter(Boolean);
+   must(JSON.stringify(types)===JSON.stringify(e.hazardDetails.map(x=>x.hazard)),
+    'Chybí Direction nebo Survival Hazard.');
+   for(const h of e.hazardDetails){
+    const x=episodeHazardFollowup({hazard:h.hazard,repairSkill:h.repairSkill,
+     repairLevel:h.repairLevel,equipmentDisposition:h.equipmentDisposition,
+     complicationDecision:h.complicationDecision,accidentAgility:h.accidentAgility,
+     accidentD6:h.accidentD6,accidentZD10:h.accidentZD10,
+     complicationSkill:h.complicationSkill,complicationLevel:h.complicationLevel,
+     directionTurn:h.directionTurn,directionD10:h.directionD10??null,directionAwareness:h.directionAwareness});
+    const linked=h.evidenceId?journal.find(k=>k.id===h.evidenceId&&
+     k.calendarCampaignId===j.calendarCampaignId&&k.campaignMinute===e.startMinute):null;
+    if(h.hazard==='accident'&&typeof x.result==='object'&&h.gmInjuryResolved&&linked){x.requiresGMCompletion=false;}
+    must(!x.requiresGMCompletion&&JSON.stringify(h)===JSON.stringify({...x,
+     evidenceId:linked?.id||null,gmInjuryResolved:!!h.gmInjuryResolved}),
+     'Hazard nemá doložené nebo úplné vyhodnocení.');
+   }
+  }
+  if(e.weatherExposure!==undefined){
+   must(Array.isArray(e.weatherExposure)&&e.weatherExposure.length===e.memberIds.length*(e.weatherHazards||[]).length,
+    'Weather Hazard neobsahuje všechny postavy a podmínky.');
+   for(const w of e.weatherExposure){
+    must(e.memberIds.includes(w.id)&&e.weatherHazards.includes(w.kind)&&!w.pending,
+     'Weather Hazard se vztahuje na cizí postavu nebo nemá doložený hod.');
+    const expected=episodeWeatherExposure({kind:w.kind,areaAV:w.areaAV,roll:w.roll,
+     protection:w.protection,fireStrength:w.fireStrength,continuousSleet:w.continuousSleet,
+     resting:w.resting,shade:w.shade,tropicalNative:w.tropicalNative,endLevel:w.endLevel});
+    must(JSON.stringify(w)===JSON.stringify({id:w.id,...expected})&&
+     !['pending','pending-endurance'].includes(w.effect),'Pozměněný nebo neúplný Weather Hazard.');
+   }
+  }
+  if(e.weatherExposure!==undefined&&e.kind==='travel'&&e.actors?.some(a=>a.weatherFatigueUnits!==undefined)){
+   const dayMinutes=e.daylight?.minutesByPeriod?
+    e.daylight.minutesByPeriod.day+e.daylight.minutesByPeriod.twilight:
+    e.settings?.lightPeriod==='night'?0:e.minutes;
+   const units=episodeWeatherFatigueUnits({weather:e.weather,exposure:e.weatherExposure,
+    minutes:e.minutes,dayMinutes,nightMinutes:e.minutes-dayMinutes});
+   for(const a of e.actors){
+    const expected=units[a.id]||0,total=a.carryIn+e.minutes*a.rate+expected;
+    must(a.weatherFatigueUnits===expected&&a.delta===Math.floor(total/240)&&a.carryOut===total%240,
+     'Minutová únava způsobená počasím neodpovídá doloženému Cold/Heat Hazard.');
+   }
+  }
+  if(e.distanceFractionIn!==undefined){
+   must(e.kind==='travel'&&Math.abs(e.distanceFractionIn-lastTimeEpisodeDistanceFraction(prior,j.calendarCampaignId,e.startMinute))<1e-7,
+    'Ztracený nebo cizí zlomek cestovní vzdálenosti.');
+   const meters=e.motion.finalLPW*4000*e.minutes/240+e.distanceFractionIn;
+   must(e.distanceMeters===Math.floor(meters+1e-10)&&Math.abs(e.distanceFractionOut-Math.max(0,meters-e.distanceMeters))<1e-7,
+    'Minutové metry nebo přenesený zlomek neodpovídají rychlosti.');
   }
   if(e.navigationState!==undefined){
    must(['clear','lost','misdirection'].includes(e.navigationState),
