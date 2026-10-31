@@ -105,10 +105,13 @@ export function validateWildernessJournal(journal=[]){
 export function foragingResources(journal=[],campaignId){
  const sums={foodDays:0,waterDays:0,herbDoses:0,herbs:{}};
  for(const j of journal)if(j.calendarCampaignId===campaignId&&
-  (j.calendarTrekWildernessProof||j.calendarTimeEpisode?.foraging)){
-  const p=j.calendarTrekWildernessProof||j.calendarTimeEpisode.foraging;
-  for(const k of ['foodDays','waterDays','herbDoses'])sums[k]+=p.totals?.[k]??p.results.reduce((a,r)=>a+(r[k]||0),0);
-  for(const r of p.results)if(r.herbDoses)sums.herbs[r.herbName]=(sums.herbs[r.herbName]||0)+r.herbDoses;
+  (j.calendarTrekWildernessProof||j.calendarTimeEpisode?.foraging||j.calendarTimeEpisode?.travelForaging?.length)){
+  const proofs=j.calendarTrekWildernessProof?[j.calendarTrekWildernessProof]:
+   [...(j.calendarTimeEpisode.foraging?[j.calendarTimeEpisode.foraging]:[]),...(j.calendarTimeEpisode.travelForaging||[])];
+  for(const p of proofs){
+   for(const k of ['foodDays','waterDays','herbDoses'])sums[k]+=p.totals?.[k]??p.results.reduce((a,r)=>a+(r[k]||0),0);
+   for(const r of p.results)if(r.herbDoses)sums.herbs[r.herbName]=(sums.herbs[r.herbName]||0)+r.herbDoses;
+  }
  }
  return sums;
 }

@@ -66,6 +66,12 @@ const MOVE={
   'wilderness-trail':[3,4,.5,0],'cold-woodland':[2,4,0,0],'alpine-vegetation':[2,4,0,0],
   'needleleaf-forest':[2,2,0,0],'ice-snow-rockfield':[1,2,0,0],'mixed-forest':[1,1,0,0]}};
 const CONVEYANCE=['foot','mount','cart','wagon'];
+export function trekAvailableTerrain(topography,conveyance='foot'){
+ const column=CONVEYANCE.indexOf(conveyance);
+ assert(Object.hasOwn(MOVE,topography)&&column>=0,'Neplatná topografie nebo doprava');
+ return Object.keys(MOVE[topography]).filter(key=>MOVE[topography][key][column]>0);
+}
+
 export function trekMovement({topography,terrain,conveyance='foot',progress=0,slow=0,loaded=false,
  bearing=0,progressD10=[],doubleTime=false,hours=4,continuousPrecipitation=false}={}){
  const rate=MOVE[topography]?.[terrain],column=CONVEYANCE.indexOf(conveyance);

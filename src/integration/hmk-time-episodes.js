@@ -13,10 +13,33 @@ export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
 export const EPISODE_KINDS=['travel','rest','sleep','winded','forage','tracking','watch','other'];
+/** GM continuous-time random encounter adaptation of HMK p.150.
+ * The source TN is from the published special d10, but the density is scaled
+ * to the exact elapsed minutes rather than manufacturing discrete watches.
+ * A SINGLE witnessed d100 percentile samples a Poisson count: multiple
+ * encounters can occur during long episodes. This is a transparent GM variant,
+ * not the printed HMK d10 test. Wilderness night has half the density.
+ */
+export function episodeEncounterByMinutes({minutes,environ='rural',night=false,d100}={}){
+ must(whole(minutes,1,10080),'Encounter vyžaduje délku epizody v minutách');
+ const tn={highway:[2,1],rural:[4,1],wilderness:[1,1],underworld:[9,9]}[environ]?.[night?1:0];
+ must(tn!==undefined&&typeof night==='boolean','Encounter: neplatné prostředí či denní doba');
+ must(whole(d100,1,100),'Minutový Encounter vyžaduje skutečný d100 (1–100).');
+ const referenceMinutes=night&&environ==='wilderness'?480:240;
+ const intensity=-Math.log1p(-tn/10)*minutes/referenceMinutes;
+ // Percentile midpoint provides an unbiased, reproducible finite d100 draw.
+ const target=(d100-.5)/100;
+ let probability=Math.exp(-intensity),cumulative=probability,count=0;
+ while(cumulative<target&&count<10000){count++;probability*=intensity/count;cumulative+=probability;}
+ return {format:'hmk-episode-encounter-minute-v1',d100,tn,environ,night,minutes,
+  count,found:count>0,chance:1-Math.exp(-intensity),resolved:false,
+  procedure:'gm-minute-poisson-from-hmk-d10-density',sourcePage:150};
+}
+
 export function calculateTimeEpisode({minute,minutes,kind='travel',topography='flat',terrain='paved-road',conveyance='foot',
  progress=0,bearing=0,extraSlow=0,wearied=false,injured=false,loaded=false,continuousPrecipitation=false,progressD10=[],directionD10=[],
  enduranceByActor={},endRollByActor={},memberIds=[],weather=null,encounterRoll=null,encounterEnviron='rural',
- encounterResolved=false,encounterNight=false,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
+ encounterResolved=false,encounterNight=false,encounterPercentile=null,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
  survivalCriticalFailure=false,survivalD10=null}={}){
  must(whole(minute,0,1e9)&&whole(minutes,1,10080)&&minute+minutes<=1e9,'Epizoda potřebuje 1–10 080 skutečných minut.');
  must(EPISODE_KINDS.includes(kind),'Neznámý druh epizody');
@@ -63,7 +86,9 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
  must(target!==undefined,'Neznámé prostředí setkání');
  must(typeof encounterNight==='boolean','Encounter: neplatný den/noc');
  if(encounterRoll!==null){must(whole(encounterRoll,1,10),'Encounter vyžaduje skutečný hod d10');}
- const encounter=encounterRoll===null?null:{roll:encounterRoll,tn:target,night:encounterNight,found:encounterRoll<=target,
+ const encounter=encounterPercentile!==null?
+  {...episodeEncounterByMinutes({minutes,environ:encounterEnviron,night:encounterNight,d100:encounterPercentile}),resolved:!!encounterResolved}:
+  encounterRoll===null?null:{roll:encounterRoll,tn:target,night:encounterNight,found:encounterRoll<=target,
   resolved:!!encounterResolved};
  return {format:EPISODE_FORMAT,startMinute:minute,endMinute:minute+minutes,minutes,kind,
   memberIds:[...memberIds],terrain,topography,conveyance,motion,
@@ -96,6 +121,42 @@ export function assertTimeEpisodeAppendOnly(before=[],after=[]){
  * The free-minute episode mode is a declared GM variant of the printed watch.
  * No stars from distinct tests are ever added together.
  */
+/** Partial, minute-exact recovery within the printed per-period maximum.
+ * Historical complete rest claims are honoured; new partial attempts accrue
+ * floor-rounded credits with a carried remainder rather than fixed thresholds.
+ */
+export const EPISODE_MINUTE_RECOVERY_FORMAT='hmk-episode-minute-recovery-v1';
+export function calculateEpisodeMinuteRecovery({kind,minute,minutes,current,prior=null,legacyClaimStart=null}={}){
+ const rates={rest:{numerator:5,denominator:240,maximum:5,period:1440},
+  sleep:{numerator:15,denominator:480,maximum:15,period:1440},
+  winded:{numerator:5,denominator:10,maximum:5,period:60}};
+ const rate=rates[kind];
+ must(rate&&whole(minute,0,1e9)&&whole(minutes,1,10080)&&whole(current,0,10000),
+  'Neplatné údaje pro minutovou obnovu únavy.');
+ let state=prior;
+ if(!state&&whole(legacyClaimStart,0,1e9)&&minute>=legacyClaimStart&&minute-legacyClaimStart<rate.period)
+  state={windowStart:legacyClaimStart,credited:rate.maximum,carry:0};
+ if(state){must(whole(state.windowStart,0,1e9)&&whole(state.credited,0,rate.maximum)&&
+  whole(state.carry,0,rate.denominator-1)&&state.windowStart<=minute,
+  'Historie poměrné obnovy únavy je neplatná.');}
+ let remaining=minutes,at=minute,totalCredited=0,totalRecovered=0;
+ let available=current;
+ while(remaining>0){
+  if(!state||at>=state.windowStart+rate.period)
+   state={windowStart:at,credited:0,carry:0};
+  const segment=Math.min(remaining,state.windowStart+rate.period-at);
+  const units=state.carry+segment*rate.numerator;
+  const due=Math.min(rate.maximum-state.credited,Math.floor(units/rate.denominator));
+  state={windowStart:state.windowStart,credited:state.credited+due,
+   carry:state.credited+due>=rate.maximum?0:units%rate.denominator};
+  totalCredited+=due;
+  const healed=Math.min(available,due);totalRecovered+=healed;available-=healed;
+  remaining-=segment;at+=segment;
+ }
+ return {format:EPISODE_MINUTE_RECOVERY_FORMAT,kind,minutes,minute,
+  credited:totalCredited,recovered:totalRecovered,remaining:available,
+  next:state,sourcePages:[150,176],procedure:'gm-proportional-floor-carry-per-period-v1'};
+}
 export const EPISODE_SKILL_MEMORY_FORMAT='hmk-gm-episode-skill-memory-v1';
 const normalizedIds=ids=>[...(ids||[])].sort();
 export function episodeSkillProof(row,skill,guideId,campaignId,atMinute){
@@ -129,7 +190,7 @@ export function lastEpisodeBefore(journal=[],campaignId,minute){
 }
 export function mayReuseEpisodeSkill({previous,minute,context,kind='orientation',trail='' }={}){
  const old=previous?.calendarTimeEpisode;
- if(!old||old.endMinute!==minute||old.kind!==(kind==='orientation'?'travel':'tracking'))return false;
+ if(!old||old.endMinute!==minute||(kind==='orientation'?old.kind!=='travel':!['tracking','travel'].includes(old.kind)))return false;
  const memo=kind==='orientation'?old.orientation:old.trackingMemory;
  if(!memo?.skillId||memo.format!==EPISODE_SKILL_MEMORY_FORMAT||
   JSON.stringify(memo.context)!==JSON.stringify(context))return false;
@@ -341,6 +402,12 @@ export function validateTimeEpisodes(journal=[]){
      'Převzaté pohybové kostky neodpovídají skutečné souvislé epizodě.');
    }
   }
+  if(e.encounter?.format==='hmk-episode-encounter-minute-v1'){
+   const expected={...episodeEncounterByMinutes({minutes:e.minutes,environ:e.encounter.environ,
+    night:e.encounter.night,d100:e.encounter.d100}),resolved:!!e.encounter.resolved};
+   must(JSON.stringify(expected)===JSON.stringify(e.encounter),
+    'Minutové riziko setkání musí odpovídat doloženému d100, prostředí a délce epizody.');
+  }
   if(e.survivalHazard!==undefined){
    const critical=e.kind==='travel'&&e.orientation?.level==='CF'&&e.orientation?.sourceMode==='new';
    const d=e.settings?.survivalD10;
@@ -354,6 +421,19 @@ export function validateTimeEpisodes(journal=[]){
    must(e.navigationState===episodeNavigationState(earlier,e.direction,{recovered:!!e.navigationRecovered}),
     'Stav bloudění nebyl správně převeden do navazující epizody.');
   }
+  if(e.travelForaging!==undefined){
+   must(e.kind==='travel'&&e.orientation?.modes?.foraging===e.travelForaging.length,
+    'Počet Foraging hodů při cestě neodpovídá skutečným získaným Modes.');
+   const local=new Map();
+   for(const f of e.travelForaging){
+    const key=JSON.stringify([f.target,f.herbName||'']);
+    const carryIn=local.get(key)||lastForagingCarry(prior,j.calendarCampaignId,j.characterId,f.target,f.herbName||'');
+    const expected=calculateEpisodeForaging({minutes:e.minutes,habitat:f.habitat,season:f.season,
+     roll:f.roll,target:f.target,herbName:f.herbName||'',carryIn});
+    must(JSON.stringify(f)===JSON.stringify(expected),'Foraging při cestě není podložen doloženým d10 a přenosem.');
+    local.set(key,f.carryOut);
+   }
+  }else if(e.orientation?.modes?.foraging>0){must(false,'Foraging při cestě není vyhodnocen.');}
   if(e.foraging){
    const f=e.foraging;
    must(e.kind==='forage'&&f.minutes===e.minutes&&j.characterId&&e.memberIds.includes(j.characterId),
@@ -394,9 +474,9 @@ export function calculateEpisodeForaging({minutes,habitat,season,roll,target='fo
 }
 export function lastForagingCarry(journal=[],campaignId,actorId,target,herbName=''){
  for(let i=journal.length-1;i>=0;i--){const row=journal[i],p=row.calendarTimeEpisode;
-  if(!p?.foraging||row.calendarCampaignId!==campaignId||row.characterId!==actorId||
-   p.foraging.target!==target||p.foraging.herbName!==(target==='herbs'?herbName.trim():null))continue;
-  return p.foraging.carryOut;
+  if(row.calendarCampaignId!==campaignId||row.characterId!==actorId)continue;
+  for(const f of [...(p?.travelForaging||[])].reverse().concat(p?.foraging?[p.foraging]:[]))
+   if(f.target===target&&f.herbName===(target==='herbs'?herbName.trim():null))return f.carryOut;
  }
  return {foodDays:0,waterDays:0,herbDoses:0};
 }
