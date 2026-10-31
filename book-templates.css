@@ -7126,7 +7126,7 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-spread-left .hc-episode-needs-input{outline:2px solid #ae4734;outline-offset:3px;border-radius:3px;background:rgba(194,57,41,.09)}
 
 /* v93.644: time-specific medical checks and GM acknowledgements in Travel. */
-.hc-episode-spread-right [data-episode-medical-key],
+.hc-episode-spread-right .hc-episode-medical-missing,
 .hc-episode-spread-right [data-episode-incap-move]{
   border:2px solid #a4251e!important;
   border-radius:5px;
@@ -7147,3 +7147,11 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
   background:rgba(252,242,225,.6);
 }
 .hc-episode-spread-right .hc-episode-gm-review input{flex:0 0 auto}
+
+/* v93.645: timed requirements use the SAME compact two-page typography. */
+.hc-episode-spread-right .hc-episode-medical-rolls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.42rem .6rem;margin-top:.45rem;align-items:end}
+.hc-episode-spread-right .hc-episode-medical-roll-label{display:flex;flex-direction:column;min-width:0;font-size:.77rem;line-height:1.35;gap:.2rem;color:inherit}
+.hc-episode-spread-right .hc-episode-medical-roll-label input,
+.hc-episode-spread-right .hc-episode-medical-roll-label select{min-width:0;width:100%;font-size:.8rem;padding:.3rem .44rem;min-height:2rem}
+.hc-episode-spread-right .hc-episode-medical-rolls button{font-size:.77rem;padding:.38rem .5rem;min-height:1.96rem}
+.hc-episode-spread-right .hc-episode-medical-missing:focus{outline:2px solid #a4251e;outline-offset:2px}
