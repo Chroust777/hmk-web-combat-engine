@@ -7002,3 +7002,25 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-proof{display:grid;grid-template-columns: minmax(110px, 1fr) minmax(0, 1.6fr);gap:.2rem .6rem;border-top:1px solid rgba(111,80,48,.16);padding:.47rem 0;font-size:.9em;line-height:1.4}
 .hc-episode-proof strong{color:#62412f}.hc-episode-proof span{overflow-wrap:anywhere}.hc-episode-proof small{grid-column:2;color:#725e48;overflow-wrap:anywhere;font-size:.78em}
 @media(max-width:760px){.hc-episode-proof{grid-template-columns:1fr}.hc-episode-proof small{grid-column:1}}
+
+/* v93.635: skin trauma only appears after a witnessed critical weather exposure.
+ * Keep its physical dice and per-location aftercare visually separate from routine weather. */
+.hc-episode-spread-left .hc-episode-skin:not([hidden]){
+ display:block;min-width:0;margin:.9rem 0 .2rem;padding:.85rem 1rem;
+ border:1px solid rgba(135,85,42,.42);border-left:4px solid #885a38;
+ border-radius:8px;background:rgba(244,230,199,.38)
+}
+.hc-episode-spread-left .hc-episode-skin h5{
+ margin:0 0 .35rem;font-size:1rem;line-height:1.35;color:#5d3925
+}
+.hc-episode-spread-left .hc-episode-skin .hmk-trek-grid{
+ margin:.55rem 0;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.55rem .75rem
+}
+.hc-episode-spread-left .hc-episode-skin textarea{
+ display:block;width:100%;min-height:5.5rem;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+ font-size:.83rem;line-height:1.5
+}
+.hc-episode-spread-left .hc-episode-skin [data-episode-skin-status]{
+ margin:.6rem 0 0;font-weight:600;font-size:.87rem;line-height:1.5
+}
+.hc-episode-spread-left [hidden],.hc-episode-spread-right [hidden]{display:none!important}

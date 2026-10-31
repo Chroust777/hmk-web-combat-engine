@@ -529,10 +529,56 @@ export function validateTimeEpisodes(journal=[]){
      directionTurn:h.directionTurn,directionD10:h.directionD10??null,directionAwareness:h.directionAwareness});
     const linked=h.evidenceId?journal.find(k=>k.id===h.evidenceId&&
      k.calendarCampaignId===j.calendarCampaignId&&k.campaignMinute===e.startMinute):null;
-    if(h.hazard==='accident'&&typeof x.result==='object'&&h.gmInjuryResolved&&linked){x.requiresGMCompletion=false;}
-    must(!x.requiresGMCompletion&&JSON.stringify(h)===JSON.stringify({...x,
-     evidenceId:linked?.id||null,gmInjuryResolved:!!h.gmInjuryResolved}),
-     'Hazard nemá doložené nebo úplné vyhodnocení.');
+    if(h.automationVersion==='v93.635'){
+     must(h.requiresGMCompletion===false,'Automatizovaný hazard nesmí mít nedokončené následky.');
+     if(h.hazard==='accident'){
+      const a=h.accidentProof;
+      const proof=journal.find(k=>k.characterId===a?.victimId&&
+       k.calendarCampaignId===j.calendarCampaignId&&k.campaignMinute===e.startMinute&&
+       k.skillTestProof?.type==='skill-physical-consequence'&&
+       k.skillTestProof?.kind==='survival-accident'&&
+       k.skillTestProof?.autoFromTimeEpisode===j.id);
+      const report=proof?.skillTestProof?.report;
+      must(a&&(e.memberIds.includes(a.victimId)||e.animals?.some(q=>q.id===a.victimId))&&report&&
+       a.sl===report.sl&&a.eml===report.eml&&a.avoided===report.avoided&&
+       a.impact===(report.impact??null)&&a.location===(report.location??null)&&
+       a.armourValue===(report.armourValue??null)&&
+       JSON.stringify(a.physicalDice)===JSON.stringify(report.physicalDice)&&
+       h.injuryProofId==='skill-injury:survival-accident:'+report.sourceId&&
+       h.victimId===a.victimId,'Accident nemá původní, jednoznačně zapsaný Injury/Combat důkaz.');
+     }else{
+      must(!x.requiresGMCompletion&&JSON.stringify(h.result)===JSON.stringify(x.result),
+       'Hazard nesouhlasí s potvrzenými kostkami nebo výsledkem.');
+      if(h.hazard==='equipment'&&h.equipmentDisposition==='repair'){
+       const proof=journal.find(k=>k.id===h.repairProofId);
+       must(episodeSkillProof(proof,h.repairSkill,proof?.characterId,j.calendarCampaignId,e.startMinute)?.level===h.repairLevel,
+        'Oprava výstroje nemá pravý Skill Test.');
+      }
+      if(h.hazard==='complication'&&h.complicationDecision==='test'){
+       if(Array.isArray(h.memberOutcomes)){
+        must(h.memberOutcomes.length===e.memberIds.length&&h.memberOutcomes.every(m=>{
+         const p=journal.find(k=>k.id===h.complicationProofIds?.[e.memberIds.indexOf(m.id)]);
+         return e.memberIds.includes(m.id)&&
+          episodeSkillProof(p,h.complicationSkill,m.id,j.calendarCampaignId,e.startMinute)?.level===m.level;
+        }), 'Komplikace družiny nemá jednotlivé ověřené Skill Tests.');
+       }else{
+        const proof=journal.find(k=>k.id===h.complicationProofId);
+        must(episodeSkillProof(proof,h.complicationSkill,proof?.characterId,j.calendarCampaignId,e.startMinute)?.level===h.complicationLevel,
+         'Komplikace nemá skutečný Skill Test.');
+       }
+      }
+      if(h.hazard==='misdirection'){
+       const proof=journal.find(k=>k.id===h.directionProofId);
+       must(episodeSkillProof(proof,'Awareness',proof?.characterId,j.calendarCampaignId,e.startMinute)?.level===h.directionAwareness,
+        'Misdirection nesouhlasí se skutečným Awareness.');
+      }
+     }
+    }else{
+     if(h.hazard==='accident'&&typeof x.result==='object'&&h.gmInjuryResolved&&linked){x.requiresGMCompletion=false;}
+     must(!x.requiresGMCompletion&&JSON.stringify(h)===JSON.stringify({...x,
+      evidenceId:linked?.id||null,gmInjuryResolved:!!h.gmInjuryResolved}),
+      'Hazard nemá doložené nebo úplné vyhodnocení.');
+    }
    }
   }
   if(e.weatherExposure!==undefined){
@@ -554,6 +600,40 @@ export function validateTimeEpisodes(journal=[]){
     must(JSON.stringify(w)===JSON.stringify(newProof?{id:w.id,...expected,proofId:w.exposed?w.proofId:null,
      coldCondition:w.kind==='cold'?w.coldCondition||'dry':null}:{id:w.id,...expected})&&
      !['pending','pending-endurance'].includes(w.effect),'Pozměněný nebo neúplný Weather Hazard.');
+   }
+  }
+  if(e.weatherSkinDetails!==undefined){
+   must(Array.isArray(e.weatherSkinDetails),'Frostbite/Sunburn vyžaduje seznam doložených lokalit.');
+   const required=e.weatherExposure?.filter(w=>w.effect==='cold-exposure-frostbite'||
+    w.effect==='heat-exposure-HR4-sunburn')||[];
+   must(e.weatherSkinDetails.length===required.length,'Každé skutečné kožní trauma musí mít úplnou Injury Sequence.');
+   for(const skin of e.weatherSkinDetails){
+    must(skin.pending===false&&skin.report?.rulePage===185&&
+     required.some(w=>w.id===skin.id&&w.kind===skin.kind&&
+      skin.sourceId===w.proofId+':episode:'+e.startMinute+':'+w.kind),
+     'Kožní poranění nesouhlasí s expozicí a doloženým Skill Testem.');
+    must(journal.some(k=>k.characterId===skin.id&&k.skillTestProof?.type==='episode-weather-skin'&&
+     k.skillTestProof.sourceId===skin.sourceId&&
+     k.skillTestProof.autoFromTimeEpisode===j.id&&
+     JSON.stringify(k.skillTestProof.report)===JSON.stringify(skin.report)),
+     'Kožní trauma nebylo ve zdravotním stavu skutečně zapsáno.');
+   }
+  }
+  if(e.weatherRestFatigue!==undefined){
+   must(['rest','sleep','winded'].includes(e.kind)&&
+    e.weatherRestFatigue.length===e.memberIds.length,
+    'Klimatická únava při odpočinku má chybný seznam postav.');
+   const day=e.daylight?.minutesByPeriod?
+    e.daylight.minutesByPeriod.day+e.daylight.minutesByPeriod.twilight:
+    e.settings?.lightPeriod==='night'?0:e.minutes;
+   const units=episodeWeatherFatigueUnits({weather:e.weather,exposure:e.weatherExposure,
+    minutes:e.minutes,dayMinutes:day,nightMinutes:e.minutes-day});
+   for(const a of e.weatherRestFatigue){
+    must(e.memberIds.includes(a.id)&&a.addedUnits===(units[a.id]||0)&&
+     a.delta===Math.floor((a.carryIn+a.addedUnits)/240)&&
+     a.carryOut===(a.carryIn+a.addedUnits)%240&&
+     e.recovery?.some(x=>x.id===a.id&&x.weatherAdded===a.delta&&x.weatherCarry===a.carryOut),
+     'Odpočinek nesouhlasí s minutovou klimatickou únavou.');
    }
   }
   if(e.weatherExposure!==undefined&&e.kind==='travel'&&e.actors?.some(a=>a.weatherFatigueUnits!==undefined)){
