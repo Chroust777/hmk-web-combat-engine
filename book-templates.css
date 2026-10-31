@@ -7096,3 +7096,24 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 
 .hc-episode-spread-left .hc-episode-clockline{margin:.55rem 0 .7rem!important;color:#694d32;font-size:.79rem!important}
 .hc-episode-spread-left legend.hc-episode-hover-help{cursor:help;text-decoration:underline dotted rgba(98,66,34,.5)}
+
+/* v93.638 · travel episode: focused validation and one accountable task trail. */
+.hc-episode-spread-left .hc-episode-needs-input{
+  border:2px solid #a4251e!important;border-radius:6px!important;
+  box-shadow:0 0 0 3px rgba(164,37,30,.14)!important;
+  background:rgba(254,228,220,.65)!important;
+  padding:.3rem!important;
+  scroll-margin-block:6.5rem;
+}
+.hc-episode-spread-left .hc-episode-needs-input input:not([type=checkbox]),
+.hc-episode-spread-left .hc-episode-needs-input select,
+.hc-episode-spread-left .hc-episode-needs-input textarea{border-color:#a4251e!important;outline-color:#a4251e!important}
+.hc-episode-spread-left .hc-episode-suboptions{grid-column:1/-1;border:1px solid rgba(111,79,47,.24);border-radius:7px;padding:.55rem .68rem;margin:.4rem 0;background:rgba(250,242,223,.34)}
+.hc-episode-spread-left .hc-episode-suboptions>summary{font-size:.82rem;cursor:pointer;color:#63452d;font-weight:650}
+.hc-episode-spread-left .hc-episode-suboptions>.hmk-trek-grid{padding-top:.65rem}
+.hc-episode-spread-right .hc-episode-proof-done{border-left:3px solid rgba(67,111,59,.65);padding-left:.5rem}
+.hc-episode-spread-right .hc-episode-proof-pending{border-left:3px solid #ad7945;padding-left:.5rem}
+.hc-episode-skill-handoff{border:1px solid rgba(110,81,46,.35);border-radius:8px;background:rgba(246,233,207,.65);padding:.7rem .9rem;margin:0 0 .95rem;font-size:.88rem}
+.hc-episode-skill-handoff p{margin:.38rem 0 .62rem}
+.hc-episode-skill-handoff strong{color:#58361f}
+.hc-episode-spread-right .hc-episode-task button{font-size:.79rem}
