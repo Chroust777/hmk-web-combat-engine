@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.645';
+const APP_VERSION='93.646';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -21025,7 +21025,8 @@ function showEpisodeIndependentDeadlines(form){
   const stored=rolls[r.key]||{},values=nested?(typeof stored==='object'?stored:{roll:stored}):{roll:stored};
   const inputs=fields.map(f=>{
    const key=encodeURIComponent(r.key),value=values[f.name]??'';
-   const missing=value===''||(!f.type&&(Number(value)<f.min||Number(value)>f.max||!Number.isInteger(Number(value))));
+   const missing=value===''||((!f.type||f.type==='number')&&(Number(value)<f.min||Number(value)>f.max||!Number.isInteger(Number(value))))||
+    (f.type==='text'&&String(value).trim().length<(f.minLength||1))||(f.type==='choice'&&!f.options?.some(x=>x.value===value));
    const missingClass=missing?' class="hc-episode-medical-missing"':'';
    const control=f.type==='choice'?'<select '+missingClass+' data-episode-medical-key="'+esc(key)+'" data-episode-medical-field="'+esc(f.name)+'" aria-label="'+esc(f.label+' · '+actor)+'"><option value="">Vyberte</option>'+
     f.options.map(opt=>'<option value="'+esc(opt.value)+'" '+(value===opt.value?'selected':'')+'>'+esc(opt.label)+'</option>').join('')+'</select>':
