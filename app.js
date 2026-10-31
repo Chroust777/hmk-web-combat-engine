@@ -165,6 +165,7 @@ import {eligibleRestingAnimals,planAnimalRest} from './src/integration/hmk-trekk
 import {ANIMAL_AREA_AV,weatherAnimalCandidates,prepareAnimalTrekkingWeather,validateAnimalWeatherJournal} from './src/integration/hmk-trekking-animal-weather.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekWeatherReference,trekAvailableTerrain,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence,assertTrekDailyWeatherAppendOnly} from './src/integration/hmk-trekking-routine.js';
+import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-scope.js';
 import {EPISODE_FORMAT,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEpisodeTravelDelayCarry} from './src/integration/hmk-time-episodes.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
@@ -300,7 +301,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.642';
+const APP_VERSION='93.643';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -20876,6 +20877,46 @@ function renderEpisodeEndStatus(form,result,weather){
 /** Independent of sequential rule-engine errors: show all already knowable
  * requirements at the first evaluation. Dependent CF/Hazard/Encounter tasks
  * are added only once their original roll is known. */
+/** A pre-existing dated obligation is independent of the travel receipt.
+ * Detect it before the GM has spent time resolving all of the episode dice.
+ * This is deliberately NON-mutating: the existing medical executor needs its
+ * real due minute, so we must never falsify a completed d100 at the start.
+ */
+function episodeIndependentDeadlines(form){
+ const clock=data.campaignClock;if(!clock)return [];
+ const duration=Number(form.elements.namedItem('minutes')?.value);
+ if(!Number.isSafeInteger(duration)||duration<1||duration>10080)return [];
+ const end=clock.minute+duration;
+ const journalIds=new Map(data.journal.map(j=>[j.id,j]));
+ try{return campaignCalendarAgenda(clock,data.characters,data.journal).all.filter(item=>
+  Number.isSafeInteger(item.minute)&&item.minute>=clock.minute&&item.minute<end&&
+  // These obligations belong to the still-running episode; they must be
+  // completed in its own checklist, never duplicated as external events.
+  !(item.kind==='skill-critical'&&isTravelEpisodeReceipt(journalIds.get(item.originId)))&&
+  // An automatic Poison/Disease onset can be applied by the original clock
+  // executor; it is not itself a new d100 at this point.
+  !['poison','disease'].includes(item.kind));}
+ catch{return [];}
+}
+function showEpisodeIndependentDeadlines(form){
+ const panel=document.querySelector('.hc-episode-spread-right');if(!panel)return;
+ let box=panel.querySelector('[data-episode-independent-due]');
+ if(!box){box=document.createElement('section');box.className='hc-episode-checklist';
+  box.setAttribute('data-episode-independent-due','');
+  panel.querySelector('[data-episode-checklist]')?.parentElement?.after(box);}
+ if(!box)return;
+ const tasks=episodeEvaluationRequested?episodeIndependentDeadlines(form):[];
+ box.hidden=!tasks.length;
+ if(tasks.length){
+  box.innerHTML='<h4>Časovaný závazek během intervalu · '+tasks.length+'</h4>'+tasks.map(x=>
+   '<div class="hc-episode-task"><div><b>'+esc(x.name||x.characterId||'Postava')+
+   ' · '+esc(displayCampaignMinute(x.minute))+'</b><p>'+esc(x.description||x.kind)+
+   '</p><p>Jde o samostatný dříve naplánovaný termín. Nejde o nový výsledek Cestování. '+
+   'Tento zdravotní/pravidlový krok zatím nelze zpracovat v rozepsané epizodě při zmrazeném čase; '+
+   'závěrečný časový zápis je zablokován, aby termín nebyl přeskočen.</p></div></div>').join('');
+  const finalize=panel.querySelector('[data-episode-finalize]');if(finalize)finalize.disabled=true;
+ }
+}
 function episodePlannedTasks(form){
  const v=episodeFormSnapshot(form),tasks=[];
  const add=(name,detail,field,skill=null,actorId=null)=>{
@@ -21212,7 +21253,7 @@ function updateEpisodePreview(form){
  }else{
   const details=document.querySelector('.hc-episode-spread-right .hc-episode-result-details');if(details)details.hidden=false;
  }
-
+ showEpisodeIndependentDeadlines(form);
 }
 function episodeCarrySettingsFromLast(){
  const clock=data.campaignClock,last=clock?lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute):null;
@@ -21457,6 +21498,8 @@ document.addEventListener('submit',e=>{
   for(const [field,id] of episodePinnedSkillFields)
    if(form.elements.namedItem(field)&&form.elements.namedItem(field).value!==id)
     throw Error('Doklad '+field+' už byl přiřazen k této epizodě a nesmí být změněn.');
+  const timed=episodeIndependentDeadlines(form);
+  if(timed.length)throw Error('Časovaný termín uvnitř epizody ('+timed.map(x=>(x.name||x.characterId)+' · '+displayCampaignMinute(x.minute)).join('; ')+') není možné přeskočit. Nejprve musí být pravidlově vyřešen v původním čase.');
   const clock=data.campaignClock,{result,weather,precipitation,v}=episodePreviewFromForm(form,clock);
   if(!v.confirmed)throw Error('GM musí potvrdit skutečný průběh epizody.');
   // The entire selected interval is one transaction. Events retain their relative
