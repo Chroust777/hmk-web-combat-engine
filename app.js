@@ -300,7 +300,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.638';
+const APP_VERSION='93.639';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1826,6 +1826,12 @@ function trekDayAccountHTML626(clock,{personalId=null,limitDays=6}={}){
 let timeEpisodeDraft={};
 let episodeEvaluationRequested=false;
 let episodePendingSkillRequest=null;
+// Only a request initiated by the episode may capture a newly saved Skill Test.
+// Every request is single-use; another test, including the same skill later,
+// must never overwrite the pinned historical receipt.
+let episodeActiveSkillRequestId=null;
+let episodeSkillReturnPending=false;
+let episodeDraftEpoch=uuid();
 let timeEpisodeDraftCampaign=null;
 function episodeRecentRows(clock){return episodeTimeline(data.journal,campaignKey(clock));}
 function episodeNumber(d,n=0){const x=Number(d);return Number.isFinite(x)?x:n;}
@@ -1893,6 +1899,7 @@ function episodeEncounterEventsHTML(count,terrain,period){
  return Array.from({length:count},(_,i)=>`<details data-episode-encounter-row="${i}"><summary>Setkání #${i+1} · překvapení a vzdálenost (HMK 150)</summary>
  <div class="hmk-trek-grid"><label>Protistrana · bdělost<select name="evFoe_${i}">${[['normal','Normal'],['lax','Lax'],['alert','Alert']].map(x=>option(...x)).join('')}</select></label>
  <label class="hc-check"><input name="evBeast_${i}" type="checkbox"> Zvíře / bestie · vždy Alert</label>
+ <label>Testující člen družiny<select name="evPartyActor_${i}">${data.characters.filter(c=>data.campaignClock?.characterIds?.includes(c.id)).map(c=>option(c.id,c.name)).join('')}</select></label>
  <label>Skill Test družiny<select name="evPartySkill_${i}"><option value="Awareness">Awareness</option><option value="Stealth">Stealth (jen Stalking)</option></select></label>
  <label>Protistrana · test<select name="evFoeSkill_${i}"><option value="Awareness">Awareness</option><option value="Stealth">Stealth</option></select></label>
  <label>Doložený Skill Test družiny<select name="evPartyProof_${i}"><option value="">— vybrat při požadovaném testu —</option>${proofOptions}</select></label>
@@ -9245,6 +9252,13 @@ document.addEventListener('click',e=>{
 },true);
 
 function render(){
+ if(episodeActiveSkillRequestId){
+  const r=episodePendingSkillRequest;
+  if(!r||r.status!=='waiting'||r.id!==episodeActiveSkillRequestId||
+   view!=='skills'||activeSkillTab!=='value'||selected!==r.actorId||
+   skillSVChoice595?.kind!=='ordinary'||skillSVChoice595?.value!==r.skill)
+   episodeActiveSkillRequestId=null;
+ }
  if(view!=='encounter')stagedEncounterSelection=null; // no unattended roster changes survive navigation
  // Every return from another screen starts with an operational Skill Tests
  // selector. Direct handoffs from a stable or a calendar retain their requested
@@ -10202,7 +10216,17 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
   const link=trekkingSkillLinkForNewProof({pending,source:origin,actorId:selected,
     campaignId:data.campaignClock?campaignKey(data.campaignClock):null,
     minute:data.campaignClock?.minute,proof,journal:data.journal});
-  data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof,...(extra||{}),
+  const er=episodePendingSkillRequest;
+  const explicitEpisodeLink=er?.status==='waiting'&&er.id===episodeActiveSkillRequestId&&
+   er.episodeEpoch===episodeDraftEpoch&&er.campaignId===campaignKey(data.campaignClock)&&
+   er.minute===data.campaignClock?.minute&&selected===er.actorId&&
+   view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&
+   skillSVChoice595?.kind==='ordinary'&&skillSVChoice595.value===er.skill&&
+   isSV&&actualSkill===er.skill?{
+    requestId:er.id,episodeEpoch:er.episodeEpoch,field:er.field,skill:er.skill,
+    actorId:er.actorId,campaignId:er.campaignId,minute:er.minute}:null;
+  data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof,
+    ...(explicitEpisodeLink?{calendarEpisodeSkillLink:explicitEpisodeLink}:{}),...(extra||{}),
     ...(timedId?{calendarSkillProjectSV591:{startId:timedId,kind:timedStart.calendarSkillProjectStart591.kind}}:{}),
     ...(data.campaignClock?{calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute}:{}),
     ...(fishingLink?{calendarFishingSVStart590:fishingLink}:{}),
@@ -10237,12 +10261,15 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
    }
   }
  }))throw Error('Záznam nebyl uložen; nepovažujte tento hod za uložený.');
- if(episodePendingSkillRequest){
+ if(episodePendingSkillRequest?.status==='waiting'){
   const r=episodePendingSkillRequest,row=data.journal.find(j=>j.id===savedId);
-  if(r.campaignId===campaignKey(data.campaignClock)&&r.minute===data.campaignClock?.minute&&
+  if(row?.calendarEpisodeSkillLink?.requestId===r.id&&
    episodeSkillProof(row,r.skill,r.actorId,r.campaignId,r.minute)){
-    r.completedId=savedId;r.status='resolved';episodeAutoBindSkillReceipt();
+    r.completedId=savedId;episodeAutoBindSkillReceipt();
   }
+  // The explicit episode launch is consumed by this saved test. A later
+  // ordinary test is never captured without another click in the episode.
+  if(episodeActiveSkillRequestId===r.id)episodeActiveSkillRequestId=null;
  }
  if(data.journal.some(j=>j.id===savedId&&j.calendarTrekTrackingAwarenessProof))pendingTrackingAwarenessId=null;
  const sourceLink=data.journal.find(x=>x.id===savedId)?.calendarTrekSkillSource;
@@ -19961,20 +19988,51 @@ function episodeFormSnapshot(form){
 /** One task, one actor, one original Skill Test. No surrogate SV or reroll. */
 function episodeAutoBindSkillReceipt(){
  const request=episodePendingSkillRequest;
- if(!request||request.campaignId!==campaignKey(data.campaignClock)||request.minute!==data.campaignClock?.minute)return;
+ if(!request||request.status!=='waiting'||request.episodeEpoch!==episodeDraftEpoch||
+  request.campaignId!==campaignKey(data.campaignClock)||request.minute!==data.campaignClock?.minute)return;
  const old=data.journal.find(j=>j.id===request.completedId);
- if(old&&episodeSkillProof(old,request.skill,request.actorId,request.campaignId,request.minute)){
-  timeEpisodeDraft[request.field]=old.id;
-  if(request.field.startsWith('whProof_')){
-   const tail=request.field.slice('whProof_'.length);
-   timeEpisodeDraft['whEnd_'+tail]=(old.skillTestProof.a||old.skillTestProof.result)?.level||'';
-  }
-  request.status='resolved';
+ if(old?.calendarEpisodeSkillLink?.requestId!==request.id||
+  old.calendarEpisodeSkillLink.episodeEpoch!==episodeDraftEpoch||
+  !episodeSkillProof(old,request.skill,request.actorId,request.campaignId,request.minute))return;
+ // Never replace an already occupied field: an explicit new request is required
+ // to reassign a test before the epizoda is committed.
+ if(timeEpisodeDraft[request.field]&&timeEpisodeDraft[request.field]!==old.id)return;
+ timeEpisodeDraft[request.field]=old.id;
+ if(request.field.startsWith('whProof_')){
+  const tail=request.field.slice('whProof_'.length);
+  timeEpisodeDraft['whEnd_'+tail]=(old.skillTestProof.a||old.skillTestProof.result)?.level||'';
  }
+ if(request.field==='hazardEvidenceId')timeEpisodeDraft.hazardSkillLevel=(old.skillTestProof.a||old.skillTestProof.result)?.level||'';
+ request.status='resolved';request.resolvedId=old.id;
+ episodeActiveSkillRequestId=null;
+}
+function episodeLinkedProofRows(form){
+ const cid=campaignKey(data.campaignClock),minute=data.campaignClock?.minute;
+ return data.journal.filter(j=>{
+  const l=j.calendarEpisodeSkillLink;
+  return l?.episodeEpoch===episodeDraftEpoch&&l.campaignId===cid&&l.minute===minute&&
+   form?.elements.namedItem(l.field)?.value===j.id&&
+   !!episodeSkillProof(j,l.skill,l.actorId,cid,minute);
+ });
+}
+function episodeLinkedProofHTML(form){
+ return episodeLinkedProofRows(form).map(j=>{
+  const l=j.calendarEpisodeSkillLink,p=j.skillTestProof.a||j.skillTestProof.result;
+  const eventMatch=l.field.match(/^evPartyProof_(\d+)$/);
+  const role=eventMatch?'Encounter #'+(Number(eventMatch[1])+1)+' · ':
+   l.field.startsWith('hazardCompProof_')?'Complication · ':
+   l.field.startsWith('whProof_')?'Weather Hazard · ':
+   l.field==='hazardDirectionProofId'?'Direction Hazard · ':
+   l.field==='trackingAwarenessProofId'?'Tracking · ':'';
+  return '<div class="hc-episode-proof hc-episode-proof-done"><strong>✓ '+esc(role+l.skill)+' · '+esc(character(l.actorId)?.name||l.actorId)+'</strong>'+ 
+   '<span>Vyřešeno: '+esc(p.level)+' · SV '+esc(String(p.sv))+' · d100 '+esc(String(p.d100??p.roll??'—'))+
+   (l.skill==='Survival'&&p.level==='CF'?' · navazuje Survival Hazard':'')+
+   '</span><small>Doklad '+esc(j.id)+' · přiřazeno pouze této epizodě</small></div>';
+ }).join('');
 }
 function episodeSkillReturnBannerHTML(){
  const r=episodePendingSkillRequest;
- if(!r||r.campaignId!==campaignKey(data.campaignClock)||r.minute!==data.campaignClock?.minute)return '';
+ if(!r||!episodeSkillReturnPending||r.campaignId!==campaignKey(data.campaignClock)||r.minute!==data.campaignClock?.minute)return '';
  const j=data.journal.find(x=>x.id===r.completedId);
  const proof=j?.skillTestProof?.a||j?.skillTestProof?.result;
  return `<aside class="hc-episode-skill-handoff" role="status"><strong>Rozpracovaná epizoda · ${esc(r.skill)} · ${esc(character(r.actorId)?.name||r.actorId)}</strong><p>${r.status==='resolved'&&proof?'✓ Hod uložen: '+esc(proof.level)+' · SV '+esc(String(proof.sv))+'. '+(proof.level==='CF'?'Při návratu se nabídne navazující Survival Hazard nebo jiné relevantní následky.':'Výsledek se automaticky přenese do cestování.'):'Proveďte a uložte skutečný Success Value test. Potom se vraťte do epizody.'}</p><button type="button" class="secondary" data-episode-return>Vrátit se do Cestování</button></aside>`;
@@ -20045,8 +20103,8 @@ function episodeMarkField(form,name,{focus=false}={}){
 function episodeStartSkillRequest(field,skill,actorId){
  const clock=data.campaignClock;
  if(!clock||!character(actorId))return false;
- const request={field,skill,actorId,campaignId:campaignKey(clock),minute:clock.minute,status:'waiting',completedId:null};
- episodePendingSkillRequest=request;
+ const request={id:uuid(),episodeEpoch:episodeDraftEpoch,field,skill,actorId,campaignId:campaignKey(clock),minute:clock.minute,status:'waiting',completedId:null};
+ episodePendingSkillRequest=request;episodeActiveSkillRequestId=request.id;episodeSkillReturnPending=true;
  timeEpisodeDraft={...timeEpisodeDraft,[field]:''};
  selected=actorId;view='skills';activeSkillTab='value';
  skillSVChoice595={actorId,kind:'ordinary',value:skill};
@@ -20294,7 +20352,8 @@ function episodePreviewFromForm(form,clock){
     'Awareness',guideId,campaignKey(clock),clock.minute)?.level||null:null});
   const evidence=data.journal.find(j=>j.id===String(v.hazardEvidenceId||'').trim()&&
    j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute);
-  detail.evidenceId=evidence?.id||null;
+  detail.evidenceId=evidence?.id||null;detail.workerId=v.hazardWorkerId||guideId;
+  detail.complicationScope=v.hazardComplicationScope||'single';
   if(hazardType==='misdirection'&&detail.result==='pending-awareness')detail.requiresGMCompletion=true;
   if(hazardType==='equipment'){
    const item=data.inventory.find(x=>x.id===v.hazardItemId&&members.includes(x.characterId));
@@ -20452,14 +20511,16 @@ function episodePreviewFromForm(form,clock){
    const nonhostile=!!v['evNonhostile_'+i];
    const memberProof=data.journal.find(j=>j.id===String(value('evPartyProof')||'').trim());
    const partyEvidence=memberProof?(episodeSkillProof(memberProof,value('evPartySkill')||'Awareness',memberProof.characterId,campaignKey(clock),clock.minute)):null;
-   if(memberProof&&(!partyEvidence||!members.includes(memberProof.characterId)))
+   const partyActorId=value('evPartyActor')||members[0];
+   if(memberProof&&(!partyEvidence||!members.includes(memberProof.characterId)||memberProof.characterId!==partyActorId))
     throw Error('Encounter #'+(i+1)+': zvolený doklad není dovednost člena družiny v aktuální kampani a minutě.');
    const surprise=nonhostile?null:episodeEncounterSurprise({partyModes:orientation?.modes||(kind==='watch'?{vigilance:1}:{}),conveyance:v.conveyance,
     foeWatchfulness:value('evFoe')||'normal',foeIsBeast:!!v['evBeast_'+i],
     partySkill:value('evPartySkill')||'Awareness',foeSkill:value('evFoeSkill')||'Awareness',
     partyLevel:partyEvidence?.level||null,foeLevel:value('evFoeLevel')||null,
     decision:value('evDecision')||null});
-   result.encounterDetails.push({i,offset:actualOffset,nonhostile,distance,surprise,partySkillEvidenceId:partyEvidence?.skillId||null,
+   result.encounterDetails.push({i,offset:actualOffset,nonhostile,distance,surprise,partySkill:value('evPartySkill')||'Awareness',partyActorId,
+    partySkillEvidenceId:partyEvidence?.skillId||null,
     pending:nonhostile?false:!surprise.verified||!surprise.decision});
   }
   result.encounter.resolved=!!v.encounterResolution&&result.encounterDetails.length===result.encounter.count&&
@@ -20542,14 +20603,46 @@ function episodeEndTasks(result){
  if(result.encounter?.found){
   for(let i=0;i<result.encounter.count;i++){
    const event=result.encounterDetails?.find(x=>x.i===i);
-   if(!event||event.pending)add('Encounter #'+(i+1),
-    'Doložit čas, d4 vzdálenosti, Surprise a rozhodnutí protistran. Případné Skill Tests a Combat dokončit před závěrečným potvrzením.',
-    'evD4_'+i);
+   if(!event||event.pending){
+    const s=event?.surprise,requiresParty=!event?.nonhostile&&s&&
+     (s.procedure==='opposed'||s.procedure==='unopposed'&&s.preferred==='party')&&
+     !event.partySkillEvidenceId;
+    if(requiresParty)tasks.push({name:'Encounter #'+(i+1)+' · '+event.partySkill,
+     detail:'Vyhodnoťte samostatný '+event.partySkill+' test vybraného člena družiny. Doklad se trvale přiřadí jen tomuto setkání.',
+     action:'evPartyProof_'+i,skill:event.partySkill,actorId:event.partyActorId});
+    else add('Encounter #'+(i+1),
+     'Doložit čas, d4 vzdálenosti, Surprise a rozhodnutí protistran. Případné Skill Tests a Combat dokončit před závěrečným potvrzením.',
+     'evD4_'+i);
+   }
   }
  }
+ if(result.encounter?.found&&result.encounterDetails?.length===result.encounter.count&&
+    result.encounterDetails.every(x=>!x.pending)&&!result.encounter.resolved)
+  add('Encounter · celkové uzavření','Všechna jednotlivá setkání jsou vyhodnocena. Potvrďte jejich celkový výsledek, případný Combat a následky před dokončením celé epizody.','encounterResolution');
  if(result.trackingFollowup?.needsAwareness&&!result.trackingFollowup.awarenessLevel)
-  add('Tracking · Awareness','Vybrat uložený Awareness test ze stejné kampaně, jinak nelze vyhodnotit Spoor.','trackingAwarenessProofId');
+  tasks.push({name:'Tracking · Awareness',detail:'Doložte Awareness test osoby sledující stopu; Spoor se bez něj neuzavře.',
+   action:'trackingAwarenessProofId',skill:'Awareness',actorId:result.trackingMemory?.guideId||result.memberIds?.[0]});
  for(const h of result.hazardDetails||[]){
+  if(h.requiresGMCompletion&&h.hazard==='equipment'&&h.itemId&&h.equipmentDisposition==='repair'&&h.repairSkill&&!h.repairProofId){
+   tasks.push({name:'Equipment · '+h.repairSkill,detail:'Uložte skutečný opravářský test. Jeho SL bude převzato z dokladu, nikoli z ručního výběru.',
+    action:'hazardEvidenceId',skill:h.repairSkill,actorId:h.workerId});continue;
+  }
+  if(h.requiresGMCompletion&&h.hazard==='complication'&&h.complicationDecision==='test'&&h.complicationSkill){
+   if(h.complicationScope==='party'){
+    for(const [i,id] of (result.memberIds||[]).entries())if(!h.complicationProofIds?.[i])
+     tasks.push({name:'Complication · '+h.complicationSkill+' · '+(character(id)?.name||id),
+      detail:'Skupinová komplikace vyžaduje samostatný doklad každého účastníka.',
+      action:'hazardCompProof_'+id,skill:h.complicationSkill,actorId:id});
+    continue;
+   }else if(!h.complicationProofId){
+    tasks.push({name:'Complication · '+h.complicationSkill,detail:'Vyhodnoťte konkrétní zvolenou dovednost a vraťte její doklad.',
+     action:'hazardEvidenceId',skill:h.complicationSkill,actorId:h.workerId});continue;
+   }
+  }
+  if(h.requiresGMCompletion&&h.hazard==='misdirection'&&h.result==='pending-awareness'){
+   tasks.push({name:'Direction Hazard · Awareness',detail:'Rozhodující Awareness test se vyhodnotí ve Skill Tests.',
+    action:'hazardDirectionProofId',skill:'Awareness',actorId:result.orientation?.guideId||result.memberIds?.[0]});continue;
+  }
   if(h.requiresGMCompletion)add('Hazard · '+h.hazard,
    h.hazard==='accident'?(h.automationError||'Doložit skutečné kostky a dokončit Injury Sequence v existujícím Combat State.'):
    h.hazard==='equipment'?'Vybrat předmět a doložit skutečnou opravu v Inventory.':
@@ -20605,7 +20698,9 @@ function renderEpisodeEndStatus(form,result,weather){
   for(const w of result.weatherExposure||[])rows.push(['Počasí · '+w.kind+' · '+(character(w.id)?.name||w.id),
    w.pending?'čeká na vyhodnocení':String(w.effect||'bez následku'),w.proofId||'',
    'whProof_'+w.kind+'_'+w.id]);
-  proofList.innerHTML=rows.length?rows.map(([label,details,proof,jump])=>{
+  const scopedIds=new Set(episodeLinkedProofRows(form).map(j=>j.id));
+  const displayRows=rows.filter(([label,details,proof])=>!(scopedIds.has(proof)&&/^(Orienteering|Tracking)$|^Orienteering/.test(label)));
+  proofList.innerHTML=displayRows.length?displayRows.map(([label,details,proof,jump])=>{
    const route=/Encounter|Nehoda|Accident|Kožní trauma/.test(label)?'encounter':/equipment/i.test(label)?'inventory':'skills';
    const target=route==='inventory'?'Inventář':route==='encounter'?'Combat':'Skill Tests';
    const waiting=/čeká|potřebuje|pending/i.test(details);
@@ -20615,15 +20710,17 @@ function renderEpisodeEndStatus(form,result,weather){
     (waiting?'<button type="button" class="secondary hc-episode-proof-link" data-episode-nav="'+route+'">Otevřít '+target+'</button>':'')+'</span>'+ 
     (proof?'<small>Doklad '+esc(proof)+'</small>':'')+'</div>';}).join(''):
    '<p class="hc-hint">Žádný zvláštní test ani událost nebyly při této činnosti potřebné.</p>';
+  proofList.innerHTML=episodeLinkedProofHTML(form)+proofList.innerHTML;
  }
  const tasks=episodeEndTasks(result),checklist=root.querySelector('[data-episode-checklist]');
  if(!form.elements.namedItem('confirmed')?.checked)tasks.push({name:'Potvrzení GM',detail:'Po dokončení všech výsledků potvrďte skutečný průběh a čas na levé stránce.',action:'confirmed'});
  if(checklist)checklist.innerHTML=tasks.length?'<p class="hc-episode-task-lead">Před dokončením zbývá '+tasks.length+' vyhodnocení:</p>'+tasks.map((t,i)=>
    '<div class="hc-episode-task"><span class="hc-task-number">'+(i+1)+'</span><div><b>'+esc(t.name)+'</b><p>'+esc(t.detail)+'</p>'+
     (t.action?'<button type="button" class="secondary" data-episode-jump="'+esc(t.action)+'">Doplnit související pole</button> ':'')+
-    (t.name.startsWith('Encounter')?'<button type="button" data-episode-nav="encounter">Otevřít Combat / Encounter</button>':
+    (t.skill?'<button type="button" data-episode-skill-task="'+esc(t.skill)+'" data-episode-skill-field="'+esc(t.action)+'" data-episode-skill-actor="'+esc(t.actorId)+'">Otevřít '+esc(t.skill)+' Skill Test</button>':'')+
+    (t.name.startsWith('Encounter')&&!t.skill?'<button type="button" data-episode-nav="encounter">Otevřít Combat / Encounter</button>':
      t.name==='Tracking · Awareness'?'<button type="button" data-episode-skill-task="Awareness" data-episode-skill-field="trackingAwarenessProofId" data-episode-skill-actor="'+esc(result.trackingMemory?.guideId||result.memberIds?.[0]||'')+'">Otevřít Awareness Test</button>':
-     t.name.startsWith('Počasí')&&t.action.startsWith('whProof_')?'<button type="button" data-episode-skill-task="Endurance" data-episode-skill-field="'+esc(t.action)+'" data-episode-skill-actor="'+esc(t.action.split('_').slice(2).join('_'))+'">Otevřít Endurance Test</button>':'')+
+     t.name.startsWith('Počasí')&&t.action.startsWith('whProof_')&&!form.elements.namedItem(t.action)?.value?'<button type="button" data-episode-skill-task="Endurance" data-episode-skill-field="'+esc(t.action)+'" data-episode-skill-actor="'+esc(t.action.split('_').slice(2).join('_'))+'">Otevřít Endurance Test</button>':'')+
     '</div></div>').join(''):
    '<p class="hc-episode-all-clear">✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.</p>';
  const button=root.querySelector('[data-episode-finalize]');if(button)button.disabled=!!tasks.length;
@@ -20642,7 +20739,7 @@ function renderEpisodeEndError(form,message){
   const actorName=character(issue.actorId)?.name||'vybraná postava';
   list.innerHTML='<div class="hc-episode-task"><span class="hc-task-number">1</span><div><strong>'+esc(needsSkill?issue.skill+' · '+actorName:'Chybějící vstup')+'</strong><p>'+esc(message)+'</p>'+
    (issue.field?'<button type="button" class="secondary" data-episode-jump="'+esc(issue.field)+'">Ukázat a označit pole</button>':'')+
-   (needsSkill?'<button type="button" data-episode-skill-task="'+esc(issue.skill)+'" data-episode-skill-field="'+esc(issue.field)+'" data-episode-skill-actor="'+esc(issue.actorId||'')+'">Otevřít '+esc(issue.skill)+' Skill Test</button>':'')+'</div></div>';
+   (needsSkill&&!form.elements.namedItem(issue.field)?.value?'<button type="button" data-episode-skill-task="'+esc(issue.skill)+'" data-episode-skill-field="'+esc(issue.field)+'" data-episode-skill-actor="'+esc(issue.actorId||'')+'">Otevřít '+esc(issue.skill)+' Skill Test</button>':'')+'</div></div>';
  }
  const proof=root.querySelector('[data-episode-evidence]');
  if(proof){
@@ -20656,7 +20753,8 @@ function renderEpisodeEndError(form,message){
    if(saved)known.push('<div class="hc-episode-proof hc-episode-proof-done"><strong>✓ '+esc(skill)+' · '+esc(character(actorId)?.name||actorId)+'</strong><span>Vyřešeno: '+esc(saved.level)+' · SV '+esc(String(saved.sv))+' · d100 '+esc(String(saved.roll??'—'))+
     (skill==='Survival'&&saved.level==='CF'?' · navazuje Survival Hazard':'')+'</span><small>Doklad '+esc(j.id)+'</small></div>');
   }
-  proof.innerHTML=known.length?known.join(''):'<p class="hc-hint">Jakmile doplníte podklady, objeví se zde konkrétní výsledky.</p>';
+  const linkedRows=episodeLinkedProofRows(form),scopedIds=new Set(linkedRows.map(j=>j.id));
+  proof.innerHTML=known.length||linkedRows.length?episodeLinkedProofHTML(form)+known.filter(x=>![...scopedIds].some(id=>x.includes(id))).join(''):'<p class="hc-hint">Jakmile doplníte podklady, objeví se zde konkrétní výsledky.</p>';
  }
  const button=root.querySelector('[data-episode-finalize]');if(button)button.disabled=true;
 }
@@ -21045,15 +21143,30 @@ document.addEventListener('click',e=>{
  if(!field)return;
  episodeMarkField(form,b.dataset.episodeJump,{focus:true});
 },true);
+function episodeOpenRequestedSkill(button){
+ const form=document.querySelector('#hmk-time-episode-form');
+ const field=button.dataset.episodeSkillField;
+ // A completed evidence is immutable for this draft. Reopening the skill
+ // workbench, including for the same actor and skill, is always standalone.
+ if(form?.elements.namedItem(field)?.value)return false;
+ if(form)timeEpisodeDraft=episodeFormSnapshot(form);
+ return episodeStartSkillRequest(field,button.dataset.episodeSkillTask,
+  button.dataset.episodeSkillActor);
+}
+// Pointer navigation is done before blur/change can replace its source button.
+// Click remains for keyboard and accessibility activation.
+document.addEventListener('pointerdown',e=>{
+ const b=e.target.closest?.('[data-episode-skill-task]');
+ if(!b||e.button!==0||b.disabled)return;
+ e.preventDefault();e.stopImmediatePropagation();episodeOpenRequestedSkill(b);
+},true);
 document.addEventListener('click',e=>{
- const b=e.target.closest?.('[data-episode-skill-task]');if(!b)return;
- e.preventDefault();
- const form=document.querySelector('#hmk-time-episode-form');if(form)timeEpisodeDraft=episodeFormSnapshot(form);
- episodeStartSkillRequest(b.dataset.episodeSkillField,b.dataset.episodeSkillTask,b.dataset.episodeSkillActor);
+ const b=e.target.closest?.('[data-episode-skill-task]');if(!b||b.disabled)return;
+ e.preventDefault();e.stopImmediatePropagation();episodeOpenRequestedSkill(b);
 },true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-episode-return]');if(!b)return;
- e.preventDefault();episodeAutoBindSkillReceipt();
+ e.preventDefault();episodeAutoBindSkillReceipt();episodeSkillReturnPending=false;
  view='calendar';calendarLanding=false;calendarCreating=false;activeCalendarSection='travel';
  render();
  const form=document.querySelector('#hmk-time-episode-form');if(form){episodeEvaluationRequested=true;updateEpisodePreview(form);}
@@ -21260,6 +21373,7 @@ document.addEventListener('submit',e=>{
    data.campaignClock=next;applyDeterministicCalendarOnsets();
   },{gmClockAdvance:true})){
    notice='Celá epizoda dokončena · '+result.minutes+' minut, '+result.distanceMeters+' metrů. Kronika a zdravotní stavy byly aktualizovány.';
+   episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;episodeSkillReturnPending=false;episodeDraftEpoch=uuid();
    timeEpisodeDraft=v.rememberSettings?episodeClearDiceDraft(v):episodeFreshDraft();
    render();
   }
