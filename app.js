@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.650';
+const APP_VERSION='93.651';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1885,9 +1885,20 @@ function episodeConfigureSkillGate(root){
     'Je povolen pouze tento konkrétně vyžádaný test. Po uložení se výsledek uzamkne k epizodě.':
     'Samostatné testy této postavy jsou pozastavené. Vraťte se do Cestování a otevřete příslušný požadavek.')+'</p>';
   host.prepend(note);}
- if(!allowed){
-  for(const form of root.querySelectorAll('#skill-value-form,#skill-secondary-form,#skill-assistance-form'))
+ // A pending episode receipt locks *every* unrelated Skill executor, not
+ // just the three common d100 forms. This includes Situational Secondary
+ // Rolls and their separately confirmed follow-ups. The original actor/ID
+ // binding and the Return to Travel button remain intact.
+ const workbench=root.querySelector('#hmk-skill-workbench');
+ if(workbench){
+  for(const tab of workbench.querySelectorAll('[data-skill-tab]')){
+   tab.disabled=true;
+   tab.title='Nejdříve dokončete vyžádaný test nebo se vraťte do Cestování.';
+  }
+  for(const form of workbench.querySelectorAll('form')){
+   if(allowed&&form.id==='skill-value-form')continue;
    for(const input of form.querySelectorAll('input,select,textarea,button'))input.disabled=true;
+  }
  }
 }
 function episodeSetupIssue(form){
@@ -11785,6 +11796,9 @@ document.addEventListener('click',e=>{const t=e.target.closest?.('[data-skill-ta
  e.preventDefault();e.stopImmediatePropagation();
  const next=t.dataset.skillTab;
  if(!['secondary','value','assistance','situational','followups'].includes(next))return;
+ // A re-click or programmatic switch must not consume the single-use
+ // episode receipt, nor open an unrelated executor while this actor waits.
+ if(episodeOpenActorRequest(selected))return;
  // Switching tabs ends the precisely routed episode test. A future ordinary
  // test (even the identical skill) is NOT an episode receipt.
  episodeActiveSkillRequestId=null;
@@ -20276,6 +20290,7 @@ function episodeIssue(message,form){
   [/nový Orienteering|nový.*Survival|Survival Success Value|Pro nový Orienteering/i,'orientationProofId','Survival'],
   [/předchozí Orienteering/i,'orientationReuse'],
   [/Riding.*Animalcraft|Drover test/i,'droverProofId','Riding'],
+  [/skutečně sledovanou stopu|sledovanou stopu|název stopy/i,'trackingTrail'],
   [/Tracking.*SV|Tracking test|skutečný Tracking/i,'trackingProofId','Tracking'],
   [/Awareness test|Tracking SV 3/i,'trackingAwarenessProofId','Awareness'],
   [/Přebytek Progress|Progress.*d10/i,'progressD10'],
@@ -21628,7 +21643,9 @@ function updateEpisodePreview(form){
    if(hint)hint.textContent=missing?'Povinný údaj: '+spareProgress+' samostatných d10, protože po zrušení Slow zbývá '+spareProgress+' Progress. Klikněte + d10.':'Doložené Progress hody: '+rolls.length+' / '+spareProgress;}
   if(directionRow){directionRow.hidden=!travel||!(result.motion?.requiredBearing>result.bearing);
    directionRow.title='Chybějící Bearing vyžaduje d10 za každý nepokrytý požadavek (HMK 148).';
-   const missingCount=Math.max(0,result.motion.requiredBearing-result.bearing);
+   // Rest, Sleep, Windedness, Watch and Other do not have a movement
+   // result. Never dereference a Travel-only Bearing requirement for them.
+   const missingCount=travel&&result.motion?Math.max(0,result.motion.requiredBearing-result.bearing):0;
    const rolls=String(form.elements.namedItem('directionD10')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
    const missing=episodeEvaluationRequested&&missingCount>0&&rolls.length!==missingCount;
    directionRow.classList.toggle('hc-episode-needs-input',missing);
