@@ -7024,3 +7024,24 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
  margin:.6rem 0 0;font-weight:600;font-size:.87rem;line-height:1.5
 }
 .hc-episode-spread-left [hidden],.hc-episode-spread-right [hidden]{display:none!important}
+
+/* v93.636: compact coherent episode workflow, help on text (not '?' buttons). */
+.hc-episode-spread-left .hc-episode-editor,
+.hc-episode-spread-right .hc-episode-result{font:inherit;line-height:1.45}
+.hc-episode-spread-left .hc-episode-settings,.hc-episode-spread-left fieldset{margin-block:.72rem;padding:.75rem;border:1px solid rgba(105,75,45,.27);border-radius:8px}
+.hc-episode-spread-left .hmk-trek-grid{gap:.6rem .8rem}
+.hc-episode-spread-left .hc-episode-editor label{font-size:.91rem;line-height:1.45}
+.hc-episode-spread-left .hc-hint,.hc-episode-spread-left p{font-size:.85rem;line-height:1.45}
+.hc-episode-spread-left .hc-episode-editor input:not([type=checkbox]),.hc-episode-spread-left .hc-episode-editor select{width:100%;max-width:100%;box-sizing:border-box}
+.hc-episode-spread-left .hc-episode-hover-help{cursor:help;text-decoration:underline dotted rgba(98,66,34,.5);text-decoration-thickness:1px;text-underline-offset:3px}
+.hc-episode-spread-left .hc-episode-hover-help:hover,.hc-episode-spread-left .hc-episode-hover-help:focus-visible{color:#684222}
+.hc-episode-constant-weather{padding:.52rem .7rem;margin:.7rem 0;background:rgba(143,116,66,.08);border-left:3px solid #98723f}
+.hc-episode-delay-fields{margin-top:.65rem;padding:.85rem;background:rgba(239,225,198,.4);border-radius:7px;border:1px solid rgba(112,83,48,.28);grid-column:1/-1}
+.hc-episode-delay-fields h4{margin:0 0 .35rem;font-size:1rem}
+.hc-episode-spread-left .hc-episode-evaluate{width:100%;margin:1rem 0 .3rem;background:#715038;color:#fff;border-radius:7px;padding:.82rem 1rem;font-size:1rem;font-weight:700;cursor:pointer}
+.hc-episode-spread-left .hc-episode-evaluate:hover{background:#593c29}
+.hc-episode-spread-right .hc-episode-proof-link{display:inline-flex;float:right;min-width:0;font-size:.79rem;padding:.3rem .46rem;margin:.15rem 0 .2rem .5rem;white-space:normal}
+.hc-episode-spread-right .hc-episode-proof{grid-template-columns:minmax(115px,.9fr) minmax(0,1.8fr);align-items:start;gap:.45rem .8rem}
+.hc-episode-spread-right .hc-episode-overview,.hc-episode-spread-right .hc-episode-evidence,.hc-episode-spread-right .hc-episode-checklist{margin-bottom:1rem}
+.hc-episode-spread-left .hc-episode-help{display:none!important}
+@media(max-width:760px){.hc-episode-spread-right .hc-episode-proof{grid-template-columns:1fr}}
