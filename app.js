@@ -300,7 +300,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.639';
+const APP_VERSION='93.640';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2764,7 +2764,14 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   starts.sort((a,b)=>a.due-b.due);
   return starts.length?`<section class="panel hc-calendar hsk-calendar-timed-skills"><h3>Časované Skill Tests · ${starts.length}</h3><p class="hc-hint">Skutečně zahájené činnosti; zobrazované termíny jsou odvozené z neměnných zápisů. Hod lze provést až po splnění pravidlové doby.</p>${starts.map(a=>`<p class="hsk-calendar-timed-row"><strong>${esc(a.name)}</strong> · ${esc(a.actor)} · ${esc(displayCampaignMinute(a.start))} → <strong>${esc(displayCampaignMinute(a.due))}</strong> · ${a.due>clock.minute?'zbývá '+esc(chronicleRemainingTime(a.due-clock.minute)):'základní termín dosažen'}<small>${esc(a.details)}</small></p>`).join('')}</section>`:'';
  })();
- const overviewHTML=`${board}${timedSkillPending590}${bestiaryCalendarDuePanel567(clock)}${unknownFallNotice}${suspendedHealingHTML}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
+ const independentCriticalDue=agenda.due.filter(x=>x.kind==='skill-critical'&&
+  data.journal.some(j=>j.id===x.originId&&j.calendarIndependentSkillTest?.campaignId===campaignKey(clock)
+   &&j.calendarIndependentSkillTest?.actorId===x.characterId));
+ const independentCriticalHTML=independentCriticalDue.length?
+  `<section class="panel hc-calendar-unresolved" data-independent-skill-critical><h3>Nevyřešené následky samostatných Skill Tests · ${independentCriticalDue.length}</h3>
+   <p class="hc-hint">Tyto hody nebyly vyžádány cestovní epizodou. Výsledky epizod jsou neměnné. Dokud GM neuzavře skutečné následky CF, kalendář nepovolí další posun času.</p>
+   ${independentCriticalDue.map(renderItem).join('')}</section>`:'';
+ const overviewHTML=`${independentCriticalHTML}${board}${timedSkillPending590}${bestiaryCalendarDuePanel567(clock)}${unknownFallNotice}${suspendedHealingHTML}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?`${trekDailyWeatherFormHTML(clock)}${overviewHTML}`:
   activeCalendarSection==='travel'?`${timeEpisodePageHTML(clock,participants)}${activeHMKActivities(data.journal,clock).length?interruptionsHTML:''}`:
   activeCalendarSection==='chronicle'?timeEpisodeChronicleHTML(clock):
@@ -9267,11 +9274,14 @@ function render(){
   // A travel handoff is an explicit Success Value route: never replace it
   // with an unrelated Secondary Mastery form when changing chapters.
   const travelSkill=episodePendingSkillRequest?.status==='waiting'&&
+   episodeActiveSkillRequestId===episodePendingSkillRequest.id&&
    episodePendingSkillRequest.campaignId===campaignKey(data.campaignClock)&&
    episodePendingSkillRequest.minute===data.campaignClock?.minute;
   if(!travelSkill)skillSVChoice595=null;
   const linked=!!(travelSkill||pendingStableAnimalcraftId||pendingTrekHandoff||pendingTrackingAwarenessId);
-  activeSkillTab=linked?'value':'secondary';
+  // Calendar CF navigation deliberately targets the existing follow-up form;
+  // do not reset it to an unrelated fresh Skill Test tab.
+  if(activeSkillTab!=='followups')activeSkillTab=linked?'value':'secondary';
  }
  lastRenderedSkillRoute596=view;
  // Deny all paths to partially generated sheets, even routes that set view
@@ -10226,7 +10236,10 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
     requestId:er.id,episodeEpoch:er.episodeEpoch,field:er.field,skill:er.skill,
     actorId:er.actorId,campaignId:er.campaignId,minute:er.minute}:null;
   data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof,
-    ...(explicitEpisodeLink?{calendarEpisodeSkillLink:explicitEpisodeLink}:{}),...(extra||{}),
+    ...(explicitEpisodeLink?{calendarEpisodeSkillLink:explicitEpisodeLink}:
+      !gmLink&&!link&&!timedId&&!trackingAwareness&&!fishingLink&&data.campaignClock?
+      {calendarIndependentSkillTest:{format:'hmk-independent-skill-test-v1',
+       campaignId:campaignKey(data.campaignClock),minute:data.campaignClock.minute,actorId:selected}}:{}),...(extra||{}),
     ...(timedId?{calendarSkillProjectSV591:{startId:timedId,kind:timedStart.calendarSkillProjectStart591.kind}}:{}),
     ...(data.campaignClock?{calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute}:{}),
     ...(fishingLink?{calendarFishingSVStart590:fishingLink}:{}),
@@ -11549,7 +11562,7 @@ document.addEventListener('submit',e=>{
  catch(error){if(out)out.textContent='Zvláštní SR nelze dokončit: '+error.message;}
 },true);
 document.addEventListener('change',e=>{
- if(e.target?.matches?.('[data-skill-actor]')){pendingTrackingAwarenessId=null;pendingTrekHandoff=null;pendingStableAnimalcraftId=null;skillSVChoice595=null;selected=e.target.value;render();return;}
+ if(e.target?.matches?.('[data-skill-actor]')){episodeActiveSkillRequestId=null;pendingTrackingAwarenessId=null;pendingTrekHandoff=null;pendingStableAnimalcraftId=null;skillSVChoice595=null;selected=e.target.value;render();return;}
  const form=e.target?.form;
  if(!['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id))return;
  if(e.target.name==='opposed'){
@@ -11612,6 +11625,9 @@ document.addEventListener('click',e=>{const t=e.target.closest?.('[data-skill-ta
  e.preventDefault();e.stopImmediatePropagation();
  const next=t.dataset.skillTab;
  if(!['secondary','value','assistance','situational','followups'].includes(next))return;
+ // Switching tabs ends the precisely routed episode test. A future ordinary
+ // test (even the identical skill) is NOT an episode receipt.
+ episodeActiveSkillRequestId=null;
  // Clicking the currently selected tab opens it anew; after leaving a tab,
  // never re-open a stale skill, animal or timed project implicitly.
  skillSVChoice595=null;
@@ -14426,7 +14442,16 @@ function explainAndOpenBlockedCalendarTerm(err,targetMinute){
  if(!due)return false;
  const actor=character(due.characterId);
  window.alert('Čas nebyl změněn. Povinná kontrola: '+(actor?.name||due.name)+' · '+due.description+' · '+displayCampaignMinute(due.minute)+'. Po zavření tohoto okna se otevře správný formulář.');
- if(actor&&due.sourceId&&due.kind){selected=actor.id;focusCalendarRuleAction(actor,due.kind,due.sourceId,due.elapsedMinutes);return true;}
+ if(actor&&due.sourceId&&due.kind){
+  selected=actor.id;
+  if(['skill-critical','skill-fall','skill-injury','weather-course','weather-skin'].includes(due.kind)){
+   episodeActiveSkillRequestId=null;
+   if(due.kind==='skill-critical'){view='skills';activeSkillTab='followups';}
+   else{view='sheet';activeSheetSection='status';}
+   render();
+  }
+  focusCalendarRuleAction(actor,due.kind,due.sourceId,due.elapsedMinutes);return true;
+ }
  view='calendar';calendarLanding=false;activeCalendarSection='overview';render();
  const row=[...document.querySelectorAll('[data-cal-agenda]')].find(n=>n.dataset.calAgenda===due.id);
  row?.scrollIntoView({block:'center',behavior:'auto'});row?.focus({preventScroll:true});
@@ -14718,7 +14743,14 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   if(form)hskSpecialRefresh(form);
   break;
  }
- case 'skill-critical':form=q('form[data-skill-critical-form]').find(f=>sourceId.startsWith(f.elements.namedItem('origin')?.value+'-'));break;
+ case 'skill-critical':{
+  // The agenda source is <original immutable journal ID>-<side>. Both must
+  // match the form; do not offer another CF by the same actor/skill.
+  const side=sourceId.slice(-1),origin=sourceId.slice(0,-2);
+  form=['A','B'].includes(side)?q('form[data-skill-critical-form]').find(f=>
+   f.elements.namedItem('origin')?.value===origin&&f.elements.namedItem('side')?.value===side):null;
+  break;
+ }
  case 'skill-fall':form=byHidden('form[data-climbing-fall-form]')||byHidden('form[data-climbing-short-fall]');break;
  case 'skill-injury':form=byHidden('form[data-skill-physical-impact]');break;
  case 'weather-course':form=byHidden('form[data-skill-weather-course]');choose(form,'elapsedMinutes',elapsedText);break;
@@ -14729,7 +14761,17 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  case 'psyche-interval':case 'psyche-recovery':form=q(kind==='psyche-interval'?'form[data-hmk-calendar-psyche-schedule]':'form[data-hmk-calendar-psyche-roll]').find(f=>f.elements.namedItem('characterId')?.value===actor.id&&(!sourceId||encodeURIComponent(f.elements.namedItem('trait')?.value||'')===sourceId.split(':')[0]));break;
  default:break;
  }
- if(form){installCalendarDiceControls(form,kind,sourceId,actor.id);for(let parent=form.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+ if(form){
+  // The follow-up tab keeps its real rule forms in a hidden source container.
+  // Merely scrolling to that hidden form was a false handoff. Select the exact
+  // journal-source form and expose it via the existing tab's own open button.
+  if(view==='skills'&&activeSkillTab==='followups'&&form.hasAttribute('data-hmk-followup-entry-598')){
+   const chooser=document.querySelector('[data-hmk-followup-choice-598]');
+   if(chooser){chooser.value=form.getAttribute('data-hmk-followup-entry-598');
+    chooser.dispatchEvent(new Event('change',{bubbles:true}));
+    document.querySelector('[data-hmk-followup-open-598]')?.click();}
+  }
+  installCalendarDiceControls(form,kind,sourceId,actor.id);for(let parent=form.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
   if(kind==='skill-fall'){
    const guide=form.querySelector('.hsk-falling-help');if(guide)guide.open=false;
    if(!form.querySelector('[data-calendar-fall-handoff]')){
@@ -15023,7 +15065,10 @@ document.addEventListener('click',e=>{
   selected=target.id;const destination=t.dataset.calDestination||'notes';
   if(t.dataset.calKind==='skill-fall'){activeSheetSection='status';view='sheet';}
   else if(destination==='combat'||destination==='healing'){if(!combatInitiativeSequence)encounterSelection.add(target.id);view='encounter';}
-  else if(destination==='skills'){view='skills';}
+  else if(destination==='skills'){view='skills';
+   if(t.dataset.calKind==='skill-critical'||t.dataset.calKind==='skill-injury'||t.dataset.calKind==='skill-fall')
+    {activeSkillTab='followups';episodeActiveSkillRequestId=null;}
+  }
   else{activeSheetSection=destination==='inventory'?'inventory':destination==='hazards'?'hazards':destination==='status'?'status':'notes';view='sheet';}
   render();
   if(t.dataset.calKind==='gm'&&t.dataset.calSkill){
@@ -16078,6 +16123,9 @@ if(t.dataset.action==='export-raw'){downloadRawStorage();return}
 if(t.dataset.action==='export-kernel-character'){const c=character(selected);if(c)downloadJSON(kernelExport([c]),'hmk-character-'+safeFilename(c.name)+'.json');return}
 if(t.dataset.action==='export-kernel-all'){downloadJSON(kernelExport(data.characters),'hmk-domain-export.json');return}
 if(t.dataset.nav){
+ // Direct navigation is independent. Never retain permission for an earlier
+ // episode handoff to capture a later, manually launched Skill Test.
+ episodeActiveSkillRequestId=null;
  // Each explicit entry into Skill Tests starts a clean picker. A previous
  // choice must never leak across navigation into another procedure.
  if(view==='skills'||t.dataset.nav==='skills'){
