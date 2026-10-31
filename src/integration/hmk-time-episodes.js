@@ -5,6 +5,8 @@
  */
 import {trekMovement,trekWeatherDay,trekWeatherWatch,trekHazards} from './hmk-trekking-routine.js';
 import {expeditionSecondaryRoll} from './hmk-calendar-expedition.js';
+import {createOrienteeringContext,adjustedOrienteeringSV} from './hmk-trekking-orienteering.js';
+import {allocateTrekModes} from './hmk-trekking-correction.js';
 export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -83,12 +85,211 @@ export function assertTimeEpisodeAppendOnly(before=[],after=[]){
   must(byId.has(j.id)&&JSON.stringify(j)===JSON.stringify(byId.get(j.id)),'Historickou epizodu nelze smazat ani přepsat.');
  }return true;
 }
+/** A skill roll is a permanent witnessed fact; its temporary effect is not.
+ * The free-minute episode mode is a declared GM variant of the printed watch.
+ * No stars from distinct tests are ever added together.
+ */
+export const EPISODE_SKILL_MEMORY_FORMAT='hmk-gm-episode-skill-memory-v1';
+const normalizedIds=ids=>[...(ids||[])].sort();
+export function episodeSkillProof(row,skill,guideId,campaignId,atMinute){
+ const p=row?.skillTestProof,actual=p?.skills?.[0]||p?.skill||p?.primarySkill;
+ const r=p?.a||p?.result;
+ if(!row||row.calendarCampaignId!==campaignId||row.characterId!==guideId||
+  row.campaignMinute!==atMinute||actual!==skill||
+  !String(p?.type||'').includes('value')||!Number.isSafeInteger(r?.sv)||
+  !['CF','F','S','CS'].includes(r?.level))return null;
+ const stars=r?.svTier?.stars;
+ return {skillId:row.id,guideId,skill,sv:r.sv,level:r.level,
+  stars:Number.isInteger(stars)?stars:null,roll:r.d100??r.roll??null};
+}
+/** Historical local weather is not a global receipt. Tie skill reuse to the
+ * actual GM-weather dice as well, never to the name of the area alone. */
+export function episodeWeatherContextKey(sourceId,weather){
+ if(sourceId)return sourceId;
+ if(!weather)return null;
+ return 'local:'+JSON.stringify([weather.season,weather.climate,weather.landscape,
+  weather.temperatureD10,weather.precipitationD10,weather.alpine,weather.aridDesert]);
+}
+export function episodeMovementContext({guideId,memberIds,area,topography,terrain,conveyance,weatherSourceId,minute,
+ familiar=false,torchlight=false,fullMoon=false,afterSnowfall=false}={}){
+ return {guideId,memberIds:normalizedIds(memberIds),area:String(area||'').trim(),
+  topography,terrain,conveyance,weatherSourceId:weatherSourceId??null,
+  night:(minute%1440<360||minute%1440>=1200),familiar,torchlight,fullMoon,afterSnowfall};
+}
+export function lastEpisodeBefore(journal=[],campaignId,minute){
+ return journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarTimeEpisode&&
+  j.calendarTimeEpisode.endMinute<=minute).sort((a,b)=>b.calendarTimeEpisode.endMinute-a.calendarTimeEpisode.endMinute)[0]||null;
+}
+export function mayReuseEpisodeSkill({previous,minute,context,kind='orientation',trail='' }={}){
+ const old=previous?.calendarTimeEpisode;
+ if(!old||old.endMinute!==minute||old.kind!==(kind==='orientation'?'travel':'tracking'))return false;
+ const memo=kind==='orientation'?old.orientation:old.trackingMemory;
+ if(!memo?.skillId||memo.format!==EPISODE_SKILL_MEMORY_FORMAT||
+  JSON.stringify(memo.context)!==JSON.stringify(context))return false;
+ return kind!=='tracking'||memo.trail===String(trail||'').trim()&&!!memo.trail;
+}
+export function computeEpisodeOrientation({mode='none',currentSkill=null,previous=null,minute,
+  context,priority='pace',requiredBearing=0,continuousPrecipitation=false,familiar=false,
+  torchlight=false,fullMoon=false,afterSnowfall=false,droverSkill=null}={}){
+ must(['none','new','reuse'].includes(mode),'Neznámé použití Orienteering.');
+ if(mode==='none')return null;
+ let witness;
+ if(mode==='reuse'){
+  must(mayReuseEpisodeSkill({previous,minute,context}),
+   'Předchozí Orienteering není použitelný: epizody přímo nenavazují nebo se změnily podmínky. Proveďte nový Survival test.');
+  witness=previous.calendarTimeEpisode.orientation;
+ }else{
+  must(currentSkill?.skill==='Survival'&&currentSkill.guideId===context.guideId,
+   'Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty.');
+  witness=currentSkill;
+ }
+ let adjustment,allocation;
+ if(mode==='reuse'){
+  adjustment=witness.adjustment;
+  must(adjustment&&Number.isInteger(adjustment.adjustedSV),'Převzatý SV nemá doložený výpočet.');
+ }else{
+  const ctx=createOrienteeringContext({night:context.night,partySize:context.memberIds.length,
+   familiar,torchlight:context.night&&torchlight,fullMoon:context.night&&fullMoon,
+   afterSnowfall:context.night&&afterSnowfall,conveyance:context.conveyance,
+   droverId:context.conveyance==='foot'?null:context.guideId,
+   animalsPresent:context.conveyance!=='foot'});
+  if(context.conveyance!=='foot')must(droverSkill?.skillId&&
+   ['Animalcraft','Riding'].includes(droverSkill.skill)&&droverSkill.guideId===context.guideId,
+   'Cesta se zvířaty potřebuje skutečný Riding/Animalcraft test průvodce.');
+  adjustment=adjustedOrienteeringSV({baseSV:witness.sv,context:ctx,
+   droverResult:droverSkill?{level:droverSkill.level}:null});
+ }
+ allocation=allocateTrekModes({autoAllocate:true,autoPriority:priority,slow:0,
+  orienteeringSlow:0,foraging:0,stalking:0,vigilance:0,trackingForcedBearingSourceId:null},
+  adjustment,{requiredBearing});
+ return {format:EPISODE_SKILL_MEMORY_FORMAT,skillId:witness.skillId,guideId:context.guideId,
+  context,sv:witness.sv,level:witness.level,stars:witness.stars??null,roll:witness.roll??null,
+  adjustment,priority,
+  droverSkillId:mode==='reuse'?witness.droverSkillId??null:droverSkill?.skillId??null,
+  droverLevel:mode==='reuse'?witness.droverLevel??null:droverSkill?.level??null,
+  modes:{progress:allocation.progress,bearing:allocation.bearing,
+   foraging:allocation.foraging,stalking:allocation.stalking,vigilance:allocation.vigilance,
+   lax:allocation.lax,orienteeringSlow:allocation.orienteeringSlow},
+  reusedFromEpisodeId:mode==='reuse'?previous.id:null,sourceMode:mode};
+}
+export function computeEpisodeTracking({mode='none',currentSkill=null,previous=null,minute,context,trail=''}={}){
+ must(['none','new','reuse'].includes(mode),'Neznámé použití Tracking.');
+ if(mode==='none')return null;
+ const trailName=String(trail||'').trim();must(trailName.length>0,'Uveďte skutečně sledovanou stopu.');
+ const witness=mode==='reuse'?(mayReuseEpisodeSkill({previous,minute,context,kind:'tracking',trail:trailName})?
+  previous.calendarTimeEpisode.trackingMemory:null):currentSkill;
+ must(witness?.skill==='Tracking'||mode==='reuse'&&witness?.skillId,
+  'Tracking: vyberte skutečný nový Tracking SV, nebo souvislé pokračování téže stopy.');
+ must(witness.guideId===context.guideId,'Tracking musí patřit téže postavě.');
+ return {format:EPISODE_SKILL_MEMORY_FORMAT,skillId:witness.skillId,guideId:context.guideId,
+  context,trail:trailName,sv:witness.sv,level:witness.level,stars:witness.stars??null,
+  roll:witness.roll??null,sourceMode:mode,reusedFromEpisodeId:mode==='reuse'?previous.id:null};
+}
+export function episodeNavigationState(previous,newDirection=null,{recovered=false}={}){
+ const p=previous?.calendarTimeEpisode;
+ const earlier=p?.navigationState||
+  (p?.direction?.direction==='lost'?'lost':p?.direction?.direction==='misdirection'?'misdirection':'clear');
+ const active=recovered?'clear':earlier;
+ return newDirection?.direction==='lost'?'lost':newDirection?.direction==='misdirection'?'misdirection':active;
+}
 export function validateTimeEpisodes(journal=[]){
  const byCampaign=new Map(),prior=[];
  for(const j of journal){const e=j.calendarTimeEpisode;if(!e)continue;
   must(e.format===EPISODE_FORMAT&&whole(e.startMinute,0,1e9)&&whole(e.minutes,1,10080)&&
    e.endMinute===e.startMinute+e.minutes&&e.startMinute===j.campaignMinute&&
    typeof j.calendarCampaignId==='string'&&Array.isArray(e.memberIds),'Neplatná herní epizoda');
+  // The references are not new rolls. Verify linked proof and continuous inheritance.
+  for(const [key,skill] of [['orientation','Survival'],['trackingMemory','Tracking']]){
+   const memo=e[key];if(!memo)continue;
+   must(memo.format===EPISODE_SKILL_MEMORY_FORMAT&&typeof memo.skillId==='string'&&
+    memo.guideId===memo.context?.guideId&&e.memberIds.includes(memo.guideId),
+    'Neplatný doklad paměti epizody.');
+   const expectedContext=episodeMovementContext({guideId:j.characterId,memberIds:e.memberIds,
+    area:e.area,topography:e.topography,terrain:e.terrain,conveyance:e.conveyance,
+    weatherSourceId:episodeWeatherContextKey(e.weatherSourceId,e.weather),minute:e.startMinute,
+    familiar:!!e.settings?.orientationFamiliar,torchlight:!!e.settings?.orientationTorch,
+    fullMoon:!!e.settings?.orientationMoon,afterSnowfall:!!e.settings?.orientationSnow});
+   must(JSON.stringify(expectedContext)===JSON.stringify(memo.context),
+    'Situační okolnosti a členové epizody neodpovídají doloženému SV.');
+   const linked=journal.find(x=>x.id===memo.skillId);
+   must(linked&&linked.calendarCampaignId===j.calendarCampaignId&&linked.campaignMinute<=e.startMinute,
+    'Epizoda odkazuje na neexistující nebo budoucí Skill Test.');
+   must(episodeSkillProof(linked,skill,memo.guideId,j.calendarCampaignId,linked.campaignMinute),
+    'Epizoda odkazuje na nesprávnou dovednost nebo postavu.');
+   const sr=episodeSkillProof(linked,skill,memo.guideId,j.calendarCampaignId,linked.campaignMinute);
+   must(memo.sv===sr.sv&&memo.level===sr.level&&memo.stars===sr.stars,
+    'Výsledek nebo hvězdičky historického Skill Testu byly pozměněny.');
+   if(key==='orientation'){
+    must(e.kind==='travel'&&memo.modes?.progress===e.progress&&memo.modes?.bearing===e.bearing,
+     'Orienteering režimy musí souhlasit s vypočteným pohybem epizody.');
+    must(memo.adjustment?.baseSV===sr.sv&&Number.isInteger(memo.adjustment?.advantageModes),
+     'Upravený SV není podložen původním hodem.');
+    const required=trekMovement({topography:e.topography,terrain:e.terrain,
+     conveyance:e.conveyance,progress:0,slow:0,bearing:0,loaded:false,progressD10:[],
+     continuousPrecipitation:!!e.precipitation?.slowMode}).requiredBearing;
+    const allocation=allocateTrekModes({autoAllocate:true,autoPriority:memo.priority,slow:0,
+     orienteeringSlow:0,foraging:0,stalking:0,vigilance:0,trackingForcedBearingSourceId:null},
+     memo.adjustment,{requiredBearing:required});
+    const keys=['progress','bearing','foraging','stalking','vigilance','lax','orienteeringSlow'];
+    must(keys.every(k=>memo.modes[k]===allocation[k]),
+     'Advantage Modes neodpovídají doloženému SV a strategii GM.');
+    if(memo.sourceMode==='new'){
+     const droverRow=memo.droverSkillId?journal.find(x=>x.id===memo.droverSkillId):null;
+     const droverProof= e.conveyance==='foot'?null:
+      (episodeSkillProof(droverRow,'Animalcraft',memo.guideId,j.calendarCampaignId,e.startMinute)||
+       episodeSkillProof(droverRow,'Riding',memo.guideId,j.calendarCampaignId,e.startMinute));
+     must(e.conveyance==='foot'||droverProof&&droverProof.level===memo.droverLevel,
+      'Cestování se zvířaty nemá doložený Drover Test.');
+     const ctx=createOrienteeringContext({night:memo.context.night,
+      partySize:memo.context.memberIds.length,familiar:memo.context.familiar,
+      torchlight:memo.context.night&&memo.context.torchlight,
+      fullMoon:memo.context.night&&memo.context.fullMoon,
+      afterSnowfall:memo.context.night&&memo.context.afterSnowfall,
+      conveyance:e.conveyance,
+      ...(e.conveyance==='foot'?{}:{droverId:memo.guideId,animalsPresent:true})});
+     must(JSON.stringify(adjustedOrienteeringSV({baseSV:sr.sv,context:ctx,
+      droverResult:droverProof?{level:droverProof.level}:null}))===
+      JSON.stringify(memo.adjustment),'Situační úprava Orienteering SV byla pozměněna.');
+    }
+   }
+   if(memo.sourceMode==='new')must(linked.campaignMinute===e.startMinute&&memo.reusedFromEpisodeId===null,
+    'Nový hod musí být doložen na začátku právě této epizody.');
+   else{
+    must(memo.sourceMode==='reuse'&&typeof memo.reusedFromEpisodeId==='string',
+     'Neplatná návaznost převzatého hodu.');
+    const before=journal.find(x=>x.id===memo.reusedFromEpisodeId);
+    must(before&&before.calendarTimeEpisode?.endMinute===e.startMinute&&
+     (key!=='orientation'||JSON.stringify(before.calendarTimeEpisode?.orientation?.adjustment)===JSON.stringify(memo.adjustment))&&
+     before.calendarTimeEpisode?.[key]?.skillId===memo.skillId&&
+     before.calendarTimeEpisode?.[key]?.format===EPISODE_SKILL_MEMORY_FORMAT&&
+     JSON.stringify(before.calendarTimeEpisode?.[key]?.context)===JSON.stringify(memo.context)&&
+     (key!=='trackingMemory'||before.calendarTimeEpisode.trackingMemory.trail===memo.trail),
+     'Převzatý hod nesouvisí s bezprostředně předcházející epizodou.');
+   }
+  }
+  if(e.movementRollSources){
+   for(const [key,sourceId] of Object.entries(e.movementRollSources)){
+    must(['progress','direction'].includes(key),'Neznámý druh převzatých pohybových kostek.');
+    if(!sourceId)continue;
+    const source=journal.find(x=>x.id===sourceId&&x.calendarCampaignId===j.calendarCampaignId&&x.calendarTimeEpisode);
+    const older=source?.calendarTimeEpisode;
+    const diceKey=key==='progress'?'progressD10':'directionD10';
+    must(older?.endMinute===e.startMinute&&older.kind==='travel'&&
+     e.orientation?.reusedFromEpisodeId===sourceId&&
+     JSON.stringify(older.movementRolls?.[diceKey])===JSON.stringify(e.movementRolls?.[diceKey])&&
+     older.slow===e.slow&&older.progress===e.progress&&older.bearing===e.bearing&&
+     older.loaded===e.loaded&&older.terrain===e.terrain&&older.topography===e.topography&&
+     older.conveyance===e.conveyance,
+     'Převzaté pohybové kostky neodpovídají skutečné souvislé epizodě.');
+   }
+  }
+  if(e.navigationState!==undefined){
+   must(['clear','lost','misdirection'].includes(e.navigationState),
+    'Neplatná evidence orientace družiny.');
+   const earlier=lastEpisodeBefore(journal,j.calendarCampaignId,e.startMinute);
+   must(e.navigationState===episodeNavigationState(earlier,e.direction,{recovered:!!e.navigationRecovered}),
+    'Stav bloudění nebyl správně převeden do navazující epizody.');
+  }
   if(e.foraging){
    const f=e.foraging;
    must(e.kind==='forage'&&f.minutes===e.minutes&&j.characterId&&e.memberIds.includes(j.characterId),

@@ -6900,3 +6900,13 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-local-weather[hidden],.hc-episode-encounter [hidden],[data-episode-end-person][hidden]{display:none!important}
 @media(max-width:900px){.hc-episode-columns{grid-template-columns:minmax(0,1fr)}.hc-episode-result{position:static}.hc-episode-editor,.hc-episode-result{padding:.8rem}}
 @media(max-width:490px){.hc-episode-settings .hmk-trek-grid{grid-template-columns:minmax(0,1fr)}.hc-episode-head h2{font-size:1.3rem}.hc-episode-editor label{font-size:.88rem}}
+
+/* v93.629 – compact skill-memory controls for GM-timed episodes. */
+.hc-episode-memory-note{border-left:3px solid #96774d;background:rgba(165,131,77,.09);padding:.65rem .8rem;font-size:.86rem;line-height:1.45}
+.hc-episode-auto-modes{grid-column:1/-1;padding:.65rem .8rem;border:1px dashed rgba(118,74,26,.4);border-radius:5px;background:rgba(184,153,106,.11);font-size:.87rem;line-height:1.4}
+.hc-episode-navigation{border-top:1px solid rgba(118,74,26,.24);margin-top:.8rem;padding:.6rem 0}
+.hc-episode-navigation .hc-check{font-size:.88rem}
+.hc-episode-settings [data-episode-orientation-new]>.hmk-trek-grid{margin-top:.65rem}
+.hc-episode-settings [data-episode-orientation-new] label,.hc-episode-settings [data-episode-tracking] label{margin:.4rem 0}
+.hc-episode-settings [hidden],.hc-episode-settings label[hidden],.hc-episode-settings div[hidden]{display:none!important}
+.hc-episode-settings .hc-help-term{border-bottom:1px dotted #926d45;cursor:help}
