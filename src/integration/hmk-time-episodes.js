@@ -218,6 +218,9 @@ export function calculateEpisodeMinuteRecovery({kind,minute,minutes,current,prio
 export const EPISODE_SKILL_MEMORY_FORMAT='hmk-gm-episode-skill-memory-v1';
 const normalizedIds=ids=>[...(ids||[])].sort();
 export function episodeSkillProof(row,skill,guideId,campaignId,atMinute){
+ // A stand-alone Skill Test may have its own calendar obligations, including
+ // CF follow-ups, but it cannot become evidence for an unrelated episode.
+ if(row?.calendarIndependentSkillTest)return null;
  const p=row?.skillTestProof,actual=p?.skills?.[0]||p?.skill||p?.primarySkill;
  const r=p?.a||p?.result;
  if(!row||row.calendarCampaignId!==campaignId||row.characterId!==guideId||
