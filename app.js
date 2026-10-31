@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.649';
+const APP_VERSION='93.650';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2059,7 +2059,7 @@ function timeEpisodePageHTML(clock,participants){
   <label class="hc-check" data-episode-weather-geography><input name="aridDesert" type="checkbox"> Pouštní podmínky</label>
  <label data-episode-weather-roll>Teplota (d10)<span class="hc-episode-die"><input name="temperatureD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="temperatureD10">⚄ d10</button></span></label>
  <label data-episode-weather-roll>Srážky (d10)<span class="hc-episode-die"><input name="precipitationD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="precipitationD10">⚄ d10</button></span></label>
- </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p></details>
+ </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p><details class="hc-episode-reference"><summary>Vysvětlivka počasí · všechny možné výsledky</summary><p><strong>Teplota:</strong> bez teplotního hazardu, cold hazard (chlad), heat hazard (horko). Z téhož denního d10 se podmínky zvlášť vypočtou pro <strong>Den</strong> a <strong>Noc</strong>; noc používá klimatický postih.</p><p><strong>Srážky:</strong> bez srážek nebo srážky. Za běžných podmínek déšť; při cold hazardu sníh, nebo při hraničním hodu déšť se sněhem / mrznoucí déšť. Doplňující d6 určuje intenzitu: 1 = nepřetržité srážky, 2–6 = slabé či pro pohyb nevýznamné. Změní-li se skutečné počasí během epizody, GM rozdělí časový interval.</p></details></details>
 
   <fieldset class="hc-episode-party-panel"><legend>3 · Účastníci a průvodce</legend><div class="hc-episode-members">${characterRows}</div><label>Průvodce / osoba provádějící orientaci<select name="guideId">${participants.map(c=>option(c.id,c.name)).join('')}</select></label></fieldset>
  ${stableTravelRoster.length?`<fieldset data-episode-stable-roster><legend>Zvířata vybraná ze Stáje · doložené zatížení</legend>
@@ -2069,7 +2069,7 @@ function timeEpisodePageHTML(clock,participants){
  <details class="hc-episode-settings" data-episode-section="skills"><summary>4 · Dovednosti vybrané činnosti</summary>
  <p class="hc-episode-brief">Survival / Tracking · nový doložený hod nebo povolené pokračování.</p>
  ${lastRow?`<p class="hc-episode-memory-note">Poslední doložená epizoda: ${esc(displayCampaignMinute(lastRow.calendarTimeEpisode.startMinute))}–${esc(displayCampaignMinute(lastRow.calendarTimeEpisode.endMinute))}; ${esc(lastRow.calendarTimeEpisode.kind)}. Předchozí Orienteering: ${lastRow.calendarTimeEpisode.orientation?`SV ${lastRow.calendarTimeEpisode.orientation.sv} · ${lastRow.calendarTimeEpisode.orientation.stars??'—'} ★`:'bez doloženého SV'}. Navigace: ${esc(lastRow.calendarTimeEpisode.navigationState||'bez evidovaného bloudění')}.</p>`:''}
- <label data-episode-orientation-use class="hc-check hc-episode-remember-sv"><input type="checkbox" name="orientationReuse" ${lastRow?.calendarTimeEpisode?.orientation?'':'disabled'}> <span class="hc-help-term" tabindex="0" data-hmk-help="Použít dříve doložený Survival SV jen při bezprostředním pokračování stejné cesty se stejnou družinou, průvodcem a podmínkami. Pokud není zaškrtnuto, požaduje se nový Survival Skill Test.">Převzít platný Orienteering SV z předchozí epizody</span></label>
+ <label data-episode-orientation-use class="hc-check hc-episode-remember-sv"><input type="checkbox" name="orientationReuse" ${lastRow?.calendarTimeEpisode?.orientation?'':'disabled'}> <span class="hc-help-term" tabindex="0" data-hmk-help="Použít dříve doložený Survival SV jen při bezprostředním pokračování stejné cesty se stejnou družinou, průvodcem a podmínkami. Pokud není zaškrtnuto, požaduje se nový Survival Skill Test.">Převzít platný Orienteering SV z předchozí epizody</span></label><p class="hc-hint" data-episode-reuse-status role="status"></p>
  <input type="hidden" name="orientationUse" value="new">
  <div data-episode-orientation-new><label>Doložený Survival SV průvodce (aktuální minuta)<select name="orientationProofId"><option value="">— Vyberte skutečný uložený test —</option>${skillOptions('Survival')}</select></label>
  <div class="hmk-trek-grid"><label>Cíl rozdělení výhod<select name="orientationPriority"><option value="pace">Udržet směr, potom rychlost</option><option value="forage">Udržet směr, potom Foraging</option><option value="stealth">Udržet směr, potom Stalking</option><option value="vigilance">Udržet směr, potom Vigilance</option></select></label>
@@ -2103,7 +2103,7 @@ function timeEpisodePageHTML(clock,participants){
  <label>Awareness při Tracking SV 3–4 ${episodeRuleHelp('Tracking Awareness','HMK 147: pouze skutečný uložený Awareness test postavy v současné minutě může dát 1 Spoor.')}<select name="trackingAwarenessProofId"><option value="">— Vyberte skutečný Awareness test —</option>${skillOptions('Awareness')}</select></label>
  <label>Počet Spoor hvězd věnovaných skrytí vlastní stopy<input name="trackingSpoorSpent" type="number" min="0" max="100" value="0"></label></div>
  <p class="hc-hint">Tracking CF vynutí jeden Bearing při příští cestovní epizodě; není to nový náhodný hod. Pozor: Spoor od různých hodů se nesčítají.</p></div>
-  <div class="hc-episode-navigation" data-episode-navigation><p data-episode-navigation-text class="hc-hint">Dřívější bloudění se nepřestane počítat jen kvůli novému testu nebo uplynutí času.</p>
+  <div class="hc-episode-navigation" data-episode-navigation><p data-episode-navigation-text class="hc-hint" data-hmk-help="Všechny možné stavy: clear = družina drží správný směr; misdirection = jde odchýleným směrem; lost = ztratila orientaci. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení. Samotný další hod je automaticky nemaže.">Dřívější bloudění se nepřestane počítat jen kvůli novému testu nebo uplynutí času.</p>
  <label class="hc-check"><input name="navigationRecovered" type="checkbox"> <span class="hc-help-term" tabindex="0" data-hmk-help="Samostatné výslovné rozhodnutí GM: družina skutečně zjistila správnou trasu. Samotný úspěch nového Orienteering není automatický návrat na cestu. Rozhodnutí se zapíše do epizody.">GM doložil napravení bloudění / návrat na trasu</span></label></div>
  <p data-episode-skill-memory-status class="hc-hint">Výsledek a jeho platnost se objeví po výběru.</p>
  </details>
@@ -2111,8 +2111,8 @@ function timeEpisodePageHTML(clock,participants){
  <div data-episode-travel-rolls><details class="hc-episode-suboptions hc-episode-roll-group" open><summary>Pohyb a orientace</summary><div class="hmk-trek-grid"><label>Další Slow Modes · pouze výjimky GM<input name="extraSlow" type="number" min="0" max="20" value="0" title="Pouze další skutečné zpomalení. Slow za stav postav, počasí a nízký Orienteering SV připočítává engine sám."></label>
  <p class="hc-episode-auto-modes" role="status" data-episode-allocated-modes title="Výhody vznikají výhradně z doloženého SV a automaticky se přidělují na Bearing a zvolený cíl. ★ z předchozích hodů se nesčítají.">Progress a Bearing se vypočítají z doloženého Orienteering SV. Bez testu jsou obě hodnoty nula.</p>
  <label data-episode-progress-row>Progress (d10) · při přebytku ${episodeRuleHelp('Progress d10','HMK 146: každý Progress ruší jeden Slow; za každý zbývající Progress hoďte vlastní d10 proti TN = 2 × základní LPW. Alespoň jeden úspěch zvýší LPW o 1 (ne o počet úspěchů). Hody se nikdy automaticky nepředpokládají.')}<span class="hc-episode-die"><input name="progressD10" placeholder="např. 4,8" title="Zadejte d10 oddělené čárkami, jednu za každou přebytečnou Progress Mode."><button type="button" data-episode-progress-die>+ d10</button></span></label></div>
- <label data-episode-direction-row>Direction Hazard (d10) · při chybějícím Bearing ${episodeRuleHelp('Direction Hazard','HMK 148: není-li pokryt potřebný Bearing, hází se samostatný d10 za každý chybějící bod: 1–4 Lost Time (další Slow), 5–9 Misdirection, 10 Lost. Některé následky vyžadují navazující GM rozhodnutí, ne automatické zrušení stavu.')}<span class="hc-episode-die"><input name="directionD10" placeholder="např. 3,7" title="Jeden skutečný d10 za každý chybějící Bearing. Hod 1–4 = Lost Time, 5–9 = Misdirection, 10 = Lost (HMK 148)."><button type="button" data-episode-direction-die>+ d10</button></span></label>
- <label data-episode-survival-hazard>Survival Hazard (d10) · jen při kritickém neúspěchu Survival ${episodeRuleHelp('Survival Hazard','HMK 148: pokud původní Survival / Orienteering test skončil CF, družina musí vyřešit Survival Hazard bez ohledu na výsledné upravené SV. Hod d10: 1–3 Equipment (výstroj), 4–6 Accident (nehoda), 7–10 Complication (komplikace). Další hody na opravu, úraz či změnu výstroje se řeší podle vybraného následku ve stávajícím Skill Tests a Combat, nejsou automaticky považovány za vyřízené.')}<span class="hc-episode-die"><input name="survivalD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="survivalD10">⚄ d10</button></span></label>
+ <p class="hc-hint" id="episode-progress-explanation" data-episode-progress-explanation role="status"></p><label data-episode-direction-row>Direction Hazard (d10) · při chybějícím Bearing ${episodeRuleHelp('Direction Hazard','HMK 148: není-li pokryt potřebný Bearing, hází se samostatný d10 za každý chybějící bod: 1–4 Lost Time (další Slow), 5–9 Misdirection, 10 Lost. Některé následky vyžadují navazující GM rozhodnutí, ne automatické zrušení stavu.')}<span class="hc-episode-die"><input name="directionD10" placeholder="např. 3,7" title="Jeden skutečný d10 za každý chybějící Bearing. Hod 1–4 = Lost Time, 5–9 = Misdirection, 10 = Lost (HMK 148)."><button type="button" data-episode-direction-die>+ d10</button></span></label>
+ <p class="hc-hint" data-episode-direction-explanation role="status"></p><label data-episode-survival-hazard>Survival Hazard (d10) · jen při kritickém neúspěchu Survival ${episodeRuleHelp('Survival Hazard','HMK 148: pokud původní Survival / Orienteering test skončil CF, družina musí vyřešit Survival Hazard bez ohledu na výsledné upravené SV. Hod d10: 1–3 Equipment (výstroj), 4–6 Accident (nehoda), 7–10 Complication (komplikace). Další hody na opravu, úraz či změnu výstroje se řeší podle vybraného následku ve stávajícím Skill Tests a Combat, nejsou automaticky považovány za vyřízené.')}<span class="hc-episode-die"><input name="survivalD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="survivalD10">⚄ d10</button></span></label>
  <details class="hc-episode-suboptions"><summary>Volitelné režimy a zatížení</summary><div class="hmk-trek-grid"><label class="hc-check"><input name="doubleTime" type="checkbox"> Double Time · dvojnásobná rychlost jen bez Slow a Loaded (HMK 146, 150) ${episodeRuleHelp('Double Time','Pohyb se zdvojnásobí pouze při nulových zbývajících Slow a bez Loaded. Únava se počítá po skutečných minutách: pěší 10/h (úspěšný END SR snižuje o 5/h); drover 5/h. Důsledky Danger zůstávají doložené.')}</label>
  <label class="hc-check" data-episode-load-bypass><input name="loadBypass" type="checkbox"> Místo automaticky zjištěného Loaded zaplatit vyšší únavu podle ENC (HMK 145)</label>
  <label class="hc-check"><input name="dunesSlow" type="checkbox"> Duny · zvolit Slow místo +5 únavy</label>
@@ -2121,13 +2121,13 @@ function timeEpisodePageHTML(clock,participants){
  </div></details></details><details class="hc-episode-suboptions hc-episode-roll-group"><summary>Únava a srážky</summary><label>Srážky · stav v této minutové epizodě (d6) ${episodeRuleHelp('Srážkový d6','HMK 144: denní teplota a srážky vzniknou ze dvou d10. D6 popisuje doloženou souvislost srážek během aktuální epizody, ne nezávislý hod každou minutu. Pokud se počasí během činnosti změní, GM zahájí novou epizodu přesně v minutě změny. Další rozdělení dne není povinné.')}<span class="hc-episode-die"><input name="precipitationD6" type="number" min="1" max="6" placeholder="1–6"><button type="button" data-episode-die="precipitationD6">⚄ d6</button></span></label>
  <p class="hc-hint">Hod (d6: 1) znamená nepřetržité srážky; ostatní hodnoty nepřidávají Slow. U převzatého globálního počasí se denní d10 nepřehazují.</p>
  <div class="hc-episode-dice-by-person"><strong>END SR (d10) · individuálně při cestování</strong> ${episodeRuleHelp('END SR','Každá postava má vlastní hod d10 proti TN = podlaha(END/2); při jízdě a vozidle +2. Výsledná únava se počítá za zadané minuty, zaokrouhlí dolů a nevyčerpaná část se bezpečně přenese. Jednotlivé END hody jsou doložené skutečnými d10. HMK 62,149.')}<p>Každá postava má vlastní skutečný hod; TN odpovídá jejímu END. Hod se nepřebírá od průvodce.</p>
- ${participants.map(c=>`<label data-episode-end-person="${esc(c.id)}">${esc(c.name)} · END (d10)<span class="hc-episode-die"><input name="end_${esc(c.id)}" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="end_${esc(c.id)}">⚄ d10</button></span></label>`).join('')}</div></details></div><details class="hc-episode-suboptions hc-episode-roll-group hc-episode-encounter"><summary>Náhodná setkání</summary><details class="hc-episode-reference"><summary>GM výjimka · vynechat náhodné setkání jen v bezpečném prostředí</summary><label class="hc-check"><input name="checkEncounter" type="checkbox" checked> Provést kontrolu setkání podle skutečného prostředí ${episodeRuleHelp('Random Encounter','HMK 150 používá speciální d10 a TN podle prostředí a dne/noci (2/1, 4/1, 1/1, 9/9). Tato domluvená GM varianta převádí hustotu setkání na přesnou délku v minutách a jedním d100 určuje počet setkání; v dlouhé epizodě mohou být i dvě nebo více. Noční divočina má oproti denní poloviční četnost. Nejedná se o doslovný HMK hod d10.')}</label><p class="hc-hint">Základní kontrola probíhá automaticky při vyhodnocení. Odškrtnutí je výjimečné rozhodnutí GM a vyžaduje odůvodnění.</p><label data-episode-encounter-waiver hidden>Proč se Encounter nekontroluje (GM výjimka)<textarea name="encounterWaiver" rows="2" maxlength="250" placeholder="Např. skutečně bezpečná uzavřená místnost."></textarea></label></details><div data-episode-encounter-panel><div class="hmk-trek-grid"><label>Prostředí setkání<select name="environ">${[['highway','Silnice'],['rural','Venkov'],['wilderness','Divočina'],['underworld','Podzemí']].map(([v,l])=>option(v,l)).join('')}</select></label>
+ ${participants.map(c=>`<label data-episode-end-person="${esc(c.id)}">${esc(c.name)} · END (d10)<span class="hc-episode-die"><input name="end_${esc(c.id)}" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="end_${esc(c.id)}">⚄ d10</button></span></label>`).join('')}</div></details></div><details class="hc-episode-suboptions hc-episode-roll-group hc-episode-encounter"><summary>Náhodná setkání</summary><details class="hc-episode-reference"><summary>GM výjimka · vynechat náhodné setkání jen v bezpečném prostředí</summary><label class="hc-check"><input name="checkEncounter" type="checkbox" checked> Provést kontrolu setkání podle skutečného prostředí ${episodeRuleHelp('Random Encounter','HMK 150 používá speciální d10 a TN podle prostředí a dne/noci (2/1, 4/1, 1/1, 9/9). Tato domluvená GM varianta převádí hustotu setkání na přesnou délku v minutách a jedním d100 určuje počet setkání; v dlouhé epizodě mohou být i dvě nebo více. Noční divočina má oproti denní poloviční četnost. Nejedná se o doslovný HMK hod d10.')}</label><p class="hc-hint">Základní kontrola probíhá automaticky při vyhodnocení. Odškrtnutí je výjimečné rozhodnutí GM a vyžaduje odůvodnění.</p><label data-episode-encounter-waiver hidden>Proč se Encounter nekontroluje (GM výjimka)<textarea name="encounterWaiver" rows="2" maxlength="250" placeholder="Např. skutečně bezpečná uzavřená místnost."></textarea></label></details><div data-episode-encounter-panel><div class="hmk-trek-grid"><input name="environ" type="hidden" value="highway"><p class="hc-hint" data-episode-auto-environ role="status">Prostředí Encounteru se určuje automaticky z vybrané cesty / krajiny.</p>
  <input type="hidden" name="encounterPeriod" value="day">
 <input type="hidden" name="encounterD100" value=""><input type="hidden" name="encounterD100Sub" value=""><input type="hidden" name="encounterRollContext" value=""><input type="checkbox" name="encounterFine" checked hidden aria-hidden="true">
  <p class="hc-episode-encounter-summary" data-episode-encounter-summary role="status">Pravděpodobnost a výsledek automatických kostek se zobrazí před závěrečným potvrzením.</p></div>
  <label>Celkový stav setkání<select name="encounterResolution"><option value="">Čeká na dořešení jednotlivých setkání</option><option value="no-consequence">Všechna vzniklá setkání bez dalších následků</option><option value="resolved">Všechna vzniklá setkání vyhodnocena v Combat / Skill Tests</option></select></label>
  <div data-episode-encounter-events><p class="hc-hint">Setkání se evidují uvnitř jediné minutové epizody. Každé má vlastní d4, čas výskytu a doložený Surprise. Všechny následné testy se dokončí před jediným společným zápisem.</p></div>
-  <details class="hc-episode-reference"><summary>HMK 150 · tabulka Encounter d10</summary><table><thead><tr><th>Prostředí</th><th>Den / soumrak</th><th>Noc</th></tr></thead><tbody><tr><td>Hlavní silnice</td><td>2</td><td>1</td></tr><tr><td>Venkov</td><td>4</td><td>1</td></tr><tr><td>Divočina</td><td>1</td><td>1*</td></tr><tr><td>Podzemí</td><td>9</td><td>9</td></tr></tbody></table><p>Zdrojové cílové číslo d10 slouží jako hustota rizika. V minutovém formuláři se nepoužívají časové bloky: pravděpodobnost a případný počet setkání se spočítají z přesné délky epizody a doloženého d100. U každého vzniklého setkání se vyhodnotí skutečná bdělost, překvapení a vzdálenost.</p></details></div></details>
+</div></details>
  <fieldset data-episode-hazard-details hidden><legend>Hazards · následné skutečné testy HMK 148–149</legend>
  <p class="hc-hint" data-episode-hazard-summary>Nejprve doložte hazard a jeho skutečný následek.</p>
  <div class="hmk-trek-grid">
@@ -20468,6 +20468,34 @@ function episodeStableAnimals(stableIds,clock){
  }
  return result;
 }
+/** HMK 150: roads connect settlements (Highway); cultivated landscape is Rural;
+ * natural paths and remote terrain count as Wilderness. Underworld requires a
+ * distinct underground journey, not an arbitrary surface-terrain dropdown. */
+function episodeEncounterEnvironment(terrain){
+ if(['paved-road','unpaved-road'].includes(terrain))return 'highway';
+ if(['rural-track','cropland-grassland'].includes(terrain))return 'rural';
+ return 'wilderness';
+}
+function episodeOrientationReuseCheck(form,clock,sky){
+ try{
+  const v=episodeFormSnapshot(form);
+  const weather=episodeCurrentWeather(form,clock,{mandatory:false});
+  if(!weather.weather)return {allowed:false,reason:'Není dosud doloženo aktuální počasí.'};
+  const previous=lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute);
+  if(!previous?.calendarTimeEpisode?.orientation)return {allowed:false,reason:'Předchozí cestovní epizoda nemá doložený Orienteering.'};
+  if(previous.calendarTimeEpisode.endMinute!==clock.minute)return {allowed:false,reason:'Předchozí epizoda neskončila přesně v aktuální minutě.'};
+  const period=sky?.period||v.lightPeriod;
+  const context=episodeMovementContext({guideId:v.guideId,memberIds:v.memberIds||[],area:weather.area,
+   topography:v.topography,terrain:v.terrain,conveyance:v.conveyance,
+   weatherSourceId:episodeWeatherContextKey(weather.sourceId,weather.weather),minute:clock.minute,
+   nightOverride:period==='night',familiar:!!v.orientationFamiliar,
+   torchlight:period==='night'&&!!v.orientationTorch,fullMoon:period==='night'&&!!v.orientationMoon,
+   afterSnowfall:period==='night'&&!!v.orientationSnow});
+  return mayReuseEpisodeSkill({previous,minute:clock.minute,context})?
+   {allowed:true,reason:'Předchozí Orienteering má shodný čas i všechny požadované podmínky.'}:
+   {allowed:false,reason:'Změnila se družina, průvodce, oblast, počasí, terén, doprava nebo podmínky viditelnosti; případně předchozí výsledek není platný pro převzetí.'};
+ }catch(err){return {allowed:false,reason:err.message};}
+}
 /** One automatic, auditable percentile sample per encounter context, not per re-render.
  * An explicit GM waiver is allowed; every eligible episode otherwise evaluates a check. */
 function episodeEnsureEncounterRoll(form,clock,sky){
@@ -21323,10 +21351,10 @@ function updateEpisodePreview(form){
    `Noční bonusy jsou vypnuté (${sky?.period==='twilight'?'soumrak':'denní světlo'} na začátku).`)+
    (spansNight?' Cesta přechází mezi dnem a nocí: pro nový Orienteering s odlišnými světelnými podmínkami rozdělte epizodu v okamžiku změny světla.':'');
  }
- episodeEnsureEncounterRoll(form,data.campaignClock,sky);
  const reuseInput=form.elements.namedItem('orientationReuse'),originInput=form.elements.namedItem('orientationUse');
  if(originInput&&reuseInput)originInput.value=reuseInput.checked?'reuse':'new';
- const v=episodeFormSnapshot(form),kind=v.kind,travel=kind==='travel';
+ let v=episodeFormSnapshot(form);
+ const kind=v.kind,travel=kind==='travel';
  delete form.dataset.episodeOrientationStars;delete form.dataset.episodeOrientationSv;
  if(travel){
   const select=form.elements.namedItem('terrain');
@@ -21336,6 +21364,22 @@ function updateEpisodePreview(form){
   }catch{} // The explicit calculation below reports invalid combinations.
  }
 
+ const derivedEnviron=episodeEncounterEnvironment(form.elements.namedItem('terrain')?.value);
+ const environInput=form.elements.namedItem('environ');
+ if(environInput)environInput.value=derivedEnviron;
+ const environName={highway:'silnice',rural:'venkov',wilderness:'divočina'}[derivedEnviron];
+ const environSummary=form.querySelector('[data-episode-auto-environ]');
+ if(environSummary)environSummary.textContent='Automaticky určeno: '+environName+' (podle typu krajiny / cesty). Pravděpodobnost Encounteru používá toto prostředí.';
+ episodeEnsureEncounterRoll(form,data.campaignClock,sky);
+ const reuseCheck=episodeOrientationReuseCheck(form,data.campaignClock,sky);
+ const reuseStatus=form.querySelector('[data-episode-reuse-status]');
+ if(reuseInput){
+  if(reuseInput.checked&&!reuseCheck.allowed){reuseInput.checked=false;if(originInput)originInput.value='new';}
+  reuseInput.disabled=!reuseCheck.allowed;
+  if(reuseStatus)reuseStatus.textContent=reuseCheck.allowed?'Předchozí Orienteering lze převzít.':
+   'Převzetí se automaticky vypnulo: '+reuseCheck.reason+' Proveďte nový Survival Success Value test.';
+ }
+ v=episodeFormSnapshot(form);
  const isTravel=travel,isTracking=kind==='tracking',outdoor=['travel','tracking','forage','watch'].includes(kind);
  const alpineGround=['alpine-vegetation','ice-snow-rockfield'].includes(v.terrain);
  const desertGround=v.terrain==='dunes';
@@ -21397,7 +21441,7 @@ function updateEpisodePreview(form){
    else{
     const light=(sky?.period==='night'?'nightHazard':'daylightHazard');
     const hazard=weather[light];
-    level.textContent=`${weather.hasPrecipitation?'Srážky':'Bez srážek'} · ${hazard==='cold'?'Chladový hazard':hazard==='heat'?'Tepelný hazard':'Bez teplotního hazardu'} · d10 doloženo`;
+    level.innerHTML=`<strong>Den</strong>: ${weather.daylightHazard==='cold'?'cold hazard':weather.daylightHazard==='heat'?'heat hazard':'bez teplotního hazardu'} · <strong>Noc</strong>: ${weather.nightHazard==='cold'?'cold hazard':weather.nightHazard==='heat'?'heat hazard':'bez teplotního hazardu'} · ${weather.hasPrecipitation?'srážky (d6 určí intenzitu)':'bez srážek'} · d10 doloženo`;
    }
   }catch(err){level.textContent=err.message;}
  }
@@ -21411,8 +21455,10 @@ function updateEpisodePreview(form){
  for(const node of form.querySelectorAll('[data-episode-drover]'))node.hidden=v.conveyance==='foot';
 
  const navigationPrev=lastEpisodeBefore(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute);
- const navigationText=form.querySelector('[data-episode-navigation-text]');if(navigationText)navigationText.textContent=
-  'Přetrvávající stav družiny: '+episodeNavigationState(navigationPrev)+'. Zůstává až do GM potvrzeného napravení.';
+ const navigationText=form.querySelector('[data-episode-navigation-text]');if(navigationText){
+  const state=episodeNavigationState(navigationPrev);
+  navigationText.innerHTML='Přetrvávající stav družiny: <span class="hc-help-term" tabindex="0" data-hmk-help="Možnosti: clear = správný směr, misdirection = odchýlení od trasy, lost = ztracení. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení.">'+esc(state)+'</span>. Možnosti: clear = správná trasa; misdirection = odchýlení; lost = ztracení. Změna stavu vyžaduje skutečný pravidlový následek nebo rozhodnutí GM.';
+ }
  const weatherGlobal=v.weatherSource!=='local';
  for(const name of ['temperatureD10','precipitationD10','season','climate']){
   const input=form.elements.namedItem(name);if(input)input.disabled=weatherGlobal;
@@ -21572,9 +21618,22 @@ function updateEpisodePreview(form){
   const progressRow=form.querySelector('[data-episode-progress-row]'),directionRow=form.querySelector('[data-episode-direction-row]');
   const spareProgress=Math.max(0,result.progress-result.slow);
   if(progressRow){progressRow.hidden=!travel||!spareProgress;
-   progressRow.title='Nyní je třeba '+spareProgress+' × d10: každý zbývající Progress vyžaduje vlastní hod (HMK 146).';}
+   progressRow.title='Nyní je třeba '+spareProgress+' × d10: každý zbývající Progress vyžaduje vlastní hod (HMK 146).';
+   const input=form.elements.namedItem('progressD10');
+   const rolls=String(input?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
+   const missing=episodeEvaluationRequested&&spareProgress>0&&rolls.length!==spareProgress;
+   progressRow.classList.toggle('hc-episode-needs-input',missing);
+   progressRow.setAttribute('aria-describedby','episode-progress-explanation');
+   const hint=form.querySelector('[data-episode-progress-explanation]');
+   if(hint)hint.textContent=missing?'Povinný údaj: '+spareProgress+' samostatných d10, protože po zrušení Slow zbývá '+spareProgress+' Progress. Klikněte + d10.':'Doložené Progress hody: '+rolls.length+' / '+spareProgress;}
   if(directionRow){directionRow.hidden=!travel||!(result.motion?.requiredBearing>result.bearing);
-   directionRow.title='Chybějící Bearing vyžaduje d10 za každý nepokrytý požadavek (HMK 148).';}
+   directionRow.title='Chybějící Bearing vyžaduje d10 za každý nepokrytý požadavek (HMK 148).';
+   const missingCount=Math.max(0,result.motion.requiredBearing-result.bearing);
+   const rolls=String(form.elements.namedItem('directionD10')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
+   const missing=episodeEvaluationRequested&&missingCount>0&&rolls.length!==missingCount;
+   directionRow.classList.toggle('hc-episode-needs-input',missing);
+   const hint=form.querySelector('[data-episode-direction-explanation]');
+   if(hint)hint.textContent=missing?'Povinný údaj: '+missingCount+' d10, protože chybí '+missingCount+' Bearing. Klikněte + d10.':'Doložené Direction hody: '+rolls.length+' / '+missingCount;}
   if(modesInfo)modesInfo.textContent=result.orientation?
    `Doložené SV ${result.orientation.adjustment.adjustedSV} · ${result.orientation.stars??'—'} ★ · Progress ${result.progress} · Bearing ${result.bearing} · Orienteering Slow ${result.orientation.modes.orienteeringSlow}${result.orientation.reusedFromEpisodeId?' (převzatý hod)':''}.`:
    'Bez Orienteering: Progress 0, Bearing 0. Dřívější výhody se automaticky nepřičítají.';
@@ -21591,7 +21650,7 @@ function updateEpisodePreview(form){
    `${result.recoveryPreview?.length?result.recoveryPreview.map(p=>{const w=result.weatherRestFatigue?.find(x=>x.id===p.id);return `<p>${esc(character(p.id)?.name||p.id)} · zotavení ${p.recovered} bodů, klimatická únava +${w?.delta||0} bodů${w?.addedUnits?' (minutově '+w.addedUnits+' jednotek; převod zbytku '+w.carryOut+')':''}. ${p.next.carry?'Nevyčerpaná část zotavení přenesena.':''}</p>`;}).join(''):'<p>Bez přesunu. Příslušné testy se řeší v původních Skill Tests.</p>'}`;
   out.innerHTML=`<p><b>${esc(displayCampaignMinute(result.startMinute))}–${esc(displayCampaignMinute(result.endMinute))}</b> · ${result.minutes} minut</p>
     ${travelText}
-    ${weather.weather?`<p><b>Počasí HMK 144:</b> ${esc(weather.area)} · ${weather.origin==='global'?'stejné původní d10, upravené pro skutečný reliéf':'nové místní d10'} · teplota d10 ${weather.weather.temperatureD10}, upravená den ${weather.weather.adjustedDayTemperature}, noc ${weather.weather.adjustedNightTemperature}; srážky d10 ${weather.weather.precipitationD10} → ${weather.weather.precipitationRoll} proti TN ${weather.weather.precipitationTN}; výška ${weather.weather.alpine?'alpská −4':weather.weather.landscape==='mountain'?'hory −2':weather.weather.landscape==='rough'?'kopce −1':'rovina 0'}, poušť ${weather.weather.aridDesert?'ANO':'NE'}; den ${esc(weather.weather.daylightHazard||'bez hazardu')}, noc ${esc(weather.weather.nightHazard||'bez hazardu')}${precipitation?', srážky '+esc(precipitation.precipitation):''}.</p>`:''}
+    ${weather.weather?`<p><b>Počasí HMK 144:</b> ${esc(weather.area)} · ${weather.origin==='global'?'stejné původní d10, upravené pro skutečný reliéf':'nové místní d10'} · teplota d10 ${weather.weather.temperatureD10}, upravená den ${weather.weather.adjustedDayTemperature}, noc ${weather.weather.adjustedNightTemperature}; srážky d10 ${weather.weather.precipitationD10} → ${weather.weather.precipitationRoll} proti TN ${weather.weather.precipitationTN}; výška ${weather.weather.alpine?'alpská −4':weather.weather.landscape==='mountain'?'hory −2':weather.weather.landscape==='rough'?'kopce −1':'rovina 0'}, poušť ${weather.weather.aridDesert?'ANO':'NE'}; <strong>Den</strong>: ${esc(weather.weather.daylightHazard==='cold'?'cold hazard':weather.weather.daylightHazard==='heat'?'heat hazard':'bez hazardu')}, <strong>Noc</strong>: ${esc(weather.weather.nightHazard==='cold'?'cold hazard':weather.weather.nightHazard==='heat'?'heat hazard':'bez hazardu')}${precipitation?', srážky '+esc(precipitation.precipitation):''}.</p>`:''}
     ${result.movementRollSources?.progress?`<p>Progress (d10) převzaty z předchozího uloženého výsledku; nevzniká nový hod.</p>`:''}
     ${result.survivalHazard?`<p><b>Survival Hazard (HMK 148)</b> · d10 ${esc(String(v.survivalD10))} → ${esc(({equipment:'Equipment · výstroj',accident:'Accident · nehoda',complication:'Complication · komplikace'})[result.survivalHazard])}. GM musí následně vyřešit konkrétní dopady podle tabulky.</p>`:''}
     ${result.encounterDetails?.length?`<p><b>Encounter · postupy:</b> ${result.encounterDetails.filter(e=>!e.pending).length}/${result.encounter.count} setkání doloženo; každé vyžaduje vlastní čas, Surprise a vzdálenost.</p>`:''}
@@ -21640,6 +21699,12 @@ function updateEpisodePreview(form){
   const details=document.querySelector('.hc-episode-spread-right .hc-episode-result-details');if(details)details.hidden=false;
  }
  showEpisodeIndependentDeadlines(form);
+ const finalButton=document.querySelector('.hc-episode-spread-right [data-episode-finalize]');
+ const evaluateButton=form.querySelector('[data-episode-evaluate]');
+ if(evaluateButton){
+  evaluateButton.disabled=!!(episodeEvaluationRequested&&finalButton&&!finalButton.disabled);
+  evaluateButton.title=evaluateButton.disabled?'Všechny povinné výsledky jsou doložené. Nyní dokončete celou epizodu vpravo.':'';
+ }
  hideVisibleTechnicalUUIDs(form.closest('.hc-episode-shell')||form);
 }
 function episodeCarrySettingsFromLast(){
@@ -21699,9 +21764,9 @@ function initializeTimeEpisodeForm(form){
   trackingTrail:'Identifikátor sledované stopy. Při novém cíli se musí provést nový Tracking test.',
   trackingRoad:'Povrch mění obtížnost stopování; asfalt či zpevněná cesta zanechává méně stop.',
   trackingPartyTracked:'Počet osob tvořících stopu, ovlivňuje její čitelnost.',
-  environ:'Silnice, venkov, divočina a podzemí mají odlišnou četnost náhodných setkání.',
+  environ:'Druh prostředí pro automatickou pravděpodobnost Encounteru se nyní odvozuje z vybrané cesty či krajiny: silnice, venkov nebo divočina. Podzemí patří samostatnému podzemnímu cestování.',
   encounterFine:'Engine automaticky provede dva d100 kvůli přesnosti i u krátkých epizod.',
-  weatherSafeShelter:'Jen skutečný klimatický úkryt potvrzený GM může zrušit vnější Cold/Heat Exposure.',
+  weatherSafeShelter:'Skutečné bezpečné kryté prostředí po CELÝ interval bez působení daného chladu či horka (např. vytápěná stavba nebo skutečně bezpečná jeskyně); potvrzuje GM. Běžný plášť, stan či přístřešek pouze přidává ochranné AV v jednotlivých testech a automaticky hazard neruší.',
   orientationFamiliar:'Průvodce zná oblast, může obdržet příslušnou výhodu Orienteering.',
   mode_progress:'Progress ruší Slow; případný přebytek může zvýšit rychlost podle dodatečných d10.',
   mode_bearing:'Bearing pomáhá udržet směr; jeho nedostatek spouští Direction Hazard.',
@@ -21826,6 +21891,9 @@ document.addEventListener('click',e=>{
  episodeEvaluationRequested=true;
  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
  const issue=form.dataset.episodeProblemField;
+ if(['progressD10','directionD10'].includes(issue)){
+  episodeMarkField(form,issue,{focus:true});return;
+ }
  if(form.dataset.episodeProblem&&issue&&!episodeIssue(form.dataset.episodeProblem,form).skill&&
     episodeSetupIssue(form)&&episodeMarkField(form,issue,{focus:true}))return;
  const missing=document.querySelector('.hc-episode-spread-right .hc-episode-medical-missing');
