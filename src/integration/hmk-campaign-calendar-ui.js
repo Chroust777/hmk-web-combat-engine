@@ -1,3 +1,4 @@
+import {isTravelEpisodeReceipt,travelEpisodeCalendarSegments} from './hmk-episode-calendar-scope.js';
 import {TR_MONTHS,campaignTRDate,formatTRDate,gmCalendarAgenda,campaignSunsignForDate} from './hmk-calendar-planner.js';
 import {isCompletedSkillTest,skillTestEvidenceHTML} from './hmk-skill-result-evidence-529.js';
 import {calendarEventDestination} from './hmk-calendar-event-routing.js';
@@ -114,7 +115,9 @@ export function calendarBoardEvents({clock,characters=[],journal=[]}={}){
  const animalRestActors=journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarActivityProof?.plan?.animalRestPolicy)
   .map(j=>({id:j.characterId,name:j.calendarActivityProof.name}));
  const activitiesCharacters=[...characters,...animalRestActors.filter(a=>!characters.some(c=>c.id===a.id))];
- const all=[...agenda.all.map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities([...calendarActorActivities(clock,activitiesCharacters,journal),...calendarNutritionConditionActivities(clock,characters,journal)]),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
+ const sourceRows=new Map(journal.map(row=>[row.id,row]));
+ const travelTask=(p)=>p.kind==='skill-critical'&&isTravelEpisodeReceipt(sourceRows.get(p.originId));
+ const all=[...agenda.all.filter(p=>!travelTask(p)).map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities([...calendarActorActivities(clock,activitiesCharacters,journal),...calendarNutritionConditionActivities(clock,characters,journal),...travelEpisodeCalendarSegments(clock,characters,journal)]),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
  const receipts=calendarUIReceipts(journal,clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`);
  const visible=compactNutritionTimelineEvents(all.filter(p=>receipts.get(p.id)!=='hide').map(p=>({...p,uiAcknowledged:receipts.get(p.id)==='acknowledge'})),journal)
   .filter(p=>receipts.get(p.id)!=='hide').map(p=>({...p,uiAcknowledged:p.uiAcknowledged||receipts.get(p.id)==='acknowledge'}));

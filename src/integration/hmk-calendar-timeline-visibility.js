@@ -1,3 +1,4 @@
+import {isTravelEpisodeReceipt} from './hmk-episode-calendar-scope.js';
 /** Presentation-only filter for GM/world calendar. This module never edits
  * immutable journal receipts or changes rule obligations in the scheduler.
  * Every private transaction remains in the character's Notes & Logbook.
@@ -18,7 +19,7 @@ const PRIVATE_COMBAT_ACTIONS=new Set([
  'mounted-shared-move', 'missile-precombat-crossbow-loaded'
 ]);
 export function calendarWorldHistoryRelevant(entry){
- if(!entry || typeof entry!=='object')return false;
+ if(!entry || typeof entry!=='object'||isTravelEpisodeReceipt(entry))return false;
  // Nutrition receipts are worth a calendar marker only if a character actually
  // lacks food or water; ordinary rations accounting belongs to the logbook.
  if(entry.calendarNutritionDay && (Number(entry.calendarNutritionDay.foodShortfall)>0 ||
@@ -44,7 +45,7 @@ export function calendarVisibleActivities(activities=[]){
  // Rest and 24-hour nutrition intervals are durable calendar activities.
  // Keep their completed/cancelled marker at the ORIGINAL interval without
  // turning them into another due obligation or repeating private log entries.
- const historicallyVisible=new Set(['winded','rest','sleep','nutrition-conditions']);
+ const historicallyVisible=new Set(['winded','rest','sleep','nutrition-conditions','travel']);
  return activities.filter(event=>event.origin!=='activity'||
   !['resolved','cancelled'].includes(event.status)||historicallyVisible.has(event.kind));
 }

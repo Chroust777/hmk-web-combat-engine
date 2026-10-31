@@ -171,6 +171,11 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
  for(const e of journal){
   const p=e?.skillTestProof;if(!p)continue;
   if(e.calendarCampaignId&&clock.campaignId&&e.calendarCampaignId!==clock.campaignId)continue;
+  // Every episode-requested Skill Test belongs to the travel episode's
+  // own task graph. Its CF/F (including Survival Hazard) must not spawn a
+  // second generic calendar task. An ordinary stand-alone Skill Test has no
+  // calendarEpisodeSkillLink and retains the original follow-up behavior.
+  if(e.calendarEpisodeSkillLink)continue;
   if(p.type==='critical-followup'){
    // A non-dice Survival Hazard follows the original Trekking CF. It has no
    // secondary SL at all, but still requires actual hazard dice / GM routing.
