@@ -107,8 +107,11 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
     requirements.push({key,...due,kind:'malnutrition-course',reason:'Bez uzavřeného a doloženého nutričního dne není povoleno určit Advance/Healing.'});
     missing=true;continue;
    }
+   // A cryptographic UI roll is identified by its exact key AND value.
+   // Manually entered/changed numbers remain 'manual'; no provenance is inferred.
+   const rolledByApp=rolls.__hmkRollSource?.[key]===n;
    const entry=resolveMalnutritionCourse(temp,{actorId:due.characterId,episodeId:due.episodeId,roll:n,
-    rollOrigin:'manual',gmConfirmed:true,idFactory:ids,stamp:now});
+    rollOrigin:rolledByApp?'software':'manual',gmConfirmed:true,idFactory:ids,stamp:now});
    const after=actor.hmk.combatState;
    changes.push({key,actorId:due.characterId,dueMinute:due.dueMinute,kind:due.kind,roll:n,
     beforeHR:entry.proof.beforeHR,afterHR:entry.proof.afterHR,sl:entry.proof.sl,
