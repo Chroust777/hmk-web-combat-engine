@@ -8,14 +8,18 @@ import {activeNutritionPolicies,finishDueNutritionDays,enrollUnmonitoredNutritio
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {needsAssistedIntake,assistedIntakeForDay,createAssistedIntake} from './hmk-nutrition-assisted-intake.js';
 import {episodeTimedCourseAgenda,episodeTimedCourseStep,episodeTimedCourseKey,episodeTimedCourseFields} from './hmk-episode-timed-courses.js';
-import {movementAggravationPlan,movementAggravationStep,movementAggravationKey,movementSeriousWounds,movementActorAble} from './hmk-episode-movement-aggravation.js';
 const incapacitating=new Set(['INC','UNC','KIA']);
 export function episodeTimedMedicalKey(t){return [t.characterId,t.episodeId,t.dueMinute].join('|');}
 export function episodeActorCanAct(state){
  if(!state)return true;
  return !incapacitating.has(state.shock)&&!state.coma?.active&&!state.asphyxiaComaPending?.active;
 }
-export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactory,stamp,movement=null}={}){
+// Scope boundary (HMK 141–146 / 160–161 / 182): this is the chronological
+// Travel/Rest/Sleep HEALTH scheduler, not the Combat turn/action scheduler.
+// Never generate Half/Full/Charge/Double Move Agility checks from travel minutes.
+// Combat movement aggravation belongs to real Combat actions/turns; health
+// complications (healing, infection, blood loss, etc.) remain handled here.
+export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactory,stamp}={}){
  const start=database.campaignClock?.minute;
  if(!Number.isSafeInteger(start)||!Number.isSafeInteger(endMinute)||endMinute<start||endMinute>start+10080)
   throw Error('Neplatné hranice časové epizody.');
@@ -24,11 +28,6 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
  const now=typeof stamp==='function'?stamp:()=>new Date(0).toISOString();
  const originalJournalIds=new Set(temp.journal.map(x=>x.id));
  const changes=[],requirements=[],incapacitations=[],seen=new Set();
- const movementPlan=movement?.enabled?movementAggravationPlan(database,{start,end:endMinute,...movement}):
-  {enabled:false,mode:movement?.mode||'half',carryOut:{},checks:[]};
- const movementMemberIds=movement?.memberIds||[];
- const movementActive=new Map(movementMemberIds.map(id=>{const state=database.characters.find(c=>c.id===id)?.hmk?.combatState;return [id,!!(movementActorAble(state)&&movementSeriousWounds(state).length)];}));
- const movementSince=new Map(movementMemberIds.map(id=>[id,start]));
  // The provisional clock is local to the clone. Its events never reach the
  // real campaign calendar: the final episode creates ONE advance event only.
  const virtualMinute=minute=>{
@@ -49,9 +48,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    temp.characters.find(c=>c.id===t.characterId)?.hmk?.combatState?.shock!=='KIA');
   const dueTimes=dueCases.map(t=>Math.max(at,t.dueMinute));
   const courseAgenda=episodeTimedCourseAgenda(temp,endMinute-1);
-  const dueMove=movementPlan.checks.filter(t=>t.minute>=at);
-  const next=Math.min(endMinute,...dayEnds,...dueTimes,...courseAgenda.map(t=>Math.max(at,t.minute)),
-   ...dueMove.map(t=>t.minute));
+  const next=Math.min(endMinute,...dayEnds,...dueTimes,...courseAgenda.map(t=>Math.max(at,t.minute)));
   virtualMinute(next);
   // A character in INC/UNC/Coma cannot be assumed to swallow a day's
   // rations. This GM fact is distinct from a d100 and is recorded with the
@@ -169,55 +166,6 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    }
   }
   if(missing)break;
-  // A healing/ailment Course may create the first Serious injury during this
-  // episode (e.g. G4 -> S3). Start its movement clock at the ACTUAL due
-  // minute; never incorrectly demand tests for earlier uninjured movement.
-  if(movementPlan.enabled)for(const id of movementMemberIds){
-   const state=temp.characters.find(c=>c.id===id)?.hmk?.combatState;
-   const current=!!(movementActorAble(state)&&movementSeriousWounds(state).length);
-   const previous=movementActive.get(id)||false;
-   if(current&&!previous){
-    if(movementPlan.mode==='double')throw Error('HMK 182: při nově vzniklém Serious zranění není Double Move dovoleno. Rozdělte epizodu u zdravotního termínu '+next+'.');
-    movementSince.set(id,next);movementPlan.carryIn[id]=0;
-    if(movementPlan.mode==='half'){
-     let ordinal=0;
-     for(let minute=next+240;minute<=endMinute;minute+=240)
-      movementPlan.checks.push({characterId:id,minute,ordinal:++ordinal,mode:'half'});
-    }else{
-     let ordinal=0;
-     for(let minute=next+1;minute<=endMinute;minute++)for(let turn=0;turn<12;turn++)
-      movementPlan.checks.push({characterId:id,minute,ordinal:++ordinal,mode:movementPlan.mode});
-     if(ordinal>1440)throw Error('Full Move / Charge: příliš dlouhý úsek po nové Serious ráně. Rozdělte cestu na epizody po nejvýše 120 minutách.');
-    }
-    movementPlan.checks.sort((a,b)=>a.minute-b.minute||a.characterId.localeCompare(b.characterId)||a.ordinal-b.ordinal);
-   }else if(!current&&previous){
-    // A fully healed/dead/incapacitated patient has no more movement tests.
-    movementPlan.checks=movementPlan.checks.filter(e=>e.characterId!==id||e.minute<=next);
-    movementPlan.carryOut[id]=0;
-   }
-   movementActive.set(id,current);
-  }
-  // Movement is processed in the same provisional minute as other medical
-  // courses, AFTER any healing/death that may cancel the original requirement.
-  // One five-second Full/Charge turn may share a calendar minute with other
-  // turns, but each retains a unique ordinal and its own physical dice.
-  for(const event of movementPlan.checks.filter(t=>t.minute===next)){
-   if(requirements.some(r=>r.characterId===event.characterId&&r.dueMinute<=next))continue;
-   if(incapacitations.some(i=>i.actorId===event.characterId&&i.minute<=next))continue;
-   const key=movementAggravationKey(event);
-   if(seen.has(key))throw Error('Duplicitní pohybová Aggravation '+key);
-   seen.add(key);
-   try{
-    const step=movementAggravationStep(temp,event,{rolls,idFactory:ids,stamp:now});
-    if(step.requirement){requirements.push(step.requirement);missing=true;break;}
-    if(step.change)changes.push(step.change);
-   }catch(error){
-    requirements.push({key,characterId:event.characterId,dueMinute:event.minute,kind:'movement-aggravation',
-     reason:'Pohybový Agility test nelze ověřit: '+error.message,fields:[],error:error.message});
-    missing=true;break;
-   }
-  }
-  if(missing)break;
   if(next>=endMinute)break;
   at=next+1;
  }
@@ -227,14 +175,6 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
  // death/incapacity without ever manufacturing a result.
  if(requirements.length){
   const visible=new Set([...changes,...requirements].map(x=>x.key));
-  for(const event of movementPlan.checks){
-   const key=movementAggravationKey(event);
-   if(visible.has(key)||requirements.some(r=>r.characterId===event.characterId&&r.dueMinute<=event.minute))continue;
-   if(incapacitations.some(i=>i.actorId===event.characterId&&i.minute<=event.minute))continue;
-   // Future movement tests are not declared mandatory if earlier healing
-   // may remove their last S injury; only the next definitely due test is shown.
-   break;
-  }
   for(const event of episodeTimedCourseAgenda(database,endMinute-1)){
    const key=episodeTimedCourseKey(event);
    if(visible.has(key))continue;
@@ -249,20 +189,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    visible.add(key);
   }
  }
- // A patient who becomes unconscious cannot accumulate more walked minutes;
- // and a healed-away last Serious wound ends the four-hour carry.
- if(movementPlan.enabled&&movementPlan.mode==='half')for(const id of Object.keys(movementPlan.carryOut)){
-  const first=incapacitations.filter(x=>x.actorId===id).sort((a,b)=>a.minute-b.minute)[0];
-  const since=movementSince.get(id)??start;
-  const stop=first?Math.min(endMinute,first.minute):endMinute;
-  const walked=Math.max(0,stop-since);
-  const prior=movementPlan.carryIn?.[id]||0;
-  const c=temp.characters.find(x=>x.id===id);
-  const stillSerious=movementActorAble(c?.hmk?.combatState)&&movementSeriousWounds(c.hmk.combatState).length>0;
-  movementPlan.carryOut[id]=stillSerious?(prior+walked)%240:0;
- }
- return {requirements,changes,incapacitations,complete:requirements.length===0,movementAggravation:movementPlan.enabled?{
-  enabled:true,mode:movementPlan.mode,carryOut:movementPlan.carryOut,checkCount:changes.filter(x=>x.kind==='movement-aggravation').length}:null,
+ return {requirements,changes,incapacitations,complete:requirements.length===0,
   generatedJournal:temp.journal.filter(j=>!originalJournalIds.has(j.id)).map(j=>({...j,
    calendarEpisodeTimedMedical:{...j.calendarEpisodeTimedMedical,format:'hmk-episode-timed-medical-v1',startMinute:start,endMinute}})),
   characters:temp.characters,inventory:temp.inventory,medicalClockMinute:temp.campaignClock.minute};
