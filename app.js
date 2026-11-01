@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.651';
+const APP_VERSION='93.652';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -21214,9 +21214,9 @@ function showEpisodeIndependentDeadlines(form){
  box.hidden=!relevant;
  if(!episodeEvaluationRequested)return;
  const rolls=episodeTimedRolls(form);
- const medicalRows=(medical?.changes||[]).map(c=>'<div class="hc-episode-proof hc-episode-proof-done"><strong>✓ '+
+ const medicalRows=(medical?.changes||[]).map(c=>'<div class="hc-episode-proof hc-episode-proof-done"><strong>'+(c.cancelled?'⊘ ':'✓ ')+
   esc(character(c.actorId)?.name||c.actorId)+' · '+esc(c.kind)+' · '+esc(displayCampaignMinute(c.dueMinute))+
-  '</strong><p>Vyřešeno · '+esc(c.description||'původní HMK zdravotní procedura')+
+  '</strong><p>'+(c.cancelled?'Zrušený termín · ':'Vyřešeno · ')+esc(c.description||'původní HMK zdravotní procedura')+
   (c.roll==null?'':' · d100 '+esc(c.roll))+(c.sl?' · '+esc(c.sl):'')+
   (Number.isSafeInteger(c.beforeHR)?' · HR '+c.beforeHR+' → '+c.afterHR:'')+
   (c.shockAfter&&c.shockAfter!=='NONE'?' · '+esc(c.shockAfter):'')+'</p></div>').join('');
@@ -21238,7 +21238,7 @@ function showEpisodeIndependentDeadlines(form){
    const control=f.type==='choice'?'<select '+missingClass+' data-episode-medical-key="'+esc(key)+'" data-episode-medical-field="'+esc(f.name)+'" aria-label="'+esc(f.label+' · '+actor)+'"><option value="">Vyberte</option>'+
     f.options.map(opt=>'<option value="'+esc(opt.value)+'" '+(value===opt.value?'selected':'')+'>'+esc(opt.label)+'</option>').join('')+'</select>':
     '<input '+missingClass+' data-episode-medical-key="'+esc(key)+'" data-episode-medical-field="'+esc(f.name)+'" type="'+(f.type==='text'?'text':'number')+'" '+
-    (f.type==='text'?'':'min="'+f.min+'" max="'+f.max+'"')+' value="'+esc(value)+'" aria-label="'+esc(f.label+' · '+actor)+'">';
+    (f.type==='text'?'minlength="'+(f.minLength||1)+'" maxlength="'+(f.maxLength||500)+'"':'min="'+f.min+'" max="'+f.max+'"')+' value="'+esc(value)+'" aria-label="'+esc(f.label+' · '+actor)+'">';
    return '<label class="hc-episode-medical-roll-label">'+esc(f.label)+control+'</label> '+
     (f.type?'':'<button type="button" class="secondary" data-episode-medical-die="'+esc(key)+'" data-episode-medical-field="'+esc(f.name)+'" data-episode-medical-faces="'+(f.max-f.min+1)+'" data-episode-medical-offset="'+(f.min-1)+'">Hod d'+(f.max-f.min+1)+'</button>');
   }).join(' ');
@@ -21823,12 +21823,44 @@ function initializeTimeEpisodeForm(form){
  }
  updateEpisodePreview(form);
 }
+/** Persist an editable medical control BEFORE any preview can replace it.
+ * The literal string '0' is a real zero; only the empty string is missing.
+ * Preserve in-progress number/text editing until change/blur or Evaluate.
+ */
+function episodeMarkMedicalInput(input){
+ const value=String(input.value).trim();
+ const valid=input.tagName==='SELECT'?value!=='' :input.type==='text'
+  ?value.length>=Math.max(1,input.minLength||1)&&value.length<=(input.maxLength>0?input.maxLength:500)
+  :value!==''&&Number.isSafeInteger(Number(value))&&
+   Number(value)>=Number(input.min)&&Number(value)<=Number(input.max);
+ input.classList.toggle('hc-episode-medical-missing',!valid);
+}
+function episodePersistMedicalInput(input,form){
+ const key=decodeURIComponent(input.dataset.episodeMedicalKey),field=input.dataset.episodeMedicalField;
+ const rolls=episodeTimedRolls(form),value=String(input.value).trim();
+ if(!field){if(value!=='')rolls[key]=value;else delete rolls[key];}
+ else{
+  const record=rolls[key]&&typeof rolls[key]==='object'?{...rolls[key]}:{};
+  if(value!=='')record[field]=value;else delete record[field];
+  if(Object.keys(record).length)rolls[key]=record;else delete rolls[key];
+ }
+ form.elements.namedItem('episodeTimedRollsJson').value=JSON.stringify(rolls);
+}
 document.addEventListener('input',e=>{
  const form=e.target?.closest?.('#hmk-time-episode-form');if(!form)return;
+ if(e.target?.matches?.('[data-episode-medical-key]')){
+  episodePersistMedicalInput(e.target,form);
+  episodeMarkMedicalInput(e.target);
+  timeEpisodeDraft=episodeFormSnapshot(form);
+  return;
+ }
  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
 },true);
 document.addEventListener('change',e=>{
  const form=e.target?.closest?.('#hmk-time-episode-form');if(!form)return;
+ // Do not rebuild the next input during focus transfer from a health field.
+ // Its own change handler persists the value; Evaluate refreshes all results.
+ if(e.target?.matches?.('[data-episode-medical-key]'))return;
  if(e.target.name?.startsWith('evMoon_'))e.target.dataset.userSet='true';
  if(e.target.name==='rememberSettings'){
   const draft=e.target.checked?episodeCarrySettingsFromLast():episodeFreshDraft();
@@ -21881,13 +21913,9 @@ document.addEventListener('change',e=>{
 document.addEventListener('change',e=>{
  const input=e.target.closest?.('[data-episode-medical-key]');if(!input)return;
  const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
- const key=decodeURIComponent(input.dataset.episodeMedicalKey),rolls=episodeTimedRolls(form),field=input.dataset.episodeMedicalField;
- if(!field){if(String(input.value).trim())rolls[key]=String(input.value).trim();else delete rolls[key];}
- else{const record=rolls[key]&&typeof rolls[key]==='object'?{...rolls[key]}:{};
-  if(String(input.value).trim())record[field]=String(input.value).trim();else delete record[field];
-  if(Object.keys(record).length)rolls[key]=record;else delete rolls[key];}
- form.elements.namedItem('episodeTimedRollsJson').value=JSON.stringify(rolls);
- timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
+ episodePersistMedicalInput(input,form);
+ episodeMarkMedicalInput(input);
+ timeEpisodeDraft=episodeFormSnapshot(form);
 },true);
 document.addEventListener('change',e=>{
  const input=e.target.closest?.('[data-episode-gm-review]');if(!input)return;
@@ -22195,7 +22223,7 @@ document.addEventListener('submit',e=>{
      skillTestProof:{type:'episode-weather-skin',sourceId:medical.sourceId,
       actorId:medical.id,report:medical.skin.report,autoFromTimeEpisode:sourceId,rulePage:185}});
    }
-   const p={...result,actors,animals,skillLinks,timedMedical:(stagedTimed?.changes||[]).map(x=>({actorId:x.actorId,dueMinute:x.dueMinute,kind:x.kind,roll:x.roll,sl:x.sl,beforeHR:x.beforeHR,afterHR:x.afterHR,shockAfter:x.shockAfter,
+   const p={...result,actors,animals,skillLinks,timedMedical:(stagedTimed?.changes||[]).map(x=>({actorId:x.actorId,dueMinute:x.dueMinute,kind:x.kind,cancelled:x.cancelled===true,roll:x.roll??null,sl:x.sl,beforeHR:x.beforeHR,afterHR:x.afterHR,shockAfter:x.shockAfter,
      description:x.description??null,report:x.report??null,sourceKey:x.key??null})),
     incapacitationDecision:v.episodeIncapChoice||null,gmReviews:gm.reviewed.map(p=>({id:p.id,title:p.title,dueMinute:p.dueMinute})),area:weather.area,weatherOrigin:weather.origin,weatherSourceId:weather.sourceId,
     precipitation,settings:{...v,confirmed:undefined},narrative:v.narrative||'',mapScale:Number(v.mapScale),recovery};
