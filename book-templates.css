@@ -7155,3 +7155,23 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-spread-right .hc-episode-medical-roll-label select{min-width:0;width:100%;font-size:.8rem;padding:.3rem .44rem;min-height:2rem}
 .hc-episode-spread-right .hc-episode-medical-rolls button{font-size:.77rem;padding:.38rem .5rem;min-height:1.96rem}
 .hc-episode-spread-right .hc-episode-medical-missing:focus{outline:2px solid #a4251e;outline-offset:2px}
+
+/* v93.661 – timed medical requirements occupy the full page width (no
+   phantom 1.65rem task-index column) and have standard navy dice controls. */
+.hc-episode-spread-right .hc-episode-task.hc-episode-medical-task{grid-template-columns:minmax(0,1fr)!important;min-width:0}
+.hc-episode-spread-right .hc-episode-medical-task>div{min-width:0;overflow-wrap:anywhere}
+.hc-episode-spread-right .hc-episode-medical-rolls{display:flex;flex-wrap:wrap;align-items:end;gap:8px 12px;width:100%;min-width:0}
+.hc-episode-spread-right .hc-episode-medical-die-pair{display:flex;flex:0 1 235px;min-width:160px;flex-direction:column;gap:4px;align-items:stretch}
+.hc-episode-spread-right .hc-episode-medical-die-pair>label{margin:0!important}
+.hc-episode-spread-right button.hc-episode-medical-auto{width:100%;max-width:180px;min-height:32px;margin:0!important}
+:is(.content-skills,.content-calendar,.content-sheet,.content-combat) button[data-hmk-general-auto-die],
+:is(.content-skills,.content-calendar,.content-sheet,.content-combat) button[data-hsk-random-victim],
+.hc-episode-spread-right button.hc-episode-medical-auto{
+ background:#213e5b!important;color:#fff7e6!important;border:1px solid #45617a!important;
+ border-radius:4px!important;font-weight:700!important;box-shadow:0 2px 4px #32261c33!important;
+}
+.hsk-climb-fall .hsk-hazard-step{padding:.55rem .65rem;margin:.55rem 0;border:1px solid #ba8d546b;border-radius:5px}
+.hsk-climb-fall .hsk-hazard-step[hidden]{display:none!important}
+.hsk-climb-fall input[type=number]+button[data-hmk-general-auto-die]{display:block;width:100%;max-width:170px;margin:.35rem 0 0;padding:.38rem .55rem;font-size:.78rem}
+.hsk-climb-fall .hsk-hazard-step .field-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+@media(max-width:650px){.hc-episode-spread-right .hc-episode-medical-die-pair{flex:1 1 100%;min-width:0}}

@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.660';
+const APP_VERSION='93.661';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -8700,12 +8700,15 @@ function enhanceHMKDiceFields(){
  const app=document.getElementById('app');if(!app)return;
  const legal=new Set([4,6,8,10,12,20,30,100]);
  for(const input of app.querySelectorAll('form input[type="number"]')){
-  if(input.nextElementSibling?.dataset?.hmkGeneralAutoDie==='true'||input.disabled||input.closest('#campaign-expedition-form')||input.closest('.hc-calendar-recovery-die'))continue;
+  if(input.nextElementSibling?.dataset?.hmkGeneralAutoDie==='true'||input.disabled||input.closest('#campaign-expedition-form')||input.closest('.hc-calendar-recovery-die')||input.closest('[data-episode-medical-rolls]'))continue;
   const label=input.closest('label');if(!label)continue;
   if(label.querySelector('[data-episode-die]'))continue; // A dedicated episode dX generator is already present.
   // Existing dedicated generators already know each rule's roll provenance.
   // Never put a second general button next to them.
   const sibling=label.nextElementSibling;
+  // A dedicated generator can be a sibling of the label OR inside the label;
+  // never duplicate it or replace its existing provenance behavior.
+  if(label.querySelector('button[data-hmk-general-auto-die],button[data-hmk-recovery-generate],button[data-hmk-calendar-auto-die],button[data-hmk-creation-roll],button[data-episode-medical-die]'))continue;
   if(sibling?.tagName==='BUTTON'&&([...sibling.attributes].some(a=>a.name.startsWith('data-')&&/roll|die|dice|generate/i.test(a.name))||/⚄|generovat|hodit/i.test(sibling.textContent||'')))continue;
   const raw=label.textContent||'';
   const match=raw.match(/(?:^|[^a-zA-Z0-9])d(4|6|8|10|12|20|30|100)(?![0-9])/i);
@@ -8714,6 +8717,7 @@ function enhanceHMKDiceFields(){
   const min=input.min===''?1:Number(input.min);if(!Number.isFinite(min)||min>1||min<0)continue;
   const b=document.createElement('button');b.type='button';b.className='hc-small';
   b.dataset.hmkGeneralAutoDie='true';b.dataset.hmkDieFaces=String(faces);
+  b.classList.add('hc-provision-generate');
   b.textContent='⚄ d'+faces;b.setAttribute('aria-label','Vygenerovat hod d'+faces+' do tohoto pole');
   input.insertAdjacentElement('afterend',b);
  }
@@ -9570,7 +9574,7 @@ function render(){
 const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
   node.matches?.('form,section,div')||node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form]')))))
-   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);enhanceHMKDiceFields();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
 // On narrow layouts the navigation joins the page scroll instead of using
@@ -10164,23 +10168,35 @@ function hskSkillPhysicalImpactForm(entry){
  const actor=character(proof.actorId);
  if(!actor)return '';
  const id=survival?'survival-accident':'fishing-cf';
- const targets=survival?data.characters.filter(x=>!x.archived&&(x.kind!=='Animal'||!!x.hmk?.verifiedMountedBreed)).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(''):'';
+ const candidateIds=new Set(data.campaignClock?.characterIds||data.characters.map(x=>x.id));
+ const eligibleTargets=survival?data.characters.filter(x=>candidateIds.has(x.id)&&!x.archived&&(x.kind!=='Animal'||!!x.hmk?.verifiedMountedBreed)):[];
+ const targetOptions='<option value="">— nejprve určete náhodně —</option>'+eligibleTargets.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
+ const dieInput=(name,faces,label)=>'<label>'+label+'<input type="number" name="'+name+'" min="1" max="'+faces+'" inputmode="numeric"></label>';
  return `<form class="hsk-climb-fall" data-skill-physical-impact>
  <input type="hidden" name="sourceId" value="${esc(entry.id)}"><input type="hidden" name="kind" value="${id}">
- <h4>${survival?'Survival Hazard · Accident (str. 148)':'Fishing · náhodné zranění d10e (str. 71)'}</h4>
- <p>${survival?'CF v Trekking vyvolá Survival Hazard. Pokud padne 4–6, náhodně určená postava či ověřené zvíře testuje Agility; F/CF vede k nárazu d6+4b, při CF navíc +5. Při jiném výsledku Hazard GM vyhodnotí Equipment nebo Complication.':'Následné CF rybářského Dexterity/Agility testu způsobí skutečný Impact d10e do náhodné tělesné lokace. Zbraň ani zbroj se nesmějí domýšlet.'}</p>
+ <h4>${survival?'Survival Hazard · HMK str. 148':'Fishing · náhodné zranění d10e · HMK str. 71'}</h4>
+ <p>${survival?'Nejprve určete d10: <strong>1–3 Equipment</strong> (výstroj), <strong>4–6 Accident</strong> (nehoda), <strong>7–10 Complication</strong> (komplikace). Jen Accident vyžaduje náhodného účastníka a Agility; další hody vznikají až při F/CF. Nevyplňujte skryté nepovinné hodnoty.':'Fishing CF způsobí Impact d10e do náhodné lokality. Fyzické hody určují následek podle HMK.'}</p>
+ ${survival?`<div class="hsk-hazard-step"><div class="field-grid">${dieInput('hazardD10',10,'Survival Hazard d10 (povinný)')}</div><p class="tiny" data-hsk-hazard-guidance>Vyplňte nebo vygenerujte d10; podle výsledku se objeví pouze potřebné další vstupy.</p></div>
+ <div data-hsk-hazard-accident hidden class="hsk-hazard-step"><div class="field-grid"><label>Náhodně zvolený účastník
+ <select name="targetId">${targetOptions}</select></label>
+ ${dieInput('agilityD100',100,'Agility d100 náhodně zvoleného účastníka')}</div>
+ <button type="button" class="hc-small hc-provision-generate" data-hsk-random-victim>⚄ Náhodně určit účastníka</button>
+ <p class="tiny">Postavu lze také vybrat ručně podle skutečného fyzického losu. Po vyplnění Agility se zobrazí další krok. Tento výběr není nový test Orienteering.</p></div>
+ <div data-hsk-hazard-gm hidden class="hsk-hazard-step"><label>GM: doložený skutečný následek Equipment nebo Complication
+ <textarea name="gmHazardOutcome" rows="3" minlength="8" maxlength="600" placeholder="Konkrétní událost, případný opravný/terénní Skill Test a výsledek, zdržení či dopad na další hlídku."></textarea></label>
+ <p class="tiny">Equipment: HMK str. 148 rozlišuje opravné dovednosti a zdržení podle CF/F/S/CS. Complication: HMK str. 149 řeší průchod překážkou a návaznou hlídku. Aplikace zde neprovádí další neprokázaný Skill Test ani sama nemění pohyb další hlídky. GM musí výsledné rozhodnutí výslovně doložit.</p></div>`:''}
+ <div data-hsk-hazard-impact ${survival?'hidden':''} class="hsk-hazard-step">
+ <p class="tiny">${survival?'Pouze při Agility F nebo CF: Impact d6 + 4 Blunt (při CF ještě +5). Jestliže Agility uspěje, tyto hody neprovádějte.':'Povinné fyzické hody pro zranění po Fishing CF.'}</p>
  <div class="field-grid">
- ${survival?`<label>Survival Hazard d10 (1–10)<input type="number" name="hazardD10" min="1" max="10" required></label><label>Náhodně určená postižená postava<select name="targetId">${targets}</select></label><label>Agility d100 (jen Accident 4–6)<input type="number" name="agilityD100" min="1" max="100"></label>`:''}
- <label>${survival?'Impact d6 (jen neúspěšný Accident)':'Impact d10e'}<input type="number" name="impactDie" min="1" max="${survival?6:10}" ${survival?'':'required'}></label>
- <label>d10 ZD – náhodná zóna<input type="number" name="zoneD10" min="1" max="10" ${survival?'':'required'}></label>
- <label>d10 LD – náhodná lokalita<input type="number" name="locationD10" min="1" max="10" ${survival?'':'required'}></label>
- <label>Směr dopadu<select name="direction"><option value="front">Zepředu</option><option value="rear">Zezadu</option><option value="side">Z boku</option></select></label>
- <label>Shock d100 (jen při účinném Impact)<input type="number" name="shockD100" min="1" max="100"></label>
- <label>Compound d10 (povinný při již zraněné lokaci)<input type="number" name="compoundD10" min="1" max="10"></label>
- </div>
- ${survival?'<label><input type="checkbox" name="randomVictimConfirmed"> GM potvrzuje náhodný výběr postižené postavy při Accident</label>':''}
- <label><input type="checkbox" name="gmConfirmed" required> GM potvrdil fyzické hody, vybavení a skutečné okolnosti</label>
- <button type="submit">${survival?'Vyhodnotit Survival Hazard a případně zapsat zranění':'Trvale zapsat Fishing zranění'}</button>
+ ${dieInput('impactDie',survival?6:10,survival?'Impact d6':'Impact d10e')}
+ ${dieInput('zoneD10',10,'ZD d10 – náhodná anatomická zóna')}
+ ${dieInput('locationD10',10,'LD d10 – náhodná anatomická lokalita')}
+ <label>Skutečný směr dopadu<select name="direction"><option value="front">Zepředu</option><option value="rear">Zezadu</option><option value="side">Z boku</option></select></label>
+ ${dieInput('shockD100',100,'Shock d100 – pouze při účinném Impact po zbroji')}
+ ${dieInput('compoundD10',10,'Compound d10 – pouze při zásahu již zraněné stejné lokality a strany')}
+ </div></div>
+ ${survival?'':'<label><input type="checkbox" name="gmConfirmed" required> GM potvrdil skutečné dopady a ochranu zbroje</label>'}
+ <button type="submit">${survival?'Vyhodnotit Hazard a případnou Injury Sequence':'Trvale zapsat Fishing zranění'}</button>
  <output role="status" aria-live="polite"></output></form>`;
 }
 function hskSkillEnvironmentFollowup(entry){
@@ -10858,6 +10874,51 @@ document.addEventListener('submit',event=>{
   const target=document.querySelector('[data-climbing-fall-form]');if(target)target.replaceWith(Object.assign(document.createElement('p'),{textContent:'Falling Routine dokončena a uložena. Potvrzená zranění najdete v Character Sheet → Combat & Conditions i v tabulce Body Locations.'}));
  }catch(error){if(out)out.textContent='Pád nebyl zapsán: '+error.message;}
 },true);
+function refreshSurvivalHazardFields(form){
+ if(!form?.matches?.('[data-skill-physical-impact]')||form.elements.namedItem('kind')?.value!=='survival-accident')return;
+ const d=Number(form.elements.namedItem('hazardD10')?.value),isAccident=d>=4&&d<=6;
+ const casualty=form.querySelector('[data-hsk-hazard-accident]'),impact=form.querySelector('[data-hsk-hazard-impact]');
+ const gm=form.querySelector('[data-hsk-hazard-gm]'),gmOutcome=form.elements.namedItem('gmHazardOutcome');
+ const isGmOutcome=(d>=1&&d<=3)||(d>=7&&d<=10);
+ if(casualty)casualty.hidden=!isAccident;
+ if(gm)gm.hidden=!isGmOutcome;
+ if(gmOutcome){gmOutcome.required=isGmOutcome;if(!isGmOutcome)gmOutcome.value='';}
+ // Only an actual Agility F/CF can create the Blunt injury branch. The
+ // authoritative skill-physical executor rechecks EML, Shock and armour.
+ const hasAgility=String(form.elements.namedItem('agilityD100')?.value||'').trim()!=='';
+ const roll=Number(form.elements.namedItem('agilityD100')?.value);
+ const victim=character(form.elements.namedItem('targetId')?.value);
+ let failed=false;
+ if(isAccident&&hasAgility&&victim&&Number.isInteger(roll)&&roll>=1&&roll<=100){
+  try{
+   const load=resolveCombatantLoad({character:victim,inventory:data.inventory});
+   const status=persistentStateOf(victim),mastery=availableMasteries(victim).find(x=>x.name.toLowerCase()==='agility');
+   const injury=projectLiveInjuries({state:status,round:Math.max(1,combatClock.round||1,status.lastRound||0),test:'agility',usedArms:['left','right'],timelineId:'skill:'+form.elements.namedItem('sourceId').value});
+   const eml=mastery?.ml-combatFatigueTotals(status).total+load.agilityAndMeleePenalty+injury.modifier;
+   failed=Number.isFinite(eml)&&successLevel(roll,eml)<2;
+  }catch{failed=false;}
+ }
+ if(impact)impact.hidden=!isAccident||!failed;
+ const hint=form.querySelector('[data-hsk-hazard-guidance]');
+ if(hint)hint.textContent=!Number.isInteger(d)||d<1||d>10?'Vyplňte skutečný Hazard d10 (1–10).':
+  d<=3?'Equipment (1–3): žádná Agility. Doložte GM rozhodnutí o výstroji, případném opravném Skill Testu a zdržení.':
+  d>=7?'Complication (7–10): určete GM překážku, použitý Skill Test a jeho důsledky. Pouze odpovídající situace vyžadují Agility.':
+  !victim?'Accident (4–6): náhodně vyberte účastníka a proveďte Agility d100.':
+  !hasAgility?'Accident (4–6): doplňte skutečný Agility d100 vybraného účastníka.':
+  failed?'Agility F/CF: je povinný Impact d6, ZD a LD; Shock/Compound pouze pokud to následně vyžadují pravidla.':
+  'Agility S/CS: nehoda odvrácena. Žádný Impact, ZD, LD ani Shock.';
+ // Values of now-inapplicable dice may not leak into a different branch.
+ for(const block of [casualty,impact])if(block?.hidden)for(const control of block.querySelectorAll('input[type="number"]'))control.value='';
+}
+document.addEventListener('input',e=>{const form=e.target?.closest?.('[data-skill-physical-impact]');if(form&&['hazardD10','agilityD100'].includes(e.target.name))refreshSurvivalHazardFields(form);},true);
+document.addEventListener('change',e=>{const form=e.target?.closest?.('[data-skill-physical-impact]');if(form&&['hazardD10','agilityD100','targetId'].includes(e.target.name))refreshSurvivalHazardFields(form);},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-hsk-random-victim]');if(!b)return;e.preventDefault();
+ const form=b.closest('form'),sel=form?.elements.namedItem('targetId');if(!sel)return;
+ const choices=[...sel.options].filter(x=>x.value);if(!choices.length)return;
+ sel.value=choices[choices.length===1?0:secureHMKDie(choices.length)-1].value;
+ sel.dispatchEvent(new Event('change',{bubbles:true}));
+},true);
 document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-skill-physical-impact]'))return;
  event.preventDefault();event.stopImmediatePropagation();
@@ -10876,8 +10937,12 @@ document.addEventListener('submit',event=>{
   if(combatInitiativeSequence)throw Error('Aktivní Initiative vyžaduje autoritativní bojové pořadí');
   const raw=name=>form.elements.namedItem(name)?.value?.trim()||'';
   const optional=name=>raw(name)===''?null:Number(raw(name));
-  const target=character(kind==='survival-accident'?raw('targetId'):proof.actorId);
-  if(!target)throw Error('Cílová postava nebyla nalezena');
+  const hazardD10=optional('hazardD10');
+  // Equipment and Complication require no accident victim. A random
+  // target is required ONLY when the Hazard d10 selects Accident (4–6).
+  const accident=kind==='survival-accident'&&hazardD10>=4&&hazardD10<=6;
+  const target=character(accident?raw('targetId'):proof.actorId);
+  if(!target)throw Error(accident?'Nejprve náhodně určete účastníka nehody':'Cílová postava nebyla nalezena');
   // The original Survival Hazard can affect a DIFFERENT party member than
   // the trekking guide. Never reject a legitimate randomly chosen victim,
   // but the target must belong to the identical live campaign.
@@ -10888,26 +10953,28 @@ document.addEventListener('submit',event=>{
     throw Error('Následek Survival Hazard musí zasáhnout účastníka stejné aktivní kampaně');
   }
   if(target.kind==='Animal'&&!target.hmk?.verifiedMountedBreed)throw Error('Neověřené zvíře nelze zranit lidskou tabulkou; nejprve založte ověřený zvířecí profil.');
-  const hazardD10=optional('hazardD10');
   const round=Math.max(1,combatClock.round||1,persistentStateOf(target).lastRound||0);
   // Non-accident branches are GM follow-ups, not invented injuries.
   if(kind==='survival-accident'&&hazardD10!=null&&(hazardD10<=3||hazardD10>=7)){
    if(!Number.isSafeInteger(hazardD10)||hazardD10<1||hazardD10>10)throw Error('Neplatný fyzický hazard d10');
-   if(!form.elements.namedItem('gmConfirmed').checked)throw Error('GM musí potvrdit hazard');
-   const description=hazardD10<=3?'Equipment (GM dořeší výbavu)':'Complication (GM dořeší překážku)';
+   // The explicit GM submit action is the attestation; do not require a
+   // redundant checkbox after the actual hazard die and source proof.
+   const description=hazardD10<=3?'Equipment':'Complication';
+   const gmOutcome=raw('gmHazardOutcome');
+   if(gmOutcome.length<8||gmOutcome.length>600)throw Error('GM musí uvést konkrétní rozhodnutí o následku, použitých testech a případném zdržení (8–600 znaků).');
    if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===sourceId))throw Error('Duplicitní hazard');
     data.journal.push({id:uuid(),characterId:proof.actorId,title:'Survival Hazard · '+description,
-     body:'Survival Hazard d10 '+hazardD10+' · '+description+' · žádné automatické zranění',createdAt:stamp(),
+     body:'Survival Hazard d10 '+hazardD10+' · '+description+' · GM: '+gmOutcome+' · žádné automatické zranění',createdAt:stamp(),
      calendarCampaignId:data.campaignClock?campaignKey(data.campaignClock):null,
      campaignMinute:Number.isSafeInteger(data.campaignClock?.minute)?data.campaignClock.minute:null,
-     skillTestProof:{type:'skill-physical-consequence',sourceId,kind,nonInjuryHazard:true,hazardD10,rulePage:148}});
+     skillTestProof:{type:'skill-physical-consequence',sourceId,kind,nonInjuryHazard:true,hazardD10,gmOutcome,rulePage:hazardD10<=3?148:149}});
    }))throw Error('Hazard nelze uložit');
   }else{
    const report=prepareSkillPhysicalInjury({kind,actor:target,inventory:data.inventory,
-    state:persistentStateOf(target),sourceId,round,gmConfirmed:form.elements.namedItem('gmConfirmed').checked,
+    state:persistentStateOf(target),sourceId,round,gmConfirmed:kind==='survival-accident'||form.elements.namedItem('gmConfirmed')?.checked===true,
     impactDie:optional('impactDie'),zoneD10:optional('zoneD10'),locationD10:optional('locationD10'),
     direction:raw('direction'),shockD100:optional('shockD100'),compoundD10:optional('compoundD10'),
-    hazardD10,agilityD100:optional('agilityD100'),randomVictimConfirmed:form.elements.namedItem('randomVictimConfirmed')?.checked===true});
+    hazardD10,agilityD100:optional('agilityD100'),randomVictimConfirmed:kind==='survival-accident'?!!raw('targetId'):false});
    const body='HMK str. '+(kind==='fishing-cf'?'71':'148')+' · '+kind+' · '+target.name+(report.bodyKind==='horse'?' · zvířecí anatomie B/C '+report.breed:'')+
     (report.sl?' · Agility '+report.sl+' / EML '+report.eml:'')+
     (report.avoided?' · nehoda odvrácena':' · Impact '+report.impact+report.aspect+
@@ -21319,10 +21386,10 @@ function showEpisodeIndependentDeadlines(form){
   (c.shockAfter&&c.shockAfter!=='NONE'?' · '+esc(c.shockAfter):'')+'</p></div>').join('');
  const missingRows=(medical?.requirements||[]).map(r=>{
   const actor=character(r.characterId)?.name||r.characterId;
-  if(r.mode==='pending')return '<div class="hc-episode-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
+  if(r.mode==='pending')return '<div class="hc-episode-task hc-episode-medical-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
    '</strong><p>'+esc(r.reason)+'</p><p>Nejdříve doložte příděly v původní evidenci stravy a vody; bez nich nelze zdravotní d100 správně vypočítat.</p>'+
    '<button type="button" class="secondary" data-episode-nav="inventory">Otevřít inventář a zásoby</button></div></div>';
-  if(r.error)return '<div class="hc-episode-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
+  if(r.error)return '<div class="hc-episode-task hc-episode-medical-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
    '</strong><p>'+esc(r.reason)+'</p><button type="button" class="secondary" data-episode-nav="'+
    esc(calendarEventDestination({kind:r.kind}))+'">Otevřít původní pravidlový modul</button></div></div>';
   const fields=r.fields||[{name:'roll',label:'Skutečný d100',min:1,max:100}],nested=!!r.fields;
@@ -21332,14 +21399,18 @@ function showEpisodeIndependentDeadlines(form){
    const missing=value===''||((!f.type||f.type==='number')&&(Number(value)<f.min||Number(value)>f.max||!Number.isInteger(Number(value))))||
     (f.type==='text'&&String(value).trim().length<(f.minLength||1))||(f.type==='choice'&&!f.options?.some(x=>x.value===value));
    const missingClass=missing?' class="hc-episode-medical-missing"':'';
-   const control=f.type==='choice'?'<select '+missingClass+' data-episode-medical-key="'+esc(key)+'" data-episode-medical-field="'+esc(f.name)+'" aria-label="'+esc(f.label+' · '+actor)+'"><option value="">Vyberte</option>'+
+   // Scalar malnutrition d100 must be stored as rolls[key]=n. Structured
+   // courses store rolls[key][field]. Never silently interchange the two.
+   const fieldAttr=nested?' data-episode-medical-field="'+esc(f.name)+'"':'';
+   const control=f.type==='choice'?'<select '+missingClass+' data-episode-medical-key="'+esc(key)+'"'+fieldAttr+' aria-label="'+esc(f.label+' · '+actor)+'"><option value="">Vyberte</option>'+
     f.options.map(opt=>'<option value="'+esc(opt.value)+'" '+(value===opt.value?'selected':'')+'>'+esc(opt.label)+'</option>').join('')+'</select>':
-    '<input '+missingClass+' data-episode-medical-key="'+esc(key)+'" data-episode-medical-field="'+esc(f.name)+'" type="'+(f.type==='text'?'text':'number')+'" '+
+    '<input '+missingClass+' data-episode-medical-key="'+esc(key)+'"'+fieldAttr+' type="'+(f.type==='text'?'text':'number')+'" '+
     (f.type==='text'?'minlength="'+(f.minLength||1)+'" maxlength="'+(f.maxLength||500)+'"':'min="'+f.min+'" max="'+f.max+'"')+' value="'+esc(value)+'" aria-label="'+esc(f.label+' · '+actor)+'">';
-   return '<label class="hc-episode-medical-roll-label">'+esc(f.label)+control+'</label> '+
-    (f.type?'':'<button type="button" class="secondary" data-episode-medical-die="'+esc(key)+'" data-episode-medical-field="'+esc(f.name)+'" data-episode-medical-faces="'+(f.max-f.min+1)+'" data-episode-medical-offset="'+(f.min-1)+'">Hod d'+(f.max-f.min+1)+'</button>');
+   const isDie=!f.type&&Number.isSafeInteger(f.min)&&f.min===1&&[4,6,8,10,12,20,30,100].includes(f.max);
+   return '<div class="hc-episode-medical-die-pair"><label class="hc-episode-medical-roll-label">'+esc(f.label)+control+'</label>'+
+    (isDie?'<button type="button" class="hc-small hc-provision-generate hc-episode-medical-auto" data-episode-medical-die="'+esc(key)+'"'+fieldAttr+' data-episode-medical-faces="'+f.max+'" data-episode-medical-offset="0">⚄ d'+f.max+'</button>':'')+'</div>';
   }).join(' ');
-  return '<div class="hc-episode-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
+  return '<div class="hc-episode-task hc-episode-medical-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
    '</strong><p>'+esc(r.reason)+'</p><div class="hc-episode-medical-rolls">'+inputs+'</div></div></div>';
  }).join('');
  const incap=medical?.incapacitations||[];
@@ -21935,6 +22006,9 @@ function episodeMarkMedicalInput(input){
 function episodePersistMedicalInput(input,form){
  const key=decodeURIComponent(input.dataset.episodeMedicalKey),field=input.dataset.episodeMedicalField;
  const rolls=episodeTimedRolls(form),value=String(input.value).trim();
+ // Editing the value by hand cannot inherit a previous automatic-roll proof.
+ if(rolls.__hmkRollSource?.[key]!==undefined){delete rolls.__hmkRollSource[key];
+  if(!Object.keys(rolls.__hmkRollSource).length)delete rolls.__hmkRollSource;}
  if(!field){if(value!=='')rolls[key]=value;else delete rolls[key];}
  else{
   const record=rolls[key]&&typeof rolls[key]==='object'?{...rolls[key]}:{};
@@ -21995,8 +22069,11 @@ document.addEventListener('click',e=>{
  const key=decodeURIComponent(b.dataset.episodeMedicalDie);
  try{const rolls=episodeTimedRolls(form),field=b.dataset.episodeMedicalField||'roll',
   faces=Number(b.dataset.episodeMedicalFaces)||100,offset=Number(b.dataset.episodeMedicalOffset)||0;
-  if(field==='roll'&&!b.dataset.episodeMedicalField)rolls[key]=secureHMKDie(100);
-  else{const record=rolls[key]&&typeof rolls[key]==='object'?{...rolls[key]}:{};record[field]=secureHMKDie(faces)+offset;rolls[key]=record;}
+  if(field==='roll'&&!b.dataset.episodeMedicalField){
+   const roll=secureHMKDie(100);rolls[key]=roll;
+   const sources=rolls.__hmkRollSource&&typeof rolls.__hmkRollSource==='object'?{...rolls.__hmkRollSource}:{};
+   sources[key]=roll;rolls.__hmkRollSource=sources;
+  }else{const record=rolls[key]&&typeof rolls[key]==='object'?{...rolls[key]}:{};record[field]=secureHMKDie(faces)+offset;rolls[key]=record;}
   form.elements.namedItem('episodeTimedRollsJson').value=JSON.stringify(rolls);
   timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
  }catch(err){alert('Zdravotní hod nebyl proveden: '+err.message);}
@@ -22013,6 +22090,9 @@ document.addEventListener('change',e=>{
  episodePersistMedicalInput(input,form);
  episodeMarkMedicalInput(input);
  timeEpisodeDraft=episodeFormSnapshot(form);
+ // Manual health rolls must refresh the same chronological executor as the
+ // software d100 button, not wait for an unrelated re-evaluate click.
+ updateEpisodePreview(form);
 },true);
 document.addEventListener('change',e=>{
  const input=e.target.closest?.('[data-episode-gm-review]');if(!input)return;
