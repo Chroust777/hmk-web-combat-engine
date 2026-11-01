@@ -143,12 +143,22 @@ export function episodeTimedCourseStep(database,event,{rolls={},idFactory,stamp}
  default:throw Error('Nepodporovaná časovaná procedura '+event.kind);
  }
  const prior=state.shock;actor.hmk.combatState=outcome.state;
+ // The four state-first executors return sparse top-level values, but their
+ // authoritative, complete roll/modifier/outcome evidence lives in the Combat
+ // State event created by THIS invocation. Never infer it from later state.
+ const eventProof=outcome.state.events?.find(e=>e.id===eventId);
+ const stateFirstTypes=new Set(['coma','extended-shock','grim','blood-loss']);
+ if(stateFirstTypes.has(event.kind)&&!eventProof)throw Error('Chybí původní zdravotní událost pro doklad '+event.kind);
+ const report=stateFirstTypes.has(event.kind)?{
+  ...structuredClone(eventProof.details),combatStateEventId:eventProof.id,
+  combatStateEventType:eventProof.type,shockBefore:prior,shockAfter:outcome.state.shock
+ }:(outcome.report??outcome.result??null);
  const doc={id:idFactory(),calendarCampaignId:campaignKey(database.campaignClock),characterId:actor.id,
   campaignMinute:event.minute,createdAt:stamp(),title:'HMK · časovaný '+event.kind+' uvnitř Cestování',
   body:event.description+' · '+fields.map(f=>f.label+': '+input[f.name]).join(', ')+' · původní pravidlový výpočet',
-  calendarEpisodeTimedMedical:{format:'hmk-episode-timed-medical-v1',type:event.kind,key,sourceId:event.id,dueMinute:event.minute,inputs:input,report:outcome.report||outcome.result||null}};
+  calendarEpisodeTimedMedical:{format:'hmk-episode-timed-medical-v1',type:event.kind,key,sourceId:event.id,dueMinute:event.minute,inputs:input,report,combatStateEventId:eventProof?.id??null}};
  database.journal.push(doc);
  return {key,event,fields,values:input,receipt:doc,change:{key,actorId:actor.id,dueMinute:event.minute,
-  kind:event.kind,roll:input.roll??null,description:event.description,shockBefore:prior,shockAfter:outcome.state.shock,report:outcome.report||outcome.result||null},
+  kind:event.kind,roll:input.roll??null,description:event.description,shockBefore:prior,shockAfter:outcome.state.shock,report},
   incapacitation:!['INC','UNC','KIA'].includes(prior)&&['INC','UNC','KIA'].includes(outcome.state.shock)?{actorId:actor.id,minute:event.minute,shock:outcome.state.shock,cause:event.kind,sourceKey:key}:null};
 }

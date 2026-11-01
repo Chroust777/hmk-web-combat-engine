@@ -39,7 +39,8 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    const days=temp.journal.filter(j=>j.calendarCampaignId===campaignId&&j.characterId===p.characterId&&j.calendarNutritionDay?.policyId===p.id);
    return (days.at(-1)?.calendarNutritionDay.endMinute??p.campaignMinute)+1440;
   }).filter(m=>m>=at&&m<=endMinute);
-  const dueCases=dueMalnutritionCases(temp).filter(t=>t.dueMinute<endMinute);
+  const dueCases=dueMalnutritionCases(temp).filter(t=>t.dueMinute<endMinute&&
+   temp.characters.find(c=>c.id===t.characterId)?.hmk?.combatState?.shock!=='KIA');
   const dueTimes=dueCases.map(t=>Math.max(at,t.dueMinute));
   const courseAgenda=episodeTimedCourseAgenda(temp,endMinute-1);
   const next=Math.min(endMinute,...dayEnds,...dueTimes,...courseAgenda.map(t=>Math.max(at,t.minute)));
@@ -81,6 +82,16 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    const key=episodeTimedMedicalKey(due);
    if(seen.has(key))throw Error('Duplicitní zdravotní termín '+key);
    seen.add(key);
+   if(temp.characters.find(c=>c.id===due.characterId)?.hmk?.combatState?.shock==='KIA'){
+    const reason='Zrušeno: postava zemřela před dalším splatným zdravotním testem.';
+    temp.journal.push({id:ids(),characterId:due.characterId,calendarCampaignId:campaignId,
+     campaignMinute:due.dueMinute,createdAt:now(),title:'HMK · zrušený malnutrition Course',body:reason,
+     calendarEpisodeTimedMedical:{format:'hmk-episode-timed-medical-v1',type:'malnutrition-course',
+      key,sourceId:due.episodeId,dueMinute:due.dueMinute,cancelled:true,reason,inputs:null,report:null}});
+    changes.push({key,actorId:due.characterId,dueMinute:due.dueMinute,
+     kind:'malnutrition-course',cancelled:true,description:reason,shockAfter:'KIA'});
+    continue;
+   }
    const value=rolls[key],n=Number(value);
    if(!/^(?:[1-9]|[1-9][0-9]|100)$/.test(String(value??''))||!Number.isInteger(n)){
     requirements.push({key,...due,kind:'malnutrition-course',reason:due.mode==='pending'?'Nejdříve doložte skutečné denní příděly.':'Vyžaduje skutečný zdravotní d100.'});
@@ -102,14 +113,41 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
   }
   if(missing)break;
   // Every specialized timed course uses its ORIGINAL executor. A completed
-  // action can create a NEW due event later in this very episode.
+  // action can create a NEW due event later in this very episode. Never
+  // execute another result for a patient whose earlier same-minute result
+  // remains unknown; it might end the patient's life or alter the schedule.
+  const blockedActors=new Set(requirements.filter(r=>r.characterId&&r.dueMinute<=next).map(r=>r.characterId));
   for(const event of courseAgenda.filter(t=>t.minute<=next)){
+   if(blockedActors.has(event.characterId))continue;
    const key='special:'+event.id+':'+event.minute;
    if(seen.has(key))throw Error('Duplicitní zdravotní termín '+key);
    seen.add(key);
+   const actor=temp.characters.find(c=>c.id===event.characterId);
+   // The agenda was taken at the start of this minute. A preceding Course,
+   // including one for the SAME patient and minute, can end the life or the
+   // condition that justified another scheduled Course. Recheck against the
+   // current state instead of sending a dead patient to a healing executor.
+   const stillDue=actor?.hmk?.combatState?.shock!=='KIA'&&
+    episodeTimedCourseAgenda(temp,endMinute-1).some(current=>
+     episodeTimedCourseKey(current)===episodeTimedCourseKey(event)&&current.id===event.id);
+   if(!stillDue){
+    const reason=actor?.hmk?.combatState?.shock==='KIA'
+     ?'Zrušeno: postava zemřela při dřívější zdravotní kontrole.'
+     :'Zrušeno: předchozí zdravotní výsledek odstranil původní splatnost.';
+    // A cancellation is a calendar receipt, NOT a fictitious medical roll or
+    // a second Combat State event. Keep the original event/character IDs.
+    temp.journal.push({id:ids(),calendarCampaignId:campaignId,characterId:event.characterId,
+     campaignMinute:event.minute,createdAt:now(),title:'HMK · zrušený zdravotní termín',body:reason,
+     calendarEpisodeTimedMedical:{format:'hmk-episode-timed-medical-v1',type:event.kind,
+      key:episodeTimedCourseKey(event),sourceId:event.id,dueMinute:event.minute,
+      cancelled:true,reason,inputs:null,report:null}});
+    changes.push({key:episodeTimedCourseKey(event),actorId:event.characterId,dueMinute:event.minute,
+     kind:event.kind,cancelled:true,description:reason,shockAfter:actor?.hmk?.combatState?.shock});
+    continue;
+   }
    try{
     const step=episodeTimedCourseStep(temp,event,{rolls,idFactory:ids,stamp:now});
-    if(step.requirement){requirements.push(step.requirement);missing=true;continue;}
+    if(step.requirement){requirements.push(step.requirement);blockedActors.add(event.characterId);missing=true;continue;}
     changes.push(step.change);
     if(step.incapacitation)incapacitations.push(step.incapacitation);
    }catch(error){
@@ -118,6 +156,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
     requirements.push({key:episodeTimedCourseKey(event),characterId:event.characterId,
      dueMinute:event.minute,kind:event.kind,reason:'Vyžaduje doložení v původním pravidlovém modulu: '+error.message,
      fields:[],error:error.message});
+    blockedActors.add(event.characterId);
     missing=true;
    }
   }
@@ -134,6 +173,9 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
   for(const event of episodeTimedCourseAgenda(database,endMinute-1)){
    const key=episodeTimedCourseKey(event);
    if(visible.has(key))continue;
+   // A second test on the same patient cannot be demanded before the first
+   // unknown test (which may be fatal) has been resolved by the GM.
+   if(requirements.some(r=>!r.provisional&&r.characterId===event.characterId&&r.dueMinute<=event.minute))continue;
    const stagedActor=temp.characters.find(c=>c.id===event.characterId);
    if(stagedActor?.hmk?.combatState?.shock==='KIA')continue;
    requirements.push({key,kind:event.kind,characterId:event.characterId,dueMinute:event.minute,
