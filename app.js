@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.661';
+const APP_VERSION='93.662';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1851,6 +1851,9 @@ let timeEpisodeDraftCampaign=null;
 // pressing "Vyhodnotit epizodu"; they become resolution tasks afterwards.
 let episodeOutstandingSkillTasks=[];
 const episodePinnedSkillFields=new Map();
+// The printed HMK Success Value procedure applies to Orienteering / Tracking.
+// Other follow-ups require ordinary Skill Tests with Success Levels (CF/F/S/CS).
+function episodeSkillNeedsSV(field){return field==='orientationProofId'||field==='trackingProofId';}
 function episodeOpenActorRequest(actorId){
  if(!actorId||!episodeEvaluationRequested)return null;
  const clock=data.campaignClock,cid=clock?campaignKey(clock):null;
@@ -1862,12 +1865,14 @@ function episodeOpenActorRequest(actorId){
 }
 function episodeSkillAuthorized(actorId,skill){
  const r=episodePendingSkillRequest;
- return !!(r?.status==='waiting'&&r.id===episodeActiveSkillRequestId&&
+ if(!(r?.status==='waiting'&&r.id===episodeActiveSkillRequestId&&
   r.episodeEpoch===episodeDraftEpoch&&r.campaignId===campaignKey(data.campaignClock)&&
   r.minute===data.campaignClock?.minute&&r.actorId===actorId&&r.skill===skill&&
-  view==='skills'&&activeSkillTab==='value'&&selected===actorId&&
-  skillSVChoice595?.kind==='ordinary'&&skillSVChoice595?.value===skill);
+  view==='skills'&&selected===actorId))return false;
+ return episodeSkillNeedsSV(r.field)?activeSkillTab==='value'&&
+  skillSVChoice595?.kind==='ordinary'&&skillSVChoice595?.value===skill:activeSkillTab==='secondary';
 }
+
 function episodeConfigureSkillGate(root){
  if(view!=='skills')return;
  const pending=episodeOpenActorRequest(selected);
@@ -1878,6 +1883,15 @@ function episodeConfigureSkillGate(root){
  }
  if(!pending)return;
  const allowed=episodeSkillAuthorized(selected,pending.skill);
+ // Prevent a weather/complication/encounter test from falling back to the
+ // first skill in the list, and stop the pending task being saved under it.
+ if(allowed&&!episodeSkillNeedsSV(pending.field)){
+  const primary=root.querySelector('#skill-secondary-form [name="primary"]');
+  if(primary){const desired=[...primary.options].find(o=>o.value===pending.skill);
+   if(desired){primary.value=pending.skill;primary.dataset.hmkEpisodeFixedSkill=pending.skill;
+    primary.setAttribute('aria-readonly','true');primary.style.pointerEvents='none';}
+  }
+ }
  const host=root.querySelector('.hmk-skill-context-595')||root.querySelector('#skill-value-form')?.parentElement;
  if(host){const note=document.createElement('aside');note.className='hc-episode-skill-lock';note.setAttribute('role','status');
   note.innerHTML='<strong>🔒 '+(character(selected)?.name||'Postava')+' · nevyřešený '+
@@ -1896,7 +1910,7 @@ function episodeConfigureSkillGate(root){
    tab.title='Nejdříve dokončete vyžádaný test nebo se vraťte do Cestování.';
   }
   for(const form of workbench.querySelectorAll('form')){
-   if(allowed&&form.id==='skill-value-form')continue;
+   if(allowed&&form.id===(episodeSkillNeedsSV(pending.field)?'skill-value-form':'skill-secondary-form'))continue;
    for(const input of form.querySelectorAll('input,select,textarea,button'))input.disabled=true;
   }
  }
@@ -4361,7 +4375,7 @@ function journalConditionDetailsHTML(c,state,load,editing=false){
  const endSR=Number.isFinite(h.attributes?.end)?Math.floor(h.attributes.end/2):'—';
  const pf=Number.isFinite(load.personalFatiguePerPeriod)?load.personalFatiguePerPeriod:'—';
  const block=(title,items,cl='')=>`<section class="journal-book-section ${cl}">${journalRuleTitle(title)}<div class="journal-mini-stats">${items.map(([a,b])=>`<div><span>${journalTerm(a,CHRONICLE_FATIGUE_HELP[a]||null)}</span><strong${journalHelp(a,CHRONICLE_FATIGUE_HELP[a]||null)}>${esc(b)}</strong></div>`).join('')}</div></section>`;
- return `<div class="journal-condition-detail-grid">${block('Impact',[['Poslední Impact',impactValue],['Recorded Hits',(state.events||[]).filter(x=>x.type==='confirmed-hit').length]])}${block('Shock State',[['Current',shock],['Extended HR',state.extendedShock?.hr??'—'],['Coma HR',state.coma?.hr??'—']],'journal-shock-state')}${block('Stress',[['Psyche',stress],['Aural Shock',auraShock],['Shadow',shadow]])}${block('Fatigue',[['Winded',fat.windedness],['Weary',fat.weariness],['Weak',fat.weakness],['Total',fat.total],['PF',pf],['END SR (TN)',endSR]],'journal-fatigue-state')}${editing?'':`<section class="journal-book-section journal-fatigue-gm"><h4>Fatigue · GM korekce</h4><p class="journal-condition-hint">Cestování přičítá Weariness automaticky po END SR. Zde opravujte pouze skutečně doloženou výjimku nebo chybný záznam. Blood Loss Weakness se nemění ručně; Conditions jsou odvozené.</p><form id="journal-gm-fatigue-form"><input type="hidden" name="characterId" value="${esc(c.id)}"><label>Druh únavy<select name="kind" required><option value="weariness">Weary / Weariness</option><option value="windedness">Winded / Windedness</option><option value="otherWeakness">Other Weakness (nikoli BP)</option></select></label><label>Změna (+/− body)<input type="number" name="delta" min="-9999" max="9999" step="1" value="0" required></label><label>GM důvod (povinný)<textarea name="reason" minlength="8" maxlength="500" required placeholder="Popište skutečný důvod korekce"></textarea></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje ruční korekci, nikoliv automatický cestovní hod</label><button type="submit">Zapsat do Fatigue a historie</button></form></section>`}</div>`;
+ return `<div class="journal-condition-detail-grid">${block('Impact',[['Poslední Impact',impactValue],['Recorded Hits',(state.events||[]).filter(x=>x.type==='confirmed-hit').length]])}${block('Shock State',[['Current',shock],['Extended HR',state.extendedShock?.hr??'—'],['Coma HR',state.coma?.hr??'—']],'journal-shock-state')}${block('Stress',[['Psyche',stress],['Aural Shock',auraShock],['Shadow',shadow]])}${editing?`<section class="journal-book-section journal-fatigue-state journal-fatigue-inline-edit">${journalRuleTitle('Fatigue · Edit')}<div class="journal-mini-stats">${[['Winded','windedness'],['Weary','weariness'],['Other Weakness','otherWeakness']].map(([label,key])=>`<div><label for="sheet-fatigue-${key}">${journalTerm(label)}</label><input id="sheet-fatigue-${key}" name="sheet_fatigue_${key}" aria-label="${esc(label)}" type="number" min="0" max="99999" step="1" required value="${state.fatigue[key]}"></div>`).join('')}<div><span>Blood Loss Weakness · pouze automaticky</span><strong>${state.bloodLoss.weaknessFatigue}</strong></div><div><span>Total</span><strong>${fat.total}</strong></div><div><span>PF</span><strong>${esc(pf)}</strong></div><div><span>END SR (TN)</span><strong>${esc(endSR)}</strong></div></div><label class="journal-fatigue-edit-reason">Důvod změny Fatigue (povinný, pouze pokud měníte hodnoty)<textarea name="sheet_fatigue_reason" minlength="8" maxlength="500" placeholder="GM důvod změny · min. 8 znaků"></textarea></label><p class="journal-condition-hint">Editace mění jen Windedness, Weariness a Other Weakness. Blood Loss a zdravotní Conditions se počítají automaticky. Uloží se jedním tlačítkem Edit → Uložit.</p></section>`:block('Fatigue',[['Winded',fat.windedness],['Weary',fat.weariness],['Weak',fat.weakness],['Total',fat.total],['PF',pf],['END SR (TN)',endSR]],'journal-fatigue-state')}</div>`;
 }
 function journalSimpleChecklist(title,rows){return `<section class="journal-book-section">${journalRuleTitle(title)}<p class="journal-condition-hint">Aktuální stav z doložených účinků; není to formulář pro ruční zaškrtnutí.</p><div class="journal-condition-statuses">${rows.map(([label,value,explanation])=>`<div class="journal-condition-status"${journalHelp(label,explanation)}><span>${journalTerm(label,explanation)}</span><strong>${esc(firstPresent(value,'—'))}</strong></div>`).join('')}</div></section>`;}
 function foragingEvidenceInCharacterInventory(actorId){
@@ -4378,7 +4392,7 @@ function journalSectionNav(){
  const c=character(selected),specialties=c?characterSpecialtyChapters(c):[];
  const stableCount=c?bestiaryKnownAnimals().filter(a=>a.ownerId===c.id&&!stableBurden(data,campaignKey(data.campaignClock),a).exit).length:0;
  const sections=[['overview','Chronicle Spread'],['inventory','Arsenal & Gear'],['status','Combat & Conditions'],['hazards','Nebezpečí / Trauma'],['provisions','Provisions · jídlo a pití'],...(stableCount?[['stable','♞ Stáj ('+stableCount+')']]:[]),...specialties.map(x=>[x.id,x.label]),['notes','Notes & Logbook']];
- return `<div class="journal-book-subnav">${sections.map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills a mincí přímo v deníku">✎ Edit</button>'}<span class="journal-character-action-divider" aria-hidden="true"></span><button type="button" class="secondary journal-character-action" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="secondary journal-character-action" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`;
+ return `<div class="journal-book-subnav">${sections.map(([id,label])=>`<button type="button" class="${activeSheetSection===id?'':'secondary'}" data-sheet-section="${id}" aria-current="${activeSheetSection===id?'page':'false'}">${esc(label)}</button>`).join('')}<span class="journal-edit-divider" aria-hidden="true"></span>${sheetEditingId===selected?'<button type="submit" form="sheet-inline-form" class="journal-edit-save">✓ Uložit</button><button type="button" data-sheet-cancel class="journal-edit-cancel">Zrušit</button>':'<button type="button" class="journal-edit-button" data-sheet-edit title="Zapnout editaci atributů, Skills, mincí a Fatigue přímo v deníku">✎ Edit</button>'}<span class="journal-character-action-divider" aria-hidden="true"></span><button type="button" class="secondary journal-character-action" data-action="creation-open">✎ Pravidlová tvorba</button><button type="button" class="secondary journal-character-action" data-action="export-kernel-character">▤ Export HMK profilu</button></div>`;
 }
 /** A page contains live DOM controls; the book decoration is the same for all folios.
  * Character-only navigation never belongs to World, Combat, Skills or Library.
@@ -9497,8 +9511,8 @@ function render(){
  if(episodeActiveSkillRequestId){
   const r=episodePendingSkillRequest;
   if(!r||r.status!=='waiting'||r.id!==episodeActiveSkillRequestId||
-   view!=='skills'||activeSkillTab!=='value'||selected!==r.actorId||
-   skillSVChoice595?.kind!=='ordinary'||skillSVChoice595?.value!==r.skill)
+   view!=='skills'||activeSkillTab!==(episodeSkillNeedsSV(r.field)?'value':'secondary')||selected!==r.actorId||
+   (episodeSkillNeedsSV(r.field)&&(skillSVChoice595?.kind!=='ordinary'||skillSVChoice595?.value!==r.skill)))
    episodeActiveSkillRequestId=null;
  }
  if(view!=='encounter')stagedEncounterSelection=null; // no unattended roster changes survive navigation
@@ -9516,7 +9530,7 @@ function render(){
   const linked=!!(travelSkill||pendingStableAnimalcraftId||pendingTrekHandoff||pendingTrackingAwarenessId);
   // Calendar CF navigation deliberately targets the existing follow-up form;
   // do not reset it to an unrelated fresh Skill Test tab.
-  if(activeSkillTab!=='followups')activeSkillTab=linked?'value':'secondary';
+  if(activeSkillTab!=='followups')activeSkillTab=linked?(travelSkill&&!episodeSkillNeedsSV(episodePendingSkillRequest.field)?'secondary':'value'):'secondary';
  }
  lastRenderedSkillRoute596=view;
  // Deny all paths to partially generated sheets, even routes that set view
@@ -10431,7 +10445,7 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
  const savedId=uuid();
  const skill=proof?.skills?.[0]||proof?.skill||'';
  const activeEpisode=episodeOpenActorRequest(selected);
- if(activeEpisode&&(proof?.type!=='secondary-mastery-value-test'||!episodeSkillAuthorized(selected,skill)))
+ if(activeEpisode&&(proof?.type!==(episodeSkillNeedsSV(activeEpisode.field)?'secondary-mastery-value-test':'secondary-mastery-test')||!episodeSkillAuthorized(selected,skill)))
   throw Error('Postava '+(character(selected)?.name||selected)+' má nevyřešený '+activeEpisode.skill+
    ' test z Cestování. Samostatný test není nyní povolen; otevřete úkol z epizody.');
  const isSV=proof?.type==='secondary-mastery-value-test';
@@ -10484,9 +10498,9 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
   const explicitEpisodeLink=er?.status==='waiting'&&er.id===episodeActiveSkillRequestId&&
    er.episodeEpoch===episodeDraftEpoch&&er.campaignId===campaignKey(data.campaignClock)&&
    er.minute===data.campaignClock?.minute&&selected===er.actorId&&
-   view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&
-   skillSVChoice595?.kind==='ordinary'&&skillSVChoice595.value===er.skill&&
-   isSV&&actualSkill===er.skill?{
+   view==='skills'&&activeSkillTab===(episodeSkillNeedsSV(er.field)?'value':'secondary')&&
+   (!episodeSkillNeedsSV(er.field)||skillSVChoice595?.actorId===selected&&skillSVChoice595?.kind==='ordinary'&&skillSVChoice595.value===er.skill)&&
+   isSV===episodeSkillNeedsSV(er.field)&&actualSkill===er.skill?{
     requestId:er.id,episodeEpoch:er.episodeEpoch,field:er.field,skill:er.skill,
     actorId:er.actorId,campaignId:er.campaignId,minute:er.minute}:null;
   data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof,
@@ -10974,7 +10988,10 @@ document.addEventListener('submit',event=>{
     state:persistentStateOf(target),sourceId,round,gmConfirmed:kind==='survival-accident'||form.elements.namedItem('gmConfirmed')?.checked===true,
     impactDie:optional('impactDie'),zoneD10:optional('zoneD10'),locationD10:optional('locationD10'),
     direction:raw('direction'),shockD100:optional('shockD100'),compoundD10:optional('compoundD10'),
-    hazardD10,agilityD100:optional('agilityD100'),randomVictimConfirmed:kind==='survival-accident'?!!raw('targetId'):false});
+    hazardD10,agilityD100:optional('agilityD100'),randomVictimConfirmed:kind==='survival-accident'?!!raw('targetId'):false,
+    autoDieValues:Object.fromEntries(['hazardD10','agilityD100','impactDie','zoneD10','locationD10','shockD100','compoundD10'].
+     flatMap(name=>{const control=form.elements.namedItem(name);return control?.value&&control.dataset?.hmkAutoDice===control.value?
+      [[name,Number(control.value)]]:[];}))});
    const body='HMK str. '+(kind==='fishing-cf'?'71':'148')+' · '+kind+' · '+target.name+(report.bodyKind==='horse'?' · zvířecí anatomie B/C '+report.breed:'')+
     (report.sl?' · Agility '+report.sl+' / EML '+report.eml:'')+
     (report.avoided?' · nehoda odvrácena':' · Impact '+report.impact+report.aspect+
@@ -17814,33 +17831,6 @@ document.addEventListener('click',e=>{
   }
  }
 },true);
-// v93.660: exceptional, audited GM Fatigue adjustments in the character journal.
-// Trekking END SR is handled by the travel episode, NOT by this manual form.
-// Conditions remain derived from their authoritative health proofs.
-document.addEventListener('submit',e=>{
- const f=e.target;if(f.id!=='journal-gm-fatigue-form')return;
- e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Fatigue nelze ručně upravovat během aktivní Initiative.');
- const v=Object.fromEntries(new FormData(f));const c=character(selected);
- if(!c||c.id!==v.characterId)return alert('Postava se změnila. Otevřete znovu deník.');
- const reason=String(v.reason||'').trim();
- if(v.gmConfirmed!=='yes'||reason.length<8||reason.length>500)return alert('GM musí potvrdit a popsat důvod (8–500 znaků).');
- if(!['windedness','weariness','otherWeakness'].includes(v.kind)||!/^[-]?(?:0|[1-9]\d*)$/.test(String(v.delta||'')))return alert('Neplatný typ nebo změna Fatigue.');
- const delta=Number(v.delta);
- if(!Number.isSafeInteger(delta)||Math.abs(delta)>9999||delta===0)return alert('Zadejte nenulovou celočíselnou změnu Fatigue.');
- if(!uiConfirm('GM: opravdu změnit '+v.kind+' postavy '+c.name+' o '+delta+'? Půjde o trvalý zápis do Combat State i osobní historie.'))return;
- mutate(()=>{
-  const live=character(c.id);if(!live||live.id!==v.characterId)throw Error('Identita postavy se změnila');
-  const previous=persistentStateOf(live),id=uuid();
-  // Administrative correction does not advance combat rounds or campaign time.
-  const changed=applyConfirmedFatigue({state:previous,round:Math.max(1,previous.lastRound),eventId:id,kind:v.kind,delta});
-  const calendarId=data.campaignClock?campaignKey(data.campaignClock):null;
-  const minute=data.campaignClock?.minute??null;
-  changed.state.events[changed.state.events.length-1].details={...changed.state.events.at(-1).details,reason,source:'character-journal-gm',campaignId:calendarId,campaignMinute:minute};
-  live.hmk??={};live.hmk.combatState=changed.state;
-  data.journal.push({id:uuid(),characterId:live.id,title:'GM Fatigue korekce',body:v.kind+' '+(delta>0?'+':'')+delta+'. Důvod: '+reason,createdAt:stamp(),...(calendarId?{calendarCampaignId:calendarId,campaignMinute:minute}:{}),gmFatigueAdjustment:{eventId:id,kind:v.kind,delta,reason,source:'character-journal-gm'}});
- });
-},true);
 // v93.276: direct, single-surface Character Sheet edit.
 // Rule-derived Creation values cannot be silently overwritten outside their 14-step proof trail.
 document.addEventListener('click',e=>{
@@ -17861,7 +17851,7 @@ document.addEventListener('submit',e=>{
  if(!revisedName||revisedName.length>120){return alert('Jméno postavy: zadejte 1–120 znaků.');}
  const attrKeys=['str','end','dex','agl','per','cml','aur','wil','rea','cre','emp','elo'];
  const valid=(raw,label,max)=>{if(!/^(?:0|[1-9][0-9]*)$/.test(String(raw??''))||!Number.isSafeInteger(Number(raw))||Number(raw)>max)throw Error(label+': zadejte celé nezáporné číslo.');return Number(raw)};
- let attrs=[],dp=[],legacy=[],coinChange=null;
+ let attrs=[],dp=[],legacy=[],coinChange=null,fatigueChanges=[],fatigueReason="";
  try{
   for(const key of attrKeys){
    const raw=v['sheet_attr_'+key];
@@ -17883,6 +17873,18 @@ document.addEventListener('submit',e=>{
     if(!('sheet_legacy_ml_'+i in v))continue;
     legacy.push([i,valid(v['sheet_legacy_ml_'+i],'Skill ML',200)]);
    }
+  }
+  // Fatigue is edited inside the existing Character Sheet Edit form, never
+  // by a separate independent GM submit action. Blood Loss is immutable here.
+  const baselineState=persistentStateOf(c);
+  for(const kind of ['windedness','weariness','otherWeakness']){
+   const target=valid(v['sheet_fatigue_'+kind],kind+' Fatigue',99999);
+   const delta=target-baselineState.fatigue[kind];
+   if(delta){if(Math.abs(delta)>9999)throw Error('Fatigue: jednotlivá změna smí být nejvýše 9999 bodů.');fatigueChanges.push({kind,delta});}
+  }
+  if(fatigueChanges.length){
+   fatigueReason=String(v.sheet_fatigue_reason||'').trim();
+   if(fatigueReason.length<8||fatigueReason.length>500)throw Error('Změna Fatigue vyžaduje zdůvodnění GM (8–500 znaků).');
   }
   const cash=cashForCharacter(c);
   if('sheet_coin_current' in v){
@@ -17919,6 +17921,25 @@ document.addEventListener('submit',e=>{
   }else{
    for(const [key,n] of attrs)h.attributes[key]=n;
    for(const [i,n] of legacy)h.skills[i].ml=n;
+  }
+  if(fatigueChanges.length){
+   const previous=persistentStateOf(live),round=Math.max(1,previous.lastRound),ids=[],adjustments=[];
+   let current=previous;
+   for(const {kind,delta} of fatigueChanges){
+    const eventId=uuid();
+    const changed=applyConfirmedFatigue({state:current,round,eventId,kind,delta});
+    changed.state.events.at(-1).details={...changed.state.events.at(-1).details,
+     reason:fatigueReason,source:'character-journal-inline-edit',campaignId:campaignKey(data.campaignClock),
+     campaignMinute:data.campaignClock?.minute??null};
+    current=changed.state;ids.push(eventId);adjustments.push({kind,delta});
+   }
+   h.combatState=current;
+   const calendarId=data.campaignClock?campaignKey(data.campaignClock):null;
+   const minute=data.campaignClock?.minute??null;
+   data.journal.push({id:uuid(),characterId:live.id,title:'GM Fatigue korekce',
+    body:adjustments.map(x=>x.kind+' '+(x.delta>0?'+':'')+x.delta).join(', ')+'. Důvod: '+fatigueReason,
+    createdAt:stamp(),...(calendarId?{calendarCampaignId:calendarId,campaignMinute:minute}:{}),
+    gmFatigueAdjustment:{eventIds:ids,adjustments,reason:fatigueReason,source:'character-journal-inline-edit'}});
   }
   if(coinChange){
    const reason=String(v.sheet_coin_reason||'').trim();
@@ -20374,7 +20395,7 @@ function episodeAutoBindSkillReceipt(){
  const old=data.journal.find(j=>j.id===request.completedId);
  if(old?.calendarEpisodeSkillLink?.requestId!==request.id||
   old.calendarEpisodeSkillLink.episodeEpoch!==episodeDraftEpoch||
-  !episodeSkillProof(old,request.skill,request.actorId,request.campaignId,request.minute))return;
+  !episodeSkillProof(old,request.skill,request.actorId,request.campaignId,request.minute,{requireSV:episodeSkillNeedsSV(request.field)}))return;
  // Never replace an already occupied field: an explicit new request is required
  // to reassign a test before the epizoda is committed.
  if(timeEpisodeDraft[request.field]&&timeEpisodeDraft[request.field]!==old.id)return;
@@ -20394,7 +20415,7 @@ function episodeLinkedProofRows(form){
   const l=j.calendarEpisodeSkillLink;
   return l?.episodeEpoch===episodeDraftEpoch&&l.campaignId===cid&&l.minute===minute&&
    form?.elements.namedItem(l.field)?.value===j.id&&
-   !!episodeSkillProof(j,l.skill,l.actorId,cid,minute);
+   !!episodeSkillProof(j,l.skill,l.actorId,cid,minute,{requireSV:episodeSkillNeedsSV(l.field)});
  });
 }
 function episodeLinkedProofHTML(form){
@@ -20407,7 +20428,7 @@ function episodeLinkedProofHTML(form){
    l.field==='hazardDirectionProofId'?'Direction Hazard · ':
    l.field==='trackingAwarenessProofId'?'Tracking · ':'';
   return '<div class="hc-episode-proof hc-episode-proof-done"><strong>✓ '+esc(role+l.skill)+' · '+esc(character(l.actorId)?.name||l.actorId)+'</strong>'+ 
-   '<span>Vyřešeno: '+esc(p.level)+' · SV '+esc(String(p.sv))+' · d100 '+esc(String(p.d100??p.roll??'—'))+
+   '<span>Vyřešeno: '+esc(p.level)+(Number.isSafeInteger(p.sv)?' · SV '+esc(String(p.sv)):'')+' · d100 '+esc(String(p.d100??p.roll??'—'))+
    (l.skill==='Survival'&&p.level==='CF'?' · navazuje Survival Hazard':'')+
    '</span><small>Výsledek propojen s touto epizodou.</small></div>';
  }).join('');
@@ -20417,7 +20438,7 @@ function episodeSkillReturnBannerHTML(){
  if(!r||!episodeSkillReturnPending||r.campaignId!==campaignKey(data.campaignClock)||r.minute!==data.campaignClock?.minute)return '';
  const j=data.journal.find(x=>x.id===r.completedId);
  const proof=j?.skillTestProof?.a||j?.skillTestProof?.result;
- return `<aside class="hc-episode-skill-handoff" role="status"><strong>Rozpracovaná epizoda · ${esc(r.skill)} · ${esc(character(r.actorId)?.name||r.actorId)}</strong><p>${r.status==='resolved'&&proof?'✓ Hod uložen: '+esc(proof.level)+' · SV '+esc(String(proof.sv))+'. '+(proof.level==='CF'?'Při návratu se nabídne navazující Survival Hazard nebo jiné relevantní následky.':'Výsledek se automaticky přenese do cestování.'):'Proveďte a uložte skutečný Success Value test. Potom se vraťte do epizody.'}</p><button type="button" class="secondary" data-episode-return>Vrátit se do Cestování</button></aside>`;
+ return `<aside class="hc-episode-skill-handoff" role="status"><strong>Rozpracovaná epizoda · ${esc(r.skill)} · ${esc(character(r.actorId)?.name||r.actorId)}</strong><p>${r.status==='resolved'&&proof?'✓ Hod uložen: '+esc(proof.level)+(Number.isSafeInteger(proof.sv)?' · SV '+esc(String(proof.sv)):'')+'. '+(proof.level==='CF'?'Při návratu se nabídne navazující Survival Hazard nebo jiné relevantní následky.':'Výsledek se automaticky přenese do cestování.'):'Proveďte a uložte skutečný Success Value test. Potom se vraťte do epizody.'}</p><button type="button" class="secondary" data-episode-return>Vrátit se do Cestování</button></aside>`;
 }
 /** Route a visible form error to the precise named input rather than a generic chapter. */
 function episodeIssue(message,form){
@@ -20492,8 +20513,8 @@ function episodeStartSkillRequest(field,skill,actorId){
  if(previous?.status==='waiting'&&previous.episodeEpoch===episodeDraftEpoch){
   if(previous.field===field&&previous.skill===skill&&previous.actorId===actorId){
    episodeActiveSkillRequestId=previous.id;episodeSkillReturnPending=true;
-   selected=actorId;view='skills';activeSkillTab='value';
-   skillSVChoice595={actorId,kind:'ordinary',value:skill};render();return true;
+   selected=actorId;view='skills';activeSkillTab=episodeSkillNeedsSV(field)?'value':'secondary';
+   skillSVChoice595=episodeSkillNeedsSV(field)?{actorId,kind:'ordinary',value:skill}:null;render();return true;
   }
   // Two independently required tests can be performed in either order. A
   // handoff which has not produced a journal receipt can be superseded: its
@@ -20507,8 +20528,8 @@ function episodeStartSkillRequest(field,skill,actorId){
  const request={id:uuid(),episodeEpoch:episodeDraftEpoch,field,skill,actorId,campaignId:campaignKey(clock),minute:clock.minute,status:'waiting',completedId:null};
  episodePendingSkillRequest=request;episodeActiveSkillRequestId=request.id;episodeSkillReturnPending=true;
  timeEpisodeDraft={...timeEpisodeDraft,[field]:''};
- selected=actorId;view='skills';activeSkillTab='value';
- skillSVChoice595={actorId,kind:'ordinary',value:skill};
+ selected=actorId;view='skills';activeSkillTab=episodeSkillNeedsSV(field)?'value':'secondary';
+ skillSVChoice595=episodeSkillNeedsSV(field)?{actorId,kind:'ordinary',value:skill}:null;
  render();return true;
 }
 function episodeFormRestore(form,draft){
@@ -20599,7 +20620,9 @@ function episodeAssertScopedSkillInputs(v){
   if(field==='orientationProofId'&&v.orientationUse==='reuse')continue;
   const row=data.journal.find(j=>j.id===id),link=row?.calendarEpisodeSkillLink;
   if(!link||link.episodeEpoch!==episodeDraftEpoch||link.field!==field||
-    episodePinnedSkillFields.get(field)!==id)
+    episodePinnedSkillFields.get(field)!==id||
+    !episodeSkillProof(row,link.skill,link.actorId,campaignKey(data.campaignClock),data.campaignClock.minute,{requireSV:episodeSkillNeedsSV(field)})||
+    episodeSkillNeedsSV(field)!==(['secondary-mastery-value-test','skill-value-result'].includes(row.skillTestProof?.type)))
    throw Error('Skill Test '+field+' nebyl vyžádán touto epizodou. Otevřete jeho vlastní tlačítko ve výsledcích; samostatné hody nelze převzít.');
  }
 }
@@ -20742,7 +20765,7 @@ function episodePreviewFromForm(form,clock){
   nightOverride:actualPeriod==='night',familiar:!!v.orientationFamiliar,torchlight:actualPeriod==='night'&&!!v.orientationTorch,
   fullMoon:actualPeriod==='night'&&!!v.orientationMoon,afterSnowfall:actualPeriod==='night'&&!!v.orientationSnow});
  const skillAtMinute=(id,skill)=>episodeSkillProof(data.journal.find(j=>j.id===id),skill,
-  guideId,campaignKey(clock),clock.minute);
+  guideId,campaignKey(clock),clock.minute,{requireSV:true});
  let orientation=null,trackingMemory=null;
  if(kind==='travel'){
   const base=trekMovement({topography:v.topography,terrain:v.terrain,conveyance:v.conveyance,
@@ -22146,7 +22169,9 @@ function episodeOpenRequestedSkill(button){
 document.addEventListener('submit',e=>{
  if(view!=='skills'||!e.target?.closest?.('.layout'))return;
  const pending=episodeOpenActorRequest(selected);if(!pending)return;
- const authorized=e.target.id==='skill-value-form'&&episodeSkillAuthorized(selected,pending.skill);
+ const authorized=e.target.id===(episodeSkillNeedsSV(pending.field)?'skill-value-form':'skill-secondary-form')&&
+  episodeSkillAuthorized(selected,pending.skill)&&e.target.elements?.namedItem('primary')?.value===pending.skill&&
+  (episodeSkillNeedsSV(pending.field)||!e.target.elements?.namedItem('opposed')?.checked);
  if(!authorized){e.preventDefault();e.stopImmediatePropagation();
   alert((character(selected)?.name||'Postava')+' má nevyřešený test z Cestování: '+pending.skill+
    '. Samostatné testy lze obnovit až po dořešení požadavku.');}

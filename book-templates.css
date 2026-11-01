@@ -7175,3 +7175,9 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hsk-climb-fall input[type=number]+button[data-hmk-general-auto-die]{display:block;width:100%;max-width:170px;margin:.35rem 0 0;padding:.38rem .55rem;font-size:.78rem}
 .hsk-climb-fall .hsk-hazard-step .field-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
 @media(max-width:650px){.hc-episode-spread-right .hc-episode-medical-die-pair{flex:1 1 100%;min-width:0}}
+
+/* v93.662: Fatigue uses the native journal Edit surface, never an extra form. */
+.content-sheet .journal-fatigue-inline-edit .journal-mini-stats input[type=number]{width:6.2em;max-width:48%;min-width:5em;box-sizing:border-box;padding:4px 6px;color:#203345;background:#fffaf1;border:1px solid #9e7c55;border-radius:3px;font:700 12px Georgia,serif}
+.content-sheet .journal-fatigue-inline-edit .journal-mini-stats label{flex:1;min-width:0;font:11px Georgia,serif;color:#4d3425}
+.content-sheet .journal-fatigue-edit-reason{display:grid;gap:5px;margin:10px 0 4px;font:11px Georgia,serif;color:#4d3425}
+.content-sheet .journal-fatigue-edit-reason textarea{width:100%;max-width:100%;min-height:55px;box-sizing:border-box;padding:7px;background:#fffaf1;border:1px solid #9e7c55;border-radius:3px;color:#203345;font:12px Georgia,serif}
