@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.657';
+const APP_VERSION='93.658';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2047,6 +2047,11 @@ function timeEpisodePageHTML(clock,participants){
  <input type="hidden" name="episodeIncapChoice" value="">
  <input type="hidden" name="episodeIncapMoveMinutes" value="">
  <input type="hidden" name="episodeGMReviewedJson" value="{}">
+ <fieldset class="hc-episode-suboptions" data-episode-aggravation><legend>HMK 182 · Serious Injury Aggravation (volitelné pravidlo)</legend>
+ <label class="hc-check"><input name="seriousAggravationEnabled" type="checkbox"> GM používá volitelné pravidlo aggravation při pohybu</label>
+ <label>Skutečný režim pohybu <select name="seriousMoveRate"><option value="half">Half Move · Agility každé 4 h pohybu</option><option value="full">Full Move · každý tah (5 sekund)</option><option value="charge">Charge · každý tah (5 sekund)</option><option value="double">Double Move · zakázáno při Serious hlavě/trupu/noze</option></select></label>
+ <p class="hc-hint">Jde o typ pohybu z boje (HMK 160, 182), nikoli o cestovní Double Time (HMK 146). Běžný dlouhý pochod používejte jako Half Move. Všechna povinná Agility a případná Shock SR se zobrazí ve zdravotním checklistu.</p>
+ </fieldset>
  <div class="hmk-trek-grid"><label>Činnost<select name="kind">${[['travel','Cestování / pochod'],['rest','Odpočinek'],['sleep','Spánek'],['winded','Krátký klid (Windedness)'],['forage','Shánění potravy'],['tracking','Sledování stop'],['watch','Ostraha / vigilance'],['other','Jiná činnost']].map(([v,l])=>option(v,l)).join('')}</select></label>
  <label>Délka · skutečné minuty<input name="minutes" type="number" min="1" max="10080" value="${esc(String(d.minutes||60))}" required title="Skutečná délka epizody v minutách (nejvýše sedm dní v jednom zápisu)."></label></div>
  <p class="hc-episode-clockline"><strong>Začátek:</strong> ${esc(start)} · <span data-episode-end>Konec po zadání minut</span>. Vyhodnocení na konci intervalu; čas se do té doby neposouvá.</p>
@@ -4315,6 +4320,21 @@ function journalTimedMedicalResultHTML(entry){
  if(!proof||proof.cancelled)return '';
  const report=proof.report;
  if(!report||typeof report!=='object'||Array.isArray(report))return '';
+ if(proof.type==='movement-aggravation'){
+  const renderWound=w=>{
+   const outcome=report.consequence?.consequences?.find(x=>x.woundId===w.id);
+   const side=w.side==='left'?' L':w.side==='right'?' R':'';
+   const name=String(w.location||'neurčená lokace').toUpperCase()+side+' · '+String(w.severity||'')+String(w.level||'')+String(w.aspect||'');
+   if(!outcome)return '<span>'+esc(name)+' · bez navazující Shock SR</span>';
+   const effect=outcome.passed?'Shock SR úspěch':outcome.oldHR===null?
+    'Shock SR neúspěch · přenos snížení HR do budoucí léčby (−'+outcome.carriedReduction+')':
+    'Shock SR neúspěch · HR '+outcome.oldHR+' → '+outcome.newHR;
+   return '<span>'+esc(name+' · Shock d10 '+outcome.d10+' / TN '+outcome.tn+' · '+effect)+'</span>';
+  };
+  return '<div class="journal-medical-receipt-result" aria-label="Doložená pohybová Aggravation">'+
+   '<span>Agility: <strong>'+esc(report.level||'—')+'</strong> · d100 '+esc(proof.inputs?.roll??'—')+
+   ' / EML '+esc(proof.inputs?.eml??'—')+'</span>'+ (report.woundDescriptions||[]).map(renderWound).join(' · ')+ '</div>';
+ }
  const labels=[['phase','Fáze'],['hr','HR'],['beforeHR','HR před'],['afterHR','HR po'],
   ['nextHR','Následující HR'],['shockBefore','Shock před'],['shockAfter','Shock po'],
   ['shock','Shock'],['bpBefore','BP před'],['bpAfter','BP po'],
@@ -21220,7 +21240,12 @@ function episodeTimedRolls(form){
 function episodeTimedMedical(form,{strict=false}={}){
  const duration=Number(form.elements.namedItem('minutes')?.value),clock=data.campaignClock;
  if(!clock||!Number.isSafeInteger(duration)||duration<1||duration>10080)return null;
- try{return episodeTimedMedicalPreview(data,{endMinute:clock.minute+duration,rolls:episodeTimedRolls(form)});}
+ try{
+  const v=episodeFormSnapshot(form),enabled=v.kind==='travel'&&v.conveyance==='foot'&&v.seriousAggravationEnabled===true;
+  if(enabled&&Number(v.hazardDelayNow||0)>0)throw Error('HMK 182: epizodu se zdrženími rozdělte na čistý pohyb a čas bez pohybu; jinak nelze datovat Agility kontroly.');
+  return episodeTimedMedicalPreview(data,{endMinute:clock.minute+duration,rolls:episodeTimedRolls(form),
+   movement:{enabled,mode:v.seriousMoveRate||'half',memberIds:v.memberIds||[],movementMinutes:duration}});
+ }
  catch(err){if(strict)throw err;return {error:err.message,requirements:[],changes:[],incapacitations:[],complete:false};}
 }
 /** GM memo reminders are reviewable without fabricated skill or health dice.
@@ -21239,7 +21264,7 @@ function episodeGMReviews(form){
  return {pending:agenda.filter(p=>p.destination!=='notes'||!values[p.id]||values[p.id]!==p.dueMinute),
   reviewed:agenda.filter(p=>p.destination==='notes'&&values[p.id]===p.dueMinute)};
 }
-const EPISODE_TIMED_COURSE_KINDS=new Set(['malnutrition-course','poison','disease','healing','infection','blood-loss','grim','extended-shock','coma','weather-course','sleep-deprivation']);
+const EPISODE_TIMED_COURSE_KINDS=new Set(['movement-aggravation','malnutrition-course','poison','disease','healing','infection','blood-loss','grim','extended-shock','coma','weather-course','sleep-deprivation']);
 function episodeOtherTimedTasks(form){return episodeIndependentDeadlines(form).filter(x=>!EPISODE_TIMED_COURSE_KINDS.has(x.kind));}
 function episodeGMStagedClock(clock,reviewed){
  if(!reviewed.length)return clock;
@@ -21422,6 +21447,7 @@ function updateEpisodePreview(form){
  if(originInput&&reuseInput)originInput.value=reuseInput.checked?'reuse':'new';
  let v=episodeFormSnapshot(form);
  const kind=v.kind,travel=kind==='travel';
+ const aggrPanel=form.querySelector('[data-episode-aggravation]');if(aggrPanel)aggrPanel.hidden=!travel||v.conveyance!=='foot';
  delete form.dataset.episodeOrientationStars;delete form.dataset.episodeOrientationSv;
  if(travel){
   const select=form.elements.namedItem('terrain');
@@ -21782,14 +21808,14 @@ function episodeCarrySettingsFromLast(){
  if(!settings)return {};
  const keep=['kind','memberIds','animalIds','stableAnimalIds','guideId','weatherSource','area','topography','terrain','conveyance','mapScale',
   'season','climate','alpine','aridDesert','lightPeriod','lightCalculation','latitudeBand','sunriseMinute','twilightMinutes','daylightSeason','extraSlow','environ','habitat','forageTarget','herbName','orientationPriority',
-  'orientationFamiliar','orientationTorch','orientationMoon','orientationSnow','trackingTrail',
+  'orientationFamiliar','orientationTorch','orientationMoon','orientationSnow','trackingTrail','seriousAggravationEnabled','seriousMoveRate',
   'trackingLight','trackingRoad','trackingPartyTracked','trackingSnow','trackingRain','trackingAlpine','orientationAllocation','orientationLowChoice','weatherSafeShelter'];
  const draft=Object.fromEntries(keep.filter(k=>k in settings).map(k=>[k,settings[k]]));
  return {...draft,rememberSettings:true,orientationUse:'new',trackingUse:'new',confirmed:false,
   navigationRecovered:false,checkEncounter:true};
 }
 function episodeFreshDraft(){return {rememberSettings:false,orientationUse:'new',trackingUse:'new',confirmed:false,
- memberIds:[],animalIds:[],stableAnimalIds:[],orientationProofId:'',trackingProofId:'',progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
+ memberIds:[],animalIds:[],stableAnimalIds:[],orientationProofId:'',trackingProofId:'',progressD10:'',directionD10:'',seriousAggravationEnabled:false,seriousMoveRate:'half',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
 function episodeClearDiceDraft(draft){
  const saved={...draft,confirmed:false,orientationProofId:'',trackingProofId:'',droverProofId:'',encounterD100Sub:'',
   progressD10:'',directionD10:'',survivalD10:'',precipitationD6:'',encounterD100:'',forageD10:'',
@@ -22277,6 +22303,7 @@ document.addEventListener('submit',e=>{
    }
    const p={...result,actors,animals,skillLinks,timedMedical:(stagedTimed?.changes||[]).map(x=>({actorId:x.actorId,dueMinute:x.dueMinute,kind:x.kind,cancelled:x.cancelled===true,roll:x.roll??null,sl:x.sl,beforeHR:x.beforeHR,afterHR:x.afterHR,shockAfter:x.shockAfter,
      description:x.description??null,report:x.report??null,sourceKey:x.key??null})),
+    movementAggravation:stagedTimed?.movementAggravation||null,
     incapacitationDecision:v.episodeIncapChoice||null,gmReviews:gm.reviewed.map(p=>({id:p.id,title:p.title,dueMinute:p.dueMinute})),area:weather.area,weatherOrigin:weather.origin,weatherSourceId:weather.sourceId,
     precipitation,settings:{...v,confirmed:undefined},narrative:v.narrative||'',mapScale:Number(v.mapScale),recovery};
    data.journal.push({id:sourceId,characterId:v.guideId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
