@@ -10,9 +10,17 @@ export function severityFromInjuryLevel(level){
 export function compoundCompatible(a,b){
   if(!a||!b) return false;
   if(a.location!==b.location) return false;
+  // A limb location has independent left/right anatomy (HMK pp.167,170).
+  // Existing callers may already filter by side and pass an unsided draft;
+  // never conflate two *explicit*, contradictory sides.
+  const aSide=String(a.side??'').toLowerCase(),bSide=String(b.side??'').toLowerCase();
+  if(['left','right'].includes(aSide)&&['left','right'].includes(bSide)&&aSide!==bSide)return false;
   const aArea=!!a.area, bArea=!!b.area;
   if(aArea||bArea) return aArea&&bArea;
-  const elemental=x=>x.aspect==='fire'||x.aspect==='frost';
+  // The production Injury Sequence stores Fire as aspect 'f' (p167), not
+  // always the expanded label 'fire'. Both Fire and Frost compound ONLY
+  // with Fire/Frost injuries (HMK p168), never with blunt/edge/point.
+  const elemental=x=>['f','fire','frost'].includes(String(x.aspect??'').toLowerCase());
   if(elemental(a)||elemental(b)) return elemental(a)&&elemental(b);
   return true;
 }
@@ -20,7 +28,11 @@ export function compoundCompatible(a,b){
 export function compoundInjury({existing=[],incoming,d10}={}){
   if(!incoming) throw new Error('Incoming injury required');
   const compatible=existing.filter(x=>compoundCompatible(x,incoming));
-  if(!compatible.length) return {required:false,tn:null,success:false,injury:{...incoming},injuryShock:incoming.level};
+  if(!compatible.length){
+    if(d10!==undefined&&d10!==null)throw new RangeError('Compound d10 is not required for incompatible injuries');
+    return {required:false,tn:null,success:false,injury:{...incoming},injuryShock:incoming.level};
+  }
+  if(!Number.isSafeInteger(d10)||d10<1||d10>10)throw new RangeError('Compound Injury requires a real d10 result (1–10)');
   const pool=[...compatible,incoming];
   const tn=pool.reduce((s,x)=>s+x.level,0);
   const success=d10<=tn;

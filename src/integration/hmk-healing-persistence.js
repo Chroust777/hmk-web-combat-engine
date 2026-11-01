@@ -267,13 +267,19 @@ export function applyConfirmedBloodLossHealing({state,round,eventId,daySinceBloo
  requireRule(s.bloodLoss.bp>0,'Postava nemá BP k obnovení');
  const due=s.bloodLoss.healingNextDay??10;
  requireRule(daySinceBloodLoss===due,'Blood Loss Healing Roll je splatný den '+due);
- const otherFatigue=s.fatigue.windedness+s.fatigue.weariness+s.fatigue.otherWeakness;
- const eml=endurance-otherFatigue,sl=successLevel(roll,eml);
+ // HMK p181 explicitly excludes all fatigue except WEAKNESS from sources
+ // other than this anaemia. Windedness and Weariness are NOT modifiers here.
+ const otherWeakness=s.fatigue.otherWeakness;
+ const enduranceML=endurance*5;
+ const eml=enduranceML-otherWeakness,sl=successLevel(roll,eml);
  const prior=s.bloodLoss.bp;
  s.bloodLoss.bp=Math.max(0,prior-(sl===SL.CS?2:sl===SL.S?1:0));
  s.bloodLoss.weaknessFatigue=s.bloodLoss.bp*5;
  s.bloodLoss.healingNextDay=s.bloodLoss.bp===0?null:daySinceBloodLoss+(sl===SL.CF?20:10);
- track(s,{eventId,round,type:'blood-loss-healing',details:{daySinceBloodLoss,roll,endurance,otherFatigue,eml,sl:Object.keys(SL).find(k=>SL[k]===sl),bpBefore:prior,bpAfter:s.bloodLoss.bp,nextDay:s.bloodLoss.healingNextDay}});
+ track(s,{eventId,round,type:'blood-loss-healing',details:{daySinceBloodLoss,roll,endurance,
+  enduranceML,otherWeakness,otherFatigue:otherWeakness,excludedWindedness:s.fatigue.windedness,
+  excludedWeariness:s.fatigue.weariness,excludedAnaemia:prior*5,
+  eml,sl:Object.keys(SL).find(k=>SL[k]===sl),bpBefore:prior,bpAfter:s.bloodLoss.bp,nextDay:s.bloodLoss.healingNextDay}});
  return {state:s,bpBefore:prior,bpAfter:s.bloodLoss.bp,nextHealingDay:s.bloodLoss.healingNextDay};
 }
 /** Grim G/CF wound: daily Location Shock Roll until no longer G or CF-treated (p180). */
