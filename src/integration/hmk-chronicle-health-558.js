@@ -97,7 +97,7 @@ export function projectChronicleHealth_558({actorId,state,now=null,campaignId=nu
     'Termín nedoložen nebo běžné léčení pozastaveno',
    infected?'Infekce pozastavuje Healing Rolls všech ran (HMK str. 181).':
     'Přesný čas úplného uzdravení nelze bez dalších skutečných hodů určit.',!!kind));
-  if(h.grimWound)rows.push(item(w.id+':grim','Grim Wound · '+name,'Shock',
+  if(h.grimWound&&w.severity==='G')rows.push(item(w.id+':grim','Grim Wound · '+name,'Shock',
    'samostatná denní kontrola',dueDescriptor(agenda,'grim',actorId,gmTime,displayMinute,null,w.id),
    'Současná infekce neruší povinnost denního Grim Shock.',false));
  }

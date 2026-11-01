@@ -200,7 +200,7 @@ export function concentrationInterruptionReason(state){
  if(['withdrawing','routed','catatonic'].includes(state.morale?.state))return `morale-${state.morale.state}`;
  if((state.wounds||[]).some(w=>w.healed!==true&&w.severity==='G'&&
   ['sk','skull'].includes(String(w.location).trim().toLowerCase())))return 'grievous-skull';
- if((state.wounds||[]).some(w=>w.healed!==true&&w.healing?.grimWound===true))return 'grim-wound';
+ if((state.wounds||[]).some(w=>w.healed!==true&&w.severity==='G'&&w.healing?.grimWound===true))return 'grim-wound';
  return null;
 }
 

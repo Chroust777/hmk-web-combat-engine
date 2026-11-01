@@ -197,7 +197,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
       'Doložte aktuální Infection HR a termín denního Course v původní zdravotní evidenci; čas nelze bezpečně posunout');
     }else add(c,'infection','Infection Course (denně)',h.nextInfectionDay,w.id);
    }
-   if(h.grimWound){
+   if(h.grimWound&&w.severity==='G'){
     if(!validDueDay(h.nextGrimShockDay))unresolved(w,'grim','Grim Wound bez platného denního Shock termínu',
      'Doložte poslední Grim Shock a jeho další pravidlový den; automatický d100 se nevytváří');
     else add(c,'grim','Grim Wound Shock (denně)',h.nextGrimShockDay,w.id);

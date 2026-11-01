@@ -37,6 +37,18 @@ function verifyWoundDay(s,id,day){
   'Časová osa této rány se vrací do minulosti: '+id);
 }
 
+/** HMK p182: black-box treatment can accrue 5 permanent impairment per 20
+ * GM-attested elapsed days UNTIL the injury first becomes Minor. Do not
+ * postpone all accumulation until the transition S -> M, and never restart
+ * accumulation after that transition. No elapsed days are invented. */
+function accruePermanentImpairment(w,elapsedDays){
+ const h=w.healing;
+ if(!h?.permanentEligible||!int(elapsedDays,0,100000))return;
+ if(w.severity==='M'&&h.daysToMinor==null)return; // legacy M1: crossing day is unknown
+ const days=h.daysToMinor??elapsedDays;
+ const amount=permanentHealingImpairment({daysToMinor:days,eligible:true});
+ h.permanentImpairment=Math.max(h.permanentImpairment??0,amount);
+}
 /** HMK p354: horse fore/hind leg fractures have permanently decreased HR.
  * It is applied AFTER the existing treatment table, not as a second
  * treatment or a separate write path.  HR <= 2 blocks mundane healing. */
@@ -176,12 +188,20 @@ export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinc
  let sl=successLevel(roll,rawEML);
  if(sl===SL.F&&healingFailureIsCritical({roll,cauterised:!!h.cauterised,area:!!h.area}))sl=SL.CF;
  const result=resolveInjuryHealingRoll({injuryLevel:w.level,sl,infectionPossible:!!h.infectionPossible});
+ const originalSeverity=w.severity;
  if(result.infected){h.infected=true;h.infectionHR=infectionInitialHR(h.healingRate);h.nextInfectionDay=daySinceInjury+1;setInfectionWeakness(s,w,infectionWeaknessFatigue(h.infectionHR));}
- else if(result.injuryLevel===0){w.healed=true;h.healedDay=daySinceInjury;w.bleeding=false;w.nextAdvanceRound=null;}
+ else if(result.injuryLevel===0){
+  // A CS from S2 can jump straight to healed, skipping the recorded M1 stage.
+  if(originalSeverity!=='M'&&h.daysToMinor==null)h.daysToMinor=daySinceInjury;
+  w.healed=true;h.healedDay=daySinceInjury;w.bleeding=false;w.nextAdvanceRound=null;h.grimWound=false;h.nextGrimShockDay=null;
+ }
  else {
   w.level=result.injuryLevel;w.severity=severityFromInjuryLevel(w.level);
-  if(w.severity==='M'&&h.daysToMinor==null){h.daysToMinor=daySinceInjury;h.permanentImpairment=permanentHealingImpairment({daysToMinor:daySinceInjury,eligible:!!h.permanentEligible});}
+  // HMK p180: daily Grim Shock ends as soon as this wound is no longer Grievous.
+  if(w.severity!=='G'){h.grimWound=false;h.nextGrimShockDay=null;}
+  if(originalSeverity!=='M'&&w.severity==='M'&&h.daysToMinor==null)h.daysToMinor=daySinceInjury;
  }
+ accruePermanentImpairment(w,daySinceInjury);
  if(!w.healed&&!result.infected)h.nextHealingDay=daySinceInjury+5;
  track(s,{eventId,round,type:'injury-healing-roll',details:{woundId,daySinceInjury,hb,hr:h.healingRate,rawEML,herbalBonus:herb.bonus,herbalSourceIds:herb.sourceIds,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:w.healed?'healed':w.severity+w.level,infected:!!result.infected,historicalEvidence:historicalEvidence?{...historicalEvidence,sourceDay:daySinceInjury}:null}});
  return {state:s,healed:!!w.healed,infected:!!h.infected,result};
@@ -208,6 +228,7 @@ export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySi
  const sl=successLevel(roll,rawEML),result=resolveInfectionCourse({hr:h.infectionHR,sl});
  h.infectionHR=result.hr;
  if(result.dead){s.shock='KIA';s.shockFollowup=null;s.extendedShock=null;s.coma=null;for(const x of s.wounds)x.nextAdvanceRound=null;}
+ accruePermanentImpairment(w,daySinceInjury);
  const resumed=[];
  if(result.defeated){
   h.infected=false;h.nextInfectionDay=null;setInfectionWeakness(s,w,0);
@@ -227,6 +248,7 @@ export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySi
      int(e.details?.daySinceInjury,0,100000)).map(e=>e.details.daySinceInjury);
     requireRule(previousDays.length===0||elapsed>=Math.max(...previousDays),
      'Dny od poranění jiné rány nemohou běžet zpět: '+item.woundId);
+    accruePermanentImpairment(other,elapsed);
     other.healing.nextHealingDay=elapsed+5;
     resumed.push({woundId:item.woundId,confirmedElapsedDays:elapsed,nextHealingDay:other.healing.nextHealingDay});
    }
@@ -262,7 +284,10 @@ export function applyConfirmedGrimWoundShock({state,round,eventId,woundId,daySin
  requireRule(daySinceInjury===due,'Denní Grim Wound Shock je splatný den '+due);
  requireRule(int(locationShock,0,10)&&int(shockML,0,200)&&int(roll,1,100),'Je nutný skutečný Location Shock, EML a d100');
  const sl=successLevel(roll,shockML),modifier=sl===SL.CF?2:sl===SL.F?1:sl===SL.S?0:-1;
- const index=locationShock+modifier;
+ // HMK pp169,180: Grim Shock repeats injury sequence step 4: Location Shock
+ // PLUS the wound's current Injury Level PLUS the actual Shock Roll modifier.
+ const injuryShock=w.level;
+ const index=locationShock+injuryShock+modifier;
  const incoming=index>=10?'KIA':index===9?'UNC':index===8?'INC':index===7?'STN':'NONE';
  const rank={NONE:0,STN:1,INC:2,UNC:3,KIA:4};
  if(s.shock===incoming&&s.shock==='STN')s.shock='INC';
@@ -274,7 +299,7 @@ export function applyConfirmedGrimWoundShock({state,round,eventId,woundId,daySin
   s.shockFollowup={kind:s.shock,originRound:round,dueRound:round+(s.shock==='UNC'?120:1),phase:s.shock==='UNC'?'after-ten-minutes':'end-next-turn',timelineId:s.encounterTimelineId??null};
  }
  w.healing.nextGrimShockDay=daySinceInjury+1;
- track(s,{eventId,round,type:'grim-wound-shock',details:{woundId,daySinceInjury,locationShock,shockML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),index,newShock:s.shock}});
+ track(s,{eventId,round,type:'grim-wound-shock',details:{woundId,daySinceInjury,locationShock,injuryShock,shockML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),index,newShock:s.shock}});
  return {state:s,shock:s.shock,index};
 }
 
