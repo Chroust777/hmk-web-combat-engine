@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.656';
+const APP_VERSION='93.657';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7325,14 +7325,15 @@ function hmkSpecialBranchesPanel(chars){
 }
 function hmkLongtermHealingPanel(chars){
  if(!chars.length)return '';
- const woundOptions=chars.flatMap(c=>persistentStateOf(c).wounds.filter(w=>!w.healed).map(w=>`<option value="${esc(c.id+'::'+w.id)}">${esc(c.name)} · ${esc(w.location)} ${esc(w.severity+w.level)} · ${esc(w.id)}</option>`)).join('');
+ const woundNumber=(c,w)=>persistentStateOf(c).wounds.findIndex(x=>x.id===w.id)+1;
+ const woundOptions=chars.flatMap(c=>persistentStateOf(c).wounds.filter(w=>!w.healed).map(w=>`<option value="${esc(c.id+'::'+w.id)}">${esc(c.name)} · ${esc(w.location.toUpperCase())} ${w.side==='left'?'L':w.side==='right'?'R':'?'} · ${esc(w.severity+w.level+(w.aspect||''))} · rána ${woundNumber(c,w)}</option>`)).join('');
  const fields=`<label>Rána<select name="wound" required>${woundOptions||'<option value="">Žádná aktivní rána</option>'}</select></label><label>Dny od vzniku rány (skutečně potvrzené GM)<input name="daySinceInjury" type="number" min="0" step="1" required></label>`;
  const infected=chars.flatMap(c=>persistentStateOf(c).wounds.filter(w=>!w.healed&&w.healing?.infected).map(w=>({c,w})));
  const frostOptions=chars.flatMap(c=>persistentStateOf(c).wounds.filter(w=>!w.healed&&w.severity==='G'&&
   ['frost'].includes(String(w.aspect).toLowerCase())&&!w.healing?.treated&&(w.bodyKind===undefined||w.bodyKind==='human')&&
   ['fa','face','ua','el','fo','ha','th','kn','ca','ft','upper arm','elbow','forearm','hand','thigh','knee','calf','foot'].includes(String(w.location).toLowerCase()))
-  .map(w=>`<option value="${esc(c.id+'::'+w.id)}">${esc(c.name)} · ${esc(w.location)} ${esc(w.severity+w.level)} · ${esc(w.id)}</option>`)).join('');
- const infectionOptions=infected.map(({c,w})=>`<option value="${esc(c.id+'::'+w.id)}">${esc(c.name)} · ${esc(w.location)} ${esc(w.severity+w.level)} · ${esc(w.id)}</option>`).join('');
+  .map(w=>`<option value="${esc(c.id+'::'+w.id)}">${esc(c.name)} · ${esc(w.location.toUpperCase())} ${w.side==='left'?'L':w.side==='right'?'R':'?'} · ${esc(w.severity+w.level+(w.aspect||''))} · rána ${woundNumber(c,w)}</option>`)).join('');
+ const infectionOptions=infected.map(({c,w})=>`<option value="${esc(c.id+'::'+w.id)}">${esc(c.name)} · ${esc(w.location.toUpperCase())} ${w.side==='left'?'L':w.side==='right'?'R':'?'} · ${esc(w.severity+w.level+(w.aspect||''))} · rána ${woundNumber(c,w)}</option>`).join('');
  const infectionFields=`<label>Infikovaná rána<select name="wound" required>${infectionOptions||'<option value="">Žádná aktivní infekce</option>'}</select></label><label>Dny od vzniku této rány (GM potvrdil)<input name="daySinceInjury" type="number" min="0" step="1" required></label>`;
  const infectionResumptionFields=infected.map(({c,w},i)=>{
   const others=persistentStateOf(c).wounds.filter(x=>x.id!==w.id&&!x.healed&&x.healing?.treated&&!x.healing.noMundaneHealing);
@@ -10196,7 +10197,7 @@ function hskSeriousAggravationForm(entry){
  if(result?.level!=='CF')return '';
  const actor=character(proof.actorId),wounds=persistentStateOf(actor).wounds.filter(x=>!x.healed&&['S','G'].includes(x.severity));
  if(!wounds.length||data.journal.some(x=>x.skillTestProof?.type==='skill-aggravation-aftermath'&&x.skillTestProof.sourceId===entry.id))return '';
- const rows=wounds.map(w=>`<label data-aggravation-wound data-wound-id="${esc(w.id)}"><input type="checkbox" name="used"> ${esc(w.location)} · ${esc(w.severity)}${w.level} · Shock SR d10 <input type="number" name="d10" min="1" max="10" placeholder="d10, pokud dotčeno"></label>`).join('');
+ const rows=wounds.map((w,i)=>`<label data-aggravation-wound data-wound-id="${esc(w.id)}"><input type="checkbox" name="used"> ${esc(w.location.toUpperCase())} · ${w.side==='left'?'L':w.side==='right'?'R':'strana nedoložena'} · ${esc(w.severity)}${w.level}${esc(w.aspect||'')} · rána ${i+1} · Shock SR d10 <input type="number" name="d10" min="1" max="10" placeholder="d10, pokud dotčeno"></label>`).join('');
  return `<details class="hsk-climb-fall"><summary>Volitelné pravidlo: CF → zhoršení vážné rány · HMK str.182</summary>
  <form data-skill-aggravation-aftermath><input type="hidden" name="sourceId" value="${esc(entry.id)}">
  <p>Pouze je-li toto pravidlo v kampani zapnuté a CF skutečně použilo zraněnou zónu. U každé vybrané S/G rány je samostatný Shock SR. Nevybrané rány zůstávají beze změny.</p>
@@ -10957,7 +10958,7 @@ document.addEventListener('submit',event=>{
   if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='skill-aggravation-aftermath'&&x.skillTestProof.sourceId===sourceId))throw Error('Dvojí aggravation');
    synchronizeCombatInjuries(actor,outcome.state);
    data.journal.push({id:uuid(),characterId:actor.id,title:'Serious Injury Aggravation · HMK 182',
-    body:outcome.report.consequences.map(x=>x.woundId+' d10 '+x.d10+' / TN '+x.tn+' → '+(x.passed?'bez zhoršení':'HR −1')).join('\n'),
+    body:outcome.report.consequences.map(x=>{const sourceWound=persistentStateOf(actor).wounds.find(w=>w.id===x.woundId);return (sourceWound?`${sourceWound.location.toUpperCase()} ${sourceWound.side==='left'?'L':sourceWound.side==='right'?'R':'?'} ${sourceWound.severity}${sourceWound.level}${sourceWound.aspect||''}`:'Doložená rána')+' · d10 '+x.d10+' / TN '+x.tn+' → '+(x.passed?'bez zhoršení':'HR −1');}).join('\n'),
     createdAt:stamp(),skillTestProof:{type:'skill-aggravation-aftermath',sourceId,actorId:actor.id,
      results:outcome.report.consequences,rulePage:182}});
   }))throw Error('Zápis zhoršení rány nebyl dokončen');
