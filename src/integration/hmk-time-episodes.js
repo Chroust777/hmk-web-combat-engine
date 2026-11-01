@@ -246,7 +246,7 @@ export function calculateEpisodeMinuteRecovery({kind,minute,minutes,current,prio
 }
 export const EPISODE_SKILL_MEMORY_FORMAT='hmk-gm-episode-skill-memory-v1';
 const normalizedIds=ids=>[...(ids||[])].sort();
-export function episodeSkillProof(row,skill,guideId,campaignId,atMinute){
+export function episodeSkillProof(row,skill,guideId,campaignId,atMinute,{requireSV=false}={}){
  // A stand-alone Skill Test may have its own calendar obligations, including
  // CF follow-ups, but it cannot become evidence for an unrelated episode.
  if(row?.calendarIndependentSkillTest)return null;
@@ -254,10 +254,11 @@ export function episodeSkillProof(row,skill,guideId,campaignId,atMinute){
  const r=p?.a||p?.result;
  if(!row||row.calendarCampaignId!==campaignId||row.characterId!==guideId||
   row.campaignMinute!==atMinute||actual!==skill||
-  !String(p?.type||'').includes('value')||!Number.isSafeInteger(r?.sv)||
+  !['secondary-mastery-value-test','skill-value-result','secondary-mastery-test'].includes(p?.type)||
+  (requireSV&&(!['secondary-mastery-value-test','skill-value-result'].includes(p?.type)||!Number.isSafeInteger(r?.sv)))||
   !['CF','F','S','CS'].includes(r?.level))return null;
  const stars=r?.svTier?.stars;
- return {skillId:row.id,guideId,skill,sv:r.sv,level:r.level,
+ return {skillId:row.id,guideId,skill,sv:['secondary-mastery-value-test','skill-value-result'].includes(p.type)?r.sv:null,level:r.level,
   stars:Number.isInteger(stars)?stars:null,roll:r.d100??r.roll??null};
 }
 /** Historical local weather is not a global receipt. Tie skill reuse to the

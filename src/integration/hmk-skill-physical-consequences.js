@@ -12,7 +12,7 @@ import {successLevel} from '../rules/tests.js';
 import {availableMasteries} from './hmk-skill-test-engine.js';
 const must=(ok,msg)=>{if(!ok)throw Error(msg)};
 const die=(v,max)=>Number.isSafeInteger(v)&&v>=1&&v<=max;
-function rollProof(...rows){return rows.map(([faces,value])=>({faces,value,source:'GM-entered-physical-die'}));}
+function rollProof(...rows){return rows.map(([faces,value,source])=>({faces,value,source:source==='cryptographic-software-die'?'cryptographic-software-die':'GM-entered-physical-die'}));}
 const mastery=(actor,name)=>{
  // HMK p.61: attributes are legitimate primary test masteries (score × 5).
  // Character Creation stores Agility as hmk.attributes.agl, NOT as a Skill.
@@ -22,7 +22,7 @@ const mastery=(actor,name)=>{
 };
 export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,round=1,gmConfirmed=false,
  impactDie,zoneD10,locationD10,direction='front',shockD100=null,compoundD10=null,
- hazardD10=null,agilityD100=null,randomVictimConfirmed=false}={}){
+ hazardD10=null,agilityD100=null,randomVictimConfirmed=false,autoDieValues={}}={}){
  must(['fishing-cf','survival-accident'].includes(kind),'Neznámý typ zranění Skill Tests');
  must(gmConfirmed===true&&actor?.id&&Array.isArray(inventory)&&state&&typeof sourceId==='string'&&sourceId&&
   die(round,9999),'Nutné potvrzení GM, cílová postava, aktuální Combat State a zdroj události');
@@ -37,6 +37,9 @@ export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,
  const evt='skill-injury:'+kind+':'+sourceId;
  must(!state.events.some(x=>x.id===evt||x.id===evt+':complete'),'Tento následek už je trvale zapsán');
  const limit=kind==='fishing-cf'?10:6;
+ // A generated roll is witnessed only when the exact form value still equals
+ // its cryptographic button result. All others remain physical/GM entries.
+ const dieEvidence=(name,faces,value)=>[faces,value,autoDieValues?.[name]===value?'cryptographic-software-die':'GM-entered-physical-die'];
  let sl=null,eml=null;
  if(kind==='survival-accident'){
   must(randomVictimConfirmed===true,'GM musí doložit náhodný výběr postiženého člena družiny');
@@ -56,7 +59,7 @@ export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,
    const next=structuredClone(state);next.events.push({id:evt,type:'skill-survival-accident-avoided',round,
     details:{sourceId,agilityD100,eml,sl,hazardD10,rulePage:148,randomVictimConfirmed:true}});
    next.lastRound=Math.max(next.lastRound,round);validateCombatState(next);
-   return {state:next,kind,sourceId,sl,eml,injury:null,avoided:true,physicalDice:rollProof([10,hazardD10],[100,agilityD100])};
+   return {state:next,kind,sourceId,sl,eml,injury:null,avoided:true,physicalDice:rollProof(dieEvidence('hazardD10',10,hazardD10),dieEvidence('agilityD100',100,agilityD100))};
   }
  }
  must(die(impactDie,limit)&&die(zoneD10,10)&&die(locationD10,10),
@@ -68,9 +71,10 @@ export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,
  const armour=resolveLiveCombatArmour({inventory,targetId:actor.id,location:loc.location,aspect,direction,mode:'auto',rigidStatus:'unknown'});
  must(armour.ready,'Neznámá skutečná ochrana zbroje pro '+loc.location+': '+(armour.reason||'neověřeno'));
  const impact=impactDie+(kind==='survival-accident'?4+(sl==='CF'?5:0):0);
- const dice=rollProof(...(kind==='survival-accident'?[[10,hazardD10],[100,agilityD100]]:[]),
-  [limit,impactDie],[10,zoneD10],[10,locationD10],
-  ...((shockD100==null)?[]:[[100,shockD100]]),...((compoundD10==null)?[]:[[10,compoundD10]]));
+ const dice=rollProof(...(kind==='survival-accident'?[dieEvidence('hazardD10',10,hazardD10),dieEvidence('agilityD100',100,agilityD100)]:[]),
+  dieEvidence('impactDie',limit,impactDie),dieEvidence('zoneD10',10,zoneD10),dieEvidence('locationD10',10,locationD10),
+  ...((shockD100==null)?[]:[dieEvidence('shockD100',100,shockD100)]),
+  ...((compoundD10==null)?[]:[dieEvidence('compoundD10',10,compoundD10)]));
  const applied=woundFromFall({state,character:actor,round,timelineId:'skill:'+sourceId,eventId:evt,
   bodyKind:'human',aspect,location:loc.location,side:loc.side,locationShock:loc.locationShock,
   strikeImpact:impact,AV:armour.armourValue,shockRoll:shockD100,compoundD10,physicalDice:dice});
