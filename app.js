@@ -167,7 +167,7 @@ import {ANIMAL_AREA_AV,weatherAnimalCandidates,prepareAnimalTrekkingWeather,vali
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekWeatherReference,trekAvailableTerrain,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence,assertTrekDailyWeatherAppendOnly} from './src/integration/hmk-trekking-routine.js';
 import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-scope.js';
-import {EPISODE_FORMAT,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEpisodeTravelDelayCarry} from './src/integration/hmk-time-episodes.js';
+import {EPISODE_FORMAT,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry} from './src/integration/hmk-time-episodes.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.663';
+const APP_VERSION='93.664';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1466,7 +1466,7 @@ function personalProvisionRulebookHTML(actor,policies,dayCandidates,dayPlans,clo
  const cancellation=outstanding.map(x=>{const c=x.calendarNutritionConditions,already=data.journal.some(j=>j.calendarNutritionConditionsCancel?.planId===x.id);
   if(already||clock.minute>=c.endMinute)return '';
   return `<form data-nutrition-conditions-cancel class="hc-provision-pauser"><input type="hidden" name="sourceId" value="${esc(x.id)}"><label>Přerušit potvrzený plán (${esc(c.kind)})<input name="reason" minlength="3" required placeholder="Skutečný důvod přerušení"></label><button type="submit" class="secondary">Zrušit plán</button></form>`;}).join('');
- const health=due.length?`<section class="hc-person-health"><h4>Starvation / Thirst · kontrola ${esc(actor.name)}</h4>${due.map(t=>`<form data-malnutrition-course><strong ${journalHelp('HR',HR_HELP_558)}>${t.kind==='starvation'?'Starvation':'Thirst'} HR${t.hr} · ${medicalHint('Weakness')} ${t.weakness} · ${t.mode==='healing'?'Healing':t.mode==='advance'?'Advance':'čeká na doklad dávky'} · ${esc(medicalFullMoment(t.dueMinute))}</strong><p class="hc-medical-detail">Vznik: ${esc(medicalFullMoment(t.originMinute))} · poslední zúčtování: ${t.latestRation==='full'?'plné dávky':t.latestRation==='half'?'poloviční dávky':t.latestRation==='none'?'bez dávek':'bez přesného dokladu'} · ${esc(t.provisionMode)}. Následek této epizody se mění až podle skutečných Healing Rolls; uzdravení nastává při HR6 (HMK 184–186).</p>${malnutritionLastRollHTML(actorId,t.kind,t.episodeId)}${malnutritionPrognosisHTML(t,actor,clock)}<input type="hidden" name="actorId" value="${esc(actorId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}"><div class="hc-person-health-roll-actions"><label>Skutečný ${medicalHint('d100')} (1–100)<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="hc-small hc-provision-generate" data-malnutrition-die="yes">⚄ d100</button><button type="submit" ${clock.minute<t.dueMinute||t.mode==='pending'?'disabled title="Zdravotní test vyžaduje splatnost a doloženou dávku"':''}>Potvrdit zdravotní test</button></div></form>`).join('')}</section>`:'';
+ const health=due.length?`<section class="hc-person-health"><h4>Hladovění / žízeň · zdravotní kontrola ${esc(actor.name)}</h4>${due.map(t=>`<form data-malnutrition-course><strong ${journalHelp('HR',HR_HELP_558)}>${t.kind==='starvation'?'Hladovění':'Žízeň'} HR${t.hr} · ${medicalHint('Weakness')} ${t.weakness} · ${t.mode==='healing'?'Healing':t.mode==='advance'?'Advance':'čeká na doklad dávky'} · ${esc(medicalFullMoment(t.dueMinute))}</strong><p class="hc-medical-detail">Vznik: ${esc(medicalFullMoment(t.originMinute))} · poslední zúčtování: ${t.latestRation==='full'?'plné dávky':t.latestRation==='half'?'poloviční dávky':t.latestRation==='none'?'bez dávek':'bez přesného dokladu'} · ${esc(t.provisionMode)}. Následek této epizody se mění až podle skutečných Healing Rolls; uzdravení nastává při HR6 (HMK 184–186).</p>${malnutritionLastRollHTML(actorId,t.kind,t.episodeId)}${malnutritionPrognosisHTML(t,actor,clock)}<input type="hidden" name="actorId" value="${esc(actorId)}"><input type="hidden" name="episodeId" value="${esc(t.episodeId)}"><div class="hc-person-health-roll-actions"><label>Skutečný ${medicalHint('d100')} (1–100)<input name="roll" type="number" min="1" max="100" required></label><button type="button" class="hc-small hc-provision-generate" data-malnutrition-die="yes">⚄ d100</button><button type="submit" ${clock.minute<t.dueMinute||t.mode==='pending'?'disabled title="Zdravotní test vyžaduje splatnost a doloženou dávku"':''}>Potvrdit zdravotní test</button></div></form>`).join('')}</section>`:'';
  const history=malnutritionRecentClosedHTML(actorId);
  // Switching to assured supply hides optional setup forms, not already-due medical checks
  // or cancellation of a previously scheduled 24-hour conditions plan.
@@ -12882,9 +12882,9 @@ document.addEventListener('submit',e=>{
   const rollOrigin=input?.dataset?.generatedMalnutritionRoll===String(value)?'software':'manual';
   if(mutate(()=>resolveMalnutritionCourse(data,{actorId,episodeId,roll:value,rollOrigin,
    gmConfirmed:true,idFactory:uuid,stamp}))){
-   notice='Malnutrition: potvrzený d100 byl zapsán do zdravotního stavu i historie v aktuální minutě. Čas zůstal beze změny.';
+   notice='Hladovění / žízeň: potvrzený d100 byl zapsán do zdravotního stavu i historie v aktuální minutě. Čas zůstal beze změny.';
   }
- }catch(error){alert('Malnutrition Course nebyl uložen: '+error.message)}
+ }catch(error){alert('Kontrola hladu / žízně nebyla uložena: '+error.message)}
 },true);
 // The personal Provision and travel/watch panels call the SAME rest rule engine.
 document.addEventListener('submit',e=>{
@@ -20813,8 +20813,11 @@ function episodePreviewFromForm(form,clock){
  const wearied=people.some(c=>{const f=persistentStateOf(c).fatigue;
   return (f.windedness||0)+(f.weariness||0)+(f.otherWeakness||0)>=20;});
  const injured=people.some(c=>persistentStateOf(c).wounds?.some(w=>!w.healed&&['S','G'].includes(w.severity)));
- const computedSlow=Number(v.extraSlow||0)+Number(modes.orienteeringSlow||0)+taskSlow+
+ const equipmentSlowIn=kind==='travel'?lastEquipmentSlowCarry(data.journal,campaignKey(clock),clock.minute):0;
+ const equipmentDelayIn=kind==='travel'?lastEpisodeTravelDelayCarry(data.journal,campaignKey(clock),clock.minute):0;
+ const equipmentBaseSlow=Number(v.extraSlow||0)+Number(modes.orienteeringSlow||0)+taskSlow+
   Number(wearied)+Number(injured)+Number(precipitation?.slowMode);
+ const computedSlow=equipmentBaseSlow+Number(equipmentSlowIn>0);
  const spare=Math.max(0,modes.progress-computedSlow);
  const priorMovement=previous?.calendarTimeEpisode;
  const sameMovement=orientation?.sourceMode==='reuse'&&priorMovement?.kind==='travel'&&
@@ -20850,7 +20853,7 @@ function episodePreviewFromForm(form,clock){
  const inactiveByActor=Object.fromEntries((medAtEnd?.incapacitations||[]).filter(x=>members.includes(x.actorId))
   .map(x=>[x.actorId,x]));
  const result=calculateTimeEpisode({minute:clock.minute,minutes,kind,topography:v.topography,terrain:v.terrain,
-  conveyance:v.conveyance,progress:modes.progress,bearing:modes.bearing,extraSlow:Number(v.extraSlow||0)+Number(modes.orienteeringSlow||0)+taskSlow,
+  conveyance:v.conveyance,progress:modes.progress,bearing:modes.bearing,extraSlow:Number(v.extraSlow||0)+Number(modes.orienteeringSlow||0)+taskSlow+Number(equipmentSlowIn>0),
   wearied,injured,loaded:actualLoaded,continuousPrecipitation:!!precipitation?.slowMode,
   progressD10,directionD10,enduranceByActor:end,endRollByActor:rolls,memberIds:members,weather:seasonWeather,
   encounterPercentile:encounterD100,encounterSubPercentile:encounterD100Sub,encounterEnviron:v.environ,encounterNight:kind==='travel'?actualPeriod==='night':v.encounterPeriod==='night',
@@ -20858,6 +20861,7 @@ function episodePreviewFromForm(form,clock){
   survivalCriticalFailure:orientation?.level==='CF'&&orientation?.sourceMode==='new',
   survivalD10:orientation?.level==='CF'&&orientation?.sourceMode==='new'?Number(v.survivalD10):null,
   previousCarry:carry,mapScale:Number(v.mapScale),
+  movementMinutes:kind==='travel'?Math.max(0,minutes-equipmentDelayIn):null,
   doubleTime:!!v.doubleTime,loadBypass:!!v.loadBypass,dunesSlow:!!v.dunesSlow,
   encByActor,forcedBearing,
   previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute),
@@ -20954,15 +20958,21 @@ function episodePreviewFromForm(form,clock){
  }
  result.hazardDetail=result.hazardDetails[0]??null;
   if(kind==='travel'){
-   const incoming=0;
+   const incoming=equipmentDelayIn;
    const relevant=result.hazardDetails.find(h=>['equipment','complication'].includes(h.hazard));
    const raw=k=>String(v[k]??'0').trim();
-   const now=Number(raw('hazardDelayNow')||0),future=0;
-   const delay=episodeMinuteDelay({minutes,incoming,current:relevant?now:0,future:0,persistCarry:false});
+   const now=Number(raw('hazardDelayNow')||0);
    const outcome=relevant?.result;
+   const future=relevant?.hazard==='equipment'&&['long-delay','irreparable'].includes(outcome)?240:0;
+   const delay=episodeMinuteDelay({minutes,incoming,current:relevant?now:0,future,persistCarry:true});
+   result.equipmentBaseSlow=equipmentBaseSlow;
+   result.equipmentSlowCarryIn=equipmentSlowIn;
+   result.equipmentSlowCarryOut=Math.max(0,equipmentSlowIn-minutes)+
+    (relevant?.hazard==='equipment'&&outcome==='short-delay'?240:0);
    if(relevant){
 
 
+    if(relevant.hazard==='equipment'&&now!==0)throw Error('Equipment Hazard: oprava S zpomaluje následující hlídku, F/CF spotřebuje následující hlídku. Zdržení nelze přičítat zároveň současné cestě.');
     if(outcome==='no-delay'&&now)throw Error('Úspěch CS nezpůsobuje zdržení. Opravte minuty.');
    }
    const previewIncap=episodeEvaluationRequested?episodeTimedMedical(form)?.incapacitations||[]:[];
@@ -21360,7 +21370,7 @@ function episodeTimedRolls(form){
 function episodeTimedMedical(form,{strict=false}={}){
  const duration=Number(form.elements.namedItem('minutes')?.value),clock=data.campaignClock;
  if(!clock||!Number.isSafeInteger(duration)||duration<1||duration>10080)return null;
- try{return episodeTimedMedicalPreview(data,{endMinute:clock.minute+duration,rolls:episodeTimedRolls(form)});}
+ try{return episodeTimedMedicalPreview(data,{endMinute:clock.minute+duration,rolls:{}});}
  catch(err){if(strict)throw err;return {error:err.message,requirements:[],changes:[],incapacitations:[],complete:false};}
 }
 /** GM memo reminders are reviewable without fabricated skill or health dice.
@@ -21405,41 +21415,33 @@ function showEpisodeIndependentDeadlines(form){
  const relevant=other.length||medical?.changes.length||medical?.requirements.length||medical?.error||medical?.incapacitations.length||gm.pending.length||gm.reviewed.length;
  box.hidden=!relevant;
  if(!episodeEvaluationRequested)return;
- const rolls=episodeTimedRolls(form);
  const medicalRows=(medical?.changes||[]).map(c=>'<div class="hc-episode-proof hc-episode-proof-done"><strong>'+(c.cancelled?'⊘ ':'✓ ')+
   esc(character(c.actorId)?.name||c.actorId)+' · '+esc(c.kind)+' · '+esc(displayCampaignMinute(c.dueMinute))+
   '</strong><p>'+(c.cancelled?'Zrušený termín · ':'Vyřešeno · ')+esc(c.description||'původní HMK zdravotní procedura')+
   (c.roll==null?'':' · d100 '+esc(c.roll))+(c.sl?' · '+esc(c.sl):'')+
   (Number.isSafeInteger(c.beforeHR)?' · HR '+c.beforeHR+' → '+c.afterHR:'')+
   (c.shockAfter&&c.shockAfter!=='NONE'?' · '+esc(c.shockAfter):'')+'</p></div>').join('');
+ // In Travel a dated medical event is a LINK, never a second dice executor.
+ // Split the watch at its actual timestamp, then resolve it in the original
+ // Health / Provisions module. The main medical preview remains read-only.
  const missingRows=(medical?.requirements||[]).map(r=>{
-  const actor=character(r.characterId)?.name||r.characterId;
-  if(r.mode==='pending')return '<div class="hc-episode-task hc-episode-medical-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
-   '</strong><p>'+esc(r.reason)+'</p><p>Nejdříve doložte příděly v původní evidenci stravy a vody; bez nich nelze zdravotní d100 správně vypočítat.</p>'+
-   '<button type="button" class="secondary" data-episode-nav="inventory">Otevřít inventář a zásoby</button></div></div>';
-  if(r.error)return '<div class="hc-episode-task hc-episode-medical-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
-   '</strong><p>'+esc(r.reason)+'</p><button type="button" class="secondary" data-episode-nav="'+
-   esc(calendarEventDestination({kind:r.kind}))+'">Otevřít původní pravidlový modul</button></div></div>';
-  const fields=r.fields||[{name:'roll',label:'Skutečný d100',min:1,max:100}],nested=!!r.fields;
-  const stored=rolls[r.key]||{},values=nested?(typeof stored==='object'?stored:{roll:stored}):{roll:stored};
-  const inputs=fields.map(f=>{
-   const key=encodeURIComponent(r.key),value=values[f.name]??'';
-   const missing=value===''||((!f.type||f.type==='number')&&(Number(value)<f.min||Number(value)>f.max||!Number.isInteger(Number(value))))||
-    (f.type==='text'&&String(value).trim().length<(f.minLength||1))||(f.type==='choice'&&!f.options?.some(x=>x.value===value));
-   const missingClass=missing?' class="hc-episode-medical-missing"':'';
-   // Scalar malnutrition d100 must be stored as rolls[key]=n. Structured
-   // courses store rolls[key][field]. Never silently interchange the two.
-   const fieldAttr=nested?' data-episode-medical-field="'+esc(f.name)+'"':'';
-   const control=f.type==='choice'?'<select '+missingClass+' data-episode-medical-key="'+esc(key)+'"'+fieldAttr+' aria-label="'+esc(f.label+' · '+actor)+'"><option value="">Vyberte</option>'+
-    f.options.map(opt=>'<option value="'+esc(opt.value)+'" '+(value===opt.value?'selected':'')+'>'+esc(opt.label)+'</option>').join('')+'</select>':
-    '<input '+missingClass+' data-episode-medical-key="'+esc(key)+'"'+fieldAttr+' type="'+(f.type==='text'?'text':'number')+'" '+
-    (f.type==='text'?'minlength="'+(f.minLength||1)+'" maxlength="'+(f.maxLength||500)+'"':'min="'+f.min+'" max="'+f.max+'"')+' value="'+esc(value)+'" aria-label="'+esc(f.label+' · '+actor)+'">';
-   const isDie=!f.type&&Number.isSafeInteger(f.min)&&f.min===1&&[4,6,8,10,12,20,30,100].includes(f.max);
-   return '<div class="hc-episode-medical-die-pair"><label class="hc-episode-medical-roll-label">'+esc(f.label)+control+'</label>'+
-    (isDie?'<button type="button" class="hc-small hc-provision-generate hc-episode-medical-auto" data-episode-medical-die="'+esc(key)+'"'+fieldAttr+' data-episode-medical-faces="'+f.max+'" data-episode-medical-offset="0">⚄ d'+f.max+'</button>':'')+'</div>';
-  }).join(' ');
-  return '<div class="hc-episode-task hc-episode-medical-task"><div><strong>'+esc(actor)+' · '+esc(r.kind)+' · '+esc(displayCampaignMinute(r.dueMinute))+
-   '</strong><p>'+esc(r.reason)+'</p><div class="hc-episode-medical-rolls">'+inputs+'</div></div></div>';
+  const name=character(r.characterId)?.name||'Postava';
+  const kind=r.kind==='malnutrition-course'?
+   (r.episodeId?.includes('starvation')?'Hladovění · Starvation':
+    r.episodeId?.includes('thirst')?'Žízeň · Thirst':'Hladovění / žízeň · zdravotní kontrola'):
+   ({'assisted-intake':'Příjem jídla a vody','blood-loss':'Ztráta krve',healing:'Hojení',
+    infection:'Infekce',poison:'Otrava',disease:'Nemoc','extended-shock':'Prodloužený Shock',
+    coma:'Kóma',grim:'Grim Wound','weather-course':'Vliv počasí','sleep-deprivation':'Spánková deprivace'}[r.kind]||r.kind);
+  const due=Number(r.dueMinute),now=data.campaignClock.minute;
+  const outside=due>now;
+  const explanation=outside?
+   'Termín leží uvnitř naplánovaného intervalu. Nejdříve ukončete cestu v přesné minutě kontroly; poté ji proveďte v původním modulu. Pouhé otevření formuláře čas kampaně nemění.':
+   'Kontrola je nyní splatná. Otevřete původní zdravotní formulář; v Cestování žádný náhradní hod neexistuje.';
+  const action=outside?'<button type="button" class="secondary" data-episode-medical-boundary="'+esc(due)+'">Rozdělit cestu v tomto termínu</button>':
+   '<button type="button" class="secondary" data-episode-medical-route="'+esc(r.kind)+'" data-episode-medical-actor="'+esc(r.characterId)+'" data-episode-medical-source="'+esc(r.woundId||r.sourceId||r.episodeId||'')+'" data-episode-medical-elapsed="'+esc(r.elapsedMinutes??'')+'">Otevřít příslušný zdravotní modul</button>';
+  return '<div class="hc-episode-task hc-episode-medical-task" data-episode-medical-link-only="yes"><div>'+ 
+   '<strong>'+esc(name)+' · '+esc(kind)+' · '+esc(displayCampaignMinute(due))+'</strong>'+ 
+   '<p>'+esc(r.reason||'Splatná zdravotní kontrola')+'</p><p>'+esc(explanation)+'</p>'+action+'</div></div>';
  }).join('');
  const incap=medical?.incapacitations||[];
  const blocked=incap.length>0;
@@ -21458,14 +21460,15 @@ function showEpisodeIndependentDeadlines(form){
   const reviewed=gm.reviewed.some(x=>x.id===p.id),safeKey=encodeURIComponent(p.id);
   return '<div class="hc-episode-task"><div><strong>'+esc(p.title)+' · '+esc(displayCampaignMinute(p.dueMinute))+
    '</strong><p>'+esc(p.note||'Časovaná událost GM')+'</p>'+
-   (p.destination!=='notes'?'<p>Tato událost vyžaduje původní pravidlový modul. Potvrzení nenahrazuje skutečný test.</p>':
+   (p.destination!=='notes'?'<p>Tato událost vyžaduje původní pravidlový modul. Potvrzení nenahrazuje skutečný test.</p>'+
+     (p.characterId?'<button type="button" class="secondary" data-cal-link="'+esc(p.characterId)+'" data-cal-kind="gm" data-cal-destination="'+esc(p.destination)+'" data-cal-plan="'+esc(p.id)+'" data-cal-skill="'+esc(p.skill||'')+'">Otevřít původní test</button>':''):
     '<label class="hc-episode-gm-review"><input type="checkbox" data-episode-gm-review="'+esc(safeKey)+'" '+(reviewed?'checked':'')+
     '> Zkontrolováno GM</label>')+'</div></div>';
  }).join('');
  const others=other.map(x=>'<div class="hc-episode-task"><div><b>'+esc(x.name||x.characterId||'Postava')+
   ' · '+esc(displayCampaignMinute(x.minute))+'</b><p>'+esc(x.description||x.kind)+'</p>'+ 
   '<p>Tento pravidlový termín zatím vyžaduje původní autoritativní modul; nelze jej odškrtnutím obejít.</p>'+ 
-  '<button type="button" class="secondary" data-episode-nav="'+esc(calendarEventDestination(x)==='calendar'?'skills':calendarEventDestination(x))+'">Otevřít příslušný modul</button></div></div>').join('');
+  '<button type="button" class="secondary" data-cal-link="'+esc(x.characterId)+'" data-cal-kind="'+esc(x.kind)+'" data-cal-destination="'+esc(calendarEventDestination(x))+'" data-cal-source="'+esc(x.sourceId||x.woundId||'')+'" data-cal-elapsed="'+esc(x.elapsedMinutes??'')+'">Otevřít původní kontrolu</button></div></div>').join('');
  box.innerHTML='<h4>Časované kontroly a následky během epizody</h4>'+
   (medical?.error?'<p class="notice error">'+esc(medical.error)+'</p>':'')+
   medicalRows+missingRows+incapHTML+gmRows+others;
@@ -21858,7 +21861,7 @@ function updateEpisodePreview(form){
     <p><strong>Čas pohybu:</strong> ${result.movementMinutes??result.minutes} z ${result.minutes} minut${result.travelDelay?.applied?', zdržení '+result.travelDelay.applied+' minut':''}.</p>
     <p><strong>Uraženo:</strong> ${result.distanceMeters} m (${(result.distanceMeters/1000).toLocaleString('cs-CZ',{maximumFractionDigits:3})} km)</p>
     <p><strong>Na mapě:</strong> ${result.mapCentimetres} cm.</p>
-    ${result.actors.map(a=>`<p>${esc(character(a.id)?.name||a.id)}: ${a.endNotRequired?'END se neprovádí · zdravotní neschopnost od '+esc(displayCampaignMinute(a.endNotRequired.minute)):
+    ${result.actors.map(a=>`<p>${esc(character(a.id)?.name||a.id)}: ${a.endNotRequired?(a.endNotRequired.reason==='equipment-delay'?'Bez chůze: oprava výstroje · END se neprovádí':'END se neprovádí · zdravotní neschopnost od '+esc(displayCampaignMinute(a.endNotRequired.minute))):
     'END '+(a.hourlyEndSR?'(hodinové d10: '+a.hourlyEndSR.map(x=>x.roll+' '+(x.success?'S':'F')).join(', ')+')':'(d10: '+a.roll+'), TN '+a.sr.tn+' · '+(a.sr.success?'úspěch':'neúspěch'))}; Weariness +${a.delta}${a.weatherFatigueUnits?' (včetně počasí '+(a.weatherFatigueUnits/240).toFixed(2)+' bodu)':''}${a.carryOut?' (přenáší se nevyčerpaný zlomek)':''}.</p>`).join('')}${result.stableAnimalLoad?.length?result.stableAnimalLoad.map(a=>`<p>Stáj: ${esc(a.name)} · ENC ${a.enc}${a.loaded?' · Loaded':' · bez Loaded'} (skutečná výstroj a náklad).</p>`).join(''):''}${result.animals?.length?result.animals.map(a=>`<p>Zvíře ${esc(character(a.id)?.name||a.id)}: Weariness +${a.delta} · GM analogie.</p>`).join(''):''}`:
    `${result.recoveryPreview?.length?result.recoveryPreview.map(p=>{const w=result.weatherRestFatigue?.find(x=>x.id===p.id);return `<p>${esc(character(p.id)?.name||p.id)} · zotavení ${p.recovered} bodů, klimatická únava +${w?.delta||0} bodů${w?.addedUnits?' (minutově '+w.addedUnits+' jednotek; převod zbytku '+w.carryOut+')':''}. ${p.next.carry?'Nevyčerpaná část zotavení přenesena.':''}</p>`;}).join(''):'<p>Bez přesunu. Příslušné testy se řeší v původních Skill Tests.</p>'}`;
   out.innerHTML=`<p><b>${esc(displayCampaignMinute(result.startMinute))}–${esc(displayCampaignMinute(result.endMinute))}</b> · ${result.minutes} minut</p>
@@ -22077,8 +22080,12 @@ document.addEventListener('click',e=>{
  const sides=Number(b.dataset.episodeFaces)||
   (b.dataset.episodeDie==='precipitationD6'?6:b.dataset.episodeDie==='encounterD100'?100:10);
  try{const hourly=b.dataset.episodeDie.startsWith('end_')&&form.elements.namedItem('doubleTime')?.checked;
-  const count=hourly?Math.ceil(Number(form.elements.namedItem('minutes')?.value||0)/60):1;
-  if(!Number.isSafeInteger(count)||count<1||count>168)throw Error('Nejprve zadejte platnou délku cesty.');
+  const elapsed=Number(form.elements.namedItem('minutes')?.value||0),
+   incoming=lastEpisodeTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute),
+   movement=Math.max(0,elapsed-incoming);
+  const count=hourly?Math.ceil(movement/60):(movement===0?0:1);
+  if(!Number.isSafeInteger(count)||count<0||count>168||!Number.isSafeInteger(elapsed)||elapsed<1)throw Error('Nejprve zadejte platnou délku cesty.');
+  if(count===0){field.value='';field.dataset.episodeGenerated='';timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);return;}
   field.value=Array.from({length:count},()=>secureHMKDie(sides)).join(',');field.dataset.episodeGenerated=field.value;
   timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
  }catch(err){alert('Hod nebyl proveden: '+err.message)}
@@ -22092,22 +22099,11 @@ document.addEventListener('click',e=>{
  }catch(err){alert('Hod nebyl proveden: '+err.message)}
 },true);
 document.addEventListener('click',e=>{
- const b=e.target.closest?.('[data-episode-medical-die],[data-episode-incap]');if(!b)return;
+ const b=e.target.closest?.('[data-episode-incap]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
  const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
  if(b.dataset.episodeIncap){form.elements.namedItem('episodeIncapChoice').value=b.dataset.episodeIncap;
   timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);return;}
- const key=decodeURIComponent(b.dataset.episodeMedicalDie);
- try{const rolls=episodeTimedRolls(form),field=b.dataset.episodeMedicalField||'roll',
-  faces=Number(b.dataset.episodeMedicalFaces)||100,offset=Number(b.dataset.episodeMedicalOffset)||0;
-  if(field==='roll'&&!b.dataset.episodeMedicalField){
-   const roll=secureHMKDie(100);rolls[key]=roll;
-   const sources=rolls.__hmkRollSource&&typeof rolls.__hmkRollSource==='object'?{...rolls.__hmkRollSource}:{};
-   sources[key]=roll;rolls.__hmkRollSource=sources;
-  }else{const record=rolls[key]&&typeof rolls[key]==='object'?{...rolls[key]}:{};record[field]=secureHMKDie(faces)+offset;rolls[key]=record;}
-  form.elements.namedItem('episodeTimedRollsJson').value=JSON.stringify(rolls);
-  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
- }catch(err){alert('Zdravotní hod nebyl proveden: '+err.message);}
 },true);
 document.addEventListener('change',e=>{
  const input=e.target.closest?.('[data-episode-incap-move]');if(!input)return;
@@ -22202,6 +22198,47 @@ document.addEventListener('click',e=>{
  render();
  const form=document.querySelector('#hmk-time-episode-form');if(form){episodeEvaluationRequested=true;updateEpisodePreview(form);}
 },true);
+// Only the native medical executor owns health dice. Travel can either
+// shorten a prepared episode to the due minute or navigate there after the
+// real campaign clock has reached that minute. No preview advances time.
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-episode-medical-boundary],[data-episode-medical-route]');
+ if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=document.querySelector('#hmk-time-episode-form');if(!form||!data.campaignClock)return;
+ if(b.dataset.episodeMedicalBoundary){
+  const minute=Number(b.dataset.episodeMedicalBoundary),duration=minute-data.campaignClock.minute;
+  if(!Number.isSafeInteger(duration)||duration<=0||duration>10080){alert('Neplatný termín zdravotní kontroly.');return;}
+  const field=form.elements.namedItem('minutes');field.value=String(duration);
+  episodeEvaluationRequested=false;
+  timeEpisodeDraft=episodeFormSnapshot(form);
+  updateEpisodePreview(form);
+  notice='Cesta byla zkrácena na '+displayCampaignMinute(minute)+'. Dokončete tento úsek a pak vyhodnoťte zdravotní kontrolu v jejím původním modulu. Zbývající cestu zadejte jako navazující epizodu.';
+  return;
+ }
+ const type=b.dataset.episodeMedicalRoute,actorId=b.dataset.episodeMedicalActor;
+ const sourceId=b.dataset.episodeMedicalSource||'';
+ const elapsed=b.dataset.episodeMedicalElapsed||'';
+ if(!character(actorId))return;
+ timeEpisodeDraft=episodeFormSnapshot(form);selected=actorId;
+ if(type==='malnutrition-course'||type==='assisted-intake'){
+  calendarLanding=false;activeCalendarSection='provisions';provisionScope='person';
+  provisionGuideActorId=actorId;view='calendar';render();
+  const target=[...document.querySelectorAll('form[data-malnutrition-course]')].find(f=>f.elements.namedItem('actorId')?.value===actorId&&
+    (!sourceId||f.elements.namedItem('episodeId')?.value===sourceId));
+  if(target){for(let node=target.parentElement;node;node=node.parentElement)if(node.tagName==='DETAILS')node.open=true;
+   target.scrollIntoView({block:'center',behavior:'auto'});target.elements.namedItem('roll')?.focus({preventScroll:true});}
+  return;
+ }
+ const destination=calendarEventDestination({kind:type});
+ if(destination==='healing'||destination==='combat'){
+  if(!combatInitiativeSequence)encounterSelection.add(actorId);
+  view='encounter';render();focusCalendarRuleAction(character(actorId),type,sourceId,elapsed);return;
+ }
+ if(destination==='hazards'){view='sheet';activeSheetSection='hazards';render();focusCalendarRuleAction(character(actorId),type,sourceId,elapsed);return;}
+ if(destination==='skills'){view='skills';activeSkillTab='secondary';render();focusCalendarRuleAction(character(actorId),type,sourceId,elapsed);return;}
+ calendarLanding=false;activeCalendarSection='overview';view='calendar';render();
+},true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-episode-nav],[data-episode-chronicle]');if(!b)return;
  e.preventDefault();
@@ -22257,7 +22294,7 @@ document.addEventListener('submit',e=>{
   if(gm.pending.length)throw Error('Nevyřízené povinné události GM: '+gm.pending.map(x=>x.title).join(', ')+'.');
   if(timed.length)throw Error('Povinný časovaný postup vyžaduje autoritativní vyhodnocení: '+timed.map(x=>(x.name||x.characterId)+' · '+displayCampaignMinute(x.minute)).join('; ')+'.');
   const stagedTimed=episodeTimedMedical(form,{strict:true});
-  if(stagedTimed?.requirements.length)throw Error('Nejdříve vyhodnoťte všechny splatné zdravotní d100 v pravém panelu.');
+  if(stagedTimed?.requirements.length)throw Error('V Cestování nelze provádět zdravotní hody. Rozdělte interval v termínu a vyhodnoťte kontrolu v původním zdravotním modulu.');
   if(stagedTimed?.incapacitations.length&&!form.elements.namedItem('episodeIncapChoice')?.value)throw Error('Postava ztratila schopnost pokračovat: doložte rozhodnutí GM na pravé stránce.');
   if(stagedTimed?.incapacitations.length&&form.elements.namedItem('episodeIncapChoice')?.value==='stop'){
    const first=Math.min(...stagedTimed.incapacitations.map(x=>x.minute));
@@ -22352,7 +22389,7 @@ document.addEventListener('submit',e=>{
     const origin=input?.dataset.episodeGenerated===input?.value?'cryptographic-software-die':'manual';
     const evidence=commitExpeditionFatigue(c,{kind:'travel',accrual:a.delta,durationMinutes:result.minutes,
      rolls:a.endNotRequired?[]:(a.hourlyEndSR||[{roll:a.roll,tn:a.sr.tn,success:a.sr.success}]),sourcePages:[62,145,146,150],mode:v.doubleTime?(v.conveyance==='foot'?'double-walk':'double-drover'):(v.conveyance==='foot'?'walk':v.conveyance==='mount'?'ride':'drive')},result.endMinute,
-     a.endNotRequired?'gm-inactive-no-end-roll':origin,sourceId+':'+a.id);
+     a.endNotRequired?(a.endNotRequired.reason==='equipment-delay'?'gm-equipment-watch-no-travel':'gm-inactive-no-end-roll'):origin,sourceId+':'+a.id);
     return {...a,origin:a.endNotRequired?'not-performed-medical':origin,before,after:evidence.finalFatigue};
    });
    const animals=(result.animals||[]).map(a=>{
