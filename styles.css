@@ -508,3 +508,17 @@ form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;
  .inv-group-totals,.inv-bulk-toolbar{display:grid;gap:.45rem}
  .inv-bulk-count{margin-left:0}
 }
+
+/* v93.686: one currently required Trekking procedure at a time. */
+.hc-episode-task-focus:not([hidden]) {
+  margin: .65rem 0 1rem;
+  padding: .8rem .9rem;
+  border: 1px solid rgba(117, 77, 41, .48);
+  border-left: 4px solid #76502c;
+  border-radius: 5px;
+  background: rgba(251, 241, 215, .68);
+  color: #573a25;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.hc-episode-task-focus[hidden] { display: none !important; }
