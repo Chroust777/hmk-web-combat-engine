@@ -169,7 +169,7 @@ export function lastEpisodeTravelDelayCarry(journal=[],campaignId,minute=Infinit
 }
 /** One Slow Mode from a successful equipment repair (S) applies to the NEXT
  * trekking watch (HMK p.148). Minutes in shorter watches decrement this
- * obligation without duplicating the Slow Mode. Older receipts had no carry;
+ * obligation only for actual moving minutes, without duplicating it. Older receipts had no carry;
  * inspect their result only for the first subsequent travel watch. */
 export function lastEquipmentSlowCarry(journal=[],campaignId,minute=Infinity){
  for(let i=journal.length-1;i>=0;i--){
@@ -788,9 +788,18 @@ export function validateTimeEpisodes(journal=[]){
    if(e.equipmentSlowCarryOut!==undefined){
     const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute);
     const newSlow=e.hazardDetails?.some(h=>h.hazard==='equipment'&&h.result==='short-delay')?240:0;
-    must(e.equipmentSlowCarryIn===priorSlow&&e.equipmentSlowCarryOut===Math.max(0,priorSlow-e.minutes)+newSlow&&
+    // Legacy receipts before v93.666 incorrectly consumed a Slow obligation
+    // during an equipment repair with zero movement. Keep historical data
+    // readable, but never issue (or accept as new) that calculation again.
+    const movingCarry=Math.max(0,priorSlow-e.movementMinutes)+newSlow;
+    const legacyCarry=Math.max(0,priorSlow-e.minutes)+newSlow;
+    const verified=e.equipmentSlowCarryRule==='moving-minutes-v93.666';
+    must(e.equipmentSlowCarryRule===undefined||verified,
+     'Neznámá verze výpočtu Equipment Slow.');
+    must(e.equipmentSlowCarryIn===priorSlow&&
+     (e.equipmentSlowCarryOut===movingCarry||!verified&&e.equipmentSlowCarryOut===legacyCarry)&&
      e.slow===e.equipmentBaseSlow+Number(priorSlow>0)+Number(!!e.dunesSlow),
-     'Equipment Hazard Slow se musí odečíst přesně jednou během dalších cestovních hlídek.');
+     'Equipment Hazard Slow se musí odečíst přesně jednou během skutečného pohybu; starší doklady zůstávají čitelné.');
    }
    must(d.method==='gm-current-episode-only-v2'||!(hazard?.hazard==='complication'&&['long-delay','irreparable'].includes(outcome))||d.current>0,
     'Dlouhá komplikace musí zohlednit i čas ztracený v aktuální epizodě.');
