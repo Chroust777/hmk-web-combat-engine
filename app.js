@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.686';
+const APP_VERSION='93.687';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -21855,10 +21855,18 @@ function episodePlannedTasks(form){
    'Vykonejte samostatný Tracking Success Value pro aktuální stopu.',
    'trackingProofId','Tracking',v.guideId);
  const incap=new Map((episodeTimedMedical(form)?.incapacitations||[]).map(x=>[x.actorId,x]));
- if(v.kind==='travel')for(const id of v.memberIds||[])if(!incap.has(id)||incap.get(id).minute>data.campaignClock?.minute)
-  add('Únava · END d10 · '+(character(id)?.name||id),
-   incap.has(id)?'END pro skutečně ušlé minuty PŘED zdravotní neschopností; po ní se žádný další aktivní test neprovádí.':
-   'Doložte skutečný individuální END d10.', 'end_'+id);
+ // The orientation evidence must first establish the episode's actual
+ // movement. A prospective travel setup is not proof that an END roll is due.
+ // In particular, a confirmed prior equipment delay may consume all minutes.
+ const orientationReady=v.orientationUse==='reuse'||!!v.orientationProofId;
+ const rawMinutes=Number(v.minutes);
+ const carriedDelay=lastEpisodeTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute);
+ const hasTravelMovement=Number.isSafeInteger(rawMinutes)&&rawMinutes>Math.max(0,carriedDelay);
+ if(v.kind==='travel'&&orientationReady&&hasTravelMovement)
+  for(const id of v.memberIds||[])if(!incap.has(id)||incap.get(id).minute>data.campaignClock?.minute)
+   add('Únava · END d10 · '+(character(id)?.name||id),
+    incap.has(id)?'END pro skutečně ušlé minuty PŘED zdravotní neschopností; po ní se žádný další aktivní test neprovádí.':
+    'Doložte skutečný individuální END d10.', 'end_'+id);
  if(v.kind==='forage')add('Foraging · d10','Doložte skutečný hod shánění potravy.','forageD10');
  return tasks;
 }
@@ -21954,7 +21962,17 @@ function updateEpisodeTaskFocus(form){
   for(const nodes of Object.values(groups))for(const node of nodes){if(node.dataset.episodeFocusHidden==='true'){node.hidden=false;delete node.dataset.episodeFocusHidden;}}
   return;
  }
- const task=tasks.find(t=>t.field===episodeFocusedTaskField)||tasks.find(t=>t.field===issue)||tasks[0]||null;
+ // Keep the selected subpanel visible while entering a d10. Previously
+ // entering its first digit removed the completed task and immediately
+ // hid the entire fatigue section, making the next END die unclickable.
+ const editing=document.activeElement;
+ const liveName=editing?.name||editing?.dataset?.episodeDie||'';
+ const editingFatigue=!!(editing&&form.contains(editing)&&/^end_/.test(liveName));
+ const focusedArea=episodeFocusedTaskField?episodeTaskArea(episodeFocusedTaskField):null;
+ const nextInArea=focusedArea?tasks.find(t=>episodeTaskArea(t.field)===focusedArea):null;
+ const task=tasks.find(t=>t.field===episodeFocusedTaskField)||
+  (editingFatigue?{field:liveName,title:'Únava · END d10'}:null)||
+  nextInArea||tasks.find(t=>t.field===issue)||tasks[0]||null;
  const field=task?.field||issue;
  const active=field?episodeTaskArea(field):'none';
  const labels={motion:'Pohyb a orientace',fatigue:'Únava a srážky',encounter:'Náhodné setkání',hazard:'Survival / Direction Hazard',weather:'Cold / Heat Hazard',foraging:'Foraging',other:'Navazující pravidlová procedura',none:'Všechny požadované hody jsou doloženy'};
