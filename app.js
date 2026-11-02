@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.687';
+const APP_VERSION='93.688';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2287,7 +2287,7 @@ function timeEpisodePageHTML(clock,participants){
  </details>
  <details class="hc-episode-settings" data-episode-section="rolls"><summary>5 · Potřebné hody a případné události</summary>
  <p class="hc-hint hc-episode-task-focus" data-episode-task-focus hidden role="status"></p>
- <div data-episode-travel-rolls><details class="hc-episode-suboptions hc-episode-roll-group" open><summary>Pohyb a orientace</summary><div class="hmk-trek-grid"><label>Další Slow Modes · pouze výjimky GM<input name="extraSlow" type="number" min="0" max="20" value="0" title="Pouze další skutečné zpomalení. Slow za stav postav, počasí a nízký Orienteering SV připočítává engine sám."></label>
+ <div data-episode-travel-rolls><details class="hc-episode-suboptions hc-episode-roll-group" open><summary>Pohyb a orientace</summary><div class="hmk-trek-grid"><details class="hc-episode-reference" data-episode-optional-gm><summary>GM výjimka · další Slow mimo automatický výpočet</summary><label>Další Slow Modes<input name="extraSlow" type="number" min="0" max="20" value="0" title="Zadejte výhradně výslovné rozhodnutí GM. Automatické Slow nezadávejte."></label></details>
  <p class="hc-episode-auto-modes" role="status" data-episode-allocated-modes title="Výhody vznikají výhradně z doloženého SV a automaticky se přidělují na Bearing a zvolený cíl. ★ z předchozích hodů se nesčítají.">Progress a Bearing se vypočítají z doloženého Orienteering SV. Bez testu jsou obě hodnoty nula.</p>
  <label data-episode-progress-row>Progress (d10) · při přebytku ${episodeRuleHelp('Progress d10','HMK 146: každý Progress ruší jeden Slow; za každý zbývající Progress hoďte vlastní d10 proti TN = 2 × základní LPW. Alespoň jeden úspěch zvýší LPW o 1 (ne o počet úspěchů). Hody se nikdy automaticky nepředpokládají.')}<span class="hc-episode-die"><input name="progressD10" placeholder="např. 4,8" title="Zadejte d10 oddělené čárkami, jednu za každou přebytečnou Progress Mode."><button type="button" data-episode-progress-die>+ d10</button></span></label></div>
  <p class="hc-hint" id="episode-progress-explanation" data-episode-progress-explanation role="status"></p><label data-episode-direction-row>Direction Hazard (d10) · při chybějícím Bearing ${episodeRuleHelp('Direction Hazard','HMK 148: není-li pokryt potřebný Bearing, hází se samostatný d10 za každý chybějící bod: 1–4 Lost Time (další Slow), 5–9 Misdirection, 10 Lost. Některé následky vyžadují navazující GM rozhodnutí, ne automatické zrušení stavu.')}<span class="hc-episode-die"><input name="directionD10" placeholder="např. 3,7" title="Jeden skutečný d10 za každý chybějící Bearing. Hod 1–4 = Lost Time, 5–9 = Misdirection, 10 = Lost (HMK 148)."><button type="button" data-episode-direction-die>+ d10</button></span></label>
@@ -20873,6 +20873,9 @@ function episodeIssue(message,form){
  const forage=message.match(/Foraging Mode\s+(\d+)/i);
  if(forage)return {field:'travelForageD10_'+(Number(forage[1])-1),skill:null,actorId:null};
  if(/Foraging vyžaduje skutečný d10/i.test(message))return {field:'forageD10',skill:null,actorId:null};
+ // Every completion blocker must lead to a named step. v93.688.
+ if(/Equipment Hazard.*zdržení|Equipment Hazard.*následující hlídku|Úspěch CS nezpůsobuje zdržení/i.test(message))
+  return {field:'hazardDelayNow',skill:null,actorId:null};
  const unscoped=message.match(/Skill Test ([A-Za-z0-9_]+) nebyl vyžádán touto epizodou/i);
  if(unscoped)return {field:unscoped[1],skill:null,actorId:null};
  const weather=message.match(/Weather Hazard\s+([^/\s]+)\/(cold|heat)/i);
@@ -21347,7 +21350,9 @@ function episodePreviewFromForm(form,clock){
       obstacleMinute>minutes))throw Error('Complication F/CF: GM musí doložit přesnou minutu překážky v aktuální hlídce.');
    if(relevant?.hazard==='complication'&&outcome==='irreparable'&&!v.hazardComplicationRouteChanged)
     throw Error('Complication CF: GM musí potvrdit změnu trasy.');
-   const now=failedComplication?minutes-obstacleMinute:Number(raw('hazardDelayNow')||0);
+   // An Equipment repair acts on the NEXT watch, never the current one.
+   const now=relevant?.hazard==='equipment'?0:
+    failedComplication?minutes-obstacleMinute:Number(raw('hazardDelayNow')||0);
    const future=(relevant?.hazard==='equipment'||relevant?.hazard==='complication')&&
      ['long-delay','irreparable'].includes(outcome)?240:0;
    if(relevant?.hazard==='complication'){
@@ -21680,7 +21685,7 @@ function renderEpisodeEndStatus(form,result,weather){
  const awaitingGM=!form.elements.namedItem('confirmed')?.checked;
  if(awaitingGM)tasks.push({name:'Potvrzení GM',detail:'Všechny hody mohou být hotové, ale před trvalým zápisem musíte vlevo zaškrtnout potvrzení skutečného průběhu a času GM.',action:'confirmed'});
  form.dataset.episodeAwaitingGM=String(tasks.length===1&&awaitingGM);
- if(checklist)checklist.innerHTML=tasks.length?'<p class="hc-episode-task-lead">Před dokončením zbývá '+tasks.length+' vyhodnocení. Nezávislé úkoly můžete řešit v libovolném pořadí:</p>'+tasks.map((t,i)=>
+ if(checklist)checklist.innerHTML=tasks.length?'<p class="hc-episode-task-lead">Další povinný krok (1 z '+tasks.length+'). Po jeho vyřešení aplikace automaticky nabídne další návaznost:</p>'+tasks.slice(0,1).map((t,i)=>
    '<div class="hc-episode-task"><span class="hc-task-number">'+(i+1)+'</span><div><b>'+esc(t.name)+'</b><p>'+esc(t.detail)+'</p>'+
     (t.action?'<button type="button" class="secondary" data-episode-jump="'+esc(t.action)+'">Doplnit související pole</button> ':'')+
     (t.skill?'<button type="button" data-episode-skill-task="'+esc(t.skill)+'" data-episode-skill-field="'+esc(t.action)+'" data-episode-skill-actor="'+esc(t.actorId)+'">Otevřít '+esc(t.skill)+' Skill Test</button>':'')+
@@ -21871,8 +21876,12 @@ function episodePlannedTasks(form){
  return tasks;
 }
 function episodePlannedTaskHTML(t,i){
+ const button=t.field==='hazardDelayNow'&&/Equipment Hazard/i.test(t.detail)?
+  '<button type="button" class="secondary" data-episode-fix-equipment-delay>Opravit zdržení bez opakování hodu</button>':
+  t.field?'<button type="button" class="secondary" data-episode-jump="'+esc(t.field)+'">Otevřít požadované pole</button>':
+  '<button type="button" class="secondary" data-episode-review>Ukázat pravidlovou překážku</button>';
  return '<div class="hc-episode-task"><span class="hc-task-number">'+(i+1)+'</span><div><strong>'+esc(t.name)+'</strong>'+ 
-  '<p>'+esc(t.detail)+'</p><button type="button" class="secondary" data-episode-jump="'+esc(t.field)+'">Doplnit pole</button> '+
+  '<p>'+esc(t.detail)+'</p>'+button+' '+
   (t.skill&&t.actorId?'<button type="button" data-episode-skill-task="'+esc(t.skill)+'" data-episode-skill-field="'+esc(t.field)+'" data-episode-skill-actor="'+esc(t.actorId)+'">Otevřít '+esc(t.skill)+' Skill Test</button>':'')+'</div></div>';
 }
 function renderEpisodeEndError(form,message){
@@ -21885,9 +21894,14 @@ function renderEpisodeEndError(form,message){
   issue.field?.startsWith('evD4_')?'Encounter · vzdálenost':
   issue.field?.startsWith('progressD10')?'Pohyb · Progress':
   needsSkill?(issue.skill+' · '+(character(issue.actorId)?.name||issue.actorId)):'Chybějící vstup';
- if(issue.field&&!planned.some(t=>t.field===issue.field))
-  planned.unshift({name:taskName,
-   detail:message,field:issue.field,skill:issue.skill,actorId:issue.actorId});
+ // Never claim zero tasks when the authoritative validator rejects finalization.
+ if(!planned.some(t=>t.field===issue.field&&issue.field)){
+  const name=/Equipment Hazard/i.test(message)?'Equipment Hazard · zdržení':
+   /Complication/i.test(message)?'Complication · pravidlový následek':
+   /Direction Hazard/i.test(message)?'Direction Hazard · následek':taskName;
+  planned.unshift({name,detail:message,field:issue.field||'',
+   skill:issue.skill,actorId:issue.actorId});
+ }
  episodeOutstandingSkillTasks=planned.filter(t=>t.skill&&t.actorId);
  form.dataset.episodeProblem=message;
  form.dataset.episodeProblemField=issue.field||'';
@@ -21897,7 +21911,7 @@ function renderEpisodeEndError(form,message){
  const list=root.querySelector('[data-episode-checklist]');
  if(list){
   const actorName=character(issue.actorId)?.name||'vybraná postava';
-  list.innerHTML='<p class="hc-episode-task-lead">Čeká '+planned.length+' aktuálně zjistitelných úkolů. Nezávislé hody lze řešit v libovolném pořadí; případné následky se přidají až po jejich příčině.</p>'+planned.map(episodePlannedTaskHTML).join('');
+  list.innerHTML='<p class="hc-episode-task-lead">Další povinný krok (1 z '+planned.length+'). Po potvrzení se určí další návaznost:</p>'+planned.slice(0,1).map(episodePlannedTaskHTML).join('');
  }
  const proof=root.querySelector('[data-episode-evidence]');
  if(proof){
@@ -21933,6 +21947,8 @@ function updateEpisodeTaskFocus(form){
  const note=section?.querySelector('[data-episode-task-focus]');
  if(!section||!note)return;
  const travel=form.elements.namedItem('kind')?.value==='travel';
+ // First the setup, then only the concrete mandatory rule step.
+ section.hidden=!!(travel&&!episodeEvaluationRequested);
  const groups={
   motion:section.querySelectorAll('[data-episode-travel-rolls] > .hc-episode-roll-group:first-child'),
   fatigue:section.querySelectorAll('[data-episode-travel-rolls] > .hc-episode-roll-group:nth-child(2)'),
@@ -21958,7 +21974,7 @@ function updateEpisodeTaskFocus(form){
  const issue=form.dataset.episodeProblemField||'';
  // When validation cannot yet identify a field, do not hide potential corrections.
  if(!tasks.length&&form.dataset.episodeProblem&&!issue){
-  note.hidden=true;
+  note.hidden=false;note.textContent='Nevyřešená pravidlová překážka: '+form.dataset.episodeProblem;
   for(const nodes of Object.values(groups))for(const node of nodes){if(node.dataset.episodeFocusHidden==='true'){node.hidden=false;delete node.dataset.episodeFocusHidden;}}
   return;
  }
@@ -21978,7 +21994,7 @@ function updateEpisodeTaskFocus(form){
  const labels={motion:'Pohyb a orientace',fatigue:'Únava a srážky',encounter:'Náhodné setkání',hazard:'Survival / Direction Hazard',weather:'Cold / Heat Hazard',foraging:'Foraging',other:'Navazující pravidlová procedura',none:'Všechny požadované hody jsou doloženy'};
  note.hidden=false;
  note.textContent=active==='none'?'✓ Všechny pravidlové úkoly této epizody jsou doloženy. Zkontrolujte a potvrďte výsledek vpravo.':
-  'Aktuální úkol: '+(task?.title||labels[active])+'. Zobrazena jsou pouze pole k tomuto kroku. Další povinnosti vyberete v seznamu vpravo; již vyplněné výsledky zůstávají zachovány.';
+  'Aktuální úkol: '+(task?.title||labels[active])+'. Zobrazena jsou pouze pole k tomuto kroku. Další pravidlový krok se nabídne automaticky po dokončení aktuálního; již vyplněné výsledky zůstávají zachovány.';
  section.open=true;
  for(const [key,nodes] of Object.entries(groups))for(const node of nodes){
   if(key===active){if(node.dataset.episodeFocusHidden==='true'){node.hidden=false;delete node.dataset.episodeFocusHidden;}
@@ -22212,6 +22228,11 @@ function updateEpisodePreview(form){
 
  }
  const out=document.querySelector('.hc-episode-spread-right [data-episode-preview]')||form.closest('.hc-episode-shell')?.querySelector('[data-episode-preview]');if(!out)return;
+ // Hidden Complication delay is not a current-watch Equipment expense.
+ if(travel&&/^[123]$/.test(String(v.survivalD10??'').trim())){
+  const delay=form.elements.namedItem('hazardDelayNow');
+  if(delay&&String(delay.value)!=='0'){delay.value='0';v.hazardDelayNow='0';}
+ }
  try{
   const {result,weather,precipitation}=episodePreviewFromForm(form,data.campaignClock);
   delete form.dataset.episodeProblem;delete form.dataset.episodeProblemField;
@@ -22636,6 +22657,19 @@ document.addEventListener('click',e=>{
  if(missing){missing.scrollIntoView({block:'center',behavior:'smooth'});missing.focus({preventScroll:true});return;}
  const panel=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
  if(panel){panel.scrollIntoView({block:'center',behavior:'smooth'});panel.setAttribute('tabindex','-1');panel.focus({preventScroll:true});}
+},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-episode-fix-equipment-delay]');if(!b)return;
+ e.preventDefault();const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
+ const die=String(form.elements.namedItem('survivalD10')?.value||'').trim();
+ if(!/^[123]$/.test(die))return;
+ const delay=form.elements.namedItem('hazardDelayNow');if(!delay)return;
+ delay.value='0';timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
+},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-episode-review]');if(!b)return;
+ e.preventDefault();const detail=document.querySelector('.hc-episode-spread-right .hc-episode-result-details');
+ if(detail){detail.hidden=false;detail.open=true;detail.scrollIntoView({block:'center',behavior:'smooth'});}
 },true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-episode-jump]');if(!b)return;
