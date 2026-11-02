@@ -76,6 +76,45 @@ export function prepareTrekkingWeatherTest({state,sourceId,round=1,kind,original
  return {state:s,report:{kind,originalSL,hr,periodMinutes,skinPending,
   addedWeariness,outcome,requiresSkinInjury:skinPending!==null}};
 }
+/** GM begins Warming / Compress at a real minute, without fabricating a die roll.
+ * This cancels the remaining Advance interval and restarts the calendar
+ * at the healing interval measured from the actual treatment start.
+ */
+export function startTrekkingWeatherExposureTreatment({state,sourceId,round=1,
+ elapsedMinutes,removedFromHazard=false,treatmentConfirmed=false,coolWater=false,gmConfirmed=false}={}){
+ const s=structuredClone(state);validateCombatState(s);
+ need(gmConfirmed===true&&int(round,1,9999)&&round>=s.lastRound&&int(elapsedMinutes,0,10000000),
+  'Chybí doložený okamžik zahájení léčby a potvrzení GM');
+ const h=s.environmentalHazards?.find(x=>x.active&&x.sourceId===sourceId);
+ need(h,'Zadaná trvající expozice neexistuje');
+ need(s.shock!=='KIA','Zemřelá postava nemůže zahájit léčbu');
+ need(!h.treatmentStarted,'Warming/Compress již bylo zahájeno');
+ need(removedFromHazard===true&&treatmentConfirmed===true,
+  'Před léčbou musí GM potvrdit vyjmutí z expozice a Warming/Compress');
+ // CS on Advance or CF on Healing skips a *future* course by moving
+ // lastElapsedMinutes ahead of the actual roll; that virtual skip is NOT
+ // physical elapsed time and cannot prevent an earlier Warming/Compress.
+ const lastConfirmed=s.events.filter(e=>e.type==='skill-weather-course'&&
+  e.details?.sourceId===sourceId).at(-1)?.details?.elapsedMinutes;
+ const lastActual=h.lastActualElapsedMinutes??lastConfirmed??h.lastElapsedMinutes;
+ need(elapsedMinutes>=lastActual,
+  'Léčbu nelze časově vrátit před poslední skutečně potvrzený Course');
+ const intervalMinutes=h.kind==='cold'?120:coolWater?5:15;
+ need(h.kind==='cold'||h.kind==='heat','Neznámý druh expozice');
+ need(h.kind==='heat'||!coolWater,'Chlazení vodou nelze použít jako Cold Warming');
+ const id=nextId(sourceId,h.kind,':treatment-start');
+ need(!s.events.some(e=>e.id===id),'Stejnou léčbu nelze zahájit dvakrát');
+ h.treatmentStarted=true;
+ h.healingIntervalMinutes=intervalMinutes;
+ h.lastElapsedMinutes=elapsedMinutes;
+ h.treatmentStartElapsedMinutes=elapsedMinutes;
+ s.events.push({id,type:'skill-weather-treatment-start',round,
+  details:{sourceId,kind:h.kind,elapsedMinutes,intervalMinutes,removedFromHazard:true,
+   treatmentConfirmed:true,coolWater:!!coolWater,gmConfirmed:true,rulePage:185}});
+ s.lastRound=round;validateCombatState(s);
+ return {state:s,report:{sourceId,kind:h.kind,elapsedMinutes,intervalMinutes,
+  treatment:h.kind==='cold'?'Warming':'Compress',coolWater:!!coolWater,hr:h.hr}};
+}
 export function advanceTrekkingWeatherExposure({state,actor,sourceId,round=1,
  method='advance',elapsedMinutes,roll,gmConfirmed=false,
  removedFromHazard=false,treatmentConfirmed=false,coolWater=false}={}){
@@ -85,20 +124,24 @@ export function advanceTrekkingWeatherExposure({state,actor,sourceId,round=1,
   'Chybí fyzický d100, doložený čas nebo potvrzení GM');
  const h=s.environmentalHazards?.find(x=>x.sourceId===sourceId&&x.active);
  need(h,'Není dostupná aktivní expozice tohoto původního testu');
- const dueMinutes=method==='advance'?h.periodMinutes:h.kind==='cold'?120:coolWater?5:15;
- need(elapsedMinutes>=h.lastElapsedMinutes+dueMinutes,
-  'Další Course/Healing Roll dosud není splatný podle fyzicky potvrzeného času');
- if(method==='healing')need(removedFromHazard===true&&treatmentConfirmed===true,
-  'Léčení vyžaduje vyjmutí z expozice a potvrzené Warming/Compress');
- else need(h.treatmentStarted===false,'Během aktivního léčení již nelze zapisovat další Exposure Advance');
+ need(method===(h.treatmentStarted?'healing':'advance'),
+  'Změna režimu vyžaduje samostatně potvrzený začátek Warming/Compress');
+ const dueMinutes=method==='advance'?h.periodMinutes:h.healingIntervalMinutes;
+ need(int(dueMinutes,1,10000)&&elapsedMinutes===h.lastElapsedMinutes+dueMinutes,
+  'Course/Healing Roll musí odpovídat přesně splatnému termínu');
+ if(method==='healing'){
+  need(removedFromHazard===true&&treatmentConfirmed===true,
+   'Léčení vyžaduje vyjmutí z expozice a potvrzené Warming/Compress');
+  need(h.kind==='heat'?coolWater===(dueMinutes===5):!coolWater,
+   'Režim Compress/Warming musí odpovídat dříve potvrzenému intervalu');
+ }
  const idx=h.sequence+1,id=nextId(sourceId,h.kind,':period:'+idx);
  need(!s.events.some(e=>e.id===id),'Opakovaný zápis Course/Healing není dovolen');
  const attrs=actor.hmk?.attributes??{},end=attrs.end,will=attrs.wil;
  need(int(end,1,200)&&int(will,1,200),'Pro Exposure Course/Healing musí být doloženo END a WIL');
  const hb=healingBase({endurance:end,will}),eml=hb*(method==='advance'?h.hr:5),sl=successLevel(roll,eml);
  const outcome=method==='advance'?exposureAdvance({healingRate:h.hr,sl}):exposureHealing({healingRate:h.hr,sl});
- if(method==='healing'){h.treatmentStarted=true;h.healingIntervalMinutes=dueMinutes;}
- h.lastElapsedMinutes=elapsedMinutes;h.sequence=idx;
+ h.lastElapsedMinutes=elapsedMinutes;h.lastActualElapsedMinutes=elapsedMinutes;h.sequence=idx;
  applyStatus(s,h,outcome.healingRate);
  if(outcome.defeated){h.active=false;}
  if(outcome.skipNext){h.lastElapsedMinutes+=dueMinutes;}

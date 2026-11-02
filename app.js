@@ -33,7 +33,7 @@ import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingF
 import {woundFromFall} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
 import {prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
-import {prepareTrekkingWeatherTest,advanceTrekkingWeatherExposure} from './src/integration/hmk-weather-hazard-aftermath.js';
+import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure} from './src/integration/hmk-weather-hazard-aftermath.js';
 import {prepareColdWaterShock,prepareExposureSkinInjuries} from './src/integration/hmk-weather-trauma-completion.js';
 import {prepareMundaneFireStrike,prepareEnclosedSmokeStart,prepareEnclosedSmokeCompletion} from './src/integration/hmk-mundane-fire-smoke.js';
 import {preparePoisonStart,preparePoisonOnset,preparePoisonCourse} from './src/integration/hmk-poison-course.js';
@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.678';
+const APP_VERSION='93.679';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -9517,7 +9517,7 @@ document.addEventListener('click',e=>{
 },true);
 function decorateSkillContinuationHelp(root){
  if(!root)return;
- const selector='form[data-hmk-animal-training],form[data-hmk-fishing-catch],form[data-hmk-engineering-design],form[data-skill-critical-form],form[data-skill-balance-nerves],form[data-skill-swimming-aftermath],form[data-skill-aggravation-aftermath],form[data-skill-weather-course],form[data-skill-weather-onset],form[data-skill-weather-skin],form[data-skill-cold-shock],form[data-climbing-fall-form],form[data-climbing-short-fall],form[data-skill-fishing-gear],form[data-skill-physical-impact],form[data-skill-serious-aggravation],form[data-skill-trekking-weather],form[data-skill-trekking-cold-shock],form[data-skill-trekking-skin],form[data-skill-trekking-weather-course]';
+ const selector='form[data-skill-weather-treatment],form[data-hmk-animal-training],form[data-hmk-fishing-catch],form[data-hmk-engineering-design],form[data-skill-critical-form],form[data-skill-balance-nerves],form[data-skill-swimming-aftermath],form[data-skill-aggravation-aftermath],form[data-skill-weather-course],form[data-skill-weather-onset],form[data-skill-weather-skin],form[data-skill-cold-shock],form[data-climbing-fall-form],form[data-climbing-short-fall],form[data-skill-fishing-gear],form[data-skill-physical-impact],form[data-skill-serious-aggravation],form[data-skill-trekking-weather],form[data-skill-trekking-cold-shock],form[data-skill-trekking-skin],form[data-skill-trekking-weather-course]';
  for(const form of root.querySelectorAll(selector)){
   for(const field of form.querySelectorAll('input[name],select[name],textarea[name]')){
    if(field.type==='hidden')continue;
@@ -10428,18 +10428,32 @@ function hskTrekkingSkinForms(actorId){
  <button type="submit">Zapsat všechna kožní zranění</button><output role="status" aria-live="polite"></output>
  </form></details>`).join('');
 }
+function hskTrekkingWeatherTreatmentForms(actorId){
+ const actor=character(actorId);if(!actor)return '';
+ return (persistentStateOf(actor).environmentalHazards||[]).filter(h=>h.active&&!h.treatmentStarted).map(h=>`
+ <details class="hsk-climb-fall"><summary>Zahájit ${h.kind==='cold'?'Warming':'Compress'} · ${h.kind==='cold'?'Cold':'Heat'} Exposure · HMK 185</summary>
+ <form data-skill-weather-treatment><input type="hidden" name="sourceId" value="${esc(h.sourceId)}">
+ <p>GM zaznamená skutečný začátek léčby při aktuálním čase kalendáře. Bez nového d100; původní Course se nahradí novou lhůtou od této minuty.</p>
+ <label><input name="removedFromHazard" type="checkbox" required> GM potvrdil vyvedení z ${h.kind==='cold'?'chladu a vody':'přímého slunce'}</label>
+ <label><input name="treatmentConfirmed" type="checkbox" required> ${h.kind==='cold'?'Warming':'Compress'} skutečně zahájeno</label>
+ ${h.kind==='heat'?'<label><input name="coolWater" type="checkbox"> Compress při chlazení vodou (každých 5 minut místo 15)</label>':''}
+ <label><input name="gmSameMinuteFirst" type="checkbox"> Pokud je současně splatný Exposure Advance, GM výslovně volí nejprve Warming/Compress v téže minutě</label>
+ <label><input name="gmConfirmed" type="checkbox" required> GM potvrzuje tento skutečný okamžik a podmínky</label>
+ <button type="submit">Potvrdit zahájení léčby a přepočítat kalendář</button>
+ <output role="status" aria-live="polite"></output></form></details>`).join('');
+}
 function hskTrekkingWeatherCourseForms(actorId){
  const actor=character(actorId);if(!actor)return '';
  const state=persistentStateOf(actor),active=(state.environmentalHazards||[]).filter(x=>x.active);
  return active.map(h=>`<details class="hsk-climb-fall"><summary>${h.kind==='cold'?'Cold':'Heat'} Exposure · HR${h.hr} · pokračování, HMK str.185</summary>
  <form data-skill-weather-course><input type="hidden" name="sourceId" value="${esc(h.sourceId)}">
  <p>Trvající expozice: HR${h.hr}, interval ${h.periodMinutes} minut; naposledy potvrzeno ${h.lastElapsedMinutes} minut od začátku. ${h.skinPending?'<strong>Neuzavřené samostatné poranění '+esc(h.skinPending)+' – vyžaduje anatomické vyhodnocení GM.</strong>':''}</p>
- <div class="field-grid"><label>Druh postupu<select name="method"><option value="advance">Exposure Advance</option><option value="healing">Exposure Healing</option></select></label>
+ <div class="field-grid"><label>Pravidlová procedura: ${h.treatmentStarted?'Exposure Healing':'Exposure Advance'}<input type="hidden" name="method" value="${h.treatmentStarted?'healing':'advance'}"></label>
  <label>Skutečně uběhlé minuty od začátku expozice<input type="number" name="elapsedMinutes" min="1" required></label>
  <label>Nový Course/Healing d100<input type="number" name="roll" min="1" max="100" required></label>
- <label><input type="checkbox" name="removedFromHazard"> Vyvedeno z chladu/horka (povinné pro Healing)</label>
- <label><input type="checkbox" name="treatmentConfirmed"> Warming/Compress potvrzen GM (povinné pro Healing)</label>
- <label><input type="checkbox" name="coolWater"> Chlazeno ve vodě (jen Heat Healing; zkrácený interval)</label></div>
+ <label><input type="checkbox" name="removedFromHazard" ${h.treatmentStarted?'checked':''}> Vyvedeno z chladu/horka (povinné pro Healing)</label>
+ <label><input type="checkbox" name="treatmentConfirmed" ${h.treatmentStarted?'checked':''}> Warming/Compress potvrzen GM (povinné pro Healing)</label>
+ <label><input type="checkbox" name="coolWater" ${h.kind==='heat'&&h.treatmentStarted&&h.healingIntervalMinutes===5?'checked':''}> Chlazeno ve vodě (jen Heat Healing; zkrácený interval)</label></div>
  <label><input type="checkbox" name="gmConfirmed" required> GM potvrdil čas, terapii a fyzický d100</label>
  <button type="submit">Vyhodnotit další období expozice</button><output role="status" aria-live="polite"></output>
  </form></details>`).join('');
@@ -10452,7 +10466,7 @@ function hskPendingSkillPhysicalConsequences(actorId){
   (x.characterId===actorId||x.skillTestProof.opponentId===actorId)&&
   !['critical-followup','climbing-falling','skill-physical-consequence','special-secondary-roll'].includes(x.skillTestProof.type));
  const originalForms=unresolved.map(x=>hskCriticalNextHTML(x.id,x.skillTestProof,{actorId})+hskBalanceNervesHTML(x.id,x.skillTestProof,{actorId})).join('');
- const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskFishingGearForm(x)+hskSkillPhysicalImpactForm(x)).join('')+data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+hskEpisodeWeatherOnsetForms(actorId)+hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
+ const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskFishingGearForm(x)+hskSkillPhysicalImpactForm(x)).join('')+data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+hskEpisodeWeatherOnsetForms(actorId)+hskTrekkingWeatherTreatmentForms(actorId)+hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
  return html?'<section class="panel wide"><h3>Čekající pravidlové následky Skill Tests</h3><p class="muted">Nevyřešené kritické hody jsou dostupné i po obnovení stránky; původní hod se znovu nehází.</p>'+html+'</section>':'';
 }
 let pendingCalendarGMTest=null;
@@ -11330,6 +11344,49 @@ document.addEventListener('submit',event=>{
  }catch(e){if(out)out.textContent='Kožní poranění nebylo zapsáno: '+e.message;}
 },true);
 document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-skill-weather-treatment]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
+ try{
+  const sourceId=form.elements.namedItem('sourceId').value;
+  const onset=data.journal.find(x=>x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===sourceId);
+  const actor=character(onset?.characterId),clock=data.campaignClock;
+  if(!actor||!clock||onset.skillTestProof.actorId!==actor.id||
+    onset.calendarCampaignId!==campaignKey(clock)||combatInitiativeSequence)
+   throw Error('Léčba vyžaduje ověřený vznik expozice a aktivní herní kalendář mimo Initiative');
+  const orig=persistentStateOf(actor),h=orig.environmentalHazards?.find(x=>x.sourceId===sourceId&&x.active);
+  const origin=h?getCampaignEpisodeAnchor(clock,'weather',actor.id,h.id):null;
+  if(!origin||clock.minute<origin.minute)throw Error('Chybí skutečný čas vzniku expozice');
+  const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
+  const pending=agenda.all.find(x=>x.kind==='weather-course'&&x.characterId===actor.id&&x.sourceId===sourceId);
+  if(!pending||pending.minute<clock.minute)throw Error('Dříve splatný Exposure Course je nutné nejprve samostatně vyhodnotit');
+  if(pending.minute===clock.minute&&!form.elements.namedItem('gmSameMinuteFirst').checked)
+   throw Error('Ve stejné minutě musí GM určit, zda první proběhne Warming/Compress nebo Exposure Advance');
+  const elapsedMinutes=clock.minute-origin.minute;
+  const outcome=startTrekkingWeatherExposureTreatment({state:orig,sourceId,
+   round:Math.max(1,combatClock.round||1,orig.lastRound||0),elapsedMinutes,
+   removedFromHazard:form.elements.namedItem('removedFromHazard').checked,
+   treatmentConfirmed:form.elements.namedItem('treatmentConfirmed').checked,
+   coolWater:form.elements.namedItem('coolWater')?.checked===true,
+   gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
+  if(!mutate(()=>{
+   if(data.campaignClock.minute!==clock.minute||campaignKey(data.campaignClock)!==campaignKey(clock))
+    throw Error('Kalendář se během potvrzování změnil');
+   synchronizeCombatInjuries(actor,outcome.state);
+   data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignKey(clock),
+    campaignMinute:clock.minute,createdAt:stamp(),title:'Exposure '+outcome.report.treatment+' · zahájení · HMK 185',
+    body:outcome.report.treatment+' zahájeno při '+displayCampaignMinute(clock.minute)+
+     ', nový Healing každých '+outcome.report.intervalMinutes+' minut, HR'+outcome.report.hr+
+     '. Původní Course se již neprovádí; nový d100 zatím nebyl hozen.',
+    skillTestProof:{type:'skill-weather-treatment-start',sourceId,actorId:actor.id,
+     report:outcome.report,
+     ...(onset.skillTestProof.episodeId?{episodeId:onset.skillTestProof.episodeId,
+      originalSkillProofId:onset.skillTestProof.originalSkillProofId}:{})}});
+  }))throw Error('Zahájení léčby nebylo uloženo');
+  form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{
+   textContent:'Léčba zahájena. Kalendář vypočetl nový povinný Healing termín.'}));
+ }catch(e){if(out)out.textContent='Warming/Compress nebylo uloženo: '+e.message;}
+},true);
+document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-skill-weather-course]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
  try{
@@ -11348,8 +11405,9 @@ document.addEventListener('submit',event=>{
    const due=onset.calendarCampaignId===camp?
     campaignCalendarAgenda(data.campaignClock,data.characters,data.journal).all.find(x=>
      x.kind==='weather-course'&&x.characterId===actor.id&&x.sourceId===sourceId):null;
-   if(!due||due.minute!==data.campaignClock.minute||due.elapsedMinutes!==elapsedMinutes)
-    throw Error('Exposure Course vyžaduje přesný splatný termín Kalendáře; předčasný ani přeskočený hod nelze potvrdit.');
+   if(!due||due.minute!==data.campaignClock.minute||due.elapsedMinutes!==elapsedMinutes||
+     due.method!==form.elements.namedItem('method').value)
+    throw Error('Exposure Course vyžaduje přesný splatný termín a režim Kalendáře; předčasný ani přeskočený hod nelze potvrdit.');
   }
   const orig=persistentStateOf(actor),outcome=advanceTrekkingWeatherExposure({state:orig,actor,sourceId,
    round:Math.max(1,combatClock.round||1,orig.lastRound||0),method:form.elements.namedItem('method').value,
