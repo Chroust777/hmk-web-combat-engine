@@ -197,11 +197,21 @@ export function pendingTrackingCFBearing(journal=[],campaignId,minute=Infinity){
   if(ep.trackingMemory?.level==='CF'&&ep.trackingMemory?.sourceMode==='new')return 1;
  }return 0;
 }
+/** Approved GM minute-accounting exception (2026-11-02), HMK p.176:
+ * Whole Fatigue points are stored with a 1/240-point carried remainder.
+ * The remainder follows the character through travel and exposed rest;
+ * empty/non-exposed episodes do not discard it. Discrete rolls are unchanged.
+ * NOTE: simultaneous climate+recovery netting remains under audit. */
 export function lastTimeEpisodeCarry(journal=[],campaignId,actorId){
  for(let i=journal.length-1;i>=0;i--){const j=journal[i];
   if(j.calendarCampaignId!==campaignId||!j.calendarTimeEpisode)continue;
-  const a=[...(j.calendarTimeEpisode.actors||[]),...(j.calendarTimeEpisode.animals||[])].find(x=>x.id===actorId);
-  if(a)return a.carryOut;
+  const ep=j.calendarTimeEpisode;
+  const a=[...(ep.actors||[]),...(ep.animals||[]),...(ep.weatherRestFatigue||[])].find(x=>x.id===actorId);
+  if(a){
+   if(a.carryOut===undefined)return 0; // legacy pre-carry documents
+   must(whole(a.carryOut,0,239),'Historický zbytek minutové únavy je neplatný.');
+   return a.carryOut;
+  }
  }return 0;
 }
 export function episodeTimeline(journal=[],campaignId,characterId=null){
@@ -701,6 +711,13 @@ export function validateTimeEpisodes(journal=[]){
      'Kožní trauma nebylo ve zdravotním stavu skutečně zapsáno.');
    }
   }
+  if(e.minuteCarryRule==='fixed-point-240-v93.684'){
+   for(const a of [...(e.actors||[]),...(e.animals||[]),...(e.weatherRestFatigue||[])]){
+    must(a.carryIn===lastTimeEpisodeCarry(prior,j.calendarCampaignId,a.id)&&
+     whole(a.carryOut,0,239),
+     'Časová epizoda ztratila potvrzený zbytek minutové únavy postavy.');
+   }
+  }else must(e.minuteCarryRule===undefined,'Neznámý model minutové únavy.');
   if(e.weatherRestFatigue!==undefined){
    must(['rest','sleep','winded'].includes(e.kind)&&
     e.weatherRestFatigue.length===e.memberIds.length,

@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.683';
+const APP_VERSION='93.684';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -21432,7 +21432,7 @@ function episodePreviewFromForm(form,clock){
    if(!raw||!Number.isInteger(die)||die<1||die>10)throw Error('Foraging Mode '+(n+1)+' vyžaduje vlastní d10.');
    const target=v['travelForageTarget'+n],herbName=String(v['travelHerb'+n]||'').trim();
    const key=JSON.stringify([target,target==='herbs'?herbName:'']);
-   const carryIn=partial.get(key)||lastForagingCarry(data.journal,campaignKey(clock),guideId,target,herbName);
+   const carryIn=partial.has(key)?partial.get(key):lastForagingCarry(data.journal,campaignKey(clock),guideId,target,herbName);
    const f=calculateEpisodeForaging({minutes,habitat:v.travelHabitat,season,roll:die,target,herbName,carryIn});
    result.travelForaging.push(f);partial.set(key,f.carryOut);
   }
@@ -21452,6 +21452,7 @@ function episodePreviewFromForm(form,clock){
 
  if(kind==='travel'&&weather.weather&&!weather.sourceId&&weather.origin==='episode-only'&&!String(weather.area).trim())
   throw Error('Nová oblast musí mít název.');
+ result.minuteCarryRule='fixed-point-240-v93.684';
  return {result,weather,precipitation,v};
 }
 function episodeContinuousRestMinutes(kind,members,minute){
