@@ -27,8 +27,11 @@ function noOtherObstacles(s,exceptId=null){
  check(s.shock==='NONE'&&!s.shockFollowup&&!s.extendedShock&&!s.coma?.active&&!s.bloodShockPending,
   'Poison: existuje nezávislý Shock / Coma; nelze jej tiše přepsat');
  check(!(s.environmentalHazards||[]).some(x=>x.active),'Poison: souběžná Environmental Exposure musí být předem pravidlově dořešena');
- check(!(s.diseaseCourses||[]).some(x=>['pending-profile','incubating','active'].includes(x.status)),
-  'Poison: současná Disease expozice vyžaduje dořešení GM; žádný tichý souběh');
+ // A Disease exposure has no symptoms until its Onset (HMK 183).
+ // Allow an attested, still-latent infection; do not overwrite an ACTIVE
+ // Disease outcome or invent a shared Shock adjudication.
+ check(!(s.diseaseCourses||[]).some(x=>x.status==='active'),
+  'Poison: aktivní Disease příznaky vyžadují dořešení GM; žádný tichý souběh');
  check(!(s.toxinCourses||[]).some(x=>x.id!==exceptId&&(x.status==='active'||x.status==='incubating')), 
   'Poison: další současný toxin vyžaduje samostatné pravidlové řešení interakce');
 }
@@ -110,8 +113,8 @@ export function preparePoisonCourse({actor,state,sourceId,round=1,elapsedMinutes
   'Poison: další Course je splatný přesně po '+t.periodMinutes+' minutách; žádné tiché přeskočení');
  check(s.shock===t.shockApplied,'Poison Course: existující Shock pochází z jiného zdroje');
  check(!s.shockFollowup&&!s.extendedShock&&!s.coma?.active,'Poison Course: paralelní Shock/Coma musí posoudit GM');
- check(!(s.diseaseCourses||[]).some(x=>['pending-profile','incubating','active'].includes(x.status)),
-  'Poison Course: současná Disease expozice vyžaduje dořešení GM');
+ check(!(s.diseaseCourses||[]).some(x=>x.status==='active'),
+  'Poison Course: současné aktivní Disease příznaky vyžadují dořešení GM');
  const hb=profile(actor),baseEML=hb*t.hr+physicianSV;
  let antivenin={bonus:0,sourceIds:[],completeIds:[],sourcePage:75};
  if(herbalContext!==null){

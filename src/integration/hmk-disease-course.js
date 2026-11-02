@@ -30,10 +30,14 @@ function draft(actor,state,round){actorProfile(actor);validateCombatState(state)
  return structuredClone(state);}
 function push(state,id,type,round,details){check(!state.events.some(e=>e.id===id),'Disease: duplicitní událost');
  state.events.push({id,type,round,details});state.lastRound=round;validateCombatState(state);}
-function conflict(state,{exceptId=null,allowCurrentDiseaseShock=false}={}){
+function conflict(state,{exceptId=null,allowCurrentDiseaseShock=false,exposureOnly=false}={}){
  const active=(state.diseaseCourses||[]).filter(x=>x.id!==exceptId&&['pending-profile','incubating','active'].includes(x.status));
  check(!active.length,'Disease: jiná otevřená nemoc potřebuje samostatné pravidlové rozhodnutí GM');
- check(!(state.toxinCourses||[]).some(t=>['incubating','active'].includes(t.status)),'Disease: současný Poison/Toxin nelze sloučit bez pravidel');
+ // Contagion is only evidence of contracting a disease, not its onset.
+ // During incubation neither disease nor toxin applies a NEW Disease
+ // outcome; active concurrent outcomes remain blocked pending GM review.
+ check(!(state.toxinCourses||[]).some(t=>t.status==='active'&&!exposureOnly),
+  'Disease: současný aktivní Poison/Toxin vyžaduje dořešení GM');
  check(!(state.environmentalHazards||[]).some(t=>t.active),'Disease: současnou Environmental Exposure nelze sloučit bez pravidel');
  check(!state.shockFollowup&&!state.extendedShock&&!state.coma?.active&&!state.bloodShockPending,
   'Disease: současný Shock follow-up nebo Coma vyžaduje řešení GM');
@@ -108,7 +112,7 @@ export function prepareDiseaseExposure({actor,state,sourceId,diseaseKey,transmis
  const priorBonus=prev?.nextExposureBonus||0,usedCI=contagionIndex+priorBonus;
  const contagion=contagionTest({contagionIndex:usedCI,endurance:end,roll:contagionD100});
  const contracted=contagion.contracted;
- if(contracted)conflict(s);
+ if(contracted)conflict(s,{exposureOnly:true});
  const current={id,sourceId:sourceId.trim(),diseaseKey:diseaseKey.trim(),transmission,
   contagionIndex,contagionIndexD20,contagionD100,usedCI,priorBonus,
   contagionEML:usedCI*end,contagionSL:slNames[contagion.sl],
