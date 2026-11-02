@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.669';
+const APP_VERSION='93.670';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -15305,8 +15305,18 @@ document.addEventListener('click',e=>{
   if(allCampaignClocks(data).length>=50)return alert('Byl dosažen limit 50 kampaní.');
   calendarCreating=true;calendarLanding=false;calendarUI=null;activeCalendarSection='overview';render();return;
  }
+ const key=t.dataset.calendarOpen;
+ // Opening the already-active campaign is presentation-only. In particular,
+ // an uncommitted travel Skill Test must remain in the working episode, and
+ // this click must NEVER enter mutate()/save() or switchCampaign().
+ if(key===campaignKey(data.campaignClock)){
+  calendarCreating=false;calendarLanding=false;calendarUI=null;activeCalendarSection='overview';render();return;
+ }
+ // Changing to another campaign really does replace active campaign data.
+ // Keep that persistent transition blocked until the travel transaction ends.
+ if(episodeStageBaseline)return alert('Přepnutí na jinou kampaň mění herní stav. Nejdříve dokončete nebo nouzově zrušte rozpracovanou cestovní epizodu. Otevření aktuálního kalendáře a ostatní prohlížení zůstává povolené.');
  if(combatInitiativeSequence)return alert('Před přepnutím kampaně dokončete aktivní Initiative.');
- try{const key=t.dataset.calendarOpen;const next=switchCampaign(data,key);
+ try{const next=switchCampaign(data,key);
   if(mutate(()=>{data.campaignClock=next.campaignClock;data.campaignClocks=next.campaignClocks;data.campaignActorBranches=next.campaignActorBranches;data.characters=next.characters;data.inventory=next.inventory;})){
    calendarCreating=false;calendarLanding=false;calendarUI=null;activeCalendarSection='overview';render();
   }
