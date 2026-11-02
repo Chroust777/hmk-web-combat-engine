@@ -149,6 +149,7 @@ import {applyConfirmedTreatment,applyConfirmedFrostAmputation,applyConfirmedInju
 import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
+import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
 import {availableSpellAuralRecoveries,persistSpellAuralRecovery} from './src/integration/hmk-spell-aural-recovery.js';
@@ -302,7 +303,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.673';
+const APP_VERSION='93.674';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1947,9 +1948,24 @@ function episodeConfigureSkillGate(root){
   }
  }
 }
+/** Cestování only asks the calendar HOW LONG it may run. The original
+ * medical, skill and GM forms retain authority for their own obligations.
+ * The window is recalculated from saved state after every confirmed result.
+ */
+function episodeMandatoryWindow(clock=data.campaignClock){
+ if(!clock)return null;
+ return mandatoryCalendarWindow({minute:clock.minute,
+  agenda:campaignCalendarAgenda(clock,data.characters,data.journal),
+  gmAgenda:gmCalendarAgenda(clock)});
+}
 function episodeSetupIssue(form){
  const v=episodeFormSnapshot(form),number=Number(v.minutes);
- if(!Number.isSafeInteger(number)||number<1)return {field:'minutes',message:'Zadejte platnou délku epizody v celých minutách.'};
+ if(!Number.isSafeInteger(number)||number<1||number>10080)return {field:'minutes',message:'Zadejte délku 1–10 080 minut.'};
+ const window=episodeMandatoryWindow();
+ if(window?.unknown.length)return {field:'minutes',message:'Kalendář obsahuje neověřený povinný termín ('+window.unknown[0].description+'). Nejdříve jej vyjasněte v původním modulu.'};
+ if(window&&number>window.maxAllowed)return {field:'minutes',message:window.maxAllowed===0?
+  'V aktuální minutě je splatná povinná událost. Vyhodnoťte ji nejdříve v Kalendáři, bez posunu času.':
+  'Maximální délka aktivity je '+window.maxAllowed+' minut – do '+displayCampaignMinute(window.limitMinute)+'. Zkraťte interval a dokončete cestu před samostatným testem.'};
  if(!v.memberIds?.length)return {field:'memberIds',message:'Vyberte alespoň jednu postavu.'};
  if(['travel','tracking'].includes(v.kind)&&!v.memberIds.includes(v.guideId))
   return {field:'guideId',message:'Průvodce musí být vybrán z účastníků epizody.'};
@@ -2095,6 +2111,7 @@ function timeEpisodePageHTML(clock,participants){
  <input type="hidden" name="episodeGMReviewedJson" value="{}">
  <div class="hmk-trek-grid"><label>Činnost<select name="kind">${[['travel','Cestování / pochod'],['rest','Odpočinek'],['sleep','Spánek'],['winded','Krátký klid (Windedness)'],['forage','Shánění potravy'],['tracking','Sledování stop'],['watch','Ostraha / vigilance'],['other','Jiná činnost']].map(([v,l])=>option(v,l)).join('')}</select></label>
  <label>Délka · skutečné minuty<input name="minutes" type="number" min="1" max="10080" value="${esc(String(d.minutes||60))}" required title="Skutečná délka epizody v minutách (nejvýše sedm dní v jednom zápisu)."></label></div>
+ <p class="hc-episode-clockline" data-episode-mandatory-cap role="status">Kalendář vypočítává nejbližší povinnou časovou hranici.</p>
  <p class="hc-episode-clockline"><strong>Začátek:</strong> ${esc(start)} · <span data-episode-end>Konec po zadání minut</span>. Vyhodnocení na konci intervalu; čas se do té doby neposouvá.</p>
  
  <label class="hc-check"><input name="rememberSettings" type="checkbox" checked> <span class="hc-help-term" tabindex="0" data-hmk-help="Převezme účastníky, průvodce, krajinu, trasu a další nastavení z poslední epizody. Nikdy nekopíruje staré hody, SV ani jejich ★. Po zrušení zaškrtnutí můžete začít od výchozího nastavení; existující následky postav zůstávají.">Předvyplnit nastavení z poslední epizody</span></label>
@@ -2330,6 +2347,13 @@ function campaignCalendarView(){
   return arr.map(x=>({...x,characterId:c.id,label:c.name+' · '+x.name}));
  });
  const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button></div></div>`;};
+ const renderDueGroups=events=>groupConcurrentObligations(events).map(g=>{
+  const person=character(g.characterId)?.name||g.items[0]?.name||g.characterId;
+  return `<section class="hc-calendar-concurrent" data-calendar-concurrent-minute="${g.minute}" data-calendar-concurrent-actor="${esc(g.characterId)}">
+   <h4>${esc(displayCampaignMinute(g.minute))} · ${esc(person)} · ${g.items.length} ${g.items.length===1?'kontrola':'samostatné kontroly'}</h4>
+   <p class="hc-hint">${g.items.length>1?'Každý výsledek potvrďte zvlášť v původním modulu. Po potvrzení se termíny načtou znovu; kalendář zůstává ve stejné minutě.':'Vyhodnocení probíhá v původním modulu.'}</p>
+   ${g.items.map(renderItem).join('')}</section>`;
+ }).join('');
  if(!calendarUI)calendarUI=calendarInitialUI(clock);
  const selectedCalendarPeople=calendarMemberIds(clock,data.characters);
  const board=campaignCalendarBoardHTML({clock,characters:selectedCalendarPeople,journal:data.journal,ui:calendarUI,escapeHTML:esc});
@@ -2924,7 +2948,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   `<section class="panel hc-calendar-unresolved" data-independent-skill-critical><h3>Nevyřešené následky samostatných Skill Tests · ${independentCriticalDue.length}</h3>
    <p class="hc-hint">Tyto hody nebyly vyžádány cestovní epizodou. Výsledky epizod jsou neměnné. Dokud GM neuzavře skutečné následky CF, kalendář nepovolí další posun času.</p>
    ${independentCriticalDue.map(renderItem).join('')}</section>`:'';
- const overviewHTML=`${independentCriticalHTML}${board}${timedSkillPending590}${bestiaryCalendarDuePanel567(clock)}${unknownFallNotice}${suspendedHealingHTML}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
+ const overviewHTML=`${independentCriticalHTML}${board}<section class="panel hc-calendar-concurrent-due"><h3>Splatné povinné kontroly · ${agenda.due.length}</h3>${agenda.due.length?renderDueGroups(agenda.due):'<p class="hc-hint">Nyní nejsou splatné žádné povinné kontroly.</p>'}</section>${timedSkillPending590}${bestiaryCalendarDuePanel567(clock)}${unknownFallNotice}${suspendedHealingHTML}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?`${trekDailyWeatherFormHTML(clock)}${overviewHTML}`:
   activeCalendarSection==='travel'?`${timeEpisodePageHTML(clock,participants)}${activeHMKActivities(data.journal,clock).length?interruptionsHTML:''}`:
   activeCalendarSection==='chronicle'?timeEpisodeChronicleHTML(clock):
@@ -2932,7 +2956,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   activeCalendarSection==='craft'?`${herbalHTML}${alchemyHTML}`:
   `${membersHTML}${legacyOriginPanel}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
- <section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?agenda.due.map(renderItem).join(''):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Vyřešení probíhá v původním Combat / Healing průvodci; kalendář pouze hlídá čas, nerozhoduje o hodu ani nezapisuje paralelní Combat State.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
+ <section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?renderDueGroups(agenda.due):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Vyřešení probíhá v původním Combat / Healing průvodci; kalendář pouze hlídá čas, nerozhoduje o hodu ani nezapisuje paralelní Combat State.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
  <section class="panel"><h3>Následující termíny · ${agenda.future.length}</h3>${agenda.future.length?agenda.future.slice(0,100).map(renderItem).join(''):'<p class="muted">Žádná další doložená splatnost.</p>'}</section>
  <section class="panel"><h3>Historické rány – potvrzení počátku · ${unresolved.length}</h3><p>Starší rány nepřevádíme automaticky z čísla bojového kola. Zadejte jejich skutečný věk v celých dnech a zbývajících hodinách/minutách.</p>${anchorOptions?`<form id="campaign-anchor-wound-form"><label>Rána<select name="wound" required>${anchorOptions}</select></label><div class="field-grid">${field('days','Počet uplynulých dní',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje doložený okamžik zranění</label><button type="submit">Ukotvit historickou ránu</button></form>`:'<p>Všechny existující otevřené rány mají doložený počátek.</p>'}</section>
  <section class="panel"><h3>Další historické procedury</h3>${timeOrigins.length?`<form id="campaign-anchor-procedure-form"><label>Procedura<select name="origin" required>${timeOrigins.map(x=>`<option value="${esc(x.kind+'::'+x.characterId+(x.episodeId?'::'+x.episodeId:''))}">${esc(x.label)} (${x.unit})</option>`).join('')}</select></label>${field('days','Skutečně uplynulé dny',0,'number')}${field('hours','Zbývající hodiny',0,'number')}${field('minutes','Zbývající minuty',0,'number')}<label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje počátek procedury</label><button type="submit">Ukotvit proceduru</button></form>`:'<p>Žádná další aktivní procedura nepotřebuje potvrzení počátku.</p>'}</section>
@@ -21435,12 +21459,16 @@ function episodeTimedRolls(form){
 // The Travel UI invokes only health timelines. HMK 182 Move/Charge/Double
 // Move aggravation belongs to Combat turn actions; do not infer those turns
 // from multi-hour travel duration or from the trekking pace choices.
+/** v93.674: No parallel healthcare resolution inside a travel transaction.
+ * Previously the preview could stage poison/disease/healing results and add
+ * medical journal rows while the journey was still being assembled. Every
+ * timed medical course now belongs to the original module at a calendar
+ * boundary. Deterministic onsets are committed by calendar clock advancement.
+ */
 function episodeTimedMedical(form,{strict=false}={}){
- const duration=Number(form.elements.namedItem('minutes')?.value),clock=data.campaignClock;
- if(!clock||!Number.isSafeInteger(duration)||duration<1||duration>10080)return null;
- try{return episodeTimedMedicalPreview(data,{endMinute:clock.minute+duration,rolls:{}});}
- catch(err){if(strict)throw err;return {error:err.message,requirements:[],changes:[],incapacitations:[],complete:false};}
+ return null;
 }
+
 /** GM memo reminders are reviewable without fabricated skill or health dice.
  * Real skills, wounds, timers and poisons stay mandatory in their own engine.
  * IDs and deadline must match the original pre-existing plan exactly. */
@@ -21450,13 +21478,10 @@ function episodeGMReviewData(form){
  }catch{return {};}
 }
 function episodeGMReviews(form){
- const clock=data.campaignClock,duration=Number(form.elements.namedItem('minutes')?.value);
- if(!clock||!Number.isSafeInteger(duration)||duration<1||duration>10080)return {pending:[],reviewed:[]};
- const values=episodeGMReviewData(form),start=clock.minute,end=start+duration;
- const agenda=gmCalendarAgenda(clock).filter(p=>p.requiresAction&&!p.resolution&&p.dueMinute>=start&&p.dueMinute<end);
- return {pending:agenda.filter(p=>p.destination!=='notes'||!values[p.id]||values[p.id]!==p.dueMinute),
-  reviewed:agenda.filter(p=>p.destination==='notes'&&values[p.id]===p.dueMinute)};
+ // No GM calendar action may be completed implicitly by Travel.
+ return {pending:[],reviewed:[]};
 }
+
 const EPISODE_TIMED_COURSE_KINDS=new Set(['malnutrition-course','poison','disease','healing','infection','blood-loss','grim','extended-shock','coma','weather-course','sleep-deprivation']);
 function episodeOtherTimedTasks(form){return episodeIndependentDeadlines(form).filter(x=>!EPISODE_TIMED_COURSE_KINDS.has(x.kind));}
 function episodeGMStagedClock(clock,reviewed){
@@ -21618,6 +21643,19 @@ function renderEpisodeEndError(form,message){
 }
 function updateEpisodePreview(form){
  if(!form)return;
+ const window=episodeMandatoryWindow();
+ const minuteInput=form.elements.namedItem('minutes');
+ const timeCap=form.querySelector('[data-episode-mandatory-cap]');
+ if(window&&minuteInput){minuteInput.max=String(window.maxAllowed);
+  if(timeCap){
+   const label=window.first?.origin==='gm'?(window.first.title||'GM událost'):(window.first?.description||'povinná kontrola');
+   timeCap.textContent=window.unknown.length?'Neověřená zdravotní časová osa: '+window.unknown[0].description+'. Nejprve vyřešte v původním modulu.':
+    window.maxAllowed===0?'Maximální délka: 0 minut. Nyní je splatná '+label+'. Otevřete původní vyhodnocení v Kalendáři.':
+    'Maximální možná doba činnosti: '+window.maxAllowed+' minut (do '+displayCampaignMinute(window.limitMinute)+').'+
+    (window.first?' Poté: '+label+'.':' V příštích sedmi dnech není další povinná událost.');
+  }
+ }
+
  const sky=applyEpisodeCalendarSky(form);
  const nightNow=sky?.period==='night';
  for(const name of ['orientationTorch','orientationMoon','orientationSnow']){
@@ -22378,6 +22416,8 @@ document.addEventListener('submit',e=>{
  const form=e.target;if(form?.id!=='hmk-time-episode-form')return;
  e.preventDefault();e.stopImmediatePropagation();
  try{
+  const boundaryIssue=episodeSetupIssue(form);
+  if(boundaryIssue&&boundaryIssue.field==='minutes')throw Error(boundaryIssue.message);
   if(!episodeEvaluationRequested)throw Error('Nejdříve nastavte podmínky a stiskněte Vyhodnotit epizodu.');
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Kampaň musí být otevřená mimo boj.');
   if(episodePendingEncounter(data.campaignClock))throw Error('Cesta je přerušena setkáním. Nejprve uzavřete Encounter; další herní čas se nesmí posunout.');
