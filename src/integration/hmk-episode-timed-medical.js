@@ -193,7 +193,12 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
   }
  }
  return {requirements,changes,incapacitations,complete:requirements.length===0,
-  generatedJournal:temp.journal.filter(j=>!originalJournalIds.has(j.id)).map(j=>({...j,
-   calendarEpisodeTimedMedical:{...j.calendarEpisodeTimedMedical,format:'hmk-episode-timed-medical-v1',startMinute:start,endMinute}})),
+  // Only real timed-medical receipts carry timed-medical metadata. Nutrition
+  // closures, onset records, and other native procedure documents retain their
+  // original type; attaching an empty medical receipt misclassifies them in
+  // the character diary and calendar and can create phantom health evidence.
+  generatedJournal:temp.journal.filter(j=>!originalJournalIds.has(j.id)).map(j=>
+   j.calendarEpisodeTimedMedical?{...j,calendarEpisodeTimedMedical:{...j.calendarEpisodeTimedMedical,
+    format:'hmk-episode-timed-medical-v1',startMinute:start,endMinute}}:j),
   characters:temp.characters,inventory:temp.inventory,medicalClockMinute:temp.campaignClock.minute};
 }
