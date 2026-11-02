@@ -68,7 +68,9 @@ export function episodeTimedCourseStep(database,event,{rolls={},idFactory,stamp}
  if(fields.some(f=>f.name==='arcaneBonus')&&isValid(values.arcaneBonus,{min:0,max:100})&&Number(values.arcaneBonus)>0)
   fields=[...fields,proof('arcaneEvidence','Původ potvrzeného Arcane bonusu (GM, min. 6 znaků)')];
  const required=fields.filter(f=>!isValid(values[f.name],f));
- if(required.length)return {key,event,fields,values,requirement:{key,kind:event.kind,characterId:event.characterId,dueMinute:event.minute,reason:event.description,fields,values}};
+ if(required.length)return {key,event,fields,values,requirement:{key,kind:event.kind,characterId:event.characterId,dueMinute:event.minute,
+  sourceId:event.sourceId||null,woundId:event.woundId||null,episodeId:event.episodeId||null,
+  elapsedMinutes:event.elapsedMinutes??null,reason:event.description,fields,values}};
  const input=Object.fromEntries(fields.map(f=>[f.name,f.type==='choice'||f.type==='text'?String(values[f.name]).trim():Number(values[f.name])]));
  const {end,wil}=actorAttributes(actor),round=Math.max(1,state.lastRound),eventId=idFactory();
  const sourceId=event.sourceId||String(event.episodeId||'').replace(/^(poison|disease):/,'');

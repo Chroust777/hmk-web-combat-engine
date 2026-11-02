@@ -102,9 +102,10 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
    must(whole(enc,0,100),'Nenastavená nebo neplatná ENC postavy.');
    const extraFatigue=loadBypass?Math.floor(enc/(conveyance==='foot'?10:20))*10:0;
    const duneFatigue=terrain==='dunes'&&conveyance==='foot'&&!dunesSlow?5:0;
-   if(activeMinutes===0&&inactive)return {id,endurance:end,roll:null,sr:null,rate:0,delta:0,carryIn,
-    carryOut:carryIn,enc,extraFatigue:0,duneFatigue:0,movementFatigueUnits:0,earlyIncapacity,
-    endNotRequired:{minute:inactive.minute,shock:inactive.shock,sourceKey:inactive.sourceKey}};
+   if(activeMinutes===0)return {id,endurance:end,roll:null,sr:null,rate:0,delta:0,carryIn,
+    carryOut:carryIn,enc,extraFatigue:0,duneFatigue:0,movementFatigueUnits:0,...(earlyIncapacity?{earlyIncapacity}:{}),
+    endNotRequired:inactive?{minute:inactive.minute,shock:inactive.shock,sourceKey:inactive.sourceKey}:
+     {reason:'equipment-delay',minute,sourceKey:'equipment-next-watch'}};
    must(whole(end,0,50),'Cestující postava potřebuje doložené END.');
    const raw=endRollByActor[id],rolls=Array.isArray(raw)?raw:[raw];
    const count=doubleTime?Math.ceil(activeMinutes/60):1;
@@ -165,6 +166,19 @@ export function lastEpisodeTravelDelayCarry(journal=[],campaignId,minute=Infinit
   if(row.calendarCampaignId!==campaignId||!ep||ep.startMinute>=minute||ep.kind!=='travel')continue;
   return ep.travelDelay?.carryOut??0;
  }return 0;
+}
+/** One Slow Mode from a successful equipment repair (S) applies to the NEXT
+ * trekking watch (HMK p.148). Minutes in shorter watches decrement this
+ * obligation without duplicating the Slow Mode. Older receipts had no carry;
+ * inspect their result only for the first subsequent travel watch. */
+export function lastEquipmentSlowCarry(journal=[],campaignId,minute=Infinity){
+ for(let i=journal.length-1;i>=0;i--){
+  const row=journal[i],e=row.calendarTimeEpisode;
+  if(row.calendarCampaignId!==campaignId||!e||e.kind!=='travel'||e.startMinute>=minute)continue;
+  if(Number.isSafeInteger(e.equipmentSlowCarryOut))return e.equipmentSlowCarryOut;
+  return e.hazardDetails?.some(h=>h.hazard==='equipment'&&h.result==='short-delay')?240:0;
+ }
+ return 0;
 }
 /** Fractional metre accounting follows the last journey, even across rest. */
 export function lastTimeEpisodeDistanceFraction(journal=[],campaignId,minute=Infinity){
@@ -732,6 +746,14 @@ export function validateTimeEpisodes(journal=[]){
     'Částečná únava postavy před zdravotní neschopností nemá pravidlový doklad.');
   }
   if(e.kind==='travel')for(const a of e.actors||[])if(a.endNotRequired){
+   if(a.endNotRequired.reason==='equipment-delay'){
+    must(e.movementMinutes===0&&e.travelDelay?.applied===e.minutes&&
+     a.roll===null&&a.sr===null&&a.movementFatigueUnits===0&&a.rate===0&&
+     a.delta===Math.floor((a.carryIn+(a.weatherFatigueUnits||0))/240)&&
+     a.carryOut===(a.carryIn+(a.weatherFatigueUnits||0))%240,
+     'Při opravě výstroje bez chůze nesmí vzniknout fiktivní END hod ani únava z pohybu.');
+    continue;
+   }
    const witness=e.timedMedical?.find(x=>x.actorId===a.id&&
     x.dueMinute===a.endNotRequired.minute&&x.shockAfter===a.endNotRequired.shock);
    must(witness&&['INC','UNC','KIA'].includes(witness.shockAfter)&&
@@ -759,8 +781,17 @@ export function validateTimeEpisodes(journal=[]){
    }
    const hazard=e.hazardDetails?.find(h=>h.hazard==='equipment'||h.hazard==='complication');
    const outcome=hazard?.result;
-   const mandatoryNext=['short-delay','long-delay','irreparable'].includes(outcome);
-   must(d.method==='gm-current-episode-only-v2'||!mandatoryNext||d.future>0,'Zdržení po hazardu musí mít doložené minuty do další cesty.');
+   const mandatoryNext=hazard?.hazard==='equipment'&&['long-delay','irreparable'].includes(outcome);
+   if(d.method!=='gm-current-episode-only-v2')must(d.future===(mandatoryNext?240:0)&&
+    (d.current===0||!!hazard),
+    'Zdržení v další hlídce nemá doložený Equipment Hazard nebo je jeho délka pozměněna.');
+   if(e.equipmentSlowCarryOut!==undefined){
+    const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute);
+    const newSlow=e.hazardDetails?.some(h=>h.hazard==='equipment'&&h.result==='short-delay')?240:0;
+    must(e.equipmentSlowCarryIn===priorSlow&&e.equipmentSlowCarryOut===Math.max(0,priorSlow-e.minutes)+newSlow&&
+     e.slow===e.equipmentBaseSlow+Number(priorSlow>0)+Number(!!e.dunesSlow),
+     'Equipment Hazard Slow se musí odečíst přesně jednou během dalších cestovních hlídek.');
+   }
    must(d.method==='gm-current-episode-only-v2'||!(hazard?.hazard==='complication'&&['long-delay','irreparable'].includes(outcome))||d.current>0,
     'Dlouhá komplikace musí zohlednit i čas ztracený v aktuální epizodě.');
   }
