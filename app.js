@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.662';
+const APP_VERSION='93.663';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2146,7 +2146,7 @@ function timeEpisodePageHTML(clock,participants){
  </div></details></details><details class="hc-episode-suboptions hc-episode-roll-group"><summary>Únava a srážky</summary><label>Srážky · stav v této minutové epizodě (d6) ${episodeRuleHelp('Srážkový d6','HMK 144: denní teplota a srážky vzniknou ze dvou d10. D6 popisuje doloženou souvislost srážek během aktuální epizody, ne nezávislý hod každou minutu. Pokud se počasí během činnosti změní, GM zahájí novou epizodu přesně v minutě změny. Další rozdělení dne není povinné.')}<span class="hc-episode-die"><input name="precipitationD6" type="number" min="1" max="6" placeholder="1–6"><button type="button" data-episode-die="precipitationD6">⚄ d6</button></span></label>
  <p class="hc-hint">Hod (d6: 1) znamená nepřetržité srážky; ostatní hodnoty nepřidávají Slow. U převzatého globálního počasí se denní d10 nepřehazují.</p>
  <div class="hc-episode-dice-by-person"><strong>END SR (d10) · individuálně při cestování</strong> ${episodeRuleHelp('END SR','Každá postava má vlastní hod d10 proti TN = podlaha(END/2); při jízdě a vozidle +2. Výsledná únava se počítá za zadané minuty, zaokrouhlí dolů a nevyčerpaná část se bezpečně přenese. Jednotlivé END hody jsou doložené skutečnými d10. HMK 62,149.')}<p>Každá postava má vlastní skutečný hod; TN odpovídá jejímu END. Hod se nepřebírá od průvodce.</p>
- ${participants.map(c=>`<label data-episode-end-person="${esc(c.id)}">${esc(c.name)} · END (d10)<span class="hc-episode-die"><input name="end_${esc(c.id)}" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="end_${esc(c.id)}">⚄ d10</button></span></label>`).join('')}</div></details></div><details class="hc-episode-suboptions hc-episode-roll-group hc-episode-encounter"><summary>Náhodná setkání</summary><details class="hc-episode-reference"><summary>GM výjimka · vynechat náhodné setkání jen v bezpečném prostředí</summary><label class="hc-check"><input name="checkEncounter" type="checkbox" checked> Provést kontrolu setkání podle skutečného prostředí ${episodeRuleHelp('Random Encounter','HMK 150 používá speciální d10 a TN podle prostředí a dne/noci (2/1, 4/1, 1/1, 9/9). Tato domluvená GM varianta převádí hustotu setkání na přesnou délku v minutách a jedním d100 určuje počet setkání; v dlouhé epizodě mohou být i dvě nebo více. Noční divočina má oproti denní poloviční četnost. Nejedná se o doslovný HMK hod d10.')}</label><p class="hc-hint">Základní kontrola probíhá automaticky při vyhodnocení. Odškrtnutí je výjimečné rozhodnutí GM a vyžaduje odůvodnění.</p><label data-episode-encounter-waiver hidden>Proč se Encounter nekontroluje (GM výjimka)<textarea name="encounterWaiver" rows="2" maxlength="250" placeholder="Např. skutečně bezpečná uzavřená místnost."></textarea></label></details><div data-episode-encounter-panel><div class="hmk-trek-grid"><input name="environ" type="hidden" value="highway"><p class="hc-hint" data-episode-auto-environ role="status">Prostředí Encounteru se určuje automaticky z vybrané cesty / krajiny.</p>
+ ${participants.map(c=>`<label data-episode-end-person="${esc(c.id)}">${esc(c.name)} · END SR (d10; při Double Time za každou hodinu)<span class="hc-episode-die"><input name="end_${esc(c.id)}" type="text" inputmode="numeric" placeholder="1–10; Double Time: 1,9,4,8"><button type="button" data-episode-die="end_${esc(c.id)}">⚄ d10</button></span></label>`).join('')}</div></details></div><details class="hc-episode-suboptions hc-episode-roll-group hc-episode-encounter"><summary>Náhodná setkání</summary><details class="hc-episode-reference"><summary>GM výjimka · vynechat náhodné setkání jen v bezpečném prostředí</summary><label class="hc-check"><input name="checkEncounter" type="checkbox" checked> Provést kontrolu setkání podle skutečného prostředí ${episodeRuleHelp('Random Encounter','HMK 150 používá speciální d10 a TN podle prostředí a dne/noci (2/1, 4/1, 1/1, 9/9). Tato domluvená GM varianta převádí hustotu setkání na přesnou délku v minutách a jedním d100 určuje počet setkání; v dlouhé epizodě mohou být i dvě nebo více. Noční divočina má oproti denní poloviční četnost. Nejedná se o doslovný HMK hod d10.')}</label><p class="hc-hint">Základní kontrola probíhá automaticky při vyhodnocení. Odškrtnutí je výjimečné rozhodnutí GM a vyžaduje odůvodnění.</p><label data-episode-encounter-waiver hidden>Proč se Encounter nekontroluje (GM výjimka)<textarea name="encounterWaiver" rows="2" maxlength="250" placeholder="Např. skutečně bezpečná uzavřená místnost."></textarea></label></details><div data-episode-encounter-panel><div class="hmk-trek-grid"><input name="environ" type="hidden" value="highway"><p class="hc-hint" data-episode-auto-environ role="status">Prostředí Encounteru se určuje automaticky z vybrané cesty / krajiny.</p>
  <input type="hidden" name="encounterPeriod" value="day">
 <input type="hidden" name="encounterD100" value=""><input type="hidden" name="encounterD100Sub" value=""><input type="hidden" name="encounterRollContext" value=""><input type="checkbox" name="encounterFine" checked hidden aria-hidden="true">
  <p class="hc-episode-encounter-summary" data-episode-encounter-summary role="status">Pravděpodobnost a výsledek automatických kostek se zobrazí před závěrečným potvrzením.</p></div>
@@ -2193,8 +2193,8 @@ function timeEpisodePageHTML(clock,participants){
  <div class="hc-episode-skin" data-episode-skin-kind="${h}" data-episode-skin-actor="${esc(c.id)}" hidden>
   <h5>Kožní trauma · ${h==='cold'?'Frostbite':'Sunburn'} · HMK 185</h5>
   <p class="hc-hint">Pouze při skutečném CF a potvrzené expozici. Zapište každou exponovanou lokalitu (i bez rány). Každý řádek: <code>lokalita;strana;skutečná AV;d10 Sunburn;d100 Shock;d10 Compound</code>. Prázdné nepoužité hody ponechte prázdné. U končetin zadejte left/right. Automatická Injury Sequence nejprve prověří zbroj a případnou existující ránu.</p>
-  <div class="hmk-trek-grid"><label data-episode-skin-cold>Frostbite · vítr d20<input name="whSkinWind_${h}_${esc(c.id)}" type="number" min="1" max="20"></label>
-  <label data-episode-skin-cold>Frostbite · délka d20<input name="whSkinDuration_${h}_${esc(c.id)}" type="number" min="1" max="20"></label>
+  <div class="hmk-trek-grid"><label data-episode-skin-cold>Frostbite · vítr d20<span class="hc-episode-die"><input name="whSkinWind_${h}_${esc(c.id)}" type="number" min="1" max="20"><button type="button" data-episode-die="whSkinWind_${h}_${esc(c.id)}" data-episode-faces="20">⚄ d20</button></span></label>
+  <label data-episode-skin-cold>Frostbite · délka d20<span class="hc-episode-die"><input name="whSkinDuration_${h}_${esc(c.id)}" type="number" min="1" max="20"><button type="button" data-episode-die="whSkinDuration_${h}_${esc(c.id)}" data-episode-faces="20">⚄ d20</button></span></label>
   <label data-episode-skin-heat>Sunburn · barva pleti<select name="whSkinComplexion_${h}_${esc(c.id)}"><option value="">— potvrďte —</option>${[['very-light','Velmi světlá'],['light','Světlá'],['medium','Střední'],['dark','Tmavá'],['very-dark','Velmi tmavá']].map(([x,l])=>option(x,l)).join('')}</select></label></div>
   <label>Exponované lokality (jeden řádek na lokalitu)<textarea name="whSkinRows_${h}_${esc(c.id)}" rows="4" placeholder="fa;;0;5;23;\nha;left;1;4;16;"></textarea></label>
   <label class="hc-check"><input name="whSkinReviewed_${h}_${esc(c.id)}" type="checkbox"> Potvrzuji, že jsem zkontroloval/a všechny exponované lokality, skutečné AV a potřebné hody.</label>
@@ -20830,7 +20830,12 @@ function episodePreviewFromForm(form,clock){
  const progressD10=pvals?pvals.split(',').map(x=>Number(x.trim())):(inheritedProgress?[...inheritedProgress]:[]);
  const directionD10=dvals?dvals.split(',').map(x=>Number(x.trim())):(inheritedDirection?[...inheritedDirection]:[]);
  if(kind==='travel'&&progressD10.length!==spare)throw Error('Přebytek Progress vyžaduje '+spare+' skutečných d10. Zadejte je oddělené čárkami.');
- const rolls=Object.fromEntries(members.map(id=>[id,Number(v['end_'+id])]));
+ const rolls=Object.fromEntries(members.map(id=>{
+  const raw=String(v['end_'+id]??'').trim();
+  // One END SR per watch normally; Double Time requires an independent
+  // roll every actual hour (HMK 150), never extrapolate one die four times.
+  return [id,v.doubleTime?(raw?raw.split(',').map(x=>Number(x.trim())):[]):Number(raw)];
+ }));
  const end=Object.fromEntries(people.map(c=>[c.id,c.hmk?.attributes?.end]));
  const carry=Object.fromEntries(members.map(id=>[id,lastTimeEpisodeCarry(data.journal,campaignKey(clock),id)]));
  if(kind==='travel'&&members.some(id=>!Number.isSafeInteger(end[id])))throw Error('Některá postava nemá doložené END.');
@@ -21058,7 +21063,7 @@ function episodePreviewFromForm(form,clock){
    exposure:result.weatherExposure,minutes,dayMinutes,nightMinutes});
   result.actors=result.actors.map(actor=>{
    const extra=weatherUnits[actor.id]||0;
-   const units=actor.carryIn+(actor.earlyIncapacity?.activeMovementMinutes??(result.movementMinutes??minutes))*actor.rate+extra;
+   const units=actor.carryIn+(actor.movementFatigueUnits??(actor.earlyIncapacity?.activeMovementMinutes??(result.movementMinutes??minutes))*actor.rate)+extra;
    return {...actor,weatherFatigueUnits:extra,delta:Math.floor(units/240),carryOut:units%240};
   });
  }
@@ -21854,7 +21859,7 @@ function updateEpisodePreview(form){
     <p><strong>Uraženo:</strong> ${result.distanceMeters} m (${(result.distanceMeters/1000).toLocaleString('cs-CZ',{maximumFractionDigits:3})} km)</p>
     <p><strong>Na mapě:</strong> ${result.mapCentimetres} cm.</p>
     ${result.actors.map(a=>`<p>${esc(character(a.id)?.name||a.id)}: ${a.endNotRequired?'END se neprovádí · zdravotní neschopnost od '+esc(displayCampaignMinute(a.endNotRequired.minute)):
-    'END (d10: '+a.roll+'), TN '+a.sr.tn+' · '+(a.sr.success?'úspěch':'neúspěch')}; Weariness +${a.delta}${a.weatherFatigueUnits?' (včetně počasí '+(a.weatherFatigueUnits/240).toFixed(2)+' bodu)':''}${a.carryOut?' (přenáší se nevyčerpaný zlomek)':''}.</p>`).join('')}${result.stableAnimalLoad?.length?result.stableAnimalLoad.map(a=>`<p>Stáj: ${esc(a.name)} · ENC ${a.enc}${a.loaded?' · Loaded':' · bez Loaded'} (skutečná výstroj a náklad).</p>`).join(''):''}${result.animals?.length?result.animals.map(a=>`<p>Zvíře ${esc(character(a.id)?.name||a.id)}: Weariness +${a.delta} · GM analogie.</p>`).join(''):''}`:
+    'END '+(a.hourlyEndSR?'(hodinové d10: '+a.hourlyEndSR.map(x=>x.roll+' '+(x.success?'S':'F')).join(', ')+')':'(d10: '+a.roll+'), TN '+a.sr.tn+' · '+(a.sr.success?'úspěch':'neúspěch'))}; Weariness +${a.delta}${a.weatherFatigueUnits?' (včetně počasí '+(a.weatherFatigueUnits/240).toFixed(2)+' bodu)':''}${a.carryOut?' (přenáší se nevyčerpaný zlomek)':''}.</p>`).join('')}${result.stableAnimalLoad?.length?result.stableAnimalLoad.map(a=>`<p>Stáj: ${esc(a.name)} · ENC ${a.enc}${a.loaded?' · Loaded':' · bez Loaded'} (skutečná výstroj a náklad).</p>`).join(''):''}${result.animals?.length?result.animals.map(a=>`<p>Zvíře ${esc(character(a.id)?.name||a.id)}: Weariness +${a.delta} · GM analogie.</p>`).join(''):''}`:
    `${result.recoveryPreview?.length?result.recoveryPreview.map(p=>{const w=result.weatherRestFatigue?.find(x=>x.id===p.id);return `<p>${esc(character(p.id)?.name||p.id)} · zotavení ${p.recovered} bodů, klimatická únava +${w?.delta||0} bodů${w?.addedUnits?' (minutově '+w.addedUnits+' jednotek; převod zbytku '+w.carryOut+')':''}. ${p.next.carry?'Nevyčerpaná část zotavení přenesena.':''}</p>`;}).join(''):'<p>Bez přesunu. Příslušné testy se řeší v původních Skill Tests.</p>'}`;
   out.innerHTML=`<p><b>${esc(displayCampaignMinute(result.startMinute))}–${esc(displayCampaignMinute(result.endMinute))}</b> · ${result.minutes} minut</p>
     ${travelText}
@@ -22071,7 +22076,10 @@ document.addEventListener('click',e=>{
  if(!field||field.disabled)return;
  const sides=Number(b.dataset.episodeFaces)||
   (b.dataset.episodeDie==='precipitationD6'?6:b.dataset.episodeDie==='encounterD100'?100:10);
- try{field.value=String(secureHMKDie(sides));field.dataset.episodeGenerated=field.value;
+ try{const hourly=b.dataset.episodeDie.startsWith('end_')&&form.elements.namedItem('doubleTime')?.checked;
+  const count=hourly?Math.ceil(Number(form.elements.namedItem('minutes')?.value||0)/60):1;
+  if(!Number.isSafeInteger(count)||count<1||count>168)throw Error('Nejprve zadejte platnou délku cesty.');
+  field.value=Array.from({length:count},()=>secureHMKDie(sides)).join(',');field.dataset.episodeGenerated=field.value;
   timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
  }catch(err){alert('Hod nebyl proveden: '+err.message)}
 },true);
@@ -22343,7 +22351,7 @@ document.addEventListener('submit',e=>{
     const input=form.elements.namedItem('end_'+a.id);
     const origin=input?.dataset.episodeGenerated===input?.value?'cryptographic-software-die':'manual';
     const evidence=commitExpeditionFatigue(c,{kind:'travel',accrual:a.delta,durationMinutes:result.minutes,
-     rolls:a.endNotRequired?[]:[{roll:a.roll,tn:a.sr.tn,success:a.sr.success}],sourcePages:[62,145,146,150],mode:v.conveyance==='foot'?'walk':v.conveyance==='mount'?'ride':'drive'},result.endMinute,
+     rolls:a.endNotRequired?[]:(a.hourlyEndSR||[{roll:a.roll,tn:a.sr.tn,success:a.sr.success}]),sourcePages:[62,145,146,150],mode:v.doubleTime?(v.conveyance==='foot'?'double-walk':'double-drover'):(v.conveyance==='foot'?'walk':v.conveyance==='mount'?'ride':'drive')},result.endMinute,
      a.endNotRequired?'gm-inactive-no-end-roll':origin,sourceId+':'+a.id);
     return {...a,origin:a.endNotRequired?'not-performed-medical':origin,before,after:evidence.finalFatigue};
    });
