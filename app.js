@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.670';
+const APP_VERSION='93.671';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -8017,6 +8017,7 @@ function guidedAttackPanel(chars){
  ${pendingCombatActionHandoff?`<p class="notice">Připravený jediný Combat útok: ${esc(pendingCombatActionHandoff.kind)} · aktér ${esc(character(pendingCombatActionHandoff.actorId)?.name)} · cíl ${esc(character(pendingCombatActionHandoff.targetId)?.name)} · kolo ${pendingCombatActionHandoff.round}. <button type="button" class="secondary" data-action="hmk-sheet-combat-cancel">Zrušit předvýběr</button></p>`:''}
  ${guidedAttackSession||guidedMountedSession||guidedTurnSession||guidedDeclaredSession||guidedSpatialSession||guidedTraumaSession||guidedBloodSession||guidedRecoverySession?progress:(firstGuidedMandatoryDue(selected)?guidedMandatoryPanel(selected):`<form id="hmk-guided-hit-start-form"><div class="field-grid">
  <label>Akce<select name="kind"><option value="melee" ${pendingCombatActionHandoff?.kind==='melee'?'selected':''}>Melee Strike</option><option value="deadly">Deadly Melee – bezbranný cíl, automatický čtyřhvězdičkový CS (HMK 191)</option><option value="press" ${pendingCombatActionHandoff?.kind==='press'?'selected':''}>Melee – Press (deklarovat před hodem)</option><option value="trip" ${pendingCombatActionHandoff?.kind==='trip'?'selected':''}>Melee – Trip (deklarovat před hodem)</option><option value="grab" ${pendingCombatActionHandoff?.kind==='grab'?'selected':''}>Melee – Grab (deklarovat před hodem)</option><option value="spatial">Move / Evade / Charge – prostorová akce</option><option value="missile" ${pendingCombatActionHandoff?.kind==='missile'?'selected':''}>Missile / Volley (vyžaduje ověřená data střelné zbraně)</option><option value="mounted-control">Mounted Control (HMK str.172)</option><option value="free-action">Volná akce – zbraň, kapsa, krok, dveře, příkaz, zastrašení (HMK str.161)</option><option value="mishap-recovery">Vstát / zvednout upuštěnou zbraň (Move / Grope)</option><option value="turn-action">Akce v právě probíhajícím tahu (Pass, Ready, soustředění)</option><option value="trauma-course">Extended Shock / Coma – Course Roll (HMK str.179)</option><option value="morale-reaction">Routed / Withdrawing – povinný Reaction (HMK str.162)</option><option value="rally">Rally – Command (Initiative) (HMK str.62,162)</option><option value="cohesion-register">Group Cohesion – definovat spojence (HMK str.162)</option><option value="cohesion-assess">Group Cohesion – nově povšimnutá ztráta</option><option value="vanquished-ruling">Vanquished – potvrdit skutečnou neschopnost (HMK str.162)</option><option value="surrender-release">Routed – GM potvrdí konec kapitulace (HMK str.162)</option><option value="special-morale">Special Morale – skutečná mimořádná událost (HMK str.162)</option></select></label>
+ <label>Typ zdravotní Course (při souběhu Coma a Extended Shock povinné)<select name="traumaCourseKind"><option value="">Zvolit splatnou proceduru…</option><option value="extended-shock">Extended Shock · každé 4 hodiny</option><option value="coma">Coma · podle skutečného d10denního intervalu</option></select></label>
  <label><input name="deadlyReachConfirmed" type="checkbox" value="yes"> GM potvrzuje dosah bezbranného cíle (pouze Deadly Melee).</label>
  <label><input name="deadlyCalled" type="checkbox" value="yes"> Deadly Melee: místo ZD/LD využít doloženou 1-round koncentraci na tento cíl</label>
  <label>Vybraná anatomická lokace při koncentraci<select name="deadlyLocation"><option value="">Bez cíleného zásahu</option>${[['sk','Skull'],['fa','Face'],['nk','Neck'],['sh','Shoulder'],['ua','Upper Arm'],['el','Elbow'],['fo','Forearm'],['ha','Hand'],['tx','Thorax'],['ab','Abdomen'],['pv','Pelvis'],['th','Thigh'],['kn','Knee'],['ca','Calf'],['ft','Foot']].map(([c,n])=>`<option value="${c}">${n} (${c})</option>`).join('')}</select></label>
@@ -15085,6 +15086,13 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   if(form)refreshCalendarHealingFields(form);
   choose(form,'endurance',attrs.end);choose(form,'will',attrs.wil);break;
  }
+ case 'coma':case 'extended-shock':{
+  // Both courses can coexist. Select the ORIGINAL guided Course for the
+  // requested calendar obligation, never the merely first active one.
+  form=document.getElementById('hmk-guided-hit-start-form');
+  choose(form,'kind','trauma-course');choose(form,'attackerId',actor.id);
+  choose(form,'traumaCourseKind',kind);break;
+ }
  case 'blood-loss':form=document.getElementById('hmk-blood-regeneration-form');choose(form,'targetId',actor.id);
   if(form)refreshCalendarHealingFields(form);choose(form,'endurance',attrs.end);break;
  case 'poison':{
@@ -15209,7 +15217,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
    field.focus({preventScroll:true});
   }
   notice='Otevřen autoritativní '+choice+' test pro hlídku '+sourceId+'. Výsledek se uloží s vazbou na její konkrétní čas a kampaň.';
- }else if(['skill-fall','skill-critical','skill-injury','weather-course','weather-skin','treatment','healing','injury-morale','injury-mishap','infection','grim','poison','disease','psyche-recovery','psyche-interval','psyche-manifestation','aural-recovery','talisman-period','blood-shock','shock-followup','bleeding','blood-loss','asphyxia','sleep-deprivation','psyche-choice'].includes(kind)){
+ }else if(['skill-fall','skill-critical','skill-injury','weather-course','weather-skin','treatment','healing','injury-morale','injury-mishap','infection','grim','poison','disease','psyche-recovery','psyche-interval','psyche-manifestation','aural-recovery','talisman-period','blood-shock','shock-followup','bleeding','blood-loss','coma','extended-shock','asphyxia','sleep-deprivation','psyche-choice'].includes(kind)){
   const msg='Kalendář otevřel příslušnou oblast postavy '+actor.name+', ale pro tuto událost není v aktuálním stavu dostupný autoritativní pravidlový formulář. Žádný hod nebyl proveden; zkontrolujte předchozí povinnosti.';
   notice=msg;const area=document.querySelector('main.content');if(area){const warning=document.createElement('p');warning.className='notice';warning.setAttribute('role','status');warning.textContent=msg;area.prepend(warning);}
  }else{
@@ -19403,7 +19411,11 @@ document.addEventListener('submit',e=>{
     // This is a timed medical follow-up, never an extra attack/turn action.
     const patient=character(v.attackerId);
     if(!patient||!encounterSelection.has(patient.id))throw Error('Zvolte léčenou postavu v poli Útočník');
-    const readiness=guidedTraumaCourseReadiness({state:persistentStateOf(patient),character:patient});
+    const selectedCourse=['extended-shock','coma'].includes(v.traumaCourseKind)?v.traumaCourseKind:null;
+    const patientState=persistentStateOf(patient);
+    if(patientState.extendedShock&&patientState.coma?.active&&!selectedCourse)
+     throw Error('Coma a Extended Shock běží současně: výslovně vyberte splatný typ Course podle Kalendáře.');
+    const readiness=guidedTraumaCourseReadiness({state:patientState,character:patient,kind:selectedCourse});
     if(!readiness.available)throw Error('Postava nemá aktivní Extended Shock ani Coma Course');
     const exact=(label,min,max)=>{
      const val=window.prompt(label,'');if(val===null)return null;
