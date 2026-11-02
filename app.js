@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.681';
+const APP_VERSION='93.682';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -21537,7 +21537,7 @@ function renderEpisodeEndStatus(form,result,weather){
  const root=document.querySelector('.hc-episode-spread-right')||form.closest('.hc-episode-shell');
  if(!root)return;
  const overview=root.querySelector('[data-episode-overview]');
- if(overview)overview.innerHTML='<strong>'+esc(String(result.minutes))+' minut · '+esc(result.kind)+'</strong><p>Od '+esc(displayCampaignMinute(result.startMinute))+' do '+esc(displayCampaignMinute(result.endMinute))+'</p>'+
+ if(overview)overview.innerHTML='<p class="hc-hint" data-episode-build-version="'+esc(APP_VERSION)+'">Spuštěná verze: v'+esc(APP_VERSION)+'</p><strong>'+esc(String(result.minutes))+' minut · '+esc(result.kind)+'</strong><p>Od '+esc(displayCampaignMinute(result.startMinute))+' do '+esc(displayCampaignMinute(result.endMinute))+'</p>'+
   (result.kind==='travel'?'<p><strong>'+esc(String(result.distanceMeters))+' m</strong> · END a únava v detailu.</p>':'<p>Čas a následky při závěrečném potvrzení.</p>')+
   (result.travelDelay?.applied?'<p><b>Zdržení '+result.travelDelay.applied+' min</b> · pohyb '+result.travelDelay.movementMinutes+' min.</p>':'')+
   '<p>Počasí: '+esc(weather.area)+'</p>';
@@ -21581,7 +21581,9 @@ function renderEpisodeEndStatus(form,result,weather){
  }
  const tasks=episodeEndTasks(result),checklist=root.querySelector('[data-episode-checklist]');
  episodeOutstandingSkillTasks=tasks.filter(t=>t.skill&&t.actorId&&!form.elements.namedItem(t.action)?.value);
- if(!form.elements.namedItem('confirmed')?.checked)tasks.push({name:'Potvrzení GM',detail:'Po dokončení všech výsledků potvrďte skutečný průběh a čas na levé stránce.',action:'confirmed'});
+ const awaitingGM=!form.elements.namedItem('confirmed')?.checked;
+ if(awaitingGM)tasks.push({name:'Potvrzení GM',detail:'Všechny hody mohou být hotové, ale před trvalým zápisem musíte vlevo zaškrtnout potvrzení skutečného průběhu a času GM.',action:'confirmed'});
+ form.dataset.episodeAwaitingGM=String(tasks.length===1&&awaitingGM);
  if(checklist)checklist.innerHTML=tasks.length?'<p class="hc-episode-task-lead">Před dokončením zbývá '+tasks.length+' vyhodnocení. Nezávislé úkoly můžete řešit v libovolném pořadí:</p>'+tasks.map((t,i)=>
    '<div class="hc-episode-task"><span class="hc-task-number">'+(i+1)+'</span><div><b>'+esc(t.name)+'</b><p>'+esc(t.detail)+'</p>'+
     (t.action?'<button type="button" class="secondary" data-episode-jump="'+esc(t.action)+'">Doplnit související pole</button> ':'')+
@@ -21812,6 +21814,7 @@ function renderEpisodeEndError(form,message){
 }
 function updateEpisodePreview(form){
  if(!form)return;
+ delete form.dataset.episodeAwaitingGM;
  const window=episodeMandatoryWindow();
  const minuteInput=form.elements.namedItem('minutes');
  const timeCap=form.querySelector('[data-episode-mandatory-cap]');
@@ -22161,7 +22164,8 @@ function updateEpisodePreview(form){
   }else if(budget){const m=err.message.match(/Orienteering SV ([-\d]+) dovoluje (\d+) Progress\/Bearing Modes, ale bylo použito (\d+)/);
    if(m)budget.textContent='SV '+m[1]+' → '+m[2]+' ★. Rozdělili jste '+m[3]+' ★; snižte přidělené Modes.';}
   renderEpisodeEndError(form,err.message);
-  out.innerHTML='<p class="hc-episode-await">K dokončení chybí: '+esc(err.message)+'</p>';
+  const technical=err instanceof ReferenceError||err instanceof TypeError;
+  out.innerHTML='<p class="hc-episode-await" role="alert">'+(technical?'Technická chyba aplikace v'+esc(APP_VERSION)+': ':'K dokončení chybí: ')+esc(err.message)+'</p>';
  }
  // The setup phase never requests Skill Tests, dice or a GM confirmation.
  // All mechanically necessary resolutions are requested AFTER Evaluate.
@@ -22185,8 +22189,11 @@ function updateEpisodePreview(form){
  const finalButton=document.querySelector('.hc-episode-spread-right [data-episode-finalize]');
  const evaluateButton=form.querySelector('[data-episode-evaluate]');
  if(evaluateButton){
-  evaluateButton.disabled=!!(episodeEvaluationRequested&&finalButton&&!finalButton.disabled);
-  evaluateButton.title=evaluateButton.disabled?'Všechny povinné výsledky jsou doložené. Nyní dokončete celou epizodu vpravo.':'';
+  const awaitingGM=episodeEvaluationRequested&&form.dataset.episodeAwaitingGM==='true';
+  const ready=episodeEvaluationRequested&&finalButton&&!finalButton.disabled;
+  evaluateButton.disabled=!!(awaitingGM||ready);
+  evaluateButton.textContent=awaitingGM?'✓ Vyhodnoceno · potvrďte GM vlevo':ready?'✓ Vyhodnoceno · dokončete vpravo':'Vyhodnotit epizodu →';
+  evaluateButton.title=awaitingGM?'Všechny aktuální výsledky jsou doloženy. Zaškrtněte potvrzení GM ve formuláři vlevo.':ready?'Všechny povinné výsledky jsou doložené. Nyní dokončete celou epizodu vpravo.':'';
  }
  hideVisibleTechnicalUUIDs(form.closest('.hc-episode-shell')||form);
 }
