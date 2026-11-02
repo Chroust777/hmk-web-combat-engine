@@ -49,7 +49,7 @@ export function prepareTrekkingWeatherTest({state,sourceId,round=1,kind,original
  let hr=null,periodMinutes=null,addedWeariness=0,skinPending=null;
  if(kind==='cold'){
   need(Object.hasOwn(cold,coldCondition),'Neznámé skutečné podmínky chladu');
-  if(['coolWater','coldWater','freezingWater'].includes(coldCondition)&&['F','CF'].includes(originalSL))
+  if(['coolWater','coldWater','freezingWater'].includes(coldCondition))
    need(s.events.some(e=>e.id==='skill-cold-shock:'+sourceId&&e.type==='skill-cold-water-shock'&&e.details?.report?.condition===coldCondition),
     'Ponoření do studené vody nejprve vyžaduje potvrzený Cold Shock 3d6 a Endurance.');
   if(['F','CF'].includes(originalSL)){hr=cold[coldCondition].hr;periodMinutes=cold[coldCondition].period;
