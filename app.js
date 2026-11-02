@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.676';
+const APP_VERSION='93.677';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10367,6 +10367,19 @@ function hskEpisodeWeatherOnsetForms(actorId){
    const proof=data.journal.find(x=>x.id===w.proofId&&x.characterId===actorId&&
     x.calendarCampaignId===camp);
    if(!proof||!['CF','F','S','CS'].includes((proof.skillTestProof?.a||proof.skillTestProof?.result)?.level))continue;
+   // Water immersion demands an immediate one-time Shock procedure BEFORE
+   // the separate Exposure outcome, regardless of the original Hazard SL.
+   const water=w.kind==='cold'&&['coolWater','coldWater','freezingWater'].includes(w.coldCondition);
+   if(water&&!persistentStateOf(character(actorId)).events.some(x=>x.id==='skill-cold-shock:'+sourceId)){
+    forms.push(`<details class="hsk-climb-fall" open><summary>Cold Shock · skutečné ponoření · ${esc(displayCampaignMinute(episode.endMinute))} · HMK 185</summary>
+    <form data-skill-cold-shock><input type="hidden" name="sourceId" value="${esc(sourceId)}"><input type="hidden" name="episodeId" value="${esc(e.id)}"><input type="hidden" name="condition" value="${esc(w.coldCondition)}">
+    <p>Nejprve samostatně potvrďte skutečné 3d6 kol ponoření a nový Endurance d100. Původní Weather Hazard Endurance/Survival se neopakuje. Podmínky ${esc(w.coldCondition)}.</p>
+    <div class="field-grid">${[1,2,3].map(i=>`<label>d6 č. ${i}<input name="d6_${i}" type="number" min="1" max="6" required></label>`).join('')}
+    <label>Cold Shock Endurance d100<input name="enduranceD100" type="number" min="1" max="100" required></label></div>
+    <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečné ponoření a všechny hody</label>
+    <button type="submit">Vyhodnotit a uložit Cold Shock</button><output role="status" aria-live="polite"></output></form></details>`);
+    continue;
+   }
    forms.push(`<details class="hsk-climb-fall"><summary>${w.kind==='cold'?'Cold':'Heat'} Hazard – zdravotní následek v ${esc(displayCampaignMinute(episode.endMinute))} · HMK 149,185</summary>
     <form data-skill-weather-onset><input type="hidden" name="sourceId" value="${esc(sourceId)}"><input type="hidden" name="episodeId" value="${esc(e.id)}"><input type="hidden" name="kind" value="${esc(w.kind)}">
     <p>Původní Endurance/Survival ${esc(w.proofId)} má výsledek ${esc((proof.skillTestProof.a||proof.skillTestProof.result).level)}. Tento hod se neopakuje. Cestovní Fatigue je již započtená; zde se potvrdí pouze samostatný zdravotní následek.</p>
@@ -10377,8 +10390,13 @@ function hskEpisodeWeatherOnsetForms(actorId){
  return forms.join('');
 }
 function hskTrekkingColdShockForm(entry){
+ // An external episode must use its own stable medical source ID for both
+ // Cold Shock and Cold Exposure. The legacy proof-ID form cannot complete it.
+ if(data.journal.some(j=>j.calendarCampaignId===entry?.calendarCampaignId&&
+  j.calendarTimeEpisode?.weatherAftercare==='external-v93.676'&&
+  j.calendarTimeEpisode.weatherExposure?.some(w=>w.exposed&&w.id===entry.characterId&&w.proofId===entry.id)))return '';
  const p=entry?.skillTestProof,r=p?.a||p?.result,sk=p?.skills?.[0]||p?.skill;
- if(!['Endurance','Survival'].includes(sk)||!['CF','F'].includes(r?.level)||
+ if(!['Endurance','Survival'].includes(sk)||!['CF','F','S','CS'].includes(r?.level)||
   !['secondary-mastery-value-test','secondary-mastery-test','assistance-success-test'].includes(p?.type)||
   data.journal.some(j=>j.skillTestProof?.type==='skill-cold-water-shock'&&j.skillTestProof.sourceId===entry.id))return '';
  return `<details class="hsk-climb-fall"><summary>Studená voda · Cold Shock před expozicí · HMK str.185</summary>
@@ -11243,20 +11261,36 @@ document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-skill-cold-shock]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
  try{
-  const sourceId=form.elements.namedItem('sourceId').value,src=data.journal.find(x=>x.id===sourceId),proof=src?.skillTestProof;
+  const sourceId=form.elements.namedItem('sourceId').value;
+  const episodeId=form.elements.namedItem('episodeId')?.value||null;
+  const receipt=episodeId?data.journal.find(j=>j.id===episodeId):null;
+  const episode=receipt?.calendarTimeEpisode;
+  const condition=form.elements.namedItem('condition').value;
+  const linked=episodeId?episode?.weatherExposure?.find(w=>w.kind==='cold'&&w.exposed===true&&
+   episodeWeatherAftercareId(episodeId,w.id,w.kind)===sourceId):null;
+  const src=data.journal.find(x=>x.id===(linked?.proofId||sourceId)),proof=src?.skillTestProof;
   const actor=character(proof?.actorId),result=proof?.a||proof?.result;
-  if(!actor||actor.id!==src.characterId||!['CF','F'].includes(result?.level)||!['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill))throw Error('Nedoložený původní Cold Hazard');
+  if(!actor||actor.id!==src.characterId||
+   !['CF','F','S','CS'].includes(result?.level)||
+   !['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill))throw Error('Nedoložený původní Cold Hazard');
+  if(episodeId&&(!linked||linked.id!==actor.id||linked.proofId!==src.id||
+   episode.weatherAftercare!=='external-v93.676'||receipt.calendarCampaignId!==campaignKey(data.campaignClock)||
+   src.calendarCampaignId!==receipt.calendarCampaignId||data.campaignClock.minute!==episode.endMinute||
+   linked.coldCondition!==condition||!['coolWater','coldWater','freezingWater'].includes(condition)))
+   throw Error('Cold Shock neodpovídá potvrzené cestovní epizodě, postavě, vodě nebo přesné minutě.');
   if(combatInitiativeSequence)throw Error('Cold Shock v Initiative patří do řízeného Combat State');
   const old=persistentStateOf(actor);
   const outcome=prepareColdWaterShock({actor,state:old,sourceId,round:Math.max(1,combatClock.round||1,old.lastRound||0),
-   condition:form.elements.namedItem('condition').value,d6s:[1,2,3].map(i=>Number(form.elements.namedItem('d6_'+i).value)),
+   condition,d6s:[1,2,3].map(i=>Number(form.elements.namedItem('d6_'+i).value)),
    enduranceD100:Number(form.elements.namedItem('enduranceD100').value),gmConfirmed:form.elements.namedItem('gmConfirmed').checked});
   if(!mutate(()=>{
    if(data.journal.some(x=>x.skillTestProof?.type==='skill-cold-water-shock'&&x.skillTestProof.sourceId===sourceId))throw Error('Opakovaný Cold Shock');
    synchronizeCombatInjuries(actor,outcome.state);
    data.journal.push({id:uuid(),characterId:actor.id,title:'Cold Shock · HMK str.185',
+    ...(episodeId?{calendarCampaignId:receipt.calendarCampaignId,campaignMinute:episode.endMinute}:{}),
     body:'3d6: '+outcome.report.immersionRounds+' kol · Endurance '+outcome.report.enduranceD100+' → '+outcome.report.sl+' · SHK '+outcome.report.index+' · '+outcome.report.shock,
-    createdAt:stamp(),skillTestProof:{type:'skill-cold-water-shock',sourceId,actorId:actor.id,report:outcome.report}});
+    createdAt:stamp(),skillTestProof:{type:'skill-cold-water-shock',sourceId,actorId:actor.id,report:outcome.report,
+     ...(episodeId?{episodeId,originalSkillProofId:src.id}: {})}});
   }))throw Error('Cold Shock nebyl uložen');
   form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Cold Shock uložen v Combat State. Další Cold Exposure se posoudí samostatně.'}));
  }catch(e){if(out)out.textContent='Cold Shock nebyl zapsán: '+e.message;}
@@ -11267,6 +11301,9 @@ document.addEventListener('submit',event=>{
  try{
   const sourceId=form.elements.namedItem('sourceId').value,actor=character(selected),orig=actor&&persistentStateOf(actor);
   if(!actor||!orig?.environmentalHazards?.some(h=>h.sourceId===sourceId&&h.skinPending))throw Error('Neexistuje nedokončené kožní poranění této postavy');
+  const onsetReceipt=data.journal.find(x=>x.characterId===actor.id&&x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===sourceId);
+  const skinTime=onsetReceipt?.calendarCampaignId===campaignKey(data.campaignClock)?
+   {calendarCampaignId:onsetReceipt.calendarCampaignId,campaignMinute:data.campaignClock.minute}:{};
   if(combatInitiativeSequence)throw Error('Zranění během Initiative musí vést Combat');
   const toNumber=x=>x?.trim()?Number(x.trim()):null;
   const rows=form.elements.namedItem('rows').value.trim().split('\n').filter(x=>x.trim()).map(line=>{
@@ -11282,10 +11319,12 @@ document.addEventListener('submit',event=>{
   if(!mutate(()=>{
    if(data.journal.some(x=>x.skillTestProof?.type==='skill-weather-skin'&&x.skillTestProof.sourceId===sourceId))throw Error('Dvojí zápis kožního traumatu');
    synchronizeCombatInjuries(actor,outcome.state);
-   data.journal.push({id:uuid(),characterId:actor.id,title:'Weather '+outcome.report.kind+' · HMK str.185',
+   data.journal.push({id:uuid(),characterId:actor.id,...skinTime,title:'Weather '+outcome.report.kind+' · HMK str.185',
     body:'Zkontrolováno '+outcome.report.reviewedLocations+' lokací · založeno '+outcome.report.wounds.length+' ran: '+
      outcome.report.wounds.map(w=>w.location+' '+(w.side||'')+' '+w.severity+w.il).join(', '),createdAt:stamp(),
-    skillTestProof:{type:'skill-weather-skin',sourceId,actorId:actor.id,report:outcome.report}});
+    skillTestProof:{type:'skill-weather-skin',sourceId,actorId:actor.id,report:outcome.report,
+     ...(onsetReceipt?.skillTestProof?.episodeId?{episodeId:onsetReceipt.skillTestProof.episodeId,
+      originalSkillProofId:onsetReceipt.skillTestProof.originalSkillProofId}: {})}});
   }))throw Error('Kožní zranění nelze uložit');
   form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Zranění byla automaticky zapsána do Combat State a historie.'}));
  }catch(e){if(out)out.textContent='Kožní poranění nebylo zapsáno: '+e.message;}
