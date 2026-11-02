@@ -176,7 +176,7 @@ export function lastEquipmentSlowCarry(journal=[],campaignId,minute=Infinity){
   const row=journal[i],e=row.calendarTimeEpisode;
   if(row.calendarCampaignId!==campaignId||!e||e.kind!=='travel'||e.startMinute>=minute)continue;
   if(Number.isSafeInteger(e.equipmentSlowCarryOut))return e.equipmentSlowCarryOut;
-  return e.hazardDetails?.some(h=>h.hazard==='equipment'&&h.result==='short-delay')?240:0;
+  return e.hazardDetails?.some(h=>(h.hazard==='equipment'||h.hazard==='complication'&&h.automationVersion==='v93.681')&&h.result==='short-delay')?240:0;
  }
  return 0;
 }
@@ -602,7 +602,7 @@ export function validateTimeEpisodes(journal=[]){
       'Accident: cestování musí skončit v doložené minutě a předat zranění původnímu modulu.');
      continue;
     }
-    if(h.automationVersion==='v93.635'){
+    if(h.automationVersion==='v93.635'||h.automationVersion==='v93.681'&&h.hazard==='complication'){
      must(h.requiresGMCompletion===false,'Automatizovaný hazard nesmí mít nedokončené následky.');
      if(h.hazard==='accident'){
       const a=h.accidentProof;
@@ -799,13 +799,14 @@ export function validateTimeEpisodes(journal=[]){
    }
    const hazard=e.hazardDetails?.find(h=>h.hazard==='equipment'||h.hazard==='complication');
    const outcome=hazard?.result;
-   const mandatoryNext=hazard?.hazard==='equipment'&&['long-delay','irreparable'].includes(outcome);
+   const currentComplication=hazard?.hazard==='complication'&&hazard.automationVersion==='v93.681';
+   const mandatoryNext=(hazard?.hazard==='equipment'||currentComplication)&&['long-delay','irreparable'].includes(outcome);
    if(d.method!=='gm-current-episode-only-v2')must(d.future===(mandatoryNext?240:0)&&
     (d.current===0||!!hazard),
     'Zdržení v další hlídce nemá doložený Equipment Hazard nebo je jeho délka pozměněna.');
    if(e.equipmentSlowCarryOut!==undefined){
     const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute);
-    const newSlow=e.hazardDetails?.some(h=>h.hazard==='equipment'&&h.result==='short-delay')?240:0;
+    const newSlow=e.hazardDetails?.some(h=>(h.hazard==='equipment'||h.hazard==='complication'&&h.automationVersion==='v93.681')&&h.result==='short-delay')?240:0;
     // Legacy receipts before v93.666 incorrectly consumed a Slow obligation
     // during an equipment repair with zero movement. Keep historical data
     // readable, but never issue (or accept as new) that calculation again.
@@ -819,8 +820,18 @@ export function validateTimeEpisodes(journal=[]){
      e.slow===e.equipmentBaseSlow+Number(priorSlow>0)+Number(!!e.dunesSlow),
      'Equipment Hazard Slow se musí odečíst přesně jednou během skutečného pohybu; starší doklady zůstávají čitelné.');
    }
-   must(d.method==='gm-current-episode-only-v2'||!(hazard?.hazard==='complication'&&['long-delay','irreparable'].includes(outcome))||d.current>0,
-    'Dlouhá komplikace musí zohlednit i čas ztracený v aktuální epizodě.');
+   if(currentComplication){
+    if(['long-delay','irreparable'].includes(outcome)){
+     must(whole(hazard.hazardAtMinute,1,e.minutes)&&d.current===e.minutes-hazard.hazardAtMinute&&
+      d.future===240,'Complication F/CF: zdržení musí odpovídat minutě překážky a následující hlídce.');
+    }else must(d.future===0,'Complication S/CS: nesmí se přidávat celý další watch jako zdržení.');
+    if(outcome==='irreparable')must(hazard.routeChangeConfirmed===true,
+      'Complication CF: chybí potvrzená změna trasy.');
+   }else if(hazard?.hazard==='complication'&&['long-delay','irreparable'].includes(outcome)) {
+    // Archived documents are not rewritten or reinterpreted.
+    must(d.method==='gm-current-episode-only-v2'||d.current>0,
+     'Starší dlouhá komplikace nemá doložené zdržení aktuální hlídky.');
+   }
   }
   if(e.travelDelay&&Array.isArray(e.animals)){
    for(const a of e.animals){const units=a.carryIn+(e.movementMinutes??e.travelDelay.movementMinutes)*a.rate;

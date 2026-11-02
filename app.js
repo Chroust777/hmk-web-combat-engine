@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.680';
+const APP_VERSION='93.681';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2225,17 +2225,19 @@ function timeEpisodePageHTML(clock,participants){
  <label data-hazard-complication>Dovednost komplikace<select name="hazardComplicationSkill"><option value="">— není vybrána —</option>${['Agility','Animalcraft','Climbing','Timbercraft','Swimming'].map(x=>option(x,x)).join('')}</select></label>
  <label data-hazard-worker>Opravář / řešitel překážky<select name="hazardWorkerId"><option value="">— vyberte účastníka —</option>${participants.map(c=>option(c.id,c.name)).join('')}</select></label>
  <label data-hazard-complication>Koho překážka ovlivňuje<select name="hazardComplicationScope"><option value="single">Jeden vybraný řešitel</option><option value="party">Každý člen družiny zvlášť</option></select></label>
+ <label data-hazard-complication class="hc-check"><input name="hazardComplicationRouteChanged" type="checkbox"> Complication CF: GM potvrzuje skutečnou změnu trasy (HMK 149)</label>
  <div data-hazard-complication-party>${participants.map(c=>`<label>${esc(c.name)} · skutečný doklad Skill Testu<select name="hazardCompProof_${esc(c.id)}"><option value="">— dosud nevyhodnoceno —</option>${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&j.characterId===c.id&&j.skillTestProof).map(j=>option(j.id,j.title||j.id)).join('')}</select></label>`).join('')}</div>
  <div class="hc-episode-delay-fields" data-episode-delay-fields hidden>
  <h4>Zdržení · skutečné minuty GM (HMK 148–149)</h4>
- <p class="hc-hint">Nejde o další hod ani o další časový interval. Délka celé epizody se nemění; minuty zdržení se odečtou od pohybu a nevyčerpaný zbytek zůstane pro následující cestu. Výsledek S/F/CF určuje typ následku, konkrétní minuty potvrzuje GM.</p>
+ <p class="hc-hint">Nejde o nový hod. Při Complication F/CF se skutečné zdržení vypočte z doložené minuty překážky; další 240minutová hlídka je ztracena. Při Complication S vzniká Slow Mode v následující hlídce. Jiné skutečné zdržení potvrzuje GM.</p>
  <div class="hmk-trek-grid"><label>Ztráta pohybu během této epizody · minuty<input type="number" name="hazardDelayNow" min="0" max="10080" value="0" title="Zadejte jen skutečné minuty, kdy se družina v této epizodě kvůli překážce nepohybovala."></label>
  </div>
  <p class="hc-hint" data-episode-delay-hint>Vyberte skutečný výsledek hazardu; podle něj aplikace určí povinné doklady.</p></div>
  <label data-hazard-skill-level>Výsledek skutečného Skill Testu<select name="hazardSkillLevel"><option value="">— nutno doložit —</option>${['CF','F','S','CS'].map(x=>option(x,x)).join('')}</select></label>
+ <label data-hazard-minute>Minuta nehody / překážky od začátku epizody · určuje GM<input name="hazardAtMinute" type="number" min="1" max="10080" placeholder="např. 45" inputmode="numeric"></label>
+ <p data-hazard-minute class="hc-hint">Accident přeruší celou cestu v této minutě. U Complication F/CF zbytek současné hlídky ztrácí družina a další hlídka je také ztracena. Dále se automaticky přepočítá pohyb a únava.</p>
  <div data-hazard-accident class="hc-episode-accident-step"><h4>Accident · přerušení cesty (HMK 148)</h4>
  <p class="hc-hint">Nejprve doložte minutu vzniku nehody. Cestování skončí právě v tomto okamžiku a započítá pouze skutečný pohyb, vzdálenost a únavu. Los oběti, Agility a Injury Sequence proběhnou až po potvrzení epizody v původních Skill Tests / Combat, nikoliv zde.</p>
- <label>Minuta nehody od začátku intervalu · potvrzuje GM<input name="hazardAtMinute" type="number" min="1" max="10080" placeholder="např. 45" inputmode="numeric"></label>
  <input name="incidentPlannedMinutes" type="hidden" value="">
  <p class="hc-hint" data-episode-accident-result>Uveďte přesný čas nehody; zdravotní hody zatím neprovádějte.</p></div>
  <label data-hazard-direction>Skutečný d10 pro směr odchýlení (liché = vlevo, sudé = vpravo)<span class="hc-episode-die"><input name="hazardDirectionD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="hazardDirectionD10" data-episode-faces="10">⚄ d10</button></span></label>
@@ -21169,6 +21171,7 @@ function episodePreviewFromForm(form,clock){
  result.navigationState=episodeNavigationState(previous,result.direction,{recovered:!!v.navigationRecovered});
  result.navigationRecovered=!!v.navigationRecovered;
  const hazardTypes=[result.survivalHazard,result.direction?.direction].filter(Boolean);
+ if(kind==='travel'&&hazardTypes.length&&minutes>240)throw Error('Hazard patří do konkrétní čtyřhodinové hlídky (HMK 148–149). Rozdělte delší plánovanou cestu na nejvýše 240minutové úseky a hazard vyhodnoťte v jeho vlastní hlídce; jinak by se zdržení a Slow Mode přenesly do nesprávného času.');
  result.hazardDetails=[];
  for(const hazardType of hazardTypes){
   const l=v.hazardSkillLevel||null,ag=v.hazardAgility||null;
@@ -21242,9 +21245,21 @@ function episodePreviewFromForm(form,clock){
    const incoming=equipmentDelayIn;
    const relevant=result.hazardDetails.find(h=>['equipment','complication'].includes(h.hazard));
    const raw=k=>String(v[k]??'0').trim();
-   const now=Number(raw('hazardDelayNow')||0);
    const outcome=relevant?.result;
-   const future=relevant?.hazard==='equipment'&&['long-delay','irreparable'].includes(outcome)?240:0;
+   const failedComplication=relevant?.hazard==='complication'&&['long-delay','irreparable'].includes(outcome);
+   const obstacleMinute=Number(v.hazardAtMinute);
+   if(failedComplication&&(!/^[1-9]\d*$/.test(String(v.hazardAtMinute||''))||
+      obstacleMinute>minutes))throw Error('Complication F/CF: GM musí doložit přesnou minutu překážky v aktuální hlídce.');
+   if(relevant?.hazard==='complication'&&outcome==='irreparable'&&!v.hazardComplicationRouteChanged)
+    throw Error('Complication CF: GM musí potvrdit změnu trasy.');
+   const now=failedComplication?minutes-obstacleMinute:Number(raw('hazardDelayNow')||0);
+   const future=(relevant?.hazard==='equipment'||relevant?.hazard==='complication')&&
+     ['long-delay','irreparable'].includes(outcome)?240:0;
+   if(relevant?.hazard==='complication'){
+    relevant.hazardAtMinute=failedComplication?obstacleMinute:null;
+    relevant.routeChangeConfirmed=outcome==='irreparable'?true:outcome==='reroute'?true:false;
+    relevant.automationVersion='v93.681';
+   }
    const delay=episodeMinuteDelay({minutes,incoming,current:relevant?now:0,future,persistCarry:true});
    result.equipmentBaseSlow=equipmentBaseSlow;
    result.equipmentSlowCarryIn=equipmentSlowIn;
@@ -21265,7 +21280,7 @@ function episodePreviewFromForm(form,clock){
    // HMK 148: a next-watch Slow from equipment repair is spent only during
    // ACTUAL travel. Repair delays and medically aborted walks must not use it up.
    result.equipmentSlowCarryOut=Math.max(0,equipmentSlowIn-result.movementMinutes)+
-    (relevant?.hazard==='equipment'&&outcome==='short-delay'?240:0);
+    (relevant&&['equipment','complication'].includes(relevant.hazard)&&outcome==='short-delay'?240:0);
    result.equipmentSlowCarryRule='moving-minutes-v93.666';
    result.medicalTravelStop=confirmedStop?{minute:Math.min(...previewIncap.map(x=>x.minute)),
     movementMinutes:result.movementMinutes}:null;
@@ -21511,9 +21526,6 @@ function episodeEndTasks(result){
  if(result.hazardDetails?.some(h=>['equipment','complication'].includes(h.hazard)&&h.requiresGMCompletion&&
   ['short-delay','long-delay','irreparable'].includes(h.result)))
   add('Zdržení · skutečné minuty','Je-li překážka zdržela přímo během epizody, zadejte doložené minuty; na další epizodu se nepřenášejí.','hazardDelayNow');
-  add('Počasí · '+(skin.kind==='cold'?'Frostbite':'Sunburn')+' · '+(character(skin.id)?.name||skin.id),
-   skin.error||'Doložte lokality, zbroj a skutečné hody pro Injury Sequence.',
-   'whSkinRows_'+skin.kind+'_'+skin.id);
  for(const w of result.weatherExposure||[]){
   if(w.pending||['pending','pending-endurance'].includes(w.effect))
    add('Počasí · '+w.kind+' · '+(character(w.id)?.name||w.id),
@@ -22033,6 +22045,13 @@ function updateEpisodePreview(form){
    for(const n of hz.querySelectorAll('[data-hazard-complication]'))n.hidden=!types.includes('complication');
    for(const n of hz.querySelectorAll('[data-hazard-skill-level]'))n.hidden=!types.includes('equipment')&&!(types.includes('complication')&&v.hazardComplicationScope!=='party');
    for(const n of hz.querySelectorAll('[data-hazard-agility],[data-hazard-accident]'))n.hidden=!types.includes('accident');
+   for(const n of hz.querySelectorAll('[data-hazard-minute]'))n.hidden=!types.some(x=>['accident','complication'].includes(x));
+   const currentDelay=form.elements.namedItem('hazardDelayNow');
+   if(currentDelay&&types.includes('complication')&&['F','CF'].includes(v.hazardSkillLevel)){
+    const at=Number(v.hazardAtMinute),elapsed=Number(v.minutes);
+    currentDelay.value=Number.isSafeInteger(at)&&at>=1&&at<=elapsed?String(elapsed-at):'0';
+    currentDelay.readOnly=true;
+   }else if(currentDelay)currentDelay.readOnly=false;
    for(const n of hz.querySelectorAll('[data-hazard-worker]'))n.hidden=!types.some(x=>['equipment','complication'].includes(x));
    for(const n of hz.querySelectorAll('[data-hazard-complication-party]'))n.hidden=!types.includes('complication')||v.hazardComplicationScope!=='party';
    const proof=hz.querySelector('[data-episode-accident-result]');if(proof&&types.includes('accident')){
@@ -22183,13 +22202,14 @@ function episodeCarrySettingsFromLast(){
  return {...draft,rememberSettings:true,orientationUse:'new',trackingUse:'new',confirmed:false,
   navigationRecovered:false,checkEncounter:true};
 }
-function episodeFreshDraft(){return {rememberSettings:false,orientationUse:'new',trackingUse:'new',confirmed:false,
+function episodeFreshDraft(){return {rememberSettings:false,orientationUse:'new',trackingUse:'new',confirmed:false,hazardComplicationRouteChanged:false,
  memberIds:[],animalIds:[],stableAnimalIds:[],orientationProofId:'',trackingProofId:'',progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
 function episodeClearDiceDraft(draft){
  const saved={...draft,confirmed:false,orientationProofId:'',trackingProofId:'',droverProofId:'',encounterD100Sub:'',
   progressD10:'',directionD10:'',survivalD10:'',precipitationD6:'',encounterD100:'',forageD10:'',
   temperatureD10:'',precipitationD10:'',
   checkEncounter:true,encounterResolution:'',encounterRollContext:'',navigationRecovered:false,orientationUse:'new',trackingUse:'new',
+  hazardComplicationRouteChanged:false,hazardAtMinute:'',hazardDelayNow:'0',
   skillProofIds:[],episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};
  for(const k of Object.keys(saved))if(k.startsWith('end_'))saved[k]='';
  return saved;
@@ -22239,7 +22259,7 @@ function initializeTimeEpisodeForm(form){
   mode_vigilance:'Vigilance zvyšuje bdělost družiny při vyhodnocení Encounter.',
 
   orientationUse:'Orienteering je situační Survival test. Jeho výsledek SV přiděluje výhody Progress, Bearing, Foraging, Stalking a Vigilance.',
-  hazardDelayNow:'GM doloží minuty aktuální epizody spotřebované překážkou. Plynou jako herní čas, ale nepočítají se jako cesta.',
+  hazardDelayNow:'Minuty zdržení odečtené od pohybu; při Complication F/CF se počítají automaticky od skutečné minuty překážky. Příští povinnosti se přenesou do nové epizody.',
 
   checkEncounter:'Ve výchozím stavu automaticky kontrolováno každou venkovní epizodu. Odškrtnutí je pouze pro GM doloženou bezpečnou výjimku.',
   confirmed:'Potvrzení skutečných doložených podkladů GM; samo o sobě nenahrazuje žádný povinný Skill Test.'
