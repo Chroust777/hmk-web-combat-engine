@@ -175,7 +175,14 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // own task graph. Its CF/F (including Survival Hazard) must not spawn a
   // second generic calendar task. An ordinary stand-alone Skill Test has no
   // calendarEpisodeSkillLink and retains the original follow-up behavior.
-  if(e.calendarEpisodeSkillLink)continue;
+  // A recorded Survival CF remains open until its original injury routine
+  // completes when the travel episode was explicitly cut at an Accident.
+  // Unlike older in-episode hazards, the confirmed trip is NOT the injury proof.
+  const deferredAccident=e.calendarEpisodeSkillLink?.field==='orientationProofId'?journal.find(j=>
+   j.calendarCampaignId===e.calendarCampaignId&&j.calendarTimeEpisode?.orientation?.skillId===e.id&&
+   j.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)):null;
+  if(e.calendarEpisodeSkillLink&&!deferredAccident)continue;
+  const actualDueMinute=deferredAccident?.calendarTimeEpisode?.endMinute??e.campaignMinute;
   if(p.type==='critical-followup'){
    // A non-dice Survival Hazard follows the original Trekking CF. It has no
    // secondary SL at all, but still requires actual hazard dice / GM routing.
@@ -215,11 +222,11 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
     (z.calendarCampaignId===e.calendarCampaignId&&
      z.calendarTimeEpisode?.orientation?.skillId===e.id&&
      !!z.calendarTimeEpisode.survivalHazard&&
-     (z.calendarTimeEpisode.hazardDetails||[]).every(h=>!h.requiresGMCompletion)));
+     (z.calendarTimeEpisode.hazardDetails||[]).every(h=>!h.requiresGMCompletion&&!h.externalMedicalPending)));
    if(episodeAlreadyHandled)continue;
    if(journal.some(z=>z.skillTestProof?.type==='critical-followup'&&z.skillTestProof.originId===e.id&&z.skillTestProof.side===x.side))continue;
    const c=characters.find(c=>c.id===x.id);
-   if(c)push(c,'skill-critical',e.id+'-'+x.side,`${x.skill} ${x.result.level} – GM ověří konkrétní činnost a případný navazující test (HMK ${skillFollowupActivities(x.skill,x.result.level)[0].page})`,e.campaignMinute,'skills',
+   if(c)push(c,'skill-critical',e.id+'-'+x.side,`${x.skill} ${x.result.level} – GM ověří konkrétní činnost a případný navazující test (HMK ${skillFollowupActivities(x.skill,x.result.level)[0].page})`,actualDueMinute,'skills',
     {originId:e.id,side:x.side,level:x.result.level,decisionRequired:true});
   }
  }

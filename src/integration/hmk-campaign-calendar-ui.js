@@ -116,7 +116,16 @@ export function calendarBoardEvents({clock,characters=[],journal=[]}={}){
   .map(j=>({id:j.characterId,name:j.calendarActivityProof.name}));
  const activitiesCharacters=[...characters,...animalRestActors.filter(a=>!characters.some(c=>c.id===a.id))];
  const sourceRows=new Map(journal.map(row=>[row.id,row]));
- const travelTask=(p)=>p.kind==='skill-critical'&&isTravelEpisodeReceipt(sourceRows.get(p.originId));
+ const travelTask=(p)=>{
+  if(p.kind!=='skill-critical'||!isTravelEpisodeReceipt(sourceRows.get(p.originId)))return false;
+  // An unfinished accident must remain visible in the real calendar until
+  // original Critical Followup + Injury Sequence complete; it is NOT a
+  // completed in-episode health roll.
+  const unresolvedAccident=journal.some(z=>z.calendarTimeEpisode?.orientation?.skillId===p.originId&&
+    z.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)&&
+    !journal.some(done=>done.skillTestProof?.type==='critical-followup'&&done.skillTestProof.originId===p.originId));
+  return !unresolvedAccident;
+ };
  const all=[...agenda.all.filter(p=>!travelTask(p)).map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities([...calendarActorActivities(clock,activitiesCharacters,journal),...calendarNutritionConditionActivities(clock,characters,journal),...travelEpisodeCalendarSegments(clock,characters,journal)]),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
  const receipts=calendarUIReceipts(journal,clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`);
  const visible=compactNutritionTimelineEvents(all.filter(p=>receipts.get(p.id)!=='hide').map(p=>({...p,uiAcknowledged:receipts.get(p.id)==='acknowledge'})),journal)

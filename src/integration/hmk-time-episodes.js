@@ -593,6 +593,15 @@ export function validateTimeEpisodes(journal=[]){
      directionTurn:h.directionTurn,directionD10:h.directionD10??null,directionAwareness:h.directionAwareness});
     const linked=h.evidenceId?journal.find(k=>k.id===h.evidenceId&&
      k.calendarCampaignId===j.calendarCampaignId&&k.campaignMinute===e.startMinute):null;
+    if(h.automationVersion==='v93.675'&&h.hazard==='accident'){
+     must(h.externalMedicalPending===true&&h.requiresGMCompletion===false&&
+      h.result==='pending-original-skill-combat'&&whole(h.hazardAtMinute,1,e.minutes)&&
+      h.hazardAtMinute===e.minutes&&whole(h.hazardD10,4,6)&&e.endMinute===e.startMinute+e.minutes&&
+      e.orientation?.level==='CF'&&e.survivalHazard==='accident'&&
+      !h.accidentProof&&!h.injuryProofId&&!h.victimId,
+      'Accident: cestování musí skončit v doložené minutě a předat zranění původnímu modulu.');
+     continue;
+    }
     if(h.automationVersion==='v93.635'){
      must(h.requiresGMCompletion===false,'Automatizovaný hazard nesmí mít nedokončené následky.');
      if(h.hazard==='accident'){
