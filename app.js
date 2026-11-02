@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.665';
+const APP_VERSION='93.666';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -17431,7 +17431,10 @@ document.addEventListener('submit',e=>{
     args.daySinceInjury=due;
    }
    t=applyConfirmedInjuryHealing({...args,endurance:Number(v.endurance),will:Number(v.will),roll:Number(v.roll),
-    herbalContext:historicalEvidence?null:herbalContext,historicalEvidence,gmConfirmed:historicalEvidence!==null});
+    herbalContext:historicalEvidence?null:herbalContext,historicalEvidence,
+    // The existing GM confirmation dialog guards the actual mutate()/save().
+    // A normal (non-historical) Healing Roll must not be rejected before it.
+    gmConfirmed:true});
   }
   else {const otherWoundDays=Object.fromEntries([...form.entries()].filter(([k])=>k.startsWith('resumeDay:')&&k.slice(10)).map(([k,val])=>[k.slice(10),val===''?null:Number(val)]));
    if(data.campaignClock)for(const other of persistentStateOf(c).wounds){if(other.id===woundId||other.healed||!other.healing?.treated||other.healing?.noMundaneHealing)continue;
@@ -20967,8 +20970,6 @@ function episodePreviewFromForm(form,clock){
    const delay=episodeMinuteDelay({minutes,incoming,current:relevant?now:0,future,persistCarry:true});
    result.equipmentBaseSlow=equipmentBaseSlow;
    result.equipmentSlowCarryIn=equipmentSlowIn;
-   result.equipmentSlowCarryOut=Math.max(0,equipmentSlowIn-minutes)+
-    (relevant?.hazard==='equipment'&&outcome==='short-delay'?240:0);
    if(relevant){
 
 
@@ -20983,6 +20984,11 @@ function episodePreviewFromForm(form,clock){
     throw Error('Zastavený pochod: doložte skutečné minuty pohybu v pravé části.');
    result.travelDelay=delay;
    result.movementMinutes=confirmedStop?Math.min(delay.movementMinutes,moveLimit):delay.movementMinutes;
+   // HMK 148: a next-watch Slow from equipment repair is spent only during
+   // ACTUAL travel. Repair delays and medically aborted walks must not use it up.
+   result.equipmentSlowCarryOut=Math.max(0,equipmentSlowIn-result.movementMinutes)+
+    (relevant?.hazard==='equipment'&&outcome==='short-delay'?240:0);
+   result.equipmentSlowCarryRule='moving-minutes-v93.666';
    result.medicalTravelStop=confirmedStop?{minute:Math.min(...previewIncap.map(x=>x.minute)),
     movementMinutes:result.movementMinutes}:null;
    const metres=result.motion.finalLPW*4000*result.movementMinutes/240+result.distanceFractionIn;
