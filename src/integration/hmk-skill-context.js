@@ -25,7 +25,21 @@ export function skillConditionAvailability({actor,inventory=[],name,mounted=fals
  const applicability=encApplicability(actor,name);
  const out={applicability,fatigue:{ready:false,reason:'Postava nemá potvrzený trvalý bojový stav'},enc:{ready:false,reason:'Zatížení nebylo doloženo'}};
  const state=actor?.hmk?.combatState;
- if(state){try{validateCombatState(state);const fatigue=combatFatigueTotals(state);const modifier=fatigueEMLModifier(fatigue.total);out.fatigue=modifier.ok?{ready:true,modifier:modifier.value,totals:fatigue,shock:state.shock,source:'confirmed-combat-state'}:{ready:false,reason:'Únava v potvrzeném stavu nesplňuje pravidla p.176'};}catch(err){out.fatigue={ready:false,reason:'Neplatný trvalý bojový stav: '+err.message};}}
+ if(state){try{
+  validateCombatState(state);
+  const fatigue=combatFatigueTotals(state),modifier=fatigueEMLModifier(fatigue.total);
+  if(modifier.ok)out.fatigue={ready:true,modifier:modifier.value,totals:fatigue,shock:state.shock,source:'confirmed-combat-state'};
+  else if(Number.isSafeInteger(fatigue.total)&&fatigue.total>=0&&fatigue.total<=1000){
+   // Historical GM-minute travel episodes can have certified 1–4-point partial
+   // Weariness. Keep that exact persisted amount and the original receipt;
+   // blocking the next Survival test would contradict the committed episode.
+   // This is a compatibility path for the declared proportional-time GM variant,
+   // NOT a change to printed p.176 or the stricter manually entered GM Fatigue.
+   out.fatigue={ready:true,modifier:-fatigue.total,totals:fatigue,shock:state.shock,
+    source:'confirmed-combat-state',variant:'legacy-minute-proportional-fatigue',
+    note:'Poměrná Fatigue z minutové cestovní varianty: převzata bez přepisu historie.'};
+  }else out.fatigue={ready:false,reason:'Únava v potvrzeném stavu je mimo doložený rozsah 0–1000.'};
+ }catch(err){out.fatigue={ready:false,reason:'Neplatný trvalý bojový stav: '+err.message};}}
  if(applicability.kind==='not-applicable'){out.enc={ready:true,modifier:0,source:'not-applicable-by-skill-base'};return out;}
  if(applicability.kind==='unknown'){out.enc={ready:false,reason:'Skill Base není pravidlově ověřený'};return out;}
  if(!Array.isArray(inventory)){out.enc={ready:false,reason:'Chybí inventář'};return out;}
