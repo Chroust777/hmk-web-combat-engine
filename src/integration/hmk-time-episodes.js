@@ -675,6 +675,15 @@ export function validateTimeEpisodes(journal=[]){
      !['pending','pending-endurance'].includes(w.effect),'Pozměněný nebo neúplný Weather Hazard.');
    }
   }
+  if(e.weatherAftercare!==undefined){
+   must(e.weatherAftercare==='external-v93.676'&&e.weatherSkinDetails===undefined&&
+    Array.isArray(e.weatherExposure),
+    'Nový Weather Hazard musí být vyhodnocen výhradně mimo Cestování.');
+   for(const w of e.weatherExposure.filter(w=>w.exposed)){
+    must(typeof w.proofId==='string'&&!!w.proofId,
+     'Předání Weather Onset vyžaduje původní ID Endurance/Survival.');
+   }
+  }
   if(e.weatherSkinDetails!==undefined){
    must(Array.isArray(e.weatherSkinDetails),'Frostbite/Sunburn vyžaduje seznam doložených lokalit.');
    const required=e.weatherExposure?.filter(w=>w.effect==='cold-exposure-frostbite'||

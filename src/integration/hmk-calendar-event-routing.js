@@ -12,7 +12,7 @@ export function calendarEventDestination(event){
   case 'psyche-interval':case 'psyche-recovery':return 'healing';
   case 'trek-survival':case 'trek-drover-test':case 'trek-direction-hazard':case 'trek-weather-hazard':
   case 'skill-critical':case 'skill-fall':case 'skill-injury':case 'weather-course':
-  case 'weather-skin':case 'talisman-period':return 'skills';
+  case 'weather-skin':case 'weather-onset':case 'talisman-period':return 'skills';
   default:return 'combat';
  }
 }

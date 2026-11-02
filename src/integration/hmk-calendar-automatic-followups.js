@@ -10,6 +10,11 @@ import {dueInjuryMorale,unresolvedInjuryMishaps} from './persistent-combat-state
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
+/** Immutable bridge from committed travel to existing Weather Onset.
+ * All event dates and IDs derive from the confirmed episode receipt. */
+export function episodeWeatherAftercareId(episodeId,actorId,kind){
+ return ['episode-weather',episodeId,actorId,kind].map(x=>encodeURIComponent(String(x))).join(':');
+}
 export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnchor=()=>null){
  const all=[],unknown=[];
  if(!clock)return {all,unknown};
@@ -20,6 +25,29 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   all.push({id,characterId:person.id,name:person.name,kind,sourceId,description,minute,
    route,status:minute<=clock.minute?'due':'future',...extra});
  };
+ // Only new travel receipts explicitly marked external may create these
+ // obligations. Legacy receipts already persisted medical effects in the trip.
+ for(const receipt of journal){
+  const episode=receipt.calendarTimeEpisode;
+  if(episode?.weatherAftercare!=='external-v93.676'||receipt.calendarCampaignId!==
+   (clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`))continue;
+  for(const w of episode.weatherExposure||[]){
+   if(!w.exposed)continue;
+   const person=characters.find(c=>c.id===w.id);
+   if(!person||person.hmk?.combatState?.shock==='KIA')continue;
+   const original=journal.find(j=>j.id===w.proofId&&j.characterId===w.id&&
+    j.calendarCampaignId===receipt.calendarCampaignId);
+   if(!original){unknown.push({characterId:w.id,name:person.name,kind:'weather-onset',
+    sourceId:receipt.id,reason:'Chybí původní Endurance/Survival Skill Test.'});continue;}
+   const sourceId=episodeWeatherAftercareId(receipt.id,w.id,w.kind);
+   if(journal.some(j=>j.characterId===w.id&&j.skillTestProof?.type==='skill-weather-onset'&&
+    (j.skillTestProof.sourceId===sourceId||
+     (j.skillTestProof.sourceId===w.proofId&&j.skillTestProof.report?.kind===w.kind))))continue;
+   push(person,'weather-onset',sourceId,
+    `${w.kind==='cold'?'Cold':'Heat'} Hazard – potvrdit zdravotní následek z původního Skill Testu (HMK 149,185)`,
+    episode.endMinute,'skills',{episodeId:receipt.id,originalSkillProofId:w.proofId});
+  }
+ }
  for(const c of characters){
   const s=c?.hmk?.combatState; if(s?.shock==='KIA')continue;
   // HMK pp.184–186: nutrition is an ailment in persistent Combat State.
