@@ -13,13 +13,14 @@ const hbFromCharacter=character=>{
  ensure(int(a.end,1,40)&&int(a.wil,1,40),'Healing Base vyžaduje ověřené END a WIL uložené postavy');
  return healingBase({endurance:a.end,will:a.wil});
 };
-export function guidedTraumaCourseReadiness({state,character}={}){
+export function guidedTraumaCourseReadiness({state,character,kind=null}={}){
  validateCombatState(state);ensure(character?.id&&character.hmk,'Chybí uložená postava');
  if(state.shock==='KIA')return {available:false,reason:'KIA'};
- if(state.extendedShock)return {available:true,kind:'extended-shock',
+ ensure(kind===null||['extended-shock','coma'].includes(kind),'Neznámý typ zdravotní Course');
+ if(state.extendedShock&&kind!=='coma')return {available:true,kind:'extended-shock',
   nextHours:state.extendedShock.elapsedHours+4,healingBase:hbFromCharacter(character),
   note:'Každé 4 hodiny od posledního Course Roll; čas musí být doložen (HMK p.179)'};
- if(state.coma?.active)return {available:true,kind:'coma',
+ if(state.coma?.active&&kind!=='extended-shock')return {available:true,kind:'coma',
   nextDays:state.coma.nextCourseDays,healingBase:hbFromCharacter(character),
   note:'Po skutečně uplynulém d10denním intervalu (HMK p.179)'};
  return {available:false,reason:'no-active-course'};
@@ -27,8 +28,8 @@ export function guidedTraumaCourseReadiness({state,character}={}){
 export function createGuidedTraumaCourse({state,character,round,eventId,timelineId=null,
  kind=null,elapsedHoursSinceOnset=null,daysElapsed=null,physicianStars=null,
  arcaneBonus=null,restfulShelter=null,timeConfirmed=false}={}){
- const r=guidedTraumaCourseReadiness({state,character});
- ensure(r.available,'Postava nemá otevřený Extended Shock ani Coma Course');
+ const r=guidedTraumaCourseReadiness({state,character,kind});
+ ensure(r.available,'Postava nemá otevřený požadovaný Extended Shock nebo Coma Course');
  ensure(kind===r.kind,'Nesouhlasí typ aktivního Course');
  ensure(int(round,1,9999)&&round>=state.lastRound&&typeof eventId==='string'&&eventId.length>0,
   'Chybí platné kolo / ID Course události');
@@ -86,7 +87,7 @@ export function commitGuidedTraumaCourse({session,state,character,round,timeline
   'Změnila se postava, kolo nebo časová osa');
  ensure(witness(state)===session.stateWitness&&witness(character.hmk)===session.characterWitness,
   'Postava nebo bojový stav se změnily: Course je zastaralý');
- const r=guidedTraumaCourseReadiness({state,character});
+ const r=guidedTraumaCourseReadiness({state,character,kind:session.kind});
  ensure(r.available&&r.kind===session.kind,'Aktivní Course se změnil');
  const ctx=session.context,die=session.rolls.find(x=>x.id==='courseD100')?.value;
  ensure(int(die,1,100),'Chybí skutečný Course d100');
