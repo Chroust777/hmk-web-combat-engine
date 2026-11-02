@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.666';
+const APP_VERSION='93.667';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -917,13 +917,14 @@ function main(){
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
   <div class="castle-campaign-card"><strong>HârnMaster World of Kèthîra</strong></div>
+  <div class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></div>
   <div class="nav-section-label">HLAVNÍ MENU</div>
   ${navLinks.map(([id,icon,label])=>`<button type="button" class="castle-nav-link ${view===id?'active':''}" data-nav="${id}"><span class="castle-nav-icon" aria-hidden="true">${icon}</span><span class="castle-nav-label">${esc(label)}</span><span class="castle-nav-spacer" aria-hidden="true"></span></button>`).join('')}
   <div class="nav-section-label castle-character-section">POSTAVY <span>${data.characters.length}</span></div>
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character"><span class="castle-create-symbol" aria-hidden="true">✣</span><span class="castle-create-label">Vytvořit postavu</span><span class="castle-create-plus" aria-hidden="true">＋</span></button>
   <div class="castle-sidebar-footer"><button type="button" data-nav="backup" class="hmk-cloud-sidebar" data-cloud-sidebar title="Stav synchronizace">${esc(cloudStatusLabel())}</button><br>⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
- </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter','backup','trash','gmhistory'].includes(view)?' content-sheet':''}"><nav class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></nav>${cloudSync?.enabled&&!cloudSync.canWrite()?`<div class="notice error" data-cloud-block-banner>⚠ ${esc(cloudStatusLabel())}: herní zápisy jsou do připojení zablokované. <button type="button" data-nav="backup">Přejít k připojení</button></div>`:''}${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
+ </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter','backup','trash','gmhistory'].includes(view)?' content-sheet':''}">${cloudSync?.enabled&&!cloudSync.canWrite()?`<div class="notice error" data-cloud-block-banner>⚠ ${esc(cloudStatusLabel())}: herní zápisy jsou do připojení zablokované. <button type="button" data-nav="backup">Přejít k připojení</button></div>`:''}${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
  <footer class="footer">HârnMaster Keeper’s Ledger · v${APP_VERSION} · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace</footer></div>`;
 }
 
@@ -2215,7 +2216,14 @@ function timeEpisodePageHTML(clock,participants){
  <label class="hc-check" data-episode-final-confirm><input type="checkbox" name="confirmed" required> Potvrzuji skutečně vyhodnocené podklady pro uzavření epizody</label>
  <button type="button" class="hc-episode-evaluate" data-episode-evaluate>Vyhodnotit epizodu →</button>
  </form></section>
- <aside class="hc-episode-result" aria-live="polite"><h3>Vyhodnocení a dokončení</h3><div class="hc-episode-overview" data-episode-overview></div><section class="hc-episode-evidence"><h4>Pravidlové výsledky a doklady</h4><div data-episode-evidence>Dosud žádný doložený výsledek.</div></section><section class="hc-episode-checklist"><h4>Úkoly před dokončením</h4><div data-episode-checklist>Vyplňte délku a skutečné podmínky.</div></section><button type="submit" form="hmk-time-episode-form" class="hc-episode-confirm" data-episode-finalize disabled>Dokončit a zapsat celou epizodu</button><details class="hc-episode-result-details"><summary>Podrobný pravidlový výpočet a hody</summary><div data-episode-preview><p>Zvolte činnost, čas a podmínky; zde se objeví skutečná vypočtená vzdálenost a únavové podklady. Výsledek se uloží až po potvrzení.</p></div></details><div class="hc-episode-latest"><h4>Poslední dokončená epizoda</h4>${latest?`<p><strong>${esc(displayCampaignMinute(latest.startMinute))}–${esc(displayCampaignMinute(latest.endMinute))}</strong> · ${esc(latest.kind)} · ${latest.minutes} min · ${latest.distanceMeters} m</p><p>${esc(latest.narrative||'Záznam uložen.')}</p>`:'<p>Zatím žádná. Historické doklady zůstávají zachované v původním deníku.</p>'}<button type="button" class="secondary" data-episode-chronicle>Přejít do kroniky ↗</button></div></aside></div>
+ <aside class="hc-episode-result" aria-live="polite"><h3>Vyhodnocení a dokončení</h3><div class="hc-episode-overview" data-episode-overview></div><section class="hc-episode-evidence"><h4>Pravidlové výsledky a doklady</h4><div data-episode-evidence>Dosud žádný doložený výsledek.</div></section><section class="hc-episode-checklist"><h4>Úkoly před dokončením</h4><div data-episode-checklist>Vyplňte délku a skutečné podmínky.</div></section><button type="submit" form="hmk-time-episode-form" class="hc-episode-confirm" data-episode-finalize disabled>Dokončit a zapsat celou epizodu</button>
+ <details class="hc-episode-emergency" data-episode-emergency>
+  <summary>Nouzové odblokování Cestování</summary>
+  <p>Pokud se rozpracovaná epizoda zasekla, můžete <strong>zahodit pouze její rozepsaný návrh</strong>. Žádný hod se neoznačí za úspěšný, čas kampaně se neposune a žádné zranění, únava, zásoby ani inventář se nezmění. Již skutečně uložené doklady zůstanou zachované.</p>
+  <p>Nejde o pravidlové přeskočení splatných zdravotních kontrol. Ty je stále nutné vyřešit v původním modulu. Tento bezpečný únik nikdy nevytváří falešné zdravotní doklady.</p>
+  <label class="hc-check"><input type="checkbox" data-episode-emergency-confirm> Rozumím: zahodit rozpracované Cestování bez zápisu a bez posunu času.</label>
+  <button type="button" class="hc-episode-emergency-reset secondary" data-episode-emergency-reset disabled>Zahodit návrh a odblokovat formulář</button>
+ </details><details class="hc-episode-result-details"><summary>Podrobný pravidlový výpočet a hody</summary><div data-episode-preview><p>Zvolte činnost, čas a podmínky; zde se objeví skutečná vypočtená vzdálenost a únavové podklady. Výsledek se uloží až po potvrzení.</p></div></details><div class="hc-episode-latest"><h4>Poslední dokončená epizoda</h4>${latest?`<p><strong>${esc(displayCampaignMinute(latest.startMinute))}–${esc(displayCampaignMinute(latest.endMinute))}</strong> · ${esc(latest.kind)} · ${latest.minutes} min · ${latest.distanceMeters} m</p><p>${esc(latest.narrative||'Záznam uložen.')}</p>`:'<p>Zatím žádná. Historické doklady zůstávají zachované v původním deníku.</p>'}<button type="button" class="secondary" data-episode-chronicle>Přejít do kroniky ↗</button></div></aside></div>
  ${old.length?`<details class="hc-episode-legacy"><summary>Předchozí rozběhnuté činnosti (${old.length}) · původní evidence</summary><p class="hc-hint">Staré činnosti zůstávají platné. Před novou epizodou je případně přerušte podle původního pravidlového postupu, aby se nepřekrývaly.</p>${old.map(r=>`<p>${esc(r.calendarActivityProof.name)} · ${esc(displayCampaignMinute(r.calendarActivityProof.startMinute))}–${esc(displayCampaignMinute(r.calendarActivityProof.endMinute))}</p>`).join('')}</details>`:''}
  </section>`;
 }
@@ -22284,6 +22292,30 @@ document.addEventListener('submit',e=>{
   if(outcome==='stop')timeEpisodeDraft=episodeFreshDraft();
   notice='Setkání dořešeno; další minuty lze vyhodnotit samostatnou epizodou.';
  }catch(err){alert('Setkání nelze uzavřít: '+err.message);}
+},true);
+// Emergency recovery is intentionally a DRAFT-ONLY operation. It cannot forge
+// completion of HMK rules, skip medical deadlines or advance the campaign clock.
+// Saved combat state, inventory, fatigue, calendar and journal are untouched.
+document.addEventListener('change',e=>{
+ const confirm=e.target.closest?.('[data-episode-emergency-confirm]');if(!confirm)return;
+ const panel=confirm.closest('[data-episode-emergency]');
+ const button=panel?.querySelector('[data-episode-emergency-reset]');
+ if(button)button.disabled=!confirm.checked;
+},true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-episode-emergency-reset]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const panel=button.closest('[data-episode-emergency]');
+ if(!panel?.querySelector('[data-episode-emergency-confirm]')?.checked)return;
+ if(!uiConfirm('Nouzově zahodit ROZEPSANOU cestovní epizodu? Žádné zdravotní ani cestovní výsledky se neuloží a čas zůstane stejný. Již uložené doklady zůstanou zachované.'))return;
+ // Remove ONLY transient links for this draft; no saved evidence is deleted.
+ timeEpisodeDraft={...episodeFreshDraft()};
+ episodeEvaluationRequested=false;episodePendingSkillRequest=null;
+ episodeActiveSkillRequestId=null;episodeSkillReturnPending=false;
+ episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];
+ episodeDraftEpoch=uuid();
+ notice='Nouzové odblokování: rozepsaná epizoda byla zahozena. Čas ani trvalé stavy se nezměnily. Nevyhodnocené povinné kontroly zůstávají splatné.';
+ render();
 },true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(form?.id!=='hmk-time-episode-form')return;
