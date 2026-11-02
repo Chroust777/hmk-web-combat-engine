@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.684';
+const APP_VERSION='93.685';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -670,8 +670,8 @@ function validate(d){
 function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null,episodeCommit=false}={}){
  // Uncommitted Skill Test receipts belong ONLY to the in-progress episode.
  // No unrelated save (including cloud sync) may accidentally publish them.
- if(episodeStageBaseline&&!episodeCommit){
-  notice='Cestování obsahuje dosud neuložené testy. Nejprve dokončete epizodu nebo ji nouzově zrušte.';
+ if(timeEpisodeMutationLocked()&&!episodeCommit){
+  notice=timeEpisodeLockExplanation();
   return false;
  }
  if(window.__hmkOutdatedBuild){notice='Je dostupná nová verze aplikace. Obnovte stránku, než uložíte další herní akci.';return false;}
@@ -853,8 +853,8 @@ function installCalendarDiceControls(form,kind,sourceId,actorId){
 let pendingTrekHandoff=null; // UI-only context; the journal proof is the authority after save.
 let pendingTrackingAwarenessId=null; // UI navigation only; the persisted source link is authoritative.
 function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit=false}={}){
- if(episodeStageBaseline&&!episodeSkillStaging&&!episodeCommit){
-  alert('Cestování má rozpracované výsledky testů. Nejdříve epizodu dokončete nebo nouzově zrušte; jiné zápisy by jinak mohly tyto výsledky předčasně uložit.');
+ if(timeEpisodeMutationLocked()&&!episodeSkillStaging&&!episodeCommit){
+  alert(timeEpisodeLockExplanation());
   return false;
  }
  if(cloudSync&&!cloudSync.canWrite()){alert('Nejdříve připojte GitHub Cloud v menu Cloud a zálohy.');return false;}
@@ -1881,6 +1881,88 @@ let episodeDraftEpoch=uuid();
 let episodeStageBaseline=null;
 let episodeFinalCommitInFlight=false;
 let timeEpisodeDraftCampaign=null;
+/** v93.685: ONE exclusive time-episode transaction. The prior guard covered
+ * only the phase after the first staged Skill Test, leaving a gap after
+ * Evaluate and before any dice were staged. Navigation is never a mutation.
+ * Keep this lock in memory; no speculative evidence enters durable storage.
+ */
+function timeEpisodeMutationLocked(){
+ return !!(episodeEvaluationRequested||episodeStageBaseline||episodePendingSkillRequest||
+  episodeActiveSkillRequestId||episodePinnedSkillFields.size||episodeOutstandingSkillTasks.length);
+}
+function timeEpisodeLockExplanation(){
+ return 'Právě se vyhodnocuje časová epizoda. Ostatní zápisy a plánování odpočinku, spánku či činností jsou do dokončení nebo nouzového zrušení zamčené. Prohlížení Kalendáře zůstává povolené.';
+}
+// Capture independently submitted forms BEFORE module-level submit handlers.
+// A normal tab switch is allowed, but a second transaction never starts.
+// Required Skill Tests initiated by the episode are still owned by the
+// existing staging guard; no independent Skill Test can be committed.
+window.addEventListener('submit',event=>{
+ if(!timeEpisodeMutationLocked())return;
+ const form=event.target;
+ if(form?.id==='hmk-time-episode-form')return;
+ if(view==='skills'&&(episodePendingSkillRequest||episodeActiveSkillRequestId||episodeSkillReturnPending))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ alert(timeEpisodeLockExplanation());
+},true);
+// Buttons that commit without submitting a form must also be blocked before
+// they prompt the GM, edit a campaign, or invoke independent async storage.
+const TIME_EPISODE_INDEPENDENT_ACTIONS=[
+ '[data-provision-rest-cancel]','[data-calendar-interrupt-activity]',
+ '[data-calendar-interrupt-selected]','[data-calendar-continue-after-interrupt]',
+ '[data-calendar-hazard-open]','[data-calendar-new]','[data-calendar-delete]',
+ '[data-cloud-action]','[data-restore]','[data-purge]',
+ '[data-action="new-character"]','[data-action="auto-random-character"]',
+ '[data-action="new-item"]'
+].join(',');
+window.addEventListener('click',event=>{
+ if(!timeEpisodeMutationLocked())return;
+ const control=event.target?.closest?.('button');
+ if(!control||!control.matches(TIME_EPISODE_INDEPENDENT_ACTIONS))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ alert(timeEpisodeLockExplanation());
+},true);
+document.addEventListener('click',event=>{
+ const control=event.target?.closest?.('[data-hmk-exclusive-return]');if(!control)return;
+ event.preventDefault();view='calendar';calendarLanding=false;activeCalendarSection='travel';render();
+},true);
+/** Render-level affordance is NOT the security boundary; mutate/save guards
+ * reject writes even from an old form, programmatic call or another section.
+ * Required nested Skill Test is handled by the existing staging permission.
+ */
+function decorateTimeEpisodeExclusiveLock(root){
+ if(!timeEpisodeMutationLocked())return;
+ const allowedSkill=view==='skills'&&
+  !!(episodePendingSkillRequest||episodeActiveSkillRequestId||episodeSkillReturnPending);
+ for(const form of root.querySelectorAll('form')){
+  if(form.id==='hmk-time-episode-form')continue;
+  // The existing episode Skill Test route remains live, including its
+  // nested follow-up panels, whose mutations are separately staged.
+  if(view==='skills'&&allowedSkill)continue;
+  for(const el of form.querySelectorAll('button, input[type="submit"], input[type="button"]')){
+   if(el.closest('[data-episode-emergency]'))continue;
+   el.disabled=true;el.title=timeEpisodeLockExplanation();
+  }
+  form.dataset.hmkExclusiveLocked='true';
+ }
+ // Rest cancellation is a BUTTON outside the rest planning form. Block it
+ // until the travel draft is discarded, rather than making a partial write.
+ for(const el of root.querySelectorAll(TIME_EPISODE_INDEPENDENT_ACTIONS)){
+  el.disabled=true;el.title=timeEpisodeLockExplanation();
+ }
+ if(!(view==='calendar'&&activeCalendarSection==='travel')){
+  const content=root.querySelector('.content');if(content){
+   const banner=document.createElement('aside');banner.className='notice hc-episode-exclusive-notice';banner.setAttribute('role','status');
+   banner.innerHTML='<strong>🔒 Probíhá časová epizoda.</strong> Ostatní zápisy a plánování jsou zamčené, prohlížení je povoleno. '+
+    '<button type="button" data-hmk-exclusive-return>Vraťte se do Cestování</button>';
+   content.prepend(banner);
+  }
+ }
+ const main=root.querySelector('#hmk-time-episode-form')||root.querySelector('.hc-episode-shell');
+ if(main){const status=document.createElement('p');status.className='hc-hint hc-episode-exclusive-notice';status.setAttribute('role','status');
+  status.textContent='🔒 Ostatní změny kampaně jsou po dobu této epizody zamčené. Prohlížení je povolené; k uvolnění použijte dokončení nebo nouzové zrušení.';
+  main.prepend(status);}
+}
 // A prepared episode has two phases. Skill rolls are NOT prerequisites for
 // pressing "Vyhodnotit epizodu"; they become resolution tasks afterwards.
 let episodeOutstandingSkillTasks=[];
@@ -1980,6 +2062,15 @@ function episodeSetupIssue(form){
   'V aktuální minutě je splatná povinná událost. Vyhodnoťte ji nejdříve v Kalendáři, bez posunu času.':
   'Maximální délka aktivity je '+window.maxAllowed+' minut – do '+displayCampaignMinute(window.limitMinute)+'. Zkraťte interval a dokončete cestu před samostatným testem.'};
  if(!v.memberIds?.length)return {field:'memberIds',message:'Vyberte alespoň jednu postavu.'};
+ // Earlier versions could save a separate rest/sleep plan while a travel
+ // episode was already evaluated. These durable activities must be resolved
+ // BEFORE starting any overlapping time episode, not during its final commit.
+ const occupied=activeHMKActivities(data.journal,data.campaignClock).filter(j=>
+  v.memberIds.includes(j.calendarActivityProof?.characterId));
+ if(occupied.length){const names=occupied.map(j=>(character(j.calendarActivityProof.characterId)?.name||'Postava')+
+  ' · '+(j.calendarActivityProof.kind||'činnost')).join(', ');
+  return {field:'memberIds',message:'Současně běží jiná naplánovaná činnost ('+names+'). Nejdříve ji přerušte v původním modulu; nebo nouzově zrušte rozpracovanou epizodu, pak přerušte plán. Nelze potvrdit dvě paralelní aktivity stejné postavy.'};}
+
  if(['travel','tracking'].includes(v.kind)&&!v.memberIds.includes(v.guideId))
   return {field:'guideId',message:'Průvodce musí být vybrán z účastníků epizody.'};
  if(!v.weatherSource)return {field:'weatherSource',message:'Vyberte globální počasí nebo vlastní počasí epizody.'};
@@ -9649,6 +9740,7 @@ function render(){
  enhanceHMKDiceFields();
  updateExpeditionDiceFields(app.querySelector('#campaign-expedition-form'),{reset:false});
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
+ decorateTimeEpisodeExclusiveLock(app);
 }
 // Follow-up panels may appear after a skill proof is appended without a full render.
 // Observe only added DOM nodes; attribute edits from help decoration do not loop.
@@ -13183,6 +13275,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-provision-rest-planner]'))return;
  e.preventDefault();e.stopImmediatePropagation();
+ if(timeEpisodeMutationLocked()){alert(timeEpisodeLockExplanation());return;}
  try{
   const clock=data.campaignClock,fd=new FormData(form),actorId=String(fd.get('actorId')||''),kind=String(fd.get('kind')||'');
   if(!clock||!['winded','rest','sleep'].includes(kind)||!calendarMemberIds(clock,data.characters).some(x=>x.id===actorId))throw Error('Odpočinek vyžaduje postavu aktivní kampaně.');
@@ -13203,6 +13296,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('button[data-provision-rest-cancel]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
+ if(timeEpisodeMutationLocked()){alert(timeEpisodeLockExplanation());return;}
  try{
   if(combatInitiativeSequence)throw Error('Nejdříve dokončete probíhající Initiative.');
   const clock=data.campaignClock,id=button.dataset.provisionRestCancel;
