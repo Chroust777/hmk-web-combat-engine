@@ -302,7 +302,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.664';
+const APP_VERSION='93.665';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4314,7 +4314,7 @@ const JOURNAL_HISTORY_CATEGORIES=Object.freeze([
 function journalHistoryCategory(entry){
  const j=entry||{},title=String(j.title||'').toLocaleLowerCase('cs');
  // Timed medical receipts are health evidence, even when their title is not English.
- if(j.calendarEpisodeTimedMedical||j.calendarMalnutritionMedical)return 'health';
+ if((typeof j.calendarEpisodeTimedMedical?.type==='string'&&!!j.calendarEpisodeTimedMedical?.key)||j.calendarMalnutritionMedical)return 'health';
  if(j.skillTestProof)return 'skills';
  if(j.combatProof||/shock|treatment|healing|wound|injur|zraněn|léčen|krvác|coma|infection|chirurg/.test(title))return 'health';
  if(j.origin==='cash'||j.cashReceipt||j.calendarCashProof||/mince|hotovost|nákup|prodej|platba/.test(title))return 'finance';
@@ -4325,7 +4325,7 @@ function journalHistoryCategory(entry){
 }
 /** Present actual structured results; keep internal event IDs in the document model only. */
 function journalTimedMedicalResultHTML(entry){
- const proof=entry?.calendarEpisodeTimedMedical||entry?.calendarMalnutritionMedical;
+ const proof=(typeof entry?.calendarEpisodeTimedMedical?.type==='string'&&entry.calendarEpisodeTimedMedical?.key?entry.calendarEpisodeTimedMedical:null)||entry?.calendarMalnutritionMedical;
  if(!proof||proof.cancelled)return '';
  const report=proof.report;
  if(!report||typeof report!=='object'||Array.isArray(report))return '';
