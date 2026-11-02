@@ -144,11 +144,19 @@ export function episodeTimedCourseStep(database,event,{rolls={},idFactory,stamp}
    break;}
  default:throw Error('Nepodporovaná časovaná procedura '+event.kind);
  }
- const prior=state.shock;actor.hmk.combatState=outcome.state;
+ const prior=state.shock;
+ // State-first executors accept eventId; poison, disease, and other original
+ // executors may instead construct their own immutable event IDs. Preserve
+ // the exact newly appended source event rather than persisting a null link.
+ const priorEventIds=new Set((state.events||[]).map(e=>e.id));
+ const appendedEvents=(outcome.state.events||[]).filter(e=>!priorEventIds.has(e.id));
+ if(appendedEvents.length!==1)throw Error('Časovaný zdravotní výsledek nemá právě jednu původní Combat State událost: '+event.kind);
+ const sourceEvent=appendedEvents[0];
+ actor.hmk.combatState=outcome.state;
  // The four state-first executors return sparse top-level values, but their
  // authoritative, complete roll/modifier/outcome evidence lives in the Combat
  // State event created by THIS invocation. Never infer it from later state.
- const eventProof=outcome.state.events?.find(e=>e.id===eventId);
+ const eventProof=sourceEvent;
  const stateFirstTypes=new Set(['coma','extended-shock','grim','blood-loss']);
  if(stateFirstTypes.has(event.kind)&&!eventProof)throw Error('Chybí původní zdravotní událost pro doklad '+event.kind);
  const report=stateFirstTypes.has(event.kind)?{
