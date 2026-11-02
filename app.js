@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.677';
+const APP_VERSION='93.678';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11334,24 +11334,41 @@ document.addEventListener('submit',event=>{
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
  try{
   const sourceId=form.elements.namedItem('sourceId').value;
-  const first=data.journal.find(x=>x.id===sourceId),actor=character(first?.characterId);
-  if(!actor||!data.journal.some(x=>x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===sourceId))
+  // Travel aftercare uses a stable medical source ID, not the journal-row
+  // ID of the original Endurance roll. Locate the committed Onset certificate
+  // first; legacy watch-scoped sources remain valid by the same certificate.
+  const onset=data.journal.find(x=>x.skillTestProof?.type==='skill-weather-onset'&&
+   x.skillTestProof.sourceId===sourceId),actor=character(onset?.characterId);
+  if(!actor||onset.skillTestProof.actorId!==actor.id)
    throw Error('Chybí ověřený původ expozice');
   if(combatInitiativeSequence)throw Error('V aktivní Initiative nelze obejít Combat State');
+  const elapsedMinutes=Number(form.elements.namedItem('elapsedMinutes').value);
+  if(data.campaignClock){
+   const camp=campaignKey(data.campaignClock);
+   const due=onset.calendarCampaignId===camp?
+    campaignCalendarAgenda(data.campaignClock,data.characters,data.journal).all.find(x=>
+     x.kind==='weather-course'&&x.characterId===actor.id&&x.sourceId===sourceId):null;
+   if(!due||due.minute!==data.campaignClock.minute||due.elapsedMinutes!==elapsedMinutes)
+    throw Error('Exposure Course vyžaduje přesný splatný termín Kalendáře; předčasný ani přeskočený hod nelze potvrdit.');
+  }
   const orig=persistentStateOf(actor),outcome=advanceTrekkingWeatherExposure({state:orig,actor,sourceId,
    round:Math.max(1,combatClock.round||1,orig.lastRound||0),method:form.elements.namedItem('method').value,
-   elapsedMinutes:Number(form.elements.namedItem('elapsedMinutes').value),roll:Number(form.elements.namedItem('roll').value),
+   elapsedMinutes,roll:Number(form.elements.namedItem('roll').value),
    gmConfirmed:form.elements.namedItem('gmConfirmed').checked,
    removedFromHazard:form.elements.namedItem('removedFromHazard').checked,
    treatmentConfirmed:form.elements.namedItem('treatmentConfirmed').checked,
    coolWater:form.elements.namedItem('coolWater').checked});
   if(!mutate(()=>{
    synchronizeCombatInjuries(actor,outcome.state);
-   data.journal.push({id:uuid(),characterId:actor.id,title:'Exposure '+outcome.report.method+' · HMK 185',
+   data.journal.push({id:uuid(),characterId:actor.id,
+    ...(data.campaignClock?{calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute}:{}),
+    title:'Exposure '+outcome.report.method+' · HMK 185',
     body:'d100 '+form.elements.namedItem('roll').value+' · '+outcome.report.sl+
      ' · HR '+outcome.report.hr+' · slabost '+outcome.report.weakness+
      ' · Shock '+outcome.report.shock,createdAt:stamp(),skillTestProof:{type:'skill-weather-course',sourceId,
-      actorId:actor.id,report:outcome.report}});
+      actorId:actor.id,report:outcome.report,
+      ...(onset.skillTestProof.episodeId?{episodeId:onset.skillTestProof.episodeId,
+       originalSkillProofId:onset.skillTestProof.originalSkillProofId}: {})}});
   }))throw Error('Course/Healing nelze uložit');
   form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Course/Healing Roll byl trvale zapsán. Další splatný krok najdeš v deníku.'}));
  }catch(e){if(out)out.textContent='Exposure Course se neuložil: '+e.message;}
