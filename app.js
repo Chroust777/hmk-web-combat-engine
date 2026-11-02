@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.679';
+const APP_VERSION='93.680';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -9976,6 +9976,25 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
  return sides.filter(x=>(actorId===null||x.id===actorId)&&['F','CF'].includes(x.result?.level)&&!x.result?.forcedCF&&
   !(x.skill==='Animalcraft'&&data.journal.some(j=>j.skillTestProof?.type==='animal-training'&&j.skillTestProof.originId===originalId))&&
   !data.journal.some(j=>j.skillTestProof?.type==='critical-followup'&&j.skillTestProof.originId===originalId&&j.skillTestProof.side===x.side)).map(x=>{
+  // HMK p.145 / p.148: the CF on a Trekking Orienteering Survival SV
+  // invokes a Survival Hazard d10 in the ORIGINAL travel routine, not a
+  // second Skill d100 nor a standalone critical-followup receipt. During
+  // a staged episode even a non-dice receipt would be rejected by mutate(),
+  // and worse, could incorrectly pretend the hazard had been resolved.
+  if(x.skill==='Survival'&&x.result.level==='CF'){
+   const source=data.journal.find(j=>j.id===originalId);
+   // Confirmed travel already owns Equipment/Complication or the later
+   // original Accident Injury executor. Never advertise the old fake CF form.
+   if(data.journal.some(j=>j.calendarCampaignId===source?.calendarCampaignId&&
+    j.calendarTimeEpisode?.orientation?.skillId===originalId&&j.calendarTimeEpisode?.survivalHazard))return '';
+   const link=source?.calendarEpisodeSkillLink;
+   const staged=!!(episodeStageBaseline&&link?.field==='orientationProofId'&&
+    link?.episodeEpoch===episodeDraftEpoch&&link?.campaignId===campaignKey(data.campaignClock)&&
+    link?.actorId===x.id&&link?.minute===data.campaignClock?.minute&&
+    episodePendingSkillRequest?.status==='resolved'&&episodePendingSkillRequest?.completedId===originalId);
+   if(staged)return '<section class="hsk-followup-advisory" role="status"><strong>Survival CF při Trekking · HMK str. 145, 148</strong><p>Původní d100 '+esc(String(x.result.roll??'—'))+' je již doložen. Žádný další d100 zde nezadávejte. Vraťte se do rozpracovaného Cestování; tam zadejte skutečný Survival Hazard d10 (1–3 Equipment, 4–6 Accident, 7–10 Complication). Následky se vyhodnotí ve svých pravidlových modulech. Rozpracované testy se uloží až potvrzením celé epizody GM.</p><button type="button" class="secondary" data-episode-return>Vrátit se do Cestování · Survival Hazard d10</button></section>';
+   return '<p class="hsk-followup-advisory"><strong>Survival CF · HMK str. 148:</strong> Survival Hazard d10 je povinný pouze při doloženém Orienteering CF v Trekking. Nelze jej vyhodnotit pouhým uložením obecného následku Skill Testu. Použijte původní cestovní rutinu a její důkaz události; nový d100 se zde nehází.</p>';
+  }
   const options=skillFollowupActivities(x.skill,x.result.level);
   if(!options.length){if(!includeAdvisory)return '';const note=skillFailureGuidance(x.skill,x.result.level);return '<p class="hsk-followup-advisory"><strong>'+esc(x.skill)+' '+esc(x.result.level)+' · HMK '+(note?.page||60)+':</strong> '+esc(note?.text||'Další test není doložen.')+'</p>';}
   const choices=options.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+' · HMK str. '+a.page+'</option>').join('');
@@ -10238,16 +10257,26 @@ function hskFishingGearForm(entry){
 }
 function hskSkillPhysicalImpactForm(entry){
  const proof=entry.skillTestProof;
- if(proof?.type!=='critical-followup')return '';
- const fishing=proof.skill==='Fishing'&&proof.activity==='fishing-sv'&&proof.result?.level==='CF';
+ const directAccident=proof?.type==='secondary-mastery-value-test'&&
+  proof.skills?.[0]==='Survival'&&proof.a?.level==='CF'&&
+  entry.calendarEpisodeSkillLink?.field==='orientationProofId'&&
+  data.journal.some(j=>j.calendarCampaignId===entry.calendarCampaignId&&
+   j.calendarTimeEpisode?.orientation?.skillId===entry.id&&
+   j.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending));
+ if(proof?.type!=='critical-followup'&&!directAccident)return '';
+ const fishing=!directAccident&&proof.skill==='Fishing'&&proof.activity==='fishing-sv'&&proof.result?.level==='CF';
  if(fishing&&fishingGearDue(data.journal,entry))return '';
- const survival=proof.skill==='Survival'&&proof.activity==='trek-survival-hazard';
+ const survival=directAccident||(proof.skill==='Survival'&&proof.activity==='trek-survival-hazard');
  if(!fishing&&!survival)return '';
+ // Historical two-step receipts keep working; new episodes must NOT generate
+ // a fabricated intermediate critical-followup without a hazard d10.
+ if(directAccident&&data.journal.some(j=>j.skillTestProof?.type==='critical-followup'&&
+  j.skillTestProof.originId===entry.id&&j.skillTestProof.activity==='trek-survival-hazard'))return '';
  if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===entry.id))return '';
  const actor=character(proof.actorId);
  if(!actor)return '';
  const confirmedTrek=survival?data.journal.find(j=>j.calendarCampaignId===campaignKey(data.campaignClock)&&
-  j.calendarTimeEpisode?.orientation?.skillId===proof.originId&&
+  j.calendarTimeEpisode?.orientation?.skillId===(directAccident?entry.id:proof.originId)&&
   j.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)):null;
  const hazardReceipt=confirmedTrek?.calendarTimeEpisode?.hazardDetails?.find(h=>h.hazard==='accident'&&h.externalMedicalPending);
  const fixedHazardDie=hazardReceipt?.hazardD10;
@@ -10466,7 +10495,14 @@ function hskPendingSkillPhysicalConsequences(actorId){
   (x.characterId===actorId||x.skillTestProof.opponentId===actorId)&&
   !['critical-followup','climbing-falling','skill-physical-consequence','special-secondary-roll'].includes(x.skillTestProof.type));
  const originalForms=unresolved.map(x=>hskCriticalNextHTML(x.id,x.skillTestProof,{actorId})+hskBalanceNervesHTML(x.id,x.skillTestProof,{actorId})).join('');
- const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskFishingGearForm(x)+hskSkillPhysicalImpactForm(x)).join('')+data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+hskEpisodeWeatherOnsetForms(actorId)+hskTrekkingWeatherTreatmentForms(actorId)+hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
+ const confirmedAccidents=data.journal.filter(x=>x.characterId===actorId&&
+  x.calendarEpisodeSkillLink?.field==='orientationProofId'&&
+  data.journal.some(j=>j.calendarCampaignId===x.calendarCampaignId&&
+   j.calendarTimeEpisode?.orientation?.skillId===x.id&&
+   j.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)));
+ const html=originalForms+pending.map(x=>hskClimbingFallForm(x)+hskFishingGearForm(x)+hskSkillPhysicalImpactForm(x)).join('')+
+  confirmedAccidents.map(x=>hskSkillPhysicalImpactForm(x)).join('')+
+  data.journal.filter(x=>x.characterId===actorId).map(x=>hskSkillEnvironmentFollowup(x)+hskSeriousAggravationForm(x)+hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+hskEpisodeWeatherOnsetForms(actorId)+hskTrekkingWeatherTreatmentForms(actorId)+hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
  return html?'<section class="panel wide"><h3>Čekající pravidlové následky Skill Tests</h3><p class="muted">Nevyřešené kritické hody jsou dostupné i po obnovení stránky; původní hod se znovu nehází.</p>'+html+'</section>':'';
 }
 let pendingCalendarGMTest=null;
@@ -11077,9 +11113,12 @@ document.addEventListener('submit',event=>{
   const sourceId=form.elements.namedItem('sourceId').value;
   const origin=data.journal.find(x=>x.id===sourceId),proof=origin?.skillTestProof;
   const kind=form.elements.namedItem('kind').value;
-  if(proof?.type!=='critical-followup'||
-    (kind==='fishing-cf'&&!(proof.skill==='Fishing'&&proof.activity==='fishing-sv'&&proof.result?.level==='CF'))||
-    (kind==='survival-accident'&&!(proof.skill==='Survival'&&proof.activity==='trek-survival-hazard')))
+  const directAccident=kind==='survival-accident'&&proof?.type==='secondary-mastery-value-test'&&
+   proof.skills?.[0]==='Survival'&&proof.a?.level==='CF'&&
+   origin.calendarEpisodeSkillLink?.field==='orientationProofId';
+  if(!proof||
+    (kind==='fishing-cf'&&!(proof.type==='critical-followup'&&proof.skill==='Fishing'&&proof.activity==='fishing-sv'&&proof.result?.level==='CF'))||
+    (kind==='survival-accident'&&!directAccident&&!(proof.type==='critical-followup'&&proof.skill==='Survival'&&proof.activity==='trek-survival-hazard')))
    throw Error('Nedoložený původní CF a následný test');
   if(kind==='fishing-cf'&&fishingGearDue(data.journal,origin))throw Error('Nejprve dokončete ztrátu nebo poškození konkrétní výbavy.');
   if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===sourceId))
@@ -11088,9 +11127,10 @@ document.addEventListener('submit',event=>{
   const raw=name=>form.elements.namedItem(name)?.value?.trim()||'';
   const optional=name=>raw(name)===''?null:Number(raw(name));
   const hazardD10=optional('hazardD10');
-  const originalTrek=kind==='survival-accident'?data.journal.find(j=>j.calendarTimeEpisode?.orientation?.skillId===proof.originId&&
+  const originalTrek=kind==='survival-accident'?data.journal.find(j=>j.calendarTimeEpisode?.orientation?.skillId===(directAccident?origin.id:proof.originId)&&
    j.calendarCampaignId===campaignKey(data.campaignClock)&&j.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)):null;
   const fixedAccident=originalTrek?.calendarTimeEpisode.hazardDetails.find(h=>h.hazard==='accident'&&h.externalMedicalPending);
+  if(directAccident&&!fixedAccident)throw Error('Nehoda nemá potvrzený cestovní původ s původním hazard d10.');
   if(fixedAccident){
    if(!Number.isSafeInteger(fixedAccident.hazardD10)||fixedAccident.hazardD10<4||fixedAccident.hazardD10>6||
     hazardD10!==fixedAccident.hazardD10||data.campaignClock.minute!==originalTrek.calendarTimeEpisode.endMinute)
@@ -11105,6 +11145,9 @@ document.addEventListener('submit',event=>{
   // the trekking guide. Never reject a legitimate randomly chosen victim,
   // but the target must belong to the identical live campaign.
   const linkedTrek=kind==='survival-accident'?data.journal.find(j=>j.id===proof.originId)?.calendarTrekSkillSource:null;
+  if(directAccident&&(!originalTrek?.calendarTimeEpisode?.memberIds?.includes(target.id)||
+   data.campaignClock.minute!==originalTrek.calendarTimeEpisode.endMinute))
+   throw Error('Accident: oběť musí patřit do původní družiny a test nastat v potvrzené minutě nehody.');
   if(linkedTrek){
    if(!data.campaignClock||campaignKey(data.campaignClock)!==linkedTrek.campaignId||
      !(data.campaignClock.characterIds??data.characters.map(c=>c.id)).includes(target.id))

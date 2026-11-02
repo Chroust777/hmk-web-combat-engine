@@ -123,7 +123,9 @@ export function calendarBoardEvents({clock,characters=[],journal=[]}={}){
   // completed in-episode health roll.
   const unresolvedAccident=journal.some(z=>z.calendarTimeEpisode?.orientation?.skillId===p.originId&&
     z.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)&&
-    !journal.some(done=>done.skillTestProof?.type==='critical-followup'&&done.skillTestProof.originId===p.originId));
+    !journal.some(done=>done.skillTestProof?.type==='skill-physical-consequence'&&
+      (done.skillTestProof.sourceId===p.originId||journal.some(link=>link.id===done.skillTestProof.sourceId&&
+       link.skillTestProof?.type==='critical-followup'&&link.skillTestProof.originId===p.originId))));
   return !unresolvedAccident;
  };
  const all=[...agenda.all.filter(p=>!travelTask(p)).map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities([...calendarActorActivities(clock,activitiesCharacters,journal),...calendarNutritionConditionActivities(clock,characters,journal),...travelEpisodeCalendarSegments(clock,characters,journal)]),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];

@@ -211,6 +211,9 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    j.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)):null;
   if(e.calendarEpisodeSkillLink&&!deferredAccident)continue;
   const actualDueMinute=deferredAccident?.calendarTimeEpisode?.endMinute??e.campaignMinute;
+  if(deferredAccident&&journal.some(done=>done.skillTestProof?.type==='skill-physical-consequence'&&
+   (done.skillTestProof.sourceId===e.id||journal.some(link=>link.id===done.skillTestProof.sourceId&&
+    link.skillTestProof?.type==='critical-followup'&&link.skillTestProof.originId===e.id))))continue;
   if(p.type==='critical-followup'){
    // A non-dice Survival Hazard follows the original Trekking CF. It has no
    // secondary SL at all, but still requires actual hazard dice / GM routing.
