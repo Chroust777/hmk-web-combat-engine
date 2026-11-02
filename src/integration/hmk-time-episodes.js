@@ -86,49 +86,46 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   distanceMeters=Math.floor(exactMetres+1e-10);
   var distanceFractionOut=Math.min(0.9999999999,Math.max(0,exactMetres-distanceMeters));
   actors=memberIds.map(id=>{
-   const end=enduranceByActor[id],roll=endRollByActor[id];
-   const inactive=inactiveByActor[id];
-   if(inactive){
-    const carryIn=previousCarry[id]??0;
-    must(whole(carryIn,0,239)&&Number.isSafeInteger(inactive.minute)&&
-     inactive.minute>=minute&&inactive.minute<=minute+minutes&&
-     ['INC','UNC','KIA'].includes(inactive.shock),
-     'Nesplnitelný END test vyžaduje doložený zdravotní stav a minutu vzniku.');
-    const priorMovement=Math.min(movementMinutes,inactive.minute-minute);
-    const earlyIncapacity={minute:inactive.minute,shock:inactive.shock,sourceKey:inactive.sourceKey,
-     activeMovementMinutes:priorMovement};
-    if(priorMovement>0){
-     // END attests fatigue ALREADY accumulated before the medical crisis,
-     // not an impossible active action AFTER the character became unconscious.
-     must(whole(end,0,50)&&whole(roll,1,10),
-      'Doložte END d10 pro minuty, které postava skutečně prošla před zdravotní neschopností.');
-     const sr=expeditionSecondaryRoll({endurance:end,roll,
-      riding:conveyance==='mount'||conveyance==='cart'||conveyance==='wagon'});
-     const enc=encByActor[id]??0;must(whole(enc,0,100),'Neplatná ENC postavy.');
-     const extraFatigue=loadBypass?Math.floor(enc/(conveyance==='foot'?10:20))*10:0;
-     const duneFatigue=terrain==='dunes'&&conveyance==='foot'&&!dunesSlow?5:0;
-     const rate=(doubleTime?(conveyance==='foot'?40:20)-(sr.success?20:0):(sr.success?0:5))+extraFatigue+duneFatigue;
-     const units=carryIn+priorMovement*rate;
-     return {id,endurance:end,roll,sr,rate,delta:Math.floor(units/240),carryIn,
-      carryOut:units%240,enc,extraFatigue,duneFatigue,earlyIncapacity};
-    }
-    return {id,endurance:end,roll:null,sr:null,rate:0,delta:0,carryIn,carryOut:carryIn,
-     enc:encByActor[id]??0,extraFatigue:0,duneFatigue:0,earlyIncapacity,
-     endNotRequired:{minute:inactive.minute,shock:inactive.shock,sourceKey:inactive.sourceKey}};
-   }
-   must(whole(end,0,50)&&whole(roll,1,10),'Každá cestující postava potřebuje skutečný END SR d10.');
-   const sr=expeditionSecondaryRoll({endurance:end,roll,riding:conveyance==='mount'||conveyance==='cart'||conveyance==='wagon'});
-   const enc=encByActor[id]??0;
-   must(whole(enc,0,100),'Nenastavená nebo neplatná ENC postavy.');
-   const extraFatigue=loadBypass?(Math.floor(enc/(conveyance==='foot'?10:20))*10):0;
-   const duneFatigue=terrain==='dunes'&&conveyance==='foot'&&!dunesSlow?5:0;
-   const rate=(doubleTime?(conveyance==='foot'?40:20)-(sr.success?20:0):(sr.success?0:5))+extraFatigue+duneFatigue;
-   // rate represents weariness per reference interval, scaled to actual minutes;
-   // Double Time rates are per hour and are therefore multiplied by four.
+   const end=enduranceByActor[id],inactive=inactiveByActor[id];
    const carryIn=previousCarry[id]??0;
    must(whole(carryIn,0,239),'Neplatný zbytek poměrné únavy.');
-   const units=carryIn+movementMinutes*rate,delta=Math.floor(units/240),carryOut=units%240;
-   return {id,endurance:end,roll,sr,rate,delta,carryIn,carryOut,enc,extraFatigue,duneFatigue};
+   let activeMinutes=movementMinutes,earlyIncapacity=null;
+   if(inactive){
+    must(Number.isSafeInteger(inactive.minute)&&inactive.minute>=minute&&inactive.minute<=minute+minutes&&
+     ['INC','UNC','KIA'].includes(inactive.shock),
+     'Nesplnitelný END test vyžaduje doložený zdravotní stav a minutu vzniku.');
+    activeMinutes=Math.min(movementMinutes,inactive.minute-minute);
+    earlyIncapacity={minute:inactive.minute,shock:inactive.shock,sourceKey:inactive.sourceKey,
+     activeMovementMinutes:activeMinutes};
+   }
+   const enc=encByActor[id]??0;
+   must(whole(enc,0,100),'Nenastavená nebo neplatná ENC postavy.');
+   const extraFatigue=loadBypass?Math.floor(enc/(conveyance==='foot'?10:20))*10:0;
+   const duneFatigue=terrain==='dunes'&&conveyance==='foot'&&!dunesSlow?5:0;
+   if(activeMinutes===0&&inactive)return {id,endurance:end,roll:null,sr:null,rate:0,delta:0,carryIn,
+    carryOut:carryIn,enc,extraFatigue:0,duneFatigue:0,movementFatigueUnits:0,earlyIncapacity,
+    endNotRequired:{minute:inactive.minute,shock:inactive.shock,sourceKey:inactive.sourceKey}};
+   must(whole(end,0,50),'Cestující postava potřebuje doložené END.');
+   const raw=endRollByActor[id],rolls=Array.isArray(raw)?raw:[raw];
+   const count=doubleTime?Math.ceil(activeMinutes/60):1;
+   must(rolls.length===count&&rolls.every(r=>whole(r,1,10)),doubleTime?
+    'Double Time vyžaduje samostatný skutečný END d10 za každou započatou hodinu pohybu ('+count+' hodů).':
+    'Každá cestující postava potřebuje skutečný END SR d10.');
+   const srs=rolls.map(roll=>expeditionSecondaryRoll({endurance:end,roll,
+    riding:conveyance==='mount'||conveyance==='cart'||conveyance==='wagon'}));
+   const baseUnits=doubleTime?srs.reduce((total,sr,i)=>{
+    const inHour=Math.min(60,Math.max(0,activeMinutes-60*i));
+    const base=conveyance==='foot'?10:5;
+    // Fatigue is accrued in 1/240-point units; 60 minutes * 4 = one hour.
+    return total+inHour*4*Math.max(0,base-(sr.success?5:0));
+   },0):activeMinutes*(srs[0].success?0:5);
+   const movementFatigueUnits=baseUnits+activeMinutes*(extraFatigue+duneFatigue);
+   const units=carryIn+movementFatigueUnits;
+   return {id,endurance:end,roll:srs[0].roll,sr:srs[0],
+    ...(doubleTime?{hourlyEndSR:srs}:{}),
+    rate:activeMinutes?movementFatigueUnits/activeMinutes:0,movementFatigueUnits,
+    delta:Math.floor(units/240),carryIn,carryOut:units%240,
+    enc,extraFatigue,duneFatigue,...(earlyIncapacity?{earlyIncapacity}:{})};
   });
  }
  if(weather){must(weather.format==='hmk-trekking-weather-day-v1','Neplatný doklad počasí');}
@@ -147,7 +144,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   ...(kind==='travel'?{distanceFractionIn:previousDistanceFraction,distanceFractionOut}:{}),
   mapCentimetres:Math.round(distanceMeters*100000/mapScale)/1000,
   actors,encounter,direction,survivalHazard,weather,slow,progress,bearing,loaded,
-  ...(kind==='travel'?{doubleTime,loadBypass,dunesSlow,forcedBearing}:{}),
+  ...(kind==='travel'?{doubleTime,loadBypass,dunesSlow,forcedBearing,...(doubleTime?{endSRMode:'hourly-verified-v93.663'}:{})}:{}),
   weatherHazard:weather?weather.daylightHazard:null,
   consumption:'stávající časově doložený 24hodinový účet výživy',
   gmTimeScale:'gm-arbitrary-episode-proportional-carry-v1',sourcePages:[144,145,146,149,150]};
@@ -698,9 +695,29 @@ export function validateTimeEpisodes(journal=[]){
    for(const a of e.actors){
     const expected=units[a.id]||0,activeMinutes=a.earlyIncapacity?.activeMovementMinutes??
      (e.movementMinutes??e.travelDelay?.movementMinutes??e.minutes),
-     total=a.carryIn+activeMinutes*a.rate+expected;
+     total=a.carryIn+(a.movementFatigueUnits??activeMinutes*a.rate)+expected;
     must(a.weatherFatigueUnits===expected&&a.delta===Math.floor(total/240)&&a.carryOut===total%240,
      'Minutová únava způsobená počasím neodpovídá doloženému Cold/Heat Hazard.');
+   }
+  }
+  // New Double Time receipts are strictly backed by ONE independent END SR
+  // for each real hour, not a reused watch-wide roll (HMK 150).
+  // Keep older pre-93.663 receipts readable without inventing missing dice.
+  if(e.kind==='travel'&&e.endSRMode==='hourly-verified-v93.663'){
+   must(e.doubleTime===true,'Hourly END audit: pouze pro Double Time.');
+   for(const a of e.actors||[]){
+    if(a.endNotRequired){must(a.movementFatigueUnits===0&&a.hourlyEndSR===undefined,
+     'Hourly END audit: po ztrátě schopnosti pohybu není další hod.');continue;}
+    const active=a.earlyIncapacity?.activeMovementMinutes??e.movementMinutes??e.minutes;
+    must(Array.isArray(a.hourlyEndSR)&&a.hourlyEndSR.length===Math.ceil(active/60)&&
+     a.hourlyEndSR.every(r=>whole(r.roll,1,10)&&r.tn===Math.floor(a.endurance/2)+
+      (['mount','wagon','cart'].includes(e.conveyance)?2:0)&&r.success===(r.roll<=r.tn)),
+     'Hourly END audit: chybí samostatné a doložené hodinové hody.');
+    const expected=a.hourlyEndSR.reduce((n,r,i)=>n+Math.min(60,Math.max(0,active-60*i))*4*
+     Math.max(0,(e.conveyance==='foot'?10:5)-(r.success?5:0)),0)+
+     active*(a.extraFatigue+a.duneFatigue);
+    must(a.movementFatigueUnits===expected&&a.roll===a.hourlyEndSR[0]?.roll,
+     'Hourly END audit: skutečná hodinová únava neodpovídá dokladům.');
    }
   }
   if(e.kind==='travel')for(const a of e.actors||[])if(a.earlyIncapacity){
@@ -710,8 +727,8 @@ export function validateTimeEpisodes(journal=[]){
    must(witness&&['INC','UNC','KIA'].includes(witness.shockAfter)&&
     med.activeMovementMinutes===expectedMinutes&&
     (expectedMinutes===0||a.sr!==null&&whole(a.roll,1,10))&&
-    a.delta===Math.floor((a.carryIn+expectedMinutes*a.rate+(a.weatherFatigueUnits||0))/240)&&
-    a.carryOut===(a.carryIn+expectedMinutes*a.rate+(a.weatherFatigueUnits||0))%240,
+    a.delta===Math.floor((a.carryIn+(a.movementFatigueUnits??expectedMinutes*a.rate)+(a.weatherFatigueUnits||0))/240)&&
+    a.carryOut===(a.carryIn+(a.movementFatigueUnits??expectedMinutes*a.rate)+(a.weatherFatigueUnits||0))%240,
     'Částečná únava postavy před zdravotní neschopností nemá pravidlový doklad.');
   }
   if(e.kind==='travel')for(const a of e.actors||[])if(a.endNotRequired){
