@@ -152,7 +152,8 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
 }
 /** GM minute adaptation of HMK pp.148–149: time lost to an obstacle is
  * still elapsed campaign time, but not moving time. Unspent delays survive
- * other activities and are consumed once by subsequent travel episodes. */
+ * other activities and are consumed once by subsequent travel episodes.
+ * Equipment F/CF is no longer represented by this carry after v93.695. */
 export function episodeMinuteDelay({minutes,incoming=0,current=0,future=0,persistCarry=true}={}){
  must(whole(minutes,1,10080)&&whole(incoming,0,10000000)&&whole(current,0,10080)&&
   whole(future,0,10080),'Zdržení: potřebujeme skutečné celé minuty (nikoli odhadovaný hod).');
@@ -179,6 +180,23 @@ export function lastEquipmentSlowCarry(journal=[],campaignId,minute=Infinity){
   return e.hazardDetails?.some(h=>(h.hazard==='equipment'||h.hazard==='complication'&&h.automationVersion==='v93.681')&&h.result==='short-delay')?240:0;
  }
  return 0;
+}
+/** v93.695 GM adaptation: Equipment repairs are inventory work, never travel time.
+ * Complication remains a genuine travel obstruction. Reconstruct its independent
+ * remaining delay from immutable travel receipts, including pre-v93.695 saves.
+ * Historical receipts themselves keep their original verification rules. */
+export function independentTravelDelayCarry(journal=[],campaignId,minute=Infinity){
+ const episodes=journal.filter(j=>j.calendarCampaignId===campaignId&&
+  j.calendarTimeEpisode?.kind==='travel'&&j.calendarTimeEpisode.startMinute<minute)
+  .map(j=>j.calendarTimeEpisode).sort((a,b)=>a.startMinute-b.startMinute);
+ let remaining=0;
+ for(const e of episodes){
+  remaining=Math.max(0,remaining-e.minutes);
+  const complication=e.hazardDetails?.find(h=>h.hazard==='complication'&&
+   h.automationVersion==='v93.681'&&['long-delay','irreparable'].includes(h.result));
+  if(complication&&e.travelDelay?.future===240)remaining+=240;
+ }
+ return remaining;
 }
 /** Fractional metre accounting follows the last journey, even across rest. */
 export function lastTimeEpisodeDistanceFraction(journal=[],campaignId,minute=Infinity){
@@ -799,9 +817,13 @@ export function validateTimeEpisodes(journal=[]){
   if(e.travelDelay!==undefined){
    must(e.kind==='travel','Zdržení lze přenášet jen mezi cestovními epizodami.');
    const d=e.travelDelay;
+   const independent=d.method==='gm-complication-only-v93.695';
    const expected=episodeMinuteDelay({minutes:e.minutes,
-    incoming:d.method==='gm-current-episode-only-v2'?0:lastEpisodeTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute),
+    incoming:d.method==='gm-current-episode-only-v2'?0:independent?
+     independentTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute):
+     lastEpisodeTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute),
     current:d.current,future:d.future,persistCarry:d.method!=='gm-current-episode-only-v2'});
+   if(independent)expected.method='gm-complication-only-v93.695';
    must(JSON.stringify(expected)===JSON.stringify(d)&&
     (e.medicalTravelStop?e.movementMinutes<=d.movementMinutes:e.movementMinutes===d.movementMinutes),
     'Zdržení nebo přenesené minuty neodpovídají předchozí cestě.');
@@ -818,7 +840,7 @@ export function validateTimeEpisodes(journal=[]){
    const outcome=hazard?.result;
    const currentComplication=hazard?.hazard==='complication'&&hazard.automationVersion==='v93.681';
    const mandatoryNext=(hazard?.hazard==='equipment'||currentComplication)&&['long-delay','irreparable'].includes(outcome);
-   if(d.method!=='gm-current-episode-only-v2')must(d.future===(mandatoryNext?240:0)&&
+   if(d.method!=='gm-current-episode-only-v2')must(d.future===((independent?currentComplication:mandatoryNext)?240:0)&&
     (d.current===0||!!hazard),
     'Zdržení v další hlídce nemá doložený Equipment Hazard nebo je jeho délka pozměněna.');
    if(e.equipmentSlowCarryOut!==undefined){
