@@ -207,12 +207,22 @@ export function lastTimeEpisodeDistanceFraction(journal=[],campaignId,minute=Inf
 }
 /** A Tracking CF imposes Bearing on the next actual travelling episode,
  * not the next generic event. That obligation is consumed once, not repeated. */
-export function pendingTrackingCFBearing(journal=[],campaignId,minute=Infinity){
+export function pendingTrackingCFBearing(journal=[],campaignId,minute=Infinity,memberIds=null){
+ // Historical callers may omit memberIds; new episode preparations must supply
+ // the actual party. A CF is a party obligation, never a campaign-wide buff.
+ const members=memberIds===null?null:new Set(memberIds);
+ if(members&&(!Array.isArray(memberIds)||!memberIds.length||members.size!==memberIds.length))
+  throw Error('Tracking CF: neplatní účastníci následující cesty');
  const episodes=journal.filter(row=>row.calendarCampaignId===campaignId&&row.calendarTimeEpisode&&
   row.calendarTimeEpisode.startMinute<minute).sort((a,b)=>b.calendarTimeEpisode.startMinute-a.calendarTimeEpisode.startMinute);
  for(const row of episodes){const ep=row.calendarTimeEpisode;
-  if(ep.kind==='travel')return ep.trackingMemory?.level==='CF'&&ep.trackingMemory?.sourceMode==='new'?1:0;
-  if(ep.trackingMemory?.level==='CF'&&ep.trackingMemory?.sourceMode==='new')return 1;
+  const party=ep.memberIds??[];
+  if(members&&!party.some(id=>members.has(id)))continue;
+  const cf=ep.trackingMemory?.level==='CF'&&ep.trackingMemory?.sourceMode==='new';
+  if(cf&&members&&(party.length!==members.size||party.some(id=>!members.has(id))))
+   throw Error('Tracking CF: původní družina změnila složení. Povinný Bearing vyžaduje rozhodnutí GM.');
+  if(ep.kind==='travel')return cf?1:0;
+  if(cf)return 1;
  }return 0;
 }
 /** Approved GM minute-accounting exception (2026-11-02), HMK p.176:
