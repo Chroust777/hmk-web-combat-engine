@@ -305,7 +305,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.698';
+const APP_VERSION='93.699';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -21497,7 +21497,8 @@ function episodePreviewFromForm(form,clock){
  result.movementRolls={progressD10,directionD10};
  result.movementRollSources={progress:pvals?null:inheritedProgress?previous.id:null,
   direction:dvals?null:inheritedDirection?previous.id:null};
- result.navigationState=episodeNavigationState(previous,result.direction,{recovered:!!v.navigationRecovered});
+ result.navigationState=episodeNavigationState(lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members),result.direction,{recovered:!!v.navigationRecovered});
+ result.navigationPartyScope='v93.699';
  result.navigationRecovered=!!v.navigationRecovered;
  const hazardTypes=[result.survivalHazard,result.direction?.direction].filter(Boolean);
  if(kind==='travel'&&hazardTypes.length&&minutes>240)throw Error('Hazard patří do konkrétní čtyřhodinové hlídky (HMK 148–149). Rozdělte delší plánovanou cestu na nejvýše 240minutové úseky a hazard vyhodnoťte v jeho vlastní hlídce; jinak by se zdržení a Slow Mode přenesly do nesprávného času.');
@@ -22424,7 +22425,7 @@ function updateEpisodePreview(form){
  for(const node of form.querySelectorAll('[data-episode-tracking-new]'))node.hidden=!episodeEvaluationRequested||v.trackingUse!=='new';
  for(const node of form.querySelectorAll('[data-episode-drover]'))node.hidden=v.conveyance==='foot';
 
- const navigationPrev=lastEpisodeBefore(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute);
+ const navigationPrev=v.memberIds?.length?lastEpisodeBefore(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute,v.memberIds):null;
  const navigationText=form.querySelector('[data-episode-navigation-text]');if(navigationText){
   const state=episodeNavigationState(navigationPrev);
   navigationText.innerHTML='Přetrvávající stav družiny: <span class="hc-help-term" tabindex="0" data-hmk-help="Možnosti: clear = správný směr, misdirection = odchýlení od trasy, lost = ztracení. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení.">'+esc(state)+'</span>. Možnosti: clear = správná trasa; misdirection = odchýlení; lost = ztracení. Změna stavu vyžaduje skutečný pravidlový následek nebo rozhodnutí GM.';
