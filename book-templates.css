@@ -7181,3 +7181,19 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .content-sheet .journal-fatigue-inline-edit .journal-mini-stats label{flex:1;min-width:0;font:11px Georgia,serif;color:#4d3425}
 .content-sheet .journal-fatigue-edit-reason{display:grid;gap:5px;margin:10px 0 4px;font:11px Georgia,serif;color:#4d3425}
 .content-sheet .journal-fatigue-edit-reason textarea{width:100%;max-width:100%;min-height:55px;box-sizing:border-box;padding:7px;background:#fffaf1;border:1px solid #9e7c55;border-radius:3px;color:#203345;font:12px Georgia,serif}
+
+/* v93.701 · Weather Hazard is one ordered per-actor medical handoff.
+ * No data/roll logic in CSS; the original DOM form field names remain stable. */
+.hc-episode-spread-left .hc-weather-actor{margin:.65rem 0;padding:.55rem .7rem;
+ border:1px solid rgba(120,81,40,.35);border-radius:8px;background:rgba(255,249,226,.4)}
+.hc-episode-spread-left .hc-weather-actor>summary{font-weight:700;color:#55351e;cursor:pointer}
+.hc-episode-spread-left .hc-weather-actor-steps{display:grid;gap:.65rem;padding:.6rem .2rem .2rem}
+.hc-episode-spread-left .hc-weather-step{border:1px solid rgba(114,82,45,.22);
+ border-radius:7px;padding:.65rem .7rem;background:rgba(255,253,239,.48);min-width:0}
+.hc-episode-spread-left .hc-weather-step h5{margin:0 0 .55rem;color:#644129;font-size:.93rem}
+.hc-episode-spread-left .hc-weather-step-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem 1rem}
+.hc-episode-spread-left .hc-weather-step-grid>label{min-width:0;display:flex;flex-direction:column;justify-content:flex-start;gap:.32rem}
+.hc-episode-spread-left .hc-weather-step-grid>label.hc-check{flex-direction:row;align-items:center;gap:.5rem;margin-top:.3rem}
+.hc-episode-spread-left .hc-weather-step-grid [data-episode-die]{white-space:nowrap}
+.hc-episode-spread-left .hc-weather-step [data-hmk-help]{cursor:help}
+@media(max-width:700px){.hc-episode-spread-left .hc-weather-step-grid{grid-template-columns:minmax(0,1fr)}}
