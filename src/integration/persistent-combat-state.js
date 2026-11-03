@@ -313,6 +313,9 @@ export function validateCombatState(s){
   }
  if(s.shockFollowup!==undefined&&s.shockFollowup!==null){
   const q=s.shockFollowup;
+  if(q.domain!==undefined)requireCond(q.domain==='travel-weather'&&
+   typeof q.sourceId==='string'&&q.sourceId&&whole(q.originMinute,0,1000000000),
+   'Weather Shock vyžaduje neměnný zdroj a kalendářovou minutu');
   requireCond(q&&['STN','INC','UNC'].includes(q.kind)&&whole(q.originRound,1,9999)&&whole(q.dueRound,1,9999)
    &&q.dueRound===(q.phase==='after-all-bleeding-stopped'?q.originRound:q.originRound+(q.kind==='UNC'?RECHECK_ROUNDS:1))
    &&(q.timelineId===null||(typeof q.timelineId==='string'&&q.timelineId.length>0&&q.timelineId.length<=100))
@@ -434,6 +437,11 @@ export function recordConfirmedSurrenderRelease({state,round,timelineId,eventId,
 }
 export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudication={}}={}){
  const s=ready(state,round,eventId);
+ const injuryOrigin=adjudication.injuryOrigin??'combat';
+ requireCond(['combat','travel-weather'].includes(injuryOrigin),'Nepovolený původ fyzického zranění');
+ if(injuryOrigin==='travel-weather')requireCond(eventId.startsWith('skill-weather-skin:')&&
+  typeof adjudication.weatherSourceId==='string'&&adjudication.weatherSourceId&&
+  whole(adjudication.originMinute,0,1000000000),'Weather zranění musí nést původní zdroj a skutečnou kalendářovou minutu');
  requireCond(draft?.ok===true&&draft.format==='hmk-combat-event-draft-v1'&&draft.status==='preview-only'&&draft.mutatesCharacter===false,'Lze potvrdit jen původní ověřený návrh zásahu');
  requireCond(typeof characterId==='string'&&draft.target?.id===characterId,'Zásah patří jiné postavě');
  requireCond(draft.inputs?.previousState===s.shock,'Předchozí Shock v návrhu nesouhlasí s trvalým stavem; zásah přepočítejte');
@@ -496,7 +504,7 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
   const level=Number(inj.injury.slice(1)),severity=inj.injury[0];
   requireCond((level===1&&severity==='M')||([2,3].includes(level)&&severity==='S')||([4,5].includes(level)&&severity==='G'),'Nesouhlasí Severity a Injury Level');
   const fixedLevel=compound?.injury?.level??level;const fixedSeverity=compound?.injury?.severity??severity;
-  return {id:`wound:${eventId}`,location:draft.location,severity:fixedSeverity,level:fixedLevel,aspect:draft.aspect,bleeding:adjudication.bleeding,nextAdvanceRound:adjudication.bleeding?round+BLOOD_LOSS_PERIOD_ROUNDS:null,recordedRound:round,originEventId:eventId,compoundReviewed:!!adjudication.compoundReviewed,shockSL:draft.inputs?.shockLevel??null,side:adjudication.side??null,bodyKind,timelineId:adjudication.timelineId??null,amputation:amp&&!ampFromOld?{severed:amp.severed,triangleModifier:amp.triangleModifier,sl:amp.slName,roll:amp.roll,strengthML:amp.strengthML,shockTestModifier:amp.shockTestModifier}:null,moralePending:['S','G'].includes(fixedSeverity),projectileArrowOrBolt:adjudication.arrowOrBolt===true,impaled:projectileImpalement({projectile:adjudication.arrowOrBolt===true,severity:fixedSeverity,injuryLevel:fixedLevel})};
+  return {id:`wound:${eventId}`,originDomain:injuryOrigin,location:draft.location,severity:fixedSeverity,level:fixedLevel,aspect:draft.aspect,bleeding:adjudication.bleeding,nextAdvanceRound:adjudication.bleeding?round+BLOOD_LOSS_PERIOD_ROUNDS:null,recordedRound:round,originEventId:eventId,compoundReviewed:!!adjudication.compoundReviewed,shockSL:draft.inputs?.shockLevel??null,side:adjudication.side??null,bodyKind,timelineId:adjudication.timelineId??null,amputation:amp&&!ampFromOld?{severed:amp.severed,triangleModifier:amp.triangleModifier,sl:amp.slName,roll:amp.roll,strengthML:amp.strengthML,shockTestModifier:amp.shockTestModifier}:null,moralePending:['S','G'].includes(fixedSeverity),projectileArrowOrBolt:adjudication.arrowOrBolt===true,impaled:projectileImpalement({projectile:adjudication.arrowOrBolt===true,severity:fixedSeverity,injuryLevel:fixedLevel})};
  })():null;
  if(wound)requireCond(!s.wounds.some(w=>w.id===wound.id),'Tato rána již byla potvrzena');
  if(compound?.compoundedExisting){
@@ -523,7 +531,12 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
  if(s.shock!==previousShock)s.shockOriginRound=round;
  if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.shockFollowup=null;for(const w of s.wounds)w.nextAdvanceRound=null;}
  else if(s.shock!==previousShock)installShockFollowup(s,{round,timelineId:adjudication.timelineId??null});
- record(s,eventId,'confirmed-hit',round,{targetId:characterId,location:draft.location,aspect:draft.aspect,kind:inj.kind,injury:inj.injury??null,woundId:wound?.id??null,shock:s.shock,bleeding:wound?.bleeding??false,compound:compound?{d10:adjudication.compoundD10,success:compound.success,affectedId:compound.compoundedInjuryId??null}:null,impact:draft.impactResult?.effectiveImpact??null,proposalId:draft.proposalId??null,amputation:amp?{affectedWoundId:ampFromOld?priorCompounded.id:wound?.id??null,severed:amp.severed,dead:amp.dead,sl:amp.slName,roll:amp.roll,forcedBleeder:amp.forceBleeder,shockTestModifier:amp.shockTestModifier}:null,injuryMishaps:wound?hmkInjuryMishaps(wound.location,wound.severity,bodyKind):[],moralePending:wound?.moralePending??false,impaled:wound?.impaled??false,source:'HMK 161–162, 167–170; verified special consequences'});
+ if(injuryOrigin==='travel-weather'&&s.shockFollowup&&s.shock!==previousShock){
+  s.shockFollowup.domain='travel-weather';s.shockFollowup.sourceId=adjudication.weatherSourceId;
+  s.shockFollowup.originMinute=adjudication.originMinute;
+ }
+ record(s,eventId,injuryOrigin==='travel-weather'?'travel-weather-injury':'confirmed-hit',round,{domain:injuryOrigin,
+  ...(injuryOrigin==='travel-weather'?{sourceId:adjudication.weatherSourceId,originMinute:adjudication.originMinute}:{}),targetId:characterId,location:draft.location,aspect:draft.aspect,kind:inj.kind,injury:inj.injury??null,woundId:wound?.id??null,shock:s.shock,bleeding:wound?.bleeding??false,compound:compound?{d10:adjudication.compoundD10,success:compound.success,affectedId:compound.compoundedInjuryId??null}:null,impact:draft.impactResult?.effectiveImpact??null,proposalId:draft.proposalId??null,amputation:amp?{affectedWoundId:ampFromOld?priorCompounded.id:wound?.id??null,severed:amp.severed,dead:amp.dead,sl:amp.slName,roll:amp.roll,forcedBleeder:amp.forceBleeder,shockTestModifier:amp.shockTestModifier}:null,injuryMishaps:wound?hmkInjuryMishaps(wound.location,wound.severity,bodyKind):[],moralePending:wound?.moralePending??false,impaled:wound?.impaled??false,source:injuryOrigin==='travel-weather'?'HMK 185, 167–170; environmental injury & shared physical consequences':'HMK 161–162, 167–170; verified special consequences'});
  return {state:s,wound};
 }
 /** HMK p271 direct Acid: successive successful rounds increase the SAME
@@ -634,6 +647,16 @@ export function shockFollowupReadiness({state,round,characterId=null,actorId=nul
  const q=state.shockFollowup??null;
  if(!q)return {due:false,reason:'legacy-state-needs-gm-timing-evidence'};
  if(!whole(round,1,9999))return {due:false,reason:'invalid-round'};
+ if(q.domain==='travel-weather'){
+  if(!characterId||actorId!==characterId)return {due:false,reason:'wrong-weather-patient'};
+  if(!Number.isSafeInteger(elapsedMinutesSinceOriginal)||elapsedMinutesSinceOriginal<0)
+   return {due:false,reason:'missing-weather-calendar-time'};
+  if(q.kind==='UNC')return elapsedMinutesSinceOriginal>=10?
+   {due:true,kind:'UNC',requirement:'weather-ten-minutes'}:
+   {due:false,reason:'unc-ten-minutes-not-proven'};
+  if(turnEnded!==true)return {due:false,reason:'weather-next-action-not-gm-confirmed'};
+  return {due:true,kind:q.kind,requirement:'gm-confirmed-weather-next-action'};
+ }
  if(q.phase==='after-all-bleeding-stopped'){
   return !state.wounds.some(w=>w.bleeding)&&round>=q.dueRound?{due:true,kind:q.kind,requirement:'after-all-bleeding-stopped'}:{due:false,reason:'bleeding-not-stopped'};
  }
@@ -688,8 +711,15 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
    if(requireComa)s.coma={active:true,hr:result.coma.initialHR,elapsedDays:0,nextCourseDays:initialComaD10};
   }
  }
+ if(q?.domain==='travel-weather'&&s.shockFollowup){
+  // A subsequent STN reroll is another *weather* obligation. No combat
+  // round is manufactured, nor is the calendar advanced by the reroll.
+  s.shockFollowup.domain='travel-weather';s.shockFollowup.sourceId=q.sourceId;
+  s.shockFollowup.originMinute=q.originMinute+
+   (Number.isSafeInteger(elapsedMinutesSinceOriginal)?elapsedMinutesSinceOriginal:0);
+ }
  if(s.shock!==before)s.shockOriginRound=round;
- record(s,eventId,'shock-recovery',round,{before,after:s.shock,sl:Object.keys(SL).find(k=>SL[k]===sl),
+ record(s,eventId,'shock-recovery',round,{domain:q?.domain??'combat',sourceId:q?.sourceId??null,before,after:s.shock,sl:Object.keys(SL).find(k=>SL[k]===sl),
   extendedShockHR:s.extendedShock?.hr??null,comaHR:s.coma?.hr??null,
   verifiedRoll,evidence:q?{dueRound:q.dueRound,phase:q.phase,timelineId:q.timelineId,actorId,turnEnded,elapsedMinutesSinceOriginal}:'legacy GM timing confirmed'});
  return {state:s};

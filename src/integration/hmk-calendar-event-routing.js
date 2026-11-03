@@ -7,7 +7,7 @@ export function calendarEventDestination(event){
  switch(event?.kind){
   case 'herbal-potion':case 'malnutrition-course':return 'calendar';
   case 'poison':case 'disease':case 'asphyxia':case 'sleep-deprivation':
-  case 'weather-course':case 'weather-skin':case 'weather-onset':return 'hazards';
+  case 'weather-course':case 'weather-skin':case 'weather-onset':case 'weather-shock':return 'hazards';
   case 'healing':case 'infection':case 'grim':case 'treatment':case 'blood-loss':
   case 'coma':case 'extended-shock':case 'aural-recovery':case 'psyche-manifestation':
   case 'psyche-interval':case 'psyche-recovery':return 'healing';

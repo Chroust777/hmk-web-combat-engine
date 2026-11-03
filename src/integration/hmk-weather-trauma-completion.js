@@ -36,7 +36,7 @@ function prepared({state,actor,sourceId,round,gmConfirmed}){
  * The caller must separately initiate the subsequent ongoing Cold Exposure.
  */
 export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6s,enduranceD100,
- gmConfirmed=false}={}){
+ gmConfirmed=false,originMinute=null}={}){
  const s=prepared({state,actor,sourceId,round,gmConfirmed}),id='skill-cold-shock:'+sourceId;
  requireIt(!s.events.some(e=>e.id===id),'Cold Shock tohoto ponoření už byl vyhodnocen');
  requireIt(['coolWater','coldWater','freezingWater'].includes(condition),'Studený šok vyžaduje doložené ponoření do chladné vody');
@@ -57,6 +57,11 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
   if(stateName==='INC'||stateName==='UNC')s.posture.prone=true;
   if(['STN','INC','UNC'].includes(stateName))s.shockFollowup={kind:stateName,originRound:round,timelineId:null,
    dueRound:round+(stateName==='UNC'?120:1),phase:stateName==='UNC'?'after-ten-minutes':'end-next-turn'};
+ }
+ if(s.shockFollowup){
+  requireIt(integer(originMinute,0,1000000000),'Cold Water Shock vyžaduje skutečnou kalendářovou minutu');
+  s.shockFollowup.domain='travel-weather';s.shockFollowup.sourceId=sourceId;
+  s.shockFollowup.originMinute=originMinute;
  }
  if(stateName==='KIA'){s.shockFollowup=null;s.extendedShock=null;s.coma=null;for(const w of s.wounds)w.nextAdvanceRound=null;}
  const report={condition,immersionRounds:d6s.reduce((a,b)=>a+b,0),d6s,enduranceD100,endEML,sl:named(sl),base,index,modifier,shock:stateName,rulePage:185};
@@ -96,9 +101,10 @@ function injuriesFromExposure(h,{windD20,durationD20,complexion,rows,maximumExpo
  * Each real wound must pass the existing Injury/Compound/Shock/Morale pipeline.
  * Whole collection commits together or not at all. */
 export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,round=1,
- windD20=null,durationD20=null,complexion=null,rows=[],maximumExposureMinutes=null,gmConfirmed=false,
+ windD20=null,durationD20=null,complexion=null,rows=[],maximumExposureMinutes=null,originMinute=null,gmConfirmed=false,
  allLocationsReviewed=false}={}){
  let s=prepared({actor,state,sourceId,round,gmConfirmed});
+ requireIt(integer(originMinute,0,1000000000),'Kožní Weather následky vyžadují skutečnou kalendářovou minutu');
  requireIt(Array.isArray(inventory)&&allLocationsReviewed===true,
   'GM musí potvrdit kompletní seznam vystavených míst a aktuální zbroj');
  const hazard=s.environmentalHazards?.find(h=>h.sourceId===sourceId&&h.skinPending);
@@ -145,7 +151,8 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
    carryover:{state:carry}};
   const applied=applyConfirmedHit({state:s,characterId:actor.id,draft,round,eventId,
    adjudication:{gmReviewed:true,bodyKind:'human',compoundReviewed:!!compound,compoundD10:r.compoundD10??null,
-    bleeding:false,arrowOrBolt:false,side,timelineId:'skill:'+sourceId}});
+    bleeding:false,arrowOrBolt:false,side,timelineId:'skill:'+sourceId,
+    injuryOrigin:'travel-weather',weatherSourceId:sourceId,originMinute}});
   s=applied.state;
   const evt=s.events.find(e=>e.id===eventId);evt.details.weatherTrauma={kind:hazard.skinPending,
    sourceId,windD20,durationD20,complexion,location:where,side,

@@ -142,7 +142,15 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
   if(s.wounds?.some(w=>w.bleeding))unknown.push({characterId:c.id,name:c.name,kind:'bleeding',
    description:'Aktivní krvácení: Blood Loss Advance / Stoppage patří do bojové časové osy',
    reason:'Nejprve vyřešte krvácení přes Combat; 60 kol není automaticky potvrzených 5 minut kampaně'});
-  if(s.shockFollowup)unknown.push({characterId:c.id,name:c.name,kind:'shock-followup',
+  if(s.shockFollowup?.domain==='travel-weather'){
+   const q=s.shockFollowup,dueMinute=q.kind==='UNC'?q.originMinute+10:q.originMinute;
+   // UNC: ten *actual* minutes from the original Shock; STN/INC: GM
+   // certifies the next real action, never a synthetic Combat round.
+   all.push({id:KEY('weather-shock',c.id,q.sourceId),characterId:c.id,name:c.name,
+    kind:'weather-shock',sourceId:q.sourceId,
+    description:q.kind==='UNC'?'Cold/Weather Shock Reroll – po 10 minutách':'Weather Shock Reroll – GM potvrdí další skutečnou akci',
+    minute:dueMinute,anchorMinute:q.originMinute,status:dueMinute<=clock.minute?'due':'future'});
+  }else if(s.shockFollowup)unknown.push({characterId:c.id,name:c.name,kind:'shock-followup',
    description:'Povinný Shock Reroll v bojové časové ose',reason:'Před posunem času dokončete Shock Follow-up'});
   if(s.extendedShock){add(c,'extended-shock','Extended Shock Course (4 h)',s.extendedShock.elapsedHours+4,null,'hours');}
   if(s.coma?.active&&s.coma.nextCourseDays!=null){add(c,'coma','Coma Course (d10 dní)',s.coma.elapsedDays+s.coma.nextCourseDays);}

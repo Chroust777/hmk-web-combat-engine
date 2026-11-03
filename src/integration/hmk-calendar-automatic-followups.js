@@ -7,6 +7,7 @@ import {criticalActivities,skillFollowupActivities} from './hmk-skill-critical-a
 import {trekkingOutstandingCases} from './hmk-trekking-followups.js';
 import {pendingTrackingAwareness} from './hmk-tracking-awareness-537.js';
 import {dueInjuryMorale,unresolvedInjuryMishaps} from './persistent-combat-state.js';
+import {medicalOriginOfWound,MEDICAL_ORIGIN} from './hmk-medical-origin.js';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -77,17 +78,18 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // Previously, a Skill Accident outside active Initiative could leave them
   // hidden even though Treatment/Healing were already displayed.
   if(s?.format==='hmk-persistent-combat-v1'){
-   for(const m of unresolvedInjuryMishaps(s))push(c,'injury-mishap',m.id,
-    'Nevyřízený Injury Mishap – původní Combat průvodce (HMK 161,170)',clock.minute,'combat',{woundId:m.woundId});
-   for(const m of dueInjuryMorale(s))push(c,'injury-morale',m.woundId,
-    'Povinný Morale po Serious/Grievous zranění (HMK 162)',clock.minute,'combat',{woundId:m.woundId});
+   for(const m of unresolvedInjuryMishaps(s)){const wound=s.wounds.find(w=>w.id===m.woundId),weather=medicalOriginOfWound(wound,s.events)===MEDICAL_ORIGIN.WEATHER;
+    push(c,'injury-mishap',m.id,weather?'Weather Injury Mishap – povinná zdravotní následnost (HMK 170)':'Nevyřízený Injury Mishap – původní Combat průvodce (HMK 161,170)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
+   for(const m of dueInjuryMorale(s)){const wound=s.wounds.find(w=>w.id===m.woundId),weather=medicalOriginOfWound(wound,s.events)===MEDICAL_ORIGIN.WEATHER;
+    push(c,'injury-morale',m.woundId,weather?'Weather Injury Morale – až po zotavení ze Shock (HMK 162)':'Povinný Morale po Serious/Grievous zranění (HMK 162)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
   }
   // Every committed injury without a resolved initial treatment decision
   // needs routing into the existing Treatment/Untreated workflow. No roll is
   // fabricated and the GM may explicitly record that treatment was absent.
   for(const w of s?.wounds??[])if(!w.healed&&!w.healing&&!s?.extendedShock&&!(s?.wounds??[]).some(x=>x.bleeding))
-   push(c,'treatment',w.id,'Nová rána – Treatment nebo doložené bez ošetření (HMK 178–179)',clock.minute,'combat',{woundId:w.id});
-  if(s?.shockFollowup){
+   push(c,'treatment',w.id,'Nová rána – Treatment nebo doložené bez ošetření (HMK 178–179)',clock.minute,
+    medicalOriginOfWound(w,s.events)===MEDICAL_ORIGIN.WEATHER?'hazards':'combat',{woundId:w.id});
+  if(s?.shockFollowup&&s.shockFollowup.domain!==MEDICAL_ORIGIN.WEATHER){
    const pending=s.shockFollowup;
    if(pending.kind==='UNC'&&pending.phase==='after-ten-minutes'){
     // HMK p169: an unconscious subject rerolls after ten actual minutes.

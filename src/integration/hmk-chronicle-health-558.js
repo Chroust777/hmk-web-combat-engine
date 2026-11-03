@@ -102,8 +102,8 @@ export function projectChronicleHealth_558({actorId,state,now=null,campaignId=nu
    'Současná infekce neruší povinnost denního Grim Shock.',false));
  }
  if(s.shockFollowup)rows.push(item('shock-followup','Shock Reroll','Povinný',
-  'čeká na skutečný Shock test',dueDescriptor(agenda,'shock-followup',actorId,gmTime,displayMinute),
-  'Termín může záviset na bojovém kole; nepřevádět automaticky na minuty kampaně.',false));
+  'čeká na skutečný Shock test',dueDescriptor(agenda,s.shockFollowup.domain==='travel-weather'?'weather-shock':'shock-followup',actorId,gmTime,displayMinute),
+  s.shockFollowup.domain==='travel-weather'?'Weather Shock: skutečná minuta je doložena Kalendářem; bez bojové časové osy.':'Termín může záviset na bojovém kole; nepřevádět automaticky na minuty kampaně.',false));
  if(s.bloodShockPending)rows.push(item('blood-shock-pending','Blood Shock','Povinný',
   'vyřešit v Combat',dueDescriptor(agenda,'blood-shock',actorId,gmTime,displayMinute),
   'Povinný Shock následek Blood Loss se nesmí pominout.',false));
@@ -136,7 +136,7 @@ export function projectChronicleHealth_558({actorId,state,now=null,campaignId=nu
  for(const seq of s.ailmentSequelae||[])if(seq.active)rows.push(item(seq.id,'Trvalý následek',
   seq.condition||'neurčeno',seq.affectedLimb||'trvalý stav',
   'Bez automatického termínu obnovy','Původní Disease Course je dokladem následku.',false));
- const eligible=new Set(['healing','infection','grim','extended-shock','coma','blood-loss','treatment','bleeding','weather','weather-course','weather-skin','poison','disease','sleep','sleep-deprivation','shock-followup','blood-shock','aural-recovery','psyche-choice','asphyxia']);
+ const eligible=new Set(['healing','infection','grim','extended-shock','coma','blood-loss','treatment','bleeding','weather','weather-course','weather-skin','poison','disease','sleep','sleep-deprivation','shock-followup','weather-shock','blood-shock','aural-recovery','psyche-choice','asphyxia']);
  for(const missing of agenda?.unknown||[])if(missing.characterId===actorId&&eligible.has(missing.kind))issues.push(missing.description||missing.reason||missing.kind);
  return {rows,issues,hasActiveMalnutrition:rows.some(r=>r.label.startsWith('Hlad')||r.label.startsWith('Žízeň'))};
 }
