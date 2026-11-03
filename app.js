@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.693';
+const APP_VERSION='93.694';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -988,6 +988,22 @@ function logCalendarCombatResolution(c,state,kind){
  if(!sourceEventId||!state.events.some(e=>e.id===sourceEventId))throw Error('Kalendář: chybí fyzicky potvrzená zdrojová Combat událost');
  data.campaignClock=recordCampaignResolution(data.campaignClock,{eventId:uuid(),sourceEventId,
   characterId:c.id,kind});
+ // Record one immutable, auditable diary receipt for the same original Combat
+ // State event. This is a witness, NOT a second medical calculation/roll.
+ const original=state.events.at(-1);
+ if(!original||original.id!==sourceEventId)throw Error('Zdravotní doklad nemá původní Combat event.');
+ if(data.journal.some(j=>j.calendarMedicalResolution?.sourceEventId===sourceEventId))
+  throw Error('Zdravotní doklad této procedury již existuje.');
+ data.journal.push({id:uuid(),characterId:c.id,createdAt:stamp(),
+  calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute,
+  title:'HMK · zdravotní procedura · '+c.name,
+  body:'Potvrzená procedura '+original.type+' · zdroj Combat State '+sourceEventId+
+   (original.details?.woundId?' · rána '+original.details.woundId:'')+
+   ' · '+displayCampaignMinute(data.campaignClock.minute),
+  calendarMedicalResolution:{format:'hmk-calendar-medical-receipt-v1',kind,
+   sourceEventId,sourceType:original.type,woundId:original.details?.woundId??null,
+   procedureStartMinute:original.details?.procedureTime?.startMinute??null,
+   procedureEndMinute:original.details?.procedureTime?.endMinute??null}});
 }
 function autoAnchorNewCombatOrigins(c,before,after,eventId){
  if(!data.campaignClock||!calendarMemberIds(data.campaignClock,data.characters).some(x=>x.id===c.id))return;
@@ -7545,7 +7561,7 @@ function hmkLongtermHealingPanel(chars){
   }catch(error){return [`<p class="tiny">Curative · ${esc(c.name)} / ${esc(w.id)}: ${esc(error.message)}. Zdravotní hod bude zastaven.</p>`]}
  })) .join(''):'';
  return `<section class="panel"><h3>HMK · dlouhodobé léčení zranění (str. 177–182)</h3>${herbHints}<p class="muted">Pro každou ránu samostatně. Léčení vyžaduje zastavené krvácení, ukončený Extended Shock, potvrzený den a skutečné hody. Další léčitel musí mít vyšší Physician Index. Aktivní infekce přerušuje Healing Rolls všech ran. Veškeré výsledky jsou trvale uloženy u postavy, nikoli odhadované podle bojových kol.</p>
- <div class="field-grid"><form id="hmk-treatment-form"><h4>Treatment Roll</h4>${fields}<label><input type="checkbox" name="untreated" value="yes"> Bez skutečného ošetření (vlastnosti CF; žádný vymyšlený d100)</label><label>Physician ML<input type="number" name="physicianML" min="0" max="200"></label><label>Physician Index<input type="number" name="physicianIndex" min="0" max="20"></label><label>Skutečný d100<input type="number" name="physicianRoll" min="1" max="100"></label><label>DEX Secondary Modifier při náročném Treatment<input type="number" name="dexSecondaryModifier" value="0" step="1"></label><label>Dostupné prostředky (vyberte pouze reálně přítomné)<select name="available" multiple size="4"><option value="water">Voda</option><option value="bandages">Obvazy</option><option value="needle-thread">Jehla a nit</option><option value="surgery-tools">Chirurgické nástroje</option></select></label><label><input type="checkbox" name="broadhead" value="yes"> Projectile Broadhead</label><label>Skutečný začátek zákroku · minuta kampaně (při aktivním kalendáři povinné)<input type="number" name="procedureStartMinute" min="0" step="1" placeholder="Doložený začátek; konec = aktuální minuta"></label><label>Případné zdůvodnění kratší než orientační doby zákroku<input name="procedureVarianceReason" maxlength="500" placeholder="GM doložil odlišnou skutečnou dobu"></label><p class="tiny">Skutečný čas musí být potvrzený v kalendáři GM. Pravidlová doba je orientační. Zákrok sám hodiny neposouvá.</p><button type="submit" ${woundOptions?'':'disabled'}>Potvrdit Treatment</button></form>
+ <div class="field-grid"><form id="hmk-treatment-form"><h4>Treatment Roll</h4>${fields}<label><input type="checkbox" name="untreated" value="yes"> Bez skutečného ošetření (vlastnosti CF; žádný vymyšlený d100)</label><label>Physician ML<input type="number" name="physicianML" min="0" max="200"></label><label>Physician Index<input type="number" name="physicianIndex" min="0" max="20"></label><label>Skutečný d100<input type="number" name="physicianRoll" min="1" max="100"></label><label>DEX Secondary Modifier při náročném Treatment<input type="number" name="dexSecondaryModifier" value="0" step="1"></label><label>Dostupné prostředky (vyberte pouze reálně přítomné)<select name="available" multiple size="4"><option value="water">Voda</option><option value="bandages">Obvazy</option><option value="needle-thread">Jehla a nit</option><option value="surgery-tools">Chirurgické nástroje</option></select></label><label><input type="checkbox" name="broadhead" value="yes"> Projectile Broadhead</label><label>Skutečný začátek zákroku · minuta kampaně (při aktivním kalendáři povinné)<input type="number" name="procedureStartMinute" min="0" step="1" placeholder="Doložený začátek; konec = aktuální minuta"></label><label>Skutečný konec zákroku · minuta kampaně (pouze je-li ještě v budoucnosti)<input type="number" name="procedureEndMinute" min="0" step="1" placeholder="Prázdné = již uplynulý čas"></label><label>Případné zdůvodnění kratší než orientační doby zákroku<input name="procedureVarianceReason" maxlength="500" placeholder="GM doložil odlišnou skutečnou dobu"></label><p class="tiny">Skutečný čas musí být potvrzený v kalendáři GM. Pravidlová doba je orientační. Pokud je časový postup zablokován čekajícím Treatment, vyplňte začátek = aktuální minuta a potvrzený konec; engine provede zákrok a posun Kalendáře atomicky, pokud žádná jiná povinná událost neleží mezi nimi.</p><button type="submit" ${woundOptions?'':'disabled'}>Potvrdit Treatment</button></form>
  <form id="hmk-healing-roll-form"><h4>Injury Healing Roll · každých 5 dní</h4>${fields}<label>Endurance<input type="number" name="endurance" min="1" max="40" required></label><label>Will<input type="number" name="will" min="1" max="40" required></label><label>Skutečný d100<input type="number" name="roll" min="1" max="100" required></label><label><input type="checkbox" name="historicalRoll" value="yes"> Doložený historický d100 ze zmeškaného přesného termínu</label><label>Původ historického výsledku (GM musí uvést existující doklad/hod)<input name="historicalSource" maxlength="500" placeholder="Např. den 5: fyzický hod z herních poznámek"></label><label><input type="checkbox" name="historicalConfirmed" value="yes"> GM potvrzuje, že tento d100 skutečně padl v původním termínu, NE teď</label><label><input type="checkbox" name="historicalNoBonus" value="yes"> GM potvrzuje, že k původnímu hodu nepatřil nedoložený bylinný nebo arkánní bonus</label><p class="tiny">Historický hod se zapíše jako dnešní auditní oprava s původním dnem. Pokud hod neexistoval, nic se nevytváří; kalendář zůstane pozastaven.</p><button type="submit" ${woundOptions?'':'disabled'}>Trvale zapsat Healing Roll</button></form>
  <form id="hmk-frost-amputation-form"><h4>Frost G · Amputation Treatment (str. 178, 180)</h4><p class="tiny">Jen lidské končetiny či obličej; vznikne NOVÁ Edge rána a povinný Shock. Bez doložených hodů nedojde k žádnému zápisu.</p><label>Frost rána<select name="wound" required>${frostOptions||'<option value="">Žádná vhodná frost rána</option>'}</select></label><label>Dny od rány<input name="daySinceInjury" type="number" min="0" step="1" required></label><label>Physician ML<input name="physicianML" type="number" min="0" max="200" required></label><label>Physician Index<input name="physicianIndex" type="number" min="0" max="20" required></label><label>DEX Secondary Modifier<input name="dexSecondaryModifier" type="number" value="0" step="1" required></label><label>Skutečný Treatment d100<input name="physicianRoll" type="number" min="1" max="100" required></label><label>Location Shock (tabulka pro stejnou lokaci)<input name="locationShock" type="number" min="0" max="10" required></label><label>Původní Shock ML<input name="shockML" type="number" min="0" max="200" required></label><label>Skutečný Shock d100<input name="shockRoll" type="number" min="1" max="100" required></label><label>Pokud vznikne G5 Edge s trojúhelníkem: Strength ML<input name="amputationStrengthML" type="number" min="0" max="200"></label><label>G5 Edge s trojúhelníkem: skutečný Strength d100<input name="amputationRoll" type="number" min="1" max="100"></label><label>Začátek zákroku v minutách kampaně<input name="procedureStartMinute" type="number" min="0" step="1" placeholder="Při kalendáři povinné"></label><label><input name="gmConfirmed" value="yes" type="checkbox" required> GM ověřil anatomii, všechny fyzické hody a skutečný čas zákroku</label><button type="submit" ${frostOptions?'':'disabled'}>Uložit kompletní Frost Amputation + Edge Injury + Shock</button></form>
  <form id="hmk-infection-course-form"><h4>Infection Course · každý den</h4>${infectionFields}${infectionResumptionFields}<label>Endurance<input type="number" name="endurance" min="1" max="40" required></label><label>Will<input type="number" name="will" min="1" max="40" required></label><label>Skutečný d100<input type="number" name="roll" min="1" max="100" required></label><label>Physician SV bonus<input type="number" name="physicianSV" value="0" step="1"></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil denní Course</label><button type="submit" ${woundOptions?'':'disabled'}>Trvale zapsat Infection Course</button></form>
@@ -17829,7 +17845,17 @@ document.addEventListener('submit',e=>{
   const c=character(raw.slice(0,split)),woundId=raw.slice(split+2);
   if(!c||!encounterSelection.has(c.id))throw Error('Postava není v aktuálním střetnutí');
   const args={state:persistentStateOf(c),round:combatClock.round,eventId:uuid(),woundId,daySinceInjury:Number(v.daySinceInjury),gmConfirmed:f.id==='hmk-infection-course-form'?v.gmConfirmed==='yes':true};
-  confirmCalendarWoundDay(c.id,woundId,args.daySinceInjury);
+  const treatmentClock=data.campaignClock;
+  const treatmentFinish=v.procedureEndMinute===''||v.procedureEndMinute===undefined?null:Number(v.procedureEndMinute);
+  const directTreatmentFinish=f.id==='hmk-treatment-form'&&v.untreated!=='yes'&&treatmentClock&&
+   Number.isSafeInteger(treatmentFinish)&&treatmentFinish>treatmentClock.minute;
+  if(directTreatmentFinish){
+   const attestedOrigin=getCampaignAnchor(treatmentClock,'wound',c.id,woundId);
+   if(!attestedOrigin)throw Error('Treatment vyžaduje původní časovou kotvu rány.');
+   if(treatmentFinish>treatmentClock.minute+10080)throw Error('Zákrok nesmí přesáhnout 7 dní v jediné události.');
+   if(args.daySinceInjury!==Math.floor((treatmentFinish-attestedOrigin.minute)/DAY_MINUTES))
+    throw Error('Dny od zranění musí odpovídat skutečnému konci Treatment.');
+  }else confirmCalendarWoundDay(c.id,woundId,args.daySinceInjury);
   // Historical Curative evidence is read from THIS calendar and THIS wound.
   // The health resolver validates it again before modifying the original EML.
   const clock=data.campaignClock;
@@ -17846,7 +17872,12 @@ document.addEventListener('submit',e=>{
   if(clock&&needsTime){
    if(procedureStart<origin?.minute||procedureStart>clock.minute)throw Error('Čas zákroku nesmí předcházet ráně ani být v budoucnosti');
   }
-  const procedureTime=clock&&needsTime?{startMinute:procedureStart,endMinute:clock.minute,
+  if(directTreatmentFinish&&procedureStart!==clock.minute)
+   throw Error('Při zahájení nového Treatment musí začátek přesně odpovídat aktuální minutě Kalendáře.');
+  if(clock&&needsTime&&treatmentFinish!==null&&!directTreatmentFinish&&treatmentFinish!==clock.minute)
+   throw Error('Konec Treatment musí odpovídat aktuální minutě nebo být pozdější.');
+  const procedureTime=clock&&needsTime?{startMinute:procedureStart,
+   endMinute:directTreatmentFinish?treatmentFinish:clock.minute,
    gmConfirmed:true,varianceReason:String(v.procedureVarianceReason??'').trim()}:null;
   let t;
   if(f.id==='hmk-treatment-form')t=applyConfirmedTreatment({...args,untreated:v.untreated==='yes',physicianML:v.physicianML===''?null:Number(v.physicianML),physicianIndex:v.physicianIndex===''?null:Number(v.physicianIndex),physicianRoll:v.physicianRoll===''?null:Number(v.physicianRoll),dexSecondaryModifier:Number(v.dexSecondaryModifier),broadhead:v.broadhead==='yes',available:form.getAll('available'),procedureTime});
@@ -17880,8 +17911,30 @@ document.addEventListener('submit',e=>{
     otherWoundDays[other.id]=n;
    }
    t=applyConfirmedInfectionCourse({...args,endurance:Number(v.endurance),will:Number(v.will),roll:Number(v.roll),physicianSV:Number(v.physicianSV),otherWoundDays,herbalContext});}
-  if(!uiConfirm('Trvale zapsat léčení '+c.name+' podle doložených dnů a hodů?'))return;
-  mutate(()=>{synchronizeCombatInjuries(c,t.state);logCalendarCombatResolution(c,t.state,f.id);});
+  // HMK 178: an unperformed Treatment blocks the calendar at the injury's
+  // minute. If its procedure time is still ahead, resolve that one obligation
+  // and the exact elapsed time as ONE transaction. Project only the closure of
+  // this particular Treatment for the calendar's independent barrier check.
+  // New side effects (such as surgery bleeding) begin at procedure END, not
+  // artificially at its START; all other pending events remain blockers.
+  let advancedTreatmentClock=null;
+  if(directTreatmentFinish){
+   if(f.id!=='hmk-treatment-form')throw Error('Časovaný postup patří pouze Treatment.');
+   const projected=structuredClone(data.characters),patient=projected.find(x=>x.id===c.id);
+   const originalWound=patient?.hmk?.combatState?.wounds?.find(x=>x.id===woundId);
+   const resolvedWound=t.state?.wounds?.find(x=>x.id===woundId);
+   if(!originalWound||!resolvedWound)throw Error('Nelze ověřit identitu léčené rány.');
+   originalWound.healing=structuredClone(resolvedWound.healing);
+   originalWound.healed=!!resolvedWound.healed;
+   advancedTreatmentClock=advanceCampaignCalendar(clock,{
+    deltaMinutes:treatmentFinish-clock.minute,eventId:uuid(),
+    reason:'GM: dokončení Treatment rány '+woundId+' u '+c.name,
+    gmConfirmed:true,characters:projected,journal:data.journal});
+  }
+  if(!uiConfirm('Trvale zapsat léčení '+c.name+(advancedTreatmentClock?' a posunout Kalendář na '+displayCampaignMinute(treatmentFinish):'')+' podle doložených dnů a hodů?'))return;
+  mutate(()=>{if(advancedTreatmentClock)data.campaignClock=advancedTreatmentClock;
+   synchronizeCombatInjuries(c,t.state);logCalendarCombatResolution(c,t.state,f.id);
+  },{gmClockAdvance:!!advancedTreatmentClock});
  }catch(err){alert('Léčení nebylo zapsáno: '+err.message);}
 },true);
 document.addEventListener('submit',e=>{
