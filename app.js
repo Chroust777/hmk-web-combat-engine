@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.689';
+const APP_VERSION='93.690';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -21669,10 +21669,20 @@ function episodeEndTasks(result){
  if(result.hazardDetails?.some(h=>['equipment','complication'].includes(h.hazard)&&h.requiresGMCompletion&&
   ['short-delay','long-delay','irreparable'].includes(h.result)))
   add('Zdržení · skutečné minuty','Je-li překážka zdržela přímo během epizody, zadejte doložené minuty; na další epizodu se nepřenášejí.','hazardDelayNow');
+ // Each Weather Hazard has distinct prerequisites (HMK p.149).
+ // A missing Area AV or hazard die must never point the player to a
+ // future Endurance receipt. Only an actual exposure requires that test.
  for(const w of result.weatherExposure||[]){
-  if(w.pending||['pending','pending-endurance'].includes(w.effect))
-   add('Počasí · '+w.kind+' · '+(character(w.id)?.name||w.id),
-    'Doložit AV, ochranu, kostku a skutečný Endurance/Survival test.','whProof_'+w.kind+'_'+w.id);
+  const person=character(w.id)?.name||w.id,tail='_'+w.kind+'_'+w.id;
+  if(w.pending||!Number.isInteger(w.areaAV))
+   add('Počasí · '+person+' · Area AV','Nejprve doložte skutečné Area AV postavy.','whAV'+tail);
+  else if(w.effect==='pending'||w.roll===null)
+   add('Počasí · '+person+' · Hazard d'+(w.faces||'?'),
+    'Nyní proveďte skutečný individuální hod počasí.','whRoll'+tail);
+  else if(w.effect==='pending-endurance')
+   tasks.push({name:'Počasí · '+person+' · Endurance',
+    detail:'Expozice byla potvrzena; otevřete a uložte skutečný Endurance (Survival) Skill Test.',
+    action:'whProof'+tail,skill:'Endurance',actorId:w.id});
  }
  return tasks;
 }
