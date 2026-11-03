@@ -305,7 +305,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.699';
+const APP_VERSION='93.700';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10682,7 +10682,7 @@ function hskTrekkingSkinForms(actorId){
  const locations='sk, fa, nk, sh, ua, el, fo, ha, tx, ab, pv, th, kn, ca, ft';
  return hazards.map(h=>`<details class="hsk-climb-fall"><summary>Dokončit ${h.skinPending==='frostbite'?'Frostbite':'Sunburn'} · jednotlivá zranění · HMK str.185</summary>
  <form data-skill-weather-skin><input name="sourceId" type="hidden" value="${esc(h.sourceId)}">
- <p>Každou skutečně vystavenou anatomickou lokaci uveď na samostatný řádek. Při Frostbite musí zadané AV odpovídat skutečné zbroji; při Sunburn se používá samostatné d10 pro každou lokaci. Vznikne-li zranění, doplň jeho fyzický Shock d100 a případný Compound d10. Vše se zapíše jako jediná transakce.</p>
+ <p>Každou skutečně vystavenou anatomickou lokaci uveď na samostatný řádek. Ve schválené minutové adaptaci se zachová původní d20, ale skutečná délka Frostbite nesmí překročit potvrzené minuty cestovní epizody. Při Frostbite musí zadané AV odpovídat skutečné zbroji; při Sunburn se používá samostatné d10 pro každou lokaci. Vznikne-li zranění, doplň jeho fyzický Shock d100 a případný Compound d10. Vše se zapíše jako jediná transakce.</p>
  ${h.skinPending==='frostbite'?`<div class="field-grid"><label>Vítr · fyzické d20<input name="windD20" type="number" min="1" max="20" required></label><label>Délka expozice · fyzické d20<input name="durationD20" type="number" min="1" max="20" required></label></div>`:
  `<label>Skutečná pleť postavy<select name="complexion"><option value="very-light">Very Light · TN10</option><option value="light">Light · TN7</option><option value="medium">Medium · TN4</option><option value="dark">Dark · TN2</option><option value="very-dark">Very Dark · TN1</option></select></label>`}
  <label>Lokace; strana; AV; Sunburn d10; Shock d100; Compound d10
@@ -11595,6 +11595,20 @@ document.addEventListener('submit',event=>{
   const sourceId=form.elements.namedItem('sourceId').value,actor=character(selected),orig=actor&&persistentStateOf(actor);
   if(!actor||!orig?.environmentalHazards?.some(h=>h.sourceId===sourceId&&h.skinPending))throw Error('Neexistuje nedokončené kožní poranění této postavy');
   const onsetReceipt=data.journal.find(x=>x.characterId===actor.id&&x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===sourceId);
+  // Only the origin episode determines the available frostbite time.
+  // Do not turn a 20-minute trek into four hours of skin injury merely
+  // because the printed p185 d20 was designed for a 240-minute watch.
+  const episodeId=onsetReceipt?.skillTestProof?.episodeId||null;
+  const episodeReceipt=episodeId?data.journal.find(j=>j.id===episodeId&&
+   j.calendarCampaignId===onsetReceipt.calendarCampaignId):null;
+  const episode=episodeReceipt?.calendarTimeEpisode;
+  if(episodeId&&(!episode||episode.weatherAftercare!=='external-v93.676'||
+   !episode.weatherExposure?.some(w=>w.id===actor.id&&w.exposed===true&&
+    episodeWeatherAftercareId(episodeId,w.id,w.kind)===sourceId)||
+   !Number.isSafeInteger(episode.minutes)||episode.minutes<1||
+   episode.endMinute>data.campaignClock?.minute))
+   throw Error('Frostbite/Sunburn vyžaduje ověřenou skutečnou délku původní cestovní epizody.');
+  const maximumExposureMinutes=episodeId?episode.minutes:null;
   const skinTime=onsetReceipt?.calendarCampaignId===campaignKey(data.campaignClock)?
    {calendarCampaignId:onsetReceipt.calendarCampaignId,campaignMinute:data.campaignClock.minute}:{};
   if(combatInitiativeSequence)throw Error('Zranění během Initiative musí vést Combat');
@@ -11608,6 +11622,7 @@ document.addEventListener('submit',event=>{
    round:Math.max(1,combatClock.round||1,orig.lastRound||0),rows,
    windD20:toNumber(form.elements.namedItem('windD20')?.value),durationD20:toNumber(form.elements.namedItem('durationD20')?.value),
    complexion:form.elements.namedItem('complexion')?.value||null,
+   maximumExposureMinutes,
    gmConfirmed:form.elements.namedItem('gmConfirmed').checked,allLocationsReviewed:form.elements.namedItem('allLocationsReviewed').checked});
   if(!mutate(()=>{
    if(data.journal.some(x=>x.skillTestProof?.type==='skill-weather-skin'&&x.skillTestProof.sourceId===sourceId))throw Error('Dvojí zápis kožního traumatu');
