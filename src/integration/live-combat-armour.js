@@ -3,6 +3,7 @@
  * A source-id alone never certifies a modified/stale armour snapshot.
  */
 import {PRINTED_ARMOUR_ARTICLES_P118} from '../rules/armour-articles-printed.js';
+import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 import {locationArmourValue} from '../rules/armour-options.js';
 import {HMK_BODY_LOCATIONS} from './armour-coverage-readiness.js';
 import {resolveCustomArmour} from './armour-custom-combat.js';
@@ -36,6 +37,7 @@ const sameArray=(a,b)=>Array.isArray(a)&&a.length===b.length&&[...a].sort().ever
  * article. We don't silently replace the owned snapshot with a newer definition.
  */
 export function resolveOwnedArmourArticle(item,{allowCarried=false}={}){
+ if(equipmentUnusable(item))return fail('Poškozená nebo neopravitelná zbroj neposkytuje použitelnou ochranu');
  const rightSlot=allowCarried?item?.slot==='carried':item?.slot==='worn';
  const rightQuantity=allowCarried?Number.isSafeInteger(item?.quantity)&&item.quantity>=1:item?.quantity===1;
  if(!item||!rightSlot||!rightQuantity||item.snapshot?.category!=='armor')return fail('Invalid worn or carried armour article');
@@ -114,6 +116,7 @@ export function resolveLiveCombatArmour({inventory,targetId,location,aspect,dire
  if(!['auto','custom','reference'].includes(mode))return fail('Unknown armour resolution mode');
  if(!['yes','no','unknown'].includes(rigidStatus))return fail('Unknown rigid armour selection');
  const worn=inventory.filter(x=>x.characterId===targetId&&x.slot==='worn'&&x.snapshot?.category==='armor');
+ if(worn.some(equipmentUnusable))return fail('Poškozenou nebo neopravitelnou zbroj nelze použít v boji');
  if(inventory.some(x=>x.characterId===targetId&&x.slot==='worn'&&x.snapshot?.category!=='armor'))return fail('Non-armour item in worn slot');
  if(worn.some(x=>x.quantity!==1))return fail('Worn armour must have a quantity of exactly one');
  const match=identifyWornPrintedSuit(inventory,targetId);

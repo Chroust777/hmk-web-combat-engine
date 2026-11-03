@@ -2,6 +2,7 @@
  * A two-hand mode reserves the second physical hand; it never creates a second
  * inventory entry or an invented off-hand item. No character migration occurs.
  */
+import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 const HANDS=['main_hand','off_hand'];
 export function isHandheldItem(item){
  const category=item?.snapshot?.category;
@@ -33,7 +34,7 @@ export function supportsSelectableTwoHandGrip(item){
 export function setWeaponGrip(doc,{ownerId,itemId,grip}={}){
  if(!['one','two'].includes(grip)||!doc?.characters?.some(c=>c.id===ownerId))throw Error('Neplatný režim držení nebo postava');
  const old=doc.inventory?.find(x=>x.id===itemId&&x.characterId===ownerId);
- if(!old||!['main_hand','off_hand'].includes(old.slot)||old.snapshot?.category!=='weapon')
+ if(!old||equipmentUnusable(old)||!['main_hand','off_hand'].includes(old.slot)||old.snapshot?.category!=='weapon')
   throw Error('Režim držení lze měnit jen u skutečně připravené zbraně');
  if(grip==='two'&&!supportsSelectableTwoHandGrip(old))throw Error('Obouruční použití není pro tento ověřený režim doloženo');
  if(grip==='one'&&requiresTwoHands({...old,grip:'one'}))throw Error('Tato zbraň vyžaduje dvě ruce');
@@ -49,7 +50,7 @@ export function validateHandInventory(inventory,ownerId){
  if(equipped.length>2||new Set(equipped.map(x=>x.slot)).size!==equipped.length)
   throw Error('Ruka je již obsazena jiným předmětem');
  for(const x of equipped){
-  if(!isHandheldItem(x)||x.destroyed||!Number.isSafeInteger(x.quantity)||x.quantity!==1||
+  if(!isHandheldItem(x)||equipmentUnusable(x)||!Number.isSafeInteger(x.quantity)||x.quantity!==1||
     (x.grip!==undefined&&!['one','two'].includes(x.grip))||
     (x.snapshot?.category==='weapon'&&x.grip==='two'&&!supportsSelectableTwoHandGrip(x)))
    throw Error('V ruce smí být pouze přípustný, nepoškozením zničený jednotlivý předmět');
@@ -62,7 +63,7 @@ export function equipInventoryHand(doc,{ownerId,slot,itemId='',newItemId=null}={
  if(!HANDS.includes(slot)||!doc?.characters?.some(x=>x.id===ownerId))throw Error('Neplatná postava nebo ruka');
  validateHandInventory(doc.inventory,ownerId);
  const chosen=itemId?doc.inventory.find(x=>x.id===itemId&&x.characterId===ownerId):null;
- if(itemId&&(!chosen||!isHandheldItem(chosen)||chosen.destroyed||!['carried','none',slot].includes(chosen.slot??'none')))
+ if(itemId&&(!chosen||!isHandheldItem(chosen)||equipmentUnusable(chosen)||!['carried','none',slot].includes(chosen.slot??'none')))
   throw Error('Předmět není dostupný nebo není pravidlově určen k držení v ruce');
  const current=doc.inventory.find(x=>x.characterId===ownerId&&x.slot===slot);
  if(current?.id===chosen?.id)return structuredClone(doc);

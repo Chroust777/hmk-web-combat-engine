@@ -38,6 +38,7 @@ const skill=(person,skillId)=>{
  if(live){must(live.length===1,'Chybí jediná živá ML pro '+match[0].name);return {...match[0],ml:live[0].ml};}
  return match[0];
 };
+import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 function held(inventory,id,itemId){
  const match=inventory.filter(i=>i.id===itemId&&i.characterId===id&&['main_hand','off_hand'].includes(i.slot));
  must(match.length===1&&match[0].snapshot?.category==='weapon','Vybraná zbraň není skutečně nasazena v ruce účastníka');
@@ -47,7 +48,7 @@ function held(inventory,id,itemId){
   ['b','e','p','f'].includes(x.aspect)&&[4,6,8,10,12,20].includes(zoneDie),
   'Zbraň nemá plně doložený Impact Die, Zone Die nebo aspekt z HMK');
  must(int(p.quality,0,100)&&int(w.currentWQ,0,100),'Chybí základní nebo aktuální Weapon Quality');
- must(!w.destroyed&&w.currentWQ>0,'Zničenou zbraň nelze použít');
+ must(!equipmentUnusable(w)&&w.currentWQ>0,'Poškozenou či zničenou zbraň nelze použít');
  return {record:w,mode:x,impactDie:Number(x.impactDie.slice(1)),zoneDie};
 }
 function validatedActor({person,state,inventory,weaponId,skillId,usedArms,round,timelineId,threateningFoes=1}){

@@ -1,4 +1,5 @@
 import {PRINTED_ARMOUR_SUITS_P113_116} from '../rules/armour-suit-printed.js';
+import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 import {printedSuitAV} from '../rules/armour-all-suits-fixed.js';
 import {printedSuitRigid} from '../rules/armour-suit-rigid-printed.js';
 
@@ -6,6 +7,7 @@ import {printedSuitRigid} from '../rules/armour-suit-rigid-printed.js';
 export function identifyWornPrintedSuit(inventory,characterId){
  if(!Array.isArray(inventory)||typeof characterId!=='string')return {ok:false,reason:'Invalid inventory/character'};
  const worn=inventory.filter(x=>x.characterId===characterId&&x.slot==='worn'&&x.snapshot?.category==='armor');
+ if(worn.some(equipmentUnusable))return {ok:false,reason:'Poškozená zbroj není platným nasazeným kompletem'};
  if(worn.some(x=>x.quantity!==1||typeof x.snapshot.name!=='string'))return {ok:false,reason:'Invalid worn article quantity/name'};
  // Only a STANDARD, unmodified printed suit is covered by its ready-made
  // p.113–116 protection matrix. Once the actual owner specifies physical

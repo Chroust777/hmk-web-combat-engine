@@ -4,6 +4,7 @@
  * Unknown masses and unsupported suit layering are not zero; verified C/D Bulk is automatic.
  */
 import {PRINTED_ARMOUR_ARTICLES_P118} from '../rules/armour-articles-printed.js';
+import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 import {PRINTED_ARMOUR_SUITS_P113_116} from '../rules/armour-suit-printed.js';
 import {identifyWornPrintedSuit} from './printed-suit-combat.js';
 import {resolveOwnedArmourArticle} from './live-combat-armour.js';
@@ -52,6 +53,7 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   if(!['worn','carried','main_hand','off_hand','none','chest','stable',undefined,null].includes(x.slot))issues.push(`Unknown equipment slot: ${x.id}`);
  }
  const worn=owned.filter(x=>x.slot==='worn');
+ if(worn.some(equipmentUnusable))return fail(['Poškozený nebo neopravitelný kus nelze započítat jako nasazenou zbroj']);
  if(worn.some(x=>x.snapshot?.category!=='armor'))issues.push('Non-armour item in worn slot');
  const articles=[];
  for(const item of worn){

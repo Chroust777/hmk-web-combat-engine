@@ -11,6 +11,7 @@ import {projectLiveInjuries} from './live-injury-impairment.js';
 import {resolveCombatantLoad} from './combatant-load.js';
 import {SL,successLevel} from '../rules/tests.js';
 import {resolveCrossbowArcheryChoice} from './hmk-crossbow-archery-choice.js';
+import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 
 const demand=(ok,message)=>{if(!ok)throw Error(message);};
 const weaponType=item=>item?.snapshot?.properties?.missileType??item?.snapshot?.properties?.verifiedModes?.[0]?.missileType;
@@ -24,7 +25,7 @@ const unique=(inventory,actorId,itemId)=>{
 function heldWeapon(inventory,actorId,weaponId){
  const item=unique(inventory,actorId,weaponId);
  demand(item.snapshot?.category==='weapon'&&['main_hand','off_hand'].includes(item.slot)&&
-  !item.destroyed&&item.quantity===1,'Střelná zbraň musí být skutečně držena v ruce');
+  !equipmentUnusable(item)&&item.quantity===1,'Střelná zbraň musí být skutečně držena v ruce');
  demand(['bow','crossbow','sling'].includes(weaponType(item)),
   'Span/Load platí pouze pro ověřený luk, kuši nebo prak');
  return item;
@@ -151,7 +152,7 @@ export function startGuidedMissileAim({id,sequence,states,inventory,actorId,weap
  checkedId(id);
  const w=unique(inventory,actorId,weaponId),type=weaponType(w);
  demand(w.snapshot?.category==='weapon'&&['main_hand','off_hand'].includes(w.slot)&&
-  w.quantity===1&&!w.destroyed&&['bow','crossbow','thrown'].includes(type),
+  w.quantity===1&&!equipmentUnusable(w)&&['bow','crossbow','thrown'].includes(type),
   'Aim: zbraň musí být skutečně držena a dovolovat Aim (bow/crossbow/thrown)');
  const mark=readiness(s,weaponId);
  if(type==='bow'||type==='crossbow')requireFreePreparingHand(inventory,actorId,w);
@@ -334,7 +335,7 @@ export function completeGuidedMissilePreparation({id,sequence,states,inventory,a
  demand(Array.isArray(inventory),'Chybí úplný inventář pro dokončení Missile přípravy');
  const w=task.kind==='missile-aim'&&task.weaponType==='thrown'?
   unique(inventory,actorId,task.weaponId):heldWeapon(inventory,actorId,task.weaponId);
- demand(w.snapshot?.category==='weapon'&&['main_hand','off_hand'].includes(w.slot)&&!w.destroyed,
+ demand(w.snapshot?.category==='weapon'&&['main_hand','off_hand'].includes(w.slot)&&!equipmentUnusable(w),
   'Dokončení přípravy vyžaduje stále drženou zbraň');
  demand(witness(w)===task.weaponWitness,'Zbraň se během koncentrace změnila');
  const done=confirmConcentrationCompletion(s,states,{actorId,gmConfirmed:true});

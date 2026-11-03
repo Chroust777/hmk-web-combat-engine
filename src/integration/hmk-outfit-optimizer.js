@@ -4,6 +4,7 @@
  * entire set of independently positive, verified articles fits legally.
  */
 import {resolveOwnedArmourArticle} from './live-combat-armour.js';
+import {equipmentUsable} from './hmk-equipment-serviceability.js';
 import {evaluateOrderedArmour,locallyPossibleArmourArticles} from './armour-layer-evaluation.js';
 import {arrangeStartingArmour} from './hmk-starting-armour-layout.js';
 import {findExactArmourOrder} from './hmk-exact-layer-order-524.js';
@@ -30,7 +31,7 @@ export const isCloth=x=>{
  if(m==='d'||m==='padded')return /\bshirt\b/.test(n);
  return false;
 };
-const available=x=>['carried','worn'].includes(x.slot) && x.snapshot?.category==='armor' && !x.destroyed;
+const available=x=>['carried','worn'].includes(x.slot) && x.snapshot?.category==='armor' && equipmentUsable(x);
 // White/grey/black outlines all establish Rigid Armour (pp.111, 168).
 // Grey and black additionally distinguish the OPTIONAL Metal Armour rule
 // (p.133): scale/mail convert severe EDGE; plate converts EDGE and POINT.
@@ -329,7 +330,7 @@ export function applyOptimalOutfit(inventory,ownerId,preview,allowedIds=null){
  for(const x of next){
   if(x.characterId!==ownerId||x.slot==='chest')continue;
   if(placement.has(x.id)){
-   if(!['worn','carried'].includes(x.slot)||x.snapshot?.category!=='armor'||x.quantity!==1)throw Error('Předmět nelze obléknout');
+   if(!['worn','carried'].includes(x.slot)||x.snapshot?.category!=='armor'||x.quantity!==1||!equipmentUsable(x))throw Error('Poškozený předmět nelze obléknout');
    Object.assign(x,{slot:'worn',gearStowage:'normal',layerOrder:placement.get(x.id).layerOrder,layerSlot:null,bulkExceptionZones:[]});
   }else if(x.slot==='worn'&&x.snapshot?.category==='armor'){
    Object.assign(x,{slot:'carried',gearStowage:'normal',layerOrder:null,layerSlot:null,bulkExceptionZones:[]});
