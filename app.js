@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.692';
+const APP_VERSION='93.693';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10386,7 +10386,12 @@ function hskSkillPhysicalImpactForm(entry){
  const fixedHazardDie=hazardReceipt?.hazardD10;
  const id=survival?'survival-accident':'fishing-cf';
  const candidateIds=new Set(data.campaignClock?.characterIds||data.characters.map(x=>x.id));
- const eligibleTargets=survival?data.characters.filter(x=>candidateIds.has(x.id)&&!x.archived&&(x.kind!=='Animal'||!!x.hmk?.verifiedMountedBreed)):[];
+ // v93.693: an Accident victim is drawn ONLY from the confirmed watch's
+ // participants. Showing every campaign character made an impossible victim
+ // selectable and then failed at submission, leaving a blocking dead-end.
+ const watchMembers=directAccident?new Set(confirmedTrek?.calendarTimeEpisode?.memberIds||[]):null;
+ const eligibleTargets=survival?data.characters.filter(x=>candidateIds.has(x.id)&&
+  (!watchMembers||watchMembers.has(x.id))&&!x.archived&&(x.kind!=='Animal'||!!x.hmk?.verifiedMountedBreed)):[];
  const targetOptions='<option value="">— nejprve určete náhodně —</option>'+eligibleTargets.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
  const dieInput=(name,faces,label)=>'<label>'+label+'<input type="number" name="'+name+'" min="1" max="'+faces+'" inputmode="numeric"></label>';
  return `<form class="hsk-climb-fall" data-skill-physical-impact>
@@ -15438,7 +15443,16 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  let form=null;
  const s=actor.hmk?.combatState,attrs=actor.hmk?.attributes||{};
  switch(kind){
- case 'injury-morale':form=document.getElementById('combat-injury-morale-form');choose(form,'wound',actor.id+'::'+sourceId);break;
+ case 'injury-morale':{
+  // Calendar must open the AUTHORITATIVE sequential Combat executor. The
+  // legacy manual form is intentionally blocked by its submit handler.
+  // Match the exact wound and character; never focus some other due step.
+  const guided=document.getElementById('hmk-guided-mandatory-form');
+  form=guided?.elements.namedItem('dueKind')?.value==='injury-morale'&&
+   guided.elements.namedItem('dueId')?.value===sourceId&&
+   guided.elements.namedItem('characterId')?.value===actor.id?guided:null;
+  break;
+ }
  case 'injury-mishap':form=document.getElementById('combat-injury-mishap-form');choose(form,'mishap',actor.id+'::'+sourceId);break;
  case 'bleeding':form=document.getElementById('combat-blood-stoppage-form');choose(form,'wound',actor.id+'::'+sourceId);break;
  case 'shock-followup':form=document.getElementById('combat-recovery-persistent-form');choose(form,'characterId',actor.id);break;
@@ -15517,7 +15531,9 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
    }
   }
   form.scrollIntoView({block:'center',behavior:'instant'});
-  const rollInput=kind==='skill-fall'?form.elements.namedItem('heightFt'):
+  const rollInput=kind==='injury-morale'&&form.id==='hmk-guided-mandatory-form'?
+   (form.querySelector('input[name="abe"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
+   kind==='skill-fall'?form.elements.namedItem('heightFt'):
    form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"]');
   rollInput?.focus({preventScroll:true});
  }else if(['trek-weather-hazard','trek-direction-hazard','trek-encounter','trek-survival','trek-survival-test','trek-drover-test'].includes(kind)){
@@ -20911,6 +20927,15 @@ function episodeIssue(message,form){
  const forage=message.match(/Foraging Mode\s+(\d+)/i);
  if(forage)return {field:'travelForageD10_'+(Number(forage[1])-1),skill:null,actorId:null};
  if(/Foraging vyžaduje skutečný d10/i.test(message))return {field:'forageD10',skill:null,actorId:null};
+ // v93.693: both late hazards can block before they have a valid preview.
+ // A missing occurrence minute or CF route confirmation must open its own
+ // editable field, never a generic read-only explanation with no action.
+ if(/Accident:.*minut[ua]|Nehoda:.*minut[ua]/i.test(message))
+  return {field:'hazardAtMinute',skill:null,actorId:null};
+ if(/Complication F\/CF:.*minutu/i.test(message))
+  return {field:'hazardAtMinute',skill:null,actorId:null};
+ if(/Complication CF:.*změnu trasy/i.test(message))
+  return {field:'hazardComplicationRouteChanged',skill:null,actorId:null};
  // Every completion blocker must lead to a named step. v93.688.
  if(/Equipment Hazard.*zdržení|Equipment Hazard.*následující hlídku|Úspěch CS nezpůsobuje zdržení/i.test(message))
   return {field:'hazardDelayNow',skill:null,actorId:null};
@@ -21930,7 +21955,7 @@ function episodePlannedTaskHTML(t,i){
  const button=t.field==='hazardDelayNow'&&/Equipment Hazard/i.test(t.detail)?
   '<button type="button" class="secondary" data-episode-fix-equipment-delay>Opravit zdržení bez opakování hodu</button>':
   t.skill&&t.actorId?'<button type="button" data-episode-skill-task="'+esc(t.skill)+'" data-episode-skill-field="'+esc(t.field)+'" data-episode-skill-actor="'+esc(t.actorId)+'">Otevřít '+esc(t.skill)+' Skill Test</button>':
-  t.field?'<button type="button" class="secondary" data-episode-jump="'+esc(t.field)+'">Otevřít požadované pole</button>':
+  t.field?'<button type="button" class="secondary" data-episode-jump="'+esc(t.field)+'">'+(t.field==='hazardAtMinute'?'Zadat přesnou minutu':t.field==='hazardComplicationRouteChanged'?'Potvrdit změnu trasy':'Otevřít požadované pole')+'</button>':
   '<button type="button" class="secondary" data-episode-review>Ukázat pravidlovou překážku</button>';
  return '<div class="hc-episode-task"><span class="hc-task-number">'+(i+1)+'</span><div><strong>'+esc(t.name)+'</strong>'+ 
   '<p>'+esc(t.detail)+'</p>'+button+'</div></div>';
@@ -21944,6 +21969,8 @@ function renderEpisodeEndError(form,message){
   issue.field?.startsWith('whProof_')?'Klimatický následek · Endurance':
   issue.field?.startsWith('evD4_')?'Encounter · vzdálenost':
   issue.field?.startsWith('progressD10')?'Pohyb · Progress':
+  issue.field==='hazardAtMinute'?(/Accident/i.test(message)?'Accident · minuta nehody':'Complication · minuta překážky'):
+  issue.field==='hazardComplicationRouteChanged'?'Complication CF · změna trasy':
   needsSkill?(issue.skill+' · '+(character(issue.actorId)?.name||issue.actorId)):'Chybějící vstup';
  // Never claim zero tasks when the authoritative validator rejects finalization.
  if(!planned.some(t=>t.field===issue.field&&issue.field)){
