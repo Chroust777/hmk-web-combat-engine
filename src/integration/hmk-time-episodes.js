@@ -324,9 +324,17 @@ export function episodeMovementContext({guideId,memberIds,area,topography,terrai
   topography,terrain,conveyance,weatherSourceId:weatherSourceId??null,
   night:nightOverride===null?(minute%1440<360||minute%1440>=1200):!!nightOverride,familiar,torchlight,fullMoon,afterSnowfall};
 }
-export function lastEpisodeBefore(journal=[],campaignId,minute){
+export function lastEpisodeBefore(journal=[],campaignId,minute,memberIds=null){
+ // Historical callers can request the campaign's latest episode. Navigation
+ // MUST instead follow only an overlapping party: an unrelated party's rest
+ // cannot erase Lost, and its Lost must never infect independent travellers.
+ const members=memberIds===null?null:new Set(memberIds);
+ if(members&&(!Array.isArray(memberIds)||members.size!==memberIds.length||!memberIds.length))
+  throw Error('Navigation: neplatní účastníci epizody.');
  return journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarTimeEpisode&&
-  j.calendarTimeEpisode.endMinute<=minute).sort((a,b)=>b.calendarTimeEpisode.endMinute-a.calendarTimeEpisode.endMinute)[0]||null;
+  j.calendarTimeEpisode.endMinute<=minute&&
+  (!members||j.calendarTimeEpisode.memberIds?.some(id=>members.has(id))))
+  .sort((a,b)=>b.calendarTimeEpisode.endMinute-a.calendarTimeEpisode.endMinute)[0]||null;
 }
 export function mayReuseEpisodeSkill({previous,minute,context,kind='orientation',trail='' }={}){
  const old=previous?.calendarTimeEpisode;
@@ -898,7 +906,13 @@ export function validateTimeEpisodes(journal=[]){
   if(e.navigationState!==undefined){
    must(['clear','lost','misdirection'].includes(e.navigationState),
     'Neplatná evidence orientace družiny.');
-   const earlier=lastEpisodeBefore(journal,j.calendarCampaignId,e.startMinute);
+   // Preserve immutable pre-93.699 saves under their original validation
+   // policy. New episodes use the party-scoped rule; never rewrite old dice
+   // or historical episode records as part of an application upgrade.
+   must(e.navigationPartyScope===undefined||e.navigationPartyScope==='v93.699',
+    'Neznámý formát návaznosti navigace.');
+   const earlier=lastEpisodeBefore(journal,j.calendarCampaignId,e.startMinute,
+    e.navigationPartyScope==='v93.699'?e.memberIds:null);
    must(e.navigationState===episodeNavigationState(earlier,e.direction,{recovered:!!e.navigationRecovered}),
     'Stav bloudění nebyl správně převeden do navazující epizody.');
   }
