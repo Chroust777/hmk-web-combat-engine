@@ -305,7 +305,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.697';
+const APP_VERSION='93.698';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -21385,7 +21385,7 @@ function episodePreviewFromForm(form,clock){
  if(kind==='travel'){
   const base=trekMovement({topography:v.topography,terrain:v.terrain,conveyance:v.conveyance,
    progress:0,slow:0,bearing:0,loaded:false,progressD10:[],continuousPrecipitation:!!precipitation?.slowMode});
-  const forced=pendingTrackingCFBearing(data.journal,campaignKey(clock),clock.minute);
+  const forced=pendingTrackingCFBearing(data.journal,campaignKey(clock),clock.minute,members);
   const droverRow=data.journal.find(j=>j.id===v.droverProofId);
   const drover=v.conveyance==='foot'?null:
    (episodeSkillProof(droverRow,'Riding',guideId,campaignKey(clock),clock.minute)||
@@ -21409,7 +21409,7 @@ function episodePreviewFromForm(form,clock){
     partyTracked:Number(v.trackingPartyTracked),twilight:v.trackingLight==='twilight',night:v.trackingLight==='night',
     alpine:!!v.trackingAlpine,road:v.trackingRoad||'none'}});
  const modes=orientation?.modes||{progress:0,bearing:0,orienteeringSlow:0,foraging:0,stalking:0};
- const forcedBearing=kind==='travel'?pendingTrackingCFBearing(data.journal,campaignKey(clock),clock.minute):0;
+ const forcedBearing=kind==='travel'?pendingTrackingCFBearing(data.journal,campaignKey(clock),clock.minute,members):0;
  if(kind==='travel')for(const node of form.querySelectorAll('[data-episode-tracking]'))
   node.hidden=modes.stalking!==1;
  const travelForagingPanel=form.querySelector('[data-episode-trek-foraging]');
