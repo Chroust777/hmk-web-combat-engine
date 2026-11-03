@@ -304,7 +304,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.690';
+const APP_VERSION='93.692';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -21556,7 +21556,8 @@ function episodePreviewFromForm(form,clock){
   const claimKey={rest:'lastFourHour',sleep:'lastEightHour',winded:'lastWinded'}[kind];
   result.recoveryPreview=people.map(c=>{
    const stat=persistentStateOf(c).fatigue;
-   const current=kind==='winded'?stat.windedness:stat.weariness;
+   const climate=kind==='winded'?0:(result.weatherRestFatigue?.find(x=>x.id===c.id)?.delta||0);
+   const current=(kind==='winded'?stat.windedness:stat.weariness)+climate;
    const expedition=c.hmk?.expedition||{};
    return {id:c.id,...calculateEpisodeMinuteRecovery({kind,minute:result.startMinute,
     minutes,current,prior:expedition.minuteRecovery?.[kind],
@@ -22050,9 +22051,14 @@ function updateEpisodeTaskFocus(form){
  const compActor=field.startsWith('hazardCompProof_')?field.slice('hazardCompProof_'.length):null;
  for(const node of form.querySelectorAll('[data-episode-complication-actor]'))
   node.hidden=!!compActor&&node.dataset.episodeComplicationActor!==compActor;
- const weatherMatch=field.match(/^whProof_(cold|heat)_(.+)$/);
- if(weatherMatch)for(const node of form.querySelectorAll('[data-episode-weather-actor]'))
-  node.hidden=node.dataset.episodeWeatherActor!==weatherMatch[2];
+ // Area AV and individual hazard dice are actor-specific too. Reveal and
+ // open precisely the actor requested by the one-step checklist.
+ const weatherMatch=field.match(/^wh(?:Proof|Roll|AV)_(cold|heat)_(.+)$/);
+ if(weatherMatch)for(const node of form.querySelectorAll('[data-episode-weather-actor]')){
+  const current=node.dataset.episodeWeatherActor===weatherMatch[2];
+  node.hidden=!current;
+  if(current&&node.tagName==='DETAILS')node.open=true;
+ }
  const labels={motion:'Pohyb a orientace',fatigue:'Únava a srážky',encounter:'Náhodné setkání',hazard:'Survival / Direction Hazard',weather:'Cold / Heat Hazard',foraging:'Foraging',other:'Navazující pravidlová procedura',none:'Všechny požadované hody jsou doloženy'};
  note.hidden=false;
  note.textContent=active==='none'?'✓ Všechny pravidlové úkoly této epizody jsou doloženy. Zkontrolujte a potvrďte výsledek vpravo.':
@@ -22636,6 +22642,11 @@ document.addEventListener('change',e=>{
  // Do not rebuild the next input during focus transfer from a health field.
  // Its own change handler persists the value; Evaluate refreshes all results.
  if(e.target?.matches?.('[data-episode-medical-key]'))return;
+ // A typed die has already been persisted and recalculated by `input`.
+ // Rebuilding the right-hand checklist again on blur would detach the
+ // clicked NEXT-step button between mousedown and mouseup.
+ if(e.target.type==='number'&&e.target.name&&
+    String(timeEpisodeDraft[e.target.name]??'')===e.target.value)return;
  if(e.target.name?.startsWith('evMoon_'))e.target.dataset.userSet='true';
  if(e.target.name==='rememberSettings'&&!episodeEvaluationRequested){
   const draft=e.target.checked?episodeCarrySettingsFromLast():episodeFreshDraft();
@@ -23005,20 +23016,27 @@ document.addEventListener('submit',e=>{
     const claimKey={rest:'lastFourHour',sleep:'lastEightHour',winded:'lastWinded'}[kind];
     for(const id of result.memberIds){
      const actor=character(id),state=persistentStateOf(actor);
-     const current=kind==='winded'?state.fatigue.windedness:state.fatigue.weariness;
+     const target=kind==='winded'?'windedness':'weariness';
+     const currentBeforeClimate=state.fatigue[target];
      const expedition=actor.hmk.expedition??={claims:{}};
-     const plan=calculateEpisodeMinuteRecovery({kind,minute:result.startMinute,minutes:result.minutes,
-      current,prior:expedition.minuteRecovery?.[kind],legacyClaimStart:expedition.claims?.[claimKey]});
-     const committed=commitExpeditionFatigue(actor,{...plan,durationMinutes:result.minutes,
-      sourcePages:[150,176]},result.endMinute,'gm-episode-minutes',sourceId+':'+id);
      const climate=result.weatherRestFatigue?.find(x=>x.id===id);
+     // v93.691: simultaneous climate fatigue and recovery must be netted
+     // in a partition-independent order. First apply the actual climate
+     // accrual, then use the earned recovery against that current weariness.
+     // In particular, resting at 0 fatigue while accumulating +5 weather
+     // must agree whether 240 minutes are one episode or several shorter ones.
      if(climate&&climate.delta>0){
       commitExpeditionFatigue(actor,{kind:'travel',accrual:climate.delta,durationMinutes:result.minutes,
        rolls:[],sourcePages:[149,150,176]},result.endMinute,'gm-episode-weather-fatigue',sourceId+':weather:'+id);
      }
+     const current=persistentStateOf(actor).fatigue[target];
+     const plan=calculateEpisodeMinuteRecovery({kind,minute:result.startMinute,minutes:result.minutes,
+      current,prior:expedition.minuteRecovery?.[kind],legacyClaimStart:expedition.claims?.[claimKey]});
+     const committed=commitExpeditionFatigue(actor,{...plan,durationMinutes:result.minutes,
+      sourcePages:[150,176]},result.endMinute,'gm-episode-minutes',sourceId+':'+id);
      expedition.minuteRecovery??={};expedition.minuteRecovery[kind]=plan.next;
-     recovery.push({id,credited:plan.credited,delta:committed.delta,prior:committed.priorFatigue,
-      after:persistentStateOf(actor).fatigue[kind==='winded'?'windedness':'weariness'],carry:plan.next.carry,
+     recovery.push({id,credited:plan.credited,delta:committed.delta,prior:currentBeforeClimate,
+      after:persistentStateOf(actor).fatigue[target],carry:plan.next.carry,
       weatherAdded:climate?.delta??0,weatherCarry:climate?.carryOut??null});
     }
    }
