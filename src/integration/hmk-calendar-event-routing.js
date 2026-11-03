@@ -6,13 +6,13 @@ export function calendarEventDestination(event){
  if(event?.route&&['combat','healing','hazards','skills','inventory','calendar'].includes(event.route))return event.route;
  switch(event?.kind){
   case 'herbal-potion':case 'malnutrition-course':return 'calendar';
-  case 'poison':case 'disease':case 'asphyxia':case 'sleep-deprivation':return 'hazards';
+  case 'poison':case 'disease':case 'asphyxia':case 'sleep-deprivation':
+  case 'weather-course':case 'weather-skin':case 'weather-onset':return 'hazards';
   case 'healing':case 'infection':case 'grim':case 'treatment':case 'blood-loss':
   case 'coma':case 'extended-shock':case 'aural-recovery':case 'psyche-manifestation':
   case 'psyche-interval':case 'psyche-recovery':return 'healing';
   case 'trek-survival':case 'trek-drover-test':case 'trek-direction-hazard':case 'trek-weather-hazard':
-  case 'skill-critical':case 'skill-fall':case 'skill-injury':case 'weather-course':
-  case 'weather-skin':case 'weather-onset':case 'talisman-period':return 'skills';
+  case 'skill-critical':case 'skill-fall':case 'skill-injury':case 'talisman-period':return 'skills';
   default:return 'combat';
  }
 }
