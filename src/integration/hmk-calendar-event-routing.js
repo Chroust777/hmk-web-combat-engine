@@ -3,6 +3,12 @@
  * and its persisted evidence remain the only rules executor.
  */
 export function calendarEventDestination(event){
+ // HMK Travel encounter is a GM-notification only. Never let historical
+ // or current travel evidence navigate to the Combat encounter engine.
+ if(event?.kind==='trek-encounter')return 'calendar';
+ // Even stale events carrying route='combat' must never send Weather
+ // consequences into the combat encounter UI.
+ if(['weather-course','weather-skin','weather-onset','weather-shock'].includes(event?.kind))return 'hazards';
  if(event?.route&&['combat','healing','hazards','skills','inventory','calendar'].includes(event.route))return event.route;
  switch(event?.kind){
   case 'herbal-potion':case 'malnutrition-course':return 'calendar';

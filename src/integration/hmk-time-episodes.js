@@ -588,6 +588,13 @@ export function validateTimeEpisodes(journal=[]){
    must(Array.isArray(e.encounterDetails)&&e.encounter?.found&&
     e.encounterDetails.length===e.encounter.count,'Každé setkání vyžaduje vlastní detail.');
    for(const [i,record] of e.encounterDetails.entries()){
+    if(record?.externalToGM===true){
+     must(record.i===i&&record.pending===false&&e.encounter.resolved===true&&
+      ['adjudicated','no-further-action'].includes(record.disposition)&&
+      Object.keys(record).every(k=>['i','externalToGM','pending','disposition'].includes(k)),
+      'Encounter: GM musí potvrdit samostatné vyhodnocení bez automatického Combatu.');
+     continue;
+    }
     must(record.i===i&&whole(record.offset,0,e.interruption?.kind==='encounter'?e.minutes:e.minutes-1)&&record.pending===false,
      'Encounter: chybí skutečný čas výskytu nebo dokončení.');
     const d=record.distance;

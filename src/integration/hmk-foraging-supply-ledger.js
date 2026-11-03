@@ -6,9 +6,16 @@
 const requireIt=(value,message)=>{if(!value)throw Error(message)};
 const units=['foodDays','waterDays','herbDoses'];
 export const FORAGING_SUPPLY_USE_FORMAT='hmk-foraging-supply-use-v1';
+// One walking episode may have several separately rolled Foraging Modes.
+// Flatten their *results* to unique receipt indexes, exactly once. This is the
+// same source-of-truth used for debits, water storage and herbal reservations.
+function foragingProofResults(row){
+ const direct=row.calendarTrekWildernessProof||row.calendarTimeEpisode?.foraging;
+ const modes=direct?[direct]:(row.calendarTimeEpisode?.travelForaging??[]);
+ return modes.flatMap(p=>Array.isArray(p?.results)?p.results:[]);
+}
 function lotsFromProof(row){
- const p=row.calendarTrekWildernessProof||row.calendarTimeEpisode?.foraging;if(!p)return [];
- return p.results.flatMap((r,i)=>units.filter(unit=>r[unit]>0).map(unit=>({
+ return foragingProofResults(row).flatMap((r,i)=>units.filter(unit=>r[unit]>0).map(unit=>({
   key:row.id+':'+i+':'+unit,sourceId:row.id,resultIndex:i,
   campaignId:row.calendarCampaignId,minute:row.calendarTimeEpisode?.endMinute??row.campaignMinute,
   unit,herbName:unit==='herbDoses'?r.herbName:null,quantity:r[unit]
@@ -48,9 +55,9 @@ export function createSupplyUse({journal=[],campaignId,minute,sourceId,resultInd
  requireIt(typeof purpose==='string'&&purpose.length<=120&&(disposition!=='ingredient-reserved'||purpose.trim()),
   'Rezervace bylin potřebuje označení zamýšlené Concoction (nenahrazuje její výrobu)');
  const origin=journal.find(j=>j.id===sourceId);
- requireIt((origin?.calendarTrekWildernessProof||origin?.calendarTimeEpisode?.foraging)&&origin.calendarCampaignId===campaignId&&
-  (origin.calendarTimeEpisode?.endMinute??origin.campaignMinute)<=minute,'Zdroj není doložen v této kampani a minulosti');
- const result=(origin.calendarTrekWildernessProof||origin.calendarTimeEpisode?.foraging).results[resultIndex];
+ requireIt(origin&&foragingProofResults(origin).length>0&&origin.calendarCampaignId===campaignId&&
+  (origin.calendarTimeEpisode?.endMinute??origin.campaignMinute)<=minute,'Zdroj Foraging není doložen v této kampani a minulosti');
+ const result=foragingProofResults(origin)[resultIndex];
  requireIt(result&&result[unit]>0,'Původní Foraging neobsahuje tuto zásobu');
  const available=availableSupplyLots(journal,campaignId).find(l=>
   l.sourceId===sourceId&&l.resultIndex===resultIndex&&l.unit===unit);

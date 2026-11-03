@@ -11,7 +11,7 @@ const whole=x=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const KINDS=Object.freeze({
  weather:{kind:'trek-weather-hazard',route:'hazards',label:'Weather Hazard – nejprve ochrana AV a d6/d10 nebo d4/d6/d10, potom případný Endurance (Survival) · HMK 149'},
  direction:{kind:'trek-direction-hazard',route:'skills',label:'Direction Hazard – vyhodnotit skutečné bloudění a jeho následky'},
- encounter:{kind:'trek-encounter',route:'combat',label:'Random Encounter – vyhodnotit Encounter Tables a následnou situaci'},
+ encounter:{kind:'trek-encounter',route:'calendar',label:'Encounter: GM určí, zda k setkání došlo, a vyhodnotí situaci samostatně; Cestování nikdy neotevírá Combat'},
  survival:{kind:'trek-survival',route:'skills',label:'Survival Hazard – vyhodnotit CF a případný Accident'},
  'survival-test':{kind:'trek-survival-test',route:'skills',label:'Orienteering / Survival Success Value – doložit povinný test (HMK 145,148)'},
  drover:{kind:'trek-drover-test',route:'skills',label:'Drover Test – Riding / Animalcraft (HMK 145)'}
