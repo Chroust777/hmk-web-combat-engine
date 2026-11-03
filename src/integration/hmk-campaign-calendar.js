@@ -287,7 +287,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
  return {due:all.filter(x=>x.status==='due'),future:all.filter(x=>x.status==='future'),unknown,all,suspended,prepared};
 }
-export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmConfirmed,characters=[],journal=[]}={}){
+export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmConfirmed,characters=[],journal=[],deferConcurrentTreatmentAtStart=false}={}){
  validateCampaignCalendar(clock);
  ensure(gmConfirmed===true,'GM musí potvrdit skutečně uplynulý čas');
  ensure(validInt(deltaMinutes,1,MAX_MINUTE)&&clock.minute+deltaMinutes<=MAX_MINUTE,
@@ -295,6 +295,7 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
  ensure(typeof reason==='string'&&reason.trim().length>=3&&reason.trim().length<=400,
   'Uveďte doložený důvod posunu času (alespoň 3 znaky)');
  ensure(typeof eventId==='string'&&eventId.length>0&&!clock.events.some(e=>e.id===eventId),'Duplicitní ID');
+ ensure(typeof deferConcurrentTreatmentAtStart==='boolean','Neplatný režim časovaného Treatment');
  const agenda=campaignCalendarAgenda(clock,characters,journal);
  if(agenda.unknown.length)throw Error('Nelze posunout čas: neověřený nebo neuzavřený časový závazek – '+
   agenda.unknown[0].name+' / '+agenda.unknown[0].description+'. '+agenda.unknown[0].reason);
@@ -316,6 +317,15 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
    }
    continue;
   }
+  // When two fresh wounds arise at the same minute, a GM-confirmed real
+  // Treatment may occupy time while another wound waits untreated. That second
+  // Treatment obligation must remain overdue and block the NEXT time advance;
+  // it must not make the first legitimate Treatment impossible.
+  // This exception is available ONLY to the atomic Treatment executor, never
+  // as a generic way to skip healing, infection, shock, or future obligations.
+  if(deferConcurrentTreatmentAtStart===true&&event.kind==='treatment'&&
+     event.minute===clock.minute&&event.status==='due'&&
+     getCampaignAnchor(clock,'wound',event.characterId,event.woundId??event.sourceId)?.minute===clock.minute)continue;
   blockers.push(event);
  }
  blockers.sort((a,b)=>a.minute-b.minute);

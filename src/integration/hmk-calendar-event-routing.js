@@ -6,6 +6,12 @@ export function calendarEventDestination(event){
  // HMK Travel encounter is a GM-notification only. Never let historical
  // or current travel evidence navigate to the Combat encounter engine.
  if(event?.kind==='trek-encounter')return 'calendar';
+ // A persisted travel/Weather medical source overrides obsolete route='combat'.
+ // Origin is immutable evidence; this router never creates a second procedure.
+ if((event?.originDomain==='travel-weather'||event?.domain==='travel-weather')&&
+   ['treatment','healing','infection','grim','coma','extended-shock','shock-followup',
+    'injury-morale','injury-mishap','bleeding','blood-loss','blood-shock'].includes(event?.kind))
+  return 'hazards';
  // Even stale events carrying route='combat' must never send Weather
  // consequences into the combat encounter UI.
  if(['weather-course','weather-skin','weather-onset','weather-shock'].includes(event?.kind))return 'hazards';
