@@ -64,12 +64,19 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
  s.lastRound=round;validateCombatState(s);
  return {state:s,report};
 }
-function injuriesFromExposure(h,{windD20,durationD20,complexion,rows}){
+function injuriesFromExposure(h,{windD20,durationD20,complexion,rows,maximumExposureMinutes=null}){
  requireIt(Array.isArray(rows)&&rows.length>0&&rows.length<=30,'Doložte všechny exponované lokace, včetně lokací bez výsledné rány');
+ requireIt(maximumExposureMinutes===null||integer(maximumExposureMinutes,1,10080),
+  'Frostbite/Sunburn: chybí ověřená délka minutové epizody');
  if(h.skinPending==='frostbite'){
   requireIt(integer(windD20,1,20)&&integer(durationD20,1,20),'Frostbite vyžaduje fyzické d20 pro vítr a délku expozice');
-  const period=windMinutes(windD20),duration=durationMinutes(durationD20);
-  return {period,duration,rows:rows.map(r=>{
+  // HMK p185 samples a duration inside a FOUR-HOUR watch. In our approved
+  // minute-based GM episodes, the d20 is preserved verbatim but cannot create
+  // more actual minutes of frost injury than the certified episode contained.
+  // A null bound is reserved for legacy/non-episode sources without such proof.
+  const period=windMinutes(windD20),sampledDuration=durationMinutes(durationD20);
+  const duration=maximumExposureMinutes===null?sampledDuration:Math.min(sampledDuration,maximumExposureMinutes);
+  return {period,duration,sampledDuration,rows:rows.map(r=>{
     requireIt(integer(r.av,0,50),'Pro každou Frostbite lokaci je nutné AV0, AV1–3 nebo doložená vyšší ochrana');
     const il=r.av===0?Math.floor(duration/period):r.av<=3?Math.floor(duration/(period*2)):0;
     requireIt(il<=5,'Více než IL5 v jedné lokaci není touto tabulkou jednoznačně vyřešeno; musí rozhodnout GM');
@@ -77,7 +84,9 @@ function injuriesFromExposure(h,{windD20,durationD20,complexion,rows}){
   })};
  }
  requireIt(Object.hasOwn(complexionTN,complexion),'Sunburn vyžaduje skutečnou pleť postavy');
- return {period:240,duration:240,rows:rows.map(r=>{
+ // Sunburn keeps the HMK p185 discrete d10; 240 is the reference watch,
+ // not a claim that a shorter minute episode has actually elapsed.
+ return {period:240,duration:Math.min(240,maximumExposureMinutes??240),rows:rows.map(r=>{
    requireIt(integer(r.skinD10,1,10),'Každá slunci vystavená lokace vyžaduje vlastní d10');
    const il=r.skinD10<=complexionTN[complexion]?(r.skinD10<=6?1:2):0;
    return {...r,il,sourceRoll:r.skinD10};
@@ -87,7 +96,7 @@ function injuriesFromExposure(h,{windD20,durationD20,complexion,rows}){
  * Each real wound must pass the existing Injury/Compound/Shock/Morale pipeline.
  * Whole collection commits together or not at all. */
 export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,round=1,
- windD20=null,durationD20=null,complexion=null,rows=[],gmConfirmed=false,
+ windD20=null,durationD20=null,complexion=null,rows=[],maximumExposureMinutes=null,gmConfirmed=false,
  allLocationsReviewed=false}={}){
  let s=prepared({actor,state,sourceId,round,gmConfirmed});
  requireIt(Array.isArray(inventory)&&allLocationsReviewed===true,
@@ -99,7 +108,7 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
  requireIt(!s.events.some(e=>e.id===id),'Kožní následky tohoto Hazard už jsou vyřešeny');
  requireIt(s.shock==='NONE'&&!s.shockFollowup&&!s.extendedShock&&!s.coma,
   'Pro sérii kožních ran musí být vyřešen existující Shock; nelze ho potichu přepsat');
- const provided=injuriesFromExposure(hazard,{windD20,durationD20,complexion,rows});
+ const provided=injuriesFromExposure(hazard,{windD20,durationD20,complexion,rows,maximumExposureMinutes});
  const visited=new Set(),wounds=[];
  for(let n=0;n<provided.rows.length;n++){
   const r=provided.rows[n],where=r.location,side=r.side||null;
@@ -146,7 +155,10 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
  const live=s.environmentalHazards.find(h=>h.sourceId===sourceId);
  const skinKind=live.skinPending;live.skinPending=null;live.skinResolved=true;live.skinWounds=wounds.map(x=>x.woundId);
  const report={kind:skinKind,sourceId,windD20,durationD20,complexion,
-  periodMinutes:provided.period,durationMinutes:provided.duration,reviewedLocations:visited.size,wounds,rulePage:185};
+  periodMinutes:provided.period,durationMinutes:provided.duration,
+  ...(maximumExposureMinutes!==null?{episodeMaxExposureMinutes:maximumExposureMinutes,
+   ...(skinKind==='frostbite'?{sampledDurationMinutes:provided.sampledDuration}:{referenceWatchMinutes:240})}:{}),
+  reviewedLocations:visited.size,wounds,rulePage:185};
  s.events.push({id,type:'skill-weather-skin-complete',round,details:report});s.lastRound=round;
  validateCombatState(s);return {state:s,report};
 }
