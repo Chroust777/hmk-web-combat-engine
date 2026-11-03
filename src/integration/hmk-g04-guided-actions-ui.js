@@ -12,6 +12,7 @@ import {prepareMountedRideBy,finalizeMountedRideBy,persistMountedRideBy} from '.
 import {prepareMountedSharedMove,finalizeMountedSharedMove,persistMountedSharedMove} from './hmk-mounted-shared-turn.js';
 import {guidedAttackRequirement,chooseGuidedAttack,submitGuidedAttackDie,advanceGuidedAttack,completeGuidedAttack} from './hmk-guided-attack-journey.js';
 import {resolveVerifiedAreaProtection} from './hmk-verified-area-protection.js';
+import {equipmentUsable} from './hmk-equipment-serviceability.js';
 import {previewProactiveDoomFlameEvade} from './hmk-proactive-area-evade.js';
 import {dueInjuryMorale} from './persistent-combat-state.js';
 import {pelahnBonusIncantChoices} from './hmk-pelahn-incant-registry.js';
@@ -71,8 +72,8 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
     <p>Vyžaduje kompletní fyzické hody v existující Melee a Injury Sequence. Jediný zápis nastane až po END. Další povinné následky bez podpory zůstávají odmítnuté.</p>
     <form id="hmk-g04-pelahn-melee-start">
     ${selection('targetId','Skutečný cíl',combatants.filter(c=>c.id!==burst.actorId).map(c=>({id:c.id,label:c.name||c.id})))}
-    ${selection('attackerWeaponId','Nasazená zbraň útočníka',document.inventory.filter(i=>i.characterId===burst.actorId&&['main_hand','off_hand'].includes(i.slot)&&i.snapshot?.category==='weapon').map(i=>({id:i.id,label:i.snapshot.name||i.id})))}
-    ${selection('defenderWeaponId','Nasazená zbraň cíle',document.inventory.filter(i=>i.characterId!==burst.actorId&&['main_hand','off_hand'].includes(i.slot)&&i.snapshot?.category==='weapon').map(i=>({id:i.id,label:i.snapshot.name||i.id})))}
+    ${selection('attackerWeaponId','Nasazená zbraň útočníka',document.inventory.filter(i=>i.characterId===burst.actorId&&['main_hand','off_hand'].includes(i.slot)&&i.snapshot?.category==='weapon'&&equipmentUsable(i)).map(i=>({id:i.id,label:i.snapshot.name||i.id})))}
+    ${selection('defenderWeaponId','Nasazená zbraň cíle',document.inventory.filter(i=>i.characterId!==burst.actorId&&['main_hand','off_hand'].includes(i.slot)&&i.snapshot?.category==='weapon'&&equipmentUsable(i)).map(i=>({id:i.id,label:i.snapshot.name||i.id})))}
     ${selection('attackerSkillId','Melee aktéra',(current?.hmk?.skills??[]).filter(s=>String(s.name).toLowerCase()==='melee').map(s=>({id:s.id,label:s.name+' ML '+s.ml})))}
     ${selection('defenderSkillId','Melee obránce',combatants.filter(c=>c.id!==burst.actorId).flatMap(c=>(c.hmk?.skills??[]).filter(s=>String(s.name).toLowerCase()==='melee').map(s=>({id:s.id,label:(c.name||c.id)+' ML '+s.ml}))))}
     <label>Ruka aktéra<select name="attackerUsedArms"><option value="right">pravá</option><option value="left">levá</option><option value="both">obě</option></select></label>
@@ -83,7 +84,7 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
     <p>Ověřeně nabitý luk, kuše nebo prak; nebo v ruce držená vrhací zbraň z tabulky HMK str. 110. Pouze přímá střelba / vrh bez Volley, nabíjení, Charge a dalších komplikací. Všechny kostky fyzicky hází GM. Vržená zbraň opustí ruku ve stejném atomickém zápisu.</p>
     <form id="hmk-g04-pelahn-missile-start">
     ${selection('targetId','Cíl přímo mířené střely',combatants.filter(c=>c.id!==burst.actorId).map(c=>({id:c.id,label:c.name||c.id})))}
-    ${selection('weaponId','Ověřeně nabitá nebo vrhací zbraň',document.inventory.filter(i=>i.characterId===burst.actorId&&['main_hand','off_hand'].includes(i.slot)&&i.snapshot?.category==='weapon'&&(seq.missileReadiness?.[i.id]?.loaded||i.snapshot?.properties?.missileType==='thrown')).map(i=>({id:i.id,label:i.snapshot.name||i.id})))}
+    ${selection('weaponId','Ověřeně nabitá nebo vrhací zbraň',document.inventory.filter(i=>i.characterId===burst.actorId&&['main_hand','off_hand'].includes(i.slot)&&i.snapshot?.category==='weapon'&&equipmentUsable(i)&&(seq.missileReadiness?.[i.id]?.loaded||i.snapshot?.properties?.missileType==='thrown')).map(i=>({id:i.id,label:i.snapshot.name||i.id})))}
     ${selection('skillId','Dovednost střelce',(current?.hmk?.skills??[]).filter(z=>['archery','slings','throwing'].includes(String(z.name).toLowerCase())).map(z=>({id:z.id,label:z.name+' ML '+z.ml})))}
     <label>Skutečně použitá ruka<select name="attackerUsedArms"><option value="both">obě</option><option value="right">pravá</option><option value="left">levá</option></select></label>
     <label>Kuše: způsob Archery testu<select name="crossbowBasis"><option value="">GM vybere pro kuši…</option><option value="ml">Archery ML</option><option value="sb3">Archery SB × 3</option></select></label>

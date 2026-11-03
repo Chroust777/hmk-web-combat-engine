@@ -8,6 +8,7 @@
 import {validateEncounterSequence,currentEncounterActor,finishEncounterTurn,dueEncounterEvents,confirmConcentrationCompletion as completeConcentration} from './encounter-turn-sequence.js';
 import {validateCombatState} from './persistent-combat-state.js';
 import {guidedTurnChoices} from './hmk-guided-turn-choices.js';
+import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 const requireFact=(yes,message)=>{if(!yes)throw Error(message)};
 
 /** HMK p.170: a Grievous arm/area injury renders its location unusable.
@@ -54,7 +55,7 @@ export function resolveGuidedShieldUnsling({id,sequence,states,inventory,actorId
  requireFact(slungConfirmed===true,'GM musí potvrdit, že konkrétní štít je opravdu zavěšen a dosažitelný');
  const matches=inventory.filter(x=>x.id===itemId&&x.characterId===actorId);
  requireFact(matches.length===1&&matches[0].snapshot?.category==='shield'&&
-  matches[0].slot==='carried'&&matches[0].quantity===1&&matches[0].destroyed!==true&&
+  matches[0].slot==='carried'&&matches[0].quantity===1&&!equipmentUnusable(matches[0])&&
   matches[0].gearStowage!=='backpack',
   'Grope: štít není samostatně nesený dostupný kus mimo batoh');
  requireFact(!inventory.some(x=>x.characterId===actorId&&x.slot===hand),
@@ -122,7 +123,7 @@ export function startGuidedBackpackGrope({id,sequence,states,inventory,actorId,i
   'Zvolte konkrétní předmět a volnou ruku');
  const found=inventory.filter(i=>i.id===itemId&&i.characterId===actorId);
  requireFact(found.length===1&&found[0].slot==='carried'&&found[0].gearStowage==='backpack'&&
-  found[0].quantity===1&&found[0].destroyed!==true,
+  found[0].quantity===1&&!equipmentUnusable(found[0]),
   'Předmět není jednoznačně doložen jako jeden kus v batohu této postavy');
  requireFact(found[0].snapshot?.category!=='armor',
   'Nasazování zbroje nemá automaticky čas jedné akce Grope');
@@ -152,7 +153,7 @@ export function completeGuidedBackpackGrope({id,sequence,states,inventory,actorI
  validateCombatState(states[actorId]);
  const items=inventory.filter(i=>i.id===task.itemId&&i.characterId===actorId);
  requireFact(items.length===1&&JSON.stringify(items[0])===task.itemWitness&&
-  items[0].slot==='carried'&&items[0].gearStowage==='backpack',
+  items[0].slot==='carried'&&items[0].gearStowage==='backpack'&&!equipmentUnusable(items[0]),
   'Backpack Grope: předmět se změnil během vícekolové činnosti');
  requireFact(!inventory.some(i=>i.characterId===actorId&&i.slot===task.hand),
   'Backpack Grope: cílová ruka byla obsazena během koncentrace');

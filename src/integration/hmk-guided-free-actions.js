@@ -6,6 +6,7 @@ import {validateEncounterSequence,currentEncounterActor,encounterFreeActionAvail
  recordEncounterFreeAction,dueEncounterEvents} from './encounter-turn-sequence.js';
 import {validateCombatState} from './persistent-combat-state.js';
 import {guidedTurnChoices} from './hmk-guided-turn-choices.js';
+import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 import {pathCrossesClosedBarrier,effectiveSpatialBarriers,validateSpatialBarriers} from './hmk-guided-spatial-barriers.js';
 const check=(value,message)=>{if(!value)throw Error(message)};
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
@@ -90,6 +91,7 @@ export function prepareGuidedFreeAction({id,sequence,states,inventory,actorId,
   const found=inventory.filter(x=>x.id===itemId&&x.characterId===actorId&&x.slot==='carried'&&!x.destroyed);
   check(found.length===1&&found[0].quantity===1,'Předmět není jediným dostupným neseným kusem');
   item=found[0];
+  check(!equipmentUnusable(item),'Poškozený či neopravitelný předmět nelze připravit do ruky');
   check(kind==='draw-weapon'?item.snapshot?.category==='weapon':item.snapshot?.category==='other',
    'Vybraný druh předmětu neodpovídá volné akci');
   check(item.gearStowage!=='backpack'&&accessibleConfirmed===true&&sourceConfirmed===true,

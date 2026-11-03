@@ -11,6 +11,7 @@ import {resolveSkillTrauma,impairedSkillKind,skillTraumaAvailability} from './hm
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {resolveCombatantLoad} from './combatant-load.js';
 import {resolveOwnedArmourArticle} from './live-combat-armour.js';
+import {equipmentUsable} from './hmk-equipment-serviceability.js';
 import {strengthEncumbranceModifier,modifiedEncumbrance} from '../rules/encumbrance.js';
 
 /** Read-side minimum, independently source-proven ENC.  Printed article ENC and
@@ -68,7 +69,7 @@ export function inferredArms(actor,inventory,name,state){
  const dominant=actor?.hmk?.handedness;
  if(!sides.has(dominant))throw Error('Zraněná paže: chybí ověřená dominantní ruka postavy; doplňte Character Sheet.');
  if(name==='Melee'||name==='Throwing'){
-  const own=inventory.filter(x=>x.characterId===actor.id&&x.snapshot?.category==='weapon'&&['main_hand','off_hand'].includes(x.slot));
+  const own=inventory.filter(x=>x.characterId===actor.id&&x.snapshot?.category==='weapon'&&equipmentUsable(x)&&['main_hand','off_hand'].includes(x.slot));
   if(own.length!==1)throw Error('Zraněná paže: u Melee/Throwing není jednoznačně určena použitá zbraň v ruce; změňte vybavení nebo použijte Combat s konkrétní akcí.');
   return {usedArms:[own[0].slot==='main_hand'?dominant:dominant==='left'?'right':'left'],source:'equipped-'+own[0].slot,weaponId:own[0].id};
  }
