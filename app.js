@@ -306,7 +306,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.703';
+const APP_VERSION='93.704';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10764,7 +10764,7 @@ function hskEnvironmentalWoundCarePanel(actor){
  if(!pending)return '';
  if(persistentStateOf(actor).shockFollowup?.domain==='travel-weather'||hskWeatherInjuryMandatory(actor.id))
   return '<p class="notice">Nejdříve dokončete jediný povinný Weather Shock, Injury Mishap nebo Morale. Treatment a další léčebné hody se nesmějí vyhodnocovat současně.</p>';
- return `<details class="hmk-weather-wound-care"><summary>Rány z počasí · Treatment, Healing, Infection Course a případná amputace</summary>
+ return `<details class="hmk-weather-wound-care" open><summary>Rány z počasí · Treatment, Healing, Infection Course a případná amputace</summary>
  <p class="hc-hint">Povinné ošetření nové Frostbite/Sunburn rány je samostatný zdravotní krok. Používá původní společný HMK Treatment/Healing/Infection executor a nemění čas bez potvrzení GM.</p>
  ${hmkLongtermHealingPanel([actor],{origin:MEDICAL_ORIGIN.WEATHER})}</details>`;
 }
@@ -18244,7 +18244,8 @@ document.addEventListener('submit',e=>{
    advancedTreatmentClock=advanceCampaignCalendar(clock,{
     deltaMinutes:treatmentFinish-clock.minute,eventId:uuid(),
     reason:'GM: dokončení Treatment rány '+woundId+' u '+c.name,
-    gmConfirmed:true,characters:projected,journal:data.journal});
+    gmConfirmed:true,characters:projected,journal:data.journal,
+    deferConcurrentTreatmentAtStart:true});
   }
   if(!uiConfirm('Trvale zapsat léčení '+c.name+(advancedTreatmentClock?' a posunout Kalendář na '+displayCampaignMinute(treatmentFinish):'')+' podle doložených dnů a hodů?'))return;
   mutate(()=>{if(advancedTreatmentClock)data.campaignClock=advancedTreatmentClock;
