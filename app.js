@@ -305,7 +305,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.696';
+const APP_VERSION='93.697';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -19805,7 +19805,7 @@ document.addEventListener('submit',e=>{
      destination={x:Number(rawX),y:Number(rawY)};
     }else{
      const accessible=data.inventory.filter(x=>x.characterId===actor.id&&x.slot==='carried'&&x.quantity===1&&
-      !x.destroyed&&x.gearStowage!=='backpack'&&x.snapshot?.category===(kind==='draw-weapon'?'weapon':'other'));
+      equipmentUsable(x)&&x.gearStowage!=='backpack'&&x.snapshot?.category===(kind==='draw-weapon'?'weapon':'other'));
      if(!accessible.length)throw Error('Není doložený samostatně nesený vhodný předmět mimo batoh');
      const chosen=chooseNamedRecord(accessible,x=>x.snapshot.name,'Vyberte předmět z inventáře:');
      if(chosen===null)return;
