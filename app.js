@@ -283,6 +283,7 @@ import {applyConfirmedWeaponWQ,applyConfirmedAreaStrike,applyConfirmedMountedCon
 import {qualityImpactPenalty} from './src/rules/weapon-damage.js';
 import {riderImpactAtRound} from './src/rules/mounted.js';
 import {medicalOriginOfWound,medicalWounds,MEDICAL_ORIGIN} from './src/integration/hmk-medical-origin.js';
+import {weatherPhysicianCandidates} from './src/integration/hmk-weather-healer.js';
 import {initialCombatState,validateCombatState,combatFatigueTotals,applyConfirmedHit,applyConfirmedAstralReembodiment,applyConfirmedBloodLoss,applyConfirmedBloodStoppage,applyConfirmedShockRecovery,applyConfirmedFatigue,dueBloodLoss,applyConfirmedWoundContext,shockFollowupReadiness,applyExtendedShockCourse,applyComaCourse,dueInjuryMorale,unresolvedInjuryMishaps,specialActionReadiness,applyConfirmedInjuryMishap,applyConfirmedInjuryMorale,applyConfirmedSpecialAftermath,applyConfirmedMoraleReaction,applyConfirmedBraveExpiry,beginConfirmedEncounter} from './src/integration/persistent-combat-state.js';
 // v60: Bundled domain contract constructors; the 3-file deployment is self-contained.
 /** HMK domain contracts. Runtime objects are plain JSON-serialisable data. */
@@ -309,7 +310,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.712';
+const APP_VERSION='93.713';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1126,6 +1127,75 @@ function syncWeatherCareFormGuidance(form,{focus=false}={}){
   try{current.focus({preventScroll:true});}catch(_){current.focus();}
  }
 }
+/** Build an auditable read-only Physician choice from actual campaign roster.
+ * Selecting one healer is the only GM input; ML / Index / DEX always come
+ * from that character's skills and attributes, never submitted numbers.
+ */
+function weatherHealerChoicesForForm(form){
+ const pick=form?.elements?.namedItem('wound');
+ if(!pick)return [];
+ const raw=String(pick.value||''),ix=raw.indexOf('::');
+ if(ix<1)return [];
+ const patient=character(raw.slice(0,ix)),woundId=raw.slice(ix+2);
+ const wound=patient&&persistentStateOf(patient).wounds.find(x=>x.id===woundId);
+ const party=data.campaignClock?calendarMemberIds(data.campaignClock,data.characters):data.characters;
+ return weatherPhysicianCandidates({patient,wound,party});
+}
+function syncWeatherHealerFields(form){
+ if(!form?.closest('.hmk-weather-care')||!['hmk-treatment-form','hmk-frost-amputation-form'].includes(form.id))return;
+ const select=form.elements.namedItem('healerId');
+ if(!select)return;
+ const wound=form.elements.namedItem('wound');
+ const untreated=form.id==='hmk-treatment-form'&&form.elements.namedItem('untreated')?.checked===true;
+ const options=weatherHealerChoicesForForm(form);
+ const chosen=String(select.value||'');
+ const signature=String(wound?.value||'')+'|'+options.map(x=>`${x.id}:${x.ml}`).join('|');
+ if(select.dataset.weatherHealerSignature!==signature){
+  select.innerHTML='<option value="">Vyberte skutečného léčitele…</option>'+options.map(h=>
+   `<option value="${esc(h.id)}">${esc(h.name)} · Physician ML ${h.ml} · Index ${h.index}${h.self?' · vlastní ošetření M/S':''}</option>`).join('');
+  select.dataset.weatherHealerSignature=signature;
+  if(options.some(h=>h.id===chosen))select.value=chosen;
+  else if(options.length===1)select.value=options[0].id;
+ }
+ select.required=!untreated;
+ select.disabled=untreated;
+ const healer=options.find(x=>x.id===select.value)||null;
+ const ml=form.elements.namedItem('physicianML'),idx=form.elements.namedItem('physicianIndex');
+ if(ml)ml.value=untreated?'':healer?String(healer.ml):'';
+ if(idx)idx.value=untreated?'':healer?String(healer.index):'';
+ const dexField=form.elements.namedItem('dexSecondaryModifier');
+ if(dexField){
+  const usesDex=form.id==='hmk-frost-amputation-form'||(()=>{
+   const raw=String(wound?.value||''),i=raw.indexOf('::');
+   const patient=i<1?null:character(raw.slice(0,i));
+   const w=patient&&persistentStateOf(patient).wounds.find(x=>x.id===raw.slice(i+2));
+   if(!w)return false;
+   try{const method=weatherTreatmentTiming({wound:w,startMinute:data.campaignClock?.minute??0,
+    onsetMinute:data.campaignClock?getCampaignAnchor(data.campaignClock,'wound',patient.id,w.id)?.minute??0:0,
+    allowAmputation:false}).method;
+    return ['sur','ext','amp'].includes(method);
+   }catch(_){return false;}
+  })();
+  dexField.value=untreated||!usesDex?'0':healer?.dexSecondary===null?'':healer?String(healer.dexSecondary):'';
+  dexField.readOnly=true;
+ }
+ const status=form.querySelector('[data-weather-healer-status]');
+ if(status)status.textContent=untreated?'Neošetřená rána: bez léčitele, bez skutečného Physician hodu a bez posunu času.':
+  !options.length?'Nikdo z členů kampaně nemá nyní způsobilou Physician dovednost. Ránu lze ponechat skutečně neošetřenou.':
+  healer?'Vybraný léčitel: '+healer.name+' · ML '+healer.ml+' · Index '+healer.index+'.'+
+    (healer.self?' Vlastní ošetření je možné jen pokud skutečný stav a okolnosti dovolují.':''):
+    'Vyberte léčitele; aplikace převezme jeho ML, Index a případný DEX modifikátor.';
+ const roll=form.elements.namedItem('physicianRoll');
+ if(roll){roll.required=!untreated;roll.disabled=untreated;
+   const label=roll.closest('label');if(label)label.hidden=untreated;
+   const die=roll.nextElementSibling;if(die?.dataset?.hmkGeneralAutoDie)die.hidden=untreated;
+ }
+ const wrapper=select.closest('label');if(wrapper)wrapper.hidden=untreated;
+ for(const key of ['physicianML','physicianIndex']){
+  const input=form.elements.namedItem(key),label=input?.closest('label');
+  if(label)label.hidden=untreated;
+ }
+}
 function syncWeatherCarePanel(){
  const panel=document.querySelector('.hmk-weather-care');
  if(!panel)return;
@@ -1143,7 +1213,7 @@ function syncWeatherCarePanel(){
  for(const button of buttons)button.classList.toggle('active',button.dataset.weatherCareStep===chosen);
  const activeCard=cards.find(card=>!card.hidden);
  const activeForm=activeCard?.querySelector('form');
- if(activeForm)syncWeatherCareFormGuidance(activeForm);
+ if(activeForm){syncWeatherHealerFields(activeForm);syncWeatherCareFormGuidance(activeForm);}
 }
 let calendarUI=null; // Presentation state only, never stored in character/campaign evidence.
 let activeCalendarSection='overview';
@@ -7797,9 +7867,9 @@ function hmkLongtermHealingPanel(chars,{origin='combat'}={}){
  const sections=[];
  const pushSection=(id,title,enabled,body)=>sections.push({id,title,enabled,body});
  const commonWoundFields=(selectOptions,label='Rána')=>`<div class="field-grid hmk-weather-care-grid"><label class="hmk-guided-field">${helpTerm(label,'Vyberte přesně tu ránu, kterou právě řeší Kalendář nebo poslední zdravotní krok. Aplikace nepředjímá jinou ránu sama od sebe.')}<select name="wound" data-guide-order="1" required>${selectOptions||'<option value="">Žádná aktivní rána</option>'}</select></label><label class="hmk-guided-field">${helpTerm('Dny od vzniku rány','Počet celých dní od skutečného vzniku této rány. Pokud je aktivní Kalendář a rána má ukotvený počátek, aplikace pole doplní sama a GM jej nemá vymýšlet od oka.')}<input name="daySinceInjury" type="number" min="0" step="1" data-guide-order="2" required ${clock?'placeholder="Kalendář doplní automaticky"':''}></label></div>`;
- const treatmentForm=`<form id="hmk-treatment-form" data-weather-care-form="treatment"><h4>Treatment Roll</h4><p class="tiny">Zobrazen je pouze aktuální léčebný krok. Ostatní zdravotní akce jsou skryté, aby se GM soustředil jen na tento zápis.</p>${weatherCare?'<p class="hc-hint hmk-treatment-plan" data-weather-treatment-timing role="status">Čas Treatment vypočítá Kalendář podle typu a závažnosti rány; nelze jej ručně přepsat.</p>':''}${commonWoundFields(woundOptions)}<div class="field-grid hmk-weather-care-grid"><label class="hmk-guided-field">${helpTerm('Physician ML','Mastery Level skutečného léčitele pro tento Treatment. Pokud se léčitel mění, musí jít o reálně přítomnou osobu.')}<input type="number" name="physicianML" min="0" max="200" data-guide-order="3"></label><label class="hmk-guided-field">${helpTerm('Physician Index','Skutečný Physician Index léčitele. Aplikace jej nepřevádí z jiného atributu ani nehádá. Vyšší další léčitel může pokračovat v léčbě podle HMK 177–182.')}<input type="number" name="physicianIndex" min="0" max="20" data-guide-order="4"></label><label class="hmk-guided-field">${helpTerm('Skutečný d100','Sem patří skutečně hozený Treatment Roll. Lze jej zadat ručně nebo použít tlačítko d100 přímo u pole.')}<input type="number" name="physicianRoll" min="1" max="100" data-guide-order="5"></label></div><details class="hmk-care-advanced"><summary>Rozšířené údaje pouze když jsou potřeba</summary><div class="field-grid hmk-weather-care-grid"><label><input type="checkbox" name="untreated" value="yes"> Bez skutečného ošetření (CF; žádný vymyšlený d100)</label><label>${helpTerm('DEX Secondary Modifier','Vyplňte jen pokud pravidla tohoto konkrétního Treatment vyžadují Secondary Modifier. Jinak ponechte 0.')}<input type="number" name="dexSecondaryModifier" value="0" step="1"></label><label>${helpTerm('Dostupné prostředky','Vyberte pouze prostředky, které byly u ošetření skutečně přítomné. Neoznačené prostředky aplikace nepředpokládá.')}<select name="available" multiple size="4"><option value="water">Voda</option><option value="bandages">Obvazy</option><option value="needle-thread">Jehla a nit</option><option value="surgery-tools">Chirurgické nástroje</option></select></label><label><input type="checkbox" name="broadhead" value="yes"> Projectile Broadhead</label>${weatherCare?'':`<label>${helpTerm('Začátek zákroku · minuta kampaně','Doložený skutečný začátek Treatment.')}<input type="number" name="procedureStartMinute" min="0" step="1"></label><label>${helpTerm('Konec zákroku · minuta kampaně','Skutečný konec Treatment.')}<input type="number" name="procedureEndMinute" min="0" step="1"></label><label>${helpTerm('Odlišná skutečná doba','Pouze s doloženou výjimkou GM.')}<input name="procedureVarianceReason" maxlength="500"></label>`}</div></details><button type="submit" ${woundOptions?'':'disabled'}>Potvrdit Treatment</button></form>`;
+ const treatmentForm=`<form id="hmk-treatment-form" data-weather-care-form="treatment"><h4>Treatment Roll</h4>${weatherCare?`<label class="hmk-care-no-treatment">${helpTerm('Bez skutečného ošetření','Pouze pokud opravdu neproběhlo žádné Treatment. Nejde o neúspěšný hod. HMK str. 180 použije vlastnosti CF bez fiktivního d100 a bez času zákroku.')}<input type="checkbox" name="untreated" value="yes"> Rána zůstala skutečně neošetřená</label>`:''}<p class="tiny">Zobrazen je pouze aktuální léčebný krok. Ostatní zdravotní akce jsou skryté, aby se GM soustředil jen na tento zápis.</p>${weatherCare?'<p class="hc-hint hmk-treatment-plan" data-weather-treatment-timing role="status">Čas Treatment vypočítá Kalendář podle typu a závažnosti rány; nelze jej ručně přepsat.</p>':''}${commonWoundFields(woundOptions)}<p class="tiny" data-weather-healer-status role="status"></p><div class="field-grid hmk-weather-care-grid">${weatherCare?`<label class="hmk-guided-field">${helpTerm('Léčitel · skutečně přítomná postava','Vyberte způsobilého člena aktuální kampaně. Seznam automaticky vylučuje mrtvé, osoby v kómatu, v bezvědomí nebo v nepřerušeném Shocku. Pacient s M/S ránou může sám sebe ošetřit, pokud mu v tom situace nebrání. Samotný výběr potvrzuje, že je léčitel u pacienta.') }<select name="healerId" data-guide-order="3" required><option value="">Vyberte léčitele…</option></select></label><label>${helpTerm('Physician ML · automaticky','Skutečný Mastery Level z Physician dovednosti vybraného léčitele. Hodnotu nelze měnit ručně.')}<input type="number" name="physicianML" readonly min="0" max="200"></label><label>${helpTerm('Physician Index · automaticky','Physician Index = celá část Physician ML / 10. Při opakovaném Treatment musí být vyšší než u všech předchozích léčitelů této rány.')}<input type="number" name="physicianIndex" readonly min="0" max="20"></label>`:`<label class="hmk-guided-field">${helpTerm('Physician ML','Skutečný Physician ML léčitele.')}<input type="number" name="physicianML" min="0" max="200" data-guide-order="3"></label><label class="hmk-guided-field">${helpTerm('Physician Index','Physician Index z ML léčitele.')}<input type="number" name="physicianIndex" min="0" max="20" data-guide-order="4"></label>`}<label class="hmk-guided-field">${helpTerm('Skutečný d100','Sem patří skutečně hozený Treatment Roll. Lze jej zadat ručně nebo použít tlačítko d100 přímo u pole.')}<input type="number" name="physicianRoll" min="1" max="100" data-guide-order="5"></label></div><details class="hmk-care-advanced"><summary>Rozšířené údaje pouze když jsou potřeba</summary><div class="field-grid hmk-weather-care-grid">${weatherCare?'':'<label><input type="checkbox" name="untreated" value="yes"> Bez skutečného ošetření (CF; žádný vymyšlený d100)</label>'}<label>${helpTerm('DEX Secondary Modifier','Použije se jen u Surgery, Extraction a Amputation. V Weather Care se odvodí z DEX vybraného léčitele; u ostatních zákroků je 0.')}<input type="number" name="dexSecondaryModifier" value="0" step="1" ${weatherCare?'readonly':''}></label><label>${helpTerm('Dostupné prostředky','Vyberte pouze prostředky, které byly u ošetření skutečně přítomné. Neoznačené prostředky aplikace nepředpokládá.')}<select name="available" multiple size="4"><option value="water">Voda</option><option value="bandages">Obvazy</option><option value="needle-thread">Jehla a nit</option><option value="surgery-tools">Chirurgické nástroje</option></select></label>${weatherCare?'':'<label><input type="checkbox" name="broadhead" value="yes"> Projectile Broadhead</label>'}${weatherCare?'':`<label>${helpTerm('Začátek zákroku · minuta kampaně','Doložený skutečný začátek Treatment.')}<input type="number" name="procedureStartMinute" min="0" step="1"></label><label>${helpTerm('Konec zákroku · minuta kampaně','Skutečný konec Treatment.')}<input type="number" name="procedureEndMinute" min="0" step="1"></label><label>${helpTerm('Odlišná skutečná doba','Pouze s doloženou výjimkou GM.')}<input name="procedureVarianceReason" maxlength="500"></label>`}</div></details><button type="submit" ${woundOptions?'':'disabled'}>Potvrdit Treatment</button></form>`;
  const healingForm=`<form id="hmk-healing-roll-form" data-weather-care-form="healing"><h4>Injury Healing Roll · každých 5 dní</h4><p class="tiny">Aplikace ukazuje jen povinné minimum. Další volby pro historický zmeškaný hod jsou schované níže.</p>${commonWoundFields(woundOptions)}<div class="field-grid hmk-weather-care-grid"><label class="hmk-guided-field">${helpTerm('Endurance','Aktuální END postavy pro tento Healing Roll. Nezadávejte odhad; má jít o skutečnou ověřenou hodnotu v době hodu.')}<input type="number" name="endurance" min="1" max="40" required data-guide-order="3"></label><label class="hmk-guided-field">${helpTerm('Will','Aktuální WIL postavy pro tento Healing Roll.')}<input type="number" name="will" min="1" max="40" required data-guide-order="4"></label><label class="hmk-guided-field">${helpTerm('Skutečný d100','Sem patří skutečný Healing Roll. Po vyplnění aplikace zvýrazní další povinné potvrzení tlačítkem zápisu.')}<input type="number" name="roll" min="1" max="100" required data-guide-order="5"></label></div><details class="hmk-care-advanced"><summary>Historický zmeškaný hod · jen pokud už opravdu existuje</summary><div class="field-grid hmk-weather-care-grid"><label><input type="checkbox" name="historicalRoll" value="yes"> Doložený historický d100 ze zmeškaného přesného termínu</label><label>${helpTerm('Původ historického výsledku','Uveďte existující doklad, z něhož historický d100 skutečně pochází. Nesmí jít o nový hod vymyšlený zpětně.')}<input name="historicalSource" maxlength="500" placeholder="Např. den 5: fyzický hod z herních poznámek"></label><label><input type="checkbox" name="historicalConfirmed" value="yes"> GM potvrzuje, že tento d100 skutečně padl v původním termínu</label><label><input type="checkbox" name="historicalNoBonus" value="yes"> GM potvrzuje, že k původnímu hodu nepatřil nedoložený bylinný nebo arkánní bonus</label></div><p class="tiny">Historický hod se zapisuje jako auditní oprava s původním dnem. Pokud takový hod nikdy neexistoval, nesmí se zde vytvářet.</p></details><button type="submit" ${woundOptions?'':'disabled'}>Trvale zapsat Healing Roll</button></form>`;
- const frostForm=`<form id="hmk-frost-amputation-form" data-weather-care-form="frost"><h4>Frost G · Amputation Treatment (str. 178, 180)</h4><p class="tiny">Jen lidské končetiny nebo obličej. Tato větev vytváří novou Edge ránu a zároveň vyžaduje navazující Shock.</p>${weatherCare?'<p class="hc-hint hmk-treatment-plan" data-weather-treatment-timing role="status">Kalendář určí jednu minutu pro Amputation Treatment.</p>':''}${commonWoundFields(frostOptions,'Frost rána')}<div class="field-grid hmk-weather-care-grid"><label class="hmk-guided-field">${helpTerm('Physician ML','ML skutečného léčitele pro amputační Treatment.')}<input name="physicianML" type="number" min="0" max="200" required data-guide-order="3"></label><label class="hmk-guided-field">${helpTerm('Physician Index','Skutečný Physician Index pro tento zákrok.')}<input name="physicianIndex" type="number" min="0" max="20" required data-guide-order="4"></label><label class="hmk-guided-field">${helpTerm('Skutečný Treatment d100','Skutečně hozený Treatment Roll pro amputační zákrok.')}<input name="physicianRoll" type="number" min="1" max="100" required data-guide-order="5"></label><label class="hmk-guided-field">${helpTerm('Location Shock','Hodnota Location Shock z tabulky pro stejnou anatomickou lokaci. Aplikace ji sama nevynalézá.')}<input name="locationShock" type="number" min="0" max="10" required data-guide-order="6"></label><label class="hmk-guided-field">${helpTerm('Původní Shock ML','Shock ML po zohlednění pravidlových modifikátorů pro tento povinný Shock.')}<input name="shockML" type="number" min="0" max="200" required data-guide-order="7"></label><label class="hmk-guided-field">${helpTerm('Skutečný Shock d100','Skutečný Shock Roll navazující na amputační Treatment.')}<input name="shockRoll" type="number" min="1" max="100" required data-guide-order="8"></label></div><details class="hmk-care-advanced"><summary>Rozšířené údaje jen pro speciální případ G5 Edge s trojúhelníkem</summary><div class="field-grid hmk-weather-care-grid"><label>${helpTerm('DEX Secondary Modifier','Ponechte 0, pokud konkrétní pravidlová situace nevyžaduje jinou hodnotu.')}<input name="dexSecondaryModifier" type="number" value="0" step="1" required></label><label>${helpTerm('Strength ML','Vyplňte pouze pokud vznikne G5 Edge s trojúhelníkem a pravidla vyžadují další Strength test.')}<input name="amputationStrengthML" type="number" min="0" max="200"></label><label>${helpTerm('Skutečný Strength d100','Skutečný hod pro výše uvedený Strength test, jen pokud je skutečně vyžadován.')}<input name="amputationRoll" type="number" min="1" max="100"></label></div></details><button type="submit" ${frostOptions?'':'disabled'}>Uložit kompletní Frost Amputation + Edge Injury + Shock</button></form>`;
+ const frostForm=`<form id="hmk-frost-amputation-form" data-weather-care-form="frost"><h4>Frost G · Amputation Treatment (str. 178, 180)</h4><p class="tiny">Jen lidské končetiny nebo obličej. Tato větev vytváří novou Edge ránu a zároveň vyžaduje navazující Shock.</p>${weatherCare?'<p class="hc-hint hmk-treatment-plan" data-weather-treatment-timing role="status">Kalendář určí jednu minutu pro Amputation Treatment.</p>':''}${commonWoundFields(frostOptions,'Frost rána')}<p class="tiny" data-weather-healer-status role="status"></p><div class="field-grid hmk-weather-care-grid">${weatherCare?`<label class="hmk-guided-field">${helpTerm('Léčitel amputace','Jen způsobilá postava s ověřenou Physician dovedností. Pacient si sám Grievous ránu podle pravidel neošetří.')}<select name="healerId" data-guide-order="3" required><option value="">Vyberte léčitele…</option></select></label><label>${helpTerm('Physician ML · automaticky','Skutečný Physician ML vybrané postavy.')}<input name="physicianML" type="number" min="0" max="200" readonly></label><label>${helpTerm('Physician Index · automaticky','Index je celá část Physician ML / 10.')}<input name="physicianIndex" type="number" min="0" max="20" readonly></label>`:`<label class="hmk-guided-field">${helpTerm('Physician ML','ML skutečného léčitele pro amputaci.')}<input name="physicianML" type="number" min="0" max="200" required data-guide-order="3"></label><label class="hmk-guided-field">${helpTerm('Physician Index','Index skutečného léčitele.')}<input name="physicianIndex" type="number" min="0" max="20" required data-guide-order="4"></label>`}<label class="hmk-guided-field">${helpTerm('Skutečný Treatment d100','Skutečně hozený Treatment Roll pro amputační zákrok.')}<input name="physicianRoll" type="number" min="1" max="100" required data-guide-order="5"></label><label class="hmk-guided-field">${helpTerm('Location Shock','Hodnota Location Shock z tabulky pro stejnou anatomickou lokaci. Aplikace ji sama nevynalézá.')}<input name="locationShock" type="number" min="0" max="10" required data-guide-order="6"></label><label class="hmk-guided-field">${helpTerm('Původní Shock ML','Shock ML po zohlednění pravidlových modifikátorů pro tento povinný Shock.')}<input name="shockML" type="number" min="0" max="200" required data-guide-order="7"></label><label class="hmk-guided-field">${helpTerm('Skutečný Shock d100','Skutečný Shock Roll navazující na amputační Treatment.')}<input name="shockRoll" type="number" min="1" max="100" required data-guide-order="8"></label></div><details class="hmk-care-advanced"><summary>Rozšířené údaje jen pro speciální případ G5 Edge s trojúhelníkem</summary><div class="field-grid hmk-weather-care-grid"><label>${helpTerm('DEX Secondary Modifier','Amputation používá skutečný DEX Secondary Modifier z profilu vybraného léčitele.')}<input name="dexSecondaryModifier" type="number" value="0" step="1" required ${weatherCare?'readonly':''}></label><label>${helpTerm('Strength ML','Vyplňte pouze pokud vznikne G5 Edge s trojúhelníkem a pravidla vyžadují další Strength test.')}<input name="amputationStrengthML" type="number" min="0" max="200"></label><label>${helpTerm('Skutečný Strength d100','Skutečný hod pro výše uvedený Strength test, jen pokud je skutečně vyžadován.')}<input name="amputationRoll" type="number" min="1" max="100"></label></div></details><button type="submit" ${frostOptions?'':'disabled'}>Uložit kompletní Frost Amputation + Edge Injury + Shock</button></form>`;
  const infectionForm=`<form id="hmk-infection-course-form" data-weather-care-form="infection"><h4>Infection Course · každý den</h4><p class="tiny">Denní Course infekce zastavuje běžné Healing Rolls ostatních ran, dokud infekce neskončí.</p>${commonWoundFields(infectionOptions,'Infikovaná rána')}${infectionResumptionFields}<div class="field-grid hmk-weather-care-grid"><label class="hmk-guided-field">${helpTerm('Endurance','Aktuální END postižené postavy.')}<input type="number" name="endurance" min="1" max="40" required data-guide-order="3"></label><label class="hmk-guided-field">${helpTerm('Will','Aktuální WIL postižené postavy.')}<input type="number" name="will" min="1" max="40" required data-guide-order="4"></label><label class="hmk-guided-field">${helpTerm('Skutečný d100','Skutečně hozený Infection Course Roll pro dnešní splatný termín.')}<input type="number" name="roll" min="1" max="100" required data-guide-order="5"></label></div><details class="hmk-care-advanced"><summary>Doplňkové pravidlové údaje</summary><div class="field-grid hmk-weather-care-grid"><label>${helpTerm('Physician SV bonus','Pouze doložený Physician Success Value bonus. Pokud žádný neexistuje, ponechte 0.')}<input type="number" name="physicianSV" value="0" step="1"></label></div></details><button type="submit" ${infectionOptions?'':'disabled'}>Trvale zapsat Infection Course</button></form>`;
  const bloodForm=`<form id="hmk-blood-regeneration-form" data-weather-care-form="blood"><h4>Blood Loss Regeneration · každých 10 dní</h4><p class="tiny">Tato část je ponechaná samostatně, ale ostatní velké panely zůstávají skryté. Vyplňujte jen aktuální krevní obnovu.</p><div class="field-grid hmk-weather-care-grid"><label class="hmk-guided-field">${helpTerm('Postava','Vyberte postavu, které se právě týká obnova Blood Loss.')}<select name="targetId" data-guide-order="1">${chars.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><label class="hmk-guided-field">${helpTerm('Dny od skutečné ztráty BP','Skutečný počet dní od první doložené ztráty Blood Points. Při aktivním Kalendáři se má údaj ověřit proti němu.')}<input name="daySinceBloodLoss" type="number" min="0" step="1" value="10" data-guide-order="2"></label><label class="hmk-guided-field">${helpTerm('END','Aktuální Endurance postavy pro tento Blood Loss Healing test.')}<input name="endurance" type="number" min="1" max="40" value="13" data-guide-order="3"></label><label class="hmk-guided-field">${helpTerm('Skutečný d100','Skutečně hozený Blood Loss Regeneration Roll.')}<input name="roll" type="number" min="1" max="100" data-guide-order="4"></label></div><button type="submit">Zapsat obnovu BP</button></form>`;
  const grimForm=`<form id="hmk-grim-shock-form" data-weather-care-form="grim"><h4>Grim Wound · denní Location Shock</h4><p class="tiny">Denní Shock za Grim Wound se zapisuje samostatně a po uložení musí být povinnost z Kalendáře vyčerpána.</p>${commonWoundFields(woundOptions)}<div class="field-grid hmk-weather-care-grid"><label class="hmk-guided-field">${helpTerm('Ověřený Location Shock','Přesná Location Shock hodnota pro tuto lokaci podle HMK.')}<input name="locationShock" type="number" min="0" max="10" value="6" data-guide-order="3"></label><label class="hmk-guided-field">${helpTerm('Shock EML po Fatigue','Konečný Shock EML po Fatigue a dalších příslušných modifikátorech.')}<input name="shockML" type="number" min="0" max="200" value="60" data-guide-order="4"></label><label class="hmk-guided-field">${helpTerm('Skutečný d100','Skutečně hozený denní Shock Roll pro Grim Wound.')}<input name="roll" type="number" min="1" max="100" data-guide-order="5"></label></div><button type="submit" ${woundOptions?'':'disabled'}>Trvale zapsat Grim Shock</button></form>`;
@@ -9200,6 +9270,7 @@ document.addEventListener('input',e=>{
 document.addEventListener('change',e=>{
  const form=e.target?.closest?.('.hmk-weather-care form');
  if(!form)return;
+ if(['healerId','wound','untreated'].includes(e.target.name))syncWeatherHealerFields(form);
  syncWeatherCareFormGuidance(form);
  const controls=weatherCareFocusableControls(form);
  const idx=controls.indexOf(e.target);
@@ -18641,6 +18712,7 @@ document.addEventListener('change',e=>{
  const select=e.target;
  if(select?.name==='wound'||select?.name==='targetId'||
    (select?.name==='untreated'&&select.form?.id==='hmk-treatment-form'))refreshCalendarHealingFields(select.form);
+ if(select?.name==='wound'||select?.name==='healerId'||select?.name==='untreated')syncWeatherHealerFields(select.form);
  if(select?.name!=='wound'||select.form?.id!=='hmk-infection-course-form')return;
  for(const block of select.form.querySelectorAll('[data-infection-source]')){
   const active=block.dataset.infectionSource===select.value;
@@ -18669,6 +18741,14 @@ document.addEventListener('submit',e=>{
    throw Error('Weather rána se léčí výhradně ve Zdraví & Expozice, ne v Combat.');
   if(!c||!(encounterSelection.has(c.id)||environmentalCare))
    throw Error('Postava není v aktuálním střetnutí ani v doloženém zdravotním vyhodnocení');
+  const weatherHealer=environmentalCare&&['hmk-treatment-form','hmk-frost-amputation-form'].includes(f.id)&&v.untreated!=='yes'?(()=>{
+   const selectedHealer=String(v.healerId??'');
+   const proof=weatherHealerChoicesForForm(f).find(h=>h.id===selectedHealer);
+   if(!proof)throw Error('Vyberte skutečně způsobilého léčitele z aktuálního Physician seznamu.');
+   const current=character(selectedHealer);
+   if(!current||current.id!==proof.id)throw Error('Vybraný léčitel neexistuje.');
+   return proof;
+  })():null;
   const treatmentClock=data.campaignClock;
   // Weather uses its own calendar-authoritative timing projection. Do not
   // trust editable or stale form values for either the start, end or age.
@@ -18719,11 +18799,20 @@ document.addEventListener('submit',e=>{
    endMinute:directTreatmentFinish?treatmentFinish:clock.minute,
    gmConfirmed:true,varianceReason:weatherPlan?'':String(v.procedureVarianceReason??'').trim()}:null;
   let t;
-  if(f.id==='hmk-treatment-form')t=applyConfirmedTreatment({...args,untreated:v.untreated==='yes',physicianML:v.physicianML===''?null:Number(v.physicianML),physicianIndex:v.physicianIndex===''?null:Number(v.physicianIndex),physicianRoll:v.physicianRoll===''?null:Number(v.physicianRoll),dexSecondaryModifier:Number(v.dexSecondaryModifier),broadhead:v.broadhead==='yes',available:form.getAll('available'),procedureTime});
+  const actualPhysicianML=weatherHealer?weatherHealer.ml:v.physicianML===''?null:Number(v.physicianML);
+  const actualPhysicianIndex=weatherHealer?weatherHealer.index:v.physicianIndex===''?null:Number(v.physicianIndex);
+  const actualDexSecondary=weatherHealer&&['sur','ext','amp'].includes(weatherPlan?.method)?weatherHealer.dexSecondary:Number(v.dexSecondaryModifier??0);
+  if(weatherHealer&&['sur','ext','amp'].includes(weatherPlan?.method)&&actualDexSecondary===null)
+   throw Error('Léčitel nemá ověřenou Dexterity. Doplňte skutečný DEX do jeho profilu; hod nelze odhadnout.');
+  if(f.id==='hmk-treatment-form')t=applyConfirmedTreatment({...args,untreated:v.untreated==='yes',
+   physicianML:actualPhysicianML,physicianIndex:actualPhysicianIndex,
+   physicianRoll:v.physicianRoll===''||v.physicianRoll===undefined?null:Number(v.physicianRoll),
+   dexSecondaryModifier:actualDexSecondary,broadhead:environmentalCare?false:v.broadhead==='yes',
+   available:form.getAll('available'),procedureTime});
   else if(f.id==='hmk-frost-amputation-form'){
    t=applyConfirmedFrostAmputation({...args,
-    physicianML:Number(v.physicianML),physicianIndex:Number(v.physicianIndex),physicianRoll:Number(v.physicianRoll),
-    dexSecondaryModifier:Number(v.dexSecondaryModifier),locationShock:Number(v.locationShock),
+    physicianML:actualPhysicianML,physicianIndex:actualPhysicianIndex,physicianRoll:Number(v.physicianRoll),
+    dexSecondaryModifier:actualDexSecondary,locationShock:Number(v.locationShock),
     shockML:Number(v.shockML),shockRoll:Number(v.shockRoll),
     amputationStrengthML:v.amputationStrengthML===''?null:Number(v.amputationStrengthML),
     amputationRoll:v.amputationRoll===''?null:Number(v.amputationRoll),
