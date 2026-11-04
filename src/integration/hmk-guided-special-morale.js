@@ -1,3 +1,4 @@
+import {hasBraveFearSource} from './hmk-concurrent-fear.js';
 /** HMK Roleplaying in the World of Kèthîra, printed p.162.
  * Special Morale is NOT a fixed list of automatically detected events. The
  * referee supplies a concrete incident, who became aware of it, and any
@@ -100,7 +101,7 @@ export function resolveSpecialMorale({sequence,character,state,roll,aberrance,ev
  const incident=dueSpecialMorale(state,seq.timelineId);
  good(incident,'Special Morale: není splatný žádný doložený spouštěč');
  const ml=oneInitiativeML(character),fatigue=combatFatigueTotals(state).total;
- const r=hmkMoraleTransition({initiativeML:ml,fatigue,aberrance,brave:state.morale.state==='brave'||state.fear?.state==='brave',
+ const r=hmkMoraleTransition({initiativeML:ml,fatigue,aberrance,brave:state.morale.state==='brave'||hasBraveFearSource(state),
   roll,current:state.morale.state});
  const result=cp(state);result.morale.specialPending.shift();result.morale.state=r.state;
  result.morale.psycheStress+=r.result.psycheStress;

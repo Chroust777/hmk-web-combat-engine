@@ -1,3 +1,4 @@
+import {hasBraveFearSource} from './hmk-concurrent-fear.js';
 /** HMK: Roleplaying in the World of Kèthîra, printed p.162.
  * Group Cohesion is an IMMEDIATE, repeatable Morale trigger on REALISING
  * at least half of the allies remaining since the previous threshold were
@@ -111,7 +112,7 @@ export function assessGuidedCohesion({sequence,participants,observerId,noticedId
  if(triggered){
   const initiativeML=oneML(p.character,'initiative');
   const fatigue=combatFatigueTotals(state).total;
-  result=hmkMoraleTransition({initiativeML,fatigue,aberrance,brave:state.morale.state==='brave'||state.fear?.state==='brave',roll,
+  result=hmkMoraleTransition({initiativeML,fatigue,aberrance,brave:state.morale.state==='brave'||hasBraveFearSource(state),roll,
    current:state.morale.state});
   state.morale.state=result.state;
   state.morale.psycheStress+=result.result.psycheStress;

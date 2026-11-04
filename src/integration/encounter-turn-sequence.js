@@ -1,3 +1,4 @@
+import {activeFearSources} from './hmk-concurrent-fear.js';
 import {classifySpellMisfire} from './hmk-spell-misfire-effects.js';
 import {listPelahnBurstSources,pelahnSourcesForActor} from './hmk-pelahn-burst-registry.js';
 /** HMK World of Kèthîra pp.158–162, 169, 176–179.
@@ -290,9 +291,10 @@ export function dueEncounterEvents(sequence,states){
   // wound's Morale Roll becomes mandatory after all associated Shock ends.
   for(const m of unresolvedInjuryMishaps(ps))due.push({characterId:id,type:'injury-mishap',mishapId:m.id,dueRound:s.round});
   for(const m of dueInjuryMorale(ps))due.push({characterId:id,type:'injury-morale',woundId:m.woundId,dueRound:s.round});
-  if(ps.fear?.state==='brave'&&ps.fear.timelineId===s.timelineId&&
-   int(ps.fear.braveExpiresAtRound,1,MAX_ROUND)&&ps.fear.braveExpiresAtRound<=s.round)
-   due.push({characterId:id,type:'fear-brave-expiry',dueRound:ps.fear.braveExpiresAtRound});
+  for(const brave of activeFearSources(ps).filter(f=>f.state==='brave'&&f.timelineId===s.timelineId&&
+   int(f.braveExpiresAtRound,1,MAX_ROUND)&&f.braveExpiresAtRound<=s.round))
+   due.push({characterId:id,type:'fear-brave-expiry',dueRound:brave.braveExpiresAtRound,
+    sourceEventId:brave.sourceEventId});
   if(ps.morale?.state==='brave'&&ps.morale.braveTimelineId===s.timelineId
    &&int(ps.morale.braveSince,1,MAX_ROUND)&&ps.morale.braveSince+60<=s.round){
    due.push({characterId:id,type:'brave-expiry',dueRound:ps.morale.braveSince+60});
@@ -1030,9 +1032,9 @@ function surrenderOpenInSequence(s,actorId){
 function activeFearFromTimeline(sequence,actorId){
  for(let i=sequence.log.length-1;i>=0;i--){
   const e=sequence.log[i];if(e.actorId!==actorId)continue;
-  if(e.type==='fear-safe-recovery')return 'steady';
-  if(e.type==='fear-end-turn-reaction')return e.afterState;
-  if(e.type==='fear-exposure')return e.resultState;
+  if(e.type==='fear-safe-recovery')return e.projectedState??'steady';
+  if(e.type==='fear-end-turn-reaction')return e.projectedState??e.afterState;
+  if(e.type==='fear-exposure')return e.projectedState??e.resultState;
  }
  return null;
 }

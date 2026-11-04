@@ -1,3 +1,4 @@
+import {hasBraveFearSource} from './hmk-concurrent-fear.js';
 /** HârnMaster: Roleplaying in the World of Kèthîra, printed pp.168–169, 176–178.
  * Pure, deliberately conservative persistent transitions. No inferred dice,
  * missing special-injury rulings, elapsed turns or unattended blood-loss rolls.
@@ -5,6 +6,7 @@
 import {SHOCK_STATE,applyShockState,resolveStunnedRecovery,resolveShockReroll,calculateShockState} from '../rules/shock.js';
 import {PARALYSIS_LOCATIONS} from './hmk-paralysis-sequela.js';
 import {concurrentShockSources,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
+import {projectFearSources} from './hmk-concurrent-fear.js';
 import {bloodLossAdvanceTransition,bloodStoppageResult,BLOOD_LOSS_PERIOD_ROUNDS} from '../rules/bleeding.js';
 import {SL,successLevel,effectiveMasteryLevel} from '../rules/tests.js';
 import {compoundInjury,compoundCompatible} from '../rules/injury.js';
@@ -313,6 +315,7 @@ export function validateCombatState(s){
    s.events.some(e=>e.id===f.sourceEventId&&e.type==='hmk-fear-exposure'),
    'Fear musí odpovídat doloženému fyzickému Will testu a původní události');
  }
+ if(s.fearSources!==undefined)projectFearSources(s);
  if(s.posture!==undefined){requireCond(s.posture&&['prone','dropPending','passNextTurn'].every(k=>typeof s.posture[k]==='boolean'),'Neplatná evidence Mishap');}
  if(s.mishaps!==undefined){requireCond(Array.isArray(s.mishaps)&&s.mishaps.length<=2000,'Neplatný seznam Injury Mishaps');
   for(const m of s.mishaps)requireCond(m&&typeof m.id==='string'&&typeof m.woundId==='string'&&['fumble-roll','stumble-roll','automatic-fumble','automatic-stumble'].includes(m.kind)&&typeof m.resolved==='boolean','Neplatný Injury Mishap');}
@@ -906,7 +909,7 @@ export function applyConfirmedInjuryMorale({state,round,eventId,woundId,initiati
  requireCond(whole(aberrance,0,200),'Morale vyžaduje doloženou Aberrance; nepřítomná hodnota není 0');
  requireCond(w.moraleThreatABE===undefined||aberrance===w.moraleThreatABE,'Morale: zadaná Aberrance nesouhlasí s původně doloženou hodnotou rány');
  s.morale??={state:'steady',psycheStress:0,braveSince:null,braveTimelineId:null};
- const r=hmkMoraleTransition({initiativeML,fatigue:fatigueTotalUnsafe(s),aberrance,brave:s.morale.state==='brave'||s.fear?.state==='brave',roll,current:s.morale.state});
+ const r=hmkMoraleTransition({initiativeML,fatigue:fatigueTotalUnsafe(s),aberrance,brave:s.morale.state==='brave'||hasBraveFearSource(s),roll,current:s.morale.state});
  w.moralePending=false;
  s.morale.state=r.state;
  s.morale.psycheStress+=r.result.psycheStress;

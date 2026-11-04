@@ -287,6 +287,7 @@ import {qualityImpactPenalty} from './src/rules/weapon-damage.js';
 import {riderImpactAtRound} from './src/rules/mounted.js';
 import {medicalOriginOfWound,medicalWounds,MEDICAL_ORIGIN} from './src/integration/hmk-medical-origin.js';
 import {weatherPhysicianCandidates} from './src/integration/hmk-weather-healer.js';
+import {activeFearSources} from './src/integration/hmk-concurrent-fear.js';
 import {initialCombatState,validateCombatState,combatFatigueTotals,applyConfirmedHit,applyConfirmedAstralReembodiment,applyConfirmedBloodLoss,applyConfirmedBloodStoppage,applyConfirmedShockRecovery,applyConfirmedFatigue,dueBloodLoss,applyConfirmedWoundContext,shockFollowupReadiness,applyExtendedShockCourse,applyComaCourse,dueInjuryMorale,unresolvedInjuryMishaps,specialActionReadiness,applyConfirmedInjuryMishap,applyConfirmedInjuryMorale,applyConfirmedSpecialAftermath,applyConfirmedMoraleReaction,applyConfirmedBraveExpiry,beginConfirmedEncounter} from './src/integration/persistent-combat-state.js';
 // v60: Bundled domain contract constructors; the 3-file deployment is self-contained.
 /** HMK domain contracts. Runtime objects are plain JSON-serialisable data. */
@@ -313,7 +314,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.719';
+const APP_VERSION='93.720';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2089,6 +2090,10 @@ function trekDayAccountHTML626(clock,{personalId=null,limitDays=6}={}){
  * receipts and their executors remain for history, not duplicated in the UI. */
 let timeEpisodeDraft={};
 let episodeEvaluationRequested=false;
+// Preview-only evaluation owns no confirmed evidence and may coexist with
+// unrelated same-minute actions. A committed external action makes that
+// preview stale; the GM must evaluate again before final commit.
+let episodeEvaluationCheckpoint=null;
 // v93.689: An evaluated time episode has one immutable kind, party and
 // guide. Changing them after any roll can silently attach evidence to the
 // wrong activity. Only final commit or emergency cancellation releases them.
@@ -2116,7 +2121,7 @@ let timeEpisodeDraftCampaign=null;
  * Keep this lock in memory; no speculative evidence enters durable storage.
  */
 function timeEpisodeMutationLocked(){
- return !!(episodeEvaluationRequested||episodeStageBaseline||episodePendingSkillRequest||
+ return !!(episodeStageBaseline||episodePendingSkillRequest||
   episodeActiveSkillRequestId||episodePinnedSkillFields.size||episodeOutstandingSkillTasks.length);
 }
 function timeEpisodeLockExplanation(){
@@ -7619,7 +7624,9 @@ function hmkFearPanel(chars){
  if(!seq||!chars.length)return '';
  const eligible=chars.filter(c=>seq.order.includes(c.id));
  const options=eligible.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
- const live=eligible.filter(c=>['afraid','terrified','brave'].includes(c.hmk?.healthState?.fear?.state));
+ const live=eligible.flatMap(c=>activeFearSources(c.hmk?.healthState)
+  .filter(f=>['afraid','terrified','brave'].includes(f.state))
+  .map(f=>({characterId:c.id,name:c.name,fear:f})));
  const active=eligible.filter(c=>['afraid','catatonic'].includes(c.hmk?.healthState?.fear?.state));
  const staged=seq.pendingEndTurnAction?.pendingEffects?.includes('fear-end-turn-reaction')?
   seq.pendingEndTurnAction.actorId:null;
@@ -7637,7 +7644,7 @@ function hmkFearPanel(chars){
  <label><input name="gmConfirmed" type="checkbox" required> GM potvrdil skutečný fyzický hod</label>
  <button type="submit">Zapsat Fear / Psyche společně</button></form>
  <form id="hmk-fear-safe-form"><h4>Bezpečné zotavení / konec Brave</h4>
- <label>Postava<select name="characterId" required>${live.map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${esc(c.hmk.healthState.fear.state)}</option>`).join('')||'<option value="">Žádný aktivní bezpečnostní interval</option>'}</select></label>
+ <label>Postava a konkrétní zdroj<select name="fearRef" required>${live.map(c=>`<option value="${esc(JSON.stringify([c.characterId,c.fear.sourceEventId]))}">${esc(c.name)} · ${esc(c.fear.state)} · ${esc(c.fear.sourceId)}</option>`).join('')||'<option value="">Žádný aktivní bezpečnostní interval</option>'}</select></label>
  <label>Uplynulé minuty potvrzené GM<input name="elapsedMinutes" type="number" min="0" max="999999" step="1" required></label>
  <label><input name="safeFromSource" type="checkbox" required> Zdroj již neohrožuje postavu (povinné u Afraid/Terrified)</label>
  <label><input name="outOfLOS" type="checkbox"> Zdroj je mimo přímou viditelnost (povinné pro Afraid)</label>
@@ -10193,8 +10200,12 @@ document.addEventListener('submit',event=>{
    sourceKind:v.sourceKind,sourceId:v.sourceKind==='character'?v.sourceCharacter:v.sourceId,
    sourceDescription:v.sourceDescription,aberrance:Number(v.aberrance),d100:Number(v.d100),
    gmConfirmedSource:v.gmConfirmedSource==='on'});
-  else if(form.id==='hmk-fear-safe-form')result=persistFearSafeRecovery({...args,
-   elapsedMinutes:Number(v.elapsedMinutes),safeFromSource:v.safeFromSource==='on',outOfLOS:v.outOfLOS==='on'});
+  else if(form.id==='hmk-fear-safe-form'){
+   const ref=JSON.parse(v.fearRef||'null');
+   if(!Array.isArray(ref)||ref.length!==2||ref[0]!==v.characterId&&v.characterId)throw Error('Neplatný zdroj zotavení');
+   result=persistFearSafeRecovery({...args,characterId:ref[0],sourceEventId:ref[1],
+    elapsedMinutes:Number(v.elapsedMinutes),safeFromSource:v.safeFromSource==='on',outOfLOS:v.outOfLOS==='on'});
+  }
   else result=persistFearEndTurnReaction({...args,d100:Number(v.d100)});
   if(!result.ok){if(result.readOnly)storageReadOnly=true;
    alert('Fear nebyl bezpečně zapsán: '+result.code);render();return}
@@ -24030,6 +24041,7 @@ document.addEventListener('click',e=>{
  if(setup){episodeEvaluationRequested=false;timeEpisodeDraft=episodeFormSnapshot(form);
   updateEpisodePreview(form);episodeShowSetupError(form,setup);return;}
  episodeEvaluationRequested=true;
+ episodeEvaluationCheckpoint=storageBaseline;
  episodeEvaluatedIdentity=episodeIdentityOf(episodeFormSnapshot(form));
  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
  const issue=form.dataset.episodeProblemField;
@@ -24104,7 +24116,8 @@ document.addEventListener('click',e=>{
  e.preventDefault();episodeAutoBindSkillReceipt();episodeSkillReturnPending=false;
  view='calendar';calendarLanding=false;calendarCreating=false;activeCalendarSection='travel';
  render();
- const form=document.querySelector('#hmk-time-episode-form');if(form){episodeEvaluationRequested=true;updateEpisodePreview(form);}
+ const form=document.querySelector('#hmk-time-episode-form');if(form){episodeEvaluationRequested=true;
+  episodeEvaluationCheckpoint=storageBaseline;updateEpisodePreview(form);}
 },true);
 // Only the native medical executor owns health dice. Travel can either
 // shorten a prepared episode to the due minute or navigate there after the
@@ -24223,6 +24236,7 @@ document.addEventListener('submit',e=>{
   const boundaryIssue=episodeSetupIssue(form);
   if(boundaryIssue&&boundaryIssue.field==='minutes')throw Error(boundaryIssue.message);
   if(!episodeEvaluationRequested)throw Error('Nejdříve nastavte podmínky a stiskněte Vyhodnotit epizodu.');
+  if(episodeEvaluationCheckpoint!==storageBaseline&&!episodeStageBaseline)throw Error('Po náhledu proběhl jiný potvrzený zápis kampaně. Původní výsledky zůstávají uloženy; pro tuto epizodu znovu stiskněte Vyhodnotit, aby se použil aktuální stav.');
   if(episodeIdentityMismatch(form))throw Error(episodeIdentityMismatch(form));
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Kampaň musí být otevřená mimo boj.');
   if(episodePendingEncounter(data.campaignClock))throw Error('Cesta je přerušena setkáním. Nejprve uzavřete Encounter; další herní čas se nesmí posunout.');

@@ -1,3 +1,4 @@
+import {assertGlobalActionLedgerAppendOnly} from './hmk-global-action-ledger.js';
 import {assertOnlyCharacterWasDeleted} from './hmk-character-removal.js';
 import {validateNeutralAlchemyHistory,validateNeutralAlchemyCombatLinks,assertNeutralAlchemyHistoryAppendOnly} from './hmk-alchemy-neutral-history.js';
 import {assertGMOnlyCampaignTime} from './hmk-gm-clock-authority.js';
@@ -42,6 +43,8 @@ export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,g
     validateNeutralAlchemyHistory(next);
     validateNeutralAlchemyCombatLinks(next);
    }
+   if(!restoreBackup&&!characterDeletionId&&old&&next&&Array.isArray(old.characters)&&Array.isArray(next.characters))
+    assertGlobalActionLedgerAppendOnly(old,next);
    if(!characterDeletionId){assertCommittedMoralePsycheDebts(old,next);
    assertCommittedFearTransitions(old,next);
    assertCommittedShadeTransitions(old,next);
@@ -53,6 +56,7 @@ export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,g
   if(e?.message?.startsWith('Neutral history:'))return result(false,true,'invalid-neutral-history');
   if(e?.message?.startsWith('Morale → Psyche:'))return result(false,true,'unresolved-morale-psyche');
   if(e?.message?.startsWith('Fear/Aberrance:'))return result(false,true,'unresolved-fear-aberrance');
+  if(e?.message?.includes('Potvrzené operace nelze smazat')||e?.message?.includes('Poškozený nebo přepsaný záznam globální operace'))return result(false,true,'invalid-global-receipt');
   if(e?.message?.startsWith('Total Release Shade:'))return result(false,true,'invalid-shade-transition');
   if(e?.message?.startsWith('Neutral Total Release persistence:'))return result(false,true,'invalid-neutral-total-release');
   if(e?.message?.startsWith('Raw Pèleáhn'))return result(false,true,'invalid-pelahn-source-transition');

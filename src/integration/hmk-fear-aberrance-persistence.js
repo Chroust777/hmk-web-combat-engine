@@ -7,6 +7,8 @@ import {fearResult,FEAR} from '../rules/fear.js';
 import {validateCombatState} from './persistent-combat-state.js';
 import {validateEncounterSequence,finalizeStagedEncounterTurn} from './encounter-turn-sequence.js';
 import {persistVerifiedCombatSnapshot} from './verified-combat-storage.js';
+import {recordGlobalActionReceipt} from './hmk-global-action-ledger.js';
+import {activeFearSources,addFearSource,updateFearSource,hasBraveFearSource} from './hmk-concurrent-fear.js';
 const valid=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
 const check=(x,m)=>{if(!x)throw Error('Fear/Aberrance: '+m)};
 const copy=x=>structuredClone(x);
@@ -46,43 +48,49 @@ export function projectFearExposure({document,characterId,sourceId,sourceKind,so
  const {actor,seq,wil}=witness(document,characterId),state=actor.hmk.healthState;
  check(!['INC','UNC','KIA'].includes(state.shock)&&state.morale?.state!=='catatonic',
   'postava nyní nemůže vědomě vnímat nový zdroj');
- check(!state.fear||['steady','brave'].includes(state.fear.state),
-  'další současný zdroj Fear vyžaduje zvláštní společné vyhodnocení');
  check(!state.events.some(e=>e.id===eventId)&&!document.journal.some(j=>j.id==='fear:'+eventId)&&
   !seq.log.some(e=>e.eventId===eventId),'opakovaná událost');
  const abe=sourceABE(document,{sourceId,sourceKind,aberrance,sourceDescription,gmConfirmedSource});
  const known=state.events.some(e=>e.type==='hmk-fear-exposure'&&
   e.details?.sourceId===sourceId&&e.details?.timelineId===seq.timelineId);
  check(!known,'postava již tento zdroj překonala; nový zdroj musí mít nové skutečné ID');
- const base=wil*5,eml=base-abe*5+(state.fear?.state===FEAR.BRAVE?20:0),sl=successLevel(d100,eml);
+ const base=wil*5,eml=base-abe*5+(hasBraveFearSource(state)?20:0),sl=successLevel(d100,eml);
  const result=fearResult({sl,roll:d100,aberrance:abe});
  const earned=result.psycheStress;
- check(!earned||(!actor.hmk.arcane?.pendingPsycheTraitChoice&&
-  !(actor.hmk.arcane?.psycheTraumas??[]).some(t=>t.manifestationPending===true)),
-  'před dalším Fear Stresem dokončete již čekající volbu/nástup Psyche Traitu');
  const out=copy(document),person=out.characters.find(c=>c.id===characterId),s=person.hmk.healthState;
  const details={source:'HMK v1.2 p.187',sourceId,sourceKind,
   sourceDescription:sourceKind==='gm-event'?sourceDescription.trim():null,
   timelineId:seq.timelineId,characterId,willAttribute:wil,willEML:base,
   aberrance:abe,finalEML:eml,physicalD100:d100,successLevel:label[sl],resultState:result.state,
   psycheStress:earned,gmConfirmed:true,gmConfirmedSource:true};
- s.fear={state:result.state,sourceId,sourceKind,sourceEventId:eventId,
+ const incomingFear={state:result.state,sourceId,sourceKind,sourceEventId:eventId,
   sourceABE:abe,timelineId:seq.timelineId,createdRound:seq.round,
   lastReactionRound:null,
   ...(result.state===FEAR.BRAVE?{braveExpiresAtRound:seq.round+60}:{}),
   ...(result.state===FEAR.AFRAID?{safeRecoveryMinutes:1}:{}),
   ...(result.state===FEAR.TERRIFIED?{safeRecoveryMinutes:10}:{})};
  s.morale.psycheStress+=earned;
- if(earned){person.hmk.arcane??={};person.hmk.arcane.pendingPsycheTraitChoice={sourceEventId:eventId,levels:earned};}
+ if(earned){
+  person.hmk.arcane??={};
+  const arc=person.hmk.arcane,debt={sourceEventId:eventId,levels:earned};
+  if(arc.pendingPsycheTraitChoice){
+   arc.pendingPsycheTraitChoices??=[];
+   check(arc.pendingPsycheTraitChoices.length<300,'Psyche volby přesáhly bezpečnou kapacitu');
+   arc.pendingPsycheTraitChoices.push(debt);
+  }else arc.pendingPsycheTraitChoice=debt;
+ }
  s.events.push({id:eventId,type:'hmk-fear-exposure',round:seq.round,details});
+ const effective=addFearSource(s,incomingFear);
+ details.projectedState=effective.state;
  s.lastRound=Math.max(s.lastRound,seq.round);
  out.combatRuntime.sequence.log.push({type:'fear-exposure',eventId,actorId:characterId,
-  round:seq.round,sourceId,resultState:result.state});
+  round:seq.round,sourceId,resultState:result.state,projectedState:effective.state});
  out.journal.push({id:'fear:'+eventId,characterId,createdAt:new Date().toISOString(),
   title:'Fear / Aberrance · '+label[sl],body:`GM Will d100 ${d100}, Fear ${result.state}, PSY +${earned}`,
   combatProof:{actionKind:'fear-exposure',sourceEventId:eventId,...copy(details),
    physicalDice:[{faces:100,value:d100,source:'GM-entered-physical-die'}]}});
  validateCombatState(s);validateEncounterSequence(out.combatRuntime.sequence);
+ recordGlobalActionReceipt(out,{before:document,id:'receipt:'+eventId,createdAt:out.journal.at(-1).createdAt});
  return {document:out,details};
 }
 /** A single final CAS, no implicit auto-roll and no partial fear/psyche write. */
@@ -96,11 +104,12 @@ export function persistFearExposure(args={}){
 /** p.187: frightened states may fade without a new die, but only after the GM
  * confirms the specified safety, LOS and elapsed minutes. Catatonic has NO
  * such bypass: it needs its physically rolled end-of-next-turn Will test. */
-export function persistFearSafeRecovery({document,characterId,eventId,elapsedMinutes,
+export function persistFearSafeRecovery({document,characterId,eventId,sourceEventId=null,elapsedMinutes,
  safeFromSource=false,outOfLOS=false,gmConfirmed=false,storage,key,baseline}={}){
  check(gmConfirmed===true&&typeof eventId==='string'&&eventId.length>=3&&
   valid(elapsedMinutes,0,999999),'GM musí doložit čas a nové ID');
- const {actor,seq}=witness(document,characterId),s=actor.hmk.healthState,old=s.fear;
+ const {actor,seq}=witness(document,characterId),s=actor.hmk.healthState;
+ const old=sourceEventId?activeFearSources(s).find(x=>x.sourceEventId===sourceEventId):s.fear;
  check(old&&old.timelineId===seq.timelineId,'není aktivní doložený Fear tohoto střetnutí');
  check(!s.events.some(e=>e.id===eventId)&&!document.journal.some(j=>j.id==='fear:'+eventId),
   'duplicitní zotavení');
@@ -116,10 +125,10 @@ export function persistFearSafeRecovery({document,characterId,eventId,elapsedMin
   !Object.values(seq.commitments??{}).some(t=>t?.status==='in-progress'),
   'časový postup nelze potvrdit uprostřed tahu nebo koncentrace');
  const out=copy(document),p=out.characters.find(x=>x.id===characterId),state=p.hmk.healthState;
- state.fear={...old,state:FEAR.STEADY,lastSafeRecoveryEventId:eventId};
+ const effective=updateFearSource(state,old.sourceEventId,{state:FEAR.STEADY,lastSafeRecoveryEventId:eventId});
  const details={sourceEventId:old.sourceEventId,sourceId:old.sourceId,
   beforeState:old.state,afterState:FEAR.STEADY,elapsedMinutes,safeFromSource:!!safeFromSource,
-  outOfLOS:!!outOfLOS,gmConfirmed:true,timelineId:seq.timelineId};
+  outOfLOS:!!outOfLOS,gmConfirmed:true,timelineId:seq.timelineId,projectedState:effective.state};
  state.events.push({id:eventId,type:'hmk-fear-safe-recovery',round:seq.round,details});
  state.lastRound=Math.max(state.lastRound,seq.round);
  out.combatRuntime.sequence.log.push({type:'fear-safe-recovery',actorId:characterId,round:seq.round,eventId,sourceEventId:old.sourceEventId,afterState:'steady'});
@@ -127,6 +136,7 @@ export function persistFearSafeRecovery({document,characterId,eventId,elapsedMin
   title:'Fear – GM potvrdil bezpečné zotavení',body:`${old.state} → steady po ${elapsedMinutes} min.`,
   combatProof:{actionKind:'fear-safe-recovery',...details,originalFearEventId:old.sourceEventId,sourceEventId:eventId}});
  validateCombatState(state);
+ recordGlobalActionReceipt(out,{before:document,id:'receipt:'+eventId,createdAt:out.journal.at(-1).createdAt});
  const serialized=str(out),r=persistVerifiedCombatSnapshot({storage,key,baseline,serialized});
  return {...r,document:r.ok?out:null,serialized:r.ok?serialized:null};
 }
@@ -153,13 +163,13 @@ export function persistFearEndTurnReaction({document,characterId,eventId,d100,gm
  const after=(sl===SL.S||sl===SL.CS)?
   (f.state===FEAR.CATATONIC?FEAR.TERRIFIED:FEAR.STEADY):f.state;
  const out=copy(document),person=out.characters.find(c=>c.id===characterId),state=person.hmk.healthState;
- state.fear={...f,state:after,lastReactionRound:seq.round};
+ const effective=updateFearSource(state,f.sourceEventId,{state:after,lastReactionRound:seq.round});
  const details={sourceEventId:f.sourceEventId,sourceId:f.sourceId,timelineId:seq.timelineId,
-  beforeState:f.state,afterState:after,willAttribute:wil,aberrance:f.sourceABE,
+  beforeState:f.state,afterState:after,projectedState:effective.state,willAttribute:wil,aberrance:f.sourceABE,
   finalEML:eml,physicalD100:d100,successLevel:label[sl],gmConfirmed:true};
  state.events.push({id:eventId,type:'hmk-fear-end-turn-reaction',round:seq.round,details});
  out.combatRuntime.sequence.log.push({type:'fear-end-turn-reaction',actorId:characterId,
-  round:seq.round,eventId,sourceEventId:f.sourceEventId,physicalD100:d100,afterState:after});
+  round:seq.round,eventId,sourceEventId:f.sourceEventId,physicalD100:d100,afterState:after,projectedState:effective.state});
  out.journal.push({id:'fear:'+eventId,characterId,createdAt:new Date().toISOString(),
   title:'Fear – fyzický Will po tahu',body:`Will d100 ${d100}: ${f.state} → ${after}`,
   combatProof:{actionKind:'fear-end-turn-reaction',...details,
@@ -176,6 +186,7 @@ export function persistFearEndTurnReaction({document,characterId,eventId,d100,gm
   check(due.some(effect=>effect!=='fear-end-turn-reaction'),
    'nevyřešený konec tahu nelze potvrdit: '+error.message);
  }
+ recordGlobalActionReceipt(out,{before:document,id:'receipt:'+eventId,createdAt:out.journal.at(-1).createdAt});
  const serialized=str(out),r=persistVerifiedCombatSnapshot({storage,key,baseline,serialized});
  return {...r,document:r.ok?out:null,serialized:r.ok?serialized:null};
 }

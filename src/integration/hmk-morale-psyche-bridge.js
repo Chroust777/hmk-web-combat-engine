@@ -1,3 +1,4 @@
+import {hasBraveFearSource} from './hmk-concurrent-fear.js';
 /** HMK v1.2 pp.162,188–189: connect new, physically witnessed Morale PSY
  * to the existing Psyche Trait choice / manifestation / recovery sequence.
  * Mutates ONLY the caller's not-yet-committed full-document draft. The caller
@@ -29,7 +30,7 @@ function witnessedMorale(e,characterId,beforeState){
  // pre-modifier Initiative ML; reconstruct against the original event state.
  must(int(ml,0,200),'chybí doložená Initiative ML');
  const candidate=hmkMoraleTransition({initiativeML:ml,roll,fatigue,aberrance,
-  brave:beforeState.morale.state==='brave'||beforeState.fear?.state==='brave',current:beforeState.morale.state});
+  brave:beforeState.morale.state==='brave'||hasBraveFearSource(beforeState),current:beforeState.morale.state});
  must(d.rawEML===candidate.rawEML,'podvržené výsledné Morale EML');
  must(candidate.result.psycheStress===psyche&&
   (d.slName===undefined||d.slName===candidate.slName)&&

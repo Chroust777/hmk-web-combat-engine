@@ -1,3 +1,4 @@
+import {recordGlobalActionReceipt} from './hmk-global-action-ledger.js';
 /** HMK v1.2 pp.188–189, 203: explicit GM choice for pending spell-induced
  * Psyche Stress. Choice is separate from the later 10-minute manifestation
  * and d6-day recovery; those MUST remain pending rather than invented here.
@@ -98,6 +99,7 @@ export function persistSpellPsycheTraitChoice({document,characterId,sourceEventI
    gmConfirmed:true,trait,psycheLevels:pending.levels,manifestedWeaknessAdded:addedManifestedWeakness,
    manifestationPending:next.psycheTraumas.find(z=>z.trait===trait&&z.recovered!==true)?.manifestationPending===true,
    recoverySchedulePending:true}});
+ recordGlobalActionReceipt(out,{before:document,id:'receipt:'+journalId,createdAt:out.journal.at(-1).createdAt});
  const serialized=js(out),res=persistVerifiedCombatSnapshot({storage,key,baseline,serialized});
  return {...res,document:res.ok?out:null,serialized:res.ok?serialized:null};
 }
