@@ -34,7 +34,7 @@ import {woundFromFall} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
 import {prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure} from './src/integration/hmk-weather-hazard-aftermath.js';
-import {prepareColdWaterShock,prepareExposureSkinInjuries} from './src/integration/hmk-weather-trauma-completion.js';
+import {prepareColdWaterShock,prepareExposureSkinInjuries,previewExposureSkinLocation} from './src/integration/hmk-weather-trauma-completion.js';
 import {prepareMundaneFireStrike,prepareEnclosedSmokeStart,prepareEnclosedSmokeCompletion} from './src/integration/hmk-mundane-fire-smoke.js';
 import {preparePoisonStart,preparePoisonOnset,preparePoisonCourse} from './src/integration/hmk-poison-course.js';
 import {herbalPoisonProfile,prepareHerbalPoisonExposure,validateHerbalPoisonExposureJournal,assertHerbalPoisonExposureAppendOnly} from './src/integration/hmk-herbal-poison-exposure.js';
@@ -141,6 +141,7 @@ import {previewExistingArmourArrangement} from './src/integration/hmk-starting-a
 import {projectInventoryRows,inventoryTotals} from './src/integration/hmk-inventory-overview.js';
 import { projectCombatState } from './src/integration/combat-state-projection.js';
 import {resolveLiveCombatArmour} from './src/integration/live-combat-armour.js';
+import {compoundCompatible} from './src/rules/injury.js';
 import {resolveCombatantLoad,bulkForTest} from './src/integration/combatant-load.js';
 import {resolveGuidedReadiedMove,createGuidedReadiedGropeSession} from './src/integration/hmk-guided-readied-followup.js';
 import {resolveGuidedShieldUnsling,resolveGuidedWeaponStow,startGuidedBackpackGrope,completeGuidedBackpackGrope} from './src/integration/hmk-guided-item-grope.js';
@@ -307,7 +308,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.707';
+const APP_VERSION='93.708';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10668,26 +10669,166 @@ function hskTrekkingColdShockForm(entry){
  <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečné ponoření, uplynutí 3d6 kol a fyzické hody</label>
  <button type="submit">Vyhodnotit a uložit Cold Shock</button><output role="status" aria-live="polite"></output></form></details>`;
 }
+/** HMK p185: exposed locations are a GM fact, NOT a random body-location roll.
+ * Side is selected explicitly only for limbs; all downstream dice are staged
+ * per location and never serialized as an ambiguous semicolon text blob.
+ */
+const HSK_SKIN_LOCATIONS=Object.freeze([
+ ['sk','Temeno / scalp','Hlava',false],['fa','Obličej','Hlava',false],['nk','Krk','Hlava',false],
+ ['sh','Rameno','Paže',true],['ua','Nadloktí','Paže',true],['el','Loket','Paže',true],
+ ['fo','Předloktí','Paže',true],['ha','Ruka','Paže',true],
+ ['tx','Hrudník','Trup',false],['ab','Břicho','Trup',false],['pv','Pánev','Trup',false],
+ ['th','Stehno','Nohy',true],['kn','Koleno','Nohy',true],['ca','Lýtko','Nohy',true],['ft','Chodidlo','Nohy',true]
+]);
+const HSK_SKIN_LIMBS=new Set(HSK_SKIN_LOCATIONS.filter(x=>x[3]).map(x=>x[0]));
+const HSK_SKIN_HELP=Object.freeze({
+ wind:'HMK str. 185, Frostbite: vždy jeden samostatný d20 pro sílu větru při skutečně hrozícím omrznutí. 1–3 = bezvětří, interval 120 min; 4–17 = běžný vítr, 60 min; 18–20 = vichřice, 30 min. Výsledek můžeš zadat z fyzické kostky nebo tlačítkem d20.',
+ duration:'HMK str. 185, Frostbite: další nezávislý d20 určí dobu působení mrazu: 1–12 = 60 min; 13–17 = 120 min; 18–19 = 180 min; 20 = 240 min. Schválená minutová adaptace dobu zastropuje skutečnými minutami původní epizody. Nezadává se ručně odhad minut.',
+ location:'HMK str. 185: GM označí právě anatomické části těla skutečně vystavené mrazu nebo slunci. Nerozhoduje se náhodným hodem a aplikace nepozná odhalení pokožky pouze z AV vybavení. Končetiny mají samostatnou levou a pravou stranu; ostatní části stranu nemají.',
+ av:'HMK str. 185: u Frostbite AV automaticky vychází z právě oblečené ověřené výbavy v inventáři. AV0: 1 Injury Level za každý interval; AV1–3: 1 Injury Level za dva intervaly; AV4+ bez zranění z Frostbite. Jestli ochrana nesouhlasí, oprav nejprve inventář; toto číslo nepřepisuj.',
+ skin:'HMK str. 185, Sunburn: každá skutečně slunci vystavená anatomická lokace má vlastní d10. Výsledek se porovná s TN pleti: Very Light 10, Light 7, Medium 4, Dark 2, Very Dark 1. Při zásahu stejný d10 určí M1 (1–6) nebo S2 (7–10). Při Frostbite se tento d10 vůbec nehází.',
+ shock:'HMK str. 167 a 185: Shock d100 se provede pouze po skutečném vzniku zranění v této konkrétní lokaci. Pořadí hodů je jedna rána, její Shock, pak další rána. Když žádné zranění nevznikne, pole se uzamkne a Shock se nehází.',
+ compound:'HMK Injury Sequence: Compound d10 je vyžadován pouze tehdy, když se nová rána slučuje s existujícím kompatibilním nezhojeným zraněním téže lokace a strany. Jinak je pole nedostupné a hod se neprovádí.',
+ complexion:'HMK str. 185: pleť určuje prahovou hodnotu TN pouze pro Sunburn. Výběr vychází ze skutečné podoby postavy, není to náhodný hod a Frostbite jej nepoužívá.'
+});
+const hskSkinTip=key=>`<span class="hc-weather-skin-help" role="note" tabindex="0" title="${esc(HSK_SKIN_HELP[key])}" aria-label="Nápověda: ${esc(HSK_SKIN_HELP[key])}">ⓘ</span>`;
 function hskTrekkingSkinForms(actorId){
  const actor=character(actorId);if(!actor)return '';
  const hazards=(persistentStateOf(actor).environmentalHazards||[]).filter(h=>h.skinPending);
- // Human Frostbite/Sunburn form is bound to p.167 human locations. Never
- // expose that executor to an animal's p.355 anatomy or fake a complexion.
- if(actor.hmk?.verifiedMountedBreed)return hazards.map(h=>`<div class="hc-event"><strong>GM: ${esc(h.skinPending)} u zvířete ${esc(actor.name)}</strong><p class="hc-hint">HMK 185 / 355: následek kritického Weather Hazard čeká na samostatné posouzení vystavených částí zvířecí anatomie. Lidský formulář zranění a tón pleti se zde nepoužije. Zdravotní stav Exposure zůstává zachován; zvířecí kožní zranění nebylo automaticky domyšleno.</p></div>`).join('');
- const locations='sk, fa, nk, sh, ua, el, fo, ha, tx, ab, pv, th, kn, ca, ft';
- return hazards.map(h=>`<details class="hsk-climb-fall"><summary>Dokončit ${h.skinPending==='frostbite'?'Frostbite':'Sunburn'} · jednotlivá zranění · HMK str.185</summary>
- <form data-skill-weather-skin><input name="sourceId" type="hidden" value="${esc(h.sourceId)}">
- <p>Každou skutečně vystavenou anatomickou lokaci uveď na samostatný řádek. Ve schválené minutové adaptaci se zachová původní d20, ale skutečná délka Frostbite nesmí překročit potvrzené minuty cestovní epizody. Při Frostbite musí zadané AV odpovídat skutečné zbroji; při Sunburn se používá samostatné d10 pro každou lokaci. Vznikne-li zranění, doplň jeho fyzický Shock d100 a případný Compound d10. Vše se zapíše jako jediná transakce.</p>
- ${h.skinPending==='frostbite'?`<div class="field-grid"><label>Vítr · fyzické d20<input name="windD20" type="number" min="1" max="20" required></label><label>Délka expozice · fyzické d20<input name="durationD20" type="number" min="1" max="20" required></label></div>`:
- `<label>Skutečná pleť postavy<select name="complexion"><option value="very-light">Very Light · TN10</option><option value="light">Light · TN7</option><option value="medium">Medium · TN4</option><option value="dark">Dark · TN2</option><option value="very-dark">Very Dark · TN1</option></select></label>`}
- <label>Lokace; strana; AV; Sunburn d10; Shock d100; Compound d10
- <textarea name="rows" rows="5" required placeholder="ha;left;0;8;55;\nft;right;2;4;63;"></textarea></label>
- <p class="tiny">Kódy: ${locations}. Strana jen u končetiny left/right, jinak nevyplňuj. Šest sloupců oddělených středníkem; nepovinné d10/d100 ponech prázdné. Frostbite AV0/1–3/4+ se ověří proti vybavení. U Sunburn pole AV ignoruj. Pro bezránovou lokaci nevyplňuj Shock. Celý soupis musí potvrdit GM.</p>
- <label><input type="checkbox" name="allLocationsReviewed" required> GM potvrzuje, že soupis obsahuje všechna vystavená místa; nezadaná místa nebyla vystavena</label>
- <label><input type="checkbox" name="gmConfirmed" required> GM ověřil současnou ochranu a všechna fyzická d20/d10/d100</label>
- <button type="submit">Zapsat všechna kožní zranění</button><output role="status" aria-live="polite"></output>
- </form></details>`).join('');
+ // Never feed p355 animal anatomy into the p167 human executor.
+ if(actor.hmk?.verifiedMountedBreed)return hazards.map(h=>`<div class="hc-event"><strong>GM: ${esc(h.skinPending)} u zvířete ${esc(actor.name)}</strong><p class="hc-hint">HMK 185 / 355: lidský formulář se nepoužije. Expozice zůstává zachována pro samostatné posouzení zvířecí anatomie.</p></div>`).join('');
+ const locationGroups=['Hlava','Paže','Trup','Nohy'].map(group=>`<fieldset class="hc-weather-skin-group"><legend>${group}</legend><div class="hc-weather-skin-picks">${HSK_SKIN_LOCATIONS.filter(x=>x[2]===group).flatMap(([code,label,,limb])=>(limb?['left','right']:[null]).map(side=>`<label class="hc-weather-skin-pick" title="${esc(HSK_SKIN_HELP.location)}"><input type="checkbox" data-weather-skin-select data-skin-location="${code}" data-skin-side="${side||''}"> ${label}${side===null?'':side==='left'?' – levá':' – pravá'}</label>`)).join('')}</div></fieldset>`).join('');
+ return hazards.map(h=>{
+  const frost=h.skinPending==='frostbite';
+  return `<details class="hsk-climb-fall"><summary>Dokončit ${frost?'Frostbite':'Sunburn'} · jednotlivá zranění · HMK str.185</summary>
+  <form data-skill-weather-skin data-weather-skin-kind="${h.skinPending}"><input name="sourceId" type="hidden" value="${esc(h.sourceId)}">
+  <p><strong>1. ${frost?'Dva povinné hody d20':'Pleť postavy'}.</strong> ${frost?'Vítr určí délku intervalu, další d20 určí dobu mrazu. Nejsou to údaje odhadované GM.':'Pleť určí TN pro případný Sunburn d10.'} Na každé číslo je samostatné pole a tlačítko pro automatický hod; fyzický hod můžeš také přepsat ručně.</p>
+  ${frost?`<div class="field-grid"><label title="${esc(HSK_SKIN_HELP.wind)}">Vítr · d20 ${hskSkinTip('wind')}<input name="windD20" type="number" min="1" max="20" required inputmode="numeric"></label><label title="${esc(HSK_SKIN_HELP.duration)}">Délka vystavení mrazu · d20 ${hskSkinTip('duration')}<input name="durationD20" type="number" min="1" max="20" required inputmode="numeric"></label></div><p class="hc-hint">Druhý d20 neudává další čas v Kalendáři: pouze určí výsledek tabulky HMK. Skutečná doba poranění nikdy nepřekročí délku původní cestovní epizody.</p>`:
+  `<label title="${esc(HSK_SKIN_HELP.complexion)}">Skutečná pleť postavy ${hskSkinTip('complexion')}<select name="complexion"><option value="very-light">Very Light · TN10</option><option value="light">Light · TN7</option><option value="medium">Medium · TN4</option><option value="dark">Dark · TN2</option><option value="very-dark">Very Dark · TN1</option></select></label>`}
+  <p><strong>2. Označ skutečně vystavené části těla ${hskSkinTip('location')}.</strong> Zaškrtni jednotlivou část; u končetin zvlášť levou či pravou. Výběr potvrzuje GM, nikoli náhodný hod aplikace. Po zaškrtnutí se objeví pouze příslušná pole.</p>
+  <div class="hc-weather-skin-groups">${locationGroups}</div>
+  <label class="hc-weather-skin-none"><input name="noneExposed" data-weather-skin-none type="checkbox"> Žádná anatomická lokace nebyla skutečně vystavena (výslovné rozhodnutí GM; žádné zranění ani zbytečné hody)</label>
+  <p class="hc-hint" data-weather-skin-choice-status role="status">Zatím není vybrána žádná lokalita.</p>
+  <div data-weather-skin-rows></div>
+  <p><strong>3. Potvrzení všech následků.</strong> AV pro Frostbite se načte z inventáře. Při Sunburn se d10 zpřístupní pouze pro vybranou lokaci. Při skutečné ráně se zpřístupní Shock d100; Compound d10 jen při slučování kompatibilních ran.</p>
+  <label><input type="checkbox" name="allLocationsReviewed" required> GM potvrzuje úplný seznam vystavených lokalit; nezaškrtnuté nebyly vystavené</label>
+  <label><input type="checkbox" name="gmConfirmed" required> GM ověřil ochranu, podmínky a skutečně vyžádané hody</label>
+  <button type="submit">Vyhodnotit a zapsat kožní následky</button><output role="status" aria-live="polite"></output>
+  </form></details>`;
+ }).join('');
 }
+function hskSkinEpisodeMinutes(actor,sourceId){
+ const onset=data.journal.find(x=>x.characterId===actor.id&&x.skillTestProof?.type==='skill-weather-onset'&&x.skillTestProof.sourceId===sourceId);
+ const episodeId=onset?.skillTestProof?.episodeId||null;
+ const receipt=episodeId?data.journal.find(j=>j.id===episodeId&&j.calendarCampaignId===onset.calendarCampaignId):null;
+ return Number.isSafeInteger(receipt?.calendarTimeEpisode?.minutes)?receipt.calendarTimeEpisode.minutes:null;
+}
+function hskSkinCompatible(actor,loc,side,kind){
+ const state=persistentStateOf(actor),aspect=kind==='frostbite'?'frost':'fire';
+ return (state.wounds||[]).some(w=>!w.healed&&w.location===loc&&
+  (!HSK_SKIN_LIMBS.has(loc)||w.side===side)&&compoundCompatible(w,{location:loc,aspect,area:false}));
+}
+function hskSkinAddLocation(form,code,side){
+ const actor=character(selected),kind=form.dataset.weatherSkinKind;
+ const info=HSK_SKIN_LOCATIONS.find(x=>x[0]===code);
+ if(!actor||!info||!['frostbite','sunburn'].includes(kind)||info[3]&&!['left','right'].includes(side)||!info[3]&&side)return;
+ const rowId=code+':'+(side||'-');
+ if([...form.querySelectorAll('[data-weather-skin-row]')].some(r=>r.dataset.skinRowId===rowId))return;
+ const frost=kind==='frostbite';
+ const armour=frost?resolveLiveCombatArmour({inventory:data.inventory,targetId:actor.id,location:code,aspect:'f',direction:'front',mode:'auto',rigidStatus:'unknown'}):null;
+ const av=frost&&armour?.ready?armour.armourValue:null;
+ const compatible=hskSkinCompatible(actor,code,side,kind);
+ const panel=document.createElement('section');panel.className='hc-weather-skin-row';
+ panel.dataset.weatherSkinRow='';panel.dataset.skinRowId=rowId;panel.dataset.skinLocation=code;panel.dataset.skinSide=side||'';
+ if(frost&&av!==null)panel.dataset.skinAv=String(av);
+ panel.dataset.skinCompound=compatible?'yes':'no';
+ panel.innerHTML=`<h5>${esc(info[1])}${side?' – '+(side==='left'?'levá':'pravá'):''}</h5>
+ ${frost?`<p class="hc-hint" title="${esc(HSK_SKIN_HELP.av)}"><strong>Automatické AV: ${av===null?'Nelze doložit':av}</strong> ${hskSkinTip('av')} ${av===null?'<span class="hc-weather-skin-error">Nejdříve oprav ověřenou zbroj v inventáři: '+esc(armour?.reason||'neznámá ochrana')+'</span>':'(převzato z aktuálně oblečené výbavy)'}</p>`:
+ `<label title="${esc(HSK_SKIN_HELP.skin)}">Sunburn · vlastní d10 ${hskSkinTip('skin')}<input type="number" data-weather-skin-d10 name="skinD10" min="1" max="10" inputmode="numeric" required></label>`}
+ <p class="hc-hint" data-weather-skin-preview role="status">${frost?'Nejdřív zadej oba d20.':'Zadej Sunburn d10.'}</p>
+ <div class="hc-weather-skin-rolls"><label data-weather-skin-shock-wrap hidden title="${esc(HSK_SKIN_HELP.shock)}">Shock · d100 ${hskSkinTip('shock')}<input type="number" data-weather-skin-shock name="shockD100" min="1" max="100" inputmode="numeric"></label>
+ <label data-weather-skin-compound-wrap hidden title="${esc(HSK_SKIN_HELP.compound)}">Compound · d10 ${hskSkinTip('compound')}<input type="number" data-weather-skin-compound-die name="compoundD10" min="1" max="10" inputmode="numeric"></label></div>`;
+ form.querySelector('[data-weather-skin-rows]').append(panel);
+ enhanceHMKDiceFields();
+}
+function hskSkinRefresh(form){
+ if(!form?.matches?.('[data-skill-weather-skin]'))return;
+ const actor=character(selected),kind=form.dataset.weatherSkinKind;
+ if(!actor)return;
+ const rows=[...form.querySelectorAll('[data-weather-skin-row]')];
+ const none=form.elements.namedItem('noneExposed').checked;
+ form.querySelector('[data-weather-skin-choice-status]').textContent=none?'GM potvrdil: žádná skutečně vystavená lokalita.':rows.length?'Vybraných lokalit: '+rows.length+'. Všechny se zkontrolují při jediném atomickém zápisu.':'Vyber vystavené lokace, nebo výslovně potvrď, že žádná nebyla vystavena.';
+ const wind=form.elements.namedItem('windD20'),duration=form.elements.namedItem('durationD20');
+ if(kind==='frostbite'){
+  for(const f of [wind,duration]){f.disabled=none;f.required=!none;if(none)f.value='';}
+ }
+ const maxExposure=hskSkinEpisodeMinutes(actor,form.elements.namedItem('sourceId').value);
+ let awaitingPrior=false; // only one location-specific test is open at a time
+ for(const row of rows){
+  const shock=row.querySelector('[data-weather-skin-shock]'),compound=row.querySelector('[data-weather-skin-compound-die]');
+  const shockWrap=row.querySelector('[data-weather-skin-shock-wrap]'),compWrap=row.querySelector('[data-weather-skin-compound-wrap]');
+  const preview=row.querySelector('[data-weather-skin-preview]');
+  const sunDie=row.querySelector('[data-weather-skin-d10]');
+  if(sunDie){sunDie.disabled=awaitingPrior;sunDie.required=!awaitingPrior;}
+  let il=null,info=null;
+  try{
+   const av=row.dataset.skinAv!==undefined?Number(row.dataset.skinAv):null;
+   const skin=row.querySelector('[data-weather-skin-d10]');
+   const one=kind==='frostbite'?Number(wind.value):Number(skin?.value);
+   const two=kind==='frostbite'?Number(duration.value):1;
+   if(kind==='frostbite'&&av===null)throw Error('AV nelze ověřit z inventáře.');
+   if(!Number.isInteger(one)||one<1||one>(kind==='frostbite'?20:10)||!Number.isInteger(two)||two<1||two>20){
+    preview.textContent=kind==='frostbite'?'Čeká na oba správné hody d20.':'Čeká na d10 pro tuto lokaci.';
+   }else{
+    info=previewExposureSkinLocation({kind,av,windD20:kind==='frostbite'?one:null,durationD20:kind==='frostbite'?two:null,
+     skinD10:kind==='sunburn'?one:null,complexion:form.elements.namedItem('complexion')?.value||null,maximumExposureMinutes:maxExposure});
+    il=info.il;
+    preview.textContent=il?'Vypočtené poranění: '+(il===1?'M1':il<=3?'S'+il:'G'+il)+'. '+
+     (kind==='frostbite'?'Doba '+info.durationMinutes+' min, interval '+info.periodMinutes+' min.':'Sunburn dle TN pleti.')+
+     ' Nyní je potřebný Shock d100.':
+     'V této lokaci zranění nevzniklo. Shock ani Compound se nehází.';
+   }
+  }catch(err){preview.textContent='Nelze vyhodnotit: '+err.message;}
+  row.dataset.skinLevel=il===null?'':String(il);
+  const needComp=!awaitingPrior&&il!==null&&il>0&&row.dataset.skinCompound==='yes';
+  // Compound is an earlier step in the Injury Sequence; only one dice task
+  // at a time. Once its actual d10 is supplied, unlock the wound's Shock.
+  const needShock=!awaitingPrior&&il!==null&&il>0&&(!needComp||!!compound.value);
+  shockWrap.hidden=!needShock;compWrap.hidden=!needComp;
+  shock.disabled=!needShock;shock.required=needShock;if(!needShock)shock.value='';
+  compound.disabled=!needComp;compound.required=needComp;if(!needComp)compound.value='';
+  if(awaitingPrior){preview.textContent='Nejdříve dokonči požadované hody u předchozí lokace.';}
+  else if(il===null||il>0&&(needComp&&!compound.value||needShock&&!shock.value))awaitingPrior=true;
+ }
+}
+document.addEventListener('change',event=>{
+ const pick=event.target.closest?.('[data-weather-skin-select]'),none=event.target.closest?.('[data-weather-skin-none]');
+ const form=(pick||none)?.closest('form[data-skill-weather-skin]');if(!form)return;
+ if(pick){
+  if(pick.checked){form.elements.namedItem('noneExposed').checked=false;hskSkinAddLocation(form,pick.dataset.skinLocation,pick.dataset.skinSide||null);}
+  else{const rowId=pick.dataset.skinLocation+':'+(pick.dataset.skinSide||'-');
+   [...form.querySelectorAll('[data-weather-skin-row]')].find(r=>r.dataset.skinRowId===rowId)?.remove();}
+ }else if(none.checked){
+  for(const el of form.querySelectorAll('[data-weather-skin-select]'))el.checked=false;
+  form.querySelector('[data-weather-skin-rows]').replaceChildren();
+ }
+ hskSkinRefresh(form);
+},true);
+document.addEventListener('input',event=>{
+ const form=event.target.closest?.('form[data-skill-weather-skin]');if(!form)return;
+ if(!['windD20','durationD20','skinD10','complexion','shockD100','compoundD10'].includes(event.target.name))return;
+ // If the premise of a wound changes, no previously staged Shock/Compound
+ // may silently remain attached to a different resulting Injury Level.
+ if(event.target.name==='compoundD10'){
+  const shock=event.target.closest('[data-weather-skin-row]')?.querySelector('[data-weather-skin-shock]');
+  if(shock)shock.value=''; // a changed Compound may alter the Injury Shock level
+ }
+ if(event.target.matches('[name="windD20"],[name="durationD20"],[name="complexion"],[name="skinD10"]')){
+  const affected=event.target.name==='skinD10'?[event.target.closest('[data-weather-skin-row]')]:[...form.querySelectorAll('[data-weather-skin-row]')];
+  for(const row of affected){if(!row)continue;for(const x of row.querySelectorAll('[data-weather-skin-shock],[data-weather-skin-compound-die]'))x.value='';}
+ }
+ hskSkinRefresh(form);
+},true);
 function hskTrekkingWeatherTreatmentForms(actorId){
  const actor=character(actorId);if(!actor)return '';
  return (persistentStateOf(actor).environmentalHazards||[]).filter(h=>h.active&&!h.treatmentStarted).map(h=>`
@@ -11872,14 +12013,43 @@ document.addEventListener('submit',event=>{
    {calendarCampaignId:onsetReceipt.calendarCampaignId,campaignMinute:data.campaignClock.minute}:{};
   if(combatInitiativeSequence)throw Error('Zranění během Initiative musí vést Combat');
   const toNumber=x=>x?.trim()?Number(x.trim()):null;
-  const rows=form.elements.namedItem('rows').value.trim().split('\n').filter(x=>x.trim()).map(line=>{
-   const v=line.split(';');if(v.length!==6)throw Error('Každý řádek musí obsahovat přesně 6 údajů oddělených středníkem');
-   return {location:v[0].trim().toLowerCase(),side:v[1].trim().toLowerCase()||null,av:toNumber(v[2]),skinD10:toNumber(v[3]),
-    shockD100:toNumber(v[4]),compoundD10:toNumber(v[5])};
+  hskSkinRefresh(form);
+  const none=form.elements.namedItem('noneExposed').checked;
+  const selectedRows=[...form.querySelectorAll('[data-weather-skin-row]')];
+  if(!none&&!selectedRows.length)throw Error('Vyberte skutečně vystavené lokace nebo potvrďte, že žádná nebyla vystavena.');
+  if(none&&selectedRows.length)throw Error('Nelze současně potvrdit žádné vystavené místo a vybrat lokalitu.');
+  const rows=selectedRows.map(row=>{
+   if(row.dataset.skinLevel==='')throw Error('Některé vystavené místo nemá doložené AV nebo požadovaný hod.');
+   const av=row.dataset.skinAv===undefined?null:Number(row.dataset.skinAv);
+   const skinD10=toNumber(row.querySelector('[data-weather-skin-d10]')?.value);
+   const shockD100=toNumber(row.querySelector('[data-weather-skin-shock]')?.value);
+   const compoundD10=toNumber(row.querySelector('[data-weather-skin-compound-die]')?.value);
+   if(Number(row.dataset.skinLevel)>0&&!shockD100)throw Error('U vzniklé rány je povinný vlastní Shock d100.');
+   if(row.dataset.skinCompound==='yes'&&Number(row.dataset.skinLevel)>0&&!compoundD10)
+    throw Error('Při slučování rány je povinný vlastní Compound d10.');
+   return {location:row.dataset.skinLocation,side:row.dataset.skinSide||null,av,skinD10,shockD100,compoundD10};
   });
+  // Record each independent roll and its exact manual/software provenance.
+  // The authoritative injury report remains byte-for-byte governed by the
+  // original HMK executor, with these witnesses attached only to the journal.
+  const diceEvidence=[];
+  const witness=(field,faces,location=null,side=null)=>{
+   if(!(field instanceof HTMLInputElement)||field.disabled||!field.value.trim())return;
+   const value=Number(field.value);
+   if(!Number.isSafeInteger(value)||value<1||value>faces)throw Error('Neplatný hod d'+faces);
+   diceEvidence.push({field:field.name,faces,value,location,side,
+    origin:field.dataset.hmkAutoDice===field.value?'cryptographic-software-die':'gm-entered-physical-die',id:uuid()});
+  };
+  if(!none){witness(form.elements.namedItem('windD20'),20);witness(form.elements.namedItem('durationD20'),20);}
+  for(const row of selectedRows){
+   const loc=row.dataset.skinLocation,side=row.dataset.skinSide||null;
+   witness(row.querySelector('[data-weather-skin-d10]'),10,loc,side);
+   witness(row.querySelector('[data-weather-skin-shock]'),100,loc,side);
+   witness(row.querySelector('[data-weather-skin-compound-die]'),10,loc,side);
+  }
   const outcome=prepareExposureSkinInjuries({actor,inventory:data.inventory,state:orig,sourceId,
    round:Math.max(1,combatClock.round||1,orig.lastRound||0),rows,
-   windD20:toNumber(form.elements.namedItem('windD20')?.value),durationD20:toNumber(form.elements.namedItem('durationD20')?.value),
+   windD20:none?null:toNumber(form.elements.namedItem('windD20')?.value),durationD20:none?null:toNumber(form.elements.namedItem('durationD20')?.value),
    complexion:form.elements.namedItem('complexion')?.value||null,
    maximumExposureMinutes,originMinute:data.campaignClock?.minute??0,
    gmConfirmed:form.elements.namedItem('gmConfirmed').checked,allLocationsReviewed:form.elements.namedItem('allLocationsReviewed').checked});
@@ -11890,6 +12060,7 @@ document.addEventListener('submit',event=>{
     body:'Zkontrolováno '+outcome.report.reviewedLocations+' lokací · založeno '+outcome.report.wounds.length+' ran: '+
      outcome.report.wounds.map(w=>w.location+' '+(w.side||'')+' '+w.severity+w.il).join(', '),createdAt:stamp(),
     skillTestProof:{type:'skill-weather-skin',sourceId,actorId:actor.id,report:outcome.report,
+     diceEvidence,
      ...(onsetReceipt?.skillTestProof?.episodeId?{episodeId:onsetReceipt.skillTestProof.episodeId,
       originalSkillProofId:onsetReceipt.skillTestProof.originalSkillProofId}: {})}});
   }))throw Error('Kožní zranění nelze uložit');

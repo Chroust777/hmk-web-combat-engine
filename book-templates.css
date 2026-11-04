@@ -7197,3 +7197,20 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-spread-left .hc-weather-step-grid [data-episode-die]{white-space:nowrap}
 .hc-episode-spread-left .hc-weather-step [data-hmk-help]{cursor:help}
 @media(max-width:700px){.hc-episode-spread-left .hc-weather-step-grid{grid-template-columns:minmax(0,1fr)}}
+/* v93.708 — HMK p185, one exposed location/one die; responsive GM checklist. */
+.hc-weather-skin-help{display:inline-flex;align-items:center;justify-content:center;font-size:.82em;font-weight:700;line-height:1;width:1.2em;height:1.2em;border:1px solid currentColor;border-radius:50%;margin-left:.3em;cursor:help;vertical-align:middle}
+.hc-weather-skin-help:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.hc-weather-skin-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,215px),1fr));gap:.65rem;margin:.7rem 0}
+.hc-weather-skin-group{margin:0;min-width:0;border:1px solid rgba(90,68,47,.3);border-radius:6px;padding:.6rem}
+.hc-weather-skin-group legend{font-weight:700;padding:0 .4rem}
+.hc-weather-skin-picks{display:grid;gap:.25rem}
+.hc-weather-skin-pick{display:flex;align-items:baseline;gap:.4rem;cursor:pointer;font-size:.95em;padding:.15rem 0}
+.hc-weather-skin-pick input{flex:none}
+.hc-weather-skin-none{margin:.65rem 0;display:block}
+.hc-weather-skin-row{padding:.85rem 1rem;margin:.75rem 0;border:1px solid rgba(90,68,47,.35);border-radius:6px}
+.hc-weather-skin-row h5{font-size:1rem;margin:0 0 .5rem}
+.hc-weather-skin-rolls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,195px),1fr));gap:.6rem}
+.hc-weather-skin-row label{display:block;margin:.5rem 0}
+.hc-weather-skin-row .hc-weather-skin-error{display:block;font-weight:600}
+form[data-skill-weather-skin] [hidden]{display:none!important}
+@media(max-width:600px){.hc-weather-skin-groups{grid-template-columns:1fr}.hc-weather-skin-row{padding:.7rem}}
