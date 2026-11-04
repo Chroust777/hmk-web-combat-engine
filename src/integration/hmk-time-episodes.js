@@ -865,7 +865,7 @@ export function validateTimeEpisodes(journal=[]){
    const outcome=hazard?.result;
    const currentComplication=hazard?.hazard==='complication'&&hazard.automationVersion==='v93.681';
    const mandatoryNext=(hazard?.hazard==='equipment'||currentComplication)&&['long-delay','irreparable'].includes(outcome);
-   if(d.method!=='gm-current-episode-only-v2')must(d.future===((independent?currentComplication:mandatoryNext)?240:0)&&
+   if(d.method!=='gm-current-episode-only-v2')must(d.future===((independent?(currentComplication&&['long-delay','irreparable'].includes(outcome)):mandatoryNext)?240:0)&&
     (d.current===0||!!hazard),
     'Zdržení v další hlídce nemá doložený Equipment Hazard nebo je jeho délka pozměněna.');
    if(e.equipmentSlowCarryOut!==undefined){
