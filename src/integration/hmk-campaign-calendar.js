@@ -303,6 +303,40 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
  const nextMinute=clock.minute+deltaMinutes;
  const gmBlocking=nextGMBlockingEvent(clock,nextMinute);
  if(gmBlocking)throw Error(`Nelze přeskočit nevyřízenou GM událost „${gmBlocking.title}“: ${displayCampaignMinute(gmBlocking.dueMinute)}.`);
+ // New Treatment is attested by the ONE wound being completed in this
+ // transaction. Do not turn the concurrent-Treatment exception into a generic
+ // way to skip old wounds or an arbitrary time interval.
+ const completedInThisAdvance=[];
+ if(deferConcurrentTreatmentAtStart){
+  for(const c of characters)for(const w of c?.hmk?.healthState?.wounds??[]){
+   const a=w.healing?.treatments?.at(-1)?.procedureTime;
+   if(w.healing?.treatments?.length===1&&a?.gmConfirmed===true&&
+      a.startMinute===clock.minute&&a.endMinute===nextMinute){
+    const anchor=getCampaignAnchor(clock,'wound',c.id,w.id);
+    if(anchor&&anchor.minute<=clock.minute)completedInThisAdvance.push({actorId:c.id,woundId:w.id,originMinute:anchor.minute});
+   }
+  }
+  ensure(completedInThisAdvance.length===1,
+   'Časovaná výjimka vyžaduje jediný nový, GM potvrzený Treatment se správným začátkem a koncem.');
+ }
+ const continuousTreatmentCohort=(originMinute)=>{
+  if(originMinute===clock.minute)return true;
+  if(originMinute>clock.minute)return false;
+  const periods=[];
+  for(const c of characters)for(const w of c?.hmk?.healthState?.wounds??[]){
+   if(getCampaignAnchor(clock,'wound',c.id,w.id)?.minute!==originMinute)continue;
+   for(const treatment of w.healing?.treatments??[]){
+    const t=treatment.procedureTime;
+    if(t?.gmConfirmed===true&&Number.isSafeInteger(t.startMinute)&&Number.isSafeInteger(t.endMinute)&&
+       t.startMinute>=originMinute&&t.endMinute<=clock.minute&&t.startMinute<t.endMinute)
+     periods.push({start:t.startMinute,end:t.endMinute});
+   }
+  }
+  periods.sort((a,b)=>a.start-b.start||a.end-b.end);
+  let coveredTo=originMinute;
+  for(const t of periods){if(t.start!==coveredTo)return false;coveredTo=t.end;}
+  return periods.length>0&&coveredTo===clock.minute;
+ };
  // A verified incubating Poison/Disease onset is deterministic: its initial
  // HR and symptoms were committed at exposure/profile.  The executor applies
  // its effects atomically during THIS clock change, at the actual onset minute.
@@ -324,9 +358,13 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
   // it must not make the first legitimate Treatment impossible.
   // This exception is available ONLY to the atomic Treatment executor, never
   // as a generic way to skip healing, infection, shock, or future obligations.
-  if(deferConcurrentTreatmentAtStart===true&&event.kind==='treatment'&&
-     event.minute===clock.minute&&event.status==='due'&&
-     getCampaignAnchor(clock,'wound',event.characterId,event.woundId??event.sourceId)?.minute===clock.minute)continue;
+  if(deferConcurrentTreatmentAtStart===true&&event.kind==='treatment'&&event.status==='due'){
+   const originMinute=getCampaignAnchor(clock,'wound',event.characterId,event.woundId??event.sourceId)?.minute;
+   // A later wound from another onset, a gap between procedures or a second
+   // pending health obligation is NOT eligible for this narrow exception.
+   if(originMinute===completedInThisAdvance[0].originMinute&&
+      continuousTreatmentCohort(originMinute))continue;
+  }
   blockers.push(event);
  }
  blockers.sort((a,b)=>a.minute-b.minute);
