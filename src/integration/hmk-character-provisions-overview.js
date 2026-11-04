@@ -60,7 +60,7 @@ export function characterProvisionsOverview(database,actorId){
  const currentPolicyRecords=policy?records.filter(r=>r.calendarNutritionDay.policyId===policy.id):[];
  const last=currentPolicyRecords.at(-1)?.calendarNutritionDay??null;
  const nextCloseMinute=policy?(currentPolicyRecords.at(-1)?.calendarNutritionDay.endMinute??policy.campaignMinute)+DAY:null;
- const illness=(actor.hmk?.combatState?.malnutritionEpisodes??[])
+ const illness=(actor.hmk?.healthState?.malnutritionEpisodes??[])
   .filter(e=>e.campaignId===campaignId&&e.status==='active')
   .map(e=>({kind:e.kind,hr:e.hr,nextDueMinute:e.nextDueMinute}));
  const attestedItemIds=new Set(confirmedStocks.map(l=>l.itemId));

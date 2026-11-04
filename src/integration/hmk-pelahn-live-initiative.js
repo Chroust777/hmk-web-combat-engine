@@ -55,7 +55,7 @@ function moveOf(document,c,seq){
  const b=baseMove({agility:a.agl,strength:a.str,folk:size});
  const load=resolveCombatantLoad({character:c,inventory:document.inventory});
  check(load.encReady,'Hyper Burst: neověřená Encumbrance: '+load.issues.join('; '));
- const inj=projectInjuredMovement({state:c.hmk.combatState,round:seq.round,timelineId:seq.timelineId});
+ const inj=projectInjuredMovement({state:c.hmk.healthState,round:seq.round,timelineId:seq.timelineId});
  check(inj.ready&&!inj.blocked,'Hyper Burst: neověřený Move při zranění');
  // HMK p.160 distinguishes innate Move (p.56) from Effective Move:
  // Effective Move = Move - ENC - Fatigue - impairment. Hyper Burst p.204
@@ -68,10 +68,10 @@ function moveOf(document,c,seq){
 function effectiveMoveOf(document,c,seq){
  const base=moveOf(document,c,seq);
  const load=resolveCombatantLoad({character:c,inventory:document.inventory});
- const injury=projectInjuredMovement({state:c.hmk.combatState,round:seq.round,timelineId:seq.timelineId});
+ const injury=projectInjuredMovement({state:c.hmk.healthState,round:seq.round,timelineId:seq.timelineId});
  check(load.encReady&&injury.ready&&!injury.blocked&&Number.isSafeInteger(load.modifiedENC),
   'Hyper Burst Move vyžaduje autoritativní ENC a Injury impairment');
- return Math.max(0,base-load.modifiedENC-combatFatigueTotals(c.hmk.combatState).total-injury.impairment);
+ return Math.max(0,base-load.modifiedENC-combatFatigueTotals(c.hmk.healthState).total-injury.impairment);
 }
 
 function save(document,out,{storage,key,baseline}={}){
@@ -113,11 +113,11 @@ function composePelahnBonusEnd({document,ENDD100,extraAction='pass',gmConfirmed=
  const seq=validateEncounterSequence(document?.combatRuntime?.sequence),due=awaitingPelahnBonus(seq);
  check(due&&int(ENDD100,1,100),'Není splatná bonusová akce a fyzický END d100');
  const c=document.characters.find(c=>c.id===due.actorId);
- check(c?.hmk?.combatState,'Chybí skutečný stav aktéra');
- const s=c.hmk.combatState;validateCombatState(s);
+ check(c?.hmk?.healthState,'Chybí skutečný stav aktéra');
+ const s=c.hmk.healthState;validateCombatState(s);
  check(!['attack','incant'].includes(extraAction)||!['afraid','terrified','catatonic'].includes(s.fear?.state),
   'Fear: nepovolená druhá Attack/Incant; fyzický END zůstává povinný');
- check(dueEncounterEvents(seq,Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.combatState]))).length===0,
+ check(dueEncounterEvents(seq,Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.healthState]))).length===0,
   'Hyper Burst nelze dokončit před splatným Injury/Mishap/Morale');
  const fatigue=combatFatigueTotals(s).total,move=moveOf(document,c,seq),end=c.hmk.attributes?.end;
  check(int(end,1,40),'Povinný END test potřebuje skutečný atribut END');
@@ -138,7 +138,7 @@ function composePelahnBonusEnd({document,ENDD100,extraAction='pass',gmConfirmed=
  out.combatRuntime.sequence=validateEncounterSequence(next);
  const actual=out.characters.find(c=>c.id===due.actorId);
  if(evidence.wearinessAdded>0){
-  actual.hmk.combatState=applyConfirmedFatigue({state:actual.hmk.combatState,
+  actual.hmk.healthState=applyConfirmedFatigue({state:actual.hmk.healthState,
    round:seq.round,eventId:`${selectedBonusSource(seq).id}:end:${seq.round}:${due.actorId}`,
    kind:'weariness',delta:evidence.wearinessAdded}).state;
  }
@@ -175,20 +175,20 @@ export function preparePelahnBonusMelee({id,document,targetId,attackerWeaponId,d
  check(due&&targetId!==due.actorId&&seq.order.includes(targetId),
   'Bonusový Melee nemá aktuálního aktéra nebo skutečný cíl z Initiative');
  const actor=document.characters.find(c=>c.id===due.actorId),target=document.characters.find(c=>c.id===targetId);
- check(actor&&target&&actor.hmk?.combatState&&target.hmk?.combatState,
+ check(actor&&target&&actor.hmk?.healthState&&target.hmk?.healthState,
   'Bonusový Melee vyžaduje skutečný stav obou stran');
- validateCombatState(actor.hmk.combatState);validateCombatState(target.hmk.combatState);
- check(!['afraid','terrified','catatonic'].includes(actor.hmk.combatState.fear?.state),
+ validateCombatState(actor.hmk.healthState);validateCombatState(target.hmk.healthState);
+ check(!['afraid','terrified','catatonic'].includes(actor.hmk.healthState.fear?.state),
   'Fear nedovoluje druhý Melee Attack');
- check(combatFatigueTotals(actor.hmk.combatState).total<moveOf(document,actor,seq),
+ check(combatFatigueTotals(actor.hmk.healthState).total<moveOf(document,actor,seq),
   'Fatigue >= Move: žádný druhý Attack (fyzický END je přesto povinný)');
- check(dueEncounterEvents(seq,Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.combatState]))).length===0,
+ check(dueEncounterEvents(seq,Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.healthState]))).length===0,
   'Nejprve je nutné vyřešit povinné Shock/Morale/Mishap');
  const ap=seq.spatialUnits?.find(x=>x.id===actor.id),tp=seq.spatialUnits?.find(x=>x.id===target.id);
  check(xy(ap)&&xy(tp)&&Math.hypot(ap.x-tp.x,ap.y-tp.y)<=5+1e-7,
   'Bonusové Melee je v této ověřené větvi omezeno na vzdálenost do 5 ft');
- check(actor.hmk.combatState.shock==='NONE'&&!actor.hmk.combatState.posture?.passNextTurn&&
-  !actor.hmk.combatState.pendingManeuver&&!unresolvedInjuryMishaps(actor.hmk.combatState).length,
+ check(actor.hmk.healthState.shock==='NONE'&&!actor.hmk.healthState.posture?.passNextTurn&&
+  !actor.hmk.healthState.pendingManeuver&&!unresolvedInjuryMishaps(actor.hmk.healthState).length,
   'Závažný stav aktéra nedovoluje další Melee bez samostatné povinné mechaniky');
  const input={targetId,attackerWeaponId,defenderWeaponId,attackerSkillId,defenderSkillId,
   attackerUsedArms,defenderUsedArms};
@@ -244,11 +244,11 @@ export function persistPelahnExtraMelee({stage,attackSession,transcript,document
   !attackSession.weaponDamageSession,
   'Bonus Melee s Mishap/Counterstrike/Weapon Damage vyžaduje jiný povinný průchod');
  const target=document.characters.find(c=>c.id===stage.targetId);
- const resolved=completeGuidedAttack({session:attackSession,currentState:target.hmk.combatState,
+ const resolved=completeGuidedAttack({session:attackSession,currentState:target.hmk.healthState,
   sourceSignature:stage.sourceSignature,currentInventory:document.inventory});
  const out=cp(document),victim=out.characters.find(c=>c.id===stage.targetId);
  if(resolved.strike){
-  victim.hmk.combatState=cp(resolved.state);
+  victim.hmk.healthState=cp(resolved.state);
   check(Array.isArray(victim.hmk.injuries),'Chybí trvalá anatomická evidence zranění cíle');
   for(const wound of resolved.state.wounds){
    const copies=victim.hmk.injuries.filter(x=>x.id===wound.id);
@@ -258,7 +258,7 @@ export function persistPelahnExtraMelee({stage,attackSession,transcript,document
    else victim.hmk.injuries.push({...cp(wound),combatRecord:true});
   }
  }
- const due=dueInjuryMorale(victim.hmk.combatState);
+ const due=dueInjuryMorale(victim.hmk.healthState);
  check(due.length===Object.keys(injuryMoraleRolls).length&&
   Object.keys(injuryMoraleRolls).every(id=>due.some(w=>w.woundId===id)),
   'Bonus Melee: doložte každou bezprostřední Injury Morale');
@@ -268,14 +268,14 @@ export function persistPelahnExtraMelee({stage,attackSession,transcript,document
   for(const w of due){
    const ev=injuryMoraleRolls[w.woundId];
    check(ev&&int(ev.roll,1,100)&&int(ev.aberrance,0,200),'Morale vyžaduje fyzický d100 a známou Aberrance');
-   victim.hmk.combatState=applyConfirmedInjuryMorale({state:victim.hmk.combatState,
+   victim.hmk.healthState=applyConfirmedInjuryMorale({state:victim.hmk.healthState,
     round:seq.round,eventId:`${stage.id}:morale:${w.woundId}`,woundId:w.woundId,
     initiativeML:initiative[0].ml,roll:ev.roll,aberrance:ev.aberrance,
     timelineId:seq.timelineId,gmConfirmed:true}).state;
   }
  }
- check(!dueInjuryMorale(victim.hmk.combatState).length&&
-  !unresolvedInjuryMishaps(victim.hmk.combatState).length,
+ check(!dueInjuryMorale(victim.hmk.healthState).length&&
+  !unresolvedInjuryMishaps(victim.hmk.healthState).length,
   'Neuzavřené Injury Morale / Mishap nelze obejít bonusovým END');
  const sequence=cp(seq);
  sequence.log.push({type:'pelahn-bonus-melee-hit',sourceEventId:selectedBonusSource(seq).id,
@@ -317,17 +317,17 @@ export function preparePelahnBonusMissile({id,document,targetId,weaponId,skillId
  check(!['concentrate-start','concentrate-hold','ready'].includes(due.regularAction),
   'Rozpracovaná koncentrace/Readied nedovoluje bez ověřené mechaniky další Missile');
  const actor=document.characters?.find(c=>c.id===due.actorId),target=document.characters?.find(c=>c.id===targetId);
- check(actor?.hmk?.combatState&&target?.hmk?.combatState,'Chybí aktuální stav střelce nebo cíle');
- validateCombatState(actor.hmk.combatState);validateCombatState(target.hmk.combatState);
- check(!['afraid','terrified','catatonic'].includes(actor.hmk.combatState.fear?.state),
+ check(actor?.hmk?.healthState&&target?.hmk?.healthState,'Chybí aktuální stav střelce nebo cíle');
+ validateCombatState(actor.hmk.healthState);validateCombatState(target.hmk.healthState);
+ check(!['afraid','terrified','catatonic'].includes(actor.hmk.healthState.fear?.state),
   'Fear nedovoluje druhý Missile/Thrown Attack');
- check(combatFatigueTotals(actor.hmk.combatState).total<moveOf(document,actor,seq),
+ check(combatFatigueTotals(actor.hmk.healthState).total<moveOf(document,actor,seq),
   'Fatigue >= Move: další Missile nepovolena, END zůstává povinný');
- check(dueEncounterEvents(seq,Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.combatState]))).length===0,
+ check(dueEncounterEvents(seq,Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.healthState]))).length===0,
   'Nejprve je nutné vyřešit povinné Shock/Morale/Mishap');
- check(actor.hmk.combatState.shock==='NONE'&&!actor.hmk.combatState.coma?.active&&
-  !actor.hmk.combatState.posture?.passNextTurn&&!actor.hmk.combatState.pendingManeuver&&
-  !(actor.hmk.combatState.mishaps??[]).some(x=>!x.resolved),
+ check(actor.hmk.healthState.shock==='NONE'&&!actor.hmk.healthState.coma?.active&&
+  !actor.hmk.healthState.posture?.passNextTurn&&!actor.hmk.healthState.pendingManeuver&&
+  !(actor.hmk.healthState.mishaps??[]).some(x=>!x.resolved),
   'Aktér má povinný stav bránící další střelbě');
  const actualItems=document.inventory?.filter(i=>i.id===weaponId&&i.characterId===actor.id)??[];
  check(actualItems.length===1,'Zbraň nemá jednoznačnou vlastnickou evidenci');
@@ -403,11 +403,11 @@ export function persistPelahnExtraMissile({stage,attackSession,transcript,docume
   !attackSession.finalAttack?.forcedMishaps?.length,
   'Volley, jiný skutečný cíl či povinné Missile Mishaps vyžadují plný samostatný průchod');
  const target=document.characters.find(c=>c.id===stage.targetId);
- const resolved=completeGuidedAttack({session:attackSession,currentState:target.hmk.combatState,
+ const resolved=completeGuidedAttack({session:attackSession,currentState:target.hmk.healthState,
   sourceSignature:stage.sourceSignature,currentInventory:document.inventory});
  const out=cp(document),victim=out.characters.find(c=>c.id===stage.targetId);
  if(resolved.strike){
-  victim.hmk.combatState=cp(resolved.state);
+  victim.hmk.healthState=cp(resolved.state);
   check(Array.isArray(victim.hmk.injuries),'Chybí trvalá anatomická evidence zranění');
   for(const wound of resolved.state.wounds){
    const copies=victim.hmk.injuries.filter(x=>x.id===wound.id);
@@ -417,7 +417,7 @@ export function persistPelahnExtraMissile({stage,attackSession,transcript,docume
    else victim.hmk.injuries.push({...cp(wound),combatRecord:true});
   }
  }
- const due=dueInjuryMorale(victim.hmk.combatState);
+ const due=dueInjuryMorale(victim.hmk.healthState);
  check(due.length===Object.keys(injuryMoraleRolls).length&&
   Object.keys(injuryMoraleRolls).every(id=>due.some(w=>w.woundId===id)),
   'Missile: chybí okamžitá Injury Morale');
@@ -426,14 +426,14 @@ export function persistPelahnExtraMissile({stage,attackSession,transcript,docume
   check(initiative.length===1&&int(initiative[0].ml,0,200),'Cíl nemá doloženou Initiative ML');
   for(const w of due){const ev=injuryMoraleRolls[w.woundId];
    check(ev&&int(ev.roll,1,100)&&int(ev.aberrance,0,200),'Chybí fyzický hod Morale');
-   victim.hmk.combatState=applyConfirmedInjuryMorale({state:victim.hmk.combatState,
+   victim.hmk.healthState=applyConfirmedInjuryMorale({state:victim.hmk.healthState,
     round:seq.round,eventId:`${stage.id}:morale:${w.woundId}`,woundId:w.woundId,
     initiativeML:initiative[0].ml,roll:ev.roll,aberrance:ev.aberrance,
     timelineId:seq.timelineId,gmConfirmed:true}).state;
   }
  }
- check(!dueInjuryMorale(victim.hmk.combatState).length&&
-  !unresolvedInjuryMishaps(victim.hmk.combatState).length,'Nedokončený Injury/Mishap');
+ check(!dueInjuryMorale(victim.hmk.healthState).length&&
+  !unresolvedInjuryMishaps(victim.hmk.healthState).length,'Nedokončený Injury/Mishap');
  const usedWeapon=document.inventory.find(i=>i.id===stage.inputs.weaponId&&i.characterId===stage.actorId);
  const isThrow=usedWeapon.snapshot.properties.missileType==='thrown';
  const consumed=isThrow?null:consumeLoadedMissile({sequence:seq,inventory:document.inventory,
@@ -484,14 +484,14 @@ export function persistPelahnBonusIncantStart({document,spell,ENDD100,gmConfirme
   'Z téhož IR nelze vyvolat druhé Incant');
  const mage=document.characters.find(x=>x.id===due.actorId);
  check(mage?.hmk?.arcane?.primaryConvocation==='Pèleáhn','Chybí doložený Primary Pèleáhn');
- check(!['afraid','terrified','catatonic'].includes(mage.hmk.combatState?.fear?.state),
+ check(!['afraid','terrified','catatonic'].includes(mage.hmk.healthState?.fear?.state),
   'Fear nedovoluje druhý Incant');
  const descriptor=requirePelahnBonusIncantSpell(mage,spell);
  check(mage.hmk.arcane.verifiedGestureEncumbrance===0&&
   !mage.hmk.arcane.auralShockLevels&&!mage.hmk.arcane.activeMisfireWarp&&
-  mage.hmk.combatState.wounds.length===0,
+  mage.hmk.healthState.wounds.length===0,
   'Nedoložené podmínky Doom Flame Incant / Aural Shock');
- const states=Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.combatState]));
+ const states=Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.healthState]));
  const prepared=beginPelahnBonusConcentration(seq,states,{actorId:mage.id,
   durationRounds:descriptor.castingTimeRounds,gmConfirmed:true});
  const started=prepared.log.at(-1);
@@ -531,11 +531,11 @@ export function persistPelahnExtraMove({document,storage,key,baseline,battlefiel
  check(gmConfirmed===true,'Hyper Burst Move potřebuje přímé potvrzení GM');
  const seq=validateEncounterSequence(document?.combatRuntime?.sequence),due=awaitingPelahnBonus(seq);
  check(due&&int(ENDD100,1,100),'Není splatný bonusový Move a skutečný END d100');
- const c=document.characters.find(x=>x.id===due.actorId),s=c?.hmk?.combatState;
+ const c=document.characters.find(x=>x.id===due.actorId),s=c?.hmk?.healthState;
  check(s,'Chybí autoritativní stav aktéra');validateCombatState(s);
  check(!['afraid','terrified','catatonic'].includes(s.fear?.state),
   'Bonusový Move při Fear vyžaduje ověřený ústup od zdroje; nepodporovaný průchod je blokován');
- check(dueEncounterEvents(seq,Object.fromEntries(document.characters.map(x=>[x.id,x.hmk?.combatState]))).length===0,
+ check(dueEncounterEvents(seq,Object.fromEntries(document.characters.map(x=>[x.id,x.hmk?.healthState]))).length===0,
   'Hyper Burst nesmí obejít splatné Injury/Mishap/Morale');
  const fatigue=combatFatigueTotals(s).total,base=moveOf(document,c,seq),END=c.hmk.attributes?.end;
  check(int(END,1,40)&&fatigue<base,'Fatigue >= Move: druhá akce není přípustná, ale END test zůstává povinný');
@@ -572,7 +572,7 @@ export function persistPelahnExtraMove({document,storage,key,baseline,battlefiel
   ENDD100,ENDSL:evidence.ENDSL,wearinessAdded:evidence.wearinessAdded,gmEnteredDice:true});
  out.combatRuntime.sequence=validateEncounterSequence(next);
  const actor=out.characters.find(x=>x.id===c.id);
- if(evidence.wearinessAdded)actor.hmk.combatState=applyConfirmedFatigue({state:actor.hmk.combatState,
+ if(evidence.wearinessAdded)actor.hmk.healthState=applyConfirmedFatigue({state:actor.hmk.healthState,
   round:seq.round,eventId:`${selectedBonusSource(seq).id}:end:${seq.round}:${c.id}`,
   kind:'weariness',delta:evidence.wearinessAdded}).state;
  out.journal.push({id:'pelahn:'+eventId,characterId:c.id,createdAt:new Date().toISOString(),

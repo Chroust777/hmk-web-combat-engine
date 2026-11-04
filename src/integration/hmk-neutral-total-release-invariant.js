@@ -93,12 +93,12 @@ export function validateNeutralTotalReleaseHistory(document){
     e.round===proof.round&&e.spellstartId===c.spellstartId&&
     js(e.physicalDice)===js(dice)&&js(e.vortex)===js(vortex));
    const actor=document.characters?.find(a=>a.id===c.casterId);
-   const events=actor?.hmk?.combatState?.events?.filter(e=>
+   const events=actor?.hmk?.healthState?.events?.filter(e=>
     e.id===proof.sourceEventId+':total-release'&&e.type==='hmk-spell-total-release'&&
     e.round===proof.round&&e.details?.sourceEventId===proof.sourceEventId&&
     e.details?.spiritD100===c.spirit.spiritD100&&
     e.details?.spiritMLLoss===c.spirit.spiritMLLoss);
-   const csEvents=actor?.hmk?.combatState?.events?.filter(e=>
+   const csEvents=actor?.hmk?.healthState?.events?.filter(e=>
     e.type==='hmk-vortex-caster-psyche'&&e.details?.parentEventId===proof.sourceEventId);
    insist(logs?.length===1&&events?.length===1&&csEvents?.length===debts.length&&
     debts.every(d=>csEvents.filter(e=>e.id===d.sourceEventId&&
@@ -166,7 +166,7 @@ export function assertCommittedNeutralTotalRelease(before,after){
  const original=before.characters?.find(x=>x.id===c.casterId),actor=after.characters?.find(x=>x.id===c.casterId),
   oldSpirit=original?.hmk?.skills?.filter(s=>String(s.name).trim().toLowerCase()==='spirit'),
   newSpirit=actor?.hmk?.skills?.filter(s=>String(s.name).trim().toLowerCase()==='spirit'),
-  oldState=original?.hmk?.combatState,state=actor?.hmk?.combatState;
+  oldState=original?.hmk?.healthState,state=actor?.hmk?.healthState;
  insist(oldSpirit?.length===1&&newSpirit?.length===1&&
   oldSpirit[0].ml===c.spirit.spiritML&&
   newSpirit[0].ml===Math.max(0,oldSpirit[0].ml-c.spirit.spiritMLLoss)&&

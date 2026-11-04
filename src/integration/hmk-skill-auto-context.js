@@ -7,7 +7,7 @@
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 import {completeParalysis,blockedLimbs} from './hmk-paralysis-sequela.js';
 import {resolveSkillConditions,skillConditionAvailability,encApplicability} from './hmk-skill-context.js';
-import {resolveSkillTrauma,impairedSkillKind,skillTraumaAvailability} from './hmk-skill-trauma.js';
+import {resolveSkillTrauma,impairedSkillKind,skillTraumaAvailability,hasLiveInjury} from './hmk-skill-trauma.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {resolveCombatantLoad} from './combatant-load.js';
 import {resolveOwnedArmourArticle} from './live-combat-armour.js';
@@ -57,9 +57,9 @@ const armSkills=new Set(['Melee','Archery','Slings','Throwing','Dodge','Dexterit
 const bothArms=new Set(['Archery','Slings','Climbing','Swimming']);
 export function recordedActor(actor){
  if(!actor||!actor.hmk)throw Error('Postava nemá ověřený HMK profil');
- if(actor.hmk.combatState){validateCombatState(actor.hmk.combatState);return {actor,state:actor.hmk.combatState,source:'saved-combat-state'};}
+ if(actor.hmk.healthState){validateCombatState(actor.hmk.healthState);return {actor,state:actor.hmk.healthState,source:'saved-combat-state'};}
  if((actor.hmk.injuries?.length??0)>0)throw Error('Starší evidovaná zranění nejsou převedena do Combat State; dokončete je v Character Sheet / Combat.');
- const state=initialCombatState();return {actor:{...actor,hmk:{...actor.hmk,combatState:state}},state,source:'ledger-clean-baseline'};
+ const state=initialCombatState();return {actor:{...actor,hmk:{...actor.hmk,healthState:state}},state,source:'ledger-clean-baseline'};
 }
 export function inferredArms(actor,inventory,name,state){
  const woundedArms=(state?.wounds??[]).some(w=>(!w.healed||(w.healing?.permanentImpairment??0)>0)&&['sh','ua','el','fo','ha','shoulder','upper arm','elbow','forearm','hand'].includes(String(w.location??'').toLowerCase()));
@@ -180,7 +180,7 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
  const impaired=impairedSkillKind(base.actor,name);
  const arm=inferredArms(base.actor,inventory,name,state);
  let trauma;
- if(!state.wounds.length){
+ if(!hasLiveInjury(state.wounds)){
   // The old resolver required per-test GM mode decisions even on a clean
   // character. Zero injury and STN check are completely source-proven here.
   trauma=resolveSkillTrauma({actor:base.actor,inventory,name,shockMode:'auto',injuryMode:'auto',bulkMode:bk.mode,manualBulk:bk.value,perceptionMode:pe.mode,manualPerception:pe.value});

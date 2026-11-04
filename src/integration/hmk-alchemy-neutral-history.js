@@ -194,7 +194,7 @@ export function validateNeutralAlchemyCombatLinks(document){
   if(!c||row.combatProof?.timelineId!==timeline)continue;
   const sourceEventId=row.combatProof?.sourceEventId;
   const actor=document.characters?.find(x=>x.id===c.casterId);
-  const events=actor?.hmk?.combatState?.events;
+  const events=actor?.hmk?.healthState?.events;
   ok(typeof sourceEventId==='string'&&Array.isArray(events),
    'Spellfire nemá původní Combat State');
   const matching=events.filter(e=>e.id===sourceEventId+':casting-fatigue'&&

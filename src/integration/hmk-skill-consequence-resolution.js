@@ -18,7 +18,7 @@ export function automaticCriticalFailure({ml,reason,woundIds=[],svExtra=0}={}){
 }
 /** Read-only projection; same pending IDs are NEVER copied into another queue. */
 export function pendingCombatConsequences(actor){
- const s=actor?.hmk?.combatState;
+ const s=actor?.hmk?.healthState;
  if(!s)return {state:'unknown',events:[],reason:'Není potvrzen Combat State'};
  try{validateCombatState(s);}catch(e){return {state:'invalid',events:[],reason:e.message};}
  const events=[];
@@ -30,7 +30,7 @@ export function pendingCombatConsequences(actor){
  if(s.bloodShockPending===true)events.push({type:'blood-shock',id:'blood-shock:pending',sourceId:'blood-shock',label:'Blood Shock – trvalý povinný následek'});
  for(const w of s.wounds??[])if(w.bleeding&&Number.isSafeInteger(w.nextAdvanceRound))events.push({type:'bleeding-scheduled',id:`bleeding:${w.id}:${w.nextAdvanceRound}`,sourceId:w.id,label:`Blood Loss – plánováno kolo ${w.nextAdvanceRound}; splatnost vyhodnotí Combat`});
  for(const x of s.morale?.specialPending??[])events.push({type:'special-morale',id:`special-morale:${x.id}`,sourceId:x.sourceEventId,label:x.description});
- const seen=new Set();return {state:'confirmed',events:events.filter(e=>!seen.has(e.id)&&seen.add(e.id)),source:'authoritative-character.hmk.combatState',readOnly:true};
+ const seen=new Set();return {state:'confirmed',events:events.filter(e=>!seen.has(e.id)&&seen.add(e.id)),source:'authoritative-character.hmk.healthState',readOnly:true};
 }
 /** Context is explicit. The generic CF has NO universal physical mishap.
  * In combat, only existing Combat can commit mishap and equipment/posture changes.

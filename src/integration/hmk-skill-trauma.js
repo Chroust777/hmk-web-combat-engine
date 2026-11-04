@@ -7,6 +7,9 @@ import {impairedTestZones} from '../rules/injury-effects.js';
 import {resolveCombatantLoad,bulkForTest} from './combatant-load.js';
 import {skillDefinition,perceptionDefinition} from './hmk-character-creation.js';
 const BODY_ZONES=['head','arms','torso','legs'];
+// Healed wounds remain in the immutable character history, but no longer
+// count as a live injury unless HMK records a permanent impairment.
+export const hasLiveInjury = wounds => Array.isArray(wounds)&&wounds.some(w=>!w.healed||(Number(w.healing?.permanentImpairment)||0)>0);
 const IMPAIRED_NAME=Object.freeze({Acrobatics:'acrobatics',Agility:'agility',Archery:'archery',Awareness:'awareness',Climbing:'climbing',Dancing:'dancing',Dexterity:'dexterity',Dodge:'dodge',Jumping:'jumping',Legerdemain:'legerdemain',Melee:'melee',Riding:'riding',Slings:'slings',Stealth:'stealth',Strength:'strength',Swimming:'swimming',Throwing:'throwing'});
 const DERIVED_PER=new Set(['Sight','Sound','Odour']);
 const ATTRIBUTES=new Set(['Strength','Endurance','Dexterity','Agility','Perception','Comeliness','Aura','Will','Reasoning','Creativity','Empathy','Eloquence']);
@@ -30,12 +33,12 @@ export function skillPerceptionApplicability(actor,name){
 function ownedArmour(inventory,actor){return Array.isArray(inventory)&&inventory.some(x=>x?.characterId===actor?.id&&x.slot==='worn');}
 function ruleZones(test){return impairedTestZones(test).map(x=>x==='arm'?'arms':x);}
 export function skillTraumaAvailability({actor,inventory=[],name,mounted=false,bulkAssessed=false,bulkZones=[]}={}){
- const state=actor?.hmk?.combatState;
+ const state=actor?.hmk?.healthState;
  let shock={ready:false,reason:'Chybí potvrzený stav Shock'};
  if(state){try{validateCombatState(state);shock={ready:true,value:state.shock,source:'confirmed-combat-state'};}catch(e){shock={ready:false,reason:'Neplatný Combat State: '+e.message};}}
  const kind=impairedSkillKind(actor,name),wounds=state?.wounds;
  let injury={ready:false,reason:'Pro případná zranění chybí potvrzený bojový stav'};
- if(shock.ready){injury=(!wounds.length)?{ready:true,modifier:0,source:'confirmed-no-wounds',slPenalty:0}
+ if(shock.ready){injury=(!hasLiveInjury(wounds))?{ready:true,modifier:0,source:'confirmed-no-wounds',slPenalty:0}
  :{ready:false,reason:kind?'Aktuální kolo, časovou osu a použitou ruku musí potvrdit GM':'Test není výslovně uveden v tabulce Impaired Tests; účinek ran musí rozhodnout GM'};}
  let bulk={ready:false,reason:'Body-zone Bulk nebyl vyhodnocen'},perception={ready:false,reason:'Vliv zbroje na PER nebyl vyhodnocen'};
  const perApplies=skillPerceptionApplicability(actor,name);
@@ -68,7 +71,7 @@ export function resolveSkillTrauma({actor,inventory=[],name,mounted=false,
   currentRound=null,usedArm=null,bulkAssessed=false,bulkZones=[],
   manualInjury=null,manualBulk=null,manualPerception=null}={}){
  const preview=skillTraumaAvailability({actor,inventory,name,mounted,bulkAssessed,bulkZones});
- const state=actor?.hmk?.combatState;
+ const state=actor?.hmk?.healthState;
  const sm=['auto','gm-ready'].includes(shockMode)?shockMode:null;
  if(!sm)throw Error('Shock: GM musí zvolit potvrzený Combat State nebo potvrdit akceschopnost mimo doložený stav');
  if(state&&!preview.shock.ready)throw Error('Shock: neplatný potvrzený Combat State; nelze jej obejít ruční volbou');
@@ -79,7 +82,7 @@ export function resolveSkillTrauma({actor,inventory=[],name,mounted=false,
  let injury;
  if(whichMode(injuryMode,'Injury')==='auto'){
   if(!preview.shock.ready)throw Error('Injury: chybí doložený bojový stav; GM musí určit postih nebo výslovně nepotvrdit jeho použití');
-  if(!state.wounds.length)injury={...preview.injury,mode:'auto'};
+  if(!hasLiveInjury(state.wounds))injury={...preview.injury,mode:'auto'};
   else {
    if(!kind)throw Error('Injury: pro tuto dovednost není ověřená tabulka Impaired Tests; rozhodne GM');
    if(currentRound===null||currentRound===''||!Number.isSafeInteger(Number(currentRound))||Number(currentRound)<1||Number(currentRound)>9999)

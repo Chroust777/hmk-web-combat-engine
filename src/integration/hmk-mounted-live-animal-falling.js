@@ -43,9 +43,9 @@ export function previewVerifiedMountedAnimalTrauma({mount,stumbleSL,impactD10,zo
   'Horse injury requires a verified p355 breed and matching GM attestation');
  const s=info[breed];
  const fallZoneDieFaces=10; // HMK p.67 unexpected fall, not p.355 animal attack ZD
- verify(mount?.hmk?.combatState?.format==='hmk-persistent-combat-v1',
+ verify(mount?.hmk?.healthState?.format==='hmk-character-health-v1',
   'Animal injury requires its live persistent combat state');
- validateCombatState(mount.hmk.combatState);
+ validateCombatState(mount.hmk.healthState);
  verify(['F','CF'].includes(stumbleSL)&&isDie(impactD10,10)&&
   isDie(zoneD,fallZoneDieFaces)&&isDie(locationD,10)&&aimConfirmed===true&&aimZN===1,
   'Mount Stumble random hit requires physical FALL d10 ZD and d10 LD (HMK p67), Aim ZN1; p355 attack ZD is not fall ZD');
@@ -63,7 +63,7 @@ export function previewVerifiedMountedAnimalTrauma({mount,stumbleSL,impactD10,zo
  // freely supplied side. Older wounds lacking a side cannot be silently
  // assigned to this leg; require a separate GM review before any write.
  const side=leg.has(location)?(zoneD%2?'left':'right'):null;
- const sameLocation=mount.hmk.combatState.wounds.filter(w=>!w.healed&&w.location===location);
+ const sameLocation=mount.hmk.healthState.wounds.filter(w=>!w.healed&&w.location===location);
  verify(side===null||sameLocation.every(w=>w.side==='left'||w.side==='right'),
   'Existing mount leg wound has unknown side; compound must be reviewed');
  const candidate={location,aspect:'blunt',area:false};

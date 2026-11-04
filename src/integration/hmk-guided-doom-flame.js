@@ -42,7 +42,7 @@ export function prepareDoomFlameSource({id,sequence,document,casterId,center,see
   'Spellfire musí být právě aktivním tahem kouzelníka');
  check(typeof id==='string'&&id.length>0&&id.length<=140&&
   !seq.log.some(x=>x.eventId===id),'Neplatné nebo duplicitní ID Area');
- const facts=casterFacts(caster),casterState=caster.hmk.combatState;
+ const facts=casterFacts(caster),casterState=caster.hmk.healthState;
  validateCombatState(casterState);
  check(!['STN','INC','UNC','KIA'].includes(casterState.shock)&&
   !casterState.coma?.active&&
@@ -141,7 +141,7 @@ export function submitDoomFlameDie(stage,value){
     const spirit=caster?.hmk?.skills?.filter(x=>String(x.name).trim().toLowerCase()==='spirit');
     check(spirit?.length===1&&int(spirit[0].ml,0,200),
      'Total Release vyžaduje jednoznačnou aktuální Spirit ML kouzelníka');
-    const fatigue=combatFatigueTotals(caster.hmk.combatState).total;
+    const fatigue=combatFatigueTotals(caster.hmk.healthState).total;
     const eml=Math.max(0,spirit[0].ml-30-fatigue);
     return {...stage,misfireD100:100,misfireKind:'total-release',crucialMisfire:true,
      misfirePsycheStress:3,totalCastingFatigue:20,totalReleaseSpiritML:spirit[0].ml,
@@ -184,7 +184,7 @@ export function resolveDoomFlameCohort({stage,document,rollsByTarget,noEvadeTarg
   conditionsConfirmed:true,gmConfirmed:true});
  const verifiedFinal=submitDoomFlameDie(submitDoomFlameDie(verifiedStart,stage.castingRoll),stage.fireD4);
  check(js(verifiedFinal)===js(stage),'Podvržený Spell EML, Area geometrie, Casting SL nebo Impact d4');
- const states=Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.combatState]));
+ const states=Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.healthState]));
  const sourceSeq=recordScheduledHitCommit(original,{actorId:stage.casterId,states,gmConfirmed:true});
  let proactiveProof=null;
  if(proactive.length){
@@ -255,7 +255,7 @@ export function persistGuidedDoomFlame({stage,rollsByTarget,noEvadeTargetIds,pro
  for(const [id,state] of Object.entries(fresh.states)){
   const c=out.characters.find(c=>c.id===id);
   check(c?.hmk&&Array.isArray(c.hmk.injuries),'Chybí postava nebo trvalý seznam zranění');
-  c.hmk.combatState=cp(state);
+  c.hmk.healthState=cp(state);
   // Keep all Area wounds, including compounded wounds, consistent in the
   // character sheet's independent injury record.
   for(const wound of state.wounds){
@@ -293,7 +293,7 @@ export function persistFailedDoomFlame({stage,document,storage,key,baseline}={})
   center:stage.center,seedFire:stage.seedFire,conditionsConfirmed:true,gmConfirmed:true});
  const verified=submitDoomFlameDie(initial,stage.castingRoll);
  check(js(verified)===js(stage),'Podvržený casting d100, jeho F výsledek nebo Fatigue');
- const all=Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.combatState]));
+ const all=Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.healthState]));
  const newState=cp(all[stage.casterId]);validateCombatState(newState);
  newState.fatigue.windedness+=15;
  newState.events.push({id:stage.id+':failed-casting',round:stage.round,type:'hmk-casting-fatigue',
@@ -307,7 +307,7 @@ export function persistFailedDoomFlame({stage,document,storage,key,baseline}={})
  check(!outcome.pendingEndTurnAction,'Splatné následky na konci failed Casting');
  const out=cp(document);out.combatRuntime.sequence=outcome;
  out.combatRuntime.clock={round:outcome.round,actorId:currentEncounterActor(outcome)||''};
- out.characters.find(c=>c.id===stage.casterId).hmk.combatState=newState;
+ out.characters.find(c=>c.id===stage.casterId).hmk.healthState=newState;
  const jid=`doom-flame-failed:${stage.id}`;
  check(!out.journal.some(x=>x.id===jid),'Duplicitní failed Casting důkaz');
  out.journal.push({id:jid,characterId:stage.casterId,createdAt:new Date().toISOString(),
@@ -337,7 +337,7 @@ export function persistDoomFlameFormMisfire({stage,document,storage,key,baseline
   conditionsConfirmed:true,gmConfirmed:true});
  const verified=submitDoomFlameDie(submitDoomFlameDie(original,stage.castingRoll),stage.misfireD100);
  check(js(verified)===js(stage),'Podvržené fyzické hody, Misfire nebo Fatigue');
- const all=Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.combatState]));
+ const all=Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.healthState]));
  const nextState=cp(all[stage.casterId]);validateCombatState(nextState);
  nextState.fatigue.windedness+=stage.totalCastingFatigue;
  // HMK p189,190,203: Aural Shock immediately adds 5 weakness fatigue
@@ -365,7 +365,7 @@ export function persistDoomFlameFormMisfire({stage,document,storage,key,baseline
  const out=cp(document);out.combatRuntime.sequence=result;
  out.combatRuntime.clock={round:result.round,actorId:currentEncounterActor(result)||''};
  const caster=out.characters.find(c=>c.id===stage.casterId);
- caster.hmk.combatState=nextState;
+ caster.hmk.healthState=nextState;
  if(stage.phase==='misfire-mental-trauma')
   applyMisfireArcaneTrauma(caster.hmk.arcane,classifySpellMisfire(stage.misfireD100,6),stage.id);
  if(stage.crucialMisfire){

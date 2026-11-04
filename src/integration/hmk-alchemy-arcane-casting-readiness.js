@@ -93,7 +93,7 @@ export function neutralOrdinaryCastingEML({character,spell,target=null,
  const caster=alchemyArcaneCasterDossier(character);
  guard(caster.verified&&caster.known.includes(SPELLS[spell]?.id),
   'chybí ověřená znalost Neutral kouzla a současné Pvârism');
- const state=validateCombatState(character?.hmk?.combatState);
+ const state=validateCombatState(character?.hmk?.healthState);
  guard(state.shock==='NONE'&&!state.coma?.active&&
   !['withdrawing','routed','catatonic'].includes(state.morale?.state)&&
   !state.wounds.some(w=>w.healed!==true)&&

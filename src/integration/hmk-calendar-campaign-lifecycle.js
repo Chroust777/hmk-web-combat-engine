@@ -48,7 +48,7 @@ export function makeCalendarEvidenceArchive(clock,people,journal,id,inventory=[]
  assert(rationInventoryBackings.length===rationIds.size,
   'Nelze odstranit kalendář: chybí původní inventární příděly');
  const medicalBranches=people.filter(c=>ids.has(c.id)).flatMap(c=>{
-  const state=c.hmk?.combatState;
+  const state=c.hmk?.healthState;
   const episodes=(state?.malnutritionEpisodes??[]).filter(e=>e.campaignId===sourceCampaignId);
   if(!episodes.length)return [];
   const sourceIds=new Set(episodes.map(e=>e.id));

@@ -12,7 +12,7 @@ const minute=v=>Number.isSafeInteger(v)&&v>=0&&v<=1000000000;
  * coma explicitly require assistance. Other shock systems remain authoritative.
  * No additional Shock or medical status is created here. */
 export function needsAssistedIntake(actor){
- const s=actor?.hmk?.combatState;
+ const s=actor?.hmk?.healthState;
  if(!s||s.shock==='KIA')return false;
  return s.shock==='UNC'||s.shock==='INC'||s.coma?.active===true||
   (s.malnutritionEpisodes??[]).some(e=>e.status==='active'&&e.hr<=2);

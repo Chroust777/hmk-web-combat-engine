@@ -55,7 +55,7 @@ function actorAttributes(c){const a=c?.hmk?.attributes||{};const end=Number(a.en
 export function episodeTimedCourseStep(database,event,{rolls={},idFactory,stamp}={}){
  const key=episodeTimedCourseKey(event),actor=database.characters.find(c=>c.id===event.characterId);
  if(!actor)throw Error('Chybí postava pro zdravotní termín '+key);
- const state=actor.hmk?.combatState;
+ const state=actor.hmk?.healthState;
  if(!state)throw Error('Postava nemá trvalý HMK Combat State');
  let fields=episodeTimedCourseFields(event);const supplied=rolls[key];
  const values=(supplied&&typeof supplied==='object'&&!Array.isArray(supplied))?supplied:{roll:supplied};
@@ -152,7 +152,7 @@ export function episodeTimedCourseStep(database,event,{rolls={},idFactory,stamp}
  const appendedEvents=(outcome.state.events||[]).filter(e=>!priorEventIds.has(e.id));
  if(appendedEvents.length!==1)throw Error('Časovaný zdravotní výsledek nemá právě jednu původní Combat State událost: '+event.kind);
  const sourceEvent=appendedEvents[0];
- actor.hmk.combatState=outcome.state;
+ actor.hmk.healthState=outcome.state;
  // The four state-first executors return sparse top-level values, but their
  // authoritative, complete roll/modifier/outcome evidence lives in the Combat
  // State event created by THIS invocation. Never infer it from later state.

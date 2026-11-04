@@ -224,13 +224,13 @@ export function validateAcidFleshCombatLinks(database){
   const r=row.calendarAlchemyAcidFleshRound;if(!r)continue;
   const target=database.characters.find(x=>x.id===r.targetId);
   need(target,'zdravotní důkaz odkazuje na neznámou postavu');
-  const e=target.hmk?.combatState?.events?.find(x=>x.id===r.eventId);
+  const e=target.hmk?.healthState?.events?.find(x=>x.id===r.eventId);
   need(r.health?!!e&&['confirmed-hit','acid-burn-progression'].includes(e.type)&&e.details?.acidFlesh?.applicationId===r.applicationId&&
     e.details?.acidFlesh?.contactD10===r.d10&&e.details?.acidFlesh?.shockD100===r.health.shockD100&&
     e.details?.acidFlesh?.shockEML===r.health.shockEML&&
     e.details?.acidFlesh?.burnILAfter===r.burnILAfter&&
     e.details?.acidFlesh?.woundIL===r.health.woundIL&&
-    !!target.hmk.combatState.wounds.find(w=>w.id===r.health.woundId&&w.aspect==='fire')&&
+    !!target.hmk.healthState.wounds.find(w=>w.id===r.health.woundId&&w.aspect==='fire')&&
     (r.health.ingestionLethal?e.details?.acidIngestionLethal?.observedIL===r.burnILAfter:true):
     !e,'chybí skutečný odpovídající Combat State zápis');
  }

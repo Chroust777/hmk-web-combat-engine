@@ -91,7 +91,7 @@ export function previewAlchemyAreaBlast({sequence,characters=[],inventory=[],jou
   check(integer(impactD4,1,4)&&diceOrigin(impactOrigin),'nutný skutečný Impact d4 a jeho původ');
   const strikeImpact=impactD4+dose.currentAS;
   if(areaIds.length){
-   const stateMap=Object.fromEntries(characters.map(c=>[c.id,c.hmk?.combatState]));
+   const stateMap=Object.fromEntries(characters.map(c=>[c.id,c.hmk?.healthState]));
    const result=previewAreaCohort({id:sourceId,timelineId:seq.timelineId,round:seq.round,
     aspect:'fire',strikeImpact,targetIds:areaIds,characters,states:stateMap,inventory,
     rollsByTarget,sequence:seq,method});
@@ -117,7 +117,7 @@ export function previewAlchemyAreaBlast({sequence,characters=[],inventory=[],jou
      integer(mr.aberrance,0,200)&&Object.keys(mr).length===3,
      'Eruption: Special Morale vyžaduje skutečný Initiative d100, fyzický původ a GM doloženou Aberrance pro '+id);
    }
-   const originalStates=Object.fromEntries(characters.map(c=>[c.id,c.hmk.combatState]));
+   const originalStates=Object.fromEntries(characters.map(c=>[c.id,c.hmk.healthState]));
    const allStates={...originalStates,...stagedStates};
    const participants=characters.map(character=>({character,state:allStates[character.id]}));
    const registered=registerSpecialMorale({sequence:seq,participants,
@@ -150,7 +150,7 @@ export function previewAlchemyAreaBlast({sequence,characters=[],inventory=[],jou
   moraleByOpponent&&Object.keys(moraleByOpponent).length===0,
   'povinná Morale mimo výbuch patří jen Eruption');
  for(const id of areaIds){
-  const c=characters.find(x=>x.id===id),s=c?.hmk?.combatState;
+  const c=characters.find(x=>x.id===id),s=c?.hmk?.healthState;
   validateCombatState(s);
   check(s.shock!=='KIA'&&s.lastRound<=seq.round,'neplatný cíl nebo starší bojové kolo '+id);
   const roll=rollsByTarget[id];check(roll&&typeof roll==='object','chybí údaje cíle '+id);

@@ -47,7 +47,7 @@ export function prepareAnimalSurvivalAccident({actor,state,inventory,sourceId,ro
  }
  requireFact(isDie(impactDie,6)&&isDie(zoneD10,10)&&isDie(locationD10,10),
   'F/CF zvířete vyžaduje skutečné Impact d6, ZD d10 a LD d10');
- const probe=previewVerifiedMountedAnimalTrauma({mount:{...actor,hmk:{...actor.hmk,combatState:state}},
+ const probe=previewVerifiedMountedAnimalTrauma({mount:{...actor,hmk:{...actor.hmk,healthState:state}},
   printedBreed:breed,stumbleSL:'F',impactD10:impactDie,zoneD:zoneD10,locationD:locationD10,
   aimZN:1,aimConfirmed:true});
  requireFact(!probe.miss,'ZD minulo ověřenou anatomii zvířete: vyžaduje rozhodnutí GM');

@@ -18,18 +18,18 @@ const column={starvation:['foodReceived','foodNeed'],thirst:['waterReceived','wa
 const weakness=hr=>ailmentOutcome(hr).weaknessFatigue;
 const shock=hr=>({stunned:'STN',incapacitated:'INC',unconscious:'UNC',killed:'KIA',none:'NONE'})[ailmentOutcome(hr).shockState]??'NONE';
 const severity={NONE:0,STN:1,INC:2,UNC:3,KIA:4};
-function episodes(c){return c?.hmk?.combatState?.malnutritionEpisodes??[]}
+function episodes(c){return c?.hmk?.healthState?.malnutritionEpisodes??[]}
 /** Journal entries survive campaign switches. Their medical events may reside
  * in an inactive campaign's preserved actor branch, not the visible actor.
  * Never validate an old medical proof against another campaign's snapshot. */
 function evidenceState(database,actorId,campaignId){
  const actor=database.characters?.find(c=>c.id===actorId);
- if(campaignId===campaignKey(database.campaignClock))return actor?.hmk?.combatState;
- return database.campaignActorBranches?.[campaignId]?.[actorId]?.hmk?.combatState??
+ if(campaignId===campaignKey(database.campaignClock))return actor?.hmk?.healthState;
+ return database.campaignActorBranches?.[campaignId]?.[actorId]?.hmk?.healthState??
   (database.calendarEvidenceArchives??[]).find(a=>a.sourceCampaignId===campaignId)
    ?.medicalBranches?.find(b=>b.actorId===actorId)?.state;
 }
-function ensureState(c){c.hmk??={};c.hmk.combatState??=initialCombatState();return c.hmk.combatState}
+function ensureState(c){c.hmk??={};c.hmk.healthState??=initialCombatState();return c.hmk.healthState}
 function rationStatus(p,kind){const [received,needed]=column[kind],got=p[received],want=p[needed];
  if(got>=want)return 'full';if(got===0)return 'none';if(got===want/2)return 'half';return 'partial';}
 function entries(journal,campaignId,actorId){return journal.filter(j=>j.calendarCampaignId===campaignId&&j.characterId===actorId&&j.calendarNutritionDay?.format==='hmk-nutrition-day-v1').sort((a,b)=>a.calendarNutritionDay.endMinute-b.calendarNutritionDay.endMinute)}
@@ -54,7 +54,7 @@ export function applyDueMalnutritionOnsets(database,{idFactory,stamp}={}){
  const newEntries=[];
  const participants=new Set(clock.characterIds??database.characters.map(c=>c.id));
  for(const actor of database.characters.filter(c=>participants.has(c.id))){
-  const history=entries(database.journal,campaignId,actor.id);if(!history.length||actor.hmk?.combatState?.shock==='KIA')continue;
+  const history=entries(database.journal,campaignId,actor.id);if(!history.length||actor.hmk?.healthState?.shock==='KIA')continue;
   for(const kind of kinds){
    let zero=0,halves=0;
    // A cured episode cannot recur from ration shortages that were already
@@ -176,7 +176,7 @@ export function resolveMalnutritionCourse(database,{actorId,episodeId,roll,rollO
  const eventId=idFactory(),jId=idFactory(),round=Math.max(1,next.lastRound);
  next.events.push({id:eventId,type:'malnutrition-'+due.mode,round,details:{kind:e.kind,episodeId,fromHR:before,toHR:nextHR,
   roll,eml,sl:['CF','F','S','CS'][sl],dueMinute:due.dueMinute,resolvedMinute:clock.minute}});
- validateCombatState(next);actor.hmk.combatState=next;
+ validateCombatState(next);actor.hmk.healthState=next;
  const proof={format:MALNUTRITION_FORMAT,phase:due.mode,episodeId,kind:e.kind,sourceDayId:e.sourceDayId,
   dueMinute:due.dueMinute,resolvedMinute:clock.minute,sourceNutritionDayId:historical.id,
   beforeHR:before,afterHR:nextHR,roll,rollOrigin,eml,hb,sl:['CF','F','S','CS'][sl],skipNext:!!transition.skipNext,
@@ -189,7 +189,7 @@ export function resolveMalnutritionCourse(database,{actorId,episodeId,roll,rollO
 }
 export function validateMalnutritionEvidence(database){
  const journal=database?.journal??[];
- for(const actor of database?.characters??[]){const state=actor.hmk?.combatState;if(!state)continue;
+ for(const actor of database?.characters??[]){const state=actor.hmk?.healthState;if(!state)continue;
   const existing=new Set();for(const e of state.malnutritionEpisodes??[]){
    check(e.format===MALNUTRITION_FORMAT&&kinds.includes(e.kind)&&!existing.has(e.id)&&
     Number.isSafeInteger(e.originMinute)&&e.originMinute>=0&&Number.isSafeInteger(e.sequence)&&e.sequence>=0&&

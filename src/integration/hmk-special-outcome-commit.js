@@ -12,7 +12,7 @@ const W=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const astralName=(power)=>[power?.family,power?.subject].filter(Boolean).join(' · ');
 export const YEAR=360*DAY_MINUTES;
 export const MONTH=30*DAY_MINUTES;
-const auralEvents=c=>(c?.hmk?.combatState?.events||[]).filter(e=>['hmk-spell-misfire','hmk-spell-total-release','hmk-shaman-talisman-aural'].includes(e.type)&&Number(e.details?.auralShock)>0).length;
+const auralEvents=c=>(c?.hmk?.healthState?.events||[]).filter(e=>['hmk-spell-misfire','hmk-spell-total-release','hmk-shaman-talisman-aural'].includes(e.type)&&Number(e.details?.auralShock)>0).length;
 
 function religionOf(c){
  const h=c?.hmk||{};
@@ -58,8 +58,8 @@ export function applyRecordedSpecialOutcome({document,sourceId,commitId,gmConfir
  h.liveEffects??={};const active=h.liveEffects, minute=next.campaignClock.minute;
  const outcome=proof.outcome,id=proof.routineId;let detail='',effect={};
  if(outcome.kind==='fatigue'||outcome.kind==='recovery'){
-  ensure(!actor.hmk.injuries?.length||actor.hmk.combatState,'Starší rány nejsou převedeny do Combat State');
-  const state=h.combatState??initialCombatState();
+  ensure(!actor.hmk.injuries?.length||actor.hmk.healthState,'Starší rány nejsou převedeny do Combat State');
+  const state=h.healthState??initialCombatState();
   const winded=['fatigue-climbing','fatigue-digging','fatigue-melee','fatigue-full-run','fatigue-sprint','fatigue-swimming'].includes(id);
   const kind=winded?'windedness':'weariness';
   const max=outcome.kind==='recovery'?Math.min(state.fatigue.weariness,outcome.wearinessRecovered):outcome.accrual;
@@ -70,7 +70,7 @@ export function applyRecordedSpecialOutcome({document,sourceId,commitId,gmConfir
    j.specialOutcomeProof?.minute===minute&&['fatigue','recovery'].includes(j.specialOutcomeProof?.family)),
    'Ve stejném okamžiku kampaně již byla zapsána Fatigue/Recovery. Posuňte potvrzený čas, nikoli další d10.');
   const updated=applyConfirmedFatigue({state,round:Math.max(1,state.lastRound||1),eventId:'special:'+sourceId,kind,delta});
-  h.combatState=updated.state;
+  h.healthState=updated.state;
   detail=`${kind} ${delta>=0?'+':''}${delta}; celkem ${Object.values(updated.state.fatigue).reduce((a,b)=>a+b,0)+updated.state.bloodLoss.weaknessFatigue}`;
   effect={family:outcome.kind,kind,delta};
  }else if(id==='festival-style'){

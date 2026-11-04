@@ -45,7 +45,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    return (days.at(-1)?.calendarNutritionDay.endMinute??p.campaignMinute)+1440;
   }).filter(m=>m>=at&&m<=endMinute);
   const dueCases=dueMalnutritionCases(temp).filter(t=>t.dueMinute<endMinute&&
-   temp.characters.find(c=>c.id===t.characterId)?.hmk?.combatState?.shock!=='KIA');
+   temp.characters.find(c=>c.id===t.characterId)?.hmk?.healthState?.shock!=='KIA');
   const dueTimes=dueCases.map(t=>Math.max(at,t.dueMinute));
   const courseAgenda=episodeTimedCourseAgenda(temp,endMinute-1);
   const next=Math.min(endMinute,...dayEnds,...dueTimes,...courseAgenda.map(t=>Math.max(at,t.minute)));
@@ -76,7 +76,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
     foodAccepted:v.foodAccepted==='yes',waterAccepted:v.waterAccepted==='yes',caregiver:v.caregiver,reason:v.reason});
    temp.journal.push({id:ids(),characterId:p.characterId,calendarCampaignId:campaignId,campaignMinute:proof.minute,
     createdAt:now(),title:'HMK · pomoc s příjmem během Cestování',body:proof.reason,calendarNutritionAssistedIntake:proof});
-   changes.push({key,actorId:p.characterId,dueMinute:proof.minute,kind:'assisted-intake',description:'Doložen skutečný příjem potravy/vody',shockAfter:actor.hmk.combatState?.shock});
+   changes.push({key,actorId:p.characterId,dueMinute:proof.minute,kind:'assisted-intake',description:'Doložen skutečný příjem potravy/vody',shockAfter:actor.hmk.healthState?.shock});
   }
   if(intakeMissing)break;
   finishDueNutritionDays(temp,{idFactory:ids,stamp:now});
@@ -87,7 +87,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    const key=episodeTimedMedicalKey(due);
    if(seen.has(key))throw Error('Duplicitní zdravotní termín '+key);
    seen.add(key);
-   if(temp.characters.find(c=>c.id===due.characterId)?.hmk?.combatState?.shock==='KIA'){
+   if(temp.characters.find(c=>c.id===due.characterId)?.hmk?.healthState?.shock==='KIA'){
     const reason='Zrušeno: postava zemřela před dalším splatným zdravotním testem.';
     temp.journal.push({id:ids(),characterId:due.characterId,calendarCampaignId:campaignId,
      campaignMinute:due.dueMinute,createdAt:now(),title:'HMK · zrušený malnutrition Course',body:reason,
@@ -102,7 +102,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
     requirements.push({key,...due,kind:'malnutrition-course',reason:due.mode==='pending'?'Nejdříve doložte skutečné denní příděly.':'Vyžaduje skutečný zdravotní d100.'});
     missing=true;continue;
    }
-   const actor=temp.characters.find(c=>c.id===due.characterId),before=actor?.hmk?.combatState;
+   const actor=temp.characters.find(c=>c.id===due.characterId),before=actor?.hmk?.healthState;
    if(due.mode==='pending'){
     requirements.push({key,...due,kind:'malnutrition-course',reason:'Bez uzavřeného a doloženého nutričního dne není povoleno určit Advance/Healing.'});
     missing=true;continue;
@@ -112,7 +112,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    const rolledByApp=rolls.__hmkRollSource?.[key]===n;
    const entry=resolveMalnutritionCourse(temp,{actorId:due.characterId,episodeId:due.episodeId,roll:n,
     rollOrigin:rolledByApp?'software':'manual',gmConfirmed:true,idFactory:ids,stamp:now});
-   const after=actor.hmk.combatState;
+   const after=actor.hmk.healthState;
    changes.push({key,actorId:due.characterId,dueMinute:due.dueMinute,kind:due.kind,roll:n,
     beforeHR:entry.proof.beforeHR,afterHR:entry.proof.afterHR,sl:entry.proof.sl,
     proof:entry.proof,shockAfter:after.shock});
@@ -135,11 +135,11 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    // including one for the SAME patient and minute, can end the life or the
    // condition that justified another scheduled Course. Recheck against the
    // current state instead of sending a dead patient to a healing executor.
-   const stillDue=actor?.hmk?.combatState?.shock!=='KIA'&&
+   const stillDue=actor?.hmk?.healthState?.shock!=='KIA'&&
     episodeTimedCourseAgenda(temp,endMinute-1).some(current=>
      episodeTimedCourseKey(current)===episodeTimedCourseKey(event)&&current.id===event.id);
    if(!stillDue){
-    const reason=actor?.hmk?.combatState?.shock==='KIA'
+    const reason=actor?.hmk?.healthState?.shock==='KIA'
      ?'Zrušeno: postava zemřela při dřívější zdravotní kontrole.'
      :'Zrušeno: předchozí zdravotní výsledek odstranil původní splatnost.';
     // A cancellation is a calendar receipt, NOT a fictitious medical roll or
@@ -150,7 +150,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
       key:episodeTimedCourseKey(event),sourceId:event.id,dueMinute:event.minute,
       cancelled:true,reason,inputs:null,report:null}});
     changes.push({key:episodeTimedCourseKey(event),actorId:event.characterId,dueMinute:event.minute,
-     kind:event.kind,cancelled:true,description:reason,shockAfter:actor?.hmk?.combatState?.shock});
+     kind:event.kind,cancelled:true,description:reason,shockAfter:actor?.hmk?.healthState?.shock});
     continue;
    }
    try{
@@ -185,7 +185,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    // unknown test (which may be fatal) has been resolved by the GM.
    if(requirements.some(r=>!r.provisional&&r.characterId===event.characterId&&r.dueMinute<=event.minute))continue;
    const stagedActor=temp.characters.find(c=>c.id===event.characterId);
-   if(stagedActor?.hmk?.combatState?.shock==='KIA')continue;
+   if(stagedActor?.hmk?.healthState?.shock==='KIA')continue;
    requirements.push({key,kind:event.kind,characterId:event.characterId,dueMinute:event.minute,
     reason:event.description+' · nezávislý známý termín; výsledek se vypočte až ve skutečném čase.',
     fields:episodeTimedCourseFields(event),values:rolls[key]||{},provisional:true});

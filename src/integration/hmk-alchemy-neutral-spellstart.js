@@ -29,7 +29,7 @@ export function prepareNeutralAlchemySpellstart({document,id,casterId,finishId,s
  ok(!document.journal.some(x=>x.id==='neutral-spellstart:'+id||x.combatProof?.sourceEventId===id),
   'opakované ID důkazu');
  const seq=validateEncounterSequence(document.combatRuntime?.sequence),states={};
- document.characters.forEach(c=>{if(c.hmk?.combatState)states[c.id]=validateCombatState(c.hmk.combatState)});
+ document.characters.forEach(c=>{if(c.hmk?.healthState)states[c.id]=validateCombatState(c.hmk.healthState)});
  ok(seq.order.every(who=>states[who]),'chybí trvalý Combat State účastníka');
  ok(seq.active===true&&currentEncounterActor(seq)===casterId&&!seq.interruptActiveId&&
   !seq.pendingEndTurnAction,'spellstart smí začít jen na vlastním aktivním IR');

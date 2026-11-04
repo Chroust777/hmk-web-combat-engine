@@ -37,15 +37,15 @@ export function movementAggravationPlan(database,{start,end,memberIds=[],enabled
  if(!enabled)return {enabled:false,mode,carryOut:{},checks:[]};
  const actors=memberIds.map(id=>database.characters.find(c=>c.id===id));
  assert(actors.every(Boolean)&&new Set(memberIds).size===memberIds.length,'Chybí původní účastník cestování');
- if(mode==='double'&&actors.some(c=>liveSerious(c.hmk?.combatState).length))throw Error('HMK 182: Double Move je při Serious zranění hlavy, trupu či nohy zakázán. Zvolte Half / Full Move.');
+ if(mode==='double'&&actors.some(c=>liveSerious(c.hmk?.healthState).length))throw Error('HMK 182: Double Move je při Serious zranění hlavy, trupu či nohy zakázán. Zvolte Half / Full Move.');
  // The current UI has minute resolution, but a Full Move or Charge is a
  // five-second TURN, not a whole minute. Every actual turn earns its own test.
  const turnCount=mode==='half'?0:span*12;
- assert(!actors.some(c=>movementActorAble(c.hmk?.combatState)&&liveSerious(c.hmk?.combatState).length)||turnCount<=1440,'Full Move / Charge: nejvýše 120 minut v jedné epizodě (1440 tahů). Rozdělte úsek na kratší epizody.');
+ assert(!actors.some(c=>movementActorAble(c.hmk?.healthState)&&liveSerious(c.hmk?.healthState).length)||turnCount<=1440,'Full Move / Charge: nejvýše 120 minut v jedné epizodě (1440 tahů). Rozdělte úsek na kratší epizody.');
  const carryIn=movementAggravationCarry(database,{start,memberIds,mode});
  const carryOut={},checks=[];
  for(const c of actors){
-  const state=c.hmk?.combatState;const wounds=movementActorAble(state)?liveSerious(state):[];
+  const state=c.hmk?.healthState;const wounds=movementActorAble(state)?liveSerious(state):[];
   const prior=wounds.length&&mode==='half'?(carryIn[c.id]||0):0;
   carryOut[c.id]=wounds.length&&mode==='half'?(prior+span)%240:0;
   if(!wounds.length||span===0)continue;
@@ -64,8 +64,8 @@ export const movementAggravationKey=e=>['movement-aggravation',e.characterId,e.m
  * movement zones. Never roll Shock for ordinary F, S, CS. */
 export function movementAggravationStep(database,event,{rolls={},idFactory,stamp}={}){
  const actor=database.characters.find(c=>c.id===event.characterId);
- assert(actor?.hmk?.combatState,'Aggravation: chybí Combat State původní postavy');
- const state=actor.hmk.combatState;validateCombatState(state);
+ assert(actor?.hmk?.healthState,'Aggravation: chybí Combat State původní postavy');
+ const state=actor.hmk.healthState;validateCombatState(state);
  const wounds=liveSerious(state),key=movementAggravationKey(event);
  if(state.shock==='KIA'||!wounds.length)return {key,event,skipped:true};
  if(!movementActorAble(state))return {key,event,skipped:true,incapacitated:true};
@@ -99,7 +99,7 @@ export function movementAggravationStep(database,event,{rolls={},idFactory,stamp
  if(level==='CF'){
   const outcome=prepareSeriousInjuryAggravation({actor,state,sourceId,round:Math.max(1,state.lastRound),originalSL:'CF',ruleEnabled:true,
    woundRolls:wounds.map(w=>({woundId:w.id,d10:Number(supplied['shock_'+w.id])})),gmConfirmed:true});
-  actor.hmk.combatState=outcome.state;consequence=outcome.report;
+  actor.hmk.healthState=outcome.state;consequence=outcome.report;
  }
  const inputs={roll,eml,emlSource:automatic?'live-combat-fatigue-armour-injury':'gm-attested',
   ...(automatic?{}:{emlEvidence:supplied.emlEvidence.trim()}),shockRolls:level==='CF'?wounds.map(w=>({woundId:w.id,roll:Number(supplied['shock_'+w.id])})):[]};

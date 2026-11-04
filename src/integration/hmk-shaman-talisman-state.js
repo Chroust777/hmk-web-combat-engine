@@ -10,7 +10,7 @@ const ok=(x,m)=>{if(!x)throw Error(m);};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
 const levels=['CF','F','S','CS'];
 function mastery(c,name){return availableMasteries(c).find(x=>x.name===name);}
-const auralEvents=c=>(c?.hmk?.combatState?.events||[]).filter(e=>
+const auralEvents=c=>(c?.hmk?.healthState?.events||[]).filter(e=>
  ['hmk-spell-misfire','hmk-spell-total-release','hmk-shaman-talisman-aural'].includes(e.type)&&Number(e.details?.auralShock)>0).length;
 const talismanOwned=(item,recipientId)=>item&&item.characterId===recipientId&&item.quantity===1&&
  ['carried','main_hand','off_hand'].includes(item.slot||'none');
@@ -112,13 +112,13 @@ export function applyTalismanBestowal({document,shamanId,recipientId,itemId,powe
    nextShaman.hmk??={};nextShaman.hmk.arcane??={};
    const arc=nextShaman.hmk.arcane, oldLevel=arc.auralShockLevels??0;
    ok(whole(oldLevel,0,99)&&oldLevel+shock<=99,'Aural Shock by překročil povolenou úroveň.');
-   const combat=nextShaman.hmk.combatState??initialCombatState();validateCombatState(combat);
+   const combat=nextShaman.hmk.healthState??initialCombatState();validateCombatState(combat);
    ok(combat.fatigue.otherWeakness+5*shock<=99999,'Aural Weakness mimo rozsah.');
    arc.auralShockLevels=oldLevel+shock;
    combat.fatigue.otherWeakness+=shock*5;
    combat.events.push({id:'shaman-aural:'+eventId,type:'hmk-shaman-talisman-aural',round:Math.max(1,combat.lastRound||1),
     details:{auralShock:shock,tranceLevel,willLevel,sourceEventId:eventId}});
-   nextShaman.hmk.combatState=combat;validateCombatState(combat);
+   nextShaman.hmk.healthState=combat;validateCombatState(combat);
   }
  }
  next.journal.push({id:eventId,characterId:shamanId,createdAt:new Date().toISOString(),
@@ -147,7 +147,7 @@ export function validateTalismanEvidence(document){
     levels[successLevel(p.willRoll,p.willEML)]===p.willLevel&&
     p.auralShock===(p.willLevel==='CF'?power.anima+1:p.willLevel==='F'?power.anima:0),
     'Trance CF musí obsahovat správný Will a Aural Shock.');
-   if(p.auralShock)ok(shaman.hmk?.combatState?.events?.some(e=>e.id==='shaman-aural:'+entry.id&&
+   if(p.auralShock)ok(shaman.hmk?.healthState?.events?.some(e=>e.id==='shaman-aural:'+entry.id&&
     e.type==='hmk-shaman-talisman-aural'&&e.details?.auralShock===p.auralShock),
     'Šamanský Aural Shock musí být skutečně uložen v Combat State.');
   }

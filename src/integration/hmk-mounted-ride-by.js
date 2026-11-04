@@ -17,7 +17,7 @@ const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 function segmentDistance(q,a,b){const vx=b.x-a.x,vy=b.y-a.y,len=vx*vx+vy*vy;
  const t=len>0?Math.max(0,Math.min(1,((q.x-a.x)*vx+(q.y-a.y)*vy)/len)):0;
  return dist(q,{x:a.x+t*vx,y:a.y+t*vy});}
-function liveStates(doc){return Object.fromEntries(doc.characters.map(c=>[c.id,c.hmk?.combatState]));}
+function liveStates(doc){return Object.fromEntries(doc.characters.map(c=>[c.id,c.hmk?.healthState]));}
 /** Prepare both the real movement and the real Melee session before any die. */
 export function prepareMountedRideBy({id,document,riderId,mountId,targetId,battlefield,path,
  declaredDistanceFt,previousRate,newRate,controlEventId,
@@ -196,10 +196,10 @@ export function persistMountedRideBy({stage,attackSession,transcript,injuryMoral
  check(fresh.riderState?.mountedRiderImpact&&
   riderImpactAtRound(fresh.riderState.mountedRiderImpact,stage.movement.round)===stage.impactAward.bonus,
   'Chybí trvalá platnost bonusu pro jezdce');
- out.characters.find(c=>c.id===fresh.riderId).hmk.combatState=cp(fresh.riderState);
+ out.characters.find(c=>c.id===fresh.riderId).hmk.healthState=cp(fresh.riderState);
  if(fresh.targetState){
   const c=out.characters.find(c=>c.id===fresh.targetId),s=fresh.targetState;
-  c.hmk.combatState=cp(s);
+  c.hmk.healthState=cp(s);
   for(const w of s.wounds){const prior=c.hmk.injuries.find(x=>x.id===w.id&&x.combatRecord);
    if(prior)Object.assign(prior,{level:w.level,severity:w.severity,location:w.location});
    else if(!c.hmk.injuries.some(x=>x.id===w.id))c.hmk.injuries.push({...cp(w),combatRecord:true});}

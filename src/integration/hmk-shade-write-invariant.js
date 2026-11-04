@@ -19,10 +19,10 @@ export function assertCommittedShadeTransitions(previous,next){
   const after=fresh.hmk?.arcane?.shade??null;
   if(before){
    const id=before.sourceEventId;
-   insist(json(before)===json(after)&&fresh.hmk.combatState?.shock==='KIA'&&
+   insist(json(before)===json(after)&&fresh.hmk.healthState?.shock==='KIA'&&
     next.combatRuntime?.sequence?.log?.some(e=>e.type==='pelahn-total-release-shade'&&e.eventId===id)&&
     next.journal?.some(j=>j.id==='total-release:'+id&&j.combatProof?.shadeTransformation===true)&&
-    fresh.hmk.combatState?.events?.some(e=>e.id===id+':shade'));
+    fresh.hmk.healthState?.events?.some(e=>e.id===id+':shade'));
    continue;
   }
   if(!after)continue;
@@ -32,8 +32,8 @@ export function assertCommittedShadeTransitions(previous,next){
    typeof after.sourceEventId==='string'&&after.sourceEventId&&
    typeof after.originTimelineId==='string'&&after.originTimelineId&&
    Number.isSafeInteger(after.originRound)&&after.originRound>=1&&
-   !old.hmk.arcane?.shade&&old.hmk.combatState?.shock!=='KIA'&&
-   fresh.hmk.combatState?.shock==='KIA');
+   !old.hmk.arcane?.shade&&old.hmk.healthState?.shock!=='KIA'&&
+   fresh.hmk.healthState?.shock==='KIA');
   const seq=next.combatRuntime?.sequence,id=after.sourceEventId;
   const source=seq?listPelahnBurstSources(seq).find(b=>b.id===id):null;
   insist(seq?.timelineId===after.originTimelineId&&source?.id===id&&
@@ -42,7 +42,7 @@ export function assertCommittedShadeTransitions(previous,next){
    source.endRound===source.startRound+(source.spell==='Pyre'?2:5));
   const records=seq.log?.filter(e=>e.type==='pelahn-total-release-source'&&e.eventId===id),
    shadeEvents=seq.log?.filter(e=>e.type==='pelahn-total-release-shade'&&e.eventId===id),
-   stateEvents=fresh.hmk.combatState.events?.filter(e=>e.id===id+':shade'),
+   stateEvents=fresh.hmk.healthState.events?.filter(e=>e.id===id+':shade'),
    journals=next.journal?.filter(x=>x.id==='total-release:'+id);
   insist(records?.length===1&&shadeEvents?.length===1&&stateEvents?.length===1&&journals?.length===1&&
    journals[0].combatProof?.shadeTransformation===true&&
@@ -54,6 +54,6 @@ export function assertCommittedShadeTransitions(previous,next){
    shadeEvents[0].spiritD100===physical[2].value&&
    stateEvents[0].details?.sourceEventId===id&&
    fresh.hmk.arcane?.pendingPsycheTraitChoice?.sourceEventId===id&&
-   fresh.hmk.combatState.morale.psycheStress===old.hmk.combatState.morale.psycheStress+3);
+   fresh.hmk.healthState.morale.psycheStress===old.hmk.healthState.morale.psycheStress+3);
  }
 }

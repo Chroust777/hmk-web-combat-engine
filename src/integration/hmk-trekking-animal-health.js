@@ -17,7 +17,7 @@ const travelWound=w=>String(w.location).trim().toLowerCase()!=='tl'&&
 export function trekRegisteredAnimalHealth(actor){
  requireFact(actor?.id&&typeof actor.id==='string'&&breeds.has(actor.hmk?.verifiedMountedBreed),
   'Zvíře musí mít vlastní ověřenou identitu a plemeno ze záznamu Combat State (HMK 355).');
- const state=actor.hmk?.combatState;
+ const state=actor.hmk?.healthState;
  requireFact(state,'Zvíře '+actor.id+': chybí jeho autoritativní Combat State.');
  validateCombatState(state);
  const seriousWounds=state.wounds.filter(w=>!w.healed&&['S','G'].includes(w.severity)).map(w=>{

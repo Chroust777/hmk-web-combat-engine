@@ -16,8 +16,8 @@ export function assertCommittedFearTransitions(before,after){
   'původní Fear časovou osu nelze podvrhnout ani odstranit');
  for(const newC of after.characters){
   const oldC=before.characters.find(x=>x.id===newC.id);
-  if(!oldC?.hmk?.combatState||!newC?.hmk?.combatState)continue;
-  const oldS=oldC.hmk.combatState,newS=newC.hmk.combatState;
+  if(!oldC?.hmk?.healthState||!newC?.hmk?.healthState)continue;
+  const oldS=oldC.hmk.healthState,newS=newC.hmk.healthState;
   const oldIds=new Set((oldS.events??[]).map(e=>e.id));
   const originalFearEvents=(oldS.events??[]).filter(e=>e.type.startsWith('hmk-fear-'));
   need(originalFearEvents.every(e=>

@@ -9,7 +9,7 @@ import {validateCampaignCalendar,assertCampaignCalendarAppendOnly} from './hmk-c
 import {coinBalance,ensureCampaignCashAccount} from './hmk-library-economy.js';
 const fail=(msg)=>{throw Error(msg)};
 const clone=v=>structuredClone(v);
-const TIME_KEYS=['combatState','injuries','arcane','liveEffects','expedition'];
+const TIME_KEYS=['healthState','injuries','arcane','liveEffects','expedition'];
 export function campaignKey(clock){return clock?.campaignId||`legacy:${clock?.events?.[0]?.id||''}`;}
 export function allCampaignClocks(database){return [...(database.campaignClock?[database.campaignClock]:[]),...(database.campaignClocks||[])];}
 export function captureCampaignActor(actor,inventory){
@@ -136,7 +136,7 @@ export function assertCampaignActorTimeIsolation(before,after){
  if(!after.campaignClock)return true;
  const ids=new Set(after.campaignClock.characterIds??(after.characters||[]).map(c=>c.id));
  const oldPeople=new Map((before.characters||[]).map(c=>[c.id,c]));
- const signature=c=>JSON.stringify({combat:c?.hmk?.combatState??null,
+ const signature=c=>JSON.stringify({combat:c?.hmk?.healthState??null,
   magic:c?.hmk?.liveEffects??null,arcane:c?.hmk?.arcane??null,
   injuries:c?.hmk?.injuries??null,expedition:c?.hmk?.expedition??null});
  const inventoryOf=(db,id)=>JSON.stringify((db.inventory??[]).filter(i=>i.characterId===id));

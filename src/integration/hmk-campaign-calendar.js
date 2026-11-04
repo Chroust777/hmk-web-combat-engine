@@ -13,6 +13,7 @@ const validInt=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const ensure=(ok,msg)=>{if(!ok)throw Error(msg);};
 const MAX_MINUTE=1000000000;
 const KEY=(kind,characterId,woundId='')=>`${kind}:${characterId}:${woundId}`;
+const isVerifiedHealthSource=s=>s==='confirmed-combat'||s==='confirmed-health';
 const KNOWN=['wound','extended-shock','coma','blood-loss','poison','disease','weather','sleep','aural'];
 export function displayCampaignMinute(minute){
  ensure(validInt(minute,-MAX_MINUTE,MAX_MINUTE),'Neplatný čas kampaně');
@@ -33,8 +34,8 @@ export function validateCampaignCalendar(clock){
    a.characterId.length<=200&&validInt(a.minute,-MAX_MINUTE,MAX_MINUTE)&&
    (a.kind!=='wound'||(typeof a.woundId==='string'&&a.woundId.length>0&&a.woundId.length<=200))&&
    (a.kind==='wound'||a.woundId==null)&&
-   ['gm-attested','confirmed-combat'].includes(a.source)&&
-   (a.source!=='confirmed-combat'||(typeof a.combatEventId==='string'&&a.combatEventId.length>0))&&
+   ['gm-attested','confirmed-combat','confirmed-health'].includes(a.source)&&
+   (!isVerifiedHealthSource(a.source)||(typeof a.combatEventId==='string'&&a.combatEventId.length>0))&&
    (a.eventId==null||(typeof a.eventId==='string'&&a.eventId.length>0))&&
    (a.episodeId==null||(['poison','disease','weather','sleep','aural'].includes(a.kind)&&typeof a.episodeId==='string'&&a.episodeId.length>0&&a.episodeId.length<=200)),
    'Neplatný důkaz počátku časované procedury');
@@ -42,7 +43,7 @@ export function validateCampaignCalendar(clock){
   // Wound IDs are permanent. Shock/Coma/BP may begin another episode after recovery.
   if(a.kind==='wound')ensure(!keys.has(key),'Duplicitní časový počátek '+key);
   keys.add(key);
-  if(a.source==='confirmed-combat'){const origin=key+'@'+a.combatEventId;ensure(!combatKeys.has(origin),'Duplicitní zdroj časové epizody');combatKeys.add(origin);}
+  if(isVerifiedHealthSource(a.source)){const origin=key+'@'+a.combatEventId;ensure(!combatKeys.has(origin),'Duplicitní zdroj časové epizody');combatKeys.add(origin);}
  }
  let last=-1;const eventIds=new Set();
  for(const e of clock.events){
@@ -87,22 +88,22 @@ export function elapsedCalendarDays(clock,kind,characterId,woundId=null){
 }
 export function anchorCampaignOrigin(clock,{kind,characterId,woundId=null,elapsedMinutes=0,eventId,source='gm-attested',combatEventId=null,episodeId=null,gmConfirmed=false}={}){
  validateCampaignCalendar(clock);
- ensure(gmConfirmed===true||source==='confirmed-combat','Původ historické události musí potvrdit GM');
+ ensure(gmConfirmed===true||isVerifiedHealthSource(source),'Původ historické události musí potvrdit GM');
  ensure(KNOWN.includes(kind)&&typeof characterId==='string'&&characterId&&
   (kind!=='wound'||(typeof woundId==='string'&&woundId)), 'Neplatný cíl kotvy');
  const prior=['poison','disease','weather','sleep','aural'].includes(kind)?getCampaignEpisodeAnchor(clock,kind,characterId,combatEventId||episodeId):getCampaignAnchor(clock,kind,characterId,woundId);
- ensure(!prior||(source==='confirmed-combat'&&kind!=='wound'&&combatEventId&&combatEventId!==prior.combatEventId),
+ ensure(!prior||(isVerifiedHealthSource(source)&&kind!=='wound'&&combatEventId&&combatEventId!==prior.combatEventId),
   'Časový počátek této události už byl jednou potvrzen');
  ensure(!['poison','disease','weather','sleep','aural'].includes(kind)||
-  (source==='confirmed-combat'?!!combatEventId:typeof episodeId==='string'&&episodeId.length>0),'Časovaná epizoda vyžaduje ověřenou identitu');
+  (isVerifiedHealthSource(source)?!!combatEventId:typeof episodeId==='string'&&episodeId.length>0),'Časovaná epizoda vyžaduje ověřenou identitu');
  ensure(validInt(elapsedMinutes,0,MAX_MINUTE)&&elapsedMinutes<=clock.minute+MAX_MINUTE/2,
   'Neplatná doložená doba od začátku');
  ensure(typeof eventId==='string'&&eventId.length>0&&!clock.events.some(e=>e.id===eventId),
   'Duplicitní časová událost');
- ensure(source!=='confirmed-combat'||(typeof combatEventId==='string'&&combatEventId),
-  'Automatická kotva vyžaduje ID potvrzeného bojového výsledku');
+ ensure(!isVerifiedHealthSource(source)||(typeof combatEventId==='string'&&combatEventId),
+  'Automatická kotva vyžaduje ID potvrzené zdravotní nebo bojové události');
  const next=structuredClone(clock);
- next.anchors.push({kind,characterId,...(kind==='wound'?{woundId}:{}),minute:clock.minute-elapsedMinutes,source,eventId,...(episodeId?{episodeId}:{}),...(source==='confirmed-combat'?{combatEventId}:{})});
+ next.anchors.push({kind,characterId,...(kind==='wound'?{woundId}:{}),minute:clock.minute-elapsedMinutes,source,eventId,...(episodeId?{episodeId}:{}),...(isVerifiedHealthSource(source)?{combatEventId}:{})});
  next.events.push({id:eventId,type:'anchor',minute:clock.minute,
   reason:`${source}: ${KEY(kind,characterId,woundId)}; doložený věk ${elapsedMinutes} minut`});
  validateCampaignCalendar(next);return next;
@@ -118,7 +119,7 @@ export function recordCampaignResolution(clock,{eventId,sourceEventId,characterI
   'Chybí autoritativní událost, nebo je její čas už zapsán');
  const next=structuredClone(clock);
  next.events.push({id:eventId,type:'resolution',minute:clock.minute,sourceEventId,characterId,kind,
-  reason:`Pravidlově potvrzené ${kind}; Combat event ${sourceEventId}`});
+  reason:`Pravidlově potvrzené ${kind}; zdravotní událost ${sourceEventId}`});
  validateCampaignCalendar(next);return next;
 }
 /** Returns scheduled obligations only when their start times are attested.
@@ -138,7 +139,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
    description,minute,anchorMinute:anchor.minute,status:minute<=clock.minute?'due':'future'});
  };
  for(const c of characters){
-  const s=c?.hmk?.combatState;if(!s||s.shock==='KIA')continue;
+  const s=c?.hmk?.healthState;if(!s||s.shock==='KIA')continue;
   if(s.wounds?.some(w=>w.bleeding))unknown.push({characterId:c.id,name:c.name,kind:'bleeding',
    description:'Aktivní krvácení: Blood Loss Advance / Stoppage patří do bojové časové osy',
    reason:'Nejprve vyřešte krvácení přes Combat; 60 kol není automaticky potvrzených 5 minut kampaně'});

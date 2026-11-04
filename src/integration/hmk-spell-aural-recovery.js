@@ -19,14 +19,14 @@ function validateCandidate(document,characterId){
  const person=document?.characters?.find(c=>c.id===characterId);
  check(person&&document.characters.filter(c=>c.id===characterId).length===1,
   'Aural Recovery: postava není jednoznačně doložena');
- const shamanOrigin=person.hmk?.combatState?.events?.some(e=>e.type==='hmk-shaman-talisman-aural'&&whole(e.details?.auralShock,1,6));
+ const shamanOrigin=person.hmk?.healthState?.events?.some(e=>e.type==='hmk-shaman-talisman-aural'&&whole(e.details?.auralShock,1,6));
  // Shamanic bestowals take place outside combat; unlike spell-origin recovery,
  // an explicit active encounter is not a prerequisite for one-game-day recovery.
  const seq=document?.combatRuntime?.sequence?validateEncounterSequence(document.combatRuntime.sequence):
-  {active:false,round:Math.max(1,person.hmk.combatState?.lastRound||1),pendingEndTurnAction:null,interruptActiveId:null};
+  {active:false,round:Math.max(1,person.hmk.healthState?.lastRound||1),pendingEndTurnAction:null,interruptActiveId:null};
  check(seq.active!==true&&!seq.pendingEndTurnAction&&!seq.interruptActiveId,
   'Aural Recovery: nedokončené Initiative, povinnosti nebo přerušení');
- const state=validateCombatState(person.hmk?.combatState),arc=person.hmk?.arcane;
+ const state=validateCombatState(person.hmk?.healthState),arc=person.hmk?.arcane;
  check(state.shock!=='KIA','Aural Recovery: zemřelá postava nemůže provádět Will Roll');
  check(arc&&whole(arc.auralShockLevels,1,99)&&
   whole(state.fatigue.otherWeakness,5*arc.auralShockLevels,99999),
@@ -74,7 +74,7 @@ export function persistSpellAuralRecovery({document,characterId,eventId,gameDay,
  check(state.morale?.psycheStress+outcome.psycheStressGained<=99999,
   'Aural Recovery: překročen limit PSY');
  const next=cp(document),caster=next.characters.find(c=>c.id===characterId);
- const a=caster.hmk.arcane,s=caster.hmk.combatState;
+ const a=caster.hmk.arcane,s=caster.hmk.healthState;
  a.auralShockLevels=outcome.levels;
  a.auralRecoveryLastDay=gameDay;
  s.fatigue.otherWeakness-=delta*5;

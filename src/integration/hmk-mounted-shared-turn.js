@@ -301,7 +301,7 @@ export function persistMountedSharedMove({stage,plan,document,storage,key,baseli
  const mount=document.characters.find(c=>c.id===stage?.mountId);
  assert(rider&&mount,'Jezdec nebo zvíře již nejsou ve střetnutí');
  const states=Object.fromEntries(document.characters.filter(c=>seq.order.includes(c.id))
-  .map(c=>[c.id,c.hmk?.combatState]));
+  .map(c=>[c.id,c.hmk?.healthState]));
  const battlefield=JSON.parse(stage.battlefieldWitness);
  if(stage.falling)assert(same(document.inventory)===stage.inventoryWitness,
   'Inventář obou zraněných účastníků se před atomickým commitem změnil');
@@ -327,19 +327,19 @@ export function persistMountedSharedMove({stage,plan,document,storage,key,baseli
   assert(plan.mountState&&plan.mountState.fatigue.windedness===
    states[stage.mountId].fatigue.windedness+stage.doubleMoveProof.fatigueAdded,
    'Mounted Double Move neuložil správnou PF/END únavu zvířete');
-  out.characters.find(c=>c.id===stage.mountId).hmk.combatState=cp(plan.mountState);
+  out.characters.find(c=>c.id===stage.mountId).hmk.healthState=cp(plan.mountState);
  }
  if(stage.falling){
   assert(plan.falling&&plan.mountState&&plan.riderState,
    'Stumble F/CF musí uložit stav koně i jezdce ve STEJNÉM checkpointu');
-  out.characters.find(c=>c.id===stage.mountId).hmk.combatState=cp(plan.mountState);
-  out.characters.find(c=>c.id===stage.riderId).hmk.combatState=cp(plan.riderState);
+  out.characters.find(c=>c.id===stage.mountId).hmk.healthState=cp(plan.mountState);
+  out.characters.find(c=>c.id===stage.riderId).hmk.healthState=cp(plan.riderState);
  }
  if(plan.riderImpactAwarded){
   assert(plan.riderState?.mountedRiderImpact&&
    same(plan.riderState.mountedRiderImpact)===same(stage.impactPreview),
    'Povinný Rider Impact chybí v atomickém plánu');
-  out.characters.find(c=>c.id===stage.riderId).hmk.combatState=cp(plan.riderState);
+  out.characters.find(c=>c.id===stage.riderId).hmk.healthState=cp(plan.riderState);
  }
  out.journal.push({id:`mounted:${stage.id}`,characterId:stage.riderId,
   createdAt:new Date().toISOString(),title:`HMK společný jízdní pohyb, kolo ${stage.round}`,

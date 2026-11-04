@@ -7,7 +7,7 @@
 export function automaticAilmentOnset(event,characters=[]){
  if(!event||!['poison','disease'].includes(event.kind))return null;
  const actor=characters.find(c=>c.id===event.characterId);
- const state=actor?.hmk?.combatState;
+ const state=actor?.hmk?.healthState;
  const courses=event.kind==='poison'?state?.toxinCourses:state?.diseaseCourses;
  const matching=(courses??[]).filter(t=>t.status==='incubating'&&t.sourceId===event.sourceId&&
   Number.isSafeInteger(t.onsetMinutes)&&t.onsetMinutes>=0&&

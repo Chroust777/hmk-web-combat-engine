@@ -74,9 +74,9 @@ function prepareNeutralSpellfireOutcome({document,id,casterId,spell,finishId,
  const saved=js(document),{sequence,commitment,spellstart}=verifyNeutralSpellstartWitness(document,
   {casterId,spell,finishId});
  const caster=document.characters.find(x=>x.id===casterId);
- const state=validateCombatState(caster?.hmk?.combatState);
- const states=Object.fromEntries(document.characters.filter(c=>c.hmk?.combatState)
-  .map(c=>[c.id,validateCombatState(c.hmk.combatState)]));
+ const state=validateCombatState(caster?.hmk?.healthState);
+ const states=Object.fromEntries(document.characters.filter(c=>c.hmk?.healthState)
+  .map(c=>[c.id,validateCombatState(c.hmk.healthState)]));
  check(sequence.order.every(x=>states[x]),'některému účastníkovi chybí Combat State');
  const campaignId=document.campaignClock?.campaignId??document.campaignClock?.id;
  const minute=document.campaignClock?.minute;
@@ -160,7 +160,7 @@ function prepareNeutralSpellfireOutcome({document,id,casterId,spell,finishId,
  let q=confirmConcentrationCompletion(sequence,states,{actorId:casterId,gmConfirmed:true});
  q=startEncounterTurn(q,states);
  check(currentEncounterActor(q)===casterId,'spellfire se musí odehrát na vlastním IR');
- const out=cp(document),newState=out.characters.find(c=>c.id===casterId).hmk.combatState;
+ const out=cp(document),newState=out.characters.find(c=>c.id===casterId).hmk.healthState;
  check(newState.fatigue.windedness+dice.totalFatigue<=99999,'překročen limit únavy');
  newState.fatigue.windedness+=dice.totalFatigue;
  if(critical){

@@ -21,7 +21,7 @@ export function planAnimalRest({actor,kind,minute,gmConfirmed,claims={}}={}){
  requireFact(kind==='rest'||kind==='sleep','Zvíře může obnovit Weariness jen doloženým 4h odpočinkem nebo 8h spánkem.');
  requireFact(gmConfirmed===true,'GM musí potvrdit skutečný klid a podmínky odpočinku zvířete (u spánku skutečných 8 hodin).');
  const health=trekRegisteredAnimalHealth(actor);
- const state=actor.hmk.combatState;
+ const state=actor.hmk.healthState;
  requireFact(health.shock==='NONE'&&!health.comaActive&&!health.extendedShockActive,
   'Shock, Coma nebo Extended Shock vyžadují vlastní zdravotní proceduru před obyčejným odpočinkem zvířete.');
  requireFact(!state.environmentalHazards?.some(h=>h.active)&&state.sleepDeprivation?.status!=='awake',
@@ -51,9 +51,9 @@ export function assertAnimalRestStillValid(plan,actor){
  validateAnimalRestPlan(plan,actor?.id);
  const current=trekRegisteredAnimalHealth(actor);
  requireFact(JSON.stringify(current)===JSON.stringify(plan.animalRestPolicy.healthAtStart)&&
-  actor.hmk.combatState.fatigue.weariness===plan.animalRestPolicy.wearinessAtStart,
+  actor.hmk.healthState.fatigue.weariness===plan.animalRestPolicy.wearinessAtStart,
   'Zdraví / únava zvířete se během odpočinku změnily. GM musí vyznačit přerušení v reálném čase události.');
- requireFact(!actor.hmk.combatState.environmentalHazards?.some(x=>x.active),
+ requireFact(!actor.hmk.healthState.environmentalHazards?.some(x=>x.active),
   'Aktivní Weather Hazard zvířete vyžaduje rozhodnutí GM před dokončením odpočinku.');
  return true;
 }

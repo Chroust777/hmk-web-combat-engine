@@ -43,8 +43,8 @@ export function linkNewMoralePsycheAccrual(before,after){
  const processed=[];
  for(const person of after.characters){
   const prior=before.characters.find(c=>c.id===person.id);
-  if(!prior?.hmk?.combatState||!person.hmk?.combatState)continue;
-  const old=prior.hmk.combatState,now=person.hmk.combatState;
+  if(!prior?.hmk?.healthState||!person.hmk?.healthState)continue;
+  const old=prior.hmk.healthState,now=person.hmk.healthState;
   const oldIds=new Set((old.events??[]).map(e=>e.id));
   const events=(now.events??[]).filter(e=>!oldIds.has(e.id)&&kinds.has(e.type));
   const acquired=events.filter(e=>e.type==='injury-morale'?e.details?.result?.psycheStress>0:e.details?.psycheStress>0);
@@ -77,7 +77,7 @@ export function assertCommittedMoralePsycheDebts(before,after){
  if(!before?.characters||!after?.characters||!Array.isArray(after.journal))return;
  for(const person of after.characters){
   const prior=before.characters.find(c=>c.id===person.id);
-  const old=prior?.hmk?.combatState,now=person.hmk?.combatState;
+  const old=prior?.hmk?.healthState,now=person.hmk?.healthState;
   if(!old||!now)continue;
   const ids=new Set((old.events??[]).map(e=>e.id));
   const accrued=(now.events??[]).filter(e=>!ids.has(e.id)&&kinds.has(e.type)&&
@@ -109,10 +109,10 @@ export function assertCommittedMoralePsycheDebts(before,after){
 export function journalNewMoralePsycheSources(before,after){
  if(!before?.characters||!after?.characters||!Array.isArray(after.journal))return [];
  for(const c of after.characters){
-  const original=before.characters.find(x=>x.id===c.id),old=original?.hmk?.combatState;
-  if(!old||!c.hmk?.combatState)continue;
+  const original=before.characters.find(x=>x.id===c.id),old=original?.hmk?.healthState;
+  if(!old||!c.hmk?.healthState)continue;
   const oldIds=new Set((old.events??[]).map(e=>e.id));
-  for(const e of c.hmk.combatState.events.filter(x=>!oldIds.has(x.id)&&kinds.has(x.type)&&
+  for(const e of c.hmk.healthState.events.filter(x=>!oldIds.has(x.id)&&kinds.has(x.type)&&
    (x.type==='injury-morale'?x.details?.result?.psycheStress>0:x.details?.psycheStress>0))){
    // The event and its physical d100 are both checked before manufacturing
    // any inter-record reference. Never guess missing rolls.

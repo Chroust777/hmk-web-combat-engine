@@ -31,7 +31,7 @@ export function persistSpellPsycheTraitChoice({document,characterId,sourceEventI
  const arc=person.hmk?.arcane, pending=arc?.pendingPsycheTraitChoice;
  check(pending?.sourceEventId===sourceEventId&&whole(pending.levels,1,99999),
   'Neexistuje odpovídající nevyřešená událost Psyche Stress');
- const state=person.hmk?.combatState;
+ const state=person.hmk?.healthState;
  check(whole(state?.morale?.psycheStress,0,99999)&&
   state.morale.psycheStress>=pending.levels,'Ztracený nebo změněný persistentní PSY stav');
  // Source must have been committed before an after-effect can be resolved.
@@ -48,7 +48,7 @@ export function persistSpellPsycheTraitChoice({document,characterId,sourceEventI
  check(!oldCases.some(z=>z.sourceEventIds.includes(sourceEventId)),
   'Stejný Psyche důkaz byl již potvrzen');
  const out=cp(document),personNext=out.characters.find(c=>c.id===characterId),next=personNext.hmk.arcane;
- const stateNext=validateCombatState(personNext.hmk.combatState);
+ const stateNext=validateCombatState(personNext.hmk.healthState);
  let addedManifestedWeakness=0;
  next.psycheTraumas??=[];
  const prior=next.psycheTraumas.find(z=>z.trait===trait&&z.recovered!==true)??

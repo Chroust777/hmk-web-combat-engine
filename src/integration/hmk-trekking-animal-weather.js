@@ -93,12 +93,12 @@ export function prepareAnimalTrekkingWeather({journal=[],source,actor,campaignId
  const {hazard,sl}=computed({kind,breed,risk,endEML,endD100,coldCondition});
  requireIt(['manual','cryptographic-software-die'].includes(endOrigin),
   'Nedoložený původ zvířecího Endurance d100.');
- let state=structuredClone(actor.hmk.combatState),report=null;
+ let state=structuredClone(actor.hmk.healthState),report=null;
  const medicalSourceId='animal:'+source.id+':'+actor.id;
  if(sl!==null){const result=prepareTrekkingWeatherTest({state,sourceId:medicalSourceId,
   round:Math.max(round,state.lastRound),kind,originalSL:sl,coldCondition,
   weatherHazardConfirmed:true,gmConfirmed:true});state=result.state;report=result.report;}
- const after=trekRegisteredAnimalHealth({...actor,hmk:{...actor.hmk,combatState:state}});
+ const after=trekRegisteredAnimalHealth({...actor,hmk:{...actor.hmk,healthState:state}});
  const proof={format:ANIMAL_WEATHER_FORMAT,sourceId:source.id,sourceMinute:source.campaignMinute,
   campaignId,actorId:actor.id,breed,kind,risk:hazard,endEML,endD100,endOrigin:sl===null?null:endOrigin,sl,
   coldCondition,medicalSourceId,healthBefore:before,healthAfter:after,

@@ -15,7 +15,7 @@ const whole=(v,a,b)=>Number.isSafeInteger(v)&&v>=a&&v<=b;
 const intensity=['trait','impulse','disorder'];
 const slNames=['CF','F','S','CS'];
 function checkEvidence(document,person,trait){
- const a=person.hmk?.arcane,s=validateCombatState(person.hmk?.combatState);
+ const a=person.hmk?.arcane,s=validateCombatState(person.hmk?.healthState);
  check(a&&!a.pendingPsycheTraitChoice,'Psyche Recovery: nejprve dokončete výběr Psyche Traitu');
  check(Array.isArray(a.psycheTraumas)&&a.psycheTraumas.filter(t=>t?.trait===trait&&t.recovered!==true).length===1,
   'Psyche Recovery: chybí jediná aktivní doložená instance stejného traitu');
@@ -123,10 +123,10 @@ export function persistSpellPsycheRecoverySchedule({document,characterId,trait,e
  item.recoverySchedulePending=false;
  const d={characterId,trait,sourceEventIds:cp(t.sourceEventIds),
   physicalD6:d6,startGameDay:periodStartDay,dueGameDay,gmConfirmedStartDay:true};
- person.hmk.combatState.events.push({id:eventId,round:seq.round,
+ person.hmk.healthState.events.push({id:eventId,round:seq.round,
   type:'hmk-psyche-recovery-schedule',details:cp(d)});
- person.hmk.combatState.lastRound=Math.max(seq.round,s.lastRound);
- validateCombatState(person.hmk.combatState);
+ person.hmk.healthState.lastRound=Math.max(seq.round,s.lastRound);
+ validateCombatState(person.hmk.healthState);
  next.journal.push({id:'psyche-recovery-schedule:'+eventId,characterId,createdAt:new Date().toISOString(),campaignMinute:document.campaignClock?.minute??null,
   title:`HMK Psyche Recovery · ${trait} · d6=${d6}`,
   body:`Hod d6 (${diceOrigin}) = ${d6}. Interval dne ${periodStartDay} → ${dueGameDay}. PSY zatím beze změny.`,
@@ -154,7 +154,7 @@ export function persistSpellPsycheRecoveryRoll({document,characterId,trait,event
   s.fatigue.otherWeakness>=removed*5,
   'Psyche Recovery: nekonzistentní ztráta PSY nebo příslušné Weakness');
  const next=cp(document),person=next.characters.find(c=>c.id===characterId),arc=person.hmk.arcane;
- const item=arc.psycheTraumas.find(z=>z.trait===trait&&z.recovered!==true),state=person.hmk.combatState;
+ const item=arc.psycheTraumas.find(z=>z.trait===trait&&z.recovered!==true),state=person.hmk.healthState;
  item.psycheLevels=outcome.psycheLevels;
  item.intensity=outcome.intensity;
  item.permanent=outcome.permanent;

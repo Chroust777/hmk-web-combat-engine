@@ -35,9 +35,9 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
  });
  const members=memberIds.map(id=>{
   const actor=characters.find(c=>c.id===id);
-  check(actor?.hmk?.combatState,'Postava není připravena: '+id);
-  const fatigue=combatFatigueTotals(actor.hmk.combatState).total;
-  const wounds=actor.hmk.combatState.wounds.filter(serious).map(w=>{
+  check(actor?.hmk?.healthState,'Postava není připravena: '+id);
+  const fatigue=combatFatigueTotals(actor.hmk.healthState).total;
+  const wounds=actor.hmk.healthState.wounds.filter(serious).map(w=>{
    const anatomy=hmkHumanLocationSymbols(w.location);
    check(anatomy,actor.name+': neznámá lokace závažné rány ('+w.location+'); nelze spolehlivě odvodit Injured Mode.');
    return {id:w.id,location:w.location,severity:w.severity,zone:anatomy.zone};

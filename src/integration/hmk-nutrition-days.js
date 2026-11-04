@@ -258,7 +258,7 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
   check(actor&&members.has(actorId),'Nutriční režim postavy mimo aktuální kampaň');
   // A dead character cannot keep consuming supplies and cannot be forced
   // into a new ration-source decision merely by a later GM clock advance.
-  if(actor.hmk?.combatState?.shock==='KIA'){due.start=clock.minute;continue;}
+  if(actor.hmk?.healthState?.shock==='KIA'){due.start=clock.minute;continue;}
   // A disabled character may possess food but cannot be assumed to ingest
   // it. This GM attestation is factual, not a new HMK rule or a die roll.
   const assistance=needsAssistedIntake(actor)?assistedIntakeForDay(database.journal,campaignId,actorId,start,end):null;

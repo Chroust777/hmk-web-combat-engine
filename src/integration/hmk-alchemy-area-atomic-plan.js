@@ -27,7 +27,7 @@ export function prepareAlchemyAreaAtomicBattle({sequence,characters,inventory,jo
  const staged=stageAlchemyAreaThrownSource({sequence,characters,inventory,journal,campaignId,
   minute,actorId,finishId,sourceId,aimPoint,center,throwDice,areaDice,gmConfirmed});
  const seq=validateEncounterSequence(copy(staged.blast?.proposedMoraleSequence??sequence));
- const states=Object.fromEntries(characters.map(c=>[c.id,c.hmk?.combatState]));
+ const states=Object.fromEntries(characters.map(c=>[c.id,c.hmk?.healthState]));
  assert(seq.order.every(id=>states[id]&&validateCombatState(states[id])),
   'chybí původní Combat State některého bojovníka');
  const nextStates={...states,...(staged.blast?.stagedStates??{})};
@@ -127,11 +127,11 @@ export function validateAlchemyAreaCombatLinks(database){
   const p=row.calendarAlchemyAreaThrown;if(!p)continue;
   for(const [id,after] of Object.entries(p.afterStates??{})){
    const c=database.characters.find(x=>x.id===id);
-   assert(c?.hmk?.combatState&&Array.isArray(c.hmk.combatState.events),
+   assert(c?.hmk?.healthState&&Array.isArray(c.hmk.healthState.events),
     'zasažená postava už nemá svůj původní Combat State');
    const first=(p.beforeStates?.[id]?.events??[]).map(e=>e.id);
    for(const e of after.events.filter(x=>!first.includes(x.id)))
-    assert(c.hmk.combatState.events.some(x=>JSON.stringify(x)===JSON.stringify(e)),
+    assert(c.hmk.healthState.events.some(x=>JSON.stringify(x)===JSON.stringify(e)),
      'chybí neměnný výsledek Area z původního Combat State: '+id);
   }
   for(const [id,before] of Object.entries(p.beforeStrength??{})){

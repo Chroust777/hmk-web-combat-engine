@@ -14,10 +14,10 @@ const str=x=>JSON.stringify(x);
 const label={0:'CF',1:'F',2:'S',3:'CS'};
 function witness(document,characterId){
  const actors=document?.characters?.filter(c=>c.id===characterId)||[];
- check(actors.length===1&&actors[0]?.hmk?.combatState,'neexistuje jednoznačná postava s bojovým stavem');
+ check(actors.length===1&&actors[0]?.hmk?.healthState,'neexistuje jednoznačná postava s bojovým stavem');
  const actor=actors[0],seq=validateEncounterSequence(document.combatRuntime?.sequence);
  check(seq.order.includes(characterId)&&Array.isArray(document.journal),'postava není v aktuální Initiative');
- validateCombatState(actor.hmk.combatState);
+ validateCombatState(actor.hmk.healthState);
  const wil=actor.hmk?.attributes?.wil;
  check(valid(wil,1,40),'chybí ověřený atribut Will');
  return {actor,seq,wil};
@@ -43,7 +43,7 @@ export function projectFearExposure({document,characterId,sourceId,sourceKind,so
  aberrance,d100,gmConfirmed=false,gmConfirmedSource=false,eventId}={}){
  check(gmConfirmed===true&&valid(d100,1,100)&&typeof eventId==='string'&&
   eventId.length>=3&&eventId.length<=140,'fyzický Will d100, ID a souhlas GM jsou povinné');
- const {actor,seq,wil}=witness(document,characterId),state=actor.hmk.combatState;
+ const {actor,seq,wil}=witness(document,characterId),state=actor.hmk.healthState;
  check(!['INC','UNC','KIA'].includes(state.shock)&&state.morale?.state!=='catatonic',
   'postava nyní nemůže vědomě vnímat nový zdroj');
  check(!state.fear||['steady','brave'].includes(state.fear.state),
@@ -60,7 +60,7 @@ export function projectFearExposure({document,characterId,sourceId,sourceKind,so
  check(!earned||(!actor.hmk.arcane?.pendingPsycheTraitChoice&&
   !(actor.hmk.arcane?.psycheTraumas??[]).some(t=>t.manifestationPending===true)),
   'před dalším Fear Stresem dokončete již čekající volbu/nástup Psyche Traitu');
- const out=copy(document),person=out.characters.find(c=>c.id===characterId),s=person.hmk.combatState;
+ const out=copy(document),person=out.characters.find(c=>c.id===characterId),s=person.hmk.healthState;
  const details={source:'HMK v1.2 p.187',sourceId,sourceKind,
   sourceDescription:sourceKind==='gm-event'?sourceDescription.trim():null,
   timelineId:seq.timelineId,characterId,willAttribute:wil,willEML:base,
@@ -100,7 +100,7 @@ export function persistFearSafeRecovery({document,characterId,eventId,elapsedMin
  safeFromSource=false,outOfLOS=false,gmConfirmed=false,storage,key,baseline}={}){
  check(gmConfirmed===true&&typeof eventId==='string'&&eventId.length>=3&&
   valid(elapsedMinutes,0,999999),'GM musí doložit čas a nové ID');
- const {actor,seq}=witness(document,characterId),s=actor.hmk.combatState,old=s.fear;
+ const {actor,seq}=witness(document,characterId),s=actor.hmk.healthState,old=s.fear;
  check(old&&old.timelineId===seq.timelineId,'není aktivní doložený Fear tohoto střetnutí');
  check(!s.events.some(e=>e.id===eventId)&&!document.journal.some(j=>j.id==='fear:'+eventId),
   'duplicitní zotavení');
@@ -115,7 +115,7 @@ export function persistFearSafeRecovery({document,characterId,eventId,elapsedMin
  check(!seq.active&&!seq.pendingEndTurnAction&&!seq.interruptActiveId&&
   !Object.values(seq.commitments??{}).some(t=>t?.status==='in-progress'),
   'časový postup nelze potvrdit uprostřed tahu nebo koncentrace');
- const out=copy(document),p=out.characters.find(x=>x.id===characterId),state=p.hmk.combatState;
+ const out=copy(document),p=out.characters.find(x=>x.id===characterId),state=p.hmk.healthState;
  state.fear={...old,state:FEAR.STEADY,lastSafeRecoveryEventId:eventId};
  const details={sourceEventId:old.sourceEventId,sourceId:old.sourceId,
   beforeState:old.state,afterState:FEAR.STEADY,elapsedMinutes,safeFromSource:!!safeFromSource,
@@ -137,7 +137,7 @@ export function persistFearEndTurnReaction({document,characterId,eventId,d100,gm
  storage,key,baseline}={}){
  check(gmConfirmed===true&&valid(d100,1,100)&&typeof eventId==='string'&&
   eventId.length>=3&&eventId.length<=140,'konec tahu vyžaduje GM fyzický Will d100');
- const {actor,seq,wil}=witness(document,characterId),s=actor.hmk.combatState;
+ const {actor,seq,wil}=witness(document,characterId),s=actor.hmk.healthState;
  const f=s.fear;
  check(f&&['afraid','catatonic'].includes(f.state)&&f.timelineId===seq.timelineId&&
   f.lastReactionRound!==seq.round,'není splatný Fear Reaction');
@@ -152,7 +152,7 @@ export function persistFearEndTurnReaction({document,characterId,eventId,d100,gm
  const eml=wil*5-5*f.sourceABE,sl=successLevel(d100,eml);
  const after=(sl===SL.S||sl===SL.CS)?
   (f.state===FEAR.CATATONIC?FEAR.TERRIFIED:FEAR.STEADY):f.state;
- const out=copy(document),person=out.characters.find(c=>c.id===characterId),state=person.hmk.combatState;
+ const out=copy(document),person=out.characters.find(c=>c.id===characterId),state=person.hmk.healthState;
  state.fear={...f,state:after,lastReactionRound:seq.round};
  const details={sourceEventId:f.sourceEventId,sourceId:f.sourceId,timelineId:seq.timelineId,
   beforeState:f.state,afterState:after,willAttribute:wil,aberrance:f.sourceABE,
@@ -166,7 +166,7 @@ export function persistFearEndTurnReaction({document,characterId,eventId,d100,gm
    sourceEventId:eventId,originalFearEventId:f.sourceEventId,
    physicalDice:[{faces:100,value:d100,source:'GM-entered-physical-die'}]}});
  validateCombatState(state);
- const states=Object.fromEntries(out.characters.map(c=>[c.id,c.hmk?.combatState]));
+ const states=Object.fromEntries(out.characters.map(c=>[c.id,c.hmk?.healthState]));
  // End-of-turn closure belongs to the SAME transaction as the physical die.
  // If another end-turn obligation remains, the scheduler correctly refuses
  // closure; that other obligation will be collected by its own guided path.

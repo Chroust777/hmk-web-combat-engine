@@ -189,7 +189,7 @@ function finishApprovedAnimalWeariness(database,{idFactory,stamp,campaignId}){
   // Preflight all animal decisions before a single animal is altered.
   const work=group.animalWeariness.filter(policy=>!already.has(policy.actorId)).map(policy=>{
    const actor=database.characters.find(c=>c.id===policy.actorId);
-   check(actor?.hmk?.combatState,'Chybí původní Combat State zvířete '+policy.actorId);
+   check(actor?.hmk?.healthState,'Chybí původní Combat State zvířete '+policy.actorId);
    const partial=interrupts[0]?results[0].calendarExpeditionProof.animalPartialWeariness?.[policy.actorId]:null;
    // A full 240-minute watch may be INTERRUPTED part-way through. Its
    // original group therefore has no short-watch timeScaling flag, but the

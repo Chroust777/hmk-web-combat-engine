@@ -49,7 +49,7 @@ export function preflightNeutralTotalReleaseChain({document,id,casterId,finishId
   'neodpovídá původní časová osa a její checkpoint');
  const caster=document.characters.filter(c=>c.id===casterId);
  guard(caster.length===1,'sesilatel musí být jediná živá postava');
- const state=validateCombatState(caster[0].hmk?.combatState);
+ const state=validateCombatState(caster[0].hmk?.healthState);
  guard(dueInjuryMorale(state).length===0&&
   !caster[0].hmk?.arcane?.activeMisfireWarp&&
   !caster[0].hmk?.arcane?.pendingPsycheTraitChoice,

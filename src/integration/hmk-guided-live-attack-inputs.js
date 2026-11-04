@@ -123,11 +123,11 @@ export function createLiveGuidedMelee({id,timelineId,round,attacker,defender,att
  attackerSkillId,defenderSkillId,attackerUsedArms,defenderUsedArms,inventory,direction,opponents=1,
  attackerFoes=1,defenderFoes=1,aimZN=1,sourceSignature}={}){
  must(attacker?.id!==defender?.id&&attacker&&defender,'Chybí odlišný útočník a obránce');
- must(!verifiedDeadlyHelplessReason(defender.hmk?.combatState),
+ must(!verifiedDeadlyHelplessReason(defender.hmk?.healthState),
   'HMK str.191: doložený helpless cíl vyžaduje povinný Ignore a automatický four-star CS. Použijte Deadly Melee místo běžné Melee obrany.');
- const a=validatedActor({person:attacker,state:attacker.hmk?.combatState??initialCombatState(),inventory,weaponId:attackerWeaponId,
+ const a=validatedActor({person:attacker,state:attacker.hmk?.healthState??initialCombatState(),inventory,weaponId:attackerWeaponId,
   skillId:attackerSkillId,usedArms:attackerUsedArms,round,timelineId,threateningFoes:attackerFoes});
- const d=validatedActor({person:defender,state:defender.hmk?.combatState??initialCombatState(),inventory,weaponId:defenderWeaponId,
+ const d=validatedActor({person:defender,state:defender.hmk?.healthState??initialCombatState(),inventory,weaponId:defenderWeaponId,
   skillId:defenderSkillId,usedArms:defenderUsedArms,round,timelineId,threateningFoes:defenderFoes});
  const reach=verifiedReachEMLModifiers({attackerRCH:a.reach,defenderRCH:d.reach,inClose:false});
  must(reach.ok,'Nelze matematicky vyhodnotit Reach');
@@ -159,12 +159,12 @@ export function createLiveGuidedDeadlyMelee({id,timelineId,round,attacker,defend
  attackerFoes=1,sourceSignature,gmReachConfirmed=false,deadlyAim=null}={}){
  must(attacker?.id&&defender?.id&&attacker.id!==defender.id,'Chybí odlišný útočník a cíl');
  must(gmReachConfirmed===true,'Deadly Melee: GM musí potvrdit, že cíl je v aktuálním dosahu zvolené zbraně (HMK str.191).');
- const state=defender.hmk?.combatState??initialCombatState();
+ const state=defender.hmk?.healthState??initialCombatState();
  const reason=verifiedDeadlyHelplessReason(state);
  must(!!reason,'Deadly Melee: stav cíle nedokládá helpless (úplná paralýza, UNC, Coma nebo trvalá slepota).');
  must(['human','human-sized','human sized','human folk'].includes(String(defender.hmk?.folk??'').trim().toLowerCase()),
   'Deadly Melee: pro tohoto tvora není doložena kompatibilní anatomická tabulka');
- const a=validatedActor({person:attacker,state:attacker.hmk?.combatState??initialCombatState(),inventory,
+ const a=validatedActor({person:attacker,state:attacker.hmk?.healthState??initialCombatState(),inventory,
   weaponId:attackerWeaponId,skillId:attackerSkillId,usedArms:attackerUsedArms,round,timelineId,threateningFoes:attackerFoes});
  const shockSkill=(defender.hmk?.skills||[]).filter(x=>String(x.name).trim().toLowerCase()==='shock');
  must(shockSkill.length===1&&int(shockSkill[0].ml,0,200),'Cíl nemá doložený Shock ML');
@@ -225,8 +225,8 @@ export function createLiveGuidedMissile({id,timelineId,round,attacker,defender,w
  must(shooterLoad.ready&&Number.isSafeInteger(shooterLoad.perceptionPenalty)&&
   Number.isSafeInteger(shooterLoad.meleeBulkPenalty),
   `${attacker.name}: neověřené ENC/Bulk nebo postih vnímání střelce (${(shooterLoad.issues||[]).join('; ')||'chybí ověřené zóny Bulk tištěného kompletu'})`);
- const targetState=defender.hmk?.combatState??initialCombatState();
- const attackerState=attacker.hmk?.combatState??initialCombatState();
+ const targetState=defender.hmk?.healthState??initialCombatState();
+ const attackerState=attacker.hmk?.healthState??initialCombatState();
  requireParalysisAction(attackerState,'missile');
  requireParalysisArms(attackerState,attackerUsedArms==='both'?['left','right']:['left','right'].includes(attackerUsedArms)?[attackerUsedArms]:null);
  must(attackerState.shock==='NONE','Shock střelce mění oprávnění ke střelbě');
@@ -306,7 +306,7 @@ export function createLiveGuidedMissile({id,timelineId,round,attacker,defender,w
   const ml=(other.hmk?.skills??[]).filter(x=>String(x.name).toLowerCase()==='shock');
   const strength=other.hmk?.attributes?.str;
   if(ml.length!==1||!int(ml[0].ml,0,200)||!int(strength,1,200))continue;
-  participants[other.id]={state:other.hmk?.combatState??initialCombatState(),shockML:ml[0].ml,strengthML:strength*5,zoneCount:10};
+  participants[other.id]={state:other.hmk?.healthState??initialCombatState(),shockML:ml[0].ml,strengthML:strength*5,zoneCount:10};
  }
  must([0,10].includes(aimBonus),'Aim bonus musí pocházet výhradně z platné Initiative události');
  const missile={weaponType:type,distance,baseRange:baseRange-(improvisedSlingRock?30:0),ml:attackML,impactDieSides:projectileDie,

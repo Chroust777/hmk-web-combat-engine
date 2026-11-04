@@ -40,7 +40,7 @@ export function composeVerifiedPelahnTotalRelease({document,stage,spell,complexi
   dice.reduce((a,b)=>a+b,0)===stage.totalReleaseSpiritMLLoss,
   'Total Release: chybí všechny fyzické Spirit loss d6');
  const out=cp(document),caster=out.characters.find(c=>c.id===stage.casterId);
- const state=caster.hmk.combatState;
+ const state=caster.hmk.healthState;
  validateCombatState(state);
  check(dueInjuryMorale(state).length===0,'Total Release: splatná Morale');
  check(!caster.hmk.arcane.activeMisfireWarp&&!caster.hmk.arcane.pendingPsycheTraitChoice,
@@ -120,8 +120,8 @@ export function composeVerifiedPelahnTotalRelease({document,stage,spell,complexi
  }
  // Spellfire is resolved during this IR. Its Fatal/Spirit-CF status takes
  // effect immediately AFTER validating the completed Incant's physical dice.
- const finishStates=Object.fromEntries(out.characters.map(c=>[c.id,c.hmk?.combatState]));
- if(isShade)finishStates[stage.casterId]={...state,shock:caster0.hmk.combatState.shock};
+ const finishStates=Object.fromEntries(out.characters.map(c=>[c.id,c.hmk?.healthState]));
+ if(isShade)finishStates[stage.casterId]={...state,shock:caster0.hmk.healthState.shock};
  const completed=finishEncounterTurn(validateEncounterSequence(next),finishStates,
   {action:'incant',gmConfirmed:true});
  check(!completed.pendingEndTurnAction,'Total Release: nevyřešené povinnosti po Incant');

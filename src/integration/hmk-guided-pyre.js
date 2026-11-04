@@ -39,7 +39,7 @@ export function prepareGuidedPyre({id,document,casterId,itemId,conditionsConfirm
  check(mage?.hmk?.arcane?.primaryConvocation==='Pèleáhn','Chybí Primary Pèleáhn');
  const desc=requirePelahnBonusIncantSpell(mage,'Pyre');
  check(desc.castingTimeRounds===1&&desc.complexity===3,'Nesouhlasí pevná tištěná data Pyre III');
- const arc=mage.hmk.arcane,state=mage.hmk.combatState;
+ const arc=mage.hmk.arcane,state=mage.hmk.healthState;
  validateCombatState(state);
  check(!['STN','INC','UNC','KIA'].includes(state.shock)&&!state.coma?.active&&
   !['withdrawing','routed','catatonic'].includes(state.morale?.state)&&
@@ -113,7 +113,7 @@ export function submitGuidedPyreDie(stage,value){
   if(spirit?.length!==1||!integer(spirit[0].ml,0,200))
    return {...stage,misfireD100:100,misfireKind:'total-release',crucialMisfire:true,
     phase:'unsupported-misfire'}; // Legacy fixture: no Spirit proof => fail closed.
-  const fatigue=combatFatigueTotals(caster.hmk.combatState).total;
+  const fatigue=combatFatigueTotals(caster.hmk.healthState).total;
   return {...stage,misfireD100:100,misfireKind:'total-release',crucialMisfire:true,
    misfirePsycheStress:3,misfireAuralShock:0,castingFatigue:15,
    totalReleaseSpiritML:spirit[0].ml,
@@ -138,7 +138,7 @@ export function persistGuidedPyre({stage,document,storage,key,baseline}={}){
  fresh=submitGuidedPyreDie(fresh,stage.castingRoll);
  if(stage.castingSL==='CF')fresh=submitGuidedPyreDie(fresh,stage.misfireD100);
  check(js(fresh)===js(stage),'Pyre: podvržený stav, hod, EML či výsledek Misfire');
- const out=cp(document),mage=out.characters.find(c=>c.id===stage.casterId),state=mage.hmk.combatState;
+ const out=cp(document),mage=out.characters.find(c=>c.id===stage.casterId),state=mage.hmk.healthState;
  validateCombatState(state);
  state.fatigue.windedness+=stage.castingFatigue;
  const misfire=stage.castingSL==='CF'?classifySpellMisfire(stage.misfireD100,3):null;
@@ -174,7 +174,7 @@ export function persistGuidedPyre({stage,document,storage,key,baseline}={}){
   misfirePsycheStress:misfire?.psycheStress??0,misfireAuralShock:misfire?.auralShock??0,
   physicalDice:[{faces:100,value:stage.castingRoll,source:'GM-entered-physical-die'},
    ...(stage.misfireD100===null?[]:[{faces:100,value:stage.misfireD100,source:'GM-entered-physical-die'}])]});
- const states=Object.fromEntries(out.characters.map(c=>[c.id,c.hmk.combatState]));
+ const states=Object.fromEntries(out.characters.map(c=>[c.id,c.hmk.healthState]));
  const finished=finishEncounterTurn(validateEncounterSequence(next),states,{action:'incant',gmConfirmed:true});
  check(!finished.pendingEndTurnAction,'Pyre: neuzavřená povinnost na konci tahu');
  out.combatRuntime.sequence=finished;

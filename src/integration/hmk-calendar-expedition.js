@@ -88,11 +88,11 @@ export function expeditionCombatState(actor){
  assert(actor.hmk===undefined||(actor.hmk&&typeof actor.hmk==='object'&&!Array.isArray(actor.hmk)),
   'Poškozený HMK profil postavy');
  actor.hmk??={};
- if(actor.hmk.combatState===undefined||actor.hmk.combatState===null){
-  actor.hmk.combatState=initialCombatState();
+ if(actor.hmk.healthState===undefined||actor.hmk.healthState===null){
+  actor.hmk.healthState=initialCombatState();
  }
- validateCombatState(actor.hmk.combatState);
- return actor.hmk.combatState;
+ validateCombatState(actor.hmk.healthState);
+ return actor.hmk.healthState;
 }
 /** Builds a durable, human-readable certified result; the existing combat
  * state remains the ONE authoritative fatigue calculator. */

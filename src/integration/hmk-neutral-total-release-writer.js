@@ -45,7 +45,7 @@ export function prepareNeutralTotalReleaseCommit({document,createdAt=new Date().
   j.calendarNeutralTotalRelease?.spellstartId===proof.spellstartId),
   'Total Release nebo původní Spellstart již byly využity');
  const out=cp(document),actor=out.characters.find(c=>c.id===proof.casterId);
- const state=actor.hmk.combatState,arc=actor.hmk.arcane;
+ const state=actor.hmk.healthState,arc=actor.hmk.arcane;
  const prior=arc.auralShockLevels??0,shock=proof.spirit.auralShock;
  must(Number.isSafeInteger(prior)&&prior>=0&&prior+shock<=99&&
   Number.isSafeInteger(state.fatigue.windedness)&&state.fatigue.windedness+proof.casting.castingFatigue<=99999&&
@@ -84,13 +84,13 @@ export function prepareNeutralTotalReleaseCommit({document,createdAt=new Date().
  }
  state.lastRound=Math.max(state.lastRound,proof.spellfireRound);
  validateCombatState(state);
- const states=Object.fromEntries(out.characters.filter(c=>c.hmk?.combatState)
-  .map(c=>[c.id,validateCombatState(c.hmk.combatState)]));
+ const states=Object.fromEntries(out.characters.filter(c=>c.hmk?.healthState)
+  .map(c=>[c.id,validateCombatState(c.hmk.healthState)]));
  let sequence=validateEncounterSequence(document.combatRuntime.sequence);
  // Completion's eligibility must be evaluated against the state BEFORE
  // Spirit and fatigue, precisely as at an ordinary Neutral spellfire.
- const beforeStates=Object.fromEntries(document.characters.filter(c=>c.hmk?.combatState)
-  .map(c=>[c.id,validateCombatState(c.hmk.combatState)]));
+ const beforeStates=Object.fromEntries(document.characters.filter(c=>c.hmk?.healthState)
+  .map(c=>[c.id,validateCombatState(c.hmk.healthState)]));
  sequence=confirmConcentrationCompletion(sequence,beforeStates,{actorId:proof.casterId,gmConfirmed:true});
  sequence=startEncounterTurn(sequence,beforeStates);
  must(currentEncounterActor(sequence)===proof.casterId,'nenastal originální Incant turn');

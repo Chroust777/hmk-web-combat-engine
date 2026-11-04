@@ -31,7 +31,7 @@ function fatigueTotalUnsafe(s){return s.fatigue.windedness+s.fatigue.weariness+s
 function applyShockProne(s){if(['INC','UNC'].includes(s.shock)){s.posture??={prone:false,dropPending:false,passNextTurn:false};s.posture.prone=true;}}
 
 const copy=x=>structuredClone(x);
-export function initialCombatState(){return {format:'hmk-persistent-combat-v1',shock:'NONE',bloodLoss:{bp:0,weaknessFatigue:0},fatigue:{windedness:0,weariness:0,otherWeakness:0},wounds:[],events:[],lastRound:0,shockOriginRound:null,shockFollowup:null,extendedShock:null,coma:null,bloodShockPending:false,morale:{state:'steady',psycheStress:0,braveSince:null,braveTimelineId:null},mishaps:[],posture:{prone:false,dropPending:false,passNextTurn:false}};}
+export function initialCombatState(){return {format:'hmk-character-health-v1',shock:'NONE',bloodLoss:{bp:0,weaknessFatigue:0},fatigue:{windedness:0,weariness:0,otherWeakness:0},wounds:[],events:[],lastRound:0,shockOriginRound:null,shockFollowup:null,extendedShock:null,coma:null,bloodShockPending:false,morale:{state:'steady',psycheStress:0,braveSince:null,braveTimelineId:null},mishaps:[],posture:{prone:false,dropPending:false,passNextTurn:false}};}
 /** HMK p.272: Fumebomb has its OWN Shock SL table, not the ordinary
  * injury SHK index. This transition writes to the original persistent
  * Shock State, its native recovery schedule, and its existing event list.
@@ -81,7 +81,7 @@ export function applyConfirmedAlchemyWeakness({state,round,eventId,sourceId,time
 }
 export function combatFatigueTotals(state){validateCombatState(state);return {windedness:state.fatigue.windedness,weariness:state.fatigue.weariness,weakness:state.fatigue.otherWeakness+state.bloodLoss.weaknessFatigue,total:state.fatigue.windedness+state.fatigue.weariness+state.fatigue.otherWeakness+state.bloodLoss.weaknessFatigue};}
 export function validateCombatState(s){
- requireCond(s&&s.format==='hmk-persistent-combat-v1'&&!Array.isArray(s),'Neznámý formát bojového stavu');
+ requireCond(s&&s.format==='hmk-character-health-v1'&&!Array.isArray(s),'Neznámý formát bojového stavu');
  requireCond(own(SHOCK,s.shock),'Neznámý Shock State');
  requireCond(s.bloodLoss&&whole(s.bloodLoss.bp,0,4)&&s.bloodLoss.weaknessFatigue===s.bloodLoss.bp*5,'Neplatné Blood Loss Points / weakness');
  requireCond(s.bloodShockPending===undefined||typeof s.bloodShockPending==='boolean','Neplatný příznak Blood Shock');

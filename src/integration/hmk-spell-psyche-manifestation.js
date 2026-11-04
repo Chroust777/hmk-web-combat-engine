@@ -12,7 +12,7 @@ function eligible(document,characterId,trait){
  const p=document?.characters?.find(c=>c.id===characterId);
  check(p&&document.characters.filter(c=>c.id===characterId).length===1,
   'Psyche Manifestation: chybí jednoznačná postava');
- const arc=p.hmk?.arcane,state=validateCombatState(p.hmk?.combatState);
+ const arc=p.hmk?.arcane,state=validateCombatState(p.hmk?.healthState);
  check(arc&&!arc.pendingPsycheTraitChoice&&typeof trait==='string',
   'Psyche Manifestation: nejdříve dokončete všechny volby traitů');
  const cases=arc.psycheTraumas??[];
@@ -49,7 +49,7 @@ export function persistSpellPsycheManifestation({document,characterId,trait,even
   !(document.journal??[]).some(e=>e.id==='psyche-manifestation:'+eventId),
   'Psyche Manifestation: duplicitní potvrzení');
  const out=cp(document),c=out.characters.find(x=>x.id===characterId);
- const t=c.hmk.arcane.psycheTraumas.find(z=>z.trait===trait&&z.recovered!==true),s=c.hmk.combatState;
+ const t=c.hmk.arcane.psycheTraumas.find(z=>z.trait===trait&&z.recovered!==true),s=c.hmk.healthState;
  t.manifestationPending=false;t.manifested=true;
  const add=t.psycheLevels*5;s.fatigue.otherWeakness+=add;
  s.events.push({id:eventId,round:witness.round,type:'hmk-psyche-manifestation',

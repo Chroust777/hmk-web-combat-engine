@@ -24,7 +24,7 @@ export function encApplicability(actor,name){
 export function skillConditionAvailability({actor,inventory=[],name,mounted=false}={}){
  const applicability=encApplicability(actor,name);
  const out={applicability,fatigue:{ready:false,reason:'Postava nemá potvrzený trvalý bojový stav'},enc:{ready:false,reason:'Zatížení nebylo doloženo'}};
- const state=actor?.hmk?.combatState;
+ const state=actor?.hmk?.healthState;
  if(state){try{
   validateCombatState(state);
   const fatigue=combatFatigueTotals(state),modifier=fatigueEMLModifier(fatigue.total);

@@ -18,7 +18,7 @@ function checked(document,characterId,trait){
  const people=document?.characters?.filter(c=>c?.id===characterId)??[];
  check(people.length===1,'Psyche Expression: chybí jednoznačná postava');
  const person=people[0],arc=person.hmk?.arcane;
- const state=validateCombatState(person.hmk?.combatState);
+ const state=validateCombatState(person.hmk?.healthState);
  const seq=validateEncounterSequence(document?.combatRuntime?.sequence);
  check(arc&&!arc.pendingPsycheTraitChoice,'Psyche Expression: nejprve povinná volba traitu');
  const hits=(arc.psycheTraumas??[]).filter(t=>t?.trait===trait&&
@@ -106,9 +106,9 @@ export function persistSpellPsycheExpression({document,characterId,trait,eventId
   sourceTraitEventIds:cp(t.sourceEventIds)};
  if(!suppressed)case0.psycheExpressionActive={status:'expressing',sourceEventId:eventId,
   minutesAfterTrigger,trigger:details.trigger,round:seq.round,timelineId:seq.timelineId};
- c.hmk.combatState.events.push({id:eventId,type:'hmk-psyche-expression',round:seq.round,details:cp(details)});
- c.hmk.combatState.lastRound=Math.max(c.hmk.combatState.lastRound,seq.round);
- validateCombatState(c.hmk.combatState);
+ c.hmk.healthState.events.push({id:eventId,type:'hmk-psyche-expression',round:seq.round,details:cp(details)});
+ c.hmk.healthState.lastRound=Math.max(c.hmk.healthState.lastRound,seq.round);
+ validateCombatState(c.hmk.healthState);
  const physicalDice=mode==='suppress'?[{faces:100,value:d100,source:'GM-entered-physical-die'},
   ...(sl===SL.CF?[{faces:6,value:d6,source:'GM-entered-physical-die'}]:[])]:[];
  next.journal.push({id:'psyche-expression:'+eventId,characterId,createdAt:new Date().toISOString(),
@@ -138,9 +138,9 @@ export function persistSpellPsycheExpressionEnd({document,characterId,trait,even
  case0.psycheExpressionActive=null;
  const details={trait,sourceEventId:active.sourceEventId,minutesAfterTrigger:active.minutesAfterTrigger,
   elapsedMinutes,gmConfirmedTriggerEnded:true,sourceTraitEventIds:cp(t.sourceEventIds)};
- c.hmk.combatState.events.push({id:eventId,type:'hmk-psyche-expression-end',round:seq.round,details:cp(details)});
- c.hmk.combatState.lastRound=Math.max(c.hmk.combatState.lastRound,seq.round);
- validateCombatState(c.hmk.combatState);
+ c.hmk.healthState.events.push({id:eventId,type:'hmk-psyche-expression-end',round:seq.round,details:cp(details)});
+ c.hmk.healthState.lastRound=Math.max(c.hmk.healthState.lastRound,seq.round);
+ validateCombatState(c.hmk.healthState);
  next.journal.push({id:'psyche-expression-end:'+eventId,characterId,createdAt:new Date().toISOString(),
   title:`HMK Psyche · konec projevu ${trait}`,
   body:`GM potvrdil konec spouštěče a dalších ${elapsedMinutes} minut (minimum ${active.minutesAfterTrigger}).`,

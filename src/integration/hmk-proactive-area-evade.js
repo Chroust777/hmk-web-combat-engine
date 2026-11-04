@@ -29,7 +29,7 @@ export function previewProactiveDoomFlameEvade({stage,document,targetId,path,bat
   'Neplatná nebo nezasažená postava pro proactive Evade');
  const target=document.characters.filter(c=>c.id===targetId);
  assert(target.length===1,'Neznámá nebo duplicitní Area postava');
- const c=target[0],state=c.hmk?.combatState;
+ const c=target[0],state=c.hmk?.healthState;
  validateCombatState(state);
  assert(state.shock==='NONE'&&!state.posture?.prone&&state.morale?.state==='steady'&&
   !state.grabHold?.active&&!state.posture?.passNextTurn&&!state.mishaps?.some(x=>!x.resolved),

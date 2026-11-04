@@ -35,7 +35,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   for(const w of episode.weatherExposure||[]){
    if(!w.exposed)continue;
    const person=characters.find(c=>c.id===w.id);
-   if(!person||person.hmk?.combatState?.shock==='KIA')continue;
+   if(!person||person.hmk?.healthState?.shock==='KIA')continue;
    const original=journal.find(j=>j.id===w.proofId&&j.characterId===w.id&&
     j.calendarCampaignId===receipt.calendarCampaignId);
    if(!original){unknown.push({characterId:w.id,name:person.name,kind:'weather-onset',
@@ -50,7 +50,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   }
  }
  for(const c of characters){
-  const s=c?.hmk?.combatState; if(s?.shock==='KIA')continue;
+  const s=c?.hmk?.healthState; if(s?.shock==='KIA')continue;
   // HMK pp.184–186: nutrition is an ailment in persistent Combat State.
   // Its first onset is based on explicit sole-source 24h ration proofs.
   // Advance and Healing dice are NEVER inferred from the time alone.
@@ -77,7 +77,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // Injury Morale and Mishap queue as a weapon hit (HMK pp.161–162,170).
   // Previously, a Skill Accident outside active Initiative could leave them
   // hidden even though Treatment/Healing were already displayed.
-  if(s?.format==='hmk-persistent-combat-v1'){
+  if(s?.format==='hmk-character-health-v1'){
    for(const m of unresolvedInjuryMishaps(s)){const wound=s.wounds.find(w=>w.id===m.woundId),weather=medicalOriginOfWound(wound,s.events)===MEDICAL_ORIGIN.WEATHER;
     push(c,'injury-mishap',m.id,weather?'Weather Injury Mishap – povinná zdravotní následnost (HMK 170)':'Nevyřízený Injury Mishap – původní Combat průvodce (HMK 161,170)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
    for(const m of dueInjuryMorale(s)){const wound=s.wounds.find(w=>w.id===m.woundId),weather=medicalOriginOfWound(wound,s.events)===MEDICAL_ORIGIN.WEATHER;

@@ -263,7 +263,7 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
    if(r.kind==='choice')return `<section class="panel">${common}<form id="hmk-g04-melee-choice">${selection('decision',r.label||r.id,r.choices.map(x=>typeof x==='string'?{id:x,label:x}:{id:x.value,label:x.label??x.value}))}${btn('Potvrdit fyzickou obranu')}</form></section>`;
    if(r.kind==='die')return `<section class="panel">${common}<form id="hmk-g04-melee-die">${fld('roll',r.label||r.id+' d'+r.faces,'','number')}${btn('Potvrdit fyzický d'+r.faces)}</form></section>`;
    if(r.kind==='complete'){
-    const originalTarget=document.characters.find(c=>c.id===draft.stage.targetId)?.hmk?.combatState;
+    const originalTarget=document.characters.find(c=>c.id===draft.stage.targetId)?.hmk?.healthState;
     const resolved=completeGuidedAttack({session:draft.attack,currentState:originalTarget,
      sourceSignature:draft.stage.sourceSignature,currentInventory:document.inventory});
     const due=dueInjuryMorale(resolved.strike?resolved.state:originalTarget);
@@ -467,8 +467,8 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
       facts[name]=answer==='yes';}
      return {id:u.id,x:u.x,y:u.y,reachFt:real(v['map_'+u.id+'_reach']),...facts};
     }),barriers:seq.spatialBarriers??[]};
-    const states=Object.fromEntries(document.characters.filter(c=>seq.order.includes(c.id)).map(c=>[c.id,c.hmk?.combatState]));
-    const control=rider.hmk?.combatState?.events?.filter(e=>e.type==='hmk-mounted-control'&&
+    const states=Object.fromEntries(document.characters.filter(c=>seq.order.includes(c.id)).map(c=>[c.id,c.hmk?.healthState]));
+    const control=rider.hmk?.healthState?.events?.filter(e=>e.type==='hmk-mounted-control'&&
      e.round===seq.round&&e.details?.mountId===mount.id&&e.details?.result?.controlled).at(-1);
     if(!control)throw Error('Chybí fyzicky ověřený Control v tomto kole');
     const fallEntered=String(v.mountFallX??'').trim()!=='';
@@ -524,7 +524,7 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
     }),barriers:seq.spatialBarriers??[]};
     if(bf.units.find(u=>u.id===v.targetId)?.foe!==true)throw Error('Skutečný protivník musí být výslovně označen jako foe');
     const rider=document.characters.find(c=>c.id===v.riderId);
-    const control=rider?.hmk?.combatState?.events?.filter(x=>x.type==='hmk-mounted-control'&&
+    const control=rider?.hmk?.healthState?.events?.filter(x=>x.type==='hmk-mounted-control'&&
       x.round===seq.round&&x.details?.mountId===v.mountId&&x.details?.result?.controlled).at(-1);
     if(!control)throw Error('Nelze doložit skutečný úspěšný Control pro tento mount v daném kole');
     const stage=prepareMountedRideBy({id:newId(),document,riderId:v.riderId,mountId:v.mountId,targetId:v.targetId,
@@ -601,7 +601,7 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
    if(['hmk-g04-pelahn-melee-commit','hmk-g04-pelahn-melee-morale','hmk-g04-pelahn-missile-commit','hmk-g04-pelahn-missile-morale'].includes(f.id)){
     if(!['pelahn-melee','pelahn-missile'].includes(draft?.kind)||guidedAttackRequirement(draft.attack).kind!=='complete')
      throw Error('Chybí dokončená druhá Melee akce');
-    const originalTarget=document.characters.find(c=>c.id===draft.stage.targetId)?.hmk?.combatState;
+    const originalTarget=document.characters.find(c=>c.id===draft.stage.targetId)?.hmk?.healthState;
     const resolved=completeGuidedAttack({session:draft.attack,currentState:originalTarget,
      sourceSignature:draft.stage.sourceSignature,currentInventory:document.inventory});
     const due=dueInjuryMorale(resolved.strike?resolved.state:originalTarget);
@@ -627,9 +627,9 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
       aberrance:positive(v['abe_'+w.woundId],0,200)};}
     }else{
      const resolved=completeGuidedAttack({session:draft.attack,
-      currentState:document.characters.find(x=>x.id===draft.stage.targetId).hmk.combatState,
+      currentState:document.characters.find(x=>x.id===draft.stage.targetId).hmk.healthState,
       sourceSignature:draft.stage.sourceSignature,currentInventory:document.inventory});
-     const originalTarget=document.characters.find(c=>c.id===draft.stage.targetId).hmk.combatState;
+     const originalTarget=document.characters.find(c=>c.id===draft.stage.targetId).hmk.healthState;
      const due=dueInjuryMorale(resolved.strike?resolved.state:originalTarget);
      if(due.length){set({...draft,phase:'morale',due});return true;}
     }

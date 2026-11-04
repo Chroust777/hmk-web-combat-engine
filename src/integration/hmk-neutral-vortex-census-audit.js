@@ -100,7 +100,7 @@ export function auditNeutralVortexAlchemyCensus({document,sourceCensus}={}){
    e.eventId===burst.id);
   const journal=document.journal.filter(e=>e.id==='total-release:'+burst.id);
   const caster=document.characters?.filter(c=>c.id===burst.casterId);
-  const events=caster?.[0]?.hmk?.combatState?.events?.filter(e=>
+  const events=caster?.[0]?.hmk?.healthState?.events?.filter(e=>
    e.id===burst.id+':total-release'&&e.type==='hmk-spell-total-release');
   check(log?.length===1&&journal.length===1&&caster?.length===1&&
    events?.length===1&&log[0].actorId===burst.casterId&&

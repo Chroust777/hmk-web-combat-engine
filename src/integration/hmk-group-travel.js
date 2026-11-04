@@ -92,7 +92,7 @@ export function planHMKGroupWatch({journal=[],characters=[],inventory=[],clock,m
  // Combat State also includes blood-loss Weakness. A partial fatigue sum can
  // silently allow a prohibited trek when the true total already reaches 40.
  const fatigueOf=actor=>{
-  const s=actor.hmk?.combatState, f=s?.fatigue??{};
+  const s=actor.hmk?.healthState, f=s?.fatigue??{};
   const bloodWeakness=s?.bloodLoss?.weaknessFatigue??0;
   return totalFatigue({windedness:f.windedness??0,weariness:f.weariness??0,
    weakness:(f.otherWeakness??0)+bloodWeakness});

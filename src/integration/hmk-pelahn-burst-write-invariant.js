@@ -39,7 +39,7 @@ export function assertCommittedPelahnBurstSources(before,after){
    d.value>=1&&d.value<=d.faces&&[6,100].includes(d.faces))&&
   dice.slice(0,3).every(d=>d.faces===100)&&dice[1].value===100);
  const caster=after.characters?.find(c=>c.id===source.casterId);
- const event=caster?.hmk?.combatState?.events?.find(e=>e.id===id+':total-release');
+ const event=caster?.hmk?.healthState?.events?.find(e=>e.id===id+':total-release');
  const journal=after.journal?.find(x=>x.id==='total-release:'+id);
  valid(event?.type==='hmk-spell-total-release'&&
   event.details?.sourceEventId===id&&event.details?.spell===source.spell&&

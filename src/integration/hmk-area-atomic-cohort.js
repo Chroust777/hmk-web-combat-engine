@@ -103,7 +103,7 @@ export function persistSourceBoundAreaPlan({stage,plan,storage,key,baseline,docu
  // Never accept a caller-constructed plan or a forged preview as a write
  // capability. Reconstruct EVERY rule result from the authoritative document
  // and the GM-entered dice stored in the staged session.
- const liveStates=Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.combatState]));
+ const liveStates=Object.fromEntries(document.characters.map(c=>[c.id,c.hmk?.healthState]));
  const freshStage=prepareSourceBoundAreaCohort({sequence:pre,sourceEventId:stage?.sourceEventId,
   characters:document.characters,states:liveStates,inventory:document.inventory,
   rollsByTarget:stage?.rollsByTarget,method:stage?.method});
@@ -122,12 +122,12 @@ export function persistSourceBoundAreaPlan({stage,plan,storage,key,baseline,docu
  // No caller-supplied arbitrary mutation of already confirmed target events.
  const out=clone(document);
  for(const id of plan.targetIds){
-  const c=out.characters.find(c=>c.id===id);const before=c.hmk?.combatState;
+  const c=out.characters.find(c=>c.id===id);const before=c.hmk?.healthState;
   check(before&&Array.isArray(c.hmk.injuries),'Postava nemá kompletní trvalý stav a seznam ran');
   validateCombatState(before);
   check(plan.states[id].events.length>=before.events.length,'Neplatná historie Area');
   // Existing wounds may have compounded. Reconcile the complete set by ID.
-  c.hmk.combatState=clone(plan.states[id]);
+  c.hmk.healthState=clone(plan.states[id]);
   const oldIds=new Set(before.wounds.map(w=>w.id));
   for(const wound of plan.states[id].wounds){
    const exists=c.hmk.injuries.find(x=>x.id===wound.id&&x.combatRecord===true);
