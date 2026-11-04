@@ -150,6 +150,7 @@ import {parseSpatialBarrierSegments,effectiveSpatialBarriers} from './src/integr
 import {recordEncounterFreeAction,encounterFreeActionAvailable,createEncounterSequence,validateEncounterSequence,startEncounterTurn,finishEncounterTurn,finalizeStagedEncounterTurn,nextEncounterRound,dueEncounterEvents,dueEndTurnEvents,currentEncounterActor,assertScheduledMeleeActor,resolveReadiedEncounterAction,cancelReadiedEncounterAction,completeReadiedEncounterAction,confirmAlertnessReaction,confirmConcentrationCompletion,abandonEncounterConcentration,ongoingEncounterConcentration,requireConcentrationCompatibleDefence,assertScheduledHitCanCommit,recordScheduledHitCommit,setEncounterTieOrder,configureInitialCrossbowPriority,requireInitialCrossbowShot} from './src/integration/encounter-turn-sequence.js';
 import {applyConfirmedTreatment,applyConfirmedFrostAmputation,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock} from './src/integration/hmk-healing-persistence.js';
 import {weatherTreatmentTiming} from './src/integration/hmk-weather-treatment-timing.js';
+import {travelBleedingTerm,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
 import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
@@ -310,7 +311,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.713';
+const APP_VERSION='93.714';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11188,9 +11189,72 @@ function hskWeatherInjuryMandatory(actorId){
  }
  return '';
 }
+/** Weather Bleeding belongs to Health/Exposure; never call the Combat
+ * Stoppage form or infer 60 combat rounds from an elapsed calendar interval.
+ * One five-minute plan, one due physical Physician/Strength roll, one write. */
+function hskWeatherBleedingCarePanel(actorId){
+ const helpTerm=(label,text)=>`<span class="hc-help-term" tabindex="0" data-hmk-help="${esc(text)}">${label}</span>`;
+ const actor=character(actorId),clock=data.campaignClock;
+ if(!actor||!clock)return '';
+ const state=persistentStateOf(actor),wounds=medicalWounds(state,MEDICAL_ORIGIN.WEATHER)
+  .filter(w=>w.bleeding&&!w.healed);
+ if(!wounds.length)return '';
+ const party=calendarMemberIds(clock,data.characters);
+ const items=wounds.map(w=>{
+  let term;
+  try{term=travelBleedingTerm({clock,actorId:actor.id,wound:w,state});}
+  catch(error){return `<p class="notice">${esc(w.id)} · Blood Stoppage nelze zatím otevřít: ${esc(error.message)}</p>`;}
+  const due=clock.minute===term.dueMinute,remaining=term.dueMinute-clock.minute;
+  const plan=term.plan;
+  const who=plan?party.find(c=>c.id===plan.healerId):null;
+  const healerOptions=weatherPhysicianCandidates({patient:actor,wound:w,party});
+  const start=remaining===5&&!plan;
+  const title=`${esc(w.location)} ${esc(w.severity+w.level)} · ${esc(w.id)}`;
+  const head=`<h4>Blood Stoppage · ${title}</h4><p class="hc-hint">Původ ${esc(displayCampaignMinute(term.anchorMinute))} ·
+   příští povinný interval ${esc(displayCampaignMinute(term.dueMinute))} ·
+   ${plan?`probíhá 5minutové ${plan.method==='cau'?'Cauterisation':'Staunch'} u ${esc(who?.name||plan.healerId)}`:
+    'bez zahájeného ošetření'}.
+   Každých 5 minut jeden Blood Loss na každého Bleedera; po skutečném Blood Stoppage výsledku CF/F/S ještě Blood Loss, po CS nikoliv (HMK 178).</p>`;
+  if(start){return `<article class="hc-calendar-linked-row">${head}
+   <form data-weather-blood-start class="hc-fields"><input type="hidden" name="woundId" value="${esc(w.id)}">
+   <div class="field-grid"><label>${helpTerm('Skutečný léčitel','Vyberte živého, schopného Physician z aktuální kampaně. Tato volba zaznamená začátek skutečného pětiminutového úkonu, ne provedený hod.')}
+   <select name="healerId" required><option value="">Vyberte léčitele…</option>${healerOptions.map(h=>`<option value="${esc(h.id)}">${esc(h.name)} · Physician ML ${h.ml}${h.self?' · self':''}</option>`).join('')}</select></label>
+   <label>${helpTerm('Treatment','Staunch (sta) se provádí tlakem s obvazem a vodou; Cauterisation (cau) vyžaduje rozžhavený kov a dává +30 EML, ale ovlivňuje následné hojení.')}
+   <select name="method"><option value="sta">Staunch · 5 minut</option><option value="cau">Cauterisation · 5 minut (+30)</option></select></label>
+   </div><p class="hc-hint">Počet souběžných ran ošetřených stejným léčitelem se ověří z potvrzených začátků v celé kampani (−10 za každou další ránu).</p>
+   <div class="field-grid"><label><input type="checkbox" name="hasBandage"> Skutečně přítomný obvaz</label>
+   <label><input type="checkbox" name="hasWater"> Voda pro Clean & Dress</label>
+   <label><input type="checkbox" name="hasNeedleThread"> Jehla a nit pro Serious Edge/Point</label>
+   <label><input type="checkbox" name="hasHeatedTool"> Rozžhavený kovový nástroj pro Cauterisation</label>
+   <label><input type="checkbox" name="tourniquet"> Turniket (pouze končetina, Staunch +20)</label></div>
+   <button type="submit" ${healerOptions.length?'':'disabled'}>Zahájit 5minutové ošetření</button>
+   <p class="tiny">D100 se zatím nehází. Kalendář se sám neposune; GM jej posune na vyznačený konec ošetření.</p>
+   </form></article>`;}
+  if(due){return `<article class="hc-calendar-linked-row">${head}
+   <form data-weather-blood-complete class="hc-fields"><input type="hidden" name="woundId" value="${esc(w.id)}">
+   <input type="hidden" name="mode" value="${plan?'stoppage':'loss'}">
+   ${plan?`<p>Potvrzený léčitel: <strong>${esc(who?.name||plan.healerId)}</strong> · ${esc(plan.method)}
+    · 5 minut skutečně uplynulo.</p>
+    <label>${helpTerm('Physician d100','Skutečný hod léčitele, EML vypočítá systém z Physician ML, Fatigue, metody, případného předchozího bonusu a počtu současně ošetřených ran.')}
+    <input type="number" name="physicianRoll" min="1" max="100" required></label>`:
+    '<p>V předchozím intervalu nebylo zahájeno doložené ošetření. Vyhodnoťte pouze Blood Loss.</p>'}
+   <label>${helpTerm('Blood Loss · Strength d100','Povinný jeden skutečný hod pacienta proti Strength ×5 bez Fatigue a impairment. Po Critical Success (CS) u Physician ponechte prázdné; po CF/F/S jej vyplňte.')}
+   <input type="number" name="strengthRoll" min="1" max="100" ${plan?'':'required'}></label>
+   <button type="submit">${plan?'Zapsat Blood Stoppage + případný Blood Loss':'Zapsat Blood Loss Advance'}</button>
+   </form></article>`;}
+  return `<article class="hc-calendar-linked-row">${head}<p class="hc-hint">${remaining>0?
+   `Do splatnosti zbývá ${remaining} minut. ${plan?'Dokončete kalendářem skutečných 5 minut.':'Ošetření již nelze zpětně zahájit. V termínu proběhne Blood Loss.'}`:
+   'Splatný interval je po termínu; kalendář musí být nejprve uveden do souladu s pravidlovou povinností.'}</p></article>`;
+ }).join('');
+ return `<section class="panel wide hmk-weather-blood-care"><h3>Blood Stoppage · cestovní zdravotní postup · ${esc(actor.name)}</h3>
+ <p class="hc-hint">Aktivní krvácení je přednostní před běžným Treatment/Healing. Celkové Blood Loss Points jsou ${state.bloodLoss.bp}/4,
+ Weakness ${state.bloodLoss.weaknessFatigue}. Bez vstupu do Combatu, bez fiktivních hodů či okamžitého 5minutového skoku.</p>${items}</section>`;
+}
 function hskEnvironmentalWoundCarePanel(actor){
  const pending=medicalWounds(persistentStateOf(actor),MEDICAL_ORIGIN.WEATHER).some(w=>!w.healed);
  if(!pending)return '';
+ if(persistentStateOf(actor).wounds.some(w=>w.bleeding&&medicalOriginOfWound(w,persistentStateOf(actor).events)===MEDICAL_ORIGIN.WEATHER))
+  return '<p class="notice">Před dalším Treatment nebo Healing nejprve uzavřete Blood Stoppage v Zdraví & Expozice.</p>';
  if(persistentStateOf(actor).shockFollowup?.domain==='travel-weather'||hskWeatherInjuryMandatory(actor.id))
   return '<p class="notice">Treatment každé rány zůstává evidovaný samostatně. Nejprve dokončete výše uvedený aktuální Shock, Injury Mishap nebo Morale; potom se otevře ošetření konkrétní rány. Nejde o nový Shock d100 pro každý Treatment.</p>';
  return `<details class="hmk-weather-wound-care" open><summary>Rány z počasí · Treatment, Healing, Infection Course a případná amputace</summary>
@@ -11204,17 +11268,17 @@ function hskWeatherShockFollowup(actorId){
  const actor=character(actorId),state=actor&&persistentStateOf(actor),q=state?.shockFollowup;
  if(!q||q.domain!=='travel-weather')return '';
  const clock=data.campaignClock,minute=clock?.minute;
- const dueMinute=q.kind==='UNC'?q.originMinute+10:q.originMinute;
- const shockML=actor?.hmk?.skills?.find(x=>String(x.name).toLowerCase()==='shock')?.ml;
+ const dueMinute=q.phase==='after-all-bleeding-stopped'?q.originMinute:q.kind==='UNC'?q.originMinute+10:q.originMinute;
+ const shockML=actor?availableMasteries(actor).find(x=>x.name==='Shock')?.ml:null;
  const canRoll=Number.isSafeInteger(minute)&&minute>=dueMinute&&Number.isSafeInteger(shockML);
  const fatigue=combatFatigueTotals(state).total,eml=Number(shockML)-fatigue-(q.kind==='STN'?0:20);
  return `<section class="panel wide hmk-weather-shock-followup"><h3>Weather Shock · ${esc(actor.name)} · ${esc(q.kind)}</h3>
- <p class="hc-hint">Samostatný Shock Reroll z cestování (${esc(q.sourceId)}). Původ ${esc(displayCampaignMinute(q.originMinute))}. ${q.kind==='UNC'?'Počkat skutečných 10 minut':'Po další skutečné akci mimo boj vyhodnoť tento hod'}. Kalendář je autoritou pro minuty; tento hod jej sám neposune. Combat pouze čte účinky na postavu (HMK 169, 185).</p>
+ <p class="hc-hint">Samostatný Shock Reroll z cestování (${esc(q.sourceId)}). Původ ${esc(displayCampaignMinute(q.originMinute))}. ${q.phase==='after-all-bleeding-stopped'?'Okamžitý Shock Reroll po zastavení všech Bleederů':q.kind==='UNC'?'Počkat skutečných 10 minut':'Po další skutečné akci mimo boj vyhodnoť tento hod'}. Kalendář je autoritou pro minuty; tento hod jej sám neposune. Combat pouze čte účinky na postavu (HMK 169, 185).</p>
  <p>Shock ML ${esc(String(shockML??'nedoloženo'))} · Fatigue ${fatigue} · ${q.kind==='STN'?'bez dalšího −20':'−20 při INC/UNC'} · EML ${esc(String(Number.isInteger(shockML)?eml:'nedoloženo'))}</p>
  <form data-weather-shock-followup><input type="hidden" name="sourceId" value="${esc(q.sourceId)}">
  <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required></label>
  ${q.kind==='UNC'?`<label>Pokud nastane UNC + CF: Location Shock z původní rány<input name="comaLocationShock" type="number" min="0" max="15"></label><label>Injury Level původní rány<input name="comaInjuryLevel" type="number" min="1" max="5"></label><label>První d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10"></label>`:''}
- <p class="hc-hint">${q.kind==='UNC'?'Test je dostupný přesně po uplynutí deseti minut.':'Tlačítko vyhodnotí Shock po dokončení následující skutečné akce postavy; žádný bojový tah se nevytváří.'}</p>
+ <p class="hc-hint">${q.phase==='after-all-bleeding-stopped'?'Ihned po zastavení všech Bleederů – bez dalších deseti minut.':q.kind==='UNC'?'Test je dostupný přesně po uplynutí deseti minut.':'Tlačítko vyhodnotí Shock po dokončení následující skutečné akce postavy; žádný bojový tah se nevytváří.'}</p>
  <button type="submit" ${canRoll?'':'disabled'}>Vyhodnotit a zapsat Shock d100</button><output role="status" aria-live="polite"></output></form>
  ${!canRoll?'<p class="notice">Zatím nesplatné nebo postava nemá doložené Shock ML.</p>':''}</section>`;
 }
@@ -11262,7 +11326,9 @@ function hskWeatherHealthConsequences(actorId){
  const entries=data.journal.filter(x=>x.characterId===actorId);
  const success=hskWeatherHealthLastReceipt?.actorId===actorId?
   `<p class="hc-health-result" role="status" aria-live="polite">${esc(hskWeatherHealthLastReceipt.message)}</p>`:'';
+ const weatherBlood=hskWeatherBleedingCarePanel(actorId);
  const weatherShock=hskWeatherShockFollowup(actorId);
+ if(weatherBlood)return success+weatherBlood+(weatherShock||'')+hskWeatherInjuryMandatory(actorId);
  // One current compulsory health test per actor; no new Cold/Heat dice while
  // a prior weather-induced Shock reroll remains unresolved.
  if(weatherShock)return success+weatherShock;
@@ -12236,6 +12302,62 @@ document.addEventListener('submit',event=>{
   selected=actor.id;view='sheet';activeSheetSection='hazards';render();
  }catch(error){if(out)out.textContent='Weather Course nebyl zapsán: '+error.message;}
 },true);
+/** Weather Blood Stoppage: the preparation, five-minute obligation and
+ * actual d100 are separate witnessed transactions on the same campaign. */
+document.addEventListener('submit',event=>{
+ const form=event.target;if(!form?.matches?.('[data-weather-blood-start],[data-weather-blood-complete]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const out=form.querySelector('output');
+ try{
+  const actor=character(selected),clock=data.campaignClock,woundId=String(form.elements.namedItem('woundId')?.value||'');
+  if(!actor||!clock||combatInitiativeSequence||view!=='sheet'||activeSheetSection!=='hazards')
+   throw Error('Blood Stoppage z Cestování musí probíhat v Zdraví & Expozice mimo Combat');
+  const party=calendarMemberIds(clock,data.characters);
+  if(!party.some(c=>c.id===actor.id))throw Error('Pacient není člen aktuální kampaně');
+  const state=persistentStateOf(actor);
+  if(!state.wounds.some(w=>w.id===woundId&&medicalOriginOfWound(w,state.events)===MEDICAL_ORIGIN.WEATHER))
+   throw Error('Rána není doloženým Weather Bleederem této postavy');
+  const v=Object.fromEntries(new FormData(form)),start=form.matches('[data-weather-blood-start]');
+  const healerId=start?v.healerId:state.wounds.find(w=>w.id===woundId)?.travelBlood?.plan?.healerId;
+  const healer=party.find(c=>c.id===healerId)||null;
+  const id=uuid();
+  const numeric=(x)=>x===undefined||x===null||String(x).trim()===''?null:Number(x);
+  const outcome=start?beginTravelBloodStoppage({clock,state,patient:actor,healer,party,woundId,
+   method:v.method,hasBandage:v.hasBandage==='on',hasWater:v.hasWater==='on',
+   hasNeedleThread:v.hasNeedleThread==='on',hasHeatedTool:v.hasHeatedTool==='on',
+   tourniquet:v.tourniquet==='on',
+   gmConfirmed:true,eventId:id}):completeTravelBleedingInterval({clock,state,
+    patient:actor,healer,party,woundId,mode:v.mode,physicianRoll:numeric(v.physicianRoll),
+    strengthRoll:numeric(v.strengthRoll),journal:data.journal,gmConfirmed:true,eventId:id});
+  const expectedVersion=campaignKey(clock),expectedMinute=clock.minute;
+  if(!mutate(()=>{
+   if(!data.campaignClock||campaignKey(data.campaignClock)!==expectedVersion||
+     data.campaignClock.minute!==expectedMinute)throw Error('Kalendář se během ošetření změnil');
+   if(JSON.stringify(persistentStateOf(actor))!==JSON.stringify(state))throw Error('Zdravotní stav se během hodu změnil');
+   synchronizeCombatInjuries(actor,outcome.state);
+   if(!start)logCalendarCombatResolution(actor,outcome.state,'travel-blood-stoppage');
+   data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:expectedVersion,
+    campaignMinute:expectedMinute,createdAt:stamp(),
+    title:start?'Zahájení Blood Stoppage · HMK 178':'Weather Blood Stoppage / Blood Loss · HMK 178',
+    body:start?('GM zahájil skutečné pětiminutové ošetření '+woundId+' · léčitel '+healer.name+
+      ' · do '+displayCampaignMinute(outcome.dueMinute)):
+      ('Bleeder '+woundId+' · '+v.mode+' · Physician '+(outcome.physicianSL||'bez ošetření')+
+      ' · Blood Loss '+(outcome.bloodSL||'bez dalšího hodu')+' · BP '+outcome.bp+'/4'+
+      ' · Shock '+outcome.shock+(outcome.stopped?' · krvácení zastaveno':'')),
+    calendarTravelBloodProof:{format:'hmk-weather-blood-v93.714',kind:start?'blood-stoppage-start':v.mode,
+     sourceEventId:id,woundId,patientId:actor.id,healerId:healer?.id??null,
+     dueMinute:start?outcome.dueMinute:clock.minute}});
+  }))throw Error('Zdravotní stav nebyl bezpečně uložen');
+  hskWeatherHealthLastReceipt={actorId:actor.id,message:start?
+   'Zahájeno 5minutové ošetření. Kalendář posuňte přesně na '+displayCampaignMinute(outcome.dueMinute)+
+    '; teprve potom potvrďte skutečný Physician d100 a případný Strength d100.':
+   'Pětiminutový zdravotní interval zapsán: '+(outcome.stopped?'Bleeder zastaven.':'krvácení pokračuje.')+
+    ' BP '+outcome.bp+'/4, Shock '+outcome.shock+
+    (outcome.nextDueMinute?' · další interval '+displayCampaignMinute(outcome.nextDueMinute):'')};
+  selected=actor.id;activeSheetSection='hazards';view='sheet';render();
+ }catch(error){if(out)out.textContent='Blood Stoppage nebyl zapsán: '+error.message;
+  else alert('Blood Stoppage nebyl zapsán: '+error.message);}
+},true);
 document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-weather-shock-followup]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
@@ -12244,10 +12366,10 @@ document.addEventListener('submit',event=>{
   if(!actor||!clock||combatInitiativeSequence)throw Error('Weather Shock vyžaduje aktivní Kalendář mimo Combat Initiative');
   const state=persistentStateOf(actor),q=state.shockFollowup;
   if(q?.domain!=='travel-weather'||q.sourceId!==sourceId)throw Error('Původní Weather Shock neodpovídá postavě a zdroji');
-  const elapsed=clock.minute-q.originMinute,due=q.kind==='UNC'?10:0;
+  const elapsed=clock.minute-q.originMinute,due=q.phase==='after-all-bleeding-stopped'?0:q.kind==='UNC'?10:0;
   if(elapsed<due||elapsed<0)throw Error('Weather Shock test nesmí předcházet splatné minutě');
   if(!calendarMemberIds(clock,data.characters).some(c=>c.id===actor.id))throw Error('Shock postavy nepatří do této kampaně');
-  const ml=actor.hmk?.skills?.find(s=>String(s.name||'').toLowerCase()==='shock')?.ml;
+  const ml=availableMasteries(actor).find(s=>s.name==='Shock')?.ml;
   if(!Number.isSafeInteger(ml)||ml<1)throw Error('Postava nemá ověřenou Shock ML');
   const roll=Number(form.elements.namedItem('roll').value),eml=ml-combatFatigueTotals(state).total-(q.kind==='STN'?0:20);
   if(!Number.isInteger(roll)||roll<1||roll>100)throw Error('Vyžadován skutečný Shock d100');
@@ -12255,12 +12377,16 @@ document.addEventListener('submit',event=>{
   // Clicking the current mandatory action confirms that it has just been resolved.
   // The calendar's 10-minute UNC deadline remains enforced separately.
   const id=uuid(),turnEnded=q.kind!=='UNC';
-  const outcome=applyConfirmedShockRecovery({state,round:Math.max(1,combatClock.round||1,state.lastRound||0),
+  const comaLocationShock=form.elements.namedItem('comaLocationShock')?.value?Number(form.elements.namedItem('comaLocationShock').value):null;
+  const comaInjuryLevel=form.elements.namedItem('comaInjuryLevel')?.value?Number(form.elements.namedItem('comaInjuryLevel').value):null;
+  const initialComaD10=form.elements.namedItem('initialComaD10')?.value?Number(form.elements.namedItem('initialComaD10').value):null;
+  const outcome=q.phase==='after-all-bleeding-stopped'?completeTravelBloodShockReroll({
+   clock,state,actorId:actor.id,sourceId,shockML:ml,roll,comaLocationShock,comaInjuryLevel,
+   initialComaD10,eventId:id,gmConfirmed:true}):applyConfirmedShockRecovery({state,
+   round:Math.max(1,combatClock.round||1,state.lastRound||0),
    eventId:id,sl,timingConfirmed:true,characterId:actor.id,actorId:actor.id,
    turnEnded,elapsedMinutesSinceOriginal:elapsed,timelineId:null,shockML:ml,roll,
-   comaLocationShock:form.elements.namedItem('comaLocationShock')?.value?Number(form.elements.namedItem('comaLocationShock').value):null,
-   comaInjuryLevel:form.elements.namedItem('comaInjuryLevel')?.value?Number(form.elements.namedItem('comaInjuryLevel').value):null,
-   initialComaD10:form.elements.namedItem('initialComaD10')?.value?Number(form.elements.namedItem('initialComaD10').value):null});
+   comaLocationShock,comaInjuryLevel,initialComaD10});
   if(!mutate(()=>{
    if(data.campaignClock.minute!==clock.minute||campaignKey(data.campaignClock)!==campaignKey(clock))throw Error('Mezitím se změnil Kalendář');
    synchronizeCombatInjuries(actor,outcome.state);
@@ -16303,6 +16429,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  // Weather aftercare is now in the dedicated Health/Exposure chapter, not
  // the Combat Status tab or generic Skill Tests. Keep source-linked IDs.
  if((['weather-onset','weather-course','weather-skin','weather-shock'].includes(kind)||
+   (kind==='bleeding'&&hskIsEnvironmentalWound(actor,sourceId))||
    (['injury-morale','injury-mishap'].includes(kind)&&
      (kind==='injury-morale'?hskIsEnvironmentalWound(actor,sourceId):unresolvedInjuryMishaps(persistentStateOf(actor)).some(m=>m.id===sourceId&&hskIsEnvironmentalWound(actor,m.woundId))))||
    (['treatment','healing','infection','grim'].includes(kind)&&hskIsEnvironmentalWound(actor,sourceId))||
@@ -16338,7 +16465,13 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  }
  case 'injury-mishap':if(unresolvedInjuryMishaps(persistentStateOf(actor)).some(m=>m.id===sourceId&&hskIsEnvironmentalWound(actor,m.woundId))){form=q('form[data-weather-injury-mishap]')[0]||null;break;}
   form=document.getElementById('combat-injury-mishap-form');choose(form,'mishap',actor.id+'::'+sourceId);break;
- case 'bleeding':form=document.getElementById('combat-blood-stoppage-form');choose(form,'wound',actor.id+'::'+sourceId);break;
+ case 'bleeding':{
+  if(hskIsEnvironmentalWound(actor,sourceId)){
+   form=[...document.querySelectorAll('form[data-weather-blood-start],form[data-weather-blood-complete]')]
+    .find(f=>f.elements.namedItem('woundId')?.value===sourceId)||null;
+  }else{form=document.getElementById('combat-blood-stoppage-form');choose(form,'wound',actor.id+'::'+sourceId);}
+  break;
+ }
  case 'shock-followup':form=document.getElementById('combat-recovery-persistent-form');choose(form,'characterId',actor.id);break;
  case 'treatment':case 'healing':case 'infection':case 'grim':{
   if(hskIsEnvironmentalWound(actor,sourceId)){weatherCareActiveSection=kind==='treatment'?'treatment':kind==='healing'?'healing':kind==='infection'?'infection':'grim';syncWeatherCarePanel();}
@@ -16725,7 +16858,7 @@ document.addEventListener('click',e=>{
  if(t.dataset.calLink){
   pendingTrekHandoff=null;
   const target=character(t.dataset.calLink);if(!target)return alert('Postava již není v registru');
-  selected=target.id;const destination=(t.dataset.calKind==='weather-shock'||(['treatment','healing','infection','grim'].includes(t.dataset.calKind)&&hskIsEnvironmentalWound(target,t.dataset.calSource))||(['coma','extended-shock'].includes(t.dataset.calKind)&&hskWeatherTraumaCourseKind(target,t.dataset.calKind)))?'hazards':(t.dataset.calDestination||'notes');
+  selected=target.id;const destination=(t.dataset.calKind==='weather-shock'||(t.dataset.calKind==='bleeding'&&hskIsEnvironmentalWound(target,t.dataset.calSource))||(['treatment','healing','infection','grim'].includes(t.dataset.calKind)&&hskIsEnvironmentalWound(target,t.dataset.calSource))||(['coma','extended-shock'].includes(t.dataset.calKind)&&hskWeatherTraumaCourseKind(target,t.dataset.calKind)))?'hazards':(t.dataset.calDestination||'notes');
   if(t.dataset.calKind==='skill-fall'){activeSheetSection='status';view='sheet';}
   else if(destination==='combat'||destination==='healing'){if(!combatInitiativeSequence)encounterSelection.add(target.id);view='encounter';}
   else if(destination==='skills'){view='skills';
