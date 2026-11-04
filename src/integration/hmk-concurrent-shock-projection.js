@@ -19,7 +19,8 @@ export function concurrentShockSources(state){
   ...(state.environmentalHazards??[]).filter(x=>x.active).map(x=>({id:x.id,kind:'weather',shock:x.shockApplied??'NONE'})),
   ...(state.toxinCourses??[]).filter(x=>x.status==='active'||x.status==='dead').map(x=>({id:x.id,kind:'poison',shock:x.shockApplied??'NONE'})),
   ...(state.diseaseCourses??[]).filter(x=>x.status==='active'||x.status==='dead').map(x=>({id:x.id,kind:'disease',shock:x.shockApplied??'NONE'})),
-  ...(state.malnutritionEpisodes??[]).filter(x=>x.status==='active'||x.status==='dead').map(x=>({id:x.id,kind:'malnutrition',shock:x.shockApplied??'NONE'}))
+  ...(state.malnutritionEpisodes??[]).filter(x=>x.status==='active'||x.status==='dead').map(x=>({id:x.id,kind:'malnutrition',shock:x.shockApplied??'NONE'})),
+  ...(state.parallelColdShocks??[]).filter(x=>x.shock!=='NONE').map(x=>({id:'parallel-cold:'+x.sourceId,kind:'cold-water',shock:x.shock}))
  ];
 }
 export function initializeConcurrentShock(state){

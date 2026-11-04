@@ -15,9 +15,13 @@ export function assertLegacyMutationDoesNotChangeCombat(before,after,{sequence=n
   reject('Během Initiative nelze uložit neúplná data mimo Combat průvodce');
  if(!same(before.combatRuntime??null,after.combatRuntime??null))
   reject('Kontrolní bod Initiative smí měnit pouze potvrzená Combat transakce');
- if(!same(before.inventory,after.inventory))
-  reject('Inventář během Initiative smí měnit pouze dokončená Combat akce');
  const ids=new Set(participantIds);
+ const protectedInventory=(rows)=>rows.filter(x=>ids.has(x.characterId)).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+ if(!same(protectedInventory(before.inventory),protectedInventory(after.inventory)))
+  reject('Inventář účastníků Initiative smí měnit pouze dokončená Combat akce');
+ // A nonparticipant's inventory is independent of the active encounter.
+ // All catalogue and inventory integrity validators still run at save-time.
+
  for(const id of ids){
   const a=before.characters.filter(c=>c.id===id),b=after.characters.filter(c=>c.id===id);
   if(a.length!==1||b.length!==1||!same(a[0],b[0]))

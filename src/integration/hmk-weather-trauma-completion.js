@@ -8,6 +8,7 @@ import {compoundInjury,compoundCompatible} from '../rules/injury.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {calculateShockState,shockStateFromIndex,applyShockState,SHOCK_STATE} from '../rules/shock.js';
 import {resolveLiveCombatArmour} from './live-combat-armour.js';
+import {appendParallelColdShock} from './hmk-parallel-cold-shock.js';
 
 const requireIt=(v,message)=>{if(!v)throw Error(message)};
 const integer=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
@@ -63,10 +64,10 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
  // superseded, not left as a stale second recovery and not silently erased.
  // An already established 4-hour Extended Shock/Coma is DIFFERENT: its own
  // mandatory Course cannot be superseded by a fresh immersion Shock.
- requireIt(!newIsStronger||!(s.extendedShock||s.coma?.active),
-  'Silnější nový Cold Shock při trvajícím Extended Shock/Coma vyžaduje samostatně časovaný zdroj; původní Course nelze přepsat');
+ const parallel=newIsStronger&&!!(s.extendedShock||s.coma?.active)&&carryShock!=='KIA';
  const supersededFollowup=newIsStronger&&s.shockFollowup?structuredClone(s.shockFollowup):null;
- if(newIsStronger){
+ if(parallel){appendParallelColdShock(s,{sourceId,originEventId:id,originMinute,originRound:round,shock:carryShock});}
+ else if(newIsStronger){
   s.shock=carryShock;s.shockOriginRound=round;
   if(carryShock==='INC'||carryShock==='UNC')s.posture.prone=true;
   if(['STN','INC','UNC'].includes(carryShock)){
@@ -79,7 +80,7 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
  }
  const report={condition,immersionRounds:d6s.reduce((a,b)=>a+b,0),d6s,enduranceD100,endEML,
   sl:named(sl),base,index,modifier,shock:stateName,carryoverShock:carryShock,effectiveShock:s.shock,
-  previousShock:oldShock,previousCoursePreserved:!newIsStronger&&!!(s.shockFollowup||s.extendedShock||s.coma),
+  previousShock:oldShock,parallelCourseSource:parallel?sourceId:null,previousCoursePreserved:parallel||(!newIsStronger&&!!(s.shockFollowup||s.extendedShock||s.coma)),
   ...(supersededFollowup?{supersededFollowup,reason:'HMK p169: only the most severe current Shock State has a native Shock Reroll'}:{}),rulePage:185};
  s.events.push({id,type:'skill-cold-water-shock',round,details:{sourceId,report,gmConfirmed:true}});
  s.lastRound=round;validateCombatState(s);

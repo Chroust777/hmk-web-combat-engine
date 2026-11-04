@@ -72,6 +72,7 @@ import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './src/
 import {fieldRuleNote} from './src/integration/hmk-creation-rule-help.js';
 import {auditArmourLibraryConsistency} from './src/integration/armour-library-consistency.js';
 import {assertLegacyMutationDoesNotChangeCombat} from './src/integration/active-combat-write-boundary.js';
+import {resolveParallelColdReroll,resolveParallelColdCourse,assertParallelColdShocksAppendOnly} from './src/integration/hmk-parallel-cold-shock.js';
 import {assertAlternateManeuverWriteAllowed} from './src/integration/hmk-alternate-maneuver-write-gate.js';
 import {persistVerifiedCombatSnapshot} from './src/integration/verified-combat-storage.js';
 import {prepareNeutralAlchemySpellstart,persistNeutralAlchemySpellstart} from './src/integration/hmk-alchemy-neutral-spellstart.js';
@@ -314,7 +315,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.721';
+const APP_VERSION='93.722';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -709,6 +710,7 @@ function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null
   // authorized disaster-recovery operation for an attempted event overwrite.
   if(storageBaseline!==null&&!restoreBackup)linkNewMoralePsycheAccrual(committedBefore,data);
   if(!restoreBackup)assertGlobalActionLedgerAppendOnly(committedBefore,data);
+  if(!restoreBackup)for(const former of committedBefore.characters??[]){const current=(data.characters??[]).find(x=>x.id===former.id);if(current)assertParallelColdShocksAppendOnly(former.hmk?.healthState??initialCombatState(),current.hmk?.healthState??initialCombatState());}
   if(!restoreBackup&&JSON.stringify(committedBefore)!==JSON.stringify(data)){
    recordGlobalActionReceipt(data,{before:committedBefore,id:uuid(),createdAt:stamp(),
     mode:episodeCommit?'episode-commit':'normal'});
@@ -2160,7 +2162,7 @@ function timeEpisodeMutationLocked(){
 function timeEpisodeLockExplanation(){
  return 'Rozpracovaná epizoda uchovává své hody samostatně. Nezávislé akce ve stejné minutě lze potvrdit; skutečný posun času musí respektovat splatné HMK události.';
 }
-// v93.721: NO global form/button interception for same-minute events.
+// v93.722: NO global form/button interception for same-minute events.
 // Independent writes pass through the verified committed-state rebase.
 // Calendar advancement remains subject to its own actual deadlines.
 document.addEventListener('click',event=>{
@@ -5599,7 +5601,7 @@ function reconciliationFieldChanges(oldSnapshot,newSnapshot){
  });
 }
 function reconcileInventoryItem(id){
- if(combatInitiativeSequence)return alert('Během Initiative nelze měnit bojové parametry existujících inventárních položek mimo Combat průvodce.');
+ if(combatInitiativeSequence?.order?.includes(data.inventory.find(x=>x.id===id)?.characterId))return alert('Během Initiative nelze měnit bojové parametry existujících inventárních položek mimo Combat průvodce.');
  if(storageReadOnly)return alert('Úložiště je pouze pro čtení.');
  const candidate=inventoryReconciliationCandidate(id);
  if(!candidate)return alert('Položku nelze bezpečně aktualizovat. Ověřte její původ, kategorii a případné změny.');
@@ -5630,7 +5632,7 @@ function reconcileInventoryItem(id){
  if(!ask('Ověřili jste, že byla záloha JSON skutečně uložena a je dostupná? Pokud ne, zvolte Zrušit.'))return;
  if(!ask(`POTVRDIT AKTUALIZACI JEDNOHO KUSU\n\n${x.snapshot.name}\nPouze tato pole:\n${selectedFields.join('\n')}\n\nVšechna ostatní pole snapshotu, WQ, stav, vlastník, slot a počet zůstanou beze změny.`))return;
  mutate(()=>{
-  if(combatInitiativeSequence)throw Error('Aktualizace inventáře byla zablokována běžící Initiative.');
+  if(combatInitiativeSequence?.order?.includes(data.inventory.find(x=>x.id===id)?.characterId))throw Error('Inventář aktivního účastníka patří do Combat průvodce.');
   const current=data.inventory.find(v=>v.id===id);
   if(!current||JSON.stringify(canonicalCatalogValue(current.snapshot))!==fingerprint||current.sourceItemId!==source.id||JSON.stringify(canonicalCatalogValue({characterId:current.characterId,quantity:current.quantity,slot:current.slot,condition:current.condition,currentWQ:current.currentWQ}))!==recordFingerprint)throw Error('Položka se mezitím změnila.');
   const latest=findCatalogItem(source.id);
@@ -11355,20 +11357,57 @@ function hskWeatherShockFollowup(actorId){
  <button type="submit" ${canRoll?'':'disabled'}>Vyhodnotit a zapsat Shock d100</button><output role="status" aria-live="polite"></output></form>
  ${!canRoll?'<p class="notice">Zatím nesplatné nebo postava nemá doložené Shock ML.</p>':''}</section>`;
 }
+/** Source-keyed immersion follow-ups never replace an earlier Extended
+ * Shock/Coma and never need Combat to open an auxiliary procedure. */
+function hskParallelColdHealthPanel(actorId){
+ const actor=character(actorId),clock=data.campaignClock;
+ if(!actor||!clock)return '';
+ const s=persistentStateOf(actor),rows=s.parallelColdShocks??[];
+ return rows.filter(x=>x.followup||x.extendedShock||x.coma?.active).map(x=>{
+  const items=[];
+  if(x.followup){
+   const due=x.followup.dueMinute,ml=availableMasteries(actor).find(z=>z.name==='Shock')?.ml;
+   const eml=Number(ml)-combatFatigueTotals(s).total-(x.shock==='STN'?0:20);
+   items.push(`<form data-parallel-cold-reroll><input type="hidden" name="sourceId" value="${esc(x.sourceId)}">
+    <h4>Cold Water Shock Reroll · ${esc(x.sourceId)}</h4>
+    <p class="hc-hint">Původní Shock ${esc(x.shock)}, termín ${esc(displayCampaignMinute(due))}; žádný další bojový krok ani časový posun se nevytváří. Původní Extended Shock/Coma běží nezávisle.</p>
+    <p>Shock ML ${esc(String(ml??'neznámá'))} · EML ${esc(String(Number.isInteger(ml)?eml:'neznámá'))}.</p>
+    <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required></label>
+    ${x.shock==='UNC'?'<label>Jen při UNC+CF: GM výslovně určený Coma HR pro ponoření bez Injury Level<input name="initialComaHR" type="number" min="1" max="20"></label><label>Jen při UNC+CF: první skutečný Coma d10 dní<input name="initialComaD10" type="number" min="1" max="10"></label>':''}
+    <button type="submit" ${clock.minute>=due&&Number.isInteger(ml)?'':'disabled'}>Zapsat samostatný Shock Reroll</button><output role="status" aria-live="polite"></output></form>`);
+  }
+  for(const kind of ['extended-shock','coma']){
+   const c=kind==='extended-shock'?x.extendedShock:x.coma?.active?x.coma:null;
+   if(!c)continue;
+   const due=kind==='extended-shock'?c.startMinute+(c.elapsedHours+4)*60:c.startMinute+(c.elapsedDays+c.nextCourseDays)*DAY_MINUTES;
+   items.push(`<form data-parallel-cold-course><input type="hidden" name="sourceId" value="${esc(x.sourceId)}"><input type="hidden" name="kind" value="${kind}">
+    <h4>${kind==='extended-shock'?'Extended Shock':'Coma'} · samostatný Cold Water Course</h4>
+    <p class="hc-hint">Zdroj ${esc(x.sourceId)} · HR${c.hr} · pravidlový termín ${esc(displayCampaignMinute(due))} · aktuální minuta ${esc(displayCampaignMinute(clock.minute))}.</p>
+    <label>Skutečný Course d100<input name="roll" type="number" min="1" max="100" required></label>
+    ${kind==='extended-shock'?'<label>Nejvyšší skutečné Physician SV hvězdy<input name="physicianStars" type="number" min="0" max="10" value="0" required></label>':'<label>Klidné chráněné prostředí<select name="restfulShelter"><option value="yes">Ano</option><option value="no">Ne (−20)</option></select></label><label>Nový skutečný d10, pouze pokud Coma pokračuje<input name="nextComaD10" type="number" min="1" max="10"></label>'}
+    <label>Doložený Arcane bonus<input name="arcaneBonus" type="number" min="0" max="100" value="0" required></label>
+    <button type="submit" ${clock.minute===due?'':'disabled'}>Zapsat právě splatný Course</button><output role="status" aria-live="polite"></output></form>`);
+  }
+  return `<section class="panel wide hmk-parallel-cold-course"><h3>Cold Water Shock · souběžná zdravotní událost · ${esc(actor.name)}</h3>${items.join('')}</section>`;
+ }).join('');
+}
 /** Health owns time-bound Weather Extended Shock and Coma. Only one
  * due Course, one actor and one d100 are offered. The original HMK p.179
  * executor remains authoritative; Combat is never started by Travel. */
 function hskWeatherTraumaCourseKind(actor,kind){
  const s=actor&&persistentStateOf(actor);
  return !!s&&((kind==='extended-shock'&&s.extendedShock?.domain==='travel-weather')||
-  (kind==='coma'&&s.coma?.active&&s.coma.domain==='travel-weather'));
+  (kind==='coma'&&s.coma?.active&&s.coma.domain==='travel-weather')||
+  (s.parallelColdShocks??[]).some(x=>kind==='extended-shock'?!!x.extendedShock:kind==='coma'&&x.coma?.active));
 }
 function hskWeatherTraumaCourseForm(actorId){
  const actor=character(actorId),clock=data.campaignClock;
  if(!actor||!clock)return '';
  const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
+ const health=persistentStateOf(actor);
  const due=agenda.due.filter(x=>x.characterId===actorId&&['extended-shock','coma'].includes(x.kind)&&
-  hskWeatherTraumaCourseKind(actor,x.kind)).sort((a,b)=>a.minute-b.minute||
+  !x.sourceId&&((x.kind==='extended-shock'&&health.extendedShock?.domain==='travel-weather')||
+  (x.kind==='coma'&&health.coma?.active&&health.coma.domain==='travel-weather'))).sort((a,b)=>a.minute-b.minute||
   (a.kind==='extended-shock'?-1:1))[0];
  if(!due)return '';
  const kind=due.kind,state=persistentStateOf(actor),course=kind==='extended-shock'?state.extendedShock:state.coma;
@@ -11401,18 +11440,19 @@ function hskWeatherHealthConsequences(actorId){
   `<p class="hc-health-result" role="status" aria-live="polite">${esc(hskWeatherHealthLastReceipt.message)}</p>`:'';
  const weatherBlood=hskWeatherBleedingCarePanel(actorId);
  const weatherShock=hskWeatherShockFollowup(actorId);
- if(weatherBlood)return success+weatherBlood+(weatherShock||'')+hskWeatherInjuryMandatory(actorId);
+ const parallel=hskParallelColdHealthPanel(actorId);
+ if(weatherBlood)return success+parallel+weatherBlood+(weatherShock||'')+hskWeatherInjuryMandatory(actorId);
  // One current compulsory health test per actor; no new Cold/Heat dice while
  // a prior weather-induced Shock reroll remains unresolved.
- if(weatherShock)return success+weatherShock;
+ if(weatherShock)return success+parallel+weatherShock;
  const trauma=hskWeatherTraumaCourseForm(actorId);
- if(trauma)return success+trauma;
+ if(trauma)return success+parallel+trauma;
  const injuryMandatory=hskWeatherInjuryMandatory(actorId);
- if(injuryMandatory)return success+injuryMandatory;
+ if(injuryMandatory)return success+parallel+injuryMandatory;
  const html=entries.map(x=>hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+
   hskEpisodeWeatherOnsetForms(actorId)+hskTrekkingWeatherTreatmentForms(actorId)+
   hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
- return success+(html?'<section class="panel wide hmk-health-exposure-followups"><h3>Počasí · zdravotní vyhodnocení HMK 149, 185</h3><p class="hc-hint">Každý jednotlivý hod má původní ID a pravidlový termín. Po uložení aplikace sama vybere další splatnou povinnost; další potvrzovací checkbox není třeba. Combat pouze čte trvalý zdravotní stav.</p>'+html+'</section>':'');
+ return success+parallel+(html?'<section class="panel wide hmk-health-exposure-followups"><h3>Počasí · zdravotní vyhodnocení HMK 149, 185</h3><p class="hc-hint">Každý jednotlivý hod má původní ID a pravidlový termín. Po uložení aplikace sama vybere další splatnou povinnost; další potvrzovací checkbox není třeba. Combat pouze čte trvalý zdravotní stav.</p>'+html+'</section>':'');
 }
 function hskPendingSkillPhysicalConsequences(actorId,{includeWeather=true}={}){
  const pending=data.journal.filter(x=>x.skillTestProof?.type==='critical-followup'&&
@@ -12429,6 +12469,47 @@ document.addEventListener('submit',event=>{
   selected=actor.id;activeSheetSection='hazards';view='sheet';render();
  }catch(error){if(out)out.textContent='Blood Stoppage nebyl zapsán: '+error.message;
   else alert('Blood Stoppage nebyl zapsán: '+error.message);}
+},true);
+document.addEventListener('submit',event=>{
+ const f=event.target;if(!f?.matches?.('[data-parallel-cold-reroll],[data-parallel-cold-course]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=f.querySelector('output');
+ try{
+  const actor=character(selected),clock=data.campaignClock;
+  if(!actor||!clock||combatInitiativeSequence||!calendarMemberIds(clock,data.characters).some(c=>c.id===actor.id))
+   throw Error('Samostatný Cold Shock Course vyžaduje aktuální zdravotní Kalendář mimo Combat');
+  const state=persistentStateOf(actor),sourceId=f.elements.namedItem('sourceId')?.value;
+  if(!(state.parallelColdShocks??[]).some(x=>x.sourceId===sourceId))throw Error('Zdroj Cold Shock již není otevřený');
+  const val=name=>f.elements.namedItem(name)?.value??'';
+  const integer=(name,min,max,optional=false)=>{
+   if(optional&&val(name)==='')return null;
+   const n=Number(val(name));if(val(name)===''||!Number.isSafeInteger(n)||n<min||n>max)throw Error('Neplatný skutečný '+name);
+   return n;
+  };
+  const id=uuid(),round=Math.max(1,state.lastRound||1),minute=clock.minute;
+  const kind=f.matches('[data-parallel-cold-reroll]')?'shock-reroll':val('kind');
+  let result;
+  if(kind==='shock-reroll'){
+   const shockML=availableMasteries(actor).find(x=>x.name==='Shock')?.ml;
+   result=resolveParallelColdReroll({state,sourceId,round,eventId:id,minute,shockML,
+    roll:integer('roll',1,100),initialComaHR:integer('initialComaHR',1,20,true),
+    initialComaD10:integer('initialComaD10',1,10,true),gmConfirmed:true});
+  }else result=resolveParallelColdCourse({state,actor,sourceId,kind,round,eventId:id,minute,
+   roll:integer('roll',1,100),physicianStars:kind==='extended-shock'?integer('physicianStars',0,10):0,
+   arcaneBonus:integer('arcaneBonus',0,100),restfulShelter:val('restfulShelter')!=='no',
+   nextComaD10:integer('nextComaD10',1,10,true),gmConfirmed:true});
+  const previous=JSON.stringify(state),camp=campaignKey(clock);
+  if(!mutate(()=>{
+   if(data.campaignClock.minute!==minute||campaignKey(data.campaignClock)!==camp||
+    JSON.stringify(persistentStateOf(actor))!==previous)throw Error('Čas či zdravotní stav se během zápisu změnily');
+   synchronizeCombatInjuries(actor,result.state);
+   data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:camp,campaignMinute:minute,
+    createdAt:stamp(),title:'Cold Water · '+kind+' · HMK 169/179/185',
+    body:'Samostatný zdroj '+sourceId+' · skutečný d100 '+(result.report.roll??'potvrzen'),
+    skillTestProof:{type:'parallel-cold-course',kind,sourceId,originalEventId:id,actorId:actor.id,
+     confirmedMinute:minute,report:result.report}});
+  }))throw Error('Samostatný Cold Shock Course se neuložil');
+  selected=actor.id;activeSheetSection='hazards';view='sheet';render();
+ }catch(error){if(out)out.textContent='Cold Shock Course se neuložil: '+error.message;}
 },true);
 document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-weather-shock-followup]'))return;
@@ -16552,8 +16633,10 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  }
  case 'coma':case 'extended-shock':{
   if(hskWeatherTraumaCourseKind(actor,kind)){
-   form=document.querySelector('form[data-weather-trauma-course]');
-   if(form?.elements.namedItem('kind')?.value!==kind)form=null;
+   form=[...document.querySelectorAll('form[data-parallel-cold-course]')].find(f=>
+    f.elements.namedItem('kind')?.value===kind&&f.elements.namedItem('sourceId')?.value===sourceId)||null;
+   if(!form)form=[...document.querySelectorAll('form[data-weather-trauma-course]')].find(f=>
+    f.elements.namedItem('kind')?.value===kind&&(!sourceId||f.elements.namedItem('sourceId')?.value===sourceId))||null;
    break;
   }
   // Both courses can coexist. Select the ORIGINAL guided Course for the
@@ -16595,7 +16678,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  }
  case 'skill-fall':form=byHidden('form[data-climbing-fall-form]')||byHidden('form[data-climbing-short-fall]');break;
  case 'skill-injury':form=byHidden('form[data-skill-physical-impact]');break;
- case 'weather-shock':form=byHidden('form[data-weather-shock-followup]');break;
+ case 'weather-shock':form=byHidden('form[data-parallel-cold-reroll]')||byHidden('form[data-weather-shock-followup]');break;
  case 'weather-onset':form=byHidden('form[data-skill-weather-onset]');break;
  case 'weather-course':form=byHidden('form[data-skill-weather-course]');choose(form,'elapsedMinutes',elapsedText);break;
  case 'weather-skin':form=byHidden('form[data-skill-weather-skin]');break;
@@ -18004,7 +18087,7 @@ if(t.dataset.nav){
   selected=actor.id;activeSheetSection='hazards';sheetEditingId=null;view='sheet';
  }else{view=t.dataset.nav;if(view==='calendar'){calendarLanding=!combatInitiativeSequence;calendarCreating=false;calendarUI=null;activeCalendarSection='overview';}}
  query='';overlay=null;render();return}if(t.dataset.open){openCharacterJournal(t.dataset.open);return}
-if(t.dataset.copy){if(combatInitiativeSequence)return alert('Během Initiative nelze kopírovat postavu včetně bojového stavu a inventáře.');const c=character(t.dataset.copy);mutate(()=>{const id=uuid();const copy={...structuredClone(c),id,name:c.name+' (kopie)'};if(copy.hmk){copy.hmk.skills=(copy.hmk.skills||[]).map(s=>({...s,id:uuid()}));copy.hmk.injuries=(copy.hmk.injuries||[]).map(i=>({...i,id:uuid()}))}data.characters.push(copy);const clonedInvIds=new Map();for(const x of data.inventory.filter(x=>x.characterId===c.id)){const newId=uuid();clonedInvIds.set(x.id,newId);data.inventory.push({...structuredClone(x),id:newId,characterId:id})}if(copy.hmk?.cashLedger){copy.hmk.cashLedger=copy.hmk.cashLedger.map(t=>({...t,id:uuid(),inventoryIds:t.inventoryIds.map(i=>clonedInvIds.get(i)??i)}))}if(copy.hmk?.campaignCashAccounts){for(const account of Object.values(copy.hmk.campaignCashAccounts)){account.purchases=account.purchases.map(t=>({...t,id:uuid(),inventoryIds:t.inventoryIds.map(i=>clonedInvIds.get(i)??i),purchasedItems:t.purchasedItems.map(x=>({...x,inventoryId:clonedInvIds.get(x.inventoryId)??x.inventoryId}))}));account.adjustments=account.adjustments.map(t=>({...t,id:uuid()}));}}for(const x of data.journal.filter(x=>x.characterId===c.id))data.journal.push({...structuredClone(x),id:uuid(),characterId:id});});return}
+if(t.dataset.copy){if(combatInitiativeSequence?.order?.includes(t.dataset.copy))return alert('Během Initiative nelze kopírovat postavu včetně bojového stavu a inventáře.');const c=character(t.dataset.copy);mutate(()=>{const id=uuid();const copy={...structuredClone(c),id,name:c.name+' (kopie)'};if(copy.hmk){copy.hmk.skills=(copy.hmk.skills||[]).map(s=>({...s,id:uuid()}));copy.hmk.injuries=(copy.hmk.injuries||[]).map(i=>({...i,id:uuid()}))}data.characters.push(copy);const clonedInvIds=new Map();for(const x of data.inventory.filter(x=>x.characterId===c.id)){const newId=uuid();clonedInvIds.set(x.id,newId);data.inventory.push({...structuredClone(x),id:newId,characterId:id})}if(copy.hmk?.cashLedger){copy.hmk.cashLedger=copy.hmk.cashLedger.map(t=>({...t,id:uuid(),inventoryIds:t.inventoryIds.map(i=>clonedInvIds.get(i)??i)}))}if(copy.hmk?.campaignCashAccounts){for(const account of Object.values(copy.hmk.campaignCashAccounts)){account.purchases=account.purchases.map(t=>({...t,id:uuid(),inventoryIds:t.inventoryIds.map(i=>clonedInvIds.get(i)??i),purchasedItems:t.purchasedItems.map(x=>({...x,inventoryId:clonedInvIds.get(x.inventoryId)??x.inventoryId}))}));account.adjustments=account.adjustments.map(t=>({...t,id:uuid()}));}}for(const x of data.journal.filter(x=>x.characterId===c.id))data.journal.push({...structuredClone(x),id:uuid(),characterId:id});});return}
 if(t.dataset.deleteCharacter){
  const c=character(t.dataset.deleteCharacter);if(!c)return;
  if(!ask(`Definitivně smazat postavu „${c.name}“ včetně jejího inventáře a pravidlové historie?\n\nSmazání nejde vrátit.`))return;
@@ -18015,12 +18098,12 @@ if(t.dataset.deleteCharacter){
  try{if(sessionStorage.getItem(CREATION_LAST_ID)===id)sessionStorage.removeItem(CREATION_LAST_ID)}catch{}
  encounterSelection.delete(id);persistEncounterDraft();render();return;
 }
-if(t.dataset.archive){if(combatInitiativeSequence)return alert('Během Initiative nelze archivovat postavu.');const c=character(t.dataset.archive);if(ask(`Archivovat postavu ${c.name}?`))mutate(()=>{data.campaignActorBranches??={};if(data.campaignClock){const b=data.campaignActorBranches[campaignKey(data.campaignClock)]??={};b[c.id]=captureCampaignActor(c,data.inventory);}data.characters=data.characters.filter(x=>x.id!==c.id);data.trash.push(c)});return}
-if(t.dataset.restore){if(combatInitiativeSequence)return alert('Během Initiative nelze obnovovat archivované postavy.');mutate(()=>{const c=data.trash.find(x=>x.id===t.dataset.restore);data.trash=data.trash.filter(x=>x.id!==c.id);data.characters.push(c)});return}
+if(t.dataset.archive){if(combatInitiativeSequence?.order?.includes(t.dataset.archive))return alert('Během Initiative nelze archivovat postavu.');const c=character(t.dataset.archive);if(ask(`Archivovat postavu ${c.name}?`))mutate(()=>{data.campaignActorBranches??={};if(data.campaignClock){const b=data.campaignActorBranches[campaignKey(data.campaignClock)]??={};b[c.id]=captureCampaignActor(c,data.inventory);}data.characters=data.characters.filter(x=>x.id!==c.id);data.trash.push(c)});return}
+if(t.dataset.restore){if(combatInitiativeSequence?.order?.includes(t.dataset.restore))return alert('Během Initiative nelze obnovovat archivované postavy.');mutate(()=>{const c=data.trash.find(x=>x.id===t.dataset.restore);data.trash=data.trash.filter(x=>x.id!==c.id);data.characters.push(c)});return}
 if(t.dataset.purge){const c=data.trash.find(x=>x.id===t.dataset.purge);if(!c)return;if(ask(`DEFINITIVNĚ smazat archivovanou postavu „${c.name}“ včetně deníku, inventáře a dokladů?`)){if(deleteCharacterEntirely(c.id)){encounterSelection.delete(c.id);persistEncounterDraft();render();}}return}
 if(t.dataset.reconcileInv){reconcileInventoryItem(t.dataset.reconcileInv);return}
 if(t.dataset.removeInv){
- if(combatInitiativeSequence)return alert('Během Initiative mění inventář jen dokončená Combat akce.');
+ if(combatInitiativeSequence?.order?.includes(selected))return alert('Během Initiative mění inventář jen dokončená Combat akce.');
  const x=data.inventory.find(i=>i.id===t.dataset.removeInv&&i.characterId===selected);
  if(!x||!data.campaignClock)return alert('Pro doloženou ztrátu nejprve otevřete kampaň a postavu.');
  if(x.slot==='chest')return alert('Předmět je uložen v Truhlici. Nejprve doloženě vyzvedněte.');
@@ -19666,7 +19749,7 @@ document.addEventListener('submit',e=>{
  if(ok){sheetEditingId=null;render();}
 },true);
 
-document.addEventListener('submit',e=>{const f=e.target;if(!['character-editor','item-editor','character-form','add-inventory','journal-form'].includes(f.id))return;e.preventDefault();const v=Object.fromEntries(new FormData(f));if(f.id==='character-editor'){if(!v.name.trim())return alert('Zadejte jméno');if(mutate(()=>data.characters.push({id:uuid(),name:v.name.trim(),occupation:v.occupation||'',kind:v.kind,description:v.description||'',portrait:''}))) {overlay=null;render()}return}if(f.id==='character-form'){if(combatInitiativeSequence&&encounterSelection.has(selected))return alert('Identitu aktivního účastníka během Initiative nelze měnit mimo Combat průvodce.');if(!v.name.trim())return alert('Zadejte jméno');mutate(()=>{const live=character(selected);Object.assign(live,{name:v.name.trim(),kind:v.kind,description:v.description,portrait:v.portrait});if(!isCreationOwned(live))live.occupation=v.occupation;});return}if(f.id==='item-editor'){if(editItem&&item(editItem)?.builtin)return alert('Vestavěné definice nelze upravit.');if(!v.name.trim())return alert('Zadejte název');let properties;try{properties=JSON.parse(v.properties||'{}');if(!properties||Array.isArray(properties)||typeof properties!=='object')throw Error()}catch{return alert('Parametry musí být platný JSON objekt')}if(mutate(()=>{const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties};if(editItem)Object.assign(item(editItem),record);else data.items.push(record)})){overlay=null;render()}return}if(f.id==='add-inventory'){if(combatInitiativeSequence)return alert('Během Initiative měňte inventář pouze pravidlově dokončenou akcí Combat průvodce.');const i=item(v.itemId);const quantity=Number(v.quantity);if(!i||!Number.isSafeInteger(quantity)||quantity<1||quantity>999999)return alert('Vyberte předmět a platný počet');if(!validSlotForCategory(v.slot,i.category))return alert('Tento slot neodpovídá kategorii předmětu');if(['main_hand','off_hand','worn'].includes(v.slot)&&quantity!==1)return alert('Vybavený předmět musí představovat jeden kus. Další kusy evidujte samostatně jako nesené.');if(!handSlotAvailable(selected,v.slot))return alert('Ruka je již obsazena. Nejprve přesuňte stávající předmět.');const baseQuality=i.properties?.quality;
+document.addEventListener('submit',e=>{const f=e.target;if(!['character-editor','item-editor','character-form','add-inventory','journal-form'].includes(f.id))return;e.preventDefault();const v=Object.fromEntries(new FormData(f));if(f.id==='character-editor'){if(!v.name.trim())return alert('Zadejte jméno');if(mutate(()=>data.characters.push({id:uuid(),name:v.name.trim(),occupation:v.occupation||'',kind:v.kind,description:v.description||'',portrait:''}))) {overlay=null;render()}return}if(f.id==='character-form'){if(combatInitiativeSequence&&encounterSelection.has(selected))return alert('Identitu aktivního účastníka během Initiative nelze měnit mimo Combat průvodce.');if(!v.name.trim())return alert('Zadejte jméno');mutate(()=>{const live=character(selected);Object.assign(live,{name:v.name.trim(),kind:v.kind,description:v.description,portrait:v.portrait});if(!isCreationOwned(live))live.occupation=v.occupation;});return}if(f.id==='item-editor'){if(editItem&&item(editItem)?.builtin)return alert('Vestavěné definice nelze upravit.');if(!v.name.trim())return alert('Zadejte název');let properties;try{properties=JSON.parse(v.properties||'{}');if(!properties||Array.isArray(properties)||typeof properties!=='object')throw Error()}catch{return alert('Parametry musí být platný JSON objekt')}if(mutate(()=>{const record={id:editItem||uuid(),name:v.name.trim(),category:v.category,description:v.description||'',source:v.source||'',properties};if(editItem)Object.assign(item(editItem),record);else data.items.push(record)})){overlay=null;render()}return}if(f.id==='add-inventory'){if(combatInitiativeSequence?.order?.includes(selected))return alert('Během Initiative měňte inventář pouze pravidlově dokončenou akcí Combat průvodce.');const i=item(v.itemId);const quantity=Number(v.quantity);if(!i||!Number.isSafeInteger(quantity)||quantity<1||quantity>999999)return alert('Vyberte předmět a platný počet');if(!validSlotForCategory(v.slot,i.category))return alert('Tento slot neodpovídá kategorii předmětu');if(['main_hand','off_hand','worn'].includes(v.slot)&&quantity!==1)return alert('Vybavený předmět musí představovat jeden kus. Další kusy evidujte samostatně jako nesené.');if(!handSlotAvailable(selected,v.slot))return alert('Ruka je již obsazena. Nejprve přesuňte stávající předmět.');const baseQuality=i.properties?.quality;
  const givenWQ=String(v.currentWQ??'').trim();
  if(givenWQ!==''&&!/^(?:0|[1-9]\d*)$/.test(givenWQ))return alert('Aktuální WQ musí být celé nezáporné číslo 0–999.');
  const requestedWQ=givenWQ===''?null:Number(givenWQ);
@@ -19680,12 +19763,12 @@ document.addEventListener('click',e=>{
 document.addEventListener('submit',e=>{
  const f=e.target.closest('form[data-library-form]');if(!f)return;
  e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Během aktivní Initiative nelze vybavení přidávat mimo pravidlový Combat průvodce.');
  const v=Object.fromEntries(new FormData(f));
  const acquisition=e.submitter?.value;
  if(!['buy','free'].includes(acquisition))return alert('Vyberte Koupit nebo Vzít zdarma.');
  const receiver=character(v.recipientId);
  if(!receiver)return alert('Vyberte existující aktivní postavu.');
+ if(combatInitiativeSequence?.order?.includes(receiver.id))return alert('Inventář účastníka Initiative musí být měněn pravidlovou Combat akcí.');
  if(activeCampaignCashKey(receiver)===undefined)return alert('Postava musí být účastníkem právě aktivní kampaně.');
  libraryRecipientId=receiver.id;
  let sources=[],totalPrice=null,suitName=null,buyQuantity=1;
@@ -19886,7 +19969,7 @@ document.addEventListener('click',e=>{
  e.preventDefault();e.stopImmediatePropagation();
  const action=button.dataset.outfitAction,ownerId=selected;
  if(view!=='sheet'||activeSheetSection!=='inventory'||!character(ownerId))return;
- if(combatInitiativeSequence)return alert('Během Initiative se výbava mění pouze pravidlovou Combat akcí.');
+ if(combatInitiativeSequence?.order?.includes(ownerId))return alert('Výbava účastníka Initiative se mění pouze pravidlovou Combat akcí.');
  if(action.startsWith('undress-chest')){
   const outfitMode=action==='undress-chest-armour'?'armour':action==='undress-chest-clothing'?'clothing':'all';
   const worn=previewUndressOutfit(data.inventory,ownerId,outfitMode);

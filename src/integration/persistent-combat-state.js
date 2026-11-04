@@ -1,4 +1,5 @@
 import {hasBraveFearSource} from './hmk-concurrent-fear.js';
+import {validateParallelColdShocks} from './hmk-parallel-cold-shock.js';
 /** HârnMaster: Roleplaying in the World of Kèthîra, printed pp.168–169, 176–178.
  * Pure, deliberately conservative persistent transitions. No inferred dice,
  * missing special-injury rulings, elapsed turns or unattended blood-loss rolls.
@@ -92,6 +93,7 @@ export function applyConfirmedAlchemyWeakness({state,round,eventId,sourceId,time
 }
 export function combatFatigueTotals(state){validateCombatState(state);return {windedness:state.fatigue.windedness,weariness:state.fatigue.weariness,weakness:state.fatigue.otherWeakness+state.bloodLoss.weaknessFatigue,total:state.fatigue.windedness+state.fatigue.weariness+state.fatigue.otherWeakness+state.bloodLoss.weaknessFatigue};}
 export function validateCombatState(s){
+ validateParallelColdShocks(s);
  if(s?.concurrentShockProjection!==undefined){const p=s.concurrentShockProjection;
   requireCond(p&&p.format==='hmk-concurrent-shock-v1'&&
    ['NONE','STN','INC','UNC','KIA'].includes(p.baseShock)&&

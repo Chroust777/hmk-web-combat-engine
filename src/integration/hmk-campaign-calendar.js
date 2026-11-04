@@ -159,6 +159,25 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
    description:'Povinný Shock Reroll v bojové časové ose',reason:'Před posunem času dokončete Shock Follow-up'});
   if(s.extendedShock){add(c,'extended-shock','Extended Shock Course (4 h)',s.extendedShock.elapsedHours+4,null,'hours');}
   if(s.coma?.active&&s.coma.nextCourseDays!=null){add(c,'coma','Coma Course (d10 dní)',s.coma.elapsedDays+s.coma.nextCourseDays);}
+  // Each independent immersion retains its own witnessed due time. Neither
+  // the primary Extended Shock nor another patient's Calendar is replaced.
+  for(const p of s.parallelColdShocks??[]){
+   if(p.followup){const dueMinute=p.followup.dueMinute;
+    all.push({id:KEY('weather-shock',c.id,p.sourceId),characterId:c.id,name:c.name,
+     kind:'weather-shock',sourceId:p.sourceId,description:'Samostatný Cold Water Shock Reroll (HMK 169, 185)',
+     minute:dueMinute,anchorMinute:p.originMinute,status:dueMinute<=clock.minute?'due':'future'});
+   }
+   if(p.extendedShock){const dueMinute=p.extendedShock.startMinute+(p.extendedShock.elapsedHours+4)*60;
+    all.push({id:KEY('extended-shock',c.id,p.sourceId),characterId:c.id,name:c.name,
+     kind:'extended-shock',sourceId:p.sourceId,description:'Cold Water Extended Shock · vlastní 4h Course',
+     minute:dueMinute,anchorMinute:p.extendedShock.startMinute,status:dueMinute<=clock.minute?'due':'future'});
+   }
+   if(p.coma?.active){const dueMinute=p.coma.startMinute+(p.coma.elapsedDays+p.coma.nextCourseDays)*DAY_MINUTES;
+    all.push({id:KEY('coma',c.id,p.sourceId),characterId:c.id,name:c.name,
+     kind:'coma',sourceId:p.sourceId,description:'Cold Water Coma · vlastní d10 Course',
+     minute:dueMinute,anchorMinute:p.coma.startMinute,status:dueMinute<=clock.minute?'due':'future'});
+   }
+  }
   if(s.bloodLoss?.bp>0){add(c,'blood-loss','Blood Loss Regeneration (10 dní)',s.bloodLoss.healingNextDay??10);}
   // HMK p.183–184,186: onsets and courses are timed by confirmed GM data.
   // Older imported episodes lacking a real campaign origin remain unresolved,
