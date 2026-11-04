@@ -1,0 +1,93 @@
+[
+  {
+    "test": "tools/test_weather_skin_rules_93708.mjs",
+    "status": "PASS",
+    "returncode": 0,
+    "output": "PASS 15 skin previews HMK p185",
+    "error": ""
+  },
+  {
+    "test": "tools/test_trekking_weather_complete_510_health_93706.cjs",
+    "status": "PASS",
+    "returncode": 0,
+    "output": "PASS 79 assertions: Weather Hazard v93.510 (cold/heat, AV, dice, party, calendar, provenance, duplicates, legacy)",
+    "error": ""
+  },
+  {
+    "test": "tools/test_multi_infection_healing_541_health_93706.cjs",
+    "status": "PASS",
+    "returncode": 0,
+    "output": "PASS v93.541 multi-infection, repeated interruption, deadline evidence and durable calendar: 49 checks",
+    "error": ""
+  },
+  {
+    "test": "tools/test_healing_remaining_544_health_93706.cjs",
+    "status": "PASS",
+    "returncode": 0,
+    "output": "PASS v93.544 healing audit 68 assertions",
+    "error": ""
+  },
+  {
+    "test": "tools/test_healing_surgical_audit_542_health_93706.cjs",
+    "status": "PASS",
+    "returncode": 0,
+    "output": "PASS v93.542 surgical side effects, extraction, bleeding and calendar: 39 checks",
+    "error": ""
+  },
+  {
+    "test": "tools/test_calendar_all_time_barriers_509.cjs",
+    "status": "FAIL",
+    "returncode": 1,
+    "output": "",
+    "error": "cs_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n    at node:internal/main/run_main_module:36:49 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: true,\n  operator: '=='\n}\n\nNode.js v22.16.0"
+  },
+  {
+    "test": "tools/test_calendar_event_controls_509.cjs",
+    "status": "FAIL",
+    "returncode": 1,
+    "output": "",
+    "error": "ostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n    at node:internal/main/run_main_module:36:49 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '=='\n}\n\nNode.js v22.16.0"
+  },
+  {
+    "test": "tools/test_trekking_party_weather_509.cjs",
+    "status": "FAIL",
+    "returncode": 1,
+    "output": "",
+    "error": ":12)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '=='\n}\n\nNode.js v22.16.0"
+  },
+  {
+    "test": "tools/test_trekking_animal_weather_518.cjs",
+    "status": "FAIL",
+    "returncode": 1,
+    "output": "",
+    "error": "30:14)\n    at Object.<anonymous> (node:internal/modules/cjs/loader:1895:10)\n    at Module.load (node:internal/modules/cjs/loader:1465:32)\n    at Function._load (node:internal/modules/cjs/loader:1282:12)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n\nNode.js v22.16.0"
+  },
+  {
+    "test": "tools/test_trekking_interrupt_512.cjs",
+    "status": "FAIL",
+    "returncode": 1,
+    "output": "",
+    "error": "    at Function._load (node:internal/modules/cjs/loader:1282:12)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n    at node:internal/main/run_main_module:36:49\n\nNode.js v22.16.0"
+  },
+  {
+    "test": "tools/test_trekking_fatigue_matrix_511.cjs",
+    "status": "FAIL",
+    "returncode": 1,
+    "output": "",
+    "error": "    at Function._load (node:internal/modules/cjs/loader:1282:12)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n    at node:internal/main/run_main_module:36:49\n\nNode.js v22.16.0"
+  },
+  {
+    "test": "tools/test_trekking_ui_519.cjs",
+    "status": "FAIL",
+    "returncode": 1,
+    "output": "",
+    "error": "erCalculationHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js';\\n\" +\n    \"import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './src/integration/hmk-creation-psyche.js';\\n\" +\n    'import {f'... 2495085 more characters,\n  expected: /APP_VERSION='93\\.519'/,\n  operator: 'match'\n}\n\nNode.js v22.16.0"
+  },
+  {
+    "test": "tools/test_trekking_loaded_party_509.cjs",
+    "status": "PASS",
+    "returncode": 0,
+    "output": "PASS 6 loaded trekking Fatigue and attested same-watch weather deltas v93.509",
+    "error": ""
+  }
+]

@@ -1,0 +1,37 @@
+OPEN {'clock': 25200, 'form': True, 'actorCount': 4, 'blockers': None}
+PREP {'result': 'Po vyhodnocení zde vznikne seznam všech potřebných hodů a navazujících situací.', 'actions': []}
+EVALUATE Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:
+
+1
+Orienteering · Survival · Pair1
+
+Vykonejte a uložte skutečný Survival Success Value test průvodce.
+
+Otevřít Survival Skill Test
+TASKS 1
+SKILL SCREEN 3
+SKILL FORMS [{'id': 'skill-secondary-form', 'action': None, 'hidden': True, 'roll': True, 'html': '<form id="skill-secondary-form"><h4>Aktivní strana (A) · Pair1</h4><div class="hsk-form-grid"><label>Primary Skill <select name="primary" required="" disabled=""><option value="Acrobatics">Acrobatics · ML 16</o'}, {'id': 'skill-value-form', 'action': None, 'hidden': False, 'roll': False, 'html': '<form id="skill-value-form"><div class="hsk-form-grid"><label>Primary Skill <select name="primary" required=""><option value="Acrobatics">Acrobatics · ML 16</option><option value="Agility">Agility · ML 80</opti'}, {'id': 'skill-assistance-form', 'action': None, 'hidden': True, 'roll': True, 'html': '<form id="skill-assistance-form"><div class="hsk-form-grid"><label>Primární Skill <select name="primary" required="" disabled=""><option value="Acrobatics">Acrobatics · ML 16</option><option value="Agility">Agi'}]
+SKILL INPUTS [('rollA', 'number'), ('roll10A', 'number'), ('gmModifierA', 'number'), ('gmReasonA', 'text'), ('gearConfirmedA', 'checkbox'), ('gmENCA', 'number'), ('gmBulkA', 'number'), ('gmPerA', 'number')]
+SKILL SAVED 1
+RETURN Další povinný krok (1 z 2). Po potvrzení se určí další návaznost:
+
+1
+Pohyb · Progress
+
+Přebytek Progress vyžaduje 2 skutečných d10. Zadejte je oddělené čárkami.
+
+Otevřít požadované pole
+TASKS REMAIN 0
+END SCENE Další povinný krok (1 z 1). Po jeho vyřešení aplikace automaticky nabídne další návaznost:
+
+1
+Potvrzení GM
+
+Všechny hody mohou být hotové, ale před trvalým zápisem musíte vlevo zaškrtnout potvrzení skutečného průběhu a času GM.
+
+Doplnit požadovaný údaj
+READY False
+FINISHED {'clock': 25230, 'events': [720, 840, 960, 1080, 1200, 7920, 9360, 10800, 18000, 25200, 25230], 'journal': 122}
+RELOAD RESULT {'clock': 25230, 'events': [720, 840, 960, 1080, 1200, 7920, 9360, 10800, 18000, 25200, 25230], 'journal': 122}
+PASS NEXT TRAVEL FINISH + RELOAD
+ALERTS ['Potvrdit činnost Pair1 od Den 18 · 12:00 do Den 18 · 12:30 a posunout skutečný herní čas?']

@@ -1,0 +1,49 @@
+BOOT 1080 due []
+PROV 0 0
+PROVISION DONE 0
+PROV 1 0
+PROVISION DONE 1
+PROV 2 0
+PROVISION DONE 2
+PROV 3 0
+PROVISION DONE 3
+WARMING 0 1 hazards [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold', 'active': True, 'hr': 5, 'treated': False, 'elapsed': 240}]
+WARMED 0 [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold', 'active': True, 'hr': 5, 'treated': True, 'elapsed': 360}] []
+WARMING 1 1 hazards [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782140958-2xox553t7yu:cold', 'active': True, 'hr': 5, 'treated': False, 'elapsed': 240}]
+WARMED 1 [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782140958-2xox553t7yu:cold', 'active': True, 'hr': 5, 'treated': True, 'elapsed': 360}] []
+WARMING 2 1 hazards [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782143998-hewfcmzadn6:cold', 'active': True, 'hr': 5, 'treated': False, 'elapsed': 240}]
+WARMED 2 [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782143998-hewfcmzadn6:cold', 'active': True, 'hr': 5, 'treated': True, 'elapsed': 360}] []
+WARMING 3 1 hazards [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782147582-1zq3dr5dhyf:cold', 'active': True, 'hr': 5, 'treated': False, 'elapsed': 240}]
+WARMED 3 [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782147582-1zq3dr5dhyf:cold', 'active': True, 'hr': 5, 'treated': True, 'elapsed': 360}] []
+AFTER WARMING 1080 future [('weather-course', 1200), ('weather-course', 1200), ('weather-course', 1200), ('weather-course', 1200), ('healing', 7920), ('healing', 7920), ('healing', 7920)]
+ADVANCE 120 1200 DUE [('weather-course', 'id-1793782135766-73kzy4lpetc', 480), ('weather-course', 'id-1793782140958-2xox553t7yu', 480), ('weather-course', 'id-1793782143998-hewfcmzadn6', 480), ('weather-course', 'id-1793782147582-1zq3dr5dhyf', 480)]
+HEAL EXPOSURE 0 [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold', 'active': False, 'hr': 6, 'treated': True, 'elapsed': 480}]
+HEAL EXPOSURE 1 [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782140958-2xox553t7yu:cold', 'active': False, 'hr': 6, 'treated': True, 'elapsed': 480}]
+HEAL EXPOSURE 2 [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782143998-hewfcmzadn6:cold', 'active': False, 'hr': 6, 'treated': True, 'elapsed': 480}]
+HEAL EXPOSURE 3 [{'id': 'episode-weather:id-1793782154753-arxi16gxrrm:id-1793782147582-1zq3dr5dhyf:cold', 'active': False, 'hr': 6, 'treated': True, 'elapsed': 480}]
+COURSES OK clock 1200 due []
+FIRST ADV 7920 due [('healing', 'wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold:location:0'), ('healing', 'wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold:location:1'), ('healing', 'wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782143998-hewfcmzadn6:cold:location:0')]
+HEAL OPTIONS 0 ['id-1793782135766-73kzy4lpetc::wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold:location:0', 'id-1793782135766-73kzy4lpetc::wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold:location:1']
+HEAL CF 0 0 {'treated': True, 'treatments': [{'physicianIndex': 2, 'physicianML': 25, 'physicianRoll': 95, 'rawEML': 45, 'sl': 0, 'slName': 'CF', 'result': {'kind': 'hr', 'healingRate': 3, 'infectionPossible': True, 'permanentImpairmentEligible': True, 'bleeding': False, 'eliminateMinorImpairment': False}, 'day': 0, 'treatmentMethod': 'wrm', 'procedureMinutes': 120, 'procedureTime': {'startMinute': 720, 'endMinute': 840, 'gmConfirmed': True, 'varianceReason': ''}, 'surgeryBleeder': False, 'projectileExtracted': False}], 'healingRate': 3, 'noMundaneHealing': False, 'infectionPossible': True, 'permanentEligible': True, 'cauterised': False, 'area': False, 'grimWound': False, 'nextGrimShockDay': None, 'nextHealingDay': 5, 'healedDay': None, 'infected': True, 'infectionHR': 4, 'nextInfectionDay': 6, 'infectionWeakness': 5, 'permanentImpairment': 0} []
+HEAL OPTIONS 2 ['id-1793782143998-hewfcmzadn6::wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782143998-hewfcmzadn6:cold:location:0']
+HEAL CF 2 0 {'treated': True, 'treatments': [{'physicianIndex': 2, 'physicianML': 25, 'physicianRoll': 95, 'rawEML': 45, 'sl': 0, 'slName': 'CF', 'result': {'kind': 'hr', 'healingRate': 3, 'infectionPossible': True, 'permanentImpairmentEligible': True, 'bleeding': False, 'eliminateMinorImpairment': False}, 'day': 0, 'treatmentMethod': 'wrm', 'procedureMinutes': 120, 'procedureTime': {'startMinute': 960, 'endMinute': 1080, 'gmConfirmed': True, 'varianceReason': ''}, 'surgeryBleeder': False, 'projectileExtracted': False}], 'healingRate': 3, 'noMundaneHealing': False, 'infectionPossible': True, 'permanentEligible': True, 'cauterised': False, 'area': False, 'grimWound': False, 'nextGrimShockDay': None, 'nextHealingDay': 5, 'healedDay': None, 'infected': True, 'infectionHR': 4, 'nextInfectionDay': 6, 'infectionWeakness': 5, 'permanentImpairment': 0} []
+ONE-ACTOR WOUND2 SUSPENDED []
+CALENDAR 7920 due []
+SUSPENDED [('healing', 'wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold:location:0'), ('healing', 'wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold:location:1')]
+INFECT DUE 6 0 opts ['id-1793782135766-73kzy4lpetc::wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold:location:0']
+INFECT 6 0 5 True dialog []
+INFECT DUE 6 2 opts ['id-1793782143998-hewfcmzadn6::wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782143998-hewfcmzadn6:cold:location:0']
+INFECT 6 2 5 True dialog []
+INFECT DUE 7 0 opts ['id-1793782135766-73kzy4lpetc::wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782135766-73kzy4lpetc:cold:location:0']
+INFECT 7 0 6 False dialog []
+INFECT DUE 7 2 opts ['id-1793782143998-hewfcmzadn6::wound:skill-weather-skin:episode-weather:id-1793782154753-arxi16gxrrm:id-1793782143998-hewfcmzadn6:cold:location:0']
+INFECT 7 2 6 False dialog []
+RESUMED [[12, 12], [], [12], []]
+HEAL 13 0 0 healed None hr 3 dialog []
+HEAL 13 0 1 healed None hr 3 dialog []
+HEAL 13 2 0 healed None hr 3 dialog []
+HEAL 18 0 0 healed True hr 3 dialog []
+HEAL 18 0 1 healed True hr 3 dialog []
+HEAL 18 2 0 healed True hr 3 dialog []
+FINAL 25200 wounds [('Pair1', [True, True]), ('Pair2', []), ('Pair3', [True]), ('Pair4', [])] errors []
+PASS FOUR PARTY: weather, 3 wounds, 2 infections, 4 exposures, every course, healed, persisted, no Combat 25200

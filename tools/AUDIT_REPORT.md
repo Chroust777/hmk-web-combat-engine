@@ -1,38 +1,37 @@
-# HMK Keeper's Ledger v93.711 – Audit výsledků
+# HMK v93.712 – Weather Treatment timing and E2E audit
 
-Výchozí stav: kompletní produkční v93.710 vzniklá z vydaného ZIPu v93.700 a návazných PATCHů.
+Source baseline: complete production v93.711. Sole rules source: HârnMaster: Roleplaying in the World of Kèthîra v1.2, notably pp. 177–181, 185. Date: 2026-11-04.
 
-## Opravené produkční chyby
+## Production changes
 
-1. **Katalogová cena vlastní položky.** Na původní v93.710 byl vstup „Cena / hodnota (text)“ ukládán do `properties.value`, zatímco katalog, cenové nabídky a výdej čtou výhradně `properties.pricePence`. V Chromium reprodukováno: vlastní položka s hodnotou 79 se zobrazila jako „Cena —“ a neměla cenovou nabídku. V nové verzi lze vyplnit samostatnou nezápornou celočíselnou cenu v d u všech čtyř kategorií, ukládá se do `pricePence`, je zobrazena jako „Cena 79 d“ a vytváří cenový doklad. Testována úprava 79 → 124 d, ostatní kategorie, cenová nula vs. prázdné pole.
-2. **Dřívější vlastní ceny.** Pokud dřívější vlastní položka kategorie „ostatní“ obsahovala jednoznačné celé číslo v textovém `value`, je při načtení normalizováno do `pricePence`. Nejednoznačný text (např. „hodnota 8“ či pojmenování) se nehádá. Normalizace zůstane v paměti a při příštím uložení se uloží natrvalo. Chromium ověřil načtení a trvalé zapsání 75 d.
-3. **Chybějící produkční modul v předchozím ZIPu.** `app.js` vydané v93.710 odkazovalo na `src/integration/hmk-weather-skin-coverage.js`, ale vydaný rozdílový ZIP tento soubor neobsahoval. To ohrožovalo přímou produkční načítací cestu `index.html → app.js → src/`, i když vestavěný bundle modul obsahoval. v93.711 přidává přesný modul; byla ověřena přítomnost všech 285 lokálních importů `app.js`, syntaktická kontrola a nové sestavení synchronizovaného bundle.
+- **Calendar-authoritative Treatment timing:** new pure calculation `src/integration/hmk-weather-treatment-timing.js` derives actual procedure duration, start, end, and wound age for Warming, Compress, Set, Clean/Dress, Surgery, Extraction and Frost G Amputation. Users cannot supply or overwrite the start/end times in Weather Injury Care.
+- **Atomic Calendar commit:** treatment and its time move together only after proof checks. The Calendar refuses other intervening due events; same-minute independent Cold/Heat Courses remain required. Untreated (CF) does not invent time or dice.
+- **Single relevant health task:** when Exposure Course is due now, time-consuming Treatment is deferred and hidden until Course is resolved; auto section selection no longer silently selects Grim Shock because of undefined properties.
+- **Frost G Amputation special case:** one-minute procedure, recognizes original Grievous Frost rather than a normal Warming case. Projected completed amputation is accepted as a verified treatment by the Calendar. It creates a separate Edge injury and possible Bleeding/Shock. The derived Edge wound retains *travel-weather* medical origin by verified immutable source events rather than being mistaken for Combat; follow-up Shock uses weather time. New Bleeding from this procedure remains an open follow-up (below).
+- Production `index.html` and `app.js` version advanced to **93.712**; bundle rebuilt from production src.
 
-## Ověření oblečeného vs. neseného vybavení
+## Successful tests
 
-Produkční Frostbite/Sunburn resolver i společný live armour resolver berou ochranné vrstvy pouze z `inventory.slot === 'worn'`. Carried, chest a worn jiné postavy se nezapočítávají. 10 cílených Node kontrol: **PASS**. Specifické kontroly fyzické ochrany oblečeného cloth, plate i neměnnosti carried.
+| Category | Checked | Result |
+|---|---|---|
+| Pure timing rule assertions | 58 | PASS |
+| Chromium: 2 actors / 3 Frostbite Warming procedures and two coincident Cold Exposure Courses | 1 scenario | PASS |
+| Chromium: 2 actors / 3 wounds / two infections / healing-suspension / resumption / complete healing | 1 scenario | PASS |
+| Chromium: 4 actors / 4 weather exposures / 3 wounds / 2 infections / all wounds healed / persist and reload | 1 scenario | PASS |
+| Chromium: 4-actor fixture, new completed 30-minute Trek and reload | 1 scenario | PASS |
+| Chromium: genuine Frost G4 from Weather, 1-min Amputation, new Weather Edge injury, due Bleeding+Shock | 1 scenario | PASS to the listed boundary |
+| Selected Node regression suites | 6 | PASS |
+| Selected obsolete Node suites failing on unchanged v93.711 as well | 7 | HISTORICAL FAIL, not a new regression |
+| Actual HTTP Chromium navigation index.html → app.js → src | — | NOT VERIFIED due to execution environment restrictions |
 
-## Regrese
+### Evidence and limits
 
-- 15: Frostbite/Sunburn calculations — PASS
-- 79: cestovní Weather Hazard, návaznosti, kalendář — PASS
-- 49: současné infekce, přesné termíny — PASS
-- 68: dlouhodobé Healing — PASS
-- 39: chirurgické a infekční následky — PASS
-- 10: worn vs. carried/foreign weather and shared armour — PASS
+- Tests used the **production bundle injected into Chromium**, and fully generated characters from existing validated fixture states; they are not a successful HTTP navigation test.
+- Some later-day Calendar advances and feeding provisions in the long-term scenarios were made through original rule functions, not click-through on every Calendar input screen. Reuse of stored, complete scenarios across phases is not proof of one uninterrupted end-to-end session from day 1 to final day for *every* travel mode.
+- Tests did **not** exhaust all combinations of Weather → Shock → Extended Shock/Coma → simultaneous bleeding → infection → later travel, all weather/terrain/inventory variations, or every one of the 8 Travel activities. Therefore **Travel/Trekking is not at 100%** and no subsequent activity should be treated as fully audited yet.
+- **Known open integration gap:** after Frost G amputation the newly created Edge injury can be a Bleeder. It is correctly scheduled in the Calendar and correctly tied to travel-weather, but `focusCalendarRuleAction(kind='bleeding')` still opens a Combat Blood Stoppage form. A separate non-Combat bleeding executor (with true 5-minute treatment and physical dice) needs to be completed and fully retested before declaring Weather complete.
+- Normal Combat rules/Initiative logic are deliberately not audited here; its physical injuries share `healthState` but Travel never automatically starts Combat.
 
-**Celkem 260 cílených Node kontrol PASS, žádné selhání v těchto sadách.**
+## Test reproducibility
 
-Chromium s vloženým produkčním bundlem: reprodukce chyby v93.710; vytvoření a editace nové ceny v93.711 u všech kategorií; načtení staré ceny; Frostbite vznik jedné rány bez duplicate roll a přístup do Weather Injury Care. PASS v provedených scénářích.
-
-**Nevyzkoušeno:** skutečné HTTP Chromium otevření; lokální HTTP server byl prostředím zablokován. Žádné potvrzení produkčního browser bootu nepředstíráme.
-
-## Nedokončená auditní oblast Weather Injury
-
-1. **Složená dlouhodobá zdravotní osa:** čtyři postavy se souběhem Frostbite, Sunburn, Shock, více ran na jedné postavě, Infekcí, Extended Shock/Coma, dokončením dalšího cestovního úseku v jednom čistém UI průchodu. Node testy tuto kombinaci nenahrazují.
-2. **Časovaný Treatment v UI:** při Chromium kontrole správně fungovalo načtení dnů od rány a jednoho aktivního formuláře, ale pole `procedureStartMinute` a `procedureEndMinute` zůstala prázdná. Prověřit jejich automatické doplnění jen tam, kde to Kalendář skutečně dovoluje, i přesné navedení uživatele, pokud konec zákroku zatím nelze znát.
-3. **Složitá krytí a vrstvy:** směrové krytí pláště, neúplně ověřená vlastní zbroj, poškozené vrstvy, události mezi svlečením a oblečením, a přechody F AV 0 / 1–3 / 4+. Neznámá ochrana musí zůstat blokována nebo být doložená GM, nikdy uhádnutá.
-4. **Závěrečný UI audit:** přechod Kalendář → jediný povinný zdravotní krok → trvalý zápis → zmizení splněné povinnosti → další úkol. Musí platit i pro několik ran splatných v jedné minutě.
-5. **Produkční HTTP E2E:** nezávisle potvrdit na GitHub Pages / dostupném HTTP serveru po aplikaci PATCH, včetně přímé cesty do nového modulu a zobrazení knihovní ceny.
-
-**PATCH** proti v93.710: `app.js`, `hmk-app.bundle.js`, `index.html`, `src/integration/hmk-weather-skin-coverage.js`. Žádné ostatní produkční soubory nebyly změněny.
+The audit scripts were written against the in-container project path `/mnt/data/hmk93712_work` with source fixtures from `/mnt/data/hmk93707_work/fixtures`. The separate audit ZIP contains scripts, logs, and representative fixtures for analysis; when running elsewhere, adjust path constants to your project location. Tests are not part of the production PATCH.
