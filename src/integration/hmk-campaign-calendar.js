@@ -1,3 +1,4 @@
+import {medicalOriginOfWound} from './hmk-medical-origin.js';
 /**
  * HMK v1.2 p.178–182: absolute campaign-time *evidence*, not an alternative
  * combat or healing rules engine. Only GM-confirmed time is authoritative.
@@ -140,16 +141,17 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
  };
  for(const c of characters){
   const s=c?.hmk?.healthState;if(!s||s.shock==='KIA')continue;
-  if(s.wounds?.some(w=>w.bleeding))unknown.push({characterId:c.id,name:c.name,kind:'bleeding',
-   description:'Aktivní krvácení: Blood Loss Advance / Stoppage patří do bojové časové osy',
-   reason:'Nejprve vyřešte krvácení přes Combat; 60 kol není automaticky potvrzených 5 minut kampaně'});
+  if(s.wounds?.some(w=>w.bleeding&&medicalOriginOfWound(w,s.events)!=='travel-weather'))
+   unknown.push({characterId:c.id,name:c.name,kind:'bleeding',
+    description:'Bojový Bleeder – Blood Loss / Stoppage vyžaduje ověřenou bojovou osu',
+    reason:'Combat má svou původní časovou osu; 60 kol se nesmí odhadnout z Kalendáře'});
   if(s.shockFollowup?.domain==='travel-weather'){
-   const q=s.shockFollowup,dueMinute=q.kind==='UNC'?q.originMinute+10:q.originMinute;
+   const q=s.shockFollowup,dueMinute=q.phase==='after-all-bleeding-stopped'?q.originMinute:q.kind==='UNC'?q.originMinute+10:q.originMinute;
    // UNC: ten *actual* minutes from the original Shock; STN/INC: GM
    // certifies the next real action, never a synthetic Combat round.
    all.push({id:KEY('weather-shock',c.id,q.sourceId),characterId:c.id,name:c.name,
     kind:'weather-shock',sourceId:q.sourceId,
-    description:q.kind==='UNC'?'Cold/Weather Shock Reroll – po 10 minutách':'Weather Shock Reroll – GM potvrdí další skutečnou akci',
+    description:q.phase==='after-all-bleeding-stopped'?'Blood Loss Shock Reroll – ihned po zastavení všech Bleederů':q.kind==='UNC'?'Cold/Weather Shock Reroll – po 10 minutách':'Weather Shock Reroll – GM potvrdí další skutečnou akci',
     minute:dueMinute,anchorMinute:q.originMinute,status:dueMinute<=clock.minute?'due':'future'});
   }else if(s.shockFollowup)unknown.push({characterId:c.id,name:c.name,kind:'shock-followup',
    description:'Povinný Shock Reroll v bojové časové ose',reason:'Před posunem času dokončete Shock Follow-up'});

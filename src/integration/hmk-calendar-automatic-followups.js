@@ -8,6 +8,7 @@ import {trekkingOutstandingCases} from './hmk-trekking-followups.js';
 import {pendingTrackingAwareness} from './hmk-tracking-awareness-537.js';
 import {dueInjuryMorale,unresolvedInjuryMishaps} from './persistent-combat-state.js';
 import {medicalOriginOfWound,MEDICAL_ORIGIN} from './hmk-medical-origin.js';
+import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -71,8 +72,18 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // Mental-trauma recovery is independently valid without an encounter/combat state.
   // The wound and environmental branches below need actual combat evidence.
   // All these are current unresolved obligations, not new fabricated time intervals.
-  for(const w of s?.wounds??[])if(w.bleeding&&!w.healed)
-   push(c,'bleeding',w.id,'Aktivní Bleeder – Blood Stoppage / Blood Loss Advance (HMK 177–178)',clock.minute,'combat',{woundId:w.id});
+  for(const w of s?.wounds??[])if(w.bleeding&&!w.healed){
+   if(medicalOriginOfWound(w,s.events)===MEDICAL_ORIGIN.WEATHER){
+    try{
+     const bleeding=travelBleedingTerm({clock,actorId:c.id,wound:w,state:s});
+     push(c,'bleeding',w.id,'Weather Bleeder – Blood Stoppage / Blood Loss po 5 minutách (HMK 178)',
+      bleeding.dueMinute,'hazards',{woundId:w.id,originDomain:MEDICAL_ORIGIN.WEATHER,
+       treatmentStarted:!!bleeding.plan,anchorMinute:bleeding.anchorMinute});
+    }catch(error){unknown.push({characterId:c.id,name:c.name,kind:'bleeding',sourceId:w.id,
+     description:'Weather Bleeder – povinná zdravotní kontrola (HMK 178)',reason:error.message});}
+   }else push(c,'bleeding',w.id,'Aktivní Bleeder – Blood Stoppage / Blood Loss Advance (HMK 177–178)',
+    clock.minute,'combat',{woundId:w.id});
+  }
   // Skill-generated Serious/Grievous injuries use the SAME mandatory
   // Injury Morale and Mishap queue as a weapon hit (HMK pp.161–162,170).
   // Previously, a Skill Accident outside active Initiative could leave them
@@ -108,7 +119,11 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    }else push(c,'shock-followup',pending.originRound??'shock',
     'Povinný Shock Follow-up – dokončit v bojovém průvodci (HMK 169)',clock.minute,'combat');
   }
-  if(s?.bloodShockPending)push(c,'blood-shock','pending','Povinný Blood Loss Shock (HMK 177)',clock.minute,'combat');
+  // A Weather blood Shock remains latent while ANY Bleeder is still open.
+  // The mandatory reroll arises after all wounds stop, not once per BP.
+  if(s?.bloodShockPending&&!(s.wounds||[]).some(w=>w.bleeding&&
+    medicalOriginOfWound(w,s.events)===MEDICAL_ORIGIN.WEATHER))
+   push(c,'blood-shock','pending','Povinný Blood Loss Shock (HMK 178)',clock.minute,'combat');
   if(s?.asphyxiaComaPending?.active)push(c,'asphyxia','pending','Asphyxia / Coma – dokončit doložené následky (HMK 183)',clock.minute,'hazards');
   if(c.hmk?.arcane?.pendingPsycheTraitChoice)push(c,'psyche-choice','pending',
    'Nevyřízená volba Psyche Traitu (HMK 188–190)',clock.minute,'combat');
