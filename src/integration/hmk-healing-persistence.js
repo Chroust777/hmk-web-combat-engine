@@ -376,7 +376,8 @@ export function applyConfirmedFrostAmputation({state,round,eventId,woundId,daySi
  // healing physical wound; the newly inflicted Edge wound MUST be healed.
  source.healed=true;source.bleeding=false;source.nextAdvanceRound=null;
  source.healing={...(source.healing??{}),treated:true,frostAmputated:true,healedDay:daySinceInjury,
-  amputationResult:edgeWound.id,physicianIndex,physicianRoll,physicianEML:eml};
+  amputationResult:edgeWound.id,physicianIndex,physicianRoll,physicianEML:eml,
+  amputationProcedureTime:procedureTime?{...procedureTime}:null};
  s.wounds.push(edgeWound);
  const originalShock=s.shock;
  if(next!==originalShock||amp?.dead)s.shockOriginRound=round;

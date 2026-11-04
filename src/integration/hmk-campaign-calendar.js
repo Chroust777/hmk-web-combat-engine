@@ -309,8 +309,12 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
  const completedInThisAdvance=[];
  if(deferConcurrentTreatmentAtStart){
   for(const c of characters)for(const w of c?.hmk?.healthState?.wounds??[]){
-   const a=w.healing?.treatments?.at(-1)?.procedureTime;
-   if(w.healing?.treatments?.length===1&&a?.gmConfirmed===true&&
+   const isOrdinary=w.healing?.treatments?.length===1;
+   const isAmputation=w.healed===true&&w.healing?.frostAmputated===true&&
+      !!w.healing.amputationResult&&!w.healing?.treatments?.length;
+   const a=isAmputation?w.healing.amputationProcedureTime:
+    w.healing?.treatments?.at(-1)?.procedureTime;
+   if((isOrdinary||isAmputation)&&a?.gmConfirmed===true&&
       a.startMinute===clock.minute&&a.endMinute===nextMinute){
     const anchor=getCampaignAnchor(clock,'wound',c.id,w.id);
     if(anchor&&anchor.minute<=clock.minute)completedInThisAdvance.push({actorId:c.id,woundId:w.id,originMinute:anchor.minute});
@@ -325,8 +329,10 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
   const periods=[];
   for(const c of characters)for(const w of c?.hmk?.healthState?.wounds??[]){
    if(getCampaignAnchor(clock,'wound',c.id,w.id)?.minute!==originMinute)continue;
-   for(const treatment of w.healing?.treatments??[]){
-    const t=treatment.procedureTime;
+   const verifiedPeriods=[...(w.healing?.treatments??[]).map(t=>t.procedureTime)];
+   if(w.healed===true&&w.healing?.frostAmputated===true&&w.healing.amputationResult)
+    verifiedPeriods.push(w.healing.amputationProcedureTime);
+   for(const t of verifiedPeriods){
     if(t?.gmConfirmed===true&&Number.isSafeInteger(t.startMinute)&&Number.isSafeInteger(t.endMinute)&&
        t.startMinute>=originMinute&&t.endMinute<=clock.minute&&t.startMinute<t.endMinute)
      periods.push({start:t.startMinute,end:t.endMinute});

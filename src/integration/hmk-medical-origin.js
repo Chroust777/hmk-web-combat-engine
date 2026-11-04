@@ -11,6 +11,17 @@ export function medicalOriginOfWound(wound,events=[]){
   original.details?.domain===MEDICAL_ORIGIN.WEATHER&&
   original.details?.woundId===wound.id)return MEDICAL_ORIGIN.WEATHER;
  if(wound.originDomain===MEDICAL_ORIGIN.COMBAT&&original?.type==='confirmed-hit')return MEDICAL_ORIGIN.COMBAT;
+ // A frost amputation makes a NEW Edge wound. It inherits the medical origin
+ // of the original documented frost injury, NOT the name of the executor.
+ // Strictly verify both immutable event links; never classify an ordinary
+ // Combat Edge wound as Travel solely because it is an amputation.
+ if(wound.fromFrostWoundId&&original?.type==='frost-amputation-treatment'&&
+    original.details?.newWoundId===wound.id&&
+    original.details?.woundId===wound.fromFrostWoundId){
+  const source=events.find(e=>e.id===String(wound.fromFrostWoundId).replace(/^wound:/,''));
+  if(source?.type==='travel-weather-injury'&&source.details?.domain===MEDICAL_ORIGIN.WEATHER&&
+    source.details?.woundId===wound.fromFrostWoundId)return MEDICAL_ORIGIN.WEATHER;
+ }
  // Previous pre-release Weather state: use its immutable original proof rather
  // than treating every frost/fire injury as environmental.
  if(wound.originDomain===undefined&&String(wound.originEventId||'').startsWith('skill-weather-skin:')&&
