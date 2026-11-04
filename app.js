@@ -306,7 +306,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.704';
+const APP_VERSION='93.705';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10790,12 +10790,54 @@ function hskWeatherShockFollowup(actorId){
  <button type="submit" ${canRoll?'':'disabled'}>Vyhodnotit a uložit Weather Shock Reroll</button><output role="status" aria-live="polite"></output></form>
  ${!canRoll?'<p class="notice">Zatím nesplatné nebo postava nemá doložené Shock ML.</p>':''}</section>`;
 }
+/** Health owns time-bound Weather Extended Shock and Coma. Only one
+ * due Course, one actor and one d100 are offered. The original HMK p.179
+ * executor remains authoritative; Combat is never started by Travel. */
+function hskWeatherTraumaCourseKind(actor,kind){
+ const s=actor&&persistentStateOf(actor);
+ return !!s&&((kind==='extended-shock'&&s.extendedShock?.domain==='travel-weather')||
+  (kind==='coma'&&s.coma?.active&&s.coma.domain==='travel-weather'));
+}
+function hskWeatherTraumaCourseForm(actorId){
+ const actor=character(actorId),clock=data.campaignClock;
+ if(!actor||!clock)return '';
+ const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
+ const due=agenda.due.filter(x=>x.characterId===actorId&&['extended-shock','coma'].includes(x.kind)&&
+  hskWeatherTraumaCourseKind(actor,x.kind)).sort((a,b)=>a.minute-b.minute||
+  (a.kind==='extended-shock'?-1:1))[0];
+ if(!due)return '';
+ const kind=due.kind,state=persistentStateOf(actor),course=kind==='extended-shock'?state.extendedShock:state.coma;
+ const anchor=getCampaignAnchor(clock,kind,actor.id);
+ if(!anchor)return '<p class="notice error">Weather '+esc(kind)+': chybí původní časová kotva. Nepřesouvejte tuto událost do Combatu.</p>';
+ const expected=anchor.minute+(kind==='extended-shock'?(state.extendedShock.elapsedHours+4)*60:
+  (state.coma.elapsedDays+state.coma.nextCourseDays)*DAY_MINUTES);
+ if(clock.minute!==expected)return '<p class="notice error">Weather '+esc(kind)+': termín '+esc(displayCampaignMinute(expected))+
+  ' neodpovídá aktuálnímu času. Žádný dodatečný hod se nevytváří.</p>';
+ let hb;
+ try{hb=guidedTraumaCourseReadiness({state,character:actor,kind}).healingBase;}
+ catch(error){return '<p class="notice error">'+esc(error.message)+'</p>';}
+ return `<section class="panel wide hmk-weather-trauma-course"><h3>${kind==='coma'?'Coma':'Extended Shock'} · ${esc(actor.name)}</h3>
+ <p class="hc-hint">Samostatné zdravotní vyhodnocení z počasí · HMK str.179. Původní zdroj ${esc(course.sourceId)}.
+ Doložený termín ${esc(displayCampaignMinute(expected))}; Kalendář se tímto hodem neposouvá.</p>
+ <p>Healing Base ${hb} · aktuální HR ${course.hr} · skutečná minuta ${esc(String(clock.minute))}.</p>
+ <form data-weather-trauma-course><input type="hidden" name="kind" value="${kind}">
+ <input type="hidden" name="sourceId" value="${esc(course.sourceId)}">
+ <label>Skutečný Course d100<input name="roll" type="number" min="1" max="100" required></label>
+ ${kind==='extended-shock'?'<label>Skutečný Physician SV – počet hvězd (0 bez ošetření)<input name="physicianStars" type="number" min="0" max="10" value="0" required></label>':
+ '<label>Klidné chráněné prostředí<select name="restfulShelter"><option value="yes">Ano</option><option value="no">Ne (−20)</option></select></label><label>Nový skutečný d10 pouze pokud Coma pokračuje<input name="periodD10" type="number" min="1" max="10" placeholder="Nevyplňovat při ukončení"></label>'}
+ <label>Doložený Arcane Recovery bonus (0 pokud není)<input name="arcaneBonus" type="number" min="0" max="100" value="0" required></label>
+ <label><input type="checkbox" name="confirmed" required> GM potvrzuje skutečný d100, zdroj a přesný termín</label>
+ <button type="submit">Dokončit jediný ${kind==='coma'?'Coma':'Extended Shock'} Course</button>
+ <output role="status" aria-live="polite"></output></form></section>`;
+}
 function hskWeatherHealthConsequences(actorId){
  const entries=data.journal.filter(x=>x.characterId===actorId);
  const weatherShock=hskWeatherShockFollowup(actorId);
  // One current compulsory health test per actor; no new Cold/Heat dice while
  // a prior weather-induced Shock reroll remains unresolved.
  if(weatherShock)return weatherShock;
+ const trauma=hskWeatherTraumaCourseForm(actorId);
+ if(trauma)return trauma;
  const injuryMandatory=hskWeatherInjuryMandatory(actorId);
  if(injuryMandatory)return injuryMandatory;
  const html=entries.map(x=>hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+
@@ -11716,6 +11758,56 @@ document.addEventListener('submit',event=>{
   }))throw Error('Weather Injury nebyl zapsán');
   selected=actor.id;view='sheet';activeSheetSection='hazards';render();
  }catch(error){if(out)out.textContent='Weather Injury nebyl vyřešen: '+error.message;}
+},true);
+document.addEventListener('submit',event=>{
+ const f=event.target;if(!f?.matches?.('[data-weather-trauma-course]'))return;
+ event.preventDefault();event.stopImmediatePropagation();const out=f.querySelector('output');
+ try{
+  const actor=character(selected),clock=data.campaignClock,kind=f.elements.namedItem('kind').value;
+  const sourceId=f.elements.namedItem('sourceId').value;
+  if(!actor||!clock||combatInitiativeSequence||!hskWeatherTraumaCourseKind(actor,kind))
+   throw Error('Weather Course musí patřit aktivní zdravotní události mimo Combat');
+  if(!calendarMemberIds(clock,data.characters).some(c=>c.id===actor.id))throw Error('Postava nepatří do kampaně');
+  const s=persistentStateOf(actor),course=kind==='coma'?s.coma:s.extendedShock;
+  if(course.sourceId!==sourceId)throw Error('Změnil se původní zdroj Course');
+  const anchor=getCampaignAnchor(clock,kind,actor.id);
+  if(!anchor)throw Error('Course nemá doloženou kalendářovou kotvu');
+  const due=anchor.minute+(kind==='extended-shock'?(s.extendedShock.elapsedHours+4)*60:
+   (s.coma.elapsedDays+s.coma.nextCourseDays)*DAY_MINUTES);
+  if(due!==clock.minute)throw Error('Vyhodnocení musí proběhnout v přesném splatném termínu');
+  if(!f.elements.namedItem('confirmed').checked)throw Error('GM nepotvrdil skutečný čas a d100');
+  const readiness=guidedTraumaCourseReadiness({state:s,character:actor,kind});
+  if(!readiness.available||readiness.kind!==kind)throw Error('Aktivní Course již není splatný');
+  const value=name=>f.elements.namedItem(name)?.value;
+  const number=(name,min,max)=>{const n=Number(value(name));if(value(name)===''||!Number.isSafeInteger(n)||n<min||n>max)throw Error('Neplatný '+name);return n;};
+  const roll=number('roll',1,100),arcaneBonus=number('arcaneBonus',0,100);
+  const round=Math.max(1,s.lastRound||1),eventId=uuid();
+  const result=kind==='extended-shock'?applyExtendedShockCourse({state:s,round,eventId,
+   healingBase:readiness.healingBase,roll,physicianStars:number('physicianStars',0,10),
+   arcaneBonus,elapsedHoursSinceOnset:readiness.nextHours,gmConfirmed:true}):
+   applyComaCourse({state:s,round,eventId,healingBase:readiness.healingBase,roll,
+    periodD10:value('periodD10')===''?null:number('periodD10',1,10),
+    daysElapsed:readiness.nextDays,restfulShelter:value('restfulShelter')==='yes',
+    arcaneBonus,gmConfirmed:true});
+  const newEvent=result.state.events.at(-1);
+  if(!newEvent||newEvent.id!==eventId)throw Error('Chybí pravidlový důkaz Course');
+  newEvent.details.physicalDice={format:'hmk-manual-dice-proof-v1',source:'HMK p.179',
+   rolls:[{id:'courseD100',faces:100,value:roll},...(kind==='coma'&&value('periodD10')!==''?
+    [{id:'nextComaD10',faces:10,value:Number(value('periodD10'))}]:[])]};
+  if(!uiConfirm('Uložit jediný '+kind+' Course '+actor.name+' v '+displayCampaignMinute(clock.minute)+' bez posunu času?'))return;
+  if(!mutate(()=>{
+   if(data.campaignClock.minute!==clock.minute)throw Error('Změnil se Kalendář');
+   if(JSON.stringify(persistentStateOf(actor))!==JSON.stringify(s))throw Error('Změnil se zdravotní stav');
+   synchronizeCombatInjuries(actor,result.state);
+   logCalendarCombatResolution(actor,result.state,'weather-'+kind);
+   data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignKey(clock),
+    campaignMinute:clock.minute,createdAt:stamp(),title:'Weather '+kind+' Course · HMK 179',
+    body:'Zdroj '+sourceId+' · skutečný d100 '+roll+' · HR '+course.hr+' → '+(kind==='coma'?result.hr:result.nextHR),
+    skillTestProof:{type:'weather-trauma-course',kind,sourceId,originalEventId:eventId,
+     actorId:actor.id,roll,confirmedMinute:clock.minute}});
+  }))throw Error('Course se neuložil');
+  selected=actor.id;view='sheet';activeSheetSection='hazards';render();
+ }catch(error){if(out)out.textContent='Weather Course nebyl zapsán: '+error.message;}
 },true);
 document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-weather-shock-followup]'))return;
@@ -15479,10 +15571,12 @@ function explainAndOpenBlockedCalendarTerm(err,targetMinute){
  uiAlert('Čas nebyl změněn. Povinná kontrola: '+(actor?.name||due.name)+' · '+due.description+' · '+displayCampaignMinute(due.minute)+'. Po zavření tohoto okna se otevře správný formulář.');
  if(actor&&due.sourceId&&due.kind){
   selected=actor.id;
-  if(['skill-critical','skill-fall','skill-injury','weather-onset','weather-course','weather-skin','weather-shock'].includes(due.kind)||(['treatment','healing','infection','grim'].includes(due.kind)&&hskIsEnvironmentalWound(actor,due.sourceId))){
+  if(['skill-critical','skill-fall','skill-injury','weather-onset','weather-course','weather-skin','weather-shock'].includes(due.kind)||(['treatment','healing','infection','grim'].includes(due.kind)&&hskIsEnvironmentalWound(actor,due.sourceId))||
+    (['coma','extended-shock'].includes(due.kind)&&hskWeatherTraumaCourseKind(actor,due.kind))){
    episodeActiveSkillRequestId=null;
    if(due.kind==='skill-critical'){view='skills';activeSkillTab='followups';}
-   else{view='sheet';activeSheetSection=(['weather-onset','weather-course','weather-skin','weather-shock'].includes(due.kind)||(['treatment','healing','infection','grim'].includes(due.kind)&&hskIsEnvironmentalWound(actor,due.sourceId)))?'hazards':'status';}
+   else{view='sheet';activeSheetSection=(['weather-onset','weather-course','weather-skin','weather-shock'].includes(due.kind)||(['treatment','healing','infection','grim'].includes(due.kind)&&hskIsEnvironmentalWound(actor,due.sourceId))||
+    (['coma','extended-shock'].includes(due.kind)&&hskWeatherTraumaCourseKind(actor,due.kind)))?'hazards':'status';}
    render();
   }
   focusCalendarRuleAction(actor,due.kind,due.sourceId,due.elapsedMinutes);return true;
@@ -15742,7 +15836,8 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  if((['weather-onset','weather-course','weather-skin','weather-shock'].includes(kind)||
    (['injury-morale','injury-mishap'].includes(kind)&&
      (kind==='injury-morale'?hskIsEnvironmentalWound(actor,sourceId):unresolvedInjuryMishaps(persistentStateOf(actor)).some(m=>m.id===sourceId&&hskIsEnvironmentalWound(actor,m.woundId))))||
-   (['treatment','healing','infection','grim'].includes(kind)&&hskIsEnvironmentalWound(actor,sourceId)))&&
+   (['treatment','healing','infection','grim'].includes(kind)&&hskIsEnvironmentalWound(actor,sourceId))||
+   (['coma','extended-shock'].includes(kind)&&hskWeatherTraumaCourseKind(actor,kind)))&&
     (view!=='sheet'||activeSheetSection!=='hazards'||selected!==actor.id)){
   selected=actor.id;view='sheet';activeSheetSection='hazards';render();
  }
@@ -15776,6 +15871,11 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   choose(form,'endurance',attrs.end);choose(form,'will',attrs.wil);break;
  }
  case 'coma':case 'extended-shock':{
+  if(hskWeatherTraumaCourseKind(actor,kind)){
+   form=document.querySelector('form[data-weather-trauma-course]');
+   if(form?.elements.namedItem('kind')?.value!==kind)form=null;
+   break;
+  }
   // Both courses can coexist. Select the ORIGINAL guided Course for the
   // requested calendar obligation, never the merely first active one.
   form=document.getElementById('hmk-guided-hit-start-form');
@@ -16148,7 +16248,7 @@ document.addEventListener('click',e=>{
  if(t.dataset.calLink){
   pendingTrekHandoff=null;
   const target=character(t.dataset.calLink);if(!target)return alert('Postava již není v registru');
-  selected=target.id;const destination=(t.dataset.calKind==='weather-shock'||(['treatment','healing','infection','grim'].includes(t.dataset.calKind)&&hskIsEnvironmentalWound(target,t.dataset.calSource)))?'hazards':(t.dataset.calDestination||'notes');
+  selected=target.id;const destination=(t.dataset.calKind==='weather-shock'||(['treatment','healing','infection','grim'].includes(t.dataset.calKind)&&hskIsEnvironmentalWound(target,t.dataset.calSource))||(['coma','extended-shock'].includes(t.dataset.calKind)&&hskWeatherTraumaCourseKind(target,t.dataset.calKind)))?'hazards':(t.dataset.calDestination||'notes');
   if(t.dataset.calKind==='skill-fall'){activeSheetSection='status';view='sheet';}
   else if(destination==='combat'||destination==='healing'){if(!combatInitiativeSequence)encounterSelection.add(target.id);view='encounter';}
   else if(destination==='skills'){view='skills';
