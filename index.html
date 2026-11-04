@@ -3,16 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HMK Keeper’s Ledger · v93.709</title>
-<link rel="stylesheet" href="./styles.css?v=93.709-minutes">
-<link rel="stylesheet" href="./skill-workbench.css?v=93.709-minutes">
-<link rel="stylesheet" href="./library.css?v=93.709-minutes">
-<link rel="stylesheet" href="./book-templates.css?v=93.709-minutes">
+<title>HMK Keeper’s Ledger · v93.710</title>
+<link rel="stylesheet" href="./styles.css?v=93.710-minutes">
+<link rel="stylesheet" href="./skill-workbench.css?v=93.710-minutes">
+<link rel="stylesheet" href="./library.css?v=93.710-minutes">
+<link rel="stylesheet" href="./book-templates.css?v=93.710-minutes">
 <style>.hmk-boot-note{max-width:760px;margin:5rem auto;padding:1.5rem;border:1px solid #8f7652;border-radius:10px;background:#f3eddf;color:#332817;font:16px/1.6 system-ui,sans-serif}.hmk-boot-note code{font-size:90%;overflow-wrap:anywhere}</style>
 
+<style>
+.hmk-weather-care-nav{display:flex;flex-wrap:wrap;gap:.45rem;margin:.75rem 0}
+.hmk-weather-care-nav button{padding:.45rem .7rem;border:1px solid #8f7652;border-radius:8px;background:#f1ead9;color:#2d2418;cursor:pointer}
+.hmk-weather-care-nav button.active{background:#163b6d;color:#fff;border-color:#163b6d}
+.hmk-weather-care-card{margin-top:.75rem;padding:.75rem;border:1px solid rgba(143,118,82,.45);border-radius:10px;background:rgba(255,250,240,.55)}
+.hmk-weather-care-grid{gap:.7rem}
+.hmk-care-advanced{margin:.8rem 0;border-top:1px dashed rgba(143,118,82,.5);padding-top:.5rem}
+.hmk-guided-field,.hmk-care-current,.hmk-care-complete,.hmk-care-pending{transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease}
+label.hmk-care-current{background:rgba(176,31,31,.08);border:1px solid rgba(176,31,31,.45);border-radius:8px;padding:.35rem .45rem;box-shadow:0 0 0 1px rgba(176,31,31,.08)}
+label.hmk-care-complete{background:rgba(34,102,52,.06);border:1px solid rgba(34,102,52,.18);border-radius:8px;padding:.35rem .45rem}
+label.hmk-care-pending{opacity:.9}
+.hmk-weather-care .field-grid{align-items:start}
+</style>
 </head>
 <body>
-<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.709…</main></div>
+<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.710…</main></div>
 <script>
 (function(){
  var app=document.getElementById('app');
@@ -22,14 +35,14 @@
   if(reported||document.querySelector('#app .shell'))return;
   reported=true;
   var msg=String(detail||'Neznámá chyba načítání.');
-  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.709 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>app.js</code> a podsložku <code>src/</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
+  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.710 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>app.js</code> a podsložku <code>src/</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
  };
  window.addEventListener('error',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.message||('Nelze načíst '+(event.filename||'skript')));});
  window.addEventListener('unhandledrejection',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.reason?.message||String(event.reason));});
  window.addEventListener('load',function(){setTimeout(function(){if(!document.querySelector('#app .shell'))window.__hmkBootFailure('Produkční aplikace se nespustila nebo nebyl načten její JavaScript.');},4000);});
 })();
 </script>
-<script type="module" src="./app.js?v=93.709-minutes" onerror="window.__hmkBootFailure('HTTP chyba: chybí app.js nebo některý z importovaných modulů není dostupný na GitHub Pages.')"></script>
+<script type="module" src="./app.js?v=93.710-minutes" onerror="window.__hmkBootFailure('HTTP chyba: chybí app.js nebo některý z importovaných modulů není dostupný na GitHub Pages.')"></script>
 
 <script>
 (function(){
