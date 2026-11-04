@@ -70,9 +70,10 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
  return {state:s,report};
 }
 function injuriesFromExposure(h,{windD20,durationD20,complexion,rows,maximumExposureMinutes=null}){
- requireIt(Array.isArray(rows)&&rows.length>0&&rows.length<=30,'Doložte všechny exponované lokace, včetně lokací bez výsledné rány');
+ requireIt(Array.isArray(rows)&&rows.length<=30,'Doložte všechny exponované lokace, včetně lokací bez výsledné rány');
  requireIt(maximumExposureMinutes===null||integer(maximumExposureMinutes,1,10080),
   'Frostbite/Sunburn: chybí ověřená délka minutové epizody');
+ if(rows.length===0)return {period:0,duration:0,sampledDuration:0,rows:[]}; // GM-confirmed fully covered skin; no unnecessary dice.
  if(h.skinPending==='frostbite'){
   requireIt(integer(windD20,1,20)&&integer(durationD20,1,20),'Frostbite vyžaduje fyzické d20 pro vítr a délku expozice');
   // HMK p185 samples a duration inside a FOUR-HOUR watch. In our approved
@@ -96,6 +97,16 @@ function injuriesFromExposure(h,{windD20,durationD20,complexion,rows,maximumExpo
    const il=r.skinD10<=complexionTN[complexion]?(r.skinD10<=6?1:2):0;
    return {...r,il,sourceRoll:r.skinD10};
  })};
+}
+/** UI-only read-only projection, backed by the EXACT printed injury function.
+ * No dice generated and no character state modified. */
+export function previewExposureSkinLocation({kind,av=null,windD20=null,durationD20=null,skinD10=null,
+ complexion=null,maximumExposureMinutes=null}={}){
+ requireIt(kind==='frostbite'||kind==='sunburn','Neznámý kožní následek');
+ const out=injuriesFromExposure({skinPending:kind},{windD20,durationD20,complexion,
+  rows:[{av,skinD10}],maximumExposureMinutes});
+ return {il:out.rows[0].il,periodMinutes:out.period,durationMinutes:out.duration,
+  ...(kind==='frostbite'?{sampledDurationMinutes:out.sampledDuration}:{})};
 }
 /** Skin result uses the printed direct Injury Level, never a fabricated impact.
  * Each real wound must pass the existing Injury/Compound/Shock/Morale pipeline.
