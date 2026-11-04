@@ -45,7 +45,11 @@ export function prepareTrekkingWeatherTest({state,sourceId,round=1,kind,original
  need(['cold','heat'].includes(kind)&&slText.includes(originalSL),'Nepodložená meteorologická zkouška');
  need(weatherHazardConfirmed===true,'GM musí potvrdit předcházející Weather Hazard z Trekking str.149');
  s.environmentalHazards??=[];
- need(!s.environmentalHazards.some(x=>x.active),'Souběžná trvající expozice vyžaduje samostatné posouzení GM');
+ // Independent exposure sources are separate evidenced courses. An existing
+ // active Cold/Heat episode does NOT veto a new proven exposure. For HR4/5
+ // this is additive weakness with no new Shock; impaired Shock outcomes still
+ // use the protective state conflict checks in applyStatus, never overwrite.
+
  let hr=null,periodMinutes=null,addedWeariness=0,skinPending=null;
  if(kind==='cold'){
   need(Object.hasOwn(cold,coldCondition),'Neznámé skutečné podmínky chladu');
@@ -61,7 +65,7 @@ export function prepareTrekkingWeatherTest({state,sourceId,round=1,kind,original
   if(originalSL==='S')addedWeariness=10;
   if(originalSL==='CS')addedWeariness=5;
  }
- need(hr===null||s.shock==='NONE','Nová expozice nesmí potichu přepsat existující Shock');
+ need(hr===null||hr>=4||s.shock==='NONE','Těžší souběžná expozice vyžaduje zachování původního Shock Course');
  const hazard=hr===null?null:{id,sourceId,kind,hr,initialHR:hr,periodMinutes,
   active:true,skinPending,weaknessApplied:0,shockApplied:'NONE',lastElapsedMinutes:0,
   sequence:0,treatmentStarted:false};

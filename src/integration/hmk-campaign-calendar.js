@@ -1,4 +1,5 @@
 import {medicalOriginOfWound} from './hmk-medical-origin.js';
+import {validateConcurrentProcedures,openConcurrentProcedures,assertConcurrentProceduresAppendOnly} from './hmk-concurrent-procedures.js';
 /**
  * HMK v1.2 p.178–182: absolute campaign-time *evidence*, not an alternative
  * combat or healing rules engine. Only GM-confirmed time is authoritative.
@@ -60,6 +61,7 @@ export function validateCampaignCalendar(clock){
  if(clock.journalMinuteEvidence!==undefined){ensure(Array.isArray(clock.journalMinuteEvidence)&&clock.journalMinuteEvidence.length<=400000,'Neplatné propojení starších časů');
   const jIds=new Set();for(const j of clock.journalMinuteEvidence){ensure(j&&typeof j.id==='string'&&j.id&&!jIds.has(j.id)&&typeof j.characterId==='string'&&validInt(j.minute,-MAX_MINUTE,MAX_MINUTE),'Neplatný historický čas hodu');jIds.add(j.id);}}
  validateCalendarPlans(clock);
+ validateConcurrentProcedures(clock);
  return clock;
 }
 export function createCampaignCalendar({day,hour,minute,label='',eventId,gmConfirmed,campaignId=null,characterIds=null}={}){
@@ -287,6 +289,21 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
    sourceId:j.id,description:'Herblore SV – dokončení '+h.herbType+' (HMK 74)',
    minute:h.dueMinute,anchorMinute:h.minute,status:h.dueMinute<=clock.minute?'due':'future'});
  }
+ // Independently begun procedures are scheduled, not already treated.
+ // The original Treatment obligation is represented by the authenticated
+ // in-progress operation, never emitted a second time at its onset.
+ const running=openConcurrentProcedures(clock);
+ const busy=new Set(running.map(p=>p.characterId+'::'+p.woundId));
+ for(let i=all.length-1;i>=0;i--)if(all[i].kind==='treatment'&&busy.has(all[i].characterId+'::'+all[i].woundId))all.splice(i,1);
+ for(let i=unknown.length-1;i>=0;i--)if(unknown[i].kind==='treatment'&&busy.has(unknown[i].characterId+'::'+unknown[i].woundId))unknown.splice(i,1);
+ for(const op of running){
+  const patient=characters.find(c=>c.id===op.characterId);
+  all.push({id:'concurrent-treatment:'+op.startId,characterId:op.characterId,
+   name:patient?.name??op.characterId,kind:'concurrent-treatment',woundId:op.woundId,
+   startId:op.startId,description:'Dokončení časovaného Treatment (bez nového hodu)',
+   minute:op.endMinute,anchorMinute:op.startMinute,
+   status:op.endMinute<=clock.minute?'due':'future'});
+ }
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
  return {due:all.filter(x=>x.status==='due'),future:all.filter(x=>x.status==='future'),unknown,all,suspended,prepared};
 }
@@ -389,8 +406,9 @@ export function assertCampaignCalendarAppendOnly(before,after){
   const archives=after?.calendarEvidenceArchives??[],prior=before?.calendarEvidenceArchives??[];
   ensure(archives.length===prior.length+1&&archives.at(-1)?.format==='hmk-calendar-character-time-evidence-v1'&&
    before.campaignClock.anchors.length===archives.at(-1).anchors.length&&
-   before.campaignClock.anchors.every((a,i)=>JSON.stringify(a)===JSON.stringify(archives.at(-1).anchors[i])),
-   'Kalendář lze odstranit jen se zachováním všech časových důkazů postav');
+   before.campaignClock.anchors.every((a,i)=>JSON.stringify(a)===JSON.stringify(archives.at(-1).anchors[i]))&&
+   JSON.stringify(before.campaignClock.concurrentProcedures??[])===JSON.stringify(archives.at(-1).concurrentProcedures??[]),
+   'Kalendář lze odstranit jen se zachováním všech časových důkazů a souběžných výkonů');
   return true;
  }
  validateCampaignCalendar(after.campaignClock);
@@ -401,6 +419,7 @@ export function assertCampaignCalendarAppendOnly(before,after){
   old.anchors.every((x,i)=>JSON.stringify(x)===JSON.stringify(now.anchors[i])),
   'Dřívější potvrzené důkazy času nelze přepisovat');
  assertCalendarPlansAppendOnly(old,now);
+ assertConcurrentProceduresAppendOnly(old,now);
  if(JSON.stringify(old.characterIds??null)!==JSON.stringify(now.characterIds??null))
   ensure(now.events.slice(old.events.length).some(e=>e.type==='membership'),'Změna členství vyžaduje auditní zápis');
  return true;

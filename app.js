@@ -34,6 +34,7 @@ import {woundFromFall} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
 import {prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure} from './src/integration/hmk-weather-hazard-aftermath.js';
+import {startConcurrentProcedure,finishConcurrentProcedure,cancelConcurrentProcedure,openConcurrentProcedures} from './src/integration/hmk-concurrent-procedures.js';
 import {prepareColdWaterShock,prepareExposureSkinInjuries,previewExposureSkinLocation} from './src/integration/hmk-weather-trauma-completion.js';
 import {prepareMundaneFireStrike,prepareEnclosedSmokeStart,prepareEnclosedSmokeCompletion} from './src/integration/hmk-mundane-fire-smoke.js';
 import {preparePoisonStart,preparePoisonOnset,preparePoisonCourse} from './src/integration/hmk-poison-course.js';
@@ -311,7 +312,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.717';
+const APP_VERSION='93.718';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3238,7 +3239,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   `<section class="panel hc-calendar-unresolved" data-independent-skill-critical><h3>Nevyřešené následky samostatných Skill Tests · ${independentCriticalDue.length}</h3>
    <p class="hc-hint">Tyto hody nebyly vyžádány cestovní epizodou. Výsledky epizod jsou neměnné. Dokud GM neuzavře skutečné následky CF, kalendář nepovolí další posun času.</p>
    ${independentCriticalDue.map(renderItem).join('')}</section>`:'';
- const overviewHTML=`${independentCriticalHTML}${board}<section class="panel hc-calendar-concurrent-due"><h3>Splatné povinné kontroly · ${agenda.due.length}</h3>${agenda.due.length?renderDueGroups(agenda.due):'<p class="hc-hint">Nyní nejsou splatné žádné povinné kontroly.</p>'}</section>${timedSkillPending590}${bestiaryCalendarDuePanel567(clock)}${unknownFallNotice}${suspendedHealingHTML}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
+ const overviewHTML=`${independentCriticalHTML}${concurrentMedicalProceduresHTML()}${board}<section class="panel hc-calendar-concurrent-due"><h3>Splatné povinné kontroly · ${agenda.due.length}</h3>${agenda.due.length?renderDueGroups(agenda.due):'<p class="hc-hint">Nyní nejsou splatné žádné povinné kontroly.</p>'}</section>${timedSkillPending590}${bestiaryCalendarDuePanel567(clock)}${unknownFallNotice}${suspendedHealingHTML}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
  const calendarPage=activeCalendarSection==='overview'?`${trekDailyWeatherFormHTML(clock)}${overviewHTML}`:
   activeCalendarSection==='travel'?`${timeEpisodePageHTML(clock,participants)}${wildernessHTML}${activeHMKActivities(data.journal,clock).length?interruptionsHTML:''}`:
   activeCalendarSection==='chronicle'?timeEpisodeChronicleHTML(clock):
@@ -7833,6 +7834,12 @@ function hmkSpecialBranchesPanel(chars){
  <form id="hmk-mount-charge-form"><h4>Rider Impact po přímém pohybu koně</h4><div class="field-grid">${actor('targetId','Jezdec')}${field('mountRiderImpact','Rider Impact příslušného zvířete',8,'number')}${field('straightDistanceFt','Skutečně ujetá přímá vzdálenost v ft',70,'number')}${guard}</div><button type="submit" disabled title="Rider Impact vyžaduje ověřený pohyb zvířete">Zapsat bonus a dobu účinnosti</button></form></details>
  <div class="notice" id="hmk-special-branches-result" role="status">Potvrzené následky se ukládají do aktuálního stavu postavy. Ostatní jezdecké, plošné a mnohocílové kombinace GM dále potvrzuje podle PDF HMK.</div></section>`;
 }
+function concurrentMedicalProceduresHTML({actorId=null}={}){
+ const clock=data.campaignClock;if(!clock)return '';
+ const plans=openConcurrentProcedures(clock).filter(p=>!actorId||p.characterId===actorId);
+ if(!plans.length)return '';
+ return `<section class="panel hmk-concurrent-health"><h3>Rozpracovaná ošetření · ${plans.length}</h3><p class="hc-hint">Zahájení zákroku bylo bezpečně uloženo. Další nezávislé události v téže minutě lze vyhodnotit v libovolném pořadí. Doložené hody se neopakují; skutečný zdravotní účinek vzniká až po dokončení.</p>${plans.map(p=>`<div class="hc-event"><strong>${esc(character(p.characterId)?.name||p.characterId)}</strong> · ${esc(p.formId==='hmk-frost-amputation-form'?'Amputation':'Treatment')} · od ${esc(displayCampaignMinute(p.startMinute))} do ${esc(displayCampaignMinute(p.endMinute))} ${p.endMinute>clock.minute?'<span class="muted">(probíhá)</span>':`<button type="button" class="hc-small" data-concurrent-medical-finish="${esc(p.startId)}">Dokončit ošetření ↗</button>`} <button type="button" class="hc-small secondary" data-concurrent-medical-cancel="${esc(p.startId)}">Přerušit (GM)</button></div>`).join('')}</section>`;
+}
 function hmkLongtermHealingPanel(chars,{origin='combat'}={}){
  if(!chars.length)return '';
  const eligibleWounds=c=>medicalWounds(persistentStateOf(c),origin);
@@ -7856,7 +7863,9 @@ function hmkLongtermHealingPanel(chars,{origin='combat'}={}){
  const immediateWeatherCourses=weatherCare&&clock?
   campaignCalendarAgenda(clock,data.characters,data.journal).due.filter(x=>
    x.kind==='weather-course'&&x.minute<=clock.minute):[];
- if(immediateWeatherCourses.length)return `<section class="panel hmk-weather-care" data-weather-care-deferred="weather-course"><h3>Weather Injury Care · čeká na aktuální Course</h3><p class="hc-hint">Nejprve vyhodnoťte ${immediateWeatherCourses.length} splatné ${immediateWeatherCourses.length===1?'zdravotní vyhodnocení':'zdravotní vyhodnocení'} Cold/Heat Exposure v jejich samostatných formulářích. Kalendář nepovolí další časovaný Treatment, dokud tyto kontroly nepotvrdíte. Po zápisu se zde automaticky otevře následující rána.</p></section>`;
+ // Independent weather courses remain visible in the calendar; do not
+ // disable another patient's Treatment panel because a course is due.
+
  const herbHints=clock?chars.flatMap(c=>eligibleWounds(c).filter(w=>!w.healed).flatMap(w=>{
   const origin=getCampaignAnchor(clock,'wound',c.id,w.id);
   if(!origin)return [];
@@ -7893,7 +7902,7 @@ function hmkLongtermHealingPanel(chars,{origin='combat'}={}){
  if(!sections.some(s=>s.id===activeSection&&s.enabled))activeSection=(sections.find(s=>s.enabled)||sections[0]).id;
  const nav=weatherCare?`<p class="hc-hint"><strong>Aktuální krok: ${esc(sections.find(s=>s.id===activeSection)?.title||'zdravotní vyhodnocení')}</strong>. Další formulář se otevře až po zapsání a následném přepočtu Kalendáře. Přechod na jinou splatnou povinnost provádějte přímo přes její odkaz v Kalendáři.</p>`:'';
  const body=weatherCare?sections.map(s=>`<section class="hmk-weather-care-card ${s.id===activeSection?'is-active':''}" data-weather-care-card="${esc(s.id)}" ${s.id===activeSection?'':'hidden'}>${s.body}</section>`).join(''):`<div class="field-grid">${treatmentForm}${healingForm}${frostForm}${infectionForm}${bloodForm}${grimForm}</div>`;
- return `<section class="panel ${weatherCare?'hmk-weather-care':'hmk-combat-care'}"><h3>${weatherCare?'Weather Injury Care · HMK 177–182, 185':'HMK · dlouhodobé léčení bojových zranění (str. 177–182)'}</h3>${herbHints}<p class="muted">Pro každou ránu samostatně. Léčení vyžaduje zastavené krvácení, ukončený Extended Shock, potvrzený den a skutečné hody. Další léčitel musí mít vyšší Physician Index. Aktivní infekce přerušuje Healing Rolls všech ran. Veškeré výsledky jsou trvale uloženy u postavy, nikoli odhadované podle bojových kol.</p>${nav}${body}</section>`;
+ return `<section class="panel ${weatherCare?'hmk-weather-care':'hmk-combat-care'}"><h3>${weatherCare?'Weather Injury Care · HMK 177–182, 185':'HMK · dlouhodobé léčení bojových zranění (str. 177–182)'}</h3>${herbHints}${weatherCare?concurrentMedicalProceduresHTML({actorId:chars[0]?.id}):''}<p class="muted">Pro každou ránu samostatně. Léčení vyžaduje zastavené krvácení, ukončený Extended Shock, potvrzený den a skutečné hody. Další léčitel musí mít vyšší Physician Index. Aktivní infekce přerušuje Healing Rolls všech ran. Veškeré výsledky jsou trvale uloženy u postavy, nikoli odhadované podle bojových kol.</p>${nav}${body}</section>`;
 }
 function encounterImpactPreviewPanel(chars){
  if(!chars.length)return '';
@@ -18876,6 +18885,54 @@ document.addEventListener('change',e=>{
 document.addEventListener('input',e=>{
  if(e.target?.matches?.('#hmk-treatment-form [name=procedureStartMinute],#hmk-frost-amputation-form [name=procedureStartMinute]'))e.target.setCustomValidity('');
 });
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-concurrent-medical-cancel]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const op=openConcurrentProcedures(data.campaignClock).find(x=>x.startId===button.dataset.concurrentMedicalCancel);
+ if(!op)return;
+ const reason=window.prompt('Skutečný důvod přerušení zákroku (původní hod zůstává v historii):','');
+ if(reason===null)return;
+ mutate(()=>{data.campaignClock=cancelConcurrentProcedure(data.campaignClock,{id:uuid(),startId:op.startId,reason,confirmed:true});});
+},true);
+// Complete a previously started Medical procedure; apply original real dice
+// to the latest authoritative state, exactly once, never a stale snapshot.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-concurrent-medical-finish]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const clock=data.campaignClock;
+  const op=openConcurrentProcedures(clock).find(x=>x.startId===button.dataset.concurrentMedicalFinish);
+  if(!op||clock.minute!==op.endMinute)throw Error('Zákrok není nyní splatný.');
+  const patient=character(op.characterId);
+  if(!patient)throw Error('Pacient neexistuje.');
+  const current=persistentStateOf(patient),w=current.wounds.find(x=>x.id===op.woundId);
+  if(!w||w.healed)throw Error('Rána už není dostupná; výsledek nebyl přepsán.');
+  const origin=getCampaignAnchor(clock,'wound',patient.id,op.woundId);
+  if(!origin||Math.floor((clock.minute-origin.minute)/DAY_MINUTES)!==op.args.daySinceInjury)
+   throw Error('Od zahájení se změnil doložený věk rány; původní hod zůstává uložen pro kontrolu GM.');
+  const medicalRound=Math.max(1,combatClock.round||1,current.lastRound||0);
+  const core={state:current,round:medicalRound,eventId:op.eventId,woundId:op.woundId,
+   daySinceInjury:op.args.daySinceInjury,physicianML:op.args.physicianML,
+   physicianIndex:op.args.physicianIndex,physicianRoll:op.args.physicianRoll,
+   dexSecondaryModifier:op.args.dexSecondaryModifier,procedureTime:op.args.procedureTime,gmConfirmed:true};
+  let done;
+  if(op.formId==='hmk-treatment-form')done=applyConfirmedTreatment({...core,untreated:false,
+   available:op.args.available,broadhead:false});
+  else{
+   done=applyConfirmedFrostAmputation({...core,locationShock:op.args.locationShock,
+    shockML:op.args.shockML,shockRoll:op.args.shockRoll,
+    amputationStrengthML:op.args.amputationStrengthML,amputationRoll:op.args.amputationRoll});
+   if(done.state.shockFollowup){done.state.shockFollowup.domain=MEDICAL_ORIGIN.WEATHER;
+    done.state.shockFollowup.sourceId=done.edgeWound.id;
+    done.state.shockFollowup.originMinute=clock.minute;}
+  }
+  if(mutate(()=>{
+   data.campaignClock=finishConcurrentProcedure(data.campaignClock,{id:uuid(),startId:op.startId,resultEventId:op.eventId});
+   synchronizeCombatInjuries(patient,done.state);
+   logCalendarCombatResolution(patient,done.state,op.formId);
+  }))notice='Treatment dokončen bez opakovaného hodu: '+patient.name;
+ }catch(err){alert('Dokončení ošetření nebylo uloženo: '+err.message);}
+},true);
 document.addEventListener('submit',e=>{
  const f=e.target;
  if(!['hmk-treatment-form','hmk-frost-amputation-form','hmk-healing-roll-form','hmk-infection-course-form'].includes(f.id))return;
@@ -19008,6 +19065,24 @@ document.addEventListener('submit',e=>{
   // this particular Treatment for the calendar's independent barrier check.
   // New side effects (such as surgery bleeding) begin at procedure END, not
   // artificially at its START; all other pending events remain blockers.
+  // Concurrency: medical procedure START is a persistent receipt, not an
+  // implicit jump of the shared campaign clock. A verified result is calculated
+  // in preview only; it is applied to the CURRENT patient at the true deadline.
+  if(environmentalCare&&directTreatmentFinish){
+   const operation={formId:f.id,characterId:c.id,woundId,healerId:weatherHealer.id,
+    startMinute:clock.minute,endMinute:treatmentFinish,eventId:args.eventId,confirmed:true,
+    args:{daySinceInjury:args.daySinceInjury,physicianML:actualPhysicianML,
+     physicianIndex:actualPhysicianIndex,physicianRoll:Number(v.physicianRoll),
+     dexSecondaryModifier:actualDexSecondary,available:form.getAll('available'),
+     procedureTime,locationShock:v.locationShock===''?null:Number(v.locationShock),
+     shockML:v.shockML===''?null:Number(v.shockML),
+     shockRoll:v.shockRoll===''?null:Number(v.shockRoll),
+     amputationStrengthML:v.amputationStrengthML===''?null:Number(v.amputationStrengthML),
+     amputationRoll:v.amputationRoll===''?null:Number(v.amputationRoll)}};
+   if(mutate(()=>{data.campaignClock=startConcurrentProcedure(data.campaignClock,{id:uuid(),procedure:operation});}))
+    notice='Zákrok zahájen v '+displayCampaignMinute(clock.minute)+'; dokončení '+displayCampaignMinute(treatmentFinish)+'. Ostatní současné události zůstávají přístupné.';
+   return;
+  }
   let advancedTreatmentClock=null;
   if(directTreatmentFinish){
    if(!['hmk-treatment-form','hmk-frost-amputation-form'].includes(f.id))throw Error('Časovaný postup patří pouze Treatment.');

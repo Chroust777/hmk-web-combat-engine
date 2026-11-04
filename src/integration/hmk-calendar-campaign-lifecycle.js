@@ -3,6 +3,7 @@
  * confirmed character evidence. Time translation requires a proven shared
  * Tuzyn Reckoning date, or an explicit GM declaration of the SAME day axis.
  */
+import {validateConcurrentProcedures} from './hmk-concurrent-procedures.js';
 const DAY=1440, LIMIT=1000000000;
 const integer=n=>Number.isSafeInteger(n);
 const assert=(ok,msg)=>{if(!ok)throw Error(msg);};
@@ -56,7 +57,11 @@ export function makeCalendarEvidenceArchive(clock,people,journal,id,inventory=[]
    (e.type?.startsWith('malnutrition-')&&sourceIds.has(e.details?.episodeId)));
   return [{actorId:c.id,state:{malnutritionEpisodes:structuredClone(episodes),events:structuredClone(events)}}];
  });
+ // Calendar deletion must never silently erase confirmed, open medical work.
+ // Retain exact immutable receipts even when the active calendar is removed.
+ validateConcurrentProcedures(clock);
  return {format:'hmk-calendar-character-time-evidence-v1',id,sourceCampaignId,medicalBranches,waterInventoryBackings,rationInventoryBackings,
+  archivedMinute:clock.minute,concurrentProcedures:structuredClone(clock.concurrentProcedures??[]),
   trOrigin:clock.trOrigin?structuredClone(clock.trOrigin):null,
   characterIds:[...ids],
   anchors:structuredClone((clock.anchors||[]).filter(a=>ids.has(a.characterId))),
@@ -77,6 +82,11 @@ export function validateCalendarEvidenceArchives(archives){
    'Poškozený archiv časových důkazů');ids.add(a.id);
   assert(a.characterIds.every(x=>typeof x==='string'&&x.length>0)&&new Set(a.characterIds).size===a.characterIds.length,
    'Neplatný výběr postav v archivu');
+  if(a.concurrentProcedures!==undefined){
+   assert(integer(a.archivedMinute)&&a.archivedMinute>=0&&a.archivedMinute<=LIMIT,
+    'Neplatná minuta archivu souběžných výkonů');
+   validateConcurrentProcedures({minute:a.archivedMinute,concurrentProcedures:a.concurrentProcedures});
+  }
   if(a.sourceCampaignId!==undefined||a.medicalBranches!==undefined){
    assert(typeof a.sourceCampaignId==='string'&&a.sourceCampaignId&&Array.isArray(a.medicalBranches)&&
     a.medicalBranches.length<=a.characterIds.length,'Neplatný archiv medicínských důkazů');
