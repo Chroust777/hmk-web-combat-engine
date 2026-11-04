@@ -327,6 +327,8 @@ export function validateCombatState(s){
   requireCond(x&&['INC','UNC'].includes(x.originState)&&s.shock===x.originState&&whole(x.hr,1,5)
    &&whole(x.elapsedHours,0,100000)&&x.elapsedHours%EXTENDED_HOURS===0
    &&s.shockFollowup==null,'Neplatný Extended Shock (HR / časování / stav)');
+  if(x.domain!==undefined)requireCond(x.domain==='travel-weather'&&typeof x.sourceId==='string'&&x.sourceId.length>0,
+   'Extended Shock z počasí musí zachovat zdroj cestovní události');
  }
  if(s.asphyxiaComaPending!==undefined&&s.asphyxiaComaPending!==null){
   const a=s.asphyxiaComaPending;
@@ -354,6 +356,8 @@ export function validateCombatState(s){
   requireCond(c&&c.active===true&&whole(c.hr,1,20)&&whole(c.elapsedDays,0,100000)
    &&(c.nextCourseDays===null||whole(c.nextCourseDays,1,10))
    &&(s.extendedShock!==null&&s.extendedShock!==undefined||s.shock==='NONE'), 'Neplatný stav Coma');
+  if(c.domain!==undefined)requireCond(c.domain==='travel-weather'&&typeof c.sourceId==='string'&&c.sourceId.length>0,
+   'Coma z počasí musí zachovat zdroj cestovní události');
  }
  for(const e of s.events){requireCond(e&&typeof e.id==='string'&&e.id&&!events.has(e.id)&&typeof e.type==='string'&&whole(e.round,1,9999),'Neplatná nebo duplicitní bojová událost');events.add(e.id);}
  return s;
@@ -707,8 +711,11 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
   s.shock=REVERSE[result.state];applyShockProne(s);
   s.shockFollowup=s.shock==='STN'?pendingShock('STN',round,timelineId):null;
   if(result.extendedShock){
-   s.extendedShock={originState:before,hr:result.extendedShock.hr,elapsedHours:0};
-   if(requireComa)s.coma={active:true,hr:result.coma.initialHR,elapsedDays:0,nextCourseDays:initialComaD10};
+   // The causal Weather Shock owns subsequent medical courses. They must
+   // never masquerade as Encounter/Combat follow-ups in the Calendar.
+   const medicalSource=q?.domain==='travel-weather'?{domain:'travel-weather',sourceId:q.sourceId}:{};
+   s.extendedShock={originState:before,hr:result.extendedShock.hr,elapsedHours:0,...medicalSource};
+   if(requireComa)s.coma={active:true,hr:result.coma.initialHR,elapsedDays:0,nextCourseDays:initialComaD10,...medicalSource};
   }
  }
  if(q?.domain==='travel-weather'&&s.shockFollowup){
