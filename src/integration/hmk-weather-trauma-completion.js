@@ -42,8 +42,10 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
  requireIt(['coolWater','coldWater','freezingWater'].includes(condition),'Studený šok vyžaduje doložené ponoření do chladné vody');
  requireIt(Array.isArray(d6s)&&d6s.length===3&&d6s.every(v=>integer(v,1,6))&&integer(enduranceD100,1,100),
   'Chybí skutečné 3d6 trvání a Endurance d100');
- requireIt(s.shock==='NONE'&&!s.shockFollowup&&!s.extendedShock&&!s.coma,
-  'Stávající Shock/Coma vyžaduje rozhodnutí GM; nový Cold Shock jej nesmí přepsat');
+ // Existing Shock is NOT an automatic veto: the physical immersion roll
+ // still occurs.  A weaker/equal new state never replaces an earlier Course.
+ // Stronger simultaneous pending recoveries need a source-keyed scheduler;
+ // do not silently erase that obligation.
  const end=actor.hmk?.attributes?.end;
  requireIt(integer(end,1,200),'Chybí doložený END atribut');
  const endEML=end*5-combatFatigueTotals(s).total;
@@ -51,20 +53,34 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
  const modifier={CF:2,F:1,S:0,CS:-1}[named(sl)],index=base+modifier;
  const stateName=reverse[shockStateFromIndex(index)];
  requireIt(stateName,'Neznámý Cold Shock Index');
- s.shock=stateName;
- if(stateName!=='NONE'){
-  s.shockOriginRound=round;
-  if(stateName==='INC'||stateName==='UNC')s.posture.prone=true;
-  if(['STN','INC','UNC'].includes(stateName))s.shockFollowup={kind:stateName,originRound:round,timelineId:null,
-   dueRound:round+(stateName==='UNC'?120:1),phase:stateName==='UNC'?'after-ten-minutes':'end-next-turn'};
+ const oldShock=s.shock;
+ const carryShock=reverse[applyShockState(external[oldShock],external[stateName])];
+ requireIt(carryShock,'Cold Shock Carryover neodpovídá HMK str.169');
+ const ranks={NONE:0,STN:1,INC:2,UNC:3,KIA:4};
+ const newIsStronger=ranks[carryShock]>ranks[oldShock];
+ // The native HMK p169 followup covers the currently MOST severe Shock State;
+ // when a stronger state replaces it, the old pending followup is recorded as
+ // superseded, not left as a stale second recovery and not silently erased.
+ // An already established 4-hour Extended Shock/Coma is DIFFERENT: its own
+ // mandatory Course cannot be superseded by a fresh immersion Shock.
+ requireIt(!newIsStronger||!(s.extendedShock||s.coma?.active),
+  'Silnější nový Cold Shock při trvajícím Extended Shock/Coma vyžaduje samostatně časovaný zdroj; původní Course nelze přepsat');
+ const supersededFollowup=newIsStronger&&s.shockFollowup?structuredClone(s.shockFollowup):null;
+ if(newIsStronger){
+  s.shock=carryShock;s.shockOriginRound=round;
+  if(carryShock==='INC'||carryShock==='UNC')s.posture.prone=true;
+  if(['STN','INC','UNC'].includes(carryShock)){
+   requireIt(integer(originMinute,0,1000000000),'Cold Water Shock vyžaduje skutečnou kalendářovou minutu');
+   s.shockFollowup={kind:carryShock,originRound:round,timelineId:null,
+    dueRound:round+(carryShock==='UNC'?120:1),phase:carryShock==='UNC'?'after-ten-minutes':'end-next-turn',
+    domain:'travel-weather',sourceId,originMinute};
+  }
+  if(carryShock==='KIA'){s.shockFollowup=null;s.extendedShock=null;s.coma=null;for(const w of s.wounds)w.nextAdvanceRound=null;}
  }
- if(s.shockFollowup){
-  requireIt(integer(originMinute,0,1000000000),'Cold Water Shock vyžaduje skutečnou kalendářovou minutu');
-  s.shockFollowup.domain='travel-weather';s.shockFollowup.sourceId=sourceId;
-  s.shockFollowup.originMinute=originMinute;
- }
- if(stateName==='KIA'){s.shockFollowup=null;s.extendedShock=null;s.coma=null;for(const w of s.wounds)w.nextAdvanceRound=null;}
- const report={condition,immersionRounds:d6s.reduce((a,b)=>a+b,0),d6s,enduranceD100,endEML,sl:named(sl),base,index,modifier,shock:stateName,rulePage:185};
+ const report={condition,immersionRounds:d6s.reduce((a,b)=>a+b,0),d6s,enduranceD100,endEML,
+  sl:named(sl),base,index,modifier,shock:stateName,carryoverShock:carryShock,effectiveShock:s.shock,
+  previousShock:oldShock,previousCoursePreserved:!newIsStronger&&!!(s.shockFollowup||s.extendedShock||s.coma),
+  ...(supersededFollowup?{supersededFollowup,reason:'HMK p169: only the most severe current Shock State has a native Shock Reroll'}:{}),rulePage:185};
  s.events.push({id,type:'skill-cold-water-shock',round,details:{sourceId,report,gmConfirmed:true}});
  s.lastRound=round;validateCombatState(s);
  return {state:s,report};
@@ -123,8 +139,10 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
   'Nevyřešená Frostbite/Sunburn z původního Weather Hazard neexistuje');
  const id='skill-weather-skin:'+sourceId;
  requireIt(!s.events.some(e=>e.id===id),'Kožní následky tohoto Hazard už jsou vyřešeny');
- requireIt(s.shock==='NONE'&&!s.shockFollowup&&!s.extendedShock&&!s.coma,
-  'Pro sérii kožních ran musí být vyřešen existující Shock; nelze ho potichu přepsat');
+ // Existing Shock does not prevent resolving zero-injury exposed locations.
+ // Where an actual injury occurs the original applyConfirmedHit executor
+ // validates Carryover, existing Shock and any Extended Shock/Coma itself.
+ // The whole collection still commits atomically or not at all.
  const provided=injuriesFromExposure(hazard,{windD20,durationD20,complexion,rows,maximumExposureMinutes});
  const visited=new Set(),wounds=[];
  for(let n=0;n<provided.rows.length;n++){
