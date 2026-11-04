@@ -35,6 +35,7 @@ import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-c
 import {prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure} from './src/integration/hmk-weather-hazard-aftermath.js';
 import {startConcurrentProcedure,finishConcurrentProcedure,cancelConcurrentProcedure,openConcurrentProcedures} from './src/integration/hmk-concurrent-procedures.js';
+import {validateGlobalActionLedger,assertGlobalActionLedgerAppendOnly,recordGlobalActionReceipt} from './src/integration/hmk-global-action-ledger.js';
 import {prepareColdWaterShock,prepareExposureSkinInjuries,previewExposureSkinLocation} from './src/integration/hmk-weather-trauma-completion.js';
 import {prepareMundaneFireStrike,prepareEnclosedSmokeStart,prepareEnclosedSmokeCompletion} from './src/integration/hmk-mundane-fire-smoke.js';
 import {preparePoisonStart,preparePoisonOnset,preparePoisonCourse} from './src/integration/hmk-poison-course.js';
@@ -312,7 +313,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.718';
+const APP_VERSION='93.719';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -556,6 +557,7 @@ function assertAnimalTrainingCalendarAppendOnly590(before,after){
    throw Error('Animalcraft: kalendářní doklad nelze změnit ani odstranit.');}
 }
 function validate(d){
+ validateGlobalActionLedger(d);
  validateSkillTimedWork591(d);
  validateAnimalTrainingCalendar590(d);
  validateLogbookVisibility(d);
@@ -700,7 +702,17 @@ function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null
  if(cloudSync&&!cloudSync.canWrite()){notice='Cloudová kampaň není synchronizována. Přejděte do Cloud a zálohy.';return false;}
  if(storageReadOnly){notice='Zápis je zablokován: původní úložiště se nepodařilo načíst.';return false;}
  try{
-  if(storageBaseline!==null)linkNewMoralePsycheAccrual(JSON.parse(storageBaseline),data);
+  const committedBefore=storageBaseline===null?clean():JSON.parse(storageBaseline);
+  // An explicit, GM-confirmed JSON backup restore may legitimately replace a
+  // newer event history with an older verified snapshot. Do not mistake that
+  // authorized disaster-recovery operation for an attempted event overwrite.
+  if(storageBaseline!==null&&!restoreBackup)linkNewMoralePsycheAccrual(committedBefore,data);
+  if(!restoreBackup)assertGlobalActionLedgerAppendOnly(committedBefore,data);
+  if(!restoreBackup&&JSON.stringify(committedBefore)!==JSON.stringify(data)){
+   recordGlobalActionReceipt(data,{before:committedBefore,id:uuid(),createdAt:stamp(),
+    mode:episodeCommit?'episode-commit':'normal'});
+  }
+  validate(data);
   const serialized=JSON.stringify(data);
   let r;
   episodeFinalCommitInFlight=!!episodeCommit;
@@ -715,10 +727,21 @@ function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null
   }
   return false;
  }catch(e){
-  if(String(e?.message??'').startsWith('Morale → Psyche:')){notice=e.message;return false;}
+  console.error(e);
+  // A rejected *new* action is not evidence that the verified stored campaign
+  // is corrupt. Restore the last CAS-confirmed snapshot, keeping unrelated
+  // actions available. Never treat a transient rules/validation failure as a
+  // permanent read-only lock. Genuine external storage changes remain locked.
+  try{
+   if(cloudStorage.getItem(STORAGE)===storageBaseline){
+    data=storageBaseline===null?clean():normalizeLegacyCustomPrices(validate(JSON.parse(storageBaseline)));
+    notice='Nový krok nebyl uložen ('+String(e?.message??e)+'). Ověřený stav kampaně zůstává zachován; ostatní nezávislé akce lze dál vyhodnocovat.';
+    return false;
+   }
+  }catch(recoveryError){console.error('Nepodařilo se obnovit ověřený kontrolní bod',recoveryError);}
   storageReadOnly=true;
-  notice='Kontrolní bod nelze ověřit. Další zápisy jsou zablokovány až do obnovení stránky.';
-  console.error(e);return false;
+  notice='Uložený kontrolní bod se mezitím změnil nebo jej nelze ověřit. Zápis je zastaven proti přepsání dat; nouzový export zůstává přístupný.';
+  return false;
  }
 }
 window.addEventListener('storage',event=>{if(event.key===STORAGE&&event.newValue!==storageBaseline){storageReadOnly=true;notice='Data se změnila v jiné záložce. Zápisy jsou zablokovány, obnovte stránku.';render()}});
@@ -883,7 +906,9 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
  if(storageReadOnly){alert('Zápis zablokován kvůli chybě původních dat. Nejdříve je bezpečně obnovte.');return false}
  const previous=structuredClone(data);
  try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});enrollUnmonitoredNutrition(data,{fromMinute:previous.campaignClock.minute,idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute);if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+missed.kind+' d100 splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertTimeEpisodeAppendOnly(previous.journal,data.journal);assertTrekDayAppendOnly(previous.journal,data.journal);assertTrekDailyWeatherAppendOnly(previous.journal,data.journal);assertWeatherVoidAppendOnly(previous.journal,data.journal);assertWeatherShiftAppendOnly(previous.journal,data.journal);assertEncounterGMAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertAssistedIntakeAppendOnly(previous.journal,data.journal);assertNutritionAnimalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertAnimalTrainingCalendarAppendOnly590(previous,data);assertSkillTimedAppendOnly591(previous,data);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute)
-  requireAnimalMedicalGMTimeMayAdvance567({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});validate(data);
+  requireAnimalMedicalGMTimeMayAdvance567({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});
+  assertGlobalActionLedgerAppendOnly(previous,data);
+  validate(data);
   if(episodeSkillStaging){
    // First successful nested test captures the exact pre-test document.
    // All subsequent episode Skill Test receipts remain in RAM until one final

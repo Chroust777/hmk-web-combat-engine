@@ -8,6 +8,7 @@ import {healingBase} from '../rules/healing.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {ailmentOutcome,ailmentCourse} from '../rules/ailments.js';
 import {validateCombatState} from './persistent-combat-state.js';
+import {initializeConcurrentShock,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
 import {antiveninPoisonEvidence} from './hmk-herbal-antivenin-bridge.js';
 const check=(ok,msg)=>{if(!ok)throw Error(msg)};
 const int=(n,lo,hi)=>Number.isSafeInteger(n)&&n>=lo&&n<=hi;
@@ -24,16 +25,10 @@ function prepare(actor,state,round){profile(actor);validateCombatState(state);
  return structuredClone(state);
 }
 function noOtherObstacles(s,exceptId=null){
- check(s.shock==='NONE'&&!s.shockFollowup&&!s.extendedShock&&!s.coma?.active&&!s.bloodShockPending,
-  'Poison: existuje nezávislý Shock / Coma; nelze jej tiše přepsat');
- check(!(s.environmentalHazards||[]).some(x=>x.active),'Poison: souběžná Environmental Exposure musí být předem pravidlově dořešena');
- // A Disease exposure has no symptoms until its Onset (HMK 183).
- // Allow an attested, still-latent infection; do not overwrite an ACTIVE
- // Disease outcome or invent a shared Shock adjudication.
- check(!(s.diseaseCourses||[]).some(x=>x.status==='active'),
-  'Poison: aktivní Disease příznaky vyžadují dořešení GM; žádný tichý souběh');
- check(!(s.toxinCourses||[]).some(x=>x.id!==exceptId&&(x.status==='active'||x.status==='incubating')), 
-  'Poison: další současný toxin vyžaduje samostatné pravidlové řešení interakce');
+ // Multiple physical sources remain independent; each contributes its own
+ // HR, weakness and timed Course. Shared Shock is projected by source,
+ // not overwritten by the latest toxin. Actual dependent dice still apply.
+ initializeConcurrentShock(s);
 }
 function entry(s,sourceId){const id='poison:'+sourceId.trim(),t=(s.toxinCourses||[]).find(x=>x.id===id);
  check(t&&s.events.some(e=>e.id===id&&e.type==='poison-start'), 'Nenalezena doložená Poison událost');return t;
@@ -41,19 +36,13 @@ function entry(s,sourceId){const id='poison:'+sourceId.trim(),t=(s.toxinCourses|
 function applyOutcome(s,t,nextHR,round){
  const effect=ailmentOutcome(nextHR);
  check(s.fatigue.otherWeakness>=t.weaknessApplied,'Poison: již aplikovaná slabost se změnila nekonzistentně');
- check(s.shock===t.shockApplied,'Poison: Shock se změnil jinou událostí, přepis je blokován');
+
  s.fatigue.otherWeakness+=effect.weaknessFatigue-t.weaknessApplied;
  t.weaknessApplied=effect.weaknessFatigue;
- s.shock=shock[effect.shockState];
- t.shockApplied=s.shock;
- if(s.shock==='INC'||s.shock==='UNC'||s.shock==='KIA')s.posture.prone=true;
- if(s.shock==='KIA'){
-  s.shockFollowup=null;s.extendedShock=null;s.coma=null;s.bloodShockPending=false;
-  for(const w of s.wounds)w.nextAdvanceRound=null;
- }
- if(s.shock!=='NONE')s.shockOriginRound=round;
+ t.shockApplied=shock[effect.shockState];
  t.hr=Math.max(0,Math.min(6,nextHR));
  t.status=effect.dead?'dead':effect.defeated?'defeated':'active';
+ projectConcurrentShock(s,{round});
  return {hr:t.hr,shock:s.shock,weakness:effect.weaknessFatigue,status:t.status};
 }
 function push(s,id,type,round,details){check(!s.events.some(x=>x.id===id),'Duplicitní Poison událost '+id);
@@ -111,10 +100,6 @@ export function preparePoisonCourse({actor,state,sourceId,round=1,elapsedMinutes
   (physicianSV===0||physicianConfirmed===true),'Poison: skutečný d100, doložený Physician SV / GM potvrzení');
  check(elapsedMinutes===t.elapsedMinutes+t.periodMinutes,
   'Poison: další Course je splatný přesně po '+t.periodMinutes+' minutách; žádné tiché přeskočení');
- check(s.shock===t.shockApplied,'Poison Course: existující Shock pochází z jiného zdroje');
- check(!s.shockFollowup&&!s.extendedShock&&!s.coma?.active,'Poison Course: paralelní Shock/Coma musí posoudit GM');
- check(!(s.diseaseCourses||[]).some(x=>x.status==='active'),
-  'Poison Course: současné aktivní Disease příznaky vyžadují dořešení GM');
  const hb=profile(actor),baseEML=hb*t.hr+physicianSV;
  let antivenin={bonus:0,sourceIds:[],completeIds:[],sourcePage:75};
  if(herbalContext!==null){

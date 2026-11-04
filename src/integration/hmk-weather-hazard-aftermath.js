@@ -4,6 +4,7 @@
  * This reducer NEVER fabricates anatomy, dice, exposure periods or treatment.
  */
 import {validateCombatState} from './persistent-combat-state.js';
+import {initializeConcurrentShock,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
 import {healingBase} from '../rules/healing.js';
 import {ailmentOutcome,exposureAdvance,exposureHealing} from '../rules/ailments.js';
 import {successLevel,SL} from '../rules/tests.js';
@@ -20,23 +21,19 @@ const prepared=(state,round,sourceId,id,gmConfirmed)=>{
  return structuredClone(state);
 };
 function applyStatus(s,h,newHR){
- const oldWeak=h.weaknessApplied??0,previousShock=h.shockApplied??'NONE';
+ initializeConcurrentShock(s);
+ const oldWeak=h.weaknessApplied??0;
  const x=ailmentOutcome(newHR),newWeak=x.weaknessFatigue;
  need(s.fatigue.otherWeakness>=oldWeak,'Předchozí slabost z expozice není v Combat State doložena');
  s.fatigue.otherWeakness+=newWeak-oldWeak;
- if(previousShock!=='NONE')need(s.shock===previousShock,'Jiný Shock změnil stav; GM musí vyřešit souběh');
- else need(s.shock==='NONE'||newHR>3,'Jiný aktivní Shock nelze přepsat expozicí');
- if(previousShock!=='NONE')s.shock='NONE';
  let added='NONE';
  if(x.shockState&&x.shockState!=='none'){
    const convert={stunned:'STN',incapacitated:'INC',unconscious:'UNC',killed:'KIA'};
    added=convert[x.shockState]??String(x.shockState).toUpperCase();
    need(['STN','INC','UNC','KIA'].includes(added),'Neznámý Outcome stavu nemoci');
-   s.shock=added;s.shockFollowup=null;s.extendedShock=null;s.coma=null;
-   if(added==='UNC'||added==='INC')s.posture.prone=true;
-   if(added==='KIA'){for(const w of s.wounds)w.nextAdvanceRound=null;}
  }
  h.hr=newHR;h.weaknessApplied=newWeak;h.shockApplied=added;
+ projectConcurrentShock(s);
  return x;
 }
 export function prepareTrekkingWeatherTest({state,sourceId,round=1,kind,originalSL,coldCondition='dry',
@@ -65,12 +62,11 @@ export function prepareTrekkingWeatherTest({state,sourceId,round=1,kind,original
   if(originalSL==='S')addedWeariness=10;
   if(originalSL==='CS')addedWeariness=5;
  }
- need(hr===null||hr>=4||s.shock==='NONE','Těžší souběžná expozice vyžaduje zachování původního Shock Course');
  const hazard=hr===null?null:{id,sourceId,kind,hr,initialHR:hr,periodMinutes,
   active:true,skinPending,weaknessApplied:0,shockApplied:'NONE',lastElapsedMinutes:0,
   sequence:0,treatmentStarted:false};
- const outcome=hazard?applyStatus(s,hazard,hr):null;
  if(hazard)s.environmentalHazards.push(hazard);
+ const outcome=hazard?applyStatus(s,hazard,hr):null;
  if(fatigueAccountedExternally)addedWeariness=0;
  s.fatigue.weariness+=addedWeariness;
  s.events.push({id,type:'skill-trekking-weather-hazard',round,

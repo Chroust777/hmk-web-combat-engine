@@ -56,9 +56,8 @@ export function prepareSleeplessDay({actor,state,episodeId,hoursAwake,enduranceD
 }
 
 /** HMK p.176: confirmed eight hours of actual sleep reduces weariness by 15.
- * Only safely attribute recovery if ALL current weariness is proven to come
- * from this single sleepless episode. External fatigue needs a GM-reviewed
- * split rather than an invented allocation. PSY persists independently.
+ * Recovery is charged only against proven sleep-deprivation weariness.
+ * Independent fatigue stays intact; PSY persists independently.
  */
 export function prepareSleeplessNight({actor,state,episodeId,sleepHours,round=1,gmConfirmed=false}={}){
  check(gmConfirmed===true&&sleepHours===8&&whole(round,1,9999),
@@ -68,10 +67,10 @@ export function prepareSleeplessNight({actor,state,episodeId,sleepHours,round=1,
  check(actor?.id&&p?.status==='awake'&&p.episodeId===episodeId,
   'Sleep Deprivation: chybí otevřená epizoda této postavy');
  check(s.shock!=='KIA'&&round>=s.lastRound,'Sleep Deprivation: neplatné kolo nebo mrtvá postava');
- check(s.fatigue.weariness===p.activeWeariness,
-  'Sleep Deprivation: souběžná Weariness z dalších zdrojů nemá doložené rozdělení; spánek vyhodnoťte GM zvlášť');
+ check(s.fatigue.weariness>=p.activeWeariness,
+  'Sleep Deprivation: doložená Weariness z této epizody již v celkovém stavu není');
  const id=p.id+':sleep';check(!s.events.some(e=>e.id===id),'Sleep Deprivation: spánek již byl zapsán');
- const remove=Math.min(s.fatigue.weariness,15);
+ const remove=Math.min(p.activeWeariness,15);
  s.fatigue.weariness-=remove;
  p.activeWeariness-=remove;
  p.status='slept';
@@ -103,8 +102,8 @@ export function prepareSleeplessFourHourRest({actor,state,episodeId,startMinute,
  check(actor?.id&&p?.status==='awake'&&p.episodeId===episodeId,
   'Sleep Deprivation: není otevřená odpovídající epizoda');
  check(s.shock!=='KIA'&&round>=s.lastRound,'Sleep Deprivation: neplatné kolo nebo mrtvá postava');
- check(s.fatigue.weariness===p.activeWeariness,
-  'Sleep Deprivation: souběžná Weariness z jiných zdrojů není pro bezpečné automatické odečtení rozlišena');
+ check(s.fatigue.weariness>=p.activeWeariness,
+  'Sleep Deprivation: doložená Weariness z této epizody již v celkovém stavu není');
  check(p.activeWeariness>0,'Sleep Deprivation: v této epizodě není co obnovovat');
  check(!p.restRecords?.some(r=>r.dayIndex===dayIndex),
   'Sleep Deprivation: čtyřhodinový odpočinek už byl v tomto herním dni započten');

@@ -7,6 +7,7 @@
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {healingBase} from '../rules/healing.js';
+import {initializeConcurrentShock,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {ailmentOutcome,exposureAdvance,exposureHealing,malnutritionSchedule} from '../rules/ailments.js';
 export const MALNUTRITION_FORMAT='hmk-malnutrition-medical-v1';
@@ -34,17 +35,10 @@ function rationStatus(p,kind){const [received,needed]=column[kind],got=p[receive
  if(got>=want)return 'full';if(got===0)return 'none';if(got===want/2)return 'half';return 'partial';}
 function entries(journal,campaignId,actorId){return journal.filter(j=>j.calendarCampaignId===campaignId&&j.characterId===actorId&&j.calendarNutritionDay?.format==='hmk-nutrition-day-v1').sort((a,b)=>a.calendarNutritionDay.endMinute-b.calendarNutritionDay.endMinute)}
 function chooseShock(state,prev){
- const current=(state.malnutritionEpisodes??[]).filter(x=>x.status==='active'||x.status==='dead').reduce((s,x)=>severity[shock(x.hr)]>severity[s]?shock(x.hr):s,'NONE');
- // Never overwrite a foreign Injury, Disease, Poison, Coma or combat Shock.
- const protectedState=!!(state.extendedShock||state.coma?.active||state.shockFollowup||
-  (state.shock!=='NONE'&&(state.wounds??[]).some(w=>!w.healed))||
-  (state.toxinCourses??[]).some(x=>['active','incubating'].includes(x.status)&&x.shockApplied!=='NONE')||
-  (state.diseaseCourses??[]).some(x=>x.status==='active'&&x.shockApplied!=='NONE')||
-  (state.environmentalHazards??[]).some(x=>x.active&&x.shockApplied!=='NONE'));
- const external=state.shock!==prev&&state.shock!=='NONE';
- if(current!==prev)check(!protectedState&&!external,'Malnutrition: souběžný Shock z jiného zdroje vyžaduje původní pravidlové dořešení');
- if(current!==prev)state.shock=current;if(['INC','UNC'].includes(current))state.posture.prone=true;
- if(current==='KIA'){state.posture.prone=true;state.shockFollowup=null;state.extendedShock=null;state.coma=null;state.bloodShockPending=false;for(const w of state.wounds??[])w.nextAdvanceRound=null;}
+ // Every starvation/thirst course retains its own HR, source, fatigue and
+ // due date. Combined Shock is projected from all independently active
+ // causes instead of rejecting an unrelated Poison, Disease or Coma.
+ return projectConcurrentShock(state);
 }
 /** Called atomically ONLY after the GM's clock finalized nutrition days. */
 export function applyDueMalnutritionOnsets(database,{idFactory,stamp}={}){
@@ -164,7 +158,8 @@ export function resolveMalnutritionCourse(database,{actorId,episodeId,roll,rollO
  const nextWeak=weakness(nextHR),delta=nextWeak-e.weaknessApplied;
  check(state.fatigue.otherWeakness+delta>=0&&state.fatigue.otherWeakness+delta<=99999,'Malnutrition: změna slabosti by poškodila jiné zdroje');
  // Clone the health state and commit only when the entire medical outcome is valid.
- const next=structuredClone(state),t=next.malnutritionEpisodes.find(x=>x.id===episodeId);
+ const next=structuredClone(state);initializeConcurrentShock(next);
+ const t=next.malnutritionEpisodes.find(x=>x.id===episodeId);
  t.hr=nextHR;t.weaknessApplied=nextWeak;t.shockApplied=shock(nextHR);t.sequence+=1;
  t.status=nextHR===0?'dead':nextHR===6?'defeated':'active';
  const interval=due.mode==='healing'?DAY:malnutritionSchedule({kind:e.kind,halfRations:half,completeRest:rest}).advanceEveryDays*DAY;

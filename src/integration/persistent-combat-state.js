@@ -4,6 +4,7 @@
  */
 import {SHOCK_STATE,applyShockState,resolveStunnedRecovery,resolveShockReroll,calculateShockState} from '../rules/shock.js';
 import {PARALYSIS_LOCATIONS} from './hmk-paralysis-sequela.js';
+import {concurrentShockSources,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
 import {bloodLossAdvanceTransition,bloodStoppageResult,BLOOD_LOSS_PERIOD_ROUNDS} from '../rules/bleeding.js';
 import {SL,successLevel,effectiveMasteryLevel} from '../rules/tests.js';
 import {compoundInjury,compoundCompatible} from '../rules/injury.js';
@@ -16,6 +17,14 @@ const slValues=new Set([SL.CF,SL.F,SL.S,SL.CS]);
 function parsedSL(value){const sl=typeof value==='string'&&Object.prototype.hasOwnProperty.call(SL,value)?SL[value]:value;requireCond(slValues.has(sl),'Neplatný výsledek CF/F/S/CS');return sl;}
 const own=(x,k)=>Object.prototype.hasOwnProperty.call(x,k);
 const whole=(n,min=0,max=999999)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
+const concurrentShockRank={NONE:0,STN:1,INC:2,UNC:3,KIA:4};
+function strongerIndependentShock(s,original){
+ return s.concurrentShockProjection?.format==='hmk-concurrent-shock-v1'&&
+  s.shock===s.concurrentShockProjection.projectedShock&&
+  concurrentShockRank[s.shock]>concurrentShockRank[original]&&
+  concurrentShockSources(s).some(x=>x.shock===s.shock);
+}
+
 function requireCond(cond,message){if(!cond)throw Error(message);}
 const RECHECK_ROUNDS=120; // p169: ten minutes × twelve five-second rounds
 const EXTENDED_HOURS=4; // p179: one Course Roll per 4 hours
@@ -81,6 +90,12 @@ export function applyConfirmedAlchemyWeakness({state,round,eventId,sourceId,time
 }
 export function combatFatigueTotals(state){validateCombatState(state);return {windedness:state.fatigue.windedness,weariness:state.fatigue.weariness,weakness:state.fatigue.otherWeakness+state.bloodLoss.weaknessFatigue,total:state.fatigue.windedness+state.fatigue.weariness+state.fatigue.otherWeakness+state.bloodLoss.weaknessFatigue};}
 export function validateCombatState(s){
+ if(s?.concurrentShockProjection!==undefined){const p=s.concurrentShockProjection;
+  requireCond(p&&p.format==='hmk-concurrent-shock-v1'&&
+   ['NONE','STN','INC','UNC','KIA'].includes(p.baseShock)&&
+   ['NONE','STN','INC','UNC','KIA'].includes(p.projectedShock),
+   'Neplatná evidence souběžného Shocku');}
+
  requireCond(s&&s.format==='hmk-character-health-v1'&&!Array.isArray(s),'Neznámý formát bojového stavu');
  requireCond(own(SHOCK,s.shock),'Neznámý Shock State');
  requireCond(s.bloodLoss&&whole(s.bloodLoss.bp,0,4)&&s.bloodLoss.weaknessFatigue===s.bloodLoss.bp*5,'Neplatné Blood Loss Points / weakness');
@@ -324,7 +339,7 @@ export function validateCombatState(s){
  }
  if(s.extendedShock!==undefined&&s.extendedShock!==null){
   const x=s.extendedShock;
-  requireCond(x&&['INC','UNC'].includes(x.originState)&&s.shock===x.originState&&whole(x.hr,1,5)
+  requireCond(x&&['INC','UNC'].includes(x.originState)&&(s.shock===x.originState||strongerIndependentShock(s,x.originState))&&whole(x.hr,1,5)
    &&whole(x.elapsedHours,0,100000)&&x.elapsedHours%EXTENDED_HOURS===0
    &&s.shockFollowup==null,'Neplatný Extended Shock (HR / časování / stav)');
   if(x.domain!==undefined)requireCond(x.domain==='travel-weather'&&typeof x.sourceId==='string'&&x.sourceId.length>0,
@@ -355,7 +370,7 @@ export function validateCombatState(s){
   const c=s.coma;
   requireCond(c&&c.active===true&&whole(c.hr,1,20)&&whole(c.elapsedDays,0,100000)
    &&(c.nextCourseDays===null||whole(c.nextCourseDays,1,10))
-   &&(s.extendedShock!==null&&s.extendedShock!==undefined||s.shock==='NONE'), 'Neplatný stav Coma');
+   &&(s.extendedShock!==null&&s.extendedShock!==undefined||s.shock==='NONE'||strongerIndependentShock(s,'NONE')), 'Neplatný stav Coma');
   if(c.domain!==undefined)requireCond(c.domain==='travel-weather'&&typeof c.sourceId==='string'&&c.sourceId.length>0,
    'Coma z počasí musí zachovat zdroj cestovní události');
  }
@@ -746,7 +761,7 @@ export function applyExtendedShockCourse({state,round,eventId,healingBase,roll,p
  const nextHR=oldHR+delta;
  s.extendedShock.elapsedHours=elapsedHoursSinceOnset;
  if(nextHR<=0){s.shock='KIA';s.shockOriginRound=round;s.extendedShock=null;s.shockFollowup=null;s.coma=null;}
- else if(nextHR>=6){s.shock='NONE';s.shockOriginRound=round;s.extendedShock=null;s.shockFollowup=null;}
+ else if(nextHR>=6){s.shock='NONE';s.shockOriginRound=round;s.extendedShock=null;s.shockFollowup=null;if(s.concurrentShockProjection)projectConcurrentShock(s,{round});}
  else s.extendedShock.hr=nextHR;
  record(s,eventId,'extended-shock-course',round,{oldHR,nextHR,healingBase,fatigue,physicianStars,arcaneBonus,rawEML:eml,eml:effectiveMasteryLevel(eml),roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:s.shock,comaActive:!!s.coma});
  return {state:s,oldHR,nextHR,rawEML:eml,sl,comaActive:!!s.coma};

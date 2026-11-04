@@ -8,6 +8,7 @@ import {SL,successLevel} from '../rules/tests.js';
 import {ailmentOutcome,ailmentCourse} from '../rules/ailments.js';
 import {contagionTest} from '../rules/ailments.js';
 import {validateCombatState} from './persistent-combat-state.js';
+import {initializeConcurrentShock,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
 import {PARALYSIS_LOCATIONS} from './hmk-paralysis-sequela.js';
 
 const check=(ok,msg)=>{if(!ok)throw Error(msg)};
@@ -31,17 +32,9 @@ function draft(actor,state,round){actorProfile(actor);validateCombatState(state)
 function push(state,id,type,round,details){check(!state.events.some(e=>e.id===id),'Disease: duplicitní událost');
  state.events.push({id,type,round,details});state.lastRound=round;validateCombatState(state);}
 function conflict(state,{exceptId=null,allowCurrentDiseaseShock=false,exposureOnly=false}={}){
- const active=(state.diseaseCourses||[]).filter(x=>x.id!==exceptId&&['pending-profile','incubating','active'].includes(x.status));
- check(!active.length,'Disease: jiná otevřená nemoc potřebuje samostatné pravidlové rozhodnutí GM');
- // Contagion is only evidence of contracting a disease, not its onset.
- // During incubation neither disease nor toxin applies a NEW Disease
- // outcome; active concurrent outcomes remain blocked pending GM review.
- check(!(state.toxinCourses||[]).some(t=>t.status==='active'&&!exposureOnly),
-  'Disease: současný aktivní Poison/Toxin vyžaduje dořešení GM');
- check(!(state.environmentalHazards||[]).some(t=>t.active),'Disease: současnou Environmental Exposure nelze sloučit bez pravidel');
- check(!state.shockFollowup&&!state.extendedShock&&!state.coma?.active&&!state.bloodShockPending,
-  'Disease: současný Shock follow-up nebo Coma vyžaduje řešení GM');
- if(!allowCurrentDiseaseShock)check(state.shock==='NONE','Disease: nezávislý Shock nesmí být přepsán');
+ // Independent exposures can all coexist, including incubation and
+ // active symptoms. The source-specific medical courses remain distinct.
+ initializeConcurrentShock(state);
 }
 function find(state,sourceId){check(isId(sourceId),'Disease: chybí identifikátor expozice');
  const id='disease:'+sourceId.trim(),e=(state.diseaseCourses||[]).find(x=>x.id===id);
@@ -51,7 +44,7 @@ function mappedIndex(d20){return d20<=3?1:d20<=9?2:d20<=17?3:d20<=19?4:5;}
 function mappedVirulence(d20){return d20<=2?1:d20<=5?2:d20<=12?3:d20<=16?4:5;}
 function apply(state,episode,next,round){
  check(state.fatigue.otherWeakness>=episode.weaknessApplied,'Disease: změněná evidence slabosti');
- check(state.shock===episode.shockApplied,'Disease: Shock změnil jiný zdroj');
+
  check(next>=(episode.floorHR||0),'Disease: nepovolené překročení neletálního HR minima');
  if(next===0&&NONFATAL_ZERO.has(episode.zeroOutcome)){
   check(episode.standardLethal===false&&episode.floorHR===0,'Disease: HR0 alternativa bez GM doložení');
@@ -63,7 +56,8 @@ function apply(state,episode,next,round){
    active:true,round,courseSequence:episode.sequence,sourcePage:184};
   state.ailmentSequelae=[...(state.ailmentSequelae||[]),sequela];
   state.fatigue.otherWeakness-=episode.weaknessApplied;episode.weaknessApplied=0;
-  state.shock='NONE';episode.shockApplied='NONE';episode.hr=0;episode.status='sequela';
+  episode.shockApplied='NONE';episode.hr=0;episode.status='sequela';
+  projectConcurrentShock(state,{round});
   if(episode.zeroOutcome==='paralysis'&&episode.zeroParalysisLimb==='complete')state.posture.prone=true;
   // HR0 explicitly replaces, and does not add to, the previous Disease outcome.
   // Permanent sensory loss survives disease resolution and is not a KIA state.
@@ -74,14 +68,9 @@ const out=ailmentOutcome(next),normalized=Math.max(0,Math.min(next,6)),kind=hrSh
  check(({KIA:'killed',UNC:'unconscious',INC:'incapacitated',STN:'stunned',NONE:'none'})[kind]===out.shockState,
   'Disease: interní rozdíl v Outcome tabulce');
  state.fatigue.otherWeakness+=weak-episode.weaknessApplied;episode.weaknessApplied=weak;
- state.shock=kind;episode.shockApplied=kind;
- if(kind==='INC'||kind==='UNC'||kind==='KIA')state.posture.prone=true;
- if(kind==='KIA'){
-  state.shockFollowup=null;state.extendedShock=null;state.coma=null;state.bloodShockPending=false;
-  for(const wound of state.wounds)wound.nextAdvanceRound=null;
- }
- if(kind!=='NONE')state.shockOriginRound=round;
+ episode.shockApplied=kind;
  episode.hr=normalized;episode.status=kind==='KIA'?'dead':normalized===6?'defeated':'active';
+ projectConcurrentShock(state,{round});
  return {hr:normalized,shock:kind,weakness:weak,status:episode.status};
 }
 /** A d100 roll only. A failed exposure creates an immutable pending task;
@@ -177,7 +166,6 @@ export function prepareDiseaseCourse({actor,state,sourceId,round=1,elapsedMinute
  check(!selfTreatment||t.initialHR>=4,'Disease: self-treatment je povolen jen při počáteční HR4 nebo HR5');
  check(elapsedMinutes===t.elapsedMinutes+1440,'Disease: Course probíhá každých 24 hodin po nástupu');
  conflict(s,{exceptId:t.id,allowCurrentDiseaseShock:true});
- check(s.shock===t.shockApplied,'Disease: aktuální Shock se změnil nezávisle; přepis blokován');
  const hb=actorProfile(actor).hb,rawEML=hb*t.hr+physicianSV;
  const sl=successLevel(courseD100,rawEML),course=ailmentCourse({healingRate:t.hr,sl});
  const beforeHR=t.hr;t.elapsedMinutes=elapsedMinutes;t.sequence+=1;
