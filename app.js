@@ -78,6 +78,7 @@ import {prepareFailedNeutralSpellfire,persistFailedNeutralSpellfire,prepareCriti
 import {validateNeutralAlchemyHistory,validateNeutralAlchemyCombatLinks} from './src/integration/hmk-alchemy-neutral-history.js';
 import {validateNeutralTotalReleaseHistory} from './src/integration/hmk-neutral-total-release-invariant.js';
 import {prepareNeutralTotalReleaseCommit,persistNeutralTotalReleaseCommit} from './src/integration/hmk-neutral-total-release-writer.js';
+import {readCharacterHealth,writeCharacterHealth,assertCharacterHealthAuthority} from './src/integration/hmk-character-health-store.js';
 import {linkNewMoralePsycheAccrual,journalNewMoralePsycheSources} from './src/integration/hmk-morale-psyche-bridge.js';
 import {persistFearExposure,persistFearSafeRecovery,persistFearEndTurnReaction} from './src/integration/hmk-fear-aberrance-persistence.js';
 import {createG04ActionWizards} from './src/integration/hmk-g04-guided-actions-ui.js';
@@ -306,7 +307,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.705';
+const APP_VERSION='93.706';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -549,10 +550,10 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.combatState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTimeEpisodes(d.journal);validateTrekDayHistory(d.journal);validateWeatherLifecycle(d.journal);validateWeatherShifts(d.journal);validateEncounterGMJournal(d.journal);validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateTrackingAwarenessJournal(d.journal);validateSkillActivityTimeProofs(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
+ if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.healthState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.healthState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTimeEpisodes(d.journal);validateTrekDayHistory(d.journal);validateWeatherLifecycle(d.journal);validateWeatherShifts(d.journal);validateEncounterGMJournal(d.journal);validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateTrackingAwarenessJournal(d.journal);validateSkillActivityTimeProofs(d.journal);validateSupplyJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.healthState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
  if(p?.elixirName!=='Erudition'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;
  const actor=d.characters.find(c=>c.id===p.targetId);
- const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-erudition-aural');
+ const event=actor?.hmk?.healthState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-erudition-aural');
  if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||
   event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||
   event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)
@@ -561,7 +562,7 @@ function validate(d){
  for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
   if(p?.elixirName!=='Egosight'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;
   const actor=d.characters.find(c=>c.id===p.targetId);
-  const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-egosight-aural');
+  const event=actor?.hmk?.healthState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-egosight-aural');
   if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||
    event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||
    event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)
@@ -570,7 +571,7 @@ function validate(d){
  for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
   if(p?.elixirName!=='Footpad'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;
   const actor=d.characters.find(c=>c.id===p.targetId);
-  const event=actor?.hmk?.combatState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-footpad-aural');
+  const event=actor?.hmk?.healthState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-footpad-aural');
   if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||
    event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||
    event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)
@@ -581,7 +582,7 @@ function validate(d){
   const p=row.calendarAlchemyEgosightProfusionIll;
   if(!p||row.calendarCampaignId!==campaignKey(d.campaignClock))continue;
   const actor=d.characters.find(c=>c.id===p.targetId);
-  const event=actor?.hmk?.combatState?.events?.find(e=>e.id===row.id&&e.type==='hmk-alchemy-profusion-aural');
+  const event=actor?.hmk?.healthState?.events?.find(e=>e.id===row.id&&e.type==='hmk-alchemy-profusion-aural');
   if(!event||event.details?.triggerUseId!==p.triggerUseId||event.details?.sourceUseId!==p.sourceUseId||
     event.details?.targetId!==p.targetId||event.details?.calendarCampaignId!==p.campaignId||
     event.details?.calendarMinute!==p.minute||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)
@@ -591,7 +592,7 @@ function validate(d){
   const p=row.calendarAlchemyEruditionProfusionIll;
   if(!p||row.calendarCampaignId!==campaignKey(d.campaignClock))continue;
   const actor=d.characters.find(c=>c.id===p.targetId);
-  const event=actor?.hmk?.combatState?.events?.find(e=>e.id===row.id&&e.type==='hmk-alchemy-profusion-aural');
+  const event=actor?.hmk?.healthState?.events?.find(e=>e.id===row.id&&e.type==='hmk-alchemy-profusion-aural');
   if(!event||event.details?.triggerUseId!==p.triggerUseId||event.details?.sourceUseId!==p.sourceUseId||
     event.details?.targetId!==p.targetId||event.details?.calendarCampaignId!==p.campaignId||
     event.details?.calendarMinute!==p.minute||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)
@@ -600,7 +601,7 @@ function validate(d){
  validateDarkvisionHealingJournal(d.journal);for(const entry of d.journal){const proof=entry.calendarAlchemyFinish;
  if(entry.calendarCampaignId!==campaignKey(d.campaignClock)||proof?.result!=='ruined-by-dissolution')continue;
  const actor=d.characters.find(c=>c.id===entry.characterId);
- if(actor&&!actor.hmk?.combatState?.events?.some(e=>e.id===entry.id&&e.type==='hmk-alchemy-dissolution-aural'&&
+ if(actor&&!actor.hmk?.healthState?.events?.some(e=>e.id===entry.id&&e.type==='hmk-alchemy-dissolution-aural'&&
  e.details?.auralShock===proof.criticalFailure?.auralShockAdded&&e.details?.dissolutionD100===proof.criticalFailure?.dissolutionD100&&
  (proof.criticalFailure?.crucialDissolution?JSON.stringify(e.details?.crucialShock)===JSON.stringify(proof.criticalFailure.shockRoll):!e.details?.crucialShock)))
  throw Error('Alchemy: Dissolution nemá nezměněný Aural/Combat State důkaz');}
@@ -609,8 +610,8 @@ function validate(d){
  const ids=new Set();for(const c of [...d.characters,...d.trash]){if(!c||typeof c.id!=='string'||!c.id||typeof c.name!=='string'||ids.has(c.id))throw Error('Neplatná nebo duplicitní postava');if(c.kind!==undefined&&!['PC','NPC'].includes(c.kind))throw Error('Neplatný typ postavy');ids.add(c.id)}
  for(const k of ['items','inventory','journal']){const seen=new Set();for(const v of d[k]){if(!v||typeof v.id!=='string'||!v.id||seen.has(v.id))throw Error('Duplicitní nebo neplatné ID: '+k);seen.add(v.id)}}
  for(const i of d.items){if(typeof i.id==='string'&&i.id.startsWith('hmk:'))throw Error('Kolize s vestavěnou definicí HMK');if(typeof i.name!=='string'||!['weapon','shield','armor','other'].includes(i.category)||!i.properties||typeof i.properties!=='object'||Array.isArray(i.properties))throw Error('Neplatná položka knihovny')}
- for(const c of [...d.characters,...d.trash]){if(c.hmk!==undefined){if(!c.hmk||typeof c.hmk!=='object'||Array.isArray(c.hmk))throw Error('Neplatný HMK profil');for(const k of ['skills','injuries']){if(c.hmk[k]!==undefined){if(!Array.isArray(c.hmk[k]))throw Error('Neplatný seznam '+k);const unique=new Set();for(const r of c.hmk[k]){if(!r||typeof r.id!=='string'||!r.id||unique.has(r.id))throw Error('Duplicitní HMK ID: '+k);unique.add(r.id)}}}if(c.hmk.combatState){validateCombatState(c.hmk.combatState);for(const w of c.hmk.combatState.wounds){const i=c.hmk.injuries?.find(i=>i.id===w.id&&i.combatRecord===true);if(!i||i.location!==w.location||i.severity!==w.severity||i.bleeding!==w.bleeding)throw Error('Nesoulad evidované rány a trvalého bojového stavu');}}}}
- for(const c of [...d.characters,...d.trash])if(c.hmk?.creation)assertCreationInvariants(c);
+ for(const c of [...d.characters,...d.trash]){if(c.hmk!==undefined){if(!c.hmk||typeof c.hmk!=='object'||Array.isArray(c.hmk))throw Error('Neplatný HMK profil');for(const k of ['skills','injuries']){if(c.hmk[k]!==undefined){if(!Array.isArray(c.hmk[k]))throw Error('Neplatný seznam '+k);const unique=new Set();for(const r of c.hmk[k]){if(!r||typeof r.id!=='string'||!r.id||unique.has(r.id))throw Error('Duplicitní HMK ID: '+k);unique.add(r.id)}}}if(c.hmk.healthState){validateCombatState(c.hmk.healthState);for(const w of c.hmk.healthState.wounds){const i=c.hmk.injuries?.find(i=>i.id===w.id&&i.combatRecord===true);if(!i||i.location!==w.location||i.severity!==w.severity||i.bleeding!==w.bleeding)throw Error('Nesoulad evidované rány a trvalého bojového stavu');}}}}
+ for(const c of [...d.characters,...d.trash]){assertCharacterHealthAuthority(c);if(c.hmk?.creation)assertCreationInvariants(c);}
  if(d.inventory.some(x=>!ids.has(x.characterId)||!x.snapshot||typeof x.snapshot.name!=='string'||!['weapon','shield','armor','other'].includes(x.snapshot.category)||!Number.isSafeInteger(x.quantity)||x.quantity<1||x.quantity>999999||(x.slot!==undefined&&!SLOTS.some(s=>s[0]===x.slot)))||d.journal.some(x=>(!ids.has(x.characterId)&&!(x.characterId===null&&((x.bestiaryEncounter&&x.calendarCampaignId===x.bestiaryEncounter.campaignId)||(x.bestiaryTrauma&&x.calendarCampaignId===x.bestiaryTrauma.campaignId))))||typeof x.body!=='string'))throw Error('Záloha obsahuje osiřelé nebo poškozené záznamy');
  for(const x of d.inventory){if(x.sourceItemId!==undefined&&x.sourceItemId!==null&&typeof x.sourceItemId!=='string')throw Error('Neplatný odkaz na knihovnu');if(x.condition!==undefined&&typeof x.condition!=='string')throw Error('Neplatný stav předmětu');if(x.currentWQ!==undefined&&x.currentWQ!==null&&(!Number.isSafeInteger(x.currentWQ)||x.currentWQ<0||x.currentWQ>999))throw Error('Neplatná aktuální kvalita WQ předmětu');if(x.slot!==undefined&&!validSlotForCategory(x.slot,x.snapshot.category))throw Error('Neplatná kombinace slotu a kategorie předmětu');if(['main_hand','off_hand','worn'].includes(x.slot)&&x.quantity!==1)throw Error('Vybavený předmět musí představovat právě jeden kus');if(x.layerOrder!==undefined&&x.layerOrder!==null&&(!Number.isSafeInteger(x.layerOrder)||x.layerOrder<0||x.layerOrder>99||x.snapshot.category!=='armor'))throw Error('Neplatné pořadí vrstvy');if(x.layerSlot!==undefined&&x.layerSlot!==null&&(!['underFar','underNear','base','overNear','overFar'].includes(x.layerSlot)||x.snapshot.category!=='armor'))throw Error('Neplatný sloupec vrstvy')}
  if(d.combatRuntime!==undefined&&d.combatRuntime!==null){
@@ -647,7 +648,7 @@ function validate(d){
       offer.confirmedActorId!==(r.sequence.interruptActiveId||
        (r.sequence.active?r.sequence.order[r.sequence.cursor]:null))||
       !d.characters.some(c=>c.id===offer.confirmedOwnerId&&
-       c.hmk?.combatState?.events?.some(e=>e.id===offer.confirmedEventId)))
+       c.hmk?.healthState?.events?.some(e=>e.id===offer.confirmedEventId)))
     throw Error('Poškozený nebo nedoložený kredit Tactical Advantage v kontrolním bodu');
   }
   if(r.taLedger!==undefined){
@@ -661,7 +662,7 @@ function validate(d){
    if(r.taLedger.credits.some(x=>x.sourceEventId!==undefined&&
       ((x.sourceTimelineId!==undefined&&x.sourceTimelineId!==r.timelineId)||
        !d.characters.some(c=>r.participants.includes(c.id)&&
-        c.hmk?.combatState?.events?.some(e=>e.id===x.sourceEventId)))))
+        c.hmk?.healthState?.events?.some(e=>e.id===x.sourceEventId)))))
     throw Error('TA odkazuje na chybějící potvrzený bojový výsledek nebo jiné střetnutí');
   }
  }
@@ -711,7 +712,7 @@ function synchronizeAutomaticCalendarOrigins(before,after){
  const oldPeople=new Map((before.characters||[]).map(c=>[c.id,c]));
  for(const c of after.characters){
   if(!calendarMemberIds(after.campaignClock,after.characters).some(x=>x.id===c.id))continue;
-  const previous=oldPeople.get(c.id),s=c.hmk?.combatState,prior=previous?.hmk?.combatState;
+  const previous=oldPeople.get(c.id),s=c.hmk?.healthState,prior=previous?.hmk?.healthState;
   if(!s)continue;
   const newEvents=(s.events||[]).filter(e=>!(prior?.events||[]).some(x=>x.id===e.id));
   const verified=newEvents.at(-1)?.id;
@@ -721,7 +722,7 @@ function synchronizeAutomaticCalendarOrigins(before,after){
    if(kind!=='wound'&&getCampaignEpisodeAnchor(after.campaignClock,kind,c.id,episodeId||verified))return;
    after.campaignClock=anchorCampaignOrigin(after.campaignClock,{
     kind,characterId:c.id,...(woundId?{woundId}:{}),...(episodeId?{episodeId}:{}),
-    elapsedMinutes,eventId:uuid(),combatEventId:verified,source:'confirmed-combat'});
+    elapsedMinutes,eventId:uuid(),combatEventId:verified,source:'confirmed-health'});
   };
   const oldWounds=new Set((prior?.wounds||[]).map(w=>w.id));
   for(const w of s.wounds||[])if(!oldWounds.has(w.id))anchor('wound',null,0,w.id);
@@ -987,19 +988,19 @@ function confirmCalendarEpisodeElapsed(kind,characterId,episodeId,elapsedMinutes
 function logCalendarCombatResolution(c,state,kind){
  if(!data.campaignClock||!calendarMemberIds(data.campaignClock,data.characters).some(x=>x.id===c.id))return;
  const sourceEventId=state.events?.at(-1)?.id;
- if(!sourceEventId||!state.events.some(e=>e.id===sourceEventId))throw Error('Kalendář: chybí fyzicky potvrzená zdrojová Combat událost');
+ if(!sourceEventId||!state.events.some(e=>e.id===sourceEventId))throw Error('Kalendář: chybí původní potvrzená událost zdravotního stavu');
  data.campaignClock=recordCampaignResolution(data.campaignClock,{eventId:uuid(),sourceEventId,
   characterId:c.id,kind});
  // Record one immutable, auditable diary receipt for the same original Combat
  // State event. This is a witness, NOT a second medical calculation/roll.
  const original=state.events.at(-1);
- if(!original||original.id!==sourceEventId)throw Error('Zdravotní doklad nemá původní Combat event.');
+ if(!original||original.id!==sourceEventId)throw Error('Zdravotní doklad nemá původní událost zdravotního stavu.');
  if(data.journal.some(j=>j.calendarMedicalResolution?.sourceEventId===sourceEventId))
   throw Error('Zdravotní doklad této procedury již existuje.');
  data.journal.push({id:uuid(),characterId:c.id,createdAt:stamp(),
   calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute,
   title:'HMK · zdravotní procedura · '+c.name,
-  body:'Potvrzená procedura '+original.type+' · zdroj Combat State '+sourceEventId+
+  body:'Potvrzená procedura '+original.type+' · zdroj zdravotního stavu '+sourceEventId+
    (original.details?.woundId?' · rána '+original.details.woundId:'')+
    ' · '+displayCampaignMinute(data.campaignClock.minute),
   calendarMedicalResolution:{format:'hmk-calendar-medical-receipt-v1',kind,
@@ -1007,19 +1008,19 @@ function logCalendarCombatResolution(c,state,kind){
    procedureStartMinute:original.details?.procedureTime?.startMinute??null,
    procedureEndMinute:original.details?.procedureTime?.endMinute??null}});
 }
-function autoAnchorNewCombatOrigins(c,before,after,eventId){
+function autoAnchorNewHealthOrigins(c,before,after,eventId){
  if(!data.campaignClock||!calendarMemberIds(data.campaignClock,data.characters).some(x=>x.id===c.id))return;
  const previous=new Set((before?.wounds??[]).map(w=>w.id));
  for(const w of after.wounds??[]){
   if(!previous.has(w.id)&&!getCampaignAnchor(data.campaignClock,'wound',c.id,w.id))
    data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'wound',characterId:c.id,woundId:w.id,
-    eventId:uuid(),combatEventId:eventId,source:'confirmed-combat'});
+    eventId:uuid(),combatEventId:eventId,source:'confirmed-health'});
  }
  for(const [kind,started] of [['extended-shock',!before?.extendedShock&&!!after.extendedShock],
   ['coma',!before?.coma?.active&&!!after.coma?.active],
   ['blood-loss',!(before?.bloodLoss?.bp>0)&&(after.bloodLoss?.bp>0)]]){
   if(started)
-   data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind,characterId:c.id,eventId:uuid(),combatEventId:eventId,source:'confirmed-combat'});
+   data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind,characterId:c.id,eventId:uuid(),combatEventId:eventId,source:'confirmed-health'});
  }
 }
 function refreshCalendarHealingFields(form){
@@ -1097,7 +1098,7 @@ function partyProvisionCardsHTML(participants,compact=false){
  * purchases and physical receipt. This is only an action gate: no new health
  * state, inventory or medical determination is created. */
 function personalProvisionActionBlock(actor){
- const combat=actor?.hmk?.combatState;
+ const combat=actor?.hmk?.healthState;
  if(combat?.shock==='KIA'||(combat?.malnutritionEpisodes??[]).some(x=>x.status==='dead'||(x.status==='active'&&x.hr===0)))
   return 'Mrtvá postava nemůže osobně nakupovat ani převzít či pořídit zásoby.';
  if(needsAssistedIntake(actor))
@@ -1439,7 +1440,7 @@ function malnutritionLastRollHTML(actorId,kind,episodeId=null){
 /** v93.604: read-only HB/HR prognóza přímo u postavy. Není to hod ani
  * samostatná léčba; průběh zapisuje výhradně původní medical writer. */
 function malnutritionPrognosisHTML(t,actor,clock){
- const state=actor?.hmk?.combatState;
+ const state=actor?.hmk?.healthState;
  const episode=(state?.malnutritionEpisodes||[]).find(x=>x.id===t.episodeId);
  const dueReceipt=(data.journal||[]).find(j=>j.calendarCampaignId===campaignKey(clock)&&j.characterId===actor?.id&&j.calendarNutritionDay?.endMinute===t.dueMinute);
  const day=dueReceipt?.calendarNutritionDay;
@@ -2187,7 +2188,7 @@ function episodePendingEncounter(clock){
 function timeEpisodePageHTML(clock,participants){
  const areas=timeEpisodeWeatherOptions(clock),first=participants[0];
  const latest=episodeRecentRows(clock).at(-1)?.calendarTimeEpisode;
- const animalRoster=data.characters.filter(a=>a.hmk?.verifiedMountedBreed&&a.hmk?.combatState&&(clock.characterIds??[]).includes(a.id));
+ const animalRoster=data.characters.filter(a=>a.hmk?.verifiedMountedBreed&&a.hmk?.healthState&&(clock.characterIds??[]).includes(a.id));
  const stableTravelRoster=verifiedLivestock(data,campaignKey(clock)).filter(a=>a.spec?.breed&&Number.isFinite(a.spec?.str));
  const earlier=latest?.settings||{};
  const skillCandidates=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&
@@ -2438,13 +2439,13 @@ function campaignCalendarView(){
  const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
  const participants=calendarMemberIds(clock,data.characters);
  const unresolved=participants.flatMap(c=>{
-  const s=c.hmk?.combatState;if(!s||s.shock==='KIA')return [];
+  const s=c.hmk?.healthState;if(!s||s.shock==='KIA')return [];
   return (s.wounds??[]).filter(w=>!w.healed&&!getCampaignAnchor(clock,'wound',c.id,w.id))
    .map(w=>({characterId:c.id,woundId:w.id,label:c.name+' · '+w.location+' '+w.severity+w.level}));
  });
  const anchorOptions=unresolved.map(x=>`<option value="${esc(x.characterId+'::'+x.woundId)}">${esc(x.label)}</option>`).join('');
  const timeOrigins=participants.flatMap(c=>{
-  const s=c.hmk?.combatState;if(!s||s.shock==='KIA')return [];
+  const s=c.hmk?.healthState;if(!s||s.shock==='KIA')return [];
   const arr=[];
   if(s.extendedShock&&!getCampaignAnchor(clock,'extended-shock',c.id))arr.push({kind:'extended-shock',name:'Extended Shock',unit:'hodiny'});
   if(s.coma?.active&&!getCampaignAnchor(clock,'coma',c.id))arr.push({kind:'coma',name:'Coma',unit:'dny'});
@@ -2633,7 +2634,7 @@ function campaignCalendarView(){
  const pendingSoporificEND=pendingSoporificTests(data.journal,campaignKey(clock));
  const pendingSoporificOnsets=pendingSoporificEffects(data.journal,campaignKey(clock));
  const legacyParalytics=appliedPotions.filter(j=>j.calendarHerbPotionAdminister.herbType==='paralytic'&&j.calendarHerbPotionAdminister.paralyticTracked!==true);
- const paralyzedNow=data.characters.filter(c=>activeHerbalParalysis(c.hmk?.combatState,clock.minute));
+ const paralyzedNow=data.characters.filter(c=>activeHerbalParalysis(c.hmk?.healthState,clock.minute));
  const pendingHerbalPotions=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarHerbPotionStart&&
   !data.journal.some(r=>r.calendarHerbPotionComplete?.startId===j.id));
  const pendingAlchemy=pendingAlchemyPreparations(data.journal,campaignKey(clock));
@@ -2663,7 +2664,7 @@ function campaignCalendarView(){
  </details>
  <p class="hc-hint">Create ML60+, Invent ML100+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Tekuté elixíry lze doloženě uložit do stávající Vial, 4 oz; plná nádoba má 0,5 lb v existujícím ENC. Účinky elixírů dosud nejsou aktivovány.</p>
  ${participants.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0,pend=pendingAlchemy.find(x=>x.characterId===c.id);
-  if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.combatState?.shock==='KIA')return '';
+  if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
   return `<form data-alchemy-start><strong>${esc(c.name)} · Alchemy ML ${ml} · Sunsign ${esc(sunsign||'NEVYPLNĚN')}</strong><input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}">
   <div class="hc-fields"><label>Kanonický elixír<select name="elixirName" required>${CANONICAL_ALCHEMY_ELIXIRS.map(x=>`<option value="${esc(x.name)}">${esc(x.name)} · ${esc(x.principle)} (${esc(x.convocation)})</option>`).join('')}</select></label>
@@ -2678,7 +2679,7 @@ function campaignCalendarView(){
  <h4>Invent · unikátní elixíry (HMK 267–268)</h4>
  <p class="hc-hint">Při ML100+ určete nový elixír před první přípravou: název, jeden z 35 principů, imbibed/applied, instantaneous/temporary a přesný popis účinku potvrzený GM. Nový vynálezce má −3 SV, dokud jej poprvé úspěšně nedokončí. Poučený alchymista má −1 SV do svého prvního úspěchu. Tyto postihy snižují až Preparation SV, <strong>nikoli Alchemy EML</strong>. Mechanické účinky unikátního elixíru zůstávají bez samostatně podložených pravidel neaktivní.</p>
  ${participants.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0;
-  if(ml<100||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.combatState?.shock==='KIA')return '';
+  if(ml<100||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
   return `<form data-alchemy-start data-alchemy-invent><strong>${esc(c.name)} · Invent ML ${ml} · nová receptura</strong>
   <input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}"><input type="hidden" name="mode" value="invent">
@@ -2697,7 +2698,7 @@ function campaignCalendarView(){
   <button type="submit">Invent · zahájit výrobu (bez posunu času)</button></form>`;}).join('')}
  ${knownInventorElixirs.map(source=>{const recipe=source.calendarAlchemyFinish.uniqueElixir;
  return participants.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0;
-  if(c.id===source.characterId||ml<60||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.combatState?.shock==='KIA')return '';
+  if(c.id===source.characterId||ml<60||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
   return `<form data-alchemy-start data-alchemy-known><strong>${esc(c.name)} · znalost unikátní receptury „${esc(recipe.title)}“ · ML ${ml}</strong>
   <input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}"><input type="hidden" name="mode" value="known"><input type="hidden" name="elixirName" value="${esc(recipe.title)}"><input type="hidden" name="knowledgeFinishId" value="${esc(source.id)}">
@@ -2848,10 +2849,10 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const vialItem=physical?data.inventory.find(x=>x.id===pos.vialId):null;
  const actualOwner=pos&&vialItem?.characterId===pos.ownerId?pos.ownerId:p.actorId;
  const canApply=(!physical||(vialItem&&['carried','none'].includes(vialItem.slot)&&vialItem.characterId===pos.ownerId))&&(p.herbType!=='poison'||p.sv<15);
- const targets=p.herbType==='antivenin'?participants.flatMap(c=>(c.hmk?.combatState?.toxinCourses||[])
+ const targets=p.herbType==='antivenin'?participants.flatMap(c=>(c.hmk?.healthState?.toxinCourses||[])
   .filter(t=>['incubating','active'].includes(t.status))
   .map(t=>({ref:c.id+'::'+encodeURIComponent(t.sourceId),label:c.name+' · Poison '+t.sourceId+' · HR'+t.hr}))):
-  needsWound?participants.flatMap(c=>(c.hmk?.combatState?.wounds||[]).filter(w=>!w.healed&&(p.herbType!=='coagulant'||w.bleeding)&&(p.herbType!=='curative'||!(w.area||w.healing?.area))).map(w=>({ref:c.id+'::'+w.id,label:c.name+' · '+w.location+' · '+w.id}))):participants.map(c=>({ref:c.id,label:c.name}));
+  needsWound?participants.flatMap(c=>(c.hmk?.healthState?.wounds||[]).filter(w=>!w.healed&&(p.herbType!=='coagulant'||w.bleeding)&&(p.herbType!=='curative'||!(w.area||w.healing?.area))).map(w=>({ref:c.id+'::'+w.id,label:c.name+' · '+w.location+' · '+w.id}))):participants.map(c=>({ref:c.id,label:c.name}));
  const method=p.herbType==='aromatic'?'perfume':needsWound?'poultice':p.herbType==='hallucinogenic'?'ingested':'ingested';
  return `<form data-herb-admin><strong>${esc(p.herbType)} · ${esc(potencyLabel(p.potency))} · SV ${p.sv}</strong> · připravil ${esc(character(p.actorId)?.name||p.actorId)} · platí do ${esc(displayCampaignMinute(p.expiryMinute))}
  <input type="hidden" name="completeId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(actualOwner)}"><input type="hidden" name="method" value="${method}">
@@ -2876,7 +2877,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <label class="hc-check"><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje ztrátu obsahu; prázdná lahvička zůstává postavě</label><button type="submit">Odepsat pouze obsah</button></form>`:'';
  }).join('')}
  <h4>Paralytic · povinné Endurance d100 (HMK 75, 184)</h4>
- ${paralyzedNow.length?`<p class="hc-hint">Aktuální úplná paralýza: ${paralyzedNow.map(c=>esc(c.name||c.id)+' · do '+esc(displayCampaignMinute(c.hmk.combatState.herbalParalysis.endMinute))).join('; ')}. Postava zůstává prone; po uplynutí času musí případné vstání řešit běžnou bojovou akcí.</p>`:''}
+ ${paralyzedNow.length?`<p class="hc-hint">Aktuální úplná paralýza: ${paralyzedNow.map(c=>esc(c.name||c.id)+' · do '+esc(displayCampaignMinute(c.hmk.healthState.herbalParalysis.endMinute))).join('; ')}. Postava zůstává prone; po uplynutí času musí případné vstání řešit běžnou bojovou akcí.</p>`:''}
  ${legacyParalytics.length?`<p class="hc-hint">${legacyParalytics.length} starší podání Paralytic bez časového důkazu v93.400: není automaticky vyhodnoceno ani zpětně přiřazeno. GM je musí vyřešit jednotlivě; staré hodiny se tím nezablokují.</p>`:''}
  ${unresolvedParalytics.map(t=>{const patient=character(t.targetId),end=patient?.hmk?.attributes?.end;
   const ready=t.potency===3?!!combatInitiativeSequence&&combatInitiativeSequence.timelineId===t.timelineId&&combatInitiativeSequence.round===t.dueRound:clock.minute===t.dueMinute;
@@ -2903,7 +2904,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const weapons=data.inventory.filter(x=>x.characterId===owner&&x.snapshot?.category==='weapon'&&x.quantity===1&&['main_hand','off_hand'].includes(x.slot)&&!armedWeaponPoisons.some(a=>a.weaponItemId===x.id));
  return `<form data-herb-weapon-paste><strong>${esc(character(owner)?.name||owner)} · Poison ${esc(potencyLabel(p.potency))}, SV ${p.sv}</strong><input type="hidden" name="completeId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(owner)}"><label>Skutečná vybavená čepel nebo hrot<select name="weaponItemId">${weapons.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot.name)}</option>`).join('')}</select></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje nanesení dávky na tuto konkrétní zbraň v aktuálním bojovém kole</label><button type="submit" ${weapons.length?'':'disabled'}>Nanést pastu · spotřebovat dávku</button></form>`;
  }).join('')}
- ${armedWeaponPoisons.map(p=>{const wounds=participants.flatMap(c=>(c.hmk?.combatState?.events||[]).filter(e=>e.type==='confirmed-hit'&&e.details?.kind==='injury'&&['e','p'].includes(e.details?.aspect)&&e.round>=p.round&&e.round===combatInitiativeSequence?.round&&c.hmk.combatState.wounds?.some(w=>w.id===e.details.woundId&&w.timelineId===p.timelineId)).map(e=>({c,e})));
+ ${armedWeaponPoisons.map(p=>{const wounds=participants.flatMap(c=>(c.hmk?.healthState?.events||[]).filter(e=>e.type==='confirmed-hit'&&e.details?.kind==='injury'&&['e','p'].includes(e.details?.aspect)&&e.round>=p.round&&e.round===combatInitiativeSequence?.round&&c.hmk.healthState.wounds?.some(w=>w.id===e.details.woundId&&w.timelineId===p.timelineId)).map(e=>({c,e})));
  return `<div class="hc-event"><strong>Aktivní Poison paste · ${esc(character(p.actorId)?.name||p.actorId)} · ${esc(p.weaponName)}</strong> · původní kolo ${p.round}, ${esc(p.timelineId)}.
  ${data.inventory.some(x=>x.id===p.weaponItemId&&x.characterId===p.actorId&&['main_hand','off_hand'].includes(x.slot))?`<form data-herb-weapon-hit><input type="hidden" name="pasteId" value="${esc(p.pasteId)}"><label>Ověřený ne-Glancing injuring hit<select name="hitRef">${wounds.map(({c,e})=>`<option value="${esc(c.id+'::'+e.id)}">${esc(c.name)} · ${esc(e.id)} · kolo ${e.round}, ${esc(e.details.aspect)}, ${esc(e.details.injury)}</option>`).join('')}</select></label><label class="hc-check"><input type="checkbox" name="weaponConfirmed" required> GM potvrzuje, že právě tato natřená zbraň skutečně způsobila vybraný zásah, nikoli jiná zbraň</label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje ne-Glancing zranění a navazující, dosud nevyřešený Resistance Roll (+20 oběti)</label><button type="submit" ${wounds.length?'':'disabled'}>Doložit přenos jedu ze zásahu · nevyhodnocuje Resistance</button></form>`:'<p class="hc-hint">Zbraň není dostupná v inventáři. Nejdříve vyřešte historickou nesrovnalost.</p>'}
  <form data-herb-weapon-discard><input type="hidden" name="pasteId" value="${esc(p.pasteId)}"><label>Důvod odstranění pasty<input name="reason" minlength="3" maxlength="240" required></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje vyřazení nepoužité pasty</label><button type="submit">Odepsat pastu bez otravy</button></form></div>`;
@@ -2976,7 +2977,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  </section>`;
  const animalRestHTML=`<section class="hc-calendar hc-expedition" id="hmk-animal-rest"><h3>Zvířata · odpočinek a obnova Weariness</h3>
   <p class="hc-hint"><strong>Odvozené pravidlo (nikoliv výslovná sazba HMK pro zvířata):</strong> GM potvrdí nepřerušený klid zvířete, potom se využije existující obnova podle HMK str. 150 a 176: 4 h −5 Weariness, nebo při doložených 8 h skutečného spánku −15. Každý typ nejvýše jednou za 24 h. Bez hodu END a bez automatického spuštění spánku. Účinek nastane až při posunu času GM; Weakness ani Windedness se tím neléčí.</p>
-  ${restingAnimals.length?`<form data-trek-animal-rest class="hc-fields"><label>Registrované zvíře kampaně<select name="animalId" required>${restingAnimals.map(c=>`<option value="${esc(c.id)}">${esc(c.name||c.id)} · ${esc(c.hmk.verifiedMountedBreed)} · Weariness ${esc(c.hmk.combatState?.fatigue?.weariness??'?')}</option>`).join('')}</select></label>
+  ${restingAnimals.length?`<form data-trek-animal-rest class="hc-fields"><label>Registrované zvíře kampaně<select name="animalId" required>${restingAnimals.map(c=>`<option value="${esc(c.id)}">${esc(c.name||c.id)} · ${esc(c.hmk.verifiedMountedBreed)} · Weariness ${esc(c.hmk.healthState?.fatigue?.weariness??'?')}</option>`).join('')}</select></label>
    <label>Činnost<select name="kind"><option value="rest">4 hodiny klidu · Weariness −5</option><option value="sleep">8 hodin skutečného spánku · Weariness −15</option></select></label>
    <label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje vhodné a bezpečné podmínky pro zvolený nepřerušený odpočinek; u spánku skutečných 8 hodin.</label>
    <button type="submit">Naplánovat odpočinek zvířete · bez posunu času</button></form>`:'<p class="hc-hint">Žádné ověřené zvíře přidružené k této kampani. Zvíře nejprve výslovně zařaďte mezi členy tohoto kalendáře (Nastavení kampaně) a ověřte jeho plemeno a Combat State. Pouhá zmínka v Trekking Routine nestačí k úpravě zdraví jiného kalendáře.</p>'}
@@ -7215,14 +7216,14 @@ function saveCombatDraftToHistory(draft){
  if(JSON.stringify(current)!==JSON.stringify(combatDraftHistory))return {ok:false,reason:'Historie se změnila. Obnovte stránku.'};
  return persistCombatDraftHistory([...current,{id:uuid(),savedAt:stamp(),chronology:{round:combatClock.round,actorId:combatClock.actorId},draft:structuredClone(draft)}].slice(-COMBAT_DRAFT_HISTORY_LIMIT));
 }
-// Persistent source of truth: c.hmk.combatState in localStorage-backed character records.
+// Persistent source of truth: c.hmk.healthState in localStorage-backed character records.
 // Preview-only session history remains independent; never replay it as committed wounds.
-function persistentStateOf(c){return c?.hmk?.combatState??initialCombatState();}
+function persistentStateOf(c){return readCharacterHealth(c);}
 function combatInjurySignature(id){const c=character(id);if(!c)return null;const s=persistentStateOf(c);return JSON.stringify({wounds:s.wounds,shock:s.shock,fatigue:s.fatigue,toxinCourses:s.toxinCourses??[],diseaseCourses:s.diseaseCourses??[],ailmentSequelae:s.ailmentSequelae??[],morale:s.morale??null,mishaps:s.mishaps??[],posture:s.posture??null,herbalParalysis:s.herbalParalysis??null,grabHold:s.grabHold??null,pendingManeuver:s.pendingManeuver??null,pendingAutomaticGrab:s.pendingAutomaticGrab??null,mountControl:s.mountControl??null,mountedRiderImpact:s.mountedRiderImpact??null,extendedShock:s.extendedShock??null});}
 function synchronizeCombatInjuries(c,state){
  // Authoritative commit boundary: date newly confirmed wounds and the first
  // active Shock/Coma/Blood Loss stream atomically with the Combat State.
- autoAnchorNewCombatOrigins(c,persistentStateOf(c),state,state.events?.at(-1)?.id??null);
+ autoAnchorNewHealthOrigins(c,persistentStateOf(c),state,state.events?.at(-1)?.id??null);
  c.hmk=c.hmk||{};c.hmk.injuries=c.hmk.injuries||[];
  for(const wound of state.wounds){
   let record=c.hmk.injuries.find(i=>i.id===wound.id);
@@ -7230,7 +7231,7 @@ function synchronizeCombatInjuries(c,state){
   if(record.combatRecord!==true)throw Error('Kolize ID s ručně evidovanou ranou');
   record.location=wound.location;record.severity=wound.severity;record.bleeding=wound.bleeding;record.injuryLevel=wound.level;record.healed=!!wound.healed;record.healingRate=wound.healing?.healingRate??null;record.description=`HMK ${wound.severity}${wound.level} · ${wound.aspect} · kolo ${wound.recordedRound}${wound.bleeding?' · Bleeder':''}${wound.healed?' · ZHOJENO':''}`;
  }
- c.hmk.combatState=state;
+ writeCharacterHealth(c,state);
 }
 function confirmableCombatDraft(d){
  if(!d?.ok||!character(d.target?.id)||!encounterSelection.has(d.target.id))throw Error('Neplatný nebo neaktuální návrh cíle');
@@ -7398,8 +7399,8 @@ function hmkFearPanel(chars){
  if(!seq||!chars.length)return '';
  const eligible=chars.filter(c=>seq.order.includes(c.id));
  const options=eligible.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
- const live=eligible.filter(c=>['afraid','terrified','brave'].includes(c.hmk?.combatState?.fear?.state));
- const active=eligible.filter(c=>['afraid','catatonic'].includes(c.hmk?.combatState?.fear?.state));
+ const live=eligible.filter(c=>['afraid','terrified','brave'].includes(c.hmk?.healthState?.fear?.state));
+ const active=eligible.filter(c=>['afraid','catatonic'].includes(c.hmk?.healthState?.fear?.state));
  const staged=seq.pendingEndTurnAction?.pendingEffects?.includes('fear-end-turn-reaction')?
   seq.pendingEndTurnAction.actorId:null;
  return `<section class="panel"><h3>Fear / Aberrance · HMK v1.2 str.187</h3>
@@ -7416,7 +7417,7 @@ function hmkFearPanel(chars){
  <label><input name="gmConfirmed" type="checkbox" required> GM potvrdil skutečný fyzický hod</label>
  <button type="submit">Zapsat Fear / Psyche společně</button></form>
  <form id="hmk-fear-safe-form"><h4>Bezpečné zotavení / konec Brave</h4>
- <label>Postava<select name="characterId" required>${live.map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${esc(c.hmk.combatState.fear.state)}</option>`).join('')||'<option value="">Žádný aktivní bezpečnostní interval</option>'}</select></label>
+ <label>Postava<select name="characterId" required>${live.map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${esc(c.hmk.healthState.fear.state)}</option>`).join('')||'<option value="">Žádný aktivní bezpečnostní interval</option>'}</select></label>
  <label>Uplynulé minuty potvrzené GM<input name="elapsedMinutes" type="number" min="0" max="999999" step="1" required></label>
  <label><input name="safeFromSource" type="checkbox" required> Zdroj již neohrožuje postavu (povinné u Afraid/Terrified)</label>
  <label><input name="outOfLOS" type="checkbox"> Zdroj je mimo přímou viditelnost (povinné pro Afraid)</label>
@@ -7428,20 +7429,20 @@ function hmkFearPanel(chars){
  <label>Fyzický Will d100<input name="d100" type="number" min="1" max="100" step="1" required></label>
  <label><input name="gmConfirmed" type="checkbox" required> GM potvrdil konec provedené akce i fyzický hod</label>
  <button type="submit">Vyhodnotit Fear Reaction</button></form>`:''}
- ${active.length?`<p class="muted">Čekající Fear Reaction: ${active.map(c=>esc(c.name)+': '+esc(c.hmk.combatState.fear.state)).join('; ')}</p>`:''}</section>`;
+ ${active.length?`<p class="muted">Čekající Fear Reaction: ${active.map(c=>esc(c.name)+': '+esc(c.hmk.healthState.fear.state)).join('; ')}</p>`:''}</section>`;
 }
 function combatPersistentStatePanel(chars){
  const opts=chars.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
  const rows=chars.map(c=>{
   const s=persistentStateOf(c);let valid=true;try{validateCombatState(s)}catch{valid=false;}
-  if(!valid)return `<tr><td>${esc(c.name)}</td><td colspan="5">Neplatný bojový stav – zápisy blokovány</td></tr>`;
+  if(!valid)return `<tr><td>${esc(c.name)}</td><td colspan="5">Neplatný společný zdravotní stav – zápisy blokovány</td></tr>`;
   const fatigue=combatFatigueTotals(s),due=dueBloodLoss(s,combatClock.round);const specialPending=unresolvedInjuryMishaps(s).length+dueInjuryMorale(s).length;
   const recoveryNote=s.extendedShock?` · <strong>Extended Shock HR${s.extendedShock.hr}, další Course Roll za 4h (GM)</strong>`:s.coma?.active?` · <strong>Coma HR${s.coma.hr}, další Course za ${s.coma.nextCourseDays} dní</strong>`:s.shockFollowup?` · <strong>Shock ${s.shockFollowup.phase==='end-next-turn'?'konec dalšího tahu':'po 10 minutách'} (od kola ${s.shockFollowup.originRound})</strong>`:'';
   const move=projectInjuredMovement({state:s,round:combatClock.round,timelineId:combatInjuryTimelineId});const injurySummary=move.ready?(move.blocked?' · <strong>Move nepoužitelné</strong>':move.impairment?' · Move −'+move.impairment:''): ' · <strong>Impairment neúplné</strong>'; 
   return `<tr><td>${esc(c.name)}</td><td>${s.shock}${recoveryNote}</td><td>${s.wounds.length} (${s.wounds.filter(w=>w.bleeding).length} krvácí)${specialPending?' · <strong>'+specialPending+' speciální hod(y)</strong>':''}${s.posture?.prone?' · PRONE':''}${s.morale&&s.morale.state!=='steady'?' · Morale '+esc(s.morale.state):''}${s.morale?.surrender?.active?' · SURRENDERED':''}${s.fear?.state&&s.fear.state!=='steady'?' · Fear '+esc(s.fear.state):''}${injurySummary}</td><td>${s.bloodLoss.bp}/4</td><td>${fatigue.total}</td><td>${due.length?`<strong>${due.length} čeká na hod</strong>`:'—'}</td></tr>`;
  }).join('');
  const active=chars.flatMap(c=>persistentStateOf(c).wounds.filter(w=>w.bleeding).map(w=>`<option value="${esc(c.id+'::'+w.id)}">${esc(c.name)} · ${esc(w.location)}${w.staunchBonus?` · další Staunch +${w.staunchBonus}`:''} · ${esc(w.id)}</option>`)).join('');
- return `<section class="panel"><h3>Potvrzený bojový stav · trvale v postavách (HMK 168–169, 176–178)</h3><p class="muted">Odděleno od pracovní historie. Zásah se zapíše pouze po potvrzení GM; zranění a Shock se uloží do zálohovaných dat postavy. Fatigue potvrzeného bojového stavu se použije do dalšího Melee EML místo ručního pole Fatigue. Přepnutí kola automaticky nehází Blood Loss ani nezotavuje Shock. Splatnost Shock kontroluje známou časovou osu, konec tahu potvrzuje GM. Extended Shock a Coma používají potvrzené časové intervaly a skutečné hody; amputace, Morale a Mishap vyžadují doložené hody a potvrzení GM.</p><div class="table-scroll"><table><thead><tr><th>Postava</th><th>Shock</th><th>Rány</th><th>BP</th><th>Fatigue</th><th>Splatné Advance</th></tr></thead><tbody>${rows}</tbody></table></div>
+ return `<section class="panel"><h3>Společný zdravotní stav postavy · čte jej Combat i Cestování (HMK 168–169, 176–178)</h3><p class="muted">Odděleno od pracovní historie. Zásah se zapíše pouze po potvrzení GM; zranění a Shock se uloží do zálohovaných dat postavy. Fatigue potvrzeného bojového stavu se použije do dalšího Melee EML místo ručního pole Fatigue. Přepnutí kola automaticky nehází Blood Loss ani nezotavuje Shock. Splatnost Shock kontroluje známou časovou osu, konec tahu potvrzuje GM. Extended Shock a Coma používají potvrzené časové intervaly a skutečné hody; amputace, Morale a Mishap vyžadují doložené hody a potvrzení GM.</p><div class="table-scroll"><table><thead><tr><th>Postava</th><th>Shock</th><th>Rány</th><th>BP</th><th>Fatigue</th><th>Splatné Advance</th></tr></thead><tbody>${rows}</tbody></table></div>
  <form id="combat-encounter-start-form"><h4>Nové střetnutí se stejnými postavami</h4><p class="muted">Výslovné potvrzení nového kola 1. Zranění, Weakness, Fatigue a Morale zůstávají u postav. Pokud některá stále krvácí, trvá Shock nebo čeká povinný Mishap či Morale, nový začátek se odmítne; skutečný čas mezi střetnutími se nikdy nedopočítává.</p><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM ověřil konec předchozího střetnutí a všechny nevyřízené následky</label><button type="submit">Zahájit nové střetnutí (kolo 1)</button></form>
  <form id="confirm-combat-hit-form"><h4>Potvrdit právě vypočtený zásah</h4><p class="muted">Vyžaduje aktuální náhled výše. GM před potvrzením rozhodne Compound Injury, Bleeding, případnou amputaci, přeměnu poranění kovovou zbrojí a další zvláštní účinky. Samotný náhled je neumí všechny rozhodnout.</p><div class="field-grid"><label>Bleeding podle Body Location / výsledku zvláštních testů<select name="bleeding" required><option value="">GM musí určit</option><option value="yes">Ano – aktivní Bleeder</option><option value="no">Ne – rána nekrvácí</option></select></label><label>Compound Injury d10 při opakování rány v lokaci (1–10)<input type="number" name="compoundD10" min="1" max="10" step="1" placeholder="Nevyplňovat, pokud není Compound"></label><label><input type="checkbox" name="compoundReviewed" value="yes"> GM ověřil výsledek Compound Injury; Injury Shock musí odpovídat hodu</label><label>Strana zasažené končetiny (paže nebo nohy)<select name="injuredSide"><option value="">Neurčeno / jiná zóna</option><option value="left">Levá</option><option value="right">Pravá</option></select></label><label>Zásah šípem/kušovou šipkou (Impalement, str.170)<select name="arrowOrBolt"><option value="no">Ne</option><option value="yes">Ano</option></select></label><label>G5 Edge + trojúhelník: Strength ML (bez modifikátoru trojúhelníku)<input name="amputationStrengthML" type="number" min="0" max="200" step="1" placeholder="Jen pokud p167 vyžaduje"></label><label>Amputation: skutečný d100<input name="amputationRoll" type="number" min="1" max="100" step="1" placeholder="Jen G5 Edge + △"></label><label><input type="checkbox" name="amputationBeast" value="yes"> Nestandardní Strength u zvířete (ML70/50/30 podle △)</label><label>Amputation S: původní Shock ML<input name="shockML" type="number" min="0" max="200" step="1" placeholder="Ověření −20"></label><label>Amputation S: skutečný Shock d100<input name="shockRoll" type="number" min="1" max="100" step="1" placeholder="Ověření −20"></label><label><input type="checkbox" name="gmReviewed" value="yes" required> GM ověřil všechny zvláštní podmínky zranění podle HMK</label></div><button type="button" disabled title="Zásah se trvale zapisuje pouze z řízeného průvodce">Zásah – použijte jednotný průvodce</button></form>
  <div class="field-grid"><form id="combat-blood-loss-form"><h4>Blood Loss Advance · každých 60 kol</h4><label>Aktivní rána<select name="wound" required>${active||'<option value="">Žádný Bleeder</option>'}</select></label><label>Výsledek Blood Loss Roll<select name="sl"><option>CS</option><option>S</option><option>F</option><option>CF</option></select></label><button type="submit" ${active?'':'disabled'}>Zapsat jeden splatný Advance</button></form>
@@ -9944,7 +9945,7 @@ document.addEventListener('click',e=>{
  if(pendingAutomaticManeuver&&!pendingAutomaticManeuver.used){alert('Nejdříve vyhodnoťte deklarovaný Press, Trip nebo Grab. HMK str.106.');return;}
  if(pendingAutomaticFreePress&&!pendingAutomaticFreePress.used) {alert('Nejdříve proveďte nebo odmítněte volitelný Free Press. HMK str.172 jej řadí před Action TA.');return;}
   const source=character(pendingMeleeTA?.confirmedOwnerId);
-  const certified=!!(pendingMeleeTA?.confirmedEventId&&source?.hmk?.combatState?.events?.some(x=>x.id===pendingMeleeTA.confirmedEventId)
+  const certified=!!(pendingMeleeTA?.confirmedEventId&&source?.hmk?.healthState?.events?.some(x=>x.id===pendingMeleeTA.confirmedEventId)
    &&pendingMeleeTA.confirmedTimelineId===combatInjuryTimelineId
    &&pendingMeleeTA.confirmedRound===combatClock.round
    &&combatInitiativeSequence&&pendingMeleeTA.confirmedCursor===combatInitiativeSequence.cursor
@@ -11393,7 +11394,7 @@ document.addEventListener('submit',event=>{
   if(!follow||follow.type!=='critical-followup'||!['Climbing','Acrobatics','Jumping'].includes(follow.skill)||!['F','CF'].includes(follow.result?.level))throw Error('Chybí potvrzený neúspěšný následek pádu');
   if(data.journal.some(x=>x.skillTestProof?.type==='climbing-falling'&&x.skillTestProof.sourceId===sourceId))throw Error('Tento pád již byl uzavřen');
   const actor=character(follow.actorId);
-  if(!actor||actor.hmk?.combatState?.shock==='KIA')throw Error('Aktuální postava není způsobilá pro tuto proceduru');
+  if(!actor||actor.hmk?.healthState?.shock==='KIA')throw Error('Aktuální postava není způsobilá pro tuto proceduru');
   if(combatInitiativeSequence)throw Error('Při probíhající Initiative se pád musí vyhodnotit v autoritativním bojovém pořadí. Přímý zápis ze Skill Tests je zablokován.');
   const value=(row,key,optional=false)=>{const raw=row.querySelector('[name="'+key+'"]')?.value.trim();return optional&&!raw?null:Number(raw)};
   const rows=[...form.querySelectorAll('[data-climb-fall-row]')].map(row=>({
@@ -12153,7 +12154,7 @@ document.addEventListener('submit',event=>{
    if(persistentStateOf(actor).events.some(e=>e.id===result.report.id))throw Error('Opakovaná otrava');
    synchronizeCombatInjuries(actor,result.state);
    if(data.campaignClock)data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'poison',characterId:actor.id,
-    eventId:uuid(),combatEventId:result.course.id,source:'confirmed-combat'});
+    eventId:uuid(),combatEventId:result.course.id,source:'confirmed-health'});
    data.journal.push({id:uuid(),characterId:actor.id,title:'Poison/Toxin · expozice · HMK 186',
     body:'Zdroj '+result.course.sourceId+'; HR'+result.course.initialHR+'; onset '+result.course.onsetMinutes+' minut; Course každých '+result.course.periodMinutes+' minut. Zatím bez stavového účinku.',
     createdAt:stamp(),skillTestProof:{type:'poison-start',sourceId:result.course.sourceId,actorId:actor.id,course:result.course}});
@@ -12212,7 +12213,7 @@ function hskCommitDisease(actor,result,title,body,kind){
   synchronizeCombatInjuries(actor,result.state);
   if(kind==='disease-exposure'&&result.report.contracted&&data.campaignClock)
    data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'disease',characterId:actor.id,
-    eventId:uuid(),combatEventId:result.episode.id,source:'confirmed-combat'});
+    eventId:uuid(),combatEventId:result.episode.id,source:'confirmed-health'});
   data.journal.push({id:uuid(),characterId:actor.id,title,body,createdAt:stamp(),
    skillTestProof:{type:kind,actorId:actor.id,sourceId:result.episode.sourceId,
     report:result.report,episode:structuredClone(result.episode)}});
@@ -13340,7 +13341,7 @@ function buildTrekWatchEvidence(form){
    animals.push({id,droverId,loadLb:burden.minimumLb,awkwardLb:0});
   }
   const livestockActors=livestockTravelActors(stable);
-  const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:[...data.characters.map(c=>({...c,hmk:{...(c.hmk??{}),combatState:persistentStateOf(c)}})),...livestockActors],
+  const partyModes=trekPartyModes({memberIds,guideId:actor.id,characters:[...data.characters.map(c=>({...c,hmk:{...(c.hmk??{}),healthState:persistentStateOf(c)}})),...livestockActors],
    inventory:data.inventory,conveyance:v.conveyance,loadedByGM:v.loaded==='yes',drovingAnimals:animals});
   let stableVehicle575=null;
   if(v.trekVehicleId){
@@ -14073,15 +14074,15 @@ document.addEventListener('submit',e=>{
   const fd=new FormData(f),clock=data.campaignClock,campaignId=campaignKey(clock),targetId=String(fd.get('targetId'));
   const who=character(targetId);if(!who||!calendarMemberIds(clock,data.characters).some(c=>c.id===targetId))throw Error('Postava není členem aktivní kampaně');
   const roll=Number(fd.get('d100')),eventId=uuid(),willAttribute=who.hmk?.attributes?.wil;
-  const combatFatigue=who.hmk?.combatState?.fatigue;
-  const fatiguePenalty=(combatFatigue?.windedness??0)+(combatFatigue?.weariness??0)+(combatFatigue?.otherWeakness??0)+(who.hmk?.combatState?.bloodLoss?.weaknessFatigue??0);
+  const combatFatigue=who.hmk?.healthState?.fatigue;
+  const fatiguePenalty=(combatFatigue?.windedness??0)+(combatFatigue?.weariness??0)+(combatFatigue?.otherWeakness??0)+(who.hmk?.healthState?.bloodLoss?.weaknessFatigue??0);
   const proof=createTranscendenceWill({journal:data.journal,campaignId,transcendenceId:String(fd.get('transcendenceId')),
    targetId,minute:clock.minute,willAttribute,fatiguePenalty,d100:roll,
    dieOrigin:f.elements.namedItem('d100').dataset.astralGenerated===String(roll)?'cryptographic-software-die':'manual',
    gmConfirmed:fd.get('gmConfirmed')==='on'});
-  const resolved=applyTranscendenceWill({state:who.hmk?.combatState??initialCombatState(),arcane:who.hmk?.arcane,
-   round:Math.max(1,who.hmk?.combatState?.lastRound??1),eventId,proof});
-  if(mutate(()=>{const c=character(targetId);c.hmk.combatState=resolved.state;c.hmk.arcane=resolved.arcane;
+  const resolved=applyTranscendenceWill({state:who.hmk?.healthState??initialCombatState(),arcane:who.hmk?.arcane,
+   round:Math.max(1,who.hmk?.healthState?.lastRound??1),eventId,proof});
+  if(mutate(()=>{const c=character(targetId);c.hmk.healthState=resolved.state;c.hmk.arcane=resolved.arcane;
    data.journal.push({id:eventId,characterId:targetId,calendarCampaignId:campaignId,campaignMinute:clock.minute,
     createdAt:stamp(),title:'HMK 291 · Transcendence CF → Will',body:'Will d100 '+roll+' → '+proof.sl+
     '; Aural Shock +'+proof.auralShockAdded+'; Weakness +'+proof.weaknessAdded+'. GM čas beze změny.',calendarHerbTranscendenceWill:proof});})){
@@ -14104,7 +14105,7 @@ document.addEventListener('submit',e=>{
   if(Number(fd.get('spiritML'))!==spiritML)throw Error('Spirit ML nesouhlasí s ověřenou postavou');
   if(fd.has('tranceML')&&Number(fd.get('tranceML'))!==tranceML)throw Error('Trance ML nesouhlasí s ověřenou postavou');
   const spiritD100=Number(fd.get('d100')),tranceD10=fd.has('tranceD10')?Number(fd.get('tranceD10')):null,
-   sourceId=String(fd.get('sourceId')),eventId=uuid(),state=who.hmk?.combatState??initialCombatState();
+   sourceId=String(fd.get('sourceId')),eventId=uuid(),state=who.hmk?.healthState??initialCombatState();
   const proof=createHallucinogenicReembodiment({journal:data.journal,campaignId,sourceId,targetId,minute:clock.minute,
    spiritRoundsSpent:Number(fd.get('spiritRoundsSpent')),spiritML,d100:spiritD100,
    dieOrigin:f.elements.namedItem('d100').dataset.herbGenerated===String(spiritD100)?'cryptographic-software-die':'manual',
@@ -14113,7 +14114,7 @@ document.addEventListener('submit',e=>{
    physicalStateClear:fd.get('physicalStateClear')==='on',spiritActionsAdjudicated:fd.get('spiritActionsAdjudicated')==='on',
    gmConfirmed:fd.get('gmConfirmed')==='on'});
   const resolved=applyConfirmedAstralReembodiment({state,round:Math.max(1,state.lastRound),eventId,proof});
-  if(mutate(()=>{const c=character(targetId);c.hmk??={};c.hmk.combatState=resolved.state;
+  if(mutate(()=>{const c=character(targetId);c.hmk??={};c.hmk.healthState=resolved.state;
    data.journal.push({id:eventId,characterId:targetId,calendarCampaignId:campaignId,campaignMinute:clock.minute,
     createdAt:stamp(),title:'HMK 298 · Reembodiment Spirit',body:'Spirit d100 '+proof.d100+' → '+proof.adjustedSL+'; Weariness +'+proof.weariness+(proof.stunned?', Stunned':'')+'. GM čas beze změny.',calendarHerbReembodiment:proof});})){
    notice='Reembodiment '+proof.adjustedSL+' · Weariness +'+proof.weariness+(proof.stunned?' · Stunned':'');render();}
@@ -14131,9 +14132,9 @@ document.addEventListener('submit',e=>{
   const patient=character(targetId),endurance=patient?.hmk?.attributes?.end,seq=combatInitiativeSequence,
    round=p.potency===3?seq?.round??null:null,timelineId=p.potency===3?seq?.timelineId??null:null,eventId=uuid();
   const result=applyConfirmedParalyticEndurance({journal:data.journal,campaignId:campaignKey(clock),applicationId:id,
-   targetId,minute:clock.minute,round,timelineId,state:patient?.hmk?.combatState,endurance,
+   targetId,minute:clock.minute,round,timelineId,state:patient?.hmk?.healthState,endurance,
    d100:Number(fd.get('d100')),eventId,gmConfirmed:!!fd.get('gmConfirmed')});
-  const saveParalytic=()=>{const c=character(targetId);c.hmk??={};c.hmk.combatState=result.state;
+  const saveParalytic=()=>{const c=character(targetId);c.hmk??={};c.hmk.healthState=result.state;
    data.journal.push({id:eventId,characterId:targetId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
     createdAt:stamp(),title:'HMK 75 · Paralytic → END',body:'Potvrzený END d100; '+(result.proof.paralyzed?'úplná paralýza na jednu hodinu.':'Endurance úspěch, žádná paralýza.')+' GM čas beze změny.',calendarHerbParalyticEndurance:result.proof});};
   const ok=seq&&p.potency===3?(commitGuidedTransition(seq,saveParalytic),true):mutate(saveParalytic);
@@ -14151,9 +14152,9 @@ document.addEventListener('submit',e=>{
   const patient=character(targetId),seq=combatInitiativeSequence,eventId=uuid();
   const result=applyConfirmedSoporificEnd({journal:data.journal,campaignId:campaignKey(clock),applicationId:id,
    targetId,minute:clock.minute,round:p.potency===3?seq?.round??null:null,
-   timelineId:p.potency===3?seq?.timelineId??null:null,state:patient?.hmk?.combatState,
+   timelineId:p.potency===3?seq?.timelineId??null:null,state:patient?.hmk?.healthState,
    endurance:patient?.hmk?.attributes?.end,d100:Number(fd.get('d100')),eventId,gmConfirmed:!!fd.get('gmConfirmed')});
-  const store=()=>{const c=character(targetId);c.hmk??={};c.hmk.combatState=result.state;
+  const store=()=>{const c=character(targetId);c.hmk??={};c.hmk.healthState=result.state;
    data.journal.push({id:eventId,characterId:targetId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
     createdAt:stamp(),title:'HMK 75 · Soporific END SV',body:'Ověřený END Success Value, bez posunu času. SV≤0 vyžaduje GM řešení.',calendarHerbSoporificEnd:result.proof});};
   const ok=seq&&p.potency===3?(commitGuidedTransition(seq,store),true):mutate(store);
@@ -14171,8 +14172,8 @@ document.addEventListener('submit',e=>{
   const result=applyConfirmedSoporificEffect({journal:data.journal,campaignId:campaignKey(clock),testId,phase,targetId,
    minute:clock.minute,round:t.phase==='unconsciousness'?seq?.round??null:null,
    timelineId:t.phase==='unconsciousness'?seq?.timelineId??null:null,
-   state:patient?.hmk?.combatState,eventId,gmConfirmed:!!fd.get('gmConfirmed')});
-  const store=()=>{const c=character(targetId);c.hmk??={};c.hmk.combatState=result.state;
+   state:patient?.hmk?.healthState,eventId,gmConfirmed:!!fd.get('gmConfirmed')});
+  const store=()=>{const c=character(targetId);c.hmk??={};c.hmk.healthState=result.state;
    data.journal.push({id:eventId,characterId:targetId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
     createdAt:stamp(),title:'HMK 75 · Soporific '+phase,
     body:'Doložený bylinný účinek, oddělený od zranění a jejich Shock. Bez posunu času.',calendarHerbSoporificEffect:result.proof});};
@@ -14195,9 +14196,9 @@ document.addEventListener('submit',e=>{
   const patient=character(targetId),shockML=skillValueForJournal(patient,['Shock']),eventId=uuid();
   if(!Number.isSafeInteger(shockML)||!seq.order.includes(targetId))throw Error('Shock ML nebo příjemce v právě probíhajícím střetnutí chybí');
   const resolved=applyConfirmedEmeticShock({journal:data.journal,campaignId:campaignKey(clock),applicationId:id,minute:clock.minute,
-   round:seq.round,timelineId:seq.timelineId,targetId,state:patient?.hmk?.combatState,shockML,
+   round:seq.round,timelineId:seq.timelineId,targetId,state:patient?.hmk?.healthState,shockML,
    d100:Number(fd.get('d100')),eventId,gmConfirmed:fd.get('gmConfirmed')==='on'});
-  commitGuidedTransition(seq,()=>{const c=character(targetId);c.hmk??={};c.hmk.combatState=resolved.state;
+  commitGuidedTransition(seq,()=>{const c=character(targetId);c.hmk??={};c.hmk.healthState=resolved.state;
    data.journal.push({id:eventId,characterId:targetId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
     createdAt:stamp(),title:'HMK 75 · Emetic → Shock',body:'Skutečný Shock d100 a trvalý stav; čas neposunut.',calendarHerbEmeticShock:resolved.proof});});
   notice='Emetic Shock '+resolved.proof.sl+' → '+resolved.proof.newShock+' (SHK '+resolved.proof.shockIndex+').';render();
@@ -14242,7 +14243,7 @@ document.addEventListener('submit',e=>{
   const memberIds=calendarMemberIds(clock,data.characters).map(c=>c.id);
   const target=character(targetId),potionRow=data.journal.find(x=>x.id===fd.get('completeId'));
   const type=potionRow?.calendarHerbPotionComplete?.herbType;
-  if(type==='soporific'&&(activeHerbalSoporific(target?.hmk?.combatState)||pendingSoporificTests(data.journal,campaignKey(clock)).some(t=>t.targetId===targetId)||pendingSoporificEffects(data.journal,campaignKey(clock)).some(t=>t.targetId===targetId)))throw Error('Soporific: příjemce už má aktivní nebo nevyřešený účinek. Další dávku musí GM vyřešit mimo tuto automatickou větev.');
+  if(type==='soporific'&&(activeHerbalSoporific(target?.hmk?.healthState)||pendingSoporificTests(data.journal,campaignKey(clock)).some(t=>t.targetId===targetId)||pendingSoporificEffects(data.journal,campaignKey(clock)).some(t=>t.targetId===targetId)))throw Error('Soporific: příjemce už má aktivní nebo nevyřešený účinek. Další dávku musí GM vyřešit mimo tuto automatickou větev.');
   if(type==='poison'&&potionRow?.calendarHerbPotionComplete?.sv>=15)throw Error('Poison: nekladný interval 15 − SV vyžaduje rozhodnutí GM; automaticky jej neurčujeme');
   const physicallyBottled=vialBinding(data.journal,campaignKey(clock),String(fd.get('completeId')));
   if(physicallyBottled){const pos=vialState(data.journal,campaignKey(clock),String(fd.get('completeId')),clock.minute);
@@ -14253,10 +14254,10 @@ document.addEventListener('submit',e=>{
   const emeticOnsetD6=type==='emetic'?Number(fd.get('emeticOnsetD6')):null;
   const emeticOnsetOrigin=type==='emetic'?(f.elements.namedItem('emeticOnsetD6')?.dataset.herbGenerated===String(emeticOnsetD6)?'cryptographic-software-die':'manual'):'';
   const woundId=['curative','coagulant'].includes(type)?woundPart:'';
-  if(type==='antivenin'&&!target?.hmk?.combatState?.toxinCourses?.some(t=>t.sourceId===poisonSourceId&&['incubating','active'].includes(t.status)))
+  if(type==='antivenin'&&!target?.hmk?.healthState?.toxinCourses?.some(t=>t.sourceId===poisonSourceId&&['incubating','active'].includes(t.status)))
    throw Error('Antivenin: vybraná otrava není aktivní nebo nemá doložený původ v této kampani');
   if(['curative','coagulant'].includes(type)){
-   const wound=target?.hmk?.combatState?.wounds?.find(w=>w.id===woundId&&!w.healed);
+   const wound=target?.hmk?.healthState?.wounds?.find(w=>w.id===woundId&&!w.healed);
    if(!wound||type==='coagulant'&&!wound.bleeding)throw Error('Není doložená odpovídající aktivní rána');
    if(type==='curative'&&(wound.area||wound.healing?.area))throw Error('Area Injury podle HMK 75 vyžaduje pět skutečných dávek; jednorázové podání není přípustné.');
   }
@@ -14286,7 +14287,7 @@ document.addEventListener('submit',e=>{
     if(persistentStateOf(target).events.some(e=>e.id===herbalPoison.report.id))throw Error('Poison je již aktivní');
     synchronizeCombatInjuries(target,herbalPoison.state);
     data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'poison',characterId:target.id,
-     eventId:uuid(),combatEventId:herbalPoison.course.id,source:'confirmed-combat'});
+     eventId:uuid(),combatEventId:herbalPoison.course.id,source:'confirmed-health'});
     data.journal.push({id:uuid(),characterId:target.id,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
      createdAt:stamp(),title:'Herbal Poison · doložené požití · HMK 75/186',
      body:'Podání '+applicationRow.id+'; HR'+herbalPoison.course.initialHR+'; nástup '+herbalPoison.proof.onsetCount+' '+herbalPoison.proof.onsetUnit+'; period '+herbalPoison.course.periodMinutes+' min; bez okamžitého stavového účinku.',
@@ -14310,7 +14311,7 @@ document.addEventListener('submit',e=>{
    p=createHerbWeaponPaste({journal:data.journal,inventory:data.inventory,campaignId:key,minute,
     actorId:String(fd.get('actorId')),completeId:String(fd.get('completeId')),weaponItemId:String(fd.get('weaponItemId')),
     timelineId:seq.timelineId,round:seq.round,
-    witnessedHitIds:[...new Set(data.characters.flatMap(c=>(c.hmk?.combatState?.events||[]).filter(x=>x.type==='confirmed-hit').map(x=>x.id)))],gmConfirmed:!!fd.get('gmConfirmed')});
+    witnessedHitIds:[...new Set(data.characters.flatMap(c=>(c.hmk?.healthState?.events||[]).filter(x=>x.type==='confirmed-hit').map(x=>x.id)))],gmConfirmed:!!fd.get('gmConfirmed')});
    if(mutate(()=>record(p.actorId,'Poison paste · nanesení na zbraň',
     'Skutečná dávka byla nanesena na vybavenou zbraň. Účinek vyžaduje potvrzený zraňující zásah. Čas GM beze změny.',
     'calendarHerbWeaponPaste',p)))notice='Pasta byla doloženě nanesena; dávka již není volná.';
@@ -14326,9 +14327,9 @@ document.addEventListener('submit',e=>{
    const pasteId=String(fd.get('pasteId')),original=data.journal.find(x=>x.id===pasteId)?.calendarHerbWeaponPaste;
    const ref=String(fd.get('hitRef')||'').split('::'),target=character(ref[0]);
    if(ref.length!==2||!target)throw Error('Vyberte potvrzený zásah');
-   const event=target.hmk?.combatState?.events?.find(x=>x.id===ref[1]);
+   const event=target.hmk?.healthState?.events?.find(x=>x.id===ref[1]);
    p=createHerbWeaponPasteHit({journal:data.journal,campaignId:key,pasteId,minute,
-    actorId:original?.actorId,targetId:target.id,weaponItemId:original?.weaponItemId,targetState:target.hmk?.combatState,
+    actorId:original?.actorId,targetId:target.id,weaponItemId:original?.weaponItemId,targetState:target.hmk?.healthState,
     timelineId:seq.timelineId,round:seq.round,hitEventId:event?.id,
     gmConfirmed:!!fd.get('gmConfirmed'),weaponWitnessConfirmed:!!fd.get('weaponConfirmed')});
    if(mutate(()=>record(target.id,'Poison paste · skutečný zraňující zásah',
@@ -14367,7 +14368,7 @@ document.addEventListener('submit',e=>{
    gmConfirmed:!!fd.get('gmConfirmed')});
   commitGuidedTransition(seq,()=>{
    synchronizeCombatInjuries(target,result.state);
-   data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'poison',characterId:target.id,eventId:uuid(),combatEventId:result.course.id,source:'confirmed-combat'});
+   data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'poison',characterId:target.id,eventId:uuid(),combatEventId:result.course.id,source:'confirmed-health'});
    data.journal.push({id:uuid(),characterId:target.id,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
     createdAt:stamp(),title:'Great Poison · skutečný bojový nástup · HMK 75/186',
     body:'Požití '+id+'; nástup v kole '+seq.round+'; HR4; 4× symptom d10; další Course dle pravidel.',
@@ -14842,7 +14843,7 @@ document.addEventListener('submit',e=>{
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Zotavení vyžaduje platný kalendář mimo aktivní boj');
   const v=Object.fromEntries(new FormData(form)),campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
   const target=calendarMemberIds(data.campaignClock,data.characters).find(c=>c.id===v.targetId);
-  if(!target||target.hmk?.combatState?.shock==='KIA')throw Error('Příjemce není živá postava kampaně');
+  if(!target||target.hmk?.healthState?.shock==='KIA')throw Error('Příjemce není živá postava kampaně');
   const input=form.elements.namedItem(form.matches('[data-darkvision-healing-start]')?'hpD6':'d100');
   const roll=Number(input.value),origin=input.dataset.alchemyGenerated===String(roll)?'cryptographic-software-die':'manual';
   const start=form.matches('[data-darkvision-healing-start]');
@@ -14901,7 +14902,7 @@ document.addEventListener('submit',e=>{
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Egosight dotyk vyžaduje platný kalendář GM mimo boj');
   const v=Object.fromEntries(new FormData(form)),campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
   const actor=calendarMemberIds(data.campaignClock,data.characters).find(c=>c.id===v.actorId);
-  if(!actor||actor.hmk?.combatState?.shock==='KIA')throw Error('Egosight: postava není živou součástí kampaně');
+  if(!actor||actor.hmk?.healthState?.shock==='KIA')throw Error('Egosight: postava není živou součástí kampaně');
   const ego=v.ego===''?null:Number(v.ego),egoSubversion=v.egoSubversion===''?null:v.egoSubversion==='yes';
   const proof=createEgosightTouch({journal:data.journal,campaignId,minute,actorId:actor.id,
    auralShockLevels:actor.hmk?.arcane?.auralShockLevels??0,artefactReference:v.artefactReference,
@@ -14921,7 +14922,7 @@ document.addEventListener('submit',e=>{
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Egosight Imbibing vyžaduje GM kalendář mimo boj');
   const v=Object.fromEntries(new FormData(form)),campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
   const members=calendarMemberIds(data.campaignClock,data.characters),target=members.find(c=>c.id===v.targetId);
-  if(!target||target.hmk?.combatState?.shock==='KIA'||!members.some(c=>c.id===v.actorId))
+  if(!target||target.hmk?.healthState?.shock==='KIA'||!members.some(c=>c.id===v.actorId))
    throw Error('Egosight: oba účastníci musí být živí ve stejné kampani');
   const actual=availableMasteries(target).find(m=>m.name===v.testSkill)?.ml;
   if(!actual)throw Error('Egosight: chybí skutečné Aura nebo Alchemy ML');
@@ -14933,13 +14934,13 @@ document.addEventListener('submit',e=>{
    gmConfirmed:!!v.confirmed});
   const empty=createAlchemyVialEmpty({journal:data.journal,inventory:data.inventory,campaignId,minute,
    actorId:v.actorId,finishId:v.finishId,reason:'Egosight consumed by '+target.name,confirmedByGM:true});
-  const ownResolved=proof.illEffect?applyAlchemyEgosightAural({state:target.hmk?.combatState,
+  const ownResolved=proof.illEffect?applyAlchemyEgosightAural({state:target.hmk?.healthState,
    arcane:target.hmk?.arcane,proof,eventId:useId}):null;
   const secondary=prepareAlchemyConcurrentCF({journal:data.journal,proof,useId,targetId:v.targetId,
    campaignId,minute,form,hpPrefix:'egosightHp_',initialResolved:ownResolved,
-   healthState:target.hmk?.combatState,arcaneState:target.hmk?.arcane});
+   healthState:target.hmk?.healthState,arcaneState:target.hmk?.arcane});
   if(mutate(()=>{
-   if(secondary.hasHealthChange){const c=character(v.targetId);c.hmk.combatState=secondary.state;c.hmk.arcane=secondary.arcane;
+   if(secondary.hasHealthChange){const c=character(v.targetId);c.hmk.healthState=secondary.state;c.hmk.arcane=secondary.arcane;
     data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:v.targetId,
      episodeId:useId,eventId:uuid(),gmConfirmed:true});}
    data.journal.push({id:emptyId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,
@@ -14960,7 +14961,7 @@ document.addEventListener('submit',e=>{
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Footpad vyžaduje GM kalendář mimo boj');
   const v=Object.fromEntries(new FormData(form)),campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
   const members=calendarMemberIds(data.campaignClock,data.characters),target=members.find(c=>c.id===v.targetId);
-  if(!target||target.hmk?.combatState?.shock==='KIA'||!members.some(c=>c.id===v.actorId))throw Error('Postavy musí být živé a ve stejné kampani');
+  if(!target||target.hmk?.healthState?.shock==='KIA'||!members.some(c=>c.id===v.actorId))throw Error('Postavy musí být živé a ve stejné kampani');
   const actual=availableMasteries(target).find(m=>m.name===v.testSkill)?.ml;
   if(!actual)throw Error('Footpad vyžaduje platné Aura/Alchemy ML příjemce');
   const input=form.elements.namedItem('d100'),roll=Number(input.value),origin=input.dataset.alchemyGenerated===String(roll)?'cryptographic-software-die':'manual';
@@ -14970,14 +14971,14 @@ document.addEventListener('submit',e=>{
    gmConfirmed:!!v.confirmed});
   const empty=createAlchemyVialEmpty({journal:data.journal,inventory:data.inventory,campaignId,minute,
    actorId:v.actorId,finishId:v.finishId,reason:'Footpad consumed by '+target.name,confirmedByGM:true});
-  const ownResolved=proof.illEffect?applyAlchemyFootpadAural({state:target.hmk?.combatState,arcane:target.hmk?.arcane,
+  const ownResolved=proof.illEffect?applyAlchemyFootpadAural({state:target.hmk?.healthState,arcane:target.hmk?.arcane,
    proof,eventId:useId}):null;
   const secondary=prepareAlchemyConcurrentCF({journal:data.journal,proof,useId,targetId:v.targetId,
    campaignId,minute,form,hpPrefix:'footpadHp_',initialResolved:ownResolved,
-   healthState:target.hmk?.combatState,arcaneState:target.hmk?.arcane});
+   healthState:target.hmk?.healthState,arcaneState:target.hmk?.arcane});
   const resolved=secondary.hasHealthChange?secondary:null;
   if(mutate(()=>{
-   if(resolved){const c=character(v.targetId);c.hmk.combatState=resolved.state;c.hmk.arcane=resolved.arcane;
+   if(resolved){const c=character(v.targetId);c.hmk.healthState=resolved.state;c.hmk.arcane=resolved.arcane;
     data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:v.targetId,
      episodeId:useId,eventId:uuid(),gmConfirmed:true});}
    data.journal.push({id:emptyId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
@@ -14996,7 +14997,7 @@ document.addEventListener('submit',e=>{
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Erudition vyžaduje společný kalendář GM mimo aktivní boj');
   const v=Object.fromEntries(new FormData(form)),campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
   const members=calendarMemberIds(data.campaignClock,data.characters),target=members.find(c=>c.id===v.targetId);
-  if(!target||target.hmk?.combatState?.shock==='KIA'||!members.some(c=>c.id===v.actorId))throw Error('Postavy musí být živé a ve stejné kampani');
+  if(!target||target.hmk?.healthState?.shock==='KIA'||!members.some(c=>c.id===v.actorId))throw Error('Postavy musí být živé a ve stejné kampani');
   const actual=availableMasteries(target).find(m=>m.name===v.testSkill)?.ml;
   if(!actual)throw Error('Erudition vyžaduje skutečné Aura/Alchemy ML příjemce');
   const input=form.elements.namedItem('d100'),roll=Number(input.value);
@@ -15007,14 +15008,14 @@ document.addEventListener('submit',e=>{
    gmConfirmed:!!v.confirmed});
   const empty=createAlchemyVialEmpty({journal:data.journal,inventory:data.inventory,campaignId,minute,
    actorId:v.actorId,finishId:v.finishId,reason:'Erudition consumed by '+target.name,confirmedByGM:true});
-  const ownResolved=proof.illEffect?applyAlchemyEruditionAural({state:target.hmk?.combatState,arcane:target.hmk?.arcane,
+  const ownResolved=proof.illEffect?applyAlchemyEruditionAural({state:target.hmk?.healthState,arcane:target.hmk?.arcane,
    proof,eventId:useId}):null;
   const secondary=prepareAlchemyConcurrentCF({journal:data.journal,proof,useId,targetId:v.targetId,
    campaignId,minute,form,hpPrefix:'eruditionHp_',initialResolved:ownResolved,
-   healthState:target.hmk?.combatState,arcaneState:target.hmk?.arcane});
+   healthState:target.hmk?.healthState,arcaneState:target.hmk?.arcane});
   const resolved=secondary.hasHealthChange?secondary:null;
   if(mutate(()=>{
-   if(resolved){const c=character(v.targetId);c.hmk.combatState=resolved.state;c.hmk.arcane=resolved.arcane;
+   if(resolved){const c=character(v.targetId);c.hmk.healthState=resolved.state;c.hmk.arcane=resolved.arcane;
     data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:v.targetId,
      episodeId:useId,eventId:uuid(),gmConfirmed:true});}
    data.journal.push({id:emptyId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
@@ -15033,7 +15034,7 @@ document.addEventListener('submit',e=>{
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Physic vyžaduje potvrzený GM kalendář mimo aktivní boj');
   const v=Object.fromEntries(new FormData(form)),campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
   const target=calendarMemberIds(data.campaignClock,data.characters).find(c=>c.id===v.targetId);
-  if(!target||target.hmk?.combatState?.shock==='KIA'||!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===v.actorId))throw Error('Osoby musí být živé a ve stejné kampani');
+  if(!target||target.hmk?.healthState?.shock==='KIA'||!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===v.actorId))throw Error('Osoby musí být živé a ve stejné kampani');
   const actual=availableMasteries(target).find(m=>m.name===v.testSkill)?.ml;
   if(!actual)throw Error('Chybí skutečné Aura/Alchemy ML příjemce');
   const dieInput=form.elements.namedItem('d100'),die=Number(dieInput.value),origin=dieInput.dataset.alchemyGenerated===String(die)?'cryptographic-software-die':'manual';
@@ -15043,13 +15044,13 @@ document.addEventListener('submit',e=>{
    emptyId,gmConfirmed:!!v.confirmed});
   const empty=createAlchemyVialEmpty({journal:data.journal,inventory:data.inventory,campaignId,minute,
    actorId:v.actorId,finishId:v.finishId,reason:'Physic consumed by '+target.name,confirmedByGM:true});
-  const resolved=proof.illEffect?applyAlchemyPhysicAural({state:target.hmk?.combatState,arcane:target.hmk?.arcane,proof,eventId:useId}):null;
+  const resolved=proof.illEffect?applyAlchemyPhysicAural({state:target.hmk?.healthState,arcane:target.hmk?.arcane,proof,eventId:useId}):null;
   const secondary=prepareAlchemyConcurrentCF({journal:data.journal,proof,useId,targetId:v.targetId,
    campaignId,minute,form,hpPrefix:'physicHp_',initialResolved:resolved,
-   healthState:target.hmk?.combatState,arcaneState:target.hmk?.arcane});
+   healthState:target.hmk?.healthState,arcaneState:target.hmk?.arcane});
   const combined=secondary.hasHealthChange?secondary:null;
   if(mutate(()=>{
-   if(combined){const c=character(v.targetId);c.hmk.combatState=combined.state;c.hmk.arcane=combined.arcane;
+   if(combined){const c=character(v.targetId);c.hmk.healthState=combined.state;c.hmk.arcane=combined.arcane;
     data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:v.targetId,
      episodeId:useId,eventId:uuid(),gmConfirmed:true});}
    data.journal.push({id:emptyId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
@@ -15081,12 +15082,12 @@ document.addEventListener('submit',e=>{
   const healingStart=proof.illEffect?createDarkvisionHealingStart({journal:[...data.journal,simulatedUse],campaignId,minute,useId,targetId:v.targetId,
    hpD6:healingDie,origin:hpInput.dataset.alchemyGenerated===String(healingDie)?'cryptographic-software-die':'manual',gmConfirmed:!!v.confirmed}):null;
   const secondary=prepareAlchemyConcurrentCF({journal:data.journal,proof,useId,targetId:v.targetId,
-   campaignId,minute,form,hpPrefix:'profusionHp_',healthState:target.hmk?.combatState,
+   campaignId,minute,form,hpPrefix:'profusionHp_',healthState:target.hmk?.healthState,
    arcaneState:target.hmk?.arcane});
   const empty=createAlchemyVialEmpty({journal:data.journal,inventory:data.inventory,campaignId,minute,
    actorId:v.actorId,finishId:v.finishId,reason:'Darkvision consumed by '+target.name,confirmedByGM:true});
   if(mutate(()=>{
-   if(secondary.hasHealthChange){const c=character(v.targetId);c.hmk.combatState=secondary.state;c.hmk.arcane=secondary.arcane;
+   if(secondary.hasHealthChange){const c=character(v.targetId);c.hmk.healthState=secondary.state;c.hmk.arcane=secondary.arcane;
     data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:v.targetId,episodeId:useId,eventId:uuid(),gmConfirmed:true});}
    data.journal.push({id:emptyId,characterId:v.actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
     title:'Alchemy · lahvička po vypití',body:'HMK 269 · prázdná nádoba zůstává; aktivní dočasný elixír dále podléhá Decay.',calendarAlchemyVialEmpty:empty});
@@ -15143,7 +15144,7 @@ document.addEventListener('submit',e=>{
   if(f.matches('[data-alchemy-start]')){
    const who=character(actorId),actualML=availableMasteries(who).find(x=>x.name==='Alchemy')?.ml;
    if(!actualML||actualML!==Number(v.alchemyML))throw Error('Alchemy ML se změnilo; obnovte panel.');
-   if(who.hmk?.arcane?.auralShockLevels>0||who.hmk?.combatState?.shock==='KIA')throw Error('Alchemy nelze zahájit během Aural Shock ani po smrti postavy (HMK 169,190).');
+   if(who.hmk?.arcane?.auralShockLevels>0||who.hmk?.healthState?.shock==='KIA')throw Error('Alchemy nelze zahájit během Aural Shock ani po smrti postavy (HMK 169,190).');
    const actualSunsign=who.hmk?.sunsign||who.hmk?.creation?.computed?.sunsign||'';
    if(v.sunsign!==actualSunsign)throw Error('Sunsign se změnil; obnovte panel.');
    const time=[0,1,2].map(i=>dice('timeD6'+i));
@@ -15164,7 +15165,7 @@ document.addEventListener('submit',e=>{
    const assistantPlan=ids.map(id=>{if(!members.has(id)||id===actorId)throw Error('Alchemy Assistant musí být jiný člen stejné kampaně');
     const helper=character(id),ml=availableMasteries(helper).find(x=>x.name==='Alchemy')?.ml;
     if(!Number.isInteger(ml)||ml<40)throw Error('Alchemy Assistant nemá ověřené ML40+');
-    if(helper.hmk?.arcane?.auralShockLevels>0||helper.hmk?.combatState?.shock==='KIA')throw Error('Alchemy Assistant není způsobilý pro nepřerušenou asistenci');
+    if(helper.hmk?.arcane?.auralShockLevels>0||helper.hmk?.healthState?.shock==='KIA')throw Error('Alchemy Assistant není způsobilý pro nepřerušenou asistenci');
     return {actorId:id,ml};});
    const proof=createAlchemyStart({journal:data.journal,campaignId,minute,actorId,alchemyML:actualML,elixirName:v.elixirName,
     sunsign:actualSunsign,workshopSource:v.workshopSource,wealth:who.hmk?.wealth??null,workshopStars:Number(v.workshopStars),
@@ -15190,7 +15191,7 @@ document.addEventListener('submit',e=>{
    if(!crucial&&f.elements.namedItem('crucialShockD100')?.value)throw Error('Shock d100 patří jen ke Crucial Dissolution 5/0.');
    const shock=crucial?dice('crucialShockD100'):null;
    const shockML=crucial?availableMasteries(who).find(x=>x.name==='Shock')?.ml??null:null;
-   const state=who.hmk?.combatState??initialCombatState();
+   const state=who.hmk?.healthState??initialCombatState();
    const cfLevels=willFailed?(dissolution.value<=60?1:dissolution.value<=90?3:5):0;
    const shockFatigue=crucial?combatFatigueTotals(state).total+5*cfLevels:null;
    const aug=Array.from({length:willFailed?0:count},(_,i)=>dice('aug'+i));
@@ -15202,7 +15203,7 @@ document.addEventListener('submit',e=>{
    const eventId=uuid(),resolved=proof.result==='ruined-by-dissolution'?applyAlchemyDissolution({
     state,arcane:who.hmk?.arcane,proof,eventId}):null;
    if(mutate(()=>{
-    if(resolved){const c=character(actorId);c.hmk.combatState=resolved.state;c.hmk.arcane=resolved.arcane;
+    if(resolved){const c=character(actorId);c.hmk.healthState=resolved.state;c.hmk.arcane=resolved.arcane;
      data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'aural',characterId:actorId,
       episodeId:eventId,eventId:uuid(),gmConfirmed:true});}
     data.journal.push({id:eventId,characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
@@ -15847,7 +15848,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   if(el instanceof HTMLSelectElement&&!Array.from(el.options).some(o=>o.value===String(value)))return;
   el.value=String(value);el.dispatchEvent(new Event('change',{bubbles:true}));};
  let form=null;
- const s=actor.hmk?.combatState,attrs=actor.hmk?.attributes||{};
+ const s=actor.hmk?.healthState,attrs=actor.hmk?.attributes||{};
  switch(kind){
  case 'injury-morale':{
   if(hskIsEnvironmentalWound(actor,sourceId)){form=q('form[data-weather-injury-morale]')[0]||null;break;}
@@ -16338,10 +16339,10 @@ document.addEventListener('submit',e=>{
   let kind,characterId,woundId=null,episodeId=null;
   if(f.id==='campaign-anchor-wound-form'){
    [characterId,woundId]=String(v.wound??'').split('::');kind='wound';
-   if(!character(characterId)?.hmk?.combatState?.wounds?.some(w=>w.id===woundId&&!w.healed))throw Error('Rána už neexistuje nebo je zhojená');
+   if(!character(characterId)?.hmk?.healthState?.wounds?.some(w=>w.id===woundId&&!w.healed))throw Error('Rána už neexistuje nebo je zhojená');
   }else{
    [kind,characterId,episodeId]=String(v.origin??'').split('::');
-   const s=character(characterId)?.hmk?.combatState;
+   const s=character(characterId)?.hmk?.healthState;
    if(!s||!((kind==='extended-shock'&&s.extendedShock)||(kind==='coma'&&s.coma?.active)||(kind==='blood-loss'&&s.bloodLoss?.bp>0)||(kind==='poison'&&(s.toxinCourses??[]).some(t=>t.id===episodeId&&['incubating','active'].includes(t.status)))||(kind==='disease'&&(s.diseaseCourses??[]).some(t=>t.id===episodeId&&['pending-profile','incubating','active'].includes(t.status)))||(kind==='weather'&&(s.environmentalHazards??[]).some(h=>h.id===episodeId&&h.active))||(kind==='sleep'&&s.sleepDeprivation?.status==='awake'&&s.sleepDeprivation?.episodeId===episodeId)||(kind==='aural'&&character(characterId)?.hmk?.arcane?.auralShockLevels>0&&episodeId==='aural-legacy')))throw Error('Procedura již není aktivní');
   }
   const next=anchorCampaignOrigin(data.campaignClock,{kind,characterId,woundId,episodeId,elapsedMinutes,
@@ -18336,7 +18337,7 @@ document.addEventListener('submit',e=>{
   if(directTreatmentFinish){
    if(f.id!=='hmk-treatment-form')throw Error('Časovaný postup patří pouze Treatment.');
    const projected=structuredClone(data.characters),patient=projected.find(x=>x.id===c.id);
-   const originalWound=patient?.hmk?.combatState?.wounds?.find(x=>x.id===woundId);
+   const originalWound=patient?.hmk?.healthState?.wounds?.find(x=>x.id===woundId);
    const resolvedWound=t.state?.wounds?.find(x=>x.id===woundId);
    if(!originalWound||!resolvedWound)throw Error('Nelze ověřit identitu léčené rány.');
    originalWound.healing=structuredClone(resolvedWound.healing);
@@ -18453,23 +18454,23 @@ if(e.target.id==='shock-ml-form'){
    output.textContent='Je nevyřízená volba automatického Grab po Trip 10+; podle HMK str.106 ji musí hráč uzavřít před další Melee akcí.';return;
  }
  if(combatInitiativeSequence){try{const q=liveInitiativeSequence();assertScheduledMeleeActor(q,v.attackerId,combatSequenceStates());assertScheduledHitCanCommit(q,v.attackerId,combatSequenceStates());}catch(err){output.textContent='Initiative: '+err.message;return;}}
- if(target.hmk?.combatState&&v.previousState!==target.hmk.combatState.shock){output.textContent='Předchozí Shock musí odpovídat potvrzenému stavu '+target.hmk.combatState.shock+'. Přepněte volbu a proveďte nový výpočet.';return;}
- if(target.hmk?.combatState?.shock==='KIA'){output.textContent='Cíl již má potvrzený KIA stav.';return;}
+ if(target.hmk?.healthState&&v.previousState!==target.hmk.healthState.shock){output.textContent='Předchozí Shock musí odpovídat potvrzenému stavu '+target.hmk.healthState.shock+'. Přepněte volbu a proveďte nový výpočet.';return;}
+ if(target.hmk?.healthState?.shock==='KIA'){output.textContent='Cíl již má potvrzený KIA stav.';return;}
  let weaponStrike=null;let meleeGate=null;let actualStriker=null;let originalDefenderId=target.id;let preparedSetupLedger=null;let attackerLoad=null;let defenderLoad=null;
  if(v.impactSource==='melee'){
   const attacker=selectedEncounterCharacters().find(c=>c.id===v.attackerId);
   if(!attacker||attacker.id===target.id){output.textContent='Vyberte odlišného útočníka ze střetnutí.';return;}
   if(combatInitiativeSequence){try{assertScheduledMeleeActor(liveInitiativeSequence(),attacker.id,combatSequenceStates())}catch(err){output.textContent='Initiative: '+err.message;return;}}
-  if(attacker.hmk?.combatState?.coma?.active){output.textContent='Útočník je v potvrzeném Coma a nesmí jednat (HMK str.179).';return;}
+  if(attacker.hmk?.healthState?.coma?.active){output.textContent='Útočník je v potvrzeném Coma a nesmí jednat (HMK str.179).';return;}
   if(combatInitiativeSequence&&ongoingEncounterConcentration(liveInitiativeSequence(),attacker.id)){output.textContent='Útočník je ve vícekolové koncentraci; musí ji nejprve dokončit nebo opustit (HMK str.160).';return;}
   if(combatInitiativeSequence&&v.defence!=='ignore'&&ongoingEncounterConcentration(liveInitiativeSequence(),target.id)){output.textContent='Obránce se soustředí na vícekolovou akci a musí Ignore, dokud ji výslovně neopustí (HMK str.160).';return;}
   if(activeHerbalSoporific(persistentStateOf(attacker))){output.textContent='Útočník je pod účinkem Soporific (INC/UNC) a nesmí jednat, dokud GM doloženě nevyřeší stav.';return;}
   if(activeHerbalParalysis(persistentStateOf(attacker),data.campaignClock?.minute??-1)){output.textContent='Útočník je úplně paralysován (HMK 75/184) a nesmí jednat.';return;}
   if(v.defence!=='ignore'&&activeHerbalSoporific(persistentStateOf(target))){output.textContent='Obránce je pod účinkem Soporific (INC/UNC); nesmí aktivně bránit.';return;}
   if(v.defence!=='ignore'&&activeHerbalParalysis(persistentStateOf(target),data.campaignClock?.minute??-1)){output.textContent='Obránce je úplně paralysován a nemůže aktivně bránit. Použijte Ignore / Deadly Attacks (HMK 184/191).';return;}
-  if(['INC','UNC','KIA'].includes(attacker.hmk?.combatState?.shock)){output.textContent='Útočník je podle potvrzeného stavu '+attacker.hmk.combatState.shock+' a nemůže provést samostatnou Melee akci.';return;}
-  if(v.defence!=='ignore'&&target.hmk?.combatState?.coma?.active){output.textContent='Obránce je v Coma a nemůže zvolit aktivní obranu.';return;}
-  if(v.defence!=='ignore'&&['INC','UNC','KIA'].includes(target.hmk?.combatState?.shock)){output.textContent='Obránce je podle potvrzeného stavu '+target.hmk.combatState.shock+' a nemůže provést aktivní obrannou akci. Zvolte odpovídající řešení podle HMK.';return;}
+  if(['INC','UNC','KIA'].includes(attacker.hmk?.healthState?.shock)){output.textContent='Útočník je podle potvrzeného stavu '+attacker.hmk.healthState.shock+' a nemůže provést samostatnou Melee akci.';return;}
+  if(v.defence!=='ignore'&&target.hmk?.healthState?.coma?.active){output.textContent='Obránce je v Coma a nemůže zvolit aktivní obranu.';return;}
+  if(v.defence!=='ignore'&&['INC','UNC','KIA'].includes(target.hmk?.healthState?.shock)){output.textContent='Obránce je podle potvrzeného stavu '+target.hmk.healthState.shock+' a nemůže provést aktivní obrannou akci. Zvolte odpovídající řešení podle HMK.';return;}
   const attackerSpecial=specialActionReadiness(persistentStateOf(attacker),{role:'attacker'});
   if(!attackerSpecial.ready){output.textContent='Útočník: '+attackerSpecial.reason;return;}
   const defenderSpecial=specialActionReadiness(persistentStateOf(target),{role:'defender',defence:v.defence});
@@ -18486,8 +18487,8 @@ if(e.target.id==='shock-ml-form'){
   const integerField=name=>/^-?\d+$/.test(String(v[name]??''))?Number(v[name]):NaN;
   const attackMods=[{label:'GM situační modifikátory útoku',value:integerField('attackerModifier')}];
   const defendMods=[{label:'GM situační modifikátory obrany',value:integerField('defenderModifier')}];
-  const attackerFatigue=fatigueEMLModifier(attacker.hmk?.combatState?combatFatigueTotals(persistentStateOf(attacker)).total:integerField('attackerFatigue'));
-  const defenderFatigue=fatigueEMLModifier(target.hmk?.combatState?combatFatigueTotals(persistentStateOf(target)).total:integerField('defenderFatigue'));
+  const attackerFatigue=fatigueEMLModifier(attacker.hmk?.healthState?combatFatigueTotals(persistentStateOf(attacker)).total:integerField('attackerFatigue'));
+  const defenderFatigue=fatigueEMLModifier(target.hmk?.healthState?combatFatigueTotals(persistentStateOf(target)).total:integerField('defenderFatigue'));
   if(!attackerFatigue.ok||(v.defence!=='ignore'&&!defenderFatigue.ok)){output.textContent='Fatigue: '+(!attackerFatigue.ok?attackerFatigue.reason:defenderFatigue.reason);return;}
   attackMods.push({label:attackerFatigue.label,value:attackerFatigue.value});
   attackMods.push({label:'HMK p112 upravené ENC (Melee SB obsahuje AGL)',value:attackerLoad.agilityAndMeleePenalty});
@@ -18842,7 +18843,7 @@ document.addEventListener('submit',e=>{
      campaignMinute:data.campaignClock?.minute??null};
     current=changed.state;ids.push(eventId);adjustments.push({kind,delta});
    }
-   h.combatState=current;
+   h.healthState=current;
    const calendarId=data.campaignClock?campaignKey(data.campaignClock):null;
    const minute=data.campaignClock?.minute??null;
    data.journal.push({id:uuid(),characterId:live.id,title:'GM Fatigue korekce',
@@ -19647,7 +19648,7 @@ document.addEventListener('submit',e=>{const f=e.target;if(!['hmk-profile-form',
   if(changed.length){h.creation.status='in-progress';delete h.creation.completed[10];delete h.creation.completed[12];delete h.creation.completed[14];}
  }mutate(()=>{c.hmk={...h,attributes:a};syncCreationSkills(c.hmk,uuid)});return}if(f.id==='hmk-skill-form'){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}if(combatInitiativeSequence)return alert('Během Initiative nelze měnit dovednosti mimo Combat průvodce.');if(!String(v.name||'').trim())return alert('Zadejte název dovednosti');const skill={id:uuid(),group:v.group,name:v.name.trim(),sb:v.sb===''?null:Number(v.sb),ml:v.ml===''?null:Number(v.ml)};if([skill.sb,skill.ml].some(n=>n!==null&&(!Number.isSafeInteger(n)||n<0||n>999)))return alert('Neplatné SB/ML');mutate(()=>{c.hmk={...h,skills:[...(h.skills||[]),skill]}});return}if(f.id==='hmk-injury-form'){if(combatInitiativeSequence)return alert('Během Initiative nelze mimo Combat zapisovat nové rány.');if(!String(v.location||'').trim())return alert('Zadejte lokalitu');mutate(()=>{c.hmk={...h,injuries:[...(h.injuries||[]),{id:uuid(),location:v.location,description:v.description||'',severity:v.severity||''}]}})}},true);
 document.addEventListener('change',e=>{const id=e.target?.dataset?.encounterCharacter;if(!id)return;if(combatInitiativeSequence){e.target.checked=encounterSelection.has(id);return alert('Nejprve ukončete Initiative sekvenci; účastníky v jejím průběhu nelze tiše změnit.');}if(!data.characters.some(c=>c.id===id))return;if(!stagedEncounterSelection)stagedEncounterSelection=new Set(encounterSelection);if(e.target.checked)stagedEncounterSelection.add(id);else stagedEncounterSelection.delete(id);render()});
-document.addEventListener('click',e=>{const t=e.target.closest('[data-remove-skill],[data-remove-injury]');if(!t)return;const c=character(selected);if(!c||!uiConfirm('Odstranit tento záznam?'))return;if(t.dataset.removeSkill){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}}const key=t.dataset.removeSkill?'skills':'injuries';const id=t.dataset.removeSkill||t.dataset.removeInjury;if(combatInitiativeSequence)return alert('Během Initiative se nemohou ručně mazat dovednosti ani zranění.');if(key==='injuries'&&c.hmk?.combatState?.wounds?.some(w=>w.id===id))return alert('Potvrzenou bojovou ránu nelze vymazat mimo pravidlové zotavení.');mutate(()=>{c.hmk=c.hmk||{};c.hmk[key]=(c.hmk[key]||[]).filter(x=>x.id!==id)})});
+document.addEventListener('click',e=>{const t=e.target.closest('[data-remove-skill],[data-remove-injury]');if(!t)return;const c=character(selected);if(!c||!uiConfirm('Odstranit tento záznam?'))return;if(t.dataset.removeSkill){try{assertLegacyMutationAllowed(c)}catch(err){return alert(err.message)}}const key=t.dataset.removeSkill?'skills':'injuries';const id=t.dataset.removeSkill||t.dataset.removeInjury;if(combatInitiativeSequence)return alert('Během Initiative se nemohou ručně mazat dovednosti ani zranění.');if(key==='injuries'&&c.hmk?.healthState?.wounds?.some(w=>w.id===id))return alert('Potvrzenou bojovou ránu nelze vymazat mimo pravidlové zotavení.');mutate(()=>{c.hmk=c.hmk||{};c.hmk[key]=(c.hmk[key]||[]).filter(x=>x.id!==id)})});
 
 // v21: independent catalogue exchange. Never import character data or overwrite definitions.
 // Canonical fingerprint: JSON object key order does not change a definition's identity.
@@ -21651,7 +21652,7 @@ function episodePreviewFromForm(form,clock){
  const kind=v.kind,minutes=Number(v.minutes),guideId=v.guideId;
  const animals=(v.animalIds||[]).map(id=>character(id));
  const stableAnimals=kind==='travel'?episodeStableAnimals(v.stableAnimalIds||[],clock):[];
- if(animals.some(c=>!c?.hmk?.verifiedMountedBreed||!c.hmk.combatState||!(data.campaignClock.characterIds??[]).includes(c.id)))
+ if(animals.some(c=>!c?.hmk?.verifiedMountedBreed||!c.hmk.healthState||!(data.campaignClock.characterIds??[]).includes(c.id)))
   throw Error('Zvíře musí mít ověřený stav a patřit do této kampaně.');
  if(!members.includes(guideId))throw Error('Průvodce musí být mezi účastníky.');
  const weather=episodeCurrentWeather(form,clock,{mandatory:true}),
@@ -23477,7 +23478,7 @@ document.addEventListener('submit',e=>{
   if(active.length)throw Error('Před začátkem nové epizody ukončete starší stále aktivní činnost: '+active.map(a=>a.calendarActivityProof.name).join(', ')+'.');
   if(result.weatherHazard&&result.weatherExposure?.some(x=>x.pending||['pending','pending-endurance'].includes(x.effect)))
    throw Error('Weather Hazard: každá postava musí mít doloženou ochrannou AV, skutečný hod a případný END (Survival).');
-  const timedStates=new Map((stagedTimed?.characters||[]).filter(c=>c.hmk?.combatState).map(c=>[c.id,c.hmk.combatState]));
+  const timedStates=new Map((stagedTimed?.characters||[]).filter(c=>c.hmk?.healthState).map(c=>[c.id,c.hmk.healthState]));
   // Weather onset + Frostbite/Sunburn belong to the ORIGINAL Health/Skills
   // executors. There is no pending medical mutation to merge into this trip.
   const gmMessage=`${result.kind} · ${result.minutes} minut · ${weather.area}`;
@@ -23502,8 +23503,8 @@ document.addEventListener('submit',e=>{
    // legacy branches. Accidents have NO in-episode health write.
    if(stagedTimed?.generatedJournal?.length)data.journal.push(...stagedTimed.generatedJournal);
    for(const [id,state] of timedStates){const actor=character(id);
-    if(actor&&JSON.stringify(actor.hmk?.combatState)!==JSON.stringify(state)){
-     actor.hmk??={};actor.hmk.combatState=state;
+    if(actor&&JSON.stringify(actor.hmk?.healthState)!==JSON.stringify(state)){
+     actor.hmk??={};actor.hmk.healthState=state;
     }
    }
    const actors=result.actors.map(a=>{
