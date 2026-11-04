@@ -39,7 +39,8 @@ export function skillTraumaAvailability({actor,inventory=[],name,mounted=false,b
  const kind=impairedSkillKind(actor,name),wounds=state?.wounds;
  let injury={ready:false,reason:'Pro případná zranění chybí potvrzený bojový stav'};
  if(shock.ready){injury=(!hasLiveInjury(wounds))?{ready:true,modifier:0,source:'confirmed-no-wounds',slPenalty:0}
- :{ready:false,reason:kind?'Aktuální kolo, časovou osu a použitou ruku musí potvrdit GM':'Test není výslovně uveden v tabulce Impaired Tests; účinek ran musí rozhodnout GM'};}
+ :!kind?{ready:true,modifier:0,source:'p170-not-an-impaired-test',slPenalty:0}
+ :{ready:false,reason:'Aktuální kolo, časovou osu a použitou ruku musí potvrdit GM'};}
  let bulk={ready:false,reason:'Body-zone Bulk nebyl vyhodnocen'},perception={ready:false,reason:'Vliv zbroje na PER nebyl vyhodnocen'};
  const perApplies=skillPerceptionApplicability(actor,name);
  // Bulk on the printed Impaired Tests table cannot apply to an unrelated
@@ -82,7 +83,7 @@ export function resolveSkillTrauma({actor,inventory=[],name,mounted=false,
  let injury;
  if(whichMode(injuryMode,'Injury')==='auto'){
   if(!preview.shock.ready)throw Error('Injury: chybí doložený bojový stav; GM musí určit postih nebo výslovně nepotvrdit jeho použití');
-  if(!hasLiveInjury(state.wounds))injury={...preview.injury,mode:'auto'};
+  if(!hasLiveInjury(state.wounds)||!kind)injury={...preview.injury,mode:'auto'};
   else {
    if(!kind)throw Error('Injury: pro tuto dovednost není ověřená tabulka Impaired Tests; rozhodne GM');
    if(currentRound===null||currentRound===''||!Number.isSafeInteger(Number(currentRound))||Number(currentRound)<1||Number(currentRound)>9999)

@@ -180,7 +180,10 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
  const impaired=impairedSkillKind(base.actor,name);
  const arm=inferredArms(base.actor,inventory,name,state);
  let trauma;
- if(!hasLiveInjury(state.wounds)){
+ if(!hasLiveInjury(state.wounds)||!impaired){
+  // HMK p.170 applies impairment to the listed tests only; an existing
+  // wound does not create an invented penalty for other skills. All
+  // separately proven fatigue, Shock and capacity restrictions remain.
   // The old resolver required per-test GM mode decisions even on a clean
   // character. Zero injury and STN check are completely source-proven here.
   trauma=resolveSkillTrauma({actor:base.actor,inventory,name,shockMode:'auto',injuryMode:'auto',bulkMode:bk.mode,manualBulk:bk.value,perceptionMode:pe.mode,manualPerception:pe.value});
