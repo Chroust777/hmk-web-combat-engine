@@ -7214,3 +7214,9 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-weather-skin-row .hc-weather-skin-error{display:block;font-weight:600}
 form[data-skill-weather-skin] [hidden]{display:none!important}
 @media(max-width:600px){.hc-weather-skin-groups{grid-template-columns:1fr}.hc-weather-skin-row{padding:.7rem}}
+
+/* v93.709 — a single parchment hover tooltip, no duplicated native white tip. */
+.hc-weather-skin-help{display:none!important}
+.journal-wound-meaning[data-hmk-help],form[data-skill-weather-skin] [data-hmk-help]{cursor:help}
+.journal-wound-meaning:focus-visible,form[data-skill-weather-skin] [data-hmk-help]:focus-visible{outline:2px solid #886542;outline-offset:2px}
+.hc-health-result{border:1px solid #b49968;background:#e9e0ca;color:#40301e;padding:.7rem .85rem;border-radius:5px;line-height:1.45;margin:.5rem 0 1rem}
