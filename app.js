@@ -311,7 +311,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.714';
+const APP_VERSION='93.715';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11255,6 +11255,8 @@ function hskEnvironmentalWoundCarePanel(actor){
  if(!pending)return '';
  if(persistentStateOf(actor).wounds.some(w=>w.bleeding&&medicalOriginOfWound(w,persistentStateOf(actor).events)===MEDICAL_ORIGIN.WEATHER))
   return '<p class="notice">Před dalším Treatment nebo Healing nejprve uzavřete Blood Stoppage v Zdraví & Expozice.</p>';
+ if(persistentStateOf(actor).extendedShock)
+  return '<p class="notice">Treatment není nyní dostupný: nejprve musí skončit Extended Shock podle čtyřhodinových Course Rolls (HMK 179). Kalendář zachovává čas dalšího Course.</p>';
  if(persistentStateOf(actor).shockFollowup?.domain==='travel-weather'||hskWeatherInjuryMandatory(actor.id))
   return '<p class="notice">Treatment každé rány zůstává evidovaný samostatně. Nejprve dokončete výše uvedený aktuální Shock, Injury Mishap nebo Morale; potom se otevře ošetření konkrétní rány. Nejde o nový Shock d100 pro každý Treatment.</p>';
  return `<details class="hmk-weather-wound-care" open><summary>Rány z počasí · Treatment, Healing, Infection Course a případná amputace</summary>
@@ -18893,7 +18895,11 @@ document.addEventListener('submit',e=>{
   })():null;
   if(environmentalCare&&['hmk-treatment-form','hmk-frost-amputation-form'].includes(f.id)&&!treatmentClock)
    throw Error('Weather Treatment vyžaduje aktivní Kalendář, který je jediným zdrojem času.');
-  const args={state:persistentStateOf(c),round:combatClock.round,eventId:uuid(),woundId,
+  // A Weather health course can advance its persistent medical event order
+  // without any Combat Initiative rounds. Combat keeps its real round.
+  const medicalState=persistentStateOf(c);
+  const medicalRound=environmentalCare?Math.max(1,combatClock.round||1,medicalState.lastRound||0):combatClock.round;
+  const args={state:medicalState,round:medicalRound,eventId:uuid(),woundId,
    daySinceInjury:weatherPlan?.daySinceInjury??Number(v.daySinceInjury),gmConfirmed:true};
   const treatmentFinish=weatherPlan?weatherPlan.endMinute:
    v.procedureEndMinute===''||v.procedureEndMinute===undefined?null:Number(v.procedureEndMinute);
