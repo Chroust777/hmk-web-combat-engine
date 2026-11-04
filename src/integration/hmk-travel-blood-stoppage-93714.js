@@ -167,8 +167,12 @@ export function completeTravelBleedingInterval({clock,state,patient,healer=null,
    currentShockState:SHOCK_STATE[s.shock]});
   const old=s.shock;
   s.bloodLoss=result.bloodLoss;s.shock=shockName(result.shockState);gainedBP=result.gainedBP;
-  check(!(s.extendedShock&&s.shock!==old&&s.shock!=='KIA'),
-   'Nový Shock při Extended Shock vyžaduje zvláštní ověření GM');
+  // HMK 178 (Bleeding example) -> 179 (Extended Shock): blood loss can
+  // elevate an existing Extended Shock INC to UNC. Preserve its *original*
+  // HR and elapsed four-hour course; only its current Shock State changes.
+  // Never create a second Extended Shock or synthetic reroll.
+  if(s.extendedShock&&s.shock!==old&&s.shock!=='KIA')
+   s.extendedShock.originState=s.shock;
   if(['INC','UNC'].includes(s.shock))s.posture.prone=true;
   if(gainedBP>0&&s.shock!=='KIA')s.bloodShockPending=true;
   if(s.shock==='KIA'){
@@ -193,8 +197,10 @@ export function completeTravelBleedingInterval({clock,state,patient,healer=null,
  target.travelBlood={campaignId:campaignId(clock),nextDueMinute:clock.minute+5,plan:null};
  if(stopped&&s.bloodShockPending&&s.shock!=='KIA'&&!s.wounds.some(x=>x.bleeding)){
   s.bloodShockPending=false;
-  check(!s.extendedShock,'Blood Shock v Extended Shock vyžaduje rozhodnutí GM');
-  if(s.shock==='STN'){s.shock='NONE';s.shockFollowup=null;s.shockOriginRound=s.lastRound;}
+  // Existing Extended Shock already owns recovery per HMK 179. The printed
+  // Bleeding example continues as Extended Shock (UNC), not a new reroll.
+  if(s.extendedShock){/* keep Course HR/elapsed hours and no followup */}
+  else if(s.shock==='STN'){s.shock='NONE';s.shockFollowup=null;s.shockOriginRound=s.lastRound;}
   else if(['INC','UNC'].includes(s.shock))s.shockFollowup={kind:s.shock,
    domain:MEDICAL_ORIGIN.WEATHER,sourceId:woundId,originMinute:clock.minute,
    originRound:s.lastRound,dueRound:s.lastRound,phase:'after-all-bleeding-stopped',timelineId:null};
