@@ -321,7 +321,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.733';
+const APP_VERSION='93.734';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2356,7 +2356,33 @@ function episodePendingEncounter(clock){
 }
 function timeEpisodePageHTML(clock,participants){
  const areas=timeEpisodeWeatherOptions(clock),first=participants[0];
- const latest=episodeRecentRows(clock).at(-1)?.calendarTimeEpisode;
+ const latestEpisodeRow=episodeRecentRows(clock).at(-1);
+ const latest=latestEpisodeRow?.calendarTimeEpisode;
+ const cid=campaignKey(clock);
+ const latestLots=latestEpisodeRow?availableSupplyLots(data.journal,cid).filter(l=>l.sourceId===latestEpisodeRow.id):[];
+ const latestFinder=latestEpisodeRow?character(latestEpisodeRow.characterId):null;
+ const eligibleRecipients=participants.filter(c=>!c.hmk?.verifiedMountedBreed);
+ const latestWaterVessels=data.inventory.filter(i=>eligibleRecipients.some(c=>c.id===i.characterId)&&
+  i.slot==='carried'&&waterContainerCapacity(i)!==null&&
+  waterskinBalances(data.journal,cid,i.characterId,clock.minute).filter(b=>b.itemId===i.id).every(b=>b.remaining===0));
+ const latestSuppliesHTML=latestEpisodeRow&&(latest?.foraging||latest?.travelForaging?.length)?`<details class="hc-episode-supplies" open>
+ <summary>Uzávěrka nálezů · Foraging · příjemci a hmotnost</summary>
+ <p class="hc-hint"><strong>Nálezce: ${esc(latestFinder?.name||latestEpisodeRow.characterId)}</strong> (průvodce podle HMK 147). Rozdělení určuje GM. Výsledek Foraging je v potravních/vodních dnech; libry potravy pravidla neurčují a musejí být doloženy GM. Voda v 0,5gal měchu váží 5 lb, v 1gal džbánu 10 lb. Nesené a spotřebované zásoby nejsou totéž.</p>
+ ${(latest?.foraging?[latest.foraging]:latest?.travelForaging||[]).map((f,i)=>`<p>Foraging ${i+1} · d10 ${esc(f.roll)} · potrava ${f.results?.reduce((n,x)=>n+(x.foodDays||0),0)||0} food-days · voda ${f.results?.reduce((n,x)=>n+(x.waterDays||0),0)||0} water-days · byliny ${f.results?.reduce((n,x)=>n+(x.herbDoses||0),0)||0} dávek.</p>`).join('')}
+ ${latestLots.map(l=>l.unit==='foodDays'?`<form data-foraging-carry class="hc-episode-allocation"><strong>Potrava #${l.resultIndex+1} · k přidělení ${l.remaining} food-days</strong>
+ <input type="hidden" name="sourceId" value="${esc(l.sourceId)}"><input type="hidden" name="resultIndex" value="${l.resultIndex}">
+ <div class="hmk-trek-grid"><label>Příjemce<select name="actorId">${eligibleRecipients.map(c=>option(c.id,c.name)).join('')}</select></label>
+ <label>Potravní dny<input name="quantity" type="number" min="0.5" step="0.5" max="${l.remaining}" value="${Math.min(1,l.remaining)}" required></label>
+ <label>Skutečný druh potravy<input name="itemName" minlength="2" maxlength="100" required placeholder="Např. ryby, bobule"></label>
+ <label>Skutečná hmotnost přebíraného množství (lb)<input name="totalWeightLb" type="number" step="0.01" min="0.01" max="20000" required></label></div>
+ <label class="hc-check"><input name="confirmed" type="checkbox" value="yes" required> GM potvrzuje příjemce, druh a hmotnost.</label><button type="submit">Přidělit potravu · aktualizovat ENC</button></form>`:
+ l.unit==='waterDays'?`<form data-episode-foraging-water class="hc-episode-allocation"><strong>Voda #${l.resultIndex+1} · k přidělení ${l.remaining} water-days (${l.remaining*10} lb při úplném naplnění nádob)</strong>
+ <input type="hidden" name="sourceId" value="${esc(l.sourceId)}"><input type="hidden" name="resultIndex" value="${l.resultIndex}">
+ <label>Příjemce · prázdná, nesená nádoba<select name="itemId" required><option value="">— vyberte nádobu —</option>${latestWaterVessels.filter(x=>waterContainerCapacity(x)<=l.remaining).map(x=>`<option value="${esc(x.id)}">${esc(character(x.characterId)?.name||x.characterId)} · ${esc(x.snapshot?.name||'Nádoba')} · ${waterContainerCapacity(x)} gal / ${waterContainerCapacity(x)*10} lb</option>`).join('')}</select></label>
+ <p class="hc-hint">Pouze skutečně nesené měchy a džbány; přijetí vody není její vypití. Pokud žádná nádoba není dostupná, nález zůstává ve společné evidenci.</p>
+ <label class="hc-check"><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje pitnou vodu a její skutečné nalití.</label><button type="submit" ${!latestWaterVessels.some(x=>waterContainerCapacity(x)<=l.remaining)?'disabled':''}>Přidělit vodu do nádoby · aktualizovat ENC</button></form>`:
+ `<p>Byliny #${l.resultIndex+1} · ${l.remaining} dávek (${esc(l.herbName||'druh neurčen')}); rezervace a zpracování v evidenci Foraging/Herbalism.</p>`).join('')||'<p>Všechny nalezené zásoby byly vydány nebo spotřebovány. Zápisy a původní hody zůstávají v kronice.</p>'}
+ </details>`:'';
  const animalRoster=data.characters.filter(a=>a.hmk?.verifiedMountedBreed&&a.hmk?.healthState&&(clock.characterIds??[]).includes(a.id));
  const stableTravelRoster=verifiedLivestock(data,campaignKey(clock)).filter(a=>a.spec?.breed&&Number.isFinite(a.spec?.str));
  const earlier=latest?.settings||{};
@@ -2434,7 +2460,10 @@ function timeEpisodePageHTML(clock,participants){
  ${stableTravelRoster.length?`<fieldset data-episode-stable-roster><legend>Zvířata vybraná ze Stáje · doložené zatížení</legend>
  <p class="hc-hint">Výběr používá existující stájové záznamy, jejich postroje, náklad a jezdce. Nic nespojuje podle podobného jména. Stájový záznam sám nevytváří bojový Combat State.</p>
  <div class="hc-episode-members">${stableTravelRoster.map(a=>{const b=stableBurden(data,campaignKey(clock),a);return `<label class="hc-check"><input name="stableAnimalIds" type="checkbox" value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)} · ENC ${Number.isSafeInteger(b.adjustedENC)?b.adjustedENC:'nedoloženo'}${b.rider?' · jezdec ze Stáje':''}${b.cargoOverflow?' · PŘETÍŽENO':''}</label>`}).join('')}</div></fieldset>`:''}
- ${animalRoster.length?`<fieldset><legend>Zvířata na cestě · vlastní Combat State</legend><p class="hc-hint">Pohyb zvířete zohledňuje jeho skutečný zdravotní stav, zranění a únavu. Samotný pochod nepřičítá nepodloženou zvířecí únavu; žádný zvířecí END d10 se nevymýšlí.</p><div class="hc-episode-members">${animalRoster.map(a=>`<label class="hc-check"><input name="animalIds" type="checkbox" value="${esc(a.id)}">${esc(a.name)}</label>`).join('')}</div></fieldset>`:''}
+ ${animalRoster.length?`<fieldset><legend>Zvířata na cestě · vlastní Combat State</legend><p class="hc-hint">Pohyb zvířete zohledňuje jeho skutečný zdravotní stav, zranění a únavu. Samotný pochod nepřičítá nepodloženou zvířecí únavu; žádný zvířecí END d10 se nevymýšlí.</p><div class="hc-episode-members">${animalRoster.map(a=>{let health;
+ try{health=trekRegisteredAnimalHealth(a)}catch(err){health={error:err.message}}
+ const healthStatus=health.error?' · CHYBNÝ STAV: '+health.error:health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40?' · NEMŮŽE SAMO POKRAČOVAT':health.injured?' · zraněné · Slow':health.fatigue>=20?' · unavené · Slow':'';
+ return `<div class="hc-trek-animal-choice"><label class="hc-check"><input name="animalIds" type="checkbox" value="${esc(a.id)}">${esc(a.name)}${esc(healthStatus)}</label><button type="button" class="secondary" data-trek-leave-animal="${esc(a.id)}">Opustit zvíře (včetně ponechaného nákladu)</button></div>`}).join('')}</div><p class="hc-hint">Zvíře, které nemůže pokračovat, nezaškrtávejte. GM ho může kdykoliv vyřadit z aktivní družiny pomocí Opustit zvíře. Jeho zdravotní historie zůstane zachována; věci ponechané u zvířete už družina nenese. Chcete-li náklad zachránit, nejprve jej skutečně převeďte v inventáři.</p></fieldset>`:''}
  <details class="hc-episode-settings" data-episode-section="skills"><summary>4 · Dovednosti vybrané činnosti</summary>
  <p class="hc-episode-brief">Survival / Tracking · nový doložený hod nebo povolené pokračování.</p>
  ${lastRow?`<p class="hc-episode-memory-note">Poslední doložená epizoda: ${esc(displayCampaignMinute(lastRow.calendarTimeEpisode.startMinute))}–${esc(displayCampaignMinute(lastRow.calendarTimeEpisode.endMinute))}; ${esc(lastRow.calendarTimeEpisode.kind)}. Předchozí Orienteering: ${lastRow.calendarTimeEpisode.orientation?`SV ${lastRow.calendarTimeEpisode.orientation.sv} · ${lastRow.calendarTimeEpisode.orientation.stars??'—'} ★`:'bez doloženého SV'}. Navigace: ${esc(lastRow.calendarTimeEpisode.navigationState||'bez evidovaného bloudění')}.</p>`:''}
@@ -2576,7 +2605,7 @@ function timeEpisodePageHTML(clock,participants){
   <p>Nejde o pravidlové přeskočení splatných zdravotních kontrol. Ty je stále nutné vyřešit v původním modulu. Tento bezpečný únik nikdy nevytváří falešné zdravotní doklady.</p>
   <label class="hc-check"><input type="checkbox" data-episode-emergency-confirm> Rozumím: zahodit rozpracované Cestování bez zápisu a bez posunu času.</label>
   <button type="button" class="hc-episode-emergency-reset secondary" data-episode-emergency-reset disabled>Zrušit celou rozpracovanou epizodu</button>
- </details><details class="hc-episode-result-details"><summary>Podrobný pravidlový výpočet a hody</summary><div data-episode-preview><p>Zvolte činnost, čas a podmínky; zde se objeví skutečná vypočtená vzdálenost a únavové podklady. Výsledek se uloží až po potvrzení.</p></div></details><div class="hc-episode-latest"><h4>Poslední dokončená epizoda</h4>${latest?`<p><strong>${esc(displayCampaignMinute(latest.startMinute))}–${esc(displayCampaignMinute(latest.endMinute))}</strong> · ${esc(latest.kind)} · ${latest.minutes} min · ${latest.distanceMeters} m</p><p>${esc(latest.narrative||'Záznam uložen.')}</p>`:'<p>Zatím žádná. Historické doklady zůstávají zachované v původním deníku.</p>'}<button type="button" class="secondary" data-episode-chronicle>Přejít do kroniky ↗</button></div></aside></div>
+ </details><details class="hc-episode-result-details"><summary>Podrobný pravidlový výpočet a hody</summary><div data-episode-preview><p>Zvolte činnost, čas a podmínky; zde se objeví skutečná vypočtená vzdálenost a únavové podklady. Výsledek se uloží až po potvrzení.</p></div></details>${latestSuppliesHTML}<div class="hc-episode-latest"><h4>Poslední dokončená epizoda</h4>${latest?`<p><strong>${esc(displayCampaignMinute(latest.startMinute))}–${esc(displayCampaignMinute(latest.endMinute))}</strong> · ${esc(latest.kind)} · ${latest.minutes} min · ${latest.distanceMeters} m</p><p>${esc(latest.narrative||'Záznam uložen.')}</p>${latest.trekWatchfulness?`<p><b>Stalking / Vigilance:</b> ${esc(latest.trekWatchfulness.effective)} · Stalking ${latest.orientation?.modes?.stalking||0}, Vigilance ${latest.orientation?.modes?.vigilance||0}. ${latest.trackingMemory?'Tracking má vlastní doložený výsledek.':'Bez dalšího fiktivního hodu Tracking.'}</p>`:''}`:'<p>Zatím žádná. Historické doklady zůstávají zachované v původním deníku.</p>'}<button type="button" class="secondary" data-episode-chronicle>Přejít do kroniky ↗</button></div></aside></div>
  ${old.length?`<details class="hc-episode-legacy"><summary>Předchozí rozběhnuté činnosti (${old.length}) · původní evidence</summary><p class="hc-hint">Staré činnosti zůstávají platné. Před novou epizodou je případně přerušte podle původního pravidlového postupu, aby se nepřekrývaly.</p>${old.map(r=>`<p>${esc(r.calendarActivityProof.name)} · ${esc(displayCampaignMinute(r.calendarActivityProof.startMinute))}–${esc(displayCampaignMinute(r.calendarActivityProof.endMinute))}</p>`).join('')}</details>`:''}
  </section>`;
 }
@@ -15171,6 +15200,34 @@ document.addEventListener('submit',e=>{
    createdAt:stamp(),title,body:'HMK 74–75 · doloženo bez posunu GM času',[kind]:p})))notice=title+' · auditováno bez posunu času';
  }catch(err){alert('Bylinná procedura nebyla uložena: '+err.message)}
 },true);
+// v93.734: a completed travel episode offers its OWN Foraging lots for allocation.
+// All water mutations go through the same authoritative, double-entry water
+// and supply-ledger validators as the inventory editor; never imply drinking.
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-episode-foraging-water]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const clock=data.campaignClock;if(!clock||combatInitiativeSequence||episodeStageBaseline)
+   throw Error('Přidělení vody je možné jen po potvrzení epizody mimo Initiative.');
+  const v=Object.fromEntries(new FormData(f)),cid=campaignKey(clock),minute=clock.minute;
+  if(v.confirmed!=='yes'||!v.itemId)throw Error('GM musí potvrdit konkrétní prázdnou nádobu a nalití.');
+  const latest=episodeRecentRows(clock).at(-1);
+  if(!latest||latest.id!==v.sourceId||latest.calendarCampaignId!==cid)
+   throw Error('Zvolený nález nepatří poslední dokončené epizodě.');
+  const item=data.inventory.find(i=>i.id===v.itemId),actorId=item?.characterId;
+  if(!actorId||!calendarMemberIds(clock,data.characters).some(c=>c.id===actorId&&!c.hmk?.verifiedMountedBreed))
+   throw Error('Nádobu musí skutečně nést živý příjemce v aktivní družině.');
+  const useId=uuid(),fillId=uuid();
+  const {use,fill}=createForagingWaterStorage({inventory:data.inventory,journal:data.journal,campaignId:cid,
+   minute,actorId,itemId:v.itemId,sourceId:v.sourceId,resultIndex:Number(v.resultIndex),
+   useId,fillId,gmConfirmed:true});
+  if(mutate(()=>data.journal.push({id:useId,characterId:actorId,calendarCampaignId:cid,campaignMinute:minute,
+   createdAt:stamp(),title:'HMK · voda z epizody → nádoba',body:`Foraging ${v.sourceId}: ${use.quantity} water-days; nevypito.`,calendarForagingSupplyUse:use},
+   {id:fillId,characterId:actorId,calendarCampaignId:cid,campaignMinute:minute,
+   createdAt:stamp(),title:'HMK · nalezená voda skutečně nesená',body:`${fill.quantity} gal / ${fill.weightLb} lb · ${character(actorId)?.name||actorId}; ENC aktuální.`,calendarInventoryWaterFill:fill})))
+   notice='Voda byla doloženě přelita do nádoby postavy; množství ani ENC se neduplikuje.';
+ }catch(err){alert('Přidělení nalezené vody: '+err.message)}
+},true);
 // One witnessed Foraging receipt can become carried gear ONLY with actual GM
 // mass and species. It is not eaten until a separate use is recorded.
 document.addEventListener('submit',e=>{
@@ -15939,6 +15996,42 @@ document.addEventListener('click',e=>{
    calendarUI=null;calendarLanding=true;calendarCreating=false;notice='Kalendář odstraněn, ostatní kalendáře a časové důkazy postav zachovány.';render();
   }
  }catch(error){alert('Kalendář nebyl odstraněn: '+error.message)}
+},true);
+// GM choice: an immobilised animal cannot be forced to travel, but it
+// must not imprison the campaign clock. Existing membership machinery handles
+// the change, while the animal and its cargo remain in their own records.
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-trek-leave-animal]');if(!btn)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const clock=data.campaignClock,actorId=btn.dataset.trekLeaveAnimal,animal=character(actorId);
+  if(!clock||!animal?.hmk?.verifiedMountedBreed||!(clock.characterIds||[]).includes(actorId))
+   throw Error('Zvíře už nepatří do aktivní družiny.');
+  if(combatInitiativeSequence||episodeStageBaseline||episodeEvaluationRequested)
+   throw Error('Nejprve uzavřete nebo zrušte rozpracovanou cestovní epizodu či Initiative.');
+  const active=activeHMKActivities(data.journal,clock).filter(r=>r.characterId===actorId);
+  if(active.length)throw Error('Nejdříve dokončete rozběhnutou činnost zvířete.');
+  const cargo=data.inventory.filter(i=>i.characterId===actorId&&i.slot!=='chest');
+  if(!uiConfirm('Opustit '+animal.name+' v aktuální minutě? Zvíře a jeho Combat State zůstanou zachovány mimo aktivní družinu. '+
+    'Nesených inventárních položek: '+cargo.length+'. Ty zůstanou u opuštěného zvířete a družina je nebude moci používat. '+
+    'Pokud je chcete zachránit, stiskněte Zrušit a nejprve je převeďte v inventáři.'))return;
+  const cid=campaignKey(clock),ids=(clock.characterIds||[]).filter(id=>id!==actorId);
+  if(!ids.length)throw Error('Nelze opustit posledního aktivního člena kalendáře.');
+  assertCompatibleLiveEffectTimeAxis(clock,data.calendarEvidenceArchives??[],data.characters,ids);
+  const revised=recoverCalendarEvidence(clock,data.calendarEvidenceArchives??[],ids,{idFactory:uuid});
+  revised.clock.events.push({id:uuid(),type:'membership',minute:clock.minute,
+   reason:'GM: opuštění zvířete '+animal.name+' včetně ponechaného nákladu'});
+  const receipt={format:'hmk-trek-animal-departure-v1',actorId,campaignId:cid,minute:clock.minute,
+   cargoIds:cargo.map(i=>i.id),disposition:'left-with-animal',gmConfirmed:true};
+  if(mutate(()=>{
+   const updated=syncCampaignMembership(data,revised.clock);
+   data.campaignClock=updated.campaignClock;data.campaignActorBranches=updated.campaignActorBranches;
+   data.characters=updated.characters;data.inventory=updated.inventory;
+   data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:cid,campaignMinute:clock.minute,
+    createdAt:stamp(),title:'HMK · zvíře opuštěno na cestě',body:'Bez pohybu zvířete, bez posunu GM času. '+cargo.length+' položek zůstává u zvířete.',
+    calendarTrekAnimalDeparture:receipt});
+  }))notice=animal.name+' bylo vyřazeno z aktivní cestující družiny. Historie a ponechaný náklad zůstávají zachované.';
+ }catch(err){alert('Opuštění zvířete: '+err.message)}
 },true);
 document.addEventListener('submit',e=>{
  const f=e.target;if(f.id!=='campaign-members-form')return;
