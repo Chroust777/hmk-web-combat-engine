@@ -595,3 +595,33 @@ form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;
  .hc-trek-global-weather .hc-weather-dice-pair{gap:6px}
  .hc-trek-global-weather .hc-weather-dice-pair button{min-width:34px;padding:3px!important}
 }
+
+/* v93.738 — project-wide typography contract. Use tokens instead of isolated font choices. */
+:root{
+ --hmk-font-heading:var(--hmk-book-title-font,"Cinzel",Georgia,serif);
+ --hmk-font-body:var(--hmk-book-body-font,"Cormorant Garamond",Georgia,serif);
+ --hmk-size-body:14px;
+ --hmk-size-detail:12px;
+ --hmk-size-card-title:15px;
+ --hmk-line-body:1.43;
+}
+body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
+:where(h1,h2,h3,h4,h5,h6,.journal-book-title,.journal-skill-family h4){font-family:var(--hmk-font-heading)}
+:where(button,input,select,textarea,label,table,details,summary,output){font-family:var(--hmk-font-body)}
+/* Disabled actions and their linked roll entry always look disabled. */
+:where(input,button,select,textarea):disabled{cursor:not-allowed!important;opacity:.52;filter:grayscale(.22)}
+:where(input,button,select,textarea):disabled:focus{outline:0}
+
+/* A single authoritative font family for headings and one for narrative,
+   field labels, values, buttons, tables and health status throughout the app.
+   Do not override monospace code, raw JSON or decorative SVG geometry. */
+#app :is(p,span,div,li,dt,dd,td,th,label,summary,small,strong,b,em,
+         button,input,select,textarea,output,legend,blockquote){
+ font-family:var(--hmk-font-body)!important;
+}
+#app :is(h1,h2,h3,h4,h5,h6,.journal-book-title,thead th,.hsk-group-head th){
+ font-family:var(--hmk-font-heading)!important;
+}
+#app :is(pre,code,kbd,samp,.catalog-json,.hmk-json-preview){
+ font-family:ui-monospace,Consolas,monospace!important;
+}

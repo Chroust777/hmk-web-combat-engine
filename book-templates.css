@@ -7246,3 +7246,98 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .content-sheet .hc-clock-heading .hc-clock-weather>span:first-child{font-size:.72rem;font-weight:700;letter-spacing:.065em}
 .content-sheet .hc-clock-heading .hc-clock-weather-row{font-weight:400;font-size:clamp(.88rem,1.1vw,1rem);letter-spacing:normal;overflow-wrap:anywhere}
 .content-sheet .hc-clock-heading .hc-clock-weather-row small{font-size:.75rem;display:inline}
+
+/* v93.738 · Chronicle Spread and Provisions share a controlled type scale.
+   Existing folio panel proportions stay intact; detailed medical paragraphs
+   no longer appear as prominent headings. All text inherits site font tokens. */
+.content-sheet .journal-book--calendar .hc-provision-alert,
+.content-sheet .journal-book--calendar .hc-person-health form>strong,
+.content-sheet .journal-book--calendar .hc-party-health-row .hc-party-health-description>strong,
+.content-sheet .journal-book--calendar .hc-malnutrition-prognosis>strong,
+.content-sheet .journal-book--calendar .hc-malnutrition-prognosis>p,
+.content-sheet .journal-book--calendar .hc-medical-detail,
+.content-sheet .journal-book--calendar .hc-provision-next,
+.content-sheet .journal-book--calendar .hc-provision-closure{
+ font-family:var(--hmk-font-body)!important;
+ font-size:var(--hmk-size-detail)!important;
+ line-height:1.43!important;
+ letter-spacing:normal!important;
+ overflow-wrap:anywhere;
+}
+.content-sheet .journal-book--calendar .hc-provision-alert,
+.content-sheet .journal-book--calendar .hc-malnutrition-prognosis>strong,
+.content-sheet .journal-book--calendar .hc-person-health form>strong{
+ font-weight:700!important;
+}
+.content-sheet .journal-book--calendar .hc-person-health h4,
+.content-sheet .journal-book--calendar .hc-party-health h4,
+.content-sheet .journal-book--calendar .hc-provision-card h4{
+ font:700 var(--hmk-size-card-title)/1.3 var(--hmk-font-heading)!important;
+}
+.content-sheet .journal-book--calendar .hc-malnutrition-prognosis,
+.content-sheet .journal-book--calendar .hc-person-health,
+.content-sheet .journal-book--calendar .hc-party-health{
+ font-family:var(--hmk-font-body)!important;
+ font-size:var(--hmk-size-body);
+}
+/* Fatigue uses the same coloured, translucent parchment as the Chronicle's
+   attribute clusters and Coins, both during reading and editing. */
+.content-sheet .journal-book--overview .journal-condition-detail-grid>.journal-fatigue-state,
+.content-sheet .journal-book--overview .journal-condition-detail-grid>.journal-fatigue-inline-edit{
+ background:rgba(251,242,222,.38)!important;
+ background-image:none!important;
+ border:1px solid rgba(137,94,45,.44)!important;
+ box-shadow:inset 0 1px rgba(255,247,225,.65)!important;
+ color:#2c2014!important;
+}
+.content-sheet .journal-book--overview .journal-fatigue-inline-edit :is(input[type=number],textarea){
+ background:rgba(255,248,228,.72)!important;
+ border:1px solid rgba(137,94,45,.53)!important;
+ font-family:var(--hmk-font-body)!important;
+ color:#2b2016!important;
+}
+/* Skills editing is not a separate dark themed workbench. Its entire scroll
+   area, frozen first column, alternating rows, headers and inputs are vellum. */
+.content-sheet .journal-book--overview .journal-inline-skills .table-scroll,
+.content-sheet .journal-book--overview .journal-inline-skills .hsk-edit-scroll,
+.content-sheet .journal-book--overview .journal-inline-skills .journal-edit-skills-surface{
+ background:rgba(251,242,222,.30)!important;
+ background-image:none!important;
+ color:#2d2115!important;
+ border-color:rgba(137,94,45,.44)!important;
+ box-shadow:none!important;
+}
+.content-sheet .journal-book--overview .journal-inline-skills :is(.hsk-table,.catalog-spec){
+ background:transparent!important;
+ color:#2d2115!important;
+ font-family:var(--hmk-font-body)!important;
+ font-size:var(--hmk-size-detail)!important;
+}
+.content-sheet .journal-book--overview .journal-inline-skills :is(.hsk-table,.catalog-spec) :is(td,th){
+ border-color:rgba(137,94,45,.33)!important;
+ color:#352719!important;
+ background:rgba(251,242,222,.19)!important;
+ font-family:var(--hmk-font-body)!important;
+}
+.content-sheet .journal-book--overview .journal-inline-skills :is(.hsk-table,.catalog-spec) :is(thead th,.hsk-group-head th){
+ background:rgba(193,160,112,.43)!important;
+ color:#4b3018!important;
+ font-weight:700!important;
+}
+.content-sheet .journal-book--overview .journal-inline-skills :is(.hsk-edit-detail,.catalog-spec) :is(th:first-child,td:first-child){
+ background:#f1e3c4!important;
+ color:#362515!important;
+}
+.content-sheet .journal-book--overview .journal-inline-skills :is(.sheet-dp-input,.sheet-inline-input){
+ background:#faf0d8!important;
+ color:#302015!important;
+ border:1px solid #9c7d52!important;
+ font-family:var(--hmk-font-body)!important;
+}
+.content-sheet .journal-book--overview .journal-inline-skills .hsk-edit-detail tbody tr:hover td{
+ background:rgba(236,211,166,.36)!important;
+}
+@media(max-width:640px){
+ .content-sheet .journal-book--calendar .hc-medical-detail,
+ .content-sheet .journal-book--calendar .hc-malnutrition-prognosis>p{font-size:var(--hmk-size-detail)!important}
+}
