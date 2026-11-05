@@ -746,7 +746,11 @@ export function validateTimeEpisodes(journal=[]){
   if(e.weatherExposure!==undefined){
    must(Array.isArray(e.weatherExposure)&&e.weatherExposure.length===(e.memberIds.length-safeAtStart.length)*(e.weatherHazards||[]).length,
     'Weather Hazard neobsahuje všechny skutečně vystavené postavy a podmínky.');
+   const witnessedHazards=new Set();
    for(const w of e.weatherExposure){
+    const receiptKey=w.id+':'+w.kind;
+    must(!witnessedHazards.has(receiptKey),'Duplicitní Weather Hazard u stejné postavy a typu.');
+    witnessedHazards.add(receiptKey);
     must(e.memberIds.includes(w.id)&&!safeAtStart.includes(w.id)&&e.weatherHazards.includes(w.kind)&&!w.pending,
      'Weather Hazard se vztahuje na cizí nebo bezpečně krytou postavu či nemá doložený hod.');
     const expected=episodeWeatherExposure({kind:w.kind,areaAV:w.areaAV,roll:w.roll,

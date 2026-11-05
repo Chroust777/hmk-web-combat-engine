@@ -167,6 +167,13 @@ export function episodeWeatherExposure({kind,areaAV,roll,protection=0,fireStreng
   Number.isInteger(protection)&&protection>=0&&protection<=5&&
   Number.isInteger(fireStrength)&&fireStrength>=0&&fireStrength<=10&&
   ['CF','F','S','CS',null].includes(endLevel),'Weather Hazard: doložte AV, ochranu a END (Survival) test.');
+ // HMK p.149: the d10 Heat Hazard die requires *shaded rest*, not
+ // merely proximity to shade during a travelling episode. Cold-only
+ // equipment and fire bonuses cannot be smuggled into a heat receipt.
+ requireTrue(kind!=='heat'||(!shade||resting),
+  'Heat Hazard: stín d10 je dovolen pouze při odpočinku.');
+ requireTrue(kind!=='heat'||(protection===0&&fireStrength===0&&!continuousSleet),
+  'Heat Hazard: ochrana proti chladu ani oheň nesmějí být použity pro vedro.');
  let faces,tn,trigger;
  if(kind==='cold'){
   faces=continuousSleet?10:6;
@@ -196,9 +203,13 @@ export function episodeWeatherFatigueUnits({weather,exposure=[],minutes,dayMinut
  requireTrue(weather?.format==='hmk-trekking-weather-day-v1'&&Number.isSafeInteger(minutes)&&minutes>0&&
    Number.isSafeInteger(dayMinutes)&&Number.isSafeInteger(nightMinutes)&&dayMinutes>=0&&nightMinutes>=0&&dayMinutes+nightMinutes===minutes,
    'Weather fatigue vyžaduje doložené počasí a skutečné minuty den/noc.');
- const out={};
+ const out={},seen=new Set();
  for(const item of exposure){
-  requireTrue(typeof item.id==='string'&&['cold','heat'].includes(item.kind),'Weather fatigue: neplatná postava či hazard.');
+  requireTrue(typeof item.id==='string'&&item.id.length>0&&['cold','heat'].includes(item.kind),
+   'Weather fatigue: neplatná postava či hazard.');
+  const key=item.id+':'+item.kind;
+  requireTrue(!seen.has(key),'Weather fatigue: duplicitní hazard stejné postavy.');
+  seen.add(key);
   const points=item.effect==='fatigue-5'?5:item.effect==='fatigue-10'?10:0;
   const affected=(weather.daylightHazard===item.kind?dayMinutes:0)+(weather.nightHazard===item.kind?nightMinutes:0);
   out[item.id]=(out[item.id]||0)+points*affected;
