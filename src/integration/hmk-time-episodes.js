@@ -11,6 +11,7 @@ import {allocateTrekModes} from './hmk-trekking-correction.js';
 import {assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 import {trackingModifiers,trackingOutcome} from './hmk-trekking-wilderness-tasks.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js';
+import {validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
 export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -788,6 +789,23 @@ export function validateTimeEpisodes(journal=[]){
      JSON.stringify(k.skillTestProof.report)===JSON.stringify(skin.report)),
      'Kožní trauma nebylo ve zdravotním stavu skutečně zapsáno.');
    }
+  }
+  if(e.animalHealth!==undefined){
+   must(e.kind==='travel'&&Array.isArray(e.animalHealth)&&
+    Array.isArray(e.settings?.animalIds)&&
+    e.animalHealth.length===e.settings.animalIds.length&&
+    e.animalHealth.every((h,i)=>h.actorId===e.settings.animalIds[i]),
+    'Zdravotní snapshot zvířat neodpovídá účastníkům cesty.');
+   must(!e.animals?.length,'HMK p.145: nesmí vzniknout automatická zvířecí únava bez pravidla.');
+   for(const h of e.animalHealth){
+    validateTrekAnimalHealthProof(h,h.actorId);
+    must(h.shock==='NONE'&&!h.comaActive&&!h.extendedShockActive&&!h.immobile&&h.fatigue<40,
+     'Neschopné zvíře nesmí pokračovat v potvrzeném pochodu.');
+   }
+   // These two modes are OR-combinations with human mobility restrictions;
+   // they are never two Slow Modes for one and the same condition.
+   if(e.animalHealth.some(h=>h.fatigue>=20))must(e.slow>=1,'Cesta opomenula unavené zvíře.');
+   if(e.animalHealth.some(h=>h.injured))must(e.slow>=1,'Cesta opomenula zraněné zvíře.');
   }
   if(e.minuteCarryRule==='fixed-point-240-v93.684'){
    for(const a of [...(e.actors||[]),...(e.animals||[]),...(e.weatherRestFatigue||[])]){

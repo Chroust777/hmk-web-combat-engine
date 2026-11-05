@@ -173,7 +173,10 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   const halfRation=['hmk:gear:hmk-p120-026','hmk:gear:hmk-p120-027'].includes(item.sourceItemId)&&
    item.snapshot?.id===item.sourceItemId&&item.snapshot?.properties?.weightLb===3&&
    Number.isSafeInteger(item.quantity*2)&&item.quantity>=0.5;
-  if((!Number.isSafeInteger(item.quantity)||item.quantity<1)&&!halfRation){issues.push(`${item.id}: invalid carried quantity`);continue;}
+  const foragedPortion=typeof item._foragingCarryReceipt==='string'&&item._foragingCarryReceipt&&
+   Number.isSafeInteger(item.quantity*2)&&item.quantity>=0.5&&item.slot==='carried'&&
+   String(item.snapshot?.name||'').startsWith('Nalezená potrava · ');
+  if((!Number.isSafeInteger(item.quantity)||item.quantity<1)&&!halfRation&&!foragedPortion){issues.push(`${item.id}: invalid carried quantity`);continue;}
   const p=item.snapshot?.properties;
   let physicalWeight=p?.weightLb;
   if(Number.isFinite(physicalWeight)&&Number.isFinite(item.waterContentsLb))physicalWeight+=item.waterContentsLb/item.quantity;
@@ -194,7 +197,7 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   // A half-ration is a legitimate physical 1.5 lb remainder. The general
   // gear-load calculator counts whole objects, so normalise this portion
   // to one weighed remainder without silently rounding the burden away.
-  const fractionalRation=halfRation&&!Number.isSafeInteger(item.quantity);
+  const fractionalRation=(halfRation||foragedPortion)&&!Number.isSafeInteger(item.quantity);
   gear.push({id:item.id,weightLb:fractionalRation?physicalWeight*item.quantity:physicalWeight,
    quantity:fractionalRation?1:item.quantity,stowage});
  }

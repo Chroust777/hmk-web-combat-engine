@@ -7,6 +7,7 @@
  */
 import {shelteredOrProvisionedMinutes} from './hmk-pc-sheltered-stay-93730.js';
 import {availableSupplyLots,createSupplyUse} from './hmk-foraging-supply-ledger.js';
+import {foragedCarriedFood,createForagingCarryEat} from './hmk-foraging-carried-food.js';
 import {assertExclusiveForagingProven} from './hmk-inventory-provisions.js';
 import {availableRationLots,createPhysicalRationUse,projectCampaignRationInventory} from './hmk-physical-ration-ledger.js';
 import {availablePhysicalWater,createPhysicalWaterUse} from './hmk-physical-water-ledger.js';
@@ -166,9 +167,10 @@ function reachableWaterLots(database,campaignId,actorId,start,end){
  });
 }
 
-const consumeBeforeDay=(journal,actorId,campaignId,start,end,unit,includeStart=false)=>round(journal.filter(x=>x.characterId===actorId&&x.calendarCampaignId===campaignId&&x.calendarForagingSupplyUse?.unit===unit&&
- x.calendarForagingSupplyUse?.disposition==='consumed'&&x.calendarForagingSupplyUse?.nutritionDayId===undefined&&
- (includeStart?x.campaignMinute>=start:x.campaignMinute>start)&&x.campaignMinute<=end).reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0));
+const consumeBeforeDay=(journal,actorId,campaignId,start,end,unit,includeStart=false)=>round(journal.filter(x=>x.characterId===actorId&&x.calendarCampaignId===campaignId&&
+ (includeStart?x.campaignMinute>=start:x.campaignMinute>start)&&x.campaignMinute<=end).reduce((n,x)=>n+
+ (x.calendarForagingSupplyUse?.unit===unit&&x.calendarForagingSupplyUse.disposition==='consumed'&&x.calendarForagingSupplyUse.nutritionDayId===undefined?x.calendarForagingSupplyUse.quantity:0)+
+ (unit==='foodDays'&&x.calendarForagingCarryEat?.nutritionDayId===undefined?x.calendarForagingCarryEat?.quantity||0:0),0));
 /** A deficit is **accounted**, not an applied medical ailment. The original
  * Starvation/Thirst onset, HR and Advance/Healing Rolls remain unresolved
  * until committed in the persistent ailment executor.
@@ -213,7 +215,8 @@ function requireUnambiguousSharedAllocation(database,campaignId,cohort){
    const manual=Math.min(required,consumeBeforeDay(journal,actorId,campaignId,c.start,end,unit,c.start===p.minute));
    let leftover=round(required-manual-assured);
    const personal=unit==='foodDays'&&(p.inventoryRations===true||p.gmProvisioned===true)?
-     reachableFoodLots(database,campaignId,actorId,c.start,end).reduce((n,l)=>n+l.remaining,0):
+     (reachableFoodLots(database,campaignId,actorId,c.start,end).reduce((n,l)=>n+l.remaining,0)+
+     foragedCarriedFood(journal,campaignId,end).filter(l=>l.actorId===actorId).reduce((n,l)=>n+l.remaining,0)):
      unit==='waterDays'&&(p.inventoryWater===true||p.gmProvisioned===true)?
      reachableWaterLots(database,campaignId,actorId,c.start,end).reduce((n,l)=>n+l.remaining,0):0;
    leftover=round(Math.max(0,leftover-Math.min(leftover,personal)));
@@ -300,6 +303,23 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
      database.journal.push(row);automatic.push(row);remaining=round(remaining-quantity);
     }
    }
+   // Actually collected and GM weighed food is private carried property;
+   // do not use it for other party members. Consume it before the communal
+   // pool, and only if this character's real nutrition mode allows supplies.
+   if(unit==='foodDays'&&(p.inventoryRations===true||p.gmProvisioned===true||p.foragingOnly===true)){
+    while(remaining>0){
+     const lot=foragedCarriedFood(database.journal,campaignId,end).find(x=>x.actorId===actorId&&x.remaining>=0.5);
+     if(!lot)break;
+     const quantity=Math.min(remaining,lot.remaining);
+     const proof=createForagingCarryEat({journal:database.journal,campaignId,minute:end,actorId,
+      carryId:lot.sourceJournalId,quantity,nutritionDayId:`${policy.id}:${end}`});
+     const row={id:idFactory(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:end,
+      createdAt:stamp(),title:'HMK · automaticky snědená nalezená potrava',
+      body:`${quantity} food-days · ${actor.name} · ze skutečně neseného balíku ${lot.itemName}; bez samostatného posunu času`,
+      calendarForagingCarryEat:proof};
+     database.journal.push(row);automatic.push(row);remaining=round(remaining-quantity);
+    }
+   }
    if(unit==='waterDays'&&(p.inventoryWater===true||p.gmProvisioned===true)){
     while(remaining>=0.5){
      const bottle=reachableWaterLots(database,campaignId,actorId,start,end)[0];if(!bottle)break;
@@ -374,6 +394,10 @@ export function validateNutritionJournal(journal=[]){
   if(use?.nutritionDayId){check(typeof use.nutritionDayId==='string'&&use.nutritionDayId,'Poškozená vazba automatického výdeje');
    if(!seen.has(use.nutritionDayId))seen.set(use.nutritionDayId,[]);seen.get(use.nutritionDayId).push(row);
   }
+  const carriedFood=row.calendarForagingCarryEat;
+  if(carriedFood?.nutritionDayId){check(typeof carriedFood.nutritionDayId==='string'&&carriedFood.nutritionDayId,'Poškozená vazba automaticky snědené nalezené potravy');
+   if(!seen.has(carriedFood.nutritionDayId))seen.set(carriedFood.nutritionDayId,[]);seen.get(carriedFood.nutritionDayId).push(row);
+  }
   const d=row.calendarNutritionDay;
   if(!d){prior.push(row);continue;}
   const policy=known.get(d.policyId)?.calendarNutritionPolicy;
@@ -412,7 +436,8 @@ export function validateNutritionJournal(journal=[]){
   else check(!journal.some(r=>r.calendarNutritionProvisionSwitch?.actorId===d.actorId&&r.campaignMinute>=d.startMinute&&r.campaignMinute<d.endMinute), 'Časovaný režim musí mít průkaz poměrných přídělů.');
   const expectedFood=!allowedFood?0:round(Math.min(d.foodNeed,assuredFood+consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'foodDays',d.startMinute===policy.minute)+
    debitRows.filter(x=>x.calendarForagingSupplyUse?.unit==='foodDays').reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0)+
-   debitRows.filter(x=>x.calendarInventoryRationUse?.unit==='foodDays').reduce((n,x)=>n+x.calendarInventoryRationUse.quantity,0)));
+   debitRows.filter(x=>x.calendarInventoryRationUse?.unit==='foodDays').reduce((n,x)=>n+x.calendarInventoryRationUse.quantity,0)+
+   debitRows.filter(x=>x.calendarForagingCarryEat?.quantity).reduce((n,x)=>n+x.calendarForagingCarryEat.quantity,0)));
   const expectedWater=!allowedWater?0:round(Math.min(d.waterNeed,assuredWater+consumeBeforeDay(prior,d.actorId,d.campaignId,d.startMinute,d.endMinute,'waterDays',d.startMinute===policy.minute)+
    debitRows.filter(x=>x.calendarForagingSupplyUse?.unit==='waterDays').reduce((n,x)=>n+x.calendarForagingSupplyUse.quantity,0)+
    debitRows.filter(x=>x.calendarInventoryWaterUse?.unit==='waterDays').reduce((n,x)=>n+x.calendarInventoryWaterUse.quantity,0)));

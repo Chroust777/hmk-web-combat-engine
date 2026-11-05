@@ -48,7 +48,7 @@ export function createSupplyUse({journal=[],campaignId,minute,sourceId,resultInd
   'Neplatný zdroj nebo množství zásob');
  requireIt(typeof actorId==='string'&&actorId.length>0,'Vyberte postavu, která zásobu používá');
  requireIt(unit==='herbDoses'?disposition==='ingredient-reserved':
-  unit==='waterDays'?['consumed','stored-in-container'].includes(disposition):disposition==='consumed',
+  unit==='waterDays'?['consumed','stored-in-container'].includes(disposition):['consumed','packed-in-inventory'].includes(disposition),
   'Byliny lze rezervovat; voda může být spotřebována nebo doloženě naplněna do nádoby');
  requireIt(disposition!=='stored-in-container'||([0.5,1].includes(quantity)&&unit==='waterDays'&&typeof containerFillId==='string'&&containerFillId.length>0),
   'Převod vody do nádoby vyžaduje jedinečný důkaz naplnění a 0,5 nebo 1 galon');
