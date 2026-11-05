@@ -160,7 +160,7 @@ export function prepareAnimalFrostSequence573({profile,previous,campaignId,minut
     allExposedConfirmed===true,'Breath p.244: vyžaduje doloženou fyzickou variantu 8 a přední/zadní polovinu kužele.');
    requireProof(sites?.length===1&&sites[0]?.locationId==='area'&&
     (sites[0]?.side||'none')==='none',
-    'Breath je jedno plošné Frost zranění, nikoli sada lokálních ran; zadej area;none;AreaAV;Shock;Fatigue.');
+    'Breath je jedno plošné Frost zranění, nikoli sada lokálních ran; zadej area;none;Shock;Fatigue. AV se načítá automaticky.');
    impact=magic.d4+(magic.position==='front'?magic.index:Math.floor(magic.index/2));
   }else{
    requireProof(sites?.length===1,'Cold Elemental Bolt p.261 zasahuje jednu, nikoli všechny lokality.');
