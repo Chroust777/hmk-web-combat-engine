@@ -128,13 +128,14 @@ export function trackingModifiers({continuousSnow=false,continuousRain=false,par
 }
 export function trackingOutcome(adjustedSV,{criticalFailure=false}={}){
  test(Number.isSafeInteger(adjustedSV)&&adjustedSV>=-100&&adjustedSV<=100,'Tracking vyžaduje skutečný SV');
- return {adjustedSV,spoorStars:adjustedSV>=5?adjustedSV-4:0,
+ return {adjustedSV,spoorStars:adjustedSV>=5?Math.min(5,adjustedSV-4):0,
   awarenessNeeded:adjustedSV>=3&&adjustedSV<=4,
   nextWatchBearingOnCF:criticalFailure,sourcePage:147};
 }
 
-// v1 capped Spoor stars at 5; preserve old proofs without rewriting history.
-export const TRACKING_FORMAT='hmk-trekking-tracking-outcome-v2';
+// HMK p.147: SV 9+ is exactly 5 Spoor stars. Preserve historical v2
+// receipts that incorrectly exceeded the printed ceiling without rewriting them.
+export const TRACKING_FORMAT='hmk-trekking-tracking-outcome-v3';
 export function createTrackingProof({source,journal=[],campaignId,skillId,conditions}={}){
  test(source?.calendarTrekProof?.format==='hmk-trekking-watch-evidence-v1'&&source.calendarCampaignId===campaignId,
   'Tracking musí patřit ke konkrétní cestovní hlídce');
@@ -160,13 +161,14 @@ export function validateTrackingJournal(journal=[]){
   test(!seen.has(p.sourceId),'Jedna hlídka nemůže mít dva různě potvrzené Tracking výsledky');seen.add(p.sourceId);
   const source=byId.get(p.sourceId),expected=createTrackingProof({source,journal,campaignId:row.calendarCampaignId,
    skillId:p.skillId,conditions:p.conditions});
-  // Original v1 had a 5-star ceiling even for SV >9. Never retroactively
-  // rewrite historical records: only NEW v2 results use printed unlimited
-  // beyond-9 Spoor stars (HMK 147).
-  if(p.format==='hmk-trekking-tracking-outcome-v1'){
-   expected.format=p.format;
-   expected.score.spoorStars=Math.min(5,expected.score.spoorStars);
-  }
+  // Prior v1 was already capped; v2 erroneously awarded unlimited
+  // stars beyond SV9. Validate the original arithmetic on immutable v2
+  // receipts, never silently mutate previously certified historical rows.
+  test(['hmk-trekking-tracking-outcome-v1','hmk-trekking-tracking-outcome-v2',TRACKING_FORMAT].includes(p.format),
+   'Neznámá verze historického Tracking dokladu');
+  expected.format=p.format;
+  if(p.format==='hmk-trekking-tracking-outcome-v2')
+   expected.score.spoorStars=expected.score.adjustedSV>=5?expected.score.adjustedSV-4:0;
   test(row.characterId===p.trackerId&&row.campaignMinute===source.campaignMinute&&
    JSON.stringify(expected)===JSON.stringify(p),'Poškozený nebo cizí Tracking důkaz');
  }

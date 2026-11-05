@@ -73,12 +73,13 @@ export function trekAvailableTerrain(topography,conveyance='foot'){
 }
 
 export function trekMovement({topography,terrain,conveyance='foot',progress=0,slow=0,loaded=false,
- bearing=0,progressD10=[],doubleTime=false,hours=4,continuousPrecipitation=false}={}){
+ bearing=0,progressD10=[],doubleTime=false,hours=4,minutes=null,continuousPrecipitation=false}={}){
  const rate=MOVE[topography]?.[terrain],column=CONVEYANCE.indexOf(conveyance);
  assert(rate&&column>=0,'Nepodporovaná kombinace HMK topografie, terénu a dopravy');
  const lpw=rate[column];assert(lpw!==null&&lpw>0,'HMK v tomto terénu nepovoluje daný způsob dopravy');
  assert(int(progress,0,10)&&int(slow,0,20)&&int(bearing,0,20)&&typeof loaded==='boolean'&&
-  typeof doubleTime==='boolean'&&typeof continuousPrecipitation==='boolean'&&[1,2,3,4].includes(hours),'Neplatné režimy pohybu');
+  typeof doubleTime==='boolean'&&typeof continuousPrecipitation==='boolean'&&
+  (minutes===null?[1,2,3,4].includes(hours):int(minutes,1,10080)),'Neplatné režimy pohybu');
  const remainingSlow=Math.max(0,slow-progress),spareProgress=Math.max(0,progress-slow);
  assert(Array.isArray(progressD10)&&progressD10.length===spareProgress&&progressD10.every(r=>int(r,1,10)),'Zbývající Progress Mode vyžaduje vlastní hod d10');
  const progressSuccess=progressD10.some(r=>r<=2*lpw);
@@ -91,7 +92,7 @@ export function trekMovement({topography,terrain,conveyance='foot',progress=0,sl
   ['paved-road','unpaved-road','rural-track','wilderness-trail'].includes(terrain)?(terrain==='paved-road'?0:continuousPrecipitation?1:0):1;
  const deficit=Math.max(0,dots-bearing);
  return {baseLPW:lpw,progressSuccess,remainingSlow,spareProgress,loaded,finalLPW,
-  leagues:finalLPW*(hours/4),kilometres:finalLPW*(hours/4)*4,
+  leagues:finalLPW*((minutes===null?hours*60:minutes)/240),kilometres:finalLPW*((minutes===null?hours*60:minutes)/240)*4,
   requiredBearing:dots,bearingDeficit:deficit,directionHazardDue:deficit>0,sourcePage:146};
 }
 /** HMK p.145: the party may spend the entire four-hour watch foraging in

@@ -150,7 +150,7 @@ export function episodeTrackingFollowup({adjustedSV,criticalFailure=false,awaren
  requireTrue(Number.isInteger(adjustedSV)&&typeof criticalFailure==='boolean'&&
   (awarenessLevel===null||levels.includes(awarenessLevel))&&Number.isInteger(spoorSpent)&&spoorSpent>=0,
   'Tracking vyžaduje doložený SV, Awareness a příděl Spoor.');
- const stars=Math.max(0,adjustedSV-4),needsAwareness=adjustedSV>=3&&adjustedSV<=4;
+ const stars=Math.min(5,Math.max(0,adjustedSV-4)),needsAwareness=adjustedSV>=3&&adjustedSV<=4;
  requireTrue(spoorSpent<=stars,'Spoor nesmí převýšit získané hvězdy.');
  return {format:'hmk-episode-tracking-followup-v1',adjustedSV,criticalFailure,
   awarenessLevel,needsAwareness,spoorStars:stars,spoorSpent,

@@ -5,6 +5,7 @@
  * Only the GM's clock mutation closes a 24-hour interval. Receipts and
  * shortages are atomic; the daily ledger never advances the clock.
  */
+import {shelteredOrProvisionedMinutes} from './hmk-pc-sheltered-stay-93730.js';
 import {availableSupplyLots,createSupplyUse} from './hmk-foraging-supply-ledger.js';
 import {assertExclusiveForagingProven} from './hmk-inventory-provisions.js';
 import {availableRationLots,createPhysicalRationUse,projectCampaignRationInventory} from './hmk-physical-ration-ledger.js';
@@ -37,21 +38,21 @@ export function createNutritionProvisionSwitch({campaignId,actorId,minute,provis
 }
 export function gmProvisionedMinutes(journal=[],campaignId,actorId,policyRow,start,end){
  check(end>start&&end-start===DAY,'Časový výpočet jídla a pití vyžaduje úplný 24h účet.');
- // Start from a prior 24h policy's explicit status, then overlay GM switches
- // in chronological order. Never count a minute twice or reset the daily need.
- let state=!!policyRow.calendarNutritionPolicy.gmProvisioned,pos=start,covered=0;
- const switches=journal.filter(r=>r.calendarCampaignId===campaignId&&r.characterId===actorId&&
-  r.calendarNutritionProvisionSwitch?.format===NUTRITION_PROVISION_SWITCH_FORMAT&&
-  r.campaignMinute>=policyRow.campaignMinute&&r.campaignMinute<=end)
-  .sort((a,b)=>a.campaignMinute-b.campaignMinute);
- for(const row of switches){
-  if(row.campaignMinute<start){state=row.calendarNutritionProvisionSwitch.provisioned;continue;}
-  if(state)covered+=row.campaignMinute-pos;
-  pos=row.campaignMinute;state=row.calendarNutritionProvisionSwitch.provisioned;
- }
- if(state)covered+=end-pos;
- return covered;
+ // Original GM-provisioned switches and new timestamped PC safe stay may
+ // overlap. Count their UNION by minute; never double-charge or invent stock.
+ const gmAt=(minute)=>{
+  let state=!!policyRow.calendarNutritionPolicy.gmProvisioned;
+  for(const row of journal){
+   if(row.calendarCampaignId!==campaignId||row.characterId!==actorId||
+      row.calendarNutritionProvisionSwitch?.format!==NUTRITION_PROVISION_SWITCH_FORMAT||
+      row.campaignMinute<policyRow.campaignMinute||row.campaignMinute>minute)continue;
+   state=row.calendarNutritionProvisionSwitch.provisioned;
+  }
+  return state;
+ };
+ return shelteredOrProvisionedMinutes(journal,campaignId,actorId,start,end,gmAt);
 }
+
 /** Ration quantities use HMK half-day units, but the exact elapsed minutes
  * are retained for the GM audit. Multiple switches never round separately. */
 export function gmProvisionedQuantity(journal=[],campaignId,actorId,policyRow,start,end,need){

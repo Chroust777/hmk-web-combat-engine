@@ -4,6 +4,7 @@
  * All receipts are append-only and never substitute for genuine Skill Tests.
  */
 import {trekMovement,trekWeatherDay,trekWeatherWatch,trekHazards} from './hmk-trekking-routine.js';
+import {pcShelteredStayAt} from './hmk-pc-sheltered-stay-93730.js';
 import {expeditionSecondaryRoll} from './hmk-calendar-expedition.js';
 import {createOrienteeringContext,adjustedOrienteeringSV} from './hmk-trekking-orienteering.js';
 import {allocateTrekModes} from './hmk-trekking-correction.js';
@@ -515,8 +516,14 @@ export function validateTimeEpisodes(journal=[]){
     must(!(memo.conditions.continuousRain&&memo.conditions.continuousSnow)&&
      !(memo.conditions.twilight&&memo.conditions.night),'Tracking: neplatné podmínky');
     const expectedModifier=trackingModifiers(memo.conditions);
+    const expectedTrackingScore=trackingOutcome(sr.sv+expectedModifier.delta,{criticalFailure:sr.level==='CF'});
+    // Preserve pre-93.730 episode receipts with the historically excessive
+    // Spoor calculation, but apply the printed 9+ = 5 cap to every new score.
+    const oldSpoor=Number.isSafeInteger(memo.score?.spoorStars)&&memo.score.spoorStars>5&&
+     expectedTrackingScore.adjustedSV>=10&&memo.score.spoorStars===expectedTrackingScore.adjustedSV-4;
+    if(oldSpoor)expectedTrackingScore.spoorStars=expectedTrackingScore.adjustedSV-4;
     must(JSON.stringify(expectedModifier)===JSON.stringify(memo.modifier)&&
-     JSON.stringify(trackingOutcome(sr.sv+expectedModifier.delta,{criticalFailure:sr.level==='CF'}))===JSON.stringify(memo.score),
+     JSON.stringify(expectedTrackingScore)===JSON.stringify(memo.score),
      'Tracking situace a Spoor neodpovídají původnímu hodu');
    }
    if(memo.sourceMode==='new')must(linked.campaignMinute===e.startMinute&&memo.reusedFromEpisodeId===null,
@@ -624,8 +631,12 @@ export function validateTimeEpisodes(journal=[]){
   if(e.trackingFollowup){
    const t=e.trackingFollowup,m=e.trackingMemory;
    must(m&&t.adjustedSV===m.score.adjustedSV,'Tracking navazující test ztratil původní SV.');
+   const originalV2Overcap=t.spoorStars>5&&t.adjustedSV>=10&&t.spoorStars===t.adjustedSV-4&&
+    t.spoorSpent<=t.spoorStars&&t.trailCapacity===t.spoorStars-t.spoorSpent;
    const expected=episodeTrackingFollowup({adjustedSV:t.adjustedSV,criticalFailure:m.level==='CF',
-    awarenessLevel:t.awarenessLevel,spoorSpent:t.spoorSpent});
+    awarenessLevel:t.awarenessLevel,spoorSpent:originalV2Overcap?Math.min(t.spoorSpent,5):t.spoorSpent});
+   if(originalV2Overcap){expected.spoorStars=t.adjustedSV-4;expected.spoorSpent=t.spoorSpent;
+    expected.trailCapacity=expected.spoorStars-t.spoorSpent;}
    const skill=t.awarenessSkillId?journal.find(x=>x.id===t.awarenessSkillId):null;
    const aw=skill?episodeSkillProof(skill,'Awareness',m.guideId,j.calendarCampaignId,e.startMinute):null;
    must(t.awarenessLevel===(aw?.level||null)&&
@@ -713,12 +724,17 @@ export function validateTimeEpisodes(journal=[]){
     }
    }
   }
+  const safeAtStart=e.weatherShelteredPCs??[];
+  must(Array.isArray(safeAtStart)&&new Set(safeAtStart).size===safeAtStart.length&&
+   (!safeAtStart.length||!['travel','tracking','watch','forage'].includes(e.kind))&&
+   safeAtStart.every(id=>e.memberIds.includes(id)&&pcShelteredStayAt(journal,j.calendarCampaignId,id,e.startMinute)),
+   'Zajištěný pobyt PC nemá doložený doklad v kalendáři nebo byl použit na venkovní činnost.');
   if(e.weatherExposure!==undefined){
-   must(Array.isArray(e.weatherExposure)&&e.weatherExposure.length===e.memberIds.length*(e.weatherHazards||[]).length,
-    'Weather Hazard neobsahuje všechny postavy a podmínky.');
+   must(Array.isArray(e.weatherExposure)&&e.weatherExposure.length===(e.memberIds.length-safeAtStart.length)*(e.weatherHazards||[]).length,
+    'Weather Hazard neobsahuje všechny skutečně vystavené postavy a podmínky.');
    for(const w of e.weatherExposure){
-    must(e.memberIds.includes(w.id)&&e.weatherHazards.includes(w.kind)&&!w.pending,
-     'Weather Hazard se vztahuje na cizí postavu nebo nemá doložený hod.');
+    must(e.memberIds.includes(w.id)&&!safeAtStart.includes(w.id)&&e.weatherHazards.includes(w.kind)&&!w.pending,
+     'Weather Hazard se vztahuje na cizí nebo bezpečně krytou postavu či nemá doložený hod.');
     const expected=episodeWeatherExposure({kind:w.kind,areaAV:w.areaAV,roll:w.roll,
      protection:w.protection,fireStrength:w.fireStrength,continuousSleet:w.continuousSleet,
      resting:w.resting,shade:w.shade,tropicalNative:w.tropicalNative,endLevel:w.endLevel});

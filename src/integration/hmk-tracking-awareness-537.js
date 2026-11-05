@@ -8,7 +8,7 @@ const valid=(yes,why)=>{if(!yes)throw Error(why)};
 const levels=['CF','F','S','CS'];
 export function trackingAwarenessFromSkill({trackingRow,skillProof,actorId,campaignId,minute,journal=[]}={}){
  const t=trackingRow?.calendarTrekTrackingProof;
- valid(['hmk-trekking-tracking-outcome-v1','hmk-trekking-tracking-outcome-v2'].includes(t?.format)&&t.score?.awarenessNeeded===true&&
+ valid(['hmk-trekking-tracking-outcome-v1','hmk-trekking-tracking-outcome-v2','hmk-trekking-tracking-outcome-v3'].includes(t?.format)&&t.score?.awarenessNeeded===true&&
    [3,4].includes(t.score.adjustedSV),'Awareness po Tracking vyžaduje doložené upravené SV 3–4 (HMK 147)');
  valid(trackingRow.calendarCampaignId===campaignId&&actorId===t.trackerId&&
    Number.isSafeInteger(minute)&&minute>=trackingRow.campaignMinute,
