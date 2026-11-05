@@ -1,0 +1,24 @@
+'use strict';
+const assert=require('node:assert/strict'), fs=require('node:fs'),path=require('node:path');
+const ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
+const root=process.argv[2]||'/mnt/data/hmk_dev_93723', orig=require.extensions['.js'];
+require.extensions['.js']=(m,p)=>p.startsWith(root+'/src/')?m._compile(ts.transpileModule(fs.readFileSync(p,'utf8'),{fileName:p,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,p):orig(m,p);
+const {calculateWeatherAreaAV,AREA_WEIGHTS}=require(root+'/src/integration/hmk-weather-area-av.js');
+const {PRINTED_ARMOUR_ARTICLES_P118}=require(root+'/src/rules/armour-articles-printed.js');
+const {locationArmourValue}=require(root+'/src/rules/armour-options.js');
+let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++},yes=x=>{assert.ok(x);n++};
+const stub=(location)=>({ready:true,armourValue:{sk:3,fa:2,nk:1,tx:7,ab:7,pv:6,th:4}[location]??0});
+const bare=calculateWeatherAreaAV({inventory:[],actorId:'A'});eq(bare.value,0);
+const covsum=Object.values(AREA_WEIGHTS).reduce((a,b)=>a+b,0);yes(Math.abs(covsum-1)<1e-9);
+const src={id:'x',characterId:'A',slot:'worn'};
+const measure=calculateWeatherAreaAV({inventory:[src],actorId:'A',resolveArmour:({location})=>stub(location)});
+let raw=Object.entries(AREA_WEIGHTS).reduce((s,[z,k])=>s+k*stub(z).armourValue,0);eq(measure.raw,raw);eq(measure.value,Math.round(raw));
+let broken=calculateWeatherAreaAV({inventory:[src],actorId:'A',resolveArmour:({location})=>location==='ab'?{ready:false,reason:'unverified'}:stub(location)});
+eq(broken.ready,false);yes(broken.reason.includes('ab'));
+const mat={cloth:'C',leather:'L',padded:'D',quilted:'Q',gambeson:'G',kurbul:'K',scale:'S',mail:'M',plate:'P'};
+function itemFromArticle(a,id,actorId){const sid='hmk:armour:p118:verified:'+a.id;return {id,characterId:actorId,quantity:1,slot:'worn',layerOrder:0,sourceItemId:sid,snapshot:{id:sid,name:a.name,category:'armor',properties:{coverageVerified:true,material:mat[a.material],weightLb:a.weightLb,coveredLocations:a.coveredLocations,locationProtection:Object.fromEntries(a.coveredLocations.map(loc=>[loc,Object.fromEntries(['b','e','p','f'].map(k=>[k,locationArmourValue({layers:[{material:a.material}],zone:loc,aspect:k}).av]))])),coverageMarkers:a.coverageMarkers,directionRestriction:a.directionRestriction,rigid:a.rigid,layerZoneByLocation:a.layerZoneByLocation}}};}
+const shirt=PRINTED_ARMOUR_ARTICLES_P118.find(a=>a.id==='hmk118-cloth-shirt');
+const worn=itemFromArticle(shirt,'shirt','A');const wornResult=calculateWeatherAreaAV({inventory:[worn],actorId:'A'});
+console.log('REAL WORN result',JSON.stringify(wornResult));yes(wornResult.ready);yes(wornResult.wornCount===1);yes(wornResult.locations.tx>=0);
+const carried={...worn,slot:'carried'};eq(calculateWeatherAreaAV({inventory:[carried],actorId:'A'}).value,0);
+console.log('PASS AV '+n+' assertions');
