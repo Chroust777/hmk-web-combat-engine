@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 let ts;try{ts=require('typescript')}catch{ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js')}
-const root=path.resolve(__dirname,'hmk-web-combat-engine-main');
+const root=path.resolve(__dirname,'..');
 const original=require.extensions['.js'];
 require.extensions['.js']=(mod,file)=>file.startsWith(path.join(root,'src')+path.sep)
  ? mod._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,file)

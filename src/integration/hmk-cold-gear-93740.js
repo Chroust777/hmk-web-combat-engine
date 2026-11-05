@@ -5,6 +5,8 @@
  */
 import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 import {EXPEDITION_EFFECTS_P120} from '../rules/expedition-effects.js';
+import {EXPEDITION_EQUIPMENT_P120} from '../rules/possessions-printed.js';
+import {PRINTED_ARMOUR_ARTICLES_P118} from '../rules/armour-articles-printed.js';
 // One authoritative table: printed Expedition gear with the Cold AV corrected
 // from the definitive Cold Hazard table (HMK p.149).
 const pairs=EXPEDITION_EFFECTS_P120.filter(r=>Number.isSafeInteger(r.coldAV)).map(r=>[
@@ -15,16 +17,35 @@ const GEAR=Object.freeze({...listed,
  'padded cloak':listed['cloak (padded)']
 });
 const name=x=>String(x?.snapshot?.name??x?.name??'').trim().toLowerCase();
+// v93.742: a GM-owned item must NOT inherit a printed Cold AV solely
+// because its editable name matches a printed item. Check the immutable
+// printed ID and relevant printed characteristics, also after JSON restore.
+const printedOther=new Map(EXPEDITION_EQUIPMENT_P120.map(x=>[`hmk:gear:${x.id}`,x]));
+const printedCloaks=new Map(PRINTED_ARMOUR_ARTICLES_P118.filter(x=>x.name==='Cloak').map(x=>[`hmk:armour:p118:verified:${x.id}`,x]));
+function attestedPrinted(item){
+ const x=item?.snapshot??item;
+ if(!x||x.builtin!==true||typeof x.id!=='string'||(item?.snapshot&&item.sourceItemId!=null&&item.sourceItemId!==x.id))return false;
+ if(x.category==='other'){
+  const row=printedOther.get(x.id);
+  return !!row&&row.name===x.name&&x.properties?.weightLb===row.weightLb;
+ }
+ if(x.category==='armor'){
+  const row=printedCloaks.get(x.id);
+  return !!row&&x.name.toLowerCase()===(row.material+' cloak')&&
+   x.properties?.material===row.material&&x.properties?.weightLb===row.weightLb&&
+   x.properties?.coverageVerified===true;
+ }
+ return false;
+}
 export function coldCatalogRule(item){
  const n=name(item),cat=item?.snapshot?.category??item?.category;
- if(cat!=='armor'&&cat!=='other')return null;
+ if((cat!=='armor'&&cat!=='other')||!attestedPrinted(item))return null;
  const printed=GEAR[n];
  if(printed)return {...printed,reference:'HMK p.149'};
- // Printed p.118 armour cloaks have canonical names and an audited material.
- if(cat==='armor'&&/\bcloak$/.test(n)){
+ if(cat==='armor'){
   const material=String(item?.snapshot?.properties?.material??item?.properties?.material??'').toLowerCase();
-  if(['c','cloth'].includes(material))return {...GEAR['cloth cloak'],reference:'HMK pp.120,149'};
-  if(['d','padded'].includes(material))return {...GEAR['padded cloak'],reference:'HMK pp.120,149'};
+  if(material==='cloth')return {...GEAR['cloth cloak'],reference:'HMK pp.120,149'};
+  if(material==='padded')return {...GEAR['padded cloak'],reference:'HMK pp.120,149'};
  }
  return null;
 }

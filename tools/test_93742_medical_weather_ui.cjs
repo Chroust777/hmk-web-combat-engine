@@ -1,0 +1,33 @@
+'use strict';
+/** Source-level guardrail. The interactive proof is conducted independently in
+ * local Chromium; this file checks that the release still contains its gates. */
+const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
+const root=path.resolve(__dirname,'..');
+const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const cold=fs.readFileSync(path.join(root,'src/integration/hmk-cold-gear-93740.js'),'utf8');
+let c=0;const has=(what,re)=>{assert.match(app,re,what);c++};
+const after=(a,b)=>{const i=app.indexOf(a),j=app.indexOf(b,i+1);assert(i>=0&&j>i,a+' → '+b);c++};
+assert.match(index,/<title>HMK Keeper’s Ledger · v93\.742<\/title>/);c++;
+has('version',/const APP_VERSION='93\.742'/);
+has('Weather Shock d100 disabled',/hskWeatherShockFollowup[\s\S]*?name="roll"[^>]+\$\{canRoll\?'':'disabled/);
+has('Weather Shock coma field disabled',/name="comaLocationShock"[^>]+\$\{canRoll\?'':'disabled/);
+has('Weather Shock IL disabled',/name="comaInjuryLevel"[^>]+\$\{canRoll\?'':'disabled/);
+has('Weather Shock d10 disabled',/name="initialComaD10"[^>]+\$\{canRoll\?'':'disabled/);
+has('parallel cold followup roll disabled',/name="roll"[^>]+\$\{rerollReady\?'':'disabled/);
+has('parallel cold coma HR disabled',/name="initialComaHR"[^>]+\$\{rerollReady\?'':'disabled/);
+has('parallel cold coma d10 disabled',/name="initialComaD10"[^>]+\$\{rerollReady\?'':'disabled/);
+has('parallel cold course roll disabled',/name="roll"[^>]+\$\{courseReady\?'':'disabled/);
+has('parallel cold course doctor disabled',/name="physicianStars"[^>]+\$\{courseReady\?'':'disabled/);
+has('parallel cold coma shelter disabled',/name="restfulShelter"[^>]+\$\{courseReady\?'':'disabled/);
+has('parallel cold coma next days disabled',/name="nextComaD10"[^>]+\$\{courseReady\?'':'disabled/);
+has('parallel cold arcane disabled',/name="arcaneBonus"[^>]+\$\{courseReady\?'':'disabled/);
+has('Weather Hazard d100/d6 input gate',/name="roll"[^>]+\$\{verifiedAreaAV\.ready\?'':'disabled/);
+has('Weather Hazard generator gate',/data-trek-weather-auto \$\{verifiedAreaAV\.ready\?'':'disabled'/);
+has('Weather Hazard submit gate',/type="submit" \$\{verifiedAreaAV\.ready\?'':'disabled'/);
+has('Weather Hazard synthetic event guard',/if\(!form\|\|button\.disabled\|\|!die\|\|die\.disabled\|\|form\.querySelector\('button\[type="submit"\]'\)\?\.disabled\)return/);
+assert.match(cold,/item\.sourceItemId!=null&&item\.sourceItemId!==x\.id/);c++;
+assert.match(cold,/x\.builtin!==true/);c++;
+assert.match(cold,/printedOther\.get\(x\.id\)/);c++;
+assert.match(cold,/printedCloaks\.get\(x\.id\)/);c++;
+console.log('PASS '+c+' v93.742 medical/weather UI and Cold AV provenance source guards');

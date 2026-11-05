@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict'), fs=require('node:fs'),path=require('node:path');
 const ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
-const root=process.argv[2]||'/mnt/data/hmk_dev_93723', orig=require.extensions['.js'];
+const root=process.argv[2]||path.resolve(__dirname,'..'), orig=require.extensions['.js'];
 require.extensions['.js']=(m,p)=>p.startsWith(root+'/src/')?m._compile(ts.transpileModule(fs.readFileSync(p,'utf8'),{fileName:p,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,p):orig(m,p);
 const {calculateWeatherAreaAV,AREA_WEIGHTS}=require(root+'/src/integration/hmk-weather-area-av.js');
 const {PRINTED_ARMOUR_ARTICLES_P118}=require(root+'/src/rules/armour-articles-printed.js');

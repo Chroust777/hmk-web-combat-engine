@@ -24,7 +24,7 @@ ok(board.includes('data-cal-skill="Awareness"')&&board.includes('data-cal-plan='
 const required=['herbal-potion','malnutrition-course','poison','disease','asphyxia','sleep-deprivation','blood-shock','healing','infection','grim','treatment','blood-loss','coma','extended-shock','shock-followup','bleeding','aural-recovery','psyche-manifestation','psyche-interval','psyche-recovery','skill-critical','skill-fall','skill-injury','weather-course','weather-skin','talisman-period','trek-survival-test','trek-drover-test'];
 for(const kind of required){ok(['combat','healing','hazards','skills','calendar'].includes(Route.calendarEventDestination({kind})),kind);}
 const app=fs.readFileSync(path.join(root,'app.js'),'utf8'),index=fs.readFileSync(path.join(root,'index.html'),'utf8');
-ok(app.includes("APP_VERSION='93.509'")&&index.includes('v93.509'),'version');
+ok(app.includes("APP_VERSION='93.742'")&&index.includes('v93.742'),'version');
 ok(app.includes('data-nutrition-party-conditions')&&app.includes('hc-clock-heading'),'party+clock');
 ok(!app.includes('GM potvrzuje úplné 24hodinové podmínky a při jejich změně plán zruší.'),'no checkbox per actor');
 ok(app.includes("if(!cancel&&plan.skill"),'required GM skill evidence before marking completion');

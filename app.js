@@ -323,7 +323,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.741';
+const APP_VERSION='93.742';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11106,8 +11106,8 @@ function hskWeatherShockFollowup(actorId){
  <p class="hc-hint">Samostatný Shock Reroll z cestování (${esc(q.sourceId)}). Původ ${esc(displayCampaignMinute(q.originMinute))}. ${q.phase==='after-all-bleeding-stopped'?'Okamžitý Shock Reroll po zastavení všech Bleederů':q.kind==='UNC'?'Počkat skutečných 10 minut':'Po další skutečné akci mimo boj vyhodnoť tento hod'}. Kalendář je autoritou pro minuty; tento hod jej sám neposune. Combat pouze čte účinky na postavu (HMK 169, 185).</p>
  <p>Shock ML ${esc(String(shockML??'nedoloženo'))} · Fatigue ${fatigue} · ${q.kind==='STN'?'bez dalšího −20':'−20 při INC/UNC'} · EML ${esc(String(Number.isInteger(shockML)?eml:'nedoloženo'))}</p>
  <form data-weather-shock-followup><input type="hidden" name="sourceId" value="${esc(q.sourceId)}">
- <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required></label>
- ${q.kind==='UNC'?`<label>Pokud nastane UNC + CF: Location Shock z původní rány<input name="comaLocationShock" type="number" min="0" max="15"></label><label>Injury Level původní rány<input name="comaInjuryLevel" type="number" min="1" max="5"></label><label>První d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10"></label>`:''}
+ <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required ${canRoll?'':'disabled title="Shock ještě není splatný nebo chybí ověřená ML"'}></label>
+ ${q.kind==='UNC'?`<label>Pokud nastane UNC + CF: Location Shock z původní rány<input name="comaLocationShock" type="number" min="0" max="15" ${canRoll?'':'disabled'}></label><label>Injury Level původní rány<input name="comaInjuryLevel" type="number" min="1" max="5" ${canRoll?'':'disabled'}></label><label>První d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" ${canRoll?'':'disabled'}></label>`:''}
  <p class="hc-hint">${q.phase==='after-all-bleeding-stopped'?'Ihned po zastavení všech Bleederů – bez dalších deseti minut.':q.kind==='UNC'?'Test je dostupný přesně po uplynutí deseti minut.':'Tlačítko vyhodnotí Shock po dokončení následující skutečné akce postavy; žádný bojový tah se nevytváří.'}</p>
  <button type="submit" ${canRoll?'':'disabled'}>Vyhodnotit a zapsat Shock d100</button><output role="status" aria-live="polite"></output></form>
  ${!canRoll?'<p class="notice">Zatím nesplatné nebo postava nemá doložené Shock ML.</p>':''}</section>`;
@@ -11123,25 +11123,27 @@ function hskParallelColdHealthPanel(actorId){
   if(x.followup){
    const due=x.followup.dueMinute,ml=availableMasteries(actor).find(z=>z.name==='Shock')?.ml;
    const eml=Number(ml)-combatFatigueTotals(s).total-(x.shock==='STN'?0:20);
+   const rerollReady=clock.minute>=due&&Number.isInteger(ml);
    items.push(`<form data-parallel-cold-reroll><input type="hidden" name="sourceId" value="${esc(x.sourceId)}">
     <h4>Cold Water Shock Reroll · ${esc(x.sourceId)}</h4>
     <p class="hc-hint">Původní Shock ${esc(x.shock)}, termín ${esc(displayCampaignMinute(due))}; žádný další bojový krok ani časový posun se nevytváří. Původní Extended Shock/Coma běží nezávisle.</p>
     <p>Shock ML ${esc(String(ml??'neznámá'))} · EML ${esc(String(Number.isInteger(ml)?eml:'neznámá'))}.</p>
-    <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required></label>
-    ${x.shock==='UNC'?'<label>Jen při UNC+CF: GM výslovně určený Coma HR pro ponoření bez Injury Level<input name="initialComaHR" type="number" min="1" max="20"></label><label>Jen při UNC+CF: první skutečný Coma d10 dní<input name="initialComaD10" type="number" min="1" max="10"></label>':''}
-    <button type="submit" ${clock.minute>=due&&Number.isInteger(ml)?'':'disabled'}>Zapsat samostatný Shock Reroll</button><output role="status" aria-live="polite"></output></form>`);
+    <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required ${rerollReady?'':'disabled'}></label>
+    ${x.shock==='UNC'?`<label>Jen při UNC+CF: GM výslovně určený Coma HR pro ponoření bez Injury Level<input name="initialComaHR" type="number" min="1" max="20" ${rerollReady?'':'disabled'}></label><label>Jen při UNC+CF: první skutečný Coma d10 dní<input name="initialComaD10" type="number" min="1" max="10" ${rerollReady?'':'disabled'}></label>`:''}
+    <button type="submit" ${rerollReady?'':'disabled'}>Zapsat samostatný Shock Reroll</button><output role="status" aria-live="polite"></output></form>`);
   }
   for(const kind of ['extended-shock','coma']){
    const c=kind==='extended-shock'?x.extendedShock:x.coma?.active?x.coma:null;
    if(!c)continue;
    const due=kind==='extended-shock'?c.startMinute+(c.elapsedHours+4)*60:c.startMinute+(c.elapsedDays+c.nextCourseDays)*DAY_MINUTES;
+   const courseReady=clock.minute===due;
    items.push(`<form data-parallel-cold-course><input type="hidden" name="sourceId" value="${esc(x.sourceId)}"><input type="hidden" name="kind" value="${kind}">
     <h4>${kind==='extended-shock'?'Extended Shock':'Coma'} · samostatný Cold Water Course</h4>
     <p class="hc-hint">Zdroj ${esc(x.sourceId)} · HR${c.hr} · pravidlový termín ${esc(displayCampaignMinute(due))} · aktuální minuta ${esc(displayCampaignMinute(clock.minute))}.</p>
-    <label>Skutečný Course d100<input name="roll" type="number" min="1" max="100" required></label>
-    ${kind==='extended-shock'?'<label>Nejvyšší skutečné Physician SV hvězdy<input name="physicianStars" type="number" min="0" max="10" value="0" required></label>':'<label>Klidné chráněné prostředí<select name="restfulShelter"><option value="yes">Ano</option><option value="no">Ne (−20)</option></select></label><label>Nový skutečný d10, pouze pokud Coma pokračuje<input name="nextComaD10" type="number" min="1" max="10"></label>'}
-    <label>Doložený Arcane bonus<input name="arcaneBonus" type="number" min="0" max="100" value="0" required></label>
-    <button type="submit" ${clock.minute===due?'':'disabled'}>Zapsat právě splatný Course</button><output role="status" aria-live="polite"></output></form>`);
+    <label>Skutečný Course d100<input name="roll" type="number" min="1" max="100" required ${courseReady?'':'disabled'}></label>
+    ${kind==='extended-shock'?`<label>Nejvyšší skutečné Physician SV hvězdy<input name="physicianStars" type="number" min="0" max="10" value="0" required ${courseReady?'':'disabled'}></label>`:`<label>Klidné chráněné prostředí<select name="restfulShelter" ${courseReady?'':'disabled'}><option value="yes">Ano</option><option value="no">Ne (−20)</option></select></label><label>Nový skutečný d10, pouze pokud Coma pokračuje<input name="nextComaD10" type="number" min="1" max="10" ${courseReady?'':'disabled'}></label>`}
+    <label>Doložený Arcane bonus<input name="arcaneBonus" type="number" min="0" max="100" value="0" required ${courseReady?'':'disabled'}></label>
+    <button type="submit" ${courseReady?'':'disabled'}>Zapsat právě splatný Course</button><output role="status" aria-live="polite"></output></form>`);
   }
   return `<section class="panel wide hmk-parallel-cold-course"><h3>Cold Water Shock · souběžná zdravotní událost · ${esc(actor.name)}</h3>${items.join('')}</section>`;
  }).join('');
@@ -15687,9 +15689,9 @@ function openCalendarWeatherRoll(actor,source){
  `<label>Podmínky hlídky<select name="heatCondition"><option value="moving">Pohyb / bez odpočinku · d4</option><option value="resting">Klid bez pohybu · d6</option><option value="shade">Odpočinek ve stínu · d10</option></select></label>
  <label>Původ ze subtropického nebo tropického klimatu<select name="native"><option value="no">Ne</option><option value="yes">Ano · vyšší kostka d6/d8/d12</option></select></label>
  <p>Heat AV = max(Area AV, 1). Při hodu menším nebo rovném AV následuje Endurance.</p>`}
- <label>Skutečný Weather Hazard hod<input name="roll" type="number" min="1" max="${kind==='cold'?(continuous?10:6):4}" step="1" required></label></div>
- <button type="button" data-trek-weather-auto>⚄ Hodit d${kind==='cold'?(continuous?10:6):4}</button>
- <button type="submit">Zapsat Weather Hazard Roll</button><output role="status" aria-live="polite"></output>
+ <label>Skutečný Weather Hazard hod<input name="roll" type="number" min="1" max="${kind==='cold'?(continuous?10:6):4}" step="1" required ${verifiedAreaAV.ready?'':'disabled title="Nejdřív doložte ochranu oblečené výstroje"'}></label></div>
+ <button type="button" data-trek-weather-auto ${verifiedAreaAV.ready?'':'disabled'}>⚄ Hodit d${kind==='cold'?(continuous?10:6):4}</button>
+ <button type="submit" ${verifiedAreaAV.ready?'':'disabled'}>Zapsat Weather Hazard Roll</button><output role="status" aria-live="polite"></output>
  </form>`;
  const target=main.querySelector('.hc-trek-routine')||main.querySelector('.hc-calendar');
  if(target)target.before(node);else main.append(node);
@@ -15711,7 +15713,8 @@ document.addEventListener('change',e=>{
 document.addEventListener('input',e=>{if(e.target.matches?.('[data-trek-weather-roll] input[name="roll"]'))delete e.target.dataset.weatherAuto;},true);
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-trek-weather-auto]');if(!button)return;
- e.preventDefault();const form=button.closest('form'),die=form?.elements.namedItem('roll');if(!die)return;
+ e.preventDefault();const form=button.closest('form'),die=form?.elements.namedItem('roll');
+ if(!form||button.disabled||!die||die.disabled||form.querySelector('button[type="submit"]')?.disabled)return;
  const sides=weatherFormSides(form),number=secureHMKDie(sides);die.max=String(sides);die.value=String(number);die.dataset.weatherAuto=String(number);
  button.textContent='⚄ d'+sides+' = '+number;
 },true);
