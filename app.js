@@ -154,6 +154,7 @@ import {recordEncounterFreeAction,encounterFreeActionAvailable,createEncounterSe
 import {applyConfirmedTreatment,applyConfirmedFrostAmputation,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock} from './src/integration/hmk-healing-persistence.js';
 import {weatherTreatmentTiming} from './src/integration/hmk-weather-treatment-timing.js';
 import {calculateWeatherAreaAV} from './src/integration/hmk-weather-area-av.js';
+import {resolveBestiaryFrostAV93725,parseBestiaryFrostSites93725} from './src/integration/hmk-bestiary-frost-auto-av-93725.js';
 import {travelBleedingTerm,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
 import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
@@ -316,7 +317,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.724';
+const APP_VERSION='93.725';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3362,7 +3363,7 @@ function openCharacterJournal(id){
 function creationDrafts(){return data.characters.filter(c=>c.hmk?.creation&&!['complete','auto-generated'].includes(c.hmk.creation.status))}
 function resumeCreation(id){
  const c=character(id);if(!c)return false;
- if(combatInitiativeSequence)return false;
+ if(combatActorLocked93725(id))return false;
  selected=id;view='creation';overlay=null;notice='';
  try{sessionStorage.setItem(CREATION_LAST_ID,id)}catch{}
  render();return true;
@@ -5202,8 +5203,8 @@ function equippedHandsPanel(inv,character){
   const choices=inv.filter(x=>x.id!==actual?.id&&!x.destroyed&&isHandheldItem(x)&&
    ['none','carried'].includes(x.slot??'none')&&Number.isSafeInteger(x.quantity)&&x.quantity>0);
   const gripSelector=actual?.snapshot?.category==='weapon'&&supportsSelectableTwoHandGrip(actual)&&!actual.snapshot.properties?.twoHanded&&!actual.snapshot.properties?.verifiedModes?.[0]?.twoHanded?
-   `<label class="hmk-grip-slot"><span>Držení ${esc(actual.snapshot.name)}</span><select data-weapon-grip="${esc(actual.id)}" aria-label="Držení ${esc(actual.snapshot.name)}" ${combatInitiativeSequence?'disabled':''}><option value="one" ${gripOf(actual)==='one'?'selected':''}>Jednoručně</option><option value="two" ${gripOf(actual)==='two'?'selected':''}>Obouručně</option></select><button type="button" class="secondary hc-small" data-hmk-commit-grip-597="${esc(actual.id)}" ${combatInitiativeSequence?'disabled':''}>Potvrdit držení</button></label>`:actual?.snapshot?.category==='weapon'&&requiresTwoHands(actual)?'<small>Držení: obouručně (povinné)</small>':'';
-  return `<div class="hmk-hand-control"><label class="hmk-hand-slot"><strong>${esc(label)}</strong><select data-equip-hand="${esc(slot)}" aria-label="${esc(label)} – vybavení z inventáře" ${combatInitiativeSequence?'disabled title="Změny výbavy během Initiative vyžadují Combat akci"':''}><option value="">${reserved?'Vyhrazeno obouruční zbrani':`Volná${actual?' (odložit do inventáře)':''}`}</option>${actual?`<option selected value="${esc(actual.id)}">${esc(actual.snapshot?.name||'Nasazený předmět')}</option>`:''}${!reserved?choices.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot?.name||'Předmět')}${x.quantity>1?' · 1 z '+x.quantity:''}${requiresTwoHands(x)?' · obouruč':''}</option>`).join(''):''}</select><button type="button" class="secondary hc-small" data-hmk-commit-hand-597="${esc(slot)}" ${combatInitiativeSequence?'disabled':''}>Potvrdit ruku</button></label>${gripSelector||''}</div>`;
+   `<label class="hmk-grip-slot"><span>Držení ${esc(actual.snapshot.name)}</span><select data-weapon-grip="${esc(actual.id)}" aria-label="Držení ${esc(actual.snapshot.name)}" ${combatActorLocked93725(character?.id)?'disabled':''}><option value="one" ${gripOf(actual)==='one'?'selected':''}>Jednoručně</option><option value="two" ${gripOf(actual)==='two'?'selected':''}>Obouručně</option></select><button type="button" class="secondary hc-small" data-hmk-commit-grip-597="${esc(actual.id)}" ${combatActorLocked93725(character?.id)?'disabled':''}>Potvrdit držení</button></label>`:actual?.snapshot?.category==='weapon'&&requiresTwoHands(actual)?'<small>Držení: obouručně (povinné)</small>':'';
+  return `<div class="hmk-hand-control"><label class="hmk-hand-slot"><strong>${esc(label)}</strong><select data-equip-hand="${esc(slot)}" aria-label="${esc(label)} – vybavení z inventáře" ${combatActorLocked93725(character?.id)?'disabled title="Výbava účastníka vyžaduje Combat akci"':''}><option value="">${reserved?'Vyhrazeno obouruční zbrani':`Volná${actual?' (odložit do inventáře)':''}`}</option>${actual?`<option selected value="${esc(actual.id)}">${esc(actual.snapshot?.name||'Nasazený předmět')}</option>`:''}${!reserved?choices.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot?.name||'Předmět')}${x.quantity>1?' · 1 z '+x.quantity:''}${requiresTwoHands(x)?' · obouruč':''}</option>`).join(''):''}</select><button type="button" class="secondary hc-small" data-hmk-commit-hand-597="${esc(slot)}" ${combatActorLocked93725(character?.id)?'disabled':''}>Potvrdit ruku</button></label>${gripSelector||''}</div>`;
  };
  return `<div class="equipment-summary equipped-hands" aria-label="Aktuální obsazení rukou">${handedness==='right'||handedness==='left'?show(mainRight?'off_hand':'main_hand','Levá ruka')+show(mainRight?'main_hand':'off_hand','Pravá ruka'):show('main_hand','Hlavní ruka – fyzická strana neurčena')+show('off_hand','Vedlejší ruka – fyzická strana neurčena')}</div>`;
 }
@@ -5371,7 +5372,7 @@ function characterInventoryOverview(c,inv){
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-hmk-item-repair-legacy]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
- if(!data.campaignClock||combatInitiativeSequence||storageReadOnly||view!=='sheet'||activeSheetSection!=='inventory')return;
+ if(!data.campaignClock||combatActorLocked93725(selected)||storageReadOnly||view!=='sheet'||activeSheetSection!=='inventory')return;
  const x=data.inventory.find(i=>i.id===b.dataset.hmkItemRepairLegacy&&i.characterId===selected),
   legacy=x&&legacyEquipmentRepairCandidate(x);
  if(!legacy)return;
@@ -5389,7 +5390,7 @@ document.addEventListener('submit',e=>{
  const fd=new FormData(form),remaining=Number(fd.get('remainingMinutes')),
   itemId=String(fd.get('itemId')||''),ownerId=String(fd.get('ownerId')||''),episodeId=String(fd.get('episodeId')||'');
  if(!Number.isSafeInteger(remaining)||remaining<0||remaining>240||fd.get('gmConfirmed')!=='yes')return alert('Potvrďte skutečný zbývající počet minut 0–240.');
- if(!data.campaignClock||combatInitiativeSequence||view!=='sheet'||activeSheetSection!=='inventory'||selected!==ownerId)return alert('Změnila se kampaň, postava nebo probíhá boj.');
+ if(!data.campaignClock||combatActorLocked93725(ownerId)||view!=='sheet'||activeSheetSection!=='inventory'||selected!==ownerId)return alert('Změnila se kampaň, postava nebo probíhá její boj.');
  if(mutate(()=>{
   const x=data.inventory.find(i=>i.id===itemId&&i.characterId===ownerId),legacy=x&&legacyEquipmentRepairCandidate(x);
   if(!legacy||legacy.sourceEpisodeId!==episodeId)throw Error('Historická oprava již neodpovídá aktuálním údajům.');
@@ -5412,9 +5413,9 @@ document.addEventListener('click',e=>{
  const x=data.inventory.find(i=>i.id===b.dataset.hmkItemRepair&&i.characterId===selected);
  if(!x||view!=='sheet'||activeSheetSection!=='inventory'||
    x.hmkEquipmentRepair?.status!=='damaged'||!(x.hmkEquipmentRepair.remainingMinutes>0))return;
- if(!data.campaignClock||combatInitiativeSequence||storageReadOnly)return alert('Oprava vybavení vyžaduje otevřenou kampaň mimo boj a zapisovatelné úložiště.');
+ if(!data.campaignClock||combatActorLocked93725(selected)||storageReadOnly)return alert('Oprava vybavení účastníka boje vyžaduje Combat akci.');
  const remaining=x.hmkEquipmentRepair.remainingMinutes;
- const candidates=(data.campaignClock.characterIds||[]).map(id=>character(id)).filter(Boolean);
+ const candidates=(data.campaignClock.characterIds||[]).map(id=>character(id)).filter(c=>c&&!combatActorLocked93725(c.id));
  const preferredWorker=x.hmkEquipmentRepair.lastWorkerId||x.hmkEquipmentRepair.repairActorId||selected;
  overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Ruční oprava · ${esc(x.snapshot?.name||'Předmět')}</h2>
  <p>Vlastník: <strong>${esc(character(selected)?.name||selected)}</strong>. Zbývá <strong>${remaining} min</strong> z ${x.hmkEquipmentRepair.totalMinutes||240} min.</p>
@@ -5430,7 +5431,7 @@ document.addEventListener('submit',e=>{
  const minutes=Number(fd.get('workedMinutes')),before=Number(fd.get('remainingBefore')),workerId=String(fd.get('workerId')||'');
  if(!Number.isSafeInteger(minutes)||minutes<1||minutes>before||fd.get('gmConfirmed')!=='yes')return alert('GM musí potvrdit kladný počet minut, nejvýše zbývající práci.');
  if(!data.campaignClock.characterIds?.includes(workerId)||!character(workerId))return alert('Vyberte skutečnou opravující postavu z kampaně.');
- if(!data.campaignClock||combatInitiativeSequence||view!=='sheet'||selected!==ownerId||activeSheetSection!=='inventory')return alert('Změnila se kampaň, postava nebo probíhá boj.');
+ if(!data.campaignClock||combatActorLocked93725(ownerId,workerId)||view!=='sheet'||selected!==ownerId||activeSheetSection!=='inventory')return alert('Změnila se kampaň, postava nebo probíhá její boj.');
  if(mutate(()=>{
   const item=data.inventory.find(x=>x.id===itemId&&x.characterId===ownerId),r=item?.hmkEquipmentRepair;
   if(!r||r.format!=='hmk-inventory-equipment-repair-v1'||r.status!=='damaged'||r.remainingMinutes!==before||
@@ -5468,7 +5469,7 @@ function armourLoadoutPanel(inv,owner=null){
  const load=owner?resolveCombatantLoad({character:owner,inventory:activeRationInventory()}):null;
  const reorderPreview=load&&!load.bulkReady&&load.layeringFeasibility?.status!=='forbidden'?previewExistingArmourArrangement(inv):null;
  const rows=layerDisplayRows(report,inv,load).map(r=>`<tr class="arm-layer-row arm-layer-${r.status}"><th scope="row" title="${esc(r.names)}">${esc(r.location)} <span class="muted tiny">${esc(JOURNAL_ANATOMICAL_LOCATIONS.find(([code])=>code===r.location)?.[1]||r.locationName)}</span></th><td class="arm-layer-count ${r.status==='valid'?'':'arm-layer-alert'}" title="${esc(r.detail)}">${r.count}${r.status==='over-limit'?` <b>+${r.count-5}</b>`:''}</td><td>${r.protection.b}</td><td>${r.protection.e}</td><td>${r.protection.p}</td><td>${r.protection.f}</td><td class="arm-layer-explain">${r.status==='valid'?'—':esc(r.detail)}</td></tr>`).join('');
- return `<section class="panel wide"><h3>Worn Armour · Location Protection & Layers</h3><div class="hmk-outfit-toolbar" aria-label="Automatické převlékání"><fieldset class="hmk-outfit-action-group"><legend>Výbava u postavy</legend><button type="button" data-outfit-action="armour" ${!owner||combatInitiativeSequence?'disabled':''}>Obléknout nejlepší zbroj</button><button type="button" class="secondary" data-outfit-action="undress-armour" ${!owner||combatInitiativeSequence?'disabled':''}>Svléknout zbroj</button><button type="button" class="secondary" data-outfit-action="clothing" ${!owner||combatInitiativeSequence?'disabled':''}>Obléknout běžný oděv</button><button type="button" class="secondary" data-outfit-action="undress-clothing" ${!owner||combatInitiativeSequence?'disabled':''}>Svléknout běžný oděv</button></fieldset><fieldset class="hmk-outfit-action-group"><legend>Převlékání z / do truhly</legend><button type="button" data-chest-outfit="armour" ${!owner||combatInitiativeSequence?'disabled':''}>Obléknout nejlepší zbroj z truhly</button><button type="button" class="secondary" data-outfit-action="undress-chest-armour" ${!owner||combatInitiativeSequence?'disabled':''}>Svléknout zbroj do truhly</button><button type="button" class="secondary" data-chest-outfit="clothing" ${!owner||combatInitiativeSequence?'disabled':''}>Obléknout běžný oděv z truhly</button><button type="button" class="secondary" data-outfit-action="undress-chest-clothing" ${!owner||combatInitiativeSequence?'disabled':''}>Svléknout běžný oděv do truhly</button></fieldset></div><p class="tiny muted">Zbroj: u přesného zakoupeného kompletu se použije tištěná sestava a její ověřené hodnoty, bez umělého limitu 12 článků. Vlastní kombinace se nyní hledají úplným prohledáním pravidlově přípustných možností bez svévolného limitu 12 článků. Běžný oděv: ověřené látkové články, běžné kožené oděvní kusy a vycpávané košile dle HMK s. 113 a 118; jiné textilie bez doložené anatomie se automaticky neoblékají. Před změnou se zobrazí kontrolovaný návrh. Během Initiative je změna zakázána.</p><p class="muted tiny">Zobrazené B/E/P/F jsou součty z předmětů, nikoli automatické potvrzení pravidlové ochrany. Červeně je prokázané překročení počtu vrstev či nepřípustná kombinace. Jantarová znamená, že pořadí skutečně ovlivňuje přípustnost a ještě není doloženo; nejde automaticky o chybu ani o Bulk postih. Oblečení v různých Body Zones se neposuzuje jako jedna společná vrstva, i když sdílí anatomickou lokaci (např. Cloth Tunic + Cloth Breeches na Pelvis).</p>${rows?`<div class="catalog-scroll"><table class="catalog-spec arm-layer-table"><thead><tr><th>Location</th><th>Layers</th><th>${journalTerm('b')}</th><th>${journalTerm('e')}</th><th>${journalTerm('p')}</th><th>${journalTerm('f')}</th><th>Kontrola</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p>Žádná nasazená zbroj.</p>'}${reorderPreview?.ready?`<div class="actions"><button type="button" class="secondary" data-armour-autolayer="${esc(owner.id)}">Uspořádat zbroj do přípustných vrstev</button><p class="tiny muted">Aplikace navrhne a zapíše doložené pořadí, nikoli nová pravidla ani nový postih. Nemění počet či vlastnictví předmětů.</p></div>`:''}${report.skipped.length?`<p class="notice">U ${report.skipped.length} položek chybí úplná anatomická data; ochrana je jen částečný součet.</p>`:''}</section>`;
+ return `<section class="panel wide"><h3>Worn Armour · Location Protection & Layers</h3><div class="hmk-outfit-toolbar" aria-label="Automatické převlékání"><fieldset class="hmk-outfit-action-group"><legend>Výbava u postavy</legend><button type="button" data-outfit-action="armour" ${!owner||combatActorLocked93725(owner?.id)?'disabled':''}>Obléknout nejlepší zbroj</button><button type="button" class="secondary" data-outfit-action="undress-armour" ${!owner||combatActorLocked93725(owner?.id)?'disabled':''}>Svléknout zbroj</button><button type="button" class="secondary" data-outfit-action="clothing" ${!owner||combatActorLocked93725(owner?.id)?'disabled':''}>Obléknout běžný oděv</button><button type="button" class="secondary" data-outfit-action="undress-clothing" ${!owner||combatActorLocked93725(owner?.id)?'disabled':''}>Svléknout běžný oděv</button></fieldset><fieldset class="hmk-outfit-action-group"><legend>Převlékání z / do truhly</legend><button type="button" data-chest-outfit="armour" ${!owner||combatActorLocked93725(owner?.id)?'disabled':''}>Obléknout nejlepší zbroj z truhly</button><button type="button" class="secondary" data-outfit-action="undress-chest-armour" ${!owner||combatActorLocked93725(owner?.id)?'disabled':''}>Svléknout zbroj do truhly</button><button type="button" class="secondary" data-chest-outfit="clothing" ${!owner||combatActorLocked93725(owner?.id)?'disabled':''}>Obléknout běžný oděv z truhly</button><button type="button" class="secondary" data-outfit-action="undress-chest-clothing" ${!owner||combatActorLocked93725(owner?.id)?'disabled':''}>Svléknout běžný oděv do truhly</button></fieldset></div><p class="tiny muted">Zbroj: u přesného zakoupeného kompletu se použije tištěná sestava a její ověřené hodnoty, bez umělého limitu 12 článků. Vlastní kombinace se nyní hledají úplným prohledáním pravidlově přípustných možností bez svévolného limitu 12 článků. Běžný oděv: ověřené látkové články, běžné kožené oděvní kusy a vycpávané košile dle HMK s. 113 a 118; jiné textilie bez doložené anatomie se automaticky neoblékají. Před změnou se zobrazí kontrolovaný návrh. Během Initiative je změna zakázána.</p><p class="muted tiny">Zobrazené B/E/P/F jsou součty z předmětů, nikoli automatické potvrzení pravidlové ochrany. Červeně je prokázané překročení počtu vrstev či nepřípustná kombinace. Jantarová znamená, že pořadí skutečně ovlivňuje přípustnost a ještě není doloženo; nejde automaticky o chybu ani o Bulk postih. Oblečení v různých Body Zones se neposuzuje jako jedna společná vrstva, i když sdílí anatomickou lokaci (např. Cloth Tunic + Cloth Breeches na Pelvis).</p>${rows?`<div class="catalog-scroll"><table class="catalog-spec arm-layer-table"><thead><tr><th>Location</th><th>Layers</th><th>${journalTerm('b')}</th><th>${journalTerm('e')}</th><th>${journalTerm('p')}</th><th>${journalTerm('f')}</th><th>Kontrola</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<p>Žádná nasazená zbroj.</p>'}${reorderPreview?.ready?`<div class="actions"><button type="button" class="secondary" data-armour-autolayer="${esc(owner.id)}">Uspořádat zbroj do přípustných vrstev</button><p class="tiny muted">Aplikace navrhne a zapíše doložené pořadí, nikoli nová pravidla ani nový postih. Nemění počet či vlastnictví předmětů.</p></div>`:''}${report.skipped.length?`<p class="notice">U ${report.skipped.length} položek chybí úplná anatomická data; ochrana je jen částečný součet.</p>`:''}</section>`;
 }
 function combatantLoadPanel(c){
  const r=resolveCombatantLoad({character:c,inventory:activeRationInventory()});
@@ -6093,14 +6094,7 @@ function bestiaryFrostSourceForm571(actor,health){
  <form data-hmk-beast-frost-source-571 class="hc-fields"><input type="hidden" name="targetId" value="${esc(actor.id)}">
  <label>Zdroj již vyhodnoceného Frost<select name="source"><option value="other">Jiný nezávisle doložený zdroj (GM)</option></select></label>
  <label>Úroveň zranění<select name="level"><option value="4">G4f</option><option value="5">G5f</option></select></label>
- <details class="hmk-bestiary-wide" open><summary>Frostbite z počasí · výpočet podle d20 a ochrany (HMK 185)</summary>
- <p class="hc-hint">Pro zdroj „počasí“ jsou následující hody povinné. Vítr: 1–3 = 2 h, 4–17 = 1 h, 18–20 = 30 min. Expozice: 1–12 = 1 h, 13–17 = 2 h, 18–19 = 3 h, 20 = 4 h. AV0: IL za každé období; AV1–3: IL za dvě období; AV4+: bez Frostbite. Formulář ukládá <strong>jednu doloženou lokalitu</strong>; další vystavená místa je nutné rozhodnout zvlášť.</p>
- <label>Vítr · skutečný d20<input name="windD20" type="number" min="1" max="20"></label>
- <label>Délka expozice · skutečný d20<input name="durationD20" type="number" min="1" max="20"></label>
- <label>Potvrzená ochrana AV této lokality (včetně přirozené a vybavení; min. přirozená ${actor.profile.combat?.av?.f??'—'})<input name="locationAV" type="number" min="${Math.max(0,actor.profile.combat?.av?.f??0)}" max="100" value="${Math.max(0,actor.profile.combat?.av?.f??0)}"></label>
- <label class="hc-check"><input type="checkbox" name="freezingAirConfirmed"> GM potvrzuje skutečný mrazivý vzduch</label>
- <label class="hc-check"><input type="checkbox" name="siteExposedConfirmed"> GM potvrzuje vystavení této konkrétní lokality</label>
- <output data-hmk-frostbite-out-572 class="hc-hint hmk-bestiary-wide" aria-live="polite">Vyplň dvě d20 a AV pro kontrolu výsledného IL.</output></details>
+ <p class="hc-hint">AV zvířete a nové Weather/Frost doklady se zadávají výhradně v aktivní Frost Sequence; tento archivní formulář neprovádí Weather výpočet.</p>
  <label>Zone Number · 1–${readiness.maxZN}<input type="number" name="zoneNumber" min="1" max="${readiness.maxZN}" step="1" required></label>
  <label>Location d10 · skutečný hod<input type="number" name="locationD10" min="1" max="10" step="1" required></label>
  <label class="hmk-bestiary-wide">Doložený původ Frost (pravidlový krok, hody a účinek)<textarea name="sourceDetails" rows="2" maxlength="300" minlength="5" required></textarea></label>
@@ -6133,6 +6127,7 @@ function bestiaryFrostAmputationForm571(actor,w,health,minute){
  * explicit immutable journal evidence. Page 149 watch can only be linked to
  * the SAME purchased animal that actually travelled in that watch. */
 function bestiaryFrostCompletionPanel573(actor,health,cid,minute){
+ const frostAV=resolveBestiaryFrostAV93725({profile:actor.profile,inventory:data.inventory,beastId:actor.id,ownerAnimalId:actor.ownerAnimalId});
  if(!creatureAnatomyReadiness566(actor.profile).ready)return '';
  const sourceList=actor.ownerAnimalId?data.journal.filter(row=>row.calendarCampaignId===cid&&
    row.campaignMinute<=minute&&minute<=row.campaignMinute+240&&row.calendarTrekProof?.weatherWatch?.hazard==='cold'&&
@@ -6163,14 +6158,14 @@ function bestiaryFrostCompletionPanel573(actor,health,cid,minute){
  <label>Skutečný magický Impact d4<input name="magicD4" type="number" min="1" max="4"></label><label>Talent / Spell Index<input name="magicIndex" type="number" min="1" max="30"></label>
  <label class="hc-check"><input name="magicCS" type="checkbox"> CS (význam pouze pro Cold Bolt)</label>
  <label>Breath – umístění<select name="magicPosition"><option value="front">Přední polovina</option><option value="back">Zadní polovina</option></select></label>
- <label>Výchozí Frost AV · pro Cold Bolt závazná hodnota<input name="magicAreaAV" type="number" min="0" max="100" value="${Math.max(0,actor.profile.combat?.av?.f??0)}"></label>
+ <p class="hc-hint">Automatická Frost AV: <strong>${frostAV.ready?frostAV.value:"nelze bezpečně ověřit"}</strong> · ${esc(frostAV.ready?"Přirozená ochrana druhu z bestiáře; nasazená výstroj byla ověřena.":frostAV.reason)}</p>
  <label>Cold Bolt – zvolená Zone Number<input name="magicZN" type="number" min="1" max="${creatureAnatomyReadiness566(actor.profile).maxZN}"></label>
  <label>Cold Bolt – skutečné Location d10<input name="magicLD" type="number" min="1" max="10"></label>
  <label class="hc-check"><input name="spellfireConfirmed" type="checkbox"> GM ověřil účinné Spellfire / Talent</label>
  <label class="hc-check"><input name="targetAffectedConfirmed" type="checkbox"> GM ověřil cíl a dosah (včetně fyzické opce 8 pro Breath)</label></details>
- <label class="hmk-bestiary-wide">Frostbite z počasí: ÚPLNÝ soupis exponovaných lokalit; Cold Bolt: přesně jedna lokace; Breath: přesně jeden řádek <code>area;none;Area AV;Shock d100;Fatigue</code>. Formát <code>lokace;strana;AV;Shock d100;Fatigue[;subsite]</code>
- <textarea name="sites" rows="5" spellcheck="false" placeholder="flg;left;2;15;0&#10;flg;right;2;72;0&#10;hd;none;4;;" required></textarea>
- <small>Počasí: lokace hd/nk/flg/hlg/tx/ab/wng, strana left/right u párových a none u ostatních. Breath: POUZE <code>area;none;AV;Shock d100;Fatigue</code>, AV se musí rovnat Area AV uvedené v sekci magie; nikdy nepřidávat více tělesných lokalit. Cold Bolt: jedna skutečně zasažená lokace s LD a ověřenou AV. Nezraněná lokace má prázdný Shock a Fatigue. Volitelný 6. údaj: Head = jmenovitá část obličeje, Wing = wing-limb potvrzený GM. Compound a IL nad G5 systém bezpečně blokuje.</small></label>
+ <label class="hmk-bestiary-wide">Frostbite: všechny exponované lokace; Cold Bolt: jedna skutečně zasažená lokace; Breath: jediný řádek <code>area;none;Shock d100;Fatigue</code>. Ochranu AV načítá aplikace sama z doloženého profilu a nasazené výstroje.
+ <textarea name="sites" rows="5" spellcheck="false" placeholder="flg;left;15;0&#10;flg;right;72;0&#10;hd;none;;" required></textarea>
+ <small>Formát <code>lokace;strana;Shock d100;Fatigue[;subsite]</code> — žádné ručně zadávané AV. Počasí: hd/nk/flg/hlg/tx/ab/wng; párové lokace left/right. U nezraněné lokace nechte Shock a Fatigue prázdné. Přirozená Frost AV z profilu tvora je nezávislá na AV majitele.</small></label>
  <label class="hc-check hmk-bestiary-wide"><input name="allExposedConfirmed" type="checkbox" required> GM potvrzuje kompletnost exponovaných míst (u Bolt přesně jedinou lokaci) a případné druhové výjimky</label>
  <label class="hc-check hmk-bestiary-wide"><input name="gmConfirmed" type="checkbox" required> GM potvrzuje všechny skutečné hody a okamžik zápisu; výsledky budou trvalé a nezměnitelné</label>
  <button type="submit">Vyhodnotit a uložit Frost Sequence · vše atomicky</button><output role="status" aria-live="polite"></output></form></details>`:'<p class="hc-hint">Nová Frost Sequence je blokovaná, dokud není vyřešen Shock a krvácení.</p>'}
@@ -7117,6 +7112,13 @@ function readInitiativeSequence(){try{const raw=sessionStorage.getItem(COMBAT_IN
 let combatInitiativeSequence=data.combatRuntime!==undefined&&data.combatRuntime!==null
  ?(data.combatRuntime.sequence?validateEncounterSequence(data.combatRuntime.sequence):null)
  :readInitiativeSequence();
+/** Cross-module independent writes are allowed for nonparticipants only.
+ * The permanent Combat transaction validator still protects participants and
+ * immutable proofs. This check controls UI workflow, not HMK turn order. */
+function combatActorLocked93725(...ids){
+ const participantIds=new Set([...(combatInitiativeSequence?.order||[]),...(data.combatRuntime?.sequence?.order||[])]);
+ return ids.some(id=>typeof id==='string'&&participantIds.has(id));
+}
 function combatSequenceStates(){return Object.fromEntries(selectedEncounterCharacters().map(c=>[c.id,persistentStateOf(c)]));}
 function verifyCombatSequenceRoster(s){
  const ids=[...encounterSelection].sort();const roster=[...s.order].sort();
@@ -10270,7 +10272,7 @@ document.addEventListener('submit',event=>{
 document.addEventListener('submit',event=>{
  const form=event.target;if(form.id!=='hmk-perception-mode-form')return;
  event.preventDefault();event.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Perception nelze přepínat během aktivní Initiative.');
+ if(combatActorLocked93725(selected))return alert('Změna Perception účastníka boje patří do Combat.');
  const original=character(selected);if(!original?.hmk?.creation)return alert('Nejprve otevřete Character Creation.');
  const v=Object.fromEntries(new FormData(form)),dice={};
  for(const k of ['eye','hrg','sml'])if(String(v[k]??'').trim())dice[k]=String(v[k]).split(',').map(x=>x.trim());
@@ -11939,7 +11941,7 @@ document.addEventListener('submit',event=>{
    ...(trainingExtension?{trainingExtension}:{}),...(writingExtension?{writingExtension}:{})};
   if(!mutate(()=>{
    if(plan.id==='acro-gymnastics'||(plan.id==='acro-gymnastics-failure'&&['F','CF'].includes(result?.level))){
-    if(combatInitiativeSequence)throw Error('Během Initiative se Prone zapisuje výhradně přes bojový systém');
+    if(combatActorLocked93725(actor.id))throw Error('Prone účastníka boje se zapisuje přes Combat');
     const state=structuredClone(persistentStateOf(actor));
     state.posture.prone=true;
     state.events.push({id:'skill-prone:'+originId+':'+side,type:'skill-acrobatics-prone',round:Math.max(1,combatClock.round||1,state.lastRound||0),details:{originId,side,rulePage:64}});
@@ -12051,7 +12053,7 @@ document.addEventListener('submit',event=>{
   if(proof?.type!=='critical-followup'||!['Climbing','Acrobatics','Jumping'].includes(proof.skill)||!['F','CF'].includes(proof.result?.level))throw Error('Neověřený původní pád');
   if(data.journal.some(x=>x.skillTestProof?.type==='climbing-falling'&&x.skillTestProof.sourceId===sourceId))throw Error('Pád je již uzavřen');
   const actor=character(proof.actorId);if(!actor)throw Error('Postava nebyla nalezena');
-  if(combatInitiativeSequence)throw Error('Aktivní Initiative: pád se musí řešit přímo v Combat pořadí');
+  if(combatActorLocked93725(actor.id))throw Error('Pád účastníka boje se řeší v Combat pořadí');
   const fall=prepareShortClimbingFall({actor,state:persistentStateOf(actor),
    fallHeightFt:Number(form.elements.namedItem('heightFt').value),originSkill:proof.skill,
    prone:form.elements.namedItem('prone').value==='yes',
@@ -12079,7 +12081,7 @@ document.addEventListener('submit',event=>{
   if(data.journal.some(x=>x.skillTestProof?.type==='climbing-falling'&&x.skillTestProof.sourceId===sourceId))throw Error('Tento pád již byl uzavřen');
   const actor=character(follow.actorId);
   if(!actor||actor.hmk?.healthState?.shock==='KIA')throw Error('Aktuální postava není způsobilá pro tuto proceduru');
-  if(combatInitiativeSequence)throw Error('Při probíhající Initiative se pád musí vyhodnotit v autoritativním bojovém pořadí. Přímý zápis ze Skill Tests je zablokován.');
+  if(combatActorLocked93725(actor.id))throw Error('Pád účastníka boje patří do Combat pořadí.');
   const value=(row,key,optional=false)=>{const raw=row.querySelector('[name="'+key+'"]')?.value.trim();return optional&&!raw?null:Number(raw)};
   const rows=[...form.querySelectorAll('[data-climb-fall-row]')].map(row=>({
    impactD10:value(row,'impactD10',true),zoneD10:value(row,'zoneD10',true),locationD10:value(row,'locationD10',true),
@@ -12248,7 +12250,7 @@ document.addEventListener('submit',event=>{
   if(!actor||actor.id!==saved?.characterId||(proof.skills?.[0]||proof.skill)!=='Swimming'||
    !original||!Number.isInteger(original.roll))throw Error('Chybí ověřený původní Swimming d100');
   if(data.journal.some(x=>x.skillTestProof?.type==='skill-swimming-aftermath'&&x.skillTestProof.sourceId===sourceId))throw Error('Následek již byl zapsán');
-  if(combatInitiativeSequence)throw Error('Aktivní Initiative: stav musí být řešen v bojovém pořadí');
+  if(combatActorLocked93725(actor.id))throw Error('Stav účastníka boje patří do Combat pořadí');
   const field=n=>form.elements.namedItem(n)?.value?.trim()??'';
   const opt=n=>field(n)===''?null:Number(field(n));
   if(field('soakedClothingENC')==='')throw Error('Doložte typ skutečně mokrého oděvu');
@@ -12278,7 +12280,7 @@ document.addEventListener('submit',event=>{
   const src=data.journal.find(x=>x.id===sourceId),proof=src?.skillTestProof;
   const actor=character(proof?.actorId),result=proof?.a||proof?.result;
   if(!actor||actor.id!==src?.characterId||result?.level!=='CF')throw Error('Chybí potvrzený původní CF u postavy');
-  if(combatInitiativeSequence)throw Error('Zhoršení rány během Initiative patří do řízeného bojového pořadí');
+  if(combatActorLocked93725(actor.id))throw Error('Zhoršení rány účastníka boje patří do Combat pořadí');
   const rows=[...form.querySelectorAll('[data-aggravation-wound]')].filter(x=>x.querySelector('[name="used"]')?.checked);
   const woundRolls=rows.map(x=>({woundId:x.dataset.woundId,d10:Number(x.querySelector('[name="d10"]').value)}));
   const outcome=prepareSeriousInjuryAggravation({actor,state:persistentStateOf(actor),sourceId,
@@ -12309,7 +12311,7 @@ document.addEventListener('submit',event=>{
   const actor=character(src?.characterId),result=proof?.a||proof?.result;
   if(!actor||src?.characterId!==actor.id||!['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill)||
    !['CF','F','S','CS'].includes(result?.level))throw Error('Chybí doložený původní test Endurance (Survival)');
-  if(combatInitiativeSequence)throw Error('Během Initiative musí stav řídit Combat');
+  if(combatActorLocked93725(actor.id))throw Error('Zdravotní stav účastníka boje řídí Combat');
   let kind=null,atMinute=data.campaignClock.minute,coldCondition=form.elements.namedItem('coldCondition')?.value||'dry';
   if(episodeId){
    const receipt=data.journal.find(j=>j.id===episodeId&&j.calendarCampaignId===src?.calendarCampaignId);
@@ -12379,7 +12381,7 @@ document.addEventListener('submit',event=>{
    src.calendarCampaignId!==receipt.calendarCampaignId||data.campaignClock.minute!==episode.endMinute||
    linked.coldCondition!==condition||!['coolWater','coldWater','freezingWater'].includes(condition)))
    throw Error('Cold Shock neodpovídá potvrzené cestovní epizodě, postavě, vodě nebo přesné minutě.');
-  if(combatInitiativeSequence)throw Error('Cold Shock v Initiative patří do řízeného Combat State');
+  if(combatActorLocked93725(actor.id))throw Error('Cold Shock účastníka boje patří do Combat State');
   const old=persistentStateOf(actor);
   const outcome=prepareColdWaterShock({actor,state:old,sourceId,round:Math.max(1,combatClock.round||1,old.lastRound||0),
    originMinute:data.campaignClock?.minute??0,
@@ -12658,7 +12660,7 @@ document.addEventListener('submit',event=>{
   const maximumExposureMinutes=episodeId?episode.minutes:null;
   const skinTime=onsetReceipt?.calendarCampaignId===campaignKey(data.campaignClock)?
    {calendarCampaignId:onsetReceipt.calendarCampaignId,campaignMinute:data.campaignClock.minute}:{};
-  if(combatInitiativeSequence)throw Error('Zranění během Initiative musí vést Combat');
+  if(combatActorLocked93725(actor.id))throw Error('Zranění účastníka boje musí vést Combat');
   const toNumber=x=>x?.trim()?Number(x.trim()):null;
   hskSkinRefresh(form);
   if(form.dataset.skinCoverageComplete!=='yes')throw Error('Ochrana anatomických lokací není z inventáře ověřena. Opravte nejprve oblečenou výbavu.');
@@ -12775,7 +12777,7 @@ document.addEventListener('submit',event=>{
    x.skillTestProof.sourceId===sourceId),actor=character(onset?.characterId);
   if(!actor||onset.skillTestProof.actorId!==actor.id)
    throw Error('Chybí ověřený původ expozice');
-  if(combatInitiativeSequence)throw Error('V aktivní Initiative nelze obejít Combat State');
+  if(combatActorLocked93725(actor.id))throw Error('Combat State účastníka boje nelze obejít');
   const elapsedMinutes=Number(form.elements.namedItem('elapsedMinutes').value);
   if(data.campaignClock){
    const camp=campaignKey(data.campaignClock);
@@ -12812,7 +12814,7 @@ document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-hmk-mundane-fire]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
  try{
-  if(combatInitiativeSequence)throw Error('Během Initiative patří Fire Injury do řízeného Combat pořadí');
+  if(combatActorLocked93725(selected))throw Error('Fire Injury účastníka boje patří do Combat pořadí');
   const actor=character(selected),state=persistentStateOf(actor),fld=n=>form.elements.namedItem(n),
    optional=n=>fld(n)?.value?.trim()?Number(fld(n).value.trim()):null,
    checked=n=>fld(n)?.checked===true;
@@ -12924,7 +12926,7 @@ document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-hmk-smoke-start]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
  try{
-  if(combatInitiativeSequence)throw Error('Smoke při Initiative musí vést řízený Combat');
+  if(combatActorLocked93725(selected))throw Error('Smoke účastníka boje musí vést Combat');
   const actor=character(selected),state=persistentStateOf(actor),f=n=>form.elements.namedItem(n);
   const outcome=prepareEnclosedSmokeStart({actor,state,sourceId:f('sourceId').value.trim(),
    round:Math.max(1,combatClock.round||1,state.lastRound||0),
@@ -12943,7 +12945,7 @@ document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-hmk-smoke-complete]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
  try{
-  if(combatInitiativeSequence)throw Error('Smoke během Initiative musí vést Combat');
+  if(combatActorLocked93725(selected))throw Error('Smoke účastníka boje musí vést Combat');
   const actor=character(selected),state=persistentStateOf(actor),f=n=>form.elements.namedItem(n),
    optional=n=>f(n)?.value?.trim()?Number(f(n).value.trim()):null;
   const outcome=prepareEnclosedSmokeCompletion({actor,state,sourceId:f('sourceId').value.trim(),
@@ -12966,7 +12968,7 @@ document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-hmk-poison-start]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
  try{
-  if(combatInitiativeSequence)throw Error('Poison během Initiative musí vyhodnotit GM přímo v Combat pořadí');
+  if(combatActorLocked93725(selected))throw Error('Poison účastníka boje musí vést Combat');
   const actor=character(selected),state=persistentStateOf(actor),f=n=>form.elements.namedItem(n),
    round=Math.max(1,combatClock.round||1,state.lastRound||0);
   const result=preparePoisonStart({actor,state,round,sourceId:f('sourceId').value.trim(),
@@ -12989,7 +12991,7 @@ document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-hmk-poison-onset]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
  try{
-  if(combatInitiativeSequence)throw Error('Poison během Initiative patří do bojového pořadí');
+  if(combatActorLocked93725(selected))throw Error('Poison účastníka boje patří do Combat pořadí');
   const actor=character(selected),state=persistentStateOf(actor),f=n=>form.elements.namedItem(n);
   const result=preparePoisonOnset({actor,state,sourceId:f('sourceId').value.trim(),
    round:Math.max(1,combatClock.round||1,state.lastRound||0),elapsedMinutes:Number(f('elapsedMinutes').value),
@@ -13007,7 +13009,7 @@ document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-hmk-poison-course]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
  try{
-  if(combatInitiativeSequence)throw Error('Poison Course během Initiative musí vést Combat');
+  if(combatActorLocked93725(selected))throw Error('Poison Course účastníka boje musí vést Combat');
   const actor=character(selected),state=persistentStateOf(actor),f=n=>form.elements.namedItem(n);
   const poisonSourceId=f('sourceId').value.trim();
   const poisonCourse=state.toxinCourses?.find(t=>t.sourceId===poisonSourceId);
@@ -13046,7 +13048,7 @@ function hskCommitDisease(actor,result,title,body,kind){
 function hskDiseaseTransaction(form,build,title,body,kind){
  const out=form.querySelector('output');
  try{
-  if(combatInitiativeSequence)throw Error('Během Initiative se Disease řeší v rámci pořadí GM, ne mimo Combat');
+  if(combatActorLocked93725(selected))throw Error('Disease účastníka boje řeší Combat');
   const actor=character(selected);if(!actor)throw Error('Chybí postava');
   const original=persistentStateOf(actor),f=n=>form.elements.namedItem(n);
   const round=Math.max(1,combatClock.round||1,original.lastRound||0);
@@ -13454,10 +13456,10 @@ document.addEventListener('submit',event=>{
  if(f?.id!=='hsk-talisman-bestowal')return;
  event.preventDefault();event.stopImmediatePropagation();
  try{
-  if(combatInitiativeSequence)throw Error('Talisman Bestowal nelze zapisovat během aktivního Initiative.');
   const shaman=character(selected),v=Object.fromEntries(new FormData(f));
   if(!shaman)throw Error('Nejprve vyberte konkrétního šamana.');
   const recipient=character(v.talismanRecipient),possession=data.inventory.find(i=>i.id===v.talismanItem);
+  if(combatActorLocked93725(shaman.id,recipient?.id))throw Error('Talisman účastníka Initiative musí být řešen přes Combat.');
   if(!recipient||recipient.id===shaman.id)throw Error('Zvolte jiného skutečného příjemce.');
   if(!possession||possession.characterId!==recipient.id||possession.quantity!==1||
    possession.snapshot?.category!=='other'||!['carried','main_hand','off_hand'].includes(possession.slot))
@@ -13486,7 +13488,7 @@ document.addEventListener('submit',event=>{
  if(!f?.matches?.('[data-hsk-special-commit]'))return;
  event.preventDefault();event.stopImmediatePropagation();
  try{
-  if(combatInitiativeSequence)throw Error('Během aktivní Initiative je přímý zápis následků SR zablokován.');
+  if(combatActorLocked93725(selected))throw Error('Následek SR účastníka Initiative řeší Combat.');
   const v=Object.fromEntries(new FormData(f)),sourceId=v.sourceId;
   const source=data.journal.find(x=>x.id===sourceId);
   if(!source||source.characterId!==selected)throw Error('Aktivní postava neodpovídá původnímu SR.');
@@ -14830,7 +14832,7 @@ document.addEventListener('submit',e=>{
    type='calendarHerbLucidDream';title='HMK 75/292 · Hallucinogenic Lucid Dream';
    body='Skutečný d20 '+d20+', Aura '+aura+'; Lucid Dream '+proof.dreamRounds+' bojových kol. Saviris a Reembodiment zůstávají samostatnými hody.';
   }else if(f.matches('[data-hallucinogenic-trance-start]')){
-   if(combatInitiativeSequence)throw Error('Zahájení nepřerušené Trance není dovoleno během aktivní Initiative');
+    if(combatActorLocked93725(targetId))throw Error('Zahájení Trance účastníka Initiative patří do Combat.');
    const ml=skillValueForJournal(who,['Trance']);
    proof=createHallucinogenicTranceStart({journal,campaignId,applicationId:String(fd.get('applicationId')),minute,targetId,
     tranceSkillML:ml,consciousConfirmed:fd.get('conscious')==='on',uninterruptedIntended:fd.get('uninterrupted')==='on',gmConfirmed:true});
@@ -14922,7 +14924,7 @@ document.addEventListener('submit',e=>{
  try{
   const clock=data.campaignClock,fd=new FormData(f),targetId=String(fd.get('targetId')),who=character(targetId),campaignId=campaignKey(clock);
   if(!clock||!who||!calendarMemberIds(clock,data.characters).some(x=>x.id===targetId))throw Error('Chybí postava v aktivní kampani');
-  if(combatInitiativeSequence)throw Error('Reembodiment v živé Initiative vyžaduje samostatný Combat průvodce');
+   if(combatActorLocked93725(targetId))throw Error('Reembodiment účastníka Initiative vyžaduje Combat průvodce');
   const spiritML=skillValueForJournal(who,['Spirit']),tranceML=skillValueForJournal(who,['Trance']);
   if(Number(fd.get('spiritML'))!==spiritML)throw Error('Spirit ML nesouhlasí s ověřenou postavou');
   if(fd.has('tranceML')&&Number(fd.get('tranceML'))!==tranceML)throw Error('Trance ML nesouhlasí s ověřenou postavou');
@@ -15030,8 +15032,8 @@ document.addEventListener('submit',e=>{
  const f=e.target;if(!f?.matches?.('[data-herb-vial-discard]'))return;
  e.preventDefault();e.stopImmediatePropagation();
  try{const clock=data.campaignClock;if(!clock)throw Error('Chybí aktivní kampaň');
-  if(combatInitiativeSequence)throw Error('Během boje ztrátu obsahu řešte pravidlovou Combat akcí');
   const fd=new FormData(f),campaignId=campaignKey(clock),minute=clock.minute;
+   if(combatActorLocked93725(String(fd.get('actorId')||'')))throw Error('Ztráta obsahu u účastníka Initiative patří do Combat.');
   const p=createHerbVialDiscard({journal:data.journal,inventory:data.inventory,campaignId,minute,
     actorId:String(fd.get('actorId')||''),completeId:String(fd.get('completeId')||''),
     reason:String(fd.get('reason')||''),confirmedByGM:fd.get('confirmed')==='yes'});
@@ -15045,8 +15047,8 @@ document.addEventListener('submit',e=>{
  const f=e.target;if(!f?.matches?.('[data-herb-vial]'))return;
  e.preventDefault();e.stopImmediatePropagation();
  try{const clock=data.campaignClock;if(!clock)throw Error('Chybí aktivní kampaň');
-  if(combatInitiativeSequence)throw Error('Během aktivního boje nelze lahvičku naplnit bez příslušné Combat akce');
   const fd=new FormData(f),campaignId=campaignKey(clock),minute=clock.minute;
+   if(combatActorLocked93725(String(fd.get('actorId')||'')))throw Error('Plnění lahvičky účastníka Initiative patří do Combat.');
   const p=createHerbVialBinding({journal:data.journal,inventory:data.inventory,campaignId,minute,
     actorId:String(fd.get('actorId')||''),completeId:String(fd.get('completeId')||''),vialId:String(fd.get('vialId')||''),confirmedByGM:fd.get('confirmed')==='yes'});
   if(mutate(()=>data.journal.push({id:uuid(),characterId:p.actorId,calendarCampaignId:campaignId,campaignMinute:minute,
@@ -15094,7 +15096,7 @@ document.addEventListener('submit',e=>{
    createdAt:stamp(),title:'HMK 75 · podání bylinného lektvaru',body:'Doložené podání bez posunu GM času. Následné testy řeší příslušný původní modul.',calendarHerbPotionAdminister:proof};
   let herbalPoison=null;
   if(type==='poison'&&potionRow?.calendarHerbPotionComplete?.potency!==3){
-   if(combatInitiativeSequence)throw Error('Poison Mild/Strong během Initiative musí GM vést přímo v bojové proceduře; tento minutový průchod je mimo boj');
+    if(combatActorLocked93725(actorId,targetId))throw Error('Poison účastníka Initiative musí GM vést v bojové proceduře.');
    const poisonState=persistentStateOf(target),round=Math.max(1,combatClock.round||1,poisonState.lastRound||0);
    herbalPoison=prepareHerbalPoisonExposure({journal:[...data.journal,applicationRow],
     campaignId:campaignKey(clock),applicationId:applicationRow.id,minute:clock.minute,actor:target,
@@ -15926,8 +15928,8 @@ document.addEventListener('submit',e=>{
  e.preventDefault();e.stopImmediatePropagation();
  try{
   if(!data.campaignClock)throw Error('Chybí aktivní kampaň');
-  if(combatInitiativeSequence)throw Error('Nádobu během aktivního boje nelze mimo Combat vyprazdňovat nebo naplňovat');
   const v=Object.fromEntries(new FormData(f)),campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
+   if(combatActorLocked93725(v.actorId))throw Error('Nádoba účastníka Initiative vyžaduje Combat akci.');
   if(!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===v.actorId))throw Error('Postava nepatří do kampaně');
   if(f.matches('[data-alchemy-vial-bind]')){
    const b=createAlchemyVialBinding({journal:data.journal,inventory:data.inventory,campaignId,minute,
@@ -17374,16 +17376,9 @@ document.addEventListener('submit',e=>{
     campaignId:cid,minute,eventId,travelAllowed:v.travelAllowed==='yes',
     adjustedMove:Number(v.adjustedMove),attackIndices,reason:String(v.reason||''),gmConfirmed:v.gmConfirmed==='on'});
   }else{
-   const sites=String(v.sites||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).map(line=>{
-    const cols=line.split(';').map(x=>x.trim());if(![5,6].includes(cols.length))throw Error('Každá lokace musí mít 5 nebo 6 položek oddělených středníkem.');
-    if(cols[5]&&cols[0].toLowerCase()!=='hd'&&!(cols[0].toLowerCase()==='wng'&&cols[5]==='wing-limb'))
-     throw Error('Subsite se zadává jen u Head nebo jako wing-limb pro Wing.');
-    return {locationId:cols[0].toLowerCase(),side:cols[1].toLowerCase(),
-     av:cols[2]===''?null:Number(cols[2]),shockRoll:cols[3]===''?null:Number(cols[3]),
-     fatigue:cols[4]===''?null:Number(cols[4]),
-     facialFeature:cols[0].toLowerCase()==='hd'?(cols[5]||''):'',
-     wingAsLimbConfirmed:cols[0].toLowerCase()==='wng'&&cols[5]==='wing-limb'};
-   });
+   const frostAV=resolveBestiaryFrostAV93725({profile:actor.profile,inventory:data.inventory,beastId:actor.id,ownerAnimalId:actor.ownerAnimalId});
+   if(!frostAV.ready)throw Error(frostAV.reason);
+   const sites=parseBestiaryFrostSites93725(String(v.sites||''),frostAV);
    const weather=v.origin==='weather-watch';
    const watchSource=weather?data.journal.find(x=>x.id===v.watchSourceId):null;
    const weatherEvidence=weather?data.journal.find(x=>x.calendarTrekAnimalWeatherProof?.sourceId===watchSource?.id&&
@@ -17397,7 +17392,7 @@ document.addEventListener('submit',e=>{
      {magic:{caster:String(v.magicCaster||''),sourceML:Number(v.magicSourceML),
       testEML:Number(v.magicTestEML),testD100:Number(v.magicTestD100),
       d4:Number(v.magicD4),index:Number(v.magicIndex),cs:v.magicCS==='on',
-      areaAV:Number(v.magicAreaAV),zoneNumber:Number(v.magicZN),locationD10:Number(v.magicLD),
+      areaAV:frostAV.value,zoneNumber:Number(v.magicZN),locationD10:Number(v.magicLD),
       position:v.magicPosition,physicalOption8:v.origin==='breath',
       spellfireConfirmed:v.spellfireConfirmed==='on',targetAffectedConfirmed:v.targetAffectedConfirmed==='on'}})});
    if(weather&&data.journal.some(j=>j.bestiaryTrauma?.kind==='frost-sequence-573'&&
@@ -17416,22 +17411,6 @@ document.addEventListener('submit',e=>{
   if(out)out.textContent='Doložený Frost / GM Move zápis byl uložen v neměnném deníku.';
  }catch(error){if(out)out.textContent='Bestiář · zápis nebyl uložen: '+error.message;}
 },true);
-document.addEventListener('input',e=>{
- const f=e.target.closest?.('[data-hmk-beast-frost-source-571]');if(!f)return;
- const out=f.querySelector('[data-hmk-frostbite-out-572]');if(!out)return;
- const v=Object.fromEntries(new FormData(f));
- if(v.source!=='weather'){out.textContent='Magický nebo jiný zdroj: skutečný IL musí být doložen samostatným pravidlovým výpočtem.';return;}
- const actor=encounterBeastHistory(data,campaignKey(data.campaignClock)).find(x=>x.id===v.targetId&&x.active);
- const innateAV=actor?.profile?.combat?.av?.f;
- if(!v.windD20||!v.durationD20||!Number.isSafeInteger(innateAV)){
-  out.textContent='Vyplň skutečné d20, ochranu lokality a dolož mrazivý vzduch.';return;
- }
- try{const result=resolveBeastFrostbite572({windD20:Number(v.windD20),durationD20:Number(v.durationD20),
-  locationAV:Number(v.locationAV),innateAV,freezingAirConfirmed:true,siteExposedConfirmed:true});
-  out.textContent='Vítr: '+result.periodMinutes+' min · expozice: '+result.durationMinutes+' min · přímé Frost IL '+result.injuryLevel+
-   (result.injuryLevel<4?' — toto není Grievous Frost; nelze zapsat do formuláře G4/G5.':result.injuryLevel===Number(v.level)?' · odpovídá zvolené G'+v.level+'f.':' · změň zvolenou závažnost.');
- }catch(error){out.textContent=error.message;}
-},true);
 document.addEventListener('submit',e=>{
  const f=e.target;if(!f?.matches?.('[data-hmk-beast-frost-source-571],[data-hmk-beast-frost-amp-571]'))return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -17446,9 +17425,7 @@ document.addEventListener('submit',e=>{
    minute,eventId,zoneNumber:Number(v.zoneNumber),locationD10:Number(v.locationD10),level:Number(v.level),
    source:v.source,sourceDetails:v.sourceDetails,facialFeature:String(v.facialFeature||'').trim(),
    wingAsLimbConfirmed:v.wingAsLimbConfirmed==='on',
-   frostbite:v.source==='weather'?{windD20:Number(v.windD20),durationD20:Number(v.durationD20),
-    locationAV:Number(v.locationAV),freezingAirConfirmed:v.freezingAirConfirmed==='on',
-    siteExposedConfirmed:v.siteExposedConfirmed==='on'}:null,
+   frostbite:null,
    shockRoll:Number(v.shockRoll),shockFatigue:Number(v.shockFatigue),gmConfirmed:v.confirmed==='on'}):
    prepareAnimalFrostAmputation571({profile:{...actor.profile,id:actor.id},previous,
     wound:previous.wounds.find(w=>w.id===v.woundId),minute,eventId,
@@ -18194,7 +18171,7 @@ if(t.dataset.deleteLog){const row=data.journal.find(j=>j.id===t.dataset.deleteLo
 if(t.dataset.editItem){if(item(t.dataset.editItem)?.builtin)return alert('Vestavěné pravidlové definice nelze upravit.');editItem=t.dataset.editItem;const i=item(editItem);overlay=equipmentEditor('Upravit předmět',i);render();return}
 if(t.dataset.copyItem){const i=item(t.dataset.copyItem);if(i?.builtin)return alert('Vestavěné definice se nekopírují; vytvořte vlastní předmět.');mutate(()=>data.items.push({...structuredClone(i),id:uuid(),name:i.name+' (kopie)'}));return}
 if(t.dataset.deleteItem){if(item(t.dataset.deleteItem)?.builtin)return alert('Vestavěné pravidlové definice nelze odstranit.');if(ask('Odstranit předmět z knihovny? Existující inventáře zůstanou beze změny.'))mutate(()=>data.items=data.items.filter(x=>x.id!==t.dataset.deleteItem));return}
-const a=t.dataset.action;if(a==='open-generator-config'){overlay=generatorConfigDialog();render();return}if(a==='auto-random-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="hmk-random-name-title"><h2 id="hmk-random-name-title">Generovat náhodnou postavu</h2><p>Nejprve pojmenujte postavu. Potom proběhne automaticky všech 14 kroků HMK s uložením softwarových hodů.</p><form id="hmk-random-name-form"><label>Jméno postavy<input type="text" name="name" maxlength="120" minlength="1" required autocomplete="off" autofocus placeholder="Zadejte jméno postavy"></label><label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label><div class="actions"><button type="submit">⚄ Vygenerovat postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>';render();const name=document.querySelector('#hmk-random-name-form [name="name"]');if(name){name.value='';name.setAttribute('autocomplete','new-password');}return}if(a==='auto-trait-character'){overlay=generatorConfigDialog();render();return}if(a==='new-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog"><h2>Nová postava · Character Creation</h2><p>Nejdřív zadáte jméno. Potom vás průvodce provede čtrnácti kroky HMK v1.2, vždy pouze jedním aktuálním krokem.</p><form id="creation-new-form"><label>Jméno postavy<input name="name" required maxlength="120"></label><label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label><button type="submit">Založit rozpracovanou postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></form></section></div>';render();const name=document.querySelector('#creation-new-form [name="name"]');if(name){name.value='';name.setAttribute('autocomplete','new-password');}}if(a==='creation-open'){if(combatInitiativeSequence)return alert('Edit Character Creation není během aktivní Initiative povolen.');if(!selected||!character(selected))return;view='creation';overlay=null;render();return}if(a==='new-item'){editItem=null;category=({melee:'weapon',ranged:'weapon',armour:'armor',shields:'shield',other:'other'})[libraryTab]||'other';overlay=equipmentEditor('Nový předmět',{category});render()}if(a==='cancel-editor'){overlay=null;render()}if(a==='go-characters'){view='characters';query='';render()}if(a==='export'){if(storageReadOnly){alert('Původní data se nepodařilo načíst. Použijte nouzovou kopii původního úložiště, nikoliv standardní zálohu.');return}const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`hmk-ledger-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),5000)}
+const a=t.dataset.action;if(a==='open-generator-config'){overlay=generatorConfigDialog();render();return}if(a==='auto-random-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-labelledby="hmk-random-name-title"><h2 id="hmk-random-name-title">Generovat náhodnou postavu</h2><p>Nejprve pojmenujte postavu. Potom proběhne automaticky všech 14 kroků HMK s uložením softwarových hodů.</p><form id="hmk-random-name-form"><label>Jméno postavy<input type="text" name="name" maxlength="120" minlength="1" required autocomplete="off" autofocus placeholder="Zadejte jméno postavy"></label><label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label><div class="actions"><button type="submit">⚄ Vygenerovat postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>';render();const name=document.querySelector('#hmk-random-name-form [name="name"]');if(name){name.value='';name.setAttribute('autocomplete','new-password');}return}if(a==='auto-trait-character'){overlay=generatorConfigDialog();render();return}if(a==='new-character'){overlay='<div class="editor-backdrop"><section class="panel editor-dialog"><h2>Nová postava · Character Creation</h2><p>Nejdřív zadáte jméno. Potom vás průvodce provede čtrnácti kroky HMK v1.2, vždy pouze jedním aktuálním krokem.</p><form id="creation-new-form"><label>Jméno postavy<input name="name" required maxlength="120"></label><label>Typ postavy<select name="kind"><option value="PC">PC</option><option value="NPC">NPC</option></select></label><button type="submit">Založit rozpracovanou postavu</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></form></section></div>';render();const name=document.querySelector('#creation-new-form [name="name"]');if(name){name.value='';name.setAttribute('autocomplete','new-password');}}if(a==='creation-open'){if(combatActorLocked93725(selected))return alert('Úprava účastníka boje patří do Combat.');if(!selected||!character(selected))return;view='creation';overlay=null;render();return}if(a==='new-item'){editItem=null;category=({melee:'weapon',ranged:'weapon',armour:'armor',shields:'shield',other:'other'})[libraryTab]||'other';overlay=equipmentEditor('Nový předmět',{category});render()}if(a==='cancel-editor'){overlay=null;render()}if(a==='go-characters'){view='characters';query='';render()}if(a==='export'){if(storageReadOnly){alert('Původní data se nepodařilo načíst. Použijte nouzovou kopii původního úložiště, nikoliv standardní zálohu.');return}const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`hmk-ledger-${new Date().toISOString().slice(0,10)}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),5000)}
 });
 document.addEventListener('submit',e=>{
  if(e.target.id!=='special-strike-preview-form')return;
@@ -19711,7 +19688,7 @@ document.addEventListener('click',e=>{
  const start=e.target.closest('[data-sheet-edit]'),cancel=e.target.closest('[data-sheet-cancel]');
  if(!start&&!cancel)return;
  e.preventDefault();e.stopImmediatePropagation();
- if(start){if(combatInitiativeSequence)return alert('Během aktivní Initiative nelze upravovat Character Sheet.');if(!selected||!character(selected))return;sheetEditingId=selected;activeSheetSection='overview';}
+ if(start){if(combatActorLocked93725(selected))return alert('Účastníka boje upravujte přes Combat.');if(!selected||!character(selected))return;sheetEditingId=selected;activeSheetSection='overview';}
  else {sheetEditingId=null;activeSheetSection='overview';}
  render();
 },true);
@@ -19719,7 +19696,7 @@ document.addEventListener('submit',e=>{
  const form=e.target;if(form.id!=='sheet-inline-form')return;
  e.preventDefault();e.stopImmediatePropagation();
  const c=character(selected);if(!c||sheetEditingId!==c.id)return;
- if(combatInitiativeSequence)return alert('Během aktivní Initiative nelze měnit Character Sheet.');
+ if(combatActorLocked93725(selected))return alert('Účastníka boje upravujte přes Combat.');
  const v=Object.fromEntries(new FormData(form));
  const revisedName=String(v.sheet_character_name??c.name).trim();
  if(!revisedName||revisedName.length>120){return alert('Jméno postavy: zadejte 1–120 znaků.');}
@@ -19868,8 +19845,8 @@ document.addEventListener('submit',e=>{
  }
  const transactionId=uuid(),at=stamp();
  const saved=mutate(()=>{
-  if(combatInitiativeSequence)throw Error('Zahájena Initiative.');
-  const current=character(receiver.id);if(!current)throw Error('Postava již neexistuje.');
+  if(combatActorLocked93725(receiver.id))throw Error('Nákup účastníka Initiative vyžaduje Combat akci.');
+   const current=character(receiver.id);if(!current)throw Error('Postava již neexistuje.');
   if(activeCampaignCashKey(current)===undefined)throw Error('Postava není účastníkem kalendáře.');
   // Validate AGAIN against persisted data inside the atomic mutation.
   if(acquisition==='buy'){if(activeCampaignCashKey(current)===undefined)throw Error('Postava není členem aktuální kampaně.');prepareLibraryPurchase(current,totalPrice,activeCampaignCashKey(current));}
@@ -20103,7 +20080,7 @@ document.addEventListener('change',e=>{
 document.addEventListener('click',e=>{
  const control=e.target?.closest?.('[data-inv-bulk-action]');if(!control)return;
  e.preventDefault();e.stopImmediatePropagation();
- if(view!=='sheet'||activeSheetSection!=='inventory'||combatInitiativeSequence)return alert('Hromadné přesuny jsou dostupné jen mimo Initiative v inventáři postavy.');
+ if(view!=='sheet'||activeSheetSection!=='inventory'||combatActorLocked93725(selected))return alert('Hromadné přesuny účastníka boje vyžadují Combat akci.');
  const section=control.closest('[data-inv-bulk-section]'),kind=section?.dataset.invBulkSection;
  const ids=[...section.querySelectorAll('[data-inv-bulk-select]:checked')].map(x=>x.value);
  if(!ids.length)return alert('Nejprve označte předměty v tomto seznamu.');
@@ -20183,7 +20160,7 @@ document.addEventListener('submit',e=>{
  try{
   const d=inventoryBulkDraft;
   if(!d||d.action!=='stable-load'||view!=='sheet'||activeSheetSection!=='inventory'||
-    selected!==d.ownerId||combatInitiativeSequence)throw Error('Neaktuální volba postavy nebo Combat Initiative.');
+    selected!==d.ownerId||combatActorLocked93725(d.ownerId))throw Error('Neaktuální volba postavy nebo Combat Initiative.');
   if(d.clock!==JSON.stringify(data.campaignClock)||d.at!==JSON.stringify(d.ids.map(id=>data.inventory.find(i=>i.id===id))))
    throw Error('Položky nebo herní čas se od otevření formuláře změnily.');
   const campaignId=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
@@ -20227,8 +20204,9 @@ document.addEventListener('submit',e=>{
  if(e.target?.id!=='inventory-batch-form')return;e.preventDefault();e.stopImmediatePropagation();
  const draft=inventoryBulkDraft,v=Object.fromEntries(new FormData(e.target));
  try{
-  if(!draft||view!=='sheet'||activeSheetSection!=='inventory'||draft.ownerId!==selected||combatInitiativeSequence)throw Error('Výběr ani postava už nejsou aktuální.');
-  if(draft.at!==JSON.stringify(draft.ids.map(id=>data.inventory.find(x=>x.id===id)))||draft.clock!==JSON.stringify(data.campaignClock))throw Error('Inventář nebo kampaň se od potvrzení změnily.');
+  if(!draft||view!=='sheet'||activeSheetSection!=='inventory'||draft.ownerId!==selected||combatActorLocked93725(draft.ownerId))throw Error('Výběr ani postava už nejsou aktuální.');
+  if(combatActorLocked93725(v.recipientId))throw Error('Příjemce je účastníkem probíhajícího boje.');
+   if(draft.at!==JSON.stringify(draft.ids.map(id=>data.inventory.find(x=>x.id===id)))||draft.clock!==JSON.stringify(data.campaignClock))throw Error('Inventář nebo kampaň se od potvrzení změnily.');
   const next=applyInventoryBatch(data,{ownerId:selected,itemIds:draft.ids,action:draft.action,location:v.location||'',recipientId:v.recipientId||null,reason:v.reason||'',confirmed:v.confirmed==='yes',idFactory:uuid,createdAt:stamp()});
   if(mutate(()=>{data.inventory=next.inventory;data.journal=next.journal;})){inventoryBulkDraft=null;overlay=null;render();}
  }catch(error){alert('Hromadná změna nebyla zapsána: '+error.message);}
@@ -20237,7 +20215,7 @@ document.addEventListener('submit',e=>{
  if(e.target?.id!=='inventory-sale-form')return;e.preventDefault();e.stopImmediatePropagation();
  const draft=inventoryBulkDraft,v=Object.fromEntries(new FormData(e.target));
  try{
-  if(!draft||draft.action!=='sale'||draft.ownerId!==selected||view!=='sheet'||activeSheetSection!=='inventory'||combatInitiativeSequence)throw Error('Výběr již není aktivní.');
+  if(!draft||draft.action!=='sale'||draft.ownerId!==selected||view!=='sheet'||activeSheetSection!=='inventory'||combatActorLocked93725(draft.ownerId))throw Error('Výběr již není aktivní.');
   if(draft.at!==JSON.stringify(draft.ids.map(id=>data.inventory.find(x=>x.id===id)))||draft.clock!==JSON.stringify(data.campaignClock))throw Error('Stav inventáře nebo čas kampaně se změnil.');
   const next=applyInventorySale(data,{ownerId:selected,itemIds:draft.ids,buyer:v.buyer,proceedsPence:Number(v.proceedsPence),location:v.location||'',confirmed:v.confirmed==='yes',idFactory:uuid,createdAt:stamp()});
   if(mutate(()=>{data.inventory=next.inventory;data.journal=next.journal;data.characters=next.characters;})){inventoryBulkDraft=null;overlay=null;render();}
@@ -20245,7 +20223,7 @@ document.addEventListener('submit',e=>{
 },true);
 document.addEventListener('click',e=>{
  const b=e.target?.closest?.('[data-chest-outfit]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();
- if(view!=='sheet'||activeSheetSection!=='inventory'||combatInitiativeSequence)return alert('Převlečení z truhly není dostupné během Initiative.');
+ if(view!=='sheet'||activeSheetSection!=='inventory'||combatActorLocked93725(selected))return alert('Převlečení účastníka boje vyžaduje Combat akci.');
  const places=[...new Set(data.inventory.filter(x=>x.characterId===selected&&x.slot==='chest').map(x=>x.chestLocation).filter(Boolean))];
  if(!places.length)return alert('Postava nemá dostupnou truhlu s doloženým umístěním.');
  const mode=b.dataset.chestOutfit;
@@ -20254,7 +20232,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('submit',e=>{
  if(e.target?.id!=='inventory-chest-outfit-form')return;e.preventDefault();e.stopImmediatePropagation();
  const v=Object.fromEntries(new FormData(e.target));
- if(view!=='sheet'||activeSheetSection!=='inventory'||String(v.actorId)!==selected||combatInitiativeSequence)return alert('Změnil se vlastník nebo režim Combat.');
+ if(view!=='sheet'||activeSheetSection!=='inventory'||String(v.actorId)!==selected||combatActorLocked93725(selected))return alert('Změnil se vlastník nebo režim Combat.');
  try{
   const plan=previewChestOutfit(data,{ownerId:selected,location:v.location,mode:v.mode});
   if(!plan.ready)throw Error(plan.reason);
@@ -20273,7 +20251,7 @@ document.addEventListener('click',e=>{
  e.preventDefault();e.stopImmediatePropagation();
  const id=t.dataset.armourAutolayer;
  if(view!=='sheet'||selected!==id||!character(id))return;
- if(combatInitiativeSequence)return alert('Během Initiative nelze bez Combat akce měnit vrstvení.');
+ if(combatActorLocked93725(id))return alert('Vrstvení účastníka boje vyžaduje Combat akci.');
  const current=data.inventory.filter(x=>x.characterId===id);
  const preview=previewExistingArmourArrangement(current);
  if(!preview.ready)return alert(preview.reason);
@@ -20298,7 +20276,7 @@ document.addEventListener('click',e=>{
  const button=e.target?.closest?.('[data-hmk-commit-grip-597]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
  const ctrl=button.closest('label')?.querySelector('[data-weapon-grip]'),ownerId=selected;
- if(!ctrl||view!=='sheet'||activeSheetSection!=='inventory'||!character(ownerId)||combatInitiativeSequence){render();return;}
+ if(!ctrl||view!=='sheet'||activeSheetSection!=='inventory'||!character(ownerId)||combatActorLocked93725(ownerId)){render();return;}
  try{
   const next=setWeaponGrip(data,{ownerId,itemId:ctrl.dataset.weaponGrip,grip:ctrl.value});
   if(!mutate(()=>{data.inventory=next.inventory;}))render();
@@ -20309,7 +20287,7 @@ document.addEventListener('click',e=>{
  e.preventDefault();e.stopImmediatePropagation();
  const ctrl=button.closest('label')?.querySelector('[data-equip-hand]'),ownerId=selected;
  if(!ctrl||view!=='sheet'||activeSheetSection!=='inventory'||!character(ownerId))return;
- if(combatInitiativeSequence){alert('Během Initiative vybavujte pouze potvrzenou Combat akcí.');render();return;}
+ if(combatActorLocked93725(ownerId)){alert('Výbavu účastníka boje měňte jen potvrzenou Combat akcí.');render();return;}
  try{
   const updated=equipInventoryHand(data,{ownerId,slot:ctrl.dataset.equipHand,itemId:String(ctrl.value||''),newItemId:uuid()});
   if(!mutate(()=>{data.inventory=updated.inventory;}))render();
@@ -20325,7 +20303,7 @@ document.addEventListener('submit',e=>{
  if(e.target?.id!=='inventory-partial-drop-form')return;
  e.preventDefault();e.stopImmediatePropagation();
  try{
-  if(view!=='sheet'||activeSheetSection!=='inventory'||combatInitiativeSequence)throw Error('Odložení není v aktuálním režimu dostupné.');
+  if(view!=='sheet'||activeSheetSection!=='inventory'||combatActorLocked93725(selected))throw Error('Odložení účastníka boje vyžaduje Combat akci.');
   const fd=new FormData(e.target),clock=data.campaignClock,actorId=String(fd.get('actorId')||''),itemId=String(fd.get('itemId')||'');
   if(!clock||actorId!==selected)throw Error('Změnila se postava nebo kampaň.');
   const x=data.inventory.find(i=>i.id===itemId&&i.characterId===actorId&&i.slot!=='chest');
@@ -20351,14 +20329,14 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{const t=e.target.closest('[data-edit-inv]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();const x=data.inventory.find(x=>x.id===t.dataset.editInv&&x.characterId===selected);if(!x)return;overlay=inventoryEditForm(x);render()},true);
 document.addEventListener('click',e=>{
  const t=e.target.closest('[data-fill-water]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Naplnění vody během Initiative musí být řešeno pravidlovou akcí');
+ if(combatActorLocked93725(selected))return alert('Naplnění vody účastníka boje vyžaduje Combat akci');
  const item=data.inventory.find(x=>x.id===t.dataset.fillWater&&x.characterId===selected);
  if(!item||!data.campaignClock)return alert('Vyberte aktivní kampaň a platný předmět');
  overlay=waterFillForm(item);render();
 },true);
 document.addEventListener('submit',e=>{
  if(e.target?.id!=='water-fill-form')return;e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Probíhá iniciativa.');
+ if(combatActorLocked93725(selected))return alert('Účastník boje vyžaduje Combat akci.');
  const fd=new FormData(e.target),clock=data.campaignClock;
  if(!clock||String(fd.get('actorId'))!==selected||view!=='sheet')return alert('Nesouhlasí postava nebo kalendář.');
  try{
@@ -20391,12 +20369,12 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const t=e.target.closest('[data-pour-water]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();
  const clock=data.campaignClock,donorId=selected,sourceItem=data.inventory.find(i=>i.id===t.dataset.pourWater&&i.characterId===donorId);
- if(!clock||!sourceItem||combatInitiativeSequence)return alert('Předání vody vyžaduje otevřenou kampaň a stav mimo Initiative.');
+ if(!clock||!sourceItem||combatActorLocked93725(donorId))return alert('Předání vody účastníka boje vyžaduje Combat akci.');
  const campaignId=campaignKey(clock),members=new Set(clock.characterIds??data.characters.map(c=>c.id));
  if(!members.has(donorId))return alert('Postava nepatří do otevřené kampaně.');
  const fills=availablePhysicalWater(data.journal,campaignId,donorId,clock.minute).filter(x=>x.itemId===sourceItem.id);
  const targets=data.inventory.filter(i=>i.characterId!==donorId&&members.has(i.characterId)&&
-  i.slot==='carried'&&waterContainerCapacity(i)!==null&&
+  !combatActorLocked93725(i.characterId)&&i.slot==='carried'&&waterContainerCapacity(i)!==null&&
   waterskinBalances(data.journal,campaignId,i.characterId,clock.minute).filter(b=>b.itemId===i.id).reduce((n,b)=>n+b.remaining,0)===0&&
   fills.some(f=>f.remaining>=waterContainerCapacity(i)));
  if(!targets.length)return alert('Žádná postava stejné kampaně nemá dostupnou prázdnou nádobu vhodnou pro předání vody.');
@@ -20405,8 +20383,9 @@ document.addEventListener('click',e=>{
 },true);
 document.addEventListener('submit',e=>{
  if(e.target?.id!=='water-transfer-form')return;e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence||view!=='sheet')return alert('Převod vody během Initiative nebo mimo inventář není dovolen.');
  const f=new FormData(e.target),clock=data.campaignClock;
+ const recipientActorId=data.inventory.find(i=>i.id===f.get('recipientItemId'))?.characterId;
+ if(combatActorLocked93725(selected,recipientActorId)||view!=='sheet')return alert('Předání vody účastníka boje vyžaduje Combat akci.');
  if(!clock||String(f.get('donorId'))!==selected)return alert('Změnila se kampaň nebo předávající postava.');
  try{
   const recipientItemId=String(f.get('recipientItemId')||'');
@@ -20420,14 +20399,14 @@ document.addEventListener('submit',e=>{
 },true);
 document.addEventListener('click',e=>{
  const t=e.target.closest('[data-chest-move]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Během Initiative lze ukládat nebo vyzvedávat jen po pravidlové akci.');
+ if(combatActorLocked93725(selected))return alert('Truhlice účastníka boje vyžaduje Combat akci.');
  const x=data.inventory.find(x=>x.id===t.dataset.chestMove&&x.characterId===selected);
  if(!x)return alert('Předmět již není v inventáři postavy.');
  overlay=chestMoveForm(x);render();
 },true);
 document.addEventListener('submit',e=>{
  if(e.target?.id!=='chest-move-form')return;e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Nelze měnit Truhlici během Initiative.');
+ if(combatActorLocked93725(selected))return alert('Truhlice účastníka boje vyžaduje Combat akci.');
  const v=Object.fromEntries(new FormData(e.target));
  if(v.actorId!==selected||view!=='sheet'||!character(selected))return alert('Změnila se vybraná postava.');
  try{
@@ -20444,7 +20423,7 @@ document.addEventListener('submit',e=>{
  const v=Object.fromEntries(new FormData(e.target));
  const ownerId=String(v.ownerId??'');
  if(!ownerId||ownerId!==selected||view!=='sheet'||!character(ownerId))return alert('Změnila se otevřená postava. Znovu otevřete vybavení z jejího listu.');
- if(combatInitiativeSequence)return alert('Změna vybavení během Initiative vyžaduje řádně vyhodnocenou Combat akci');
+ if(combatActorLocked93725(ownerId))return alert('Změna vybavení účastníka boje vyžaduje Combat akci');
  const quantity=Number(v.quantity),currentWQ=String(v.currentWQ??'').trim()===''?null:Number(v.currentWQ);
  const layerOrder=String(v.layerOrder??'').trim()===''?null:Number(v.layerOrder);
  const layerSlot=v.layerSlot||null;
@@ -20463,7 +20442,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const t=e.target.closest('[data-loss-ration]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();
  const clock=data.campaignClock;
- if(!clock||combatInitiativeSequence||view!=='sheet')return alert('Odpis potravin vyžaduje otevřenou kampaň mimo Initiative.');
+ if(!clock||combatActorLocked93725(selected)||view!=='sheet')return alert('Odpis potravin účastníka boje vyžaduje Combat akci.');
  const lot=rationStockBalances(data.journal,campaignKey(clock),selected,clock.minute)
   .find(x=>x.sourceId===t.dataset.lossRation&&x.minute<=clock.minute&&x.remaining>=0.5);
  if(!lot)return alert('Neexistuje žádná zbývající doložená zásoba k odpisu.');
@@ -20483,7 +20462,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const t=e.target.closest('[data-loss-water]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();
  const clock=data.campaignClock;
- if(!clock||combatInitiativeSequence||view!=='sheet')return alert('Odpis vody vyžaduje otevřenou kampaň mimo Initiative.');
+ if(!clock||combatActorLocked93725(selected)||view!=='sheet')return alert('Odpis vody účastníka boje vyžaduje Combat akci.');
  const lots=waterskinBalances(data.journal,campaignKey(clock),selected,clock.minute)
   .filter(x=>x.itemId===t.dataset.lossWater&&x.remaining>=0.5);
  if(!lots.length)return alert('Nádoba neobsahuje doloženou vodu.');
@@ -20506,19 +20485,19 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const t=e.target.closest('[data-transfer-ration]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();
  const clock=data.campaignClock;
- if(!clock||combatInitiativeSequence)return alert('Předání potravin vyžaduje otevřenou kampaň a stav mimo Initiative.');
+ if(!clock||combatActorLocked93725(selected))return alert('Předání potravin účastníka boje vyžaduje Combat akci.');
  const members=new Set(clock.characterIds??data.characters.map(c=>c.id));
  if(!members.has(selected))return alert('Předávající není členem kampaně.');
  const lot=availableRationLots(data.journal,campaignKey(clock),selected,clock.minute).find(l=>l.sourceId===t.dataset.transferRation);
  if(!lot)return alert('Potraviny již nejsou dostupné nebo překročily trvanlivost.');
- const others=data.characters.filter(c=>c.id!==selected&&members.has(c.id));
+ const others=data.characters.filter(c=>c.id!==selected&&members.has(c.id)&&!combatActorLocked93725(c.id));
  if(!others.length)return alert('Žádný další člen kampaně nemůže potraviny převzít.');
  overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Předat doložené potraviny</h2><p class="tiny muted">${esc(lot.name)} · dostupné ${lot.remaining} dne/dní · skutečná trvanlivost do minuty ${lot.expiresAt}. Převod nenahrazuje spotřebu ani nezakládá novou lhůtu čerstvosti. Čas GM se nemění.</p><form id="ration-transfer-form"><input type="hidden" name="actorId" value="${esc(selected)}"><input type="hidden" name="sourceId" value="${esc(lot.sourceId)}"><label>Příjemce<select name="recipientId" required>${others.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><label>Množství (dny potravy)<input name="quantity" type="number" min="0.5" max="${lot.remaining}" step="0.5" value="${lot.remaining}" required></label><label>Skutečné okolnosti<input name="reason" minlength="2" maxlength="160" required placeholder="Např. skutečně rozděleno při táboření"></label><label><input name="confirmedByGM" type="checkbox" value="yes" required> GM potvrzuje skutečné předání přídělů</label><div class="actions"><button type="submit">Doložit předání</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
  render();
 },true);
 document.addEventListener('submit',e=>{
  if(e.target?.id!=='ration-transfer-form')return;e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence||view!=='sheet')return alert('Předání vyžaduje inventář mimo Initiative.');
+ if(combatActorLocked93725(selected,new FormData(e.target).get('recipientId'))||view!=='sheet')return alert('Předání s účastníkem boje vyžaduje Combat akci.');
  const fd=new FormData(e.target),clock=data.campaignClock;
  if(!clock||String(fd.get('actorId'))!==selected)return alert('Změnila se kampaň či předávající postava.');
  try{
@@ -20534,7 +20513,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('click',e=>{
  const t=e.target.closest('[data-transfer-inv]');if(!t)return;
  e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Během Initiative lze předávat předměty jen pravidlovou Combat akcí.');
+ if(combatActorLocked93725(selected))return alert('Předání předmětu účastníka boje vyžaduje Combat akci.');
  const x=data.inventory.find(i=>i.id===t.dataset.transferInv&&i.characterId===selected);
  if(!x)return alert('Předmět již nepatří otevřené postavě.');
  const others=data.characters.filter(c=>c.id!==selected);
@@ -20542,7 +20521,7 @@ document.addEventListener('click',e=>{
  if(!data.campaignClock)return alert('Předání vyžaduje otevřený kalendář kampaně.');
  const members=new Set(data.campaignClock.characterIds??data.characters.map(c=>c.id));
  if(!members.has(selected))return alert('Předávající není účastníkem kalendáře.');
- const allowed=others.filter(c=>members.has(c.id));
+ const allowed=others.filter(c=>members.has(c.id)&&!combatActorLocked93725(c.id));
  if(!allowed.length)return alert('Ve stejné kampani není žádný příjemce.');
  overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Doložit předání: ${esc(x.snapshot.name)}</h2><form id="inventory-transfer-form"><input type="hidden" name="inventoryId" value="${esc(x.id)}"><input type="hidden" name="ownerId" value="${esc(selected)}"><label>Příjemce<select name="recipientId" required>${allowed.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><label>Počet kusů<input type="number" name="quantity" min="1" max="${esc(x.quantity)}" value="${esc(x.quantity)}" step="1" required></label><label>Skutečné okolnosti předání<input name="reason" required maxlength="240" minlength="2" placeholder="Např. předáno během zastávky družiny"></label><label><input name="confirmedByGM" type="checkbox" value="yes" required> GM potvrzuje skutečné předání</label><p class="tiny">Předání části zásoby založí nový inventární balík příjemce. Zapsaný původ se zachová a čas GM se nezmění.</p><div class="actions"><button type="submit">Potvrdit předání</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
  render();
@@ -20550,7 +20529,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('submit',e=>{
  if(e.target?.id!=='inventory-transfer-form')return;
  e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Předání je během Initiative zablokováno.');
+ if(combatActorLocked93725(selected,new FormData(e.target).get('recipientId')))return alert('Předání předmětu účastníka boje vyžaduje Combat akci.');
  const v=Object.fromEntries(new FormData(e.target));
  if(v.ownerId!==selected||view!=='sheet')return alert('Předávající postava se změnila.');
  let updated;try{updated=recordInventoryDisposition(data,{kind:'transfer',actorId:v.ownerId,itemId:v.inventoryId,recipientId:v.recipientId,
@@ -20565,7 +20544,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('submit',e=>{
  if(e.target?.id!=='inventory-loss-form')return;
  e.preventDefault();e.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Ztrátu během Initiative řeší Combat akce.');
+ if(combatActorLocked93725(selected))return alert('Ztrátu účastníka boje řeší Combat akce.');
  const v=Object.fromEntries(new FormData(e.target));
  if(v.actorId!==selected||view!=='sheet'||!data.campaignClock)return alert('Změnila se otevřená postava nebo kampaň.');
  try{
@@ -21941,7 +21920,7 @@ document.addEventListener('submit',event=>{
  const form=event.target;
  if(!['creation-new-form','creation-step-form'].includes(form?.id))return;
  event.preventDefault();event.stopImmediatePropagation();
- if(combatInitiativeSequence)return alert('Character Creation / Edit není povolen během aktivní Initiative.');
+ if(form.id==='creation-step-form'&&combatActorLocked93725(selected))return alert('Úprava účastníka boje patří do Combat.');
  if(storageReadOnly)return alert('Úložiště je pouze pro čtení.');
  const v=Object.fromEntries(new FormData(form));
  if(form.id==='creation-new-form'){
@@ -22082,7 +22061,7 @@ document.addEventListener('click',event=>{
  }
  if(t.hasAttribute('data-creation-edit-voice')){creationAttributeChoice='voi';render();return}
  if(t.hasAttribute('data-creation-select-attr')){creationAttributeChoice=document.getElementById('creation-attr-name')?.value||null;render();return}
- if(combatInitiativeSequence)return alert('Během aktivní Initiative nelze měnit Character Creation.');
+ if(combatActorLocked93725(selected))return alert('Úprava účastníka boje patří do Combat.');
  const original=character(selected);if(!original)return;
  const c=creationOf(original);
  const direct=t.hasAttribute('data-creation-step')?Number(t.dataset.creationStep):null;
