@@ -4,7 +4,7 @@
  * Physical food, bottled potable water and shared Foraging lots stay distinct.
  */
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
-import {activeNutritionPolicies} from './hmk-nutrition-days.js';
+import {activeNutritionPolicies,personalNutritionStock} from './hmk-nutrition-days.js';
 import {rationStockBalances,availableRationLots} from './hmk-physical-ration-ledger.js';
 import {availablePhysicalWater} from './hmk-physical-water-ledger.js';
 import {provenCarriedRations} from './hmk-inventory-provisions.js';
@@ -81,17 +81,18 @@ export function characterProvisionsOverview(database,actorId){
  const currentPolicyRecords=policy?records.filter(r=>r.calendarNutritionDay.policyId===policy.id):[];
  const last=currentPolicyRecords.at(-1)?.calendarNutritionDay??null;
  const nextCloseMinute=policy?(currentPolicyRecords.at(-1)?.calendarNutritionDay.endMinute??policy.campaignMinute)+DAY:null;
+ const personal=policy?personalNutritionStock(database,campaignId,actorId,nextCloseMinute-DAY,nextCloseMinute,now):{foodDays:0,waterDays:0};
  const illness=(actor.hmk?.healthState?.malnutritionEpisodes??[])
   .filter(e=>e.campaignId===campaignId&&e.status==='active')
   .map(e=>({kind:e.kind,hr:e.hr,nextDueMinute:e.nextDueMinute}));
  const attestedItemIds=new Set(confirmedStocks.map(l=>l.itemId));
  const baseline=provenCarriedRations(database.inventory??[],actorId).filter(l=>!attestedItemIds.has(l.itemId));
  return {available:true,actorId,campaignId,minute:now,
-  food:{confirmedUnits:foodUnits,daysAtCurrentBaseline:conservativeRationDays(fresh,now,foodNeed),
+  food:{confirmedUnits:foodUnits,accessibleUnits:personal.foodDays,daysAtCurrentBaseline:conservativeRationDays(fresh,now,foodNeed),
    dailyBaseline:foodNeed,expiredUnits:expiredFood,
    unconfirmedInventoryUnits:rounded(baseline.reduce((n,l)=>n+l.foodDays,0)),
    lots:fresh.map(l=>({name:l.name,itemId:l.itemId,remaining:l.remaining,expiresAt:l.expiresAt}))},
-  water:{confirmedGallons:waterGallons,daysAtCurrentBaseline:Math.floor(waterGallons/waterNeed),
+  water:{confirmedGallons:waterGallons,accessibleGallons:personal.waterDays,daysAtCurrentBaseline:Math.floor(waterGallons/waterNeed),
    dailyBaseline:waterNeed,containers:water.map(l=>({itemId:l.itemId,remaining:l.remaining}))},
   policy:policy?{id:policy.id,foragingOnly:policy.calendarNutritionPolicy.foragingOnly===true,
     inventoryRations:policy.calendarNutritionPolicy.inventoryRations===true,

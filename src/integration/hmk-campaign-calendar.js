@@ -128,7 +128,7 @@ export function recordCampaignResolution(clock,{eventId,sourceEventId,characterI
 /** Returns scheduled obligations only when their start times are attested.
  * Procedure validation/physical dice remain with their EXISTING engines.
  */
-export function campaignCalendarAgenda(clock,characters=[],journal=[]){
+export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=[]){
  if(!clock)return {due:[],future:[],unknown:[],all:[],suspended:[]};
  validateCampaignCalendar(clock);
  characters=Array.isArray(clock.characterIds)?characters.filter(c=>clock.characterIds.includes(c.id)):characters;
@@ -258,7 +258,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
    }
   }
  }
- const automatic=automaticHMKFollowups(clock,characters,journal,getCampaignEpisodeAnchor);
+ const automatic=automaticHMKFollowups(clock,characters,journal,getCampaignEpisodeAnchor,inventory);
  // A saved Trekking Routine is only a PREPARATION. It does not by itself
  // start a journey or expose the party to its possible hazards. Preserve its
  // skill/hazard navigation as nonblocking preparation until an authenticated
@@ -326,7 +326,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[]){
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
  return {due:all.filter(x=>x.status==='due'),future:all.filter(x=>x.status==='future'),unknown,all,suspended,prepared};
 }
-export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmConfirmed,characters=[],journal=[],deferConcurrentTreatmentAtStart=false}={}){
+export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmConfirmed,characters=[],journal=[],inventory=[],deferConcurrentTreatmentAtStart=false}={}){
  validateCampaignCalendar(clock);
  ensure(gmConfirmed===true,'GM musí potvrdit skutečně uplynulý čas');
  ensure(validInt(deltaMinutes,1,MAX_MINUTE)&&clock.minute+deltaMinutes<=MAX_MINUTE,
@@ -335,7 +335,7 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
   'Uveďte doložený důvod posunu času (alespoň 3 znaky)');
  ensure(typeof eventId==='string'&&eventId.length>0&&!clock.events.some(e=>e.id===eventId),'Duplicitní ID');
  ensure(typeof deferConcurrentTreatmentAtStart==='boolean','Neplatný režim časovaného Treatment');
- const agenda=campaignCalendarAgenda(clock,characters,journal);
+ const agenda=campaignCalendarAgenda(clock,characters,journal,inventory);
  if(agenda.unknown.length)throw Error('Nelze posunout čas: neověřený nebo neuzavřený časový závazek – '+
   agenda.unknown[0].name+' / '+agenda.unknown[0].description+'. '+agenda.unknown[0].reason);
  const nextMinute=clock.minute+deltaMinutes;

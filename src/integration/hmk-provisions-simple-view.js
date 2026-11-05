@@ -3,6 +3,8 @@
  * Physical weight changes only through the original append-only custody receipts.
  */
 import {characterProvisionsOverview} from './hmk-character-provisions-overview.js';
+import {foragedCarriedFood} from './hmk-foraging-carried-food.js';
+import {effectivelyProvisionedAt} from './hmk-nutrition-days.js';
 import {rationStockBalances} from './hmk-physical-ration-ledger.js';
 import {availablePhysicalWater} from './hmk-physical-water-ledger.js';
 const half=n=>Math.round(n*2)/2;
@@ -24,12 +26,26 @@ export function characterCarryProjection(database,actorId){
  const carriedFood=half(foodLots.reduce((n,l)=>n+l.remaining,0));
  const carriedWater=half(waterLots.reduce((n,l)=>n+l.remaining,0));
  const edibleFood=half(foodLots.filter(l=>l.expiresAt>=minute).reduce((n,l)=>n+l.remaining,0));
- const foodLb=carriedFood*3,waterLb=carriedWater*10;
+ const personalFood=Number.isFinite(status.food.accessibleUnits)?status.food.accessibleUnits:edibleFood;
+ const personalWater=Number.isFinite(status.water.accessibleGallons)?status.water.accessibleGallons:carriedWater;
+ const found=foragedCarriedFood(journal,campaignId,minute).filter(l=>l.actorId===actorId&&l.remaining>0);
+ const foundWeightLb=found.reduce((n,l)=>n+(l.totalWeightLb*l.remaining/l.quantity),0);
+ const foodLb=carriedFood*3+foundWeightLb,waterLb=carriedWater*10;
+ // The immutable ledger consumes whole or half day units at the 24h close.
+ // Between closes, show a purely visual estimate of remaining coverage time,
+ // without recording a fake fractional meal or prematurely lowering ENC.
+ const nextClose=status.policy?.nextCloseMinute;
+ const inDay=Number.isSafeInteger(nextClose)&&nextClose>minute&&nextClose-minute<=1440;
+ const elapsed=inDay?1440-(nextClose-minute):0;
+ const gmCovered=effectivelyProvisionedAt(journal,campaignId,actorId,minute);
+ const foodDuration=rationEquivalentMinutes(personalFood,status.food.dailyBaseline);
+ const waterDuration=rationEquivalentMinutes(personalWater,status.water.dailyBaseline);
+ const estimate=duration=>duration===null?null:Math.max(0,duration-(gmCovered?0:elapsed));
  return {available:true,actorId,minute,campaignId,foodLots,waterLots,
   physicalFoodLb:foodLb,physicalWaterLb:waterLb,totalPhysicalLb:foodLb+waterLb,
-  carriedFood,carriedWater,edibleFood,
-  foodMinutes:rationEquivalentMinutes(edibleFood,status.food.dailyBaseline),
-  waterMinutes:rationEquivalentMinutes(carriedWater,status.water.dailyBaseline),
+  carriedFood:half(carriedFood+found.reduce((n,l)=>n+l.remaining,0)),carriedWater,edibleFood:personalFood,
+  foodMinutes:foodDuration,waterMinutes:waterDuration,
+  estimatedFoodMinutes:estimate(foodDuration),estimatedWaterMinutes:estimate(waterDuration),
   // No counter reports 'time to starvation'. These are only ration equivalents.
   spoiledFood:half(carriedFood-edibleFood),baselineFoodNeed:status.food.dailyBaseline,
   baselineWaterNeed:status.water.dailyBaseline};

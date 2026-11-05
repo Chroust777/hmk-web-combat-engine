@@ -70,7 +70,8 @@ export function effectivelyProvisionedAt(journal=[],campaignId,actorId,minute=In
  * access for the next FULL nutrition day. This is a forecast only, not a new injury, ration or die.
  * It prevents a calendar showing only the old distant Advance while a closer
  * daily Healing becomes mandatory at the next 24h closure. */
-export function projectedVerifiedMalnutritionHealingMinute(journal=[],campaignId,actorId,now,kind,originalDueMinute){
+export function projectedVerifiedMalnutritionHealingMinute(journal=[],campaignId,actorId,now,kind,originalDueMinute,
+ {inventory=[],characters=[]}={}){
  if(!['starvation','thirst'].includes(kind)||!validMinute(now)||!validMinute(originalDueMinute))return null;
  const current=activeNutritionPolicies(journal,campaignId,[actorId])[0];
  if(!current)return null;
@@ -84,10 +85,16 @@ export function projectedVerifiedMalnutritionHealingMinute(journal=[],campaignId
  const unit=kind==='starvation'?'foodDays':'waterDays';
  const witnessed=consumeBeforeDay(journal,actorId,campaignId,start,now,unit,start===current.campaignMinute);
  const covered=gmProvisionedQuantity(journal,campaignId,actorId,current,start,end,need);
- // Even with known carried stock, a future meal may not actually occur.
- // Forecast only already-witnessed consumption or a current continuing
- // GM attestation, never mere ownership or an unassigned Foraging yield.
- return round(witnessed+covered)>=need?end:null;
+ // Owner's dated, edible and accessible supplies are consumed automatically
+ // by the existing 24h executor. The same read-only evidence may therefore
+ // anticipate its Healing deadline without a separate "I ate" click.
+ const actor=characters.find(c=>c.id===actorId);
+ if(actor&&needsAssistedIntake(actor)){
+  const assistance=assistedIntakeForDay(journal,campaignId,actorId,start,end)?.calendarNutritionAssistedIntake;
+  if(!assistance||(unit==='foodDays'?assistance.foodAccepted===false:assistance.waterAccepted===false))return null;
+ }
+ const personal=personalNutritionStock({journal,inventory},campaignId,actorId,start,end,now);
+ return round(witnessed+covered+personal[unit])>=need?end:null;
 }
 export function activeNutritionPolicies(journal=[],campaignId,actorIds=null){
  const byActor=new Map(),allowed=actorIds?new Set(actorIds):null;
@@ -195,6 +202,28 @@ function reachableWaterLots(database,campaignId,actorId,start,end){
   const animal=rationCustody(database,campaignId,actorId,l.itemId,start,end);
   return animal?[{...l,animal}]:[];
  });
+}
+
+
+/** Read-only coverage from CURRENT, individually assigned supplies. This is
+ * deliberately not a new meal receipt: daily closing still posts the one
+ * authoritative immutable debit. Storage outside the character's actual
+ * custody never counts as portable food or water. */
+export function personalNutritionStock(database,campaignId,actorId,start,end,atMinute){
+ if(!database||!validMinute(atMinute)||!validMinute(start)||!validMinute(end)||end<=start)
+  return {foodDays:0,waterDays:0,sourceIds:[]};
+ const p=activeNutritionPolicies(database.journal||[],campaignId,[actorId])[0]?.calendarNutritionPolicy;
+ if(!p)return {foodDays:0,waterDays:0,sourceIds:[]};
+ const sourceIds=[];
+ const food=p.inventoryRations===true||p.gmProvisioned===true?
+  reachableFoodLots(database,campaignId,actorId,start,atMinute).filter(l=>l.expiresAt>=end):[];
+ const foraged=p.inventoryRations===true||p.foragingOnly===true||p.gmProvisioned===true?
+  foragedCarriedFood(database.journal||[],campaignId,atMinute).filter(l=>l.actorId===actorId&&l.remaining>=0.5):[];
+ const water=p.inventoryWater===true||p.gmProvisioned===true?
+  reachableWaterLots(database,campaignId,actorId,start,atMinute):[];
+ for(const l of [...food,...foraged,...water])sourceIds.push(l.sourceId??l.sourceJournalId??l.fillId);
+ return {foodDays:round(food.reduce((n,l)=>n+l.remaining,0)+foraged.reduce((n,l)=>n+l.remaining,0)),
+  waterDays:round(water.reduce((n,l)=>n+l.remaining,0)),sourceIds};
 }
 
 const consumeBeforeDay=(journal,actorId,campaignId,start,end,unit,includeStart=false)=>round(journal.filter(x=>x.characterId===actorId&&x.calendarCampaignId===campaignId&&

@@ -18,7 +18,7 @@ const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
 export function episodeWeatherAftercareId(episodeId,actorId,kind){
  return ['episode-weather',episodeId,actorId,kind].map(x=>encodeURIComponent(String(x))).join(':');
 }
-export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnchor=()=>null){
+export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnchor=()=>null,inventory=[]){
  const all=[],unknown=[];
  if(!clock)return {all,unknown};
  const push=(person,kind,sourceId,description,minute,route='combat',extra={})=>{
@@ -58,10 +58,10 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // Advance and Healing dice are NEVER inferred from the time alone.
   for(const m of s?.malnutritionEpisodes??[])if(m.status==='active'&&m.campaignId===(clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`))
    {const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
-    const predicted=projectedVerifiedMalnutritionHealingMinute(journal,campaignId,c.id,clock.minute,m.kind,m.nextDueMinute);
+    const predicted=projectedVerifiedMalnutritionHealingMinute(journal,campaignId,c.id,clock.minute,m.kind,m.nextDueMinute,{inventory,characters});
     const healingSoon=Number.isSafeInteger(predicted)&&predicted<m.nextDueMinute;
     push(c,'malnutrition-course',m.id,healingSoon?
-     `${m.kind==='thirst'?'Thirst':'Starvation'} · Healing d100 při nejbližší plné denní dávce (HMK 185–186; potvrzená spotřeba nebo předpoklad pokračování zajištění GM)`:
+     `${m.kind==='thirst'?'Thirst':'Starvation'} · Healing d100 při nejbližší plné denní dávce (HMK 185–186; automatický výdej nesených dávek, potvrzená spotřeba či zajištění GM)`:
      `${m.kind==='thirst'?'Thirst':'Starvation'} · Exposure Advance/Healing d100 (HMK 185–186)`,
      healingSoon?predicted:m.nextDueMinute,'calendar',{episodeId:m.id,...(healingSoon?{nutritionHealingForecast:true,originalDueMinute:m.nextDueMinute}:{})});
    }
