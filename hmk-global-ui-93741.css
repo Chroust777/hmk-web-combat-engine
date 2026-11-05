@@ -1,0 +1,172 @@
+/* HMK Keeper's Ledger v93.741 – LAST loaded layer, shared typographic and book layout tokens.
+ * This is an intentionally narrow reset: character Chronicle Spread, decorative book art,
+ * ML / Secondary-Mastery numeric cells and highlighted result figures retain their sizing.
+ */
+:root{
+ --hmk-ui-heading-font:"Cinzel",Georgia,serif;
+ --hmk-ui-body-font:"Cormorant Garamond",Georgia,serif;
+ --hmk-ui-page-heading:19px;
+ --hmk-ui-panel-heading:15px;
+ --hmk-ui-body:13px;
+ --hmk-ui-small:12px;
+ --hmk-ui-leading:1.43;
+ --hmk-ui-panel-parchment:linear-gradient(180deg,rgba(248,235,209,.79),rgba(236,213,174,.38));
+ --hmk-ui-panel-border:rgba(125,88,49,.42);
+}
+/* Book folios other than the intentionally preserved Chronicle Spread. */
+body #app .journal-book:not(.journal-book--overview)
+ :is(p,li,dt,dd,label,summary,small,legend,textarea,select,input,button,output,td,th){
+ font-family:var(--hmk-ui-body-font)!important;
+}
+body #app .journal-book:not(.journal-book--overview)
+ :is(p,li,dt,dd,label,summary,legend,textarea,select,input,button,output){
+ font-size:var(--hmk-ui-body)!important;
+ line-height:var(--hmk-ui-leading)!important;
+}
+body #app .journal-book:not(.journal-book--overview)
+ :is(small,.tiny,.hc-hint,.muted,.hc-provision-help){
+ font-family:var(--hmk-ui-body-font)!important;
+ font-size:var(--hmk-ui-small)!important;
+ line-height:var(--hmk-ui-leading)!important;
+}
+/* The original journal, skill EML/result numbers and date-grid day numbers are not normalized. */
+body #app .journal-book:not(.journal-book--overview)
+ :is(h1,h2,h3,h4,h5,h6),
+body #app .content:not(.content-sheet) :is(h1,h2,h3,h4,h5,h6){
+ font-family:var(--hmk-ui-heading-font)!important;
+}
+body #app .journal-book:not(.journal-book--overview)
+ :is(.folio-chapter-content>h2,.folio-chapter-heading h2,.journal-chapter-title),
+body #app .content:not(.content-sheet)>h2{
+ font-size:var(--hmk-ui-page-heading)!important;
+}
+body #app .journal-book:not(.journal-book--overview)
+ :is(.panel>h3,.hsk-test-card>h3,.hsk-rule-panel>h3,.hc-calendar>h3,.hc-weekly>h3){
+ font-family:var(--hmk-ui-heading-font)!important;
+ font-size:var(--hmk-ui-panel-heading)!important;
+ line-height:1.3!important;
+}
+/* Numeric EML, Secondary Mastery and important skill result numbers must keep their scale. */
+body #app .journal-book--skills :is(.hsk-eml-trace,.hsk-eml-chip,.hsk-eml-total,
+ .hsk-value-display,.hsk-bigstars,.hsk-tn-readout,.hsk-result-slot,.hsk-table,.hsk-secondary-ml){
+ font-size:revert-layer;
+}
+/* Fix the two mismatched Skills panels with identical parchment, borders and text hierarchy. */
+body #app .content-sheet .journal-book--skills .folio-chapter-content
+ :is(.hsk-skill-rule-explainer,.hsk-test-card){
+ background:var(--hmk-ui-panel-parchment)!important;
+ background-image:var(--hmk-ui-panel-parchment)!important;
+ border:1px solid var(--hmk-ui-panel-border)!important;
+ border-radius:8px!important;
+ color:#382719!important;
+ box-shadow:inset 0 1px rgba(255,249,231,.7)!important;
+ padding:12px 14px!important;
+}
+body #app .content-sheet .journal-book--skills .folio-chapter-content
+ :is(.hsk-skill-rule-explainer,.hsk-test-card) :is(p,label,legend,small,li,div,span,strong,b,em){
+ font-family:var(--hmk-ui-body-font)!important;
+}
+body #app .content-sheet .journal-book--skills .folio-chapter-content
+ :is(.hsk-skill-rule-explainer,.hsk-test-card) :is(p,label,legend){
+ font-size:var(--hmk-ui-body)!important;
+ line-height:var(--hmk-ui-leading)!important;
+}
+body #app .content-sheet .journal-book--skills .folio-chapter-content
+ :is(.hsk-skill-rule-explainer,.hsk-test-card) :is(.tiny,.muted,small){
+ font-size:var(--hmk-ui-small)!important;
+}
+body #app .content-sheet .journal-book--skills .folio-chapter-content
+ :is(.hsk-skill-rule-explainer,.hsk-test-card)>h3,
+body #app .content-sheet .journal-book--skills .hsk-rule-panel>h3{
+ font:700 var(--hmk-ui-panel-heading)/1.3 var(--hmk-ui-heading-font)!important;
+ color:#633a22!important;
+ background:transparent!important;
+}
+body #app .content-sheet .journal-book--skills .hsk-skill-rule-explainer .hsk-rule-panel{
+ background:transparent!important;
+ border:0!important;
+ box-shadow:none!important;
+ color:#382719!important;
+}
+/* Do not accidentally resize distinctive skill numeric cells. */
+body #app .content-sheet .journal-book--skills .hsk-eml-trace :is(.hsk-eml-chip,.hsk-eml-total,.hsk-eml-chip b,.hsk-eml-chip small){
+ font-size:revert-layer!important;
+}
+/* Browser-wide narrative size and face outside the original Character Journal. */
+body #app .content:not(.content-sheet) :is(p,li,dt,dd,label,summary,small,td,th,textarea,select,input,button){
+ font-family:var(--hmk-ui-body-font)!important;
+}
+/* Calendar: ONLY the left parchment contains full-width stacked agenda. The right
+ * original book page keeps the month/date grid and its existing dimensions. */
+body #app .journal-book--calendar .journal-book-page--left
+ :is(.hc-weekly,.hc-week-tabs,.hc-week-tabs>details,.hc-week-list){
+ display:block!important;
+ width:100%!important;
+ max-width:none!important;
+ min-width:0!important;
+ box-sizing:border-box!important;
+}
+body #app .journal-book--calendar .journal-book-page--left .hc-week-tabs>details{
+ margin:0 0 11px!important;
+}
+body #app .journal-book--calendar .journal-book-page--left .hc-week-list{
+ height:auto!important;
+ max-height:none!important;
+ overflow:visible!important;
+}
+body #app .journal-book--calendar .journal-book-page--right .hc-calendar{
+ width:100%!important;
+ margin-top:0!important;
+}
+/* Library part cross-references read like printed manuscript, never blue buttons. */
+body #app button.library-part-link{
+ background:transparent!important;background-image:none!important;color:#633e24!important;
+ border:0!important;box-shadow:none!important;text-decoration:none!important;
+ border-radius:0!important; padding:0!important; min-height:0!important;
+ text-align:left!important;display:inline!important;cursor:pointer;
+ font-family:var(--hmk-ui-body-font)!important;font-size:inherit!important;
+ font-weight:600!important;
+}
+body #app button.library-part-link:hover{color:#2f1d12!important;filter:none!important;text-decoration:none!important}
+body #app button.library-part-link:focus-visible{outline:2px solid #946a3b!important;outline-offset:2px!important}
+/* Help remains hover/focus-enabled via data-hmk-help; the redundant info glyph is absent. */
+body #app [data-hmk-help]{cursor:help}
+/* In Skill Test explanations, .tiny is NOT a smaller semantic tier: the two
+ * cited instructions are equally important and must have the same 13px body. */
+body #app .content-sheet .journal-book--skills .folio-chapter-content
+ :is(.hsk-skill-rule-explainer .hsk-rule-panel p,.hsk-test-card>p){
+ font-family:var(--hmk-ui-body-font)!important;
+ font-size:var(--hmk-ui-body)!important;
+ line-height:var(--hmk-ui-leading)!important;
+}
+/* Use the full left-page width for both agenda sections, preserving the month grid. */
+body #app .journal-book--calendar .journal-book-page--left .hc-weekly{
+ padding-left:8px!important;padding-right:8px!important;
+}
+/* Final font-family override for text carried by nested spans and divs. Earlier
+ * app styles used font shorthand on inline wrappers, bypassing the p/label reset.
+ * The Chronicle Spread remains exempt; heading descendants are explicitly reset. */
+body #app .journal-book:not(.journal-book--overview)
+ :is(article,section,fieldset,blockquote,div,span,strong,b,em,code,dd,dt,caption,summary){
+ font-family:var(--hmk-ui-body-font)!important;
+}
+body #app .journal-book:not(.journal-book--overview)
+ :is(h1,h2,h3,h4,h5,h6,h1 *,h2 *,h3 *,h4 *,h5 *,h6 *){
+ font-family:var(--hmk-ui-heading-font)!important;
+}
+/* Standard compact helper copy; it must never accidentally become a headline. */
+body #app .journal-book:not(.journal-book--overview)
+ :is(.hc-health-card,.hc-nutrition-card,.hc-episode-summary,.catalog-parameter-tip)
+ :is(p,span,strong,small){font-family:var(--hmk-ui-body-font)!important}
+/* Measured in Chromium: old folio rules kept the tab H3 at 23.905px and
+ * the immediate chapter H2 at 17px. Enforce the promised 19/15 hierarchy. */
+body #app .journal-book:not(.journal-book--overview) .folio-chapter-heading h3{
+ font-family:var(--hmk-ui-heading-font)!important;
+ font-size:var(--hmk-ui-page-heading)!important;
+ line-height:1.25!important;
+}
+body #app .journal-book:not(.journal-book--overview) .folio-chapter-content h2{
+ font-family:var(--hmk-ui-heading-font)!important;
+ font-size:var(--hmk-ui-panel-heading)!important;
+ line-height:1.3!important;
+}

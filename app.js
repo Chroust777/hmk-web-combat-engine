@@ -323,7 +323,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.740';
+const APP_VERSION='93.741';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1687,7 +1687,7 @@ function partyProvisionWizardHTML(participants,clock,{supplyHTML,nutritionHTML,a
  <div class="hc-party-intro"><h2>Zásoby družiny · den po dni</h2><p>Stačí rozhodnout, <strong>kdo spotřebovává zásoby</strong>, případně rozdělit skutečné nálezy a potvrdit výjimky. Denní spotřebu vyhodnotí kalendář při posunu času GM. Žádný krok sám nepřidává jídlo, vodu ani hody.</p><p><strong>Teď je:</strong> ${esc(displayCampaignMinute(clock.minute))} · ${esc(czCount(participants.length,'postava','postavy','postav'))}</p></div>
  ${partyProvisionLedgerHTML(participants)}
  <section class="hc-party-step" id="hc-party-step-people"><header class="hc-party-step-head"><span class="hc-party-step-number">1</span><div><h3>Kdo má sledovanou výživu?</h3><p>Stav všech členů je vidět hned. Běžné sledování stačí zapnout jednou; další dny se opakuje automaticky.</p></div></header>
- <div class="hc-party-table-wrap"><table class="hc-party-status-table"><thead><tr><th>Postava</th><th>Režim</th><th>Poslední den</th><th><span tabindex="0" class="hc-help-term" data-hmk-help="Uzávěrka je vypočtena z doloženého začátku dne. Je to předpokládaná 24hodinová hranice pro denní spotřebu, nikoli nový kalendářní závazek.">Další 24h uzávěrka ⓘ</span></th></tr></thead><tbody>${rows||'<tr><td colspan="4">V kampani zatím nejsou žádné postavy.</td></tr>'}</tbody></table></div>
+ <div class="hc-party-table-wrap"><table class="hc-party-status-table"><thead><tr><th>Postava</th><th>Režim</th><th>Poslední den</th><th><span tabindex="0" class="hc-help-term" data-hmk-help="Uzávěrka je vypočtena z doloženého začátku dne. Je to předpokládaná 24hodinová hranice pro denní spotřebu, nikoli nový kalendářní závazek.">Další 24h uzávěrka</span></th></tr></thead><tbody>${rows||'<tr><td colspan="4">V kampani zatím nejsou žádné postavy.</td></tr>'}</tbody></table></div>
  ${newcomers.length?`<form data-provision-party-start class="hc-party-form"><fieldset><legend>Zapnout běžné sledování také pro</legend><div class="hc-characters">${newcomers.map(c=>`<label class="hc-character"><input type="checkbox" name="actorIds" value="${esc(c.id)}"><span>${esc(c.name)}</span></label>`).join('')}</div></fieldset><button type="submit">Zapnout sledování vybraným</button><small>Pouze evidenční režim 1 denní dávka jídla a vody. Žádná zásoba ani uplynulý den se tím nezakládá.</small></form>`:
  ''}
  </section>
@@ -1909,7 +1909,7 @@ function weatherDayTimelineHTML(day,{latitudeBand='mid',daylightSeason=null,sunr
  const fmt=n=>`${String(Math.floor(n/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;
  const periodLabel={day:'Den',twilight:'Soumrak',night:'Noc'};
  const hazardHelp='Riziko podle HMK 144–149: v tomto úseku může počasí vyvolat Cold Hazard nebo Heat Hazard. Samotné označení není zranění ani automatický hod. Potřebný Weather Hazard Roll se řeší až pro konkrétní doloženou expozici a podle skutečné ochrany postavy; bez rizika se teplotní Hazard Roll neprovádí.';
- return `<div class="hc-weather-timeline"><div class="hc-episode-table-scroll"><table class="hc-episode-weather-timeline"><caption class="hc-weather-table-caption">Potvrzený průběh počasí pro celý den</caption><thead><tr><th>Čas</th><th>Část dne</th><th>Světlo</th><th>Jaké je počasí</th><th>Srážky</th><th><span class="hc-help-term" tabindex="0" data-hmk-help="${esc(hazardHelp)}" aria-label="Riziko HMK – zobrazit vysvětlení">Riziko HMK ⓘ</span></th><th>Teplota d10 po úpravách</th></tr></thead>
+ return `<div class="hc-weather-timeline"><div class="hc-episode-table-scroll"><table class="hc-episode-weather-timeline"><caption class="hc-weather-table-caption">Potvrzený průběh počasí pro celý den</caption><thead><tr><th>Čas</th><th>Část dne</th><th>Světlo</th><th>Jaké je počasí</th><th>Srážky</th><th><span class="hc-help-term" tabindex="0" data-hmk-help="${esc(hazardHelp)}" aria-label="Riziko HMK – zobrazit vysvětlení">Riziko HMK</span></th><th>Teplota d10 po úpravách</th></tr></thead>
  <tbody>${t.rows.map(r=>{const d=visibleWeather({hazard:r.hazard,precipitation:r.precipitation});return `<tr${r.hazard?' class="hc-weather-timeline-hazard"':''}><td>${fmt(r.start)}–${fmt(r.end)}</td><td>${r.daypart}</td><td>${periodLabel[r.period]}</td><td><strong>${d.icon} ${esc(d.heading)}</strong></td><td>${esc(d.precipitation)}</td><td>${esc(d.badge)}</td><td>${r.adjustedTemperature}</td></tr>`;}).join('')}</tbody></table></div></div>`;
 }
 /** Draft inputs and generated dice are NOT a resolved weather outcome. Only the
@@ -4776,7 +4776,7 @@ function folioChapterParts(body,kind=''){
  // directly beneath the scope buttons on the LEFT page. Split at actual
  // semantic step boundaries; keep all live forms and original event handlers.
  if(kind.includes('journal-book--calendar')){
-  // v93.740 release regression: restore the actual two-page overview used by
+  // v93.741 release regression: restore the actual two-page overview used by
   // the validated v93.739 working build. A nested CSS grid on one folio
   // cannot put the month calendar on the right PAPER PAGE.
   const primary=nodes.find(el=>el.classList.contains('hc-calendar-primary'));

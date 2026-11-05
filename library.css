@@ -330,3 +330,15 @@
 .hc-cold-kit{display:grid;gap:.4rem;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
 .hc-cold-kit>p,.hc-cold-kit>.hc-check{grid-column:1/-1}
 @media(max-width:700px){.hc-cold-kit{grid-template-columns:1fr}}
+
+/* v93.741: textual library navigation, not blue button/underlined hyperlink. */
+#app .content-sheet .journal-book--library button.library-part-link,
+#app .library-table button.library-part-link{
+ appearance:none!important; background:transparent!important; background-image:none!important;
+ border:0!important; box-shadow:none!important; text-decoration:none!important;
+ color:#633e24!important; padding:0!important; margin:0!important; min-height:0!important;
+ font:inherit!important; font-weight:600!important; cursor:pointer; display:inline;
+}
+#app .content-sheet .journal-book--library button.library-part-link:hover,
+#app .library-table button.library-part-link:hover{color:#382013!important;filter:none!important;text-decoration:none!important}
+#app button.library-part-link:focus-visible{outline:2px solid #8e6037!important;outline-offset:2px!important}

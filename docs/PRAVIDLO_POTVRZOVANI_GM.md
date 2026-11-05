@@ -22,3 +22,6 @@ Přímé klikání do nasazeného webu GitHub Pages není v obvyklém běhu asis
 - Veškeré nadpisy používají `--hmk-font-heading`, běžné texty `--hmk-font-body`. Konkrétní velikosti a řádkování jsou centrální tokeny v `styles.css`; nové komponenty mají použít tyto tokeny. Medicínské souhrny jsou menší než nadpisy.
 - Edice Chronicle Spread: Skills, Fatigue, Attributes a Coins sdílejí pergamenovou paletu, nikoli samostatný tmavý formulář.
 - E2E testing: nespoléhat na přímé ovládání produkční GitHub Pages; testovat lokální stránku v Chromium (případně offline bezsíťový browser bundle) a jasně uvádět hranici pokrytí.
+
+## Zpřesnění v93.741 — jednotná vizuální hierarchie
+Viz `docs/UI_TYPOGRAFIE_A_AUDIT_v93.741.md`. Nová závěrečná CSS vrstva je `hmk-global-ui-93741.css`. Vizualizaci musí potvrdit lokální Chromium; změnu stylů nelze vydávat za plné otestování všech starších průvodců.

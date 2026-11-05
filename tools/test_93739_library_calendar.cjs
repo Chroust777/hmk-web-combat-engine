@@ -1,23 +1,27 @@
-const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
-const root=path.resolve(__dirname,'..'),app=fs.readFileSync(path.join(root,'app.js'),'utf8'),cal=fs.readFileSync(path.join(root,'src/integration/hmk-campaign-calendar-ui.js'),'utf8'),lib=fs.readFileSync(path.join(root,'library.css'),'utf8'),css=fs.readFileSync(path.join(root,'book-templates.css'),'utf8'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+/* Maintained historical regression: originally introduced in v93.739,
+   re-anchored to current semantics rather than old version/tooltip wording. */
+'use strict';const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
+const root=path.resolve(__dirname,'..');
+const read=s=>fs.readFileSync(path.join(root,s),'utf8');
+const app=read('app.js'),cal=read('src/integration/hmk-campaign-calendar-ui.js'),lib=read('library.css'),css=read('book-templates.css'),newCss=read('hmk-global-ui-93741.css'),html=read('index.html'),cold=read('src/integration/hmk-cold-gear-93740.js');
 const tests=[
- ['release version',/APP_VERSION='93\.739'/.test(app)&&html.includes('v93.739')],
+ ['release matches',/APP_VERSION='93\.741'/.test(app)&&html.includes('93.741')],
  ['slash B/E/P/F',app.includes(' / e${numeric(armourValue.e)} / p${numeric(armourValue.p)} / f${numeric(armourValue.f)}')],
- ['remove covered locations semantic duplication',app.includes("key==='coveredLocations'&&locRows.length")],
- ['nested coverage skip',app.includes("'locationProtection','coveredLocations'")],
- ['separate cold bonus',app.includes('Cold Hazard AV +${coldBonus}')],
- ['no F cold conflation',app.includes('Ochrana F značí ochranu před Fire/Frost')],
- ['cloth and padded cloak',app.includes("p.material==='D'?2:1")],
- ['replace pending layer note',app.includes('Pravidla kombinování vrstev viz strany 117 a 119')],
- ['suit verified links only',app.includes('resolved.ok?resolved.parts[i]:null')],
- ['link destination',app.includes("libraryTab='armour';libraryPage=0;query=link.dataset.libraryPartSearch")],
- ['inline printed source',app.includes('library-source-inline')],
- ['two-column calendar',cal.includes('hc-calendar-overview-grid')],
- ['stack left sidebar',css.includes('.hc-calendar-overview-left .hc-week-tabs{display:flex;flex-direction:column')],
- ['no constrained list height',css.includes('.hc-calendar-overview-left .hc-week-list{max-height:none')],
- ['mobile stacking',css.includes('@media(max-width:800px){.content-calendar .hc-calendar-overview-grid')],
- ['source inline style',lib.includes('.library-item-title .library-source-inline')],
- ['suit part interaction',lib.includes('.library-part-link')]
+ ['no covered location duplication',app.includes("const identicalProtection=baseProtection&&locRows.every")],
+ ['omit nested duplicate coverage',app.includes("'locationProtection','coveredLocations'")],
+ ['Cold Hazard source present',cold.includes("reference:'HMK p.149'")],
+ ['Cold AV vs F Area AV explained',cold.includes('Ochrana F na krytých místech se započte do Area AV')],
+ ['cloth and padded cloak explicit',cold.includes("'cloth cloak':listed['cloak (cloth)']")&&cold.includes("'padded cloak':listed['cloak (padded)']")],
+ ['legality layer clarification',app.includes('Pravidla kombinování vrstev viz strany 117 a 119')],
+ ['verified suit links only',app.includes('resolved.ok?resolved.parts[i]:null')],
+ ['accurate suit link target',app.includes('link.dataset.libraryPartId')&&app.includes('libraryTab=\'armour\'')],
+ ['printed page next to title',app.includes('library-source-inline')],
+ ['two-column spread',css.includes('hc-calendar-overview-grid')],
+ ['fullwidth stacked left weekly',newCss.includes('.hc-week-tabs>details')&&newCss.includes('width:100%!important')],
+ ['no list height restriction',newCss.includes('max-height:none!important')],
+ ['mobile stack preserved',css.includes('@media(max-width:800px){.content-calendar .hc-calendar-overview-grid')],
+ ['printed page inline style',lib.includes('.library-item-title .library-source-inline')],
+ ['part crossrefs still interactive but unadorned',lib.includes('.library-part-link')&&newCss.includes('text-decoration:none!important')]
 ];
-for(const [name,ok] of tests)assert.ok(ok,name);
-console.log(`PASS ${tests.length} v93.739 library/calendar contracts`);
+for(const [label,ok] of tests)assert.ok(ok,label);
+console.log('PASS '+tests.length+' maintained v93.739→v93.741 library/calendar historical contracts');

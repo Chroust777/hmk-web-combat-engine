@@ -12,5 +12,5 @@ const checks={
  'Útočné režimy':['Impact','modifikátor']};
 for(const [key,parts] of Object.entries(checks)) {const value=get(key);for(const fragment of parts)assert.ok(value.includes(fragment),key+': '+fragment+' not in '+value);assert.ok(!value.includes('Doplňující doložený parametr'));}
 assert.ok(!get('neznámý-neověřený-parametr').includes('Doplňující doložený parametr'));
-assert.ok(s.includes('title="${esc(libraryFieldHelp(headings[index]))}"'));
+assert.ok(s.includes('data-hmk-help="${esc(libraryFieldHelp(headings[index]))}"'));
 console.log('PASS:',Object.keys(checks).length,'rule descriptions and per-cell tooltips');
