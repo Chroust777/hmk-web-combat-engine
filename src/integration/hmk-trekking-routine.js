@@ -66,6 +66,32 @@ const MOVE={
   'wilderness-trail':[3,4,.5,0],'cold-woodland':[2,4,0,0],'alpine-vegetation':[2,4,0,0],
   'needleleaf-forest':[2,2,0,0],'ice-snow-rockfield':[1,2,0,0],'mixed-forest':[1,1,0,0]}};
 const CONVEYANCE=['foot','mount','cart','wagon'];
+/** HMK 1.2 p.146, the symbols in the Trek Movement table:
+ * 0 = no dot, 1 = black dot (always), 2 = two black dots,
+ * rain = blue drop-dot (only continuous precipitation).
+ * Wilderness Trail is a blue raindrop-dot (rain-only) in every topography.
+ */
+const TREK_BEARING_MARKS=Object.freeze({
+ 'paved-road':0,'unpaved-road':'rain','rural-track':'rain',
+ 'wilderness-trail':'rain','cropland-grassland':1,'mixed-woodland':1,
+ 'heath-moor':1,'needleleaf-forest':1,'mixed-forest':1,
+ 'dunes':2,'wetlands':2,'cold-woodland':1,'alpine-vegetation':1,
+ 'ice-snow-rockfield':1
+});
+export function trekBearingRequirement({topography,terrain,continuousPrecipitation=false}={}){
+ const row=MOVE[topography]?.[terrain];
+ assert(row&&typeof continuousPrecipitation==='boolean','Bearing: nedoložená tabulka terénu nebo srážek');
+ const mark=TREK_BEARING_MARKS[terrain];
+ assert(mark!==undefined,'Bearing: chybí pravidlový symbol pro terén');
+ return {requiredBearing:mark==='rain'?(continuousPrecipitation?1:0):mark,
+  symbol:mark,conditional:mark==='rain',sourcePage:146};
+}
+export function trekMovementTableRow({topography,terrain}={}){
+ const row=MOVE[topography]?.[terrain];
+ assert(row,'Neexistuje takový řádek Trek Movement (HMK 146)');
+ return {topography,terrain,foot:row[0],mount:row[1],cart:row[2],wagon:row[3],
+  bearingSymbol:TREK_BEARING_MARKS[terrain],sourcePage:146};
+}
 export function trekAvailableTerrain(topography,conveyance='foot'){
  const column=CONVEYANCE.indexOf(conveyance);
  assert(Object.hasOwn(MOVE,topography)&&column>=0,'Neplatná topografie nebo doprava');
@@ -73,12 +99,12 @@ export function trekAvailableTerrain(topography,conveyance='foot'){
 }
 
 export function trekMovement({topography,terrain,conveyance='foot',progress=0,slow=0,loaded=false,
- bearing=0,progressD10=[],doubleTime=false,hours=4,minutes=null,continuousPrecipitation=false}={}){
+ bearing=0,progressD10=[],doubleTime=false,hours=4,minutes=null,continuousPrecipitation=false,bearingRule='hmk'}={}){
  const rate=MOVE[topography]?.[terrain],column=CONVEYANCE.indexOf(conveyance);
  assert(rate&&column>=0,'Nepodporovaná kombinace HMK topografie, terénu a dopravy');
  const lpw=rate[column];assert(lpw!==null&&lpw>0,'HMK v tomto terénu nepovoluje daný způsob dopravy');
  assert(int(progress,0,10)&&int(slow,0,20)&&int(bearing,0,20)&&typeof loaded==='boolean'&&
-  typeof doubleTime==='boolean'&&typeof continuousPrecipitation==='boolean'&&
+  typeof doubleTime==='boolean'&&typeof continuousPrecipitation==='boolean'&&['hmk','legacy'].includes(bearingRule)&&
   (minutes===null?[1,2,3,4].includes(hours):int(minutes,1,10080)),'Neplatné režimy pohybu');
  const remainingSlow=Math.max(0,slow-progress),spareProgress=Math.max(0,progress-slow);
  assert(Array.isArray(progressD10)&&progressD10.length===spareProgress&&progressD10.every(r=>int(r,1,10)),'Zbývající Progress Mode vyžaduje vlastní hod d10');
@@ -88,8 +114,14 @@ export function trekMovement({topography,terrain,conveyance='foot',progress=0,sl
  if(doubleTime)finalLPW*=2;
  // One or two dots in the printed table (p.146) require Bearing. Path
  // droplets only require one Bearing during continuous precipitation.
- const dots=terrain==='dunes'||terrain==='wetlands'?2:
-  ['paved-road','unpaved-road','rural-track','wilderness-trail'].includes(terrain)?(terrain==='paved-road'?0:continuousPrecipitation?1:0):1;
+ // Past hmk-trekking-watch-evidence-v1 receipts used the old route heuristic.
+ // Their archived hashes/replay must remain readable; the single ACTIVE
+ // minute-episode engine always calls this with the corrected HMK p146 table.
+ const dots=bearingRule==='legacy'?(
+  terrain==='dunes'||terrain==='wetlands'?2:
+  ['paved-road','unpaved-road','rural-track','wilderness-trail'].includes(terrain)?
+   (terrain==='paved-road'?0:continuousPrecipitation?1:0):1):
+  trekBearingRequirement({topography,terrain,continuousPrecipitation}).requiredBearing;
  const deficit=Math.max(0,dots-bearing);
  return {baseLPW:lpw,progressSuccess,remainingSlow,spareProgress,loaded,finalLPW,
   leagues:finalLPW*((minutes===null?hours*60:minutes)/240),kilometres:finalLPW*((minutes===null?hours*60:minutes)/240)*4,
@@ -127,7 +159,7 @@ export function adjustedTrekkingMovement(proof){
  return trekMovement({topography:proof.landscape,terrain:proof.terrain,
   conveyance:proof.conveyance,progress:m.progress,slow:m.slow+1,
   loaded:m.loaded,bearing:m.bearing,doubleTime:m.doubleTime,
-  continuousPrecipitation:proof.weatherWatch?.continuous===true,
+  continuousPrecipitation:proof.weatherWatch?.continuous===true,bearingRule:'legacy',
   progressD10:oldSpare>0?m.progressD10.slice(1):m.progressD10});
 }
 export function trekHazards({bearingDeficit=0,directionD10=[],survivalCriticalFailure=false,survivalD10=null}={}){
@@ -286,7 +318,7 @@ export function validateTrekkingJournalEvidence(document){
   const movement=trekWatchMovement({stationaryForaging:p.orienteeringContext?.stationaryForaging===true,topography:p.landscape,terrain:p.terrain,conveyance:p.conveyance,
    progress:p.modes?.progress,slow:p.modes?.slow,loaded:p.modes?.loaded,bearing:p.modes?.bearing,
    progressD10:p.modes?.progressD10,doubleTime:p.modes?.doubleTime,
-   continuousPrecipitation:watch.continuous});
+   continuousPrecipitation:watch.continuous,bearingRule:'legacy'});
   assert(JSON.stringify(movement)===JSON.stringify(p.movement),'Nesouhlasí vypočítaný pohyb');
   if(p.effectiveMovement)assert(JSON.stringify(adjustedTrekkingMovement(p))===JSON.stringify(p.effectiveMovement),
    'Doložené zkrácení trasy v Direction Lost Time neodpovídá HMK 148');

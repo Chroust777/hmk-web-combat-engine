@@ -21,6 +21,28 @@ const HABITATS={
  'needleleaf-forest':['fair','average','fair','poor']
 };
 export const FORAGING_HABITATS=Object.freeze(Object.keys(HABITATS));
+/** HMK p.146 terrain vs p.147 Foraging Conditions are NOT identical
+ * vocabularies. Auto-fill only unambiguous vegetation. A road, mixed
+ * crop/grassland, mixed woodland, or wetland does not prove the dominant
+ * foraging habitat; the GM must provide that missing geographic fact.
+ */
+const TREK_FORAGING_HABITAT=Object.freeze({
+ 'needleleaf-forest':'needleleaf-forest','mixed-forest':'mixed-forest',
+ 'heath-moor':'heath-moor','alpine-vegetation':'alpine-vegetation',
+ 'ice-snow-rockfield':'ice-snow-rockfield','dunes':'desert',
+ 'cold-woodland':'mixed-cold-woodland'
+});
+export function foragingHabitatFromTerrain(terrain){
+ const habitat=TREK_FORAGING_HABITAT[terrain]??null;
+ return {habitat,automatic:!!habitat,sourcePages:[146,147],
+  reason:habitat?'Doložený vegetační typ odpovídá Foraging Conditions.':
+   'Terén sám neurčuje dominantní biotop sběru; GM zvolí skutečné okolní prostředí.'};
+}
+export function foragingTableRow({habitat,season}={}){
+ const quality=foragingQuality({habitat,season});
+ return {habitat,season,quality,results:RESULTS.map(row=>row[QUALITIES.indexOf(quality)]),
+  d10Ranges:['1–2','3–4','5–7','8–9','10'],sourcePage:147};
+}
 const SEASONS=['spring','summer','autumn','winter'];
 // HMK printed p.147: rows d10 1-2,3-4,5-7,8-9,10;
 // null = NONE, zero = 0 (water only when searching food).
