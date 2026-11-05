@@ -322,7 +322,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.736';
+const APP_VERSION='93.737';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1904,23 +1904,16 @@ function weatherDayTimelineHTML(day,{latitudeBand='mid',daylightSeason=null,sunr
  const t=weather24HourTimeline({weather:day,latitudeBand,daylightSeason:lightSeason,sunriseMinute:sunrise,twilightMinutes});
  const fmt=n=>`${String(Math.floor(n/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;
  const periodLabel={day:'Den',twilight:'Soumrak',night:'Noc'};
- const danger=t.changes.length?'Meteorologické změny v '+t.changes.map(x=>fmt(x.minute)).join(', ')+'.':'Bez změny druhu počasí při přechodech světla.';
- return `<div class="hc-weather-timeline"><p><strong>Průběh počasí během 24 hodin</strong> · ${esc(danger)}<br>Počáteční hody: teplota d10 ${day.temperatureD10}, srážky d10 ${day.precipitationD10}; teplota po úpravách den ${day.adjustedDayTemperature}, noc ${day.adjustedNightTemperature} (noční rozdíl ${t.nightModifier}). Srážky po úpravách ${day.precipitationRoll} / TN ${day.precipitationTN}.</p>
- <div class="hc-episode-table-scroll"><table class="hc-episode-weather-timeline"><thead><tr><th>Čas</th><th>Část dne</th><th>Světlo</th><th>Jaké je počasí</th><th>Srážky</th><th>Riziko HMK</th><th>Teplota d10 po úpravách</th></tr></thead>
- <tbody>${t.rows.map(r=>{const d=visibleWeather({hazard:r.hazard,precipitation:r.precipitation});return `<tr${r.hazard?' class="hc-weather-timeline-hazard"':''}><td>${fmt(r.start)}–${fmt(r.end)}</td><td>${r.daypart}</td><td>${periodLabel[r.period]}</td><td><strong>${d.icon} ${esc(d.heading)}</strong></td><td>${esc(d.precipitation)}</td><td>${esc(d.badge)}</td><td>${r.adjustedTemperature}</td></tr>`;}).join('')}</tbody></table></div>
- <p class="hc-hint">HMK 142/144: noční postih platí pouze ve skutečné noci; při soumraku se používá denní teplota. Šířka a aktuální sezóna určují délku světla. Východ slunce ${fmt(sunrise)} a soumrak ${twilightMinutes} min jsou <strong>orientační aproximace</strong>, nikoliv pravidlově určená hodina. Doplňující d6 určuje nepřetržitost srážek jen ve skutečně zvoleném intervalu. Kroupy nejsou výsledkem základní tabulky HMK 144.</p></div>`;
+ const hazardHelp='Riziko podle HMK 144–149: v tomto úseku může počasí vyvolat Cold Hazard nebo Heat Hazard. Samotné označení není zranění ani automatický hod. Potřebný Weather Hazard Roll se řeší až pro konkrétní doloženou expozici a podle skutečné ochrany postavy; bez rizika se teplotní Hazard Roll neprovádí.';
+ return `<div class="hc-weather-timeline"><div class="hc-episode-table-scroll"><table class="hc-episode-weather-timeline"><caption class="hc-weather-table-caption">Potvrzený průběh počasí pro celý den</caption><thead><tr><th>Čas</th><th>Část dne</th><th>Světlo</th><th>Jaké je počasí</th><th>Srážky</th><th><span class="hc-help-term" tabindex="0" data-hmk-help="${esc(hazardHelp)}" aria-label="Riziko HMK – zobrazit vysvětlení">Riziko HMK ⓘ</span></th><th>Teplota d10 po úpravách</th></tr></thead>
+ <tbody>${t.rows.map(r=>{const d=visibleWeather({hazard:r.hazard,precipitation:r.precipitation});return `<tr${r.hazard?' class="hc-weather-timeline-hazard"':''}><td>${fmt(r.start)}–${fmt(r.end)}</td><td>${r.daypart}</td><td>${periodLabel[r.period]}</td><td><strong>${d.icon} ${esc(d.heading)}</strong></td><td>${esc(d.precipitation)}</td><td>${esc(d.badge)}</td><td>${r.adjustedTemperature}</td></tr>`;}).join('')}</tbody></table></div></div>`;
 }
+/** Draft inputs and generated dice are NOT a resolved weather outcome. Only the
+ * submit handler, after explicit GM confirmation and a journal write, renders
+ * the authoritative table via trekDailyWeatherFormHTML. */
 function updateTrekGlobalWeatherPreview(form){
- const out=form?.querySelector('[data-trek-global-weather-preview]');if(!out||!data.campaignClock)return;
- try{
-  const v=Object.fromEntries(new FormData(form));let season=v.season;
-  const tr=campaignTRDate(data.campaignClock,data.campaignClock.minute);
-  if(season==='auto'){if(!tr)throw Error('Bez data TR určete roční období ručně.');season=trekSeasonFromMonth(tr.month);}
-  if(!String(v.temperature||'').trim()||!String(v.precipitation||'').trim()){out.innerHTML='<p class="hc-hint">Po obou denních d10 se zobrazí celý 24hodinový průběh včetně změn v noci.</p>';return;}
-  const day=trekWeatherDay({season,climate:v.climate,landscape:v.landscape,alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',temperatureD10:Number(v.temperature),precipitationD10:Number(v.precipitation)});
-  const lightSeason=tr?trekkingDaylightSeason(tr.month,tr.day):season;
-  out.innerHTML=weatherDayTimelineHTML(day,{latitudeBand:v.latitudeBand||'mid',daylightSeason:lightSeason});
- }catch(err){out.textContent=err.message;}
+ const out=form?.querySelector('[data-trek-global-weather-preview]');if(!out)return;
+ out.innerHTML='<p class="hc-hint">Zadané hody jsou zatím pouze návrh. Výsledek počasí a 24hodinová tabulka se zobrazí až po kliknutí na „Potvrdit denní počasí“ a souhlasu GM.</p>';
 }
 function trekDailyWeatherFormHTML(clock){
  const id=campaignKey(clock),di=Math.floor(clock.minute/1440),end=(di+1)*1440;
@@ -1928,21 +1921,22 @@ function trekDailyWeatherFormHTML(clock){
  const remaining=end-clock.minute,hours=Math.floor(remaining/60),mins=remaining%60;
  return `<section class="hc-calendar hc-trek-global-weather"><details open><summary>Denní počasí kampaně · HMK 144</summary>
  <p class="hc-hint">Každá oblast má jednu platnou dvojici hodů d10 za kalendářní den (00:00–24:00). HMK neudává °C ani intenzitu deště v mm. Následující d6 na nepřetržité srážky se vyhodnocuje až v uživatelem zvoleném časovém intervalu. GM může odvolat současné počasí kdykoliv během dne. Původní hody a dokončené účinky zůstanou v historii; probíhající cesta se od této minuty rozdělí a pro zbývající úsek se vybere nové počasí.</p>
- <form data-trek-global-weather novalidate><div class="hmk-trek-grid">
+ <form data-trek-global-weather novalidate><div class="hmk-trek-grid hc-global-weather-fields">
  <label>Oblast / trasa<input name="area" maxlength="90" required placeholder="Např. Východní les"></label>
  <label>Roční období<select name="season"><option value="auto">Z data TR</option><option value="spring">Jaro</option><option value="summer">Léto</option><option value="autumn">Podzim</option><option value="winter">Zima</option></select></label>
  <label>Šířkové pásmo pro rozdělení dne a noci<select name="latitudeBand"><option value="mid">Střední</option><option value="high">Vysoká</option><option value="polar">Polární</option><option value="low">Nízká</option></select></label>
  <label>Klima<select name="climate"><option value="subpolar">Subpolární</option><option value="cool" selected>Mírné chladné</option><option value="warm">Mírné teplé</option><option value="subtropical">Subtropické</option><option value="dry-tropical">Tropické suché</option><option value="wet-tropical">Tropické vlhké</option></select></label>
  <label>Krajina / nadmořská výška<select name="landscape"><option value="flat">Rovina</option><option value="rough">Kopce</option><option value="mountain">Hory</option></select></label>
- <label class="hc-check"><input type="checkbox" name="alpine" value="yes"> Alpská nadmořská poloha (−4)</label>
- <label class="hc-check"><input type="checkbox" name="aridDesert" value="yes"> Suchá poušť (+2 srážkový hod; v létě +4 teplota)</label>
- <div class="hc-trek-shift-control hc-trek-global-die-control"><label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní teplota d10 se srovnává s tabulkou počasí (HMK 144) podle ročního období, klimatu a výšky. Nejde o °C; výsledkem je prochladnutí, přehřátí nebo počasí bez teplotního ohrožení. Noc má vlastní teplotní postih bez nového denního d10.">Teplota dne · d10</span><input type="number" name="temperature" min="1" max="10" required placeholder="1–10"></label><button type="button" class="hc-small hc-trek-generate" data-trek-global-die="temperature" title="Kryptograficky hodit jednu d10 pro teplotu dne">⚄ d10</button></div>
- <div class="hc-trek-shift-control hc-trek-global-die-control"><label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní srážky d10 určují, zda v této oblasti a dni srážky nastanou. Druh může být déšť, sníh nebo plískanice podle teplotního hazardu. Zda jsou nepřetržité, určuje doplňující d6 konkrétního časového intervalu (naše minutová adaptace HMK 144).">Srážky dne · d10</span><input type="number" name="precipitation" min="1" max="10" required placeholder="1–10"></label><button type="button" class="hc-small hc-trek-generate" data-trek-global-die="precipitation" title="Kryptograficky hodit jednu d10 pro srážky dne">⚄ d10</button></div></div>
+ <div class="hc-weather-condition-pair"><label class="hc-check"><input type="checkbox" name="alpine" value="yes"> <span>Alpská nadmořská výška (−4)</span></label>
+ <label class="hc-check"><input type="checkbox" name="aridDesert" value="yes"> <span>Suchá poušť (+2 srážky; v létě +4 teplota)</span></label></div>
+ <div class="hc-weather-dice-pair">
+ <div class="hc-trek-shift-control hc-trek-global-die-control"><label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní teplota d10 se srovnává s tabulkou počasí (HMK 144) podle ročního období, klimatu a výšky. Nejde o °C; výsledkem je prochladnutí, přehřátí nebo běžná teplota. Noc má vlastní teplotní postih bez nového denního d10.">Teplota dne · d10</span><input type="number" name="temperature" min="1" max="10" required placeholder="1–10"></label><button type="button" class="hc-small hc-trek-generate" data-trek-global-die="temperature" title="Kryptograficky hodit jednu d10 pro teplotu dne">⚄ d10</button></div>
+ <div class="hc-trek-shift-control hc-trek-global-die-control"><label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní srážky d10 určují, zda v této oblasti a dni srážky nastanou. Druh může být déšť, sníh nebo plískanice podle teplotního hazardu. Zda jsou nepřetržité, určuje doplňující d6 konkrétního časového intervalu (naše minutová adaptace HMK 144).">Srážky dne · d10</span><input type="number" name="precipitation" min="1" max="10" required placeholder="1–10"></label><button type="button" class="hc-small hc-trek-generate" data-trek-global-die="precipitation" title="Kryptograficky hodit jednu d10 pro srážky dne">⚄ d10</button></div></div></div>
  <div class="hc-trek-weather-actions"><button type="submit">Potvrdit denní počasí</button></div>
- <output role="status" aria-live="polite"></output><div data-trek-global-weather-preview aria-live="polite"><p class="hc-hint">Po obou denních d10 se zobrazí celý 24hodinový průběh.</p></div></form>
+ <output role="status" aria-live="polite"></output><div data-trek-global-weather-preview aria-live="polite"><p class="hc-hint">Zadejte oba hody a potvrďte denní počasí. Teprve poté se zobrazí výsledná tabulka.</p></div></form>
  <h4>Potvrzené oblasti · do konce dne zbývá ${hours} h ${mins} min</h4>
  ${rows.map(j=>{const w=j.calendarTrekDayWeather,allowed=canVoidWeather(data.journal,j.id,id,clock.minute);
-  return `<div class="hc-trek-weather-record"><strong>${esc(w.area)}</strong> · ${esc(displayCampaignMinute(j.campaignMinute))} · platí do ${esc(displayCampaignMinute(end))} (zbývá ${hours} h ${mins} min).<p>${trekWeatherDetailsHTML(w.weatherDay)}</p>${weatherDayTimelineHTML(w.weatherDay,{latitudeBand:w.latitudeBand||'mid',daylightSeason:(()=>{const tr=campaignTRDate(clock,j.campaignMinute);return tr?trekkingDaylightSeason(tr.month,tr.day):w.season;})()})}<p class="hc-hint">Teplota d10 (${w.weatherDay.temperatureD10}), srážky d10 (${w.weatherDay.precipitationD10}); klima ${esc(w.climate)}, krajina ${esc(w.landscape)}.</p>${(()=>{const shift=effectiveTrekShift(id,clock.minute,w.area);return shift?`<p><strong>Aktuálně od ${esc(displayCampaignMinute(shift.campaignMinute))} platí změna GM:</strong> ${trekWeatherDetailsHTML(shift.calendarTrekWeatherShift.weatherDay)} · do konce dne nebo další potvrzené změny.</p>${shift.campaignMinute===clock.minute&&data.journal.some(stop=>stop.calendarCampaignId===id&&stop.campaignMinute===clock.minute&&stop.calendarActivityInterruptProof?.reason?.includes('GM změnil počasí v oblasti '+w.area))?'<button type="button" class="hc-small" data-weather-shift-go-travel>Pokračovat ve zbývajícím úseku ↗</button>':''}`:'';})()}${allowed.ok?`<button type="button" class="hc-small secondary" data-trek-weather-void="${esc(j.id)}">Odvolat počasí · nové od této minuty</button>`:`<p class="hc-hint">Změna uzamčena: ${esc(allowed.reason)}</p>`}</div>`;}).join('')||'<p class="hc-hint">Pro dnešní den zatím není potvrzené žádné počasí. Potvrzení proběhne pouze tlačítkem výše.</p>'}
+  return `<div class="hc-trek-weather-record"><strong>${esc(w.area)}</strong> · ${esc(displayCampaignMinute(j.campaignMinute))} · platí do ${esc(displayCampaignMinute(end))} (zbývá ${hours} h ${mins} min).${weatherDayTimelineHTML(w.weatherDay,{latitudeBand:w.latitudeBand||'mid',daylightSeason:(()=>{const tr=campaignTRDate(clock,j.campaignMinute);return tr?trekkingDaylightSeason(tr.month,tr.day):w.season;})()})}${(()=>{const shift=effectiveTrekShift(id,clock.minute,w.area);return shift?`<p><strong>Aktuálně od ${esc(displayCampaignMinute(shift.campaignMinute))} platí změna GM:</strong> ${trekWeatherDetailsHTML(shift.calendarTrekWeatherShift.weatherDay)} · do konce dne nebo další potvrzené změny.</p>${shift.campaignMinute===clock.minute&&data.journal.some(stop=>stop.calendarCampaignId===id&&stop.campaignMinute===clock.minute&&stop.calendarActivityInterruptProof?.reason?.includes('GM změnil počasí v oblasti '+w.area))?'<button type="button" class="hc-small" data-weather-shift-go-travel>Pokračovat ve zbývajícím úseku ↗</button>':''}`:'';})()}${allowed.ok?`<button type="button" class="hc-small secondary" data-trek-weather-void="${esc(j.id)}">Odvolat počasí · nové od této minuty</button>`:`<p class="hc-hint">Změna uzamčena: ${esc(allowed.reason)}</p>`}</div>`;}).join('')||'<p class="hc-hint">Pro dnešní den zatím není potvrzené žádné počasí. Potvrzení proběhne pouze tlačítkem výše.</p>'}
  ${rows.length?`<details class="hc-trek-gm-weather-change"><summary>GM · změnit počasí v průběhu dne (od aktuální minuty)</summary>
  <p class="hc-hint">Volitelné rozhodnutí GM mimo standardní denní tabulku HMK 144. Základní denní hody i již proběhlé účinky zůstávají v historii. Nové podmínky platí od nynějška pro oblast až do konce dne nebo další potvrzené změny, i když družina zrovna necestuje.</p>
  <form data-trek-global-shift><div class="hmk-trek-grid"><label>Potvrzená oblast<select name="sourceId">${rows.map(j=>`<option value="${esc(j.id)}">${esc(j.calendarTrekDayWeather.area)}</option>`).join('')}</select></label>
@@ -1978,7 +1972,7 @@ function trekDieOutcomeHelp(name,form){
    const chosen=Number(form.elements.namedItem(name==='trekDieTemperature'?'trekDieDailyPrecipitation':'trekDieTemperature')?.value);
    const other=Number.isSafeInteger(chosen)&&chosen>=1&&chosen<=10?chosen:5;
    const rows=d10.map(n=>{const r=trekWeatherDay({...settings,temperatureD10:name==='trekDieTemperature'?n:other,precipitationD10:name==='trekDieDailyPrecipitation'?n:other});
-    return n+' = '+(name==='trekDieTemperature'?'den '+(r.daylightHazard==='cold'?'Cold Hazard':r.daylightHazard==='heat'?'Heat Hazard':'bez teplotního hazardu')+', noc '+(r.nightHazard==='cold'?'Cold Hazard':r.nightHazard==='heat'?'Heat Hazard':'bez teplotního hazardu')+', upraveno '+r.adjustedDayTemperature:'srážky '+(r.hasPrecipitation?'ANO':'NE')+', upravený hod '+r.precipitationRoll+' proti hranici '+r.precipitationTN);
+    return n+' = '+(name==='trekDieTemperature'?'den '+(r.daylightHazard==='cold'?'Cold Hazard':r.daylightHazard==='heat'?'Heat Hazard':'běžná teplota')+', noc '+(r.nightHazard==='cold'?'Cold Hazard':r.nightHazard==='heat'?'Heat Hazard':'běžná teplota')+', upraveno '+r.adjustedDayTemperature:'srážky '+(r.hasPrecipitation?'ANO':'NE')+', upravený hod '+r.precipitationRoll+' proti hranici '+r.precipitationTN);
    });
    return prefix+'\n'+rows.join('\n')+'\nVýsledky odpovídají právě zvolené sezoně, klimatu a úpravám terénu; jiná nastavení mohou mít jiné výsledky (HMK 144).';
   }catch{return 'Pro přehled všech 1–10 nejdřív zvolte platné roční období, klima a terén (HMK 144).';}
@@ -2458,7 +2452,7 @@ function timeEpisodePageHTML(clock,participants){
   <label class="hc-check" data-episode-weather-geography><input name="aridDesert" type="checkbox"> Pouštní podmínky</label>
  <label data-episode-weather-roll>Teplota (d10)<span class="hc-episode-die"><input name="temperatureD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="temperatureD10">⚄ d10</button></span></label>
  <label data-episode-weather-roll>Srážky (d10)<span class="hc-episode-die"><input name="precipitationD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="precipitationD10">⚄ d10</button></span></label>
- </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p><details class="hc-episode-reference"><summary>Vysvětlivka počasí · všechny možné výsledky</summary><p><strong>Teplota:</strong> bez teplotního ohrožení, nebezpečný chlad nebo nebezpečné horko. Z téhož denního d10 se podmínky zvlášť vypočtou pro <strong>Den</strong> a <strong>Noc</strong>; noc používá klimatický postih.</p><p><strong>Srážky:</strong> bez srážek nebo srážky. Za běžných podmínek déšť; při cold hazardu sníh, nebo při hraničním hodu déšť se sněhem / mrznoucí déšť. Doplňující d6 určuje intenzitu: 1 = nepřetržité srážky, 2–6 = slabé či pro pohyb nevýznamné. Změní-li se skutečné počasí během epizody, GM rozdělí časový interval.</p></details></details>
+ </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p><details class="hc-episode-reference"><summary>Vysvětlivka počasí · všechny možné výsledky</summary><p><strong>Teplota:</strong> běžné teplotní podmínky, nebezpečný chlad nebo nebezpečné horko. Z téhož denního d10 se podmínky zvlášť vypočtou pro <strong>Den</strong> a <strong>Noc</strong>; noc používá klimatický postih.</p><p><strong>Srážky:</strong> bez srážek nebo srážky. Za běžných podmínek déšť; při cold hazardu sníh, nebo při hraničním hodu déšť se sněhem / mrznoucí déšť. Doplňující d6 určuje intenzitu: 1 = nepřetržité srážky, 2–6 = slabé či pro pohyb nevýznamné. Změní-li se skutečné počasí během epizody, GM rozdělí časový interval.</p></details></details>
 
   <fieldset class="hc-episode-party-panel"><legend>3 · Účastníci a průvodce</legend><div class="hc-episode-members">${characterRows}</div><label>Průvodce / osoba provádějící orientaci<select name="guideId">${participants.map(c=>option(c.id,c.name)).join('')}</select></label></fieldset>
  ${stableTravelRoster.length?`<fieldset data-episode-stable-roster><legend>Zvířata vybraná ze Stáje · doložené zatížení</legend>
@@ -3193,7 +3187,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   const periodLabel=w.period==='night'?'noc':w.period==='day'?'den':'soumrak / neupřesněno';
   const detail=active?`${active.icon} ${active.temperature} · ${active.kind}`:
    `☀️ ${day.temperature} · ${day.kind}; 🌙 ${night.temperature} · ${night.kind}`;
-  return `<span class="hc-clock-weather-row"><b>${esc(w.area)}:</b> ${esc(detail)} <small>(${esc(periodLabel)}${w.changed?', změna GM':''}${active?', světelná hranice orientační':''})</small></span>`;
+  return `<span class="hc-clock-weather-row"><b>${esc(w.area)}:</b> ${esc(detail)} <small>(${esc(periodLabel)}${w.changed?', změna GM':''}${active?', den/noc podle přibližného východu a západu slunce':''})</small></span>`;
  }).join(''):'<span class="hc-clock-weather-row">Denní počasí dosud nebylo GM potvrzeno.</span>';
  const withClock=folio.replace('</header><div class="folio-chapter-content">',
   `<div class="hc-clock-heading" role="status" aria-label="Aktuální herní datum, čas a počasí"><span>AKTUÁLNÍ ČAS KAMPANĚ</span><strong>${esc(clockLabel)} · ${esc(timeLabel)}</strong><div class="hc-clock-weather"><span>POČASÍ · AKTUÁLNÍ DEN</span>${weatherHeading}</div>${date?'':'<small>Datum TR nebylo v tomto kalendáři ještě přiřazeno.</small>'}</div></header><div class="folio-chapter-content">`);
@@ -10716,6 +10710,8 @@ function hskTrekkingSkinForms(actorId){
   <label class="hc-weather-skin-none"><input name="noneExposed" data-weather-skin-none type="checkbox" ${automatic.length===0&&!uncertain.length?'checked':''}> Bez skutečně vystavených lokací (automaticky, pokud je ochrana všech míst doložena; GM může opravit výjimečnou situaci)</label>
   <p class="hc-hint" data-weather-skin-choice-status role="status">Zatím není vybrána žádná lokalita.</p>
   <div data-weather-skin-rows></div>
+  <button type="button" class="secondary" data-weather-skin-evaluate>Vyhodnotit zadané hody a určit další testy</button>
+  <p class="hc-hint">Dokud nestisknete toto tlačítko, nejsou ze zadaných kostek vypočtena žádná poranění. Změna původních hodů vyžaduje nové vyhodnocení.</p>
   <p><strong>3. Potvrzení všech následků.</strong> AV pro Frostbite se načte z inventáře. Při Sunburn se d10 zpřístupní pouze pro vybranou lokaci. Při skutečné ráně se zpřístupní Shock d100; Compound d10 jen při slučování kompatibilních ran.</p>
   <p class="hc-hint">Kliknutí na uložení zkontroluje všechny vybrané lokace i skutečné hody. Není potřeba další potvrzovací checkbox.</p>
   <button type="submit">Vyhodnotit a zapsat kožní následky</button><output role="status" aria-live="polite"></output>
@@ -10791,6 +10787,7 @@ function hskSkinRefresh(form){
   for(const f of [wind,duration]){f.disabled=none;f.required=!none;if(none)f.value='';}
  }
  const maxExposure=hskSkinEpisodeMinutes(actor,form.elements.namedItem('sourceId').value);
+ const evaluationConfirmed=form.dataset.skinEvaluated==='yes';
  let awaitingPrior=false; // only one location-specific test is open at a time
  for(const row of rows){
   row.hidden=awaitingPrior; // Only the next independent injury is visible.
@@ -10798,6 +10795,16 @@ function hskSkinRefresh(form){
   const shockWrap=row.querySelector('[data-weather-skin-shock-wrap]'),compWrap=row.querySelector('[data-weather-skin-compound-wrap]');
   const preview=row.querySelector('[data-weather-skin-preview]');
   const sunDie=row.querySelector('[data-weather-skin-d10]');
+  if(!evaluationConfirmed){
+   // No injury prediction or roll selection from unconfirmed editable dice.
+   row.hidden=false;
+   if(sunDie){sunDie.disabled=false;sunDie.required=true;}
+   row.dataset.skinLevel='';
+   preview.textContent='Zadejte potřebné hody a stiskněte „Vyhodnotit zadané hody“.';
+   shockWrap.hidden=true;compWrap.hidden=true;
+   for(const field of [shock,compound]){field.disabled=true;field.required=false;field.value='';}
+   continue;
+  }
   if(sunDie){sunDie.disabled=awaitingPrior;sunDie.required=!awaitingPrior;}
   let il=null,info=null;
   try{
@@ -10833,6 +10840,7 @@ function hskSkinRefresh(form){
 document.addEventListener('change',event=>{
  const pick=event.target.closest?.('[data-weather-skin-select]'),none=event.target.closest?.('[data-weather-skin-none]');
  const form=(pick||none)?.closest('form[data-skill-weather-skin]');if(!form)return;
+ delete form.dataset.skinEvaluated;
  if(pick){
   if(pick.checked){form.elements.namedItem('noneExposed').checked=false;hskSkinAddLocation(form,pick.dataset.skinLocation,pick.dataset.skinSide||null);}
   else{const rowId=pick.dataset.skinLocation+':'+(pick.dataset.skinSide||'-');
@@ -10853,10 +10861,18 @@ document.addEventListener('input',event=>{
   if(shock)shock.value=''; // a changed Compound may alter the Injury Shock level
  }
  if(event.target.matches('[name="windD20"],[name="durationD20"],[name="complexion"],[name="skinD10"]')){
+  delete form.dataset.skinEvaluated;
   const affected=event.target.name==='skinD10'?[event.target.closest('[data-weather-skin-row]')]:[...form.querySelectorAll('[data-weather-skin-row]')];
   for(const row of affected){if(!row)continue;for(const x of row.querySelectorAll('[data-weather-skin-shock],[data-weather-skin-compound-die]'))x.value='';}
  }
  hskSkinRefresh(form);
+},true);
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-weather-skin-evaluate]');if(!button)return;
+ const form=button.closest('form[data-skill-weather-skin]');if(!form)return;
+ event.preventDefault();
+ form.dataset.skinEvaluated='yes';
+ hskSkinRefresh(form); // Explicit user action: still no journal or health mutation.
 },true);
 /** The calendar owns all elapsed minutes and determines which course is due.
  * Previewing a continuous exposure is never itself permission to roll d100.
@@ -12300,6 +12316,7 @@ document.addEventListener('submit',event=>{
   hskSkinRefresh(form);
   if(form.dataset.skinCoverageComplete!=='yes')throw Error('Ochrana anatomických lokací není z inventáře ověřena. Opravte nejprve oblečenou výbavu.');
   const none=form.elements.namedItem('noneExposed').checked;
+  if(!none&&form.dataset.skinEvaluated!=='yes')throw Error('Nejprve potvrďte vyhodnocení zadaných hodů tlačítkem.');
   const selectedRows=[...form.querySelectorAll('[data-weather-skin-row]')];
   if(!none&&!selectedRows.length)throw Error('Vyberte skutečně vystavené lokace nebo potvrďte, že žádná nebyla vystavena.');
   if(none&&selectedRows.length)throw Error('Nelze současně potvrdit žádné vystavené místo a vybrat lokalitu.');
@@ -22890,14 +22907,16 @@ function updateEpisodePreview(form){
  }
  const level=form.querySelector('[data-episode-weather-selected]');
  if(level){
-  try{
+  if(!episodeEvaluationRequested){
+   level.textContent='Počasí pro epizodu se vyhodnotí až po kliknutí na „Vyhodnotit epizodu“. Již potvrzené denní počasí zůstává dostupné v kalendáři.';
+  }else try{
    const source=episodeCurrentWeather(form,data.campaignClock,{mandatory:false});
    const weather=source.weather;
    if(!weather)level.textContent='Výsledek počasí se objeví po obou d10.';
    else{
     const light=(sky?.period==='night'?'nightHazard':'daylightHazard');
     const hazard=weather[light];
-    level.innerHTML=trekWeatherDetailsHTML(weather)+weatherDayTimelineHTML(weather,{latitudeBand:sky?.band||v.latitudeBand||'mid',daylightSeason:sky?.lightSeason||weather.season,sunriseMinute:sky?.sunrise,twilightMinutes:60});
+    level.innerHTML=weatherDayTimelineHTML(weather,{latitudeBand:sky?.band||v.latitudeBand||'mid',daylightSeason:sky?.lightSeason||weather.season,sunriseMinute:sky?.sunrise,twilightMinutes:60});
    }
   }catch(err){level.textContent=err.message;}
  }

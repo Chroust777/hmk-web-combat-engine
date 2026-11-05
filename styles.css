@@ -564,3 +564,34 @@ form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;
 .hc-trek-animal-choice{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;border-bottom:1px solid rgba(143,118,82,.24);padding:.25rem 0}
 .hc-trek-animal-choice>button{font-size:.8rem;white-space:normal;flex-shrink:0}
 @media(max-width:620px){.hc-episode-supplies{padding:.6rem}.hc-episode-supplies>.hc-episode-allocation{padding:.6rem}}
+
+/* v93.737 — single confirmation boundary for weather and aligned climate controls. */
+.hc-trek-global-weather [data-trek-global-weather] .hc-global-weather-fields{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px;align-items:start;
+}
+.hc-trek-global-weather .hc-global-weather-fields>label{display:flex;flex-direction:column;gap:5px;min-width:0;margin:0!important;box-sizing:border-box}
+.hc-trek-global-weather .hc-global-weather-fields>label>input,
+.hc-trek-global-weather .hc-global-weather-fields>label>select{box-sizing:border-box;width:100%;min-width:0;margin:0!important}
+.hc-trek-global-weather .hc-weather-condition-pair,
+.hc-trek-global-weather .hc-weather-dice-pair{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px;align-items:stretch;min-width:0}
+.hc-trek-global-weather .hc-weather-condition-pair>label.hc-check{
+ display:flex!important;align-items:center!important;flex-direction:row!important;justify-content:flex-start;
+ gap:.55rem;min-height:52px;padding:9px 10px;margin:0!important;border:1px solid rgba(125,92,56,.35);
+ border-radius:6px;background:rgba(255,250,234,.29);box-sizing:border-box;line-height:1.35;
+}
+.hc-trek-global-weather .hc-weather-condition-pair>label>input[type=checkbox]{margin:0!important;flex:0 0 auto;width:18px;height:18px}
+.hc-trek-global-weather .hc-weather-condition-pair>label>span{min-width:0;overflow-wrap:break-word}
+.hc-trek-global-weather .hc-weather-dice-pair>.hc-trek-global-die-control{
+ display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:end;min-width:0;margin:0;
+}
+.hc-trek-global-weather .hc-weather-dice-pair>.hc-trek-global-die-control>label{display:flex;flex-direction:column;gap:6px;min-width:0;margin:0!important}
+.hc-trek-global-weather .hc-weather-dice-pair input{width:100%;min-width:0;box-sizing:border-box;margin:0!important}
+.hc-trek-global-weather .hc-weather-dice-pair button{margin:0!important;min-width:40px;min-height:40px;box-sizing:border-box;padding:6px!important}
+.hc-trek-global-weather .hc-weather-table-caption{font-weight:700;text-align:left;padding:5px 0 9px;caption-side:top;color:#52381e}
+.hc-weather-timeline [data-hmk-help]{cursor:help;text-decoration:underline dotted #8a6840;text-underline-offset:3px}
+.hc-weather-timeline [data-hmk-help]:focus-visible{outline:2px solid #946a3b;outline-offset:2px}
+@media(max-width:410px){
+ .hc-trek-global-weather .hc-weather-condition-pair{grid-template-columns:1fr;gap:6px}
+ .hc-trek-global-weather .hc-weather-dice-pair{gap:6px}
+ .hc-trek-global-weather .hc-weather-dice-pair button{min-width:34px;padding:3px!important}
+}

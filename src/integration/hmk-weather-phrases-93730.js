@@ -5,7 +5,7 @@ export function visibleWeather({hazard=null,precipitation='none',continuous=null
  const precip=precipitation==='rain'?'déšť':precipitation==='snow'?'sněžení':
   precipitation==='sleet'?'déšť se sněhem / mrznoucí déšť':precipitation==='unconfirmed'?'srážky dosud neurčeny':
   'beze srážek';
- const temp=cold?'nebezpečný chlad':heat?'nebezpečné horko':'bez teplotního nebezpečí';
+ const temp=cold?'nebezpečný chlad':heat?'nebezpečné horko':'běžná teplota';
  const heading=precipitation==='unconfirmed'?'Počasí zatím neurčeno':
   cold&&precipitation==='snow'?'Sněžení a silný chlad':
   cold&&precipitation==='sleet'?'Plískanice a silný chlad':
@@ -18,6 +18,6 @@ export function visibleWeather({hazard=null,precipitation='none',continuous=null
   continuous===false&&precipitation!=='none'&&precipitation!=='unconfirmed'?'Slabý / nevýznamný '+precip:
   precip;
  return {heading,temperature:temp,precipitation:label,
-  badge:hazard==='cold'?'Riziko prochladnutí':hazard==='heat'?'Riziko přehřátí':'Bez teplotního rizika',
+  badge:hazard==='cold'?'Riziko prochladnutí':hazard==='heat'?'Riziko přehřátí':'Běžná teplota',
   icon:cold?'❄️':heat?'☀️':precipitation==='rain'?'🌧️':precipitation==='snow'?'🌨️':precipitation==='sleet'?'🌨️':'⛅'};
 }
