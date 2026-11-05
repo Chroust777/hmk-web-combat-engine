@@ -170,3 +170,34 @@ body #app .journal-book:not(.journal-book--overview) .folio-chapter-content h2{
  font-size:var(--hmk-ui-panel-heading)!important;
  line-height:1.3!important;
 }
+
+
+/* v93.745: measured AFTER all stylesheets in Chromium.
+ * Skills primary/secondary EML numbers must be large, blue and legible;
+ * the old revert-layer declaration above otherwise computed only 11px. */
+body #app .content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip b,
+body #app .content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip strong,
+body #app .content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-total,
+body #app .content-sheet .journal-book--skills .folio-chapter-content .hsk-verdict-chip strong{
+ font:800 24px/1.12 var(--hmk-ui-body-font)!important;color:#17466c!important;
+}
+/* Book header navigation uses the SAME font metrics on every chapter tab. */
+body #app .content-sheet :is(.journal-book--skills,.journal-book--library,.journal-book--overview,.journal-book--sheet-inventory,.journal-book--characters)
+ .journal-book-subnav button,
+body #app .content-library .journal-book .library-navigation.journal-book-subnav button{
+ font-family:var(--hmk-ui-body-font)!important;
+ font-size:13px!important;font-weight:700!important;line-height:1.2!important;
+}
+
+/* v93.745: definitive blue character-creation dice control. The late
+ * global parchment button selector otherwise overrides the book CSS. */
+body #app .content-sheet .journal-book--creation button.hmk-creation-die,
+body #app .journal-book--creation button.hmk-creation-die,
+body #app .journal-book--creation button.hmk-creation-die.secondary{
+ background:#244b72!important;
+ background-image:linear-gradient(180deg,#3b638a,#173e65)!important;
+ color:#fff2d7!important;
+ border-color:#a98750!important;
+ font:700 13px/1.25 var(--hmk-ui-body-font)!important;
+ box-shadow:0 2px 4px rgba(40,25,12,.2)!important;
+}

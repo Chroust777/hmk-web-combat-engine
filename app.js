@@ -323,7 +323,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.744';
+const APP_VERSION='93.745';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3194,10 +3194,13 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const weatherHeading=confirmedWeather.length?confirmedWeather.map(w=>{
   const day=trekWeatherWords(w.weather,false),night=trekWeatherWords(w.weather,true);
   const active=w.period==='night'?night:w.period==='day'?day:null;
-  const periodLabel=w.period==='night'?'noc':w.period==='day'?'den':'soumrak / neupřesněno';
-  const detail=active?`${active.icon} ${active.temperature} · ${active.kind}`:
-   `☀️ ${day.temperature} · ${day.kind}; 🌙 ${night.temperature} · ${night.kind}`;
-  return `<span class="hc-clock-weather-row"><b>${esc(w.area)}:</b> ${esc(detail)} <small>(${esc(periodLabel)}${w.changed?', změna GM':''}${active?', den/noc podle přibližného východu a západu slunce':''})</small></span>`;
+  // "Deštivé počasí" already conveys rain; do not repeat "déšť" and
+  // do not append another day/night explanation to a current-period label.
+  const compact=x=>x.temperature+((x.kind==='déšť'&&/deštiv/i.test(x.temperature))?'':x.kind&&x.kind!=='bez srážek'?` · ${x.kind}`:'');
+  const detail=active?`${active.icon} ${compact(active)}`:
+   compact(day)===compact(night)?`${day.icon} ${compact(day)}`:
+   `☀️ ${compact(day)}; 🌙 ${compact(night)}`;
+  return `<span class="hc-clock-weather-row"><b>${esc(w.area)}:</b> ${esc(detail)}${w.changed?' <small>· změna GM</small>':''}</span>`;
  }).join(''):'<span class="hc-clock-weather-row">Denní počasí dosud nebylo GM potvrzeno.</span>';
  const withClock=folio.replace('</header><div class="folio-chapter-content">',
   `<div class="hc-clock-heading" role="status" aria-label="Aktuální herní datum, čas a počasí"><span>AKTUÁLNÍ ČAS KAMPANĚ</span><strong>${esc(clockLabel)} · ${esc(timeLabel)}</strong><div class="hc-clock-weather"><span>POČASÍ · AKTUÁLNÍ DEN</span>${weatherHeading}</div>${date?'':'<small>Datum TR nebylo v tomto kalendáři ještě přiřazeno.</small>'}</div></header><div class="folio-chapter-content">`);
@@ -4787,11 +4790,17 @@ function folioChapterParts(body,kind=''){
     const location=nodes.indexOf(primary);
     const detached=nodes.slice(location+1);
     const rightExtras=detached.filter(x=>x.matches?.('.hc-calendar.hc-time-control,.hc-calendar.hc-planner'));
+    // The second, original GM advance form is not the quick time control:
+    // it must live AFTER the event planner on the right folio, not underneath
+    // the seven-day list on the left.
+    const gmAdvance=detached.filter(x=>x.querySelector(':scope > h3')?.textContent?.trim()==='Posun času GM');
     const before=nodes.slice(0,location).map(x=>x.outerHTML).join('');
-    const after=detached.filter(x=>!rightExtras.includes(x)).map(x=>x.outerHTML).join('');
+    const after=detached.filter(x=>!rightExtras.includes(x)&&!gmAdvance.includes(x)).map(x=>x.outerHTML).join('');
     const week=queue.querySelector(':scope > .hc-weekly');
     const queueContent=week?week.outerHTML+[...queue.children].filter(x=>x!==week).map(x=>x.outerHTML).join(''):queue.innerHTML;
-    return [queueContent+before+after,dated.innerHTML+rightExtras.map(x=>x.outerHTML).join('')];
+    const timeControls=rightExtras.filter(x=>x.matches?.('.hc-time-control'));
+    const planner=rightExtras.filter(x=>x.matches?.('.hc-planner'));
+    return [queueContent+before+after,dated.innerHTML+timeControls.map(x=>x.outerHTML).join('')+planner.map(x=>x.outerHTML).join('')+gmAdvance.map(x=>x.outerHTML).join('')];
    }
   }
   const episode=nodes.find(el=>el.classList.contains('hc-episode-shell'));
@@ -9238,7 +9247,7 @@ function enhanceHMKDiceFields(){
   const sibling=label.nextElementSibling;
   // A dedicated generator can be a sibling of the label OR inside the label;
   // never duplicate it or replace its existing provenance behavior.
-  if(label.querySelector('button[data-hmk-general-auto-die],button[data-hmk-recovery-generate],button[data-hmk-calendar-auto-die],button[data-hmk-creation-roll],button[data-episode-medical-die]'))continue;
+  if(label.querySelector('button[data-hmk-general-auto-die],button[data-hmk-recovery-generate],button[data-hmk-calendar-auto-die],button[data-hmk-creation-roll],button[data-hmk-creation-die],button[data-episode-medical-die]'))continue;
   if(sibling?.tagName==='BUTTON'&&([...sibling.attributes].some(a=>a.name.startsWith('data-')&&/roll|die|dice|generate/i.test(a.name))||/⚄|generovat|hodit/i.test(sibling.textContent||'')))continue;
   const raw=label.textContent||'';
   const match=raw.match(/(?:^|[^a-zA-Z0-9])d(4|6|8|10|12|20|30|100)(?![0-9])/i);
@@ -9767,6 +9776,9 @@ function render(){
  // The sidebar has its own scrolling container. Rendering replaces its DOM node,
  // so retain the actual scroll position instead of resetting the menu to the top.
  const app=document.getElementById('app');
+ // A field hover bubble must not remain on screen after switching chapters.
+ const obsoleteTooltip=document.querySelector('.hmk-journal-floating-tooltip');
+ if(obsoleteTooltip)obsoleteTooltip.hidden=true;
  const sidebarPosition=app.querySelector('.layout>.nav')?.scrollTop??0;
  const nextRoute=currentUiRoute();
  if(!uiNavigationRestoring)uiNavigation.visit(nextRoute,{scrollY:window.scrollY});
@@ -20727,49 +20739,42 @@ try{
 // Show the deterministic result immediately as the GM types physical dice.
 // The same resolver runs AGAIN during the persistent mutation: UI updates
 // alone are never trusted as evidence and no die is generated by the app.
-// One source-linked explanatory dialog for every Character Creation field.
-// Pure UI: never modifies the creation state or generates random dice.
-document.addEventListener('click',event=>{
- const btn=event.target?.closest?.('[data-hmk-rule-help]');if(!btn)return;
- event.preventDefault();event.stopImmediatePropagation();
- const modal=document.getElementById('hmk-rule-dialog');if(!modal)return;
- const field=btn.closest('label')?.querySelector('[name]');
- const selectedOption=field?.tagName==='SELECT'?field.selectedOptions?.[0]?.textContent:'';
- const step=Number(btn.dataset.hmkRuleStep);
- const liveCharacter=character(selected);
- const wizardForm=btn.closest('#creation-step-form');
- const current=(name)=>wizardForm?.elements?.namedItem(name)?.value||'';
- const liveHelpValues={...(liveCharacter?.hmk?.creation?.values??{})};
+// Global project rule: contextual rules are displayed on hover or keyboard
+// focus of the field label, not after clicking a question-mark/dialog.
+function refreshCreationRuleTooltip(target){
+ if(!target?.matches?.('[data-hmk-rule-help]'))return;
+ const actor=character(selected);if(!actor)return;
+ const form=target.closest('#creation-step-form');
+ const field=target.closest('label')?.querySelector('[name]');
+ const current=name=>form?.elements?.namedItem(name)?.value||'';
+ const values={...(actor.hmk?.creation?.values||{})};
  for(const key of ['familyWeaponcrafterType','familyMartialChoice','familyVariantChoice',
   'familyRitualChoice','familyScriptChoice','familySecondScriptChoice',
   'occupationLanguageChoice','occupationScriptChoice','occupationRitualChoice',
   'nativeRitualChoice','moralityChoice','pvarChantryId']){
-  const value=current(key);if(value)liveHelpValues[key]=value;
+  const v=current(key);if(v)values[key]=v;
  }
- const previewCharacter={...liveCharacter,
-  occupation:current('occupation')||liveCharacter?.occupation,
-  hmk:{...(liveCharacter?.hmk??{}),
-   creation:{...(liveCharacter?.hmk?.creation??{}),values:liveHelpValues},
-   folk:current('folk')||liveCharacter?.hmk?.folk,
-   ageGroup:current('ageGroup')||liveCharacter?.hmk?.ageGroup,
-   familyOccupation:current('familyOccupation')||liveCharacter?.hmk?.familyOccupation,
-   birthRegion:current('birthRegion')||liveCharacter?.hmk?.birthRegion,
-   socialClass:current('socialClass')||liveCharacter?.hmk?.socialClass,
-   society:current('society')||liveCharacter?.hmk?.society}};
- const fieldName=btn.dataset.hmkRuleHelp;
- // DP is interpreted for the actual Skill chosen immediately beside it.
- const chosen=fieldName==='skillDP'?current('skillName'):(field?.value??'');
- const stage=SKILL_STAGES[creationOf(liveCharacter).skillStage]??null;
- const note=fieldRuleNote(step,fieldName,previewCharacter,chosen,stage);
- const title=btn.dataset.hmkRuleTitle||'Pravidla pro tuto volbu';
- modal.querySelector('#hmk-rule-dialog-title').textContent=title+(selectedOption&&chosen?' · '+selectedOption:'');
- modal.querySelector('#hmk-rule-dialog-page').textContent='HMK v1.2 · tištěná str. '+note.page;
- modal.querySelector('#hmk-rule-dialog-effect').textContent=note.effect;
- modal.querySelector('#hmk-rule-dialog-dice').textContent=note.dice;
- modal.querySelector('#hmk-rule-dialog-original').textContent=note.excerpt.length?'HMK v1.2 – '+note.quoteScope+': “'+note.excerpt.join('”  “')+'”':'Tato položka nemá v tištěných pravidlech samostatný doslovný popis.';
- modal.querySelector('#hmk-rule-dialog-context').textContent=note.context||'Nejprve určete příslušné vstupní hodnoty postavy.';
- modal.querySelector('#hmk-rule-dialog-status').textContent=note.hasExcerpt?'Doslovný anglický výňatek ze zdrojové strany je oddělen od českého výkladu a údajů konkrétní postavy.':note.verified?'K této ovládací položce není v příručce samostatná věta; nepřidávejte vlastní pravidla.':'Přesné speciální pravidlo zde není doloženo; potřebné výjimky nelze domýšlet.';
- if(typeof modal.showModal==='function')modal.showModal();else modal.setAttribute('open','');
+ const previewActor={...actor,
+  occupation:current('occupation')||actor.occupation,
+  hmk:{...(actor.hmk||{}),creation:{...(actor.hmk?.creation||{}),values},
+   folk:current('folk')||actor.hmk?.folk,ageGroup:current('ageGroup')||actor.hmk?.ageGroup,
+   familyOccupation:current('familyOccupation')||actor.hmk?.familyOccupation,
+   birthRegion:current('birthRegion')||actor.hmk?.birthRegion,
+   socialClass:current('socialClass')||actor.hmk?.socialClass,
+   society:current('society')||actor.hmk?.society}};
+ const name=target.dataset.hmkRuleHelp;
+ const chosen=name==='skillDP'?current('skillName'):(field?.value||'');
+ const stage=SKILL_STAGES[creationOf(actor).skillStage]||null;
+ const rule=fieldRuleNote(Number(target.dataset.hmkRuleStep),name,previewActor,chosen,stage);
+ const pieces=[target.dataset.hmkRuleTitle||'Pravidlová nápověda',
+  `HMK v1.2 · str. ${rule.page}`,rule.effect,rule.dice];
+ if(rule.context)pieces.push(rule.context);
+ if(!rule.verified)pieces.push('Přesné zvláštní pravidlo ještě není doloženo; GM musí ověřit.');
+ target.setAttribute('data-hmk-help',pieces.filter(Boolean).join('\n'));
+}
+for(const type of ['pointerover','focusin'])document.addEventListener(type,event=>{
+ const target=event.target?.closest?.('[data-hmk-rule-help]');
+ if(target)refreshCreationRuleTooltip(target);
 },true);
 
 document.addEventListener('input',event=>{
@@ -21291,11 +21296,6 @@ function hmkShowJournalTooltip(element){
 }
 // Highlight contextual ? only while the pointer actually targets that button.
 // CSS :hover alone can linger on nested labels after layout/scroll changes.
-document.addEventListener('keydown',event=>{
- const target=event.target?.closest?.('[data-hmk-rule-help]');
- if(!target)return;
- if(event.key==='Enter'||event.key===' '){event.preventDefault();target.click();}
-},true);
 document.addEventListener('click',event=>{
  const button=event.target?.closest?.('[data-hmk-creation-die]');
  if(!button)return;
@@ -21304,10 +21304,17 @@ document.addEventListener('click',event=>{
  const name=button.dataset.hmkCreationDie,field=form.elements?.namedItem?.(name);
  if(!field||field.disabled||field.readOnly)return;
  const faces=Math.max(2,Number(button.dataset.hmkDieFaces)||Number(field.max)||100);
- const value=1+Math.floor(Math.random()*faces);
- field.value=String(value);
- field.dispatchEvent(new Event('input',{bubbles:true}));
- field.dispatchEvent(new Event('change',{bubbles:true}));
+ try{
+  // Character Creation includes d1000 (Region). Weather's secureHMKDie
+  // intentionally caps at d100, so use the existing audited d1000 generator.
+  if(!globalThis.crypto?.getRandomValues)throw Error('Kryptografický generátor není dostupný');
+  const value=secureAutoDie(faces);
+  field.value=String(value);
+  field.dataset.hmkAutoDice=field.value;
+  field.dataset.origin='cryptographic-software-die';
+  field.dispatchEvent(new Event('input',{bubbles:true}));
+  field.dispatchEvent(new Event('change',{bubbles:true}));
+ }catch(err){alert('Hod kostkou nebyl proveden: '+err.message);}
 },true);
 document.addEventListener('pointerover',event=>{
  const button=event.target?.closest?.('button.hmk-rule-help');

@@ -25,3 +25,9 @@ Přímé klikání do nasazeného webu GitHub Pages není v obvyklém běhu asis
 
 ## Zpřesnění v93.741 — jednotná vizuální hierarchie
 Viz `docs/UI_TYPOGRAFIE_A_AUDIT_v93.741.md`. Nová závěrečná CSS vrstva je `hmk-global-ui-93741.css`. Vizualizaci musí potvrdit lokální Chromium; změnu stylů nelze vydávat za plné otestování všech starších průvodců.
+
+## Zpřesnění v93.745 — kontextová nápověda a kostky
+- Pravidlová nápověda v Character Creation se otevírá **pouhým najetím** na související text pole nebo při zaměření klávesnicí, nikoli klikáním na otazník. Nesmí měnit stav hry.
+- Tlačítka softwarových kostek mají napříč aplikací jednotné **modré** vizuální provedení; samotný hod pouze vyplní hodnotu a nic neukládá.
+- U generování d1000 použít kryptografický zdroj náhody, nikoli `Math.random()`. Ke stejnému poli nevytvářet druhé generační tlačítko.
+- Horní podzáložkové menu postavy, Knihovny a Skill Tests má srovnatelnou vypočtenou velikost i tloušťku písma. Výsledek ověřovat ve skutečně vykresleném Chromium s poslední CSS vrstvou.

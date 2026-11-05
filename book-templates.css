@@ -7394,3 +7394,29 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .content-sheet .journal-book--creation .hmk-rule-help-inline:hover,
 .content-sheet .journal-book--creation .hmk-rule-help-inline:focus-visible{outline:2px solid rgba(175,140,75,.35);outline-offset:2px;border-radius:2px;background:rgba(214,194,155,.16)}
 .content-sheet .journal-book--creation .hmk-creation-die{margin-top:6px;min-height:29px!important;padding:3px 8px!important;font-size:11px!important;font-weight:700!important;align-self:flex-start}
+
+/* v93.745: creation dice use the same blue treatment as the other HMK die buttons. */
+.content-sheet .journal-book--creation button.hmk-creation-die{
+ background:linear-gradient(180deg,#365e84,#163a61)!important;
+ color:#fff4db!important;border:1px solid #a9854c!important;
+ border-radius:5px!important;box-shadow:0 2px 4px #0002!important;
+ font:700 12px/1.25 var(--hmk-font-body,Georgia,serif)!important;
+}
+.content-sheet .journal-book--creation button.hmk-creation-die:is(:hover,:focus-visible){filter:brightness(1.12)}
+/* Match the same size and weight for tab navigation on character/skills/library pages. */
+.content-sheet :is(.journal-book--overview,.journal-book--sheet-inventory,.journal-book--characters,.journal-book--skills,.journal-book--library)
+ .journal-book-subnav > button,
+.content-library .journal-book .library-navigation.journal-book-subnav button,
+.content-sheet .journal-book--skills .hsk-tabs button{
+ font-family:var(--hmk-font-body,'Cormorant Garamond',Georgia,serif)!important;
+ font-size:12px!important;font-weight:700!important;line-height:1.2!important;
+}
+/* Primary ML/Secondary ML/total numeric glyphs return to a legible blue 24 px. */
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip b,
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip strong,
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-total,
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-verdict-chip strong{
+ font-size:24px!important;font-weight:800!important;line-height:1.1!important;
+ color:#17466c!important;
+}
+.content-calendar .journal-book--calendar .folio-chapter-page--right > .folio-chapter-content :is(.hc-time-control,.hc-planner,.hc-gm-advance){width:100%;min-width:0;margin-top:12px}
