@@ -322,7 +322,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.738';
+const APP_VERSION='93.739';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5735,7 +5735,7 @@ function catalogNoteInCzech(label,value){
  const known={
   'Location codes from p.118; layering, Bulk, ENC and armour totals not calculated.':'Kódy anatomických lokalit podle strany 118. Vrstvení, Bulk, ENC ani výsledná ochrana zbroje zde nejsou vypočítány.',
   'Anatomical dots from p.118; rigid coverage, ENC, layering and suit totals not calculated.':'Anatomické značky podle strany 118. Tuhost krytí, ENC, vrstvení ani souhrnné hodnoty kompletu zde nejsou vypočítány.',
-  'p118 verified anatomical coverage; legality of combined layers still requires audit':'Anatomické krytí ověřené podle strany 118; přípustnost kombinovaných vrstev je nutné ještě ověřit.',
+  'p118 verified anatomical coverage; legality of combined layers still requires audit':'Krytí vychází z tabulky HMK na straně 118. Pravidla kombinování vrstev viz strany 117 a 119; bez samostatné kontroly celé oblečené sestavy se soulad vrstev nepotvrzuje.',
   'none':'žádné','front-only':'pouze zepředu','rigid':'tuhé krytí','standard':'běžné krytí'
  };
  if(known[value])return known[value];
@@ -5794,7 +5794,7 @@ function catalogNoteInCzech(label,value){
  }else{
   visible.add(p.skill?'skill':'use');visible.add('quality');
  }
- const scalar=Object.entries(p).filter(([key,v])=>!visible.has(key)&&v!==null&&v!==undefined&&typeof v!=='object');
+ const scalar=Object.entries(p).filter(([key,v])=>!visible.has(key)&&v!==null&&v!==undefined&&typeof v!=='object'&&!(item.category==='armor'&&key==='coveredLocations'&&locRows.length));
  const scalarTable=scalar.length?table(['Parametr','Hodnota'],scalar.map(([k,v])=>[niceKey(k),k==='material'?displayArmourMaterial(v):v])):'';
  // Recursive structured-data renderer for custom equipment: text and tables only.
  // Bound depth avoids infinite recursion for malformed user-provided objects.
@@ -5810,13 +5810,16 @@ function catalogNoteInCzech(label,value){
   if(entries.every(([,x])=>x===null||typeof x!=='object'))return table(['Parametr','Hodnota'],entries.map(([k,x])=>[niceKey(k),catalogNoteInCzech(niceKey(k),human(x))]));
   return `<div class="catalog-data-nested">${entries.map(([k,x])=>`<div class="catalog-complex"><strong class="catalog-parameter-tip" tabindex="0" data-hmk-help="${esc(libraryFieldHelp(niceKey(k)))}" >${esc(niceKey(k))}</strong>${describe(x,depth+1)}</div>`).join('')}</div>`;
  };
- const skipped=new Set(['verifiedModes','alternateStrikeModes','locationProtection']);
+ const skipped=new Set(['verifiedModes','alternateStrikeModes','locationProtection','coveredLocations']);
  const complex=Object.entries(p).filter(([k,v])=>!skipped.has(k)&&v!==null&&typeof v==='object');
  const extras=complex.length?`<h4>Další vlastnosti a pravidla</h4>${complex.map(([k,v])=>`<div class="catalog-complex"><strong class="catalog-parameter-tip" tabindex="0" data-hmk-help="${esc(libraryFieldHelp(niceKey(k)))}" >${esc(niceKey(k))}</strong>${describe(v)}</div>`).join('')}`:'';
  const remainingProtection=protection!==undefined&&!locRows.length?`<h4>Ochrana</h4>${describe(protection)}`:'';
+ const isCloak=/(?:^|\s)cloak(?:$|[,\s])/i.test(item.name||'');
+ const coldBonus=item.category==='armor'&&isCloak&&['C','D'].includes(String(p.material||''))?(p.material==='D'?2:1):null;
+ const coldInfo=item.category==='armor'?`<h4>Ochrana před chladem</h4><p class="tiny">${coldBonus!==null?`Cold Hazard AV +${coldBonus} při použití ${esc(item.name)} (HMK str. 120, 149). Bonus se neurčuje z hodnoty F a u současně používaných zdrojů se řídí tabulkou Cold Hazard.`:'Samostatný bonus Cold Hazard AV pro tuto položku není v HMK doložen. Ochrana F značí ochranu před Fire/Frost zásahem, nikoliv automatický bonus při cestování zimou (HMK str. 117, 149).'}</p>`:'';
  const categoryLabel={weapon:'Zbraň',shield:'Štít',armor:'Zbroj',other:'Ostatní předmět'}[item.category]||'Předmět';
  const noData=!Object.keys(p).length?'<p class="muted">U této položky zatím nejsou evidovány parametry.</p>':!scalarTable&&!modeTable&&!locTable&&!extras&&!remainingProtection?'<p class="muted">Všechny dostupné parametry jsou již uvedeny v řádku předmětu.</p>':'';
- return `<details class="catalog-parameters"><summary title="${esc(libraryFieldHelp('Úplné údaje'))}">⚙ Zobrazit parametry · ${esc(categoryLabel)}</summary><div class="catalog-parameters-inner">${scalarTable}${modeTable}${locTable}${extras}${remainingProtection}${noData}</div></details>`;
+ return `<details class="catalog-parameters"><summary title="${esc(libraryFieldHelp('Úplné údaje'))}">⚙ Zobrazit parametry · ${esc(categoryLabel)}</summary><div class="catalog-parameters-inner">${scalarTable}${modeTable}${locTable}${coldInfo}${extras}${remainingProtection}${noData}</div></details>`;
 }
 function armourLibraryConsistencyPanel(){
  const a=auditArmourLibraryConsistency();
@@ -6452,7 +6455,7 @@ function libraryBrief(i){
  const impact=m=>m?`${esc(m.impactDie??'—')}${Number.isFinite(m.impactModifier)?(m.impactModifier>=0?'+':'')+m.impactModifier:''}${m.aspect?' '+esc(m.aspect):''}`:'—';
  const firstMode=Array.isArray(p.verifiedModes)?p.verifiedModes[0]:null;
  const armourValue=Object.values(p.locationProtection||{})[0];
- const summary=armourValue?`b${numeric(armourValue.b)} e${numeric(armourValue.e)} p${numeric(armourValue.p)} f${numeric(armourValue.f)}`:'—';
+ const summary=armourValue?`b${numeric(armourValue.b)} / e${numeric(armourValue.e)} / p${numeric(armourValue.p)} / f${numeric(armourValue.f)}`:'—';
  const price=p.pricePence!==undefined?`${numeric(p.pricePence)} d`:p.pricePerDozenPence!==undefined?`${numeric(p.pricePerDozenPence)} d/12`:'—';
  const weight=p.weightLb!==undefined?`${numeric(p.weightLb)} lb`:'—';
  if(i.category==='armor')return [esc(displayArmourMaterial(p.material)),`${numeric(p.encumbrance)}${p.printedEncCode==='a'?' (podmíněné)':p.printedEncCode==='p'?' (PER)':''}`,summary,price,weight];
@@ -6475,7 +6478,7 @@ function libraryColumnHeadings(item){
 function libraryDataRows(rows){
  return rows.map(i=>{
  const b=libraryBrief(i);const audit=catalogAuditEntry(i);const headings=libraryColumnHeadings(i);
- return `<tr data-library-item="${esc(i.id)}"><td class="library-item-title" data-hmk-help="${esc(libraryItemPurpose(i))}" title="${esc(libraryItemPurpose(i))}" tabindex="0">${esc(i.name)}<small>${i.builtin?'Pravidla '+esc(libraryPrintedPages(i.source)):'Vlastní položka · '+esc(i.source||'zdroj neuveden')}</small></td>
+ return `<tr data-library-item="${esc(i.id)}"><td class="library-item-title" data-hmk-help="${esc(libraryItemPurpose(i))}" title="${esc(libraryItemPurpose(i))}" tabindex="0"><span class="library-item-name">${esc(i.name)}</span> <small class="library-source-inline">${i.builtin?'Pravidla '+esc(libraryPrintedPages(i.source)):'Vlastní · '+esc(i.source||'zdroj neuveden')}</small></td>
  ${b.map((value,index)=>`<td class="library-mini catalog-parameter-tip" data-hmk-help="${esc(libraryFieldHelp(headings[index]))}" tabindex="0">${value}</td>`).join('')}
  <td class="library-details-cell">${catalogParameters(i)}${i.builtin?'':`<details><summary>Správa vlastní položky</summary><p class="tiny">${esc(i.description||'')}</p><div class="actions"><button data-edit-item="${esc(i.id)}">Upravit</button><button data-copy-item="${esc(i.id)}" class="secondary">Kopírovat</button><button data-delete-item="${esc(i.id)}" class="danger">Smazat</button></div></details>`}</td>
  <td>${libraryAssignForm(i.id,'item',true,libraryPurchaseOffer(i))}</td></tr>`;
@@ -6486,9 +6489,9 @@ function librarySuitRows(suits){
  const crosswalk=reconcileSuitArticles();const articles=PRINTED_ARMOUR_ARTICLES_P118;const catalog=allCatalogItems();
  return suits.map(s=>{
   const resolved=resolveSuitCatalogParts(s,crosswalk,articles,catalog);
-  return `<tr data-library-suit="${esc(s.name)}"><td class="library-item-title" tabindex="0" title="${esc('Tištěný komplet zbroje podle HMK; skládá se z '+s.articles.length+' položek: '+s.articles.join(', '))}" data-hmk-help="${esc('Tištěný komplet zbroje podle HMK; jednotlivé součásti: '+s.articles.join(', '))}">${esc(s.name)}<small>HMK · strana ${s.page} · tištěná referenční sestava</small></td>
+  return `<tr data-library-suit="${esc(s.name)}"><td class="library-item-title" tabindex="0" title="${esc('Tištěný komplet zbroje podle HMK; skládá se z '+s.articles.length+' položek: '+s.articles.join(', '))}" data-hmk-help="${esc('Tištěný komplet zbroje podle HMK; jednotlivé součásti: '+s.articles.join(', '))}"><span class="library-item-name">${esc(s.name)}</span> <small class="library-source-inline">Pravidla str. ${s.page}</small></td>
    <td class="library-mini">${esc(s.enc)}</td><td class="library-mini">PER −${esc(s.per)}</td><td class="library-mini">${esc(s.area)}</td><td class="library-mini">${esc(s.price)} d</td><td class="library-mini">${esc(s.weightLb)} lb</td>
-   <td class="library-details-cell"><details><summary>${s.articles.length} součástí · podrobnosti</summary><ol class="library-suit-parts">${s.articles.map(n=>`<li>${esc(n)}</li>`).join('')}</ol><p class="tiny">Tištěné souhrnné hodnoty ENC/PER/Area se nepřisuzují jednotlivým položkám. Oblékání a vrstvení vyžaduje samostatnou validaci.</p>${resolved.ok?'':`<p class="library-warning">${esc(resolved.reason)}</p>`}</details></td>
+   <td class="library-details-cell"><details><summary>${s.articles.length} součástí · podrobnosti</summary><ol class="library-suit-parts">${s.articles.map((n,i)=>{const part=resolved.ok?resolved.parts[i]:null;return `<li>${part?`<button type="button" class="library-part-link" data-library-part-search="${esc(part.name)}" title="Otevřít v knihovně: ${esc(part.name)}">${esc(n)}</button>`:esc(n)}</li>`;}).join('')}</ol><p class="tiny">Tištěné souhrnné hodnoty ENC/PER/Area se nepřisuzují jednotlivým položkám. Oblékání a vrstvení vyžaduje samostatnou validaci.</p>${resolved.ok?'':`<p class="library-warning">${esc(resolved.reason)}</p>`}</details></td>
    <td>${libraryAssignForm(s.name,'suit',resolved.ok,{pricePence:suitPurchasePrice(s),quantity:1})}</td></tr>`;
  }).join('');
 }
@@ -16648,6 +16651,7 @@ document.addEventListener('submit',e=>{
   if(out)out.textContent=`${result.name} · ${result.ability}: ${result.sl} · d100 (${result.roll}) ${result.roll<=result.eml?'≤':'>'} EML ${result.eml} (tištěné ML ${result.ml}${enc?' · zátěž ENC −'+enc:''})${result.attackImpact?' · základní Impact '+result.attackImpact:''}. Jen kontrolní výpočet; nikoli rozhodnutí Combat Outcome či zranění.`;
  }catch(err){if(out)out.textContent='Nelze vyhodnotit: '+err.message;}
 },true);
+document.addEventListener('click',e=>{const link=e.target.closest?.('[data-library-part-search]');if(!link)return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='armour';libraryPage=0;query=link.dataset.libraryPartSearch||'';overlay=null;render();const first=document.querySelector('tr[data-library-item] .catalog-parameters summary');if(first)first.scrollIntoView({block:'center'});},true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-bestiary-open]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='bestiary';render();},true);
 document.addEventListener('change',e=>{
  const control=e.target.closest?.('select[data-library-other-filter-select]');if(!control)return;
