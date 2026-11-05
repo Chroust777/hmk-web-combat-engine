@@ -1,0 +1,22 @@
+test_concurrent_93718.cjs	93725	0	PASS: 373 assertions, 24 permutations of 4 simultaneous starts and completions; append-only/reload-contract, no duplicate, deadline protection 
+test_concurrent_93718.cjs	93726	0	PASS: 373 assertions, 24 permutations of 4 simultaneous starts and completions; append-only/reload-contract, no duplicate, deadline protection 
+test_fear_parallel_93720.cjs	93725	0	PASS 67 concurrent Fear assertions 
+test_fear_parallel_93720.cjs	93726	0	PASS 67 concurrent Fear assertions 
+test_global_parallel_93719.cjs	93725	0	PASS 501 assertions; 24 medical four-source permutations; 6 global-ledger orderings 
+test_global_parallel_93719.cjs	93726	0	PASS 501 assertions; 24 medical four-source permutations; 6 global-ledger orderings 
+test_mixed_deadlock_93718.cjs	93725	0	PASS 14 assertions: Pepa Treatment start + Michal second Cold F on existing damp HR4, both orders, and 120-min safe advance 
+test_mixed_deadlock_93718.cjs	93726	0	PASS 14 assertions: Pepa Treatment start + Michal second Cold F on existing damp HR4, both orders, and 120-min safe advance 
+test_sleep_parallel_93719.cjs	93725	0	PASS 40 sleep/rest concurrent-source assertions 
+test_sleep_parallel_93719.cjs	93726	0	PASS 40 sleep/rest concurrent-source assertions 
+test_weather_concurrency_93718.cjs	93725	0	PASS 14 assertions for two simultaneous damp Cold exposures, both orders, accumulated Weakness, preserved source events 
+test_weather_concurrency_93718.cjs	93726	0	PASS 14 assertions for two simultaneous damp Cold exposures, both orders, accumulated Weakness, preserved source events 
+test_93725.cjs	93725	0	PASS 77 v93.725 combined AV/Combat independent-write assertions 
+test_93725.cjs	93726	0	PASS 77 v93.725 combined AV/Combat independent-write assertions 
+test_93724_version_updated.cjs	93725	1	}  Node.js v22.16.0 
+test_93724_version_updated.cjs	93726	1	}  Node.js v22.16.0 
+test_global_shock_93722_rescoped.cjs	93725	1	}  Node.js v22.16.0 
+test_global_shock_93722_rescoped.cjs	93726	1	}  Node.js v22.16.0 
+test_weather_area_93723.cjs	93725	0	REAL WORN result {"ready":true,"value":0,"raw":0.32999999999999996,"locations":{"sk":0,"fa":0,"nk":0,"sh":1,"ua":1,"el":0,"fo":0,"ha":0,"tx":1,"ab":1,"pv":0,"th":0,"kn":0,"ca":0,"f
+test_weather_area_93723.cjs	93726	0	REAL WORN result {"ready":true,"value":0,"raw":0.32999999999999996,"locations":{"sk":0,"fa":0,"nk":0,"sh":1,"ua":1,"el":0,"fo":0,"ha":0,"tx":1,"ab":1,"pv":0,"th":0,"kn":0,"ca":0,"f
+test_combat_write_boundary_93722.cjs	93725	0	PASS 127 Combat write-boundary assertions, 24 permutations, nonparticipant allowed and original initiative proofs preserved 
+test_combat_write_boundary_93722.cjs	93726	0	PASS 127 Combat write-boundary assertions, 24 permutations, nonparticipant allowed and original initiative proofs preserved 
