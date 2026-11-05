@@ -7241,3 +7241,8 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .hsk-exposure-roll-grid label{min-width:0}
 .hsk-exposure-wait{padding:.6rem .75rem;border-left:3px solid #8c7150;background:rgba(254,249,236,.5);line-height:1.55}
 @media(max-width:650px){.hsk-exposure-readout,.hsk-exposure-roll-grid,.hsk-exposure-roll-row{grid-template-columns:minmax(0,1fr)}.hsk-exposure-roll-row button{width:100%}}
+/* HMK 93.736 - one authoritative daily weather summary beside campaign date. */
+.content-sheet .hc-clock-heading .hc-clock-weather{display:flex;flex-direction:column;gap:5px;margin-top:7px;padding-top:8px;border-top:1px solid rgba(117,78,41,.35);width:100%;font-size:.92rem;line-height:1.35}
+.content-sheet .hc-clock-heading .hc-clock-weather>span:first-child{font-size:.72rem;font-weight:700;letter-spacing:.065em}
+.content-sheet .hc-clock-heading .hc-clock-weather-row{font-weight:400;font-size:clamp(.88rem,1.1vw,1rem);letter-spacing:normal;overflow-wrap:anywhere}
+.content-sheet .hc-clock-heading .hc-clock-weather-row small{font-size:.75rem;display:inline}
