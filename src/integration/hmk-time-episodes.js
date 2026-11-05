@@ -195,7 +195,7 @@ export function independentTravelDelayCarry(journal=[],campaignId,minute=Infinit
   remaining=Math.max(0,remaining-e.minutes);
   const complication=e.hazardDetails?.find(h=>h.hazard==='complication'&&
    h.automationVersion==='v93.681'&&['long-delay','irreparable'].includes(h.result));
-  if(complication&&e.travelDelay?.future===240)remaining+=240;
+  if(complication&&Number.isSafeInteger(e.travelDelay?.future)&&e.travelDelay.future>0)remaining+=e.travelDelay.future;
  }
  return remaining;
 }
@@ -413,6 +413,19 @@ export function computeEpisodeOrientation({mode='none',currentSkill=null,previou
    foraging:allocation.foraging,stalking:allocation.stalking,vigilance:allocation.vigilance,
    lax:allocation.lax,orienteeringSlow:allocation.orienteeringSlow},
   reusedFromEpisodeId:mode==='reuse'?previous.id:null,sourceMode:mode};
+}
+/** Pure source-of-truth for HMK p.147 Tracking Conditions. Never trust
+ * disabled UI checkbox serialization: the actual witnessed precipitation,
+ * calendar illumination and terrain are the authority. */
+export function episodeTrackingConditionsFromContext({weatherWatch=null,period='day',terrain='',road='none',partyTracked=0}={}){
+ must(['day','twilight','night'].includes(period),'Tracking: neznámá denní doba');
+ const isContinuous=weatherWatch?.continuous===true;
+ const conditions={continuousSnow:isContinuous&&weatherWatch?.precipitation==='snow',
+  continuousRain:isContinuous&&weatherWatch?.precipitation==='rain',
+  partyTracked,twilight:period==='twilight',night:period==='night',
+  alpine:terrain==='alpine-vegetation',road};
+ trackingModifiers(conditions); // Validate all user-supplied non-derived facts.
+ return conditions;
 }
 export function computeEpisodeTracking({mode='none',currentSkill=null,previous=null,minute,context,trail='',conditions=null}={}){
  must(['none','new','reuse'].includes(mode),'Neznámé použití Tracking.');
@@ -887,12 +900,12 @@ export function validateTimeEpisodes(journal=[]){
    const outcome=hazard?.result;
    const currentComplication=hazard?.hazard==='complication'&&hazard.automationVersion==='v93.681';
    const mandatoryNext=(hazard?.hazard==='equipment'||currentComplication)&&['long-delay','irreparable'].includes(outcome);
-   if(d.method!=='gm-current-episode-only-v2')must(d.future===((independent?(currentComplication&&['long-delay','irreparable'].includes(outcome)):mandatoryNext)?240:0)&&
+   if(d.method!=='gm-current-episode-only-v2')must(d.future===((independent?(currentComplication&&['long-delay','irreparable'].includes(outcome)):mandatoryNext)?e.minutes:0)&&
     (d.current===0||!!hazard),
     'Zdržení v další hlídce nemá doložený Equipment Hazard nebo je jeho délka pozměněna.');
    if(e.equipmentSlowCarryOut!==undefined){
     const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute);
-    const newSlow=e.hazardDetails?.some(h=>(h.hazard==='equipment'||h.hazard==='complication'&&h.automationVersion==='v93.681')&&h.result==='short-delay')?240:0;
+    const newSlow=e.hazardDetails?.some(h=>(h.hazard==='equipment'||h.hazard==='complication'&&h.automationVersion==='v93.681')&&h.result==='short-delay')?e.minutes:0;
     // Legacy receipts before v93.666 incorrectly consumed a Slow obligation
     // during an equipment repair with zero movement. Keep historical data
     // readable, but never issue (or accept as new) that calculation again.
@@ -909,8 +922,8 @@ export function validateTimeEpisodes(journal=[]){
    if(currentComplication){
     if(['long-delay','irreparable'].includes(outcome)){
      must(whole(hazard.hazardAtMinute,1,e.minutes)&&d.current===e.minutes-hazard.hazardAtMinute&&
-      d.future===240,'Complication F/CF: zdržení musí odpovídat minutě překážky a následující hlídce.');
-    }else must(d.future===0,'Complication S/CS: nesmí se přidávat celý další watch jako zdržení.');
+      d.future===e.minutes,'Complication F/CF: zdržení musí odpovídat minutě překážky a navazujícímu minutovému intervalu.');
+    }else must(d.future===0,'Complication S/CS: nesmí se přidávat další časový interval jako zdržení.');
     if(outcome==='irreparable')must(hazard.routeChangeConfirmed===true,
       'Complication CF: chybí potvrzená změna trasy.');
    }else if(hazard?.hazard==='complication'&&['long-delay','irreparable'].includes(outcome)) {
