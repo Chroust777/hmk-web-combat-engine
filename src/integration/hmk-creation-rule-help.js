@@ -337,7 +337,7 @@ export function withCreationRuleHelp(markup,step){
   const before=labelMarkup.slice(opening.length,firstControl.index);
   const caption=before.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim()||name;
   const note=fieldRuleNote(step,name);
-  const button=`<button type="button" class="hmk-rule-help" data-hmk-rule-help="${esc(name)}" data-hmk-rule-step="${step}" data-hmk-rule-title="${esc(caption)}" data-hmk-rule-page="${note.page}" data-hmk-rule-effect="${esc(note.effect)}" data-hmk-rule-dice="${esc(note.dice)}" data-hmk-rule-verified="${note.verified?'yes':'no'}" aria-label="Pravidla pro ${esc(caption)}" title="HMK v1.2 · kontextové pravidlo">?</button>`;
-  return labelMarkup.slice(0,firstControl.index)+button+labelMarkup.slice(firstControl.index);
+  const attrs=`class="hmk-rule-help-inline" tabindex="0" role="button" data-hmk-rule-help="${esc(name)}" data-hmk-rule-step="${step}" data-hmk-rule-title="${esc(caption)}" data-hmk-rule-page="${note.page}" data-hmk-rule-effect="${esc(note.effect)}" data-hmk-rule-dice="${esc(note.dice)}" data-hmk-rule-verified="${note.verified?'yes':'no'}" aria-label="Pravidla pro ${esc(caption)}" title="HMK v1.2 · kontextové pravidlo"`;
+  return labelMarkup.slice(0,opening.length)+`<span ${attrs}>${before}</span>`+labelMarkup.slice(firstControl.index);
  });
 }

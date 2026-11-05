@@ -27,6 +27,22 @@ const num=(name,label,val='',min=0,max=999)=>`<label>${E(label)}<input type="num
 const attributesLabels={str:'Strength',end:'Endurance',dex:'Dexterity',agl:'Agility',per:'Perception',cml:'Comeliness',aur:'Aura',wil:'Will',rea:'Reasoning',cre:'Creativity',emp:'Empathy',elo:'Eloquence'};
 const CLASS=['Unfree','Free','Guilded','Military','Priestly','Noble'];
 const optNum=(name,label,val='',min=0,max=100)=>num(name,label,val,min,max).replace(' required','');
+function withCreationDieButtons(markup){
+ return String(markup).replace(/<label\b[^>]*>[\s\S]*?<\/label>/g,labelMarkup=>{
+  if(labelMarkup.includes('data-hmk-creation-die'))return labelMarkup;
+  const open=/<label\b[^>]*>/i.exec(labelMarkup)?.[0]??'';
+  const input=/<input\b[^>]*type="number"[^>]*name="([^"]+)"[^>]*>/i.exec(labelMarkup);
+  if(!open||!input)return labelMarkup;
+  const body=labelMarkup.slice(open.length,labelMarkup.length-8);
+  const plain=body.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+  const die=/\bd\s*(1000|100|30|20|12|10|8|6|4|3|2)\b/i.exec(plain);
+  if(!die)return labelMarkup;
+  const name=input[1],faces=Number(die[1]);
+  if(!Number.isFinite(faces)||faces<2)return labelMarkup;
+  const button=`<button type="button" class="secondary hmk-creation-die" data-hmk-creation-die="${E(name)}" data-hmk-die-faces="${faces}">⚄ d${faces}</button>`;
+  return labelMarkup.replace(/<\/label>$/i,button+'</label>');
+ });
+}
 /** Explicit bounded player choices for divisible *printed* DP pools.
  * Each slot is one of the original DP, not an additional skill point.
  * Existing persisted `Language=2; Other=1` evidence remains readable.
@@ -234,7 +250,7 @@ export function creationStepIntroduction(character){
 }
 export function creationWizardHTML(character,{editAttribute=null}={}){
  const c=creationOf(character),step=c.step,title=CHARACTER_STEPS[step-1],complete=Object.keys(c.completed??{}).length;
- const enrichedBody=withCreationRuleHelp(body(character,editAttribute),step)+appearanceStepHTML(character);
+ const enrichedBody=withCreationDieButtons(withCreationRuleHelp(body(character,editAttribute),step))+withCreationDieButtons(appearanceStepHTML(character));
  const invokerLegacyNotice=legacyParentInvokerNeedsReview(character)?'<p class="notice">Starší rodičovský Invoker: čtyři fyzické Talent d20 nebyly doloženy. Je nutné přes Edit znovu zadat fyzické hody v kroku 11/12 nebo opravit rodičovské povolání v kroku 7 (HMK str.42). Původní hody jsou v historii.</p>':'';
  const legacyNotice=legacyTribalRegionNeedsReview(character)?'<p class="notice">Pravidla Tribal/Settled byla upřesněna podle HMK str. 29. Historický profil není smazán; před dalšími změnami potvrďte <strong>Birthplace (krok 5)</strong> přes Edit. Původní fyzické hody zůstávají zachované.</p>':'';
  return `<section class="panel wide creation-flow" aria-labelledby="cc-title"><div class="topline"><h2 id="cc-title">Character Creation · ${E(character.name)}</h2><button type="button" class="secondary" data-creation-leave>← Character Sheet</button></div><div class="notice">Průvodce podle HMK v1.2, krok ${step}/14 · ${E(title[0])} · tištěná str. ${title[1]}. ${c.status==='auto-generated'?'Hody provedl software automaticky.':'Ruční průvodce používá fyzické kostky.'} Data ukládá stávající úložiště postav. <strong>Stav: ${c.status==='auto-generated'?'automaticky dokončeno (softwarové hody)':c.status==='review-required'?'GM review required':'rozpracováno'}</strong>.</div>${legacyNotice}${creationStepIntroduction(character)}<progress value="${complete}" max="14" aria-label="Dokončené kroky"></progress><form id="creation-step-form"><div class="field-grid creation-inputs">${enrichedBody}<output data-creation-roll-preview aria-live="polite" class="notice tiny">Zadejte fyzický hod; při známé tabulce se výsledek doplní automaticky.</output></div><div class="actions">${step>1?'<button type="button" class="secondary" data-creation-back>← Předchozí krok</button>':''}<button type="submit" name="action" value="next">${step===14?'Uložit a předat GM kontrole':step===12&&c.skillStage<7?'Další stadium Skillů →':'Uložit a pokračovat →'}</button></div></form><p class="muted">Možnost návratu a pozdějšího Edit zůstává dostupná. Změny základních atributů mohou vyžadovat znovu ověřit navazující Skill DP a bojové parametry.</p>${complete?`<details><summary>Edit: přejít na již vyplněný krok</summary><div class="field-grid"><select id="creation-jump-select">${CHARACTER_STEPS.map(([label,page],i)=>`<option value="${i+1}" ${step===i+1?'selected':''}>${i+1}. ${E(label)} (str. ${page})</option>`).join('')}</select><button type="button" data-creation-jump>Otevřít vybraný krok</button></div></details>`:''}<dialog class="hmk-rule-dialog" id="hmk-rule-dialog" aria-labelledby="hmk-rule-dialog-title"><header><h3 id="hmk-rule-dialog-title">HMK · pravidlová nápověda</h3><p id="hmk-rule-dialog-page" class="tiny"></p></header><p id="hmk-rule-dialog-effect"></p><p id="hmk-rule-dialog-dice" class="tiny"></p><p id="hmk-rule-dialog-original"></p><p id="hmk-rule-dialog-context" class="tiny"></p><p id="hmk-rule-dialog-status" class="tiny"></p><form method="dialog"><button type="submit" class="secondary">Zavřít</button></form></dialog></section>`;

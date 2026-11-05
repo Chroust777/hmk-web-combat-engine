@@ -2438,7 +2438,7 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-episode-clockline"><strong>Začátek:</strong> ${esc(start)} · <span data-episode-end>Konec po zadání minut</span>. Vyhodnocení na konci intervalu; čas se do té doby neposouvá.</p>
  
  <label class="hc-check"><input name="rememberSettings" type="checkbox" checked> <span class="hc-help-term" tabindex="0" data-hmk-help="Převezme účastníky, průvodce, krajinu, trasu a další nastavení z poslední epizody. Nikdy nekopíruje staré hody, SV ani jejich ★. Po zrušení zaškrtnutí můžete začít od výchozího nastavení; existující následky postav zůstávají.">Předvyplnit nastavení z poslední epizody</span></label>
- <details class="hc-episode-settings" data-episode-section="environment" open><summary>2 · Počasí a prostředí pro celou epizodu</summary><div class="hmk-trek-grid">
+ <details class="hc-episode-settings" data-episode-section="environment" open><summary><span class="hc-help-term" tabindex="0" data-hmk-help="Teplota: běžné podmínky, nebezpečný chlad nebo nebezpečné horko. Z téhož denního d10 se podmínky zvlášť vypočtou pro den a noc; noc používá klimatický postih. Srážky: bez srážek nebo srážky. Za běžných podmínek déšť; při cold hazardu sníh, nebo při hraničním hodu déšť se sněhem / mrznoucí déšť. Doplňující d6 určuje intenzitu: 1 = nepřetržité srážky, 2–6 = slabé či pro pohyb nevýznamné. Změní-li se skutečné počasí během epizody, GM rozdělí časový interval.">2 · Počasí a prostředí pro celou epizodu</span></summary><div class="hmk-trek-grid">
  <div class="hc-episode-sky-strip"><span class="hc-help-term" tabindex="0" data-hmk-help="Roční období určuje datum kampaně TR. Světlo se vypočítá z hodiny, šířkového pásma a délky dne podle HMK 142. Protože HMK neudává místní východ slunce, hranice dne používají polední aproximaci; konkrétní časové okolnosti může upravit GM změnou epizody.">Světlo a roční období</span><strong data-episode-light-auto>Odvozuje se z kalendáře</strong></div>
  <label class="hc-episode-latitude">Šířkové pásmo <select name="latitudeBand"><option value="mid">Střední</option><option value="high">Vysoká</option><option value="polar">Polární</option><option value="low">Nízká</option></select></label>
  <div hidden aria-hidden="true"><input name="lightPeriod" value="day"><input name="lightCalculation" value="latitude"><input name="daylightSeason" value="spring"><input name="sunriseMinute" value="360"><input name="twilightMinutes" value="60"></div>
@@ -2456,7 +2456,7 @@ function timeEpisodePageHTML(clock,participants){
   <label class="hc-check" data-episode-weather-geography><input name="aridDesert" type="checkbox"> Pouštní podmínky</label>
  <label data-episode-weather-roll>Teplota (d10)<span class="hc-episode-die"><input name="temperatureD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="temperatureD10">⚄ d10</button></span></label>
  <label data-episode-weather-roll>Srážky (d10)<span class="hc-episode-die"><input name="precipitationD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="precipitationD10">⚄ d10</button></span></label>
- </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p><details class="hc-episode-reference"><summary>Vysvětlivka počasí · všechny možné výsledky</summary><p><strong>Teplota:</strong> běžné teplotní podmínky, nebezpečný chlad nebo nebezpečné horko. Z téhož denního d10 se podmínky zvlášť vypočtou pro <strong>Den</strong> a <strong>Noc</strong>; noc používá klimatický postih.</p><p><strong>Srážky:</strong> bez srážek nebo srážky. Za běžných podmínek déšť; při cold hazardu sníh, nebo při hraničním hodu déšť se sněhem / mrznoucí déšť. Doplňující d6 určuje intenzitu: 1 = nepřetržité srážky, 2–6 = slabé či pro pohyb nevýznamné. Změní-li se skutečné počasí během epizody, GM rozdělí časový interval.</p></details></details>
+ </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p></details>
 
   <fieldset class="hc-episode-party-panel"><legend>3 · Účastníci a průvodce</legend><div class="hc-episode-members">${characterRows}</div><label>Průvodce / osoba provádějící orientaci<select name="guideId">${participants.map(c=>option(c.id,c.name)).join('')}</select></label></fieldset>
  ${stableTravelRoster.length?`<fieldset data-episode-stable-roster><legend>Zvířata vybraná ze Stáje · doložené zatížení</legend>
@@ -2569,9 +2569,9 @@ function timeEpisodePageHTML(clock,participants){
  ${participants.map(c=>`<details class="hc-weather-actor" data-episode-weather-actor="${esc(c.id)}"><summary>${esc(c.name)} · ${h==='cold'?'chlad':'horko'}</summary>
  <div class="hc-weather-actor-steps">
  <section class="hc-weather-step"><h5>1 · Skutečná ochrana a okolnosti</h5><div class="hmk-trek-grid hc-weather-step-grid">
- <label>Area AV · automaticky z oblečené výstroje (HMK 133)<input name="whAV_${h}_${esc(c.id)}" type="number" min="0" readonly data-hmk-derived="worn-armour" placeholder="Načítám skutečnou zbroj…"><small data-weather-av-source="${esc(c.id)}" role="status">Výpočet ze skutečně nasazených kusů výstroje.</small></label>
+ <label>Tepelná ochrana ze zbroje · F / Area AV celé oblečené sestavy (HMK 133, 149)<input name="whAV_${h}_${esc(c.id)}" type="number" min="0" readonly data-hmk-derived="worn-armour" placeholder="Načítám skutečnou zbroj…"><small data-weather-av-source="${esc(c.id)}" role="status">Načteno z F ochrany skutečně oblečené sestavy.</small></label>
  ${h==='cold'?`${(()=>{const cold=coldInventoryChoices(data.inventory,c.id);const auto=cold.automatic.reduce((a,x)=>!a||x.rule.av>a.rule.av?x:a,null);return `<div class="hc-cold-kit">
- <p><strong>Automatický plášť:</strong> ${auto?esc(auto.item.snapshot.name)+' +'+auto.rule.av:'žádný doložený'}. Základ Area AV je již načten z oblečené zbroje.</p>
+ <p><strong>Automatický plášť:</strong> ${auto?esc(auto.item.snapshot.name)+' +'+auto.rule.av:'žádný doložený'}. Základ tepelné ochrany ze zbroje je již načten z oblečené sestavy.</p>
  <label>Skutečně použité další vybavení<select name="whGearId_${h}_${esc(c.id)}"><option value="">Bez dalšího (automatický plášť zůstává)</option>${cold.gear.map(x=>`<option value="${esc(x.item.id)}">${esc(x.item.snapshot.name)} +${x.rule.av}</option>`).join('')}</select></label>
  <label>Úkryt<select name="whShelterId_${h}_${esc(c.id)}"><option value="">Bez úkrytu</option>${cold.shelters.map(x=>`<option value="${esc(x.item.id)}">${esc(x.item.snapshot.name)} +2</option>`).join('')}<option value="cave">Mělká jeskyně +3</option></select></label>
  <label class="hc-check"><input name="whUseConfirmed_${h}_${esc(c.id)}" type="checkbox" value="yes"> GM potvrzuje skutečné použití vybraného předmětu / úkrytu (plášť oblečený v inventáři automaticky).</label>
@@ -4752,7 +4752,7 @@ function folioLibraryEntry(row,headers){
  if(!cells.length)return '';
  const fields=cells.slice(1,-2).map((cell,i)=>{const label=headers[i+1]||'Parametr',help=libraryFieldHelp(label);return `<div class="folio-catalog-field"><dt class="catalog-parameter-tip" tabindex="0" data-hmk-help="${esc(help)}">${esc(label)}</dt><dd class="catalog-parameter-tip" tabindex="0" data-hmk-help="${esc(help)}">${cell.innerHTML}</dd></div>`;}).join('');
  const identity=[...row.attributes].filter(a=>a.name.startsWith('data-')).map(a=>` ${a.name}="${esc(a.value)}"`).join('');
- return `<article class="folio-catalog-entry"${identity}><div class="folio-catalog-heading" tabindex="0" title="${esc(cells[0].getAttribute('title')||cells[0].getAttribute('data-hmk-help')||'')}" data-hmk-help="${esc(cells[0].getAttribute('data-hmk-help')||cells[0].getAttribute('title')||'')}">${cells[0].innerHTML}</div><dl class="folio-catalog-stats">${fields}</dl><div class="folio-catalog-foot"><div class="folio-catalog-details">${cells.at(-2)?.innerHTML||''}</div><div class="folio-catalog-actions">${cells.at(-1)?.innerHTML||''}</div></div></article>`;
+ return `<article class="folio-catalog-entry"${identity}><div class="folio-catalog-heading" tabindex="0" title="${esc(cells[0].getAttribute('title')||cells[0].getAttribute('data-hmk-help')||'')}" data-hmk-help="${esc(cells[0].getAttribute('data-hmk-help')||cells[0].getAttribute('title')||'')}">${cells[0].innerHTML}</div><div class="folio-catalog-top"><dl class="folio-catalog-stats">${fields}</dl><div class="folio-catalog-actions folio-catalog-actions--top">${cells.at(-1)?.innerHTML||''}</div></div><div class="folio-catalog-details">${cells.at(-2)?.innerHTML||''}</div></article>`;
 }
 // The completed-step map is intentionally cleared when editing an earlier
 // chapter. Keep only the furthest visited page number as UI navigation state.
@@ -4785,11 +4785,13 @@ function folioChapterParts(body,kind=''){
    const dated=primary.querySelector(':scope > .hc-calendar-primary-visual');
    if(queue&&dated){
     const location=nodes.indexOf(primary);
+    const detached=nodes.slice(location+1);
+    const rightExtras=detached.filter(x=>x.matches?.('.hc-calendar.hc-time-control,.hc-calendar.hc-planner'));
     const before=nodes.slice(0,location).map(x=>x.outerHTML).join('');
-    const after=nodes.slice(location+1).map(x=>x.outerHTML).join('');
+    const after=detached.filter(x=>!rightExtras.includes(x)).map(x=>x.outerHTML).join('');
     const week=queue.querySelector(':scope > .hc-weekly');
     const queueContent=week?week.outerHTML+[...queue.children].filter(x=>x!==week).map(x=>x.outerHTML).join(''):queue.innerHTML;
-    return [queueContent+before+after,dated.innerHTML];
+    return [queueContent+before+after,dated.innerHTML+rightExtras.map(x=>x.outerHTML).join('')];
    }
   }
   const episode=nodes.find(el=>el.classList.contains('hc-episode-shell'));
@@ -21289,6 +21291,24 @@ function hmkShowJournalTooltip(element){
 }
 // Highlight contextual ? only while the pointer actually targets that button.
 // CSS :hover alone can linger on nested labels after layout/scroll changes.
+document.addEventListener('keydown',event=>{
+ const target=event.target?.closest?.('[data-hmk-rule-help]');
+ if(!target)return;
+ if(event.key==='Enter'||event.key===' '){event.preventDefault();target.click();}
+},true);
+document.addEventListener('click',event=>{
+ const button=event.target?.closest?.('[data-hmk-creation-die]');
+ if(!button)return;
+ event.preventDefault();
+ const form=button.closest('#creation-step-form');if(!form)return;
+ const name=button.dataset.hmkCreationDie,field=form.elements?.namedItem?.(name);
+ if(!field||field.disabled||field.readOnly)return;
+ const faces=Math.max(2,Number(button.dataset.hmkDieFaces)||Number(field.max)||100);
+ const value=1+Math.floor(Math.random()*faces);
+ field.value=String(value);
+ field.dispatchEvent(new Event('input',{bubbles:true}));
+ field.dispatchEvent(new Event('change',{bubbles:true}));
+},true);
 document.addEventListener('pointerover',event=>{
  const button=event.target?.closest?.('button.hmk-rule-help');
  if(button)button.classList.add('hmk-help-direct-hover');

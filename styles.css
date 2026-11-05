@@ -625,3 +625,5 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 #app :is(pre,code,kbd,samp,.catalog-json,.hmk-json-preview){
  font-family:ui-monospace,Consolas,monospace!important;
 }
+
+.hmk-rule-help-inline{cursor:pointer}

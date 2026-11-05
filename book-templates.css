@@ -1728,13 +1728,14 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
 .folio-catalog-entry{min-width:0;position:relative;padding:7px 8px 8px;background:rgba(248,233,202,.22);border:1px solid var(--folio-rule);box-shadow:inset 0 1px rgba(255,247,228,.85)}
 .folio-catalog-heading{font:700 13px/1.25 "Cinzel",Georgia,serif;color:#203c55!important;padding:0 0 5px;border-bottom:1px solid var(--folio-rule);overflow-wrap:anywhere}
 .folio-catalog-heading small{display:block;color:#795e3f;font:11px/1.2 Georgia,serif;font-weight:400;margin-top:2px}
-.folio-catalog-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:4px 0 7px;gap:3px 7px}
-.folio-catalog-field{min-width:0;display:grid;gap:1px}
+.folio-catalog-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,.78fr);gap:10px;align-items:start;margin:5px 0 7px}
+.folio-catalog-stats{display:flex;flex-wrap:wrap;align-items:flex-start;align-content:flex-start;margin:0;gap:6px 18px;min-width:0}
+.folio-catalog-field{min-width:0;display:grid;gap:1px;min-width:92px;max-width:max-content}
 .folio-catalog-field dt{font:700 10px/1.2 Georgia,serif;color:#7a5734}
 .folio-catalog-field dd{margin:0;font:12px/1.25 "Cormorant Garamond",Georgia,serif;color:#292019;overflow-wrap:anywhere}
-.folio-catalog-foot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.04fr);gap:5px;align-items:start;padding-top:6px;border-top:1px solid var(--folio-rule)}
-.folio-catalog-foot>*{min-width:0}
+.folio-catalog-details{font-size:11px;overflow-wrap:anywhere;padding-top:6px;border-top:1px solid var(--folio-rule)}
 .folio-catalog-actions{padding-left:6px;border-left:1px solid var(--folio-rule)}
+.folio-catalog-actions--top{padding-top:1px}
 .folio-catalog-actions form{max-width:100%;min-width:0}
 .folio-catalog-actions .library-assign{min-width:0;display:grid;gap:3px}
 .folio-catalog-actions .library-assign select{min-width:0;width:100%}
@@ -1758,8 +1759,8 @@ main.content.content-sheet>.ledger-topline{max-width:100%;margin:0;padding:4px 1
  .content-sheet .journal-book--chapter .folio-chapter-page--left,.content-sheet .journal-book--chapter .folio-chapter-page--right{padding:12px!important}
  .folio-chapter-content .field-grid,.folio-chapter-content .hsk-form-grid{grid-template-columns:1fr!important}
  .folio-chapter-content .equipped-hands{grid-template-columns:1fr!important}
- .folio-catalog-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
- .folio-catalog-foot{grid-template-columns:1fr}
+ .folio-catalog-top{grid-template-columns:1fr}
+ .folio-catalog-stats{gap:6px 14px}
  .folio-catalog-actions{padding-left:0;border-left:0;border-top:1px solid var(--folio-rule);padding-top:4px}
  .folio-chapter-content .inv-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 }
@@ -5897,9 +5898,9 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 
 
 /* v93.585 – legible two-page library with nonbreaking parameter labels. */
-.content-sheet .journal-book--library .folio-catalog-foot{
- grid-template-columns:minmax(0,1.75fr) minmax(0,.85fr)!important;
- gap:7px!important; align-items:start!important;
+.content-sheet .journal-book--library .folio-catalog-top{
+ grid-template-columns:minmax(0,1.45fr) minmax(235px,.78fr)!important;
+ gap:8px!important; align-items:start!important;
 }
 .content-sheet .journal-book--library .folio-catalog-actions{
  padding-left:5px!important; min-width:0!important;
@@ -7373,3 +7374,23 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 
 /* v93.740: six catalog data fields in armour and expedition supplies; keep readable wrapping */
 .content-sheet .journal-book--library .folio-catalog-stats{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+
+
+/* v93.743 – compact library item header, right-side GM controls and inline rule help. */
+.content-sheet .journal-book--library .folio-catalog-stats{justify-content:flex-start!important}
+.content-sheet .journal-book--library .journal-book-subnav button,
+.content-sheet .journal-book--library .library-other-top-controls button,
+.content-sheet .journal-book--characters .topline button,
+.content-sheet .journal-book--overview .topline button,
+.content-sheet .journal-book--creation .topline button,
+.content-sheet .journal-book--sheet-inventory .topline button{font-weight:700!important}
+.content-calendar .journal-book--calendar .folio-chapter-page--right :is(.hc-time-control,.hc-planner){margin-top:10px}
+.content-calendar .hc-episode-settings [data-episode-weather-geography].hc-check{justify-self:start;max-width:16rem;width:auto!important}
+.content-calendar .hc-episode-settings [data-episode-weather-geography].hc-check input{width:auto!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace :is(.hsk-eml-chip,.hsk-eml-total){font-size:19px!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-chip b{font-size:21px!important}
+.content-sheet .journal-book--skills .folio-chapter-content .hsk-verdict-chip strong{font-size:20px!important}
+.content-sheet .journal-book--creation .hmk-rule-help-inline{display:inline;cursor:pointer;color:#5d3a23!important;text-decoration:underline dotted rgba(93,58,35,.55);text-underline-offset:2px}
+.content-sheet .journal-book--creation .hmk-rule-help-inline:hover,
+.content-sheet .journal-book--creation .hmk-rule-help-inline:focus-visible{outline:2px solid rgba(175,140,75,.35);outline-offset:2px;border-radius:2px;background:rgba(214,194,155,.16)}
+.content-sheet .journal-book--creation .hmk-creation-die{margin-top:6px;min-height:29px!important;padding:3px 8px!important;font-size:11px!important;font-weight:700!important;align-self:flex-start}
