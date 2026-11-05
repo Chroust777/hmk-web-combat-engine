@@ -317,7 +317,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.725';
+const APP_VERSION='93.726';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3750,7 +3750,7 @@ function hazardsView(actorId){
  const actor=character(actorId);if(!actor)return '<section class="panel wide"><p>Nejprve otevřete deník konkrétní postavy.</p></section>';
  const h=characterHazardAccess(persistentStateOf(actor));
  const mode=hazardComposer?.actorId===actor.id?hazardComposer.kind:null;
- const triggers=[['fire','Oheň / kouř'],['poison','Nová otrava'],['disease','Nová nemoc'],['sleep','Nedostatek spánku']];
+ const triggers=[['fire','Oheň / kouř'],['cold-water','Studená voda · skutečné ponoření'],['poison','Nová otrava'],['disease','Nová nemoc'],['sleep','Nedostatek spánku']];
  return `<section class="panel wide panel--chapter"><h3>Nebezpečí a jejich následky · ${esc(actor.name)}</h3>
  <p class="notice">Tyto situace mohou nastat u jakékoli postavy, nezávisle na povolání. Bez doloženého nebezpečí se žádná nemoc, otrava ani trauma nezakládá. Kalendář hlídá termíny; zdravotní následky se ukládají do jediného zdravotního stavu v deníku postavy (healthState), bez zahájení Combatu.</p>
  <details class="hc-hazard-gm-trigger" ${mode?'open':''}><summary>GM · zahájit skutečně vzniklé nebezpečí</summary>
@@ -3758,6 +3758,7 @@ function hazardsView(actorId){
  <button type="button" class="secondary" data-nav="skills">⚄ Skill Tests</button></section>
  ${hskHazardSummary(actor.id)}${h.asphyxia?hskAsphyxiaComaPanel(actor.id):''}
  ${h.smoke||mode==='fire'?hskMundaneFireSmokePanel(actor.id):''}
+ ${mode==='cold-water'?hskGMImmersionShockForm93726(actor.id):''}
  ${h.poison||mode==='poison'?hskPoisonPanel(actor.id):''}
  ${h.disease||h.sequelae||mode==='disease'?hskDiseasePanel(actor.id):''}
  ${h.sleep||mode==='sleep'?hskSleeplessPanel(actor.id):''}`;
@@ -11040,6 +11041,23 @@ function hskEpisodeWeatherOnsetForms(actorId){
  }
  return forms.join('');
 }
+/** Deliberate GM-triggered immersion; no generic skill roll is sufficient.
+ * Selecting this section never starts a shock or commits dice.
+ */
+function hskGMImmersionShockForm93726(actorId){
+ const actor=character(actorId),clock=data.campaignClock;
+ if(!actor)return '';
+ const allowed=!!clock&&calendarMemberIds(clock,data.characters).some(x=>x.id===actor.id);
+ return `<section class="panel wide hsk-exposure-card"><h3>Studená voda · jednorázový Cold Shock (HMK 185)</h3>
+ <p class="hc-hint">Pouze pokud GM potvrdí skutečné, právě proběhlé ponoření. Cold Shock není běžný Exposure Course: po skutečných 3d6 kolech ponoření se jednou hází Endurance d100. Výsledek a Shock se uloží s aktuálním časem. Dlouhodobá Cold Exposure je samostatná událost, kterou nenahrazujeme vymyšleným hodem.</p>
+ <form data-skill-cold-shock data-gm-immersion="yes"><input type="hidden" name="actorId" value="${esc(actor.id)}"><input type="hidden" name="sourceId" value="${esc('gm-cold-immersion:'+uuid())}">
+ <div class="hsk-exposure-roll-grid"><label data-hmk-help="HMK 185: GM určí skutečnou teplotu vody. Chladná voda = SHK5, studená = SHK6, ledová = SHK7. Cold Shock pouze při skutečném ponoření, nikoli při dešti nebo běžném pobytu v chladu." tabindex="0">Teplota skutečné vody<select name="condition"><option value="coolWater">Chladná voda · SHK5</option><option value="coldWater">Studená voda · SHK6</option><option value="freezingWater">Ledová voda · SHK7</option></select></label>
+ ${[1,2,3].map(i=>`<label data-hmk-help="Tento d6 je ${i}. část skutečného 3d6: součet určí počet bojových kol ponoření do jednorázového Endurance hodu. Nejde o minuty ani opakovanou expozici." tabindex="0">Skutečný d6 č. ${i}<input name="d6_${i}" type="number" min="1" max="6" required inputmode="numeric"></label>`).join('')}
+ <label data-hmk-help="Po skutečných 3d6 kolech ponoření proveďte právě jeden nový Endurance d100 vůči END × 5 (s příslušnou Fatigue). CF +2 SHK; F +1; S +0; CS −1 (HMK 185)." tabindex="0">Cold Shock · Endurance d100<input name="enduranceD100" type="number" min="1" max="100" required inputmode="numeric"></label></div>
+ <button type="submit" ${allowed?'':'disabled'}>GM: zapsat skutečné ponoření a Cold Shock</button>
+ ${allowed?'':'<p class="hc-hint">Nejdříve přidejte postavu do aktuální kampaně a vytvořte Kalendář.</p>'}
+ <output role="status" aria-live="polite"></output></form></section>`;
+}
 function hskTrekkingColdShockForm(entry){
  // An external episode must use its own stable medical source ID for both
  // Cold Shock and Cold Exposure. The legacy proof-ID form cannot complete it.
@@ -11047,13 +11065,22 @@ function hskTrekkingColdShockForm(entry){
   j.calendarTimeEpisode?.weatherAftercare==='external-v93.676'&&
   j.calendarTimeEpisode.weatherExposure?.some(w=>w.exposed&&w.id===entry.characterId&&w.proofId===entry.id)))return '';
  const p=entry?.skillTestProof,r=p?.a||p?.result,sk=p?.skills?.[0]||p?.skill;
+ // A generic Endurance/Survival skill receipt is NOT evidence of immersion.
+ // In minute-based Trekking the episode-linked form below has the authoritative
+ // water condition. Legacy watches may offer this only when their weather
+ // record explicitly proves a water immersion, never for an unrelated test.
+ const link=entry?.calendarTrekSkillSource;
+ const watch=link?.sourceId?data.journal.find(j=>j.id===link.sourceId&&j.calendarCampaignId===entry.calendarCampaignId)?.calendarTrekProof:null;
+ const confirmedWater=link?.hazard==='weather'&&watch?.weatherWatch?.hazard==='cold'&&
+  ['coolWater','coldWater','freezingWater'].includes(watch.weatherWatch.coldCondition);
+ if(!confirmedWater)return '';
  if(!['Endurance','Survival'].includes(sk)||!['CF','F','S','CS'].includes(r?.level)||
   !['secondary-mastery-value-test','secondary-mastery-test','assistance-success-test'].includes(p?.type)||
   data.journal.some(j=>j.skillTestProof?.type==='skill-cold-water-shock'&&j.skillTestProof.sourceId===entry.id))return '';
  return `<details class="hsk-climb-fall"><summary>Studená voda · Cold Shock před expozicí · HMK str.185</summary>
  <form data-skill-cold-shock><input type="hidden" name="sourceId" value="${esc(entry.id)}">
  <p>Pouze při doloženém skutečném ponoření do studené vody. Po fyzických 3d6 kolech se provede jednorázový Endurance test; výsledný Shock se zapíše a případná další Cold Exposure následuje samostatně.</p>
- <div class="field-grid"><label>Teplota vody<select name="condition"><option value="coolWater">Cool Water · SHK5</option><option value="coldWater">Cold Water · SHK6</option><option value="freezingWater">Freezing Water · SHK7</option></select></label>
+ <div class="field-grid"><label data-hmk-help="Doložená teplota vody je převzata z původního cestovního Weather dokladu. GM ji při vyhodnocení stejného ponoření znovu nevybírá." tabindex="0">Doložená teplota vody<input name="condition" type="hidden" value="${esc(watch.weatherWatch.coldCondition)}"><output>${esc(({coolWater:'Chladná voda · SHK5',coldWater:'Studená voda · SHK6',freezingWater:'Ledová voda · SHK7'})[watch.weatherWatch.coldCondition])}</output></label>
  ${[1,2,3].map(i=>`<label>d6 č. ${i}<input name="d6_${i}" type="number" min="1" max="6" required></label>`).join('')}
  <label>Endurance d100<input name="enduranceD100" type="number" min="1" max="100" required></label></div>
  <button type="submit">Vyhodnotit a uložit Cold Shock</button><output role="status" aria-live="polite"></output></form></details>`;
@@ -11275,31 +11302,73 @@ document.addEventListener('input',event=>{
  }
  hskSkinRefresh(form);
 },true);
+/** The calendar owns all elapsed minutes and determines which course is due.
+ * Previewing a continuous exposure is never itself permission to roll d100.
+ */
+const HSK_EXPOSURE_HELP_93726=Object.freeze({
+ warming:'HMK 185: zahajuje léčbu chladu až po skutečném vyvedení z chladu a vody. Od této minuty běží Warming (zahřívání), Healing Base × 5 každé 2 hodiny až do HR6. Je to vědomé rozhodnutí GM; samotné otevření formuláře nic nezapíše.',
+ compress:'HMK 185: zahajuje léčbu horka po odstranění ze slunečního záření. Compress = obklady a Healing Base × 5 každých 15 minut; při skutečném chlazení chladnou vodou každých 5 minut. Další hody plánuje Kalendář.',
+ removed:'Toto není údaj odvozovaný z inventáře ani hod kostkou. GM potvrdí skutečnou změnu prostředí: při chladu postava není nadále vystavena původnímu chladu ani studené vodě, při horku je mimo přímé slunce. Bez splnění podmínky nemůže začít Healing.',
+ water:'Pouze Heat Exposure při skutečném chlazení chladnou vodou: Compress Healing po 5 minutách místo běžných 15 (HMK 185). Neznamená ponoření do ledové vody a nevyvolává Cold Shock.',
+ start:'Kliknutí na Zahájit léčbu potvrdí doložené vyvedení z expozice a v aktuální minutě vytvoří počátek Warming/Compress. Žádný Course d100 se teď nehází a Kalendář se tímto tlačítkem neposune.',
+ method:'Exposure Advance: postava je stále vystavena příčině; d100 proti Healing Base × aktuální HR na konci každého pravidlového intervalu. Exposure Healing: po doloženém vyvedení a zahájení Warming/Compress se hází d100 proti Healing Base × 5 v intervalu léčby. Jeden hod nikdy nenahrazuje druhý.',
+ elapsed:'Toto je skutečná doba mezi doloženým začátkem expozice a nynějším okamžikem Kalendáře. Aplikace ji počítá sama. Vnitřní počet intervalů se může lišit při Critical Success, který vynechá další Course; fyzický čas se ale nepřepisuje.',
+ die:'Skutečný nový d100 se zpřístupní až přesně v okamžiku, kdy Kalendář označí daný Exposure Advance nebo Healing za splatný. Nelze přenést starý hod ani vyplňovat dopředu.',
+ course:'Toto tlačítko zapíše jediný skutečně splatný Course/Healing d100, upraví HR a případný Shock/Weakness. Uložený doklad má vlastní zdrojové ID a při obnově se neopakuje.'
+});
 function hskTrekkingWeatherTreatmentForms(actorId){
  const actor=character(actorId);if(!actor)return '';
- return (persistentStateOf(actor).environmentalHazards||[]).filter(h=>h.active&&!h.treatmentStarted).map(h=>`
- <details class="hsk-climb-fall"><summary>Zahájit ${h.kind==='cold'?'Warming':'Compress'} · ${h.kind==='cold'?'Cold':'Heat'} Exposure · HMK 185</summary>
- <form data-skill-weather-treatment><input type="hidden" name="sourceId" value="${esc(h.sourceId)}">
- <p>GM zaznamená skutečný začátek léčby při aktuálním čase kalendáře. Bez nového d100; původní Course se nahradí novou lhůtou od této minuty.</p>
- <label><input name="removedFromHazard" type="checkbox" required> GM potvrdil vyvedení z ${h.kind==='cold'?'chladu a vody':'přímého slunce'}</label>
- ${h.kind==='heat'?'<label><input name="coolWater" type="checkbox"> Compress při chlazení vodou (každých 5 minut místo 15)</label>':''}
- <label><input name="gmSameMinuteFirst" type="checkbox"> Pokud je současně splatný Exposure Advance, GM výslovně volí nejprve Warming/Compress v téže minutě</label>
- <button type="submit">Potvrdit zahájení léčby a přepočítat kalendář</button>
- <output role="status" aria-live="polite"></output></form></details>`).join('');
+ const clock=data.campaignClock;
+ return (persistentStateOf(actor).environmentalHazards||[]).filter(h=>h.active&&!h.treatmentStarted).map(h=>{
+  const origin=clock?getCampaignEpisodeAnchor(clock,'weather',actor.id,h.id):null;
+  const ready=!!clock&&!!origin&&clock.minute>=origin.minute;
+  const kind=h.kind==='cold';
+  const treatment=kind?'Warming':'Compress';
+  const due=clock?campaignCalendarAgenda(clock,data.characters,data.journal).all.find(x=>x.kind==='weather-course'&&x.characterId===actor.id&&x.sourceId===h.sourceId):null;
+  return `<details class="hsk-climb-fall hsk-exposure-card"><summary>Zahájit ${treatment} · ${kind?'Cold':'Heat'} Exposure · HMK 185</summary>
+   <form data-skill-weather-treatment><input type="hidden" name="sourceId" value="${esc(h.sourceId)}">
+   <p class="hc-hint">${esc(displayCampaignMinute(clock?.minute??0))} · Tento krok není další Course hod. GM může zahájit léčbu, jakmile postava skutečně opustí nebezpečné podmínky; počátek a další termíny určí Kalendář.</p>
+   ${due&&due.minute===clock?.minute?'<p class="hc-hint">Ve stejné minutě je také splatný Exposure Advance. Potvrzením tohoto tlačítka GM volí nejprve zahájení léčby; alternativně lze nejdřív provést splatný Course.</p>':''}
+   <div class="hsk-exposure-choice" data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.removed)}" tabindex="0">
+    <label class="hsk-exposure-check"><input name="removedFromHazard" type="checkbox" required> <span><strong>Skutečně vyvedeno z ${kind?'chladu a vody':'přímého slunce'}</strong><small>GM potvrdí změnu prostředí; bez ní nelze zahájit Healing.</small></span></label>
+   </div>
+   ${kind?'':`<div class="hsk-exposure-choice" data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.water)}" tabindex="0"><label class="hsk-exposure-check"><input name="coolWater" type="checkbox"><span><strong>Compress s chlazením chladnou vodou</strong><small>Skutečné chlazení: kontrola po 5 místo 15 minutách.</small></span></label></div>`}
+   <p class="hc-hint" data-hmk-help="${esc(kind?HSK_EXPOSURE_HELP_93726.warming:HSK_EXPOSURE_HELP_93726.compress)}" tabindex="0">${kind?'Warming: HB × 5 jednou za 120 minut.':'Compress: HB × 5 každých 15 minut, nebo každých 5 při skutečném chlazení vodou.'}</p>
+   <button type="submit" ${ready?'':'disabled'} data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.start)}">Zahájit ${treatment} v aktuální minutě</button>
+   ${!ready?'<p class="hc-hint">Chybí platná kalendářová kotva této expozice; čas nelze domýšlet.</p>':''}
+   <output role="status" aria-live="polite"></output></form></details>`;
+ }).join('');
 }
 function hskTrekkingWeatherCourseForms(actorId){
  const actor=character(actorId);if(!actor)return '';
  const state=persistentStateOf(actor),active=(state.environmentalHazards||[]).filter(x=>x.active);
- return active.map(h=>`<details class="hsk-climb-fall"><summary>${h.kind==='cold'?'Cold':'Heat'} Exposure · HR${h.hr} · pokračování, HMK str.185</summary>
- <form data-skill-weather-course><input type="hidden" name="sourceId" value="${esc(h.sourceId)}">
- <p>Trvající expozice: HR${h.hr}, interval ${h.periodMinutes} minut; naposledy potvrzeno ${h.lastElapsedMinutes} minut od začátku. ${h.skinPending?'<strong>Neuzavřené samostatné poranění '+esc(h.skinPending)+' – vyžaduje anatomické vyhodnocení GM.</strong>':''}</p>
- <div class="field-grid"><label>Pravidlová procedura: ${h.treatmentStarted?'Exposure Healing':'Exposure Advance'}<input type="hidden" name="method" value="${h.treatmentStarted?'healing':'advance'}"></label>
- <label>Skutečně uběhlé minuty od začátku expozice<input type="number" name="elapsedMinutes" min="1" required></label>
- <label>Nový Course/Healing d100<input type="number" name="roll" min="1" max="100" required></label>
- <label><input type="checkbox" name="removedFromHazard" ${h.treatmentStarted?'checked':''}> Vyvedeno z chladu/horka (povinné pro Healing)</label>
- <label><input type="checkbox" name="coolWater" ${h.kind==='heat'&&h.treatmentStarted&&h.healingIntervalMinutes===5?'checked':''}> Chlazeno ve vodě (jen Heat Healing; zkrácený interval)</label></div>
- <button type="submit">Vyhodnotit další období expozice</button><output role="status" aria-live="polite"></output>
- </form></details>`).join('');
+ const clock=data.campaignClock;
+ const agenda=clock?campaignCalendarAgenda(clock,data.characters,data.journal):null;
+ return active.map(h=>{
+  const due=agenda?.all.find(x=>x.kind==='weather-course'&&x.characterId===actor.id&&x.sourceId===h.sourceId)||null;
+  const origin=clock?getCampaignEpisodeAnchor(clock,'weather',actor.id,h.id):null;
+  const elapsedActual=origin&&clock?clock.minute-origin.minute:null;
+  const ready=!!clock&&!!due&&due.minute===clock.minute;
+  const method=h.treatmentStarted?'healing':'advance';
+  const methodLabel=h.treatmentStarted?'Exposure Healing':'Exposure Advance';
+  const period=h.treatmentStarted?h.healingIntervalMinutes:h.periodMinutes;
+  const label=h.kind==='cold'?'Cold':'Heat';
+  return `<details class="hsk-climb-fall hsk-exposure-card" ${ready?'open':''}><summary>${label} Exposure · HR${h.hr} · ${ready?'splatný '+methodLabel:'následující kontrola'} · HMK 185</summary>
+   <p class="hc-hint">Aktivní ${label} Exposure. ${h.treatmentStarted?'Warming/Compress byl zahájen a platí režim Healing.':'Nebylo zahájeno Warming/Compress: stále platí původní Exposure Advance.'} ${h.skinPending?'<strong>Ještě je třeba vyřešit '+esc(h.skinPending)+' v anatomickém formuláři.</strong>':''}</p>
+   <div class="hsk-exposure-readout">
+    <div data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.method)}" tabindex="0"><span>Pravidlový postup</span><strong>${methodLabel}</strong></div>
+    <div data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.elapsed)}" tabindex="0"><span>Skutečně uběhlý čas (Kalendář)</span><strong>${elapsedActual===null?'Neověřeno':elapsedActual+' minut'}</strong></div>
+    <div data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.die)}" tabindex="0"><span>Další kontrola d100</span><strong>${due?esc(displayCampaignMinute(due.minute)):'Chybí časová kotva'}</strong></div>
+    <div tabindex="0" data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.method)}"><span>Pravidlový interval</span><strong>${Number.isInteger(period)?period+' minut':'Neověřeno'}</strong></div>
+   </div>
+   ${ready?`<form data-skill-weather-course><input type="hidden" name="sourceId" value="${esc(h.sourceId)}"><input type="hidden" name="method" value="${method}">
+    <p class="hc-hint">Nyní je splatná právě tato kontrola. Skutečné minuty i režim jsou převzaty z Kalendáře a nelze je měnit. ${h.treatmentStarted?'Vyvedení z nebezpečí a případné chlazení už bylo potvrzeno při zahájení léčby.':'Pro Advance není potřeba zaškrtávat vyvedení ani chlazení.'}</p>
+    <div class="hsk-exposure-roll-row"><label data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.die)}" tabindex="0">Nový skutečný ${methodLabel} d100<input type="number" name="roll" min="1" max="100" inputmode="numeric" required></label>
+    <button type="submit" data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.course)}">Vyhodnotit právě splatný d100</button></div>
+    <output role="status" aria-live="polite"></output></form>`:
+    `<p class="hsk-exposure-wait" role="status">${due&&clock&&due.minute>clock.minute?'Další hod ještě není splatný. Před tímto termínem není možné zadávat kostku ani vytvářet další Course.':due&&clock&&due.minute<clock.minute?'Termín již uplynul; je potřeba zkontrolovat časovou osu, nelze zpětně vymyslet hod.':'Nejdříve musí být doložena časová kotva v Kalendáři.'}</p>`}
+   </details>`;
+ }).join('');
 }
 /** Environmental medical continuations have a dedicated Health/Exposure
  * chapter. They still use the EXACT original Skill/Calendar/CombatState
@@ -12364,16 +12433,24 @@ document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-skill-cold-shock]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
  try{
+  const manual=form.dataset.gmImmersion==='yes';
+  const clock=data.campaignClock;
   const sourceId=form.elements.namedItem('sourceId').value;
-  const episodeId=form.elements.namedItem('episodeId')?.value||null;
+  const episodeId=manual?null:form.elements.namedItem('episodeId')?.value||null;
   const receipt=episodeId?data.journal.find(j=>j.id===episodeId):null;
   const episode=receipt?.calendarTimeEpisode;
   const condition=form.elements.namedItem('condition').value;
   const linked=episodeId?episode?.weatherExposure?.find(w=>w.kind==='cold'&&w.exposed===true&&
    episodeWeatherAftercareId(episodeId,w.id,w.kind)===sourceId):null;
-  const src=data.journal.find(x=>x.id===(linked?.proofId||sourceId)),proof=src?.skillTestProof;
-  const actor=character(proof?.actorId),result=proof?.a||proof?.result;
-  if(!actor||actor.id!==src.characterId||
+  const src=manual?null:data.journal.find(x=>x.id===(linked?.proofId||sourceId)),proof=src?.skillTestProof;
+  const actor=manual?character(form.elements.namedItem('actorId').value):character(proof?.actorId),
+   result=proof?.a||proof?.result;
+  if(manual){
+   if(!/^gm-cold-immersion:[a-z0-9._:-]{10,}$/i.test(sourceId))throw Error('Chybí jedinečný doklad skutečného ponoření');
+   if(!clock||!actor||actor.id!==selected||!calendarMemberIds(clock,data.characters).some(x=>x.id===actor.id)||
+    view!=='sheet'||activeSheetSection!=='hazards'||hazardComposer?.kind!=='cold-water'||hazardComposer.actorId!==actor.id)
+    throw Error('Jednorázový Cold Shock smí zahájit GM jen pro přítomnou postavu v aktuálním čase kampaně.');
+  }else if(!actor||actor.id!==src.characterId||
    !['CF','F','S','CS'].includes(result?.level)||
    !['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill))throw Error('Nedoložený původní Cold Hazard');
   if(episodeId&&(!linked||linked.id!==actor.id||linked.proofId!==src.id||
@@ -12391,10 +12468,12 @@ document.addEventListener('submit',event=>{
    if(data.journal.some(x=>x.skillTestProof?.type==='skill-cold-water-shock'&&x.skillTestProof.sourceId===sourceId))throw Error('Opakovaný Cold Shock');
    synchronizeCombatInjuries(actor,outcome.state);
    data.journal.push({id:uuid(),characterId:actor.id,title:'Cold Shock · HMK str.185',
+    ...(manual?{calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute}:{}),
     ...(episodeId?{calendarCampaignId:receipt.calendarCampaignId,campaignMinute:episode.endMinute}:{}),
     body:'3d6: '+outcome.report.immersionRounds+' kol · Endurance '+outcome.report.enduranceD100+' → '+outcome.report.sl+' · SHK '+outcome.report.index+' · '+outcome.report.shock,
     createdAt:stamp(),skillTestProof:{type:'skill-cold-water-shock',sourceId,actorId:actor.id,report:outcome.report,
-     ...(episodeId?{episodeId,originalSkillProofId:src.id}: {})}});
+     ...(manual?{gmImmersionConfirmed:true,campaignMinute:clock.minute}:{}),
+    ...(episodeId?{episodeId,originalSkillProofId:src.id}: {})}});
   }))throw Error('Cold Shock nebyl uložen');
   form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Cold Shock uložen jako Weather zdravotní událost; případný Shock Reroll řešte ve Zdraví & Expozice.'}));
  }catch(e){if(out)out.textContent='Cold Shock nebyl zapsán: '+e.message;}
@@ -12738,8 +12817,8 @@ document.addEventListener('submit',event=>{
   const agenda=campaignCalendarAgenda(clock,data.characters,data.journal);
   const pending=agenda.all.find(x=>x.kind==='weather-course'&&x.characterId===actor.id&&x.sourceId===sourceId);
   if(!pending||pending.minute<clock.minute)throw Error('Dříve splatný Exposure Course je nutné nejprve samostatně vyhodnotit');
-  if(pending.minute===clock.minute&&!form.elements.namedItem('gmSameMinuteFirst').checked)
-   throw Error('Ve stejné minutě musí GM určit, zda první proběhne Warming/Compress nebo Exposure Advance');
+  // Clicking start is the explicit GM choice to begin treatment before
+  // another Course due in the same minute. No second confirmation checkbox.
   const elapsedMinutes=clock.minute-origin.minute;
   const outcome=startTrekkingWeatherExposureTreatment({state:orig,sourceId,
    round:Math.max(1,combatClock.round||1,orig.lastRound||0),elapsedMinutes,
@@ -12778,23 +12857,26 @@ document.addEventListener('submit',event=>{
   if(!actor||onset.skillTestProof.actorId!==actor.id)
    throw Error('Chybí ověřený původ expozice');
   if(combatActorLocked93725(actor.id))throw Error('Combat State účastníka boje nelze obejít');
-  const elapsedMinutes=Number(form.elements.namedItem('elapsedMinutes').value);
-  if(data.campaignClock){
-   const camp=campaignKey(data.campaignClock);
-   const due=onset.calendarCampaignId===camp?
-    campaignCalendarAgenda(data.campaignClock,data.characters,data.journal).all.find(x=>
-     x.kind==='weather-course'&&x.characterId===actor.id&&x.sourceId===sourceId):null;
-   if(!due||due.minute!==data.campaignClock.minute||due.elapsedMinutes!==elapsedMinutes||
-     due.method!==form.elements.namedItem('method').value)
-    throw Error('Exposure Course vyžaduje přesný splatný termín a režim Kalendáře; předčasný ani přeskočený hod nelze potvrdit.');
-  }
-  const orig=persistentStateOf(actor),outcome=advanceTrekkingWeatherExposure({state:orig,actor,sourceId,
-   round:Math.max(1,combatClock.round||1,orig.lastRound||0),method:form.elements.namedItem('method').value,
+  const clock=data.campaignClock;
+  if(!clock||onset.calendarCampaignId!==campaignKey(clock))
+   throw Error('Exposure Course vyžaduje ověřený Kalendář odpovídající původnímu dokladu.');
+  const due=campaignCalendarAgenda(clock,data.characters,data.journal).all.find(x=>
+   x.kind==='weather-course'&&x.characterId===actor.id&&x.sourceId===sourceId);
+  const orig=persistentStateOf(actor);
+  const h=orig.environmentalHazards?.find(x=>x.active&&x.sourceId===sourceId);
+  const method=h?.treatmentStarted?'healing':'advance';
+  if(!due||!h||due.minute!==clock.minute||due.method!==method||
+   due.elapsedMinutes!==h.lastElapsedMinutes+(method==='healing'?h.healingIntervalMinutes:h.periodMinutes))
+   throw Error('Tento d100 ještě není splatný nebo bylo mezitím změněno časování expozice.');
+  // Only the calendar owns elapsed minutes. No form field or checkbox may
+  // override the previously recorded treatment mode and cool-water evidence.
+  const elapsedMinutes=due.elapsedMinutes;
+  const outcome=advanceTrekkingWeatherExposure({state:orig,actor,sourceId,
+   round:Math.max(1,combatClock.round||1,orig.lastRound||0),method,
    elapsedMinutes,roll:Number(form.elements.namedItem('roll').value),
-   gmConfirmed:true,
-   removedFromHazard:form.elements.namedItem('removedFromHazard').checked,
-   treatmentConfirmed:!!orig.environmentalHazards?.find(x=>x.sourceId===sourceId)?.treatmentStarted,
-   coolWater:form.elements.namedItem('coolWater').checked});
+   gmConfirmed:true,removedFromHazard:!!h.treatmentStarted,
+   treatmentConfirmed:!!h.treatmentStarted,
+   coolWater:h.kind==='heat'&&!!h.treatmentStarted&&h.healingIntervalMinutes===5});
   if(!mutate(()=>{
    synchronizeCombatInjuries(actor,outcome.state);
    data.journal.push({id:uuid(),characterId:actor.id,
@@ -16881,7 +16963,7 @@ document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-hazard-create]');if(!btn)return;
  e.preventDefault();e.stopImmediatePropagation();
  const kind=btn.dataset.hazardCreate;
- if(view!=='sheet'||activeSheetSection!=='hazards'||!character(selected)||!['fire','poison','disease','sleep'].includes(kind))return;
+ if(view!=='sheet'||activeSheetSection!=='hazards'||!character(selected)||!['fire','cold-water','poison','disease','sleep'].includes(kind))return;
  hazardComposer={actorId:selected,kind};render();
 },true);
 // Calendar subsections are view state only: never affect GM clock or evidence.

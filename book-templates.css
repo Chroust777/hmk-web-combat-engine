@@ -7220,3 +7220,24 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .journal-wound-meaning[data-hmk-help],form[data-skill-weather-skin] [data-hmk-help]{cursor:help}
 .journal-wound-meaning:focus-visible,form[data-skill-weather-skin] [data-hmk-help]:focus-visible{outline:2px solid #886542;outline-offset:2px}
 .hc-health-result{border:1px solid #b49968;background:#e9e0ca;color:#40301e;padding:.7rem .85rem;border-radius:5px;line-height:1.45;margin:.5rem 0 1rem}
+
+/* v93.726 – Weather Exposure is a calendar-driven, responsive single action. */
+.hsk-exposure-card{max-width:100%;min-width:0}
+.hsk-exposure-card>summary{line-height:1.4}
+.hsk-exposure-readout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem;margin:.7rem 0 1rem}
+.hsk-exposure-readout>div{display:flex;flex-direction:column;gap:.2rem;min-width:0;padding:.65rem .75rem;border:1px solid rgba(106,80,48,.27);border-radius:8px;background:rgba(255,249,233,.45)}
+.hsk-exposure-readout span{font-size:.84em;color:#705238}
+.hsk-exposure-readout strong{overflow-wrap:anywhere;font-size:.96em}
+.hsk-exposure-readout [data-hmk-help],.hsk-exposure-card [data-hmk-help]{cursor:help}
+.hsk-exposure-choice{margin:.65rem 0;padding:.6rem .7rem;border:1px solid rgba(106,80,48,.28);border-radius:8px;background:rgba(255,249,233,.38)}
+.hsk-exposure-check{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:.8rem;margin:0!important;cursor:pointer}
+.hsk-exposure-check input{flex:0 0 auto;width:18px;height:18px;margin:.2rem 0 0}
+.hsk-exposure-check span{display:flex;flex-direction:column;gap:.24rem;min-width:0}
+.hsk-exposure-check small{line-height:1.4;font-size:.82em;opacity:.85}
+.hsk-exposure-roll-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;align-items:end}
+.hsk-exposure-roll-row label{margin:0;min-width:0}
+.hsk-exposure-roll-row button{margin:0 0 .1rem;max-width:100%}
+.hsk-exposure-roll-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.hsk-exposure-roll-grid label{min-width:0}
+.hsk-exposure-wait{padding:.6rem .75rem;border-left:3px solid #8c7150;background:rgba(254,249,236,.5);line-height:1.55}
+@media(max-width:650px){.hsk-exposure-readout,.hsk-exposure-roll-grid,.hsk-exposure-roll-row{grid-template-columns:minmax(0,1fr)}.hsk-exposure-roll-row button{width:100%}}
