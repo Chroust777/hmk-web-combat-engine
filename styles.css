@@ -536,3 +536,11 @@ form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;
 .hc-medical-time-table td{font-variant-numeric:tabular-nums}
 .hc-medical-time-table td small{display:block;font-weight:400;color:#66593f;margin-top:.25rem}
 .hc-medical-time-table td .hc-small{margin:.1rem .1rem .1rem 0}
+
+/* v93.729: 24-hour weather timeline remains readable on narrow screens. */
+.hc-weather-timeline{margin:.65rem 0 1rem;max-width:100%;overflow:hidden;}
+.hc-weather-timeline .hc-episode-table-scroll{max-width:100%;overflow-x:auto;}
+.hc-episode-weather-timeline{border-collapse:collapse;width:100%;font-size:.84rem;}
+.hc-episode-weather-timeline th,.hc-episode-weather-timeline td{border:1px solid var(--border,#b4bec6);padding:.4rem .55rem;text-align:left;white-space:nowrap;}
+.hc-episode-weather-timeline tbody tr.hc-weather-timeline-hazard{font-weight:600;}
+.hc-weather-timeline .hc-hint{font-size:.82rem;}

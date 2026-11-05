@@ -178,6 +178,7 @@ import {eligibleRestingAnimals,planAnimalRest} from './src/integration/hmk-trekk
 import {ANIMAL_AREA_AV,weatherAnimalCandidates,prepareAnimalTrekkingWeather,validateAnimalWeatherJournal} from './src/integration/hmk-trekking-animal-weather.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekWeatherReference,trekAvailableTerrain,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence,assertTrekDailyWeatherAppendOnly} from './src/integration/hmk-trekking-routine.js';
+import {weather24HourTimeline,trekkingDaylightSeason} from './src/integration/hmk-episode-weather-timeline.js';
 import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-scope.js';
 import {EPISODE_FORMAT,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry} from './src/integration/hmk-time-episodes.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
@@ -318,7 +319,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.728';
+const APP_VERSION='93.729';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1884,28 +1885,58 @@ function trekWeatherWords(w,night=false){
 }
 function trekWeatherDetailsHTML(w){
  const day=trekWeatherWords(w,false),night=trekWeatherWords(w,true);
- return `<span data-hmk-help="HMK str. 144: d10 neurčuje stupně Celsia ani mm deště. Teplotní hazard je pravidlová kategorie. Intenzitu/trvání srážek určí až d6 pro každou příslušnou hlídku." tabindex="0">Den: ${esc(day.temperature)}; ${esc(day.kind)}. Noc: ${esc(night.temperature)}; ${esc(night.kind)}.</span>`;
+ return `<span data-hmk-help="HMK str. 144: d10 neurčuje stupně Celsia ani mm deště. Teplotní hazard je pravidlová kategorie. Nepřetržitost srážek určí doplňující d6 pro skutečný časový interval zvolené činnosti." tabindex="0">Den: ${esc(day.temperature)}; ${esc(day.kind)}. Noc: ${esc(night.temperature)}; ${esc(night.kind)}.</span>`;
+}
+function weatherDayTimelineHTML(day,{latitudeBand='mid',daylightSeason=null,sunriseMinute=null,twilightMinutes=60}={}){
+ if(!day)return '';
+ const lightSeason=daylightSeason||day.season;
+ const duration=EPISODE_DAYLIGHT_HOURS[latitudeBand]?.[lightSeason];
+ if(!duration)return '<p class="hc-hint">Pro časový přehled vyberte šířkové pásmo a datum.</p>';
+ const sunrise=Number.isSafeInteger(sunriseMinute)?sunriseMinute:Math.round(720-duration*30);
+ const t=weather24HourTimeline({weather:day,latitudeBand,daylightSeason:lightSeason,sunriseMinute:sunrise,twilightMinutes});
+ const fmt=n=>`${String(Math.floor(n/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;
+ const hazardLabel={cold:'Cold Hazard',heat:'Heat Hazard'};
+ const precipitationLabel={none:'Bez srážek',rain:'Déšť',snow:'Sníh',sleet:'Déšť se sněhem / mrznoucí déšť'};
+ const periodLabel={day:'Den',twilight:'Soumrak',night:'Noc'};
+ const danger=t.changes.length?'Změny klasifikace v '+t.changes.map(x=>fmt(x.minute)).join(', ')+'.':'Počasí se při přechodu mezi světlem a tmou v kategoriích nemění.';
+ return `<div class="hc-weather-timeline"><p><strong>24 hodin z jediné dvojice denních d10.</strong> Teplota d10 ${day.temperatureD10}; úprava den ${day.adjustedDayTemperature}, noc ${day.adjustedNightTemperature} (noční rozdíl ${t.nightModifier}); srážky d10 ${day.precipitationD10} → ${day.precipitationRoll} / TN ${day.precipitationTN}. <strong>${esc(danger)}</strong></p>
+ <div class="hc-episode-table-scroll"><table class="hc-episode-weather-timeline"><thead><tr><th>Čas</th><th>Část dne</th><th>Světlo</th><th>Teplota d10 po úpravách</th><th>Teplotní následek</th><th>Druh srážek</th></tr></thead>
+ <tbody>${t.rows.map(r=>`<tr${r.hazard?' class="hc-weather-timeline-hazard"':''}><td>${fmt(r.start)}–${fmt(r.end)}</td><td>${r.daypart}</td><td>${periodLabel[r.period]}</td><td>${r.adjustedTemperature}</td><td>${hazardLabel[r.hazard]||'Bez hazardu'}</td><td>${precipitationLabel[r.precipitation]}</td></tr>`).join('')}</tbody></table></div>
+ <p class="hc-hint">HMK 142/144: klimatický postih platí jen ve skutečné noci; při soumraku se používá denní teplota. Délka dne odpovídá ročnímu období a šířce; východ slunce ${fmt(sunrise)} a soumrak ${twilightMinutes} min jsou <strong>orientační nastavení</strong>, nikoliv přesný údaj HMK. Doplňující srážkový d6 se vyhodnotí pro skutečný časový interval zvolený uživatelem.</p></div>`;
+}
+function updateTrekGlobalWeatherPreview(form){
+ const out=form?.querySelector('[data-trek-global-weather-preview]');if(!out||!data.campaignClock)return;
+ try{
+  const v=Object.fromEntries(new FormData(form));let season=v.season;
+  const tr=campaignTRDate(data.campaignClock,data.campaignClock.minute);
+  if(season==='auto'){if(!tr)throw Error('Bez data TR určete roční období ručně.');season=trekSeasonFromMonth(tr.month);}
+  if(!String(v.temperature||'').trim()||!String(v.precipitation||'').trim()){out.innerHTML='<p class="hc-hint">Po obou denních d10 se zobrazí celý 24hodinový průběh včetně změn v noci.</p>';return;}
+  const day=trekWeatherDay({season,climate:v.climate,landscape:v.landscape,alpine:v.alpine==='yes',aridDesert:v.aridDesert==='yes',temperatureD10:Number(v.temperature),precipitationD10:Number(v.precipitation)});
+  const lightSeason=tr?trekkingDaylightSeason(tr.month,tr.day):season;
+  out.innerHTML=weatherDayTimelineHTML(day,{latitudeBand:v.latitudeBand||'mid',daylightSeason:lightSeason});
+ }catch(err){out.textContent=err.message;}
 }
 function trekDailyWeatherFormHTML(clock){
  const id=campaignKey(clock),di=Math.floor(clock.minute/1440),end=(di+1)*1440;
  const rows=activeWeatherAreas(data.journal,id,di);
  const remaining=end-clock.minute,hours=Math.floor(remaining/60),mins=remaining%60;
  return `<section class="hc-calendar hc-trek-global-weather"><details open><summary>Denní počasí kampaně · HMK 144</summary>
- <p class="hc-hint">Každá oblast má jednu platnou dvojici hodů d10 za kalendářní den (00:00–24:00). HMK neudává °C ani intenzitu deště v mm. Následující d6 na nepřetržité srážky se vyhodnocuje až v konkrétní hlídce. GM může odvolat současné počasí kdykoliv během dne. Původní hody a dokončené účinky zůstanou v historii; probíhající cesta se od této minuty rozdělí a pro zbývající úsek se vybere nové počasí.</p>
+ <p class="hc-hint">Každá oblast má jednu platnou dvojici hodů d10 za kalendářní den (00:00–24:00). HMK neudává °C ani intenzitu deště v mm. Následující d6 na nepřetržité srážky se vyhodnocuje až v uživatelem zvoleném časovém intervalu. GM může odvolat současné počasí kdykoliv během dne. Původní hody a dokončené účinky zůstanou v historii; probíhající cesta se od této minuty rozdělí a pro zbývající úsek se vybere nové počasí.</p>
  <form data-trek-global-weather novalidate><div class="hmk-trek-grid">
  <label>Oblast / trasa<input name="area" maxlength="90" required placeholder="Např. Východní les"></label>
  <label>Roční období<select name="season"><option value="auto">Z data TR</option><option value="spring">Jaro</option><option value="summer">Léto</option><option value="autumn">Podzim</option><option value="winter">Zima</option></select></label>
+ <label>Šířkové pásmo pro rozdělení dne a noci<select name="latitudeBand"><option value="mid">Střední</option><option value="high">Vysoká</option><option value="polar">Polární</option><option value="low">Nízká</option></select></label>
  <label>Klima<select name="climate"><option value="subpolar">Subpolární</option><option value="cool" selected>Mírné chladné</option><option value="warm">Mírné teplé</option><option value="subtropical">Subtropické</option><option value="dry-tropical">Tropické suché</option><option value="wet-tropical">Tropické vlhké</option></select></label>
  <label>Krajina / nadmořská výška<select name="landscape"><option value="flat">Rovina</option><option value="rough">Kopce</option><option value="mountain">Hory</option></select></label>
  <label class="hc-check"><input type="checkbox" name="alpine" value="yes"> Alpská nadmořská poloha (−4)</label>
  <label class="hc-check"><input type="checkbox" name="aridDesert" value="yes"> Suchá poušť (+2 srážkový hod; v létě +4 teplota)</label>
  <div class="hc-trek-shift-control hc-trek-global-die-control"><label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní teplota d10 se srovnává s tabulkou počasí (HMK 144) podle ročního období, klimatu a výšky. Nejde o °C; výsledkem je Cold / Heat Hazard nebo bez hazardu. Noc má vlastní teplotní postih bez nového denního d10.">Teplota dne · d10</span><input type="number" name="temperature" min="1" max="10" required placeholder="1–10"></label><button type="button" class="hc-small hc-trek-generate" data-trek-global-die="temperature" title="Kryptograficky hodit jednu d10 pro teplotu dne">⚄ d10</button></div>
- <div class="hc-trek-shift-control hc-trek-global-die-control"><label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní srážky d10 určují, zda v této oblasti a dni srážky nastanou. Druh může být déšť, sníh nebo plískanice podle teplotního hazardu. Zda jsou nepřetržité, určuje až d6 konkrétní čtyřhodinové hlídky (HMK 144).">Srážky dne · d10</span><input type="number" name="precipitation" min="1" max="10" required placeholder="1–10"></label><button type="button" class="hc-small hc-trek-generate" data-trek-global-die="precipitation" title="Kryptograficky hodit jednu d10 pro srážky dne">⚄ d10</button></div></div>
+ <div class="hc-trek-shift-control hc-trek-global-die-control"><label><span class="hc-help-term" tabindex="0" data-hmk-help="Denní srážky d10 určují, zda v této oblasti a dni srážky nastanou. Druh může být déšť, sníh nebo plískanice podle teplotního hazardu. Zda jsou nepřetržité, určuje doplňující d6 konkrétního časového intervalu (naše minutová adaptace HMK 144).">Srážky dne · d10</span><input type="number" name="precipitation" min="1" max="10" required placeholder="1–10"></label><button type="button" class="hc-small hc-trek-generate" data-trek-global-die="precipitation" title="Kryptograficky hodit jednu d10 pro srážky dne">⚄ d10</button></div></div>
  <div class="hc-trek-weather-actions"><button type="submit">Potvrdit denní počasí</button></div>
- <output role="status" aria-live="polite"></output></form>
+ <output role="status" aria-live="polite"></output><div data-trek-global-weather-preview aria-live="polite"><p class="hc-hint">Po obou denních d10 se zobrazí celý 24hodinový průběh.</p></div></form>
  <h4>Potvrzené oblasti · do konce dne zbývá ${hours} h ${mins} min</h4>
  ${rows.map(j=>{const w=j.calendarTrekDayWeather,allowed=canVoidWeather(data.journal,j.id,id,clock.minute);
-  return `<div class="hc-trek-weather-record"><strong>${esc(w.area)}</strong> · ${esc(displayCampaignMinute(j.campaignMinute))} · platí do ${esc(displayCampaignMinute(end))} (zbývá ${hours} h ${mins} min).<p>${trekWeatherDetailsHTML(w.weatherDay)}</p><p class="hc-hint">Teplota d10 (${w.weatherDay.temperatureD10}), srážky d10 (${w.weatherDay.precipitationD10}); klima ${esc(w.climate)}, krajina ${esc(w.landscape)}.</p>${(()=>{const shift=effectiveTrekShift(id,clock.minute,w.area);return shift?`<p><strong>Aktuálně od ${esc(displayCampaignMinute(shift.campaignMinute))} platí změna GM:</strong> ${trekWeatherDetailsHTML(shift.calendarTrekWeatherShift.weatherDay)} · do konce dne nebo další potvrzené změny.</p>${shift.campaignMinute===clock.minute&&data.journal.some(stop=>stop.calendarCampaignId===id&&stop.campaignMinute===clock.minute&&stop.calendarActivityInterruptProof?.reason?.includes('GM změnil počasí v oblasti '+w.area))?'<button type="button" class="hc-small" data-weather-shift-go-travel>Pokračovat ve zbývajícím úseku ↗</button>':''}`:'';})()}${allowed.ok?`<button type="button" class="hc-small secondary" data-trek-weather-void="${esc(j.id)}">Odvolat počasí · nové od této minuty</button>`:`<p class="hc-hint">Změna uzamčena: ${esc(allowed.reason)}</p>`}</div>`;}).join('')||'<p class="hc-hint">Pro dnešní den zatím není potvrzené žádné počasí. Potvrzení proběhne pouze tlačítkem výše.</p>'}
+  return `<div class="hc-trek-weather-record"><strong>${esc(w.area)}</strong> · ${esc(displayCampaignMinute(j.campaignMinute))} · platí do ${esc(displayCampaignMinute(end))} (zbývá ${hours} h ${mins} min).<p>${trekWeatherDetailsHTML(w.weatherDay)}</p>${weatherDayTimelineHTML(w.weatherDay,{latitudeBand:w.latitudeBand||'mid',daylightSeason:(()=>{const tr=campaignTRDate(clock,j.campaignMinute);return tr?trekkingDaylightSeason(tr.month,tr.day):w.season;})()})}<p class="hc-hint">Teplota d10 (${w.weatherDay.temperatureD10}), srážky d10 (${w.weatherDay.precipitationD10}); klima ${esc(w.climate)}, krajina ${esc(w.landscape)}.</p>${(()=>{const shift=effectiveTrekShift(id,clock.minute,w.area);return shift?`<p><strong>Aktuálně od ${esc(displayCampaignMinute(shift.campaignMinute))} platí změna GM:</strong> ${trekWeatherDetailsHTML(shift.calendarTrekWeatherShift.weatherDay)} · do konce dne nebo další potvrzené změny.</p>${shift.campaignMinute===clock.minute&&data.journal.some(stop=>stop.calendarCampaignId===id&&stop.campaignMinute===clock.minute&&stop.calendarActivityInterruptProof?.reason?.includes('GM změnil počasí v oblasti '+w.area))?'<button type="button" class="hc-small" data-weather-shift-go-travel>Pokračovat ve zbývajícím úseku ↗</button>':''}`:'';})()}${allowed.ok?`<button type="button" class="hc-small secondary" data-trek-weather-void="${esc(j.id)}">Odvolat počasí · nové od této minuty</button>`:`<p class="hc-hint">Změna uzamčena: ${esc(allowed.reason)}</p>`}</div>`;}).join('')||'<p class="hc-hint">Pro dnešní den zatím není potvrzené žádné počasí. Potvrzení proběhne pouze tlačítkem výše.</p>'}
  ${rows.length?`<details class="hc-trek-gm-weather-change"><summary>GM · změnit počasí v průběhu dne (od aktuální minuty)</summary>
  <p class="hc-hint">Volitelné rozhodnutí GM mimo standardní denní tabulku HMK 144. Základní denní hody i již proběhlé účinky zůstávají v historii. Nové podmínky platí od nynějška pro oblast až do konce dne nebo další potvrzené změny, i když družina zrovna necestuje.</p>
  <form data-trek-global-shift><div class="hmk-trek-grid"><label>Potvrzená oblast<select name="sourceId">${rows.map(j=>`<option value="${esc(j.id)}">${esc(j.calendarTrekDayWeather.area)}</option>`).join('')}</select></label>
@@ -16643,11 +16674,12 @@ function applyDeterministicCalendarOnsets(){
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-trek-global-die]');if(!btn)return;
  e.preventDefault();const form=btn.closest('form'),field=form?.elements.namedItem(btn.dataset.trekGlobalDie);
- if(!field)return;field.value=String(secureHMKDie(10));field.dataset.cryptographicValue=field.value;
+ if(!field)return;field.value=String(secureHMKDie(10));field.dataset.cryptographicValue=field.value;updateTrekGlobalWeatherPreview(form);
 },true);
 document.addEventListener('input',e=>{
- if(e.target.closest?.('form[data-trek-global-weather]')&&e.target.matches('input[type="number"]'))delete e.target.dataset.cryptographicValue;
+ if(e.target.closest?.('form[data-trek-global-weather]')){if(e.target.matches('input[type="number"]'))delete e.target.dataset.cryptographicValue;updateTrekGlobalWeatherPreview(e.target.closest('form'));}
 },true);
+document.addEventListener('change',e=>{const form=e.target.closest?.('form[data-trek-global-weather]');if(form)updateTrekGlobalWeatherPreview(form);},true);
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-trek-weather-void]');if(!button)return;
  e.preventDefault();const clock=data.campaignClock;if(!clock)return;
@@ -16749,7 +16781,7 @@ document.addEventListener('submit',e=>{
   if(!uiConfirm('Zapsat nezměnitelné denní počasí pro '+area+'? d10 teplota '+temperatureD10+', srážky '+precipitationD10+'.'))return;
   const entry={id:uuid(),characterId:calendarMemberIds(clock,data.characters)[0]?.id||'',calendarCampaignId:campaignId,campaignMinute:clock.minute,
    createdAt:stamp(),title:'HMK · Denní počasí · '+area,body:'Teplota d10 '+temperatureD10+', srážky d10 '+precipitationD10+'; HMK 144',
-   calendarTrekDayWeather:{format:'hmk-trek-daily-weather-v1',dayIndex,area,season,climate,landscape,alpine,aridDesert,weatherDay,
+   calendarTrekDayWeather:{format:'hmk-trek-daily-weather-v1',dayIndex,area,season,climate,landscape,alpine,aridDesert,latitudeBand:String(fd.get('latitudeBand')||'mid'),weatherDay,
     diceOrigins:origins,uniquenessPolicy:'area-day-v93.620'}};
   if(!entry.characterId)throw Error('Přidejte do kampaně alespoň jednu postavu.');
   if(!mutate(()=>{data.journal.push(entry)}))throw Error('Počasí nebylo uloženo.');
@@ -22591,7 +22623,7 @@ function episodeIssue(message,form){
  const rules=[
   [/aspoň jednu postavu|alespoň jednu postavu/i,'memberIds'],
   [/Průvodce musí/i,'guideId'],
-  [/délk|minut.*kladn|epizod.*minut/i,'minutes'],
+  [/délk|minut.*kladn|epizod.*minut|Zvolený interval zasahuje za půlnoc/i,'minutes'],
   [/globální počasí|potvrzená oblast|potvrzené počasí/i,'weatherSource'],
   [/dvě denní d10|teplota a srážky/i,'temperatureD10'],
   [/název skutečné oblasti|název/i,'area'],
@@ -22692,6 +22724,20 @@ function episodeCurrentWeather(form,clock,{mandatory=true}={}){
   return {weather:recomputed,area:source.calendarTrekDayWeather.area,
    sourceId:shift?.id??source.id,origin:'global',weatherRebased:
    original.landscape!==v.topography||original.alpine!==alpine||original.aridDesert!==desert};
+ }
+ // The same named area/day may never acquire a second pair of daily dice
+ // via an individual travel episode. Reuse the authoritative weather receipt.
+ const already=String(v.area||'').trim()?activeAreaWeather(data.journal,cid,Math.floor(clock.minute/1440),v.area):null;
+ if(already){
+  const base=already.calendarTrekDayWeather,shift=effectiveTrekShift(cid,clock.minute,base.area);
+  const original=shift?.calendarTrekWeatherShift?.weatherDay??base.weatherDay;
+  const alpine=['alpine-vegetation','ice-snow-rockfield'].includes(v.terrain)||!!v.alpine;
+  const desert=v.terrain==='dunes'||!!v.aridDesert;
+  if(alpine&&v.topography!=='mountain')throw Error('Alpský terén vyžaduje horský reliéf.');
+  return {weather:trekWeatherDay({season:original.season,climate:original.climate,
+   temperatureD10:original.temperatureD10,precipitationD10:original.precipitationD10,
+   landscape:v.topography,alpine,aridDesert:desert}),area:base.area,sourceId:shift?.id??already.id,
+   origin:'global-auto',weatherRebased:original.landscape!==v.topography||original.alpine!==alpine||original.aridDesert!==desert};
  }
  const a=String(v.temperatureD10).trim(),b=String(v.precipitationD10).trim();
  if(!mandatory&&!a&&!b)return {weather:null,area:v.area||'Bez oblasti',sourceId:null,origin:'unspecified'};
@@ -22819,6 +22865,14 @@ function episodePreviewFromForm(form,clock){
  episodeAssertScopedSkillInputs(v);
  if(!people.length)throw Error('Vyberte aspoň jednu postavu.');
  const kind=v.kind,minutes=Number(v.minutes),guideId=v.guideId;
+ // A daily pair of weather d10 expires at midnight. Never extend the same
+ // verified weather into the next calendar date just because a GM chose
+ // a long episode. A later release can evaluate several daily receipts
+ // within one episode; until then request the actual next day's rolls.
+ if(['travel','tracking','forage','watch'].includes(kind)&&
+    Number.isSafeInteger(minutes)&&minutes>0&&
+    Math.floor((clock.minute+minutes-1)/1440)!==Math.floor(clock.minute/1440))
+  throw Error('Počasí HMK platí pouze pro daný kalendářní den. Zvolený interval zasahuje za půlnoc; pro další den jsou povinné nové denní d10. Uzavřete nynější úsek do 24:00 a po potvrzení GM pokračujte zvolenou činností s novým denním počasím.');
  const animals=(v.animalIds||[]).map(id=>character(id));
  const stableAnimals=kind==='travel'?episodeStableAnimals(v.stableAnimalIds||[],clock):[];
  if(animals.some(c=>!c?.hmk?.verifiedMountedBreed||!c.hmk.healthState||!(data.campaignClock.characterIds??[]).includes(c.id)))
@@ -22991,7 +23045,7 @@ function episodePreviewFromForm(form,clock){
  result.navigationPartyScope='v93.699';
  result.navigationRecovered=!!v.navigationRecovered;
  const hazardTypes=[result.survivalHazard,result.direction?.direction].filter(Boolean);
- if(kind==='travel'&&hazardTypes.length&&minutes>240)throw Error('Hazard patří do konkrétní čtyřhodinové hlídky (HMK 148–149). Rozdělte delší plánovanou cestu na nejvýše 240minutové úseky a hazard vyhodnoťte v jeho vlastní hlídce; jinak by se zdržení a Slow Mode přenesly do nesprávného času.');
+ // User-selected minute episodes are authoritative: a hazard cannot force a 240-minute boundary.
  result.hazardDetails=[];
  for(const hazardType of hazardTypes){
   const l=v.hazardSkillLevel||null,ag=v.hazardAgility||null;
@@ -23139,7 +23193,7 @@ function episodePreviewFromForm(form,clock){
    if(!area.ready)throw Error('Weather Hazard '+(character(id)?.name||id)+': nelze vypočítat AV z nasazené výstroje – '+area.reason);
    const item=episodeWeatherExposure({kind:hazard,areaAV:area.value,
     protection:Number(field('whProtection')||0),fireStrength:Number(field('whFire')||0),
-    continuousSleet:!!precipitation?.continuous&&precipitation?.precipitation==='sleet',
+    continuousSleet:hazard==='cold'&&!!precipitation?.continuous&&seasonWeather.hasPrecipitation&&seasonWeather.precipitationRoll===seasonWeather.precipitationTN,
     resting:['rest','sleep','winded'].includes(kind),shade:!!field('whShade'),tropicalNative:!!field('whNative'),
     roll:String(field('whRoll')||'').trim()?Number(field('whRoll')):null,
     endLevel:field('whEnd')||null});
@@ -23735,6 +23789,28 @@ function updateEpisodePreview(form){
   }
  }
  episodeLockIdentityControls(form);
+ // The confirmed daily weather is authoritative for this named area/day.
+ // Inherit its already known latitude once, before deriving light periods;
+ // subsequent deliberate user edits must not be silently overwritten.
+ const choice=form.elements.namedItem('weatherSource');
+ if(choice&&data.campaignClock){
+  if(choice.value==='local'){
+   const namedArea=String(form.elements.namedItem('area')?.value||'').trim();
+   if(namedArea){
+    const sameDay=activeAreaWeather(data.journal,campaignKey(data.campaignClock),
+     Math.floor(data.campaignClock.minute/1440),namedArea);
+    if(sameDay)choice.value=sameDay.id;
+   }
+  }
+  const bandControl=form.elements.namedItem('latitudeBand');
+  if(choice.value!=='local'&&bandControl){
+   const confirmed=data.journal.find(j=>j.id===choice.value)?.calendarTrekDayWeather;
+   if(confirmed?.latitudeBand&&bandControl.dataset.episodeWeatherBandSource!==choice.value){
+    bandControl.value=confirmed.latitudeBand;
+    bandControl.dataset.episodeWeatherBandSource=choice.value;
+   }
+  }else if(bandControl)delete bandControl.dataset.episodeWeatherBandSource;
+ }
  const identityNote=form.querySelector('[data-episode-identity-note]');
  if(identityNote)identityNote.textContent=episodeEvaluationRequested?
   '🔒 Probíhá vyhodnocení. Činnost, účastníci, průvodce a identita stopy jsou uzamčeni. Další úkol otevírejte pouze tlačítkem v pravém panelu; jinou činnost lze vybrat až po dokončení či nouzovém zrušení.':
@@ -23858,7 +23934,7 @@ function updateEpisodePreview(form){
    else{
     const light=(sky?.period==='night'?'nightHazard':'daylightHazard');
     const hazard=weather[light];
-    level.innerHTML=`<strong>Den</strong>: ${weather.daylightHazard==='cold'?'cold hazard':weather.daylightHazard==='heat'?'heat hazard':'bez teplotního hazardu'} · <strong>Noc</strong>: ${weather.nightHazard==='cold'?'cold hazard':weather.nightHazard==='heat'?'heat hazard':'bez teplotního hazardu'} · ${weather.hasPrecipitation?'srážky (d6 určí intenzitu)':'bez srážek'} · d10 doloženo`;
+    level.innerHTML=`<strong>Den</strong>: ${weather.daylightHazard==='cold'?'cold hazard':weather.daylightHazard==='heat'?'heat hazard':'bez teplotního hazardu'} · <strong>Noc</strong>: ${weather.nightHazard==='cold'?'cold hazard':weather.nightHazard==='heat'?'heat hazard':'bez teplotního hazardu'} · ${weather.hasPrecipitation?'srážky (d6 určí intenzitu)':'bez srážek'} · d10 doloženo`+weatherDayTimelineHTML(weather,{latitudeBand:sky?.band||v.latitudeBand||'mid',daylightSeason:sky?.lightSeason||weather.season,sunriseMinute:sky?.sunrise,twilightMinutes:60});
    }
   }catch(err){level.textContent=err.message;}
  }
@@ -23875,6 +23951,10 @@ function updateEpisodePreview(form){
  const navigationText=form.querySelector('[data-episode-navigation-text]');if(navigationText){
   const state=episodeNavigationState(navigationPrev);
   navigationText.innerHTML='Přetrvávající stav družiny: <span class="hc-help-term" tabindex="0" data-hmk-help="Možnosti: clear = správný směr, misdirection = odchýlení od trasy, lost = ztracení. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení.">'+esc(state)+'</span>. Možnosti: clear = správná trasa; misdirection = odchýlení; lost = ztracení. Změna stavu vyžaduje skutečný pravidlový následek nebo rozhodnutí GM.';
+ }
+ if(v.weatherSource==='local'&&String(v.area||'').trim()){
+  const existing=activeAreaWeather(data.journal,campaignKey(data.campaignClock),Math.floor(data.campaignClock.minute/1440),v.area);
+  if(existing){const select=form.elements.namedItem('weatherSource');if(select&&select.value!==existing.id){select.value=existing.id;v.weatherSource=existing.id;}}
  }
  const weatherGlobal=v.weatherSource!=='local';
  for(const name of ['temperatureD10','precipitationD10','season','climate']){
@@ -23971,9 +24051,16 @@ function updateEpisodePreview(form){
   const daily=episodeCurrentWeather(form,data.campaignClock,{mandatory:false})?.weather;
   const physicalD6=Number(form.elements.namedItem('precipitationD6')?.value);
   if(daily?.hasPrecipitation&&Number.isInteger(physicalD6)&&physicalD6>=1&&physicalD6<=6){
-   const watch=trekWeatherWatch(daily,{night:sky?.period==='night',
-    pavedRoad:v.terrain==='paved-road',precipitationD6:physicalD6});
-   preliminarySleet=!!watch?.continuous&&watch?.precipitation==='sleet';
+   // A chosen interval may span daylight and night. The qualifying
+   // cold+sleet phase need not be the first one: the roll's die must be
+   // consistent with the evaluated multi-phase consequences below.
+   const periods=sky?.intervals?.minutesByPeriod;
+   const coldCovered=periods
+    ? ((periods.day+periods.twilight>0)&&daily.daylightHazard==='cold')||
+      (periods.night>0&&daily.nightHazard==='cold')
+    : (sky?.period==='night'?daily.nightHazard:daily.daylightHazard)==='cold';
+   preliminarySleet=physicalD6===1&&coldCovered&&
+    daily.precipitationRoll===daily.precipitationTN;
   }
  }catch{}
  for(const hazard of ['cold','heat'])for(const id of v.memberIds||[]){
@@ -24205,7 +24292,7 @@ function initializeTimeEpisodeForm(form){
  const episodeGlossary={
   kind:'Činnost určuje, které pravidlové kroky a hody se mají vyhodnotit. Zobrazují se jen potřebné postupy.',
   minutes:'Skutečný čas epizody v celých minutách. Celý interval se zapíše jednou; zdržení pouze snižuje čas pohybu.',
-  weatherSource:'Počasí platí po celou epizodu. Globální zdroj přebírá doložené denní kostky; místní zdroj vyžaduje nové d10.',
+  weatherSource:'Dvě denní d10 platí pro danou oblast a kalendářní den (24 h). Nová oblast vyžaduje první potvrzené d10; další epizoda stejného dne je převezme. Noční teplotní postih nevyžaduje nový hod.',
   topography:'Rovina, kopce a hory ovlivňují teplotní úpravu; při cestování také dostupnou rychlost pohybu.',
   terrain:'Povrch a typ krajiny ovlivňují pohyb, orientaci, viditelnost a některé klimatické či přírodní modifikátory.',
   conveyance:'Doprava určuje základní rychlost, přípustný terén, zatížení a únavové podmínky.',
@@ -24774,9 +24861,26 @@ document.addEventListener('submit',e=>{
       irreparable:hazard.result==='irreparable',
       repairProofId:hazard.repairProofId||null}});
    }
+   let episodeWeatherSourceId=weather.sourceId;
+   if(weather.origin==='episode-only'){
+    const dayIndex=Math.floor(clock.minute/1440);
+    if(activeAreaWeather(data.journal,campaignKey(clock),dayIndex,weather.area))
+     throw Error('Denní počasí oblasti již existuje; znovu použijte původní dvojici d10.');
+    const day=weather.weather;
+    const originNames=['temperatureD10','precipitationD10'];
+    const diceOrigins=originNames.map(n=>{const f=form.elements.namedItem(n);return f?.dataset.episodeGenerated===f?.value?'cryptographic-software-die':'manual';});
+    const dailyId=uuid();
+    data.journal.push({id:dailyId,characterId:v.guideId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
+     createdAt:stamp(),title:'HMK · Denní počasí · '+weather.area,
+     body:'Dva potvrzené denní hody z cestovní epizody: teplota d10 '+day.temperatureD10+', srážky d10 '+day.precipitationD10+'.',
+     calendarTrekDayWeather:{format:'hmk-trek-daily-weather-v1',dayIndex,area:weather.area,
+      season:day.season,climate:day.climate,landscape:day.landscape,alpine:day.alpine,aridDesert:day.aridDesert,
+      latitudeBand:v.latitudeBand||'mid',weatherDay:day,diceOrigins,uniquenessPolicy:'area-day-v93.620'}});
+    episodeWeatherSourceId=dailyId;
+   }
    const p={...result,actors,animals,skillLinks,timedMedical:(stagedTimed?.changes||[]).map(x=>({actorId:x.actorId,dueMinute:x.dueMinute,kind:x.kind,cancelled:x.cancelled===true,roll:x.roll??null,sl:x.sl,beforeHR:x.beforeHR,afterHR:x.afterHR,shockAfter:x.shockAfter,
      description:x.description??null,report:x.report??null,sourceKey:x.key??null})),
-    incapacitationDecision:v.episodeIncapChoice||null,gmReviews:gm.reviewed.map(p=>({id:p.id,title:p.title,dueMinute:p.dueMinute})),area:weather.area,weatherOrigin:weather.origin,weatherSourceId:weather.sourceId,
+    incapacitationDecision:v.episodeIncapChoice||null,gmReviews:gm.reviewed.map(p=>({id:p.id,title:p.title,dueMinute:p.dueMinute})),area:weather.area,weatherOrigin:weather.origin,weatherSourceId:weather.sourceId,weatherDailySourceId:episodeWeatherSourceId,
     precipitation,settings:{...v,confirmed:undefined},narrative:v.narrative||'',mapScale:Number(v.mapScale),recovery};
    data.journal.push({id:sourceId,characterId:v.guideId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
     createdAt:stamp(),title:'HMK · epizoda · '+(v.area||weather.area)+' · '+result.minutes+' min',
