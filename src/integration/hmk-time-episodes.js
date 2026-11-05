@@ -643,7 +643,8 @@ export function validateTimeEpisodes(journal=[]){
      complicationDecision:h.complicationDecision,accidentAgility:h.accidentAgility,
      accidentD6:h.accidentD6,accidentZD10:h.accidentZD10,
      complicationSkill:h.complicationSkill,complicationLevel:h.complicationLevel,
-     directionTurn:h.directionTurn,directionD10:h.directionD10??null,directionAwareness:h.directionAwareness});
+     directionTurn:h.directionTurn,directionD10:h.directionD10??null,directionAwareness:h.directionAwareness,
+     directionObservationDeferred:h.directionObservationDeferred===true});
     const linked=h.evidenceId?journal.find(k=>k.id===h.evidenceId&&
      k.calendarCampaignId===j.calendarCampaignId&&k.campaignMinute===e.startMinute):null;
     if(h.automationVersion==='v93.675'&&h.hazard==='accident'){
@@ -694,9 +695,14 @@ export function validateTimeEpisodes(journal=[]){
        }
       }
       if(h.hazard==='misdirection'){
-       const proof=journal.find(k=>k.id===h.directionProofId);
-       must(episodeSkillProof(proof,'Awareness',proof?.characterId,j.calendarCampaignId,e.startMinute)?.level===h.directionAwareness,
-        'Misdirection nesouhlasí se skutečným Awareness.');
+       if(h.directionObservationDeferred===true)must(h.directionAwareness===null&&!h.directionProofId&&
+        h.result==='continue-misdirected',
+        'Odložený Awareness nesmí obsahovat vymyšlený hod ani změnu směru.');
+       else{
+        const proof=journal.find(k=>k.id===h.directionProofId);
+        must(episodeSkillProof(proof,'Awareness',proof?.characterId,j.calendarCampaignId,e.startMinute)?.level===h.directionAwareness,
+         'Misdirection nesouhlasí se skutečným Awareness.');
+       }
       }
      }
     }else{

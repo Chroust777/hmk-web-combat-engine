@@ -65,8 +65,14 @@ export function hasFinishedLinkedTrekHazard(source,hazard,journal,actorId=source
      x.skillTestProof.originId===j.id&&x.skillTestProof.activity==='trek-survival-hazard'&&
      x.characterId===source.characterId&&x.calendarCampaignId===source.calendarCampaignId);
    return !!follow&&journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&
-    x.skillTestProof.sourceId===follow.id&&x.skillTestProof.nonInjuryHazard!==true&&
-    x.skillTestProof.actorId===x.characterId&&x.calendarCampaignId===source.calendarCampaignId&&
+    x.skillTestProof.sourceId===follow.id&&
+    (x.skillTestProof.nonInjuryHazard===true?
+      Number.isInteger(x.skillTestProof.hazardD10)&&
+      (x.skillTestProof.hazardD10<=3||x.skillTestProof.hazardD10>=7)&&
+      typeof x.skillTestProof.gmOutcome==='string'&&x.skillTestProof.gmOutcome.trim().length>=8&&
+      x.characterId===source.characterId:
+      x.skillTestProof.actorId===x.characterId)&&
+    x.calendarCampaignId===source.calendarCampaignId&&
     validMinute(x.campaignMinute)&&x.campaignMinute>=source.campaignMinute);
   });
  }

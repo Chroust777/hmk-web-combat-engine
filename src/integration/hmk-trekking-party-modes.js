@@ -11,6 +11,23 @@ import {animalTrekLoad,validateAnimalTrekLoadProof} from './hmk-trekking-animal-
 const check=(v,msg)=>{if(!v)throw Error(msg);};
 const int=n=>Number.isSafeInteger(n)&&n>=0;
 const serious=w=>!w.healed&&['S','G'].includes(w.severity);
+/** One canonical human mobility derivation for both Trekking Routine and
+ * Calendar Time Episodes. HMK 145: only head, torso and leg wounds cause
+ * Injured / immobility; fatigue includes weakness from blood loss (HMK 176).
+ * No manual status switches and no inferred unknown wound locations.
+ */
+export function trekPersonHealthSnapshot({id,name,healthState}={}){
+ check(!!healthState,'Postava nemá doložený zdravotní stav: '+(name||id));
+ const fatigue=combatFatigueTotals(healthState).total;
+ const seriousWounds=(healthState.wounds||[]).filter(serious).map(w=>{
+  const anatomy=hmkHumanLocationSymbols(w.location);
+  check(anatomy,(name||id)+': neznámá lokace závažné rány ('+w.location+'); nelze spolehlivě odvodit Injured Mode.');
+  return {id:w.id,location:w.location,severity:w.severity,zone:anatomy.zone};
+ });
+ return {id,name,fatigue,seriousWounds,
+  injured:seriousWounds.some(w=>['head','torso','legs'].includes(w.zone)),
+  immobile:seriousWounds.some(w=>w.severity==='G'&&['head','torso','legs'].includes(w.zone))};
+}
 export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],conveyance='foot',loadedByGM=false,allowCertifiedWeatherAccrual=false,drovingAnimals=[]}={}){
  check(Array.isArray(memberIds)&&memberIds.length&&memberIds.length===new Set(memberIds).size&&memberIds.every(x=>typeof x==='string'&&x),
   'Vyberte jedinečné účastníky hlídky.');
@@ -36,21 +53,14 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
  const members=memberIds.map(id=>{
   const actor=characters.find(c=>c.id===id);
   check(actor?.hmk?.healthState,'Postava není připravena: '+id);
-  const fatigue=combatFatigueTotals(actor.hmk.healthState).total;
-  const wounds=actor.hmk.healthState.wounds.filter(serious).map(w=>{
-   const anatomy=hmkHumanLocationSymbols(w.location);
-   check(anatomy,actor.name+': neznámá lokace závažné rány ('+w.location+'); nelze spolehlivě odvodit Injured Mode.');
-   return {id:w.id,location:w.location,severity:w.severity,zone:anatomy.zone};
-  });
-  const injury=wounds.some(w=>['head','torso','legs'].includes(w.zone));
-  const immobile=wounds.some(w=>w.severity==='G'&&['head','torso','legs'].includes(w.zone));
+  const health=trekPersonHealthSnapshot({id,name:actor.name,healthState:actor.hmk.healthState});
   const load=conveyance==='foot'?resolveCombatantLoad({character:actor,inventory}):null;
   // An incomplete inventory is UNKNOWN, not an automatically unloaded character.
   const enc=load?.encReady===true?load.modifiedENC:null;
   const minimum=load?.knownMinimumENC??null;
   const loaded=conveyance==='foot'&&(enc!==null?enc>=10:minimum!==null&&minimum>=10);
-  return {id,name:actor.name,fatigue,injured:injury,immobile,seriousWounds:wounds,
-   modifiedENC:enc,minimumENC:enc===null?minimum:null,loaded,loadUnresolved:conveyance==='foot'&&enc===null&&!loaded};
+  return {...health,modifiedENC:enc,minimumENC:enc===null?minimum:null,
+   loaded,loadUnresolved:conveyance==='foot'&&enc===null&&!loaded};
  });
  const tooTired=members.find(x=>x.fatigue>=40);
  // Only the ORIGINAL at-departure fatigue may disqualify a watch. A post-watch

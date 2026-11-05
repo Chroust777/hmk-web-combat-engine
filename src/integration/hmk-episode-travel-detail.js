@@ -98,7 +98,7 @@ export function episodeEncounterSurprise({partyModes={},conveyance='foot',foeWat
 export function episodeHazardFollowup({hazard,repairSkill=null,repairLevel=null,
  equipmentDisposition='repair',complicationDecision='test',
  accidentAgility=null,accidentD6=null,accidentZD10=null,complicationSkill=null,complicationLevel=null,
- directionTurn=null,directionD10=null,directionAwareness=null}={}){
+ directionTurn=null,directionD10=null,directionAwareness=null,directionObservationDeferred=false}={}){
  requireTrue(['equipment','accident','complication','misdirection','lost','lost-time'].includes(hazard),
   'Nesprávný druh hazardu.');
  requireTrue(['repair','ignore','abandon'].includes(equipmentDisposition)&&
@@ -132,12 +132,17 @@ export function episodeHazardFollowup({hazard,repairSkill=null,repairLevel=null,
   requireTrue(directionTurn===null||['left','right'].includes(directionTurn),'Směr: doložte vlevo/vpravo.');
   requireTrue(directionD10===null||directionTurn===(directionD10%2?'left':'right'),'Směr: odchýlení neodpovídá lichému/sudému d10.');
   requireTrue(directionAwareness===null||levels.includes(directionAwareness),'Směr: nesprávný Awareness výsledek.');
+  requireTrue(typeof directionObservationDeferred==='boolean'&&
+   (!directionObservationDeferred||(hazard==='misdirection'&&directionAwareness===null)),
+   'Misdirection: odložení Awareness je možné jen bez doloženého hodu; výsledek nesmí být vymyšlen.');
   result=directionTurn===null?'pending-direction':hazard==='lost'?'requires-special-bearing':
+   directionObservationDeferred?'continue-misdirected':
    directionAwareness===null?'pending-awareness':levels.indexOf(directionAwareness)>=2?'reoriented':'continue-misdirected';
  }
  if(hazard==='lost-time')result='extra-slow-current-episode';
  return {format:'hmk-episode-hazard-followup-v1',hazard,repairSkill,repairLevel,equipmentDisposition,complicationDecision,accidentAgility,
   accidentD6,accidentZD10,complicationSkill,complicationLevel,directionTurn,directionD10,directionAwareness,
+  ...(directionObservationDeferred?{directionObservationDeferred:true}:{}),
   result,requiresGMCompletion:result==='pending'||result==='pending-injury'||result==='pending-direction'||
    result==='pending-awareness'||(typeof result==='object'&&result.requiresInjurySequence),sourcePages:[148,149]};
 }
