@@ -13,7 +13,7 @@ export function calculateWeatherAreaAV({inventory,actorId,resolveArmour=resolveL
  if(worn.length===0)return {ready:true,value:0,raw:0,locations:Object.fromEntries(Object.keys(COV).map(k=>[k,0])),method:'weighted-p133',wornCount:0};
  const locations={};let raw=0;
  for(const [location,weight] of Object.entries(COV)){
-  const r=resolveArmour({inventory,targetId:actorId,location,aspect:'f',direction:'front',mode:'auto',rigidStatus:'unknown'});
+  const r=resolveArmour({inventory,targetId:actorId,location,aspect:'f',direction:'front',mode:'auto',rigidStatus:'unknown',directionalContext:{areaHazard:true}});
   if(!r?.ready||!Number.isSafeInteger(r.armourValue)||r.armourValue<0)
    return {ready:false,reason:`${location}: ${r?.reason||'ochrana AV není ověřena'}`};
   locations[location]=r.armourValue;raw+=r.armourValue*weight;

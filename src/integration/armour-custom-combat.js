@@ -39,14 +39,19 @@ export function resolveCustomArmour({pieces,location,aspect,direction,layerOptio
  // The p.118 single-foe direction check and multiple-foe TN5/TN7 tests
  // cannot be chosen without an observed number of threatening foes.
  // A non-directional article needs no such external information.
+ // Area weather is not a strike from an opponent. A garment covering a
+ // location in any orientation contributes its F-aspect to Area AV (HMK 133).
+ // The combat path remains strict and still demands witnessed foe context.
+ const areaHazard=directionalContext.areaHazard===true;
  const suppliedOpponents=directionalContext.opponents;
- if(directional.length && !Number.isSafeInteger(suppliedOpponents))
+ if(!areaHazard&&directional.length && !Number.isSafeInteger(suppliedOpponents))
   return fail('HMK p118: number of threatening foes is required for directional armour');
- const opponents=suppliedOpponents??1;
+ const opponents=areaHazard?null:(suppliedOpponents??1);
  const d10=directionalContext.d10??null;
- if(!Number.isSafeInteger(opponents)||opponents<1||opponents>999)return fail('Invalid count of threatening foes');
- if(opponents>1&&directional.length&&(!Number.isSafeInteger(d10)||d10<1||d10>10))return fail('HMK p118 directional d10 (1–10) required against multiple foes');
+ if(!areaHazard&&(!Number.isSafeInteger(opponents)||opponents<1||opponents>999))return fail('Invalid count of threatening foes');
+ if(!areaHazard&&opponents>1&&directional.length&&(!Number.isSafeInteger(d10)||d10<1||d10>10))return fail('HMK p118 directional d10 (1–10) required against multiple foes');
  const covered=candidates.filter(a=>{
+  if(areaHazard)return true; // environmental F protection has no foe direction
   const marker=a.coverageMarkers[location];
   if(opponents>1){
    if(marker==='rear-only')return d10<=5;
@@ -56,7 +61,7 @@ export function resolveCustomArmour({pieces,location,aspect,direction,layerOptio
  });
  const layers=covered.map(a=>({material:a.material,rigid:a.coverageMarkers[location]==='rigid'||(a.rigid&&['front-only','rear-only'].includes(a.coverageMarkers[location])),aq:0}));
  const value=locationArmourValue({layers,zone:location,aspect,options:armourOptions});
- return {ready:true,source:'HMK World of Kethira pp.117-119',location,aspect,direction,armourValue:value.av,rigidArmour:value.rigid,metalArmour:covered.some(a=>materialMetal.has(a.material)),articleIds:covered.map(a=>a.id),extraEnc:layering.extraEnc,bulkPenalty:layering.bulkPenalty,layering,directionalContext:{opponents,d10:directional.length&&opponents>1?d10:null,checkedArticleIds:directional.map(a=>a.id)}};
+ return {ready:true,source:'HMK World of Kethira pp.117-119',location,aspect,direction,armourValue:value.av,rigidArmour:value.rigid,metalArmour:covered.some(a=>materialMetal.has(a.material)),articleIds:covered.map(a=>a.id),extraEnc:layering.extraEnc,bulkPenalty:layering.bulkPenalty,layering,directionalContext:areaHazard?{areaHazard:true,checkedArticleIds:directional.map(a=>a.id)}:{opponents,d10:directional.length&&opponents>1?d10:null,checkedArticleIds:directional.map(a=>a.id)}};
 }
 
 export function resolveCustomArmourMeleeHit({pieces,location,aspect,direction,layerOptions={},armourOptions={},directionalContext={},armourReduction=0,...hit}={}){

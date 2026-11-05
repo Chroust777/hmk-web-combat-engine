@@ -88,7 +88,7 @@ export function resolveOwnedArmourArticle(item,{allowCarried=false}={}){
  * and aspect; never reduces a total below zero. Directional custom layers
  * use the set of articles which really participated in protection.
  */
-function acidAdjustedProtection(base,worn,location,aspect,direction,activeInventoryIds){
+function acidAdjustedProtection(base,worn,location,aspect,direction,activeInventoryIds,areaHazard=false){
  let reduction=0;const sourceIds=[];
  for(const item of worn){
   const d=acidArmourDamage(item,location);
@@ -96,7 +96,7 @@ function acidAdjustedProtection(base,worn,location,aspect,direction,activeInvent
   if(d===0||!activeInventoryIds.includes(item.id))continue;
   const p=item.snapshot?.properties||{};
   const marker=p.coverageMarkers?.[location];
-  if(marker==='front-only'&&direction!=='front'||marker==='rear-only'&&direction!=='rear')continue;
+  if(!areaHazard&&(marker==='front-only'&&direction!=='front'||marker==='rear-only'&&direction!=='rear'))continue;
   const originalAV=p.locationProtection?.[location]?.[aspect];
   if(!Number.isSafeInteger(originalAV)||originalAV<0)return {ready:false,reason:'Missing original article AV for Acid reduction',requiresGMResolution:true};
   const loss=Math.min(d,originalAV);
@@ -167,7 +167,7 @@ export function resolveLiveCombatArmour({inventory,targetId,location,aspect,dire
  const actual=p.rigidArmour?'yes':'no';
  if(rigidStatus!=='unknown'&&rigidStatus!==actual)return fail(`GM rigid selection contradicts audited p118 protection (${actual})`);
  const adjusted=acidAdjustedProtection(p.armourValue,worn,location,aspect,direction,
-  worn.filter(x=>p.articleIds.some(id=>byId.get(id)?.id===x.id)).map(x=>x.id));
+  worn.filter(x=>p.articleIds.some(id=>byId.get(id)?.id===x.id)).map(x=>x.id),directionalContext.areaHazard===true);
  if(!adjusted.ready)return adjusted;
  return {ready:true,mode:'custom-worn',source:'HMK pp.117–119',targetId,location,aspect,direction,
   ...adjusted,rigidArmour:p.rigidArmour,rigidStatus:actual,rigidSource:'p118 verified marks',

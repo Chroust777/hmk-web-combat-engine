@@ -320,3 +320,13 @@
 .library-table .library-item-title .library-source-inline{display:inline;font-size:.72em;white-space:normal;margin-left:.3em;color:#c4ae89;font-weight:400}
 .library-part-link{background:transparent!important;border:0!important;color:#dfbe7b!important;text-decoration:underline;text-underline-offset:2px;cursor:pointer;text-align:left;padding:0!important;min-height:0!important;font:inherit}
 .library-part-link:hover,.library-part-link:focus-visible{color:#fff0bf!important;text-decoration-thickness:2px}
+
+/* v93.740: actual book folio, not only library table — inline printed page on SAME line */
+.content-sheet .journal-book--library .folio-catalog-heading .library-source-inline,
+.content-sheet .journal-book--library .folio-catalog-heading small.library-source-inline,
+.library-table .library-item-title .library-source-inline { display:inline!important; font:400 .76em/1.18 var(--hmk-font-body,Georgia,serif)!important; color:#7b5732!important; margin:0 0 0 .45em!important; white-space:normal!important; vertical-align:baseline!important; }
+.content-sheet .journal-book--library .folio-catalog-heading .library-source-inline::before{content:' · '}
+.catalog-cold-rule,.catalog-coverage-exceptions{font:400 .9em/1.35 var(--hmk-font-body,Georgia,serif);margin:.35rem 0;padding:.3rem .4rem;border-left:2px solid #a98750;background:rgba(178,129,60,.08)}
+.hc-cold-kit{display:grid;gap:.4rem;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
+.hc-cold-kit>p,.hc-cold-kit>.hc-check{grid-column:1/-1}
+@media(max-width:700px){.hc-cold-kit{grid-template-columns:1fr}}

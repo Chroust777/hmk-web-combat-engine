@@ -7351,3 +7351,25 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .content-calendar .hc-calendar-overview-right>.hc-calendar{margin-top:0}
 @media(max-width:800px){.content-calendar .hc-calendar-overview-grid{grid-template-columns:minmax(0,1fr)}}
 @media(min-width:801px){.content-calendar .hc-calendar-overview-right{position:sticky;top:12px;align-self:start}}
+
+/* v93.740: actual book folio, not only library table — inline printed page on SAME line */
+.content-sheet .journal-book--library .folio-catalog-heading .library-source-inline,
+.content-sheet .journal-book--library .folio-catalog-heading small.library-source-inline,
+.library-table .library-item-title .library-source-inline { display:inline!important; font:400 .76em/1.18 var(--hmk-font-body,Georgia,serif)!important; color:#7b5732!important; margin:0 0 0 .45em!important; white-space:normal!important; vertical-align:baseline!important; }
+.content-sheet .journal-book--library .folio-catalog-heading .library-source-inline::before{content:' · '}
+.catalog-cold-rule,.catalog-coverage-exceptions{font:400 .9em/1.35 var(--hmk-font-body,Georgia,serif);margin:.35rem 0;padding:.3rem .4rem;border-left:2px solid #a98750;background:rgba(178,129,60,.08)}
+.hc-cold-kit{display:grid;gap:.4rem;grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
+.hc-cold-kit>p,.hc-cold-kit>.hc-check{grid-column:1/-1}
+@media(max-width:700px){.hc-cold-kit{grid-template-columns:1fr}}
+
+/* v93.740: restore actually split calendar folios, not nested halves of left page. */
+.content-calendar .hc-week-tabs{display:flex!important;flex-direction:column!important;gap:10px!important}
+.content-calendar .hc-week-tabs>details{width:100%!important;min-width:0}
+.content-calendar .hc-week-list{max-height:none!important;height:auto!important;overflow:visible!important}
+.content-calendar .hc-weekly{width:100%;max-width:100%;box-sizing:border-box}
+.content-calendar .hc-calendar-primary-queue,.content-calendar .hc-calendar-primary-visual{min-width:0;width:100%}
+.content-calendar .hc-calendar-primary-visual>.hc-calendar{margin-top:0}
+@media(min-width:760px){.content-calendar .journal-book--calendar .folio-chapter-page--right{align-self:start}}
+
+/* v93.740: six catalog data fields in armour and expedition supplies; keep readable wrapping */
+.content-sheet .journal-book--library .folio-catalog-stats{grid-template-columns:repeat(3,minmax(0,1fr))!important}

@@ -1,10 +1,11 @@
 import {isHandheldItem,validateHandInventory} from './hmk-hand-equipment.js';
+import {coldCatalogRule} from './hmk-cold-gear-93740.js';
 import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 /** A direct, owner-bound, atomic inventory item edit. No navigation changes,
  * no RNG and no alternate storage path. UI calls within existing mutate/CAS. */
 const SLOTS=['none','main_hand','off_hand','worn','carried','chest'];
 function fail(reason){throw Error(reason)}
-export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,currentWQ,condition,gearStowage='normal',layerOrder=null,layerSlot=null,bulkExceptionZones=[]}={}){
+export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,currentWQ,condition,gearStowage='normal',coldWorn=false,layerOrder=null,layerSlot=null,bulkExceptionZones=[]}={}){
  if(!doc||!Array.isArray(doc.inventory)||typeof ownerId!=='string'||!ownerId||typeof itemId!=='string'||!itemId)fail('Neplatný vlastník nebo předmět');
  const item=doc.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
  if(!item||!doc.characters?.some(x=>x.id===ownerId))fail('Předmět nepatří otevřené postavě');
@@ -12,6 +13,8 @@ export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,current
  if(item.slot==='chest'&&quantity!==item.quantity)fail('Počet věcí v Truhlici lze změnit pouze vyzvednutím a novým doloženým uložením');
  if(!SLOTS.includes(slot)||(['main_hand','off_hand'].includes(slot)&&!isHandheldItem(item))||(slot==='worn'&&item.snapshot?.category!=='armor'))fail('Nepřípustný slot pro tento předmět');
  if(['main_hand','off_hand','worn'].includes(slot)&&equipmentUnusable(item))fail('Poškozený nebo neopravitelný předmět nelze vybavit ani obléknout.');
+ if(coldWorn!==false&&coldWorn!==true)fail('Neplatný stav pláště');
+ if(coldWorn&&!(item.snapshot?.category==='other'&&coldCatalogRule(item.snapshot)?.kind==='cloak'&&slot==='carried'&&quantity===1&&!equipmentUnusable(item)))fail('Cold Hazard: lze označit jen skutečně nošený dostupný plášť.');
  if(!Number.isSafeInteger(quantity)||quantity<1||quantity>999999||(['main_hand','off_hand','worn'].includes(slot)&&quantity!==1))fail('Neplatný počet kusů pro vybavený předmět');
  if(currentWQ!==null&&(!Number.isSafeInteger(currentWQ)||currentWQ<0||currentWQ>999))fail('Neplatná WQ');
  if(typeof condition!=='string')fail('Neplatný stav předmětu');
@@ -21,7 +24,7 @@ export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,current
  if(layerSlot!==null&&(!['underFar','underNear','base','overNear','overFar'].includes(layerSlot)||item.snapshot.category!=='armor'))fail('Neplatný sloupec vrstvy');
  if(!Array.isArray(bulkExceptionZones)||new Set(bulkExceptionZones).size!==bulkExceptionZones.length||bulkExceptionZones.some(x=>!['head','arms','torso','legs'].includes(x)))fail('Neplatné Bulk zóny');
  const next=structuredClone(doc);const target=next.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
- target.slot=slot;target.quantity=quantity;target.currentWQ=currentWQ;target.condition=condition;target.gearStowage=gearStowage;
+ target.slot=slot;target.quantity=quantity;target.currentWQ=currentWQ;target.coldWorn=coldWorn;target.condition=condition;target.gearStowage=gearStowage;
  if(target.snapshot.category==='armor'){target.layerOrder=layerOrder;target.layerSlot=layerSlot;target.bulkExceptionZones=bulkExceptionZones;}
  validateHandInventory(next.inventory,ownerId);
  return next;
@@ -40,7 +43,7 @@ export function transferInventoryItem(doc,{ownerId,itemId,recipientId}={}){
  if(owned.slot==='chest')fail('Předmět je v Truhlici: nejprve jej s potvrzeným přístupem vyzvedněte');
  const next=structuredClone(doc);
  const target=next.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
- target.characterId=recipientId;target.slot='carried';target.gearStowage='normal';
+ target.characterId=recipientId;target.slot='carried';target.gearStowage='normal';target.coldWorn=false;
  if(target.snapshot.category==='armor'){target.layerOrder=null;target.layerSlot=null;target.bulkExceptionZones=[];}
  return next;
 }

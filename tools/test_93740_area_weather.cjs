@@ -1,0 +1,20 @@
+'use strict';const assert=require('node:assert/strict');
+(async()=>{
+const {missingPrintedArmourCatalogEntries}=await import('../src/integration/armour-article-catalog.js');
+const {calculateWeatherAreaAV}=await import('../src/integration/hmk-weather-area-av.js');
+const {resolveLiveCombatArmour}=await import('../src/integration/live-combat-armour.js');
+const {coldInventoryChoices,resolveColdHazardEquipment}=await import('../src/integration/hmk-cold-gear-93740.js');
+let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++};const check=(a)=>{assert.ok(a);n++};
+const cat=missingPrintedArmourCatalogEntries([]),cloak=cat.find(x=>x.name==='Cloth Cloak');check(cloak);
+const item={id:'test-cloak',characterId:'PC1',sourceItemId:cloak.id,snapshot:structuredClone(cloak),quantity:1,slot:'worn',currentWQ:null};
+const direct=resolveLiveCombatArmour({inventory:[item],targetId:'PC1',location:'tx',aspect:'f',direction:'front'});
+eq(direct.ready,false);check(/threatening foes/.test(direct.reason));
+const area=calculateWeatherAreaAV({inventory:[item],actorId:'PC1'});
+eq(area.ready,true);check(Number.isSafeInteger(area.value));eq(area.wornCount,1);check(area.raw>=0);
+eq(coldInventoryChoices([item],'PC1').automatic[0].rule.av,1);
+const gear=resolveColdHazardEquipment({inventory:[item],actorId:'PC1'});eq(gear.gearAV,1);eq(gear.automaticCloak,true);
+const empty=calculateWeatherAreaAV({inventory:[],actorId:'PC1'});eq(empty.value,0);
+const mail=cat.find(x=>x.name==='Mail Hauberk');check(mail);const wornMail={id:'mail',characterId:'PC1',sourceItemId:mail.id,snapshot:structuredClone(mail),quantity:1,slot:'worn',layerOrder:0};const mailArea=calculateWeatherAreaAV({inventory:[wornMail],actorId:'PC1'});eq(mailArea.ready,true);
+const broken=structuredClone(item);broken.hmkEquipmentRepair={status:'damaged'};const bad=calculateWeatherAreaAV({inventory:[broken],actorId:'PC1'});eq(bad.ready,false);
+console.log('PASS '+n+' Area AV: full printed wear, environmental directional F, strict combat foe gate and broken armour');
+})();
