@@ -17,6 +17,26 @@ function lastDays(journal,campaignId,actorId){
    row.calendarNutritionDay?.format==='hmk-nutrition-day-v1')
   .sort((a,b)=>a.calendarNutritionDay.endMinute-b.calendarNutritionDay.endMinute);
 }
+/** A precise last meal/drink time is only known if a witnessed receipt
+ * records actual consumption. A 24h automatic debit is an ACCOUNTING time,
+ * not proof of the exact minute a person swallowed food or water. */
+export function lastNutritionConsumptionEvidence(journal=[],campaignId,actorId,now){
+ const seen={food:null,water:null};
+ for(const row of journal){
+  if(row.calendarCampaignId!==campaignId||row.characterId!==actorId||
+     !Number.isSafeInteger(row.campaignMinute)||row.campaignMinute>now||
+     row.stableHub574?.type==='care')continue;
+  const f=row.calendarForagingSupplyUse,food=!!row.calendarForagingCarryEat||!!row.calendarInventoryRationUse||
+   (f?.unit==='foodDays'&&f.disposition==='consumed');
+  const water=!!row.calendarInventoryWaterUse||(f?.unit==='waterDays'&&f.disposition==='consumed');
+  for(const [kind,match] of [['food',food],['water',water]])if(match&&
+    (!seen[kind]||row.campaignMinute>=seen[kind].minute))
+   seen[kind]={minute:row.campaignMinute,accountingOnly:!!(
+    row.calendarForagingCarryEat?.nutritionDayId||row.calendarInventoryRationUse?.nutritionDayId||
+    row.calendarInventoryWaterUse?.nutritionDayId||f?.nutritionDayId),sourceId:row.id};
+ }
+ return seen;
+}
 /** Whole future closed days of *personal* edible rations. A lot must still be
  * fresh at each day's END, not merely fresh at the moment of inspection.
  * The GM's weather/activity may change the real daily need later.
@@ -55,6 +75,7 @@ export function characterProvisionsOverview(database,actorId){
  const waterGallons=rounded(water.reduce((sum,l)=>sum+l.remaining,0));
  const policy=activeNutritionPolicies(journal,campaignId,[actorId]).find(x=>x.characterId===actorId)??null;
  const records=lastDays(journal,campaignId,actorId);
+ const intake=lastNutritionConsumptionEvidence(journal,campaignId,actorId,now);
  const foodNeed=policy?.calendarNutritionPolicy?.autoNeeds?1:policy?.calendarNutritionPolicy?.foodNeed??1;
  const waterNeed=policy?.calendarNutritionPolicy?.autoNeeds?1:policy?.calendarNutritionPolicy?.waterNeed??1;
  const currentPolicyRecords=policy?records.filter(r=>r.calendarNutritionDay.policyId===policy.id):[];
@@ -79,6 +100,8 @@ export function characterProvisionsOverview(database,actorId){
     food:{received:last.foodReceived,need:last.foodNeed,status:status(last.foodReceived,last.foodNeed)},
     water:{received:last.waterReceived,need:last.waterNeed,status:status(last.waterReceived,last.waterNeed)}}:null,
   illness,
+  intake:{...intake,foodLastAccountedMinute:records.filter(r=>r.calendarNutritionDay.foodReceived>0).at(-1)?.calendarNutritionDay.endMinute??null,
+   waterLastAccountedMinute:records.filter(r=>r.calendarNutritionDay.waterReceived>0).at(-1)?.calendarNutritionDay.endMinute??null},
   // Zero provable receipts != proved deprivation. This result is deliberately
   // not a "fed" boolean nor a countdown to physiological starvation.
   nutritionEvidence:policy?(last?'last-closed-day':'awaiting-first-close'):'not-monitored'};

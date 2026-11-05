@@ -5,7 +5,7 @@
  * Only the GM's clock mutation closes a 24-hour interval. Receipts and
  * shortages are atomic; the daily ledger never advances the clock.
  */
-import {shelteredOrProvisionedMinutes} from './hmk-pc-sheltered-stay-93730.js';
+import {shelteredOrProvisionedMinutes,pcShelteredStayAt} from './hmk-pc-sheltered-stay-93730.js';
 import {availableSupplyLots,createSupplyUse} from './hmk-foraging-supply-ledger.js';
 import {foragedCarriedFood,createForagingCarryEat} from './hmk-foraging-carried-food.js';
 import {assertExclusiveForagingProven} from './hmk-inventory-provisions.js';
@@ -58,6 +58,36 @@ export function gmProvisionedMinutes(journal=[],campaignId,actorId,policyRow,sta
  * are retained for the GM audit. Multiple switches never round separately. */
 export function gmProvisionedQuantity(journal=[],campaignId,actorId,policyRow,start,end,need){
  return Math.min(need,Math.max(0,round(need*gmProvisionedMinutes(journal,campaignId,actorId,policyRow,start,end)/DAY)));
+}
+/** The shelter attestation and the separate GM-supply switch describe two
+ * independent sources of real provisioning. Their UI is one effective
+ * yes/no indication, but the immutable receipts must never be duplicated. */
+export function effectivelyProvisionedAt(journal=[],campaignId,actorId,minute=Infinity){
+ return pcShelteredStayAt(journal,campaignId,actorId,minute)||gmProvisionedAt(journal,campaignId,actorId,minute);
+}
+/** Preview the *earliest possible* new Healing obligation when an already
+ * malnourished character has enough confirmed intake or continuing GM
+ * access for the next FULL nutrition day. This is a forecast only, not a new injury, ration or die.
+ * It prevents a calendar showing only the old distant Advance while a closer
+ * daily Healing becomes mandatory at the next 24h closure. */
+export function projectedVerifiedMalnutritionHealingMinute(journal=[],campaignId,actorId,now,kind,originalDueMinute){
+ if(!['starvation','thirst'].includes(kind)||!validMinute(now)||!validMinute(originalDueMinute))return null;
+ const current=activeNutritionPolicies(journal,campaignId,[actorId])[0];
+ if(!current)return null;
+ const p=current.calendarNutritionPolicy;
+ const last=dayRecords(journal,campaignId,actorId).filter(x=>x.calendarNutritionDay.policyId===current.id).at(-1);
+ const start=last?.calendarNutritionDay.endMinute??current.campaignMinute,end=start+DAY;
+ if(start>now||end<=now||end>=originalDueMinute)return null;
+ const needs=p.autoNeeds===true?dailyNutritionNeeds({journal,campaignId,actorId,policyId:current.id,startMinute:start,endMinute:end}):
+  {foodNeed:p.foodNeed,waterNeed:p.waterNeed};
+ const need=kind==='starvation'?needs.foodNeed:needs.waterNeed;
+ const unit=kind==='starvation'?'foodDays':'waterDays';
+ const witnessed=consumeBeforeDay(journal,actorId,campaignId,start,now,unit,start===current.campaignMinute);
+ const covered=gmProvisionedQuantity(journal,campaignId,actorId,current,start,end,need);
+ // Even with known carried stock, a future meal may not actually occur.
+ // Forecast only already-witnessed consumption or a current continuing
+ // GM attestation, never mere ownership or an unassigned Foraging yield.
+ return round(witnessed+covered)>=need?end:null;
 }
 export function activeNutritionPolicies(journal=[],campaignId,actorIds=null){
  const byActor=new Map(),allowed=actorIds?new Set(actorIds):null;
@@ -170,7 +200,13 @@ function reachableWaterLots(database,campaignId,actorId,start,end){
 const consumeBeforeDay=(journal,actorId,campaignId,start,end,unit,includeStart=false)=>round(journal.filter(x=>x.characterId===actorId&&x.calendarCampaignId===campaignId&&
  (includeStart?x.campaignMinute>=start:x.campaignMinute>start)&&x.campaignMinute<=end).reduce((n,x)=>n+
  (x.calendarForagingSupplyUse?.unit===unit&&x.calendarForagingSupplyUse.disposition==='consumed'&&x.calendarForagingSupplyUse.nutritionDayId===undefined?x.calendarForagingSupplyUse.quantity:0)+
- (unit==='foodDays'&&x.calendarForagingCarryEat?.nutritionDayId===undefined?x.calendarForagingCarryEat?.quantity||0:0),0));
+ (unit==='foodDays'&&x.calendarForagingCarryEat?.nutritionDayId===undefined?x.calendarForagingCarryEat?.quantity||0:0)+
+ // A separately witnessed physical ration/water use IS a meal/drink unless
+ // its original evidence explicitly says the OWNER fed a STABLED ANIMAL.
+ // Animal-care use belongs to the animal, not the owner's daily needs.
+ (x.stableHub574?.type==='care'?0:unit==='foodDays'&&x.calendarInventoryRationUse?.nutritionDayId===undefined?
+   x.calendarInventoryRationUse?.quantity||0:unit==='waterDays'&&x.calendarInventoryWaterUse?.nutritionDayId===undefined?
+   x.calendarInventoryWaterUse?.quantity||0:0),0));
 /** A deficit is **accounted**, not an applied medical ailment. The original
  * Starvation/Thirst onset, HR and Advance/Healing Rolls remain unresolved
  * until committed in the persistent ailment executor.

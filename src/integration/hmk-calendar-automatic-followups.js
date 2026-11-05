@@ -9,6 +9,7 @@ import {pendingTrackingAwareness} from './hmk-tracking-awareness-537.js';
 import {dueInjuryMorale,unresolvedInjuryMishaps} from './persistent-combat-state.js';
 import {medicalOriginOfWound,MEDICAL_ORIGIN} from './hmk-medical-origin.js';
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
+import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -56,8 +57,14 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // Its first onset is based on explicit sole-source 24h ration proofs.
   // Advance and Healing dice are NEVER inferred from the time alone.
   for(const m of s?.malnutritionEpisodes??[])if(m.status==='active'&&m.campaignId===(clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`))
-   push(c,'malnutrition-course',m.id,`${m.kind==='thirst'?'Thirst':'Starvation'} · Exposure Advance/Healing d100 (HMK 185–186)`,
-    m.nextDueMinute,'calendar',{episodeId:m.id});
+   {const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
+    const predicted=projectedVerifiedMalnutritionHealingMinute(journal,campaignId,c.id,clock.minute,m.kind,m.nextDueMinute);
+    const healingSoon=Number.isSafeInteger(predicted)&&predicted<m.nextDueMinute;
+    push(c,'malnutrition-course',m.id,healingSoon?
+     `${m.kind==='thirst'?'Thirst':'Starvation'} · Healing d100 při nejbližší plné denní dávce (HMK 185–186; potvrzená spotřeba nebo předpoklad pokračování zajištění GM)`:
+     `${m.kind==='thirst'?'Thirst':'Starvation'} · Exposure Advance/Healing d100 (HMK 185–186)`,
+     healingSoon?predicted:m.nextDueMinute,'calendar',{episodeId:m.id,...(healingSoon?{nutritionHealingForecast:true,originalDueMinute:m.nextDueMinute}:{})});
+   }
   // HMK p.300: a bestowed talisman does NOT simply expire. At the exact
   // end of every period its recipient must make Spirit SR (two successful
   // SR for outsiders). The ORIGINAL astral-talisman executor extends the
