@@ -40,7 +40,8 @@ export function auditArmourLoadout(inventory=[]){
    const paddedQuilted=relevant.filter(a=>['D','Q'].includes(a.material));
    const unmapped=relevant.filter(a=>!a.material);
    const zoneWarnings=[];
-   if(paddedQuilted.length>1)zoneWarnings.push('Multiple padded/quilted articles in one zone: manual p.117 layering review required');
+   const dqOverlap=codes.some(loc=>relevant.filter(a=>a.covered.has(loc)&&['D','Q'].includes(a.material)).length>1);
+   if(dqOverlap)zoneWarnings.push('Overlapping padded/quilted layers at a location: p.117 Bulk review required');
    if(unmapped.length)zoneWarnings.push('Unknown armour material: layering cannot be checked');
    for(const reason of zoneWarnings)warnings.push({zone,reason,articleIds:relevant.map(a=>a.id)});
    zones.push({zone,articleIds:relevant.map(a=>a.id),paddedQuiltedCount:paddedQuilted.length,warnings:zoneWarnings});

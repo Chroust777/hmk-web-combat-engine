@@ -77,8 +77,8 @@ for(const kind of ['poison','disease']){
 }
 {
  const s=fs.readFileSync(path.join(root,'app.js'),'utf8'),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- ok(s.includes("const APP_VERSION='93.742'")&&html.includes('v93.742'),'aligned version');
+ ok(s.includes("const APP_VERSION='93.744'")&&html.includes('v93.744'),'aligned version');
  ok((s.match(/applyDeterministicCalendarOnsets\(\)/g)||[]).length===5,'four GM clock handlers call one onset executor');
  ok(s.includes('campaignMinute:event.minute')&&s.includes('displayCampaignMinute(event.minute)'),'automatic onset is time-stamped at exact event, not later GM time');
 }
-console.log(`PASS ${n} cross-category calendar event barriers, auto onsets, clock, rest, skill safety v93.742`);
+console.log(`PASS ${n} cross-category calendar event barriers, auto onsets, clock, rest, skill safety v93.744`);

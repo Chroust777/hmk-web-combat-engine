@@ -5,7 +5,7 @@ const root=path.resolve(__dirname,'..');
 const read=s=>fs.readFileSync(path.join(root,s),'utf8');
 const app=read('app.js'),cal=read('src/integration/hmk-campaign-calendar-ui.js'),lib=read('library.css'),css=read('book-templates.css'),newCss=read('hmk-global-ui-93741.css'),html=read('index.html'),cold=read('src/integration/hmk-cold-gear-93740.js');
 const tests=[
- ['release matches',/APP_VERSION='93\.742'/.test(app)&&html.includes('93.742')],
+ ['release matches',/APP_VERSION='93\.744'/.test(app)&&html.includes('93.744')],
  ['slash B/E/P/F',app.includes(' / e${numeric(armourValue.e)} / p${numeric(armourValue.p)} / f${numeric(armourValue.f)}')],
  ['no covered location duplication',app.includes("const identicalProtection=baseProtection&&locRows.every")],
  ['omit nested duplicate coverage',app.includes("'locationProtection','coveredLocations'")],
@@ -24,4 +24,4 @@ const tests=[
  ['part crossrefs still interactive but unadorned',lib.includes('.library-part-link')&&newCss.includes('text-decoration:none!important')]
 ];
 for(const [label,ok] of tests)assert.ok(ok,label);
-console.log('PASS '+tests.length+' maintained v93.739→v93.742 library/calendar historical contracts');
+console.log('PASS '+tests.length+' maintained v93.739→v93.744 library/calendar historical contracts');

@@ -14,8 +14,8 @@ export const ARMOUR_LAYER_COLUMNS=Object.freeze([
 ]);
 export const ARMOUR_LAYER_NOTES=Object.freeze([
  'Restrictions checked separately by Body Zone and Location',
- 'No more than five layers per Body Zone',
- 'Only one D or Q layer per five layers',
+ 'No more than five overlapping layers at a Body Zone/Location; distinct disjoint articles are not stacked',
+ 'Only one overlapping D or Q layer per physical stack; Bulk permits one C/D violating article per affected Body Zone',
  'Multi-material columns allow only one article',
  '[kp] means arm/leg articles only',
  'Last over column restricted to Cloak, Mantle, Vest, Surcoat, Coat, Robe, Cuisse; D/Q adds 5 ENC',

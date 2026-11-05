@@ -63,17 +63,16 @@ export function checkArmourLayering(articles=[]){
   const locs=zoneLocations(prepared,zone);
   const relevant=prepared.filter(a=>Array.isArray(a.coveredLocations)&&articleCoversZone(a,zone));
   const zoneIssues=[];
-  // HMK p.117: the five-layer cap applies to the entire Body Zone,
-  // including articles that do not overlap at any single location.
-  if(relevant.length>5)zoneIssues.push({kind:'violation',reason:'More than five articles in Body Zone',ids:relevant.map(a=>a.id)});
-  const dq=prepared.filter(a=>['D','Q'].includes(a.code) && articleCoversZone(a,zone));
-  // HMK p.117: zone-level D/Q limit, even when locations are disjoint.
-  if(dq.length>1)zoneIssues.push({kind:'violation',reason:'More than one D/Q article in Body Zone',ids:dq.map(a=>a.id)});
+  // HMK p.117: layer limits are evaluated within each anatomical stack.
+  // The printed p.116 suits contain >5 distinct articles in one Body Zone;
+  // non-overlapping articles are not consecutive layers of one location.
   const matchSets=[];
   for(const loc of locs){
    const covering=relevant.filter(a=>Array.isArray(a.coveredLocations)&&articleCoversZoneLocation(a,zone,loc));
    if(!covering.length)continue;
    if(covering.length>5)zoneIssues.push({kind:'violation',reason:'More than five layers at location',location:loc});
+   if(covering.filter(a=>['D','Q'].includes(a.code)).length>1)
+    zoneIssues.push({kind:'violation',reason:'More than one D/Q at location',location:loc});
    const ordered=covering.slice().sort((a,b)=>a.layerOrder-b.layerOrder);
    if(covering.some(a=>!Number.isInteger(a.layerOrder))||new Set(covering.map(a=>a.layerOrder)).size!==covering.length){
     zoneIssues.push({kind:'unresolved',reason:'Missing or duplicated inner-to-outer layer order',location:loc});
@@ -88,7 +87,7 @@ export function checkArmourLayering(articles=[]){
   }
   // HMK p.117 Obris: each anatomical location has its own base and
   // material-column assignment. No cross-location slot intersection.
-  // Zone-wide layer and D/Q caps above remain independent constraints.
+  // Bulk remains one C/D exception per affected Body Zone, never one per location.
   zones.push({zone,articleIds:relevant.map(a=>a.id),issues:zoneIssues});issues.push(...zoneIssues.map(x=>({...x,zone})));
  }
  return {format:'hmk-layer-legality-v2',authoritative:false,status:issues.some(i=>i.kind==='invalid'||i.kind==='violation')?'violation':issues.length?'unresolved':'compatible',issues,zones,locations,

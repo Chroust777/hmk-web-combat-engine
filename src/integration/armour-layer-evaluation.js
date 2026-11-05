@@ -85,16 +85,18 @@ function evaluateOrderedArmourSelected(articles,{bulkExceptionByZone={},slotByAr
   if(candidate!==undefined && (typeof candidate!=='string'||!zoneArticles.some(a=>a.id===candidate&&['C','D'].includes(a.code))))errors.push(`Invalid Bulk exception in ${zone}`);
   const excluded=zoneArticles.filter(a=>a.id===candidate);
   const standard=zoneArticles.filter(a=>a.id!==candidate);
-  const dqViolation=zoneArticles.filter(a=>['D','Q'].includes(a.code)).length>1;
-  let originalViolations=dqViolation;
-  // Count distinct articles in the whole zone, not the largest local stack.
-  // One nominated C/D Bulk article can be the sole over-limit exception.
-  if(zoneArticles.length>5)originalViolations=true;
-  let candidateInViolation=dqViolation&&excluded.some(a=>a.code==='D');
-  if(zoneArticles.length>5 && excluded.length)candidateInViolation=true;
+  // HMK p.117 checks Body Zone AND anatomical Location. Multiple distinct
+  // articles in one zone do not automatically form multiple physical layers:
+  // p.116 printed Plate & Mail has eight separate arm articles but never eight
+  // layers at one arm location. Count only the simultaneously overlapping stack.
+  let originalViolations=false;
+  let candidateInViolation=false;
   for(const loc of locs){
    const full=zoneArticles.filter(a=>articleCoversZoneLocation(a,zone,loc));
-   if(full.length>5){originalViolations=true;if(full.some(a=>a.id===candidate))candidateInViolation=true;}
+   if(full.length>5||full.filter(a=>['D','Q'].includes(a.code)).length>1){
+    originalViolations=true;
+    if(full.some(a=>a.id===candidate))candidateInViolation=true;
+   }
    if(full.length&&full.every(a=>Number.isSafeInteger(a.layerOrder))&&new Set(full.map(a=>a.layerOrder)).size===full.length){
     if(!matchesFor([...full].sort((a,b)=>a.layerOrder-b.layerOrder),zone).length){
      originalViolations=true;
@@ -102,17 +104,17 @@ function evaluateOrderedArmourSelected(articles,{bulkExceptionByZone={},slotByAr
     }
    }
   }
-  const dq=standard.filter(a=>['D','Q'].includes(a.code));
   const zoneErrors=[];
-  if(zoneArticles.length>5 && !(candidate && standard.length<=5))zoneErrors.push('More than five articles in Body Zone');
-  if(standard.length>5)zoneErrors.push('More than five ordinary articles in Body Zone');
-  if(dq.length>1)zoneErrors.push('More than one D/Q in Body Zone');
   for(const location of locs){
    const all=zoneArticles.filter(a=>articleCoversZoneLocation(a,zone,location));
    if(!all.length)continue;
    const normal=all.filter(a=>a.id!==candidate);
+   // The exceptional C/D garment may be a sixth overlapping layer only
+   // after its subtraction makes the remaining stack p.117-compatible.
    if(all.length>5 && !(candidate&&normal.length<=5))zoneErrors.push(`${location}: exceeds five layers`);
    if(normal.length>5)zoneErrors.push(`${location}: exceeds five ordinary layers`);
+   if(normal.filter(a=>['D','Q'].includes(a.code)).length>1)
+    zoneErrors.push(`${location}: more than one overlapping D/Q layer`);
    const orderValid=normal.every(a=>Number.isSafeInteger(a.layerOrder))&&new Set(normal.map(a=>a.layerOrder)).size===normal.length;
    if(!orderValid){unresolved.push(`${zone}/${location}: unresolved physical order`);locationReports.push({zone,location,status:'unresolved'});continue;}
    const ordered=[...normal].sort((a,b)=>a.layerOrder-b.layerOrder);
@@ -214,10 +216,17 @@ export function evaluateOrderedArmour(articles,options={}){
  }
  // Combining zone-local proofs is essential for coats affecting both arms
  // and torso. A result is accepted only after a FULL independent audit.
- let best=null,bestMap=null;
+ let best=null,unresolvedBulk=null;
  function examine(i,map){
   if(i===selections.length){
    const checked=evaluateOrderedArmourSelected(articles,{...opts,bulkExceptionByZone:{...fixed,...map}});
+   // A valid exception can still leave its extra ENC ambiguous (e.g. p119
+   // C/Q/D). Preserve that fact as UNRESOLVED rather than a false VIOLATION;
+   // no consumer may use unproven ENC or AV until GM supplies the real slot.
+   if(checked.status==='unresolved'&&!checked.errors.length){
+    if(!unresolvedBulk)unresolvedBulk=checked;
+    return;
+   }
    if(checked.status!=='compatible')return;
    // Prefer the smallest justified Bulk penalty, then a stable ID order.
    const score=[-checked.bulkPenalty,Object.values(map).join('|')];
@@ -227,6 +236,8 @@ export function evaluateOrderedArmour(articles,options={}){
   for(const [zone,id] of selections[i])examine(i+1,{...map,[zone]:id});
  }
  examine(0,{});
+ if(!best&&unresolvedBulk)return {...unresolvedBulk,bulkAutoApplied:false,
+  notes:[...(unresolvedBulk.notes||[]),'A potential p.117 Bulk exception exists, but the exact layer column and ENC must be resolved first']};
  if(!best)return first;
  return {...best.outcome,bulkAutoApplied:true,notes:[...(best.outcome.notes||[]),'Automatic p.117 Cloth/Padded Bulk exception; GM approval not required']};
 }
@@ -255,7 +266,7 @@ export function locallyPossibleArmourArticles(articles){
  const prepared=articles.map(a=>({...a,code:code(a.material)}));
  for(const zone of BODY_ZONES){
   const all=prepared.filter(a=>articleCoversZone(a,zone));
-  if(all.length>6)return false;
+  if(zoneLocations(prepared,zone).some(loc=>all.filter(a=>articleCoversZoneLocation(a,zone,loc)).length>6))return false;
   const locs=zoneLocations(prepared,zone);
   if(!locs.length)continue;
   // No exception, or a single C/D article excused in this Body Zone.
@@ -263,8 +274,10 @@ export function locallyPossibleArmourArticles(articles){
   let zonePossible=false;
   for(const except of possible){
    const standard=all.filter(a=>a.id!==except?.id);
-   if(standard.length>5||standard.filter(a=>['D','Q'].includes(a.code)).length>1)continue;
-   if(locs.every(loc=>checkPermutations(standard.filter(a=>articleCoversZoneLocation(a,zone,loc)),zone))){zonePossible=true;break;}
+   if(locs.every(loc=>{
+    const at=standard.filter(a=>articleCoversZoneLocation(a,zone,loc));
+    return at.length<=5&&at.filter(a=>['D','Q'].includes(a.code)).length<=1&&checkPermutations(at,zone);
+   })){zonePossible=true;break;}
   }
   if(!zonePossible)return false;
  }
@@ -283,17 +296,17 @@ export function localArmourOrderDomains(articles){
  for(const zone of BODY_ZONES){
   const zoneArticles=pre.filter(a=>articleCoversZone(a,zone));
   if(!zoneArticles.length)continue;
-  if(zoneArticles.length>6)return null;
+  if(zoneLocations(pre,zone).some(loc=>zoneArticles.filter(a=>articleCoversZoneLocation(a,zone,loc)).length>6))return null;
   const locations=zoneLocations(pre,zone);
   const exceptions=[null,...zoneArticles.filter(a=>['C','D'].includes(a.code))];
   const options=[];
   for(const except of exceptions){
    const standard=zoneArticles.filter(a=>a.id!==except?.id);
-   if(standard.length>5||standard.filter(a=>['D','Q'].includes(a.code)).length>1)continue;
    const subtasks=[];
    let bad=false;
    for(const loc of locations){
     const parts=standard.filter(a=>articleCoversZoneLocation(a,zone,loc));
+    if(parts.length>5||parts.filter(a=>['D','Q'].includes(a.code)).length>1){bad=true;break;}
     const orders=[];const selected=[],used=new Set();
     const visit=()=>{
      if(selected.length===parts.length){

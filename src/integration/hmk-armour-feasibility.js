@@ -71,8 +71,10 @@ function everyPhysicalOrderWorks(articles,zone){
  return enumerate([],articles);
 }
 function possibleZone(arr,zone){
- if(arr.length>5||arr.filter(a=>a.code==='D'||a.code==='Q').length>1)return false;
- return zoneLocations(arr,zone).every(loc=>possibleColumns(arr.filter(a=>articleCoversZoneLocation(a,zone,loc)),zone));
+ return zoneLocations(arr,zone).every(loc=>{
+  const layers=arr.filter(a=>articleCoversZoneLocation(a,zone,loc));
+  return layers.length<=5&&layers.filter(a=>a.code==='D'||a.code==='Q').length<=1&&possibleColumns(layers,zone);
+ });
 }
 export function assessArmourFeasibility(articles=[]){
  const zones={};
@@ -80,7 +82,7 @@ export function assessArmourFeasibility(articles=[]){
   const covered=articles.filter(a=>articleCoversZone(a,zone));
   const valid=covered.length===0||possibleZone(covered,zone);
   let exceptions=[];
-  if(!valid&&covered.length<=6){
+  if(!valid&&zoneLocations(covered,zone).every(loc=>covered.filter(a=>articleCoversZoneLocation(a,zone,loc)).length<=6)){
    for(const a of covered){
     if(a.code!=='C'&&a.code!=='D')continue;
     if(possibleZone(covered.filter(x=>x.id!==a.id),zone))exceptions.push(a.id);

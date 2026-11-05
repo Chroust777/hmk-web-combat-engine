@@ -231,13 +231,22 @@ function exactCustomOutfit(owned,candidates,mode,presetIncumbent=null){
  let bestRank=presetIncumbent?[best.totalAV,best.rigidLocations,best.metalPointLocations??0,best.metalEdgeLocations??0,
    best.bulkPenalty??0,-(best.extraEnc??0),-Math.round((best.armourWeightLb??0)*10),-best.names.length]:null;
  let branches=0,orderedChecks=0;
- const zoneCount=Object.fromEntries(zones.map(z=>[z,0]));
+ // HMK p.116 has >6 *different* arm articles in a single printed suit,
+ // but at most a handful overlap at any actual location. A zone article
+ // count is NOT a legal cardinality bound and would silently prune valid
+ // customised outfits and falsely call the remaining search "optimal".
+ const locationCount=new Map();
+ const zoneBoundSafe=Object.fromEntries(zones.map(z=>[z,
+  items.filter(c=>c.article.bodyZones?.includes(z)).length<=6]));
  const selected=[],rigidCovered=new Set(),pointCovered=new Set(),edgeCovered=new Set();
  function unionCount(prefix,suffix){let value=prefix.size;for(const loc of suffix)if(!prefix.has(loc))value++;return value;}
  function optimisticRank(i,sum){
   let avUpper=sum+remainingAV[i];
   for(const z of zones){
-   const state=zoneUpper[z][i],free=Math.max(0,6-zoneCount[z]);
+   if(!zoneBoundSafe[z])continue; // The six-article bound would underestimate.
+   const state=zoneUpper[z][i];
+   const selectedInZone=selected.filter(c=>c.article.bodyZones?.includes(z)).length;
+   const free=Math.max(0,6-selectedInZone);
    avUpper=Math.min(avUpper,sum+state.outside+state.inside[free]);
   }
   // CRITICAL: each armour article can give multiple rigid locations. A
@@ -264,9 +273,13 @@ function exactCustomOutfit(owned,candidates,mode,presetIncumbent=null){
    return;
   }
   const c=items[i];
-  if((c.article.bodyZones||[]).every(z=>zoneCount[z]<6)){
+  // Monotone necessary condition: at most 5 regular overlapping layers,
+  // with at most one exceptional C/D layer (6 total) at one location.
+  // Never count non-overlapping pieces against a zone-wide cap.
+  const covered=c.article.coveredLocations||[];
+  if(covered.every(loc=>(locationCount.get(loc)||0)<6)){
    selected.push(c);
-   for(const z of c.article.bodyZones||[])zoneCount[z]++;
+   for(const loc of covered)locationCount.set(loc,(locationCount.get(loc)||0)+1);
    const inserts=[];
    for(const [set,locs] of [[rigidCovered,c.quality.rigidLocations],
     [pointCovered,c.quality.metalPointLocations],[edgeCovered,c.quality.metalEdgeLocations]]){
@@ -274,7 +287,7 @@ function exactCustomOutfit(owned,candidates,mode,presetIncumbent=null){
    }
    visit(i+1,sum+c.quality.av);
    for(const [set,added] of inserts)for(const loc of added)set.delete(loc);
-   for(const z of c.article.bodyZones||[])zoneCount[z]--;
+   for(const loc of covered)locationCount.set(loc,locationCount.get(loc)-1);
    selected.pop();
   }
   visit(i+1,sum);
