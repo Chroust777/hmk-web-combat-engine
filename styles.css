@@ -544,3 +544,12 @@ form label > button[data-hmk-calendar-auto-die]{display:block;width:max-content;
 .hc-episode-weather-timeline th,.hc-episode-weather-timeline td{border:1px solid var(--border,#b4bec6);padding:.4rem .55rem;text-align:left;white-space:nowrap;}
 .hc-episode-weather-timeline tbody tr.hc-weather-timeline-hazard{font-weight:600;}
 .hc-weather-timeline .hc-hint{font-size:.82rem;}
+
+/* v93.730 · PC-only sheltered stay, with in-line labels rather than wide checkbox rows */
+.hc-pc-shelter {margin:12px 0;padding:12px;border:1px solid var(--hc-border,#8b775b);border-radius:8px}
+.hc-pc-shelter h4 {margin:0 0 6px}
+.hc-pc-shelter-list {display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 14px}
+.hc-pc-shelter-item {display:inline-flex!important;align-items:center;gap:6px;padding:6px 10px;max-width:max-content;width:auto!important;border:1px solid #8e8067;border-radius:6px;cursor:pointer}
+.hc-pc-shelter-item input[type="checkbox"] {flex:0 0 auto;width:16px;height:16px;margin:0}
+.hc-pc-shelter-item small {font-size:0.75em;opacity:.76}
+.hc-weather-timeline strong {white-space:normal}
