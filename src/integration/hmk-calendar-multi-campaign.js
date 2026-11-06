@@ -6,9 +6,11 @@
  * A calendar timestamp identifies the event within that campaign ONLY.
  */
 import {validateCampaignCalendar,assertCampaignCalendarAppendOnly} from './hmk-campaign-calendar.js';
+import {initialCombatState} from './persistent-combat-state.js';
 import {coinBalance,ensureCampaignCashAccount} from './hmk-library-economy.js';
 const fail=(msg)=>{throw Error(msg)};
 const clone=v=>structuredClone(v);
+const sameJSON=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const TIME_KEYS=['healthState','injuries','arcane','liveEffects','expedition'];
 export function campaignKey(clock){return clock?.campaignId||`legacy:${clock?.events?.[0]?.id||''}`;}
 export function allCampaignClocks(database){return [...(database.campaignClock?[database.campaignClock]:[]),...(database.campaignClocks||[])];}
@@ -153,7 +155,24 @@ export function assertCampaignActorTimeIsolation(before,after){
    c.hmk?.creation?.values?.autoStartingKit?.source&&
    c.hmk?.creation?.values?.autoGeneration&&
    !(before.inventory||[]).some(i=>i.characterId===c.id);
-  if(signature(old)!==signature(c)||(!initialKitCompletion&&inventoryOf(before,c.id)!==inventoryOf(after,c.id)))
+  const oldMembership=(before.campaignClock?.characterIds||[]).includes(c.id);
+  const newProof=(after.journal||[]).slice((before.journal||[]).length)
+   .find(j=>j.calendarMemberRelease?.actorId===c.id&&
+    j.calendarMemberRelease?.campaignId===campaignKey(before.campaignClock)&&
+    j.calendarMemberRelease?.minute===before.campaignClock?.minute&&
+    j.calendarMemberRelease?.gmConfirmed===true&&
+    j.calendarMemberReleaseArchive?.healthState&&
+    sameJSON(j.calendarMemberReleaseArchive.healthState,old.hmk?.healthState??initialCombatState()));
+  const expectedRelease=clone(old);expectedRelease.hmk??={};
+  const cleanHealth=initialCombatState();
+  cleanHealth.shock=old.hmk?.healthState?.shock==='KIA'?'KIA':'NONE';
+  cleanHealth.events=clone(old.hmk?.healthState?.events??[]);
+  expectedRelease.hmk.healthState=cleanHealth;
+  expectedRelease.hmk.injuries=[];
+  expectedRelease.hmk.expedition={claims:{}};
+  const gmRelease=oldMembership&&newProof&&sameJSON(c,expectedRelease)&&
+   inventoryOf(before,c.id)===inventoryOf(after,c.id);
+  if(!gmRelease&&(signature(old)!==signature(c)||(!initialKitCompletion&&inventoryOf(before,c.id)!==inventoryOf(after,c.id))))
    fail(`Postava ${c.name} není v právě otevřené kampani. Před změnou časově citlivého stavu či inventáře otevřete její kalendář.`);
  }
  return true;
