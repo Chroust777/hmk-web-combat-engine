@@ -905,6 +905,27 @@ export function validateTimeEpisodes(journal=[]){
      'Při opravě výstroje bez chůze nesmí vzniknout fiktivní END hod ani únava z pohybu.');
     continue;
    }
+   // A documented passive patient is not a newly incapacitated walker. The
+   // original live health snapshot was witnessed at departure; no invented END
+   // or timed-medical onset may be required for someone carried from minute 0.
+   if(a.endNotRequired.reason==='transported'){
+    const proof=e.transportProof,health=proof?.originalHealth?.find(x=>x.id===a.id);
+    must(e.transportedMemberIds?.includes(a.id)&&['gm-transport-confirmation-v93.755','gm-transport-confirmation-v93.756'].includes(proof?.format)&&
+     (proof.format!=='gm-transport-confirmation-v93.756'||
+      proof.vehicle?.format==='hmk-confirmed-passenger-vehicle-93756')&&
+     proof.gmConfirmed===true&&proof.conveyance===e.conveyance&&
+     ['cart','wagon'].includes(e.conveyance)&&Array.isArray(proof.memberIds)&&
+     JSON.stringify([...proof.memberIds].sort())===JSON.stringify([...e.transportedMemberIds].sort())&&
+     proof.originalHealth?.length===e.transportedMemberIds.length&&health&&
+     (health.immobile===true||health.fatigue>=40||health.shock!=='NONE'||
+      health.comaActive===true||health.extendedShockActive===true)&&
+     a.endNotRequired.minute===e.startMinute&&a.endNotRequired.sourceKey==='gm-confirmed-transport-v93.755'&&
+     a.roll===null&&a.sr===null&&a.rate===0&&a.movementFatigueUnits===0&&
+     a.delta===Math.floor((a.carryIn+(a.weatherFatigueUnits||0))/240)&&
+     a.carryOut===(a.carryIn+(a.weatherFatigueUnits||0))%240,
+     'Přepravovaný pacient nemá správné potvrzení GM, původ zdravotního stavu nebo vynechaný END.');
+    continue;
+   }
    const witness=e.timedMedical?.find(x=>x.actorId===a.id&&
     x.dueMinute===a.endNotRequired.minute&&x.shockAfter===a.endNotRequired.shock);
    must(witness&&['INC','UNC','KIA'].includes(witness.shockAfter)&&
