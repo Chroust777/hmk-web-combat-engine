@@ -323,7 +323,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.746';
+const APP_VERSION='93.747';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2361,6 +2361,9 @@ function timeEpisodePageHTML(clock,participants){
  const latestEpisodeRow=episodeRecentRows(clock).at(-1);
  const latest=latestEpisodeRow?.calendarTimeEpisode;
  const cid=campaignKey(clock);
+ // The first post-commit Foraging allocation panel renders immediately. Declare
+ // the select-option renderer before latestSuppliesHTML evaluates it (TDZ).
+ const option=(value,text)=>`<option value="${esc(value)}">${esc(text)}</option>`;
  const latestLots=latestEpisodeRow?availableSupplyLots(data.journal,cid).filter(l=>l.sourceId===latestEpisodeRow.id):[];
  const latestFinder=latestEpisodeRow?character(latestEpisodeRow.characterId):null;
  const eligibleRecipients=participants.filter(c=>!c.hmk?.verifiedMountedBreed);
@@ -2408,7 +2411,6 @@ function timeEpisodePageHTML(clock,participants){
   });
  const lastResolvedPause=episodeRecentRows(clock).filter(x=>x.calendarTimeEpisode?.interruption&&
   data.journal.some(j=>j.calendarEpisodeInterruptionResolution?.episodeId===x.id)).at(-1);
- const option=(value,text)=>`<option value="${esc(value)}">${esc(text)}</option>`;
  const characterRows=participants.map((c,i)=>`<label class="hc-check"><input name="memberIds" type="checkbox" value="${esc(c.id)}" ${i===0?'checked':''}> ${esc(c.name)}</label>`).join('');
  const old=activeHMKActivities(data.journal,clock).filter(row=>participants.some(x=>x.id===row.characterId));
  return `<section class="hc-calendar hc-episode-shell"><header class="hc-episode-head"><h2>Časové epizody družiny</h2></header>
@@ -21554,6 +21556,10 @@ function episodeIssue(message,form){
  const forage=message.match(/Foraging Mode\s+(\d+)/i);
  if(forage)return {field:'travelForageD10_'+(Number(forage[1])-1),skill:null,actorId:null};
  if(/Foraging vyžaduje skutečný d10/i.test(message))return {field:'forageD10',skill:null,actorId:null};
+ // Foraging Conditions are deliberately not inferable for roads/wetlands (HMK 147).
+ // Missing habitat must lead GM to the editable biome selector, not a dead-end notice.
+ if(/Nedoložený biotop nebo období pro Foraging/i.test(message))
+  return {field:form?.elements.namedItem('kind')?.value==='travel'?'travelHabitat':'habitat',skill:null,actorId:null};
  // v93.693: both late hazards can block before they have a valid preview.
  // A missing occurrence minute or CF route confirmation must open its own
  // editable field, never a generic read-only explanation with no action.
