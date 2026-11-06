@@ -20,6 +20,25 @@ const info={
  charger:{table:'C',maxZN:20,b:5,shockML:65},
  destrier:{table:'C',maxZN:20,b:6,shockML:75}
 };
+/** Read-only p.355 body table for an existing registered mount. This shares
+ * precisely the B/C breed table used by the original Injury Sequence.
+ * It never creates an animal, wound, armour rating or secondary health state. */
+export function verifiedMountedAnimalAnatomy(breed){
+ if(typeof breed!=='string'||!Object.hasOwn(info,breed))return null;
+ const specification=info[breed],b=specification.table==='B';
+ return {breed,table:specification.table,maxZN:specification.maxZN,
+  naturalBluntAV:specification.b,shockML:specification.shockML,
+  locations:[
+   {code:'hd',name:'Hlava',zone:`1–${b?3:4}`,ln:'1–4',shock:5},
+   {code:'nk',name:'Krk',zone:`1–${b?3:4}`,ln:'5–10',shock:5},
+   {code:'flg',name:'Přední noha',zone:b?'4–5':'5–6',ln:'1–10',shock:2},
+   {code:'flk',name:'Bok',zone:b?'6–12':'7–14',ln:'1–6',shock:4},
+   {code:'ab',name:'Břicho',zone:b?'6–12':'7–14',ln:'7–10',shock:4},
+   {code:'qtr',name:'Záď',zone:b?'13–16':'15–20',ln:'1–5',shock:3},
+   {code:'hlg',name:'Zadní noha',zone:b?'13–16':'15–20',ln:'6–9',shock:2},
+   {code:'tl',name:'Ocas',zone:b?'13–16':'15–20',ln:'10',shock:1}
+  ]};
+}
 /** Breed-verified printed Shock ML for the original animal, never a GM guess. */
 export function verifiedMountedShockML(animal){
  const breed=animal?.hmk?.verifiedMountedBreed;
