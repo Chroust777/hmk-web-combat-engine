@@ -72,6 +72,16 @@ export function episodeEncounterSurprise({partyModes={},conveyance='foot',foeWat
  if(partySkill!==null)requireTrue(procedure.partySkills.includes(partySkill),'Surprise: nesprávná dovednost družiny.');
  if(foeSkill!==null)requireTrue(other==='alert'||foeSkill==='Awareness',
   'Normal a Lax protivník používá Awareness, nikoliv Stealth.');
+ // A success level is not evidence unless the real tested skill was named.
+ // Automatic Surprise never authorises extra (invented or duplicated) tests.
+ requireTrue((partyLevel===null&&partySkill===null)||(partyLevel!==null&&partySkill!==null),
+  'Surprise: doložte současně skutečnou dovednost a úroveň testu družiny.');
+ requireTrue((foeLevel===null&&foeSkill===null)||(foeLevel!==null&&foeSkill!==null),
+  'Surprise: doložte současně skutečnou dovednost a úroveň testu protistrany.');
+ if(procedure.kind==='automatic')requireTrue(partyLevel===null&&foeLevel===null,
+  'Surprise: automatický výsledek nemá žádné nové hody.');
+ if(procedure.kind==='unopposed')requireTrue(procedure.preferred==='party'?foeLevel===null:partyLevel===null,
+  'Surprise: při Unopposed se netestuje méně bdělá strana.');
  let winner=procedure.automaticWinner,verified=false;
  if(procedure.kind==='automatic')verified=true;
  else if(procedure.kind==='unopposed'){
