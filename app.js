@@ -323,7 +323,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.748';
+const APP_VERSION='93.749';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2329,22 +2329,24 @@ function episodeEncounterEventsHTML(count,terrain,period){
  const options=(items)=>items.map(([value,label])=>`<option value="${esc(value)}">${esc(label)}</option>`).join('');
  const terrainOptions=Object.entries(EPISODE_ENCOUNTER_TERRAINS).map(([key,label])=>
   `<option value="${esc(key)}">${esc(label)}</option>`).join('');
- const levelOptions=options([['','— test zatím nedoložen —'],['CF','CF'],['F','F'],['S','S'],['CS','CS']]);
  return `<p class="hc-hint"><strong>${count} skutečných setkání.</strong> Při podrobném vyhodnocení musí mít každé vlastní doloženou minutu, skutečný d4 vzdálenosti a případné Surprise testy. Combat nelze spustit automaticky bez skutečného nepřítele a rozhodnutí GM.</p>`+
  Array.from({length:count},(_,i)=>`<details data-episode-encounter-row="${i}" class="hc-episode-suboptions" open><summary>Setkání ${i+1} · vzdálenost a překvapení HMK 150</summary><div class="hmk-trek-grid">
  <label>Minuta výskytu od počátku úseku<input name="evOffset_${i}" type="number" min="0" step="1" placeholder="Skutečná minuta GM"></label>
- <label>Skutečný d4 · vzdálenost<input name="evD4_${i}" type="number" min="1" max="4" step="1" placeholder="1–4"></label>
+ <label>Skutečný d4 · vzdálenost<span class="hc-episode-die"><input name="evD4_${i}" type="number" min="1" max="4" step="1" placeholder="1–4"><button type="button" data-episode-die="evD4_${i}" data-episode-faces="4">⚄ d4</button></span></label>
  <label>Skutečný terén setkání<select name="evTerrain_${i}"><option value="">— vyberte doložený terén —</option>${terrainOptions}</select></label>
  <input name="evPeriod_${i}" type="hidden" value="${esc(period)}">
  <label>Osvětlení noci<select name="evMoon_${i}">${options([['dark','Tmavá noc'],['quarter','Měsíc / slabé světlo'],['bright','Jasná noc / měsíční svit']])}</select></label>
- <label>Hearing d10 (pouze les, volitelný)<input name="evHearingD10_${i}" type="number" min="1" max="10" placeholder="není nutný"></label>
+ <label>Hearing d10 (pouze les, volitelný)<span class="hc-episode-die"><input name="evHearingD10_${i}" type="number" min="1" max="10" placeholder="není nutný"><button type="button" data-episode-die="evHearingD10_${i}" data-episode-faces="10">⚄ d10</button></span></label>
  <label class="hc-check"><input name="evNonhostile_${i}" type="checkbox"> GM potvrdil klidné setkání (bez Surprise)</label>
  <label>Skutečná bdělost protistrany<select name="evFoeWatchfulness_${i}">${options([['','— zvolí GM —'],['lax','Lax · nepozorná'],['normal','Normal · běžná'],['alert','Alert · ostražitá']])}</select></label>
  <label class="hc-check"><input name="evFoeIsBeast_${i}" type="checkbox"> Protistrana je zvíře (Alert podle HMK)</label>
- <label>Test družiny<select name="evPartySkill_${i}">${options([['','— žádný / automatický výsledek —'],['Awareness','Awareness'],['Stealth','Stealth']])}</select></label>
- <label>Výsledek testu družiny<select name="evPartyLevel_${i}">${levelOptions}</select></label>
- <label>Test protistrany<select name="evFoeSkill_${i}">${options([['','— žádný / automatický výsledek —'],['Awareness','Awareness'],['Stealth','Stealth']])}</select></label>
- <label>Výsledek testu protistrany<select name="evFoeLevel_${i}">${levelOptions}</select></label>
+ <label>Dovednost průvodce družiny<select name="evPartySkill_${i}">${options([['','— automaticky / bez hodu —'],['Awareness','Awareness'],['Stealth','Stealth']])}</select></label>
+ <label>Skutečný d100 družiny<span class="hc-episode-die"><input name="evPartyD100_${i}" type="number" min="1" max="100" placeholder="1–100"><button type="button" data-episode-die="evPartyD100_${i}" data-episode-faces="100">⚄ d100</button></span></label>
+ <label>Doložené EML družiny<input name="evPartyEML_${i}" type="number" min="-200" max="200" placeholder="skutečné EML průvodce"></label>
+ <label>Dovednost průvodce protistrany<select name="evFoeSkill_${i}">${options([['','— automaticky / bez hodu —'],['Awareness','Awareness'],['Stealth','Stealth']])}</select></label>
+ <label>Skutečný d100 protistrany<span class="hc-episode-die"><input name="evFoeD100_${i}" type="number" min="1" max="100" placeholder="1–100"><button type="button" data-episode-die="evFoeD100_${i}" data-episode-faces="100">⚄ d100</button></span></label>
+ <label>Doložené EML protistrany<input name="evFoeEML_${i}" type="number" min="-200" max="200" placeholder="skutečné EML protistrany"></label>
+ <p class="hc-hint">SL se odvodí ze skutečného d100 a EML (HMK 60–62); ruční volba S/F/CS/CF sama o sobě není dokladem hodu. U cizí protistrany GM doloží skutečné EML. Cestování nic neodesílá do Combatu.</p>
  <label>Rozhodnutí GM po Surprise<select name="evDecision_${i}">${options([['','— zatím nerozhodnuto —'],['observe','Pozorovat'],['leave','Vzdálit se'],['parlay','Vyjednávat'],['ambush','Útok / Combat samostatně']])}</select></label>
  </div><p class="hc-hint" data-episode-encounter-readout="${i}">Doložte skutečný d4, přesnou minutu, bdělost a podle tabulky nutný test; nic se nedopočítává z neexistujícího hodu.</p></details>`).join('');
 }
@@ -21584,8 +21586,38 @@ function episodeIssue(message,form){
  }
  const weather=message.match(/Weather Hazard\s+([^/\s]+)\/(cold|heat)/i);
  if(weather)return {field:'whProof_'+weather[2]+'_'+weather[1],skill:'Endurance',actorId:weather[1]};
- const encounter=message.match(/(?:Encounter|Setkání)\s*#(\d+)/i);
- if(encounter)return {field:/minuta výskytu/i.test(message)?'evOffset_'+(Number(encounter[1])-1):'evD4_'+(Number(encounter[1])-1),skill:null,actorId:null};
+ // Route detailed Encounter/Surprise failures to their OWN editable field.
+ // Older messages use "Encounter #1" while current preview uses "Encounter 1:".
+ // Never highlight distance d4 for an unrelated missing Surprise receipt.
+ const encounter=message.match(/(?:Encounter|Setkání)\s*#?\s*(\d+)\s*:?/i);
+ if(encounter){
+  const i=Number(encounter[1])-1,part=message.slice(encounter.index+encounter[0].length);
+  const name=(prefix)=>prefix+'_'+i;
+  let field;
+  if(/minut[au] výskytu|skutečnou minutu/i.test(part))field=name('evOffset');
+  else if(/Encounter Distance/i.test(part)){
+   const missingDistance=['evTerrain','evD4','evMoon'].map(name).find(key=>!String(form?.elements.namedItem(key)?.value||'').trim());
+   field=missingDistance||name('evTerrain');
+  }
+  else if(/skutečný d4|d4 pro vzdálenost/i.test(part))field=name('evD4');
+  else if(/Hearing|sluch/i.test(part))field=name('evHearingD10');
+  else if(/terén|Distance/i.test(part))field=name('evTerrain');
+  else if(/bdělost/i.test(part))field=name('evFoeWatchfulness');
+  else if(/dovednost družiny/i.test(part))field=name('evPartySkill');
+  else if(/skutečný d100 družiny|d100 družiny/i.test(part))field=name('evPartyD100');
+  else if(/EML družiny/i.test(part))field=name('evPartyEML');
+  else if(/úroveň testu družiny/i.test(part))field=name('evPartyD100');
+  else if(/skutečný d100 protistrany|d100 protistrany/i.test(part))field=name('evFoeD100');
+  else if(/EML protistrany/i.test(part))field=name('evFoeEML');
+  else if(/úroveň testu protistrany/i.test(part))field=name('evFoeD100');
+  else if(/dovednost protistrany|Normal a Lax protivník/i.test(part))field=name('evFoeSkill');
+  else if(/rozhodnutí GM/i.test(part))field=name('evDecision');
+  else if(/Surprise testy|úroveň|úrovně|testu/i.test(part)){
+   const needed=['evFoeWatchfulness','evPartySkill','evPartyD100','evPartyEML','evFoeSkill','evFoeD100','evFoeEML','evDecision'];
+   field=missing(needed.map(name))||name('evDecision');
+  }else field=name('evD4');
+  return {field,skill:null,actorId:null};
+ }
  const rules=[
   [/aspoň jednu postavu|alespoň jednu postavu/i,'memberIds'],
   [/Průvodce musí/i,'guideId'],
@@ -21827,6 +21859,8 @@ function episodeEncounterProbability(form,clock,sky){
   d100:100,d100Sub:100,lightMinutes});
 }
 function episodePreviewFromForm(form,clock){
+ // A failed/aborted orientation must never leak the previous episode's Watchfulness.
+ delete form.dataset.episodeOrientationModes;
  const v=episodeFormSnapshot(form),members=v.memberIds||[],people=members.map(character);
  episodeAssertScopedSkillInputs(v);
  if(!people.length)throw Error('Vyberte aspoň jednu postavu.');
@@ -21923,6 +21957,7 @@ function episodePreviewFromForm(form,clock){
    droverSkill:drover});
   form.dataset.episodeOrientationStars=String(orientation?.stars??0);
   form.dataset.episodeOrientationSv=String(orientation?.adjustment?.adjustedSV??'');
+  form.dataset.episodeOrientationModes=JSON.stringify(orientation?.modes||{});
  }
  // Tracking light penalty varies (-1 twilight / -3 night). Re-evaluate
  // ONLY when actual Tracking is performed, never block ordinary movement.
@@ -22253,16 +22288,40 @@ function episodePreviewFromForm(form,clock){
    const eventAt=clock.minute+offset;
    const period=autoLight?.segments.find(x=>x.start<=eventAt&&eventAt<x.end)?.period||actualPeriod;
    const hearingRaw=String(v['evHearingD10_'+i]??'').trim();
-   const distance=episodeEncounterDistance({terrain:v['evTerrain_'+i],d4,period,
-    moon:v['evMoon_'+i]||'dark',hearingD10:hearingRaw?Number(hearingRaw):null});
+   let distance;
+   try{distance=episodeEncounterDistance({terrain:v['evTerrain_'+i],d4,period,
+    moon:v['evMoon_'+i]||'dark',hearingD10:hearingRaw?Number(hearingRaw):null});}
+   catch(err){throw Error('Encounter '+(i+1)+': '+err.message);}
    const nonhostile=!!v['evNonhostile_'+i];
-   const surprise=nonhostile?null:episodeEncounterSurprise({partyModes:orientation?.modes||{},
-    conveyance:v.conveyance,foeWatchfulness:v['evFoeWatchfulness_'+i]||'',
-    foeIsBeast:!!v['evFoeIsBeast_'+i],partySkill:v['evPartySkill_'+i]||null,
-    foeSkill:v['evFoeSkill_'+i]||null,partyLevel:v['evPartyLevel_'+i]||null,
-    foeLevel:v['evFoeLevel_'+i]||null,decision:v['evDecision_'+i]||null});
-   if(surprise&&(!surprise.verified||!surprise.decision))
-    throw Error('Encounter '+(i+1)+': doložte všechny skutečně potřebné Surprise testy a rozhodnutí GM.');
+   let surprise=null;
+   if(!nonhostile){
+    try{surprise=episodeEncounterSurprise({partyModes:orientation?.modes||{},
+     conveyance:v.conveyance,foeWatchfulness:v['evFoeWatchfulness_'+i]||'',
+     foeIsBeast:!!v['evFoeIsBeast_'+i],partySkill:v['evPartySkill_'+i]||null,
+     foeSkill:v['evFoeSkill_'+i]||null,
+     partyRoll:String(v['evPartyD100_'+i]||'').trim()?Number(v['evPartyD100_'+i]):null,
+     partyEML:String(v['evPartyEML_'+i]||'').trim()?Number(v['evPartyEML_'+i]):null,
+     foeRoll:String(v['evFoeD100_'+i]||'').trim()?Number(v['evFoeD100_'+i]):null,
+     foeEML:String(v['evFoeEML_'+i]||'').trim()?Number(v['evFoeEML_'+i]):null,
+     requireWitness:true,decision:v['evDecision_'+i]||null});}
+    catch(err){throw Error('Encounter '+(i+1)+': '+err.message);}
+   }
+   if(surprise&&!surprise.verified){
+    const expected=surprise.procedure==='opposed'?['party','foe']:[surprise.preferred];
+    for(const side of expected){
+     const text=side==='party'?'družiny':'protistrany';
+     const chosen=side==='party'?v['evPartySkill_'+i]:v['evFoeSkill_'+i];
+     const level=side==='party'?v['evPartyLevel_'+i]:v['evFoeLevel_'+i];
+     if(!chosen)throw Error('Encounter '+(i+1)+': chybí dovednost '+text+' pro Surprise.');
+     if(!String(v[(side==='party'?'evPartyD100_':'evFoeD100_')+i]||'').trim())
+      throw Error('Encounter '+(i+1)+': chybí skutečný d100 '+text+' pro Surprise.');
+     if(!String(v[(side==='party'?'evPartyEML_':'evFoeEML_')+i]||'').trim())
+      throw Error('Encounter '+(i+1)+': chybí doložené EML '+text+' pro Surprise.');
+    }
+    throw Error('Encounter '+(i+1)+': Surprise vyžaduje další doložený test.');
+   }
+   if(surprise&&!surprise.decision)
+    throw Error('Encounter '+(i+1)+': chybí rozhodnutí GM po Surprise.');
    // Combat changes the shared calendar. Never declare more travel minutes
    // beyond a fight that is already known to occur inside this interval.
    if(surprise?.decision==='ambush'&&offset!==minutes-1)
@@ -22419,7 +22478,7 @@ function renderEpisodeEndStatus(form,result,weather){
   for(const e of result.encounterDetails||[]){
    rows.push(['Encounter #'+(e.i+1),e.pending?'Čeká na rozhodnutí GM':
     (e.externalToGM?'GM rozhodl: '+(e.disposition==='adjudicated'?'samostatně mimo aplikaci':'bez dalšího vyhodnocení'):
-     'Doložená vzdálenost '+e.distance.sightingFeet+' ft · '+(e.nonhostile?'klidné setkání':'Surprise '+e.surprise.winner+' / '+e.surprise.decision)),
+     'Doložená vzdálenost '+e.distance.sightingFeet+' ft · '+(e.nonhostile?'klidné setkání':'Surprise '+e.surprise.procedure+' · '+(e.surprise.partyEvidence?'družina d100 '+e.surprise.partyEvidence.roll+' / EML '+e.surprise.partyEvidence.eml+' → '+e.surprise.partyLevel+' · ':'')+(e.surprise.foeEvidence?'protistrana d100 '+e.surprise.foeEvidence.roll+' / EML '+e.surprise.foeEvidence.eml+' → '+e.surprise.foeLevel+' · ':'')+(e.surprise.winner||'nikdo')+' / '+e.surprise.decision)),
     '', 'encounterResolution']);
   }
 
@@ -22807,6 +22866,45 @@ function updateEpisodeTaskFocus(form){
   }
  }
 }
+// Global dice contract: if the Surprise procedure does not call for a side's
+// d100, BOTH its manual field and its shared blue d100 button are disabled.
+// Obsolete values are cleared ONLY in the uncommitted draft after the GM
+// changes Watchfulness/procedure; no persisted journal receipt is touched.
+function episodeSyncSurpriseAvailability(form){
+ const raw=form.dataset.episodeOrientationModes;
+ if(!raw)return false;
+ let modes;try{modes=JSON.parse(raw);}catch{return false;}
+ const v=episodeFormSnapshot(form);if(v.kind!=='travel')return false;
+ let removed=false;
+ for(const row of form.querySelectorAll('[data-episode-encounter-row]')){
+  if(row.hidden||v.encounterResolution!=='detailed')continue;
+  const i=Number(row.dataset.episodeEncounterRow),friendly=!!v['evNonhostile_'+i];
+  const beast=!!v['evFoeIsBeast_'+i];
+  const foe=beast?'alert':v['evFoeWatchfulness_'+i];
+  let sides=[];
+  if(!friendly&&['lax','normal','alert'].includes(foe))try{
+   const watch=trekWatchfulness({modes,conveyance:v.conveyance});
+   const procedure=trekSurpriseProcedure({party:watch,foe});
+   sides=procedure.kind==='automatic'?[]:procedure.kind==='opposed'?['Party','Foe']:
+    procedure.preferred==='party'?['Party']:['Foe'];
+  }catch{}
+  for(const side of ['Party','Foe']){
+   const enabled=!friendly&&sides.includes(side);
+   for(const suffix of ['Skill','D100','EML']){
+    const name='ev'+side+suffix+'_'+i,field=form.elements.namedItem(name);
+    if(field){
+     if(!enabled&&String(field.value||'').trim()){field.value='';removed=true;}
+     field.disabled=!enabled;
+     field.title=enabled?'Skutečný doložený test Surprise (HMK 150).':
+      'Pro tuto proceduru Surprise se tato strana netestuje.';
+    }
+    const button=form.querySelector('[data-episode-die="'+name+'"]');
+    if(button)button.disabled=!enabled;
+   }
+  }
+ }
+ return removed;
+}
 function updateEpisodePreview(form){
  if(!form)return;
  // Reassert the original episode identity even if a script tries to modify
@@ -22998,7 +23096,7 @@ function updateEpisodePreview(form){
     ' %. '+(episodeEvaluationRequested?'Automatický hod: '+form.elements.namedItem('encounterD100').value+'/'+form.elements.namedItem('encounterD100Sub').value+
     (episodeEncounterByMinutes({minutes:Number(v.minutes),environ:v.environ,night:sky?.period==='night',d100:Number(form.elements.namedItem('encounterD100').value),
      d100Sub:Number(form.elements.namedItem('encounterD100Sub').value),lightMinutes:{day:sky.intervals.minutesByPeriod.day+sky.intervals.minutesByPeriod.twilight,night:sky.intervals.minutesByPeriod.night}}).found?
-      ' · SETKÁNÍ NASTALO — GM připraví Encounter.':' · Bez náhodného setkání.'):
+      ' · SETKÁNÍ NASTALO — GM rozhodne, zda situaci rozehraje; Cestování Combat nespouští.':' · Bez náhodného setkání.'):
      ' · Kontrola proběhne automaticky při vyhodnocení.'):'Nejprve určete délku a prostředí.';
   }catch(err){encounterSummary.textContent='Encounter: '+err.message;}
  }
@@ -23147,8 +23245,25 @@ function updateEpisodePreview(form){
     if(terrain&&!save['evTerrain_'+i])terrain.value=EPISODE_ENCOUNTER_TERRAINS[v.terrain]?v.terrain:'';
    }
   }
-  for(const row of eventContainer.querySelectorAll('[data-episode-encounter-row]'))
+  for(const row of eventContainer.querySelectorAll('[data-episode-encounter-row]')){
    row.hidden=v.encounterResolution!=='detailed';
+   const i=Number(row.dataset.episodeEncounterRow),friendly=!!v['evNonhostile_'+i],beast=!!v['evFoeIsBeast_'+i];
+   const terrain=String(v['evTerrain_'+i]||'');
+   const forest=['mixed-forest','mixed-woodland','cold-woodland','needleleaf-forest'].includes(terrain);
+   for(const name of ['evHearingD10_'+i]){
+    const input=form.elements.namedItem(name),button=form.querySelector('[data-episode-die="'+name+'"]');
+    if(input){input.disabled=!forest;input.title=forest?'Volitelná skutečná kostka sluchu HMK 150.':'Hearing d10 se neprovádí mimo les a lesnatou krajinu.';}
+    if(button)button.disabled=!forest;
+   }
+   const foeWatchfulness=form.elements.namedItem('evFoeWatchfulness_'+i);
+   if(foeWatchfulness){foeWatchfulness.disabled=friendly||beast;foeWatchfulness.title=beast?'Zvíře, které nespí, je podle HMK automaticky Alert.':'';}
+   for(const kind of ['PartySkill','PartyD100','PartyEML','FoeSkill','FoeD100','FoeEML','Decision']){
+    const field=form.elements.namedItem('ev'+kind+'_'+i);
+    if(field)field.disabled=friendly;
+    const die=form.querySelector('[data-episode-die="ev'+kind+'_'+i+'"]');
+    if(die)die.disabled=friendly;
+   }
+  }
  }
  if(sky)for(const row of form.querySelectorAll('[data-episode-encounter-row]')){
   const index=Number(row.dataset.episodeEncounterRow),offset=Number(form.elements.namedItem('evOffset_'+index)?.value||0);
@@ -23223,8 +23338,12 @@ function updateEpisodePreview(form){
     readout.textContent='Setkání v minutě '+event.offset+' · viditelnost '+event.distance.sightingFeet+' ft'+
      (event.distance.hearingFeet!==null?' · sluch '+event.distance.hearingFeet+' ft':'')+
      (event.nonhostile?' · klidné setkání, bez Surprise':
-      ' · Surprise '+event.surprise.procedure+' · vítěz '+(event.surprise.winner||'nikdo')+
-      ' · rozhodnutí GM '+event.surprise.decision);
+      ' · Surprise '+event.surprise.procedure+
+      (event.surprise.partyEvidence?' · družina d100 '+event.surprise.partyEvidence.roll+' / EML '+event.surprise.partyEvidence.eml+' → '+event.surprise.partyLevel:'')+
+      (event.surprise.foeEvidence?' · protistrana d100 '+event.surprise.foeEvidence.roll+' / EML '+event.surprise.foeEvidence.eml+' → '+event.surprise.foeLevel:'')+
+      ' · překvapila '+(event.surprise.winner==='party'?'družina':event.surprise.winner==='foe'?'protistrana':'nikdo')+
+      ' · počáteční stav '+event.surprise.alertness+' · rozhodnutí GM '+event.surprise.decision+
+      ' · žádný automatický Combat');
    }
   }
   const hz=form.querySelector('[data-episode-hazard-details]');if(hz){
@@ -23389,6 +23508,13 @@ function updateEpisodePreview(form){
   evaluateButton.disabled=!!(awaitingGM||ready);
   evaluateButton.textContent=awaitingGM?'✓ Vyhodnoceno · potvrďte GM vlevo':ready?'✓ Vyhodnoceno · dokončete vpravo':'Vyhodnotit epizodu →';
   evaluateButton.title=awaitingGM?'Všechny aktuální výsledky jsou doloženy. Zaškrtněte potvrzení GM ve formuláři vlevo.':ready?'Všechny povinné výsledky jsou doložené. Nyní dokončete celou epizodu vpravo.':'';
+ }
+ // Re-synchronise after orientation becomes known (even if later inputs are missing).
+ // Clearing no-longer-applicable *draft* rolls must also clear the stale blocker.
+ if(episodeSyncSurpriseAvailability(form)&&!form.dataset.episodeSurpriseResync){
+  form.dataset.episodeSurpriseResync='true';
+  try{updateEpisodePreview(form);}finally{delete form.dataset.episodeSurpriseResync;}
+  return;
  }
  updateEpisodeTaskFocus(form);
  hideVisibleTechnicalUUIDs(form.closest('.hc-episode-shell')||form);
