@@ -112,7 +112,8 @@ import {missingPrintedArmourCatalogEntries} from './src/integration/armour-artic
 import {identifyWornPrintedSuit,resolvePrintedSuitProtection,selectPrintedSuitRigidStatus} from './src/integration/printed-suit-combat.js';
 import {hmkHumanLocationSymbols} from './src/integration/injury-special-hmk.js';
 import {hmkAnimalLocationSymbols} from './src/integration/injury-special-hmk.js';
-import {verifiedMountedAnimalAnatomy} from './src/integration/hmk-mounted-live-animal-falling.js';
+import {verifiedMountedAnimalAnatomy,verifiedMountedShockML} from './src/integration/hmk-mounted-live-animal-falling.js';
+import {verifiedNoncombatComaCause} from './src/integration/hmk-noncombat-coma-cause-93753.js';
 import {travelEncounterCharacterHint} from './src/integration/hmk-travel-encounter-context-93750.js';
 import {locationArmourValue} from './src/rules/armour-options.js';
 import {auditPrintedSuitLayers} from './src/integration/armour-suit-layer-audit.js';
@@ -326,7 +327,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.752';
+const APP_VERSION='93.753';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11166,20 +11167,32 @@ function hskEnvironmentalWoundCarePanel(actor){
 /** Weather Shock is a distinct original procedure with its own calendar
  * minute, actor and immutable source ID. Combat still sees resulting fatigue,
  * wounds and Shock, but cannot create a second Weather roll. */
+/** Shock ML is read from the live actor if explicitly registered. For a
+ * registered mount without an individual entry, HMK p.355 supplies the
+ * original printed breed Shock ML. Never guess for an unknown animal. */
+function hskVerifiedNoncombatShockML(actor){
+ if(!actor)return null;
+ const live=availableMasteries(actor).filter(x=>x.name==='Shock');
+ if(live.length>1)return null; // conflicting authoritative entries
+ if(live.length===1)return Number.isSafeInteger(live[0].ml)&&live[0].ml>0?live[0].ml:null;
+ const printed=verifiedMountedShockML(actor);
+ return Number.isSafeInteger(printed)&&printed>0?printed:null;
+}
 function hskWeatherShockFollowup(actorId){
  const actor=character(actorId),state=actor&&persistentStateOf(actor),q=state?.shockFollowup;
  if(!q||!isNoncombatMedicalOrigin(q.domain))return '';
  const clock=data.campaignClock,minute=clock?.minute;
  const dueMinute=q.phase==='after-all-bleeding-stopped'?q.originMinute:q.kind==='UNC'?q.originMinute+10:q.originMinute;
- const shockML=actor?availableMasteries(actor).find(x=>x.name==='Shock')?.ml:null;
+ const shockML=hskVerifiedNoncombatShockML(actor);
  const canRoll=Number.isSafeInteger(minute)&&minute>=dueMinute&&Number.isSafeInteger(shockML);
  const fatigue=combatFatigueTotals(state).total,eml=Number(shockML)-fatigue-(q.kind==='STN'?0:20);
+ const comaCause=verifiedNoncombatComaCause({actor,state,shockFollowup:q});
  return `<section class="panel wide hmk-weather-shock-followup"><h3>${q.domain==='travel-accident'?'Accident':'Weather'} Shock · ${esc(actor.name)} · ${esc(q.kind)}</h3>
  <p class="hc-hint">Samostatný Shock Reroll z cestování (${esc(q.sourceId)}). Původ ${esc(displayCampaignMinute(q.originMinute))}. ${q.phase==='after-all-bleeding-stopped'?'Okamžitý Shock Reroll po zastavení všech Bleederů':q.kind==='UNC'?'Počkat skutečných 10 minut':'Po další skutečné akci mimo boj vyhodnoť tento hod'}. Kalendář je autoritou pro minuty; tento hod jej sám neposune. Combat pouze čte účinky na postavu (HMK 169, 185).</p>
  <p>Shock ML ${esc(String(shockML??'nedoloženo'))} · Fatigue ${fatigue} · ${q.kind==='STN'?'bez dalšího −20':'−20 při INC/UNC'} · EML ${esc(String(Number.isInteger(shockML)?eml:'nedoloženo'))}</p>
  <form data-weather-shock-followup><input type="hidden" name="sourceId" value="${esc(q.sourceId)}">
  <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required ${canRoll?'':'disabled title="Shock ještě není splatný nebo chybí ověřená ML"'}></label>
- ${q.kind==='UNC'?`<label>Pokud nastane UNC + CF: Location Shock z původní rány<input name="comaLocationShock" type="number" min="0" max="15" ${canRoll?'':'disabled'}></label><label>Injury Level původní rány<input name="comaInjuryLevel" type="number" min="1" max="5" ${canRoll?'':'disabled'}></label><label>První d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" ${canRoll?'':'disabled'}></label>`:''}
+ ${q.kind==='UNC'?`<p class="hc-hint">${comaCause.ready?'Coma při CF: původní rána '+esc(comaCause.woundId)+' · ověřené Location Shock '+comaCause.locationShock+' · IL '+comaCause.injuryLevel+' · počáteční HR '+comaCause.initialHR+'. Hodnoty nejsou upravitelné.':'Coma při CF: '+esc(comaCause.reason)}</p><input name="comaLocationShock" type="hidden" value="${comaCause.ready?comaCause.locationShock:''}"><input name="comaInjuryLevel" type="hidden" value="${comaCause.ready?comaCause.injuryLevel:''}"><label>První skutečný d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" ${canRoll&&comaCause.ready?'':'disabled'}></label>`:''}
  <p class="hc-hint">${q.phase==='after-all-bleeding-stopped'?'Ihned po zastavení všech Bleederů – bez dalších deseti minut.':q.kind==='UNC'?'Test je dostupný přesně po uplynutí deseti minut.':'Tlačítko vyhodnotí Shock po dokončení následující skutečné akce postavy; žádný bojový tah se nevytváří.'}</p>
  ${q.kind!=='UNC'&&q.phase!=='after-all-bleeding-stopped'?'<label><input type="checkbox" name="actualActionConfirmed" required '+(canRoll?'':'disabled')+'> GM potvrzuje skutečnou následující akci mimo boj, na jejímž konci probíhá Shock Reroll</label>':''}
  <button type="submit" ${canRoll?'':'disabled'}>Vyhodnotit a zapsat Shock d100</button><output role="status" aria-live="polite"></output></form>
@@ -12366,7 +12379,7 @@ document.addEventListener('submit',event=>{
   const elapsed=clock.minute-q.originMinute,due=q.phase==='after-all-bleeding-stopped'?0:q.kind==='UNC'?10:0;
   if(elapsed<due||elapsed<0)throw Error('Weather Shock test nesmí předcházet splatné minutě');
   if(!calendarMemberIds(clock,data.characters).some(c=>c.id===actor.id))throw Error('Shock postavy nepatří do této kampaně');
-  const ml=availableMasteries(actor).find(s=>s.name==='Shock')?.ml;
+  const ml=hskVerifiedNoncombatShockML(actor);
   if(!Number.isSafeInteger(ml)||ml<1)throw Error('Postava nemá ověřenou Shock ML');
   const roll=Number(form.elements.namedItem('roll').value),eml=ml-combatFatigueTotals(state).total-(q.kind==='STN'?0:20);
   if(!Number.isInteger(roll)||roll<1||roll>100)throw Error('Vyžadován skutečný Shock d100');
@@ -12378,6 +12391,14 @@ document.addEventListener('submit',event=>{
   const comaLocationShock=form.elements.namedItem('comaLocationShock')?.value?Number(form.elements.namedItem('comaLocationShock').value):null;
   const comaInjuryLevel=form.elements.namedItem('comaInjuryLevel')?.value?Number(form.elements.namedItem('comaInjuryLevel').value):null;
   const initialComaD10=form.elements.namedItem('initialComaD10')?.value?Number(form.elements.namedItem('initialComaD10').value):null;
+  if(q.kind==='UNC'&&sl==='CF'){
+   const cause=verifiedNoncombatComaCause({actor,state,shockFollowup:q});
+   if(!cause.ready)throw Error('Není doložena vyvolávající rána pro Coma: '+cause.reason);
+   if(comaLocationShock!==cause.locationShock||comaInjuryLevel!==cause.injuryLevel)throw Error('Coma: Location Shock a IL neodpovídají původní ráně; upravená nebo zastaralá data se nesmí použít.');
+   if(!Number.isSafeInteger(initialComaD10)||initialComaD10<1||initialComaD10>10)throw Error('Chybí fyzický d10 pro první Coma Course.');
+  }else if(comaLocationShock!==null||comaInjuryLevel!==null||initialComaD10!==null){
+   throw Error('Coma hody a anatomické parametry jsou nepřípustné, pokud Shock Reroll nemá UNC + CF.');
+  }
   const outcome=q.phase==='after-all-bleeding-stopped'?completeTravelBloodShockReroll({
    clock,state,actorId:actor.id,sourceId,shockML:ml,roll,comaLocationShock,comaInjuryLevel,
    initialComaD10,eventId:id,gmConfirmed:true}):applyConfirmedShockRecovery({state,
