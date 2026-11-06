@@ -1,3 +1,4 @@
+import {validateSharedTimeWindowJournal93767,assertSharedEpisodeOverlaps93768} from './hmk-shared-time-window-93767.js';
 /** HMK Keeper's Ledger – GM-timed episodes.
  * Explicit house-rule mode: time is divided into freely chosen episodes,
  * not compulsory four-hour watches. Printed LPW remains the source speed.
@@ -1103,10 +1104,14 @@ export function validateTimeEpisodes(journal=[]){
   const key=j.calendarCampaignId;if(!byCampaign.has(key))byCampaign.set(key,[]);byCampaign.get(key).push(e);
   prior.push(j);
  }
- for(const entries of byCampaign.values()){
-  entries.sort((a,b)=>a.startMinute-b.startMinute);
-  for(let i=1;i<entries.length;i++)must(entries[i].startMinute>=entries[i-1].endMinute,'Herní epizody se nesmějí časově překrývat.');
- }return true;
+ // Keep the existing legacy rules for disjoint chronological episodes;
+ // a GM shared window is the only supported exception to time overlap.
+ assertSharedEpisodeOverlaps93768([...byCampaign].flatMap(([campaignId,entries])=>
+  entries.map(e=>({campaignId,startMinute:e.startMinute,endMinute:e.endMinute,
+   memberIds:e.memberIds||[],animalIds:(e.animals||[]).map(x=>x.id),
+   sharedWindowId:e.sharedWindowId||null}))));
+ validateSharedTimeWindowJournal93767(journal);
+ return true;
 }
 
 /** GM time-scaled Foraging (original printed table, new arbitrary-minute procedure).

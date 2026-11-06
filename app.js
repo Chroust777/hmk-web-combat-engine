@@ -1,3 +1,5 @@
+import {startSharedTimeWindow93767,addSharedTimeGroup93767,confirmSharedTimeWindow93767} from './src/integration/hmk-shared-time-window-93767.js';
+import {captureSharedActivityDelta93769,replaySharedActivityDelta93769,verifySharedActivityQueue93769} from './src/integration/hmk-shared-serial-receipts-93769.js';
 import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js';
 import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js';
 import {heftPenalty,strengthImpactModifier,twoHandedImpactBonus} from './src/rules/weapon-modes.js';
@@ -332,7 +334,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.766';
+const APP_VERSION='93.769';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -969,6 +971,7 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
    const committed=structuredClone(data);
    episodeStageBaseline=committed;
    data=rebaseEpisodeWorkingCopy(committed,stagedWorkingData);
+   if(sharedTimeWindowDraft)sharedPrepareGroupScratch93769(sharedTimeWindowSelectedGroupId);
    // If the sidecar cannot be refreshed, its previous valid snapshot is
    // still replayable over the NEW committed campaign on reload. Do not
    // roll back an independent operation which has already been committed.
@@ -2070,6 +2073,12 @@ let episodeDraftEpoch=uuid();
 // collected in working data, then committed ONCE with the final travel episode.
 // This also protects against the user cancelling after several evaluated rolls.
 let episodeStageBaseline=null;
+// Optional shared GM window. Individual verified subactivities are held ONLY
+// in RAM until the final, one-clock transaction; no geography is tracked.
+let sharedTimeWindowDraft=null;
+let sharedTimeWindowQueue=[];
+let sharedTimeWindowSelectedGroupId=null;
+let episodeQueueAction=false;
 let episodeIndependentMutationInFlight=false;
 let episodeFinalCommitInFlight=false;
 let timeEpisodeDraftCampaign=null;
@@ -2114,28 +2123,161 @@ function episodeStagedRows(working){
 }
 function rebaseEpisodeWorkingCopy(committed,working){
  const next=structuredClone(committed),ids=new Set(next.journal.map(j=>j.id));
+ // A shared-window scratch may contain full PREPARED episodes (with a
+ // speculative group clock). Only independent, GM-confirmed Skill receipts
+ // may cross an unrelated same-minute mutation. The travel episode patches
+ // themselves must remain in the private queue until the ONE final commit.
+ const preparedIds=sharedTimeWindowDraft?new Set(sharedTimeWindowQueue.flatMap(q=>(q.patch?.journal||[]).map(j=>j.id))):null;
  for(const row of episodeStagedRows(working)){
+  if(preparedIds?.has(row.id))continue;
   if(ids.has(row.id))throw Error('Duplicitní Skill receipt při rebase epizody');
   next.journal.push(structuredClone(row));ids.add(row.id);
  }
- validate(next);return next;
+ validate(next);
+ if(sharedTimeWindowDraft){
+  // Check all queued activities against the just-written tentative base.
+  // A changed participant or item must not silently invalidate a receipt.
+  const preview=structuredClone(next),oldData=data;
+  try{
+   data=preview;
+   for(const entry of sharedTimeWindowQueue){
+    if(sharedTravelInputWitness93768(entry.witnessIds)!==entry.witness)
+     throw Error('Nesouvisející zápis změnil účastníka rozpracovaného pochodu. Nejprve přehodnoťte skupinu.');
+    replaySharedActivityDelta93769(preview,entry.patch);
+   }
+  }finally{data=oldData;}
+ }
+ return next;
+}
+/** Token only detects a changed authoritative baseline; it never replaces CAS. */
+function sharedCommittedBaselineToken93769(){
+ const raw=String(storageBaseline||'');let a=2166136261,b=5381;
+ for(let i=0;i<raw.length;i++){const x=raw.charCodeAt(i);a=Math.imul(a^x,16777619);b=Math.imul(b,33)^x;}
+ return raw.length+':'+(a>>>0).toString(16)+':'+(b>>>0).toString(16);
+}
+/** In a virtual group preview, keep only independent uncommitted Skill
+ * receipts. Previous episode receipts come from serialized patches and must
+ * never be loaded twice or persisted as counterfeit confirmed history.
+ */
+function sharedUncommittedSkillRows93769(){
+ if(!episodeStageBaseline)return [];
+ const original=new Set((episodeStageBaseline.journal||[]).map(j=>j.id));
+ const fromPatches=new Set(sharedTimeWindowQueue.flatMap(q=>(q.patch?.journal||[]).map(j=>j.id)));
+ return (data.journal||[]).filter(j=>!original.has(j.id)&&!fromPatches.has(j.id)).map(j=>structuredClone(j));
+}
+/** Switch to a group's PRIVATE working state, never to the saved campaign.
+ * Actual clock is untouched in STORAGE and in episodeStageBaseline.
+ * No imaginary health result/die is introduced by this change of preview.
+ */
+function sharedPrepareGroupScratch93769(groupId=null,{forCommit=false}={}){
+ if(!sharedTimeWindowDraft)return;
+ if(!episodeStageBaseline&&sharedTimeWindowQueue.length)throw Error('Chybí pracovní základ společného okna.');
+ const rows=sharedUncommittedSkillRows93769();
+ const base=structuredClone(episodeStageBaseline||data);
+ const original=new Set(base.journal.map(j=>j.id));
+ for(const row of rows){if(original.has(row.id))throw Error('Duplicitní Skill doklad.');base.journal.push(structuredClone(row));original.add(row.id);}
+ const acts=sharedTimeWindowQueue.filter(q=>q.groupId===groupId);
+ for(const entry of acts)replaySharedActivityDelta93769(base,entry.patch);
+ // Confirmed daily weather is an area/day fact available to other groups;
+ // publish it only inside this private working copy. It is still uncommitted.
+ for(const entry of sharedTimeWindowQueue)if(!forCommit&&entry.groupId!==groupId)
+  for(const row of entry.patch?.journal||[])if(row.calendarTrekDayWeather&&!original.has(row.id)){
+   base.journal.push(structuredClone(row));original.add(row.id);
+  }
+ const anchor=acts.length?acts.at(-1).patch.endMinute:sharedTimeWindowDraft.startMinute;
+ if(anchor>sharedTimeWindowDraft.startMinute){
+  base.campaignClock.minute=anchor;
+  base.campaignClock.events.push({id:'draft-'+sharedTimeWindowDraft.windowId+'-'+anchor,
+   type:'advance',minute:anchor,reason:'Pouze neuložený pracovní čas činnosti; GM ještě neposunul kalendář'});
+ }
+ data=base;
+ sharedTimeWindowSelectedGroupId=groupId;
+ return {startMinute:anchor,remainingMinutes:sharedTimeWindowDraft.endMinute-anchor};
+}
+function sharedValidateWitnessQueue93769(list){
+ const original=data;
+ try{
+  const base=structuredClone(episodeStageBaseline||data);
+  const savedIds=new Set(base.journal.map(j=>j.id));
+  for(const row of sharedUncommittedSkillRows93769())if(!savedIds.has(row.id)){
+   base.journal.push(row);savedIds.add(row.id);
+  }
+  data=base;
+  for(const entry of list){
+   if(sharedTravelInputWitness93768(entry.witnessIds)!==entry.witness)
+    throw Error('Změnil se stav nebo vybavení účastníka '+entry.label+'.');
+   replaySharedActivityDelta93769(data,entry.patch);
+  }
+  return true;
+ }finally{data=original;}
 }
 function persistEpisodeDraftSidecar({snapshotForm=false}={}){
  if(!episodeStageBaseline)return;
  const form=snapshotForm?document.querySelector('#hmk-time-episode-form'):null;
  if(form)timeEpisodeDraft=episodeFormSnapshot(form);
- const body={format:'hmk-episode-sidecar-v1',campaignId:campaignKey(data.campaignClock),minute:data.campaignClock.minute,
-  epoch:episodeDraftEpoch,rows:episodeStagedRows(data),draft:timeEpisodeDraft,
+ const body={format:'hmk-episode-sidecar-v1',campaignId:campaignKey(data.campaignClock),minute:sharedTimeWindowDraft?.startMinute??data.campaignClock.minute,
+  epoch:episodeDraftEpoch,rows:sharedTimeWindowDraft?sharedUncommittedSkillRows93769():episodeStagedRows(data),draft:timeEpisodeDraft,
   request:episodePendingSkillRequest,activeRequestId:episodeActiveSkillRequestId,
   evaluationRequested:episodeEvaluationRequested,identity:episodeEvaluatedIdentity,
   pinned:[...episodePinnedSkillFields],tasks:episodeOutstandingSkillTasks,
-  currentStep:episodeCurrentGuidedStep};
+  currentStep:episodeCurrentGuidedStep,
+  // A shared window contains ephemeral activity executors (functions) that
+  // cannot be serialized. Its Skill receipts are only working data. A reload
+  // must FAIL CLOSED and discard those receipts rather than restoring an
+  // apparently confirmable half-window with a missing activity queue.
+  sharedWindowId:sharedTimeWindowDraft?.windowId||null,
+  sharedQueuedCount:sharedTimeWindowQueue.length,
+  sharedWindow:sharedTimeWindowDraft?structuredClone(sharedTimeWindowDraft):null,
+  sharedSelectedGroupId:sharedTimeWindowSelectedGroupId,
+  sharedQueue:sharedTimeWindowQueue.map(({apply,...receipt})=>structuredClone(receipt)),
+  baselineToken:sharedCommittedBaselineToken93769()};
  localStorage.setItem(EPISODE_SIDECAR_KEY,JSON.stringify(body));
 }
 function discardEpisodeDraftSidecar(){localStorage.removeItem(EPISODE_SIDECAR_KEY);}
 function restoreEpisodeDraftSidecar(){
  const raw=localStorage.getItem(EPISODE_SIDECAR_KEY);if(!raw)return;
  let side;try{side=JSON.parse(raw);}catch{return;}
+ if(side?.sharedWindowId){
+  // Only fully serialized verified receipts may survive a reload. v93.768
+  // closure-only markers are deliberately discarded without touching campaign.
+  try{
+   if(side.format!=='hmk-episode-sidecar-v1'||side.baselineToken!==sharedCommittedBaselineToken93769()||
+    side.sharedWindow?.windowId!==side.sharedWindowId||
+    side.sharedWindow?.campaignId!==campaignKey(data.campaignClock)||
+    side.sharedWindow?.startMinute!==data.campaignClock.minute||
+    !Array.isArray(side.sharedQueue)||side.sharedQueue.length!==side.sharedQueuedCount||
+    !side.sharedQueue.length||!Array.isArray(side.rows))throw Error('Chybí shodný základ nebo úplná fronta.');
+   const allowedEpochs=new Set([side.epoch,...side.sharedQueue.map(q=>q.epoch)]);
+   if(!side.rows.every(j=>!j.calendarEpisodeSkillLink||
+     j.calendarEpisodeSkillLink.campaignId===side.campaignId&&
+     allowedEpochs.has(j.calendarEpisodeSkillLink.episodeEpoch)&&
+     j.calendarEpisodeSkillLink.minute>=side.sharedWindow.startMinute&&
+     j.calendarEpisodeSkillLink.minute<=side.sharedWindow.endMinute))throw Error('Nesouhlasí časové kotvy dokladů.');
+   const committed=structuredClone(data),originalIds=new Set(committed.journal.map(j=>j.id));
+   if(side.rows.some(j=>originalIds.has(j.id)))throw Error('Doklad již byl potvrzen.');
+   const working=structuredClone(committed);working.journal.push(...structuredClone(side.rows));
+   const replay=verifySharedActivityQueue93769(working,side.sharedQueue);
+   if(replay.journal.filter(j=>j.calendarTimeEpisode?.sharedWindowId===side.sharedWindowId).length!==side.sharedQueue.length)
+    throw Error('Chybí nezávislé epizody.');
+   data=working;episodeStageBaseline=committed;
+   sharedTimeWindowDraft=structuredClone(side.sharedWindow);
+   sharedTimeWindowQueue=structuredClone(side.sharedQueue);
+   episodeDraftEpoch=side.epoch;timeEpisodeDraft=side.draft||{};
+   episodePendingSkillRequest=side.request??null;episodeActiveSkillRequestId=side.activeRequestId??null;
+   episodeEvaluationRequested=!!side.evaluationRequested;episodeEvaluatedIdentity=side.identity??null;
+   episodePinnedSkillFields.clear();for(const [k,v] of side.pinned||[])episodePinnedSkillFields.set(k,v);
+   episodeOutstandingSkillTasks=side.tasks||[];episodeCurrentGuidedStep=side.currentStep??null;
+   timeEpisodeDraftCampaign=side.campaignId;
+   if(side.sharedSelectedGroupId)sharedPrepareGroupScratch93769(side.sharedSelectedGroupId);
+   notice='Rozpracované společné okno obnoveno s '+side.sharedQueue.length+' připravenými činnostmi. Před finálním GM potvrzením se všechny doklady znovu ověří.';
+   return;
+  }catch(error){
+   discardEpisodeDraftSidecar();
+   sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];
+   notice='Rozpracované okno nebylo bezpečně obnovitelné ('+(error?.message||error)+'). Autoritativní kampaň a její čas se nezměnily.';
+   return;
+  }
+ }
  if(side?.format!=='hmk-episode-sidecar-v1'||!Array.isArray(side.rows)||!side.rows.length||
   side.campaignId!==campaignKey(data.campaignClock)||side.minute!==data.campaignClock.minute||
   !side.rows.some(j=>j?.calendarEpisodeSkillLink?.episodeEpoch===side.epoch)||
@@ -2445,6 +2587,14 @@ function timeEpisodePageHTML(clock,participants){
  <p>Dokončený úsek již uložil původní Survival CF a Hazard d10. Je nutné provést jen příslušný Agility test a případné zranění. Kalendář nezahajuje nový pochod s neznámou pohyblivostí oběti.</p>
  ${pendingAccidents.map(row=>`<p><strong>${esc(displayCampaignMinute(row.calendarTimeEpisode.endMinute))}</strong> · ${esc(character(row.characterId)?.name||row.characterId)} · hod na hazard d10 ${row.calendarTimeEpisode.hazardDetails.find(h=>h.hazard==='accident').hazardD10}. <button type="button" data-episode-open-accident="${esc(row.characterId)}">Otevřít původní zdravotní následky ve Skill Tests</button></p>`).join('')}</section>`:''}
  <div class="hc-episode-columns"><section class="hc-episode-editor"><h3>1 · Nastavit epizodu</h3>
+<section class="hc-episode-checklist" data-shared-window-control>
+<h4>Společný interval cestování (samostatné rozhodnutí GM)</h4>
+<p class="hc-hint">Nejprve založte jeden interval. Každá další skupina smí využít nejvýše jeho časový rozpočet. Ostatní postavy nemají pohybové testy. Žádná geografická evidence.</p>
+<label>Celkový plán cestování (min) <input type="number" min="1" max="10080" value="60" data-shared-window-minutes></label>
+<button type="button" class="secondary" data-shared-window-create>Založit společný interval (bez hodu)</button>
+<button type="button" class="secondary" data-shared-window-cancel hidden>Zrušit návrh společného intervalu</button>
+<p data-shared-window-summary role="status"></p>
+</section>
 <form id="hmk-time-episode-form" novalidate>
  <input type="hidden" name="episodeTimedRollsJson" value="{}">
  <input type="hidden" name="episodeIncapChoice" value="">
@@ -2636,6 +2786,14 @@ function timeEpisodePageHTML(clock,participants){
  <button type="button" class="hc-episode-evaluate" data-episode-evaluate>Vyhodnotit epizodu →</button>
  </form></section>
  <aside class="hc-episode-result" aria-live="polite"><h3>Vyhodnocení a dokončení</h3><div class="hc-episode-overview" data-episode-overview></div><section class="hc-episode-evidence"><h4>Pravidlové výsledky a doklady</h4><div data-episode-evidence>Dosud žádný doložený výsledek.</div></section><section class="hc-episode-checklist"><h4>Úkoly před dokončením</h4><div data-episode-checklist>Vyplňte délku a skutečné podmínky.</div></section><button type="submit" form="hmk-time-episode-form" class="hc-episode-confirm" data-episode-finalize disabled>Dokončit a zapsat celou epizodu</button>
+ <section class="hc-episode-checklist" data-shared-window-panel>
+ <h4>Společné časové okno · nezávislé skupiny</h4>
+ <p class="hc-hint">Každá skupina může mít několik navazujících činností s vlastními časovými kotvami. Nevyužitý čas se automaticky nestává odpočinkem. Dílčí výsledky se ukládají jen do obnovitelné pracovní fronty; skutečný kalendář posune jedině finální potvrzení GM.</p>
+ <label>Vytvořit nebo pokračovat ve skupině <select data-shared-window-continue><option value="">Nová skupina (od začátku okna)</option></select></label>
+ <div data-shared-window-status></div>
+ <button type="button" class="secondary" data-episode-window-stage disabled>Dokončit činnost skupiny (bez posunu času)</button>
+ <button type="button" class="hc-episode-confirm" data-episode-window-commit disabled>Potvrdit všechny skupiny a posunout kalendář</button>
+ </section>
  <details class="hc-episode-emergency" data-episode-emergency>
   <summary>Nouzové odblokování Cestování</summary>
   <p>Zruší <strong>celou rozpracovanou epizodu včetně všech jejích již vyhodnocených, ale dosud neuložených Skill Testů</strong>. Obnoví se stav před rozpracováním cestovní epizody. Čas, zdravotní stav, únava, zásoby, inventář ani deník se neuloží nebo nezmění. Nezávislé doklady uložené před touto epizodou zůstávají zachované.</p>
@@ -23135,6 +23293,44 @@ function episodeSyncSurpriseAvailability(form){
  }
  return removed;
 }
+/** Snapshot only dependencies for the chosen group, not unrelated PCs.
+ * A GM may continue resolving independent tests at this minute; only a
+ * real change to the group's source state makes its preview stale.
+ */
+function sharedTravelInputWitness93768(ids){
+ const chosen=[...new Set(ids)].sort();
+ const people=chosen.map(id=>character(id)).map(c=>c?structuredClone(c):null);
+ const gear=(data.inventory||[]).filter(x=>chosen.includes(x.characterId))
+  .map(x=>structuredClone(x)).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+ const linkedItemIds=new Set(gear.map(x=>x.itemId));
+ const definitions=(data.items||[]).filter(x=>linkedItemIds.has(x.id))
+  .map(x=>structuredClone(x)).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+ return JSON.stringify({chosen,people,gear,definitions});
+}
+function updateSharedTimeWindowControls(form){
+ const root=document.querySelector('[data-shared-window-panel]');if(!root)return;
+ const selection=root.querySelector('[data-shared-window-continue]');
+ if(selection){
+  const existing=[...new Set((sharedTimeWindowDraft?.groups||[]).map(g=>g.groupId))];
+  const previous=sharedTimeWindowSelectedGroupId||'';
+  selection.innerHTML='<option value="">Nová skupina (od začátku okna)</option>'+existing.map(gid=>{
+   const actions=sharedTimeWindowDraft.groups.filter(g=>g.groupId===gid),last=actions.at(-1);
+   const remaining=sharedTimeWindowDraft.endMinute-(last.startMinute+last.minutes);
+   return `<option value="${esc(gid)}" ${previous===gid?'selected':''} ${remaining<1?'disabled':''}>Pokračovat: ${esc(last.memberIds.map(id=>character(id)?.name||id).join(', '))} · zbývá ${remaining} min</option>`;
+  }).join('');
+ }
+ const stage=root.querySelector('[data-episode-window-stage]'),commit=root.querySelector('[data-episode-window-commit]');
+ const finish=document.querySelector('[data-episode-finalize]');
+ const active=!!sharedTimeWindowDraft,hasGroups=sharedTimeWindowQueue.length>0;
+ if(stage)stage.disabled=!active||!episodeEvaluationRequested||!finish||finish.disabled;
+ if(commit)commit.disabled=!hasGroups||episodeEvaluationRequested||!!episodePendingSkillRequest||episodeOutstandingSkillTasks.length>0;
+ if(finish)finish.hidden=active;
+ const status=root.querySelector('[data-shared-window-status]');
+ if(status)status.innerHTML=active?`<p><strong>Společné okno ${esc(displayCampaignMinute(sharedTimeWindowDraft.startMinute))}–${esc(displayCampaignMinute(sharedTimeWindowDraft.endMinute))}</strong>, ${sharedTimeWindowDraft.minutes} minut · připraveno ${sharedTimeWindowQueue.length} činností</p>${sharedTimeWindowSelectedGroupId&&data.campaignClock?.minute>sharedTimeWindowDraft.startMinute?`<p role="note" class="hc-hint"><strong>Pracovní minuta této skupiny: ${esc(displayCampaignMinute(data.campaignClock.minute))}.</strong> Autoritativní kalendář zůstává na ${esc(displayCampaignMinute(sharedTimeWindowDraft.startMinute))} až do závěrečného potvrzení GM.</p>`:''}<ul>${sharedTimeWindowQueue.map(q=>`<li>${esc(q.label)} · ${esc(q.kind)} · ${esc(q.memberNames.join(', '))} · ${q.minutes} min ${esc(displayCampaignMinute(q.patch.startMinute))}–${esc(displayCampaignMinute(q.patch.endMinute))}, k dispozici ${Math.max(0,sharedTimeWindowDraft.endMinute-q.patch.endMinute)} min pro pokračování</li>`).join('')}</ul>`:'';
+ const summary=document.querySelector('[data-shared-window-summary]');
+ if(summary)summary.textContent=active?`GM založil ${sharedTimeWindowDraft.minutes}min okno. Každá činnost smí být kratší; volný čas se nesmí sám proměnit na odpočinek nebo jiný test.`:'Nejprve založte společné okno, pokud potřebujete současné činnosti více skupin. Jediná samostatná epizoda dál funguje původním způsobem.';
+ const cancel=document.querySelector('[data-shared-window-cancel]');if(cancel)cancel.hidden=!active;
+}
 function updateEpisodePreview(form){
  if(!form)return;
  // Reassert the original episode identity even if a script tries to modify
@@ -23783,6 +23979,7 @@ function updateEpisodePreview(form){
   evaluateButton.textContent=awaitingGM?'✓ Vyhodnoceno · potvrďte GM vlevo':ready?'✓ Vyhodnoceno · dokončete vpravo':'Vyhodnotit epizodu →';
   evaluateButton.title=awaitingGM?'Všechny aktuální výsledky jsou doloženy. Zaškrtněte potvrzení GM ve formuláři vlevo.':ready?'Všechny povinné výsledky jsou doložené. Nyní dokončete celou epizodu vpravo.':'';
  }
+ updateSharedTimeWindowControls(form);
  // Re-synchronise after orientation becomes known (even if later inputs are missing).
  // Clearing no-longer-applicable *draft* rolls must also clear the stale blocker.
  if(episodeSyncSurpriseAvailability(form)&&!form.dataset.episodeSurpriseResync){
@@ -23910,6 +24107,7 @@ function initializeTimeEpisodeForm(form){
  if(!Object.keys(timeEpisodeDraft).length)timeEpisodeDraft=episodeCarrySettingsFromLast();
  episodeAutoBindSkillReceipt();
  episodeFormRestore(form,timeEpisodeDraft);
+ if(sharedTimeWindowDraft){const n=form.elements.namedItem('minutes');if(n){n.max=String(sharedTimeWindowDraft.minutes);n.readOnly=false;}}
  refreshWeatherAreaAVFields(form);
  for(const [field,id] of episodePinnedSkillFields){
   const input=form.elements.namedItem(field);
@@ -23975,6 +24173,7 @@ document.addEventListener('change',e=>{
   const draft=e.target.checked?episodeCarrySettingsFromLast():episodeFreshDraft();
   timeEpisodeDraft={...draft,rememberSettings:e.target.checked};
   episodeFormRestore(form,timeEpisodeDraft);
+ if(sharedTimeWindowDraft){const n=form.elements.namedItem('minutes');if(n){n.max=String(sharedTimeWindowDraft.minutes);n.readOnly=false;}}
  refreshWeatherAreaAVFields(form);
   const re=form.elements.namedItem('orientationReuse');if(re)re.checked=timeEpisodeDraft.orientationUse==='reuse';
  }
@@ -24272,6 +24471,7 @@ document.addEventListener('click',e=>{
  // Restore the pre-test checkpoint; nested Skill Test results were staged in RAM.
  // This does not delete previously committed independent receipts.
  if(episodeStageBaseline){data=structuredClone(episodeStageBaseline);episodeStageBaseline=null;}
+ sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];episodeQueueAction=false;
  discardEpisodeDraftSidecar();
  timeEpisodeDraft={...episodeFreshDraft()};episodePendingRemainderMinutes=null;
  episodeEvaluationRequested=false;episodePendingSkillRequest=null;
@@ -24282,10 +24482,101 @@ document.addEventListener('click',e=>{
  notice='Nouzové odblokování: celá pracovní epizoda včetně jejích Skill Testů byla zahozena. Trvalá data a čas zůstaly beze změny.';
  render();
 },true);
+document.addEventListener('change',e=>{
+ const selector=e.target.closest?.('[data-shared-window-continue]');if(!selector)return;
+ try{
+  if(episodeEvaluationRequested||episodePendingSkillRequest||episodeOutstandingSkillTasks.length)
+   throw Error('Nejprve dokončete již otevřený test této činnosti.');
+  const groupId=selector.value||null;
+  const last=groupId?sharedTimeWindowDraft?.groups.filter(g=>g.groupId===groupId).at(-1):null;
+  const scratch=sharedPrepareGroupScratch93769(groupId);
+  const defaults={...episodeFreshDraft(),weatherSource:'local',minutes:String(scratch.remainingMinutes)};
+  if(last){defaults.memberIds=[...last.memberIds];defaults.animalIds=[...last.animalIds];defaults.stableAnimalIds=[...last.stableAnimalIds];defaults.guideId=last.memberIds[0];}
+  timeEpisodeDraft=defaults;timeEpisodeDraftCampaign=campaignKey(data.campaignClock);episodeDraftEpoch=uuid();
+  persistEpisodeDraftSidecar();render();
+ }catch(error){alert('Skupinu nelze přepnout: '+error.message);updateSharedTimeWindowControls(document.querySelector('#hmk-time-episode-form'));}
+},true);
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-shared-window-create]');if(!btn)return;
+ e.preventDefault();
+ try{
+  if(sharedTimeWindowDraft||sharedTimeWindowQueue.length||episodeEvaluationRequested||episodeStageBaseline)
+   throw Error('Nejdříve dokončete nebo zrušte rozpracovaný interval.');
+  const wanted=Number(document.querySelector('[data-shared-window-minutes]')?.value);
+  const cap=episodeMandatoryWindow();
+  if(cap?.unknown?.length)throw Error('Neověřená povinná událost kalendáře: '+cap.unknown[0].description);
+  if(!Number.isSafeInteger(wanted)||wanted<1||wanted>10080)throw Error('Zadejte 1–10 080 minut.');
+  if(cap?.maxAllowed===0)throw Error('V aktuální minutě je splatný povinný zdravotní test; nejprve jej vyřiďte.');
+  const minutes=Math.min(wanted,cap?.maxAllowed??10080);
+  sharedTimeWindowSelectedGroupId=null;
+  sharedTimeWindowDraft=startSharedTimeWindow93767({campaignId:campaignKey(data.campaignClock),
+   startMinute:data.campaignClock.minute,minutes,windowId:uuid()});
+  timeEpisodeDraft={...timeEpisodeDraft,weatherSource:timeEpisodeDraft.weatherSource||'local',minutes:String(minutes)};
+  notice=wanted>minutes?'Společné okno zkráceno z '+wanted+' na '+minutes+' minut k nejbližšímu povinnému termínu.':'Společné časové okno založeno bez posunu času.';
+  render();
+ }catch(err){alert('Společné okno nebylo založeno: '+err.message);}
+},true);
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-shared-window-cancel]');if(!btn)return;
+ e.preventDefault();if(sharedTimeWindowQueue.length||episodeStageBaseline){alert('Zrušení rozpracovaných skupin proveďte přes Nouzové odblokování, aby se zahozené hody správně vrátily.');return;}
+ sharedTimeWindowDraft=null;sharedTimeWindowSelectedGroupId=null;episodeEvaluationRequested=false;timeEpisodeDraft=episodeFreshDraft();render();
+},true);
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-episode-window-stage]');if(!btn||btn.disabled)return;
+ e.preventDefault();const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
+ episodeQueueAction=true;form.requestSubmit();
+},true);
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-episode-window-commit]');if(!btn||btn.disabled)return;
+ e.preventDefault();
+ if(!sharedTimeWindowDraft||!sharedTimeWindowQueue.length)return;
+ try{
+  // The last selected group's virtual minute is NOT the campaign minute.
+  // Restore the real window-start scratch before single authoritative commit.
+  sharedPrepareGroupScratch93769(null,{forCommit:true});
+  const clock=data.campaignClock;
+  if(!clock||clock.minute!==sharedTimeWindowDraft.startMinute||campaignKey(clock)!==sharedTimeWindowDraft.campaignId)
+   throw Error('Změnil se autoritativní čas kampaně. Rozpracované skupiny nelze potvrdit.');
+  if(episodeEvaluationRequested||episodePendingSkillRequest||episodeOutstandingSkillTasks.length)
+   throw Error('Nejprve dokončete všechny rozpracované hody poslední skupiny nebo ji zrušte.');
+  const list=[...sharedTimeWindowQueue];
+  // Validate again immediately before GM confirmation; this is not a lock
+  // on other Skill Tests, only a proof that each prepared result is current.
+  sharedValidateWitnessQueue93769(list);
+  const clockEventId=uuid();
+  const authorized=confirmSharedTimeWindow93767(sharedTimeWindowDraft,{episodeIds:list.map(x=>x.sourceId),clockEventId,gmConfirmed:true});
+  const names=list.map(x=>x.memberNames.join(', ')).join(' | ');
+  if(!uiConfirm('GM: potvrdit '+list.length+' nezávislých činností od '+displayCampaignMinute(authorized.startMinute)+' do '+displayCampaignMinute(authorized.endMinute)+' a posunout JEDINÝ kalendář o '+authorized.minutes+' minut?'))return;
+  if(!mutate(()=>{
+   for(const entry of list){
+    if(sharedTravelInputWitness93768(entry.witnessIds)!==entry.witness)
+     throw Error('Změna stavu/ENC skupiny mezi přípravou a trvalým potvrzením.');
+    replaySharedActivityDelta93769(data,entry.patch);
+   }
+   data.journal.push({id:uuid(),characterId:list[0].memberIds?.[0]||sharedTimeWindowDraft.groups[0]?.memberIds[0],calendarCampaignId:authorized.campaignId,campaignMinute:authorized.startMinute,
+    createdAt:stamp(),title:'HMK · společné časové okno · '+authorized.minutes+' min',
+    body:'GM potvrdil '+list.length+' nezávislých činností: '+names+'.',calendarTimeWindow:authorized});
+   const reviews=[...new Map(list.flatMap(x=>x.gmReviews).map(x=>[x.id+':'+x.dueMinute,x])).values()];
+   const gmClock=episodeGMStagedClock(clock,reviews);
+   data.campaignClock=advanceCampaignCalendar(gmClock,{deltaMinutes:authorized.minutes,eventId:clockEventId,
+    reason:'GM společné časové okno: '+list.length+' nezávislých činností',gmConfirmed:true,
+    characters:data.characters,journal:[...data.journal,...list.flatMap(x=>x.scopedSurvivalCF)],inventory:data.inventory});
+   applyDeterministicCalendarOnsets();closeWeatherNoEffectAftercare();
+  },{gmClockAdvance:true,episodeCommit:true}))return;
+  sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowSelectedGroupId=null;episodeQueueAction=false;
+  episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;episodeSkillReturnPending=false;
+  episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];
+  timeEpisodeDraft=episodeFreshDraft();episodeEvaluationRequested=false;
+  episodeEvaluatedIdentity=null;episodeCurrentGuidedStep=null;episodeDraftEpoch=uuid();
+  notice='GM potvrdil společné okno: '+authorized.minutes+' minut, '+list.length+' činností, jeden posun kalendáře.';
+  render();
+ }catch(err){alert('Společné okno nebylo zapsáno: '+err.message);}
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(form?.id!=='hmk-time-episode-form')return;
  e.preventDefault();e.stopImmediatePropagation();
  try{
+  if(sharedTimeWindowDraft&&!episodeQueueAction)throw Error('Společné okno je založeno. Připravte činnost skupiny, nebo použijte finální potvrzení okna.');
   const boundaryIssue=episodeSetupIssue(form);
   if(boundaryIssue&&boundaryIssue.field==='minutes')throw Error(boundaryIssue.message);
   if(!episodeEvaluationRequested)throw Error('Nejdříve nastavte podmínky a stiskněte Vyhodnotit epizodu.');
@@ -24310,6 +24601,10 @@ document.addEventListener('submit',e=>{
     throw Error('Při zastavení pochodu doložte skutečné minuty pohybu před ztrátou schopnosti pokračovat.');
   }
   const clock=data.campaignClock,{result,weather,precipitation,v}=episodePreviewFromForm(form,clock);
+  if(sharedTimeWindowDraft&&(result.endMinute>sharedTimeWindowDraft.endMinute||
+   result.startMinute<(sharedTimeWindowSelectedGroupId?
+    sharedTimeWindowDraft.groups.filter(g=>g.groupId===sharedTimeWindowSelectedGroupId).at(-1)?.startMinute??sharedTimeWindowDraft.startMinute:
+    sharedTimeWindowDraft.startMinute)))throw Error('Činnost nesmí překročit zbylé minuty skupiny.');
   if(!v.confirmed)throw Error('GM musí potvrdit skutečný průběh epizody.');
   // The entire selected interval is one transaction. Events retain their relative
   // minute in the receipt; no campaign time, distance or fatigue is committed
@@ -24356,9 +24651,10 @@ document.addEventListener('submit',e=>{
   const next=advanceCampaignCalendar(gmClock,{deltaMinutes:result.minutes,eventId:uuid(),reason:'GM časová epizoda: '+gmMessage,gmConfirmed:true,
    characters:stagedTimed?.characters||data.characters,journal:[...data.journal,...shelterClosures,...(stagedTimed?.generatedJournal||[]),...scopedSurvivalCF],inventory:data.inventory});
   const name=result.memberIds.map(id=>character(id)?.name||id).join(', '),sourceId=uuid();
-  if(!uiConfirm('Potvrdit činnost '+name+' od '+displayCampaignMinute(result.startMinute)+' do '+displayCampaignMinute(result.endMinute)+' a posunout skutečný herní čas?'))return;
+  if(!episodeQueueAction&&!uiConfirm('Potvrdit činnost '+name+' od '+displayCampaignMinute(result.startMinute)+' do '+displayCampaignMinute(result.endMinute)+' a posunout skutečný herní čas?'))return;
   const members=result.memberIds.map(id=>character(id));
-  if(mutate(()=>{
+  let sharedWindowMarker=null,sharedGroupMarker=null;
+  const applyCurrent=()=>{
    // Any committed health state below belongs to existing non-accident
    // legacy branches. Accidents have NO in-episode health write.
    if(shelterClosures.length)data.journal.push(...shelterClosures);
@@ -24459,8 +24755,13 @@ document.addEventListener('submit',e=>{
    let episodeWeatherSourceId=weather.sourceId;
    if(weather.origin==='episode-only'){
     const dayIndex=Math.floor(clock.minute/1440);
-    if(activeAreaWeather(data.journal,campaignKey(clock),dayIndex,weather.area))
-     throw Error('Denní počasí oblasti již existuje; znovu použijte původní dvojici d10.');
+    const existingArea=activeAreaWeather(data.journal,campaignKey(clock),dayIndex,weather.area);
+   if(existingArea){
+    if(!sharedWindowMarker||existingArea.calendarTrekDayWeather.weatherDay.temperatureD10!==weather.weather.temperatureD10||
+     existingArea.calendarTrekDayWeather.weatherDay.precipitationD10!==weather.weather.precipitationD10)
+     throw Error('Stejná oblast a den vyžadují stejnou již potvrzenou dvojici počasí.');
+    episodeWeatherSourceId=existingArea.id;
+   }else{ 
     const day=weather.weather;
     const originNames=['temperatureD10','precipitationD10'];
     const diceOrigins=originNames.map(n=>{const f=form.elements.namedItem(n);return f?.dataset.episodeGenerated===f?.value?'cryptographic-software-die':'manual';});
@@ -24472,16 +24773,60 @@ document.addEventListener('submit',e=>{
       season:day.season,climate:day.climate,landscape:day.landscape,alpine:day.alpine,aridDesert:day.aridDesert,
       latitudeBand:v.latitudeBand||'mid',weatherDay:day,diceOrigins,uniquenessPolicy:'area-day-v93.620'}});
     episodeWeatherSourceId=dailyId;
+    }
    }
    const p={...result,actors,animals,skillLinks,timedMedical:(stagedTimed?.changes||[]).map(x=>({actorId:x.actorId,dueMinute:x.dueMinute,kind:x.kind,cancelled:x.cancelled===true,roll:x.roll??null,sl:x.sl,beforeHR:x.beforeHR,afterHR:x.afterHR,shockAfter:x.shockAfter,
      description:x.description??null,report:x.report??null,sourceKey:x.key??null})),
     incapacitationDecision:v.episodeIncapChoice||null,gmReviews:gm.reviewed.map(p=>({id:p.id,title:p.title,dueMinute:p.dueMinute})),area:weather.area,weatherOrigin:weather.origin,weatherSourceId:weather.sourceId,weatherDailySourceId:episodeWeatherSourceId,
     precipitation,settings:{...v,confirmed:undefined},narrative:v.narrative||'',mapScale:Number(v.mapScale),recovery};
+   if(sharedWindowMarker){p.sharedWindowId=sharedWindowMarker;p.sharedGroupId=sharedGroupMarker;}
    data.journal.push({id:sourceId,characterId:v.guideId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
     createdAt:stamp(),title:'HMK · epizoda · '+(v.area||weather.area)+' · '+result.minutes+' min',
     body:v.narrative||`${name}: ${gmMessage}. Uraženo ${result.distanceMeters} m.`,calendarTimeEpisode:p});
-   data.campaignClock=next;applyDeterministicCalendarOnsets();closeWeatherNoEffectAftercare();
-  },{gmClockAdvance:true,episodeCommit:true})){
+  };
+  if(episodeQueueAction){
+   const groupId=sharedTimeWindowSelectedGroupId||uuid();
+   const basis=sharedTimeWindowDraft;
+   if(!basis)throw Error('Nejdříve založte celkový cestovní interval.');
+   const extended=addSharedTimeGroup93767(basis,{groupId,kind:result.kind,memberIds:result.memberIds,
+    animalIds:(result.animals||[]).map(a=>a.id),stableAnimalIds:v.stableAnimalIds||[],
+    vehicleKey:result.transportProof?.vehicle?.vehicleKey||null,startMinute:result.startMinute,minutes:result.minutes});
+   if(!episodeStageBaseline)episodeStageBaseline=structuredClone(data);
+   sharedTimeWindowDraft=extended;sharedWindowMarker=extended.windowId;sharedGroupMarker=groupId;
+   const witnessIds=[...result.memberIds,...(result.animals||[]).map(a=>a.id),...(v.stableAnimalIds||[])];
+   // Execute the EXISTING HMK executor once against a private copy to
+   // capture a serializable receipt, never against the durable campaign.
+   const before=structuredClone(data);let after;
+   try{data=structuredClone(before);applyCurrent();after=data;}
+   finally{data=before;}
+   const patch=captureSharedActivityDelta93769(before,after,{activityId:sourceId,groupId,
+    startMinute:result.startMinute,endMinute:result.endMinute});
+   sharedTimeWindowQueue.push({sourceId,groupId,patch,epoch:episodeDraftEpoch,label:weather.area,kind:result.kind,minutes:result.minutes,
+    memberNames:result.memberIds.map(id=>character(id)?.name||id),gmReviews:gm.reviewed,scopedSurvivalCF,
+    witnessIds,witness:sharedTravelInputWitness93768(witnessIds)});
+   // Persist only a FAIL-CLOSED recovery marker, never a serialized closure.
+   // If this write fails, do not imply that a restorable window exists.
+   try{persistEpisodeDraftSidecar();}
+   catch(error){
+    sharedTimeWindowQueue.pop();sharedTimeWindowDraft=basis;
+    throw Error('Rozpracované okno nelze bezpečně označit v místním úložišti: '+(error?.message||error));
+   }
+   episodeQueueAction=false;episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;
+   episodeSkillReturnPending=false;episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];
+   episodeEvaluationRequested=false;episodeEvaluatedIdentity=null;episodeCurrentGuidedStep=null;
+   // After finishing a group action, return to the actual window start;
+   // choosing "Pokračovat" explicitly will reconstruct its future scratch.
+   sharedPrepareGroupScratch93769(null);
+   episodeDraftEpoch=uuid();timeEpisodeDraft={...episodeFreshDraft(),weatherSource:'local',minutes:String(extended.minutes)};
+   // The durable sidecar must describe the NEXT clean group, not the old
+   // evaluated form. Otherwise reload would resurrect a false blocker.
+   persistEpisodeDraftSidecar();
+   notice='Činnost skupiny připravena bez zápisu a posunu času. Připravte další skupinu nebo potvrďte společné okno.';
+   render();return;
+  }
+  if(mutate(()=>{applyCurrent();data.campaignClock=next;
+   applyDeterministicCalendarOnsets();closeWeatherNoEffectAftercare();},
+   {gmClockAdvance:true,episodeCommit:true})){
    notice='Epizoda dokončena · '+result.minutes+' minut, '+result.distanceMeters+' metrů.'+(result.hazardDetails?.some(h=>h.externalMedicalPending)?' NEHODA: vyhodnoťte ji v původních Skill Tests / Combat.':'')+(result.weatherExposure?.some(w=>w.exposed)?' WEATHER HAZARD: zdravotní následky vyhodnoťte v původních Skill Tests; další čas čeká na potvrzení.':'')+' Kronika a stav byly aktualizovány.';
    episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;episodeSkillReturnPending=false;episodeDraftEpoch=uuid();
    episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];episodeEvaluationRequested=false;
@@ -24498,6 +24843,7 @@ document.addEventListener('submit',e=>{
    render();
   }
  }catch(err){
+  episodeQueueAction=false;
   const target=data.campaignClock?.minute+(Number(form.elements.namedItem('minutes')?.value)||0);
   if(!explainAndOpenBlockedCalendarTerm(err,target))alert('Epizoda nebyla uložena: '+err.message);
  }

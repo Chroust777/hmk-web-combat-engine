@@ -1,0 +1,26 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('node:assert/strict');
+const ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
+const file=path.join(__dirname,'../src/integration/hmk-shared-time-window-93767.js');
+const out=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const m={exports:{}};new Function('module','exports',out)(m,m.exports);
+const audit=m.exports.assertSharedEpisodeOverlaps93768;
+const e=(start,end,person,win=null,campaign='c')=>({campaignId:campaign,startMinute:start,endMinute:end,memberIds:[person],animalIds:[],sharedWindowId:win});
+let n=0;
+const pass=xs=>{assert.equal(audit(xs),true);n++};
+const reject=(xs,rx)=>{assert.throws(()=>audit(xs),rx);n++};
+pass([]);pass([e(0,10,'a')]);pass([e(0,10,'a'),e(10,20,'a')]);
+reject([e(0,10,'a'),e(9,12,'b')],/překrývat/);
+pass([e(0,10,'a','w'),e(0,10,'b','w')]);
+pass([e(0,10,'a','w'),e(0,10,'b','w'),e(0,10,'c','w')]);
+reject([e(0,10,'a','w'),e(0,10,'a','w')],/Stejný/);
+reject([e(0,10,'a','w1'),e(0,10,'b','w2')],/překrývat/);
+reject([e(0,100,'a','w'),e(0,5,'b','w'),e(6,10,'c')],/překrývat/); // hidden non-neighbour overlap
+pass([e(0,100,'a','w'),e(0,5,'b','w'),e(6,10,'c','w')]);
+pass([e(0,10,'a','w'),e(10,20,'a','w'),e(0,20,'b','w')]);
+pass([e(0,10,'a'),e(0,10,'a',null,'different')]);
+reject([e(0,10,'a'),{...e(0,10,'b'),endMinute:0}],/Neplatné/);
+reject([e(0,10,'a'),{...e(0,10,'b'),memberIds:null}],/Neplatné/);
+reject([{...e(0,10,'a','w'),animalIds:['horse']},{...e(0,10,'b','w'),animalIds:['horse']}],/Stejný/);
+for(let i=1;i<=50;i++)pass([e(0,i,'a','w'),e(0,i,'b','w'),e(i,i+1,'a','w')]);
+console.log('PASS',n,'shared-window nested overlap, actor exclusivity, sequential boundaries, legacy protection');
