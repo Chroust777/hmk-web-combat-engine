@@ -8,8 +8,11 @@ const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const cold=fs.readFileSync(path.join(root,'src/integration/hmk-cold-gear-93740.js'),'utf8');
 let c=0;const has=(what,re)=>{assert.match(app,re,what);c++};
 const after=(a,b)=>{const i=app.indexOf(a),j=app.indexOf(b,i+1);assert(i>=0&&j>i,a+' → '+b);c++};
-assert.match(index,/<title>HMK Keeper’s Ledger · v93\.755<\/title>/);c++;
-has('version',/const APP_VERSION='93\.755'/);
+// Release metadata is not a rule mechanic: check the title against the actual
+// APP_VERSION rather than freezing a historical 93.755 string.
+const release=app.match(/const APP_VERSION='(\d+\.\d+)'/);
+assert.ok(release,'Missing app version');c++;
+assert.ok(index.includes('<title>HMK Keeper’s Ledger · v'+release[1]+'</title>'),'Index/app version mismatch');c++;
 has('Weather Shock d100 disabled',/hskWeatherShockFollowup[\s\S]*?name="roll"[^>]+\$\{canRoll\?'':'disabled/);
 has('Weather Shock coma source read-only',/<input name="comaLocationShock" type="hidden"/);
 has('Weather Shock injury level read-only',/<input name="comaInjuryLevel" type="hidden"/);
