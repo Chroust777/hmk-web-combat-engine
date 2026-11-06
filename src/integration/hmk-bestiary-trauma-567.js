@@ -538,39 +538,13 @@ export function assertAnimalTraumaAppendOnly567(before,after){
  return true;
 }
 
-/** Called before GM advances the campaign clock. Active medical episodes cannot
- * be silently advanced beyond a mandatory scheduled test. The GM may advance
- * precisely to the deadline and resolve the actual roll there. */
+/** Deprecated v93.760: Bestiary temporary creatures are encounter-only.
+ * They do not create mandatory campaign-calendar obligations, whether still on
+ * the scene or dismissed. PC/NPC and registered stable animals are scheduled
+ * by the authoritative campaign agenda, not by these snapshot proofs.
+ * Retained as a compatible API for older callers; it MUST NOT gate the clock.
+ */
 export function requireAnimalMedicalGMTimeMayAdvance567({journal,campaignId,beforeMinute,afterMinute}={}){
  valid(int(beforeMinute,0,1e10)&&int(afterMinute,beforeMinute,1e10),'Neplatné časové rozmezí GM.');
- const created=new Map(),closed=new Set();
- for(const j of journal||[]){const r=j.bestiaryEncounter;
-  if(!r||r.campaignId!==campaignId)continue;
-  if(r.action==='create')created.set(r.id,r);
-  if(r.action==='dismiss')closed.add(r.id);
- }
- // One latest representative per stable animal. Do not lose an ongoing
- // medical obligation just because its most recent encounter was dismissed.
- const latestStable=new Map();
- for(const [id,p] of created)if(p.ownerAnimalId)latestStable.set(p.ownerAnimalId,id);
- for(const [id,p] of created){
-  if(p.ownerAnimalId&&latestStable.get(p.ownerAnimalId)!==id)continue;
-  if(!p.ownerAnimalId&&closed.has(id))continue;
-  const h=animalHealthProjection567(journal,campaignId,id);
-  if(h.shock==='killed')continue;
-  const due=[];
-  if(h.shock==='unconscious'&&h.shockDueMinute!==null)due.push({at:h.shockDueMinute,label:'Shock Reroll (UNC)'});
-  if(h.extendedShock?.active&&h.extendedShockDueMinute!==null)due.push({at:h.extendedShockDueMinute,label:'Extended Shock Course'});
-  if(h.bloodHealingDueMinute!==null)due.push({at:h.bloodHealingDueMinute,label:'Blood Loss Healing'});
-  if(h.coma?.active&&h.comaDueMinute!==null)due.push({at:h.comaDueMinute,label:'Coma Course'});
-  if(h.infectionDueMinute!==null)due.push({at:h.infectionDueMinute,label:'Infection Course'});
-  for(const wound of h.wounds){if(wound.healed)continue;
-   if(wound.grimDueMinute!==null)due.push({at:wound.grimDueMinute,label:'Grim Wound Shock'});
-   if((wound.bleeding||wound.treatment&&!wound.infected)&&wound.nextDueMinute!==null)
-    due.push({at:wound.nextDueMinute,label:wound.bleeding?'Blood Loss / Stoppage':'Healing Roll'});
-  }
-  const omitted=due.find(x=>x.at>=beforeMinute&&x.at<afterMinute);
-  valid(!omitted,`Tvor ${created.get(id).name}: nelze přeskočit ${omitted?.label||''} v čase ${omitted?.at}. Posuň čas jen k termínu a proveď skutečný hod.`);
- }
  return true;
 }
