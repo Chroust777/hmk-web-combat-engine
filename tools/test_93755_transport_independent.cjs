@@ -1,0 +1,43 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
+const root=path.resolve(__dirname,'..'),old=require.extensions['.js'];
+require.extensions['.js']=(m,f)=>f.startsWith(path.join(root,'src')+path.sep)?m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{fileName:f,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,f):old(m,f);
+const {initialCombatState}=require('../src/integration/persistent-combat-state.js');
+const {trekPersonHealthSnapshot,trekPartyModes,validateTrekPartySnapshot}=require('../src/integration/hmk-trekking-party-modes.js');
+const {calculateTimeEpisode}=require('../src/integration/hmk-time-episodes.js');
+let count=0;
+const ok=(b,m)=>{assert.ok(b,m);count++},eq=(a,b,m)=>{assert.deepEqual(a,b,m);count++},bad=(f,r)=>{assert.throws(f,r);count++};
+const actor=(id)=>({id,name:id,hmk:{attributes:{str:12,end:12},healthState:initialCombatState()}});
+const guide=actor('guide'),patient=actor('patient'),away=actor('away');
+const group=[guide,patient,away];
+let healthy=trekPartyModes({memberIds:['guide'],guideId:'guide',characters:group,inventory:[],conveyance:'wagon'});
+ok(validateTrekPartySnapshot(healthy),'healthy guide alone can continue without patient');
+patient.hmk.healthState.shock='UNC';
+const st=trekPersonHealthSnapshot({id:patient.id,name:patient.name,healthState:patient.hmk.healthState});
+eq(st.immobile,false,'No Grievous wound, but UNC exists');eq(st.cannotSelfMove,true,'UNC must not be treated as ambulatory');
+bad(()=>trekPartyModes({memberIds:['guide','patient'],guideId:'guide',characters:group,conveyance:'foot'}),/vlastní silou/);
+bad(()=>trekPartyModes({memberIds:['guide','patient'],guideId:'guide',characters:group,conveyance:'mount'}),/vlastní silou/);
+bad(()=>trekPartyModes({memberIds:['guide','patient'],guideId:'guide',characters:group,conveyance:'wagon'}),/GM.*potvrdit/);
+bad(()=>trekPartyModes({memberIds:['guide','patient'],guideId:'guide',characters:group,conveyance:'wagon',transportedMemberIds:['away']}),/neplatný/);
+const transported=trekPartyModes({memberIds:['guide','patient'],guideId:'guide',characters:group,conveyance:'wagon',transportedMemberIds:['patient']});
+eq(transported.transportedMemberIds,['patient']);ok(validateTrekPartySnapshot(transported),'verified GM declaration');
+const forged=structuredClone(transported);forged.transportedMemberIds=[];bad(()=>validateTrekPartySnapshot(forged),/Změněné/);
+bad(()=>trekPartyModes({memberIds:['patient','guide'],guideId:'patient',characters:group,conveyance:'wagon',transportedMemberIds:['patient']}),/Průvodce/);
+const state0=JSON.stringify(patient.hmk.healthState);
+const base={minute:480,minutes:60,kind:'travel',topography:'flat',terrain:'paved-road',conveyance:'wagon',
+ progress:0,bearing:5,extraSlow:0,wearied:false,injured:false,loaded:false,progressD10:[],directionD10:[],
+ memberIds:['guide','patient'],enduranceByActor:{guide:12,patient:12},endRollByActor:{guide:5,patient:0},encByActor:{guide:0,patient:0},
+ encounterEnviron:'highway',transportedMemberIds:['patient'],previousCarry:{guide:120,patient:135}};
+const res=calculateTimeEpisode(base);
+eq(res.endMinute,540,'exact elapsed interval');eq(res.actors.length,2);
+const p=res.actors.find(x=>x.id==='patient');eq(p.endNotRequired.reason,'transported');eq(p.roll,null);eq(p.delta,0);eq(p.carryOut,135);eq(p.movementFatigueUnits,0);
+ok(res.actors.find(x=>x.id==='guide').sr!==null,'guide actual END');
+eq(JSON.stringify(patient.hmk.healthState),state0,'preview does not mutate patient');
+bad(()=>calculateTimeEpisode({...base,transportedMemberIds:[]}),/END d10|END SR/);
+bad(()=>calculateTimeEpisode({...base,transportedMemberIds:['patient'],conveyance:'foot'}),/Přepravovaní/);
+bad(()=>calculateTimeEpisode({...base,endRollByActor:{guide:5,patient:8}}),/nemá provádět END/);
+const single=calculateTimeEpisode({...base,conveyance:'foot',memberIds:['guide'],enduranceByActor:{guide:12},endRollByActor:{guide:4},transportedMemberIds:[]});
+eq(single.endMinute,540);eq(single.actors.length,1);
+eq(JSON.stringify(patient.hmk.healthState),state0,'left-behind patient state preserved after another act');
+console.log('PASS',count,'transport / participant scope / UNC and cart / no phantom END / immutable carry / one interval');
