@@ -1,0 +1,36 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
+const source=fs.readFileSync(path.resolve(__dirname,'../src/integration/hmk-shared-travel-window-93767.js'),'utf8');
+const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+const m={exports:{}};new Function('module','exports',js)(m,m.exports);
+const {openSharedTravelWindow93767:open,addSharedTravelGroup93767:addGroup,addSharedTravelActivity93767:addActivity,setSharedTravelActivityProof93767:proof,stageSharedTravelAtomicCopy93767:stage,validateSharedTravelWindow93767:validate}=m.exports;
+let w=open({campaignId:'camp',windowId:'win',startMinute:480,requestedMinutes:60,maxAllowedMinutes:40,limitMinute:520});
+w=addGroup(w,{groupId:'a',memberIds:['a']});w=addGroup(w,{groupId:'b',memberIds:['b']});
+w=addActivity(w,{groupId:'a',activityId:'at1',kind:'travel',minutes:20});
+w=addActivity(w,{groupId:'a',activityId:'at2',kind:'forage',minutes:10});
+w=addActivity(w,{groupId:'b',activityId:'at3',kind:'travel',minutes:30});
+for(const [id,p,start,end,actor] of [['at1','p1',480,500,'a'],['at2','p2',500,510,'a'],['at3','p3',480,510,'b']])w=proof(w,{activityId:id,proofId:p,sourceStartMinute:start,sourceEndMinute:end,participantIds:[actor]});
+const docs=[{proofId:'p1',startMinute:480,endMinute:500,kind:'travel',memberIds:['a']},
+{proofId:'p2',startMinute:500,endMinute:510,kind:'forage',memberIds:['a']},
+{proofId:'p3',startMinute:480,endMinute:510,kind:'travel',memberIds:['b']}];
+const state={campaignClock:{minute:480},journal:[],characters:[{id:'a',fatigue:0},{id:'b',fatigue:0}]};
+let operations=0,advanced=0;const apply=(s,doc,g,a)=>{operations++;s.journal.push({...doc,groupId:g.groupId,activityId:a.activityId});};
+const advance=(s,{deltaMinutes})=>{advanced++;s.campaignClock.minute+=deltaMinutes;};
+const check=(s)=>{assert.equal(s.journal.length,3);assert.equal(s.campaignClock.minute,520)};
+const args={window:w,snapshot:state,gmConfirmed:true,proofDocuments:docs,applyActivity:apply,advanceCalendar:advance,validateCopy:check};
+const made=stage(args);assert.equal(made.campaignClock.minute,520);assert.equal(state.campaignClock.minute,480);
+assert.equal(operations,3);assert.equal(advanced,1);assert.equal(state.journal.length,0);
+assert.throws(()=>stage({...args,gmConfirmed:false}),/GM/);
+assert.throws(()=>stage({...args,snapshot:{...state,campaignClock:{minute:481}}}),/Mezitím/);
+assert.throws(()=>stage({...args,proofDocuments:[docs[0],docs[1]]}),/právě jeden/);
+assert.throws(()=>stage({...args,proofDocuments:[docs[0],{...docs[1],memberIds:['b']},docs[2]]}),/jiné skupině/);
+const discarded=structuredClone(state);
+assert.throws(()=>stage({...args,snapshot:discarded,applyActivity:(s,p)=>{s.journal.push(p);if(p.proofId==='p2')throw Error('test failure');}}),/test failure/);
+assert.deepEqual(discarded,state);
+assert.throws(()=>stage({...args,applyActivity:(s)=>{s.campaignClock.minute++}}),/Dílčí/);
+assert.throws(()=>stage({...args,advanceCalendar:(s)=>{s.campaignClock.minute+=30;}}),/přesně jednou/);
+assert.throws(()=>stage({...args,validateCopy:()=>{throw Error('invalid health');}}),/invalid health/);
+const bad=structuredClone(w);bad.endMinute=519;assert.throws(()=>validate(bad),/hranice/);
+const bad2=structuredClone(w);bad2.maxAllowedMinutes=100;assert.throws(()=>validate(bad2),/hranice/);
+console.log('PASS 15 atomic transaction isolation / GM / time / receipts / invalidation checks');
