@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {prepareSkillPhysicalInjury} from '../src/integration/hmk-skill-physical-consequences.js';
+import {initialCombatState} from '../src/integration/persistent-combat-state.js';
+import {verifiedNoncombatComaCause} from '../src/integration/hmk-noncombat-coma-cause-93753.js';
+import {verifiedHumanLocationShock} from '../src/integration/hmk-weather-trauma-completion.js';
+let count=0; const eq=(x,y,m)=>{assert.deepEqual(x,y,m);count++};
+const a={id:'p753',kind:'PC',name:'Original',hmk:{attributes:{str:12,end:12,dex:12,agl:12,per:12,rea:12,wil:12},skills:[{name:'Shock',ml:65}],healthState:initialCombatState()}};
+const opts={kind:'survival-accident',actor:a,inventory:[],state:a.hmk.healthState,sourceId:'causal-753',round:1,gmConfirmed:true,originMinute:480,hazardD10:5,agilityD100:100,randomVictimConfirmed:true,impactDie:1,zoneD10:1,locationD10:6,shockD100:100};
+const d=prepareSkillPhysicalInjury(opts);eq(d.state.shock,'UNC','actual shock');
+const cause=verifiedNoncombatComaCause({actor:a,state:d.state,shockFollowup:d.state.shockFollowup});
+eq(cause.ready,true,'causal wound verified');eq(cause.locationShock,verifiedHumanLocationShock(d.state.wounds[0].location),'printed anatomy LS');eq(cause.injuryLevel,d.state.wounds[0].level,'actual IL');eq(cause.initialHR,12-cause.locationShock-cause.injuryLevel,'HR derived');
+eq(verifiedNoncombatComaCause({actor:a,state:d.state,shockFollowup:{...d.state.shockFollowup,sourceId:'forged'}}).ready,false,'foreign source rejected');
+eq(verifiedNoncombatComaCause({actor:a,state:{...d.state,wounds:[]},shockFollowup:d.state.shockFollowup}).ready,false,'missing wound rejected');
+eq(verifiedNoncombatComaCause({actor:a,state:{...d.state,events:[]},shockFollowup:d.state.shockFollowup}).ready,false,'missing original injury event rejected');
+eq(verifiedNoncombatComaCause({actor:a,state:d.state,shockFollowup:{...d.state.shockFollowup,domain:'travel-weather'}}).ready,false,'unsupported environment not invented');
+console.log('PASS verified original coma causal anatomy',count,'assertions',cause);
