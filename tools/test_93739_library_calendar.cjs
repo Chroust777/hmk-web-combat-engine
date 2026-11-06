@@ -10,7 +10,7 @@ const tests=[
  ['no covered location duplication',app.includes("const identicalProtection=baseProtection&&locRows.every")],
  ['omit nested duplicate coverage',app.includes("'locationProtection','coveredLocations'")],
  ['Cold Hazard source present',cold.includes("reference:'HMK p.149'")],
- ['Cold AV vs F Area AV explained',cold.includes('Ochrana F na krytých místech se započte do Area AV')],
+ ['Cold AV vs F Area AV explained',cold.includes('F is location protection, not a flat')&&cold.includes('Cold Hazard +${r.av}')&&app.includes("'Chlad AV':'F AV")], // v93.762: preserve substantive separation, update obsolete exact prose
  ['cloth and padded cloak explicit',cold.includes("'cloth cloak':listed['cloak (cloth)']")&&cold.includes("'padded cloak':listed['cloak (padded)']")],
  ['legality layer clarification',app.includes('Pravidla kombinování vrstev viz strany 117 a 119')],
  ['verified suit links only',app.includes('resolved.ok?resolved.parts[i]:null')],

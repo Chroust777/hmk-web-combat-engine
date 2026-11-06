@@ -15,7 +15,7 @@ const obj=(id,name,category='other',slot='carried',extra={})=>{
  return {id,characterId:actor,quantity:1,slot,condition:'',currentWQ:null,gearStowage:'normal',sourceItemId:source.id,snapshot:source,...extra};
 };
 for(const [name,expect] of [['Bedroll',1],['Bedroll, heavy',2],['Blanket',1],['Cloak (Cloth)',1],['Cloak (Padded)',2],['Cloth Cloak',1],['Padded Cloak',2],['Tent, 1-man',2]])eq(coldCatalogRule(obj('a',name, /^(Cloth|Padded) Cloak$/.test(name)?'armor':'other'))?.av,expect);
-eq(coldCatalogRule(obj('a','Metal Boots','armor')),null);eq(clothingColdText({name:'Mail Hauberk',category:'armor'}).includes('Area AV'),true);
+eq(coldCatalogRule(obj('a','Metal Boots','armor')),null);eq(clothingColdText({name:'Mail Hauberk',category:'armor'}).includes('nebyla doložena'),true); // v93.762: unknown F must not be presented as a numerical benefit
 const cloak=obj('cloak','Padded Cloak','armor','worn'), blanket=obj('blanket','Blanket'), heavy=obj('heavy','Bedroll, heavy'), tent=obj('tent','Tent, 1-man'), cloth=obj('cloth','Cloak (Cloth)');
 const inv=[cloak,blanket,heavy,tent,cloth];eq(coldInventoryChoices(inv,actor).automatic.length,1);eq(resolveColdHazardEquipment({inventory:inv,actorId:actor}).gearAV,2);
 throws(()=>resolveColdHazardEquipment({inventory:inv,actorId:actor,gearId:'blanket'}),/potvrdit/);

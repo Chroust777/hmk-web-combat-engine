@@ -89,8 +89,35 @@ export function resolveColdHazardEquipment({inventory,actorId,gearId='',shelterI
   explanation:`zbroj + ochrana ${main?.rule.av??0} / úkryt ${shelterAV} / oheň ${fireFS}`
  };
 }
+/** v93.762 read-only catalogue presentation. F is location protection, not a flat
+ * addition to the actor's weighted Area AV. Separate cloak/gear Cold AV is an
+ * independent, confirmed p.149 effect. Never infer F from an editable name. */
+export function armourColdFValues(item){
+ if((item?.snapshot?.category??item?.category)!=='armor')return [];
+ const properties=item?.snapshot?.properties??item?.properties??{};
+ const protection=properties.locationProtection;
+ if(!protection||typeof protection!=='object'||Array.isArray(protection))return [];
+ const values=Object.values(protection).filter(x=>x&&typeof x==='object'&&!Array.isArray(x))
+  .map(x=>x.f??x.F).filter(x=>Number.isSafeInteger(x)&&x>=0&&x<=20);
+ return [...new Set(values)].sort((a,b)=>a-b);
+}
+function fLabel(item){
+ const values=armourColdFValues(item);
+ return values.length===0?null:values.length===1?`F AV +${values[0]}`:
+  `F AV +${values[0]} až +${values[values.length-1]}`;
+}
+export function coldLibrarySummary(item){
+ const f=fLabel(item),r=coldCatalogRule(item);
+ if((item?.snapshot?.category??item?.category)==='armor')
+  return (f??'F AV —')+(r?.kind==='cloak'?` · plášť +${r.av}`:'');
+ return r?`Cold +${r.av}`:'—';
+}
 export function clothingColdText(item){
- const r=coldCatalogRule(item);
- return r?`Cold Hazard AV +${r.av} (${r.kind==='cloak'?'pouze při oblečení':r.kind==='shelter'?'při skutečně postaveném stanu':'při skutečném použití'}; HMK 149)`:
- item?.category==='armor'?`Ochrana F na krytých místech se započte do Area AV celé oblečené sestavy (HMK 133, 149).`:'';
+ const f=fLabel(item),r=coldCatalogRule(item),cat=item?.snapshot?.category??item?.category;
+ if(cat==='armor'){
+  if(!f)return 'F AV — (číselná ochrana F nebyla doložena)';
+  return f+(r?.kind==='cloak'?` · Cold Hazard +${r.av} (oblečený plášť)`:'')+
+   ' · jen kryté lokace (HMK 117, 133'+(r?.kind==='cloak'?', 149':'')+')';
+ }
+ return r?`Cold Hazard AV +${r.av} (${r.kind==='shelter'?'postavený stan':'skutečné použití'}; HMK 149)`:'';
 }

@@ -161,7 +161,7 @@ import {recordEncounterFreeAction,encounterFreeActionAvailable,createEncounterSe
 import {applyConfirmedTreatment,applyConfirmedFrostAmputation,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock} from './src/integration/hmk-healing-persistence.js';
 import {weatherTreatmentTiming} from './src/integration/hmk-weather-treatment-timing.js';
 import {calculateWeatherAreaAV} from './src/integration/hmk-weather-area-av.js';
-import {coldCatalogRule,clothingColdText,coldInventoryChoices,resolveColdHazardEquipment} from './src/integration/hmk-cold-gear-93740.js';
+import {coldCatalogRule,coldLibrarySummary,clothingColdText,coldInventoryChoices,resolveColdHazardEquipment} from './src/integration/hmk-cold-gear-93740.js';
 import {resolveBestiaryFrostAV93725,parseBestiaryFrostSites93725} from './src/integration/hmk-bestiary-frost-auto-av-93725.js';
 import {travelBleedingTerm,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
 import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js';
@@ -330,7 +330,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.761';
+const APP_VERSION='93.762';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5772,6 +5772,7 @@ const LIBRARY_FIELD_HELP=Object.freeze({
  'Materiál':'Materiál zbroje; ovlivňuje její základní ochranné hodnoty.',
  'ENC':'Armour Encumbrance (ENC) je postih za nošenou zbroj podle její konstrukce a pokrytí; může ovlivnit pohyb, AGL a dovednosti zahrnující AGL do Skill Base. Není totožný s celkovou váhou předmětu. HMK str. 112, 118.',
  'Ochrana b/e/p/f':'Ochrana proti tupému, sečnému, bodnému a ohnivému či mrazivému poškození.',
+ 'Chlad AV':'F AV je ochrana materiálu před mrazem pouze na krytých anatomických místech. Area AV celé oblečené sestavy se počítá jako vážený součet F ochrany všech lokací (HMK 117, 133). Při Cold Hazard se použije menší z Area AV a AV4; případný samostatný bonus pláště +1/+2 se uplatní pouze při oblečení (HMK 149). Nejde o plochý přírůstek stejné velikosti k Area AV.',
  'Typ':'Kategorie dané položky.',
  'Dovednost / užití':'Dovednost nebo účel, s nímž se předmět používá.',
  'Kvalita':'Pokud katalog uvádí číselnou kvalitu, vyjadřuje kvalitu a stav konkrétního předmětu; bez zvláštního pravidla se nesmí zaměnit za Weapon Quality bojové zbraně.',
@@ -6567,11 +6568,11 @@ function libraryBrief(i){
  const summary=armourValue?`b${numeric(armourValue.b)} / e${numeric(armourValue.e)} / p${numeric(armourValue.p)} / f${numeric(armourValue.f)}`:'—';
  const price=p.pricePence!==undefined?`${numeric(p.pricePence)} d`:p.pricePerDozenPence!==undefined?`${numeric(p.pricePerDozenPence)} d/12`:'—';
  const weight=p.weightLb!==undefined?`${numeric(p.weightLb)} lb`:'—';
- if(i.category==='armor')return [esc(displayArmourMaterial(p.material)),`${numeric(p.encumbrance)}${p.printedEncCode==='a'?' (podmíněné)':p.printedEncCode==='p'?' (PER)':''}`,summary,esc(coldCatalogRule(i)?'+'+coldCatalogRule(i).av:'Area AV'),price,weight];
+ if(i.category==='armor')return [esc(displayArmourMaterial(p.material)),`${numeric(p.encumbrance)}${p.printedEncCode==='a'?' (podmíněné)':p.printedEncCode==='p'?' (PER)':''}`,summary,esc(coldLibrarySummary(i)),price,weight];
  if(i.category==='shield')return [numeric(p.quality),`Block ${numeric(p.shieldModifier??p.blockModifier)}`,`Deflect ${numeric(p.deflect)}`,price,weight];
  if(i.category==='weapon')return [numeric(p.quality),p.baseRangeFt!==undefined?`BR ${numeric(p.baseRangeFt)} ft`:`${numeric(p.heft)} / ${numeric(p.length)}`,impact(firstMode),price,weight];
  if(p.projectileKind)return [esc(p.projectileKind),esc(p.shaftWeight||p.slingProjectileForm||'—'),esc(p.impactDie||'—'),price,weight];
- return [esc(libraryItemKind(i)),esc(p.skill||p.use||'—'),esc(p.quality||'—'),esc(coldCatalogRule(i)?'+'+coldCatalogRule(i).av:'—'),price,weight];
+ return [esc(libraryItemKind(i)),esc(p.skill||p.use||'—'),esc(p.quality||'—'),esc(coldLibrarySummary(i)),price,weight];
 }
 function libraryPrintedPages(source){
  const m=String(source||'').match(/(?:pp?\.?|str\.?|page[s]?)\s*(\d+(?:\s*[–-]\s*\d+)?)/i);
