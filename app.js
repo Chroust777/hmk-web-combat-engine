@@ -111,6 +111,9 @@ import {specialStrikeFromSnapshot} from './src/integration/special-strike-previe
 import {missingPrintedArmourCatalogEntries} from './src/integration/armour-article-catalog.js';
 import {identifyWornPrintedSuit,resolvePrintedSuitProtection,selectPrintedSuitRigidStatus} from './src/integration/printed-suit-combat.js';
 import {hmkHumanLocationSymbols} from './src/integration/injury-special-hmk.js';
+import {hmkAnimalLocationSymbols} from './src/integration/injury-special-hmk.js';
+import {verifiedMountedAnimalAnatomy} from './src/integration/hmk-mounted-live-animal-falling.js';
+import {travelEncounterCharacterHint} from './src/integration/hmk-travel-encounter-context-93750.js';
 import {locationArmourValue} from './src/rules/armour-options.js';
 import {auditPrintedSuitLayers} from './src/integration/armour-suit-layer-audit.js';
 import {auditArmourCoverage} from './src/integration/armour-coverage-readiness.js';
@@ -323,7 +326,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.749';
+const APP_VERSION='93.750';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2469,7 +2472,7 @@ function timeEpisodePageHTML(clock,participants){
  ${animalRoster.length?`<fieldset><legend>Zvířata na cestě · vlastní Combat State</legend><p class="hc-hint">Pohyb zvířete zohledňuje jeho skutečný zdravotní stav, zranění a únavu. Samotný pochod nepřičítá nepodloženou zvířecí únavu; žádný zvířecí END d10 se nevymýšlí.</p><div class="hc-episode-members">${animalRoster.map(a=>{let health;
  try{health=trekRegisteredAnimalHealth(a)}catch(err){health={error:err.message}}
  const healthStatus=health.error?' · CHYBNÝ STAV: '+health.error:health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40?' · NEMŮŽE SAMO POKRAČOVAT':health.injured?' · zraněné · Slow':health.fatigue>=20?' · unavené · Slow':'';
- return `<div class="hc-trek-animal-choice"><label class="hc-check"><input name="animalIds" type="checkbox" value="${esc(a.id)}">${esc(a.name)}${esc(healthStatus)}</label><button type="button" class="secondary" data-trek-leave-animal="${esc(a.id)}">Opustit zvíře (včetně ponechaného nákladu)</button></div>`}).join('')}</div><p class="hc-hint">Zvíře, které nemůže pokračovat, nezaškrtávejte. GM ho může kdykoliv vyřadit z aktivní družiny pomocí Opustit zvíře. Jeho zdravotní historie zůstane zachována; věci ponechané u zvířete už družina nenese. Chcete-li náklad zachránit, nejprve jej skutečně převeďte v inventáři.</p></fieldset>`:''}
+ return `<div class="hc-trek-animal-choice"><label class="hc-check"><input name="animalIds" type="checkbox" value="${esc(a.id)}">${esc(a.name)}${esc(healthStatus)}</label><button type="button" class="secondary" data-trek-leave-animal="${esc(a.id)}">Opustit zvíře (včetně ponechaného nákladu)</button><details class="hc-trek-animal-injuries"><summary>Anatomie a aktuální zranění (HMK 355)</summary>${hmkAnimalWoundAnatomyHTML(a)}</details></div>`}).join('')}</div><p class="hc-hint">Zvíře, které nemůže pokračovat, nezaškrtávejte. GM ho může kdykoliv vyřadit z aktivní družiny pomocí Opustit zvíře. Jeho zdravotní historie zůstane zachována; věci ponechané u zvířete už družina nenese. Chcete-li náklad zachránit, nejprve jej skutečně převeďte v inventáři.</p></fieldset>`:''}
  <details class="hc-episode-settings" data-episode-section="skills"><summary>4 · Dovednosti vybrané činnosti</summary>
  <p class="hc-episode-brief">Survival / Tracking · nový doložený hod nebo povolené pokračování.</p>
  ${lastRow?`<p class="hc-episode-memory-note">Poslední doložená epizoda: ${esc(displayCampaignMinute(lastRow.calendarTimeEpisode.startMinute))}–${esc(displayCampaignMinute(lastRow.calendarTimeEpisode.endMinute))}; ${esc(lastRow.calendarTimeEpisode.kind)}. Předchozí Orienteering: ${lastRow.calendarTimeEpisode.orientation?`SV ${lastRow.calendarTimeEpisode.orientation.sv} · ${lastRow.calendarTimeEpisode.orientation.stars??'—'} ★`:'bez doloženého SV'}. Navigace: ${esc(lastRow.calendarTimeEpisode.navigationState||'bez evidovaného bloudění')}.</p>`:''}
@@ -4340,7 +4343,57 @@ const JOURNAL_ANATOMICAL_LOCATIONS=[['sk','Skull',5],['fa','Face',4],['nk','Neck
 // zone die ranges and location die ranges. ZN is merged across zone rows.
 const JOURNAL_ZN_GROUPS={sk:['Head','1',3],sh:['Arms','2–3',5],tx:['Torso','4–7',3],th:['Legs','8–10',4]};
 const JOURNAL_LN_RANGES={sk:'1–5',fa:'6–8',nk:'9–10',sh:'1–3',ua:'4–6',el:'7',fo:'8–9',ha:'10',tx:'1–4',ab:'5–7',pv:'8–10',th:'1–4',kn:'5',ca:'6–8',ft:'9–10'};
+function hmkAnimalWoundAnatomyHTML(c){
+ const breed=c?.hmk?.verifiedMountedBreed,anatomy=verifiedMountedAnimalAnatomy(breed);
+ if(!anatomy)return '';
+ const state=persistentStateOf(c),wounds=state.wounds||[];
+ const formatWound=w=>{
+  const side=['left','l'].includes(String(w.side).toLowerCase())?'L':
+   ['right','r'].includes(String(w.side).toLowerCase())?'R':
+   ['flg','hlg'].includes(w.location)?'?':'';
+  return (side?side+': ':'')+(w.severity||'?')+(w.level||'?')+(w.aspect||'')+
+   (w.healed?' (zahojeno)':'')+(w.healing?.infected?' · infekce':'');
+ };
+ const rows=anatomy.locations.map(loc=>{
+  const symbol=hmkAnimalLocationSymbols(loc.code);
+  const at=wounds.filter(w=>w.location===loc.code);
+  const active=at.filter(w=>!w.healed);
+  const help=`HMK str. 355: zvířecí anatomie ${anatomy.table}; ZN ${loc.zone}, LD ${loc.ln}; SHK ${loc.shock}. `+
+   `Aktivní zranění ${active.length}; původní rány z Combat State, žádná kopie.`;
+  return `<tr><th scope="row" ${journalHelpData('Location',help)}>${esc(loc.code.toUpperCase())}</th>`+
+   `<td>${esc(loc.name)}</td><td>${esc(loc.zone)}</td><td>${esc(loc.ln)}</td>`+
+   `<td>${esc(String(loc.shock))}</td><td>${symbol?esc(String(symbol.bleeds)):'—'}</td>`+
+   `<td>${at.length?at.map(w=>`<span class="journal-wound-meaning" tabindex="0" ${journalHelpData('Injury',help+' Zranění: '+formatWound(w))}>${esc(formatWound(w))}</span>`).join(' · '):'—'}</td></tr>`;
+ }).join('');
+ const unknown=wounds.filter(w=>!anatomy.locations.some(loc=>loc.code===w.location));
+ return `<section class="journal-book-section journal-body-locations" data-hmk-animal-body-locations="${esc(c.id)}">`+
+  `${journalRuleTitle('Body Locations · Animal B/C · Injuries')}`+
+  `<p class="hc-hint">${esc(c.name)} · HMK s.355 · tabulka ${esc(anatomy.table)} · ${anatomy.maxZN} ZN. `+
+  `Přirozené Blunt AV ${anatomy.naturalBluntAV} bez doloženého dalšího brnění; jiné aspekty AV se zde neodhadují. `+
+  `Zdravotní stav je přímo v jediném autoritativním Combat State. Rána na noze má vlastní stranu L/R; ? = nedoložená.</p>`+
+  `<div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><thead><tr>`+
+  `<th>LOC</th><th>Lokace</th><th>ZN</th><th>LN</th><th>SHK</th><th>●</th><th>Zranění</th>`+
+  `</tr></thead><tbody>${rows}</tbody></table></div>`+
+  (unknown.length?`<p class="notice error">${unknown.length} ran má neověřenou zvířecí lokalitu; nelze je přiřadit.</p>`:'')+
+  `</section>`;
+}
+function hmkTravelEncounterHintHTML(c){
+ const clock=data.campaignClock,context=clock?travelEncounterCharacterHint({journal:data.journal,
+  campaignId:campaignKey(clock),minute:clock.minute,actorId:c.id}):null;
+ if(!context)return '';
+ const label={aware:'Aware · bdělý',confused:'Confused · zmatený',unaware:'Unaware · nepřipravený'}[context.initialAlertness];
+ const watch={lax:'Lax',normal:'Normal',alert:'Alert'}[context.watchfulness];
+ return `<section class="journal-book-section" data-hmk-travel-alertness="${esc(c.id)}" role="status">`+
+  `${journalRuleTitle('Cestování · poslední Encounter / Alertness')}`+
+  `<p><strong>${esc(label)}</strong> · Watchfulness ${esc(watch)} · čas setkání ${esc(displayCampaignMinute(context.eventMinute))}`+
+  ` · rozhodnutí GM ${esc(context.decision)}.</p>`+
+  `<p class="hc-hint" ${journalHelpData('Alertness','HMK s.150,158–159: jde o počáteční stav pro konkrétní setkání, nikoliv trvalou vlastnost postavy. Případný Reaction při boji řeší původní Combat. Bez pevného počtu minut v pravidlech.')} tabindex="0">`+
+  `Pouze upozornění pro GM při ručním založení Combatu, nikoli automatický účinek. `+
+  `Od setkání uplynulo ${context.elapsedMinutes} minut. GM ověří, zda stav stále odpovídá situaci. `+
+  `Po potvrzení další časové epizody tato nápověda zmizí; příslušný historický záznam zůstane zachován.</p></section>`;
+}
 function journalBodyLocationsHTML(c){
+ if(c?.hmk?.verifiedMountedBreed)return hmkAnimalWoundAnatomyHTML(c);
  const inv=data.inventory.filter(x=>x.characterId===c.id);
  const worn=inv.filter(x=>x.slot==='worn'&&x.snapshot?.category==='armor');
  const suit=identifyWornPrintedSuit(data.inventory,c.id);
@@ -5096,7 +5149,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.shock==='UNC'?'Ano':state.shock==='KIA'?'KIA':'Ne'],['Death Save',state.shock==='KIA'?'KIA':'—']];
  const conditionRows=projectChronicleConditions(state,{campaignId:data.campaignClock?campaignKey(data.campaignClock):null,auralShockLevels:h.arcane?.auralShockLevels});
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitEntries.map(t=>`<li data-hmk-help="${esc(t.help+' Aktuální záznam: '+t.value)}" tabindex="0" aria-label="${esc(t.help+' Aktuální záznam: '+t.value)}">${esc(t.value)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load,editing)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitEntries.map(t=>`<li data-hmk-help="${esc(t.help+' Aktuální záznam: '+t.value)}" tabindex="0" aria-label="${esc(t.help+' Aktuální záznam: '+t.value)}">${esc(t.value)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}${hmkTravelEncounterHintHTML(c)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load,editing)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -21652,6 +21705,16 @@ function episodeIssue(message,form){
 }
 function episodeMarkField(form,name,{focus=false}={}){
  for(const node of form.querySelectorAll('.hc-episode-needs-input'))node.classList.remove('hc-episode-needs-input');
+ // The accident minute is a prerequisite of the hazard preview itself. When
+ // that preview cannot yet be calculated, reveal the genuine prerequisite
+ // rather than asking GM to follow a link to an inaccessible field.
+ if(name==='hazardAtMinute'&&form.elements.namedItem('kind')?.value==='travel'&&
+    /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''))){
+  const hazard=form.querySelector('[data-episode-hazard-details]');
+  if(hazard){hazard.hidden=false;
+   for(const item of hazard.querySelectorAll('[data-hazard-minute],[data-hazard-accident]'))item.hidden=false;
+  }
+ }
  const field=name?form.elements.namedItem(name):null;
  if(!field)return false;
  const target=field instanceof RadioNodeList?field[0]:field;
@@ -23902,7 +23965,21 @@ document.addEventListener('click',e=>{
  e.preventDefault();
  const id=accident.dataset.episodeOpenAccident;
  if(!character(id))return;
- selected=id;view='skills';activeSkillTab='value';render();
+ selected=id;view='skills';activeSkillTab='followups';render();
+ // A medical follow-up must open its exact existing form, not just land
+ // on the general Skill Tests chapter with all continuation forms hidden.
+ const source=document.querySelector('[data-hmk-followup-source-598]');
+ const pending=[...(source?.querySelectorAll('form[data-skill-physical-impact]')||[])].find(f=>
+  f.querySelector('[name="kind"]')?.value==='survival-accident');
+ const choice=document.querySelector('[data-hmk-followup-choice-598]');
+ if(pending&&choice){
+  choice.value=pending.getAttribute('data-hmk-followup-entry-598')||'';
+  choice.dispatchEvent(new Event('change',{bubbles:true}));
+  document.querySelector('[data-hmk-followup-open-598]')?.click();
+  const target=document.querySelector('[data-hmk-followup-display-598] [name="targetId"]');
+  if(target){target.closest('label')?.classList.add('hc-episode-needs-input');
+   target.scrollIntoView({block:'center',behavior:'auto'});target.focus({preventScroll:true});}
+ }
 },true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-episode-nav],[data-episode-chronicle]');if(!b)return;
