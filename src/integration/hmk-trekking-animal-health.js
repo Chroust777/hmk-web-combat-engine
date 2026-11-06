@@ -8,7 +8,7 @@ import {combatFatigueTotals,validateCombatState} from './persistent-combat-state
 import {hmkAnimalLocationSymbols} from './injury-special-hmk.js';
 const requireFact=(v,m)=>{if(!v)throw Error(m);};
 const int=v=>Number.isSafeInteger(v)&&v>=0;
-const breeds=new Set(['donkey','pony','mule','palfrey','courser','charger','destrier']);
+const breeds=new Set(['bovine','camel','donkey','pony','mule','palfrey','courser','charger','destrier']);
 // The p.355 tail (tl) is coded in the existing injury anatomy as the hind
 // body region, but p.145's incapacitating 'leg' must NOT include a tail.
 const travelWound=w=>String(w.location).trim().toLowerCase()!=='tl'&&

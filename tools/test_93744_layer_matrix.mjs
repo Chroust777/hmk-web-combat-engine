@@ -1,14 +1,14 @@
 
-import {evaluateOrderedArmour} from './src/integration/armour-layer-evaluation.js';
-import {PRINTED_LAYER_COMBINATIONS_P119} from './src/rules/armour-layer-combinations-p119.js';
-import {PRINTED_ARMOUR_ARTICLES_P118} from './src/rules/armour-articles-printed.js';
-import {PRINTED_ARMOUR_SUITS_P113_116} from './src/rules/armour-suit-printed.js';
-import {auditArmourCoverage} from './src/integration/armour-coverage-readiness.js';
-import {auditSuitEnc} from './src/integration/armour-suit-enc-audit.js';
-import {auditSuitAnatomicalStacks} from './src/integration/armour-suit-anatomical-audit.js';
-import {checkArmourLayering} from './src/integration/armour-layer-legality.js';
-import {assessArmourFeasibility} from './src/integration/hmk-armour-feasibility.js';
-import {verifyOrderedArmourLayers} from './src/rules/armour-layer-order.js';
+import {evaluateOrderedArmour} from '../src/integration/armour-layer-evaluation.js';
+import {PRINTED_LAYER_COMBINATIONS_P119} from '../src/rules/armour-layer-combinations-p119.js';
+import {PRINTED_ARMOUR_ARTICLES_P118} from '../src/rules/armour-articles-printed.js';
+import {PRINTED_ARMOUR_SUITS_P113_116} from '../src/rules/armour-suit-printed.js';
+import {auditArmourCoverage} from '../src/integration/armour-coverage-readiness.js';
+import {auditSuitEnc} from '../src/integration/armour-suit-enc-audit.js';
+import {auditSuitAnatomicalStacks} from '../src/integration/armour-suit-anatomical-audit.js';
+import {checkArmourLayering} from '../src/integration/armour-layer-legality.js';
+import {assessArmourFeasibility} from '../src/integration/hmk-armour-feasibility.js';
+import {verifyOrderedArmourLayers} from '../src/rules/armour-layer-order.js';
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 let assertions=0;const failures=[];
 function check(test,message){assertions++;if(!test)failures.push(message);}
@@ -86,7 +86,7 @@ check(stats.oracleMismatch===0,'all 66,429 material signatures vs independent re
 // The full combinatorial inventory (2^92) is intentionally not enumerated;
 // material/layout equivalence classes above are exhaustively covered.
 // Distinct disjoint articles can exceed five in one zone without extra layers.
-const make=(id,m,loc,order)=>({id,name:'Coat',material:m,layerOrder:order,coveredLocations:[loc],bodyZones:['arms'],layerZoneByLocation:{[loc]:'arms'}});
+const make=(id,m,loc,order)=>({id,name:'Coat',material:m,code:Object.keys(material).find(k=>material[k]===m),layerOrder:order,coveredLocations:[loc],bodyZones:['arms'],layerZoneByLocation:{[loc]:'arms'}});
 const distinctDQ=[make('a','padded','sh',0),make('b','quilted','fo',1)];
 const sixDistinct=[make('c1','cloth','sh',0),make('c2','cloth','sh',1),...['ua','el','fo','ha'].map((l,i)=>make('c'+(i+3),'cloth',l,i+2))];
 for(const [name,items] of [['disjoint D/Q',distinctDQ],['six distinct articles',sixDistinct]]){

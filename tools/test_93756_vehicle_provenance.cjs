@@ -5,6 +5,7 @@ const root=path.resolve(__dirname,'..'),old=require.extensions['.js'];
 require.extensions['.js']=(m,f)=>f.startsWith(root+path.sep+'src'+path.sep)?m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{fileName:f,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,f):old(m,f);
 const {transportVehicleReceipt93756,availableTransportVehicles93756,validateTransportVehicleHistory93756}=require('../src/integration/hmk-travel-vehicle-93756.js');
 const {livestockOffer}=require('../src/integration/hmk-livestock-562.js');
+const {prepareStableAnimalHealthRegistration93759}=require('../src/integration/hmk-stable-animal-health-registration-93759.js');
 const {STABLE_HUB_FORMAT_574}=require('../src/integration/hmk-stable-hub-574.js');
 const {VEHICLES_TACK_P122}=require('../src/rules/conveyance-printed-p122.js');
 let n=0;function pass(x,m){assert.ok(x,m);n++}function eq(a,b,m){assert.deepEqual(a,b,m);n++}function bad(f,re){assert.throws(f,re);n++}
@@ -21,12 +22,16 @@ function fake(){
   data.journal.push({id:'stable-'+entryId,characterId:owner.id,calendarCampaignId:cid,campaignMinute:450,
    stableHub574:{format:STABLE_HUB_FORMAT_574,type:kind,animalId,ownerId:owner.id,entryId,itemId,
     weightLb:item?.weightLb,priceD:item?.priceD,reason:'GM documented ownership',mode:'gift',...extra}})};
- return {data,mk,operation};
+ const registerHealthy=id=>{const r=prepareStableAnimalHealthRegistration93759({data,campaignId:cid,minute,animalId:id,proofId:'health-'+id,gmConfirmed:true,examinedHealthy:true,examNote:'GM examined this exact draft animal and certified no wounds, shock, fatigue, coma or overdue medical events.'});data.characters.push(r.actor);data.journal.push({id:'health-'+id,characterId:'gm',calendarCampaignId:cid,campaignMinute:minute,animalHealthRegistration93759:r.proof});return r;};
+ return {data,mk,operation,registerHealthy};
 }
 const x=fake(),{data,mk,operation}=x;mk('horse1');mk('horse2');
 operation('horse1','vehicle-add','hmk-p122-tack-03','cart1');
 operation('horse1','tack-add','hmk-p122-tack-05','harness1');
 operation('horse2','tack-add','hmk-p122-tack-05','harness2');
+// v93.759: receipt now REQUIRES a separately GM-confirmed current Health State.
+// The old v93.756 fixture intentionally had only ownership; that is no longer safe.
+x.registerHealthy('horse1');x.registerHealthy('horse2');
 let cars=availableTransportVehicles93756(data,cid);eq(cars.length,1);
 const base={data,campaignId:cid,minute,conveyance:'cart',vehicleKey:cars[0].key,
  teamIds:['horse1'],stableAnimalIds:['horse1'],transportedMemberIds:['patient1'],
@@ -55,6 +60,7 @@ eq(transportVehicleReceipt93756(wagon).capacityLb,6400);
 const ox=fake(),ox1=ox.mk('ox1','hmk-p122-beast-01'),ox2=ox.mk('ox2','hmk-p122-beast-01');
 ox.operation(ox1,'vehicle-add','hmk-p122-tack-13','wagonOx');
 ox.operation(ox1,'tack-add','hmk-p122-tack-06','harnessOx1');ox.operation(ox2,'tack-add','hmk-p122-tack-06','harnessOx2');
+ox.registerHealthy('ox1');ox.registerHealthy('ox2');
 const oxCar=availableTransportVehicles93756(ox.data,cid)[0];
 eq(transportVehicleReceipt93756({...wagon,data:ox.data,vehicleKey:oxCar.key,teamIds:[ox1,ox2],stableAnimalIds:[ox1,ox2]}).capacityLb,8000);
 // Recorded weight is checked when archived episode is reloaded; fake alteration fails.

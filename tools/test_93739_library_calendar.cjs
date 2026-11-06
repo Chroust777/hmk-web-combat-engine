@@ -5,7 +5,7 @@ const root=path.resolve(__dirname,'..');
 const read=s=>fs.readFileSync(path.join(root,s),'utf8');
 const app=read('app.js'),cal=read('src/integration/hmk-campaign-calendar-ui.js'),lib=read('library.css'),css=read('book-templates.css'),newCss=read('hmk-global-ui-93741.css'),html=read('index.html'),cold=read('src/integration/hmk-cold-gear-93740.js');
 const tests=[
- ['release matches',/APP_VERSION='93\.744'/.test(app)&&html.includes('93.744')],
+ ['release matches',((m)=>!!m&&html.includes(m[1]))(/APP_VERSION='(93\.\d+)'/.exec(app))],
  ['slash B/E/P/F',app.includes(' / e${numeric(armourValue.e)} / p${numeric(armourValue.p)} / f${numeric(armourValue.f)}')],
  ['no covered location duplication',app.includes("const identicalProtection=baseProtection&&locRows.every")],
  ['omit nested duplicate coverage',app.includes("'locationProtection','coveredLocations'")],
