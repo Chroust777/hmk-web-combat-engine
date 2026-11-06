@@ -35,7 +35,7 @@ function vehicleReceiptInternal93757({data,campaignId,minute,conveyance,
  insist(goodId(campaignId)&&lb(minute),'neplatná identita kampaně nebo čas.');
  insist(['cart','wagon'].includes(conveyance),'cestování musí použít káru nebo vůz.');
  insist(gmCoLocated===true,'GM musí potvrdit dostupnost vozu, postrojů a osob na stejném místě.');
- insist(Array.isArray(transportedMemberIds)&&transportedMemberIds.length>=1&&
+ insist(Array.isArray(transportedMemberIds)&&
   new Set(transportedMemberIds).size===transportedMemberIds.length,'neplatní přepravovaní pacienti.');
  insist(Array.isArray(teamIds)&&new Set(teamIds).size===teamIds.length&&teamIds.length>=1&&
   teamIds.every(id=>stableAnimalIds.includes(id)), 'tažná zvířata musí být ve stejné cestovní epizodě.');

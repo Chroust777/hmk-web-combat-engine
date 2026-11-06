@@ -132,6 +132,7 @@ import {stableHubProjection,stableCargoCapacity,stableBurden,validateStableHub,a
 import {prepareStableAnimalHealthRegistration93759} from './src/integration/hmk-stable-animal-health-registration-93759.js';
 import {stableAnimalZones575,stableTraining575,effectiveStableBeast575,stableHauling575,validateStableTravel575} from './src/integration/hmk-stable-operations-575.js';
 import {availableTransportVehicles93756,transportVehicleReceipt93756,validateTransportVehicleHistory93756} from './src/integration/hmk-travel-vehicle-93756.js';
+import {confirmTravelPosition93764,travelPositionAt93764,validateTravelPositions93764} from './src/integration/hmk-trek-positions-93764.js';
 import {BESTIARY_ANIMALS_563,livestockMatcher,newEncounterBeastProof,encounterBeastHistory,validateLivestockTrainingRefs,assertBestiaryAppendOnly} from './src/integration/hmk-bestiary-563.js';
 import {renderFullCreatureStats565} from './src/integration/hmk-bestiary-native-ui-565.js';
 import {creatureIntro569,creatureSource569} from './src/integration/hmk-bestiary-intro-569.js';
@@ -330,7 +331,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.763';
+const APP_VERSION='93.764';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -589,7 +590,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.healthState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.healthState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTimeEpisodes(d.journal);validateTrekDayHistory(d.journal);validateWeatherLifecycle(d.journal);validateWeatherShifts(d.journal);validateEncounterGMJournal(d.journal);validateDirectionGMJournal(d.journal);validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateTrackingAwarenessJournal(d.journal);validateSkillActivityTimeProofs(d.journal);validateSupplyJournal(d.journal);validateForagingCarriedJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.healthState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
+ if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.healthState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.healthState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTimeEpisodes(d.journal);validateTravelPositions93764(d.journal);validateTrekDayHistory(d.journal);validateWeatherLifecycle(d.journal);validateWeatherShifts(d.journal);validateEncounterGMJournal(d.journal);validateDirectionGMJournal(d.journal);validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateTrackingAwarenessJournal(d.journal);validateSkillActivityTimeProofs(d.journal);validateSupplyJournal(d.journal);validateForagingCarriedJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.healthState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
  if(p?.elixirName!=='Erudition'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;
  const actor=d.characters.find(c=>c.id===p.targetId);
  const event=actor?.hmk?.healthState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-erudition-aural');
@@ -2257,6 +2258,11 @@ function episodeSetupIssue(form){
   ' · '+(j.calendarActivityProof.kind||'činnost')).join(', ');
   return {field:'memberIds',message:'Současně běží jiná naplánovaná činnost ('+names+'). Nejdříve ji přerušte v původním modulu; nebo nouzově zrušte rozpracovanou epizodu, pak přerušte plán. Nelze potvrdit dvě paralelní aktivity stejné postavy.'};}
 
+ if(v.kind==='travel'){
+  if(String(v.travelFromLocation||'').trim().length<2)return {field:'travelFromLocation',message:'Poloha pochodu: zadejte konkrétní výchozí místo.'};
+  if(String(v.travelToLocation||'').trim().length<2)return {field:'travelToLocation',message:'Poloha pochodu: zadejte konkrétní cílové místo.'};
+  if(v.travelLocationsConfirmed!==true)return {field:'travelLocationsConfirmed',message:'Poloha pochodu: GM musí výslovně potvrdit polohu vybrané skupiny a prostředků.'};
+ }
  if(['travel','tracking'].includes(v.kind)&&!v.memberIds.includes(v.guideId))
   return {field:'guideId',message:'Průvodce musí být vybrán z účastníků epizody.'};
  if(!v.weatherSource)return {field:'weatherSource',message:'Vyberte globální počasí nebo vlastní počasí epizody.'};
@@ -2476,8 +2482,14 @@ function timeEpisodePageHTML(clock,participants){
  <label data-episode-weather-roll>Srážky (d10)<span class="hc-episode-die"><input name="precipitationD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="precipitationD10">⚄ d10</button></span></label>
  </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p></details>
 
-  <fieldset class="hc-episode-party-panel"><legend>3 · Účastníci a průvodce</legend><div class="hc-episode-members">${characterRows}</div><label>Průvodce / osoba provádějící orientaci<select name="guideId">${participants.map(c=>option(c.id,c.name)).join('')}</select></label>
- <div data-episode-transport-panel hidden><strong>Převoz nepohyblivých pacientů (GM)</strong><p class="hc-hint">Pouze doloženou károu nebo vozem ze Stáje a se správnými tažnými zvířaty a postroji. Každého pacienta GM potvrzuje zvlášť; pacient nemá END hod za chůzi. HMK 122, 145.</p>
+  <fieldset data-episode-location-fields><legend>Poloha skupiny · potvrzuje GM</legend>
+ <p class="hc-hint">Pojmenujte <strong>konkrétní fyzické místo</strong>, nikoli jen oblast počasí. Stejný název používejte při návratu. Systém pamatuje, kde skončili vybraní cestující, zvířata ze Stáje a použitý vůz. Nevybraná družina ani odstavený vůz se automaticky nepřemístí. U starších cest bez polohy se první místo výslovně potvrzuje GM.</p>
+ <div class="hmk-trek-grid"><label>Skutečné místo odjezdu<input name="travelFromLocation" maxlength="120" placeholder="Např. Brod u jihovýchodního mostu"></label>
+ <label>Skutečné místo na konci pochodu<input name="travelToLocation" maxlength="120" placeholder="Např. Severní tábořiště"></label></div>
+ <label class="hc-check"><input name="travelLocationsConfirmed" type="checkbox"> GM potvrzuje polohu všech vybraných účastníků, zvířat a použitého vozu. Rozdělení a sloučení družin je možné jen při skutečné shodě místa.</label>
+ <p class="hc-hint" data-episode-location-status role="status"></p></fieldset>
+ <fieldset class="hc-episode-party-panel"><legend>3 · Účastníci a průvodce</legend><div class="hc-episode-members">${characterRows}</div><label>Průvodce / osoba provádějící orientaci<select name="guideId">${participants.map(c=>option(c.id,c.name)).join('')}</select></label>
+ <div data-episode-transport-panel hidden><strong>Skutečné vozidlo a tažná skupina (GM)</strong><p class="hc-hint">Každá cesta károu či vozem musí mít doložené skutečné vozidlo ze Stáje, postroje, zdravou tažnou skupinu a hmotnost. Každého nepohyblivého pacienta GM potvrzuje zvlášť; pacient nemá END hod za chůzi. HMK 122, 145.</p>
  <div class="hc-episode-members">${participants.map(c=>`<label class="hc-check" data-episode-transport-person="${esc(c.id)}" hidden><input name="transportedMemberIds" type="checkbox" value="${esc(c.id)}"> GM potvrzuje převoz · ${esc(c.name)}</label>`).join('')}</div>
  <div data-episode-transport-vehicle-evidence><label>Skutečné vozidlo z aktuální Stáje<select name="transportVehicleKey"><option value="">— Vyberte vlastněnou káru nebo vůz —</option>${transportVehicleRows.map(r=>`<option value="${esc(r.key)}">${esc(r.name)} · ${esc(stableTravelRoster.find(a=>a.id===r.ownerAnimalId)?.name||r.ownerAnimalId)}</option>`).join('')}</select></label>
  <p class="hc-hint">Doložte skutečně zapřažená zvířata: kára 1 vůl / tažný kůň; vůz 2 stejného druhu. Ve Stáji musí mít odpovídající postroje. Vybraná zvířata musí být současně účastníky cesty.</p>
@@ -21768,6 +21780,9 @@ function episodeIssue(message,form){
  const rules=[
   [/aspoň jednu postavu|alespoň jednu postavu/i,'memberIds'],
   [/Průvodce musí|Průvodce ve Shock|Průvodce.*Coma/i,'guideId'],
+  [/Poloha pochodu:.*(výchozí|není na místě odjezdu|naposledy doložen)/i,'travelFromLocation'],
+  [/Poloha pochodu:.*cílové/i,'travelToLocation'],
+  [/Poloha pochodu:.*potvrdit/i,'travelLocationsConfirmed'],
   [/Nepohyblivá nebo bezvědomá|nemůže se pohybovat vlastní silou/i,'conveyance'],
   [/Přeprava:|převoz v poli Převoz|přepravu každého/i,'transportedMemberIds'],
   [/Převoz – vozidlo:.*(není|neexistuje|vozidlo)/i,'transportVehicleKey'],
@@ -22033,6 +22048,19 @@ function episodePreviewFromForm(form,clock){
  // A failed/aborted orientation must never leak the previous episode's Watchfulness.
  delete form.dataset.episodeOrientationModes;
  const v=episodeFormSnapshot(form),members=v.memberIds||[],people=members.map(character);
+ const locations=form.querySelector('[data-episode-location-fields]');
+ if(locations){
+  locations.hidden=v.kind!=='travel';
+  const status=locations.querySelector('[data-episode-location-status]');
+  if(status&&v.kind==='travel'){
+   const known=travelPositionAt93764(data.journal,campaignKey(clock),clock.minute);
+   const items=[...(v.memberIds||[]),...(v.animalIds||[]),...(v.stableAnimalIds||[])];
+   const names=[...new Set(items.map(id=>known.get('actor:'+id)?.location).filter(Boolean))];
+   status.textContent=names.length===1?'Poslední doložené místo vybraných aktérů: '+names[0]:
+    names.length>1?'POZOR: vybrané bytosti jsou naposledy doloženy na různých místech: '+names.join(' / '):
+    'Poloha dosud není doložena pro všechny vybrané; GM musí výchozí místo výslovně ověřit.';
+  }
+ }
  episodeAssertScopedSkillInputs(v);
  if(!people.length)throw Error('Vyberte aspoň jednu postavu.');
  const kind=v.kind,minutes=Number(v.minutes),guideId=v.guideId;
@@ -22244,15 +22272,23 @@ function episodePreviewFromForm(form,clock){
   originalHealth:travelHealth.filter(p=>result.transportedMemberIds.includes(p.id)).map(p=>({id:p.id,
    shock:p.shock,comaActive:p.comaActive,extendedShockActive:p.extendedShockActive,
    immobile:p.immobile,fatigue:p.fatigue})),sourcePage:145};
- if(kind==='travel'&&result.transportedMemberIds?.length){
+ if(kind==='travel'&&['cart','wagon'].includes(v.conveyance)){
   const weights=Object.fromEntries(result.transportedMemberIds.map(id=>[id,Number(v['transportPatientLb_'+id])]));
   const vehicle=transportVehicleReceipt93756({data,campaignId:campaignKey(clock),minute:clock.minute,
    conveyance:v.conveyance,vehicleKey:v.transportVehicleKey,
    teamIds:v.transportTeamIds||[],stableAnimalIds:v.stableAnimalIds||[],
    transportedMemberIds:result.transportedMemberIds,patientLoadLb:weights,
    otherLoadLb:Number(v.transportOtherLb),gmCoLocated:v.transportCoLocated===true});
-  result.transportProof={...result.transportProof,format:'gm-transport-confirmation-v93.756',vehicle};
+  result.transportProof={...(result.transportProof||{format:'gm-transport-confirmation-v93.755',
+   memberIds:[],conveyance:v.conveyance,gmConfirmed:true,originalHealth:[],sourcePage:145}),
+   format:'gm-transport-confirmation-v93.756',vehicle};
  }
+ if(kind==='travel')result.travelPositionProof=confirmTravelPosition93764({
+  journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,
+  memberIds:members,animalIds:v.animalIds||[],stableAnimalIds:v.stableAnimalIds||[],
+  vehicleKey:result.transportProof?.vehicle?.vehicleKey||null,
+  fromLocation:v.travelFromLocation,toLocation:v.travelToLocation,
+  gmConfirmed:v.travelLocationsConfirmed===true});
  result.orientation=orientation;
  // HMK p.150: actual Stalking/Vigilance changes Watchfulness; no invented prey.
  result.trekWatchfulness=kind==='travel'&&orientation?trekWatchfulness({modes:orientation.modes,conveyance:v.conveyance}):null;
@@ -23694,7 +23730,7 @@ function updateEpisodePreview(form){
    result.orientation?`Survival ${result.orientation.roll!==null?'(d100: '+result.orientation.roll+') · ':''}SV ${result.orientation.sv} · ${result.orientation.stars??'—'} ★ · ${result.orientation.reusedFromEpisodeId?'platný přenesený hod':'nový doložený hod'}.${result.movementRollSources?.progress?' Progress (d10) převzaty z předchozí epizody.':''}${result.movementRollSources?.direction?' Direction (d10) převzaty.':''} Navigace: ${result.navigationState}.`:
    result.trackingMemory?`Tracking základ SV ${result.trackingMemory.sv}, modifikace ${result.trackingMemory.modifier?.delta??0}, upravené SV ${result.trackingMemory.score?.adjustedSV??result.trackingMemory.sv}, Spoor ${result.trackingMemory.score?.spoorStars??'—'} ★ · ${result.trackingMemory.trail}.`:
    `Bez aktivního výsledku dovednosti. Navigace: ${result.navigationState}.`;
-  const travelText=travel?`<p><strong>Rychlost:</strong> ${(result.motion.finalLPW*4000/240).toFixed(1)} m/min (odvozena z tabulky HMK 146).</p>
+  const travelText=travel?`<p><strong>Místo:</strong> ${esc(result.travelPositionProof?.fromLocation||'—')} → ${esc(result.travelPositionProof?.toLocation||'—')} · poloha potvrzena GM.</p><p><strong>Rychlost:</strong> ${(result.motion.finalLPW*4000/240).toFixed(1)} m/min (odvozena z tabulky HMK 146).</p>
     <p><strong>Čas pohybu:</strong> ${result.movementMinutes??result.minutes} z ${result.minutes} minut${result.travelDelay?.applied?', zdržení '+result.travelDelay.applied+' minut':''}.</p>
     <p><strong>Uraženo:</strong> ${result.distanceMeters} m (${(result.distanceMeters/1000).toLocaleString('cs-CZ',{maximumFractionDigits:3})} km)</p>
     <p><strong>Na mapě:</strong> ${result.mapCentimetres} cm.</p>
@@ -23783,12 +23819,12 @@ function episodeCarrySettingsFromLast(){
   'trackingLight','trackingRoad','trackingPartyTracked','trackingSnow','trackingRain','trackingAlpine','orientationAllocation','orientationLowChoice','weatherSafeShelter'];
  const draft=Object.fromEntries(keep.filter(k=>k in settings).map(k=>[k,settings[k]]));
  return {...draft,rememberSettings:true,orientationUse:'new',trackingUse:'new',confirmed:false,
-  navigationRecovered:false,checkEncounter:true};
+  navigationRecovered:false,checkEncounter:true,travelFromLocation:'',travelToLocation:'',travelLocationsConfirmed:false};
 }
 function episodeFreshDraft(){return {rememberSettings:false,orientationUse:'new',trackingUse:'new',confirmed:false,hazardComplicationRouteChanged:false,
- memberIds:[],animalIds:[],stableAnimalIds:[],transportedMemberIds:[],transportTeamIds:[],transportVehicleKey:'',transportOtherLb:'',transportCoLocated:false,orientationProofId:'',trackingProofId:'',progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
+ memberIds:[],animalIds:[],stableAnimalIds:[],travelFromLocation:'',travelToLocation:'',travelLocationsConfirmed:false,transportedMemberIds:[],transportTeamIds:[],transportVehicleKey:'',transportOtherLb:'',transportCoLocated:false,orientationProofId:'',trackingProofId:'',progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
 function episodeClearDiceDraft(draft){
- const saved={...draft,confirmed:false,orientationProofId:'',trackingProofId:'',droverProofId:'',encounterD100Sub:'',
+ const saved={...draft,travelLocationsConfirmed:false,travelFromLocation:draft.travelToLocation||'',travelToLocation:'',confirmed:false,orientationProofId:'',trackingProofId:'',droverProofId:'',encounterD100Sub:'',
   progressD10:'',directionD10:'',survivalD10:'',precipitationD6:'',encounterD100:'',forageD10:'',
   temperatureD10:'',precipitationD10:'',
   checkEncounter:true,encounterResolution:'',encounterRollContext:'',navigationRecovered:false,orientationUse:'new',trackingUse:'new',
