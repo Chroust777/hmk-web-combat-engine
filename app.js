@@ -323,7 +323,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.747';
+const APP_VERSION='93.748';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10459,7 +10459,9 @@ function hskSkillPhysicalImpactForm(entry){
  // v93.693: an Accident victim is drawn ONLY from the confirmed watch's
  // participants. Showing every campaign character made an impossible victim
  // selectable and then failed at submission, leaving a blocking dead-end.
- const watchMembers=directAccident?new Set(confirmedTrek?.calendarTimeEpisode?.memberIds||[]):null;
+ const watchMembers=directAccident?new Set([...(confirmedTrek?.calendarTimeEpisode?.memberIds||[]),
+  ...(confirmedTrek?.calendarTimeEpisode?.settings?.animalIds||[]),
+  ...(confirmedTrek?.calendarTimeEpisode?.settings?.stableAnimalIds||[])]):null;
  const eligibleTargets=survival?data.characters.filter(x=>candidateIds.has(x.id)&&
   (!watchMembers||watchMembers.has(x.id))&&!x.archived&&(x.kind!=='Animal'||!!x.hmk?.verifiedMountedBreed)):[];
  const targetOptions='<option value="">— nejprve určete náhodně —</option>'+eligibleTargets.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
@@ -11885,7 +11887,9 @@ document.addEventListener('submit',event=>{
   // the trekking guide. Never reject a legitimate randomly chosen victim,
   // but the target must belong to the identical live campaign.
   const linkedTrek=kind==='survival-accident'?data.journal.find(j=>j.id===proof.originId)?.calendarTrekSkillSource:null;
-  if(directAccident&&(!originalTrek?.calendarTimeEpisode?.memberIds?.includes(target.id)||
+  if(directAccident&&(![...(originalTrek?.calendarTimeEpisode?.memberIds||[]),
+    ...(originalTrek?.calendarTimeEpisode?.settings?.animalIds||[]),
+    ...(originalTrek?.calendarTimeEpisode?.settings?.stableAnimalIds||[])].includes(target.id)||
    data.campaignClock.minute!==originalTrek.calendarTimeEpisode.endMinute))
    throw Error('Accident: oběť musí patřit do původní družiny a test nastat v potvrzené minutě nehody.');
   if(linkedTrek){
