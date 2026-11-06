@@ -326,7 +326,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.750';
+const APP_VERSION='93.751';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -15960,7 +15960,13 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   const rollInput=kind==='injury-morale'&&form.id==='hmk-guided-mandatory-form'?
    (form.querySelector('input[name="abe"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
    kind==='skill-fall'?form.elements.namedItem('heightFt'):
-   form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"]');
+   form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"],input[name="physicianRoll"]');
+  // Calendar/Travel rule links must land on the REAL original input and
+  // visibly mark it, not merely open a whole module without a target.
+  if(['treatment','healing','infection','grim','blood-loss','coma','extended-shock'].includes(kind)&&rollInput&&!rollInput.disabled){
+   for(const old of document.querySelectorAll('.hmk-medical-required-target'))old.classList.remove('hmk-medical-required-target');
+   (rollInput.closest('label')||rollInput).classList.add('hmk-medical-required-target');
+  }
   rollInput?.focus({preventScroll:true});
  }else if(['trek-weather-hazard','trek-direction-hazard','trek-encounter','trek-survival','trek-survival-test','trek-drover-test'].includes(kind)){
   const hazard=kind==='trek-weather-hazard'?'weather':kind==='trek-direction-hazard'?'direction':
@@ -22595,7 +22601,9 @@ function episodeIndependentDeadlines(form){
  const end=clock.minute+duration;
  const journalIds=new Map(data.journal.map(j=>[j.id,j]));
  try{return campaignCalendarAgenda(clock,data.characters,data.journal,data.inventory).all.filter(item=>
-  Number.isSafeInteger(item.minute)&&item.minute>=clock.minute&&item.minute<end&&
+  // An already-overdue medical obligation must remain visible and actionable.
+  // The original scheduler still decides whether its evidence permits any advance.
+  Number.isSafeInteger(item.minute)&&item.minute<end&&
   // These obligations belong to the still-running episode; they must be
   // completed in its own checklist, never duplicated as external events.
   !(item.kind==='skill-critical'&&isTravelEpisodeReceipt(journalIds.get(item.originId)))&&
@@ -22615,14 +22623,19 @@ function episodeTimedRolls(form){
 // The Travel UI invokes only health timelines. HMK 182 Move/Charge/Double
 // Move aggravation belongs to Combat turn actions; do not infer those turns
 // from multi-hour travel duration or from the trekking pace choices.
-/** v93.675: No parallel healthcare resolution inside a travel transaction.
- * Previously the preview could stage poison/disease/healing results and add
- * medical journal rows while the journey was still being assembled. Every
- * timed medical course now belongs to the original module at a calendar
- * boundary. Deterministic onsets are committed by calendar clock advancement.
+/** Read-only routing of existing dated medical obligations.
+ * Travel must NEVER perform a separate medical d100 or advance a health state.
+ * The original calendar and treatment/healing forms own the actual resolution.
+ * An interval ending exactly at the due minute is legal; the NEXT interval
+ * must first resolve that obligation in the original module.
  */
 function episodeTimedMedical(form,{strict=false}={}){
- return null;
+ const requirements=episodeIndependentDeadlines(form).filter(x=>EPISODE_TIMED_COURSE_KINDS.has(x.kind))
+  .map(x=>({key:x.id,kind:x.kind,characterId:x.characterId,dueMinute:x.minute,
+   woundId:x.woundId??null,sourceId:x.sourceId??null,episodeId:x.episodeId??null,
+   elapsedMinutes:x.elapsedMinutes??null,
+   reason:x.description||'Povinná zdravotní kontrola v původním modulu'}));
+ return {requirements,changes:[],incapacitations:[],complete:requirements.length===0};
 }
 
 /** GM memo reminders are reviewable without fabricated skill or health dice.
@@ -22659,11 +22672,12 @@ function showEpisodeIndependentDeadlines(form){
   panel.querySelector('[data-episode-checklist]')?.parentElement?.after(box);}
  if(!box)return;
  const other=episodeEvaluationRequested?episodeOtherTimedTasks(form):[];
- const medical=episodeEvaluationRequested?episodeTimedMedical(form):null;
+ // Show medical deadlines even during setup. Otherwise the duration guard
+ // prevents Evaluate and hides the very button needed to shorten the watch.
+ const medical=episodeTimedMedical(form);
  const gm=episodeEvaluationRequested?episodeGMReviews(form):{pending:[],reviewed:[]};
  const relevant=other.length||medical?.changes.length||medical?.requirements.length||medical?.error||medical?.incapacitations.length||gm.pending.length||gm.reviewed.length;
  box.hidden=!relevant;
- if(!episodeEvaluationRequested)return;
  const medicalRows=(medical?.changes||[]).map(c=>'<div class="hc-episode-proof hc-episode-proof-done"><strong>'+(c.cancelled?'⊘ ':'✓ ')+
   esc(character(c.actorId)?.name||c.actorId)+' · '+esc(c.kind)+' · '+esc(displayCampaignMinute(c.dueMinute))+
   '</strong><p>'+(c.cancelled?'Zrušený termín · ':'Vyřešeno · ')+esc(c.description||'původní HMK zdravotní procedura')+

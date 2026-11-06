@@ -201,3 +201,8 @@ body #app .journal-book--creation button.hmk-creation-die.secondary{
  font:700 13px/1.25 var(--hmk-ui-body-font)!important;
  box-shadow:0 2px 4px rgba(40,25,12,.2)!important;
 }
+
+/* HMK v93.751: rule-link focus in the EXISTING medical form. Uses the same
+ * required-input red as Travel; changes no global fonts, dice or buttons. */
+.hmk-medical-required-target{outline:2px solid #a4251e!important;outline-offset:3px;border-radius:3px;background:rgba(194,57,41,.09)!important}
+.hmk-medical-required-target input:not([type=checkbox]),.hmk-medical-required-target select{border-color:#a4251e!important;outline-color:#a4251e!important}
