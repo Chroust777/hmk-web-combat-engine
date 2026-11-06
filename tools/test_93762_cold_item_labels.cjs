@@ -40,5 +40,5 @@ const custom={name:'Vlastní zbroj',category:'armor',builtin:false,properties:{l
 assert.deepEqual(armourColdFValues(custom),[1,3]);assert.ok(clothingColdText(custom).includes('+1 až +3'));
 const missing={name:'Bez doložených zón',category:'armor',properties:{}};
 assert.equal(coldLibrarySummary(missing),'F AV —');assert.ok(clothingColdText(missing).includes('nebyla doložena'));
-assert.ok(source.includes('esc(coldLibrarySummary(i))'));assert.ok(source.includes("'Chlad AV':'F AV"));assert.ok(source.includes("const APP_VERSION='93.762'"));
+assert.ok(source.includes('esc(coldLibrarySummary(i))'));assert.ok(source.includes("'Chlad AV':'F AV"));const release=source.match(/const APP_VERSION='(\d+\.\d+)'/);assert.ok(release&&release[1],"App release missing");const html=fs.readFileSync(path.join(root,"index.html"),"utf8");assert.ok(html.includes(release[1]),"App and HTML release disagree");
 console.log('PASS v93.762 '+(checks+7)+' checks: all 92 original+new armour article labels, exact p117 material F, cloak bonuses, gear, and unknown/custom values');

@@ -330,7 +330,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.762';
+const APP_VERSION='93.763';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2410,7 +2410,8 @@ function timeEpisodePageHTML(clock,participants){
   ['Survival','Tracking','Animalcraft','Riding','Awareness'].some(skill=>episodeSkillProof(j,skill,j.characterId,campaignKey(clock),clock.minute)));
  const skillOptions=skill=>skillCandidates.filter(j=>episodeSkillProof(j,skill,j.characterId,campaignKey(clock),clock.minute))
   .map(j=>`<option value="${esc(j.id)}">${esc(character(j.characterId)?.name||j.characterId)} · ${esc(skill)} · SV ${esc(String((j.skillTestProof.a||j.skillTestProof.result)?.sv))} · ${esc(String((j.skillTestProof.a||j.skillTestProof.result)?.svTier?.stars??'—'))} ★</option>`).join('');
- const lastRow=lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute);
+ const lastRow=lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,
+  timeEpisodeDraft?.memberIds?.length?timeEpisodeDraft.memberIds:null);
  const start=displayCampaignMinute(clock.minute),d=timeEpisodeDraft;
  const pendingEncounter=episodePendingEncounter(clock);
  // HMK 148–149: an Accident inherits the original Survival CF and hazard
@@ -21987,7 +21988,8 @@ function episodeOrientationReuseCheck(form,clock,sky){
   const v=episodeFormSnapshot(form);
   const weather=episodeCurrentWeather(form,clock,{mandatory:false});
   if(!weather.weather)return {allowed:false,reason:'Není dosud doloženo aktuální počasí.'};
-  const previous=lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute);
+  const previous=lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,
+   v.memberIds?.length?v.memberIds:null);
   if(!previous?.calendarTimeEpisode?.orientation)return {allowed:false,reason:'Předchozí cestovní epizoda nemá doložený Orienteering.'};
   if(previous.calendarTimeEpisode.endMinute!==clock.minute)return {allowed:false,reason:'Předchozí epizoda neskončila přesně v aktuální minutě.'};
   const period=sky?.period||v.lightPeriod;
@@ -22182,8 +22184,8 @@ function episodePreviewFromForm(form,clock){
  }
  const wearied=travelHealth.some(p=>p.fatigue>=20)||animalHealth.some(a=>a.fatigue>=20);
  const injured=travelHealth.some(p=>p.injured)||animalHealth.some(a=>a.injured);
- const equipmentSlowIn=kind==='travel'?lastEquipmentSlowCarry(data.journal,campaignKey(clock),clock.minute):0;
- const equipmentDelayIn=kind==='travel'?independentTravelDelayCarry(data.journal,campaignKey(clock),clock.minute):0;
+ const equipmentSlowIn=kind==='travel'?lastEquipmentSlowCarry(data.journal,campaignKey(clock),clock.minute,members):0;
+ const equipmentDelayIn=kind==='travel'?independentTravelDelayCarry(data.journal,campaignKey(clock),clock.minute,members):0;
  const equipmentBaseSlow=Number(v.extraSlow||0)+Number(modes.orienteeringSlow||0)+taskSlow+
   Number(wearied)+Number(injured)+Number(precipitation?.slowMode);
  const computedSlow=equipmentBaseSlow+Number(equipmentSlowIn>0);
@@ -22235,7 +22237,7 @@ function episodePreviewFromForm(form,clock){
   movementMinutes:kind==='travel'?Math.max(0,minutes-equipmentDelayIn):null,
   doubleTime:!!v.doubleTime,loadBypass:!!v.loadBypass,dunesSlow:!!v.dunesSlow,
   encByActor,forcedBearing,
-  previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute),
+  previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute,kind==='travel'?members:null),
   encounterLightMinutes:lightMinutes,inactiveByActor,transportedMemberIds:kind==='travel'?(v.transportedMemberIds||[]):[]});
  if(kind==='travel'&&result.transportedMemberIds?.length)result.transportProof={format:'gm-transport-confirmation-v93.755',
   memberIds:[...result.transportedMemberIds],conveyance:v.conveyance,gmConfirmed:true,
@@ -22373,6 +22375,7 @@ function episodePreviewFromForm(form,clock){
    }
    const delay={...episodeMinuteDelay({minutes,incoming,current:relevant?now:0,future,persistCarry:true}),
     method:'gm-complication-only-v93.695'};
+   result.travelPartyScope='v93.763'; // New receipts isolate travel consequences by actual participants.
    result.equipmentBaseSlow=equipmentBaseSlow;
    result.equipmentSlowCarryIn=equipmentSlowIn;
    if(relevant){
@@ -22890,7 +22893,8 @@ function episodePlannedTasks(form){
  // A genuine Complication can consume travel minutes; equipment repair cannot.
  const orientationReady=v.orientationUse==='reuse'||!!v.orientationProofId;
  const rawMinutes=Number(v.minutes);
- const carriedDelay=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute);
+ const carriedDelay=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
+  v.memberIds?.length?v.memberIds:null);
  const hasTravelMovement=Number.isSafeInteger(rawMinutes)&&rawMinutes>Math.max(0,carriedDelay);
  if(v.kind==='travel'&&orientationReady&&hasTravelMovement)
   for(const id of v.memberIds||[])if(!(v.transportedMemberIds||[]).includes(id)&&
@@ -23965,7 +23969,8 @@ document.addEventListener('click',e=>{
   (b.dataset.episodeDie==='precipitationD6'?6:b.dataset.episodeDie==='encounterD100'?100:10);
  try{const hourly=b.dataset.episodeDie.startsWith('end_')&&form.elements.namedItem('doubleTime')?.checked;
   const elapsed=Number(form.elements.namedItem('minutes')?.value||0),
-   incoming=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute),
+   incoming=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
+    (episodeFormSnapshot(form).memberIds||[]).length?episodeFormSnapshot(form).memberIds:null),
    movement=Math.max(0,elapsed-incoming);
   const count=hourly?Math.ceil(movement/60):(movement===0?0:1);
   if(!Number.isSafeInteger(count)||count<0||count>168||!Number.isSafeInteger(elapsed)||elapsed<1)throw Error('Nejprve zadejte platnou délku cesty.');

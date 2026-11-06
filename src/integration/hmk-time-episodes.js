@@ -183,14 +183,32 @@ export function lastEpisodeTravelDelayCarry(journal=[],campaignId,minute=Infinit
   return ep.travelDelay?.carryOut??0;
  }return 0;
 }
+/** v93.763: travel consequences belong to travellers, not to the shared
+ * campaign clock. An omitted scope retains the pre-93.763 replay semantics for
+ * immutable historical receipts; new UI receipts supply actual participants.
+ * Any overlapping participant is continuity. A change of membership involving
+ * more than one independently travelling group remains GM-adjudicated.
+ */
+function travelPartySet93763(memberIds){
+ if(memberIds===null)return null;
+ must(Array.isArray(memberIds)&&memberIds.length>0&&
+  new Set(memberIds).size===memberIds.length&&
+  memberIds.every(id=>typeof id==='string'&&!!id),'Pochod: neplatní účastníci družiny pro přenos následků.');
+ return new Set(memberIds);
+}
+function travelPartyOverlaps93763(e,party){
+ return !party||Array.isArray(e?.memberIds)&&e.memberIds.some(id=>party.has(id));
+}
 /** One Slow Mode from a successful equipment repair (S) applies to the NEXT
  * trekking watch (HMK p.148). Minutes in shorter watches decrement this
  * obligation only for actual moving minutes, without duplicating it. Older receipts had no carry;
  * inspect their result only for the first subsequent travel watch. */
-export function lastEquipmentSlowCarry(journal=[],campaignId,minute=Infinity){
+export function lastEquipmentSlowCarry(journal=[],campaignId,minute=Infinity,memberIds=null){
+ const party=travelPartySet93763(memberIds);
  for(let i=journal.length-1;i>=0;i--){
   const row=journal[i],e=row.calendarTimeEpisode;
-  if(row.calendarCampaignId!==campaignId||!e||e.kind!=='travel'||e.startMinute>=minute)continue;
+  if(row.calendarCampaignId!==campaignId||!e||e.kind!=='travel'||e.startMinute>=minute||
+   !travelPartyOverlaps93763(e,party))continue;
   if(Number.isSafeInteger(e.equipmentSlowCarryOut))return e.equipmentSlowCarryOut;
   return e.hazardDetails?.some(h=>(h.hazard==='equipment'||h.hazard==='complication'&&h.automationVersion==='v93.681')&&h.result==='short-delay')?240:0;
  }
@@ -200,9 +218,11 @@ export function lastEquipmentSlowCarry(journal=[],campaignId,minute=Infinity){
  * Complication remains a genuine travel obstruction. Reconstruct its independent
  * remaining delay from immutable travel receipts, including pre-v93.695 saves.
  * Historical receipts themselves keep their original verification rules. */
-export function independentTravelDelayCarry(journal=[],campaignId,minute=Infinity){
+export function independentTravelDelayCarry(journal=[],campaignId,minute=Infinity,memberIds=null){
+ const party=travelPartySet93763(memberIds);
  const episodes=journal.filter(j=>j.calendarCampaignId===campaignId&&
-  j.calendarTimeEpisode?.kind==='travel'&&j.calendarTimeEpisode.startMinute<minute)
+  j.calendarTimeEpisode?.kind==='travel'&&j.calendarTimeEpisode.startMinute<minute&&
+  travelPartyOverlaps93763(j.calendarTimeEpisode,party))
   .map(j=>j.calendarTimeEpisode).sort((a,b)=>a.startMinute-b.startMinute);
  let remaining=0;
  for(const e of episodes){
@@ -214,9 +234,11 @@ export function independentTravelDelayCarry(journal=[],campaignId,minute=Infinit
  return remaining;
 }
 /** Fractional metre accounting follows the last journey, even across rest. */
-export function lastTimeEpisodeDistanceFraction(journal=[],campaignId,minute=Infinity){
+export function lastTimeEpisodeDistanceFraction(journal=[],campaignId,minute=Infinity,memberIds=null){
+ const party=travelPartySet93763(memberIds);
  for(let i=journal.length-1;i>=0;i--){const row=journal[i],ep=row.calendarTimeEpisode;
-  if(row.calendarCampaignId!==campaignId||!ep||ep.startMinute>=minute||ep.kind!=='travel')continue;
+  if(row.calendarCampaignId!==campaignId||!ep||ep.startMinute>=minute||ep.kind!=='travel'||
+   !travelPartyOverlaps93763(ep,party))continue;
   return ep.distanceFractionOut??0;
  }return 0;
 }
@@ -474,6 +496,10 @@ export function validateTimeEpisodes(journal=[]){
   must(e.format===EPISODE_FORMAT&&whole(e.startMinute,0,1e9)&&whole(e.minutes,1,10080)&&
    e.endMinute===e.startMinute+e.minutes&&e.startMinute===j.campaignMinute&&
    typeof j.calendarCampaignId==='string'&&Array.isArray(e.memberIds),'Neplatná herní epizoda');
+  must(e.travelPartyScope===undefined||e.kind==='travel'&&e.travelPartyScope==='v93.763'&&
+   Array.isArray(e.memberIds)&&e.memberIds.length>0&&new Set(e.memberIds).size===e.memberIds.length,
+   'Neznámé nebo neplatné vymezení cestovní družiny.');
+  const travelScope=e.travelPartyScope==='v93.763'?e.memberIds:null;
   // The references are not new rolls. Verify linked proof and continuous inheritance.
   for(const [key,skill] of [['orientation','Survival'],['trackingMemory','Tracking']]){
    const memo=e[key];if(!memo)continue;
@@ -939,7 +965,7 @@ export function validateTimeEpisodes(journal=[]){
    const independent=d.method==='gm-complication-only-v93.695';
    const expected=episodeMinuteDelay({minutes:e.minutes,
     incoming:d.method==='gm-current-episode-only-v2'?0:independent?
-     independentTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute):
+     independentTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute,travelScope):
      lastEpisodeTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute),
     current:d.current,future:d.future,persistCarry:d.method!=='gm-current-episode-only-v2'});
    if(independent)expected.method='gm-complication-only-v93.695';
@@ -963,7 +989,7 @@ export function validateTimeEpisodes(journal=[]){
     (d.current===0||!!hazard),
     'Zdržení v další hlídce nemá doložený Equipment Hazard nebo je jeho délka pozměněna.');
    if(e.equipmentSlowCarryOut!==undefined){
-    const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute);
+    const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute,travelScope);
     const newSlow=e.hazardDetails?.some(h=>(h.hazard==='equipment'||h.hazard==='complication'&&h.automationVersion==='v93.681')&&h.result==='short-delay')?e.minutes:0;
     // Legacy receipts before v93.666 incorrectly consumed a Slow obligation
     // during an equipment repair with zero movement. Keep historical data
@@ -998,7 +1024,7 @@ export function validateTimeEpisodes(journal=[]){
    }
   }
   if(e.distanceFractionIn!==undefined){
-   must(e.kind==='travel'&&Math.abs(e.distanceFractionIn-lastTimeEpisodeDistanceFraction(prior,j.calendarCampaignId,e.startMinute))<1e-7,
+   must(e.kind==='travel'&&Math.abs(e.distanceFractionIn-lastTimeEpisodeDistanceFraction(prior,j.calendarCampaignId,e.startMinute,travelScope))<1e-7,
     'Ztracený nebo cizí zlomek cestovní vzdálenosti.');
    const meters=e.motion.finalLPW*4000*(e.movementMinutes??e.travelDelay?.movementMinutes??e.minutes)/240+e.distanceFractionIn;
    must(e.distanceMeters===Math.floor(meters+1e-10)&&Math.abs(e.distanceFractionOut-Math.max(0,meters-e.distanceMeters))<1e-7,
