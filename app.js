@@ -327,7 +327,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.753';
+const APP_VERSION='93.754';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11190,9 +11190,9 @@ function hskWeatherShockFollowup(actorId){
  return `<section class="panel wide hmk-weather-shock-followup"><h3>${q.domain==='travel-accident'?'Accident':'Weather'} Shock · ${esc(actor.name)} · ${esc(q.kind)}</h3>
  <p class="hc-hint">Samostatný Shock Reroll z cestování (${esc(q.sourceId)}). Původ ${esc(displayCampaignMinute(q.originMinute))}. ${q.phase==='after-all-bleeding-stopped'?'Okamžitý Shock Reroll po zastavení všech Bleederů':q.kind==='UNC'?'Počkat skutečných 10 minut':'Po další skutečné akci mimo boj vyhodnoť tento hod'}. Kalendář je autoritou pro minuty; tento hod jej sám neposune. Combat pouze čte účinky na postavu (HMK 169, 185).</p>
  <p>Shock ML ${esc(String(shockML??'nedoloženo'))} · Fatigue ${fatigue} · ${q.kind==='STN'?'bez dalšího −20':'−20 při INC/UNC'} · EML ${esc(String(Number.isInteger(shockML)?eml:'nedoloženo'))}</p>
- <form data-weather-shock-followup><input type="hidden" name="sourceId" value="${esc(q.sourceId)}">
+ <form data-weather-shock-followup data-shock-eml="${esc(String(Number.isFinite(eml)?eml:''))}" data-shock-coma-ready="${comaCause.ready&&canRoll?'yes':'no'}"><input type="hidden" name="sourceId" value="${esc(q.sourceId)}">
  <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required ${canRoll?'':'disabled title="Shock ještě není splatný nebo chybí ověřená ML"'}></label>
- ${q.kind==='UNC'?`<p class="hc-hint">${comaCause.ready?'Coma při CF: původní rána '+esc(comaCause.woundId)+' · ověřené Location Shock '+comaCause.locationShock+' · IL '+comaCause.injuryLevel+' · počáteční HR '+comaCause.initialHR+'. Hodnoty nejsou upravitelné.':'Coma při CF: '+esc(comaCause.reason)}</p><input name="comaLocationShock" type="hidden" value="${comaCause.ready?comaCause.locationShock:''}"><input name="comaInjuryLevel" type="hidden" value="${comaCause.ready?comaCause.injuryLevel:''}"><label>První skutečný d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" ${canRoll&&comaCause.ready?'':'disabled'}></label>`:''}
+ ${q.kind==='UNC'?`<p class="hc-hint">${comaCause.ready?'Coma při CF: původní rána '+esc(comaCause.woundId)+' · ověřené Location Shock '+comaCause.locationShock+' · IL '+comaCause.injuryLevel+' · počáteční HR '+comaCause.initialHR+'. Hodnoty nejsou upravitelné.':'Coma při CF: '+esc(comaCause.reason)}</p><input name="comaLocationShock" type="hidden" value="${comaCause.ready?comaCause.locationShock:''}"><input name="comaInjuryLevel" type="hidden" value="${comaCause.ready?comaCause.injuryLevel:''}"><label>První skutečný d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" disabled title="Coma d10 je dostupné pouze po skutečném výsledku UNC + CF"></label>`:''}
  <p class="hc-hint">${q.phase==='after-all-bleeding-stopped'?'Ihned po zastavení všech Bleederů – bez dalších deseti minut.':q.kind==='UNC'?'Test je dostupný přesně po uplynutí deseti minut.':'Tlačítko vyhodnotí Shock po dokončení následující skutečné akce postavy; žádný bojový tah se nevytváří.'}</p>
  ${q.kind!=='UNC'&&q.phase!=='after-all-bleeding-stopped'?'<label><input type="checkbox" name="actualActionConfirmed" required '+(canRoll?'':'disabled')+'> GM potvrzuje skutečnou následující akci mimo boj, na jejímž konci probíhá Shock Reroll</label>':''}
  <button type="submit" ${canRoll?'':'disabled'}>Vyhodnotit a zapsat Shock d100</button><output role="status" aria-live="polite"></output></form>
@@ -12368,6 +12368,19 @@ document.addEventListener('submit',event=>{
   selected=actor.id;activeSheetSection='hazards';view='sheet';render();
  }catch(error){if(out)out.textContent='Cold Shock Course se neuložil: '+error.message;}
 },true);
+// Only a witnessed UNC+CF unlocks the extra d10. The anatomical fields
+// remain read-only evidence for the possible CF branch, never an invented roll.
+document.addEventListener('input',event=>{
+ const input=event.target;if(!input?.matches?.('form[data-weather-shock-followup] [name="roll"]'))return;
+ const form=input.closest('form[data-weather-shock-followup]');
+ const next=form?.elements.namedItem('initialComaD10');if(!next)return;
+ const roll=Number(input.value),eml=Number(form.dataset.shockEml),allowed=
+  form.dataset.shockComaReady==='yes'&&input.value.trim()!==''&&
+  Number.isSafeInteger(roll)&&roll>=1&&roll<=100&&
+  Number.isFinite(eml)&&['CF','F','S','CS'][successLevel(roll,eml)]==='CF';
+ next.disabled=!allowed;
+ if(!allowed)next.value='';
+},true);
 document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-weather-shock-followup]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
@@ -12388,8 +12401,8 @@ document.addEventListener('submit',event=>{
   // The calendar's 10-minute UNC deadline remains enforced separately.
   const id=uuid(),turnEnded=q.kind!=='UNC'&&q.phase!=='after-all-bleeding-stopped';
   if(turnEnded&&!form.elements.namedItem('actualActionConfirmed')?.checked)throw Error('Pro INC/STN musí GM potvrdit skutečnou další akci, nikoli fiktivní bojový tah');
-  const comaLocationShock=form.elements.namedItem('comaLocationShock')?.value?Number(form.elements.namedItem('comaLocationShock').value):null;
-  const comaInjuryLevel=form.elements.namedItem('comaInjuryLevel')?.value?Number(form.elements.namedItem('comaInjuryLevel').value):null;
+  const comaLocationShock=sl==='CF'&&form.elements.namedItem('comaLocationShock')?.value?Number(form.elements.namedItem('comaLocationShock').value):null;
+  const comaInjuryLevel=sl==='CF'&&form.elements.namedItem('comaInjuryLevel')?.value?Number(form.elements.namedItem('comaInjuryLevel').value):null;
   const initialComaD10=form.elements.namedItem('initialComaD10')?.value?Number(form.elements.namedItem('initialComaD10').value):null;
   if(q.kind==='UNC'&&sl==='CF'){
    const cause=verifiedNoncombatComaCause({actor,state,shockFollowup:q});
