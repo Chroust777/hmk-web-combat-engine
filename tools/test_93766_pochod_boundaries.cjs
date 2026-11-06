@@ -1,0 +1,42 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
+const root=path.resolve(__dirname,'..'),old=require.extensions['.js'];
+require.extensions['.js']=(m,f)=>f.startsWith(path.join(root,'src')+path.sep)?
+ m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{fileName:f,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,f):old(m,f);
+const {calculateTimeEpisode,episodeEncounterByMinutes,validateTimeEpisodes}=require('../src/integration/hmk-time-episodes.js');
+let n=0;const eq=(a,b,why)=>{n++;assert.deepStrictEqual(a,b,why)};
+const near=(a,b,tol=1e-11)=>{n++;assert.ok(Math.abs(a-b)<tol,`${a} ≠ ${b}`)};
+const bad=(fn,regex)=>{n++;assert.throws(fn,regex)};
+const basic={minute:100,minutes:1,kind:'travel',topography:'flat',terrain:'paved-road',conveyance:'foot',
+ memberIds:['a'],enduranceByActor:{a:12},endRollByActor:{a:10},encByActor:{a:0},progress:0,bearing:0,progressD10:[],directionD10:[]};
+let r=calculateTimeEpisode(basic);
+eq(r.endMinute,101,'one-minute interval');eq(r.actors.length,1,'only declared member gets END');
+eq(r.actors[0].carryOut,5,'one-minute failed END yields 5/240 fatigue');
+eq(r.actors[0].delta,0,'partial fatigue remains fractional');
+eq(r.distanceFractionIn,0,'no prior distance');
+const long=calculateTimeEpisode({...basic,minutes:10080,endRollByActor:{a:4}});
+eq(long.endMinute,10180,'seven-day interval must preserve exact time');
+eq(long.actors[0].delta,0,'END success avoids this particular movement fatigue');
+bad(()=>calculateTimeEpisode({...basic,minutes:10081}),/1.?10.?080|epizod|minut/);
+bad(()=>calculateTimeEpisode({...basic,minutes:0}),/minut|epizod/);
+bad(()=>calculateTimeEpisode({...basic,memberIds:['a','a']}),/jedinečné/);
+bad(()=>calculateTimeEpisode({...basic,endRollByActor:{a:null}}),/END/);
+const double=calculateTimeEpisode({...basic,minutes:61,doubleTime:true,endRollByActor:{a:[10,10]}});
+eq(double.actors[0].hourlyEndSR.length,2,'61 minutes Double Time needs two distinct hourly END dice');
+bad(()=>calculateTimeEpisode({...basic,minutes:61,doubleTime:true,endRollByActor:{a:10}}),/dvě|hodinu|END/);
+bad(()=>calculateTimeEpisode({...basic,minutes:121,doubleTime:true,endRollByActor:{a:[10,10]}}),/hodinu|END/);
+eq(calculateTimeEpisode({...basic,minutes:121,doubleTime:true,endRollByActor:{a:[10,10,10]}}).actors[0].hourlyEndSR.length,3,'121 min requires three dice');
+const day=episodeEncounterByMinutes({minutes:240,environ:'rural',night:false,d100:100});
+near(day.chance,.4);eq(day.found,true,'100 percentile is positive for 40% density with count sampler');
+near(episodeEncounterByMinutes({minutes:480,environ:'wilderness',night:true,d100:2}).chance,.1);
+near(episodeEncounterByMinutes({minutes:60,environ:'rural',night:false,d100:20}).chance,1-Math.pow(.6,1/4));
+const transition=episodeEncounterByMinutes({minutes:240,environ:'rural',night:false,d100:50,lightMinutes:{day:120,night:120}});
+near(transition.chance,1-Math.sqrt(.6)*Math.sqrt(.9));
+bad(()=>episodeEncounterByMinutes({minutes:240,environ:'rural',night:false,d100:50,lightMinutes:{day:120,night:119}}),/minut|délk/);
+bad(()=>episodeEncounterByMinutes({minutes:120,environ:'rural',night:false,d100:0}),/d100/);
+const ep=(id,minute,minutes,memberIds)=>({id,calendarCampaignId:'same',campaignMinute:minute,
+ calendarTimeEpisode:{...calculateTimeEpisode({minute,minutes,kind:'rest',memberIds}),travelPartyScope:undefined}});
+eq(validateTimeEpisodes([ep('one',100,20,['a']),ep('two',120,20,['b'])]),true,'sequential independent episodes accepted');
+bad(()=>validateTimeEpisodes([ep('one',100,20,['a']),ep('parallel',105,20,['b'])]),/překrývat/);
+console.log('PASS',n,'Pochod: long/short clock, independent END, hourly Double Time, encounter minute density, strict overlap guard');

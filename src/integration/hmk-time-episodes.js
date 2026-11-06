@@ -199,12 +199,30 @@ function travelPartySet93763(memberIds){
 function travelPartyOverlaps93763(e,party){
  return !party||Array.isArray(e?.memberIds)&&e.memberIds.some(id=>party.has(id));
 }
+/** A fully released member starts a new participation lifecycle on return.
+ * This affects only the selected party's pending, fractional travel work;
+ * the immutable earlier receipts (and still-active unrelated parties) remain.
+ * Legacy unscoped historical reads are preserved verbatim.
+ */
+function partyHistoryAfterRelease93766(journal,campaignId,minute,party){
+ if(!party)return journal;
+ for(let i=journal.length-1;i>=0;i--){
+  const j=journal[i],r=j.calendarMemberRelease;
+  if(j.calendarCampaignId===campaignId&&j.campaignMinute<=minute&&
+     r?.format==='hmk-calendar-member-release-v93.765'&&
+     r.actorId===j.characterId&&party.has(r.actorId)&&
+     r.campaignId===campaignId&&r.minute===j.campaignMinute&&r.gmConfirmed===true)
+   return journal.slice(i+1);
+ }
+ return journal;
+}
 /** One Slow Mode from a successful equipment repair (S) applies to the NEXT
  * trekking watch (HMK p.148). Minutes in shorter watches decrement this
  * obligation only for actual moving minutes, without duplicating it. Older receipts had no carry;
  * inspect their result only for the first subsequent travel watch. */
 export function lastEquipmentSlowCarry(journal=[],campaignId,minute=Infinity,memberIds=null){
  const party=travelPartySet93763(memberIds);
+ journal=partyHistoryAfterRelease93766(journal,campaignId,minute,party);
  for(let i=journal.length-1;i>=0;i--){
   const row=journal[i],e=row.calendarTimeEpisode;
   if(row.calendarCampaignId!==campaignId||!e||e.kind!=='travel'||e.startMinute>=minute||
@@ -220,6 +238,7 @@ export function lastEquipmentSlowCarry(journal=[],campaignId,minute=Infinity,mem
  * Historical receipts themselves keep their original verification rules. */
 export function independentTravelDelayCarry(journal=[],campaignId,minute=Infinity,memberIds=null){
  const party=travelPartySet93763(memberIds);
+ journal=partyHistoryAfterRelease93766(journal,campaignId,minute,party);
  const episodes=journal.filter(j=>j.calendarCampaignId===campaignId&&
   j.calendarTimeEpisode?.kind==='travel'&&j.calendarTimeEpisode.startMinute<minute&&
   travelPartyOverlaps93763(j.calendarTimeEpisode,party))
@@ -236,6 +255,7 @@ export function independentTravelDelayCarry(journal=[],campaignId,minute=Infinit
 /** Fractional metre accounting follows the last journey, even across rest. */
 export function lastTimeEpisodeDistanceFraction(journal=[],campaignId,minute=Infinity,memberIds=null){
  const party=travelPartySet93763(memberIds);
+ journal=partyHistoryAfterRelease93766(journal,campaignId,minute,party);
  for(let i=journal.length-1;i>=0;i--){const row=journal[i],ep=row.calendarTimeEpisode;
   if(row.calendarCampaignId!==campaignId||!ep||ep.startMinute>=minute||ep.kind!=='travel'||
    !travelPartyOverlaps93763(ep,party))continue;
@@ -250,6 +270,7 @@ export function pendingTrackingCFBearing(journal=[],campaignId,minute=Infinity,m
  const members=memberIds===null?null:new Set(memberIds);
  if(members&&(!Array.isArray(memberIds)||!memberIds.length||members.size!==memberIds.length))
   throw Error('Tracking CF: neplatní účastníci následující cesty');
+ journal=partyHistoryAfterRelease93766(journal,campaignId,minute,members);
  const episodes=journal.filter(row=>row.calendarCampaignId===campaignId&&row.calendarTimeEpisode&&
   row.calendarTimeEpisode.startMinute<minute).sort((a,b)=>b.calendarTimeEpisode.startMinute-a.calendarTimeEpisode.startMinute);
  for(const row of episodes){const ep=row.calendarTimeEpisode;
@@ -269,7 +290,16 @@ export function pendingTrackingCFBearing(journal=[],campaignId,minute=Infinity,m
  * NOTE: simultaneous climate+recovery netting remains under audit. */
 export function lastTimeEpisodeCarry(journal=[],campaignId,actorId){
  for(let i=journal.length-1;i>=0;i--){const j=journal[i];
-  if(j.calendarCampaignId!==campaignId||!j.calendarTimeEpisode)continue;
+  if(j.calendarCampaignId!==campaignId)continue;
+  // GM offboarding (v93.765) terminates live medical and Fatigue monitoring.
+  // A later return must not resurrect sub-point weariness from an older trek.
+  // Keep the immutable old receipt intact for replay before the release.
+  const release=j.calendarMemberRelease;
+  if(release?.format==='hmk-calendar-member-release-v93.765'&&
+     release.actorId===actorId&&j.characterId===actorId&&
+     release.campaignId===campaignId&&release.minute===j.campaignMinute&&
+     release.gmConfirmed===true)return 0;
+  if(!j.calendarTimeEpisode)continue;
   const ep=j.calendarTimeEpisode;
   const a=[...(ep.actors||[]),...(ep.animals||[]),...(ep.weatherRestFatigue||[])].find(x=>x.id===actorId);
   if(a){
@@ -368,6 +398,7 @@ export function lastEpisodeBefore(journal=[],campaignId,minute,memberIds=null){
  const members=memberIds===null?null:new Set(memberIds);
  if(members&&(!Array.isArray(memberIds)||members.size!==memberIds.length||!memberIds.length))
   throw Error('Navigation: neplatní účastníci epizody.');
+ journal=partyHistoryAfterRelease93766(journal,campaignId,minute,members);
  return journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarTimeEpisode&&
   j.calendarTimeEpisode.endMinute<=minute&&
   (!members||j.calendarTimeEpisode.memberIds?.some(id=>members.has(id))))
@@ -492,7 +523,11 @@ export function episodeNavigationState(previous,newDirection=null,{recovered=fal
 }
 export function validateTimeEpisodes(journal=[]){
  const byCampaign=new Map(),prior=[];
- for(const j of journal){const e=j.calendarTimeEpisode;if(!e)continue;
+ for(const j of journal){const e=j.calendarTimeEpisode;
+  // An authorized calendar exit is a real boundary for actor-local Fatigue
+  // carry, although it is not itself a time episode. Retain it in replay's
+  // prefix so validation of later trips never revives a cleared remainder.
+  if(!e){if(j.calendarMemberRelease)prior.push(j);continue;}
   must(e.format===EPISODE_FORMAT&&whole(e.startMinute,0,1e9)&&whole(e.minutes,1,10080)&&
    e.endMinute===e.startMinute+e.minutes&&e.startMinute===j.campaignMinute&&
    typeof j.calendarCampaignId==='string'&&Array.isArray(e.memberIds),'Neplatná herní epizoda');
@@ -1097,6 +1132,11 @@ export function calculateEpisodeForaging({minutes,habitat,season,roll,target='fo
 export function lastForagingCarry(journal=[],campaignId,actorId,target,herbName=''){
  for(let i=journal.length-1;i>=0;i--){const row=journal[i],p=row.calendarTimeEpisode;
   if(row.calendarCampaignId!==campaignId||row.characterId!==actorId)continue;
+  // Unfinished proportional search is not inventory. GM release ends the
+  // abandoned activity; already gained supplies are separate receipts.
+  if(row.calendarMemberRelease?.format==='hmk-calendar-member-release-v93.765'&&
+     row.calendarMemberRelease.actorId===actorId&&row.calendarMemberRelease.gmConfirmed===true)
+   break;
   for(const f of [...(p?.travelForaging||[])].reverse().concat(p?.foraging?[p.foraging]:[]))
    if(f.target===target&&f.herbName===(target==='herbs'?herbName.trim():null))return f.carryOut;
  }

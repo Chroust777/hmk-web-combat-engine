@@ -332,7 +332,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.765';
+const APP_VERSION='93.766';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -23836,7 +23836,7 @@ function initializeTimeEpisodeForm(form){
   transportVehicleKey:'Vyberte jedinou skutečně vlastněnou káru nebo vůz ze Stáje. Nelze vymyslet nové vozidlo.',
   transportTeamIds:'Zapřažená zvířata musí být registrovaná, vybraná v cestovní epizodě a mít odpovídající postroj.',
   transportOtherLb:'Skutečné libry všech osob a vybavení kromě samostatně uvedených pacientů a už evidovaného nákladu vozu.',
-  transportCoLocated:'GM výslovně potvrzuje společnou polohu a nepřekrývající se hmotnosti. Aplikace geografickou polohu automaticky nezná.',
+  transportCoLocated:'GM potvrzuje skutečně použité vozidlo, postroje, tažná zvířata, cestující a hmotnosti. Geografické polohy GM eviduje mimo aplikaci.',
   mapScale:'Měřítko 1 : číslo umožní převést skutečně uražené metry na vzdálenost v mapě.',
   lightPeriod:'Den, soumrak nebo noc ovlivňují orientaci, Encounter a některé klimatické následky.',
 
