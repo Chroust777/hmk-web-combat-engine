@@ -635,7 +635,10 @@ export function validateTimeEpisodes(journal=[]){
     const expected=episodeEncounterSurprise({partyModes:e.orientation?.modes||{},conveyance:e.conveyance,
      foeWatchfulness:t.foeWatchfulness,foeIsBeast:t.foeIsBeast,
      partySkill:t.partySkill,foeSkill:t.foeSkill,partyLevel:t.partyLevel,
-     foeLevel:t.foeLevel,decision:t.decision});
+     foeLevel:t.foeLevel,
+     ...(t.partyEvidence?{partyRoll:t.partyEvidence.roll,partyEML:t.partyEvidence.eml}:{}),
+     ...(t.foeEvidence?{foeRoll:t.foeEvidence.roll,foeEML:t.foeEvidence.eml}:{}),
+     requireWitness:!!(t.partyEvidence||t.foeEvidence),decision:t.decision});
     must(JSON.stringify(expected)===JSON.stringify(t),'Surprise neodpovídá pravidlové tabulce.');
    }
    must(e.encounter.resolved===true||e.interruption?.kind==='encounter'&&e.encounter.resolved===false&&

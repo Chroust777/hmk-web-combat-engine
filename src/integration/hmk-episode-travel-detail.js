@@ -2,6 +2,7 @@
  * Pure/append-only data. Never fabricates a Skill Test, injury or weather roll.
  */
 import {trekWatchfulness,trekSurpriseProcedure} from './hmk-trekking-wilderness-tasks.js';
+import {successLevel} from '../rules/tests.js';
 const requireTrue=(v,message)=>{if(!v)throw Error(message)};
 const die=(n,s)=>Number.isSafeInteger(n)&&n>=1&&n<=s;
 const levels=['CF','F','S','CS'];
@@ -60,13 +61,31 @@ export function episodeEncounterDistance({terrain,d4,period='day',moon='dark',he
  return {format:'hmk-episode-encounter-distance-v1',terrain,d4,period,moon,
   sightingFeet,hearingD10,hearingFeet:hearingD10===null?null:sightingFeet*hearingD10,sourcePage:150};
 }
-/** GM enters witnessed Skill Test success LEVELS only; this does not invent them. */
+/** GM enters actual d100 and EML. The derived Skill Test level is calculated, never invented. */
 export function episodeEncounterSurprise({partyModes={},conveyance='foot',foeWatchfulness='normal',
- foeIsBeast=false,partySkill=null,foeSkill=null,partyLevel=null,foeLevel=null,decision=null}={}){
- requireTrue(['lax','normal','alert'].includes(foeWatchfulness),'Zvolte skutečnou bdělost protistrany.');
+ foeIsBeast=false,partySkill=null,foeSkill=null,partyLevel=null,foeLevel=null,decision=null,
+ partyRoll=null,partyEML=null,foeRoll=null,foeEML=null,requireWitness=false}={}){
+ requireTrue(foeIsBeast||['lax','normal','alert'].includes(foeWatchfulness),'Zvolte skutečnou bdělost protistrany.');
  const party=trekWatchfulness({modes:partyModes,conveyance});
  const other=foeIsBeast?'alert':foeWatchfulness;
  const procedure=trekSurpriseProcedure({party,foe:other});
+ // HMK pp.60–62: a witnessed original d100 and EML determine its SL;
+ // manual selection of S/CS/F/CF alone is not a forensic Skill Test.
+ const witnessed=(skill,roll,eml,level,who)=>{
+  requireTrue((roll===null||Number.isSafeInteger(roll)&&roll>=1&&roll<=100)&&
+   (eml===null||Number.isSafeInteger(eml)&&eml>=-200&&eml<=200),
+   'Surprise: neplatné d100 nebo EML '+who+'.');
+  // A partly entered test is a draft, never a roll with a guessed EML.
+  // The app's step-by-step checklist identifies the next missing input.
+  if(roll===null||eml===null)return null;
+  requireTrue(skill!==null,'Surprise: chybí dovednost '+who+'.');
+  const derived=levels[successLevel(roll,eml)];
+  requireTrue(level===null||level===derived,'Surprise: ruční úroveň neodpovídá původnímu d100/EML '+who+'.');
+  return {format:'hmk-surprise-d100-witness-v1',skill,roll,eml,level:derived,sourcePage:60};
+ };
+ const partyEvidence=witnessed(partySkill,partyRoll,partyEML,partyLevel,'družiny');
+ const foeEvidence=witnessed(foeSkill,foeRoll,foeEML,foeLevel,'protistrany');
+ const pLevel=partyEvidence?.level||partyLevel,fLevel=foeEvidence?.level||foeLevel;
  const validSkill=s=>s===null||['Awareness','Stealth'].includes(s);
  requireTrue(validSkill(partySkill)&&validSkill(foeSkill),'Surprise: neznámá dovednost.');
  if(partySkill!==null)requireTrue(procedure.partySkills.includes(partySkill),'Surprise: nesprávná dovednost družiny.');
@@ -74,36 +93,45 @@ export function episodeEncounterSurprise({partyModes={},conveyance='foot',foeWat
   'Normal a Lax protivník používá Awareness, nikoliv Stealth.');
  // A success level is not evidence unless the real tested skill was named.
  // Automatic Surprise never authorises extra (invented or duplicated) tests.
- requireTrue((partyLevel===null&&partySkill===null)||(partyLevel!==null&&partySkill!==null),
+ requireTrue(requireWitness?(pLevel===null||partySkill!==null):
+  ((pLevel===null&&partySkill===null)||(pLevel!==null&&partySkill!==null)),
   'Surprise: doložte současně skutečnou dovednost a úroveň testu družiny.');
- requireTrue((foeLevel===null&&foeSkill===null)||(foeLevel!==null&&foeSkill!==null),
+ requireTrue(requireWitness?(fLevel===null||foeSkill!==null):
+  ((fLevel===null&&foeSkill===null)||(fLevel!==null&&foeSkill!==null)),
   'Surprise: doložte současně skutečnou dovednost a úroveň testu protistrany.');
- if(procedure.kind==='automatic')requireTrue(partyLevel===null&&foeLevel===null,
+ if(requireWitness){
+  requireTrue(pLevel===null||!!partyEvidence,'Surprise: d100/EML družiny jsou povinné.');
+  requireTrue(fLevel===null||!!foeEvidence,'Surprise: d100/EML protistrany jsou povinné.');
+ }
+ if(procedure.kind==='automatic')requireTrue(pLevel===null&&fLevel===null&&partySkill===null&&foeSkill===null&&partyRoll===null&&partyEML===null&&foeRoll===null&&foeEML===null,
   'Surprise: automatický výsledek nemá žádné nové hody.');
- if(procedure.kind==='unopposed')requireTrue(procedure.preferred==='party'?foeLevel===null:partyLevel===null,
+ if(procedure.kind==='unopposed')requireTrue(procedure.preferred==='party'?(fLevel===null&&foeSkill===null&&foeRoll===null&&foeEML===null):(pLevel===null&&partySkill===null&&partyRoll===null&&partyEML===null),
   'Surprise: při Unopposed se netestuje méně bdělá strana.');
  let winner=procedure.automaticWinner,verified=false;
  if(procedure.kind==='automatic')verified=true;
  else if(procedure.kind==='unopposed'){
-  const actual=procedure.preferred==='party'?partyLevel:foeLevel;
+  const actual=procedure.preferred==='party'?pLevel:fLevel;
   requireTrue(actual===null||levels.includes(actual),'Surprise: neplatná úroveň testu.');
   if(actual!==null){winner=levels.indexOf(actual)>=2?procedure.preferred:null;verified=true;}
  }else{
-  requireTrue((partyLevel===null||levels.includes(partyLevel))&&(foeLevel===null||levels.includes(foeLevel)),
+  requireTrue((pLevel===null||levels.includes(pLevel))&&(fLevel===null||levels.includes(fLevel)),
    'Surprise: neplatná úroveň opposed testu.');
-  if(partyLevel!==null&&foeLevel!==null){
-   const p=levels.indexOf(partyLevel),f=levels.indexOf(foeLevel);
-   winner=p>f?'party':f>p?'foe':null;verified=true;
+  if(pLevel!==null&&fLevel!==null){
+   const p=levels.indexOf(pLevel),f=levels.indexOf(fLevel);
+   // HMK p.150: a guide must SUCCEED and have the higher level.
+   // A better failure (F versus CF) never confers Surprise.
+   winner=p>f&&p>=2?'party':f>p&&f>=2?'foe':null;verified=true;
   }
  }
  requireTrue(decision===null||['ambush','parlay','observe','leave'].includes(decision),
   'Surprise: GM musí zvolit skutečné rozhodnutí.');
  const alertness=winner==='party'?other==='lax'?'foe-unaware':'foe-confused':
   winner==='foe'?(party.effective==='lax'?'party-unaware':'party-confused'):
-  !verified?'pending':procedure.kind==='opposed'&&partyLevel!=='F'&&partyLevel!=='CF'?'both-aware':'both-confused';
+  !verified?'pending':procedure.kind==='opposed'&&pLevel!=='F'&&pLevel!=='CF'?'both-aware':'both-confused';
  return {format:'hmk-episode-encounter-surprise-v1',party,foeWatchfulness:other,
   foeIsBeast,procedure:procedure.kind,preferred:procedure.preferred,
-  partySkill,foeSkill,partyLevel,foeLevel,winner,verified,decision,alertness,sourcePage:150};
+  partySkill,foeSkill,partyLevel:pLevel,foeLevel:fLevel,
+  ...(partyEvidence?{partyEvidence}:{}),...(foeEvidence?{foeEvidence}:{}),winner,verified,decision,alertness,sourcePage:150};
 }
 export function episodeHazardFollowup({hazard,repairSkill=null,repairLevel=null,
  equipmentDisposition='repair',complicationDecision='test',
