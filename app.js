@@ -297,7 +297,7 @@ import {markDeadlyAimStart,verifiedDeadlyAim} from './src/integration/hmk-deadly
 import {applyConfirmedWeaponWQ,applyConfirmedAreaStrike,applyConfirmedMountedControl,applyConfirmedMountedCharge} from './src/integration/hmk-combat-aftereffects.js';
 import {qualityImpactPenalty} from './src/rules/weapon-damage.js';
 import {riderImpactAtRound} from './src/rules/mounted.js';
-import {medicalOriginOfWound,medicalWounds,MEDICAL_ORIGIN} from './src/integration/hmk-medical-origin.js';
+import {medicalOriginOfWound,medicalWounds,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './src/integration/hmk-medical-origin.js';
 import {weatherPhysicianCandidates} from './src/integration/hmk-weather-healer.js';
 import {activeFearSources} from './src/integration/hmk-concurrent-fear.js';
 import {initialCombatState,validateCombatState,combatFatigueTotals,applyConfirmedHit,applyConfirmedAstralReembodiment,applyConfirmedBloodLoss,applyConfirmedBloodStoppage,applyConfirmedShockRecovery,applyConfirmedFatigue,dueBloodLoss,applyConfirmedWoundContext,shockFollowupReadiness,applyExtendedShockCourse,applyComaCourse,dueInjuryMorale,unresolvedInjuryMishaps,specialActionReadiness,applyConfirmedInjuryMishap,applyConfirmedInjuryMorale,applyConfirmedSpecialAftermath,applyConfirmedMoraleReaction,applyConfirmedBraveExpiry,beginConfirmedEncounter} from './src/integration/persistent-combat-state.js';
@@ -326,7 +326,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.751';
+const APP_VERSION='93.752';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1109,7 +1109,7 @@ function autoAnchorNewHealthOrigins(c,before,after,eventId){
  for(const w of after.wounds??[]){
   if(!previous.has(w.id)&&!getCampaignAnchor(data.campaignClock,'wound',c.id,w.id))
    data.campaignClock=anchorCampaignOrigin(data.campaignClock,{kind:'wound',characterId:c.id,woundId:w.id,
-    eventId:uuid(),combatEventId:eventId,source:'confirmed-health'});
+    eventId:uuid(),combatEventId:w.originEventId??eventId,source:'confirmed-health'});
  }
  for(const [kind,started] of [['extended-shock',!before?.extendedShock&&!!after.extendedShock],
   ['coma',!before?.coma?.active&&!!after.coma?.active],
@@ -7905,8 +7905,8 @@ function concurrentMedicalProceduresHTML({actorId=null}={}){
 
 function hmkLongtermHealingPanel(chars,{origin='combat'}={}){
  if(!chars.length)return '';
- const eligibleWounds=c=>medicalWounds(persistentStateOf(c),origin);
- const weatherCare=origin===MEDICAL_ORIGIN.WEATHER;
+ const eligibleWounds=c=>origin==='noncombat'?persistentStateOf(c).wounds.filter(w=>isNoncombatMedicalOrigin(medicalOriginOfWound(w,persistentStateOf(c).events))):medicalWounds(persistentStateOf(c),origin);
+ const weatherCare=origin===MEDICAL_ORIGIN.WEATHER||origin==='noncombat';
  const woundNumber=(c,w)=>persistentStateOf(c).wounds.findIndex(x=>x.id===w.id)+1;
  const woundOptions=chars.flatMap(c=>eligibleWounds(c).filter(w=>!w.healed&&!(weatherCare&&w.aspect==='frost'&&w.severity==='G')).map(w=>`<option value="${esc(c.id+'::'+w.id)}">${esc(medicalWoundOptionLabel(c,w,woundNumber(c,w)))}</option>`)).join('');
  const infected=chars.flatMap(c=>eligibleWounds(c).filter(w=>!w.healed&&w.healing?.infected).map(w=>({c,w})));
@@ -11058,7 +11058,7 @@ function hskTrekkingWeatherCourseForms(actorId){
  * presentation of the original Injury/Treatment executor and shared ledger. */
 function hskIsEnvironmentalWound(actor,woundId){
  return !!actor&&persistentStateOf(actor).wounds.some(w=>w.id===woundId&&
-  medicalOriginOfWound(w,persistentStateOf(actor).events)===MEDICAL_ORIGIN.WEATHER);
+  isNoncombatMedicalOrigin(medicalOriginOfWound(w,persistentStateOf(actor).events)));
 }
 /** Travel does not begin an encounter to resolve bodily injury consequences.
  * A Weather injury's next required action is rendered here in the Health tab.
@@ -11069,24 +11069,24 @@ function hskWeatherInjuryMandatory(actorId){
  const m=unresolvedInjuryMishaps(state).find(x=>isWeather(x.woundId));
  if(m){
   const automatic=m.kind.startsWith('automatic-'),attributes=actor.hmk?.attributes||{};
-  return `<section class="panel wide hmk-weather-injury-mandatory"><h3>Weather Injury Mishap · ${esc(actor.name)}</h3>
+  return `<section class="panel wide hmk-weather-injury-mandatory"><h3>Cestovní Injury Mishap · ${esc(actor.name)}</h3>
   <p class="hc-hint">Povinný následek skutečné rány z počasí (HMK 170). Žádný bojový útok ani tah se nespouští. Rána ${esc(m.woundId)} · ${esc(m.kind)}. Vyhodnoťte pouze tuto povinnost a potvrďte GM.</p>
   <form data-weather-injury-mishap><input type="hidden" name="mishapId" value="${esc(m.id)}">
   <label>Jaká skutečná činnost byla narušena?<select name="test"><option value="agility">Agility (${esc(String(attributes.agl??'?'))} × 5)</option>${Number.isSafeInteger(attributes.dex)?`<option value="dexterity">Dexterity (${attributes.dex} × 5), pouze pokud GM potvrdí činnost vyžadující DEX</option>`:''}${(actor.hmk?.skills||[]).filter(x=>['acrobatics','legerdemain'].includes(String(x.name).toLowerCase())).map(x=>`<option value="${esc(x.name.toLowerCase())}">${esc(x.name)} · ML ${x.ml}</option>`).join('')}</select></label>
   ${automatic?'<p>Automatický Mishap: podle tabulky se další d100 nehází.</p>':'<label>Skutečný d100<input name="roll" type="number" min="1" max="100" required></label>'}
-  <button type="submit">Dokončit jediný Weather Injury Mishap</button><output role="status"></output></form></section>`;
+  <button type="submit">Dokončit jediný cestovní Injury Mishap</button><output role="status"></output></form></section>`;
  }
  const morale=dueInjuryMorale(state).find(x=>isWeather(x.woundId));
  if(morale){
   const w=state.wounds.find(x=>x.id===morale.woundId);
   const init=actor.hmk?.skills?.find(x=>String(x.name||'').toLowerCase()==='initiative')?.ml;
-  return `<section class="panel wide hmk-weather-injury-mandatory"><h3>Weather Injury Morale · ${esc(actor.name)}</h3>
+  return `<section class="panel wide hmk-weather-injury-mandatory"><h3>Cestovní Injury Morale · ${esc(actor.name)}</h3>
   <p class="hc-hint">Až po úplném Shock zotavení: jediný Morale d100 z vážné rány ${esc(w.id)} (HMK 162, 170). Bez aktivního Combatu; případný skutečný zdroj Aberrance stanoví GM.</p>
   <form data-weather-injury-morale><input type="hidden" name="woundId" value="${esc(w.id)}">
   <p>Initiative ML: ${esc(String(init??'nedoloženo'))}</p>
   <label>Skutečná Aberrance zdroje (0 jen po výslovném potvrzení GM)<input name="aberrance" type="number" min="0" max="200" ${Number.isSafeInteger(w.moraleThreatABE)?`value="${w.moraleThreatABE}" readonly`:''} required></label>
   <label>Skutečný Morale d100<input name="roll" type="number" min="1" max="100" required></label>
-  <button type="submit" ${Number.isSafeInteger(init)?'':'disabled'}>Dokončit jediný Weather Injury Morale</button><output role="status"></output></form></section>`;
+  <button type="submit" ${Number.isSafeInteger(init)?'':'disabled'}>Dokončit jediný cestovní Injury Morale</button><output role="status"></output></form></section>`;
  }
  return '';
 }
@@ -11097,8 +11097,7 @@ function hskWeatherBleedingCarePanel(actorId){
  const helpTerm=(label,text)=>`<span class="hc-help-term" tabindex="0" data-hmk-help="${esc(text)}">${label}</span>`;
  const actor=character(actorId),clock=data.campaignClock;
  if(!actor||!clock)return '';
- const state=persistentStateOf(actor),wounds=medicalWounds(state,MEDICAL_ORIGIN.WEATHER)
-  .filter(w=>w.bleeding&&!w.healed);
+ const state=persistentStateOf(actor),wounds=state.wounds.filter(w=>isNoncombatMedicalOrigin(medicalOriginOfWound(w,state.events))&&w.bleeding&&!w.healed);
  if(!wounds.length)return '';
  const party=calendarMemberIds(clock,data.characters);
  const items=wounds.map(w=>{
@@ -11152,36 +11151,37 @@ function hskWeatherBleedingCarePanel(actorId){
  Weakness ${state.bloodLoss.weaknessFatigue}. Bez vstupu do Combatu, bez fiktivních hodů či okamžitého 5minutového skoku.</p>${items}</section>`;
 }
 function hskEnvironmentalWoundCarePanel(actor){
- const pending=medicalWounds(persistentStateOf(actor),MEDICAL_ORIGIN.WEATHER).some(w=>!w.healed);
+ const pending=persistentStateOf(actor).wounds.some(w=>!w.healed&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,persistentStateOf(actor).events)));
  if(!pending)return '';
- if(persistentStateOf(actor).wounds.some(w=>w.bleeding&&medicalOriginOfWound(w,persistentStateOf(actor).events)===MEDICAL_ORIGIN.WEATHER))
+ if(persistentStateOf(actor).wounds.some(w=>w.bleeding&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,persistentStateOf(actor).events))))
   return '<p class="notice">Před dalším Treatment nebo Healing nejprve uzavřete Blood Stoppage v Zdraví & Expozice.</p>';
  if(persistentStateOf(actor).extendedShock)
   return '<p class="notice">Treatment není nyní dostupný: nejprve musí skončit Extended Shock podle čtyřhodinových Course Rolls (HMK 179). Kalendář zachovává čas dalšího Course.</p>';
- if(persistentStateOf(actor).shockFollowup?.domain==='travel-weather'||hskWeatherInjuryMandatory(actor.id))
-  return '<p class="notice">Treatment každé rány zůstává evidovaný samostatně. Nejprve dokončete výše uvedený aktuální Shock, Injury Mishap nebo Morale; potom se otevře ošetření konkrétní rány. Nejde o nový Shock d100 pro každý Treatment.</p>';
- return `<details class="hmk-weather-wound-care" open><summary>Rány z počasí · Treatment, Healing, Infection Course a případná amputace</summary>
+ if(unresolvedInjuryMishaps(persistentStateOf(actor)).some(m=>hskIsEnvironmentalWound(actor,m.woundId)))
+  return '<p class="notice">Před rozhodnutím o Treatment dokončete bezprostřední Injury Mishap. Shock Reroll má vlastní skutečný kalendářní termín; nesmí blokovat ošetření jinou způsobilou postavou ani výslovné GM rozhodnutí ponechat ránu neošetřenou.</p>';
+ return `<details class="hmk-weather-wound-care" open><summary>Rány z cestování a počasí · Treatment, Healing, Infection Course a případná amputace</summary>
  <p class="hc-hint">Povinné ošetření nové Frostbite/Sunburn rány je samostatný zdravotní krok. Používá původní společný HMK Treatment/Healing/Infection executor a nemění čas bez potvrzení GM.</p>
- ${hmkLongtermHealingPanel([actor],{origin:MEDICAL_ORIGIN.WEATHER})}</details>`;
+ ${hmkLongtermHealingPanel([actor],{origin:'noncombat'})}</details>`;
 }
 /** Weather Shock is a distinct original procedure with its own calendar
  * minute, actor and immutable source ID. Combat still sees resulting fatigue,
  * wounds and Shock, but cannot create a second Weather roll. */
 function hskWeatherShockFollowup(actorId){
  const actor=character(actorId),state=actor&&persistentStateOf(actor),q=state?.shockFollowup;
- if(!q||q.domain!=='travel-weather')return '';
+ if(!q||!isNoncombatMedicalOrigin(q.domain))return '';
  const clock=data.campaignClock,minute=clock?.minute;
  const dueMinute=q.phase==='after-all-bleeding-stopped'?q.originMinute:q.kind==='UNC'?q.originMinute+10:q.originMinute;
  const shockML=actor?availableMasteries(actor).find(x=>x.name==='Shock')?.ml:null;
  const canRoll=Number.isSafeInteger(minute)&&minute>=dueMinute&&Number.isSafeInteger(shockML);
  const fatigue=combatFatigueTotals(state).total,eml=Number(shockML)-fatigue-(q.kind==='STN'?0:20);
- return `<section class="panel wide hmk-weather-shock-followup"><h3>Weather Shock · ${esc(actor.name)} · ${esc(q.kind)}</h3>
+ return `<section class="panel wide hmk-weather-shock-followup"><h3>${q.domain==='travel-accident'?'Accident':'Weather'} Shock · ${esc(actor.name)} · ${esc(q.kind)}</h3>
  <p class="hc-hint">Samostatný Shock Reroll z cestování (${esc(q.sourceId)}). Původ ${esc(displayCampaignMinute(q.originMinute))}. ${q.phase==='after-all-bleeding-stopped'?'Okamžitý Shock Reroll po zastavení všech Bleederů':q.kind==='UNC'?'Počkat skutečných 10 minut':'Po další skutečné akci mimo boj vyhodnoť tento hod'}. Kalendář je autoritou pro minuty; tento hod jej sám neposune. Combat pouze čte účinky na postavu (HMK 169, 185).</p>
  <p>Shock ML ${esc(String(shockML??'nedoloženo'))} · Fatigue ${fatigue} · ${q.kind==='STN'?'bez dalšího −20':'−20 při INC/UNC'} · EML ${esc(String(Number.isInteger(shockML)?eml:'nedoloženo'))}</p>
  <form data-weather-shock-followup><input type="hidden" name="sourceId" value="${esc(q.sourceId)}">
  <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required ${canRoll?'':'disabled title="Shock ještě není splatný nebo chybí ověřená ML"'}></label>
  ${q.kind==='UNC'?`<label>Pokud nastane UNC + CF: Location Shock z původní rány<input name="comaLocationShock" type="number" min="0" max="15" ${canRoll?'':'disabled'}></label><label>Injury Level původní rány<input name="comaInjuryLevel" type="number" min="1" max="5" ${canRoll?'':'disabled'}></label><label>První d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" ${canRoll?'':'disabled'}></label>`:''}
  <p class="hc-hint">${q.phase==='after-all-bleeding-stopped'?'Ihned po zastavení všech Bleederů – bez dalších deseti minut.':q.kind==='UNC'?'Test je dostupný přesně po uplynutí deseti minut.':'Tlačítko vyhodnotí Shock po dokončení následující skutečné akce postavy; žádný bojový tah se nevytváří.'}</p>
+ ${q.kind!=='UNC'&&q.phase!=='after-all-bleeding-stopped'?'<label><input type="checkbox" name="actualActionConfirmed" required '+(canRoll?'':'disabled')+'> GM potvrzuje skutečnou následující akci mimo boj, na jejímž konci probíhá Shock Reroll</label>':''}
  <button type="submit" ${canRoll?'':'disabled'}>Vyhodnotit a zapsat Shock d100</button><output role="status" aria-live="polite"></output></form>
  ${!canRoll?'<p class="notice">Zatím nesplatné nebo postava nemá doložené Shock ML.</p>':''}</section>`;
 }
@@ -11226,8 +11226,8 @@ function hskParallelColdHealthPanel(actorId){
  * executor remains authoritative; Combat is never started by Travel. */
 function hskWeatherTraumaCourseKind(actor,kind){
  const s=actor&&persistentStateOf(actor);
- return !!s&&((kind==='extended-shock'&&s.extendedShock?.domain==='travel-weather')||
-  (kind==='coma'&&s.coma?.active&&s.coma.domain==='travel-weather')||
+ return !!s&&((kind==='extended-shock'&&isNoncombatMedicalOrigin(s.extendedShock?.domain))||
+  (kind==='coma'&&s.coma?.active&&isNoncombatMedicalOrigin(s.coma.domain))||
   (s.parallelColdShocks??[]).some(x=>kind==='extended-shock'?!!x.extendedShock:kind==='coma'&&x.coma?.active));
 }
 function hskWeatherTraumaCourseForm(actorId){
@@ -11236,8 +11236,8 @@ function hskWeatherTraumaCourseForm(actorId){
  const agenda=campaignCalendarAgenda(clock,data.characters,data.journal,data.inventory);
  const health=persistentStateOf(actor);
  const due=agenda.due.filter(x=>x.characterId===actorId&&['extended-shock','coma'].includes(x.kind)&&
-  !x.sourceId&&((x.kind==='extended-shock'&&health.extendedShock?.domain==='travel-weather')||
-  (x.kind==='coma'&&health.coma?.active&&health.coma.domain==='travel-weather'))).sort((a,b)=>a.minute-b.minute||
+  !x.sourceId&&((x.kind==='extended-shock'&&isNoncombatMedicalOrigin(health.extendedShock?.domain))||
+  (x.kind==='coma'&&health.coma?.active&&isNoncombatMedicalOrigin(health.coma.domain)))).sort((a,b)=>a.minute-b.minute||
   (a.kind==='extended-shock'?-1:1))[0];
  if(!due)return '';
  const kind=due.kind,state=persistentStateOf(actor),course=kind==='extended-shock'?state.extendedShock:state.coma;
@@ -11274,7 +11274,7 @@ function hskWeatherHealthConsequences(actorId){
  if(weatherBlood)return success+parallel+weatherBlood+(weatherShock||'')+hskWeatherInjuryMandatory(actorId);
  // One current compulsory health test per actor; no new Cold/Heat dice while
  // a prior weather-induced Shock reroll remains unresolved.
- if(weatherShock)return success+parallel+weatherShock;
+ if(weatherShock)return success+parallel+(hskWeatherInjuryMandatory(actorId)||'')+weatherShock;
  const trauma=hskWeatherTraumaCourseForm(actorId);
  if(trauma)return success+parallel+trauma;
  const injuryMandatory=hskWeatherInjuryMandatory(actorId);
@@ -11975,6 +11975,7 @@ document.addEventListener('submit',event=>{
     impactDie:optional('impactDie'),zoneD10:optional('zoneD10'),locationD10:optional('locationD10'),
     direction:raw('direction'),shockD100:optional('shockD100'),compoundD10:optional('compoundD10'),
     hazardD10,agilityD100:optional('agilityD100'),randomVictimConfirmed:kind==='survival-accident'?!!raw('targetId'):false,
+    originMinute:kind==='survival-accident'?data.campaignClock?.minute:null,
     autoDieValues:Object.fromEntries(['hazardD10','agilityD100','impactDie','zoneD10','locationD10','shockD100','compoundD10'].
      flatMap(name=>{const control=form.elements.namedItem(name);return control?.value&&control.dataset?.hmkAutoDice===control.value?
       [[name,Number(control.value)]]:[];}))});
@@ -12182,9 +12183,10 @@ document.addEventListener('submit',event=>{
     (test==='dexterity'?attributes.dex:attributes.agl)*5;
    if(!Number.isSafeInteger(ability)||ability<=0)throw Error('Nedoložený atribut nebo dovednost');
    const wound=state.wounds.find(w=>w.id===m.woundId),usedArms=isDex&&['sh','ua','el','fo','ha'].includes(wound?.location)&&['left','right'].includes(wound.side)?[wound.side]:null;
-   const injury=projectLiveInjuries({state,round,test,usedArms,timelineId:null});
-   if(!injury.ready)throw Error('Weather Injury impairment nelze vyhodnotit: '+injury.reason);
-   const rollStr=form.elements.namedItem('roll')?.value||'',automatic=m.kind.startsWith('automatic-');
+   const automatic=m.kind.startsWith('automatic-');
+   const injury=automatic?{impairment:0,ready:true}:projectLiveInjuries({state,round,test,usedArms,timelineId:null});
+   if(!injury.ready)throw Error('Cestovní Injury impairment nelze vyhodnotit: '+injury.reason);
+   const rollStr=form.elements.namedItem('roll')?.value||'';
    if(!automatic&&(!/^[0-9]+$/.test(rollStr)||Number(rollStr)<1||Number(rollStr)>100))throw Error('Chybí jediný skutečný d100');
    result=applyConfirmedInjuryMishap({state,round,eventId,mishapId:m.id,baseML:automatic?null:ability,
     roll:automatic?null:Number(rollStr),hasDEX,actionUsesDEX:isDex,hasLegs:actor.hmk?.anatomy?.hasLegs??true,
@@ -12202,7 +12204,7 @@ document.addEventListener('submit',event=>{
    if(data.campaignClock.minute!==clock.minute)throw Error('Kalendář se mezitím změnil');
    synchronizeCombatInjuries(actor,result.state);
    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
-    title:'Weather Injury · '+kind+' · HMK 162,170',body:'Původní Weather rána '+sourceWound+' · samostatný zdravotní následek; bez posunu herního času.',createdAt:stamp(),
+    title:'Cestovní Injury · '+kind+' · HMK 162,170',body:'Původní cestovní rána '+sourceWound+' · samostatný zdravotní následek; bez posunu herního času.',createdAt:stamp(),
     skillTestProof:{type:'weather-'+kind,actorId:actor.id,woundId:sourceWound,originEventId:eventId,gmConfirmed:true}});
   }))throw Error('Weather Injury nebyl zapsán');
   selected=actor.id;view='sheet';activeSheetSection='hazards';render();
@@ -12269,7 +12271,7 @@ document.addEventListener('submit',event=>{
   const party=calendarMemberIds(clock,data.characters);
   if(!party.some(c=>c.id===actor.id))throw Error('Pacient není člen aktuální kampaně');
   const state=persistentStateOf(actor);
-  if(!state.wounds.some(w=>w.id===woundId&&medicalOriginOfWound(w,state.events)===MEDICAL_ORIGIN.WEATHER))
+  if(!state.wounds.some(w=>w.id===woundId&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,state.events))))
    throw Error('Rána není doloženým Weather Bleederem této postavy');
   const v=Object.fromEntries(new FormData(form)),start=form.matches('[data-weather-blood-start]');
   const healerId=start?v.healerId:state.wounds.find(w=>w.id===woundId)?.travelBlood?.plan?.healerId;
@@ -12360,7 +12362,7 @@ document.addEventListener('submit',event=>{
   const actor=character(selected),clock=data.campaignClock,sourceId=form.elements.namedItem('sourceId').value;
   if(!actor||!clock||combatInitiativeSequence)throw Error('Weather Shock vyžaduje aktivní Kalendář mimo Combat Initiative');
   const state=persistentStateOf(actor),q=state.shockFollowup;
-  if(q?.domain!=='travel-weather'||q.sourceId!==sourceId)throw Error('Původní Weather Shock neodpovídá postavě a zdroji');
+  if(!isNoncombatMedicalOrigin(q?.domain)||q.sourceId!==sourceId)throw Error('Původní Weather Shock neodpovídá postavě a zdroji');
   const elapsed=clock.minute-q.originMinute,due=q.phase==='after-all-bleeding-stopped'?0:q.kind==='UNC'?10:0;
   if(elapsed<due||elapsed<0)throw Error('Weather Shock test nesmí předcházet splatné minutě');
   if(!calendarMemberIds(clock,data.characters).some(c=>c.id===actor.id))throw Error('Shock postavy nepatří do této kampaně');
@@ -12371,7 +12373,8 @@ document.addEventListener('submit',event=>{
   const sl=['CF','F','S','CS'][successLevel(roll,eml)];
   // Clicking the current mandatory action confirms that it has just been resolved.
   // The calendar's 10-minute UNC deadline remains enforced separately.
-  const id=uuid(),turnEnded=q.kind!=='UNC';
+  const id=uuid(),turnEnded=q.kind!=='UNC'&&q.phase!=='after-all-bleeding-stopped';
+  if(turnEnded&&!form.elements.namedItem('actualActionConfirmed')?.checked)throw Error('Pro INC/STN musí GM potvrdit skutečnou další akci, nikoli fiktivní bojový tah');
   const comaLocationShock=form.elements.namedItem('comaLocationShock')?.value?Number(form.elements.namedItem('comaLocationShock').value):null;
   const comaInjuryLevel=form.elements.namedItem('comaInjuryLevel')?.value?Number(form.elements.namedItem('comaInjuryLevel').value):null;
   const initialComaD10=form.elements.namedItem('initialComaD10')?.value?Number(form.elements.namedItem('initialComaD10').value):null;
@@ -12392,9 +12395,9 @@ document.addEventListener('submit',event=>{
     skillTestProof:{type:'weather-shock-recovery',sourceId,originalEventId:id,actorId:actor.id,
      from:q.kind,to:outcome.state.shock,roll,eml,sl,originMinute:q.originMinute,confirmedMinute:clock.minute}});
   }))throw Error('Weather Shock nebyl potvrzen');
-  const after=outcome.state,still=after.shockFollowup?.domain==='travel-weather';
-  const pendingWeatherMishap=unresolvedInjuryMishaps(after).some(m=>after.wounds.some(w=>w.id===m.woundId&&medicalOriginOfWound(w,after.events)===MEDICAL_ORIGIN.WEATHER));
-  const pendingWeatherMorale=dueInjuryMorale(after).some(m=>after.wounds.some(w=>w.id===m.woundId&&medicalOriginOfWound(w,after.events)===MEDICAL_ORIGIN.WEATHER));
+  const after=outcome.state,still=isNoncombatMedicalOrigin(after.shockFollowup?.domain);
+  const pendingWeatherMishap=unresolvedInjuryMishaps(after).some(m=>after.wounds.some(w=>w.id===m.woundId&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,after.events))));
+  const pendingWeatherMorale=dueInjuryMorale(after).some(m=>after.wounds.some(w=>w.id===m.woundId&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,after.events))));
   hskWeatherHealthLastReceipt={actorId:actor.id,message:'Shock d100 '+roll+' → '+sl+' byl zapsán v '+displayCampaignMinute(clock.minute)+'. Aktuální Shock: '+after.shock+'. '+
    (still?'Shock stále trvá: další test je samostatná následná povinnost. Treatment zůstává pozastaven.':pendingWeatherMishap?'Nyní následuje Injury Mishap.':pendingWeatherMorale?'Nyní následuje Injury Morale.':'Nyní pokračuj vyhodnocením jednotlivých ran a Treatment v této záložce.')};
   selected=actor.id;activeSheetSection='hazards';view='sheet';render();
@@ -12480,7 +12483,7 @@ document.addEventListener('submit',event=>{
   }))throw Error('Kožní zranění nelze uložit');
   const after=persistentStateOf(actor),newWounds=outcome.report.wounds.length;
   hskWeatherHealthLastReceipt={actorId:actor.id,message:'Kožní následky byly uloženy: '+newWounds+' ran'+(newWounds===1?'a':newWounds>1?'y':'')+'. '+
-   (after.shockFollowup?.domain==='travel-weather'?'Nyní je nutný Shock Reroll; Treatment zatím čeká.':
+   (isNoncombatMedicalOrigin(after.shockFollowup?.domain)?'Nyní je nutný Shock Reroll; Treatment zatím čeká.':
     unresolvedInjuryMishaps(after).length?'Nyní dokonči povinný Injury Mishap.':
     'Další povinné ošetření najdeš v panelu Rány z počasí.')} ;
   selected=actor.id;view='sheet';activeSheetSection='hazards';render();
@@ -15837,7 +15840,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
     (view!=='sheet'||activeSheetSection!=='hazards'||selected!==actor.id)){
   selected=actor.id;view='sheet';activeSheetSection='hazards';render();
  }
- if(kind==='treatment'&&persistentStateOf(actor).shockFollowup?.domain==='travel-weather'){
+ if(kind==='treatment'&&isNoncombatMedicalOrigin(persistentStateOf(actor).shockFollowup?.domain)){
   const pending=persistentStateOf(actor).shockFollowup;
   hskWeatherHealthLastReceipt={actorId:actor.id,message:'Treatment této rány zůstává v Kalendáři správně evidován. Nejprve je však povinný jeden Shock Reroll aktuálního stavu postavy (ne samostatný hod za každou ránu). Po jeho úspěšném zápisu aplikace ukáže následující zdravotní krok.'};
   render();
@@ -15872,7 +15875,9 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   }else{form=document.getElementById('combat-blood-stoppage-form');choose(form,'wound',actor.id+'::'+sourceId);}
   break;
  }
- case 'shock-followup':form=document.getElementById('combat-recovery-persistent-form');choose(form,'characterId',actor.id);break;
+ case 'shock-followup':{const q=persistentStateOf(actor).shockFollowup;
+  if(isNoncombatMedicalOrigin(q?.domain)){form=byHidden('form[data-weather-shock-followup]');break;}
+  form=document.getElementById('combat-recovery-persistent-form');choose(form,'characterId',actor.id);break;}
  case 'treatment':case 'healing':case 'infection':case 'grim':{
   if(hskIsEnvironmentalWound(actor,sourceId)){weatherCareActiveSection=kind==='treatment'?'treatment':kind==='healing'?'healing':kind==='infection'?'infection':'grim';syncWeatherCarePanel();}
   form=document.getElementById(kind==='treatment'?'hmk-treatment-form':kind==='healing'?'hmk-healing-roll-form':kind==='infection'?'hmk-infection-course-form':'hmk-grim-shock-form');
@@ -23963,7 +23968,7 @@ document.addEventListener('click',e=>{
    target.scrollIntoView({block:'center',behavior:'auto'});target.elements.namedItem('roll')?.focus({preventScroll:true});}
   return;
  }
- const weatherCause=type==='weather-shock'||(['injury-morale','treatment','healing','infection','grim'].includes(type)&&hskIsEnvironmentalWound(character(actorId),sourceId))||(type==='injury-mishap'&&unresolvedInjuryMishaps(persistentStateOf(character(actorId))).some(m=>m.id===sourceId&&hskIsEnvironmentalWound(character(actorId),m.woundId)));
+ const weatherCause=type==='weather-shock'||(type==='shock-followup'&&isNoncombatMedicalOrigin(persistentStateOf(character(actorId)).shockFollowup?.domain))||(['injury-morale','treatment','healing','infection','grim'].includes(type)&&hskIsEnvironmentalWound(character(actorId),sourceId))||(type==='injury-mishap'&&unresolvedInjuryMishaps(persistentStateOf(character(actorId))).some(m=>m.id===sourceId&&hskIsEnvironmentalWound(character(actorId),m.woundId)));
  const destination=weatherCause?'hazards':calendarEventDestination({kind:type});
  if(destination==='healing'||destination==='combat'){
   if(!combatInitiativeSequence)encounterSelection.add(actorId);
