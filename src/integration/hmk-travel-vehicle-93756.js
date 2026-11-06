@@ -3,6 +3,7 @@
  * health state. HMK 1.2 p.122 & 145; locations and undocumented masses require GM.
  */
 import {verifiedLivestock} from './hmk-livestock-562.js';
+import {trekRegisteredAnimalHealth,assertTrekAnimalCanMove} from './hmk-trekking-animal-health.js';
 import {stableHubProjection,stableBurden} from './hmk-stable-hub-574.js';
 import {stableHauling575} from './hmk-stable-operations-575.js';
 import {STABLE_VEHICLES_P122} from './hmk-stable-hub-574.js';
@@ -28,9 +29,9 @@ export function availableTransportVehicles93756(data,campaignId){
  * OtherLb covers driver, other occupants and all remaining onboard material,
  * excluding the vehicle ledger cargo and patient weights. No zero-weight guide.
  */
-export function transportVehicleReceipt93756({data,campaignId,minute,conveyance,
+function vehicleReceiptInternal93757({data,campaignId,minute,conveyance,
  vehicleKey,teamIds=[],stableAnimalIds=[],transportedMemberIds=[],patientLoadLb={},otherLoadLb,
- gmCoLocated=false}={}){
+ gmCoLocated=false}={},checkLiveHealth=true){
  insist(goodId(campaignId)&&lb(minute),'neplatná identita kampaně nebo čas.');
  insist(['cart','wagon'].includes(conveyance),'cestování musí použít káru nebo vůz.');
  insist(gmCoLocated===true,'GM musí potvrdit dostupnost vozu, postrojů a osob na stejném místě.');
@@ -46,6 +47,19 @@ export function transportVehicleReceipt93756({data,campaignId,minute,conveyance,
  const haul=stableHauling575({vehicleName:car.name,team});
  insist(haul.required===team.length&&lb(haul.capacityLb), 'chybí pravidlově doložená tažná skupina pro zvolený vůz.');
  for(const animal of team){
+  // When a stable animal has a verified live Combat State, it must be fit
+  // to haul. Never infer a healthy state from ownership or an empty ledger.
+  const live=(data.characters||[]).find(c=>c.id===animal.id);
+  if(checkLiveHealth&&live){
+   insist(live.hmk?.verifiedMountedBreed&&live.hmk?.healthState,
+    animal.name+': existující zvíře nemá ověřený autoritativní zdravotní stav.');
+   // A stable receipt and a same-ID live animal must describe the same breed.
+   // Otherwise a healthy donkey/pony profile could validate a cart horse's
+   // different legal hauling capacity. Never infer or overwrite either record.
+   insist(live.hmk.verifiedMountedBreed===animal.spec.breed,
+    animal.name+': plemeno živého zvířecího profilu nesouhlasí se Stájí.');
+   assertTrekAnimalCanMove(trekRegisteredAnimalHealth(live));
+  }
   const gear=stableHubProjection(data,campaignId,animal.id);
   const harness=animal.spec.breed==='bovine'?'hmk-p122-tack-06':'hmk-p122-tack-05';
   insist(gear.tack.some(t=>t.itemId===harness),animal.name+': chybí skutečný tažný postroj.');
@@ -70,6 +84,7 @@ export function transportVehicleReceipt93756({data,campaignId,minute,conveyance,
   patientLoadLb:Object.fromEntries(Object.entries(patientLoadLb).sort(([a],[b])=>a.localeCompare(b))),
   otherLoadLb,passengerLb,totalLb,gmCoLocated:true,sourcePages:[122,145]};
 }
+export function transportVehicleReceipt93756(args){return vehicleReceiptInternal93757(args,true);}
 /** Replay at each historical departure. Previously confirmed watches are not
  * retroactively changed, only v93.756 receipts have this new proof shape. */
 export function validateTransportVehicleHistory93756(data){
@@ -82,10 +97,10 @@ export function validateTransportVehicleHistory93756(data){
    ep.startMinute===p.minute&&ep.conveyance===p.conveyance,
    'historický doklad vozidla nesouhlasí s epizodou.');
   const earlier={...data,journal:journal.slice(0,i)};
-  const expected=transportVehicleReceipt93756({data:earlier,campaignId:p.campaignId,minute:p.minute,
+  const expected=vehicleReceiptInternal93757({data:earlier,campaignId:p.campaignId,minute:p.minute,
    conveyance:ep.conveyance,vehicleKey:p.vehicleKey,teamIds:p.teamIds,
    stableAnimalIds:ep.settings?.stableAnimalIds||[],transportedMemberIds:ep.transportedMemberIds||[],
-   patientLoadLb:p.patientLoadLb,otherLoadLb:p.otherLoadLb,gmCoLocated:p.gmCoLocated});
+   patientLoadLb:p.patientLoadLb,otherLoadLb:p.otherLoadLb,gmCoLocated:p.gmCoLocated},false);
   insist(JSON.stringify(p)===JSON.stringify(expected),'původní vozidlo, posádka nebo hmotnost byly změněny.');
  }
  return true;
