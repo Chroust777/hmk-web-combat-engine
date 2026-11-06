@@ -23,14 +23,14 @@ const assert=require('node:assert/strict');
    eq(report.naturalBluntAV,anatomy.naturalBluntAV);
   }
   const injury=prepareSkillPhysicalInjury({kind:'survival-accident',actor,inventory:[],state:actor.hmk.healthState,
-   sourceId:'watch-750',round:1,gmConfirmed:true,hazardD10:5,agilityD100:81,randomVictimConfirmed:true,
+   sourceId:'watch-750',originMinute:540,round:1,gmConfirmed:true,hazardD10:5,agilityD100:81,randomVictimConfirmed:true,
    impactDie:6,zoneD10:2,locationD10:2,shockD100:10});
   eq(injury.bodyKind,'horse');yes(injury.injury);yes(injury.state.wounds.length>0);
   yes(anatomy.locations.some(l=>l.code===injury.state.wounds[0].location));
   yes(validateCombatState(injury.state));eq(JSON.stringify(actor.hmk.healthState),baseline);
   // The original Injury Sequence must reject an already committed source ID.
   assert.throws(()=>prepareSkillPhysicalInjury({kind:'survival-accident',actor,
-   inventory:[],state:injury.state,sourceId:'watch-750',round:1,gmConfirmed:true,
+   inventory:[],state:injury.state,sourceId:'watch-750',originMinute:540,round:1,gmConfirmed:true,
    hazardD10:5,agilityD100:81,randomVictimConfirmed:true,impactDie:6,
    zoneD10:2,locationD10:2,shockD100:10}),/již byla zapsána/);
   total++;

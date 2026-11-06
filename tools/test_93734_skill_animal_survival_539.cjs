@@ -10,7 +10,7 @@ const assert=require('node:assert/strict');
  let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++};const bad=(fn,reg)=>{assert.throws(fn,reg);n++};
  const mk=(breed='mule')=>({id:'animal-1',kind:'Animal',name:'Pack mule',hmk:{verifiedMountedBreed:breed,
   attributes:{agl:12,end:12,str:20},healthState:initialCombatState()}});
- function opts(actor,state=actor.hmk.healthState,more={}){return {kind:'survival-accident',actor,state,inventory:[],sourceId:'watch-one',round:1,gmConfirmed:true,hazardD10:5,agilityD100:81,randomVictimConfirmed:true,...more}}
+ function opts(actor,state=actor.hmk.healthState,more={}){return {kind:'survival-accident',actor,state,inventory:[],sourceId:'watch-one',originMinute:480,round:1,gmConfirmed:true,hazardD10:5,agilityD100:81,randomVictimConfirmed:true,...more}}
  const animal=mk(),baseline=JSON.stringify(animal.hmk.healthState);
  const avoided=prepareSkillPhysicalInjury(opts(animal,undefined,{agilityD100:5}));eq(avoided.avoided,true);eq(avoided.bodyKind,'horse');eq(avoided.state.events.length,1);eq(JSON.stringify(animal.hmk.healthState),baseline);
  bad(()=>prepareSkillPhysicalInjury(opts(mk('cow'))),/ověřeným plemenem|ověřené plemeno|ověřené zvíře|registered|plemenem/);
@@ -45,7 +45,7 @@ const assert=require('node:assert/strict');
  // Date the confirmed wound in the canonical calendar and verify that the
  // original treatment/healing machinery, not a second animal scheduler, owns the due rolls.
  let campaign=createCampaignCalendar({day:1,hour:8,minute:0,label:'animal accident',eventId:'start539',gmConfirmed:true,campaignId:'campaign-one',characterIds:[animal.id]});
- campaign=anchorCampaignOrigin(campaign,{kind:'wound',characterId:animal.id,woundId,source:'confirmed-combat',combatEventId:p.state.events[0].id,eventId:'anchor539'});
+ campaign=anchorCampaignOrigin(campaign,{kind:'wound',characterId:animal.id,woundId,source:'confirmed-health',combatEventId:p.state.wounds[0].originEventId,eventId:'anchor539'});
  const dueBefore=campaignCalendarAgenda(campaign,[witness],[]);
  eq(dueBefore.due.some(e=>e.kind==='treatment'&&e.woundId===woundId),true);
  bad(()=>advanceCampaignCalendar(campaign,{deltaMinutes:300,eventId:'skip-treatment539',reason:'skip unresolved injury',gmConfirmed:true,characters:[witness],journal:[]}),/treatment|Treatment|událost|závazek|vyřešit/);
@@ -64,8 +64,11 @@ const assert=require('node:assert/strict');
  eq(guidedMandatoryMastery({kind:'shock-recovery',character:animal}).ml,39);
  bad(()=>guidedMandatoryMastery({kind:'shock-recovery',character:mk('cow')}),/Shock ML/);
  const shockWitness={...witness,hmk:{...witness.hmk,healthState:animalShock.state}};
- eq(automaticHMKFollowups(clock,[shockWitness],[],()=>null).unknown.some(x=>x.kind==='shock-followup'),true);
- const deadline=campaignCalendarAgenda(campaign,[shockWitness],[]).future.find(x=>x.kind==='shock-followup');
+ // HMK 169 requires ten REAL minutes after travel Shock; this is no longer
+ // an unknown Combat-time task and must not route into Initiative.
+ eq(animalShock.state.shockFollowup?.domain,'travel-accident');
+ eq(automaticHMKFollowups(clock,[shockWitness],[],()=>null).unknown.some(x=>x.kind==='shock-followup'),false);
+ const deadline=campaignCalendarAgenda(campaign,[shockWitness],[]).future.find(x=>x.kind==='weather-shock');
  eq(deadline?.minute,campaign.minute+10);
  eq(deadline?.status,'future');
  const serialization=JSON.parse(JSON.stringify(animalShock.state));eq(validateCombatState(serialization)!=null,true);
