@@ -330,7 +330,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.760';
+const APP_VERSION='93.761';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6283,7 +6283,7 @@ function bestiaryCompleteCatalogView({includeGenerator=true}={}){
  <article class="hmk-bestiary-species-card" data-hmk-beast-name="${esc((p.name+' '+group+' '+creatureIntro569(p)).toLocaleLowerCase('cs'))}">
  <header class="hmk-beast-card-head"><strong>${esc(p.name)}</strong><p class="hmk-beast-description">${esc(creatureIntro569(p))}</p><small>${esc(creatureSource569(p))} · ${p.generation==='variable'?'proměnlivý druh / GM':p.generation==='printed-animal'?'tištěný zvířecí profil':'ukázkový / druhový profil'}</small></header>
  <div class="hmk-beast-stat-strip">${Object.entries(p.attributes||{}).slice(0,5).map(([k,v])=>`<span><b>${esc(k.toUpperCase())}</b> ${esc(v)}</span>`).join('')||'<span>Úplný číselný profil dosud není doložen</span>'}${p.combat?.shock!=null?`<span><b>SHOCK</b> ${p.combat.shock}</span>`:''}${p.move!=null?`<span><b>MOVE</b> ${p.move}</span>`:''}</div>
- <div class="hmk-bestiary-card-actions"><details class="hmk-bestiary-stats-details"><summary>Otevřít kompletní kartu · statistiky, útoky a anatomie</summary>${renderFullCreatureStats565(p)}</details><button type="button" class="hc-small secondary" data-hmk-bestiary-pick="${esc(p.id)}">Vybrat do generátoru</button></div></article>`).join('')}</div></details>`).join('');
+ <div class="hmk-bestiary-card-actions"><details class="hmk-bestiary-stats-details"><summary>Otevřít kartu · anatomické zóny, statistiky a útoky</summary>${renderFullCreatureStats565(p)}</details><button type="button" class="hc-small secondary" data-hmk-bestiary-pick="${esc(p.id)}">Vybrat do generátoru</button></div></article>`).join('')}</div></details>`).join('');
  return `${includeGenerator?bestiaryEncounterPanel():''}<section class="panel hmk-bestiary-complete" id="hmk-bestiary-complete"><h3>Bestiář · tvorové a encountery</h3>
  <p class="hc-hint">Jednotlivé druhy se rozbalují přes celou šířku. Rozdělení na atributy, dovednosti, boj, ochranu, útoky a anatomii zachovává dostupné tištěné hodnoty HMK; chybějící profily a nadpřirozené účinky se nepředstírají.</p>
  <div class="hmk-bestiary-search"><label>Najít tvora<input type="search" data-hmk-bestiary-filter placeholder="Vlk, Gârgún, drak…"></label><span>Kategorie jsou zprvu sbalené. Vyhledávání otevře skupinu s odpovídajícími druhy.</span></div>
