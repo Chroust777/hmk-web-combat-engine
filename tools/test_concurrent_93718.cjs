@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 let ts;try{ts=require('typescript')}catch{ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js')}
-const root=path.resolve(process.argv[2]||'/mnt/data/hmk_dev_93718');
+const root=path.resolve(process.argv[2]||path.resolve(__dirname,'..'));
 const old=require.extensions['.js'];require.extensions['.js']=(m,file)=>file.startsWith(root+path.sep+'src'+path.sep)?m._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,file):old(m,file);
 const {createCampaignCalendar,anchorCampaignOrigin,campaignCalendarAgenda,advanceCampaignCalendar,validateCampaignCalendar,assertCampaignCalendarAppendOnly}=require(path.join(root,'src/integration/hmk-campaign-calendar.js'));
 const {initialCombatState}=require(path.join(root,'src/integration/persistent-combat-state.js'));
