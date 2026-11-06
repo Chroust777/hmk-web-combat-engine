@@ -24,11 +24,19 @@ export function trekPersonHealthSnapshot({id,name,healthState}={}){
   check(anatomy,(name||id)+': neznámá lokace závažné rány ('+w.location+'); nelze spolehlivě odvodit Injured Mode.');
   return {id:w.id,location:w.location,severity:w.severity,zone:anatomy.zone};
  });
- return {id,name,fatigue,seriousWounds,
-  injured:seriousWounds.some(w=>['head','torso','legs'].includes(w.zone)),
-  immobile:seriousWounds.some(w=>w.severity==='G'&&['head','torso','legs'].includes(w.zone))};
+ const shock=healthState.shock;
+ check(['NONE','STN','INC','UNC','KIA'].includes(shock), (name||id)+': neznámý Shock.');
+ const comaActive=healthState.coma?.active===true;
+ const extendedShockActive=!!healthState.extendedShock;
+ const immobile=seriousWounds.some(w=>w.severity==='G'&&['head','torso','legs'].includes(w.zone));
+ // A non-grievous wound alone cannot prove that a patient is conscious.
+ // The patient can accompany a cart/wagon only after an explicit GM transport declaration.
+ const cannotSelfMove=immobile||fatigue>=40||shock!=='NONE'||comaActive||extendedShockActive||
+  healthState.asphyxiaComaPending?.active===true;
+ return {id,name,fatigue,seriousWounds,shock,comaActive,extendedShockActive,cannotSelfMove,
+  injured:seriousWounds.some(w=>['head','torso','legs'].includes(w.zone)),immobile};
 }
-export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],conveyance='foot',loadedByGM=false,allowCertifiedWeatherAccrual=false,drovingAnimals=[]}={}){
+export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],conveyance='foot',loadedByGM=false,allowCertifiedWeatherAccrual=false,drovingAnimals=[],transportedMemberIds=[]}={}){
  check(Array.isArray(memberIds)&&memberIds.length&&memberIds.length===new Set(memberIds).size&&memberIds.every(x=>typeof x==='string'&&x),
   'Vyberte jedinečné účastníky hlídky.');
  check(memberIds.includes(guideId),'Průvodce musí být součástí skupiny.');
@@ -62,6 +70,16 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
   return {...health,modifiedENC:enc,minimumENC:enc===null?minimum:null,
    loaded,loadUnresolved:conveyance==='foot'&&enc===null&&!loaded};
  });
+ check(Array.isArray(transportedMemberIds)&&new Set(transportedMemberIds).size===transportedMemberIds.length&&
+  transportedMemberIds.every(id=>memberIds.includes(id)), 'Přeprava: neplatný nebo duplicitní pacient.');
+ const needTransport=members.filter(x=>x.cannotSelfMove);
+ check(!members.some(x=>x.shock==='KIA'),'Zemřelá postava není aktivním členem cestovní epizody.');
+ check(!members.some(x=>x.id===guideId&&(x.shock!=='NONE'||x.comaActive||x.extendedShockActive)),
+  'Průvodce ve Shock nebo Coma nemůže vykonávat Orienteering. Zvolte aktivního průvodce.');
+ check(!needTransport.length||['cart','wagon'].includes(conveyance),
+  needTransport.map(x=>x.name).join(', ')+': nemůže se pohybovat vlastní silou; zvolte skutečný vůz/káru, nebo ji nezařazujte mezi cestující.');
+ check(transportedMemberIds.length===needTransport.length&&needTransport.every(x=>transportedMemberIds.includes(x.id)),
+  'GM musí výslovně potvrdit přepravu každého nepohyblivého pacienta ve voze/káře.');
  const tooTired=members.find(x=>x.fatigue>=40);
  // Only the ORIGINAL at-departure fatigue may disqualify a watch. A post-watch
  // weather outcome can cross 40 after the party already travelled. The caller
@@ -88,6 +106,7 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
   (a.encCalculation?.breed??a.health?.breed)==='bovine');
  const forcedSlow=Number(wearied)+Number(injured)+Number(bovineSlow);
  return {format:'hmk-trek-party-modes-v1',memberIds:[...memberIds].sort(),guideId,conveyance,animals,
+  transportedMemberIds:[...transportedMemberIds].sort(),
   members,wearied,injured,loaded,bovineSlow,forcedSlow,manualLoaded:loadedByGM===true,
   loadUnresolved:unresolved.map(x=>x.id),sourcePages:[112,145,146,150,167,176,355]};
 }
@@ -127,7 +146,18 @@ export function validateTrekPartySnapshot(p){
   typeof p.manualLoaded==='boolean'&&p.loaded===(p.manualLoaded||p.members.some(m=>m.loaded)||animals.some(a=>a.loaded))&&
   !(p.conveyance!=='foot'&&p.members.some(m=>m.loaded))&&
   !(p.conveyance==='foot'&&p.manualLoaded&&!p.loadUnresolved.length&&!p.members.some(m=>m.loaded)&&!animals.some(a=>a.loaded))&&
-  !(p.members.some(m=>m.immobile||m.fatigue>=40)&&!['cart','wagon'].includes(p.conveyance))&&
+  !(p.members.some(m=>m.immobile||m.fatigue>=40||m.cannotSelfMove)&&!['cart','wagon'].includes(p.conveyance))&&
+  (p.transportedMemberIds===undefined||(Array.isArray(p.transportedMemberIds)&&
+   new Set(p.transportedMemberIds).size===p.transportedMemberIds.length&&
+   p.transportedMemberIds.every(id=>p.memberIds.includes(id))&&
+   JSON.stringify(p.transportedMemberIds)===JSON.stringify([...p.transportedMemberIds].sort())&&
+   p.members.every(m=>m.cannotSelfMove===undefined||
+    m.cannotSelfMove===p.transportedMemberIds.includes(m.id)&&
+   (m.shock===undefined||['NONE','STN','INC','UNC','KIA'].includes(m.shock))&&
+   (m.comaActive===undefined||typeof m.comaActive==='boolean')&&
+   (m.extendedShockActive===undefined||typeof m.extendedShockActive==='boolean')&&
+   (m.shock===undefined||m.cannotSelfMove===
+    (m.immobile||m.fatigue>=40||m.shock!=='NONE'||m.comaActive===true||m.extendedShockActive===true)))))&&
   JSON.stringify(p.loadUnresolved)===JSON.stringify(p.members.filter(m=>m.loadUnresolved).map(m=>m.id)),
   'Změněné doložené postihy skupiny.');
  return true;

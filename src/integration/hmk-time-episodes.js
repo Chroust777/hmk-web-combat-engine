@@ -49,12 +49,16 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
  enduranceByActor={},endRollByActor={},memberIds=[],weather=null,encounterRoll=null,encounterEnviron='rural',
  encounterResolved=false,encounterNight=false,encounterPercentile=null,encounterSubPercentile=null,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
  survivalCriticalFailure=false,survivalD10=null,doubleTime=false,loadBypass=false,encByActor={},dunesSlow=false,
-  forcedBearing=0,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null,inactiveByActor={}}={}){
+  forcedBearing=0,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null,inactiveByActor={},transportedMemberIds=[]}={}){
  must(whole(minute,0,1e9)&&whole(minutes,1,10080)&&minute+minutes<=1e9,'Epizoda potřebuje 1–10 080 skutečných minut.');
  must(EPISODE_KINDS.includes(kind),'Neznámý druh epizody');
  if(movementMinutes===null)movementMinutes=minutes;
  must(whole(movementMinutes,0,minutes),'Pohybové minuty nesmí přesáhnout skutečnou délku epizody.');
  must(Array.isArray(memberIds)&&memberIds.length>0&&new Set(memberIds).size===memberIds.length,'Vyberte jedinečné účastníky');
+ must(Array.isArray(transportedMemberIds)&&new Set(transportedMemberIds).size===transportedMemberIds.length&&
+  transportedMemberIds.every(id=>memberIds.includes(id))&&
+  (!transportedMemberIds.length||(kind==='travel'&&['cart','wagon'].includes(conveyance))),
+  'Přepravovaní pacienti vyžadují doložený vůz/káru, jednotlivé členství a potvrzení GM.');
  must(whole(mapScale,100,10000000),'Neplatné měřítko mapy');
  const slow=extraSlow+Number(wearied)+Number(injured)+Number(continuousPrecipitation)+Number(dunesSlow);
  must(whole(extraSlow,0,20)&&whole(progress,0,10)&&whole(bearing,0,20)&&whole(forcedBearing,0,1)&&
@@ -102,6 +106,15 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
    }
    const enc=encByActor[id]??0;
    must(whole(enc,0,100),'Nenastavená nebo neplatná ENC postavy.');
+   if(transportedMemberIds.includes(id)){
+    must(!inactive,'Přepravovaný pacient nemůže současně získat nový aktivní END během cesty.');
+    must(endRollByActor[id]===undefined||endRollByActor[id]===''||endRollByActor[id]===0||
+     (Array.isArray(endRollByActor[id])&&endRollByActor[id].length===0),
+     'Přepravovaný pacient nemá provádět END d10 ani získat únavu z vlastní chůze.');
+    return {id,endurance:end,roll:null,sr:null,rate:0,delta:0,carryIn,carryOut:carryIn,
+     enc,extraFatigue:0,duneFatigue:0,movementFatigueUnits:0,
+     endNotRequired:{reason:'transported',minute,sourceKey:'gm-confirmed-transport-v93.755'}};
+   }
    const extraFatigue=loadBypass?Math.floor(enc/(conveyance==='foot'?10:20))*10:0;
    const duneFatigue=terrain==='dunes'&&conveyance==='foot'&&!dunesSlow?5:0;
    if(activeMinutes===0)return {id,endurance:end,roll:null,sr:null,rate:0,delta:0,carryIn,
@@ -141,7 +154,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   encounterRoll===null?null:{roll:encounterRoll,tn:target,night:encounterNight,found:encounterRoll<=target,
   resolved:!!encounterResolved};
  return {format:EPISODE_FORMAT,startMinute:minute,endMinute:minute+minutes,minutes,kind,
-  memberIds:[...memberIds],terrain,topography,conveyance,mapScale,motion,
+  memberIds:[...memberIds],...(transportedMemberIds.length?{transportedMemberIds:[...transportedMemberIds]}:{}),terrain,topography,conveyance,mapScale,motion,
   distanceMeters,distanceKilometres:distanceMeters/1000,
   ...(kind==='travel'?{movementMinutes}:{}),
   ...(kind==='travel'?{distanceFractionIn:previousDistanceFraction,distanceFractionOut}:{}),
