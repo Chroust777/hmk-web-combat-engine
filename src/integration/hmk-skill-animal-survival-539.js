@@ -12,7 +12,7 @@ const isDie=(value,faces)=>Number.isSafeInteger(value)&&value>=1&&value<=faces;
 const roll=(faces,value)=>({faces,value,source:'GM-entered-physical-die'});
 export function prepareAnimalSurvivalAccident({actor,state,inventory,sourceId,round=1,gmConfirmed=false,
  hazardD10,agilityD100,randomVictimConfirmed=false,impactDie=null,zoneD10=null,locationD10=null,
- shockD100=null,compoundD10=null}={}){
+ shockD100=null,compoundD10=null,originMinute=null}={}){
  requireFact(gmConfirmed===true&&actor?.id&&state&&Array.isArray(inventory)&&typeof sourceId==='string'&&sourceId&&isDie(round,9999),
   'Survival Accident zvířete vyžaduje původní postavu, Combat State, událost a souhlas GM');
  const breed=actor.hmk?.verifiedMountedBreed;
@@ -68,7 +68,8 @@ export function prepareAnimalSurvivalAccident({actor,state,inventory,sourceId,ro
   skills:[...(actor.hmk?.skills||[]),{name:'Shock',ml:verifiedMountedShockML(actor)}]}};
  const applied=woundFromFall({state,character:temporary,round,timelineId:'skill:'+sourceId,eventId:evt,
   bodyKind:'horse',aspect:'b',location:probe.location,side:probe.side,locationShock:probe.locationShock,
-  strikeImpact:impact,AV:av,shockRoll:shockD100,compoundD10,physicalDice:dice});
+  strikeImpact:impact,AV:av,shockRoll:shockD100,compoundD10,physicalDice:dice,
+  injuryOrigin:'travel-accident',originMinute,medicalSourceId:sourceId});
  const next=structuredClone(applied.state);
  next.events.push({id:evt+':complete',type:'skill-physical-consequence',round,
   details:{kind:'survival-accident',sourceId,breed,bodyKind:'horse',hazardD10,agilityD100,eml,sl,

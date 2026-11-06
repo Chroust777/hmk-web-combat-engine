@@ -54,7 +54,8 @@ export function humanLocation(z,l){
  return {location:hit[0],locationShock:hit[3],side:zone==='arms'||zone==='legs'?(z%2?'left':'right'):null};
 }
 export function woundFromFall({state,character,round,timelineId,eventId,bodyKind,location,side,locationShock,
- strikeImpact,AV,aspect='b',shockRoll=null,compoundD10=null,physicalDice,hrModifier=0}={}){
+ strikeImpact,AV,aspect='b',shockRoll=null,compoundD10=null,physicalDice,hrModifier=0,
+ injuryOrigin='combat',originMinute=null,medicalSourceId=null}={}){
  validateCombatState(state);
  required(int(strikeImpact,-100,999)&&int(AV,0,999)&&['b','e'].includes(aspect),'Impact/AV/aspect musí být doloženy');
  const symbols=bodyKind==='horse'?hmkAnimalLocationSymbols(location):hmkHumanLocationSymbols(location);
@@ -95,7 +96,8 @@ export function woundFromFall({state,character,round,timelineId,eventId,bodyKind
   shockResult:{state:states[sh.state],injuryShock,locationShock},carryover:{state:carry}};
  const applied=applyConfirmedHit({state,characterId:character.id,draft,round,eventId,
   adjudication:{gmReviewed:true,bodyKind,compoundReviewed:!!comp,compoundD10,
-   bleeding,arrowOrBolt:false,side,timelineId}}).state;
+   bleeding,arrowOrBolt:false,side,timelineId,injuryOrigin,originMinute,
+   weatherSourceId:medicalSourceId}}).state;
  const evt=applied.events.find(e=>e.id===eventId);
  required(evt,'Povinný Injury Sequence event chybí');
  evt.details.physicalDice={format:'hmk-manual-dice-proof-v1',rolls:cpy(physicalDice)};

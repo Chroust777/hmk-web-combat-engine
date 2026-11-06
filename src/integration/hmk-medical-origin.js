@@ -3,10 +3,15 @@
  * actual impairment but does not own its original Weather tests or treatment.
  * HMK v1.2 pp. 167–170, 177–182, 185.
  */
-export const MEDICAL_ORIGIN=Object.freeze({WEATHER:'travel-weather',COMBAT:'combat'});
+export const MEDICAL_ORIGIN=Object.freeze({WEATHER:'travel-weather',TRAVEL:'travel-accident',COMBAT:'combat'});
+export const isNoncombatMedicalOrigin=origin=>origin===MEDICAL_ORIGIN.WEATHER||origin===MEDICAL_ORIGIN.TRAVEL;
 export function medicalOriginOfWound(wound,events=[]){
  if(!wound||typeof wound.id!=='string')return null;
  const original=Array.isArray(events)?events.find(e=>e.id===wound.originEventId):null;
+ if(wound.originDomain===MEDICAL_ORIGIN.TRAVEL&&original?.type==='travel-accident-injury'&&
+  original.details?.domain===MEDICAL_ORIGIN.TRAVEL&&
+  original.details?.woundId===wound.id&&
+  original.details?.sourceId===wound.originEventId.slice('skill-injury:survival-accident:'.length))return MEDICAL_ORIGIN.TRAVEL;
  if(wound.originDomain===MEDICAL_ORIGIN.WEATHER&&original?.type==='travel-weather-injury'&&
   original.details?.domain===MEDICAL_ORIGIN.WEATHER&&
   original.details?.woundId===wound.id)return MEDICAL_ORIGIN.WEATHER;
@@ -35,7 +40,7 @@ export function medicalWounds(state,origin){
 }
 export function medicalWeatherShockDue(state,minute){
  const q=state?.shockFollowup;
- if(q?.domain!==MEDICAL_ORIGIN.WEATHER)return null;
+ if(!isNoncombatMedicalOrigin(q?.domain))return null;
  if(!Number.isSafeInteger(q.originMinute)||q.originMinute<0||!q.sourceId)throw Error('Weather Shock nemá původní kalendářovou minutu');
  const dueMinute=q.kind==='UNC'?q.originMinute+10:q.originMinute;
  return {sourceId:q.sourceId,kind:q.kind,originMinute:q.originMinute,dueMinute,

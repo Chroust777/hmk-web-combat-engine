@@ -7,7 +7,7 @@ import {SL,successLevel} from '../rules/tests.js';
 import {bloodStoppageResult,bloodLossAdvanceTransition,multipleBleederStaunchModifier} from '../rules/bleeding.js';
 import {SHOCK_STATE,resolveShockReroll,resolveStunnedRecovery} from '../rules/shock.js';
 import {combatFatigueTotals,validateCombatState,initialCombatState} from './persistent-combat-state.js';
-import {medicalOriginOfWound,MEDICAL_ORIGIN} from './hmk-medical-origin.js';
+import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hmk-medical-origin.js';
 import {weatherPhysicianCandidates} from './hmk-weather-healer.js';
 import {herbPotionEffectAt} from './hmk-herbal-administration.js';
 const check=(ok,message)=>{if(!ok)throw Error(message)};
@@ -26,20 +26,20 @@ function sourceWound(state,woundId){
  validateCombatState(state);
  const w=state.wounds.find(x=>x.id===woundId&&x.bleeding===true&&!x.healed);
  check(!!w,'Vybraná rána není aktivní Bleeder');
- check(medicalOriginOfWound(w,state.events)===MEDICAL_ORIGIN.WEATHER,
+ check(isNoncombatMedicalOrigin(medicalOriginOfWound(w,state.events)),
   'Krvácení nevzniklo v Cestování; bojové krvácení spravuje původní Combat');
  return w;
 }
 export function travelBleedingTerm({clock,actorId,wound,state}={}){
  check(clock&&integer(clock.minute,0,1e9),'Chybí skutečný kalendářní čas');
  check(wound?.id&&actorId,'Chybí totožnost pacienta nebo rány');
- check(medicalOriginOfWound(wound,state?.events||[])===MEDICAL_ORIGIN.WEATHER,
-  'Rána nemá doložený Weather původ');
+ check(isNoncombatMedicalOrigin(medicalOriginOfWound(wound,state?.events||[])),
+  'Rána nemá doložený cestovní nebo povětrnostní původ');
  const anchor=sourceAnchor(clock,actorId,wound.id);
  check(anchor?.source==='confirmed-health'&&anchor.combatEventId===wound.originEventId,
   'Pětiminutový Bleeder musí mít automatickou kotvu původní potvrzené zdravotní události');
  check(anchor&&integer(anchor.minute,0,1e9)&&anchor.minute<=clock.minute,
-  'Weather Bleeder nemá původní doloženou minutu vzniku');
+  'Cestovní Bleeder nemá původní doloženou minutu vzniku');
  const prior=wound.travelBlood;
  if(prior){
   check(prior.campaignId===campaignId(clock)&&integer(prior.nextDueMinute,anchor.minute+5,1e9)&&
@@ -81,8 +81,11 @@ function ensureNoIgnoredCoagulant(journal,camp,minute,patientId,woundId){
 function note(s,eventId,type,minute,details){
  check(typeof eventId==='string'&&eventId&&!s.events.some(e=>e.id===eventId),
   'Duplicitní zdravotní událost');
+ const sourceWound=s.wounds.find(w=>w.id===(details.woundId??details.sourceId));
+ const origin=medicalOriginOfWound(sourceWound,s.events);
+ check(isNoncombatMedicalOrigin(origin),'Zdravotní doklad musí zachovat ověřený původ cestovní rány');
  s.events.push({id:eventId,type,round:s.lastRound,details:{...details,
-  domain:MEDICAL_ORIGIN.WEATHER,campaignMinute:minute,sourcePage:178}});
+  domain:origin,campaignMinute:minute,sourcePage:178}});
  validateCombatState(s);
 }
 /** Start treatment at the onset of one five-minute interval, not afterwards. */
@@ -202,7 +205,7 @@ export function completeTravelBleedingInterval({clock,state,patient,healer=null,
   if(s.extendedShock){/* keep Course HR/elapsed hours and no followup */}
   else if(s.shock==='STN'){s.shock='NONE';s.shockFollowup=null;s.shockOriginRound=s.lastRound;}
   else if(['INC','UNC'].includes(s.shock))s.shockFollowup={kind:s.shock,
-   domain:MEDICAL_ORIGIN.WEATHER,sourceId:woundId,originMinute:clock.minute,
+   domain:medicalOriginOfWound(target,s.events),sourceId:woundId,originMinute:clock.minute,
    originRound:s.lastRound,dueRound:s.lastRound,phase:'after-all-bleeding-stopped',timelineId:null};
  }
  note(s,eventId,mode==='stoppage'?'travel-blood-stoppage':'travel-blood-loss',clock.minute,
@@ -222,7 +225,7 @@ export function completeTravelBloodShockReroll({clock,state,actorId,sourceId,sho
  check(gmConfirmed===true,'Shock Reroll musí potvrdit GM');
  validateCombatState(state);
  const q=state.shockFollowup;
- check(q?.domain===MEDICAL_ORIGIN.WEATHER&&q.phase==='after-all-bleeding-stopped'&&
+ check(isNoncombatMedicalOrigin(q?.domain)&&q.phase==='after-all-bleeding-stopped'&&
   q.sourceId===sourceId&&integer(q.originMinute,0,1e9)&&clock?.minute===q.originMinute,
   'Okamžitý Blood Shock Reroll není splatný nebo má cizí původ');
  check(['STN','INC','UNC'].includes(state.shock)&&state.shock===q.kind&&
@@ -247,13 +250,13 @@ export function completeTravelBloodShockReroll({clock,state,actorId,sourceId,sho
   if(['INC','UNC'].includes(s.shock))s.posture.prone=true;
   if(result.extendedShock){
    s.extendedShock={originState:before,hr:result.extendedShock.hr,elapsedHours:0,
-    domain:MEDICAL_ORIGIN.WEATHER,sourceId};
+    domain:q.domain,sourceId};
    if(result.coma)s.coma={active:true,hr:result.coma.initialHR,elapsedDays:0,
-    nextCourseDays:initialComaD10,domain:MEDICAL_ORIGIN.WEATHER,sourceId};
+    nextCourseDays:initialComaD10,domain:q.domain,sourceId};
   }
  }
  s.shockFollowup=s.shock==='STN'?{kind:'STN',originRound:s.lastRound,
-  dueRound:s.lastRound,phase:'end-next-turn',timelineId:null,domain:MEDICAL_ORIGIN.WEATHER,
+  dueRound:s.lastRound+1,phase:'end-next-turn',timelineId:null,domain:q.domain,
   sourceId,originMinute:clock.minute}:null;
  if(s.shock!==before)s.shockOriginRound=s.lastRound;
  note(s,eventId,'shock-recovery',clock.minute,{sourceId,phase:q.phase,before,

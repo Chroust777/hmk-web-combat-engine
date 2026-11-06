@@ -7,7 +7,7 @@ import {criticalActivities,skillFollowupActivities} from './hmk-skill-critical-a
 import {trekkingOutstandingCases} from './hmk-trekking-followups.js';
 import {pendingTrackingAwareness} from './hmk-tracking-awareness-537.js';
 import {dueInjuryMorale,unresolvedInjuryMishaps} from './persistent-combat-state.js';
-import {medicalOriginOfWound,MEDICAL_ORIGIN} from './hmk-medical-origin.js';
+import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hmk-medical-origin.js';
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
 const DAY=1440;
@@ -80,14 +80,14 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // The wound and environmental branches below need actual combat evidence.
   // All these are current unresolved obligations, not new fabricated time intervals.
   for(const w of s?.wounds??[])if(w.bleeding&&!w.healed){
-   if(medicalOriginOfWound(w,s.events)===MEDICAL_ORIGIN.WEATHER){
+   if(isNoncombatMedicalOrigin(medicalOriginOfWound(w,s.events))){
     try{
      const bleeding=travelBleedingTerm({clock,actorId:c.id,wound:w,state:s});
-     push(c,'bleeding',w.id,'Weather Bleeder – Blood Stoppage / Blood Loss po 5 minutách (HMK 178)',
-      bleeding.dueMinute,'hazards',{woundId:w.id,originDomain:MEDICAL_ORIGIN.WEATHER,
+     push(c,'bleeding',w.id,'Cestovní Bleeder – Blood Stoppage / Blood Loss po 5 minutách (HMK 178)',
+      bleeding.dueMinute,'hazards',{woundId:w.id,originDomain:medicalOriginOfWound(w,s.events),
        treatmentStarted:!!bleeding.plan,anchorMinute:bleeding.anchorMinute});
     }catch(error){unknown.push({characterId:c.id,name:c.name,kind:'bleeding',sourceId:w.id,
-     description:'Weather Bleeder – povinná zdravotní kontrola (HMK 178)',reason:error.message});}
+     description:'Cestovní Bleeder – povinná zdravotní kontrola (HMK 178)',reason:error.message});}
    }else push(c,'bleeding',w.id,'Aktivní Bleeder – Blood Stoppage / Blood Loss Advance (HMK 177–178)',
     clock.minute,'combat',{woundId:w.id});
   }
@@ -96,18 +96,18 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // Previously, a Skill Accident outside active Initiative could leave them
   // hidden even though Treatment/Healing were already displayed.
   if(s?.format==='hmk-character-health-v1'){
-   for(const m of unresolvedInjuryMishaps(s)){const wound=s.wounds.find(w=>w.id===m.woundId),weather=medicalOriginOfWound(wound,s.events)===MEDICAL_ORIGIN.WEATHER;
-    push(c,'injury-mishap',m.id,weather?'Weather Injury Mishap – povinná zdravotní následnost (HMK 170)':'Nevyřízený Injury Mishap – původní Combat průvodce (HMK 161,170)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
-   for(const m of dueInjuryMorale(s)){const wound=s.wounds.find(w=>w.id===m.woundId),weather=medicalOriginOfWound(wound,s.events)===MEDICAL_ORIGIN.WEATHER;
-    push(c,'injury-morale',m.woundId,weather?'Weather Injury Morale – až po zotavení ze Shock (HMK 162)':'Povinný Morale po Serious/Grievous zranění (HMK 162)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
+   for(const m of unresolvedInjuryMishaps(s)){const wound=s.wounds.find(w=>w.id===m.woundId),weather=isNoncombatMedicalOrigin(medicalOriginOfWound(wound,s.events));
+    push(c,'injury-mishap',m.id,weather?'Cestovní Injury Mishap – povinná zdravotní následnost (HMK 170)':'Nevyřízený Injury Mishap – původní Combat průvodce (HMK 161,170)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
+   for(const m of dueInjuryMorale(s)){const wound=s.wounds.find(w=>w.id===m.woundId),weather=isNoncombatMedicalOrigin(medicalOriginOfWound(wound,s.events));
+    push(c,'injury-morale',m.woundId,weather?'Cestovní Injury Morale – až po zotavení ze Shock (HMK 162)':'Povinný Morale po Serious/Grievous zranění (HMK 162)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
   }
   // Every committed injury without a resolved initial treatment decision
   // needs routing into the existing Treatment/Untreated workflow. No roll is
   // fabricated and the GM may explicitly record that treatment was absent.
   for(const w of s?.wounds??[])if(!w.healed&&!w.healing&&!s?.extendedShock&&!(s?.wounds??[]).some(x=>x.bleeding))
    push(c,'treatment',w.id,'Nová rána – Treatment nebo doložené bez ošetření (HMK 178–179)',clock.minute,
-    medicalOriginOfWound(w,s.events)===MEDICAL_ORIGIN.WEATHER?'hazards':'combat',{woundId:w.id});
-  if(s?.shockFollowup&&s.shockFollowup.domain!==MEDICAL_ORIGIN.WEATHER){
+    isNoncombatMedicalOrigin(medicalOriginOfWound(w,s.events))?'hazards':'combat',{woundId:w.id});
+  if(s?.shockFollowup&&!isNoncombatMedicalOrigin(s.shockFollowup.domain)){
    const pending=s.shockFollowup;
    if(pending.kind==='UNC'&&pending.phase==='after-ten-minutes'){
     // HMK p169: an unconscious subject rerolls after ten actual minutes.
@@ -129,7 +129,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // A Weather blood Shock remains latent while ANY Bleeder is still open.
   // The mandatory reroll arises after all wounds stop, not once per BP.
   if(s?.bloodShockPending&&!(s.wounds||[]).some(w=>w.bleeding&&
-    medicalOriginOfWound(w,s.events)===MEDICAL_ORIGIN.WEATHER))
+    isNoncombatMedicalOrigin(medicalOriginOfWound(w,s.events))))
    push(c,'blood-shock','pending','Povinný Blood Loss Shock (HMK 178)',clock.minute,'combat');
   if(s?.asphyxiaComaPending?.active)push(c,'asphyxia','pending','Asphyxia / Coma – dokončit doložené následky (HMK 183)',clock.minute,'hazards');
   if(c.hmk?.arcane?.pendingPsycheTraitChoice)push(c,'psyche-choice','pending',

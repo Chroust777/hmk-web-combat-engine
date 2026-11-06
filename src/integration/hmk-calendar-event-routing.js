@@ -8,7 +8,7 @@ export function calendarEventDestination(event){
  if(event?.kind==='trek-encounter')return 'calendar';
  // A persisted travel/Weather medical source overrides obsolete route='combat'.
  // Origin is immutable evidence; this router never creates a second procedure.
- if((event?.originDomain==='travel-weather'||event?.domain==='travel-weather')&&
+ if((['travel-weather','travel-accident'].includes(event?.originDomain)||['travel-weather','travel-accident'].includes(event?.domain))&&
    ['treatment','healing','infection','grim','coma','extended-shock','shock-followup',
     'injury-morale','injury-mishap','bleeding','blood-loss','blood-shock'].includes(event?.kind))
   return 'hazards';

@@ -22,7 +22,7 @@ const mastery=(actor,name)=>{
 };
 export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,round=1,gmConfirmed=false,
  impactDie,zoneD10,locationD10,direction='front',shockD100=null,compoundD10=null,
- hazardD10=null,agilityD100=null,randomVictimConfirmed=false,autoDieValues={}}={}){
+ hazardD10=null,agilityD100=null,randomVictimConfirmed=false,autoDieValues={},originMinute=null}={}){
  must(['fishing-cf','survival-accident'].includes(kind),'Neznámý typ zranění Skill Tests');
  must(gmConfirmed===true&&actor?.id&&Array.isArray(inventory)&&state&&typeof sourceId==='string'&&sourceId&&
   die(round,9999),'Nutné potvrzení GM, cílová postava, aktuální Combat State a zdroj události');
@@ -33,7 +33,7 @@ export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,
   throw Error('Rybářské CF fyzické následky nepatří na zvířecí profil');
  if(kind==='survival-accident'&&actor.hmk?.verifiedMountedBreed)
   return prepareAnimalSurvivalAccident({actor,state,inventory,sourceId,round,gmConfirmed,
-   impactDie,zoneD10,locationD10,shockD100,compoundD10,hazardD10,agilityD100,randomVictimConfirmed});
+   impactDie,zoneD10,locationD10,shockD100,compoundD10,hazardD10,agilityD100,randomVictimConfirmed,originMinute});
  const evt='skill-injury:'+kind+':'+sourceId;
  must(!state.events.some(x=>x.id===evt||x.id===evt+':complete'),'Tento následek už je trvale zapsán');
  const limit=kind==='fishing-cf'?10:6;
@@ -77,7 +77,8 @@ export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,
   ...((compoundD10==null)?[]:[dieEvidence('compoundD10',10,compoundD10)]));
  const applied=woundFromFall({state,character:actor,round,timelineId:'skill:'+sourceId,eventId:evt,
   bodyKind:'human',aspect,location:loc.location,side:loc.side,locationShock:loc.locationShock,
-  strikeImpact:impact,AV:armour.armourValue,shockRoll:shockD100,compoundD10,physicalDice:dice});
+  strikeImpact:impact,AV:armour.armourValue,shockRoll:shockD100,compoundD10,physicalDice:dice,
+  ...(kind==='survival-accident'?{injuryOrigin:'travel-accident',originMinute,medicalSourceId:sourceId}:{})});
  const next=structuredClone(applied.state);
  next.events.push({id:evt+':complete',type:'skill-physical-consequence',round,details:{kind,sourceId,
   impact,aspect,location:loc.location,side:loc.side,armourValue:armour.armourValue,
