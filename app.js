@@ -338,7 +338,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.778';
+const APP_VERSION='93.779';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5405,8 +5405,8 @@ function inventoryEffectiveMove591(c,load){
   return result.ready?result.effective:'—';
  }catch{return '—';}
 }
-// Read-only migration preview for Equipment F recorded before v93.695.
-// Never mutate immutable historical receipts or silently invent minutes of work.
+// Historical Equipment F receipts stay immutable. A legacy item may display
+// its unresolved state, but time/work is not reconstructed from later travels.
 function legacyEquipmentRepairCandidate(item){
  if(item?.hmkEquipmentRepair||!data.campaignClock)return null;
  const key=campaignKey(data.campaignClock);
@@ -5414,18 +5414,7 @@ function legacyEquipmentRepairCandidate(item){
   j.calendarEpisodeEquipmentHazard?.itemId===item.id&&
   j.calendarEpisodeEquipmentHazard?.itemOwnerId===item.characterId);
  const latest=events.at(-1)?.calendarEpisodeEquipmentHazard;
- if(!latest||latest.result!=='long-delay'||latest.repairWork)return null;
- const original=data.journal.find(j=>j.id===latest.episodeId)?.calendarTimeEpisode;
- if(!original)return null;
- let spent=0;
- for(const j of data.journal){const e=j.calendarTimeEpisode;
-  if(j.calendarCampaignId!==key||!e||e.kind!=='travel'||e.startMinute<original.endMinute||
-   e.travelDelay?.method==='gm-complication-only-v93.695')continue;
-  spent+=Math.max(0,Math.min(240-spent,e.travelDelay?.applied||0));
-  if(spent>=240)break;
- }
- return {sourceEpisodeId:latest.episodeId,repairProofId:latest.repairProofId||null,
-  estimatedRemaining:Math.max(0,240-spent)};
+ return latest?.result==='long-delay'?{sourceEpisodeId:latest.episodeId,repairProofId:latest.repairProofId||null}:null;
 }
 function characterInventoryOverview(c,inv){
  const cold=coldInventoryChoices(data.inventory,c.id);
@@ -5498,13 +5487,11 @@ function characterInventoryOverview(c,inv){
   const legacyRepair=legacyEquipmentRepairCandidate(x);
   const legacyBadge=legacyRepair?
    `<span class="inv-item-kind" style="font-weight:700">⚒ Poškozený · GM určí stav v Upravit</span>`:'';
-  const legacyAction=''; // GM spravuje stav přímo v Upravit; čas oprav se zde neeviduje.
-  const repairBadge=repair?.status==='damaged'&&Number.isSafeInteger(repair.remainingMinutes)&&repair.remainingMinutes>0?
+  const repairBadge=repair?.status==='damaged'?
    `<span class="inv-item-kind" style="font-weight:700">⚒ Poškozený · GM určí stav v Upravit</span>`:
    repair?.status==='irreparable'?'<span class="inv-item-kind" style="font-weight:700">✖ Neopravitelný · vyřadit dle rozhodnutí GM</span>':'';
-  const repairAction=''; // v93.778: stav opravitelné výstroje spravuje GM přímo v editaci.
   const rowKindLabel=`${libraryItemKind(x.snapshot||{})}${visibleInventoryNote(x.condition)?' · '+visibleInventoryNote(x.condition):''}${x.slot==='chest'?' · '+(x.chestLocation||'Truhlice'):''}${x.slot==='stable'?(stableAnimal?` · ${stableAnimal.name} · ${stableAnimal.spec?.name||'zvíře'}`:' · na zvířeti'):''}${x.coldWorn?' · oblečený cestovní plášť (Cold AV +'+(coldCatalogRule(x.snapshot)?.av||0)+')':''}${x.gearStowage==='backpack'?' · v batohu':x.gearStowage==='awkward'?' · nepohodlně neseno':''}${['main_hand','off_hand'].includes(x.slot)&&x.snapshot?.category==='weapon'?' · '+(gripOf(x)==='two'?'obouručně':'jednoručně'):''}`;
-  return `<tr><th scope="row"><label class="inv-select-row"><input type="checkbox" class="inv-bulk-checkbox" data-inv-bulk-select${rowCheckboxTitle}${rowCheckboxDisabled} value="${esc(x.id)}" aria-label="Označit ${esc(x.snapshot?.name||'předmět')}"><span class="inv-item-name" title="${esc(libraryItemPurpose(x.snapshot||{}))}" data-hmk-help="${esc(libraryItemPurpose(x.snapshot||{}))}" tabindex="0">${esc(x.snapshot?.name||'Bezejmenný předmět')}</span></label>${esc(waterStatus)}${lotNote}${repairBadge}${legacyBadge}${potionInside?`<span class="inv-item-kind">Naplněna · ${esc(potionInside.herbType)} (${esc(potencyLabel(potionInside.potency))}); obsah bez doložené hmotnosti</span>`:''}${alchemyInside?`<span class="inv-item-kind">Alchemy · ${esc(alchemyStrength?.elixirName||'elixír')} · AS ${alchemyStrength?.currentAS??'?'}${alchemyStrength?.dispersed?' · obsah vyprázdněn':alchemyStrength?.expires?' · enchantment zanikl':''} · plná 0,5 lb</span>`:''}<span class="inv-item-kind">${esc(rowKindLabel)}</span></th><td title="${esc(slotLabel(x.slot))}">${esc(rowLocationLabel)}</td><td class="inv-number">${number(r.wq)}</td><td class="inv-number inv-price">${r.totalPrice!==null?`${r.totalPrice} d`:esc(r.priceLabel.replace(/\s*\/\s*ks\b/gi,'').replace(/\s*d\s*\/\s*12\s*ks\b/gi,' d za 12 kusů'))}</td><td class="inv-number" title="${esc(unitLabel)}">${r.totalWeight===null?'—':`${r.totalWeight.toFixed(1)} lb`}</td><td>${esc(r.armourENC)}</td><td class="inv-key-spec">${details}</td><td class="inv-cell-actions"><button type="button" class="secondary inv-edit-only" data-edit-inv="${esc(x.id)}" ${x._campaignRationReceipt||x._foragingCarryReceipt?'disabled title="Doložený zásobovací doklad lze měnit pouze původním postupem Kalendáře"':''}>Upravit</button>${repairAction}</td></tr>`;
+  return `<tr><th scope="row"><label class="inv-select-row"><input type="checkbox" class="inv-bulk-checkbox" data-inv-bulk-select${rowCheckboxTitle}${rowCheckboxDisabled} value="${esc(x.id)}" aria-label="Označit ${esc(x.snapshot?.name||'předmět')}"><span class="inv-item-name" title="${esc(libraryItemPurpose(x.snapshot||{}))}" data-hmk-help="${esc(libraryItemPurpose(x.snapshot||{}))}" tabindex="0">${esc(x.snapshot?.name||'Bezejmenný předmět')}</span></label>${esc(waterStatus)}${lotNote}${repairBadge}${legacyBadge}${potionInside?`<span class="inv-item-kind">Naplněna · ${esc(potionInside.herbType)} (${esc(potencyLabel(potionInside.potency))}); obsah bez doložené hmotnosti</span>`:''}${alchemyInside?`<span class="inv-item-kind">Alchemy · ${esc(alchemyStrength?.elixirName||'elixír')} · AS ${alchemyStrength?.currentAS??'?'}${alchemyStrength?.dispersed?' · obsah vyprázdněn':alchemyStrength?.expires?' · enchantment zanikl':''} · plná 0,5 lb</span>`:''}<span class="inv-item-kind">${esc(rowKindLabel)}</span></th><td title="${esc(slotLabel(x.slot))}">${esc(rowLocationLabel)}</td><td class="inv-number">${number(r.wq)}</td><td class="inv-number inv-price">${r.totalPrice!==null?`${r.totalPrice} d`:esc(r.priceLabel.replace(/\s*\/\s*ks\b/gi,'').replace(/\s*d\s*\/\s*12\s*ks\b/gi,' d za 12 kusů'))}</td><td class="inv-number" title="${esc(unitLabel)}">${r.totalWeight===null?'—':`${r.totalWeight.toFixed(1)} lb`}</td><td>${esc(r.armourENC)}</td><td class="inv-key-spec">${details}</td><td class="inv-cell-actions"><button type="button" class="secondary inv-edit-only" data-edit-inv="${esc(x.id)}" ${x._campaignRationReceipt||x._foragingCarryReceipt?'disabled title="Doložený zásobovací doklad lze měnit pouze původním postupem Kalendáře"':''}>Upravit</button></td></tr>`;
  };
  const animalButtonNoun=a=>{
   const name=String(a?.spec?.name||'').toLowerCase();
@@ -5545,82 +5532,9 @@ function characterInventoryOverview(c,inv){
  const table=(list,title,kind)=>`<section class="inv-ledger-section${kind==='stable'?' inv-ledger-section--stable':''}${kind==='chest'?' inv-ledger-section--chest':''}" data-inv-bulk-section="${kind}"><h4>${title} · ${czCount(list.length,'záznam','záznamy','záznamů')}</h4>${list.length?`<div class="inv-table-scroll inv-15-rows" tabindex="0" aria-label="Tabulka inventáře, maximálně 15 viditelných řádků, posuvník"><table class="catalog-spec inv-ledger-table"><colgroup><col style="width:22%"><col style="width:15%"><col style="width:5%"><col style="width:8%"><col style="width:11%"><col style="width:6%"><col style="width:21%"><col style="width:12%"></colgroup><thead><tr><th style="white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important">Předmět</th><th style="white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important">Umístění</th><th style="white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important">WQ</th><th style="white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important">Cena</th><th style="white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important">Hmotnost</th><th style="white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important" title="ENC zbroje">ENC</th><th style="white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important">Parametry</th><th style="white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important">Akce</th></tr></thead><tbody>${list.map(viewRow).join('')}</tbody></table></div>`:'<p class="muted">Žádné položky.</p>'}${kind==='chest'?chestSummary:kind==='stable'?stableSummary:sum(list,title,kind)}${list.length&&kind!=='stable'?`<div class="inv-bulk-toolbar" role="group" aria-label="Hromadné akce: ${title}"><label class="inv-select-all"><input type="checkbox" data-inv-select-all> Označit vše</label>${kind==='chest'?`<button type="button" data-inv-bulk-action="retrieve" class="secondary">Vyzvednout z truhly</button>`:`<button type="button" data-inv-bulk-action="store" class="secondary">Uložit do truhly</button>`}<button type="button" data-inv-bulk-action="transfer" class="secondary">Předat</button>${kind==='chest'?'':`<button type="button" data-inv-bulk-action="ration-transfer" class="secondary">Předat potraviny</button><button type="button" data-inv-bulk-action="ration-loss" class="secondary">Odpis potravin</button><button type="button" data-inv-bulk-action="partial" class="secondary">Odložit část zásob</button>${activeAnimals.length?`<button type="button" class="secondary" data-inv-bulk-action="stable-load">${esc(stableLoadButtonLabel)}</button>`:''}` }<button type="button" data-inv-bulk-action="loss" class="secondary">Ztráta / vyřadit</button><button type="button" data-inv-bulk-action="sale" class="secondary">Prodat označené</button><span class="inv-bulk-count" aria-live="polite">0 vybráno</span></div>`:''}</section>`;
  return `${renderCardGrid(cards,invHelp)}${coldSummary}${table(equippedRows,'Nasazené a držené předměty','equipped')}${table(carriedRows,'Nesené předměty','carried')}${liveSummary}${table(stableRows,'Na zvířeti','stable')}${table(chestRows,'Truhlice · věci ponechané doma / v úschově','chest')}<p class="tiny muted">Součty rozlišují věci fyzicky u postavy, naložené na zvířeti a uložené v Truhlici. Přesun na zvíře je dostupný jen u postavy, která zvíře vlastní, a jen mimo Initiative. Na zvíře nelze uložit více než povoluje skutečná výstroj a kapacita. Gear ENC a Effective Move postavy se vypočítávají jen z celé efektivní hmotnosti u postavy; náklad na zvířeti se promítá do ENC a Move příslušného zvířete. Při přesunu z Truhlice je nejprve nutné věci vyzvednout.</p>`;
 }
-// Pre-v93.695 Equipment F was recorded as travel delay. GM explicitly
-// reconciles what is still to be repaired; no historic journal is modified.
-document.addEventListener('click',e=>{
- const b=e.target.closest?.('[data-hmk-item-repair-legacy]');if(!b)return;
- e.preventDefault();e.stopImmediatePropagation();
- if(!data.campaignClock||combatActorLocked93725(selected)||storageReadOnly||view!=='sheet'||activeSheetSection!=='inventory')return;
- const x=data.inventory.find(i=>i.id===b.dataset.hmkItemRepairLegacy&&i.characterId===selected),
-  legacy=x&&legacyEquipmentRepairCandidate(x);
- if(!legacy)return;
- overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Převod starší opravy · ${esc(x.snapshot?.name||'Předmět')}</h2>
- <p>Starší verze účtovala opravu přes následující pochody. Odhad zbývající práce: <b>${legacy.estimatedRemaining} min</b>.</p>
- <p class="muted">GM musí určit skutečný zbytek. Čas dřívějšího pohybu může zahrnovat i jiné překážky; původní doklady zůstanou beze změny. Převod neovlivní Kalendář ani cestovní vzdálenost.</p>
- <form id="hmk-item-repair-legacy-form"><input type="hidden" name="itemId" value="${esc(x.id)}"><input type="hidden" name="ownerId" value="${esc(x.characterId)}"><input type="hidden" name="episodeId" value="${esc(legacy.sourceEpisodeId)}">
- <label>Zbývá opravit (minuty)<input type="number" name="remainingMinutes" min="0" max="240" step="1" value="${legacy.estimatedRemaining}" required></label>
- <label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje správný převod starší opravy</label><div class="actions"><button type="submit">Uložit zbývající práci</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
- render();
-},true);
-document.addEventListener('submit',e=>{
- const form=e.target;if(form?.id!=='hmk-item-repair-legacy-form')return;
- e.preventDefault();e.stopImmediatePropagation();
- const fd=new FormData(form),remaining=Number(fd.get('remainingMinutes')),
-  itemId=String(fd.get('itemId')||''),ownerId=String(fd.get('ownerId')||''),episodeId=String(fd.get('episodeId')||'');
- if(!Number.isSafeInteger(remaining)||remaining<0||remaining>240||fd.get('gmConfirmed')!=='yes')return alert('Potvrďte skutečný zbývající počet minut 0–240.');
- if(!data.campaignClock||combatActorLocked93725(ownerId)||view!=='sheet'||activeSheetSection!=='inventory'||selected!==ownerId)return alert('Změnila se kampaň, postava nebo probíhá její boj.');
- if(mutate(()=>{
-  const x=data.inventory.find(i=>i.id===itemId&&i.characterId===ownerId),legacy=x&&legacyEquipmentRepairCandidate(x);
-  if(!legacy||legacy.sourceEpisodeId!==episodeId)throw Error('Historická oprava již neodpovídá aktuálním údajům.');
-  x.hmkEquipmentRepair={format:'hmk-inventory-equipment-repair-v1',
-   status:remaining>0?'damaged':'repaired',totalMinutes:240,remainingMinutes:remaining,
-   sourceEpisodeId:episodeId,repairProofId:legacy.repairProofId,legacyGmReconciled:true,repairActorId:ownerId};
-  if(remaining>0){
-   x.condition=[x.condition||'','HMK Equipment Hazard: čeká na opravu'].filter(Boolean).join(' · ');
-   if(['main_hand','off_hand','worn'].includes(x.slot)){x.slot='carried';x.layerOrder=null;x.layerSlot=null;x.bulkExceptionZones=[];}
-  }
- })){
-  overlay=null;notice='Starší Equipment F převedeno do inventáře bez změny Kalendáře a deníku.';render();
- }
-},true);
-// GM-only independent inventory repair counter (not a Calendar event).
-// No implicit passage of game time, no reroll, no reclassification of the item.
-document.addEventListener('click',e=>{
- const b=e.target.closest?.('[data-hmk-item-repair]');if(!b)return;
- e.preventDefault();e.stopImmediatePropagation();
- const x=data.inventory.find(i=>i.id===b.dataset.hmkItemRepair&&i.characterId===selected);
- if(!x||view!=='sheet'||activeSheetSection!=='inventory'||
-   x.hmkEquipmentRepair?.status!=='damaged'||!(x.hmkEquipmentRepair.remainingMinutes>0))return;
- if(!data.campaignClock||combatActorLocked93725(selected)||storageReadOnly)return alert('Oprava vybavení účastníka boje vyžaduje Combat akci.');
- const remaining=x.hmkEquipmentRepair.remainingMinutes;
- const candidates=(data.campaignClock.characterIds||[]).map(id=>character(id)).filter(c=>c&&!combatActorLocked93725(c.id));
- const preferredWorker=x.hmkEquipmentRepair.lastWorkerId||x.hmkEquipmentRepair.repairActorId||selected;
- overlay=`<div class="editor-backdrop"><section class="panel editor-dialog" role="dialog" aria-modal="true"><h2>Ruční oprava · ${esc(x.snapshot?.name||'Předmět')}</h2>
- <p>Vlastník: <strong>${esc(character(selected)?.name||selected)}</strong>. Zbývá <strong>${remaining} min</strong> z ${x.hmkEquipmentRepair.totalMinutes||240} min.</p>
- <p class="muted">GM zadá skutečně odpracované minuty. Tato operace mění pouze stav předmětu v inventáři; neposouvá Kalendář, neodečítá dobu z Cestování a nevyvolává žádný nový hod.</p>
- <form id="hmk-item-repair-progress-form"><input type="hidden" name="itemId" value="${esc(x.id)}"><input type="hidden" name="ownerId" value="${esc(x.characterId)}"><input type="hidden" name="remainingBefore" value="${remaining}"><label>Postava, která skutečně opravovala<select name="workerId" required>${candidates.map(c=>`<option value="${esc(c.id)}" ${c.id===preferredWorker?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Skutečně odpracováno (minuty)<input type="number" name="workedMinutes" min="1" max="${remaining}" step="1" required value="${Math.min(60,remaining)}"></label>
- <label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje skutečně provedenou opravu</label><div class="actions"><button type="submit">Odečíst čas opravy</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
- render();
-},true);
-document.addEventListener('submit',e=>{
- const form=e.target;if(form?.id!=='hmk-item-repair-progress-form')return;
- e.preventDefault();e.stopImmediatePropagation();
- const fd=new FormData(form),itemId=String(fd.get('itemId')||''),ownerId=String(fd.get('ownerId')||'');
- const minutes=Number(fd.get('workedMinutes')),before=Number(fd.get('remainingBefore')),workerId=String(fd.get('workerId')||'');
- if(!Number.isSafeInteger(minutes)||minutes<1||minutes>before||fd.get('gmConfirmed')!=='yes')return alert('GM musí potvrdit kladný počet minut, nejvýše zbývající práci.');
- if(!data.campaignClock.characterIds?.includes(workerId)||!character(workerId))return alert('Vyberte skutečnou opravující postavu z kampaně.');
- if(!data.campaignClock||combatActorLocked93725(ownerId,workerId)||view!=='sheet'||selected!==ownerId||activeSheetSection!=='inventory')return alert('Změnila se kampaň, postava nebo probíhá její boj.');
- if(mutate(()=>{
-  const item=data.inventory.find(x=>x.id===itemId&&x.characterId===ownerId),r=item?.hmkEquipmentRepair;
-  if(!r||r.format!=='hmk-inventory-equipment-repair-v1'||r.status!=='damaged'||r.remainingMinutes!==before||
-     !Number.isSafeInteger(r.totalMinutes)||r.totalMinutes!==240)throw Error('Stav předmětu se mezitím změnil; obnovte formulář.');
-  r.lastWorkerId=workerId;r.remainingMinutes-=minutes;
-  if(r.remainingMinutes===0){r.status='repaired';r.completedAt=stamp();
-   item.condition=String(item.condition||'').replace(/\s*[·]\s*HMK Equipment Hazard: čeká na opravu/g,'').replace(/HMK Equipment Hazard: čeká na opravu/g,'').replace(/\s*[·]\s*$/,'').trim();}
- })){
-  overlay=null;notice=minutes+' minut opravy odečteno; Kalendář a cestovní vzdálenost nezměněny.';render();
- }
-},true);
+// Repair work is entirely GM-managed in Inventory > Upravit (v93.779).
+// Historical repair counters are preserved in saved campaign data, but no
+// work-minute forms are offered and no new timed repair obligations are made.
 function inventoryPartialDropForm(x){
  const clock=data.campaignClock,actorId=x?.characterId;
  if(!clock||!x||x.slot==='chest')return '';
@@ -25156,17 +25070,18 @@ document.addEventListener('submit',e=>{
      if(['main_hand','off_hand','worn'].includes(target.slot)){target.slot='carried';target.layerOrder=null;target.layerSlot=null;target.bulkExceptionZones=[];}
     }
     else if(hazard.result==='long-delay'){
-     // F: repairing a damaged item requires 240 MINUTES OF WORK, not travel time.
-     // GM reduces this counter manually in the owner's inventory whenever work occurs.
+     // F: the repair test was made during Equipment Hazard. The item remains
+     // unavailable until the GM marks it usable after resolving the next-watch
+     // delay at the table. Do not create a second time/work obligation.
      target.hmkEquipmentRepair={format:'hmk-inventory-equipment-repair-v1',status:'damaged',
-      totalMinutes:240,remainingMinutes:240,sourceEpisodeId:sourceId,repairProofId:hazard.repairProofId||null,repairActorId:hazard.workerId||hazard.itemOwnerId};
+      sourceEpisodeId:sourceId,repairProofId:hazard.repairProofId||null,repairActorId:hazard.workerId||hazard.itemOwnerId};
      target.condition=[originalCondition.replace(/HMK Equipment Hazard: neopravena závada/g,'').trim(),
       'HMK Equipment Hazard: čeká na opravu'].filter(Boolean).join(' · ');
      if(['main_hand','off_hand','worn'].includes(target.slot)){target.slot='carried';target.layerOrder=null;target.layerSlot=null;target.bulkExceptionZones=[];}
     }else if(hazard.result==='irreparable'){
      // CF: mark unusable/irreparable in inventory for GM disposal; never allow timer repair.
      target.hmkEquipmentRepair={format:'hmk-inventory-equipment-repair-v1',status:'irreparable',
-      totalMinutes:0,remainingMinutes:0,sourceEpisodeId:sourceId,repairProofId:hazard.repairProofId||null};
+      sourceEpisodeId:sourceId,repairProofId:hazard.repairProofId||null};
      target.condition=[originalCondition,'HMK Equipment Hazard: neopravitelný'].filter(Boolean).join(' · ');
      if(['main_hand','off_hand','worn'].includes(target.slot)){target.slot='carried';target.layerOrder=null;target.layerSlot=null;target.bulkExceptionZones=[];}
     }else if(['no-delay','short-delay'].includes(hazard.result)){
@@ -25179,7 +25094,7 @@ document.addEventListener('submit',e=>{
      calendarEpisodeEquipmentHazard:{format:'hmk-episode-equipment-change-v1',episodeId:sourceId,itemId:hazard.itemId,
       itemOwnerId:hazard.itemOwnerId,disposition:hazard.equipmentDisposition,result:hazard.result,
       conditionBefore:originalCondition,conditionAfter:hazard.result==='abandoned'?null:target.condition,
-      repairWork:hazard.result==='long-delay'?{totalMinutes:240,remainingMinutes:240}:null,
+      repairWork:null, // no work-minute accounting; original outcome is retained
       irreparable:hazard.result==='irreparable',
       repairProofId:hazard.repairProofId||null}});
    }
