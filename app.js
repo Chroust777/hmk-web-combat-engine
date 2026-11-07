@@ -1,5 +1,6 @@
 import {startSharedTimeWindow93767,addSharedTimeGroup93767,confirmSharedTimeWindow93767} from './src/integration/hmk-shared-time-window-93767.js';
 import {planSharedWindow93771,sharedDailyWindowLimit93771} from './src/integration/hmk-shared-planner-93771.js';
+import {planEpisodeRows93772,rowMaximum93772} from './src/integration/hmk-episode-rows-93772.js';
 import {captureSharedActivityDelta93769,replaySharedActivityDelta93769,verifySharedActivityQueue93769} from './src/integration/hmk-shared-serial-receipts-93769.js';
 import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js';
 import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js';
@@ -335,7 +336,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.771';
+const APP_VERSION='93.772';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2079,10 +2080,12 @@ let episodeStageBaseline=null;
 let sharedTimeWindowDraft=null;
 let sharedTimeWindowQueue=[];
 let sharedTimeWindowSelectedGroupId=null;
-// v93.771: editable cards are only a draft schedule; all actual rules, rolls,
+// v93.772: editable cards are only a draft schedule; all actual rules, rolls,
 // receipts and GM transactions remain in the original episode engine.
 let sharedTimeWindowPlans=[];
 let sharedTimeWindowActivePlanId=null;
+let sharedEpisodeAutoRun93772=false;
+let sharedDefaultWeatherId93772='';
 let episodeQueueAction=false;
 let episodeIndependentMutationInFlight=false;
 let episodeFinalCommitInFlight=false;
@@ -2235,6 +2238,7 @@ function persistEpisodeDraftSidecar({snapshotForm=false}={}){
   sharedWindow:sharedTimeWindowDraft?structuredClone(sharedTimeWindowDraft):null,
   sharedSelectedGroupId:sharedTimeWindowSelectedGroupId,
   sharedPlans:structuredClone(sharedTimeWindowPlans),sharedActivePlanId:sharedTimeWindowActivePlanId,
+  sharedAutoRun:sharedEpisodeAutoRun93772,sharedDefaultWeatherId:sharedDefaultWeatherId93772,
   sharedQueue:sharedTimeWindowQueue.map(({apply,...receipt})=>structuredClone(receipt)),
   baselineToken:sharedCommittedBaselineToken93769()};
  localStorage.setItem(EPISODE_SIDECAR_KEY,JSON.stringify(body));
@@ -2277,6 +2281,7 @@ function restoreEpisodeDraftSidecar(){
    sharedTimeWindowDraft=structuredClone(side.sharedWindow);
    sharedTimeWindowQueue=structuredClone(side.sharedQueue);
    sharedTimeWindowPlans=structuredClone(side.sharedPlans);sharedTimeWindowActivePlanId=side.sharedActivePlanId??null;
+   sharedEpisodeAutoRun93772=side.sharedAutoRun===true;sharedDefaultWeatherId93772=side.sharedDefaultWeatherId||'';
    episodeDraftEpoch=side.epoch;timeEpisodeDraft=side.draft||{};
    episodePendingSkillRequest=side.request??null;episodeActiveSkillRequestId=side.activeRequestId??null;
    episodeEvaluationRequested=!!side.evaluationRequested;episodeEvaluatedIdentity=side.identity??null;
@@ -2288,7 +2293,7 @@ function restoreEpisodeDraftSidecar(){
    return;
   }catch(error){
    discardEpisodeDraftSidecar();
-   sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;
+   sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;sharedEpisodeAutoRun93772=false;sharedDefaultWeatherId93772='';
    notice='Rozpracované okno nebylo bezpečně obnovitelné ('+(error?.message||error)+'). Autoritativní kampaň a její čas se nezměnily.';
    return;
   }
@@ -2607,12 +2612,13 @@ function timeEpisodePageHTML(clock,participants){
  ${pendingAccidents.map(row=>`<p><strong>${esc(displayCampaignMinute(row.calendarTimeEpisode.endMinute))}</strong> · ${esc(character(row.characterId)?.name||row.characterId)} · hod na hazard d10 ${row.calendarTimeEpisode.hazardDetails.find(h=>h.hazard==='accident').hazardD10}. <button type="button" data-episode-open-accident="${esc(row.characterId)}">Otevřít původní zdravotní následky ve Skill Tests</button></p>`).join('')}</section>`:''}
  <div class="hc-episode-columns"><section class="hc-episode-editor"><h3>1 · Nastavit epizodu</h3>
 <section class="hc-episode-checklist" data-shared-window-control>
-<h4>Společný interval cestování (samostatné rozhodnutí GM)</h4>
-<p class="hc-hint">Nejprve založte jeden interval. Každá další skupina smí využít nejvýše jeho časový rozpočet. Ostatní postavy nemají pohybové testy. Žádná geografická evidence.</p>
+<h4>Společný interval epizody</h4>
+<p class="hc-hint">Nejprve vyberte délku a potvrzené globální počasí dne. Po založení intervalu přidejte řádky jednotlivých postav. Hodit lze pouze pro platný řádek; kalendář se neposouvá, dokud GM nepotvrdí všechny činnosti.</p>
 <label>Celkový plán cestování (min) <input type="number" min="1" max="10080" value="60" data-shared-window-minutes></label>
+<label>Výchozí globální počasí pro nové řádky <select data-shared-window-weather><option value="">— Vyberte potvrzené počasí —</option>${areas.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('')}</select></label>
 <button type="button" class="secondary" data-shared-window-create>Založit společný interval (bez hodu)</button>
 <button type="button" class="secondary" data-shared-window-cancel hidden>Zrušit návrh společného intervalu</button>
-<div class="hc-shared-planner" data-shared-window-planner hidden><h4>Plán činností a skupin</h4><p class="hc-hint">Vytvořte skupiny, nastavte činnost, délku a postavy. Navazující činnost stejné skupiny začíná až po předchozí. Testy otevřete kliknutím na její kartu; dokončené karty se uzamknou.</p><div data-shared-plan-cards></div><button type="button" class="secondary" data-shared-plan-add>+ Přidat skupinu nebo navazující činnost</button><p data-shared-plan-feedback role="alert"></p></div>
+<div class="hc-shared-planner" data-shared-window-planner hidden><h4>Tabulka činností postav</h4><p class="hc-hint">Postava → činnost → minuty → potvrzené globální počasí. Každá postava má vlastní zbývající čas; řádky vyhodnocujte automaticky jedním tlačítkem.</p><div data-shared-plan-cards></div><button type="button" class="secondary" data-shared-plan-add>+ Přidat řádek činnosti</button><p data-shared-plan-feedback role="alert"></p><button type="button" data-shared-row-run disabled>Vyhodnotit naplánovanou epizodu →</button><p data-shared-row-run-status role="status"></p></div>
 <p data-shared-window-summary role="status"></p>
 </section>
 <form id="hmk-time-episode-form" novalidate>
@@ -2620,7 +2626,7 @@ function timeEpisodePageHTML(clock,participants){
  <input type="hidden" name="episodeIncapChoice" value="">
  <input type="hidden" name="episodeIncapMoveMinutes" value="">
  <input type="hidden" name="episodeGMReviewedJson" value="{}">
- <div class="hmk-trek-grid"><label>Činnost<select name="kind">${[['travel','Cestování / pochod'],['rest','Odpočinek'],['sleep','Spánek'],['winded','Krátký klid (Windedness)'],['forage','Shánění potravy'],['tracking','Sledování stop'],['watch','Ostraha / vigilance'],['other','Jiná činnost']].map(([v,l])=>option(v,l)).join('')}</select></label>
+ <div class="hmk-trek-grid" data-episode-legacy-identity><label>Činnost<select name="kind">${[['travel','Cestování / pochod'],['rest','Odpočinek'],['sleep','Spánek'],['winded','Krátký klid (Windedness)'],['forage','Shánění potravy'],['tracking','Sledování stop'],['watch','Ostraha / vigilance'],['other','Jiná činnost']].map(([v,l])=>option(v,l)).join('')}</select></label>
  <label>Délka · skutečné minuty<input name="minutes" type="number" min="1" max="10080" value="${esc(String(d.minutes||60))}" required title="Skutečná délka epizody v minutách (nejvýše sedm dní v jednom zápisu)."></label></div>
  <p class="hc-hint" data-episode-identity-note role="status">Nejdříve určete činnost a účastníky. Po stisknutí Vyhodnotit epizodu se tato volba uzamkne až do dokončení či nouzového zrušení.</p>
  <p class="hc-episode-clockline" data-episode-mandatory-cap role="status">Kalendář vypočítává nejbližší povinnou časovou hranici.</p>
@@ -2633,7 +2639,7 @@ function timeEpisodePageHTML(clock,participants){
  <label class="hc-episode-latitude">Šířkové pásmo <select name="latitudeBand"><option value="mid">Střední</option><option value="high">Vysoká</option><option value="polar">Polární</option><option value="low">Nízká</option></select></label>
  <div hidden aria-hidden="true"><input name="lightPeriod" value="day"><input name="lightCalculation" value="latitude"><input name="daylightSeason" value="spring"><input name="sunriseMinute" value="360"><input name="twilightMinutes" value="60"></div>
   <label class="hc-check hc-episode-weather-cover"><input name="weatherSafeShelter" type="checkbox"> Bezpečný klimatický úkryt (potvrzeno GM)</label>
- <label>Potvrzené počasí oblasti<select name="weatherSource"><option value="local">Vlastní oblast / nové počasí GM</option>${areas.map(a=>option(a.id,a.name+' · denní počasí potvrzeno')).join('')}</select></label>
+ <label data-episode-legacy-weather-picker>Potvrzené počasí oblasti<select name="weatherSource"><option value="local">Vlastní oblast / nové počasí GM</option>${areas.map(a=>option(a.id,a.name+' · denní počasí potvrzeno')).join('')}</select></label>
  <label>Název oblasti / trasy<input name="area" maxlength="90" placeholder="Např. Lesní cesta"></label>
  <label data-episode-weather-topography>Krajina / reliéf<select name="topography">${[['flat','Rovina'],['rough','Kopce'],['mountain','Hory']].map(([v,l])=>option(v,l)).join('')}</select></label>
  <label data-episode-landscape-terrain>Typ krajiny / cesta<select name="terrain">${[['paved-road','Zpevněná cesta'],['unpaved-road','Nezpevněná cesta'],['rural-track','Venkovská cesta'],['wilderness-trail','Lesní stezka'],['cropland-grassland','Louky a pole'],['mixed-woodland','Řídký les'],['cold-woodland','Chladný les'],['mixed-forest','Smíšený les'],['needleleaf-forest','Jehličnatý les'],['heath-moor','Vřesoviště'],['dunes','Duny'],['wetlands','Mokřady'],['alpine-vegetation','Alpský terén'],['ice-snow-rockfield','Sníh / skály']].map(([v,l])=>option(v,l)).join('')}</select></label>
@@ -2648,7 +2654,7 @@ function timeEpisodePageHTML(clock,participants){
  <label data-episode-weather-roll>Srážky (d10)<span class="hc-episode-die"><input name="precipitationD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="precipitationD10">⚄ d10</button></span></label>
  </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p></details>
 
- <fieldset class="hc-episode-party-panel"><legend>3 · Účastníci a průvodce</legend><div class="hc-episode-members">${characterRows}</div><label>Průvodce / osoba provádějící orientaci<select name="guideId">${participants.map(c=>option(c.id,c.name)).join('')}</select></label>
+ <fieldset class="hc-episode-party-panel"><legend>3 · Účastníci a průvodce</legend><div class="hc-episode-members" data-episode-legacy-members>${characterRows}</div><label data-episode-legacy-guide>Průvodce / osoba provádějící orientaci<select name="guideId">${participants.map(c=>option(c.id,c.name)).join('')}</select></label>
  <div data-episode-transport-panel hidden><strong>Skutečné vozidlo a tažná skupina (GM)</strong><p class="hc-hint">Každá cesta károu či vozem musí mít doložené skutečné vozidlo ze Stáje, postroje, zdravou tažnou skupinu a hmotnost. Každého nepohyblivého pacienta GM potvrzuje zvlášť; pacient nemá END hod za chůzi. HMK 122, 145.</p>
  <div class="hc-episode-members">${participants.map(c=>`<label class="hc-check" data-episode-transport-person="${esc(c.id)}" hidden><input name="transportedMemberIds" type="checkbox" value="${esc(c.id)}"> GM potvrzuje převoz · ${esc(c.name)}</label>`).join('')}</div>
  <div data-episode-transport-vehicle-evidence><label>Skutečné vozidlo z aktuální Stáje<select name="transportVehicleKey"><option value="">— Vyberte vlastněnou káru nebo vůz —</option>${transportVehicleRows.map(r=>`<option value="${esc(r.key)}">${esc(r.name)} · ${esc(stableTravelRoster.find(a=>a.id===r.ownerAnimalId)?.name||r.ownerAnimalId)}</option>`).join('')}</select></label>
@@ -2807,12 +2813,12 @@ function timeEpisodePageHTML(clock,participants){
  </form></section>
  <aside class="hc-episode-result" aria-live="polite"><h3>Vyhodnocení a dokončení</h3><div class="hc-episode-overview" data-episode-overview></div><section class="hc-episode-evidence"><h4>Pravidlové výsledky a doklady</h4><div data-episode-evidence>Dosud žádný doložený výsledek.</div></section><section class="hc-episode-checklist"><h4>Úkoly před dokončením</h4><div data-episode-checklist>Vyplňte délku a skutečné podmínky.</div></section><button type="submit" form="hmk-time-episode-form" class="hc-episode-confirm" data-episode-finalize disabled>Dokončit a zapsat celou epizodu</button>
  <section class="hc-episode-checklist" data-shared-window-panel>
- <h4>Společné časové okno · nezávislé skupiny</h4>
- <p class="hc-hint">Každá skupina může mít několik navazujících činností s vlastními časovými kotvami. Nevyužitý čas se automaticky nestává odpočinkem. Dílčí výsledky se ukládají jen do obnovitelné pracovní fronty; skutečný kalendář posune jedině finální potvrzení GM.</p>
+ <h4>Společný interval · připravené činnosti</h4>
+ <p class="hc-hint">Činnosti postav se vyhodnocují podle připravených řádků. Každá má vlastní časovou kotvu a doklad; nevyužitý čas se automaticky nezapočítává jako odpočinek. Jediný posun společného kalendáře provede GM až na závěr.</p>
  <label data-shared-window-legacy-select hidden>Vytvořit nebo pokračovat ve skupině <select data-shared-window-continue><option value="">Nová skupina (od začátku okna)</option></select></label>
  <div data-shared-window-status></div>
- <button type="button" class="secondary" data-episode-window-stage disabled>Dokončit činnost skupiny (bez posunu času)</button>
- <button type="button" class="hc-episode-confirm" data-episode-window-commit disabled>Potvrdit všechny skupiny a posunout kalendář</button>
+ <button type="button" class="secondary" data-episode-window-stage disabled>Potvrdit výsledek řádku a pokračovat (bez posunu času)</button>
+ <button type="button" class="hc-episode-confirm" data-episode-window-commit disabled>Potvrdit všechny činnosti a posunout kalendář</button>
  </section>
  <details class="hc-episode-emergency" data-episode-emergency>
   <summary>Nouzové odblokování Cestování</summary>
@@ -21881,7 +21887,7 @@ function episodeSkillReturnBannerHTML(){
  if(!r||!episodeSkillReturnPending||r.campaignId!==campaignKey(data.campaignClock)||r.minute!==data.campaignClock?.minute)return '';
  const j=data.journal.find(x=>x.id===r.completedId);
  const proof=j?.skillTestProof?.a||j?.skillTestProof?.result;
- return `<aside class="hc-episode-skill-handoff" role="status"><strong>Rozpracovaná epizoda · ${esc(r.skill)} · ${esc(character(r.actorId)?.name||r.actorId)}</strong><p>${r.status==='resolved'&&proof?'✓ Hod potvrzen v pracovním registru epizody: '+esc(proof.level)+(Number.isSafeInteger(proof.sv)?' · SV '+esc(String(proof.sv)):'')+'. '+(proof.level==='CF'?'Při návratu se nabídne navazující Survival Hazard nebo jiné relevantní následky.':'Výsledek se automaticky přenese do cestování.'):'Proveďte a uložte skutečný Success Value test. Potom se vraťte do epizody.'}</p><button type="button" class="secondary" data-episode-return>Vrátit se do Cestování</button></aside>`;
+ return `<aside class="hc-episode-skill-handoff" role="status"><button type="button" class="secondary hc-episode-return-top" data-episode-return>← Zpět do kalendáře · rozpracovaná činnost</button><strong>Rozpracovaná epizoda · ${esc(r.skill)} · ${esc(character(r.actorId)?.name||r.actorId)}</strong><p>${r.status==='resolved'&&proof?'✓ Hod potvrzen v pracovním registru epizody: '+esc(proof.level)+(Number.isSafeInteger(proof.sv)?' · SV '+esc(String(proof.sv)):'')+'. '+(proof.level==='CF'?'Při návratu se nabídne navazující Survival Hazard nebo jiné relevantní následky.':'Výsledek se automaticky přenese do cestování.'):'Proveďte a uložte skutečný Success Value test. Potom se vraťte do epizody.'}</p><button type="button" class="secondary" data-episode-return>Vrátit se do Cestování</button></aside>`;
 }
 /** Route a visible form error to the precise named input rather than a generic chapter. */
 function episodeIssue(message,form){
@@ -23336,8 +23342,18 @@ function sharedTravelInputWitness93768(ids){
  return JSON.stringify({chosen,people,gear,definitions});
 }
 const SHARED_PLAN_KINDS_93771=[['travel','Pochod'],['rest','Odpočinek'],['sleep','Spánek'],['winded','Krátký klid'],['forage','Foraging'],['tracking','Tracking'],['watch','Ostraha'],['other','Jiná činnost']];
+function sharedRowsMode93772(){return sharedTimeWindowPlans.every(x=>x.episodeRowV===2);}
+function sharedWeatherSources93772(){
+ if(!data.campaignClock)return [];
+ // Only previously GM-confirmed, currently active daily-weather records.
+ const base=episodeStageBaseline||data;
+ return activeWeatherAreas(base.journal,campaignKey(base.campaignClock),Math.floor((sharedTimeWindowDraft?.startMinute??base.campaignClock.minute)/1440));
+}
+function sharedWeatherName93772(id){return sharedWeatherSources93772().find(x=>x.id===id)?.calendarTrekDayWeather?.area||'';}
 function sharedPlanState93771(){
- return sharedTimeWindowDraft?planSharedWindow93771(sharedTimeWindowDraft,sharedTimeWindowPlans):{scheduled:[],errors:[]};
+ if(!sharedTimeWindowDraft)return {scheduled:[],errors:[],used:{}};
+ return sharedRowsMode93772()?planEpisodeRows93772(sharedTimeWindowDraft,sharedTimeWindowPlans,sharedWeatherSources93772().map(w=>w.id)):
+  planSharedWindow93771(sharedTimeWindowDraft,sharedTimeWindowPlans);
 }
 function sharedPlanCurrent93771(){return sharedTimeWindowPlans.find(p=>p.id===sharedTimeWindowActivePlanId)||null;}
 function sharedPlanPreflight93771(form,{strictPlan=true}={}){
@@ -23349,6 +23365,8 @@ function sharedPlanPreflight93771(form,{strictPlan=true}={}){
  if(!plan)return null;
  const scheduled=state.scheduled.find(x=>x.id===plan.id);
  if(!scheduled)return {field:'minutes',message:'Činnost nemá platný časový plán nebo účastníky.'};
+ if(sharedRowsMode93772()&&(v.weatherSource!==plan.weatherId||!sharedWeatherSources93772().some(w=>w.id===plan.weatherId)))
+  return {field:'weatherSource',message:'Činnost musí použít globální počasí vybrané v plánovacím řádku.'};
  const remaining=sharedTimeWindowDraft.endMinute-scheduled.startMinute;
  const duration=Number(v.minutes);
  if(!Number.isSafeInteger(duration)||duration<1||duration>remaining||duration>plan.minutes)
@@ -23379,6 +23397,7 @@ function sharedPlanPreflight93771(form,{strictPlan=true}={}){
  return null;
 }
 function sharedPlanCardsHTML93771(){
+ if(sharedRowsMode93772())return sharedEpisodeRowsHTML93772();
  const state=sharedPlanState93771(),errors=new Map(state.errors.map(x=>[x.id,x.message]));
  const previousGroups=new Map();
  return sharedTimeWindowPlans.map((plan,index)=>{
@@ -23403,10 +23422,30 @@ function sharedPlanCardsHTML93771(){
   <button type="button" class="secondary" data-shared-plan-remove="${esc(plan.id)}" ${locked?'disabled':''}>Odebrat</button></div></article>`;
  }).join('');
 }
+function sharedEpisodeRowsHTML93772(){
+ const state=sharedPlanState93771(),errors=new Map(state.errors.map(e=>[e.id,e.message]));
+ const actors=calendarMemberIds(data.campaignClock,data.characters);
+ const weather=sharedWeatherSources93772();
+ return `<div class="hc-episode-row-scroll"><table class="hc-episode-row-table"><thead><tr><th>Č.</th><th>Postava</th><th>Činnost</th><th>Minuty</th><th>Globální počasí</th><th>Časová osa a stav</th><th></th></tr></thead><tbody>${sharedTimeWindowPlans.map((r,index)=>{
+  const active=r.id===sharedTimeWindowActivePlanId,locked=!!r.done||active||sharedEpisodeAutoRun93772;
+  const slot=state.scheduled.find(x=>x.id===r.id),max=rowMaximum93772(sharedTimeWindowDraft,sharedTimeWindowPlans,r.id,r.actorId);
+  const used=state.used?.[r.actorId]||0,remaining=Math.max(0,sharedTimeWindowDraft.minutes-used);
+  const error=errors.get(r.id),status=r.done?'✓ Doklad připraven':active?'Právě vyhodnocováno':error?'Opravit před hody':slot?'Čeká na vyhodnocení':'Vyberte údaje';
+  return `<tr data-shared-plan-card="${esc(r.id)}" class="${r.done?'hc-shared-plan-done':''} ${active?'hc-shared-plan-active':''}"><td>${index+1}</td><td><select aria-label="Postava řádku ${index+1}" data-shared-row-actor="${esc(r.id)}" ${locked?'disabled':''}><option value="">— Postava —</option>${actors.map(c=>`<option value="${esc(c.id)}" ${r.actorId===c.id?'selected':''} ${r.actorId!==c.id&&rowMaximum93772(sharedTimeWindowDraft,sharedTimeWindowPlans,r.id,c.id)<1?'disabled':''}>${esc(c.name)}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</option>`).join('')}</select></td>
+  <td><select aria-label="Činnost řádku ${index+1}" data-shared-plan-kind="${esc(r.id)}" ${locked?'disabled':''}>${SHARED_PLAN_KINDS_93771.map(([key,name])=>`<option value="${key}" ${r.kind===key?'selected':''}>${name}</option>`).join('')}</select></td>
+  <td><input aria-label="Délka činnosti ${index+1}" type="number" min="1" max="${max}" value="${r.minutes||''}" data-shared-plan-minutes="${esc(r.id)}" ${locked?'disabled':''}></td>
+  <td><select aria-label="Počasí řádku ${index+1}" data-shared-row-weather="${esc(r.id)}" ${locked?'disabled':''}><option value="">— Počasí —</option>${weather.map(w=>`<option value="${esc(w.id)}" ${r.weatherId===w.id?'selected':''}>${esc(w.calendarTrekDayWeather.area)}</option>`).join('')}</select></td>
+  <td class="hc-episode-row-state">${slot?`<strong>${esc(displayCampaignMinute(slot.startMinute))}–${esc(displayCampaignMinute(slot.endMinute))}</strong>`:'—'}<small>${esc(status)}${r.actorId?' · zbývá '+remaining+' min':''}${error?' · '+esc(error):''}</small></td>
+  <td><button type="button" class="secondary" data-shared-plan-remove="${esc(r.id)}" ${locked?'disabled':''} aria-label="Zrušit řádek ${index+1}">Zrušit</button></td></tr>`;
+ }).join('')}</tbody></table></div>
+ ${!weather.length?'<p class="hc-shared-plan-error" role="alert">Pro dnešní den není potvrzené žádné globální počasí. Zrušte návrh a nejdříve založte denní počasí v kalendáři. Žádný hod v této epizodě nelze provést.</p>':''}
+ <p class="hc-hint">Každá postava má vlastní souvislou časovou osu od začátku intervalu. Nový řádek téže postavy začíná po jejím předchozím řádku; ostatní postavy mohou pracovat současně. Žádný řádek nevytváří nové počasí.</p>`;
+}
 function sharedPlanUpdate93771(id,field,value){
  if(!sharedTimeWindowDraft)throw Error('Nejprve založte společný interval.');
  const plan=sharedTimeWindowPlans.find(x=>x.id===id);
- if(!plan||plan.done||id===sharedTimeWindowActivePlanId)throw Error('Uzamčenou nebo otevřenou činnost nelze změnit.');
+ if(!plan||plan.done||id===sharedTimeWindowActivePlanId||sharedEpisodeAutoRun93772)throw Error('Uzamčenou nebo otevřenou činnost nelze změnit.');
+ if(plan.episodeRowV===2)return sharedEpisodeRowUpdate93772(plan,field,value);
  const before=structuredClone(sharedTimeWindowPlans);
  if(field==='minutes'){
   if(!Number.isSafeInteger(Number(value))||Number(value)<1)throw Error('Minuty musejí být celé kladné číslo.');
@@ -23432,6 +23471,42 @@ function sharedPlanUpdate93771(id,field,value){
  if(changedError&&before.find(x=>x.id===id)?.done){sharedTimeWindowPlans=before;throw Error(changedError.message);}
  persistEpisodeDraftSidecar();
 }
+function sharedReflowEpisodeRows93772(){
+ // Deleting the first unconfirmed row must move its actor's remaining rows to
+ // the new earliest start. Never move a previously confirmed/prepared row.
+ const lanes=new Map();
+ for(const r of sharedTimeWindowPlans)if(r.episodeRowV===2){
+  const head=r.actorId?lanes.get(r.actorId):null;
+  const wantedGroup=head||r.id,wantedFollow=head||'';
+  if(r.done&&(r.groupId!==wantedGroup||r.followsGroup!==wantedFollow))
+   throw Error('Nelze změnit již doloženou časovou osu postavy.');
+  r.groupId=wantedGroup;r.followsGroup=wantedFollow;
+  if(r.actorId&&!head)lanes.set(r.actorId,r.id);
+ }
+}
+function sharedEpisodeRowUpdate93772(plan,field,value){
+ const before=structuredClone(sharedTimeWindowPlans);
+ if(field==='actor'){
+  if(!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===value))throw Error('Vyberte platnou postavu aktuální kampaně.');
+  const maximum=rowMaximum93772(sharedTimeWindowDraft,sharedTimeWindowPlans,plan.id,value);
+  if(maximum<1)throw Error('Tato postava již vyčerpala celý společný interval.');
+  plan.actorId=value;plan.memberIds=[value];
+  plan.minutes=Math.min(plan.minutes||maximum,maximum);
+ }else if(field==='minutes'){
+  const n=Number(value),max=rowMaximum93772(sharedTimeWindowDraft,sharedTimeWindowPlans,plan.id,plan.actorId);
+  if(!Number.isSafeInteger(n)||n<1||n>max)throw Error('Pro zvolenou postavu zbývá nejvýše '+max+' minut. Žádné hody nebyly zahájeny.');
+  plan.minutes=n;
+ }else if(field==='kind'){
+  if(!SHARED_PLAN_KINDS_93771.some(x=>x[0]===value))throw Error('Neplatná činnost.');plan.kind=value;
+ }else if(field==='weather'){
+  if(!sharedWeatherSources93772().some(w=>w.id===value))throw Error('Zvolte potvrzené globální počasí platné pro tento den.');
+  plan.weatherId=value;
+ }else throw Error('Neznámý údaj plánované činnosti.');
+ sharedReflowEpisodeRows93772();
+ const result=sharedPlanState93771();
+ if(result.errors.some(e=>e.id===plan.id&&e.message.includes('Zbývá pouze'))){sharedTimeWindowPlans=before;throw Error('Plán by překročil časový limit postavy.');}
+ persistEpisodeDraftSidecar();
+}
 function updateSharedTimeWindowControls(form){
  const root=document.querySelector('[data-shared-window-panel]');if(!root)return;
  const selection=root.querySelector('[data-shared-window-continue]');
@@ -23453,13 +23528,25 @@ function updateSharedTimeWindowControls(form){
  const status=root.querySelector('[data-shared-window-status]');
  if(status)status.innerHTML=active?`<p><strong>Společné okno ${esc(displayCampaignMinute(sharedTimeWindowDraft.startMinute))}–${esc(displayCampaignMinute(sharedTimeWindowDraft.endMinute))}</strong>, ${sharedTimeWindowDraft.minutes} minut · připraveno ${sharedTimeWindowQueue.length} činností</p>${sharedTimeWindowSelectedGroupId&&data.campaignClock?.minute>sharedTimeWindowDraft.startMinute?`<p role="note" class="hc-hint"><strong>Pracovní minuta této skupiny: ${esc(displayCampaignMinute(data.campaignClock.minute))}.</strong> Autoritativní kalendář zůstává na ${esc(displayCampaignMinute(sharedTimeWindowDraft.startMinute))} až do závěrečného potvrzení GM.</p>`:''}<ul>${sharedTimeWindowQueue.map(q=>`<li>${esc(q.label)} · ${esc(q.kind)} · ${esc(q.memberNames.join(', '))} · ${q.minutes} min ${esc(displayCampaignMinute(q.patch.startMinute))}–${esc(displayCampaignMinute(q.patch.endMinute))}, k dispozici ${Math.max(0,sharedTimeWindowDraft.endMinute-q.patch.endMinute)} min pro pokračování</li>`).join('')}</ul>`:'';
  const summary=document.querySelector('[data-shared-window-summary]');
- if(summary)summary.textContent=active?`GM založil ${sharedTimeWindowDraft.minutes}min okno. Každá činnost smí být kratší; volný čas se nesmí sám proměnit na odpočinek nebo jiný test.`:'Nejprve založte společné okno, pokud potřebujete současné činnosti více skupin. Jediná samostatná epizoda dál funguje původním způsobem.';
+ if(summary)summary.textContent=active?`GM založil ${sharedTimeWindowDraft.minutes}min okno. Každá činnost smí být kratší; volný čas se nesmí sám proměnit na odpočinek nebo jiný test.`:'Nejprve zvolte dobu a potvrzené počasí, potom založte interval a naplánujte činnosti postav.';
  const cancel=document.querySelector('[data-shared-window-cancel]');if(cancel)cancel.hidden=!active;
  const total=document.querySelector('[data-shared-window-minutes]');if(total){total.disabled=active;total.title=active?'Společný interval je uzamčen. Pro změnu zrušte celý návrh před hody.':'';}
  const create=document.querySelector('[data-shared-window-create]');if(create){create.disabled=active;create.hidden=active;}
+ const defaultWeather=document.querySelector('[data-shared-window-weather]');
+ if(defaultWeather){defaultWeather.disabled=active;const choices=sharedWeatherSources93772();
+  defaultWeather.innerHTML='<option value="">— Vyberte potvrzené počasí —</option>'+choices.map(w=>`<option value="${esc(w.id)}" ${sharedDefaultWeatherId93772===w.id?'selected':''}>${esc(w.calendarTrekDayWeather.area)}</option>`).join('');
+  if(!sharedDefaultWeatherId93772&&choices.length===1){defaultWeather.value=choices[0].id;sharedDefaultWeatherId93772=choices[0].id;}
+ }
  const planner=document.querySelector('[data-shared-window-planner]');if(planner)planner.hidden=!active;
- const addCard=document.querySelector('[data-shared-plan-add]');if(addCard){addCard.disabled=!active||!!sharedTimeWindowActivePlanId||!!episodeEvaluationRequested||!!episodePendingSkillRequest;
+ const addCard=document.querySelector('[data-shared-plan-add]');if(addCard){addCard.disabled=!active||!!sharedTimeWindowActivePlanId||!!episodeEvaluationRequested||!!episodePendingSkillRequest||sharedEpisodeAutoRun93772;
   addCard.title=addCard.disabled?'Nejdříve dokončete otevřené pravidlové testy.':'';}
+ const run=document.querySelector('[data-shared-row-run]');
+ if(run){const state=sharedPlanState93771();run.hidden=!sharedRowsMode93772();run.disabled=!active||!sharedTimeWindowPlans.length||!!sharedTimeWindowActivePlanId||
+  !!episodeEvaluationRequested||!!episodePendingSkillRequest||state.errors.length>0||sharedTimeWindowPlans.every(x=>x.done)||
+  sharedTimeWindowPlans.some(x=>!x.actorId||!x.weatherId);
+ }
+ const runStatus=document.querySelector('[data-shared-row-run-status]');
+ if(runStatus)runStatus.textContent=sharedEpisodeAutoRun93772?'Postupné vyhodnocení aktivní · '+sharedTimeWindowPlans.filter(x=>x.done).length+' / '+sharedTimeWindowPlans.length+' dokladů připraveno.':'';
  const legacy=root.querySelector('[data-shared-window-legacy-select]');if(legacy)legacy.hidden=true;
  const cards=document.querySelector('[data-shared-plan-cards]');
  if(cards){const sig=JSON.stringify({window:sharedTimeWindowDraft?.endMinute,plans:sharedTimeWindowPlans,active:sharedTimeWindowActivePlanId,eval:episodeEvaluationRequested});
@@ -23467,11 +23554,17 @@ function updateSharedTimeWindowControls(form){
  const plan=sharedPlanCurrent93771(),planned=sharedPlanState93771();
  if(commit&&sharedTimeWindowPlans.length)commit.disabled=commit.disabled||planned.errors.length>0||sharedTimeWindowPlans.some(p=>!p.done);
  if(stage&&sharedTimeWindowPlans.length)stage.disabled=stage.disabled||!plan;
- if(form&&active){
-  form.hidden=!plan;
+ if(form){
+  form.hidden=!active||!plan;
   for(const node of form.querySelectorAll('[name=kind],[name=minutes],[name=memberIds]')){
    node.disabled=!!plan;
    if(plan)node.title='Údaj je uzamčen plánem skupiny. Mění se pouze před otevřením karty.';
+  }
+  if(sharedRowsMode93772()){
+   for(const selector of ['[data-episode-legacy-identity]','[data-episode-legacy-members]','[data-episode-legacy-guide]','[data-episode-legacy-weather-picker]']){
+    const node=form.querySelector(selector);if(node)node.hidden=!!plan;
+   }
+   const weatherSelect=form.elements.namedItem('weatherSource');if(weatherSelect)weatherSelect.disabled=!!plan;
   }
   const evaluate=form.querySelector('[data-episode-evaluate]');if(evaluate)evaluate.disabled=evaluate.disabled||!plan||planned.errors.length>0;
   if(plan){const entry=planned.scheduled.find(x=>x.id===plan.id);
@@ -24624,7 +24717,7 @@ document.addEventListener('click',e=>{
  // Restore the pre-test checkpoint; nested Skill Test results were staged in RAM.
  // This does not delete previously committed independent receipts.
  if(episodeStageBaseline){data=structuredClone(episodeStageBaseline);episodeStageBaseline=null;}
- sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;episodeQueueAction=false;
+ sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;sharedEpisodeAutoRun93772=false;sharedDefaultWeatherId93772='';episodeQueueAction=false;
  discardEpisodeDraftSidecar();
  timeEpisodeDraft={...episodeFreshDraft()};episodePendingRemainderMinutes=null;
  episodeEvaluationRequested=false;episodePendingSkillRequest=null;
@@ -24640,15 +24733,17 @@ document.addEventListener('click',e=>{
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-shared-plan-add]');if(!b)return;
  e.preventDefault();if(!sharedTimeWindowDraft||episodeEvaluationRequested||sharedTimeWindowActivePlanId)return;
- sharedTimeWindowPlans.push({id:uuid(),groupId:'',followsGroup:'',kind:'travel',minutes:Math.min(20,sharedTimeWindowDraft.minutes),memberIds:[],done:false});
- const plan=sharedTimeWindowPlans.at(-1);plan.groupId=plan.id;
+ const plan={id:uuid(),episodeRowV:2,actorId:'',weatherId:sharedDefaultWeatherId93772,groupId:'',followsGroup:'',kind:'travel',minutes:Math.min(20,sharedTimeWindowDraft.minutes),memberIds:[],done:false};
+ plan.groupId=plan.id;sharedTimeWindowPlans.push(plan);
  persistEpisodeDraftSidecar();render();
 },true);
 document.addEventListener('change',e=>{
- const node=e.target?.closest?.('[data-shared-plan-kind],[data-shared-plan-minutes],[data-shared-plan-follow],[data-shared-plan-member]');if(!node)return;
- const id=node.dataset.sharedPlanKind||node.dataset.sharedPlanMinutes||node.dataset.sharedPlanFollow||node.dataset.sharedPlanMember;
+ const node=e.target?.closest?.('[data-shared-plan-kind],[data-shared-plan-minutes],[data-shared-plan-follow],[data-shared-plan-member],[data-shared-row-actor],[data-shared-row-weather]');if(!node)return;
+ const id=node.dataset.sharedPlanKind||node.dataset.sharedPlanMinutes||node.dataset.sharedPlanFollow||node.dataset.sharedPlanMember||node.dataset.sharedRowActor||node.dataset.sharedRowWeather;
  try{
-  if(node.hasAttribute('data-shared-plan-kind'))sharedPlanUpdate93771(id,'kind',node.value);
+  if(node.hasAttribute('data-shared-row-actor'))sharedPlanUpdate93771(id,'actor',node.value);
+  else if(node.hasAttribute('data-shared-row-weather'))sharedPlanUpdate93771(id,'weather',node.value);
+  else if(node.hasAttribute('data-shared-plan-kind'))sharedPlanUpdate93771(id,'kind',node.value);
   else if(node.hasAttribute('data-shared-plan-minutes'))sharedPlanUpdate93771(id,'minutes',node.value);
   else if(node.hasAttribute('data-shared-plan-follow'))sharedPlanUpdate93771(id,'follow',node.value);
   else sharedPlanUpdate93771(id,'member',{id:node.value,checked:node.checked});
@@ -24669,18 +24764,20 @@ document.addEventListener('click',e=>{
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-shared-plan-remove]');if(!b||b.disabled)return;
  e.preventDefault();const id=b.dataset.sharedPlanRemove,plan=sharedTimeWindowPlans.find(p=>p.id===id);
- if(!plan||plan.done||id===sharedTimeWindowActivePlanId)return;
+ if(!plan||plan.done||id===sharedTimeWindowActivePlanId||sharedEpisodeAutoRun93772)return;
+ if(sharedRowsMode93772()){
+  if(plan.actorId&&sharedTimeWindowPlans.some(p=>p.actorId===plan.actorId&&p.done&&sharedTimeWindowPlans.indexOf(p)>sharedTimeWindowPlans.indexOf(plan))){alert('Nelze odebrat předchůdce již doložené činnosti.');return;}
+  sharedTimeWindowPlans=sharedTimeWindowPlans.filter(p=>p.id!==id);sharedReflowEpisodeRows93772();persistEpisodeDraftSidecar();render();return;
+ }
  if(sharedTimeWindowPlans.some(p=>p.id!==id&&p.followsGroup===plan.groupId&&p.groupId!==id)){
   alert('Nejdříve odeberte navazující činnosti této skupiny.');return;
  }
  sharedTimeWindowPlans=sharedTimeWindowPlans.filter(p=>p.id!==id);persistEpisodeDraftSidecar();render();
 },true);
-document.addEventListener('click',e=>{
- const b=e.target.closest?.('[data-shared-plan-open]');if(!b||b.disabled)return;
- e.preventDefault();try{
+function openPlannedEpisodeRow93772(planId){try{
   if(episodeEvaluationRequested||episodePendingSkillRequest||episodeOutstandingSkillTasks.length||sharedTimeWindowActivePlanId)
    throw Error('Jiná činnost má otevřené pravidlové testy. Nejdříve ji dokončete.');
-  const plan=sharedTimeWindowPlans.find(p=>p.id===b.dataset.sharedPlanOpen);
+  const plan=sharedTimeWindowPlans.find(p=>p.id===planId);
   const state=sharedPlanState93771();const slot=state.scheduled.find(x=>x.id===plan?.id);
   if(!plan||plan.done||!slot||state.errors.length||!plan.memberIds.length)throw Error('Plán není platný.');
   if(sharedTimeWindowPlans.some(p=>p.groupId===plan.groupId&&sharedTimeWindowPlans.indexOf(p)<sharedTimeWindowPlans.indexOf(plan)&&!p.done))
@@ -24688,10 +24785,28 @@ document.addEventListener('click',e=>{
   const scratch=sharedPrepareGroupScratch93769(plan.groupId);
   if(scratch.startMinute!==slot.startMinute||scratch.remainingMinutes<plan.minutes)throw Error('Zastaralá časová kotva skupiny.');
   sharedTimeWindowActivePlanId=plan.id;
-  timeEpisodeDraft={...episodeFreshDraft(),weatherSource:'local',kind:plan.kind,minutes:String(plan.minutes),memberIds:[...plan.memberIds],guideId:plan.memberIds[0]};
+  timeEpisodeDraft={...episodeFreshDraft(),weatherSource:plan.weatherId||'local',area:sharedWeatherName93772(plan.weatherId),kind:plan.kind,minutes:String(plan.minutes),memberIds:[...plan.memberIds],guideId:plan.memberIds[0]};
   timeEpisodeDraftCampaign=campaignKey(data.campaignClock);episodeDraftEpoch=uuid();
   persistEpisodeDraftSidecar();render();
- }catch(error){notice=error.message;alert('Činnost skupiny nelze otevřít: '+error.message);}
+ }catch(error){notice=error.message;sharedEpisodeAutoRun93772=false;alert('Činnost nelze otevřít: '+error.message);render();}
+}
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-shared-plan-open]');if(!b||b.disabled)return;
+ e.preventDefault();openPlannedEpisodeRow93772(b.dataset.sharedPlanOpen);
+},true);
+document.addEventListener('change',e=>{
+ const select=e.target.closest?.('[data-shared-window-weather]');if(!select)return;
+ if(!sharedTimeWindowDraft)sharedDefaultWeatherId93772=select.value;
+},true);
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-shared-row-run]');if(!btn||btn.disabled)return;
+ e.preventDefault();
+ const state=sharedPlanState93771();
+ if(!sharedTimeWindowDraft||state.errors.length||!sharedTimeWindowPlans.length||sharedTimeWindowActivePlanId)return;
+ sharedEpisodeAutoRun93772=true;
+ persistEpisodeDraftSidecar();
+ const first=sharedTimeWindowPlans.find(x=>!x.done);
+ if(first)openPlannedEpisodeRow93772(first.id);
 },true);
 document.addEventListener('change',e=>{
  const selector=e.target.closest?.('[data-shared-window-continue]');if(!selector)return;
@@ -24715,6 +24830,9 @@ document.addEventListener('click',e=>{
   if(sharedTimeWindowDraft||sharedTimeWindowQueue.length||episodeEvaluationRequested||episodeStageBaseline)
    throw Error('Nejdříve dokončete nebo zrušte rozpracovaný interval.');
   const wanted=Number(document.querySelector('[data-shared-window-minutes]')?.value);
+  const weatherId=document.querySelector('[data-shared-window-weather]')?.value||'';
+  if(!sharedWeatherSources93772().some(w=>w.id===weatherId))throw Error('Nejprve vyberte potvrzené globální počasí platné pro současný den.');
+  sharedDefaultWeatherId93772=weatherId;
   const cap=episodeMandatoryWindow();
   if(cap?.unknown?.length)throw Error('Neověřená povinná událost kalendáře: '+cap.unknown[0].description);
   if(!Number.isSafeInteger(wanted)||wanted<1||wanted>10080)throw Error('Zadejte 1–10 080 minut.');
@@ -24722,7 +24840,7 @@ document.addEventListener('click',e=>{
   const tillMidnight=sharedDailyWindowLimit93771(data.campaignClock.minute);
   if(tillMidnight<1)throw Error('Den končí; nejprve potvrďte přechod kalendáře na 00:00 a nové denní počasí.');
   const minutes=Math.min(wanted,cap?.maxAllowed??10080,tillMidnight);
-  sharedTimeWindowSelectedGroupId=null;sharedTimeWindowActivePlanId=null;sharedTimeWindowPlans=[];
+  sharedTimeWindowSelectedGroupId=null;sharedTimeWindowActivePlanId=null;sharedTimeWindowPlans=[];sharedEpisodeAutoRun93772=false;
   sharedTimeWindowDraft=startSharedTimeWindow93767({campaignId:campaignKey(data.campaignClock),
    startMinute:data.campaignClock.minute,minutes,windowId:uuid()});
   timeEpisodeDraft={...timeEpisodeDraft,weatherSource:timeEpisodeDraft.weatherSource||'local',minutes:String(minutes)};
@@ -24743,7 +24861,7 @@ document.addEventListener('click',e=>{
    const committed=JSON.parse(storageBaseline);validate(committed);data=committed;episodeStageBaseline=null;
   }
   sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowSelectedGroupId=null;
-  sharedTimeWindowActivePlanId=null;sharedTimeWindowPlans=[];episodeQueueAction=false;
+  sharedTimeWindowActivePlanId=null;sharedTimeWindowPlans=[];sharedEpisodeAutoRun93772=false;sharedDefaultWeatherId93772='';episodeQueueAction=false;
   episodeEvaluationRequested=false;episodeEvaluatedIdentity=null;episodeCurrentGuidedStep=null;
   episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;episodeSkillReturnPending=false;
   episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];timeEpisodeDraft=episodeFreshDraft();episodeDraftEpoch=uuid();
@@ -24799,7 +24917,7 @@ document.addEventListener('click',e=>{
     characters:data.characters,journal:[...data.journal,...list.flatMap(x=>x.scopedSurvivalCF)],inventory:data.inventory});
    applyDeterministicCalendarOnsets();closeWeatherNoEffectAftercare();
   },{gmClockAdvance:true,episodeCommit:true}))return;
-  sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;sharedTimeWindowSelectedGroupId=null;episodeQueueAction=false;
+  sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;sharedEpisodeAutoRun93772=false;sharedDefaultWeatherId93772='';sharedTimeWindowSelectedGroupId=null;episodeQueueAction=false;
   episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;episodeSkillReturnPending=false;
   episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];
   timeEpisodeDraft=episodeFreshDraft();episodeEvaluationRequested=false;
@@ -25028,6 +25146,8 @@ document.addEventListener('submit',e=>{
    const openPlan=sharedPlanCurrent93771();
    if(sharedTimeWindowPlans.length){
     const scheduled=sharedPlanState93771().scheduled.find(x=>x.id===openPlan?.id);
+    if(openPlan?.episodeRowV===2&&(v.weatherSource!==openPlan.weatherId||!sharedWeatherSources93772().some(w=>w.id===openPlan.weatherId)))
+     throw Error('Globální počasí řádku neodpovídá skutečnému vyhodnocení.');
     if(!openPlan||openPlan.done||openPlan.groupId!==groupId||!scheduled||
        result.startMinute!==scheduled.startMinute||result.minutes>openPlan.minutes||
        result.kind!==openPlan.kind||JSON.stringify([...result.memberIds].sort())!==JSON.stringify([...openPlan.memberIds].sort()))
@@ -25079,8 +25199,17 @@ document.addEventListener('submit',e=>{
    persistEpisodeDraftSidecar();
    notice=Number.isSafeInteger(accidentAt)&&accidentAt<basis.endMinute?
     'Nehoda v '+displayCampaignMinute(accidentAt)+' ukončila společný interval. Nevyužitý čas řešte až po zdravotní proceduře.':
-    'Činnost skupiny připravena bez zápisu a posunu času. Připravte další skupinu nebo potvrďte společné okno.';
-   render();return;
+    'Činnost připravena bez posunu času. Pokračuje další řádek, pokud je bezpečně platný.';
+   if(sharedEpisodeAutoRun93772){
+    const nextPlan=sharedTimeWindowPlans.find(p=>!p.done);
+    const check=sharedPlanState93771();
+    if(nextPlan&&check.errors.length===0){
+     persistEpisodeDraftSidecar();openPlannedEpisodeRow93772(nextPlan.id);return;
+    }
+    sharedEpisodeAutoRun93772=false;
+    if(nextPlan&&check.errors.length)notice='Vyhodnocení bezpečně pozastaveno: '+check.errors[0].message+' Již doložené hody zůstávají zachovány. Opravte plán nebo zrušte návrh.';
+   }
+   persistEpisodeDraftSidecar();render();return;
   }
   if(mutate(()=>{applyCurrent();data.campaignClock=next;
    applyDeterministicCalendarOnsets();closeWeatherNoEffectAftercare();},
