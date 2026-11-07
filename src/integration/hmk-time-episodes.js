@@ -750,10 +750,11 @@ export function validateTimeEpisodes(journal=[]){
      directionObservationDeferred:h.directionObservationDeferred===true});
     const linked=h.evidenceId?journal.find(k=>k.id===h.evidenceId&&
      k.calendarCampaignId===j.calendarCampaignId&&k.campaignMinute===e.startMinute):null;
-    if(h.automationVersion==='v93.675'&&h.hazard==='accident'){
+    if(['v93.675','v93.773-end-of-episode'].includes(h.automationVersion)&&h.hazard==='accident'){
      must(h.externalMedicalPending===true&&h.requiresGMCompletion===false&&
       h.result==='pending-original-skill-combat'&&whole(h.hazardAtMinute,1,e.minutes)&&
       h.hazardAtMinute===e.minutes&&whole(h.hazardD10,4,6)&&e.endMinute===e.startMinute+e.minutes&&
+      (h.automationVersion!=='v93.773-end-of-episode'||h.medicalHandoffMinute===e.endMinute)&&
       e.orientation?.level==='CF'&&e.survivalHazard==='accident'&&
       !h.accidentProof&&!h.injuryProofId&&!h.victimId,
       'Accident: cestování musí skončit v doložené minutě a předat zranění původnímu modulu.');
