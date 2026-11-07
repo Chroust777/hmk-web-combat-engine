@@ -30,7 +30,11 @@ export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,current
  target.slot=slot;target.quantity=quantity;target.currentWQ=currentWQ;target.coldWorn=coldWorn;target.condition=condition;target.gearStowage=gearStowage;
  if(gmEquipmentState==='usable'){
   if(target.hmkEquipmentRepair&&['damaged','irreparable'].includes(target.hmkEquipmentRepair.status)){
-   target.hmkEquipmentRepair={...target.hmkEquipmentRepair,status:'repaired',remainingMinutes:0,gmRestored:true};
+   const previous=target.hmkEquipmentRepair;
+   // Legacy timed records keep their original fields for compatibility;
+   // new GM-managed repairs never acquire artificial work-minute counters.
+   target.hmkEquipmentRepair={...previous,status:'repaired',gmRestored:true};
+   if(Object.hasOwn(previous,'remainingMinutes'))target.hmkEquipmentRepair.remainingMinutes=0;
   }
   target.condition=target.condition.replace(/HMK Equipment Hazard:\s*(?:neopravena závada|neopravitelný|čeká na opravu)[^;]*/gi,'GM: použitelný').trim();
  }
