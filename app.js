@@ -262,7 +262,7 @@ import {characterCarryProjection,partyCarryProjection,supplyDurationText} from '
 import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js';
 import {malnutritionPrognosis,malnutritionStateLabel} from './src/integration/hmk-malnutrition-prognosis.js';
 import {nutritionAnimals,createAnimalAccess,animalLoadedItemAt,validateNutritionAnimalAccess,assertNutritionAnimalAppendOnly} from './src/integration/hmk-nutrition-animal-access.js';
-import {needsAssistedIntake,assistedIntakeForDay,createAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAppendOnly} from './src/integration/hmk-nutrition-assisted-intake.js';
+import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAppendOnly} from './src/integration/hmk-nutrition-assisted-intake.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
@@ -337,7 +337,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.775';
+const APP_VERSION='93.776';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1444,7 +1444,7 @@ function personalProvisionActionBlock(actor){
  if(combat?.shock==='KIA'||(combat?.malnutritionEpisodes??[]).some(x=>x.status==='dead'||(x.status==='active'&&x.hr===0)))
   return 'Mrtvá postava nemůže osobně nakupovat ani převzít či pořídit zásoby.';
  if(needsAssistedIntake(actor))
-  return 'Postava v bezvědomí nebo neschopná činnosti nemůže sama nakupovat ani převzít zásoby. Zásoby může zajistit jiná postava; skutečný příjem se dokládá v Asistovaném podání GM.';
+  return 'Postava v bezvědomí nebo neschopná činnosti nemůže sama nakupovat ani převzít zásoby. Zásoby může zajistit jiná postava; pomoc s jejich podáním řeší GM mimo aplikaci.';
  return '';
 }
 function assertPersonalProvisionAction(actor){
@@ -1511,8 +1511,7 @@ function provisionGuideHTML(participants){
  ${view==='sheet'?`<div class="hc-provision-picker"><strong>Postava: ${esc(actor.name)}</strong></div>`:`<label class="hc-provision-picker">Postava<select data-provision-actor>${participants.map(c=>`<option value="${esc(c.id)}" ${c.id===actor.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>`}
  ${provisionCardHTML(actor,true)}
  ${provisionAnimalAccessHTML(actor)}
- ${assistedIntakeFormHTML(actor)}
- ${block?`<p class="hc-provision-action-blocked" role="status"><strong>Samostatné získávání zásob je nedostupné.</strong> ${esc(block)} Zdravotní průběh a asistované podání GM zůstávají dostupné.</p>`:''}
+ ${block?`<p class="hc-provision-action-blocked" role="status"><strong>Samostatné získávání zásob je nedostupné.</strong> ${esc(block)} Zdravotní průběh zůstává dostupný.</p>`:''}
  <div class="hc-provision-simple-switch"><strong>Průběžné zásobování zajištěno GM</strong><div class="hc-provision-switch-actions">
  <button type="button" class="${assured?'hc-provision-choice-active':'secondary'}" data-provision-assure="yes" data-actor-id="${esc(actor.id)}" aria-pressed="${assured}" ${inShelter?'disabled title="Zajištěné prostředí automaticky zajišťuje potravu i vodu"':disabled}>Ano · neřešit nedostatek</button>
  <button type="button" class="${!assured?'hc-provision-choice-active':'secondary'}" data-provision-assure="no" data-actor-id="${esc(actor.id)}" aria-pressed="${!assured}" ${inShelter?'disabled title="Nejprve vypněte zajištěné prostředí v Přehledu a čase"':disabled}>Ne · řešit podle zásob</button></div>
@@ -1570,36 +1569,6 @@ function activeProvisionActor(){
  // actor; never read a stale/null calendar UI selection as game authority.
  const current=members.find(c=>c.id===provisionContextActorId());
  return current||(view==='calendar'?members[0]||null:null);
-}
-/** v93.605: factual GM ruling, never automatic ingestion inferred from
- * ownership, nor a new HMK Healing/Physician test. Show alongside Provisions
- * for any postava whose original Combat/Conditions state prevents self-feeding.
- */
-function assistedIntakeDayStart(policy){
- if(policy?.calendarNutritionPolicy?.autoNeeds)return nextNutritionDayStart(data.journal,policy);
- const days=data.journal.filter(j=>j.calendarNutritionDay?.policyId===policy?.id);
- return days.at(-1)?.calendarNutritionDay.endMinute??policy?.campaignMinute??data.campaignClock?.minute;
-}
-function assistedIntakeFormHTML(actor){
- const clock=data.campaignClock;if(!clock||!needsAssistedIntake(actor))return '';
- const cid=campaignKey(clock);
- const policy=activeNutritionPolicies(data.journal,cid,[actor.id])[0];
- const start=policy?assistedIntakeDayStart(policy):clock.minute;
- if(!Number.isSafeInteger(start)||clock.minute<start||clock.minute>=start+DAY_MINUTES)return '';
- const end=start+DAY_MINUTES,existing=assistedIntakeForDay(data.journal,cid,actor.id,start,end);
- const proof=existing?.calendarNutritionAssistedIntake;
- return `<section class="hc-assisted-intake" aria-label="Asistované podání jídla a vody · ${esc(actor.name)}">
- <h4>Asistované podání jídla a vody · GM</h4>
- <p class="hc-provision-help"><strong>${esc(actor.name)} se nemůže samostatně stravovat.</strong> HMK 184–186 neurčuje zvláštní hod na podávání dávek. Pro Healing se však počítá jen jídlo a voda, které postava skutečně přijala. Samotný inventář, dostupné zvíře ani průběžné zásobování GM nejsou důkazem příjmu.</p>
- <p class="hc-provision-help">Příští 24hodinová uzávěrka: ${esc(displayCampaignMinute(start))} – ${esc(displayCampaignMinute(end))}. Rozhodnutí GM musí odpovídat skutečnostem tohoto herního dne; při pokračující neschopnosti je nutné další den doložit znovu.</p>
- ${proof?`<p class="hc-provision-help"><strong>GM již doložil:</strong> potrava ${proof.foodAccepted?'skutečně přijata, pokud existuje zásoba':'nepřijata'} · pitná voda ${proof.waterAccepted?'skutečně přijata, pokud existuje zásoba':'nepřijata'} · péče ${esc(proof.caregiver)}. Doklad nelze přepsat.</p>`:
- `<form data-provision-assisted-intake><input type="hidden" name="actorId" value="${esc(actor.id)}"><input type="hidden" name="startMinute" value="${start}">
- <label class="hc-check hc-assisted-choice"><input type="checkbox" name="foodAccepted" value="yes"><span class="hc-assisted-choice-text">GM potvrzuje skutečné podání a přijetí dostupné potravy v tomto dni</span></label>
- <label class="hc-check hc-assisted-choice"><input type="checkbox" name="waterAccepted" value="yes"><span class="hc-assisted-choice-text">GM potvrzuje skutečné podání a přijetí dostupné pitné vody v tomto dni</span></label>
- <label>Pečující / skutečný způsob podání<input name="caregiver" minlength="2" maxlength="160" required placeholder="Např. druh z družiny"></label>
- <label>Okolnosti (včetně nepodaných dávek)<textarea name="reason" minlength="3" maxlength="400" required placeholder="Co se skutečně stalo, kdo pomohl, co nebylo přijato"></textarea></label>
- <p class="hc-provision-help">Nezaškrtnuté = skutečný příjem nebyl potvrzen; systém pro něj nesmí automaticky odečíst zásobu. Zaškrtnutí nevytváří zásoby ani nezaručuje plnou dávku: skutečné množství určí až existující doklady a denní uzávěrka. Před více denními posuny řešte každý takový den zvlášť.</p>
- <button type="submit">GM · trvale doložit skutečné podání / nepodání</button></form>`}</section>`;
 }
 function provisionAnimalAccessHTML(actor){
  const clock=data.campaignClock;if(!clock)return '';
@@ -1795,8 +1764,8 @@ function malnutritionPrognosisHTML(t,actor,clock){
  const status=t.hr>=6?'Vyléčen':t.hr===0?'Zemřel':malnutritionStateLabel(t.hr);
  const horizon=t.mode==='pending'?'Při doložené plné dávce Healing; při nedostatku Advance.':
   t.mode==='healing'?'Doložená plná dávka: Healing.':'Doložený nedostatek: Advance.';
- const special=t.hr===1?'Postava je v bezvědomí: sama si jídlo ani vodu nevezme. V Zásobování vyplňte doklad GM o skutečném asistovaném příjmu pro příslušný den. Bez potvrzení nelze automaticky odečíst zásoby; jen skutečně přijaté plné dávky zakládají Healing.':
-  t.hr===2?'Postava je neschopná činnosti; potřebuje pomoc s přístupem k dávkám. Plný skutečně přijatý příděl umožní Healing.':
+ const special=t.hr===1?'Postava je v bezvědomí. Podání jídla a vody řeší GM mimo aplikaci; žádné potvrzení asistovaného příjmu se nevyžaduje. Zdravotní testy hladu a žízně se dále řídí zvoleným režimem zásobování.':
+  t.hr===2?'Postava je neschopná činnosti; případnou pomoc s podáním dávek řeší GM mimo aplikaci. Zdravotní testy se řídí zvoleným režimem zásobování.':
   t.hr===3?'Postava je omráčená (Stunned); vyhodnoťte omezení v Combat & Conditions. Plné přijaté dávky umožní Healing.':
   t.hr<=0?'Smrt při HR0: běžný Healing Roll již neprobíhá.':
   'Jestliže nedostatek pokračuje, Advance může stav zhoršit. Obnovené plné dávky umožní Healing, ale neodstraní následky automaticky.';
@@ -13964,29 +13933,6 @@ document.addEventListener('submit',e=>{
     calendarTrekWildernessProof:proof})))notice='Foraging bylo vyhodnoceno v původní minutě hlídky. Čas GM ani únava se nezměnily.';
  }catch(err){alert('Foraging nebylo uloženo: '+err.message)}
 },true);
-// A signed, date-specific GM fact for a patient who cannot feed themselves.
-// Only this acknowledgement permits auto-debit for an incapacitated actor.
-document.addEventListener('submit',e=>{
- const form=e.target;if(!form?.matches?.('[data-provision-assisted-intake]'))return;
- e.preventDefault();e.stopImmediatePropagation();
- try{
-  const f=new FormData(form),clock=data.campaignClock,actorId=String(f.get('actorId')||'');
-  if(!clock||!personalProvisionContext()||activeProvisionActor()?.id!==actorId)throw Error('Potvrďte příjem u právě zobrazené postavy.');
-  const actor=character(actorId);if(!needsAssistedIntake(actor))throw Error('Postava nyní nepotřebuje asistované stravování.');
-  const startMinute=Number(f.get('startMinute'));
-  const row=activeNutritionPolicies(data.journal,campaignKey(clock),[actorId])[0];
-  if(startMinute!==(row?assistedIntakeDayStart(row):clock.minute))throw Error('Od otevření formuláře se změnil den zásobování.');
-  if(assistedIntakeForDay(data.journal,campaignKey(clock),actorId,startMinute,startMinute+1440))throw Error('Podání už bylo pro tento den potvrzeno.');
-  const proof=createAssistedIntake({campaignId:campaignKey(clock),actorId,minute:clock.minute,startMinute,
-   foodAccepted:f.get('foodAccepted')==='yes',waterAccepted:f.get('waterAccepted')==='yes',
-   caregiver:String(f.get('caregiver')||''),reason:String(f.get('reason')||'')});
-  if(!uiConfirm('GM potvrzuje skutečný příjem potravy: '+(proof.foodAccepted?'ANO':'NE')+', pitné vody: '+(proof.waterAccepted?'ANO':'NE')+' pro toto 24h období? Doklad je trvalý a není to hod Healing.'))return;
-  if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,createdAt:stamp(),
-   title:'HMK · asistované podání dávek · '+actor.name,
-   body:'GM: potrava '+(proof.foodAccepted?'skutečně přijata':'nepřijata')+', voda '+(proof.waterAccepted?'skutečně přijata':'nepřijata')+'; pečující '+proof.caregiver+'; '+proof.reason,
-   calendarNutritionAssistedIntake:proof})))notice='GM potvrzení asistovaného příjmu pro daný den uloženo. Čas, inventář a zdravotní HR se tím nemění.';
- }catch(err){alert('Potvrzení asistovaného příjmu nebylo uloženo: '+err.message)}
-},true);
 // Persistent, dated GM co-location proof for an owned pack animal.
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-provision-animal-access]'))return;
@@ -23074,7 +23020,7 @@ function showEpisodeIndependentDeadlines(form){
   const kind=r.kind==='malnutrition-course'?
    (r.episodeId?.includes('starvation')?'Hladovění · Starvation':
     r.episodeId?.includes('thirst')?'Žízeň · Thirst':'Hladovění / žízeň · zdravotní kontrola'):
-   ({'assisted-intake':'Příjem jídla a vody','blood-loss':'Ztráta krve',healing:'Hojení',
+   ({'blood-loss':'Ztráta krve',healing:'Hojení',
     infection:'Infekce',poison:'Otrava',disease:'Nemoc','extended-shock':'Prodloužený Shock',
     coma:'Kóma',grim:'Grim Wound','weather-course':'Vliv počasí','sleep-deprivation':'Spánková deprivace'}[r.kind]||r.kind);
   const due=Number(r.dueMinute),now=data.campaignClock.minute;
@@ -24668,7 +24614,7 @@ document.addEventListener('click',e=>{
  const elapsed=b.dataset.episodeMedicalElapsed||'';
  if(!character(actorId))return;
  timeEpisodeDraft=episodeFormSnapshot(form);selected=actorId;
- if(type==='malnutrition-course'||type==='assisted-intake'){
+ if(type==='malnutrition-course'){
   calendarLanding=false;activeCalendarSection='provisions';provisionScope='person';
   provisionGuideActorId=actorId;view='calendar';render();
   const target=[...document.querySelectorAll('form[data-malnutrition-course]')].find(f=>f.elements.namedItem('actorId')?.value===actorId&&
