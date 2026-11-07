@@ -337,7 +337,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.774';
+const APP_VERSION='93.775';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12733,7 +12733,9 @@ document.addEventListener('submit',event=>{
    synchronizeCombatInjuries(actor,outcome.state);
    data.journal.push({id:uuid(),characterId:actor.id,...skinTime,title:'Weather '+outcome.report.kind+' · HMK str.185',
     body:'Zkontrolováno '+outcome.report.reviewedLocations+' lokací · založeno '+outcome.report.wounds.length+' ran: '+
-     outcome.report.wounds.map(w=>w.location+' '+(w.side||'')+' '+w.severity+w.il).join(', '),createdAt:stamp(),
+     outcome.report.wounds.map(w=>w.location+' '+(w.side||'')+' '+w.severity+w.il).join(', ')+
+     (outcome.report.skippedAfterKIA.length?' · KIA: '+outcome.report.skippedAfterKIA.length+
+      ' další lokace pouze doloženy, bez dalšího zásahu po smrti.':''),createdAt:stamp(),
     skillTestProof:{type:'skill-weather-skin',sourceId,actorId:actor.id,report:outcome.report,
      diceEvidence,
      ...(onsetReceipt?.skillTestProof?.episodeId?{episodeId:onsetReceipt.skillTestProof.episodeId,
@@ -12741,7 +12743,9 @@ document.addEventListener('submit',event=>{
   }))throw Error('Kožní zranění nelze uložit');
   const after=persistentStateOf(actor),newWounds=outcome.report.wounds.length;
   hskWeatherHealthLastReceipt={actorId:actor.id,message:'Kožní následky byly uloženy: '+newWounds+' ran'+(newWounds===1?'a':newWounds>1?'y':'')+'. '+
-   (isNoncombatMedicalOrigin(after.shockFollowup?.domain)?'Nyní je nutný Shock Reroll; Treatment zatím čeká.':
+   (after.shock==='KIA'?'KIA potvrzeno. '+outcome.report.skippedAfterKIA.length+
+    ' dalších lokací má zachované doklady hodů, bez dalších zásahů po smrti.':
+    isNoncombatMedicalOrigin(after.shockFollowup?.domain)?'Nyní je nutný Shock Reroll; Treatment zatím čeká.':
     unresolvedInjuryMishaps(after).length?'Nyní dokonči povinný Injury Mishap.':
     'Další povinné ošetření najdeš v panelu Rány z počasí.')} ;
   selected=actor.id;view='sheet';activeSheetSection='hazards';render();
