@@ -6,6 +6,7 @@ import {validateSharedTimeWindowJournal93767,assertSharedEpisodeOverlaps93768} f
  */
 import {trekMovement,trekWeatherDay,trekWeatherWatch,trekHazards} from './hmk-trekking-routine.js';
 import {pcShelteredStayAt} from './hmk-pc-sheltered-stay-93730.js';
+import {coldCatalogRule} from './hmk-cold-gear-93740.js';
 import {expeditionSecondaryRoll} from './hmk-calendar-expedition.js';
 import {createOrienteeringContext,adjustedOrienteeringSV} from './hmk-trekking-orienteering.js';
 import {allocateTrekModes} from './hmk-trekking-correction.js';
@@ -686,7 +687,7 @@ export function validateTimeEpisodes(journal=[]){
    for(const [i,record] of e.encounterDetails.entries()){
     if(record?.externalToGM===true){
      must(record.i===i&&record.pending===false&&e.encounter.resolved===true&&
-      ['adjudicated','no-further-action'].includes(record.disposition)&&
+      ['adjudicated','no-further-action','reported-to-gm'].includes(record.disposition)&&
       Object.keys(record).every(k=>['i','externalToGM','pending','disposition'].includes(k)),
       'Encounter: GM musí potvrdit samostatné vyhodnocení bez automatického Combatu.');
      continue;
@@ -841,9 +842,46 @@ export function validateTimeEpisodes(journal=[]){
       episodeSkillProof(linked,'Survival',w.id,j.calendarCampaignId,e.startMinute))?.level===w.endLevel,
       'Weather Hazard nemá skutečný doložený Endurance/Survival test.');
     }
+    // v93.774: cold protection is a documented part of every new weather
+    // receipt, even when nothing was equipped. Historic receipts without the
+    // field remain valid. Compare its attested item snapshots and exact AV;
+    // never accept the object merely because it came from the UI.
+    let protectionEvidence={};
+    if(w.coldProtection!==undefined){
+     const cp=w.coldProtection;
+     must(w.kind==='cold'&&cp&&typeof cp==='object'&&!Array.isArray(cp)&&
+      typeof cp.inventoryWitness==='string'&&typeof cp.automaticCloak==='boolean'&&
+      (cp.gearSourceId===null||typeof cp.gearSourceId==='string')&&
+      (cp.shelterSourceId===null||typeof cp.shelterSourceId==='string')&&
+      (cp.gearName===null||typeof cp.gearName==='string')&&
+      Object.keys(cp).sort().join('|')===
+       'automaticCloak|gearName|gearSourceId|inventoryWitness|shelterSourceId',
+      'Weather Cold: neplatný doklad ochrany proti chladu.');
+     let gear=null,shelter=null;
+     try{
+      const pair=JSON.parse(cp.inventoryWitness);
+      must(Array.isArray(pair)&&pair.length===2,'Cold inventář musí obsahovat dva zdroje.');
+      [gear,shelter]=pair;
+     }catch{throw Error('Weather Cold: poškozený doklad inventáře.');}
+     const itemValid=item=>item&&typeof item==='object'&&!Array.isArray(item)&&
+      item.characterId===w.id&&Number.isSafeInteger(item.quantity)&&item.quantity>0&&
+      !['chest','stable'].includes(item.slot)&&item.destroyed!==true;
+     const gearRule=gear&&coldCatalogRule(gear),shelterRule=shelter&&coldCatalogRule(shelter);
+     must((gear===null&&(cp.gearSourceId===null&&cp.gearName===null&&!cp.automaticCloak)||
+       itemValid(gear)&&gearRule&&gearRule.kind!=='shelter'&&cp.gearSourceId===gear.id&&
+       cp.gearName===(gear.snapshot?.name??null)&&
+       (!cp.automaticCloak||(gearRule.kind==='cloak'&&
+        (gear.snapshot?.category==='armor'&&gear.slot==='worn'||
+         gear.snapshot?.category==='other'&&gear.coldWorn===true))))&&
+      (shelter===null&&(cp.shelterSourceId===null||cp.shelterSourceId==='Shallow cave · GM')||
+       itemValid(shelter)&&shelterRule?.kind==='shelter'&&cp.shelterSourceId===shelter.id)&&
+      w.protection===(gearRule?.av??0)+(cp.shelterSourceId==='Shallow cave · GM'?3:shelterRule?.av??0),
+      'Weather Cold: doklad vybavení neodpovídá ochraně nebo postavě.');
+     protectionEvidence={coldProtection:cp};
+    }
     const newProof=w.proofId!==undefined;
     must(JSON.stringify(w)===JSON.stringify(newProof?{id:w.id,...expected,proofId:w.exposed?w.proofId:null,
-     coldCondition:w.kind==='cold'?w.coldCondition||'dry':null}:{id:w.id,...expected})&&
+     ...protectionEvidence,coldCondition:w.kind==='cold'?w.coldCondition||'dry':null}:{id:w.id,...expected,...protectionEvidence})&&
      !['pending','pending-endurance'].includes(w.effect),'Pozměněný nebo neúplný Weather Hazard.');
    }
   }
