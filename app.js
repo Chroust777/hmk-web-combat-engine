@@ -337,7 +337,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.776';
+const APP_VERSION='93.777';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2753,11 +2753,11 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint" data-episode-delay-hint>Vyberte skutečný výsledek hazardu; podle něj aplikace určí povinné doklady.</p></div>
  <label data-hazard-skill-level>Výsledek skutečného Skill Testu<select name="hazardSkillLevel"><option value="">— nutno doložit —</option>${['CF','F','S','CS'].map(x=>option(x,x)).join('')}</select></label>
  <label data-hazard-minute>Minuta nehody / překážky od začátku epizody · určuje GM<input name="hazardAtMinute" type="number" min="1" max="10080" placeholder="např. 45" inputmode="numeric"></label>
- <p data-hazard-minute class="hc-hint">Accident přeruší celou cestu v této minutě. U Complication F/CF družina ztrácí zbytek aktuálního intervalu a následně časový úsek odpovídající zvolené délce pochodu. Dále se automaticky přepočítá pohyb a únava.</p>
- <div data-hazard-accident class="hc-episode-accident-step"><h4>Accident · přerušení cesty (HMK 148)</h4>
- <p class="hc-hint">Nejprve doložte minutu vzniku nehody. Cestování skončí právě v tomto okamžiku a započítá pouze skutečný pohyb, vzdálenost a únavu. Los oběti, Agility a Injury Sequence proběhnou až po potvrzení epizody v původních Skill Tests / Combat, nikoliv zde.</p>
+ <p data-hazard-minute class="hc-hint">Ve společné pevné epizodě se Accident zapíše až na konci celého intervalu; ostatní činnosti se vyhodnotí. U Complication F/CF GM doloží skutečnou minutu překážky a navazující zdržení podle pravidel.</p>
+ <div data-hazard-accident class="hc-episode-accident-step"><h4>Accident · následné vyhodnocení na konci epizody (HMK 148)</h4>
+ <p class="hc-hint">Ve společné pevné epizodě nastane nehoda až na jejím konci. Plánované vzdálenosti za celý interval se zachovají. Výběr oběti, Agility a Injury Sequence se vyhodnotí samostatně po jediném potvrzení GM; Cestování samo nikdy nespouští Combat.</p>
  <input name="incidentPlannedMinutes" type="hidden" value="">
- <p class="hc-hint" data-episode-accident-result>Uveďte přesný čas nehody; zdravotní hody zatím neprovádějte.</p></div>
+ <p class="hc-hint" data-episode-accident-result>Při společné epizodě je čas nehody automaticky konec intervalu; zdravotní hody zatím neprovádějte.</p></div>
  <label data-hazard-direction>Skutečný d10 pro směr odchýlení (liché = vlevo, sudé = vpravo)<span class="hc-episode-die"><input name="hazardDirectionD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="hazardDirectionD10" data-episode-faces="10">⚄ d10</button></span></label>
  <div data-hazard-direction-awareness><label>Awareness při Misdirection · skutečný Skill Test<select name="hazardDirectionProofId"><option value="">— pokud byl skutečně proveden —</option>${skillCandidates.filter(j=>episodeSkillProof(j,'Awareness',j.characterId,campaignKey(clock),clock.minute)).map(j=>option(j.id,(character(j.characterId)?.name||j.characterId)+' · '+j.title)).join('')}</select></label>
  <label class="hc-check"><input name="hazardDirectionDeferAwareness" type="checkbox"> GM potvrzuje: při tomto pokračování nebyl proveden Awareness; družina zatím pokračuje chybným směrem. Žádný úspěch se nepředpokládá.</label></div>
@@ -21791,9 +21791,30 @@ function episodeIdentityOf(v){
   ['memberIds','animalIds','stableAnimalIds','transportedMemberIds'].includes(name)?[...(v[name]||[])].sort():
   typeof v[name]==='boolean'?v[name]:String(v[name]??'')]));
 }
+/** The original Orienteering may first reveal a Stalking Mode after the
+ * immutable episode identity was frozen. Let the GM name its previously
+ * unknown trail exactly ONCE before the Tracking Skill Test begins; the
+ * completed name then becomes part of the immutable identity and sidecar.
+ * Never unlock an already named trail or change its identity after a roll. */
+function episodeDeferredTrackingTrailAllowed(form){
+ return episodeEvaluationRequested&&!!episodeEvaluatedIdentity&&episodeEvaluatedIdentity.trackingTrail===''&&
+  !form.elements.namedItem('trackingProofId')?.value&&!episodePinnedSkillFields.has('trackingProofId')&&
+  episodePendingSkillRequest?.field!=='trackingProofId'&&
+  (form.elements.namedItem('kind')?.value==='tracking'||
+   form.elements.namedItem('kind')?.value==='travel'&&
+    (form.elements.namedItem('orientationPriority')?.value==='stealth'||
+     Number(form.elements.namedItem('mode_stalking')?.value||0)===1));
+}
 function episodeIdentityMismatch(form){
  if(!episodeEvaluationRequested||!episodeEvaluatedIdentity)return '';
  const actual=episodeIdentityOf(episodeFormSnapshot(form));
+ if(episodeDeferredTrackingTrailAllowed(form)&&actual.trackingTrail.trim()){
+  const withoutTrail={...actual,trackingTrail:''};
+  if(JSON.stringify(withoutTrail)===JSON.stringify(episodeEvaluatedIdentity)){
+   episodeEvaluatedIdentity={...episodeEvaluatedIdentity,trackingTrail:actual.trackingTrail};
+   persistEpisodeDraftSidecar({snapshotForm:true});
+  }
+ }
  return JSON.stringify(actual)===JSON.stringify(episodeEvaluatedIdentity)?'':
   'Druh činnosti, účastníci, průvodce a podmínky sledované stopy jsou po vyhodnocení uzamčeni. Dokončete tuto epizodu, nebo použijte nouzové zrušení.';
 }
@@ -21801,8 +21822,9 @@ function episodeLockIdentityControls(form){
  const locked=episodeEvaluationRequested&&!!episodeEvaluatedIdentity;
  for(const name of EPISODE_IMMUTABLE_FIELDS){
   for(const node of form.querySelectorAll('[name="'+name+'"]')){
-   node.disabled=locked;
-   if(locked)node.title='Aktivní epizoda: změna je povolena až po dokončení nebo nouzovém zrušení.';
+   const deferred=name==='trackingTrail'&&episodeDeferredTrackingTrailAllowed(form);
+   node.disabled=locked&&!deferred;
+   if(locked&&!deferred)node.title='Aktivní epizoda: změna je povolena až po dokončení nebo nouzovém zrušení.';
    else if(node.title.startsWith('Aktivní epizoda:'))node.title='';
   }
  }
@@ -23803,7 +23825,12 @@ function updateEpisodePreview(form){
  if(tools){const skillButton=tools.querySelector('[data-episode-nav="skills"]');if(skillButton)skillButton.hidden=!episodeEvaluationRequested||!outdoor||!form.dataset.episodeProblem||!episodeIssue(form.dataset.episodeProblem,form).skill;}
 
  for(const node of form.querySelectorAll('[data-episode-orientation-new]'))node.hidden=!isTravel||v.orientationUse!=='new';
- for(const node of form.querySelectorAll('[data-episode-tracking]'))node.hidden=!isTracking;
+ // A travelling guide may discover Stalking only after the Orienteering
+ // receipt exists. Keep its trail input visible while it can still be named.
+ const mayNeedTravelTracking=travel&&episodeEvaluationRequested&&
+  (v.orientationPriority==='stealth'||Number(v.mode_stalking||0)===1);
+ for(const node of form.querySelectorAll('[data-episode-tracking]'))
+  node.hidden=!(isTracking||mayNeedTravelTracking);
  for(const node of form.querySelectorAll('[data-episode-tracking-new]'))node.hidden=!episodeEvaluationRequested||v.trackingUse!=='new';
  for(const node of form.querySelectorAll('[data-episode-drover]'))node.hidden=v.conveyance==='foot';
 
