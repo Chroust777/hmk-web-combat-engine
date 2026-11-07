@@ -1,3 +1,4 @@
+import {isBandageInventoryItem,bandageWeightLb} from './hmk-bandage-stock-93778.js';
 /** HMK World of Kèthîra, printed pp.112,117-118,122,170.
  * Read-only, inventory-derived Armour ENC, Gear ENC, modified ENC, PF and
  * body-zone Bulk. Do not conflate an equipment load with accrued Fatigue.
@@ -194,6 +195,8 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   if(stowage==='backpack'&&/\bbackpack\b/i.test(item.snapshot?.name||'')){
    issues.push(`${item.id}: a backpack cannot be packed into itself or receive its own half-weight allowance`);continue;
   }
+  // Printed Bandages are counted individually; the packet has stepped mass.
+  if(isBandageInventoryItem(item))physicalWeight=bandageWeightLb(item.quantity)/item.quantity;
   // A half-ration is a legitimate physical 1.5 lb remainder. The general
   // gear-load calculator counts whole objects, so normalise this portion
   // to one weighed remainder without silently rounding the burden away.

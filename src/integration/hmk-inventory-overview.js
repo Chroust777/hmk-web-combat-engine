@@ -1,3 +1,4 @@
+import {isBandageInventoryItem,bandageWeightLb,bandageLinePriceD} from './hmk-bandage-stock-93778.js';
 /** Read-only character inventory projection for Keeper's Ledger (HMK pp. 99–122).
  * No item definitions, prices, weights or rule mechanics are invented.
  * Gear ENC is computed over the WHOLE load, not added per line.
@@ -14,10 +15,11 @@ export function projectInventoryRows(inventory=[]){
  return inventory.map(item=>{
   const p=item.snapshot?.properties||{},isPrintedRation=['hmk:gear:hmk-p120-026','hmk:gear:hmk-p120-027'].includes(item.sourceItemId),
    qty=(Number.isSafeInteger(item.quantity)||isPrintedRation&&Number.isSafeInteger(item.quantity*2))&&item.quantity>0?item.quantity:null;
+  const bandage=isBandageInventoryItem(item);
   const price=knownPrice(item),weight=isFiniteNonnegative(p.weightLb)&&isFiniteNonnegative(item.waterContentsLb??0)?p.weightLb+(item.waterContentsLb??0)/(item.quantity||1):null;
-  const totalPrice=qty!==null&&price.unit!==null?qty*price.unit:
+  const totalPrice=bandage&&qty!==null?bandageLinePriceD(qty):qty!==null&&price.unit!==null?qty*price.unit:
    qty!==null&&Number.isSafeInteger(p.pricePerDozenPence)&&qty%12===0?qty/12*p.pricePerDozenPence:null;
-  const totalWeight=qty!==null&&weight!==null?qty*weight:null;
+  const totalWeight=bandage&&qty!==null?bandageWeightLb(qty):qty!==null&&weight!==null?qty*weight:null;
   const isArmour=item.snapshot?.category==='armor';
   const isWeapon=item.snapshot?.category==='weapon';
   const isShield=item.snapshot?.category==='shield';
@@ -55,7 +57,7 @@ export function projectInventoryRows(inventory=[]){
   const protection=isArmour&&p.locationProtection&&typeof p.locationProtection==='object'?
    Object.entries(p.locationProtection).filter(([,v])=>v&&typeof v==='object').map(([loc,v])=>({loc,b:v.b,e:v.e,p:v.p,f:v.f})):[];
   const kind=item.slot==='chest'?'chest':item.slot==='stable'?'stable':item.slot==='worn'||item.slot==='main_hand'||item.slot==='off_hand'?'equipped':'carried';
-  return {item,qty,priceLabel:price.label,totalPrice,weight,totalWeight,wq,keyFields,armourENC,protection,kind};
+  return {item,qty,priceLabel:bandage?'24 d / 32 ks':price.label,totalPrice,weight:bandage&&qty?totalWeight/qty:weight,totalWeight,wq,keyFields,armourENC,protection,kind};
  });
 }
 export function inventoryTotals(rows=[]){

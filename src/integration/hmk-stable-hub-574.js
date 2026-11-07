@@ -7,6 +7,7 @@ import {VEHICLES_TACK_P122} from '../rules/conveyance-printed-p122.js';
 import {mountLoadENC,mountPersonalFatigue} from '../rules/gear-load.js';
 import {strengthEncumbranceModifier} from '../rules/encumbrance.js';
 import {filledWaterForItem} from './hmk-physical-water-ledger.js';
+import {isBandageInventoryItem,physicalInventoryWeightLb} from './hmk-bandage-stock-93778.js';
 import {rationStockBalances} from './hmk-physical-ration-ledger.js';
 import {animalAccessForDay,animalLoadedItemAt,ANIMAL_USE_FORMAT} from './hmk-nutrition-animal-access.js';
 export const STABLE_HUB_FORMAT_574='hmk-stable-hub-574';
@@ -61,7 +62,7 @@ export function stableBurden(data,campaignId,animal){
   const actual=(data.inventory||[]).find(i=>i.id===entry.inventoryId);
   if(!actual)return {...entry,currentWeightLb:entry.weightLb};
   const lots=stocks.filter(q=>q.itemId===entry.inventoryId);
-  const base=lots.length?lots.reduce((s,q)=>s+q.remaining*3,0):entry.weightLb;
+  const base=lots.length?lots.reduce((s,q)=>s+q.remaining*3,0):isBandageInventoryItem(actual)?physicalInventoryWeightLb(actual):entry.weightLb;
   const added=filledWaterForItem(data.journal,campaignId,animal.ownerId,entry.inventoryId,now)*10;
   return {...entry,currentWeightLb:Math.max(0,base)+added};
  });
@@ -145,7 +146,7 @@ export function validateStableHub(data,offerForId=null){
    // the item. The original transfer proof remains immutable and auditable.
    const currentLocation=item?.slot==='stable'&&item.stableAnimalId===x.animalId;
    requireValid((!item||item.characterId===animal.ownerId)&&(!currentLocation||
-    item.snapshot?.name===x.name&&item.quantity===x.quantity&&item.snapshot?.properties?.weightLb*x.quantity===x.weightLb)&&
+    item.snapshot?.name===x.name&&item.quantity===x.quantity&&physicalInventoryWeightLb(item)===x.weightLb)&&
     Number.isFinite(x.weightLb)&&x.weightLb>0&&Number.isSafeInteger(x.quantity)&&x.quantity>0&&isId(x.inventoryId)&&typeof x.name==='string'&&x.name.length>=1&&x.name.length<=160&&narrative(x.reason)&&isId(x.entryId)&&!entryIds.has(x.entryId)&&
     ![...snapshots.entries()].some(([otherId,s])=>animals.get(otherId)?.campaignId===animal.campaignId&&(s.inventory.has(x.inventoryId)||s.gear.has(x.inventoryId)))&&!state.inventory.has(x.inventoryId)&&!state.gear.has(x.inventoryId),
     'inventární náklad nemá doloženou identitu, váhu nebo je již naložen');

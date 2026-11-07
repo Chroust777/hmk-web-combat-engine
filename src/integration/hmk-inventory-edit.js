@@ -1,11 +1,12 @@
 import {isHandheldItem,validateHandInventory} from './hmk-hand-equipment.js';
 import {coldCatalogRule} from './hmk-cold-gear-93740.js';
 import {equipmentUnusable} from './hmk-equipment-serviceability.js';
+import {isBandageInventoryItem} from './hmk-bandage-stock-93778.js';
 /** A direct, owner-bound, atomic inventory item edit. No navigation changes,
  * no RNG and no alternate storage path. UI calls within existing mutate/CAS. */
 const SLOTS=['none','main_hand','off_hand','worn','carried','chest'];
 function fail(reason){throw Error(reason)}
-export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,currentWQ,condition,gearStowage='normal',coldWorn=false,layerOrder=null,layerSlot=null,bulkExceptionZones=[]}={}){
+export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,currentWQ,condition,gearStowage='normal',coldWorn=false,gmEquipmentState='keep',layerOrder=null,layerSlot=null,bulkExceptionZones=[]}={}){
  if(!doc||!Array.isArray(doc.inventory)||typeof ownerId!=='string'||!ownerId||typeof itemId!=='string'||!itemId)fail('Neplatný vlastník nebo předmět');
  const item=doc.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
  if(!item||!doc.characters?.some(x=>x.id===ownerId))fail('Předmět nepatří otevřené postavě');
@@ -23,8 +24,16 @@ export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,current
  if(layerOrder!==null&&(!Number.isSafeInteger(layerOrder)||layerOrder<0||layerOrder>99||item.snapshot.category!=='armor'))fail('Neplatné pořadí vrstvy');
  if(layerSlot!==null&&(!['underFar','underNear','base','overNear','overFar'].includes(layerSlot)||item.snapshot.category!=='armor'))fail('Neplatný sloupec vrstvy');
  if(!Array.isArray(bulkExceptionZones)||new Set(bulkExceptionZones).size!==bulkExceptionZones.length||bulkExceptionZones.some(x=>!['head','arms','torso','legs'].includes(x)))fail('Neplatné Bulk zóny');
+ if(!['keep','usable'].includes(gmEquipmentState))fail('Neplatná volba opravy výstroje');
+ if(isBandageInventoryItem(item)&&quantity>999999)fail('Neplatný počet obvazů');
  const next=structuredClone(doc);const target=next.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
  target.slot=slot;target.quantity=quantity;target.currentWQ=currentWQ;target.coldWorn=coldWorn;target.condition=condition;target.gearStowage=gearStowage;
+ if(gmEquipmentState==='usable'){
+  if(target.hmkEquipmentRepair&&['damaged','irreparable'].includes(target.hmkEquipmentRepair.status)){
+   target.hmkEquipmentRepair={...target.hmkEquipmentRepair,status:'repaired',remainingMinutes:0,gmRestored:true};
+  }
+  target.condition=target.condition.replace(/HMK Equipment Hazard:\s*(?:neopravena závada|neopravitelný|čeká na opravu)[^;]*/gi,'GM: použitelný').trim();
+ }
  if(target.snapshot.category==='armor'){target.layerOrder=layerOrder;target.layerSlot=layerSlot;target.bulkExceptionZones=bulkExceptionZones;}
  validateHandInventory(next.inventory,ownerId);
  return next;

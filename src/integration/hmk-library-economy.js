@@ -123,6 +123,7 @@ export function libraryPurchasePrice(definition){
  return Number.isSafeInteger(price)&&price>=0?price:null;
 }
 export function libraryPurchaseOffer(definition){
+ if(definition?.id==='hmk:gear:hmk-p120-004')return {pricePence:24,quantity:32};
  const single=libraryPurchasePrice(definition);
  if(single!==null)return {pricePence:single,quantity:1};
  const dozen=definition?.properties?.pricePerDozenPence;
