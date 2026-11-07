@@ -145,7 +145,7 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
  // validates Carryover, existing Shock and any Extended Shock/Coma itself.
  // The whole collection still commits atomically or not at all.
  const provided=injuriesFromExposure(hazard,{windD20,durationD20,complexion,rows,maximumExposureMinutes});
- const visited=new Set(),wounds=[];
+ const visited=new Set(),wounds=[],skippedAfterKIA=[];
  for(let n=0;n<provided.rows.length;n++){
   const r=provided.rows[n],where=r.location,side=r.side||null;
   requireIt(Object.hasOwn(bodyShock,where),'Neznámá lidská anatomická lokace: '+where);
@@ -164,6 +164,17 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
   requireIt(existing.length?integer(r.compoundD10,1,10):r.compoundD10==null,
    'Při opakované Frost/Fire ráně je povinný skutečný Compound d10; jinak se nehází');
   requireIt(integer(r.shockD100,1,100),'Každá nová kožní rána vyžaduje skutečný Shock d100');
+  // Several exposed skin locations belong to one simultaneous weather event.
+  // If an earlier location has already produced KIA, the original hit executor
+  // correctly refuses any further post-mortem hits.  Do not discard the entire
+  // already witnessed incident or silently invent subsequent injuries.  Check
+  // every later location/die as before, and preserve its evidence as skipped.
+  if(s.shock==='KIA'){
+   skippedAfterKIA.push({location:where,side,il:r.il,severity,sourceD10:r.sourceRoll,
+    shockD100:r.shockD100,compoundD10:r.compoundD10??null,
+    reason:'KIA již vzniklo u dříve vyhodnocené lokace stejného Weather Incident; další zásah nebyl proveden'});
+   continue;
+  }
   const incoming={id:'wound:'+eventId,location:where,aspect:thermalAspect,area:false,severity,level:r.il};
   const compound=existing.length?compoundInjury({existing,incoming,d10:r.compoundD10}):null;
   const shockIL=compound?.injuryShock??r.il;
@@ -195,7 +206,8 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
   periodMinutes:provided.period,durationMinutes:provided.duration,
   ...(maximumExposureMinutes!==null?{episodeMaxExposureMinutes:maximumExposureMinutes,
    ...(skinKind==='frostbite'?{sampledDurationMinutes:provided.sampledDuration}:{referenceWatchMinutes:240})}:{}),
-  reviewedLocations:visited.size,wounds,rulePage:185};
+  reviewedLocations:visited.size,wounds,skippedAfterKIA,
+  terminalShock:s.shock==='KIA'?'KIA':null,rulePage:185};
  s.events.push({id,type:'skill-weather-skin-complete',round,details:report});s.lastRound=round;
  validateCombatState(s);return {state:s,report};
 }
