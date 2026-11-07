@@ -334,7 +334,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.769';
+const APP_VERSION='93.770';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -21986,6 +21986,11 @@ function episodeMarkField(form,name,{focus=false}={}){
  // rather than asking GM to follow a link to an inaccessible field.
  if(name==='hazardAtMinute'&&form.elements.namedItem('kind')?.value==='travel'&&
     /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''))){
+  // Accident requires this minute BEFORE Evaluate can shorten the trek.
+  // The guided form normally hides the entire Rolls section until Evaluate,
+  // so merely revealing the nested hazard field created an unreachable step.
+  const rolls=form.querySelector('[data-episode-section="rolls"]');
+  if(rolls){rolls.hidden=false;rolls.open=true;}
   const hazard=form.querySelector('[data-episode-hazard-details]');
   if(hazard){hazard.hidden=false;
    for(const item of hazard.querySelectorAll('[data-hazard-minute],[data-hazard-accident]'))item.hidden=false;
@@ -24540,6 +24545,11 @@ document.addEventListener('click',e=>{
   if(episodeEvaluationRequested||episodePendingSkillRequest||episodeOutstandingSkillTasks.length)
    throw Error('Nejprve dokončete všechny rozpracované hody poslední skupiny nebo ji zrušte.');
   const list=[...sharedTimeWindowQueue];
+  // Also reject a stale or tampered draft that would leap past an accident.
+  if(list.flatMap(q=>q.patch?.journal||[]).some(j=>
+   j.calendarTimeEpisode?.endMinute<sharedTimeWindowDraft.endMinute&&
+   j.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)))
+   throw Error('Nehoda vyžaduje vyhodnocení v původní minutě; nelze posunout celé okno přes její zdravotní následek.');
   // Validate again immediately before GM confirmation; this is not a lock
   // on other Skill Tests, only a proof that each prepared result is current.
   sharedValidateWitnessQueue93769(list);
@@ -24788,9 +24798,17 @@ document.addEventListener('submit',e=>{
    const groupId=sharedTimeWindowSelectedGroupId||uuid();
    const basis=sharedTimeWindowDraft;
    if(!basis)throw Error('Nejdříve založte celkový cestovní interval.');
-   const extended=addSharedTimeGroup93767(basis,{groupId,kind:result.kind,memberIds:result.memberIds,
+   let extended=addSharedTimeGroup93767(basis,{groupId,kind:result.kind,memberIds:result.memberIds,
     animalIds:(result.animals||[]).map(a=>a.id),stableAnimalIds:v.stableAnimalIds||[],
     vehicleKey:result.transportProof?.vehicle?.vehicleKey||null,startMinute:result.startMinute,minutes:result.minutes});
+   // v93.770: an accident must interrupt the global time window at its
+   // actual minute. Never advance unrelated groups beyond unresolved injury.
+   const accidentAt=result.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)?result.endMinute:null;
+   if(Number.isSafeInteger(accidentAt)&&accidentAt<basis.endMinute){
+    if(sharedTimeWindowQueue.some(q=>q.patch?.endMinute>accidentAt))
+     throw Error('Nehoda nastala v '+displayCampaignMinute(accidentAt)+', ale dříve připravená skupina pokračuje za ni. Je nutné zkrátit společný interval; již doložené hody se nesmějí zpětně přepočítat.');
+    extended={...extended,endMinute:accidentAt,minutes:accidentAt-extended.startMinute};
+   }
    if(!episodeStageBaseline)episodeStageBaseline=structuredClone(data);
    sharedTimeWindowDraft=extended;sharedWindowMarker=extended.windowId;sharedGroupMarker=groupId;
    const witnessIds=[...result.memberIds,...(result.animals||[]).map(a=>a.id),...(v.stableAnimalIds||[])];
@@ -24821,7 +24839,9 @@ document.addEventListener('submit',e=>{
    // The durable sidecar must describe the NEXT clean group, not the old
    // evaluated form. Otherwise reload would resurrect a false blocker.
    persistEpisodeDraftSidecar();
-   notice='Činnost skupiny připravena bez zápisu a posunu času. Připravte další skupinu nebo potvrďte společné okno.';
+   notice=Number.isSafeInteger(accidentAt)&&accidentAt<basis.endMinute?
+    'Nehoda v '+displayCampaignMinute(accidentAt)+' ukončila společný interval. Nevyužitý čas řešte až po zdravotní proceduře.':
+    'Činnost skupiny připravena bez zápisu a posunu času. Připravte další skupinu nebo potvrďte společné okno.';
    render();return;
   }
   if(mutate(()=>{applyCurrent();data.campaignClock=next;

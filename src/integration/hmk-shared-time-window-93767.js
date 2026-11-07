@@ -74,6 +74,10 @@ export function validateSharedTimeWindowJournal93767(journal=[],clock=null){
   const list=episodes.get(key)||[];
   requireTrue(w.campaignId===row.calendarCampaignId&&row.campaignMinute===w.startMinute,
    'Neplatná kampaň nebo čas společného okna.');
+  // HMK pp.148–149: an unresolved accident is an immediate medical handoff.
+  requireTrue(!list.some(entry=>entry.calendarTimeEpisode?.endMinute<w.endMinute&&
+   entry.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)),
+   'Nehoda před koncem společného okna vyžaduje zdravotní vyhodnocení ve skutečné minutě.');
   requireTrue(list.length===w.groupCount&&w.episodeIds.length===list.length&&unique(w.episodeIds)&&
    w.episodeIds.every(id=>list.some(x=>x.id===id)),
    'Některá připravená činnost chybí nebo byla zapsána dvakrát.');
