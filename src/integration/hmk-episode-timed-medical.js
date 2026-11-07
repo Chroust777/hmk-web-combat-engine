@@ -6,7 +6,6 @@
 import {dueMalnutritionCases,resolveMalnutritionCourse,applyDueMalnutritionOnsets} from './hmk-malnutrition-medical.js';
 import {activeNutritionPolicies,finishDueNutritionDays,enrollUnmonitoredNutrition} from './hmk-nutrition-days.js';
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
-import {needsAssistedIntake,assistedIntakeForDay,createAssistedIntake} from './hmk-nutrition-assisted-intake.js';
 import {episodeTimedCourseAgenda,episodeTimedCourseStep,episodeTimedCourseKey,episodeTimedCourseFields} from './hmk-episode-timed-courses.js';
 const incapacitating=new Set(['INC','UNC','KIA']);
 export function episodeTimedMedicalKey(t){return [t.characterId,t.episodeId,t.dueMinute].join('|');}
@@ -50,35 +49,6 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
   const courseAgenda=episodeTimedCourseAgenda(temp,endMinute-1);
   const next=Math.min(endMinute,...dayEnds,...dueTimes,...courseAgenda.map(t=>Math.max(at,t.minute)));
   virtualMinute(next);
-  // A character in INC/UNC/Coma cannot be assumed to swallow a day's
-  // rations. This GM fact is distinct from a d100 and is recorded with the
-  // exact nutrition day; it must not become an unrelated calendar event.
-  let intakeMissing=false;
-  for(const p of activeNutritionPolicies(temp.journal,campaignId)){
-   const days=temp.journal.filter(j=>j.calendarCampaignId===campaignId&&j.characterId===p.characterId&&j.calendarNutritionDay?.policyId===p.id);
-   const startDay=days.at(-1)?.calendarNutritionDay.endMinute??p.campaignMinute;
-   const endDay=startDay+1440;
-   if(endDay>next)continue;
-   const actor=temp.characters.find(c=>c.id===p.characterId);
-   if(!actor||!needsAssistedIntake(actor)||assistedIntakeForDay(temp.journal,campaignId,p.characterId,startDay,endDay))continue;
-   const key=['assisted-intake',p.characterId,startDay,endDay].join('|'),v=rolls[key];
-   const fields=[
-    {name:'foodAccepted',label:'Jídlo skutečně přijato?',type:'choice',options:[{value:'yes',label:'Ano'},{value:'no',label:'Ne'}]},
-    {name:'waterAccepted',label:'Voda skutečně přijata?',type:'choice',options:[{value:'yes',label:'Ano'},{value:'no',label:'Ne'}]},
-    {name:'caregiver',label:'Kdo / jak postavě pomohl?',type:'text'},
-    {name:'reason',label:'Skutečné okolnosti podání / nepodání',type:'text'}];
-   const valid=v&&['yes','no'].includes(v.foodAccepted)&&['yes','no'].includes(v.waterAccepted)&&
-    typeof v.caregiver==='string'&&v.caregiver.trim().length>=2&&typeof v.reason==='string'&&v.reason.trim().length>=3;
-   if(!valid){requirements.push({key,characterId:p.characterId,kind:'assisted-intake',dueMinute:endDay-1,
-    reason:'GM musí doložit skutečnou pomoc s jídlem a vodou za 24 hodin, nikoli smyšlený hod.',fields,values:v||{}});
-    intakeMissing=true;continue;}
-   const proof=createAssistedIntake({campaignId,actorId:p.characterId,minute:endDay-1,startMinute:startDay,
-    foodAccepted:v.foodAccepted==='yes',waterAccepted:v.waterAccepted==='yes',caregiver:v.caregiver,reason:v.reason});
-   temp.journal.push({id:ids(),characterId:p.characterId,calendarCampaignId:campaignId,campaignMinute:proof.minute,
-    createdAt:now(),title:'HMK · pomoc s příjmem během Cestování',body:proof.reason,calendarNutritionAssistedIntake:proof});
-   changes.push({key,actorId:p.characterId,dueMinute:proof.minute,kind:'assisted-intake',description:'Doložen skutečný příjem potravy/vody',shockAfter:actor.hmk.healthState?.shock});
-  }
-  if(intakeMissing)break;
   finishDueNutritionDays(temp,{idFactory:ids,stamp:now});
   applyDueMalnutritionOnsets(temp,{idFactory:ids,stamp:now});
   const payable=dueMalnutritionCases(temp).filter(t=>t.dueMinute<endMinute&&t.dueMinute<=next).sort((a,b)=>a.dueMinute-b.dueMinute||a.characterId.localeCompare(b.characterId));
