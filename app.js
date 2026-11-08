@@ -338,7 +338,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.779';
+const APP_VERSION='93.780';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2720,7 +2720,8 @@ function timeEpisodePageHTML(clock,participants){
  <label>Počet Spoor hvězd věnovaných skrytí vlastní stopy<input name="trackingSpoorSpent" type="number" min="0" max="100" value="0"></label></div>
  <p class="hc-hint">Tracking CF vynutí jeden Bearing při příští cestovní epizodě; není to nový náhodný hod. Pozor: Spoor od různých hodů se nesčítají.</p></div>
   <div class="hc-episode-navigation" data-episode-navigation><p data-episode-navigation-text class="hc-hint" data-hmk-help="Všechny možné stavy: clear = družina drží správný směr; misdirection = jde odchýleným směrem; lost = ztratila orientaci. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení. Samotný další hod je automaticky nemaže.">Dřívější bloudění se nepřestane počítat jen kvůli novému testu nebo uplynutí času.</p>
- <label class="hc-check"><input name="navigationRecovered" type="checkbox"> <span class="hc-help-term" tabindex="0" data-hmk-help="Samostatné výslovné rozhodnutí GM: družina skutečně zjistila správnou trasu. Samotný úspěch nového Orienteering není automatický návrat na cestu. Rozhodnutí se zapíše do epizody.">GM doložil napravení bloudění / návrat na trasu</span></label></div>
+ <label class="hc-check"><input name="navigationRecovered" type="checkbox"> <span class="hc-help-term" tabindex="0" data-hmk-help="Výslovné rozhodnutí GM. Po Lost nový Orienteering musí doložit zvláštní Bearing Mode. Po starším Misdirection musí navigující postava doložit úspěšný Awareness S/CS v této epizodě. Pouhý checkbox nelze použít místo skutečného hodu.">GM doložil napravení bloudění / návrat na trasu</span></label>
+ <label data-episode-navigation-recovery-awareness>Awareness k návratu po dřívějším Misdirection (HMK 148) <select name="navigationRecoveryAwarenessProofId"><option value="">— skutečný test navigující postavy —</option>${skillOptions('Awareness')}</select></label></div>
  <p data-episode-skill-memory-status class="hc-hint">Výsledek a jeho platnost se objeví po výběru.</p>
  </details>
  <details class="hc-episode-settings" data-episode-section="rolls"><summary>5 · Potřebné hody a případné události</summary>
@@ -21854,6 +21855,10 @@ function episodeIssue(message,form){
   return {field:'hazardAtMinute',skill:null,actorId:null};
  if(/Complication CF:.*změnu trasy/i.test(message))
   return {field:'hazardComplicationRouteChanged',skill:null,actorId:null};
+ if(/Misdirection \(HMK 148\):.*Awareness Skill Test/i.test(message))
+  return {field:'navigationRecoveryAwarenessProofId',skill:'Awareness',actorId:form?.elements.namedItem('guideId')?.value||null};
+ if(/Lost \(HMK 148\):.*zvláštní Bearing Mode|Lost vyžaduje zvláštní Bearing/i.test(message))
+  return {field:'mode_bearing',skill:null,actorId:null};
  // Every completion blocker must lead to a named step. v93.688.
  if(/Equipment Hazard.*zdržení|Equipment Hazard.*následující hlídku|Úspěch CS nezpůsobuje zdržení/i.test(message))
   return {field:'hazardDelayNow',skill:null,actorId:null};
@@ -22071,7 +22076,7 @@ function episodeCurrentWeather(form,clock,{mandatory=true}={}){
 function episodeAssertScopedSkillInputs(v){
  if(!episodeEvaluationRequested)return;
  for(const [field,id] of Object.entries(v)){
-  if(!/^(orientationProofId|trackingProofId|trackingAwarenessProofId|droverProofId|hazardEvidenceId|hazardDirectionProofId|hazardCompProof_.+|evPartyProof_\d+|whProof_.+)$/.test(field)||!id)continue;
+  if(!/^(orientationProofId|trackingProofId|trackingAwarenessProofId|navigationRecoveryAwarenessProofId|droverProofId|hazardEvidenceId|hazardDirectionProofId|hazardCompProof_.+|evPartyProof_\d+|whProof_.+)$/.test(field)||!id)continue;
   // Reuse is a separately validated, explicit route; this is only for NEW tests.
   if(field==='orientationProofId'&&v.orientationUse==='reuse')continue;
   const row=data.journal.find(j=>j.id===id),link=row?.calendarEpisodeSkillLink;
@@ -22260,6 +22265,20 @@ function episodePreviewFromForm(form,clock){
   const base=trekMovement({topography:v.topography,terrain:v.terrain,conveyance:v.conveyance,
    progress:0,slow:0,bearing:0,loaded:false,progressD10:[],continuousPrecipitation:!!precipitation?.slowMode});
   const forced=pendingTrackingCFBearing(data.journal,campaignKey(clock),clock.minute,members);
+  // HMK p148: a Lost party only notices its error after earning a *new*
+  // one-time Bearing Mode beyond the ordinary terrain / Tracking requirement.
+  // A GM checkbox alone must never erase Lost in the next watch.
+  const priorNavigation=episodeNavigationState(lastEpisodeBefore(
+   data.journal,campaignKey(clock),clock.minute,members));
+  const lostRecoveryBearing=v.navigationRecovered&&priorNavigation==='lost'?1:0;
+  // A prior Misdirection is noticed by the guide's real Awareness test,
+  // retried in this watch (HMK p148); a GM checkbox alone is not a roll.
+  const recoveryAwareness=v.navigationRecovered&&priorNavigation==='misdirection'?
+   episodeSkillProof(data.journal.find(j=>j.id===v.navigationRecoveryAwarenessProofId),
+    'Awareness',guideId,campaignKey(clock),clock.minute):null;
+  if(v.navigationRecovered&&priorNavigation==='misdirection'&&
+    (!recoveryAwareness||!['S','CS'].includes(recoveryAwareness.level)))
+   throw Error('Misdirection (HMK 148): návrat na trasu vyžaduje skutečný úspěšný Awareness Skill Test navigující postavy v tomto intervalu. Neúspěšný nebo chybějící hod bloudění neodstraní.');
   const droverRow=data.journal.find(j=>j.id===v.droverProofId);
   const drover=v.conveyance==='foot'?null:
    (episodeSkillProof(droverRow,'Riding',guideId,campaignKey(clock),clock.minute)||
@@ -22270,10 +22289,12 @@ function episodePreviewFromForm(form,clock){
    previous,minute:clock.minute,context,priority:v.orientationPriority||'pace',
    allocationMode:v.orientationAllocation||'auto',lowChoice:v.orientationLowChoice||'slow',
    manualModes:Object.fromEntries(['bearing','progress','foraging','stalking','vigilance'].map(k=>[k,Number(v['mode_'+k])])),
-   requiredBearing:base.requiredBearing+forced,continuousPrecipitation:!!precipitation?.slowMode,
+   requiredBearing:base.requiredBearing+forced+lostRecoveryBearing,continuousPrecipitation:!!precipitation?.slowMode,
    familiar:!!v.orientationFamiliar,torchlight:actualPeriod==='night'&&!!v.orientationTorch,fullMoon:actualPeriod==='night'&&!!v.orientationMoon,
    afterSnowfall:actualPeriod==='night'&&!!v.orientationSnow,
    droverSkill:drover});
+  if(lostRecoveryBearing&&orientation.modes.bearing<base.requiredBearing+forced+1)
+   throw Error('Lost (HMK 148): pro návrat na správnou trasu musíte v novém Orienteering skutečně získat a přidělit zvláštní Bearing Mode navíc k povinným Bearing. Pouhé potvrzení GM nestačí.');
   form.dataset.episodeOrientationStars=String(orientation?.stars??0);
   form.dataset.episodeOrientationSv=String(orientation?.adjustment?.adjustedSV??'');
   form.dataset.episodeOrientationModes=JSON.stringify(orientation?.modes||{});
@@ -22424,9 +22445,13 @@ function episodePreviewFromForm(form,clock){
  result.movementRolls={progressD10,directionD10};
  result.movementRollSources={progress:pvals?null:inheritedProgress?previous.id:null,
   direction:dvals?null:inheritedDirection?previous.id:null};
- result.navigationState=episodeNavigationState(lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members),result.direction,{recovered:!!v.navigationRecovered});
+ result.navigationState=episodeNavigationState(lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members),result.direction,{recovered:!!v.navigationRecovered,lostPriority:true});
  result.navigationPartyScope='v93.699';
  result.navigationRecovered=!!v.navigationRecovered;
+ result.navigationRecoveryAwarenessProofId=(v.navigationRecovered&&
+  episodeNavigationState(lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members))==='misdirection')?
+  String(v.navigationRecoveryAwarenessProofId||'').trim()||null:null;
+ result.navigationRecoveryRule='special-bearing-and-awareness-v93.780';
  const hazardTypes=[result.survivalHazard,result.direction?.direction].filter(Boolean);
  // User-selected minute episodes are authoritative: a hazard cannot force a 240-minute boundary.
  result.hazardDetails=[];
@@ -22503,6 +22528,15 @@ function episodePreviewFromForm(form,clock){
   result.hazardDetails.push(detail);
  }
  result.hazardDetail=result.hazardDetails[0]??null;
+ // HMK p148: a successful *real* Awareness test made at Misdirection
+ // notices the mistake in this watch; never leave a reoriented party Lost.
+ if(kind==='travel'){
+  const reoriented=result.hazardDetails.some(h=>h.hazard==='misdirection'&&h.result==='reoriented');
+  result.navigationReorientedInWatch=reoriented;
+  if(reoriented)result.navigationState=episodeNavigationState(
+   lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members),
+   result.direction,{recovered:!!v.navigationRecovered,redirected:true,lostPriority:true});
+ }
   if(kind==='travel'){
    const incoming=equipmentDelayIn;
    const relevant=result.hazardDetails.find(h=>['equipment','complication'].includes(h.hazard));
@@ -23775,6 +23809,8 @@ function updateEpisodePreview(form){
  const autoTrackingLight=form.elements.namedItem('trackingLight');
  if(autoTrackingLight)autoTrackingLight.value=sky?.period||'day';
  const navigationPrev=v.memberIds?.length?lastEpisodeBefore(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute,v.memberIds):null;
+ const navRecoveryRow=form.querySelector('[data-episode-navigation-recovery-awareness]');
+ if(navRecoveryRow)navRecoveryRow.hidden=!(episodeNavigationState(navigationPrev)==='misdirection'&&!!v.navigationRecovered);
  const navigationText=form.querySelector('[data-episode-navigation-text]');if(navigationText){
   const state=episodeNavigationState(navigationPrev);
   navigationText.innerHTML='Přetrvávající stav družiny: <span class="hc-help-term" tabindex="0" data-hmk-help="Možnosti: clear = správný směr, misdirection = odchýlení od trasy, lost = ztracení. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení.">'+esc(state)+'</span>. Možnosti: clear = správná trasa; misdirection = odchýlení; lost = ztracení. Změna stavu vyžaduje skutečný pravidlový následek nebo rozhodnutí GM.';
