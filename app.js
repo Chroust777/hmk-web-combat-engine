@@ -339,7 +339,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.786';
+const APP_VERSION='93.787';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12453,6 +12453,51 @@ document.addEventListener('submit',event=>{
   selected=actor.id;view='sheet';activeSheetSection='hazards';render();
  }catch(error){if(out)out.textContent='Weather Course nebyl zapsán: '+error.message;}
 },true);
+/** v93.787: validated medical input handoff. A conditional Blood Loss
+ * d100 after a failed Physician roll is not HTML-required until the result is
+ * known. After OK we must point to the exact now-required manual die, never
+ * invent a roll or write a fictional success. */
+function markTravelBloodInput93787(form,node){
+ if(!node||!node.isConnected||node.disabled)return false;
+ for(const old of form.querySelectorAll('[data-hmk-medical-invalid="yes"]')){
+  old.removeAttribute('data-hmk-medical-invalid');old.removeAttribute('aria-invalid');
+  old.closest('label')?.classList.remove('hc-medical-validation-error');
+ }
+ for(let parent=node.parentElement;parent;parent=parent.parentElement){
+  if(parent.tagName==='DETAILS')parent.open=true;
+ }
+ node.setAttribute('data-hmk-medical-invalid','yes');node.setAttribute('aria-invalid','true');
+ node.closest('label')?.classList.add('hc-medical-validation-error');
+ node.scrollIntoView({block:'center',behavior:'auto'});
+ node.focus({preventScroll:true});
+ return document.activeElement===node;
+}
+function focusTravelBloodError93787(form,message){
+ const t=String(message||'');
+ const field=/Po CF\/F\/S|Blood Loss d100|Strength d100|Strength pacienta/i.test(t)?'strengthRoll':
+  /Physician d100|skutečný Physician/i.test(t)?'physicianRoll':
+  /rozžhaven|Cauterisation vyžaduje/i.test(t)?'hasHeatedTool':
+  /obvaz|bandages/i.test(t)?'bandageD6Rolls':
+  /voda|Clean & Dress/i.test(t)?'hasWater':
+  /jehl|nit/i.test(t)?'hasNeedleThread':
+  /léčitel|Physician ML/i.test(t)?'healerId':
+  /turniket/i.test(t)?'tourniquet':null;
+ let target=field&&form.elements.namedItem(field);
+ if(target instanceof RadioNodeList)target=target[0];
+ if(!target||target.disabled||!target.isConnected){
+  target=[...form.querySelectorAll('input,select,textarea')].find(x=>!x.disabled&&x.willValidate&&!x.checkValidity());
+ }
+ return markTravelBloodInput93787(form,target);
+}
+document.addEventListener('invalid',e=>{
+ const form=e.target?.closest?.('form[data-weather-blood-start],form[data-weather-blood-complete]');
+ if(form)markTravelBloodInput93787(form,e.target);
+},true);
+for(const eventName of ['input','change'])document.addEventListener(eventName,e=>{
+ const node=e.target;if(node?.getAttribute?.('data-hmk-medical-invalid')!=='yes')return;
+ node.removeAttribute('data-hmk-medical-invalid');node.removeAttribute('aria-invalid');
+ node.closest('label')?.classList.remove('hc-medical-validation-error');
+},true);
 /** Weather Blood Stoppage: the preparation, five-minute obligation and
  * actual d100 are separate witnessed transactions on the same campaign. */
 document.addEventListener('submit',event=>{
@@ -12511,7 +12556,8 @@ document.addEventListener('submit',event=>{
     (outcome.nextDueMinute?' · další interval '+displayCampaignMinute(outcome.nextDueMinute):'')};
   selected=actor.id;activeSheetSection='hazards';view='sheet';render();
  }catch(error){if(out)out.textContent='Blood Stoppage nebyl zapsán: '+error.message;
-  else alert('Blood Stoppage nebyl zapsán: '+error.message);}
+  else alert('Blood Stoppage nebyl zapsán: '+error.message);
+  focusTravelBloodError93787(form,error.message);}
 },true);
 document.addEventListener('submit',event=>{
  const f=event.target;if(!f?.matches?.('[data-parallel-cold-reroll],[data-parallel-cold-course]'))return;
