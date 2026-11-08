@@ -339,7 +339,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.782';
+const APP_VERSION='93.783';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10007,10 +10007,24 @@ function render(){
 // Observe only added DOM nodes; attribute edits from help decoration do not loop.
 const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
-  node.matches?.('form,section,div')||node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form]')))))
+  node.matches?.('form,section,div,fieldset,label,input')||
+  node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form],input[type=number]')))))
    {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);enhanceHMKDiceFields();syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
+// v93.783: a Secondary Roll can become usable WITHOUT a render or added DOM
+// node (the existing input only changes disabled=true -> false). Revisit ONLY
+// these enable transitions. The general dice helper skips disabled fields during
+// initial render, so otherwise the now-required d10 has no generator.
+// No dice are rolled here; this merely adds the same optional button used by
+// all other numeric rule forms, preserving manual input and submit validation.
+const hmkEnabledDieObserver=new MutationObserver(records=>{
+ if(records.some(r=>r.type==='attributes'&&r.target instanceof HTMLInputElement&&
+  r.target.type==='number'&&!r.target.disabled))enhanceHMKDiceFields();
+});
+hmkEnabledDieObserver.observe(document.getElementById('app'),{
+ subtree:true,attributes:true,attributeFilter:['disabled']
+});
 // On narrow layouts the navigation joins the page scroll instead of using
 // its own scroll container. Keep the viewport at the same position on sidebar
 // clicks, rather than allowing focus/scroll anchoring to jump to page top.
@@ -13224,7 +13238,20 @@ function hskApplySRSelection(form,side='A'){
  const parent=form.querySelector('[data-sr-side="'+side+'"]');if(!parent)return;
  const context=parent.querySelector('[data-sr-context]'),fields=parent.querySelector('[data-sr-fields]');
  if(fields)fields.hidden=!routine;
- const die=form.elements.namedItem('roll10'+side);if(die){die.disabled=!routine;if(!routine)die.value='';}
+ const die=form.elements.namedItem('roll10'+side);
+ if(die){
+  const nextId=routine?.id||'',previousId=die.dataset.hmkSrRoutineId||'';
+  // v93.783: a d10 from a different prescribed activity is not evidence
+  // for this one, even if the number happens to be the same. Invalidate
+  // both manual value and software attribution on a genuine source switch.
+  if(previousId!==nextId){
+   die.value='';delete die.dataset.hmkAutoDice;
+   const generator=die.nextElementSibling;
+   if(generator?.dataset?.hmkGeneralAutoDie==='true')generator.textContent='⚄ d10';
+  }
+  die.dataset.hmkSrRoutineId=nextId;
+  die.disabled=!routine;
+ }
  const key='srAutoModifiers'+side,prior=form.dataset[key]||'',names=side==='A'?['secondary1','secondary2']:['defSecondary1','defSecondary2'];
  if(prior){for(let i=0;i<2;i++){const field=form.elements.namedItem(names[i]),old=prior.split('|')[i]||'';
   if(field&&field.value===old)field.value='';}}
@@ -13509,6 +13536,11 @@ document.addEventListener('click',e=>{
  if(view!=='skills'||activeSkillTab!=='value'||!select?.value)return;
  skillSVChoice595={actorId:selected,kind,value:select.value};
  render();
+ // v93.783: the SV picker sets the selected Primary Skill programmatically.
+ // That does not fire a native change event, so its prescribed Secondary Roll
+ // routine must be populated explicitly before the GM begins rolling.
+ const activeForm=document.querySelector('#skill-value-form');
+ if(activeForm){hskConfigureSR(activeForm,'A');refreshSkillAutoPreview(activeForm);}
 },true);
 document.addEventListener('click',e=>{const t=e.target.closest?.('[data-skill-tab]');if(!t)return;
  if(!t.closest('.hmk-skill-workbench'))return;
