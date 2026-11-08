@@ -339,7 +339,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.783';
+const APP_VERSION='93.784';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -24473,7 +24473,7 @@ function initializeTimeEpisodeForm(form){
  if(timeEpisodeDraftCampaign!==campaignKey(data.campaignClock)){
   timeEpisodeDraft={};timeEpisodeDraftCampaign=campaignKey(data.campaignClock);
   episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];
-  if(episodeStageBaseline){data=structuredClone(episodeStageBaseline);episodeStageBaseline=null;discardEpisodeDraftSidecar();}
+  if(episodeStageBaseline){restoreLastCommittedEpisode93784();discardEpisodeDraftSidecar();}
   episodeEvaluationRequested=false;episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;
   episodeEvaluatedIdentity=null;episodeCurrentGuidedStep=null;
   episodeDraftEpoch=uuid();
@@ -24813,6 +24813,26 @@ document.addEventListener('submit',e=>{
   notice='Setkání dořešeno; další minuty lze vyhodnotit samostatnou epizodou.';
  }catch(err){alert('Setkání nelze uzavřít: '+err.message);}
 },true);
+// v93.784: Cancellation must restore the latest VERIFIED campaign, not the
+// snapshot captured when the episode began. Health/calendar/GM operations can
+// be independently committed while staged Skill Tests remain in RAM. Reverting
+// to the old episode snapshot would erase them from the on-screen document,
+// and could later lead to a stale write. No speculative episode roll survives.
+function restoreLastCommittedEpisode93784(){
+ if(!episodeStageBaseline)return;
+ if(storageBaseline===null)throw Error('Nelze bezpečně zahodit rozpracované hody: chybí potvrzená uložená kampaň. Exportujte zálohu.');
+ const durable=normalizeLegacyCustomPrices(validate(JSON.parse(storageBaseline)));
+ data=durable;
+ episodeStageBaseline=null;
+}
+// v93.784: All editor-backdrop forms have an explicit Cancel action. ESC is a
+// second non-committing exit path, scoped to the ordinary editor overlay only.
+// It never terminates a medical due, Combat guide or active Travel sequence.
+document.addEventListener('keydown',event=>{
+ if(event.key!=='Escape'||!overlay||!event.target?.closest?.('.editor-backdrop'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ overlay=null;render();
+},true);
 // Emergency recovery is intentionally a DRAFT-ONLY operation. It cannot forge
 // completion of HMK rules, skip medical deadlines or advance the campaign clock.
 // Saved combat state, inventory, fatigue, calendar and journal are untouched.
@@ -24845,7 +24865,8 @@ document.addEventListener('click',e=>{
  if(!uiConfirm('Nouzově zahodit CELOU rozpracovanou cestovní epizodu? Všechny její dosud pracovní Skill Testy a následky budou zrušeny. Trvalé údaje a čas zůstanou stejné.'))return;
  // Restore the pre-test checkpoint; nested Skill Test results were staged in RAM.
  // This does not delete previously committed independent receipts.
- if(episodeStageBaseline){data=structuredClone(episodeStageBaseline);episodeStageBaseline=null;}
+ try{if(episodeStageBaseline)restoreLastCommittedEpisode93784();}
+ catch(error){alert('Nouzové zrušení nebylo bezpečně dokončeno: '+error.message);return;}
  sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;sharedEpisodeAutoRun93772=false;sharedDefaultWeatherId93772='';episodeQueueAction=false;
  discardEpisodeDraftSidecar();
  timeEpisodeDraft={...episodeFreshDraft()};episodePendingRemainderMinutes=null;
