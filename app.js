@@ -339,7 +339,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.785';
+const APP_VERSION='93.786';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2452,6 +2452,45 @@ function episodeShowSetupError(form,error){
  episodeMarkField(form,error.field,{focus:true});
 }
 
+/** v93.786: travel-only validation handoff. Native alert acceptance must
+ * land at the exact editable prerequisite, visibly marked red. This does
+ * not generate a roll, mutate the campaign or pretend a due event resolved. */
+function travelMarkInvalid93786(node){
+ if(!node||!node.isConnected||node.disabled)return false;
+ for(const old of document.querySelectorAll('.hc-travel-validation-error'))old.classList.remove('hc-travel-validation-error');
+ for(const old of document.querySelectorAll('[data-hmk-travel-invalid="yes"]')){
+  old.removeAttribute('data-hmk-travel-invalid');old.removeAttribute('aria-invalid');
+ }
+ for(let parent=node.parentElement;parent;parent=parent.parentElement){
+  if(parent.tagName==='DETAILS')parent.open=true;
+ }
+ const label=node.closest('label')||node;
+ label.classList.add('hc-travel-validation-error');
+ node.dataset.hmkTravelInvalid='yes';node.setAttribute('aria-invalid','true');
+ node.scrollIntoView({block:'center',behavior:'auto'});
+ node.focus({preventScroll:true});
+ return document.activeElement===node;
+}
+function travelFocusWindowError93786(message){
+ if(/počasí|oblast/i.test(message))return travelMarkInvalid93786(document.querySelector('[data-shared-window-weather]'));
+ if(/minut|délk|půlnoc|den končí/i.test(message))return travelMarkInvalid93786(document.querySelector('[data-shared-window-minutes]'));
+ return false; // A due medical event is NOT a missing travel input.
+}
+function travelFocusPlanRowError93786(id,field){
+ const row=[...document.querySelectorAll('[data-shared-plan-card]')].find(x=>x.dataset.sharedPlanCard===id);
+ const selector={actor:'[data-shared-row-actor]',weather:'[data-shared-row-weather]',kind:'[data-shared-plan-kind]',minutes:'[data-shared-plan-minutes]',follow:'[data-shared-plan-follow]',member:'[data-shared-plan-member]'}[field];
+ return !!selector&&travelMarkInvalid93786(row?.querySelector(selector));
+}
+document.addEventListener('input',e=>{
+ const node=e.target;if(node?.dataset?.hmkTravelInvalid!=='yes')return;
+ node.removeAttribute('data-hmk-travel-invalid');node.removeAttribute('aria-invalid');
+ node.closest('.hc-travel-validation-error')?.classList.remove('hc-travel-validation-error');
+},true);
+document.addEventListener('change',e=>{
+ const node=e.target;if(node?.dataset?.hmkTravelInvalid!=='yes')return;
+ node.removeAttribute('data-hmk-travel-invalid');node.removeAttribute('aria-invalid');
+ node.closest('.hc-travel-validation-error')?.classList.remove('hc-travel-validation-error');
+},true);
 function episodeRecentRows(clock){return episodeTimeline(data.journal,campaignKey(clock));}
 function episodeNumber(d,n=0){const x=Number(d);return Number.isFinite(x)?x:n;}
 function timeEpisodeWeatherOptions(clock){
@@ -24898,7 +24937,9 @@ document.addEventListener('change',e=>{
   else if(node.hasAttribute('data-shared-plan-follow'))sharedPlanUpdate93771(id,'follow',node.value);
   else sharedPlanUpdate93771(id,'member',{id:node.value,checked:node.checked});
   render();
- }catch(error){notice=error.message;alert('Plán skupin: '+error.message);render();}
+ }catch(error){notice=error.message;alert('Plán skupin: '+error.message);render();
+  travelFocusPlanRowError93786(id,node.hasAttribute('data-shared-row-actor')?'actor':node.hasAttribute('data-shared-row-weather')?'weather':
+   node.hasAttribute('data-shared-plan-kind')?'kind':node.hasAttribute('data-shared-plan-minutes')?'minutes':node.hasAttribute('data-shared-plan-follow')?'follow':'member');}
 },true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-shared-plan-close]');if(!b||b.disabled)return;
@@ -24996,7 +25037,7 @@ document.addEventListener('click',e=>{
   timeEpisodeDraft={...timeEpisodeDraft,weatherSource:timeEpisodeDraft.weatherSource||'local',minutes:String(minutes)};
   notice=wanted>minutes?'Společné okno zkráceno z '+wanted+' na '+minutes+' minut podle nejbližší povinné nebo denní hranice.':'Společné časové okno založeno bez posunu času.';
   persistEpisodeDraftSidecar();render();
- }catch(err){alert('Společné okno nebylo založeno: '+err.message);}
+ }catch(err){alert('Společné okno nebylo založeno: '+err.message);travelFocusWindowError93786(err.message);}
 },true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-shared-window-cancel]');if(!btn)return;

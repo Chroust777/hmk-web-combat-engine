@@ -7420,3 +7420,18 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
  color:#17466c!important;
 }
 .content-calendar .journal-book--calendar .folio-chapter-page--right > .folio-chapter-content :is(.hc-time-control,.hc-planner,.hc-gm-advance){width:100%;min-width:0;margin-top:12px}
+
+/* v93.786 · Travel planner: after OK, focus the exact invalid field and mark red. */
+[data-shared-window-control] .hc-travel-validation-error,
+.hc-episode-row-table .hc-travel-validation-error,
+[data-shared-plan-card] .hc-travel-validation-error {
+ outline:2px solid #b02222!important;outline-offset:3px;border-radius:5px;
+ background:rgba(191,34,34,.10)!important;
+ scroll-margin-block:6.5rem;
+}
+[data-shared-window-control] [data-hmk-travel-invalid="yes"],
+.hc-episode-row-table [data-hmk-travel-invalid="yes"],
+[data-shared-plan-card] [data-hmk-travel-invalid="yes"] {
+ border:2px solid #b02222!important;outline-color:#b02222!important;
+ box-shadow:0 0 0 3px rgba(176,34,34,.14)!important;
+}
