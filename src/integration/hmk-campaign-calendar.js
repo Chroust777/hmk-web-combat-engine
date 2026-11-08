@@ -17,6 +17,20 @@ const MAX_MINUTE=1000000000;
 const KEY=(kind,characterId,woundId='')=>`${kind}:${characterId}:${woundId}`;
 const isVerifiedHealthSource=s=>s==='confirmed-combat'||s==='confirmed-health';
 const KNOWN=['wound','extended-shock','coma','blood-loss','poison','disease','weather','sleep','aural'];
+// Emergency GM deferral preserves a missing roll as a visible DEBT, not a
+// fabricated result.  No dice or medical state changes are performed here.
+export const GM_DEFERABLE_HEALTH_KINDS=new Set([
+ 'poison','disease','coma','extended-shock','blood-loss','grim','healing',
+ 'infection','weather-shock','weather-course','weather-onset','weather-skin',
+ 'treatment','bleeding','shock-followup','blood-shock','malnutrition-course',
+ 'injury-mishap','injury-morale','asphyxia','sleep-deprivation',
+ 'psyche-recovery','psyche-interval','psyche-manifestation','aural-recovery'
+]);
+const gmDeferredKey=(x)=>JSON.stringify([x.obligationId,x.characterId,x.kind,x.dueMinute]);
+export function isGMDeferredCalendarEvent(clock,x){
+ return !!clock?.events?.some(e=>e.type==='gm-defer'&&gmDeferredKey(e)===JSON.stringify([x.id,x.characterId,x.kind,x.minute]));
+}
+
 export function displayCampaignMinute(minute){
  ensure(validInt(minute,-MAX_MINUTE,MAX_MINUTE),'Neplatný čas kampaně');
  const day=Math.floor(minute/DAY_MINUTES)+1;
@@ -50,9 +64,15 @@ export function validateCampaignCalendar(clock){
  let last=-1;const eventIds=new Set();
  for(const e of clock.events){
   ensure(e&&typeof e.id==='string'&&e.id.length>0&&!eventIds.has(e.id)&&
-   ['init','advance','anchor','resolution','tr-origin','plan','resolve-plan','cancel-plan','membership'].includes(e.type)&&validInt(e.minute,0,MAX_MINUTE)&&
+   ['init','advance','anchor','resolution','tr-origin','plan','resolve-plan','cancel-plan','membership','gm-defer'].includes(e.type)&&validInt(e.minute,0,MAX_MINUTE)&&
    e.minute>=last&&typeof e.reason==='string'&&e.reason.length>0&&e.reason.length<=400,
    'Neplatná nebo zpětně vložená časová událost');
+  if(e.type==='gm-defer')ensure(typeof e.obligationId==='string'&&e.obligationId.length>0&&e.obligationId.length<=350&&
+   typeof e.characterId==='string'&&e.characterId.length>0&&e.characterId.length<=200&&
+   GM_DEFERABLE_HEALTH_KINDS.has(e.kind)&&validInt(e.dueMinute,0,MAX_MINUTE)&&
+   e.dueMinute<=e.minute&&typeof e.gmNote==='string'&&e.gmNote.trim().length>=10&&
+   e.gmNote.length<=400&&e.gmConfirmed===true,
+   'Neplatná nouzová GM výjimka nebo chybějící zdůvodnění');
   eventIds.add(e.id);last=e.minute;
  }
  ensure(clock.events.length>0&&clock.events[0].type==='init'&&clock.events.at(-1).minute===clock.minute,
@@ -109,6 +129,30 @@ export function anchorCampaignOrigin(clock,{kind,characterId,woundId=null,elapse
  next.anchors.push({kind,characterId,...(kind==='wound'?{woundId}:{}),minute:clock.minute-elapsedMinutes,source,eventId,...(episodeId?{episodeId}:{}),...(isVerifiedHealthSource(source)?{combatEventId}:{})});
  next.events.push({id:eventId,type:'anchor',minute:clock.minute,
   reason:`${source}: ${KEY(kind,characterId,woundId)}; doložený věk ${elapsedMinutes} minut`});
+ validateCampaignCalendar(next);return next;
+}
+/** Skip exactly ONE due medical obligation as a visible GM exception.
+ * It does NOT resolve the underlying rule/test, injury, poison or disease.
+ * The GM must correct the state or perform the original roll separately. */
+export function deferGMCalendarHealthObligation(clock,{obligation,characters=[],journal=[],inventory=[],eventId,reason,gmConfirmed}={}){
+ validateCampaignCalendar(clock);
+ ensure(gmConfirmed===true,'Přeskočení vyžaduje výslovné potvrzení GM');
+ ensure(typeof reason==='string'&&reason.trim().length>=10&&reason.length<=400,
+  'GM musí uvést konkrétní důvod výjimky (alespoň 10 znaků)');
+ ensure(typeof eventId==='string'&&eventId.length>0&&!clock.events.some(e=>e.id===eventId),
+  'Neplatné nebo duplicitní ID výjimky');
+ ensure(obligation&&typeof obligation.id==='string'&&typeof obligation.characterId==='string'&&
+  GM_DEFERABLE_HEALTH_KINDS.has(obligation.kind),'Pouze skutečně splatný zdravotní termín lze odložit');
+ const agenda=campaignCalendarAgenda(clock,characters,journal,inventory);
+ const source=agenda.due.find(e=>e.id===obligation.id&&e.characterId===obligation.characterId&&
+  e.kind===obligation.kind&&e.minute===obligation.minute);
+ ensure(!!source,'Zdravotní povinnost již není splatná nebo se její datum změnilo');
+ ensure(!isGMDeferredCalendarEvent(clock,source),'Událost již má nouzovou výjimku');
+ const next=structuredClone(clock);
+ next.events.push({id:eventId,type:'gm-defer',minute:clock.minute,
+  reason:'GM vědomě odložil povinný zdravotní hod: '+reason.trim(),
+  obligationId:source.id,characterId:source.characterId,kind:source.kind,dueMinute:source.minute,
+  gmNote:reason.trim(),gmConfirmed:true});
  validateCampaignCalendar(next);return next;
 }
 /** Add the verified Combat engine event to the SAME durable calendar log. */
@@ -324,7 +368,10 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
    status:op.endMinute<=clock.minute?'due':'future'});
  }
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
- return {due:all.filter(x=>x.status==='due'),future:all.filter(x=>x.status==='future'),unknown,all,suspended,prepared};
+ const deferred=all.filter(x=>isGMDeferredCalendarEvent(clock,x));
+ const actionable=all.filter(x=>!isGMDeferredCalendarEvent(clock,x));
+ return {due:actionable.filter(x=>x.status==='due'),future:actionable.filter(x=>x.status==='future'),
+  unknown,all:actionable,deferred,suspended,prepared};
 }
 export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmConfirmed,characters=[],journal=[],inventory=[],deferConcurrentTreatmentAtStart=false}={}){
  validateCampaignCalendar(clock);
