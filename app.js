@@ -338,7 +338,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.780';
+const APP_VERSION='93.781';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -22452,6 +22452,10 @@ function episodePreviewFromForm(form,clock){
   episodeNavigationState(lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members))==='misdirection')?
   String(v.navigationRecoveryAwarenessProofId||'').trim()||null:null;
  result.navigationRecoveryRule='special-bearing-and-awareness-v93.780';
+ // Every episode, including Rest/Foraging/Watch, carries an explicit false
+ // witness unless a real in-watch Misdirection Awareness reoriented Travel.
+ // Missing (=undefined) fails immutable receipt replay after atomic group commit.
+ result.navigationReorientedInWatch=false;
  const hazardTypes=[result.survivalHazard,result.direction?.direction].filter(Boolean);
  // User-selected minute episodes are authoritative: a hazard cannot force a 240-minute boundary.
  result.hazardDetails=[];
