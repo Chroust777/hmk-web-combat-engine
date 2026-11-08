@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict');
+(async()=>{
+ const {episodeNavigationState}=await import('../src/integration/hmk-time-episodes.js');
+ let count=0;const check=(actual,expected,why)=>{assert.equal(actual,expected,why);count++;};
+ const lost={calendarTimeEpisode:{navigationState:'lost'}};
+ const misdirected={calendarTimeEpisode:{navigationState:'misdirection'}};
+ const clear={calendarTimeEpisode:{navigationState:'clear'}};
+ const turned={direction:'misdirection'},abandoned={direction:'lost'},slow={direction:'lost-time'};
+ check(episodeNavigationState(lost,turned), 'misdirection','old immutable historical interpretation');
+ check(episodeNavigationState(lost,turned,{lostPriority:true}), 'lost','Lost cannot become Misdirection without special Bearing');
+ check(episodeNavigationState(lost,turned,{lostPriority:true,redirected:true}), 'lost','Awareness on Misdirection cannot cancel previous Lost');
+ check(episodeNavigationState(lost,turned,{lostPriority:true,recovered:true}), 'misdirection','earned Bearing cancels prior Lost but new Misdirection remains');
+ check(episodeNavigationState(lost,slow,{lostPriority:true}), 'lost','Lost persists through Lost Time');
+ check(episodeNavigationState(lost,slow,{lostPriority:true,recovered:true}), 'clear','earned Bearing clears Lost');
+ check(episodeNavigationState(misdirected,turned,{redirected:true,lostPriority:true}), 'clear','actual successful Awareness clears current Misdirection');
+ check(episodeNavigationState(misdirected,turned,{redirected:false,lostPriority:true}), 'misdirection','deferred Awareness retains Misdirection');
+ check(episodeNavigationState(clear,abandoned,{lostPriority:true}), 'lost','fresh Lost is recorded even if recovery ticked');
+ check(episodeNavigationState(lost,abandoned,{lostPriority:true,recovered:true}), 'lost','fresh Lost remains Lost');
+ console.log('PASS v93.780 navigation precedence, one-time Bearing / successful Awareness, historical compatibility: '+count+' checks');
+})().catch(e=>{console.error(e);process.exitCode=1});
