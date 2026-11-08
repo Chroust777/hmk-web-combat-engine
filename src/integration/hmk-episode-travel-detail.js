@@ -168,7 +168,13 @@ export function episodeHazardFollowup({hazard,repairSkill=null,repairLevel=null,
  if(hazard==='misdirection'||hazard==='lost'){
   requireTrue(directionD10===null||die(directionD10,10),'Směr: skutečný d10 musí být 1–10.');
   requireTrue(directionTurn===null||['left','right'].includes(directionTurn),'Směr: doložte vlevo/vpravo.');
-  requireTrue(directionD10===null||directionTurn===(directionD10%2?'left':'right'),'Směr: odchýlení neodpovídá lichému/sudému d10.');
+  // HMK p.148: a left/right deviation is not independent GM testimony.
+  // It can only be derived from the actual odd/even d10. Previously supplying
+  // directionTurn alone could produce a final, non-pending hazard receipt.
+  requireTrue(directionTurn===null||die(directionD10,10),
+   'Směr: levé/pravé odchýlení vyžaduje doložený skutečný d10.');
+  requireTrue(directionD10===null||directionTurn===(directionD10%2?'left':'right'),
+   'Směr: odchýlení neodpovídá lichému/sudému d10.');
   requireTrue(directionAwareness===null||levels.includes(directionAwareness),'Směr: nesprávný Awareness výsledek.');
   requireTrue(typeof directionObservationDeferred==='boolean'&&
    (!directionObservationDeferred||(hazard==='misdirection'&&directionAwareness===null)),
