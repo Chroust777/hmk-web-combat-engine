@@ -516,12 +516,16 @@ export function computeEpisodeTracking({mode='none',currentSkill=null,previous=n
   context,trail:trailName,sv:witness.sv,level:witness.level,stars:witness.stars??null,
   roll:witness.roll??null,conditions:actual,modifier,score,sourceMode:mode,reusedFromEpisodeId:mode==='reuse'?previous.id:null};
 }
-export function episodeNavigationState(previous,newDirection=null,{recovered=false}={}){
+export function episodeNavigationState(previous,newDirection=null,{recovered=false,redirected=false,lostPriority=false}={}){
  const p=previous?.calendarTimeEpisode;
  const earlier=p?.navigationState||
   (p?.direction?.direction==='lost'?'lost':p?.direction?.direction==='misdirection'?'misdirection':'clear');
  const active=recovered?'clear':earlier;
- return newDirection?.direction==='lost'?'lost':newDirection?.direction==='misdirection'?'misdirection':active;
+ // The guide's successful Awareness in the current misdirection watch can
+ // correct that watch (HMK p148). A newly rolled Lost is not curable this way.
+ return newDirection?.direction==='lost'?'lost':
+  lostPriority&&active==='lost'?'lost':
+  newDirection?.direction==='misdirection'?(redirected?'clear':'misdirection'):active;
 }
 export function validateTimeEpisodes(journal=[]){
  const byCampaign=new Map(),prior=[];
@@ -567,6 +571,12 @@ export function validateTimeEpisodes(journal=[]){
     const required=trekMovement({topography:e.topography,terrain:e.terrain,
      conveyance:e.conveyance,progress:0,slow:0,bearing:0,loaded:false,progressD10:[],
      continuousPrecipitation:!!e.precipitation?.slowMode}).requiredBearing;
+    const recoveryRule=e.navigationRecoveryRule==='special-bearing-and-awareness-v93.780';
+    const navPrior=recoveryRule?lastEpisodeBefore(prior,j.calendarCampaignId,e.startMinute,e.memberIds):null;
+    const specialBearing=recoveryRule&&e.navigationRecovered&&episodeNavigationState(navPrior)==='lost'?1:0;
+    const trackingBearing=recoveryRule?pendingTrackingCFBearing(prior,j.calendarCampaignId,e.startMinute,e.memberIds):0;
+    if(recoveryRule&&specialBearing)must(e.bearing>=required+trackingBearing+1,
+     'Lost: návrat na trasu bez zvláštního, skutečně přiděleného Bearing Mode.');
     let allocation;
     if(memo.allocationMode==='manual'){
      allocation={...memo.manualModes,lax:memo.adjustment.adjustedSV<=0||memo.adjustment.adjustedSV<=2&&memo.lowChoice==='lax',
@@ -575,7 +585,7 @@ export function validateTimeEpisodes(journal=[]){
     }else{
      allocation=allocateTrekModes({autoAllocate:true,autoPriority:memo.priority,slow:0,
       orienteeringSlow:0,foraging:0,stalking:0,vigilance:0,trackingForcedBearingSourceId:null},
-      memo.adjustment,{requiredBearing:required});
+      memo.adjustment,{requiredBearing:required+trackingBearing+specialBearing});
      if(memo.lowChoice==='lax'&&memo.adjustment.adjustedSV>=1&&memo.adjustment.adjustedSV<=2){
       allocation.lax=true;allocation.orienteeringSlow=0;
      }
@@ -1115,7 +1125,40 @@ export function validateTimeEpisodes(journal=[]){
     'Neznámý formát návaznosti navigace.');
    const earlier=lastEpisodeBefore(journal,j.calendarCampaignId,e.startMinute,
     e.navigationPartyScope==='v93.699'?e.memberIds:null);
-   must(e.navigationState===episodeNavigationState(earlier,e.direction,{recovered:!!e.navigationRecovered}),
+   const recoveryRule=e.navigationRecoveryRule;
+   must(recoveryRule===undefined||recoveryRule==='special-bearing-and-awareness-v93.780',
+    'Neznámý formát pravidlového návratu na trasu.');
+   const scopedEarlier=lastEpisodeBefore(prior,j.calendarCampaignId,e.startMinute,
+    e.navigationPartyScope==='v93.699'?e.memberIds:null);
+   if(recoveryRule){
+    const hadLost=episodeNavigationState(scopedEarlier)==='lost';
+    if(e.navigationRecovered&&episodeNavigationState(scopedEarlier)==='misdirection'){
+     const proof=journal.find(x=>x.id===e.navigationRecoveryAwarenessProofId);
+     const witnessed=episodeSkillProof(proof,'Awareness',e.orientation?.guideId,j.calendarCampaignId,e.startMinute);
+     must(!!witnessed&&['S','CS'].includes(witnessed.level),
+      'Misdirection: návrat na trasu bez skutečného úspěšného Awareness navigující postavy.');
+    }else must(e.navigationRecoveryAwarenessProofId===null,
+     'Misdirection: nadbytečný cizí doklad Awareness pro návrat.');
+    if(e.navigationRecovered&&hadLost){
+     const terrainBearing=trekMovement({topography:e.topography,terrain:e.terrain,
+      conveyance:e.conveyance,progress:0,slow:0,bearing:0,loaded:false,progressD10:[],
+      continuousPrecipitation:!!e.precipitation?.slowMode}).requiredBearing;
+     const forced=pendingTrackingCFBearing(prior,j.calendarCampaignId,e.startMinute,e.memberIds);
+     must(e.orientation?.modes?.bearing>=terrainBearing+forced+1,
+      'Lost vyžaduje zvláštní Bearing z prokázaného Orienteering, nikoli jen rozhodnutí GM.');
+    }
+    const reoriented=(e.hazardDetails||[]).some(h=>h.hazard==='misdirection'&&
+     h.result==='reoriented'&&h.directionAwareness&&['S','CS'].includes(h.directionAwareness));
+    must(e.navigationReorientedInWatch===reoriented,'Misdirection: změna směru neodpovídá skutečnému Awareness.');
+    if(reoriented){
+     const witness=(e.hazardDetails||[]).find(h=>h.hazard==='misdirection'&&h.result==='reoriented');
+     const proof=journal.find(x=>x.id===witness.directionProofId);
+     must(!!episodeSkillProof(proof,'Awareness',e.orientation?.guideId,j.calendarCampaignId,e.startMinute),
+      'Misdirection: úspěšný Awareness musí patřit navigující postavě.');
+    }
+   }
+   must(e.navigationState===episodeNavigationState(earlier,e.direction,{recovered:!!e.navigationRecovered,
+    redirected:recoveryRule?!!e.navigationReorientedInWatch:false,lostPriority:!!recoveryRule}),
     'Stav bloudění nebyl správně převeden do navazující epizody.');
   }
   if(e.travelForaging!==undefined){
