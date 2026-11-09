@@ -339,7 +339,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.793';
+const APP_VERSION='93.794';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2959,7 +2959,7 @@ function campaignCalendarView(){
    arr.push({kind:'aural',name:'Aural Shock',unit:'hodiny',episodeId:'aural-legacy'});
   return arr.map(x=>({...x,characterId:c.id,label:c.name+' · '+x.name}));
  });
- const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button></div></div>`;};
+ const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b>${x.kind==='healing'&&x.woundId?`<small class="hc-medical-wound-id">ID rány: ${esc(x.woundId)}</small>`:''}<div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button></div></div>`;};
  const renderDueGroups=events=>groupConcurrentObligations(events).map(g=>{
   const person=character(g.characterId)?.name||g.items[0]?.name||g.characterId;
   return `<section class="hc-calendar-concurrent" data-calendar-concurrent-minute="${g.minute}" data-calendar-concurrent-actor="${esc(g.characterId)}">
@@ -8054,6 +8054,7 @@ function hmkSpecialBranchesPanel(chars){
  <form id="hmk-mount-charge-form"><h4>Rider Impact po přímém pohybu koně</h4><div class="field-grid">${actor('targetId','Jezdec')}${field('mountRiderImpact','Rider Impact příslušného zvířete',8,'number')}${field('straightDistanceFt','Skutečně ujetá přímá vzdálenost v ft',70,'number')}${guard}</div><button type="submit" disabled title="Rider Impact vyžaduje ověřený pohyb zvířete">Zapsat bonus a dobu účinnosti</button></form></details>
  <div class="notice" id="hmk-special-branches-result" role="status">Potvrzené následky se ukládají do aktuálního stavu postavy. Ostatní jezdecké, plošné a mnohocílové kombinace GM dále potvrzuje podle PDF HMK.</div></section>`;
 }
+let calendarFocusedMedicalStartId=null;
 function concurrentMedicalProceduresHTML({actorId=null}={}){
  const clock=data.campaignClock;if(!clock)return '';
  const plans=openConcurrentProcedures(clock).filter(p=>!actorId||p.characterId===actorId);
@@ -8068,7 +8069,7 @@ function concurrentMedicalProceduresHTML({actorId=null}={}){
   const woundLabel=w?medicalWoundOptionLabel({name:patientLabel},w,(patient?persistentStateOf(patient).wounds.findIndex(x=>x.id===w.id):-1)+1).replace(patientLabel+' · ',''):p.woundId;
   const action=complete?`<button type="button" class="hc-small" data-concurrent-medical-finish="${esc(p.startId)}">Dokončit ošetření</button>`:
    clock.minute>p.endMinute?'<span class="hc-hint">Termín překročen · zkontrolovat GM</span>':'<span class="hc-hint">Probíhá</span>';
-  return `<tr data-medical-procedure="${esc(p.startId)}"><td><strong>${esc(character(p.healerId)?.name||p.healerId)}</strong></td><td>${esc(patientLabel)}<small>${esc(woundLabel)}</small></td><td>${esc(p.formId==='hmk-frost-amputation-form'?'Amputation':'Treatment')}</td><td>${esc(displayCampaignMinute(p.startMinute))}</td><td>${esc(readableCampaignDuration(p.endMinute-p.startMinute))}</td><td>${esc(readableCampaignDuration(started))}</td><td><strong>${remaining?esc(readableCampaignDuration(remaining)):'Dokončení splatné'}</strong></td><td>${esc(displayCampaignMinute(p.endMinute))}</td><td>${action} <button type="button" class="hc-small secondary" data-concurrent-medical-cancel="${esc(p.startId)}">Přerušit (GM)</button></td></tr>`;
+  return `<tr data-medical-procedure="${esc(p.startId)}" class="${p.startId===calendarFocusedMedicalStartId?'hc-medical-procedure-focus':''}"><td><strong>${esc(character(p.healerId)?.name||p.healerId)}</strong></td><td>${esc(patientLabel)}<small>${esc(woundLabel)}</small></td><td>${esc(p.formId==='hmk-frost-amputation-form'?'Amputation':'Treatment')}</td><td>${esc(displayCampaignMinute(p.startMinute))}</td><td>${esc(readableCampaignDuration(p.endMinute-p.startMinute))}</td><td>${esc(readableCampaignDuration(started))}</td><td><strong>${remaining?esc(readableCampaignDuration(remaining)):'Dokončení splatné'}</strong></td><td>${esc(displayCampaignMinute(p.endMinute))}</td><td>${action} <button type="button" class="hc-small secondary" data-concurrent-medical-cancel="${esc(p.startId)}">Přerušit (GM)</button></td></tr>`;
  }).join('')}</tbody></table></div></section>`;
 }
 
@@ -11078,6 +11079,10 @@ function hskSkinAddLocation(form,code,side){
  ${frost?`<p class="hc-hint" data-hmk-help="${esc(HSK_SKIN_HELP.av)}"><strong>Automatické AV: ${av===null?'Nelze doložit':av}</strong> ${hskSkinTip('av')} ${av===null?'<span class="hc-weather-skin-error">Nejdříve oprav ověřenou zbroj v inventáři: '+esc(armour?.reason||'neznámá ochrana')+'</span>':'(převzato z aktuálně oblečené výbavy)'}</p>`:
  `<label data-hmk-help="${esc(HSK_SKIN_HELP.skin)}">Sunburn · vlastní d10 ${hskSkinTip('skin')}<input type="number" data-weather-skin-d10 name="skinD10" min="1" max="10" inputmode="numeric" required></label>`}
  <p class="hc-hint" data-weather-skin-preview role="status">${frost?'Nejdřív zadej oba d20.':'Zadej Sunburn d10.'}</p>
+ <div data-weather-skin-gm-wrap hidden class="hc-frost-gm-decision"><strong>Frostbite nad IL5 — rozhodnutí GM, nikoli automatické pravidlo</strong>
+ <p>Vypočtené IL překračuje obvyklou škálu G1–G5. Původní IL zůstane v historii. GM může pro tento případ výslovně schválit použití G5, jinak se rána bezpečně neuloží.</p>
+ <label>Rozhodnutí<select name="gmFrostChoice" disabled><option value="">— GM zatím nerozhodl —</option><option value="G5">GM výslovně schvaluje G5 (omezení běžnou škálou)</option></select></label>
+ <label>Konkrétní důvod GM (min. 10 znaků)<textarea name="gmFrostReason" rows="2" minlength="10" maxlength="500" disabled placeholder="Zdůvodnění výjimky; původní IL bude zachováno"></textarea></label></div>
  <div class="hc-weather-skin-rolls"><label data-weather-skin-shock-wrap hidden data-hmk-help="${esc(HSK_SKIN_HELP.shock)}">Shock · d100 ${hskSkinTip('shock')}<input type="number" data-weather-skin-shock name="shockD100" min="1" max="100" inputmode="numeric" data-hmk-dice-when-enabled="true" disabled></label>
  <label data-weather-skin-compound-wrap hidden data-hmk-help="${esc(HSK_SKIN_HELP.compound)}">Compound · d10 ${hskSkinTip('compound')}<input type="number" data-weather-skin-compound-die name="compoundD10" min="1" max="10" inputmode="numeric" data-hmk-dice-when-enabled="true" disabled></label></div>`;
  form.querySelector('[data-weather-skin-rows]').append(panel);
@@ -11103,6 +11108,9 @@ function hskSkinRefresh(form){
   const shockWrap=row.querySelector('[data-weather-skin-shock-wrap]'),compWrap=row.querySelector('[data-weather-skin-compound-wrap]');
   const preview=row.querySelector('[data-weather-skin-preview]');
   const sunDie=row.querySelector('[data-weather-skin-d10]');
+  const gmWrap=row.querySelector('[data-weather-skin-gm-wrap]');
+  const gmChoice=row.querySelector('[name=gmFrostChoice]');
+  const gmReason=row.querySelector('[name=gmFrostReason]');
   if(!evaluationConfirmed){
    // No injury prediction or roll selection from unconfirmed editable dice.
    row.hidden=false;
@@ -11110,6 +11118,7 @@ function hskSkinRefresh(form){
    row.dataset.skinLevel='';
    preview.textContent='Zadejte potřebné hody a stiskněte „Vyhodnotit zadané hody“.';
    shockWrap.hidden=true;compWrap.hidden=true;
+   if(gmWrap){gmWrap.hidden=true;gmChoice.disabled=true;gmReason.disabled=true;}
    for(const field of [shock,compound])hmkSyncConditionalRollField(field,false);
    continue;
   }
@@ -11127,7 +11136,19 @@ function hskSkinRefresh(form){
     info=previewExposureSkinLocation({kind,av,windD20:kind==='frostbite'?one:null,durationD20:kind==='frostbite'?two:null,
      skinD10:kind==='sunburn'?one:null,complexion:form.elements.namedItem('complexion')?.value||null,maximumExposureMinutes:maxExposure});
     il=info.il;
-    preview.textContent=il?'Vypočtené poranění: '+(il===1?'M1':il<=3?'S'+il:'G'+il)+'. '+
+    if(gmWrap){
+     gmWrap.hidden=!info.gmDecisionRequired;
+     gmChoice.disabled=!info.gmDecisionRequired;
+     gmReason.disabled=!info.gmDecisionRequired;
+     if(!info.gmDecisionRequired){gmChoice.value='';gmReason.value='';}
+     if(info.gmDecisionRequired){
+      const confirmed=gmChoice.value==='G5'&&gmReason.value.trim().length>=10;
+      preview.textContent='Přesný Frostbite výsledek IL'+il+' překračuje škálu G5. '+
+       (confirmed?'GM schválil G5; následuje skutečný Shock d100.':'Vyžadováno výslovné rozhodnutí G5 a odůvodnění GM; do té doby není dovoleno hodit Shock.');
+      if(!confirmed)il=null;else il=5;
+     }
+    }
+    if(!info.gmDecisionRequired)preview.textContent=il?'Vypočtené poranění: '+(il===1?'M1':il<=3?'S'+il:'G'+il)+'. '+
      (kind==='frostbite'?'Doba '+info.durationMinutes+' min, interval '+info.periodMinutes+' min.':'Sunburn dle TN pleti.')+
      ' Nyní je potřebný Shock d100.':
      'V této lokaci zranění nevzniklo. Shock ani Compound se nehází.';
@@ -11161,7 +11182,7 @@ document.addEventListener('change',event=>{
 },true);
 document.addEventListener('input',event=>{
  const form=event.target.closest?.('form[data-skill-weather-skin]');if(!form)return;
- if(!['windD20','durationD20','skinD10','complexion','shockD100','compoundD10'].includes(event.target.name))return;
+ if(!['windD20','durationD20','skinD10','complexion','shockD100','compoundD10','gmFrostReason','gmFrostChoice'].includes(event.target.name))return;
  // If the premise of a wound changes, no previously staged Shock/Compound
  // may silently remain attached to a different resulting Injury Level.
  if(event.target.name==='compoundD10'){
@@ -11171,7 +11192,9 @@ document.addEventListener('input',event=>{
  if(event.target.matches('[name="windD20"],[name="durationD20"],[name="complexion"],[name="skinD10"]')){
   delete form.dataset.skinEvaluated;
   const affected=event.target.name==='skinD10'?[event.target.closest('[data-weather-skin-row]')]:[...form.querySelectorAll('[data-weather-skin-row]')];
-  for(const row of affected){if(!row)continue;for(const x of row.querySelectorAll('[data-weather-skin-shock],[data-weather-skin-compound-die]'))x.value='';}
+  for(const row of affected){if(!row)continue;for(const x of row.querySelectorAll('[data-weather-skin-shock],[data-weather-skin-compound-die]'))x.value='';
+   const gmChoice=row.querySelector('[name=gmFrostChoice]'),gmReason=row.querySelector('[name=gmFrostReason]');
+   if(gmChoice)gmChoice.value='';if(gmReason)gmReason.value='';}
  }
  hskSkinRefresh(form);
 },true);
@@ -12853,7 +12876,11 @@ document.addEventListener('submit',event=>{
    if(Number(row.dataset.skinLevel)>0&&!shockD100)throw Error('U vzniklé rány je povinný vlastní Shock d100.');
    if(row.dataset.skinCompound==='yes'&&Number(row.dataset.skinLevel)>0&&!compoundD10)
     throw Error('Při slučování rány je povinný vlastní Compound d10.');
-   return {location:row.dataset.skinLocation,side:row.dataset.skinSide||null,av,skinD10,shockD100,compoundD10};
+   const gmFrostChoice=row.querySelector('[name=gmFrostChoice]');
+   const gmFrostReason=row.querySelector('[name=gmFrostReason]');
+   return {location:row.dataset.skinLocation,side:row.dataset.skinSide||null,av,skinD10,shockD100,compoundD10,
+    gmFrostChoice:gmFrostChoice&&!gmFrostChoice.disabled?gmFrostChoice.value:null,
+    gmFrostReason:gmFrostReason&&!gmFrostReason.disabled?gmFrostReason.value.trim():null};
   });
   // Record each independent roll and its exact manual/software provenance.
   // The authoritative injury report remains byte-for-byte governed by the
@@ -12884,7 +12911,7 @@ document.addEventListener('submit',event=>{
    synchronizeCombatInjuries(actor,outcome.state);
    data.journal.push({id:uuid(),characterId:actor.id,...skinTime,title:'Weather '+outcome.report.kind+' · HMK str.185',
     body:'Zkontrolováno '+outcome.report.reviewedLocations+' lokací · založeno '+outcome.report.wounds.length+' ran: '+
-     outcome.report.wounds.map(w=>w.location+' '+(w.side||'')+' '+w.severity+w.il).join(', ')+
+     outcome.report.wounds.map(w=>w.location+' '+(w.side||'')+' '+w.severity+w.il+(w.rawIL>w.il?' [původní IL'+w.rawIL+', GM G5]':'')).join(', ')+
      (outcome.report.skippedAfterKIA.length?' · KIA: '+outcome.report.skippedAfterKIA.length+
       ' další lokace pouze doloženy, bez dalšího zásahu po smrti.':''),createdAt:stamp(),
     skillTestProof:{type:'skill-weather-skin',sourceId,actorId:actor.id,report:outcome.report,
@@ -15918,6 +15945,30 @@ document.addEventListener('change',e=>{
  if(actor&&destination==='skills')select.innerHTML+=availableMasteries(actor).filter(x=>x.ml>0).sort((a,b)=>a.name.localeCompare(b.name,'cs')).map(x=>`<option value="${esc(x.name)}">${esc(x.name)} · ML ${x.ml}</option>`).join('');
  select.disabled=!(actor&&destination==='skills');
 },true);
+/** Open the ONE original timed Treatment identified by its persisted startId.
+ * This is navigation only; the existing guarded finish/cancel handlers own all writes. */
+function openCalendarConcurrentTreatment(actor,startId){
+ const clock=data.campaignClock,op=clock&&openConcurrentProcedures(clock).find(p=>p.startId===startId);
+ if(!actor||!op||op.characterId!==actor.id)throw Error('Rozpracovaný Treatment s tímto ID nebyl nalezen. Nic se neuložilo.');
+ calendarFocusedMedicalStartId=startId;
+ selected=actor.id;view='sheet';activeSheetSection='hazards';weatherCareActiveSection='treatment';render();
+ const row=[...document.querySelectorAll('[data-medical-procedure]')].find(n=>n.dataset.medicalProcedure===startId);
+ if(!row)throw Error('Časový přehled Treatment není dostupný u správného pacienta; stav ani hod se nezměnil.');
+ for(let el=row.parentElement;el;el=el.parentElement)if(el.tagName==='DETAILS')el.open=true;
+ row.scrollIntoView({block:'center',behavior:'auto'});
+ const action=row.querySelector(clock.minute===op.endMinute?'[data-concurrent-medical-finish]':'[data-concurrent-medical-cancel]');
+ action?.focus({preventScroll:true});
+ const status=clock.minute===op.endMinute?
+  'Dokončení časovaného Treatment je NYNÍ splatné. Klikněte „Dokončit ošetření“; původní hod se neopakuje.':
+  clock.minute>op.endMinute?
+  'Termín Treatment už uplynul. Nelze zpětně předstírat včasné dokončení. GM může doložit přerušení; pokud byl zákrok ve skutečnosti včas dokončen, nejprve obnovte ověřený historický stav kampaně.':
+  'Treatment ještě není splatný. Přesné dokončení: '+displayCampaignMinute(op.endMinute)+'.';
+ const message='Pacient '+actor.name+' · rána ID '+op.woundId+' · zákrok ID '+startId+'. '+status;
+ notice=message;
+ const noticeNode=document.createElement('p');noticeNode.className='hc-treatment-route-notice';noticeNode.setAttribute('role','status');noticeNode.textContent=message;
+ row.closest('.hmk-concurrent-health')?.prepend(noticeNode);
+ return op;
+}
 /** A blocking GM clock check must hand off to its ORIGINAL, source-linked rule executor.
  * This is navigation only: never fabricate dice, facts or time changes. */
 function explainAndOpenBlockedCalendarTerm(err,targetMinute){
@@ -15930,6 +15981,10 @@ function explainAndOpenBlockedCalendarTerm(err,targetMinute){
  if(!due)return false;
  const actor=character(due.characterId);
  uiAlert('Čas nebyl změněn. Povinná kontrola: '+(actor?.name||due.name)+' · '+due.description+' · '+displayCampaignMinute(due.minute)+'. Po zavření tohoto okna se otevře správný formulář.');
+ if(actor&&due.kind==='concurrent-treatment'&&due.startId){
+  try{openCalendarConcurrentTreatment(actor,due.startId);}catch(failure){uiAlert(failure.message);}
+  return true;
+ }
  if(actor&&due.sourceId&&due.kind){
   selected=actor.id;
   if(['skill-critical','skill-fall','skill-injury','weather-onset','weather-course','weather-skin','weather-shock'].includes(due.kind)||(['treatment','healing','infection','grim'].includes(due.kind)&&hskIsEnvironmentalWound(actor,due.sourceId))||
@@ -16718,6 +16773,11 @@ document.addEventListener('click',e=>{
    if(area){const warning=document.createElement('p');warning.className='notice';warning.setAttribute('role','status');warning.textContent=message;area.prepend(warning);}
    return;
   }
+ }
+ if(t.dataset.calLink&&t.dataset.calKind==='concurrent-treatment'){
+  try{openCalendarConcurrentTreatment(character(t.dataset.calLink),t.dataset.calConcurrentId);}
+  catch(failure){uiAlert('Kontrola Treatment: '+failure.message);}
+  return;
  }
  if(t.dataset.calLink&&t.dataset.calKind==='herbal-potion'){
   const target=character(t.dataset.calLink);if(!target)return;

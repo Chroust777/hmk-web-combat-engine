@@ -667,3 +667,11 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 
 /* Native hidden state wins over legacy field/display styles. */
 [data-episode-legacy-identity][hidden],[data-episode-legacy-members][hidden],[data-episode-legacy-guide][hidden],[data-episode-legacy-weather-picker][hidden]{display:none!important}
+
+/* v93.794 — source-linked timed Treatment and source-specific healing evidence */
+.hc-medical-wound-id{display:block;font:0.82em/1.4 ui-monospace,Consolas,monospace;overflow-wrap:anywhere;color:#61492c}
+.hc-medical-procedure-focus{outline:3px solid #b02626;outline-offset:-3px;background:rgba(184,39,33,.11)}
+.hc-treatment-route-notice{border:2px solid #b02626;background:#fff1e9;color:#5e211b;border-radius:7px;padding:.75rem 1rem;margin:.7rem 0;line-height:1.5}
+.hc-frost-gm-decision{border:2px solid #af2a2a;background:rgba(255,245,232,.9);padding:.75rem;margin:.6rem 0;border-radius:8px}
+.hc-frost-gm-decision label{display:block;margin:.5rem 0}
+.hc-frost-gm-decision textarea{display:block;width:100%;min-height:3.4rem}
