@@ -8,7 +8,7 @@ export const PC_SHELTERED_STAY_FORMAT='hmk-pc-sheltered-stay-v1';
 const check=(v,msg)=>{if(!v)throw Error(msg)};
 const at=(n)=>Number.isSafeInteger(n)&&n>=0&&n<=1000000000;
 export function createPCShelteredStay({campaignId,actorId,minute,enabled,reason='Zajištěný pobyt (GM)'}={}){
- check(typeof campaignId==='string'&&campaignId.length>0&&typeof actorId==='string'&&actorId.length>0&&at(minute)&&typeof enabled==='boolean','Zajištěný pobyt vyžaduje kampaň, PC, doloženou minutu a potvrzení GM.');
+ check(typeof campaignId==='string'&&campaignId.length>0&&typeof actorId==='string'&&actorId.length>0&&at(minute)&&typeof enabled==='boolean','Zajištěný pobyt vyžaduje kampaň, postavu, doloženou minutu a potvrzení GM.');
  check(typeof reason==='string'&&reason.trim().length>0&&reason.length<=250,'Zadejte skutečné místo nebo důvod zajištění.');
  return {format:PC_SHELTERED_STAY_FORMAT,campaignId,actorId,minute,enabled,reason:reason.trim(),scope:'ordinary-environment-and-provisions-only'};
 }
@@ -47,7 +47,7 @@ export function validatePCShelteredStayJournal(journal=[],characters=[]){
  const last=new Map();
  for(const row of journal){const p=row.calendarPCShelteredStay;if(!p)continue;
   const actor=byId.get(row.characterId);
-  check(actor&&String(actor.kind||'PC').toUpperCase()==='PC','Zajištěný pobyt smí být nastaven pouze PC, nikoliv NPC nebo zvířeti.');
+  check(actor&&['PC','NPC'].includes(String(actor.kind||'PC').toUpperCase())&&!actor.hmk?.verifiedMountedBreed,'Zajištěný pobyt vyžaduje skutečnou PC nebo NPC, nikoli zvíře.');
   check(row.calendarCampaignId===p.campaignId&&row.characterId===p.actorId&&row.campaignMinute===p.minute&&
    JSON.stringify(p)===JSON.stringify(createPCShelteredStay(p)), 'Poškozený doklad zajištěného pobytu.');
   const key=p.campaignId+'\u0000'+p.actorId,previous=last.get(key);
@@ -62,11 +62,20 @@ export function assertPCShelteredStayAppendOnly(before=[],after=[]){
  }
  return true;
 }
+/** PC and NPC stay distinct. Each NPC's default is an actual minute-stamped
+ * receipt created on campaign inclusion/first post-upgrade write; never a
+ * visual-only checked box and never a retroactive rewrite of old evidence.
+ */
 export function calendarPCShelteredControlsHTML({clock,characters=[],journal=[],escapeHTML}={}){
  if(!clock)return '';
  const esc=escapeHTML||String,cid=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
- const pcs=characters.filter(c=>String(c.kind||'PC').toUpperCase()==='PC'&&!c.hmk?.verifiedMountedBreed);
- return `<section class="hc-pc-shelter" aria-label="Zajištěný pobyt jednotlivých PC"><h4>PC v zajištěném prostředí</h4><p class="hc-hint">Zaškrtnutá PC jsou od této skutečné minuty v bezpečném zázemí s dostupným jídlem a pitím: nové běžné následky počasí, hladu a žízně se nepřipisují a jejich zásoby se za zajištěný čas neodečítají. Neplatí pro NPC. Dřívější zranění, krvácení, infekce, léčba, otravy a všechny jejich termíny běží dále. Před odchodem ven volbu vypněte; změna nepřepíše minulost.</p>
- <div class="hc-pc-shelter-list">${pcs.map(c=>{const active=pcShelteredStayAt(journal,cid,c.id,clock.minute);
- return `<label class="hc-pc-shelter-item"><input type="checkbox" data-calendar-pc-shelter="${esc(c.id)}" ${active?'checked':''}><span>${esc(c.name)}</span><small>${active?'Zajištěno':'Běžné potřeby a expozice'}</small></label>`;}).join('')||'<p>V této kampani není žádná PC postava.</p>'}</div></section>`;
+ const people=characters.filter(c=>['PC','NPC'].includes(String(c.kind||'PC').toUpperCase())&&!c.hmk?.verifiedMountedBreed);
+ const groups=['PC','NPC'].map(kind=>{
+  const members=people.filter(c=>String(c.kind||'PC').toUpperCase()===kind);
+  const rows=members.map(c=>{const active=pcShelteredStayAt(journal,cid,c.id,clock.minute);
+   return `<label class="hc-pc-shelter-item"><input type="checkbox" data-calendar-pc-shelter="${esc(c.id)}" ${active?'checked':''}><span>${esc(c.name)}</span><small>${active?'Zajištěno · jídlo i pití: Ano':'Běžné potřeby a expozice · jídlo i pití: podle zásob'}</small></label>`;
+  }).join('')||`<p>${kind==='PC'?'V této kampani není žádná PC.':'V této kampani není žádná NPC.'}</p>`;
+  return `<div class="hc-pc-shelter-group" data-shelter-actor-kind="${kind}"><h5>${kind} · ${members.length}</h5><div class="hc-pc-shelter-list">${rows}</div></div>`;
+ }).join('');
+ return `<section class="hc-pc-shelter" aria-label="Zajištěné prostředí PC a NPC"><h4>Postavy v zajištěném prostředí</h4><p class="hc-hint">PC a NPC jsou oddělené. PC se nastavují jednotlivě rozhodnutím GM. NPC mají při vstupu do kampaně výchozí zajištěné prostředí a dostupné jídlo i pití (Ano), které lze kdykoli vypnout. U dříve zařazených NPC se výchozí stav zavede pouze od skutečné minuty změny, bez přepisu historie. Zajištění netvoří zásoby v inventáři ani neruší dřívější zranění, léčbu, krvácení či jiné zdravotní termíny. Při odchodu do nebezpečného prostředí vypněte.</p>${groups}</section>`;
 }

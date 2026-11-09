@@ -72,7 +72,7 @@ function renderAgendaEntry(p,esc,clock,events=[],journal=[]){
  const skillDetails=skillReceipts.map(j=>skillTestEvidenceHTML(j,esc)).join('');
  return `<article class="hc-entry hc-entry--compact ${['skill-fall','skill-critical','skill-injury'].includes(p.kind)?'hc-entry--rule-detail':''} ${p.status==='due'?'hc-entry--due':''} ${['resolved','cancelled'].includes(p.status)?'hc-entry--done':''}" ${details?`title="${esc(details)}"`:''}>
  <div class="hc-event-line"><strong class="hc-event-person">${esc(who)}</strong><time>${due}</time><span class="hc-status hc-status--${esc(p.status)}">${esc(eventStatus(p))}</span></div>
- <div class="hc-event-line hc-event-line--task"><span class="hc-event-description">${esc(label)}${p.kind==='healing'&&p.woundId?` <small class="hc-medical-wound-id">[ID rány: ${esc(p.woundId)}]</small>`:''}${p.uiAcknowledged?' · ✓ zkontrolováno GM':''}</span><span class="hc-actions">${issueAction(p,esc)}</span></div>${overlapNotice}${skillDetails}
+ <div class="hc-event-line hc-event-line--task"><span class="hc-event-description">${esc(label)}${p.uiAcknowledged?' · ✓ zkontrolováno GM':''}</span><span class="hc-actions">${issueAction(p,esc)}</span></div>${overlapNotice}${skillDetails}
  </article>`;
 }
 /** Several immutable receipts (daily ration, Starvation onset, Thirst onset)
@@ -159,7 +159,7 @@ export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,esc
  const activeRest=all.filter(p=>p.origin==='activity'&&p.status==='active'&&p.endMinute>clock.minute);
  const restOverview=activeRest.length?`<section class="hc-calendar hc-active-actors"><h3>Právě probíhající činnosti · ${activeRest.length}</h3><p class="hc-hint">✓ znamená pouze kontrolu záznamu GM. × skutečně přeruší probíhající činnost podle jejího původního pravidlového mechanismu; nedokončené účinky se nepřiznají.</p><div class="hc-event-list">${activeRest.map(p=>renderAgendaEntry(p,esc,clock,all,journal)).join('')}</div></section>`:'';
  const badges=`<section class="hc-calendar hc-weekly"><h3>Přehled na 7 dní</h3><p class="hc-hint">${esc(displayCampaignMinute(clock.minute))} – ${esc(displayCampaignMinute(weekEnd))} · jen rozhodnutí GM, události světa a otevřené povinnosti</p>
- <div class="hc-week-tabs"><details open><summary>K vyřízení · ${actionable.length}</summary>${compactWeek(actionable,'splatné povinnosti')}</details><details open><summary>Plánované události a činnosti · ${upcoming.length}</summary>${compactWeek(upcoming,'další termíny')}</details>${weeklyUnknown.length?`<details><summary>Vyžaduje upřesnění · ${weeklyUnknown.length}</summary>${weeklyUnknown.map(x=>`<p class="hc-warning">${esc(x.name)} · ${esc(x.description)} — ${esc(x.reason)}</p>`).join('')}</details>`:''}</div></section>`;
+ <div class="hc-week-tabs"><details><summary>K vyřízení · ${actionable.length}</summary>${compactWeek(actionable,'splatné povinnosti')}</details><details open><summary>Plánované události a činnosti · ${upcoming.length}</summary>${compactWeek(upcoming,'další termíny')}</details>${weeklyUnknown.length?`<details><summary>Vyžaduje upřesnění · ${weeklyUnknown.length}</summary>${weeklyUnknown.map(x=>`<p class="hc-warning">${esc(x.name)} · ${esc(x.description)} — ${esc(x.reason)}</p>`).join('')}</details>`:''}</div></section>`;
  const title=''; // The dated grid already carries the month and campaign time.
  let visualization='';
  if(ui.mode==='month'){

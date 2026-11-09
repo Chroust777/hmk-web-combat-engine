@@ -340,7 +340,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.799';
+const APP_VERSION='93.802';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -943,7 +943,7 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
  const stagedWorkingData=unrelatedDuringEpisode?structuredClone(data):null;
  if(unrelatedDuringEpisode)data=normalizeLegacyCustomPrices(validate(JSON.parse(storageBaseline)));
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();seedNPCShelterDefaults93802();
   const priorInventory=new Map((previous.inventory||[]).map(x=>[x.id,x]));
   for(const itm of data.inventory||[]){const before=priorInventory.get(itm.id);if(before&&(itm.slot!==before.slot||itm.characterId!==before.characterId)&&itm.coldWorn)itm.coldWorn=false;}
   closeWeatherNoEffectAftercare();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});enrollUnmonitoredNutrition(data,{fromMinute:previous.campaignClock.minute,idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute&&
@@ -2397,7 +2397,7 @@ function episodeIndoorWeatherNotRequired(v,clock){
  if(!!v.weatherSafeShelter)return true;
  const members=v.memberIds||[];
  return members.length>0&&members.every(id=>
-  String(character(id)?.kind||'PC').toUpperCase()==='PC'&&
+  ['PC','NPC'].includes(String(character(id)?.kind||'PC').toUpperCase())&&
   pcShelteredStayAt(data.journal,campaignKey(clock),id,clock.minute));
 }
 function ensureFixedAccidentMinute93773(form){
@@ -2961,7 +2961,7 @@ function campaignCalendarView(){
    arr.push({kind:'aural',name:'Aural Shock',unit:'hodiny',episodeId:'aural-legacy'});
   return arr.map(x=>({...x,characterId:c.id,label:c.name+' · '+x.name}));
  });
- const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b>${x.kind==='healing'&&x.woundId?`<small class="hc-medical-wound-id">ID rány: ${esc(x.woundId)}</small>`:''}<div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button></div></div>`;};
+ const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button></div></div>`;};
  const renderDueGroups=events=>groupConcurrentObligations(events).map(g=>{
   const person=character(g.characterId)?.name||g.items[0]?.name||g.characterId;
   return `<section class="hc-calendar-concurrent" data-calendar-concurrent-minute="${g.minute}" data-calendar-concurrent-actor="${esc(g.characterId)}">
@@ -9985,7 +9985,18 @@ document.addEventListener('click',e=>{
  form.hidden=false;
 },true);
 
+let npcShelterBootstrapAttempt93802=null;
+function ensureNPCShelterDefaultsOnCalendar93802(){
+ if(view!=='calendar'||storageReadOnly||episodeStageBaseline||!data.campaignClock||!cloudSync?.canWrite?.())return false;
+ const missing=missingNPCShelterDefaults93802();if(!missing.length)return false;
+ const key=campaignKey(data.campaignClock)+':'+data.campaignClock.minute+':'+missing.map(c=>c.id).sort().join(',');
+ if(key===npcShelterBootstrapAttempt93802)return false;
+ npcShelterBootstrapAttempt93802=key;
+ // mutate() carries storage CAS, full validation and the normal cloud write.
+ return !!mutate(()=>seedNPCShelterDefaults93802());
+}
 function render(){
+ if(ensureNPCShelterDefaultsOnCalendar93802())return;
  if(episodeActiveSkillRequestId){
   const r=episodePendingSkillRequest;
   if(!r||r.status!=='waiting'||r.id!==episodeActiveSkillRequestId||
@@ -16020,6 +16031,28 @@ function explainAndOpenBlockedCalendarTerm(err,targetMinute){
  row?.scrollIntoView({block:'center',behavior:'auto'});row?.focus({preventScroll:true});
  return true;
 }
+// One default shelter receipt per NPC and active campaign. Any later GM
+// 'Ne' receipt is authoritative and must never be silently reverted to 'Ano'.
+function missingNPCShelterDefaults93802(){
+ const clock=data.campaignClock;if(!clock)return [];
+ const cid=campaignKey(clock);
+ return calendarMemberIds(clock,data.characters).filter(c=>String(c.kind||'PC').toUpperCase()==='NPC'&&!c.hmk?.verifiedMountedBreed&&
+  !data.journal.some(j=>j.calendarCampaignId===cid&&j.characterId===c.id&&j.calendarPCShelteredStay));
+}
+function seedNPCShelterDefaults93802(){
+ const clock=data.campaignClock;if(!clock)return 0;
+ const cid=campaignKey(clock),minute=clock.minute;
+ const missing=missingNPCShelterDefaults93802();
+ for(const npc of missing){
+  const reason='NPC · výchozí zajištěné zázemí, jídlo a pití od vstupu / aktuální minuty kampaně';
+  const proof=createPCShelteredStay({campaignId:cid,actorId:npc.id,minute,enabled:true,reason});
+  data.journal.push({id:uuid(),characterId:npc.id,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+   title:'HMK · výchozí zajištěné prostředí NPC · '+npc.name,
+   body:'Automatický výchozí stav NPC; nepotvrzuje ani nevytváří fyzické zásoby. Původní zdravotní povinnosti zůstávají platné.',
+   calendarPCShelteredStay:proof});
+ }
+ return missing.length;
+}
 // PC-only, minute-stamped GM attestation. Never erase active wounds or medical deadlines.
 document.addEventListener('change',e=>{if(e.target?.name==='trackingRoad'&&e.target.closest?.('#hmk-time-episode-form'))e.target.dataset.episodeAutoSource='gm';},true);
 document.addEventListener('change',e=>{
@@ -16027,7 +16060,7 @@ document.addEventListener('change',e=>{
  e.stopImmediatePropagation();
  const clock=data.campaignClock,actorId=control.dataset.calendarPcShelter;
  const actor=calendarMemberIds(clock,data.characters).find(c=>c.id===actorId);
- if(!actor||String(actor.kind||'PC').toUpperCase()!=='PC'||actor.hmk?.verifiedMountedBreed){render();return;}
+ if(!actor||!['PC','NPC'].includes(String(actor.kind||'PC').toUpperCase())||actor.hmk?.verifiedMountedBreed){render();return;}
  const enabled=control.checked;
  const what=enabled?'Potvrdit, že '+actor.name+' má od této minuty zajištěný pobyt, bezpečné prostředí, potravu a pití?':'Potvrdit, že '+actor.name+' od této minuty znovu podléhá podmínkám prostředí a běžnému zásobování?';
  if(!uiConfirm(what)){render();return;}
@@ -23220,13 +23253,13 @@ function episodePreviewFromForm(form,clock){
   seasonWeather?.daylightHazard).filter(Boolean))];
  result.weatherHazard=result.weatherHazards[0]??null;
  result.weatherSafeShelter=!!v.weatherSafeShelter;
- // The calendar's PC-only safe stay protects INDOOR downtime. Selecting a PC
+ // The calendar's safe stay protects INDOOR downtime. Selecting a character
  // for outdoor travel/tracking/watch/foraging ends this attestation at departure;
  // never let it bypass real outdoor weather rolls. Pre-existing injuries,
  // infections and scheduled tests are never removed or paused.
  const outdoorEpisode=['travel','tracking','watch','forage'].includes(kind);
  result.weatherShelteredPCs=!outdoorEpisode?members.filter(id=>
-  String(character(id)?.kind||'PC').toUpperCase()==='PC'&&
+  ['PC','NPC'].includes(String(character(id)?.kind||'PC').toUpperCase())&&
   pcShelteredStayAt(data.journal,campaignKey(clock),id,clock.minute)):[];
  const protectedPCs=new Set(result.weatherShelteredPCs);
  if(result.weatherHazards.length&&!v.weatherSafeShelter){
@@ -23470,7 +23503,7 @@ function renderEpisodeEndStatus(form,result,weather){
  if(overview)overview.innerHTML='<p class="hc-hint" data-episode-build-version="'+esc(APP_VERSION)+'">Spuštěná verze: v'+esc(APP_VERSION)+'</p><strong>'+esc(String(result.minutes))+' minut · '+esc(result.kind)+'</strong><p>Od '+esc(displayCampaignMinute(result.startMinute))+' do '+esc(displayCampaignMinute(result.endMinute))+'</p>'+
   (result.kind==='travel'?'<p><strong>'+esc(String(result.distanceMeters))+' m</strong> · END a únava v detailu.</p>':'<p>Čas a následky při závěrečném potvrzení.</p>')+
   (result.travelDelay?.applied?'<p><b>Zdržení '+result.travelDelay.applied+' min</b> · pohyb '+result.travelDelay.movementMinutes+' min.</p>':'')+
-  '<p>Počasí: '+esc(weather.area)+'</p>'+ (result.weatherShelteredPCs?.length?'<p><strong>PC v zajištěném zázemí:</strong> '+esc(result.weatherShelteredPCs.map(id=>character(id)?.name||id).join(', '))+'. Nejsou přidávány nové běžné expozice; zdravotní termíny pokračují.</p>':'');
+  '<p>Počasí: '+esc(weather.area)+'</p>'+ (result.weatherShelteredPCs?.length?'<p><strong>PC/NPC v zajištěném zázemí:</strong> '+esc(result.weatherShelteredPCs.map(id=>character(id)?.name||id).join(', '))+'. Nejsou přidávány nové běžné expozice; zdravotní termíny pokračují.</p>':'');
  const proofList=root.querySelector('[data-episode-evidence]');
  if(proofList){
   const rows=[];
