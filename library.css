@@ -347,3 +347,8 @@
 .library-toolbar .library-armour-filter-select{flex:1 1 165px;min-width:145px}
 .library-armour-filter-select select{min-height:40px}
 @media(max-width:760px){.library-toolbar .library-armour-filter-select{flex-basis:100%;min-width:0}}
+
+/* v93.805: Ranged/Thrown filter shares parchment toolbar controls. */
+.library-toolbar .library-ranged-filter-select{flex:1 1 185px;min-width:155px}
+.library-ranged-filter-select select{min-height:40px}
+@media(max-width:760px){.library-toolbar .library-ranged-filter-select{flex-basis:100%;min-width:0}}

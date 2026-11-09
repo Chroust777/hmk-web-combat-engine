@@ -10,6 +10,7 @@ import {resolveCrossbowArcheryChoice} from './src/integration/hmk-crossbow-arche
 import {prepareSleeplessDay,prepareSleeplessNight,prepareSleeplessFourHourRest} from './src/integration/hmk-sleep-deprivation.js';
 import {LIBRARY_TABS,LIBRARY_PAGE_SIZE,libraryTabsForItem,libraryVisiblePage,resolveSuitCatalogParts} from './src/integration/hmk-library-tabs.js';
 import {ARMOUR_FILTER_MATERIALS_93799,ARMOUR_FILTER_LOCATIONS_93799,armourCatalogMatches93799,filterArmourCatalog93799} from './src/integration/hmk-library-armour-filters-93799.js';
+import {filterRangedCatalogue93805} from './src/integration/hmk-library-ranged-filters-93805.js';
 import {coinBalance,libraryPurchasePrice,libraryPurchaseOffer,suitPurchasePrice,prepareLibraryPurchase,assertCashLedgerAppendOnly,recordCampaignCashPurchase,recordCampaignCoinAdjustment,validateCampaignCashAccounts} from './src/integration/hmk-library-economy.js';
 import {covenantClergyPath} from './src/integration/hmk-covenant-clergy-path.js';
 import {characterSpecialtyChapters,characterSpecialtyById,isCharacterSpecialtySection} from './src/integration/hmk-character-specialty-access.js';
@@ -340,7 +341,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.804';
+const APP_VERSION='93.805';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -500,6 +501,7 @@ cloudSync=createGitHubCloudSync({localStorage,sessionStorage,storageKey:STORAGE,
 let catalogStatus='all'; // presentation-only; never persisted
 let libraryTab='melee',libraryPage=0,libraryRecipientId=null,libraryOtherFilter='all'; // presentation-only, not stored
 let libraryArmourMaterial='all',libraryArmourLocation='all'; // presentation-only, combined material + anatomical coverage filters
+let libraryRangedKind='all'; // UI only, missile versus thrown weapons
 // Older custom 'other' items stored the editor's 'Cena / hodnota' as text
 // under properties.value while catalogue and purchases read pricePence.
 // Upgrade ONLY unambiguous, whole, explicitly entered numeric prices; no
@@ -6814,15 +6816,17 @@ function libraryView(){
  const catalogItems=selectedTab==='other'&&libraryOtherFilter!=='all'
   ?allCatalogItems().filter(i=>!libraryTabsForItem(i).includes('other')||libraryItemKind(i)===libraryOtherFilter)
   :allCatalogItems();
- const filteredCatalog=selectedTab==='armour'?filterArmourCatalog93799(catalogItems,libraryArmourMaterial,libraryArmourLocation):catalogItems;
+ const filteredCatalog=selectedTab==='armour'?filterArmourCatalog93799(catalogItems,libraryArmourMaterial,libraryArmourLocation):
+  selectedTab==='ranged'?filterRangedCatalogue93805(catalogItems,libraryRangedKind):catalogItems;
  const list=['suits','rules','bestiary','stable'].includes(selectedTab)?null:libraryVisiblePage(filteredCatalog,selectedTab,query,catalogStatus,i=>catalogAuditEntry(i).ready,libraryPage);
  const otherFilterBar=selectedTab==='other'?`<label class="library-other-filter-select">Typ vybavení<select data-library-other-filter-select aria-label="Vybrat typ ostatního vybavení">${[['all','Všechny předměty'],...otherKinds.map(k=>[k,`${k} (${otherItems.filter(i=>libraryItemKind(i)===k).length})`])].map(([k,label])=>`<option value="${esc(k)}" ${libraryOtherFilter===k?'selected':''}>${esc(label)}</option>`).join('')}</select></label>`:'';
  if(list)libraryPage=list.page;
  const statusSelector=['rules','suits','bestiary','stable'].includes(selectedTab)?'':`<label>Úplnost evidence<select id="catalog-status"><option value="all" ${catalogStatus==='all'?'selected':''}>Všechny</option><option value="ready" ${catalogStatus==='ready'?'selected':''}>Bez upozornění</option><option value="missing" ${catalogStatus==='missing'?'selected':''}>K doplnění</option></select></label>`;
+ const rangedFilterBar=selectedTab==='ranged'?`<label class="library-ranged-filter-select">Druh zbraně<select data-library-ranged-kind aria-label="Filtrovat střelné nebo vrhací zbraně"><option value="all" ${libraryRangedKind==='all'?'selected':''}>Všechny střelné a vrhací</option><option value="missile" ${libraryRangedKind==='missile'?'selected':''}>Střelné (včetně střeliva)</option><option value="thrown" ${libraryRangedKind==='thrown'?'selected':''}>Vrhací zbraně</option></select></label>`:'';
  const armourFilterBar=selectedTab==='armour'?`<label class="library-armour-filter-select">Materiál zbroje<select data-library-armour-material aria-label="Filtrovat části zbroje podle materiálu"><option value="all">Všechny materiály</option>${ARMOUR_FILTER_MATERIALS_93799.map(([code,name])=>`<option value="${code}" ${libraryArmourMaterial===code?'selected':''}>${esc(name)}</option>`).join('')}</select></label><label class="library-armour-filter-select">Anatomická lokace<select data-library-armour-location aria-label="Filtrovat části zbroje podle anatomické lokace"><option value="all">Všechny lokace</option>${ARMOUR_FILTER_LOCATIONS_93799.map(([code,name])=>`<option value="${code}" ${libraryArmourLocation===code?'selected':''}>${code.toUpperCase()} – ${esc(name)}</option>`).join('')}</select></label>`:'';
  return withLibraryFolioMenu(journalChapterShell('Knihovna','Katalog vybavení, referenční tabulky a přidávání předmětů ve vzhledu Keeper’s Ledger.',`<div class="topline"><div><h2>Knihovna vybavení</h2><p class="muted">Vyberte kategorii, otevřete údaje předmětu a případně jej přímo přidejte do inventáře postavy.</p></div><div class="library-other-top-controls">${otherFilterBar}${button('+ Nový předmět','new-item')}</div></div>
  ${selectedTab==='bestiary'?bestiaryCompleteCatalogView():selectedTab==='rules'?`<section class="panel"><h3>Pravidlové tabulky, zdroje a audit</h3><p class="muted">Tyto podklady jsou pouze k nahlédnutí a nepřekážejí při výběru běžných předmětů.</p>${[['Materiály zbroje a povolené vrstvy',armourMaterialsPanel()+armourLayerReferencePanel()],['Tištěné části zbroje · podrobné referenční značky',printedArmourArticlesPanel()],['Předměty, zvířata a dílny',printedPossessionsPanel()+workshopMechanicsPanel()],['Výprava, encumbrance a pravidlové účinky',expeditionEffectsPanel()+printedGearRulesPanel()],['Audit, konzistence a pokrytí',armourLibraryConsistencyPanel()+suitArticleCrosswalkPanel()+armourCoverageReadinessPanel()+catalogCoveragePanel()+catalogAuditPanel()]].map(([title,body])=>`<details class="library-rules-details"><summary>${esc(title)}</summary>${body}</details>`).join('')}</section>`:
- `<div class="library-toolbar"><label>Hledat v této kategorii<input id="search" type="search" placeholder="Název, parametry, zdroj…" value="${esc(query)}" autocomplete="off"></label>${armourFilterBar}${statusSelector}</div>
+ `<div class="library-toolbar"><label>Hledat v této kategorii<input id="search" type="search" placeholder="Název, parametry, zdroj…" value="${esc(query)}" autocomplete="off"></label>${armourFilterBar}${rangedFilterBar}${statusSelector}</div>
  <p class="library-results">${selectedTab==='suits'?`Zobrazeno ${suitRows.length} z ${PRINTED_ARMOUR_SUITS_P113_116.length} tištěných kompletů.`:`Zobrazeno ${list.rows.length} z ${list.total} odpovídajících položek.`} Volba Koupit odečítá skutečnou hotovost, Vzít zdarma nic neodečítá. Obojí přidává nesený předmět (ENC se přepočte dle jeho hmotnosti).</p>
  ${selectedTab==='suits'?`<p class="notice tiny">Tištěné komplety jsou referenční sestavy, nikoliv samostatný předmět. Převzetí nebo nákup vytvoří nezávislé kopie <b>všech</b> ověřených článků jako <b>nesené</b>; žádnou zbroj automaticky neobléká.</p>`:''}
  <div class="library-table-wrap"><table class="library-table"><thead><tr><th>Položka</th>${(selectedTab==='suits'?['ENC','PER','Area','Cena','Hmotnost']:({melee:['WQ','HFT / LNG','Impact','Cena','Hmotnost'],ranged:['WQ / typ','Dostřel / střela','Impact','Cena','Hmotnost'],shields:['WQ','Block','Deflect','Cena','Hmotnost'],armour:['Materiál','ENC','Ochrana b/e/p/f','Chlad AV','Cena','Hmotnost'],other:['Typ','Dovednost / užití','Kvalita','Chlad AV','Cena','Hmotnost']})[selectedTab]).map(x=>`<th class="catalog-parameter-tip" data-hmk-help="${esc(libraryFieldHelp(x))}" tabindex="0">${esc(x)}</th>`).join('')}<th title="${esc(libraryFieldHelp('Úplné údaje'))}">Úplné údaje</th><th>Postava · koupit / vzít</th></tr></thead><tbody>${selectedTab==='suits'?librarySuitRows(suitRows):libraryDataRows(list.rows)}</tbody></table></div>
@@ -17359,6 +17363,12 @@ document.addEventListener('click',e=>{const link=e.target.closest?.('[data-libra
  card.scrollIntoView({block:'center'});
 },true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-bestiary-open]'))return;e.preventDefault();e.stopImmediatePropagation();view='library';libraryTab='bestiary';render();},true);
+document.addEventListener('change',e=>{
+ const select=e.target.closest?.('select[data-library-ranged-kind]');if(!select)return;
+ e.stopImmediatePropagation();
+ libraryRangedKind=['all','missile','thrown'].includes(select.value)?select.value:'all';
+ libraryPage=0;render();
+},true);
 document.addEventListener('change',e=>{
  const el=e.target;if(!el?.matches?.('select[data-library-armour-material],select[data-library-armour-location]'))return;
  e.stopImmediatePropagation();
