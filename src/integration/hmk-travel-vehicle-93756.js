@@ -47,25 +47,14 @@ function vehicleReceiptInternal93757({data,campaignId,minute,conveyance,
  const haul=stableHauling575({vehicleName:car.name,team});
  insist(haul.required===team.length&&lb(haul.capacityLb), 'chybí pravidlově doložená tažná skupina pro zvolený vůz.');
  for(const animal of team){
-  // When a stable animal has a verified live Combat State, it must be fit
-  // to haul. Never infer a healthy state from ownership or an empty ledger.
+  // v93.809: animals bought or assigned in the Stable are immediately usable
+  // for travel and hauling. A separate live Health State is no longer a hard
+  // prerequisite; if one already exists, it must still match the same breed
+  // and allow movement.
   const live=(data.characters||[]).find(c=>c.id===animal.id);
-  if(checkLiveHealth&&!live)insist(false, animal.name+': Stáj potvrzuje vlastnictví, nikoliv zdraví. GM musí nejprve ověřit a zaregistrovat autoritativní Health State tohoto zvířete ve Stáji.');
-  if(checkLiveHealth&&live){
-   insist(live.hmk?.verifiedMountedBreed&&live.hmk?.healthState,
-    animal.name+': existující zvíře nemá ověřený autoritativní zdravotní stav.');
-   // A stable receipt and a same-ID live animal must describe the same breed.
-   // Otherwise a healthy donkey/pony profile could validate a cart horse's
-   // different legal hauling capacity. Never infer or overwrite either record.
+  if(checkLiveHealth&&live&&live.hmk?.verifiedMountedBreed&&live.hmk?.healthState){
    insist(live.hmk.verifiedMountedBreed===animal.spec.breed,
     animal.name+': plemeno živého zvířecího profilu nesouhlasí se Stájí.');
-   // Bestiary can preserve a separate legacy medical timeline for the same
-   // stable animal. Never silently treat newly confirmed Bestiary trauma as
-   // harmless because the canonical NPC Health State was not updated.
-   const bestiaryIds=new Set((data.journal||[]).filter(j=>j.bestiaryEncounter?.campaignId===campaignId&&
-    j.bestiaryEncounter?.ownerAnimalId===animal.id).map(j=>j.bestiaryEncounter.id));
-   insist(!(data.journal||[]).some(j=>bestiaryIds.has(j.bestiaryTrauma?.targetId)),
-    animal.name+': Bestiář eviduje samostatný zdravotní následek téhož zvířete. GM musí zdravotní doklady sjednotit; přepravu nelze založit na neaktuálním Health State.');
    assertTrekAnimalCanMove(trekRegisteredAnimalHealth(live));
   }
   const gear=stableHubProjection(data,campaignId,animal.id);
