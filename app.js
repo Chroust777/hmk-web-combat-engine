@@ -339,7 +339,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.795';
+const APP_VERSION='93.796';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5417,7 +5417,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.shock==='UNC'?'Ano':state.shock==='KIA'?'KIA':'Ne'],['Death Save',state.shock==='KIA'?'KIA':'—']];
  const conditionRows=projectChronicleConditions(state,{campaignId:data.campaignClock?campaignKey(data.campaignClock):null,auralShockLevels:h.arcane?.auralShockLevels});
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitEntries.map(t=>`<li data-hmk-help="${esc(t.help+' Aktuální záznam: '+t.value)}" tabindex="0" aria-label="${esc(t.help+' Aktuální záznam: '+t.value)}">${esc(t.value)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}${hmkTravelEncounterHintHTML(c)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load,editing)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitEntries.map(t=>`<li data-hmk-help="${esc(t.help+' Aktuální záznam: '+t.value)}" tabindex="0" aria-label="${esc(t.help+' Aktuální záznam: '+t.value)}">${esc(t.value)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}${hmkTravelEncounterHintHTML(c)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}${editing?'<div class="journal-wound-gm-action"><button type="button" class="secondary" data-open-gm-wounds>✚ / − Správa skutečných ran · GM</button><p class="tiny muted">Výběr anatomické lokality, vytvoření a vyřešení rány přes společnou zdravotní evidenci. Nejde o volnou editaci Combat důkazů.</p></div>':''}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load,editing)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -5674,7 +5674,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  if(activeSheetSection==='animals'){activeSheetSection='overview';}
  if(activeSheetSection==='stable')return characterStableView(c);
 
- if(activeSheetSection==='hazards')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Zdraví & Expozice</h3><p>Počasí, nemoci, zdravotní následky a navazující povinnosti · ${esc(c.name)} · HMK</p></header><div class="columns journal-tech-columns">${hazardsView(c.id)}${hskWeatherHealthConsequences(c.id)}${hskEnvironmentalWoundCarePanel(c)}</div></section>`,`journal-book--chapter journal-book--hazards`);
+ if(activeSheetSection==='hazards')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Zdraví & Expozice</h3><p>Počasí, nemoci, zdravotní následky a navazující povinnosti · ${esc(c.name)} · HMK</p></header><div class="columns journal-tech-columns">${gmWoundManagementPanel(c)}${hazardsView(c.id)}${hskWeatherHealthConsequences(c.id)}${hskEnvironmentalWoundCarePanel(c)}</div></section>`,`journal-book--chapter journal-book--hazards`);
  if(activeSheetSection==='provisions')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Provisions · jídlo a pití</h3><p>${esc(c.name)} · přehled doložených zásob</p></header><div class="columns journal-tech-columns">${characterProvisionActionsHTML(c)}</div></section>`,`journal-book--chapter journal-book--provisions`);
  if(activeSheetSection==='inventory')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Arsenal & Gear</h3><p>Inventář, výbava, zatížení a speciální efekty.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Inventář postavy</h3>${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}${physicalWaterPanel(c)}</section>${foragingEvidenceInCharacterInventory(c.id)}${combatantLoadPanel(c)}${armourLoadoutPanel(inv,c)}<section class="panel wide hmk-inventory-add-panel">${journalAddInventoryForm()}</section>${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:''})()}</div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='status')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Combat & Conditions</h3><p>Aktuální stav, povinné procedury, zranění a návazné herní sekvence.</p></header><div class="columns journal-tech-columns">${hskPendingSkillPhysicalConsequences(c.id,{includeWeather:false})}${hskHazardSummary(c.id)}${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section></div></section>`,`journal-book--chapter`);
@@ -9527,6 +9527,7 @@ document.addEventListener('click',e=>{
  e.preventDefault();
  weatherCareActiveSection=btn.dataset.weatherCareStep||'treatment';
  syncWeatherCarePanel();
+ gmWoundSyncForm(app.querySelector('form#hmk-gm-health-form'));
  const active=document.querySelector(`.hmk-weather-care [data-weather-care-card="${CSS.escape(weatherCareActiveSection)}"] form`);
  if(active)syncWeatherCareFormGuidance(active,{focus:true});
 },true);
@@ -19742,21 +19743,95 @@ function hmkSheet(c){
  <details><summary>Starší ruční evidenční záznamy · oddělené od Combat State</summary>
  ${(h.injuries||[]).filter(x=>!authoritative.has(x.id)).map(x=>`<div class="list-row"><div><b>${esc(x.location)}</b> · ${esc(x.description)} <span class="muted">${esc(x.severity)}</span></div><div class="actions"><button class="secondary" data-edit-injury="${esc(x.id)}">Upravit</button><button class="danger" data-remove-injury="${esc(x.id)}">Odstranit</button></div></div>`).join('')||'<p>Žádné.</p>'}</details>
  <details><summary>Starší poznámka o zranění (nemění zdravotní stav)</summary><form id="hmk-injury-form"><div class="field-grid">${field('location','Lokalita zásahu')}${field('severity','Závažnost / označení')}${field('description','Popis poranění')}</div><button type="submit">Zapsat pouze poznámku</button></form></details>
- <details><summary><b>Zdravotní zásah GM — vytvořit skutečnou ránu / označit zhojenou</b></summary>
- <p class="muted">Výjimečná ruční korekce mimo Combat. Nevymýšlí d100, potvrzení běžné léčby ani úspěch testu. Nová rána se bere jako neošetřená a HMK z ní automaticky určí HR, riziko infekce i případný Grim/Bleeder. Dřívější ránu nelze historicky smazat, lze ji výslovně označit za vyřešenou GM.</p>
- <form id="hmk-gm-health-form">
-  <label>Typ zásahu GM<select name="action"><option value="add">Přidat skutečnou neošetřenou ránu</option><option value="resolve">Označit skutečnou ránu za zhojenou / vyřešenou</option></select></label>
-  <div class="field-grid"><label>Lokalita<select name="location">${locations}</select></label>
-  <label>Strana<select name="side"><option value="">neurčeno / neplatí</option><option value="left">levá</option><option value="right">pravá</option></select></label>
-  <label>Úroveň zranění<select name="level"><option value="1">M1 — Minor</option><option value="2">S2 — Serious</option><option value="3">S3 — Serious</option><option value="4">G4 — Grievous</option><option value="5">G5 — Grievous</option></select></label>
-  <label>Typ zásahu<select name="aspect"><option value="blunt">Blunt</option><option value="edge">Edge</option><option value="point">Point</option><option value="fire">Fire</option></select></label></div>
-  <label>Existující rána (pouze při označení zhojení)<select name="woundId"><option value="">— Vyberte skutečnou ránu —</option>${existing}</select></label>
-  <label>Povinný důvod rozhodnutí GM<textarea name="reason" required minlength="10" maxlength="500" rows="2" placeholder="Proč GM tento zásah provádí? (min. 10 znaků)"></textarea></label>
-  <label><input type="checkbox" name="gmConfirmed" value="yes" required> Potvrzuji výjimečný zásah GM a převzetí odpovědnosti za jeho pravidlové následky</label>
-  <button type="submit" ${gmAllowed?'':'disabled'}>Provést a zapsat nevratný doklad GM</button>
-  ${gmAllowed?'':'<p class="muted">Během aktivní Initiative upravte zranění pravidlovým Combat postupem.</p>'}
+</section>`;
+}
+
+/** A single authoritative wound editor for the character Journal and Health chapter.
+ * Combat records may originate in any chapter; they are never edited as legacy notes.
+ * A GM "remove" is an append-only administrative closure, not erasure of history.
+ */
+function gmWoundObligationSummary(c,w){
+ const state=persistentStateOf(c),h=w.healing||{},details=[];
+ if(w.bleeding)details.push('Bleeder / Blood Stoppage');
+ if(!w.healing)details.push('Treatment / bez ošetření – vyžaduje rozhodnutí');
+ if(h.infected)details.push('denní Infection Course');
+ if(h.grimWound)details.push('denní Grim Wound Shock');
+ if(h.treated&&!h.noMundaneHealing)details.push('Injury Healing Roll · den '+(h.nextHealingDay??'neurčen'));
+ if(h.noMundaneHealing)details.push('pozastavené běžné hojení');
+ const mishaps=(state.mishaps||[]).filter(x=>x.woundId===w.id&&!x.resolved);
+ if(mishaps.length)details.push('Injury Mishap × '+mishaps.length);
+ if(w.moralePending)details.push('Injury Morale');
+ const procedures=data.campaignClock?openConcurrentProcedures(data.campaignClock)
+  .filter(x=>x.characterId===c.id&&x.woundId===w.id):[];
+ for(const p of procedures)details.push('rozpracovaný Treatment do '+displayCampaignMinute(p.endMinute));
+ // These are patient-wide conditions; do not silently cancel another injury's
+ // Shock, Coma or actual Blood Loss because this wound was closed by GM.
+ const independent=[];
+ if(state.shockFollowup)independent.push('Shock Follow-up');
+ if(state.extendedShock)independent.push('Extended Shock');
+ if(state.coma?.active)independent.push('Coma');
+ if(state.bloodLoss?.bp>0||state.bloodShockPending)independent.push('Blood Loss / Blood Shock');
+ return {details,procedures,independent};
+}
+function gmWoundManagementPanel(c){
+ const live=persistentStateOf(c),open=live.wounds.filter(w=>!w.healed),allowed=!combatInitiativeSequence?.order?.includes(c.id);
+ const locations=JOURNAL_ANATOMICAL_LOCATIONS.map(([code,name])=>`<option value="${esc(code)}">${esc(name)} (${esc(code)})</option>`).join('');
+ const options=open.map(w=>`<option value="${esc(w.id)}">${esc(w.location.toUpperCase())}${w.side?' / '+esc(w.side):''} · ${esc(w.severity+w.level)} ${esc(w.aspect)} · ID ${esc(w.id)}</option>`).join('');
+ const woundRows=open.map(w=>{const items=gmWoundObligationSummary(c,w);return `<div class="list-row" data-gm-wound-row="${esc(w.id)}"><div><b>${esc(w.location.toUpperCase())}${w.side?' / '+esc(w.side):''} · ${esc(w.severity+w.level)}</b> · ${esc(w.aspect)}<div class="tiny muted">ID: ${esc(w.id)} · ${items.details.length?esc(items.details.join(' · ')):'bez dalších doložených termínů'}</div></div><button type="button" class="danger" data-gm-select-wound="${esc(w.id)}" ${allowed?'':'disabled'}>Vyřešit / odstranit</button></div>`}).join('');
+ return `<section class="panel wide" id="hmk-wound-management" data-gm-wound-manager="${esc(c.id)}"><h3>Zranění · společná zdravotní evidence GM</h3>
+ <p class="muted">Pro boj, cestování i jinou událost se používá tentýž zdravotní stav a kalendář. Odstranění znamená auditované <b>vyřešení konkrétní rány</b>, nikoli smazání její historie nebo vymyšlený Healing Roll. Otevřený Treatment se výslovně přeruší.</p>
+ <h4>Skutečné rány · ${open.length} aktivní</h4>${woundRows||'<p>Žádná aktivní rána.</p>'}
+ <details data-gm-wound-editor><summary><b>Přidat skutečnou ránu / vyřešit ránu podle ID</b></summary>
+ <form id="hmk-gm-health-form" novalidate><label>Akce<select name="action" required><option value="add">Vytvořit skutečnou ránu</option><option value="resolve">Vyřešit / odstranit konkrétní ránu</option></select></label>
+ <div data-gm-add-inputs><div class="field-grid"><label>Anatomická lokalita<select name="location" required><option value="">— Vyberte lokalitu —</option>${locations}</select></label>
+ <label>Strana<select name="side"><option value="">— Zvolte stranu, pokud jde o končetinu —</option><option value="left">levá</option><option value="right">pravá</option></select></label>
+ <label>Úroveň<select name="level" required><option value="">— Vyberte závažnost —</option><option value="1">M1</option><option value="2">S2</option><option value="3">S3</option><option value="4">G4</option><option value="5">G5</option></select></label>
+ <label>Typ zásahu<select name="aspect" required><option value="">— Vyberte typ —</option><option value="blunt">Blunt</option><option value="edge">Edge</option><option value="point">Point</option><option value="fire">Fire</option></select></label></div><label>Počáteční stav léčby<select name="initialCare" required><option value="pending">Nejdřív rozhodnout o Treatment (povinná událost nyní)</option><option value="untreated">Bez ošetření – GM potvrzuje následky Untreated (HMK 180)</option></select></label>
+ <p class="tiny muted">Založí se nové trvalé ID a původní čas rány. Při volbě Treatment se kalendář zastaví na povinném rozhodnutí, dokud není skutečně provedené. Volba Untreated výslovně nastaví pravidlové HR, Infection, Grim a Bleeder podle HMK, bez předstírání hodu.</p></div>
+ <div data-gm-resolve-inputs hidden><label>Konkrétní aktivní rána<select name="woundId"><option value="">— Vyberte ránu —</option>${options}</select></label>
+ <div class="notice" data-gm-wound-impact aria-live="polite">Vyberte ránu: před uložením uvidíte přesné navazující povinnosti, které se zruší.</div></div>
+ <label>Odůvodnění GM (10–500 znaků)<textarea name="reason" required minlength="10" maxlength="500" rows="2" placeholder="Důvod rozhodnutí GM"></textarea></label>
+ <label><input type="checkbox" name="gmConfirmed" value="yes" required> GM výslovně potvrzuje změnu zdravotního stavu a její kalendářové následky.</label>
+ <output data-gm-wound-error role="alert"></output><button type="submit" ${allowed?'':'disabled'}>Potvrdit a uložit s auditní stopou</button>
+ ${allowed?'':'<p class="notice">Během aktivní Initiative nelze zdravotní stav ručně přepsat.</p>'}
  </form></details></section>`;
 }
+function gmWoundSyncForm(form){
+ if(!form)return;
+ const action=form.elements.namedItem('action')?.value,resolve=action==='resolve';
+ const location=form.elements.namedItem('location')?.value;
+ const side=form.elements.namedItem('side');
+ if(side)side.required=!resolve&&['sh','ua','el','fo','ha','th','kn','ca','ft'].includes(location);
+ form.querySelector('[data-gm-add-inputs]').hidden=resolve;
+ form.querySelector('[data-gm-resolve-inputs]').hidden=!resolve;
+ const field=form.elements.namedItem('woundId');field.required=resolve;
+ const target=character(selected),w=target&&persistentStateOf(target).wounds.find(x=>x.id===field.value&&!x.healed);
+ const impact=form.querySelector('[data-gm-wound-impact]');
+ if(impact){if(!w)impact.textContent='Vyberte konkrétní ránu podle ID.';
+ else{const items=gmWoundObligationSummary(target,w);
+  impact.textContent='Zruší se pouze otevřené povinnosti této rány: '+(items.details.join(' · ')||'žádné aktuálně')+'. Trvalé auditní záznamy zůstanou. '+
+   (items.independent.length?'Samostatné zdravotní stavy postavy, které nelze prokazatelně připsat pouze této ráně, zůstanou zachovány: '+items.independent.join(', ')+'.':'');
+ }}
+}
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-gm-select-wound]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ let panel=b.closest('[data-gm-wound-manager]');
+ const form=panel?.querySelector('#hmk-gm-health-form');if(!form)return;
+ panel.querySelector('[data-gm-wound-editor]').open=true;
+ form.elements.namedItem('action').value='resolve';
+ form.elements.namedItem('woundId').value=b.dataset.gmSelectWound;
+ gmWoundSyncForm(form);
+ const node=form.elements.namedItem('woundId');node.scrollIntoView({block:'center'});node.focus({preventScroll:true});
+},true);
+document.addEventListener('change',e=>{if(e.target.matches?.('form#hmk-gm-health-form [name="action"],form#hmk-gm-health-form [name="woundId"],form#hmk-gm-health-form [name="location"]'))gmWoundSyncForm(e.target.form)},true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-open-gm-wounds]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();const c=character(selected);if(!c)return;
+ overlay=`<div class="editor-backdrop" role="presentation"><section class="panel editor-dialog" role="dialog" aria-modal="true" aria-label="Správa skutečných ran"><button type="button" data-action="cancel-editor" class="secondary">Zpět do deníku</button>${gmWoundManagementPanel(c)}</section></div>`;
+ render();
+ const detail=document.querySelector('.editor-backdrop [data-gm-wound-editor]');if(detail)detail.open=true;
+},true);
 
 function parseStructuredModes(raw){
  if(!String(raw||'').trim())return [];
@@ -20398,32 +20473,79 @@ document.addEventListener('click',e=>{
  x.name=name.trim();x.sb=parse(sb);x.ml=parse(ml)});return}
  if(t.dataset.editInjury){if(combatInitiativeSequence?.order?.includes(c.id))return alert('Zranění účastníka Initiative lze měnit jen pravidlovým Combat postupem.');const x=(c.hmk?.injuries||[]).find(x=>x.id===id);if(!x)return;if(x.combatRecord===true)return alert('Potvrzenou bojovou ránu lze upravit jen pravidlovým přechodem, ne ručně v deníku.');const location=prompt('Lokalita zásahu',x.location);if(location===null)return;if(!location.trim())return alert('Lokalita je povinná');const severity=prompt('Závažnost',x.severity||'');if(severity===null)return;const description=prompt('Popis poranění',x.description||'');if(description===null)return;mutate(()=>{x.location=location.trim();x.severity=severity;x.description=description})}
 },true);
-// Emergency authoritative health correction: GM owns the outcome, never a fictional roll.
+// One GM wound decision controls the original wound, ALL its derived future
+// schedule entries, and any open concurrent Treatment. The historic receipts
+// stay immutable and no other wound's treatment is cancelled.
 document.addEventListener('submit',e=>{
  const f=e.target;if(f.id!=='hmk-gm-health-form')return;
  e.preventDefault();e.stopImmediatePropagation();
  const c=character(selected);if(!c)return alert('Vyberte existující postavu.');
  if(combatInitiativeSequence?.order?.includes(c.id))return alert('Během Initiative je korekce povolena jen v Combat průvodci.');
- const v=Object.fromEntries(new FormData(f));
- if(v.gmConfirmed!=='yes'||String(v.reason||'').trim().length<10)return alert('GM musí potvrdit důvod zásahu (alespoň 10 znaků).');
- if(v.action==='resolve'&&!v.woundId)return alert('Vyberte skutečnou nezhojenou ránu.');
- const action=v.action==='resolve'?'resolve':'add';
- if(!uiConfirm(`POTVRZENÍ GM: ${action==='add'?'Založit SKUTEČNOU neošetřenou ránu':'Označit existující ránu za vyřešenou'}? Událost zůstane trvale v dokladech, žádný hod nebude vymyšlen.`))return;
+ gmWoundSyncForm(f);
+ const v=Object.fromEntries(new FormData(f)),action=v.action==='resolve'?'resolve':'add';
+ const mark=(name,why)=>{const node=f.elements.namedItem(name);if(node){markTravelBloodInput93787(f,node);f.querySelector('[data-gm-wound-error]').textContent=why;}return false;};
+ if(action==='resolve'&&!v.woundId)return mark('woundId','Vyberte skutečnou nezhojenou ránu podle ID.');
+ if(action==='add'){
+  for(const key of ['location','level','aspect','initialCare'])if(!v[key])return mark(key,'Vyplňte konkrétní údaj pro novou skutečnou ránu.');
+  if(['sh','ua','el','fo','ha','th','kn','ca','ft'].includes(v.location)&&!v.side)return mark('side','U párových anatomických lokací vyberte levou či pravou stranu.');
+ }
+ if(!String(v.reason||'').trim()||String(v.reason).trim().length<10)return mark('reason','Zdůvodnění musí mít alespoň 10 znaků.');
+ if(v.gmConfirmed!=='yes')return mark('gmConfirmed','GM musí výslovně potvrdit důsledky.');
+ const clock=data.campaignClock;
+ if(action==='add'&&(!clock||!calendarMemberIds(clock,data.characters).some(x=>x.id===c.id)))
+  return mark('action','Nová rána musí mít autoritativní časové ukotvení v aktivní kampani. Nejdříve přidejte postavu do Kalendáře.');
+ const source=persistentStateOf(c),w=source.wounds.find(x=>x.id===v.woundId&&!x.healed);
+ if(action==='resolve'&&!w)return mark('woundId','Tato rána už neexistuje nebo byla zhojena.');
+ const scope=action==='resolve'?gmWoundObligationSummary(c,w):{details:[],procedures:[],independent:[]};
+ const promptText=action==='add'
+  ?'POTVRZENÍ GM: založit jednu SKUTEČNOU ránu s doloženým místem a typem. '+(v.initialCare==='pending'?'Založí se povinné rozhodnutí o Treatment.':'Výslovně se potvrdí Untreated a spočítají se jeho pravidlové následky.')+' Žádný hod nebude vymyšlen.'
+  :'POTVRZENÍ GM: vyřešit přesně ránu '+w.id+'? Zruší se její neprovedené Healing/Infection/Grim/Morale/Mishap/Bleeder povinnosti'+
+   (scope.procedures.length?' a '+scope.procedures.length+' rozpracovaný časovaný Treatment (auditované přerušení)':'')+'. '+
+   (scope.independent.length?'Samostatné stavy '+scope.independent.join(', ')+' zůstanou zachovány. ':'')+'Historie zůstane nedotčená.';
+ if(!uiConfirm(promptText))return;
  const eventId='gm-health:'+uuid();
  const saved=mutate(()=>{
   const current=character(c.id);if(!current)throw Error('Postava už neexistuje');
   if(combatInitiativeSequence?.order?.includes(current.id))throw Error('Během Initiative nelze ručně měnit zranění');
   const before=persistentStateOf(current);
+  const target=before.wounds.find(x=>x.id===v.woundId&&!x.healed);
+  if(action==='resolve'&&!target)throw Error('Rána byla mezitím změněna nebo vyřešena.');
+  const inProgress=action==='resolve'&&data.campaignClock?openConcurrentProcedures(data.campaignClock)
+   .filter(x=>x.characterId===current.id&&x.woundId===v.woundId):[];
+  const otherWoundDays={};
+  if(action==='resolve'&&target.healing?.infected&&
+    !before.wounds.some(x=>x.id!==target.id&&!x.healed&&x.healing?.infected)){
+   for(const other of before.wounds){
+    if(other.id===target.id||other.healed||!other.healing?.treated||other.healing.noMundaneHealing)continue;
+    const elapsed=elapsedCalendarDays(data.campaignClock,'wound',current.id,other.id);
+    if(!Number.isSafeInteger(elapsed))throw Error('Doložte nejprve datum původu další rány '+other.id+' pro obnovení Healing po Infection.');
+    otherWoundDays[other.id]=elapsed;
+   }
+  }
   const result=prepareGMHealthOverride({state:before,action,eventId,reason:v.reason,
-   gmConfirmed:true,location:v.location,side:v.side||null,level:Number(v.level),aspect:v.aspect,woundId:v.woundId});
+   gmConfirmed:true,location:v.location,side:v.side||null,level:Number(v.level),aspect:v.aspect,
+   woundId:v.woundId,otherWoundDays,initialCare:v.initialCare});
+  const cancelled=[];
+  // Timed procedures are durable calendar operations, not merely computed
+  // healing rows. Append cancellation receipts in this SAME atomic mutation.
+  for(const op of inProgress){
+   data.campaignClock=cancelConcurrentProcedure(data.campaignClock,{id:uuid(),startId:op.startId,
+    reason:'GM vyřešil ránu '+result.woundId+': '+v.reason.trim(),confirmed:true});
+   cancelled.push(op.startId);
+  }
   synchronizeCombatInjuries(current,result.state);
+  const created=result.state.wounds.find(x=>x.id===result.woundId);
   data.journal.push({id:uuid(),characterId:current.id,createdAt:stamp(),
    ...(data.campaignClock?{calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute}:{}),
-   title:'HMK · výjimečné zdravotní rozhodnutí GM',body:`${action==='add'?'Zapsána skutečná neošetřená rána':'Rána označena jako vyřešená GM'} · ${result.woundId} · ${v.reason.trim()}`,
+   title:'HMK · zdravotní rozhodnutí GM · '+(action==='add'?'nová rána':'vyřešená rána'),
+   body:(action==='add'?'Nová skutečná rána':'Vyřešená rána')+' · '+result.woundId+
+    (action==='add'?' · '+created.location+' · '+created.severity+created.level+' · '+created.aspect:'')+
+    (cancelled.length?' · přerušeno '+cancelled.length+' časovaných zákroků':'')+' · '+v.reason.trim(),
    calendarGMHealthOverride:{format:'hmk-gm-health-override-v1',action,sourceEventId:eventId,
-    woundId:result.woundId,reason:v.reason.trim(),actualRoll:null}});
+    woundId:result.woundId,reason:v.reason.trim(),actualRoll:null,cancelledProcedureStartIds:cancelled,
+    ...(action==='add'?{initialCare:v.initialCare}:{})}});
  });
- if(saved){notice='Zdravotní zásah GM uložen s neměnným původním dokladem.';render();}
+ if(saved){overlay=null;notice=action==='add'?'Nová rána a její zdravotní návaznosti byly zapsány do kalendáře.':'Rána vyřešena; její neprovedené povinnosti a otevřené zákroky byly ukončeny, historie zůstala.';render();}
 },true);
 // Capture phase handles new forms before the legacy form dispatcher.
 document.addEventListener('submit',e=>{const f=e.target;if(!['hmk-profile-form','hmk-skill-form','hmk-injury-form','hmk-item-form'].includes(f.id))return;e.preventDefault();e.stopImmediatePropagation();const v=Object.fromEntries(new FormData(f));if(f.id==='hmk-item-form'){if(!String(v.name||'').trim())return alert('Zadejte název');const current=editItem?item(editItem):null;if(current&&current.category!==v.category)return alert('Změna kategorie existujícího předmětu není podporována. Založte nový předmět.');const props={...(current?.properties||{})};for(const [k,val] of Object.entries(v))if(k.startsWith('spec_'))props[k.slice(5)]=val;
