@@ -11,9 +11,9 @@ import {concurrentShockSources,projectConcurrentShock} from './hmk-concurrent-sh
 export const GM_HEALTH_LOCATIONS=Object.freeze(['sk','fa','nk','sh','ua','el','fo','ha','tx','ab','pv','th','kn','ca','ft']);
 const ASPECTS=new Set(['blunt','edge','point','fire']);
 const assert=(condition,message)=>{if(!condition)throw Error(message);};
-/** Determine whether a patient-wide consequence has a uniquely witnessed
- * wound origin. Legacy states with no wound provenance are NEVER guessed away.
- * A GM can separately attest ambiguous ownership in the editor.
+/** Read patient-wide consequences without requiring the GM to split a joint
+ * medical state manually. A missing legacy link is never attributed to an
+ * *independent* wound merely because one particular wound was removed.
  */
 export function gmWoundConsequenceAssessment(state,woundId){
  validateCombatState(state);
@@ -36,23 +36,50 @@ export function gmWoundConsequenceAssessment(state,woundId){
  else if(shockActive&&distinct.length>1){shock='shared-or-uncertain';}
  if(shockActive&&state.shock==='KIA')shock='fatal-requires-review';
  const bp=state.bloodLoss?.bp??0;
- const sources=state.events.filter(e=>
-   e.type==='blood-loss-advance'&&e.details?.gainedBP>0||
-   ['travel-blood-loss','travel-blood-stoppage'].includes(e.type)&&e.details?.gainedBP>0||
-   e.type==='blood-stoppage'&&e.details?.advanceSL&&e.details?.bp>0)
-  .map(e=>e.details?.woundId).filter(Boolean);
- const bloodOwners=[...new Set(sources)];
+ // BP increments are already recorded against a concrete wound ID. Account
+ // for earlier GM closures so historical BP are not counted twice.
+ const credits=new Map();let unknownBP=0;
+ for(const e of state.events){
+  const d=e.details||{};
+  if(e.type==='gm-health-wound-resolve'){
+   const spent=d.globalConsequences?.bloodPointsAttributed||0;
+   if(d.woundId&&spent)credits.set(d.woundId,Math.max(0,(credits.get(d.woundId)||0)-spent));
+   continue;
+  }
+  if(!['blood-loss-advance','blood-stoppage','travel-blood-loss','travel-blood-stoppage'].includes(e.type))continue;
+  const gained=Number(d.gainedBP)||0;
+  if(!Number.isSafeInteger(gained)||gained<=0)continue;
+  if(typeof d.woundId==='string'&&d.woundId){credits.set(d.woundId,(credits.get(d.woundId)||0)+gained);}
+  else unknownBP+=gained;
+ }
+ const bloodOwners=[...credits].filter(([,n])=>n>0).map(([id])=>id);
  let blood=bp>0?'unverified':'none';
- if(bp>0&&bloodOwners.length===1)blood=bloodOwners[0]===woundId?'owned':'independent';
- else if(bp>0&&bloodOwners.length>1)blood='shared-or-uncertain';
+ if(bp>0&&bloodOwners.length===1&&unknownBP===0)blood=bloodOwners[0]===woundId?'owned':'independent';
+ else if(bp>0&&(bloodOwners.length>1||unknownBP))blood='shared-or-uncertain';
+ const targetBP=credits.get(woundId)||0;
+ // A no-evidence legacy BP balance can only be uniquely attributed if
+ // there is no OTHER still-active wound or foreign BP provenance.
+ const bloodPointsToRemove=bp===0?0:targetBP>0?Math.min(bp,targetBP):
+  !bloodOwners.length&&!otherActive.length?bp:0;
+ const rootOwner=state.shockOriginWoundId||null;
+ const foreignGlobalOwners=[state.shockFollowup?.woundId,state.extendedShock?.woundId,state.coma?.woundId]
+  .filter(id=>id&&id!==woundId);
+ const legacySoleSource=otherActive.length===0&&!outsideSources.length&&!foreignGlobalOwners.length;
+ const shockRootToRemove=shockActive&&(rootOwner===woundId||
+  !rootOwner&&distinct.includes(woundId)||!rootOwner&&legacySoleSource||
+  !rootOwner&&state.bloodShockPending===true&&bp>0&&bloodPointsToRemove===bp&&
+   bloodOwners.every(id=>id===woundId))&&!foreignGlobalOwners.length;
  return {shockActive,shock,shockOwners:distinct,otherActiveWoundIds:otherActive.map(w=>w.id),
   concurrentShockSourceIds:outsideSources.map(x=>x.id),bloodPoints:bp,blood,
-  bloodOwners,hasBloodShock:state.bloodShockPending===true};
+  bloodOwners,hasBloodShock:state.bloodShockPending===true,
+  autoPlan:{shockRootToRemove,legacySoleSource,bloodPointsToRemove,
+   targetBPRecorded:targetBP,unknownBP,otherBPRecorded:bloodOwners.filter(id=>id!==woundId),
+   reason:shockRootToRemove?'původ cílové rány nebo jediný aktivní zdroj':'jiný či neprokázaný zdroj zůstává'}};
 }
 
 export function prepareGMHealthOverride({state,action,eventId,reason,gmConfirmed,location,
  side=null,level=1,aspect='blunt',woundId,daySinceInjury=null,otherWoundDays={},initialCare='untreated',
- shockDisposition=null,bloodPointsAttributed=null}={}){
+}={}){
  const s=structuredClone(state??initialCombatState());validateCombatState(s);
  assert(gmConfirmed===true&&typeof reason==='string'&&reason.trim().length>=10&&reason.length<=500,
   'Zdravotní zásah vyžaduje potvrzení GM a důvod (10–500 znaků)');
@@ -87,26 +114,10 @@ export function prepareGMHealthOverride({state,action,eventId,reason,gmConfirmed
  assert(typeof woundId==='string'&&s.wounds.some(w=>w.id===woundId&&!w.healed),
   'Vyberte existující nezhojenou ránu');
  const impact=gmWoundConsequenceAssessment(s,woundId);
- // The active global state may be a combination of several causes. For a
- // uniquely linked injury, use that provenance automatically; otherwise GM
- // must explicitly adjudicate, including retention of independent causes.
- const allowedShock=['clear','retain'];
- const selectedShock=impact.shockActive?(shockDisposition??
-  (impact.shock==='owned'?'clear':impact.shock==='independent'?'retain':null)):null;
- assert(!impact.shockActive||allowedShock.includes(selectedShock),
-  'Shock/Coma: určete výslovně, zda celý aktivní následek patří této ráně (zrušit / zachovat).');
- if(impact.shock==='independent')assert(selectedShock==='retain',
-  'Shock/Coma mají doložený původ jiné rány a nelze je touto operací smazat');
- if(impact.shock==='owned')assert(selectedShock==='clear',
-  'Shock/Coma jsou doloženým následkem odstraňované rány a musí skončit s ní');
- const attributedBP=impact.bloodPoints?bloodPointsAttributed??
-  (impact.blood==='owned'?impact.bloodPoints:impact.blood==='independent'?0:null):0;
- assert(Number.isSafeInteger(attributedBP)&&attributedBP>=0&&attributedBP<=impact.bloodPoints,
-  'Blood Loss: GM musí doložit počet BP patřících právě odstraňované ráně (0 až '+impact.bloodPoints+').');
- if(impact.blood==='owned')assert(attributedBP===impact.bloodPoints,
-  'Všechny doložené BP pocházejí z této rány, při odstranění se musí zrušit');
- if(impact.blood==='independent')assert(attributedBP===0,
-  'BP mají doložený původ jiné rány a nelze je touto operací smazat');
+ // No additional GM input. The closure is a single decision, with a
+ // deterministic provenance-based removal plan and an immutable receipt.
+ const attributedBP=impact.autoPlan.bloodPointsToRemove;
+ const selectedShock=impact.autoPlan.shockRootToRemove?'clear':'retain';
  const w=s.wounds.find(w=>w.id===woundId),h=w.healing||{};
  assert(daySinceInjury===null||(Number.isSafeInteger(daySinceInjury)&&daySinceInjury>=0&&daySinceInjury<=100000),
   'Nelze dosadit nedoložený počet dní');
@@ -145,16 +156,23 @@ export function prepareGMHealthOverride({state,action,eventId,reason,gmConfirmed
    resumedOtherWounds.push({woundId:other.id,confirmedElapsedDays:elapsed,nextHealingDay:elapsed+5});
   }
  }
- // Remove only GM-attested wound-owned GLOBAL consequences. This must
- // happen before the final validation and in the same atomic transaction as
- // the wound closure, Treatment cancellation and immutable receipt.
+ // Delete linked consequences in ONE mutation, but do not delete a
+ // different wound's evidence or a concurrent independent illness.
  const globalBefore={shock:s.shock,shockFollowup:!!s.shockFollowup,
   extendedShock:!!s.extendedShock,coma:!!s.coma?.active,
   bp:s.bloodLoss.bp,bloodShockPending:s.bloodShockPending===true};
+ const autoRemoved=[];
+ const belongs=(item)=>{
+  if(!item)return false;
+  const origin=item.woundId||item.sourceId;
+  return origin?origin===woundId:impact.autoPlan.shockRootToRemove;
+ };
+ if(belongs(s.shockFollowup)){s.shockFollowup=null;autoRemoved.push('shock-followup');}
+ if(belongs(s.extendedShock)){s.extendedShock=null;autoRemoved.push('extended-shock');}
+ if(belongs(s.coma)){s.coma=null;autoRemoved.push('coma');}
  if(selectedShock==='clear'){
-  if(s.bloodLoss.bp===0)s.bloodShockPending=false;
   s.shock='NONE';s.shockOriginRound=round;s.shockOriginWoundId=null;
-  s.shockFollowup=null;s.extendedShock=null;s.coma=null;
+  autoRemoved.push('shock');
   if(s.concurrentShockProjection){
    s.concurrentShockProjection.baseShock='NONE';
    s.concurrentShockProjection.projectedShock='NONE';
@@ -164,11 +182,13 @@ export function prepareGMHealthOverride({state,action,eventId,reason,gmConfirmed
  if(attributedBP>0){
   s.bloodLoss.bp-=attributedBP;
   s.bloodLoss.weaknessFatigue=s.bloodLoss.bp*5;
-  if(s.bloodLoss.bp===0){s.bloodLoss.healingNextDay=null;s.bloodShockPending=false;}
+  autoRemoved.push('blood-loss:'+attributedBP);
+  if(s.bloodLoss.bp===0)s.bloodLoss.healingNextDay=null;
  }
- // If Blood Shock is a known exclusively wound-owned consequence it has no
- // meaning without the corresponding BP, even where Shock was already NONE.
- if(impact.blood==='owned'&&s.bloodLoss.bp===0)s.bloodShockPending=false;
+ if(s.bloodLoss.bp===0){
+  s.bloodShockPending=false;
+  if(globalBefore.bloodShockPending)autoRemoved.push('blood-shock');
+ }
  w.healed=true;w.bleeding=false;w.nextAdvanceRound=null;w.moralePending=false;
  w.permanentImpairment=0;w.impaled=false;w.projectileArrowOrBolt=false;
  if(w.amputation?.severed===true){
@@ -180,7 +200,8 @@ export function prepareGMHealthOverride({state,action,eventId,reason,gmConfirmed
  s.events.push({id:eventId,type:'gm-health-wound-resolve',round,
   details:{woundId,reason:reason.trim(),priorInfected:!!h.infected,
    priorBleeding,priorPermanentEffects,gmCancelledMishaps:outstandingMishaps.map(x=>x.id),
-   globalConsequences:{assessment:impact,shockDisposition:selectedShock,bloodPointsAttributed:attributedBP,
+   globalConsequences:{assessment:impact,autoResolved:true,autoRemoved,
+    shockDisposition:selectedShock,bloodPointsAttributed:attributedBP,
     before:globalBefore,after:{shock:s.shock,shockFollowup:!!s.shockFollowup,
      extendedShock:!!s.extendedShock,coma:!!s.coma?.active,bp:s.bloodLoss.bp,
      bloodShockPending:s.bloodShockPending===true}},
