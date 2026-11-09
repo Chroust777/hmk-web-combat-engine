@@ -52,7 +52,7 @@ with sync_playwright() as p:
  add('a','rest',40)
  assert page.locator('[data-shared-plan-card]').first.locator('[data-shared-plan-minutes]').count()==0
  page.locator('[data-shared-plan-add]').click()
- assert page.locator('[data-shared-plan-card]').last.locator('[data-shared-row-actor] option[value="a"]').is_disabled()
+ assert page.locator('[data-shared-plan-card]').last.locator('[data-shared-row-actor] option[value="a"]').count()==0
  # Invalid repeated actor is rejected before any test.
  page.locator('[data-shared-plan-card]').last.locator('[data-shared-row-actor]').select_option('b')
  r=page.locator('[data-shared-plan-card]').last;r.locator('[data-shared-plan-kind]').select_option('rest')

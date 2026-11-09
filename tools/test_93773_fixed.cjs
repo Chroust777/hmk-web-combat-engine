@@ -26,7 +26,7 @@ test('two accidents same end',()=>assert.equal(minute({startMinute:480,endMinute
 test('start incorrect',()=>assert.throws(()=>minute({startMinute:480,endMinute:511,minutes:30,hazards:[]})));
 test('one minute episode',()=>assert.equal(minute({startMinute:1439,endMinute:1440,minutes:1,hazards:[{hazard:'accident',externalMedicalPending:true,hazardAtMinute:1}]}),1440));
 const old=fs.readFileSync(path.join(root,'app.js'),'utf8');
-test('draft v3 fixed',()=>assert.match(old,/episodeRowV:3,actorId:''/));
+test('draft v3 fixed',()=>assert.match(old,/episodeRowV:3,groupNumber:number,actorId:''/));
 test('full-end length preflight',()=>assert.match(old,/duration!==sharedTimeWindowDraft\.minutes/));
 test('original injury handoff preserved',()=>assert.match(old,/detail\.externalMedicalPending=true/));
 console.log('PASS',count,'fixed-window v93.773 checks');

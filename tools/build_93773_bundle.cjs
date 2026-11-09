@@ -5,7 +5,7 @@ const root=path.resolve(__dirname,'..'),file=path.join(root,'hmk-app.bundle.js')
 const prefix='(()=>{const MOD=',marker=';const CACHE={};';
 if(!old.startsWith(prefix)||!old.includes(marker))throw Error('Unexpected bundle');
 const end=old.indexOf(marker),modules=JSON.parse(old.slice(prefix.length,end));
-for(const name of ['app.js','src/integration/hmk-episode-fixed-93773.js','src/integration/hmk-time-episodes.js']){
+for(const name of ['app.js','src/integration/hmk-episode-fixed-93773.js','src/integration/hmk-time-episodes.js','src/integration/hmk-library-ranged-filters-93805.js']){
  const source=fs.readFileSync(path.join(root,name),'utf8');
  const result=ts.transpileModule(source,{fileName:name,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS},reportDiagnostics:true});
  if(result.diagnostics?.some(d=>d.category===ts.DiagnosticCategory.Error))throw Error('Compile failed '+name);
