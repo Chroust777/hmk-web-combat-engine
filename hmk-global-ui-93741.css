@@ -416,3 +416,18 @@ body #app .editor-backdrop .editor-dialog:has(> #hmk-wound-management) > button.
  body #app #hmk-wound-management > .list-row > div{flex:1 1 auto!important;width:100%!important}
  body #app #hmk-wound-management > .list-row > button{align-self:flex-start!important}
 }
+
+/* v93.803: same bold bookmark weight in every Character Journal folio and
+   every Calendar navigation tab, regardless of selected or secondary state. */
+body #app .content-sheet .journal-book .journal-book-subnav > button,
+body #app .content-calendar .journal-book--calendar .journal-book-subnav > button,
+body #app .content-calendar .hc-calendar-tabs > button,
+body #app .content-calendar .hc-provision-scope-tabs > button {
+ font-weight:700!important;
+}
+/* Print the computed weighted Area AV beside the Body Locations heading. */
+body #app .journal-book .journal-weighted-area-av {
+ display:inline!important; font:700 .85em/1.2 var(--hmk-ui-body-font,Georgia,serif)!important;
+ white-space:normal; color:#664023!important; cursor:help;
+ font-variant:normal!important; text-transform:none!important;
+}

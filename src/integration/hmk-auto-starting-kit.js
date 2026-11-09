@@ -39,7 +39,7 @@ export function prepareStartingKit(character,catalog,idFactory){
   if(!source||chosen.has(source.id)||MONEY(source)>remaining)return false;
   if(['main_hand','off_hand'].includes(slot)&&items.some(x=>x.slot===slot))return false;
   const entry={id:idFactory(),characterId:character.id,sourceItemId:source.id,snapshot:structuredClone(source),quantity:1,
-   condition:'Počáteční výbava (automatický návrh)',slot,currentWQ:source.category==='weapon'?Number(source.properties?.quality)||null:null,
+   condition:'',slot,currentWQ:source.category==='weapon'?Number(source.properties?.quality)||null:null,
    gearStowage:'normal',startingKitSource:'HMK v1.2 p.51, p.99–121; orientační výběr'};
   if(source.category==='armor'&&slot==='worn'){
    // Tentative only. Exact legal order/columns are resolved AFTER selection.
