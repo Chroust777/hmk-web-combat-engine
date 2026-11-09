@@ -1,0 +1,71 @@
+import assert from 'node:assert/strict';
+import {initialCombatState,validateCombatState} from '../src/integration/persistent-combat-state.js';
+import {gmWoundConsequenceAssessment,prepareGMHealthOverride} from '../src/integration/hmk-gm-health-override.js';
+import {createCampaignCalendar,anchorCampaignOrigin,campaignCalendarAgenda} from '../src/integration/hmk-campaign-calendar.js';
+const reason='GM potvrzuje odstranění kompletních následků konkrétní rány';
+const make=(s,n,level=4)=>prepareGMHealthOverride({state:s,action:'add',location:n,side:n==='ha'?'left':null,level,aspect:'blunt',initialCare:'pending',eventId:'add-'+n+'-'+(s?.wounds?.length||0),reason,gmConfirmed:true});
+const resolve=(s,id,caseId,extra={})=>prepareGMHealthOverride({state:s,action:'resolve',woundId:id,eventId:'resolve-'+caseId,reason,gmConfirmed:true,...extra});
+// Shock, Extended Shock, Coma and blood-loss with one source: all must disappear atomically.
+let x=make(initialCombatState(),'ha');let s=x.state,id=x.woundId;
+s.shock='UNC';s.shockOriginWoundId=id;s.shockOriginRound=1;
+s.extendedShock={originState:'UNC',hr:4,elapsedHours:0,woundId:id};
+s.coma={active:true,hr:3,elapsedDays:0,nextCourseDays:2,woundId:id};
+s.bloodLoss={bp:2,weaknessFatigue:10,healingNextDay:10};
+s.events.push({id:'blood-source-01',type:'blood-loss-advance',round:1,details:{woundId:id,gainedBP:2,totalBP:2}});
+validateCombatState(s);
+let a=gmWoundConsequenceAssessment(s,id);assert.equal(a.shock,'owned');assert.equal(a.blood,'owned');
+let r=resolve(s,id,'one');validateCombatState(r.state);
+assert.equal(r.state.shock,'NONE');assert.equal(r.state.shockFollowup,null);
+assert.equal(r.state.extendedShock,null);assert.equal(r.state.coma,null);assert.deepEqual(r.state.bloodLoss,{bp:0,weaknessFatigue:0,healingNextDay:null});
+assert(r.state.wounds[0].healed);assert.equal(r.state.events.at(-1).details.globalConsequences.bloodPointsAttributed,2);
+let clock=createCampaignCalendar({day:1,hour:8,minute:0,campaignId:'test',eventId:'calendar-start',gmConfirmed:true,characterIds:['test']});
+for (const k of ['extended-shock','coma','blood-loss'])clock=anchorCampaignOrigin(clock,{kind:k,characterId:'test',eventId:'anchor-'+k,gmConfirmed:true});
+let actor={id:'test',name:'Test',hmk:{healthState:s}};
+let before=campaignCalendarAgenda(clock,[actor]);assert(before.all.some(e=>e.kind==='extended-shock'));
+assert(before.all.some(e=>e.kind==='coma'));assert(before.all.some(e=>e.kind==='blood-loss'));
+actor.hmk.healthState=r.state;
+let after=campaignCalendarAgenda(clock,[actor]);assert(!after.all.some(e=>['extended-shock','coma','blood-loss'].includes(e.kind)),after.all);
+// Unverified ownership MUST block rather than silently lose another illness.
+x=make(initialCombatState(),'ha');s=x.state;id=x.woundId;s.shock='STN';s.shockOriginRound=1;
+s.shockFollowup={kind:'STN',originRound:1,dueRound:2,phase:'end-next-turn',timelineId:null};s.bloodLoss={bp:1,weaknessFatigue:5};
+validateCombatState(s);assert.equal(gmWoundConsequenceAssessment(s,id).shock,'unverified');
+assert.throws(()=>resolve(s,id,'uncertain'),/Shock\/Coma/);
+assert.throws(()=>resolve(s,id,'no-bp',{shockDisposition:'clear'}),/Blood Loss/);
+r=resolve(s,id,'gm-attested',{shockDisposition:'clear',bloodPointsAttributed:1});assert.equal(r.state.shock,'NONE');assert.equal(r.state.bloodLoss.bp,0);
+// Two distinct injuries: preserve independent Shock and Blood Loss without removing the second.
+x=make(initialCombatState(),'ha');s=x.state;const first=x.woundId;
+x=make(s,'fo');s=x.state;const second=x.woundId;
+s.shock='INC';s.shockOriginWoundId=second;s.shockOriginRound=1;
+s.shockFollowup={kind:'INC',originRound:1,dueRound:2,phase:'end-next-turn',timelineId:null,woundId:second};
+s.bloodLoss={bp:1,weaknessFatigue:5,healingNextDay:10};
+s.events.push({id:'blood-from-second',type:'blood-loss-advance',round:1,details:{woundId:second,gainedBP:1,totalBP:1}});
+validateCombatState(s);
+a=gmWoundConsequenceAssessment(s,first);assert.equal(a.shock,'independent');assert.equal(a.blood,'independent');
+r=resolve(s,first,'other');assert.equal(r.state.shock,'INC');assert.equal(r.state.bloodLoss.bp,1);
+assert(r.state.wounds.find(w=>w.id===second&&!w.healed));
+// Both wounds contributed BP: no arbitrary split; GM must choose BP count.
+x=make(initialCombatState(),'ha');s=x.state;const w1=x.woundId;
+x=make(s,'fo');s=x.state;const w2=x.woundId;
+s.bloodLoss={bp:3,weaknessFatigue:15,healingNextDay:10};
+s.events.push({id:'blood-one',type:'blood-loss-advance',round:1,details:{woundId:w1,gainedBP:2,totalBP:2}});
+s.events.push({id:'blood-two',type:'blood-loss-advance',round:1,details:{woundId:w2,gainedBP:1,totalBP:3}});
+validateCombatState(s);
+assert.equal(gmWoundConsequenceAssessment(s,w1).blood,'shared-or-uncertain');
+assert.throws(()=>resolve(s,w1,'shared-missing'),/Blood Loss/);
+r=resolve(s,w1,'shared-confirm',{bloodPointsAttributed:2});assert.equal(r.state.bloodLoss.bp,1);assert.equal(r.state.bloodLoss.weaknessFatigue,5);
+// Administrative removal, unlike natural healing, removes lasting impairment,
+// embedded projectiles and the loss-of-limb penalty of this wound only.
+x=make(initialCombatState(),'ha');s=x.state;id=x.woundId;
+s.wounds[0].healing={treated:true,healingRate:2,permanentImpairment:20};
+s.wounds[0].permanentImpairment=15;s.wounds[0].impaled=true;
+s.wounds[0].amputation={severed:true,side:'left',sourcePage:168};
+validateCombatState(s);r=resolve(s,id,'physical-loss');
+assert.equal(r.state.wounds[0].healing.permanentImpairment,0);
+assert.equal(r.state.wounds[0].permanentImpairment,0);
+assert.equal(r.state.wounds[0].amputation.severed,false);
+assert.equal(r.state.wounds[0].impaled,false);
+assert.equal(r.state.events.at(-1).details.priorPermanentEffects.healingImpairment,20);
+assert.equal(r.state.events.at(-1).details.priorPermanentEffects.rootImpairment,15);
+assert.equal(r.state.events.at(-1).details.priorPermanentEffects.amputation.severed,true);
+assert.equal(r.state.events.at(-1).details.priorPermanentEffects.impaled,true);
+console.log('PASS 93.797: wound-owned Shock/Coma/Extended/BP cancelled, calendar suppressed, ambiguous attribution guarded, other wound protected, shared BP explicit, immutable audit');
