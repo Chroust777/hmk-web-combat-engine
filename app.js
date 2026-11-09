@@ -136,6 +136,7 @@ import { WORKSHOP_SKILLS_P121, workshopQuality, occupationalWorkshop, waterWeigh
 import { EXPEDITION_EQUIPMENT_P120, CRAFT_ITEMS_TOOLS_P121, WORKSHOP_QUALITY_P121, WATER_WEIGHT_P121, MUNDANE_FIRE_P121 } from './src/rules/possessions-printed.js';
 import { BEASTS_P122, VEHICLES_TACK_P122, CONVEYANCE_RULES_P122 } from './src/rules/conveyance-printed-p122.js';
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
+import {planTravelEquipment93812} from './src/integration/hmk-travel-equipment-guide-93812.js';
 import {stableHubProjection,stableCargoCapacity,stableBurden,validateStableHub,assertStableHubAppendOnly,STABLE_HUB_FORMAT_574} from './src/integration/hmk-stable-hub-574.js';
 import {stableAnimalZones575,stableTraining575,effectiveStableBeast575,stableHauling575,validateStableTravel575} from './src/integration/hmk-stable-operations-575.js';
 import {availableTransportVehicles93756,transportVehicleReceipt93756,validateTransportVehicleHistory93756} from './src/integration/hmk-travel-vehicle-93756.js';
@@ -340,7 +341,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.811';
+const APP_VERSION='93.812';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2744,6 +2745,9 @@ function timeEpisodePageHTML(clock,participants){
  <label>Další hmotnost ve voze (lb) · průvodce, ostatní cestující a další náklad nezapsaný v evidenci vozu<input name="transportOtherLb" type="number" min="1" max="1000000" step="1" placeholder="Skutečná hmotnost bez pacientů a již evidovaného nákladu"></label>
  <label class="hc-check"><input type="checkbox" name="transportCoLocated"> GM potvrzuje použití konkrétního vozidla, vybraného spřežení a cestujících a že uvedené váhy nezapočítávají nic dvakrát. Geografickou polohu spravuje GM mimo aplikaci.</label>
  <p class="hc-hint" data-episode-vehicle-capacity role="status">Nosnost bude stanovena z doložené soupravy dle HMK str. 122. Nedoložené váhy nebo vozidlo zabrání potvrzení.</p></div></div></fieldset>
+ <section class="hc-episode-equipment-guide panel" data-episode-equipment-checklist hidden aria-live="polite">
+ <h4>Povinné vybavení a úkony před vyhodnocením dopravy · HMK 122</h4>
+ <div data-episode-equipment-checklist-body></div></section>
  <section class="hc-episode-stable-sync panel" data-episode-stable-sync><strong>Stáj · zvířata a vozidla pro tuto cestu</strong>
  <p class="hc-hint">Po pořízení nebo přidání koně, tažného zvířete, káry či vozu se vraťte a načtěte aktuální Stáj. Stávající členové skupiny, nastavení a ostatní připravené skupiny zůstanou zachováni. Po již zahájených hodech je nutné znovu vyhodnotit pouze tuto činnost.</p>
  <div class="actions"><button type="button" class="secondary hc-small" data-episode-open-stable="yes">Otevřít Stáj průvodce</button>
@@ -22574,6 +22578,7 @@ function episodeIssue(message,form){
   [/aspoň jednu postavu|alespoň jednu postavu/i,'memberIds'],
   [/Průvodce musí|Průvodce ve Shock|Průvodce.*Coma/i,'guideId'],
   [/Poloha pochodu:.*potvrdit/i,'travelLocationsConfirmed'],
+  [/Jízda na zvířeti:.*(zvíře|výstroj|uzda|sedlo|deka|Blanket|Saddle|Bit)/i,'stableAnimalIds'],
   [/Nepohyblivá nebo bezvědomá|nemůže se pohybovat vlastní silou/i,'conveyance'],
   [/Přeprava:|převoz v poli Převoz|přepravu každého/i,'transportedMemberIds'],
   [/Převoz – vozidlo:.*(není|neexistuje|vozidlo)/i,'transportVehicleKey'],
@@ -22872,6 +22877,14 @@ function episodePreviewFromForm(form,clock){
   throw Error('Počasí HMK platí pouze pro daný kalendářní den. Zvolený interval zasahuje za půlnoc; pro další den jsou povinné nové denní d10. Uzavřete nynější úsek do 24:00 a po potvrzení GM pokračujte zvolenou činností s novým denním počasím.');
  const animals=(v.animalIds||[]).map(id=>character(id));
  const stableAnimals=kind==='travel'?episodeStableAnimals(v.stableAnimalIds||[],clock):[];
+ // v93.812: a mounted journey cannot silently assume tack or a real mount.
+ // This preflight is intentionally limited to future departures; immutable
+ // prior campaigns are not rewritten on replay.
+ if(kind==='travel'&&v.conveyance==='mount'){
+  const incomplete=planTravelEquipment93812(data,campaignKey(clock),v).checks.find(x=>x.status==='missing');
+  if(incomplete)throw Error('Jízda na zvířeti: '+incomplete.title+'. '+incomplete.detail+' Použijte kontrolní seznam u Stáje v tomto Pochodu.');
+ }
+
  if(animals.some(c=>!c?.hmk?.verifiedMountedBreed||!c.hmk.healthState||!(data.campaignClock.characterIds??[]).includes(c.id)))
   throw Error('Zvíře musí mít ověřený stav a patřit do této kampaně.');
  // p.145: live animal illness, fatigue and serious limb/body wounds are
@@ -24616,6 +24629,7 @@ function updateEpisodePreview(form){
   // GM can uncheck transport, inspect/correct the input, then re-evaluate.
   for(const input of node.querySelectorAll('input,button'))input.disabled=transported;
  }
+ updateEpisodeEquipmentChecklist93812(form,v);
  const capInfo=form.querySelector('[data-episode-vehicle-capacity]');
  if(capInfo&&possibleTransport&&(v.transportedMemberIds||[]).length){
   try{const weights=Object.fromEntries((v.transportedMemberIds||[]).map(id=>[id,Number(v['transportPatientLb_'+id])]));
@@ -25384,6 +25398,34 @@ document.addEventListener('click',e=>{
    target.scrollIntoView({block:'center',behavior:'auto'});target.focus({preventScroll:true});}
  }
 },true);
+// v93.812: Live transport requirements. Read-only: never rolls, buys or
+// commits a course while repainting the checklist.
+function updateEpisodeEquipmentChecklist93812(form,v){
+ const area=form.querySelector('[data-episode-equipment-checklist]');if(!area)return;
+ const enabled=v.kind==='travel'&&['cart','wagon','mount'].includes(v.conveyance);
+ area.hidden=!enabled;if(!enabled)return;
+ const out=area.querySelector('[data-episode-equipment-checklist-body]');if(!out)return;
+ const plan=planTravelEquipment93812(data,campaignKey(data.campaignClock),v);
+ const outstanding=plan.checks.filter(x=>x.status==='missing');
+ const due=(v.orientationUse||'new')==='new'&&!v.droverProofId;
+ const documented=plan.checks.filter(x=>x.status==='ok').length;
+ const list=plan.checks.map(item=>{
+  const a=item.action,gear=a?.gearId?VEHICLES_TACK_P122.find(t=>t.id===a.gearId):null;
+  const label=item.status==='ok'?'✓':item.status==='missing'?'○':'·';
+  let buttons='';
+  if(a?.gearId&&a.animalId&&gear){
+   if(a.mode==='attach')buttons=`<button type="button" class="hc-small secondary" data-episode-equipment-action="attach" data-animal-id="${esc(a.animalId)}" data-item-id="${esc(gear.id)}" data-inventory-id="${esc(a.inventoryId)}">${['Cart, 2-wheel','Wagon, 4-wheel'].includes(gear.name)?'Zařadit vlastněný vůz · bez platby':'Nasadit z inventáře · bez platby'}</button>`;
+   else buttons=`<button type="button" class="hc-small" data-episode-equipment-action="${a.mode==='vehicle-buy'?'vehicle-buy':'buy'}" data-animal-id="${esc(a.animalId)}" data-item-id="${esc(gear.id)}">Koupit a zařadit · ${gear.priceD}d</button> <button type="button" class="hc-small secondary" data-episode-equipment-action="${a.mode==='vehicle-buy'?'vehicle-gift':'gift'}" data-animal-id="${esc(a.animalId)}" data-item-id="${esc(gear.id)}">Převzít bezplatně (GM)</button>`;
+  }
+  const jump=item.id==='vehicle'?'transportVehicleKey':item.id==='team'?'transportTeamIds':item.id==='animals'?'stableAnimalIds':item.id==='weight'?'transportOtherLb':item.id==='gm'?'transportCoLocated':null;
+  if(jump)buttons+=` <button type="button" class="hc-small secondary" data-episode-equipment-jump="${jump}">Ukázat pole</button>`;
+  return `<div class="hc-episode-equipment-line ${item.status==='missing'?'hc-episode-needs-input':''}" data-episode-equipment-status="${esc(item.id)}"><span class="hc-episode-equipment-marker">${label}</span><div><strong>${esc(item.title)}</strong><p class="hc-hint">${esc(item.detail)}</p><div class="actions">${buttons}</div></div></div>`;
+ }).join('');
+ const note=due?`<p class="hc-hint hc-episode-needs-input" data-episode-equipment-drover>○ Drover: průvodce musí doložit Riding (jízda) nebo Animalcraft (tažná zvířata). <button type="button" class="hc-small secondary" data-episode-equipment-jump="droverProofId">Ukázat Drover test</button></p>`:
+ '<p class="hc-hint">✓ Drover: doklad vybrán, případně převzaté platné pokračování.</p>';
+ out.innerHTML=`<p class="hc-hint"><strong>${outstanding.length+(due?1:0)} zbývajících povinných položek</strong> · ${documented} doložených. Ceny a předměty odpovídají katalogu HMK str. 122. Nákup se zapisuje do Stáje přímo z této stránky a neposouvá čas. Jestliže už začaly hody, nejprve se bezpečně obnoví pouze tato skupina.</p>${list}${note}`;
+}
+
 // v93.811: Older sidecars did not store the receipt boundary of an opened
 // group. Recover it ONLY when each provisional receipt identifies an episode
 // epoch. The active group's epoch changes on every new group; receipts from
@@ -25491,6 +25533,58 @@ function episodeRefreshStableRoster93810(form){
 }
 // Reuse the original Stable transaction handler for an inventory vehicle.
 // The mounted wagon remains a single physical item with an immutable proof.
+// v93.812: One-click physical tack acquisition/attachment, using the
+// exact original Stable event and cash proof; no second purchase ledger.
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-episode-equipment-action],[data-episode-equipment-jump]');
+ if(!btn)return;e.preventDefault();e.stopImmediatePropagation();
+ let form=document.querySelector('#hmk-time-episode-form');if(!form)return;
+ const key=btn.dataset.episodeEquipmentJump;
+ if(key){
+  const node=form.elements.namedItem(key);
+  if(node){const target=node.length&&!node.tagName?node[0]:node;
+   const label=target.closest('label,fieldset,details')||target;
+   for(let parent=label;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+   label.classList.add('hc-episode-needs-input');target.scrollIntoView({block:'center'});target.focus({preventScroll:true});}
+  return;
+ }
+ try{
+  const plan=sharedPlanCurrent93771();
+  if(!plan||plan.done||plan.kind!=='travel'||plan.id!==sharedTimeWindowActivePlanId)
+   throw Error('Doplnění výstroje je možné jen v aktivní, dosud nepotvrzené skupině Pochod.');
+  const cid=campaignKey(data.campaignClock),animal=verifiedLivestock(data,cid).find(a=>a.id===btn.dataset.animalId);
+  const gear=VEHICLES_TACK_P122.find(x=>x.id===btn.dataset.itemId);
+  if(!animal||!gear)throw Error('Zvíře nebo katalogová výstroj již neexistuje. Obnovte Stáj.');
+  const action=btn.dataset.episodeEquipmentAction;
+  if(!['buy','gift','attach','vehicle-buy','vehicle-gift'].includes(action))throw Error('Neznámé pořízení výstroje.');
+  const v=episodeFormSnapshot(form),current=planTravelEquipment93812(data,cid,v);
+  const req=current.checks.find(x=>x.action?.animalId===animal.id&&x.action?.gearId===gear.id&&
+   (action==='attach'?x.action.inventoryId===btn.dataset.inventoryId:x.action.mode==='buy'||x.action.mode==='vehicle-buy'));
+  if(!req)throw Error('Tato výstroj není momentálně chybějícím povinným vybavením vybraného zvířete. Aktualizujte kontrolní seznam.');
+  // A source change may invalidate already rolled skills. The existing
+  // group-local refresh has explicit consent, independent-group protection,
+  // and complete medical rollback semantics; reuse it, never delete dice here.
+  const started=episodeEvaluationRequested||episodePendingSkillRequest||episodePinnedSkillFields.size>0||episodeOutstandingSkillTasks.length>0;
+  if(started){
+   const refreshed=episodeRefreshStableRoster93810(form);
+   if(!refreshed||episodeEvaluationRequested||episodePendingSkillRequest||episodePinnedSkillFields.size||episodeOutstandingSkillTasks.length)return;
+   form=document.querySelector('#hmk-time-episode-form');
+   if(!form)return;
+  }
+  timeEpisodeDraft=episodeFormSnapshot(form);persistEpisodeDraftSidecar();
+  const raw=action==='attach'?{animalId:animal.id,type:'inventory-gear-attach',inventoryId:btn.dataset.inventoryId,
+   reason:'Nasazení vlastněné výstroje při přípravě skupinového Pochodu'}:
+   {animalId:animal.id,type:action.startsWith('vehicle')?'vehicle-add':'tack-add',itemId:gear.id,
+    mode:['gift','vehicle-gift'].includes(action)?'gift':'buy',reason:'Pořízení chybějící výstroje při rozpracovaném Pochodu'};
+  const purchaseForm=document.createElement('form');purchaseForm.setAttribute('data-hmk-stable-event','');purchaseForm.hidden=true;
+  for(const [name,value] of Object.entries(raw)){
+   const input=document.createElement('input');input.name=name;input.value=value;input.type='hidden';purchaseForm.append(input);
+  }
+  const submit=document.createElement('button');submit.type='submit';purchaseForm.append(submit);document.body.append(purchaseForm);
+  try{purchaseForm.requestSubmit(submit);}finally{purchaseForm.remove();}
+ }catch(error){notice=error.message;alert('Pochod · výstroj: '+error.message);}
+},true);
+
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-episode-attach-inventory-vehicle]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();

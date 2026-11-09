@@ -703,3 +703,13 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 
 .hc-episode-group-table select[aria-invalid="true"],
 .hc-episode-group-table [data-hmk-travel-invalid="yes"]{border:2px solid #b0271c!important;background:rgba(255,222,206,.74)!important;box-shadow:0 0 0 1px rgba(176,39,28,.16)}
+/* v93.812 · Live equipment requirements while the group trek remains open */
+.hc-episode-equipment-guide{margin:12px 0;padding:12px 16px;border:1px solid #aa895e;border-radius:10px}
+.hc-episode-equipment-guide h4{margin:0 0 9px;font-size:1.12rem}
+.hc-episode-equipment-line{display:flex;align-items:flex-start;gap:12px;border-top:1px solid rgba(99,60,27,.28);padding:9px 4px}
+.hc-episode-equipment-line .hc-episode-equipment-marker{flex:0 0 24px;font-weight:800;text-align:center;color:#34543c}
+.hc-episode-equipment-line.hc-episode-needs-input{border-left:3px solid #a53b32;padding-left:9px;background:rgba(159,33,21,.055)}
+.hc-episode-equipment-line.hc-episode-needs-input .hc-episode-equipment-marker{color:#8b2923}
+.hc-episode-equipment-line .hc-hint{margin:3px 0 6px}
+.hc-episode-equipment-line .actions{display:flex;flex-wrap:wrap;gap:6px}
+.hc-episode-equipment-line button{white-space:normal}
