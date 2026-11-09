@@ -7437,10 +7437,14 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 }
 
 /* v93.787 · Blood Stoppage: conditional medical d100 after warning / native validation. */
+.journal-book--hazards .hc-medical-validation-error,
+.hmk-weather-care .hc-medical-validation-error,
 .hmk-weather-blood-care .hc-medical-validation-error {
  outline:2px solid #b02222!important;outline-offset:3px;border-radius:5px;
  background:rgba(191,34,34,.12)!important;scroll-margin-block:6.5rem;
 }
+.journal-book--hazards [data-hmk-medical-invalid="yes"],
+.hmk-weather-care [data-hmk-medical-invalid="yes"],
 .hmk-weather-blood-care [data-hmk-medical-invalid="yes"] {
  border:2px solid #b02222!important;outline-color:#b02222!important;
  box-shadow:0 0 0 3px rgba(176,34,34,.16)!important;
