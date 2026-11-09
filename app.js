@@ -341,7 +341,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.806';
+const APP_VERSION='93.807';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -24174,8 +24174,16 @@ function sharedFixedRowUpdate93773(plan,field,value){
    plan.groupNumber=number;
   }else if(field==='kind'){
    if(!SHARED_PLAN_KINDS_93771.some(x=>x[0]===value))throw Error('Neplatná činnost.');
-   if(value!=='travel'&&(plan.memberIds||[]).length>1)
-    throw Error('Nejdřív odeberte ostatní členy skupiny, poté změňte Pochod na individuální činnost.');
+   // Switching from a travel party to an individual activity is a draft-only
+   // edit. Keep the selected guide as the individual actor (when valid),
+   // drop the other group members atomically, and require no extra GM step.
+   // This never touches confirmed journal entries, dice or campaign time.
+   if(value!=='travel'){
+    const actor=eligible(plan.actorId)?plan.actorId:(plan.memberIds||[]).find(eligible)||'';
+    plan.actorId=actor;
+    plan.memberIds=actor?[actor]:[];
+    if(sharedPlanMembersOpen93806===plan.id)sharedPlanMembersOpen93806=null;
+   }
    plan.kind=value;
   }else if(field==='weather'){
    if(!sharedWeatherSources93772().some(w=>w.id===value))throw Error('Zvolte potvrzené globální počasí pro aktuální den.');plan.weatherId=value;
