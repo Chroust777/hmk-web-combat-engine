@@ -7449,3 +7449,14 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
  border:2px solid #b02222!important;outline-color:#b02222!important;
  box-shadow:0 0 0 3px rgba(176,34,34,.16)!important;
 }
+
+/* v93.789: GM health correction uses the same exact-field validation
+ * as noncombat Travel health. No Combat form styling changed. */
+#hmk-gm-health-form .hc-medical-validation-error {
+ outline:2px solid #b02222!important;outline-offset:3px;border-radius:5px;
+ background:rgba(191,34,34,.12)!important;scroll-margin-block:6.5rem;
+}
+#hmk-gm-health-form [data-hmk-medical-invalid="yes"] {
+ border:2px solid #b02222!important;outline-color:#b02222!important;
+ box-shadow:0 0 0 3px rgba(176,34,34,.16)!important;
+}

@@ -339,7 +339,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.788';
+const APP_VERSION='93.789';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11374,7 +11374,7 @@ function hskWeatherShockFollowup(actorId){
  <p>Shock ML ${esc(String(shockML??'nedoloženo'))} · Fatigue ${fatigue} · ${q.kind==='STN'?'bez dalšího −20':'−20 při INC/UNC'} · EML ${esc(String(Number.isInteger(shockML)?eml:'nedoloženo'))}</p>
  <form data-weather-shock-followup data-shock-eml="${esc(String(Number.isFinite(eml)?eml:''))}" data-shock-coma-ready="${comaCause.ready&&canRoll?'yes':'no'}"><input type="hidden" name="sourceId" value="${esc(q.sourceId)}">
  <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required ${canRoll?'':'disabled title="Shock ještě není splatný nebo chybí ověřená ML"'}></label>
- ${q.kind==='UNC'?`<p class="hc-hint">${comaCause.ready?'Coma při CF: původní rána '+esc(comaCause.woundId)+' · ověřené Location Shock '+comaCause.locationShock+' · IL '+comaCause.injuryLevel+' · počáteční HR '+comaCause.initialHR+'. Hodnoty nejsou upravitelné.':'Coma při CF: '+esc(comaCause.reason)}</p><input name="comaLocationShock" type="hidden" value="${comaCause.ready?comaCause.locationShock:''}"><input name="comaInjuryLevel" type="hidden" value="${comaCause.ready?comaCause.injuryLevel:''}"><label>První skutečný d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" disabled title="Coma d10 je dostupné pouze po skutečném výsledku UNC + CF"></label>`:''}
+ ${q.kind==='UNC'?`<p class="hc-hint">${comaCause.ready?'Coma při CF: původní rána '+esc(comaCause.woundId)+' · ověřené Location Shock '+comaCause.locationShock+' · IL '+comaCause.injuryLevel+' · počáteční HR '+comaCause.initialHR+'. Hodnoty nejsou upravitelné.':'Coma při CF: '+esc(comaCause.reason)}</p><input name="comaLocationShock" type="hidden" value="${comaCause.ready?comaCause.locationShock:''}"><input name="comaInjuryLevel" type="hidden" value="${comaCause.ready?comaCause.injuryLevel:''}"><label>První skutečný d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" required disabled title="Coma d10 je dostupné pouze po skutečném výsledku UNC + CF"><button type="button" class="hc-small" data-weather-coma-d10 disabled title="Vygenerovat skutečný d10 (bez potvrzení akce)">⚄ d10</button></label>`:''}
  <p class="hc-hint">${q.phase==='after-all-bleeding-stopped'?'Ihned po zastavení všech Bleederů – bez dalších deseti minut.':q.kind==='UNC'?'Test je dostupný přesně po uplynutí deseti minut.':'Tlačítko vyhodnotí Shock po dokončení následující skutečné akce postavy; žádný bojový tah se nevytváří.'}</p>
  ${q.kind!=='UNC'&&q.phase!=='after-all-bleeding-stopped'?'<label><input type="checkbox" name="actualActionConfirmed" required '+(canRoll?'':'disabled')+'> GM potvrzuje skutečnou následující akci mimo boj, na jejímž konci probíhá Shock Reroll</label>':''}
  <button type="submit" ${canRoll?'':'disabled'}>Vyhodnotit a zapsat Shock d100</button><output role="status" aria-live="polite"></output></form>
@@ -12495,6 +12495,7 @@ const TRAVEL_HEALTH_VALIDATION_FORMS_93788=[
  'form[data-weather-blood-start]','form[data-weather-blood-complete]',
  'form[data-weather-shock-followup]','form[data-weather-injury-mishap]',
  'form[data-weather-injury-morale]','form[data-weather-trauma-course]',
+ 'form#hmk-gm-health-form',
  'form[data-parallel-cold-reroll]','form[data-parallel-cold-course]',
  'form[data-hmk-poison-start]','form[data-hmk-poison-onset]',
  'form[data-hmk-poison-course]','form[data-hmk-disease-exposure]',
@@ -12650,8 +12651,34 @@ document.addEventListener('input',event=>{
   Number.isSafeInteger(roll)&&roll>=1&&roll<=100&&
   Number.isFinite(eml)&&['CF','F','S','CS'][successLevel(roll,eml)]==='CF';
  next.disabled=!allowed;
+ const generator=form.querySelector('button[data-weather-coma-d10]');
+ if(generator)generator.disabled=!allowed;
  if(!allowed)next.value='';
 },true);
+// A newly enabled conditional d10 needs its own generator because the
+// generic enhancement skips disabled inputs on the initial render.
+document.addEventListener('click',event=>{
+ const generator=event.target?.closest?.('button[data-weather-coma-d10]');if(!generator||generator.disabled)return;
+ const form=generator.closest('form[data-weather-shock-followup]');
+ const input=form?.elements.namedItem('initialComaD10');if(!input||input.disabled)return;
+ input.value=String(secureHMKDie(10));
+ input.dispatchEvent(new Event('input',{bubbles:true}));
+ input.dispatchEvent(new Event('change',{bubbles:true}));
+},true);
+// GM resolve is conditionally mandatory. A missing wound never results in
+// a fictional resolve receipt and must visibly focus the exact field.
+document.addEventListener('change',event=>{
+ const node=event.target;
+ if(!node?.matches?.('form#hmk-gm-health-form [name="action"]'))return;
+ const form=node.closest('form'),wound=form?.elements.namedItem('woundId');
+ if(!wound)return;
+ wound.required=node.value==='resolve';
+ if(!wound.required){
+  wound.removeAttribute('aria-invalid');wound.removeAttribute('data-hmk-medical-invalid');
+  wound.closest('label')?.classList.remove('hc-medical-validation-error');
+ }
+},true);
+
 document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-weather-shock-followup]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
