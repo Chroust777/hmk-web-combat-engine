@@ -2802,7 +2802,7 @@ function timeEpisodePageHTML(clock,participants){
  <div class="hmk-trek-grid">
  <label data-hazard-repair>Výstroj · postup<select name="hazardEquipmentDisposition"><option value="repair">Opravit</option><option value="ignore">Ponechat bez opravy (bez nutnosti)</option><option value="abandon">Odložit / opustit vybavení</option></select></label>
  <label data-hazard-complication>Překážka · postup<select name="hazardComplicationDecision"><option value="test">Překonat testem</option><option value="reroute">GM mění trasu</option></select></label>
- <label data-hazard-item>Dotčený předmět ze skutečného inventáře<select name="hazardItemId"><option value="">— vyberte skutečný předmět —</option>${data.inventory.filter(x=>x.characterId===first?.id&&Number(x.quantity)>0&&!['chest','stable'].includes(x.slot)).map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot?.name||x.id)} (${esc(x.slot||'neseno')})</option>`).join('')}</select></label>
+ <label data-hazard-item>Dotčený předmět ze skutečného inventáře<select name="hazardItemId"><option value="">— vyberte skutečný předmět —</option>${data.inventory.filter(x=>participants.some(c=>c.id===x.characterId)&&Number(x.quantity)>0&&!['chest','stable'].includes(x.slot)).map(x=>`<option value="${esc(x.id)}">${esc(character(x.characterId)?.name||x.characterId)} · ${esc(x.snapshot?.name||x.id)} (${esc(x.slot||'neseno')})</option>`).join('')}</select></label>
  <label data-hazard-repair>Oprava výstroje<select name="hazardRepairSkill"><option value="">— není vybrána —</option>${['Hideworking','Metalcraft','Textilecraft','Woodworking'].map(x=>option(x,x)).join('')}</select></label>
  <label data-hazard-complication><span class="hc-help-term" tabindex="0" data-hmk-help="HMK 149 · Který test odpovídá skutečné překážce? Agility: úzká stezka na srázu, nerovný sestup nebo brod. Animalcraft: panika zvířat nebo uváznutí v terénu. Climbing: náročný výstup nebo nebezpečný zřícený most. Timbercraft: cesta vyžadující prosekání či odstranění překážejícího porostu. Swimming: hluboký nebo prudký potok či řeka. GM také určí, zda hází jeden řešitel nebo každý účastník zvlášť.">Dovednost komplikace <span aria-hidden="true">ⓘ</span></span><select name="hazardComplicationSkill"><option value="">— není vybrána —</option>${['Agility','Animalcraft','Climbing','Timbercraft','Swimming'].map(x=>option(x,x)).join('')}</select></label>
  <label data-hazard-worker>Opravář / řešitel překážky<select name="hazardWorkerId"><option value="">— vyberte účastníka —</option>${participants.map(c=>option(c.id,c.name)).join('')}</select></label>
@@ -22337,15 +22337,16 @@ function refreshWeatherAreaAVFields(form){
 function episodeRefreshHazardInventory93790(form){
  const select=form?.elements.namedItem('hazardItemId');
  if(!select)return;
- const owner=form.elements.namedItem('guideId')?.value;
  const members=[...form.querySelectorAll('[name="memberIds"]:checked')].map(x=>x.value);
  const current=select.value;
- const carried=data.inventory.filter(x=>x.characterId===owner&&members.includes(owner)&&
+ // A Survival Equipment Hazard applies to the travelling party, not only
+ // the Guide's pack. Do not offer equipment from a parallel independent party.
+ const carried=data.inventory.filter(x=>members.includes(x.characterId)&&
   Number(x.quantity)>0&&!['chest','stable'].includes(x.slot));
- const signature=owner+'|'+carried.map(x=>x.id+':'+(x.snapshot?.name||'')+':'+x.slot).join('|');
+ const signature=[...members].sort().join(',')+'|'+carried.map(x=>x.id+':'+x.characterId+':'+(x.snapshot?.name||'')+':'+x.slot).join('|');
  if(select.dataset.hazardInventorySignature===signature)return;
- select.replaceChildren(new Option('— vyberte předmět, který má tato postava u sebe —',''));
- for(const item of carried)select.add(new Option((item.snapshot?.name||item.id)+' ('+(item.slot||'neseno')+')',item.id));
+ select.replaceChildren(new Option('— vyberte skutečný předmět člena skupiny —',''));
+ for(const item of carried)select.add(new Option((character(item.characterId)?.name||item.characterId)+' · '+(item.snapshot?.name||item.id)+' ('+(item.slot||'neseno')+')',item.id));
  if(carried.some(x=>x.id===current))select.value=current;
  else {select.value='';if(timeEpisodeDraft?.hazardItemId)timeEpisodeDraft.hazardItemId='';}
  select.dataset.hazardInventorySignature=signature;
@@ -23151,7 +23152,7 @@ function episodePreviewFromForm(form,clock){
   // records continued misdirection, never an invented successful skill test.
   if(hazardType==='misdirection'&&detail.result==='pending-awareness')detail.requiresGMCompletion=true;
   if(hazardType==='equipment'){
-   const item=data.inventory.find(x=>x.id===v.hazardItemId&&x.characterId===guideId&&members.includes(guideId)&&Number(x.quantity)>0&&!['chest','stable'].includes(x.slot));
+   const item=data.inventory.find(x=>x.id===v.hazardItemId&&members.includes(x.characterId)&&Number(x.quantity)>0&&!['chest','stable'].includes(x.slot));
    if(!item)detail.requiresGMCompletion=true;
    else{
     detail.itemId=item.id;detail.itemOwnerId=item.characterId;
@@ -23483,8 +23484,14 @@ function episodeEndTasks(result){
      action:'hazardEvidenceId',skill:h.complicationSkill,actorId:h.workerId});continue;
    }
   }
+  if(h.requiresGMCompletion&&['misdirection','lost'].includes(h.hazard)&&h.result==='pending-direction'){
+   tasks.push({name:'Direction Hazard · směr odchýlení (d10)',
+    detail:'Hoďte skutečný d10: lichý znamená vlevo, sudý vpravo. Bez doloženého hodu nelze pokračovat.',
+    action:'hazardDirectionD10'});continue;
+  }
   if(h.requiresGMCompletion&&h.hazard==='misdirection'&&h.result==='pending-awareness'){
-   tasks.push({name:'Direction Hazard · Awareness',detail:'Rozhodující Awareness test se vyhodnotí ve Skill Tests.',
+   tasks.push({name:'Direction Hazard · Awareness, nebo vědomé pokračování mimo trasu',
+    detail:'Buď vyhodnoťte skutečný Awareness průvodce, nebo výslovně potvrďte, že během této epizody nebyl proveden. Bez Awareness družina zůstane na chybném směru; úspěch se nikdy nepředpokládá.',
     action:'hazardDirectionProofId',skill:'Awareness',actorId:result.orientation?.guideId||result.memberIds?.[0]});continue;
   }
   if(h.requiresGMCompletion)add('Hazard · '+h.hazard,
@@ -23769,8 +23776,10 @@ function episodePlannedTaskHTML(t,i){
   t.skill&&t.actorId?'<button type="button" data-episode-skill-task="'+esc(t.skill)+'" data-episode-skill-field="'+esc(t.field)+'" data-episode-skill-actor="'+esc(t.actorId)+'">Otevřít '+esc(t.skill)+' Skill Test</button>':
   t.field?'<button type="button" class="secondary" data-episode-jump="'+esc(t.field)+'">'+(t.field==='hazardAtMinute'?'Zadat přesnou minutu':t.field==='hazardComplicationRouteChanged'?'Potvrdit změnu trasy':'Otevřít požadované pole')+'</button>':
   '<button type="button" class="secondary" data-episode-review>Ukázat pravidlovou překážku</button>';
+ const alternate=t.skill==='Awareness'&&/Direction Hazard/.test(t.name)?
+  '<button type="button" class="secondary" data-episode-direction-defer>Bez Awareness · pokračovat chybným směrem</button>':'';
  return '<div class="hc-episode-task"><span class="hc-task-number">'+(i+1)+'</span><div><strong>'+esc(t.name)+'</strong>'+ 
-  '<p>'+esc(t.detail)+'</p>'+button+'</div></div>';
+  '<p>'+esc(t.detail)+'</p>'+button+alternate+'</div></div>';
 }
 function renderEpisodeEndError(form,message){
  const root=document.querySelector('.hc-episode-spread-right')||form.closest('.hc-episode-shell');
@@ -25248,6 +25257,13 @@ document.addEventListener('click',e=>{
  if(missing){missing.scrollIntoView({block:'center',behavior:'smooth'});missing.focus({preventScroll:true});return;}
  const panel=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
  if(panel){panel.scrollIntoView({block:'center',behavior:'smooth'});panel.setAttribute('tabindex','-1');panel.focus({preventScroll:true});}
+},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-episode-direction-defer]');if(!b)return;
+ e.preventDefault();const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
+ const decision=form.elements.namedItem('hazardDirectionDeferAwareness');if(!decision||decision.disabled)return;
+ decision.checked=true;
+ timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
 },true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-episode-fix-equipment-delay]');if(!b)return;
