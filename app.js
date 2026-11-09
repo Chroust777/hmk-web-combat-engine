@@ -340,7 +340,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.809';
+const APP_VERSION='93.810';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2077,6 +2077,10 @@ let sharedTimeWindowSelectedGroupId=null;
 let sharedTimeWindowPlans=[];
 let sharedPlanMembersOpen93806=null;
 let sharedTimeWindowActivePlanId=null;
+// v93.810: immutable IDs present before opening the current group. This lets
+// us roll back ONLY this group's staged evidence after its animals change,
+// preserving all previously completed groups in the shared window.
+let episodeGroupStartingReceiptIds93810=[];
 let sharedEpisodeAutoRun93772=false;
 let sharedDefaultWeatherId93772='';
 let episodeQueueAction=false;
@@ -2231,6 +2235,7 @@ function persistEpisodeDraftSidecar({snapshotForm=false}={}){
   sharedWindow:sharedTimeWindowDraft?structuredClone(sharedTimeWindowDraft):null,
   sharedSelectedGroupId:sharedTimeWindowSelectedGroupId,
   sharedPlans:structuredClone(sharedTimeWindowPlans),sharedActivePlanId:sharedTimeWindowActivePlanId,
+  groupStartingReceiptIds93810:episodeGroupStartingReceiptIds93810===null?null:[...episodeGroupStartingReceiptIds93810],
   sharedAutoRun:sharedEpisodeAutoRun93772,sharedDefaultWeatherId:sharedDefaultWeatherId93772,
   sharedQueue:sharedTimeWindowQueue.map(({apply,...receipt})=>structuredClone(receipt)),
   baselineToken:sharedCommittedBaselineToken93769()};
@@ -2280,6 +2285,10 @@ function restoreEpisodeDraftSidecar(){
    sharedTimeWindowDraft=structuredClone(side.sharedWindow);
    sharedTimeWindowQueue=structuredClone(side.sharedQueue);
    sharedTimeWindowPlans=structuredClone(side.sharedPlans);sharedTimeWindowActivePlanId=side.sharedActivePlanId??null;
+   // A draft from an older version might have staged tests but no precise
+   // boundary for the active group's receipts: NEVER guess which to delete.
+   episodeGroupStartingReceiptIds93810=Array.isArray(side.groupStartingReceiptIds93810)?[...side.groupStartingReceiptIds93810]:
+    sharedTimeWindowActivePlanId?null:[];
    sharedEpisodeAutoRun93772=side.sharedAutoRun===true;sharedDefaultWeatherId93772=side.sharedDefaultWeatherId||'';
    episodeDraftEpoch=side.epoch;timeEpisodeDraft=side.draft||{};
    episodePendingSkillRequest=side.request??null;episodeActiveSkillRequestId=side.activeRequestId??null;
@@ -2292,7 +2301,7 @@ function restoreEpisodeDraftSidecar(){
    return;
   }catch(error){
    discardEpisodeDraftSidecar();
-   sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;sharedEpisodeAutoRun93772=false;sharedDefaultWeatherId93772='';
+   sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;episodeGroupStartingReceiptIds93810=[];sharedEpisodeAutoRun93772=false;sharedDefaultWeatherId93772='';
    notice='Rozpracované okno nebylo bezpečně obnovitelné ('+(error?.message||error)+'). Autoritativní kampaň a její čas se nezměnily.';
    return;
   }
@@ -2723,6 +2732,11 @@ function timeEpisodePageHTML(clock,participants){
  <label>Další hmotnost ve voze (lb) · průvodce, ostatní cestující a další náklad nezapsaný v evidenci vozu<input name="transportOtherLb" type="number" min="1" max="1000000" step="1" placeholder="Skutečná hmotnost bez pacientů a již evidovaného nákladu"></label>
  <label class="hc-check"><input type="checkbox" name="transportCoLocated"> GM potvrzuje použití konkrétního vozidla, vybraného spřežení a cestujících a že uvedené váhy nezapočítávají nic dvakrát. Geografickou polohu spravuje GM mimo aplikaci.</label>
  <p class="hc-hint" data-episode-vehicle-capacity role="status">Nosnost bude stanovena z doložené soupravy dle HMK str. 122. Nedoložené váhy nebo vozidlo zabrání potvrzení.</p></div></div></fieldset>
+ <section class="hc-episode-stable-sync panel" data-episode-stable-sync><strong>Stáj · zvířata a vozidla pro tuto cestu</strong>
+ <p class="hc-hint">Po pořízení nebo přidání koně, tažného zvířete, káry či vozu se vraťte a načtěte aktuální Stáj. Stávající členové skupiny, nastavení a ostatní připravené skupiny zůstanou zachováni. Po již zahájených hodech je nutné znovu vyhodnotit pouze tuto činnost.</p>
+ <div class="actions"><button type="button" class="secondary hc-small" data-episode-open-stable="yes">Otevřít Stáj průvodce</button>
+ <button type="button" class="secondary hc-small" data-episode-open-stable-library="yes">Pořídit zvíře · Knihovna</button>
+ <button type="button" class="hc-small" data-episode-stable-refresh="yes">↻ Aktualizovat ze Stáje</button></div></section>
  ${stableTravelRoster.length?`<fieldset data-episode-stable-roster><legend>Zvířata vybraná ze Stáje · doložené zatížení</legend>
  <p class="hc-hint">Výběr používá existující stájové záznamy, jejich postroje, náklad a jezdce. Nic nespojuje podle podobného jména. Stájový záznam sám nevytváří bojový Combat State.</p>
  <div class="hc-episode-members">${stableTravelRoster.map(a=>{const b=stableBurden(data,campaignKey(clock),a);return `<label class="hc-check"><input name="stableAnimalIds" type="checkbox" value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)} · ENC ${Number.isSafeInteger(b.adjustedENC)?b.adjustedENC:'nedoloženo'}${b.rider?' · jezdec ze Stáje':''}${b.cargoOverflow?' · PŘETÍŽENO':''}</label>`}).join('')}</div></fieldset>`:''}
@@ -6595,7 +6609,7 @@ function characterStableView(owner){
  const clock=data.campaignClock,cid=clock?campaignKey(clock):null;
  const animals=cid?bestiaryKnownAnimals().filter(a=>a.ownerId===owner.id):[];
  const active=animals.filter(a=>!stableBurden(data,cid,a).exit);
- if(!active.length)return journalChapterShell('Stáj · '+owner.name,'Žádné právě vlastněné zvíře',`<p class="hmk-stable-note">Zvíře lze pořídit v Knihovně → Stáj · zvířata.</p>`,'journal-book--personal-stable');
+ if(!active.length)return journalChapterShell('Stáj · '+owner.name,'Žádné právě vlastněné zvíře',`<p class="hmk-stable-note">Zvíře lze pořídit v Knihovně → Stáj · zvířata.</p>${sharedTimeWindowActivePlanId?'<button type="button" class="hc-small" data-hmk-stable-go-travel>← Vrátit se do rozpracovaného Pochodu</button>':''}`,'journal-book--personal-stable');
  const selectedAnimal=active.find(a=>a.id===stableOwnerFocusedId)||active[0];
  const activeButtons=active.map(a=>`<button type="button" class="${a.id===selectedAnimal.id?'':'secondary'}" data-hmk-stable-pick-animal="${esc(a.id)}" aria-pressed="${a.id===selectedAnimal.id}">${esc(a.name)} · ${esc(a.spec.name)}</button>`).join('');
  let folioLeft='',folioRight='';
@@ -6796,7 +6810,7 @@ function libraryView(){
   const detailed=entries.slice(2).map(x=>x.outerHTML).join('');
   const spread=`<div class="journal-book-spread folio-chapter-spread hmk-stable-catalog-spread" id="hmk-livestock-catalog">
    <section class="journal-book-page journal-book-page--left folio-chapter-page hmk-stable-catalog-page" aria-label="Levá stránka: pořízení a ceny zvířat">
-    <header class="folio-chapter-heading"><h3>Knihovna · Stáj · zvířata</h3><p>Nákup, bezplatné převzetí a referenční ceny.</p></header>
+    <header class="folio-chapter-heading"><h3>Knihovna · Stáj · zvířata</h3><p>Nákup, bezplatné převzetí a referenční ceny.</p>${sharedTimeWindowActivePlanId?'<button type="button" class="secondary hc-small" data-hmk-stable-go-travel>← Zpět do rozpracovaného Pochodu</button>':''}</header>
     <div class="folio-chapter-content hmk-stable-catalog-column">${parts.purchase}<section class="hmk-stable-library-reference">${quick}</section></div>
    </section>
    <section class="journal-book-page journal-book-page--right folio-chapter-page hmk-stable-catalog-page" aria-label="Pravá stránka: statistiky a přirozené útoky zvířat">
@@ -17678,7 +17692,7 @@ document.addEventListener('change',e=>{
  if(item){select.setAttribute('data-hmk-help',stableGearDescription580(item));hmkHideJournalTooltip();}
 },true);
 document.addEventListener('click',e=>{if(!e.target.closest?.('[data-hmk-stable-go-travel]'))return;
- e.preventDefault();e.stopImmediatePropagation();view='calendar';render();},true);
+ e.preventDefault();e.stopImmediatePropagation();view='calendar';calendarLanding=false;activeCalendarSection='travel';render();},true);
 
 // v93.480: audited actor-specific ration acquisition. Button click is the GM
 // attestation; no assumed ingredients or separate food counter is created.
@@ -25356,6 +25370,105 @@ document.addEventListener('click',e=>{
    target.scrollIntoView({block:'center',behavior:'auto'});target.focus({preventScroll:true});}
  }
 },true);
+// v93.810: Refresh a live Stable catalogue into the CURRENT unconfirmed group.
+// This is not a campaign mutation. If the group has begun rule evaluation, its
+// own provisional skill receipts and medical effects must be discarded together
+// and re-evaluated; other groups' receipts and the durable campaign survive.
+function episodeRefreshStableRoster93810(form){
+ if(!form||!sharedTimeWindowDraft||!sharedTimeWindowActivePlanId)throw Error('Otevřete rozpracovanou skupinu Pochod v plánu činností.');
+ const plan=sharedPlanCurrent93771();
+ if(!plan||plan.done||plan.id!==sharedTimeWindowActivePlanId||plan.kind!=='travel')
+  throw Error('Doplnit zvíře lze jen do dosud nepotvrzeného Pochodu.');
+ if(episodeFinalCommitInFlight||episodeQueueAction)throw Error('Vyhodnocení se právě ukládá; nelze současně měnit zvířata.');
+ const draft=episodeFormSnapshot(form);
+ if(draft.kind!=='travel'||draft.guideId!==plan.actorId||
+   JSON.stringify([...(draft.memberIds||[])].sort())!==JSON.stringify([...plan.memberIds].sort()))
+  throw Error('Neshoduje se průvodce nebo členové otevřené skupiny. Opravte nejdříve plán.');
+ const started=episodeEvaluationRequested||episodePendingSkillRequest||episodePinnedSkillFields.size>0||
+  episodeOutstandingSkillTasks.length>0;
+ const workingReceipts=sharedUncommittedSkillRows93769();
+ if(started&&episodeGroupStartingReceiptIds93810===null)
+  throw Error('Starší rozpracované hody nemají bezpečně doloženou hranici této skupiny. Nelze je vymazat selektivně; ponechte záznam beze změny nebo použijte nouzové zrušení celé epizody.');
+ const starting=new Set(episodeGroupStartingReceiptIds93810||[]);
+ const groupReceipts=workingReceipts.filter(r=>!starting.has(r.id));
+ if((started||groupReceipts.length)&&!uiConfirm('Aktualizovat Stáj a znovu vyhodnotit jen tuto skupinu? Její rozpracované hody a nezapsané následky se zahodí; hotové výsledky ostatních skupin, skutečná kampaň a herní čas zůstanou zachovány.'))return false;
+ // Save this group's form BEFORE any DOM is replaced. This includes manual
+ // transport selections and does not touch another planned group's fields.
+ timeEpisodeDraft=draft;
+ if(started||groupReceipts.length){
+  // Build from the most recent committed campaign (including acquisitions
+  // made mid-episode), and only the receipts present BEFORE this group began.
+  // Dropping just skill rows is unsafe: a skill may create further health
+  // records. Replaying the canonical baseline also resets those effects.
+  const before=structuredClone(data),oldEpoch=episodeDraftEpoch;
+  const oldEvidence=[...episodePinnedSkillFields],oldTasks=episodeOutstandingSkillTasks;
+  const oldPending=episodePendingSkillRequest,oldActive=episodeActiveSkillRequestId;
+  const oldEvaluated=episodeEvaluationRequested,oldIdentity=episodeEvaluatedIdentity;
+  const oldStep=episodeCurrentGuidedStep,oldReturn=episodeSkillReturnPending;
+  const oldStartingIds=episodeGroupStartingReceiptIds93810;
+  const oldSelectedGroup=sharedTimeWindowSelectedGroupId;
+  try{
+   const base=structuredClone(episodeStageBaseline||data);
+   const original=new Set(base.journal.map(row=>row.id));
+   for(const receipt of workingReceipts)if(starting.has(receipt.id)&&!original.has(receipt.id)){
+    base.journal.push(structuredClone(receipt));original.add(receipt.id);
+   }
+   data=base;
+   sharedPrepareGroupScratch93769(plan.groupId);
+   // Only the current group's draft rolls are reset. The selected stable
+   // animals and vehicles, weather, terrain and group remain editable.
+   timeEpisodeDraft=episodeClearDiceDraft(draft);
+   for(const key of Object.keys(timeEpisodeDraft)){
+    if(/ProofId$|^whProof_|^evPartyProof_|^hazardCompProof_|^evFoeProof_/.test(key))timeEpisodeDraft[key]='';
+    if(/^hazard(?:EvidenceId|DirectionProofId|SkillLevel)$/.test(key))timeEpisodeDraft[key]='';
+   }
+   timeEpisodeDraft.confirmed=false;
+   episodeEvaluationRequested=false;episodeEvaluatedIdentity=null;episodeCurrentGuidedStep=null;
+   episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;episodeSkillReturnPending=false;
+   episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];episodeDraftEpoch=uuid();
+   episodeGroupStartingReceiptIds93810=workingReceipts.filter(r=>starting.has(r.id)).map(r=>r.id);
+   persistEpisodeDraftSidecar();
+  }catch(error){
+   data=before;episodeDraftEpoch=oldEpoch;episodeEvaluationRequested=oldEvaluated;
+   episodeEvaluatedIdentity=oldIdentity;episodePendingSkillRequest=oldPending;episodeActiveSkillRequestId=oldActive;
+   episodePinnedSkillFields.clear();for(const [k,v] of oldEvidence)episodePinnedSkillFields.set(k,v);
+   episodeOutstandingSkillTasks=oldTasks;timeEpisodeDraft=draft;
+   episodeCurrentGuidedStep=oldStep;episodeSkillReturnPending=oldReturn;
+   episodeGroupStartingReceiptIds93810=oldStartingIds;sharedTimeWindowSelectedGroupId=oldSelectedGroup;
+   throw error;
+  }
+ }else persistEpisodeDraftSidecar();
+ notice=(started||groupReceipts.length?'Hody této skupiny byly bezpečně vráceny k novému vyhodnocení. ':'')+
+  'Stáj byla aktualizována. Vyberte zvíře a vozidlo, případně tažné spřežení; ostatní skupiny zůstaly beze změny.';
+ render();
+ requestAnimationFrame(()=>{
+  const section=document.querySelector('[data-episode-stable-sync]');
+  section?.scrollIntoView({block:'center'});
+  section?.querySelector('[data-episode-stable-refresh]')?.focus({preventScroll:true});
+ });
+ return true;
+}
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-episode-stable-refresh],[data-episode-open-stable],[data-episode-open-stable-library]');
+ if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
+ try{
+  if(button.hasAttribute('data-episode-stable-refresh')){episodeRefreshStableRoster93810(form);return;}
+  if(!sharedPlanCurrent93771()||!sharedTimeWindowActivePlanId||sharedPlanCurrent93771().kind!=='travel')
+   throw Error('Otevřete nejprve Pochod v plánu skupin.');
+  timeEpisodeDraft=episodeFormSnapshot(form);
+  persistEpisodeDraftSidecar();
+  if(button.hasAttribute('data-episode-open-stable-library')){
+   view='library';libraryTab='stable';libraryPage=0;query='';
+  }else{
+   const guide=character(timeEpisodeDraft.guideId);
+   if(!guide)throw Error('Průvodce neexistuje.');
+   selected=guide.id;view='sheet';activeSheetSection='stable';
+  }
+  render();
+ }catch(error){notice=error.message;alert('Aktualizace Stáje: '+error.message);}
+},true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-episode-nav],[data-episode-chronicle]');if(!b)return;
  e.preventDefault();
@@ -25451,7 +25564,7 @@ document.addEventListener('click',e=>{
  // This does not delete previously committed independent receipts.
  try{if(episodeStageBaseline)restoreLastCommittedEpisode93784();}
  catch(error){alert('Nouzové zrušení nebylo bezpečně dokončeno: '+error.message);return;}
- sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;sharedEpisodeAutoRun93772=false;sharedDefaultWeatherId93772='';episodeQueueAction=false;
+ sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowPlans=[];sharedTimeWindowActivePlanId=null;episodeGroupStartingReceiptIds93810=[];sharedEpisodeAutoRun93772=false;sharedDefaultWeatherId93772='';episodeQueueAction=false;
  discardEpisodeDraftSidecar();
  timeEpisodeDraft={...episodeFreshDraft()};episodePendingRemainderMinutes=null;
  episodeEvaluationRequested=false;episodePendingSkillRequest=null;
@@ -25497,7 +25610,7 @@ document.addEventListener('click',e=>{
  // No skill evidence has begun for this card; other prepared cards remain
  // serialised and untouched. The form's unconfirmed values are discarded.
  sharedPrepareGroupScratch93769(null);
- sharedTimeWindowActivePlanId=null;sharedTimeWindowSelectedGroupId=null;
+ sharedTimeWindowActivePlanId=null;sharedTimeWindowSelectedGroupId=null;episodeGroupStartingReceiptIds93810=[];
  timeEpisodeDraft=episodeFreshDraft();episodeDraftEpoch=uuid();
  persistEpisodeDraftSidecar();render();
 },true);
@@ -25523,6 +25636,7 @@ function openPlannedEpisodeRow93772(planId){try{
   if(sharedTimeWindowPlans.some(p=>p.groupId===plan.groupId&&sharedTimeWindowPlans.indexOf(p)<sharedTimeWindowPlans.indexOf(plan)&&!p.done))
    throw Error('Nejprve dokončete předchozí činnost téže skupiny.');
   const scratch=sharedPrepareGroupScratch93769(plan.groupId);
+  episodeGroupStartingReceiptIds93810=sharedUncommittedSkillRows93769().map(j=>j.id);
   if(scratch.startMinute!==slot.startMinute||scratch.remainingMinutes<plan.minutes)throw Error('Zastaralá časová kotva skupiny.');
   sharedTimeWindowActivePlanId=plan.id;
   timeEpisodeDraft={...episodeFreshDraft(),weatherSource:plan.weatherId||'local',area:sharedWeatherName93772(plan.weatherId),kind:plan.kind,minutes:String(plan.minutes),memberIds:[...plan.memberIds],guideId:plan.actorId};
@@ -25944,7 +26058,7 @@ document.addEventListener('submit',e=>{
     if(openPlan){openPlan.done=false;delete openPlan.sourceId;}
     throw Error('Rozpracované okno nelze bezpečně označit v místním úložišti: '+(error?.message||error));
    }
-   sharedTimeWindowActivePlanId=null;
+   sharedTimeWindowActivePlanId=null;episodeGroupStartingReceiptIds93810=[];
    episodeQueueAction=false;episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;
    episodeSkillReturnPending=false;episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];
    episodeEvaluationRequested=false;episodeEvaluatedIdentity=null;episodeCurrentGuidedStep=null;
