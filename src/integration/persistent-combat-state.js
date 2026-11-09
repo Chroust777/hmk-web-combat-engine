@@ -556,9 +556,10 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
   for(const kind of hmkInjuryMishaps(wound.location,wound.severity,bodyKind))s.mishaps.push({id:`mishap:${eventId}:${kind}`,woundId:wound.id,kind,resolved:false});
  }
  const previousShock=s.shock; s.shock=amp?.dead?'KIA':calculated;applyShockProne(s);
- if(s.shock!==previousShock)s.shockOriginRound=round;
+ if(s.shock!==previousShock){s.shockOriginRound=round;s.shockOriginWoundId=wound?.id??null;}
  if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.shockFollowup=null;for(const w of s.wounds)w.nextAdvanceRound=null;}
- else if(s.shock!==previousShock)installShockFollowup(s,{round,timelineId:adjudication.timelineId??null});
+ else if(s.shock!==previousShock){installShockFollowup(s,{round,timelineId:adjudication.timelineId??null});
+  if(s.shockFollowup&&wound)s.shockFollowup.woundId=wound.id;}
  if(['travel-weather','travel-accident'].includes(injuryOrigin)&&s.shockFollowup&&s.shock!==previousShock){
   s.shockFollowup.domain=injuryOrigin;s.shockFollowup.sourceId=adjudication.weatherSourceId;
   s.shockFollowup.originMinute=adjudication.originMinute;
@@ -626,7 +627,8 @@ export function applyConfirmedBloodLoss({state,round,eventId,woundId,sl}={}){
  s.bloodLoss=r.bloodLoss;s.shock=REVERSE[r.shockState];applyShockProne(s);
  if(r.gainedBP>0&&s.shock!==was&&s.shock!=='KIA')s.bloodShockPending=true;
  if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.bloodShockPending=false;for(const w of s.wounds)w.nextAdvanceRound=null;}
- if(was!==s.shock){s.shockOriginRound=round;installShockFollowup(s,{round});}
+ if(was!==s.shock){s.shockOriginRound=round;s.shockOriginWoundId=woundId;installShockFollowup(s,{round});
+  if(s.shockFollowup)s.shockFollowup.woundId=woundId;}
  // A late GM roll resolves one period only. Never silently advance several periods.
  // The GM may adjudicate an overdue period late. Do not silently erase
  // additional five-minute periods that have already elapsed (HMK p.178).
@@ -649,7 +651,8 @@ export function applyConfirmedBloodStoppage({state,round,eventId,woundId,sl,adva
  requireCond(!previousAttempt||round>=previousAttempt.round+BLOOD_LOSS_PERIOD_ROUNDS,'Blood Stoppage lze u stejného Bleederu opakovat až po 5 minutách (60 kol)');
  const stop=bloodStoppageResult(sl);
  requireCond(!stop.advanceRoll||slValues.has(advanceSL),'HMK str.178: po CF/F/S je nutný i závěrečný Blood Loss Advance');
- if(stop.advanceRoll){const r=bloodLossAdvanceTransition({bloodLoss:s.bloodLoss,sl:advanceSL,currentShockState:SHOCK[s.shock]});const was=s.shock;requireCond(!s.extendedShock||REVERSE[r.shockState]===was||REVERSE[r.shockState]==='KIA','Změna Shock během Extended Shock vyžaduje zvláštní rozhodnutí GM (BP)');s.bloodLoss=r.bloodLoss;s.shock=REVERSE[r.shockState];applyShockProne(s);if(r.gainedBP>0&&s.shock!==was&&s.shock!=='KIA')s.bloodShockPending=true;if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.bloodShockPending=false;for(const w of s.wounds)w.nextAdvanceRound=null;}if(was!==s.shock){s.shockOriginRound=round;installShockFollowup(s,{round});}}
+ if(stop.advanceRoll){const r=bloodLossAdvanceTransition({bloodLoss:s.bloodLoss,sl:advanceSL,currentShockState:SHOCK[s.shock]});const was=s.shock;requireCond(!s.extendedShock||REVERSE[r.shockState]===was||REVERSE[r.shockState]==='KIA','Změna Shock během Extended Shock vyžaduje zvláštní rozhodnutí GM (BP)');s.bloodLoss=r.bloodLoss;s.shock=REVERSE[r.shockState];applyShockProne(s);if(r.gainedBP>0&&s.shock!==was&&s.shock!=='KIA')s.bloodShockPending=true;if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.bloodShockPending=false;for(const w of s.wounds)w.nextAdvanceRound=null;}if(was!==s.shock){s.shockOriginRound=round;s.shockOriginWoundId=woundId;installShockFollowup(s,{round});
+  if(s.shockFollowup)s.shockFollowup.woundId=woundId;}}
  if(stop.stopped){wound.bleeding=false;wound.nextAdvanceRound=null;wound.staunchBonus=0;}
  else {wound.nextAdvanceRound=s.shock==='KIA'?null:wound.nextAdvanceRound+BLOOD_LOSS_PERIOD_ROUNDS;wound.staunchBonus=stop.nextStaunchBonus;}
  // p178: once ALL bleeders stop, Blood Shock STN disappears automatically;
@@ -659,7 +662,7 @@ export function applyConfirmedBloodStoppage({state,round,eventId,woundId,sl,adva
   s.bloodShockPending=false;
   if(s.shock==='STN'){s.shock='NONE';s.shockFollowup=null;s.shockOriginRound=round;}
   else if(['INC','UNC'].includes(s.shock)){
-   s.shockFollowup={kind:s.shock,originRound:round,timelineId:null,dueRound:round,phase:'after-all-bleeding-stopped'};
+   s.shockFollowup={kind:s.shock,originRound:round,timelineId:null,dueRound:round,phase:'after-all-bleeding-stopped',woundId};
   }
  }
 
@@ -738,14 +741,17 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
    // The causal Weather Shock owns subsequent medical courses. They must
    // never masquerade as Encounter/Combat follow-ups in the Calendar.
    const medicalSource=['travel-weather','travel-accident'].includes(q?.domain)?{domain:q.domain,sourceId:q.sourceId}:{};
-   s.extendedShock={originState:before,hr:result.extendedShock.hr,elapsedHours:0,...medicalSource};
-   if(requireComa)s.coma={active:true,hr:result.coma.initialHR,elapsedDays:0,nextCourseDays:initialComaD10,...medicalSource};
+   s.extendedShock={originState:before,hr:result.extendedShock.hr,elapsedHours:0,...medicalSource,
+    ...(q?.woundId?{woundId:q.woundId}:{})};
+   if(requireComa)s.coma={active:true,hr:result.coma.initialHR,elapsedDays:0,nextCourseDays:initialComaD10,...medicalSource,
+    ...(q?.woundId?{woundId:q.woundId}:{})};
   }
  }
  if(['travel-weather','travel-accident'].includes(q?.domain)&&s.shockFollowup){
   // A subsequent STN reroll is another *weather* obligation. No combat
   // round is manufactured, nor is the calendar advanced by the reroll.
   s.shockFollowup.domain=q.domain;s.shockFollowup.sourceId=q.sourceId;
+  if(q.woundId)s.shockFollowup.woundId=q.woundId;
   s.shockFollowup.originMinute=q.originMinute+
    (Number.isSafeInteger(elapsedMinutesSinceOriginal)?elapsedMinutesSinceOriginal:0);
  }

@@ -206,7 +206,7 @@ export function completeTravelBleedingInterval({clock,state,patient,healer=null,
   else if(s.shock==='STN'){s.shock='NONE';s.shockFollowup=null;s.shockOriginRound=s.lastRound;}
   else if(['INC','UNC'].includes(s.shock))s.shockFollowup={kind:s.shock,
    domain:medicalOriginOfWound(target,s.events),sourceId:woundId,originMinute:clock.minute,
-   originRound:s.lastRound,dueRound:s.lastRound,phase:'after-all-bleeding-stopped',timelineId:null};
+   originRound:s.lastRound,dueRound:s.lastRound,phase:'after-all-bleeding-stopped',timelineId:null,woundId};
  }
  note(s,eventId,mode==='stoppage'?'travel-blood-stoppage':'travel-blood-loss',clock.minute,
   {woundId,healerId,method:term.plan?.method??null,physicianRoll,
