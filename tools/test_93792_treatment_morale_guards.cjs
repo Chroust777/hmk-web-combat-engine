@@ -1,0 +1,17 @@
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const source=fs.readFileSync('app.js','utf8');
+const between=(a,b)=>{const i=source.indexOf(a);assert(i>=0,a);const j=source.indexOf(b,i);assert(j>i,b);return source.slice(i,j)};
+const treatment=between('function hmkLongtermHealingPanel(', 'function ' + 'hskEnvironmentalWoundCarePanel');
+assert.match(treatment,/runningTreatmentKeys=new Set/);
+assert.match(treatment,/openConcurrentProcedures\(data\.campaignClock\)/);
+assert.match(treatment,/!runningTreatmentKeys\.has\(c\.id\+'::'\+w\.id\)/);
+assert.match(treatment,/weatherCare&&!treatmentWoundOptions\?/);
+assert.match(treatment,/treatmentFormRaw/);
+assert.match(source,/rána \$\{n\}\$\{!w\.healed&&!w\.healing\?\.treated\?' \(neošetřená\)'/);
+const morale=between("document.addEventListener('submit',event=>{\n const form=event.target;if(!form?.matches?.('[data-weather-injury-mishap]", "document.addEventListener('submit',event=>{\n const f=event.target;if(!f?.matches?.('[data-weather-trauma-course]'");
+assert.match(morale,/\^\\d\+\$/);
+assert.match(morale,/markTravelBloodInput93787\(form,form\.elements\.namedItem\(missing\)\)/);
+assert.match(morale,/gmConfirmedAberrance/);
+assert.match(morale,/form\.elements\.namedItem\('gmConfirmedAberrance'\)\?\.checked/);
+console.log('PASS: 10 source guard invariants for Treatment/Medical Morale');
