@@ -342,3 +342,8 @@
 #app .content-sheet .journal-book--library button.library-part-link:hover,
 #app .library-table button.library-part-link:hover{color:#382013!important;filter:none!important;text-decoration:none!important}
 #app button.library-part-link:focus-visible{outline:2px solid #8e6037!important;outline-offset:2px!important}
+
+/* v93.799: independent, combinable armour-material and anatomical-location selectors. */
+.library-toolbar .library-armour-filter-select{flex:1 1 165px;min-width:145px}
+.library-armour-filter-select select{min-height:40px}
+@media(max-width:760px){.library-toolbar .library-armour-filter-select{flex-basis:100%;min-width:0}}
