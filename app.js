@@ -340,7 +340,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.810';
+const APP_VERSION='93.811';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2636,6 +2636,18 @@ function timeEpisodePageHTML(clock,participants){
  const animalRoster=data.characters.filter(a=>a.hmk?.verifiedMountedBreed&&a.hmk?.healthState&&(clock.characterIds??[]).includes(a.id));
  const stableTravelRoster=verifiedLivestock(data,campaignKey(clock)).filter(a=>a.spec?.breed&&Number.isFinite(a.spec?.str));
  const transportVehicleRows=availableTransportVehicles93756(data,campaignKey(clock));
+ // A vehicle bought in the Library is initially a carried inventory item.
+ // It enters the travel dropdown only after it is physically registered with
+ // one owned animal in the Stable. Provide a direct single-click handoff, not
+ // a second phantom vehicle entry or a duplicate purchase.
+ const looseTravelVehicles=(data.inventory||[]).flatMap(i=>{
+  const gear=VEHICLES_TACK_P122.find(t=>t.id===i.snapshot?.properties?.stableTackId);
+  if(!gear||!['Cart, 2-wheel','Wagon, 4-wheel'].includes(gear.name)||
+   i.sourceItemId!=='hmk:stable-gear:'+gear.id||!['none','carried'].includes(i.slot)||i.quantity!==1||
+   i.snapshot?.properties?.weightLb!==gear.weightLb)return [];
+  return stableTravelRoster.filter(a=>a.ownerId===i.characterId&&!stableBurden(data,campaignKey(clock),a).exit)
+   .map(a=>({inventoryId:i.id,animalId:a.id,animalName:a.name,gearName:gear.name,ownerName:character(i.characterId)?.name||'Majitel'}));
+ });
  const earlier=latest?.settings||{};
  const skillCandidates=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&
   ['Survival','Tracking','Animalcraft','Riding','Awareness'].some(skill=>episodeSkillProof(j,skill,j.characterId,campaignKey(clock),clock.minute)));
@@ -2736,7 +2748,9 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint">Po pořízení nebo přidání koně, tažného zvířete, káry či vozu se vraťte a načtěte aktuální Stáj. Stávající členové skupiny, nastavení a ostatní připravené skupiny zůstanou zachováni. Po již zahájených hodech je nutné znovu vyhodnotit pouze tuto činnost.</p>
  <div class="actions"><button type="button" class="secondary hc-small" data-episode-open-stable="yes">Otevřít Stáj průvodce</button>
  <button type="button" class="secondary hc-small" data-episode-open-stable-library="yes">Pořídit zvíře · Knihovna</button>
- <button type="button" class="hc-small" data-episode-stable-refresh="yes">↻ Aktualizovat ze Stáje</button></div></section>
+ <button type="button" class="hc-small" data-episode-stable-refresh="yes">↻ Aktualizovat ze Stáje</button></div>
+ ${looseTravelVehicles.length?`<div class="hc-episode-stable-assign"><p class="hc-hint"><strong>Pozor: kára nebo vůz v inventáři ještě není ve Stáji.</strong> Vyberte skutečný vůz a zvíře stejného vlastníka; převedení bez dalšího nákupu vytvoří původní evidenční doklad a vozidlo pak bude dostupné v rozbalovacím seznamu.</p><label>Vlastněné vozidlo z inventáře<select data-episode-attach-vehicle-choice>${looseTravelVehicles.map((a,i)=>`<option value="${i}">${esc(a.gearName)} · ${esc(a.ownerName)} → ${esc(a.animalName)}</option>`).join('')}</select></label><button type="button" class="secondary hc-small" data-episode-attach-inventory-vehicle="yes">Zařadit vlastněný vůz do Stáje</button></div>`:
+ !transportVehicleRows.length?`<p class="hc-hint">V nabídce není žádná kára ani vůz přímo zařazený ve Stáji. Pokud jste vozidlo pořídili v Knihovně, nejdříve je převeďte na konkrétní zvíře ve Stáji; samotný osobní inventář k jízdě nestačí. Nové vozidlo můžete také pořídit přímo ve Stáji postavy.</p>`:''}</section>
  ${stableTravelRoster.length?`<fieldset data-episode-stable-roster><legend>Zvířata vybraná ze Stáje · doložené zatížení</legend>
  <p class="hc-hint">Výběr používá existující stájové záznamy, jejich postroje, náklad a jezdce. Nic nespojuje podle podobného jména. Stájový záznam sám nevytváří bojový Combat State.</p>
  <div class="hc-episode-members">${stableTravelRoster.map(a=>{const b=stableBurden(data,campaignKey(clock),a);return `<label class="hc-check"><input name="stableAnimalIds" type="checkbox" value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)} · ENC ${Number.isSafeInteger(b.adjustedENC)?b.adjustedENC:'nedoloženo'}${b.rider?' · jezdec ze Stáje':''}${b.cargoOverflow?' · PŘETÍŽENO':''}</label>`}).join('')}</div></fieldset>`:''}
@@ -25370,6 +25384,21 @@ document.addEventListener('click',e=>{
    target.scrollIntoView({block:'center',behavior:'auto'});target.focus({preventScroll:true});}
  }
 },true);
+// v93.811: Older sidecars did not store the receipt boundary of an opened
+// group. Recover it ONLY when each provisional receipt identifies an episode
+// epoch. The active group's epoch changes on every new group; receipts from
+// already completed groups keep distinct epochs and must be preserved.
+// Unattributed / non-linkable side effects are not safe to delete by guessing.
+function episodeLegacyReceiptBoundary93811(rows,activeEpoch){
+ const previous=[];
+ for(const row of rows){
+  const link=row?.calendarEpisodeSkillLink;
+  if(!link||typeof link.episodeEpoch!=='string'||!link.episodeEpoch)
+   return null;
+  if(link.episodeEpoch!==activeEpoch)previous.push(row.id);
+ }
+ return previous;
+}
 // v93.810: Refresh a live Stable catalogue into the CURRENT unconfirmed group.
 // This is not a campaign mutation. If the group has begun rule evaluation, its
 // own provisional skill receipts and medical effects must be discarded together
@@ -25387,9 +25416,21 @@ function episodeRefreshStableRoster93810(form){
  const started=episodeEvaluationRequested||episodePendingSkillRequest||episodePinnedSkillFields.size>0||
   episodeOutstandingSkillTasks.length>0;
  const workingReceipts=sharedUncommittedSkillRows93769();
- if(started&&episodeGroupStartingReceiptIds93810===null)
-  throw Error('Starší rozpracované hody nemají bezpečně doloženou hranici této skupiny. Nelze je vymazat selektivně; ponechte záznam beze změny nebo použijte nouzové zrušení celé epizody.');
- const starting=new Set(episodeGroupStartingReceiptIds93810||[]);
+ // When a draft was created before v93.810, the boundary may be absent.
+ // With no provisional receipts, there is nothing to delete. Otherwise infer
+ // the boundary from the existing immutable Skill Test episode epochs only.
+ // Unknown derived rows never get silently discarded.
+ const safeLegacyBoundary=episodeGroupStartingReceiptIds93810===null?
+  episodeLegacyReceiptBoundary93811(workingReceipts,episodeDraftEpoch):episodeGroupStartingReceiptIds93810;
+ if(safeLegacyBoundary===null){
+  // A read-only catalogue refresh is safe even when legacy roll ownership is
+  // ambiguous. Do NOT reset or unlock old tests. GM may close that episode
+  // normally or cancel its entire draft, but no other group is modified.
+  timeEpisodeDraft=draft;
+  notice='Stáj byla načtena, ale staré neoznačené hody není bezpečné mazat. Původní výsledky zůstaly beze změny. Pokud měníte tažnou skupinu, nejdříve dokončete původní činnost, případně zálohujte a zrušte rozpracované okno.';
+  persistEpisodeDraftSidecar();render();return true;
+ }
+ const starting=new Set(safeLegacyBoundary||[]);
  const groupReceipts=workingReceipts.filter(r=>!starting.has(r.id));
  if((started||groupReceipts.length)&&!uiConfirm('Aktualizovat Stáj a znovu vyhodnotit jen tuto skupinu? Její rozpracované hody a nezapsané následky se zahodí; hotové výsledky ostatních skupin, skutečná kampaň a herní čas zůstanou zachovány.'))return false;
  // Save this group's form BEFORE any DOM is replaced. This includes manual
@@ -25448,6 +25489,37 @@ function episodeRefreshStableRoster93810(form){
  });
  return true;
 }
+// Reuse the original Stable transaction handler for an inventory vehicle.
+// The mounted wagon remains a single physical item with an immutable proof.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-episode-attach-inventory-vehicle]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=document.querySelector('#hmk-time-episode-form');
+ if(!form||!sharedTimeWindowActivePlanId)return;
+ try{
+  const idx=Number(form.querySelector('[data-episode-attach-vehicle-choice]')?.value);
+  const list=(data.inventory||[]).flatMap(i=>{
+   const gear=VEHICLES_TACK_P122.find(t=>t.id===i.snapshot?.properties?.stableTackId);
+   if(!gear||!['Cart, 2-wheel','Wagon, 4-wheel'].includes(gear.name)||
+    i.sourceItemId!=='hmk:stable-gear:'+gear.id||!['none','carried'].includes(i.slot)||i.quantity!==1||
+    i.snapshot?.properties?.weightLb!==gear.weightLb)return [];
+   return verifiedLivestock(data,campaignKey(data.campaignClock)).filter(a=>a.ownerId===i.characterId&&!stableBurden(data,campaignKey(data.campaignClock),a).exit)
+    .map(a=>({inventoryId:i.id,animalId:a.id,animalName:a.name,gearName:gear.name}));
+  });
+  if(!Number.isSafeInteger(idx)||idx<0||idx>=list.length)throw Error('Vyberte platnou dvojici vozidlo a zvíře ze Stáje.');
+  const chosen=list[idx];
+  if(!uiConfirm('Převést '+chosen.gearName+' na zvíře '+chosen.animalName+' ze skutečného inventáře vlastníka? Vozidlo se znovu neplatí a herní čas se neposune.'))return;
+  timeEpisodeDraft=episodeFormSnapshot(form);
+  persistEpisodeDraftSidecar();
+  const actual=document.createElement('form');actual.setAttribute('data-hmk-stable-event','');actual.hidden=true;
+  for(const [key,value] of Object.entries({animalId:chosen.animalId,type:'inventory-gear-attach',inventoryId:chosen.inventoryId,
+   reason:'Převod již vlastněného vozidla z inventáře do evidence Stáje'})){
+   const field=document.createElement('input');field.type='hidden';field.name=key;field.value=value;actual.appendChild(field);
+  }
+  const submit=document.createElement('button');submit.type='submit';actual.appendChild(submit);document.body.appendChild(actual);
+  try{actual.requestSubmit(submit);}finally{actual.remove();}
+ }catch(error){notice=error.message;alert('Převod vozu do Stáje: '+error.message);}
+},true);
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-episode-stable-refresh],[data-episode-open-stable],[data-episode-open-stable-library]');
  if(!button)return;
