@@ -339,7 +339,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.797';
+const APP_VERSION='93.798';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -19767,8 +19767,8 @@ function gmWoundObligationSummary(c,w){
  const procedures=data.campaignClock?openConcurrentProcedures(data.campaignClock)
   .filter(x=>x.characterId===c.id&&x.woundId===w.id):[];
  for(const p of procedures)details.push('rozpracovaný Treatment do '+displayCampaignMinute(p.endMinute));
- // Provenance-dependent global effects are resolved atomically with the
- // precise wound ID. Legacy or shared origins require explicit GM attribution.
+ // Patient-wide consequences are resolved automatically by causal evidence;
+ // the GM never has to supply a separate Shock or BP decision.
  const consequences=gmWoundConsequenceAssessment(state,w.id);
  if(consequences.shockActive)details.push('Shock / Extended Shock / Coma: '+consequences.shock);
  if(consequences.bloodPoints>0)details.push('Blood Loss BP '+consequences.bloodPoints+' / '+consequences.blood);
@@ -19781,7 +19781,7 @@ function gmWoundManagementPanel(c){
  const options=open.map(w=>`<option value="${esc(w.id)}">${esc(w.location.toUpperCase())}${w.side?' / '+esc(w.side):''} · ${esc(w.severity+w.level)} ${esc(w.aspect)} · ID ${esc(w.id)}</option>`).join('');
  const woundRows=open.map(w=>{const items=gmWoundObligationSummary(c,w);return `<div class="list-row" data-gm-wound-row="${esc(w.id)}"><div><b>${esc(w.location.toUpperCase())}${w.side?' / '+esc(w.side):''} · ${esc(w.severity+w.level)}</b> · ${esc(w.aspect)}<div class="tiny muted">ID: ${esc(w.id)} · ${items.details.length?esc(items.details.join(' · ')):'bez dalších doložených termínů'}</div></div><button type="button" class="danger" data-gm-select-wound="${esc(w.id)}" ${allowed?'':'disabled'}>Vyřešit / odstranit</button></div>`}).join('');
  return `<section class="panel wide" id="hmk-wound-management" data-gm-wound-manager="${esc(c.id)}"><h3>Zranění · společná zdravotní evidence GM</h3>
- <p class="muted">Pro boj, cestování i jinou událost se používá tentýž zdravotní stav a kalendář. <b>Odstranit ránu úplně (GM)</b> znamená ukončit její doložené akutní i trvalé následky včetně Shock, Coma, Blood Loss, trvalé újmy a navázaných povinností; u nejasného sdíleného původu je nutné rozhodnutí GM. Běžné zhojení může trvalé následky ponechat. Historie původních událostí a hodů zůstává zachována.</p>
+ <p class="muted">Pro boj, cestování i jinou událost se používá tentýž zdravotní stav a kalendář. <b>Odstranit ránu úplně (GM)</b> znamená ukončit její doložené akutní i trvalé následky včetně Shock, Coma, Blood Loss, trvalé újmy a navázaných povinností; bez dalších polí pro Shock, Coma nebo Blood Loss. Běžné zhojení může trvalé následky ponechat. Historie původních událostí a hodů zůstává zachována.</p>
  <h4>Skutečné rány · ${open.length} aktivní</h4>${woundRows||'<p>Žádná aktivní rána.</p>'}
  <details data-gm-wound-editor><summary><b>Přidat skutečnou ránu / vyřešit ránu podle ID</b></summary>
  <form id="hmk-gm-health-form" novalidate><label>Akce<select name="action" required><option value="add">Vytvořit skutečnou ránu</option><option value="resolve">Vyřešit / odstranit konkrétní ránu</option></select></label>
@@ -19792,13 +19792,9 @@ function gmWoundManagementPanel(c){
  <p class="tiny muted">Založí se nové trvalé ID a původní čas rány. Při volbě Treatment se kalendář zastaví na povinném rozhodnutí, dokud není skutečně provedené. Volba Untreated výslovně nastaví pravidlové HR, Infection, Grim a Bleeder podle HMK, bez předstírání hodu.</p></div>
  <div data-gm-resolve-inputs hidden><label>Konkrétní aktivní rána<select name="woundId"><option value="">— Vyberte ránu —</option>${options}</select></label>
  <div class="notice" data-gm-wound-impact aria-live="polite">Vyberte ránu: před uložením uvidíte přesné navazující povinnosti, které se zruší.</div>
- <div data-gm-shock-review hidden><label>Aktivní Shock / Coma / Extended Shock – původ následku
- <select name="shockDisposition"><option value="">— GM musí doložit původ –</option><option value="clear">Následek patří této ráně – ukončit včetně všech Course / Follow-up</option><option value="retain">Následek patří jiné nezávislé příčině – zachovat</option></select></label></div>
- <div data-gm-blood-review hidden><label>Blood Loss – BP náležející právě této ráně
- <input name="bloodPointsAttributed" type="number" min="0" max="4" step="1" placeholder="GM musí doložit BP"></label></div>
- <p class="tiny muted" data-gm-wound-cause-note>Otevřené zdravotní důsledky jsou sdílený stav postavy. Rozhodnutí u nejednoznačného původu se zapíše do auditu; jinou ránu nemažeme.</p></div>
- <label>Odůvodnění GM (10–500 znaků)<textarea name="reason" required minlength="10" maxlength="500" rows="2" placeholder="Důvod rozhodnutí GM"></textarea></label>
- <label><input type="checkbox" name="gmConfirmed" value="yes" required> GM výslovně potvrzuje změnu zdravotního stavu a její kalendářové následky.</label>
+ <p class="tiny muted" data-gm-wound-cause-note>Rána i její ID-vázané následky se automaticky uzavřou; jiné doložené zdroje zůstanou. Žádné další rozhodovací pole není potřeba.</p></div>
+ <div data-gm-creation-confirm><label>Odůvodnění GM (10–500 znaků)<textarea name="reason" minlength="10" maxlength="500" rows="2" placeholder="Důvod vytvoření skutečné rány"></textarea></label>
+ <label><input type="checkbox" name="gmConfirmed" value="yes"> GM potvrzuje vytvoření rány a její kalendářové následky.</label></div>
  <output data-gm-wound-error role="alert"></output><button type="submit" ${allowed?'':'disabled'}>Potvrdit a uložit s auditní stopou</button>
  ${allowed?'':'<p class="notice">Během aktivní Initiative nelze zdravotní stav ručně přepsat.</p>'}
  </form></details></section>`;
@@ -19814,29 +19810,18 @@ function gmWoundSyncForm(form){
  const field=form.elements.namedItem('woundId');field.required=resolve;
  const target=character(selected),w=target&&persistentStateOf(target).wounds.find(x=>x.id===field.value&&!x.healed);
  const impact=form.querySelector('[data-gm-wound-impact]');
- const shockNode=form.querySelector('[data-gm-shock-review]');
- const bloodNode=form.querySelector('[data-gm-blood-review]');
  const note=form.querySelector('[data-gm-wound-cause-note]');
- const shockField=form.elements.namedItem('shockDisposition');
- const bpField=form.elements.namedItem('bloodPointsAttributed');
- const fresh=form.dataset.gmConsequenceWound!==String(w?.id||'');
- if(fresh){form.dataset.gmConsequenceWound=String(w?.id||'');
-  if(shockField)shockField.value='';if(bpField)bpField.value='';}
+ const creationConfirm=form.querySelector('[data-gm-creation-confirm]');
+ if(creationConfirm)creationConfirm.hidden=resolve;
  if(impact){if(!w)impact.textContent='Vyberte konkrétní ránu podle ID.';
  else{const items=gmWoundObligationSummary(target,w);
   const cause=items.consequences;
   impact.textContent='Ukončí se otevřené povinnosti ID '+w.id+': '+
    (items.details.join(' · ')||'žádné aktuálně')+'. Historické hody a jiné rány zůstanou. ';
-  if(shockNode)shockNode.hidden=!cause.shockActive;
-  if(shockField){shockField.required=cause.shockActive;
-   if(fresh)shockField.value=cause.shock==='owned'?'clear':cause.shock==='independent'?'retain':'';}
-  if(bloodNode)bloodNode.hidden=cause.bloodPoints===0;
-  if(bpField){bpField.max=String(cause.bloodPoints);bpField.required=cause.bloodPoints>0;
-   if(fresh)bpField.value=cause.blood==='owned'?String(cause.bloodPoints):cause.blood==='independent'?'0':'';}
-  if(note)note.textContent=(cause.shock==='fatal-requires-review'?'KIA nelze tímto zásahem přepsat. ':'')+
-   'Doložený Shock: '+cause.shock+'; Blood Loss: '+cause.blood+'. Pokud se příčiny překrývají, GM musí určit skutečný podíl; žádné hodnoty se neodhadují.';
+  if(note)note.textContent='Bez dalšího rozhodnutí GM: Shock / Coma / Extended Shock '+
+   (cause.autoPlan.shockRootToRemove?'se uzavřou dle původu rány':'se zachovají, pokud patří jiné nebo neurčené příčině')+
+   '; Blood Loss automaticky odečte '+cause.autoPlan.bloodPointsToRemove+' BP z '+cause.bloodPoints+'.';
  }}
- if(!w){if(shockNode)shockNode.hidden=true;if(bloodNode)bloodNode.hidden=true;}
 }
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-gm-select-wound]');if(!b)return;
@@ -19847,7 +19832,7 @@ document.addEventListener('click',e=>{
  form.elements.namedItem('action').value='resolve';
  form.elements.namedItem('woundId').value=b.dataset.gmSelectWound;
  gmWoundSyncForm(form);
- const node=form.elements.namedItem('woundId');node.scrollIntoView({block:'center'});node.focus({preventScroll:true});
+ form.requestSubmit();
 },true);
 document.addEventListener('change',e=>{if(e.target.matches?.('form#hmk-gm-health-form [name="action"],form#hmk-gm-health-form [name="woundId"],form#hmk-gm-health-form [name="location"]'))gmWoundSyncForm(e.target.form)},true);
 document.addEventListener('click',e=>{
@@ -20514,34 +20499,23 @@ document.addEventListener('submit',e=>{
   for(const key of ['location','level','aspect','initialCare'])if(!v[key])return mark(key,'Vyplňte konkrétní údaj pro novou skutečnou ránu.');
   if(['sh','ua','el','fo','ha','th','kn','ca','ft'].includes(v.location)&&!v.side)return mark('side','U párových anatomických lokací vyberte levou či pravou stranu.');
  }
- if(!String(v.reason||'').trim()||String(v.reason).trim().length<10)return mark('reason','Zdůvodnění musí mít alespoň 10 znaků.');
- if(v.gmConfirmed!=='yes')return mark('gmConfirmed','GM musí výslovně potvrdit důsledky.');
+ const reason=action==='resolve'
+  ?'GM odstranil celou ránu '+v.woundId+' včetně navázaných zdravotních následků.'
+  :String(v.reason||'').trim();
+ if(action==='add'&&reason.length<10)return mark('reason','Zdůvodnění vytvoření musí mít alespoň 10 znaků.');
+ if(action==='add'&&v.gmConfirmed!=='yes')return mark('gmConfirmed','GM musí potvrdit vytvoření rány.');
  const clock=data.campaignClock;
  if(action==='add'&&(!clock||!calendarMemberIds(clock,data.characters).some(x=>x.id===c.id)))
   return mark('action','Nová rána musí mít autoritativní časové ukotvení v aktivní kampani. Nejdříve přidejte postavu do Kalendáře.');
  const source=persistentStateOf(c),w=source.wounds.find(x=>x.id===v.woundId&&!x.healed);
  if(action==='resolve'&&!w)return mark('woundId','Tato rána už neexistuje nebo byla zhojena.');
  const scope=action==='resolve'?gmWoundObligationSummary(c,w):{details:[],procedures:[],consequences:null};
- if(action==='resolve'){
-  if(scope.consequences.shockActive&&!['clear','retain'].includes(v.shockDisposition))
-   return mark('shockDisposition','Chybí výslovné rozhodnutí GM o skutečném původu Shock / Coma.');
-  if(scope.consequences.bloodPoints>0&&(!/^\d+$/.test(String(v.bloodPointsAttributed??''))||
-   Number(v.bloodPointsAttributed)>scope.consequences.bloodPoints))
-   return mark('bloodPointsAttributed','GM musí určit skutečný počet BP z této rány.');
-  if(scope.consequences.shock==='owned'&&v.shockDisposition!=='clear'||
-     scope.consequences.shock==='independent'&&v.shockDisposition!=='retain')
-   return mark('shockDisposition','Volba neodpovídá doloženému původu Shock / Coma.');
-  if(scope.consequences.blood==='owned'&&Number(v.bloodPointsAttributed)!==scope.consequences.bloodPoints||
-     scope.consequences.blood==='independent'&&Number(v.bloodPointsAttributed)!==0)
-   return mark('bloodPointsAttributed','Počet BP musí odpovídat prokazatelnému původu dané rány.');
- }
  const promptText=action==='add'
   ?'POTVRZENÍ GM: založit jednu SKUTEČNOU ránu s doloženým místem a typem. '+(v.initialCare==='pending'?'Založí se povinné rozhodnutí o Treatment.':'Výslovně se potvrdí Untreated a spočítají se jeho pravidlové následky.')+' Žádný hod nebude vymyšlen.'
-  :'POTVRZENÍ GM: vyřešit přesně ránu '+w.id+'? Zruší se její neprovedené Healing/Infection/Grim/Morale/Mishap/Bleeder povinnosti'+
-   (scope.procedures.length?' a '+scope.procedures.length+' rozpracovaný časovaný Treatment (auditované přerušení)':'')+'. '+
-   (scope.consequences.shockActive?' Shock / Coma: '+(v.shockDisposition==='clear'?'ukončit':'zachovat')+'.':'')+
-   (scope.consequences.bloodPoints?' Blood Loss: odečíst '+v.bloodPointsAttributed+' BP z '+scope.consequences.bloodPoints+'.':'')+
-   ' Historie zůstane nedotčená; jiné prokazatelné příčiny zůstávají.';
+  :'Odstranit ránu '+w.id+' a všechny její navázané zdravotní následky a budoucí termíny? '+
+   (scope.procedures.length?'Přeruší se '+scope.procedures.length+' otevřených časovaných Treatment. ':'')+
+   'Shock/Coma se vyřeší automaticky podle evidovaného původu. Blood Loss odečte '+
+   scope.consequences.autoPlan.bloodPointsToRemove+' BP. Jiné rány zůstanou. Historie bude zachována.';
  if(!uiConfirm(promptText))return;
  const eventId='gm-health:'+uuid();
  const saved=mutate(()=>{
@@ -20562,17 +20536,15 @@ document.addEventListener('submit',e=>{
     otherWoundDays[other.id]=elapsed;
    }
   }
-  const result=prepareGMHealthOverride({state:before,action,eventId,reason:v.reason,
+  const result=prepareGMHealthOverride({state:before,action,eventId,reason,
    gmConfirmed:true,location:v.location,side:v.side||null,level:Number(v.level),aspect:v.aspect,
-   woundId:v.woundId,otherWoundDays,initialCare:v.initialCare,
-   ...(action==='resolve'?{shockDisposition:v.shockDisposition||null,
-    bloodPointsAttributed:v.bloodPointsAttributed===''?null:Number(v.bloodPointsAttributed)}:{})});
+   woundId:v.woundId,otherWoundDays,initialCare:v.initialCare});
   const cancelled=[];
   // Timed procedures are durable calendar operations, not merely computed
   // healing rows. Append cancellation receipts in this SAME atomic mutation.
   for(const op of inProgress){
    data.campaignClock=cancelConcurrentProcedure(data.campaignClock,{id:uuid(),startId:op.startId,
-    reason:'GM vyřešil ránu '+result.woundId+': '+v.reason.trim(),confirmed:true});
+    reason:'GM vyřešil ránu '+result.woundId+': '+reason,confirmed:true});
    cancelled.push(op.startId);
   }
   synchronizeCombatInjuries(current,result.state);
@@ -20583,9 +20555,9 @@ document.addEventListener('submit',e=>{
    title:'HMK · zdravotní rozhodnutí GM · '+(action==='add'?'nová rána':'vyřešená rána'),
    body:(action==='add'?'Nová skutečná rána':'Vyřešená rána')+' · '+result.woundId+
     (action==='add'?' · '+created.location+' · '+created.severity+created.level+' · '+created.aspect:'')+
-    (cancelled.length?' · přerušeno '+cancelled.length+' časovaných zákroků':'')+' · '+v.reason.trim(),
+    (cancelled.length?' · přerušeno '+cancelled.length+' časovaných zákroků':'')+' · '+reason,
    calendarGMHealthOverride:{format:'hmk-gm-health-override-v1',action,sourceEventId:eventId,
-    woundId:result.woundId,reason:v.reason.trim(),actualRoll:null,cancelledProcedureStartIds:cancelled,
+    woundId:result.woundId,reason,actualRoll:null,cancelledProcedureStartIds:cancelled,
     ...(action==='resolve'?{globalConsequences:gmEvent.details.globalConsequences}:{}),
     ...(action==='add'?{initialCare:v.initialCare}:{})}});
  });
