@@ -7487,5 +7487,13 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 @media(max-width:750px){.hc-episode-spread-left .hc-weather-step-grid,
  .hc-episode-spread-left .hc-cold-kit{grid-template-columns:minmax(0,1fr)}
  .hc-episode-spread-left .hc-weather-step{padding:.65rem}}
-/* The return from a nested Skill Test is available above the folio, without scrolling. */
-.shell-skills .hc-episode-skill-handoff{position:sticky;top:0;z-index:30;margin:.45rem 0 .75rem;box-shadow:0 2px 9px rgba(40,29,18,.18)}
+/* Travel-origin Skill Test: action stays directly below the *active test result*
+   in the right-hand folio, never as a page-wide or sticky banner. */
+.shell-skills .hc-episode-skill-return-inline{
+ position:static;z-index:auto;margin:.55rem 0 .15rem;box-shadow:none;
+ border:0;background:transparent;padding:0;
+ display:flex;flex-direction:column;align-items:flex-start;gap:.35rem;
+ max-width:100%;box-sizing:border-box;
+}
+.shell-skills .hc-episode-skill-return-inline button{max-width:100%;white-space:normal}
+.shell-skills .hc-episode-skill-return-inline small{font-size:.79rem;color:#6b563c}

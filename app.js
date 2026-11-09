@@ -339,7 +339,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.790';
+const APP_VERSION='93.791';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4084,7 +4084,8 @@ function skillWorkbenchView(){
  const choice=skillSVChoice595?.actorId===actor.id&&activeSkillTab==='value'?skillSVChoice595:null;
  const nextKind=choice?.kind==='timed'?choice.value:choice?.kind==='ordinary'?choice.value.toLowerCase():pendingStableAnimalcraftId?'animal':null;
  const followup=nextKind==='animal'||nextKind==='animalcraft'?'animal':nextKind==='fishing'?'fishing':nextKind==='engineering'?'engineering':'none';
- return episodeSkillReturnBannerHTML()+journalChapterShell('Skills','Skill testy a výpočty vybrané postavy; skutečná nebezpečí a jejich následky se řeší výhradně v jejím deníku.',skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null,campaignKey(data.campaignClock),followup),`journal-book--skills`);
+ const workbench=skillWorkbenchHTML(actor,data.characters,data.inventory,data.journal,activeSkillTab,data.campaignClock?.minute??null,campaignKey(data.campaignClock),followup);
+ return journalChapterShell('Skills','Skill testy a výpočty vybrané postavy; skutečná nebezpečí a jejich následky se řeší výhradně v jejím deníku.',episodeSkillReturnBelowResultHTML(workbench),`journal-book--skills`);
 }
 function charactersView(){
  const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));
@@ -10404,7 +10405,7 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
     link?.episodeEpoch===episodeDraftEpoch&&link?.campaignId===campaignKey(data.campaignClock)&&
     link?.actorId===x.id&&link?.minute===data.campaignClock?.minute&&
     episodePendingSkillRequest?.status==='resolved'&&episodePendingSkillRequest?.completedId===originalId);
-   if(staged)return '<section class="hsk-followup-advisory" role="status"><strong>Survival CF při Trekking · HMK str. 145, 148</strong><p>Původní d100 '+esc(String(x.result.roll??'—'))+' je již doložen. Žádný další d100 zde nezadávejte. Vraťte se do rozpracovaného Cestování; tam zadejte skutečný Survival Hazard d10 (1–3 Equipment, 4–6 Accident, 7–10 Complication). Následky se vyhodnotí ve svých pravidlových modulech. Rozpracované testy se uloží až potvrzením celé epizody GM.</p><button type="button" class="secondary" data-episode-return>Vrátit se do Cestování · Survival Hazard d10</button></section>';
+   if(staged)return '<section class="hsk-followup-advisory" role="status"><strong>Survival CF při Trekking · HMK str. 145, 148</strong><p>Původní d100 '+esc(String(x.result.roll??'—'))+' je již doložen. Žádný další d100 zde nezadávejte. Vraťte se do rozpracovaného Cestování; tam zadejte skutečný Survival Hazard d10 (1–3 Equipment, 4–6 Accident, 7–10 Complication). Následky se vyhodnotí ve svých pravidlových modulech. Rozpracované testy se uloží až potvrzením celé epizody GM.</p></section>';
    return '<p class="hsk-followup-advisory"><strong>Survival CF · HMK str. 148:</strong> Survival Hazard d10 je povinný pouze při doloženém Orienteering CF v Trekking. Nelze jej vyhodnotit pouhým uložením obecného následku Skill Testu. Použijte původní cestovní rutinu a její důkaz události; nový d100 se zde nehází.</p>';
   }
   const options=skillFollowupActivities(x.skill,x.result.level);
@@ -22105,12 +22106,30 @@ function episodeLinkedProofHTML(form){
    '</span><small>Výsledek propojen s touto epizodou.</small></div>';
  }).join('');
 }
+/** Travel-owned Skill Tests return beside their own evaluation, inside the
+ * right folio. Never render a sticky page-wide banner above the book. This
+ * preserves the original test forms, output IDs and save/return callbacks. */
+function episodeSkillReturnBelowResultHTML(workbenchHTML){
+ const footer=episodeSkillReturnBannerHTML();
+ if(!footer)return workbenchHTML;
+ const holder=document.createElement('div');holder.innerHTML=workbenchHTML;
+ const section=[...holder.querySelectorAll('.hsk-test-card[data-skill-section]')]
+  .find(node=>node.dataset.skillSection===activeSkillTab);
+ const result=section?.querySelector('[id^="hsk-result-"]');
+ if(result)result.insertAdjacentHTML('afterend',footer);
+ else {
+  // Fall back only for optional / conditional tabs without a standard result.
+  const target=holder.querySelector('[data-hmk-followup-display-598],.hsk-special-container,.hsk-separated-tests')||holder.querySelector('.hmk-skill-workbench');
+  target?.insertAdjacentHTML('beforeend',footer);
+ }
+ return holder.innerHTML;
+}
 function episodeSkillReturnBannerHTML(){
  const r=episodePendingSkillRequest;
  if(!r||!episodeSkillReturnPending||r.campaignId!==campaignKey(data.campaignClock)||r.minute!==data.campaignClock?.minute)return '';
  const j=data.journal.find(x=>x.id===r.completedId);
  const proof=j?.skillTestProof?.a||j?.skillTestProof?.result;
- return `<aside class="hc-episode-skill-handoff" role="status"><button type="button" class="secondary hc-episode-return-top" data-episode-return>← Zpět do kalendáře · rozpracovaná činnost</button><strong>Rozpracovaná epizoda · ${esc(r.skill)} · ${esc(character(r.actorId)?.name||r.actorId)}</strong><p>${r.status==='resolved'&&proof?'✓ Hod potvrzen v pracovním registru epizody: '+esc(proof.level)+(Number.isSafeInteger(proof.sv)?' · SV '+esc(String(proof.sv)):'')+'. '+(proof.level==='CF'?'Při návratu se nabídne navazující Survival Hazard nebo jiné relevantní následky.':'Výsledek se automaticky přenese do cestování.'):'Proveďte a uložte skutečný Success Value test. Potom se vraťte do epizody.'}</p><button type="button" class="secondary" data-episode-return>Vrátit se do Cestování</button></aside>`;
+ return `<div class="hc-episode-skill-handoff hc-episode-skill-return-inline" role="group" aria-label="Návrat do rozpracovaného Cestování"><button type="button" class="secondary" data-episode-return>← Vrátit se do Cestování</button>${r.status==='resolved'&&proof?'':`<small>Pokud test ještě nebyl vyhodnocen, návrat neuloží žádný hod.</small>`}</div>`;
 }
 /** Route a visible form error to the precise named input rather than a generic chapter. */
 function episodeIssue(message,form){
