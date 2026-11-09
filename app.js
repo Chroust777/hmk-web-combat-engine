@@ -339,7 +339,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.794';
+const APP_VERSION='93.795';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11118,7 +11118,8 @@ function hskSkinRefresh(form){
    row.dataset.skinLevel='';
    preview.textContent='Zadejte potřebné hody a stiskněte „Vyhodnotit zadané hody“.';
    shockWrap.hidden=true;compWrap.hidden=true;
-   if(gmWrap){gmWrap.hidden=true;gmChoice.disabled=true;gmReason.disabled=true;}
+   if(gmWrap){gmWrap.hidden=true;gmChoice.disabled=true;gmReason.disabled=true;
+    gmChoice.required=false;gmReason.required=false;}
    for(const field of [shock,compound])hmkSyncConditionalRollField(field,false);
    continue;
   }
@@ -11137,9 +11138,12 @@ function hskSkinRefresh(form){
      skinD10:kind==='sunburn'?one:null,complexion:form.elements.namedItem('complexion')?.value||null,maximumExposureMinutes:maxExposure});
     il=info.il;
     if(gmWrap){
-     gmWrap.hidden=!info.gmDecisionRequired;
-     gmChoice.disabled=!info.gmDecisionRequired;
-     gmReason.disabled=!info.gmDecisionRequired;
+     const currentDecision=info.gmDecisionRequired&&!awaitingPrior;
+     gmWrap.hidden=!currentDecision;
+     gmChoice.disabled=!currentDecision;
+     gmReason.disabled=!currentDecision;
+     gmChoice.required=currentDecision;
+     gmReason.required=currentDecision;
      if(!info.gmDecisionRequired){gmChoice.value='';gmReason.value='';}
      if(info.gmDecisionRequired){
       const confirmed=gmChoice.value==='G5'&&gmReason.value.trim().length>=10;
@@ -11202,6 +11206,15 @@ document.addEventListener('click',event=>{
  const button=event.target.closest?.('[data-weather-skin-evaluate]');if(!button)return;
  const form=button.closest('form[data-skill-weather-skin]');if(!form)return;
  event.preventDefault();
+ if(!form.elements.namedItem('noneExposed')?.checked){
+  const missing=[...form.querySelectorAll('input[name="windD20"],input[name="durationD20"],input[name="skinD10"]')]
+   .find(x=>!x.disabled&&(!x.value.trim()||!x.checkValidity()));
+  if(missing){
+   markTravelBloodInput93787(form,missing);
+   const out=form.querySelector('output');if(out)out.textContent='Nejdříve doplňte červeně označený skutečný hod ('+missing.name+'). Kožní následky dosud nebyly vyhodnoceny ani uloženy.';
+   return;
+  }
+ }
  form.dataset.skinEvaluated='yes';
  hskSkinRefresh(form); // Explicit user action: still no journal or health mutation.
 },true);
@@ -16432,13 +16445,18 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
    }
   }
   form.scrollIntoView({block:'center',behavior:'instant'});
-  const rollInput=kind==='injury-morale'&&form.id==='hmk-guided-mandatory-form'?
+  const skinTarget=kind==='weather-skin'?([...form.querySelectorAll(
+   'input[name="windD20"],input[name="durationD20"],input[name="skinD10"],select[name="gmFrostChoice"],textarea[name="gmFrostReason"],input[name="compoundD10"],input[name="shockD100"]')]
+   .find(x=>!x.disabled&&!x.closest('[hidden]')&&(!String(x.value||'').trim()||!x.checkValidity()))||
+   form.querySelector('[data-weather-skin-evaluate]')):null;
+  const rollInput=kind==='weather-skin'?skinTarget:
+   kind==='injury-morale'&&form.id==='hmk-guided-mandatory-form'?
    (form.querySelector('input[name="abe"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
    kind==='skill-fall'?form.elements.namedItem('heightFt'):
    form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"],input[name="physicianRoll"]');
   // Calendar/Travel rule links must land on the REAL original input and
   // visibly mark it, not merely open a whole module without a target.
-  if(['treatment','healing','infection','grim','blood-loss','coma','extended-shock'].includes(kind)&&rollInput&&!rollInput.disabled){
+  if(['treatment','healing','infection','grim','blood-loss','coma','extended-shock','weather-skin'].includes(kind)&&rollInput&&!rollInput.disabled){
    for(const old of document.querySelectorAll('.hmk-medical-required-target'))old.classList.remove('hmk-medical-required-target');
    (rollInput.closest('label')||rollInput).classList.add('hmk-medical-required-target');
   }
