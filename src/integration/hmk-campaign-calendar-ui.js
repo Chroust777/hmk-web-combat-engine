@@ -52,7 +52,7 @@ function issueAction(p,esc){
   `<button type="button" class="hc-small hc-event-mark" title="${control==='rules'?'Přejít k povinnému pravidlovému vyhodnocení':'Označit událost jako zkontrolovanou – bez změny herních následků'}" aria-label="${control==='rules'?'Otevřít povinné vyhodnocení':'Zkontrolovat událost'}" data-cal-event-check="${id}">✓</button><button type="button" class="hc-small hc-event-mark" title="${control==='rules'?'Povinný hod nelze zrušit bez pravidlového vyřešení':control==='activity'||control==='nutrition'?'Přerušit probíhající interval':'Skrýt historickou či informativní událost z kalendáře'}" aria-label="${control==='rules'?'Prověřit možnost zrušení':'Zrušit / skrýt událost'}" data-cal-event-remove="${id}">×</button>`;
  const text=p.origin==='history'?'Deník ↗':p.origin==='activity'?'Činnost ↗':
   p.origin==='gm'?'Otevřít ↗':p.origin==='hml'?'Kontrola ↗':'Detail ↗';
- const route=p.characterId?`<button type="button" class="hc-small hc-event-link" title="${esc(eventDestination(p))}" data-cal-link="${esc(p.characterId)}" data-cal-destination="${esc(p.destination||'healing')}" data-cal-kind="${esc(p.kind||'gm')}" data-cal-source="${esc(p.sourceId||p.woundId||'')}" data-cal-elapsed="${esc(p.elapsedMinutes??'')}" ${p.origin==='gm'&&p.skill?`data-cal-skill="${esc(p.skill)}" data-cal-plan="${esc(p.id)}"`: ''} ${p.origin==='history'?`data-cal-history-id="${esc(p.sourceId)}"`:''}>${esc(text)}</button>`:'';
+ const route=p.characterId?`<button type="button" class="hc-small hc-event-link" title="${esc(eventDestination(p))}" data-cal-link="${esc(p.characterId)}" data-cal-destination="${esc(p.destination||'healing')}" data-cal-kind="${esc(p.kind||'gm')}" data-cal-concurrent-id="${esc(p.startId||'')}" data-cal-source="${esc(p.sourceId||p.woundId||'')}" data-cal-elapsed="${esc(p.elapsedMinutes??'')}" ${p.origin==='gm'&&p.skill?`data-cal-skill="${esc(p.skill)}" data-cal-plan="${esc(p.id)}"`: ''} ${p.origin==='history'?`data-cal-history-id="${esc(p.sourceId)}"`:''}>${esc(text)}</button>`:'';
  return `${route}${marks}`;
 }
 
@@ -72,7 +72,7 @@ function renderAgendaEntry(p,esc,clock,events=[],journal=[]){
  const skillDetails=skillReceipts.map(j=>skillTestEvidenceHTML(j,esc)).join('');
  return `<article class="hc-entry hc-entry--compact ${['skill-fall','skill-critical','skill-injury'].includes(p.kind)?'hc-entry--rule-detail':''} ${p.status==='due'?'hc-entry--due':''} ${['resolved','cancelled'].includes(p.status)?'hc-entry--done':''}" ${details?`title="${esc(details)}"`:''}>
  <div class="hc-event-line"><strong class="hc-event-person">${esc(who)}</strong><time>${due}</time><span class="hc-status hc-status--${esc(p.status)}">${esc(eventStatus(p))}</span></div>
- <div class="hc-event-line hc-event-line--task"><span class="hc-event-description">${esc(label)}${p.uiAcknowledged?' · ✓ zkontrolováno GM':''}</span><span class="hc-actions">${issueAction(p,esc)}</span></div>${overlapNotice}${skillDetails}
+ <div class="hc-event-line hc-event-line--task"><span class="hc-event-description">${esc(label)}${p.kind==='healing'&&p.woundId?` <small class="hc-medical-wound-id">[ID rány: ${esc(p.woundId)}]</small>`:''}${p.uiAcknowledged?' · ✓ zkontrolováno GM':''}</span><span class="hc-actions">${issueAction(p,esc)}</span></div>${overlapNotice}${skillDetails}
  </article>`;
 }
 /** Several immutable receipts (daily ration, Starvation onset, Thirst onset)

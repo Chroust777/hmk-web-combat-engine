@@ -86,7 +86,7 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
  s.lastRound=round;validateCombatState(s);
  return {state:s,report};
 }
-function injuriesFromExposure(h,{windD20,durationD20,complexion,rows,maximumExposureMinutes=null}){
+function injuriesFromExposure(h,{windD20,durationD20,complexion,rows,maximumExposureMinutes=null,previewOnly=false}){
  requireIt(Array.isArray(rows)&&rows.length<=30,'Doložte všechny exponované lokace, včetně lokací bez výsledné rány');
  requireIt(maximumExposureMinutes===null||integer(maximumExposureMinutes,1,10080),
   'Frostbite/Sunburn: chybí ověřená délka minutové epizody');
@@ -102,8 +102,21 @@ function injuriesFromExposure(h,{windD20,durationD20,complexion,rows,maximumExpo
   return {period,duration,sampledDuration,rows:rows.map(r=>{
     requireIt(integer(r.av,0,50),'Pro každou Frostbite lokaci je nutné AV0, AV1–3 nebo doložená vyšší ochrana');
     const il=r.av===0?Math.floor(duration/period):r.av<=3?Math.floor(duration/(period*2)):0;
-    requireIt(il<=5,'Více než IL5 v jedné lokaci není touto tabulkou jednoznačně vyřešeno; musí rozhodnout GM');
-    return {...r,il,sourceRoll:null};
+    // HMK p185 can produce IL6–8, but the normal Injury Scale stops at G5.
+    // The raw result is never changed or silently clamped. The GM must make
+    // an explicit, source-linked noncanonical ruling before a real injury.
+    const extreme=il>5;
+    if(extreme&&!previewOnly){
+     requireIt(r.gmFrostChoice==='G5'&&typeof r.gmFrostReason==='string'&&
+      r.gmFrostReason.trim().length>=10&&r.gmFrostReason.trim().length<=500,
+      'Frostbite IL'+il+': GM musí výslovně zvolit G5 a uvést konkrétní odůvodnění (min. 10 znaků). Bez rozhodnutí nelze zapsat ránu.');
+    }else if(!extreme&&!previewOnly){
+     requireIt(!r.gmFrostChoice&&!r.gmFrostReason,
+      'GM výjimku Frostbite G5 nelze použít pro IL0–5.');
+    }
+    return {...r,il:extreme?5:il,rawIL:il,
+     gmFrostRuling:extreme&&!previewOnly?{choice:'G5',rawIL:il,effectiveIL:5,reason:r.gmFrostReason.trim(),
+      rule:'GM výjimka mimo běžnou škálu G1–G5 (HMK 185)'}:null,sourceRoll:null};
   })};
  }
  requireIt(Object.hasOwn(complexionTN,complexion),'Sunburn vyžaduje skutečnou pleť postavy');
@@ -121,8 +134,11 @@ export function previewExposureSkinLocation({kind,av=null,windD20=null,durationD
  complexion=null,maximumExposureMinutes=null}={}){
  requireIt(kind==='frostbite'||kind==='sunburn','Neznámý kožní následek');
  const out=injuriesFromExposure({skinPending:kind},{windD20,durationD20,complexion,
-  rows:[{av,skinD10}],maximumExposureMinutes});
- return {il:out.rows[0].il,periodMinutes:out.period,durationMinutes:out.duration,
+  rows:[{av,skinD10}],maximumExposureMinutes,previewOnly:true});
+ const preview=out.rows[0];
+ return {il:preview.rawIL??preview.il,gmDecisionRequired:kind==='frostbite'&&preview.rawIL>5,
+  suggestedGMLimit:kind==='frostbite'&&preview.rawIL>5?'G5':null,
+  periodMinutes:out.period,durationMinutes:out.duration,
   ...(kind==='frostbite'?{sampledDurationMinutes:out.sampledDuration}:{})};
 }
 /** Skin result uses the printed direct Injury Level, never a fabricated impact.
@@ -170,7 +186,7 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
   // already witnessed incident or silently invent subsequent injuries.  Check
   // every later location/die as before, and preserve its evidence as skipped.
   if(s.shock==='KIA'){
-   skippedAfterKIA.push({location:where,side,il:r.il,severity,sourceD10:r.sourceRoll,
+   skippedAfterKIA.push({location:where,side,il:r.il,rawIL:r.rawIL??r.il,gmFrostRuling:r.gmFrostRuling,severity,sourceD10:r.sourceRoll,
     shockD100:r.shockD100,compoundD10:r.compoundD10??null,
     reason:'KIA již vzniklo u dříve vyhodnocené lokace stejného Weather Incident; další zásah nebyl proveden'});
    continue;
@@ -197,8 +213,8 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
   s=applied.state;
   const evt=s.events.find(e=>e.id===eventId);evt.details.weatherTrauma={kind:hazard.skinPending,
    sourceId,windD20,durationD20,complexion,location:where,side,
-   sourceD10:r.sourceRoll,il:r.il,shockD100:r.shockD100,shockEML,compoundD10:r.compoundD10??null};
-  wounds.push({location:where,side,il:r.il,severity,woundId:applied.wound?.id,shock:s.shock});
+   sourceD10:r.sourceRoll,il:r.il,rawIL:r.rawIL??r.il,gmFrostRuling:r.gmFrostRuling,shockD100:r.shockD100,shockEML,compoundD10:r.compoundD10??null};
+  wounds.push({location:where,side,il:r.il,rawIL:r.rawIL??r.il,gmFrostRuling:r.gmFrostRuling,severity,woundId:applied.wound?.id,shock:s.shock});
  }
  const live=s.environmentalHazards.find(h=>h.sourceId===sourceId);
  const skinKind=live.skinPending;live.skinPending=null;live.skinResolved=true;live.skinWounds=wounds.map(x=>x.woundId);
