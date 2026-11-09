@@ -7460,3 +7460,32 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
  border:2px solid #b02222!important;outline-color:#b02222!important;
  box-shadow:0 0 0 3px rgba(176,34,34,.16)!important;
 }
+
+/* v93.790 — weather hazard: disciplined, responsive per-actor cold equipment form.
+   Only presentation changes; existing names/checkboxes keep their rule behavior. */
+.hc-episode-spread-left .hc-weather-actor{padding:.8rem .9rem;border-color:#9b7951;background:rgba(255,250,237,.82);box-shadow:0 2px 8px rgba(77,50,23,.08)}
+.hc-episode-spread-left .hc-weather-actor>summary{font-size:1rem;padding:.14rem 0 .38rem}
+.hc-episode-spread-left .hc-weather-actor-steps{gap:.8rem;padding:.55rem 0 0}
+.hc-episode-spread-left .hc-weather-step{padding:.85rem .95rem;background:rgba(255,254,248,.8);border-color:rgba(114,82,45,.32)}
+.hc-episode-spread-left .hc-weather-step h5{font-size:.95rem;margin-bottom:.65rem;border-bottom:1px solid rgba(114,82,45,.2);padding-bottom:.4rem}
+.hc-episode-spread-left .hc-weather-step-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem 1rem;align-items:start}
+.hc-episode-spread-left .hc-weather-step-grid>label{margin:0;align-self:stretch;min-width:0}
+.hc-episode-spread-left .hc-weather-step-grid input:not([type=checkbox]),
+.hc-episode-spread-left .hc-weather-step-grid select{box-sizing:border-box;width:100%;min-width:0;max-width:100%}
+.hc-episode-spread-left .hc-weather-step-grid>label.hc-check,
+.hc-episode-spread-left .hc-cold-kit>label.hc-check{display:flex;align-items:flex-start;gap:.6rem;flex-direction:row;min-width:0;line-height:1.4;padding:.6rem .7rem;border:1px solid rgba(118,86,54,.24);border-radius:6px;background:rgba(250,244,226,.64)}
+.hc-episode-spread-left .hc-weather-step-grid label.hc-check input[type=checkbox],
+.hc-episode-spread-left .hc-cold-kit label.hc-check input[type=checkbox]{flex:none;width:18px;height:18px;margin:.06rem 0 0}
+.hc-episode-spread-left .hc-cold-kit{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem .85rem;margin:.15rem 0;padding:.75rem;border:1px solid rgba(121,89,53,.24);border-radius:7px;background:rgba(242,231,205,.33);min-width:0}
+.hc-episode-spread-left .hc-cold-kit>p{grid-column:1/-1;margin:0 0 .25rem;line-height:1.4}
+.hc-episode-spread-left .hc-cold-kit>label{min-width:0;margin:0}
+.hc-episode-spread-left .hc-cold-kit>label.hc-check{grid-column:1/-1}
+.hc-episode-spread-left .hc-weather-step-grid>.hc-cold-kit+label{grid-column:1/-1}
+.hc-episode-spread-left .hc-weather-step-grid .hc-episode-die{display:flex;align-items:center;gap:.35rem;min-width:0}
+.hc-episode-spread-left .hc-weather-step-grid .hc-episode-die input{flex:1;min-width:0}
+.hc-episode-spread-left .hc-weather-step-grid .hc-episode-die button{flex:none}
+@media(max-width:750px){.hc-episode-spread-left .hc-weather-step-grid,
+ .hc-episode-spread-left .hc-cold-kit{grid-template-columns:minmax(0,1fr)}
+ .hc-episode-spread-left .hc-weather-step{padding:.65rem}}
+/* The return from a nested Skill Test is available above the folio, without scrolling. */
+.shell-skills .hc-episode-skill-handoff{position:sticky;top:0;z-index:30;margin:.45rem 0 .75rem;box-shadow:0 2px 9px rgba(40,29,18,.18)}

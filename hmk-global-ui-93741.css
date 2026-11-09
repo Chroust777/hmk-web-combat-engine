@@ -206,3 +206,14 @@ body #app .journal-book--creation button.hmk-creation-die.secondary{
  * required-input red as Travel; changes no global fonts, dice or buttons. */
 .hmk-medical-required-target{outline:2px solid #a4251e!important;outline-offset:3px;border-radius:3px;background:rgba(194,57,41,.09)!important}
 .hmk-medical-required-target input:not([type=checkbox]),.hmk-medical-required-target select{border-color:#a4251e!important;outline-color:#a4251e!important}
+
+/* v93.790: the user requested restrained EML breakdown numerals.
+   This last-loaded layer intentionally overrides the earlier v93.745
+   24px !important typography. Do NOT shrink the result verdict. */
+body #app .content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip b,
+body #app .content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-chip strong{
+ font:700 16px/1.22 var(--hmk-ui-body-font)!important;
+}
+body #app .content-sheet .journal-book--skills .folio-chapter-content .hsk-eml-trace .hsk-eml-total{
+ font:800 17px/1.22 var(--hmk-ui-body-font)!important;
+}
