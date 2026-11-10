@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {trekMovement} from '../src/integration/hmk-trekking-routine.js';
+const travel=(extra={})=>trekMovement({topography:'flat',terrain:'paved-road',conveyance:'foot',...extra});
+assert.equal(travel().kilometres,20);
+assert.equal(travel({minutes:60}).kilometres,5);
+assert.equal(travel({loaded:true}).kilometres,10);
+assert.equal(travel({slow:1}).kilometres,10);
+assert.equal(travel({loaded:true,slow:1}).kilometres,5);
+assert.equal(travel({slow:2}).kilometres,5);
+assert.equal(travel({doubleTime:true}).kilometres,40);
+assert.equal(trekMovement({topography:'flat',terrain:'paved-road',conveyance:'mount'}).kilometres,40);
+assert.equal(trekMovement({topography:'flat',terrain:'paved-road',conveyance:'cart'}).kilometres,20);
+assert.equal(trekMovement({topography:'flat',terrain:'paved-road',conveyance:'wagon'}).kilometres,20);
+assert.equal(travel({minutes:45}).kilometres,3.75);
+console.log('PASS 11 Trek Movement p.146 numerical reference cases (including ENC/Slow/short watch)');
