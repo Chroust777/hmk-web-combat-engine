@@ -343,7 +343,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.818';
+const APP_VERSION='93.819';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2945,7 +2945,9 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint">Velikost kostky se mění podle skutečných podmínek. Hazard Roll vyhodnoťte pro každou postavu zvlášť.</p>
  <div class="hmk-trek-grid hc-weather-step-grid"><label>Skutečný Hazard hod<span class="hc-episode-die"><input name="whRoll_${h}_${esc(c.id)}" type="number" min="1" max="${h==='cold'?6:4}" placeholder="1–${h==='cold'?6:4}"><button type="button" data-episode-die="whRoll_${h}_${esc(c.id)}" data-episode-faces="${h==='cold'?6:4}">⚄ d${h==='cold'?6:4}</button></span></label></div>
  </section>
- <section class="hc-weather-step"><h5>3 · Endurance (Survival) · jen při expozici</h5><div class="hmk-trek-grid hc-weather-step-grid">
+ <section class="hc-weather-step"><h5>3 · Endurance (Survival) · jen při expozici</h5>
+ ${['INC','UNC'].includes(persistentStateOf(c)?.shock)?'<p class="notice warning">Shock '+esc(persistentStateOf(c).shock)+': tato postava nesmí vykonávat samostatný Skill Test. Při skutečné expozici je nutné původní zdravotní vyhodnocení GM, nikoli fiktivní Endurance. Pokud zvíře/pacient není vystaven, doložte skutečnou ochranu a Hazard Roll.</p>':''}
+ <div class="hmk-trek-grid hc-weather-step-grid">
  <label>Původní samostatně vyžádaný Endurance/Survival doklad<select name="whProof_${h}_${esc(c.id)}"><option value="">— čeká na vyžádaný test —</option>${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&['Endurance','Survival'].some(skill=>episodeSkillProof(j,skill,c.id,campaignKey(clock),clock.minute))).map(j=>`<option value="${esc(j.id)}">${esc(j.title||'Skill Test')} · ${esc((j.skillTestProof.a||j.skillTestProof.result)?.level||'—')}</option>`).join('')}</select></label>
  <label>Výsledek Endurance (automaticky převzatý z dokladu)<select name="whEnd_${h}_${esc(c.id)}"><option value="">— zatím není vyžádán —</option>${['CF','F','S','CS'].map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label>
  </div><p class="hc-hint">Předchozí Survival / Orienteering je jiný test. Jeho d100 ani ID nepřepisujte a nepoužívejte místo Endurance. Po skončení cesty zdravotní pokračování najdete v deníku → Zdraví &amp; Expozice.</p></section>
@@ -22707,7 +22709,10 @@ function episodeIssue(message,form){
   return {field,skill:null,actorId:null};
  }
  const weather=message.match(/Weather Hazard\s+([^/\s]+)\/(cold|heat)/i);
- if(weather)return {field:'whProof_'+weather[2]+'_'+weather[1],skill:'Endurance',actorId:weather[1]};
+ if(weather){
+  if(/Shock INC|Shock UNC/.test(message))return {field:'whRoll_'+weather[2]+'_'+weather[1],skill:null,actorId:null};
+  return {field:'whProof_'+weather[2]+'_'+weather[1],skill:'Endurance',actorId:weather[1]};
+ }
  // Route detailed Encounter/Surprise failures to their OWN editable field.
  // Older messages use "Encounter #1" while current preview uses "Encounter 1:".
  // Never highlight distance d4 for an unrelated missing Surprise receipt.
@@ -23534,6 +23539,13 @@ function episodePreviewFromForm(form,clock){
     resting:['rest','sleep','winded'].includes(kind),shade:!!field('whShade'),tropicalNative:!!field('whNative'),
     roll:String(field('whRoll')||'').trim()?Number(field('whRoll')):null,
     endLevel:field('whEnd')||null});
+   // Shock INC/UNC forbids independent Skill Tests (HMK p.169).
+   // Weather exposure still matters: do not invent S/CF or imply immunity.
+   // An exposed patient needs an original GM/medical ruling, not the active
+   // Endurance Skill Test route used for a conscious participant.
+   const patientShock=travelHealth.find(p=>p.id===id)?.shock||persistentStateOf(character(id))?.shock||'NONE';
+   if(item.exposed&&['INC','UNC'].includes(patientShock))
+    throw Error('Weather Hazard '+id+'/'+hazard+': Shock '+patientShock+' zakazuje samostatný Endurance Skill Test (HMK 169). U nepohyblivého pacienta nelze domýšlet výsledek expozice. GM musí doložit skutečnou ochranu před počasím, nebo zdravotní následek vyřešit v původním zdravotním modulu.');
    const proofId=String(field('whProof')||'').trim()||null;
    const proofRow=data.journal.find(j=>j.id===proofId);
    const proof=proofId?(episodeSkillProof(proofRow,'Endurance',id,campaignKey(clock),clock.minute)||
@@ -23751,10 +23763,16 @@ function episodeEndTasks(result){
   else if(w.effect==='pending'||w.roll===null)
    add('Počasí · '+person+' · Hazard d'+(w.faces||'?'),
     'Nyní proveďte skutečný individuální hod počasí.','whRoll'+tail);
-  else if(w.effect==='pending-endurance')
-   tasks.push({name:'Počasí · '+person+' · Endurance',
+  else if(w.effect==='pending-endurance'){
+   const shock=persistentStateOf(character(w.id))?.shock||'NONE';
+   if(['INC','UNC'].includes(shock))
+    tasks.push({name:'Počasí · '+person+' · pacient v Shock '+shock,
+     detail:'Neprovádějte samostatný Endurance Skill Test. Expozice vyžaduje skutečné zdravotní rozhodnutí GM a ochranu pacienta; výsledek nelze domýšlet.',
+     action:'whRoll'+tail,skill:null,actorId:null});
+   else tasks.push({name:'Počasí · '+person+' · Endurance',
     detail:'Expozice byla potvrzena; otevřete a uložte skutečný Endurance (Survival) Skill Test.',
     action:'whProof'+tail,skill:'Endurance',actorId:w.id});
+  }
  }
  return tasks;
 }
@@ -24516,7 +24534,7 @@ function updateSharedTimeWindowControls(form){
  }
  const planner=document.querySelector('[data-shared-window-planner]');if(planner)planner.hidden=!active;
  const addCard=document.querySelector('[data-shared-plan-add]');if(addCard){addCard.disabled=!active||!!sharedTimeWindowActivePlanId||!!episodeEvaluationRequested||!!episodePendingSkillRequest||sharedEpisodeAutoRun93772;
-  addCard.title=addCard.disabled?'Nejdříve dokončete otevřené pravidlové testy.':'';}
+  addCard.title=addCard.disabled?(!active?'Nejprve založte společný interval. Pokud jej kalendář blokuje, vyřešte konkrétní splatnou událost nahoře.':'Dokončete nynější skupinu nebo její skutečně vyžádané testy.'):'';}
  const run=document.querySelector('[data-shared-row-run]');
  if(run){const state=sharedPlanState93771();run.hidden=!sharedRowsMode93772();run.disabled=!active||!sharedTimeWindowPlans.length||!!sharedTimeWindowActivePlanId||
   !!episodeEvaluationRequested||!!episodePendingSkillRequest||state.errors.length>0||sharedTimeWindowPlans.every(x=>x.done)||
@@ -26138,7 +26156,19 @@ document.addEventListener('click',e=>{
   const cap=episodeMandatoryWindow();
   if(cap?.unknown?.length)throw Error('Neověřená povinná událost kalendáře: '+cap.unknown[0].description);
   if(!Number.isSafeInteger(wanted)||wanted<1||wanted>10080)throw Error('Zadejte 1–10 080 minut.');
-  if(cap?.maxAllowed===0)throw Error('V aktuální minutě je splatný povinný zdravotní test; nejprve jej vyřiďte.');
+  if(cap?.maxAllowed===0){
+   const due=cap.first;
+   const desc=String(due?.description||due?.title||'povinná událost kalendáře');
+   if(due?.kind==='skill-critical'&&document.querySelector('[data-episode-open-accident]')){
+    const accident=document.querySelector('[data-episode-open-accident]');
+    notice='Nehoda po Pochodu ještě vyžaduje Agility / Injury Sequence. Otevřete tlačítko navazující nehody, dokončete původní Skill Tests a teprve poté založte další interval.';
+    render();
+    const guide=document.querySelector('[data-episode-open-accident]');
+    if(guide){guide.scrollIntoView({block:'center',behavior:'instant'});guide.focus();}
+    return;
+   }
+   throw Error('Nový interval čeká na skutečně splatnou událost: '+desc+'. Otevřete odpovídající původní formulář; žádný hod se nesmí přeskočit.');
+  }
   const tillMidnight=sharedDailyWindowLimit93771(data.campaignClock.minute);
   if(tillMidnight<1)throw Error('Den končí; nejprve potvrďte přechod kalendáře na 00:00 a nové denní počasí.');
   const minutes=Math.min(wanted,cap?.maxAllowed??10080,tillMidnight);
