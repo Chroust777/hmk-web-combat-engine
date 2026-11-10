@@ -1,0 +1,13 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path');
+const ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
+const root=path.resolve(__dirname,'..'),file=path.join(root,'hmk-app.bundle.js');
+const old=fs.readFileSync(file,'utf8'),prefix='(()=>{const MOD=',marker=';const CACHE={};';
+if(!old.startsWith(prefix)||!old.includes(marker))throw Error('Unexpected browser bundle');
+const offset=old.indexOf(marker),modules=JSON.parse(old.slice(prefix.length,offset));
+const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+const output=ts.transpileModule(source,{fileName:'app.js',compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS},reportDiagnostics:true});
+if(output.diagnostics?.some(d=>d.category===ts.DiagnosticCategory.Error))throw Error('Invalid JS app.js');
+modules['app.js']=output.outputText;
+fs.writeFileSync(file,prefix+JSON.stringify(modules)+old.slice(offset));
+console.log('v93.821 browser bundle rebuilt; app.js');
