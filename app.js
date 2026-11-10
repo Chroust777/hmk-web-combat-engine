@@ -343,7 +343,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.816';
+const APP_VERSION='93.817';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -741,10 +741,10 @@ function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null
   // An explicit, GM-confirmed JSON backup restore may legitimately replace a
   // newer event history with an older verified snapshot. Do not mistake that
   // authorized disaster-recovery operation for an attempted event overwrite.
-  if(storageBaseline!==null&&!restoreBackup)linkNewMoralePsycheAccrual(committedBefore,data);
-  if(!restoreBackup)assertGlobalActionLedgerAppendOnly(committedBefore,data);
+  if(storageBaseline!==null&&!restoreBackup&&!characterDeletionId)linkNewMoralePsycheAccrual(committedBefore,data);
+  if(!restoreBackup&&!characterDeletionId)assertGlobalActionLedgerAppendOnly(committedBefore,data);
   if(!restoreBackup)for(const former of committedBefore.characters??[]){const current=(data.characters??[]).find(x=>x.id===former.id);if(current)assertParallelColdShocksAppendOnly(former.hmk?.healthState??initialCombatState(),current.hmk?.healthState??initialCombatState());}
-  if(!restoreBackup&&JSON.stringify(committedBefore)!==JSON.stringify(data)){
+  if(!restoreBackup&&!characterDeletionId&&JSON.stringify(committedBefore)!==JSON.stringify(data)){
    recordGlobalActionReceipt(data,{before:committedBefore,id:uuid(),createdAt:stamp(),
     mode:episodeCommit?'episode-commit':'normal'});
   }
@@ -1004,21 +1004,62 @@ function area(name,label,value=''){return `<label>${esc(label)}<textarea name="$
  * water/health/skill evidence of the deleted character is removed together with
  * the character. Ordinary mutate() retains append-only evidence protections. */
 function deleteCharacterEntirely(id){
- if(combatInitiativeSequence?.order?.includes(id)||data.combatRuntime?.sequence?.order?.includes(id)){alert('Postavu nelze smazat během jejího aktivního bojového střetnutí. Nejdříve boj dokončete.');return false}
- if(storageReadOnly||cloudSync&&!cloudSync.canWrite()){alert('Nejdříve připojte aktuální Cloud, aby se smazání bezpečně synchronizovalo.');return false}
- const original=structuredClone(data);
+ // GM deletes a *whole person* with their proofs; this is not a game-action
+ // that may rewrite any other participant or their health/journal receipts.
+ if(combatInitiativeSequence?.order?.includes(id)||data.combatRuntime?.sequence?.order?.includes(id)){
+  alert('Postavu nelze smazat během jejího aktivního bojového střetnutí. Nejdříve boj dokončete.');return false;
+ }
+ if(storageReadOnly||cloudSync&&!cloudSync.canWrite()){
+  alert('Nejdříve připojte aktuální Cloud, aby se smazání bezpečně synchronizovalo.');return false;
+ }
+ // A live travel draft may not lose one of its own actors, even if that
+ // actor has not yet generated a Skill receipt. An unrelated, newly created
+ // NPC, on the other hand, is safe to delete without dropping the draft.
+ const travelReferenced=JSON.stringify({plans:sharedTimeWindowPlans,queue:sharedTimeWindowQueue,
+  group:sharedTimeWindowDraft,episode:timeEpisodeDraftCampaign,
+  pending:episodePendingSkillRequest}).includes('"'+id+'"')||
+  (episodeStageBaseline&&episodeStagedRows(data).some(row=>JSON.stringify(row).includes('"'+id+'"')));
+ if(travelReferenced){
+  alert('Postava je součástí rozpracovaného Pochodu. Nejprve ji odeberte ze skupiny, nebo skupinu bezpečně obnovte; rozpracované hody nesmějí ztratit účastníka.');
+  return false;
+ }
+ const original=structuredClone(data),duringEpisode=!!episodeStageBaseline;
  try{
-  const next=removeCharacterWithEvidence(original,id);
-  assertOnlyCharacterWasDeleted(original,next,id);
+  // The visible document may contain UNCOMMITTED travel receipts. The
+  // deletion has to start from the last verified checkpoint, not from them.
+  const committedBefore=duringEpisode?normalizeLegacyCustomPrices(validate(JSON.parse(storageBaseline))):original;
+  const next=removeCharacterWithEvidence(committedBefore,id);
+  assertOnlyCharacterWasDeleted(committedBefore,next,id);
   validate(next);
   data=next;
-  if(!save({characterDeletionId:id})){data=original;render();alert('Smazání se nepodařilo uložit. Původní postava zůstala zachována.');return false}
-  // A deleted participant cannot remain in the active combat controller.
-  if(combatInitiativeSequence?.order?.includes(id)){
-   combatInitiativeSequence=null;pendingCombatActionHandoff=null;
+  // Only the exact pure deletion is allowed through the special storage
+  // verifier. No normal append-only action receipt is fabricated for it.
+  episodeIndependentMutationInFlight=duringEpisode;
+  let savedOk=false;
+  try{savedOk=save({characterDeletionId:id});}
+  finally{episodeIndependentMutationInFlight=false;}
+  if(!savedOk){data=original;render();alert('Smazání se nepodařilo uložit: '+(notice||'úložiště změnu odmítlo')+'. Původní postava zůstala zachována.');return false}
+  if(duringEpisode){
+   const committed=structuredClone(data);
+   episodeStageBaseline=committed;
+   data=rebaseEpisodeWorkingCopy(committed,original);
+   if(sharedTimeWindowDraft)sharedPrepareGroupScratch93769(sharedTimeWindowSelectedGroupId);
+   try{persistEpisodeDraftSidecar();}catch(error){notice='Postava byla smazána, ale pracovní kopii Pochodu nelze bezpečně uložit. Před obnovením stránky exportujte zálohu.';}
   }
   return true;
- }catch(error){data=original;render();alert('Postavu nelze bezpečně smazat: '+(error?.message||String(error)));return false}
+ }catch(error){
+  // If the physical deletion has ALREADY been committed, never resurrect
+  // its old in-memory record just because restoring a draft failed.
+  if(storageBaseline!==null){
+   try{const confirmed=JSON.parse(storageBaseline);
+    if(!(confirmed.characters||[]).some(c=>c.id===id)&&!(confirmed.trash||[]).some(c=>c.id===id)){
+     data=confirmed;notice='Smazání bylo potvrzeno, ale rozpracovaný Pochod potřebuje obnovit ze zálohy. '+String(error?.message||error);
+     render();return true;
+    }
+   }catch{}
+  }
+  data=original;render();alert('Postavu nelze bezpečně smazat: '+(error?.message||String(error)));return false;
+ }
 }
 function character(id){return data.characters.find(c=>c.id===id)}
 function activeCampaignCashKey(c){
@@ -5243,10 +5284,16 @@ function folioChapterParts(body,kind=''){
   if(gallery){
    const groups=[...gallery.querySelectorAll(':scope > .character-registry-group')];
    const cards=groups.length?groups.flatMap(group=>[...group.querySelectorAll(':scope > .folio-character-list > .character-card')].map(card=>({kind:group.dataset.characterKind,html:card.outerHTML}))):[...gallery.children].map(card=>({kind:'PC',html:card.outerHTML}));
-   const firstPageCount=Math.min(4,cards.length);
    const pre=nodes.filter(x=>x!==gallery).map(x=>x.outerHTML).join('');
    const groupedPage=entries=>['PC','NPC'].map(kind=>{const matches=entries.filter(c=>c.kind===kind);return matches.length?`<section class="character-registry-group" data-character-kind="${kind}"><h3 class="character-group-heading">${kind} <small>(${matches.length})</small></h3><div class="folio-character-list">${matches.map(c=>c.html).join('')}</div></section>`:'';}).join('');
-   return [pre+groupedPage(cards.slice(0,firstPageCount)),groupedPage(cards.slice(firstPageCount))];
+   // Do not split one NPC row at an arbitrary 4th CHARACTER boundary.
+   // PC records occupy the left folio; NPC records occupy the right folio.
+   // If there are only NPCs, show them together on the left. The group's
+   // CSS grid handles all rows, rather than putting the latest NPC alone
+   // in the top-right corner when there was room alongside its peers.
+   const pcs=cards.filter(c=>c.kind==='PC'),npcs=cards.filter(c=>c.kind==='NPC');
+   const left=pcs.length?pcs:npcs,right=pcs.length?npcs:[];
+   return [pre+groupedPage(left),groupedPage(right)];
   }
   return [nodes.filter(x=>!x.classList.contains('empty')).map(x=>x.outerHTML).join(''),
    nodes.filter(x=>x.classList.contains('empty')).map(x=>x.outerHTML).join('')];
@@ -22161,6 +22208,10 @@ document.addEventListener('click',event=>{
  const t=event.target.closest?.('[data-creation-back],[data-creation-leave],[data-creation-jump],[data-creation-step],[data-creation-select-attr],[data-creation-edit-voice]');if(!t)return;
  event.preventDefault();event.stopImmediatePropagation();
  if(t.hasAttribute('data-creation-leave')){
+  // Cancel discards the form and its ephemeral dirty/error marker together.
+  // Without this, the next visit falsely shows a persisted step as edited.
+  const leaving=character(selected);
+  if(leaving)clearCreationStepUI(leaving.id,creationOf(leaving).step);
   if(characterJournalReadiness(character(selected)).ready){view='sheet';notice='';}
   else{view='characters';notice='Deník postavy bude dostupný až po dokončení všech 14 kroků a závěrečné revizi.';}
   render();return
