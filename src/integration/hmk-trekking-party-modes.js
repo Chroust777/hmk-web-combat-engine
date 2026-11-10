@@ -76,19 +76,19 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
  check(!members.some(x=>x.shock==='KIA'),'Zemřelá postava není aktivním členem cestovní epizody.');
  check(!members.some(x=>x.id===guideId&&(x.shock!=='NONE'||x.comaActive||x.extendedShockActive)),
   'Průvodce ve Shock nebo Coma nemůže vykonávat Orienteering. Zvolte aktivního průvodce.');
- check(!needTransport.length||['cart','wagon'].includes(conveyance),
-  needTransport.map(x=>x.name).join(', ')+': nemůže se pohybovat vlastní silou; zvolte skutečný vůz/káru, nebo ji nezařazujte mezi cestující.');
+ check(!needTransport.length||['cart','wagon','mount'].includes(conveyance),
+  needTransport.map(x=>x.name).join(', ')+': nemůže se pohybovat vlastní silou; zvolte doložený převoz na zajištěném koni či vozidle.');
  check(transportedMemberIds.length===needTransport.length&&needTransport.every(x=>transportedMemberIds.includes(x.id)),
-  'GM musí výslovně potvrdit přepravu každého nepohyblivého pacienta ve voze/káře.');
+  'GM musí výslovně potvrdit přepravu každého pacienta, který se nemůže pohybovat vlastní silou.');
  const tooTired=members.find(x=>x.fatigue>=40);
  // Only the ORIGINAL at-departure fatigue may disqualify a watch. A post-watch
  // weather outcome can cross 40 after the party already travelled. The caller
  // may suppress this check ONLY while verifying a saved party snapshot, which
  // must then prove every subsequent fatigue increment against Weather evidence.
- check(allowCertifiedWeatherAccrual||!tooTired||['cart','wagon'].includes(conveyance),
+ check(allowCertifiedWeatherAccrual||!tooTired||['cart','wagon','mount'].includes(conveyance)&&transportedMemberIds.includes(tooTired?.id),
   tooTired?.name+': Fatigue ≥ 40 – nelze se samostatně přesouvat; vyžaduje převoz (HMK 145).');
  const immobile=members.find(x=>x.immobile);
- check(!immobile||['cart','wagon'].includes(conveyance),
+ check(!immobile||['cart','wagon','mount'].includes(conveyance)&&transportedMemberIds.includes(immobile.id),
   immobile?.name+': Grievous zranění hlavy, trupu nebo nohy vyžaduje převoz (HMK 145).');
  const unresolved=members.filter(x=>x.loadUnresolved);
  check(conveyance!=='foot'||!unresolved.length||loadedByGM===true,

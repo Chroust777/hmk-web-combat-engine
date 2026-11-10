@@ -83,8 +83,8 @@ export function planTravelEquipment93812(data,cid,v){
     `${mode==='cart'?'Kára 84d':'Vůz 220d'} chybí ve Stáji. Pokud už je v inventáři, použijte „Zařadit vlastněný vůz“. Jinak lze pořídit přímo zde.`,
     vehicleAction));
   if(current&&team.length&&!team.some(a=>a.id===current.ownerAnimalId))checks.push(bad('vehicle-team','Vozidlo není u tažného zvířete','Vyberte tažné zvíře, na němž je tento konkrétní vůz ve Stáji.'));
-  checks.push(Number(v.transportOtherLb)>0?good('weight','Hmotnost vozu vyplněna',v.transportOtherLb+' lb mimo již evidovaný náklad'):
-   bad('weight','Doplnit skutečnou hmotnost','Vyplňte „Další hmotnost ve voze“ v librách, včetně průvodce a ostatních cestujících; nesčítejte evidovaný náklad dvakrát.'));
+  checks.push(v.transportMassReady===true?good('weight','Hmotnost posádky automaticky doložena',v.transportOtherLb+' lb ostatní cestující a nezapsaný náklad; pacienti se započtou zvlášť'):
+   bad('weight','Doložit tělesnou hmotnost a inventář','Aplikace počítá hmotnost cestujících automaticky z Character Creation → Appearance a skutečného Inventáře. Chybějící údaje opravte v kartě postavy.'));
   checks.push(v.transportCoLocated?good('gm','GM potvrdil sestavu','Poloha, postroje, cestující a váhy potvrzeny.'):
    bad('gm','Potvrdit společné použití (GM)','Zaškrtněte potvrzení použití konkrétního vozidla, spřežení a skutečného nákladu.'));
  }

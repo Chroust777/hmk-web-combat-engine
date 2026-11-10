@@ -7,6 +7,7 @@ import {resolveTrekAnimalReadiness93815,assertNoActiveBestiaryTravelConflict9381
 import {stableHubProjection,stableBurden} from './hmk-stable-hub-574.js';
 import {stableHauling575} from './hmk-stable-operations-575.js';
 import {STABLE_VEHICLES_P122} from './hmk-stable-hub-574.js';
+import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
 const insist=(yes,message)=>{if(!yes)throw Error('Převoz – vozidlo: '+message);};
 const lb=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000;
 const goodId=x=>typeof x==='string'&&x.length>0&&x.length<200;
@@ -25,7 +26,7 @@ export function availableTransportVehicles93756(data,campaignId){
  }
  return rows;
 }
-/** Patient weights are actual GM-entered *body plus carried equipment*.
+/** Patient weights are automatically calculated from verified Appearance and carried inventory.
  * OtherLb covers driver, other occupants and all remaining onboard material,
  * excluding the vehicle ledger cargo and patient weights. No zero-weight guide.
  */
@@ -68,13 +69,13 @@ function vehicleReceiptInternal93757({data,campaignId,minute,conveyance,
  const vehicleState=stableHubProjection(data,campaignId,car.ownerAnimalId);
  const cargoLb=vehicleState.vehicleCargo.filter(c=>c.vehicleId===car.entryId).reduce((s,c)=>s+c.weightLb,0);
  insist(lb(cargoLb),'neplatná hmotnost nákladu ve vozidle.');
- insist(lb(otherLoadLb)&&otherLoadLb>0,'doložte kladnou hmotnost průvodce a ostatního vybavení v librách.');
+ insist(typeof otherLoadLb==='number'&&Number.isFinite(otherLoadLb)&&otherLoadLb>=0,'doložte skutečnou hmotnost dalších cestujících a nákladu v librách.');
  const keys=Object.keys(patientLoadLb);
  insist(keys.length===transportedMemberIds.length&&keys.every(id=>transportedMemberIds.includes(id))&&
-  transportedMemberIds.every(id=>lb(patientLoadLb[id])&&patientLoadLb[id]>0),
+  transportedMemberIds.every(id=>Number.isFinite(patientLoadLb[id])&&patientLoadLb[id]>0),
   'každý pacient potřebuje doloženou celkovou hmotnost těla a výstroje (lb).');
  const passengerLb=transportedMemberIds.reduce((s,id)=>s+patientLoadLb[id],0);
- const totalLb=cargoLb+otherLoadLb+passengerLb;
+ const totalLb=Math.round((cargoLb+otherLoadLb+passengerLb)*1000)/1000;
  insist(totalLb<=haul.capacityLb,'hmotnost '+totalLb+' lb překračuje doloženou nosnost '+haul.capacityLb+' lb.');
  return {format:TRANSPORT_VEHICLE_FORMAT_93756,campaignId,minute,conveyance,
   vehicleKey:car.key,ownerAnimalId:car.ownerAnimalId,vehicleId:car.entryId,
@@ -101,6 +102,7 @@ export function validateTransportVehicleHistory93756(data){
    stableAnimalIds:ep.settings?.stableAnimalIds||[],transportedMemberIds:ep.transportedMemberIds||[],
    patientLoadLb:p.patientLoadLb,otherLoadLb:p.otherLoadLb,gmCoLocated:p.gmCoLocated},false);
   insist(JSON.stringify(p)===JSON.stringify(expected),'původní vozidlo, posádka nebo hmotnost byly změněny.');
+  if(ep.transportProof?.mass)validateTransportMassEvidence93816(ep.transportProof.mass,ep.memberIds,ep.transportedMemberIds||[],p.patientLoadLb,p.otherLoadLb);
  }
  return true;
 }

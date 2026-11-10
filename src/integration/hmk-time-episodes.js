@@ -14,6 +14,7 @@ import {assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 import {trackingModifiers,trackingOutcome} from './hmk-trekking-wilderness-tasks.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js';
 import {validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
+import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
 export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -59,8 +60,8 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
  must(Array.isArray(memberIds)&&memberIds.length>0&&new Set(memberIds).size===memberIds.length,'Vyberte jedinečné účastníky');
  must(Array.isArray(transportedMemberIds)&&new Set(transportedMemberIds).size===transportedMemberIds.length&&
   transportedMemberIds.every(id=>memberIds.includes(id))&&
-  (!transportedMemberIds.length||(kind==='travel'&&['cart','wagon'].includes(conveyance))),
-  'Přepravovaní pacienti vyžadují doložený vůz/káru, jednotlivé členství a potvrzení GM.');
+  (!transportedMemberIds.length||(kind==='travel'&&['cart','wagon','mount'].includes(conveyance))),
+  'Přepravovaní pacienti vyžadují doložený skutečný transport, jednotlivé členství a potvrzení GM.');
  must(whole(mapScale,100,10000000),'Neplatné měřítko mapy');
  const slow=extraSlow+Number(wearied)+Number(injured)+Number(continuousPrecipitation)+Number(dunesSlow);
  must(whole(extraSlow,0,20)&&whole(progress,0,10)&&whole(bearing,0,20)&&whole(forcedBearing,0,1)&&
@@ -1034,11 +1035,16 @@ export function validateTimeEpisodes(journal=[]){
    // or timed-medical onset may be required for someone carried from minute 0.
    if(a.endNotRequired.reason==='transported'){
     const proof=e.transportProof,health=proof?.originalHealth?.find(x=>x.id===a.id);
-    must(e.transportedMemberIds?.includes(a.id)&&['gm-transport-confirmation-v93.755','gm-transport-confirmation-v93.756'].includes(proof?.format)&&
+    must(e.transportedMemberIds?.includes(a.id)&&['gm-transport-confirmation-v93.755','gm-transport-confirmation-v93.756','gm-transport-confirmation-v93.816'].includes(proof?.format)&&
      (proof.format!=='gm-transport-confirmation-v93.756'||
       proof.vehicle?.format==='hmk-confirmed-passenger-vehicle-93756')&&
+     (proof.format!=='gm-transport-confirmation-v93.816'||
+      proof.mount?.format==='hmk-gm-secured-mount-passenger-93816'&&
+      proof.mount.patientId===a.id&&proof.mount.riderId!==a.id&&
+      proof.mount.gmConfirmed===true&&proof.mount.totalLb>=proof.mount.patientLb&&
+      proof.mount.enc>=0&&proof.mount.moveAfterLoad>=5)&&
      proof.gmConfirmed===true&&proof.conveyance===e.conveyance&&
-     ['cart','wagon'].includes(e.conveyance)&&Array.isArray(proof.memberIds)&&
+     ['cart','wagon','mount'].includes(e.conveyance)&&Array.isArray(proof.memberIds)&&
      JSON.stringify([...proof.memberIds].sort())===JSON.stringify([...e.transportedMemberIds].sort())&&
      proof.originalHealth?.length===e.transportedMemberIds.length&&health&&
      (health.immobile===true||health.fatigue>=40||health.shock!=='NONE'||
@@ -1048,6 +1054,17 @@ export function validateTimeEpisodes(journal=[]){
      a.delta===Math.floor((a.carryIn+(a.weatherFatigueUnits||0))/240)&&
      a.carryOut===(a.carryIn+(a.weatherFatigueUnits||0))%240,
      'Přepravovaný pacient nemá správné potvrzení GM, původ zdravotního stavu nebo vynechaný END.');
+    if(proof.format==='gm-transport-confirmation-v93.816'){
+     must(proof.mount?.format==='hmk-gm-secured-mount-passenger-93816'&&
+      proof.mount.mountId&&proof.mount.riderId&&proof.mount.stableRiderProofId&&
+      proof.mount.patientLb===proof.mass?.patientLoadLb?.[a.id]&&
+      proof.mount.totalLb===Math.round((proof.mount.minimumLb+proof.mount.patientLb)*1000)/1000&&
+      Number.isSafeInteger(proof.mount.enc)&&Number.isFinite(proof.mount.moveAfterLoad)&&proof.mount.moveAfterLoad>=5&&
+      proof.mount.campaignId&&proof.mount.minute===e.startMinute&&proof.mount.gmConfirmed===true,
+      'Převoz na koni: neplatný skutečný jezdec, pacient, ENC nebo bezpečný Move.');
+     validateTransportMassEvidence93816(proof.mass,e.memberIds,e.transportedMemberIds,
+      {[a.id]:proof.mount.patientLb},proof.mass.otherLoadLb);
+    }
     continue;
    }
    const witness=e.timedMedical?.find(x=>x.actorId===a.id&&
