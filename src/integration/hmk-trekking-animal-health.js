@@ -6,6 +6,7 @@
  */
 import {combatFatigueTotals,validateCombatState} from './persistent-combat-state.js';
 import {hmkAnimalLocationSymbols} from './injury-special-hmk.js';
+import {animalHealthProjection567} from './hmk-bestiary-trauma-567.js';
 const requireFact=(v,m)=>{if(!v)throw Error(m);};
 const int=v=>Number.isSafeInteger(v)&&v>=0;
 const breeds=new Set(['bovine','camel','donkey','pony','mule','palfrey','courser','charger','destrier']);
@@ -59,4 +60,93 @@ export function assertTrekAnimalCanMove(health){
   'Zvíře '+health.actorId+': Grievous zranění hlavy, trupu či nohy – nemůže táhnout ani nést náklad (HMK 145).');
  requireFact(health.fatigue<40,
   'Zvíře '+health.actorId+': Fatigue ≥ 40 – nemůže pokračovat vlastní silou (HMK 145).');
+}
+
+/** v93.815 – Strict read-only boundary between the stable travel roster and
+ * veterinary health. Ownership/load comes exclusively from the Stable;
+ * the canonical health record contributes ONLY mobility-relevant facts.
+ * No Combat actor is enrolled in a travel group, no state is created or
+ * written here, and a partially linked profile may never hide a known wound.
+ * Existing legacy veterinary profiles retain their separately proven IDs.
+ */
+export function resolveTrekAnimalReadiness93815({stableAnimals=[],legacyAnimals=[],registeredProfiles=[],activeProfileIds=[]}={}){
+ requireFact(Array.isArray(stableAnimals)&&Array.isArray(legacyAnimals)&&
+  Array.isArray(registeredProfiles)&&Array.isArray(activeProfileIds),
+  'Pochod: neplatná evidence zvířat a jejich zdravotních profilů.');
+ const active=new Set(activeProfileIds),profiles=new Map();
+ for(const actor of registeredProfiles){
+  if(!actor?.id)continue;
+  requireFact(!profiles.has(actor.id),'Zdravotní evidence obsahuje duplicitní ID zvířete '+actor.id+'.');
+  profiles.set(actor.id,actor);
+ }
+ const ids=new Set(),snapshots=[];
+ function select(id){
+  requireFact(typeof id==='string'&&id.length>0&&!ids.has(id),
+   'Pochod: stejné zvíře je vybráno dvakrát. Zvolte jedno ID ve Stáji.');
+  ids.add(id);
+ }
+ for(const stable of stableAnimals){
+  select(stable?.id);
+  const actor=profiles.get(stable.id);
+  if(!actor)continue; // A verified Stable purchase does not invent a healthy Combat State.
+  requireFact(actor.hmk?.verifiedMountedBreed===stable.breed,
+   'Stáj · '+(stable.name||stable.id)+': zdravotní profil stejného ID má jiné nebo nedoložené plemeno. Opravte propojení identity, nikoliv výsledek Pochodu.');
+  requireFact(active.has(stable.id)&&actor.hmk?.healthState,
+   'Stáj · '+(stable.name||stable.id)+': existující zdravotní profil není aktivní a úplný v tomto kalendáři. Před cestou jej pravidlově sjednoťte; nesmí se ignorovat skutečné zranění.');
+  const snapshot=trekRegisteredAnimalHealth(actor);
+  assertTrekAnimalCanMove(snapshot);
+  snapshots.push(snapshot);
+ }
+ for(const actor of legacyAnimals){
+  select(actor?.id);
+  requireFact(profiles.has(actor.id)&&active.has(actor.id)&&actor.hmk?.healthState,
+   'Historický zdravotní profil zvířete musí být aktivní a ověřený v kampani.');
+  const snapshot=trekRegisteredAnimalHealth(actor);
+  assertTrekAnimalCanMove(snapshot);
+  snapshots.push(snapshot);
+ }
+ return snapshots;
+}
+
+/** Bestiary encounters have a SECOND historical trauma projection. Never
+ * silently present a healthy Stable/Combat snapshot when an active wound or
+ * Shock for that SAME physically owned animal survives in that older stream.
+ * This conservative boundary is read-only: it does not infer a conversion of
+ * Bestiary IL into a new Combat wound or erase original injury history.
+ * Once every Bestiary medical consequence is resolved, travel may proceed.
+ */
+export function assertNoActiveBestiaryTravelConflict93815({journal=[],campaignId,animalIds=[]}={}){
+ requireFact(Array.isArray(journal)&&Array.isArray(animalIds)&&typeof campaignId==='string',
+  'Pochod: chybí zdravotní návaznost na Bestiář.');
+ for(const animalId of new Set(animalIds)){
+  const visits=journal.filter(j=>j.bestiaryEncounter?.action==='create'&&
+   j.bestiaryEncounter?.campaignId===campaignId&&j.bestiaryEncounter?.ownerAnimalId===animalId);
+  if(!visits.length)continue;
+  const encounters=new Set(visits.map(j=>j.bestiaryEncounter.id));
+  const medical=journal.filter(j=>j.bestiaryTrauma?.campaignId===campaignId&&
+   encounters.has(j.bestiaryTrauma.targetId));
+  if(!medical.length)continue;
+  // Unknown historic formats cannot be projected as healthy.  The old
+  // encounter projection groups wounds by both animal ID and its owner ID;
+  // ownership transfers must not hide previous unresolved medical facts.
+  requireFact(medical.every(j=>j.bestiaryTrauma?.format==='hmk-bestiary-trauma-567-v1'),
+   'Stáj · '+animalId+': Bestiář obsahuje starší neověřený zdravotní formát. Před Pochodem musí GM sjednotit historii.');
+  const ownershipGroups=new Map();
+  for(const visit of visits){
+   const owner=visit.bestiaryEncounter.ownerId??'';
+   if(!ownershipGroups.has(owner))ownershipGroups.set(owner,[]);
+   ownershipGroups.get(owner).push(visit.bestiaryEncounter.id);
+  }
+  // Do not mutate either Bestiary or Combat history to make a trip pass.
+  for(const ids of ownershipGroups.values()){
+   let projected;
+   try{projected=animalHealthProjection567(journal,campaignId,ids.at(-1));}
+   catch(err){throw Error('Stáj · '+animalId+': zdravotní historie Bestiáře není jednoznačná: '+err.message);}
+   const active=projected.shock!=='none'||projected.wounds.some(w=>!w.healed||w.permanentImpairment>0)||
+    !!projected.extendedShock?.active||!!projected.coma?.active||projected.bloodLoss?.bp>0||
+    !!projected.permanentLosses?.length||projected.comaWeariness>0;
+   if(active)throw Error('Stáj · '+animalId+': Bestiář eviduje aktivní zdravotní následek téhož zvířete mimo jeho základní zdravotní profil. Pochod nesmí předpokládat zdravé zvíře ani přepisovat Combat State. Otevřete zdravotní historii zvířete v Bestiáři a dokončete skutečné léčení a následné testy; neuzavřené či trvalé následky vyžadují sjednocení GM.');
+  }
+ }
+ return true;
 }

@@ -3,7 +3,7 @@
  * health state. HMK 1.2 p.122 & 145; locations and undocumented masses require GM.
  */
 import {verifiedLivestock} from './hmk-livestock-562.js';
-import {trekRegisteredAnimalHealth,assertTrekAnimalCanMove} from './hmk-trekking-animal-health.js';
+import {resolveTrekAnimalReadiness93815,assertNoActiveBestiaryTravelConflict93815} from './hmk-trekking-animal-health.js';
 import {stableHubProjection,stableBurden} from './hmk-stable-hub-574.js';
 import {stableHauling575} from './hmk-stable-operations-575.js';
 import {STABLE_VEHICLES_P122} from './hmk-stable-hub-574.js';
@@ -51,11 +51,13 @@ function vehicleReceiptInternal93757({data,campaignId,minute,conveyance,
   // for travel and hauling. A separate live Health State is no longer a hard
   // prerequisite; if one already exists, it must still match the same breed
   // and allow movement.
-  const live=(data.characters||[]).find(c=>c.id===animal.id);
-  if(checkLiveHealth&&live&&live.hmk?.verifiedMountedBreed&&live.hmk?.healthState){
-   insist(live.hmk.verifiedMountedBreed===animal.spec.breed,
-    animal.name+': plemeno živého zvířecího profilu nesouhlasí se Stájí.');
-   assertTrekAnimalCanMove(trekRegisteredAnimalHealth(live));
+  if(checkLiveHealth){
+   // Identical guard to the Pochod: a partly registered or wrong-breed
+   // health actor must NOT silently disappear from the wagon preflight.
+   // A Stable animal without any health profile remains unmodified.
+   assertNoActiveBestiaryTravelConflict93815({journal:data.journal||[],campaignId,animalIds:[animal.id]});
+   resolveTrekAnimalReadiness93815({stableAnimals:[{id:animal.id,name:animal.name,breed:animal.spec.breed}],
+    registeredProfiles:data.characters||[],activeProfileIds:data.campaignClock?.characterIds||[]});
   }
   const gear=stableHubProjection(data,campaignId,animal.id);
   const harness=animal.spec.breed==='bovine'?'hmk-p122-tack-06':'hmk-p122-tack-05';
