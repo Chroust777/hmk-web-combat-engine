@@ -271,13 +271,28 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    // Before either exists the original CF still blocks unrelated time jumps.
    const episodeOrienteeringCF=x.skill==='Survival'&&x.result.level==='CF'&&
     e.calendarEpisodeSkillLink?.field==='orientationProofId';
+   // The confirmed Trekking episode is evidence that its Survival Hazard
+   // was handled. An Accident is different: its Agility/Injury sequence is
+   // deferred to the actual Skill Tests ledger. Clear this SAME CF only
+   // when its linked physical-consequence receipt exists; never clear on
+   // a coincidental injury, a GM click or a different character's test.
+   const accidentMedicalResolved=journal.some(done=>
+    done.calendarCampaignId===e.calendarCampaignId&&
+    done.skillTestProof?.type==='skill-physical-consequence'&&
+    (done.skillTestProof.sourceId===e.id||journal.some(link=>
+     link.id===done.skillTestProof.sourceId&&
+     link.calendarCampaignId===e.calendarCampaignId&&
+     link.skillTestProof?.type==='critical-followup'&&
+     link.skillTestProof.originId===e.id)));
    const episodeAlreadyHandled=episodeOrienteeringCF&&journal.some(z=>
     (z.calendarScopedCriticalResolution?.originId===e.id&&
      z.calendarScopedCriticalResolution.campaignId===e.calendarCampaignId)||
     (z.calendarCampaignId===e.calendarCampaignId&&
      z.calendarTimeEpisode?.orientation?.skillId===e.id&&
      !!z.calendarTimeEpisode.survivalHazard&&
-     (z.calendarTimeEpisode.hazardDetails||[]).every(h=>!h.requiresGMCompletion&&!h.externalMedicalPending)));
+     (z.calendarTimeEpisode.hazardDetails||[]).every(h=>
+      !h.requiresGMCompletion&&(!h.externalMedicalPending||
+       (h.hazard==='accident'&&accidentMedicalResolved)))));
    if(episodeAlreadyHandled)continue;
    if(journal.some(z=>z.skillTestProof?.type==='critical-followup'&&z.skillTestProof.originId===e.id&&z.skillTestProof.side===x.side))continue;
    const c=characters.find(c=>c.id===x.id);
