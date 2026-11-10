@@ -1,3 +1,4 @@
+import {verifyPassiveWeatherResistance} from './hmk-weather-passive-93820.js';
 import {validateSharedTimeWindowJournal93767,assertSharedEpisodeOverlaps93768} from './hmk-shared-time-window-93767.js';
 /** HMK Keeper's Ledger – GM-timed episodes.
  * Explicit house-rule mode: time is divided into freely chosen episodes,
@@ -847,7 +848,12 @@ export function validateTimeEpisodes(journal=[]){
     const expected=episodeWeatherExposure({kind:w.kind,areaAV:w.areaAV,roll:w.roll,
      protection:w.protection,fireStrength:w.fireStrength,continuousSleet:w.continuousSleet,
      resting:w.resting,shade:w.shade,tropicalNative:w.tropicalNative,endLevel:w.endLevel});
-    if(w.proofId!==undefined&&w.exposed){
+    if(w.passiveResistance!==undefined){
+     must(w.exposed===true&&w.proofId===null&&verifyPassiveWeatherResistance(w.passiveResistance)&&
+      w.endLevel===w.passiveResistance.level,
+      'Weather Hazard nemá platný pasivní zdravotní Endurance (Survival) hod.');
+    }
+    if(w.proofId!==undefined&&w.exposed&&!w.passiveResistance){
      const linked=journal.find(x=>x.id===w.proofId);
      must(!!linked&&(episodeSkillProof(linked,'Endurance',w.id,j.calendarCampaignId,e.startMinute)||
       episodeSkillProof(linked,'Survival',w.id,j.calendarCampaignId,e.startMinute))?.level===w.endLevel,
@@ -892,6 +898,7 @@ export function validateTimeEpisodes(journal=[]){
     }
     const newProof=w.proofId!==undefined;
     must(JSON.stringify(w)===JSON.stringify(newProof?{id:w.id,...expected,proofId:w.exposed?w.proofId:null,
+     ...(w.passiveResistance?{passiveResistance:w.passiveResistance}:{}),
      ...protectionEvidence,coldCondition:w.kind==='cold'?w.coldCondition||'dry':null}:{id:w.id,...expected,...protectionEvidence})&&
      !['pending','pending-endurance'].includes(w.effect),'Pozměněný nebo neúplný Weather Hazard.');
    }
@@ -901,8 +908,8 @@ export function validateTimeEpisodes(journal=[]){
     Array.isArray(e.weatherExposure),
     'Nový Weather Hazard musí být vyhodnocen výhradně mimo Cestování.');
    for(const w of e.weatherExposure.filter(w=>w.exposed)){
-    must(typeof w.proofId==='string'&&!!w.proofId,
-     'Předání Weather Onset vyžaduje původní ID Endurance/Survival.');
+    must((typeof w.proofId==='string'&&!!w.proofId)||verifyPassiveWeatherResistance(w.passiveResistance),
+     'Předání Weather Onset vyžaduje původní Endurance/Survival nebo skutečný pasivní zdravotní hod.');
    }
   }
   if(e.weatherSkinDetails!==undefined){

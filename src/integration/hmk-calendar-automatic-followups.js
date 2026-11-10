@@ -40,7 +40,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    if(!person||person.hmk?.healthState?.shock==='KIA')continue;
    const original=journal.find(j=>j.id===w.proofId&&j.characterId===w.id&&
     j.calendarCampaignId===receipt.calendarCampaignId);
-   if(!original){unknown.push({characterId:w.id,name:person.name,kind:'weather-onset',
+   if(!original&&!w.passiveResistance){unknown.push({characterId:w.id,name:person.name,kind:'weather-onset',
     sourceId:receipt.id,reason:'Chybí původní Endurance/Survival Skill Test.'});continue;}
    const sourceId=episodeWeatherAftercareId(receipt.id,w.id,w.kind);
    if(journal.some(j=>j.characterId===w.id&&j.skillTestProof?.type==='skill-weather-onset'&&
@@ -48,7 +48,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
      (j.skillTestProof.sourceId===w.proofId&&j.skillTestProof.report?.kind===w.kind))))continue;
    push(person,'weather-onset',sourceId,
     `${w.kind==='cold'?'Cold':'Heat'} Hazard – potvrdit zdravotní následek z původního Skill Testu (HMK 149,185)`,
-    episode.endMinute,'skills',{episodeId:receipt.id,originalSkillProofId:w.proofId});
+    episode.endMinute,'skills',{episodeId:receipt.id,originalSkillProofId:w.proofId,passiveResistance:!!w.passiveResistance});
   }
  }
  for(const c of characters){
