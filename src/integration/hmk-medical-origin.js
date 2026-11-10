@@ -4,7 +4,7 @@
  * HMK v1.2 pp. 167–170, 177–182, 185.
  */
 export const MEDICAL_ORIGIN=Object.freeze({WEATHER:'travel-weather',TRAVEL:'travel-accident',COMBAT:'combat',GM:'gm-confirmed'});
-export const isNoncombatMedicalOrigin=origin=>origin===MEDICAL_ORIGIN.WEATHER||origin===MEDICAL_ORIGIN.TRAVEL||origin===MEDICAL_ORIGIN.GM;
+export const isNoncombatMedicalOrigin=origin=>origin===MEDICAL_ORIGIN.WEATHER||origin===MEDICAL_ORIGIN.TRAVEL||origin===MEDICAL_ORIGIN.GM||origin==='gm-health';
 export function medicalOriginOfWound(wound,events=[]){
  if(!wound||typeof wound.id!=='string')return null;
  const original=Array.isArray(events)?events.find(e=>e.id===wound.originEventId):null;

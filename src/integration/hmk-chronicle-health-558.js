@@ -101,9 +101,17 @@ export function projectChronicleHealth_558({actorId,state,now=null,campaignId=nu
    'samostatná denní kontrola',dueDescriptor(agenda,'grim',actorId,gmTime,displayMinute,null,w.id),
    'Současná infekce neruší povinnost denního Grim Shock.',false));
  }
- if(s.shockFollowup)rows.push(item('shock-followup','Shock Reroll','Povinný',
-  'čeká na skutečný Shock test',dueDescriptor(agenda,s.shockFollowup.domain==='travel-weather'?'weather-shock':'shock-followup',actorId,gmTime,displayMinute),
-  s.shockFollowup.domain==='travel-weather'?'Weather Shock: skutečná minuta je doložena Kalendářem; bez bojové časové osy.':'Termín může záviset na bojovém kole; nepřevádět automaticky na minuty kampaně.',false));
+ if(s.shockFollowup){
+  const q=s.shockFollowup;
+  const manual=q.domain==='gm-health';
+  const manualDue=manual&&integer(q.originMinute)?nextTime(q.originMinute+(q.kind==='UNC'?10:0),gmTime,displayMinute):
+    'Původní herní minuta není doložena; nejdříve potvrdit v Kalendáři';
+  rows.push(item('shock-followup','Shock Reroll','Povinný',
+   'čeká na skutečný Shock test',manual?manualDue:dueDescriptor(agenda,q.domain==='travel-weather'?'weather-shock':'shock-followup',actorId,gmTime,displayMinute),
+   manual?'GM doložený Shock bez anatomické rány; u STN/INC je navíc nutná skutečně dokončená následující akce.':
+    q.domain==='travel-weather'?'Weather Shock: původní minuta je doložena Kalendářem; bez bojové časové osy.':
+    'Termín může záviset na bojovém kole; nepřevádět automaticky na minuty kampaně.',false));
+ }
  if(s.bloodShockPending)rows.push(item('blood-shock-pending','Blood Shock','Povinný',
   'vyřešit v Combat',dueDescriptor(agenda,'blood-shock',actorId,gmTime,displayMinute),
   'Povinný Shock následek Blood Loss se nesmí pominout.',false));

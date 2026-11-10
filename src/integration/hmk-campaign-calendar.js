@@ -178,12 +178,12 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  characters=Array.isArray(clock.characterIds)?characters.filter(c=>clock.characterIds.includes(c.id)):characters;
  journal=projectedCalendarJournal(clock,journal);
  const all=[],unknown=[],suspended=[];
- const add=(c,kind,description,daysOrHours,woundId=null,unit='days')=>{
+ const add=(c,kind,description,daysOrHours,woundId=null,unit='days',extra={})=>{
   const anchor=getCampaignAnchor(clock,kind==='healing'||kind==='infection'||kind==='grim'?'wound':kind,c.id,woundId);
   if(!anchor){unknown.push({characterId:c.id,name:c.name,kind,woundId,description,reason:'Chybí potvrzený okamžik začátku'});return;}
   const minute=anchor.minute+daysOrHours*(unit==='hours'?60:DAY_MINUTES);
   all.push({id:KEY(kind,c.id,woundId),characterId:c.id,name:c.name,kind,woundId,
-   description,minute,anchorMinute:anchor.minute,status:minute<=clock.minute?'due':'future'});
+   description,minute,anchorMinute:anchor.minute,status:minute<=clock.minute?'due':'future',...extra});
  };
  for(const c of characters){
   const s=c?.hmk?.healthState;if(!s||s.shock==='KIA')continue;
@@ -192,17 +192,27 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
     description:'Bojový Bleeder – Blood Loss / Stoppage vyžaduje ověřenou bojovou osu',
     reason:'Combat má svou původní časovou osu; 60 kol se nesmí odhadnout z Kalendáře'});
   if(isNoncombatMedicalOrigin(s.shockFollowup?.domain)){
-   const q=s.shockFollowup,dueMinute=q.phase==='after-all-bleeding-stopped'?q.originMinute:q.kind==='UNC'?q.originMinute+10:q.originMinute;
-   // UNC: ten *actual* minutes from the original Shock; STN/INC: GM
-   // certifies the next real action, never a synthetic Combat round.
-   all.push({id:KEY('weather-shock',c.id,q.sourceId),characterId:c.id,name:c.name,
-    kind:'weather-shock',sourceId:q.sourceId,
-    description:q.phase==='after-all-bleeding-stopped'?'Blood Loss Shock Reroll – ihned po zastavení všech Bleederů':q.kind==='UNC'?'Cestovní Shock Reroll – po 10 minutách':'Cestovní Shock Reroll – GM potvrdí další skutečnou akci',
-    minute:dueMinute,anchorMinute:q.originMinute,status:dueMinute<=clock.minute?'due':'future'});
+   const q=s.shockFollowup;
+   // A GM may establish an unconscious NPC without an active campaign clock.
+   // NEVER coerce the undetermined source minute (null) to minute 0/10.
+   if(q.domain==='gm-health'&&!(Number.isSafeInteger(q.originMinute)&&q.originMinute>=0)){
+    unknown.push({characterId:c.id,name:c.name,kind:'weather-shock',sourceId:q.sourceId,
+     description:'GM Shock Reroll – nelze určit čas bez potvrzeného počátku',
+     reason:'GM musí doložit počáteční minutu v Kalendáři; dosud neproběhlo žádných odhadovaných 10 minut'});
+   }else{
+    const dueMinute=q.phase==='after-all-bleeding-stopped'?q.originMinute:q.kind==='UNC'?q.originMinute+10:q.originMinute;
+    // UNC: ten *actual* minutes from the original Shock; STN/INC: GM
+    // certifies the next real action, never a synthetic Combat round.
+    all.push({id:KEY('weather-shock',c.id,q.sourceId),characterId:c.id,name:c.name,
+     kind:'weather-shock',sourceId:q.sourceId,
+     description:q.phase==='after-all-bleeding-stopped'?'Blood Loss Shock Reroll – ihned po zastavení všech Bleederů':q.domain==='gm-health'?(q.kind==='UNC'?'GM Shock Reroll – po 10 skutečných minutách':'GM Shock Reroll – po následující skutečné akci'):
+      q.kind==='UNC'?'Cestovní Shock Reroll – po 10 minutách':'Cestovní Shock Reroll – GM potvrdí další skutečnou akci',
+     minute:dueMinute,anchorMinute:q.originMinute,status:dueMinute<=clock.minute?'due':'future'});
+   }
   }else if(s.shockFollowup)unknown.push({characterId:c.id,name:c.name,kind:'shock-followup',
    description:'Povinný Shock Reroll v bojové časové ose',reason:'Před posunem času dokončete Shock Follow-up'});
-  if(s.extendedShock){add(c,'extended-shock','Extended Shock Course (4 h)',s.extendedShock.elapsedHours+4,null,'hours');}
-  if(s.coma?.active&&s.coma.nextCourseDays!=null){add(c,'coma','Coma Course (d10 dní)',s.coma.elapsedDays+s.coma.nextCourseDays);}
+  if(s.extendedShock){add(c,'extended-shock','Extended Shock Course (4 h)',s.extendedShock.elapsedHours+4,null,'hours',isNoncombatMedicalOrigin(s.extendedShock.domain)?{route:'hazards',originDomain:s.extendedShock.domain}:{});}
+  if(s.coma?.active&&s.coma.nextCourseDays!=null){add(c,'coma','Coma Course (d10 dní)',s.coma.elapsedDays+s.coma.nextCourseDays,null,'days',isNoncombatMedicalOrigin(s.coma.domain)?{route:'hazards',originDomain:s.coma.domain}:{});}
   // Each independent immersion retains its own witnessed due time. Neither
   // the primary Extended Shock nor another patient's Calendar is replaced.
   for(const p of s.parallelColdShocks??[]){
