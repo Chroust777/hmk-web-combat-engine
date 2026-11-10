@@ -75,6 +75,7 @@ import {isHandheldItem,requiresTwoHands,gripOf,supportsSelectableTwoHandGrip,set
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
 import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
 import {creationWizardHTML,characterCalculationHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js';
+import {isStableAnimalProfile93813,registryCharacters93813,registryCounts93813} from './src/integration/hmk-character-registry-separation-93813.js';
 import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './src/integration/hmk-creation-psyche.js';
 import {fieldRuleNote} from './src/integration/hmk-creation-rule-help.js';
 import {auditArmourLibraryConsistency} from './src/integration/armour-library-consistency.js';
@@ -341,7 +342,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.812';
+const APP_VERSION='93.813';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1063,14 +1064,15 @@ function main(){
  if(view==='encounter')body=encounterView();
  const scene=activeVisualScene();
  const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['gmhistory','▤','GM · Historie činností'],['backup','☁','Cloud a zálohy'],['trash','♧','Archiv']];
- const characterButtons=data.characters.map(c=>{const ready=characterJournalReadiness(c).ready;return `<button type="button" class="castle-character ${c.id===selected?'active':''} ${ready?'':'castle-character--draft'}" ${ready?'data-open':'data-resume-creation'}="${esc(c.id)}" title="${ready?'Otevřít deník':'Pokračovat v pravidlové tvorbě'}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`;}).join('');
+ const registryPeople=registryCharacters93813(data.characters);
+ const characterButtons=registryPeople.map(c=>{const ready=characterJournalReadiness(c).ready;return `<button type="button" class="castle-character ${c.id===selected?'active':''} ${ready?'':'castle-character--draft'}" ${ready?'data-open':'data-resume-creation'}="${esc(c.id)}" title="${ready?'Otevřít deník':'Pokračovat v pravidlové tvorbě'}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`;}).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
   <div class="castle-campaign-card"><strong>HârnMaster World of Kèthîra</strong></div>
   <div class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></div>
   <div class="nav-section-label">HLAVNÍ MENU</div>
   ${navLinks.map(([id,icon,label])=>`<button type="button" class="castle-nav-link ${view===id?'active':''}" data-nav="${id}"><span class="castle-nav-icon" aria-hidden="true">${icon}</span><span class="castle-nav-label">${esc(label)}</span><span class="castle-nav-spacer" aria-hidden="true"></span></button>`).join('')}
-  <div class="nav-section-label castle-character-section">POSTAVY <span>${data.characters.length}</span></div>
+  <div class="nav-section-label castle-character-section">POSTAVY <span>${registryPeople.length}</span></div>
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character"><span class="castle-create-symbol" aria-hidden="true">✣</span><span class="castle-create-label">Vytvořit postavu</span><span class="castle-create-plus" aria-hidden="true">＋</span></button>
   <div class="castle-sidebar-footer"><button type="button" data-nav="backup" class="hmk-cloud-sidebar" data-cloud-sidebar title="Stav synchronizace">${esc(cloudStatusLabel())}</button><br>⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
@@ -2603,6 +2605,7 @@ function episodePendingEncounter(clock){
   r.calendarEpisodeInterruptionResolution?.episodeId===j.id))||null;
 }
 function timeEpisodePageHTML(clock,participants){
+ participants=registryCharacters93813(participants);
  const areas=timeEpisodeWeatherOptions(clock),first=participants[0];
  const latestEpisodeRow=episodeRecentRows(clock).at(-1);
  const latest=latestEpisodeRow?.calendarTimeEpisode;
@@ -2936,9 +2939,11 @@ function campaignCalendarView(){
  const clocks=allCampaignClocks(data);
  if(calendarLanding&&clocks.length){
   const cards=clocks.map(c=>{const memberIds=c.characterIds??data.characters.map(a=>a.id);
-   const members=memberIds.map(id=>data.characters.find(a=>a.id===id)?.name||'Postava mimo registr').join(', ');
+   const humanIds=memberIds.filter(id=>!isStableAnimalProfile93813(character(id)));
+   const animalIds=memberIds.filter(id=>isStableAnimalProfile93813(character(id)));
+   const members=humanIds.map(id=>character(id)?.name||'Postava mimo registr').join(', ');
    const active=campaignKey(c)===campaignKey(data.campaignClock);
-   return `<article class="hc-campaign-card"><h3>${esc(c.label||'Nepojmenovaná kampaň')}${active?' · aktivní':''}</h3><p>${esc(displayCampaignMinute(c.minute))} · ${czCount(memberIds.length,'postava','postavy','postav')}</p><p class="hc-campaign-people">${esc(members||'Zatím bez účastníků')}</p><button type="button" data-calendar-open="${esc(campaignKey(c))}">Otevřít kalendář ↗</button></article>`;
+   return `<article class="hc-campaign-card"><h3>${esc(c.label||'Nepojmenovaná kampaň')}${active?' · aktivní':''}</h3><p>${esc(displayCampaignMinute(c.minute))} · ${czCount(humanIds.length,'postava','postavy','postav')}${animalIds.length?' · '+czCount(animalIds.length,'zvíře','zvířata','zvířat'):''}</p><p class="hc-campaign-people">${esc(members||'Zatím bez postav')}${animalIds.length?' · '+esc(animalIds.map(id=>character(id)?.name||id).join(', '))+' (Stáj)':''}</p><button type="button" data-calendar-open="${esc(campaignKey(c))}">Otevřít kalendář ↗</button></article>`;
   }).join('');
   return journalChapterShell('Svět · Kalendáře kampaní','Vyberte časovou osu konkrétní kampaně.',
    `<section class="hc-calendar hc-campaign-chooser"><h2>Kalendáře kampaní</h2><p>Každá kampaň má vlastní potvrzenou časovou osu, události a účastníky. Stejná postava může hrát ve více kalendářích: při prvním přidání vznikne samostatná větev jejího aktuálního zdravotního stavu, aktivních účinků a inventáře. Změny těchto stavů v jedné kampani se nepropíší zpětně do druhé. Časové záznamy se nepřevádějí odhadem.</p><div class="hc-campaign-grid">${cards}</div><button type="button" class="hc-small" data-calendar-new="yes">+ Založit další kalendář</button></section>`, 'journal-book--calendar');
@@ -2946,7 +2951,7 @@ function campaignCalendarView(){
  const clock=data.campaignClock;
  if(!clock||calendarCreating){
   const free=availableCampaignCharacters(data),occupied=new Set();
-  const candidate=data.characters.map(c=>`<label class="hc-character"><input type="checkbox" name="characterId" value="${esc(c.id)}" ${occupied.has(c.id)?'disabled':'checked'}><span>${esc(c.name)} (${esc(c.kind||'PC')}) ${occupied.has(c.id)?'· v jiné kampani':''}</span></label>`).join('');
+  const candidate=registryCharacters93813(data.characters).map(c=>`<label class="hc-character"><input type="checkbox" name="characterId" value="${esc(c.id)}" ${occupied.has(c.id)?'disabled':'checked'}><span>${esc(c.name)} (${esc(c.kind||'PC')}) ${occupied.has(c.id)?'· v jiné kampani':''}</span></label>`).join('');
   const history=(data.calendarEvidenceArchives??[]);
   return journalChapterShell('Svět · Kalendář kampaně','Doložený čas kampaně a výběr účastníků.',`<h2>${calendarCreating?'Nový kalendář kampaně':'První kalendář kampaně'}</h2><button type="button" class="hc-small" data-calendar-back="yes">‹ Výběr kalendářů</button><section class="panel hc-calendar hc-setup"><p>HMK str. 11, 22 a 178–182. Časová evidence zranění postav se zachovává i po odstranění předchozího kalendáře. Dny bojových kol se nikdy automaticky nepřevádějí na minuty.</p>
   <form id="campaign-start-form"><div class="hc-start-grid">
@@ -3440,7 +3445,9 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const included=new Set(participants.map(c=>c.id));
  const usedElsewhere=new Set();
  const memberRow=(c,checked)=>`<label class="hc-character"><input type="checkbox" name="characterId" value="${esc(c.id)}" ${checked?'checked':''}><span>${esc(c.name)}</span></label>`;
- const membersHTML=`<section class="hc-calendar hc-campaign-settings"><button type="button" class="hc-small" data-calendar-back="yes">‹ Všechny kalendáře</button><h3>Postavy kampaně · ${czCount(participants.length,'zahrnutá postava','zahrnuté postavy','zahrnutých postav')}</h3><p class="hc-hint">Stejnou postavu lze přidat do více kampaní. Při odškrtnutí a uložení potvrdí GM vyřazení; aktivní zdravotní následky a povinnosti se ukončí, s výjimkou smrti (KIA). Staré potvrzené doklady zůstávají v historii. Nepřítomnost v jedné epizodě není vyřazením z kalendáře.</p><form id="campaign-members-form"><fieldset><legend>Zahrnuté postavy</legend><div class="hc-characters">${data.characters.filter(c=>included.has(c.id)).map(c=>memberRow(c,true)).join('')||'<p>Bez účastníků</p>'}</div></fieldset><fieldset><legend>Nezahrnuté postavy · kliknutím přidat</legend><div class="hc-characters">${data.characters.filter(c=>!included.has(c.id)).map(c=>memberRow(c,false)).join('')||'<p>Všechny postavy již patří do kampaně.</p>'}</div></fieldset><button type="submit">Uložit účastníky kampaně</button></form><details><summary>Odstranění tohoto kalendáře</summary><p>Smazáním odstraníte jen tento kalendář a jeho GM události. Neaktivní kalendáře ani postavy se nemažou. Časové důkazy se zachovají.</p><button type="button" class="danger" data-calendar-delete="yes">Zálohovat a smazat tento kalendář</button></details></section>`;
+ const campaignHumanProfiles=registryCharacters93813(data.characters);
+ const campaignAnimalProfiles=data.characters.filter(isStableAnimalProfile93813);
+ const membersHTML=`<section class="hc-calendar hc-campaign-settings"><button type="button" class="hc-small" data-calendar-back="yes">‹ Všechny kalendáře</button><h3>Postavy kampaně · ${czCount(participants.filter(c=>!isStableAnimalProfile93813(c)).length,'zahrnutá postava','zahrnuté postavy','zahrnutých postav')}</h3><p class="hc-hint">Stejnou postavu lze přidat do více kampaní. Při odškrtnutí a uložení potvrdí GM vyřazení; aktivní zdravotní následky a povinnosti se ukončí, s výjimkou smrti (KIA). Staré potvrzené doklady zůstávají v historii. Nepřítomnost v jedné epizodě není vyřazením z kalendáře.</p><form id="campaign-members-form"><fieldset><legend>Zahrnuté postavy</legend><div class="hc-characters">${campaignHumanProfiles.filter(c=>included.has(c.id)).map(c=>memberRow(c,true)).join('')||'<p>Bez účastníků</p>'}</div></fieldset><fieldset><legend>Nezahrnuté postavy · kliknutím přidat</legend><div class="hc-characters">${campaignHumanProfiles.filter(c=>!included.has(c.id)).map(c=>memberRow(c,false)).join('')||'<p>Všechny postavy již patří do kampaně.</p>'}</div></fieldset>${campaignAnimalProfiles.length?`<fieldset><legend>Zvířata / historické zdravotní profily (nejsou NPC postavy)</legend><p class="hc-hint">Starší zdravotní profily zvířat zde zůstávají kvůli původním zdravotním a časovým dokladům; jejich vlastnictví a výstroj spravuje Stáj.</p><div class="hc-characters">${campaignAnimalProfiles.map(c=>memberRow(c,included.has(c.id))).join('')}</div></fieldset>`:''}<button type="submit">Uložit účastníky kampaně</button></form><details><summary>Odstranění tohoto kalendáře</summary><p>Smazáním odstraníte jen tento kalendář a jeho GM události. Neaktivní kalendáře ani postavy se nemažou. Časové důkazy se zachovají.</p><button type="button" class="danger" data-calendar-delete="yes">Zálohovat a smazat tento kalendář</button></details></section>`;
  const legacyOriginPanel=!clock.trOrigin?`<details class="hc-advanced"><summary>Starší kalendář bez skutečného TR data – jednorázové přiřazení</summary><section class="panel"><form id="campaign-tr-origin-form" class="hc-inline"><label>Rok TR<input name="year" type="number" min="1" max="9999" value="720" required></label><label>Měsíc<select name="month">${TR_MONTHS.map((m,i)=>`<option value="${i+1}">${esc(m)}</option>`).join('')}</select></label><label>Den<input name="day" type="number" min="1" max="30" value="1" required></label><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje datum</label><button type="submit">Přiřadit skutečné TR datum</button></form></section></details>`:'';
  const calendarTabs=`<nav class="journal-book-subnav hc-calendar-tabs" aria-label="Sekce kalendáře">${CALENDAR_SECTIONS.map(([id,label])=>`<button type="button" data-calendar-section="${id}" class="${activeCalendarSection===id?'':'secondary'}" aria-current="${activeCalendarSection===id?'page':'false'}">${esc(label)}</button>`).join('')}</nav>`;
  const fallUnknown=agenda.unknown.filter(x=>x.kind==='skill-fall'&&x.sourceId);
@@ -3539,6 +3546,14 @@ let creationAttributeChoice=null;
 const CREATION_LAST_ID='hmk-ledger-last-creation-character-v1';
 function openCharacterJournal(id){
  const c=character(id);if(!c)return false;
+ if(isStableAnimalProfile93813(c)){
+  const owner=character(c.hmk?.livestockOwnerId);
+  if(owner&&!isStableAnimalProfile93813(owner)){
+   stableOwnerFocusedId=c.id;selected=owner.id;activeSheetSection='stable';
+   view='sheet';overlay=null;sheetEditingId=null;render();return true;
+  }
+  selected=null;libraryTab='stable';view='library';overlay=null;render();return true;
+ }
  selected=id;overlay=null;sheetEditingId=null;
  const gate=characterJournalReadiness(c);
  if(gate.ready){activeSheetSection='overview';view='sheet';render();return true;}
@@ -3546,9 +3561,10 @@ function openCharacterJournal(id){
  notice=gate.reason+' Deník se odemkne po potvrzení všech 14 kroků a úspěšné revizi.';
  render();return false;
 }
-function creationDrafts(){return data.characters.filter(c=>c.hmk?.creation&&!['complete','auto-generated'].includes(c.hmk.creation.status))}
+function creationDrafts(){return registryCharacters93813(data.characters).filter(c=>c.hmk?.creation&&!['complete','auto-generated'].includes(c.hmk.creation.status))}
 function resumeCreation(id){
  const c=character(id);if(!c)return false;
+ if(isStableAnimalProfile93813(c))return openCharacterJournal(id);
  if(combatActorLocked93725(id))return false;
  selected=id;view='creation';overlay=null;notice='';
  try{sessionStorage.setItem(CREATION_LAST_ID,id)}catch{}
@@ -4114,7 +4130,8 @@ function applySelectedSV595(root){
  if(title)title.textContent=isFishing?'Fishing · konkrétní čtyřhodinový Success Value (d100)':choice.kind==='timed'&&choice.value==='drawing'?'Drawing · kvalita díla podle Success Value':choice.kind==='timed'&&choice.value==='cookery'?'Cookery · připravené jídlo podle Success Value':choice.kind==='timed'&&choice.value==='glassworking'?'Glassworking · kvalita výrobku podle Success Value':choice.kind==='timed'&&choice.value==='woodworking'?'Woodworking · kvalita výrobku podle Success Value':'2. Success Value · dlouhodobá činnost';
 }
 function skillWorkbenchView(){
- const actor=character(selected)??data.characters[0];if(actor&&selected!==actor.id)selected=actor.id;
+ const people=registryCharacters93813(data.characters);
+ const actor=people.find(c=>c.id===selected)??people[0];if(actor&&selected!==actor.id)selected=actor.id;
  if(actor&&activeSkillTab==='value'&&(pendingStableAnimalcraftId||pendingTrekHandoff||pendingTrackingAwarenessId||pendingCalendarGMTest)&&skillSVChoice595?.kind==='timed')skillSVChoice595=null;
  if(!actor)return journalChapterShell('Skills','Skill testy ve stejném stylu deníku.',`<section class="panel"><h2>Skill Tests</h2><p>Nejprve vytvořte postavu.</p><button data-nav="characters">Přejít do registru</button></section>`,`journal-book--skills`);
  const choice=skillSVChoice595?.actorId===actor.id&&activeSkillTab==='value'?skillSVChoice595:null;
@@ -4124,10 +4141,11 @@ function skillWorkbenchView(){
  return journalChapterShell('Skills','Skill testy a výpočty vybrané postavy; skutečná nebezpečí a jejich následky se řeší výhradně v jejím deníku.',episodeSkillReturnBelowResultHTML(workbench),`journal-book--skills`);
 }
 function charactersView(){
- const list=data.characters.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));
- const completed=data.characters.filter(c=>characterJournalReadiness(c).ready).length;
- const inProgress=data.characters.length-completed;
- return `<section class="view-hero hero-characters"><div class="view-hero__stats registry-stats"><div><span>Aktivní profily</span><strong>${data.characters.length}</strong></div><div><span>Hotové deníky</span><strong>${completed}</strong></div><div><span>Rozpracovaná tvorba</span><strong>${inProgress}</strong></div></div></section><div class="registry-actions" role="group" aria-label="Vytvoření nové postavy">${button('+ Vytvořit postavu krok za krokem','new-character')}<button type="button" data-action="auto-random-character">⚄ Čistě vygenerovaná postava</button><button type="button" data-action="open-generator-config">✦ Vygenerovaná postava podle rysů</button></div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards character-gallery">${['PC','NPC'].map(kind=>{const group=list.filter(c=>(c.kind||'PC')===kind);return `<section class="character-registry-group" data-character-kind="${kind}"><h3 class="character-group-heading">${kind} <small>(${group.length})</small></h3><div class="folio-character-list">${group.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><div class="character-card__crest" aria-hidden="true">${esc((c.name||'?').trim().slice(0,1).toUpperCase())}</div><div class="character-card__body"><div class="character-card__tags"><span class="pill">${esc(c.kind)}</span>${c.hmk?.folk?`<span class="pill">${esc(c.hmk.folk)}</span>`:''}${c.hmk?.ageGroup?`<span class="pill">${esc(c.hmk.ageGroup)}</span>`:''}</div><h3>${esc(c.name)}</h3><div class="muted character-card__occupation">${esc(c.occupation||'Bez povolání')}</div><div class="muted character-card__description" title="${esc(c.hmk?.creation?.status==='auto-generated'?'':(c.description||''))}">${esc(c.hmk?.creation?.status==='auto-generated'?(c.hmk?.creation?.values?.autoGeneration?.semantic?'Vygenerovaná postava podle rysů':'Čistě vygenerovaná postava'):(c.description||''))}</div>${c.hmk?.creation?`<div class="muted character-card__progress">Character Creation · ${esc(characterJournalReadiness(c).ready?(c.hmk.creation.status==='auto-generated'?'Automaticky dokončeno':'14/14 · ke kontrole GM'):'nedokončeno · krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="character-card__controls">${characterJournalReadiness(c).ready?`<button type="button" class="character-card__open" data-open="${esc(c.id)}">Otevřít deník</button>${creationCardAction(c)}`:`<button type="button" class="character-card__continue" data-resume-creation="${esc(c.id)}">Pokračovat v tvorbě</button><button type="button" class="character-card__locked" disabled title="Nejprve dokončete všech 14 kroků a revizi">Deník zatím uzamčen</button>`}<details class="character-card__more"><summary>Další možnosti</summary><div class="character-card__more-actions"><button type="button" class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button type="button" class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button type="button" class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></details></div></div></article>`).join('')}</div></section>`;}).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`
+ const people=registryCharacters93813(data.characters);
+ const list=people.filter(c=>(c.name+' '+c.occupation+' '+c.kind).toLowerCase().includes(query.toLowerCase()));
+ const completed=people.filter(c=>characterJournalReadiness(c).ready).length;
+ const inProgress=people.length-completed;
+ return `<section class="view-hero hero-characters"><div class="view-hero__stats registry-stats"><div><span>Aktivní postavy</span><strong>${people.length}</strong></div><div><span>Hotové deníky</span><strong>${completed}</strong></div><div><span>Rozpracovaná tvorba</span><strong>${inProgress}</strong></div></div><p class="hc-hint">Zvířata mají vlastní evidenci ve Stáji majitele a v Bestiáři / Combat. Do PC/NPC a rozpracované Character Creation se nezapočítávají. ${registryCounts93813(data.characters).animals?`Aktivních veterinárních profilů: ${registryCounts93813(data.characters).animals}.`: ''}</p></section><div class="registry-actions" role="group" aria-label="Vytvoření nové postavy">${button('+ Vytvořit postavu krok za krokem','new-character')}<button type="button" data-action="auto-random-character">⚄ Čistě vygenerovaná postava</button><button type="button" data-action="open-generator-config">✦ Vygenerovaná postava podle rysů</button></div><div class="toolbar"><input id="search" placeholder="Hledat postavu…" value="${esc(query)}"></div>${list.length?`<div class="cards character-gallery">${['PC','NPC'].map(kind=>{const group=list.filter(c=>(c.kind||'PC')===kind);return `<section class="character-registry-group" data-character-kind="${kind}"><h3 class="character-group-heading">${kind} <small>(${group.length})</small></h3><div class="folio-character-list">${group.map(c=>`<article class="card character-card"><button type="button" class="character-delete" data-delete-character="${esc(c.id)}" aria-label="Smazat postavu ${esc(c.name)}" title="Smazat postavu ${esc(c.name)}">×</button><div class="character-card__crest" aria-hidden="true">${esc((c.name||'?').trim().slice(0,1).toUpperCase())}</div><div class="character-card__body"><div class="character-card__tags"><span class="pill">${esc(c.kind)}</span>${c.hmk?.folk?`<span class="pill">${esc(c.hmk.folk)}</span>`:''}${c.hmk?.ageGroup?`<span class="pill">${esc(c.hmk.ageGroup)}</span>`:''}</div><h3>${esc(c.name)}</h3><div class="muted character-card__occupation">${esc(c.occupation||'Bez povolání')}</div><div class="muted character-card__description" title="${esc(c.hmk?.creation?.status==='auto-generated'?'':(c.description||''))}">${esc(c.hmk?.creation?.status==='auto-generated'?(c.hmk?.creation?.values?.autoGeneration?.semantic?'Vygenerovaná postava podle rysů':'Čistě vygenerovaná postava'):(c.description||''))}</div>${c.hmk?.creation?`<div class="muted character-card__progress">Character Creation · ${esc(characterJournalReadiness(c).ready?(c.hmk.creation.status==='auto-generated'?'Automaticky dokončeno':'14/14 · ke kontrole GM'):'nedokončeno · krok '+c.hmk.creation.step+'/14')}</div>`:''}<div class="character-card__controls">${characterJournalReadiness(c).ready?`<button type="button" class="character-card__open" data-open="${esc(c.id)}">Otevřít deník</button>${creationCardAction(c)}`:`<button type="button" class="character-card__continue" data-resume-creation="${esc(c.id)}">Pokračovat v tvorbě</button><button type="button" class="character-card__locked" disabled title="Nejprve dokončete všech 14 kroků a revizi">Deník zatím uzamčen</button>`}<details class="character-card__more"><summary>Další možnosti</summary><div class="character-card__more-actions"><button type="button" class="secondary" data-copy="${esc(c.id)}">Kopírovat</button><button type="button" class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button type="button" class="danger" data-archive="${esc(c.id)}">Archivovat</button></div></details></div></div></article>`).join('')}</div></section>`;}).join('')}</div>`:'<div class="empty">Žádné odpovídající postavy.</div>'}`
 }
 function firstPresent(...values){for(const value of values){if(value===0)return '0';if(value!==undefined&&value!==null&&String(value).trim()!=='')return String(value);}return '—';}
 function listPresent(value){return Array.isArray(value)&&value.length?value.join(', '):'—';}
@@ -5400,7 +5418,7 @@ function journalChapterShell(title,subtitle,body,extraClass=''){
 }
 function creationBookView(){
  const c=selected?character(selected):null;
- if(!c)return journalChapterShell('Pravidlová tvorba postavy','Průvodce je navázán na konkrétní postavu v registru.',`<div class="empty">Nejprve v registru otevřete nebo založte konkrétní postavu. Poté bude dostupná kompletní 14kroková pravidlová tvorba HMK 1:1.</div>`,'journal-book--creation');
+ if(!c||isStableAnimalProfile93813(c))return journalChapterShell('Pravidlová tvorba postavy','Průvodce je navázán na konkrétní postavu v registru.',`<div class="empty">Nejprve v registru otevřete nebo založte konkrétní postavu. Poté bude dostupná kompletní 14kroková pravidlová tvorba HMK 1:1.</div>`,'journal-book--creation');
  return journalChapterShell('Pravidlová tvorba postavy',`${c.name} · 14 kroků podle HMK v1.2`,creationWizardView(),'journal-book--creation');
 }
 function characterJournalHero(c,inv,editing=false){
@@ -6540,7 +6558,7 @@ function stableHubAnimalHTML(a,campaignId){
  const foodLots=availableRationLots(data.journal,campaignId,a.ownerId,data.campaignClock?.minute??0);
  const family=verifiedLivestock(data,campaignId).filter(b=>b.id!==a.id&&b.spec?.breed);
  const activeVehicles=p.vehicles.filter(v=>['Cart, 2-wheel','Wagon, 4-wheel','Sled'].includes(VEHICLES_TACK_P122.find(x=>x.id===v.itemId)?.name));
- const riderChoices=data.characters.filter(c=>!c.archived);
+ const riderChoices=registryCharacters93813(data.characters).filter(c=>!c.archived);
 
  const statNames={str:'STR',end:'END',agl:'AGL',per:'PER',aur:'AUR',wil:'WIL',rea:'REA',cre:'CRE',aware:'Awareness',scent:'Scent',stealth:'Stealth',spirit:'Spirit',initiative:'Initiative'};
  const statHelp={str:'Strength (STR): tělesná síla; upravuje zatížení.',end:'Endurance (END): odolnost a výdrž.',agl:'Agility (AGL): pohyblivost a reflexy.',per:'Perception (PER): vnímání a smysly.',aur:'Aura (AUR): duchovní a magické nadání.',wil:'Will (WIL): vůle a odhodlání.',rea:'Reasoning (REA): úsudek a paměť.',cre:'Creativity (CRE): představivost.',aware:'Awareness: všímavost a rozpoznání nebezpečí.',scent:'Scent: stopování a vnímání pachů.',stealth:'Stealth: skrytý pohyb.',spirit:'Spirit: odolnost a práce s duchovní silou.',initiative:'Initiative: reakce v boji.'};
@@ -6606,7 +6624,7 @@ function stableHubAnimalHTML(a,campaignId){
 function livestockAcquisitionHTML({location='library'}={}){
  const clock=data.campaignClock, campaignId=clock?campaignKey(clock):null;
  const active=verifiedLivestock(data,campaignId);
- const options=data.characters.filter(c=>!c.archived&&!c.hmk?.verifiedMountedBreed).map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${esc(cashForCharacter(c).ok?cashForCharacter(c).balance+'d':'hotovost nedoložena')}</option>`).join('');
+ const options=registryCharacters93813(data.characters).filter(c=>!c.archived).map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${esc(cashForCharacter(c).ok?cashForCharacter(c).balance+'d':'hotovost nedoložena')}</option>`).join('');
  const beasts=BEASTS_P122.filter(b=>livestockOffer(b.id));
  const acquisition=`<h3>Stáj · pořízení zvířete</h3><p class="hc-trek-explainer">HMK str. 122 a 354–355. V katalogu jsou ověřené ceny a limity výcviku. Nákup vytvoří záznam vlastnictví, kupní doklad a odečte peníze z kampaně; bezplatné převzetí hotovost nemění; <strong>nezakládá automaticky Combat State ani nesimuluje výcvik</strong>. Při cestování se použije doložená tělesná hmotnost a základní STR.</p>
  ${clock&&options?`<form data-hmk-livestock-acquire class="hc-livestock-acquire"><label>Druh zvířete<select name="beastId" required>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<option value="${esc(b.id)}">${esc(b.name)} · ${b.priceD}d · STR ${sp.str??'neuvedeno'} · ${sp.bodyWeightLb??'?'} lb · MB max. ${b.maxMasteryBoosts}</option>`}).join('')}</select></label><label>Jméno zvířete<input name="beastName" maxlength="60" required placeholder="Např. Blesk"></label><label>Majitel / platící postava<select name="ownerId" required>${options}</select></label><div class="hc-livestock-actions"><button type="submit" name="acquisition" value="buy">Koupit za cenu HMK</button><button type="submit" name="acquisition" value="free" class="secondary">Převzít zdarma (potvrdí GM)</button></div></form>`:'<p>Pro nákup je nutná aktivní kampaň a alespoň jedna postava.</p>'}
@@ -6674,11 +6692,12 @@ function printedPossessionsPanel(){const table=(title,rows)=>`<h4>${title} (${ro
 function catalogCoveragePanel(){const coverage=catalogCoverage(allCatalogItems());return `<section class="panel wide"><h3>Pokrytí vybavení podle PDF HMK</h3><p class="muted">Tato kontrola nezaměňuje počet evidovaných položek za úplnost pravidlových tabulek. Hotové komplety vyžadují samostatnou strukturovanou definici; pouhý název nestačí.</p><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Oblast</th><th>Strany HMK</th><th>Evidováno</th><th>Stav</th></tr></thead><tbody>${coverage.sections.map(x=>`<tr><td>${esc(x.label)}</td><td>${esc(x.pages)}</td><td>${x.count===null?'—':esc(x.count)}</td><td>${x.complete?'Strukturované minimum splněno':'Neověřeno / nedokončeno'}</td></tr>`).join('')}</tbody></table></div><p class="tiny muted">U kompletů je cílové minimum 12. U ostatních oblastí není celkový počet bezpečně stanoven; stav zůstává neověřený.</p><div class="actions">${button('Exportovat přehled pokrytí JSON','export-catalog-coverage')}</div></section>`;}
 function armourCoverageReadinessPanel(){const a=auditArmourCoverage();return `<section class="panel wide"><h3>HMK · ověření anatomického pokrytí</h3><p><b>${a.ready} / ${a.total}</b> položek připravených pro pravidlový výpočet · ${a.pending} vyžaduje vizuální přepis pokrytí z PDF.</p><p class="muted">Bez ověřených míst zásahu, zón, směrových omezení a příznaku pevné zbroje je výpočet zablokován. Propojení ${a.matched}/${a.suitParts} součástí kompletů potvrzuje pouze identitu položek, nikoli ochranu.</p></section>`;}
 function suitArticleCrosswalkPanel(){const r=reconcileSuitArticles();return `<section class="panel wide"><h3>HMK · propojení součástí 12 kompletů s katalogem</h3><p class="muted">Kontrola názvů jednotlivých součástí proti 92 referenčním položkám. Shoda názvu neznamená ověřené anatomické pokrytí ani povolení automatického oblékání.</p><p><b>${r.matched} / ${r.parts}</b> jednoznačně přiřazených součástí · ${r.unmatched.length} bez shody · ${r.ambiguous.length} nejednoznačných.</p>${r.unmatched.length||r.ambiguous.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Komplet</th><th>Součást</th><th>Stav</th></tr></thead><tbody>${[...r.unmatched,...r.ambiguous].map(e=>`<tr><td>${esc(e.suit)}</td><td>${esc(e.label)}</td><td>${esc(e.status)}</td></tr>`).join('')}</tbody></table></div>`:'<p>Všechny názvy mají jednoznačnou shodu. Anatomické pokrytí je zapsáno; kontrola skutečného pořadí vrstev zatím není uzavřena.</p>'}</section>`;}
-function libraryCharacterOptions(){const preferred=libraryRecipientId||selected||data.characters[0]?.id;return data.characters.map(c=>{const cash=cashForCharacter(c);return `<option value="${esc(c.id)}" ${c.id===preferred?'selected':''}>${esc(c.name)}${c.occupation?' · '+esc(c.occupation):''} · ${cash.ok?esc(cash.balance)+'d':'hotovost nedoložena'}</option>`}).join('')}
+function libraryCharacterOptions(){const people=registryCharacters93813(data.characters);const preferred=libraryRecipientId||selected||people[0]?.id;return people.map(c=>{const cash=cashForCharacter(c);return `<option value="${esc(c.id)}" ${c.id===preferred?'selected':''}>${esc(c.name)}${c.occupation?' · '+esc(c.occupation):''} · ${cash.ok?esc(cash.balance)+'d':'hotovost nedoložena'}</option>`}).join('')}
 function libraryAssignForm(itemId,kind='item',available=true,offer=null){
- if(!data.characters.length)return '<span class="library-warning">Nejdříve vytvořte postavu.</span>';
+ if(!registryCharacters93813(data.characters).length)return '<span class="library-warning">Nejdříve vytvořte postavu.</span>';
  if(!available)return '<span class="library-warning">Přiřazení není doložené katalogem.</span>';
- const preferred=character(libraryRecipientId||selected||data.characters[0]?.id)||data.characters[0];
+ const people=registryCharacters93813(data.characters);
+ const preferred=people.find(c=>c.id===(libraryRecipientId||selected))||people[0];
  const cash=cashForCharacter(preferred),price=offer?.pricePence??null,canBuy=price!==null&&cash.ok&&cash.balance>=price;
  const reason=price===null?'Nákup nedostupný: chybí jednoznačná cena v d.':!cash.ok?cash.reason:cash.balance<price?`Nedostatek hotovosti (${cash.balance}d).`:'';
  return `<form class="library-assign" data-library-form="${esc(kind)}"><input type="hidden" name="itemId" value="${esc(itemId)}"><select name="recipientId" aria-label="Postava pro převzetí nebo nákup" title="Komu bude předmět patřit" required>${libraryCharacterOptions()}</select><div class="library-acquire-actions"><button type="submit" name="acquisition" value="buy" ${canBuy?'':`disabled title="${esc(reason)}"`}>Koupit${price!==null?' '+(offer.quantity>1?esc(offer.quantity)+' ks · ':'· ')+esc(price)+'d':''}</button><button type="submit" name="acquisition" value="free" class="secondary">Vzít zdarma</button></div>${reason?`<small class="library-purchase-hint">${esc(reason)}</small>`:''}</form>`;
@@ -6921,7 +6940,7 @@ function gmHistoryView(){
  return journalChapterShell('GM · Historie činností',`${czCount(meaningfulEntries.length,'doložený záznam','doložené záznamy','doložených záznamů')} postav a kampaní`,
  `<section class="panel"><h3>Historie rozdělená podle postav</h3><p class="muted">Vyberte postavu, pak typ události. Opposed Test je v přehledu obou účastníků, ale zůstává jediným původním pravidlovým záznamem; souhrnný počet proto uvádí jedinečné události. „Osobní záznam“ otevře odpovídající log postavy.</p>${filter}<div class="gm-history-person-groups">${grouped.groups.map(groupSection).join('')}${unassigned}</div></section>`,'journal-book--gm-history');
 }
-function trashView(){return journalChapterShell('Archiv postav','Archivované profily zůstávají zachované spolu s inventářem a historií.',`<section class="panel folio-archive-list"><h3>Archivované postavy</h3><p class="muted">Obnovení postavu vrátí do registru. Trvalé smazání vyžaduje samostatné potvrzení.</p>${data.trash.length?data.trash.map(c=>`<div class="folio-archive-row"><div class="folio-archive-identity"><b>${esc(c.name)}</b><span>${esc(c.occupation||'Bez povolání')}</span></div><div class="actions folio-archive-actions"><button data-restore="${esc(c.id)}">Obnovit</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-purge="${esc(c.id)}">Definitivně smazat</button></div></div>`).join(''):'<div class="empty">Archiv je prázdný.</div>'}</section><section class="panel folio-archive-info"><h3>Evidence archivu</h3><dl class="folio-archive-metrics"><div><dt>Archivované postavy</dt><dd>${data.trash.length}</dd></div><div><dt>Aktivní postavy</dt><dd>${data.characters.length}</dd></div></dl><p class="muted">Archivace nepřepisuje deník ani inventář postavy. Obnovení ji vrátí do registru.</p><button type="button" class="secondary" data-nav="characters">Otevřít registr postav</button></section>`,'journal-book--archive')}
+function trashView(){return journalChapterShell('Archiv postav','Archivované profily zůstávají zachované spolu s inventářem a historií.',`<section class="panel folio-archive-list"><h3>Archivované postavy</h3><p class="muted">Obnovení postavu vrátí do registru. Trvalé smazání vyžaduje samostatné potvrzení.</p>${data.trash.length?data.trash.map(c=>`<div class="folio-archive-row"><div class="folio-archive-identity"><b>${esc(c.name)}</b><span>${esc(c.occupation||'Bez povolání')}</span></div><div class="actions folio-archive-actions"><button data-restore="${esc(c.id)}">Obnovit</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-purge="${esc(c.id)}">Definitivně smazat</button></div></div>`).join(''):'<div class="empty">Archiv je prázdný.</div>'}</section><section class="panel folio-archive-info"><h3>Evidence archivu</h3><dl class="folio-archive-metrics"><div><dt>Archivované postavy</dt><dd>${data.trash.length}</dd></div><div><dt>Aktivní postavy</dt><dd>${registryCharacters93813(data.characters).length}</dd></div></dl><p class="muted">Archivace nepřepisuje deník ani inventář postavy. Obnovení ji vrátí do registru.</p><button type="button" class="secondary" data-nav="characters">Otevřít registr postav</button></section>`,'journal-book--archive')}
 function readinessReport(c){
  const issues=[];const h=c.hmk||{};const attrs=h.attributes||{};
  const required=[...HMK_ATTRIBUTES.PHYSICAL,...HMK_ATTRIBUTES.MENTAL];
@@ -6969,7 +6988,7 @@ function downloadRawStorage(){
  if(raw===null){alert('V tomto prohlížeči není původní záznam.');return}
  const blob=new Blob([raw],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='hmk-raw-emergency-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
-function backupView(){const summary={characters:data.characters.length,archived:data.trash.length,items:allCatalogItems().length,inventory:data.inventory.length,journal:data.journal.length};return journalChapterShell('Cloud a zálohy','Soukromé úložiště kampaní, správa připojení a bezpečné exporty.',`${cloudPanel()}${!storageReadOnly?inventoryProvenancePanel():''}${storageReadOnly?'<div class="notice error">Načtení úložiště selhalo. Standardní záloha je zablokována; nejdříve stáhněte nouzovou kopii původních dat.</div>':''}<section class="panel hmk-backup-overview"><h3>Kontrola místních záznamů</h3><div class="equipment-summary"><div>Aktivní postavy: ${summary.characters} · archiv: ${summary.archived}</div><div>Celkem položek knihovny: ${summary.items} · vestavěné HMK: ${BUILTIN_ITEMS.length} · inventář: ${summary.inventory} · deník: ${summary.journal}</div><div>Stav zápisu: ${storageReadOnly?'ZABLOKOVÁN':'Připraven'}</div></div><p><strong>Datový formát:</strong> v1 (kompatibilní se staršími verzemi). Umístění vybavení je nepovinné pole; Starší položky bez uvedeného umístění se zobrazí jako nesené.</p><p>Bez připojení GitHub Cloud se data ukládají jen lokálně v tomto prohlížeči (localStorage). Pokud jsou otevřené dvě záložky, změna v druhé záložce zablokuje zápis, aby nedošlo k přepsání dat. S připojeným GitHub Cloud se změny synchronizují online a bez ručního JSON importu. Režim anonymního prohlížení, vymazání dat webu nebo změna zařízení mohou záznamy odstranit; pravidelně zálohujte.</p><div class="actions">${button('Stáhnout JSON zálohu','export')}${button('Export doménových dat HMK','export-kernel-all')}${button('Stáhnout diagnostiku','export-diagnostic')}${button('Nouzová kopie původního úložiště','export-raw')}<label>Importovat JSON zálohu<input type="file" id="import-file" accept=".json,application/json"></label><label>Přidat jednu postavu ze zálohy<input type="file" id="import-character-file" accept=".json,application/json"></label></div><div class="notice error">Import nahradí aktuální lokální data. Před importem si stáhněte zálohu.</div></section>`,'journal-book--backup')}
+function backupView(){const summary={characters:registryCharacters93813(data.characters).length,archived:data.trash.filter(c=>!isStableAnimalProfile93813(c)).length,items:allCatalogItems().length,inventory:data.inventory.length,journal:data.journal.length};return journalChapterShell('Cloud a zálohy','Soukromé úložiště kampaní, správa připojení a bezpečné exporty.',`${cloudPanel()}${!storageReadOnly?inventoryProvenancePanel():''}${storageReadOnly?'<div class="notice error">Načtení úložiště selhalo. Standardní záloha je zablokována; nejdříve stáhněte nouzovou kopii původních dat.</div>':''}<section class="panel hmk-backup-overview"><h3>Kontrola místních záznamů</h3><div class="equipment-summary"><div>Aktivní postavy: ${summary.characters} · archiv: ${summary.archived}</div><div>Celkem položek knihovny: ${summary.items} · vestavěné HMK: ${BUILTIN_ITEMS.length} · inventář: ${summary.inventory} · deník: ${summary.journal}</div><div>Stav zápisu: ${storageReadOnly?'ZABLOKOVÁN':'Připraven'}</div></div><p><strong>Datový formát:</strong> v1 (kompatibilní se staršími verzemi). Umístění vybavení je nepovinné pole; Starší položky bez uvedeného umístění se zobrazí jako nesené.</p><p>Bez připojení GitHub Cloud se data ukládají jen lokálně v tomto prohlížeči (localStorage). Pokud jsou otevřené dvě záložky, změna v druhé záložce zablokuje zápis, aby nedošlo k přepsání dat. S připojeným GitHub Cloud se změny synchronizují online a bez ručního JSON importu. Režim anonymního prohlížení, vymazání dat webu nebo změna zařízení mohou záznamy odstranit; pravidelně zálohujte.</p><div class="actions">${button('Stáhnout JSON zálohu','export')}${button('Export doménových dat HMK','export-kernel-all')}${button('Stáhnout diagnostiku','export-diagnostic')}${button('Nouzová kopie původního úložiště','export-raw')}<label>Importovat JSON zálohu<input type="file" id="import-file" accept=".json,application/json"></label><label>Přidat jednu postavu ze zálohy<input type="file" id="import-character-file" accept=".json,application/json"></label></div><div class="notice error">Import nahradí aktuální lokální data. Před importem si stáhněte zálohu.</div></section>`,'journal-book--backup')}
 // Encounter preparation is deliberately non-destructive: no changes to character records or rules kernel.
 function selectedEncounterCharacters(){return data.characters.filter(c=>encounterSelection.has(c.id))}
 function encounterPayload(){
@@ -10065,6 +10084,15 @@ function render(){
   if(activeSkillTab!=='followups')activeSkillTab=linked?(travelSkill&&!episodeSkillNeedsSV(episodePendingSkillRequest.field)?'secondary':'value'):'secondary';
  }
  lastRenderedSkillRoute596=view;
+ // Legacy veterinary actors may be the saved selected ID of an older tab.
+ // Route them to their owner's Stable without altering the authoritative actor.
+ if((view==='sheet'||view==='creation')&&isStableAnimalProfile93813(character(selected))){
+  const actor=character(selected),owner=character(actor?.hmk?.livestockOwnerId);
+  if(owner&&!isStableAnimalProfile93813(owner)){
+   stableOwnerFocusedId=actor.id;selected=owner.id;activeSheetSection='stable';view='sheet';
+  }else{selected=null;libraryTab='stable';view='library';}
+  sheetEditingId=null;overlay=null;
+ }
  // Deny all paths to partially generated sheets, even routes that set view
  // directly without clicking a registry card (import, skill link, wizard exit).
  if(view==='sheet'){
@@ -17998,7 +18026,7 @@ if(t.dataset.nav){
  }
  pendingTrackingAwarenessId=null;pendingTrekHandoff=null;lastCombatEvent=null;
  if(t.dataset.nav==='hazards'){
-  const actor=character(selected)??data.characters[0];
+  const actor=registryCharacters93813(data.characters).find(c=>c.id===selected)??registryCharacters93813(data.characters)[0];
   if(!actor){view='characters';overlay=null;render();return}
   selected=actor.id;activeSheetSection='hazards';sheetEditingId=null;view='sheet';
  }else{view=t.dataset.nav;if(view==='calendar'){calendarLanding=!combatInitiativeSequence;calendarCreating=false;calendarUI=null;activeCalendarSection='overview';}}
@@ -24088,7 +24116,7 @@ function sharedPlanCardsHTML93771(){
   <div class="hc-shared-plan-fields"><label>Činnost <select data-shared-plan-kind="${esc(plan.id)}" ${locked?'disabled':''}>${SHARED_PLAN_KINDS_93771.map(([key,name])=>`<option value="${key}" ${plan.kind===key?'selected':''}>${name}</option>`).join('')}</select></label>
   <label>Minuty <input data-shared-plan-minutes="${esc(plan.id)}" type="number" min="1" max="${sharedTimeWindowDraft.minutes}" value="${plan.minutes}" ${locked?'disabled':''}></label>
   <label>Návaznost <select data-shared-plan-follow="${esc(plan.id)}" ${locked?'disabled':''}>${followChoices.map(([id,label])=>`<option value="${esc(id)}" ${plan.followsGroup===id?'selected':''}>${esc(label)}</option>`).join('')}</select></label></div>
-  <details class="hc-shared-plan-members"><summary>Postavy · ${plan.memberIds.length}${participants?' · '+esc(participants):' · vyberte'}</summary>${calendarMemberIds(data.campaignClock,data.characters).map(c=>`<label><input type="checkbox" data-shared-plan-member="${esc(plan.id)}" value="${esc(c.id)}" ${plan.memberIds.includes(c.id)?'checked':''} ${locked?'disabled':''}> ${esc(c.name)}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</label>`).join('')}</details>
+  <details class="hc-shared-plan-members"><summary>Postavy · ${plan.memberIds.length}${participants?' · '+esc(participants):' · vyberte'}</summary>${registryCharacters93813(calendarMemberIds(data.campaignClock,data.characters)).map(c=>`<label><input type="checkbox" data-shared-plan-member="${esc(plan.id)}" value="${esc(c.id)}" ${plan.memberIds.includes(c.id)?'checked':''} ${locked?'disabled':''}> ${esc(c.name)}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</label>`).join('')}</details>
   ${error?`<p class="hc-shared-plan-error" role="alert">${esc(error)}</p>`:''}
   <div class="hc-shared-plan-actions"><button type="button" data-shared-plan-open="${esc(plan.id)}" ${ready?'':'disabled'}>${plan.done?'Doklady připraveny':'Otevřít pravidlové testy →'}</button>
   ${isActive?`<button type="button" class="secondary" data-shared-plan-close="${esc(plan.id)}" ${episodeEvaluationRequested||episodePendingSkillRequest||episodeOutstandingSkillTasks.length?'disabled':''}>Zpět do plánu (bez testů)</button>`:''}
@@ -24097,7 +24125,7 @@ function sharedPlanCardsHTML93771(){
 }
 function sharedEpisodeRowsHTML93772(){
  const state=sharedPlanState93771(),errors=new Map(state.errors.map(e=>[e.id,e.message]));
- const actors=calendarMemberIds(data.campaignClock,data.characters);
+ const actors=registryCharacters93813(calendarMemberIds(data.campaignClock,data.characters));
  const weather=sharedWeatherSources93772();
  const usedNumbers=new Set(sharedTimeWindowPlans.map((r,i)=>r.groupNumber??i+1));
  const groupLimit=Math.max(8,Math.min(99,actors.length));
@@ -24173,7 +24201,7 @@ function sharedReflowEpisodeRows93772(){
 function sharedFixedRowUpdate93773(plan,field,value){
  const before=structuredClone(sharedTimeWindowPlans);
  try{
-  const all=calendarMemberIds(data.campaignClock,data.characters);
+  const all=registryCharacters93813(calendarMemberIds(data.campaignClock,data.characters));
   const eligible=id=>all.some(c=>c.id===id)&&!sharedTimeWindowPlans.some(x=>x.id!==plan.id&&(x.memberIds||[]).includes(id));
   if(field==='actor'){
    if(!eligible(value))throw Error('Postava nepatří do kampaně nebo už je v jiné skupině.');
