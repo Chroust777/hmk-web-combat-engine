@@ -192,7 +192,7 @@ import {scheduleHMKActivity,finishDueHMKActivities,finishInterruptedHMKTravel,va
 import {nutritionRestActivity,interruptionForCancelledNutritionRest} from './src/integration/hmk-nutrition-rest-bridge.js';
 import {planHMKGroupWatch} from './src/integration/hmk-group-travel.js';
 import {trekPartyModes,trekPersonHealthSnapshot} from './src/integration/hmk-trekking-party-modes.js';
-import {trekRegisteredAnimalHealth,assertTrekAnimalCanMove} from './src/integration/hmk-trekking-animal-health.js';
+import {trekRegisteredAnimalHealth,assertTrekAnimalCanMove,resolveTrekAnimalReadiness93815,assertNoActiveBestiaryTravelConflict93815} from './src/integration/hmk-trekking-animal-health.js';
 import {eligibleRestingAnimals,planAnimalRest} from './src/integration/hmk-trekking-animal-rest.js';
 import {ANIMAL_AREA_AV,weatherAnimalCandidates,prepareAnimalTrekkingWeather,validateAnimalWeatherJournal} from './src/integration/hmk-trekking-animal-weather.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
@@ -342,7 +342,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.814';
+const APP_VERSION='93.815';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2760,9 +2760,13 @@ function timeEpisodePageHTML(clock,participants){
  ${looseTravelVehicles.length?`<div class="hc-episode-stable-assign"><p class="hc-hint"><strong>Pozor: kára nebo vůz v inventáři ještě není ve Stáji.</strong> Vyberte skutečný vůz a zvíře stejného vlastníka; převedení bez dalšího nákupu vytvoří původní evidenční doklad a vozidlo pak bude dostupné v rozbalovacím seznamu.</p><label>Vlastněné vozidlo z inventáře<select data-episode-attach-vehicle-choice>${looseTravelVehicles.map((a,i)=>`<option value="${i}">${esc(a.gearName)} · ${esc(a.ownerName)} → ${esc(a.animalName)}</option>`).join('')}</select></label><button type="button" class="secondary hc-small" data-episode-attach-inventory-vehicle="yes">Zařadit vlastněný vůz do Stáje</button></div>`:
  !transportVehicleRows.length?`<p class="hc-hint">V nabídce není žádná kára ani vůz přímo zařazený ve Stáji. Pokud jste vozidlo pořídili v Knihovně, nejdříve je převeďte na konkrétní zvíře ve Stáji; samotný osobní inventář k jízdě nestačí. Nové vozidlo můžete také pořídit přímo ve Stáji postavy.</p>`:''}</section>
  ${stableTravelRoster.length?`<fieldset data-episode-stable-roster><legend>Zvířata na cestě · výběr ze Stáje</legend>
- <p class="hc-hint"><strong>Každé zvíře zaškrtněte jen jednou.</strong> Tím je zařazeno na cestu včetně doloženého ENC, jezdce, nákladu a případného zdravotního profilu (Combat State). Zdravotní stav níže není druhý výběr zvířete. Má-li zvíře vážné zranění nebo vysokou únavu, aplikace nedovolí, aby se samo přesouvalo.</p>
- <div class="hc-episode-animal-roster">${stableTravelRoster.map(a=>{const b=stableBurden(data,campaignKey(clock),a),profile=animalRoster.find(x=>x.id===a.id);let health=null;
- if(profile)try{health=trekRegisteredAnimalHealth(profile)}catch(err){health={error:err.message}}
+ <p class="hc-hint"><strong>Každé zvíře vyberte jednou ze Stáje.</strong> Stáj určuje vlastnictví, jezdce, postroje a náklad. Existuje-li samostatně doložený zdravotní profil stejného ID, Pochod z něj pouze přečte omezení pohybu (zranění, Shock, únava); nevybírá bojového účastníka a nevytváří ani nemění bojový stav. Samotná cesta nepřidává zvířeti domyšlenou únavu.</p>
+ <div class="hc-episode-animal-roster">${stableTravelRoster.map(a=>{const b=stableBurden(data,campaignKey(clock),a),profile=data.characters.find(x=>x.id===a.id);let health=null;
+ try{assertNoActiveBestiaryTravelConflict93815({journal:data.journal,campaignId:campaignKey(clock),animalIds:[a.id]});
+  if(profile&&profile.hmk?.verifiedMountedBreed!==a.spec.breed)throw Error('Zdravotní profil stejného ID má jiné plemeno.');
+  if(profile&&!(clock.characterIds||[]).includes(profile.id))throw Error('Zdravotní profil není aktivní v kalendáři.');
+  if(profile)health=trekRegisteredAnimalHealth(profile);
+ }catch(err){health={error:err.message}}
  const healthStatus=!health?'Bez samostatného zdravotního profilu – pouze doložený stav ve Stáji':health.error?'CHYBNÝ ZDRAVOTNÍ STAV: '+health.error:health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40?'NEMŮŽE SE SAMO PŘESOUVAT':health.injured?'Zraněné · režim Slow':health.fatigue>=20?'Unavené · režim Slow':'Zdravotní stav bez omezení pohybu';
  const blocked=!!health&&(!!health.error||health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40);
  return `<div class="hc-episode-stable-animal${blocked?' hc-episode-animal-unfit':''}" data-episode-stable-animal="${esc(a.id)}"><label class="hc-check"><input name="stableAnimalIds" type="checkbox" value="${esc(a.id)}"><span><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ENC ${Number.isSafeInteger(b.adjustedENC)?b.adjustedENC:'nedoloženo'}${b.rider?' · jezdec ze Stáje':''}${b.cargoOverflow?' · PŘETÍŽENO':''}</span></label><p class="hc-hint hc-episode-animal-health">Zdravotní stav: ${esc(healthStatus)}</p>${profile?`<div class="hc-episode-animal-actions"><button type="button" class="secondary hc-small" data-trek-leave-animal="${esc(a.id)}">Opustit zvíře (včetně ponechaného nákladu)</button><details class="hc-trek-animal-injuries"><summary>Aktuální zranění (HMK 355)</summary>${hmkAnimalWoundAnatomyHTML(profile)}</details></div>`:''}</div>`}).join('')}</div></fieldset>`:''}
@@ -22919,7 +22923,9 @@ function episodePreviewFromForm(form,clock){
     Number.isSafeInteger(minutes)&&minutes>0&&
     Math.floor((clock.minute+minutes-1)/1440)!==Math.floor(clock.minute/1440))
   throw Error('Počasí HMK platí pouze pro daný kalendářní den. Zvolený interval zasahuje za půlnoc; pro další den jsou povinné nové denní d10. Uzavřete nynější úsek do 24:00 a po potvrzení GM pokračujte zvolenou činností s novým denním počasím.');
- const animals=(v.animalIds||[]).map(id=>character(id));
+ // Animal selections belong only to travel. A rest/watch/forage activity must
+ // never accidentally treat a hidden old travel checkbox as an active animal.
+ const animals=kind==='travel'?(v.animalIds||[]).map(id=>character(id)):[];
  const stableAnimals=kind==='travel'?episodeStableAnimals(v.stableAnimalIds||[],clock):[];
  // v93.812: a mounted journey cannot silently assume tack or a real mount.
  // This preflight is intentionally limited to future departures; immutable
@@ -22929,19 +22935,18 @@ function episodePreviewFromForm(form,clock){
   if(incomplete)throw Error('Jízda na zvířeti: '+incomplete.title+'. '+incomplete.detail+' Použijte kontrolní seznam u Stáje v tomto Pochodu.');
  }
 
- if(animals.some(c=>!c?.hmk?.verifiedMountedBreed||!c.hmk.healthState||!(data.campaignClock.characterIds??[]).includes(c.id)))
-  throw Error('Zvíře musí mít ověřený stav a patřit do této kampaně.');
- // p.145: live animal illness, fatigue and serious limb/body wounds are
- // authoritative movement prerequisites, not a GM checkbox or a copied
- // human snapshot. Never move an unconscious/immobile mount or draft beast.
- // One stable checkbox also activates the animal's existing Combat State.
- // Keep stable roster IDs as authoritative occupancy; do not add duplicate
- // animalIds to group membership, but do enforce health and Slow movement.
- const stableHealthProfiles=kind==='travel'?stableAnimals.map(a=>character(a.id)).filter(a=>
-  a?.hmk?.verifiedMountedBreed&&a.hmk.healthState&&(clock.characterIds??[]).includes(a.id)):[];
- const animalHealth=kind==='travel'?[...new Map([...animals,...stableHealthProfiles].filter(Boolean).map(a=>[a.id,a])).values()]
-  .map(a=>trekRegisteredAnimalHealth(a)):[];
- for(const state of animalHealth)assertTrekAnimalCanMove(state);
+ // Read the verified Stable roster and ONLY the mobility facts of an
+ // existing veterinary health record. Never manufacture Combat actors,
+ // add a second participant, or silently skip a mismatched/inactive profile.
+ if(kind==='travel')assertNoActiveBestiaryTravelConflict93815({journal:data.journal,campaignId:campaignKey(clock),
+  animalIds:[...stableAnimals.map(a=>a.id),...animals.map(a=>a?.id).filter(Boolean)]});
+ const animalHealth=kind==='travel'?resolveTrekAnimalReadiness93815({
+  stableAnimals:stableAnimals.map(a=>({id:a.id,name:a.name,
+   breed:verifiedLivestock(data,campaignKey(clock)).find(x=>x.id===a.id)?.spec?.breed})),
+  legacyAnimals:animals,
+  registeredProfiles:data.characters,
+  activeProfileIds:clock.characterIds||[]
+ }):[];
  if(!members.includes(guideId))throw Error('Průvodce musí být mezi účastníky.');
  // A documented indoor PC safe stay does not require irrelevant new
  // outdoor weather dice. Other participants still require witnessed weather
@@ -26130,11 +26135,13 @@ document.addEventListener('submit',e=>{
      a.endNotRequired?(a.endNotRequired.reason==='equipment-delay'?'gm-complication-no-travel':a.endNotRequired.reason==='transported'?'gm-confirmed-transport-no-end':'gm-inactive-no-end-roll'):origin,sourceId+':'+a.id);
     return {...a,origin:a.endNotRequired?'not-performed-medical':origin,before,after:evidence.finalFatigue};
    });
-   const animals=(result.animals||[]).map(a=>{
-    const c=character(a.id),evidence=commitExpeditionFatigue(c,{kind:'travel',accrual:a.delta,
-     durationMinutes:result.minutes,rolls:[],sourcePages:[145,150,176]},result.endMinute,'gm-animal-analogy',sourceId+':'+a.id);
-    return {...a,before:evidence.priorFatigue,after:evidence.finalFatigue};
-   });
+   // No automatic animal trekking fatigue is specified by HMK 145–150.
+   // Older generic execution code could have written speculative animal
+   // Fatigue into the shared Health State if a future preview populated
+   // result.animals. Fail closed instead: the travel receipt owns no
+   // animal Combat State writes. Historical receipts stay untouched.
+   if(result.animals?.length)throw Error('Pochod: nepodložený zvířecí Fatigue nelze zapsat do zdravotního stavu.');
+   const animals=[];
    const kind=result.kind,recovery=[];
    if(['winded','rest','sleep'].includes(kind)){
     const claimKey={rest:'lastFourHour',sleep:'lastEightHour',winded:'lastWinded'}[kind];
