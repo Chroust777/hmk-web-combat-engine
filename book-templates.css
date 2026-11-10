@@ -7514,3 +7514,12 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .hc-episode-spread-right .hc-episode-task.hc-episode-setup-task{display:block;min-width:0;overflow-wrap:anywhere}
 .hc-episode-spread-right .hc-episode-task.hc-episode-setup-task>strong{display:block;margin-bottom:.35rem}
 .hc-episode-spread-right .hc-episode-task.hc-episode-setup-task>button{display:inline-block;width:auto;max-width:100%;min-width:min(100%,10rem);white-space:normal}
+
+/* v93.825 · Chronicle Spread anatomy stays read-only and collapsed by default. */
+.content-sheet .journal-anatomy-collapsible{min-width:0;margin:0;padding:0;border:0;background:transparent}
+.content-sheet .journal-anatomy-collapsible>summary.journal-book-title{display:flex;align-items:center;flex-wrap:wrap;gap:.35rem;cursor:pointer;list-style:none;user-select:none;min-height:24px}
+.content-sheet .journal-anatomy-collapsible>summary.journal-book-title::-webkit-details-marker{display:none}
+.content-sheet .journal-anatomy-collapsible>summary.journal-book-title:before{content:'▸';color:#6e4825;font:700 15px Georgia,serif;flex:none}
+.content-sheet .journal-anatomy-collapsible[open]>summary.journal-book-title:before{content:'▾'}
+.content-sheet .journal-anatomy-collapsible>summary.journal-book-title:focus-visible{outline:2px solid #8f7652;outline-offset:2px}
+.content-sheet .journal-anatomy-collapsible .journal-wound-count{font:normal 10px Georgia,serif;color:#71452d;padding:1px 4px;border:1px solid #a78b6680;border-radius:3px}
