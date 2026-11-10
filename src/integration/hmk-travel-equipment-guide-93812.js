@@ -55,9 +55,8 @@ export function planTravelEquipment93812(data,cid,v){
    addGear(a,['Bit & bridle'],'Povinná uzda pro jízdní zvíře (HMK 122)');
    addGear(a,['Blanket, horse'],'Povinná podložka/deka (HMK 122)');
    addGear(a,['Saddle, riding','Saddle, war'],'Povinné sedlo, stačí jeden z uvedených typů (HMK 122)');
-   const rider=stableHubProjection(data,cid,a.id).rider;
-   checks.push(rider?good('rider:'+a.id,a.name+' · jezdec určen','Jezdec '+rider.characterId+' je doložen v evidenci Stáje.'):
-    info('rider:'+a.id,a.name+' · jezdec není přiřazen','Je-li postava na zvířeti, doložte nasednutí ve Stáji a skutečnou hmotnost jezdce.'));
+   checks.push(info('rider:'+a.id,a.name+' · jezdec se vybírá v Pochodu',
+    'Jezdce a jeho aktuální hmotnost počítá Pochod; Stáj má pouze výstroj a náklad. Žádné samostatné nasedání se nevyžaduje.'));
   }
  }else{
   checks.push(pullers.length>=required?good('animals','Dostupná tažná zvířata',pullers.map(a=>a.name).join(', ')):

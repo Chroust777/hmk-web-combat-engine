@@ -4,6 +4,7 @@
  * GM attestation is required where HMK provides no feeding/resale price table.
  */
 import {VEHICLES_TACK_P122} from '../rules/conveyance-printed-p122.js';
+import {recordedTravelRide93823} from './hmk-travel-riding-93823.js';
 import {mountLoadENC,mountPersonalFatigue} from '../rules/gear-load.js';
 import {strengthEncumbranceModifier} from '../rules/encumbrance.js';
 import {filledWaterForItem} from './hmk-physical-water-ledger.js';
@@ -68,14 +69,18 @@ export function stableBurden(data,campaignId,animal){
  });
  const cargoLb=p.cargoLb+moved.reduce((sum,e)=>sum+e.currentWeightLb-e.weightLb,0);
  const gearAndCargoLb=p.tackLb+cargoLb;
- const riderWeightLb=p.rider?.weightLb??0;
+ // Travel, not old Stable mount buttons, owns the present riding position.
+ const travelRide=recordedTravelRide93823(data,campaignId,animal.id);
+ const riderWeightLb=travelRide?.loadLb??0;
  const minimumLb=gearAndCargoLb+riderWeightLb;
  const capacity=stableCargoCapacity(p,spec);
  const usesAnimalLoad=!!(spec.str&&spec.breed),loadKind=spec.breed==='camel'?'camel':spec.breed==='elephant'?'elephant':spec.breed==='bovine'?'bovine':'horse';
  const base=usesAnimalLoad?mountLoadENC(minimumLb,{kind:loadKind}):null;
  const adjusted=base===null?null:Math.max(0,base+strengthEncumbranceModifier(spec.str)+(spec.breed==='mule'?-20:0));
- return {...p,inventoryItems:moved,cargoLb,gearAndCargoLb,riderWeightLb,minimumLb,capacity,baseENC:base,adjustedENC:adjusted,
-  pf:adjusted===null?null:mountPersonalFatigue(adjusted),requiresAdditionalRiderWeight:!p.rider,
+ return {...p,legacyStableRider:p.rider,travelRide93823:travelRide,
+  rider:travelRide?.occupants?.length?{characterId:travelRide.occupants[0],weightLb:riderWeightLb,proofId:travelRide.sourceId}:null,
+  inventoryItems:moved,cargoLb,gearAndCargoLb,riderWeightLb,minimumLb,capacity,baseENC:base,adjustedENC:adjusted,
+  pf:adjusted===null?null:mountPersonalFatigue(adjusted),requiresAdditionalRiderWeight:!travelRide?.occupants?.length,
   cargoOverflow:capacity!==null&&cargoLb>capacity};
 }
 export function validateStableHub(data,offerForId=null){
@@ -94,7 +99,7 @@ export function validateStableHub(data,offerForId=null){
    requireValid(x.type!=='sale'||nonnegative(x.priceD),'neplatná prodejní cena');
    requireValid(narrative(x.reason),'prodej/opouštění vyžaduje podklad GM');
    requireValid(x.type!=='release'||x.priceD===0,'opuštění nesmí přidávat peníze');
-   requireValid(!state.tack.size&&!state.vehicles.size&&!state.cargo.size&&!state.inventory.size&&!state.gear.size&&!state.vehicleCargo.size&&!state.rider,'před vyřazením zvířete se musí vyložit náklad a oddělit výstroj/vozidla');
+   requireValid(!state.tack.size&&!state.vehicles.size&&!state.cargo.size&&!state.inventory.size&&!state.gear.size&&!state.vehicleCargo.size,'před vyřazením zvířete se musí vyložit náklad a oddělit výstroj/vozidla');
    state.exit=true;
   }else if(x.type==='tack-add'){
    const item=VEHICLES_TACK_P122.find(t=>t.id===x.itemId),factor=x.elephantMultiplier===5?5:1;
