@@ -47,36 +47,41 @@ export function validateTransportMassEvidence93816(p,memberIds,patientIds,actual
    actualOtherLoad===derived.otherLoadLb,'hmotnost cestujících nebo nákladu neodpovídá dokladu.');
  return true;
 }
-/** Explicit GM exception: one secured immobile passenger with a different,
- * active controlling rider. HMK p.122 says rider(s) count to mount ENC, but
- * does NOT certify safety; the GM must confirm how the patient is secured.
- * No invented mount capacity: check actual resulting ENC and MOVE. */
+/** v93.822: the group selects the handler's position for THIS travel episode.
+ * Stable rider history is not an extra passenger and must not be double counted.
+ * This is a calculation/transport configuration, not a Combat action.
+ */
 export function securedMountedPassenger93816({data,campaignId,minute,mountId,patientId,
-   memberIds,selectedStableIds,mass,gmConfirmed=false}={}){
- ok(gmConfirmed===true,'GM musí potvrdit skutečné zajištění pacienta na koni a schopnost jezdce jej vést.');
+   memberIds,selectedStableIds,mass,handlerId=null,handlerPosition='mounted',gmConfirmed=true}={}){
  ok(typeof mountId==='string'&&mountId&&typeof patientId==='string'&&patientId&&
-    memberIds?.includes(patientId)&&selectedStableIds?.includes(mountId),'vyberte skutečného koně a pacienta z této cestovní skupiny.');
+    memberIds?.includes(patientId)&&selectedStableIds?.includes(mountId),'vyberte skutečného koně a pacienta z této skupiny.');
  ok(mass?.format===TRANSPORT_MASS_FORMAT_93816&&mass.people?.length===memberIds.length&&
-    mass.patientLoadLb[patientId]>0&&Object.keys(mass.patientLoadLb).length===1,'na jednom koni lze zde doložit jednoho zabezpečeného pacienta. Pro další použijte vozidlo.');
+    mass.patientLoadLb[patientId]>0&&Object.keys(mass.patientLoadLb).length===1,
+    'zvolte jednoho pacienta na tomto koni; pro více pacientů použijte další zvíře nebo vozidlo.');
  const animal=verifiedLivestock(data,campaignId).find(a=>a.id===mountId);
- ok(animal&&['palfrey','courser','charger','destrier','pony'].includes(animal.spec.breed),'pacienta lze přepravovat jen na skutečném vhodném koni ze Stáje.');
- const p=stableHubProjection(data,campaignId,mountId),rider=p.rider;
- ok(rider?.characterId&&memberIds.includes(rider.characterId)&&rider.characterId!==patientId,
-   'kůň potřebuje samostatného aktivního jezdce, doloženého ve Stáji; pacient není řidič.');
- const certifiedRider=mass.people.find(w=>w.id===rider.characterId);
- ok(certifiedRider&&Math.abs(certifiedRider.totalLb-rider.weightLb)<.001,
-   'hmotnost jezdce se od nasednutí změnila; aktualizujte jezdecký záznam ve Stáji (sesednout / nasednout).');
+ ok(animal&&['palfrey','courser','charger','destrier','pony'].includes(animal.spec.breed),'vyberte koně ze Stáje.');
+ ok(['mounted','leading'].includes(handlerPosition),'vyberte zda průvodce jede, nebo vede koně pěšky.');
+ const chosenHandler=handlerId||memberIds.find(id=>id!==patientId);
+ ok(chosenHandler&&chosenHandler!==patientId&&memberIds.includes(chosenHandler),
+    'vyberte schopného průvodce ze stejné skupiny, který koně povede.');
+ const handler=mass.people.find(w=>w.id===chosenHandler);
+ ok(handler&&handler.totalLb>0,'chybí hmotnost průvodce.');
+ const p=stableHubProjection(data,campaignId,mountId);
  const names=p.tack.map(t=>VEHICLES_TACK_P122.find(g=>g.id===t.itemId)?.name);
- ok(names.includes('Bit & bridle')&&names.includes('Blanket, horse')&&
-    (names.includes('Saddle, riding')||names.includes('Saddle, war')),
-    'kůň nemá doloženou uzdu, deku a jezdecké sedlo.');
+ ok(names.includes('Bit & bridle')&&(names.includes('Saddle, riding')||names.includes('Saddle, war')),
+   'pro pacienta na koni doplňte uzdu a sedlo ve Stáji (koupit / zdarma).');
  const b=stableBurden(data,campaignId,animal);
- ok(!b.exit&&!b.cargoOverflow&&safe(b.minimumLb),'zvíře nemá doložené zatížení nebo je přetížené.');
- const totalLb=round(b.minimumLb+mass.patientLoadLb[patientId]);
+ ok(!b.exit&&safe(b.gearAndCargoLb),'zvíře není dostupné nebo jeho náklad nelze vypočítat.');
+ // Crucially NOT b.minimumLb: that includes a possibly stale Stable rider.
+ // Every actual occupant is counted exactly once for this travel episode.
+ const handlerOnHorse=handlerPosition==='mounted';
+ const handlerLb=handlerOnHorse?handler.totalLb:0;
+ const totalLb=round(b.gearAndCargoLb+mass.patientLoadLb[patientId]+handlerLb);
  const enc=Math.max(0,mountLoadENC(totalLb,{kind:'horse'})+strengthEncumbranceModifier(animal.spec.str));
- ok(Number.isSafeInteger(enc)&&Number.isFinite(animal.spec.move)&&animal.spec.move-enc>=5,
-    'kůň s jezdcem a pacientem nemá dostatečný zbývající Move; použijte káru/vůz.');
- return {format:MOUNT_PASSENGER_FORMAT_93816,campaignId,minute,mountId,patientId,riderId:rider.characterId,
-   animalName:animal.name,stableRiderProofId:rider.proofId,minimumLb:b.minimumLb,patientLb:mass.patientLoadLb[patientId],
-   totalLb,enc,moveAfterLoad:animal.spec.move-enc,gmConfirmed:true,sourcePages:[122,145]};
+ ok(Number.isSafeInteger(enc)&&Number.isFinite(animal.spec.move),'hmotnost nebo Move koně nejsou k dispozici.');
+ return {format:MOUNT_PASSENGER_FORMAT_93816,campaignId,minute,mountId,patientId,
+  riderId:handlerOnHorse?chosenHandler:null,handlerId:chosenHandler,handlerPosition,
+  animalName:animal.name,stableRiderProofId:null,minimumLb:b.gearAndCargoLb,
+  patientLb:mass.patientLoadLb[patientId],handlerLb,totalLb,enc,
+  moveAfterLoad:animal.spec.move-enc,gmConfirmed:true,sourcePages:[122,145]};
 }
