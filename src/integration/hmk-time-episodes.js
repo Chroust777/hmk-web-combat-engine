@@ -922,11 +922,24 @@ export function validateTimeEpisodes(journal=[]){
    }
   }
   if(e.animalHealth!==undefined){
+   // Older episodes had only animalIds (legacy veterinary actors). New
+   // journeys select physical animals once via stableAnimalIds; when one
+   // has a verified Combat State its health is ALSO mandatory evidence,
+   // without adding a second animal membership or speculative fatigue.
+   // Validate legacy prefix exactly and the optional stable-health suffix
+   // against the same immutable Stable selection, never by animal name.
+   const legacyAnimalIds=e.settings?.animalIds||[];
+   const stableAnimalIds=e.settings?.stableAnimalIds||[];
+   const healthIds=e.animalHealth.map(h=>h.actorId);
    must(e.kind==='travel'&&Array.isArray(e.animalHealth)&&
-    Array.isArray(e.settings?.animalIds)&&
-    e.animalHealth.length===e.settings.animalIds.length&&
-    e.animalHealth.every((h,i)=>h.actorId===e.settings.animalIds[i]),
-    'Zdravotní snapshot zvířat neodpovídá účastníkům cesty.');
+    (e.settings?.animalIds===undefined||Array.isArray(e.settings.animalIds))&&
+    (e.settings.stableAnimalIds===undefined||Array.isArray(e.settings.stableAnimalIds))&&
+    healthIds.length>=legacyAnimalIds.length&&
+    legacyAnimalIds.every((id,i)=>healthIds[i]===id)&&
+    healthIds.slice(legacyAnimalIds.length).every(id=>stableAnimalIds.includes(id))&&
+    new Set([...legacyAnimalIds,...stableAnimalIds]).size===legacyAnimalIds.length+stableAnimalIds.length&&
+    new Set(healthIds).size===healthIds.length,
+    'Zdravotní snapshot zvířat neodpovídá jedinečnému výběru zvířat ze Stáje.');
    must(!e.animals?.length,'HMK p.145: nesmí vzniknout automatická zvířecí únava bez pravidla.');
    for(const h of e.animalHealth){
     validateTrekAnimalHealthProof(h,h.actorId);
