@@ -203,6 +203,7 @@ import {weather24HourTimeline,trekkingDaylightSeason} from './src/integration/hm
 import {calendarTravelWeatherSegments,firstCalendarTravelBoundary} from './src/integration/hmk-weather-calendar-timeline-93730.js';
 import {visibleWeather} from './src/integration/hmk-weather-phrases-93730.js';
 import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-scope.js';
+import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {EPISODE_FORMAT,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry} from './src/integration/hmk-time-episodes.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
@@ -343,7 +344,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.819';
+const APP_VERSION='93.820';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2923,7 +2924,7 @@ function timeEpisodePageHTML(clock,participants){
 
  <p class="hc-hint" data-episode-hazard-context>Doklad se přiřadí výhradně k aktuálnímu pravidlovému následku.</p></div><p data-episode-hazard-result class="hc-hint">Všechny povinné následky se ověří před finálním zápisem celé epizody.</p></fieldset>
  <fieldset data-episode-weather-details hidden><legend>Prochladnutí / přehřátí · HMK 149</legend>
- <p class="hc-hint">U každé exponované postavy je povinný skutečný Endurance/Survival Skill Test. Jeho SV ani kostky se nevymýšlejí: vyberte původní doklad. Cestování zaznamená jen průběh expozice a cestovní Fatigue. Po potvrzení epizody kalendář nabídne samostatné zdravotní vyhodnocení ve Skill Tests; před potvrzením nevzniká rána ani nový zdravotní stav.</p>
+ <p class="hc-hint">Každá expozice vyžaduje skutečný Endurance (Survival) hod. Schopná postava jej doloží původním Skill Testem; nepohyblivá INC/UNC provádí pouze nedobrovolný zdravotní odpor (d100) bez samostatné akce. Vypočte se z ověřené Endurance, Survival a aktuální Fatigue. Po dokončení Pochodu se zdravotní následky zapisují ve Zdraví &amp; Expozice; žádná rána se předem nevytváří.</p>
  ${['cold','heat'].map(h=>`<div data-episode-weather-kind="${h}"><h4>${h==='cold'?'❄️ Nebezpečný chlad':'☀️ Nebezpečné horko'}</h4>
  ${participants.map(c=>`<details class="hc-weather-actor" data-episode-weather-actor="${esc(c.id)}"><summary>${esc(c.name)} · ${h==='cold'?'chlad':'horko'}</summary>
  <div class="hc-weather-actor-steps">
@@ -2946,7 +2947,8 @@ function timeEpisodePageHTML(clock,participants){
  <div class="hmk-trek-grid hc-weather-step-grid"><label>Skutečný Hazard hod<span class="hc-episode-die"><input name="whRoll_${h}_${esc(c.id)}" type="number" min="1" max="${h==='cold'?6:4}" placeholder="1–${h==='cold'?6:4}"><button type="button" data-episode-die="whRoll_${h}_${esc(c.id)}" data-episode-faces="${h==='cold'?6:4}">⚄ d${h==='cold'?6:4}</button></span></label></div>
  </section>
  <section class="hc-weather-step"><h5>3 · Endurance (Survival) · jen při expozici</h5>
- ${['INC','UNC'].includes(persistentStateOf(c)?.shock)?'<p class="notice warning">Shock '+esc(persistentStateOf(c).shock)+': tato postava nesmí vykonávat samostatný Skill Test. Při skutečné expozici je nutné původní zdravotní vyhodnocení GM, nikoli fiktivní Endurance. Pokud zvíře/pacient není vystaven, doložte skutečnou ochranu a Hazard Roll.</p>':''}
+ ${['INC','UNC'].includes(persistentStateOf(c)?.shock)?`<div class="notice warning" data-episode-passive-weather="${h}_${esc(c.id)}"><strong>Shock ${esc(persistentStateOf(c).shock)} · pasivní Endurance (Survival)</strong><p>Nepohyblivý pacient nevykonává žádnou akci. Je-li skutečně exponován, zadejte jediný pasivní odporový hod d100. Aplikace vypočte výsledek z ověřené Endurance, sekundárního Survival a Fatigue; následky se potvrdí až po Pochodu v původním zdravotním modulu.</p>
+ <label>Skutečný pasivní Endurance d100<span class="hc-episode-die"><input name="whPassiveD100_${h}_${esc(c.id)}" type="number" min="1" max="100" placeholder="1–100"><button type="button" data-episode-die="whPassiveD100_${h}_${esc(c.id)}" data-episode-faces="100">⚄ d100</button></span></label><label class="hc-check"><input name="whPassiveConfirmed_${h}_${esc(c.id)}" type="checkbox"> GM potvrzuje skutečný hod a pasivní (neaktivní) zdravotní odpor</label></div>`:''}
  <div class="hmk-trek-grid hc-weather-step-grid">
  <label>Původní samostatně vyžádaný Endurance/Survival doklad<select name="whProof_${h}_${esc(c.id)}"><option value="">— čeká na vyžádaný test —</option>${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&['Endurance','Survival'].some(skill=>episodeSkillProof(j,skill,c.id,campaignKey(clock),clock.minute))).map(j=>`<option value="${esc(j.id)}">${esc(j.title||'Skill Test')} · ${esc((j.skillTestProof.a||j.skillTestProof.result)?.level||'—')}</option>`).join('')}</select></label>
  <label>Výsledek Endurance (automaticky převzatý z dokladu)<select name="whEnd_${h}_${esc(c.id)}"><option value="">— zatím není vyžádán —</option>${['CF','F','S','CS'].map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label>
@@ -10992,8 +10994,8 @@ function pendingWeatherNoEffectAftercare(){
   for(const w of ep.weatherExposure||[]){
    if(!w.exposed||['coolWater','coldWater','freezingWater'].includes(w.coldCondition))continue;
    const original=data.journal.find(j=>j.id===w.proofId&&j.characterId===w.id&&j.calendarCampaignId===camp);
-   const level=(original?.skillTestProof?.a||original?.skillTestProof?.result)?.level;
-   if(!['S','CS'].includes(level))continue;
+   const level=w.passiveResistance?.level??(original?.skillTestProof?.a||original?.skillTestProof?.result)?.level;
+   if(!['S','CS'].includes(level)||(!original&&!w.passiveResistance))continue;
    const sourceId=episodeWeatherAftercareId(receipt.id,w.id,w.kind);
    if(data.journal.some(j=>j.characterId===w.id&&j.skillTestProof?.type==='skill-weather-onset'&&j.skillTestProof.sourceId===sourceId))continue;
    const actor=character(w.id);
@@ -11021,7 +11023,7 @@ function closeWeatherNoEffectAftercare(){
    createdAt:stamp(),title:'Trekking '+w.kind+' Hazard · automatické potvrzení bez zdravotního následku · HMK 149',
    body:'Původní doložený výsledek '+level+'; cestovní Fatigue již byla zapsána. Žádný další hod ani rána.',
    skillTestProof:{type:'skill-weather-onset',sourceId,actorId:actor.id,report:outcome.report,
-    episodeId:receipt.id,originalSkillProofId:original.id,automaticNoEffect:true}});
+    episodeId:receipt.id,originalSkillProofId:original?.id??null,passiveResistance:w.passiveResistance??null,automaticNoEffect:true}});
  }
  return rows.length;
 }
@@ -11042,7 +11044,8 @@ function hskEpisodeWeatherOnsetForms(actorId){
      (x.skillTestProof.sourceId===w.proofId&&x.skillTestProof.report?.kind===w.kind))))continue;
    const proof=data.journal.find(x=>x.id===w.proofId&&x.characterId===actorId&&
     x.calendarCampaignId===camp);
-   if(!proof||!['CF','F','S','CS'].includes((proof.skillTestProof?.a||proof.skillTestProof?.result)?.level))continue;
+   const onsetLevel=w.passiveResistance?.level??(proof?.skillTestProof?.a||proof?.skillTestProof?.result)?.level;
+   if(!['CF','F','S','CS'].includes(onsetLevel))continue;
    // Water immersion demands an immediate one-time Shock procedure BEFORE
    // the separate Exposure outcome, regardless of the original Hazard SL.
    const water=w.kind==='cold'&&['coolWater','coldWater','freezingWater'].includes(w.coldCondition);
@@ -11057,7 +11060,7 @@ function hskEpisodeWeatherOnsetForms(actorId){
    }
    forms.push(`<details class="hsk-climb-fall"><summary>${w.kind==='cold'?'Cold':'Heat'} Hazard – zdravotní následek v ${esc(displayCampaignMinute(episode.endMinute))} · HMK 149,185</summary>
     <form data-skill-weather-onset><input type="hidden" name="sourceId" value="${esc(sourceId)}"><input type="hidden" name="episodeId" value="${esc(e.id)}"><input type="hidden" name="kind" value="${esc(w.kind)}">
-    <p>Původní Endurance/Survival má výsledek ${esc((proof.skillTestProof.a||proof.skillTestProof.result).level)}. Je již interně propojen se správnou postavou, minutou a původním dokladem; tento hod se neopakuje. Cestovní Fatigue je již započtená; zde se potvrdí pouze samostatný zdravotní následek.</p>
+    <p>Původní ${w.passiveResistance?'pasivní zdravotní Endurance (Survival)':'Endurance/Survival'} má výsledek ${esc(onsetLevel)}. Je již propojen se správnou postavou, minutou a skutečným hodem; d100 se neopakuje. Cestovní Fatigue je již započtená; zde se potvrdí pouze samostatný zdravotní následek.</p>
     <p>Skutečné podmínky Cold Hazard: ${esc(w.coldCondition||'dry')}. Původní identifikátor expozice zůstává bezpečně uložen v deníku.</p>
     <button type="submit">Potvrdit zdravotní následek Weather Hazard</button><output role="status" aria-live="polite"></output></form></details>`);
   }
@@ -12522,19 +12525,21 @@ document.addEventListener('submit',event=>{
   const episodeExposure=episodeReceipt?.calendarTimeEpisode?.weatherExposure?.find(w=>w.kind===episodeKind&&
    episodeWeatherAftercareId(episodeReceipt.id,w.id,w.kind)===sourceId);
   const src=data.journal.find(x=>x.id===(episodeExposure?.proofId||sourceId)),proof=src?.skillTestProof;
-  const actor=character(src?.characterId),result=proof?.a||proof?.result;
-  if(!actor||src?.characterId!==actor.id||!['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill)||
+  const passive=episodeExposure?.passiveResistance;
+  const actor=character(passive?episodeExposure.id:src?.characterId);
+  const result=passive?{level:passive.level}:proof?.a||proof?.result;
+  if(!actor||(!passive&&(src?.characterId!==actor.id||!['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill)))||
    !['CF','F','S','CS'].includes(result?.level))throw Error('Chybí doložený původní test Endurance (Survival)');
   if(combatActorLocked93725(actor.id))throw Error('Zdravotní stav účastníka boje řídí Combat');
   let kind=null,atMinute=data.campaignClock.minute,coldCondition=form.elements.namedItem('coldCondition')?.value||'dry';
   if(episodeId){
-   const receipt=data.journal.find(j=>j.id===episodeId&&j.calendarCampaignId===src?.calendarCampaignId);
+   const receipt=data.journal.find(j=>j.id===episodeId&&j.calendarCampaignId===(passive?episodeReceipt?.calendarCampaignId:src?.calendarCampaignId));
    const episode=receipt?.calendarTimeEpisode;
    kind=form.elements.namedItem('kind')?.value;
-   const exposure=episode?.weatherExposure?.find(w=>w.id===actor?.id&&w.kind===kind&&w.exposed===true&&w.proofId===src?.id);
+   const exposure=episode?.weatherExposure?.find(w=>w.id===actor?.id&&w.kind===kind&&w.exposed===true&&(passive?w.passiveResistance===passive:w.proofId===src?.id));
    if(!exposure||episode.weatherAftercare!=='external-v93.676'||
      sourceId!==episodeWeatherAftercareId(receipt.id,actor.id,kind)||
-     src.calendarCampaignId!==campaignKey(data.campaignClock)||
+     (passive?receipt.calendarCampaignId:src.calendarCampaignId)!==campaignKey(data.campaignClock)||
      data.campaignClock.minute!==episode.endMinute)
     throw Error('Weather Onset neodpovídá uloženému cestovnímu dokladu, postavě nebo splatné minutě.');
    coldCondition=exposure.coldCondition||'dry';atMinute=episode.endMinute;
@@ -12560,16 +12565,16 @@ document.addEventListener('submit',event=>{
   if(!mutate(()=>{
    if(data.journal.some(x=>x.characterId===actor.id&&x.skillTestProof?.type==='skill-weather-onset'&&
     (x.skillTestProof.sourceId===sourceId||
-     (episodeId&&x.skillTestProof.sourceId===src.id&&x.skillTestProof.report?.kind===kind))))throw Error('Dvojí zápis');
+     (episodeId&&src?.id&&x.skillTestProof.sourceId===src.id&&x.skillTestProof.report?.kind===kind))))throw Error('Dvojí zápis');
    synchronizeCombatInjuries(actor,outcome.state);
    data.journal.push({id:uuid(),characterId:actor.id,
-    calendarCampaignId:src.calendarCampaignId,campaignMinute:atMinute,
+    calendarCampaignId:passive?episodeReceipt.calendarCampaignId:src.calendarCampaignId,campaignMinute:atMinute,
     title:'Trekking '+kind+' Hazard · HMK 149,185',
     body:'Původní '+result.level+' · HR '+(outcome.report.hr??'bez expozice')+
      ' · Weariness +'+(episodeId?0:outcome.report.addedWeariness)+
      (outcome.report.skinPending?' · VYŽADUJE samostatné '+outcome.report.skinPending:''),createdAt:stamp(),
     skillTestProof:{type:'skill-weather-onset',sourceId,actorId:actor.id,report:outcome.report,
-     ...(episodeId?{episodeId,originalSkillProofId:src.id}: {})}});
+     ...(episodeId?{episodeId,originalSkillProofId:src?.id??null,passiveResistance:passive??null}: {})}});
   }))throw Error('Zápis Weather Hazard se neuložil');
   form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Weather Hazard byl doložen a uložen. Následné Course/Healing hody jsou dostupné v deníku.'}));
  }catch(e){if(out)out.textContent='Weather Hazard nebyl uložen: '+e.message;}
@@ -12587,20 +12592,27 @@ document.addEventListener('submit',event=>{
   const condition=form.elements.namedItem('condition').value;
   const linked=episodeId?episode?.weatherExposure?.find(w=>w.kind==='cold'&&w.exposed===true&&
    episodeWeatherAftercareId(episodeId,w.id,w.kind)===sourceId):null;
-  const src=manual?null:data.journal.find(x=>x.id===(linked?.proofId||sourceId)),proof=src?.skillTestProof;
-  const actor=manual?character(form.elements.namedItem('actorId').value):character(proof?.actorId),
-   result=proof?.a||proof?.result;
+  const passive=linked?.passiveResistance??null;
+  const src=manual||passive?null:data.journal.find(x=>x.id===linked?.proofId),proof=src?.skillTestProof;
+  const actor=manual?character(form.elements.namedItem('actorId').value):
+    character(passive?linked?.id:proof?.actorId),result=passive?{level:passive.level}:proof?.a||proof?.result;
   if(manual){
    if(!/^gm-cold-immersion:[a-z0-9._:-]{10,}$/i.test(sourceId))throw Error('Chybí jedinečný doklad skutečného ponoření');
    if(!clock||!actor||actor.id!==selected||!calendarMemberIds(clock,data.characters).some(x=>x.id===actor.id)||
     view!=='sheet'||activeSheetSection!=='hazards'||hazardComposer?.kind!=='cold-water'||hazardComposer.actorId!==actor.id)
     throw Error('Jednorázový Cold Shock smí zahájit GM jen pro přítomnou postavu v aktuálním čase kampaně.');
-  }else if(!actor||actor.id!==src.characterId||
+  }else if(passive){
+   if(!actor||linked.proofId!==null||!verifyPassiveWeatherResistance(passive)||
+    !['CF','F','S','CS'].includes(result?.level)||
+    actor.hmk?.healthState?.shock!==passive.shock)
+    throw Error('Cold Shock neodpovídá doložené pasivní zdravotní odolnosti INC/UNC.');
+  }else if(!actor||actor.id!==src?.characterId||
    !['CF','F','S','CS'].includes(result?.level)||
-   !['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill))throw Error('Nedoložený původní Cold Hazard');
-  if(episodeId&&(!linked||linked.id!==actor.id||linked.proofId!==src.id||
+   !['Endurance','Survival'].includes(proof?.skills?.[0]||proof?.skill))
+    throw Error('Nedoložený původní Cold Hazard');
+  if(episodeId&&(!linked||linked.id!==actor.id||linked.proofId!==(src?.id??null)||
    episode.weatherAftercare!=='external-v93.676'||receipt.calendarCampaignId!==campaignKey(data.campaignClock)||
-   src.calendarCampaignId!==receipt.calendarCampaignId||data.campaignClock.minute!==episode.endMinute||
+   (!passive&&src.calendarCampaignId!==receipt.calendarCampaignId)||data.campaignClock.minute!==episode.endMinute||
    linked.coldCondition!==condition||!['coolWater','coldWater','freezingWater'].includes(condition)))
    throw Error('Cold Shock neodpovídá potvrzené cestovní epizodě, postavě, vodě nebo přesné minutě.');
   if(combatActorLocked93725(actor.id))throw Error('Cold Shock účastníka boje patří do Combat State');
@@ -12618,7 +12630,7 @@ document.addEventListener('submit',event=>{
     body:'3d6: '+outcome.report.immersionRounds+' kol · Endurance '+outcome.report.enduranceD100+' → '+outcome.report.sl+' · SHK '+outcome.report.index+' · '+outcome.report.shock,
     createdAt:stamp(),skillTestProof:{type:'skill-cold-water-shock',sourceId,actorId:actor.id,report:outcome.report,
      ...(manual?{gmImmersionConfirmed:true,campaignMinute:clock.minute}:{}),
-    ...(episodeId?{episodeId,originalSkillProofId:src.id}: {})}});
+    ...(episodeId?{episodeId,originalSkillProofId:src?.id??null,passiveResistance:passive??null}: {})}});
   }))throw Error('Cold Shock nebyl uložen');
   form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Cold Shock uložen jako Weather zdravotní událost; případný Shock Reroll řešte ve Zdraví & Expozice.'}));
  }catch(e){if(out)out.textContent='Cold Shock nebyl zapsán: '+e.message;}
@@ -23533,25 +23545,36 @@ function episodePreviewFromForm(form,clock){
    const coldProof=hazard==='cold'?resolveColdHazardEquipment({inventory:data.inventory,actorId:id,
     gearId:String(field('whGearId')||''),shelterId:String(field('whShelterId')||''),usedConfirmed:field('whUseConfirmed')==='yes',
     fireFS:Number(field('whFire')||0),fireConfirmed:field('whFireConfirmed')==='yes'}):null;
-   const item=episodeWeatherExposure({kind:hazard,areaAV:area.value,
+   let item=episodeWeatherExposure({kind:hazard,areaAV:area.value,
     protection:coldProof?coldProof.gearAV+coldProof.shelterAV:0,fireStrength:coldProof?.fireFS??0,
     continuousSleet:hazard==='cold'&&!!precipitation?.continuous&&seasonWeather.hasPrecipitation&&seasonWeather.precipitationRoll===seasonWeather.precipitationTN,
     resting:['rest','sleep','winded'].includes(kind),shade:!!field('whShade'),tropicalNative:!!field('whNative'),
     roll:String(field('whRoll')||'').trim()?Number(field('whRoll')):null,
     endLevel:field('whEnd')||null});
-   // Shock INC/UNC forbids independent Skill Tests (HMK p.169).
-   // Weather exposure still matters: do not invent S/CF or imply immunity.
-   // An exposed patient needs an original GM/medical ruling, not the active
-   // Endurance Skill Test route used for a conscious participant.
+   // INC/UNC forbids independent ACTIONS, not involuntary resistance to
+   // heat/cold: HMK 149 explicitly still requires Endurance (Survival).
    const patientShock=travelHealth.find(p=>p.id===id)?.shock||persistentStateOf(character(id))?.shock||'NONE';
-   if(item.exposed&&['INC','UNC'].includes(patientShock))
-    throw Error('Weather Hazard '+id+'/'+hazard+': Shock '+patientShock+' zakazuje samostatný Endurance Skill Test (HMK 169). U nepohyblivého pacienta nelze domýšlet výsledek expozice. GM musí doložit skutečnou ochranu před počasím, nebo zdravotní následek vyřešit v původním zdravotním modulu.');
-   const proofId=String(field('whProof')||'').trim()||null;
+   const incapacitated=['INC','UNC'].includes(patientShock);
+   let passive=null;
+   if(item.exposed&&incapacitated){
+    const passiveRaw=String(field('whPassiveD100')||'').trim();
+    if(passiveRaw){
+     passive=passiveWeatherResistance(character(id),Number(passiveRaw),field('whPassiveConfirmed')===true);
+     item=episodeWeatherExposure({kind:hazard,areaAV:area.value,
+      protection:coldProof?coldProof.gearAV+coldProof.shelterAV:0,fireStrength:coldProof?.fireFS??0,
+      continuousSleet:hazard==='cold'&&!!precipitation?.continuous&&seasonWeather.hasPrecipitation&&seasonWeather.precipitationRoll===seasonWeather.precipitationTN,
+      resting:['rest','sleep','winded'].includes(kind),shade:!!field('whShade'),tropicalNative:!!field('whNative'),
+      roll:item.roll,endLevel:passive.level});
+    }
+   }
+   const proofId=incapacitated?null:String(field('whProof')||'').trim()||null;
    const proofRow=data.journal.find(j=>j.id===proofId);
    const proof=proofId?(episodeSkillProof(proofRow,'Endurance',id,campaignKey(clock),clock.minute)||
     episodeSkillProof(proofRow,'Survival',id,campaignKey(clock),clock.minute)):null;
-   if(item.exposed&&(!proof||proof.level!==item.endLevel))throw Error('Weather Hazard '+id+'/'+hazard+': zvolte skutečný Endurance/Survival test odpovídající zadanému výsledku.');
-   result.weatherExposure.push({id,...item,proofId:item.exposed?proof.skillId:null,
+   if(item.exposed&&!incapacitated&&(!proof||proof.level!==item.endLevel))throw Error('Weather Hazard '+id+'/'+hazard+': zvolte skutečný Endurance/Survival test odpovídající zadanému výsledku.');
+   if(incapacitated&&String(field('whProof')||'').trim())throw Error('Weather Hazard '+id+'/'+hazard+': nepohyblivá postava nesmí použít samostatný Skill Test; použijte pasivní zdravotní odpor.');
+   result.weatherExposure.push({id,...item,proofId:item.exposed&&!incapacitated?proof.skillId:null,
+    ...(passive?{passiveResistance:passive}:{}),
     ...(coldProof?{coldProtection:{gearSourceId:coldProof.gearSourceId,shelterSourceId:coldProof.shelterSourceId,gearName:coldProof.gearName,automaticCloak:coldProof.automaticCloak,inventoryWitness:coldProof.inventoryWitness}}:{}),
     coldCondition:hazard==='cold'?field('whCold')||'dry':null});
   }
@@ -23766,9 +23789,9 @@ function episodeEndTasks(result){
   else if(w.effect==='pending-endurance'){
    const shock=persistentStateOf(character(w.id))?.shock||'NONE';
    if(['INC','UNC'].includes(shock))
-    tasks.push({name:'Počasí · '+person+' · pacient v Shock '+shock,
-     detail:'Neprovádějte samostatný Endurance Skill Test. Expozice vyžaduje skutečné zdravotní rozhodnutí GM a ochranu pacienta; výsledek nelze domýšlet.',
-     action:'whRoll'+tail,skill:null,actorId:null});
+    tasks.push({name:'Počasí · '+person+' · pasivní odolnost v Shock '+shock,
+     detail:'Expozice je doložena. Proveďte skutečný pasivní Endurance d100 a potvrďte jej GM. Žádná aktivní akce ani fiktivní úspěch.',
+     action:'whPassiveD100'+tail,skill:null,actorId:null});
    else tasks.push({name:'Počasí · '+person+' · Endurance',
     detail:'Expozice byla potvrzena; otevřete a uložte skutečný Endurance (Survival) Skill Test.',
     action:'whProof'+tail,skill:'Endurance',actorId:w.id});
@@ -24109,7 +24132,7 @@ let episodeFocusedTaskField='';
 function episodeTaskArea(field){
  if(/^(hazard|survivalD10)/.test(field))return field==='survivalD10'?'motion':'hazard';
  if(/^(ev[A-Z_]|encounter)/.test(field))return 'encounter';
- if(/^(whProof_|whRoll_|whAV_|end_|precipitationD6)/.test(field))return field.startsWith('wh')?'weather':'fatigue';
+ if(/^(whProof_|whRoll_|whAV_|whPassiveD100_|end_|precipitationD6)/.test(field))return field.startsWith('wh')?'weather':'fatigue';
  if(/^(progressD10|directionD10|extraSlow|mode_|loaded|doubleTime)/.test(field))return 'motion';
  if(/^(travelForage|travelHabitat|travelHerb|forage|habitat|herb)/.test(field))return 'foraging';
  return 'other';
@@ -24174,7 +24197,7 @@ function updateEpisodeTaskFocus(form){
   node.hidden=!!compActor&&node.dataset.episodeComplicationActor!==compActor;
  // Area AV and individual hazard dice are actor-specific too. Reveal and
  // open precisely the actor requested by the one-step checklist.
- const weatherMatch=field.match(/^wh(?:Proof|Roll|AV)_(cold|heat)_(.+)$/);
+ const weatherMatch=field.match(/^wh(?:Proof|Roll|AV|PassiveD100)_(cold|heat)_(.+)$/);
  if(weatherMatch)for(const node of form.querySelectorAll('[data-episode-weather-actor]')){
   const current=node.dataset.episodeWeatherActor===weatherMatch[2];
   node.hidden=!current;
