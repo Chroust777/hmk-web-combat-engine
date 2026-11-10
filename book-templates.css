@@ -7497,3 +7497,20 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 }
 .shell-skills .hc-episode-skill-return-inline button{max-width:100%;white-space:normal}
 .shell-skills .hc-episode-skill-return-inline small{font-size:.79rem;color:#6b563c}
+
+
+/* v93.814 · Pochod: one animal selector, readable correction, no legacy chooser. */
+.hc-episode-shell [data-episode-legacy-members][hidden],
+.hc-episode-shell [data-episode-legacy-guide][hidden],
+.hc-episode-shell [data-episode-mandatory-cap][hidden],
+.hc-episode-shell [data-shared-window-cap][hidden]{display:none!important}
+.hc-episode-stable-animal{padding:.55rem .6rem;margin:.48rem 0;border:1px solid rgba(116,78,43,.27);border-radius:7px;background:rgba(255,247,227,.35)}
+.hc-episode-stable-animal .hc-episode-animal-health{margin:.18rem 0 .35rem 1.6rem;font-size:.83rem;line-height:1.5}
+.hc-episode-animal-unfit .hc-episode-animal-health{color:#982f28;font-weight:700}
+.hc-episode-animal-actions{display:flex;gap:.55rem;align-items:flex-start;flex-wrap:wrap;margin-left:1.6rem}
+.hc-episode-animal-actions details{flex:1 1 13rem;min-width:0}
+.hc-episode-animal-actions button{max-width:100%;white-space:normal}
+.hc-shared-window-cap:not([hidden]){padding:.6rem .75rem;border-left:3px solid rgba(122,85,43,.7);background:rgba(247,234,206,.5);line-height:1.48;margin:.45rem 0 .75rem}
+.hc-episode-spread-right .hc-episode-task.hc-episode-setup-task{display:block;min-width:0;overflow-wrap:anywhere}
+.hc-episode-spread-right .hc-episode-task.hc-episode-setup-task>strong{display:block;margin-bottom:.35rem}
+.hc-episode-spread-right .hc-episode-task.hc-episode-setup-task>button{display:inline-block;width:auto;max-width:100%;min-width:min(100%,10rem);white-space:normal}
