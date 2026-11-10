@@ -343,7 +343,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.817';
+const APP_VERSION='93.818';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2846,7 +2846,7 @@ function timeEpisodePageHTML(clock,participants){
  <select name="orientationLowChoice"><option value="slow">Slow Mode</option><option value="lax">Lax Mode</option></select></label>
  <label data-episode-drover>Drover · doložený Riding / Animalcraft při dopravě se zvířaty<select name="droverProofId"><option value="">— Vyberte skutečný hod —</option>${skillOptions('Riding')}${skillOptions('Animalcraft')}</select></label>
  </div>
- <div data-episode-tracking><label>Tracking · rozhodnutí GM<select name="trackingUse"><option value="new">Nový Tracking SV</option><option value="reuse">Převzít skutečný SV pro bezprostřední sledování stejné stopy</option><option value="none">Bez Tracking hodu</option></select></label>
+ <div data-episode-tracking><p class="hc-hint">Stalking umožňuje sledování stop, ale samo ho nenařizuje. Pokud chcete sledovat konkrétní stopu, zvolte před vyhodnocením nový Tracking test nebo oprávněné pokračování.</p><label>Tracking · rozhodnutí GM<select name="trackingUse"><option value="new">Nový Tracking SV</option><option value="reuse">Převzít skutečný SV pro bezprostřední sledování stejné stopy</option><option value="none">Bez Tracking hodu</option></select></label>
  <label>Identifikace stopy (stejný název při pokračování)<input name="trackingTrail" maxlength="120" placeholder="Např. stopy zraněného vlka"></label>
  <fieldset class="hc-episode-tracking-conditions"><legend>Tracking · podmínky a Spoor podle HMK 147 ${episodeRuleHelp('Tracking','Tracking při cestování se použije pouze s doloženým Stalking Mode, nebo jako samostatná činnost Sledování stop. Ke skutečnému Tracking SV se přičítá sníh +4, déšť −1, každých 5 sledovaných osob +1, soumrak −1, noc −3, alpská vegetace −1, nezpevněná cesta −2 nebo zpevněná −4. SV ≤2 bez účinku; 3–4 následný Awareness; 5+ Spoor hvězdy; CF vyžaduje Bearing při další cestovní epizodě. Hody d100 se provádí v původních Skill Tests.')}</legend><div class="hmk-trek-grid">
  <input type="hidden" name="trackingLight" value="day">
@@ -13746,7 +13746,7 @@ function hskPreviewFor(form,person,field,side){
  try{
   const info=hskFields(form,side);if(!info.primary)return;
   const mastery=skillActorMastery(person,info.primary),ctx=skillAutoFor(person,info.primary,form,side),secs=hskValidatedSecondaries(person,info);
-  const helpers=form.id==='skill-assistance-form'?skillAssistantMLs(form,mastery.name):form.id==='skill-value-form'?hskAlchemySVHelpers(form,mastery.name):[];
+  const helpers=form.id==='skill-assistance-form'?skillAssistantMLs(form,mastery.name):form.id==='skill-value-form'?hskSVHelpers93818(form,mastery.name):[];
   const assist=Math.min(10,helpers.filter(x=>x.mastery.ml*2>=mastery.ml).reduce((total,x)=>total+x.mastery.index,0));
   node.innerHTML=hskTrace(person,mastery,ctx,secs,assist,hskGMModifier(form,side));
  }catch(err){node.innerHTML='<div class="hsk-calculation hsk-unready"><b>Pravidlová kontrola:</b> '+esc(err.message)+'<p class="tiny muted">Test není zrušen: lze vyřešit stav v inventáři, nebo doložit rozhodnutí GM pro chybějící hodnoty ENC / Bulk / PER. Nedoložený postih nelze automaticky považovat za nulu.</p></div>';}
@@ -13832,8 +13832,22 @@ function refreshSkillAutoPreview(form){
  const actor=character(selected);if(!actor)return;
  hskPreviewFor(form,actor,'primary','A');
  hskRefreshSRTarget(form,actor,'A');
- if(form.id==='skill-value-form'){const block=form.querySelector('[data-alchemy-sv-helpers]');
-  if(block)block.hidden=form.elements.namedItem('srActivityA')?.value!=='alchemy-elixir';}
+ if(form.id==='skill-value-form'){
+  const block=form.querySelector('[data-alchemy-sv-helpers]');
+  if(block)block.hidden=form.elements.namedItem('srActivityA')?.value!=='alchemy-elixir';
+  const orientBlock=form.querySelector('[data-orienteering-sv-helpers]');
+  const orientContext=hskOrienteeringAssistanceContext93818();
+  if(orientBlock){
+   orientBlock.hidden=!orientContext||form.elements.namedItem('primary')?.value!=='Survival';
+   const validIds=new Set(orientContext?.plan?.memberIds||[]),guide=character(selected);
+   const guideML=guide?availableMasteries(guide).find(x=>x.name==='Survival')?.ml??0:0;
+   for(const choice of orientBlock.querySelectorAll('select[name^="orientAssist"] option[value]:not([value=""])')){
+    const helper=character(choice.value),ml=helper?availableMasteries(helper).find(x=>x.name==='Survival')?.ml??0:0;
+    choice.disabled=!orientContext||!validIds.has(choice.value)||choice.value===selected||ml*2<guideML;
+    if(choice.disabled&&choice.selected)choice.parentElement.value='';
+   }
+  }
+ }
  if(form.id==='skill-value-form'){const guide=form.querySelector('[data-sv-guide]');if(guide){const ml=skillActorMastery(actor,form.elements.namedItem('primary')?.value).ml;const idx=Math.floor(ml/10);guide.innerHTML='<div class="hsk-sv-guide"><strong>Primary ML '+ml+' → Index '+idx+'</strong><p class="tiny muted">Hod d100 určí úpravu Indexu. Platí původní ML, nikoli EML.</p><div class="hsk-sv-outcomes">'+[['CF',-2],['F',-1],['S',0],['CS',1]].map(([level,modifier])=>{const value=idx+modifier,stars=Math.max(0,Math.min(5,value-4));return '<span><b>'+level+'</b> '+(modifier>0?'+':'')+modifier+' → SV '+value+' · '+(stars?'★'.repeat(stars):'—')+'</span>';}).join('')+'</div></div>';}}
  if(form.id==='skill-secondary-form'&&form.elements.namedItem('opposed')?.checked){
   const opponent=character(form.elements.namedItem('opponentId')?.value);
@@ -13997,6 +14011,44 @@ document.addEventListener('click',e=>{const t=e.target.closest?.('[data-skill-ta
  const thisForm=root?.querySelector(activeSkillTab==='value'?'#skill-value-form':activeSkillTab==='assistance'?'#skill-assistance-form':activeSkillTab==='secondary'?'#skill-secondary-form':'[data-skill-section="none"]');
  if(thisForm){hskConfigureSR(thisForm,'A');if(thisForm.id==='skill-secondary-form')hskConfigureSR(thisForm,'B');refreshSkillAutoPreview(thisForm);}
 });
+// HMK 1.2 p.145: up to two other members of this actual travel group may
+// assist the GUIDE's one Survival Success Value test. This is not an
+// independent Assistance test and does not modify the primary SV Index.
+function hskOrienteeringAssistanceContext93818(){
+ const r=episodePendingSkillRequest,clock=data.campaignClock,plan=sharedPlanCurrent93771();
+ if(!(r?.status==='waiting'&&r.id===episodeActiveSkillRequestId&&
+  r.episodeEpoch===episodeDraftEpoch&&r.field==='orientationProofId'&&r.skill==='Survival'&&
+  r.campaignId===campaignKey(clock)&&r.minute===clock?.minute&&
+  r.actorId===selected&&plan?.actorId===selected&&
+  Array.isArray(plan.memberIds)&&plan.memberIds.includes(selected)&&
+  episodeSkillAuthorized(selected,'Survival')))return null;
+ return {request:r,plan};
+}
+function hskOrienteeringSVHelpers93818(form,primary){
+ if(form?.id!=='skill-value-form')return [];
+ const ids=[form.elements.namedItem('orientAssist1')?.value||'',form.elements.namedItem('orientAssist2')?.value||''].filter(Boolean);
+ if(!ids.length)return [];
+ const context=hskOrienteeringAssistanceContext93818();
+ if(!context||primary!=='Survival')throw Error('Pomoc při Orienteeringu lze doložit pouze ve vyžádaném Survival SV testu právě této cestovní skupiny (HMK 145).');
+ if(new Set(ids).size!==ids.length)throw Error('Stejný pomocník při Orienteeringu nesmí být vybrán dvakrát.');
+ if(!form.elements.namedItem('orientAssistConfirmed')?.checked)
+  throw Error('Než provedete Orienteering d100, potvrďte skutečnou pomoc vybraných členů skupiny (HMK 145).');
+ const guide=skillActorMastery(character(selected),'Survival');
+ return ids.map(id=>{
+  if(id===selected||!context.plan.memberIds.includes(id))
+   throw Error('Pomocník Orienteeringu musí být jiný, skutečně zařazený člen právě této cestovní skupiny.');
+  const actor=character(id);if(!actor)throw Error('Pomocník již není v evidenci postav.');
+  const mastery=skillActorMastery(actor,'Survival');
+  if(mastery.ml*2<guide.ml)
+   throw Error('Pomocník '+actor.name+' má Survival ML '+mastery.ml+', ale potřebuje alespoň polovinu ML průvodce ('+guide.ml+').');
+  return {actor,mastery};
+ });
+}
+function hskSVHelpers93818(form,primary){
+ const orient=[form?.elements.namedItem('orientAssist1')?.value,form?.elements.namedItem('orientAssist2')?.value].filter(Boolean);
+ if(orient.length)return hskOrienteeringSVHelpers93818(form,primary);
+ return hskAlchemySVHelpers(form,primary);
+}
 function hskAlchemySVHelpers(form,primary){
  if(form?.id!=='skill-value-form')return [];
  const ids=[form.elements.namedItem('assist1')?.value||'',form.elements.namedItem('assist2')?.value||''].filter(Boolean);
@@ -14010,7 +14062,7 @@ function hskAlchemySVHelpers(form,primary){
 }
 function hskResolveSide({person,form,side,helpers=[]}){
  const info=hskFields(form,side),mastery=skillActorMastery(person,info.primary),secs=hskValidatedSecondaries(person,info);
- if(form.id==='skill-value-form')helpers=hskAlchemySVHelpers(form,info.primary);
+ if(form.id==='skill-value-form')helpers=hskSVHelpers93818(form,info.primary);
  const sr=hskSecondaryRoll(form,person,info,side);
  const ctx=skillAutoFor(person,info.primary,form,side);
  const footpad=data.campaignClock?footpadSkillEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),
@@ -14165,7 +14217,7 @@ document.addEventListener('submit',event=>{
    const winner=comparison.winner==='a'?actor.name:comparison.winner==='b'?other.name:comparison.bothFailed?'Nikdo (oba testy neuspěly)':'Nikdo (remíza)';
    body+='\n\n'+hskResultText('B',b)+'\n\nVítěz: '+winner+' · Victory Stars: '+comparison.stars+' '+(comparison.stars?'★'.repeat(Math.min(10,comparison.stars)):'—')+
      (comparison.persuasionTie?'\nPersuasion: HMK str.138 vyžaduje rozhodnout i neúspěšnou remízu F/F nebo CF/CF.':'');
-  }else if(sv){if(a.helpers.length)body+='\nAlchemy Assistance · '+a.helpers.map(x=>x.actor.name+' ML '+x.mastery.ml).join('; ')+' · bonus EML +'+a.result.assistance;body+='\n\nIndex Primary ML '+a.result.index+' + SL modifier '+({'CF':-2,'F':-1,'S':0,'CS':1}[a.result.level])+
+  }else if(sv){if(a.helpers.length)body+='\n'+(hskOrienteeringAssistanceContext93818()?'Orienteering Assistance · HMK 145':'Alchemy Assistance · HMK 268')+' · '+a.helpers.map(x=>x.actor.name+' ML '+x.mastery.ml+' (Index '+x.mastery.index+')').join('; ')+' · bonus EML +'+a.result.assistance;body+='\n\nIndex Primary ML '+a.result.index+' + SL modifier '+({'CF':-2,'F':-1,'S':0,'CS':1}[a.result.level])+
     ' + předepsaný SR bonus '+(a.result.secondarySVBonus||0)+' = SV '+a.result.sv+' · '+a.result.svTier.label+' · '+a.result.svTier.stars+' SV ★ '+(a.result.svTier.stars?'★'.repeat(Math.min(10,a.result.svTier.stars)):'—')+(a.result.level==='CF'?'\nPozor: CF může podle konkrétní činnosti způsobit další následek bez ohledu na hodnotu SV.':'');
   }else body+='\nUnopposed Victory Stars: '+a.result.unopposedStars+' '+(a.result.unopposedStars?'★'.repeat(a.result.unopposedStars):'—');
   const followA=skillFailureGuidance(a.info.primary,a.result.level),followB=b?skillFailureGuidance(b.info.primary,b.result.level):null;
@@ -14183,6 +14235,13 @@ document.addEventListener('submit',event=>{
    preliminaryArmour:a.ctx.armourIsProvisional||b?.ctx.armourIsProvisional||false,stimulantA:a.ctx.stimulant??null,stimulantB:b?.ctx.stimulant??null,herbalCharmA:a.ctx.herbalCharm??null,herbalCharmB:b?.ctx.herbalCharm??null,darkvisionA:a.ctx.darkvision??null,darkvisionB:b?.ctx.darkvision??null,eruditionA:a.erudition??null,eruditionB:b?.erudition??null,footpadA:a.footpad??null,footpadB:b?.footpad??null,seductionConfirmed:opposed&&hskSelectedSeduction(form),emlRangeA:a.emlRange,emlRangeB:b?.emlRange||null,secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
    secondaryRollResult:a.sr,secondaryRollResultB:b?.sr||null,
    ...(sv&&a.info.primary==='Alchemy'&&a.sr?.routineId==='alchemy-elixir'?{helpers:a.helpers.map(x=>({actorId:x.actor.id,skill:'Alchemy',ml:x.mastery.ml}))}:{}),
+   ...(sv&&hskOrienteeringAssistanceContext93818()&&a.info.primary==='Survival'?{
+    helpers:a.helpers.map(x=>({actorId:x.actor.id,skill:'Survival',ml:x.mastery.ml,index:x.mastery.index})),
+    orienteeringAssistance:{sourcePage:145,groupId:sharedPlanCurrent93771()?.groupId||'',
+     guideId:selected,helperIds:a.helpers.map(x=>x.actor.id),
+     helperIndices:a.helpers.map(x=>x.mastery.index),emlBonus:a.result.assistance,
+     gmConfirmed:a.helpers.length?!!form.elements.namedItem('orientAssistConfirmed')?.checked:false}
+   }:{}),
    a:a.result,b:b?.result||null,result:opposed?comparison:a.result,
    comparison:comparison??null,gmNarrative:narrative,scene,opposedAction:actionName,rollOrigins:b?[a.die.origin,b.die.origin]:[a.die.origin],
    conditions:a.ctx.condition,conditionsB:b?.ctx.condition||null,trauma:a.ctx.trauma,traumaB:b?.ctx.trauma||null,
@@ -22778,6 +22837,12 @@ function episodeSelectRequestedDroverSkill93816(field,skill){
   notice='Průvodce nemá v kartě otevřenou dovednost '+skill+'. Takový test nelze nahradit jinou dovedností. Zvolte doloženého průvodce nebo upravte jeho skutečné schopnosti.';
  }
 }
+function episodeConfigureOrienteeringAssist93818(field){
+ if(field==='orientationProofId'){
+  const form=document.getElementById('skill-value-form');
+  if(form)refreshSkillAutoPreview(form);
+ }
+}
 function episodeStartSkillRequest(field,skill,actorId){
  const clock=data.campaignClock,form=document.querySelector('#hmk-time-episode-form');
  if(!episodeEvaluationRequested||!clock||!character(actorId))return false;
@@ -22798,7 +22863,7 @@ function episodeStartSkillRequest(field,skill,actorId){
   if(previous.field===field&&previous.skill===skill&&previous.actorId===actorId){
    episodeActiveSkillRequestId=previous.id;episodeSkillReturnPending=true;
    selected=actorId;view='skills';activeSkillTab=episodeSkillNeedsSV(field)?'value':'secondary';
-   skillSVChoice595=episodeSkillNeedsSV(field)?{actorId,kind:'ordinary',value:skill}:null;render();episodeSelectRequestedDroverSkill93816(field,skill);return true;
+   skillSVChoice595=episodeSkillNeedsSV(field)?{actorId,kind:'ordinary',value:skill}:null;render();episodeSelectRequestedDroverSkill93816(field,skill);episodeConfigureOrienteeringAssist93818(field);return true;
   }
   alert('Nejdříve dokončete již otevřený Skill Test. Další žádost nesmí přepsat rozpracovaný hod.');
   return false;
@@ -22809,7 +22874,7 @@ function episodeStartSkillRequest(field,skill,actorId){
  timeEpisodeDraft={...timeEpisodeDraft,[field]:''};
  selected=actorId;view='skills';activeSkillTab=episodeSkillNeedsSV(field)?'value':'secondary';
  skillSVChoice595=episodeSkillNeedsSV(field)?{actorId,kind:'ordinary',value:skill}:null;
- render();episodeSelectRequestedDroverSkill93816(field,skill);return true;
+ render();episodeSelectRequestedDroverSkill93816(field,skill);episodeConfigureOrienteeringAssist93818(field);return true;
 }
 function episodeFormRestore(form,draft){
  if(!form||!draft)return;
@@ -23114,10 +23179,10 @@ function episodePreviewFromForm(form,clock){
  }
  // Tracking light penalty varies (-1 twilight / -3 night). Re-evaluate
  // ONLY when actual Tracking is performed, never block ordinary movement.
- if((kind==='tracking'||kind==='travel'&&orientation?.modes.stalking===1)&&
+ if((kind==='tracking'||kind==='travel'&&orientation?.modes.stalking===1&&v.trackingUse!=='none')&&
    autoLight?.segments?.length>1&&new Set(autoLight.segments.map(x=>x.period)).size>1)
   throw Error('Tracking Conditions (HMK 147): během sledování se změnil den, soumrak nebo noc. Rozdělte pouze Tracking test podle doložené změny světla. Běžný pochod bez Tracking tím není blokován.');
- if(kind==='tracking'||kind==='travel'&&orientation?.modes.stalking===1)trackingMemory=computeEpisodeTracking({mode:v.trackingUse||'new',
+ if(kind==='tracking'||kind==='travel'&&orientation?.modes.stalking===1&&v.trackingUse!=='none')trackingMemory=computeEpisodeTracking({mode:v.trackingUse||'new',
   currentSkill:skillAtMinute(v.trackingProofId,'Tracking'),previous,minute:clock.minute,context,
   trail:v.trackingTrail,conditions:episodeTrackingConditionsFromContext({
     weatherWatch:precipitation,period:actualPeriod,terrain:v.terrain,
@@ -24028,7 +24093,7 @@ function episodeTaskArea(field){
  if(/^(ev[A-Z_]|encounter)/.test(field))return 'encounter';
  if(/^(whProof_|whRoll_|whAV_|end_|precipitationD6)/.test(field))return field.startsWith('wh')?'weather':'fatigue';
  if(/^(progressD10|directionD10|extraSlow|mode_|loaded|doubleTime)/.test(field))return 'motion';
- if(/^(travelForage|forage|habitat|herb)/.test(field))return 'foraging';
+ if(/^(travelForage|travelHabitat|travelHerb|forage|habitat|herb)/.test(field))return 'foraging';
  return 'other';
 }
 function updateEpisodeTaskFocus(form){
@@ -24710,7 +24775,7 @@ function updateEpisodePreview(form){
  for(const node of form.querySelectorAll('[data-episode-orientation-new]'))node.hidden=!isTravel||v.orientationUse!=='new';
  // A travelling guide may discover Stalking only after the Orienteering
  // receipt exists. Keep its trail input visible while it can still be named.
- const mayNeedTravelTracking=travel&&episodeEvaluationRequested&&
+ const mayNeedTravelTracking=travel&&
   (v.orientationPriority==='stealth'||Number(v.mode_stalking||0)===1);
  for(const node of form.querySelectorAll('[data-episode-tracking]'))
   node.hidden=!(isTracking||mayNeedTravelTracking);
@@ -25201,16 +25266,16 @@ function episodeCarrySettingsFromLast(){
   'orientationFamiliar','orientationTorch','orientationMoon','orientationSnow','trackingTrail',
   'trackingLight','trackingRoad','trackingPartyTracked','trackingSnow','trackingRain','trackingAlpine','orientationAllocation','orientationLowChoice','weatherSafeShelter'];
  const draft=Object.fromEntries(keep.filter(k=>k in settings).map(k=>[k,settings[k]]));
- return {...draft,rememberSettings:true,orientationUse:'new',trackingUse:'new',confirmed:false,
+ return {...draft,rememberSettings:true,orientationUse:'new',trackingUse:'none',confirmed:false,
   navigationRecovered:false,checkEncounter:true};
 }
-function episodeFreshDraft(){return {rememberSettings:false,orientationUse:'new',trackingUse:'new',confirmed:false,hazardComplicationRouteChanged:false,
+function episodeFreshDraft(){return {rememberSettings:false,orientationUse:'new',trackingUse:'none',confirmed:false,hazardComplicationRouteChanged:false,
  memberIds:[],animalIds:[],stableAnimalIds:[],transportedMemberIds:[],transportTeamIds:[],transportVehicleKey:'',transportOtherLb:'',transportExtraLb:'0',transportMountAnimalId:'',transportMountConfirmed:false,transportCoLocated:false,orientationProofId:'',trackingProofId:'',progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
 function episodeClearDiceDraft(draft){
  const saved={...draft,confirmed:false,orientationProofId:'',trackingProofId:'',droverProofId:'',encounterD100Sub:'',
   progressD10:'',directionD10:'',survivalD10:'',precipitationD6:'',encounterD100:'',forageD10:'',
   temperatureD10:'',precipitationD10:'',
-  checkEncounter:true,encounterResolution:'',encounterRollContext:'',navigationRecovered:false,orientationUse:'new',trackingUse:'new',
+  checkEncounter:true,encounterResolution:'',encounterRollContext:'',navigationRecovered:false,orientationUse:'new',trackingUse:'none',
   hazardComplicationRouteChanged:false,hazardAtMinute:'',hazardDelayNow:'0',
   skillProofIds:[],episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};
  for(const k of Object.keys(saved))if(k.startsWith('end_'))saved[k]='';
@@ -25312,6 +25377,11 @@ function initializeTimeEpisodeForm(form){
  if(!Object.keys(timeEpisodeDraft).length)timeEpisodeDraft=episodeCarrySettingsFromLast();
  episodeAutoBindSkillReceipt();
  episodeFormRestore(form,timeEpisodeDraft);
+ // Tracking is optional during a Stalking travel watch; dedicated Tracking requires its own test.
+ if(form.elements.namedItem('kind')?.value==='tracking'&&timeEpisodeDraft.trackingUse==='none'){
+  const trackingSelection=form.elements.namedItem('trackingUse');if(trackingSelection)trackingSelection.value='new';
+  timeEpisodeDraft.trackingUse='new';
+ }
  if(sharedTimeWindowDraft){const n=form.elements.namedItem('minutes');if(n){n.max=String(sharedTimeWindowDraft.minutes);n.readOnly=false;}}
  refreshWeatherAreaAVFields(form);
  for(const [field,id] of episodePinnedSkillFields){
@@ -26017,7 +26087,7 @@ function openPlannedEpisodeRow93772(planId){try{
   episodeGroupStartingReceiptIds93810=sharedUncommittedSkillRows93769().map(j=>j.id);
   if(scratch.startMinute!==slot.startMinute||scratch.remainingMinutes<plan.minutes)throw Error('Zastaralá časová kotva skupiny.');
   sharedTimeWindowActivePlanId=plan.id;
-  timeEpisodeDraft={...episodeFreshDraft(),weatherSource:plan.weatherId||'local',area:sharedWeatherName93772(plan.weatherId),kind:plan.kind,minutes:String(plan.minutes),memberIds:[...plan.memberIds],guideId:plan.actorId};
+  timeEpisodeDraft={...episodeFreshDraft(),weatherSource:plan.weatherId||'local',area:sharedWeatherName93772(plan.weatherId),kind:plan.kind,trackingUse:plan.kind==='tracking'?'new':'none',minutes:String(plan.minutes),memberIds:[...plan.memberIds],guideId:plan.actorId};
   timeEpisodeDraftCampaign=campaignKey(data.campaignClock);episodeDraftEpoch=uuid();
   persistEpisodeDraftSidecar();render();
  }catch(error){notice=error.message;sharedEpisodeAutoRun93772=false;alert('Činnost nelze otevřít: '+error.message);render();}
@@ -26475,7 +26545,7 @@ document.addEventListener('submit',e=>{
    // it must obtain that day's actual weather and independent tests.
    if(episodePendingRemainderMinutes!==null){
     timeEpisodeDraft={...episodeCarrySettingsFromLast(),minutes:String(episodePendingRemainderMinutes),
-     orientationUse:'new',trackingUse:'new',confirmed:false,weatherSource:'local',
+     orientationUse:'new',trackingUse:v.kind==='tracking'?'new':'none',confirmed:false,weatherSource:'local',
      temperatureD10:'',precipitationD10:'',precipitationD6:''};
     episodePendingRemainderMinutes=null;
    }
