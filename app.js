@@ -346,7 +346,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.823';
+const APP_VERSION='93.824';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11856,7 +11856,21 @@ function hskWeatherHealthConsequences(actorId){
  if(weatherBlood)return success+parallel+weatherBlood+(weatherShock||'')+hskWeatherInjuryMandatory(actorId);
  // One current compulsory health test per actor; no new Cold/Heat dice while
  // a prior weather-induced Shock reroll remains unresolved.
- if(weatherShock)return success+parallel+(hskWeatherInjuryMandatory(actorId)||'')+weatherShock;
+ if(weatherShock){
+  // HMK 185: an immersion's immediate Cold Exposure remains due at the
+  // original minute even when Cold Shock has just worsened INC to UNC.
+  // The 10-minute Shock Reroll is a *later* obligation; it must not hide
+  // the earlier, still unwritten weather-onset receipt. The underlying
+  // Shock restriction, timer, and original dice are never bypassed.
+  const state=persistentStateOf(character(actorId));
+  const q=state.shockFollowup,now=data.campaignClock?.minute;
+  const beforeShockDue=!!q&&isNoncombatMedicalOrigin(q.domain)&&
+   q.phase==='after-ten-minutes'&&Number.isSafeInteger(q.originMinute)&&
+   Number.isSafeInteger(now)&&now>=q.originMinute&&now<q.originMinute+10;
+  const priorExposure=beforeShockDue?hskEpisodeWeatherOnsetForms(actorId):'';
+  const exposurePanel=priorExposure?'<section class="panel wide hmk-health-exposure-followups"><h3>Nejprve dokončit původní Cold Exposure · HMK 185</h3><p class="hc-hint">Původní ponoření a nový Cold Shock jsou už doloženy. Vyhodnoť nyní jeho dosud nezapsaný zdravotní následek; samostatný Shock Reroll zůstává naplánovaný na svůj skutečný termín.</p>'+priorExposure+'</section>':'';
+  return success+parallel+(hskWeatherInjuryMandatory(actorId)||'')+exposurePanel+weatherShock;
+ }
  const trauma=hskWeatherTraumaCourseForm(actorId);
  if(trauma)return success+parallel+trauma;
  const injuryMandatory=hskWeatherInjuryMandatory(actorId);
