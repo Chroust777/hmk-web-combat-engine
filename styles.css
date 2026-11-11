@@ -713,3 +713,13 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hc-episode-equipment-line .hc-hint{margin:3px 0 6px}
 .hc-episode-equipment-line .actions{display:flex;flex-wrap:wrap;gap:6px}
 .hc-episode-equipment-line button{white-space:normal}
+
+/* v93.838 – contextual species/equipment help and explicit stable custody */
+.hmk-stable-equipment-ref{margin:1rem 0;padding:.55rem .8rem;border:1px solid #b79460;border-radius:7px;background:rgba(255,250,234,.48)}
+.hmk-stable-equipment-ref>summary{font-weight:700;cursor:pointer;color:#60452c}
+.hmk-stable-equipment-guide{min-width:850px;font-size:.91em}
+.hmk-stable-equipment-guide td,.hmk-stable-equipment-guide th{vertical-align:top}
+.hmk-stable-move{display:flex;align-items:end;flex-wrap:wrap;gap:.35rem}
+.hmk-stable-move label{font-size:.86em;min-width:200px;flex:1}
+.hmk-stable-move select{width:100%;max-width:330px}
+.hmk-stable-move button{white-space:nowrap}

@@ -66,7 +66,7 @@ try:
   page.wait_for_function('!!window.__forage35Seed')
   page.evaluate('window.__forage35Seed()')
   before=page.evaluate('window.__forage35Snap()')
-  chk(before['version']=='93.837' and before['minute']==480,'version and seeded campaign time')
+  chk(before['version'] in ('93.837','93.838') and before['minute']==480,'version and seeded campaign time')
   page.locator('[data-shared-window-minutes]').fill('60')
   chk(page.evaluate('window.__forage35Snap().stored')==before['stored'],'minutes typing cannot commit')
   page.locator('[data-shared-window-create]').click()

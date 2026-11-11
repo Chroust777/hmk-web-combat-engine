@@ -141,7 +141,7 @@ import { EXPEDITION_EQUIPMENT_P120, CRAFT_ITEMS_TOOLS_P121, WORKSHOP_QUALITY_P12
 import { BEASTS_P122, VEHICLES_TACK_P122, CONVEYANCE_RULES_P122 } from './src/rules/conveyance-printed-p122.js';
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
 import {planTravelEquipment93812,resolveTravelMount93837,isRidingAnimal93837} from './src/integration/hmk-travel-equipment-guide-93812.js';
-import {stableHubProjection,stableCargoCapacity,stableBurden,validateStableHub,assertStableHubAppendOnly,STABLE_HUB_FORMAT_574} from './src/integration/hmk-stable-hub-574.js';
+import {stableHubProjection,stableCargoCapacity,stableBurden,validateStableHub,assertStableHubAppendOnly,stableGearFit93838,STABLE_HUB_FORMAT_574} from './src/integration/hmk-stable-hub-574.js';
 import {stableAnimalZones575,stableTraining575,effectiveStableBeast575,stableHauling575,validateStableTravel575} from './src/integration/hmk-stable-operations-575.js';
 import {availableTransportVehicles93756,transportVehicleReceipt93756,validateTransportVehicleHistory93756} from './src/integration/hmk-travel-vehicle-93756.js';
 import {certifiedTransportMass93816,securedMountedPassenger93816,validateTransportMassEvidence93816} from './src/integration/hmk-transport-passengers-93816.js';
@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.837';
+const APP_VERSION='93.838';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6816,17 +6816,45 @@ function stableTravelRiderCard93823(animal,campaignId,burden){
 }
 // v93.574 · Stable is the single animal-management workspace; the journal
 // keeps immutable proofs, not a second editable animal overview.
+function stableEquipmentReference93838(){
+ const uses={
+  'Bovine (Oxen)':['Tah: kára 2 500 lb / vůz (2 voli) 8 000 lb.','Harness, ox · případně Pack harness','Jízda: ne'],
+  Camel:['Jízda a soumarský náklad; 5 ENC / 40 lb.','Bit & bridle · Blanket, horse · sedlo; Pack harness / Saddle bags','Tah káry/vozu: v aplikaci neověřen'],
+  'Dog, guard':['Strážní práce; výcvik MB.','Žádná výstroj z tabulky HMK 122 automaticky.','Jízda / tah: ne'],
+  'Dog, hunter':['Lovecké práce; výcvik MB.','Žádná výstroj z tabulky HMK 122 automaticky.','Jízda / tah: ne'],
+  'Dog, ratter':['Lov krys; výcvik MB.','Žádná výstroj z tabulky HMK 122 automaticky.','Jízda / tah: ne'],
+  Donkey:['Soumarské zvíře; aplikace zatím neověřuje jízdu.','Pack harness / Saddle bags; případně podkovy','Tah vozu: bez automatického režimu'],
+  Elephant:['Speciální platforma s postrojem (HMK 122: 200 lb, 480d).','Zvláštní sloní postroj; jiná výstroj ×5 pouze dle pravidel','Aplikace nemá potvrzenou standardní nosnost'],
+  'Hawk • Falcon':['Sokolnictví / výcvik.','Žádná běžná jezdecká či nákladní výstroj.','Jízda / tah: ne'],
+  Mule:['Soumarské zvíře; jízda bez potvrzeného režimu Pochodu.','Pack harness / Saddle bags; případně podkovy','Tah vozu: bez automatického režimu'],
+  'Palfrey, cart horse':['Tah: kára 2 000 lb / vůz (2 koně) 6 400 lb.','Harness, horse; Collar, horse; při jízdě uzda + deka + sedlo','Jízda: aplikace umožňuje jen s kompletní výstrojí'],
+  'Palfrey, plough horse':['Tažný/plužní kůň; cestovní režim vozu není ověřen.','Harness, horse / Collar, horse; jezdecká souprava při jízdě','Jízda: obecná třída Palfrey s vybavením'],
+  'Palfrey, riding horse':['Jezdecký kůň.','Bit & bridle · Blanket, horse · Saddle, riding/war; Saddle bags','Tah vozu: v aplikaci nepovolen'],
+  'Warhorse, courser':['Jízda a bojový kůň.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah vozu: v aplikaci nepovolen'],
+  'Warhorse, charger':['Jízda a bojový kůň.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah vozu: v aplikaci nepovolen'],
+  'Warhorse, destrier':['Jízda a bojový kůň.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah vozu: v aplikaci nepovolen'],
+  Warpony:['Jízda a bojový poník.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah vozu: v aplikaci nepovolen']
+ };
+ return `<details class="hmk-stable-equipment-ref"><summary>Všech 16 druhů · výstroj, jízda, tah a nosnost · HMK 122</summary><p class="hc-hint"><strong>Pramen HMK 122:</strong> katalog druhů, výstroje, obecné povinnosti, nosnosti káry a vozu, nákladní postroj (20 % tělesné hmotnosti) a speciální sloní konstrukce. <strong>Omezení aplikace:</strong> u druhů bez ověřeného dopravního režimu se pohyb ani tah automaticky nepovolí; seznam není novou tabulkou pravidel HMK. Podkovy, brašny ani postroj nenahrazují sedlo. Každý předmět musí být skutečně pořízen a nasazen.</p><div class="catalog-scroll"><table class="catalog-spec hmk-stable-equipment-guide"><thead><tr><th>Zvíře · HMK 122</th><th>Využití / tah</th><th>Vhodná výstroj</th><th>Omezení</th></tr></thead><tbody>${BEASTS_P122.map(beast=>{const c=uses[beast.name]||['Bez automatického využití','Nevyhodnoceno','GM'];return `<tr><th>${esc(beast.name)}</th><td>${esc(c[0])}</td><td>${esc(c[1])}</td><td>${esc(c[2])}</td></tr>`}).join('')}</tbody></table></div><p class="hc-hint">HMK 122: sedlové brašny pojmou 15 lb každé; pack harness dovoluje až 20 % doložené hmotnosti zvířete. Hmotnost brašen, postrojů, nákladu i jezdce se zahrnuje do ENC/PF. Kára, vůz a saně mají samostatnou evidenci; jejich vlastní konstrukční hmotnost se nepovažuje za náklad na hřbetě.</p></details>`;
+}
 function stableHubAnimalHTML(a,campaignId){
  const p=stableBurden(data,campaignId,a),dead=!!p.exit;
  const liveHealthActor=data.characters.find(c=>c.id===a.id&&c.hmk?.verifiedMountedBreed&&c.hmk?.healthState);
  const encounters=encounterBeastHistory(data,campaignId).filter(x=>x.ownerAnimalId===a.id&&x.ownerId===a.ownerId);
  const last=encounters.at(-1),health=last?animalHealthProjection567(data.journal,campaignId,last.id):null;
  const training=data.journal.filter(j=>j.livestockTraining?.animalId===a.id&&j.calendarCampaignId===campaignId);
- const rows=(array,kind)=>array.map(e=>`<tr><td>${esc(kind!=='cargo'?VEHICLES_TACK_P122.find(t=>t.id===e.itemId)?.name||'Předmět':e.name)}</td><td>${e.weightLb} lb</td><td>${esc(e.reason)}</td><td>${dead?'—':`<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="${e.inventoryId?'inventory-gear-detach':kind+'-remove'}"><input type="hidden" name="inventoryId" value="${esc(e.inventoryId||'')}"><input type="hidden" name="entryId" value="${esc(e.entryId)}"><input type="hidden" name="reason" value="${e.inventoryId?'Vrácení vlastněné výstroje do inventáře postavy':kind==='tack'?'Sejmuto a vyřazeno ze stájového vybavení':kind==='vehicle'?'Vozidlo fyzicky vyřazeno ze stáje':'Náklad fyzicky vyložen ze zvířete'}"><button class="secondary hc-small">${e.inventoryId?'Sundat do inventáře':kind==='tack'?'Sejmout / vyřadit':kind==='vehicle'?'Vyřadit vozidlo':'Vyložit'}</button></form>`}</td></tr>`).join('');
- const options=VEHICLES_TACK_P122.filter(x=>!['Wheel','Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(x.name));
+ const siblings=verifiedLivestock(data,campaignId).filter(other=>other.id!==a.id&&other.ownerId===a.ownerId&&!stableBurden(data,campaignId,other).exit);
+ const rows=(array,kind)=>array.map(e=>{
+  const gear=VEHICLES_TACK_P122.find(t=>t.id===e.itemId);
+  const transfer=kind!=='cargo';
+  const action=transfer?`<form data-hmk-stable-event class="hmk-stable-move"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="stable-gear-move"><input type="hidden" name="entryId" value="${esc(e.entryId)}"><input type="hidden" name="inventoryId" value="${esc(e.inventoryId||'')}"><input type="hidden" name="role" value="${kind}"><input type="hidden" name="reason" value="Potvrzený fyzický přesun vybavení; původní nákup i identita zachovány"><label>Kam předat<select name="destination" required><option value="inventory">Do inventáře vlastníka</option>${siblings.filter(other=>stableGearFit93838(gear,other).ok&& (other.spec.breed==='elephant'?e.weightLb===gear.weightLb*5:e.weightLb===gear.weightLb)).map(other=>`<option value="${esc(other.id)}">Na ${esc(other.name)} · ${esc(other.spec.name)}</option>`).join('')}</select></label><button type="submit" class="secondary hc-small">Potvrdit přesun</button></form>`:
+   `<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="cargo-remove"><input type="hidden" name="entryId" value="${esc(e.entryId)}"><input type="hidden" name="reason" value="Potvrzené vyložení nákladu"><button class="secondary hc-small">Vyložit</button></form>`;
+  return `<tr><td>${esc(transfer?gear?.name||'Předmět':e.name)}</td><td>${e.weightLb} lb</td><td>${esc(e.reason)}</td><td>${dead?'—':action}</td></tr>`;
+ }).join('');
+ const options=VEHICLES_TACK_P122.filter(x=>!['Wheel','Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(x.name)&&stableGearFit93838(x,a).ok);
  const z=stableAnimalZones575(data,campaignId,a,health);
  const trainingState=stableTraining575(data,campaignId,a);
- const looseGear=data.inventory.filter(i=>i.characterId===a.ownerId&&['carried','none'].includes(i.slot)&&i.quantity===1&&VEHICLES_TACK_P122.some(t=>t.id===i.snapshot?.properties?.stableTackId&&t.name!=='Wheel'));
+ const looseGear=data.inventory.filter(i=>i.characterId===a.ownerId&&['carried','none'].includes(i.slot)&&i.quantity===1&&VEHICLES_TACK_P122.some(t=>t.id===i.snapshot?.properties?.stableTackId&&t.name!=='Wheel'&&stableGearFit93838(t,a).ok));
  const userItems=data.inventory.filter(i=>i.characterId===a.ownerId&&['carried','none','main_hand','off_hand'].includes(i.slot)&&
    Number.isSafeInteger(i.quantity)&&i.quantity>0&&Number.isFinite(i.snapshot?.properties?.weightLb)&&i.snapshot.properties.weightLb>0);
  const vesselLots=availablePhysicalWater(data.journal,campaignId,a.ownerId,data.campaignClock?.minute??0);
@@ -6849,6 +6877,7 @@ function stableHubAnimalHTML(a,campaignId){
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Lokace</th><th>ZN / LN</th><th>SHK</th><th>Rány v historii</th><th>Stav nyní</th></tr></thead><tbody>
  ${z.rows.map(r=>{const live=r.wounds.filter(w=>!w.healed),loss=r.wounds.some(w=>!!w.amputation),pattern=r.segments.map(t=>`${t.znMin}${t.znMin!==t.znMax?'–'+t.znMax:''} / ${t.lnMin}–${t.lnMax}`).join(', ');
  return `<tr class="${live.length?'hmk-stable-zone-hurt':loss?'hmk-stable-zone-loss':''}"><th>${esc(r.name)}</th><td>${esc(pattern)}</td><td>${r.shock}</td><td>${r.wounds.length?esc(r.wounds.map(w=>(w.level>=4?'G':w.level===1?'M':'S')+w.level+w.aspect+(w.healed?' (zahojeno)':'')+(w.amputation?' · amputace':'')).join('; ')):'—'}</td><td>${live.length?`${live.length} aktivní · ${live.some(w=>w.bleeding)?'krvácení · ':''}${live.some(w=>w.infected)?'infekce · ':''}${live.some(w=>w.grimDue!==null)?'Grim · ':''}léčení dle záznamu`:loss?'Trvalá amputace':'Bez evidovaného zranění'}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="hc-hint">Pro tento druh není doložená zónová tabulka. Nelze zobrazit bezpečné smyšlené rozdělení těla.</p>'}
+ ${stableEquipmentReference93838()}
  <p><strong>Shock:</strong> ${esc(health?.shock??'neexistuje zdravotní doklad')} · ${health?.wounds?.filter(w=>!w.healed).length??0} aktivních ran. ${health?'Uzdravené rány a amputace zůstávají v historii.':'Bez encounteru zatím nelze potvrdit, že zvíře není zraněno.'}</p></div>
  <p>Výcvik: ${training.length} identitou propojených dokladů · encountery: ${encounters.length} · ${health?`aktivní rány ${health.wounds.filter(w=>!w.healed).length} · Shock ${esc(health.shock)} · Blood loss ${health.bloodLoss.bp} BP`:'žádný doložený zdravotní stav (nikoli automaticky zdravé zvíře)'}</p>
  ${last?`<p>Poslední encounter: ${esc(last.name)}. Zdravotní historie pokračuje pod trvalou identitou.</p>`:''}
@@ -18017,6 +18046,73 @@ document.addEventListener('click',e=>{
   });
  }catch(err){alert('Zahájení výcviku: '+err.message);}
 },true);
+/** Stable gear custody in one explicit confirmed transaction, never an implicit select change.
+ * Legacy stable-only acquisitions are MATERIALIZED from their original proof,
+ * so one existing piece remains one piece after movement and no new fee arises.
+ */
+function stableGearMove93838(raw,source,owner,campaignId,minute,before){
+ const role=raw.role,entryId=String(raw.entryId||''),destId=String(raw.destination||'');
+ if(!['tack','vehicle'].includes(role)||(!destId)||!owner||source.ownerId!==owner.id)throw Error('Neplatný zdroj nebo cíl přesunu.');
+ const record=(role==='tack'?before.tack:before.vehicles).find(e=>e.entryId===entryId&&String(e.inventoryId||'')===String(raw.inventoryId||''));
+ const gear=VEHICLES_TACK_P122.find(g=>g.id===record?.itemId);
+ if(!record||!gear)throw Error('Původní vybavení už není na zvířeti.');
+ const other=destId==='inventory'?null:verifiedLivestock(data,campaignId).find(a=>a.id===destId&&a.ownerId===source.ownerId&&a.id!==source.id);
+ if(destId!=='inventory'&&!other)throw Error('Cílové zvíře není aktivní nebo nemá stejného vlastníka.');
+ if(other){const fit=stableGearFit93838(gear,other);if(!fit.ok)throw Error(fit.reason);
+  const expected=other.spec.breed==='elephant'&&role==='tack'?gear.weightLb*5:gear.weightLb;
+  if(expected!==record.weightLb)throw Error('Nesouhlasí velikost/ hmotnost postroje; nelze jej bez úpravy přendat na jiný druh.');}
+ if(role==='vehicle'&&before.vehicleCargo.some(q=>q.vehicleId===record.entryId))throw Error('Před přesunem vozu je nutné vyložit veškerý náklad vozidla.');
+ if(role==='tack'){
+  const remain=before.tack.filter(t=>t.entryId!==entryId),names=remain.map(t=>VEHICLES_TACK_P122.find(g=>g.id===t.itemId)?.name);
+  const nextCap=names.includes('Pack harness')?Math.floor(source.spec.bodyWeightLb*.2):names.filter(n=>n==='Saddle bags, 15 lb').length*15;
+  if(!Number.isFinite(nextCap)||before.cargoLb>nextCap)throw Error('Po sejmutí by náklad překročil kapacitu. Nejdříve vyložte odpovídající obsah brašen/postroje.');
+ }
+ const known=!!record.inventoryId,inventory=known?data.inventory.find(i=>i.id===record.inventoryId&&i.characterId===owner.id):null;
+ if(known&&(!inventory||inventory.slot!=='stable'||inventory.stableAnimalId!==source.id))throw Error('Inventární identita postroje nesouhlasí se Stájí.');
+ const original=!known&&data.journal.find(j=>j.calendarCampaignId===campaignId&&j.stableHub574?.animalId===source.id&&
+  j.stableHub574?.entryId===entryId&&['tack-add','vehicle-add'].includes(j.stableHub574.type));
+ if(!known&&!original)throw Error('Historický nákup nemá původní doklad, nelze jej zdvojit ani vyrobit.');
+ if(other&&gear.name==='Saddle, war'&&!ask(`HMK 122: válečné sedlo je vyrobeno na míru konkrétnímu koni. GM potvrzuje, že sedlo pro ${other.name} bylo skutečně upraveno a přizpůsobeno? Bez úpravy ho nelze jen přehodit.`))return;
+ if(!ask(`Potvrdit skutečný přesun ${gear.name} (${record.weightLb} lb) ze zvířete ${source.name} ${other?'na zvíře '+other.name:'do inventáře '+owner.name}?\nPeníze se nemění; inventář, hmotnost, ENC a nosnost se přepočtou až po potvrzení.`))return;
+ const reason='Skutečný přesun '+gear.name+' od '+source.name+' '+(other?'na '+other.name:'do inventáře '+owner.name);
+ if(mutate(()=>{
+  if(campaignKey(data.campaignClock)!==campaignId||data.campaignClock.minute!==minute||combatInitiativeSequence)throw Error('Změnila se kampaň, čas nebo Initiative.');
+  const liveFrom=verifiedLivestock(data,campaignId).find(a=>a.id===source.id&&a.ownerId===owner.id);
+  const liveTo=other&&verifiedLivestock(data,campaignId).find(a=>a.id===other.id&&a.ownerId===owner.id);
+  if(!liveFrom||(other&&!liveTo))throw Error('Zvíře už není dostupné.');
+  const now=stableBurden(data,campaignId,liveFrom),itemNow=(role==='tack'?now.tack:now.vehicles).find(g=>g.entryId===entryId);
+  if(!itemNow||itemNow.itemId!==gear.id||itemNow.weightLb!==record.weightLb||itemNow.inventoryId!==record.inventoryId)throw Error('Předmět se mezitím změnil.');
+  if(role==='vehicle'&&now.vehicleCargo.some(q=>q.vehicleId===entryId))throw Error('Vůz stále obsahuje náklad.');
+  if(role==='tack'){
+   const names=now.tack.filter(t=>t.entryId!==entryId).map(t=>VEHICLES_TACK_P122.find(g=>g.id===t.itemId)?.name);
+   const cap=names.includes('Pack harness')?Math.floor(liveFrom.spec.bodyWeightLb*.2):names.filter(n=>n==='Saddle bags, 15 lb').length*15;
+   if(!Number.isFinite(cap)||now.cargoLb>cap)throw Error('Přesun by porušil nosnost původního zvířete.');
+  }
+  const at=stamp(),inventoryId=record.inventoryId||uuid();
+  if(known){const i=data.inventory.find(i=>i.id===inventoryId&&i.characterId===owner.id);
+   if(!i||i.slot!=='stable'||i.stableAnimalId!==source.id)throw Error('Původní inventární položka byla změněna.');
+  }else{
+   const catalog=STABLE_GEAR_CATALOG_580.find(g=>g.properties.stableTackId===gear.id);
+   if(!catalog||!original||data.inventory.some(i=>i.id===inventoryId))throw Error('Chybí jedinečný původní doklad nebo katalog předmětu.');
+   const snap=structuredClone(catalog);snap.properties.weightLb=record.weightLb;
+   data.inventory.push({id:inventoryId,currentWQ:null,characterId:owner.id,sourceItemId:catalog.id,snapshot:snap,
+    quantity:1,condition:'',slot:'carried',acquisition:{mode:'stable-recovery',at,campaignId,campaignMinute:minute,pricePence:0,
+     stableSourceProofId:original.id,stableSourceEntryId:entryId}});
+  }
+  const journal=(event,animal)=>data.journal.push({id:uuid(),characterId:owner.id,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:at,
+   title:'HMK 122 · Stáj · fyzický přesun '+gear.name,body:reason+' · bez nového nákupu',stableHub574:event});
+  const base={format:STABLE_HUB_FORMAT_574,animalId:source.id,ownerId:owner.id,entryId,inventoryId,role,reason};
+  journal(known?{...base,type:'inventory-gear-detach'}:{...base,type:'legacy-gear-detach',itemId:gear.id,weightLb:record.weightLb,sourceProofId:original.id},source);
+  const i=data.inventory.find(i=>i.id===inventoryId);
+  if(!i)throw Error('Chybí inventární položka.');
+  i.slot=other?'stable':'carried';if(other)i.stableAnimalId=other.id;else delete i.stableAnimalId;
+  if(other){
+   const to={format:STABLE_HUB_FORMAT_574,animalId:other.id,ownerId:owner.id,type:'inventory-gear-attach',
+    entryId:uuid(),inventoryId,itemId:gear.id,role,name:gear.name,weightLb:record.weightLb,quantity:1,reason};
+   journal(to,other);
+  }
+ }))notice=`Přesun ${gear.name}: ${source.name} → ${other?.name||'inventář '+owner.name}; nový nákup ani trvalá ztráta nevznikly.`;
+}
 // v93.574: stable ownership lifecycle, original-price tack, physical cargo and care.
 // Every successful operation is an append-only, actor-bound and clock-bound proof.
 document.addEventListener('submit',e=>{
@@ -18028,6 +18124,7 @@ document.addEventListener('submit',e=>{
   const animal=verifiedLivestock(data,campaignId).find(a=>a.id===raw.animalId);
   if(!animal)throw Error('Zvíře není aktivní ve stáji této kampaně.');
   const owner=character(animal.ownerId),type=String(raw.type),reason=String(raw.reason||'').trim(),p=stableBurden(data,campaignId,animal);
+  if(type==='stable-gear-move'){stableGearMove93838(raw,animal,owner,campaignId,minute,p);return;}
   if(type==='rider-mount'||type==='rider-dismount')throw Error('Nasednutí a sesednutí se nyní nastavuje jen v Pochodu. Stáj stav pouze zobrazuje.');
   if(!owner||activeCampaignCashKey(owner)===undefined||reason.length<3||reason.length>240)throw Error('Chybí aktivní vlastník nebo potvrzený skutečný původ / důvod úkonu.');
   const event={format:STABLE_HUB_FORMAT_574,animalId:animal.id,ownerId:animal.ownerId,type,reason};
@@ -18047,6 +18144,7 @@ document.addEventListener('submit',e=>{
   }else if(type==='tack-add'){
    const item=VEHICLES_TACK_P122.find(t=>t.id===raw.itemId);
    if(!item||['Wheel','Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(item.name))throw Error('Tento předmět není jednotlivou výstrojí nesenou zvířetem.');
+   if(!stableGearFit93838(item,animal).ok)throw Error(stableGearFit93838(item,animal).reason);
    if(!['buy','gift'].includes(raw.mode))throw Error('Neplatný způsob pořízení výstroje.');
    if(!animal.spec.breed&&['Pack harness','Saddle bags, 15 lb'].includes(item.name))throw Error('Druh nemá doloženou nosnou funkci podle tabulky HMK; nákladní postroj vyžaduje ověřené tažné nebo soumarské zvíře.');
    const factor=animal.spec.breed==='elephant'?5:1;
@@ -18056,6 +18154,7 @@ document.addEventListener('submit',e=>{
   }else if(type==='vehicle-add'){
    const item=VEHICLES_TACK_P122.find(t=>t.id===raw.itemId);
    if(!item||!['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(item.name)||!['buy','gift'].includes(raw.mode))throw Error('Vozidlo nemá ověřenou cenu a původ.');
+   if(!stableGearFit93838(item,animal).ok)throw Error(stableGearFit93838(item,animal).reason);
    Object.assign(event,{entryId:uuid(),itemId:item.id,mode:raw.mode,weightLb:item.weightLb,priceD:item.priceD,transactionId:uuid()});
    if(raw.mode==='buy')cashDelta=-event.priceD;
   }else if(type==='inventory-gear-attach'){
@@ -18064,6 +18163,7 @@ document.addEventListener('submit',e=>{
    if(!item||!gear||gear.name==='Wheel'||item.sourceItemId!=='hmk:stable-gear:'+gear.id||!['carried','none'].includes(item.slot)||item.quantity!==1||
     item.snapshot.properties.weightLb!==gear.weightLb)throw Error('Výstroj není jediný fyzický kus z Knihovny v inventáři vlastníka.');
    const role=['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(gear.name)?'vehicle':'tack';
+   if(!stableGearFit93838(gear,animal).ok)throw Error(stableGearFit93838(gear,animal).reason);
    if(!animal.spec.breed&&['Pack harness','Saddle bags, 15 lb'].includes(gear.name))throw Error('Tento druh nemá doloženou nosnou funkci.');
    const weightLb=animal.spec.breed==='elephant'&&role==='tack'?gear.weightLb*5:gear.weightLb;
    if(weightLb!==item.snapshot.properties.weightLb)throw Error('Výstroj vyžadující úpravu hmotnosti musí mít samostatný doložený předmět.');
