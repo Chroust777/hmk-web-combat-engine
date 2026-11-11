@@ -413,13 +413,13 @@ export function lastEpisodeBefore(journal=[],campaignId,minute,memberIds=null){
   (!members||j.calendarTimeEpisode.memberIds?.some(id=>members.has(id))))
   .sort((a,b)=>b.calendarTimeEpisode.endMinute-a.calendarTimeEpisode.endMinute)[0]||null;
 }
-export function mayReuseEpisodeSkill({previous,minute,context,kind='orientation',trail='' }={}){
+export function mayReuseEpisodeSkill({previous,minute,context,kind='orientation',trail='',trackerId=null }={}){
  const old=previous?.calendarTimeEpisode;
  if(!old||old.endMinute!==minute||(kind==='orientation'?old.kind!=='travel':!['tracking','travel'].includes(old.kind)))return false;
  const memo=kind==='orientation'?old.orientation:old.trackingMemory;
  if(!memo?.skillId||memo.format!==EPISODE_SKILL_MEMORY_FORMAT||
   JSON.stringify(memo.context)!==JSON.stringify(context))return false;
- return kind!=='tracking'||memo.trail===String(trail||'').trim()&&!!memo.trail;
+ return kind!=='tracking'||memo.trail===String(trail||'').trim()&&!!memo.trail&&(!trackerId||(memo.trackerId||memo.guideId)===trackerId);
 }
 export function computeEpisodeOrientation({mode='none',currentSkill=null,previous=null,minute,
   context,priority='pace',allocationMode='auto',manualModes=null,lowChoice='slow',requiredBearing=0,continuousPrecipitation=false,familiar=false,
@@ -503,15 +503,16 @@ export function episodeTrackingConditionsFromContext({weatherWatch=null,period='
  trackingModifiers(conditions); // Validate all user-supplied non-derived facts.
  return conditions;
 }
-export function computeEpisodeTracking({mode='none',currentSkill=null,previous=null,minute,context,trail='',conditions=null}={}){
+export function computeEpisodeTracking({mode='none',currentSkill=null,previous=null,minute,context,trackerId=context?.guideId,trail='',conditions=null}={}){
  must(['none','new','reuse'].includes(mode),'Neznámé použití Tracking.');
  if(mode==='none')return null;
  const trailName=String(trail||'').trim();must(trailName.length>0,'Uveďte skutečně sledovanou stopu.');
- const witness=mode==='reuse'?(mayReuseEpisodeSkill({previous,minute,context,kind:'tracking',trail:trailName})?
+ must(context?.memberIds?.includes(trackerId),'Tracking musí provést skutečný člen cestující družiny.');
+ const witness=mode==='reuse'?(mayReuseEpisodeSkill({previous,minute,context,kind:'tracking',trail:trailName,trackerId})?
   previous.calendarTimeEpisode.trackingMemory:null):currentSkill;
  must(witness?.skill==='Tracking'||mode==='reuse'&&witness?.skillId,
   'Tracking: vyberte skutečný nový Tracking SV, nebo souvislé pokračování téže stopy.');
- must(witness.guideId===context.guideId,'Tracking musí patřit téže postavě.');
+ must((witness.trackerId||witness.guideId)===trackerId,'Tracking musí patřit vybranému stopaři.');
  const actual=conditions||{continuousSnow:false,continuousRain:false,partyTracked:0,twilight:false,night:context.night,alpine:false,road:'none'};
  must(!(actual.continuousRain&&actual.continuousSnow)&&!(actual.twilight&&actual.night),
   'Tracking: vzájemně vyloučené podmínky deště/sněhu nebo denní doby.');
@@ -520,7 +521,7 @@ export function computeEpisodeTracking({mode='none',currentSkill=null,previous=n
   'Tracking SV nelze převzít při změně prostředí nebo stopových modifikátorů.');
  const score=trackingOutcome(witness.sv+modifier.delta,{criticalFailure:witness.level==='CF'});
  return {format:EPISODE_SKILL_MEMORY_FORMAT,skillId:witness.skillId,guideId:context.guideId,
-  context,trail:trailName,sv:witness.sv,level:witness.level,stars:witness.stars??null,
+  trackerId,context,trail:trailName,sv:witness.sv,level:witness.level,stars:witness.stars??null,
   roll:witness.roll??null,conditions:actual,modifier,score,sourceMode:mode,reusedFromEpisodeId:mode==='reuse'?previous.id:null};
 }
 export function episodeNavigationState(previous,newDirection=null,{recovered=false,redirected=false,lostPriority=false}={}){
@@ -552,7 +553,8 @@ export function validateTimeEpisodes(journal=[]){
   for(const [key,skill] of [['orientation','Survival'],['trackingMemory','Tracking']]){
    const memo=e[key];if(!memo)continue;
    must(memo.format===EPISODE_SKILL_MEMORY_FORMAT&&typeof memo.skillId==='string'&&
-    memo.guideId===memo.context?.guideId&&e.memberIds.includes(memo.guideId),
+    memo.guideId===memo.context?.guideId&&e.memberIds.includes(memo.guideId)&&
+    (key!=='trackingMemory'||e.memberIds.includes(memo.trackerId||memo.guideId)),
     'Neplatný doklad paměti epizody.');
    const expectedContext=episodeMovementContext({guideId:j.characterId,memberIds:e.memberIds,
     area:e.area,topography:e.topography,terrain:e.terrain,conveyance:e.conveyance,
@@ -565,9 +567,9 @@ export function validateTimeEpisodes(journal=[]){
    const linked=journal.find(x=>x.id===memo.skillId);
    must(linked&&linked.calendarCampaignId===j.calendarCampaignId&&linked.campaignMinute<=e.startMinute,
     'Epizoda odkazuje na neexistující nebo budoucí Skill Test.');
-   must(episodeSkillProof(linked,skill,memo.guideId,j.calendarCampaignId,linked.campaignMinute),
+   must(episodeSkillProof(linked,skill,key==='trackingMemory'?(memo.trackerId||memo.guideId):memo.guideId,j.calendarCampaignId,linked.campaignMinute),
     'Epizoda odkazuje na nesprávnou dovednost nebo postavu.');
-   const sr=episodeSkillProof(linked,skill,memo.guideId,j.calendarCampaignId,linked.campaignMinute);
+   const sr=episodeSkillProof(linked,skill,key==='trackingMemory'?(memo.trackerId||memo.guideId):memo.guideId,j.calendarCampaignId,linked.campaignMinute);
    must(memo.sv===sr.sv&&memo.level===sr.level&&memo.stars===sr.stars,
     'Výsledek nebo hvězdičky historického Skill Testu byly pozměněny.');
    if(key==='orientation'){
@@ -748,7 +750,7 @@ export function validateTimeEpisodes(journal=[]){
    if(originalV2Overcap){expected.spoorStars=t.adjustedSV-4;expected.spoorSpent=t.spoorSpent;
     expected.trailCapacity=expected.spoorStars-t.spoorSpent;}
    const skill=t.awarenessSkillId?journal.find(x=>x.id===t.awarenessSkillId):null;
-   const aw=skill?episodeSkillProof(skill,'Awareness',m.guideId,j.calendarCampaignId,e.startMinute):null;
+   const aw=skill?episodeSkillProof(skill,'Awareness',m.trackerId||m.guideId,j.calendarCampaignId,e.startMinute):null;
    must(t.awarenessLevel===(aw?.level||null)&&
     JSON.stringify(t)===JSON.stringify({...expected,awarenessSkillId:t.awarenessSkillId}),
     'Tracking Awareness/Spoor neodpovídá skutečnému Skill Testu.');
