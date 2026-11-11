@@ -10,8 +10,12 @@ export const FORAGING_SUPPLY_USE_FORMAT='hmk-foraging-supply-use-v1';
 // Flatten their *results* to unique receipt indexes, exactly once. This is the
 // same source-of-truth used for debits, water storage and herbal reservations.
 function foragingProofResults(row){
- const direct=row.calendarTrekWildernessProof||row.calendarTimeEpisode?.foraging;
- const modes=direct?[direct]:(row.calendarTimeEpisode?.travelForaging??[]);
+ const direct=row.calendarTrekWildernessProof;
+ const episode=row.calendarTimeEpisode;
+ // A stationary activity can award up to five independent Foraging Modes.
+ // Legacy single-d10 receipts stay readable, without duplicate accounting.
+ const modes=direct?[direct]:Array.isArray(episode?.standaloneForaging)?
+  episode.standaloneForaging:(episode?.foraging?[episode.foraging]:(episode?.travelForaging??[]));
  return modes.flatMap(p=>Array.isArray(p?.results)?p.results:[]);
 }
 function lotsFromProof(row){
@@ -127,7 +131,8 @@ export function allocateForagingRations({journal=[],campaignId,minute,actorIds=[
 export function assertSupplyJournalAppendOnly(previous=[],next=[]){
  const byId=new Map(next.map(row=>[row.id,row]));
  for(const row of previous){
-  if(!row.calendarForagingSupplyUse&&!row.calendarTrekWildernessProof&&!row.calendarTimeEpisode?.foraging)continue;
+  if(!row.calendarForagingSupplyUse&&!row.calendarTrekWildernessProof&&!row.calendarTimeEpisode?.foraging&&
+   !row.calendarTimeEpisode?.standaloneForaging?.length&&!row.calendarTimeEpisode?.travelForaging?.length)continue;
   requireIt(byId.has(row.id)&&JSON.stringify(byId.get(row.id))===JSON.stringify(row),
    'Doložený nález nebo výdej zásob nelze změnit ani smazat přes běžný zápisník');
  }

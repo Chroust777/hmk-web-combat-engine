@@ -423,9 +423,10 @@ export function mayReuseEpisodeSkill({previous,minute,context,kind='orientation'
 }
 export function computeEpisodeOrientation({mode='none',currentSkill=null,previous=null,minute,
   context,priority='pace',allocationMode='auto',manualModes=null,lowChoice='slow',requiredBearing=0,continuousPrecipitation=false,familiar=false,
-  torchlight=false,fullMoon=false,afterSnowfall=false,droverSkill=null}={}){
+  torchlight=false,fullMoon=false,afterSnowfall=false,droverSkill=null,stationaryForaging=false}={}){
  must(['none','new','reuse'].includes(mode),'Neznámé použití Orienteering.');
  if(mode==='none')return null;
+ must(!stationaryForaging||mode==='new','Samostatný Foraging vyžaduje nový situační Orienteering; přebírání cestovního SV není dovoleno.');
  let witness;
  if(mode==='reuse'){
   must(mayReuseEpisodeSkill({previous,minute,context}),
@@ -443,7 +444,7 @@ export function computeEpisodeOrientation({mode='none',currentSkill=null,previou
  }else{
   const ctx=createOrienteeringContext({night:context.night,partySize:context.memberIds.length,
    familiar,torchlight:context.night&&torchlight,fullMoon:context.night&&fullMoon,
-   afterSnowfall:context.night&&afterSnowfall,conveyance:context.conveyance,
+   afterSnowfall:context.night&&afterSnowfall,stationaryForaging,conveyance:context.conveyance,
    droverId:context.conveyance==='foot'?null:context.guideId,
    animalsPresent:context.conveyance!=='foot'});
   if(context.conveyance!=='foot')must(droverSkill?.skillId&&
@@ -470,6 +471,14 @@ export function computeEpisodeOrientation({mode='none',currentSkill=null,previou
    lax:adjustment.adjustedSV<=0||adjustment.adjustedSV<=2&&lowChoice==='lax',
    orienteeringSlow:adjustment.adjustedSV<=0||adjustment.adjustedSV<=2&&lowChoice==='slow'?1:0};
   assertOrienteeringModes({adjustment,modes:allocation});
+ }else if(stationaryForaging){
+  const stars=adjustment.advantageModes;
+  // HMK 145: the first two awarded stars are forced Foraging. Remaining
+  // stars default to Foraging; GM can manually choose Stalking/Vigilance.
+  allocation={progress:0,bearing:0,foraging:stars,stalking:0,vigilance:0,
+   lax:adjustment.adjustedSV<=0||adjustment.adjustedSV<=2&&lowChoice==='lax',
+   orienteeringSlow:adjustment.adjustedSV<=0||adjustment.adjustedSV<=2&&lowChoice==='slow'?1:0};
+  assertOrienteeringModes({adjustment,modes:allocation});
  }else{
   allocation=allocateTrekModes({autoAllocate:true,autoPriority:priority,slow:0,
    orienteeringSlow:0,foraging:0,stalking:0,vigilance:0,trackingForcedBearingSourceId:null},
@@ -481,7 +490,7 @@ export function computeEpisodeOrientation({mode='none',currentSkill=null,previou
  }
  return {format:EPISODE_SKILL_MEMORY_FORMAT,skillId:witness.skillId,guideId:context.guideId,
   context,sv:witness.sv,level:witness.level,stars:witness.stars??null,roll:witness.roll??null,
-  adjustment,priority,allocationMode,lowChoice:mode==='reuse'?witness.lowChoice||lowChoice:lowChoice,
+  adjustment,priority,allocationMode,stationaryForaging:stationaryForaging===true,lowChoice:mode==='reuse'?witness.lowChoice||lowChoice:lowChoice,
   manualModes:allocationMode==='manual'?Object.fromEntries(['bearing','progress','foraging','stalking','vigilance'].map(k=>[k,allocation[k]])):null,
   droverSkillId:mode==='reuse'?witness.droverSkillId??null:droverSkill?.skillId??null,
   droverLevel:mode==='reuse'?witness.droverLevel??null:droverSkill?.level??null,
@@ -573,11 +582,15 @@ export function validateTimeEpisodes(journal=[]){
    must(memo.sv===sr.sv&&memo.level===sr.level&&memo.stars===sr.stars,
     'Výsledek nebo hvězdičky historického Skill Testu byly pozměněny.');
    if(key==='orientation'){
-    must(e.kind==='travel'&&memo.modes?.progress===e.progress&&memo.modes?.bearing===e.bearing,
+    const stationary=e.kind==='forage'&&e.stationaryForagingPolicy==='hmk-stationary-v93.835';
+    must((e.kind==='travel'||stationary)&&memo.modes?.progress===e.progress&&memo.modes?.bearing===e.bearing,
      'Orienteering režimy musí souhlasit s vypočteným pohybem epizody.');
+    if(stationary)must(e.progress===0&&e.bearing===0&&memo.stationaryForaging===true&&memo.sourceMode==='new'&&
+     e.distanceMeters===0&&Array.isArray(e.standaloneForaging),
+     'Foraging na místě vyžaduje nulový pohyb a nový doložený Orienteering.');
     must(memo.adjustment?.baseSV===sr.sv&&Number.isInteger(memo.adjustment?.advantageModes),
      'Upravený SV není podložen původním hodem.');
-    const required=trekMovement({topography:e.topography,terrain:e.terrain,
+    const required=stationary?0:trekMovement({topography:e.topography,terrain:e.terrain,
      conveyance:e.conveyance,progress:0,slow:0,bearing:0,loaded:false,progressD10:[],
      continuousPrecipitation:!!e.precipitation?.slowMode}).requiredBearing;
     const recoveryRule=e.navigationRecoveryRule==='special-bearing-and-awareness-v93.780';
@@ -589,6 +602,11 @@ export function validateTimeEpisodes(journal=[]){
     let allocation;
     if(memo.allocationMode==='manual'){
      allocation={...memo.manualModes,lax:memo.adjustment.adjustedSV<=0||memo.adjustment.adjustedSV<=2&&memo.lowChoice==='lax',
+      orienteeringSlow:memo.adjustment.adjustedSV<=0||memo.adjustment.adjustedSV<=2&&memo.lowChoice!=='lax'?1:0};
+     assertOrienteeringModes({adjustment:memo.adjustment,modes:allocation});
+    }else if(stationary){
+     allocation={progress:0,bearing:0,foraging:memo.adjustment.advantageModes,stalking:0,vigilance:0,
+      lax:memo.adjustment.adjustedSV<=0||memo.adjustment.adjustedSV<=2&&memo.lowChoice==='lax',
       orienteeringSlow:memo.adjustment.adjustedSV<=0||memo.adjustment.adjustedSV<=2&&memo.lowChoice!=='lax'?1:0};
      assertOrienteeringModes({adjustment:memo.adjustment,modes:allocation});
     }else{
@@ -613,7 +631,7 @@ export function validateTimeEpisodes(journal=[]){
       partySize:memo.context.memberIds.length,familiar:memo.context.familiar,
       torchlight:memo.context.night&&memo.context.torchlight,
       fullMoon:memo.context.night&&memo.context.fullMoon,
-      afterSnowfall:memo.context.night&&memo.context.afterSnowfall,
+      afterSnowfall:memo.context.night&&memo.context.afterSnowfall,stationaryForaging:stationary,
       conveyance:e.conveyance,
       ...(e.conveyance==='foot'?{}:{droverId:memo.guideId,animalsPresent:true})});
      must(JSON.stringify(adjustedOrienteeringSV({baseSV:sr.sv,context:ctx,
@@ -1223,8 +1241,24 @@ export function validateTimeEpisodes(journal=[]){
     must(JSON.stringify(f)===JSON.stringify(expected),'Foraging při cestě není podložen doloženým d10 a přenosem.');
     local.set(key,f.carryOut);
    }
-  }else if(e.orientation?.modes?.foraging>0){must(false,'Foraging při cestě není vyhodnocen.');}
-  if(e.foraging){
+  }else if(e.kind==='travel'&&e.orientation?.modes?.foraging>0){must(false,'Foraging při cestě není vyhodnocen.');}
+  if(e.stationaryForagingPolicy==='hmk-stationary-v93.835'){
+   must(e.kind==='forage'&&e.orientation?.stationaryForaging===true&&
+    e.standaloneForaging.length===e.orientation.modes.foraging&&e.standaloneForaging.length<=5,
+    'Nález při samostatném Foraging musí mít jeden d10 za každý získaný Foraging Mode.');
+   const local=new Map();
+   for(const f of e.standaloneForaging){
+    const key=JSON.stringify([f.target,f.herbName||'']);
+    const carryIn=local.has(key)?local.get(key):lastForagingCarry(prior,j.calendarCampaignId,j.characterId,f.target,f.herbName||'');
+    const expected=calculateEpisodeForaging({minutes:e.minutes,habitat:f.habitat,season:f.season,
+     roll:f.roll,target:f.target,herbName:f.herbName||'',carryIn});
+    must(JSON.stringify(f)===JSON.stringify(expected),'Samostatný Foraging: změněný d10, cíl nebo přenos.');
+    local.set(key,f.carryOut);
+   }
+   must(e.foraging===undefined||JSON.stringify(e.foraging)===JSON.stringify(e.standaloneForaging[0]),
+    'Foraging: souhrnný nález neodpovídá doloženým hodům.');
+  }
+  if(e.foraging&&e.stationaryForagingPolicy!=='hmk-stationary-v93.835'){
    const f=e.foraging;
    must(e.kind==='forage'&&f.minutes===e.minutes&&j.characterId&&e.memberIds.includes(j.characterId),
     'Foraging neodpovídá času, činnosti a průvodci epizody.');
@@ -1247,7 +1281,7 @@ export function validateTimeEpisodes(journal=[]){
 }
 
 /** GM time-scaled Foraging (original printed table, new arbitrary-minute procedure).
- * One GM-declared roll per episode; fractional yields carried in quantum units
+ * One GM-declared roll per earned Foraging Mode; fractional yields carried in quantum units
  * until a real half food-/water-day or full herb dose exists. */
 import {foragingDie} from './hmk-trekking-wilderness-tasks.js';
 export function calculateEpisodeForaging({minutes,habitat,season,roll,target='food-water',herbName='',carryIn={}}={}){
@@ -1274,7 +1308,8 @@ export function lastForagingCarry(journal=[],campaignId,actorId,target,herbName=
   if(row.calendarMemberRelease?.format==='hmk-calendar-member-release-v93.765'&&
      row.calendarMemberRelease.actorId===actorId&&row.calendarMemberRelease.gmConfirmed===true)
    break;
-  for(const f of [...(p?.travelForaging||[])].reverse().concat(p?.foraging?[p.foraging]:[]))
+  for(const f of [...(p?.travelForaging||[]),...(p?.standaloneForaging||
+    (p?.foraging?[p.foraging]:[]))].reverse())
    if(f.target===target&&f.herbName===(target==='herbs'?herbName.trim():null))return f.carryOut;
  }
  return {foodDays:0,waterDays:0,herbDoses:0};
