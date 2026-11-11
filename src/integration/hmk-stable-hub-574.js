@@ -35,8 +35,8 @@ export function stableGearFit93838(gear,animal){
  if(['Harness, horse','Collar, horse'].includes(name))return {ok:horse,reason:'Koňský tažný postroj/chomout patří koni; tah v Pochodu se ověřuje zvlášť.'};
  if(name==='Horseshoes, 4')return {ok:equine,reason:'Podkovy vyžadují koňský typ kopyta.'};
  if(['Bit & bridle','Blanket, horse','Saddle, riding','Saddle, war'].includes(name))return {
-  ok:horse||camel||(name==='Bit & bridle'&&equine),
-  reason:'Jezdecká souprava podle HMK 122 patří koni nebo velbloudovi. Pro jiné druhy nelze automaticky potvrdit jezdeckou funkci.'};
+  ok:equine||camel,
+  reason:'Jezdecká souprava podle HMK 122 patří jezdeckému equidovi nebo velbloudovi. Pro jiné druhy nelze automaticky potvrdit jezdeckou funkci.'};
  if(['Pack harness','Saddle bags, 15 lb'].includes(name))return {
   ok:horse||camel||elephant||ox||['mule','donkey'].includes(breed),reason:'Soumarskou výstroj lze potvrdit jen u doloženého nákladního druhu; není automaticky vybavením psa ani sokola. Sloní výstroj má zvláštní velikost a cenu.'};
  if(elephant)return {ok:false,reason:'Sloní specializovaná výstroj vyžaduje samostatné doložení.'};

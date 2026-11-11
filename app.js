@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.840';
+const APP_VERSION='93.841';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6845,17 +6845,17 @@ function stableEquipmentReference93839(ownerId){
   'Dog, guard':['Strážní práce; výcvik MB.','Žádná výstroj z tabulky HMK 122 automaticky.','Jízda / tah: ne'],
   'Dog, hunter':['Lovecké práce; výcvik MB.','Žádná výstroj z tabulky HMK 122 automaticky.','Jízda / tah: ne'],
   'Dog, ratter':['Lov krys; výcvik MB.','Žádná výstroj z tabulky HMK 122 automaticky.','Jízda / tah: ne'],
-  Donkey:['Soumarské zvíře; aplikace zatím neověřuje jízdu.','Pack harness / Saddle bags; případně podkovy','Tah vozu: bez automatického režimu'],
-  Elephant:['Speciální platforma s postrojem (HMK 122: 200 lb, 480d).','Zvláštní sloní postroj; jiná výstroj ×5 pouze dle pravidel','Aplikace nemá potvrzenou standardní nosnost'],
+  Donkey:['Soumarské zvíře; pro jízdu vyžaduje uzdu, deku a sedlo (HMK 122).','Pack harness / Saddle bags; pro jízdu Bit & bridle · Blanket, horse · Saddle, riding','Tah káry/vozu: HMK 122 neuvádí'],
+  Elephant:['Zvláštní platforma s postrojem: 200 lb a 480d; drover + 3 archers (HMK 122).','Sloní výstroj a ceny/hnotnosti se násobí ×5; speciální platforma se pořizuje ve Stáji','Nesení: 5 ENC za každých 80 plných lb; tah vozidel HMK 122 neuvádí'],
   'Hawk • Falcon':['Sokolnictví / výcvik.','Žádná běžná jezdecká či nákladní výstroj.','Jízda / tah: ne'],
-  Mule:['Soumarské zvíře; jízda bez potvrzeného režimu Pochodu.','Pack harness / Saddle bags; případně podkovy','Tah vozu: bez automatického režimu'],
+  Mule:['Soumarské zvíře; pro jízdu vyžaduje uzdu, deku a sedlo (HMK 122).','Pack harness / Saddle bags; pro jízdu Bit & bridle · Blanket, horse · Saddle, riding','Tah káry/vozu: HMK 122 neuvádí'],
   'Palfrey, cart horse':['Tah: kára 2 000 lb / vůz (2 koně) 6 400 lb.','Harness, horse; Collar, horse; při jízdě uzda + deka + sedlo','Jízda: jen s kompletní výstrojí'],
-  'Palfrey, plough horse':['Tažný/plužní kůň; cestovní režim vozu není ověřen.','Harness, horse / Collar, horse; jezdecká souprava při jízdě','Tah při Pochodu: jen ověřený režim'],
-  'Palfrey, riding horse':['Jezdecký kůň.','Bit & bridle · Blanket, horse · Saddle, riding/war; Saddle bags','Tah vozu: v aplikaci nepovolen'],
-  'Warhorse, courser':['Jízda a bojový kůň.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah vozu: v aplikaci nepovolen'],
-  'Warhorse, charger':['Jízda a bojový kůň.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah vozu: v aplikaci nepovolen'],
-  'Warhorse, destrier':['Jízda a bojový kůň.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah vozu: v aplikaci nepovolen'],
-  Warpony:['Jízda a bojový poník.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah vozu: v aplikaci nepovolen']
+  'Palfrey, plough horse':['Plužní / pracovní kůň; pro jízdu vyžaduje kompletní jezdeckou soupravu.','Harness, horse / Collar, horse pro práci; Bit & bridle · Blanket, horse · Saddle, riding pro jízdu','Tah káry/vozu: HMK 122 výslovně uvádí cart horse, ne plough horse'],
+  'Palfrey, riding horse':['Jezdecký kůň.','Bit & bridle · Blanket, horse · Saddle, riding/war; Saddle bags','Tah káry/vozu: HMK 122 neuvádí'],
+  'Warhorse, courser':['Jízda a bojový kůň.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah káry/vozu: HMK 122 neuvádí'],
+  'Warhorse, charger':['Jízda a bojový kůň.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah káry/vozu: HMK 122 neuvádí'],
+  'Warhorse, destrier':['Jízda a bojový kůň.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah káry/vozu: HMK 122 neuvádí'],
+  Warpony:['Jízda a bojový poník.','Uzda · deka · sedlo (válečné na míru) · brašny','Tah káry/vozu: HMK 122 neuvádí']
  };
  const owner=character(ownerId),cash=owner?cashForCharacter(owner):null;
  const eligibleOwner=!!owner&&activeCampaignCashKey(owner)!==undefined&&!combatActorLocked93725(ownerId);
@@ -6871,7 +6871,7 @@ function stableEquipmentReference93839(ownerId){
   const selectedGear=visible[0],catalog=selectedGear?STABLE_GEAR_CATALOG_580.find(i=>i.properties.stableTackId===selectedGear.id):null;
   const price=catalog?libraryPurchaseOffer(catalog)?.pricePence:null;
   const canBuy=eligibleOwner&&price!==null&&cash?.ok&&cash.balance>=price;
-  const speciesInfo=`${beast.name} · HMK str. 122. ${c[0]} ${c[1]} ${c[2]} Cena zvířete ${beast.priceD}d; max. výcvik ${beast.maxMasteryBoosts} MB. Výběr využití nepovoluje neověřenou jízdu ani tah.`;
+  const speciesInfo=`${beast.name} · HMK str. 122. ${c[0]} ${c[1]} ${c[2]} Cena zvířete ${beast.priceD}d; max. výcvik ${beast.maxMasteryBoosts} MB. Nabízené volby odpovídají pouze doloženým funkcím z HMK 122 a aktivním mechanikám aplikace.`;
   const reason=!eligibleOwner?'Pořizovat může jen aktivní vlastník mimo Initiative.':!cash?.ok?'Hotovost není doložena.':price!==null&&cash.balance<price?'Nedostatek hotovosti.':'';
   return `<tr class="hmk-stable-equipment-row" data-hmk-guide-beast="${esc(beast.id)}">
    <th scope="row" class="hmk-stable-gear-species" tabindex="0" data-hmk-help="${esc(speciesInfo)}" title="${esc(speciesInfo)}">${esc(beast.name)}<small>${esc(c[2])}</small></th>
@@ -6889,7 +6889,7 @@ function stableEquipmentReference93839(ownerId){
  return `<details class="hmk-stable-equipment-ref" ${stableEquipmentGuideOpen93839?'open':''}><summary>Všech 16 druhů · využití, vhodná výstroj a pořízení · HMK 122</summary>
  <p class="hc-hint"><strong>Katalog HMK str. 122:</strong> vyber využití a vhodnou výstroj; <strong>Koupit / Vzít zdarma</strong> používá stejný finanční a inventární postup jako Knihovna. Vlastníkem bude ${esc(owner?.name||'aktuální postava')}; ${cash?.ok?'doložená hotovost '+cash.balance+'d':'hotovost není doložena'}. Předmět skončí v inventáři, <strong>nenasadí se automaticky</strong>. Nasazení potvrď na pravé stránce. Přepnutí seznamů nikdy nic neukládá.</p>
  <div class="catalog-scroll hmk-stable-guide-scroll"><table class="catalog-spec hmk-stable-equipment-guide"><thead><tr><th>Zvíře · HMK 122</th><th colspan="3">Využití / tah &nbsp; · &nbsp; Vhodná výstroj &nbsp; · &nbsp; Nákup</th></tr></thead><tbody>${rows}</tbody></table></div>
- <p class="hc-hint">Kompatibilita vychází z ověřených režimů aplikace, nejde o novou úplnou pravidlovou matici HMK. Kára, vůz a saně nejsou nesený náklad. Soumarský postroj dovoluje náklad do 20 % tělesné hmotnosti, brašny po 15 lb. Válečné sedlo je na míru; neověřený druh výstroje se nenabízí.</p></details>`;
+ <p class="hc-hint">Řádky výše nyní přímo odrážejí tištěný HMK 122: kára = 1 vůl nebo 1 cart horse; vůz = 2 voli nebo 2 cart horses; saně = 1–2 cart horses; pack harness = do 20 % tělesné hmotnosti; saddle bags = 15 lb; sloní ceny a hmotnosti výstroje ×5. Kde HMK konkrétní funkci neuvádí, řádek to píše výslovně místo starého technického „nepovoleno“.</p></details>`;
 }
 
 function stableHubAnimalHTML(a,campaignId){

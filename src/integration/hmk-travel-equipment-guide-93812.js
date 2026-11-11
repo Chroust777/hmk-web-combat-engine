@@ -14,7 +14,7 @@ const canPull=a=>isCartHorse(a)||isOx(a);
 // v93.837: only a mount qualified under HMK p.122 can be selected as the
 // current rider's animal. Other, independently selected pack/draft animals
 // may accompany the group without becoming riding candidates.
-const rideBreeds=new Set(['palfrey','courser','charger','destrier','pony','camel']);
+const rideBreeds=new Set(['palfrey','courser','charger','destrier','pony','camel','donkey','mule']);
 export const isRidingAnimal93837=a=>!!a&&rideBreeds.has(a.spec?.breed);
 /** Never reinterpret an explicit mount ID or silently switch to another one.
  * The empty choice is the documented auto-selection of the first ELIGIBLE
@@ -25,13 +25,13 @@ export function resolveTravelMount93837(animals,selectedIds=[],requestedId=''){
  if(requestedId){
   const chosen=selected.find(a=>a.id===requestedId);
   if(!chosen)return {animal:null,reason:'Vybrané jízdní zvíře není zaškrtnuté v seznamu „Zvířata na cestě“. Zaškrtněte je, nebo zvolte automatický výběr.'};
-  if(!isRidingAnimal93837(chosen))return {animal:null,reason:chosen.name+' ('+chosen.spec.name+') není jízdní kůň ani velbloud.'};
+  if(!isRidingAnimal93837(chosen))return {animal:null,reason:chosen.name+' ('+chosen.spec.name+') není doložené jezdecké zvíře (kůň, osel, mezek nebo velbloud).'};
   return {animal:chosen,reason:null};
  }
  const animal=selected.find(isRidingAnimal93837)||null;
  return {animal,reason:animal?null:selected.length?
-  'Vybraná zvířata nejsou jezdecká. Vůl (Bovine/Oxen) používá Harness, ox pro tah; pro jízdu vyberte skutečného koně nebo velblouda a doložte uzdu, deku a sedlo.':
-  'Zaškrtněte alespoň jednoho skutečného koně nebo velblouda v seznamu Stáje.'};
+  'Vybraná zvířata nejsou jezdecká. Vůl (Bovine/Oxen) používá Harness, ox pro tah; pro jízdu vyberte skutečné jezdecké zvíře (kůň, osel, mezek nebo velbloud) a doložte uzdu, deku a sedlo.':
+  'Zaškrtněte alespoň jedno skutečné jezdecké zvíře (kůň, osel, mezek nebo velbloud) v seznamu Stáje.'};
 }
 
 const loose=(data,animal,gear)=>animal&&(data.inventory||[]).find(i=>
