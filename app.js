@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.828';
+const APP_VERSION='93.829';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2800,12 +2800,12 @@ function timeEpisodePageHTML(clock,participants){
  <label>Potravní dny<input name="quantity" type="number" min="0.5" step="0.5" max="${l.remaining}" value="${Math.min(1,l.remaining)}" required></label>
  <label>Skutečný druh potravy<input name="itemName" minlength="2" maxlength="100" required placeholder="Např. ryby, bobule"></label>
  <label>Skutečná hmotnost přebíraného množství (lb)<input name="totalWeightLb" type="number" step="0.01" min="0.01" max="20000" required></label></div>
- <label class="hc-check"><input name="confirmed" type="checkbox" value="yes" required> GM potvrzuje příjemce, druh a hmotnost.</label><button type="submit">Přidělit potravu · aktualizovat ENC</button></form>`:
+ <button type="submit">Přidělit potravu · aktualizovat ENC</button></form>`:
  l.unit==='waterDays'?`<form data-episode-foraging-water class="hc-episode-allocation"><strong>Voda #${l.resultIndex+1} · k přidělení ${l.remaining} water-days (${l.remaining*10} lb při úplném naplnění nádob)</strong>
  <input type="hidden" name="sourceId" value="${esc(l.sourceId)}"><input type="hidden" name="resultIndex" value="${l.resultIndex}">
  <label>Příjemce · prázdná, nesená nádoba<select name="itemId" required><option value="">— vyberte nádobu —</option>${latestWaterVessels.filter(x=>waterContainerCapacity(x)<=l.remaining).map(x=>`<option value="${esc(x.id)}">${esc(character(x.characterId)?.name||x.characterId)} · ${esc(x.snapshot?.name||'Nádoba')} · ${waterContainerCapacity(x)} gal / ${waterContainerCapacity(x)*10} lb</option>`).join('')}</select></label>
  <p class="hc-hint">Pouze skutečně nesené měchy a džbány; přijetí vody není její vypití. Pokud žádná nádoba není dostupná, nález zůstává ve společné evidenci.</p>
- <label class="hc-check"><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje pitnou vodu a její skutečné nalití.</label><button type="submit" ${!latestWaterVessels.some(x=>waterContainerCapacity(x)<=l.remaining)?'disabled':''}>Přidělit vodu do nádoby · aktualizovat ENC</button></form>`:
+ <button type="submit" ${!latestWaterVessels.some(x=>waterContainerCapacity(x)<=l.remaining)?'disabled':''}>Přidělit vodu do nádoby · aktualizovat ENC</button></form>`:
  `<p>Byliny #${l.resultIndex+1} · ${l.remaining} dávek (${esc(l.herbName||'druh neurčen')}); rezervace a zpracování v evidenci Foraging/Herbalism.</p>`).join('')||'<p>Všechny nalezené zásoby byly vydány nebo spotřebovány. Zápisy a původní hody zůstávají v kronice.</p>'}
  </details>`:'';
  const animalRoster=data.characters.filter(a=>a.hmk?.verifiedMountedBreed&&a.hmk?.healthState&&(clock.characterIds??[]).includes(a.id));
@@ -2857,7 +2857,7 @@ function timeEpisodePageHTML(clock,participants){
  <form data-episode-finish-interruption><input type="hidden" name="episodeId" value="${esc(pendingEncounter.id)}">
  <label>Výsledek události<select name="resolution"><option value="">— vyberte —</option><option value="continue">Setkání je vyřízeno, cesta může pokračovat</option><option value="stop">Setkání je vyřízeno, družina zastavila cestu</option></select></label>
  <label>Doložení výsledku / rozhodnutí GM<textarea name="detail" required maxlength="400" placeholder="Např. protistrana ustoupila; boj skončil a postavy mohou pokračovat."></textarea></label>
- <label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje skutečné dokončení Encounter / návazných Skill Tests.</label>
+
  <button type="submit">Zaznamenat dořešení a odblokovat čas</button></form></section>`:''}
  ${!pendingEncounter&&lastResolvedPause?`<p class="hc-hint" role="status">Předchozí cesta byla pozastavena; její nevyhodnocený zbytek byl ${lastResolvedPause.calendarTimeEpisode.interruption.remainingMinutes} minut. Zda pokračovat po vyřešeném setkání, rozhoduje GM podle aktuální situace.</p>`:''}
  ${currentEncounterReports.length?`<section class="hc-episode-interruption" role="status" data-episode-encounter-reported><h3>Encounter · oznámení GM na konci epizody</h3>
@@ -2894,7 +2894,7 @@ function timeEpisodePageHTML(clock,participants){
  <div class="hc-episode-sky-strip"><span class="hc-help-term" tabindex="0" data-hmk-help="Roční období určuje datum kampaně TR. Světlo se vypočítá z hodiny, šířkového pásma a délky dne podle HMK 142. Protože HMK neudává místní východ slunce, hranice dne používají polední aproximaci; konkrétní časové okolnosti může upravit GM změnou epizody.">Světlo a roční období</span><strong data-episode-light-auto>Odvozuje se z kalendáře</strong></div>
  <label class="hc-episode-latitude">Šířkové pásmo <select name="latitudeBand"><option value="mid">Střední</option><option value="high">Vysoká</option><option value="polar">Polární</option><option value="low">Nízká</option></select></label>
  <div hidden aria-hidden="true"><input name="lightPeriod" value="day"><input name="lightCalculation" value="latitude"><input name="daylightSeason" value="spring"><input name="sunriseMinute" value="360"><input name="twilightMinutes" value="60"></div>
-  <label class="hc-check hc-episode-weather-cover"><input name="weatherSafeShelter" type="checkbox"> Bezpečný klimatický úkryt (potvrzeno GM)</label>
+  <label class="hc-check hc-episode-weather-cover"><input name="weatherSafeShelter" type="checkbox"> Bezpečný klimatický úkryt po celý interval</label>
  <label data-episode-legacy-weather-picker>Potvrzené počasí oblasti<select name="weatherSource"><option value="local">Vlastní oblast / nové počasí GM</option>${areas.map(a=>option(a.id,a.name+' · denní počasí potvrzeno')).join('')}</select></label>
  <label>Název oblasti / trasy<input name="area" maxlength="90" placeholder="Např. Lesní cesta"></label>
  <label data-episode-weather-topography>Krajina / reliéf<select name="topography">${[['flat','Rovina'],['rough','Kopce'],['mountain','Hory']].map(([v,l])=>option(v,l)).join('')}</select></label>
@@ -2917,7 +2917,7 @@ function timeEpisodePageHTML(clock,participants){
  <button type="button" data-episode-load-patients>GM: naložit pacienta do skutečné káry / vozu</button>
  <p class="hc-hint">Tímto kliknutím potvrzujete skutečné společné použití zvoleného vozidla, spřežení a všech členů skupiny. Váhu vypočítá aplikace z postav a inventáře. Pokud chybí kára, vůl nebo postroj, použijte Stáj a bezplatné přidělení vybavení níže. Pacient nehází END za chůzi.</p>
  </section>
- <div data-episode-transport-patients hidden><strong>Doklad přepravovaných osob</strong><div class="hc-episode-members">${participants.map(c=>`<label class="hc-check" data-episode-transport-person="${esc(c.id)}" hidden><input name="transportedMemberIds" type="checkbox" value="${esc(c.id)}"> GM potvrzuje skutečnou přepravu · ${esc(c.name)}</label>`).join('')}</div></div>
+ <div data-episode-transport-patients hidden><strong>Doklad přepravovaných osob</strong><div class="hc-episode-members">${participants.map(c=>`<label class="hc-check" data-episode-transport-person="${esc(c.id)}" hidden><input name="transportedMemberIds" type="checkbox" value="${esc(c.id)}"> Přepravovaná osoba · ${esc(c.name)}</label>`).join('')}</div></div>
  <div data-episode-transport-panel hidden><strong>Skutečné vozidlo a tažná skupina (GM)</strong><p class="hc-hint">Každá cesta károu či vozem musí mít doložené skutečné vozidlo ze Stáje, postroje, zdravou tažnou skupinu a hmotnost. Každého nepohyblivého pacienta GM potvrzuje zvlášť; pacient nemá END hod za chůzi. HMK 122, 145.</p>
  <div data-episode-transport-vehicle-evidence><label>Skutečné vozidlo z aktuální Stáje<select name="transportVehicleKey"><option value="">— Vyberte vlastněnou káru nebo vůz —</option>${transportVehicleRows.map(r=>`<option value="${esc(r.key)}">${esc(r.name)} · ${esc(stableTravelRoster.find(a=>a.id===r.ownerAnimalId)?.name||r.ownerAnimalId)}</option>`).join('')}</select></label>
  <p class="hc-hint">Doložte skutečně zapřažená zvířata: kára 1 vůl / tažný kůň; vůz 2 stejného druhu. Ve Stáji musí mít odpovídající postroje. Vybraná zvířata musí být současně účastníky cesty.</p>
@@ -2926,7 +2926,7 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint" data-episode-transport-mass-summary role="status">Aplikace automaticky načte váhu těla a neseného inventáře všech cestujících včetně průvodce a pacientů. Chybějící váhu opravte v kartě postavy.</p>
  <input name="transportOtherLb" type="hidden" value="0">
  <label>Další fyzický náklad, který <strong>není</strong> v inventáři cestujících ani ve Stáji (lb) · volitelné<input name="transportExtraLb" type="number" min="0" max="1000000" step="0.001" value="0" placeholder="0"></label>
- <label class="hc-check"><input type="checkbox" name="transportCoLocated"> GM potvrzuje použití konkrétního vozidla, vybraného spřežení a cestujících a že uvedené váhy nezapočítávají nic dvakrát. Geografickou polohu spravuje GM mimo aplikaci.</label>
+ <input type="checkbox" name="transportCoLocated" checked hidden aria-hidden="true" tabindex="-1"><p class="hc-hint">Výběr konkrétního vozidla, zvířat a cestujících je přímým rozhodnutím GM. Nosnost, postroje a identitu výbavy aplikace stále povinně ověřuje; další potvrzení není potřeba.</p>
  <p class="hc-hint" data-episode-vehicle-capacity role="status">Nosnost bude stanovena z doložené soupravy dle HMK str. 122. Nedoložené váhy nebo vozidlo zabrání potvrzení.</p></div></div></fieldset>
  <div data-episode-transport-mount-panel hidden class="panel"><strong>Převoz nepohyblivé postavy na koni (GM)</strong>
  <p class="hc-hint">Vyberte koně a osobu, která jej vede. Průvodce buď jde pěšky vedle koně (jeho váha se koni nepřičítá), nebo jede s pacientem (započítají se oba). Tělo a nesený inventář se přepočítají automaticky podle aktuálních postav. Přetížení se zobrazí s hodnotami ENC a Move.</p>
@@ -3043,7 +3043,7 @@ function timeEpisodePageHTML(clock,participants){
  <label data-hazard-complication><span class="hc-help-term" tabindex="0" data-hmk-help="HMK 149 · Který test odpovídá skutečné překážce? Agility: úzká stezka na srázu, nerovný sestup nebo brod. Animalcraft: panika zvířat nebo uváznutí v terénu. Climbing: náročný výstup nebo nebezpečný zřícený most. Timbercraft: cesta vyžadující prosekání či odstranění překážejícího porostu. Swimming: hluboký nebo prudký potok či řeka. GM také určí, zda hází jeden řešitel nebo každý účastník zvlášť.">Dovednost komplikace <span aria-hidden="true">ⓘ</span></span><select name="hazardComplicationSkill"><option value="">— není vybrána —</option>${['Agility','Animalcraft','Climbing','Timbercraft','Swimming'].map(x=>option(x,x)).join('')}</select></label>
  <label data-hazard-worker>Opravář / řešitel překážky<select name="hazardWorkerId"><option value="">— vyberte účastníka —</option>${participants.map(c=>option(c.id,c.name)).join('')}</select></label>
  <label data-hazard-complication>Koho překážka ovlivňuje<select name="hazardComplicationScope"><option value="single">Jeden vybraný řešitel</option><option value="party">Každý člen družiny zvlášť</option></select></label>
- <label data-hazard-complication class="hc-check"><input name="hazardComplicationRouteChanged" type="checkbox"> Complication CF: GM potvrzuje skutečnou změnu trasy (HMK 149)</label>
+ <label data-hazard-complication class="hc-check"><input name="hazardComplicationRouteChanged" type="checkbox"> Complication CF: Trasa skutečně změněna po CF (HMK 149)</label>
  <div data-hazard-complication-party>${participants.map(c=>`<label data-episode-complication-actor="${esc(c.id)}">${esc(c.name)} · skutečný doklad Skill Testu<select name="hazardCompProof_${esc(c.id)}"><option value="">— dosud nevyhodnoceno —</option>${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&j.characterId===c.id&&j.skillTestProof).map(j=>option(j.id,j.title||j.id)).join('')}</select></label>`).join('')}</div>
  <div class="hc-episode-delay-fields" data-episode-delay-fields hidden>
  <h4>Zdržení · skutečné minuty GM (HMK 148–149)</h4>
@@ -3060,7 +3060,7 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint" data-episode-accident-result>Při společné epizodě je čas nehody automaticky konec intervalu; zdravotní hody zatím neprovádějte.</p></div>
  <label data-hazard-direction>Skutečný d10 pro směr odchýlení (liché = vlevo, sudé = vpravo)<span class="hc-episode-die"><input name="hazardDirectionD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="hazardDirectionD10" data-episode-faces="10">⚄ d10</button></span></label>
  <div data-hazard-direction-awareness><label>Awareness při Misdirection · skutečný Skill Test<select name="hazardDirectionProofId"><option value="">— pokud byl skutečně proveden —</option>${skillCandidates.filter(j=>episodeSkillProof(j,'Awareness',j.characterId,campaignKey(clock),clock.minute)).map(j=>option(j.id,(character(j.characterId)?.name||j.characterId)+' · '+j.title)).join('')}</select></label>
- <label class="hc-check"><input name="hazardDirectionDeferAwareness" type="checkbox"> GM potvrzuje: při tomto pokračování nebyl proveden Awareness; družina zatím pokračuje chybným směrem. Žádný úspěch se nepředpokládá.</label></div>
+ <label class="hc-check"><input name="hazardDirectionDeferAwareness" type="checkbox"> Družina nyní nepoužila Awareness a pokračuje chybným směrem (bez hodu a bez předpokládaného úspěchu).</label></div>
  </div><div class="hc-episode-hazard-proof">
  <label>Doklad navazujícího testu, Injury nebo úpravy výstroje<select name="hazardEvidenceId"><option value="">— zatím nedoloženo —</option>${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&(j.skillTestProof||j.combatProof||j.calendarInventoryProof)).map(j=>`<option value="${esc(j.id)}">${esc(character(j.characterId)?.name||'GM')} · ${esc(j.title||'Pravidlový doklad')}</option>`).join('')}</select></label>
 
@@ -3073,12 +3073,10 @@ function timeEpisodePageHTML(clock,participants){
  <section class="hc-weather-step"><h5>1 · Skutečná ochrana a okolnosti</h5><div class="hmk-trek-grid hc-weather-step-grid">
  <label>Tepelná ochrana ze zbroje · F / Area AV celé oblečené sestavy (HMK 133, 149)<input name="whAV_${h}_${esc(c.id)}" type="number" min="0" readonly data-hmk-derived="worn-armour" placeholder="Načítám skutečnou zbroj…"><small data-weather-av-source="${esc(c.id)}" role="status">Načteno z F ochrany skutečně oblečené sestavy.</small></label>
  ${h==='cold'?`${(()=>{const cold=coldInventoryChoices(data.inventory,c.id);const auto=cold.automatic.reduce((a,x)=>!a||x.rule.av>a.rule.av?x:a,null);return `<div class="hc-cold-kit">
- <p><strong>Automatický plášť:</strong> ${auto?esc(auto.item.snapshot.name)+' +'+auto.rule.av:'žádný doložený'}. Základ tepelné ochrany ze zbroje je již načten z oblečené sestavy.</p>
+ <p><strong>Automatický plášť:</strong> ${auto?esc(auto.item.snapshot.name)+' +'+auto.rule.av:'žádný doložený'}. Základ tepelné ochrany ze zbroje je již načten z oblečené sestavy. Výběr vybavení a úkrytu GM přímo stanovuje skutečné použití – bez druhého potvrzení.</p>
  <label>Skutečně použité další vybavení<select name="whGearId_${h}_${esc(c.id)}"><option value="">Bez dalšího (automatický plášť zůstává)</option>${cold.gear.map(x=>`<option value="${esc(x.item.id)}">${esc(x.item.snapshot.name)} +${x.rule.av}</option>`).join('')}</select></label>
- <label>Úkryt<select name="whShelterId_${h}_${esc(c.id)}"><option value="">Bez úkrytu</option>${cold.shelters.map(x=>`<option value="${esc(x.item.id)}">${esc(x.item.snapshot.name)} +2</option>`).join('')}<option value="cave">Mělká jeskyně +3</option></select></label>
- <label class="hc-check"><input name="whUseConfirmed_${h}_${esc(c.id)}" type="checkbox" value="yes"> GM potvrzuje skutečné použití vybraného předmětu / úkrytu (plášť oblečený v inventáři automaticky).</label>
- <label>Oheň +FS (0 = žádný)<input name="whFire_${h}_${esc(c.id)}" type="number" min="0" max="10" value="0"></label>
- <label class="hc-check"><input name="whFireConfirmed_${h}_${esc(c.id)}" type="checkbox" value="yes"> GM potvrzuje skutečně hořící oheň, pokud FS &gt; 0.</label>
+ <label>Úkryt<select name="whShelterId_${h}_${esc(c.id)}"><option value="">Bez úkrytu</option>${cold.shelters.map(x=>`<option value="${esc(x.item.id)}">${esc(x.item.snapshot.name)} +2</option>`).join('')}${!cold.shelters.length?'<option disabled>Stan +2 · bez skutečného stanu v inventáři</option>':''}<option value="cave">Mělká jeskyně +3</option></select></label>
+ <label>Skutečně hořící oheň · FS (0 = žádný)<input name="whFire_${h}_${esc(c.id)}" type="number" min="0" max="20" value="0"></label>
  </div>`;})()}
  <label>Podmínky případné Cold Exposure (HMK 185)<select name="whCold_${h}_${esc(c.id)}"><option value="dry">Sucho</option><option value="damp">Vlhko</option><option value="coolWater">Chladná voda</option><option value="coldWater">Studená voda</option><option value="freezingWater">Ledová voda</option></select></label>`:
  `<label class="hc-check" data-episode-heat-shade><input name="whShade_${h}_${esc(c.id)}" type="checkbox"> Odpočinek ve stínu (jen při odpočinku)</label>
@@ -3090,7 +3088,7 @@ function timeEpisodePageHTML(clock,participants){
  </section>
  <section class="hc-weather-step"><h5>3 · Endurance (Survival) · jen při expozici</h5>
  ${['INC','UNC'].includes(persistentStateOf(c)?.shock)?`<div class="notice warning" data-episode-passive-weather="${h}_${esc(c.id)}"><strong>Shock ${esc(persistentStateOf(c).shock)} · pasivní Endurance (Survival)</strong><p>Nepohyblivý pacient nevykonává žádnou akci. Je-li skutečně exponován, zadejte jediný pasivní odporový hod d100. Aplikace vypočte výsledek z ověřené Endurance, sekundárního Survival a Fatigue; následky se potvrdí až po Pochodu v původním zdravotním modulu.</p>
- <label>Skutečný pasivní Endurance d100<span class="hc-episode-die"><input name="whPassiveD100_${h}_${esc(c.id)}" type="number" min="1" max="100" placeholder="1–100"><button type="button" data-episode-die="whPassiveD100_${h}_${esc(c.id)}" data-episode-faces="100">⚄ d100</button></span></label><label class="hc-check"><input name="whPassiveConfirmed_${h}_${esc(c.id)}" type="checkbox"> GM potvrzuje skutečný hod a pasivní (neaktivní) zdravotní odpor</label></div>`:''}
+ <label>Skutečný pasivní Endurance d100<span class="hc-episode-die"><input name="whPassiveD100_${h}_${esc(c.id)}" type="number" min="1" max="100" placeholder="1–100"><button type="button" data-episode-die="whPassiveD100_${h}_${esc(c.id)}" data-episode-faces="100">⚄ d100</button></span></label></div>`:''}
  <div class="hmk-trek-grid hc-weather-step-grid">
  <label>Původní samostatně vyžádaný Endurance/Survival doklad<select name="whProof_${h}_${esc(c.id)}"><option value="">— čeká na vyžádaný test —</option>${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&['Endurance','Survival'].some(skill=>episodeSkillProof(j,skill,c.id,campaignKey(clock),clock.minute))).map(j=>`<option value="${esc(j.id)}">${esc(j.title||'Skill Test')} · ${esc((j.skillTestProof.a||j.skillTestProof.result)?.level||'—')}</option>`).join('')}</select></label>
  <label>Výsledek Endurance (automaticky převzatý z dokladu)<select name="whEnd_${h}_${esc(c.id)}"><option value="">— zatím není vyžádán —</option>${['CF','F','S','CS'].map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label>
@@ -3108,7 +3106,7 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint" data-episode-skill-links>Pracovní Skill Tests se k epizodě přiřazují výhradně jejím požadavkem a uloží se až při dokončení. Nezávislé testy se nepřebírají.</p>
  </details>
  <label>Popis pro kroniku GM<textarea name="narrative" rows="2" maxlength="400" placeholder="Družina se vydala podél lesa, déšť sílil…"></textarea></label>
- <label class="hc-check" data-episode-final-confirm><input type="checkbox" name="confirmed" required> Potvrzuji skutečně vyhodnocené podklady pro uzavření epizody</label>
+<input type="checkbox" name="confirmed" checked hidden aria-hidden="true" tabindex="-1">
  <button type="button" class="hc-episode-evaluate" data-episode-evaluate>Vyhodnotit epizodu →</button>
  </form></section>
  <aside class="hc-episode-result" aria-live="polite"><h3>Vyhodnocení a dokončení</h3><div class="hc-episode-overview" data-episode-overview></div><section class="hc-episode-evidence"><h4>Pravidlové výsledky a doklady</h4><div data-episode-evidence>Dosud žádný doložený výsledek.</div></section><section class="hc-episode-checklist"><h4>Úkoly před dokončením</h4><div data-episode-checklist>Vyplňte délku a skutečné podmínky.</div></section><button type="submit" form="hmk-time-episode-form" class="hc-episode-confirm" data-episode-finalize disabled>Dokončit a zapsat celou epizodu</button>
@@ -3269,11 +3267,11 @@ function campaignCalendarView(){
  <label>Převzato (food-days)<input name="quantity" type="number" min="0.5" max="${l.remaining}" step="0.5" value="${Math.min(1,l.remaining)}" required></label>
  <label>Skutečný druh potravy<input name="itemName" maxlength="100" minlength="2" placeholder="Např. bobule, jedlé houby, ryby" required></label>
  <label>Celková hmotnost převzaté potravy (lb)<input name="totalWeightLb" type="number" min="0.01" max="20000" step="0.01" placeholder="Skutečně zjištěná hmotnost" required></label></div>
- <label class="hc-check"><input name="confirmed" type="checkbox" value="yes" required> GM potvrzuje skutečný balík potravy, příjemce a hmotnost.</label><button type="submit">Převzít do inventáře a přepočítat ENC</button></form>`).join('')||'<p class="hc-hint">Není dostupná volná potrava k fyzickému převzetí.</p>'}
+ <button type="submit">Převzít do inventáře a přepočítat ENC</button></form>`).join('')||'<p class="hc-hint">Není dostupná volná potrava k fyzickému převzetí.</p>'}
  ${carriedForagingFood.map(l=>`<form data-foraging-carry-eat><strong>${esc(character(l.actorId)?.name||l.actorId)} · ${esc(l.itemName)} · zbývá ${l.remaining} food-days · ${Number((l.totalWeightLb*l.remaining/l.quantity).toFixed(2))} lb</strong>
  <input type="hidden" name="carryId" value="${esc(l.sourceJournalId)}"><input type="hidden" name="actorId" value="${esc(l.actorId)}">
  <label>Skutečně snědeno (food-days)<input name="quantity" type="number" step="0.5" min="0.5" max="${l.remaining}" value="${Math.min(1,l.remaining)}" required></label>
- <label class="hc-check"><input name="confirmed" type="checkbox" value="yes" required> GM potvrzuje skutečné snědení postavou (snižuje ENC; bez posunu času)</label>
+ 
  <button type="submit">Zapsat skutečnou spotřebu z inventáře</button></form>`).join('')}
  </details></section>`;
  const herbCandidates=herbAssessmentCandidates(data.journal,campaignKey(clock));
@@ -16283,7 +16281,7 @@ document.addEventListener('submit',e=>{
   const clock=data.campaignClock;if(!clock||combatInitiativeSequence||episodeStageBaseline)
    throw Error('Přidělení vody je možné jen po potvrzení epizody mimo Initiative.');
   const v=Object.fromEntries(new FormData(f)),cid=campaignKey(clock),minute=clock.minute;
-  if(v.confirmed!=='yes'||!v.itemId)throw Error('GM musí potvrdit konkrétní prázdnou nádobu a nalití.');
+  if(!v.itemId)throw Error('GM musí vybrat konkrétní prázdnou nádobu pro nalití.');
   const latest=episodeRecentRows(clock).at(-1);
   if(!latest||latest.id!==v.sourceId||latest.calendarCampaignId!==cid)
    throw Error('Zvolený nález nepatří poslední dokončené epizodě.');
@@ -16309,8 +16307,8 @@ document.addEventListener('submit',e=>{
  try{
   const clock=data.campaignClock;if(!clock||combatInitiativeSequence)throw Error('Převod zásob vyžaduje Kalendář mimo Initiative');
   const v=Object.fromEntries(new FormData(f)),cid=campaignKey(clock),at=clock.minute;
-  if(v.confirmed!=='yes'||!calendarMemberIds(clock,data.characters).some(c=>c.id===v.actorId))
-   throw Error('GM musí potvrdit existující postavu a skutečné množství.');
+  if(!calendarMemberIds(clock,data.characters).some(c=>c.id===v.actorId))
+   throw Error('Vyberte existující postavu a skutečné množství.');
   if(f.matches('[data-foraging-carry]')){
    const id=uuid(),createdAt=stamp();
    const {supplyUse,carry}=createForagingCarry({journal:data.journal,campaignId:cid,minute:at,
@@ -16706,7 +16704,7 @@ document.addEventListener('submit',e=>{
   const weatherDay=trekWeatherDay({season,climate,landscape,alpine,aridDesert,temperatureD10,precipitationD10});
   if(activeAreaWeather(data.journal,campaignId,dayIndex,area))throw Error('Pro tuto oblast už dnes platí denní počasí. Chcete-li nové, potvrďte časovou změnu GM nebo nejprve odvolejte aktivní výhled.');
   const origins=['temperature','precipitation'].map(name=>{const field=form.elements.namedItem(name);return field.dataset.cryptographicValue===field.value?'cryptographic-software-die':'manual';});
-  if(!uiConfirm('Zapsat nezměnitelné denní počasí pro '+area+'? d10 teplota '+temperatureD10+', srážky '+precipitationD10+'.'))return;
+  // v93.829: submitting both real d10 is the GM's explicit choice; no second modal acknowledgement.
   const entry={id:uuid(),characterId:calendarMemberIds(clock,data.characters)[0]?.id||'',calendarCampaignId:campaignId,campaignMinute:clock.minute,
    createdAt:stamp(),title:'HMK · Denní počasí · '+area,body:'Teplota d10 '+temperatureD10+', srážky d10 '+precipitationD10+'; HMK 144',
    calendarTrekDayWeather:{format:'hmk-trek-daily-weather-v1',dayIndex,area,season,climate,landscape,alpine,aridDesert,latitudeBand:String(fd.get('latitudeBand')||'mid'),weatherDay,
@@ -16732,10 +16730,9 @@ function openCalendarWeatherRoll(actor,source){
  <div class="field-grid"><label>Area AV · automaticky z oblečené výstroje<input type="number" name="areaAV" min="0" max="99" step="1" readonly data-hmk-derived="worn-armour" value="${verifiedAreaAV.ready?verifiedAreaAV.value:''}" placeholder="Vyžaduje ověřenou výstroj"><small>${esc(verifiedAreaAV.ready?'Vypočteno z aktuálního inventáře (HMK 133).':'Výpočet AV není doložen: '+verifiedAreaAV.reason)}</small></label>
  ${kind==='cold'?`${(()=>{const cold=coldInventoryChoices(data.inventory,actor.id);const auto=cold.automatic.reduce((a,x)=>!a||x.rule.av>a.rule.av?x:a,null);return `<div class="hc-cold-kit"><p><strong>Automatická ochrana z inventáře:</strong> ${auto?esc(auto.item.snapshot.name)+' · Cold AV +'+auto.rule.av:'Bez skutečně oblečeného ověřeného pláště'}. Základ zbroje min(Area AV,4) se přičte samostatně.</p>
  <label>Používaná přikrývka / bedroll / další plášť<select name="coldGearId"><option value="">Žádné další vybavení (pouze skutečně oblečený plášť)</option>${cold.gear.map(x=>`<option value="${esc(x.item.id)}">${esc(x.item.snapshot.name)} · +${x.rule.av} · ${esc(slotLabel(x.item.slot))}</option>`).join('')}</select></label>
- <label>Skutečně používaný úkryt<select name="coldShelterId"><option value="">Bez úkrytu</option>${cold.shelters.map(x=>`<option value="${esc(x.item.id)}">${esc(x.item.snapshot.name)} · +2</option>`).join('')}<option value="cave">Mělká jeskyně · +3 (potvrdí GM)</option></select></label>
- <label class="hc-check"><input type="checkbox" name="coldUseConfirmed" value="yes"> GM potvrzuje skutečné používání vybraného neseného vybavení / postaveného stanu / jeskyně (oblékaný plášť je automatický).</label>
- <label>Oheň FS (0 = žádný)<input name="fireFS" type="number" min="0" max="20" value="0" step="1"></label>
- <label class="hc-check"><input type="checkbox" name="coldFireConfirmed" value="yes"> GM potvrzuje skutečně hořící oheň, pokud je FS vyšší než nula.</label></div>`;})()}
+ <label>Skutečně používaný úkryt<select name="coldShelterId"><option value="">Bez úkrytu</option>${cold.shelters.map(x=>`<option value="${esc(x.item.id)}">${esc(x.item.snapshot.name)} · +2</option>`).join('')}${!cold.shelters.length?'<option disabled>Stan · +2 · vyžaduje skutečný stan v inventáři</option>':''}<option value="cave">Mělká jeskyně · +3</option></select></label>
+ <label>Skutečně hořící oheň FS (0 = žádný)<input name="fireFS" type="number" min="0" max="20" value="0" step="1"></label>
+</div>`;})()}
  <p>Kontinuální plískanice: ${continuous?'ano, povinný d10':'ne, povinný d6'}. Cold AV = min(Area AV, 4) + nejvyšší používaná ochrana + úkryt + oheň. Bonusy několika plášťů/přikrývek se bez dalšího nesčítají.</p>`:
  `<label>Podmínky hlídky<select name="heatCondition"><option value="moving">Pohyb / bez odpočinku · d4</option><option value="resting">Klid bez pohybu · d6</option><option value="shade">Odpočinek ve stínu · d10</option></select></label>
  <label>Původ ze subtropického nebo tropického klimatu<select name="native"><option value="no">Ne</option><option value="yes">Ano · vyšší kostka d6/d8/d12</option></select></label>
@@ -16781,7 +16778,7 @@ document.addEventListener('submit',e=>{
   if(roll>sides)throw Error('Výsledek neodpovídá kostce d'+sides);
   const verifiedAreaAV=calculateWeatherAreaAV({inventory:data.inventory,actorId:actor.id});
   if(!verifiedAreaAV.ready)throw Error('Area AV z oblečené výstroje není ověřena: '+verifiedAreaAV.reason);
-  const coldProof=kind==='cold'?resolveColdHazardEquipment({inventory:data.inventory,actorId:actor.id,gearId:String(fd.get('coldGearId')||''),shelterId:String(fd.get('coldShelterId')||''),usedConfirmed:fd.get('coldUseConfirmed')==='yes',fireFS:Number(fd.get('fireFS')),fireConfirmed:fd.get('coldFireConfirmed')==='yes'}):null;
+  const coldProof=kind==='cold'?resolveColdHazardEquipment({inventory:data.inventory,actorId:actor.id,gearId:String(fd.get('coldGearId')||''),shelterId:String(fd.get('coldShelterId')||''),fireFS:Number(fd.get('fireFS'))}):null;
   const input={kind,areaAV:verifiedAreaAV.value,roll,
    origin:form.elements.namedItem('roll').dataset.weatherAuto===String(roll)?'cryptographic-software-die':'manual',
    ...(kind==='cold'?{gearAV:coldProof.gearAV,shelterAV:coldProof.shelterAV,
@@ -22862,6 +22859,8 @@ function episodeFormSnapshot(form){
  const o={};for(const node of [...form.elements]){
   if(!node.name)continue;
   if(['memberIds','animalIds','stableAnimalIds','transportedMemberIds','transportTeamIds','skillProofIds'].includes(node.name)){o[node.name]??=[];if(node.checked)o[node.name].push(node.value);continue;}
+  if(node.name==='confirmed'){o.confirmed=true;continue;}
+  if(node.name==='transportCoLocated'){o.transportCoLocated=['cart','wagon'].includes(form.elements.namedItem('conveyance')?.value);continue;}
   o[node.name]=node.type==='checkbox'?node.checked:node.value;
  }
  // Older drafts could check the same stable animal once as animalIds and
@@ -23230,7 +23229,7 @@ function episodeFormRestore(form,draft){
    // Migration is limited to the *open draft*, never historical journal rows.
    node.checked=selected||(node.name==='stableAnimalIds'&&Array.isArray(draft.animalIds)&&draft.animalIds.includes(node.value));
   }
-  else if(node.type==='checkbox')node.checked=!!draft[node.name];
+  else if(node.type==='checkbox')node.checked=['confirmed','transportCoLocated'].includes(node.name)?true:!!draft[node.name];
   else node.value=draft[node.name];
  }
 }
@@ -23931,8 +23930,8 @@ function episodePreviewFromForm(form,clock){
    const area=calculateWeatherAreaAV({inventory:data.inventory,actorId:id});
    if(!area.ready)throw Error('Weather Hazard '+(character(id)?.name||id)+': nelze vypočítat AV z nasazené výstroje – '+area.reason);
    const coldProof=hazard==='cold'?resolveColdHazardEquipment({inventory:data.inventory,actorId:id,
-    gearId:String(field('whGearId')||''),shelterId:String(field('whShelterId')||''),usedConfirmed:field('whUseConfirmed')==='yes',
-    fireFS:Number(field('whFire')||0),fireConfirmed:field('whFireConfirmed')==='yes'}):null;
+    gearId:String(field('whGearId')||''),shelterId:String(field('whShelterId')||''),
+    fireFS:Number(field('whFire')||0)}):null;
    let item=episodeWeatherExposure({kind:hazard,areaAV:area.value,
     protection:coldProof?coldProof.gearAV+coldProof.shelterAV:0,fireStrength:coldProof?.fireFS??0,
     continuousSleet:hazard==='cold'&&!!precipitation?.continuous&&seasonWeather.hasPrecipitation&&seasonWeather.precipitationRoll===seasonWeather.precipitationTN,
@@ -23947,7 +23946,7 @@ function episodePreviewFromForm(form,clock){
    if(item.exposed&&incapacitated){
     const passiveRaw=String(field('whPassiveD100')||'').trim();
     if(passiveRaw){
-     passive=passiveWeatherResistance(character(id),Number(passiveRaw),field('whPassiveConfirmed')===true);
+     passive=passiveWeatherResistance(character(id),Number(passiveRaw),true);
      item=episodeWeatherExposure({kind:hazard,areaAV:area.value,
       protection:coldProof?coldProof.gearAV+coldProof.shelterAV:0,fireStrength:coldProof?.fireFS??0,
       continuousSleet:hazard==='cold'&&!!precipitation?.continuous&&seasonWeather.hasPrecipitation&&seasonWeather.precipitationRoll===seasonWeather.precipitationTN,
@@ -25701,8 +25700,8 @@ function updateEpisodePreview(form){
   const awaitingGM=episodeEvaluationRequested&&form.dataset.episodeAwaitingGM==='true';
   const ready=episodeEvaluationRequested&&finalButton&&!finalButton.disabled;
   evaluateButton.disabled=!!(awaitingGM||ready);
-  evaluateButton.textContent=awaitingGM?'✓ Vyhodnoceno · potvrďte GM vlevo':ready?'✓ Vyhodnoceno · dokončete vpravo':'Vyhodnotit epizodu →';
-  evaluateButton.title=awaitingGM?'Všechny aktuální výsledky jsou doloženy. Zaškrtněte potvrzení GM ve formuláři vlevo.':ready?'Všechny povinné výsledky jsou doložené. Nyní dokončete celou epizodu vpravo.':'';
+  evaluateButton.textContent=awaitingGM?'✓ Vyhodnoceno · dokončete vpravo':ready?'✓ Vyhodnoceno · dokončete vpravo':'Vyhodnotit epizodu →';
+  evaluateButton.title=awaitingGM?'Všechny aktuální výsledky jsou doloženy. Dokončete epizodu přímo tlačítkem vpravo.':ready?'Všechny povinné výsledky jsou doložené. Nyní dokončete celou epizodu vpravo.':'';
  }
  updateSharedTimeWindowControls(form);
  // Re-synchronise after orientation becomes known (even if later inputs are missing).
@@ -25754,7 +25753,7 @@ function initializeTimeEpisodeForm(form){
   topography:'Rovina, kopce a hory ovlivňují teplotní úpravu; při cestování také dostupnou rychlost pohybu.',
   terrain:'Povrch a typ krajiny ovlivňují pohyb, orientaci, viditelnost a některé klimatické či přírodní modifikátory.',
   conveyance:'Doprava určuje základní rychlost, přípustný terén, zatížení a únavové podmínky.',
-  transportedMemberIds:'GM potvrzuje převoz konkrétního pacienta. Další pole dokládají skutečné vozidlo, zapřažení, postroje a nosnost (HMK 122, 145).',
+  transportedMemberIds:'Výběr osoby určuje skutečného přepravovaného pacienta. Vozidlo, zapřažení, postroje a nosnost jsou doloženy odděleně (HMK 122, 145).',
   transportVehicleKey:'Vyberte jedinou skutečně vlastněnou káru nebo vůz ze Stáje. Nelze vymyslet nové vozidlo.',
   transportTeamIds:'Zapřažená zvířata musí být registrovaná, vybraná v cestovní epizodě a mít odpovídající postroj.',
   transportOtherLb:'Automaticky doložená hmotnost všech ostatních cestujících a dodatečného nákladu mimo Stáj.',
@@ -25763,7 +25762,7 @@ function initializeTimeEpisodeForm(form){
   travelRideAnimalId:'Pro aktuální Pochod zvolte zvíře, na kterém jezdec jede; nemusíte nasedat ve Stáji.',
   travelRideRiderId:'Vyberte skutečného jezdce; hmotnost postavy a inventáře se počítá automaticky.',
   transportMountConfirmed:'Informativní potvrzení; způsob přepravy určuje aktuální výběr.',
-  transportCoLocated:'GM potvrzuje skutečně použité vozidlo, postroje, tažná zvířata, cestující a hmotnosti. Geografické polohy GM eviduje mimo aplikaci.',
+  transportCoLocated:'Vozidlo, postroje, zvířata i hmotnosti se ověřují z výběru a uložených dokladů. Geografickou polohu GM eviduje mimo aplikaci.',
   mapScale:'Měřítko 1 : číslo umožní převést skutečně uražené metry na vzdálenost v mapě.',
   lightPeriod:'Den, soumrak nebo noc ovlivňují orientaci, Encounter a některé klimatické následky.',
 
@@ -25798,17 +25797,15 @@ function initializeTimeEpisodeForm(form){
   hazardDelayNow:'Minuty zdržení odečtené od pohybu; při Complication F/CF se počítají automaticky od skutečné minuty překážky. Příští povinnosti se přenesou do nové epizody.',
 
   checkEncounter:'Ve výchozím stavu automaticky kontrolováno každou venkovní epizodu. Odškrtnutí je pouze pro GM doloženou bezpečnou výjimku.',
-  confirmed:'Potvrzení skutečných doložených podkladů GM; samo o sobě nenahrazuje žádný povinný Skill Test.'
+  confirmed:'Dokončení epizody je samo potvrzením GM; všechny povinné hody, zdroje a zdravotní následky musí být doloženy. Další checkbox není potřebný.'
  };
  // HMK 149/185: the weather input names include the actor ID. Tooltip text
  // must come from the field family, never from that opaque ID.
  const weatherHelp={
   whAV:{cold:'Skutečná Area AV oděvu a zbroje postavy. Pro Cold Hazard se podle HMK 149 použije nižší z této hodnoty a AV4. Aplikace automaticky vypočítá váženou Area AV z aktuálně oblečených a použitelných kusů (HMK 133); přístřešky a oheň se přičítají samostatně. Není to hod kostkou.',heat:'Area AV automaticky z nasazené výbavy (HMK 133); Heat Hazard používá alespoň AV1, i když je postava téměř neoblečená. Hází se proti této hodnotě (HMK 149).'},
-  whGearId:'Dostupné vybavení vybrané přímo z inventáře. Oblečený plášť se započte automaticky. Bedroll a přikrývku GM potvrzuje jako skutečně používané.',
-  whShelterId:'Stan je možné započítat pouze z inventáře a po potvrzení jeho postavení. Mělkou jeskyni +3 doloží GM výběrem a potvrzením.',
-  whUseConfirmed:'Potvrzení skutečného použití vybavení/úkrytu, nikoli další hod. Samotné vlastnictví bedrollu nebo stanu není jeho použití.',
-  whFireConfirmed:'FS se počítá pouze při opravdu hořícím ohni potvrzeném GM.',
-  whFire:'Skutečný Fire Strength (FS) zahřívajícího ohně podle HMK 121, 149. Není-li použitelný oheň, zadejte 0. Přičítá se k cíli Cold Hazard pouze tehdy, když GM potvrdí, že z něj postava skutečně těží.',
+  whGearId:'Dostupné vybavení přímo z inventáře. Oblečený plášť se započte automaticky; výběr bedrollu nebo přikrývky znamená, že je GM skutečně používá. Žádný další checkbox není potřeba.',
+  whShelterId:'HMK 149: stan z dostupného inventáře +2, mělká jeskyně +3. Už samotný výběr GM znamená skutečně použitý úkryt, bez dalšího potvrzení. Jiný bonus úkrytu pravidla neuvádějí.',
+  whFire:'Skutečný Fire Size (FS) již hořícího a využívaného ohně podle HMK 121 a 149. Zadejte 0, pokud postava z ohně netěží. Zadaný FS je sám prohlášením GM; nepoužívá se další potvrzovací checkbox.',
   whCold:'Podmínky pro samostatnou Cold Exposure na HMK 185. Sucho = HR5, 4 hodiny; vlhko = HR4, 4 hodiny; chladná voda = HR4, 2 hodiny; studená voda = HR3, 1 hodina; ledová voda = HR2, 30 minut. Ponoření má navíc samostatný Cold Shock před pokračující expozicí.',
   whShade:'Jen skutečný odpočinek ve stínu bez pochodu. HMK 149: Heat Hazard d10 místo d6 pro odpočinek bez stínu, resp. místo d4 při běžné činnosti. Stín se nedá použít pro probíhající pochod.',
   whNative:'Postava je původem z potvrzeného subtropického nebo tropického klimatického pásma. HMK 149: pro Heat Hazard se velikost kostky zvyšuje: d4→d6, d6→d8 nebo d10→d12.',
@@ -25990,7 +25987,7 @@ document.addEventListener('click',e=>{
    if(at<elapsed){
     form.elements.namedItem('incidentPlannedMinutes').value=String(initial);
     form.elements.namedItem('minutes').value=String(at);
-    form.elements.namedItem('confirmed').checked=false;
+    form.elements.namedItem('confirmed').checked=true;
     notice='Nehoda v '+at+'. minutě: plán '+initial+' min byl zkrácen. Nyní potvrďte pouze skutečných '+at+' min; zbývající čas neproběhl.';
    }
   }
@@ -26427,8 +26424,8 @@ document.addEventListener('submit',e=>{
   if(!pending||pending.id!==fd.get('episodeId')||clock.minute!==pending.calendarTimeEpisode.endMinute)
    throw Error('Nenavazujete na poslední skutečně pozastavené setkání.');
   const outcome=fd.get('resolution'),details=String(fd.get('detail')||'').trim();
-  if(!['continue','stop'].includes(outcome)||!details||fd.get('confirmed')!=='on')
-   throw Error('Doložte skutečný konec střetnutí, rozhodnutí a potvrzení GM.');
+  if(!['continue','stop'].includes(outcome)||!details)
+   throw Error('Doložte skutečný konec střetnutí a jeho rozhodnutí.');
   if(!mutate(()=>{data.journal.push({id:uuid(),characterId:pending.characterId,
    calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,createdAt:stamp(),
    title:'HMK · Encounter – dořešení pozastavené cesty',body:details,
@@ -26771,7 +26768,7 @@ document.addEventListener('submit',e=>{
    result.startMinute<(sharedTimeWindowSelectedGroupId?
     sharedTimeWindowDraft.groups.filter(g=>g.groupId===sharedTimeWindowSelectedGroupId).at(-1)?.startMinute??sharedTimeWindowDraft.startMinute:
     sharedTimeWindowDraft.startMinute)))throw Error('Činnost nesmí překročit zbylé minuty skupiny.');
-  if(!v.confirmed)throw Error('GM musí potvrdit skutečný průběh epizody.');
+  // The GM explicitly commits with the Finish/Stage button; no second checkbox is required.
   // The entire selected interval is one transaction. Events retain their relative
   // minute in the receipt; no campaign time, distance or fatigue is committed
   // until ALL mandatory resolutions have been completed.
