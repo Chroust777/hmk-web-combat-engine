@@ -1,0 +1,189 @@
+{
+  "status": "PASS",
+  "checks": [
+    "Correct current version",
+    "Stable acquisition form visible",
+    "Catalog Bovine (Oxen)",
+    "Blesk exists",
+    "Catalog Palfrey, riding horse",
+    "Vitr exists",
+    "Catalog Palfrey, cart horse",
+    "Tulak exists",
+    "Source animal detail appears",
+    "Species equipment table under anatomy",
+    "All 16 printed species present",
+    "Capacity and gear table rendered",
+    "Legacy direct purchase has one stable receipt, no duplicate inventory",
+    "Real gear move select and separate button",
+    "Dropdown change made no save",
+    "Legacy purchase materialized once on horse",
+    "Animal loads recalculated: old 0 lb, new 3 lb",
+    "New inventory physical item persisted to storage",
+    "Original purchase and custody chain preserved",
+    "Same item ID returned to actual owner inventory",
+    "Target ENC load drops after recovery",
+    "Unloaded item saved to storage",
+    "Recovered item offered for real re-attachment",
+    "Old piece reattached with same ID",
+    "Loads recalc on both animals after return",
+    "Cargo added into 15 lb bag capacity",
+    "Attempt to remove loaded saddlebags blocked",
+    "User-facing no-capacity error displayed",
+    "War saddle exists in supported printed catalog",
+    "20 lb war saddle raises horse base ENC by 5",
+    "Gear fitted to animal does not burden owner",
+    "Removing 20 lb saddle drops horse base ENC by 5",
+    "Same 20 lb saddle now causes owner Gear ENC 5",
+    "Two independently acquired pieces remain exactly two physical items",
+    "Original Stable vehicle purchasing UI accessible",
+    "Cart exists in ox Stable ownership ledger",
+    "Cart has physical transfer destination control",
+    "Changing cart destination does not save",
+    "Cart transferred ox -> cart horse",
+    "Cart chassis is not an animal back load",
+    "Same cart physically returned to owner inventory",
+    "Three physical items, no duplication, persisted",
+    "Local saved state rehydration preserves custody and owner ENC",
+    "No JavaScript page errors []"
+  ],
+  "count": 44,
+  "dialogs": [
+    "GM potvrzuje bezplatné převzetí Bovine (Oxen) (Blesk) postavou Michal?",
+    "GM potvrzuje bezplatné převzetí Palfrey, riding horse (Vitr) postavou Michal?",
+    "GM potvrzuje bezplatné převzetí Palfrey, cart horse (Tulak) postavou Michal?",
+    "Stáj · Blesk: GM potvrzuje převzetí výstroje?\nVybavení potvrzené GM",
+    "Potvrdit skutečný přesun Saddle bags, 15 lb (3 lb) ze zvířete Blesk na zvíře Vitr?\nPeníze se nemění; inventář, hmotnost, ENC a nosnost se přepočtou až po potvrzení.",
+    "Potvrdit skutečný přesun Saddle bags, 15 lb (3 lb) ze zvířete Vitr do inventáře Michal?\nPeníze se nemění; inventář, hmotnost, ENC a nosnost se přepočtou až po potvrzení.",
+    "Stáj · Blesk: GM potvrzuje naložení?\nDoložený náklad 10 lb",
+    "Stáj: Po sejmutí by náklad překročil kapacitu. Nejdříve vyložte odpovídající obsah brašen/postroje.",
+    "Stáj · Vitr: GM potvrzuje převzetí výstroje?\nDoloženo GM: válečné sedlo pro Vitr",
+    "Potvrdit skutečný přesun Saddle, war (20 lb) ze zvířete Vitr do inventáře Michal?\nPeníze se nemění; inventář, hmotnost, ENC a nosnost se přepočtou až po potvrzení.",
+    "Stáj · Blesk: GM potvrzuje pořízení vozidla?\nDoložená kára ze stáje",
+    "Potvrdit skutečný přesun Cart, 2-wheel (200 lb) ze zvířete Blesk na zvíře Tulak?\nPeníze se nemění; inventář, hmotnost, ENC a nosnost se přepočtou až po potvrzení.",
+    "Potvrdit skutečný přesun Cart, 2-wheel (200 lb) ze zvířete Tulak do inventáře Michal?\nPeníze se nemění; inventář, hmotnost, ENC a nosnost se přepočtou až po potvrzení."
+  ],
+  "pageErrors": [],
+  "final": {
+    "version": "93.839",
+    "minute": 480,
+    "animals": [
+      {
+        "id": "id-1794432226674-9bnlwjmxueo",
+        "name": "Blesk",
+        "b": 13,
+        "baseEnc": 0,
+        "gear": [
+          {
+            "entryId": "id-1794432228511-s1ytrwd958",
+            "inventoryId": "id-1794432228131-lhv2xkl9cah",
+            "itemId": "hmk-p122-tack-09"
+          }
+        ],
+        "vehicles": [],
+        "cargo": 10,
+        "capacity": 15,
+        "enc": 0
+      },
+      {
+        "id": "id-1794432226795-t43akllgvrg",
+        "name": "Vitr",
+        "b": 0,
+        "baseEnc": 0,
+        "gear": [],
+        "vehicles": [],
+        "cargo": 0,
+        "capacity": 0,
+        "enc": 0
+      },
+      {
+        "id": "id-1794432226895-nce5zp53ksd",
+        "name": "Tulak",
+        "b": 0,
+        "baseEnc": 0,
+        "gear": [],
+        "vehicles": [],
+        "cargo": 0,
+        "capacity": 0,
+        "enc": 0
+      }
+    ],
+    "inventory": [
+      {
+        "id": "id-1794432228131-lhv2xkl9cah",
+        "owner": "a",
+        "slot": "stable",
+        "animal": "id-1794432226674-9bnlwjmxueo",
+        "weight": 3,
+        "quantity": 1
+      },
+      {
+        "id": "id-1794432229027-q1beti1etds",
+        "owner": "a",
+        "slot": "carried",
+        "animal": null,
+        "weight": 20,
+        "quantity": 1
+      },
+      {
+        "id": "id-1794432229348-pbcwqvsiorm",
+        "owner": "a",
+        "slot": "carried",
+        "animal": null,
+        "weight": 200,
+        "quantity": 1
+      }
+    ],
+    "events": [
+      {
+        "type": "tack-add",
+        "animalId": "id-1794432226674-9bnlwjmxueo"
+      },
+      {
+        "type": "legacy-gear-detach",
+        "animalId": "id-1794432226674-9bnlwjmxueo"
+      },
+      {
+        "type": "inventory-gear-attach",
+        "animalId": "id-1794432226795-t43akllgvrg"
+      },
+      {
+        "type": "inventory-gear-detach",
+        "animalId": "id-1794432226795-t43akllgvrg"
+      },
+      {
+        "type": "inventory-gear-attach",
+        "animalId": "id-1794432226674-9bnlwjmxueo"
+      },
+      {
+        "type": "cargo-add",
+        "animalId": "id-1794432226674-9bnlwjmxueo"
+      },
+      {
+        "type": "tack-add",
+        "animalId": "id-1794432226795-t43akllgvrg"
+      },
+      {
+        "type": "legacy-gear-detach",
+        "animalId": "id-1794432226795-t43akllgvrg"
+      },
+      {
+        "type": "vehicle-add",
+        "animalId": "id-1794432226674-9bnlwjmxueo"
+      },
+      {
+        "type": "legacy-gear-detach",
+        "animalId": "id-1794432226674-9bnlwjmxueo"
+      },
+      {
+        "type": "inventory-gear-attach",
+        "animalId": "id-1794432226895-nce5zp53ksd"
+      },
+      {
+        "type": "inventory-gear-detach",
+        "animalId": "id-1794432226895-nce5zp53ksd"
+      }
+    ],
+    "stored": 3,
+    "personGearEnc": 55
+  }
+}

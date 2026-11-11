@@ -1,0 +1,6 @@
+{
+  "status": "BLOCKED",
+  "error": "Page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at http://harn.test/index.html\nCall log:\n  - navigating to \"http://harn.test/index.html\", waiting until \"load\"\n",
+  "pageErrors": [],
+  "requestCount": 0
+}
