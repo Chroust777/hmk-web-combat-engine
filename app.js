@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.833';
+const APP_VERSION='93.834';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2120,7 +2120,7 @@ let episodeCurrentGuidedStep=null;
 // Otherwise an initially missing checkbox becomes impossible to complete
 // after Evaluate locks the actual episode (and can deadlock the calendar).
 const EPISODE_IMMUTABLE_FIELDS=['kind','guideId','memberIds','animalIds','stableAnimalIds',
- 'trackingUse','trackingTrail','trackingRoad','trackingPartyTracked',
+ 'trackingUse','trackingActorId','trackingTrail','trackingRoad','trackingPartyTracked',
  'trackingSnow','trackingRain','trackingAlpine'];
 let episodePendingSkillRequest=null;
 // Only a request initiated by the episode may capture a newly saved Skill Test.
@@ -3006,6 +3006,8 @@ function timeEpisodePageHTML(clock,participants){
  <label data-episode-drover>Drover · doložený Riding / Animalcraft při dopravě se zvířaty<select name="droverProofId"><option value="">— Vyberte skutečný hod —</option>${skillOptions('Riding')}${skillOptions('Animalcraft')}</select></label>
  </div>
  <div data-episode-tracking><p class="hc-hint">Stalking umožňuje sledování stop, ale samo ho nenařizuje. Pro sledování a Spoor je nutná osvojená dovednost <strong>Tracking</strong> (HMK 147). Bez Tracking zvolte „Bez Tracking hodu“. Samostatný Awareness či atributový Perception mohou podle HMK 87 odhalit jen zjevné stopy, ale jejich test se nesmí připojit jako Tracking SV ani jako Spoor.</p><label>Tracking · rozhodnutí GM<select name="trackingUse"><option value="new">Nový Tracking SV</option><option value="reuse">Převzít skutečný SV pro bezprostřední sledování stejné stopy</option><option value="none">Bez Tracking hodu</option></select></label>
+ <label>Skutečný stopař ze stejné družiny (nemusí být průvodce)<select name="trackingActorId"><option value="">— Vyberte postavu s Tracking ML &gt; 0 —</option>${(clock.characterIds||[]).map(id=>{const actor=character(id),known=availableMasteries(actor).find(x=>x.name==='Tracking'&&x.ml>0);return `<option value="${esc(id)}" ${known?'':'disabled'}>${esc(actor?.name||id)} · Tracking ${known?.ml??0}</option>`}).join('')}</select></label>
+ <p class="hc-hint" data-episode-tracker-status role="status">Pro Tracking/Spoor vyberte člena právě cestující družiny s osvojeným Tracking. Průvodce může být jiná postava.</p>
  <div class="hc-episode-trail-entry"><label>Identifikace stopy (stejný název při pokračování)<input name="trackingTrail" maxlength="120" placeholder="Např. stopy zraněného vlka" autocomplete="off"></label>
  <button type="button" class="secondary hc-small" data-episode-confirm-trail>Potvrdit identifikaci stopy → další test</button>
  <p class="hc-hint" data-episode-trail-status role="status">Zapište celý název stopy. Teprve tlačítko jej uzamkne pro následující Tracking test.</p></div>
@@ -22957,7 +22959,7 @@ function episodeIdentityOf(v){
  * character as the immutable trail identity (v93.830). After confirmation,
  * the name is locked before the real Tracking test can be requested. */
 function episodeDeferredTrackingTrailAllowed(form){
- return episodeEvaluationRequested&&!!episodeEvaluatedIdentity&&episodeEvaluatedIdentity.trackingTrail===''&&
+ return episodeEvaluationRequested&&!!episodeEvaluatedIdentity&&episodeEvaluatedIdentity.trackingConfirmed!==true&&
   !form.elements.namedItem('trackingProofId')?.value&&!episodePinnedSkillFields.has('trackingProofId')&&
   episodePendingSkillRequest?.field!=='trackingProofId'&&
   (form.elements.namedItem('kind')?.value==='tracking'||
@@ -22972,17 +22974,21 @@ function episodeIdentityMismatch(form){
  // allows a complete name to be entered without automatically pinning its
  // first letter. The explicit confirm button is the only freeze boundary.
  if(episodeDeferredTrackingTrailAllowed(form)){
-  const withoutTrail={...actual,trackingTrail:''};
+  // A newly earned Stalking Mode may first reveal a need for a tracker.
+  // Until the dedicated confirmation button, these are draft decisions.
+  const withoutTrail={...actual,trackingTrail:'',trackingUse:episodeEvaluatedIdentity.trackingUse,
+   trackingActorId:episodeEvaluatedIdentity.trackingActorId};
   if(JSON.stringify(withoutTrail)===JSON.stringify(episodeEvaluatedIdentity))return '';
  }
- return JSON.stringify(actual)===JSON.stringify(episodeEvaluatedIdentity)?'':
+ const {trackingConfirmed:confirmationMeta,...lockedIdentity}=episodeEvaluatedIdentity;
+ return JSON.stringify(actual)===JSON.stringify(lockedIdentity)?'':
   'Druh činnosti, účastníci, průvodce a podmínky sledované stopy jsou po vyhodnocení uzamčeni. Dokončete tuto epizodu, nebo použijte nouzové zrušení.';
 }
 function episodeLockIdentityControls(form){
  const locked=episodeEvaluationRequested&&!!episodeEvaluatedIdentity;
  for(const name of EPISODE_IMMUTABLE_FIELDS){
   for(const node of form.querySelectorAll('[name="'+name+'"]')){
-   const deferred=name==='trackingTrail'&&episodeDeferredTrackingTrailAllowed(form);
+   const deferred=['trackingTrail','trackingUse','trackingActorId'].includes(name)&&episodeDeferredTrackingTrailAllowed(form);
    node.disabled=locked&&!deferred;
    if(locked&&!deferred)node.title='Aktivní epizoda: změna je povolena až po dokončení nebo nouzovém zrušení.';
    else if(node.title.startsWith('Aktivní epizoda:'))node.title='';
@@ -22993,8 +22999,9 @@ function episodeLockIdentityControls(form){
   const name=String(form.elements.namedItem('trackingTrail')?.value||'').trim();
   const available=!locked||episodeDeferredTrackingTrailAllowed(form);
   const relevant=form.elements.namedItem('trackingUse')?.value!=='none';
+  const tracker=form.elements.namedItem('trackingActorId')?.value;
   confirmation.hidden=!available||!relevant;
-  confirmation.disabled=!available||!relevant||!name;
+  confirmation.disabled=!available||!relevant||!name||!tracker;
   const status=form.querySelector('[data-episode-trail-status]');
   if(status)status.textContent=locked&&!available?
    'Identifikace stopy je potvrzená a uzamčená pro tento původní Tracking doklad.':
@@ -23199,7 +23206,7 @@ function episodeIssue(message,form){
   [/GM potvr|Potvrzení GM/i,'confirmed']
  ];
  const found=rules.find(([pattern])=>pattern.test(message));
- if(found)return {field:found[1],skill:found[2]||null,actorId:form?.elements.namedItem('guideId')?.value||null};
+ if(found){const isTrackingProof=found[1]==='trackingProofId'||found[1]==='trackingAwarenessProofId';return {field:found[1],skill:found[2]||null,actorId:form?.elements.namedItem(isTrackingProof?'trackingActorId':'guideId')?.value||null};}
  const explicit=message.match(/(?:whProof|whSkinRows|hazardCompProof|evD4|end)_[\w-]+/);
  return {field:explicit?.[0]||null,skill:null,actorId:null};
 }
@@ -23610,8 +23617,8 @@ function episodePreviewFromForm(form,clock){
   weatherSourceId:episodeWeatherContextKey(weather.sourceId,seasonWeather),minute:clock.minute,
   nightOverride:actualPeriod==='night',familiar:!!v.orientationFamiliar,torchlight:actualPeriod==='night'&&!!v.orientationTorch,
   fullMoon:actualPeriod==='night'&&!!v.orientationMoon,afterSnowfall:actualPeriod==='night'&&!!v.orientationSnow});
- const skillAtMinute=(id,skill)=>episodeSkillProof(data.journal.find(j=>j.id===id),skill,
-  guideId,campaignKey(clock),clock.minute,{requireSV:true});
+ const skillAtMinute=(id,skill,actorId=guideId)=>episodeSkillProof(data.journal.find(j=>j.id===id),skill,
+  actorId,campaignKey(clock),clock.minute,{requireSV:true});
  let orientation=null,trackingMemory=null;
  if(kind==='travel'){
   const base=trekMovement({topography:v.topography,terrain:v.terrain,conveyance:v.conveyance,
@@ -23657,8 +23664,8 @@ function episodePreviewFromForm(form,clock){
    autoLight?.segments?.length>1&&new Set(autoLight.segments.map(x=>x.period)).size>1)
   throw Error('Tracking Conditions (HMK 147): během sledování se změnil den, soumrak nebo noc. Rozdělte pouze Tracking test podle doložené změny světla. Běžný pochod bez Tracking tím není blokován.');
  if(kind==='tracking'||kind==='travel'&&orientation?.modes.stalking===1&&v.trackingUse!=='none')trackingMemory=computeEpisodeTracking({mode:v.trackingUse||'new',
-  currentSkill:skillAtMinute(v.trackingProofId,'Tracking'),previous,minute:clock.minute,context,
-  trail:v.trackingTrail,conditions:episodeTrackingConditionsFromContext({
+  currentSkill:skillAtMinute(v.trackingProofId,'Tracking',v.trackingActorId||guideId),previous,minute:clock.minute,context,
+  trackerId:v.trackingActorId||guideId,trail:v.trackingTrail,conditions:episodeTrackingConditionsFromContext({
     weatherWatch:precipitation,period:actualPeriod,terrain:v.terrain,
     partyTracked:Number(v.trackingPartyTracked),road:v.trackingRoad||'none'})});
  const modes=orientation?.modes||{progress:0,bearing:0,orienteeringSlow:0,foraging:0,stalking:0};
@@ -23737,19 +23744,12 @@ function episodePreviewFromForm(form,clock){
   Number(wearied)+Number(injured)+Number(precipitation?.slowMode);
  const computedSlow=equipmentBaseSlow+Number(equipmentSlowIn>0);
  const spare=Math.max(0,modes.progress-computedSlow);
- const priorMovement=previous?.calendarTimeEpisode;
- const sameMovement=orientation?.sourceMode==='reuse'&&priorMovement?.kind==='travel'&&
-  priorMovement.slow===computedSlow&&priorMovement.progress===modes.progress&&
-  priorMovement.bearing===modes.bearing&&priorMovement.loaded===actualLoaded&&
-  priorMovement.conveyance===v.conveyance&&priorMovement.terrain===v.terrain&&
-  priorMovement.topography===v.topography&&!forcedBearing;
+ // HMK 146/148: movement dice belong to THIS watch, even when the
+ // previously witnessed Survival SV is valid for immediate continuation.
+ // Retain historic replay for older receipts but never mint new reused dice.
  const pvals=String(v.progressD10||'').trim(),dvals=String(v.directionD10||'').trim();
- const inheritedProgress=sameMovement&&Array.isArray(priorMovement.movementRolls?.progressD10)&&
-  priorMovement.movementRolls.progressD10.length===spare?priorMovement.movementRolls.progressD10:null;
- const inheritedDirection=sameMovement&&Array.isArray(priorMovement.movementRolls?.directionD10)?
-  priorMovement.movementRolls.directionD10:null;
- const progressD10=pvals?pvals.split(',').map(x=>Number(x.trim())):(inheritedProgress?[...inheritedProgress]:[]);
- const directionD10=dvals?dvals.split(',').map(x=>Number(x.trim())):(inheritedDirection?[...inheritedDirection]:[]);
+ const progressD10=pvals?pvals.split(',').map(x=>Number(x.trim())):[];
+ const directionD10=dvals?dvals.split(',').map(x=>Number(x.trim())):[];
  if(kind==='travel'&&progressD10.length!==spare)throw Error('Přebytek Progress vyžaduje '+spare+' skutečných d10. Zadejte je oddělené čárkami.');
  const rolls=Object.fromEntries(members.map(id=>{
   const raw=String(v['end_'+id]??'').trim();
@@ -23816,7 +23816,7 @@ function episodePreviewFromForm(form,clock){
  if(trackingMemory){
   const spent=Number(v.trackingSpoorSpent||0);
   const awareness=episodeSkillProof(data.journal.find(j=>j.id===v.trackingAwarenessProofId),
-   'Awareness',guideId,campaignKey(clock),clock.minute);
+   'Awareness',trackingMemory.trackerId||guideId,campaignKey(clock),clock.minute);
   const aw=awareness?.level||null;
   result.trackingFollowup={...episodeTrackingFollowup({adjustedSV:trackingMemory.score.adjustedSV,
    criticalFailure:trackingMemory.level==='CF',awarenessLevel:aw,spoorSpent:spent}),
@@ -23827,8 +23827,7 @@ function episodePreviewFromForm(form,clock){
  // Actual post-episode changes remain with the animal's Combat State.
  if(animalHealth.length)result.animalHealth=animalHealth;
  result.movementRolls={progressD10,directionD10};
- result.movementRollSources={progress:pvals?null:inheritedProgress?previous.id:null,
-  direction:dvals?null:inheritedDirection?previous.id:null};
+ result.movementRollSources={progress:null,direction:null};
  result.navigationState=episodeNavigationState(lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members),result.direction,{recovered:!!v.navigationRecovered,lostPriority:true});
  result.navigationPartyScope='v93.699';
  result.navigationRecovered=!!v.navigationRecovered;
@@ -24215,7 +24214,7 @@ function episodeEndTasks(result){
   add('Encounter · rozhodnutí GM','Kladný procentní výsledek: '+result.encounter.count+' setkání. GM může doložit vzdálenost a Surprise jednotlivě přímo v Cestování nebo potvrdit externí vyhodnocení. Combat zůstává oddělený a nesmí vzniknout bez protivníka.','encounterResolution');
  if(result.trackingFollowup?.needsAwareness&&!result.trackingFollowup.awarenessLevel)
   tasks.push({name:'Tracking · Awareness',detail:'Doložte Awareness test osoby sledující stopu; Spoor se bez něj neuzavře.',
-   action:'trackingAwarenessProofId',skill:'Awareness',actorId:result.trackingMemory?.guideId||result.memberIds?.[0]});
+   action:'trackingAwarenessProofId',skill:'Awareness',actorId:result.trackingMemory?.trackerId||result.trackingMemory?.guideId||result.memberIds?.[0]});
  for(const h of result.hazardDetails||[]){
   if(h.requiresGMCompletion&&h.hazard==='equipment'&&h.itemId&&h.equipmentDisposition==='repair'&&h.repairSkill&&!h.repairProofId){
    tasks.push({name:'Equipment · '+h.repairSkill,detail:'Uložte skutečný opravářský test. Jeho SL bude převzato z dokladu, nikoli z ručního výběru.',
@@ -24507,7 +24506,7 @@ function episodePlannedTasks(form){
  if(v.kind==='tracking'&&v.trackingUse==='new')
   add('Tracking · '+(character(v.guideId)?.name||'průvodce'),
    'Vykonejte samostatný Tracking Success Value pro aktuální stopu.',
-   'trackingProofId','Tracking',v.guideId);
+   'trackingProofId','Tracking',v.trackingActorId||v.guideId);
  const incap=new Map((episodeTimedMedical(form)?.incapacitations||[]).map(x=>[x.actorId,x]));
  // The orientation evidence must first establish the episode's actual
  // movement. A prospective travel setup is not proof that an END roll is due.
@@ -24592,7 +24591,7 @@ function renderEpisodeEndError(form,message){
   const known=[];
   for(const [field,skill] of [['orientationProofId','Survival'],['trackingProofId','Tracking'],['trackingAwarenessProofId','Awareness'],['droverProofId','Riding']]){
    const j=data.journal.find(x=>x.id===v[field]);
-   const actorId=field==='trackingAwarenessProofId'?(v.guideId||''):v.guideId;
+   const actorId=['trackingProofId','trackingAwarenessProofId'].includes(field)?(v.trackingActorId||v.guideId||''):v.guideId;
    const saved=episodeSkillProof(j,skill,actorId,cid,minute)||
     (skill==='Riding'?episodeSkillProof(j,'Animalcraft',actorId,cid,minute):null);
    if(saved)known.push('<div class="hc-episode-proof hc-episode-proof-done"><strong>✓ '+esc(skill)+' · '+esc(character(actorId)?.name||actorId)+'</strong><span>Vyřešeno: '+esc(saved.level)+' · SV '+esc(String(saved.sv))+' · d100 '+esc(String(saved.roll??'—'))+
@@ -25317,6 +25316,18 @@ function updateEpisodePreview(form){
  // receipt exists. Keep its trail input visible while it can still be named.
  const mayNeedTravelTracking=travel&&
   (v.orientationPriority==='stealth'||Number(v.mode_stalking||0)===1);
+ const trackerSelect=form.elements.namedItem('trackingActorId');
+ if(trackerSelect){
+  const roster=new Set(v.memberIds||[]);
+  for(const opt of trackerSelect.options){if(!opt.value)continue;
+   const actor=character(opt.value);
+   opt.disabled=!roster.has(opt.value)||!actor||!availableMasteries(actor).some(x=>x.name==='Tracking'&&x.ml>0);
+  }
+  if(trackerSelect.value&&trackerSelect.selectedOptions[0]?.disabled)trackerSelect.value='';
+  const status=form.querySelector('[data-episode-tracker-status]');
+  if(status)status.textContent=trackerSelect.value?`Zvolený stopař: ${character(trackerSelect.value)?.name||trackerSelect.value}. Tracking musí být potvrzen tlačítkem identifikace stopy.`:
+   'Zvolte oprávněného člena aktuální družiny; samotná změna seznamu test nevyvolá.';
+ }
  for(const node of form.querySelectorAll('[data-episode-tracking]'))
   node.hidden=!(isTracking||mayNeedTravelTracking);
  for(const node of form.querySelectorAll('[data-episode-tracking-new]'))node.hidden=!episodeEvaluationRequested||v.trackingUse!=='new';
@@ -25836,9 +25847,9 @@ function episodeCarrySettingsFromLast(){
   navigationRecovered:false,checkEncounter:true};
 }
 function episodeFreshDraft(){return {rememberSettings:false,orientationUse:'new',trackingUse:'none',confirmed:false,hazardComplicationRouteChanged:false,
- memberIds:[],animalIds:[],stableAnimalIds:[],transportedMemberIds:[],transportTeamIds:[],transportVehicleKey:'',transportOtherLb:'',transportExtraLb:'0',transportMountAnimalId:'',transportMountHandlerId:'',transportMountHandlerPosition:'leading',travelRideAnimalId:'',travelRideRiderId:'',transportMountConfirmed:false,transportCoLocated:false,orientationProofId:'',trackingProofId:'',progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
+ memberIds:[],animalIds:[],stableAnimalIds:[],transportedMemberIds:[],transportTeamIds:[],transportVehicleKey:'',transportOtherLb:'',transportExtraLb:'0',transportMountAnimalId:'',transportMountHandlerId:'',transportMountHandlerPosition:'leading',travelRideAnimalId:'',travelRideRiderId:'',transportMountConfirmed:false,transportCoLocated:false,orientationProofId:'',trackingProofId:'',trackingActorId:'',progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
 function episodeClearDiceDraft(draft){
- const saved={...draft,confirmed:false,orientationProofId:'',trackingProofId:'',droverProofId:'',encounterD100Sub:'',
+ const saved={...draft,confirmed:false,orientationProofId:'',trackingProofId:'',trackingActorId:'',droverProofId:'',encounterD100Sub:'',
   progressD10:'',directionD10:'',survivalD10:'',precipitationD6:'',encounterD100:'',forageD10:'',
   temperatureD10:'',precipitationD10:'',
   checkEncounter:true,encounterResolution:'',encounterRollContext:'',navigationRecovered:false,orientationUse:'new',trackingUse:'none',
@@ -26011,8 +26022,21 @@ document.addEventListener('change',e=>{
     String(timeEpisodeDraft[e.target.name]??'')===e.target.value)return;
  if(e.target.name?.startsWith('evMoon_'))e.target.dataset.userSet='true';
  if(e.target.name==='rememberSettings'&&!episodeEvaluationRequested){
-  const draft=e.target.checked?episodeCarrySettingsFromLast():episodeFreshDraft();
-  timeEpisodeDraft={...draft,rememberSettings:e.target.checked};
+  const wantsPrevious=e.target.checked;
+  const draft=wantsPrevious?episodeCarrySettingsFromLast():episodeFreshDraft();
+  // The shared planner owns party/guide/time. Reusing the previous episode
+  // must prefill only editable settings; it may NEVER silently replace the
+  // current planned characters or weather when the checkbox is toggled.
+  const activePlan=sharedPlanCurrent93771();
+  const authoritative=activePlan?{kind:activePlan.kind,memberIds:[...activePlan.memberIds],guideId:activePlan.actorId,
+   minutes:String(activePlan.minutes),weatherSource:activePlan.weatherId||'local',area:sharedWeatherName93772(activePlan.weatherId)}:{};
+  const changedGuide=!!activePlan&&!!draft.guideId&&draft.guideId!==activePlan.actorId;
+  timeEpisodeDraft={...draft,...authoritative,rememberSettings:e.target.checked,
+   ...(changedGuide?{orientationFamiliar:false}:{}),orientationUse:'new',trackingUse:activePlan?.kind==='tracking'?'new':'none',
+   trackingActorId:'',orientationProofId:'',trackingProofId:'',progressD10:'',directionD10:''};
+  // Reset omitted fields as well: restoring a sparse fresh draft alone would
+  // leave the previous trail, terrain and checkbox values on screen.
+  form.reset();form.elements.namedItem('rememberSettings').checked=wantsPrevious;
   episodeFormRestore(form,timeEpisodeDraft);
  if(sharedTimeWindowDraft){const n=form.elements.namedItem('minutes');if(n){n.max=String(sharedTimeWindowDraft.minutes);n.readOnly=false;}}
  refreshWeatherAreaAVFields(form);
@@ -26029,7 +26053,13 @@ document.addEventListener('click',e=>{
  const form=button.closest('#hmk-time-episode-form');if(!form)return;
  const input=form.elements.namedItem('trackingTrail');
  const trail=String(input?.value||'').trim();
+ const draft=episodeFormSnapshot(form),trackerId=String(draft.trackingActorId||'');
  if(!trail){episodeMarkField(form,'trackingTrail',{focus:true});return;}
+ if(!draft.memberIds?.includes(trackerId)||
+  !availableMasteries(character(trackerId)).some(x=>x.name==='Tracking'&&x.ml>0)){
+  alert('Nejprve vyberte skutečného člena družiny, který ovládá Tracking (ML > 0).');
+  episodeMarkField(form,'trackingActorId',{focus:true});return;
+ }
  if(episodePinnedSkillFields.has('trackingProofId')||episodePendingSkillRequest?.field==='trackingProofId'&&episodePendingSkillRequest.status==='waiting'){
   alert('Tracking test už má rozpracovaný nebo uzamčený doklad. Identifikaci stopy nyní nelze změnit.');return;
  }
@@ -26039,7 +26069,8 @@ document.addEventListener('click',e=>{
    alert(episodeIdentityMismatch(form));return;
   }
   // This click, not the first keystroke, makes the trail immutable.
-  episodeEvaluatedIdentity={...episodeEvaluatedIdentity,trackingTrail:trail};
+  episodeEvaluatedIdentity={...episodeEvaluatedIdentity,trackingUse:draft.trackingUse,
+   trackingActorId:trackerId,trackingTrail:trail,trackingConfirmed:true};
  }
  input.value=trail;
  timeEpisodeDraft=episodeFormSnapshot(form);
@@ -26712,7 +26743,17 @@ function openPlannedEpisodeRow93772(planId){try{
   episodeGroupStartingReceiptIds93810=sharedUncommittedSkillRows93769().map(j=>j.id);
   if(scratch.startMinute!==slot.startMinute||scratch.remainingMinutes<plan.minutes)throw Error('Zastaralá časová kotva skupiny.');
   sharedTimeWindowActivePlanId=plan.id;
-  timeEpisodeDraft={...episodeFreshDraft(),weatherSource:plan.weatherId||'local',area:sharedWeatherName93772(plan.weatherId),kind:plan.kind,trackingUse:plan.kind==='tracking'?'new':'none',minutes:String(plan.minutes),memberIds:[...plan.memberIds],guideId:plan.actorId};
+  // Pre-fill a new travel card from the most recent episode, even after
+  // a time gap, but never transfer a roll/advantage/receipt. The shared plan
+  // remains authoritative for participants, guide, time and weather.
+  const previousSettings=plan.kind==='travel'?episodeCarrySettingsFromLast():{};
+  const changedGuide=!!previousSettings.guideId&&previousSettings.guideId!==plan.actorId;
+  timeEpisodeDraft={...episodeFreshDraft(),...previousSettings,
+   rememberSettings:Object.keys(previousSettings).length>0,
+   ...(changedGuide?{orientationFamiliar:false}:{}),
+   weatherSource:plan.weatherId||'local',area:sharedWeatherName93772(plan.weatherId),kind:plan.kind,
+   trackingUse:plan.kind==='tracking'?'new':'none',trackingActorId:'',
+   minutes:String(plan.minutes),memberIds:[...plan.memberIds],guideId:plan.actorId};
   timeEpisodeDraftCampaign=campaignKey(data.campaignClock);episodeDraftEpoch=uuid();
   persistEpisodeDraftSidecar();render();
  }catch(error){notice=error.message;sharedEpisodeAutoRun93772=false;alert('Činnost nelze otevřít: '+error.message);render();}
