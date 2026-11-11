@@ -7540,3 +7540,31 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .content-sheet .journal-book--overview .journal-health-courses__count{font-size:11px;color:#735538;font-weight:400}
 .hmk-gm-shock-status .hmk-gm-shock-editor>summary{cursor:pointer;color:#654426;font-weight:700;padding:.35rem 0}
 .hmk-gm-shock-status .hmk-gm-shock-editor>summary:focus-visible{outline:2px solid #8f7652}
+
+/* v93.827 – Chronicle anatomy alignment / complete rigid AV boxes.
+   Override earlier 93.3xx table defaults without changing the HMK values. */
+.content-sheet .journal-book--overview .journal-anatomy-table thead th:nth-child(4),
+.content-sheet .journal-book--overview .journal-anatomy-table thead th:nth-child(4)>span,
+.content-sheet .journal-book--overview .journal-anatomy-table tbody td.journal-ln-cell {
+  text-align:center!important;vertical-align:middle!important;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table thead th:nth-child(4)>span {
+  display:block;width:100%;box-sizing:border-box;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table td.journal-av {
+  text-align:center!important;vertical-align:middle!important;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table td.journal-av .journal-av-value {
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  box-sizing:border-box!important;width:1.85em!important;min-width:1.85em!important;
+  height:1.85em!important;min-height:1.85em!important;
+  padding:0!important;line-height:1!important;text-align:center!important;
+  vertical-align:middle!important;font-variant-numeric:tabular-nums;
+}
+.content-sheet .journal-book--overview .journal-anatomy-table td.journal-av .journal-av-value.journal-av-rigid {
+  border:1px solid #40342b!important;outline:0!important;
+  border-radius:1px!important;box-shadow:inset 0 0 0 .2px #40342b;
+}
+.content-sheet .journal-book--overview .journal-shock-state .journal-mini-stats [data-hmk-help]{
+  cursor:help;text-decoration:underline dotted rgba(106,67,33,.6);text-underline-offset:3px;
+}
