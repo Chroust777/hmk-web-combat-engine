@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.831';
+const APP_VERSION='93.832';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -951,7 +951,15 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
  const stagedWorkingData=unrelatedDuringEpisode?structuredClone(data):null;
  if(unrelatedDuringEpisode)data=normalizeLegacyCustomPrices(validate(JSON.parse(storageBaseline)));
  const previous=structuredClone(data);
- try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();seedNPCShelterDefaults93802();
+ try {const calendarDiceWitness=calendarDiceWitnessForActiveForm(data.campaignClock);fn();
+  // GM-confirmed creation / campaign enrolment is the handoff authorising the
+  // initial NPC safe stay. Do not silently create receipts for unrelated older
+  // NPCs on an arbitrary subsequent save (legacy cases have a dedicated button).
+  const newCampaign=!!data.campaignClock&&(!previous.campaignClock||campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock));
+  const beforePeople=new Set(previous.characters.map(c=>c.id));
+  const beforeMembers=new Set(previous.campaignClock?.characterIds||[]);
+  const freshNPC=missingNPCShelterDefaults93802().filter(c=>newCampaign||!beforePeople.has(c.id)||!beforeMembers.has(c.id));
+  if(freshNPC.length)seedNPCShelterDefaults93802(new Set(freshNPC.map(c=>c.id)));
   const priorInventory=new Map((previous.inventory||[]).map(x=>[x.id,x]));
   for(const itm of data.inventory||[]){const before=priorInventory.get(itm.id);if(before&&(itm.slot!==before.slot||itm.characterId!==before.characterId)&&itm.coldWorn)itm.coldWorn=false;}
   closeWeatherNoEffectAftercare();closeDeterministicWeatherAftercare();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:data.journal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});enrollUnmonitoredNutrition(data,{fromMinute:previous.campaignClock.minute,idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute&&
@@ -2997,7 +3005,7 @@ function timeEpisodePageHTML(clock,participants){
  <select name="orientationLowChoice"><option value="slow">Slow Mode</option><option value="lax">Lax Mode</option></select></label>
  <label data-episode-drover>Drover · doložený Riding / Animalcraft při dopravě se zvířaty<select name="droverProofId"><option value="">— Vyberte skutečný hod —</option>${skillOptions('Riding')}${skillOptions('Animalcraft')}</select></label>
  </div>
- <div data-episode-tracking><p class="hc-hint">Stalking umožňuje sledování stop, ale samo ho nenařizuje. Pokud chcete sledovat konkrétní stopu, zvolte před vyhodnocením nový Tracking test nebo oprávněné pokračování.</p><label>Tracking · rozhodnutí GM<select name="trackingUse"><option value="new">Nový Tracking SV</option><option value="reuse">Převzít skutečný SV pro bezprostřední sledování stejné stopy</option><option value="none">Bez Tracking hodu</option></select></label>
+ <div data-episode-tracking><p class="hc-hint">Stalking umožňuje sledování stop, ale samo ho nenařizuje. Pro sledování a Spoor je nutná osvojená dovednost <strong>Tracking</strong> (HMK 147). Bez Tracking zvolte „Bez Tracking hodu“. Samostatný Awareness či atributový Perception mohou podle HMK 87 odhalit jen zjevné stopy, ale jejich test se nesmí připojit jako Tracking SV ani jako Spoor.</p><label>Tracking · rozhodnutí GM<select name="trackingUse"><option value="new">Nový Tracking SV</option><option value="reuse">Převzít skutečný SV pro bezprostřední sledování stejné stopy</option><option value="none">Bez Tracking hodu</option></select></label>
  <div class="hc-episode-trail-entry"><label>Identifikace stopy (stejný název při pokračování)<input name="trackingTrail" maxlength="120" placeholder="Např. stopy zraněného vlka" autocomplete="off"></label>
  <button type="button" class="secondary hc-small" data-episode-confirm-trail>Potvrdit identifikaci stopy → další test</button>
  <p class="hc-hint" data-episode-trail-status role="status">Zapište celý název stopy. Teprve tlačítko jej uzamkne pro následující Tracking test.</p></div>
@@ -14582,7 +14590,10 @@ document.addEventListener('click',e=>{
   effectiveTrekSource(source,data.journal).calendarTrekProof.modes.stalking!==1)return alert('Neplatná postava nebo doložený Stalking Mode této hlídky');
  // Stalking is a movement mode, not a grant of Tracking mastery.
  if(!availableMasteries(character(actorId)).some(x=>x.name==='Tracking'&&x.ml>0)){
-  notice='Tracking není u zvolené postavy osvojený (HMK str. 87). Stalking žádný Tracking ML nepřidává. Vyberte ve formuláři hlídky postavu, která Tracking zná; Perception/Awareness odhalí jen zjevné stopy, nenahrazují Tracking SV.';
+  // Never leave an unrelated prior Tracking picker active after a refused handoff.
+  pendingTrekHandoff=null;
+  if(skillSVChoice595?.value==='Tracking')skillSVChoice595=null;
+  notice='Tato postava neovládá Tracking (HMK str. 87, 147). Awareness nebo Perception mohou SAMOSTATNÝM testem odhalit zjevné stopy, ale nenahrazují Tracking SV a nevytvoří Spoor. Chcete-li dokončit sledování, vyberte postavu s Tracking; jinak ponechte sledování stopy neaktivní. Nikdy nevybírejte Awareness/Perception do rozpracovaného formuláře Tracking.';
   render();return;
  }
  selected=actorId;view='skills';activeSkillTab='value';pendingTrekHandoff={sourceId:source.id,hazard:'tracking'};
@@ -16520,10 +16531,10 @@ function missingNPCShelterDefaults93802(){
  return calendarMemberIds(clock,data.characters).filter(c=>String(c.kind||'PC').toUpperCase()==='NPC'&&!c.hmk?.verifiedMountedBreed&&
   !data.journal.some(j=>j.calendarCampaignId===cid&&j.characterId===c.id&&j.calendarPCShelteredStay));
 }
-function seedNPCShelterDefaults93802(){
+function seedNPCShelterDefaults93802(onlyIds=null){
  const clock=data.campaignClock;if(!clock)return 0;
  const cid=campaignKey(clock),minute=clock.minute;
- const missing=missingNPCShelterDefaults93802();
+ const missing=missingNPCShelterDefaults93802().filter(c=>!onlyIds||onlyIds.has(c.id));
  for(const npc of missing){
   const reason='NPC · výchozí zajištěné zázemí, jídlo a pití od vstupu / aktuální minuty kampaně';
   const proof=createPCShelteredStay({campaignId:cid,actorId:npc.id,minute,enabled:true,reason});
@@ -16541,7 +16552,7 @@ document.addEventListener('click',e=>{
  if(view!=='calendar'||!data.campaignClock||storageReadOnly)return;
  const missing=missingNPCShelterDefaults93802();
  if(!missing.length){notice='Všichni NPC již mají zajištěný pobyt výslovně nastavený.';render();return;}
- if(mutate(()=>seedNPCShelterDefaults93802()))notice='Výchozí zajištění NPC bylo výslovně uloženo.';
+ if(mutate(()=>seedNPCShelterDefaults93802()))notice='Výchozí zajištění starších NPC bylo doplněno.';
 },true);
 // PC-only, minute-stamped GM attestation. Never erase active wounds or medical deadlines.
 document.addEventListener('change',e=>{if(e.target?.name==='trackingRoad'&&e.target.closest?.('#hmk-time-episode-form'))e.target.dataset.episodeAutoSource='gm';},true);
@@ -16567,6 +16578,20 @@ document.addEventListener('click',e=>{
   data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
    title:'HMK · '+(enabled?'Zajištěný pobyt':'Ukončení zajištěného pobytu')+' · '+actor.name,
    body:reason+'; dříve vzniklé zdravotní stavy pokračují beze změny.',calendarPCShelteredStay:proof});
+  // On leaving a GM-secured stay, the explicit GM choice is to use actual
+  // available provisions again.  The existing separate GM-supply switch may
+  // otherwise remain YES, contradicting the newly confirmed NO shelter.
+  // This is ONE atomic button commit; never a checkbox/change side effect.
+  if(!enabled&&gmProvisionedAt(data.journal,cid,actorId,clock.minute)){
+   const policy=activeNutritionPolicies(data.journal,cid,[actorId])[0];
+   if(policy){
+    const supply=createNutritionProvisionSwitch({campaignId:cid,actorId,minute:clock.minute,provisioned:false});
+    data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
+     title:'HMK · návrat k zásobování podle skutečných zásob · '+actor.name,
+     body:'Současně s potvrzeným odchodem ze zajištěného prostředí. Původní denní účet ani zásoby se nepřepisují.',
+     calendarNutritionProvisionSwitch:supply});
+   }
+  }
  }))notice='Zajištěné prostředí · '+actor.name+' · '+(enabled?'zapnuto':'vypnuto')+' od '+displayCampaignMinute(clock.minute)+'.';
 },true);
 document.addEventListener('submit',e=>{
@@ -23244,7 +23269,7 @@ function episodeStartSkillRequest(field,skill,actorId){
  const clock=data.campaignClock,form=document.querySelector('#hmk-time-episode-form');
  if(!episodeEvaluationRequested||!clock||!character(actorId))return false;
  if(skill==='Tracking'&&!availableMasteries(character(actorId)).some(x=>x.name==='Tracking'&&x.ml>0)){
-  notice='Zvolená postava nemá osvojený Tracking ML (HMK str. 87). Stalking je režim pohybu, nikoli náhrada dovednosti. Vyberte zkušeného stopaře; žádný hod nebyl vytvořen.';render();return false;
+  notice='Zvolená postava nemá Tracking ML (HMK str. 87, 147). Awareness/Perception jsou samostatné testy pro zjevné stopy, NIKOLI náhrada Tracking SV či Spoor. Vyberte stopaře s Tracking nebo zrušte sledování stopy pro tuto hlídku; žádný hod nebyl vytvořen.';render();return false;
  }
  if(form&&episodeIdentityMismatch(form)){
   alert(episodeIdentityMismatch(form));return false;
