@@ -779,3 +779,87 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hmk-stable-equipment-guide .hmk-stable-gear-species{overflow-wrap:anywhere}
 /* Accessible labels stay in the DOM but do not crowd the compact table. */
 .hmk-stable-guide-field .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+
+/* v93.840 · parchment, dense operational controls; forms stay authoritative. */
+.hmk-transport-compact,.hmk-stable-logistics-93840{background:linear-gradient(95deg,#f7e8c98c,#f2d8a868),url('./assets/ui/book/parchment_dynamic_texture.png')!important;background-size:100% 100%,580px 580px!important;border:1px solid #ad8857;border-radius:10px;color:#50351f}
+.hmk-transport-compact{padding:10px!important;min-width:0}
+.hmk-transport-heading{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:end;gap:9px;border-bottom:1px solid #b79b70;padding-bottom:8px;margin-bottom:8px}
+.hmk-transport-primary{font-weight:700;font-size:.85rem;min-width:0}
+.hmk-transport-primary select{width:100%;height:35px;min-width:0;margin-top:4px}
+.hmk-transport-heading-status{font-size:.77rem;line-height:1.35;color:#6d502d;padding:5px 7px;border-radius:5px;background:#f7eccd9c}
+.hmk-transport-compact .panel{margin:7px 0!important;padding:9px!important;min-width:0!important;border:1px solid #ba9865!important;background:#fff4d98c!important}
+.hmk-transport-compact [data-episode-stable-sync]{display:block}
+.hmk-transport-compact [data-episode-stable-sync]>strong{display:block;font-size:.88rem;margin:0 0 5px}
+.hmk-transport-compact [data-episode-stable-sync] .actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:5px 0}
+.hmk-transport-compact [data-episode-stable-sync] .actions>button{font-size:.75rem!important;line-height:1.16!important;min-height:32px!important;white-space:normal!important;padding:5px!important;margin:0!important}
+.hmk-transport-compact [data-episode-stable-roster]{margin-top:8px;padding:8px;border:1px solid #c4a77a;min-width:0}
+.hmk-transport-compact [data-episode-stable-roster]>legend{font-size:.89rem;font-weight:700}
+.hmk-transport-compact .hc-episode-animal-roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:6px}
+.hmk-transport-compact .hc-episode-stable-animal{margin:0!important;padding:7px!important;min-width:0}
+.hmk-transport-compact .hc-episode-stable-animal label{display:flex;align-items:flex-start;gap:5px;font-size:.78rem;line-height:1.3}
+.hmk-transport-compact .hc-episode-stable-animal .hc-episode-animal-health{margin:3px 0 0 24px;font-size:.73rem;line-height:1.28}
+.hmk-transport-compact .hc-episode-animal-actions{margin:5px 0 0 22px;gap:4px}
+.hmk-transport-compact .hc-episode-animal-actions button{padding:4px 6px!important;font-size:.72rem!important}
+.hmk-transport-compact [data-episode-transport-panel] label,.hmk-transport-compact [data-episode-healthy-ride-panel] label,.hmk-transport-compact [data-episode-transport-mount-panel] label{font-size:.8rem;min-width:0}
+.hmk-transport-compact [data-episode-transport-panel] select,.hmk-transport-compact [data-episode-healthy-ride-panel] select,.hmk-transport-compact [data-episode-transport-mount-panel] select{max-width:100%;min-width:0;min-height:32px}
+.hmk-transport-compact [data-episode-transport-panel] .hc-episode-members{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:3px}
+.hmk-transport-compact .hmk-transport-guidance{margin:4px 0;font-size:.73rem;line-height:1.35;color:#705437}
+.hmk-transport-compact .hmk-transport-guidance>summary{cursor:pointer;display:inline-block;text-decoration:underline dotted #a0875b}
+.hmk-transport-compact .hmk-transport-guidance p{margin:3px 0 7px}
+.hmk-transport-compact .hmk-transport-mini{font-size:.76rem;margin:4px 0;line-height:1.35}
+.hmk-stable-logistics-93840{padding:9px!important;min-width:0}
+.hmk-stable-logistics-93840>h4{margin:0 0 8px;font-size:1rem}
+.hmk-stable-load-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:6px 0 9px}
+.hmk-stable-load-stats>div{border:1px solid #bca277;border-radius:5px;background:#fff6e3a6;padding:6px 4px;min-width:0;text-align:center}
+.hmk-stable-load-stats small{display:block;font-size:.68rem;color:#77583d;line-height:1.15}
+.hmk-stable-load-stats strong{display:block;font-size:.91rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hmk-stable-load-explain{font-size:.75rem;margin:5px 0 8px;color:#674a30}
+.hmk-stable-load-explain>summary{cursor:pointer;text-decoration:underline dotted}
+.hmk-stable-load-explain p{font-size:.78rem;line-height:1.42}
+.hmk-stable-logistics-items{display:grid;grid-template-columns:minmax(0,1fr);gap:7px}
+.hmk-stable-logistics-card{background:#fff9eb8f;border:1px solid #c2a77d;border-radius:6px;padding:6px;min-width:0}
+.hmk-stable-logistics-card>h5{font-size:.86rem;margin:1px 0 5px;display:flex;justify-content:space-between;gap:6px}
+.hmk-stable-logistics-card>h5 small{font-size:.73rem;color:#71553b}
+.hmk-stable-logistics-card .catalog-scroll{overflow:visible;max-width:100%}
+.hmk-stable-logistics-card .hmk-stable-compact-table{min-width:0!important;width:100%!important;table-layout:fixed!important;font-size:.74rem}
+.hmk-stable-logistics-card .hmk-stable-compact-table th,.hmk-stable-logistics-card .hmk-stable-compact-table td{padding:4px 3px!important;line-height:1.2!important;vertical-align:middle!important}
+.hmk-stable-logistics-card .hmk-stable-compact-table th:nth-child(1){width:32%}
+.hmk-stable-logistics-card .hmk-stable-compact-table th:nth-child(2){width:14%}
+.hmk-stable-logistics-card .hmk-stable-compact-table th:nth-child(3),.hmk-stable-logistics-card .hmk-stable-compact-table td:nth-child(3){display:none!important}
+.hmk-stable-logistics-card .hmk-stable-compact-table th:nth-child(4){width:54%}
+.hmk-stable-logistics-card .hmk-stable-move{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:3px!important;align-items:center!important;min-width:0}
+.hmk-stable-logistics-card .hmk-stable-move select{min-width:0!important;width:100%!important;max-width:none!important;font-size:.7rem!important;padding:2px 14px 2px 3px!important}
+.hmk-stable-logistics-card .hmk-stable-move button{font-size:.7rem!important;padding:4px!important;min-height:27px!important}
+.hmk-stable-logistics-93840 form.hc-fields{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 7px;margin:7px 0!important;padding:7px!important;border:1px solid #c6ab7f;border-radius:6px;background:#fff8e991}
+.hmk-stable-logistics-93840 form.hc-fields label{min-width:0;font-size:.76rem;line-height:1.25}
+.hmk-stable-logistics-93840 form.hc-fields input,.hmk-stable-logistics-93840 form.hc-fields select{width:100%;min-width:0;max-width:none;min-height:30px;font-size:.78rem}
+.hmk-stable-logistics-93840 form.hc-fields button{grid-column:1/-1;justify-self:start;margin:0!important;font-size:.78rem!important;padding:6px 10px!important}
+.hmk-hazard-choice-confirm{background:#f8edd6;border:1px solid #ab8251;border-radius:7px;display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:8px;margin:9px 0}
+.hmk-hazard-choice-confirm[hidden]{display:none!important}
+.hmk-hazard-choice-status{font-size:.8rem;line-height:1.3;flex:1 1 170px}
+.hmk-hazard-choice-status[data-state="pending"]{color:#8a361e;font-weight:700}
+.hmk-hazard-choice-status[data-state="confirmed"]{color:#315735}
+.hmk-hazard-choice-confirm button{white-space:normal;min-height:31px}
+@media(max-width:640px){.hmk-transport-heading{grid-template-columns:1fr}.hmk-transport-compact [data-episode-stable-sync] .actions{grid-template-columns:1fr 1fr}.hmk-stable-load-stats{grid-template-columns:1fr 1fr}}
+/* v93.840 transport action checklist: one compact line per obligation.
+   Every original purchase/action/jump is still a real button; the explanation
+   is keyboard-accessible but does not cover the primary controls. */
+.hmk-transport-compact .hc-episode-equipment-guide{padding:7px!important}
+.hmk-transport-compact .hc-episode-equipment-guide>h4{font-size:.82rem!important;margin:0 0 4px!important}
+.hmk-transport-check-progress{font-size:.75rem;margin:1px 0 6px;line-height:1.35}
+.hmk-transport-check-row{display:grid!important;grid-template-columns:13px minmax(0,1fr) auto;gap:3px 6px!important;align-items:center;padding:6px 3px!important;min-height:35px!important;border-top:1px solid #c8ae85!important;background:none!important}
+.hmk-transport-check-row .hc-episode-equipment-marker{align-self:center;font-size:.83rem}
+.hmk-transport-check-label{min-width:0;font-size:.78rem;line-height:1.28;overflow-wrap:break-word}
+.hmk-transport-check-actions{display:flex!important;flex-wrap:wrap;gap:3px!important;justify-content:flex-end;align-items:center;margin:0!important}
+.hmk-transport-check-actions button{min-height:26px!important;font-size:.7rem!important;line-height:1.15!important;padding:4px 6px!important;margin:0!important;max-width:220px}
+.hmk-transport-check-detail{grid-column:2/-1;font-size:.72rem;color:#62482e;margin:0!important}
+.hmk-transport-check-detail>summary{font-size:.68rem;cursor:pointer;display:inline-block;border-bottom:1px dotted #9d7950}
+.hmk-transport-check-detail p{font-size:.72rem;line-height:1.35;margin:3px 0!important}
+.hmk-transport-drover{display:flex;flex-wrap:wrap;align-items:center;gap:7px;font-size:.74rem;padding:5px 3px;border-top:1px solid #c8ae85}
+.hmk-transport-drover button{font-size:.71rem!important;padding:4px 7px!important;min-height:26px!important;margin:0!important}
+.hmk-transport-compact [data-episode-transport-mass-summary],
+.hmk-transport-compact [data-episode-vehicle-capacity]{font-size:.72rem!important;line-height:1.35!important;margin:5px 0!important}
+.hmk-transport-compact [data-episode-transport-panel]>strong,
+.hmk-transport-compact [data-episode-transport-patients]>strong{font-size:.82rem}
+.hmk-transport-compact .hc-episode-stable-sync>p.hc-hint{font-size:.73rem;line-height:1.35;margin:5px 0!important}
+@media(max-width:620px){.hmk-transport-check-row{grid-template-columns:13px minmax(0,1fr)!important}.hmk-transport-check-actions{grid-column:2;justify-content:flex-start}.hmk-transport-check-detail{grid-column:2}}

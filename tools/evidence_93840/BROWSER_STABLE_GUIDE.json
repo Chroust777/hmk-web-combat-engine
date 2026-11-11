@@ -1,0 +1,145 @@
+{
+  "version": "93.840",
+  "count": 38,
+  "status": "PASS",
+  "checks": [
+    "Available Bovine (Oxen)",
+    "Added animal Blesk",
+    "Available Palfrey, riding horse",
+    "Added animal Vitr",
+    "No coins spent acquiring gifted animals",
+    "16 species with real dropdowns",
+    "Guide has actual parchment background",
+    "Each species has two menus",
+    "Each species has Buy and Free actions",
+    "Species and item contextual tooltips present",
+    "Dogs cannot buy unverified horse harness",
+    "Ox single shared-library form",
+    "Change mode does not mutate/cost coins",
+    "Mode switch selects first matching pack item",
+    "Change gear alone does not mutate/cost coins",
+    "Tooltip updates with selected real item",
+    "Buy button shows current printed price",
+    "Library purchase deducts exact printed cost",
+    "Canonical item ID and one physical inventory entry",
+    "Library puts purchased gear in character inventory with true cost",
+    "Real campaign cash purchase transaction recorded",
+    "Storage persists purchase; no time deducted",
+    "Buying did not automatically equip animal",
+    "Free acquisition does not reduce coins",
+    "Free entry is a real physical Library inventory entry",
+    "Free acquisition has no fictitious cash transaction",
+    "Owned goods offered for real Stable attach",
+    "Purchased saddlebags attach to ox via normal Stable",
+    "Animal load increases by real item weight",
+    "Move form exists",
+    "Transfer dropdown and confirm button share same row",
+    "Compact one-word transfer button",
+    "Compact row in revised table",
+    "Transfer selection does not change animal burden",
+    "Transfer to compatible horse moves load and keeps single item",
+    "Stable receipt retains purchase ID",
+    "Saved JSON correctly rehydrates cash, items and transfer",
+    "No Chromium page errors: []"
+  ],
+  "dialogs": [
+    "GM potvrzuje bezplatné převzetí Bovine (Oxen) (Blesk) postavou Michal?",
+    "GM potvrzuje bezplatné převzetí Palfrey, riding horse (Vitr) postavou Michal?",
+    "Koupit Saddle bags, 15 lb za 36d pro postavu Michal?",
+    "Potvrdit skutečný přesun Saddle bags, 15 lb (3 lb) ze zvířete Blesk na zvíře Vitr?\nPeníze se nemění; inventář, hmotnost, ENC a nosnost se přepočtou až po potvrzení."
+  ],
+  "errors": [],
+  "final": {
+    "version": "93.840",
+    "cash": {
+      "ok": true,
+      "initial": 300,
+      "spent": 36,
+      "gained": 0,
+      "balance": 264,
+      "transactions": 1,
+      "adjustments": 0,
+      "campaignId": "stable-gear-v839",
+      "legacy": false,
+      "inheritedLegacy": false
+    },
+    "minute": 480,
+    "inv": [
+      {
+        "id": "id-1794434589750-6m1bn9jfw2",
+        "item": "hmk:stable-gear:hmk-p122-tack-09",
+        "slot": "stable",
+        "animal": "id-1794434589435-wgktip2rqo",
+        "price": 36,
+        "mode": "buy",
+        "w": 3
+      },
+      {
+        "id": "id-1794434589984-447b0kn18fc",
+        "item": "hmk:stable-gear:hmk-p122-tack-06",
+        "slot": "carried",
+        "animal": null,
+        "price": 0,
+        "mode": "free",
+        "w": 7
+      }
+    ],
+    "animals": [
+      {
+        "id": "id-1794434589313-dd14xqrp2dn",
+        "name": "Blesk",
+        "load": 0,
+        "tack": []
+      },
+      {
+        "id": "id-1794434589435-wgktip2rqo",
+        "name": "Vitr",
+        "load": 3,
+        "tack": [
+          {
+            "itemId": "hmk-p122-tack-09",
+            "inventoryId": "id-1794434589750-6m1bn9jfw2"
+          }
+        ]
+      }
+    ],
+    "purchases": [
+      {
+        "kind": "library-purchase",
+        "id": "id-1794434589749-hts0enhbcw",
+        "at": "2026-11-11T22:03:09.749Z",
+        "campaignId": "stable-gear-v839",
+        "campaignMinute": 480,
+        "amountPence": 36,
+        "inventoryIds": [
+          "id-1794434589750-6m1bn9jfw2"
+        ],
+        "label": "Saddle bags, 15 lb",
+        "purchasedItems": [
+          {
+            "inventoryId": "id-1794434589750-6m1bn9jfw2",
+            "sourceItemId": "hmk:stable-gear:hmk-p122-tack-09",
+            "quantity": 1,
+            "snapshot": {
+              "id": "hmk:stable-gear:hmk-p122-tack-09",
+              "name": "Saddle bags, 15 lb",
+              "category": "other",
+              "builtin": true,
+              "source": "HMK 1.2, p. 122 · Vehicles & Tack",
+              "description": "Sedlové brašny s nákladní kapacitou 15 lb; vlastní hmotnost se počítá zvlášť.",
+              "properties": {
+                "weightLb": 3,
+                "pricePence": 36,
+                "skill": "H",
+                "use": "Výstroj zvířete / vozidlo · HMK 122",
+                "stableTackId": "hmk-p122-tack-09"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "stableEvents": 3,
+    "stored": 2
+  }
+}

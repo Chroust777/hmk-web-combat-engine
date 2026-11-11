@@ -1,0 +1,36 @@
+'use strict';
+/* Source-level contract supplement. Real browser E2E: browser_93840_hazard_e2e.py */
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const js=fs.readFileSync('app.js','utf8'),css=fs.readFileSync('styles.css','utf8'),html=fs.readFileSync('index.html','utf8');
+let passed=0;
+function check(name,ok){assert.ok(ok,name);passed++}
+check('release version',js.includes("const APP_VERSION='93.840'"));
+check('HTML cache release',html.includes('93.840-interaction-audit'));
+check('production bundle exists',fs.statSync('hmk-app.bundle.js').size>1000000);
+check('hazard confirm is a button not submit',js.includes('type="button" class="hc-small" data-hazard-choices-confirm'));
+check('hazard confirmed stamp',js.includes('name="hazardChoices93840"'));
+check('snapshot carries approved projection',js.includes('function episodeFormSnapshot(form)')&&js.includes('accepted=episodeHazardState93840(form)'));
+check('snapshot blocks pending hazard values',js.includes('if(episodeHazardConfirmation93840.has(form)&&episodeHazardPending93840(form))'));
+check('select guarded from automatic preview',js.includes('if(episodeHazardInputIsDraft93840(e.target))'));
+check('read checkbox state only as draft',js.includes("n.type==='checkbox'?n.checked:n.value"));
+check('includes disposition',js.includes("'hazardEquipmentDisposition'"));
+check('includes repair skill',js.includes("'hazardRepairSkill'"));
+check('includes hazard victim/worker',js.includes("'hazardWorkerId'"));
+check('includes route change',js.includes("'hazardComplicationRouteChanged'"));
+check('includes Direction die',js.includes("'hazardDirectionD10'"));
+check('includes item id',js.includes("'hazardItemId'"));
+check('includes evidence id',js.includes("'hazardEvidenceId'"));
+check('includes dynamic complication proof',js.includes("n.name.startsWith('hazardCompProof_')"));
+check('confirm once via explicit click',js.includes("e.target.closest?.('[data-hazard-choices-confirm]')"));
+check('only confirmed skills rebased',js.includes('approved.values[request.field]=old.id'));
+check('proof rebase is based on linked receipt',js.includes('if(old?.calendarEpisodeSkillLink?.requestId!==request.id'));
+check('stage gate',js.includes('episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form)'));
+check('submit gate',js.includes('function episodeHazardRequireConfirmed93840(form)'));
+check('transport mode in section 3',js.includes('hmk-transport-compact')&&js.includes('name="conveyance" data-hmk-transport-conveyance'));
+check('transport checklist compact',js.includes('hmk-transport-check-row')&&js.includes('hmk-transport-check-detail'));
+check('Stable ledger remains equipped and compact',js.includes('hmk-stable-logistics-card')&&js.includes('hmk-stable-load-stats'));
+check('Parchment source',css.includes('parchment_dynamic_texture.png'));
+check('navigation inline, no removed button',css.includes('.hmk-transport-check-actions')&&js.includes('data-episode-equipment-jump'));
+check('minute model preserved',js.includes('name="minutes"'));
+check('status visible pending',css.includes('.hmk-hazard-choice-status[data-state="pending"]'));
+console.log('PASS '+passed+' source contract checks for HMK v93.840');
