@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.830';
+const APP_VERSION='93.831';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1580,6 +1580,7 @@ function provisionGuideHTML(participants){
   route==='other'?`<button type="button" data-provision-go="gear" ${disabled}>Zapsat získané jídlo / vodu ↗</button>`:'';
  return `<section class="panel hc-provision-guide"><h3>Zásoby a výživa · ${esc(actor.name)}</h3>
  ${view==='sheet'?`<div class="hc-provision-picker"><strong>Postava: ${esc(actor.name)}</strong></div>`:`<label class="hc-provision-picker">Postava<select data-provision-actor>${participants.map(c=>`<option value="${esc(c.id)}" ${c.id===actor.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>`}
+ ${!policy?`<div class="hc-provision-init"><p>Sledování výživy této postavy ještě nebylo výslovně zahájeno. Zobrazení ani přepnutí postavy nic nezapisuje.</p><button type="button" data-provision-init-nutrition="${esc(actor.id)}">Potvrdit zahájení sledování výživy</button></div>`:''}
  ${provisionCardHTML(actor,true)}
  ${provisionAnimalAccessHTML(actor)}
  ${block?`<p class="hc-provision-action-blocked" role="status"><strong>Samostatné získávání zásob je nedostupné.</strong> ${esc(block)} Zdravotní průběh zůstává dostupný.</p>`:''}
@@ -1611,6 +1612,14 @@ function ensurePersonalNutritionTracking(actorId){
   body:'Výchozí režim: Ne · řešit podle skutečných zásob; bez připsání potravin, vody nebo posunu času.',
   calendarNutritionPolicy:policy}));
 }
+// v93.831: explicit handoff to the existing audited nutrition writer.
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-provision-init-nutrition]');if(!btn)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const id=btn.dataset.provisionInitNutrition,actor=character(id);
+ if(!actor||!data.campaignClock)return;
+ if(!ensurePersonalNutritionTracking(id)){notice='Sledování je již aktivní, nebo postava není účastníkem kalendáře.';render();}
+},true);
 /** v93.471 — UI scopes are strictly presentation state. Both variants submit
  * the existing HMK nutrition writers; selecting a route grants no food/water.
  * Personal forms bind exactly ONE actor (never an implicit campaign group).
@@ -10309,7 +10318,7 @@ function ensureNPCShelterDefaultsOnCalendar93802(){
  return !!mutate(()=>seedNPCShelterDefaults93802());
 }
 function render(){
- if(ensureNPCShelterDefaultsOnCalendar93802())return;
+ // v93.831: rendering is read-only; NPC defaults require an explicit GM commit.
  if(episodeActiveSkillRequestId){
   const r=episodePendingSkillRequest;
   if(!r||r.status!=='waiting'||r.id!==episodeActiveSkillRequestId||
@@ -10328,7 +10337,8 @@ function render(){
    episodeActiveSkillRequestId===episodePendingSkillRequest.id&&
    episodePendingSkillRequest.campaignId===campaignKey(data.campaignClock)&&
    episodePendingSkillRequest.minute===data.campaignClock?.minute;
-  if(!travelSkill)skillSVChoice595=null;
+  // Explicit Stalking/Tracking handoff must retain its selected SV skill.
+  if(!travelSkill&&!pendingTrekHandoff&&!pendingTrackingAwarenessId&&!pendingStableAnimalcraftId&&!pendingCalendarGMTest)skillSVChoice595=null;
   const linked=!!(travelSkill||pendingStableAnimalcraftId||pendingTrekHandoff||pendingTrackingAwarenessId);
   // Calendar CF navigation deliberately targets the existing follow-up form;
   // do not reset it to an unrelated fresh Skill Test tab.
@@ -10478,6 +10488,16 @@ document.addEventListener('submit',event=>{
  mutate(()=>{const item=character(selected);if(!item)throw Error('Postava zmizela');Object.assign(item,update)});
 },true);
 
+// v93.831 interaction contract: an Enter key inside an editable control
+// cannot implicitly submit a form (including Notes or an immutable d100).
+// Use the explicitly labelled submit button instead.
+document.addEventListener('keydown',e=>{
+ if(e.key!=='Enter'||e.isComposing||e.target?.tagName==='TEXTAREA')return;
+ const target=e.target;
+ if(target?.closest?.('form')&&target.matches?.('input, select, textarea')){
+  e.preventDefault();e.stopImmediatePropagation();
+ }
+},true);
 document.addEventListener('submit',e=>{if(!e.target?.id?.startsWith('hmk-g04-'))return;
  e.preventDefault();e.stopImmediatePropagation();g04Actions.handleSubmit(e.target);
 },true);
@@ -14560,12 +14580,18 @@ document.addEventListener('click',e=>{
  if(!source?.calendarTrekProof||source.calendarCampaignId!==campaignKey(data.campaignClock)||
   !source.calendarTrekProof.partyModes?.memberIds.includes(actorId)||
   effectiveTrekSource(source,data.journal).calendarTrekProof.modes.stalking!==1)return alert('Neplatná postava nebo doložený Stalking Mode této hlídky');
+ // Stalking is a movement mode, not a grant of Tracking mastery.
+ if(!availableMasteries(character(actorId)).some(x=>x.name==='Tracking'&&x.ml>0)){
+  notice='Tracking není u zvolené postavy osvojený (HMK str. 87). Stalking žádný Tracking ML nepřidává. Vyberte ve formuláři hlídky postavu, která Tracking zná; Perception/Awareness odhalí jen zjevné stopy, nenahrazují Tracking SV.';
+  render();return;
+ }
  selected=actorId;view='skills';activeSkillTab='value';pendingTrekHandoff={sourceId:source.id,hazard:'tracking'};
+ skillSVChoice595={actorId,kind:'ordinary',value:'Tracking'};
  render();const form=document.getElementById('skill-value-form'),input=form?.elements.namedItem('primary');
  if(input&&[...input.options].some(o=>o.value==='Tracking')){
   input.value='Tracking';input.dispatchEvent(new Event('change',{bubbles:true}));
   form.scrollIntoView({block:'center',behavior:'auto'});
- }else notice='Vybraná postava nemá Tracking. Pravidlový hod nebyl vytvořen.';
+ }else{notice='Tracking není v dostupných dovednostech; žádný hod nebyl vytvořen.';render();}
 },true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-tracking-awareness-source]');if(!btn)return;
@@ -16508,17 +16534,31 @@ function seedNPCShelterDefaults93802(){
  }
  return missing.length;
 }
+// An explicit button, never rendering, authorizes initial NPC shelter receipts.
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-calendar-seed-npc-shelter]');if(!btn)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(view!=='calendar'||!data.campaignClock||storageReadOnly)return;
+ const missing=missingNPCShelterDefaults93802();
+ if(!missing.length){notice='Všichni NPC již mají zajištěný pobyt výslovně nastavený.';render();return;}
+ if(mutate(()=>seedNPCShelterDefaults93802()))notice='Výchozí zajištění NPC bylo výslovně uloženo.';
+},true);
 // PC-only, minute-stamped GM attestation. Never erase active wounds or medical deadlines.
 document.addEventListener('change',e=>{if(e.target?.name==='trackingRoad'&&e.target.closest?.('#hmk-time-episode-form'))e.target.dataset.episodeAutoSource='gm';},true);
-document.addEventListener('change',e=>{
- const control=e.target?.closest?.('[data-calendar-pc-shelter]');if(!control)return;
+document.addEventListener('click',e=>{
+ const control=e.target?.closest?.('[data-calendar-pc-shelter-confirm]');if(!control)return;
+ e.preventDefault();
  e.stopImmediatePropagation();
- const clock=data.campaignClock,actorId=control.dataset.calendarPcShelter;
+ const clock=data.campaignClock,actorId=control.dataset.calendarPcShelterConfirm;
  const actor=calendarMemberIds(clock,data.characters).find(c=>c.id===actorId);
  if(!actor||!['PC','NPC'].includes(String(actor.kind||'PC').toUpperCase())||actor.hmk?.verifiedMountedBreed){render();return;}
- const enabled=control.checked;
+ const draft=control.closest('.hc-pc-shelter-item')?.querySelector('[data-calendar-pc-shelter]');
+ if(!draft)return;
+ const enabled=draft.checked;
+ if(pcShelteredStayAt(data.journal,campaignKey(clock),actorId,clock.minute)===enabled){notice='Uložení není nutné; zajištění postavy se nezměnilo.';render();return;}
  const what=enabled?'Potvrdit, že '+actor.name+' má od této minuty zajištěný pobyt, bezpečné prostředí, potravu a pití?':'Potvrdit, že '+actor.name+' od této minuty znovu podléhá podmínkám prostředí a běžnému zásobování?';
- if(!uiConfirm(what)){render();return;}
+ // Clicking the labelled confirmation button is GM consent; no modal required.
+
  const reason=enabled?'Zajištěné zázemí / domov (GM)':'Odchod ze zajištěného prostředí (GM)';
  if(mutate(()=>{
   const cid=campaignKey(clock),before=pcShelteredStayAt(data.journal,cid,actorId,clock.minute);
@@ -17051,7 +17091,7 @@ document.addEventListener('click',e=>{
  activeCalendarSection=next;
  if(next==='provisions'&&provisionScope==='person'){
   const actorId=provisionGuideActorId||calendarMemberIds(data.campaignClock,data.characters)[0]?.id;
-  if(actorId&&ensurePersonalNutritionTracking(actorId))return;
+  // v93.831: switching to Provisions never creates a nutrition receipt.
  }
  render();
 },true);
@@ -18248,7 +18288,7 @@ document.addEventListener('change',e=>{
  if(view!=='calendar'||activeCalendarSection!=='provisions')return;
  if(!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===field.value))return;
  provisionGuideActorId=field.value;
- if(ensurePersonalNutritionTracking(field.value))return;
+ // Choosing another actor is navigation only.
  render();
 },true);
 document.addEventListener('click',e=>{
@@ -18258,7 +18298,7 @@ document.addEventListener('click',e=>{
  const value=button.dataset.provisionScope;if(!['person','party'].includes(value))return;
  provisionScope=value;
  if(value==='person'){const id=provisionGuideActorId||calendarMemberIds(data.campaignClock,data.characters)[0]?.id;
-  if(id&&ensurePersonalNutritionTracking(id))return;}
+  /* no commit on scope switch */}
  render();
 },true);
 // Foraging shortcut: pure presentation. Unfold the verified trekking form,
@@ -18303,7 +18343,7 @@ document.addEventListener('click',e=>{
   const actorId=button.dataset.provisionActorId;
   if(!character(actorId)||!data.campaignClock)return;
   provisionGuideActorId=actorId;provisionScope='person';activeCalendarSection='provisions';calendarLanding=false;calendarCreating=false;view='calendar';
-  if(ensurePersonalNutritionTracking(actorId))return;
+  // no nutrition commit when navigating from the character's provisions shortcut
   render();return;
  }
  if(!personalProvisionContext())return;
@@ -19950,7 +19990,7 @@ document.addEventListener('click',e=>{
  if(requested==='stable'&&!bestiaryKnownAnimals().some(a=>a.ownerId===selected&&!stableBurden(data,campaignKey(data.campaignClock),a).exit))return;
  activeSheetSection=requested;
  if(activeSheetSection!=='overview')sheetEditingId=null;
- if(requested==='provisions'&&selected&&ensurePersonalNutritionTracking(selected))return;
+ // Pure tab navigation must never mutate the nutrition ledger.
  render();
  if(oldTop!==null&&oldScroll>0){
   const currentNav=document.querySelector('.journal-book-subnav');
@@ -23203,6 +23243,9 @@ function episodeConfigureOrienteeringAssist93818(field){
 function episodeStartSkillRequest(field,skill,actorId){
  const clock=data.campaignClock,form=document.querySelector('#hmk-time-episode-form');
  if(!episodeEvaluationRequested||!clock||!character(actorId))return false;
+ if(skill==='Tracking'&&!availableMasteries(character(actorId)).some(x=>x.name==='Tracking'&&x.ml>0)){
+  notice='Zvolená postava nemá osvojený Tracking ML (HMK str. 87). Stalking je režim pohybu, nikoli náhrada dovednosti. Vyberte zkušeného stopaře; žádný hod nebyl vytvořen.';render();return false;
+ }
  if(form&&episodeIdentityMismatch(form)){
   alert(episodeIdentityMismatch(form));return false;
  }
