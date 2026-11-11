@@ -32,7 +32,11 @@ clock=anchorCampaignOrigin(clock,{kind:'wound',characterId:actor.id,woundId:woun
 const agenda=campaignCalendarAgenda(clock,[actor],[]);
 const next=agenda.all.find(x=>x.kind==='weather-shock');ok(next,'Calendar has noncombat shock');eq(next.minute,490,'Shock Reroll due in 10 actual minutes');
 const auto=automaticHMKFollowups(clock,[actor],[]);ok(auto.all.some(x=>x.kind==='injury-mishap'&&x.route==='hazards'),'Mishap routed to noncombat health');
-ok(auto.all.some(x=>x.kind==='treatment'&&x.route==='hazards'),'Treatment noncombat');
+// Current HMK 179–180: Treatment waits until immediate bleeding and Shock
+// duties have been resolved; the calendar must allow the ten-minute Reroll.
+ok(auto.suspended.some(x=>x.kind==='treatment'&&x.woundId===wound.id),
+ 'Treatment retained as suspended during acute Bleeding and Shock');
+ok(!auto.all.some(x=>x.kind==='treatment'), 'Treatment does not block the earlier genuine Shock term');
 ok(!auto.all.some(x=>x.kind==='shock-followup'&&x.route==='combat'),'No combat duplicate for shock');
 eq(calendarEventDestination({kind:'shock-followup',originDomain:MEDICAL_ORIGIN.TRAVEL,route:'combat'}),'hazards','Legacy route override');
 const m=unresolvedInjuryMishaps(actor.hmk.healthState);console.log('MISHAP kinds',m.map(x=>x.kind));
@@ -112,7 +116,7 @@ animalClock=anchorCampaignOrigin(animalClock,{kind:'wound',characterId:packAnima
 const animalDue=campaignCalendarAgenda(animalClock,[packAnimal],[]);
 ok(animalDue.future.some(x=>x.kind==='weather-shock'&&x.minute===490),'Animal shock due at original +10m');
 const animalFollowups=automaticHMKFollowups(animalClock,[packAnimal],[]);
-ok(animalFollowups.all.some(x=>x.kind==='treatment'&&x.route==='hazards'),'Animal wound Treatment stays in original health workflow');
+ok(animalFollowups.suspended.some(x=>x.kind==='treatment'&&x.woundId===packAnimal.hmk.healthState.wounds[0].id),'Animal Treatment retained without blocking Shock');
 ok(!animalFollowups.all.some(x=>x.kind==='shock-followup'&&x.route==='combat'),'No phantom animal Combat shock');
 try{advanceCampaignCalendar(animalClock,{deltaMinutes:11,eventId:'animal-bad-skip',reason:'Cannot skip animal Shock',gmConfirmed:true,characters:[packAnimal]});
  throw Error('Skipping animal health deadline must be rejected');}

@@ -72,7 +72,7 @@ ok(cf.state.coma?.active===true&&cf.state.coma.hr===3&&cf.state.coma.nextCourseD
 ok(cf.state.extendedShock.domain==='travel-weather'&&cf.state.coma.domain==='travel-weather','both parallel course origins remain non-combat');
 assert.throws(()=>applyExtendedShockCourse({state:cf.state,round:1,eventId:'too-early-course',healingBase:14,roll:5,elapsedHoursSinceOnset:3,gmConfirmed:true}),/Course Roll/);checks++;
 const hour4=applyExtendedShockCourse({state:cf.state,round:1,eventId:'after-4-hours',healingBase:14,roll:5,elapsedHoursSinceOnset:4,gmConfirmed:true});
-ok(hour4.state.shock==='NONE'&&hour4.state.coma?.active,'Extended Shock resolution must not silently delete Coma');
+ok(hour4.state.shock==='UNC'&&hour4.state.coma?.active,'Extended Shock resolution must not silently delete Coma');
 assert.throws(()=>applyComaCourse({state:hour4.state,round:1,eventId:'too-early-coma',healingBase:14,roll:5,periodD10:1,daysElapsed:1,gmConfirmed:true}),/předchozí d10denní/);checks++;
 const day2=applyComaCourse({state:hour4.state,round:1,eventId:'coma-day2',healingBase:14,roll:5,periodD10:1,daysElapsed:2,gmConfirmed:true});
 ok(day2.state.coma?.active&&day2.state.coma.nextCourseDays===1,'Coma persists with a separate GM rolled future d10');

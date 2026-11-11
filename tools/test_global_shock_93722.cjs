@@ -35,7 +35,7 @@ for(const withComa of [false,true]){
  eq(origCourse.extendedShock,null);eq(origCourse.shock,'UNC');
  const recovered=resolveParallelColdCourse({state:origCourse,sourceId:'new-'+withComa,kind:'extended-shock',round:5,eventId:'new-course-'+withComa,minute:970,actor:a,roll:10,gmConfirmed:true});
  eq(recovered.state.parallelColdShocks[0].phase,'resolved');
- if(withComa)eq(recovered.state.shock,'NONE');else eq(recovered.state.shock,'NONE');
+ if(withComa)eq(recovered.state.shock,'UNC');else eq(recovered.state.shock,'NONE');
  bad(()=>resolveParallelColdCourse({state:recovered.state,sourceId:'new-'+withComa,kind:'extended-shock',round:6,eventId:'repeat-course',minute:970,actor:a,roll:10,gmConfirmed:true}),/neexistuje/);
  assertParallelColdShocksAppendOnly(s,reroll.state);assertParallelColdShocksAppendOnly(reroll.state,origCourse);assertParallelColdShocksAppendOnly(origCourse,recovered.state);count+=3;
  const forgery=structuredClone(recovered.state);forgery.parallelColdShocks[0].originMinute=500;

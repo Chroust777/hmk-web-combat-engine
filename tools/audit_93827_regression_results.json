@@ -1,0 +1,158 @@
+[
+  [
+    "test_93827_calendar_coma_unblock.cjs",
+    "PASS",
+    "ORIGINAL_AGENDA {\n  all: [ [ 'weather-shock', 490 ] ],\n  suspended: [ [ 'treatment', 'Povinný Shock Reroll dosud nebyl vyhodnocen' ] ]\n}\nDUE_AFTER_TEN {\n  due: [ [ 'weather-shock', 490 ] ],\n  suspended: [ [ 'treatment', 'Povinný Shock Reroll dosud nebyl vyhodnocen' ] ]\n}\nPASS 10 checks, real 10-min Calendar, suspended treatment, UNC stays through coma, recovered, weariness, fatal\n\n",
+    1.51
+  ],
+  [
+    "test_global_shock_93722.cjs",
+    "PASS",
+    "PASS 56 independent Cold/Extended/Coma and Combat inventory concurrency assertions\n\n",
+    1.44
+  ],
+  [
+    "test_93775_skin_terminal.cjs",
+    "PASS",
+    "PASS 31 assertions: fatal multi-location, strict invalid inputs, UNC/CF Extended Shock and independent Coma\n\n",
+    1.5
+  ],
+  [
+    "test_93794_real_coma_and_gm.mjs",
+    "PASS",
+    "{\n  \"result\": \"PASS\",\n  \"checks\": 14,\n  \"cause\": {\n    \"locationShock\": 4,\n    \"injuryLevel\": 3,\n    \"initialHR\": 5\n  },\n  \"coma\": {\n    \"hr\": 5,\n    \"firstCourseDays\": 4\n  },\n  \"scheduled\": {\n    \"extended\": 720,\n    \"coma\": 6240\n  },\n  \"gmBefore\": [\n    \"bleeding\",\n    \"grim\",\n    \"healing\"\n  ],\n  \"gmAfter\": []\n}\n\n",
+    0.13
+  ],
+  [
+    "test_93753_coma_cause.mjs",
+    "PASS",
+    "PASS verified original coma causal anatomy 9 assertions {\n  ready: true,\n  locationShock: 4,\n  injuryLevel: 3,\n  woundId: 'wound:skill-injury:survival-accident:causal-753',\n  sourceEventId: 'skill-injury:survival-accident:causal-753',\n  initialHR: 5\n}\n\n",
+    0.09
+  ],
+  [
+    "test_93751_healing_calendar_boundary.cjs",
+    "PASS",
+    "PASS v93.751 healing/calendar tests 17\n\n",
+    0.11
+  ],
+  [
+    "test_93794_single_patient_compound.mjs",
+    "PASS",
+    "SCHEDULE [\n  { kind: 'bleeding', minute: 7685, woundId: 'wound:gm-fresh-93794' },\n  { kind: 'poison', minute: 7740, woundId: undefined },\n  { kind: 'grim', minute: 9120, woundId: 'wound:gm-fresh-93794' },\n  { kind: 'infection', minute: 9120, woundId: 'wound:gm-old-93794' }\n]\n{\"result\":\"PASS\",\"checks\":13,\"scenario\":\"one actor two original wounds, original failed healing infection, poison onset, weariness 41\",\"before\":[\"bleeding\",\"poison\",\"grim\",\"infection\"],\"after\":[\"poison\",\"infection\"],\"originIds\":[\"gm-old-93794\",\"gm-fresh-93794\"]}\n\n",
+    0.11
+  ],
+  [
+    "test_93792_treatment_morale_guards.cjs",
+    "PASS",
+    "PASS: 10 source guard invariants for Treatment/Medical Morale\n\n",
+    0.03
+  ],
+  [
+    "test_93734_multi_infection_healing_541.cjs",
+    "PASS",
+    "PASS v93.541 multi-infection, repeated interruption, deadline evidence and durable calendar: 49 checks\n\n",
+    0.11
+  ],
+  [
+    "test_93734_healing_remaining_544.cjs",
+    "PASS",
+    "PASS v93.544 healing audit 68 assertions\n\n",
+    0.11
+  ],
+  [
+    "test_93734_healing_surgical_audit_542.cjs",
+    "PASS",
+    "PASS v93.542 surgical side effects, extraction, bleeding and calendar: 39 checks\n\n",
+    0.11
+  ],
+  [
+    "test_93753_multi_health_same_minute.mjs",
+    "PASS",
+    "PASS 240 assertions, 6 completion permutations, humans + original pony anatomy, all same-minute Shock obligations preserved.\n\n",
+    0.16
+  ],
+  [
+    "test_93755_staggered_patient_calendar.cjs",
+    "PASS",
+    "PASS 17 independent actor/one clock/two differently anchored healing terms/chronology/no duplicate\n\n",
+    0.11
+  ],
+  [
+    "test_93752_accident_origin_calendar.mjs",
+    "PASS",
+    "MISHAP kinds [ 'automatic-fumble' ]\nBLOOD STOP UNC {\n  kind: 'UNC',\n  originRound: 1,\n  timelineId: 'skill:confirmed-survival-hazard-752',\n  dueRound: 121,\n  phase: 'after-ten-minutes',\n  woundId: 'wound:skill-injury:survival-accident:confirmed-survival-hazard-752',\n  domain: 'travel-accident',\n  sourceId: 'confirmed-survival-hazard-752',\n  originMinute: 480\n}\nPASS 52 checks of provenance, same-minute obligations, bleeding, Shock, Extended and Coma scheduling\n\n",
+    0.14
+  ],
+  [
+    "test_93757_live_draught_health.cjs",
+    "FAIL",
+    "\n/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/src/integration/hmk-trekking-animal-health.js:18\n    throw Error(m); };\n    ^\n\nError: Stáj · Horse: existující zdravotní profil není aktivní a úplný v tomto kalendáři. Před cestou jej pravidlově sjednoťte; nesmí se ignorovat skutečné zranění.\n    at requireFact (/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/src/integration/hmk-trekking-animal-health.js:18:11)\n    at resolveTrekAnimalReadiness93815 (/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/src/integration/hmk-trekking-animal-health.js:94:9)\n    at vehicleReceiptInternal93757 (/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/src/integration/hmk-travel-vehicle-93756.js:66:81)\n    at transportVehicleReceipt93756 (/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/src/integration/hmk-travel-vehicle-93756.js:92:54)\n    at pass (/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/test_93757_live_draught_health.cjs:19:38)\n    at Object.<anonymous> (/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/test_93757_live_draught_health.cjs:20:1)\n    at Module._compile (node:internal/modules/cjs/loader:1730:14)\n    at Object.<anonymous> (node:internal/modules/cjs/loader:1895:10)\n    at Module.load (node:internal/modules/cjs/loader:1465:32)\n    at Function._load (node:internal/modules/cjs/loader:1282:12)\n\nNode.js v22.16.0\n",
+    0.79
+  ],
+  [
+    "test_93782_gm_wound_matrix.mjs",
+    "PASS",
+    "PASS v93.782 2114 GM wound add/resolve checks, 300 location×aspect×level combinations, infection/bleeding/grim/calendar, no fictional dice, audit\n\n",
+    0.15
+  ],
+  [
+    "test_93782_gm_defer_matrix.mjs",
+    "PASS",
+    "PASS v93.782 348 actual-source health obligations, six resolution orders, no invented dice, no combat\n\n",
+    0.21
+  ],
+  [
+    "test_93797_wound_causality.mjs",
+    "FAIL",
+    "\nnode:internal/modules/run_main:123\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Missing expected exception.\n    at file:///mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/test_93797_wound_causality.mjs:32:8\n    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: /Shock\\/Coma/,\n  operator: 'throws'\n}\n\nNode.js v22.16.0\n",
+    0.12
+  ],
+  [
+    "test_93797_all_frostbite_sites.mjs",
+    "PASS",
+    "FROST input: 15 anatomical codes / 24 side-specific sites; IL1 across naked skin; shock = NONE\nCALENDAR: {\n  wounds: 24,\n  healing: 24,\n  infections: 0,\n  grim: 0,\n  other: [],\n  unknown: [ 'weather' ]\n}\nPASS 93.797: 24 distinct frostbite site wounds -> 24 unique healing event IDs; closing 1 leaves 23; calendar refresh stable; no cross-site duplicate\n\n",
+    0.13
+  ],
+  [
+    "test_93798_auto_wound_closure.mjs",
+    "PASS",
+    "PASS 93.798: auto closure, shared BP, independent wound, no GM cause fields, legacy fallback, calendar\n\n",
+    0.11
+  ],
+  [
+    "test_93796_gm_wounds.mjs",
+    "PASS",
+    "PASS 93.796: GM Untreated/Infection closure reopens independently anchored Healing; Morale/Mishap cancellation; duplicate blocked; default Treatment remains pending\n\n",
+    0.05
+  ],
+  [
+    "test_exposure_course_93726.cjs",
+    "PASS",
+    "PASS 22 independent exposure reducer assertions\n\n",
+    0.56
+  ],
+  [
+    "test_weather_shock_93702.cjs",
+    "FAIL",
+    "\nnode:internal/modules/cjs/loader:1404\n  throw err;\n  ^\n\nError: Cannot find module '/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/hmk-web-combat-engine-main/src/integration/persistent-combat-state.js'\nRequire stack:\n- /mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/test_weather_shock_93702.cjs\n    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)\n    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)\n    at Function._load (node:internal/modules/cjs/loader:1211:37)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Module.require (node:internal/modules/cjs/loader:1487:12)\n    at require (node:internal/modules/helpers:135:16)\n    at Object.<anonymous> (/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/test_weather_shock_93702.cjs:6:79)\n    at Module._compile (node:internal/modules/cjs/loader:1730:14) {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: [\n    '/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/test_weather_shock_93702.cjs'\n  ]\n}\n\nNode.js v22.16.0\n",
+    0.17
+  ],
+  [
+    "test_93799_armour_filters.mjs",
+    "PASS",
+    "PASS 93.799 unit: 9 materials, 15 locations, combined filtering, custom material, protected no-guessing, not armour excluded\n\n",
+    0.03
+  ],
+  [
+    "test_93724_version_updated.cjs",
+    "FAIL",
+    "\nnode:fs:442\n    return binding.readFileUtf8(path, stringToFlags(options.flag));\n                   ^\n\nError: ENOENT: no such file or directory, open '/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/repo/app.js'\n    at Object.readFileSync (node:fs:442:20)\n    at Object.<anonymous> (/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/test_93724_version_updated.cjs:4:14)\n    at Module._compile (node:internal/modules/cjs/loader:1730:14)\n    at Object..js (node:internal/modules/cjs/loader:1895:10)\n    at Module.load (node:internal/modules/cjs/loader:1465:32)\n    at Function._load (node:internal/modules/cjs/loader:1282:12)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n    at node:internal/main/run_main_module:36:49 {\n  errno: -2,\n  code: 'ENOENT',\n  syscall: 'open',\n  path: '/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/repo/app.js'\n}\n\nNode.js v22.16.0\n",
+    0.02
+  ],
+  [
+    "test_93759_stable_health_registration.cjs",
+    "FAIL",
+    "\nnode:assert:95\n  throw new AssertionError(obj);\n  ^\n\nAssertionError [ERR_ASSERTION]: Missing expected exception.\n    at bad (/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/test_93759_stable_health_registration.cjs:13:120)\n    at Object.<anonymous> (/mnt/data/hmk_work_93827/hmk-web-combat-engine-main/tools/test_93759_stable_health_registration.cjs:23:1)\n    at Module._compile (node:internal/modules/cjs/loader:1730:14)\n    at Object.<anonymous> (node:internal/modules/cjs/loader:1895:10)\n    at Module.load (node:internal/modules/cjs/loader:1465:32)\n    at Function._load (node:internal/modules/cjs/loader:1282:12)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n    at node:internal/main/run_main_module:36:49 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: /Stáj potvrzuje vlastnictví, nikoliv zdraví/,\n  operator: 'throws'\n}\n\nNode.js v22.16.0\n",
+    0.77
+  ]
+]
