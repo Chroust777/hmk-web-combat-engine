@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.834';
+const APP_VERSION='93.835';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2807,10 +2807,10 @@ function timeEpisodePageHTML(clock,participants){
  const latestWaterVessels=data.inventory.filter(i=>eligibleRecipients.some(c=>c.id===i.characterId)&&
   i.slot==='carried'&&waterContainerCapacity(i)!==null&&
   waterskinBalances(data.journal,cid,i.characterId,clock.minute).filter(b=>b.itemId===i.id).every(b=>b.remaining===0));
- const latestSuppliesHTML=latestEpisodeRow&&(latest?.foraging||latest?.travelForaging?.length)?`<details class="hc-episode-supplies" open>
+ const latestSuppliesHTML=latestEpisodeRow&&(latest?.foraging||latest?.standaloneForaging?.length||latest?.travelForaging?.length)?`<details class="hc-episode-supplies" open>
  <summary>Uzávěrka nálezů · Foraging · příjemci a hmotnost</summary>
  <p class="hc-hint"><strong>Nálezce: ${esc(latestFinder?.name||latestEpisodeRow.characterId)}</strong> (průvodce podle HMK 147). Rozdělení určuje GM. Výsledek Foraging je v potravních/vodních dnech; libry potravy pravidla neurčují a musejí být doloženy GM. Voda v 0,5gal měchu váží 5 lb, v 1gal džbánu 10 lb. Nesené a spotřebované zásoby nejsou totéž.</p>
- ${(latest?.foraging?[latest.foraging]:latest?.travelForaging||[]).map((f,i)=>`<p>Foraging ${i+1} · d10 ${esc(f.roll)} · potrava ${f.results?.reduce((n,x)=>n+(x.foodDays||0),0)||0} food-days · voda ${f.results?.reduce((n,x)=>n+(x.waterDays||0),0)||0} water-days · byliny ${f.results?.reduce((n,x)=>n+(x.herbDoses||0),0)||0} dávek.</p>`).join('')}
+ ${(latest?.standaloneForaging??(latest?.foraging?[latest.foraging]:latest?.travelForaging||[])).map((f,i)=>`<p>Foraging ${i+1} · d10 ${esc(f.roll)} · potrava ${f.results?.reduce((n,x)=>n+(x.foodDays||0),0)||0} food-days · voda ${f.results?.reduce((n,x)=>n+(x.waterDays||0),0)||0} water-days · byliny ${f.results?.reduce((n,x)=>n+(x.herbDoses||0),0)||0} dávek.</p>`).join('')}
  ${latestLots.map(l=>l.unit==='foodDays'?`<form data-foraging-carry class="hc-episode-allocation"><strong>Potrava #${l.resultIndex+1} · k přidělení ${l.remaining} food-days</strong>
  <input type="hidden" name="sourceId" value="${esc(l.sourceId)}"><input type="hidden" name="resultIndex" value="${l.resultIndex}">
  <div class="hmk-trek-grid"><label>Příjemce<select name="actorId">${eligibleRecipients.map(c=>option(c.id,c.name)).join('')}</select></label>
@@ -3116,7 +3116,8 @@ function timeEpisodePageHTML(clock,participants){
  </div><p class="hc-hint">Předchozí Survival / Orienteering je jiný test. Jeho d100 ani ID nepřepisujte a nepoužívejte místo Endurance. Po skončení cesty zdravotní pokračování najdete v deníku → Zdraví &amp; Expozice.</p></section>
  </div></details>`).join('')}</div>`).join('')}
  </fieldset>
- <fieldset data-episode-foraging-fields><legend>Foraging · doložený výsledek HMK 147</legend><p class="hc-hint">GM vybírá prostředí, hledaný zdroj a skutečný d10. U kratší epizody se poměrná část nálezu sčítá s následujícími epizodami; do zásob přibude pouze celá půldenní dávka nebo dávka bylin.</p><div class="hmk-trek-grid"><label>Dominantní biotop<select name="habitat"><option value="">— Určit z potvrzené krajiny —</option>${[['mixed-forest','Smíšený les'],['needleleaf-forest','Jehličnatý les'],['grassland','Travnatá krajina'],['cropland-pasture','Pole a pastviny'],['heath-moor','Vřesoviště a rašeliniště'],['mixed-cold-woodland','Chladný les'],['alpine-vegetation','Alpská vegetace'],['desert','Poušť'],['ice-snow-rockfield','Led, sníh a skály']].map(([v,l])=>option(v,l)).join('')}</select><small data-episode-foraging-auto="habitat"></small></label><label>Co postava hledá<select name="forageTarget"><option value="food-water">Potrava a voda</option><option value="herbs">Byliny</option></select></label><label>Druh byliny (jen při sběru bylin)<input name="herbName" maxlength="100" placeholder="Název konkrétní byliny"></label><label>Foraging (d10)<span class="hc-episode-die"><input name="forageD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="forageD10">⚄ d10</button></span></label></div></fieldset>
+ <fieldset data-episode-foraging-fields><legend>Samostatný Foraging · HMK 145 + 147</legend><p class="hc-hint" data-episode-stationary-mode-status>Nejprve doložte Orienteering. Zadaný d10 sám nevytváří žádný Foraging Mode.</p><p class="hc-hint">Za každý skutečný Foraging Mode získaný z nového Orienteering s +2 SV smí GM vyhodnotit jeden d10. Délka je libovolná v minutách; poměrné převody a přenos jsou implementační rozhodnutí. Do zásob se zapisují jen doložené dávky.</p><div class="hmk-trek-grid"><label>Dominantní biotop<select name="habitat"><option value="">— Určit z potvrzené krajiny —</option>${[['mixed-forest','Smíšený les'],['needleleaf-forest','Jehličnatý les'],['grassland','Travnatá krajina'],['cropland-pasture','Pole a pastviny'],['heath-moor','Vřesoviště a rašeliniště'],['mixed-cold-woodland','Chladný les'],['alpine-vegetation','Alpská vegetace'],['desert','Poušť'],['ice-snow-rockfield','Led, sníh a skály']].map(([v,l])=>option(v,l)).join('')}</select><small data-episode-foraging-auto="habitat"></small></label><label>Co postava hledá<select name="forageTarget"><option value="food-water">Potrava a voda</option><option value="herbs">Byliny</option></select></label><label>Druh byliny (jen při sběru bylin)<input name="herbName" maxlength="100" placeholder="Název konkrétní byliny"></label><label>Foraging (d10)<span class="hc-episode-die"><input name="forageD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="forageD10">⚄ d10</button></span></label></div>
+ ${Array.from({length:4},(_,i)=>{const n=i+1;return `<div class="hmk-trek-grid" data-episode-stationary-forage-row="${n}" hidden><label>Foraging Mode ${n+1} · cíl<select name="forageTarget${n}"><option value="food-water">Potrava a voda</option><option value="herbs">Byliny</option></select></label><label>Konkrétní bylina<input name="forageHerb${n}" maxlength="100"></label><label>Samostatný d10<span class="hc-episode-die"><input name="forageD10_${n}" type="number" min="1" max="10"><button type="button" data-episode-die="forageD10_${n}">⚄ d10</button></span></label></div>`}).join('')}</fieldset>
  <fieldset data-episode-trek-foraging hidden><legend>Foraging během pochodu · dle získaných Foraging Modes (HMK 147)</legend>
  <p class="hc-hint">Jeden d10 za každý skutečně přidělený Foraging Mode. Nález se poměrně přepočítá na skutečné minuty a nevyčerpaná část přejde do další epizody. Stalking/Foraging již započítávají Slow.</p>
  <label>Dominantní biotop<select name="travelHabitat"><option value="">— Určit z potvrzené krajiny —</option>${[['mixed-forest','Smíšený les'],['needleleaf-forest','Jehličnatý les'],['grassland','Travnatá krajina'],['cropland-pasture','Pole a pastviny'],['heath-moor','Vřesoviště'],['mixed-cold-woodland','Chladný les'],['alpine-vegetation','Alpská vegetace'],['desert','Poušť'],['ice-snow-rockfield','Led, sníh a skály']].map(([v,l])=>option(v,l)).join('')}</select><small data-episode-foraging-auto="travelHabitat"></small></label>
@@ -23098,8 +23099,9 @@ function episodeIssue(message,form){
   return {field:missing(ids.map(id=>'end_'+id))||'end_'+(ids[0]||''),skill:null,actorId:null};
  }
  const forage=message.match(/Foraging Mode\s+(\d+)/i);
- if(forage)return {field:'travelForageD10_'+(Number(forage[1])-1),skill:null,actorId:null};
+ if(forage)return {field:form?.elements.namedItem('kind')?.value==='forage'?(Number(forage[1])===1?'forageD10':'forageD10_'+(Number(forage[1])-1)):'travelForageD10_'+(Number(forage[1])-1),skill:null,actorId:null};
  if(/Foraging vyžaduje skutečný d10/i.test(message))return {field:'forageD10',skill:null,actorId:null};
+ if(/Samostatný Foraging.*Survival Hazard/i.test(message))return {field:'survivalD10',skill:null,actorId:null};
  // Foraging Conditions are deliberately not inferable for roads/wetlands (HMK 147).
  // Missing habitat must lead GM to the editable biome selector, not a dead-end notice.
  if(/Nedoložený biotop nebo období pro Foraging/i.test(message))
@@ -23528,6 +23530,7 @@ function episodeEncounterProbability(form,clock,sky){
 function episodePreviewFromForm(form,clock){
  // A failed/aborted orientation must never leak the previous episode's Watchfulness.
  delete form.dataset.episodeOrientationModes;
+ delete form.dataset.episodeStationaryForagingModes;
  const v=episodeFormSnapshot(form),members=v.memberIds||[],people=members.map(character);
  episodeAssertScopedSkillInputs(v);
  if(!people.length)throw Error('Vyberte aspoň jednu postavu.');
@@ -23668,6 +23671,21 @@ function episodePreviewFromForm(form,clock){
   trackerId:v.trackingActorId||guideId,trail:v.trackingTrail,conditions:episodeTrackingConditionsFromContext({
     weatherWatch:precipitation,period:actualPeriod,terrain:v.terrain,
     partyTracked:Number(v.trackingPartyTracked),road:v.trackingRoad||'none'})});
+  if(kind==='forage'){
+   // Standalone stationary Foraging is a full HMK 145 Orienteering, not a
+   // free d10. No movement, no reused travel SV, +2 SV in the source rule.
+   orientation=computeEpisodeOrientation({mode:'new',currentSkill:skillAtMinute(v.orientationProofId,'Survival'),
+    minute:clock.minute,context,priority:'forage',allocationMode:v.orientationAllocation||'auto',
+    manualModes:Object.fromEntries(['bearing','progress','foraging','stalking','vigilance'].map(k=>[k,Number(v['mode_'+k])])),
+    lowChoice:v.orientationLowChoice||'slow',stationaryForaging:true,
+    familiar:!!v.orientationFamiliar,torchlight:actualPeriod==='night'&&!!v.orientationTorch,
+    fullMoon:actualPeriod==='night'&&!!v.orientationMoon,afterSnowfall:actualPeriod==='night'&&!!v.orientationSnow});
+   form.dataset.episodeStationaryForagingModes=String(orientation.modes.foraging);
+   form.dataset.episodeOrientationStars=String(orientation.stars??0);
+   form.dataset.episodeOrientationSv=String(orientation.adjustment.adjustedSV);
+   form.dataset.episodeOrientationModes=JSON.stringify(orientation.modes);
+
+  }
  const modes=orientation?.modes||{progress:0,bearing:0,orienteeringSlow:0,foraging:0,stalking:0};
  const forcedBearing=kind==='travel'?pendingTrackingCFBearing(data.journal,campaignKey(clock),clock.minute,members):0;
  if(kind==='travel')for(const node of form.querySelectorAll('[data-episode-tracking]'))
@@ -23808,9 +23826,10 @@ function episodePreviewFromForm(form,clock){
    memberIds:[],conveyance:v.conveyance,gmConfirmed:true,originalHealth:[],sourcePage:145}),
    format:'gm-transport-confirmation-v93.756',vehicle,mass:transportMass93816};
  }
+ if(kind==='forage')result.stationaryForagingPolicy='hmk-stationary-v93.835';
  result.orientation=orientation;
  // HMK p.150: actual Stalking/Vigilance changes Watchfulness; no invented prey.
- result.trekWatchfulness=kind==='travel'&&orientation?trekWatchfulness({modes:orientation.modes,conveyance:v.conveyance}):null;
+ result.trekWatchfulness=['travel','forage'].includes(kind)&&orientation?trekWatchfulness({modes:orientation.modes,conveyance:kind==='forage'?'foot':v.conveyance}):null;
  result.trackingMemory=trackingMemory;
  result.daylight=autoLight;
  if(trackingMemory){
@@ -24183,16 +24202,26 @@ function episodePreviewFromForm(form,clock){
   }
  }
 
- if(kind==='forage'){
-  const roll=Number(v.forageD10);
-  if(!Number.isSafeInteger(roll)||roll<1||roll>10)throw Error('Foraging vyžaduje skutečný d10 (1–10).');
-  const source=weather.sourceId?data.journal.find(j=>j.id===weather.sourceId):null;
-  const season=source?.calendarTrekDayWeather?.season||source?.calendarTrekWeatherShift?.season||weather.weather?.season||v.season;
-  if(!['spring','summer','autumn','winter'].includes(season))throw Error('Foraging potřebuje roční období vybrané oblasti.');
-  const herbName=String(v.herbName||'').trim(),target=v.forageTarget;
-  const carryIn=lastForagingCarry(data.journal,campaignKey(clock),guideId,target,herbName);
-  result.foraging=calculateEpisodeForaging({minutes,habitat:v.habitat,season,roll,target,herbName,carryIn});
- }
+  if(kind==='forage'){
+   const source=weather.sourceId?data.journal.find(j=>j.id===weather.sourceId):null;
+   const season=source?.calendarTrekDayWeather?.season||source?.calendarTrekWeatherShift?.season||weather.weather?.season||v.season;
+   if(!['spring','summer','autumn','winter'].includes(season))throw Error('Foraging potřebuje roční období vybrané oblasti.');
+   result.standaloneForaging=[];
+   const partial=new Map();
+   for(let n=0;n<modes.foraging;n++){
+    const raw=String(n===0?v.forageD10:v['forageD10_'+n]??'').trim(),roll=Number(raw);
+    if(!raw||!Number.isSafeInteger(roll)||roll<1||roll>10)
+     throw Error('Samostatný Foraging Mode '+(n+1)+' vyžaduje vlastní skutečný d10 (1–10).');
+    const target=n===0?v.forageTarget:v['forageTarget'+n];
+    const herbName=String(n===0?v.herbName:v['forageHerb'+n]||'').trim();
+    const key=JSON.stringify([target,target==='herbs'?herbName:'']);
+    const carryIn=partial.has(key)?partial.get(key):lastForagingCarry(data.journal,campaignKey(clock),guideId,target,herbName);
+    const f=calculateEpisodeForaging({minutes,habitat:v.habitat,season,roll,target,herbName,carryIn});
+    result.standaloneForaging.push(f);partial.set(key,f.carryOut);
+   }
+   if(result.standaloneForaging.length)result.foraging=result.standaloneForaging[0];
+   if(orientation.level==='CF')throw Error('Samostatný Foraging: kritické selhání Orienteering vyžaduje Survival Hazard (HMK 145/148). Tento následek není pro stacionární činnost automatizován; výsledky nelze uzavřít bez jeho pravidlového dořešení.');
+  }
 
 
  if(kind==='travel'&&weather.weather&&!weather.sourceId&&weather.origin==='episode-only'&&!String(weather.area).trim())
@@ -24499,7 +24528,7 @@ function episodePlannedTasks(form){
   add('Počasí · teplota','Doložte první skutečný meteorologický d10.','temperatureD10');
   add('Počasí · srážky','Doložte druhý meteorologický d10.','precipitationD10');
  }
- if(v.kind==='travel'&&v.orientationUse!=='reuse')
+ if((v.kind==='travel'&&v.orientationUse!=='reuse')||v.kind==='forage')
   add('Orienteering · Survival · '+(character(v.guideId)?.name||'průvodce'),
    'Vykonejte a uložte skutečný Survival Success Value test průvodce.',
    'orientationProofId','Survival',v.guideId);
@@ -24522,7 +24551,12 @@ function episodePlannedTasks(form){
    add('Únava · END d10 · '+(character(id)?.name||id),
     incap.has(id)?'END pro skutečně ušlé minuty PŘED zdravotní neschopností; po ní se žádný další aktivní test neprovádí.':
     'Doložte skutečný individuální END d10.', 'end_'+id);
- if(v.kind==='forage')add('Foraging · d10','Doložte skutečný hod shánění potravy.','forageD10');
+ if(v.kind==='forage'&&v.orientationProofId){
+  const count=Number(form.dataset.episodeStationaryForagingModes||0);
+  for(let n=0;n<count;n++)add('Samostatný Foraging · Mode '+(n+1)+' · d10',
+   'Doložte skutečný d10 pro tuto konkrétní přidělenou hvězdu. Bez Foraging Mode se nehází.',
+   n===0?'forageD10':'forageD10_'+n);
+ }
  return tasks;
 }
 function episodePlannedTaskHTML(t,i){
@@ -25255,7 +25289,7 @@ function updateEpisodePreview(form){
  show('[data-episode-landscape-terrain]',outdoor);
  show('[data-episode-weather-geography]',true);
  show('[data-episode-manual-season]',!campaignTRDate(data.campaignClock,data.campaignClock.minute));
- show('[data-episode-section="skills"]',isTravel||isTracking);
+ show('[data-episode-section="skills"]',isTravel||isTracking||kind==='forage');
  show('[data-episode-weather-roll]',episodeEvaluationRequested);
  // Other indoor activities still display the chosen global/local weather without irrelevant terrain choices.
  show('[data-episode-section="rolls"]',episodeEvaluationRequested&&(isTravel||isTracking||kind==='forage'||kind==='watch'));
@@ -25265,10 +25299,11 @@ function updateEpisodePreview(form){
   '5 · Volitelná kontrola setkání';
  show('[data-episode-travel-rolls]',isTravel);
  show('[data-episode-orientation-use]',isTravel);
- show('[data-episode-orientation-new]',isTravel&&v.orientationUse==='new');
+ show('[data-episode-orientation-new]',(isTravel&&v.orientationUse==='new')||kind==='forage');
  const orientProofField=form.elements.namedItem('orientationProofId');
  if(orientProofField)orientProofField.closest('label').hidden=!episodeEvaluationRequested;
- show('[data-episode-manual-modes]',isTravel&&v.orientationUse==='new'&&v.orientationAllocation==='manual');
+ show('[data-episode-manual-modes]',(isTravel&&v.orientationUse==='new'||kind==='forage')&&v.orientationAllocation==='manual');
+ for(const name of ['mode_progress','mode_bearing']){const input=form.elements.namedItem(name);if(input&&input.closest('label'))input.closest('label').hidden=kind==='forage';}
  show('[data-episode-skill-links]',episodeEvaluationRequested&&outdoor);
  show('[data-episode-final-confirm]',episodeEvaluationRequested);
  show('[data-episode-navigation]',isTravel);
@@ -25311,7 +25346,7 @@ function updateEpisodePreview(form){
  const tools=form.querySelector('.hc-episode-route-actions');
  if(tools){const skillButton=tools.querySelector('[data-episode-nav="skills"]');if(skillButton)skillButton.hidden=!episodeEvaluationRequested||!outdoor||!form.dataset.episodeProblem||!episodeIssue(form.dataset.episodeProblem,form).skill;}
 
- for(const node of form.querySelectorAll('[data-episode-orientation-new]'))node.hidden=!isTravel||v.orientationUse!=='new';
+ for(const node of form.querySelectorAll('[data-episode-orientation-new]'))node.hidden=!((isTravel&&v.orientationUse==='new')||kind==='forage');
  // A travelling guide may discover Stalking only after the Orienteering
  // receipt exists. Keep its trail input visible while it can still be named.
  const mayNeedTravelTracking=travel&&
@@ -25513,6 +25548,16 @@ function updateEpisodePreview(form){
  }
  for(const node of form.querySelectorAll('[name="progress"],[name="bearing"],[name="extraSlow"],[name="loaded"],[name="progressD10"],[name="conveyance"],[name="terrain"],[name="topography"]'))node.closest('label').classList.toggle('hc-episode-inactive',!travel);
  const forage=form.querySelector('[data-episode-foraging-fields]');if(forage)forage.hidden=kind!=='forage';
+ if(kind==='forage'){
+  const count=Math.max(0,Math.min(5,Number(form.dataset.episodeStationaryForagingModes)||0));
+  const note=form.querySelector('[data-episode-stationary-mode-status]');
+  if(note)note.textContent=episodeEvaluationRequested?
+   count?`Doloženo ${count} Foraging Mode(s). Každý vyžaduje vlastní d10. V tomto intervalu není žádný přesun.`:
+   'Orienteering nepřidělil žádný Foraging Mode: žádný nález d10 není oprávněn.':
+   'Nejprve vyhodnoťte a potvrďte Survival SV; bez získaných Modes není dovoleno házet d10.';
+  for(const row of form.querySelectorAll('[data-episode-stationary-forage-row]'))
+   row.hidden=!episodeEvaluationRequested||Number(row.dataset.episodeStationaryForageRow)>=count;
+ }
  const directionInput=form.elements.namedItem('directionD10');if(directionInput)directionInput.disabled=!travel;
  const encounter=form.querySelector('[data-episode-encounter-panel]');if(encounter)encounter.hidden=!v.checkEncounter;
 
@@ -25719,7 +25764,7 @@ function updateEpisodePreview(form){
   const lightNote=form.querySelector('[data-episode-light-note]');if(lightNote&&result.daylight)
    lightNote.textContent='HMK 142 · délka dne '+result.daylight.daylightHours+' h; epizoda '+result.daylight.minutesByPeriod.day+' min den, '+
     result.daylight.minutesByPeriod.twilight+' min soumrak, '+result.daylight.minutesByPeriod.night+' min noc.';
-  const lowChoice=form.querySelector('[data-episode-low-choice]');if(lowChoice)lowChoice.hidden=!(travel&&result.orientation&&result.orientation.adjustment.adjustedSV>=1&&result.orientation.adjustment.adjustedSV<=2);
+  const lowChoice=form.querySelector('[data-episode-low-choice]');if(lowChoice)lowChoice.hidden=!((travel||kind==='forage')&&result.orientation&&result.orientation.adjustment.adjustedSV>=1&&result.orientation.adjustment.adjustedSV<=2);
   const modesInfo=form.querySelector('[data-episode-allocated-modes]');
   const budget=form.querySelector('[data-episode-manual-budget]');
   if(budget&&result.orientation){const all=result.orientation.stars||0;
@@ -25772,7 +25817,7 @@ function updateEpisodePreview(form){
     ${result.weatherSafeShelter?`<p><b>Počasí · skutečné následky:</b> GM doložil bezpečný klimatický úkryt.</p>`:''}
     ${result.weatherExposure?.length?`<p><b>Počasí · skutečné následky:</b> ${result.weatherExposure.map(w=>esc(character(w.id)?.name||'Účastník')+': '+esc(w.effect||'chybí vstup')).join('; ')}.</p>`:''}
     ${result.direction?`<p><b>Direction Hazard</b> · ${result.direction.rolls.map(x=>'d10: '+x).join('; ')} · ${esc(result.direction.direction)}${result.motion?.directionLostTime?' · dodatečný Slow započítán':''}.</p>`:''}
-    ${result.foraging?`<p><b>Foraging (d10: ${result.foraging.roll})</b> · kvalita ${esc(result.foraging.quality)}. Získáno: ${result.foraging.results[0].foodDays} potravních dní, ${result.foraging.results[0].waterDays} vodních dní, ${result.foraging.results[0].herbDoses} dávek bylin; drobný nález se převádí do další epizody. Po potvrzení se nález zaúčtuje do společných zásob; fyzická položka vzniká až po doložení konkrétního příjemce a uložení.</p>`:''}
+    ${result.standaloneForaging?`<p><b>Samostatný Foraging:</b> ${result.orientation?.modes.foraging||0} doložených Modes při ${result.minutes} minutách bez pohybu. ${result.standaloneForaging.map((f,i)=>'Mode '+(i+1)+' d10 '+f.roll+' → '+f.results[0].foodDays+' potravy, '+f.results[0].waterDays+' vody, '+f.results[0].herbDoses+' bylin').join('; ')||'Bez přidělených Foraging Modes a bez hodů d10'}. Přepočet je rozhodnutí implementace na základě HMK 147.</p>`:result.foraging?`<p><b>Foraging d10 ${result.foraging.roll}</b> · ${result.foraging.results[0].foodDays} potravy, ${result.foraging.results[0].waterDays} vody, ${result.foraging.results[0].herbDoses} bylin.</p>`:''}
     ${result.travelForaging?.length?`<p><b>Foraging při cestě:</b> ${result.travelForaging.map((f,i)=>'č. '+(i+1)+' d10 '+f.roll+' → '+f.results[0].foodDays+' potravních dní, '+f.results[0].waterDays+' vodních dní, '+f.results[0].herbDoses+' dávek bylin').join('; ')}. Nález je po potvrzení zaúčtován do společných zásob; konkrétní postavě se bez doložení příjemce, hmotnosti a způsobu uložení nevytváří smyšlená položka inventáře.</p>`:''}
     ${result.orientation?`<p><b>Orienteering · Survival</b> · ${result.orientation.roll!==null?'(d100: '+result.orientation.roll+') · ':''}SV ${result.orientation.adjustment.adjustedSV}, ${result.orientation.stars??'—'} ★ · ${result.orientation.reusedFromEpisodeId?'původní doložený výsledek':'nový doložený hod'} · Progress ${result.progress}, Bearing ${result.bearing}, Foraging ${result.orientation.modes.foraging}, Stalking ${result.orientation.modes.stalking}, Vigilance ${result.orientation.modes.vigilance}.</p>`:''}
     ${result.trekWatchfulness?`<p><b>Stalking a Vigilance (HMK 145, 150):</b> ostražitost družiny ${esc(({lax:'Lax · snížená',normal:'Normal · běžná',alert:'Alert · zvýšená'})[result.trekWatchfulness.effective])}; vhodné dovednosti ${esc(result.trekWatchfulness.skills.join(' / '))}${result.trekWatchfulness.demoted?' · způsob dopravy snižuje ostražitost':''}. ${result.orientation?.modes.stalking?'Stalking je aktivní: umožňuje Tracking a příslušnou proceduru Surprise, ale sám o sobě nevytváří kořist.':'Stalking není aktivní; samostatný Tracking vyžaduje vlastní činnost.'}</p>`:''}
