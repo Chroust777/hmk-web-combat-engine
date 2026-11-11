@@ -140,7 +140,7 @@ import { WORKSHOP_SKILLS_P121, workshopQuality, occupationalWorkshop, waterWeigh
 import { EXPEDITION_EQUIPMENT_P120, CRAFT_ITEMS_TOOLS_P121, WORKSHOP_QUALITY_P121, WATER_WEIGHT_P121, MUNDANE_FIRE_P121 } from './src/rules/possessions-printed.js';
 import { BEASTS_P122, VEHICLES_TACK_P122, CONVEYANCE_RULES_P122 } from './src/rules/conveyance-printed-p122.js';
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
-import {planTravelEquipment93812} from './src/integration/hmk-travel-equipment-guide-93812.js';
+import {planTravelEquipment93812,resolveTravelMount93837,isRidingAnimal93837} from './src/integration/hmk-travel-equipment-guide-93812.js';
 import {stableHubProjection,stableCargoCapacity,stableBurden,validateStableHub,assertStableHubAppendOnly,STABLE_HUB_FORMAT_574} from './src/integration/hmk-stable-hub-574.js';
 import {stableAnimalZones575,stableTraining575,effectiveStableBeast575,stableHauling575,validateStableTravel575} from './src/integration/hmk-stable-operations-575.js';
 import {availableTransportVehicles93756,transportVehicleReceipt93756,validateTransportVehicleHistory93756} from './src/integration/hmk-travel-vehicle-93756.js';
@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.836';
+const APP_VERSION='93.837';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2918,7 +2918,7 @@ function timeEpisodePageHTML(clock,participants){
  <label data-episode-landscape-terrain>Typ krajiny / cesta<select name="terrain">${[['paved-road','Zpevněná cesta'],['unpaved-road','Nezpevněná cesta'],['rural-track','Venkovská cesta'],['wilderness-trail','Lesní stezka'],['cropland-grassland','Louky a pole'],['mixed-woodland','Řídký les'],['cold-woodland','Chladný les'],['mixed-forest','Smíšený les'],['needleleaf-forest','Jehličnatý les'],['heath-moor','Vřesoviště'],['dunes','Duny'],['wetlands','Mokřady'],['alpine-vegetation','Alpský terén'],['ice-snow-rockfield','Sníh / skály']].map(([v,l])=>option(v,l)).join('')}</select></label>
  <label data-episode-travel-geography>Doprava<select name="conveyance">${[['foot','Pěšky'],['mount','Jízda na zvířeti'],['cart','Kára'],['wagon','Vůz']].map(([v,l])=>option(v,l)).join('')}</select></label>
  <label data-episode-travel-geography>Měřítko mapy 1 : <input name="mapScale" type="number" min="100" max="10000000" value="25000" title="Například 25000 znamená 1 cm na mapě = 250 m ve skutečnosti."></label>
- </div><p class="hc-episode-weather-outcome" data-episode-trek-table-ref hidden role="status"></p> <div class="hc-episode-local-weather" data-episode-local-weather><div class="hmk-trek-grid">
+ </div><p class="hc-hint" data-episode-global-weather-lock-note role="status" hidden></p><p class="hc-episode-weather-outcome" data-episode-trek-table-ref hidden role="status"></p> <div class="hc-episode-local-weather" data-episode-local-weather><div class="hmk-trek-grid">
  <label data-episode-manual-season>Roční období<select name="season">${[['spring','Jaro'],['summer','Léto'],['autumn','Podzim'],['winter','Zima']].map(([v,l])=>option(v,l)).join('')}</select></label>
  <label>Klima<select name="climate">${[['subpolar','Subpolární'],['cool','Mírné chladné'],['warm','Mírné teplé'],['subtropical','Subtropické'],['dry-tropical','Tropické suché'],['wet-tropical','Tropické vlhké']].map(([v,l])=>option(v,l)).join('')}</select></label>
   <label class="hc-check" data-episode-weather-geography><input name="alpine" type="checkbox"> Alpská výška (−4)</label>
@@ -2954,8 +2954,8 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint" data-episode-mount-capacity role="status"></p>
  </div>
  <div data-episode-healthy-ride-panel class="panel" hidden><strong>Jezdec při tomto Pochodu · bez nasedání ve Stáji</strong>
- <p class="hc-hint">Vyberte, kdo na zvířeti skutečně jede. Aplikace automaticky započítá hmotnost postavy s jejím inventářem a výstrojí. Pokud je vybrán jeden kůň, předvyplní se průvodce. Rozhodnutí platí pro tuto cestu a po uložení je viditelné i ve Stáji.</p>
- <label>Jízdní zvíře<select name="travelRideAnimalId"><option value="">— Automaticky první vybrané zvíře —</option>${stableTravelRoster.filter(a=>['palfrey','courser','charger','destrier','pony','camel'].includes(a.spec.breed)).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
+ <p class="hc-hint">Vyberte, kdo na zvířeti skutečně jede. Aplikace automaticky započítá hmotnost postavy s jejím inventářem a výstrojí. Automatický výběr zvolí pouze prvního vhodného koně nebo velblouda <strong>ze zaškrtnutých zvířat</strong>. Vůl (Bovine/Oxen) může skupinu doprovázet, ale Harness, ox je tažný postroj, nikoli sedlo. Rozhodnutí platí pro tuto cestu a po uložení je viditelné i ve Stáji.</p>
+ <label>Jízdní zvíře<select name="travelRideAnimalId"><option value="">— Automaticky první vhodný kůň / velbloud —</option>${stableTravelRoster.filter(a=>['palfrey','courser','charger','destrier','pony','camel'].includes(a.spec.breed)).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
  <label>Postava jedoucí na zvířeti<select name="travelRideRiderId"><option value="">— Automaticky průvodce skupiny —</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <p class="hc-hint" data-episode-healthy-ride-mass role="status"></p></div>
  <section class="hc-episode-equipment-guide panel" data-episode-equipment-checklist hidden aria-live="polite">
@@ -2978,7 +2978,7 @@ function timeEpisodePageHTML(clock,participants){
  }catch(err){health={error:err.message}}
  const healthStatus=!health?'Bez samostatného zdravotního profilu – pouze doložený stav ve Stáji':health.error?'CHYBNÝ ZDRAVOTNÍ STAV: '+health.error:health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40?'NEMŮŽE SE SAMO PŘESOUVAT':health.injured?'Zraněné · režim Slow':health.fatigue>=20?'Unavené · režim Slow':'Zdravotní stav bez omezení pohybu';
  const blocked=!!health&&(!!health.error||health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40);
- return `<div class="hc-episode-stable-animal${blocked?' hc-episode-animal-unfit':''}" data-episode-stable-animal="${esc(a.id)}"><label class="hc-check"><input name="stableAnimalIds" type="checkbox" value="${esc(a.id)}"><span><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ENC ${Number.isSafeInteger(b.adjustedENC)?b.adjustedENC:'nedoloženo'}${b.travelRide93823?.occupants?.length?' · poslední doložená jízda':''}${b.cargoOverflow?' · PŘETÍŽENO':''}</span></label><p class="hc-hint hc-episode-animal-health">Zdravotní stav: ${esc(healthStatus)}</p>${profile?`<div class="hc-episode-animal-actions"><button type="button" class="secondary hc-small" data-trek-leave-animal="${esc(a.id)}">Opustit zvíře (včetně ponechaného nákladu)</button><details class="hc-trek-animal-injuries"><summary>Aktuální zranění (HMK 355)</summary>${hmkAnimalWoundAnatomyHTML(profile)}</details></div>`:''}</div>`}).join('')}</div></fieldset>`:''}
+ return `<div class="hc-episode-stable-animal${blocked?' hc-episode-animal-unfit':''}" data-episode-stable-animal="${esc(a.id)}"><label class="hc-check"><input name="stableAnimalIds" type="checkbox" value="${esc(a.id)}"><span><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ${esc(a.spec.role||'Zvíře ze Stáje')}${!isRidingAnimal93837(a)?' · NENÍ JÍZDNÍ':''} · ENC ${Number.isSafeInteger(b.adjustedENC)?b.adjustedENC:'nedoloženo'}${b.travelRide93823?.occupants?.length?' · poslední doložená jízda':''}${b.cargoOverflow?' · PŘETÍŽENO':''}</span></label><p class="hc-hint hc-episode-animal-health">Zdravotní stav: ${esc(healthStatus)}</p>${profile?`<div class="hc-episode-animal-actions"><button type="button" class="secondary hc-small" data-trek-leave-animal="${esc(a.id)}">Opustit zvíře (včetně ponechaného nákladu)</button><details class="hc-trek-animal-injuries"><summary>Aktuální zranění (HMK 355)</summary>${hmkAnimalWoundAnatomyHTML(profile)}</details></div>`:''}</div>`}).join('')}</div></fieldset>`:''}
  ${animalRoster.some(a=>!stableTravelRoster.some(s=>s.id===a.id))?`<fieldset data-episode-unmatched-animal><legend>Starší zvířecí zdravotní profily bez záznamu Stáje</legend><p class="hc-hint">Tyto historické profily nejsou v seznamu ověřených zvířat Stáje. Pro novou jízdu či tažení nelze jejich plemeno, postroje nebo náklad odhadovat. Historické údaje zůstávají zachovány.</p><div class="hc-episode-members">${animalRoster.filter(a=>!stableTravelRoster.some(s=>s.id===a.id)).map(a=>{let health;
  try{health=trekRegisteredAnimalHealth(a)}catch(err){health={error:err.message}}
  const healthStatus=health.error?' · CHYBNÝ STAV: '+health.error:health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40?' · NEMŮŽE SAMO POKRAČOVAT':health.injured?' · zraněné · Slow':health.fatigue>=20?' · unavené · Slow':'';
@@ -6797,8 +6797,8 @@ function stableTravelRiderCard93823(animal,campaignId,burden){
    const ids=[v.transportedMemberIds[0],...(v.transportMountHandlerPosition==='mounted'?[v.transportMountHandlerId||v.guideId]:[])].filter(Boolean);
    draft={ids,handler:v.transportMountHandlerId||v.guideId,position:v.transportMountHandlerPosition||'leading'};
   }else if(v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length){
-   const first=(v.stableAnimalIds||[])[0];
-   if((v.travelRideAnimalId||first)===animal.id)draft={ids:[v.travelRideRiderId||v.guideId].filter(Boolean),position:'mounted'};
+   const chosen=resolveTravelMount93837(verifiedLivestock(data,campaignKey(data.campaignClock)),v.stableAnimalIds||[],v.travelRideAnimalId||'').animal;
+   if(chosen?.id===animal.id)draft={ids:[v.travelRideRiderId||v.guideId].filter(Boolean),position:'mounted'};
   }else draft={ids:[],position:'none'};
  }
  const ride=burden.travelRide93823;
@@ -23340,17 +23340,17 @@ function episodeCurrentWeather(form,clock,{mandatory=true}={}){
   if(!source)throw Error('Potvrzená oblast již není platná. Vyberte aktuální globální počasí nebo novou oblast.');
   const shift=effectiveTrekShift(cid,clock.minute,source.calendarTrekDayWeather.area);
   const original=shift?.calendarTrekWeatherShift?.weatherDay??source.calendarTrekDayWeather.weatherDay;
-  const alpine=['alpine-vegetation','ice-snow-rockfield'].includes(v.terrain)||!!v.alpine;
-  const desert=v.terrain==='dunes'||!!v.aridDesert;
-  // Rebase the SAME witnessed daily dice when terrain elevation actually changes.
-  // Never silently apply the lower-altitude receipt to alpine travel.
-  if(alpine&&v.topography!=='mountain')throw Error('Alpský terén vyžaduje horský reliéf i při převzetí globálního počasí.');
+  const alpine=['alpine-vegetation','ice-snow-rockfield'].includes(v.terrain)||!!original.alpine;
+  const desert=v.terrain==='dunes'||!!original.aridDesert;
+  // Source is authoritative for the area and its topography. Actual route
+  // terrain may add alpine/desert exposure but never unlocks the global rolls.
+  if(alpine&&original.landscape!=='mountain')throw Error('Alpský terén vyžaduje potvrzené horské počasí oblasti v Kalendáři.');
   const recomputed=trekWeatherDay({season:original.season,climate:original.climate,
    temperatureD10:original.temperatureD10,precipitationD10:original.precipitationD10,
-   landscape:v.topography,alpine,aridDesert:desert});
+   landscape:original.landscape,alpine,aridDesert:desert});
   return {weather:recomputed,area:source.calendarTrekDayWeather.area,
    sourceId:shift?.id??source.id,origin:'global',weatherRebased:
-   original.landscape!==v.topography||original.alpine!==alpine||original.aridDesert!==desert};
+   original.alpine!==alpine||original.aridDesert!==desert};
  }
  // The same named area/day may never acquire a second pair of daily dice
  // via an individual travel episode. Reuse the authoritative weather receipt.
@@ -23358,13 +23358,13 @@ function episodeCurrentWeather(form,clock,{mandatory=true}={}){
  if(already){
   const base=already.calendarTrekDayWeather,shift=effectiveTrekShift(cid,clock.minute,base.area);
   const original=shift?.calendarTrekWeatherShift?.weatherDay??base.weatherDay;
-  const alpine=['alpine-vegetation','ice-snow-rockfield'].includes(v.terrain)||!!v.alpine;
-  const desert=v.terrain==='dunes'||!!v.aridDesert;
-  if(alpine&&v.topography!=='mountain')throw Error('Alpský terén vyžaduje horský reliéf.');
+  const alpine=['alpine-vegetation','ice-snow-rockfield'].includes(v.terrain)||!!original.alpine;
+  const desert=v.terrain==='dunes'||!!original.aridDesert;
+  if(alpine&&original.landscape!=='mountain')throw Error('Alpský terén vyžaduje potvrzené horské počasí oblasti v Kalendáři.');
   return {weather:trekWeatherDay({season:original.season,climate:original.climate,
    temperatureD10:original.temperatureD10,precipitationD10:original.precipitationD10,
-   landscape:v.topography,alpine,aridDesert:desert}),area:base.area,sourceId:shift?.id??already.id,
-   origin:'global-auto',weatherRebased:original.landscape!==v.topography||original.alpine!==alpine||original.aridDesert!==desert};
+   landscape:original.landscape,alpine,aridDesert:desert}),area:base.area,sourceId:shift?.id??already.id,
+   origin:'global-auto',weatherRebased:original.alpine!==alpine||original.aridDesert!==desert};
  }
  const a=String(v.temperatureD10).trim(),b=String(v.precipitationD10).trim();
  if(!mandatory&&!a&&!b)return {weather:null,area:v.area||'Bez oblasti',sourceId:null,origin:'unspecified'};
@@ -23432,9 +23432,9 @@ function episodeHealthyMountRide93823(v,memberIds,clock){
  if(v.kind!=='travel'||v.conveyance!=='mount'||(v.transportedMemberIds||[]).length)return null;
  const cid=campaignKey(clock),choices=(v.stableAnimalIds||[]);
  if(!choices.length)return null;
- const animalId=choices.includes(v.travelRideAnimalId)?v.travelRideAnimalId:choices[0];
- const animal=verifiedLivestock(data,cid).find(a=>a.id===animalId);
- if(!animal)return null;
+ const mount=resolveTravelMount93837(verifiedLivestock(data,cid),choices,v.travelRideAnimalId||'');
+ if(!mount.animal)throw Error('Jízda na zvířeti: '+mount.reason);
+ const animal=mount.animal,animalId=animal.id;
  const riderId=memberIds.includes(v.travelRideRiderId)?v.travelRideRiderId:
   memberIds.includes(v.guideId)?v.guideId:memberIds[0];
  const rider=character(riderId),mass=stableRiderWeight584(rider);
@@ -25390,16 +25390,45 @@ function updateEpisodePreview(form){
   if(existing){const select=form.elements.namedItem('weatherSource');if(select&&select.value!==existing.id){select.value=existing.id;v.weatherSource=existing.id;}}
  }
  const weatherGlobal=v.weatherSource!=='local';
- for(const name of ['temperatureD10','precipitationD10','season','climate']){
-  const input=form.elements.namedItem(name);if(input)input.disabled=weatherGlobal;
+ const source=data.journal.find(j=>j.id===v.weatherSource)?.calendarTrekDayWeather;
+ const changedWeather=source&&weatherGlobal?
+  effectiveTrekShift(campaignKey(data.campaignClock),data.campaignClock.minute,source.area)?.calendarTrekWeatherShift?.weatherDay:null;
+ const displayedWeather=changedWeather||source?.weatherDay;
+ // v93.837: globally CONFIRMED weather facts are read-only in an episode.
+ // This is a draft-only display sync, never an extra weather roll or a commit.
+ // Users may select a different weather area (or 'local') explicitly.
+ // Route-specific terrain, shelter, and travel decisions remain editable.
+ for(const name of ['temperatureD10','precipitationD10','season','climate','latitudeBand','topography']){
+  const input=form.elements.namedItem(name);if(!input)continue;
+  if(source&&weatherGlobal){
+   const value={temperatureD10:displayedWeather?.temperatureD10,
+    precipitationD10:displayedWeather?.precipitationD10,season:displayedWeather?.season??source.season,
+    climate:displayedWeather?.climate??source.climate,latitudeBand:source.latitudeBand,
+    topography:displayedWeather?.landscape??source.landscape}[name];
+   if(value!==undefined&&value!==null)input.value=String(value);
+  }
+  input.disabled=weatherGlobal;
+  input.closest('label')?.classList.toggle('hc-episode-inactive',weatherGlobal);
+  input.title=weatherGlobal?'Potvrzeno v denním globálním počasí oblasti. Pro změnu přejděte do Kalendáře nebo zvolte jinou oblast.':'';
+ }
+ for(const name of ['alpine','aridDesert']){
+  const input=form.elements.namedItem(name);if(!input)continue;
+  if(source&&weatherGlobal)input.checked=!!(displayedWeather?.[name]??source[name]);
+  input.disabled=weatherGlobal;
+  input.closest('label')?.classList.toggle('hc-episode-inactive',weatherGlobal);
  }
  for(const button of form.querySelectorAll('[data-episode-die="temperatureD10"],[data-episode-die="precipitationD10"]'))button.disabled=weatherGlobal;
  const local=form.querySelector('[data-episode-local-weather]');if(local)local.hidden=weatherGlobal;
- const source=data.journal.find(j=>j.id===v.weatherSource)?.calendarTrekDayWeather;
- if(source&&weatherGlobal){
-  const a=form.elements.namedItem('area');if(a)a.value=source.area;
-  // The confirmed DAILY dice carry over; the actual route's elevation is not overwritten.
+ const areaInput=form.elements.namedItem('area');
+ if(areaInput){
+  if(source&&weatherGlobal)areaInput.value=source.area;
+  areaInput.readOnly=weatherGlobal;
+  areaInput.closest('label')?.classList.toggle('hc-episode-inactive',weatherGlobal);
+  areaInput.title=weatherGlobal?'Název převzatý z potvrzeného počasí. Vyberte jinou oblast, chcete-li změnit zdroj.':'';
  }
+ const selectedWeatherInfo=form.querySelector('[data-episode-global-weather-lock-note]');
+ if(selectedWeatherInfo){selectedWeatherInfo.hidden=!weatherGlobal;
+  selectedWeatherInfo.textContent=weatherGlobal?'Globálně potvrzené počasí: oblast, roční období, klima, šířkové pásmo, reliéf, nadmořské a pouštní podmínky i denní d10 jsou převzaté a uzamčené. Typ cesty, skutečný terén a úkryt zůstávají volitelné. Změna počasí vyžaduje potvrzení v Kalendáři.':'';}
  // Deterministic Tracking Conditions (HMK 147) from the actual route,
  // atmospheric roll and calendar. GM supplies only facts we cannot infer:
  // identity/size of the pursued group, and any unusual surface override.
@@ -26082,6 +26111,13 @@ document.addEventListener('change',e=>{
  if(e.target.type==='number'&&e.target.name&&
     String(timeEpisodeDraft[e.target.name]??'')===e.target.value)return;
  if(e.target.name?.startsWith('evMoon_'))e.target.dataset.userSet='true';
+ // Switching to an EXPLICIT new local area must not immediately reselect the
+ // just-left global area via its still-readonly inherited name. No campaign
+ // write or dice roll occurs; only the unfinished local form draft is reset.
+ if(e.target.name==='weatherSource'&&e.target.value==='local'&&!episodeEvaluationRequested){
+  const area=form.elements.namedItem('area');
+  if(area?.readOnly)area.value='';
+ }
  if(e.target.name==='rememberSettings'&&!episodeEvaluationRequested){
   const wantsPrevious=e.target.checked;
   const draft=wantsPrevious?episodeCarrySettingsFromLast():episodeFreshDraft();

@@ -11,6 +11,29 @@ const getAnimal=(data,cid,id)=>verifiedLivestock(data,cid).find(a=>a.id===id)||n
 const isCartHorse=a=>a?.spec?.breed==='palfrey'&&/cart horse/i.test(a.spec.name);
 const isOx=a=>a?.spec?.breed==='bovine';
 const canPull=a=>isCartHorse(a)||isOx(a);
+// v93.837: only a mount qualified under HMK p.122 can be selected as the
+// current rider's animal. Other, independently selected pack/draft animals
+// may accompany the group without becoming riding candidates.
+const rideBreeds=new Set(['palfrey','courser','charger','destrier','pony','camel']);
+export const isRidingAnimal93837=a=>!!a&&rideBreeds.has(a.spec?.breed);
+/** Never reinterpret an explicit mount ID or silently switch to another one.
+ * The empty choice is the documented auto-selection of the first ELIGIBLE
+ * animal among checked Stable IDs, not the first animal of any species.
+ */
+export function resolveTravelMount93837(animals,selectedIds=[],requestedId=''){
+ const selected=[...new Set(selectedIds)].map(id=>(animals||[]).find(a=>a.id===id)).filter(Boolean);
+ if(requestedId){
+  const chosen=selected.find(a=>a.id===requestedId);
+  if(!chosen)return {animal:null,reason:'Vybrané jízdní zvíře není zaškrtnuté v seznamu „Zvířata na cestě“. Zaškrtněte je, nebo zvolte automatický výběr.'};
+  if(!isRidingAnimal93837(chosen))return {animal:null,reason:chosen.name+' ('+chosen.spec.name+') není jízdní kůň ani velbloud.'};
+  return {animal:chosen,reason:null};
+ }
+ const animal=selected.find(isRidingAnimal93837)||null;
+ return {animal,reason:animal?null:selected.length?
+  'Vybraná zvířata nejsou jezdecká. Vůl (Bovine/Oxen) používá Harness, ox pro tah; pro jízdu vyberte skutečného koně nebo velblouda a doložte uzdu, deku a sedlo.':
+  'Zaškrtněte alespoň jednoho skutečného koně nebo velblouda v seznamu Stáje.'};
+}
+
 const loose=(data,animal,gear)=>animal&&(data.inventory||[]).find(i=>
  i.characterId===animal.ownerId&&i.sourceItemId==='hmk:stable-gear:'+gear.id&&
  i.snapshot?.properties?.stableTackId===gear.id&&
@@ -30,7 +53,8 @@ export function planTravelEquipment93812(data,cid,v){
  const required=mode==='cart'?1:mode==='wagon'?2:1;
  const pullers=selected.filter(canPull);
  const invalid=team.filter(a=>!canPull(a));
- let operative=mode==='mount'?selected:team.length?team:pullers;
+ const riding=mode==='mount'?resolveTravelMount93837(all,v.stableAnimalIds||[],v.travelRideAnimalId||''):null;
+ let operative=mode==='mount'?(riding.animal?[riding.animal]:[]):team.length?team:pullers;
  const listGear=[];
  const addGear=(animal,names,description)=>{
   const p=stableHubProjection(data,cid,animal.id);
@@ -46,12 +70,13 @@ export function planTravelEquipment93812(data,cid,v){
    `${gear.priceD}d · ${gear.weightLb} lb · ${description} · ${inv?'Kus už je v inventáři vlastníka; znovu neplatit.':'Chybí na zvířeti; lze koupit a přímo nasadit.'}`,action));
  };
  if(mode==='mount'){
-  checks.push(selected.length?good('animals','Jízdní zvíře vybráno',selected.map(a=>a.name).join(', ')):
-   bad('animals','Vybrat jízdní zvíře','Zaškrtněte vhodného koně či velblouda v seznamu Stáje.'));
+  checks.push(riding.animal?good('animals','Jízdní zvíře vybráno',riding.animal.name+' · '+riding.animal.spec.name):
+   bad('animals','Vybrat vhodné jízdní zvíře',riding.reason));
+  for(const a of selected.filter(a=>a.id!==riding.animal?.id)){
+   checks.push(info('companion:'+a.id,a.name+' · doprovází skupinu',
+    isRidingAnimal93837(a)?'Toto zvíře není vybráno pro aktuálního jezdce.':'Není jezdeckým zvířetem; může cestovat se skupinou jako tažné nebo nákladní zvíře. Jízda na jiném doloženém koni není blokována.'));
+  }
   for(const a of operative){
-   if(!['palfrey','courser','charger','destrier','pony','camel'].includes(a.spec.breed)){
-    checks.push(bad('type:'+a.id,a.name+' · nevhodné jízdní zvíře','Zvolte koně nebo velblouda; jiné druhy nemají v tomto režimu ověřené jezdecké vybavení.'));continue;
-   }
    addGear(a,['Bit & bridle'],'Povinná uzda pro jízdní zvíře (HMK 122)');
    addGear(a,['Blanket, horse'],'Povinná podložka/deka (HMK 122)');
    addGear(a,['Saddle, riding','Saddle, war'],'Povinné sedlo, stačí jeden z uvedených typů (HMK 122)');

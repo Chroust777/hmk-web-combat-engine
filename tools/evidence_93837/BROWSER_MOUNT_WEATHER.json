@@ -1,0 +1,94 @@
+{
+  "status": "PASS",
+  "checks": [
+    "Actual episode form opens",
+    "Daily weather source confirmed",
+    "latitudeBand inherited and disabled",
+    "topography inherited and disabled",
+    "season inherited and disabled",
+    "climate inherited and disabled",
+    "temperatureD10 inherited and disabled",
+    "precipitationD10 inherited and disabled",
+    "alpine inherited and disabled",
+    "aridDesert inherited and disabled",
+    "Area title inherited read-only",
+    "Latitude and landscape inherited",
+    "Original daily d10 values visible and immutable",
+    "Route terrain/shelter remain independent",
+    "Global weather locking explained",
+    "Weather source is locked by the active confirmed group plan",
+    "Catalogue offers Bovine (Oxen)",
+    "Ox-only warns before any mount rolls",
+    "Ox clearly labelled not rideable",
+    "Selecting ox does not advance time",
+    "Catalogue offers Palfrey, riding horse",
+    "Ox remains selected across Stable refresh",
+    "Auto mount still default",
+    "Horse selected automatically from mixed herd",
+    "Ox companion does not block selected horse",
+    "Companion ox shown as informational",
+    "Real tack gifts confirmed by clicking",
+    "Mount remains correct after saddling",
+    "Rider real mass computed on eligible horse",
+    "Explicit horse selection computed",
+    "No accidental timeline commit",
+    "Real droverProofId test opened",
+    "Real orientationProofId test opened",
+    "Ready-to-stage still no time advance",
+    "Explicit 45 minute Calendar confirmation persisted",
+    "One travel receipt",
+    "Horse (not ox) is actually ridden",
+    "Both animals retained in travel party",
+    "No JS page errors: []"
+  ],
+  "count": 39,
+  "errors": [],
+  "dialogs": [
+    "GM potvrzuje bezplatné převzetí Bovine (Oxen) (Blesk) postavou Michal?",
+    "GM potvrzuje bezplatné převzetí Palfrey, riding horse (Vitr) postavou Michal?",
+    "Stáj · Vitr: GM potvrzuje převzetí výstroje?\nPořízení chybějící výstroje při rozpracovaném Pochodu",
+    "Stáj · Vitr: GM potvrzuje převzetí výstroje?\nPořízení chybějící výstroje při rozpracovaném Pochodu",
+    "Stáj · Vitr: GM potvrzuje převzetí výstroje?\nPořízení chybějící výstroje při rozpracovaném Pochodu",
+    "GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:45 a posunout JEDINÝ kalendář o 45 minut?"
+  ],
+  "final": {
+    "minute": 525,
+    "stored": 525,
+    "animals": [
+      {
+        "id": "id-1794423987672-zmqlo0snwz8",
+        "name": "Blesk",
+        "breed": "bovine"
+      },
+      {
+        "id": "id-1794423988516-ec51q3he9zk",
+        "name": "Vitr",
+        "breed": "palfrey"
+      }
+    ],
+    "episodes": [
+      {
+        "ride": {
+          "format": "hmk-travel-ride-position-93823",
+          "animalId": "id-1794423988516-ec51q3he9zk",
+          "riderId": "a",
+          "riderLb": 150,
+          "gearAndCargoLb": 14,
+          "totalLb": 164,
+          "enc": 0,
+          "moveAfterLoad": 130,
+          "sourcePage": 122
+        },
+        "members": [
+          "a"
+        ],
+        "stable": [
+          "id-1794423987672-zmqlo0snwz8",
+          "id-1794423988516-ec51q3he9zk"
+        ]
+      }
+    ],
+    "version": "93.837",
+    "previewError": ""
+  }
+}

@@ -1,0 +1,22 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
+const root=path.resolve(__dirname,'..'),old=require.extensions['.js'];
+require.extensions['.js']=(m,f)=>f.startsWith(path.join(root,'src')+path.sep)?m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{fileName:f,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,f):old(m,f);
+const {resolveTravelMount93837,isRidingAnimal93837,planTravelEquipment93812}=require('../src/integration/hmk-travel-equipment-guide-93812.js');
+const ox={id:'ox',name:'Blesk',ownerId:'a',spec:{breed:'bovine',name:'Bovine (Oxen)'}},horse={id:'horse',name:'Vitr',ownerId:'a',spec:{breed:'palfrey',name:'Palfrey, riding horse'}},camel={id:'camel',name:'Sahar',ownerId:'a',spec:{breed:'camel',name:'Camel'}};
+let count=0;const eq=(a,b,m)=>{assert.deepEqual(a,b,m);count++},ok=(v,m)=>{assert.ok(v,m);count++};
+eq(isRidingAnimal93837(ox),false);eq(isRidingAnimal93837(horse),true);eq(isRidingAnimal93837(camel),true);
+eq(resolveTravelMount93837([ox,horse],['ox','horse']).animal?.id,'horse','first eligible, not first ox');
+eq(resolveTravelMount93837([ox,horse],['horse','ox']).animal?.id,'horse','stable order independent of selection order');
+eq(resolveTravelMount93837([ox,horse],['ox']).animal,null,'ox-only cannot be mounted');
+ok(/Bovine|vůl/i.test(resolveTravelMount93837([ox,horse],['ox']).reason),'clear ox reason');
+eq(resolveTravelMount93837([ox,horse],['ox','horse'],'horse').animal?.id,'horse','explicit selected horse');
+eq(resolveTravelMount93837([ox,horse],['ox','horse'],'ox').animal,null,'wrong explicit ox rejected');
+eq(resolveTravelMount93837([ox,horse],['ox'],'horse').animal,null,'explicit but unchecked horse rejected');
+eq(resolveTravelMount93837([ox,horse],[]).animal,null,'empty cannot mint mount');
+eq(resolveTravelMount93837([camel,ox],['ox','camel']).animal?.id,'camel','camel supported');
+eq(resolveTravelMount93837([ox,horse],['horse','horse']).animal?.id,'horse','duplicate ID does not grant second animal');
+const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+for(const marker of ["const APP_VERSION='93.837'", "resolveTravelMount93837(verifiedLivestock(data,cid),choices", "const riding=mode==='mount'?resolveTravelMount93837", "['temperatureD10','precipitationD10','season','climate','latitudeBand','topography']", "areaInput.readOnly=weatherGlobal", "data-episode-global-weather-lock-note", "displayedWeather?.temperatureD10"]){ok(source.includes(marker)||fs.readFileSync(path.join(root,'src/integration/hmk-travel-equipment-guide-93812.js'),'utf8').includes(marker),'missing expected '+marker)}
+console.log('PASS',count,'pure mount routing + explicit rejection + global weather lock contracts');
