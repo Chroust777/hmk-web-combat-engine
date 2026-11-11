@@ -13,7 +13,10 @@ const html=S.calendarPCShelteredControlsHTML({clock,characters,journal,escapeHTM
 assert.match(html,/data-shelter-actor-kind="PC"/);assert.match(html,/data-shelter-actor-kind="NPC"/);
 assert.match(html,/Karel <span class="hc-pc-shelter-status">\(Nezajištěno\)/);
 assert.match(html,/Hana <span class="hc-pc-shelter-status">\(Zajištěno\)/);
-assert.match(html,/Marta <span class="hc-pc-shelter-status">\(Nezajištěno\)/);
+assert.match(html,/Marta <span class="hc-pc-shelter-status">\(Výchozí návrh NPC\)/);
+assert.match(html,/data-calendar-pc-shelter="npc-2" checked/);
+assert.match(html,/data-calendar-pc-shelter-confirm-all/);
+assert.doesNotMatch(html,/data-calendar-seed-npc-shelter|data-calendar-pc-shelter-confirm="/);
 assert.match(html,/data-calendar-pc-shelter="npc-1" checked/);
 assert.doesNotMatch(html,/jídlo i pití: podle zásob|Běžné potřeby a expozice/);
 assert.equal(S.pcShelteredStayAt(journal,'release-93804','npc-1',clock.minute),true);

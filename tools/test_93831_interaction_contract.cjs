@@ -8,8 +8,8 @@ const {calendarPCShelteredControlsHTML}=require('../src/integration/hmk-pc-shelt
 let n=0;const ok=(x,why)=>{assert.ok(x,why);n++;};
 const html=calendarPCShelteredControlsHTML({clock:{campaignId:'audit',minute:480},characters:[{id:'a',name:'Test',kind:'PC'}],journal:[],escapeHTML:String});
 ok(html.includes('data-calendar-pc-shelter="a"'),'draft shelter checkbox');
-ok(html.includes('data-calendar-pc-shelter-confirm="a"'),'explicit shelter button');
-ok(html.includes('data-calendar-seed-npc-shelter'),'explicit NPC init');
+ok(html.includes('data-calendar-pc-shelter-confirm-all'),'single explicit shelter button');
+ok(!html.includes('data-calendar-seed-npc-shelter'),'no special NPC default button');
 ok(!/if\(ensureNPCShelterDefaultsOnCalendar93802\(\)\)return;/.test(app),'no render-side NPC mutate');
 ok(!/if\(actorId&&ensurePersonalNutritionTracking\(actorId\)\)return;/.test(app),'no nav-side nutrition init');
 ok(!/if\(ensurePersonalNutritionTracking\(field\.value\)\)return;/.test(app),'no actor-selection nutrition mutate');
