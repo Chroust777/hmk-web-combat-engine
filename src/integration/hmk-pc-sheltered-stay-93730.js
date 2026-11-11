@@ -73,9 +73,9 @@ export function calendarPCShelteredControlsHTML({clock,characters=[],journal=[],
  const groups=['PC','NPC'].map(kind=>{
   const members=people.filter(c=>String(c.kind||'PC').toUpperCase()===kind);
   const rows=members.map(c=>{const active=pcShelteredStayAt(journal,cid,c.id,clock.minute);
-   return `<label class="hc-pc-shelter-item"><input type="checkbox" data-calendar-pc-shelter="${esc(c.id)}" ${active?'checked':''} aria-label="${esc(c.name)} – zajištěné prostředí"><span class="hc-pc-shelter-name">${esc(c.name)} <span class="hc-pc-shelter-status">(${active?'Zajištěno':'Nezajištěno'})</span></span></label>`;
+   return `<div class="hc-pc-shelter-item"><label><input type="checkbox" data-calendar-pc-shelter="${esc(c.id)}" ${active?'checked':''} aria-label="${esc(c.name)} – návrh zajištěného prostředí"><span class="hc-pc-shelter-name">${esc(c.name)} <span class="hc-pc-shelter-status">(${active?'Zajištěno':'Nezajištěno'})</span></span></label><button type="button" class="secondary" data-calendar-pc-shelter-confirm="${esc(c.id)}">Potvrdit změnu pobytu</button></div>`;
   }).join('')||`<p>${kind==='PC'?'V této kampani není žádná PC.':'V této kampani není žádná NPC.'}</p>`;
   return `<div class="hc-pc-shelter-group" data-shelter-actor-kind="${kind}"><h5>${kind} · ${members.length}</h5><div class="hc-pc-shelter-list">${rows}</div></div>`;
  }).join('');
- return `<section class="hc-pc-shelter" aria-label="Zajištěné prostředí PC a NPC"><h4>Postavy v zajištěném prostředí</h4>${groups}</section>`;
+ return `<section class="hc-pc-shelter" aria-label="Zajištěné prostředí PC a NPC"><h4>Postavy v zajištěném prostředí</h4><p>Zaškrtnutí připraví pouze návrh. Zápis provede až tlačítko u postavy.</p><button type="button" class="secondary" data-calendar-seed-npc-shelter>Potvrdit výchozí zajištění dosud nenastavených NPC</button>${groups}</section>`;
 }
