@@ -30,7 +30,7 @@ const assert=require('node:assert/strict');
  eq(resolveColdHazardEquipment({inventory:[custom],actorId:'P'}).gearAV,0,'GM custom does not grant printed protection');
  assert.throws(()=>applyInventoryItemEdit({characters:[{id:'P'}],inventory:[{...custom,snapshot:{...custom.snapshot,category:'other'},coldWorn:false}]},{ownerId:'P',itemId:'gm-cloak',slot:'carried',quantity:1,currentWQ:null,condition:'',coldWorn:true}),/Cold Hazard/);n++;
  eq(resolveColdHazardEquipment({inventory:[padded,bedroll,shelter],actorId:'P'}).gearAV,2,'worn padded cloak granted');
- assert.throws(()=>resolveColdHazardEquipment({inventory:[padded,bedroll,shelter],actorId:'P',gearId:'bed'}),/potvrdit/);n++;
+ eq(resolveColdHazardEquipment({inventory:[padded,bedroll,shelter],actorId:'P',gearId:'bed'}).gearAV,2,'GM-selected bedroll requires no second checkbox');
  const bedPlus=resolveColdHazardEquipment({inventory:[bedroll,shelter],actorId:'P',gearId:'bed',shelterId:'tent',usedConfirmed:true});
  eq([bedPlus.gearAV,bedPlus.shelterAV],[2,2],'attested used heavy bedroll plus pitched tent');
  const wornCloth=entry('cloth',pick('Cloth Cloak'),'worn');

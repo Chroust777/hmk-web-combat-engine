@@ -18,11 +18,11 @@ for(const [name,expect] of [['Bedroll',1],['Bedroll, heavy',2],['Blanket',1],['C
 eq(coldCatalogRule(obj('a','Metal Boots','armor')),null);eq(clothingColdText({name:'Mail Hauberk',category:'armor'}).includes('nebyla doložena'),true); // v93.762: unknown F must not be presented as a numerical benefit
 const cloak=obj('cloak','Padded Cloak','armor','worn'), blanket=obj('blanket','Blanket'), heavy=obj('heavy','Bedroll, heavy'), tent=obj('tent','Tent, 1-man'), cloth=obj('cloth','Cloak (Cloth)');
 const inv=[cloak,blanket,heavy,tent,cloth];eq(coldInventoryChoices(inv,actor).automatic.length,1);eq(resolveColdHazardEquipment({inventory:inv,actorId:actor}).gearAV,2);
-throws(()=>resolveColdHazardEquipment({inventory:inv,actorId:actor,gearId:'blanket'}),/potvrdit/);
+eq(resolveColdHazardEquipment({inventory:inv,actorId:actor,gearId:'blanket'}).gearAV,2);
 eq(resolveColdHazardEquipment({inventory:inv,actorId:actor,gearId:'blanket',usedConfirmed:true}).gearAV,2); // no cloak + blanket stacking
 const full=resolveColdHazardEquipment({inventory:inv,actorId:actor,gearId:'heavy',shelterId:'tent',usedConfirmed:true,fireFS:3,fireConfirmed:true});eq(full.gearAV,2);eq(full.shelterAV,2);eq(full.fireFS,3);eq(full.gearSourceId,'cloak');
-throws(()=>resolveColdHazardEquipment({inventory:inv,actorId:actor,shelterId:'tent'}),/potvrdit/);
-throws(()=>resolveColdHazardEquipment({inventory:inv,actorId:actor,fireFS:2}),/Oheň/);
+eq(resolveColdHazardEquipment({inventory:inv,actorId:actor,shelterId:'tent'}).shelterAV,2);
+eq(resolveColdHazardEquipment({inventory:inv,actorId:actor,fireFS:2}).fireFS,2);
 throws(()=>resolveColdHazardEquipment({inventory:inv,actorId:actor,gearId:'fake',usedConfirmed:true}),/není v dostupném/);
 eq(resolveColdHazardEquipment({inventory:inv,actorId:actor,shelterId:'cave',usedConfirmed:true}).shelterAV,3);
 const locked=[obj('cloak','Padded Cloak','armor','chest'),obj('bed','Bedroll','other','stable'),obj('tent','Tent, 1-man','other','carried',{hmkEquipmentRepair:{status:'damaged'}})];eq(coldInventoryChoices(locked,actor).automatic.length,0);eq(coldInventoryChoices(locked,actor).shelters.length,0);
