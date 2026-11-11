@@ -1,6 +1,7 @@
 /** HMK v1.2 printed pp.120, 133, 149: Cold Hazard gear provenance.
  * One actually used gear source (best eligible), one shelter, and FS.
- * Inventory identity is authoritative. No roll or inventory mutation.
+ * Inventory identity is authoritative. The GM-owned selection itself certifies use.
+ * No redundant confirmation checkbox, roll, or inventory mutation.
  * A worn armour cloak has an extra Cold AV bonus on top of its F aspect.
  */
 import {equipmentUnusable} from './hmk-equipment-serviceability.js';
@@ -60,24 +61,20 @@ export function coldInventoryChoices(inventory,actorId){
   x.item.snapshot?.category==='other'&&x.item.coldWorn===true));
  return {automatic,gear:choices.filter(x=>x.rule.kind!=='shelter'),shelters:choices.filter(x=>x.rule.kind==='shelter')};
 }
-export function resolveColdHazardEquipment({inventory,actorId,gearId='',shelterId='',usedConfirmed=false,fireFS=0,fireConfirmed=false}={}){
+export function resolveColdHazardEquipment({inventory,actorId,gearId='',shelterId='',fireFS=0}={}){
  if(!Number.isSafeInteger(fireFS)||fireFS<0||fireFS>20)throw Error('Neplatná síla ohně FS');
- if(fireFS>0&&fireConfirmed!==true)throw Error('Oheň vyžaduje potvrzení GM, že skutečně hoří.');
  const c=coldInventoryChoices(inventory,actorId);
  const auto=c.automatic.reduce((best,x)=>!best||x.rule.av>best.rule.av?x:best,null);
  let chosen=null;
  if(gearId){chosen=c.gear.find(x=>x.item.id===gearId);if(!chosen)throw Error('Vybraná ochrana není v dostupném inventáři postavy.');
-  if(!(chosen.item.snapshot?.category==='armor'&&chosen.item.slot==='worn')&&!chosen.item.coldWorn&&usedConfirmed!==true)
-   throw Error('GM musí potvrdit skutečné použití neseného vybavení.');}
+}
  const main=[auto,chosen].filter(Boolean).reduce((best,x)=>!best||x.rule.av>best.rule.av?x:best,null);
  let shelterAV=0,shelterSource=null;
  if(shelterId==='cave'){
-  if(usedConfirmed!==true)throw Error('GM musí potvrdit použití mělké jeskyně.');
   shelterAV=3;shelterSource='Shallow cave · GM';
  }else if(shelterId){
   const shelter=c.shelters.find(x=>x.item.id===shelterId);
   if(!shelter)throw Error('Vybraný stan není v dostupném inventáři postavy.');
-  if(usedConfirmed!==true)throw Error('GM musí potvrdit skutečně postavený stan.');
   shelterAV=shelter.rule.av;shelterSource=shelter.item.id;
  }
  return {
