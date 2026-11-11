@@ -1,0 +1,36 @@
+/* v93.842: source contract complementing real Chromium click regressions. */
+const fs=require('fs'),assert=require('assert');
+const app=fs.readFileSync('app.js','utf8');
+const css=fs.readFileSync('styles.css','utf8');
+const html=fs.readFileSync('index.html','utf8');
+let count=0;
+function ck(condition,name){assert(condition,name);count++;}
+ck(app.includes("const APP_VERSION='93.842'"),'release 93.842');
+ck(html.includes('93.842'),'HTML release');
+ck(app.includes('function episodeIdentityMismatch(form)'), 'identity guard exists');
+ck(app.includes('const unrelatedTracking='), 'unrelated Tracking condition');
+ck(app.includes("episodeEvaluatedIdentity.kind==='travel'"),'requires locked travel');
+ck(app.includes("episodeEvaluatedIdentity.trackingUse==='none'"),'requires no locked Tracking');
+ck(app.includes("snapshot.orientationPriority!=='stealth'"),'stalking priority remains guarded');
+ck(app.includes("Number(snapshot.mode_stalking||0)!==1"),'stalking mode remains guarded');
+ck(app.includes('actual[k]=episodeEvaluatedIdentity[k]'),'irrelevant identity canonicalization');
+ck(app.includes('const changed=Object.keys(lockedIdentity).filter'), 'specific error labels');
+ck(app.includes('function episodeCarrySettingsFromLast()'),'last settings path exists');
+ck(app.includes('function episodeHazardInputs93840(form)'), 'hazard confirmation scoped');
+ck(app.includes("legend.startsWith('Equipment Hazard ·')"),'equipment active hazard scope');
+ck(app.includes("new Set(['hazardEquipmentDisposition','hazardItemId'"),'equipment-only selectors');
+ck(app.includes('episodeHazardConfirmation93840=new WeakMap()'), 'hazard form-local approval');
+ck(app.includes('episodeHazardPending93840(form)'), 'pending hazard detection');
+ck(app.includes('data-hazard-choices-confirm'), 'explicit hazard button');
+ck(app.includes('stableGuideSelected93842=new Map()'),'presentation filter separate state');
+ck(app.includes('[data-hmk-stable-filter-confirm]'), 'explicit stable filter button');
+ck(app.includes('if(value===\'all\')stableGuideSelected93842.delete(ownerId)'), 'all species restore');
+ck(app.includes('stableGuideSelected93842.set(ownerId,value)'), 'specific owned animal filter');
+ck(app.includes('verifiedLivestock(data,campaignId).find(a=>a.id===value&&a.ownerId===ownerId'), 'ownership verified');
+ck(app.includes('hmk-stable-elephant-special-93842'), 'special elephant direct purchase');
+ck(app.includes('name="type" value="cargo-add"'), 'manual cargo form preserved');
+ck(app.includes('name="type" value="inventory-gear-attach"'), 'existing inventory attachment preserved');
+ck(!app.includes('data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="tack-add"'), 'removed duplicated right-side tack purchase');
+ck(css.includes('.hmk-stable-catalog-filter-93842'), 'parchment filter style');
+ck(css.includes('.hmk-stable-elephant-special-93842'), 'elephant exceptional purchase style');
+console.log('PASS v93.842 source interaction contract',count);

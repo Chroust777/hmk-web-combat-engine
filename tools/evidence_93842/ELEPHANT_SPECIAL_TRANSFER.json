@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "tack": "Pack harness",
+  "originalWeightLb": 10,
+  "elephantWeightLb": 50,
+  "cashUntouched": true,
+  "stableReceipts": 1,
+  "minute": 480,
+  "errors": []
+}

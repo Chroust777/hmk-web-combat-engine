@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "version": "93.842",
+  "minutesAfterSecond": 600,
+  "episodes": 2,
+  "trackingSkillRows": 0,
+  "manualPartyGuard": "PASS",
+  "dormantTrackingGuard": "PASS",
+  "errors": [],
+  "dialogs": [
+    "GM: potvrdit 1 nezávislých činností od Den 1 · 09:00 do Den 1 · 10:00 a posunout JEDINÝ kalendář o 60 minut?"
+  ]
+}

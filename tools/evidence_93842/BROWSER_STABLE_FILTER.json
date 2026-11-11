@@ -1,0 +1,25 @@
+{
+  "status": "PASS",
+  "count": 17,
+  "checks": [
+    "Default displays all 16 species",
+    "Filter contains All plus exactly two actually owned animals",
+    "Owned animals are individually named",
+    "Changing select alone does NOT filter the table",
+    "Dropdown does not mutate inventory, money, journal or time",
+    "Enter on dropdown does not confirm",
+    "Explicit button filters to one owned species",
+    "Shows correct Blesk species",
+    "Applying display filter does not change campaign data",
+    "Second selection stays uncommitted",
+    "Explicitly selects owned riding horse",
+    "All restores 16 rows",
+    "No duplicated buy/equip gear form on right",
+    "No duplicated buy vehicle form on right",
+    "Manual cargo row preserved",
+    "Canonical Library acquisition forms preserved on left",
+    "No page errors"
+  ],
+  "errors": [],
+  "version": "93.842"
+}

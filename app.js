@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.841';
+const APP_VERSION='93.842';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6838,7 +6838,20 @@ const STABLE_EQUIPMENT_USE_93839=Object.freeze({
  care:'Péče · podkování',handling:'Vedení zvířete · uzda'
 });
 let stableEquipmentGuideOpen93839=false;
+// The filter changes only on its own explicit confirmation; the default
+// catalogue always contains all sixteen species. No animal or inventory write.
+const stableGuideSelected93842=new Map();
 function stableEquipmentReference93839(ownerId){
+ const campaignId=data.campaignClock?campaignKey(data.campaignClock):null;
+ const ownedAnimals=campaignId?verifiedLivestock(data,campaignId).filter(a=>a.ownerId===ownerId&&
+  !stableBurden(data,campaignId,a).exit):[];
+ const selectedAnimal=ownedAnimals.find(a=>a.id===stableGuideSelected93842.get(ownerId))||null;
+ const filterMarkup=`<div class="hmk-stable-catalog-filter-93842">
+  <label>Filtrovat katalog podle vlastněného zvířete<select data-hmk-stable-filter-choice aria-label="Vybrat zvíře, kterého se má katalog týkat">
+   <option value="all" ${!selectedAnimal?'selected':''}>Všech 16 druhů · výchozí zobrazení</option>
+   ${ownedAnimals.map(a=>`<option value="${esc(a.id)}" ${selectedAnimal?.id===a.id?'selected':''}>${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}
+  </select></label><button type="button" data-hmk-stable-filter-confirm data-owner-id="${esc(ownerId)}">Potvrdit filtr</button>
+  <span role="status">${selectedAnimal?'Zobrazen pouze druh: '+esc(selectedAnimal.name)+' · '+esc(selectedAnimal.spec.name):'Zobrazeno všech 16 druhů.'}</span></div>`;
  const uses={
   'Bovine (Oxen)':['Tah: kára 2 500 lb / vůz (2 voli) 8 000 lb.','Harness, ox · případně Pack harness','Jízda: ne'],
   Camel:['Jízda a soumarský náklad; 5 ENC / 40 lb.','Bit & bridle · Blanket, horse · sedlo; Pack harness / Saddle bags','Tah káry/vozu: v aplikaci neověřen'],
@@ -6859,7 +6872,7 @@ function stableEquipmentReference93839(ownerId){
  };
  const owner=character(ownerId),cash=owner?cashForCharacter(owner):null;
  const eligibleOwner=!!owner&&activeCampaignCashKey(owner)!==undefined&&!combatActorLocked93725(ownerId);
- const rows=BEASTS_P122.map(beast=>{
+ const rows=BEASTS_P122.filter(beast=>!selectedAnimal||beast.id===selectedAnimal.beastId).map(beast=>{
   const c=uses[beast.name]||['Bez automatického využití','Nevyhodnoceno','GM'];
   const sp=livestockOffer(beast.id),animal={spec:sp},special=sp?.breed==='elephant';
   // Ordinary Library items use printed one-size weights. Elephant gear is ×5
@@ -6884,9 +6897,18 @@ function stableEquipmentReference93839(ownerId){
     <span class="hmk-stable-guide-actions"><button type="submit" name="acquisition" value="buy" data-hmk-stable-guide-buy-button ${canBuy?'':`disabled title="${esc(reason||'Nelze zakoupit vybranou položku.') }"`}>Koupit${price===null?'':' · '+price+'d'}</button><button type="submit" name="acquisition" value="free" class="secondary" ${eligibleOwner&&!!goods.length?'': 'disabled'}>Vzít zdarma</button></span>
     ${special?`<span class="hmk-stable-guide-footnote">Sloní výstroj ×5 pořizujte v detailu zvířete; běžné předměty Knihovny nemají její upravenou hmotnost.</span>`:''}
     ${!goods.length&&!special?`<span class="hmk-stable-guide-footnote">${esc(c[1])}</span>`:''}
-    </form></td></tr>`;
+    </form>${special&&ownedAnimals.some(a=>a.beastId===beast.id)?`<form data-hmk-stable-event class="hmk-stable-elephant-special-93842">
+      <input type="hidden" name="type" value="tack-add">
+      <label>Slon, kterému vybavení patří<select name="animalId">${ownedAnimals.filter(a=>a.beastId===beast.id).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('')}</select></label>
+      <label>Zvláštní výstroj ×5 (HMK 122)<select name="itemId">${VEHICLES_TACK_P122.filter(g=>!['Wheel','Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(g.name)&&stableGearFit93838(g,animal).ok).map(g=>`<option value="${esc(g.id)}">${esc(g.name)} · ${g.weightLb*5} lb · ${g.priceD*5}d</option>`).join('')}</select></label>
+      <label>Pořízení<select name="mode"><option value="buy">Koupit</option><option value="gift">Vzít zdarma (GM)</option></select></label>
+      <input type="hidden" name="reason" value="Vlastník potvrzuje zvláštní sloní výstroj dle HMK 122">
+      <button type="submit">Potvrdit sloní výstroj</button>
+      <small>Samostatná sloní výjimka: cena a váha ×5; pořizuje se přímo do Stáje, ne jako běžný předmět Knihovny. Platforma 200 lb / 480d není zaměnitelná s tímto postrojem.</small>
+    </form>`:''}</td></tr>`;
  }).join('');
  return `<details class="hmk-stable-equipment-ref" ${stableEquipmentGuideOpen93839?'open':''}><summary>Všech 16 druhů · využití, vhodná výstroj a pořízení · HMK 122</summary>
+ ${filterMarkup}
  <p class="hc-hint"><strong>Katalog HMK str. 122:</strong> vyber využití a vhodnou výstroj; <strong>Koupit / Vzít zdarma</strong> používá stejný finanční a inventární postup jako Knihovna. Vlastníkem bude ${esc(owner?.name||'aktuální postava')}; ${cash?.ok?'doložená hotovost '+cash.balance+'d':'hotovost není doložena'}. Předmět skončí v inventáři, <strong>nenasadí se automaticky</strong>. Nasazení potvrď na pravé stránce. Přepnutí seznamů nikdy nic neukládá.</p>
  <div class="catalog-scroll hmk-stable-guide-scroll"><table class="catalog-spec hmk-stable-equipment-guide"><thead><tr><th>Zvíře · HMK 122</th><th colspan="3">Využití / tah &nbsp; · &nbsp; Vhodná výstroj &nbsp; · &nbsp; Nákup</th></tr></thead><tbody>${rows}</tbody></table></div>
  <p class="hc-hint">Řádky výše nyní přímo odrážejí tištěný HMK 122: kára = 1 vůl nebo 1 cart horse; vůz = 2 voli nebo 2 cart horses; saně = 1–2 cart horses; pack harness = do 20 % tělesné hmotnosti; saddle bags = 15 lb; sloní ceny a hmotnosti výstroje ×5. Kde HMK konkrétní funkci neuvádí, řádek to píše výslovně místo starého technického „nepovoleno“.</p></details>`;
@@ -6958,9 +6980,7 @@ function stableHubAnimalHTML(a,campaignId){
  <h4>Tažený náklad vozidla (oddělený od hřbetu zvířete)</h4>
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Náklad / vozidlo</th><th>Váha</th><th>Akce</th></tr></thead><tbody>${p.vehicleCargo.map(q=>`<tr><td>${esc(q.name)} · položka ${p.vehicleCargo.indexOf(q)+1}</td><td>${q.weightLb} lb</td><td>${dead?'—':`<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-cargo-remove"><input type="hidden" name="entryId" value="${esc(q.entryId)}"><input type="hidden" name="reason" value="Skutečně vyloženo z taženého vozidla"><button class="secondary hc-small">Vyložit z vozu</button></form>`}</td></tr>`).join('')||'<tr><td colspan="3">Vozidlo nemá zaevidovaný náklad</td></tr>'}</tbody></table></div>
  ${!dead&&activeVehicles.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-cargo-add"><label>Vozidlo<select name="vehicleId">${activeVehicles.map(q=>`<option value="${esc(q.entryId)}">${esc(VEHICLES_TACK_P122.find(t=>t.id===q.itemId)?.name)}</option>`).join('')}</select></label><label>Náklad ve voze<input name="name" minlength="2" maxlength="90" required></label><label>Skutečná hmotnost (lb)<input name="weightLb" type="number" min="1" max="1000000" step="1" required></label><label>Potvrzení GM<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Zapsat náklad vozidla</button></form>`:''}
- ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="tack-add"><label>Pořídit / vybavit zvíře<select name="itemId" required data-hmk-stable-gear-select data-hmk-help="${esc(stableGearDescription580(options[0]))}">${options.map(t=>`<option value="${esc(t.id)}" title="${esc(stableGearDescription580(t))}">${esc(t.name)} · ${t.weightLb} lb · ${t.priceD}d${a.spec.breed==='elephant'?' (slon ×5 u odpovídající výstroje)':''}</option>`).join('')}</select></label><label>Pořízení<select name="mode"><option value="buy">Koupit za cenu HMK</option><option value="gift">Bezplatně (GM potvrdí zdroj)</option></select></label><label>Zdroj / potvrzení GM<input name="reason" required minlength="3" maxlength="240" placeholder="Prodejce, dar, nalezené vybavení"></label><button type="submit">Přidat ověřenou výstroj</button></form>
- <form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-add"><label>Pořídit vozidlo / saně (nejsou to nesené brašny)<select name="itemId" data-hmk-stable-gear-select data-hmk-help="${esc(stableGearDescription580(VEHICLES_TACK_P122.find(t=>t.name==='Cart, 2-wheel')))}">${VEHICLES_TACK_P122.filter(t=>['Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(t.name)).map(t=>`<option value="${esc(t.id)}" title="${esc(stableGearDescription580(t))}">${esc(t.name)} · ${t.priceD}d · ${t.weightLb} lb konstrukce</option>`).join('')}</select></label><label>Pořízení<select name="mode"><option value="buy">Koupit za cenu HMK</option><option value="gift">Bezplatně, skutečný zdroj</option></select></label><label>Zdroj / doložený původ<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Zařadit vozidlo do stáje</button></form>
- <form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="cargo-add"><label>Položka nákladu (samostatný fyzický předmět, nikoli kopie inventáře postavy)<input name="name" required minlength="2" maxlength="90" placeholder="Např. pytel zrní"></label><label>Skutečná hmotnost položky (lb)<input name="weightLb" type="number" min="1" max="1000000" step="1" required></label><label>Původ / potvrzení GM<input name="reason" required minlength="3" maxlength="240" placeholder="Kde a jak bylo skutečně naloženo"></label><button type="submit">Naložit do evidovaného prostoru</button></form>`:''}</section>
+ ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="cargo-add"><label>Položka nákladu (samostatný fyzický předmět, nikoli kopie inventáře postavy)<input name="name" required minlength="2" maxlength="90" placeholder="Např. pytel zrní"></label><label>Skutečná hmotnost položky (lb)<input name="weightLb" type="number" min="1" max="1000000" step="1" required></label><label>Původ / potvrzení GM<input name="reason" required minlength="3" maxlength="240" placeholder="Kde a jak bylo skutečně naloženo"></label><button type="submit">Naložit do evidovaného prostoru</button></form>`:''}</section>
  <section class="hmk-stable-block"><h4>Krmení, voda a péče</h4><p>HMK zde neuvádí pevnou univerzální denní dávku podle druhu. Protokol zaznamenává skutečně provedenou péči a hmotnost vydané potravy či vody. Bez potvrzení zdroje se zásoby nevytvářejí, čas se neposouvá.</p>
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="care"><label>Úkon<select name="kind"><option value="food">Nakrmilo se</option><option value="water">Napojilo se</option><option value="grooming">Ošetření srsti / kopyt</option><option value="shelter">Ustájení / přístřeší</option><option value="veterinary">Veterinární úkon GM (bez automatického léčení)</option><option value="other">Jiná péče</option></select></label><label>Skutečné množství (lb; povinné pro jídlo/vodu)<input name="amount" type="number" min="0" step="0.1" placeholder="Např. 8"></label><label>Odkud pochází krmivo/voda a co se stalo<input name="reason" required minlength="3" maxlength="240" placeholder="Např. napájelo se u doloženého potoka"></label><button type="submit">Zapsat skutečnou péči</button></form>`:''}
  ${!dead&&foodLots.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="care"><input type="hidden" name="kind" value="food"><input type="hidden" name="sourceKind" value="ration"><label>Vydat ze skutečných zásob jídla<select name="sourceId">${foodLots.map(q=>`<option value="${esc(q.sourceId)}">${esc(q.name)} · zbývá ${q.remaining*3} lb · expirace ${q.expiresAt}</option>`).join('')}</select></label><label>Množství v lb (kroky po 1,5 lb)<input name="amount" type="number" step="1.5" min="1.5" required></label><label>Skutečné nakrmení GM<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Nakrmít a odečíst původní sklad</button></form>`:''}
@@ -18343,6 +18363,22 @@ document.addEventListener('change',e=>{
 document.addEventListener('toggle',e=>{
  const node=e.target;if(node?.matches?.('details.hmk-stable-equipment-ref')&&node.isConnected)stableEquipmentGuideOpen93839=node.open;
 },true);
+// v93.842: selecting a filter option NEVER hides rows or saves anything.
+// Only the explicit button commits a temporary presentation preference.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-hmk-stable-filter-confirm]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const ownerId=button.dataset.ownerId,section=button.closest('.hmk-stable-equipment-ref');
+ const value=section?.querySelector('[data-hmk-stable-filter-choice]')?.value||'all';
+ const campaignId=data.campaignClock?campaignKey(data.campaignClock):null;
+ const live=campaignId?verifiedLivestock(data,campaignId).find(a=>a.id===value&&a.ownerId===ownerId&&
+  !stableBurden(data,campaignId,a).exit):null;
+ if(value!=='all'&&!live){alert('Toto zvíře již není aktivním majetkem vybrané postavy. Aktualizujte Stáj.');return;}
+ if(value==='all')stableGuideSelected93842.delete(ownerId);
+ else stableGuideSelected93842.set(ownerId,value);
+ stableEquipmentGuideOpen93839=true;
+ render();
+},true);
 // v93.839 · selection in equipment guide is a non-persistent preview only.
 document.addEventListener('change',e=>{
  const form=e.target?.closest?.('form[data-hmk-stable-guide-buy]');
@@ -23133,8 +23169,17 @@ const episodeHazardSelectable93840=new Set([
  'hazardDirectionD10','hazardDirectionProofId','hazardDirectionDeferAwareness','hazardDelayNow']);
 function episodeHazardInputs93840(form){
  const hz=form?.querySelector('[data-episode-hazard-details]');if(!hz)return [];
+ // v93.842: a confirmed Equipment decision must not be invalidated by an
+ // unrelated HIDDEN Complication/Direction selector or a previous hazard's
+ // obsolete minute. Only choices belonging to the visible hazard are eligible
+ // for explicit confirmation; combined hazards retain the full superset.
+ const legend=hz.querySelector('[data-episode-hazard-legend]')?.textContent||'';
+ const equipment=legend.startsWith('Equipment Hazard ·');
+ const allowed=equipment?new Set(['hazardEquipmentDisposition','hazardItemId',
+  'hazardRepairSkill','hazardWorkerId','hazardSkillLevel','hazardEvidenceId']):null;
  return [...hz.querySelectorAll('[name]')].filter(n=>n.name!=='hazardChoices93840'&&
-  (episodeHazardSelectable93840.has(n.name)||n.name.startsWith('hazardCompProof_')));
+  (allowed?allowed.has(n.name):
+   (episodeHazardSelectable93840.has(n.name)||n.name.startsWith('hazardCompProof_'))));
 }
 function episodeHazardRead93840(form){
  return Object.fromEntries(episodeHazardInputs93840(form).map(n=>[n.name,n.type==='checkbox'?n.checked:n.value]));
@@ -23166,7 +23211,7 @@ function episodeHazardSelectionUI93840(form,required){
  box.hidden=!required;
  const pending=episodeHazardPending93840(form);
  const status=box.querySelector('[data-hazard-choice-status]');
- if(status){status.textContent=pending?'Rozpracované volby · změny nejsou potvrzené ani použité pro další test.':'Volby potvrzené GM · další povinné testy se řídí tímto rozhodnutím.';
+ if(status){status.textContent=pending?'Rozpracovaná volba: nic se neuložilo. Pro pokračování klikněte na „Potvrdit volbu Hazardu“.':'Potvrzeno GM · teprve nyní lze vyhodnotit povinné následky.';
   status.dataset.state=pending?'pending':'confirmed';}
  const button=box.querySelector('[data-hazard-choices-confirm]');if(button)button.disabled=!required||!pending;
 }
@@ -23238,7 +23283,21 @@ function episodeDeferredTrackingTrailAllowed(form){
 }
 function episodeIdentityMismatch(form){
  if(!episodeEvaluationRequested||!episodeEvaluatedIdentity)return '';
- const actual=episodeIdentityOf(episodeFormSnapshot(form));
+ const snapshot=episodeFormSnapshot(form);
+ const actual=episodeIdentityOf(snapshot);
+ // v93.842: ordinary Pochod does NOT use Tracking. The form retains
+ // hidden default selectors from previous episodes, but those settings may
+ // never convert an ordinary Orienteering request into a Tracking request.
+ // Only ignore these fields when the *locked* activity explicitly had no
+ // Tracking and neither Stalking nor a dedicated Tracking activity applies.
+ const unrelatedTracking=episodeEvaluatedIdentity.kind==='travel'&&actual.kind==='travel'&&
+  episodeEvaluatedIdentity.trackingUse==='none'&&
+  snapshot.orientationPriority!=='stealth'&&Number(snapshot.mode_stalking||0)!==1;
+ if(unrelatedTracking){
+  for(const k of ['trackingUse','trackingActorId','trackingTrail','trackingRoad',
+   'trackingPartyTracked','trackingSnow','trackingRain','trackingAlpine'])
+   actual[k]=episodeEvaluatedIdentity[k];
+ }
  // A typed trail is only a DRAFT. Matching the remaining immutable fields
  // allows a complete name to be entered without automatically pinning its
  // first letter. The explicit confirm button is the only freeze boundary.
@@ -23250,8 +23309,11 @@ function episodeIdentityMismatch(form){
   if(JSON.stringify(withoutTrail)===JSON.stringify(episodeEvaluatedIdentity))return '';
  }
  const {trackingConfirmed:confirmationMeta,...lockedIdentity}=episodeEvaluatedIdentity;
- return JSON.stringify(actual)===JSON.stringify(lockedIdentity)?'':
-  'Druh činnosti, účastníci, průvodce a podmínky sledované stopy jsou po vyhodnocení uzamčeni. Dokončete tuto epizodu, nebo použijte nouzové zrušení.';
+ if(JSON.stringify(actual)===JSON.stringify(lockedIdentity))return '';
+ const labels={kind:'druh činnosti',guideId:'průvodce',memberIds:'účastníci',animalIds:'zvířata výpravy',stableAnimalIds:'zvířata ze Stáje',trackingUse:'režim Tracking',trackingActorId:'stopař',trackingTrail:'identifikace stopy',trackingRoad:'povrch stopy',trackingPartyTracked:'počet sledovaných',trackingSnow:'sníh na stopě',trackingRain:'déšť na stopě',trackingAlpine:'alpské podmínky stopy'};
+ const changed=Object.keys(lockedIdentity).filter(k=>JSON.stringify(lockedIdentity[k])!==JSON.stringify(actual[k]));
+ return 'Po zahájení vyhodnocení se změnilo uzamčené nastavení: '+changed.map(k=>labels[k]||k).join(', ')+
+  '. Dřívější hody nelze převést na jinou skupinu. Dokončete původní epizodu, nebo použijte bezpečné nouzové zrušení.';
 }
 function episodeLockIdentityControls(form){
  const locked=episodeEvaluationRequested&&!!episodeEvaluatedIdentity;
@@ -26229,6 +26291,12 @@ function episodeCarrySettingsFromLast(){
   'orientationFamiliar','orientationTorch','orientationMoon','orientationSnow','trackingTrail',
   'trackingLight','trackingRoad','trackingPartyTracked','trackingSnow','trackingRain','trackingAlpine','orientationAllocation','orientationLowChoice','weatherSafeShelter'];
  const draft=Object.fromEntries(keep.filter(k=>k in settings).map(k=>[k,settings[k]]));
+ // A new ordinary trip never inherits an unfinished trail identification.
+ // Carrying terrain and the party is safe; carrying a Tracking target is not.
+ if(settings.kind!=='tracking'){
+  for(const k of ['trackingTrail','trackingLight','trackingRoad','trackingPartyTracked',
+   'trackingSnow','trackingRain','trackingAlpine'])delete draft[k];
+ }
  return {...draft,rememberSettings:true,orientationUse:'new',trackingUse:'none',confirmed:false,
   navigationRecovered:false,checkEncounter:true};
 }
@@ -26347,7 +26415,11 @@ function initializeTimeEpisodeForm(form){
  }
  if(sharedTimeWindowDraft){const n=form.elements.namedItem('minutes');if(n){n.max=String(sharedTimeWindowDraft.minutes);n.readOnly=false;}}
  refreshWeatherAreaAVFields(form);
- episodeHazardState93840(form);
+ // v93.842: do NOT initialize the Hazard confirmation before the active
+ // Equipment/Complication/Direction legend has been derived. The initial
+ // generic legend includes hidden fields of OTHER hazards; that previously
+ // rejected a valid rebased repair Skill Test and hid its confirmation button.
+ // updateEpisodePreview initializes it after selecting the real hazard.
  for(const [field,id] of episodePinnedSkillFields){
   const input=form.elements.namedItem(field);
   if(input){input.value=id;input.disabled=true;input.title='Vyřešený doklad epizody je uzamčen a nelze jej přepsat.';}

@@ -867,3 +867,23 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hmk-stable-logistics-93840 .catalog-spec,.hmk-stable-logistics-93840 .hmk-stable-compact-table{background:transparent!important}
 .hmk-stable-logistics-93840 table th{background:#e4c38f80!important}
 .hmk-stable-logistics-93840 table td{background:#f8edd77d!important}
+
+/* v93.842 · book-like Stable catalogue filter; a selection is never applied
+   until the explicit confirmation button. Keep the old 16-row default. */
+.hmk-stable-catalog-filter-93842{
+ display:grid;grid-template-columns:minmax(0,1fr) auto;
+ gap:6px 9px;align-items:end;margin:6px 0 9px;padding:8px;
+ background:linear-gradient(105deg,#f0dab4d6,#e3c492c4),url('./assets/ui/book/parchment_repeat_seamless.png');
+ background-size:100% 100%,480px 480px;
+ border:1px solid #b18b55;border-radius:6px;color:#51371f;
+}
+.hmk-stable-catalog-filter-93842 label{font-size:.8rem;display:block;min-width:0;font-weight:700}
+.hmk-stable-catalog-filter-93842 select{display:block;min-width:0;width:100%;max-width:none;min-height:32px;margin:4px 0 0;background:#f2e0bf;border:1px solid #ab885b}
+.hmk-stable-catalog-filter-93842 button{margin:0!important;min-height:32px;padding:5px 9px!important;font-size:.78rem!important}
+.hmk-stable-catalog-filter-93842 [role=status]{font-size:.72rem;line-height:1.25;color:#634629;grid-column:1/-1}
+.hmk-stable-elephant-special-93842{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:7px;margin:6px 0 0;border:1px dashed #aa804b;border-radius:6px;background:#e9d0a6ac}
+.hmk-stable-elephant-special-93842 label{font-size:.72rem;min-width:0}
+.hmk-stable-elephant-special-93842 select{max-width:100%;width:100%;min-width:0}
+.hmk-stable-elephant-special-93842 button,.hmk-stable-elephant-special-93842 small{grid-column:1/-1}
+.hmk-stable-elephant-special-93842 small{font-size:.69rem}
+@media(max-width:560px){.hmk-stable-catalog-filter-93842{grid-template-columns:1fr}.hmk-stable-elephant-special-93842{grid-template-columns:1fr}}
