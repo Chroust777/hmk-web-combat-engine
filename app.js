@@ -42,7 +42,7 @@ import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-in
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
 import {prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure} from './src/integration/hmk-weather-hazard-aftermath.js';
-import {prepareGMShockStateChange} from './src/integration/hmk-gm-shock-state-93826.js';
+import {prepareGMShockStateChange,gmStandingEligibility} from './src/integration/hmk-gm-shock-state-93826.js';
 import {startConcurrentProcedure,finishConcurrentProcedure,cancelConcurrentProcedure,openConcurrentProcedures} from './src/integration/hmk-concurrent-procedures.js';
 import {validateGlobalActionLedger,assertGlobalActionLedgerAppendOnly,recordGlobalActionReceipt} from './src/integration/hmk-global-action-ledger.js';
 import {prepareColdWaterShock,prepareExposureSkinInjuries,previewExposureSkinLocation,verifiedHumanLocationShock} from './src/integration/hmk-weather-trauma-completion.js';
@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.827';
+const APP_VERSION='93.828';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -20265,13 +20265,15 @@ function gmShockStatePanel(c){
   (h.toxinCourses||[]).filter(x=>x.status==='active'&&x.shockApplied!=='NONE').length+
   (h.diseaseCourses||[]).filter(x=>x.status==='active'&&x.shockApplied!=='NONE').length+
   (h.parallelColdShocks||[]).filter(x=>x.shock!=='NONE').length;
+ const standingEligibility=gmStandingEligibility(h,inCalendar?data.campaignClock.minute:null);
+ const canSuggestStanding=h.posture?.prone===true&&standingEligibility.allowed;
  const labels={NONE:'NONE · bez Shock',STN:'STN · omráčený',INC:'INC · neschopný samostatných akcí',
   UNC:'UNC · v bezvědomí',KIA:'KIA · mrtvý'};
  const options=Object.entries(labels).map(([value,label])=>
   `<option value="${value}" ${h.shock===value?'selected':''}>${label}</option>`).join('');
  return `<section class="panel wide hmk-gm-shock-status" data-gm-shock-status="${esc(c.id)}">
  <h3>Stav postavy · Shock (HMK 169) · GM</h3>
- <p>Aktuální trvalý stav: <strong data-gm-shock-current>${esc(h.shock)}</strong> · Aktivní anatomická zranění: ${h.wounds.filter(w=>!w.healed).length}.
+ <p>Aktuální trvalý stav: <strong data-gm-shock-current>${esc(h.shock)}</strong> · Poloha: <strong data-gm-posture-current>${h.posture?.prone?'PRONE · na zemi':'stojí / není prone'}</strong> · Aktivní anatomická zranění: ${h.wounds.filter(w=>!w.healed).length}.
  Stav INC/UNC/STN může GM doložit i <b>bez anatomické rány</b> (např. kolaps či nalezený bezvědomý NPC).
  Combat, Chronicle Spread a cestování čtou tentýž uložený stav.</p>
  ${activeSources?`<p class="notice">Upozornění: ${activeSources} aktivních nezávislých zdravotních zdrojů vytváří Shock. Přímé GM nastavení je rozhodnutí o současném stavu, <b>neuzavírá</b> jejich vlastní HR/Course; při další pravidlové události mohou stav znovu změnit.</p>`:''}
@@ -20279,9 +20281,12 @@ function gmShockStatePanel(c){
  <form data-gm-shock-set><input type="hidden" name="actorId" value="${esc(c.id)}">
  <label>Cílový stav<select name="shock" required>${options}</select></label>
  <label>Důvod rozhodnutí GM (10–500 znaků)<textarea name="reason" required minlength="10" maxlength="500" rows="2" placeholder="Např. nalezen v bezvědomí po kolapsu, bez zjevné anatomické rány"></textarea></label>
+ <label data-gm-shock-standing-row ${h.shock!=='NONE'?'hidden':''}><input type="checkbox" name="standingConfirmed" value="yes" ${h.shock==='NONE'&&canSuggestStanding?'checked':''}> GM zároveň potvrzuje, že postava <b>skutečně stojí</b> (ukončí staré prone). Nejde o automatické vstání jen proto, že Shock = NONE. Při změně INC/UNC → NONE se tato volba nabídne automaticky; lze ji odškrtnout, pokud postava zůstává ležet.</label>
+ ${h.posture?.prone&&!standingEligibility.allowed?`<p class="notice">Vstání nyní nelze předvybrat: ${esc(standingEligibility.reason)}. Přesto lze změnit Shock a ponechat prone.</p>`:''}
+ <p class="tiny muted">Poloha PRONE se ukládá nezávisle na Shock. Pokud už má postava NONE, ale stále leží, ponech NONE, potvrď vstání a ulož toto GM rozhodnutí zde. V běžící Initiative se vstávání řeší akcí Move (HMK 171).</p>
  <p class="hc-hint">Nový Shock se uloží do zdravotního stavu a neměnné historie v aktuální minutě Kalendáře. Staré rány, krevní ztráta, únava a jednotlivé průběhy nemocí zůstanou zachovány. Přepsaný Shock Reroll/Extended Shock/Coma se administrativně uzavře s výslovným dokladem; nevymýšlí se žádné kostky ani místo zásahu.</p>
  <label><input type="checkbox" name="gmConfirmed" value="yes" required> GM vědomě nastavuje stav bez dalšího pravidlového hodu; nejde o výsledek Shock Roll.</label>
- <button type="submit" ${!locked?'':'disabled'}>GM: trvale nastavit zdravotní stav</button>
+ <button type="submit" ${!locked?'':'disabled'}>GM: potvrdit Shock / polohu</button>
  ${!inCalendar?'<p class="notice">Postava zatím není v aktivním Kalendáři: zdravotní stav se uloží, ale jeho čas a termín Shock Reroll zůstanou NEDOLOŽENÉ. Po zařazení do Kalendáře stejný stav znovu potvrď a ukotvi jeho skutečnou počáteční minutu.</p>':''}
  ${locked?'<p class="notice">Během aktivní Initiative nelze přepsat stav účastníka.</p>':''}
  <output role="status" aria-live="polite"></output></form></details></section>`;
@@ -20998,6 +21003,16 @@ document.addEventListener('click',e=>{
 // schedule entries, and any open concurrent Treatment. The historic receipts
 // stay immutable and no other wound's treatment is cancelled.
 // GM-created shock/collapse is a real administrative change, not a wound or die.
+document.addEventListener('change',event=>{
+ const select=event.target;if(!select?.matches?.('form[data-gm-shock-set] select[name="shock"]'))return;
+ const form=select.closest('form'),row=form?.querySelector('[data-gm-shock-standing-row]'),checkbox=form?.elements.namedItem('standingConfirmed');
+ if(!row||!checkbox)return;
+ const possible=select.value==='NONE';row.hidden=!possible;
+ // A selected NONE is an explicit GM decision; preserve manual opt-out until
+ // the select changes again. Never change the saved posture from a UI preview.
+ const state=persistentStateOf(character(form.elements.namedItem('actorId').value));
+ checkbox.checked=possible&&state.posture?.prone===true&&gmStandingEligibility(state,data.campaignClock?.minute??null).allowed;
+},true);
 document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('form[data-gm-shock-set]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
@@ -21009,9 +21024,11 @@ document.addEventListener('submit',event=>{
   const before=persistentStateOf(actor),eventId='gm-shock:'+uuid(),inCalendar=!!clock&&
    calendarMemberIds(clock,data.characters).some(x=>x.id===actor.id),minute=inCalendar?clock.minute:null;
   const result=prepareGMShockStateChange({state:before,eventId,shock:v.shock,
-   reason:String(v.reason||''),minute,gmConfirmed:v.gmConfirmed==='yes'});
-  if(!uiConfirm('GM mění zdravotní Shock '+before.shock+' → '+v.shock+'. '+
-   'Původní zdravotní průběhy a rány se nemění; starý Shock Reroll/Coma/Extended Shock se administrativně ukončí. Pokračovat?'))return;
+   reason:String(v.reason||''),minute,gmConfirmed:v.gmConfirmed==='yes',standingConfirmed:v.standingConfirmed==='yes'});
+  if(!uiConfirm('GM '+(before.shock===v.shock?'potvrzuje polohu postavy při Shock '+v.shock:
+   'mění zdravotní Shock '+before.shock+' → '+v.shock)+'. '+
+   (result.postureCleared?'GM potvrzuje, že postava stojí; ruší se staré PRONE. ':'Poloha prone zůstane zachována. ')+
+   'Původní zdravotní průběhy a rány se nemění; dosavadní Shock Reroll/Coma/Extended Shock se administrativně ukončí. Pokračovat?'))return;
   if(!mutate(()=>{
    const current=character(actor.id);
    if(!current||(inCalendar&&(!data.campaignClock||data.campaignClock.minute!==minute||
@@ -21021,11 +21038,13 @@ document.addEventListener('submit',event=>{
    synchronizeCombatInjuries(current,result.state);
    data.journal.push({id:uuid(),characterId:current.id,createdAt:stamp(),
     ...(inCalendar?{calendarCampaignId:campaignKey(clock),campaignMinute:minute}:{}),
-    title:'HMK · GM změna zdravotního stavu '+before.shock+' → '+v.shock,
-    body:'Rozhodnutí GM bez hodu d100, bez vytvoření rány · '+String(v.reason).trim(),
+    title:result.postureCleared&&before.shock===v.shock?'HMK · GM potvrzení: postava stojí':
+     'HMK · GM změna zdravotního stavu '+before.shock+' → '+v.shock,
+    body:'Rozhodnutí GM bez hodu d100, bez vytvoření rány · '+(result.postureCleared?'Postava stojí, prone ukončeno · ':'')+String(v.reason).trim(),
     calendarGMShockState:{format:'hmk-gm-shock-state-v1',eventId,from:before.shock,to:v.shock,
      reason:String(v.reason).trim(),originalRoll:null,cancelled:result.cancelled,
-     independentWithoutWound:true}});
+     independentWithoutWound:true,standingConfirmed:v.standingConfirmed==='yes'&&v.shock==='NONE',
+     proneBefore:before.posture?.prone===true,proneAfter:result.state.posture?.prone===true}});
   }))throw Error('Uložení zdravotního stavu se nepodařilo');
   selected=actor.id;activeSheetSection='hazards';view='sheet';render();
  }catch(err){if(out)out.textContent='Stav GM nebyl uložen: '+err.message;}
