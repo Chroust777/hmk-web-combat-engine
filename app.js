@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.832';
+const APP_VERSION='93.833';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -16545,54 +16545,55 @@ function seedNPCShelterDefaults93802(onlyIds=null){
  }
  return missing.length;
 }
-// An explicit button, never rendering, authorizes initial NPC shelter receipts.
+// A single explicit GM handoff applies the whole shelter checklist atomically.
+// Selection of any individual checkbox remains read-only until this button.
 document.addEventListener('click',e=>{
- const btn=e.target.closest?.('[data-calendar-seed-npc-shelter]');if(!btn)return;
+ const button=e.target.closest?.('[data-calendar-pc-shelter-confirm-all]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
- if(view!=='calendar'||!data.campaignClock||storageReadOnly)return;
- const missing=missingNPCShelterDefaults93802();
- if(!missing.length){notice='Všichni NPC již mají zajištěný pobyt výslovně nastavený.';render();return;}
- if(mutate(()=>seedNPCShelterDefaults93802()))notice='Výchozí zajištění starších NPC bylo doplněno.';
-},true);
-// PC-only, minute-stamped GM attestation. Never erase active wounds or medical deadlines.
-document.addEventListener('change',e=>{if(e.target?.name==='trackingRoad'&&e.target.closest?.('#hmk-time-episode-form'))e.target.dataset.episodeAutoSource='gm';},true);
-document.addEventListener('click',e=>{
- const control=e.target?.closest?.('[data-calendar-pc-shelter-confirm]');if(!control)return;
- e.preventDefault();
- e.stopImmediatePropagation();
- const clock=data.campaignClock,actorId=control.dataset.calendarPcShelterConfirm;
- const actor=calendarMemberIds(clock,data.characters).find(c=>c.id===actorId);
- if(!actor||!['PC','NPC'].includes(String(actor.kind||'PC').toUpperCase())||actor.hmk?.verifiedMountedBreed){render();return;}
- const draft=control.closest('.hc-pc-shelter-item')?.querySelector('[data-calendar-pc-shelter]');
- if(!draft)return;
- const enabled=draft.checked;
- if(pcShelteredStayAt(data.journal,campaignKey(clock),actorId,clock.minute)===enabled){notice='Uložení není nutné; zajištění postavy se nezměnilo.';render();return;}
- const what=enabled?'Potvrdit, že '+actor.name+' má od této minuty zajištěný pobyt, bezpečné prostředí, potravu a pití?':'Potvrdit, že '+actor.name+' od této minuty znovu podléhá podmínkám prostředí a běžnému zásobování?';
- // Clicking the labelled confirmation button is GM consent; no modal required.
-
- const reason=enabled?'Zajištěné zázemí / domov (GM)':'Odchod ze zajištěného prostředí (GM)';
- if(mutate(()=>{
-  const cid=campaignKey(clock),before=pcShelteredStayAt(data.journal,cid,actorId,clock.minute);
-  if(before===enabled)return;
-  const proof=createPCShelteredStay({campaignId:cid,actorId,minute:clock.minute,enabled,reason});
-  data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
-   title:'HMK · '+(enabled?'Zajištěný pobyt':'Ukončení zajištěného pobytu')+' · '+actor.name,
-   body:reason+'; dříve vzniklé zdravotní stavy pokračují beze změny.',calendarPCShelteredStay:proof});
-  // On leaving a GM-secured stay, the explicit GM choice is to use actual
-  // available provisions again.  The existing separate GM-supply switch may
-  // otherwise remain YES, contradicting the newly confirmed NO shelter.
-  // This is ONE atomic button commit; never a checkbox/change side effect.
-  if(!enabled&&gmProvisionedAt(data.journal,cid,actorId,clock.minute)){
-   const policy=activeNutritionPolicies(data.journal,cid,[actorId])[0];
-   if(policy){
-    const supply=createNutritionProvisionSwitch({campaignId:cid,actorId,minute:clock.minute,provisioned:false});
-    data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
-     title:'HMK · návrat k zásobování podle skutečných zásob · '+actor.name,
-     body:'Současně s potvrzeným odchodem ze zajištěného prostředí. Původní denní účet ani zásoby se nepřepisují.',
-     calendarNutritionProvisionSwitch:supply});
+ const section=button.closest('.hc-pc-shelter'),clock=data.campaignClock;
+ if(!clock||view!=='calendar'||!section||storageReadOnly)return;
+ const members=calendarMemberIds(clock,data.characters).filter(c=>
+  ['PC','NPC'].includes(String(c.kind||'PC').toUpperCase())&&!c.hmk?.verifiedMountedBreed);
+ const allowed=new Map(members.map(c=>[c.id,c]));
+ const checks=[...section.querySelectorAll('[data-calendar-pc-shelter]')];
+ if(checks.length!==members.length||new Set(checks.map(x=>x.dataset.calendarPcShelter)).size!==members.length||
+  checks.some(x=>!allowed.has(x.dataset.calendarPcShelter))){
+  alert('Seznam účastníků se změnil. Otevřete znovu Kalendář a potvrďte aktuální volby.');return;
+ }
+ const cid=campaignKey(clock),minute=clock.minute;
+ const pending=checks.map(input=>{
+  const actor=allowed.get(input.dataset.calendarPcShelter),enabled=input.checked;
+  const recorded=data.journal.some(j=>j.calendarCampaignId===cid&&j.characterId===actor.id&&j.calendarPCShelteredStay);
+  const previous=pcShelteredStayAt(data.journal,cid,actor.id,minute);
+  return {actor,enabled,recorded,previous};
+ }).filter(row=>!row.recorded&&String(row.actor.kind||'PC').toUpperCase()==='NPC'||row.previous!==row.enabled);
+ if(!pending.length){notice='Žádné změny zajištěného prostředí nejsou k potvrzení.';render();return;}
+ try{
+  if(mutate(()=>{
+   for(const {actor,enabled,previous} of pending){
+    // A legacy NPC without a proof can be accepted or declined in this same
+    // batch; new NPCs already have a default proof from their creation commit.
+    const reason=!enabled?'Odchod ze zajištěného prostředí (GM)':
+     'Zajištěné zázemí / domov (GM)';
+    const proof=createPCShelteredStay({campaignId:cid,actorId:actor.id,minute,enabled,reason});
+    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+     title:'HMK · '+(enabled?'Zajištěný pobyt':'Ukončení zajištěného pobytu')+' · '+actor.name,
+     body:reason+'; ostatní zdravotní a historické doklady zůstávají beze změny.',calendarPCShelteredStay:proof});
+    // A shelter exit restores normal accounting by default, but does NOT
+    // prohibit a later independent GM-confirmed YES in Provisions.
+    if(!enabled&&gmProvisionedAt(data.journal,cid,actor.id,minute)){
+     const policy=activeNutritionPolicies(data.journal,cid,[actor.id])[0];
+     if(policy){
+      const supply=createNutritionProvisionSwitch({campaignId:cid,actorId:actor.id,minute,provisioned:false});
+      data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
+       title:'HMK · návrat k zásobování podle skutečných zásob · '+actor.name,
+       body:'Výchozí stav po odchodu z úkrytu, lze nezávisle změnit v Provisions.',
+       calendarNutritionProvisionSwitch:supply});
+     }
+    }
    }
-  }
- }))notice='Zajištěné prostředí · '+actor.name+' · '+(enabled?'zapnuto':'vypnuto')+' od '+displayCampaignMinute(clock.minute)+'.';
+  }))notice='Společně potvrzené zajištění: '+pending.length+' změněných postav. Zásoby lze nezávisle nastavit v Provisions.';
+ }catch(err){alert('Zajištěné prostředí nebylo změněno: '+err.message);}
 },true);
 document.addEventListener('submit',e=>{
  const f=e.target;
@@ -23524,6 +23525,7 @@ function episodePreviewFromForm(form,clock){
  episodeAssertScopedSkillInputs(v);
  if(!people.length)throw Error('Vyberte aspoň jednu postavu.');
  const kind=v.kind,minutes=Number(v.minutes),guideId=v.guideId;
+ if(kind==='tracking'&&!episodeHasTracking93833(v.guideId))throw Error('Sledování stop není pro tuto postavu dostupné: Tracking ML musí být větší než 0.');
  if(kind==='travel'){
   const unresolved=data.journal.some(j=>j.calendarCampaignId===campaignKey(clock)&&
    j.calendarTimeEpisode?.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)&&
@@ -24750,6 +24752,14 @@ function sharedTravelInputWitness93768(ids){
   .map(x=>structuredClone(x)).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
  return JSON.stringify({chosen,people,gear,definitions});
 }
+function episodeHasTracking93833(actorId){
+ const actor=character(actorId);
+ return !!actor&&availableMasteries(actor).some(m=>m.name==='Tracking'&&m.ml>0);
+}
+function episodeTrackingOption93833(actorId,kind,label,selected){
+ const unavailable=kind==='tracking'&&!episodeHasTracking93833(actorId);
+ return `<option value="${kind}" ${selected?'selected':''} ${unavailable?'disabled title="Vybraná postava nemá osvojený Tracking ML"':''}>${label}</option>`;
+}
 const SHARED_PLAN_KINDS_93771=[['travel','Pochod'],['rest','Odpočinek'],['sleep','Spánek'],['winded','Krátký klid'],['forage','Foraging'],['tracking','Tracking'],['watch','Ostraha'],['other','Jiná činnost']];
 function sharedFixedMode93773(){return sharedTimeWindowPlans.every(x=>x.episodeRowV===3);}
 function sharedRowsMode93772(){return sharedTimeWindowPlans.every(x=>x.episodeRowV===2||x.episodeRowV===3);}
@@ -24763,14 +24773,18 @@ function sharedWeatherName93772(id){return sharedWeatherSources93772().find(x=>x
 function sharedPlanState93771(){
  if(!sharedTimeWindowDraft)return {scheduled:[],errors:[],used:{}};
  if(sharedTimeWindowPlans.some(x=>x.episodeRowV===3)&&!sharedFixedMode93773())return {scheduled:[],errors:[{id:'',message:'Nepřípustná kombinace různých formátů epizod.'}],used:{}};
- return sharedFixedMode93773()?planFixedEpisode93773(sharedTimeWindowDraft,sharedTimeWindowPlans,sharedWeatherSources93772().map(w=>w.id)):
+ const planned=sharedFixedMode93773()?planFixedEpisode93773(sharedTimeWindowDraft,sharedTimeWindowPlans,sharedWeatherSources93772().map(w=>w.id)):
   sharedRowsMode93772()?planEpisodeRows93772(sharedTimeWindowDraft,sharedTimeWindowPlans,sharedWeatherSources93772().map(w=>w.id)):
   planSharedWindow93771(sharedTimeWindowDraft,sharedTimeWindowPlans);
+ for(const row of sharedTimeWindowPlans)if(row.kind==='tracking'&&!episodeHasTracking93833(row.actorId))
+  planned.errors.push({id:row.id,message:'Tracking ML 0: pro Sledování stop zvolte postavu s osvojeným Tracking.'});
+ return planned;
 }
 function sharedPlanCurrent93771(){return sharedTimeWindowPlans.find(p=>p.id===sharedTimeWindowActivePlanId)||null;}
 function sharedPlanPreflight93771(form,{strictPlan=true}={}){
  if(!sharedTimeWindowDraft)return null;
  const plan=sharedPlanCurrent93771(),v=episodeFormSnapshot(form);
+ if(plan?.kind==='tracking'&&!episodeHasTracking93833(plan.actorId))return {field:'memberIds',message:'Sledování stop není dostupné: vybraná postava má Tracking ML 0 nebo jej nemá osvojený. Zvolte stopaře s Tracking či jinou činnost.'};
  if(strictPlan&&!plan)return {field:'minutes',message:'Nejprve vytvořte a otevřete kartu činnosti skupiny. Bez platného časového plánu se žádné testy neprovádějí.'};
  const state=sharedPlanState93771();
  if(state.errors.length)return {field:'minutes',message:'Opravte plán skupin: '+state.errors[0].message};
@@ -24826,7 +24840,7 @@ function sharedPlanCardsHTML93771(){
    !episodeEvaluationRequested&&!episodePendingSkillRequest;
   return `<article class="hc-shared-plan-card ${plan.done?'hc-shared-plan-done':''} ${isActive?'hc-shared-plan-active':''}" data-shared-plan-card="${esc(plan.id)}">
   <header><strong>Činnost ${index+1} ${plan.done?'✓ dokončena':isActive?'· právě otevřena':''}</strong><span>${scheduled?esc(displayCampaignMinute(scheduled.startMinute))+'–'+esc(displayCampaignMinute(scheduled.endMinute)):'Čeká na výběr'}</span></header>
-  <div class="hc-shared-plan-fields"><label>Činnost <select data-shared-plan-kind="${esc(plan.id)}" ${locked?'disabled':''}>${SHARED_PLAN_KINDS_93771.map(([key,name])=>`<option value="${key}" ${plan.kind===key?'selected':''}>${name}</option>`).join('')}</select></label>
+  <div class="hc-shared-plan-fields"><label>Činnost <select data-shared-plan-kind="${esc(plan.id)}" ${locked?'disabled':''}>${SHARED_PLAN_KINDS_93771.map(([key,name])=>episodeTrackingOption93833(plan.actorId,key,name,plan.kind===key)).join('')}</select></label>
   <label>Minuty <input data-shared-plan-minutes="${esc(plan.id)}" type="number" min="1" max="${sharedTimeWindowDraft.minutes}" value="${plan.minutes}" ${locked?'disabled':''}></label>
   <label>Návaznost <select data-shared-plan-follow="${esc(plan.id)}" ${locked?'disabled':''}>${followChoices.map(([id,label])=>`<option value="${esc(id)}" ${plan.followsGroup===id?'selected':''}>${esc(label)}</option>`).join('')}</select></label></div>
   <details class="hc-shared-plan-members"><summary>Postavy · ${plan.memberIds.length}${participants?' · '+esc(participants):' · vyberte'}</summary>${registryCharacters93813(calendarMemberIds(data.campaignClock,data.characters)).map(c=>`<label><input type="checkbox" data-shared-plan-member="${esc(plan.id)}" value="${esc(c.id)}" ${plan.memberIds.includes(c.id)?'checked':''} ${locked?'disabled':''}> ${esc(c.name)}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</label>`).join('')}</details>
@@ -24857,7 +24871,7 @@ function sharedEpisodeRowsHTML93772(){
   <td><select aria-label="Skupina řádku ${index+1}" data-shared-plan-group="${esc(r.id)}" ${locked?'disabled':''}>${groupChoices.map(n=>`<option value="${n}" ${n===groupNumber?'selected':''} ${n!==groupNumber&&usedNumbers.has(n)?'disabled':''}>Skupina ${n}</option>`).join('')}</select></td>
   <td><select aria-label="${r.kind==='travel'?'Průvodce':'Postava'} skupiny ${groupNumber}" data-shared-row-actor="${esc(r.id)}" ${!r.actorId||!members.includes(r.actorId)?'aria-invalid="true"':''} ${locked?'disabled':''}><option value="">— ${r.kind==='travel'?'Průvodce':'Postava'} —</option>${eligible.map(c=>`<option value="${esc(c.id)}" ${r.actorId===c.id?'selected':''}>${esc(c.name)}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</option>`).join('')}</select></td>
   <td>${memberHTML}</td>
-  <td><select aria-label="Činnost skupiny ${groupNumber}" data-shared-plan-kind="${esc(r.id)}" ${locked?'disabled':''}>${SHARED_PLAN_KINDS_93771.map(([key,name])=>`<option value="${key}" ${r.kind===key?'selected':''}>${name}</option>`).join('')}</select></td>
+  <td><select aria-label="Činnost skupiny ${groupNumber}" data-shared-plan-kind="${esc(r.id)}" ${locked?'disabled':''}>${SHARED_PLAN_KINDS_93771.map(([key,name])=>episodeTrackingOption93833(r.actorId,key,name,r.kind===key)).join('')}</select></td>
   <td>${sharedFixedMode93773()?`<strong>${sharedTimeWindowDraft.minutes} min</strong><small>Celý interval</small>`:`<input aria-label="Délka činnosti ${index+1}" type="number" min="1" max="${max}" value="${r.minutes||''}" data-shared-plan-minutes="${esc(r.id)}" ${locked?'disabled':''}>`}</td>
   <td><select aria-label="Počasí skupiny ${groupNumber}" data-shared-row-weather="${esc(r.id)}" ${!r.weatherId?'aria-invalid="true"':''} ${locked?'disabled':''}><option value="">— Počasí —</option>${weather.map(w=>`<option value="${esc(w.id)}" ${r.weatherId===w.id?'selected':''}>${esc(w.calendarTrekDayWeather.area)}</option>`).join('')}</select></td>
   <td class="hc-episode-row-state">${slot?`<strong>${esc(displayCampaignMinute(slot.startMinute))}–${esc(displayCampaignMinute(slot.endMinute))}</strong>`:'—'}<small>${esc(status)}${r.actorId&&!sharedFixedMode93773()?' · zbývá '+remaining+' min':''}${error?' · '+esc(error):''}</small></td>
@@ -24879,9 +24893,11 @@ function sharedPlanUpdate93771(id,field,value){
   plan.minutes=Number(value);
  }else if(field==='kind'){
   if(!SHARED_PLAN_KINDS_93771.some(x=>x[0]===value))throw Error('Neplatná činnost.');
+  if(value==='tracking'&&!episodeHasTracking93833(plan.actorId))throw Error('Postava nemá osvojený Tracking; Sledování stop nelze vybrat.');
   plan.kind=value;
  }else if(field==='member'){
   if(!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===value.id))throw Error('Postava nepatří do aktuální kampaně.');
+  if(value.checked&&plan.kind==='tracking'&&!episodeHasTracking93833(value.id))throw Error('Sledování stop vyžaduje Tracking ML nad 0.');
   plan.memberIds=value.checked?[...new Set([...plan.memberIds,value.id])]:plan.memberIds.filter(x=>x!==value.id);
  }else if(field==='follow'){
   const prior=sharedTimeWindowPlans.slice(0,sharedTimeWindowPlans.indexOf(plan));
@@ -24918,6 +24934,7 @@ function sharedFixedRowUpdate93773(plan,field,value){
   const eligible=id=>all.some(c=>c.id===id)&&!sharedTimeWindowPlans.some(x=>x.id!==plan.id&&(x.memberIds||[]).includes(id));
   if(field==='actor'){
    if(!eligible(value))throw Error('Postava nepatří do kampaně nebo už je v jiné skupině.');
+   if(plan.kind==='tracking'&&!episodeHasTracking93833(value))throw Error('Tato postava nemá Tracking ML nad 0; pro Sledování stop ji nelze vybrat.');
    plan.actorId=value;
    plan.memberIds=plan.kind==='travel'?[...new Set([...(plan.memberIds||[]),value])]:[value];
   }else if(field==='member'){
@@ -24937,6 +24954,7 @@ function sharedFixedRowUpdate93773(plan,field,value){
    plan.groupNumber=number;
   }else if(field==='kind'){
    if(!SHARED_PLAN_KINDS_93771.some(x=>x[0]===value))throw Error('Neplatná činnost.');
+   if(value==='tracking'&&!episodeHasTracking93833(plan.actorId))throw Error('Sledování stop vyžaduje osvojenou dovednost Tracking; vyberte jinou postavu.');
    // Switching from a travel party to an individual activity is a draft-only
    // edit. Keep the selected guide as the individual actor (when valid),
    // drop the other group members atomically, and require no extra GM step.
@@ -24965,6 +24983,7 @@ function sharedEpisodeRowUpdate93772(plan,field,value){
  const before=structuredClone(sharedTimeWindowPlans);
  if(field==='actor'){
   if(!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===value))throw Error('Vyberte platnou postavu aktuální kampaně.');
+  if(plan.kind==='tracking'&&!episodeHasTracking93833(value))throw Error('Tato postava nemá Tracking ML nad 0; pro Sledování stop ji nelze vybrat.');
   const maximum=rowMaximum93772(sharedTimeWindowDraft,sharedTimeWindowPlans,plan.id,value);
   if(maximum<1)throw Error('Tato postava již vyčerpala celý společný interval.');
   plan.actorId=value;plan.memberIds=[value];
@@ -24974,7 +24993,9 @@ function sharedEpisodeRowUpdate93772(plan,field,value){
   if(!Number.isSafeInteger(n)||n<1||n>max)throw Error('Pro zvolenou postavu zbývá nejvýše '+max+' minut. Žádné hody nebyly zahájeny.');
   plan.minutes=n;
  }else if(field==='kind'){
-  if(!SHARED_PLAN_KINDS_93771.some(x=>x[0]===value))throw Error('Neplatná činnost.');plan.kind=value;
+  if(!SHARED_PLAN_KINDS_93771.some(x=>x[0]===value))throw Error('Neplatná činnost.');
+  if(value==='tracking'&&!episodeHasTracking93833(plan.actorId))throw Error('Sledování stop vyžaduje Tracking ML nad 0.');
+  plan.kind=value;
  }else if(field==='weather'){
   if(!sharedWeatherSources93772().some(w=>w.id===value))throw Error('Zvolte potvrzené globální počasí platné pro tento den.');
   plan.weatherId=value;
