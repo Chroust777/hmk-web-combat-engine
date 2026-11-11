@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.829';
+const APP_VERSION='93.830';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2989,7 +2989,9 @@ function timeEpisodePageHTML(clock,participants){
  <label data-episode-drover>Drover · doložený Riding / Animalcraft při dopravě se zvířaty<select name="droverProofId"><option value="">— Vyberte skutečný hod —</option>${skillOptions('Riding')}${skillOptions('Animalcraft')}</select></label>
  </div>
  <div data-episode-tracking><p class="hc-hint">Stalking umožňuje sledování stop, ale samo ho nenařizuje. Pokud chcete sledovat konkrétní stopu, zvolte před vyhodnocením nový Tracking test nebo oprávněné pokračování.</p><label>Tracking · rozhodnutí GM<select name="trackingUse"><option value="new">Nový Tracking SV</option><option value="reuse">Převzít skutečný SV pro bezprostřední sledování stejné stopy</option><option value="none">Bez Tracking hodu</option></select></label>
- <label>Identifikace stopy (stejný název při pokračování)<input name="trackingTrail" maxlength="120" placeholder="Např. stopy zraněného vlka"></label>
+ <div class="hc-episode-trail-entry"><label>Identifikace stopy (stejný název při pokračování)<input name="trackingTrail" maxlength="120" placeholder="Např. stopy zraněného vlka" autocomplete="off"></label>
+ <button type="button" class="secondary hc-small" data-episode-confirm-trail>Potvrdit identifikaci stopy → další test</button>
+ <p class="hc-hint" data-episode-trail-status role="status">Zapište celý název stopy. Teprve tlačítko jej uzamkne pro následující Tracking test.</p></div>
  <fieldset class="hc-episode-tracking-conditions"><legend>Tracking · podmínky a Spoor podle HMK 147 ${episodeRuleHelp('Tracking','Tracking při cestování se použije pouze s doloženým Stalking Mode, nebo jako samostatná činnost Sledování stop. Ke skutečnému Tracking SV se přičítá sníh +4, déšť −1, každých 5 sledovaných osob +1, soumrak −1, noc −3, alpská vegetace −1, nezpevněná cesta −2 nebo zpevněná −4. SV ≤2 bez účinku; 3–4 následný Awareness; 5+ Spoor hvězdy; CF vyžaduje Bearing při další cestovní epizodě. Hody d100 se provádí v původních Skill Tests.')}</legend><div class="hmk-trek-grid">
  <input type="hidden" name="trackingLight" value="day">
  <label>Povrch stop<select name="trackingRoad"><option value="none">Bez postihu cesty</option><option value="unpaved">Nezpevněná cesta (−2 SV)</option><option value="paved">Zpevněná cesta (−4 SV)</option></select></label>
@@ -22884,11 +22886,10 @@ function episodeIdentityOf(v){
   ['memberIds','animalIds','stableAnimalIds','transportedMemberIds'].includes(name)?[...(v[name]||[])].sort():
   typeof v[name]==='boolean'?v[name]:String(v[name]??'')]));
 }
-/** The original Orienteering may first reveal a Stalking Mode after the
- * immutable episode identity was frozen. Let the GM name its previously
- * unknown trail exactly ONCE before the Tracking Skill Test begins; the
- * completed name then becomes part of the immutable identity and sidecar.
- * Never unlock an already named trail or change its identity after a roll. */
+/** A trail first discovered after Orienteering stays editable until GM
+ * explicitly clicks Confirm. Input/blur events must NEVER freeze the first
+ * character as the immutable trail identity (v93.830). After confirmation,
+ * the name is locked before the real Tracking test can be requested. */
 function episodeDeferredTrackingTrailAllowed(form){
  return episodeEvaluationRequested&&!!episodeEvaluatedIdentity&&episodeEvaluatedIdentity.trackingTrail===''&&
   !form.elements.namedItem('trackingProofId')?.value&&!episodePinnedSkillFields.has('trackingProofId')&&
@@ -22901,12 +22902,12 @@ function episodeDeferredTrackingTrailAllowed(form){
 function episodeIdentityMismatch(form){
  if(!episodeEvaluationRequested||!episodeEvaluatedIdentity)return '';
  const actual=episodeIdentityOf(episodeFormSnapshot(form));
- if(episodeDeferredTrackingTrailAllowed(form)&&actual.trackingTrail.trim()){
+ // A typed trail is only a DRAFT. Matching the remaining immutable fields
+ // allows a complete name to be entered without automatically pinning its
+ // first letter. The explicit confirm button is the only freeze boundary.
+ if(episodeDeferredTrackingTrailAllowed(form)){
   const withoutTrail={...actual,trackingTrail:''};
-  if(JSON.stringify(withoutTrail)===JSON.stringify(episodeEvaluatedIdentity)){
-   episodeEvaluatedIdentity={...episodeEvaluatedIdentity,trackingTrail:actual.trackingTrail};
-   persistEpisodeDraftSidecar({snapshotForm:true});
-  }
+  if(JSON.stringify(withoutTrail)===JSON.stringify(episodeEvaluatedIdentity))return '';
  }
  return JSON.stringify(actual)===JSON.stringify(episodeEvaluatedIdentity)?'':
   'Druh činnosti, účastníci, průvodce a podmínky sledované stopy jsou po vyhodnocení uzamčeni. Dokončete tuto epizodu, nebo použijte nouzové zrušení.';
@@ -22920,6 +22921,18 @@ function episodeLockIdentityControls(form){
    if(locked&&!deferred)node.title='Aktivní epizoda: změna je povolena až po dokončení nebo nouzovém zrušení.';
    else if(node.title.startsWith('Aktivní epizoda:'))node.title='';
   }
+ }
+ const confirmation=form.querySelector('[data-episode-confirm-trail]');
+ if(confirmation){
+  const name=String(form.elements.namedItem('trackingTrail')?.value||'').trim();
+  const available=!locked||episodeDeferredTrackingTrailAllowed(form);
+  const relevant=form.elements.namedItem('trackingUse')?.value!=='none';
+  confirmation.hidden=!available||!relevant;
+  confirmation.disabled=!available||!relevant||!name;
+  const status=form.querySelector('[data-episode-trail-status]');
+  if(status)status.textContent=locked&&!available?
+   'Identifikace stopy je potvrzená a uzamčená pro tento původní Tracking doklad.':
+   'Napište celý název; bez potvrzení se identifikace nezamkne a následující Tracking test se nespustí.';
  }
 }
 function episodeNextSkillStep(form){
@@ -23192,6 +23205,13 @@ function episodeStartSkillRequest(field,skill,actorId){
  if(!episodeEvaluationRequested||!clock||!character(actorId))return false;
  if(form&&episodeIdentityMismatch(form)){
   alert(episodeIdentityMismatch(form));return false;
+ }
+ // Do not allow a Tracking receipt to be attached to an unconfirmed draft
+ // trail, even if a checklist button remains visible during typing.
+ if(field==='trackingProofId'&&form&&episodeDeferredTrackingTrailAllowed(form)){
+  episodeMarkField(form,'trackingTrail',{focus:true});
+  alert('Nejprve napište celý název stopy a klikněte na „Potvrdit identifikaci stopy“.');
+  return false;
  }
  if(form&&sharedTimeWindowDraft){const issue=episodeSetupIssue(form);if(issue){
   alert('Před hodem je nutné opravit plán nebo čas: '+issue.message);return false;
@@ -25910,6 +25930,44 @@ document.addEventListener('change',e=>{
   const re=form.elements.namedItem('orientationReuse');if(re)re.checked=timeEpisodeDraft.orientationUse==='reuse';
  }
  updateEpisodePreview(form);timeEpisodeDraft=episodeFormSnapshot(form);
+},true);
+// v93.830: explicit, one-time confirmation of the Tracking trail name.
+// It is deliberately NOT an input/change handler: typing any number of
+// characters preserves focus and never advances or locks the stage.
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-episode-confirm-trail]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=button.closest('#hmk-time-episode-form');if(!form)return;
+ const input=form.elements.namedItem('trackingTrail');
+ const trail=String(input?.value||'').trim();
+ if(!trail){episodeMarkField(form,'trackingTrail',{focus:true});return;}
+ if(episodePinnedSkillFields.has('trackingProofId')||episodePendingSkillRequest?.field==='trackingProofId'&&episodePendingSkillRequest.status==='waiting'){
+  alert('Tracking test už má rozpracovaný nebo uzamčený doklad. Identifikaci stopy nyní nelze změnit.');return;
+ }
+ if(episodeEvaluationRequested){
+  if(!episodeDeferredTrackingTrailAllowed(form))return;
+  if(episodeIdentityMismatch(form)){
+   alert(episodeIdentityMismatch(form));return;
+  }
+  // This click, not the first keystroke, makes the trail immutable.
+  episodeEvaluatedIdentity={...episodeEvaluatedIdentity,trackingTrail:trail};
+ }
+ input.value=trail;
+ timeEpisodeDraft=episodeFormSnapshot(form);
+ if(episodeStageBaseline||sharedTimeWindowDraft)persistEpisodeDraftSidecar({snapshotForm:true});
+ updateEpisodePreview(form);
+ if(!episodeEvaluationRequested){
+  // Start the existing guided evaluation; unresolved genuine prerequisites
+  // still appear in its checklist and cannot be skipped by this button.
+  form.querySelector('[data-episode-evaluate]')?.click();
+ }
+ const next=episodeNextSkillStep(form);
+ if(next?.field==='trackingProofId'&&next.skill==='Tracking'&&next.actorId){
+  episodeStartSkillRequest(next.field,next.skill,next.actorId);
+ }else if(episodeEvaluationRequested){
+  const requested=episodeCurrentGuidedStep?.field;
+  if(requested&&requested!=='trackingTrail')episodeMarkField(form,requested,{focus:false});
+ }
 },true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-episode-die]');if(!b)return;
