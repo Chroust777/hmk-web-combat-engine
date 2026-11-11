@@ -72,13 +72,15 @@ export function calendarPCShelteredControlsHTML({clock,characters=[],journal=[],
  const people=characters.filter(c=>['PC','NPC'].includes(String(c.kind||'PC').toUpperCase())&&!c.hmk?.verifiedMountedBreed);
  const groups=['PC','NPC'].map(kind=>{
   const members=people.filter(c=>String(c.kind||'PC').toUpperCase()===kind);
-  const rows=members.map(c=>{const active=pcShelteredStayAt(journal,cid,c.id,clock.minute);
-   return `<div class="hc-pc-shelter-item"><label><input type="checkbox" data-calendar-pc-shelter="${esc(c.id)}" ${active?'checked':''} aria-label="${esc(c.name)} – návrh zajištěného prostředí"><span class="hc-pc-shelter-name">${esc(c.name)} <span class="hc-pc-shelter-status">(${active?'Zajištěno':'Nezajištěno'})</span></span></label><button type="button" class="secondary" data-calendar-pc-shelter-confirm="${esc(c.id)}">Potvrdit změnu pobytu</button></div>`;
+  const rows=members.map(c=>{
+   const recorded=journal.some(j=>j.calendarCampaignId===cid&&j.characterId===c.id&&j.calendarPCShelteredStay);
+   // A pre-upgrade NPC with no receipt is offered the ordinary NPC default,
+   // but never silently written by rendering. The common GM button records it.
+   const presumed=String(c.kind||'PC').toUpperCase()==='NPC'&&!recorded;
+   const active=recorded?pcShelteredStayAt(journal,cid,c.id,clock.minute):presumed;
+   return `<div class="hc-pc-shelter-item"><label><input type="checkbox" data-calendar-pc-shelter="${esc(c.id)}" ${active?'checked':''} aria-label="${esc(c.name)} – návrh zajištěného prostředí"><span class="hc-pc-shelter-name">${esc(c.name)} <span class="hc-pc-shelter-status">(${!recorded&&presumed?'Výchozí návrh NPC':active?'Zajištěno':'Nezajištěno'})</span></span></label></div>`;
   }).join('')||`<p>${kind==='PC'?'V této kampani není žádná PC.':'V této kampani není žádná NPC.'}</p>`;
   return `<div class="hc-pc-shelter-group" data-shelter-actor-kind="${kind}"><h5>${kind} · ${members.length}</h5><div class="hc-pc-shelter-list">${rows}</div></div>`;
  }).join('');
- const legacyNpc=people.some(c=>String(c.kind||'PC').toUpperCase()==='NPC'&&
-   !journal.some(j=>j.calendarCampaignId===cid&&j.characterId===c.id&&j.calendarPCShelteredStay));
- const legacyRepair=legacyNpc?'<button type="button" class="secondary" data-calendar-seed-npc-shelter>Doplnit výchozí zajištění starších NPC bez záznamu</button>':'';
- return `<section class="hc-pc-shelter" aria-label="Zajištěné prostředí PC a NPC"><h4>Postavy v zajištěném prostředí</h4><p>Nově vytvořená NPC vstupují do kampaně s automaticky potvrzeným zajištěným pobytem. Zaškrtnutí či odškrtnutí zde připraví pouze návrh. Teprve tlačítko u postavy uloží změnu; při odchodu se dále řeší skutečné zásoby.</p>${legacyRepair}${groups}</section>`;
+ return `<section class="hc-pc-shelter" aria-label="Zajištěné prostředí PC a NPC"><h4>Postavy v zajištěném prostředí</h4><p>Nová NPC mají zajištěné prostředí automaticky při potvrzeném vstupu do kampaně. Změny všech checkboxů jsou pouze návrh. Jediným tlačítkem níže se společně uloží jen změněné postavy. Po odchodu ze zajištěného prostředí lze v Provisions samostatně potvrdit Ano · neřešit nedostatek i mimo úkryt.</p>${groups}<button type="button" data-calendar-pc-shelter-confirm-all>Potvrdit změny zajištěného prostředí (všechny postavy)</button><p class="hc-hint">Postavy bez změny zůstanou nedotčené; žádné zranění ani starší deník se nepřepisují.</p></section>`;
 }
