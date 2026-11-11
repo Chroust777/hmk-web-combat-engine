@@ -77,5 +77,8 @@ export function calendarPCShelteredControlsHTML({clock,characters=[],journal=[],
   }).join('')||`<p>${kind==='PC'?'V této kampani není žádná PC.':'V této kampani není žádná NPC.'}</p>`;
   return `<div class="hc-pc-shelter-group" data-shelter-actor-kind="${kind}"><h5>${kind} · ${members.length}</h5><div class="hc-pc-shelter-list">${rows}</div></div>`;
  }).join('');
- return `<section class="hc-pc-shelter" aria-label="Zajištěné prostředí PC a NPC"><h4>Postavy v zajištěném prostředí</h4><p>Zaškrtnutí připraví pouze návrh. Zápis provede až tlačítko u postavy.</p><button type="button" class="secondary" data-calendar-seed-npc-shelter>Potvrdit výchozí zajištění dosud nenastavených NPC</button>${groups}</section>`;
+ const legacyNpc=people.some(c=>String(c.kind||'PC').toUpperCase()==='NPC'&&
+   !journal.some(j=>j.calendarCampaignId===cid&&j.characterId===c.id&&j.calendarPCShelteredStay));
+ const legacyRepair=legacyNpc?'<button type="button" class="secondary" data-calendar-seed-npc-shelter>Doplnit výchozí zajištění starších NPC bez záznamu</button>':'';
+ return `<section class="hc-pc-shelter" aria-label="Zajištěné prostředí PC a NPC"><h4>Postavy v zajištěném prostředí</h4><p>Nově vytvořená NPC vstupují do kampaně s automaticky potvrzeným zajištěným pobytem. Zaškrtnutí či odškrtnutí zde připraví pouze návrh. Teprve tlačítko u postavy uloží změnu; při odchodu se dále řeší skutečné zásoby.</p>${legacyRepair}${groups}</section>`;
 }
