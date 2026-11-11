@@ -47,7 +47,9 @@ export function projectConcurrentShock(state,{round=null}={}){
  const projection=initializeConcurrentShock(state);
  const sources=concurrentShockSources(state);
  check(sources.every(x=>valid(x.shock)),'Neplatný souběžný Shock zdroje');
- const next=strongest([projection.baseShock,...sources.map(x=>x.shock)]);
+ // A live Coma is itself incapacitating; resolving a concurrent Cold/Exposure
+ // source must never downgrade its displayed Shock state before Coma Course.
+ const next=strongest([projection.baseShock,...sources.map(x=>x.shock),state.coma?.active?'UNC':'NONE']);
  const previous=state.shock;
  state.shock=next;
  projection.projectedShock=next;

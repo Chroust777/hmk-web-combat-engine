@@ -376,7 +376,7 @@ export function validateCombatState(s){
   const c=s.coma;
   requireCond(c&&c.active===true&&whole(c.hr,1,20)&&whole(c.elapsedDays,0,100000)
    &&(c.nextCourseDays===null||whole(c.nextCourseDays,1,10))
-   &&(s.extendedShock!==null&&s.extendedShock!==undefined||s.shock==='NONE'||strongerIndependentShock(s,'NONE')), 'Neplatný stav Coma');
+   &&(s.extendedShock!==null&&s.extendedShock!==undefined||['NONE','UNC'].includes(s.shock)||strongerIndependentShock(s,'NONE')), 'Neplatný stav Coma');
   if(c.domain!==undefined)requireCond(['travel-weather','travel-accident','gm-health'].includes(c.domain)&&typeof c.sourceId==='string'&&c.sourceId.length>0,
    'Coma z počasí musí zachovat zdroj cestovní události');
  }
@@ -777,7 +777,13 @@ export function applyExtendedShockCourse({state,round,eventId,healingBase,roll,p
  const nextHR=oldHR+delta;
  s.extendedShock.elapsedHours=elapsedHoursSinceOnset;
  if(nextHR<=0){s.shock='KIA';s.shockOriginRound=round;s.extendedShock=null;s.shockFollowup=null;s.coma=null;}
- else if(nextHR>=6){s.shock='NONE';s.shockOriginRound=round;s.extendedShock=null;s.shockFollowup=null;if(s.concurrentShockProjection)projectConcurrentShock(s,{round});}
+ else if(nextHR>=6){
+  // HMK 179: resolving Extended Shock does NOT wake a still-comatose patient.
+  // An active coma is independently unconscious until its own d10-day Course succeeds.
+  s.shock=s.coma?.active?'UNC':'NONE';s.shockOriginRound=round;
+  s.extendedShock=null;s.shockFollowup=null;
+  if(s.concurrentShockProjection)projectConcurrentShock(s,{round});
+ }
  else s.extendedShock.hr=nextHR;
  record(s,eventId,'extended-shock-course',round,{oldHR,nextHR,healingBase,fatigue,physicianStars,arcaneBonus,rawEML:eml,eml:effectiveMasteryLevel(eml),roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:s.shock,comaActive:!!s.coma});
  return {state:s,oldHR,nextHR,rawEML:eml,sl,comaActive:!!s.coma};
@@ -797,7 +803,15 @@ export function applyComaCourse({state,round,eventId,healingBase,roll,periodD10,
  requireCond(hr<=0||hr>=6||whole(periodD10,1,10),'Pokračující Coma vyžaduje nový skutečný d10 pro další interval');
  let wearinessAdded=0;
  if(hr<=0){s.shock='KIA';s.shockOriginRound=round;s.coma=null;s.extendedShock=null;s.shockFollowup=null;s.bloodShockPending=false;for(const w of s.wounds)w.nextAdvanceRound=null;}
- else if(hr>=6){wearinessAdded=Math.floor(duration/5)*5;s.fatigue.weariness+=wearinessAdded;s.coma=null;}
+ else if(hr>=6){
+  wearinessAdded=Math.floor(duration/5)*5;s.fatigue.weariness+=wearinessAdded;s.coma=null;
+  // On Coma recovery, leave any independent Extended Shock intact. Otherwise
+  // release the coma-related UNC only now, never at the Extended Shock boundary.
+  if(!s.extendedShock&&s.shock==='UNC'){
+   s.shock='NONE';s.shockOriginRound=round;s.shockFollowup=null;
+   if(s.concurrentShockProjection)projectConcurrentShock(s,{round});
+  }
+ }
  else {s.coma.hr=hr;s.coma.elapsedDays=duration;s.coma.nextCourseDays=periodD10;}
  record(s,eventId,'coma-course',round,{before,afterHR:hr,daysElapsed,duration,periodD10,healingBase,fatigue,arcaneBonus,restfulShelter,rawEML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),wearinessAdded,dead:s.shock==='KIA'});
  return {state:s,hr,wearinessAdded};

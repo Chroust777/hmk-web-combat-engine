@@ -343,6 +343,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
   else all.push(item);
  }
  unknown.push(...automatic.unknown);
+ suspended.push(...(automatic.suspended??[]));
  // Some legacy Combat-time notices have the same canonical obligation as a
  // live automatic entry. Render only the actionable event, retaining the
  // same blocking rule: the original Combat proof must resolve it.

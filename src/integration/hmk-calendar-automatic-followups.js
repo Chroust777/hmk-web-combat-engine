@@ -19,8 +19,8 @@ export function episodeWeatherAftercareId(episodeId,actorId,kind){
  return ['episode-weather',episodeId,actorId,kind].map(x=>encodeURIComponent(String(x))).join(':');
 }
 export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnchor=()=>null,inventory=[]){
- const all=[],unknown=[];
- if(!clock)return {all,unknown};
+ const all=[],unknown=[],suspended=[];
+ if(!clock)return {all,unknown,suspended};
  const push=(person,kind,sourceId,description,minute,route='combat',extra={})=>{
   if(!safe(minute))return unknown.push({characterId:person.id,name:person.name,kind,sourceId,route,description,reason:kind==='skill-fall'?'Původní Skill Test nemá doloženou minutu. Falling Routine je třeba vyřešit podle skutečné výšky; původní test zůstává zachován.':'Chybí doložený okamžik či lhůta'});
   const id=key('automatic',kind,person.id,sourceId);
@@ -104,9 +104,27 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // Every committed injury without a resolved initial treatment decision
   // needs routing into the existing Treatment/Untreated workflow. No roll is
   // fabricated and the GM may explicitly record that treatment was absent.
-  for(const w of s?.wounds??[])if(!w.healed&&!w.healing&&!s?.extendedShock&&!(s?.wounds??[]).some(x=>x.bleeding))
+  // HMK 179–180: the patient cannot begin wound Treatment until blood
+  // stoppage and Extended Shock permit it. A still-due UNC Shock Reroll
+  // must first pass its *real* ten-minute deadline; scheduling Treatment at
+  // the wound's creation minute otherwise deadlocks the calendar before
+  // the Shock Reroll can ever be performed. Keep the wound and its pending
+  // treatment visible as a nonblocking suspension, never fake a treatment.
+  const untreated=(s?.wounds??[]).filter(w=>!w.healed&&!w.healing);
+  const pendingBlood=(s?.wounds??[]).some(w=>w.bleeding&&!w.healed);
+  const pendingShock=!!s?.extendedShock ||
+   (!!s?.shockFollowup&&['INC','UNC'].includes(s.shock));
+  for(const w of untreated){
+   if(pendingBlood||pendingShock){
+    suspended.push({characterId:c.id,name:c.name,kind:'treatment',woundId:w.id,
+     sourceId:w.id,description:'Treatment pozastaven – nejprve Blood Stoppage / Shock (HMK 179–180)',
+     reason:pendingBlood?'Rána stále krvácí':s.extendedShock?'Probíhá Extended Shock':
+      'Povinný Shock Reroll dosud nebyl vyhodnocen'});
+    continue;
+   }
    push(c,'treatment',w.id,'Nová rána – Treatment nebo doložené bez ošetření (HMK 178–179)',clock.minute,
     isNoncombatMedicalOrigin(medicalOriginOfWound(w,s.events))?'hazards':'combat',{woundId:w.id});
+  }
   if(s?.shockFollowup&&!isNoncombatMedicalOrigin(s.shockFollowup.domain)){
    const pending=s.shockFollowup;
    if(pending.kind==='UNC'&&pending.phase==='after-ten-minutes'){
@@ -324,5 +342,5 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    tracking.campaignMinute,'skills',{trackingId:tracking.id,decisionRequired:true});
  }
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
- return {all,unknown};
+ return {all,unknown,suspended};
 }
