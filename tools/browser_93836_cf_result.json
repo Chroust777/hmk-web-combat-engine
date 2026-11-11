@@ -1,0 +1,117 @@
+{
+  "script": "browser_93836_foraging_cf.py",
+  "checks": [
+    {
+      "name": "initial 08:00",
+      "status": "PASS"
+    },
+    {
+      "name": "foraging interface",
+      "status": "PASS"
+    },
+    {
+      "name": "Survival Skill Tests opened",
+      "status": "PASS"
+    },
+    {
+      "name": "return to Foraging",
+      "status": "PASS"
+    },
+    {
+      "name": "CF Skill Test itself cannot advance clock",
+      "status": "PASS"
+    },
+    {
+      "name": "CF requires a real hazard d10",
+      "status": "PASS"
+    },
+    {
+      "name": "Survival Hazard d10 visible during stationary Foraging",
+      "status": "PASS"
+    },
+    {
+      "name": "typing hazard die cannot advance clock",
+      "status": "PASS"
+    },
+    {
+      "name": "hazard ready but not committed",
+      "status": "PASS"
+    },
+    {
+      "name": "Accident preview completed without invented medical roll",
+      "status": "PASS"
+    },
+    {
+      "name": "Accident followup panel visible",
+      "status": "PASS"
+    },
+    {
+      "name": "explicit stage queues pending accident",
+      "status": "PASS"
+    },
+    {
+      "name": "explicit commit advances one hour",
+      "status": "PASS"
+    },
+    {
+      "name": "Accident proof queued for original Health Skill Tests",
+      "status": "PASS"
+    },
+    {
+      "name": "original CF preserved and no movement",
+      "status": "PASS"
+    },
+    {
+      "name": "CF episode independently passes journal replay",
+      "status": "PASS"
+    },
+    {
+      "name": "no chromium errors",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "dialogs": [
+    "GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 09:00 a posunout JEDINÝ kalendář o 60 minut?"
+  ],
+  "before_hazard": {
+    "error": "Survival CF: navazuje povinný Survival Hazard. Doložte skutečný d10 (1–10); původní Survival test je uložen.",
+    "errorField": "survivalD10"
+  },
+  "mid": {
+    "error": "",
+    "errorField": "",
+    "minute": 480
+  },
+  "after": {
+    "minute": 540,
+    "episodeCount": 1,
+    "supply": {
+      "gross": {
+        "foodDays": 0,
+        "waterDays": 0,
+        "herbDoses": 0,
+        "herbs": {}
+      },
+      "available": {
+        "foodDays": 0,
+        "waterDays": 0,
+        "herbDoses": 0,
+        "herbs": {}
+      },
+      "lots": []
+    },
+    "journal": 5,
+    "dialogs": [
+      "GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 09:00 a posunout JEDINÝ kalendář o 60 minut?"
+    ]
+  },
+  "tamper": {
+    "original": "ACCEPTED",
+    "changedDie": "ACCEPTED",
+    "lostMode": "REJECTED: Nález při samostatném Foraging musí mít jeden d10 za každý získaný Foraging Mode.",
+    "changedCarry": "REJECTED: Samostatný Foraging: změněný d10, cíl nebo přenos.",
+    "missingSurvival": "REJECTED: Epizoda odkazuje na neexistující nebo budoucí Skill Test.",
+    "lots": 0
+  }
+}

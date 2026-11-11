@@ -347,7 +347,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.835';
+const APP_VERSION='93.836';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3031,12 +3031,13 @@ function timeEpisodePageHTML(clock,participants){
  </details>
  <details class="hc-episode-settings" data-episode-section="rolls"><summary>5 · Potřebné hody a případné události</summary>
  <p class="hc-hint hc-episode-task-focus" data-episode-task-focus hidden role="status"></p>
+ <label data-episode-survival-hazard>Survival Hazard (d10) · jen při kritickém neúspěchu Survival ${episodeRuleHelp('Survival Hazard','HMK 148: pokud původní Survival / Orienteering test skončil CF, družina musí vyřešit Survival Hazard bez ohledu na výsledné upravené SV. Hod d10: 1–3 Equipment (výstroj), 4–6 Accident (nehoda), 7–10 Complication (komplikace). Další hody na opravu, úraz či změnu výstroje se řeší podle vybraného následku ve stávajícím Skill Tests a Combat, nejsou automaticky považovány za vyřízené.')}<span class="hc-episode-die"><input name="survivalD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="survivalD10">⚄ d10</button></span></label>
  <div data-episode-travel-rolls><details class="hc-episode-suboptions hc-episode-roll-group" open><summary>Pohyb a orientace</summary>
  <p class="hc-hint" data-episode-dice-guidance role="status">Kostky zatím neházejte. Aplikace nejprve vyžádá Orienteering a stanoví, zda potřebujete Progress nebo Direction Hazard. Povinné kostky pak výslovně zobrazí.</p><div class="hmk-trek-grid"><details class="hc-episode-reference" data-episode-optional-gm><summary>GM výjimka · další Slow mimo automatický výpočet</summary><label>Další Slow Modes<input name="extraSlow" type="number" min="0" max="20" value="0" title="Zadejte výhradně výslovné rozhodnutí GM. Automatické Slow nezadávejte."></label></details>
  <p class="hc-episode-auto-modes" role="status" data-episode-allocated-modes title="Výhody vznikají výhradně z doloženého SV a automaticky se přidělují na Bearing a zvolený cíl. ★ z předchozích hodů se nesčítají.">Progress a Bearing se vypočítají z doloženého Orienteering SV. Bez testu jsou obě hodnoty nula.</p>
  <label data-episode-progress-row hidden>Progress (d10) · při přebytku ${episodeRuleHelp('Progress d10','HMK 146: každý Progress ruší jeden Slow; za každý zbývající Progress hoďte vlastní d10 proti TN = 2 × základní LPW. Alespoň jeden úspěch zvýší LPW o 1 (ne o počet úspěchů). Hody se nikdy automaticky nepředpokládají.')}<span class="hc-episode-die"><input name="progressD10" placeholder="např. 4,8" title="Zadejte d10 oddělené čárkami, jednu za každou přebytečnou Progress Mode."><button type="button" data-episode-progress-die>+ d10</button></span></label></div>
  <p class="hc-hint" id="episode-progress-explanation" data-episode-progress-explanation role="status"></p><label data-episode-direction-row hidden>Direction Hazard (d10) · při chybějícím Bearing ${episodeRuleHelp('Direction Hazard','HMK 148: není-li pokryt potřebný Bearing, hází se samostatný d10 za každý chybějící bod: 1–4 Lost Time (další Slow), 5–9 Misdirection, 10 Lost. Některé následky vyžadují navazující GM rozhodnutí, ne automatické zrušení stavu.')}<span class="hc-episode-die"><input name="directionD10" placeholder="např. 3,7" title="Jeden skutečný d10 za každý chybějící Bearing. Hod 1–4 = Lost Time, 5–9 = Misdirection, 10 = Lost (HMK 148)."><button type="button" data-episode-direction-die>+ d10</button></span></label>
- <p class="hc-hint" data-episode-direction-explanation role="status"></p><label data-episode-survival-hazard>Survival Hazard (d10) · jen při kritickém neúspěchu Survival ${episodeRuleHelp('Survival Hazard','HMK 148: pokud původní Survival / Orienteering test skončil CF, družina musí vyřešit Survival Hazard bez ohledu na výsledné upravené SV. Hod d10: 1–3 Equipment (výstroj), 4–6 Accident (nehoda), 7–10 Complication (komplikace). Další hody na opravu, úraz či změnu výstroje se řeší podle vybraného následku ve stávajícím Skill Tests a Combat, nejsou automaticky považovány za vyřízené.')}<span class="hc-episode-die"><input name="survivalD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="survivalD10">⚄ d10</button></span></label>
+ <p class="hc-hint" data-episode-direction-explanation role="status"></p>
  <details class="hc-episode-suboptions"><summary>Volitelné režimy a zatížení</summary><div class="hmk-trek-grid"><label class="hc-check"><input name="doubleTime" type="checkbox"> Double Time · dvojnásobná rychlost jen bez Slow a Loaded (HMK 146, 150) ${episodeRuleHelp('Double Time','Pohyb se zdvojnásobí pouze při nulových zbývajících Slow a bez Loaded. Únava se počítá po skutečných minutách: pěší 10/h (úspěšný END SR snižuje o 5/h); drover 5/h. Důsledky Danger zůstávají doložené.')}</label>
  <label class="hc-check" data-episode-load-bypass><input name="loadBypass" type="checkbox"> Místo automaticky zjištěného Loaded zaplatit vyšší únavu podle ENC (HMK 145)</label>
  <label class="hc-check"><input name="dunesSlow" type="checkbox"> Duny · zvolit Slow místo +5 únavy</label>
@@ -23217,7 +23218,7 @@ function episodeMarkField(form,name,{focus=false}={}){
  // The accident minute is a prerequisite of the hazard preview itself. When
  // that preview cannot yet be calculated, reveal the genuine prerequisite
  // rather than asking GM to follow a link to an inaccessible field.
- if(name==='hazardAtMinute'&&form.elements.namedItem('kind')?.value==='travel'&&
+ if(name==='hazardAtMinute'&&['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
     /^(?:[4-9]|10)$/.test(String(form.elements.namedItem('survivalD10')?.value||''))){
   // Accident and Complication F/CF must both reveal the exact-minute control.
   // The guided form normally hides the entire Rolls section until Evaluate,
@@ -23530,8 +23531,11 @@ function episodeEncounterProbability(form,clock,sky){
 function episodePreviewFromForm(form,clock){
  // A failed/aborted orientation must never leak the previous episode's Watchfulness.
  delete form.dataset.episodeOrientationModes;
- delete form.dataset.episodeStationaryForagingModes;
  const v=episodeFormSnapshot(form),members=v.memberIds||[],people=members.map(character);
+ // Preserve the display of already-proven Foraging Modes while later hazard
+ // inputs are still incomplete.  The backend rechecks the fresh Survival
+ // proof and independently validates every d10 at final confirmation.
+ if(v.kind!=='forage'||!v.orientationProofId)delete form.dataset.episodeStationaryForagingModes;
  episodeAssertScopedSkillInputs(v);
  if(!people.length)throw Error('Vyberte aspoň jednu postavu.');
  const kind=v.kind,minutes=Number(v.minutes),guideId=v.guideId;
@@ -23587,7 +23591,7 @@ function episodePreviewFromForm(form,clock){
  const d6=String(v.precipitationD6??'').trim();
  // An original Survival CF immediately opens its actual follow-on hazard.
  // Preserve the value-test receipt; never reroll the primary d100.
- const orientationCF=kind==='travel'&&v.orientationUse==='new'&&
+ const orientationCF=(kind==='travel'&&v.orientationUse==='new'||kind==='forage')&&
   episodeSkillProof(data.journal.find(j=>j.id===v.orientationProofId),'Survival',guideId,campaignKey(clock),clock.minute)?.level==='CF';
  if(orientationCF&&(!String(v.survivalD10||'').trim()||!Number.isInteger(Number(v.survivalD10))||Number(v.survivalD10)<1||Number(v.survivalD10)>10))
   throw Error('Survival CF: navazuje povinný Survival Hazard. Doložte skutečný d10 (1–10); původní Survival test je uložen.');
@@ -23943,7 +23947,10 @@ function episodePreviewFromForm(form,clock){
    lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members),
    result.direction,{recovered:!!v.navigationRecovered,redirected:true,lostPriority:true});
  }
-  if(kind==='travel'){
+  if(kind==='forage'&&result.hazardDetails.some(h=>h.hazard==='complication'&&
+   ['short-delay','long-delay','irreparable','reroute'].includes(h.result)))
+  throw Error('Complication při samostatném Foraging: vyžaduje výslovné pravidlové vyřešení minut zdržení a výtěžnosti. Bez něj nesmí být nález potvrzen.');
+ if(kind==='travel'){
    const incoming=equipmentDelayIn;
    const relevant=result.hazardDetails.find(h=>['equipment','complication'].includes(h.hazard));
    const raw=k=>String(v[k]??'0').trim();
@@ -24220,7 +24227,8 @@ function episodePreviewFromForm(form,clock){
     result.standaloneForaging.push(f);partial.set(key,f.carryOut);
    }
    if(result.standaloneForaging.length)result.foraging=result.standaloneForaging[0];
-   if(orientation.level==='CF')throw Error('Samostatný Foraging: kritické selhání Orienteering vyžaduje Survival Hazard (HMK 145/148). Tento následek není pro stacionární činnost automatizován; výsledky nelze uzavřít bez jeho pravidlového dořešení.');
+   // Survival CF is resolved using the SAME original Hazard chain as Travel;
+   // the original Agility/Injury executor remains the only medical authority.
   }
 
 
@@ -25308,7 +25316,7 @@ function updateEpisodePreview(form){
  show('[data-episode-final-confirm]',episodeEvaluationRequested);
  show('[data-episode-navigation]',isTravel);
  const orientProof=data.journal.find(j=>j.id===v.orientationProofId);
- const survivalCF=travel&&v.orientationUse==='new'&&
+ const survivalCF=(travel&&v.orientationUse==='new'||kind==='forage')&&
   (orientProof?.skillTestProof?.a?.level||orientProof?.skillTestProof?.result?.level)==='CF';
  show('[data-episode-survival-hazard]',survivalCF);
  const rollPanel=form.querySelector('[data-episode-encounter-panel]');if(rollPanel)rollPanel.hidden=!v.checkEncounter;
@@ -25707,10 +25715,10 @@ function updateEpisodePreview(form){
   }
   const hz=form.querySelector('[data-episode-hazard-details]');if(hz){
    const types=(result.hazardDetails||[]).map(x=>x.hazard),kind=types.join(' + ');
-   hz.hidden=!travel||!types.length;
+   hz.hidden=!['travel','forage'].includes(v.kind)||!types.length;
    const single=types.length===1?types[0]:null;
    const legend=hz.querySelector('[data-episode-hazard-legend]');
-   if(legend)legend.textContent=({equipment:'Equipment Hazard · poškozený předmět',accident:'Accident · nehoda během cesty',complication:'Complication · překážka na cestě',misdirection:'Direction Hazard · odchýlení trasy',lost:'Direction Hazard · ztracený směr'})[single]||'Současné hazardové následky · HMK 148–149';
+   if(legend)legend.textContent=({equipment:'Equipment Hazard · poškozený předmět',accident:'Accident · nehoda během činnosti',complication:'Complication · přírodní překážka',misdirection:'Direction Hazard · odchýlení trasy',lost:'Direction Hazard · ztracený směr'})[single]||'Současné hazardové následky · HMK 148–149';
    const context=hz.querySelector('[data-episode-hazard-context]');
    if(context)context.textContent=types.includes('equipment')?'Vyberte skutečný předmět, způsob řešení a případnou opravářskou dovednost. Původní ID předmětu i hod zůstanou zachovány.':
     types.includes('accident')?(sharedFixedMode93773()?'Nehoda nastane na konci pevného intervalu; teprve po posunu společného kalendáře otevřete zdravotní procedury.':'Nejprve potvrďte minutu nehody; po dokončení cesty se zdravotní testy provedou v původních modulech.'):
@@ -25839,6 +25847,14 @@ function updateEpisodePreview(form){
   renderEpisodeEndError(form,err.message);
   const technical=err instanceof ReferenceError||err instanceof TypeError;
   out.innerHTML='<p class="hc-episode-await" role="alert">'+(technical?'Technická chyba aplikace v'+esc(APP_VERSION)+': ':'K dokončení chybí: ')+esc(err.message)+'</p>';
+ }
+ // Refresh after validation as well: fresh Survival evidence sets the Mode count
+ // *inside* episodePreviewFromForm.  Incomplete subsequent d10/hazard input
+ // must not hide mandatory mode fields for another round of user interaction.
+ if(form.elements.namedItem('kind')?.value==='forage'){
+  const count=Math.max(0,Math.min(5,Number(form.dataset.episodeStationaryForagingModes)||0));
+  for(const row of form.querySelectorAll('[data-episode-stationary-forage-row]'))
+   row.hidden=!episodeEvaluationRequested||Number(row.dataset.episodeStationaryForageRow)>=count;
  }
  // The setup phase never requests Skill Tests, dice or a GM confirmation.
  // All mechanically necessary resolutions are requested AFTER Evaluate.

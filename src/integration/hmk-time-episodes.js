@@ -73,7 +73,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   typeof previousDistanceFraction==='number'&&previousDistanceFraction>=0&&previousDistanceFraction<1,
   'Neplatné pohybové režimy nebo přenos zlomku vzdálenosti.');
  must(!(loaded&&loadBypass),'Zrušený Loaded Mode nelze současně započítat jako zpomalení.');
- if(kind!=='travel')must(!survivalCriticalFailure&&survivalD10===null,'Survival Hazard platí pouze pro aktivní cestování.');
+ if(!['travel','forage'].includes(kind))must(!survivalCriticalFailure&&survivalD10===null,'Survival Hazard platí pouze pro Orienteering při cestování nebo samostatném Foraging.');
  let motion=null,distanceMeters=0,actors=[],direction=null,survivalHazard=null;
  if(kind==='travel'){
   // HMK printed rate is leagues per four-hour WATCH.  A freely timed GM episode
@@ -152,6 +152,10 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
     enc,extraFatigue,duneFatigue,...(earlyIncapacity?{earlyIncapacity}:{})};
   });
  }
+ // HMK 145 / 148: Orienteering CF also applies when the party forages
+ // in its starting hex. There is no Direction Hazard or movement.
+ if(kind==='forage')survivalHazard=trekHazards({bearingDeficit:0,directionD10:[],
+  survivalCriticalFailure,survivalD10}).survival;
  if(weather){must(weather.format==='hmk-trekking-weather-day-v1','Neplatný doklad počasí');}
  const target={highway:[2,1],rural:[4,1],wilderness:[1,1],underworld:[9,9]}[encounterEnviron]?.[encounterNight?1:0];
  must(target!==undefined,'Neznámé prostředí setkání');
@@ -705,7 +709,8 @@ export function validateTimeEpisodes(journal=[]){
     'Minutové riziko setkání musí odpovídat doloženému d100, prostředí a délce epizody.');
   }
   if(e.survivalHazard!==undefined){
-   const critical=e.kind==='travel'&&e.orientation?.level==='CF'&&e.orientation?.sourceMode==='new';
+   const critical=(e.kind==='travel'||e.kind==='forage'&&e.stationaryForagingPolicy==='hmk-stationary-v93.835')&&
+    e.orientation?.level==='CF'&&e.orientation?.sourceMode==='new';
    const d=e.settings?.survivalD10;
    const expected=critical?trekHazards({survivalCriticalFailure:true,survivalD10:Number(d)}).survival:null;
    must(e.survivalHazard===expected,'Survival Hazard neodpovídá CF ani doloženému d10.');
@@ -795,7 +800,7 @@ export function validateTimeEpisodes(journal=[]){
       (h.automationVersion!=='v93.773-end-of-episode'||h.medicalHandoffMinute===e.endMinute)&&
       e.orientation?.level==='CF'&&e.survivalHazard==='accident'&&
       !h.accidentProof&&!h.injuryProofId&&!h.victimId,
-      'Accident: cestování musí skončit v doložené minutě a předat zranění původnímu modulu.');
+      'Accident: činnost musí skončit v doložené minutě a předat zranění původnímu modulu.');
      continue;
     }
     if(h.automationVersion==='v93.635'||h.automationVersion==='v93.681'&&h.hazard==='complication'){

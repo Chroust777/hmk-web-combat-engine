@@ -1,0 +1,65 @@
+{
+  "script": "browser_93836_cf_complication.py",
+  "checks": [
+    {
+      "name": "initial 08:00",
+      "status": "PASS"
+    },
+    {
+      "name": "foraging interface",
+      "status": "PASS"
+    },
+    {
+      "name": "Survival Skill Tests opened",
+      "status": "PASS"
+    },
+    {
+      "name": "return to Foraging",
+      "status": "PASS"
+    },
+    {
+      "name": "CF Skill Test itself cannot advance clock",
+      "status": "PASS"
+    },
+    {
+      "name": "CF requires a real hazard d10",
+      "status": "PASS"
+    },
+    {
+      "name": "Survival Hazard d10 visible during stationary Foraging",
+      "status": "PASS"
+    },
+    {
+      "name": "typing Complication cannot advance clock",
+      "status": "PASS"
+    },
+    {
+      "name": "Complication no auto calendar or supply mutation",
+      "status": "PASS"
+    },
+    {
+      "name": "Complication cannot be staged without its real follow-up",
+      "status": "PASS"
+    },
+    {
+      "name": "Complication result reported as missing real evidence",
+      "status": "PASS"
+    },
+    {
+      "name": "no chromium errors",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "dialogs": [],
+  "before_hazard": {
+    "error": "Survival CF: navazuje povinný Survival Hazard. Doložte skutečný d10 (1–10); původní Survival test je uložen.",
+    "errorField": "survivalD10"
+  },
+  "blocked": {
+    "minute": 480,
+    "episodes": 0,
+    "error": "",
+    "field": ""
+  }
+}

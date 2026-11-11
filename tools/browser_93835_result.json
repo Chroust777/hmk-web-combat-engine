@@ -1,5 +1,5 @@
 {
-  "script": "browser_93835_stationary_foraging.py",
+  "script": "browser_93836_stationary_regression.py",
   "checks": [
     {
       "name": "version and seeded campaign time",
@@ -170,7 +170,7 @@
   },
   "cold_load_settings_changes": {},
   "cold_load_episode_exact_equal": false,
-  "cold_load_loaded_json_hash": "ad90900965d6d6554cbdb3ee2d7df523231f4e1b97c630ec033f09d1f5e0f3bc",
-  "cold_load_committed_json_hash": "c497dfc5ea05a2fc04085bb960f194012867dce5f12e7ee29b51876706f7733a",
+  "cold_load_loaded_json_hash": "9cec913f1d8fdf8dec31953f08454eff28fedd86509d649c44e95c7d91e830a1",
+  "cold_load_committed_json_hash": "31b71507c0a42f5f9377b0d126434d0af5ee96079499a0b68ef4a8a93802c988",
   "browser_reload": "BLOCKED_BY_ADMINISTRATOR: actual URL reload was not executable"
 }

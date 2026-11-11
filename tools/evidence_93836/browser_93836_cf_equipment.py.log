@@ -1,0 +1,2 @@
+DEBUG {'m': '4', 'err': 'Samostatný Foraging Mode 2 vyžaduje vlastní skutečný d10 (1–10).', 'eval': True, 'proof': 'id-1794421651290-3pc2o479q1u', 'forageHidden': False, 'rows': [{'hidden': False, 'i': '1'}, {'hidden': False, 'i': '2'}, {'hidden': False, 'i': '3'}, {'hidden': True, 'i': '4'}], 'hazard': True}
+PASS CF Chromium 17 checks

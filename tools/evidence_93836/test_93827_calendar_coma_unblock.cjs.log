@@ -1,0 +1,9 @@
+ORIGINAL_AGENDA {
+  all: [ [ 'weather-shock', 490 ] ],
+  suspended: [ [ 'treatment', 'Povinný Shock Reroll dosud nebyl vyhodnocen' ] ]
+}
+DUE_AFTER_TEN {
+  due: [ [ 'weather-shock', 490 ] ],
+  suspended: [ [ 'treatment', 'Povinný Shock Reroll dosud nebyl vyhodnocen' ] ]
+}
+PASS 10 checks, real 10-min Calendar, suspended treatment, UNC stays through coma, recovered, weariness, fatal
