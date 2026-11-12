@@ -351,7 +351,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.846';
+const APP_VERSION='93.847';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2959,8 +2959,8 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint" data-episode-mount-capacity role="status"></p>
  </div>
  <div data-episode-healthy-ride-panel class="panel" hidden><strong>Jezdec při tomto Pochodu · bez nasedání ve Stáji</strong>
- <details class="hmk-transport-guidance"><summary>Jak se počítá jezdec a ENC</summary><p>Aplikace automaticky započítá hmotnost jezdce s inventářem a výstrojí. Automatický výběr použije prvního vhodného koně nebo velblouda ze zaškrtnutých zvířat. Vůl může skupinu doprovázet, ale tažný postroj nenahrazuje sedlo. Výsledek se zapíše až po potvrzení celé cesty.</p></details>
- <label>Jízdní zvíře<select name="travelRideAnimalId"><option value="">— Automaticky první vhodný kůň / velbloud —</option>${stableTravelRoster.filter(a=>['palfrey','courser','charger','destrier','pony','camel'].includes(a.spec.breed)).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
+ <details class="hmk-transport-guidance"><summary>Jak se počítá jezdec a ENC</summary><p>Aplikace automaticky započítá hmotnost jezdce s inventářem a výstrojí. Automatický výběr použije první vhodné jezdecké zvíře (kůň, osel, mezek nebo velbloud) ze zaškrtnutých zvířat. Vůl může skupinu doprovázet, ale tažný postroj nenahrazuje sedlo. Výsledek se zapíše až po potvrzení celé cesty.</p></details>
+ <label>Jízdní zvíře<select name="travelRideAnimalId"><option value="">— Automaticky první vhodné jezdecké zvíře —</option>${stableTravelRoster.filter(isRidingAnimal93837).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
  <label>Postava jedoucí na zvířeti<select name="travelRideRiderId"><option value="">— Automaticky průvodce skupiny —</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
  <p class="hc-hint" data-episode-healthy-ride-mass role="status"></p></div>
  <section class="hc-episode-equipment-guide panel" data-episode-equipment-checklist hidden aria-live="polite">
@@ -23347,6 +23347,9 @@ function episodeHazardSelectionUI93840(form,required){
  const box=form.querySelector('[data-hazard-confirmation]');if(!box)return;
  box.hidden=!required;
  const pending=episodeHazardPending93840(form);
+ // Keep the real confirmation reachable after the exact minute was edited.
+ // Only this UI visibility changes: no result, dice or saved proof is accepted.
+ if(required&&pending){const hz=box.closest('[data-episode-hazard-details]');if(hz)hz.hidden=false;}
  const status=box.querySelector('[data-hazard-choice-status]');
  if(status){status.textContent=pending?'Výběr zatím nemá účinek. Potvrďte postup; následně aplikace nabídne potřebný test.':'Postup potvrzen. Nyní proveďte případný navazující test.';
   status.dataset.state=pending?'pending':'confirmed';}
@@ -23360,8 +23363,15 @@ function episodeHazardInputIsDraft93840(node){
 function episodeHazardChoicesRequired93840(form){
  if(!form||!episodeEvaluationRequested)return false;
  const hz=form.querySelector('[data-episode-hazard-details]');
- if(!hz||hz.hidden)return false;
+ if(!hz)return false;
  const legend=hz.querySelector('[data-episode-hazard-legend]')?.textContent||'';
+ // v93.847: after a Complication Skill Test the result can momentarily
+ // disappear from the derived-task list. Its already-confirmed choices and
+ // subsequently entered obstacle minute still require an EXPLICIT GM click.
+ // Do not hide the only confirmation button merely because the derived
+ // hazard section was hidden while rebuilding the next task.
+ const complication=/^Complication ·/.test(legend)&&Number(form.elements.namedItem('survivalD10')?.value)>=7;
+ if(hz.hidden&&!complication)return false;
  return !/^Accident ·/.test(legend)&&!!legend;
 }
 function episodeHazardRequireConfirmed93840(form){
