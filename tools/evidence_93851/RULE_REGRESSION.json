@@ -1,0 +1,241 @@
+{
+  "version": "93.851",
+  "authority": "HMK v1.2 printed pp.141–150",
+  "passed": 32,
+  "total": 32,
+  "failed": [],
+  "rows": [
+    {
+      "label": "desert-flats equals Flat Rural Track foot",
+      "status": "PASS",
+      "details": 5
+    },
+    {
+      "label": "desert-flats equals Flat Rural Track mount",
+      "status": "PASS",
+      "details": 9
+    },
+    {
+      "label": "desert-flats equals Flat Rural Track cart",
+      "status": "PASS",
+      "details": 4
+    },
+    {
+      "label": "desert-flats equals Flat Rural Track wagon",
+      "status": "PASS",
+      "details": 3
+    },
+    {
+      "label": "Bearing paved-road, rain=false",
+      "status": "PASS",
+      "details": 0
+    },
+    {
+      "label": "Bearing unpaved-road, rain=false",
+      "status": "PASS",
+      "details": 0
+    },
+    {
+      "label": "Bearing desert-flats, rain=false",
+      "status": "PASS",
+      "details": 2
+    },
+    {
+      "label": "Bearing rural-track, rain=false",
+      "status": "PASS",
+      "details": 0
+    },
+    {
+      "label": "Bearing wilderness-trail, rain=false",
+      "status": "PASS",
+      "details": 0
+    },
+    {
+      "label": "Bearing paved-road, rain=true",
+      "status": "PASS",
+      "details": 0
+    },
+    {
+      "label": "Bearing unpaved-road, rain=true",
+      "status": "PASS",
+      "details": 0
+    },
+    {
+      "label": "Bearing desert-flats, rain=true",
+      "status": "PASS",
+      "details": 2
+    },
+    {
+      "label": "Bearing rural-track, rain=true",
+      "status": "PASS",
+      "details": 1
+    },
+    {
+      "label": "Bearing wilderness-trail, rain=true",
+      "status": "PASS",
+      "details": 1
+    },
+    {
+      "label": "desert flats unavailable in rough",
+      "status": "PASS",
+      "details": null
+    },
+    {
+      "label": "desert flats unavailable in mountain",
+      "status": "PASS",
+      "details": null
+    },
+    {
+      "label": "dunes Slow is not an extra Progress d10",
+      "status": "PASS",
+      "details": {
+        "slow": 1,
+        "spare": 0
+      }
+    },
+    {
+      "label": "dunes Slow consumes a would-be Progress die",
+      "status": "PASS",
+      "details": null
+    },
+    {
+      "label": "dunes Slow forbidden on paved road",
+      "status": "PASS",
+      "details": null
+    },
+    {
+      "label": "dunes Slow forbidden on desert flats",
+      "status": "PASS",
+      "details": null
+    },
+    {
+      "label": "dunes Slow forbidden when mounted",
+      "status": "PASS",
+      "details": null
+    },
+    {
+      "label": "dunes without Slow applies +5 fatigue",
+      "status": "PASS",
+      "details": {
+        "normal": {
+          "id": "a",
+          "endurance": 12,
+          "roll": 5,
+          "sr": {
+            "tn": 6,
+            "roll": 5,
+            "success": true,
+            "sourcePage": 62
+          },
+          "rate": 5,
+          "movementFatigueUnits": 300,
+          "delta": 1,
+          "carryIn": 0,
+          "carryOut": 60,
+          "enc": 0,
+          "extraFatigue": 0,
+          "duneFatigue": 5
+        },
+        "slow": {
+          "id": "a",
+          "endurance": 12,
+          "roll": 5,
+          "sr": {
+            "tn": 6,
+            "roll": 5,
+            "success": true,
+            "sourcePage": 62
+          },
+          "rate": 0,
+          "movementFatigueUnits": 0,
+          "delta": 0,
+          "carryIn": 0,
+          "carryOut": 0,
+          "enc": 0,
+          "extraFatigue": 0,
+          "duneFatigue": 0
+        }
+      }
+    },
+    {
+      "label": "free GM Progress requires its own real d10 if no Slow",
+      "status": "PASS",
+      "details": true
+    },
+    {
+      "label": "free GM Progress can cancel real Slow without extra d10",
+      "status": "PASS",
+      "details": 3
+    },
+    {
+      "label": "Watchfulness foot with no animals unchanged",
+      "status": "PASS",
+      "details": {
+        "original": "alert",
+        "effective": "alert",
+        "skills": [
+          "Awareness"
+        ],
+        "demoted": false,
+        "sourcePage": 150
+      }
+    },
+    {
+      "label": "Watchfulness foot with pack animal demoted alert to normal",
+      "status": "PASS",
+      "details": {
+        "original": "alert",
+        "effective": "normal",
+        "skills": [
+          "Awareness"
+        ],
+        "demoted": true,
+        "sourcePage": 150
+      }
+    },
+    {
+      "label": "Watchfulness foot with pack animal demoted normal to lax",
+      "status": "PASS",
+      "details": {
+        "original": "normal",
+        "effective": "lax",
+        "skills": [
+          "Awareness"
+        ],
+        "demoted": true,
+        "sourcePage": 150
+      }
+    },
+    {
+      "label": "Watchfulness foot pack applies to actual Surprise procedure",
+      "status": "PASS",
+      "details": {
+        "without": "automatic",
+        "with": "unopposed"
+      }
+    },
+    {
+      "label": "non-guide Drover applied to Orienteering",
+      "status": "PASS",
+      "details": {
+        "actor": "b",
+        "penalty": -1
+      }
+    },
+    {
+      "label": "wrong Drover skill rejected",
+      "status": "PASS",
+      "details": null
+    },
+    {
+      "label": "wrong Drover actor rejected",
+      "status": "PASS",
+      "details": null
+    },
+    {
+      "label": "no Drover proof rejected",
+      "status": "PASS",
+      "details": null
+    }
+  ]
+}

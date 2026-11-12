@@ -1,0 +1,54 @@
+{
+  "desert": {
+    "pass_marker": true,
+    "has_traceback": false,
+    "tail": " FLATS SELECTED Trek Movement (HMK 146) · 5 lig na 240 referenčních minut · Bearing 2 za každého počasí · skutečná vzdálenost a únava se přepočítají na zadané minuty.\nSTEP desert 0 orientationProofId Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Orienteering · Survival · Aktér A  Vykonejte a ulož\nSTEP desert 1 end_a Každá cestující postava potřebuje skutečný END SR d10. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Únava · END d10 · Aktér A  Doložte skutečný individ\nRECEIPT {'minute': 510, 'stored': 510, 'episodes': [{'memberIds': ['a'], 'hazards': [], 'from': 480, 'to': 510}], 'windows': 1} DIALOGS ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:30 a posunout JEDINÝ kalendář o 30 minut?'] ERRORS []\nPASS ONE PERSON desert\n",
+    "initialAttempt": "Testovací skript nepokrýval nový potvrzovací krok nebo měl zavřený podpanel; aktualizován a opakován"
+  },
+  "dunes_fixed": {
+    "pass_marker": true,
+    "has_traceback": false,
+    "tail": "HEADINGS_PASS dunes\nSTEP dunes 0 orientationProofId Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Orienteering · Survival · Aktér A  Vykonejte a ulož\nSTEP dunes 1 end_a Každá cestující postava potřebuje skutečný END SR d10. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Únava · END d10 · Aktér A  Doložte skutečný individ\nRECEIPT {'minute': 510, 'stored': 510, 'episodes': [{'memberIds': ['a'], 'hazards': [], 'from': 480, 'to': 510}], 'windows': 1} DIALOGS ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:30 a posunout JEDINÝ kalendář o 30 minut?'] ERRORS []\nPASS ONE PERSON dunes\n"
+  },
+  "gmprogress": {
+    "pass_marker": true,
+    "has_traceback": false,
+    "tail": "ý Survival Success Value průvodce z aktuální minuty. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Orienteering · Survival · Aktér A  Vykonejte a ulož\nSTEP gmprogress 1 progressD10 Přebytek Progress vyžaduje 3 skutečných d10. Zadejte je oddělené čárkami. TASK Další povinný krok (1 z 2). Po potvrzení se určí další návaznost:  1 Pohyb · Progress  Přebytek Progress vyžaduje 3 skut\nSTEP gmprogress 2 end_a Každá cestující postava potřebuje skutečný END SR d10. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Únava · END d10 · Aktér A  Doložte skutečný individ\nRECEIPT {'minute': 510, 'stored': 510, 'episodes': [{'memberIds': ['a'], 'hazards': [], 'from': 480, 'to': 510}], 'windows': 1} DIALOGS ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:30 a posunout JEDINÝ kalendář o 30 minut?'] ERRORS []\nPASS ONE PERSON gmprogress\n",
+    "initialAttempt": "Testovací skript nepokrýval nový potvrzovací krok nebo měl zavřený podpanel; aktualizován a opakován"
+  },
+  "drover_other": {
+    "pass_marker": true,
+    "has_traceback": false,
+    "tail": " připravené činnosti\n\nČinnosti postav se vyhodnocují podle připravených řádků. Každá má vlastní časovou kotvu a doklad; nevyužitý čas se automaticky nezapočítává jako odpočinek. Jediný posun společného kalendáře provede GM až na závěr.\n\nPotvrdit výsledek řádku a pokračovat (bez posunu času) Potvrdit všechny činnosti a posunout kalendář\nNouzové odblokování Cestování\nPoslední dokončená epizoda\n\nDen 1 · 08:00–Den 1 · 08:45 · travel · 45 min · 4500 m\n\nZáznam uložen.\n\nStalking / Vigilance: normal · Stalking 0, Vigilance 0. Bez dalšího fiktivního hodu Tracking.\n\nPřejít do kroniky ↗\nHârnMaster Keeper’s Ledger · v93.851 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace\nPASS Chromium v93.851 NON-GUIDE DROVER: actual two travel groups, bought and selected animal, manual Survival Skill Tests, two journals, one final clock advance 480→525; no duplicate animal and no runtime errors.\n"
+  },
+  "two": {
+    "pass_marker": true,
+    "has_traceback": false,
+    "tail": "rval · připravené činnosti\n\nČinnosti postav se vyhodnocují podle připravených řádků. Každá má vlastní časovou kotvu a doklad; nevyužitý čas se automaticky nezapočítává jako odpočinek. Jediný posun společného kalendáře provede GM až na závěr.\n\nPotvrdit výsledek řádku a pokračovat (bez posunu času) Potvrdit všechny činnosti a posunout kalendář\nNouzové odblokování Cestování\nPoslední dokončená epizoda\n\nDen 1 · 08:00–Den 1 · 08:45 · travel · 45 min · 4500 m\n\nZáznam uložen.\n\nStalking / Vigilance: normal · Stalking 0, Vigilance 0. Bez dalšího fiktivního hodu Tracking.\n\nPřejít do kroniky ↗\nHârnMaster Keeper’s Ledger · v93.851 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace\nPASS Chromium v93.851 TWO GROUPS: actual two travel groups, bought and selected animal, manual Survival Skill Tests, two journals, one final clock advance 480→525; no duplicate animal and no runtime errors.\n"
+  },
+  "manual": {
+    "pass_marker": true,
+    "has_traceback": false,
+    "tail": "rval · připravené činnosti\n\nČinnosti postav se vyhodnocují podle připravených řádků. Každá má vlastní časovou kotvu a doklad; nevyužitý čas se automaticky nezapočítává jako odpočinek. Jediný posun společného kalendáře provede GM až na závěr.\n\nPotvrdit výsledek řádku a pokračovat (bez posunu času) Potvrdit všechny činnosti a posunout kalendář\nNouzové odblokování Cestování\nPoslední dokončená epizoda\n\nDen 1 · 08:00–Den 1 · 08:45 · travel · 45 min · 4500 m\n\nZáznam uložen.\n\nStalking / Vigilance: normal · Stalking 0, Vigilance 0. Bez dalšího fiktivního hodu Tracking.\n\nPřejít do kroniky ↗\nHârnMaster Keeper’s Ledger · v93.851 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace\nPASS Chromium v93.851 TWO GROUPS: actual two travel groups, bought and selected animal, manual Survival Skill Tests, two journals, one final clock advance 480→525; no duplicate animal and no runtime errors.\n"
+  },
+  "double_retry": {
+    "pass_marker": true,
+    "has_traceback": false,
+    "tail": "al · připravené činnosti\n\nČinnosti postav se vyhodnocují podle připravených řádků. Každá má vlastní časovou kotvu a doklad; nevyužitý čas se automaticky nezapočítává jako odpočinek. Jediný posun společného kalendáře provede GM až na závěr.\n\nPotvrdit výsledek řádku a pokračovat (bez posunu času) Potvrdit všechny činnosti a posunout kalendář\nNouzové odblokování Cestování\nPoslední dokončená epizoda\n\nDen 1 · 08:00–Den 1 · 10:15 · travel · 135 min · 27000 m\n\nZáznam uložen.\n\nStalking / Vigilance: normal · Stalking 0, Vigilance 0. Bez dalšího fiktivního hodu Tracking.\n\nPřejít do kroniky ↗\nHârnMaster Keeper’s Ledger · v93.851 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace\nPASS Chromium v93.851 TWO GROUPS: actual two travel groups, bought and selected animal, manual Survival Skill Tests, two journals, one final clock advance 480→615; no duplicate animal and no runtime errors.\n"
+  },
+  "accident": {
+    "pass_marker": true,
+    "has_traceback": false,
+    "tail": "'a'], 'hazards': [{'format': 'hmk-episode-hazard-followup-v1', 'hazard': 'accident', 'repairSkill': None, 'repairLevel': None, 'equipmentDisposition': 'repair', 'complicationDecision': 'test', 'accidentAgility': None, 'accidentD6': None, 'accidentZD10': None, 'complicationSkill': None, 'complicationLevel': None, 'directionTurn': None, 'directionD10': None, 'directionAwareness': None, 'result': 'pending-original-skill-combat', 'requiresGMCompletion': False, 'sourcePages': [148, 149], 'evidenceId': None, 'workerId': 'a', 'complicationScope': 'single', 'externalMedicalPending': True, 'hazardAtMinute': 30, 'medicalHandoffMinute': 510, 'hazardD10': 5, 'automationVersion': 'v93.773-end-of-episode'}], 'from': 480, 'to': 510}], 'windows': 1} DIALOGS ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:30 a posunout JEDINÝ kalendář o 30 minut?'] ERRORS []\nPASS ONE PERSON accident\n"
+  },
+  "direction": {
+    "pass_marker": true,
+    "has_traceback": false,
+    "tail": "nute': 510, 'stored': 510, 'episodes': [{'memberIds': ['a'], 'hazards': [{'format': 'hmk-episode-hazard-followup-v1', 'hazard': 'misdirection', 'repairSkill': None, 'repairLevel': None, 'equipmentDisposition': 'repair', 'complicationDecision': 'test', 'accidentAgility': None, 'accidentD6': None, 'accidentZD10': None, 'complicationSkill': None, 'complicationLevel': None, 'directionTurn': 'left', 'directionD10': 7, 'directionAwareness': None, 'directionObservationDeferred': True, 'result': 'continue-misdirected', 'requiresGMCompletion': False, 'sourcePages': [148, 149], 'evidenceId': None, 'workerId': 'a', 'complicationScope': 'single', 'automationVersion': 'v93.635', 'directionProofId': None}], 'from': 480, 'to': 510}], 'windows': 1} DIALOGS ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:30 a posunout JEDINÝ kalendář o 30 minut?'] ERRORS []\nPASS ONE PERSON direction\n"
+  },
+  "tracking": {
+    "pass_marker": true,
+    "has_traceback": false,
+    "tail": "HEADINGS_PASS tracking\nTRACKING ROAD PASS no premature commit\n"
+  }
+}

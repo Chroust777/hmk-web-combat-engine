@@ -1,0 +1,68 @@
+[
+  {
+    "test": "test_93785_travel_matrix.mjs",
+    "status": "PASS",
+    "code": 0,
+    "tail": "PASS v93.785 rule matrix {\"weather\":4800,\"orientation\":1136,\"movement\":1365,\"direction\":320,\"encounter\":90,\"exposure\":210} TOTAL 7921\n\n",
+    "seconds": 0.17
+  },
+  {
+    "test": "test_93833_full_foraging_matrix_audit.cjs",
+    "status": "PASS",
+    "code": 0,
+    "tail": "PASS 1539 independent Foraging matrix, GM 60m carry, NONE/0, Tracking SV and validation assertions\n\n",
+    "seconds": 2.17
+  },
+  {
+    "test": "test_93835_stationary_foraging.cjs",
+    "status": "PASS",
+    "code": 0,
+    "tail": "PASS 70 stationary HMK +2SV, mode allocation, invalid advantage prevention, 3 supply receipts, legacy, NONE/0\n\n",
+    "seconds": 1.83
+  },
+  {
+    "test": "test_93836_stationary_cf.cjs",
+    "status": "PASS",
+    "code": 0,
+    "tail": "PASS 48 stationary CF dice outcomes, no movement, required evidence, nontravel guard\n\n",
+    "seconds": 1.94
+  },
+  {
+    "test": "test_93843_equipment_skill.mjs",
+    "status": "PASS",
+    "code": 0,
+    "tail": "PASS HMK 148 equipment skill selection 58 assertions\n\n",
+    "seconds": 0.04
+  },
+  {
+    "test": "test_93845_gm_equipment.mjs",
+    "status": "PASS",
+    "code": 0,
+    "tail": "PASS v93.845 GM-managed equipment: 38 assertions\n\n",
+    "seconds": 0.14
+  },
+  {
+    "test": "test_93846_accident_tracking_complication.mjs",
+    "status": "PASS",
+    "code": 0,
+    "tail": "PASS SOURCE / v93.846 accident, tracking, draught team, complication: 45 assertions\n\n",
+    "seconds": 0.2
+  },
+  {
+    "test": "test_93847_anatomy_mount.mjs",
+    "status": "PASS",
+    "code": 1,
+    "tail": "PASS species anatomy + riding + draught: 79 checks / 16 species\n\nnode:fs:2426\n    return binding.writeFileUtf8(\n                   ^\n\nError: ENOENT: no such file or directory, open '/mnt/data/hmk_build851/hmk-web-combat-engine-main/tools/evidence_93847/species_anatomy.json'\n    at Object.writeFileSync (node:fs:2426:20)\n    at file:///mnt/data/hmk_build851/hmk-web-combat-engine-main/tools/test_93847_anatomy_mount.mjs:34:4\n    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {\n  errno: -2,\n  code: 'ENOENT',\n  syscall: 'open',\n  path: '/mnt/data/hmk_build851/hmk-web-combat-engine-main/tools/evidence_93847/species_anatomy.json'\n}\n\nNode.js v22.16.0\n",
+    "seconds": 0.09,
+    "rerun": "PASS 79 / 16 species after creating its missing output directory",
+    "initialFailure": "test evidence directory did not exist"
+  },
+  {
+    "test": "test_93842_interaction_contract.cjs",
+    "status": "SKIP",
+    "code": 1,
+    "tail": "N]: release 93.842\n    at ck (/mnt/data/hmk_build851/hmk-web-combat-engine-main/tools/test_93842_interaction_contract.cjs:7:29)\n    at Object.<anonymous> (/mnt/data/hmk_build851/hmk-web-combat-engine-main/tools/test_93842_interaction_contract.cjs:8:1)\n    at Module._compile (node:internal/modules/cjs/loader:1730:14)\n    at Object..js (node:internal/modules/cjs/loader:1895:10)\n    at Module.load (node:internal/modules/cjs/loader:1465:32)\n    at Function._load (node:internal/modules/cjs/loader:1282:12)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)\n    at node:internal/main/run_main_module:36:49 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '=='\n}\n\nNode.js v22.16.0\n",
+    "seconds": 0.04,
+    "reason": "historical fixed-version test requires exact v93.842 string, not applicable as v93.851 version gate"
+  }
+]

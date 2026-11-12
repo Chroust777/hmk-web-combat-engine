@@ -1,0 +1,150 @@
+{
+  "status": "PASS",
+  "checks": 79,
+  "records": [
+    {
+      "name": "Bovine (Oxen)",
+      "profile": "bovine",
+      "anatomy": "c",
+      "maxZN": 20,
+      "ride": false,
+      "breed": "bovine",
+      "bodyWeightLb": 1500
+    },
+    {
+      "name": "Camel",
+      "profile": "camel",
+      "anatomy": "c",
+      "maxZN": 20,
+      "ride": true,
+      "breed": "camel",
+      "bodyWeightLb": 1100
+    },
+    {
+      "name": "Dog, guard",
+      "profile": "guard",
+      "anatomy": "e",
+      "maxZN": 6,
+      "ride": false,
+      "breed": null,
+      "bodyWeightLb": 110
+    },
+    {
+      "name": "Dog, hunter",
+      "profile": "hunter",
+      "anatomy": "e",
+      "maxZN": 6,
+      "ride": false,
+      "breed": null,
+      "bodyWeightLb": 60
+    },
+    {
+      "name": "Dog, ratter",
+      "profile": "ratter",
+      "anatomy": "d",
+      "maxZN": 3,
+      "ride": false,
+      "breed": null,
+      "bodyWeightLb": 20
+    },
+    {
+      "name": "Donkey",
+      "profile": "donkey",
+      "anatomy": "b",
+      "maxZN": 16,
+      "ride": true,
+      "breed": "donkey",
+      "bodyWeightLb": 600
+    },
+    {
+      "name": "Elephant",
+      "profile": "elephant",
+      "anatomy": "j",
+      "maxZN": 40,
+      "ride": false,
+      "breed": "elephant",
+      "bodyWeightLb": 10000
+    },
+    {
+      "name": "Hawk • Falcon",
+      "profile": "hawk",
+      "anatomy": "i",
+      "maxZN": 3,
+      "ride": false,
+      "breed": null,
+      "bodyWeightLb": 2
+    },
+    {
+      "name": "Mule",
+      "profile": "mule",
+      "anatomy": "c",
+      "maxZN": 20,
+      "ride": true,
+      "breed": "mule",
+      "bodyWeightLb": 900
+    },
+    {
+      "name": "Palfrey, cart horse",
+      "profile": "palfrey",
+      "anatomy": "c",
+      "maxZN": 20,
+      "ride": true,
+      "breed": "palfrey",
+      "bodyWeightLb": 1000
+    },
+    {
+      "name": "Palfrey, plough horse",
+      "profile": "palfrey",
+      "anatomy": "c",
+      "maxZN": 20,
+      "ride": true,
+      "breed": "palfrey",
+      "bodyWeightLb": 1000
+    },
+    {
+      "name": "Palfrey, riding horse",
+      "profile": "palfrey",
+      "anatomy": "c",
+      "maxZN": 20,
+      "ride": true,
+      "breed": "palfrey",
+      "bodyWeightLb": 1000
+    },
+    {
+      "name": "Warhorse, courser",
+      "profile": "courser",
+      "anatomy": "c",
+      "maxZN": 20,
+      "ride": true,
+      "breed": "courser",
+      "bodyWeightLb": 1100
+    },
+    {
+      "name": "Warhorse, charger",
+      "profile": "charger",
+      "anatomy": "c",
+      "maxZN": 20,
+      "ride": true,
+      "breed": "charger",
+      "bodyWeightLb": 1200
+    },
+    {
+      "name": "Warhorse, destrier",
+      "profile": "destrier",
+      "anatomy": "c",
+      "maxZN": 20,
+      "ride": true,
+      "breed": "destrier",
+      "bodyWeightLb": 1400
+    },
+    {
+      "name": "Warpony",
+      "profile": "pony",
+      "anatomy": "b",
+      "maxZN": 16,
+      "ride": true,
+      "breed": "pony",
+      "bodyWeightLb": 700
+    }
+  ]
+}
