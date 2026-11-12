@@ -1,0 +1,3 @@
+PASS forage {'minute': 480, 'journal': 1, 'version': '93.849', 'kind': 'forage', 'tracker': 'none', 'req': None} {'minute': 480, 'journal': 1, 'version': '93.849', 'kind': 'forage', 'tracker': 'none', 'req': None} errors []
+PASS tracking {'minute': 480, 'journal': 1, 'version': '93.849', 'kind': 'tracking', 'tracker': 'new', 'req': None} {'minute': 480, 'journal': 1, 'version': '93.849', 'kind': 'tracking', 'tracker': 'new', 'req': None} errors []
+PASS travel {'minute': 480, 'journal': 1, 'version': '93.849', 'kind': 'travel', 'tracker': 'none', 'req': None} {'minute': 480, 'journal': 1, 'version': '93.849', 'kind': 'travel', 'tracker': 'none', 'req': None} errors []
