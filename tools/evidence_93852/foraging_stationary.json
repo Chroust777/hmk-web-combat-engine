@@ -1,0 +1,176 @@
+{
+  "script": "browser_93835_stationary_foraging.py",
+  "checks": [
+    {
+      "name": "version and seeded campaign time",
+      "status": "PASS"
+    },
+    {
+      "name": "minutes typing cannot commit",
+      "status": "PASS"
+    },
+    {
+      "name": "UI opens stationary Foraging",
+      "status": "PASS"
+    },
+    {
+      "name": "UI shows mandatory new Orienteering fields",
+      "status": "PASS"
+    },
+    {
+      "name": "explicit evaluate reveals the roll panel",
+      "status": "PASS"
+    },
+    {
+      "name": "d10 and blur do not create supplies or time",
+      "status": "PASS"
+    },
+    {
+      "name": "evaluate blocks standalone d10 without Survival SV",
+      "status": "PASS"
+    },
+    {
+      "name": "genuine Survival task button exposed",
+      "status": "PASS"
+    },
+    {
+      "name": "Skill Tests opens by actual button",
+      "status": "PASS"
+    },
+    {
+      "name": "return to stationary Foraging after saved Survival test",
+      "status": "PASS"
+    },
+    {
+      "name": "Survival proof selected after return",
+      "status": "PASS"
+    },
+    {
+      "name": "+2 Orienteering yields at least two Foraging Modes",
+      "status": "PASS"
+    },
+    {
+      "name": "Survival receipt does not end episode",
+      "status": "PASS"
+    },
+    {
+      "name": "mode 2 has visible independent d10",
+      "status": "PASS"
+    },
+    {
+      "name": "d10 mode 2 edits do not advance time",
+      "status": "PASS"
+    },
+    {
+      "name": "mode 3 has visible independent d10",
+      "status": "PASS"
+    },
+    {
+      "name": "d10 mode 3 edits do not advance time",
+      "status": "PASS"
+    },
+    {
+      "name": "mode 4 has visible independent d10",
+      "status": "PASS"
+    },
+    {
+      "name": "d10 mode 4 edits do not advance time",
+      "status": "PASS"
+    },
+    {
+      "name": "mode 5 has visible independent d10",
+      "status": "PASS"
+    },
+    {
+      "name": "d10 mode 5 edits do not advance time",
+      "status": "PASS"
+    },
+    {
+      "name": "repeated first d10 edit cannot commit 1",
+      "status": "PASS"
+    },
+    {
+      "name": "repeated first d10 edit cannot commit 10",
+      "status": "PASS"
+    },
+    {
+      "name": "repeated first d10 edit cannot commit 3",
+      "status": "PASS"
+    },
+    {
+      "name": "repeated first d10 edit cannot commit 10",
+      "status": "PASS"
+    },
+    {
+      "name": "all independent d10 resolve after explicitly evaluating",
+      "status": "PASS"
+    },
+    {
+      "name": "stage button queues episode, no premature campaign clock advance",
+      "status": "PASS"
+    },
+    {
+      "name": "one commit advances 60 minutes and stores exactly awarded d10 results",
+      "status": "PASS"
+    },
+    {
+      "name": "committed +2 SV and zero movement",
+      "status": "PASS"
+    },
+    {
+      "name": "committed d10 yields ledger food and water",
+      "status": "PASS"
+    },
+    {
+      "name": "committed stationary episode validates from real stored journal",
+      "status": "PASS"
+    },
+    {
+      "name": "journal replay rejects changedDie",
+      "status": "PASS"
+    },
+    {
+      "name": "journal replay rejects lostMode",
+      "status": "PASS"
+    },
+    {
+      "name": "journal replay rejects changedCarry",
+      "status": "PASS"
+    },
+    {
+      "name": "journal replay rejects missingSurvival",
+      "status": "PASS"
+    },
+    {
+      "name": "ledger counts one food lot and one water lot per Mode without alias duplication",
+      "status": "PASS"
+    },
+    {
+      "name": "isolated Chromium cold-load of minute, supply and episode count (not URL reload)",
+      "status": "PASS"
+    },
+    {
+      "name": "no browser page errors",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "dialogs": [
+    "GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 09:00 a posunout JEDINÝ kalendář o 60 minut?"
+  ],
+  "foraging_modes": 5,
+  "reevaluation_note": "UI automatically re-evaluated after field edits while earlier evaluate state remained true; no durable write",
+  "tamper": {
+    "original": "ACCEPTED",
+    "changedDie": "REJECTED: Samostatný Foraging: změněný d10, cíl nebo přenos.",
+    "lostMode": "REJECTED: Nález při samostatném Foraging musí mít jeden d10 za každý získaný Foraging Mode.",
+    "changedCarry": "REJECTED: Samostatný Foraging: změněný d10, cíl nebo přenos.",
+    "missingSurvival": "REJECTED: Epizoda odkazuje na neexistující nebo budoucí Skill Test.",
+    "lots": 10
+  },
+  "cold_load_settings_changes": {},
+  "cold_load_episode_exact_equal": false,
+  "cold_load_loaded_json_hash": "7dddc2c6d015d9f61a042d98f61776ff0729c0afa8c95bbc7379cb60e0ab5ba4",
+  "cold_load_committed_json_hash": "6cc508430074ba73f6ccf021c4dc554a6bcd116aeaabe71500eb15b80687a715",
+  "browser_reload": "BLOCKED_BY_ADMINISTRATOR: actual URL reload was not executable"
+}

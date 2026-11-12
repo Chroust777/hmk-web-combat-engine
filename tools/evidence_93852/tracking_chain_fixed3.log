@@ -1,0 +1,16 @@
+HEADINGS_PASS tracking
+TRACKING ROAD PASS no premature commit
+RED_HIGHLIGHT_PASS
+STEP tracking 0 trackingProofId Tracking: vyberte skutečný nový Tracking SV, nebo souvislé pokračování téže stopy. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Tracking · Aktér A  Vykonejte samostatný Tracking S
+RECEIPT {'minute': 510, 'stored': 510, 'episodes': [{'memberIds': ['a'], 'hazards': [], 'from': 480, 'to': 510}], 'windows': 1} DIALOGS ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:30 a posunout JEDINÝ kalendář o 30 minut?'] ERRORS []
+TRACKING_CF_PENDING_ONE_BEARING_PASS
+TRACKING_NEXT 0 orientationProofId Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty.
+TRACKING_NEXT 1 directionD10 Chybí 1 platný Direction Hazard d10 (HMK 148).
+TRACKING_NEXT 2 directionD10 Chybí 1 platný Direction Hazard d10 (HMK 148).
+TRACKING_NEXT 3 end_a Každá cestující postava potřebuje skutečný END SR d10.
+TRACKING_NEXT 4 hazardDirectionD10 
+TRACKING_NEXT 5 hazardDirectionD10 
+TRACKING_NEXT 6  
+TRACKING_NEXT 7 hazardDirectionD10 
+PASS TRACKING_CF -> REQUIRED_BEARING -> SECOND_TRAVEL [{'kind': 'tracking', 'bearing': 0, 'forced': None}, {'kind': 'travel', 'bearing': 2, 'forced': None}]
+PASS AUDIT93852 ONE PERSON tracking

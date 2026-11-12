@@ -1,0 +1,51 @@
+HEADINGS_PASS stalking
+STEP stalking 0 orientationProofId Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Orienteering · Survival · Aktér A  Vykonejte a ulož
+STEP stalking 1 trackingProofId Tracking: vyberte skutečný nový Tracking SV, nebo souvislé pokračování téže stopy. TASK Další povinný krok (1 z 2). Po potvrzení se určí další návaznost:  1 Tracking · Aktér A  Tracking: vyberte skutečný nový
+TRACKING_SKILL_FORM_DEBUG / CS a tím úpravu SV.
+
+CF -2 → SV 4 · —
+F -1 → SV 5 · ★
+S 0 → SV 6 · ★★
+CS +1 → SV 7 · ★★★
+Rozšířená pravidla konkrétní činnosti (jen pokud je HMK vyžaduje)
+GM situační modifier EML (±)
+Důvod GM modifikátoru
+Výjimka při nedoloženém zbrojním postihu (jen pokud je nutná)
+Aktér A · rozklad EML
+Primary ML
+60
+Secondary 1 (nezvoleno)
++0
+Secondary 2 (nezvoleno)
++0
+Fatigue
++0
+ENC
++0
+Zranění
++0
+Bulk
++0
+Zbroj / PER
++0
+EML 60
+Časovaný projekt · doložený kalendářní začátek
+— nejdříve zahajte projekt —
+Časový zámek platí pouze pro vybraný projekt. Běžné SV testy zůstávají samostatné.
+Vyhodnotit Success Value
+Výsledek testu se zobrazí zde.
+← Vrátit se do Cestování
+Pokud test ještě nebyl vyhodnocen, návrat neuloží žádný hod.
+Poslední uložený SV test
+Success Value · Survival
+
+SV 6 · Nadstandardní hodnota · S
+
+★★
+
+CF končící nulou = CF0, pětkou = CF5. Fumble / Stumble nastane jen tam, kde to konkrétní pravidlo vyžaduje (zejména Combat). Samotné CF0/CF5 mimo takovou činnost není automatickým pádem.
+
+HârnMaster Keeper’s Ledger · v93.852 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace FORMS 1 0 FIELDS ['primary', 'rollA', 'srActivityA', 'roll10A', 'assist1', 'assist2', 'orientAssist1', 'orientAssist2', 'orientAssistConfirmed', 'secondary1', 'secondary2', 'gmModifierA', 'gmReasonA', 'gearConfirmedA', 'gmENCA', 'gmBulkA', 'gmPerA', 'timedProjectId']
+STEP stalking 2 end_a Každá cestující postava potřebuje skutečný END SR d10. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Únava · END d10 · Aktér A  Doložte skutečný individ
+RECEIPT {'minute': 510, 'stored': 510, 'episodes': [{'memberIds': ['a'], 'hazards': [], 'from': 480, 'to': 510}], 'windows': 1} DIALOGS ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:30 a posunout JEDINÝ kalendář o 30 minut?'] ERRORS []
+PASS AUDIT93852 ONE PERSON stalking

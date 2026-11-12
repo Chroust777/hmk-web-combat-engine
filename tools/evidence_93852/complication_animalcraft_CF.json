@@ -1,0 +1,37 @@
+{
+  "status": "PASS",
+  "skillResult": "CF",
+  "minute": 540,
+  "hazards": [
+    {
+      "format": "hmk-episode-hazard-followup-v1",
+      "hazard": "complication",
+      "repairSkill": null,
+      "repairLevel": null,
+      "equipmentDisposition": "repair",
+      "complicationDecision": "test",
+      "accidentAgility": null,
+      "accidentD6": null,
+      "accidentZD10": null,
+      "complicationSkill": "Animalcraft",
+      "complicationLevel": "CF",
+      "directionTurn": null,
+      "directionD10": null,
+      "directionAwareness": null,
+      "result": "irreparable",
+      "requiresGMCompletion": false,
+      "sourcePages": [
+        148,
+        149
+      ],
+      "evidenceId": "id-1794512145054-8qtcp8czww3",
+      "workerId": "a",
+      "complicationScope": "single",
+      "complicationProofId": "id-1794512145054-8qtcp8czww3",
+      "automationVersion": "v93.681",
+      "hazardAtMinute": 25,
+      "routeChangeConfirmed": true
+    }
+  ],
+  "browserErrors": []
+}

@@ -1,0 +1,45 @@
+{
+  "version": "93.852",
+  "base_version": "93.851",
+  "date": "2026-11-12",
+  "status_legend": [
+    "PASS",
+    "FAIL",
+    "SKIP",
+    "BLOCKED",
+    "NEOVĚŘENO"
+  ],
+  "fixed_bugs": [
+    "Stationary Foraging +2 adjusted Orienteering SV: source-star vs adjusted-mode-star miscomparison at immutable journal validation",
+    "Tracking trail identity cleared because internal trackingConfirmed flag incorrectly compared to form identity",
+    "Stalking to Tracking Skill Test demanded obsolete removed confirm trail button; now explicit Open Tracking Skill Test confirms validated trail"
+  ],
+  "confirmed_e2e": [
+    "one PC: Survival CF accident -> final commit",
+    "one PC: Misdirection direction hazard -> final commit",
+    "one PC: dunes Slow -> final commit",
+    "one PC: Desert Flats -> final commit",
+    "two separate parties: horse mount, cart, wagon harness/tack, one shared clock commit",
+    "one PC: stationary Foraging +2 adjusted SV, 5 actual Foraging d10, supply journal and reload",
+    "Tracking CF -> required next Bearing -> next trek and consumed obligation",
+    "Stalking + Tracking within same trek after explicit Skill Test click",
+    "Survival CF -> Equipment Hazard -> repair Skill F/S/CS/CF",
+    "Survival CF -> Complication F/CF and next decisions",
+    "Double Time: multiple END d10 and one clock advancement",
+    "manual star allocation and corrected invalid input",
+    "Tracking missing trail red marker, editable name and road dropdown"
+  ],
+  "not_certified": [
+    "complete incapacitated-patient transport: harness and 270 lb verified, end-to-end commit not completed",
+    "all theoretical combinations of hazards, anatomy, weather, concurrent actions",
+    "real deployed GitHub Pages and private user campaign reload"
+  ],
+  "static_assertions": {
+    "terrain_and_bearing": 290,
+    "travel_rules": 32,
+    "travel_matrix": 7921,
+    "travel_guard": 3235,
+    "known_failures": 0
+  },
+  "test_environment": "isolated Chromium, explicit UI interactions, dedicated state; actual GitHub Pages not tested"
+}

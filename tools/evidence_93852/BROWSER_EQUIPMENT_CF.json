@@ -1,0 +1,215 @@
+{
+  "before": {
+    "version": "93.852",
+    "minute": 480,
+    "storedMinute": 480,
+    "events": 1,
+    "journal": 3,
+    "skillRows": [
+      {
+        "id": "id-1794511946010-n5k4ct6alen",
+        "type": "secondary-mastery-value-test",
+        "skill": [
+          "Survival"
+        ],
+        "level": "CF"
+      },
+      {
+        "id": "id-1794511952801-f3dlo5ku3pn",
+        "type": "secondary-mastery-test",
+        "skill": [
+          "Textilecraft"
+        ],
+        "level": "CF"
+      }
+    ],
+    "episodes": [],
+    "receipts": [],
+    "item": [
+      {
+        "id": "item-a",
+        "condition": "",
+        "repair": null,
+        "usable": true
+      }
+    ],
+    "health": [
+      {
+        "id": "a",
+        "health": []
+      },
+      {
+        "id": "b",
+        "health": []
+      }
+    ],
+    "queue": 0,
+    "clearCount": 1,
+    "stageDisabled": false,
+    "finishDisabled": false,
+    "hazardStatus": "Opraváře a předmět potvrďte přímo tlačítkem otevření Skill Testu.",
+    "hazardButtonDisabled": true,
+    "hazardButtonHidden": true,
+    "hazardDetailsHidden": true,
+    "hazardLegend": "Equipment Hazard · poškozený předmět",
+    "hazardChoice": "{\"context\":\"[\\\"travel\\\",\\\"2\\\",\\\"\\\",\\\"id-1794511946010-n5k4ct6alen\\\",\\\"\\\",\\\"a\\\",[\\\"a\\\",\\\"b\\\"]]\",\"values\":{\"hazardItemId\":\"item-a\",\"hazardEquipmentDisposition\":\"repair\",\"hazardRepairSkill\":\"Textilecraft\",\"hazardWorkerId\":\"b\",\"hazardSkillLevel\":\"CF\",\"hazardEvidenceId\":\"id-1794511952801-f3dlo5ku3pn\"}}",
+    "evalReq": true,
+    "episodeProblem": null,
+    "pending": {
+      "start": 480,
+      "end": 540
+    },
+    "errors": []
+  },
+  "after": {
+    "version": "93.852",
+    "minute": 540,
+    "storedMinute": 540,
+    "events": 2,
+    "journal": 8,
+    "skillRows": [
+      {
+        "id": "id-1794511946010-n5k4ct6alen",
+        "type": "secondary-mastery-value-test",
+        "skill": [
+          "Survival"
+        ],
+        "level": "CF"
+      },
+      {
+        "id": "id-1794511952801-f3dlo5ku3pn",
+        "type": "secondary-mastery-test",
+        "skill": [
+          "Textilecraft"
+        ],
+        "level": "CF"
+      }
+    ],
+    "episodes": [
+      {
+        "id": "id-1794511953270-g6mxnzfjfag",
+        "from": 480,
+        "to": 540,
+        "minutes": 60,
+        "memberIds": [
+          "a",
+          "b"
+        ],
+        "slow": 0,
+        "baseSlow": 0,
+        "carryIn": 0,
+        "carryOut": 0,
+        "movementMinutes": 60,
+        "distance": 6000,
+        "nav": "clear",
+        "direction": null,
+        "hazards": [
+          {
+            "format": "hmk-episode-hazard-followup-v1",
+            "hazard": "equipment",
+            "repairSkill": "Textilecraft",
+            "repairLevel": "CF",
+            "equipmentDisposition": "repair",
+            "complicationDecision": "test",
+            "accidentAgility": null,
+            "accidentD6": null,
+            "accidentZD10": null,
+            "complicationSkill": null,
+            "complicationLevel": null,
+            "directionTurn": null,
+            "directionD10": null,
+            "directionAwareness": null,
+            "result": "irreparable",
+            "requiresGMCompletion": false,
+            "sourcePages": [
+              148,
+              149
+            ],
+            "evidenceId": "id-1794511952801-f3dlo5ku3pn",
+            "workerId": "b",
+            "complicationScope": "single",
+            "itemId": "item-a",
+            "itemOwnerId": "a",
+            "itemName": "Cloth Tunic",
+            "repairProofId": "id-1794511952801-f3dlo5ku3pn",
+            "equipmentGMPolicy": "gm-controlled-v93.845",
+            "automationVersion": "v93.635"
+          }
+        ],
+        "delay": {
+          "format": "hmk-episode-minute-delay-v1",
+          "incoming": 0,
+          "current": 0,
+          "future": 0,
+          "applied": 0,
+          "movementMinutes": 60,
+          "carryOut": 0,
+          "sourcePages": [
+            148,
+            149
+          ],
+          "method": "gm-complication-only-v93.695"
+        }
+      }
+    ],
+    "receipts": [
+      {
+        "format": "hmk-episode-equipment-change-v1",
+        "episodeId": "id-1794511953270-g6mxnzfjfag",
+        "itemId": "item-a",
+        "itemOwnerId": "a",
+        "disposition": "repair",
+        "result": "irreparable",
+        "conditionBefore": "",
+        "conditionAfter": "HMK Equipment Hazard: neopravitelný",
+        "repairWork": null,
+        "irreparable": true,
+        "repairProofId": "id-1794511952801-f3dlo5ku3pn"
+      }
+    ],
+    "item": [
+      {
+        "id": "item-a",
+        "condition": "HMK Equipment Hazard: neopravitelný",
+        "repair": {
+          "format": "hmk-inventory-equipment-repair-v1",
+          "status": "irreparable",
+          "sourceEpisodeId": "id-1794511953270-g6mxnzfjfag",
+          "repairProofId": "id-1794511952801-f3dlo5ku3pn",
+          "repairActorId": "b",
+          "gmManaged": true,
+          "outcome": "irreparable"
+        },
+        "usable": false
+      }
+    ],
+    "health": [
+      {
+        "id": "a",
+        "health": []
+      },
+      {
+        "id": "b",
+        "health": []
+      }
+    ],
+    "queue": 0,
+    "clearCount": 0,
+    "stageDisabled": true,
+    "finishDisabled": true,
+    "hazardStatus": "Vyberte postup a potvrďte jej.",
+    "hazardButtonDisabled": false,
+    "hazardButtonHidden": true,
+    "hazardDetailsHidden": true,
+    "hazardLegend": "Hazards · následné skutečné testy HMK 148–149",
+    "hazardChoice": "",
+    "evalReq": false,
+    "episodeProblem": null,
+    "pending": null,
+    "errors": []
+  },
+  "dialog": [
+    "GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 09:00 a posunout JEDINÝ kalendář o 60 minut?"
+  ],
+  "errors": []
+}

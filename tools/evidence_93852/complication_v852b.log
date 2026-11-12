@@ -1,0 +1,57 @@
+STEP F 0 'orientationProofId' Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty. HAZ None
+OPEN_SKILL F Survival
+AFTER_OPEN F returns 1 skillforms 1 0 dialogs [] text od.
+Poslední uložený SV test
+Dosud žádný uložený SV test.
+
+CF končící nulou = CF0, pětkou = CF5. Fumble / Stumble nastane jen tam, kde to konkrétní pravidlo vyžaduje (zejména Combat). Samotné CF0/CF5 mimo takovou činnost není automatickým pádem.
+
+HârnMaster Keeper’s Ledger · v93.852 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace
+STEP F 1 'survivalD10' Survival CF: navazuje povinný Survival Hazard. Doložte skutečný d10 (1–10); původní Survival test je uložen. HAZ None
+STEP F 2 'progressD10' Přebytek Progress vyžaduje 1 skutečných d10. Zadejte je oddělené čárkami. HAZ None
+STEP F 3 'progressD10' Přebytek Progress vyžaduje 1 skutečných d10. Zadejte je oddělené čárkami. HAZ None
+STEP F 4 'end_a' Každá cestující postava potřebuje skutečný END SR d10. HAZ {'p': True, 'required': False, 'disabled': False, 'hzHidden': True, 'stage': True}
+STEP F 5 ''  HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP F 6 ''  HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP F 7 ''  HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP F 8 ''  HAZ {'p': False, 'required': True, 'disabled': True, 'hzHidden': False, 'stage': True}
+OPEN_SKILL F Animalcraft
+AFTER_OPEN F returns 1 skillforms 0 1 dialogs [] text ud test ještě nebyl vyhodnocen, návrat neuloží žádný hod.
+
+CF končící nulou = CF0, pětkou = CF5. Fumble / Stumble nastane jen tam, kde to konkrétní pravidlo vyžaduje (zejména Combat). Samotné CF0/CF5 mimo takovou činnost není automatickým pádem.
+
+HârnMaster Keeper’s Ledger · v93.852 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace
+STEP F 9 'hazardAtMinute' Complication F/CF: GM musí doložit přesnou minutu překážky v aktuální hlídce. HAZ {'p': False, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP F 10 'hazardAtMinute' Complication F/CF: GM musí doložit přesnou minutu překážky v aktuální hlídce. HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP F 11 ''  HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+COMPLICATION_COMMIT F {'minute': 540, 'hazards': [{'format': 'hmk-episode-hazard-followup-v1', 'hazard': 'complication', 'repairSkill': None, 'repairLevel': None, 'equipmentDisposition': 'repair', 'complicationDecision': 'test', 'accidentAgility': None, 'accidentD6': None, 'accidentZD10': None, 'complicationSkill': 'Animalcraft', 'complicationLevel': 'F', 'directionTurn': None, 'directionD10': None, 'directionAwareness': None, 'result': 'long-delay', 'requiresGMCompletion': False, 'sourcePages': [148, 149], 'evidenceId': 'id-1794512127204-e2oaxivn3hg', 'workerId': 'a', 'complicationScope': 'single', 'complicationProofId': 'id-1794512127204-e2oaxivn3hg', 'automationVersion': 'v93.681', 'hazardAtMinute': 25, 'routeChangeConfirmed': False}], 'dialogs': ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 09:00 a posunout JEDINÝ kalendář o 60 minut?']}
+STEP CF 0 'orientationProofId' Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty. HAZ None
+OPEN_SKILL CF Survival
+AFTER_OPEN CF returns 1 skillforms 1 0 dialogs ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 09:00 a posunout JEDINÝ kalendář o 60 minut?'] text od.
+Poslední uložený SV test
+Dosud žádný uložený SV test.
+
+CF končící nulou = CF0, pětkou = CF5. Fumble / Stumble nastane jen tam, kde to konkrétní pravidlo vyžaduje (zejména Combat). Samotné CF0/CF5 mimo takovou činnost není automatickým pádem.
+
+HârnMaster Keeper’s Ledger · v93.852 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace
+STEP CF 1 'survivalD10' Survival CF: navazuje povinný Survival Hazard. Doložte skutečný d10 (1–10); původní Survival test je uložen. HAZ None
+STEP CF 2 'progressD10' Přebytek Progress vyžaduje 1 skutečných d10. Zadejte je oddělené čárkami. HAZ None
+STEP CF 3 'progressD10' Přebytek Progress vyžaduje 1 skutečných d10. Zadejte je oddělené čárkami. HAZ None
+STEP CF 4 'end_a' Každá cestující postava potřebuje skutečný END SR d10. HAZ {'p': True, 'required': False, 'disabled': False, 'hzHidden': True, 'stage': True}
+STEP CF 5 ''  HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP CF 6 ''  HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP CF 7 ''  HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP CF 8 ''  HAZ {'p': False, 'required': True, 'disabled': True, 'hzHidden': False, 'stage': True}
+OPEN_SKILL CF Animalcraft
+AFTER_OPEN CF returns 1 skillforms 0 1 dialogs ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 09:00 a posunout JEDINÝ kalendář o 60 minut?'] text ud test ještě nebyl vyhodnocen, návrat neuloží žádný hod.
+
+CF končící nulou = CF0, pětkou = CF5. Fumble / Stumble nastane jen tam, kde to konkrétní pravidlo vyžaduje (zejména Combat). Samotné CF0/CF5 mimo takovou činnost není automatickým pádem.
+
+HârnMaster Keeper’s Ledger · v93.852 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace
+STEP CF 9 'hazardAtMinute' Complication F/CF: GM musí doložit přesnou minutu překážky v aktuální hlídce. HAZ {'p': False, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP CF 10 'hazardAtMinute' Complication F/CF: GM musí doložit přesnou minutu překážky v aktuální hlídce. HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP CF 11 'hazardComplicationRouteChanged' Complication CF: GM musí potvrdit změnu trasy. HAZ {'p': False, 'required': True, 'disabled': True, 'hzHidden': False, 'stage': True}
+STEP CF 12 'hazardComplicationRouteChanged' Complication CF: GM musí potvrdit změnu trasy. HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+STEP CF 13 ''  HAZ {'p': True, 'required': True, 'disabled': False, 'hzHidden': False, 'stage': True}
+COMPLICATION_COMMIT CF {'minute': 540, 'hazards': [{'format': 'hmk-episode-hazard-followup-v1', 'hazard': 'complication', 'repairSkill': None, 'repairLevel': None, 'equipmentDisposition': 'repair', 'complicationDecision': 'test', 'accidentAgility': None, 'accidentD6': None, 'accidentZD10': None, 'complicationSkill': 'Animalcraft', 'complicationLevel': 'CF', 'directionTurn': None, 'directionD10': None, 'directionAwareness': None, 'result': 'irreparable', 'requiresGMCompletion': False, 'sourcePages': [148, 149], 'evidenceId': 'id-1794512145054-8qtcp8czww3', 'workerId': 'a', 'complicationScope': 'single', 'complicationProofId': 'id-1794512145054-8qtcp8czww3', 'automationVersion': 'v93.681', 'hazardAtMinute': 25, 'routeChangeConfirmed': True}], 'dialogs': ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 09:00 a posunout JEDINÝ kalendář o 60 minut?', 'GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 09:00 a posunout JEDINÝ kalendář o 60 minut?']}
+PASS real Chromium both Complication F/CF: actual issue button, Animalcraft skill return, confirmation, one calendar shift

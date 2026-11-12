@@ -1,0 +1,99 @@
+CAP BEFORE 'Maximální délka nového intervalu: 960 minut (do Den 2 · 00:00). Hranice kalendářního dne; pro další den se potvrzuje nové počasí.'
+FORM AFTER START: old actor picker hidden, cap hidden, new animals header visible
+REGISTRATION {'id': 'id-1794512427216-fr9uxsvggr', 'minute': 480, 'stored': 480}
+WAGON_CHECKLIST 1 k doplnění · 7 hotovo ⓘ
+
+✓
+Dostupná tažná zvířata
+Ukázat pole
+Proč je to potřeba?
+✓
+Tažná skupina vybrána
+Ukázat pole
+Proč je to potřeba?
+✓
+Blesk · Harness, horse
+Proč je to potřeba?
+✓
+Druhy kun · Harness, horse
+Proč je to potřeba?
+✓
+Vozidlo vybráno
+Ukázat pole
+Proč je to potřeba?
+✓
+Hmotnost posádky automaticky doložena
+Ukázat pole
+Proč je to potřeba?
+✓
+GM potvrdil sestavu
+Ukázat pole
+Proč je to potřeba?
+○ Drover · Animalcraft
+Po „Vyhodnotit epizodu“ otevřete požadovaný test v seznamu úkolů vpravo.
+AFTER CHECK {'selectedStable': ['id-1794512427216-fr9uxsvggr', 'id-1794512428018-95y9ohbqewm'], 'selectedLegacy': None, 'stable': ['id-1794512427216-fr9uxsvggr', 'id-1794512428018-95y9ohbqewm'], 'preflight': None, 'pendingGroup': 'id-1794512426247-jcyc547j5ab', 'groups': [{'actor': 'a', 'done': False}, {'actor': 'c', 'done': False}], 'time': 480, 'stored': 480} HEALTH Zdravotní stav: Zdravotní stav bez omezení pohybu
+EVALUATE CHECKLIST Další povinný krok (1 z 2). Po potvrzení se určí další návaznost:
+
+1
+Animalcraft · Aktér A
+
+Drover Test: cesta vyžaduje Animalcraft Skill Test postavy Aktér A (HMK 141, 145).
+
+Otevřít Animalcraft Skill Test
+STEP group1-with-animal 0 'droverProofId' Drover Test: cesta vyžaduje Animalcraft Skill Test postavy Aktér A (HMK 141, 145).
+STEP group1-with-animal 1 'orientationProofId' Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty.
+STEP group1-with-animal 2 'progressD10' Přebytek Progress vyžaduje 2 skutečných d10. Zadejte je oddělené čárkami.
+STEP group1-with-animal 3 'end_a' Každá cestující postava potřebuje skutečný END SR d10.
+STAGING group1-with-animal ✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.
+AFTER STAGE 1 {'selectedStable': [], 'selectedLegacy': None, 'stable': ['id-1794512427216-fr9uxsvggr', 'id-1794512428018-95y9ohbqewm'], 'preflight': None, 'pendingGroup': 'id-1794512426541-ne69nmbpwaq', 'groups': [{'actor': 'a', 'done': True}, {'actor': 'c', 'done': False}], 'time': 480, 'stored': 480} RESERVED {'groups': [{'groupId': 'id-1794512426247-jcyc547j5ab', 'kind': 'travel', 'memberIds': ['a'], 'animalIds': [], 'stableAnimalIds': ['id-1794512427216-fr9uxsvggr', 'id-1794512428018-95y9ohbqewm'], 'vehicleKey': 'id-1794512427216-fr9uxsvggr::id-1794512429656-s753waccatb', 'startMinute': 480, 'minutes': 45}], 'plan': {'id': 'id-1794512426541-ne69nmbpwaq', 'episodeRowV': 3, 'groupNumber': 2, 'actorId': 'c', 'weatherId': 'global-weather-snow', 'groupId': 'id-1794512426541-ne69nmbpwaq', 'followsGroup': '', 'kind': 'travel', 'minutes': 45, 'memberIds': ['c'], 'done': False}, 'scheduled': [{'id': 'id-1794512426247-jcyc547j5ab', 'groupId': 'id-1794512426247-jcyc547j5ab', 'groupNumber': 1, 'kind': 'travel', 'actorId': 'a', 'guideId': 'a', 'weatherId': 'global-weather-snow', 'memberIds': ['a'], 'startMinute': 480, 'endMinute': 525, 'minutes': 45}, {'id': 'id-1794512426541-ne69nmbpwaq', 'groupId': 'id-1794512426541-ne69nmbpwaq', 'groupNumber': 2, 'kind': 'travel', 'actorId': 'c', 'guideId': 'c', 'weatherId': 'global-weather-snow', 'memberIds': ['c'], 'startMinute': 480, 'endMinute': 525, 'minutes': 45}], 'reserved': [['id-1794512427216-fr9uxsvggr', 'id-1794512426247-jcyc547j5ab'], ['id-1794512428018-95y9ohbqewm', 'id-1794512426247-jcyc547j5ab']]}
+RESERVATION_PASS True False
+STEP group2-independent 0 'orientationProofId' Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty.
+STEP group2-independent 1 'progressD10' Přebytek Progress vyžaduje 2 skutečných d10. Zadejte je oddělené čárkami.
+STEP group2-independent 2 'end_c' Každá cestující postava potřebuje skutečný END SR d10.
+STAGING group2-independent ✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.
+AFTER STAGE 2 {'no_form': True}
+FINAL RECEIPT {'minute': 525, 'stored': 525, 'events': 4, 'episodes': [{'memberIds': ['a'], 'stable': ['id-1794512427216-fr9uxsvggr', 'id-1794512428018-95y9ohbqewm'], 'animalHealth': [{'format': 'hmk-trek-animal-health-v1', 'actorId': 'id-1794512427216-fr9uxsvggr', 'breed': 'palfrey', 'fatigue': 0, 'shock': 'NONE', 'comaActive': False, 'extendedShockActive': False, 'injured': False, 'immobile': False, 'seriousWounds': []}, {'format': 'hmk-trek-animal-health-v1', 'actorId': 'id-1794512428018-95y9ohbqewm', 'breed': 'palfrey', 'fatigue': 0, 'shock': 'NONE', 'comaActive': False, 'extendedShockActive': False, 'injured': False, 'immobile': False, 'seriousWounds': []}], 'from': 480, 'to': 525, 'distance': 4500}, {'memberIds': ['c'], 'stable': [], 'animalHealth': [], 'from': 480, 'to': 525, 'distance': 4500}], 'windows': 1} DIALOGS ['GM potvrzuje bezplatné převzetí Palfrey, cart horse (Blesk) postavou Aktér A?', 'GM potvrzuje bezplatné převzetí Palfrey, cart horse (Druhy kun) postavou Aktér A?', 'Stáj · Blesk: GM potvrzuje převzetí výstroje?\nPořízení chybějící výstroje při rozpracovaném Pochodu', 'Stáj · Druhy kun: GM potvrzuje převzetí výstroje?\nPořízení chybějící výstroje při rozpracovaném Pochodu', 'Stáj · Blesk: GM potvrzuje pořízení vozidla?\nPořízení chybějící výstroje při rozpracovaném Pochodu', 'GM: potvrdit 2 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:45 a posunout JEDINÝ kalendář o 45 minut?'] ERRORS [] TAIL ejte řádky jednotlivých postav. Hodit lze pouze pro platný řádek; kalendář se neposouvá, dokud GM nepotvrdí všechny činnosti.
+
+Maximální délka nového intervalu: 915 minut (do Den 2 · 00:00). Hranice kalendářního dne; pro další den se potvrzuje nové počasí.
+
+Celkový plán cestování (min)
+Výchozí globální počasí pro nové řádky
+— Vyberte potvrzené počasí —
+Les
+Založit společný interval (bez hodu)
+
+Nejprve zvolte dobu a potvrzené počasí, potom založte interval a naplánujte činnosti postav.
+
+Wilderness Tasks · Foraging / Stalking / Vigilance (HMK 147) · 0 k doložení
+Vyhodnocení a dokončení
+
+1 · Nastavení
+
+Vyberte činnost, účastníky a podmínky; poté stiskněte Vyhodnotit epizodu vlevo.
+
+Pravidlové výsledky a doklady
+
+Výsledky se zobrazí až po vyhodnocení.
+
+Úkoly před dokončením
+
+Po vyhodnocení zde vznikne seznam všech potřebných hodů a navazujících situací.
+
+Dokončit a zapsat celou epizodu
+Společný interval · připravené činnosti
+
+Činnosti postav se vyhodnocují podle připravených řádků. Každá má vlastní časovou kotvu a doklad; nevyužitý čas se automaticky nezapočítává jako odpočinek. Jediný posun společného kalendáře provede GM až na závěr.
+
+Potvrdit výsledek řádku a pokračovat (bez posunu času) Potvrdit všechny činnosti a posunout kalendář
+Nouzové odblokování Cestování
+Poslední dokončená epizoda
+
+Den 1 · 08:00–Den 1 · 08:45 · travel · 45 min · 4500 m
+
+Záznam uložen.
+
+Stalking / Vigilance: normal · Stalking 0, Vigilance 0. Bez dalšího fiktivního hodu Tracking.
+
+Přejít do kroniky ↗
+HârnMaster Keeper’s Ledger · v93.852 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace
+PASS Chromium v93.851 TWO GROUPS: actual two travel groups, bought and selected animal, manual Survival Skill Tests, two journals, one final clock advance 480→525; no duplicate animal and no runtime errors.

@@ -1,0 +1,6 @@
+HEADINGS_PASS desert
+DESERT FLATS SELECTED Trek Movement (HMK 146) · 5 lig na 240 referenčních minut · Bearing 2 za každého počasí · skutečná vzdálenost a únava se přepočítají na zadané minuty.
+STEP desert 0 orientationProofId Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Orienteering · Survival · Aktér A  Vykonejte a ulož
+STEP desert 1 end_a Každá cestující postava potřebuje skutečný END SR d10. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Únava · END d10 · Aktér A  Doložte skutečný individ
+RECEIPT {'minute': 510, 'stored': 510, 'episodes': [{'memberIds': ['a'], 'hazards': [], 'from': 480, 'to': 510}], 'windows': 1} DIALOGS ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:30 a posunout JEDINÝ kalendář o 30 minut?'] ERRORS []
+PASS ONE PERSON desert
