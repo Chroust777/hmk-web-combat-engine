@@ -139,6 +139,7 @@ import {strengthEncumbranceModifier} from './src/rules/encumbrance.js';
 import { WORKSHOP_SKILLS_P121, workshopQuality, occupationalWorkshop, waterWeightLb, mundaneFireImpact, fireGrowthSteps } from './src/rules/craft-workshop-p121.js';
 import { EXPEDITION_EQUIPMENT_P120, CRAFT_ITEMS_TOOLS_P121, WORKSHOP_QUALITY_P121, WATER_WEIGHT_P121, MUNDANE_FIRE_P121 } from './src/rules/possessions-printed.js';
 import { BEASTS_P122, VEHICLES_TACK_P122, CONVEYANCE_RULES_P122 } from './src/rules/conveyance-printed-p122.js';
+import {survivalAccidentVictimPool93846} from './src/integration/hmk-survival-accident-pool-93846.js';
 import {equipmentHazardSkill93843} from './src/integration/hmk-equipment-hazard-skill-93843.js';
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
 import {planTravelEquipment93812,resolveTravelMount93837,isRidingAnimal93837} from './src/integration/hmk-travel-equipment-guide-93812.js';
@@ -350,7 +351,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.845';
+const APP_VERSION='93.846';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11202,8 +11203,25 @@ function hskSkillPhysicalImpactForm(entry){
  const watchMembers=directAccident?new Set([...(confirmedTrek?.calendarTimeEpisode?.memberIds||[]),
   ...(confirmedTrek?.calendarTimeEpisode?.settings?.animalIds||[]),
   ...(confirmedTrek?.calendarTimeEpisode?.settings?.stableAnimalIds||[])]):null;
- const eligibleTargets=survival?data.characters.filter(x=>candidateIds.has(x.id)&&
-  (!watchMembers||watchMembers.has(x.id))&&!x.archived&&(x.kind!=='Animal'||!!x.hmk?.verifiedMountedBreed)):[];
+ // HMK 148: the original watch may include Stable animals without a
+ // separate medical actor. Suppressing them from the random draw would bias
+ // the victim lottery toward people. Require real medical registration first.
+ const accidentPool=directAccident&&confirmedTrek?survivalAccidentVictimPool93846({
+  memberIds:confirmedTrek.calendarTimeEpisode.memberIds||[],
+  stableAnimalIds:confirmedTrek.calendarTimeEpisode.settings?.stableAnimalIds||[],
+  legacyAnimalIds:confirmedTrek.calendarTimeEpisode.settings?.animalIds||[],
+  characters:data.characters,activeIds:[...candidateIds]
+ }):null;
+ const eligibleTargets=accidentPool?accidentPool.eligible:
+  survival?data.characters.filter(x=>candidateIds.has(x.id)&&
+   (!watchMembers||watchMembers.has(x.id))&&!x.archived&&(x.kind!=='Animal'||!!x.hmk?.verifiedMountedBreed)):[];
+ const accidentPoolError=accidentPool&&!accidentPool.ok?
+  'Nehodu zatím nelze náhodně rozdělit: zvířata ze Stáje bez aktivního ověřeného zdravotního profilu: '+
+  (accidentPool.missingAnimals.length?accidentPool.missingAnimals.map(id=>verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===id)?.name||id).join(', '):'žádná')+
+  (accidentPool.unsupportedAnimals.length?'; zvířata s jinou, dosud neimplementovanou anatomickou tabulkou: '+
+   accidentPool.unsupportedAnimals.map(id=>verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===id)?.name||id).join(', '):'')+
+  (accidentPool.missingPeople.length?'; neaktivní členové skupiny: '+accidentPool.missingPeople.join(', '):'')+
+  '. Nejprve dokončete jejich původní zdravotní registraci nebo předejte odlišnou anatomii GM; žádný hod ani zranění nevymýšlejte.':null;
  const targetOptions='<option value="">— nejprve určete náhodně —</option>'+eligibleTargets.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
  const dieInput=(name,faces,label)=>'<label>'+label+'<input type="number" name="'+name+'" min="1" max="'+faces+'" inputmode="numeric"></label>';
  return `<form class="hsk-climb-fall" data-skill-physical-impact>
@@ -11211,10 +11229,10 @@ function hskSkillPhysicalImpactForm(entry){
  <h4>${survival?'Survival Hazard · HMK str. 148':'Fishing · náhodné zranění d10e · HMK str. 71'}</h4>
  <p>${survival?(fixedHazardDie!=null?'Survival Hazard d10 = <strong>'+esc(String(fixedHazardDie))+'</strong> je převzat z dokončeného Cestování. <strong>Neházejte jej znovu.</strong> Pokračujte náhodným výběrem účastníka a testem Agility.':'Nejprve určete d10: <strong>1–3 Equipment</strong> (výstroj), <strong>4–6 Accident</strong> (nehoda), <strong>7–10 Complication</strong> (komplikace). Jen Accident vyžaduje náhodného účastníka a Agility; další hody vznikají až při F/CF. Nevyplňujte skryté nepovinné hodnoty.'):'Fishing CF způsobí Impact d10e do náhodné lokality. Fyzické hody určují následek podle HMK.'}</p>
  ${survival?`<div class="hsk-hazard-step"><div class="field-grid">${fixedHazardDie!=null?'<label>Survival Hazard d10 – převzato z dokončeného Cestování<input type="number" name="hazardD10" min="1" max="10" readonly value="'+esc(String(fixedHazardDie))+'"></label>':dieInput('hazardD10',10,'Survival Hazard d10 (povinný)')}</div><p class="tiny" data-hsk-hazard-guidance>Vyplňte nebo vygenerujte d10; podle výsledku se objeví pouze potřebné další vstupy.</p></div>
- <div data-hsk-hazard-accident ${fixedHazardDie>=4&&fixedHazardDie<=6?'':'hidden'} class="hsk-hazard-step"><div class="field-grid"><label>Náhodně zvolený účastník
- <select name="targetId">${targetOptions}</select></label>
+ <div data-hsk-hazard-accident ${fixedHazardDie>=4&&fixedHazardDie<=6?'':'hidden'} class="hsk-hazard-step">${accidentPoolError?`<p role="alert" class="hc-episode-await" data-hsk-accident-pool-blocked>${esc(accidentPoolError)}</p>`:`<p class="hc-hint" data-hsk-accident-pool-count>Losování zahrnuje všech ${eligibleTargets.length} doložených účastníků původního intervalu, včetně registrovaných jízdních a tažných zvířat.</p>`}<div class="field-grid"><label>Náhodně zvolený účastník
+ <select name="targetId" ${accidentPoolError?'disabled':''}>${targetOptions}</select></label>
  ${dieInput('agilityD100',100,'Agility d100 náhodně zvoleného účastníka')}</div>
- <button type="button" class="hc-small hc-provision-generate" data-hsk-random-victim>⚄ Náhodně určit účastníka</button>
+ <button type="button" class="hc-small hc-provision-generate" data-hsk-random-victim ${accidentPoolError?'disabled':''}>⚄ Náhodně určit účastníka</button>
  <p class="tiny">Postavu lze také vybrat ručně podle skutečného fyzického losu. Po vyplnění Agility se zobrazí další krok. Tento výběr není nový test Orienteering.</p></div>
  <div data-hsk-hazard-gm hidden class="hsk-hazard-step"><label>GM: doložený skutečný následek Equipment nebo Complication
  <textarea name="gmHazardOutcome" rows="3" minlength="8" maxlength="600" placeholder="Konkrétní událost, případný opravný/terénní Skill Test a výsledek, zdržení či dopad na další hlídku."></textarea></label>
@@ -12780,6 +12798,14 @@ document.addEventListener('submit',event=>{
   // Equipment and Complication require no accident victim. A random
   // target is required ONLY when the Hazard d10 selects Accident (4–6).
   const accident=kind==='survival-accident'&&hazardD10>=4&&hazardD10<=6;
+  if(accident&&directAccident){
+   const originEp=originalTrek?.calendarTimeEpisode;
+   const pool=survivalAccidentVictimPool93846({memberIds:originEp?.memberIds||[],
+    stableAnimalIds:originEp?.settings?.stableAnimalIds||[],legacyAnimalIds:originEp?.settings?.animalIds||[],
+    characters:data.characters,activeIds:data.campaignClock?.characterIds||[]});
+   if(!pool.ok)throw Error('Accident: losování musí zahrnout všechny původní účastníky, včetně zvířat. Nejdřív dokončete zdravotní registraci zvířat a ověřte aktivní skupinu.');
+   if(!pool.expectedIds.includes(raw('targetId')))throw Error('Accident: oběť není členem původní družiny.');
+  }
   const target=character(accident?raw('targetId'):proof.actorId);
   if(!target)throw Error(accident?'Nejprve náhodně určete účastníka nehody':'Cílová postava nebyla nalezena');
   // The original Survival Hazard can affect a DIFFERENT party member than
