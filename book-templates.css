@@ -6882,6 +6882,13 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-die{display:flex;align-items:stretch;gap:.3rem}
 .hc-episode-die input{flex:1;min-width:0}
 .hc-episode-die button{width:auto;white-space:nowrap;padding:.35rem .55rem;font-size:.83rem}
+/* v93.849 · the roll is never committed on a partial keystroke or on Generate. */
+.hc-episode-die{flex-wrap:wrap}
+.hc-episode-die input{flex:1 1 7.5rem}
+.hc-episode-die .hc-episode-roll-accept{font-weight:700;border:1px solid #70481f;background:#ead4a1;color:#30200d;border-radius:5px;box-shadow:inset 0 1px rgba(255,255,255,.6)}
+.hc-episode-roll-hint{display:block;margin:.2rem 0 .45rem;font-size:.78rem;line-height:1.35;color:#6b431f}
+.hc-episode-roll-pending:not(:empty){padding:.4rem .55rem;border-left:3px solid #94561c;background:rgba(231,185,115,.18)}
+
 .hc-episode-dice-by-person{border-top:1px solid rgba(118,74,26,.22);margin:.6rem 0;padding:.6rem 0}
 .hc-episode-dice-by-person label{margin:.5rem 0}
 .hc-episode-dice-by-person p{font-size:.85rem;line-height:1.4}
