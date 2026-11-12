@@ -494,7 +494,7 @@ export function computeEpisodeOrientation({mode='none',currentSkill=null,previou
   }
  }
  return {format:EPISODE_SKILL_MEMORY_FORMAT,skillId:witness.skillId,guideId:context.guideId,
-  context,sv:witness.sv,level:witness.level,stars:witness.stars??null,roll:witness.roll??null,
+  context,sv:witness.sv,level:witness.level,stars:adjustment.advantageModes,roll:witness.roll??null,
   adjustment,priority,allocationMode,stationaryForaging:stationaryForaging===true,lowChoice:mode==='reuse'?witness.lowChoice||lowChoice:lowChoice,
   manualModes:allocationMode==='manual'?Object.fromEntries(['bearing','progress','foraging','stalking','vigilance'].map(k=>[k,allocation[k]])):null,
   droverSkillId:mode==='reuse'?witness.droverSkillId??null:droverSkill?.skillId??null,
