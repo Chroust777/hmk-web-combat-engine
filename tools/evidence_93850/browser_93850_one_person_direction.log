@@ -1,0 +1,18 @@
+HEADINGS_PASS direction
+STEP direction 0 orientationProofId Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Orienteering · Survival · Aktér A  Vykonejte a ulož
+STEP direction 1 progressD10 Přebytek Progress vyžaduje 2 skutečných d10. Zadejte je oddělené čárkami. TASK Další povinný krok (1 z 2). Po potvrzení se určí další návaznost:  1 Pohyb · Progress  Přebytek Progress vyžaduje 2 skut
+STEP direction 2 directionD10 Chybí 1 platný Direction Hazard d10 (HMK 148). TASK Další povinný krok (1 z 2). Po potvrzení se určí další návaznost:  1 Direction Hazard · následek  Chybí 1 platný Directi
+STEP direction 3 end_a Každá cestující postava potřebuje skutečný END SR d10. TASK Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:  1 Únava · END d10 · Aktér A  Doložte skutečný individ
+STEP direction 4 hazardDirectionD10  TASK Další povinný krok (1 z 1). Po jeho vyřešení aplikace automaticky nabídne další návaznost:  1 Direction Hazard · směr od
+AFTER DEVIATION Aktuální povinný krok · potvrzení Direction Hazardu
+
+✓ Směr odchýlení: d10 7
+
+Hod je doložen. Nyní výslovně potvrďte postup Direction Hazardu. Teprve potom se určí případný Awareness nebo dokončení cesty.
+
+Potvrdit postup Direction Hazardu
+DIRECTION HAZARD CHOICES CONFIRMED
+AWARENESS EXPLICITLY DEFERRED
+DIRECTION HAZARD CHOICES CONFIRMED
+RECEIPT {'minute': 510, 'stored': 510, 'episodes': [{'memberIds': ['a'], 'hazards': [{'format': 'hmk-episode-hazard-followup-v1', 'hazard': 'misdirection', 'repairSkill': None, 'repairLevel': None, 'equipmentDisposition': 'repair', 'complicationDecision': 'test', 'accidentAgility': None, 'accidentD6': None, 'accidentZD10': None, 'complicationSkill': None, 'complicationLevel': None, 'directionTurn': 'left', 'directionD10': 7, 'directionAwareness': None, 'directionObservationDeferred': True, 'result': 'continue-misdirected', 'requiresGMCompletion': False, 'sourcePages': [148, 149], 'evidenceId': None, 'workerId': 'a', 'complicationScope': 'single', 'automationVersion': 'v93.635', 'directionProofId': None}], 'from': 480, 'to': 510}], 'windows': 1} DIALOGS ['GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:30 a posunout JEDINÝ kalendář o 30 minut?'] ERRORS []
+PASS ONE PERSON direction

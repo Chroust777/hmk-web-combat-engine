@@ -1,0 +1,71 @@
+CAP BEFORE 'Maximální délka nového intervalu: 960 minut (do Den 2 · 00:00). Hranice kalendářního dne; pro další den se potvrzuje nové počasí.'
+FORM AFTER START: old actor picker hidden, cap hidden, new animals header visible
+REGISTRATION {'id': 'id-1794494862649-6suq7p60ie5', 'minute': 480, 'stored': 480}
+AFTER CHECK {'selectedStable': ['id-1794494862649-6suq7p60ie5'], 'selectedLegacy': None, 'stable': ['id-1794494862649-6suq7p60ie5'], 'preflight': None, 'pendingGroup': 'id-1794494861472-h3dq41cb6h', 'groups': [{'actor': 'a', 'done': False}, {'actor': 'c', 'done': False}], 'time': 480, 'stored': 480} HEALTH Zdravotní stav: Zdravotní stav bez omezení pohybu
+EVALUATE CHECKLIST Další povinný krok (1 z 1). Po potvrzení se určí další návaznost:
+
+1
+Orienteering · Survival · Aktér A
+
+Vykonejte a uložte skutečný Survival Success Value test průvodce.
+
+Otevřít Survival Skill Test
+STEP group1-with-animal 0 'orientationProofId' Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty.
+STEP group1-with-animal 1 'progressD10' Přebytek Progress vyžaduje 2 skutečných d10. Zadejte je oddělené čárkami.
+STEP group1-with-animal 2 'end_a' Každá cestující postava potřebuje skutečný END SR d10.
+STAGING group1-with-animal ✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.
+AFTER STAGE 1 {'selectedStable': [], 'selectedLegacy': None, 'stable': ['id-1794494862649-6suq7p60ie5'], 'preflight': None, 'pendingGroup': 'id-1794494861833-xoq3ripbzee', 'groups': [{'actor': 'a', 'done': True}, {'actor': 'c', 'done': False}], 'time': 480, 'stored': 480} RESERVED {'groups': [{'groupId': 'id-1794494861472-h3dq41cb6h', 'kind': 'travel', 'memberIds': ['a'], 'animalIds': [], 'stableAnimalIds': ['id-1794494862649-6suq7p60ie5'], 'vehicleKey': None, 'startMinute': 480, 'minutes': 135}], 'plan': {'id': 'id-1794494861833-xoq3ripbzee', 'episodeRowV': 3, 'groupNumber': 2, 'actorId': 'c', 'weatherId': 'global-weather-snow', 'groupId': 'id-1794494861833-xoq3ripbzee', 'followsGroup': '', 'kind': 'travel', 'minutes': 135, 'memberIds': ['c'], 'done': False}, 'scheduled': [{'id': 'id-1794494861472-h3dq41cb6h', 'groupId': 'id-1794494861472-h3dq41cb6h', 'groupNumber': 1, 'kind': 'travel', 'actorId': 'a', 'guideId': 'a', 'weatherId': 'global-weather-snow', 'memberIds': ['a'], 'startMinute': 480, 'endMinute': 615, 'minutes': 135}, {'id': 'id-1794494861833-xoq3ripbzee', 'groupId': 'id-1794494861833-xoq3ripbzee', 'groupNumber': 2, 'kind': 'travel', 'actorId': 'c', 'guideId': 'c', 'weatherId': 'global-weather-snow', 'memberIds': ['c'], 'startMinute': 480, 'endMinute': 615, 'minutes': 135}], 'reserved': [['id-1794494862649-6suq7p60ie5', 'id-1794494861472-h3dq41cb6h']]}
+RESERVATION_PASS True False
+STEP group2-independent 0 'orientationProofId' Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty.
+STEP group2-independent 1 'progressD10' Přebytek Progress vyžaduje 2 skutečných d10. Zadejte je oddělené čárkami.
+DOUBLE TIME SWITCHED
+STEP group2-independent 2 'progressD10' Přebytek Progress vyžaduje 2 skutečných d10. Zadejte je oddělené čárkami.
+STEP group2-independent 3 'end_c' Double Time vyžaduje samostatný skutečný END d10 za každou započatou hodinu pohybu (3 hodů).
+DOUBLE TIME END LABEL Zadejte 3 celé hody d10 oddělené čárkami (např. 1,10,5).
+STAGING group2-independent ✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.
+AFTER STAGE 2 {'no_form': True}
+FINAL RECEIPT {'minute': 615, 'stored': 615, 'events': 3, 'episodes': [{'memberIds': ['a'], 'stable': ['id-1794494862649-6suq7p60ie5'], 'animalHealth': [{'format': 'hmk-trek-animal-health-v1', 'actorId': 'id-1794494862649-6suq7p60ie5', 'breed': 'palfrey', 'fatigue': 0, 'shock': 'NONE', 'comaActive': False, 'extendedShockActive': False, 'injured': False, 'immobile': False, 'seriousWounds': []}], 'from': 480, 'to': 615, 'distance': 13500}, {'memberIds': ['c'], 'stable': [], 'animalHealth': [], 'from': 480, 'to': 615, 'distance': 27000}], 'windows': 1} DIALOGS ['GM potvrzuje bezplatné převzetí Palfrey, cart horse (Blesk) postavou Aktér A?', 'GM: potvrdit 2 nezávislých činností od Den 1 · 08:00 do Den 1 · 10:15 a posunout JEDINÝ kalendář o 135 minut?'] ERRORS [] TAIL te řádky jednotlivých postav. Hodit lze pouze pro platný řádek; kalendář se neposouvá, dokud GM nepotvrdí všechny činnosti.
+
+Maximální délka nového intervalu: 825 minut (do Den 2 · 00:00). Hranice kalendářního dne; pro další den se potvrzuje nové počasí.
+
+Celkový plán cestování (min)
+Výchozí globální počasí pro nové řádky
+— Vyberte potvrzené počasí —
+Les
+Založit společný interval (bez hodu)
+
+Nejprve zvolte dobu a potvrzené počasí, potom založte interval a naplánujte činnosti postav.
+
+Wilderness Tasks · Foraging / Stalking / Vigilance (HMK 147) · 0 k doložení
+Vyhodnocení a dokončení
+
+1 · Nastavení
+
+Vyberte činnost, účastníky a podmínky; poté stiskněte Vyhodnotit epizodu vlevo.
+
+Pravidlové výsledky a doklady
+
+Výsledky se zobrazí až po vyhodnocení.
+
+Úkoly před dokončením
+
+Po vyhodnocení zde vznikne seznam všech potřebných hodů a navazujících situací.
+
+Dokončit a zapsat celou epizodu
+Společný interval · připravené činnosti
+
+Činnosti postav se vyhodnocují podle připravených řádků. Každá má vlastní časovou kotvu a doklad; nevyužitý čas se automaticky nezapočítává jako odpočinek. Jediný posun společného kalendáře provede GM až na závěr.
+
+Potvrdit výsledek řádku a pokračovat (bez posunu času) Potvrdit všechny činnosti a posunout kalendář
+Nouzové odblokování Cestování
+Poslední dokončená epizoda
+
+Den 1 · 08:00–Den 1 · 10:15 · travel · 135 min · 27000 m
+
+Záznam uložen.
+
+Stalking / Vigilance: normal · Stalking 0, Vigilance 0. Bez dalšího fiktivního hodu Tracking.
+
+Přejít do kroniky ↗
+HârnMaster Keeper’s Ledger · v93.850 · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace
+PASS Chromium v93.850 TWO GROUPS: actual two travel groups, bought and selected animal, manual Survival Skill Tests, two journals, one final clock advance 480→615; no duplicate animal and no runtime errors.
