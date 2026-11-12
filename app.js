@@ -351,7 +351,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.850';
+const APP_VERSION='93.849';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2953,7 +2953,7 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-episode-clockline"><strong>Začátek:</strong> ${esc(start)} · <span data-episode-end>Konec po zadání minut</span>. Vyhodnocení na konci intervalu; čas se do té doby neposouvá.</p>
  
  <label class="hc-check"><input name="rememberSettings" type="checkbox" checked> <span class="hc-help-term" tabindex="0" data-hmk-help="Převezme účastníky, průvodce, krajinu, trasu a další nastavení z poslední epizody. Nikdy nekopíruje staré hody, SV ani jejich ★. Po zrušení zaškrtnutí můžete začít od výchozího nastavení; existující následky postav zůstávají.">Předvyplnit nastavení z poslední epizody</span></label>
- <details class="hc-episode-settings" data-episode-section="environment" open><summary><span class="hc-help-term" tabindex="0" data-hmk-help="Teplota: běžné podmínky, nebezpečný chlad nebo nebezpečné horko. Z téhož denního d10 se podmínky zvlášť vypočtou pro den a noc; noc používá klimatický postih. Srážky: bez srážek nebo srážky. Za běžných podmínek déšť; při cold hazardu sníh, nebo při hraničním hodu déšť se sněhem / mrznoucí déšť. Doplňující d6 určuje intenzitu: 1 = nepřetržité srážky, 2–6 = slabé či pro pohyb nevýznamné. Změní-li se skutečné počasí během epizody, GM rozdělí časový interval.">2 · Počasí a prostředí pro celou epizodu</span><span class="hc-episode-section-party" data-episode-section-party="environment"></span></summary><div class="hmk-trek-grid">
+ <details class="hc-episode-settings" data-episode-section="environment" open><summary><span class="hc-help-term" tabindex="0" data-hmk-help="Teplota: běžné podmínky, nebezpečný chlad nebo nebezpečné horko. Z téhož denního d10 se podmínky zvlášť vypočtou pro den a noc; noc používá klimatický postih. Srážky: bez srážek nebo srážky. Za běžných podmínek déšť; při cold hazardu sníh, nebo při hraničním hodu déšť se sněhem / mrznoucí déšť. Doplňující d6 určuje intenzitu: 1 = nepřetržité srážky, 2–6 = slabé či pro pohyb nevýznamné. Změní-li se skutečné počasí během epizody, GM rozdělí časový interval.">2 · Počasí a prostředí pro celou epizodu</span></summary><div class="hmk-trek-grid">
  <div class="hc-episode-sky-strip"><span class="hc-help-term" tabindex="0" data-hmk-help="Roční období určuje datum kampaně TR. Světlo se vypočítá z hodiny, šířkového pásma a délky dne podle HMK 142. Protože HMK neudává místní východ slunce, hranice dne používají polední aproximaci; konkrétní časové okolnosti může upravit GM změnou epizody.">Světlo a roční období</span><strong data-episode-light-auto>Odvozuje se z kalendáře</strong></div>
  <label class="hc-episode-latitude">Šířkové pásmo <select name="latitudeBand"><option value="mid">Střední</option><option value="high">Vysoká</option><option value="polar">Polární</option><option value="low">Nízká</option></select></label>
  <div hidden aria-hidden="true"><input name="lightPeriod" value="day"><input name="lightCalculation" value="latitude"><input name="daylightSeason" value="spring"><input name="sunriseMinute" value="360"><input name="twilightMinutes" value="60"></div>
@@ -2973,7 +2973,7 @@ function timeEpisodePageHTML(clock,participants){
  <label data-episode-weather-roll>Srážky (d10)<span class="hc-episode-die"><input name="precipitationD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="precipitationD10">⚄ d10</button></span></label>
  </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p></details>
 
- <fieldset class="hc-episode-party-panel hmk-transport-compact"><legend>3 · Zvířata a doprava <span class="hc-episode-section-party" data-episode-section-party="transport"></span></legend>
+ <fieldset class="hc-episode-party-panel hmk-transport-compact"><legend>3 · Zvířata a doprava</legend>
  <div class="hmk-transport-heading"><label class="hmk-transport-primary" data-episode-travel-geography>Způsob dopravy <select name="conveyance" data-hmk-transport-conveyance><option value="foot">Pěšky</option><option value="mount">Jízda na zvířeti</option><option value="cart">Kára</option><option value="wagon">Vůz</option></select></label><span class="hmk-transport-heading-status" data-episode-transport-quick-status role="status">Zvolte způsob dopravy a zvířata ze Stáje.</span></div><div class="hc-episode-members" data-episode-legacy-members hidden aria-hidden="true">${characterRows}</div><label data-episode-legacy-guide hidden aria-hidden="true">Průvodce / osoba provádějící orientaci<select name="guideId">${participants.map(c=>option(c.id,c.name)).join('')}</select></label>
  <section class="hc-episode-patient-guide panel" data-episode-patient-guide hidden aria-live="polite">
  <strong>Přeprava nepohyblivé postavy · povinný krok před hody</strong>
@@ -3031,7 +3031,7 @@ function timeEpisodePageHTML(clock,participants){
  const healthStatus=health.error?' · CHYBNÝ STAV: '+health.error:health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40?' · NEMŮŽE SAMO POKRAČOVAT':health.injured?' · zraněné · Slow':health.fatigue>=20?' · unavené · Slow':'';
  return `<div class="hc-trek-animal-choice"><label class="hc-check"><input name="animalIds" type="checkbox" value="${esc(a.id)}" ${otherGroupAnimals93848.has(a.id)?'disabled title="Již přiřazeno jiné skupině"':''}>${esc(a.name)}${esc(healthStatus)}</label><button type="button" class="secondary" data-trek-leave-animal="${esc(a.id)}">Opustit zvíře (včetně ponechaného nákladu)</button><details class="hc-trek-animal-injuries"><summary>Anatomie a aktuální zranění (HMK 355)</summary>${hmkAnimalWoundAnatomyHTML(a)}</details></div>`}).join('')}</div></fieldset>`:''}
  </fieldset>
- <details class="hc-episode-settings" data-episode-section="skills"><summary>4 · Dovednosti vybrané činnosti <span class="hc-episode-section-party" data-episode-section-party="skills"></span></summary>
+ <details class="hc-episode-settings" data-episode-section="skills"><summary>4 · Dovednosti vybrané činnosti</summary>
  <p class="hc-episode-brief">Survival / Tracking · nový doložený hod nebo povolené pokračování.</p>
  ${lastRow?`<p class="hc-episode-memory-note">Poslední doložená epizoda: ${esc(displayCampaignMinute(lastRow.calendarTimeEpisode.startMinute))}–${esc(displayCampaignMinute(lastRow.calendarTimeEpisode.endMinute))}; ${esc(lastRow.calendarTimeEpisode.kind)}. Předchozí Orienteering: ${lastRow.calendarTimeEpisode.orientation?`SV ${lastRow.calendarTimeEpisode.orientation.sv} · ${lastRow.calendarTimeEpisode.orientation.stars??'—'} ★`:'bez doloženého SV'}. Navigace: ${esc(lastRow.calendarTimeEpisode.navigationState||'bez evidovaného bloudění')}.</p>`:''}
  <label data-episode-orientation-use class="hc-check hc-episode-remember-sv"><input type="checkbox" name="orientationReuse" ${lastRow?.calendarTimeEpisode?.orientation?'':'disabled'}> <span class="hc-help-term" tabindex="0" data-hmk-help="Použít dříve doložený Survival SV jen při bezprostředním pokračování stejné cesty se stejnou družinou, průvodcem a podmínkami. Pokud není zaškrtnuto, požaduje se nový Survival Skill Test.">Převzít platný Orienteering SV z předchozí epizody</span></label><p class="hc-hint" data-episode-reuse-status role="status"></p>
@@ -3044,7 +3044,6 @@ function timeEpisodePageHTML(clock,participants){
  <label class="hc-check" data-episode-night-option><input name="orientationSnow" type="checkbox"> Sněhová pokrývka zlepšuje noční viditelnost (HMK 145)</label> <p class="hc-hint" data-episode-night-info>Časové podmínky vypočte kalendář; ve dne nelze zapnout noční bonusy.</p></div>
  <label><span data-episode-modes-heading>Rozdělení získaných Advantage Modes</span> ${episodeRuleHelp('Trek Modes','HMK 145: za upravený Orienteering SV 5–9+ vzniká 1–5 hvězd. Každá hvězda kupuje právě jeden Bearing, Progress, Foraging, Stalking (max. 1) nebo Vigilance (max. 1). Bearing zajišťuje směr; Progress ruší Slow, přebytek vyžaduje jednotlivé d10. Při SV 1–2 vybírá GM právě jeden Lax NEBO Slow; při SV ≤0 oba. Automatické rozdělení je pouze pomocná strategie, ne jediná možnost.')}
  <select name="orientationAllocation"><option value="auto">Automaticky podle cíle a terénu</option><option value="manual">Ručně rozdělit každou ★</option></select></label>
- <div class="hc-episode-allocation-choice" data-episode-allocation-choice hidden role="group" aria-label="Potvrzení přidělení hvězd"><strong>Jak chcete přidělit získané ★?</strong> <p class="hc-hint" data-episode-allocation-status>Rozhodněte po skutečném Survival testu; pouhá změna výběru nic nepotvrzuje.</p> <button type="button" class="secondary hc-small" data-episode-allocation-set="auto">Potvrdit automatické rozdělení</button> <button type="button" class="secondary hc-small" data-episode-allocation-set="manual">Zvolit ruční rozdělení</button> <button type="button" class="hc-small" data-episode-allocation-confirm hidden>Potvrdit ruční rozdělení ★</button> <button type="button" class="secondary hc-small" data-episode-allocation-edit hidden>Upravit přidělení ★</button></div>
  <p class="hc-hint" data-episode-mode-choice-note role="status">Po doložení Survival SV uvidíte skutečný počet ★. Pak můžete ponechat automatické rozdělení nebo zvolit ruční.</p>
  <div class="hc-episode-manual-modes" data-episode-manual-modes>
  <p class="hc-episode-manual-budget" data-episode-manual-budget role="status">Nejdříve vyhodnoťte Survival SV průvodce. Jeho upravený výsledek určí počet dostupných ★.</p>
@@ -3078,7 +3077,7 @@ function timeEpisodePageHTML(clock,participants){
  <label data-episode-navigation-recovery-awareness>Awareness k návratu po dřívějším Misdirection (HMK 148) <select name="navigationRecoveryAwarenessProofId"><option value="">— skutečný test navigující postavy —</option>${skillOptions('Awareness')}</select></label></div>
  <p data-episode-skill-memory-status class="hc-hint">Výsledek a jeho platnost se objeví po výběru.</p>
  </details>
- <details class="hc-episode-settings" data-episode-section="rolls"><summary>5 · Potřebné hody a případné události <span class="hc-episode-section-party" data-episode-section-party="rolls"></span></summary>
+ <details class="hc-episode-settings" data-episode-section="rolls"><summary>5 · Potřebné hody a případné události</summary>
  <p class="hc-hint hc-episode-task-focus" data-episode-task-focus hidden role="status"></p>
  <label data-episode-survival-hazard>Survival Hazard (d10) · jen při kritickém neúspěchu Survival ${episodeRuleHelp('Survival Hazard','HMK 148: pokud původní Survival / Orienteering test skončil CF, družina musí vyřešit Survival Hazard bez ohledu na výsledné upravené SV. Hod d10: 1–3 Equipment (výstroj), 4–6 Accident (nehoda), 7–10 Complication (komplikace). Další hody na opravu, úraz či změnu výstroje se řeší podle vybraného následku ve stávajícím Skill Tests a Combat, nejsou automaticky považovány za vyřízené.')}<span class="hc-episode-die"><input name="survivalD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="survivalD10">⚄ d10</button></span></label>
  <div data-episode-travel-rolls><details class="hc-episode-suboptions hc-episode-roll-group" open><summary>Pohyb a orientace</summary>
@@ -23870,13 +23869,6 @@ function episodeIssue(message,form){
 }
 function episodeMarkField(form,name,{focus=false}={}){
  for(const node of form.querySelectorAll('.hc-episode-needs-input'))node.classList.remove('hc-episode-needs-input');
- if(name==='orientationAllocation'&&form.elements.namedItem(name)?.disabled){
-  const box=form.querySelector('[data-episode-allocation-choice]');
-  const target=box&&!box.hidden?[...box.querySelectorAll('button')].find(b=>!b.hidden&&!b.disabled):null;
-  if(target){box.closest('details')?.setAttribute('open','');box.classList.add('hc-episode-needs-input');
-   if(focus){box.scrollIntoView({block:'center',behavior:'auto'});target.focus({preventScroll:true});}
-   return true;}
- }
  // The accident minute is a prerequisite of the hazard preview itself. When
  // that preview cannot yet be calculated, reveal the genuine prerequisite
  // rather than asking GM to follow a link to an inaccessible field.
@@ -25040,7 +25032,6 @@ function renderEpisodeEndStatus(form,result,weather){
     (t.skill&&t.actorId?'<button type="button" data-episode-skill-task="'+esc(t.skill)+'" data-episode-skill-field="'+esc(t.action)+'" data-episode-skill-actor="'+esc(t.actorId)+'">Otevřít '+esc(t.skill)+' Skill Test</button>':
      t.name.startsWith('Encounter')&&!t.skill?'<button type="button" data-episode-jump="'+esc(t.action||'encounterResolution')+'">Otevřít pokračování Encounter</button>':
      '<button type="button" class="secondary" data-episode-jump="'+esc(t.action||'confirmed')+'">Doplnit požadovaný údaj</button>')+
-    (t.action==='hazardDirectionProofId'&&t.skill==='Awareness'?'<button type="button" class="secondary" data-episode-direction-defer>Bez Awareness · pokračovat chybným směrem</button>':'')+
     '</div></div>').join(''):
    '<p class="hc-episode-all-clear">✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.</p>';
  const button=root.querySelector('[data-episode-finalize]');if(button)button.disabled=!!tasks.length;
@@ -25316,85 +25307,6 @@ function renderEpisodeEndError(form,message){
  }
  const button=root.querySelector('[data-episode-finalize]');if(button)button.disabled=true;
 }
-// v93.850: an explicit, episode-local GM decision after the actual
-// Survival / Orienteering SV. No change/select/blur can confirm allocation.
-let episodeAllocationState93850={key:'',mode:null,confirmed:false};
-function episodeAllocationTask93850(form){
- if(!episodeEvaluationRequested)return null;
- const kind=form.elements.namedItem('kind')?.value;
- if(!['travel','forage'].includes(kind)||kind==='travel'&&form.elements.namedItem('orientationUse')?.value==='reuse')return null;
- const proofId=form.elements.namedItem('orientationProofId')?.value;
- const prefix=episodeDraftEpoch+'|'+kind+'|'+proofId+'|';
- const current=String(form.dataset.episodeOrientationStars??'');
- const remembered=episodeAllocationState93850.key.startsWith(prefix)?episodeAllocationState93850.stars:null;
- // The rule executor deletes the provisional SV dataset before re-evaluating.
- // An invalid MANUAL allocation throws before it can set that dataset again;
- // keep the exact already verified star budget for this same proof and epoch.
- const stars=current!==''?Number(current):remembered;
- if(!proofId||!Number.isSafeInteger(stars)||stars<1||stars>5)return null;
- const key=prefix+stars;
- if(episodeAllocationState93850.key!==key)episodeAllocationState93850={key,stars,mode:null,confirmed:false};
- return {stars,key};
-}
-function episodeDirectionConfirmationTask93850(form){
- const hazard=form.querySelector('[data-episode-hazard-details]');
- const legend=hazard?.querySelector('[data-episode-hazard-legend]')?.textContent||'';
- if(!/^Direction Hazard ·/.test(legend)||!episodeEvaluationRequested)return false;
- // The physical die was accepted by the dedicated Vložit číslo button;
- // the unrelated HMK Hazard decision still requires its own GM confirmation.
- const accepted=episodeDiceAccepted93849.get('hazardDirectionD10');
- if(!accepted||!episodeHazardChoicesRequired93840(form)||!episodeHazardPending93840(form))return false;
- const button=form.querySelector('[data-hazard-choices-confirm]');
- if(!button||button.disabled||button.hidden)return false;
- const checklist=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
- if(checklist)checklist.innerHTML='<p class="hc-episode-task-lead">Aktuální povinný krok · potvrzení Direction Hazardu</p>'+ 
-  '<div class="hc-episode-task"><strong>✓ Směr odchýlení: d10 '+esc(accepted)+'</strong><p>Hod je doložen. Nyní výslovně potvrďte postup Direction Hazardu. Teprve potom se určí případný Awareness nebo dokončení cesty.</p>'+ 
-  '<button type="button" class="secondary" data-episode-jump="hazardDirectionD10" data-episode-hazard-confirm-next>Potvrdit postup Direction Hazardu</button></div>';
- for(const b of document.querySelectorAll('[data-episode-finalize],[data-episode-window-stage]'))b.disabled=true;
- return true;
-}
-function episodeUpdateAllocationGate93850(form){
- const prompt=form.querySelector('[data-episode-allocation-choice]');
- const select=form.elements.namedItem('orientationAllocation');
- const manual=form.querySelector('[data-episode-manual-modes]');
- const task=episodeAllocationTask93850(form);
- const state=episodeAllocationState93850;
- if(select)select.disabled=true; // users must confirm via the dedicated buttons, not a select change
- if(prompt){prompt.hidden=!task;if(task&&!state.confirmed)prompt.closest('details')?.setAttribute('open','');}
- if(!task){
-  if(manual)manual.hidden=true;
-  for(const input of form.querySelectorAll('[name^="mode_"]'))input.disabled=true;
-  return;
- }
- const chosen=state.mode;
- if(select)select.value=chosen||'auto';
- if(manual)manual.hidden=chosen!=='manual';
- for(const input of form.querySelectorAll('[name^="mode_"]'))input.disabled=chosen!=='manual'||state.confirmed;
- const message=prompt?.querySelector('[data-episode-allocation-status]');
- if(message)message.textContent='Upravené Orienteering SV poskytuje '+task.stars+' ★. '+
-   (state.confirmed?(chosen==='manual'?'✓ Ruční rozdělení výslovně potvrzeno.':'✓ Automatické rozdělení výslovně potvrzeno.'):
-    chosen==='manual'?'Ručně nastavte čísla a potvrďte tlačítkem „Potvrdit ruční rozdělení ★“.':'Nejprve zvolte a potvrďte automatické nebo ruční rozdělení.');
- for(const button of prompt?.querySelectorAll('[data-episode-allocation-set]')||[])button.hidden=!!chosen;
- const manualConfirm=prompt?.querySelector('[data-episode-allocation-confirm]');
- if(manualConfirm)manualConfirm.hidden=chosen!=='manual'||state.confirmed;
- const edit=prompt?.querySelector('[data-episode-allocation-edit]');
- // Once a subsequent die or linked Tracking test has been accepted, changing
- // the allocated Modes would silently repurpose evidence. A GM must instead
- // cancel/restart the uncommitted episode; the dice/journal are not rewritten.
- const laterEvidence=[...episodeDiceAccepted93849.keys()].some(k=>
-  /^(progressD10|directionD10|end_|forageD10|travelForage|survivalD10|hazard|whRoll_|ev)/.test(k))||
-  !!form.elements.namedItem('trackingProofId')?.value;
- if(edit)edit.hidden=chosen!=='manual'||!state.confirmed||laterEvidence;
- if(message&&state.confirmed&&chosen==='manual'&&laterEvidence)
-  message.textContent+=' Rozdělení je po navazujících hodech uzamčeno; pro jiné Modes zrušte dosud neuloženou epizodu.';
- if(!state.confirmed){
-  const checklist=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
-  if(checklist)checklist.innerHTML='<p class="hc-episode-task-lead">Aktuální povinný krok · potvrzení získaných ★</p>'+ 
-   '<div class="hc-episode-task"><strong>Orienteering · rozdělení '+task.stars+' ★</strong><p>Po doloženém Survival SV nejprve potvrďte způsob přidělení. Bez vašeho kliknutí se žádný režim nepřijme. Přejděte do oddílu 4 a vyberte automatické nebo ruční rozdělení.</p>'+ 
-   '<button type="button" class="secondary" data-episode-jump="orientationAllocation">Otevřít rozdělení ★</button></div>';
-  for(const b of document.querySelectorAll('[data-episode-finalize],[data-episode-window-stage]'))b.disabled=true;
- }
-}
 // v93.686: A post-evaluation task should show its own relevant inputs,
 // not the complete Trekking worksheet. This is a display-only filter:
 // NEVER remove, disable, reset or rewrite an already entered die, proof or ID.
@@ -25406,16 +25318,6 @@ function episodeTaskArea(field){
  if(/^(progressD10|directionD10|extraSlow|mode_|loaded|doubleTime)/.test(field))return 'motion';
  if(/^(travelForage|travelHabitat|travelHerb|forage|habitat|herb)/.test(field))return 'foraging';
  return 'other';
-}
-function episodeSelectedPartyLabel93850(form){
- const ids=[...new Set([...form.querySelectorAll('[name="memberIds"]:checked')].map(x=>x.value))];
- if(!ids.length)return '';
- const names=ids.map(id=>character(id)?.name||id).filter(Boolean);
- return names.length?' ('+names.join(', ')+')':'';
-}
-function updateEpisodeParticipantHeadings93850(form){
- const label=episodeSelectedPartyLabel93850(form);
- for(const node of form.querySelectorAll('[data-episode-section-party]'))node.textContent=label;
 }
 function updateEpisodeTaskFocus(form){
  const section=form.querySelector('[data-episode-section="rolls"]');
@@ -25447,7 +25349,6 @@ function updateEpisodeTaskFocus(form){
  const tasks=[...(checklist?.querySelectorAll('.hc-episode-task [data-episode-jump],.hc-episode-task [data-episode-skill-field]')||[])].map(button=>({field:button.dataset.episodeJump||button.dataset.episodeSkillField,
   title:button.closest('.hc-episode-task')?.querySelector('b,strong')?.textContent||'Navazující pravidlový úkol'}));
  const issue=form.dataset.episodeProblemField||'';
- if(episodeFocusedTaskField&&!tasks.some(t=>t.field===episodeFocusedTaskField)&&issue!==episodeFocusedTaskField)episodeFocusedTaskField='';
  // When validation cannot yet identify a field, do not hide potential corrections.
  if(!tasks.length&&form.dataset.episodeProblem&&!issue){
   note.hidden=false;note.textContent='Nevyřešená pravidlová překážka: '+form.dataset.episodeProblem;
@@ -25486,10 +25387,8 @@ function updateEpisodeTaskFocus(form){
  }
  const labels={motion:'Pohyb a orientace',fatigue:'Únava a srážky',encounter:'Náhodné setkání',hazard:'Survival / Direction Hazard',weather:'Riziko prochladnutí / přehřátí',foraging:'Foraging',other:'Navazující pravidlová procedura',none:'Všechny požadované hody jsou doloženy'};
  note.hidden=false;
- note.textContent=active==='none'?(sharedTimeWindowDraft?'✓ Všechny pravidlové úkoly této skupiny jsou doloženy. Nyní vpravo dole klikněte na „Potvrdit výsledek řádku a pokračovat (bez posunu času)“.'
-   :'✓ Všechny pravidlové úkoly této epizody jsou doloženy. Zkontrolujte a potvrďte výsledek vpravo.'):
+ note.textContent=active==='none'?'✓ Všechny pravidlové úkoly této epizody jsou doloženy. Zkontrolujte a potvrďte výsledek vpravo.':
   'Aktuální úkol: '+(task?.title||labels[active])+'. Zobrazena jsou pouze pole k tomuto kroku. Další pravidlový krok se nabídne automaticky po dokončení aktuálního; již vyplněné výsledky zůstávají zachovány.';
- if(active==='none')episodeFocusedTaskField='';
  section.open=true;
  for(const [key,nodes] of Object.entries(groups))for(const node of nodes){
   if(key===active){if(node.dataset.episodeFocusHidden==='true'){node.hidden=false;delete node.dataset.episodeFocusHidden;}
@@ -25872,12 +25771,8 @@ function updateSharedTimeWindowControls(form){
  if(cards){const sig=JSON.stringify({window:sharedTimeWindowDraft?.endMinute,plans:sharedTimeWindowPlans,active:sharedTimeWindowActivePlanId,eval:episodeEvaluationRequested});
   if(cards.dataset.signature!==sig){cards.innerHTML=active?sharedPlanCardsHTML93771():'';cards.dataset.signature=sig;}}
  const plan=sharedPlanCurrent93771(),planned=sharedPlanState93771();
- const checklist=form?.closest('.hc-episode-shell')?.querySelector?.('[data-episode-checklist]');
- const allClear=!!checklist?.querySelector('.hc-episode-all-clear');
  if(commit&&sharedTimeWindowPlans.length)commit.disabled=commit.disabled||planned.errors.length>0||sharedTimeWindowPlans.some(p=>!p.done);
  if(stage&&sharedTimeWindowPlans.length)stage.disabled=stage.disabled||!plan;
- if(stage&&plan&&allClear&&!episodeHasUnconfirmedDice93849(form)&&!(episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form)))stage.disabled=false;
- if(commit&&sharedTimeWindowPlans.length&&sharedTimeWindowQueue.length&&sharedTimeWindowPlans.every(p=>p.done)&&planned.errors.length===0&&!episodeEvaluationRequested&&!episodePendingSkillRequest&&episodeOutstandingSkillTasks.length===0)commit.disabled=false;
  if(form){
   form.hidden=!active||!plan;
   for(const node of form.querySelectorAll('[name=kind],[name=minutes],[name=memberIds]')){
@@ -26075,10 +25970,9 @@ function updateEpisodePreview(form){
  // Other indoor activities still display the chosen global/local weather without irrelevant terrain choices.
  show('[data-episode-section="rolls"]',episodeEvaluationRequested&&(isTravel||isTracking||kind==='forage'||kind==='watch'));
  const rollsSummary=form.querySelector('[data-episode-section="rolls"]>summary');
- if(rollsSummary){
-  const title=travel?'5 · Pohyb, únava a náhodná setkání':kind==='forage'?'5 · Foraging a volitelná setkání':'5 · Volitelná kontrola setkání';
-  rollsSummary.innerHTML=esc(title)+' <span class="hc-episode-section-party" data-episode-section-party="rolls"></span>';
- }
+ if(rollsSummary)rollsSummary.textContent=travel?'5 · Pohyb, únava a náhodná setkání':
+  kind==='forage'?'5 · Foraging a volitelná setkání':
+  '5 · Volitelná kontrola setkání';
  show('[data-episode-travel-rolls]',isTravel);
  show('[data-episode-orientation-use]',isTravel);
  show('[data-episode-travel-priority]',isTravel);
@@ -26088,10 +25982,6 @@ function updateEpisodePreview(form){
  const orientProofField=form.elements.namedItem('orientationProofId');
  if(orientProofField)orientProofField.closest('label').hidden=!episodeEvaluationRequested;
  show('[data-episode-manual-modes]',(isTravel&&v.orientationUse==='new'||kind==='forage')&&v.orientationAllocation==='manual');
- let allocationChoice=form.querySelector('[data-episode-allocation-choice]');
- if(allocationChoice)allocationChoice.hidden=true;
- const prioritySelect=form.elements.namedItem('orientationPriority');
- if(prioritySelect)prioritySelect.disabled=!!episodeEvaluationRequested;
  for(const name of ['mode_progress','mode_bearing']){const input=form.elements.namedItem(name);if(input&&input.closest('label'))input.closest('label').hidden=kind==='forage';}
  show('[data-episode-skill-links]',episodeEvaluationRequested&&outdoor);
  show('[data-episode-final-confirm]',episodeEvaluationRequested);
@@ -26608,15 +26498,13 @@ function updateEpisodePreview(form){
     result.daylight.minutesByPeriod.twilight+' min soumrak, '+result.daylight.minutesByPeriod.night+' min noc.';
   const lowChoice=form.querySelector('[data-episode-low-choice]');if(lowChoice)lowChoice.hidden=!((travel||kind==='forage')&&result.orientation&&result.orientation.adjustment.adjustedSV>=1&&result.orientation.adjustment.adjustedSV<=2);
   const choiceNote=form.querySelector('[data-episode-mode-choice-note]');
-  allocationChoice=allocationChoice||form.querySelector('[data-episode-allocation-choice]');
   if(choiceNote&&result.orientation&&(kind==='travel'||kind==='forage')){
    const count=result.orientation.adjustment.advantageModes;
    choiceNote.textContent='Survival SV '+result.orientation.sv+' · situačně upravené Orienteering SV '+
     result.orientation.adjustment.adjustedSV+' → '+count+' ★ k rozdělení. '+
-    (v.orientationAllocation==='manual'?'Režim: ruční přidělení ★. Přidělte nejvýše '+count+' ★; každá počítá právě jednou.':
-     'Režim: automatické přidělení ★ podle zvoleného cíle a terénu. Chcete-li rozdělit ★ sami, použijte volbu Ručně.');
+    (v.orientationAllocation==='manual'?'Ručně přidělte nejvýše '+count+' ★; každá počítá právě jednou.':
+     'Automatické rozdělení je výchozí; chcete-li určit hvězdy sami, přepněte na Ručně rozdělit každou ★.');
   }
-
   const modesInfo=form.querySelector('[data-episode-allocated-modes]');
   const budget=form.querySelector('[data-episode-manual-budget]');
   if(budget&&result.orientation){const all=result.orientation.stars||0;
@@ -26722,7 +26610,6 @@ function updateEpisodePreview(form){
  }else{
   const details=document.querySelector('.hc-episode-spread-right .hc-episode-result-details');if(details)details.hidden=false;
  }
- updateEpisodeParticipantHeadings93850(form);
  showEpisodeIndependentDeadlines(form);
  const finalButton=document.querySelector('.hc-episode-spread-right [data-episode-finalize]');
  const evaluateButton=form.querySelector('[data-episode-evaluate]');
@@ -26739,9 +26626,7 @@ function updateEpisodePreview(form){
   const finish=form.closest('.hc-episode-shell')?.querySelector('[data-episode-finalize]')||document.querySelector('[data-episode-finalize]');
   if(finish)finish.disabled=true;
  }
- episodeUpdateAllocationGate93850(form);
  updateSharedTimeWindowControls(form);
- episodeDirectionConfirmationTask93850(form);
  // Re-synchronise after orientation becomes known (even if later inputs are missing).
  // Clearing no-longer-applicable *draft* rolls must also clear the stale blocker.
  if(episodeSyncSurpriseAvailability(form)&&!form.dataset.episodeSurpriseResync){
@@ -26971,7 +26856,6 @@ document.addEventListener('click',e=>{
 },true);
 document.addEventListener('input',e=>{
  const form=e.target?.closest?.('#hmk-time-episode-form');if(!form)return;
- if(e.target?.name==='trackingRoad')e.target.dataset.episodeAutoSource='gm';
  if(episodeHazardInputIsDraft93840(e.target)){episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));return;}
  if(e.target?.matches?.('[data-episode-medical-key]')){
   episodePersistMedicalInput(e.target,form);
@@ -27045,8 +26929,6 @@ document.addEventListener('click',e=>{
  input.value=episodeDiceAccepted93849.get(name);
  timeEpisodeDraft=episodeFormSnapshot(form);
  updateEpisodePreview(form);
- const nextAction=sharedTimeWindowDraft?document.querySelector('[data-episode-window-stage]'):document.querySelector('[data-episode-finalize]');
- if(nextAction&&!nextAction.disabled&&document.querySelector('.hc-episode-spread-right [data-episode-checklist] .hc-episode-all-clear'))nextAction.focus({preventScroll:true});
  if(episodeStageBaseline||sharedTimeWindowDraft)persistEpisodeDraftSidecar({snapshotForm:true});
 },true);
 document.addEventListener('click',e=>{
@@ -27107,41 +26989,6 @@ document.addEventListener('change',e=>{
  if(!p||p.destination!=='notes'||!p.requiresAction||p.resolution){input.checked=false;return;}
  const reviews=episodeGMReviewData(form);if(input.checked)reviews[id]=p.dueMinute;else delete reviews[id];
  form.elements.namedItem('episodeGMReviewedJson').value=JSON.stringify(reviews);
- timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
-},true);
-document.addEventListener('click',e=>{
- const b=e.target.closest?.('[data-episode-allocation-set],[data-episode-allocation-confirm],[data-episode-allocation-edit]');if(!b||b.disabled)return;
- e.preventDefault();e.stopImmediatePropagation();
- const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
- const task=episodeAllocationTask93850(form);if(!task)return;
- const state=episodeAllocationState93850;
- if(b.hasAttribute('data-episode-allocation-set')){
-  if(state.confirmed)return;
-  state.mode=b.dataset.episodeAllocationSet;
-  if(!['auto','manual'].includes(state.mode))return;
-  state.confirmed=state.mode==='auto';
- }else if(b.hasAttribute('data-episode-allocation-edit')){
-  if(state.mode!=='manual'||!state.confirmed)return;
-  state.confirmed=false;
- }else{
-  if(state.mode!=='manual'||state.confirmed)return;
-  const spent=['bearing','progress','foraging','stalking','vigilance'].reduce((n,k)=>n+Number(form.elements.namedItem('mode_'+k)?.value||0),0);
-  const over=spent>task.stars;
-  const invalid=['bearing','progress','foraging','stalking','vigilance'].some(k=>{
-   const x=Number(form.elements.namedItem('mode_'+k)?.value);return !Number.isSafeInteger(x)||x<0||(k==='stalking'||k==='vigilance'?x>1:x>5);
-  });
-  if(over||invalid){alert('Rozdělení ★ nelze potvrdit: získáno '+task.stars+', přiděleno '+spent+'. Zkontrolujte počet, nezáporná celá čísla a limity Stalking/Vigilance (max. 1).');
-   form.querySelector('[name="mode_bearing"]')?.focus();return;}
-  state.confirmed=true;
- }
- form.elements.namedItem('orientationAllocation').value=state.mode;
- timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
- if(episodeStageBaseline||sharedTimeWindowDraft)persistEpisodeDraftSidecar({snapshotForm:true});
-},true);
-document.addEventListener('change',e=>{
- const select=e.target.closest?.('[name="trackingRoad"]');if(!select)return;
- select.dataset.episodeAutoSource='gm';
- const form=select.closest('form');if(!form)return;
  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
 },true);
 document.addEventListener('click',e=>{
@@ -27241,10 +27088,6 @@ document.addEventListener('click',e=>{
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-episode-jump]');if(!b)return;
  e.preventDefault();const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
- if(b.hasAttribute('data-episode-hazard-confirm-next')){
-  const confirm=form.querySelector('[data-hazard-choices-confirm]');
-  if(confirm&&!confirm.disabled&&!confirm.hidden){confirm.click();return;}
- }
  const field=form.elements.namedItem(b.dataset.episodeJump);
  if(!field)return;
  episodeFocusedTaskField=b.dataset.episodeJump;
