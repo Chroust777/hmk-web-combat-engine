@@ -917,3 +917,18 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hmk-equipment-fields select{width:100%;min-width:0;margin-top:4px}
 .hmk-equipment-steps [data-hazard-equipment-owner]{font-size:.76rem;font-weight:600;color:#705336}
 @media(max-width:540px){.hmk-equipment-fields{grid-template-columns:minmax(0,1fr)}}
+
+/* v93.844 · explicit minute-work obligation after an HMK 148 F/CF repair.
+   The confirmation button only authorizes an unfinished episode; the full
+   campaign clock advances at the common calendar commit, never on select. */
+.hmk-equipment-time-duty{
+ margin:9px 0;padding:12px 14px;border:1px solid #a88351;border-left:5px solid #84572c;
+ border-radius:9px;color:#513920;
+ background:linear-gradient(110deg,#e9cd9ebd,#f1ddbacb),url('./assets/ui/book/parchment_repeat_seamless.png');
+ background-size:100% 100%,480px 480px;
+}
+.hmk-equipment-time-duty[hidden]{display:none!important}
+.hmk-equipment-time-duty>strong{font-size:.99rem;display:block;margin:0 0 5px}
+.hmk-equipment-time-duty p{font-size:.83rem;line-height:1.43;margin:4px 0 9px}
+.hmk-equipment-time-duty button{max-width:100%;font-size:.84rem;white-space:normal;margin:0 0 5px!important}
+.hmk-equipment-time-duty small{display:block;color:#6e5335;font-size:.75rem;line-height:1.35}

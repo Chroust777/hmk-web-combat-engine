@@ -208,6 +208,7 @@ import {calendarTravelWeatherSegments,firstCalendarTravelBoundary} from './src/i
 import {visibleWeather} from './src/integration/hmk-weather-phrases-93730.js';
 import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-scope.js';
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
+import {pendingEquipmentTimeWork93844,equipmentTimeWorkReceipt93844,validateEquipmentTimeInventory93844,EQUIPMENT_TIME_POLICY_93844,EQUIPMENT_TIME_MINUTES_93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {EPISODE_FORMAT,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry} from './src/integration/hmk-time-episodes.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
@@ -348,7 +349,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.843';
+const APP_VERSION='93.844';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -611,7 +612,7 @@ function validate(d){
  if(d?.calendarEvidenceArchives!==undefined)validateCalendarEvidenceArchives(d.calendarEvidenceArchives);
  if(d?.journal&&d?.characters)validateSpecialEffectEvidence(d);
  if(d?.journal&&d?.characters)validateTalismanEvidence(d);
- if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.healthState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.healthState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTimeEpisodes(d.journal);validateTravelPositions93764(d.journal);validateTrekDayHistory(d.journal);validateWeatherLifecycle(d.journal);validateWeatherShifts(d.journal);validateEncounterGMJournal(d.journal);validateDirectionGMJournal(d.journal);validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateTrackingAwarenessJournal(d.journal);validateSkillActivityTimeProofs(d.journal);validateSupplyJournal(d.journal);validateForagingCarriedJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.healthState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
+ if(d?.journal){validateNeutralAlchemyHistory(d);validateNeutralAlchemyCombatLinks(d);validateNeutralTotalReleaseHistory(d);for(const j of d.journal){if(j.calendarHerbTranscendenceWill&&j.calendarCampaignId===campaignKey(d.campaignClock)){const actor=d.characters.find(c=>c.id===j.characterId);const p=j.calendarHerbTranscendenceWill;const event=actor?.hmk?.healthState?.events?.find(e=>e.id===j.id&&e.type==='hmk-astral-transcendence-aural');if(!event||event.details?.transcendenceId!==p.transcendenceId||event.details?.auralShock!==p.auralShockAdded||event.details?.weaknessAdded!==p.weaknessAdded)throw Error('Transcendence Will: historický důkaz nesouhlasí s trvalým Aural/Fatigue záznamem');}if(!j.calendarHerbReembodiment||j.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===j.characterId);if(actor&&!actor.hmk?.healthState?.events?.some(e=>e.id===j.id&&e.type==='astral-reembodiment'&&e.details?.wearinessAdded===j.calendarHerbReembodiment.weariness))throw Error('Reembodiment: uložený návrat musí mít původní trvalý Combat/Fatigue důkaz');}validateTimeEpisodes(d.journal);validateEquipmentTimeInventory93844(d);validateTravelPositions93764(d.journal);validateTrekDayHistory(d.journal);validateWeatherLifecycle(d.journal);validateWeatherShifts(d.journal);validateEncounterGMJournal(d.journal);validateDirectionGMJournal(d.journal);validateTrekkingJournalEvidence(d);validateTrekLinkedEvidence(d.journal);validateWildernessJournal(d.journal);validateTrackingJournal(d.journal);validateTrackingAwarenessJournal(d.journal);validateSkillActivityTimeProofs(d.journal);validateSupplyJournal(d.journal);validateForagingCarriedJournal(d.journal);validateHerbalJournal(d.journal);validateMundaneHerbalJournal(d.journal);validateAlchemyJournal(d.journal);validateAlchemyDecayJournal(d.journal);validateAlchemyVialJournal(d.journal);validateAlchemyAcidJournal(d.journal);validateAlchemyAppliedObjectJournal(d.journal);validateAlchemyMendingInventory(d);validateAcidWeaponJournal(d.journal);validateAcidWeaponInventory(d);validateAcidArmourJournal(d.journal);validateAcidArmourInventory(d);validateAcidFleshJournal(d.journal);validateAcidFleshCombatLinks(d);validateAcidThrownJournal(d.journal);validateAcidThrownInventory(d);validateAlchemyAreaJournal(d.journal);validateAlchemyAreaCombatLinks(d);validateAlchemyImbibingJournal(d.journal);validateFootpadAcousticJournal(d.journal);validateEgosightTouchJournal(d.journal);validateEgosightProfusionJournal(d.journal);for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;if(p?.elixirName!=='Physic'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;const actor=d.characters.find(c=>c.id===p.targetId);const event=actor?.hmk?.healthState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-physic-aural');if(!event||event.details?.targetId!==p.targetId||event.details?.finishId!==p.finishId||event.details?.calendarCampaignId!==p.campaignId||event.details?.calendarMinute!==p.minute||event.details?.imbibingD100!==p.d100||event.details?.auralShock!==1||event.details?.weaknessAdded!==5)throw Error('Physic CF: chybí neměnný Combat State/Aural Shock důkaz');}for(const entry of d.journal){const p=entry.calendarAlchemyImbibing;
  if(p?.elixirName!=='Erudition'||p.sl!=='CF'||!p.illEffect||entry.calendarCampaignId!==campaignKey(d.campaignClock))continue;
  const actor=d.characters.find(c=>c.id===p.targetId);
  const event=actor?.hmk?.healthState?.events?.find(e=>e.id===entry.id&&e.type==='hmk-alchemy-erudition-aural');
@@ -2900,6 +2901,13 @@ function timeEpisodePageHTML(clock,participants){
  <input type="hidden" name="episodeIncapChoice" value="">
  <input type="hidden" name="episodeIncapMoveMinutes" value="">
  <input type="hidden" name="episodeGMReviewedJson" value="{}">
+ <input type="hidden" name="equipmentWorkSourceId" value="">
+ <div class="hmk-equipment-time-duty" data-episode-equipment-time-duty hidden>
+  <strong>HMK 148 · Povinná oprava po Equipment F/CF</strong>
+  <p data-episode-equipment-time-description role="status"></p>
+  <button type="button" class="secondary" data-episode-equipment-time-confirm>Potvrdit opravářskou činnost v tomto intervalu</button>
+  <small>Volba sama nic nezapíše. Čas se zapíše až při dokončení společného intervalu.</small>
+ </div>
  <div class="hmk-trek-grid" data-episode-legacy-identity><label>Činnost<select name="kind">${[['travel','Cestování / pochod'],['rest','Odpočinek'],['sleep','Spánek'],['winded','Krátký klid (Windedness)'],['forage','Shánění potravy'],['tracking','Sledování stop'],['watch','Ostraha / vigilance'],['other','Jiná činnost']].map(([v,l])=>option(v,l)).join('')}</select></label>
  <label>Délka · skutečné minuty<input name="minutes" type="number" min="1" max="10080" value="${esc(String(d.minutes||60))}" required title="Skutečná délka epizody v minutách (nejvýše sedm dní v jednom zápisu)."></label></div>
  <p class="hc-hint" data-episode-identity-note role="status">Nejdříve určete činnost a účastníky. Po stisknutí Vyhodnotit epizodu se tato volba uzamkne až do dokončení či nouzového zrušení.</p>
@@ -24007,6 +24015,19 @@ function episodePreviewFromForm(form,clock){
  episodeAssertScopedSkillInputs(v);
  if(!people.length)throw Error('Vyberte aspoň jednu postavu.');
  const kind=v.kind,minutes=Number(v.minutes),guideId=v.guideId;
+ const pendingEquipment=pendingEquipmentTimeWork93844(data.journal,campaignKey(clock),clock.minute,members);
+ if(pendingEquipment.length>1)throw Error('Equipment F/CF: více otevřených oprav stejné skupiny. Vyřešte každou samostatně.');
+ const requiredEquipment=pendingEquipment[0]||null;
+ if(requiredEquipment&&kind==='travel')
+  throw Error('Equipment '+(requiredEquipment.result==='long-delay'?'F':'CF')+': pochod celé družiny čeká na opraváře ('+requiredEquipment.remainingMinutes+' minut z 240).');
+ const workerNeedsWork=requiredEquipment&&members.includes(requiredEquipment.repairWorkerId);
+ if(workerNeedsWork&&(kind!=='other'||v.equipmentWorkSourceId!==requiredEquipment.sourceEpisodeId))
+  throw Error('Equipment F/CF: opravář musí odpracovat '+requiredEquipment.remainingMinutes+' minut. Vyberte „Jiná činnost“ a potvrďte tlačítkem opravářskou činnost.');
+ if(workerNeedsWork&&minutes>requiredEquipment.remainingMinutes)
+  throw Error('Equipment: zbývá '+requiredEquipment.remainingMinutes+' minut opravy. Zkraťte interval; pak pokračujte novou činností.');
+ if(v.equipmentWorkSourceId&&!workerNeedsWork)throw Error('Equipment: zvolený doklad nepatří aktuálnímu opraváři.');
+ const equipmentTimeWork=workerNeedsWork?equipmentTimeWorkReceipt93844({journal:data.journal,campaignId:campaignKey(clock),
+  minute:clock.minute,minutes,memberIds:members,sourceEpisodeId:v.equipmentWorkSourceId}):null;
  if(kind==='tracking'&&!episodeHasTracking93833(v.guideId))throw Error('Sledování stop není pro tuto postavu dostupné: Tracking ML musí být větší než 0.');
  if(kind==='travel'){
   const unresolved=data.journal.some(j=>j.calendarCampaignId===campaignKey(clock)&&
@@ -24277,6 +24298,7 @@ function episodePreviewFromForm(form,clock){
   walkingHandlerIds:mountedPassenger93816?.handlerPosition==='leading'?[mountedPassenger93816.handlerId]:[],
   previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute,kind==='travel'?members:null),
   encounterLightMinutes:lightMinutes,inactiveByActor,transportedMemberIds:kind==='travel'?(v.transportedMemberIds||[]):[]});
+ if(equipmentTimeWork)result.equipmentTimeWork93844=equipmentTimeWork;
  if(kind==='travel'&&result.transportedMemberIds?.length)result.transportProof={format:'gm-transport-confirmation-v93.755',
   memberIds:[...result.transportedMemberIds],conveyance:v.conveyance,gmConfirmed:true,
   originalHealth:travelHealth.filter(p=>result.transportedMemberIds.includes(p.id)).map(p=>({id:p.id,
@@ -24405,6 +24427,8 @@ function episodePreviewFromForm(form,clock){
    detail.hazardD10=Number(v.survivalD10); // Original hazard die; must NOT be rolled again.
    detail.result='pending-original-skill-combat';
   }
+   if(hazardType==='equipment'&&v.hazardEquipmentDisposition==='repair'&&
+    ['short-delay','long-delay','irreparable'].includes(detail.result))detail.equipmentMinutePolicy=EQUIPMENT_TIME_POLICY_93844;
   detail.automationVersion=hazardType==='accident'?(sharedPlanCurrent93771()?.episodeRowV===3?'v93.773-end-of-episode':'v93.675'):'v93.635';
   if(hazardType==='misdirection')detail.directionProofId=String(v.hazardDirectionProofId||'').trim()||null;
   result.hazardDetails.push(detail);
@@ -24466,7 +24490,8 @@ function episodePreviewFromForm(form,clock){
    // HMK 148: a next-watch Slow from equipment repair is spent only during
    // ACTUAL travel. Repair delays and medically aborted walks must not use it up.
    result.equipmentSlowCarryOut=Math.max(0,equipmentSlowIn-result.movementMinutes)+
-    (relevant&&['equipment','complication'].includes(relevant.hazard)&&outcome==='short-delay'?minutes:0);
+    (relevant?.hazard==='equipment'&&relevant?.equipmentMinutePolicy===EQUIPMENT_TIME_POLICY_93844&&outcome==='short-delay'?EQUIPMENT_TIME_MINUTES_93844:
+     relevant&&['equipment','complication'].includes(relevant.hazard)&&outcome==='short-delay'?minutes:0);
    result.equipmentSlowCarryRule='moving-minutes-v93.666';
    result.medicalTravelStop=confirmedStop?{minute:Math.min(...previewIncap.map(x=>x.minute)),
     movementMinutes:result.movementMinutes}:null;
@@ -25600,7 +25625,21 @@ function updateSharedTimeWindowControls(form){
   }
  }
 }
+function syncEquipmentTimeWorkPanel93844(form){
+ const panel=form.querySelector('[data-episode-equipment-time-duty]');if(!panel||!data.campaignClock)return;
+ const v=episodeFormSnapshot(form),pending=pendingEquipmentTimeWork93844(data.journal,campaignKey(data.campaignClock),
+  data.campaignClock.minute,v.memberIds||[]);
+ const duty=pending[0]||null;panel.hidden=!duty;
+ const desc=panel.querySelector('[data-episode-equipment-time-description]');
+ if(desc)desc.textContent=duty?'Původní Equipment '+(duty.result==='long-delay'?'F':'CF')+
+  ': zbývá '+duty.remainingMinutes+' ze 240 minut. Oprava patří družině '+duty.memberIds.map(id=>character(id)?.name||id).join(', ')+
+  '. Opravář: '+(character(duty.repairWorkerId)?.name||duty.repairWorkerId)+'. Vyberte Jiná činnost, zadejte nejvýše '+duty.remainingMinutes+' minut a potvrďte její účel tlačítkem. Pohyb, nové hody a přenos cizího dokladu nejsou dovoleny.':'';
+ const button=panel.querySelector('[data-episode-equipment-time-confirm]');
+ if(button){button.disabled=!duty||v.kind!=='other'||!(v.memberIds||[]).includes(duty.repairWorkerId)||!(v.memberIds||[]).every(id=>duty.memberIds.includes(id))||Number(v.minutes)>duty.remainingMinutes;
+  button.textContent=v.equipmentWorkSourceId===duty?.sourceEpisodeId?'✓ Opravářská činnost potvrzena':'Potvrdit opravářskou činnost v tomto intervalu';}
+}
 function updateEpisodePreview(form){
+ syncEquipmentTimeWorkPanel93844(form);
  if(!form)return;
  ensureFixedAccidentMinute93773(form);
  // Reassert the original episode identity even if a script tries to modify
@@ -26335,6 +26374,7 @@ function updateEpisodePreview(form){
     ${result.survivalHazard?`<p><b>Survival Hazard (HMK 148)</b> · d10 ${esc(String(v.survivalD10))} → ${esc(({equipment:'Equipment · výstroj',accident:'Accident · nehoda',complication:'Complication · komplikace'})[result.survivalHazard])}. GM musí následně vyřešit konkrétní dopady podle tabulky.</p>`:''}
     ${result.encounterDetails?.length?`<p><b>Encounter · GM:</b> ${result.encounterDetails.filter(e=>!e.pending).length}/${result.encounter.count} doloženo; pevná epizoda oznamuje Encounter až na konci, bez automatického Combatu.</p>`:''}
     ${result.trackingFollowup?`<p><b>Tracking:</b> ${result.trackingFollowup.spoorStars} Spoor ★; Awareness ${result.trackingFollowup.needsAwareness?'potřebný':'nepotřebný'}; CF Bearing příště ${result.trackingFollowup.forcedBearingNextEpisode?'ANO':'NE'}.</p>`:''}
+    ${result.equipmentTimeWork93844?`<p><b>Equipment · opravářská činnost:</b> ${result.equipmentTimeWork93844.workedMinutes} minut, zbývá ${result.equipmentTimeWork93844.remainingMinutes}; ${result.equipmentTimeWork93844.disposition==='repaired'?'po dokončení je předmět opraven':result.equipmentTimeWork93844.disposition==='abandoned'?'po dokončení bude předmět opuštěn':'opravy pokračují v dalším intervalu'}.</p>`:''}
     ${result.hazardDetails?.length?`<p><b>Navazující Hazards:</b> ${result.hazardDetails.map(h=>esc(h.hazard)+' · '+esc(JSON.stringify(h.result))).join(' | ')}.</p>`:''}
     ${result.weatherSafeShelter?`<p><b>Počasí · skutečné následky:</b> GM doložil bezpečný klimatický úkryt.</p>`:''}
     ${result.weatherExposure?.length?`<p><b>Počasí · skutečné následky:</b> ${result.weatherExposure.map(w=>esc(character(w.id)?.name||'Účastník')+': '+esc(w.effect||'chybí vstup')).join('; ')}.</p>`:''}
@@ -26592,6 +26632,19 @@ function episodePersistMedicalInput(input,form){
  }
  form.elements.namedItem('episodeTimedRollsJson').value=JSON.stringify(rolls);
 }
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-episode-equipment-time-confirm]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=b.closest('form');if(!form||episodeEvaluationRequested)return;
+ const v=episodeFormSnapshot(form),clock=data.campaignClock;
+ const duty=pendingEquipmentTimeWork93844(data.journal,campaignKey(clock),clock.minute,v.memberIds||[])[0];
+ if(!duty||v.kind!=='other'||Number(v.minutes)>duty.remainingMinutes||
+  !(v.memberIds||[]).includes(duty.repairWorkerId)||!(v.memberIds||[]).every(id=>duty.memberIds.includes(id)))
+  return alert('Nejdříve připravte Jinou činnost celé původní skupiny s platnou délkou minut.');
+ form.elements.namedItem('equipmentWorkSourceId').value=duty.sourceEpisodeId;
+ timeEpisodeDraft=episodeFormSnapshot(form);persistEpisodeDraftSidecar({snapshotForm:true});
+ updateEpisodePreview(form);
+},true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-hazard-repair-start]');if(!btn)return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -27690,6 +27743,21 @@ document.addEventListener('submit',e=>{
     if(original)skillLinks.push({id:original.id,actorId:original.characterId,title:original.title,
      body:original.body||'',reusedFromEpisodeId:memo.reusedFromEpisodeId});
    }
+   if(result.equipmentTimeWork93844){
+    const work=result.equipmentTimeWork93844;
+    if(work.disposition==='repaired'||work.disposition==='abandoned'){
+     const target=data.inventory.find(i=>i.id===work.itemId&&i.characterId===work.itemOwnerId);
+     if(!target||target.hmkEquipmentRepair?.sourceEpisodeId!==work.sourceEpisodeId||
+      target.hmkEquipmentRepair?.workPolicy!==EQUIPMENT_TIME_POLICY_93844)
+      throw Error('Equipment: dokončení neopravuje původní doložený předmět.');
+     if(work.disposition==='abandoned')data.inventory=data.inventory.filter(i=>i.id!==work.itemId);
+     else{
+      target.hmkEquipmentRepair={...target.hmkEquipmentRepair,status:'repaired',
+       completedMinutes:work.requiredMinutes,completedByEpisodeId:sourceId};
+      target.condition=String(target.condition||'').replace(/\s*·?\s*HMK Equipment Hazard: čeká na opravu/g,'').trim();
+     }
+    }
+   }
    for(const hazard of result.hazardDetails||[]){
     if(hazard.hazard!=='equipment'||!hazard.itemId)continue;
     const target=data.inventory.find(x=>x.id===hazard.itemId&&x.characterId===hazard.itemOwnerId);
@@ -27701,18 +27769,23 @@ document.addEventListener('submit',e=>{
      if(['main_hand','off_hand','worn'].includes(target.slot)){target.slot='carried';target.layerOrder=null;target.layerSlot=null;target.bulkExceptionZones=[];}
     }
     else if(hazard.result==='long-delay'){
-     // F: the repair test was made during Equipment Hazard. The item remains
-     // unavailable until the GM marks it usable after resolving the next-watch
-     // delay at the table. Do not create a second time/work obligation.
+     // F: the repair roll is immutable; v93.844 generates a 240-minute
+     // follow-up duty for new sources and restores the original item only
+     // after four hours have actually been confirmed in calendar episodes.
+     // Historical F receipts remain compatible with prior releases.
      target.hmkEquipmentRepair={format:'hmk-inventory-equipment-repair-v1',status:'damaged',
-      sourceEpisodeId:sourceId,repairProofId:hazard.repairProofId||null,repairActorId:hazard.workerId||hazard.itemOwnerId};
+      sourceEpisodeId:sourceId,repairProofId:hazard.repairProofId||null,repairActorId:hazard.workerId||hazard.itemOwnerId,
+      ...(hazard.equipmentMinutePolicy===EQUIPMENT_TIME_POLICY_93844?{workPolicy:EQUIPMENT_TIME_POLICY_93844}:{})};
      target.condition=[originalCondition.replace(/HMK Equipment Hazard: neopravena závada/g,'').trim(),
       'HMK Equipment Hazard: čeká na opravu'].filter(Boolean).join(' · ');
      if(['main_hand','off_hand','worn'].includes(target.slot)){target.slot='carried';target.layerOrder=null;target.layerSlot=null;target.bulkExceptionZones=[];}
     }else if(hazard.result==='irreparable'){
-     // CF: mark unusable/irreparable in inventory for GM disposal; never allow timer repair.
+     // CF: original item stays unusable throughout the timed failed repair;
+     // its physical inventory identity is removed only when the actual
+     // 240-minute obligation has been completed and confirmed.
      target.hmkEquipmentRepair={format:'hmk-inventory-equipment-repair-v1',status:'irreparable',
-      sourceEpisodeId:sourceId,repairProofId:hazard.repairProofId||null};
+      sourceEpisodeId:sourceId,repairProofId:hazard.repairProofId||null,
+      ...(hazard.equipmentMinutePolicy===EQUIPMENT_TIME_POLICY_93844?{workPolicy:EQUIPMENT_TIME_POLICY_93844}:{})};
      target.condition=[originalCondition,'HMK Equipment Hazard: neopravitelný'].filter(Boolean).join(' · ');
      if(['main_hand','off_hand','worn'].includes(target.slot)){target.slot='carried';target.layerOrder=null;target.layerSlot=null;target.bulkExceptionZones=[];}
     }else if(['no-delay','short-delay'].includes(hazard.result)){
@@ -27725,7 +27798,7 @@ document.addEventListener('submit',e=>{
      calendarEpisodeEquipmentHazard:{format:'hmk-episode-equipment-change-v1',episodeId:sourceId,itemId:hazard.itemId,
       itemOwnerId:hazard.itemOwnerId,disposition:hazard.equipmentDisposition,result:hazard.result,
       conditionBefore:originalCondition,conditionAfter:hazard.result==='abandoned'?null:target.condition,
-      repairWork:null, // no work-minute accounting; original outcome is retained
+      repairWork:null, // historical schema field; v93.844 time obligation is replayed from source episode + later work receipts
       irreparable:hazard.result==='irreparable',
       repairProofId:hazard.repairProofId||null}});
    }
