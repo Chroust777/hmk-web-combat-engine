@@ -56,61 +56,37 @@ export function equipmentTimeWorkReceipt93844({journal=[],campaignId,minute,minu
   beforeMinutes:source.workedMinutes,workedMinutes:minutes,remainingMinutes:remaining,
   disposition:remaining?'in-progress':source.result==='long-delay'?'repaired':'abandoned'};
 }
-/** Replay the whole journal; block every later member-overlapping episode
- * until its party has a witnessed repair action. Other parties can continue.
- * Legacy receipts are intentionally untouched (no fabricated past work).
+/** Legacy compatibility: preserve the authenticity of ALREADY SAVED v93.844
+ * work receipts; never require future work or block movement. The GM owns all
+ * subsequent repair scheduling after v93.845. Past entries are not rewritten.
  */
 export function validateEquipmentTimeWork93844(journal=[]){
- const campaigns=new Set(journal.filter(j=>j.calendarTimeEpisode).map(j=>j.calendarCampaignId));
- for(const cid of campaigns){
-  const chronological=journal.filter(j=>j.calendarCampaignId===cid&&j.calendarTimeEpisode)
-   .sort((a,b)=>a.calendarTimeEpisode.startMinute-b.calendarTimeEpisode.startMinute||
-    journal.indexOf(a)-journal.indexOf(b));
-  const seen=[];
-  for(const row of chronological){
-   const ep=row.calendarTimeEpisode;
-   const pending=pendingEquipmentTimeWork93844(seen,cid,ep.startMinute,ep.memberIds);
-   if(pending.length>1)fail('více souběžných nevyřešených oprav stejné skupiny.');
-   const duty=pending[0],receipt=ep.equipmentTimeWork93844;
-   if(duty){
-    const isWorker=ep.memberIds.includes(duty.repairWorkerId);
-    if(ep.kind==='travel')fail('Pochod je zakázaný, dokud opravář neodpracuje Equipment F/CF ('+duty.remainingMinutes+' min).');
-    if(isWorker){
-     if(ep.kind!=='other'||!receipt)fail('opravář nesmí přeskočit povinnou činnost '+duty.sourceEpisodeId+'.');
-     const expected=equipmentTimeWorkReceipt93844({journal:seen,campaignId:cid,minute:ep.startMinute,
-      minutes:ep.minutes,memberIds:ep.memberIds,sourceEpisodeId:duty.sourceEpisodeId});
-     if(JSON.stringify(receipt)!==JSON.stringify(expected))fail('doklad opravy nebo odečtené minuty nesouhlasí s pravidlem.');
-    }else if(receipt)fail('cizí postava nemůže odpracovat původní opravářský test.');
-   }else if(receipt)fail('čas opravy bez předcházející povinnosti.');
-   const own=sourceOf(row);
-   if(own){
-    if(!own.itemId||!own.itemOwnerId||!own.repairProofId||!own.repairWorkerId||
-     !ep.memberIds.includes(own.itemOwnerId)||!ep.memberIds.includes(own.repairWorkerId))
-     fail('zdrojový Equipment Hazard nemá skutečný předmět, opraváře a hod.');
-   }
-   seen.push(row);
+ const history=[];
+ for(const row of journal){
+  const ep=row.calendarTimeEpisode;
+  if(!ep)continue;
+  const receipt=ep.equipmentTimeWork93844;
+  if(receipt){
+   const expected=equipmentTimeWorkReceipt93844({journal:history,campaignId:row.calendarCampaignId,
+    minute:ep.startMinute,minutes:ep.minutes,memberIds:ep.memberIds,
+    sourceEpisodeId:receipt.sourceEpisodeId});
+   if(JSON.stringify(receipt)!==JSON.stringify(expected))fail('historický doklad již vykonané opravy byl změněn.');
   }
+  history.push(row);
  }
  return true;
 }
-/** The current inventory must not show a new unsolved F/CF item as healthy.
- * Historical sources are intentionally excluded from this v93.844 invariant.
+/** Inventory after v93.845 is GM-managed, not locked to a 240-minute counter.
+ * Old 93.844 work receipts retain their immutable journal validation above.
  */
 export function validateEquipmentTimeInventory93844(data){
- const clock=data?.campaignClock;
- if(!clock)return true;
- const cid=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
- const all=(data.journal||[]).filter(row=>row.calendarCampaignId===cid&&sourceOf(row));
- for(const row of all){
-  const src=sourceOf(row);
-  const pending=pendingEquipmentTimeWork93844(data.journal,cid,Infinity).find(d=>d.sourceEpisodeId===src.sourceEpisodeId);
-  const target=(data.inventory||[]).find(i=>i.id===src.itemId&&i.characterId===src.itemOwnerId);
-  if(pending){
-   if(!target||target.hmkEquipmentRepair?.sourceEpisodeId!==src.sourceEpisodeId||
-    target.hmkEquipmentRepair?.status!==(src.result==='long-delay'?'damaged':'irreparable')||
-    target.hmkEquipmentRepair?.workPolicy!==EQUIPMENT_TIME_POLICY_93844)
-    fail('nevyřešený předmět byl předčasně obnoven nebo odstraněn.');
-  }else if(src.result==='irreparable'&&target)fail('po dokončených neúspěšných opravách zůstal neodložený předmět.');
+ for(const item of data?.inventory||[]){
+  const status=item.hmkEquipmentRepair;
+  if(status?.gmManaged!==true||!['damaged','irreparable'].includes(status.status))continue;
+  if(Number.isSafeInteger(status.originalWQ)&&item.currentWQ!==0)
+   fail('GM: rozbitý předmět s WQ musí zachovat WQ 0.');
+  if(['worn','main_hand','off_hand'].includes(item.slot))
+   fail('GM: rozbitý předmět nesmí být oblečený ani v ruce.');
  }
  return true;
 }

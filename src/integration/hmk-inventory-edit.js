@@ -28,16 +28,19 @@ export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,current
  if(isBandageInventoryItem(item)&&quantity>999999)fail('Neplatný počet obvazů');
  const next=structuredClone(doc);const target=next.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
  target.slot=slot;target.quantity=quantity;target.currentWQ=currentWQ;target.coldWorn=coldWorn;target.condition=condition;target.gearStowage=gearStowage;
+ if(gmEquipmentState==='keep'&&['damaged','irreparable'].includes(item.hmkEquipmentRepair?.status)&&item.hmkEquipmentRepair.originalWQ!==undefined&&currentWQ!==0)fail('Rozbitá výstroj s WQ musí zachovat WQ 0 do výslovného potvrzení opravy GM.');
  if(gmEquipmentState==='usable'){
-  if(target.hmkEquipmentRepair?.workPolicy==='hmk-148-240-minute-splittable-v93.844'&&['damaged','irreparable'].includes(target.hmkEquipmentRepair.status))fail('Povinný Equipment F/CF vyžaduje skutečné dokončení minutové opravy v Kalendáři; ruční odemknutí je zakázáno.');
+  // The GM verifies completion at the table. Old v93.844 timed markers do
+  // not lock any new interval; historical receipts stay in the journal.
+  if(target.hmkEquipmentRepair?.status==='irreparable')fail('Equipment CF: předmět je podle skutečného hodu neopravitelný; lze jej pouze vyřadit.');
+  if(target.hmkEquipmentRepair?.originalWQ!==undefined&&currentWQ===0)
+   fail('GM: při potvrzení opraveného předmětu s WQ 0 stanovte jeho skutečnou WQ.');
   if(target.hmkEquipmentRepair&&['damaged','irreparable'].includes(target.hmkEquipmentRepair.status)){
    const previous=target.hmkEquipmentRepair;
-   // Legacy timed records keep their original fields for compatibility;
-   // new GM-managed repairs never acquire artificial work-minute counters.
+   // Preserve the original die and WQ for audit; do not generate minutes.
    target.hmkEquipmentRepair={...previous,status:'repaired',gmRestored:true};
-   if(Object.hasOwn(previous,'remainingMinutes'))target.hmkEquipmentRepair.remainingMinutes=0;
   }
-  target.condition=target.condition.replace(/HMK Equipment Hazard:\s*(?:neopravena závada|neopravitelný|čeká na opravu)[^;]*/gi,'GM: použitelný').trim();
+  target.condition=target.condition.replace(/HMK Equipment Hazard:\s*(?:neopravena závada|neopravitelný|čeká na opravu|rozbitý)[^·;]*/gi,'GM: použitelný').trim();
  }
  if(target.snapshot.category==='armor'){target.layerOrder=layerOrder;target.layerSlot=layerSlot;target.bulkExceptionZones=bulkExceptionZones;}
  validateHandInventory(next.inventory,ownerId);

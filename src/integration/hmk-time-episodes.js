@@ -1150,7 +1150,8 @@ export function validateTimeEpisodes(journal=[]){
    if(e.equipmentSlowCarryOut!==undefined){
     const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute,travelScope);
     const repairS=e.hazardDetails?.find(h=>h.hazard==='equipment'&&h.result==='short-delay');
-    const newSlow=repairS?.equipmentMinutePolicy===EQUIPMENT_TIME_POLICY_93844?240:
+    const newSlow=repairS?.equipmentGMPolicy==='gm-controlled-v93.845'?0:
+      repairS?.equipmentMinutePolicy===EQUIPMENT_TIME_POLICY_93844?240:
       e.hazardDetails?.some(h=>(h.hazard==='equipment'||h.hazard==='complication'&&h.automationVersion==='v93.681')&&h.result==='short-delay')?e.minutes:0;
     // Legacy receipts before v93.666 incorrectly consumed a Slow obligation
     // during an equipment repair with zero movement. Keep historical data

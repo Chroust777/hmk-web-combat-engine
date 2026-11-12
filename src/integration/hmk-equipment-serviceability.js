@@ -7,6 +7,6 @@ export function equipmentUnusable(item){
  if(!item||item.destroyed===true)return true;
  const repair=item.hmkEquipmentRepair;
  return repair?.status==='damaged'||repair?.status==='irreparable'||
-  /HMK Equipment Hazard:\s*(?:neopravena závada|neopravitelný|čeká na opravu)/i.test(String(item.condition||''));
+  /HMK Equipment Hazard:\s*(?:neopravena závada|neopravitelný|čeká na opravu|rozbitý)/i.test(String(item.condition||''));
 }
 export const equipmentUsable=item=>!equipmentUnusable(item);
