@@ -196,3 +196,15 @@ I03. Ostatní historické NEOVĚŘENO / FAIL z cílených auditů nejsou tímto 
 - Přechod k následujícím hodům a finální dokončení řádku jsou blokovány, dokud není volba přidělení ★ skutečně potvrzena. Při obnově rozpracovaného dokladu se nepředpokládá skrytě potvrzený výběr.
 - Skutečný d10 směru odchýlení má vlastní tlačítko „Vložit číslo“. Pokud ještě čeká obecná GM volba Hazardu, pravý panel **nesmí opakovat požadavek na již potvrzený hod**, ale výslovně nabídne „Potvrdit postup Direction Hazardu“; poté aktuální návaznost Awareness nebo vědomé pokračování mimo trasu.
 - Závěr jediné skupiny a společného okna musí zůstat dosažitelný, pokud jsou opravdu vyřešeny všechny závazné úkoly; historie se nesmí doplňovat bez klikacího potvrzení GM.
+
+
+## v93.851 – Závazný standard modifikátorů Cestování (12. 11. 2026)
+
+- Povinný **Bearing** se určuje přesně z tabulky *Trek Movement* HMK v1.2 str. 146: nezpevněná i zpevněná cesta = **0** nezávisle na dešti; *Rural Track* a *Wilderness Trail* = 1 jen při nepřetržitých srážkách; *Desert Flats bez zjevné cesty* používá rychlost **Flat Rural Track**, ale vyžaduje **2 Bearing**. Pouhé pouštní klima nevytváří fakt o značené cestě.
+- **Drover** je samostatná postava v aktuální družině, nemusí být průvodcem. Dovednost se stanoví z doloženého způsobu dopravy: Riding při jízdě, Animalcraft pro káru, vůz a vedená nákladní zvířata; při skutečně smíšeném vedení se ověří nižší ze dvou doložených ML. Výsledek nikdy automaticky nevzniká a musí patřit konkrétnímu aktérovi.
+- Při pěším vedení zvířat se zohlední snížení Watchfulness pro Encounter/Surprise; nevyžaduje se zvláštní zbytečný přepínač.
+- **Duny**: GM může při pěší chůzi zvolit +5 únavy nebo Slow. Dune Slow musí být dostupné v kroku nastavení, musí mít právě jediný účinek na počet Progress d10, rychlost i pozdější validaci. Mimo duny či při jízdě se neaplikuje.
+- Mimořádný individuální Move je výjimka GM, nikoli automatické pravidlo odhadované ze statistiky. Volný Progress musí být výslovně zvolen **před** pravidlovým vyhodnocením a jeho vlastní d10 se dokládá stejně jako ostatní přebytečné Progress.
+- Už doložené časové epizody se nepřepočítávají podle nového výkladu Bearing. Doklady se zpětně validují podle svého původního formátu; nové mají označenou verzi pravidla. Žádné předčasné permanentní zápisy při změně seznamu, checkboxu nebo poli.
+- Automatizace geografických faktů, počasí a srážek má používat jen autoritativní data. Místní znalost oblasti, fakt dřívějšího nepřetržitého sněžení, zvláštní Move a nejednoznačný biotop či Encounter zůstávají k doložení GM.
+- Nové nasazení vyžaduje regresi: kompletní matice terénu, samostatný aktér Drovera, dune Slow včetně uložení, GM Progress, Desert Flats, jednočlenná a vícečlenná skupina, Double Time, Hazard, Tracking, jediný posun kalendáře a kontrolu FULL + PATCH = nový FULL.
