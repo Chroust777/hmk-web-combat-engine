@@ -12,6 +12,8 @@ import {validateCombatState} from './persistent-combat-state.js';
 const verify=(test,msg)=>{if(!test)throw Error(msg)};
 const isDie=(v,n)=>Number.isSafeInteger(v)&&v>=1&&v<=n;
 const info={
+ bovine:{table:'C',maxZN:20,b:6,shockML:51}, // HMK 355: ox, AV b6, Shock 51
+ camel:{table:'C',maxZN:20,b:5,shockML:42}, // HMK 355: dromedary, AV b5, Shock 42
  donkey:{table:'B',maxZN:16,b:4,shockML:39},
  pony:{table:'B',maxZN:16,b:4,shockML:36},
  mule:{table:'C',maxZN:20,b:4,shockML:39},
