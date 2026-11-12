@@ -887,3 +887,33 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hmk-stable-elephant-special-93842 button,.hmk-stable-elephant-special-93842 small{grid-column:1/-1}
 .hmk-stable-elephant-special-93842 small{font-size:.69rem}
 @media(max-width:560px){.hmk-stable-catalog-filter-93842{grid-template-columns:1fr}.hmk-stable-elephant-special-93842{grid-template-columns:1fr}}
+
+/* v93.843 · Equipment Hazard: a short guided, non-committing workflow.
+   Preserve the established parchment visual system, including inner rows. */
+[data-episode-hazard-details]:has([data-hazard-equipment-workflow]:not([hidden])){
+ background:linear-gradient(155deg,#ebd2a88a,#f5e4c8ac),url('./assets/ui/book/parchment_dynamic_texture.png');
+ background-size:100% 100%,540px 540px;border:1px solid #b18a5b;border-radius:10px;padding:12px!important
+}
+.hmk-equipment-steps{display:grid;gap:6px;margin:5px 0 10px}
+.hmk-equipment-steps[hidden],.hmk-equipment-step[hidden]{display:none!important}
+.hmk-equipment-step{background:linear-gradient(155deg,#f3e0bbbf,#e9cea0ba);border:1px solid #ba9965;border-radius:7px;padding:8px 11px}
+.hmk-equipment-step>b{color:#60412b;font-size:.91rem}
+.hmk-equipment-step p{margin:3px 0 0;font-size:.81rem;line-height:1.43}
+.hmk-equipment-timing{margin:1px 0 2px!important;padding:5px 10px;font-size:.78rem;line-height:1.4;color:#684b35}
+.hmk-equipment-derived-skill{border:1px solid #c6a578;background:#edd9b6a3;border-radius:6px;padding:7px 10px;min-width:0}
+.hmk-equipment-derived-skill strong,.hmk-equipment-derived-skill output,.hmk-equipment-derived-skill small{display:block}
+.hmk-equipment-derived-skill strong{font-size:.78rem;color:#715236}
+.hmk-equipment-derived-skill output{font-weight:700;font-size:.94rem;margin-top:2px}
+.hmk-equipment-derived-skill small{font-size:.75rem;line-height:1.3;margin-top:3px;color:#6d5239}
+[data-hazard-equipment-test-result]{margin:7px 0;font-size:.81rem;line-height:1.35}
+[data-hazard-repair-start]{margin:5px 0!important;white-space:normal}
+[data-episode-hazard-details] .hmk-trek-grid>label[data-hazard-item] select,
+[data-episode-hazard-details] .hmk-trek-grid>label[data-hazard-repair] select,
+[data-episode-hazard-details] .hmk-trek-grid>label[data-hazard-worker] select{width:100%;min-width:0}
+[data-episode-hazard-details] .hmk-hazard-choice-confirm{background:linear-gradient(130deg,#f1deb8dd,#e6c897bf);border-color:#a98453}
+/* Equipment steps contain their real controls rather than repeating them below. */
+.hmk-equipment-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:8px 0 5px}
+.hmk-equipment-fields>label,.hmk-equipment-fields>.hmk-equipment-derived-skill{min-width:0;margin:0;font-size:.8rem}
+.hmk-equipment-fields select{width:100%;min-width:0;margin-top:4px}
+.hmk-equipment-steps [data-hazard-equipment-owner]{font-size:.76rem;font-weight:600;color:#705336}
+@media(max-width:540px){.hmk-equipment-fields{grid-template-columns:minmax(0,1fr)}}
