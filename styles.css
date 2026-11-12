@@ -921,3 +921,12 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 /* v93.844 · explicit minute-work obligation after an HMK 148 F/CF repair.
    The confirmation button only authorizes an unfinished episode; the full
    campaign clock advances at the common calendar commit, never on select. */
+
+/* v93.848 · group animal reservation and quieter equipment interaction */
+.hmk-animal-reserved{opacity:.58;filter:saturate(.6);border-style:dashed!important}
+.hmk-animal-reserved input[type=checkbox]{cursor:not-allowed}
+.hmk-animal-reserved [data-episode-reservation-note]{font-size:.72rem;color:#67533c;margin:3px 0}
+.hmk-equipment-steps [data-hazard-repair-start]{width:auto;max-width:100%;white-space:normal}
+.hmk-hazard-choice-status[data-state="neutral"]{color:#423426;font-weight:400}
+#hmk-time-episode-form [data-episode-trail-fields][hidden],
+#hmk-time-episode-form [data-episode-tracking-options][hidden]{display:none!important}
