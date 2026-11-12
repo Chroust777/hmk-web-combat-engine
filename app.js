@@ -351,7 +351,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.854';
+const APP_VERSION='93.855';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -23540,6 +23540,7 @@ function episodeDicePending93849(form,input){
  timeEpisodeDraft[input.name]='';
  for(const button of document.querySelectorAll('[data-episode-finalize],[data-episode-window-stage]'))button.disabled=true;
  episodeUpdateDiceGuides93849(form);
+ episodeExplainFinalizationBlock93855(form);
 }
 function episodeFormSnapshot(form){
  episodeRefreshHazardInventory93790(form);
@@ -25859,6 +25860,52 @@ function sharedEpisodeRowUpdate93772(plan,field,value){
  if(result.errors.some(e=>e.id===plan.id&&e.message.includes('Zbývá pouze'))){sharedTimeWindowPlans=before;throw Error('Plán by překročil časový limit postavy.');}
  persistEpisodeDraftSidecar();
 }
+/** v93.855: the checklist and the finalisation button must never disagree.
+ * A typed die is not a confirmed roll. Show the exact, actionable blocker,
+ * without manufacturing a result or weakening the existing commit gate. */
+function episodeExplainFinalizationBlock93855(form){
+ const stage=document.querySelector('[data-episode-window-stage]');
+ const finish=document.querySelector('[data-episode-finalize]');
+ const activeButton=sharedTimeWindowDraft?stage:finish;
+ const checklist=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
+ if(!form||!checklist||!episodeEvaluationRequested||!activeButton)return;
+ const complete=checklist.querySelector('.hc-episode-all-clear');
+ if(!complete){activeButton.removeAttribute('title');return;}
+ if(!activeButton.disabled){activeButton.removeAttribute('title');return;}
+ const pending=[...form.querySelectorAll('[data-episode-roll-field]')].filter(input=>
+  !input.disabled&&!input.closest('[hidden]')&&
+  String(input.value||'').trim()!==String(episodeDiceAccepted93849.get(input.name)||'').trim());
+ const hazard=episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form);
+ const plan=sharedTimeWindowDraft?sharedPlanCurrent93771():null;
+ const planned=sharedTimeWindowDraft?sharedPlanState93771():null;
+ const title=pending.length?'Nepotvrzený hod · '+pending.map(input=>input.name).join(', '):
+  hazard?'Nepotvrzené rozhodnutí Hazardu':
+  sharedTimeWindowDraft&&!plan?'Není otevřená platná karta skupiny':
+  planned?.errors?.length?'Neplatný plán skupiny':
+  'Kontrola dokončení · další blokující podmínka';
+ let instruction='';let jump='';
+ if(pending.length){
+  const input=pending[0];jump=input.name;
+  const row=input.closest('label');
+  const label=(row?.textContent||input.name).replace(/\s+/g,' ').replace(/Vložit číslo/g,'').trim().slice(0,110);
+  instruction='V poli '+label+' je rozepsaný nebo změněný hod, který nebyl přijat tlačítkem „Vložit číslo“. Bez výslovného potvrzení se nesmí použít při dokončení. '+
+   (pending.length>1?'Rozpracované hody: '+pending.map(x=>x.name).join(', ')+'.':'');
+ }else if(hazard){instruction='Zvolený postup Hazardu ještě nebyl potvrzen samostatným tlačítkem. Žádný nový hod není potřeba vymýšlet.';}
+ else if(planned?.errors?.length){instruction='Plán skupin: '+planned.errors[0].message;}
+ else if(sharedTimeWindowDraft&&!plan){instruction='Nejprve otevřete platnou činnost skupiny v plánovací tabulce.';}
+ else instruction='Výsledky jsou v kontrolním seznamu doložené, ale další interní kontrola stále blokuje potvrzení. Tento stav vyžaduje diagnostiku; nic nebylo uloženo.';
+ complete.remove();
+ const panel=document.createElement('div');panel.className='hc-episode-task hc-episode-await';
+ panel.dataset.episodeCompletionBlocker='true';panel.setAttribute('role','alert');
+ panel.innerHTML='<div><b>'+esc(title)+'</b><p>'+esc(instruction)+'</p>'+
+  (jump?'<button type="button" class="secondary" data-episode-jump="'+esc(jump)+'">Přejít k nepotvrzenému hodu</button>':'')+'</div>';
+ checklist.append(panel);activeButton.title=title+' · '+instruction;
+ if(jump){
+  // Existing red validation style; do not erase other rule errors.
+  const input=form.elements.namedItem(jump);
+  const label=input?.closest('label');if(label)label.classList.add('hc-episode-needs-input');
+ }
+}
 function updateSharedTimeWindowControls(form){
  const root=document.querySelector('[data-shared-window-panel]');if(!root)return;
  const selection=root.querySelector('[data-shared-window-continue]');
@@ -26835,6 +26882,7 @@ function updateEpisodePreview(form){
   const status=form.querySelector('[data-episode-roll-pending]');
   if(status)status.textContent='Rozpracované hody ('+pending.map(i=>i.name).join(', ')+'): stiskněte příslušné „Vložit číslo“. Teprve potom lze dokončit epizodu.';
  }else{const status=form.querySelector('[data-episode-roll-pending]');if(status)status.textContent='';}
+ episodeExplainFinalizationBlock93855(form);
  hideVisibleTechnicalUUIDs(form.closest('.hc-episode-shell')||form);
 }
 function episodeCarrySettingsFromLast(){
