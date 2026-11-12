@@ -162,3 +162,12 @@ I03. Ostatní historické NEOVĚŘENO / FAIL z cílených auditů nejsou tímto 
 ---
 
 **Zásada před každým novým vývojem:** (1) ověřit aktuální skutečný FULL; (2) identifikovat pravidlo z HMK v1.2; (3) reprodukovat problém přes UI; (4) minimálně opravit; (5) provést skutečné klikací testy i regresi; (6) vydat transparentní důkazy a FULL/PATCH nebo po nalezení dalšího BLOCKED přesně popsat nezbývající kroky. Tento postup nemá výjimku pro „drobné“ opravy.
+
+
+## Závazná výjimka v93.845 · Equipment Hazard / opravy řídí GM
+
+- Po Equipment Hazardu se zachová originální Survival CF, hod d10, totožnost poškozeného předmětu a skutečný opravářský Skill Test.
+- Neúspěšně řešená (F) či ignorovaná výstroj zůstává **rozbitá/nepoužitelná** v původním inventáři (nikoliv automaticky odstraněná); má **WQ 0, pokud má definovanou WQ**. Výsledek CF se označí **neopravitelný**, bez automatického smazání. CS/S znamená opraveno dle skutečného hodu.
+- **Žádná aplikací odvozená povinná 240minutová oprava, blokace Pochodu, termín oprav ani automatické čtyři 60minutové intervaly.** Je na GM, zda, kdy a kolik skutečného času později opravě věnuje; aplikace jeho rozhodnutí nepředjímá. Tištěná HMK 148 uvádí referenční časové následky, ty jsou informací GM, nikoliv pevnou aplikací vynucenou povinností.
+- Oprava/změna na použitelný stav se děje **výslovným potvrzením GM v Inventáři**, při zachování ID, hodu, původní WQ a účetních dokladů. Nepoužitelný předmět se nesmí vybavit.
+- Historická data v93.844, pokud již mají záznamy odpracovaných minut, se nesmějí potají měnit nebo přepočítávat; zpětně se žádné nové povinnosti negenerují.
