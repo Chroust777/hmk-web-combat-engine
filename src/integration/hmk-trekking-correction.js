@@ -42,7 +42,8 @@ export function certifyTrekOrienteering(source,journal){
  */
 export function allocateTrekModes(prepared,adjustment,{requiredBearing=0}={}){
  ok(prepared?.autoAllocate===true,'Automatické režimy nebyly zvoleny.');
- ok(Number.isSafeInteger(requiredBearing)&&requiredBearing>=0&&requiredBearing<=2,'Neplatná potřeba Bearing z terénu.');
+ // Two terrain Bearing, one following Tracking CF and one Lost recovery may coexist.
+ ok(Number.isSafeInteger(requiredBearing)&&requiredBearing>=0&&requiredBearing<=4,'Neplatná kombinovaná potřeba Bearing z terénu, Tracking CF a Lost.');
  const goal=prepared.autoPriority||'pace';
  ok(['pace','forage','stealth','vigilance'].includes(goal),'Neznámý cíl automatického rozdělení.');
  const forced=prepared.trackingForcedBearingSourceId?1:0;

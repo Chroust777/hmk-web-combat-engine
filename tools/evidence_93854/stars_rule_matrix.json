@@ -1,0 +1,107 @@
+{
+  "version": "93.854",
+  "authority": "HMK v1.2 pp.145-148",
+  "test_kind": "deterministic rule-fixture matrix, not UI or historical rolls",
+  "total": 1447,
+  "pass": 1447,
+  "fail": 0,
+  "errors": [],
+  "combined_bearing_examples": [
+    {
+      "sv": 5,
+      "requiredBearing": 3,
+      "priority": "pace",
+      "modes": {
+        "bearing": 1,
+        "progress": 0,
+        "foraging": 0,
+        "stalking": 0,
+        "vigilance": 0
+      }
+    },
+    {
+      "sv": 5,
+      "requiredBearing": 3,
+      "priority": "forage",
+      "modes": {
+        "bearing": 1,
+        "progress": 0,
+        "foraging": 0,
+        "stalking": 0,
+        "vigilance": 0
+      }
+    },
+    {
+      "sv": 5,
+      "requiredBearing": 3,
+      "priority": "stealth",
+      "modes": {
+        "bearing": 1,
+        "progress": 0,
+        "foraging": 0,
+        "stalking": 0,
+        "vigilance": 0
+      }
+    },
+    {
+      "sv": 5,
+      "requiredBearing": 3,
+      "priority": "vigilance",
+      "modes": {
+        "bearing": 1,
+        "progress": 0,
+        "foraging": 0,
+        "stalking": 0,
+        "vigilance": 0
+      }
+    },
+    {
+      "sv": 5,
+      "requiredBearing": 4,
+      "priority": "pace",
+      "modes": {
+        "bearing": 1,
+        "progress": 0,
+        "foraging": 0,
+        "stalking": 0,
+        "vigilance": 0
+      }
+    },
+    {
+      "sv": 5,
+      "requiredBearing": 4,
+      "priority": "forage",
+      "modes": {
+        "bearing": 1,
+        "progress": 0,
+        "foraging": 0,
+        "stalking": 0,
+        "vigilance": 0
+      }
+    },
+    {
+      "sv": 5,
+      "requiredBearing": 4,
+      "priority": "stealth",
+      "modes": {
+        "bearing": 1,
+        "progress": 0,
+        "foraging": 0,
+        "stalking": 0,
+        "vigilance": 0
+      }
+    },
+    {
+      "sv": 5,
+      "requiredBearing": 4,
+      "priority": "vigilance",
+      "modes": {
+        "bearing": 1,
+        "progress": 0,
+        "foraging": 0,
+        "stalking": 0,
+        "vigilance": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "version": "93.854",
+  "method": "Playwright isolated Chromium, test campaigns only; no GitHub online reload",
+  "scenario_count": 5,
+  "passed": 5,
+  "rows": [
+    {
+      "scenario": "Tracking CF → duny +3 Bearing",
+      "status": "PASS",
+      "log_source": "tracking_three_bearing.log",
+      "success_marker": "PASS AUDIT93854 3 BEARING ONE PERSON tracking",
+      "page_errors": false
+    },
+    {
+      "scenario": "Ručně přidělené hvězdy – chybný návrh a oprava",
+      "status": "PASS",
+      "log_source": "manual_invalid.log",
+      "success_marker": "PASS STAR INVALID HIGHLIGHT CORRECTED ONE PERSON direction",
+      "page_errors": false
+    },
+    {
+      "scenario": "Samostatný Foraging +2 SV",
+      "status": "PASS",
+      "log_source": "foraging54.log",
+      "success_marker": "PASS Chromium Foraging UI 38 checks",
+      "page_errors": null
+    },
+    {
+      "scenario": "Dvě skupiny",
+      "status": "PASS",
+      "log_source": "groups.log",
+      "success_marker": "PASS Chromium v93.851 TWO GROUPS",
+      "page_errors": null
+    },
+    {
+      "scenario": "Double Time se dvěma skupinami",
+      "status": "PASS",
+      "log_source": "doubletime.log",
+      "success_marker": "PASS Chromium v93.851 TWO GROUPS",
+      "page_errors": null
+    }
+  ],
+  "limitations": [
+    "One post-trail Evaluate browser click in 3-Bearing scenario used Playwright force=True after unstable repaint; all rule confirmation and commit clicks normal.",
+    "Only repaired offline cloud copy loaded; no cloud synchronization was invoked."
+  ]
+}

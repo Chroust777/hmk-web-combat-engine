@@ -351,7 +351,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.853';
+const APP_VERSION='93.854';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -27202,13 +27202,19 @@ document.addEventListener('click',e=>{
   state.confirmed=false;
  }else{
   if(state.mode!=='manual'||state.confirmed)return;
-  const spent=['bearing','progress','foraging','stalking','vigilance'].reduce((n,k)=>n+Number(form.elements.namedItem('mode_'+k)?.value||0),0);
+  const modeKeys=['bearing','progress','foraging','stalking','vigilance'];
+  const spent=modeKeys.reduce((n,k)=>n+Number(form.elements.namedItem('mode_'+k)?.value||0),0);
   const over=spent>task.stars;
-  const invalid=['bearing','progress','foraging','stalking','vigilance'].some(k=>{
+  const invalidKey=modeKeys.find(k=>{
    const x=Number(form.elements.namedItem('mode_'+k)?.value);return !Number.isSafeInteger(x)||x<0||(k==='stalking'||k==='vigilance'?x>1:x>5);
   });
-  if(over||invalid){alert('Rozdělení ★ nelze potvrdit: získáno '+task.stars+', přiděleno '+spent+'. Zkontrolujte počet, nezáporná celá čísla a limity Stalking/Vigilance (max. 1).');
-   form.querySelector('[name="mode_bearing"]')?.focus();return;}
+  if(over||invalidKey){
+   // The previous handler always focused Bearing, even if Progress (or another
+   // mode) was invalid. Use the existing red-field navigation contract.
+   const field='mode_'+(invalidKey||modeKeys.find(k=>Number(form.elements.namedItem('mode_'+k)?.value||0)>0)||'bearing');
+   alert('Rozdělení ★ nelze potvrdit: získáno '+task.stars+', přiděleno '+spent+'. Zkontrolujte červeně označený údaj, celá čísla a limity Stalking/Vigilance (max. 1).');
+   episodeMarkField(form,field,{focus:true});return;
+  }
   state.confirmed=true;
  }
  form.elements.namedItem('orientationAllocation').value=state.mode;
