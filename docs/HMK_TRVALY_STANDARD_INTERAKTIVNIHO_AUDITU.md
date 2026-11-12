@@ -180,3 +180,12 @@ I03. Ostatní historické NEOVĚŘENO / FAIL z cílených auditů nejsou tímto 
 - HMK bestiář 355 dokládá u skotu tělesnou tabulku C, AV b6 a Shock 51; u velblouda tabulku C, AV b5 a Shock 42. Tato data jsou odlišná od hodnot koní. U anatomie J (slon) a jiných neimplementovaných tabulek je výsledek **BLOCKED**, dokud není dostupná původní bezpečná procedura, nikoli vymyšlený koňský zásah.
 - Počítač nesmí dosazovat fyzické d100/d6/ZD/LD/Shock, měnit potvrzenou kostku ani dokončovat Accident na jiném zvířeti, než které bylo v původním skutečně potvrzeném intervalu.
 - Trvalá ochrana Evidence Scope: jiný průvodce, stopař, typ dopravy, nové zvíře ani jiná družina nesmějí nepřímo odmazat Tracking CF → povinný Bearing, přidat nové staré hvězdy nebo znovu použít neplatný d100.
+
+## v93.849 · Uživatelsky schválená změna potvrzování v Cestování (12. 11. 2026)
+
+- B04 se upřesňuje podle výslovného rozhodnutí vlastníka: během rozpracování lze **název stopy zapsat a opravit bez samostatného tlačítka „Potvrdit stopu“**. Zvolenou identitu stopy a oprávnění skutečného stopaře přijme až **„Vyhodnotit epizodu“**. Poté se samostatně provádí skutečný Tracking Skill Test. Editace názvu nebo Enter nesmí sama provést test, vytvořit čas či zápis.
+- U Drover se odstraňuje neúčinné navigační tlačítko „Přejít na Skill“; příslušný Riding/Animalcraft se vyžádá v navazujícím explicitním pravidlovém úkolu.
+- Každý uživatelem zadávaný / generovaný d4/d6/d10/d100 přímo v Cestování a v jeho navazujících hazards je **rozpracovaný** až do výslovného tlačítka **„Vložit číslo“**. Přepsání prvního znaku ani tlačítko generátoru nesmí posunout proceduru. Zápis počtu hodů (jedna hodnota nebo čárkami oddělené přesné množství) musí být viditelný a kontrolovaný; Double Time END odpovídá počtu započatých hodin skutečného pohybu.
+- Rozbalovací nabídka **cíle rozdělení výhod** se po „Vyhodnotit epizodu“ zamkne. Volba **automatického / ručního rozdělení získaných ★** zůstává vědomým rozhodnutím GM; validaci řídí vždy až **situačně upravený Orienteering SV**, nikoli původní Survival SV. Překážka při překročení počtu ★ se musí dát zobrazit a opravit.
+- Zobrazení „Veškeré aktuálně požadované výsledky jsou doloženy“ musí odpovídat dostupnému skutečnému potvrzení řádku/epizody. Všechny dosud neodsouhlasené rozepsané hody musí být označeny a nesmí se dostat do uložených dokladů.
+- Nadále platí výjimka v93.845: Equipment Hazard nevytváří automatickou 240minutovou opravu, GM rozhoduje o čase.
