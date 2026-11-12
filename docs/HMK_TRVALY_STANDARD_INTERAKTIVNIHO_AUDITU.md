@@ -29,7 +29,7 @@ B02. Každý procesní krok předává **určené explicitní potvrzovací tlač
 
 B03. Každý skutečný Skill Test má vlastní dosažitelný vstup, vyhodnocení a návrat. Žádné automatické potvrzení po posledním znaku ani po přepnutí fokusu. Zakázaný hod nelze provést ani ručním vstupem, ani softwarovou kostkou, ani syntetickým submit.
 
-B04. Textová pole testovat znak po znaku, včetně diakritiky, oprav, Backspace/Delete, mazání celého obsahu, opětovného otevření a změn fokusu. Rozpracovaný název stopy zůstává editovatelný do stisku **„Potvrdit identifikaci stopy → další test“**.
+B04. Textová pole testovat znak po znaku, včetně diakritiky, oprav, Backspace/Delete, mazání celého obsahu, opětovného otevření a změn fokusu. Rozpracovaný název stopy zůstává editovatelný do **výslovného kliknutí na aktuální krok**: pro Tracking během Stalking jde o tlačítko **„Otevřít Tracking Skill Test“**, které současně potvrzuje identitu stopy; žádné již odstraněné pomocné tlačítko nesmí být vyžadováno. Samotné psaní, Enter ani změna výběru nikdy nic nepotvrzují.
 
 B05. Čísla testovat přes rozsah, prázdno, hranice, opakované přepsání, vedoucí nuly, nečíselné znaky a zadání výchozí hodnoty. Checkboxy a selecty opakovaně zapínat/vypínat/přepínat; kontrolovat i návrat původní hodnoty.
 
@@ -208,3 +208,11 @@ I03. Ostatní historické NEOVĚŘENO / FAIL z cílených auditů nejsou tímto 
 - Už doložené časové epizody se nepřepočítávají podle nového výkladu Bearing. Doklady se zpětně validují podle svého původního formátu; nové mají označenou verzi pravidla. Žádné předčasné permanentní zápisy při změně seznamu, checkboxu nebo poli.
 - Automatizace geografických faktů, počasí a srážek má používat jen autoritativní data. Místní znalost oblasti, fakt dřívějšího nepřetržitého sněžení, zvláštní Move a nejednoznačný biotop či Encounter zůstávají k doložení GM.
 - Nové nasazení vyžaduje regresi: kompletní matice terénu, samostatný aktér Drovera, dune Slow včetně uložení, GM Progress, Desert Flats, jednočlenná a vícečlenná skupina, Double Time, Hazard, Tracking, jediný posun kalendáře a kontrolu FULL + PATCH = nový FULL.
+
+
+## Auditní doplnění v93.852 – závazné pro další regresní testy
+
+- V samostatném Foraging upravený Orienteering SV (včetně situačního bonusu +2) určuje hvězdy Trek Modes. Při kontrole historického dokladu se nesmějí zaměňovat tyto hvězdy s hvězdami původního, neupraveného Survival Skill Testu. Oba zdroje musí zůstat ověřitelné a odolné vůči podvrženým údajům.
+- Interní pomocná značka `trackingConfirmed` není uživatelské pole identity. Nesmí způsobovat mazání rozepsané stopy nebo zamykat formulář. Nová stopa se uzamkne až po příslušném explicitním potvrzení.
+- U Stalking → Tracking je jediným potvrzovacím tlačítkem existující „Otevřít Tracking Skill Test“. Zadaná identita stopy a skutečný stopař musí být před otevřením zkontrolováni; červené označení chybějícího údaje musí být viditelné a oprava hodnoty musí být dosažitelná.
+- Kompletní klikací regresi odlišovat od pouhé kontroly výpočtu. Větve bez dokončeného zápisu (zejména nepohyblivý pacient) nesmějí mít stav PASS.

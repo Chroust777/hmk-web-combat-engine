@@ -74,6 +74,8 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   typeof previousDistanceFraction==='number'&&previousDistanceFraction>=0&&previousDistanceFraction<1,
   'Neplatné pohybové režimy nebo přenos zlomku vzdálenosti.');
  must(!(loaded&&loadBypass),'Zrušený Loaded Mode nelze současně započítat jako zpomalení.');
+ must(!dunesSlow||(kind==='travel'&&terrain==='dunes'&&conveyance==='foot'),
+  'Dunes Slow lze zvolit pouze při pěší cestě přes duny (HMK 146).');
  if(!['travel','forage'].includes(kind))must(!survivalCriticalFailure&&survivalD10===null,'Survival Hazard platí pouze pro Orienteering při cestování nebo samostatném Foraging.');
  let motion=null,distanceMeters=0,actors=[],direction=null,survivalHazard=null;
  if(kind==='travel'){
@@ -428,7 +430,7 @@ export function mayReuseEpisodeSkill({previous,minute,context,kind='orientation'
 }
 export function computeEpisodeOrientation({mode='none',currentSkill=null,previous=null,minute,
   context,priority='pace',allocationMode='auto',manualModes=null,lowChoice='slow',requiredBearing=0,continuousPrecipitation=false,familiar=false,
-  torchlight=false,fullMoon=false,afterSnowfall=false,droverSkill=null,stationaryForaging=false}={}){
+  torchlight=false,fullMoon=false,afterSnowfall=false,droverSkill=null,droverActorId=null,animalsPresent=context?.conveyance!=='foot',requiredDroverSkill=null,stationaryForaging=false}={}){
  must(['none','new','reuse'].includes(mode),'Neznámé použití Orienteering.');
  if(mode==='none')return null;
  must(!stationaryForaging||mode==='new','Samostatný Foraging vyžaduje nový situační Orienteering; přebírání cestovního SV není dovoleno.');
@@ -450,11 +452,14 @@ export function computeEpisodeOrientation({mode='none',currentSkill=null,previou
   const ctx=createOrienteeringContext({night:context.night,partySize:context.memberIds.length,
    familiar,torchlight:context.night&&torchlight,fullMoon:context.night&&fullMoon,
    afterSnowfall:context.night&&afterSnowfall,stationaryForaging,conveyance:context.conveyance,
-   droverId:context.conveyance==='foot'?null:context.guideId,
-   animalsPresent:context.conveyance!=='foot'});
-  if(context.conveyance!=='foot')must(droverSkill?.skillId&&
-   ['Animalcraft','Riding'].includes(droverSkill.skill)&&droverSkill.guideId===context.guideId,
-   'Cesta se zvířaty potřebuje skutečný Riding/Animalcraft test průvodce.');
+   droverId:animalsPresent?(droverActorId||context.guideId):null,
+   animalsPresent});
+  if(animalsPresent)must(droverSkill?.skillId&&
+   (!requiredDroverSkill||droverSkill.skill===requiredDroverSkill)&&
+   ['Animalcraft','Riding'].includes(droverSkill.skill)&&
+   droverSkill.guideId===(droverActorId||context.guideId)&&
+   context.memberIds.includes(droverActorId||context.guideId),
+   'Cesta se zvířaty potřebuje skutečný '+(requiredDroverSkill||'Riding/Animalcraft')+' Drover test určeného člena družiny.');
   adjustment=adjustedOrienteeringSV({baseSV:witness.sv,context:ctx,
    droverResult:droverSkill?{level:droverSkill.level}:null});
  }
@@ -498,6 +503,7 @@ export function computeEpisodeOrientation({mode='none',currentSkill=null,previou
   adjustment,priority,allocationMode,stationaryForaging:stationaryForaging===true,lowChoice:mode==='reuse'?witness.lowChoice||lowChoice:lowChoice,
   manualModes:allocationMode==='manual'?Object.fromEntries(['bearing','progress','foraging','stalking','vigilance'].map(k=>[k,allocation[k]])):null,
   droverSkillId:mode==='reuse'?witness.droverSkillId??null:droverSkill?.skillId??null,
+  ...(mode==='new'&&animalsPresent?{droverActorId:droverActorId||context.guideId,requiredDroverSkill}:{}),
   droverLevel:mode==='reuse'?witness.droverLevel??null:droverSkill?.level??null,
   modes:{progress:allocation.progress,bearing:allocation.bearing,
    foraging:allocation.foraging,stalking:allocation.stalking,vigilance:allocation.vigilance,
@@ -584,11 +590,17 @@ export function validateTimeEpisodes(journal=[]){
    must(episodeSkillProof(linked,skill,key==='trackingMemory'?(memo.trackerId||memo.guideId):memo.guideId,j.calendarCampaignId,linked.campaignMinute),
     'Epizoda odkazuje na nesprávnou dovednost nebo postavu.');
    const sr=episodeSkillProof(linked,skill,key==='trackingMemory'?(memo.trackerId||memo.guideId):memo.guideId,j.calendarCampaignId,linked.campaignMinute);
-   must(memo.sv===sr.sv&&memo.level===sr.level&&memo.stars===sr.stars,
+   // The original Survival skill tier describes unadjusted SV. Trekking
+   // Orienteering awards Modes from the contextual adjusted SV (including
+   // stationary Foraging +2), so these are NOT the same star count. Verify
+   // both sources independently rather than erroneously comparing them.
+   const expectedMemoryStars=key==='orientation'?memo.adjustment?.advantageModes:sr.stars;
+   must(memo.sv===sr.sv&&memo.level===sr.level&&Number.isSafeInteger(expectedMemoryStars)&&
+    memo.stars===expectedMemoryStars,
     'Výsledek nebo hvězdičky historického Skill Testu byly pozměněny.');
    if(key==='orientation'){
     const stationary=e.kind==='forage'&&e.stationaryForagingPolicy==='hmk-stationary-v93.835';
-    must((e.kind==='travel'||stationary)&&memo.modes?.progress===e.progress&&memo.modes?.bearing===e.bearing,
+    must((e.kind==='travel'||stationary)&&memo.modes?.progress+(e.gmExtraProgress||0)===e.progress&&memo.modes?.bearing===e.bearing,
      'Orienteering režimy musí souhlasit s vypočteným pohybem epizody.');
     if(stationary)must(e.progress===0&&e.bearing===0&&memo.stationaryForaging===true&&memo.sourceMode==='new'&&
      e.distanceMeters===0&&Array.isArray(e.standaloneForaging),
@@ -597,7 +609,8 @@ export function validateTimeEpisodes(journal=[]){
      'Upravený SV není podložen původním hodem.');
     const required=stationary?0:trekMovement({topography:e.topography,terrain:e.terrain,
      conveyance:e.conveyance,progress:0,slow:0,bearing:0,loaded:false,progressD10:[],
-     continuousPrecipitation:!!e.precipitation?.slowMode}).requiredBearing;
+     continuousPrecipitation:!!e.precipitation?.slowMode,
+     bearingRule:e.trekTerrainPolicy93851==='hmk-v1.2-93851'?'hmk':'legacy'}).requiredBearing;
     const recoveryRule=e.navigationRecoveryRule==='special-bearing-and-awareness-v93.780';
     const navPrior=recoveryRule?lastEpisodeBefore(prior,j.calendarCampaignId,e.startMinute,e.memberIds):null;
     const specialBearing=recoveryRule&&e.navigationRecovered&&episodeNavigationState(navPrior)==='lost'?1:0;
@@ -627,10 +640,13 @@ export function validateTimeEpisodes(journal=[]){
      'Advantage Modes neodpovídají doloženému SV a strategii GM.');
     if(memo.sourceMode==='new'){
      const droverRow=memo.droverSkillId?journal.find(x=>x.id===memo.droverSkillId):null;
-     const droverProof= e.conveyance==='foot'?null:
-      (episodeSkillProof(droverRow,'Animalcraft',memo.guideId,j.calendarCampaignId,e.startMinute)||
-       episodeSkillProof(droverRow,'Riding',memo.guideId,j.calendarCampaignId,e.startMinute));
-     must(e.conveyance==='foot'||droverProof&&droverProof.level===memo.droverLevel,
+     const proofActor=memo.droverActorId||memo.guideId;
+     const droverProof=!memo.droverSkillId?null:
+      (episodeSkillProof(droverRow,'Animalcraft',proofActor,j.calendarCampaignId,e.startMinute)||
+       episodeSkillProof(droverRow,'Riding',proofActor,j.calendarCampaignId,e.startMinute));
+     must((e.conveyance==='foot'&&!memo.droverSkillId)||droverProof&&droverProof.level===memo.droverLevel&&
+      (!memo.requiredDroverSkill||droverProof.skill===memo.requiredDroverSkill)&&
+      e.memberIds.includes(proofActor),
       'Cestování se zvířaty nemá doložený Drover Test.');
      const ctx=createOrienteeringContext({night:memo.context.night,
       partySize:memo.context.memberIds.length,familiar:memo.context.familiar,
@@ -638,7 +654,7 @@ export function validateTimeEpisodes(journal=[]){
       fullMoon:memo.context.night&&memo.context.fullMoon,
       afterSnowfall:memo.context.night&&memo.context.afterSnowfall,stationaryForaging:stationary,
       conveyance:e.conveyance,
-      ...(e.conveyance==='foot'?{}:{droverId:memo.guideId,animalsPresent:true})});
+      ...(memo.droverSkillId?{droverId:proofActor,animalsPresent:true}:{} )});
      must(JSON.stringify(adjustedOrienteeringSV({baseSV:sr.sv,context:ctx,
       droverResult:droverProof?{level:droverProof.level}:null}))===
       JSON.stringify(memo.adjustment),'Situační úprava Orienteering SV byla pozměněna.');
@@ -1219,7 +1235,8 @@ export function validateTimeEpisodes(journal=[]){
     if(e.navigationRecovered&&hadLost){
      const terrainBearing=trekMovement({topography:e.topography,terrain:e.terrain,
       conveyance:e.conveyance,progress:0,slow:0,bearing:0,loaded:false,progressD10:[],
-      continuousPrecipitation:!!e.precipitation?.slowMode}).requiredBearing;
+      continuousPrecipitation:!!e.precipitation?.slowMode,
+      bearingRule:e.trekTerrainPolicy93851==='hmk-v1.2-93851'?'hmk':'legacy'}).requiredBearing;
      const forced=pendingTrackingCFBearing(prior,j.calendarCampaignId,e.startMinute,e.memberIds);
      must(e.orientation?.modes?.bearing>=terrainBearing+forced+1,
       'Lost vyžaduje zvláštní Bearing z prokázaného Orienteering, nikoli jen rozhodnutí GM.');
