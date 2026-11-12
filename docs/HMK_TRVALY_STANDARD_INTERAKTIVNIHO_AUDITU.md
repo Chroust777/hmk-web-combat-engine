@@ -171,3 +171,12 @@ I03. Ostatní historické NEOVĚŘENO / FAIL z cílených auditů nejsou tímto 
 - **Žádná aplikací odvozená povinná 240minutová oprava, blokace Pochodu, termín oprav ani automatické čtyři 60minutové intervaly.** Je na GM, zda, kdy a kolik skutečného času později opravě věnuje; aplikace jeho rozhodnutí nepředjímá. Tištěná HMK 148 uvádí referenční časové následky, ty jsou informací GM, nikoliv pevnou aplikací vynucenou povinností.
 - Oprava/změna na použitelný stav se děje **výslovným potvrzením GM v Inventáři**, při zachování ID, hodu, původní WQ a účetních dokladů. Nepoužitelný předmět se nesmí vybavit.
 - Historická data v93.844, pokud již mají záznamy odpracovaných minut, se nesmějí potají měnit nebo přepočítávat; zpětně se žádné nové povinnosti negenerují.
+
+
+## v93.846 · Survival Accident se zvířaty – povinná bezpečnost losování
+
+- Nehoda může postihnout postavu **nebo skutečné zvíře** vybrané v původní cestovní skupině (HMK 148). Vůl, tažný kůň a jiná Stable zvířata nesmějí být potichu vypuštěna z množiny obětí, protože jim chybí zdravotní profil.
+- Losování vyžaduje jedinečný seznam původních postav a skutečně zúčastněných zvířat s ověřeným aktivním zdravotním profilem stejného ID. Bez něj se nehází ani trvale nezapisuje Injury. Registrace nesmí automaticky vytvářet druhý nezávislý bojový stav nebo přepisovat historii.
+- HMK bestiář 355 dokládá u skotu tělesnou tabulku C, AV b6 a Shock 51; u velblouda tabulku C, AV b5 a Shock 42. Tato data jsou odlišná od hodnot koní. U anatomie J (slon) a jiných neimplementovaných tabulek je výsledek **BLOCKED**, dokud není dostupná původní bezpečná procedura, nikoli vymyšlený koňský zásah.
+- Počítač nesmí dosazovat fyzické d100/d6/ZD/LD/Shock, měnit potvrzenou kostku ani dokončovat Accident na jiném zvířeti, než které bylo v původním skutečně potvrzeném intervalu.
+- Trvalá ochrana Evidence Scope: jiný průvodce, stopař, typ dopravy, nové zvíře ani jiná družina nesmějí nepřímo odmazat Tracking CF → povinný Bearing, přidat nové staré hvězdy nebo znovu použít neplatný d100.
