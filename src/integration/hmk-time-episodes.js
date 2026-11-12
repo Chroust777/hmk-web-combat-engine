@@ -1,4 +1,5 @@
 import {verifyPassiveWeatherResistance} from './hmk-weather-passive-93820.js';
+import {validateEquipmentTimeWork93844, EQUIPMENT_TIME_POLICY_93844} from './hmk-equipment-time-work-93844.js';
 import {validateSharedTimeWindowJournal93767,assertSharedEpisodeOverlaps93768} from './hmk-shared-time-window-93767.js';
 /** HMK Keeper's Ledger – GM-timed episodes.
  * Explicit house-rule mode: time is divided into freely chosen episodes,
@@ -1148,7 +1149,9 @@ export function validateTimeEpisodes(journal=[]){
     'Zdržení v další hlídce nemá doložený Equipment Hazard nebo je jeho délka pozměněna.');
    if(e.equipmentSlowCarryOut!==undefined){
     const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute,travelScope);
-    const newSlow=e.hazardDetails?.some(h=>(h.hazard==='equipment'||h.hazard==='complication'&&h.automationVersion==='v93.681')&&h.result==='short-delay')?e.minutes:0;
+    const repairS=e.hazardDetails?.find(h=>h.hazard==='equipment'&&h.result==='short-delay');
+    const newSlow=repairS?.equipmentMinutePolicy===EQUIPMENT_TIME_POLICY_93844?240:
+      e.hazardDetails?.some(h=>(h.hazard==='equipment'||h.hazard==='complication'&&h.automationVersion==='v93.681')&&h.result==='short-delay')?e.minutes:0;
     // Legacy receipts before v93.666 incorrectly consumed a Slow obligation
     // during an equipment repair with zero movement. Keep historical data
     // readable, but never issue (or accept as new) that calculation again.
@@ -1282,6 +1285,7 @@ export function validateTimeEpisodes(journal=[]){
    memberIds:e.memberIds||[],animalIds:(e.animals||[]).map(x=>x.id),
    sharedWindowId:e.sharedWindowId||null}))));
  validateSharedTimeWindowJournal93767(journal);
+ validateEquipmentTimeWork93844(journal);
  return true;
 }
 

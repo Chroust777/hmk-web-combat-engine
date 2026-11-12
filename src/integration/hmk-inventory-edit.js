@@ -29,6 +29,7 @@ export function applyInventoryItemEdit(doc,{ownerId,itemId,slot,quantity,current
  const next=structuredClone(doc);const target=next.inventory.find(x=>x.id===itemId&&x.characterId===ownerId);
  target.slot=slot;target.quantity=quantity;target.currentWQ=currentWQ;target.coldWorn=coldWorn;target.condition=condition;target.gearStowage=gearStowage;
  if(gmEquipmentState==='usable'){
+  if(target.hmkEquipmentRepair?.workPolicy==='hmk-148-240-minute-splittable-v93.844'&&['damaged','irreparable'].includes(target.hmkEquipmentRepair.status))fail('Povinný Equipment F/CF vyžaduje skutečné dokončení minutové opravy v Kalendáři; ruční odemknutí je zakázáno.');
   if(target.hmkEquipmentRepair&&['damaged','irreparable'].includes(target.hmkEquipmentRepair.status)){
    const previous=target.hmkEquipmentRepair;
    // Legacy timed records keep their original fields for compatibility;
