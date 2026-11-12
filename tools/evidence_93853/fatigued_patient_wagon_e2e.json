@@ -1,0 +1,232 @@
+[
+  {
+    "step": "initial",
+    "minute": 480,
+    "patient": "{\"format\":\"hmk-character-health-v1\",\"shock\":\"UNC\",\"bloodLoss\":{\"bp\":0,\"weaknessFatigue\":0},\"fatigue\":{\"windedness\":0,\"weariness\":0,\"otherWeakness\":0},\"wounds\":[],\"events\":[],\"lastRound\":0,\"shockOriginRound\":null,\"shockFollowup\":null,\"extendedShock\":null,\"coma\":null,\"bloodShockPending\":false,\"morale\":{\"state\":\"steady\",\"psycheStress\":0,\"braveSince\":null,\"braveTimelineId\":null},\"mishaps\":[],\"posture\":{\"prone\":false,\"dropPending\":false,\"passNextTurn\":false}}"
+  },
+  {
+    "step": "missing-patient",
+    "checklist": "Nedokončené nastavení\n\nNepohyblivá postava Aktér B, Aktér C nesmí jít pěšky. V části 3 klikněte na „Naložit pacienta“; pokud chybí kára, vůz nebo kůň, pořiďte je přes Stáj.\n\nPřejít na chybějící údaj"
+  },
+  {
+    "step": "patient-loaded-before-cart",
+    "mass": "Doloženo ze skutečných postav: 440 lb (z toho nepohybliví 290 lb); další náklad mimo evidenci 0 lb."
+  },
+  {
+    "step": "wagon-gear",
+    "i": 0,
+    "checklist": "4 k doplnění · 4 hotovo ⓘ\n\n✓\nDostupná tažná zvířata\nUkázat pole\nProč je to potřeba?\n✓\nTažná skupina vybrána\nUkázat pole\nProč je to potřeba?\n○\nPrvní kůň · Harness, horse\nKoupit a zařadit · 20d\nPřidělit zdarma a nasadit (GM)\nProč je to potřeba?\n○\nDruhý kůň · Harness, horse\nKoupit a zařadit · 20d\nPřidělit zdarma a nasadit (GM)\nProč je to potřeba?\n○\nVybrat skutečné vozidlo ve Stáji\nKoupit a zařadit · 220d\nPřidělit zdarma"
+  },
+  {
+    "step": "wagon-gear",
+    "i": 1,
+    "checklist": "3 k doplnění · 5 hotovo ⓘ\n\n✓\nDostupná tažná zvířata\nUkázat pole\nProč je to potřeba?\n✓\nTažná skupina vybrána\nUkázat pole\nProč je to potřeba?\n✓\nPrvní kůň · Harness, horse\nProč je to potřeba?\n○\nDruhý kůň · Harness, horse\nKoupit a zařadit · 20d\nPřidělit zdarma a nasadit (GM)\nProč je to potřeba?\n○\nVybrat skutečné vozidlo ve Stáji\nKoupit a zařadit · 220d\nPřidělit zdarma a nasadit (GM)\nUkázat pole\nProč je to potřeba?\n✓\nHmot"
+  },
+  {
+    "step": "wagon-ready",
+    "capacity": "Doloženo 440 / 6400 lb; skutečný vůz Wagon, 4-wheel.",
+    "mass": "Doloženo ze skutečných postav: 440 lb (z toho nepohybliví 290 lb); další náklad mimo evidenci 0 lb.",
+    "status": "✓ Připravený cestující: Aktér B, Aktér C. Dále je třeba doložit pouze skutečnou soupravu, výstroj a odpovídající hody průvodce."
+  },
+  {
+    "step": "next",
+    "group": "two-patient-wagon",
+    "i": 0,
+    "field": "droverProofId",
+    "msg": "Drover Test: cesta vyžaduje Animalcraft Skill Test postavy Aktér A (HMK 141, 145).",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "next",
+    "group": "two-patient-wagon",
+    "i": 1,
+    "field": "orientationProofId",
+    "msg": "Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty.",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "allocation-choice",
+    "group": "two-patient-wagon",
+    "i": 2
+  },
+  {
+    "step": "next",
+    "group": "two-patient-wagon",
+    "i": 3,
+    "field": "progressD10",
+    "msg": "Přebytek Progress vyžaduje 1 skutečných d10. Zadejte je oddělené čárkami.",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "next",
+    "group": "two-patient-wagon",
+    "i": 4,
+    "field": "end_a",
+    "msg": "Každá cestující postava potřebuje skutečný END SR d10.",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "ready",
+    "group": "two-patient-wagon",
+    "checklist": "✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.",
+    "stage": true
+  },
+  {
+    "step": "staged",
+    "group": "two-patient-wagon",
+    "minute": 480,
+    "queue": 1
+  },
+  {
+    "step": "final",
+    "final": {
+      "minute": 525,
+      "storedMinute": 525,
+      "patient": "{\"format\":\"hmk-character-health-v1\",\"shock\":\"UNC\",\"bloodLoss\":{\"bp\":0,\"weaknessFatigue\":0},\"fatigue\":{\"windedness\":0,\"weariness\":0,\"otherWeakness\":0},\"wounds\":[],\"events\":[],\"lastRound\":0,\"shockOriginRound\":null,\"shockFollowup\":null,\"extendedShock\":null,\"coma\":null,\"bloodShockPending\":false,\"morale\":{\"state\":\"steady\",\"psycheStress\":0,\"braveSince\":null,\"braveTimelineId\":null},\"mishaps\":[],\"posture\":{\"prone\":false,\"dropPending\":false,\"passNextTurn\":false}}",
+      "episodes": [
+        {
+          "id": "id-1794515021782-fscd1hmrcm",
+          "actors": [
+            "a",
+            "b",
+            "c"
+          ],
+          "start": 480,
+          "end": 525,
+          "transport": {
+            "format": "gm-transport-confirmation-v93.756",
+            "memberIds": [
+              "b",
+              "c"
+            ],
+            "conveyance": "wagon",
+            "gmConfirmed": true,
+            "originalHealth": [
+              {
+                "id": "b",
+                "shock": "UNC",
+                "comaActive": false,
+                "extendedShockActive": false,
+                "immobile": false,
+                "fatigue": 0
+              },
+              {
+                "id": "c",
+                "shock": "NONE",
+                "comaActive": false,
+                "extendedShockActive": false,
+                "immobile": false,
+                "fatigue": 40
+              }
+            ],
+            "sourcePage": 145,
+            "vehicle": {
+              "format": "hmk-confirmed-passenger-vehicle-93756",
+              "campaignId": "audit-rows-93772",
+              "minute": 480,
+              "conveyance": "wagon",
+              "vehicleKey": "id-1794515015329-rqo7q4xxsy::id-1794515017169-hq9qkfib69",
+              "ownerAnimalId": "id-1794515015329-rqo7q4xxsy",
+              "vehicleId": "id-1794515017169-hq9qkfib69",
+              "vehicleItemId": "hmk-p122-tack-13",
+              "vehicleProofId": "id-1794515017176-ztqnd9xpmj",
+              "vehicleName": "Wagon, 4-wheel",
+              "teamIds": [
+                "id-1794515015329-rqo7q4xxsy",
+                "id-1794515015996-ifpeqmugcqh"
+              ],
+              "capacityLb": 6400,
+              "cargoLb": 0,
+              "patientLoadLb": {
+                "b": 120,
+                "c": 170
+              },
+              "otherLoadLb": 150,
+              "passengerLb": 290,
+              "totalLb": 440,
+              "gmCoLocated": true,
+              "sourcePages": [
+                122,
+                145
+              ]
+            },
+            "mass": {
+              "format": "hmk-person-passenger-mass-93816",
+              "people": [
+                {
+                  "id": "a",
+                  "bodyLb": 150,
+                  "gearLb": 0,
+                  "totalLb": 150,
+                  "items": []
+                },
+                {
+                  "id": "b",
+                  "bodyLb": 120,
+                  "gearLb": 0,
+                  "totalLb": 120,
+                  "items": []
+                },
+                {
+                  "id": "c",
+                  "bodyLb": 170,
+                  "gearLb": 0,
+                  "totalLb": 170,
+                  "items": []
+                }
+              ],
+              "patientLoadLb": {
+                "b": 120,
+                "c": 170
+              },
+              "otherPersonLb": 150,
+              "additionalLb": 0,
+              "otherLoadLb": 150,
+              "totalPeopleLb": 440,
+              "sourcePages": [
+                122,
+                145
+              ]
+            }
+          },
+          "health": null,
+          "kind": "travel"
+        }
+      ],
+      "windowCount": 1,
+      "proofs": [
+        {
+          "id": "id-1794515020156-mifocd1z0bj",
+          "actor": "a",
+          "skill": "Success Test · Animalcraft"
+        },
+        {
+          "id": "id-1794515020851-d5aw9v8nnx",
+          "actor": "a",
+          "skill": "Success Value · Survival"
+        }
+      ],
+      "queue": 0,
+      "errors": []
+    },
+    "errors": [],
+    "dialogs": [
+      "GM potvrzuje bezplatné převzetí Palfrey, cart horse (První kůň) postavou Aktér A?",
+      "GM potvrzuje bezplatné převzetí Palfrey, cart horse (Druhý kůň) postavou Aktér A?",
+      "Stáj · První kůň: GM potvrzuje převzetí výstroje?\nPořízení chybějící výstroje při rozpracovaném Pochodu",
+      "Stáj · Druhý kůň: GM potvrzuje převzetí výstroje?\nPořízení chybějící výstroje při rozpracovaném Pochodu",
+      "Stáj · První kůň: GM potvrzuje pořízení vozidla?\nPořízení chybějící výstroje při rozpracovaném Pochodu",
+      "GM: potvrdit 1 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:45 a posunout JEDINÝ kalendář o 45 minut?"
+    ]
+  },
+  {
+    "step": "cold-load-state",
+    "minute": 525,
+    "episodes": 1,
+    "patient": "{\"format\":\"hmk-character-health-v1\",\"shock\":\"UNC\",\"bloodLoss\":{\"bp\":0,\"weaknessFatigue\":0},\"fatigue\":{\"windedness\":0,\"weariness\":0,\"otherWeakness\":0},\"wounds\":[],\"events\":[],\"lastRound\":0,\"shockOriginRound\":null,\"shockFollowup\":null,\"extendedShock\":null,\"coma\":null,\"bloodShockPending\":false,\"morale\":{\"state\":\"steady\",\"psycheStress\":0,\"braveSince\":null,\"braveTimelineId\":null},\"mishaps\":[],\"posture\":{\"prone\":false,\"dropPending\":false,\"passNextTurn\":false}}"
+  }
+]

@@ -1,0 +1,55 @@
+{
+  "checked": 290,
+  "passed": 290,
+  "failed": 0,
+  "mismatches": [],
+  "weather": [
+    {
+      "target": "paved-road",
+      "requestedPrecip": "rain",
+      "observedPrecip": "rain",
+      "continuous": true,
+      "slow": false
+    },
+    {
+      "target": "paved-road",
+      "requestedPrecip": "sleet",
+      "observedPrecip": "sleet",
+      "continuous": true,
+      "slow": true
+    },
+    {
+      "target": "paved-road",
+      "requestedPrecip": "snow",
+      "observedPrecip": "snow",
+      "continuous": true,
+      "slow": true
+    },
+    {
+      "target": "unpaved-road",
+      "requestedPrecip": "rain",
+      "observedPrecip": "rain",
+      "continuous": true,
+      "slow": true
+    },
+    {
+      "target": "unpaved-road",
+      "requestedPrecip": "sleet",
+      "observedPrecip": "sleet",
+      "continuous": true,
+      "slow": true
+    },
+    {
+      "target": "unpaved-road",
+      "requestedPrecip": "snow",
+      "observedPrecip": "snow",
+      "continuous": true,
+      "slow": true
+    }
+  ],
+  "trackingErrors": [],
+  "duneOvershoot": "Zbývající Progress Mode vyžaduje vlastní hod d10",
+  "nonDuneSlow": {
+    "error": "Dunes Slow lze zvolit pouze při pěší cestě přes duny (HMK 146)."
+  }
+}

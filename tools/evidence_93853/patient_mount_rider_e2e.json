@@ -1,0 +1,271 @@
+[
+  {
+    "step": "initial",
+    "minute": 480,
+    "patient": "{\"format\":\"hmk-character-health-v1\",\"shock\":\"UNC\",\"bloodLoss\":{\"bp\":0,\"weaknessFatigue\":0},\"fatigue\":{\"windedness\":0,\"weariness\":0,\"otherWeakness\":0},\"wounds\":[],\"events\":[],\"lastRound\":0,\"shockOriginRound\":null,\"shockFollowup\":null,\"extendedShock\":null,\"coma\":null,\"bloodShockPending\":false,\"morale\":{\"state\":\"steady\",\"psycheStress\":0,\"braveSince\":null,\"braveTimelineId\":null},\"mishaps\":[],\"posture\":{\"prone\":false,\"dropPending\":false,\"passNextTurn\":false}}"
+  },
+  {
+    "step": "missing-patient",
+    "checklist": "Nedokončené nastavení\n\nNepohyblivá postava Aktér B nesmí jít pěšky. V části 3 klikněte na „Naložit pacienta“; pokud chybí kára, vůz nebo kůň, pořiďte je přes Stáj.\n\nPřejít na chybějící údaj"
+  },
+  {
+    "step": "patient-loaded-before-cart",
+    "mass": "Doloženo ze skutečných postav: 270 lb (z toho nepohybliví 120 lb); další náklad mimo evidenci 0 lb."
+  },
+  {
+    "step": "horse-tack-needed",
+    "i": 0,
+    "checklist": "4 k doplnění · 1 hotovo ⓘ\n\n✓\nJízdní zvíře vybráno\nUkázat pole\nProč je to potřeba?\n○\nPrvní kůň · Bit & bridle\nKoupit a zařadit · 12d\nPřidělit zdarma a nasadit (GM)\nProč je to potřeba?\n○\nPrvní kůň · Blanket, horse\nKoupit a zařadit · 36d\nPřidělit zdarma a nasadit (GM)\nProč je to potřeba?\n○\nPrvní kůň · Saddle, riding nebo Saddle, war\nKoupit a zařadit · 80d\nPřidělit zdarma a nasadit (GM)\nProč je to potřeba?\n·\nPrvní kůň · jezdec se vybírá v Pochodu\nPro"
+  },
+  {
+    "step": "horse-tack-needed",
+    "i": 1,
+    "checklist": "3 k doplnění · 2 hotovo ⓘ\n\n✓\nJízdní zvíře vybráno\nUkázat pole\nProč je to potřeba?\n✓\nPrvní kůň · Bit & bridle\nProč je to potřeba?\n○\nPrvní kůň · Blanket, horse\nKoupit a zařadit · 36d\nPřidělit zdarma a nasadit (GM)\nProč je to potřeba?\n○\nPrvní kůň · Saddle, riding nebo Saddle, war\nKoupit a zařadit · 80d\nPřidělit zdarma a nasadit (GM)\nProč je to potřeba?\n·\nPrvní kůň · jezdec se vybírá v Pochodu\nProč je to potřeba?\n○ Drover · Riding\nPo „Vyhodnotit epiz"
+  },
+  {
+    "step": "horse-tack-needed",
+    "i": 2,
+    "checklist": "2 k doplnění · 3 hotovo ⓘ\n\n✓\nJízdní zvíře vybráno\nUkázat pole\nProč je to potřeba?\n✓\nPrvní kůň · Bit & bridle\nProč je to potřeba?\n✓\nPrvní kůň · Blanket, horse\nProč je to potřeba?\n○\nPrvní kůň · Saddle, riding nebo Saddle, war\nKoupit a zařadit · 80d\nPřidělit zdarma a nasadit (GM)\nProč je to potřeba?\n·\nPrvní kůň · jezdec se vybírá v Pochodu\nProč je to potřeba?\n○ Drover · Riding\nPo „Vyhodnotit epizodu“ otevřete požadovaný test v seznamu úkolů vpravo."
+  },
+  {
+    "step": "mount-ready",
+    "capacity": "Kůň První kůň · průvodce jede · pacient 120 lb + průvodce na koni 150 lb + výstroj a náklad 14 lb = 284 lb · ENC 30 · Move 100.",
+    "mass": "Doloženo ze skutečných postav: 270 lb (z toho nepohybliví 120 lb); další náklad mimo evidenci 0 lb.",
+    "patient": "✓ Připravený cestující: Aktér B. Dále je třeba doložit pouze skutečnou soupravu, výstroj a odpovídající hody průvodce."
+  },
+  {
+    "step": "next",
+    "group": "patient-mount",
+    "i": 0,
+    "field": "droverProofId",
+    "msg": "Drover Test: cesta vyžaduje Riding Skill Test postavy Aktér A (HMK 141, 145).",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "next",
+    "group": "patient-mount",
+    "i": 1,
+    "field": "orientationProofId",
+    "msg": "Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty.",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "allocation-choice",
+    "group": "patient-mount",
+    "i": 2
+  },
+  {
+    "step": "next",
+    "group": "patient-mount",
+    "i": 3,
+    "field": "progressD10",
+    "msg": "Přebytek Progress vyžaduje 2 skutečných d10. Zadejte je oddělené čárkami.",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "next",
+    "group": "patient-mount",
+    "i": 4,
+    "field": "end_a",
+    "msg": "Každá cestující postava potřebuje skutečný END SR d10.",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "ready",
+    "group": "patient-mount",
+    "checklist": "✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.",
+    "stage": true
+  },
+  {
+    "step": "staged",
+    "group": "patient-mount",
+    "minute": 480,
+    "queue": 1
+  },
+  {
+    "step": "next",
+    "group": "independent",
+    "i": 0,
+    "field": "orientationProofId",
+    "msg": "Pro nový Orienteering připojte skutečný Survival Success Value průvodce z aktuální minuty.",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "allocation-choice",
+    "group": "independent",
+    "i": 1
+  },
+  {
+    "step": "next",
+    "group": "independent",
+    "i": 2,
+    "field": "progressD10",
+    "msg": "Přebytek Progress vyžaduje 2 skutečných d10. Zadejte je oddělené čárkami.",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "next",
+    "group": "independent",
+    "i": 3,
+    "field": "end_c",
+    "msg": "Každá cestující postava potřebuje skutečný END SR d10.",
+    "stage": false,
+    "eval": true
+  },
+  {
+    "step": "ready",
+    "group": "independent",
+    "checklist": "✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.",
+    "stage": true
+  },
+  {
+    "step": "staged",
+    "group": "independent",
+    "minute": 480,
+    "queue": 2
+  },
+  {
+    "step": "final",
+    "final": {
+      "minute": 525,
+      "storedMinute": 525,
+      "patient": "{\"format\":\"hmk-character-health-v1\",\"shock\":\"UNC\",\"bloodLoss\":{\"bp\":0,\"weaknessFatigue\":0},\"fatigue\":{\"windedness\":0,\"weariness\":0,\"otherWeakness\":0},\"wounds\":[],\"events\":[],\"lastRound\":0,\"shockOriginRound\":null,\"shockFollowup\":null,\"extendedShock\":null,\"coma\":null,\"bloodShockPending\":false,\"morale\":{\"state\":\"steady\",\"psycheStress\":0,\"braveSince\":null,\"braveTimelineId\":null},\"mishaps\":[],\"posture\":{\"prone\":false,\"dropPending\":false,\"passNextTurn\":false}}",
+      "episodes": [
+        {
+          "id": "id-1794514961037-jlad0to4hch",
+          "actors": [
+            "a",
+            "b"
+          ],
+          "start": 480,
+          "end": 525,
+          "transport": {
+            "format": "gm-transport-confirmation-v93.816",
+            "memberIds": [
+              "b"
+            ],
+            "conveyance": "mount",
+            "gmConfirmed": true,
+            "originalHealth": [
+              {
+                "id": "b",
+                "shock": "UNC",
+                "comaActive": false,
+                "extendedShockActive": false,
+                "immobile": false,
+                "fatigue": 0
+              }
+            ],
+            "sourcePage": 145,
+            "mass": {
+              "format": "hmk-person-passenger-mass-93816",
+              "people": [
+                {
+                  "id": "a",
+                  "bodyLb": 150,
+                  "gearLb": 0,
+                  "totalLb": 150,
+                  "items": []
+                },
+                {
+                  "id": "b",
+                  "bodyLb": 120,
+                  "gearLb": 0,
+                  "totalLb": 120,
+                  "items": []
+                }
+              ],
+              "patientLoadLb": {
+                "b": 120
+              },
+              "otherPersonLb": 150,
+              "additionalLb": 0,
+              "otherLoadLb": 150,
+              "totalPeopleLb": 270,
+              "sourcePages": [
+                122,
+                145
+              ]
+            },
+            "mount": {
+              "format": "hmk-gm-secured-mount-passenger-93816",
+              "campaignId": "audit-rows-93772",
+              "minute": 480,
+              "mountId": "id-1794514955181-r2656lu894n",
+              "patientId": "b",
+              "riderId": "a",
+              "handlerId": "a",
+              "handlerPosition": "mounted",
+              "animalName": "První kůň",
+              "stableRiderProofId": null,
+              "minimumLb": 14,
+              "patientLb": 120,
+              "handlerLb": 150,
+              "totalLb": 284,
+              "enc": 30,
+              "moveAfterLoad": 100,
+              "gmConfirmed": true,
+              "sourcePages": [
+                122,
+                145
+              ]
+            }
+          },
+          "health": null,
+          "kind": "travel"
+        },
+        {
+          "id": "id-1794514963348-o9nrfyss0gc",
+          "actors": [
+            "c"
+          ],
+          "start": 480,
+          "end": 525,
+          "transport": null,
+          "health": null,
+          "kind": "travel"
+        }
+      ],
+      "windowCount": 1,
+      "proofs": [
+        {
+          "id": "id-1794514959374-wxtrxc7l9um",
+          "actor": "a",
+          "skill": "Success Test · Riding"
+        },
+        {
+          "id": "id-1794514960024-a8oig5k9smv",
+          "actor": "a",
+          "skill": "Success Value · Survival"
+        },
+        {
+          "id": "id-1794514962504-ewug06seqn",
+          "actor": "c",
+          "skill": "Success Value · Survival"
+        }
+      ],
+      "queue": 0,
+      "errors": []
+    },
+    "errors": [],
+    "dialogs": [
+      "GM potvrzuje bezplatné převzetí Palfrey, cart horse (První kůň) postavou Aktér A?",
+      "Stáj · První kůň: GM potvrzuje převzetí výstroje?\nPořízení chybějící výstroje při rozpracovaném Pochodu",
+      "Stáj · První kůň: GM potvrzuje převzetí výstroje?\nPořízení chybějící výstroje při rozpracovaném Pochodu",
+      "Stáj · První kůň: GM potvrzuje převzetí výstroje?\nPořízení chybějící výstroje při rozpracovaném Pochodu",
+      "GM: potvrdit 2 nezávislých činností od Den 1 · 08:00 do Den 1 · 08:45 a posunout JEDINÝ kalendář o 45 minut?"
+    ]
+  },
+  {
+    "step": "cold-load-state",
+    "minute": 525,
+    "episodes": 2,
+    "patient": "{\"format\":\"hmk-character-health-v1\",\"shock\":\"UNC\",\"bloodLoss\":{\"bp\":0,\"weaknessFatigue\":0},\"fatigue\":{\"windedness\":0,\"weariness\":0,\"otherWeakness\":0},\"wounds\":[],\"events\":[],\"lastRound\":0,\"shockOriginRound\":null,\"shockFollowup\":null,\"extendedShock\":null,\"coma\":null,\"bloodShockPending\":false,\"morale\":{\"state\":\"steady\",\"psycheStress\":0,\"braveSince\":null,\"braveTimelineId\":null},\"mishaps\":[],\"posture\":{\"prone\":false,\"dropPending\":false,\"passNextTurn\":false}}"
+  }
+]

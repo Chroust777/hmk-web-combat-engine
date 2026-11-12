@@ -1,0 +1,37 @@
+[
+  {
+    "step": "initial",
+    "minute": 480,
+    "patient": "{\"format\":\"hmk-character-health-v1\",\"shock\":\"UNC\",\"bloodLoss\":{\"bp\":0,\"weaknessFatigue\":0},\"fatigue\":{\"windedness\":0,\"weariness\":0,\"otherWeakness\":0},\"wounds\":[],\"events\":[],\"lastRound\":0,\"shockOriginRound\":null,\"shockFollowup\":null,\"extendedShock\":null,\"coma\":null,\"bloodShockPending\":false,\"morale\":{\"state\":\"steady\",\"psycheStress\":0,\"braveSince\":null,\"braveTimelineId\":null},\"mishaps\":[],\"posture\":{\"prone\":false,\"dropPending\":false,\"passNextTurn\":false}}"
+  },
+  {
+    "step": "missing-patient",
+    "checklist": "Nedokončené nastavení\n\nNepohyblivá postava Aktér B, Aktér C nesmí jít pěšky. V části 3 klikněte na „Naložit pacienta“; pokud chybí kára, vůz nebo kůň, pořiďte je přes Stáj.\n\nPřejít na chybějící údaj"
+  },
+  {
+    "step": "patient-loaded-before-cart",
+    "mass": "Doloženo ze skutečných postav: 440 lb (z toho nepohybliví 290 lb); další náklad mimo evidenci 0 lb."
+  },
+  {
+    "step": "two-patients-one-horse",
+    "status": "K dokončení přepravy chybí: Přeprava: zvolte jednoho pacienta na tomto koni; pro více pacientů použijte další zvíře nebo vozidlo. Otevřete Stáj nebo doplňte skutečný postroj či vozidlo.",
+    "mass": "Doloženo ze skutečných postav: 440 lb (z toho nepohybliví 290 lb); další náklad mimo evidenci 0 lb."
+  },
+  {
+    "step": "blocking-validation",
+    "field": null,
+    "msg": null,
+    "checklist": "Nedokončené nastavení\n\nPřeprava: jeden kůň může v této cestovní epizodě vézt pouze jednoho nepohyblivého pacienta. Ve skupině jsou 2 pacienti (Aktér B, Aktér C). Zvolte káru nebo vůz s odpovídající nosností a spřežením; žádný Skill Test zatím neprovádějte.\n\nPřejít na chybějící údaj",
+    "jump": [
+      "conveyance"
+    ],
+    "finalEnabled": false
+  },
+  {
+    "step": "NEGATIVE PASS",
+    "redField": "conveyance",
+    "focus": "conveyance",
+    "skillProofs": 0,
+    "calendarMinute": 480
+  }
+]

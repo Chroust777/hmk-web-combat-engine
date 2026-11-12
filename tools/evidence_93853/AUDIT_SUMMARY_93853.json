@@ -1,0 +1,24 @@
+{
+  "release": "93.853",
+  "base": "93.852",
+  "chromium_positive_scenarios": 5,
+  "chromium_negative_scenarios": 1,
+  "positive_pass": 5,
+  "negative_pass_after_fix": 1,
+  "actual_browser_http_reload": "BLOCKED_by_administrator",
+  "isolated_storage_restore": "PASS",
+  "fixed_bug": "two nonambulatory patients on one horse no longer opens Riding before invalid conveyance is corrected",
+  "new_medical_source_provenance": "fixture_preexisting",
+  "unit_checks": {
+    "travel_rules": 32,
+    "separate_healing": 17,
+    "compound_medical": 13
+  },
+  "changed_sources": [
+    "app.js",
+    "index.html",
+    "hmk-app.bundle.js"
+  ],
+  "graphics_css_unchanged": true,
+  "caveat": "Real public GitHub Pages reload and true Combat-origin patient remain unverified"
+}

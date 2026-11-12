@@ -351,7 +351,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.852';
+const APP_VERSION='93.853';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2643,6 +2643,12 @@ function episodeSetupIssue(form){
    if(patients.some(c=>!(v.transportedMemberIds||[]).includes(c.id)))
     return {field:'transportedMemberIds',message:'Nepohyblivá postava '+patients.map(c=>c.name).join(', ')+
      ' čeká na doložený převoz. Klikněte vlevo na „Naložit pacienta“; tím se vybere skutečné vozidlo i spřežení, pokud je ve Stáji.'};
+   // Preflight the same one-patient-per-horse rule enforced by the immutable
+   // mounted-passenger certificate. Never request Riding/Survival dice when the
+   // selected conveyance cannot possibly carry all actual patients.
+   if(v.conveyance==='mount'&&patients.length>1)
+    return {field:'conveyance',message:'Přeprava: jeden kůň může v této cestovní epizodě vézt pouze jednoho nepohyblivého pacienta. Ve skupině jsou '+
+     patients.length+' pacienti ('+patients.map(c=>c.name).join(', ')+'). Zvolte káru nebo vůz s odpovídající nosností a spřežením; žádný Skill Test zatím neprovádějte.'};
   }
  }
 
