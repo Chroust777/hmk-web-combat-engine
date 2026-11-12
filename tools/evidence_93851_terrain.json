@@ -1,0 +1,141 @@
+{
+  "basis": "HMK v1.2 pp.145-147,150 compared with v93.850 engine",
+  "checked": 290,
+  "pass": 290,
+  "failed": 0,
+  "mismatches": [],
+  "weather": [
+    {
+      "target": "paved-road",
+      "requestedPrecip": "rain",
+      "observedPrecip": "rain",
+      "continuous": true,
+      "slow": false
+    },
+    {
+      "target": "paved-road",
+      "requestedPrecip": "sleet",
+      "observedPrecip": "sleet",
+      "continuous": true,
+      "slow": true
+    },
+    {
+      "target": "paved-road",
+      "requestedPrecip": "snow",
+      "observedPrecip": "snow",
+      "continuous": true,
+      "slow": true
+    },
+    {
+      "target": "unpaved-road",
+      "requestedPrecip": "rain",
+      "observedPrecip": "rain",
+      "continuous": true,
+      "slow": true
+    },
+    {
+      "target": "unpaved-road",
+      "requestedPrecip": "sleet",
+      "observedPrecip": "sleet",
+      "continuous": true,
+      "slow": true
+    },
+    {
+      "target": "unpaved-road",
+      "requestedPrecip": "snow",
+      "observedPrecip": "snow",
+      "continuous": true,
+      "slow": true
+    }
+  ],
+  "tracking": [
+    {
+      "road": "none",
+      "continuousSnow": false,
+      "continuousRain": false,
+      "expected": -2,
+      "actual": -2
+    },
+    {
+      "road": "none",
+      "continuousSnow": false,
+      "continuousRain": true,
+      "expected": -3,
+      "actual": -3
+    },
+    {
+      "road": "none",
+      "continuousSnow": true,
+      "continuousRain": false,
+      "expected": 2,
+      "actual": 2
+    },
+    {
+      "road": "none",
+      "continuousSnow": true,
+      "continuousRain": true,
+      "expected": 1,
+      "actual": 1
+    },
+    {
+      "road": "unpaved",
+      "continuousSnow": false,
+      "continuousRain": false,
+      "expected": -4,
+      "actual": -4
+    },
+    {
+      "road": "unpaved",
+      "continuousSnow": false,
+      "continuousRain": true,
+      "expected": -5,
+      "actual": -5
+    },
+    {
+      "road": "unpaved",
+      "continuousSnow": true,
+      "continuousRain": false,
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "road": "unpaved",
+      "continuousSnow": true,
+      "continuousRain": true,
+      "expected": -1,
+      "actual": -1
+    },
+    {
+      "road": "paved",
+      "continuousSnow": false,
+      "continuousRain": false,
+      "expected": -6,
+      "actual": -6
+    },
+    {
+      "road": "paved",
+      "continuousSnow": false,
+      "continuousRain": true,
+      "expected": -7,
+      "actual": -7
+    },
+    {
+      "road": "paved",
+      "continuousSnow": true,
+      "continuousRain": false,
+      "expected": -2,
+      "actual": -2
+    },
+    {
+      "road": "paved",
+      "continuousSnow": true,
+      "continuousRain": true,
+      "expected": -3,
+      "actual": -3
+    }
+  ],
+  "duneOvershoot": "Zbývající Progress Mode vyžaduje vlastní hod d10",
+  "nonDuneSlow": {
+    "error": "Dunes Slow lze zvolit pouze při pěší cestě přes duny (HMK 146)."
+  }
+}
