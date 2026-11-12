@@ -189,3 +189,10 @@ I03. Ostatní historické NEOVĚŘENO / FAIL z cílených auditů nejsou tímto 
 - Rozbalovací nabídka **cíle rozdělení výhod** se po „Vyhodnotit epizodu“ zamkne. Volba **automatického / ručního rozdělení získaných ★** zůstává vědomým rozhodnutím GM; validaci řídí vždy až **situačně upravený Orienteering SV**, nikoli původní Survival SV. Překážka při překročení počtu ★ se musí dát zobrazit a opravit.
 - Zobrazení „Veškeré aktuálně požadované výsledky jsou doloženy“ musí odpovídat dostupnému skutečnému potvrzení řádku/epizody. Všechny dosud neodsouhlasené rozepsané hody musí být označeny a nesmí se dostat do uložených dokladů.
 - Nadále platí výjimka v93.845: Equipment Hazard nevytváří automatickou 240minutovou opravu, GM rozhoduje o čase.
+
+## v93.850 · Výslovné přidělení ★ a předávání Direction Hazardu (12. 11. 2026)
+
+- Po skutečně doloženém Survival/Orienteering výsledku, který dává kladný počet Advantage Modes, se nejprve vyžaduje **tlačítkem potvrzená volba** automatického či ručního rozdělení; samotný select, Enter ani vyplnění čísel není potvrzením. Ruční režim vyžaduje také výslovné potvrzení přiděleného rozpočtu a dovoluje opravu neplatného návrhu před tímto potvrzením.
+- Přechod k následujícím hodům a finální dokončení řádku jsou blokovány, dokud není volba přidělení ★ skutečně potvrzena. Při obnově rozpracovaného dokladu se nepředpokládá skrytě potvrzený výběr.
+- Skutečný d10 směru odchýlení má vlastní tlačítko „Vložit číslo“. Pokud ještě čeká obecná GM volba Hazardu, pravý panel **nesmí opakovat požadavek na již potvrzený hod**, ale výslovně nabídne „Potvrdit postup Direction Hazardu“; poté aktuální návaznost Awareness nebo vědomé pokračování mimo trasu.
+- Závěr jediné skupiny a společného okna musí zůstat dosažitelný, pokud jsou opravdu vyřešeny všechny závazné úkoly; historie se nesmí doplňovat bez klikacího potvrzení GM.
