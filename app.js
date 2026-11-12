@@ -351,7 +351,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.855';
+const APP_VERSION='93.856';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3009,7 +3009,7 @@ function timeEpisodePageHTML(clock,participants){
  <div data-episode-healthy-ride-panel class="panel" hidden><strong>Jezdec při tomto Pochodu · bez nasedání ve Stáji</strong>
  <details class="hmk-transport-guidance"><summary>Jak se počítá jezdec a ENC</summary><p>Aplikace automaticky započítá hmotnost jezdce s inventářem a výstrojí. Automatický výběr použije první vhodné jezdecké zvíře (kůň, osel, mezek nebo velbloud) ze zaškrtnutých zvířat. Vůl může skupinu doprovázet, ale tažný postroj nenahrazuje sedlo. Výsledek se zapíše až po potvrzení celé cesty.</p></details>
  <label>Jízdní zvíře<select name="travelRideAnimalId"><option value="">— Automaticky první vhodné jezdecké zvíře —</option>${stableTravelRoster.filter(isRidingAnimal93837).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
- <label>Postava jedoucí na zvířeti<select name="travelRideRiderId"><option value="">— Automaticky průvodce skupiny —</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+ <label>Postava jedoucí na zvířeti<select name="travelRideRiderId"><option value="">— Automaticky průvodce skupiny —</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select><small class="hc-hint" data-episode-rider-availability></small></label>
  <p class="hc-hint" data-episode-healthy-ride-mass role="status"></p></div>
  <section class="hc-episode-equipment-guide panel" data-episode-equipment-checklist hidden aria-live="polite">
  <h4>Povinné vybavení a úkony před vyhodnocením dopravy · HMK 122</h4>
@@ -3044,7 +3044,7 @@ function timeEpisodePageHTML(clock,participants){
  <input type="hidden" name="orientationUse" value="new">
  <div data-episode-orientation-new><label>Doložený Survival SV průvodce (aktuální minuta)<select name="orientationProofId"><option value="">— Vyberte skutečný uložený test —</option>${skillOptions('Survival')}</select></label>
  <div class="hmk-trek-grid"><label data-episode-travel-priority>Cíl rozdělení výhod při Pochodu<select name="orientationPriority"><option value="pace">Bearing (směr) → Progress (rychlost)</option><option value="forage">Bearing (směr) → Foraging (zásoby)</option><option value="stealth">Bearing (směr) → Stalking (nenápadný pohyb)</option><option value="vigilance">Bearing (směr) → Vigilance (ostražitost)</option></select></label>
- <details class="hc-episode-reference" data-episode-gm-move><summary>GM výjimka · mimořádný individuální Move</summary><label>Volný Progress (0 nebo 1)<input name="gmExtraProgress" type="number" min="0" max="1" value="0" title="HMK 146: výjimečné rozhodnutí GM. Nevzniká automaticky z určité hodnoty Move."></label><small>Udělujte pouze při doloženém mimořádném osobním Move. Přidá se k Progress z Orienteering; vyžádá další d10, pokud nezruší Slow.</small></details><label class="hc-check" data-episode-dunes-slow><input name="dunesSlow" type="checkbox"> Duny · při pěší chůzi zvolit Slow místo +5 únavy</label>
+ <details class="hc-episode-reference" data-episode-gm-move><summary>Volitelné rozhodnutí GM · neobvykle rychlá postava (HMK 146)</summary><label>Volný Progress (0 nebo 1)<input name="gmExtraProgress" type="number" min="0" max="1" value="0" title="HMK 146: výjimečné rozhodnutí GM. Nevzniká automaticky z určité hodnoty Move."></label><small>HMK 146 dovoluje GM výjimečně přidat 1 Progress při neobvykle vysokém Move (např. Move 70). Není to automatický bonus a při běžném cestování ponechte 0. Po potvrzení může vyžadovat další d10, případně vyrovnat Slow.</small></details><label class="hc-check" data-episode-dunes-slow><input name="dunesSlow" type="checkbox"> Duny · při pěší chůzi zvolit Slow místo +5 únavy</label>
  <label class="hc-check"><input name="orientationFamiliar" type="checkbox"> Průvodce skutečně zná oblast (+1 SV)</label>
  <label class="hc-check" data-episode-night-option><input name="orientationTorch" type="checkbox"> Zapálené noční umělé světlo (HMK 145)</label>
  <label class="hc-check" data-episode-night-option><input name="orientationMoon" type="checkbox"> Viditelný úplněk (HMK 145)</label>
@@ -3089,7 +3089,7 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint hc-episode-task-focus" data-episode-task-focus hidden role="status"></p>
  <label data-episode-survival-hazard>Survival Hazard (d10) · jen při kritickém neúspěchu Survival ${episodeRuleHelp('Survival Hazard','HMK 148: pokud původní Survival / Orienteering test skončil CF, družina musí vyřešit Survival Hazard bez ohledu na výsledné upravené SV. Hod d10: 1–3 Equipment (výstroj), 4–6 Accident (nehoda), 7–10 Complication (komplikace). Další hody na opravu, úraz či změnu výstroje se řeší podle vybraného následku ve stávajícím Skill Tests a Combat, nejsou automaticky považovány za vyřízené.')}<span class="hc-episode-die"><input name="survivalD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="survivalD10">⚄ d10</button></span></label>
  <div data-episode-travel-rolls><details class="hc-episode-suboptions hc-episode-roll-group" open><summary>Pohyb a orientace</summary>
- <p class="hc-hint" data-episode-dice-guidance role="status">Kostky zatím neházejte. Aplikace nejprve vyžádá Orienteering a stanoví, zda potřebujete Progress nebo Direction Hazard. Povinné kostky pak výslovně zobrazí.</p><div class="hmk-trek-grid"><details class="hc-episode-reference" data-episode-optional-gm><summary>GM výjimka · mimořádný Move (HMK 146)</summary><label>Další Slow Modes<input name="extraSlow" type="number" min="0" max="20" value="0" title="Zadejte výhradně výslovné rozhodnutí GM. Automatické Slow nezadávejte."></label><p class="hc-hint">Volný Progress za mimořádný Move je k dispozici v nastavení Orienteering; při kontrole pohybu se započte společně s ostatními Progress.</p></details>
+ <p class="hc-hint" data-episode-dice-guidance role="status">Kostky zatím neházejte. Aplikace nejprve vyžádá Orienteering a stanoví, zda potřebujete Progress nebo Direction Hazard. Povinné kostky pak výslovně zobrazí.</p><div class="hmk-trek-grid"><details class="hc-episode-reference" data-episode-optional-gm><summary>GM výjimka · mimořádný Move (HMK 146)</summary><label>Další Slow Modes<input name="extraSlow" type="number" min="0" max="20" value="0" title="Zadejte výhradně výslovné rozhodnutí GM. Automatické Slow nezadávejte."></label><p class="hc-hint">Další Slow přidávejte pouze po výslovném pravidlovém rozhodnutí GM; běžné Slow se počítají automaticky.</p></details>
  <p class="hc-hint hc-episode-roll-pending" role="status" aria-live="polite" data-episode-roll-pending></p>
  <p class="hc-episode-auto-modes" role="status" data-episode-allocated-modes title="Výhody vznikají výhradně z doloženého SV a automaticky se přidělují na Bearing a zvolený cíl. ★ z předchozích hodů se nesčítají.">Progress a Bearing se vypočítají z doloženého Orienteering SV. Bez testu jsou obě hodnoty nula.</p>
  <label data-episode-progress-row hidden>Progress (d10) · při přebytku ${episodeRuleHelp('Progress d10','HMK 146: každý Progress ruší jeden Slow; za každý zbývající Progress hoďte vlastní d10 proti TN = 2 × základní LPW. Alespoň jeden úspěch zvýší LPW o 1 (ne o počet úspěchů). Hody se nikdy automaticky nepředpokládají.')}<span class="hc-episode-die"><input name="progressD10" placeholder="např. 4,8" title="Zadejte d10 oddělené čárkami, jednu za každou přebytečnou Progress Mode."><button type="button" data-episode-progress-die>+ d10</button></span></label></div>
@@ -25114,7 +25114,11 @@ function episodeIndependentDeadlines(form){
   Number.isSafeInteger(item.minute)&&item.minute<end&&
   // These obligations belong to the still-running episode; they must be
   // completed in its own checklist, never duplicated as external events.
-  !(item.kind==='skill-critical'&&isTravelEpisodeReceipt(journalIds.get(item.originId)))&&
+  // The travel Survival CF itself is already resolved by its original Hazard.
+  // Hide the duplicate generic CF, EXCEPT when the confirmed Hazard was
+  // Accident and its original medical consequence is genuinely still due.
+  !(item.kind==='skill-critical'&&isTravelEpisodeReceipt(journalIds.get(item.originId))&&
+    !episodeOriginalTravelAccidentForCritical93856(item))&&
   // An automatic Poison/Disease onset can be applied by the original clock
   // executor; it is not itself a new d100 at this point.
   !['poison','disease'].includes(item.kind));}
@@ -25159,6 +25163,22 @@ function episodeGMReviews(form){
  return {pending:[],reviewed:[]};
 }
 
+/** v93.856 · A Survival CF in a COMMITTED travel episode is already
+ * resolved by the original Survival Hazard d10. If that hazard was Accident,
+ * its outstanding obligation is the EXACT physical-consequence executor, not
+ * a new generic Survival/critical-followup test. This is read-only. */
+function episodeOriginalTravelAccidentForCritical93856(task){
+ if(task?.kind!=='skill-critical')return null;
+ const origin=task.originId||String(task.sourceId||'').slice(0,-2);
+ const original=data.journal.find(j=>j.id===origin&&j.characterId===task.characterId);
+ if(!original?.skillTestProof||!(original.skillTestProof.a?.level==='CF'||original.skillTestProof.result?.level==='CF'))return null;
+ const receipt=data.journal.find(j=>j.calendarCampaignId===original.calendarCampaignId&&
+  j.calendarTimeEpisode?.orientation?.skillId===origin&&
+  j.calendarTimeEpisode?.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending));
+ if(!receipt)return null;
+ const hazard=receipt.calendarTimeEpisode.hazardDetails.find(h=>h.hazard==='accident'&&h.externalMedicalPending);
+ return {origin,receipt,hazard};
+}
 const EPISODE_TIMED_COURSE_KINDS=new Set(['malnutrition-course','poison','disease','healing','infection','blood-loss','grim','extended-shock','coma','weather-course','sleep-deprivation']);
 function episodeOtherTimedTasks(form){return episodeIndependentDeadlines(form).filter(x=>!EPISODE_TIMED_COURSE_KINDS.has(x.kind));}
 function episodeGMStagedClock(clock,reviewed){
@@ -25236,10 +25256,18 @@ function showEpisodeIndependentDeadlines(form){
     '<label class="hc-episode-gm-review"><input type="checkbox" data-episode-gm-review="'+esc(safeKey)+'" '+(reviewed?'checked':'')+
     '> Zkontrolováno GM</label>')+'</div></div>';
  }).join('');
- const others=other.map(x=>'<div class="hc-episode-task"><div><b>'+esc(x.name||x.characterId||'Postava')+
-  ' · '+esc(displayCampaignMinute(x.minute))+'</b><p>'+esc(x.description||x.kind)+'</p>'+ 
-  '<p>Tento pravidlový termín zatím vyžaduje původní autoritativní modul; nelze jej odškrtnutím obejít.</p>'+ 
-  '<button type="button" class="secondary" data-cal-link="'+esc(x.characterId)+'" data-cal-kind="'+esc(x.kind)+'" data-cal-destination="'+esc(calendarEventDestination(x))+'" data-cal-source="'+esc(x.sourceId||x.woundId||'')+'" data-cal-elapsed="'+esc(x.elapsedMinutes??'')+'">Otevřít původní kontrolu</button></div></div>').join('');
+ const others=other.map(x=>{
+  const accident=episodeOriginalTravelAccidentForCritical93856(x);
+  const title=accident?'Accident po Survival CF · navazující zdravotní výsledek':(x.description||x.kind);
+  const explanation=accident?'Původní Survival d100 a Hazard d10 '+accident.hazard.hazardD10+' již byly doloženy v předchozím Pochodu. Nyní vyřešte náhodného účastníka, Agility a případnou Injury Sequence v původních Skill Followups. Tyto hody se nesmějí opakovat.':
+   'Tento pravidlový termín zatím vyžaduje původní autoritativní modul; nelze jej odškrtnutím obejít.';
+  return '<div class="hc-episode-task hc-episode-timed-task"><div><b>'+esc(x.name||x.characterId||'Postava')+
+   ' · '+esc(displayCampaignMinute(x.minute))+'</b><p>'+esc(title)+'</p><p>'+esc(explanation)+'</p>'+ 
+   '<button type="button" class="secondary" '+(x.kind==='skill-critical'?'data-episode-critical-handoff="yes" ':'data-cal-link="'+esc(x.characterId)+'" ')+
+   'data-cal-kind="'+esc(x.kind)+'" data-cal-actor="'+esc(x.characterId)+'" data-cal-destination="'+esc(calendarEventDestination(x))+'" data-cal-source="'+esc(x.sourceId||x.woundId||'')+'" data-cal-elapsed="'+esc(x.elapsedMinutes??'')+'">'+
+   (accident?'Otevřít přesný Accident → Agility / Injury Sequence':x.kind==='skill-critical'?'Otevřít původní CF ve Skill Followups':'Otevřít původní kontrolu')+
+   '</button></div></div>';
+ }).join('');
  box.innerHTML='<h4>Časované kontroly a následky během epizody</h4>'+
   (medical?.error?'<p class="notice error">'+esc(medical.error)+'</p>':'')+
   medicalRows+missingRows+incapHTML+gmRows+others;
@@ -25397,7 +25425,7 @@ function episodeDirectionConfirmationTask93850(form){
  if(!button||button.disabled||button.hidden)return false;
  const checklist=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
  if(checklist)checklist.innerHTML='<p class="hc-episode-task-lead">Aktuální povinný krok · potvrzení Direction Hazardu</p>'+ 
-  '<div class="hc-episode-task"><strong>✓ Směr odchýlení: d10 '+esc(accepted)+'</strong><p>Hod je doložen. Nyní výslovně potvrďte postup Direction Hazardu. Teprve potom se určí případný Awareness nebo dokončení cesty.</p>'+ 
+  '<div class="hc-episode-task hc-episode-setup-task"><strong>✓ Směr odchýlení: d10 '+esc(accepted)+'</strong><p>Hod je doložen. Nyní výslovně potvrďte postup Direction Hazardu. Teprve potom se určí případný Awareness nebo dokončení cesty.</p>'+ 
   '<button type="button" class="secondary" data-episode-jump="hazardDirectionD10" data-episode-hazard-confirm-next>Potvrdit postup Direction Hazardu</button></div>';
  for(const b of document.querySelectorAll('[data-episode-finalize],[data-episode-window-stage]'))b.disabled=true;
  return true;
@@ -25408,7 +25436,13 @@ function episodeUpdateAllocationGate93850(form){
  const manual=form.querySelector('[data-episode-manual-modes]');
  const task=episodeAllocationTask93850(form);
  const state=episodeAllocationState93850;
- if(select)select.disabled=true; // users must confirm via the dedicated buttons, not a select change
+ // The old select is only a read-back/serialization field. Showing it as a
+ // disabled second mode switch before Survival proof misleads the GM. Actual
+ // choice buttons appear ONLY after the verified Survival -> Orienteering ★.
+ if(select){select.disabled=true;select.closest('label').hidden=true;}
+ const note=form.querySelector('[data-episode-mode-choice-note]');
+ if(note&&!task){note.textContent='Nejdříve doložte skutečný Survival SV. Dokud není potvrzený hod, neexistují přidělitelné ★ ani volba jejich rozdělení.';}
+
  if(prompt){prompt.hidden=!task;if(task&&!state.confirmed)prompt.closest('details')?.setAttribute('open','');}
  if(!task){
   if(manual)manual.hidden=true;
@@ -25439,7 +25473,7 @@ function episodeUpdateAllocationGate93850(form){
  if(!state.confirmed){
   const checklist=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
   if(checklist)checklist.innerHTML='<p class="hc-episode-task-lead">Aktuální povinný krok · potvrzení získaných ★</p>'+ 
-   '<div class="hc-episode-task"><strong>Orienteering · rozdělení '+task.stars+' ★</strong><p>Po doloženém Survival SV nejprve potvrďte způsob přidělení. Bez vašeho kliknutí se žádný režim nepřijme. Přejděte do oddílu 4 a vyberte automatické nebo ruční rozdělení.</p>'+ 
+   '<div class="hc-episode-task hc-episode-setup-task"><strong>Orienteering · rozdělení '+task.stars+' ★</strong><p>Po doloženém Survival SV nejprve potvrďte způsob přidělení. Bez vašeho kliknutí se žádný režim nepřijme. Přejděte do oddílu 4 a vyberte automatické nebo ruční rozdělení.</p>'+ 
    '<button type="button" class="secondary" data-episode-jump="orientationAllocation">Otevřít rozdělení ★</button></div>';
   for(const b of document.querySelectorAll('[data-episode-finalize],[data-episode-window-stage]'))b.disabled=true;
  }
@@ -25895,7 +25929,7 @@ function episodeExplainFinalizationBlock93855(form){
  else if(sharedTimeWindowDraft&&!plan){instruction='Nejprve otevřete platnou činnost skupiny v plánovací tabulce.';}
  else instruction='Výsledky jsou v kontrolním seznamu doložené, ale další interní kontrola stále blokuje potvrzení. Tento stav vyžaduje diagnostiku; nic nebylo uloženo.';
  complete.remove();
- const panel=document.createElement('div');panel.className='hc-episode-task hc-episode-await';
+ const panel=document.createElement('div');panel.className='hc-episode-task hc-episode-await hc-episode-timed-task';
  panel.dataset.episodeCompletionBlocker='true';panel.setAttribute('role','alert');
  panel.innerHTML='<div><b>'+esc(title)+'</b><p>'+esc(instruction)+'</p>'+
   (jump?'<button type="button" class="secondary" data-episode-jump="'+esc(jump)+'">Přejít k nepotvrzenému hodu</button>':'')+'</div>';
@@ -25992,6 +26026,64 @@ function updateSharedTimeWindowControls(form){
   }
  }
 }
+/** v93.856 · Use the active scheduled group, not all campaign people, in
+ * transport role selectors. Only draft values may be reset; a locked skill
+ * proof/identity remains untouched and will instead fail the original guard.
+ * This function only updates presentation; no journal or Stable mutation. */
+function episodeGroupRoleChoices93856(form,v){
+ if(v.kind!=='travel')return;
+ const roster=[...new Set(v.memberIds||[])].filter(id=>!!character(id));
+ const reservations=episodeAnimalReservations93848();
+ const animalField=form.elements.namedItem('travelRideAnimalId');
+ if(animalField){
+  const selected=new Set(v.stableAnimalIds||[]);
+  for(const opt of animalField.options){if(!opt.value)continue;
+   opt.disabled=!selected.has(opt.value)||reservations.has(opt.value);
+   opt.hidden=opt.disabled; // No other group's animal as an apparent choice.
+  }
+  if(!episodeEvaluationRequested&&animalField.value&&animalField.selectedOptions[0]?.disabled)
+   animalField.value='';
+  v.travelRideAnimalId=animalField.value;
+ }
+ let mountReady=false;
+ if(v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length){
+  try{
+   const available=(v.stableAnimalIds||[]).filter(id=>!reservations.has(id));
+   const riderMount=resolveTravelMount93837(verifiedLivestock(data,campaignKey(data.campaignClock)),available,v.travelRideAnimalId||'');
+   const gear=planTravelEquipment93812(data,campaignKey(data.campaignClock),{...v,stableAnimalIds:available});
+   mountReady=!!riderMount.animal&&!gear.checks.some(c=>c.status==='missing');
+  }catch{mountReady=false;}
+ }
+ const setChoices=(name,placeholder,enabled)=>{
+  const field=form.elements.namedItem(name);if(!field)return;
+  const prior=field.value;
+  const options=[['',placeholder],...roster.map(id=>[id,character(id).name||id])];
+  const signature=JSON.stringify([options,enabled,episodeEvaluationRequested&&prior&&!roster.includes(prior)?prior:null]);
+  if(field.dataset.episodeGroupSignature!==signature){
+   const fragment=document.createDocumentFragment();
+   for(const [value,title] of options){const opt=document.createElement('option');opt.value=value;opt.textContent=title;
+    opt.disabled=!!value&&!enabled;fragment.appendChild(opt);}
+   if(episodeEvaluationRequested&&prior&&!roster.includes(prior)){
+    const invalid=document.createElement('option');invalid.value=prior;invalid.disabled=true;
+    invalid.textContent='Nepřípustná původní volba mimo tuto skupinu';fragment.appendChild(invalid);
+   }
+   field.replaceChildren(fragment);field.dataset.episodeGroupSignature=signature;
+  }
+  if(prior&&(roster.includes(prior)||episodeEvaluationRequested))field.value=prior;
+  else if(prior)field.value='';
+  field.disabled=!enabled||!!(episodeEvaluationRequested&&episodeEvaluatedIdentity);
+  field.closest('label')?.classList.toggle('hc-episode-inactive',!enabled);
+  return field;
+ };
+ const actor=setChoices('droverActorId','— Člen aktuální skupiny —',true);
+ const rider=setChoices('travelRideRiderId',mountReady?'— Automaticky průvodce skupiny —':'— Nejdříve zvolte vybavené dostupné zvíře —',mountReady);
+ if(actor)v.droverActorId=actor.value;
+ if(rider)v.travelRideRiderId=rider.value;
+ const status=form.querySelector('[data-episode-rider-availability]');
+ if(status)status.textContent=mountReady?
+  'K dispozici je jezdecké zvíře s povinnou výstrojí. Jezdce lze zvolit pouze z této skupiny.':
+  'Výběr jezdce je uzamčen: nejdříve v této skupině zaškrtněte dostupné jezdecké zvíře a doložte uzdu, deku a sedlo. Zvíře přidělené jiné souběžné skupině nelze použít.';
+}
 function updateEpisodePreview(form){
  if(!form)return;
  episodeEnsureDiceControls93849(form);
@@ -26082,6 +26174,7 @@ function updateEpisodePreview(form){
  const reuseInput=form.elements.namedItem('orientationReuse'),originInput=form.elements.namedItem('orientationUse');
  if(originInput&&reuseInput)originInput.value=reuseInput.checked?'reuse':'new';
  let v=episodeFormSnapshot(form);
+ episodeGroupRoleChoices93856(form,v);
  const kind=v.kind,travel=kind==='travel';
  delete form.dataset.episodeOrientationStars;delete form.dataset.episodeOrientationSv;
  if(travel){
@@ -27376,6 +27469,14 @@ document.addEventListener('click',e=>{
   const confirm=form.querySelector('[data-hazard-choices-confirm]');
   if(confirm&&!confirm.disabled&&!confirm.hidden){confirm.click();return;}
  }
+ if(b.dataset.episodeJump==='orientationAllocation'){
+  const chooser=form.querySelector('[data-episode-allocation-choice]');
+  if(!chooser||chooser.hidden)return;
+  chooser.closest('details')?.setAttribute('open','');
+  chooser.scrollIntoView({block:'center',behavior:'auto'});
+  const target=chooser.querySelector('[data-episode-allocation-set]:not([hidden]),[data-episode-allocation-confirm]:not([hidden]),[data-episode-allocation-edit]:not([hidden])');
+  target?.focus({preventScroll:true});return;
+ }
  const field=form.elements.namedItem(b.dataset.episodeJump);
  if(!field)return;
  episodeFocusedTaskField=b.dataset.episodeJump;
@@ -27414,6 +27515,57 @@ document.addEventListener('click',e=>{
  render();
  const form=document.querySelector('#hmk-time-episode-form');if(form){episodeEvaluationRequested=true;
   episodeEvaluationCheckpoint=storageBaseline;updateEpisodePreview(form);}
+},true);
+// A skill-critical carried from a DIFFERENT travel group is an original
+// immutable CF follow-up. Route its exact origin/side into the existing
+// Skill Followups panel, never to a generic Skill Test/Combat page.
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-episode-critical-handoff]');if(!btn)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=document.querySelector('#hmk-time-episode-form');
+ const actor=character(btn.dataset.calActor),sourceId=btn.dataset.calSource||'';
+ if(!form||!actor||!/^.+-[AB]$/.test(sourceId)){
+  notice='Chybí jednoznačný zdroj historického CF; žádný náhradní hod nebude založen.';return;
+ }
+ const origin=sourceId.slice(0,-2),side=sourceId.slice(-1);
+ const original=data.journal.find(j=>j.id===origin&&j.characterId===actor.id);
+ if(!original?.skillTestProof){
+  notice='Původní Skill Test pro tento CF nebyl nalezen. Žádný další hod nebyl otevřen.';return;
+ }
+ const accident=episodeOriginalTravelAccidentForCritical93856({kind:'skill-critical',characterId:actor.id,originId:origin});
+ timeEpisodeDraft=episodeFormSnapshot(form);
+ selected=actor.id;episodeActiveSkillRequestId=null;view='skills';activeSkillTab='followups';render();
+ // Survival Accident has its own physical consequence form, NOT the generic
+ // critical-followup form. Matching just actor and skill is insufficient.
+ if(accident){
+  const target=[...document.querySelectorAll('form[data-skill-physical-impact]')].find(f=>
+   f.elements.namedItem('sourceId')?.value===origin&&f.elements.namedItem('kind')?.value==='survival-accident');
+  if(!target){notice='Accident '+actor.name+': autoritativní zdravotní formulář tohoto historického CF nebyl nalezen. Žádný hod nebyl proveden.';return;}
+  const chooser=document.querySelector('[data-hmk-followup-choice-598]');
+  if(!chooser||!target.hasAttribute('data-hmk-followup-entry-598')){
+   notice='Accident má důkaz, ale navigace Skill Followups nemá jeho odpovídající volbu. Žádný hod nebyl proveden.';return;
+  }
+  chooser.value=target.getAttribute('data-hmk-followup-entry-598');
+  chooser.dispatchEvent(new Event('change',{bubbles:true}));
+  document.querySelector('[data-hmk-followup-open-598]')?.click();
+  const opened=document.querySelector('[data-hmk-followup-display-598] form[data-skill-physical-impact]');
+  if(opened!==target){notice='Původní Accident formulář se nepodařilo otevřít. Jiná postava ani hod nebyly zvoleny.';return;}
+  const first=opened.elements.namedItem('targetId');
+  opened.scrollIntoView({block:'center',behavior:'auto'});first?.focus({preventScroll:true});
+  notice=actor.name+': otevřen přesný Accident navazující na původní Survival CF (Hazard d10 '+accident.hazard.hazardD10+'). Nepřidávejte nový Survival ani Hazard hod.';
+  return;
+ }
+ // Other critical skills still belong to the original generic CF executor.
+ focusCalendarRuleAction(actor,'skill-critical',sourceId,btn.dataset.calElapsed||'');
+ const target=[...document.querySelectorAll('form[data-skill-critical-form]')].find(f=>
+  f.elements.namedItem('origin')?.value===origin&&f.elements.namedItem('side')?.value===side);
+ if(!target){
+  notice='Pro původní '+actor.name+' · '+side+' CF není dostupný nový formulář. Pokud jde o Orienteering Survival CF, následek patří Cestování; nový d100 zde nevzniká.';
+  return;
+ }
+ if(!target.closest('[data-hmk-followup-display-598]')){
+  notice='Přesný původní CF formulář je stále skrytý. Žádný hod nebyl proveden.';
+ }
 },true);
 // Only the native medical executor owns health dice. Travel can either
 // shorten a prepared episode to the due minute or navigate there after the

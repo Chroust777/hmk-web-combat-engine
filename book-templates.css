@@ -7575,3 +7575,22 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .content-sheet .journal-book--overview .journal-shock-state .journal-mini-stats [data-hmk-help]{
   cursor:help;text-decoration:underline dotted rgba(106,67,33,.6);text-underline-offset:3px;
 }
+
+/* v93.850: legible group context, explicit Orienteering choice and hazard hand-off.
+   Matches the parchment palette; no new image or external asset dependency. */
+.hc-episode-section-party{font-size:.84em;font-weight:normal;letter-spacing:0;color:#705337}
+.hc-episode-allocation-choice{margin:.55rem 0 .7rem;padding:.58rem .7rem;border:1px solid rgba(116,78,43,.38);border-radius:6px;background:rgba(245,232,204,.58);line-height:1.42}
+.hc-episode-allocation-choice strong{display:block;margin-bottom:.27rem}
+.hc-episode-allocation-choice button{margin:.18rem .35rem .18rem 0;white-space:normal}
+.hc-episode-allocation-choice .hc-hint{margin:.18rem 0 .35rem}
+.hc-episode-allocation-choice[hidden],.hc-episode-allocation-choice button[hidden]{display:none!important}
+
+/* v93.856: full-width independent timed requirements. They carry no numeric
+   task marker, so must not fall into the 1.65rem number column. */
+.hc-episode-spread-right [data-episode-independent-due] .hc-episode-task,
+.hc-episode-spread-right .hc-episode-task.hc-episode-timed-task{
+  display:block;min-width:0;overflow-wrap:break-word;word-break:normal;
+}
+.hc-episode-spread-right [data-episode-independent-due] .hc-episode-task>div,
+.hc-episode-spread-right .hc-episode-task.hc-episode-timed-task>div{min-width:0;width:100%}
+.hc-episode-spread-right [data-episode-independent-due] .hc-episode-task button{max-width:100%;white-space:normal}
