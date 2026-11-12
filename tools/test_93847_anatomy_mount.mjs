@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {BEASTS_P122} from '../src/rules/conveyance-printed-p122.js';
+import {livestockOffer} from '../src/integration/hmk-livestock-562.js';
+import {bestiaryProfile,livestockMatcher} from '../src/integration/hmk-bestiary-563.js';
+import {animalAnatomyTable566} from '../src/integration/hmk-bestiary-anatomy-566.js';
+import {isRidingAnimal93837,resolveTravelMount93837} from '../src/integration/hmk-travel-equipment-guide-93812.js';
+import {resolveTrekAnimalReadiness93815} from '../src/integration/hmk-trekking-animal-health.js';
+import {stableHauling575} from '../src/integration/hmk-stable-operations-575.js';
+import fs from 'node:fs';
+let assertions=0;const check=(condition,why)=>{assert.ok(condition,why);assertions++};
+const records=[];
+for(const beast of BEASTS_P122){
+ const spec=livestockOffer(beast.id),profile=bestiaryProfile(livestockMatcher(beast.id));
+ const anatomy=animalAnatomyTable566(profile?.combat?.bodyTable);
+ check(!!spec&&!!profile&&!!anatomy,'Missing true species anatomy: '+beast.name);
+ check(Number.isInteger(profile.combat.shock),'Missing shock: '+beast.name);
+ check(['b','c','d','e','i','j'].includes(anatomy.id),'Unanticipated anatomy: '+beast.name);
+ const animal={id:beast.id,name:beast.name,spec};
+ const riding=isRidingAnimal93837(animal);
+ check(!riding||!!spec.str,'Unsafe riding breed without strength: '+beast.name);
+ if(riding)check(resolveTravelMount93837([animal],[animal.id],'').animal?.id===animal.id,'Mount auto selection: '+beast.name);
+ records.push({name:beast.name,profile:profile.id,anatomy:anatomy.id,maxZN:anatomy.maxZN,ride:riding,breed:spec.breed||null,bodyWeightLb:spec.bodyWeightLb});
+}
+const source=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
+check(source.includes('stableTravelRoster.filter(isRidingAnimal93837)'), 'Riding selector must match the same authority as the actual travel preflight');
+check(!source.includes("stableTravelRoster.filter(a=>['palfrey','courser','charger','destrier','pony','camel'].includes(a.spec.breed))"),'Stale selector excludes donkey and mule');
+const horses=[{spec:{name:'Palfrey, cart horse',breed:'palfrey'}},{spec:{name:'Palfrey, cart horse',breed:'palfrey'}}];
+const oxen=[{spec:{name:'Bovine (Oxen)',breed:'bovine'}},{spec:{name:'Bovine (Oxen)',breed:'bovine'}}];
+check(stableHauling575({vehicleName:'Wagon, 4-wheel',team:horses}).capacityLb===6400,'Two cart horses');
+check(stableHauling575({vehicleName:'Wagon, 4-wheel',team:oxen}).capacityLb===8000,'Two oxen');
+const readiness=resolveTrekAnimalReadiness93815({stableAnimals:[{id:'ox-a',name:'Blesk',breed:'bovine'}],registeredProfiles:[],activeProfileIds:[]});
+check(Array.isArray(readiness)&&readiness.length===0,'No health actor must not be fabricated or block ordinary travel');
+console.log('PASS species anatomy + riding + draught:',assertions,'checks / 16 species');
+fs.writeFileSync(new URL('./evidence_93847/species_anatomy.json',import.meta.url),JSON.stringify({status:'PASS',checks:assertions,records},null,2));
