@@ -15,6 +15,7 @@ import {calculateShockState,applyShockState,SHOCK_STATE} from '../rules/shock.js
 import {hmkHumanLocationSymbols,hmkAnimalLocationSymbols} from './injury-special-hmk.js';
 import {guidedMandatoryEvents,createGuidedMandatory,guidedMandatoryRequirement,submitGuidedMandatoryDie,commitGuidedMandatory} from './hmk-guided-mandatory.js';
 import {successLevel,SL} from '../rules/tests.js';
+import {fateEligibility93866,fateEML93866,fateRoll93866} from './hmk-fate-routine-93866.js';
 const required=(v,m)=>{if(!v)throw Error(m)};
 const int=(v,lo,hi)=>Number.isSafeInteger(v)&&v>=lo&&v<=hi;
 const name={0:'CF',1:'F',2:'S',3:'CS'};
@@ -55,7 +56,7 @@ export function humanLocation(z,l){
 }
 export function woundFromFall({state,character,round,timelineId,eventId,bodyKind,location,side,locationShock,
  strikeImpact,AV,aspect='b',shockRoll=null,compoundD10=null,physicalDice,hrModifier=0,
- injuryOrigin='combat',originMinute=null,medicalSourceId=null}={}){
+ injuryOrigin='combat',originMinute=null,medicalSourceId=null,fateShockProof=null}={}){
  validateCombatState(state);
  required(int(strikeImpact,-100,999)&&int(AV,-100,999)&&['b','e'].includes(aspect),'Impact/AV/aspect musí být doloženy');
  const symbols=['horse','animal'].includes(bodyKind)?hmkAnimalLocationSymbols(location):hmkHumanLocationSymbols(location);
@@ -81,7 +82,21 @@ export function woundFromFall({state,character,round,timelineId,eventId,bodyKind
  // The printed p355 Shock ML is a cross-check of a verified breed; its live
  // recorded ML can be altered by campaign progression, never freely supplied.
  const shockEML=shockML-combatFatigueTotals(state).total+(base.shockTestModifier??0);
- const shockSL=successLevel(shockRoll,shockEML);
+ const originalShockSL=successLevel(shockRoll,shockEML);
+ let shockSL=originalShockSL;
+ if(fateShockProof){
+  required(fateShockProof.actorId===character.id&&fateShockProof.skill==='Shock'&&
+   fateShockProof.originalD100===shockRoll&&fateShockProof.originalLevel===name[originalShockSL],
+   'Fate Shock neodpovídá skutečnému původnímu Shock testu.');
+  const eligibility=fateEligibility93866(character,{skillGroup:'Combat'});
+  required(eligibility.ok,eligibility.reason||'Fate není dovolen.');
+  const emlProof=fateEML93866(character,{skillGroup:'Combat',bonus:fateShockProof.emlProof?.bonus||0});
+  const verified=fateRoll93866({originalLevel:name[originalShockSL],roll:fateShockProof.roll,
+   eml:emlProof.eml,csChoice:fateShockProof.csChoice??1});
+  required(verified.increase===fateShockProof.increase&&verified.cost===fateShockProof.cost&&
+   fateShockProof.eml===emlProof.eml,'Fate Shock není doložen původními pravidlovými údaji.');
+  shockSL=Math.min(SL.CS,originalShockSL+verified.increase);
+ }
  const sh=calculateShockState({locationShock,injuryShock,shockSL});
  const carrying=applyShockState(from[state.shock],sh.state),carry=Object.keys(from).find(k=>from[k]===carrying);
  required(carry,'Nepodporovaný Shock Carryover');
@@ -102,7 +117,7 @@ export function woundFromFall({state,character,round,timelineId,eventId,bodyKind
  required(evt,'Povinný Injury Sequence event chybí');
  evt.details.physicalDice={format:'hmk-manual-dice-proof-v1',rolls:cpy(physicalDice)};
  evt.details.falling={kind:bodyKind,aspect,AV,impact:strikeImpact,effectiveImpact,shockML,
-  shockEML,shockRoll,shockSL:name[shockSL],compoundD10};
+  shockEML,shockRoll,shockSL:name[shockSL],originalShockSL:name[originalShockSL],fateShockProof:cpy(fateShockProof),compoundD10};
  if(['horse','animal'].includes(bodyKind)&&['flg','hlg','leg','wng'].includes(location)&&newInjury){
   const touched=[`wound:${eventId}`,comp?.compoundedExisting?.id].filter(Boolean);
   for(const wid of touched){

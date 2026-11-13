@@ -3,6 +3,7 @@
  * The caller commits the returned state and proof in one verified transaction.
  */
 import {prepareAnimalSurvivalAccident} from './hmk-skill-animal-survival-539.js';
+import {fateEligibility93866,fateEML93866,fateRoll93866} from './hmk-fate-routine-93866.js';
 import {humanLocation,woundFromFall} from './hmk-mounted-fall-injury-join.js';
 import {resolveLiveCombatArmour} from './live-combat-armour.js';
 import {resolveCombatantLoad} from './combatant-load.js';
@@ -22,7 +23,7 @@ const mastery=(actor,name)=>{
 };
 export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,round=1,gmConfirmed=false,
  impactDie,zoneD10,locationD10,direction='front',shockD100=null,compoundD10=null,
- hazardD10=null,agilityD100=null,randomVictimConfirmed=false,autoDieValues={},originMinute=null}={}){
+ hazardD10=null,agilityD100=null,randomVictimConfirmed=false,autoDieValues={},originMinute=null,fateShockProof=null,fateAgilityProof=null}={}){
  must(['fishing-cf','survival-accident'].includes(kind),'Neznámý typ zranění Skill Tests');
  must(gmConfirmed===true&&actor?.id&&Array.isArray(inventory)&&state&&typeof sourceId==='string'&&sourceId&&
   die(round,9999),'Nutné potvrzení GM, cílová postava, aktuální Combat State a zdroj události');
@@ -53,13 +54,27 @@ export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,
    'Nelze doložit Agility test při aktuálním Shock / zraněních');
   eml=mastery(actor,'Agility')-combatFatigueTotals(state).total+load.agilityAndMeleePenalty+injury.modifier;
   sl=['CF','F','S','CS'][successLevel(agilityD100,eml)];
+  const originalSL=sl;
+  if(fateAgilityProof){
+   must(actor.kind==='PC'&&fateAgilityProof.actorId===actor.id&&fateAgilityProof.skill==='Agility'&&
+    fateAgilityProof.originalD100===agilityD100&&fateAgilityProof.originalLevel===originalSL,
+    'Fate Agility musí navazovat na původní test a identitu PC.');
+   const check=fateEligibility93866(actor,{skillGroup:'Physical'});
+   must(check.ok,check.reason||'Fate Agility není dovolen.');
+   const fateEML=fateEML93866(actor,{skillGroup:'Physical',attributeTest:true,bonus:fateAgilityProof.emlProof?.bonus||0});
+   const result=fateRoll93866({originalLevel:originalSL,eml:fateEML.eml,roll:fateAgilityProof.roll,
+    csChoice:fateAgilityProof.csChoice??1});
+   must(result.cost===fateAgilityProof.cost&&result.increase===fateAgilityProof.increase&&
+    fateAgilityProof.eml===fateEML.eml,'Fate Agility má nedoložený výsledek.');
+   sl=result.afterLevel;
+  }
   if(['S','CS'].includes(sl)){
    must(impactDie==null&&zoneD10==null&&locationD10==null&&shockD100==null&&compoundD10==null,
     'Při úspěšném Agility nejsou fyzické Injury hody přípustné');
    const next=structuredClone(state);next.events.push({id:evt,type:'skill-survival-accident-avoided',round,
     details:{sourceId,agilityD100,eml,sl,hazardD10,rulePage:148,randomVictimConfirmed:true}});
    next.lastRound=Math.max(next.lastRound,round);validateCombatState(next);
-   return {state:next,kind,sourceId,sl,eml,injury:null,avoided:true,physicalDice:rollProof(dieEvidence('hazardD10',10,hazardD10),dieEvidence('agilityD100',100,agilityD100))};
+   return {state:next,kind,sourceId,sl,eml,fateAgilityProof,injury:null,avoided:true,physicalDice:rollProof(dieEvidence('hazardD10',10,hazardD10),dieEvidence('agilityD100',100,agilityD100))};
   }
  }
  must(die(impactDie,limit)&&die(zoneD10,10)&&die(locationD10,10),
@@ -77,7 +92,7 @@ export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,
   ...((compoundD10==null)?[]:[dieEvidence('compoundD10',10,compoundD10)]));
  const applied=woundFromFall({state,character:actor,round,timelineId:'skill:'+sourceId,eventId:evt,
   bodyKind:'human',aspect,location:loc.location,side:loc.side,locationShock:loc.locationShock,
-  strikeImpact:impact,AV:armour.armourValue,shockRoll:shockD100,compoundD10,physicalDice:dice,
+  strikeImpact:impact,AV:armour.armourValue,shockRoll:shockD100,compoundD10,physicalDice:dice,fateShockProof,
   ...(kind==='survival-accident'?{injuryOrigin:'travel-accident',originMinute,medicalSourceId:sourceId}:{})});
  const next=structuredClone(applied.state);
  next.events.push({id:evt+':complete',type:'skill-physical-consequence',round,details:{kind,sourceId,
@@ -87,5 +102,5 @@ export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,
  next.lastRound=Math.max(next.lastRound,round);validateCombatState(next);
  return {state:next,kind,sourceId,sl,eml,impact,aspect,location:loc.location,
   armourValue:armour.armourValue,effectiveImpact:applied.effectiveImpact,
-  injury:applied.injury,shock:applied.shockSL,physicalDice:dice,avoided:false};
+  injury:applied.injury,shock:applied.shockSL,fateAgilityProof,fateShockProof:applied.fateShockProof||fateShockProof,physicalDice:dice,avoided:false};
 }

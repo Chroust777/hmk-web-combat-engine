@@ -962,3 +962,15 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 #app [data-skill-physical-impact] [data-hsk-hazard-impact][hidden]{display:none!important}
 #app [data-skill-physical-impact] input:disabled,
 #app [data-skill-physical-impact] select:disabled{cursor:not-allowed;opacity:.62}
+
+/* v93.866 Fate Routine – brief modal after the fated test, before any commit. */
+.hmk-fate-dialog-93866{width:min(94vw,660px);max-height:min(90vh,850px);overflow-y:auto;border:2px solid #9a744b;border-radius:12px;padding:0;background:#f2e5ca;color:#2d251d;box-shadow:0 14px 50px rgba(0,0,0,.48)}
+.hmk-fate-dialog-93866::backdrop{background:rgba(10,10,20,.67)}
+.hmk-fate-dialog-93866 .hmk-fate-content{padding:1.15rem 1.35rem;line-height:1.5}
+.hmk-fate-dialog-93866 h3{margin:.15rem 0 .5rem}
+.hmk-fate-dialog-93866 .hmk-fate-options{display:grid;gap:.7rem}
+.hmk-fate-dialog-93866 label{display:grid;gap:.25rem;font-weight:600}
+.hmk-fate-dialog-93866 input,.hmk-fate-dialog-93866 select{max-width:100%;min-height:38px;background:#fffaf0;color:#2d251d;border:1px solid #947858;border-radius:6px;padding:.4rem .55rem}
+.hmk-fate-dialog-93866 button{min-height:42px;white-space:normal;cursor:pointer}
+.hmk-fate-dialog-93866 [data-fate-cancel]{background:#ddd8ce;color:#34312c;border:1px solid #827a70}
+.hmk-fate-dialog-93866 .hmk-fate-feedback{color:#9b2323;font-weight:700}

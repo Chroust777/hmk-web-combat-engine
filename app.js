@@ -145,6 +145,7 @@ import { WORKSHOP_SKILLS_P121, workshopQuality, occupationalWorkshop, waterWeigh
 import { EXPEDITION_EQUIPMENT_P120, CRAFT_ITEMS_TOOLS_P121, WORKSHOP_QUALITY_P121, WATER_WEIGHT_P121, MUNDANE_FIRE_P121 } from './src/rules/possessions-printed.js';
 import { BEASTS_P122, VEHICLES_TACK_P122, CONVEYANCE_RULES_P122 } from './src/rules/conveyance-printed-p122.js';
 import {survivalAccidentVictimPool93846} from './src/integration/hmk-survival-accident-pool-93846.js';
+import {fateEligibility93866,fateEML93866,fateRoll93866,fateSkillResult93866} from './src/integration/hmk-fate-routine-93866.js';
 import {animalBaselineFromStable93861,missingStableHealth93861,validateStableAutoHealth93861} from './src/integration/hmk-stable-auto-health-93861.js';
 import {equipmentHazardSkill93843} from './src/integration/hmk-equipment-hazard-skill-93843.js';
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
@@ -358,7 +359,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.865';
+const APP_VERSION='93.866';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12534,6 +12535,8 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
  const stageForEpisode=!!(episodePendingSkillRequest?.status==='waiting'&&episodeSkillAuthorized(selected,actualSkill));
  if(!mutate(()=>{
   if(proof?.consequenceProof?.eventId)assertUniqueSkillConsequence(data.journal,proof.consequenceProof.eventId);
+  if(proof?.fate)hmkApplyFateReceipt93866(proof.fate,proof.fate.actorId);
+  if(proof?.fateB)hmkApplyFateReceipt93866(proof.fateB,proof.fateB.actorId);
   const gm=pendingCalendarGMTest;
   const gmPlan=gm&&data.campaignClock?.plans?.find(p=>p.id===gm.id);
   const gmLink=gmPlan&&gmPlan.characterId===selected&&gmPlan.destination==='skills'&&gmPlan.skill===gm.skill&&
@@ -13052,15 +13055,17 @@ function refreshSurvivalHazardFields(form){
   'Vyberte účastníka; u jmen jsou uvedeny skutečné základní Agility ML.';
  if(confirm){confirm.disabled=!isAccident||!!stageForCampaign||!victim||!!error||!hasRoll||!inspection?.level;
   confirm.textContent=accepted?'✓ Agility GM potvrzeno':'✓ Potvrdit Agility d100 a výsledek';}
+ const acceptedLevel=accepted&&saved?.fateAgilityProof?
+  ['CF','F','S','CS'][Math.min(3,['CF','F','S','CS'].indexOf(inspection.level)+saved.fateAgilityProof.increase)]:inspection?.level;
  if(confirmationStatus)confirmationStatus.textContent=accepted?
   '✓ GM potvrdil '+victim.name+' · ML '+inspection.ml+' · EML '+inspection.eml+
-   ' · d100 '+roll+' → '+inspection.level+'; potvrzený hod nelze změnit.':
+   ' · d100 '+roll+' → '+(saved?.fateAgilityProof?acceptedLevel+' (Fate z původního '+inspection.level+')':inspection.level)+'; potvrzený hod nelze změnit.':
   stageForCampaign?'⛔ Potvrzený Agility hod už neodpovídá aktuálnímu zdravotnímu stavu, účastníkovi nebo EML. Nepřepisujte původní doklad; vyžaduje rozhodnutí GM.':
   !victim?'Nejprve určete oběť.':
   error?'⛔ '+error:
   !hasRoll?'Zadejte skutečný d100; další zranění zatím nepřístupné.':
   inspection?.level?'Hod připravený; pokračujte tlačítkem Potvrdit Agility.':'Hod musí být celé číslo od 1 do 100.';
- const failed=accepted&&inspection.failed;
+ const failed=accepted&&(acceptedLevel==='F'||acceptedLevel==='CF');
  if(impact)impact.hidden=!failed;
  // Do not merely hide irrelevant dice. Disable them, their generators and
  // required flags until the corresponding confirmed branch actually exists.
@@ -13068,7 +13073,7 @@ function refreshSurvivalHazardFields(form){
   const control=form.elements.namedItem(name);if(control)hmkSyncConditionalRollField(control,failed);
  }
  const direction=form.elements.namedItem('direction');if(direction)direction.disabled=!failed;
- refreshSkillPhysicalImpactDice(form,{victim,failed,level:inspection?.level});
+ refreshSkillPhysicalImpactDice(form,{victim,failed,level:acceptedLevel});
  if(final){final.disabled=isAccident&&!accepted;
   final.title=final.disabled?'Nejprve potvrďte výsledek Agility d100.':'';}
  const hint=form.querySelector('[data-hsk-hazard-guidance]');
@@ -13077,8 +13082,8 @@ function refreshSurvivalHazardFields(form){
   d>=7?'Complication (7–10): rozhodnutí GM o překážce.':
   !victim?'Accident (4–6): náhodně určete účastníka a ověřte Agility ML.':
   !accepted?'Accident: zadejte Agility d100 a výslovně jej potvrďte; žádné další hody zatím nedělejte.':
-  failed?'Potvrzené Agility '+inspection.level+': nyní proveďte Impact d6, ZD a LD. Shock/Compound jen podle pravidel.':
-  'Potvrzené Agility '+inspection.level+': nehoda odvrácena. Žádné Impact, ZD ani LD neházejte; můžete uložit výsledek.';
+  failed?'Potvrzené Agility '+acceptedLevel+': nyní proveďte Impact d6, ZD a LD. Shock/Compound jen podle pravidel.':
+  'Potvrzené Agility '+acceptedLevel+': nehoda odvrácena. Žádné Impact, ZD ani LD neházejte; můžete uložit výsledek.';
  if(casualty?.hidden)for(const control of casualty.querySelectorAll('input[type="number"]')){
   if(!control.readOnly)control.value='';
  }
@@ -13093,7 +13098,7 @@ document.addEventListener('input',e=>{const form=e.target?.closest?.('[data-skil
 document.addEventListener('change',e=>{const form=e.target?.closest?.('[data-skill-physical-impact]');if(form&&['hazardD10','agilityD100','targetId','direction','impactDie','zoneD10','locationD10'].includes(e.target.name))refreshPhysicalDiceByKind(form);},true);
 // A typed or generated d100 is only a proposal. Explicit GM confirmation is
 // required before any F/CF impact dice become reachable.
-document.addEventListener('click',e=>{
+document.addEventListener('click',async e=>{
  const b=e.target.closest?.('[data-hsk-agility-confirm]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
  const form=b.closest('form[data-skill-physical-impact]');if(!form)return;
@@ -13109,7 +13114,10 @@ document.addEventListener('click',e=>{
   if(!input||!/^([1-9]|[1-9][0-9]|100)$/.test(input.value.trim()))
    throw Error('Zadejte skutečný celý Agility d100 od 1 do 100.');
   const roll=Number(input.value),proof=hskAccidentAgilityContext93864(victim,sourceId,roll);
-  hskSaveAgilityStage93864({format:ACCIDENT_AGILITY_STAGE_FORMAT_93864,confirmed:true,
+  const fateAgilityProof=await hmkOfferFate93866({actor:victim,skill:'Agility',group:'Physical',
+   attributeTest:true,original:{level:proof.level,roll}});
+  if(fateAgilityProof?.cancelled)throw Error('Fate: Agility test nebyl potvrzen ani uložen.');
+  hskSaveAgilityStage93864({format:ACCIDENT_AGILITY_STAGE_FORMAT_93864,confirmed:true,fateAgilityProof,
    sourceId,campaignId:campaignKey(data.campaignClock),victimId:victim.id,
    roll,ml:proof.ml,eml:proof.eml,level:proof.level,confirmedAt:new Date().toISOString(),
    provenance:input.dataset.hmkAutoDice===input.value?'cryptographic-software-die':'GM-entered-physical-die'});
@@ -13127,7 +13135,7 @@ document.addEventListener('click',e=>{
  sel.value=choices[choices.length===1?0:secureHMKDie(choices.length)-1].value;
  sel.dispatchEvent(new Event('change',{bubbles:true}));
 },true);
-document.addEventListener('submit',event=>{
+document.addEventListener('submit',async event=>{
  const form=event.target;if(!form?.matches?.('[data-skill-physical-impact]'))return;
  event.preventDefault();event.stopImmediatePropagation();
  const out=form.querySelector('output');
@@ -13213,7 +13221,7 @@ document.addEventListener('submit',event=>{
      skillTestProof:{type:'skill-physical-consequence',sourceId,kind,nonInjuryHazard:true,hazardD10,gmOutcome,rulePage:hazardD10<=3?148:149}});
    }))throw Error('Hazard nelze uložit');
   }else{
-   const report=prepareSkillPhysicalInjury({kind,actor:target,inventory:data.inventory,
+   const injuryArgs={kind,actor:target,inventory:data.inventory,fateAgilityProof:accident?acceptedAgilityProof?.fateAgilityProof||null:null,
     state:persistentStateOf(target),sourceId,round,gmConfirmed:kind==='survival-accident'||form.elements.namedItem('gmConfirmed')?.checked===true,
     impactDie:optional('impactDie'),zoneD10:optional('zoneD10'),locationD10:optional('locationD10'),
     direction:raw('direction'),shockD100:optional('shockD100'),compoundD10:optional('compoundD10'),
@@ -13223,8 +13231,21 @@ document.addEventListener('submit',event=>{
      flatMap(name=>{const control=form.elements.namedItem(name);return (control?.value&&(control.dataset?.hmkAutoDice===control.value||
        (name==='agilityD100'&&acceptedAgilityProof?.provenance==='cryptographic-software-die'&&
         Number(control.value)===acceptedAgilityProof.roll)))?
-      [[name,Number(control.value)]]:[];}))});
-   if(accident&&(report.sl!==acceptedAgilityProof.level||report.eml!==acceptedAgilityProof.eml))
+      [[name,Number(control.value)]]:[];}))};
+   let report=prepareSkillPhysicalInjury(injuryArgs);
+   if(report.shock&&target.kind==='PC'&&optional('shockD100')!=null){
+    const reserved=acceptedAgilityProof?.fateAgilityProof?.cost||0;
+    const available=target.hmk?.fatePoints-reserved;
+    const adjusted=reserved?{...target,hmk:{...target.hmk,fatePoints:available}}:target;
+    const shockFate=await hmkOfferFate93866({actor:adjusted,skill:'Shock',group:'Combat',
+     original:{level:report.shock,roll:optional('shockD100')}});
+    if(shockFate?.cancelled)throw Error('Fate: Shock a jeho Injury Sequence nebyly uloženy.');
+    if(shockFate){report=prepareSkillPhysicalInjury({...injuryArgs,fateShockProof:shockFate});}
+   }
+   const expectedAgilitySL=accident&&acceptedAgilityProof.fateAgilityProof?
+    ['CF','F','S','CS'][Math.min(3,['CF','F','S','CS'].indexOf(acceptedAgilityProof.level)+acceptedAgilityProof.fateAgilityProof.increase)]:
+    acceptedAgilityProof?.level;
+   if(accident&&(report.sl!==expectedAgilitySL||report.eml!==acceptedAgilityProof.eml))
     throw Error('Pravidlový vykonavatel zranění vypočetl jiné Agility EML nebo SL než potvrdil GM.');
    const body='HMK str. '+(kind==='fishing-cf'?'71':'148')+' · '+kind+' · '+target.name+(report.bodyKind==='animal'?' · zvířecí anatomie '+(report.bodyTable||'')+' '+report.breed:'')+
     (report.sl?' · Agility '+report.sl+' / EML '+report.eml:'')+
@@ -13232,6 +13253,8 @@ document.addEventListener('submit',event=>{
       ', lokalita '+report.location+', AV '+report.armourValue+', účinný Impact '+report.effectiveImpact+
       ', zranění '+(report.injury?report.injury.severity+report.injury.level+report.aspect:'bez rány')+', Shock '+(report.shock??'—'));
    if(!mutate(()=>{if(data.journal.some(x=>x.skillTestProof?.type==='skill-physical-consequence'&&x.skillTestProof.sourceId===sourceId))throw Error('Duplicitní zranění');
+    if(report.fateAgilityProof)hmkApplyFateReceipt93866(report.fateAgilityProof,target.id);
+    if(report.fateShockProof)hmkApplyFateReceipt93866(report.fateShockProof,target.id);
     synchronizeCombatInjuries(target,report.state);
     data.journal.push({id:uuid(),characterId:target.id,title:'Následek Skill Testu · '+kind,body,createdAt:stamp(),calendarCampaignId:data.campaignClock?campaignKey(data.campaignClock):null,
      campaignMinute:Number.isSafeInteger(data.campaignClock?.minute)?data.campaignClock.minute:null,
@@ -14861,6 +14884,106 @@ function hskAlchemySVHelpers(form,primary){
  if(helpers.some(x=>x.mastery.ml<40))throw Error('Alchemy Assistant musí mít Alchemy ML40+ (HMK 268)');
  return helpers;
 }
+/** HMK p.276: Fate decision before the original test is irreversibly saved.
+ * No new acknowledgement checkbox: the player clicks Skip or Use Fate.
+ * The original d100 is preserved; a Fate die is a SEPARATE optional roll.
+ */
+function hmkFateSkillContext93866(actor,name){
+ const skill=(actor?.hmk?.skills||[]).find(x=>x.name===name);
+ if(skill?.group)return {group:skill.group,attributeTest:false};
+ const attributes=new Set(['Strength','Endurance','Dexterity','Agility','Perception','Comeliness','Aura','Will','Reason','Creativity','Empathy','Eloquence','Voice']);
+ if(attributes.has(name))return {group:'',attributeTest:true};
+ throw Error('Fate: chybí ověřená skupina dovednosti '+name+'; nesmíme použít nulový Sunsign modifier jen odhadem.');
+}
+let hmkFateDialogActive93866=false;
+async function hmkOfferFate93866({actor,skill,group,original,attributeTest=false,healingRoll=false}={}){
+ if(actor?.kind!=='PC'||!Number.isInteger(actor.hmk?.fatePoints)||actor.hmk.fatePoints<1||
+  !original||!['CF','F','S','CS'].includes(original.level)||original.roll==null)return null;
+ const liveContext=hmkFateSkillContext93866(actor,skill);
+ group=liveContext.group;attributeTest=liveContext.attributeTest;
+ const eligibility=fateEligibility93866(actor,{skillGroup:group,usesAura:/^Aura(?:\s|$)/i.test(skill||''),
+  esoterica:group==='Esoterica'});
+ if(!eligibility.ok||!original||!['CF','F','S','CS'].includes(original.level)||original.roll==null)return null;
+ if(hmkFateDialogActive93866)throw Error('Jiný Fate Roll již čeká na rozhodnutí.');
+ hmkFateDialogActive93866=true;
+ const base=fateEML93866(actor,{skillGroup:group,attributeTest,healingRoll});
+ const dlg=document.createElement('dialog');dlg.className='hmk-fate-dialog-93866';
+ dlg.innerHTML=`<div class="hmk-fate-content"><h3>Fate Roll · HMK str. 276</h3>
+ <p><strong>${esc(actor.name)}</strong> · ${esc(skill)} · původní d100 ${esc(original.roll)} → <b>${esc(original.level)}</b></p>
+ <p>Fate Points: <strong>${actor.hmk.fatePoints}</strong> · základní Fate ML ${base.baseML} · znamení ${base.sunsign>=0?'+':''}${base.sunsign} · EML ${base.eml}</p>
+ <p>Jeden dobrovolný Fate Roll bezprostředně po tomto testu. Původní kostka zůstává nezměněná. Není možné použít na Impact, ZD/LD či jiné náhodné hody.</p>
+ <div class="hmk-fate-options"><button type="button" data-fate-cancel>Zrušit test bez uložení</button><button type="button" data-fate-skip>Bez Fate – potvrdit původní výsledek</button>
+ <label>Fate d100 <input type="number" name="fateRoll" min="1" max="100" step="1" inputmode="numeric"></label>
+ <button type="button" data-fate-generate>⚄ Hodit Fate d100</button>
+ <label>Další doložený Fate EML bonus (výchozí 0) <input type="number" name="fateBonus" value="0" min="-100" max="100" step="1"></label>
+ <label>Důkaz bonusu (jen pokud není 0) <input type="text" name="bonusReason" maxlength="240" placeholder="Schopnost nebo doložený efekt"></label>
+ <label>Pokud Fate padne CS <select name="csChoice"><option value="1">+1 SL bez ztráty FP</option><option value="2">+2 SL za 1 FP</option></select></label>
+ <button type="button" data-fate-use>✓ Použít Fate Roll a potvrdit výsledek</button>
+ <p class="hmk-fate-feedback" role="alert"></p></div></div>`;
+ document.body.appendChild(dlg);
+ try{dlg.showModal()}catch{dlg.setAttribute('open','')}
+ try{return await new Promise(resolve=>{
+  let done=false;
+  const finish=v=>{if(done)return;done=true;resolve(v)};
+  dlg.addEventListener('cancel',e=>{e.preventDefault();finish({cancelled:true})});
+  dlg.querySelector('[data-fate-cancel]').addEventListener('click',()=>finish({cancelled:true}));
+  dlg.querySelector('[data-fate-skip]').addEventListener('click',()=>finish(null));
+  dlg.querySelector('[data-fate-generate]').addEventListener('click',()=>{
+   const input=dlg.querySelector('[name=fateRoll]');input.value=String(secureHMKDie(100));input.dataset.hmkAutoDice=input.value;
+  });
+  dlg.querySelector('[data-fate-use]').addEventListener('click',()=>{
+   try{
+    const field=dlg.querySelector('[name=fateRoll]'),roll=Number(field.value);
+    if(!/^(?:[1-9]|[1-9][0-9]|100)$/.test(field.value.trim()))throw Error('Fate d100 musí být celé číslo 1–100.');
+    const bonusField=dlg.querySelector('[name=fateBonus]'),bonus=Number(bonusField.value);
+    const reason=dlg.querySelector('[name=bonusReason]').value.trim();
+    if(!Number.isInteger(bonus)||bonus<-100||bonus>100||(bonus!==0&&reason.length<5))
+     throw Error('Nestandardní Fate bonus musí mít konkrétní doložený zdroj.');
+    const emlProof=fateEML93866(actor,{skillGroup:group,attributeTest,healingRoll,bonus});
+    const fate=fateRoll93866({originalLevel:original.level,eml:emlProof.eml,roll,csChoice:Number(dlg.querySelector('[name=csChoice]').value)});
+    if(fate.cost>actor.hmk.fatePoints)throw Error('Nedostatek Fate Points.');
+    finish({...fate,actorId:actor.id,skill,group,originalD100:original.roll,
+     fpBefore:actor.hmk.fatePoints,fpAfter:actor.hmk.fatePoints-fate.cost,
+     emlProof,bonusReason:reason,provenance:field.dataset.hmkAutoDice===field.value?'cryptographic-software-die':'GM-entered-physical-die'});
+   }catch(err){dlg.querySelector('.hmk-fate-feedback').textContent=err.message;}
+  });
+ })}finally{dlg.close?.();dlg.remove();hmkFateDialogActive93866=false;}
+}
+function hmkApplyFateReceipt93866(fate,actorId){
+ if(!fate)return;
+ const actor=character(actorId);
+ if(!actor||actor.id!==fate.actorId||actor.kind!=='PC'||actor.hmk?.fatePoints!==fate.fpBefore)
+  throw Error('Fate nelze uložit: původní FP nebo identita postavy se mezitím změnily.');
+ const live=hmkFateSkillContext93866(actor,fate.skill);
+ if(live.group!==fate.group)throw Error('Fate: původní skupina dovednosti se změnila.');
+ const verifiedEML=fateEML93866(actor,{skillGroup:live.group,attributeTest:live.attributeTest,
+  bonus:fate.emlProof?.bonus||0});
+ if(verifiedEML.eml!==fate.eml||verifiedEML.baseML!==fate.emlProof?.baseML||
+  verifiedEML.sunsign!==fate.emlProof?.sunsign)throw Error('Fate: zdroj bonusu nebo EML neodpovídá postavě.');
+ const eligibility=fateEligibility93866(actor,{skillGroup:fate.group,usesAura:fate.skill==='Aura',esoterica:fate.group==='Esoterica'});
+ if(!eligibility.ok)throw Error(eligibility.reason);
+ const original=Object.freeze({...fate});
+ const calculated=fateRoll93866({originalLevel:original.originalLevel,eml:original.eml,roll:original.roll,csChoice:original.csChoice??1});
+ if(calculated.cost!==fate.cost||calculated.increase!==fate.increase||fate.fpAfter!==fate.fpBefore-fate.cost)
+  throw Error('Fate má neplatný nebo změněný pravidlový výsledek.');
+ actor.hmk.fatePoints-=fate.cost;
+}
+
+function hmkFateApplySkillSide93866({fatedResult,fate,sr,form,skill,side='A',originalResult}={}){
+ if(!fate)return fatedResult;
+ let result=fateSkillResult93866(fatedResult,fate);
+ if(!sr||!fate.increase)return result;
+ const routine=hskSelectedSRRoutine(form,skill,side);
+ if(!routine)throw Error('Fate: změna Secondary Roll nemá doloženou činnost.');
+ if(!sr.success){
+  sr.success=true;sr.fateSuccess=true;
+  sr.svBonus=routine.svBonus||0;sr.slBonus=routine.slBonus||0;
+  result=hskApplySRResult(result,{...sr});
+ }else if(sr.svBonusRequiresSuccess&&originalResult.sl<2&&result.sl>=2&&sr.svBonus){
+  result=hskApplySRResult(result,{...sr,slBonus:0});
+ }
+ return result;
+}
 function hskResolveSide({person,form,side,helpers=[]}){
  const info=hskFields(form,side),mastery=skillActorMastery(person,info.primary),secs=hskValidatedSecondaries(person,info);
  if(form.id==='skill-value-form')helpers=hskSVHelpers93818(form,info.primary);
@@ -14966,7 +15089,7 @@ document.addEventListener('invalid',event=>{
   out.textContent='Test nebyl spuštěn: opravte pole „'+field+'“. '+issue;
  }
 },true);
-document.addEventListener('submit',event=>{
+document.addEventListener('submit',async event=>{
  const form=event.target;
  if(!['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id))return;
  event.preventDefault();event.stopImmediatePropagation();
@@ -14991,8 +15114,11 @@ document.addEventListener('submit',event=>{
     minute:data.campaignClock.minute,actorId:actor.id,skill:v.primary,
     auralShockLevels:actor.hmk?.arcane?.auralShockLevels??0}):null;
    const eruditionResult=applyEruditionSkillResult(raw,erudition);
-   const result=footpad?.modifier?{...eruditionResult,footpadBaseML:primary.ml,
+   let result=footpad?.modifier?{...eruditionResult,footpadBaseML:primary.ml,
     footpadBonusML:footpad.modifier,footpadSourceIds:[...footpad.sourceIds],footpadSourcePage:272}:eruditionResult;
+   const fate=await hmkOfferFate93866({actor,skill:v.primary,group:primary.group,original:result});
+   if(fate?.cancelled)throw Error('Fate: test byl zrušen bez uložení.');
+   if(fate){const prior=result;result=hmkFateApplySkillSide93866({fatedResult:prior,fate,sr,form,skill:v.primary,side:'A',originalResult:prior});}
    const consequence=classifySkillConsequence({actor,skill:v.primary,result,trauma:ctx.trauma,context:'general'});
    const consequenceProof=skillConsequenceProof({eventId:uuid(),actorId:actor.id,skill:v.primary,result,consequence,rollOrigin:die.origin});
    const body='Assistance · HMK p.60 · '+actor.name+' / '+v.primary+' ML '+primary.ml+'\n'+checks.map(x=>x.name+' ML '+x.ml+' → '+(x.eligible?'+'+x.index:'nesplňuje poloviční ML')).join('\n')+
@@ -15000,21 +15126,33 @@ document.addEventListener('submit',event=>{
     (ctx.armourWarnings.length?'\nGM výbava: '+ctx.armourWarnings.join('; '):'')+(ctx.armourIsProvisional?'\nPŘEDBĚŽNÝ zbrojní kontext: '+ctx.provisionalArmour.join('; '):'')+'\nNásledek: '+skillConsequenceText(consequence)+hskNarrativeBlock(skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}));
    recordSkillEvidence('Assistance · '+v.primary,body,{type:'assistance-success-test',actorId:actor.id,skill:v.primary,
     preliminaryArmour:ctx.armourIsProvisional,stimulant:ctx.stimulant??null,herbalCharmA:ctx.herbalCharm??null,darkvisionA:ctx.darkvision??null,eruditionA:erudition??null,footpadA:footpad??null,secondaryRollResult:sr,helpers:helpers.map(x=>({actorId:x.actor.id,skill:v.primary,ml:x.mastery.ml})),result,conditions:ctx.condition,trauma:ctx.trauma,gmArmour:ctx.armourWarnings,gmReason:form.elements.namedItem('gmReasonA')?.value?.trim()||'',
-    rollOrigin:die.origin,gmNarrative:skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}),scene:hskScene(form),consequence,consequenceProof},slot);return;
+    rollOrigin:die.origin,fate,gmNarrative:skillNarrativeSolo({actorName:actor.name,skill:v.primary,level:result.level,assistance:true,...hskScene(form)}),scene:hskScene(form),consequence,consequenceProof},slot);return;
   }
   if(form.id==='skill-value-form'&&form.elements.namedItem('primary')?.value==='Animalcraft'&&pendingStableAnimalcraftId){
    const gate=stableAnimalcraftSVTimeGate590(form);if(!gate.ready)throw Error(gate.reason);
   }
   const a=hskResolveSide({person:actor,form,side:'A'});
   const sv=form.id==='skill-value-form',opposed=form.id==='skill-secondary-form'&&form.elements.namedItem('opposed')?.checked;
-  let body=hskResultText('A',a),b=null,comparison=null;
+  const fateA=await hmkOfferFate93866({actor,skill:a.info.primary,group:a.mastery.group,original:a.result});
+  if(fateA?.cancelled)throw Error('Fate: test byl zrušen bez uložení.');
+  if(fateA){const prior=a.result;a.result=hmkFateApplySkillSide93866({fatedResult:prior,fate:fateA,sr:a.sr,form,skill:a.info.primary,side:'A',originalResult:prior});
+   a.consequence=classifySkillConsequence({actor,skill:a.info.primary,result:a.result,trauma:a.ctx.trauma,context:'general'});}
+  let body=hskResultText('A',a),b=null,comparison=null,fateB=null;
   if(opposed){
    if(!form.elements.namedItem('opponentSkill')?.value)throw Error('U Opposed Testu vyberte dovednost oponenta; bez pravidlové dvojice je volba rozhodnutím GM.');
    const other=character(form.elements.namedItem('opponentId')?.value);
    if(!other||other.id===actor.id)throw Error('Vyberte jinou postavu jako oponenta');
    b=hskResolveSide({person:other,form,side:'B'});
+   fateB=await hmkOfferFate93866({actor:other,skill:b.info.primary,group:b.mastery.group,original:b.result});
+   if(fateB?.cancelled)throw Error('Fate: Opposed Test byl zrušen bez uložení.');
+   if(fateB){const prior=b.result;b.result=hmkFateApplySkillSide93866({fatedResult:prior,fate:fateB,sr:b.sr,form,skill:b.info.primary,side:'B',originalResult:prior});
+    b.consequence=classifySkillConsequence({actor:other,skill:b.info.primary,result:b.result,trauma:b.ctx.trauma,context:'general'});}
+
    const persuasionAction=['Charm','Command','Discourse','Guile','Theatrics'].some(x=>a.info.primary===x||a.info.primary.startsWith(x+' ('));
    comparison=resolveOpposedTests(a.result,b.result,{breakTie:false,persuasion:persuasionAction});
+   if(comparison.tie&&a.result.sl===b.result.sl&&!!fateA?.increase!==!!fateB?.increase){
+    comparison={...comparison,tie:false,winner:fateA?.increase?'a':'b',stars:1,fatedTiebreak:true,sourcePage:276};
+   }
    const winner=comparison.winner==='a'?actor.name:comparison.winner==='b'?other.name:comparison.bothFailed?'Nikdo (oba testy neuspěly)':'Nikdo (remíza)';
    body+='\n\n'+hskResultText('B',b)+'\n\nVítěz: '+winner+' · Victory Stars: '+comparison.stars+' '+(comparison.stars?'★'.repeat(Math.min(10,comparison.stars)):'—')+
      (comparison.persuasionTie?'\nPersuasion: HMK str.138 vyžaduje rozhodnout i neúspěšnou remízu F/F nebo CF/CF.':'');
@@ -15043,7 +15181,7 @@ document.addEventListener('submit',event=>{
      helperIndices:a.helpers.map(x=>x.mastery.index),emlBonus:a.result.assistance,
      gmConfirmed:a.helpers.length?!!form.elements.namedItem('orientAssistConfirmed')?.checked:false}
    }:{}),
-   a:a.result,b:b?.result||null,result:opposed?comparison:a.result,
+   a:a.result,b:b?.result||null,fate:fateA,fateB,result:opposed?comparison:a.result,
    comparison:comparison??null,gmNarrative:narrative,scene,opposedAction:actionName,rollOrigins:b?[a.die.origin,b.die.origin]:[a.die.origin],
    conditions:a.ctx.condition,conditionsB:b?.ctx.condition||null,trauma:a.ctx.trauma,traumaB:b?.ctx.trauma||null,
    gmArmour:a.ctx.armourWarnings,gmArmourB:b?.ctx.armourWarnings||[],
