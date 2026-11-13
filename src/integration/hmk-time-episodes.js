@@ -590,7 +590,13 @@ export function validateTimeEpisodes(journal=[]){
    must(episodeSkillProof(linked,skill,key==='trackingMemory'?(memo.trackerId||memo.guideId):memo.guideId,j.calendarCampaignId,linked.campaignMinute),
     'Epizoda odkazuje na nesprávnou dovednost nebo postavu.');
    const sr=episodeSkillProof(linked,skill,key==='trackingMemory'?(memo.trackerId||memo.guideId):memo.guideId,j.calendarCampaignId,linked.campaignMinute);
-   must(memo.sv===sr.sv&&memo.level===sr.level&&memo.stars===sr.stars,
+   // The original Survival skill tier describes unadjusted SV. Trekking
+   // Orienteering awards Modes from the contextual adjusted SV (including
+   // stationary Foraging +2), so these are NOT the same star count. Verify
+   // both sources independently rather than erroneously comparing them.
+   const expectedMemoryStars=key==='orientation'?memo.adjustment?.advantageModes:sr.stars;
+   must(memo.sv===sr.sv&&memo.level===sr.level&&Number.isSafeInteger(expectedMemoryStars)&&
+    memo.stars===expectedMemoryStars,
     'Výsledek nebo hvězdičky historického Skill Testu byly pozměněny.');
    if(key==='orientation'){
     const stationary=e.kind==='forage'&&e.stationaryForagingPolicy==='hmk-stationary-v93.835';
