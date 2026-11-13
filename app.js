@@ -125,7 +125,7 @@ import {missingPrintedArmourCatalogEntries} from './src/integration/armour-artic
 import {identifyWornPrintedSuit,resolvePrintedSuitProtection,selectPrintedSuitRigidStatus} from './src/integration/printed-suit-combat.js';
 import {hmkHumanLocationSymbols} from './src/integration/injury-special-hmk.js';
 import {hmkAnimalLocationSymbols} from './src/integration/injury-special-hmk.js';
-import {verifiedMountedAnimalAnatomy,verifiedMountedShockML} from './src/integration/hmk-mounted-live-animal-falling.js';
+import {verifiedMountedAnimalAnatomy,verifiedMountedShockML,previewVerifiedMountedAnimalTrauma} from './src/integration/hmk-mounted-live-animal-falling.js';
 import {verifiedNoncombatComaCause} from './src/integration/hmk-noncombat-coma-cause-93753.js';
 import {travelEncounterCharacterHint} from './src/integration/hmk-travel-encounter-context-93750.js';
 import {locationArmourValue} from './src/rules/armour-options.js';
@@ -142,6 +142,7 @@ import { WORKSHOP_SKILLS_P121, workshopQuality, occupationalWorkshop, waterWeigh
 import { EXPEDITION_EQUIPMENT_P120, CRAFT_ITEMS_TOOLS_P121, WORKSHOP_QUALITY_P121, WATER_WEIGHT_P121, MUNDANE_FIRE_P121 } from './src/rules/possessions-printed.js';
 import { BEASTS_P122, VEHICLES_TACK_P122, CONVEYANCE_RULES_P122 } from './src/rules/conveyance-printed-p122.js';
 import {survivalAccidentVictimPool93846} from './src/integration/hmk-survival-accident-pool-93846.js';
+import {prepareStableAnimalHealthRegistration93759} from './src/integration/hmk-stable-animal-health-registration-93759.js';
 import {equipmentHazardSkill93843} from './src/integration/hmk-equipment-hazard-skill-93843.js';
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
 import {planTravelEquipment93812,resolveTravelMount93837,isRidingAnimal93837} from './src/integration/hmk-travel-equipment-guide-93812.js';
@@ -354,7 +355,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.859';
+const APP_VERSION='93.860';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7038,7 +7039,7 @@ function stableHubAnimalHTML(a,campaignId){
  <section class="hmk-stable-block"><h4>Identita · parametry · historie</h4><p><strong>Pravidla:</strong> HMK str. 122, ${esc(a.spec.bestiaryPage??'355')} · ${a.mode==='buy'?`zakoupeno ${a.priceD}d`:'převzato bezplatně'} · <span class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="MB = Mastery Boost. HMK 65: po doloženém výcviku 6 měsíců a testu Animalcraft se hází jednotlivé d10 proti REA zvířete. Každý úspěch přináší 1 MB do Initiative, Shock, Dodge, Press a přirozených útoků; výsledné zvýšení ML určuje tabulka Mastery Boost (HMK 46). Limit druhu je maximum MB, nikoliv automatický bonus.">limit výcviku ${a.maxMB} MB</span></p>
  <div class="catalog-scroll"><table class="catalog-spec hmk-stable-identity-stats"><tbody><tr><th>Velikost / váha</th><td>${esc(a.spec.size??'—')} / ${a.spec.bodyWeightLb??'neznámá'} lb</td></tr><tr><th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="Výchozí Move druhu dle bestiáře; skutečné omezení mohou přidat zranění, amputace a zatížení. Není to automaticky již přepočtená bojová rychlost.">Move</th><td>${a.spec.move??'neznámý'} ${last?'(před následky; ověřte zdraví)':''}</td></tr>${Object.entries(statNames).map(([k,label])=>`<tr><th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="${esc(statHelp[k])}">${esc(label)}</th><td>${a.spec[k]??'—'}</td></tr>`).join('')}<tr><th>Útoky</th><td>${esc(a.spec.attack||'Viz profil bestiáře')}</td></tr></tbody></table></div>
  ${liveHealthActor?`<p class="hc-hint"><strong>Autoritativní Health State:</strong> ověřený živý profil ${esc(liveHealthActor.hmk.verifiedMountedBreed)}.</p>`:
- !dead&&a.spec.breed?`<p class="hc-hint">Zakoupené nebo převzaté zvíře je po zařazení do Stáje okamžitě použitelné pro cestování, tah i nesení nákladu. Samostatná aktivace zdravotního profilu se už nevyžaduje.</p>`:
+ !dead&&a.spec.breed?`<p class="hc-hint">Zakoupené nebo převzaté zvíře lze používat pro běžné cestování, tah a náklad i bez zdravotního profilu. Pokud je vybráno při nehodě, GM nejprve potvrdí doložený výchozí zdravotní stav přímo v následku Accident; jinak jej nelze bezpečně zranit ani vynechat z losování.</p>`:
  `<p class="hc-hint">Zdravotní registraci tohoto druhu nelze bezpečně doložit.</p>`}
  <div class="hmk-stable-zones"><h4>Mapa anatomických zón · HMK ${z.sourcePage??'—'}</h4>
  ${z.table?`<p>Zásahová tabulka <b>${esc(z.table.toUpperCase())}</b> · ZN 1–${z.maxZN}. Následují všechny lokality druhu; označení levé/pravé strany je závislé na skutečném Location Die. Zdravotní doklad se vede pro stejné zvíře napříč encountery.</p>
@@ -7500,7 +7501,7 @@ function downloadUnfinishedHMKState93859(){
   try{return {present:true,value:JSON.parse(raw)}}catch{return {present:true,unparsedRaw:raw,parseError:true}}}
   catch(e){return {present:false,readError:String(e?.message||e)}}};
  const currentForm=document.querySelector('#hmk-time-episode-form');
- const pkg={format:'hmk-local-working-diagnostic-v93.859',appVersion:APP_VERSION,
+ const pkg={format:'hmk-local-working-diagnostic-v93.860',appVersion:APP_VERSION,
   exportedAt:new Date().toISOString(),scope:'local-only-no-cloud-token',
   note:'Obsahuje historii kampaně a nedokončené testy. Neslouží k importu; před sdílením chraňte soukromé údaje.',
   committedCampaign:read(localStorage,STORAGE),
@@ -7513,6 +7514,17 @@ function downloadUnfinishedHMKState93859(){
    tacticalAdvantages:read(sessionStorage,TA_LEDGER_KEY),
    guidedDraft:read(sessionStorage,GUIDED_DRAFT_KEY),
    encounterSelection:read(sessionStorage,ENCOUNTER_DRAFT_KEY)},
+  liveSkillHazards:[...document.querySelectorAll('form[data-skill-physical-impact]')].map(form=>{
+   const value=name=>form.elements.namedItem(name)?.value??null;
+   return {sourceId:value('sourceId'),kind:value('kind'),hazardD10:value('hazardD10'),
+    targetId:value('targetId'),agilityD100:value('agilityD100'),
+    impactDie:value('impactDie'),zoneD10:value('zoneD10'),locationD10:value('locationD10'),
+    accidentBlocked:!!form.querySelector('[data-hsk-accident-pool-blocked]'),
+    accidentBlocker:form.querySelector('[data-hsk-accident-pool-blocked]')?.textContent?.trim()||null,
+    randomVictimDisabled:form.querySelector('[data-hsk-random-victim]')?.disabled??null,
+    registerAnimalId:value('registerAnimalId'),
+    resultText:form.querySelector('output:not([data-hsk-animal-registration-status])')?.textContent?.trim()||null};
+  }),
   liveTravel:currentForm?{
    snapshot:episodeFormSnapshot(currentForm),gate:episodeDiagnosticGate93859(currentForm),evaluationRequested:episodeEvaluationRequested,
    blocker:currentForm.dataset.episodeProblem||null,
@@ -11372,6 +11384,21 @@ function hskSkillPhysicalImpactForm(entry){
    accidentPool.unsupportedAnimals.map(id=>verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===id)?.name||id).join(', '):'')+
   (accidentPool.missingPeople.length?'; neaktivní členové skupiny: '+accidentPool.missingPeople.join(', '):'')+
   '. Nejprve dokončete jejich původní zdravotní registraci nebo předejte odlišnou anatomii GM; žádný hod ani zranění nevymýšlejte.':null;
+ // The Stable confirms ownership, not a pre-accident health baseline. A
+ // verified, GM-attested medical actor can be enrolled here without revising
+ // the original watch, its dice, or the campaign minute.
+ const missingStableAnimals=accidentPool?.missingAnimals.filter(animalId=>
+  verifiedLivestock(data,campaignKey(data.campaignClock)).some(animal=>animal.id===animalId)&&
+  !data.characters.some(actor=>actor.id===animalId))||[];
+ const animalHealthRegistrationUI=missingStableAnimals.length?`<fieldset class="hc-event hmk-accident-health-registration" data-hsk-accident-animal-setup>
+ <legend>Chybějící zdravotní profil zvířete · ověření GM</legend>
+ <p class="hc-hint">Zvíře již patří do původní nehody; nesmí být vynecháno z náhodného losování. Pouze pokud GM skutečně ověřil, že <strong>před touto nehodou</strong> nemělo nevyřešené zranění, Shock, Coma ani další zdravotní stav, lze založit jeho výchozí profil. Nenahrazuje to hod Agility ani léčbu a neposune to Kalendář.</p>
+ <label>Zvíře původní skupiny<select name="registerAnimalId">${missingStableAnimals.map(animalId=>`<option value="${esc(animalId)}">${esc(verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===animalId)?.name||animalId)}</option>`).join('')}</select></label>
+ <label>Skutečný podklad zdravotního ověření (alespoň 8 znaků)<textarea name="animalHealthExamNote" rows="2" minlength="8" maxlength="500" placeholder="Co GM ověřil a na základě čeho"></textarea></label>
+ <label><input type="checkbox" name="animalHealthExamined"> GM doložil výchozí zdraví před nehodou; žádné známé starší rány ani jiné nevyřešené následky</label>
+ <label><input type="checkbox" name="animalHealthGMConfirmed"> GM výslovně potvrzuje zápis trvalého zdravotního profilu do původní kampaně</label>
+ <button type="button" class="hc-small secondary" data-hsk-register-accident-animal>Založit ověřený zdravotní profil a pokračovat</button>
+ <output data-hsk-animal-registration-status role="status" aria-live="polite"></output></fieldset>`:'';
  const targetOptions='<option value="">— nejprve určete náhodně —</option>'+eligibleTargets.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
  const dieInput=(name,faces,label)=>'<label>'+label+'<input type="number" name="'+name+'" min="1" max="'+faces+'" inputmode="numeric"></label>';
  return `<form class="hsk-climb-fall" data-skill-physical-impact>
@@ -11379,7 +11406,7 @@ function hskSkillPhysicalImpactForm(entry){
  <h4>${survival?'Survival Hazard · HMK str. 148':'Fishing · náhodné zranění d10e · HMK str. 71'}</h4>
  <p>${survival?(fixedHazardDie!=null?'Survival Hazard d10 = <strong>'+esc(String(fixedHazardDie))+'</strong> je převzat z dokončeného Cestování. <strong>Neházejte jej znovu.</strong> Pokračujte náhodným výběrem účastníka a testem Agility.':'Nejprve určete d10: <strong>1–3 Equipment</strong> (výstroj), <strong>4–6 Accident</strong> (nehoda), <strong>7–10 Complication</strong> (komplikace). Jen Accident vyžaduje náhodného účastníka a Agility; další hody vznikají až při F/CF. Nevyplňujte skryté nepovinné hodnoty.'):'Fishing CF způsobí Impact d10e do náhodné lokality. Fyzické hody určují následek podle HMK.'}</p>
  ${survival?`<div class="hsk-hazard-step"><div class="field-grid">${fixedHazardDie!=null?'<label>Survival Hazard d10 – převzato z dokončeného Cestování<input type="number" name="hazardD10" min="1" max="10" readonly value="'+esc(String(fixedHazardDie))+'"></label>':dieInput('hazardD10',10,'Survival Hazard d10 (povinný)')}</div><p class="tiny" data-hsk-hazard-guidance>Vyplňte nebo vygenerujte d10; podle výsledku se objeví pouze potřebné další vstupy.</p></div>
- <div data-hsk-hazard-accident ${fixedHazardDie>=4&&fixedHazardDie<=6?'':'hidden'} class="hsk-hazard-step">${accidentPoolError?`<p role="alert" class="hc-episode-await" data-hsk-accident-pool-blocked>${esc(accidentPoolError)}</p>`:`<p class="hc-hint" data-hsk-accident-pool-count>Losování zahrnuje všech ${eligibleTargets.length} doložených účastníků původního intervalu, včetně registrovaných jízdních a tažných zvířat.</p>`}<div class="field-grid"><label>Náhodně zvolený účastník
+ <div data-hsk-hazard-accident ${fixedHazardDie>=4&&fixedHazardDie<=6?'':'hidden'} class="hsk-hazard-step">${animalHealthRegistrationUI}${accidentPoolError?`<p role="alert" class="hc-episode-await" data-hsk-accident-pool-blocked>${esc(accidentPoolError)}</p>`:`<p class="hc-hint" data-hsk-accident-pool-count>Losování zahrnuje všech ${eligibleTargets.length} doložených účastníků původního intervalu, včetně registrovaných jízdních a tažných zvířat.</p>`}<div class="field-grid"><label>Náhodně zvolený účastník
  <select name="targetId" ${accidentPoolError?'disabled':''}>${targetOptions}</select></label>
  ${dieInput('agilityD100',100,'Agility d100 náhodně zvoleného účastníka')}</div>
  <button type="button" class="hc-small hc-provision-generate" data-hsk-random-victim ${accidentPoolError?'disabled':''}>⚄ Náhodně určit účastníka</button>
@@ -11398,6 +11425,7 @@ function hskSkillPhysicalImpactForm(entry){
  <label data-hmk-help="HMK str. 168: Compound d10 se odemkne jen při nové skutečné ráně a již existující kompatibilní nezhojené ráně TÉŽE anatomické lokace a strany. Nejde o nový hod při samotném CF." tabindex="0">Compound d10 · jen při slučování ran<input type="number" name="compoundD10" min="1" max="10" data-hmk-dice-when-enabled="true" disabled></label>
  </div><p class="tiny" data-hsk-physical-dice-status role="status">Shock a Compound jsou zamčené až do doložení skutečného účinného Impactu a starších ran.</p></div>
  ${survival?'':'<label><input type="checkbox" name="gmConfirmed" required> GM potvrdil skutečné dopady a ochranu zbroje</label>'}
+ <button type="button" class="secondary hc-small" data-action="export-working-state">Stáhnout diagnostiku tohoto Hazardu (JSON)</button>
  <button type="submit">${survival?'Vyhodnotit Hazard a případnou Injury Sequence':'Trvale zapsat Fishing zranění'}</button>
  <output role="status" aria-live="polite"></output></form>`;
 }
@@ -12844,16 +12872,35 @@ function refreshSkillPhysicalImpactDice(form,{victim=null,failed=false,level=nul
   const impactDie=number('impactDie',fishing?10:6),zd=number('zoneD10',10),ld=number('locationD10',10);
   if(impactDie!==null&&zd!==null&&ld!==null){
    try{
-    const aspect=fishing?'e':'b';
-    const loc=humanLocation(zd,ld),armour=resolveLiveCombatArmour({inventory:data.inventory,targetId:victim.id,location:loc.location,aspect,direction:form.elements.namedItem('direction').value,mode:'auto',rigidStatus:'unknown'});
-    if(!armour.ready)throw Error('Nelze doložit aktuální zbroj této lokace.');
-    const effective=impactDie+(fishing?0:4+(level==='CF'?5:0))-armour.armourValue;
-    const injury=injuryFromEffectiveImpact({effectiveImpact:effective,aspect}).injury;
-    const limbs=new Set(['sh','ua','el','fo','ha','th','kn','ca','ft']);
-    const existing=(persistentStateOf(victim).wounds||[]).some(w=>!w.healed&&w.location===loc.location&&(!limbs.has(loc.location)||w.side===loc.side)&&compoundCompatible(w,{location:loc.location,side:loc.side,aspect,area:false}));
-    needShock=effective>0;
-    needCompound=!!injury&&existing;
-    explanation='Účinný Impact '+effective+' · '+loc.location+(loc.side?' / '+loc.side:'')+'; Shock '+(needShock?'povinný':'neprovádí se')+', Compound '+(needCompound?'povinný':'neprovádí se')+'.';
+    if(!fishing&&victim.hmk?.verifiedMountedBreed){
+     // Animal injury must use printed HMK B/C anatomy and natural AV;
+     // NEVER display human ZN/body location or armour to unlock Shock.
+     const probe=previewVerifiedMountedAnimalTrauma({mount:victim,
+      printedBreed:victim.hmk.verifiedMountedBreed,stumbleSL:'F',
+      impactD10:impactDie,zoneD:zd,locationD:ld,aimZN:1,aimConfirmed:true});
+     if(probe.miss)throw Error('ZD minulo zvířecí anatomii; rozhodnutí GM je povinné.');
+     const effective=impactDie+4+(level==='CF'?5:0)-probe.naturalBluntAV;
+     const injury=injuryFromEffectiveImpact({effectiveImpact:effective,aspect:'blunt'}).injury;
+     const existing=(persistentStateOf(victim).wounds||[]).some(w=>!w.healed&&
+      w.location===probe.location&&(probe.side===null||w.side===probe.side)&&
+      compoundCompatible(w,{location:probe.location,side:probe.side,aspect:'blunt',area:false}));
+     needShock=effective>0;needCompound=!!injury&&existing;
+     explanation='Zvířecí anatomie '+probe.bodyTable+' · '+probe.location+
+      (probe.side?' / '+probe.side:'')+' · přirozené AV '+probe.naturalBluntAV+
+      ' · účinný Impact '+effective+'; Shock '+(needShock?'povinný':'neprovádí se')+
+      ', Compound '+(needCompound?'povinný':'neprovádí se')+'.';
+    }else{
+     const aspect=fishing?'e':'b';
+     const loc=humanLocation(zd,ld),armour=resolveLiveCombatArmour({inventory:data.inventory,targetId:victim.id,location:loc.location,aspect,direction:form.elements.namedItem('direction').value,mode:'auto',rigidStatus:'unknown'});
+     if(!armour.ready)throw Error('Nelze doložit aktuální zbroj této lokace.');
+     const effective=impactDie+(fishing?0:4+(level==='CF'?5:0))-armour.armourValue;
+     const injury=injuryFromEffectiveImpact({effectiveImpact:effective,aspect}).injury;
+     const limbs=new Set(['sh','ua','el','fo','ha','th','kn','ca','ft']);
+     const existing=(persistentStateOf(victim).wounds||[]).some(w=>!w.healed&&w.location===loc.location&&(!limbs.has(loc.location)||w.side===loc.side)&&compoundCompatible(w,{location:loc.location,side:loc.side,aspect,area:false}));
+     needShock=effective>0;
+     needCompound=!!injury&&existing;
+     explanation='Účinný Impact '+effective+' · '+loc.location+(loc.side?' / '+loc.side:'')+'; Shock '+(needShock?'povinný':'neprovádí se')+', Compound '+(needCompound?'povinný':'neprovádí se')+'.';
+    }
    }catch(err){explanation='Nelze odemknout hody: '+err.message;}
   }
  }
@@ -12879,10 +12926,11 @@ function refreshSurvivalHazardFields(form){
  let failed=false,agilityLevel=null;
  if(isAccident&&hasAgility&&victim&&Number.isInteger(roll)&&roll>=1&&roll<=100){
   try{
-   const load=resolveCombatantLoad({character:victim,inventory:data.inventory});
    const status=persistentStateOf(victim),mastery=availableMasteries(victim).find(x=>x.name.toLowerCase()==='agility');
    const injury=projectLiveInjuries({state:status,round:Math.max(1,combatClock.round||1,status.lastRound||0),test:'agility',usedArms:['left','right'],timelineId:'skill:'+form.elements.namedItem('sourceId').value});
-   const eml=mastery?.ml-combatFatigueTotals(status).total+load.agilityAndMeleePenalty+injury.modifier;
+   const animalAGL=victim.hmk?.verifiedMountedBreed?victim.hmk?.attributes?.agl:null;
+   const loadAdjustment=animalAGL===null?resolveCombatantLoad({character:victim,inventory:data.inventory}).agilityAndMeleePenalty:0;
+   const eml=(animalAGL===null?mastery?.ml:animalAGL*5)-combatFatigueTotals(status).total+loadAdjustment+injury.modifier;
    if(Number.isFinite(eml)){const sl=successLevel(roll,eml);failed=sl<2;agilityLevel=['CF','F','S','CS'][sl];}
   }catch{failed=false;}
  }
@@ -12907,6 +12955,58 @@ function refreshPhysicalDiceByKind(form){
 }
 document.addEventListener('input',e=>{const form=e.target?.closest?.('[data-skill-physical-impact]');if(form&&['hazardD10','agilityD100','impactDie','zoneD10','locationD10'].includes(e.target.name))refreshPhysicalDiceByKind(form);},true);
 document.addEventListener('change',e=>{const form=e.target?.closest?.('[data-skill-physical-impact]');if(form&&['hazardD10','agilityD100','targetId','direction','impactDie','zoneD10','locationD10'].includes(e.target.name))refreshPhysicalDiceByKind(form);},true);
+// Safely bridge the Staj's verified purchase into the original animal health
+// authority at the SAME calendar minute. A retrospective GM attestation is
+// mandatory; no dice, injuries, clock changes or healing are invented.
+document.addEventListener('click',event=>{
+ const b=event.target.closest?.('[data-hsk-register-accident-animal]');if(!b)return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const form=b.closest('[data-skill-physical-impact]'),box=b.closest('[data-hsk-accident-animal-setup]');
+ const out=box?.querySelector('[data-hsk-animal-registration-status]');
+ try{
+  if(!form||!box||!data.campaignClock||combatInitiativeSequence)throw Error('Nejprve otevřete platný následný Hazard mimo bojové Initiative.');
+  const read=name=>String(box.querySelector('[name="'+name+'"]')?.value||'').trim();
+  const animalId=read('registerAnimalId'),examNote=read('animalHealthExamNote');
+  const gmConfirmed=box.querySelector('[name="animalHealthGMConfirmed"]')?.checked===true;
+  const examinedHealthy=box.querySelector('[name="animalHealthExamined"]')?.checked===true;
+  const sourceId=form.elements.namedItem('sourceId')?.value;
+  const origin=data.journal.find(j=>j.id===sourceId),proof=origin?.skillTestProof;
+  const cid=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
+  if(proof?.type!=='secondary-mastery-value-test'||proof.skills?.[0]!=='Survival'||proof.a?.level!=='CF'||
+   origin?.calendarEpisodeSkillLink?.field!=='orientationProofId')throw Error('Není doložen původní Survival CF.');
+  const receipt=data.journal.find(j=>j.calendarCampaignId===cid&&
+   j.calendarTimeEpisode?.orientation?.skillId===sourceId&&
+   j.calendarTimeEpisode?.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending&&h.hazardD10>=4&&h.hazardD10<=6));
+  if(!receipt||receipt.calendarTimeEpisode.endMinute!==minute)throw Error('Neplatný původní čas nebo nehoda d10.');
+  const ep=receipt.calendarTimeEpisode;
+  if(![...(ep.settings?.stableAnimalIds||[]),...(ep.settings?.animalIds||[])].includes(animalId))
+   throw Error('Zvíře nepatřilo do původního cestovního intervalu.');
+  if(data.journal.some(j=>j.skillTestProof?.type==='skill-physical-consequence'&&j.skillTestProof.sourceId===sourceId))
+   throw Error('Následek nehody už byl potvrzen.');
+  if(!examinedHealthy||!gmConfirmed||examNote.length<8)throw Error('GM musí potvrdit skutečně doložený výchozí stav a uvést jeho podklad.');
+  const registrationId=uuid();
+  if(!mutate(()=>{
+   const result=prepareStableAnimalHealthRegistration93759({data,campaignId:cid,minute,animalId,
+    gmConfirmed,examinedHealthy,examNote,proofId:registrationId});
+   data.characters.push(result.actor);
+   data.campaignClock.characterIds.push(result.actor.id);
+   data.journal.push({id:registrationId,characterId:result.actor.id,calendarCampaignId:cid,
+    campaignMinute:minute,createdAt:stamp(),title:'Stáj · ověřený výchozí zdravotní profil · '+result.actor.name,
+    body:'GM doložil výchozí zdravotní stav před původní nehodou; beze změny času a hodů. '+examNote,
+    animalHealthRegistration93759:result.proof});
+  }))throw Error('Ověřená zdravotní registrace nebyla uložena; původní kampaň zůstala zachována.');
+  // Do not strand the GM in a hidden follow-up after a successful render.
+  // Reopen the SAME original Accident receipt, never start another roll.
+  if(view==='skills'&&activeSkillTab==='followups'){
+   const source=document.querySelector('[data-hmk-followup-source-598]');
+   const same=[...(source?.querySelectorAll('form[data-skill-physical-impact]')||[])].find(f=>
+    f.elements.namedItem('sourceId')?.value===sourceId);
+   const choice=document.querySelector('[data-hmk-followup-choice-598]');
+   const open=document.querySelector('[data-hmk-followup-open-598]');
+   if(same&&choice&&open){choice.value=same.dataset.hmkFollowupEntry598;open.click();}
+  }
+ }catch(error){if(out)out.textContent='Zdravotní registrace nebyla provedena: '+String(error?.message||error);else alert(String(error?.message||error));}
+},true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-hsk-random-victim]');if(!b)return;e.preventDefault();
  const form=b.closest('form'),sel=form?.elements.namedItem('targetId');if(!sel)return;
