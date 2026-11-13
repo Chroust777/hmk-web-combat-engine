@@ -201,11 +201,11 @@ export function validateTrackingJournal(journal=[]){
  * Determine the type of original opposed/unopposed test, never roll new
  * skills here or invent the opposing party's watchfulness.
  */
-export function trekWatchfulness({modes={},conveyance='foot'}={}){
+export function trekWatchfulness({modes={},conveyance='foot',drovingAnimals=false}={}){
  test(['foot','mount','cart','wagon'].includes(conveyance),'Neznámý cestovní prostředek');
  const level=modes.lax?'lax':(modes.stalking||modes.vigilance)?'alert':'normal';
- const afterAnimals=conveyance==='foot'?level:level==='alert'?'normal':'lax';
- const skills=level==='alert'&&conveyance==='foot'?
+ const afterAnimals=conveyance==='foot'&&!drovingAnimals?level:level==='alert'?'normal':'lax';
+ const skills=level==='alert'&&conveyance==='foot'&&!drovingAnimals?
   [...(modes.stalking?['Stealth']:[]),...(modes.vigilance?['Awareness']:[])]:['Awareness'];
  return {original:level,effective:afterAnimals,skills:afterAnimals==='alert'?skills:['Awareness'],
   demoted:afterAnimals!==level,sourcePage:150};

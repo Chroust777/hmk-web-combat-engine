@@ -58,7 +58,7 @@ const MOVE={
  flat:{'paved-road':[5,10,5,5],'unpaved-road':[5,9,5,4],'rural-track':[5,9,4,3],
   'wilderness-trail':[5,8,3,2],'cropland-grassland':[4,6,2,1],'mixed-woodland':[4,6,2,1],
   'heath-moor':[4,6,.5,.5],'needleleaf-forest':[4,5,1,.5],'mixed-forest':[3,4,.5,.5],
-  dunes:[3,4,.5,.5],wetlands:[1,1,null,null]},
+  dunes:[3,4,.5,.5],wetlands:[1,1,null,null],'desert-flats':[5,9,4,3]},
  rough:{'paved-road':[4,9,4,4],'unpaved-road':[4,8,4,3],'rural-track':[4,7,2,1],
   'wilderness-trail':[4,6,1,.5],'cropland-grassland':[3,5,1,.5],'mixed-woodland':[3,5,1,.5],
   'heath-moor':[3,5,.5,.5],'needleleaf-forest':[3,3,.5,null],'mixed-forest':[2,2,.5,null]},
@@ -70,12 +70,13 @@ const CONVEYANCE=['foot','mount','cart','wagon'];
  * 0 = no dot, 1 = black dot (always), 2 = two black dots,
  * rain = blue drop-dot (only continuous precipitation).
  * Wilderness Trail is a blue raindrop-dot (rain-only) in every topography.
+ * Unpaved Road has NO dot; Desert Flats without a marked path use Flat Rural Track LPW but require two Bearing (p.146).
  */
 const TREK_BEARING_MARKS=Object.freeze({
- 'paved-road':0,'unpaved-road':'rain','rural-track':'rain',
+ 'paved-road':0,'unpaved-road':0,'rural-track':'rain',
  'wilderness-trail':'rain','cropland-grassland':1,'mixed-woodland':1,
  'heath-moor':1,'needleleaf-forest':1,'mixed-forest':1,
- 'dunes':2,'wetlands':2,'cold-woodland':1,'alpine-vegetation':1,
+ 'dunes':2,'wetlands':2,'desert-flats':2,'cold-woodland':1,'alpine-vegetation':1,
  'ice-snow-rockfield':1
 });
 export function trekBearingRequirement({topography,terrain,continuousPrecipitation=false}={}){

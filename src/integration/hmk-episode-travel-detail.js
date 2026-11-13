@@ -62,11 +62,11 @@ export function episodeEncounterDistance({terrain,d4,period='day',moon='dark',he
   sightingFeet,hearingD10,hearingFeet:hearingD10===null?null:sightingFeet*hearingD10,sourcePage:150};
 }
 /** GM enters actual d100 and EML. The derived Skill Test level is calculated, never invented. */
-export function episodeEncounterSurprise({partyModes={},conveyance='foot',foeWatchfulness='normal',
+export function episodeEncounterSurprise({partyModes={},conveyance='foot',drovingAnimals=false,foeWatchfulness='normal',
  foeIsBeast=false,partySkill=null,foeSkill=null,partyLevel=null,foeLevel=null,decision=null,
  partyRoll=null,partyEML=null,foeRoll=null,foeEML=null,requireWitness=false}={}){
  requireTrue(foeIsBeast||['lax','normal','alert'].includes(foeWatchfulness),'Zvolte skutečnou bdělost protistrany.');
- const party=trekWatchfulness({modes:partyModes,conveyance});
+ const party=trekWatchfulness({modes:partyModes,conveyance,drovingAnimals});
  const other=foeIsBeast?'alert':foeWatchfulness;
  const procedure=trekSurpriseProcedure({party,foe:other});
  // HMK pp.60–62: a witnessed original d100 and EML determine its SL;
