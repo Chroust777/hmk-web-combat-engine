@@ -7594,3 +7594,143 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .hc-episode-spread-right [data-episode-independent-due] .hc-episode-task>div,
 .hc-episode-spread-right .hc-episode-task.hc-episode-timed-task>div{min-width:0;width:100%}
 .hc-episode-spread-right [data-episode-independent-due] .hc-episode-task button{max-width:100%;white-space:normal}
+
+/* v93.870 · Daily-weather popover: restore a readable, opaque book-table card.
+   This is strictly presentation-only: 24-hour rows and weather rules are unchanged.
+   Both the calendar heading and the travel episode use the same timeline. */
+.content-sheet .journal-book-frame .folio-chapter-page:has(.hc-weather-hover-shell:is(:hover,:focus-within,[open])){
+  z-index:1000!important; /* Above the facing folio and its calendar controls. */
+}
+#app .hc-weather-hover-shell{isolation:isolate}
+#app .hc-weather-hover-shell>.hc-weather-hover-popover{
+  box-sizing:border-box;
+  width:min(710px,calc(100vw - 44px));
+  max-height:min(68vh,590px);
+  overflow-x:hidden;
+  overflow-y:auto;
+  padding:11px 12px 12px;
+  background:#f5e8cf!important;
+  background-image:linear-gradient(180deg,#fff5e1 0%,#f5e8cf 100%)!important;
+  color:#302416!important;
+  opacity:1!important;
+  border:2px solid #88623d;
+  border-radius:9px;
+  box-shadow:0 16px 38px rgba(20,14,6,.46),0 0 0 2px #e9d0a3 inset;
+  text-align:left;
+  font:400 12px/1.32 Georgia,serif!important;
+  letter-spacing:normal!important;
+}
+#app .hc-weather-hover-popover>.hc-weather-timeline,
+#app .hc-weather-hover-popover>.hc-weather-timeline .hc-episode-table-scroll{
+  margin:0;
+  width:100%;max-width:100%;overflow:visible;
+}
+#app .hc-weather-hover-popover>strong{
+  display:block;
+  margin:1px 0 7px;
+  font:700 15px/1.25 Georgia,serif!important;
+  letter-spacing:normal!important;
+  color:#4b311d;
+}
+#app .hc-weather-hover-popover .hc-weather-table-caption{
+  caption-side:top;
+  padding:5px 6px 9px;
+  margin:0;
+  background:transparent!important;
+  color:#624329!important;
+  text-align:left;
+  font:700 12px/1.2 Georgia,serif!important;
+  letter-spacing:normal!important;
+}
+#app .hc-weather-hover-popover table.hc-episode-weather-timeline{
+  width:100%!important;
+  min-width:0!important;
+  table-layout:fixed;
+  border-collapse:separate;
+  border-spacing:0;
+  background:#fff8eb!important;
+  color:#322519;
+  font:400 11.5px/1.25 Georgia,serif!important;
+  letter-spacing:normal!important;
+  border:1px solid #94734e;
+}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td){
+  box-sizing:border-box;
+  padding:6px 5px!important;
+  text-align:left;
+  vertical-align:middle;
+  white-space:normal!important;
+  overflow-wrap:normal;
+  word-break:normal;
+  font:inherit!important;
+  line-height:1.23!important;
+  letter-spacing:normal!important;
+  border:0;
+  border-right:1px solid #c5ae86;
+  border-bottom:1px solid #d4c09b;
+  opacity:1!important;
+}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline th{
+  background:#5a3e29!important;
+  color:#fff4dc!important;
+  font-weight:700!important;
+  font-size:11.2px!important;
+}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline td{
+  background:#fff8eb!important;
+  color:#38291a!important;
+}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr:nth-child(even) td{
+  background:#eee0c6!important;
+}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-hazard td:nth-child(6){
+  color:#8b3426!important;font-weight:700!important;
+}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-current td{
+  background:#eed08a!important;
+  color:#32200e!important;
+  font-weight:700!important;
+  border-top:2px solid #956124!important;
+  border-bottom:2px solid #956124!important;
+}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-current td:first-child{
+  border-left:3px solid #956124!important;
+}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(td,th):last-child{border-right:0}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline tr:last-child td{border-bottom:0}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline td strong,
+#app .hc-weather-hover-popover .hc-episode-weather-timeline th :is(strong,span){
+  font:700 11.5px/1.23 Georgia,serif!important;
+  letter-spacing:normal!important;
+  color:inherit!important;
+  white-space:normal!important;
+}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(1){width:15%;font-variant-numeric:tabular-nums}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(2){width:13%}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(3){width:10%}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(4){width:20%}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(5){width:13%}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(6){width:15%}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(7){width:14%;font-variant-numeric:tabular-nums}
+@media (max-width:740px){
+  #app .hc-weather-hover-shell>.hc-weather-hover-popover{left:0;max-height:min(62vh,520px);width:min(710px,calc(100vw - 40px));padding:8px}
+  #app .hc-weather-hover-popover .hc-weather-timeline .hc-episode-table-scroll{overflow-x:auto;overflow-y:visible}
+  #app .hc-weather-hover-popover table.hc-episode-weather-timeline{min-width:610px!important}
+}
+/* The heading itself is a lower stacking context than the folio content.
+   Raising only the popover/page is insufficient: content would paint over its cells. */
+.content-sheet .folio-chapter-heading:has(.hc-weather-hover-shell:is(:hover,:focus-within,[open])){
+  z-index:1001!important;
+}
+/* Keep the floating card within the viewport when the book switches to
+   its narrow one-page layout. Horizontal scrolling affects only table cells. */
+@media (max-width:740px){
+  #app .hc-weather-hover-shell>.hc-weather-hover-popover{
+    left:-45px!important;
+    max-height:min(44vh,400px);
+  }
+  #app .hc-weather-hover-popover .hc-weather-timeline .hc-episode-table-scroll{
+    scrollbar-color:#967044 #f1dec0;
+    scrollbar-width:thin;
+  }
+}
