@@ -6,6 +6,7 @@
 import {hmkHumanLocationSymbols} from './injury-special-hmk.js';
 import {resolveCombatantLoad} from './combatant-load.js';
 import {combatFatigueTotals} from './persistent-combat-state.js';
+import {completeParalysis,blockedLimbs} from './hmk-paralysis-sequela.js';
 import {trekRegisteredAnimalHealth,validateTrekAnimalHealthProof,assertTrekAnimalCanMove} from './hmk-trekking-animal-health.js';
 import {animalTrekLoad,validateAnimalTrekLoadProof} from './hmk-trekking-animal-load.js';
 const check=(v,msg)=>{if(!v)throw Error(msg);};
@@ -35,6 +36,25 @@ export function trekPersonHealthSnapshot({id,name,healthState}={}){
   healthState.asphyxiaComaPending?.active===true;
  return {id,name,fatigue,seriousWounds,shock,comaActive,extendedShockActive,cannotSelfMove,
   injured:seriousWounds.some(w=>['head','torso','legs'].includes(w.zone)),immobile};
+}
+/** v93.865: live eligibility for an ACTIVE transport operator, never for a
+ * passive patient.  In particular prone by itself does not imply a Grievous
+ * mobility wound; it nevertheless prevents leading a horse or passing a
+ * Drover/Riding test until the character has actually stood up.  This
+ * projection is NOT written into historical watch receipts. */
+export function trekTravelOperatorEligibility({id,name,healthState}={}){
+ const health=trekPersonHealthSnapshot({id,name,healthState});
+ const reasons=[];
+ if(health.shock==='KIA')reasons.push('postava je mrtvá (KIA)');
+ else if(health.shock!=='NONE')reasons.push('Shock '+health.shock);
+ if(health.comaActive||health.extendedShockActive||healthState?.asphyxiaComaPending?.active===true)
+  reasons.push('Coma nebo probíhající zdravotní bezvědomí');
+ if(health.fatigue>=40)reasons.push('Fatigue 40 nebo více');
+ if(health.immobile)reasons.push('Grievous rána brání samostatnému pohybu');
+ if(healthState?.posture?.prone===true)reasons.push('postava je prone a dosud nevstala');
+ if(completeParalysis(healthState)||[...blockedLimbs(healthState)].some(x=>x.endsWith('-leg')))
+  reasons.push('doložená paralýza brání pohybu');
+ return {id,name,eligible:reasons.length===0,reasons,reason:reasons.join('; ')};
 }
 export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],conveyance='foot',loadedByGM=false,allowCertifiedWeatherAccrual=false,drovingAnimals=[],transportedMemberIds=[]}={}){
  check(Array.isArray(memberIds)&&memberIds.length&&memberIds.length===new Set(memberIds).size&&memberIds.every(x=>typeof x==='string'&&x),

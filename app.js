@@ -203,7 +203,7 @@ import {secureHMKDie,expeditionDiceSubmission,expeditionWatchFatigue,expeditionR
 import {scheduleHMKActivity,finishDueHMKActivities,finishInterruptedHMKTravel,validateHMKActivityEvidence,assertHMKActivitiesAppendOnly,activeHMKActivities,interruptHMKActivity} from './src/integration/hmk-calendar-activities.js';
 import {nutritionRestActivity,interruptionForCancelledNutritionRest} from './src/integration/hmk-nutrition-rest-bridge.js';
 import {planHMKGroupWatch} from './src/integration/hmk-group-travel.js';
-import {trekPartyModes,trekPersonHealthSnapshot} from './src/integration/hmk-trekking-party-modes.js';
+import {trekPartyModes,trekPersonHealthSnapshot,trekTravelOperatorEligibility} from './src/integration/hmk-trekking-party-modes.js';
 import {trekRegisteredAnimalHealth,assertTrekAnimalCanMove,resolveTrekAnimalReadiness93815,assertNoActiveBestiaryTravelConflict93815} from './src/integration/hmk-trekking-animal-health.js';
 import {eligibleRestingAnimals,planAnimalRest} from './src/integration/hmk-trekking-animal-rest.js';
 import {ANIMAL_AREA_AV,weatherAnimalCandidates,prepareAnimalTrekkingWeather,validateAnimalWeatherJournal} from './src/integration/hmk-trekking-animal-weather.js';
@@ -358,7 +358,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.864';
+const APP_VERSION='93.865';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2508,6 +2508,22 @@ function ensureFixedAccidentMinute93773(form){
 /** v93.821: actual health belongs to the shared medical state; this ONLY
  * identifies passengers for the present travel group, never a Combat actor.
  * The passenger action may be clicked even after other group tests exist. */
+/** v93.865: the selected group is necessary, but not sufficient, for
+ * anyone who actively leads/rides/handles.  Read CURRENT health, never a
+ * cached travel snapshot.  A passive passenger is not assessed here. */
+function episodeTravelRoleEligibility93865(id){
+ const c=character(id);
+ if(!c)return {eligible:false,reason:'postava není v aktuální kampani'};
+ if(c.hmk?.verifiedMountedBreed||c.hmk?.livestockBreed)return {eligible:false,reason:'registrované zvíře není lidský vodič ani Drover'};
+ try{return trekTravelOperatorEligibility({id,name:c.name,healthState:persistentStateOf(c)});}
+ catch(err){return {eligible:false,reason:'nelze ověřit zdravotní stav: '+err.message};}
+}
+function episodeRequireTravelOperator93865(id,memberIds,role){
+ if(!(memberIds||[]).includes(id))throw Error(role+': postava není členem právě vyhodnocované skupiny.');
+ const check=episodeTravelRoleEligibility93865(id);
+ if(!check.eligible)throw Error(role+': '+(character(id)?.name||id)+' nemůže tuto činnost vykonávat ('+check.reason+'). Zvolte schopnou postavu; stav prone nejprve vyřešte ve zdravotním/bojovém modulu.');
+ return check;
+}
 function episodeTransportPatients93821(v){
  if(v.kind!=='travel')return [];
  return (v.memberIds||[]).map(id=>character(id)).filter(Boolean).filter(c=>{
@@ -2558,7 +2574,7 @@ function episodeLoadPatients93821(form){
   const mountField=form.elements.namedItem('transportMountAnimalId');
   if(mountField&&!mountField.value&&horses.length===1)mountField.value=horses[0].id;
   const guideField=form.elements.namedItem('transportMountHandlerId');
-  const firstHandler=v.memberIds.find(id=>!patients.some(p=>p.id===id));
+  const firstHandler=v.memberIds.find(id=>!patients.some(p=>p.id===id)&&episodeTravelRoleEligibility93865(id).eligible);
   if(guideField&&!guideField.value&&firstHandler)guideField.value=firstHandler;
   if(mountField?.value){const cb=form.querySelector('[name="stableAnimalIds"][value="'+CSS.escape(mountField.value)+'"]');if(cb)cb.checked=true;}
  }
@@ -2606,7 +2622,7 @@ function episodeLoadPatients93821(form){
   try{const snap=episodeFormSnapshot(form),mass=episodePassengerMass93816(snap);
    securedMountedPassenger93816({data,campaignId:cid,minute:clock.minute,mountId:snap.transportMountAnimalId,
     patientId:patients[0]?.id,memberIds:snap.memberIds,selectedStableIds:snap.stableAnimalIds,mass,
-    handlerId:snap.transportMountHandlerId||snap.memberIds.find(id=>id!==patients[0]?.id),handlerPosition:snap.transportMountHandlerPosition||'leading'});
+    handlerId:snap.transportMountHandlerId||snap.memberIds.find(id=>id!==patients[0]?.id&&episodeTravelRoleEligibility93865(id).eligible),handlerPosition:snap.transportMountHandlerPosition||'leading'});
   }catch(e){reason=e.message;}
  }else reason='Zvolte konkrétního koně a způsob vedení (pěšky / na koni).';
  if(reason){
@@ -3029,7 +3045,7 @@ function timeEpisodePageHTML(clock,participants){
  <div data-episode-transport-mount-panel hidden class="panel"><strong>Převoz nepohyblivé postavy na koni (GM)</strong>
  <p class="hc-hint">Vyberte koně a osobu, která jej vede. Průvodce buď jde pěšky vedle koně (jeho váha se koni nepřičítá), nebo jede s pacientem (započítají se oba). Tělo a nesený inventář se přepočítají automaticky podle aktuálních postav. Přetížení se zobrazí s hodnotami ENC a Move.</p>
  <label>Konkrétní kůň, který poveze pacienta<select name="transportMountAnimalId"><option value="">— Vyberte koně ze Stáje —</option>${stableTravelRoster.filter(a=>['palfrey','courser','charger','destrier','pony'].includes(a.spec.breed)).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
- <label>Kdo vede koně<select name="transportMountHandlerId"><option value="">— Vybrat průvodce z této skupiny —</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
+ <label>Kdo vede koně<select name="transportMountHandlerId"><option value="">— Vybrat průvodce z této skupiny —</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select><small class="hc-hint" data-episode-mount-handler-status>Vyberte schopného člena aktuální skupiny.</small></label>
  <label>Způsob přepravy<select name="transportMountHandlerPosition"><option value="leading">Průvodce jde pěšky a vede koně za uzdu</option><option value="mounted">Průvodce jede na koni společně s pacientem</option></select></label>
  <p class="hc-hint">Pro pacienta je potřebná uzda a sedlo. Pokud chybí, přidejte je přes Stáj (nákup nebo zdarma). Není nutné předem absolvovat zvláštní nasednutí ve Stáji.</p>
  <p class="hc-hint" data-episode-mount-capacity role="status"></p>
@@ -7503,7 +7519,7 @@ function downloadUnfinishedHMKState93859(){
   try{return {present:true,value:JSON.parse(raw)}}catch{return {present:true,unparsedRaw:raw,parseError:true}}}
   catch(e){return {present:false,readError:String(e?.message||e)}}};
  const currentForm=document.querySelector('#hmk-time-episode-form');
- const pkg={format:'hmk-local-working-diagnostic-v93.864',appVersion:APP_VERSION,
+ const pkg={format:'hmk-local-working-diagnostic-v93.865',appVersion:APP_VERSION,
   exportedAt:new Date().toISOString(),scope:'local-only-no-cloud-token',
   note:'Obsahuje historii kampaně a nedokončené testy. Neslouží k importu; před sdílením chraňte soukromé údaje.',
   committedCampaign:read(localStorage,STORAGE),
@@ -24235,6 +24251,19 @@ function episodeIssue(message,form){
   }else field=name('evD4');
   return {field,skill:null,actorId:null};
  }
+ // v93.865: operator disability is a ROLE correction, NEVER a request to
+ // roll Riding/Animalcraft with a dead or prone character. Return the real
+ // selector for a visible remedy before matching generic Skill Test text.
+ if(/^Vodič koně s nepohyblivým pacientem:/.test(message))
+  return {field:'transportMountHandlerId',skill:null,actorId:null};
+ if(/^Drover ·/.test(message)||/^Drover Skill Test:/.test(message))
+  return {field:'droverActorId',skill:null,actorId:null};
+ if(/^Jezdec:/.test(message))
+  return {field:'travelRideRiderId',skill:null,actorId:null};
+ if(/^Pěší vodič zvířete:/.test(message))
+  return {field:'stableAnimalIds',skill:null,actorId:null};
+ if(/^Orienteering · průvodce:/.test(message))
+  return {field:'guideId',skill:null,actorId:null};
  // Drover may legitimately use Riding OR Animalcraft (HMK 145). Route
  // the real Skill Workbench to a mastery the chosen guide actually has;
  // never require an unavailable Riding roll when Animalcraft is documented.
@@ -24359,6 +24388,12 @@ function episodeStartSkillRequest(field,skill,actorId){
  const clock=data.campaignClock,form=document.querySelector('#hmk-time-episode-form');
  if(form&&(/hazard/i.test(field)||/Complication/i.test(field))){try{episodeHazardRequireConfirmed93840(form)}catch(err){alert(err.message);return false;}}
  if(!episodeEvaluationRequested||!clock||!character(actorId))return false;
+ if(form&&form.elements.namedItem('kind')?.value==='travel'&&
+   (field==='droverProofId'||field==='orientationProofId'||field==='trackingProofId'||field==='trackingAwarenessProofId')){
+  try{episodeRequireTravelOperator93865(actorId,episodeFormSnapshot(form).memberIds,
+   field==='droverProofId'?'Drover Skill Test':field==='orientationProofId'?'Orienteering':'Tracking');}
+  catch(err){alert(err.message);return false;}
+ }
  if(skill==='Tracking'&&!availableMasteries(character(actorId)).some(x=>x.name==='Tracking'&&x.ml>0)){
   notice='Zvolená postava nemá Tracking ML (HMK str. 87, 147). Awareness/Perception jsou samostatné testy pro zjevné stopy, NIKOLI náhrada Tracking SV či Spoor. Vyberte stopaře s Tracking nebo zrušte sledování stopy pro tuto hlídku; žádný hod nebyl vytvořen.';render();return false;
  }
@@ -24718,6 +24753,7 @@ function episodePreviewFromForm(form,clock){
   activeProfileIds:clock.characterIds||[]
  }):[];
  if(!members.includes(guideId))throw Error('Průvodce musí být mezi účastníky.');
+ if(kind==='travel')episodeRequireTravelOperator93865(guideId,members,'Orienteering · průvodce');
  // A documented indoor PC safe stay does not require irrelevant new
  // outdoor weather dice. Other participants still require witnessed weather
  // unless the GM separately certifies real climate shelter for everyone.
@@ -24871,6 +24907,22 @@ function episodePreviewFromForm(form,clock){
  // Physical transport is evidenced from actual Appearance and the current inventory,
  // never by a manually typed fake body weight. Vehicles count every occupant once.
  let transportMass93816=null,mountedPassenger93816=null;
+ if(kind==='travel'){
+  const droverRole=episodeDroverRequirement93851(v);
+  if(droverRole.present)episodeRequireTravelOperator93865(droverRole.actorId,members,'Drover · '+(droverRole.skill||'Riding/Animalcraft'));
+  if(v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length){
+   const actualRider=v.travelRideRiderId||v.guideId;
+   episodeRequireTravelOperator93865(actualRider,members,'Jezdec');
+   for(const animalId of (v.stableAnimalIds||[]).length>1?v.stableAnimalIds:[]){
+    const handlerId=v['packHandler_'+animalId];
+    if(handlerId)episodeRequireTravelOperator93865(handlerId,members,'Pěší vodič zvířete');
+   }
+  }
+  if(v.conveyance==='mount'&&(v.transportedMemberIds||[]).length){
+   const handlerId=v.transportMountHandlerId||members.find(id=>id!==v.transportedMemberIds[0]&&episodeTravelRoleEligibility93865(id).eligible);
+   episodeRequireTravelOperator93865(handlerId,members,'Vodič koně s nepohyblivým pacientem');
+  }
+ }
  if(kind==='travel'&&['cart','wagon'].includes(v.conveyance))transportMass93816=episodePassengerMass93816(v);
  if(kind==='travel'&&v.conveyance==='mount'&&(v.transportedMemberIds||[]).length){
   transportMass93816=episodePassengerMass93816(v);
@@ -24878,10 +24930,10 @@ function episodePreviewFromForm(form,clock){
   mountedPassenger93816=securedMountedPassenger93816({data,campaignId:campaignKey(clock),minute:clock.minute,
    mountId:v.transportMountAnimalId,patientId:v.transportedMemberIds[0],memberIds:members,
    selectedStableIds:v.stableAnimalIds||[],mass:transportMass93816,
-   handlerId:v.transportMountHandlerId||members.find(id=>id!==v.transportedMemberIds[0]),
+   handlerId:v.transportMountHandlerId||members.find(id=>id!==v.transportedMemberIds[0]&&episodeTravelRoleEligibility93865(id).eligible),
    handlerPosition:v.transportMountHandlerPosition||'leading' });
   const riderHealth=travelHealth.find(p=>p.id===mountedPassenger93816.handlerId);
-  if(!riderHealth||riderHealth.cannotSelfMove)throw Error('Přeprava na koni: vybraný průvodce není schopný vést koně.');
+  episodeRequireTravelOperator93865(mountedPassenger93816.handlerId,members,'Vodič koně s nepohyblivým pacientem');
   const mountRow=stableAnimals.find(a=>a.id===mountedPassenger93816.mountId);
   if(!mountRow)throw Error('Přeprava na koni: skutečný kůň nebyl vybrán do této skupiny.');
   mountRow.enc=mountedPassenger93816.enc;
@@ -25795,7 +25847,10 @@ function renderEpisodeEndError(form,message){
   const selectedLevel=form.elements.namedItem(levelField);
   if(selectedLevel){selectedLevel.value='';timeEpisodeDraft[levelField]='';}
  }
- const planned=episodePlannedTasks(form);
+ // An incapable operator must never appear as an offered Skill Test.
+ // The only actionable step is to fix the actual role assignment.
+ const operatorBlocked=/^(?:Vodič koně s nepohyblivým pacientem:|Drover ·|Drover Skill Test:|Jezdec:|Pěší vodič zvířete:|Orienteering · průvodce:)/.test(message);
+ const planned=operatorBlocked?[]:episodePlannedTasks(form);
  if(issue.skill&&issue.field){
   const i=planned.findIndex(t=>t.field===issue.field);
   if(i>=0){const task=planned.splice(i,1)[0];planned.unshift({...task,skill:issue.skill,actorId:issue.actorId});}
@@ -26184,7 +26239,7 @@ function sharedPlanCardsHTML93771(){
   const scheduled=state.scheduled.find(x=>x.id===plan.id),isActive=plan.id===sharedTimeWindowActivePlanId;
   const locked=!!plan.done||isActive;
   const followChoices=[['','Nová nezávislá skupina'],...[...previousGroups].map(([groupId,label])=>[groupId,'Navázat: '+label])];
-  const error=errors.get(plan.id)||'';
+  const error=errors.get(plan.id)||(plan.kind==='travel'&&plan.actorId&&!episodeTravelRoleEligibility93865(plan.actorId).eligible?'Průvodce není schopný cesty: '+episodeTravelRoleEligibility93865(plan.actorId).reason:'');
   const participants=plan.memberIds.map(id=>character(id)?.name||id).join(', ');
   if(!previousGroups.has(plan.groupId))previousGroups.set(plan.groupId,participants||'Skupina '+(index+1));
   const ready=!plan.done&&!isActive&&!error&&scheduled&&!!plan.memberIds.length&&
@@ -26212,16 +26267,17 @@ function sharedEpisodeRowsHTML93772(){
   const active=r.id===sharedTimeWindowActivePlanId,locked=!!r.done||active||sharedEpisodeAutoRun93772;
   const slot=state.scheduled.find(x=>x.id===r.id),max=sharedFixedMode93773()?sharedTimeWindowDraft.minutes:rowMaximum93772(sharedTimeWindowDraft,sharedTimeWindowPlans,r.id,r.actorId);
   const used=state.used?.[r.actorId]||0,remaining=Math.max(0,sharedTimeWindowDraft.minutes-used);
-  const error=errors.get(r.id),status=r.done?'✓ Doklad připraven':active?'Právě vyhodnocováno':error?'Opravit před hody':slot?'Čeká na vyhodnocení':'Vyberte údaje';
+  const roleProblem=r.kind==='travel'&&r.actorId&&!episodeTravelRoleEligibility93865(r.actorId).eligible?'Průvodce není schopný vykonávat Orienteering ('+episodeTravelRoleEligibility93865(r.actorId).reason+'). Vyberte jinou postavu.':'';
+  const error=errors.get(r.id)||roleProblem,status=r.done?'✓ Doklad připraven':active?'Právě vyhodnocováno':error?'Opravit před hody':slot?'Čeká na vyhodnocení':'Vyberte údaje';
   const groupNumber=r.groupNumber??index+1;
   const reserved=new Set(sharedTimeWindowPlans.filter(q=>q.id!==r.id).flatMap(q=>q.memberIds||[]));
   const eligible=actors.filter(c=>!reserved.has(c.id));
   const members=r.memberIds||[];
   const groupChoices=Array.from({length:Math.max(groupLimit,groupNumber)},(_,i)=>i+1);
-  const memberHTML=r.kind==='travel'?`<details class="hc-episode-group-members" ${!members.length?'data-hmk-travel-invalid="yes"':''} ${sharedPlanMembersOpen93806===r.id?'open':''}><summary>${members.length} ${members.length===1?'člen':'členové'} · ${esc(members.map(id=>character(id)?.name||id).join(', ')||'vybrat')}</summary><div class="hc-episode-group-member-list">${actors.map(c=>`<label class="hc-check"><input type="checkbox" data-shared-plan-member="${esc(r.id)}" value="${esc(c.id)}" ${members.includes(c.id)?'checked':''} ${locked||reserved.has(c.id)?'disabled':''}>${esc(c.name)}${c.id===r.actorId?' · průvodce':''}</label><label class="hc-episode-guide-radio"><input type="radio" name="guide-${esc(r.id)}" data-shared-plan-guide="${esc(r.id)}" value="${esc(c.id)}" ${c.id===r.actorId?'checked':''} ${locked||!members.includes(c.id)?'disabled':''}>Průvodce</label>`).join('')}</div><p class="hc-hint">V každé skupině označ jednoho průvodce. Jeho Survival / Orienteering platí pro skupinu; pomocníci se započítají jen podle pravidel Assistance při původním Skill Testu.</p></details>`:'<small>Individuální činnost</small>';
+  const memberHTML=r.kind==='travel'?`<details class="hc-episode-group-members" ${!members.length?'data-hmk-travel-invalid="yes"':''} ${sharedPlanMembersOpen93806===r.id?'open':''}><summary>${members.length} ${members.length===1?'člen':'členové'} · ${esc(members.map(id=>character(id)?.name||id).join(', ')||'vybrat')}</summary><div class="hc-episode-group-member-list">${actors.map(c=>`<label class="hc-check"><input type="checkbox" data-shared-plan-member="${esc(r.id)}" value="${esc(c.id)}" ${members.includes(c.id)?'checked':''} ${locked||reserved.has(c.id)?'disabled':''}>${esc(c.name)}${c.id===r.actorId?' · průvodce':''}</label><label class="hc-episode-guide-radio"><input type="radio" name="guide-${esc(r.id)}" data-shared-plan-guide="${esc(r.id)}" value="${esc(c.id)}" ${c.id===r.actorId?'checked':''} ${locked||!members.includes(c.id)||!episodeTravelRoleEligibility93865(c.id).eligible?'disabled':''} title="${esc(episodeTravelRoleEligibility93865(c.id).reason||'Způsobilý průvodce')}">Průvodce</label>`).join('')}</div><p class="hc-hint">V každé skupině označ jednoho průvodce. Jeho Survival / Orienteering platí pro skupinu; pomocníci se započítají jen podle pravidel Assistance při původním Skill Testu.</p></details>`:'<small>Individuální činnost</small>';
   return `<tr data-shared-plan-card="${esc(r.id)}" class="${r.done?'hc-shared-plan-done':''} ${active?'hc-shared-plan-active':''}">
   <td><select aria-label="Skupina řádku ${index+1}" data-shared-plan-group="${esc(r.id)}" ${locked?'disabled':''}>${groupChoices.map(n=>`<option value="${n}" ${n===groupNumber?'selected':''} ${n!==groupNumber&&usedNumbers.has(n)?'disabled':''}>Skupina ${n}</option>`).join('')}</select></td>
-  <td><select aria-label="${r.kind==='travel'?'Průvodce':'Postava'} skupiny ${groupNumber}" data-shared-row-actor="${esc(r.id)}" ${!r.actorId||!members.includes(r.actorId)?'aria-invalid="true"':''} ${locked?'disabled':''}><option value="">— ${r.kind==='travel'?'Průvodce':'Postava'} —</option>${eligible.map(c=>`<option value="${esc(c.id)}" ${r.actorId===c.id?'selected':''}>${esc(c.name)}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</option>`).join('')}</select></td>
+  <td><select aria-label="${r.kind==='travel'?'Průvodce':'Postava'} skupiny ${groupNumber}" data-shared-row-actor="${esc(r.id)}" ${!r.actorId||!members.includes(r.actorId)?'aria-invalid="true"':''} ${locked?'disabled':''}><option value="">— ${r.kind==='travel'?'Průvodce':'Postava'} —</option>${eligible.map(c=>`<option value="${esc(c.id)}" ${r.actorId===c.id?'selected':''} ${r.kind==='travel'&&!episodeTravelRoleEligibility93865(c.id).eligible?'disabled':''} title="${esc(episodeTravelRoleEligibility93865(c.id).reason||'')}">${esc(c.name)}${r.kind==='travel'&&!episodeTravelRoleEligibility93865(c.id).eligible?' · NEZPŮSOBILÝ':''}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</option>`).join('')}</select></td>
   <td>${memberHTML}</td>
   <td><select aria-label="Činnost skupiny ${groupNumber}" data-shared-plan-kind="${esc(r.id)}" ${locked?'disabled':''}>${SHARED_PLAN_KINDS_93771.map(([key,name])=>episodeTrackingOption93833(r.actorId,key,name,r.kind===key)).join('')}</select></td>
   <td>${sharedFixedMode93773()?`<strong>${sharedTimeWindowDraft.minutes} min</strong><small>Celý interval</small>`:`<input aria-label="Délka činnosti ${index+1}" type="number" min="1" max="${max}" value="${r.minutes||''}" data-shared-plan-minutes="${esc(r.id)}" ${locked?'disabled':''}>`}</td>
@@ -26510,6 +26566,9 @@ function updateSharedTimeWindowControls(form){
 function episodeGroupRoleChoices93856(form,v){
  if(v.kind!=='travel')return;
  const roster=[...new Set(v.memberIds||[])].filter(id=>!!character(id));
+ const roleHealth=new Map(roster.map(id=>[id,episodeTravelRoleEligibility93865(id)]));
+ const able=id=>roleHealth.get(id)?.eligible===true;
+ const ableRoster=roster.filter(able);
  const reservations=episodeAnimalReservations93848();
  const animalField=form.elements.namedItem('travelRideAnimalId');
  if(animalField){
@@ -26535,23 +26594,44 @@ function episodeGroupRoleChoices93856(form,v){
   const field=form.elements.namedItem(name);if(!field)return;
   const prior=field.value;
   const options=[['',placeholder],...roster.map(id=>[id,character(id).name||id])];
-  const signature=JSON.stringify([options,enabled,episodeEvaluationRequested&&prior&&!roster.includes(prior)?prior:null]);
+  const signature=JSON.stringify([options,enabled,roster.map(id=>[id,able(id),roleHealth.get(id)?.reason]),episodeEvaluationRequested&&prior&&!roster.includes(prior)?prior:null]);
   if(field.dataset.episodeGroupSignature!==signature){
    const fragment=document.createDocumentFragment();
    for(const [value,title] of options){const opt=document.createElement('option');opt.value=value;opt.textContent=title;
-    opt.disabled=!!value&&!enabled;fragment.appendChild(opt);}
+    opt.disabled=!!value&&(!enabled||!able(value));
+    if(value&&!able(value)){opt.textContent=title+' · NEZPŮSOBILÝ: '+roleHealth.get(value)?.reason;opt.title=roleHealth.get(value)?.reason||'';}
+    fragment.appendChild(opt);}
    if(episodeEvaluationRequested&&prior&&!roster.includes(prior)){
     const invalid=document.createElement('option');invalid.value=prior;invalid.disabled=true;
     invalid.textContent='Nepřípustná původní volba mimo tuto skupinu';fragment.appendChild(invalid);
    }
    field.replaceChildren(fragment);field.dataset.episodeGroupSignature=signature;
   }
-  if(prior&&(roster.includes(prior)||episodeEvaluationRequested))field.value=prior;
+  if(prior&&(able(prior)||episodeEvaluationRequested))field.value=prior;
   else if(prior)field.value='';
-  field.disabled=!enabled||!!(episodeEvaluationRequested&&episodeEvaluatedIdentity);
+  field.disabled=!enabled||!ableRoster.length||!!(episodeEvaluationRequested&&episodeEvaluatedIdentity);
   field.closest('label')?.classList.toggle('hc-episode-inactive',!enabled);
   return field;
  };
+ // The passive patient remains selectable for transport, NEVER as an operator.
+ // Rebuild this selection whenever the active scheduled group or live health
+ // changes.  A manually forged old draft is still rejected by the preflight.
+ const hasPatient=v.conveyance==='mount'&&(v.transportedMemberIds||[]).length>0;
+ const mountHandler=setChoices('transportMountHandlerId',
+  hasPatient?'— Vyberte schopného vodiče / jezdce —':'— Jen při převozu pacienta —',hasPatient);
+ if(mountHandler){
+  v.transportMountHandlerId=mountHandler.value;
+  const hint=form.querySelector('[data-episode-mount-handler-status]');
+  if(hint)hint.textContent=!hasPatient?'Vodič se určuje až po naložení pacienta.':
+   !ableRoster.filter(id=>!v.transportedMemberIds.includes(id)).length?
+    'Žádný schopný vodič ve skupině. Mrtvá, prone nebo jinak neschopná postava nesmí vést koně; nejprve zajistěte dalšího člena.':
+    'Vyberte pouze postavu schopnou samostatné činnosti. Pacient nemůže být vlastním vodičem.';
+  // A passenger is not an active handler even when their health is normal.
+  for(const opt of mountHandler.options)if(opt.value&&(v.transportedMemberIds||[]).includes(opt.value)){
+   opt.disabled=true;opt.textContent=(character(opt.value)?.name||opt.value)+' · pacient se nemůže vést sám';
+  }
+  if(!episodeEvaluationRequested&&mountHandler.value&&mountHandler.selectedOptions[0]?.disabled){mountHandler.value='';v.transportMountHandlerId='';}
+ }
  const healthyRide=v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length;
  const selectedCompanions=(v.stableAnimalIds||[]).filter(id=>!reservations.has(id));
  const mountId=healthyRide?resolveTravelMount93837(verifiedLivestock(data,campaignKey(data.campaignClock)),selectedCompanions,v.travelRideAnimalId||'').animal?.id:null;
@@ -26569,7 +26649,8 @@ function episodeGroupRoleChoices93856(form,v){
   const select=label.querySelector('select');if(!select)continue;
   if(show){
    for(const opt of select.options)if(opt.value){
-    opt.disabled=!roster.includes(opt.value)||opt.value===currentRider;
+    opt.disabled=!able(opt.value)||opt.value===currentRider;
+    opt.title=!able(opt.value)?roleHealth.get(opt.value)?.reason||'nezpůsobilý':opt.value===currentRider?'jezdec nemůže současně vést další zvíře pěšky':'';
     opt.hidden=opt.disabled;
    }
    if(!episodeEvaluationRequested&&select.value&&select.selectedOptions[0]?.disabled)select.value='';
@@ -26584,7 +26665,7 @@ function episodeGroupRoleChoices93856(form,v){
  const actor=setChoices('droverActorId',healthyRide&&!mixedRide?'— Totožný s jezdcem —':'— Hlavní Drover skupiny —',!healthyRide||mixedRide);
  if(actor){
   if(healthyRide&&!mixedRide&&!episodeEvaluationRequested){
-   actor.value=roster.includes(rider?.value)?rider.value:roster.includes(v.guideId)?v.guideId:roster[0]||'';
+   actor.value=able(rider?.value)?rider.value:able(v.guideId)?v.guideId:ableRoster[0]||'';
   }
   v.droverActorId=actor.value;
  }
@@ -26708,13 +26789,14 @@ function updateEpisodePreview(form){
    const current=episodeFormSnapshot(form);const need=episodeDroverRequirement93851(current);
    if(need.present&&current.conveyance==='mount'&&!(current.transportedMemberIds||[]).length){
     droverField.value=need.actorId;
-   }else if(need.present&&!current.memberIds.includes(droverField.value)){
+   }else if(need.present&&!episodeTravelRoleEligibility93865(droverField.value).eligible){
     const possible=current.memberIds.find(id=>{
+     if(!episodeTravelRoleEligibility93865(id).eligible)return false;
      const m=availableMasteries(character(id));
      const skill=current.conveyance==='mount'&&need.animals.length<=1?'Riding':'Animalcraft';
      return m.some(row=>row.name===skill&&row.ml>0);
     });
-    droverField.value=possible||current.guideId||'';
+    droverField.value=possible||(episodeTravelRoleEligibility93865(current.guideId).eligible?current.guideId:'');
    }
   }
  }
@@ -26867,7 +26949,8 @@ function updateEpisodePreview(form){
   const roster=new Set(v.memberIds||[]);
   for(const opt of trackerSelect.options){if(!opt.value)continue;
    const actor=character(opt.value);
-   opt.disabled=!roster.has(opt.value)||!actor||!availableMasteries(actor).some(x=>x.name==='Tracking'&&x.ml>0);
+   opt.disabled=!roster.has(opt.value)||!actor||!episodeTravelRoleEligibility93865(opt.value).eligible||!availableMasteries(actor).some(x=>x.name==='Tracking'&&x.ml>0);
+   opt.title=episodeTravelRoleEligibility93865(opt.value).reason||(!roster.has(opt.value)?'Postava není v aktuální skupině':'');
   }
   if(trackerSelect.value&&trackerSelect.selectedOptions[0]?.disabled)trackerSelect.value='';
   const status=form.querySelector('[data-episode-tracker-status]');
@@ -27063,7 +27146,7 @@ function updateEpisodePreview(form){
    const m=securedMountedPassenger93816({data,campaignId:campaignKey(data.campaignClock),minute:data.campaignClock.minute,
     mountId:v.transportMountAnimalId,patientId:v.transportedMemberIds[0],memberIds:v.memberIds,
     selectedStableIds:v.stableAnimalIds,mass,
-    handlerId:v.transportMountHandlerId||v.memberIds.find(id=>id!==v.transportedMemberIds[0]),
+    handlerId:v.transportMountHandlerId||v.memberIds.find(id=>id!==v.transportedMemberIds[0]&&episodeTravelRoleEligibility93865(id).eligible),
     handlerPosition:v.transportMountHandlerPosition||'leading' });
    mountInfo.textContent='Kůň '+m.animalName+' · '+(m.handlerPosition==='leading'?'průvodce jde pěšky':'průvodce jede')+' · pacient '+m.patientLb+' lb + průvodce na koni '+m.handlerLb+' lb + výstroj a náklad '+m.minimumLb+' lb = '+m.totalLb+' lb · ENC '+m.enc+' · Move '+m.moveAfterLoad+'.';
    mountInfo.classList.remove('hc-episode-needs-input');
