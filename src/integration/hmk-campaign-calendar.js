@@ -10,6 +10,7 @@ import {validateCalendarPlans,nextGMBlockingEvent,assertCalendarPlansAppendOnly}
 import {automaticHMKFollowups} from './hmk-calendar-automatic-followups.js';
 import {projectedCalendarJournal} from './hmk-calendar-campaign-lifecycle.js';
 import {automaticAilmentOnset} from './hmk-calendar-automatic-onsets.js';
+import {gmCalendarCancellationMatches} from './hmk-calendar-gm-cancellation.js';
 export const DAY_MINUTES=1440;
 const validInt=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const ensure=(ok,msg)=>{if(!ok)throw Error(msg);};
@@ -64,7 +65,7 @@ export function validateCampaignCalendar(clock){
  let last=-1;const eventIds=new Set();
  for(const e of clock.events){
   ensure(e&&typeof e.id==='string'&&e.id.length>0&&!eventIds.has(e.id)&&
-   ['init','advance','anchor','resolution','tr-origin','plan','resolve-plan','cancel-plan','membership','gm-defer'].includes(e.type)&&validInt(e.minute,0,MAX_MINUTE)&&
+   ['init','advance','anchor','resolution','tr-origin','plan','resolve-plan','cancel-plan','membership','gm-defer','gm-cancel'].includes(e.type)&&validInt(e.minute,0,MAX_MINUTE)&&
    e.minute>=last&&typeof e.reason==='string'&&e.reason.length>0&&e.reason.length<=400,
    'Neplatná nebo zpětně vložená časová událost');
   if(e.type==='gm-defer')ensure(typeof e.obligationId==='string'&&e.obligationId.length>0&&e.obligationId.length<=350&&
@@ -73,6 +74,13 @@ export function validateCampaignCalendar(clock){
    e.dueMinute<=e.minute&&typeof e.gmNote==='string'&&e.gmNote.trim().length>=10&&
    e.gmNote.length<=400&&e.gmConfirmed===true,
    'Neplatná nouzová GM výjimka nebo chybějící zdůvodnění');
+  if(e.type==='gm-cancel')ensure(typeof e.targetId==='string'&&e.targetId.length>0&&e.targetId.length<=350&&
+   typeof e.targetKind==='string'&&e.targetKind.length>0&&e.targetKind.length<=350&&
+   typeof e.targetCharacterId==='string'&&e.targetCharacterId.length<=200&&
+   validInt(e.targetDueMinute,0,MAX_MINUTE)&&
+   typeof e.rootSourceId==='string'&&e.rootSourceId.length<=350&&
+   typeof e.title==='string'&&e.title.length<=160&&e.gmConfirmed===true,
+   'Neplatné GM zrušení kalendářové události');
   eventIds.add(e.id);last=e.minute;
  }
  ensure(clock.events.length>0&&clock.events[0].type==='init'&&clock.events.at(-1).minute===clock.minute,
@@ -379,10 +387,13 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
    status:op.endMinute<=clock.minute?'due':'future'});
  }
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
- const deferred=all.filter(x=>isGMDeferredCalendarEvent(clock,x));
- const actionable=all.filter(x=>!isGMDeferredCalendarEvent(clock,x));
+ const eligible=all.filter(x=>!gmCalendarCancellationMatches(clock,x,journal));
+ const deferred=eligible.filter(x=>isGMDeferredCalendarEvent(clock,x));
+ const actionable=eligible.filter(x=>!isGMDeferredCalendarEvent(clock,x));
+ const liveUnknown=unknown.filter(x=>!gmCalendarCancellationMatches(clock,x,journal));
+ const liveSuspended=suspended.filter(x=>!gmCalendarCancellationMatches(clock,x,journal));
  return {due:actionable.filter(x=>x.status==='due'),future:actionable.filter(x=>x.status==='future'),
-  unknown,all:actionable,deferred,suspended,prepared};
+  unknown:liveUnknown,all:actionable,deferred,suspended:liveSuspended,prepared:prepared.filter(x=>!gmCalendarCancellationMatches(clock,x,journal))};
 }
 export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmConfirmed,characters=[],journal=[],inventory=[],deferConcurrentTreatmentAtStart=false}={}){
  validateCampaignCalendar(clock);

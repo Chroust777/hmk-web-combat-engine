@@ -1,7 +1,8 @@
 /** Calendar presentation receipts. They never resolve, cancel or alter a rule,
  * game clock, fatigue, medical obligation or the original immutable evidence.
  * Actual GM plans and active activities use their respective authoritative
- * cancellation mechanisms instead.
+ * cancellation mechanisms instead. The separate GM calendar-X action creates
+ * an audited clock cancellation for other obligations, never a UI-only receipt.
  */
 export const CALENDAR_UI_PROOF='hmk-calendar-ui-receipt-v1';
 const valid=x=>typeof x==='string'&&x.length>0&&x.length<=240;

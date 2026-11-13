@@ -1,3 +1,4 @@
+import {gmCalendarCancellationMatches} from './hmk-calendar-gm-cancellation.js';
 /** HMK 1.2 p.186: proof-based daily nutrition accounting, not a fabricated
  * inventory or completed malnutrition Course Roll. The GM explicitly opts
  * characters into a Foraging-only provisioning profile. Those without an
@@ -291,7 +292,8 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
  check(typeof idFactory==='function'&&typeof stamp==='function','Nutriční účetnictví vyžaduje auditní identifikátory');
  const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
  const members=new Set(clock.characterIds??database.characters.map(c=>c.id));
- const policies=policyEntries(database.journal,campaignId).filter(x=>members.has(x.characterId));
+ const policies=policyEntries(database.journal,campaignId).filter(x=>members.has(x.characterId)&&
+  !gmCalendarCancellationMatches(clock,{id:'nutrition-policy:'+x.id,sourceId:x.id,kind:'nutrition-conditions',characterId:x.characterId,minute:x.campaignMinute},database.journal));
  const completed=[];
  // Preserve every historically effective policy, even if a later GM decision
  // replaced or paused it. Process by day-end across all actors; no old policy

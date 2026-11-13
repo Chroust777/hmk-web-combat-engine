@@ -1,3 +1,4 @@
+import {gmCalendarCancellationMatches} from './hmk-calendar-gm-cancellation.js';
 /** Parallel actor actions; campaign time is owned exclusively by the GM.
  * Scheduling never edits the clock or fatigue. The existing HMK fatigue
  * calculation is committed only after GM advances past the documented end.
@@ -232,12 +233,13 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
  const clock=database?.campaignClock;if(!clock)return [];
  check(typeof idFactory==='function'&&typeof stamp==='function','Chybí generátor auditních ID');
  const campaignId=activeClockKey(clock),done=scheduledHMKCompletionIds(database.journal),stopped=interruptedHMKActivityIds(database.journal);
+ const isCancelled=row=>gmCalendarCancellationMatches(clock,{id:'activity:'+row.id,sourceId:row.id,kind:row.calendarActivityProof?.kind,characterId:row.characterId,minute:row.calendarActivityProof?.startMinute},database.journal);
  // Even if the GM jumps only part of a watch (no completion due yet), do
  // not silently pass a known Fatigue-40 threshold mid–Double Time. Preserve
  // the previous minutes on transaction rollback and permit stopping exactly
  // at the last completed, safe hour. Never fabricate a mode transition.
  for(const row of plannedHMKActivities(database.journal,campaignId)){
-  if(done.has(row.id)||stopped.has(row.id))continue;
+  if(done.has(row.id)||stopped.has(row.id)||isCancelled(row))continue;
   const act=row.calendarActivityProof,group=act.plan?.travelGroup;
   if(!group?.animalWeariness?.length)continue;
   const trek=database.journal.find(j=>j.id===act.plan.trekSourceId)?.calendarTrekProof;
@@ -252,7 +254,7 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
   }
  }
  const due=plannedHMKActivities(database.journal,campaignId).filter(row=>
-  !done.has(row.id)&&!stopped.has(row.id)&&row.calendarActivityProof.endMinute<=clock.minute)
+  !done.has(row.id)&&!stopped.has(row.id)&&!isCancelled(row)&&row.calendarActivityProof.endMinute<=clock.minute)
   .sort((a,b)=>a.calendarActivityProof.endMinute-b.calendarActivityProof.endMinute||a.id.localeCompare(b.id));
  // Preflight ALL due travel activities before ANY actor receives Fatigue.
  // A mount/pack beast injured or exhausted since scheduling cannot secretly

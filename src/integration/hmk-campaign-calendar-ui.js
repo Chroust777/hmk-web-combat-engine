@@ -10,6 +10,7 @@ import {calendarActorActivities} from './hmk-calendar-activities.js';
 import {calendarNutritionConditionActivities} from './hmk-nutrition-activity.js';
 import {calendarVisibleHistory,calendarVisibleActivities} from './hmk-calendar-timeline-visibility.js';
 import {calendarUIReceipts,calendarEventControlKind,calendarEventOverlaps} from './hmk-calendar-event-controls.js';
+import {gmCalendarCancellationMatches} from './hmk-calendar-gm-cancellation.js';
 const pad=(x)=>String(x).padStart(2,'0');
 const dayNumber=(m)=>Math.floor(m/1440)+1;
 const minDay=(n)=>Math.max(1,Math.min(n,694444));
@@ -49,7 +50,7 @@ function issueAction(p,esc){
  const id=esc(p.id),control=calendarEventControlKind(p);
  const marks=p.origin==='gm'&&!p.resolution?
   `<button type="button" class="hc-small hc-event-mark" title="Potvrdit událost GM" aria-label="Potvrdit událost GM" data-cal-resolve="${id}">✓</button><button type="button" class="hc-small hc-event-mark" title="Zrušit událost GM" aria-label="Zrušit událost GM" data-cal-cancel="${id}">×</button>`:
-  `<button type="button" class="hc-small hc-event-mark" title="${control==='rules'?'Přejít k povinnému pravidlovému vyhodnocení':'Označit událost jako zkontrolovanou – bez změny herních následků'}" aria-label="${control==='rules'?'Otevřít povinné vyhodnocení':'Zkontrolovat událost'}" data-cal-event-check="${id}">✓</button><button type="button" class="hc-small hc-event-mark" title="${control==='rules'?'Povinný hod nelze zrušit bez pravidlového vyřešení':control==='activity'||control==='nutrition'?'Přerušit probíhající interval':'Skrýt historickou či informativní událost z kalendáře'}" aria-label="${control==='rules'?'Prověřit možnost zrušení':'Zrušit / skrýt událost'}" data-cal-event-remove="${id}">×</button>`;
+  `<button type="button" class="hc-small hc-event-mark" title="${control==='rules'?'Přejít k povinnému pravidlovému vyhodnocení':'Označit událost jako zkontrolovanou – bez změny herních následků'}" aria-label="${control==='rules'?'Otevřít povinné vyhodnocení':'Zkontrolovat událost'}" data-cal-event-check="${id}">✓</button><button type="button" class="hc-small hc-event-mark" title="${control==='activity'||control==='nutrition'?'Přerušit probíhající interval':'GM: zrušit událost a navázané aktivní povinnosti'}" aria-label="Zrušit událost rozhodnutím GM" data-cal-event-remove="${id}">×</button>`;
  const text=p.origin==='history'?'Deník ↗':p.origin==='activity'?'Činnost ↗':
   p.origin==='gm'?'Otevřít ↗':p.origin==='hml'?'Kontrola ↗':'Detail ↗';
  const route=p.characterId?`<button type="button" class="hc-small hc-event-link" title="${esc(eventDestination(p))}" data-cal-link="${esc(p.characterId)}" data-cal-destination="${esc(p.destination||'healing')}" data-cal-kind="${esc(p.kind||'gm')}" data-cal-concurrent-id="${esc(p.startId||'')}" data-cal-source="${esc(p.sourceId||p.woundId||'')}" data-cal-elapsed="${esc(p.elapsedMinutes??'')}" ${p.origin==='gm'&&p.skill?`data-cal-skill="${esc(p.skill)}" data-cal-plan="${esc(p.id)}"`: ''} ${p.origin==='history'?`data-cal-history-id="${esc(p.sourceId)}"`:''}>${esc(text)}</button>`:'';
@@ -131,8 +132,8 @@ export function calendarBoardEvents({clock,characters=[],journal=[]}={}){
  };
  const all=[...agenda.all.filter(p=>!travelTask(p)).map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities([...calendarActorActivities(clock,activitiesCharacters,journal),...calendarNutritionConditionActivities(clock,characters,journal),...travelEpisodeCalendarSegments(clock,characters,journal)]),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
  const receipts=calendarUIReceipts(journal,clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`);
- const visible=compactNutritionTimelineEvents(all.filter(p=>receipts.get(p.id)!=='hide').map(p=>({...p,uiAcknowledged:receipts.get(p.id)==='acknowledge'})),journal)
-  .filter(p=>receipts.get(p.id)!=='hide').map(p=>({...p,uiAcknowledged:p.uiAcknowledged||receipts.get(p.id)==='acknowledge'}));
+ const visible=compactNutritionTimelineEvents(all.filter(p=>receipts.get(p.id)!=='hide'&&!gmCalendarCancellationMatches(clock,p,journal)).map(p=>({...p,uiAcknowledged:receipts.get(p.id)==='acknowledge'})),journal)
+  .filter(p=>receipts.get(p.id)!=='hide'&&!gmCalendarCancellationMatches(clock,p,journal)).map(p=>({...p,uiAcknowledged:p.uiAcknowledged||receipts.get(p.id)==='acknowledge'}));
  visible.sort((a,b)=>a.dueMinute-b.dueMinute||a.id.localeCompare(b.id));
  return visible;
 }
