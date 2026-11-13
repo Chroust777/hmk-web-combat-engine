@@ -9,7 +9,7 @@ import {hmkAnimalLocationSymbols} from './injury-special-hmk.js';
 import {animalHealthProjection567} from './hmk-bestiary-trauma-567.js';
 const requireFact=(v,m)=>{if(!v)throw Error(m);};
 const int=v=>Number.isSafeInteger(v)&&v>=0;
-const breeds=new Set(['bovine','camel','donkey','pony','mule','palfrey','courser','charger','destrier']);
+const breeds=new Set(['bovine','camel','donkey','pony','mule','palfrey','courser','charger','destrier','guard','hunter','ratter','elephant','hawk']);
 // The p.355 tail (tl) is coded in the existing injury anatomy as the hind
 // body region, but p.145's incapacitating 'leg' must NOT include a tail.
 const travelWound=w=>String(w.location).trim().toLowerCase()!=='tl'&&
@@ -88,8 +88,8 @@ export function resolveTrekAnimalReadiness93815({stableAnimals=[],legacyAnimals=
  for(const stable of stableAnimals){
   select(stable?.id);
   const actor=profiles.get(stable.id);
-  if(!actor)continue; // A verified Stable purchase does not invent a healthy Combat State.
-  requireFact(actor.hmk?.verifiedMountedBreed===stable.breed,
+  if(!actor)continue; // Legacy purchases may await a conflict-safe auto-enrollment.
+  requireFact(actor.hmk?.verifiedMountedBreed===(stable.breed||stable.bestiaryId),
    'Stáj · '+(stable.name||stable.id)+': zdravotní profil stejného ID má jiné nebo nedoložené plemeno. Opravte propojení identity, nikoliv výsledek Pochodu.');
   requireFact(active.has(stable.id)&&actor.hmk?.healthState,
    'Stáj · '+(stable.name||stable.id)+': existující zdravotní profil není aktivní a úplný v tomto kalendáři. Před cestou jej pravidlově sjednoťte; nesmí se ignorovat skutečné zranění.');

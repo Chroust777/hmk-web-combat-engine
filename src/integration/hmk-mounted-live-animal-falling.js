@@ -8,6 +8,8 @@
  * Falling Routine, compounded injury, Shock or the mount's Healing Rate.
  */
 import {injuryFromEffectiveImpact,compoundCompatible} from '../rules/injury.js';
+import {bestiaryProfile} from './hmk-bestiary-563.js';
+import {animalAnatomyTable566} from './hmk-bestiary-anatomy-566.js';
 import {validateCombatState} from './persistent-combat-state.js';
 const verify=(test,msg)=>{if(!test)throw Error(msg)};
 const isDie=(v,n)=>Number.isSafeInteger(v)&&v>=1&&v<=n;
@@ -22,11 +24,23 @@ const info={
  charger:{table:'C',maxZN:20,b:5,shockML:65},
  destrier:{table:'C',maxZN:20,b:6,shockML:75}
 };
+// Every creature offered by the Stable has a printed Bestiary body chart.
+// The extra species do NOT inherit B/C horse anatomy or its limb effects.
+function extraPrintedAnatomy93861(breed){
+ const profile=['guard','hunter','ratter','elephant','hawk'].includes(breed)?bestiaryProfile(breed):null;
+ const table=animalAnatomyTable566(profile?.combat?.bodyTable);
+ if(!profile||!table)return null;
+ return {breed,table:table.id.toUpperCase(),maxZN:table.maxZN,
+  naturalBluntAV:profile.combat.av.b,shockML:profile.combat.shock,
+  locations:table.rows.map(r=>({code:r.id,name:r.name,
+   zone:r.znMin+'–'+r.znMax,ln:r.lnMin+'–'+r.lnMax,shock:r.shock}))};
+}
 /** Read-only p.355 body table for an existing registered mount. This shares
  * precisely the B/C breed table used by the original Injury Sequence.
  * It never creates an animal, wound, armour rating or secondary health state. */
 export function verifiedMountedAnimalAnatomy(breed){
- if(typeof breed!=='string'||!Object.hasOwn(info,breed))return null;
+ if(typeof breed!=='string')return null;
+ if(!Object.hasOwn(info,breed))return extraPrintedAnatomy93861(breed);
  const specification=info[breed],b=specification.table==='B';
  return {breed,table:specification.table,maxZN:specification.maxZN,
   naturalBluntAV:specification.b,shockML:specification.shockML,
@@ -44,7 +58,7 @@ export function verifiedMountedAnimalAnatomy(breed){
 /** Breed-verified printed Shock ML for the original animal, never a GM guess. */
 export function verifiedMountedShockML(animal){
  const breed=animal?.hmk?.verifiedMountedBreed;
- return Object.hasOwn(info,breed)?info[breed].shockML:null;
+ return Object.hasOwn(info,breed)?info[breed].shockML:extraPrintedAnatomy93861(breed)?.shockML??null;
 }
 const leg=new Set(['flg','hlg']);
 function locationFor(spec,zn,ld){
