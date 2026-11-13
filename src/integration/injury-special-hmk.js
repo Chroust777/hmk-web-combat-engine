@@ -31,11 +31,16 @@ const ANIMAL_LOCATIONS=Object.freeze({
  hd:{triangle:null,bleeds:2,zone:'head'},nk:{triangle:20,bleeds:3,zone:'head'},
  flg:{triangle:0,bleeds:1,zone:'legs'},flk:{triangle:null,bleeds:2,zone:'torso'},
  ab:{triangle:null,bleeds:3,zone:'torso'},qtr:{triangle:null,bleeds:2,zone:'torso'},
- hlg:{triangle:0,bleeds:1,zone:'legs'},tl:{triangle:0,bleeds:0,zone:'legs'}
+ hlg:{triangle:0,bleeds:1,zone:'legs'},tl:{triangle:0,bleeds:0,zone:'legs'},
+ // Additional printed D/E/I/J locations (HMK 355,357). Unlike a horse,
+ // these creatures may have a thorax, pelvis, wings, legs, ears or trunk.
+ tx:{triangle:null,bleeds:2,zone:'torso'},pv:{triangle:null,bleeds:2,zone:'torso'},
+ wng:{triangle:0,bleeds:1,zone:'arm'},leg:{triangle:0,bleeds:1,zone:'legs'},
+ ear:{triangle:0,bleeds:1,zone:'head'},trn:{triangle:0,bleeds:1,zone:'head'}
 });
 export function hmkAnimalLocationSymbols(location){const v=ANIMAL_LOCATIONS[String(location??'').trim().toLowerCase()];return v?{...v}:null;}
 export function hmkBodyLocationSymbols(location,bodyKind='human'){
- if(bodyKind==='horse')return hmkAnimalLocationSymbols(location);
+ if(bodyKind==='horse'||bodyKind==='animal')return hmkAnimalLocationSymbols(location);
  if(bodyKind==='human')return hmkHumanLocationSymbols(location);
  throw Error('Neznámá ověřená anatomie pro Injury Sequence');
 }

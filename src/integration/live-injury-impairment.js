@@ -11,7 +11,8 @@ const LOCATION_ZONES=Object.freeze({sk:'head',skull:'head',fa:'head',face:'head'
  sh:'arm',shoulder:'arm',ua:'arm','upper arm':'arm',el:'arm',elbow:'arm',fo:'arm',forearm:'arm',ha:'arm',hand:'arm',
  tx:'torso',thorax:'torso',ab:'torso',abdomen:'torso',pv:'torso',pelvis:'torso',
  th:'legs',thigh:'legs',kn:'legs',knee:'legs',ca:'legs',calf:'legs',ft:'legs',foot:'legs',
- hd:'head',flg:'legs',hlg:'legs',flk:'torso',qtr:'torso',tl:'legs',area:'area'});
+ hd:'head',flg:'legs',hlg:'legs',flk:'torso',qtr:'torso',tl:'legs',
+ wng:'arm',leg:'legs',ear:'head',trn:'head',area:'area'});
 export const INJURY_LOCATION_ZONES=LOCATION_ZONES;
 const SL_KEY={CF:SL.CF,F:SL.F,S:SL.S,CS:SL.CS};
 const normalizeLocation=s=>String(s??'').trim().toLowerCase();

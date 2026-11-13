@@ -483,10 +483,10 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
  requireCond(!s.extendedShock||calculated===s.shock||calculated==='KIA','Změna Shock State během Extended Shock vyžaduje samostatné potvrzení GM; nelze přepsat léčebný průběh');
  requireCond(adjudication?.gmReviewed===true,'GM musí potvrdit zvláštní podmínky zranění dle HMK str.168');
  const bodyKind=adjudication.bodyKind??'human';
- requireCond(['human','horse'].includes(bodyKind),'Neznámý druh těla pro autoritativní Injury Sequence');
+ requireCond(['human','horse','animal'].includes(bodyKind),'Neznámý druh těla pro autoritativní Injury Sequence');
  requireCond(!!hmkBodyLocationSymbols(draft.location,bodyKind),'Lokalizace nepatří do ověřené anatomické tabulky');
  const limbLocations=['sh','ua','el','fo','ha','th','kn','ca','ft','shoulder','upper arm','elbow','forearm','hand','thigh','knee','calf','foot',
-  ...(bodyKind==='horse'?['flg','hlg']:[])];
+  ...(['horse','animal'].includes(bodyKind)?['flg','hlg','wng','leg','ear']:[])];
  const isLimb=limbLocations.includes(String(draft.location).toLowerCase());
  if(inj.kind==='injury'&&isLimb)requireCond(['left','right'].includes(adjudication.side),'HMK str.167: zásah do končetiny vyžaduje potvrzení strany left/right');
  const sameLoc=s.wounds.filter(w=>!w.healed&&w.location.toLowerCase()===String(draft.location).toLowerCase());
@@ -515,7 +515,7 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
  if(inj.kind==='injury'){
   const symbols=hmkBodyLocationSymbols(draft.location,bodyKind);
   requireCond(!!symbols,'Speciální účinky nelze ověřit bez anatomické lokace HMK str.167');
-  requireCond(bodyKind!=='horse'||!(severityForSpecial==='G'&&levelForSpecial===5&&['e','edge'].includes(String(aspectForSpecial).toLowerCase())&&symbols.triangle!==null), 'Zvířecí G5e vyžaduje samostatnou ověřenou Amputation Sequence');
+  requireCond(!['horse','animal'].includes(bodyKind)||!(severityForSpecial==='G'&&levelForSpecial===5&&['e','edge'].includes(String(aspectForSpecial).toLowerCase())&&symbols.triangle!==null), 'Zvířecí G5e vyžaduje samostatnou ověřenou Amputation Sequence');
   if(severityForSpecial==='G'&&levelForSpecial===5&&['e','edge'].includes(String(aspectForSpecial).toLowerCase())&&symbols.triangle!==null){
    amp=hmkAmputationAssessment({location:draft.location,aspect:aspectForSpecial,severity:severityForSpecial,level:levelForSpecial,
     strengthML:adjudication.amputationStrengthML,roll:adjudication.amputationRoll,isFolk:adjudication.amputationIsFolk!==false});

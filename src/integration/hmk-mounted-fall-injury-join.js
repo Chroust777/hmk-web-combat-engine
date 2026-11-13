@@ -22,7 +22,7 @@ const states={none:'NONE',stunned:'STN',incapacitated:'INC',unconscious:'UNC',ki
 const from={NONE:SHOCK_STATE.NONE,STN:SHOCK_STATE.STN,INC:SHOCK_STATE.INC,UNC:SHOCK_STATE.UNC,KIA:SHOCK_STATE.KIA};
 const cpy=structuredClone;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-const limb=new Set(['th','kn','ca','ft','flg','hlg']);
+const limb=new Set(['th','kn','ca','ft','flg','hlg','wng','leg','ear']);
 const profile={
  donkey:{b:4,table:'B',shockML:39},pony:{b:4,table:'B',shockML:36},
  mule:{b:4,table:'C',shockML:39},palfrey:{b:5,table:'C',shockML:36},
@@ -57,8 +57,8 @@ export function woundFromFall({state,character,round,timelineId,eventId,bodyKind
  strikeImpact,AV,aspect='b',shockRoll=null,compoundD10=null,physicalDice,hrModifier=0,
  injuryOrigin='combat',originMinute=null,medicalSourceId=null}={}){
  validateCombatState(state);
- required(int(strikeImpact,-100,999)&&int(AV,0,999)&&['b','e'].includes(aspect),'Impact/AV/aspect musí být doloženy');
- const symbols=bodyKind==='horse'?hmkAnimalLocationSymbols(location):hmkHumanLocationSymbols(location);
+ required(int(strikeImpact,-100,999)&&int(AV,-100,999)&&['b','e'].includes(aspect),'Impact/AV/aspect musí být doloženy');
+ const symbols=['horse','animal'].includes(bodyKind)?hmkAnimalLocationSymbols(location):hmkHumanLocationSymbols(location);
  required(symbols&&int(locationShock,1,10),'Neznámá anatomie zasaženého místa');
  const effectiveImpact=strikeImpact-AV;
  const base=injuryFromEffectiveImpact({effectiveImpact,aspect,rigidArmour:false});
@@ -103,7 +103,7 @@ export function woundFromFall({state,character,round,timelineId,eventId,bodyKind
  evt.details.physicalDice={format:'hmk-manual-dice-proof-v1',rolls:cpy(physicalDice)};
  evt.details.falling={kind:bodyKind,aspect,AV,impact:strikeImpact,effectiveImpact,shockML,
   shockEML,shockRoll,shockSL:name[shockSL],compoundD10};
- if(bodyKind==='horse'&&['flg','hlg'].includes(location)&&newInjury){
+ if(['horse','animal'].includes(bodyKind)&&['flg','hlg','leg','wng'].includes(location)&&newInjury){
   const touched=[`wound:${eventId}`,comp?.compoundedExisting?.id].filter(Boolean);
   for(const wid of touched){
    const w=applied.wounds.find(x=>x.id===wid);
