@@ -930,3 +930,13 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hmk-hazard-choice-status[data-state="neutral"]{color:#423426;font-weight:400}
 #hmk-time-episode-form [data-episode-trail-fields][hidden],
 #hmk-time-episode-form [data-episode-tracking-options][hidden]{display:none!important}
+
+/* v93.862 · visually distinguish immutable, confirmed values from editable dice.
+   Read-only fields remain selectable for copying but cannot be overwritten. */
+#app input[readonly]:not([type="checkbox"]):not([type="radio"]),
+#app textarea[readonly]{color:#766f66!important;background:#e0d8c9!important;
+  border-color:#b0a99c!important;cursor:not-allowed!important;opacity:.87;}
+#app input[readonly]:hover,#app input[readonly]:focus{cursor:not-allowed!important;}
+#app .hmk-locked-historical-hint{display:block;margin-top:.3rem;color:#992f24;
+ font-size:.79em;font-weight:700;}
+#app [data-hmk-locked="historical-die"]{font-variant-numeric:tabular-nums;}
