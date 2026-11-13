@@ -1,4 +1,5 @@
 import {TRAVEL_RIDING_FORMAT_93823,recordedTravelRide93823} from './src/integration/hmk-travel-riding-93823.js';
+import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js';
 import {startSharedTimeWindow93767,addSharedTimeGroup93767,confirmSharedTimeWindow93767} from './src/integration/hmk-shared-time-window-93767.js';
 import {planSharedWindow93771,sharedDailyWindowLimit93771} from './src/integration/hmk-shared-planner-93771.js';
 import {planEpisodeRows93772,rowMaximum93772} from './src/integration/hmk-episode-rows-93772.js';
@@ -352,7 +353,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.857';
+const APP_VERSION='93.858';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2126,7 +2127,7 @@ let episodeCurrentGuidedStep=null;
 // not a change of the immutable activity or the identity of its members.
 // Otherwise an initially missing checkbox becomes impossible to complete
 // after Evaluate locks the actual episode (and can deadlock the calendar).
-const EPISODE_IMMUTABLE_FIELDS=['kind','guideId','droverActorId','memberIds','animalIds','stableAnimalIds',
+const EPISODE_IMMUTABLE_FIELDS=['kind','guideId','conveyance','travelRideAnimalId','travelRideRiderId','droverActorId','memberIds','animalIds','stableAnimalIds',
  'trackingUse','trackingActorId','trackingTrail','trackingRoad','trackingPartyTracked',
  'trackingSnow','trackingRain','trackingAlpine'];
 let episodePendingSkillRequest=null;
@@ -3063,7 +3064,7 @@ function timeEpisodePageHTML(clock,participants){
  </div>
  <label data-episode-low-choice>Při SV 1–2 zvolte režim ${episodeRuleHelp('Lax nebo Slow','HMK 145: SV 1–2: GM volí Lax NEBO Slow. Lax zvyšuje riziko překvapení; Slow zpomaluje pohyb. SV 0 a méně ukládá oba režimy.')}
  <select name="orientationLowChoice"><option value="slow">Slow Mode</option><option value="lax">Lax Mode</option></select></label>
- <label data-episode-drover>Drover · skutečný člen družiny<select name="droverActorId"><option value="">— podle skutečných členů —</option>${participants.map(c=>option(c.id,c.name)).join('')}</select><small data-episode-drover-requirement>Po výběru dopravy a zvířat se určí Riding / Animalcraft (HMK 141).</small></label><label data-episode-drover-proof>Drover · doložený Skill Test<select name="droverProofId"><option value="">— Vyberte skutečný hod —</option>${skillOptions('Riding')}${skillOptions('Animalcraft')}</select></label>
+ <label data-episode-drover>Vodič / vozka (při jízdě totožný s jezdcem)<select name="droverActorId"><option value="">— podle skutečných členů —</option>${participants.map(c=>option(c.id,c.name)).join('')}</select><small data-episode-drover-requirement>Po výběru dopravy a zvířat se určí Riding / Animalcraft (HMK 141).</small></label><label data-episode-drover-proof>Drover · doložený Skill Test<select name="droverProofId"><option value="">— Vyberte skutečný hod —</option>${skillOptions('Riding')}${skillOptions('Animalcraft')}</select></label>
  </div>
  <div data-episode-tracking><p class="hc-hint">Stalking je nenápadný pohyb; <strong>Tracking je volitelné sledování konkrétní stopy</strong>. Samotné přidělení Stalking ★ žádný Tracking hod nevytváří. Pro sledování a Spoor je nutná osvojená dovednost <strong>Tracking</strong> (HMK 147). Bez Tracking zvolte „Bez Tracking hodu“. Samostatný Awareness či atributový Perception mohou podle HMK 87 odhalit jen zjevné stopy, ale jejich test se nesmí připojit jako Tracking SV ani jako Spoor.</p><label>Chcete během nenápadného pohybu také sledovat stopu?<select name="trackingUse"><option value="none" selected>Ne · pouze Stalking, bez Tracking testu</option><option value="new">Ano · provést nový Tracking Skill Test</option><option value="reuse">Pokračovat bez nového hodu · pouze stejná stopa a platný původní SV</option></select></label><p class="hc-hint" data-episode-tracking-choice-help>Výchozí je bez sledování stopy. Nový Tracking se vždy hází ve Skill Tests; platné pokračování téže stopy lze převzít jen za podmínek HMK 147. Žádný d100, SV ani Spoor se nevytváří samotnou volbou.</p>
  <label>Skutečný stopař ze stejné družiny (nemusí být průvodce)<select name="trackingActorId"><option value="">— Vyberte postavu s Tracking ML &gt; 0 —</option>${(clock.characterIds||[]).map(id=>{const actor=character(id),known=availableMasteries(actor).find(x=>x.name==='Tracking'&&x.ml>0);return `<option value="${esc(id)}" ${known?'':'disabled'}>${esc(actor?.name||id)} · Tracking ${known?.ml??0}</option>`}).join('')}</select></label>
@@ -24130,7 +24131,7 @@ function episodePartyLoad(memberIds,conveyance,v=null){
   if((v?.transportedMemberIds||[]).length){
    for(const id of v.transportedMemberIds)mountedIds.add(id);
    if(v.transportMountHandlerPosition==='mounted')mountedIds.add(v.transportMountHandlerId||v.guideId);
-  }else mountedIds.add(v?.travelRideRiderId||v?.guideId||memberIds[0]);
+  }else mountedIds.add(episodeTravelAnimalRoles({conveyance,memberIds,guideId:v?.guideId||memberIds[0],riderId:v?.travelRideRiderId||'',droverId:v?.droverActorId||''}).riderId);
  }
  for(const id of memberIds){
   const actor=character(id),load=resolveCombatantLoad({character:actor,inventory:activeRationInventory(),mounted:mountedIds.has(id)});
@@ -24151,8 +24152,8 @@ function episodeHealthyMountRide93823(v,memberIds,clock){
  const mount=resolveTravelMount93837(verifiedLivestock(data,cid),choices,v.travelRideAnimalId||'');
  if(!mount.animal)throw Error('Jízda na zvířeti: '+mount.reason);
  const animal=mount.animal,animalId=animal.id;
- const riderId=memberIds.includes(v.travelRideRiderId)?v.travelRideRiderId:
-  memberIds.includes(v.guideId)?v.guideId:memberIds[0];
+ const riderId=episodeTravelAnimalRoles({conveyance:v.conveyance,memberIds,guideId:v.guideId,
+  riderId:v.travelRideRiderId||'',droverId:v.droverActorId||''}).riderId;
  const rider=character(riderId),mass=stableRiderWeight584(rider);
  if(!mass?.ready)throw Error((rider?.name||'Jezdec')+': '+(mass?.reason||'chybí skutečná hmotnost pro jízdu.'));
  const b=stableBurden(data,cid,animal);
@@ -24175,7 +24176,10 @@ function episodeDroverRequirement93851(v){
  const stable=[...new Set(v.stableAnimalIds||[])],legacy=[...new Set(v.animalIds||[])];
  const animals=[...new Set([...stable,...legacy])];
  const present=v.kind==='travel'&&(v.conveyance!=='foot'||animals.length>0);
- const actorId=(v.memberIds||[]).includes(v.droverActorId)?v.droverActorId:v.guideId;
+ const actorId=v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length?
+  episodeTravelAnimalRoles({conveyance:v.conveyance,memberIds:v.memberIds,guideId:v.guideId,
+   riderId:v.travelRideRiderId||'',droverId:v.droverActorId||''}).droverId:
+  (v.memberIds||[]).includes(v.droverActorId)?v.droverActorId:v.guideId;
  let skill=null,mixed=false;
  if(present){
   mixed=v.conveyance==='mount'&&animals.length>1;
@@ -24494,6 +24498,12 @@ function episodePreviewFromForm(form,clock){
  }
  const healthyMountRide93823=kind==='travel'&&v.conveyance==='mount'&&!mountedPassenger93816?
   episodeHealthyMountRide93823(v,members,clock):null;
+ // HMK p.141: one selected horse gives ONE confirmed rider. Every other
+ // healthy member of this group is walking; no unassigned second saddle is
+ // inferred from the Stable or from an earlier trip. Foot travel is the
+ // party's speed ceiling, and walking END must use the actual gait.
+ const mixedFootMemberIds93858=healthyMountRide93823?
+  members.filter(id=>id!==healthyMountRide93823.riderId):[];
  if(healthyMountRide93823){
   const row=stableAnimals.find(a=>a.id===healthyMountRide93823.animalId);
   if(row){row.enc=healthyMountRide93823.enc;row.loaded=row.enc>=20;row.loadLb=healthyMountRide93823.totalLb;row.rider=healthyMountRide93823.riderId;}
@@ -24551,7 +24561,7 @@ function episodePreviewFromForm(form,clock){
   movementMinutes:kind==='travel'?Math.max(0,minutes-equipmentDelayIn):null,
   doubleTime:!!v.doubleTime,loadBypass:!!v.loadBypass,dunesSlow:!!v.dunesSlow,
   encByActor,forcedBearing,
-  walkingHandlerIds:mountedPassenger93816?.handlerPosition==='leading'?[mountedPassenger93816.handlerId]:[],
+  walkingHandlerIds:mountedPassenger93816?.handlerPosition==='leading'?[mountedPassenger93816.handlerId]:mixedFootMemberIds93858,
   previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute,kind==='travel'?members:null),
   encounterLightMinutes:lightMinutes,inactiveByActor,transportedMemberIds:kind==='travel'?(v.transportedMemberIds||[]):[]});
  if(kind==='travel'&&result.transportedMemberIds?.length)result.transportProof={format:'gm-transport-confirmation-v93.755',
@@ -24559,7 +24569,8 @@ function episodePreviewFromForm(form,clock){
   originalHealth:travelHealth.filter(p=>result.transportedMemberIds.includes(p.id)).map(p=>({id:p.id,
    shock:p.shock,comaActive:p.comaActive,extendedShockActive:p.extendedShockActive,
    immobile:p.immobile,fatigue:p.fatigue})),sourcePage:145};
- if(kind==='travel'&&healthyMountRide93823)result.mountRiding93823=healthyMountRide93823;
+ if(kind==='travel'&&healthyMountRide93823)result.mountRiding93823={...healthyMountRide93823,
+  ...(mixedFootMemberIds93858.length?{walkingMemberIds:[...mixedFootMemberIds93858]}:{})};
  if(kind==='travel'&&mountedPassenger93816){
   result.transportProof={...(result.transportProof||{}),format:'gm-transport-confirmation-v93.816',
    mass:transportMass93816,mount:mountedPassenger93816};
@@ -24753,15 +24764,19 @@ function episodePreviewFromForm(form,clock){
    result.equipmentSlowCarryRule='moving-minutes-v93.666';
    result.medicalTravelStop=confirmedStop?{minute:Math.min(...previewIncap.map(x=>x.minute)),
     movementMinutes:result.movementMinutes}:null;
-   if(mountedPassenger93816?.handlerPosition==='leading'){
-    // A person walking beside the mount cannot travel faster than walking pace.
+   if(mountedPassenger93816?.handlerPosition==='leading'||mixedFootMemberIds93858.length){
+    // HMK 141: if a mounted rider is accompanied by a walking guide/member,
+    // the party goes no faster than walking pace. Never treat a second
+    // selected pack animal as proof that an unassigned party member rides.
     const footRate=trekMovementTableRow({topography:v.topography,terrain:v.terrain}).foot;
-    if(Number.isFinite(footRate)&&footRate>0&&result.motion.finalLPW>footRate){
+    if(!Number.isFinite(footRate)||footRate<=0)throw Error('Smíšená doprava: pěší člen se tímto terénem nemůže pohybovat. Zvolte schůdnou trasu.');
+    if(result.motion.finalLPW>footRate){
       result.motion.finalLPW=footRate;
       result.motion.kilometres=footRate*4*result.movementMinutes/240;
       result.motion.leagues=footRate*result.movementMinutes/240;
-      result.transportProof.mount.footPaceCapLPW=footRate;
     }
+    if(mountedPassenger93816?.handlerPosition==='leading')result.transportProof.mount.footPaceCapLPW=footRate;
+    if(mixedFootMemberIds93858.length)result.mountRiding93823.footPaceCapLPW=footRate;
   }
   const metres=result.motion.finalLPW*4000*result.movementMinutes/240+result.distanceFractionIn;
    result.distanceMeters=Math.floor(metres+1e-10);
@@ -25093,7 +25108,9 @@ function renderEpisodeEndStatus(form,result,weather){
   }
 
   for(const h of result.hazardDetails||[])rows.push(['Hazard · '+h.hazard+(h.victimId?' · '+(character(h.victimId)?.name||h.victimId):h.itemOwnerId?' · '+(character(h.itemOwnerId)?.name||h.itemOwnerId):''),
-   h.requiresGMCompletion?'čeká na doklad':String(h.result?.impact?'Impact '+h.result.impact:h.result),
+   h.hazard==='accident'&&h.externalMedicalPending?
+    'Nehoda doložena pro konec epizody; po jejím potvrzení je nutný Agility / Injury postup v původních Skill Tests. Další cestu do vyřešení blokuje Kalendář.':
+    h.requiresGMCompletion?'čeká na doklad':String(h.result?.impact?'Impact '+h.result.impact:h.result),
    h.injuryProofId||h.repairProofId||h.complicationProofId||h.evidenceId||'',
    h.hazard==='accident'?'hazardAgilityD100':h.hazard==='equipment'?'hazardItemId':'hazardComplicationSkill']);
   for(const w of result.weatherExposure||[])rows.push(['Počasí · '+w.kind+' · '+(character(w.id)?.name||w.id),
@@ -25104,9 +25121,10 @@ function renderEpisodeEndStatus(form,result,weather){
   proofList.innerHTML=displayRows.length?displayRows.map(([label,details,proof,jump])=>{
    const route=/equipment/i.test(label)?'inventory':'skills';
    const target=route==='inventory'?'Inventář':'Skill Tests';
-   const waiting=/čeká|potřebuje|pending/i.test(details);
+   const handoff=label.startsWith('Hazard · accident')&&/Nehoda doložena/.test(details);
+   const waiting=handoff||/čeká|potřebuje|pending/i.test(details);
    return '<div class="hc-episode-proof '+(waiting?'hc-episode-proof-pending':'hc-episode-proof-done')+'"><strong>'+esc(label)+'</strong><span>'+ 
-    (waiting?'… Čeká na vyhodnocení · ':'✓ Vyřešeno · ')+esc(details)+
+    (handoff?'↪ Časový doklad připraven; zdravotní následek čeká na navazující Skill Test · ':waiting?'… Čeká na vyhodnocení · ':'✓ Vyřešeno · ')+esc(details)+
     (waiting?' · Pokračujte podle jediného aktuálního úkolu vpravo.':'')+'</span>'+ 
     (proof?'<small>Výsledek je uložen v historii.</small>':'')+'</div>';}).join(''):
    '<p class="hc-hint">Žádný zvláštní test ani událost nebyly při této činnosti potřebné.</p>';
@@ -25126,7 +25144,9 @@ function renderEpisodeEndStatus(form,result,weather){
      '<button type="button" class="secondary" data-episode-jump="'+esc(t.action||'confirmed')+'">Doplnit požadovaný údaj</button>')+
     (t.action==='hazardDirectionProofId'&&t.skill==='Awareness'?'<button type="button" class="secondary" data-episode-direction-defer>Bez Awareness · pokračovat chybným směrem</button>':'')+
     '</div></div>').join(''):
-   '<p class="hc-episode-all-clear">✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.</p>';
+   '<p class="hc-episode-all-clear">✓ Veškeré aktuálně požadované výsledky jsou doloženy. Lze potvrdit celý interval.</p>'+
+   (result.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)?
+    '<p class="hc-hint">Accident: po potvrzení intervalu Kalendář zobrazí navazující Agility / Injury ve Skill Tests. To není druhý hod za cestovní interval a není důvodem blokovat jeho uložení.</p>':'');
  const button=root.querySelector('[data-episode-finalize]');if(button)button.disabled=!!tasks.length;
 }
 /** Independent of sequential rule-engine errors: show all already knowable
@@ -25947,11 +25967,19 @@ function episodeExplainFinalizationBlock93855(form){
  const hazard=episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form);
  const plan=sharedTimeWindowDraft?sharedPlanCurrent93771():null;
  const planned=sharedTimeWindowDraft?sharedPlanState93771():null;
+ const staleEvaluation=episodeEvaluationCheckpoint!==storageBaseline&&!episodeStageBaseline;
+ const identity=episodeIdentityMismatch(form);
+ const submittedError=String(form.dataset.episodeProblem||'').trim();
+ // The guidance array can retain fulfilled requests until the next render. Only
+ // an actually open workbench request blocks retry; submit rechecks evidence.
  const title=pending.length?'Nepotvrzený hod · '+pending.map(input=>input.name).join(', '):
   hazard?'Nepotvrzené rozhodnutí Hazardu':
   sharedTimeWindowDraft&&!plan?'Není otevřená platná karta skupiny':
   planned?.errors?.length?'Neplatný plán skupiny':
-  'Kontrola dokončení · další blokující podmínka';
+  identity?'Změněné uzamčené přiřazení po vyhodnocení':
+  staleEvaluation?'Změna uložených dat kampaně během vyhodnocení':
+  submittedError?'Nedokončená kontrola pravidel':
+  'Kontrola dokončení · opětovné standardní ověření';
  let instruction='';let jump='';
  if(pending.length){
   const input=pending[0];jump=input.name;
@@ -25962,12 +25990,18 @@ function episodeExplainFinalizationBlock93855(form){
  }else if(hazard){instruction='Zvolený postup Hazardu ještě nebyl potvrzen samostatným tlačítkem. Žádný nový hod není potřeba vymýšlet.';}
  else if(planned?.errors?.length){instruction='Plán skupin: '+planned.errors[0].message;}
  else if(sharedTimeWindowDraft&&!plan){instruction='Nejprve otevřete platnou činnost skupiny v plánovací tabulce.';}
- else instruction='Výsledky jsou v kontrolním seznamu doložené, ale další interní kontrola stále blokuje potvrzení. Tento stav vyžaduje diagnostiku; nic nebylo uloženo.';
+ else if(identity){instruction=identity+' Přidělení změňte pouze před vyhodnocením; dřívější potvrzené hody zůstávají historicky nedotčené.';}
+ else if(staleEvaluation){instruction='Během otevřeného vyhodnocení byl uložen nový doklad nebo jiné potvrzení. Obnovte náhled tlačítkem „Vyhodnotit epizodu“; žádný starší hod se nezahazuje.';}
+ else if(submittedError){instruction=submittedError;}
+ else instruction='Seznam dokladů je hotový, ale tlačítko zůstalo blokované. Tlačítko níže znovu provede VŠECHNY původní kontroly dokončení. Pokud něco chybí, zobrazí konkrétní chybu. Žádné potvrzení hodu ani pravidlovou podmínku nepřeskakuje.';
+ const allowSafeRetry=!pending.length&&!hazard&&!identity&&!staleEvaluation&&!submittedError&&
+  (!sharedTimeWindowDraft||!!plan&&!(planned?.errors?.length));
  complete.remove();
  const panel=document.createElement('div');panel.className='hc-episode-task hc-episode-await hc-episode-timed-task';
  panel.dataset.episodeCompletionBlocker='true';panel.setAttribute('role','alert');
  panel.innerHTML='<div><b>'+esc(title)+'</b><p>'+esc(instruction)+'</p>'+
-  (jump?'<button type="button" class="secondary" data-episode-jump="'+esc(jump)+'">Přejít k nepotvrzenému hodu</button>':'')+'</div>';
+  (jump?'<button type="button" class="secondary" data-episode-jump="'+esc(jump)+'">Přejít k nepotvrzenému hodu</button>':'')+
+  (allowSafeRetry?'<button type="button" class="secondary" data-episode-finalization-retry>Ověřit a potvrdit řádek původní kontrolou</button>':'')+'</div>';
  checklist.append(panel);activeButton.title=title+' · '+instruction;
  if(jump){
   // Existing red validation style; do not erase other rule errors.
@@ -26110,10 +26144,19 @@ function episodeGroupRoleChoices93856(form,v){
   field.closest('label')?.classList.toggle('hc-episode-inactive',!enabled);
   return field;
  };
- const actor=setChoices('droverActorId','— Člen aktuální skupiny —',true);
+ const healthyRide=v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length;
  const rider=setChoices('travelRideRiderId',mountReady?'— Automaticky průvodce skupiny —':'— Nejdříve zvolte vybavené dostupné zvíře —',mountReady);
- if(actor)v.droverActorId=actor.value;
  if(rider)v.travelRideRiderId=rider.value;
+ const actor=setChoices('droverActorId',healthyRide?'— Totožný s jezdcem —':'— Člen aktuální skupiny —',!healthyRide);
+ if(actor){
+  if(healthyRide&&!episodeEvaluationRequested){
+   actor.value=roster.includes(rider?.value)?rider.value:roster.includes(v.guideId)?v.guideId:roster[0]||'';
+  }
+  v.droverActorId=actor.value;
+ }
+ const droverHint=form.querySelector('[data-episode-drover-requirement]');
+ if(droverHint&&healthyRide)droverHint.textContent='Při jízdě na koni je Drover vždy skutečný jezdec. Riding test provádí tentýž člen skupiny; jiného Droveře nelze přiřadit.';
+ else if(droverHint)droverHint.textContent='Při pěším vedení zvířat a při jízdě s vozem lze určit jiného skutečného člena skupiny. Test Animalcraft potvrzuje GM.';
  const status=form.querySelector('[data-episode-rider-availability]');
  if(status)status.textContent=mountReady?
   'K dispozici je jezdecké zvíře s povinnou výstrojí. Jezdce lze zvolit pouze z této skupiny.':
@@ -26227,7 +26270,9 @@ function updateEpisodePreview(form){
   const droverField=form.elements.namedItem('droverActorId');
   if(droverField){
    const current=episodeFormSnapshot(form);const need=episodeDroverRequirement93851(current);
-   if(need.present&&!current.memberIds.includes(droverField.value)){
+   if(need.present&&current.conveyance==='mount'&&!(current.transportedMemberIds||[]).length){
+    droverField.value=need.actorId;
+   }else if(need.present&&!current.memberIds.includes(droverField.value)){
     const possible=current.memberIds.find(id=>{
      const m=availableMasteries(character(id));
      const skill=current.conveyance==='mount'&&need.animals.length<=1?'Riding':'Animalcraft';
@@ -26591,7 +26636,10 @@ function updateEpisodePreview(form){
  const healthyRideMass=form.querySelector('[data-episode-healthy-ride-mass]');
  if(healthyRideMass&&travel&&v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length){
   try{const choice=episodeHealthyMountRide93823(v,v.memberIds||[],data.campaignClock);
-   healthyRideMass.textContent=choice?`${character(choice.riderId)?.name||'Jezdec'}: ${choice.riderLb} lb + výstroj a náklad ${choice.gearAndCargoLb} lb = ${choice.totalLb} lb · ENC ${choice.enc} · Move ${choice.moveAfterLoad}.`:'Nejdříve vyberte zvíře ze Stáje.';
+   const walkers=choice?(v.memberIds||[]).filter(id=>id!==choice.riderId):[];
+   healthyRideMass.textContent=choice?`${character(choice.riderId)?.name||'Jezdec'}: ${choice.riderLb} lb + výstroj a náklad ${choice.gearAndCargoLb} lb = ${choice.totalLb} lb · ENC ${choice.enc} · Move ${choice.moveAfterLoad}.`+
+    (walkers.length?' Pěšky jdou: '+walkers.map(id=>character(id)?.name||id).join(', ')+'. HMK 141: skupina se pohybuje rychlostí nejpomalejšího a pěší mají vlastní END. Další zaškrtnuté zvíře neznamená automaticky dalšího jezdce.':''):
+    'Nejdříve vyberte zvíře ze Stáje.';
    healthyRideMass.classList.remove('hc-episode-needs-input');
   }catch(err){healthyRideMass.textContent=err.message;healthyRideMass.classList.add('hc-episode-needs-input');}
  }
@@ -28177,6 +28225,17 @@ document.addEventListener('click',e=>{
   episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];timeEpisodeDraft=episodeFreshDraft();episodeDraftEpoch=uuid();
   discardEpisodeDraftSidecar();notice='Návrh společného intervalu bezpečně zrušen. Potvrzená data zůstala zachována.';render();
  }catch(error){alert('Návrh nelze bezpečně zrušit: '+error.message);}
+},true);
+// A stuck disabled Stage button must have a reachable, fail-closed remedy.
+// This route NEVER accepts dice, drops a rule check or advances Calendar directly:
+// it calls the exact normal episode submit path, which either identifies the
+// first unresolved condition or prepares a validated row without moving time.
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-episode-finalization-retry]');if(!btn||btn.disabled)return;
+ e.preventDefault();const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
+ const confirmation=form.elements.namedItem('confirmed');if(confirmation)confirmation.checked=true;
+ episodeQueueAction=!!sharedTimeWindowDraft;
+ form.requestSubmit();
 },true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-episode-window-stage]');if(!btn||btn.disabled)return;
