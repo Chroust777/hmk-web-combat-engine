@@ -974,3 +974,14 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hmk-fate-dialog-93866 button{min-height:42px;white-space:normal;cursor:pointer}
 .hmk-fate-dialog-93866 [data-fate-cancel]{background:#ddd8ce;color:#34312c;border:1px solid #827a70}
 .hmk-fate-dialog-93866 .hmk-fate-feedback{color:#9b2323;font-weight:700}
+
+/* v93.867: confirmed daily weather never expands the travel interval layout.
+   Hover with mouse, focus with keyboard; native details summary works by tap. */
+.hc-weather-hover-shell{position:relative;display:inline-block;min-width:0;max-width:100%;font-size:.92rem;z-index:2}
+.hc-weather-hover-shell>summary,.hc-weather-hover-title{cursor:help;color:inherit;font-weight:750;text-decoration:underline dotted;text-underline-offset:3px}
+.hc-weather-hover-shell>summary small{font-size:.76rem;font-weight:400;color:var(--muted,#6c6760);text-decoration:none}
+.hc-weather-hover-popover{display:none!important;position:absolute;left:0;top:calc(100% + 6px);width:min(780px,calc(100vw - 42px));max-height:min(65vh,640px);overflow:auto;padding:14px;z-index:250;background:#f6e8c7;color:#302719;border:2px solid #927448;box-shadow:0 8px 26px #19140b66;border-radius:8px;font-weight:400;text-align:left}
+.hc-weather-hover-shell:hover>.hc-weather-hover-popover,.hc-weather-hover-shell:focus-within>.hc-weather-hover-popover,.hc-weather-hover-shell[open]>.hc-weather-hover-popover{display:block!important}
+.hc-weather-timeline-current{background:#e4c678!important;color:#251b0e;font-weight:800;outline:2px solid #83551b;outline-offset:-2px}
+.hc-weather-header-hover .hc-weather-hover-popover{left:0;top:calc(100% + 8px)}
+@media(max-width:640px){.hc-weather-hover-shell>.hc-weather-hover-popover{left:-4px;width:min(660px,calc(100vw - 38px));font-size:.79rem}}

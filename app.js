@@ -359,7 +359,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.866';
+const APP_VERSION='93.867';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1987,7 +1987,7 @@ function trekWeatherDetailsHTML(w){
  const day=trekWeatherWords(w,false),night=trekWeatherWords(w,true);
  return `<span data-hmk-help="HMK 144: jde o pravidlové riziko, nikoliv konkrétní stupně Celsia. Jeden pár d10 určuje 24 hodin. Při nočním chladu se déšť může změnit ve sníh nebo plískanici." tabindex="0">☀️ Den: ${esc(day.temperature)} · ${esc(day.kind)}. 🌙 Noc: ${esc(night.temperature)} · ${esc(night.kind)}.</span>`;
 }
-function weatherDayTimelineHTML(day,{latitudeBand='mid',daylightSeason=null,sunriseMinute=null,twilightMinutes=60}={}){
+function weatherDayTimelineHTML(day,{latitudeBand='mid',daylightSeason=null,sunriseMinute=null,twilightMinutes=60,highlightMinute=null}={}){
  if(!day)return '';
  const lightSeason=daylightSeason||day.season;
  const duration=EPISODE_DAYLIGHT_HOURS[latitudeBand]?.[lightSeason];
@@ -1998,7 +1998,7 @@ function weatherDayTimelineHTML(day,{latitudeBand='mid',daylightSeason=null,sunr
  const periodLabel={day:'Den',twilight:'Soumrak',night:'Noc'};
  const hazardHelp='Riziko podle HMK 144–149: v tomto úseku může počasí vyvolat Cold Hazard nebo Heat Hazard. Samotné označení není zranění ani automatický hod. Potřebný Weather Hazard Roll se řeší až pro konkrétní doloženou expozici a podle skutečné ochrany postavy; bez rizika se teplotní Hazard Roll neprovádí.';
  return `<div class="hc-weather-timeline"><div class="hc-episode-table-scroll"><table class="hc-episode-weather-timeline"><caption class="hc-weather-table-caption">Potvrzený průběh počasí pro celý den</caption><thead><tr><th>Čas</th><th>Část dne</th><th>Světlo</th><th>Jaké je počasí</th><th>Srážky</th><th><span class="hc-help-term" tabindex="0" data-hmk-help="${esc(hazardHelp)}" aria-label="Riziko HMK – zobrazit vysvětlení">Riziko HMK</span></th><th>Teplota d10 po úpravách</th></tr></thead>
- <tbody>${t.rows.map(r=>{const d=visibleWeather({hazard:r.hazard,precipitation:r.precipitation});return `<tr${r.hazard?' class="hc-weather-timeline-hazard"':''}><td>${fmt(r.start)}–${fmt(r.end)}</td><td>${r.daypart}</td><td>${periodLabel[r.period]}</td><td><strong>${d.icon} ${esc(d.heading)}</strong></td><td>${esc(d.precipitation)}</td><td>${esc(d.badge)}</td><td>${r.adjustedTemperature}</td></tr>`;}).join('')}</tbody></table></div></div>`;
+ <tbody>${t.rows.map(r=>{const d=visibleWeather({hazard:r.hazard,precipitation:r.precipitation});return `<tr class="${[r.hazard?'hc-weather-timeline-hazard':'',Number.isInteger(highlightMinute)&&r.start<=highlightMinute&&highlightMinute<r.end?'hc-weather-timeline-current':''].filter(Boolean).join(' ')}"><td>${fmt(r.start)}–${fmt(r.end)}</td><td>${r.daypart}</td><td>${periodLabel[r.period]}</td><td><strong>${d.icon} ${esc(d.heading)}</strong></td><td>${esc(d.precipitation)}</td><td>${esc(d.badge)}</td><td>${r.adjustedTemperature}</td></tr>`;}).join('')}</tbody></table></div></div>`;
 }
 /** Draft inputs and generated dice are NOT a resolved weather outcome. Only the
  * submit handler, after explicit GM confirmation and a journal write, renders
@@ -2419,7 +2419,15 @@ function episodeOpenActorRequest(actorId){
  const task=episodeOutstandingSkillTasks.find(t=>t.actorId===actorId);
  return task?{...task,status:'queued'}:null;
 }
+/** v93.867: a requested Drover must possess the exact HMK skill.
+ * A missing Animalcraft never silently switches to Acrobatics nor
+ * creates an unrelated skill-critical Balance/Gymnastics chain. */
+function episodeLearnedSkill93867(actorId,skill){
+ const c=character(actorId);
+ return !!c&&availableMasteries(c).some(m=>m.name===skill&&Number(m.ml)>0);
+}
 function episodeSkillAuthorized(actorId,skill){
+ if(r?.field==='droverProofId'&&!episodeLearnedSkill93867(actorId,skill))return false;
  const r=episodePendingSkillRequest;
  if(!(r?.status==='waiting'&&r.id===episodeActiveSkillRequestId&&
   r.episodeEpoch===episodeDraftEpoch&&r.campaignId===campaignKey(data.campaignClock)&&
@@ -2439,6 +2447,12 @@ function episodeConfigureSkillGate(root){
  }
  if(!pending)return;
  const allowed=episodeSkillAuthorized(selected,pending.skill);
+ if(pending.field==='droverProofId'&&!episodeLearnedSkill93867(selected,pending.skill)){
+  // Pre-existing invalid drafts could have navigated to this generic form.
+  // Do not present Acrobatics as if it could satisfy Animalcraft.
+  const form=root.querySelector('#skill-secondary-form');
+  if(form){for(const b of form.querySelectorAll('button[type="submit"]'))b.disabled=true;}
+ }
  // Prevent a weather/complication/encounter test from falling back to the
  // first skill in the list, and stop the pending task being saved under it.
  if(allowed&&!episodeSkillNeedsSV(pending.field)){
@@ -2453,7 +2467,8 @@ function episodeConfigureSkillGate(root){
   note.innerHTML='<strong> '+(character(selected)?.name||'Postava')+' · vyžádaný '+
    esc(pending.skill)+' test z Cestování</strong><p>'+(allowed?
     'Tento otevřený test bude přiřazen k epizodě. Ostatní nezávislé testy lze provádět odděleně.':
-    'Test z Cestování zůstává rozpracovaný; ostatní nezávislé testy nejsou zakázané.')+'</p>';
+    pending.field==='droverProofId'&&!episodeLearnedSkill93867(selected,pending.skill)?
+    'ZASTAVENO: tato postava NEMÁ osvojenou dovednost '+esc(pending.skill)+'. Výchozí Acrobatics v seznamu NENÍ požadovaný Drover test. Nedělejte nový d100: vraťte se do rozpracovaného Cestování a po zachování historie zvolte právoplatného Droveře / způsob dopravy.':'Test z Cestování zůstává rozpracovaný; ostatní nezávislé testy nejsou zakázané.')+'</p>';
   host.prepend(note);}
  // A request is a binding hint, never a global Skill workbench lock.
  // Only the exact requested result may satisfy the episode field.
@@ -3094,7 +3109,7 @@ function timeEpisodePageHTML(clock,participants){
  <input type="hidden" name="orientationUse" value="new">
  <div data-episode-orientation-new><label>Doložený Survival SV průvodce (aktuální minuta)<select name="orientationProofId"><option value="">— Vyberte skutečný uložený test —</option>${skillOptions('Survival')}</select></label>
  <div class="hmk-trek-grid"><label data-episode-travel-priority>Cíl rozdělení výhod při Pochodu<select name="orientationPriority"><option value="pace">Bearing (směr) → Progress (rychlost)</option><option value="forage">Bearing (směr) → Foraging (zásoby)</option><option value="stealth">Bearing (směr) → Stalking (nenápadný pohyb)</option><option value="vigilance">Bearing (směr) → Vigilance (ostražitost)</option></select></label>
- <details class="hc-episode-reference" data-episode-gm-move><summary>Volitelné rozhodnutí GM · neobvykle rychlá postava (HMK 146)</summary><label>Volný Progress (0 nebo 1)<input name="gmExtraProgress" type="number" min="0" max="1" value="0" title="HMK 146: výjimečné rozhodnutí GM. Nevzniká automaticky z určité hodnoty Move."></label><small>HMK 146 dovoluje GM výjimečně přidat 1 Progress při neobvykle vysokém Move (např. Move 70). Není to automatický bonus a při běžném cestování ponechte 0. Po potvrzení může vyžadovat další d10, případně vyrovnat Slow.</small></details><label class="hc-check" data-episode-dunes-slow><input name="dunesSlow" type="checkbox"> Duny · při pěší chůzi zvolit Slow místo +5 únavy</label>
+ <label class="hc-check hc-episode-gm-fast" data-episode-gm-move><input name="gmExtraProgress" type="checkbox" value="1" title="HMK 146: jen výjimečné rozhodnutí GM při neobvykle vysokém Move. Nejde o automatický bonus."> GM: neobvykle rychlá postava · +1 Progress (HMK 146)</label><label class="hc-check" data-episode-dunes-slow><input name="dunesSlow" type="checkbox"> Duny · při pěší chůzi zvolit Slow místo +5 únavy</label>
  <label class="hc-check"><input name="orientationFamiliar" type="checkbox"> Průvodce skutečně zná oblast (+1 SV)</label>
  <label class="hc-check" data-episode-night-option><input name="orientationTorch" type="checkbox"> Zapálené noční umělé světlo (HMK 145)</label>
  <label class="hc-check" data-episode-night-option><input name="orientationMoon" type="checkbox"> Viditelný úplněk (HMK 145)</label>
@@ -3864,7 +3879,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   return `<span class="hc-clock-weather-row"><b>${esc(w.area)}:</b> ${esc(detail)}${w.changed?' <small>· změna GM</small>':''}</span>`;
  }).join(''):'<span class="hc-clock-weather-row">Denní počasí dosud nebylo GM potvrzeno.</span>';
  const withClock=folio.replace('</header><div class="folio-chapter-content">',
-  `<div class="hc-clock-heading" role="status" aria-label="Aktuální herní datum, čas a počasí"><span>AKTUÁLNÍ ČAS KAMPANĚ</span><strong>${esc(clockLabel)} · ${esc(timeLabel)}</strong><div class="hc-clock-weather"><span>POČASÍ · AKTUÁLNÍ DEN</span>${weatherHeading}</div>${date?'':'<small>Datum TR nebylo v tomto kalendáři ještě přiřazeno.</small>'}</div></header><div class="folio-chapter-content">`);
+  `<div class="hc-clock-heading" role="status" aria-label="Aktuální herní datum, čas a počasí"><span>AKTUÁLNÍ ČAS KAMPANĚ</span><strong>${esc(clockLabel)} · ${esc(timeLabel)}</strong><div class="hc-clock-weather"><div class="hc-weather-hover-shell hc-weather-header-hover" tabindex="0" aria-label="POČASÍ aktuální den: náhled 24 hodin"><span class="hc-weather-hover-title">POČASÍ · AKTUÁLNÍ DEN</span><div class="hc-weather-hover-popover">${confirmedWeather.length?confirmedWeather.map(w=>`<strong>${esc(w.area)}</strong>${weatherDayTimelineHTML(w.weather,{highlightMinute:clock.minute%1440})}`).join(''):'<p>Počasí ještě nebylo potvrzeno.</p>'}</div></div>${weatherHeading}</div>${date?'':'<small>Datum TR nebylo v tomto kalendáři ještě přiřazeno.</small>'}</div></header><div class="folio-chapter-content">`);
  return journalShell(`${calendarTabs}${withClock}`,`journal-book--chapter journal-book--calendar`,false);
 }
 // Ephemeral presentation state only. Completion still comes from the persisted HMK
@@ -24219,6 +24234,8 @@ function episodeLockIdentityControls(form){
 function episodeNextSkillStep(form){
  const first=episodeCurrentGuidedStep;
  if(!episodeEvaluationRequested||!first||!first.field||!first.skill||!first.actorId)return null;
+ if(['droverProofId','orientationProofId','trackingProofId','trackingAwarenessProofId'].includes(first.field)&&!episodeTravelRoleEligibility93865(first.actorId).eligible)return null;
+ if(first.field==='droverProofId'&&!episodeLearnedSkill93867(first.actorId,first.skill))return null;
  if(form?.elements.namedItem(first.field)?.value)return null;
  return first;
 }
@@ -24526,6 +24543,10 @@ function episodeStartSkillRequest(field,skill,actorId){
  const clock=data.campaignClock,form=document.querySelector('#hmk-time-episode-form');
  if(form&&(/hazard/i.test(field)||/Complication/i.test(field))){try{episodeHazardRequireConfirmed93840(form)}catch(err){alert(err.message);return false;}}
  if(!episodeEvaluationRequested||!clock||!character(actorId))return false;
+ if(field==='droverProofId'&&!episodeLearnedSkill93867(actorId,skill)){
+  notice='Nelze otevřít Drover '+skill+': '+(character(actorId)?.name||'Vybraný drover')+' nemá osvojený '+skill+' ML. Nepoužívejte Acrobatics ani jiný náhradní hod. Zrušte pouze nedokončený návrh a založte platnou dopravu, nebo nejprve opravte doložený skutečný stav role. Potvrzené hody v historii zůstávají.';
+  render();return false;
+ }
  if(form&&form.elements.namedItem('kind')?.value==='travel'&&
    (field==='droverProofId'||field==='orientationProofId'||field==='trackingProofId'||field==='trackingAwarenessProofId')){
   try{episodeRequireTravelOperator93865(actorId,episodeFormSnapshot(form).memberIds,
@@ -24593,7 +24614,7 @@ function episodeFormRestore(form,draft){
    // Migration is limited to the *open draft*, never historical journal rows.
    node.checked=selected||(node.name==='stableAnimalIds'&&Array.isArray(draft.animalIds)&&draft.animalIds.includes(node.value));
   }
-  else if(node.type==='checkbox')node.checked=['confirmed','transportCoLocated'].includes(node.name)?true:!!draft[node.name];
+  else if(node.type==='checkbox')node.checked=['confirmed','transportCoLocated'].includes(node.name)?true:node.name==='gmExtraProgress'?(draft[node.name]===true||draft[node.name]===1||draft[node.name]==='1'):!!draft[node.name];
   else node.value=draft[node.name];
  }
 }
@@ -25960,10 +25981,12 @@ function episodePlannedTasks(form){
  return tasks;
 }
 function episodePlannedTaskHTML(t,i){
- const button=t.field==='hazardDelayNow'&&/Equipment Hazard/i.test(t.detail)?
+ const button=t.unlearnedDrover?'<button type="button" class="secondary" data-episode-show-cancel>Najít zrušení nedokončeného plánu (historie zůstane)</button>':t.field==='hazardDelayNow'&&/Equipment Hazard/i.test(t.detail)?
   '<button type="button" class="secondary" data-episode-fix-equipment-delay>Opravit zdržení bez opakování hodu</button>':
   t.skill&&t.actorId?'<button type="button" data-episode-skill-task="'+esc(t.skill)+'" data-episode-skill-field="'+esc(t.field)+'" data-episode-skill-actor="'+esc(t.actorId)+'">Otevřít '+esc(t.skill)+' Skill Test</button>':
-  t.field?'<button type="button" class="secondary" data-episode-jump="'+esc(t.field)+'">'+(t.field==='hazardAtMinute'?'Zadat přesnou minutu':t.field==='hazardComplicationRouteChanged'?'Potvrdit změnu trasy':'Otevřít požadované pole')+'</button>':
+  t.field?(/^(?:Orienteering · průvodce:|Drover ·|Drover Skill Test:|Jezdec:)/.test(t.detail||'')?
+  '<button type="button" class="secondary" data-episode-open-operator-health="'+esc((t.field==='guideId'?episodeFormSnapshot(document.querySelector('#hmk-time-episode-form')).guideId:episodeFormSnapshot(document.querySelector('#hmk-time-episode-form')).droverActorId)||'')+'">Otevřít zdravotní stav a vyřešit nezpůsobilost</button>':
+  '<button type="button" class="secondary" data-episode-jump="'+esc(t.field)+'">'+(t.field==='hazardAtMinute'?'Zadat přesnou minutu':t.field==='hazardComplicationRouteChanged'?'Potvrdit změnu trasy':'Otevřít požadované pole')+'</button>'):
   '<button type="button" class="secondary" data-episode-review>Ukázat pravidlovou překážku</button>';
  const alternate=t.skill==='Awareness'&&/Direction Hazard/.test(t.name)?
   '<button type="button" class="secondary" data-episode-direction-defer>Bez Awareness · pokračovat chybným směrem</button>':'';
@@ -25974,6 +25997,9 @@ function renderEpisodeEndError(form,message){
  const root=document.querySelector('.hc-episode-spread-right')||form.closest('.hc-episode-shell');
  if(!root)return;
  const issue=episodeIssue(message,form),needsSkill=!!issue.skill;
+ const noDroverSkill=issue.field==='droverProofId'&&issue.skill&&issue.actorId&&
+  !episodeLearnedSkill93867(issue.actorId,issue.skill);
+ const droverUnavailableText=noDroverSkill?'Drover '+(character(issue.actorId)?.name||'')+' nemá osvojenou dovednost '+issue.skill+' (ML 0). Tato cesta pěšky se zvířetem vyžaduje Animalcraft; Riding ani Acrobatics není náhradou. Doklad nelze vytvořit a opakované samostatné hody nikdy tento požadavek nesplní. Zachovejte historii, zrušte pouze nedokončený návrh intervalu a založte skutečně možnou kombinaci Droveře a dopravy.':'';
  // Invalid pre-existing proof from the screenshot must not occupy the only
  // current Skill-Test slot. Discard ONLY the unlinked form selection, never
  // the archived original d100/journal record or a pinned valid proof.
@@ -25988,8 +26014,8 @@ function renderEpisodeEndError(form,message){
  // An incapable operator must never appear as an offered Skill Test.
  // The only actionable step is to fix the actual role assignment.
  const operatorBlocked=/^(?:Vodič koně s nepohyblivým pacientem:|Drover ·|Drover Skill Test:|Jezdec:|Pěší vodič zvířete:|Orienteering · průvodce:)/.test(message);
- const planned=operatorBlocked?[]:episodePlannedTasks(form);
- if(issue.skill&&issue.field){
+ const planned=operatorBlocked||noDroverSkill?[]:episodePlannedTasks(form);
+ if(issue.skill&&issue.field&&!noDroverSkill){
   const i=planned.findIndex(t=>t.field===issue.field);
   if(i>=0){const task=planned.splice(i,1)[0];planned.unshift({...task,skill:issue.skill,actorId:issue.actorId});}
  }
@@ -26007,7 +26033,7 @@ function renderEpisodeEndError(form,message){
    /Direction Hazard/i.test(message)?'Direction Hazard · následek':taskName;
   const detail=issue.field?.startsWith('whProof_')&&/nebyl vyžádán touto epizodou/i.test(message)?
    'Tento doklad nevznikl z požadavku aktuální epizody. Předchozí Survival / Orienteering NENÍ Endurance pro počasí. Použijte tlačítko „Otevřít Endurance Skill Test“, které sváže samostatný hod se správnou postavou a epizodou; původní hody zůstanou beze změny.':message;
-  planned.unshift({name,detail,field:issue.field||'',
+  planned.unshift(noDroverSkill?{name:'Drover · nepřípustná dovednost',detail:droverUnavailableText,field:'',skill:null,actorId:null,unlearnedDrover:true}:{name,detail,field:issue.field||'',
    skill:issue.skill,actorId:issue.actorId});
  }
  episodeCurrentGuidedStep=planned.length?{field:planned[0].field,skill:planned[0].skill||null,actorId:planned[0].actorId||null}:null;
@@ -26315,14 +26341,50 @@ function sharedWeatherSources93772(){
  return activeWeatherAreas(base.journal,campaignKey(base.campaignClock),Math.floor((sharedTimeWindowDraft?.startMinute??base.campaignClock.minute)/1440));
 }
 function sharedWeatherName93772(id){return sharedWeatherSources93772().find(x=>x.id===id)?.calendarTrekDayWeather?.area||'';}
+/** v93.867: only a mobile, living character may START/LEAD a travel party.
+ * Passive non-self-moving passengers are NOT leaders; GM still confirms their
+ * actual transport in the original transport form. Never erase old drafts. */
+function sharedActiveActorEligibility93867(id,kind){
+ if(!id)return {eligible:false,reason:'nejprve zvolte způsobilou postavu'};
+ if(!['travel','forage','tracking','watch','other'].includes(kind)){
+  const c=character(id),h=c?persistentStateOf(c):null;
+  if(!c)return {eligible:false,reason:'postava není v kampani'};
+  if(h?.shock==='KIA')return {eligible:false,reason:'postava je mrtvá (KIA)'};
+  return {eligible:true,reason:''};
+ }
+ return episodeTravelRoleEligibility93865(id);
+}
+function sharedPassengerEligibility93867(id,plan){
+ const c=character(id);if(!c)return {eligible:false,reason:'postava není v kampani'};
+ const h=persistentStateOf(c);
+ if(h?.shock==='KIA')return {eligible:false,reason:'KIA: mrtvé tělo není aktivním členem Trekking skupiny'};
+ const mobile=episodeTravelRoleEligibility93865(id);
+ if(mobile.eligible)return mobile;
+ if(plan.kind!=='travel'||!plan.actorId||!episodeTravelRoleEligibility93865(plan.actorId).eligible)
+  return {eligible:false,reason:'nejprve vyberte schopného průvodce; nepohyblivá postava smí být pouze přepravovaným pacientem'};
+ try{const snap=trekPersonHealthSnapshot({id:c.id,name:c.name,healthState:h});
+  if(snap.cannotSelfMove)return {eligible:true,reason:'jen pasivně přepravovaný pacient; před odchodem doložte transport'};
+ }catch{}
+ return {eligible:false,reason:mobile.reason||'postava není schopná činnosti'};
+}
 function sharedPlanState93771(){
  if(!sharedTimeWindowDraft)return {scheduled:[],errors:[],used:{}};
  if(sharedTimeWindowPlans.some(x=>x.episodeRowV===3)&&!sharedFixedMode93773())return {scheduled:[],errors:[{id:'',message:'Nepřípustná kombinace různých formátů epizod.'}],used:{}};
  const planned=sharedFixedMode93773()?planFixedEpisode93773(sharedTimeWindowDraft,sharedTimeWindowPlans,sharedWeatherSources93772().map(w=>w.id)):
   sharedRowsMode93772()?planEpisodeRows93772(sharedTimeWindowDraft,sharedTimeWindowPlans,sharedWeatherSources93772().map(w=>w.id)):
   planSharedWindow93771(sharedTimeWindowDraft,sharedTimeWindowPlans);
- for(const row of sharedTimeWindowPlans)if(row.kind==='tracking'&&!episodeHasTracking93833(row.actorId))
-  planned.errors.push({id:row.id,message:'Tracking ML 0: pro Sledování stop zvolte postavu s osvojeným Tracking.'});
+ for(const row of sharedTimeWindowPlans){
+  if(row.kind==='tracking'&&!episodeHasTracking93833(row.actorId))
+   planned.errors.push({id:row.id,message:'Tracking ML 0: pro Sledování stop zvolte postavu s osvojeným Tracking.'});
+  if(row.actorId&&!sharedActiveActorEligibility93867(row.actorId,row.kind).eligible)
+   planned.errors.push({id:row.id,message:'Aktivní člen '+(character(row.actorId)?.name||'')+' není způsobilý: '+sharedActiveActorEligibility93867(row.actorId,row.kind).reason+'. Nejprve vyřešte zdravotní stav nebo změňte průvodce PŘED hody.'});
+  if(row.kind==='travel')for(const id of row.memberIds||[]){
+   const permitted=sharedPassengerEligibility93867(id,row);
+   if(!permitted.eligible)planned.errors.push({id:row.id,message:(character(id)?.name||'Člen skupiny')+': neplatné přiřazení v uloženém návrhu ('+permitted.reason+'). Postavu nelze ponechat jako aktivního člena.'});
+  }
+  if(row.kind==='travel'&&(row.memberIds||[]).length&&!row.memberIds.some(id=>episodeTravelRoleEligibility93865(id).eligible))
+   planned.errors.push({id:row.id,message:'Skupina nemá žádného schopného průvodce. Nepohybliví se smějí jen přepravovat jinou postavou.'});
+ }
  return planned;
 }
 function sharedPlanCurrent93771(){return sharedTimeWindowPlans.find(p=>p.id===sharedTimeWindowActivePlanId)||null;}
@@ -26377,7 +26439,7 @@ function sharedPlanCardsHTML93771(){
   const scheduled=state.scheduled.find(x=>x.id===plan.id),isActive=plan.id===sharedTimeWindowActivePlanId;
   const locked=!!plan.done||isActive;
   const followChoices=[['','Nová nezávislá skupina'],...[...previousGroups].map(([groupId,label])=>[groupId,'Navázat: '+label])];
-  const error=errors.get(plan.id)||(plan.kind==='travel'&&plan.actorId&&!episodeTravelRoleEligibility93865(plan.actorId).eligible?'Průvodce není schopný cesty: '+episodeTravelRoleEligibility93865(plan.actorId).reason:'');
+  const error=errors.get(plan.id)||(plan.actorId&&!sharedActiveActorEligibility93867(plan.actorId,plan.kind).eligible?'Postava není schopná činnosti: '+sharedActiveActorEligibility93867(plan.actorId,plan.kind).reason:'');
   const participants=plan.memberIds.map(id=>character(id)?.name||id).join(', ');
   if(!previousGroups.has(plan.groupId))previousGroups.set(plan.groupId,participants||'Skupina '+(index+1));
   const ready=!plan.done&&!isActive&&!error&&scheduled&&!!plan.memberIds.length&&
@@ -26388,7 +26450,7 @@ function sharedPlanCardsHTML93771(){
   <div class="hc-shared-plan-fields"><label>Činnost <select data-shared-plan-kind="${esc(plan.id)}" ${locked?'disabled':''}>${SHARED_PLAN_KINDS_93771.map(([key,name])=>episodeTrackingOption93833(plan.actorId,key,name,plan.kind===key)).join('')}</select></label>
   <label>Minuty <input data-shared-plan-minutes="${esc(plan.id)}" type="number" min="1" max="${sharedTimeWindowDraft.minutes}" value="${plan.minutes}" ${locked?'disabled':''}></label>
   <label>Návaznost <select data-shared-plan-follow="${esc(plan.id)}" ${locked?'disabled':''}>${followChoices.map(([id,label])=>`<option value="${esc(id)}" ${plan.followsGroup===id?'selected':''}>${esc(label)}</option>`).join('')}</select></label></div>
-  <details class="hc-shared-plan-members"><summary>Postavy · ${plan.memberIds.length}${participants?' · '+esc(participants):' · vyberte'}</summary>${registryCharacters93813(calendarMemberIds(data.campaignClock,data.characters)).map(c=>`<label><input type="checkbox" data-shared-plan-member="${esc(plan.id)}" value="${esc(c.id)}" ${plan.memberIds.includes(c.id)?'checked':''} ${locked?'disabled':''}> ${esc(c.name)}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</label>`).join('')}</details>
+  <details class="hc-shared-plan-members"><summary>Postavy · ${plan.memberIds.length}${participants?' · '+esc(participants):' · vyberte'}</summary>${registryCharacters93813(calendarMemberIds(data.campaignClock,data.characters)).map(c=>`<label><input type="checkbox" data-shared-plan-member="${esc(plan.id)}" value="${esc(c.id)}" ${plan.memberIds.includes(c.id)?'checked':''} ${locked||!sharedPassengerEligibility93867(c.id,plan).eligible?'disabled':''} title="${esc(sharedPassengerEligibility93867(c.id,plan).reason||'')}"> ${esc(c.name)}${!sharedPassengerEligibility93867(c.id,plan).eligible?' · NEZPŮSOBILÝ':''}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</label>`).join('')}</details>
   ${error?`<p class="hc-shared-plan-error" role="alert">${esc(error)}</p>`:''}
   <div class="hc-shared-plan-actions"><button type="button" data-shared-plan-open="${esc(plan.id)}" ${ready?'':'disabled'}>${plan.done?'Doklady připraveny':'Otevřít pravidlové testy →'}</button>
   ${isActive?`<button type="button" class="secondary" data-shared-plan-close="${esc(plan.id)}" ${episodeEvaluationRequested||episodePendingSkillRequest||episodeOutstandingSkillTasks.length?'disabled':''}>Zpět do plánu (bez testů)</button>`:''}
@@ -26405,17 +26467,17 @@ function sharedEpisodeRowsHTML93772(){
   const active=r.id===sharedTimeWindowActivePlanId,locked=!!r.done||active||sharedEpisodeAutoRun93772;
   const slot=state.scheduled.find(x=>x.id===r.id),max=sharedFixedMode93773()?sharedTimeWindowDraft.minutes:rowMaximum93772(sharedTimeWindowDraft,sharedTimeWindowPlans,r.id,r.actorId);
   const used=state.used?.[r.actorId]||0,remaining=Math.max(0,sharedTimeWindowDraft.minutes-used);
-  const roleProblem=r.kind==='travel'&&r.actorId&&!episodeTravelRoleEligibility93865(r.actorId).eligible?'Průvodce není schopný vykonávat Orienteering ('+episodeTravelRoleEligibility93865(r.actorId).reason+'). Vyberte jinou postavu.':'';
+  const roleProblem=r.actorId&&!sharedActiveActorEligibility93867(r.actorId,r.kind).eligible?'Postava není schopná činnosti ('+sharedActiveActorEligibility93867(r.actorId,r.kind).reason+'). Před začátkem hodů vyberte jinou postavu.':'';
   const error=errors.get(r.id)||roleProblem,status=r.done?'✓ Doklad připraven':active?'Právě vyhodnocováno':error?'Opravit před hody':slot?'Čeká na vyhodnocení':'Vyberte údaje';
   const groupNumber=r.groupNumber??index+1;
   const reserved=new Set(sharedTimeWindowPlans.filter(q=>q.id!==r.id).flatMap(q=>q.memberIds||[]));
   const eligible=actors.filter(c=>!reserved.has(c.id));
   const members=r.memberIds||[];
   const groupChoices=Array.from({length:Math.max(groupLimit,groupNumber)},(_,i)=>i+1);
-  const memberHTML=r.kind==='travel'?`<details class="hc-episode-group-members" ${!members.length?'data-hmk-travel-invalid="yes"':''} ${sharedPlanMembersOpen93806===r.id?'open':''}><summary>${members.length} ${members.length===1?'člen':'členové'} · ${esc(members.map(id=>character(id)?.name||id).join(', ')||'vybrat')}</summary><div class="hc-episode-group-member-list">${actors.map(c=>`<label class="hc-check"><input type="checkbox" data-shared-plan-member="${esc(r.id)}" value="${esc(c.id)}" ${members.includes(c.id)?'checked':''} ${locked||reserved.has(c.id)?'disabled':''}>${esc(c.name)}${c.id===r.actorId?' · průvodce':''}</label><label class="hc-episode-guide-radio"><input type="radio" name="guide-${esc(r.id)}" data-shared-plan-guide="${esc(r.id)}" value="${esc(c.id)}" ${c.id===r.actorId?'checked':''} ${locked||!members.includes(c.id)||!episodeTravelRoleEligibility93865(c.id).eligible?'disabled':''} title="${esc(episodeTravelRoleEligibility93865(c.id).reason||'Způsobilý průvodce')}">Průvodce</label>`).join('')}</div><p class="hc-hint">V každé skupině označ jednoho průvodce. Jeho Survival / Orienteering platí pro skupinu; pomocníci se započítají jen podle pravidel Assistance při původním Skill Testu.</p></details>`:'<small>Individuální činnost</small>';
+  const memberHTML=r.kind==='travel'?`<details class="hc-episode-group-members" ${!members.length?'data-hmk-travel-invalid="yes"':''} ${sharedPlanMembersOpen93806===r.id?'open':''}><summary>${members.length} ${members.length===1?'člen':'členové'} · ${esc(members.map(id=>character(id)?.name||id).join(', ')||'vybrat')}</summary><div class="hc-episode-group-member-list">${actors.map(c=>`<label class="hc-check"><input type="checkbox" data-shared-plan-member="${esc(r.id)}" value="${esc(c.id)}" ${members.includes(c.id)?'checked':''} ${locked||reserved.has(c.id)||!sharedPassengerEligibility93867(c.id,r).eligible?'disabled':''} title="${esc(sharedPassengerEligibility93867(c.id,r).reason||'')}">${esc(c.name)}${!sharedPassengerEligibility93867(c.id,r).eligible?' · NEZPŮSOBILÝ':''}${c.id===r.actorId?' · průvodce':''}</label><label class="hc-episode-guide-radio"><input type="radio" name="guide-${esc(r.id)}" data-shared-plan-guide="${esc(r.id)}" value="${esc(c.id)}" ${c.id===r.actorId?'checked':''} ${locked||!members.includes(c.id)||!episodeTravelRoleEligibility93865(c.id).eligible?'disabled':''} title="${esc(episodeTravelRoleEligibility93865(c.id).reason||'Způsobilý průvodce')}">Průvodce</label>`).join('')}</div><p class="hc-hint">V každé skupině označ jednoho průvodce. Jeho Survival / Orienteering platí pro skupinu; pomocníci se započítají jen podle pravidel Assistance při původním Skill Testu.</p></details>`:'<small>Individuální činnost</small>';
   return `<tr data-shared-plan-card="${esc(r.id)}" class="${r.done?'hc-shared-plan-done':''} ${active?'hc-shared-plan-active':''}">
   <td><select aria-label="Skupina řádku ${index+1}" data-shared-plan-group="${esc(r.id)}" ${locked?'disabled':''}>${groupChoices.map(n=>`<option value="${n}" ${n===groupNumber?'selected':''} ${n!==groupNumber&&usedNumbers.has(n)?'disabled':''}>Skupina ${n}</option>`).join('')}</select></td>
-  <td><select aria-label="${r.kind==='travel'?'Průvodce':'Postava'} skupiny ${groupNumber}" data-shared-row-actor="${esc(r.id)}" ${!r.actorId||!members.includes(r.actorId)?'aria-invalid="true"':''} ${locked?'disabled':''}><option value="">— ${r.kind==='travel'?'Průvodce':'Postava'} —</option>${eligible.map(c=>`<option value="${esc(c.id)}" ${r.actorId===c.id?'selected':''} ${r.kind==='travel'&&!episodeTravelRoleEligibility93865(c.id).eligible?'disabled':''} title="${esc(episodeTravelRoleEligibility93865(c.id).reason||'')}">${esc(c.name)}${r.kind==='travel'&&!episodeTravelRoleEligibility93865(c.id).eligible?' · NEZPŮSOBILÝ':''}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</option>`).join('')}</select></td>
+  <td><select aria-label="${r.kind==='travel'?'Průvodce':'Postava'} skupiny ${groupNumber}" data-shared-row-actor="${esc(r.id)}" ${!r.actorId||!members.includes(r.actorId)?'aria-invalid="true"':''} ${locked?'disabled':''}><option value="">— ${r.kind==='travel'?'Průvodce':'Postava'} —</option>${eligible.map(c=>`<option value="${esc(c.id)}" ${r.actorId===c.id?'selected':''} ${!sharedActiveActorEligibility93867(c.id,r.kind).eligible?'disabled':''} title="${esc(sharedActiveActorEligibility93867(c.id,r.kind).reason||'')}">${esc(c.name)}${!sharedActiveActorEligibility93867(c.id,r.kind).eligible?' · NEZPŮSOBILÝ':''}${c.kind&&c.kind!=='PC'?' · '+esc(c.kind):''}</option>`).join('')}</select></td>
   <td>${memberHTML}</td>
   <td><select aria-label="Činnost skupiny ${groupNumber}" data-shared-plan-kind="${esc(r.id)}" ${locked?'disabled':''}>${SHARED_PLAN_KINDS_93771.map(([key,name])=>episodeTrackingOption93833(r.actorId,key,name,r.kind===key)).join('')}</select></td>
   <td>${sharedFixedMode93773()?`<strong>${sharedTimeWindowDraft.minutes} min</strong><small>Celý interval</small>`:`<input aria-label="Délka činnosti ${index+1}" type="number" min="1" max="${max}" value="${r.minutes||''}" data-shared-plan-minutes="${esc(r.id)}" ${locked?'disabled':''}>`}</td>
@@ -26444,6 +26506,7 @@ function sharedPlanUpdate93771(id,field,value){
  }else if(field==='member'){
   if(!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===value.id))throw Error('Postava nepatří do aktuální kampaně.');
   if(value.checked&&plan.kind==='tracking'&&!episodeHasTracking93833(value.id))throw Error('Sledování stop vyžaduje Tracking ML nad 0.');
+  if(value.checked&&!sharedPassengerEligibility93867(value.id,plan).eligible)throw Error('Postava není způsobilá pro vybranou skupinu: '+sharedPassengerEligibility93867(value.id,plan).reason);
   plan.memberIds=value.checked?[...new Set([...plan.memberIds,value.id])]:plan.memberIds.filter(x=>x!==value.id);
  }else if(field==='follow'){
   const prior=sharedTimeWindowPlans.slice(0,sharedTimeWindowPlans.indexOf(plan));
@@ -26480,6 +26543,8 @@ function sharedFixedRowUpdate93773(plan,field,value){
   const eligible=id=>all.some(c=>c.id===id)&&!sharedTimeWindowPlans.some(x=>x.id!==plan.id&&(x.memberIds||[]).includes(id));
   if(field==='actor'){
    if(!eligible(value))throw Error('Postava nepatří do kampaně nebo už je v jiné skupině.');
+   const health=sharedActiveActorEligibility93867(value,plan.kind);
+   if(!health.eligible)throw Error('Tato postava nemůže být prvním členem ani průvodcem skupiny: '+health.reason);
    if(plan.kind==='tracking'&&!episodeHasTracking93833(value))throw Error('Tato postava nemá Tracking ML nad 0; pro Sledování stop ji nelze vybrat.');
    plan.actorId=value;
    plan.memberIds=plan.kind==='travel'?[...new Set([...(plan.memberIds||[]),value])]:[value];
@@ -26487,11 +26552,13 @@ function sharedFixedRowUpdate93773(plan,field,value){
    if(plan.kind!=='travel')throw Error('Vícečlenná skupina je dostupná pouze pro Pochod.');
    if(value.checked){
     if(!eligible(value.id))throw Error('Postava už je ve druhé skupině tohoto intervalu.');
+    const passenger=sharedPassengerEligibility93867(value.id,plan);
+    if(!passenger.eligible)throw Error('Postava nesmí být vybrána jako aktivní člen skupiny: '+passenger.reason);
     plan.memberIds=[...new Set([...(plan.memberIds||[]),value.id])];
     if(!plan.actorId)plan.actorId=value.id;
    }else{
     plan.memberIds=(plan.memberIds||[]).filter(id=>id!==value.id);
-    if(plan.actorId===value.id)plan.actorId=plan.memberIds[0]||'';
+    if(plan.actorId===value.id)plan.actorId=plan.memberIds.find(id=>sharedActiveActorEligibility93867(id,plan.kind).eligible)||'';
    }
   }else if(field==='groupNumber'){
    const number=Number(value);
@@ -26529,6 +26596,8 @@ function sharedEpisodeRowUpdate93772(plan,field,value){
  const before=structuredClone(sharedTimeWindowPlans);
  if(field==='actor'){
   if(!calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===value))throw Error('Vyberte platnou postavu aktuální kampaně.');
+  const health=sharedActiveActorEligibility93867(value,plan.kind);
+  if(!health.eligible)throw Error('Postava nemůže vykonávat tuto činnost: '+health.reason);
   if(plan.kind==='tracking'&&!episodeHasTracking93833(value))throw Error('Tato postava nemá Tracking ML nad 0; pro Sledování stop ji nelze vybrat.');
   const maximum=rowMaximum93772(sharedTimeWindowDraft,sharedTimeWindowPlans,plan.id,value);
   if(maximum<1)throw Error('Tato postava již vyčerpala celý společný interval.');
@@ -27069,7 +27138,7 @@ function updateEpisodePreview(form){
    else{
     const light=(sky?.period==='night'?'nightHazard':'daylightHazard');
     const hazard=weather[light];
-    level.innerHTML=weatherDayTimelineHTML(weather,{latitudeBand:sky?.band||v.latitudeBand||'mid',daylightSeason:sky?.lightSeason||weather.season,sunriseMinute:sky?.sunrise,twilightMinutes:60});
+    level.innerHTML='<details class="hc-weather-hover-shell"><summary>POČASÍ · AKTUÁLNÍ DEN <small>· najetím zobrazit 24hodinovou tabulku, klepnutím otevřít</small></summary><div class="hc-weather-hover-popover">'+weatherDayTimelineHTML(weather,{latitudeBand:sky?.band||v.latitudeBand||'mid',daylightSeason:sky?.lightSeason||weather.season,sunriseMinute:sky?.sunrise,twilightMinutes:60,highlightMinute:data.campaignClock?.minute%1440})+'</div></details>';
    }
   }catch(err){level.textContent=err.message;}
  }
@@ -28212,6 +28281,26 @@ document.addEventListener('click',e=>{
  if(detail){detail.hidden=false;detail.open=true;}
 },true);
 document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-episode-show-cancel]');if(!b)return;
+ e.preventDefault();
+ const cancel=document.querySelector('[data-shared-window-cancel]');
+ if(cancel&&!cancel.hidden){cancel.closest('[data-shared-window-control]')?.scrollIntoView({block:'center',behavior:'auto'});cancel.focus({preventScroll:true});}
+ else alert('Zůstaňte v Cestování. Dokončené doklady se nesmějí přepsat; nedokončený interval zrušte pouze jeho vlastním tlačítkem.');
+},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-episode-open-operator-health]');if(!b)return;
+ e.preventDefault();
+ const id=b.dataset.episodeOpenOperatorHealth;
+ const c=character(id);if(!c)return;
+ // The unfinished episode is not modified; the health module is the only
+ // valid place to resolve a real prone/incapacitated state.
+ const form=document.querySelector('#hmk-time-episode-form');
+ if(form){timeEpisodeDraft=episodeFormSnapshot(form);persistEpisodeDraftSidecar({snapshotForm:true});}
+ selected=id;view='sheet';activeSheetSection='hazards';
+ notice='Cestování čeká na zdravotní způsobilost postavy '+c.name+'. Původní přidělení průvodce a hody se nemění. Stav prone vyřešte pravidlovým postupem, poté se vraťte do rozpracované epizody.';
+ render();
+},true);
+document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-episode-jump]');if(!b)return;
  e.preventDefault();const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
  if(b.hasAttribute('data-episode-hazard-confirm-next')){
@@ -28228,6 +28317,9 @@ document.addEventListener('click',e=>{
  }
  const field=form.elements.namedItem(b.dataset.episodeJump);
  if(!field)return;
+ if(b.dataset.episodeJump==='guideId'&&episodeEvaluationRequested&&episodeEvaluatedIdentity&&!episodeTravelRoleEligibility93865(field.value).eligible){
+  const c=character(field.value);if(c){timeEpisodeDraft=episodeFormSnapshot(form);persistEpisodeDraftSidecar({snapshotForm:true});selected=c.id;view='sheet';activeSheetSection='hazards';notice='Průvodce '+c.name+' není schopný aktivního cestování. Nejprve doložte změnu zdravotního stavu; uzamčené hody nelze převést na jiného průvodce.';render();}return;
+ }
  episodeFocusedTaskField=b.dataset.episodeJump;
  updateEpisodeTaskFocus(form);
  episodeMarkField(form,b.dataset.episodeJump,{focus:true});
