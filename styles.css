@@ -950,3 +950,15 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 }
 #app [data-hazard-confirmation]:not([hidden]){border-color:#8b663d;}
 
+
+/* v93.864 · Confirmed Agility is a locked historical GM die. */
+#app [data-skill-physical-impact] input[name="agilityD100"][readonly],
+#app [data-skill-physical-impact] select[name="targetId"]:disabled{
+ background:#ddd8ce!important;color:#66615b!important;border-color:#9f9485!important;cursor:not-allowed!important;opacity:1;
+}
+#app [data-skill-physical-impact] [data-hsk-agility-confirm-status]{
+ padding:.45rem .65rem;border-left:3px solid #927853;background:rgba(125,99,65,.08);
+}
+#app [data-skill-physical-impact] [data-hsk-hazard-impact][hidden]{display:none!important}
+#app [data-skill-physical-impact] input:disabled,
+#app [data-skill-physical-impact] select:disabled{cursor:not-allowed;opacity:.62}

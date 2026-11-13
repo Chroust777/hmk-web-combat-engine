@@ -43,6 +43,7 @@ import {WRITING_WORK_MINUTES_591,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinut
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep} from './src/integration/hmk-climbing-fall-sequence.js';
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
+import {accidentAgilityML93864,inspectAccidentAgility93864,validateAccidentAgilityStage93864,ACCIDENT_AGILITY_STAGE_FORMAT_93864} from './src/integration/hmk-accident-agility-gate-93864.js';
 import {prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure} from './src/integration/hmk-weather-hazard-aftermath.js';
 import {prepareGMShockStateChange,gmStandingEligibility} from './src/integration/hmk-gm-shock-state-93826.js';
@@ -357,7 +358,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.863';
+const APP_VERSION='93.864';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7502,11 +7503,12 @@ function downloadUnfinishedHMKState93859(){
   try{return {present:true,value:JSON.parse(raw)}}catch{return {present:true,unparsedRaw:raw,parseError:true}}}
   catch(e){return {present:false,readError:String(e?.message||e)}}};
  const currentForm=document.querySelector('#hmk-time-episode-form');
- const pkg={format:'hmk-local-working-diagnostic-v93.863',appVersion:APP_VERSION,
+ const pkg={format:'hmk-local-working-diagnostic-v93.864',appVersion:APP_VERSION,
   exportedAt:new Date().toISOString(),scope:'local-only-no-cloud-token',
   note:'Obsahuje historii kampaně a nedokončené testy. Neslouží k importu; před sdílením chraňte soukromé údaje.',
   committedCampaign:read(localStorage,STORAGE),
   travelSidecar:read(localStorage,EPISODE_SIDECAR_KEY),
+  agilityConfirmationDraft:read(localStorage,HSK_AGILITY_STAGE_KEY_93864),
   combat:{previewHistory:read(sessionStorage,COMBAT_DRAFT_HISTORY_KEY),
    initiative:read(sessionStorage,COMBAT_INITIATIVE_SEQUENCE_KEY),
    clock:read(sessionStorage,COMBAT_CLOCK_KEY),
@@ -7519,6 +7521,9 @@ function downloadUnfinishedHMKState93859(){
    const value=name=>form.elements.namedItem(name)?.value??null;
    return {sourceId:value('sourceId'),kind:value('kind'),hazardD10:value('hazardD10'),
     targetId:value('targetId'),agilityD100:value('agilityD100'),
+    agilityConfirmed:!!hskReadAgilityStage93864(value('sourceId')),
+    agilityConfirmation:hskReadAgilityStage93864(value('sourceId')),
+    agilityConfirmationVisible:!!form.querySelector('[data-hsk-agility-confirm]'),
     impactDie:value('impactDie'),zoneD10:value('zoneD10'),locationD10:value('locationD10'),
     accidentBlocked:!!form.querySelector('[data-hsk-accident-pool-blocked]'),
     accidentBlocker:form.querySelector('[data-hsk-accident-pool-blocked]')?.textContent?.trim()||null,
@@ -10727,6 +10732,7 @@ function render(){
  const sidebar=app.querySelector('.layout>.nav');
  if(sidebar)sidebar.scrollTop=sidebarPosition;
  refreshAllCalendarHealingFields();
+ hskHydrateAccidentAgility93864(app);
  enhanceHMKDiceFields();
  syncWeatherCarePanel();
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
@@ -10739,7 +10745,7 @@ const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
   node.matches?.('form,section,div,fieldset,label,input')||
   node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form],input[type=number]')))))
-   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);enhanceHMKDiceFields();syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
 // v93.783: a Secondary Roll can become usable WITHOUT a render or added DOM
@@ -11368,6 +11374,57 @@ function hskFishingGearForm(entry){
  <p class="tiny">HMK neurčuje konkrétní WQ nebo AV postih: poškození je zaznamenáno jako stav inventárního kusu, mechanický postih musí potvrdit GM.</p>
  <button type="submit">Zapsat materiální následek Fishing CF</button><output role="status" aria-live="polite"></output></form>`;
 }
+// v93.864: The original Agility die is staged separately from the final
+// Injury Sequence. It is explicitly GM-confirmed, immutable in the working
+// form and retained locally across reloads, but never committed as an Injury
+// receipt until the original physical consequence transaction succeeds.
+const HSK_AGILITY_STAGE_KEY_93864=STORAGE+':skill-accident-agility-stage-v1';
+function hskReadAgilityStage93864(sourceId){
+ try{
+  const obj=JSON.parse(localStorage.getItem(HSK_AGILITY_STAGE_KEY_93864)||'null');
+  return obj?.format==='hmk-skill-accident-stage-store-v1'?(obj.entries?.[campaignKey(data.campaignClock)+'|'+sourceId]||null):null;
+ }catch{return null;}
+}
+function hskSaveAgilityStage93864(stage){
+ const raw=localStorage.getItem(HSK_AGILITY_STAGE_KEY_93864);
+ const current=raw?JSON.parse(raw):null;
+ if(current&&current.format!=='hmk-skill-accident-stage-store-v1')throw Error('Neznámý starší formát rozpracovaných Agility hodů.');
+ const entries={...(current?.entries||{})};
+ const key=stage.campaignId+'|'+stage.sourceId;
+ if(entries[key])throw Error('Tento Agility hod už GM potvrdil; nelze jej přepsat.');
+ entries[key]=stage;
+ localStorage.setItem(HSK_AGILITY_STAGE_KEY_93864,JSON.stringify({format:'hmk-skill-accident-stage-store-v1',entries}));
+}
+function hskFinishAgilityStage93864(sourceId){
+ try{
+  const raw=localStorage.getItem(HSK_AGILITY_STAGE_KEY_93864);if(!raw)return;
+  const value=JSON.parse(raw);if(value?.format!=='hmk-skill-accident-stage-store-v1')return;
+  delete value.entries[campaignKey(data.campaignClock)+'|'+sourceId];localStorage.setItem(HSK_AGILITY_STAGE_KEY_93864,JSON.stringify(value));
+ }catch{/* Final authoritative consequence has already committed; preserve any unknown local record. */}
+}
+function hskAccidentAgilityContext93864(victim,sourceId,roll=null){
+ return inspectAccidentAgility93864({actor:victim,state:persistentStateOf(victim),inventory:data.inventory,
+  round:Math.max(1,combatClock.round||1,persistentStateOf(victim).lastRound||0),sourceId,roll});
+}
+function hskHydrateAccidentAgility93864(root=document){
+ for(const form of root.querySelectorAll('form[data-skill-physical-impact]')){
+  if(form.elements.namedItem('kind')?.value!=='survival-accident')continue;
+  const sourceId=form.elements.namedItem('sourceId')?.value;
+  const saved=hskReadAgilityStage93864(sourceId);
+  if(saved&&saved.campaignId===campaignKey(data.campaignClock)){
+   const victim=form.elements.namedItem('targetId'),roll=form.elements.namedItem('agilityD100');
+   if(victim&&[...victim.options].some(o=>o.value===saved.victimId)){
+    victim.value=saved.victimId;roll.value=String(saved.roll);
+    // Even if the current medical context changed, never silently replace
+    // an already GM-accepted physical d100 by a fresh roll.
+    victim.disabled=true;roll.readOnly=true;roll.dataset.hmkLocked='historical-die';
+    roll.title='⛔ Zamčeno: GM již potvrdil tento Agility d100.';
+    const random=form.querySelector('[data-hsk-random-victim]');if(random)random.disabled=true;
+   }
+  }
+  refreshSurvivalHazardFields(form);
+ }
+}
 function hskSkillPhysicalImpactForm(entry){
  const proof=entry.skillTestProof;
  const directAccident=proof?.type==='secondary-mastery-value-test'&&
@@ -11423,7 +11480,11 @@ function hskSkillPhysicalImpactForm(entry){
  // v93.861: Stable acquisition also creates the canonical health actor.
  // Legacy acquisitions migrate without GM checkboxes when existing trauma
  // records allow a non-destructive one-time baseline.
- const targetOptions='<option value="">— nejprve určete náhodně —</option>'+eligibleTargets.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
+ const targetOptions='<option value="">— nejprve určete náhodně —</option>'+eligibleTargets.map(x=>{
+  let mlText='ML nedoloženo';
+  try{mlText='Agility ML '+accidentAgilityML93864(x)}catch{}
+  return '<option value="'+esc(x.id)+'">'+esc(x.name)+' · '+esc(mlText)+'</option>';
+ }).join('');
  const dieInput=(name,faces,label)=>'<label>'+label+'<input type="number" name="'+name+'" min="1" max="'+faces+'" inputmode="numeric"></label>';
  return `<form class="hsk-climb-fall" data-skill-physical-impact>
  <input type="hidden" name="sourceId" value="${esc(entry.id)}"><input type="hidden" name="kind" value="${id}">
@@ -11434,7 +11495,10 @@ function hskSkillPhysicalImpactForm(entry){
  <select name="targetId" ${accidentPoolError?'disabled':''}>${targetOptions}</select></label>
  ${dieInput('agilityD100',100,'Agility d100 náhodně zvoleného účastníka')}</div>
  <button type="button" class="hc-small hc-provision-generate" data-hsk-random-victim ${accidentPoolError?'disabled':''}>⚄ Náhodně určit účastníka</button>
- <p class="tiny">Postavu lze také vybrat ručně podle skutečného fyzického losu. Po vyplnění Agility se zobrazí další krok. Tento výběr není nový test Orienteering.</p></div>
+ <p class="tiny" data-hsk-agility-ml aria-live="polite">Vyberte účastníka. Vedle každého jména je základní Agility ML; před potvrzením se ověří i aktuální EML.</p>
+ <button type="button" class="hc-small hc-provision-generate" data-hsk-agility-confirm ${accidentPoolError?'disabled':''}>✓ Potvrdit Agility d100 a výsledek</button>
+ <p class="tiny" data-hsk-agility-confirm-status role="status" aria-live="polite">Nepotvrzené Agility. Impact, ZD, LD a další hody zatím nelze zadat.</p>
+ <p class="tiny">Účastníka lze určit skutečným náhodným losem nebo doložit fyzický výsledek. Potvrzení Agility samo neukládá zranění ani neposouvá Kalendář. Další hody se zpřístupní jen při potvrzeném F/CF.</p></div>
  <div data-hsk-hazard-gm hidden class="hsk-hazard-step"><label>GM: doložený skutečný následek Equipment nebo Complication
  <textarea name="gmHazardOutcome" rows="3" minlength="8" maxlength="600" placeholder="Konkrétní událost, případný opravný/terénní Skill Test a výsledek, zdržení či dopad na další hlídku."></textarea></label>
  <p class="tiny">Equipment: HMK str. 148 rozlišuje opravné dovednosti a zdržení podle CF/F/S/CS. Complication: HMK str. 149 řeší průchod překážkou a návaznou hlídku. Aplikace zde neprovádí další neprokázaný Skill Test ani sama nemění pohyb další hlídky. GM musí výsledné rozhodnutí výslovně doložit.</p></div>`:''}
@@ -11450,7 +11514,7 @@ function hskSkillPhysicalImpactForm(entry){
  </div><p class="tiny" data-hsk-physical-dice-status role="status">Shock a Compound jsou zamčené až do doložení skutečného účinného Impactu a starších ran.</p></div>
  ${survival?'':'<label><input type="checkbox" name="gmConfirmed" required> GM potvrdil skutečné dopady a ochranu zbroje</label>'}
  <button type="button" class="secondary hc-small" data-action="export-working-state">Stáhnout diagnostiku tohoto Hazardu (JSON)</button>
- <button type="submit">${survival?'Vyhodnotit Hazard a případnou Injury Sequence':'Trvale zapsat Fishing zranění'}</button>
+ <button type="submit" ${survival?'data-hsk-physical-final disabled title="Nejprve GM potvrdí Agility d100."':''}>${survival?'Vyhodnotit Hazard a případnou Injury Sequence':'Trvale zapsat Fishing zranění'}</button>
  <output role="status" aria-live="polite"></output></form>`;
 }
 function hskSkillEnvironmentFollowup(entry){
@@ -12939,34 +13003,69 @@ function refreshSurvivalHazardFields(form){
  if(casualty)casualty.hidden=!isAccident;
  if(gm)gm.hidden=!isGmOutcome;
  if(gmOutcome){gmOutcome.required=isGmOutcome;if(!isGmOutcome)gmOutcome.value='';}
- // Only an actual Agility F/CF can create the Blunt injury branch. The
- // authoritative skill-physical executor rechecks EML, Shock and armour.
- const hasAgility=String(form.elements.namedItem('agilityD100')?.value||'').trim()!=='';
- const roll=Number(form.elements.namedItem('agilityD100')?.value);
+ const sourceId=form.elements.namedItem('sourceId')?.value;
  const victim=character(form.elements.namedItem('targetId')?.value);
- let failed=false,agilityLevel=null;
- if(isAccident&&hasAgility&&victim&&Number.isInteger(roll)&&roll>=1&&roll<=100){
-  try{
-   const status=persistentStateOf(victim),mastery=availableMasteries(victim).find(x=>x.name.toLowerCase()==='agility');
-   const injury=projectLiveInjuries({state:status,round:Math.max(1,combatClock.round||1,status.lastRound||0),test:'agility',usedArms:['left','right'],timelineId:'skill:'+form.elements.namedItem('sourceId').value});
-   const animalAGL=victim.hmk?.verifiedMountedBreed?victim.hmk?.attributes?.agl:null;
-   const loadAdjustment=animalAGL===null?resolveCombatantLoad({character:victim,inventory:data.inventory}).agilityAndMeleePenalty:0;
-   const eml=(animalAGL===null?mastery?.ml:animalAGL*5)-combatFatigueTotals(status).total+loadAdjustment+injury.modifier;
-   if(Number.isFinite(eml)){const sl=successLevel(roll,eml);failed=sl<2;agilityLevel=['CF','F','S','CS'][sl];}
-  }catch{failed=false;}
+ const rollField=form.elements.namedItem('agilityD100');
+ const roll=Number(rollField?.value),hasRoll=String(rollField?.value||'').trim()!=='';
+ const saved=hskReadAgilityStage93864(sourceId);
+ const stageForCampaign=saved&&saved.campaignId===campaignKey(data.campaignClock);
+ const confirm=form.querySelector('[data-hsk-agility-confirm]');
+ const final=form.querySelector('[data-hsk-physical-final]');
+ const mlDisplay=form.querySelector('[data-hsk-agility-ml]');
+ const confirmationStatus=form.querySelector('[data-hsk-agility-confirm-status]');
+ let inspection=null,error=null,accepted=false;
+ if(victim&&isAccident){
+  try{inspection=hskAccidentAgilityContext93864(victim,sourceId,hasRoll&&Number.isSafeInteger(roll)&&roll>=1&&roll<=100?roll:null)}
+  catch(e){error=e.message;}
  }
- if(impact)impact.hidden=!isAccident||!failed;
- refreshSkillPhysicalImpactDice(form,{victim,failed:isAccident&&failed,level:agilityLevel});
+ accepted=!!(stageForCampaign&&inspection?.level&&validateAccidentAgilityStage93864(saved,{
+  sourceId,campaignId:campaignKey(data.campaignClock),victimId:victim?.id,
+  roll,ml:inspection.ml,eml:inspection.eml,level:inspection.level}));
+ // A saved GM confirmation is immutable. If a subsequent health or campaign
+ // change invalidates its EML, do not silently unlock/rewrite the die.
+ if(stageForCampaign){
+  const sel=form.elements.namedItem('targetId');if(sel)sel.disabled=true;
+  if(rollField){rollField.readOnly=true;rollField.dataset.hmkLocked='historical-die';
+   rollField.title='⛔ Zamčeno: Agility již bylo výslovně potvrzeno GM.';}
+  const random=form.querySelector('[data-hsk-random-victim]');if(random)random.disabled=true;
+ }
+ if(mlDisplay)mlDisplay.textContent=victim?(
+  inspection?'Agility '+victim.name+' · základní ML '+inspection.ml+' · aktuální EML '+inspection.eml+
+   ' · výsledný CF/F/S/CS se zobrazí po potvrzení':
+   'Agility '+victim.name+' · vyhodnocení EML zablokováno: '+(error||'neověřené podmínky')):
+  'Vyberte účastníka; u jmen jsou uvedeny skutečné základní Agility ML.';
+ if(confirm){confirm.disabled=!isAccident||!!stageForCampaign||!victim||!!error||!hasRoll||!inspection?.level;
+  confirm.textContent=accepted?'✓ Agility GM potvrzeno':'✓ Potvrdit Agility d100 a výsledek';}
+ if(confirmationStatus)confirmationStatus.textContent=accepted?
+  '✓ GM potvrdil '+victim.name+' · ML '+inspection.ml+' · EML '+inspection.eml+
+   ' · d100 '+roll+' → '+inspection.level+'; potvrzený hod nelze změnit.':
+  stageForCampaign?'⛔ Potvrzený Agility hod už neodpovídá aktuálnímu zdravotnímu stavu, účastníkovi nebo EML. Nepřepisujte původní doklad; vyžaduje rozhodnutí GM.':
+  !victim?'Nejprve určete oběť.':
+  error?'⛔ '+error:
+  !hasRoll?'Zadejte skutečný d100; další zranění zatím nepřístupné.':
+  inspection?.level?'Hod připravený; pokračujte tlačítkem Potvrdit Agility.':'Hod musí být celé číslo od 1 do 100.';
+ const failed=accepted&&inspection.failed;
+ if(impact)impact.hidden=!failed;
+ // Do not merely hide irrelevant dice. Disable them, their generators and
+ // required flags until the corresponding confirmed branch actually exists.
+ for(const name of ['impactDie','zoneD10','locationD10']){
+  const control=form.elements.namedItem(name);if(control)hmkSyncConditionalRollField(control,failed);
+ }
+ const direction=form.elements.namedItem('direction');if(direction)direction.disabled=!failed;
+ refreshSkillPhysicalImpactDice(form,{victim,failed,level:inspection?.level});
+ if(final){final.disabled=isAccident&&!accepted;
+  final.title=final.disabled?'Nejprve potvrďte výsledek Agility d100.':'';}
  const hint=form.querySelector('[data-hsk-hazard-guidance]');
  if(hint)hint.textContent=!Number.isInteger(d)||d<1||d>10?'Vyplňte skutečný Hazard d10 (1–10).':
-  d<=3?'Equipment (1–3): žádná Agility. Doložte GM rozhodnutí o výstroji, případném opravném Skill Testu a zdržení.':
-  d>=7?'Complication (7–10): určete GM překážku, použitý Skill Test a jeho důsledky. Pouze odpovídající situace vyžadují Agility.':
-  !victim?'Accident (4–6): náhodně vyberte účastníka a proveďte Agility d100.':
-  !hasAgility?'Accident (4–6): doplňte skutečný Agility d100 vybraného účastníka.':
-  failed?'Agility F/CF: je povinný Impact d6, ZD a LD; Shock/Compound pouze pokud to následně vyžadují pravidla.':
-  'Agility S/CS: nehoda odvrácena. Žádný Impact, ZD, LD ani Shock.';
- // Values of now-inapplicable dice may not leak into a different branch.
- for(const block of [casualty,impact])if(block?.hidden)for(const control of block.querySelectorAll('input[type="number"]'))control.value='';
+  d<=3?'Equipment (1–3): není Agility. Doložte rozhodnutí GM o výstroji.':
+  d>=7?'Complication (7–10): rozhodnutí GM o překážce.':
+  !victim?'Accident (4–6): náhodně určete účastníka a ověřte Agility ML.':
+  !accepted?'Accident: zadejte Agility d100 a výslovně jej potvrďte; žádné další hody zatím nedělejte.':
+  failed?'Potvrzené Agility '+inspection.level+': nyní proveďte Impact d6, ZD a LD. Shock/Compound jen podle pravidel.':
+  'Potvrzené Agility '+inspection.level+': nehoda odvrácena. Žádné Impact, ZD ani LD neházejte; můžete uložit výsledek.';
+ if(casualty?.hidden)for(const control of casualty.querySelectorAll('input[type="number"]')){
+  if(!control.readOnly)control.value='';
+ }
 }
 function refreshPhysicalDiceByKind(form){
  if(form.elements.namedItem('kind')?.value==='survival-accident')return refreshSurvivalHazardFields(form);
@@ -12976,6 +13075,32 @@ function refreshPhysicalDiceByKind(form){
 }
 document.addEventListener('input',e=>{const form=e.target?.closest?.('[data-skill-physical-impact]');if(form&&['hazardD10','agilityD100','impactDie','zoneD10','locationD10'].includes(e.target.name))refreshPhysicalDiceByKind(form);},true);
 document.addEventListener('change',e=>{const form=e.target?.closest?.('[data-skill-physical-impact]');if(form&&['hazardD10','agilityD100','targetId','direction','impactDie','zoneD10','locationD10'].includes(e.target.name))refreshPhysicalDiceByKind(form);},true);
+// A typed or generated d100 is only a proposal. Explicit GM confirmation is
+// required before any F/CF impact dice become reachable.
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-hsk-agility-confirm]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=b.closest('form[data-skill-physical-impact]');if(!form)return;
+ const out=form.querySelector('[data-hsk-agility-confirm-status]');
+ try{
+  if(form.elements.namedItem('kind')?.value!=='survival-accident'||
+   ![4,5,6].includes(Number(form.elements.namedItem('hazardD10')?.value)))
+   throw Error('Agility se potvrzuje výhradně pro Survival Accident.');
+  const sourceId=form.elements.namedItem('sourceId')?.value;
+  const victim=character(form.elements.namedItem('targetId')?.value);
+  if(!victim)throw Error('Nejprve náhodně určete původního účastníka.');
+  const input=form.elements.namedItem('agilityD100');
+  if(!input||!/^([1-9]|[1-9][0-9]|100)$/.test(input.value.trim()))
+   throw Error('Zadejte skutečný celý Agility d100 od 1 do 100.');
+  const roll=Number(input.value),proof=hskAccidentAgilityContext93864(victim,sourceId,roll);
+  hskSaveAgilityStage93864({format:ACCIDENT_AGILITY_STAGE_FORMAT_93864,confirmed:true,
+   sourceId,campaignId:campaignKey(data.campaignClock),victimId:victim.id,
+   roll,ml:proof.ml,eml:proof.eml,level:proof.level,confirmedAt:new Date().toISOString(),
+   provenance:input.dataset.hmkAutoDice===input.value?'cryptographic-software-die':'GM-entered-physical-die'});
+  hskHydrateAccidentAgility93864(form.parentElement||document);
+  refreshSurvivalHazardFields(form);
+ }catch(err){if(out)out.textContent='⛔ Agility nebylo potvrzeno: '+err.message;}
+},true);
 // v93.861: removed the redundant, sometimes inaccessible GM health
 // registration click handler. Stable acquisition and legacy migration now
 // establish the same actor identity atomically before the accident lottery.
@@ -13046,6 +13171,16 @@ document.addEventListener('submit',event=>{
   }
   if(target.kind==='Animal'&&!target.hmk?.verifiedMountedBreed)throw Error('Neověřené zvíře nelze zranit lidskou tabulkou; nejprve založte ověřený zvířecí profil.');
   const round=Math.max(1,combatClock.round||1,persistentStateOf(target).lastRound||0);
+  let acceptedAgilityProof=null;
+  if(accident){
+   const candidate=hskAccidentAgilityContext93864(target,sourceId,optional('agilityD100'));
+   acceptedAgilityProof=hskReadAgilityStage93864(sourceId);
+   if(!validateAccidentAgilityStage93864(acceptedAgilityProof,{
+    sourceId,campaignId:campaignKey(data.campaignClock),victimId:target.id,
+    roll:candidate.roll,ml:candidate.ml,eml:candidate.eml,level:candidate.level}))
+    throw Error('Agility d100 nebylo samostatně potvrzeno GM, nebo se změnil jeho původní výsledek / zdravotní stav.');
+  }
+
   // Non-accident branches are GM follow-ups, not invented injuries.
   if(kind==='survival-accident'&&hazardD10!=null&&(hazardD10<=3||hazardD10>=7)){
    if(!Number.isSafeInteger(hazardD10)||hazardD10<1||hazardD10>10)throw Error('Neplatný fyzický hazard d10');
@@ -13069,8 +13204,12 @@ document.addEventListener('submit',event=>{
     hazardD10,agilityD100:optional('agilityD100'),randomVictimConfirmed:kind==='survival-accident'?!!raw('targetId'):false,
     originMinute:kind==='survival-accident'?data.campaignClock?.minute:null,
     autoDieValues:Object.fromEntries(['hazardD10','agilityD100','impactDie','zoneD10','locationD10','shockD100','compoundD10'].
-     flatMap(name=>{const control=form.elements.namedItem(name);return control?.value&&control.dataset?.hmkAutoDice===control.value?
+     flatMap(name=>{const control=form.elements.namedItem(name);return (control?.value&&(control.dataset?.hmkAutoDice===control.value||
+       (name==='agilityD100'&&acceptedAgilityProof?.provenance==='cryptographic-software-die'&&
+        Number(control.value)===acceptedAgilityProof.roll)))?
       [[name,Number(control.value)]]:[];}))});
+   if(accident&&(report.sl!==acceptedAgilityProof.level||report.eml!==acceptedAgilityProof.eml))
+    throw Error('Pravidlový vykonavatel zranění vypočetl jiné Agility EML nebo SL než potvrdil GM.');
    const body='HMK str. '+(kind==='fishing-cf'?'71':'148')+' · '+kind+' · '+target.name+(report.bodyKind==='animal'?' · zvířecí anatomie '+(report.bodyTable||'')+' '+report.breed:'')+
     (report.sl?' · Agility '+report.sl+' / EML '+report.eml:'')+
     (report.avoided?' · nehoda odvrácena':report.miss?' · ZD minul tělo, bez zranění a bez Shock':' · Impact '+report.impact+report.aspect+
@@ -13080,9 +13219,11 @@ document.addEventListener('submit',event=>{
     synchronizeCombatInjuries(target,report.state);
     data.journal.push({id:uuid(),characterId:target.id,title:'Následek Skill Testu · '+kind,body,createdAt:stamp(),calendarCampaignId:data.campaignClock?campaignKey(data.campaignClock):null,
      campaignMinute:Number.isSafeInteger(data.campaignClock?.minute)?data.campaignClock.minute:null,
-     skillTestProof:{type:'skill-physical-consequence',sourceId,kind,actorId:target.id,report:{...report,state:undefined}}});
+     skillTestProof:{type:'skill-physical-consequence',sourceId,kind,actorId:target.id,
+      agilityGMConfirmation:accident?acceptedAgilityProof:null,report:{...report,state:undefined}}});
    }))throw Error('Zranění nebylo uloženo');
   }
+  if(accident)hskFinishAgilityStage93864(sourceId);
   form.replaceWith(Object.assign(document.createElement('p'),{textContent:'Následek byl potvrzen a uložen do historie a příslušného stavu.'}));
  }catch(e){if(out)out.textContent='Následek nebyl zapsán: '+e.message;}
 },true);
