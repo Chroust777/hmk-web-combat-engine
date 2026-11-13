@@ -19,6 +19,7 @@ import {validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
 import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
 import {incidentMinutes93863} from './hmk-incident-window-93863.js';
 import {validateDeferredEpisodeEvent93868} from './hmk-episode-interruption-93868.js';
+import {validateUniversalStop93869,effectiveActivityMinutes93869,validateUniversalStopResolutions93869} from './hmk-universal-window-interruption-93869.js';
 export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -558,6 +559,7 @@ export function episodeNavigationState(previous,newDirection=null,{recovered=fal
   newDirection?.direction==='misdirection'?(redirected?'clear':'misdirection'):active;
 }
 export function validateTimeEpisodes(journal=[]){
+ validateUniversalStopResolutions93869(journal);
  const byCampaign=new Map(),prior=[];
  for(const j of journal){const e=j.calendarTimeEpisode;
   // An authorized calendar exit is a real boundary for actor-local Fatigue
@@ -571,6 +573,33 @@ export function validateTimeEpisodes(journal=[]){
    Array.isArray(e.memberIds)&&e.memberIds.length>0&&new Set(e.memberIds).size===e.memberIds.length,
    'Neznámé nebo neplatné vymezení cestovní družiny.');
   const travelScope=e.travelPartyScope==='v93.763'?e.memberIds:null;
+  // A universal event may only shorten the performed work of THIS activity.
+  // The full window and its immutable calendar boundaries always remain intact.
+  const general=e.generalStop93869||null;
+  if(general){
+   validateUniversalStop93869(general,{startMinute:e.startMinute,minutes:e.minutes,activityKind:e.kind});
+   const settings=e.settings||{};
+   must(settings.generalEventKind93869===general.reason&&
+    String(settings.generalEventMinute93869)===String(general.atMinute)&&
+    String(settings.generalEventDescription93869||'').trim()===general.description&&
+    String(settings.generalEventOrigin93869||'manual')===general.source&&
+    settings.generalEventProof93869===JSON.stringify(general),
+    'Přerušení: záznam nesouhlasí se vstupy potvrzenými v původní epizodě.');
+   must(!(e.hazardDetails||[]).some(h=>h.hazard==='accident'||h.hazard==='complication'&&
+    ['long-delay','irreparable'].includes(h.result)),
+    'Jediná nehoda/Complication nesmí vytvořit dvě různá zastavení skupiny.');
+  }else must(!e.settings?.generalEventProof93869,
+   'Přerušení: z uložené epizody zmizel potvrzený doklad.');
+  const performingMinutes=effectiveActivityMinutes93869(e.minutes,general);
+ const accidentForagingMinute93869=e.kind==='forage'?e.hazardDetails?.find(h=>h.hazard==='accident'&&h.eventWindow93868)?.eventWindow93868?.movingMinutes:null;
+ const foragePerformedMinutes93869=accidentForagingMinute93869===null||accidentForagingMinute93869===undefined?
+  performingMinutes:Math.min(performingMinutes,accidentForagingMinute93869);
+ if(e.foragingTimePolicy93869!==undefined)
+  must(e.foragingTimePolicy93869==='actual-interrupted-minutes-v93.869'&&
+   (e.kind==='forage'&&accidentForagingMinute93869!==null&&accidentForagingMinute93869!==undefined||
+    e.kind==='travel'&&e.movementMinutes<e.minutes),
+   'Foraging: neplatný doklad o zkrácené činnosti.');
+
   // The references are not new rolls. Verify linked proof and continuous inheritance.
   for(const [key,skill] of [['orientation','Survival'],['trackingMemory','Tracking']]){
    const memo=e[key];if(!memo)continue;
@@ -1094,7 +1123,7 @@ export function validateTimeEpisodes(journal=[]){
     proof.format==='hmk-confirmed-unused-end-dice-v93.868'&&
     proof.reason==='confirmed-dice-before-incident-minute'&&
     proof.actualMovementMinutes===e.movementMinutes&&
-    e.hazardDetails?.some(h=>h.eventWindow93868)&&
+    (e.hazardDetails?.some(h=>h.eventWindow93868)||!!general)&&
     proof.byActor&&typeof proof.byActor==='object'&&!Array.isArray(proof.byActor),
     'Nepoužité END hody smějí pocházet jen z doložené nehody nebo překážky během Double Time.');
    const ids=Object.keys(proof.byActor);
@@ -1190,7 +1219,9 @@ export function validateTimeEpisodes(journal=[]){
     current:d.current,future:d.future,persistCarry:d.method!=='gm-current-episode-only-v2'});
    if(independent)expected.method=d.method;
    must(JSON.stringify(expected)===JSON.stringify(d)&&
-    (e.medicalTravelStop?e.movementMinutes<=d.movementMinutes:e.movementMinutes===d.movementMinutes),
+    (general?
+      e.movementMinutes===Math.min(d.movementMinutes,Math.max(0,general.atMinute-d.incoming)):
+      e.medicalTravelStop?e.movementMinutes<=d.movementMinutes:e.movementMinutes===d.movementMinutes),
     'Zdržení nebo přenesené minuty neodpovídají předchozí cestě.');
    if(e.medicalTravelStop){
     const stop=e.medicalTravelStop;
@@ -1310,7 +1341,7 @@ export function validateTimeEpisodes(journal=[]){
    for(const f of e.travelForaging){
     const key=JSON.stringify([f.target,f.herbName||'']);
     const carryIn=local.get(key)||lastForagingCarry(prior,j.calendarCampaignId,j.characterId,f.target,f.herbName||'');
-    const expected=calculateEpisodeForaging({minutes:e.minutes,habitat:f.habitat,season:f.season,
+    const expected=calculateEpisodeForaging({minutes:e.foragingTimePolicy93869?e.movementMinutes:e.minutes,habitat:f.habitat,season:f.season,
      roll:f.roll,target:f.target,herbName:f.herbName||'',carryIn});
     must(JSON.stringify(f)===JSON.stringify(expected),'Foraging při cestě není podložen doloženým d10 a přenosem.');
     local.set(key,f.carryOut);
@@ -1324,7 +1355,7 @@ export function validateTimeEpisodes(journal=[]){
    for(const f of e.standaloneForaging){
     const key=JSON.stringify([f.target,f.herbName||'']);
     const carryIn=local.has(key)?local.get(key):lastForagingCarry(prior,j.calendarCampaignId,j.characterId,f.target,f.herbName||'');
-    const expected=calculateEpisodeForaging({minutes:e.minutes,habitat:f.habitat,season:f.season,
+    const expected=calculateEpisodeForaging({minutes:foragePerformedMinutes93869,habitat:f.habitat,season:f.season,
      roll:f.roll,target:f.target,herbName:f.herbName||'',carryIn});
     must(JSON.stringify(f)===JSON.stringify(expected),'Samostatný Foraging: změněný d10, cíl nebo přenos.');
     local.set(key,f.carryOut);
@@ -1334,10 +1365,10 @@ export function validateTimeEpisodes(journal=[]){
   }
   if(e.foraging&&e.stationaryForagingPolicy!=='hmk-stationary-v93.835'){
    const f=e.foraging;
-   must(e.kind==='forage'&&f.minutes===e.minutes&&j.characterId&&e.memberIds.includes(j.characterId),
+   must(e.kind==='forage'&&f.minutes===foragePerformedMinutes93869&&j.characterId&&e.memberIds.includes(j.characterId),
     'Foraging neodpovídá času, činnosti a průvodci epizody.');
    const carryIn=lastForagingCarry(prior,j.calendarCampaignId,j.characterId,f.target,f.herbName||'');
-   const expected=calculateEpisodeForaging({minutes:e.minutes,habitat:f.habitat,season:f.season,
+   const expected=calculateEpisodeForaging({minutes:foragePerformedMinutes93869,habitat:f.habitat,season:f.season,
     roll:f.roll,target:f.target,herbName:f.herbName||'',carryIn});
    must(JSON.stringify(f)===JSON.stringify(expected),'Pozměněný nebo nepodložený Foraging výsledek.');
   }
@@ -1360,7 +1391,7 @@ export function validateTimeEpisodes(journal=[]){
  * until a real half food-/water-day or full herb dose exists. */
 import {foragingDie} from './hmk-trekking-wilderness-tasks.js';
 export function calculateEpisodeForaging({minutes,habitat,season,roll,target='food-water',herbName='',carryIn={}}={}){
- must(whole(minutes,1,10080),'Foraging vyžaduje skutečné trvání');
+ must(whole(minutes,0,10080),'Foraging vyžaduje doloženou skutečnou délku výkonu');
  const die=foragingDie({habitat,season,roll,target,herbName});
  const result={},carryOut={};
  for(const [key,units] of [['foodDays',2],['waterDays',2],['herbDoses',1]]){

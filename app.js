@@ -7,6 +7,7 @@ import {planEpisodeRows93772,rowMaximum93772} from './src/integration/hmk-episod
 import {planFixedEpisode93773,fixedAccidentMinute93773} from './src/integration/hmk-episode-fixed-93773.js';
 import {incidentMinutes93863} from './src/integration/hmk-incident-window-93863.js';
 import {randomEpisodeMinute93868,deferredEpisodeEvent93868,validateDeferredEpisodeEvent93868,actualGroupMovement93868,splitEpisodeEndDice93868} from './src/integration/hmk-episode-interruption-93868.js';
+import {UNIVERSAL_STOP_REASONS_93869,confirmUniversalStop93869,validateUniversalStop93869,effectiveActivityMinutes93869,UNIVERSAL_STOP_RESOLUTION_FORMAT_93869} from './src/integration/hmk-universal-window-interruption-93869.js';
 import {captureSharedActivityDelta93769,replaySharedActivityDelta93769,verifySharedActivityQueue93769} from './src/integration/hmk-shared-serial-receipts-93769.js';
 import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js';
 import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js';
@@ -360,7 +361,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.868';
+const APP_VERSION='93.869';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2904,6 +2905,14 @@ function episodeEnforceAnimalReservations93848(form){
   stableAnimalIds:(timeEpisodeDraft.stableAnimalIds||[]).filter(id=>!used.has(id)),
   animalIds:(timeEpisodeDraft.animalIds||[]).filter(id=>!used.has(id))};}
 }
+function episodeUnresolvedGeneralStops93869(clock){
+ if(!clock)return [];
+ const cid=campaignKey(clock);
+ const done=new Set(data.journal.filter(j=>j.calendarCampaignId===cid&&j.calendarEpisodeGeneralResolution93869)
+  .map(j=>j.calendarEpisodeGeneralResolution93869.episodeId));
+ return data.journal.filter(j=>j.calendarCampaignId===cid&&j.calendarTimeEpisode?.generalStop93869&&
+  j.calendarTimeEpisode.endMinute<=clock.minute&&!done.has(j.id));
+}
 function timeEpisodePageHTML(clock,participants){
  participants=registryCharacters93813(participants);
  const areas=timeEpisodeWeatherOptions(clock),first=participants[0];
@@ -2962,6 +2971,7 @@ function timeEpisodePageHTML(clock,participants){
   timeEpisodeDraft?.memberIds?.length?timeEpisodeDraft.memberIds:null);
  const start=displayCampaignMinute(clock.minute),d=timeEpisodeDraft;
  const pendingEncounter=episodePendingEncounter(clock);
+ const pendingGeneralStops93869=episodeUnresolvedGeneralStops93869(clock);
  // HMK 148–149: an Accident inherits the original Survival CF and hazard
  // d10. Its actual Agility/Injury Sequence belongs to Skill Tests/Combat.
  // Until that consequence is committed, a new trek cannot determine the
@@ -2992,6 +3002,16 @@ function timeEpisodePageHTML(clock,participants){
  ${!pendingEncounter&&lastResolvedPause?`<p class="hc-hint" role="status">Předchozí cesta byla pozastavena; její nevyhodnocený zbytek byl ${lastResolvedPause.calendarTimeEpisode.interruption.remainingMinutes} minut. Zda pokračovat po vyřešeném setkání, rozhoduje GM podle aktuální situace.</p>`:''}
  ${currentEncounterReports.length?`<section class="hc-episode-interruption" role="status" data-episode-encounter-reported><h3>Encounter · oznámení GM na konci epizody</h3>
  <p>${currentEncounterReports.map(j=>esc(character(j.characterId)?.name||j.characterId)+' · '+j.calendarTimeEpisode.encounter.count+' setkání').join(' · ')} · čas ${esc(displayCampaignMinute(clock.minute))}. Rozhodnutí, zda situaci rozehrát, náleží GM u stolu. Cestování nespouští ani nevyžaduje Combat.</p></section>`:''}
+ ${pendingGeneralStops93869.length?`<section class="hc-episode-interruption" role="status" data-episode-generic-followups><h3>Po uzavření okna · povinné dořešení přerušených činností</h3>
+ <p>Čas již uběhl celý. Přerušení skutečného výkonu bylo započteno jen u dotčené skupiny. Zdravotní ani jiné následky nebyly automaticky vymyšleny; dořešte je teď v příslušné části aplikace nebo u stolu. Další časové okno zůstane do uzavření dokladu zablokované.</p>
+ ${pendingGeneralStops93869.map(row=>{const p=row.calendarTimeEpisode,stop=p.generalStop93869;
+ return `<section data-episode-generic-pending="${esc(row.id)}"><p><strong>${esc(character(row.characterId)?.name||row.characterId)}</strong> · ${esc(UNIVERSAL_STOP_REASONS_93869[stop.reason])} · událost ${esc(displayCampaignMinute(stop.eventMinute))} (minuta ${stop.atMinute}/${p.minutes}), zápis po okně ${esc(displayCampaignMinute(p.endMinute))}.</p>
+ <p>${esc(stop.description)} · výkon ${stop.performedMinutes} min, zbytek ${stop.remainingMinutes} min.</p>
+ <p><button type="button" class="secondary" data-episode-generic-followup-skills="${esc(row.characterId)}">Otevřít Skill Tests</button> <button type="button" class="secondary" data-episode-generic-followup-health="${esc(row.characterId)}">Otevřít Zdraví &amp; Expozice</button></p>
+ <form data-episode-generic-resolution><input type="hidden" name="episodeId" value="${esc(row.id)}">
+ <label>Pravidlový výsledek<select name="outcome" required><option value="">— skutečný následek —</option><option value="consequences-completed">Následky byly vyhodnoceny a zaznamenány</option><option value="no-further-consequences">Událost skončila bez dalších následků</option></select></label>
+ <label>Doklad / popis skutečného výsledku<textarea name="details" required minlength="6" maxlength="400" placeholder="Např. vyhodnocený test, následná zranění, číslo dokladu nebo zdůvodnění bez dalšího účinku"></textarea></label>
+ <button type="submit">Zapsat dořešení události</button></form></section>`}).join('')}</section>`:''}
  ${pendingAccidents.length?`<section class="hc-episode-interruption" role="status"><h3>Navazující nehoda · Injury Sequence ještě není uzavřena</h3>
  <p>Dokončený úsek již uložil původní Survival CF a Hazard d10. Je nutné provést jen příslušný Agility test a případné zranění. Kalendář nezahajuje nový pochod s neznámou pohyblivostí oběti.</p>
  ${pendingAccidents.map(row=>`<p><strong>${esc(displayCampaignMinute(row.calendarTimeEpisode.endMinute))}</strong> · ${esc(character(row.characterId)?.name||row.characterId)} · hod na hazard d10 ${row.calendarTimeEpisode.hazardDetails.find(h=>h.hazard==='accident').hazardD10}. <button type="button" data-episode-open-accident="${esc(row.characterId)}">Otevřít původní zdravotní následky ve Skill Tests</button></p>`).join('')}</section>`:''}
@@ -3221,6 +3241,15 @@ function timeEpisodePageHTML(clock,participants){
   <span class="hmk-hazard-choice-status" data-hazard-choice-status role="status">Vyberte postup a potvrďte jej.</span>
   <button type="button" class="hc-small" data-hazard-choices-confirm>Potvrdit postup</button>
  </div><p data-episode-hazard-result class="hc-hint">Všechny povinné následky se ověří před finálním zápisem celé epizody.</p></fieldset>
+ <details class="hc-episode-universal-stop" data-episode-universal-stop><summary>Událost, která skutečně přerušila výkon této skupiny · volitelné</summary>
+ <p class="hc-hint">Použijte pouze při skutečném zastavení výkonu. Survival Accident a Complication F/CF mají svůj vlastní potvrzovací krok výše; nezadávejte je podruhé. Ostatní členové ani celé časové okno se nezkracují. Zdravotní a další následky se řeší až po konci okna.</p>
+ <div class="hmk-trek-grid"><label>Důvod zastavení<select name="generalEventKind93869"><option value="">Žádná další přerušující událost</option>${Object.entries(UNIVERSAL_STOP_REASONS_93869).map(([id,label])=>option(id,label)).join('')}</select></label>
+ <label>Popis skutečné události<input name="generalEventDescription93869" maxlength="400" placeholder="Co zastavilo výkon této skupiny?"></label>
+ <label>Minuta od začátku intervalu<span class="hc-episode-die"><input name="generalEventMinute93869" type="number" min="1" max="10080" step="1" placeholder="1 až délka intervalu"><button type="button" data-episode-general-minute-generate>⚄ Vygenerovat minutu</button></span></label>
+ </div><input type="hidden" name="generalEventOrigin93869" value="manual"><input type="hidden" name="generalEventProof93869" value="">
+ <p data-episode-general-event-status class="hc-hint" role="status">Vyberte důvod a minutu; nic se neuloží, dokud nestisknete potvrzovací tlačítko.</p>
+ <button type="button" class="hc-small" data-episode-general-event-confirm>Potvrdit minutu přerušení</button>
+ </details>
  <fieldset data-episode-weather-details hidden><legend>Prochladnutí / přehřátí · HMK 149</legend>
  <p class="hc-hint">Každá expozice vyžaduje skutečný Endurance (Survival) hod. Schopná postava jej doloží původním Skill Testem; nepohyblivá INC/UNC provádí pouze nedobrovolný zdravotní odpor (d100) bez samostatné akce. Vypočte se z ověřené Endurance, Survival a aktuální Fatigue. Po dokončení Pochodu se zdravotní následky zapisují ve Zdraví &amp; Expozice; žádná rána se předem nevytváří.</p>
  ${['cold','heat'].map(h=>`<div data-episode-weather-kind="${h}"><h4>${h==='cold'?'❄️ Nebezpečný chlad':'☀️ Nebezpečné horko'}</h4>
@@ -24878,6 +24907,31 @@ function episodeEncounterProbability(form,clock,sky){
  return episodeEncounterByMinutes({minutes,environ:v.environ,night:sky?.period==='night',
   d100:100,d100Sub:100,lightMinutes});
 }
+function episodeGeneralStopProof93869(v,clock){
+ const reason=String(v.generalEventKind93869||''),raw=String(v.generalEventProof93869||'');
+ if(!reason&&!raw)return null;
+ if(!reason)throw Error('Přerušení: nejdříve zrušte dříve potvrzenou událost.');
+ if(!raw)throw Error('Přerušení: zvolte minutu a potvrďte ji tlačítkem „Potvrdit minutu přerušení“.');
+ let proof;try{proof=JSON.parse(raw);}catch{throw Error('Přerušení: poškozený doklad potvrzení. Potvrďte znovu.');}
+ const minutes=Number(v.minutes),startMinute=Number(clock?.minute);
+ validateUniversalStop93869(proof,{startMinute,minutes,activityKind:v.kind});
+ if(proof.reason!==reason||proof.description!==String(v.generalEventDescription93869||'').trim()||
+  String(proof.atMinute)!==String(v.generalEventMinute93869||'')||
+  proof.source!==String(v.generalEventOrigin93869||'manual'))
+  throw Error('Přerušení: změnil se důvod, popis nebo minuta. Potvrďte znovu.');
+ return proof;
+}
+function episodeGeneralStopUI93869(form){
+ const status=form.querySelector('[data-episode-general-event-status]');
+ if(!status)return;
+ const reason=form.elements.namedItem('generalEventKind93869')?.value||'';
+ const raw=form.elements.namedItem('generalEventProof93869')?.value||'';
+ let valid=false;
+ if(reason&&raw){try{episodeGeneralStopProof93869(episodeFormSnapshot(form),data.campaignClock);valid=true;}catch{}}
+ status.textContent=valid?'✓ Potvrzená minuta přerušení. Změna některého vstupu vyžaduje nové potvrzení.':
+  reason?'Vybranou událost zatím nepotvrzujete; potvrďte konkrétní minutu tlačítkem.':
+  'Bez dodatečného přerušení. Survival Accident a Complication zůstávají v původním hazardovém kroku.';
+}
 function episodePreviewFromForm(form,clock){
  // A failed/aborted orientation must never leak the previous episode's Watchfulness.
  delete form.dataset.episodeOrientationModes;
@@ -24889,6 +24943,8 @@ function episodePreviewFromForm(form,clock){
  episodeAssertScopedSkillInputs(v);
  if(!people.length)throw Error('Vyberte aspoň jednu postavu.');
  const kind=v.kind,minutes=Number(v.minutes),guideId=v.guideId;
+ const generalStop93869=episodeGeneralStopProof93869(v,clock);
+ const actualActivityMinutes93869=effectiveActivityMinutes93869(minutes,generalStop93869);
  // Equipment F/CF is a GM-managed damaged item, never an automatic clock duty.
  if(kind==='tracking'&&!episodeHasTracking93833(v.guideId))throw Error('Sledování stop není pro tuto postavu dostupné: Tracking ML musí být větší než 0.');
  if(kind==='travel'){
@@ -25157,8 +25213,10 @@ function episodePreviewFromForm(form,clock){
  // this episode's accident minute was discovered. Do not reroll or erase them:
  // only the earliest physically elapsed hours affect Fatigue, and any excess
  // accepted dice are retained verbatim as unused proof in the episode receipt.
- const incidentStopForEnd93868=kind==='travel'&&orientation?.level==='CF'?
+ const automaticStopForEnd93868=kind==='travel'&&orientation?.level==='CF'?
   episodeConfirmedMovementStop93868(form,minutes):null;
+ const incidentStopForEnd93868=kind==='travel'?
+  (generalStop93869?Math.min(generalStop93869.atMinute,automaticStopForEnd93868??minutes):automaticStopForEnd93868):null;
  const actualForEnd93868=kind==='travel'?actualGroupMovement93868({minutes,
   incomingDelay:equipmentDelayIn,atMinute:incidentStopForEnd93868}):minutes;
  const unusedEndDice93868={};
@@ -25230,6 +25288,7 @@ function episodePreviewFromForm(form,clock){
    memberIds:[],conveyance:v.conveyance,gmConfirmed:true,originalHealth:[],sourcePage:145}),
    format:'gm-transport-confirmation-v93.756',vehicle,mass:transportMass93816};
  }
+ if(generalStop93869)result.generalStop93869=generalStop93869;
  if(kind==='forage')result.stationaryForagingPolicy='hmk-stationary-v93.835';
  result.orientation=orientation;
  if(gmExtraProgress>0)result.gmExtraProgress=gmExtraProgress;
@@ -25348,6 +25407,17 @@ function episodePreviewFromForm(form,clock){
   if(hazardType==='misdirection')detail.directionProofId=String(v.hazardDirectionProofId||'').trim()||null;
   result.hazardDetails.push(detail);
  }
+ // Generic stop and source-specific Accident are alternative causes, never two
+ // independent reasons to shorten the very same group. Foraging has its own
+ // accident hazard, too; reject overlap before yielding any supplies.
+ if(generalStop93869&&result.hazardDetails.some(h=>h.hazard==='accident'||
+  h.hazard==='complication'&&['F','CF','long-delay','irreparable'].includes(h.result)))
+  throw Error('Potvrzený Survival Accident/Complication už určuje přerušení. Nezadávejte stejnou událost podruhé.');
+ const foragingAccidentMinute93869=kind==='forage'?result.hazardDetails.find(h=>h.hazard==='accident'&&h.eventWindow93868)?.eventWindow93868?.movingMinutes:null;
+ const stationForageMinutes93869=foragingAccidentMinute93869===null?actualActivityMinutes93869:
+  Math.min(actualActivityMinutes93869,foragingAccidentMinute93869);
+ if(kind==='forage'&&foragingAccidentMinute93869!==null)
+  result.foragingTimePolicy93869='actual-interrupted-minutes-v93.869';
  result.hazardDetail=result.hazardDetails[0]??null;
  // HMK p148: a successful *real* Awareness test made at Misdirection
  // notices the mistake in this watch; never leave a reoriented party Lost.
@@ -25373,6 +25443,8 @@ function episodePreviewFromForm(form,clock){
    if(relevant?.hazard==='complication'&&outcome==='irreparable'&&!v.hazardComplicationRouteChanged)
     throw Error('Complication CF: GM musí potvrdit změnu trasy.');
    // Equipment repair work is independent of Travel; only actual Complication blocks travel.
+   if(generalStop93869&&result.hazardDetails.some(h=>h.hazard==='accident'||h.hazard==='complication'&&['F','CF','long-delay','irreparable'].includes(h.result)))
+    throw Error('Přerušení: Survival Accident nebo Complication má vlastní potvrzenou minutu. Nedoplňujte druhé zastavení stejné činnosti.');
    const accident=result.hazardDetails.find(h=>h.hazard==='accident');
    const incident=accident?incidentMinutes93863({minutes,atMinute:accident.hazardAtMinute,
     kind,incomingDelay:equipmentDelayIn}):null;
@@ -25408,7 +25480,8 @@ function episodePreviewFromForm(form,clock){
      moveLimit>Math.min(...previewIncap.map(x=>x.minute))-clock.minute))
     throw Error('Zastavený pochod: doložte skutečné minuty pohybu v pravé části.');
    result.travelDelay=delay;
-   result.movementMinutes=confirmedStop?Math.min(delay.movementMinutes,moveLimit):delay.movementMinutes;
+   result.movementMinutes=Math.min(confirmedStop?Math.min(delay.movementMinutes,moveLimit):delay.movementMinutes,
+    generalStop93869?Math.max(0,generalStop93869.atMinute-equipmentDelayIn):minutes);
    // HMK 148: a next-watch Slow from equipment repair is spent only during
    // ACTUAL travel. Repair delays and medically aborted walks must not use it up.
    // Existing travel/complication carry is retained. Equipment timing is GM-managed;
@@ -25612,11 +25685,13 @@ function episodePreviewFromForm(form,clock){
    const current=(kind==='winded'?stat.windedness:stat.weariness)+climate;
    const expedition=c.hmk?.expedition||{};
    return {id:c.id,...calculateEpisodeMinuteRecovery({kind,minute:result.startMinute,
-    minutes,current,prior:expedition.minuteRecovery?.[kind],
+    minutes:actualActivityMinutes93869,current,prior:expedition.minuteRecovery?.[kind],
     legacyClaimStart:expedition.claims?.[claimKey]})};
   });
  }
 
+ if(kind==='travel'&&result.movementMinutes<minutes&&modes.foraging>0)
+  result.foragingTimePolicy93869='actual-interrupted-minutes-v93.869';
  if(kind==='travel'&&modes.foraging>0){
   const source=data.journal.find(j=>j.id===weather.sourceId);
   const season=source?.calendarTrekDayWeather?.season||source?.calendarTrekWeatherShift?.season||weather.weather?.season||v.season;
@@ -25628,7 +25703,7 @@ function episodePreviewFromForm(form,clock){
    const target=v['travelForageTarget'+n],herbName=String(v['travelHerb'+n]||'').trim();
    const key=JSON.stringify([target,target==='herbs'?herbName:'']);
    const carryIn=partial.has(key)?partial.get(key):lastForagingCarry(data.journal,campaignKey(clock),guideId,target,herbName);
-   const f=calculateEpisodeForaging({minutes,habitat:v.travelHabitat,season,roll:die,target,herbName,carryIn});
+   const f=calculateEpisodeForaging({minutes:result.foragingTimePolicy93869?result.movementMinutes:minutes,habitat:v.travelHabitat,season,roll:die,target,herbName,carryIn});
    result.travelForaging.push(f);partial.set(key,f.carryOut);
   }
  }
@@ -25647,7 +25722,7 @@ function episodePreviewFromForm(form,clock){
     const herbName=String(n===0?v.herbName:v['forageHerb'+n]||'').trim();
     const key=JSON.stringify([target,target==='herbs'?herbName:'']);
     const carryIn=partial.has(key)?partial.get(key):lastForagingCarry(data.journal,campaignKey(clock),guideId,target,herbName);
-    const f=calculateEpisodeForaging({minutes,habitat:v.habitat,season,roll,target,herbName,carryIn});
+    const f=calculateEpisodeForaging({minutes:stationForageMinutes93869,habitat:v.habitat,season,roll,target,herbName,carryIn});
     result.standaloneForaging.push(f);partial.set(key,f.carryOut);
    }
    if(result.standaloneForaging.length)result.foraging=result.standaloneForaging[0];
@@ -26766,7 +26841,7 @@ function updateSharedTimeWindowControls(form){
     (reason&&cap.maxAllowed<=dayLimit?' Poté: '+reason+'.':dayLimit<=cap?.maxAllowed?' Hranice kalendářního dne; pro další den se potvrzuje nové počasí.':'');
   }
  }
- const create=document.querySelector('[data-shared-window-create]');if(create){create.disabled=active;create.hidden=active;}
+ const create=document.querySelector('[data-shared-window-create]');if(create){create.disabled=active||episodeUnresolvedGeneralStops93869(data.campaignClock).length>0;create.hidden=active;}
  const defaultWeather=document.querySelector('[data-shared-window-weather]');
  if(defaultWeather){defaultWeather.disabled=active;const choices=sharedWeatherSources93772();
   defaultWeather.innerHTML='<option value="">— Vyberte potvrzené počasí —</option>'+choices.map(w=>`<option value="${esc(w.id)}" ${sharedDefaultWeatherId93772===w.id?'selected':''}>${esc(w.calendarTrekDayWeather.area)}</option>`).join('');
@@ -27745,6 +27820,7 @@ function updateEpisodePreview(form){
     'END '+(a.hourlyEndSR?'(hodinové d10: '+a.hourlyEndSR.map(x=>x.roll+' '+(x.success?'S':'F')).join(', ')+')':'(d10: '+a.roll+'), TN '+a.sr.tn+' · '+(a.sr.success?'úspěch':'neúspěch'))}; Weariness +${a.delta}${a.weatherFatigueUnits?' (včetně počasí '+(a.weatherFatigueUnits/240).toFixed(2)+' bodu)':''}${a.carryOut?' (přenáší se nevyčerpaný zlomek)':''}.</p>`).join('')}${result.stableAnimalLoad?.length?result.stableAnimalLoad.map(a=>`<p>Stáj: ${esc(a.name)} · ENC ${a.enc}${a.loaded?' · Loaded':' · bez Loaded'} (skutečná výstroj a náklad).</p>`).join(''):''}${result.animals?.length?result.animals.map(a=>`<p>Zvíře ${esc(character(a.id)?.name||a.id)}: Weariness +${a.delta} · GM analogie.</p>`).join(''):''}`:
    `${result.recoveryPreview?.length?result.recoveryPreview.map(p=>{const w=result.weatherRestFatigue?.find(x=>x.id===p.id);return `<p>${esc(character(p.id)?.name||p.id)} · zotavení ${p.recovered} bodů, klimatická únava +${w?.delta||0} bodů${w?.addedUnits?' (minutově '+w.addedUnits+' jednotek; převod zbytku '+w.carryOut+')':''}. ${p.next.carry?'Nevyčerpaná část zotavení přenesena.':''}</p>`;}).join(''):'<p>Bez přesunu. Příslušné testy se řeší v původních Skill Tests.</p>'}`;
   out.innerHTML=`<p><b>${esc(displayCampaignMinute(result.startMinute))}–${esc(displayCampaignMinute(result.endMinute))}</b> · ${result.minutes} minut</p>
+    ${result.generalStop93869?`<p><strong>Přerušený výkon:</strong> ${result.generalStop93869.performedMinutes} / ${result.minutes} min, příčina: ${esc(UNIVERSAL_STOP_REASONS_93869[result.generalStop93869.reason])}; celý kalendářní interval zůstává. Následky budou vyhodnoceny až po jeho uzavření.</p>`:''}
     ${travelText}
     ${weather.weather?`<p><b>Počasí HMK 144:</b> ${esc(weather.area)} · ${weather.origin==='global'?'stejné původní d10, upravené pro skutečný reliéf':'nové místní d10'} · teplota d10 ${weather.weather.temperatureD10}, upravená den ${weather.weather.adjustedDayTemperature}, noc ${weather.weather.adjustedNightTemperature}; srážky d10 ${weather.weather.precipitationD10} → ${weather.weather.precipitationRoll} proti TN ${weather.weather.precipitationTN}; výška ${weather.weather.alpine?'alpská −4':weather.weather.landscape==='mountain'?'hory −2':weather.weather.landscape==='rough'?'kopce −1':'rovina 0'}, poušť ${weather.weather.aridDesert?'ANO':'NE'}; <strong>Den</strong>: ${esc(visibleWeather({hazard:weather.weather.daylightHazard,precipitation:!weather.weather.hasPrecipitation?'none':weather.weather.daylightHazard==='cold'?(weather.weather.precipitationRoll===weather.weather.precipitationTN?'sleet':'snow'):'rain'}).heading)}, <strong>Noc</strong>: ${esc(visibleWeather({hazard:weather.weather.nightHazard,precipitation:!weather.weather.hasPrecipitation?'none':weather.weather.nightHazard==='cold'?(weather.weather.precipitationRoll===weather.weather.precipitationTN?'sleet':'snow'):'rain'}).heading)}${precipitation?', srážky '+esc(precipitation.precipitation):''}.</p>`:''}
     ${result.movementRollSources?.progress?`<p>Progress (d10) převzaty z předchozího uloženého výsledku; nevzniká nový hod.</p>`:''}
@@ -27806,6 +27882,7 @@ function updateEpisodePreview(form){
   const details=document.querySelector('.hc-episode-spread-right .hc-episode-result-details');if(details)details.hidden=false;
  }
  updateEpisodeParticipantHeadings93850(form);
+ episodeGeneralStopUI93869(form);
  showEpisodeIndependentDeadlines(form);
  const finalButton=document.querySelector('.hc-episode-spread-right [data-episode-finalize]');
  const evaluateButton=form.querySelector('[data-episode-evaluate]');
@@ -27870,6 +27947,7 @@ function episodeClearDiceDraft(draft){
   temperatureD10:'',precipitationD10:'',
   checkEncounter:true,encounterResolution:'',encounterRollContext:'',navigationRecovered:false,orientationUse:'new',trackingUse:'none',
   hazardComplicationRouteChanged:false,hazardAtMinute:'',hazardMinuteOrigin93868:'manual',hazardDelayNow:'0',
+  generalEventKind93869:'',generalEventMinute93869:'',generalEventOrigin93869:'manual',generalEventProof93869:'',generalEventDescription93869:'',
   skillProofIds:[],episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};
  for(const k of Object.keys(saved))if(k.startsWith('end_'))saved[k]='';
  return saved;
@@ -28042,6 +28120,40 @@ document.addEventListener('click',e=>{
  episodeStartSkillRequest('hazardEvidenceId',rule.skill,worker);
 },true);
 document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-episode-general-minute-generate]');if(!button||button.disabled)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=button.closest('#hmk-time-episode-form');if(!form)return;
+ try{
+  if(!form.elements.namedItem('generalEventKind93869').value)throw Error('Nejdříve vyberte důvod skutečného přerušení.');
+  const minutes=Number(form.elements.namedItem('minutes')?.value),value=randomEpisodeMinute93868(minutes);
+  const input=form.elements.namedItem('generalEventMinute93869');input.value=String(value);
+  form.elements.namedItem('generalEventOrigin93869').value='cryptographic-software-minute';
+  form.elements.namedItem('generalEventProof93869').value='';
+  timeEpisodeDraft=episodeFormSnapshot(form);episodeGeneralStopUI93869(form);
+  if(episodeStageBaseline||sharedTimeWindowDraft)persistEpisodeDraftSidecar({snapshotForm:true});
+ }catch(err){alert('Generátor minuty přerušení: '+err.message);}
+},true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-episode-general-event-confirm]');if(!button||button.disabled)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=button.closest('#hmk-time-episode-form');if(!form)return;
+ try{
+  const v=episodeFormSnapshot(form),reason=v.generalEventKind93869;
+  if(!reason)throw Error('Nejdříve vyberte důvod skutečného přerušení.');
+  const minutes=Number(v.minutes),atMinute=Number(v.generalEventMinute93869);
+  if(!/^[1-9]\d*$/.test(String(v.generalEventMinute93869||'')))throw Error('Zadejte celou minutu 1 až délka intervalu.');
+  if(((v.kind==='travel'||v.kind==='forage')&&[4,5,6].includes(Number(v.survivalD10)))||
+      ((v.kind==='travel'||v.kind==='forage')&&[7,8,9,10].includes(Number(v.survivalD10))&&
+       ['F','CF'].includes(v.hazardSkillLevel)))
+   throw Error('Survival Accident / Complication používá svůj vlastní potvrzovací krok.');
+  const proof=confirmUniversalStop93869({startMinute:data.campaignClock.minute,minutes,activityKind:v.kind,reason,
+   atMinute,source:v.generalEventOrigin93869||'manual',description:v.generalEventDescription93869});
+  form.elements.namedItem('generalEventProof93869').value=JSON.stringify(proof);
+  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
+  if(episodeStageBaseline||sharedTimeWindowDraft)persistEpisodeDraftSidecar({snapshotForm:true});
+ }catch(err){alert('Minuta přerušení nebyla potvrzena: '+err.message);}
+},true);
+document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-episode-random-event-minute]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
  const form=button.closest('#hmk-time-episode-form');if(!form||button.disabled)return;
@@ -28084,6 +28196,10 @@ document.addEventListener('click',e=>{
 document.addEventListener('input',e=>{
  const form=e.target?.closest?.('#hmk-time-episode-form');if(!form)return;
  if(e.target?.name==='trackingRoad')e.target.dataset.episodeAutoSource='gm';
+ if(['generalEventKind93869','generalEventMinute93869','generalEventDescription93869'].includes(e.target?.name)){
+  const accepted=form.elements.namedItem('generalEventProof93869');if(accepted)accepted.value='';
+  if(e.target.name==='generalEventMinute93869')form.elements.namedItem('generalEventOrigin93869').value='manual';
+ }
  if(e.target?.name==='hazardAtMinute'){
   const witness=e.target.dataset.hmkEventMinuteGenerated93868;
   if(witness!==String(e.target.value)){form.elements.namedItem('hazardMinuteOrigin93868').value='manual';
@@ -28103,6 +28219,10 @@ document.addEventListener('input',e=>{
 },true);
 document.addEventListener('change',e=>{
  const form=e.target?.closest?.('#hmk-time-episode-form');if(!form)return;
+ if(['generalEventKind93869','generalEventMinute93869','generalEventDescription93869'].includes(e.target?.name)){
+  const accepted=form.elements.namedItem('generalEventProof93869');if(accepted)accepted.value='';
+  if(e.target.name==='generalEventMinute93869')form.elements.namedItem('generalEventOrigin93869').value='manual';
+ }
  if(e.target?.name==='hazardAtMinute'){
   const witness=e.target.dataset.hmkEventMinuteGenerated93868;
   if(witness!==String(e.target.value)){form.elements.namedItem('hazardMinuteOrigin93868').value='manual';
@@ -28809,6 +28929,36 @@ document.addEventListener('click',e=>{
  // No Travel UI action may ever route implicitly to the Combat engine.
  else{view='calendar';calendarLanding=false;activeCalendarSection='travel';render();}
 },true);
+document.addEventListener('click',e=>{
+ const skills=e.target.closest?.('[data-episode-generic-followup-skills]');
+ const health=e.target.closest?.('[data-episode-generic-followup-health]');
+ const button=skills||health;if(!button)return;
+ e.preventDefault();const id=skills?.dataset.episodeGenericFollowupSkills||health?.dataset.episodeGenericFollowupHealth;
+ if(!character(id))return;
+ selected=id;
+ if(skills){view='skills';activeSkillTab='followups';}
+ else{view='sheet';activeSheetSection='hazards';}
+ render();
+},true);
+document.addEventListener('submit',e=>{
+ const form=e.target;if(!form?.matches?.('[data-episode-generic-resolution]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  const fd=new FormData(form),clock=data.campaignClock,episodeId=String(fd.get('episodeId')||'');
+  const pending=episodeUnresolvedGeneralStops93869(clock).find(j=>j.id===episodeId);
+  if(!pending)throw Error('Událost už byla uzavřena nebo se její stav mezitím změnil.');
+  const outcome=String(fd.get('outcome')||''),details=String(fd.get('details')||'').trim();
+  if(!['consequences-completed','no-further-consequences'].includes(outcome)||details.length<6||details.length>400)
+   throw Error('Vyberte skutečný výsledek a stručně popište doložené následky.');
+  if(!mutate(()=>{data.journal.push({id:uuid(),characterId:pending.characterId,
+   calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,createdAt:stamp(),
+   title:'HMK · dořešení přerušení časové epizody',body:details,
+   calendarEpisodeGeneralResolution93869:{format:UNIVERSAL_STOP_RESOLUTION_FORMAT_93869,
+    episodeId:pending.id,outcome,details}});
+  }))throw Error('Dořešení se nepodařilo uložit.');
+  notice='Potvrzené dořešení přerušení bylo zapsáno. Původní minuta události i celé časové okno zůstávají beze změny.';
+ }catch(error){alert('Dořešení přerušení: '+error.message);}
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-episode-finish-interruption]'))return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -29008,6 +29158,7 @@ document.addEventListener('change',e=>{
 },true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-shared-window-create]');if(!btn)return;
+ if(episodeUnresolvedGeneralStops93869(data.campaignClock).length){alert('Nejprve dořešte potvrzené přerušení z předchozí epizody.');return;}
  e.preventDefault();
  try{
   if(sharedTimeWindowDraft||sharedTimeWindowQueue.length||episodeEvaluationRequested||episodeStageBaseline)
@@ -29161,6 +29312,7 @@ document.addEventListener('submit',e=>{
   if(episodeIdentityMismatch(form))throw Error(episodeIdentityMismatch(form));
   if(!data.campaignClock||combatInitiativeSequence)throw Error('Kampaň musí být otevřená mimo boj.');
   if(episodePendingEncounter(data.campaignClock))throw Error('Cesta je přerušena setkáním. Nejprve uzavřete Encounter; další herní čas se nesmí posunout.');
+  if(episodeUnresolvedGeneralStops93869(data.campaignClock).length)throw Error('Po skončeném intervalu nejprve dořešte událost, která zastavila předchozí činnost.');
   for(const [field,id] of episodePinnedSkillFields)
    if(form.elements.namedItem(field)&&form.elements.namedItem(field).value!==id)
     throw Error('Doklad '+field+' už byl přiřazen k této epizodě a nesmí být změněn.');
@@ -29277,7 +29429,7 @@ document.addEventListener('submit',e=>{
        rolls:[],sourcePages:[149,150,176]},result.endMinute,'gm-episode-weather-fatigue',sourceId+':weather:'+id);
      }
      const current=persistentStateOf(actor).fatigue[target];
-     const plan=calculateEpisodeMinuteRecovery({kind,minute:result.startMinute,minutes:result.minutes,
+     const plan=calculateEpisodeMinuteRecovery({kind,minute:result.startMinute,minutes:result.generalStop93869?.performedMinutes??result.minutes,
       current,prior:expedition.minuteRecovery?.[kind],legacyClaimStart:expedition.claims?.[claimKey]});
      const committed=commitExpeditionFatigue(actor,{...plan,durationMinutes:result.minutes,
       sourcePages:[150,176]},result.endMinute,'gm-episode-minutes',sourceId+':'+id);
