@@ -142,7 +142,7 @@ import { WORKSHOP_SKILLS_P121, workshopQuality, occupationalWorkshop, waterWeigh
 import { EXPEDITION_EQUIPMENT_P120, CRAFT_ITEMS_TOOLS_P121, WORKSHOP_QUALITY_P121, WATER_WEIGHT_P121, MUNDANE_FIRE_P121 } from './src/rules/possessions-printed.js';
 import { BEASTS_P122, VEHICLES_TACK_P122, CONVEYANCE_RULES_P122 } from './src/rules/conveyance-printed-p122.js';
 import {survivalAccidentVictimPool93846} from './src/integration/hmk-survival-accident-pool-93846.js';
-import {prepareStableAnimalHealthRegistration93759} from './src/integration/hmk-stable-animal-health-registration-93759.js';
+import {animalBaselineFromStable93861,missingStableHealth93861,validateStableAutoHealth93861} from './src/integration/hmk-stable-auto-health-93861.js';
 import {equipmentHazardSkill93843} from './src/integration/hmk-equipment-hazard-skill-93843.js';
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
 import {planTravelEquipment93812,resolveTravelMount93837,isRidingAnimal93837} from './src/integration/hmk-travel-equipment-guide-93812.js';
@@ -355,7 +355,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.860';
+const APP_VERSION='93.861';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -608,6 +608,7 @@ function validate(d){
  validateAnimalTrainingCalendar590(d);
  validateLogbookVisibility(d);
  validateLivestockEvidence(d);
+ validateStableAutoHealth93861(d);
  validateStableHub(d,livestockOffer);
  validateStableTravel575(d);
  validateTransportVehicleHistory93756(d);
@@ -3053,14 +3054,14 @@ function timeEpisodePageHTML(clock,participants){
  ${looseTravelVehicles.length?`<div class="hc-episode-stable-assign"><p class="hc-hint"><strong>Pozor: kára nebo vůz v inventáři ještě není ve Stáji.</strong> Vyberte skutečný vůz a zvíře stejného vlastníka; převedení bez dalšího nákupu vytvoří původní evidenční doklad a vozidlo pak bude dostupné v rozbalovacím seznamu.</p><label>Vlastněné vozidlo z inventáře<select data-episode-attach-vehicle-choice>${looseTravelVehicles.map((a,i)=>`<option value="${i}">${esc(a.gearName)} · ${esc(a.ownerName)} → ${esc(a.animalName)}</option>`).join('')}</select></label><button type="button" class="secondary hc-small" data-episode-attach-inventory-vehicle="yes">Zařadit vlastněný vůz do Stáje</button></div>`:
  !transportVehicleRows.length?`<p class="hc-hint">V nabídce není žádná kára ani vůz přímo zařazený ve Stáji. Pokud jste vozidlo pořídili v Knihovně, nejdříve je převeďte na konkrétní zvíře ve Stáji; samotný osobní inventář k jízdě nestačí. Nové vozidlo můžete také pořídit přímo ve Stáji postavy.</p>`:''}</section>
  ${stableTravelRoster.length?`<fieldset data-episode-stable-roster><legend>Zvířata na cestě · výběr ze Stáje</legend>
- <details class="hmk-transport-guidance"><summary>Odkud se přebírá vybavení a zdraví?</summary><p>Každé zvíře vyberte jednou ze Stáje. Stáj určuje vlastnictví, postroje a náklad; existující zdravotní profil stejného ID pouze omezuje pohyb. Pochod nevytváří bojový stav ani domyšlenou únavu.</p></details>
+ <details class="hmk-transport-guidance"><summary>Odkud se přebírá vybavení a zdraví?</summary><p>Každé zvíře vyberte jednou ze Stáje. Stáj určuje vlastnictví, postroje a náklad; zdravotní profil stejného ID vzniká automaticky při pořízení a omezuje pohyb. Pochod nevytváří další bojový stav ani domyšlenou únavu.</p></details>
  <div class="hc-episode-animal-roster">${stableTravelRoster.map(a=>{const b=stableBurden(data,campaignKey(clock),a),profile=data.characters.find(x=>x.id===a.id);let health=null;
  try{assertNoActiveBestiaryTravelConflict93815({journal:data.journal,campaignId:campaignKey(clock),animalIds:[a.id]});
-  if(profile&&profile.hmk?.verifiedMountedBreed!==a.spec.breed)throw Error('Zdravotní profil stejného ID má jiné plemeno.');
+  if(profile&&profile.hmk?.verifiedMountedBreed!==(a.spec.breed||a.spec.bestiaryId))throw Error('Zdravotní profil stejného ID má jiné plemeno.');
   if(profile&&!(clock.characterIds||[]).includes(profile.id))throw Error('Zdravotní profil není aktivní v kalendáři.');
   if(profile)health=trekRegisteredAnimalHealth(profile);
  }catch(err){health={error:err.message}}
- const healthStatus=!health?'Bez samostatného zdravotního profilu – pouze doložený stav ve Stáji':health.error?'CHYBNÝ ZDRAVOTNÍ STAV: '+health.error:health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40?'NEMŮŽE SE SAMO PŘESOUVAT':health.injured?'Zraněné · režim Slow':health.fatigue>=20?'Unavené · režim Slow':'Zdravotní stav bez omezení pohybu';
+ const healthStatus=!health?'Zdravotní profil zatím chybí – vyžaduje bezpečné doplnění staršího vlastnictví':health.error?'CHYBNÝ ZDRAVOTNÍ STAV: '+health.error:health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40?'NEMŮŽE SE SAMO PŘESOUVAT':health.injured?'Zraněné · režim Slow':health.fatigue>=20?'Unavené · režim Slow':'Zdravotní stav bez omezení pohybu';
  const blocked=!!health&&(!!health.error||health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40);
  return `<div class="hc-episode-stable-animal${blocked?' hc-episode-animal-unfit':''}" data-episode-stable-animal="${esc(a.id)}"><label class="hc-check"><input name="stableAnimalIds" type="checkbox" value="${esc(a.id)}" ${otherGroupAnimals93848.has(a.id)?'disabled title="V jiném souběžném intervalu již přiřazeno jiné skupině"':''}><span><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ${esc(a.spec.role||'Zvíře ze Stáje')}${!isRidingAnimal93837(a)?' · NENÍ JÍZDNÍ':''} · ENC ${Number.isSafeInteger(b.adjustedENC)?b.adjustedENC:'nedoloženo'}${b.travelRide93823?.occupants?.length?' · poslední doložená jízda':''}${b.cargoOverflow?' · PŘETÍŽENO':''}${otherGroupAnimals93848.has(a.id)?' · OBSAZENO JINOU SKUPINOU':''}</span></label><p class="hc-hint hc-episode-animal-health">Zdravotní stav: ${esc(healthStatus)}</p>${profile?`<div class="hc-episode-animal-actions"><button type="button" class="secondary hc-small" data-trek-leave-animal="${esc(a.id)}">Opustit zvíře (včetně ponechaného nákladu)</button><details class="hc-trek-animal-injuries"><summary>Aktuální zranění (HMK 355)</summary>${hmkAnimalWoundAnatomyHTML(profile)}</details></div>`:''}</div>`}).join('')}</div></fieldset>`:''}
  ${animalRoster.some(a=>!stableTravelRoster.some(s=>s.id===a.id))?`<fieldset data-episode-unmatched-animal><legend>Starší zvířecí zdravotní profily bez záznamu Stáje</legend><p class="hc-hint">Tyto historické profily nejsou v seznamu ověřených zvířat Stáje. Pro novou jízdu či tažení nelze jejich plemeno, postroje nebo náklad odhadovat. Historické údaje zůstávají zachovány.</p><div class="hc-episode-members">${animalRoster.filter(a=>!stableTravelRoster.some(s=>s.id===a.id)).map(a=>{let health;
@@ -7095,9 +7096,9 @@ function livestockAcquisitionHTML({location='library'}={}){
  const active=verifiedLivestock(data,campaignId);
  const options=registryCharacters93813(data.characters).filter(c=>!c.archived).map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${esc(cashForCharacter(c).ok?cashForCharacter(c).balance+'d':'hotovost nedoložena')}</option>`).join('');
  const beasts=BEASTS_P122.filter(b=>livestockOffer(b.id));
- const acquisition=`<h3>Stáj · pořízení zvířete</h3><p class="hc-trek-explainer">HMK str. 122 a 354–355. V katalogu jsou ověřené ceny a limity výcviku. Nákup vytvoří záznam vlastnictví, kupní doklad a odečte peníze z kampaně; bezplatné převzetí hotovost nemění; <strong>nezakládá automaticky Combat State ani nesimuluje výcvik</strong>. Při cestování se použije doložená tělesná hmotnost a základní STR.</p>
+ const acquisition=`<h3>Stáj · pořízení zvířete</h3><p class="hc-trek-explainer">HMK str. 122 a 354–355. V katalogu jsou ověřené ceny a limity výcviku. Nákup vytvoří záznam vlastnictví, kupní doklad a odečte peníze z kampaně; bezplatné převzetí hotovost nemění; <strong>zároveň automaticky zakládá druhově ověřený výchozí zdravotní profil; výcvik se nesimuluje</strong>. Při cestování se použije doložená tělesná hmotnost a základní STR.</p>
  ${clock&&options?`<form data-hmk-livestock-acquire class="hc-livestock-acquire"><label>Druh zvířete<select name="beastId" required>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<option value="${esc(b.id)}">${esc(b.name)} · ${b.priceD}d · STR ${sp.str??'neuvedeno'} · ${sp.bodyWeightLb??'?'} lb · MB max. ${b.maxMasteryBoosts}</option>`}).join('')}</select></label><label>Jméno zvířete<input name="beastName" maxlength="60" required placeholder="Např. Blesk"></label><label>Majitel / platící postava<select name="ownerId" required>${options}</select></label><div class="hc-livestock-actions"><button type="submit" name="acquisition" value="buy">Koupit za cenu HMK</button><button type="submit" name="acquisition" value="free" class="secondary">Převzít zdarma (potvrdí GM)</button></div></form>`:'<p>Pro nákup je nutná aktivní kampaň a alespoň jedna postava.</p>'}
- <section class="hmk-stable-reference-tables"><h4>Ověřené referenční tabulky HMK</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Cena</th><th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="MB = Mastery Boost. Nejvyšší počet bonusů získatelných výcvikem Animalcraft (HMK str. 65, druhové maximum str. 122). Každý bonus vyžaduje skutečný úspěšný d10 a příslušnou dobu výcviku; ML se zvyšuje podle tabulky na str. 46.">Max MB</th><th>Hmotnost</th><th>STR</th><th>Move</th><th>Využití</th></tr></thead><tbody>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<tr><td>${esc(b.name)}</td><td>${b.priceD}d</td><td>${b.maxMasteryBoosts}</td><td>${sp.bodyWeightLb??'—'} lb</td><td>${sp.str??'—'}</td><td>${sp.move??'—'}</td><td>${esc(sp.role)}</td></tr>`}).join('')}</tbody></table></div><h4>Bestiář HMK · základní atributy a dovednosti (str. 355)</h4><p class="hmk-stable-table-hint">Širokou tabulku lze vodorovně posunout; každý řádek odpovídá jednomu druhu.</p><div class="catalog-scroll hmk-stable-stats-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Velikost</th>${['END','AGL','PER','AUR','WIL','REA','CRE','Awareness','Scent','Stealth','Spirit','Initiative'].map(k=>`<th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="${esc(stableStatHelp580(k))}">${esc(k)}</th>`).join('')}</tr></thead><tbody>${beasts.filter(x=>livestockOffer(x.id).size).map(x=>{const a=livestockOffer(x.id);return `<tr><td>${esc(x.name)}</td>${['size','end','agl','per','aur','wil','rea','cre','aware','scent','stealth','spirit','initiative'].map(k=>`<td>${esc(a[k]??'—')}</td>`).join('')}</tr>`}).join('')}</tbody></table></div><h4>Přirozené útoky (jen referenční popis)</h4>${beasts.filter(x=>livestockOffer(x.id).attack).map(x=>`<p class="hc-trek-explainer"><strong>${esc(x.name)}:</strong> ${esc(livestockOffer(x.id).attack)}</p>`).join('')}<p class="hmk-stable-ref-small">Tištěné hodnoty ukazují výchozí domestikaci, nikoli výsledky výcviku. Tyto referenční útoky nejsou automaticky vytvářené bojové akce; zvířecí zdravotní a bojový profil se eviduje samostatně.</p><p class="hmk-stable-ref-small">Vybavení se kupuje samostatně: pack harness 24d/10 lb (správně uložený náklad nejvýše 20 % hmotnosti zvířete), postroj pro koně 20d, postroj pro vola 20d, kára 84d, vůz 220d. Vůz typicky táhnou dva voli (8000 lb) nebo dva tažní koně (6400 lb). Kára jeden vůl (2500 lb) nebo jeden tažný kůň (2000 lb). Vůl přidává vlastní Slow Mode (HMK 122, 145).</p></section>
+ <section class="hmk-stable-reference-tables"><h4>Ověřené referenční tabulky HMK</h4><div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Cena</th><th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="MB = Mastery Boost. Nejvyšší počet bonusů získatelných výcvikem Animalcraft (HMK str. 65, druhové maximum str. 122). Každý bonus vyžaduje skutečný úspěšný d10 a příslušnou dobu výcviku; ML se zvyšuje podle tabulky na str. 46.">Max MB</th><th>Hmotnost</th><th>STR</th><th>Move</th><th>Využití</th></tr></thead><tbody>${beasts.map(b=>{const sp=livestockOffer(b.id);return `<tr><td>${esc(b.name)}</td><td>${b.priceD}d</td><td>${b.maxMasteryBoosts}</td><td>${sp.bodyWeightLb??'—'} lb</td><td>${sp.str??'—'}</td><td>${sp.move??'—'}</td><td>${esc(sp.role)}</td></tr>`}).join('')}</tbody></table></div><h4>Bestiář HMK · základní atributy a dovednosti (str. 355)</h4><p class="hmk-stable-table-hint">Širokou tabulku lze vodorovně posunout; každý řádek odpovídá jednomu druhu.</p><div class="catalog-scroll hmk-stable-stats-scroll"><table class="catalog-spec"><thead><tr><th>Zvíře</th><th>Velikost</th>${['END','AGL','PER','AUR','WIL','REA','CRE','Awareness','Scent','Stealth','Spirit','Initiative'].map(k=>`<th class="hmk-stable-stat-tip" tabindex="0" data-hmk-help="${esc(stableStatHelp580(k))}">${esc(k)}</th>`).join('')}</tr></thead><tbody>${beasts.filter(x=>livestockOffer(x.id).size).map(x=>{const a=livestockOffer(x.id);return `<tr><td>${esc(x.name)}</td>${['size','end','agl','per','aur','wil','rea','cre','aware','scent','stealth','spirit','initiative'].map(k=>`<td>${esc(a[k]??'—')}</td>`).join('')}</tr>`}).join('')}</tbody></table></div><h4>Přirozené útoky (jen referenční popis)</h4>${beasts.filter(x=>livestockOffer(x.id).attack).map(x=>`<p class="hc-trek-explainer"><strong>${esc(x.name)}:</strong> ${esc(livestockOffer(x.id).attack)}</p>`).join('')}<p class="hmk-stable-ref-small">Tištěné hodnoty ukazují výchozí domestikaci, nikoli výsledky výcviku. Tyto referenční útoky nejsou automaticky vytvářené bojové akce; zvířecí výchozí zdravotní profil vzniká automaticky při pořízení; další rány vznikají výhradně z potvrzených následků.</p><p class="hmk-stable-ref-small">Vybavení se kupuje samostatně: pack harness 24d/10 lb (správně uložený náklad nejvýše 20 % hmotnosti zvířete), postroj pro koně 20d, postroj pro vola 20d, kára 84d, vůz 220d. Vůz typicky táhnou dva voli (8000 lb) nebo dva tažní koně (6400 lb). Kára jeden vůl (2500 lb) nebo jeden tažný kůň (2000 lb). Vůl přidává vlastní Slow Mode (HMK 122, 145).</p></section>
 `;
  if(location==='split'){
   const marker='<section class="hmk-stable-reference-tables">',i=acquisition.indexOf(marker);
@@ -7501,7 +7502,7 @@ function downloadUnfinishedHMKState93859(){
   try{return {present:true,value:JSON.parse(raw)}}catch{return {present:true,unparsedRaw:raw,parseError:true}}}
   catch(e){return {present:false,readError:String(e?.message||e)}}};
  const currentForm=document.querySelector('#hmk-time-episode-form');
- const pkg={format:'hmk-local-working-diagnostic-v93.860',appVersion:APP_VERSION,
+ const pkg={format:'hmk-local-working-diagnostic-v93.861',appVersion:APP_VERSION,
   exportedAt:new Date().toISOString(),scope:'local-only-no-cloud-token',
   note:'Obsahuje historii kampaně a nedokončené testy. Neslouží k importu; před sdílením chraňte soukromé údaje.',
   committedCampaign:read(localStorage,STORAGE),
@@ -10606,6 +10607,40 @@ function ensureNPCShelterDefaultsOnCalendar93802(){
  // mutate() carries storage CAS, full validation and the normal cloud write.
  return !!mutate(()=>seedNPCShelterDefaults93802());
 }
+let stableAutoMigrationAttempt93861=null;
+function scheduleStableAutoMigration93861(){
+ if(storageReadOnly||episodeStageBaseline||combatInitiativeSequence||!data.campaignClock||
+  (cloudSync&&!cloudSync.canWrite()))return;
+ const cid=campaignKey(data.campaignClock),missing=missingStableHealth93861(data,cid);
+ if(!missing.length)return;
+ const signature=cid+'|'+data.campaignClock.minute+'|'+missing.map(x=>x.id).sort().join(',')+'|'+(storageBaseline?.length||0);
+ if(stableAutoMigrationAttempt93861===signature)return;
+ stableAutoMigrationAttempt93861=signature;
+ // Queued AFTER render: never mutate a DOM renderer, never alter old receipts.
+ queueMicrotask(()=>{
+  if(storageReadOnly||episodeStageBaseline||combatInitiativeSequence||
+   !data.campaignClock||campaignKey(data.campaignClock)!==cid||
+   (cloudSync&&!cloudSync.canWrite()))return;
+  const pending=missingStableHealth93861(data,cid);
+  if(!pending.length)return;
+  const originalMinute=data.campaignClock.minute;
+  const ok=mutate(()=>{
+   if(campaignKey(data.campaignClock)!==cid||data.campaignClock.minute!==originalMinute)
+    throw Error('Mezitím se změnil Kalendář; obnovte zdravotní vazby ze Stáje.');
+   for(const record of pending){
+    const proofId=uuid(),result=animalBaselineFromStable93861({data,record,campaignId:cid,
+     minute:originalMinute,proofId,legacy:true});
+    data.characters.push(result.actor);
+    if(!data.campaignClock.characterIds.includes(record.id))data.campaignClock.characterIds.push(record.id);
+    data.journal.push({id:proofId,characterId:record.id,calendarCampaignId:cid,campaignMinute:originalMinute,createdAt:stamp(),
+     title:'Stáj · převzetí historického výchozího zdravotního profilu · '+record.name,
+     body:'Jednorázová kompatibilní migrace původní evidence pořízení; původní hody a nákupní doklady beze změny.',
+     livestockHealthAuto93861:result.proof});
+   }
+  });
+  if(!ok){notice='Automatické doplnění zdravotních profilů starších zvířat nebylo možné bezpečně uložit. '+notice;render();}
+ });
+}
 function render(){
  // v93.831: rendering is read-only; NPC defaults require an explicit GM commit.
  if(episodeActiveSkillRequestId){
@@ -10695,6 +10730,7 @@ function render(){
  enhanceHMKDiceFields();
  syncWeatherCarePanel();
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
+ scheduleStableAutoMigration93861();
  decorateTimeEpisodeExclusiveLock(app);
 }
 // Follow-up panels may appear after a skill proof is appended without a full render.
@@ -11378,27 +11414,15 @@ function hskSkillPhysicalImpactForm(entry){
   survival?data.characters.filter(x=>candidateIds.has(x.id)&&
    (!watchMembers||watchMembers.has(x.id))&&!x.archived&&(x.kind!=='Animal'||!!x.hmk?.verifiedMountedBreed)):[];
  const accidentPoolError=accidentPool&&!accidentPool.ok?
-  'Nehodu zatím nelze náhodně rozdělit: zvířata ze Stáje bez aktivního ověřeného zdravotního profilu: '+
+  'Nehodu nelze uzavřít: stále chybí bezpečně převzatý zdravotní profil ze Stáje pro: '+
   (accidentPool.missingAnimals.length?accidentPool.missingAnimals.map(id=>verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===id)?.name||id).join(', '):'žádná')+
   (accidentPool.unsupportedAnimals.length?'; zvířata s jinou, dosud neimplementovanou anatomickou tabulkou: '+
    accidentPool.unsupportedAnimals.map(id=>verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===id)?.name||id).join(', '):'')+
   (accidentPool.missingPeople.length?'; neaktivní členové skupiny: '+accidentPool.missingPeople.join(', '):'')+
-  '. Nejprve dokončete jejich původní zdravotní registraci nebo předejte odlišnou anatomii GM; žádný hod ani zranění nevymýšlejte.':null;
- // The Stable confirms ownership, not a pre-accident health baseline. A
- // verified, GM-attested medical actor can be enrolled here without revising
- // the original watch, its dice, or the campaign minute.
- const missingStableAnimals=accidentPool?.missingAnimals.filter(animalId=>
-  verifiedLivestock(data,campaignKey(data.campaignClock)).some(animal=>animal.id===animalId)&&
-  !data.characters.some(actor=>actor.id===animalId))||[];
- const animalHealthRegistrationUI=missingStableAnimals.length?`<fieldset class="hc-event hmk-accident-health-registration" data-hsk-accident-animal-setup>
- <legend>Chybějící zdravotní profil zvířete · ověření GM</legend>
- <p class="hc-hint">Zvíře již patří do původní nehody; nesmí být vynecháno z náhodného losování. Pouze pokud GM skutečně ověřil, že <strong>před touto nehodou</strong> nemělo nevyřešené zranění, Shock, Coma ani další zdravotní stav, lze založit jeho výchozí profil. Nenahrazuje to hod Agility ani léčbu a neposune to Kalendář.</p>
- <label>Zvíře původní skupiny<select name="registerAnimalId">${missingStableAnimals.map(animalId=>`<option value="${esc(animalId)}">${esc(verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===animalId)?.name||animalId)}</option>`).join('')}</select></label>
- <label>Skutečný podklad zdravotního ověření (alespoň 8 znaků)<textarea name="animalHealthExamNote" rows="2" minlength="8" maxlength="500" placeholder="Co GM ověřil a na základě čeho"></textarea></label>
- <label><input type="checkbox" name="animalHealthExamined"> GM doložil výchozí zdraví před nehodou; žádné známé starší rány ani jiné nevyřešené následky</label>
- <label><input type="checkbox" name="animalHealthGMConfirmed"> GM výslovně potvrzuje zápis trvalého zdravotního profilu do původní kampaně</label>
- <button type="button" class="hc-small secondary" data-hsk-register-accident-animal>Založit ověřený zdravotní profil a pokračovat</button>
- <output data-hsk-animal-registration-status role="status" aria-live="polite"></output></fieldset>`:'';
+  '. Otevřete Stáj a obnovte aplikaci, aby proběhlo automatické doplnění staršího zvířete. Pokud existuje starší Bestiář trauma, musí být nejprve bezpečně sjednoceno; žádný hod ani zranění nevymýšlejte.':null;
+ // v93.861: Stable acquisition also creates the canonical health actor.
+ // Legacy acquisitions migrate without GM checkboxes when existing trauma
+ // records allow a non-destructive one-time baseline.
  const targetOptions='<option value="">— nejprve určete náhodně —</option>'+eligibleTargets.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
  const dieInput=(name,faces,label)=>'<label>'+label+'<input type="number" name="'+name+'" min="1" max="'+faces+'" inputmode="numeric"></label>';
  return `<form class="hsk-climb-fall" data-skill-physical-impact>
@@ -11406,7 +11430,7 @@ function hskSkillPhysicalImpactForm(entry){
  <h4>${survival?'Survival Hazard · HMK str. 148':'Fishing · náhodné zranění d10e · HMK str. 71'}</h4>
  <p>${survival?(fixedHazardDie!=null?'Survival Hazard d10 = <strong>'+esc(String(fixedHazardDie))+'</strong> je převzat z dokončeného Cestování. <strong>Neházejte jej znovu.</strong> Pokračujte náhodným výběrem účastníka a testem Agility.':'Nejprve určete d10: <strong>1–3 Equipment</strong> (výstroj), <strong>4–6 Accident</strong> (nehoda), <strong>7–10 Complication</strong> (komplikace). Jen Accident vyžaduje náhodného účastníka a Agility; další hody vznikají až při F/CF. Nevyplňujte skryté nepovinné hodnoty.'):'Fishing CF způsobí Impact d10e do náhodné lokality. Fyzické hody určují následek podle HMK.'}</p>
  ${survival?`<div class="hsk-hazard-step"><div class="field-grid">${fixedHazardDie!=null?'<label>Survival Hazard d10 – převzato z dokončeného Cestování<input type="number" name="hazardD10" min="1" max="10" readonly value="'+esc(String(fixedHazardDie))+'"></label>':dieInput('hazardD10',10,'Survival Hazard d10 (povinný)')}</div><p class="tiny" data-hsk-hazard-guidance>Vyplňte nebo vygenerujte d10; podle výsledku se objeví pouze potřebné další vstupy.</p></div>
- <div data-hsk-hazard-accident ${fixedHazardDie>=4&&fixedHazardDie<=6?'':'hidden'} class="hsk-hazard-step">${animalHealthRegistrationUI}${accidentPoolError?`<p role="alert" class="hc-episode-await" data-hsk-accident-pool-blocked>${esc(accidentPoolError)}</p>`:`<p class="hc-hint" data-hsk-accident-pool-count>Losování zahrnuje všech ${eligibleTargets.length} doložených účastníků původního intervalu, včetně registrovaných jízdních a tažných zvířat.</p>`}<div class="field-grid"><label>Náhodně zvolený účastník
+ <div data-hsk-hazard-accident ${fixedHazardDie>=4&&fixedHazardDie<=6?'':'hidden'} class="hsk-hazard-step">${accidentPoolError?`<p role="alert" class="hc-episode-await" data-hsk-accident-pool-blocked>${esc(accidentPoolError)}</p>`:`<p class="hc-hint" data-hsk-accident-pool-count>Losování zahrnuje všech ${eligibleTargets.length} doložených účastníků původního intervalu, včetně registrovaných jízdních a tažných zvířat.</p>`}<div class="field-grid"><label>Náhodně zvolený účastník
  <select name="targetId" ${accidentPoolError?'disabled':''}>${targetOptions}</select></label>
  ${dieInput('agilityD100',100,'Agility d100 náhodně zvoleného účastníka')}</div>
  <button type="button" class="hc-small hc-provision-generate" data-hsk-random-victim ${accidentPoolError?'disabled':''}>⚄ Náhodně určit účastníka</button>
@@ -12955,58 +12979,9 @@ function refreshPhysicalDiceByKind(form){
 }
 document.addEventListener('input',e=>{const form=e.target?.closest?.('[data-skill-physical-impact]');if(form&&['hazardD10','agilityD100','impactDie','zoneD10','locationD10'].includes(e.target.name))refreshPhysicalDiceByKind(form);},true);
 document.addEventListener('change',e=>{const form=e.target?.closest?.('[data-skill-physical-impact]');if(form&&['hazardD10','agilityD100','targetId','direction','impactDie','zoneD10','locationD10'].includes(e.target.name))refreshPhysicalDiceByKind(form);},true);
-// Safely bridge the Staj's verified purchase into the original animal health
-// authority at the SAME calendar minute. A retrospective GM attestation is
-// mandatory; no dice, injuries, clock changes or healing are invented.
-document.addEventListener('click',event=>{
- const b=event.target.closest?.('[data-hsk-register-accident-animal]');if(!b)return;
- event.preventDefault();event.stopImmediatePropagation();
- const form=b.closest('[data-skill-physical-impact]'),box=b.closest('[data-hsk-accident-animal-setup]');
- const out=box?.querySelector('[data-hsk-animal-registration-status]');
- try{
-  if(!form||!box||!data.campaignClock||combatInitiativeSequence)throw Error('Nejprve otevřete platný následný Hazard mimo bojové Initiative.');
-  const read=name=>String(box.querySelector('[name="'+name+'"]')?.value||'').trim();
-  const animalId=read('registerAnimalId'),examNote=read('animalHealthExamNote');
-  const gmConfirmed=box.querySelector('[name="animalHealthGMConfirmed"]')?.checked===true;
-  const examinedHealthy=box.querySelector('[name="animalHealthExamined"]')?.checked===true;
-  const sourceId=form.elements.namedItem('sourceId')?.value;
-  const origin=data.journal.find(j=>j.id===sourceId),proof=origin?.skillTestProof;
-  const cid=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
-  if(proof?.type!=='secondary-mastery-value-test'||proof.skills?.[0]!=='Survival'||proof.a?.level!=='CF'||
-   origin?.calendarEpisodeSkillLink?.field!=='orientationProofId')throw Error('Není doložen původní Survival CF.');
-  const receipt=data.journal.find(j=>j.calendarCampaignId===cid&&
-   j.calendarTimeEpisode?.orientation?.skillId===sourceId&&
-   j.calendarTimeEpisode?.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending&&h.hazardD10>=4&&h.hazardD10<=6));
-  if(!receipt||receipt.calendarTimeEpisode.endMinute!==minute)throw Error('Neplatný původní čas nebo nehoda d10.');
-  const ep=receipt.calendarTimeEpisode;
-  if(![...(ep.settings?.stableAnimalIds||[]),...(ep.settings?.animalIds||[])].includes(animalId))
-   throw Error('Zvíře nepatřilo do původního cestovního intervalu.');
-  if(data.journal.some(j=>j.skillTestProof?.type==='skill-physical-consequence'&&j.skillTestProof.sourceId===sourceId))
-   throw Error('Následek nehody už byl potvrzen.');
-  if(!examinedHealthy||!gmConfirmed||examNote.length<8)throw Error('GM musí potvrdit skutečně doložený výchozí stav a uvést jeho podklad.');
-  const registrationId=uuid();
-  if(!mutate(()=>{
-   const result=prepareStableAnimalHealthRegistration93759({data,campaignId:cid,minute,animalId,
-    gmConfirmed,examinedHealthy,examNote,proofId:registrationId});
-   data.characters.push(result.actor);
-   data.campaignClock.characterIds.push(result.actor.id);
-   data.journal.push({id:registrationId,characterId:result.actor.id,calendarCampaignId:cid,
-    campaignMinute:minute,createdAt:stamp(),title:'Stáj · ověřený výchozí zdravotní profil · '+result.actor.name,
-    body:'GM doložil výchozí zdravotní stav před původní nehodou; beze změny času a hodů. '+examNote,
-    animalHealthRegistration93759:result.proof});
-  }))throw Error('Ověřená zdravotní registrace nebyla uložena; původní kampaň zůstala zachována.');
-  // Do not strand the GM in a hidden follow-up after a successful render.
-  // Reopen the SAME original Accident receipt, never start another roll.
-  if(view==='skills'&&activeSkillTab==='followups'){
-   const source=document.querySelector('[data-hmk-followup-source-598]');
-   const same=[...(source?.querySelectorAll('form[data-skill-physical-impact]')||[])].find(f=>
-    f.elements.namedItem('sourceId')?.value===sourceId);
-   const choice=document.querySelector('[data-hmk-followup-choice-598]');
-   const open=document.querySelector('[data-hmk-followup-open-598]');
-   if(same&&choice&&open){choice.value=same.dataset.hmkFollowupEntry598;open.click();}
-  }
- }catch(error){if(out)out.textContent='Zdravotní registrace nebyla provedena: '+String(error?.message||error);else alert(String(error?.message||error));}
-},true);
+// v93.861: removed the redundant, sometimes inaccessible GM health
+// registration click handler. Stable acquisition and legacy migration now
+// establish the same actor identity atomically before the accident lottery.
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-hsk-random-victim]');if(!b)return;e.preventDefault();
  const form=b.closest('form'),sel=form?.elements.namedItem('targetId');if(!sel)return;
@@ -13053,7 +13028,7 @@ document.addEventListener('submit',event=>{
    const pool=survivalAccidentVictimPool93846({memberIds:originEp?.memberIds||[],
     stableAnimalIds:originEp?.settings?.stableAnimalIds||[],legacyAnimalIds:originEp?.settings?.animalIds||[],
     characters:data.characters,activeIds:data.campaignClock?.characterIds||[]});
-   if(!pool.ok)throw Error('Accident: losování musí zahrnout všechny původní účastníky, včetně zvířat. Nejdřív dokončete zdravotní registraci zvířat a ověřte aktivní skupinu.');
+   if(!pool.ok)throw Error('Accident: losování musí zahrnout všechny původní účastníky, včetně zvířat. Zdravotní profil je automatický ze Stáje; zkontrolujte bezpečné převzetí staršího vlastnictví a aktivní skupinu.');
    if(!pool.expectedIds.includes(raw('targetId')))throw Error('Accident: oběť není členem původní družiny.');
   }
   const target=character(accident?raw('targetId'):proof.actorId);
@@ -18408,12 +18383,24 @@ document.addEventListener('submit',e=>{
    if(mode==='buy')prepareLibraryPurchase(live,beast.priceD,cid);
    const id=uuid(),txId=uuid();
    live.hmk??={};live.hmk.livestock??=[];
-   live.hmk.livestock.push({id,name,beastId,ownerId,priceD:beast.priceD,mode,campaignId:cid,minute,maxMB:beast.maxMasteryBoosts,transactionId:txId});
+   const acquired={id,name,beastId,ownerId,priceD:beast.priceD,mode,campaignId:cid,minute,maxMB:beast.maxMasteryBoosts,transactionId:txId};
+   live.hmk.livestock.push(acquired);
+   // Every acquired catalogue animal gets one live, anatomically typed
+   // baseline at the identical purchase minute. Ownership and medical actor
+   // share the same ID; no separate GM registration or fabricated die.
+   const healthId=uuid();
+   const baseline=animalBaselineFromStable93861({data,record:acquired,campaignId:cid,minute,proofId:healthId});
+   data.characters.push(baseline.actor);
+   if(!data.campaignClock.characterIds.includes(id))data.campaignClock.characterIds.push(id);
+   data.journal.push({id:healthId,characterId:id,calendarCampaignId:cid,campaignMinute:minute,createdAt:at,
+    title:'Stáj · automatický výchozí zdravotní profil · '+name,
+    body:'Pravidlový zdravotní registr vznikl zároveň s pořízením zvířete, bez dalšího hodu, léčení a posunu času.',
+    livestockHealthAuto93861:baseline.proof});
    // Livestock is NEVER a carried Inventory Item. The actual animal belongs
    // to the stable; its cost is accounted in the immutable campaign cash ledger.
    if(mode==='buy')recordCampaignCoinAdjustment(live,{campaignId:cid,minute,id:txId,at,deltaPence:-beast.priceD,
      reason:'Nákup zvířete podle HMK 122: '+beast.name+' · '+name});
-   data.journal.push({id:uuid(),characterId:ownerId,calendarCampaignId:cid,campaignMinute:minute,createdAt:at,title:'HMK 122 · '+(mode==='buy'?'nákup zvířete':'převzetí zvířete'),body:beast.name+' · '+name+' · '+(mode==='buy'?beast.priceD+'d':'bezplatně')+'; registr stáje; žádný automatický výcvik ani zdravotní stav',livestockAcquisition:{animalId:id,ownerId,beastId,name,priceD:beast.priceD,mode,transactionId:txId}});
+   data.journal.push({id:uuid(),characterId:ownerId,calendarCampaignId:cid,campaignMinute:minute,createdAt:at,title:'HMK 122 · '+(mode==='buy'?'nákup zvířete':'převzetí zvířete'),body:beast.name+' · '+name+' · '+(mode==='buy'?beast.priceD+'d':'bezplatně')+'; registr stáje a výchozí zdravotní profil; žádný automatický výcvik',livestockAcquisition:{animalId:id,ownerId,beastId,name,priceD:beast.priceD,mode,transactionId:txId}});
   }))notice=`Do stáje bylo zařazeno ${name} (${beast.name}).`;
  }catch(err){alert('Pořízení zvířete: '+err.message)}
 },true);
