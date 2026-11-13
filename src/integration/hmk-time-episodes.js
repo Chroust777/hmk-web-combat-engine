@@ -17,6 +17,7 @@ import {trackingModifiers,trackingOutcome} from './hmk-trekking-wilderness-tasks
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js';
 import {validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
 import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
+import {incidentMinutes93863} from './hmk-incident-window-93863.js';
 export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -810,6 +811,21 @@ export function validateTimeEpisodes(journal=[]){
      directionObservationDeferred:h.directionObservationDeferred===true});
     const linked=h.evidenceId?journal.find(k=>k.id===h.evidenceId&&
      k.calendarCampaignId===j.calendarCampaignId&&k.campaignMinute===e.startMinute):null;
+    if(h.automationVersion==='v93.863-fixed-window-incident'&&h.hazard==='accident'){
+     const incident=incidentMinutes93863({minutes:e.minutes,atMinute:h.hazardAtMinute,
+      kind:e.kind,incomingDelay:e.kind==='travel'?Number(e.travelDelay?.incoming||0):0});
+     must(h.externalMedicalPending===true&&h.requiresGMCompletion===false&&
+      h.result==='pending-original-skill-combat'&&whole(h.hazardD10,4,6)&&
+      e.endMinute===e.startMinute+e.minutes&&h.medicalHandoffMinute===e.endMinute&&
+      e.orientation?.level==='CF'&&e.survivalHazard==='accident'&&
+      !h.accidentProof&&!h.injuryProofId&&!h.victimId,
+      'Accident: skutečná minuta a zdravotní předání musí zachovat celé okno a původní hod.');
+     if(e.kind==='travel')must(e.movementMinutes===incident.movementMinutes&&
+      e.travelDelay?.current===incident.idleMinutes&&
+      e.travelDelay?.method==='gm-incident-fixed-window-v93.863',
+      'Accident: metry a únava musí používat jen skutečné minuty pohybu, nikoli změnit Kalendář.');
+     continue;
+    }
     if(['v93.675','v93.773-end-of-episode'].includes(h.automationVersion)&&h.hazard==='accident'){
      must(h.externalMedicalPending===true&&h.requiresGMCompletion===false&&
       h.result==='pending-original-skill-combat'&&whole(h.hazardAtMinute,1,e.minutes)&&
@@ -1137,13 +1153,13 @@ export function validateTimeEpisodes(journal=[]){
   if(e.travelDelay!==undefined){
    must(e.kind==='travel','Zdržení lze přenášet jen mezi cestovními epizodami.');
    const d=e.travelDelay;
-   const independent=d.method==='gm-complication-only-v93.695';
+   const independent=['gm-complication-only-v93.695','gm-incident-fixed-window-v93.863'].includes(d.method);
    const expected=episodeMinuteDelay({minutes:e.minutes,
     incoming:d.method==='gm-current-episode-only-v2'?0:independent?
      independentTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute,travelScope):
      lastEpisodeTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute),
     current:d.current,future:d.future,persistCarry:d.method!=='gm-current-episode-only-v2'});
-   if(independent)expected.method='gm-complication-only-v93.695';
+   if(independent)expected.method=d.method;
    must(JSON.stringify(expected)===JSON.stringify(d)&&
     (e.medicalTravelStop?e.movementMinutes<=d.movementMinutes:e.movementMinutes===d.movementMinutes),
     'Zdržení nebo přenesené minuty neodpovídají předchozí cestě.');
@@ -1160,9 +1176,12 @@ export function validateTimeEpisodes(journal=[]){
    const outcome=hazard?.result;
    const currentComplication=hazard?.hazard==='complication'&&hazard.automationVersion==='v93.681';
    const mandatoryNext=(hazard?.hazard==='equipment'||currentComplication)&&['long-delay','irreparable'].includes(outcome);
+   const verifiedIncident=d.method==='gm-incident-fixed-window-v93.863'&&
+    e.hazardDetails?.some(h=>h.hazard==='accident'&&h.automationVersion==='v93.863-fixed-window-incident'&&
+     Number.isSafeInteger(h.hazardAtMinute)&&d.current===e.minutes-h.hazardAtMinute);
    if(d.method!=='gm-current-episode-only-v2')must(d.future===((independent?(currentComplication&&['long-delay','irreparable'].includes(outcome)):mandatoryNext)?e.minutes:0)&&
-    (d.current===0||!!hazard),
-    'Zdržení v další hlídce nemá doložený Equipment Hazard nebo je jeho délka pozměněna.');
+    (d.current===0||!!hazard||verifiedIncident),
+    'Zdržení v další hlídce nemá doložený Equipment/Complication Hazard ani potvrzenou minutu nehody.');
    if(e.equipmentSlowCarryOut!==undefined){
     const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute,travelScope);
     const repairS=e.hazardDetails?.find(h=>h.hazard==='equipment'&&h.result==='short-delay');

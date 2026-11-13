@@ -45,7 +45,12 @@ export function fixedAccidentMinute93773({startMinute,endMinute,minutes,hazards=
     endMinute!==startMinute+minutes||minutes<1)throw Error('Neplatný časový rozsah nehody.');
  for(const h of hazards){
   if(h?.hazard==='accident'&&h.externalMedicalPending){
-   if(h.hazardAtMinute!==minutes)throw Error('Nehoda musí být evidována na konci společné epizody.');
+   if(h.automationVersion==='v93.863-fixed-window-incident'){
+    if(!Number.isSafeInteger(h.hazardAtMinute)||h.hazardAtMinute<1||h.hazardAtMinute>minutes||
+       h.medicalHandoffMinute!==endMinute)
+     throw Error('Nová nehoda: původní interval i zdravotní předání musí zůstat zachovány.');
+   }else if(h.hazardAtMinute!==minutes)
+    throw Error('Starší nehoda musí být evidována na konci společné epizody.');
   }
  }
  return endMinute;
