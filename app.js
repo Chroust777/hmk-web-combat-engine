@@ -1,5 +1,6 @@
 import {TRAVEL_RIDING_FORMAT_93823,recordedTravelRide93823} from './src/integration/hmk-travel-riding-93823.js';
 import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js';
+import {assessMountedPackGroup93859} from './src/integration/hmk-mixed-transport-93859.js';
 import {startSharedTimeWindow93767,addSharedTimeGroup93767,confirmSharedTimeWindow93767} from './src/integration/hmk-shared-time-window-93767.js';
 import {planSharedWindow93771,sharedDailyWindowLimit93771} from './src/integration/hmk-shared-planner-93771.js';
 import {planEpisodeRows93772,rowMaximum93772} from './src/integration/hmk-episode-rows-93772.js';
@@ -353,7 +354,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.858';
+const APP_VERSION='93.859';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2127,7 +2128,7 @@ let episodeCurrentGuidedStep=null;
 // not a change of the immutable activity or the identity of its members.
 // Otherwise an initially missing checkbox becomes impossible to complete
 // after Evaluate locks the actual episode (and can deadlock the calendar).
-const EPISODE_IMMUTABLE_FIELDS=['kind','guideId','conveyance','travelRideAnimalId','travelRideRiderId','droverActorId','memberIds','animalIds','stableAnimalIds',
+const EPISODE_IMMUTABLE_FIELDS=['kind','guideId','conveyance','travelRideAnimalId','travelRideRiderId','droverActorId','packHandlers93859','memberIds','animalIds','stableAnimalIds',
  'trackingUse','trackingActorId','trackingTrail','trackingRoad','trackingPartyTracked',
  'trackingSnow','trackingRain','trackingAlpine'];
 let episodePendingSkillRequest=null;
@@ -2312,7 +2313,8 @@ function persistEpisodeDraftSidecar({snapshotForm=false}={}){
   groupStartingReceiptIds93810:episodeGroupStartingReceiptIds93810===null?null:[...episodeGroupStartingReceiptIds93810],
   sharedAutoRun:sharedEpisodeAutoRun93772,sharedDefaultWeatherId:sharedDefaultWeatherId93772,
   sharedQueue:sharedTimeWindowQueue.map(({apply,...receipt})=>structuredClone(receipt)),
-  baselineToken:sharedCommittedBaselineToken93769()};
+  baselineToken:sharedCommittedBaselineToken93769(),
+  diagnostic93859:form?episodeDiagnosticGate93859(form):null};
  localStorage.setItem(EPISODE_SIDECAR_KEY,JSON.stringify(body));
 }
 function discardEpisodeDraftSidecar(){localStorage.removeItem(EPISODE_SIDECAR_KEY);}
@@ -2639,6 +2641,25 @@ function episodeSetupIssue(form){
  if(['travel','tracking'].includes(v.kind)&&!v.memberIds.includes(v.guideId))
   return {field:'guideId',message:'Průvodce musí být vybrán z účastníků epizody.'};
  if(v.kind==='travel'){
+  if(v.conveyance==='mount'&&(v.stableAnimalIds||[]).length>1&&!(v.transportedMemberIds||[]).length){
+   const mount=resolveTravelMount93837(verifiedLivestock(data,campaignKey(data.campaignClock)),v.stableAnimalIds,v.travelRideAnimalId||'').animal;
+   if(mount){
+    const riderId=v.travelRideRiderId||v.guideId;
+    for(const animalId of v.stableAnimalIds.filter(id=>id!==mount.id)){
+     const active=verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===animalId);
+     if(active&&(stableBurden(data,campaignKey(data.campaignClock),active).vehicles||[]).length)
+      return {field:'stableAnimalIds',message:'Smíšená doprava: zvíře '+active.name+' má doložené vozidlo. Režim jezdec + pěšky vedené zvíře nedokáže zároveň modelovat tažený vůz. Odeberte vozidlo ze společného modelu nebo zvolte samostatnou činnost; nelze započíst odhadovanou rychlost.'};
+     const field='packHandler_'+animalId,handlerId=v[field]||'';
+     if(!v.memberIds.includes(handlerId)||handlerId===riderId)
+      return {field,message:'Smíšená doprava: zvolte pěšího vodiče pro '+(verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===animalId)?.name||animalId)+
+       '. Vodič musí být v této skupině a nesmí současně sedět na koni.'};
+    }
+    const leadIds=v.stableAnimalIds.filter(id=>id!==mount.id).map(id=>v['packHandler_'+id]);
+    const droverId=v.droverActorId||riderId;
+    if(droverId!==riderId&&!leadIds.includes(droverId))
+     return {field:'droverActorId',message:'Smíšená doprava: hlavní Drover musí být skutečný jezdec nebo některý doložený vodič zvířete v této skupině.'};
+   }
+  }
   const patients=episodeTransportPatients93821(v);
   if(patients.length){
    if(!['cart','wagon','mount'].includes(v.conveyance))
@@ -3014,6 +3035,11 @@ function timeEpisodePageHTML(clock,participants){
  <details class="hmk-transport-guidance"><summary>Jak se počítá jezdec a ENC</summary><p>Aplikace automaticky započítá hmotnost jezdce s inventářem a výstrojí. Automatický výběr použije první vhodné jezdecké zvíře (kůň, osel, mezek nebo velbloud) ze zaškrtnutých zvířat. Vůl může skupinu doprovázet, ale tažný postroj nenahrazuje sedlo. Výsledek se zapíše až po potvrzení celé cesty.</p></details>
  <label>Jízdní zvíře<select name="travelRideAnimalId"><option value="">— Automaticky první vhodné jezdecké zvíře —</option>${stableTravelRoster.filter(isRidingAnimal93837).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
  <label>Postava jedoucí na zvířeti<select name="travelRideRiderId"><option value="">— Automaticky průvodce skupiny —</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select><small class="hc-hint" data-episode-rider-availability></small></label>
+ <div class="hc-episode-pack-handlers" data-episode-pack-handlers>
+ <strong>Další zvířata vedená vedle jezdce</strong>
+ <p class="hc-hint">Pro každé další vybrané zvíře určete skutečného pěšího vodiče z této skupiny. Jeden člověk nemůže současně sedět na zvířeti a vést jiné pěšky. Průvodce orientace a hlavní Drover mohou být různé postavy (HMK 141). Druhé jezdecké zvíře se v tomto režimu NEPOVAŽUJE za automaticky obsazené dalším jezdcem.</p>
+ ${stableTravelRoster.map(a=>`<label data-episode-pack-handler-row="${esc(a.id)}" hidden>${esc(a.name)} · kdo jej skutečně vede pěšky?<select name="packHandler_${esc(a.id)}"><option value="">— Zvolte člena této skupiny —</option>${participants.map(c=>option(c.id,c.name)).join('')}</select></label>`).join('')}
+ <p class="hc-hint" data-episode-pack-handler-status role="status"></p></div>
  <p class="hc-hint" data-episode-healthy-ride-mass role="status"></p></div>
  <section class="hc-episode-equipment-guide panel" data-episode-equipment-checklist hidden aria-live="polite">
  <h4>Povinné vybavení a úkony před vyhodnocením dopravy · HMK 122</h4>
@@ -3064,7 +3090,7 @@ function timeEpisodePageHTML(clock,participants){
  </div>
  <label data-episode-low-choice>Při SV 1–2 zvolte režim ${episodeRuleHelp('Lax nebo Slow','HMK 145: SV 1–2: GM volí Lax NEBO Slow. Lax zvyšuje riziko překvapení; Slow zpomaluje pohyb. SV 0 a méně ukládá oba režimy.')}
  <select name="orientationLowChoice"><option value="slow">Slow Mode</option><option value="lax">Lax Mode</option></select></label>
- <label data-episode-drover>Vodič / vozka (při jízdě totožný s jezdcem)<select name="droverActorId"><option value="">— podle skutečných členů —</option>${participants.map(c=>option(c.id,c.name)).join('')}</select><small data-episode-drover-requirement>Po výběru dopravy a zvířat se určí Riding / Animalcraft (HMK 141).</small></label><label data-episode-drover-proof>Drover · doložený Skill Test<select name="droverProofId"><option value="">— Vyberte skutečný hod —</option>${skillOptions('Riding')}${skillOptions('Animalcraft')}</select></label>
+ <label data-episode-drover>Hlavní Drover skupiny (jezdec nebo doložený pěší vodič)<select name="droverActorId"><option value="">— podle skutečných členů —</option>${participants.map(c=>option(c.id,c.name)).join('')}</select><small data-episode-drover-requirement>Po výběru dopravy a zvířat se určí Riding / Animalcraft (HMK 141).</small></label><label data-episode-drover-proof>Drover · doložený Skill Test<select name="droverProofId"><option value="">— Vyberte skutečný hod —</option>${skillOptions('Riding')}${skillOptions('Animalcraft')}</select></label>
  </div>
  <div data-episode-tracking><p class="hc-hint">Stalking je nenápadný pohyb; <strong>Tracking je volitelné sledování konkrétní stopy</strong>. Samotné přidělení Stalking ★ žádný Tracking hod nevytváří. Pro sledování a Spoor je nutná osvojená dovednost <strong>Tracking</strong> (HMK 147). Bez Tracking zvolte „Bez Tracking hodu“. Samostatný Awareness či atributový Perception mohou podle HMK 87 odhalit jen zjevné stopy, ale jejich test se nesmí připojit jako Tracking SV ani jako Spoor.</p><label>Chcete během nenápadného pohybu také sledovat stopu?<select name="trackingUse"><option value="none" selected>Ne · pouze Stalking, bez Tracking testu</option><option value="new">Ano · provést nový Tracking Skill Test</option><option value="reuse">Pokračovat bez nového hodu · pouze stejná stopa a platný původní SV</option></select></label><p class="hc-hint" data-episode-tracking-choice-help>Výchozí je bez sledování stopy. Nový Tracking se vždy hází ve Skill Tests; platné pokračování téže stopy lze převzít jen za podmínek HMK 147. Žádný d100, SV ani Spoor se nevytváří samotnou volbou.</p>
  <label>Skutečný stopař ze stejné družiny (nemusí být průvodce)<select name="trackingActorId"><option value="">— Vyberte postavu s Tracking ML &gt; 0 —</option>${(clock.characterIds||[]).map(id=>{const actor=character(id),known=availableMasteries(actor).find(x=>x.name==='Tracking'&&x.ml>0);return `<option value="${esc(id)}" ${known?'':'disabled'}>${esc(actor?.name||id)} · Tracking ${known?.ml??0}</option>`}).join('')}</select></label>
@@ -3204,7 +3230,7 @@ function timeEpisodePageHTML(clock,participants){
 <input type="checkbox" name="confirmed" checked hidden aria-hidden="true" tabindex="-1">
  <button type="button" class="hc-episode-evaluate" data-episode-evaluate>Vyhodnotit epizodu →</button>
  </form></section>
- <aside class="hc-episode-result" aria-live="polite"><h3>Vyhodnocení a dokončení</h3><div class="hc-episode-overview" data-episode-overview></div><section class="hc-episode-evidence"><h4>Pravidlové výsledky a doklady</h4><div data-episode-evidence>Dosud žádný doložený výsledek.</div></section><section class="hc-episode-checklist"><h4>Úkoly před dokončením</h4><div data-episode-checklist>Vyplňte délku a skutečné podmínky.</div></section><button type="submit" form="hmk-time-episode-form" class="hc-episode-confirm" data-episode-finalize disabled>Dokončit a zapsat celou epizodu</button>
+ <aside class="hc-episode-result" aria-live="polite"><h3>Vyhodnocení a dokončení</h3><div class="hc-episode-overview" data-episode-overview></div><section class="hc-episode-evidence"><h4>Pravidlové výsledky a doklady</h4><div data-episode-evidence>Dosud žádný doložený výsledek.</div></section><section class="hc-episode-checklist"><h4>Úkoly před dokončením</h4><div data-episode-checklist>Vyplňte délku a skutečné podmínky.</div></section><button type="button" class="secondary hc-small" data-action="export-working-state">Stáhnout rozpracovaný stav (JSON) při blokaci</button><button type="submit" form="hmk-time-episode-form" class="hc-episode-confirm" data-episode-finalize disabled>Dokončit a zapsat celou epizodu</button>
  <section class="hc-episode-checklist" data-shared-window-panel>
  <h4>Společný interval · připravené činnosti</h4>
  <p class="hc-hint">Činnosti postav se vyhodnocují podle připravených řádků. Každá má vlastní časovou kotvu a doklad; nevyužitý čas se automaticky nezapočítává jako odpočinek. Jediný posun společného kalendáře provede GM až na závěr.</p>
@@ -7430,7 +7456,76 @@ function downloadRawStorage(){
  if(raw===null){alert('V tomto prohlížeči není původní záznam.');return}
  const blob=new Blob([raw],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='hmk-raw-emergency-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
-function backupView(){const summary={characters:registryCharacters93813(data.characters).length,archived:data.trash.filter(c=>!isStableAnimalProfile93813(c)).length,items:allCatalogItems().length,inventory:data.inventory.length,journal:data.journal.length};return journalChapterShell('Cloud a zálohy','Soukromé úložiště kampaní, správa připojení a bezpečné exporty.',`${cloudPanel()}${!storageReadOnly?inventoryProvenancePanel():''}${storageReadOnly?'<div class="notice error">Načtení úložiště selhalo. Standardní záloha je zablokována; nejdříve stáhněte nouzovou kopii původních dat.</div>':''}<section class="panel hmk-backup-overview"><h3>Kontrola místních záznamů</h3><div class="equipment-summary"><div>Aktivní postavy: ${summary.characters} · archiv: ${summary.archived}</div><div>Celkem položek knihovny: ${summary.items} · vestavěné HMK: ${BUILTIN_ITEMS.length} · inventář: ${summary.inventory} · deník: ${summary.journal}</div><div>Stav zápisu: ${storageReadOnly?'ZABLOKOVÁN':'Připraven'}</div></div><p><strong>Datový formát:</strong> v1 (kompatibilní se staršími verzemi). Umístění vybavení je nepovinné pole; Starší položky bez uvedeného umístění se zobrazí jako nesené.</p><p>Bez připojení GitHub Cloud se data ukládají jen lokálně v tomto prohlížeči (localStorage). Pokud jsou otevřené dvě záložky, změna v druhé záložce zablokuje zápis, aby nedošlo k přepsání dat. S připojeným GitHub Cloud se změny synchronizují online a bez ručního JSON importu. Režim anonymního prohlížení, vymazání dat webu nebo změna zařízení mohou záznamy odstranit; pravidelně zálohujte.</p><div class="actions">${button('Stáhnout JSON zálohu','export')}${button('Export doménových dat HMK','export-kernel-all')}${button('Stáhnout diagnostiku','export-diagnostic')}${button('Nouzová kopie původního úložiště','export-raw')}<label>Importovat JSON zálohu<input type="file" id="import-file" accept=".json,application/json"></label><label>Přidat jednu postavu ze zálohy<input type="file" id="import-character-file" accept=".json,application/json"></label></div><div class="notice error">Import nahradí aktuální lokální data. Před importem si stáhněte zálohu.</div></section>`,'journal-book--backup')}
+/** One-click forensic export of the local working state. Unlike a normal
+ * Cloud backup, this includes the uncommitted private travel sidecar.
+ * NEVER enumerate all localStorage/sessionStorage keys: GitHub credentials
+ * and encrypted token records may be present there.
+ * Non-mutating: no commit, re-evaluation, synthetic roll or clock advance.
+ */
+function episodeDiagnosticGate93859(form){
+ if(!form)return null;
+ const stage=document.querySelector('[data-episode-window-stage]');
+ const commit=document.querySelector('[data-episode-window-commit]');
+ const finish=document.querySelector('[data-episode-finalize]');
+ const checklist=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
+ const errors=[];
+ const report={evaluationRequested:episodeEvaluationRequested,episodeDraftEpoch,
+  stageDisabled:stage?.disabled??null,commitDisabled:commit?.disabled??null,
+  finishDisabled:finish?.disabled??null,allClear:!!checklist?.querySelector('.hc-episode-all-clear'),
+  visibleChecklist:checklist?.innerText?.slice(0,3000)||'',
+  issue:form.dataset.episodeProblem||null,issueField:form.dataset.episodeProblemField||null,
+  outstandingSkillRequests:episodeOutstandingSkillTasks.map(x=>({field:x.field||null,kind:x.kind||null})),
+  pendingRequestId:episodePendingSkillRequest?.id||null,
+  acceptedDice:[...episodeDiceAccepted93849],
+  sharedActivePlanId:sharedTimeWindowActivePlanId,
+  sharedQueuedCount:sharedTimeWindowQueue.length};
+ try{report.pendingDice=[...form.querySelectorAll('[data-episode-roll-field]')].filter(n=>!n.disabled&&!n.closest('[hidden]')&&
+  String(n.value||'').trim()!==String(episodeDiceAccepted93849.get(n.name)||'').trim()).map(n=>n.name)}
+ catch(e){errors.push('dice: '+e.message)}
+ try{report.hazardPending=episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form)}
+ catch(e){errors.push('hazard: '+e.message)}
+ try{report.planErrors=sharedTimeWindowDraft?sharedPlanState93771().errors.map(x=>x.message):[]}
+ catch(e){errors.push('plan: '+e.message)}
+ try{report.identityMismatch=episodeEvaluationRequested?episodeIdentityMismatch(form):null}
+ catch(e){errors.push('identity: '+e.message)}
+ report.diagnosticErrors=errors;
+ return report;
+}
+function downloadUnfinishedHMKState93859(){
+ // A diagnostic invoked directly from the working Trekking screen captures
+ // the CURRENT form, not only the last sidecar autosave. No campaign commit.
+ if(document.querySelector('#hmk-time-episode-form')&&(episodeStageBaseline||sharedTimeWindowDraft))
+  persistEpisodeDraftSidecar({snapshotForm:true});
+ const read=(store,key)=>{try{const raw=store.getItem(key);if(raw===null)return {present:false};
+  try{return {present:true,value:JSON.parse(raw)}}catch{return {present:true,unparsedRaw:raw,parseError:true}}}
+  catch(e){return {present:false,readError:String(e?.message||e)}}};
+ const currentForm=document.querySelector('#hmk-time-episode-form');
+ const pkg={format:'hmk-local-working-diagnostic-v93.859',appVersion:APP_VERSION,
+  exportedAt:new Date().toISOString(),scope:'local-only-no-cloud-token',
+  note:'Obsahuje historii kampaně a nedokončené testy. Neslouží k importu; před sdílením chraňte soukromé údaje.',
+  committedCampaign:read(localStorage,STORAGE),
+  travelSidecar:read(localStorage,EPISODE_SIDECAR_KEY),
+  combat:{previewHistory:read(sessionStorage,COMBAT_DRAFT_HISTORY_KEY),
+   initiative:read(sessionStorage,COMBAT_INITIATIVE_SEQUENCE_KEY),
+   clock:read(sessionStorage,COMBAT_CLOCK_KEY),
+   injuryTimelineId:read(sessionStorage,COMBAT_INJURY_TIMELINE_KEY),
+   closeEngagements:read(sessionStorage,IN_CLOSE_KEY),
+   tacticalAdvantages:read(sessionStorage,TA_LEDGER_KEY),
+   guidedDraft:read(sessionStorage,GUIDED_DRAFT_KEY),
+   encounterSelection:read(sessionStorage,ENCOUNTER_DRAFT_KEY)},
+  liveTravel:currentForm?{
+   snapshot:episodeFormSnapshot(currentForm),gate:episodeDiagnosticGate93859(currentForm),evaluationRequested:episodeEvaluationRequested,
+   blocker:currentForm.dataset.episodeProblem||null,
+   blockerField:currentForm.dataset.episodeProblemField||null,
+   currentStep:episodeCurrentGuidedStep,
+   taskCount:episodeOutstandingSkillTasks.length,
+   pendingSkillRequest:episodePendingSkillRequest,
+   stagedReceiptIds:episodeStageBaseline?episodeStagedRows(data).map(x=>x.id):[],
+   sharedWindowId:sharedTimeWindowDraft?.windowId||null,
+   queueCount:sharedTimeWindowQueue.length}:null};
+ downloadJSON(pkg,'hmk-rozpracovany-stav-'+new Date().toISOString().slice(0,10)+'.json');
+}
+function backupView(){const summary={characters:registryCharacters93813(data.characters).length,archived:data.trash.filter(c=>!isStableAnimalProfile93813(c)).length,items:allCatalogItems().length,inventory:data.inventory.length,journal:data.journal.length};return journalChapterShell('Cloud a zálohy','Soukromé úložiště kampaní, správa připojení a bezpečné exporty.',`${cloudPanel()}${!storageReadOnly?inventoryProvenancePanel():''}${storageReadOnly?'<div class="notice error">Načtení úložiště selhalo. Standardní záloha je zablokována; nejdříve stáhněte nouzovou kopii původních dat.</div>':''}<section class="panel hmk-backup-overview"><h3>Kontrola místních záznamů</h3><div class="equipment-summary"><div>Aktivní postavy: ${summary.characters} · archiv: ${summary.archived}</div><div>Celkem položek knihovny: ${summary.items} · vestavěné HMK: ${BUILTIN_ITEMS.length} · inventář: ${summary.inventory} · deník: ${summary.journal}</div><div>Stav zápisu: ${storageReadOnly?'ZABLOKOVÁN':'Připraven'}</div></div><p><strong>Datový formát:</strong> v1 (kompatibilní se staršími verzemi). Umístění vybavení je nepovinné pole; Starší položky bez uvedeného umístění se zobrazí jako nesené.</p><p>Bez připojení GitHub Cloud se data ukládají jen lokálně v tomto prohlížeči (localStorage). Pokud jsou otevřené dvě záložky, změna v druhé záložce zablokuje zápis, aby nedošlo k přepsání dat. S připojeným GitHub Cloud se změny synchronizují online a bez ručního JSON importu. Režim anonymního prohlížení, vymazání dat webu nebo změna zařízení mohou záznamy odstranit; pravidelně zálohujte.</p><div class="actions">${button('Stáhnout JSON zálohu','export')}${button('Export doménových dat HMK','export-kernel-all')}${button('Stáhnout rozpracovaný stav (JSON)','export-working-state')}${button('Stáhnout diagnostiku','export-diagnostic')}${button('Nouzová kopie původního úložiště','export-raw')}<p class="hc-hint">Rozpracovaný stav obsahuje soukromý lokální Pochod, neuložené Skill Testy, rozdělení ★, časové okno a hlavní deník. Není to soubor pro import. Neobsahuje GitHub přístupový token. Při blokaci stáhněte ještě před obnovením stránky.</p><label>Importovat JSON zálohu<input type="file" id="import-file" accept=".json,application/json"></label><label>Přidat jednu postavu ze zálohy<input type="file" id="import-character-file" accept=".json,application/json"></label></div><div class="notice error">Import nahradí aktuální lokální data. Před importem si stáhněte zálohu.</div></section>`,'journal-book--backup')}
 // Encounter preparation is deliberately non-destructive: no changes to character records or rules kernel.
 function selectedEncounterCharacters(){return data.characters.filter(c=>encounterSelection.has(c.id))}
 function encounterPayload(){
@@ -18810,11 +18905,18 @@ if(t.dataset.action==='export-catalog-coverage'){if(storageReadOnly)return alert
 if(t.dataset.action==='export-catalog-audit-csv'){if(storageReadOnly)return alert('Nečitelná data: audit katalogu není dostupný.');downloadCatalogAuditCSV();return}
 if(t.dataset.action==='export-catalog-audit'){if(storageReadOnly)return alert('Nečitelná data: audit katalogu není dostupný.');downloadJSON(catalogAuditReport(),'hmk-audit-katalogu-v25.json');return}
 if(t.dataset.action==='export-catalog'){if(storageReadOnly)return alert('Nečitelná data: export katalogu není dostupný.');downloadJSON({format:'hmk-equipment-catalog-v1',exportedAt:stamp(),items:structuredClone(data.items)},'hmk-katalog-vybaveni.json');return}
+if(t.dataset.action==='export-working-state'){try{downloadUnfinishedHMKState93859()}catch(err){alert('Rozpracovaný stav nelze bezpečně stáhnout: '+err.message)}return}
 if(t.dataset.action==='export-diagnostic'){downloadJSON(diagnosticReport(),'hmk-diagnostic-'+new Date().toISOString().slice(0,10)+'.json');return}
 if(t.dataset.action==='export-raw'){downloadRawStorage();return}
 if(t.dataset.action==='export-kernel-character'){const c=character(selected);if(c)downloadJSON(kernelExport([c]),'hmk-character-'+safeFilename(c.name)+'.json');return}
 if(t.dataset.action==='export-kernel-all'){downloadJSON(kernelExport(data.characters),'hmk-domain-export.json');return}
 if(t.dataset.nav){
+ // Export in Cloud & Backups must represent the latest unfinished screen,
+ // including pack handlers and unconfirmed dice. Preserve before rerender.
+ if(t.dataset.nav==='backup'&&document.querySelector('#hmk-time-episode-form')&&(episodeStageBaseline||sharedTimeWindowDraft)){
+  try{persistEpisodeDraftSidecar({snapshotForm:true})}
+  catch(err){alert('Rozpracovaná cesta se nedala bezpečně uložit pro diagnostiku: '+err.message);return}
+ }
  // Direct navigation is independent. Never retain permission for an earlier
  // episode handoff to capture a later, manually launched Skill Test.
  episodeActiveSkillRequestId=null;
@@ -23614,6 +23716,11 @@ function episodeFormSnapshot(form){
  // project the same physical animal into the new episode twice.
  if(o.stableAnimalIds?.length&&o.animalIds?.length)
   o.animalIds=o.animalIds.filter(id=>!o.stableAnimalIds.includes(id));
+ // Stable identity is compared as a deterministic transport-role witness.
+ // The selectors remain actual per-animal inputs; old campaign receipts need
+ // neither migration nor retroactive assignments.
+ o.packHandlers93859=JSON.stringify(Object.fromEntries((o.stableAnimalIds||[]).slice().sort()
+  .map(id=>[id,String(o['packHandler_'+id]||'')])));
  return o;
 }
 
@@ -24131,7 +24238,9 @@ function episodePartyLoad(memberIds,conveyance,v=null){
   if((v?.transportedMemberIds||[]).length){
    for(const id of v.transportedMemberIds)mountedIds.add(id);
    if(v.transportMountHandlerPosition==='mounted')mountedIds.add(v.transportMountHandlerId||v.guideId);
-  }else mountedIds.add(episodeTravelAnimalRoles({conveyance,memberIds,guideId:v?.guideId||memberIds[0],riderId:v?.travelRideRiderId||'',droverId:v?.droverActorId||''}).riderId);
+  }else mountedIds.add((v?.stableAnimalIds||[]).length>1?
+   (v?.travelRideRiderId||v?.guideId||memberIds[0]):
+   episodeTravelAnimalRoles({conveyance,memberIds,guideId:v?.guideId||memberIds[0],riderId:v?.travelRideRiderId||'',droverId:v?.droverActorId||''}).riderId);
  }
  for(const id of memberIds){
   const actor=character(id),load=resolveCombatantLoad({character:actor,inventory:activeRationInventory(),mounted:mountedIds.has(id)});
@@ -24152,8 +24261,22 @@ function episodeHealthyMountRide93823(v,memberIds,clock){
  const mount=resolveTravelMount93837(verifiedLivestock(data,cid),choices,v.travelRideAnimalId||'');
  if(!mount.animal)throw Error('Jízda na zvířeti: '+mount.reason);
  const animal=mount.animal,animalId=animal.id;
- const riderId=episodeTravelAnimalRoles({conveyance:v.conveyance,memberIds,guideId:v.guideId,
-  riderId:v.travelRideRiderId||'',droverId:v.droverActorId||''}).riderId;
+ const mixed=(choices.length>1);
+ const riderId=mixed?(v.travelRideRiderId||v.guideId):
+  episodeTravelAnimalRoles({conveyance:v.conveyance,memberIds,guideId:v.guideId,
+   riderId:v.travelRideRiderId||'',droverId:v.droverActorId||''}).riderId;
+ // A second animal is not magically a second riding mount. Its handler is
+ // explicit, belongs to THIS row, and walks with it. The printed mixed
+ // Drover test still belongs to exactly ONE primary beast wrangler.
+ if(mixed){
+  const roster=verifiedLivestock(data,cid);
+  const towed=choices.filter(id=>id!==animalId&&
+   (stableBurden(data,cid,roster.find(a=>a.id===id)).vehicles||[]).length);
+  if(towed.length)throw Error('Smíšená doprava: další zvíře má připojený vůz/vozidlo. Režim jezdec + pěšky vedená zvířata NENÍ režim dvou souběžných vozidel. Vůz vyřaďte, nebo plán rozdělte na samostatné skupiny; nelze odhadovat jeho tempo.');
+ }
+ const roles=mixed?assessMountedPackGroup93859({memberIds,riderId,mountAnimalId:animalId,
+  selectedAnimalIds:choices,packHandlers:Object.fromEntries(choices.map(id=>[id,v['packHandler_'+id]||''])),
+  droverId:v.droverActorId||riderId}):null;
  const rider=character(riderId),mass=stableRiderWeight584(rider);
  if(!mass?.ready)throw Error((rider?.name||'Jezdec')+': '+(mass?.reason||'chybí skutečná hmotnost pro jízdu.'));
  const b=stableBurden(data,cid,animal);
@@ -24165,7 +24288,7 @@ function episodeHealthyMountRide93823(v,memberIds,clock){
   strengthEncumbranceModifier(animal.spec.str)+(animal.spec.breed==='mule'?-20:0));
  return {format:TRAVEL_RIDING_FORMAT_93823,animalId,riderId,riderLb:mass.totalLb,
   gearAndCargoLb:b.gearAndCargoLb,totalLb,enc,moveAfterLoad:animal.spec.move-enc,
-  sourcePage:122};
+  ...(roles?{mixedRoles93859:roles}:{}),sourcePage:122};
 }
 /** HMK 141/145. A drover may be someone other than the guide. No dice are created here.
  * Single selected conveyance uses Riding for a mount and Animalcraft for
@@ -24176,13 +24299,14 @@ function episodeDroverRequirement93851(v){
  const stable=[...new Set(v.stableAnimalIds||[])],legacy=[...new Set(v.animalIds||[])];
  const animals=[...new Set([...stable,...legacy])];
  const present=v.kind==='travel'&&(v.conveyance!=='foot'||animals.length>0);
+ const mixed=v.conveyance==='mount'&&animals.length>1;
  const actorId=v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length?
-  episodeTravelAnimalRoles({conveyance:v.conveyance,memberIds:v.memberIds,guideId:v.guideId,
-   riderId:v.travelRideRiderId||'',droverId:v.droverActorId||''}).droverId:
+  (mixed?(v.droverActorId||v.travelRideRiderId||v.guideId):
+   episodeTravelAnimalRoles({conveyance:v.conveyance,memberIds:v.memberIds,guideId:v.guideId,
+    riderId:v.travelRideRiderId||'',droverId:v.droverActorId||''}).droverId):
   (v.memberIds||[]).includes(v.droverActorId)?v.droverActorId:v.guideId;
- let skill=null,mixed=false;
+ let skill=null;
  if(present){
-  mixed=v.conveyance==='mount'&&animals.length>1;
   if(mixed){
    const masteries=availableMasteries(character(actorId));
    const riding=masteries.find(m=>m.name==='Riding'),craft=masteries.find(m=>m.name==='Animalcraft');
@@ -24571,6 +24695,8 @@ function episodePreviewFromForm(form,clock){
    immobile:p.immobile,fatigue:p.fatigue})),sourcePage:145};
  if(kind==='travel'&&healthyMountRide93823)result.mountRiding93823={...healthyMountRide93823,
   ...(mixedFootMemberIds93858.length?{walkingMemberIds:[...mixedFootMemberIds93858]}:{})};
+ if(kind==='travel'&&healthyMountRide93823?.mixedRoles93859)
+  result.mixedTransport93859=structuredClone(healthyMountRide93823.mixedRoles93859);
  if(kind==='travel'&&mountedPassenger93816){
   result.transportProof={...(result.transportProof||{}),format:'gm-transport-confirmation-v93.816',
    mass:transportMass93816,mount:mountedPassenger93816};
@@ -25437,7 +25563,8 @@ function renderEpisodeEndError(form,message){
   const known=[];
   for(const [field,skill] of [['orientationProofId','Survival'],['trackingProofId','Tracking'],['trackingAwarenessProofId','Awareness'],['droverProofId',episodeDroverRequirement93851(v).skill||'Riding']]){
    const j=data.journal.find(x=>x.id===v[field]);
-   const actorId=['trackingProofId','trackingAwarenessProofId'].includes(field)?(v.trackingActorId||v.guideId||''):v.guideId;
+   const actorId=['trackingProofId','trackingAwarenessProofId'].includes(field)?(v.trackingActorId||v.guideId||''):
+   field==='droverProofId'?episodeDroverRequirement93851(v).actorId:v.guideId;
    const saved=episodeSkillProof(j,skill,actorId,cid,minute)||
     (skill==='Riding'?episodeSkillProof(j,'Animalcraft',actorId,cid,minute):null);
    if(saved)known.push('<div class="hc-episode-proof hc-episode-proof-done"><strong>✓ '+esc(skill)+' · '+esc(character(actorId)?.name||actorId)+'</strong><span>Vyřešeno: '+esc(saved.level)+' · SV '+esc(String(saved.sv))+' · d100 '+esc(String(saved.roll??'—'))+
@@ -26145,17 +26272,44 @@ function episodeGroupRoleChoices93856(form,v){
   return field;
  };
  const healthyRide=v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length;
+ const selectedCompanions=(v.stableAnimalIds||[]).filter(id=>!reservations.has(id));
+ const mountId=healthyRide?resolveTravelMount93837(verifiedLivestock(data,campaignKey(data.campaignClock)),selectedCompanions,v.travelRideAnimalId||'').animal?.id:null;
+ const mixedRide=healthyRide&&selectedCompanions.some(id=>id!==mountId);
  const rider=setChoices('travelRideRiderId',mountReady?'— Automaticky průvodce skupiny —':'— Nejdříve zvolte vybavené dostupné zvíře —',mountReady);
  if(rider)v.travelRideRiderId=rider.value;
- const actor=setChoices('droverActorId',healthyRide?'— Totožný s jezdcem —':'— Člen aktuální skupiny —',!healthyRide);
+ // Each led animal has a real, named walker; no automatic assignment from
+ // selecting a checkbox, no member from another concurrent travel group.
+ const currentRider=rider?.value||v.guideId;
+ let unassigned=0;
+ for(const label of form.querySelectorAll('[data-episode-pack-handler-row]')){
+  const animalId=label.dataset.episodePackHandlerRow;
+  const show=mixedRide&&selectedCompanions.includes(animalId)&&animalId!==mountId;
+  label.hidden=!show;
+  const select=label.querySelector('select');if(!select)continue;
+  if(show){
+   for(const opt of select.options)if(opt.value){
+    opt.disabled=!roster.includes(opt.value)||opt.value===currentRider;
+    opt.hidden=opt.disabled;
+   }
+   if(!episodeEvaluationRequested&&select.value&&select.selectedOptions[0]?.disabled)select.value='';
+   if(!select.value)unassigned++;
+  }else if(!episodeEvaluationRequested)select.value='';
+  select.disabled=!show||episodeEvaluationRequested;
+ }
+ const packStatus=form.querySelector('[data-episode-pack-handler-status]');
+ if(packStatus)packStatus.textContent=!mixedRide?'Žádná další vedená zvířata.':
+  unassigned?'Chybí '+unassigned+' skutečných pěších vodičů. Doplňte je před vyhodnocením.':
+  'Všechna další zvířata mají doloženého pěšího vodiče; skupina použije tempo nejpomalejšího.';
+ const actor=setChoices('droverActorId',healthyRide&&!mixedRide?'— Totožný s jezdcem —':'— Hlavní Drover skupiny —',!healthyRide||mixedRide);
  if(actor){
-  if(healthyRide&&!episodeEvaluationRequested){
+  if(healthyRide&&!mixedRide&&!episodeEvaluationRequested){
    actor.value=roster.includes(rider?.value)?rider.value:roster.includes(v.guideId)?v.guideId:roster[0]||'';
   }
   v.droverActorId=actor.value;
  }
  const droverHint=form.querySelector('[data-episode-drover-requirement]');
- if(droverHint&&healthyRide)droverHint.textContent='Při jízdě na koni je Drover vždy skutečný jezdec. Riding test provádí tentýž člen skupiny; jiného Droveře nelze přiřadit.';
+ if(droverHint&&healthyRide&&!mixedRide)droverHint.textContent='Jediné jezdecké zvíře: Drover je skutečný jezdec. Jeho Riding test potvrzuje GM.';
+ else if(droverHint&&mixedRide)droverHint.textContent='Smíšená doprava: hlavní Drover může být jezdec nebo některý konkrétní pěší vodič. HMK 141: použije se nižší ML z Riding a Animalcraft tohoto Droveře; jde o JEDEN skutečný Drover test, ostatní mohou asistovat.';
  else if(droverHint)droverHint.textContent='Při pěším vedení zvířat a při jízdě s vozem lze určit jiného skutečného člena skupiny. Test Animalcraft potvrzuje GM.';
  const status=form.querySelector('[data-episode-rider-availability]');
  if(status)status.textContent=mountReady?
@@ -26253,6 +26407,7 @@ function updateEpisodePreview(form){
  if(originInput&&reuseInput)originInput.value=reuseInput.checked?'reuse':'new';
  let v=episodeFormSnapshot(form);
  episodeGroupRoleChoices93856(form,v);
+ v=episodeFormSnapshot(form);
  const kind=v.kind,travel=kind==='travel';
  delete form.dataset.episodeOrientationStars;delete form.dataset.episodeOrientationSv;
  if(travel){
@@ -26456,7 +26611,7 @@ function updateEpisodePreview(form){
  const droverStatus=form.querySelector('[data-episode-drover-requirement]');
  if(droverStatus)droverStatus.textContent=!droverNeed.present?'Bez zvířat se Drover Test neprovádí.':
   'Doložte '+droverNeed.skill+' Skill Test postavy '+(character(droverNeed.actorId)?.name||'vybraný Drover')+
-  (droverNeed.mixed?' · kombinovaná doprava: nižší Riding / Animalcraft ML.':' · doprava určila dovednost automaticky.')+ ' (HMK 141,145).';
+  (droverNeed.mixed?' · kombinovaná doprava: nižší Riding / Animalcraft ML hlavního Droveře; další zvířata mají vlastní pěší vodiče.':' · doprava určila dovednost automaticky.')+ ' (HMK 141,145).';
  const duneOption=form.querySelector('[data-episode-dunes-slow]');
  if(duneOption){const allowed=travel&&v.terrain==='dunes'&&v.conveyance==='foot';duneOption.hidden=!allowed;
   const cb=duneOption.querySelector('[name="dunesSlow"]');if(cb){if(!allowed)cb.checked=false;cb.disabled=!allowed;}}
