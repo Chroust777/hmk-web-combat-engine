@@ -6,6 +6,7 @@ import {planSharedWindow93771,sharedDailyWindowLimit93771} from './src/integrati
 import {planEpisodeRows93772,rowMaximum93772} from './src/integration/hmk-episode-rows-93772.js';
 import {planFixedEpisode93773,fixedAccidentMinute93773} from './src/integration/hmk-episode-fixed-93773.js';
 import {incidentMinutes93863} from './src/integration/hmk-incident-window-93863.js';
+import {randomEpisodeMinute93868,deferredEpisodeEvent93868,validateDeferredEpisodeEvent93868,actualGroupMovement93868,splitEpisodeEndDice93868} from './src/integration/hmk-episode-interruption-93868.js';
 import {captureSharedActivityDelta93769,replaySharedActivityDelta93769,verifySharedActivityQueue93769} from './src/integration/hmk-shared-serial-receipts-93769.js';
 import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js';
 import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js';
@@ -359,7 +360,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.867';
+const APP_VERSION='93.868';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3202,7 +3203,7 @@ function timeEpisodePageHTML(clock,participants){
  </div>
  <p class="hc-hint" data-episode-delay-hint>Vyberte skutečný výsledek hazardu; podle něj aplikace určí povinné doklady.</p></div>
  <label data-hazard-skill-level>Výsledek testu (pouze u Complication)<select name="hazardSkillLevel"><option value="">— nutno doložit —</option>${['CF','F','S','CS'].map(x=>option(x,x)).join('')}</select></label>
- <label data-hazard-minute>Minuta nehody / překážky od začátku epizody · určuje GM<input name="hazardAtMinute" type="number" min="1" max="10080" placeholder="např. 45" inputmode="numeric"></label>
+ <label data-hazard-minute>Minuta nehody / překážky od začátku epizody · určuje GM<span class="hc-episode-die"><input name="hazardAtMinute" type="number" min="1" max="10080" step="1" placeholder="1–délka intervalu" inputmode="numeric"><button type="button" data-episode-random-event-minute>⚄ Vygenerovat minutu</button></span></label><input name="hazardMinuteOrigin93868" type="hidden" value="manual">
  <p data-hazard-minute class="hc-hint">GM potvrdí skutečnou minutu nehody/překážky. Délka původního společného intervalu se nikdy nepřepisuje. U Accident se pohyb zastaví od minuty nehody; Kalendář přesto uběhne celý interval. U Complication F/CF se uplatní skutečná ztráta pohybu.</p>
  <div data-hazard-accident class="hc-episode-accident-step"><h4>Accident · nehoda v doložené minutě (HMK 148)</h4>
  <p class="hc-hint">Nehoda nastane v GM potvrzené minutě. U Pochodu se další metry nepočítají; kalendářové okno se nikdy nezkrátí. Výběr oběti, Agility a Injury Sequence se vyhodnotí samostatně po jediném potvrzení GM; Cestování samo nikdy nespouští Combat.</p>
@@ -23901,6 +23902,7 @@ function episodeEquipmentValidateConfirm93843(form){
  * This never creates dice, a skill receipt or a campaign write. */
 const episodeHazardConfirmation93840=new WeakMap();
 const episodeHazardSelectable93840=new Set([
+ 'hazardMinuteOrigin93868',
  'hazardEquipmentDisposition','hazardComplicationDecision','hazardItemId','hazardRepairSkill',
  'hazardComplicationSkill','hazardWorkerId','hazardComplicationScope',
  'hazardComplicationRouteChanged','hazardSkillLevel','hazardAtMinute','hazardEvidenceId',
@@ -23916,7 +23918,7 @@ function episodeHazardInputs93840(form){
  const accident=legend.startsWith('Accident ·')||
   ['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
   /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''));
- const allowed=accident?new Set(['hazardAtMinute']):equipment?new Set(['hazardEquipmentDisposition','hazardItemId',
+ const allowed=accident?new Set(['hazardAtMinute','hazardMinuteOrigin93868']):equipment?new Set(['hazardEquipmentDisposition','hazardItemId',
   'hazardRepairSkill','hazardWorkerId','hazardSkillLevel','hazardEvidenceId']):null;
  return [...hz.querySelectorAll('[name]')].filter(n=>n.name!=='hazardChoices93840'&&
   (allowed?allowed.has(n.name):
@@ -24028,13 +24030,28 @@ const episodeDiceAccepted93849=new Map();
 function episodeEnsureDiceScope93849(){
  if(episodeDiceScope93849!==episodeDraftEpoch){episodeDiceScope93849=episodeDraftEpoch;episodeDiceAccepted93849.clear();}
 }
+/** Confirmed minute may cap movement BEFORE determining END-dice count.
+ * A mere typed or generated unconfirmed value is never used for game math. */
+function episodeConfirmedMovementStop93868(form,minutes){
+ if(!form||!Number.isSafeInteger(minutes)||minutes<1||minutes>10080)return null;
+ const roll=Number(form.elements.namedItem('survivalD10')?.value||0);
+ if(!Number.isSafeInteger(roll)||roll<4||roll>10)return null;
+ // A direction hazard on its own does not create an Injury Sequence.
+ if(roll>=7&&(form.elements.namedItem('hazardComplicationDecision')?.value!=='test'||
+    !['F','CF'].includes(form.elements.namedItem('hazardSkillLevel')?.value)))return null;
+ if(episodeHazardPending93840(form))return null;
+ const at=Number(episodeHazardState93840(form).values.hazardAtMinute);
+ return Number.isSafeInteger(at)&&at>=1&&at<=minutes?at:null;
+}
 function episodeDieCount93849(form,name){
  if(/^end_/.test(name)){
   const elapsed=Number(form.elements.namedItem('minutes')?.value||0);
+  if(!Number.isSafeInteger(elapsed)||elapsed<1||elapsed>10080)return 0;
   const v=episodeFormSnapshotCountOnly93849(form);
   const carried=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
    v.length?v:null);
-  const moving=Math.max(0,elapsed-carried);
+  const stop=episodeConfirmedMovementStop93868(form,elapsed);
+  const moving=actualGroupMovement93868({minutes:elapsed,incomingDelay:carried,atMinute:stop});
   return moving===0?0:form.elements.namedItem('doubleTime')?.checked?Math.ceil(moving/60):1;
  }
  if(name==='progressD10'||name==='directionD10'){
@@ -24092,10 +24109,15 @@ function episodeUpdateDiceGuides93849(form){
   const raw=String(input.value||'').trim();
   const hint=form.querySelector('[data-episode-roll-hint="'+name+'"]');
   const pending=raw!==accepted;
-  if(hint)hint.textContent=(count>1?`Zadejte ${count} celé hody d${faces} oddělené čárkami (např. 1,10${count>2?',5':''}).`:
-   `Zadejte ${count===0?'žádný hod':`jedno celé číslo 1–${faces}`}.`)+
+  const confirmedEndDice=name.startsWith('end_')&&!pending&&accepted?
+   accepted.split(',').map(x=>x.trim()).filter(Boolean):[];
+  const excessEndDice=confirmedEndDice.length>count?confirmedEndDice.length-count:0;
+  if(hint)hint.textContent=excessEndDice?
+   `END potvrzeno: ${accepted}. Zkrácený pohyb používá prvních ${count} d10; zbývajících ${excessEndDice} ${excessEndDice===1?'hod je uložen jako nepoužitý':'hodů je uloženo jako nepoužité'}. Žádný nový hod není potřeba.`:
+   (count>1?`Zadejte ${count} celé hody d${faces} oddělené čárkami (např. 1,10${count>2?',5':''}).`:
+    `Zadejte ${count===0?'žádný hod':`jedno celé číslo 1–${faces}`}.`)+
    (pending?' · Rozpracováno – potvrďte „Vložit číslo“.':accepted?' · Potvrzeno: '+accepted:'');
-  b.disabled=!!input.disabled||count===0;
+  b.disabled=!!input.disabled||count===0||excessEndDice>0;
   b.hidden=!!input.disabled;
   b.setAttribute('aria-label','Potvrdit '+name+': '+(count>1?`${count} hodnot oddělených čárkami`:'jedno celé číslo'));
  }
@@ -25131,11 +25153,24 @@ function episodePreviewFromForm(form,clock){
  const progressD10=pvals?pvals.split(',').map(x=>Number(x.trim())):[];
  const directionD10=dvals?dvals.split(',').map(x=>Number(x.trim())):[];
  if(kind==='travel'&&progressD10.length!==spare)throw Error('Přebytek Progress vyžaduje '+spare+' skutečných d10. Zadejte je oddělené čárkami.');
+ // For Double Time, Skill dice may have been explicitly accepted before
+ // this episode's accident minute was discovered. Do not reroll or erase them:
+ // only the earliest physically elapsed hours affect Fatigue, and any excess
+ // accepted dice are retained verbatim as unused proof in the episode receipt.
+ const incidentStopForEnd93868=kind==='travel'&&orientation?.level==='CF'?
+  episodeConfirmedMovementStop93868(form,minutes):null;
+ const actualForEnd93868=kind==='travel'?actualGroupMovement93868({minutes,
+  incomingDelay:equipmentDelayIn,atMinute:incidentStopForEnd93868}):minutes;
+ const unusedEndDice93868={};
  const rolls=Object.fromEntries(members.map(id=>{
   const raw=String(v['end_'+id]??'').trim();
   // One END SR per watch normally; Double Time requires an independent
   // roll every actual hour (HMK 150), never extrapolate one die four times.
-  return [id,v.doubleTime?(raw?raw.split(',').map(x=>Number(x.trim())):[]):Number(raw)];
+  if(!v.doubleTime)return [id,Number(raw)];
+  const all=raw?raw.split(',').map(x=>Number(x.trim())):[];
+  const part=splitEpisodeEndDice93868(all,actualForEnd93868);
+  if(part.unused.length)unusedEndDice93868[id]=part.unused;
+  return [id,part.used];
  }));
  const end=Object.fromEntries(people.map(c=>[c.id,c.hmk?.attributes?.end]));
  const carry=Object.fromEntries(members.map(id=>[id,lastTimeEpisodeCarry(data.journal,campaignKey(clock),id)]));
@@ -25149,6 +25184,7 @@ function episodePreviewFromForm(form,clock){
  if(encounterEnabled&&v.encounterFine&&(!String(v.encounterD100Sub||'').trim()||!Number.isSafeInteger(encounterD100Sub)||encounterD100Sub<1||encounterD100Sub>100))
   throw Error('Jemný Encounter vyžaduje dvě skutečné d100: základní a upřesňující.');
  if(encounterEnabled&&(!Number.isSafeInteger(encounterD100)||encounterD100<1||encounterD100>100))throw Error('Minutový Encounter vyžaduje skutečný d100 (1–100).');
+ const incidentStop93868=incidentStopForEnd93868;
  const medAtEnd=episodeEvaluationRequested?episodeTimedMedical(form):null;
  const inactiveByActor=Object.fromEntries((medAtEnd?.incapacitations||[]).filter(x=>members.includes(x.actorId))
   .map(x=>[x.actorId,x]));
@@ -25161,12 +25197,15 @@ function episodePreviewFromForm(form,clock){
   survivalCriticalFailure:orientation?.level==='CF'&&orientation?.sourceMode==='new',
   survivalD10:orientation?.level==='CF'&&orientation?.sourceMode==='new'?Number(v.survivalD10):null,
   previousCarry:carry,mapScale:Number(v.mapScale),
-  movementMinutes:kind==='travel'?Math.max(0,minutes-equipmentDelayIn):null,
+  movementMinutes:kind==='travel'?actualGroupMovement93868({minutes,incomingDelay:equipmentDelayIn,atMinute:incidentStop93868}):null,
   doubleTime:!!v.doubleTime,loadBypass:!!v.loadBypass,dunesSlow:!!v.dunesSlow,
   encByActor,forcedBearing,
   walkingHandlerIds:mountedPassenger93816?.handlerPosition==='leading'?[mountedPassenger93816.handlerId]:mixedFootMemberIds93858,
   previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute,kind==='travel'?members:null),
   encounterLightMinutes:lightMinutes,inactiveByActor,transportedMemberIds:kind==='travel'?(v.transportedMemberIds||[]):[]});
+ if(Object.keys(unusedEndDice93868).length)result.unusedEndDice93868={
+  format:'hmk-confirmed-unused-end-dice-v93.868',reason:'confirmed-dice-before-incident-minute',
+  actualMovementMinutes:actualForEnd93868,byActor:unusedEndDice93868};
  if(kind==='travel'&&result.transportedMemberIds?.length)result.transportProof={format:'gm-transport-confirmation-v93.755',
   memberIds:[...result.transportedMemberIds],conveyance:v.conveyance,gmConfirmed:true,
   originalHealth:travelHealth.filter(p=>result.transportedMemberIds.includes(p.id)).map(p=>({id:p.id,
@@ -25297,6 +25336,8 @@ function episodePreviewFromForm(form,clock){
    detail.requiresGMCompletion=false;
    detail.externalMedicalPending=true;
    detail.hazardAtMinute=at;
+   detail.eventWindow93868=deferredEpisodeEvent93868({startMinute:clock.minute,minutes,atMinute:at,
+    kind:'accident',source:v.hazardMinuteOrigin93868||'manual',incomingDelay:equipmentDelayIn});
    detail.medicalHandoffMinute=clock.minute+minutes;
    detail.automationVersion='v93.863-fixed-window-incident';
    detail.hazardD10=Number(v.survivalD10); // Original hazard die; must NOT be rolled again.
@@ -25335,6 +25376,8 @@ function episodePreviewFromForm(form,clock){
    const accident=result.hazardDetails.find(h=>h.hazard==='accident');
    const incident=accident?incidentMinutes93863({minutes,atMinute:accident.hazardAtMinute,
     kind,incomingDelay:equipmentDelayIn}):null;
+   if(accident)validateDeferredEpisodeEvent93868(accident.eventWindow93868,{startMinute:clock.minute,minutes,
+    atMinute:accident.hazardAtMinute,kind:'accident',incomingDelay:equipmentDelayIn});
    const now=incident?incident.idleMinutes:relevant?.hazard==='equipment'?0:
     failedComplication?minutes-obstacleMinute:Number(raw('hazardDelayNow')||0);
    // Equipment F/CF is inventory repair work, never next-travel delay.
@@ -25342,6 +25385,8 @@ function episodePreviewFromForm(form,clock){
      ['long-delay','irreparable'].includes(outcome)?minutes:0;
    if(relevant?.hazard==='complication'){
     relevant.hazardAtMinute=failedComplication?obstacleMinute:null;
+    if(failedComplication)relevant.eventWindow93868=deferredEpisodeEvent93868({startMinute:clock.minute,minutes,
+     atMinute:obstacleMinute,kind:'complication',source:v.hazardMinuteOrigin93868||'manual',incomingDelay:equipmentDelayIn});
     relevant.routeChangeConfirmed=outcome==='irreparable'?true:outcome==='reroute'?true:false;
     relevant.automationVersion='v93.681';
    }
@@ -26886,6 +26931,11 @@ function episodeGroupRoleChoices93856(form,v){
   'Výběr jezdce je uzamčen: nejdříve v této skupině zaškrtněte dostupné jezdecké zvíře a doložte uzdu, deku a sedlo. Zvíře přidělené jiné souběžné skupině nelze použít.';
 }
 function updateEpisodePreview(form){
+ if(form){const minuteField=form.elements.namedItem('hazardAtMinute');
+  const duration=Number(form.elements.namedItem('minutes')?.value||0);
+  if(minuteField&&Number.isSafeInteger(duration)&&duration>=1&&duration<=10080){
+   minuteField.max=String(duration);minuteField.placeholder='1–'+duration;
+  }}
  if(!form)return;
  episodeEnsureDiceControls93849(form);
  ensureFixedAccidentMinute93773(form);
@@ -27819,7 +27869,7 @@ function episodeClearDiceDraft(draft){
   progressD10:'',directionD10:'',survivalD10:'',precipitationD6:'',encounterD100:'',forageD10:'',
   temperatureD10:'',precipitationD10:'',
   checkEncounter:true,encounterResolution:'',encounterRollContext:'',navigationRecovered:false,orientationUse:'new',trackingUse:'none',
-  hazardComplicationRouteChanged:false,hazardAtMinute:'',hazardDelayNow:'0',
+  hazardComplicationRouteChanged:false,hazardAtMinute:'',hazardMinuteOrigin93868:'manual',hazardDelayNow:'0',
   skillProofIds:[],episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};
  for(const k of Object.keys(saved))if(k.startsWith('end_'))saved[k]='';
  return saved;
@@ -27992,6 +28042,24 @@ document.addEventListener('click',e=>{
  episodeStartSkillRequest('hazardEvidenceId',rule.skill,worker);
 },true);
 document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-episode-random-event-minute]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=button.closest('#hmk-time-episode-form');if(!form||button.disabled)return;
+ try{
+  const minutes=Number(form.elements.namedItem('minutes')?.value);
+  if(!Number.isSafeInteger(minutes)||minutes<1||minutes>10080)throw Error('Neplatná délka epizody.');
+  const hazard=Number(form.elements.namedItem('survivalD10')?.value||0);
+  if(!(hazard>=4&&hazard<=10))throw Error('Minutu lze hodit až po skutečně určené nehodě nebo komplikaci.');
+  const value=randomEpisodeMinute93868(minutes),field=form.elements.namedItem('hazardAtMinute');
+  if(!field||field.disabled)throw Error('Pole minuty události není aktivní.');
+  field.value=String(value);field.dataset.hmkEventMinuteGenerated93868=String(value);
+  form.elements.namedItem('hazardMinuteOrigin93868').value='cryptographic-software-minute';
+  episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));
+  timeEpisodeDraft=episodeFormSnapshot(form);
+  if(episodeStageBaseline||sharedTimeWindowDraft)persistEpisodeDraftSidecar({snapshotForm:true});
+ }catch(err){alert('Minutu události nelze vygenerovat: '+err.message)}
+},true);
+document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-hazard-choices-confirm]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
  const form=button.closest('#hmk-time-episode-form');if(!form||!episodeHazardChoicesRequired93840(form))return;
@@ -28001,6 +28069,7 @@ document.addEventListener('click',e=>{
    const raw=String(form.elements.namedItem('hazardAtMinute')?.value||'').trim();
    if(!/^[1-9]\d*$/.test(raw))throw Error('Accident: zadejte kladné celé číslo minuty nehody.');
    incidentMinutes93863({minutes:Number(form.elements.namedItem('minutes')?.value),atMinute:Number(raw),kind:form.elements.namedItem('kind')?.value});
+   const proof=form.elements.namedItem('hazardMinuteOrigin93868');if(proof&&!proof.value)proof.value='manual';
   }else {episodeEquipmentSync93843(form);episodeEquipmentValidateConfirm93843(form)}
  }catch(err){episodeShowSetupError(form,{field:'hazardAtMinute',message:err.message});return;}
  const state=episodeHazardState93840(form);
@@ -28015,6 +28084,11 @@ document.addEventListener('click',e=>{
 document.addEventListener('input',e=>{
  const form=e.target?.closest?.('#hmk-time-episode-form');if(!form)return;
  if(e.target?.name==='trackingRoad')e.target.dataset.episodeAutoSource='gm';
+ if(e.target?.name==='hazardAtMinute'){
+  const witness=e.target.dataset.hmkEventMinuteGenerated93868;
+  if(witness!==String(e.target.value)){form.elements.namedItem('hazardMinuteOrigin93868').value='manual';
+   delete e.target.dataset.hmkEventMinuteGenerated93868;}
+ }
  if(episodeHazardInputIsDraft93840(e.target)){episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));return;}
  if(e.target?.matches?.('[data-episode-medical-key]')){
   episodePersistMedicalInput(e.target,form);
@@ -28029,6 +28103,11 @@ document.addEventListener('input',e=>{
 },true);
 document.addEventListener('change',e=>{
  const form=e.target?.closest?.('#hmk-time-episode-form');if(!form)return;
+ if(e.target?.name==='hazardAtMinute'){
+  const witness=e.target.dataset.hmkEventMinuteGenerated93868;
+  if(witness!==String(e.target.value)){form.elements.namedItem('hazardMinuteOrigin93868').value='manual';
+   delete e.target.dataset.hmkEventMinuteGenerated93868;}
+ }
  if(episodeHazardInputIsDraft93840(e.target)){episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));return;}
  // Do not rebuild the next input during focus transfer from a health field.
  // Its own change handler persists the value; Evaluate refreshes all results.
@@ -28103,7 +28182,7 @@ document.addEventListener('click',e=>{
   const elapsed=Number(form.elements.namedItem('minutes')?.value||0),
    incoming=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
     (episodeFormSnapshot(form).memberIds||[]).length?episodeFormSnapshot(form).memberIds:null),
-   movement=Math.max(0,elapsed-incoming);
+   movement=actualGroupMovement93868({minutes:elapsed,incomingDelay:incoming,atMinute:episodeConfirmedMovementStop93868(form,elapsed)});
   const count=hourly?Math.ceil(movement/60):(movement===0?0:1);
   if(!Number.isSafeInteger(count)||count<0||count>168||!Number.isSafeInteger(elapsed)||elapsed<1)throw Error('Nejprve zadejte platnou délku cesty.');
   if(count===0){field.value='';field.dataset.episodeGenerated='';episodeDicePending93849(form,field);return;}
@@ -29033,14 +29112,14 @@ document.addEventListener('click',e=>{
   if(list.flatMap(q=>q.patch?.journal||[]).some(j=>
    j.calendarTimeEpisode?.endMinute<sharedTimeWindowDraft.endMinute&&
    j.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)))
-   throw Error('Nehoda vyžaduje vyhodnocení v původní minutě; nelze posunout celé okno přes její zdravotní následek.');
+   throw Error('Starší částečně uzavřená nehoda vyžaduje původní pravidlové dořešení; moderní celookenní epizody končí až na hranici okna.');
   // Validate again immediately before GM confirmation; this is not a lock
   // on other Skill Tests, only a proof that each prepared result is current.
   sharedValidateWitnessQueue93769(list);
   const clockEventId=uuid();
   const authorized=confirmSharedTimeWindow93767(sharedTimeWindowDraft,{episodeIds:list.map(x=>x.sourceId),clockEventId,gmConfirmed:true});
   const names=list.map(x=>x.memberNames.join(', ')).join(' | ');
-  if(!uiConfirm('GM: potvrdit '+list.length+' nezávislých činností od '+displayCampaignMinute(authorized.startMinute)+' do '+displayCampaignMinute(authorized.endMinute)+' a posunout JEDINÝ kalendář o '+authorized.minutes+' minut?'))return;
+  // The explicit 'Potvrdit celé okno' button IS the GM confirmation; no second dialog.
   if(!mutate(()=>{
    for(const entry of list){
     if(sharedTravelInputWitness93768(entry.witnessIds)!==entry.witness)
@@ -29150,7 +29229,7 @@ document.addEventListener('submit',e=>{
   const next=advanceCampaignCalendar(gmClock,{deltaMinutes:result.minutes,eventId:uuid(),reason:'GM časová epizoda: '+gmMessage,gmConfirmed:true,
    characters:stagedTimed?.characters||data.characters,journal:[...data.journal,...shelterClosures,...(stagedTimed?.generatedJournal||[]),...scopedSurvivalCF],inventory:data.inventory});
   const name=result.memberIds.map(id=>character(id)?.name||id).join(', '),sourceId=uuid();
-  if(!episodeQueueAction&&!uiConfirm('Potvrdit činnost '+name+' od '+displayCampaignMinute(result.startMinute)+' do '+displayCampaignMinute(result.endMinute)+' a posunout skutečný herní čas?'))return;
+  // The explicit episode-finish button IS the GM confirmation; no second dialog.
   const members=result.memberIds.map(id=>character(id));
   let sharedWindowMarker=null,sharedGroupMarker=null;
   const applyCurrent=()=>{
@@ -29296,7 +29375,7 @@ document.addEventListener('submit',e=>{
    // actual minute. Never advance unrelated groups beyond unresolved injury.
    const accidentAt=result.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)?result.endMinute:null;
    if(openPlan?.episodeRowV===3)fixedAccidentMinute93773({startMinute:result.startMinute,endMinute:result.endMinute,minutes:result.minutes,hazards:result.hazardDetails||[]});
-   if(Number.isSafeInteger(accidentAt)&&accidentAt<basis.endMinute){
+   if(openPlan?.episodeRowV!==3&&Number.isSafeInteger(accidentAt)&&accidentAt<basis.endMinute){
     if(sharedTimeWindowQueue.some(q=>q.patch?.endMinute>accidentAt))
      throw Error('Nehoda nastala v '+displayCampaignMinute(accidentAt)+', ale dříve připravená skupina pokračuje za ni. Je nutné zkrátit společný interval; již doložené hody se nesmějí zpětně přepočítat.');
     extended={...extended,endMinute:accidentAt,minutes:accidentAt-extended.startMinute};

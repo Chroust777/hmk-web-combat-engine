@@ -18,6 +18,7 @@ import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,
 import {validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
 import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
 import {incidentMinutes93863} from './hmk-incident-window-93863.js';
+import {validateDeferredEpisodeEvent93868} from './hmk-episode-interruption-93868.js';
 export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -811,6 +812,13 @@ export function validateTimeEpisodes(journal=[]){
      directionObservationDeferred:h.directionObservationDeferred===true});
     const linked=h.evidenceId?journal.find(k=>k.id===h.evidenceId&&
      k.calendarCampaignId===j.calendarCampaignId&&k.campaignMinute===e.startMinute):null;
+    if(h.eventWindow93868){
+     validateDeferredEpisodeEvent93868(h.eventWindow93868,{
+      startMinute:e.startMinute,minutes:e.minutes,atMinute:h.hazardAtMinute,
+      kind:h.hazard,incomingDelay:e.kind==='travel'?Number(e.travelDelay?.incoming||0):0});
+     must(h.eventWindow93868.recordAtMinute===e.endMinute,
+      'Potvrzená událost nesmí vyvolat zdravotní zápis před koncem okna.');
+    }
     if(h.automationVersion==='v93.863-fixed-window-incident'&&h.hazard==='accident'){
      const incident=incidentMinutes93863({minutes:e.minutes,atMinute:h.hazardAtMinute,
       kind:e.kind,incomingDelay:e.kind==='travel'?Number(e.travelDelay?.incoming||0):0});
@@ -1078,6 +1086,27 @@ export function validateTimeEpisodes(journal=[]){
      active*(a.extraFatigue+a.duneFatigue);
     must(a.movementFatigueUnits===expected&&a.roll===a.hourlyEndSR[0]?.roll,
      'Hourly END audit: skutečná hodinová únava neodpovídá dokladům.');
+   }
+  }
+  if(e.unusedEndDice93868){
+   const proof=e.unusedEndDice93868;
+   must(e.kind==='travel'&&e.doubleTime===true&&e.endSRMode==='hourly-verified-v93.663'&&
+    proof.format==='hmk-confirmed-unused-end-dice-v93.868'&&
+    proof.reason==='confirmed-dice-before-incident-minute'&&
+    proof.actualMovementMinutes===e.movementMinutes&&
+    e.hazardDetails?.some(h=>h.eventWindow93868)&&
+    proof.byActor&&typeof proof.byActor==='object'&&!Array.isArray(proof.byActor),
+    'Nepoužité END hody smějí pocházet jen z doložené nehody nebo překážky během Double Time.');
+   const ids=Object.keys(proof.byActor);
+   must(ids.length>0&&ids.every(id=>e.memberIds.includes(id)&&Array.isArray(proof.byActor[id])&&
+    proof.byActor[id].length>0&&proof.byActor[id].every(r=>whole(r,1,10))),
+    'Nepoužité END hody mají neplatného účastníka či hodnotu.');
+   for(const id of ids){
+    const actor=e.actors?.find(a=>a.id===id),raw=String(e.settings?.['end_'+id]??'').trim();
+    const original=raw?raw.split(',').map(x=>Number(x.trim())):[];
+    must(!!actor&&JSON.stringify(original)===JSON.stringify([
+     ...(actor.hourlyEndSR||[]).map(x=>x.roll),...proof.byActor[id]]),
+     'Nepoužité END hody nebyly zachovány v původním potvrzeném pořadí.');
    }
   }
   if(e.kind==='travel')for(const a of e.actors||[])if(a.earlyIncapacity){
