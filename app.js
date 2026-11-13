@@ -5,6 +5,7 @@ import {startSharedTimeWindow93767,addSharedTimeGroup93767,confirmSharedTimeWind
 import {planSharedWindow93771,sharedDailyWindowLimit93771} from './src/integration/hmk-shared-planner-93771.js';
 import {planEpisodeRows93772,rowMaximum93772} from './src/integration/hmk-episode-rows-93772.js';
 import {planFixedEpisode93773,fixedAccidentMinute93773} from './src/integration/hmk-episode-fixed-93773.js';
+import {incidentMinutes93863} from './src/integration/hmk-incident-window-93863.js';
 import {captureSharedActivityDelta93769,replaySharedActivityDelta93769,verifySharedActivityQueue93769} from './src/integration/hmk-shared-serial-receipts-93769.js';
 import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js';
 import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js';
@@ -356,7 +357,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.862';
+const APP_VERSION='93.863';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2492,18 +2493,16 @@ function episodeIndoorWeatherNotRequired(v,clock){
 }
 function ensureFixedAccidentMinute93773(form){
  const plan=sharedPlanCurrent93771();
- if(!plan||plan.episodeRowV!==3||!sharedTimeWindowDraft||form?.elements.namedItem('kind')?.value!=='travel')return;
- const hazard=String(form.elements.namedItem('survivalD10')?.value||'').trim();
+ if(!plan||plan.episodeRowV!==3||!sharedTimeWindowDraft||
+    !['travel','forage'].includes(form?.elements.namedItem('kind')?.value))return;
  const input=form.elements.namedItem('hazardAtMinute');
  if(!input)return;
- if(['4','5','6'].includes(hazard)){
-  input.value=String(sharedTimeWindowDraft.minutes);
-  input.readOnly=true;
-  const planned=form.elements.namedItem('incidentPlannedMinutes');if(planned)planned.value=String(sharedTimeWindowDraft.minutes);
- }else if(input.dataset.hmkAutoAccident==='yes'){
-  input.value='';input.readOnly=false;
- }
- input.dataset.hmkAutoAccident=['4','5','6'].includes(hazard)?'yes':'';
+ // Never manufacture or overwrite a GM occurrence minute. The fixed length
+ // belongs to Calendar, not to the number input for the incident.
+ input.max=String(sharedTimeWindowDraft.minutes);
+ input.readOnly=false;
+ const planned=form.elements.namedItem('incidentPlannedMinutes');
+ if(planned)planned.value=String(sharedTimeWindowDraft.minutes);
 }
 /** v93.821: actual health belongs to the shared medical state; this ONLY
  * identifies passengers for the present travel group, never a Combat actor.
@@ -3171,11 +3170,11 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint" data-episode-delay-hint>Vyberte skutečný výsledek hazardu; podle něj aplikace určí povinné doklady.</p></div>
  <label data-hazard-skill-level>Výsledek testu (pouze u Complication)<select name="hazardSkillLevel"><option value="">— nutno doložit —</option>${['CF','F','S','CS'].map(x=>option(x,x)).join('')}</select></label>
  <label data-hazard-minute>Minuta nehody / překážky od začátku epizody · určuje GM<input name="hazardAtMinute" type="number" min="1" max="10080" placeholder="např. 45" inputmode="numeric"></label>
- <p data-hazard-minute class="hc-hint">Ve společné pevné epizodě se Accident zapíše až na konci celého intervalu; ostatní činnosti se vyhodnotí. U Complication F/CF GM doloží skutečnou minutu překážky a navazující zdržení podle pravidel.</p>
- <div data-hazard-accident class="hc-episode-accident-step"><h4>Accident · následné vyhodnocení na konci epizody (HMK 148)</h4>
- <p class="hc-hint">Ve společné pevné epizodě nastane nehoda až na jejím konci. Plánované vzdálenosti za celý interval se zachovají. Výběr oběti, Agility a Injury Sequence se vyhodnotí samostatně po jediném potvrzení GM; Cestování samo nikdy nespouští Combat.</p>
+ <p data-hazard-minute class="hc-hint">GM potvrdí skutečnou minutu nehody/překážky. Délka původního společného intervalu se nikdy nepřepisuje. U Accident se pohyb zastaví od minuty nehody; Kalendář přesto uběhne celý interval. U Complication F/CF se uplatní skutečná ztráta pohybu.</p>
+ <div data-hazard-accident class="hc-episode-accident-step"><h4>Accident · nehoda v doložené minutě (HMK 148)</h4>
+ <p class="hc-hint">Nehoda nastane v GM potvrzené minutě. U Pochodu se další metry nepočítají; kalendářové okno se nikdy nezkrátí. Výběr oběti, Agility a Injury Sequence se vyhodnotí samostatně po jediném potvrzení GM; Cestování samo nikdy nespouští Combat.</p>
  <input name="incidentPlannedMinutes" type="hidden" value="">
- <p class="hc-hint" data-episode-accident-result>Při společné epizodě je čas nehody automaticky konec intervalu; zdravotní hody zatím neprovádějte.</p></div>
+ <p class="hc-hint" data-episode-accident-result>Zadejte a potvrďte minutu. Zdravotní hody se provedou až po potvrzení celého intervalu.</p></div>
  <label data-hazard-direction>Skutečný d10 pro směr odchýlení (liché = vlevo, sudé = vpravo)<span class="hc-episode-die"><input name="hazardDirectionD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="hazardDirectionD10" data-episode-faces="10">⚄ d10</button></span></label>
  <div data-hazard-direction-awareness><label>Awareness při Misdirection · skutečný Skill Test<select name="hazardDirectionProofId"><option value="">— pokud byl skutečně proveden —</option>${skillCandidates.filter(j=>episodeSkillProof(j,'Awareness',j.characterId,campaignKey(clock),clock.minute)).map(j=>option(j.id,(character(j.characterId)?.name||j.characterId)+' · '+j.title)).join('')}</select></label>
  <label class="hc-check"><input name="hazardDirectionDeferAwareness" type="checkbox"> Družina nyní nepoužila Awareness a pokračuje chybným směrem (bez hodu a bez předpokládaného úspěchu).</label></div>
@@ -7503,7 +7502,7 @@ function downloadUnfinishedHMKState93859(){
   try{return {present:true,value:JSON.parse(raw)}}catch{return {present:true,unparsedRaw:raw,parseError:true}}}
   catch(e){return {present:false,readError:String(e?.message||e)}}};
  const currentForm=document.querySelector('#hmk-time-episode-form');
- const pkg={format:'hmk-local-working-diagnostic-v93.862',appVersion:APP_VERSION,
+ const pkg={format:'hmk-local-working-diagnostic-v93.863',appVersion:APP_VERSION,
   exportedAt:new Date().toISOString(),scope:'local-only-no-cloud-token',
   note:'Obsahuje historii kampaně a nedokončené testy. Neslouží k importu; před sdílením chraňte soukromé údaje.',
   committedCampaign:read(localStorage,STORAGE),
@@ -23604,7 +23603,10 @@ function episodeHazardInputs93840(form){
  // for explicit confirmation; combined hazards retain the full superset.
  const legend=hz.querySelector('[data-episode-hazard-legend]')?.textContent||'';
  const equipment=legend.startsWith('Equipment Hazard ·');
- const allowed=equipment?new Set(['hazardEquipmentDisposition','hazardItemId',
+ const accident=legend.startsWith('Accident ·')||
+  ['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
+  /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''));
+ const allowed=accident?new Set(['hazardAtMinute']):equipment?new Set(['hazardEquipmentDisposition','hazardItemId',
   'hazardRepairSkill','hazardWorkerId','hazardSkillLevel','hazardEvidenceId']):null;
  return [...hz.querySelectorAll('[name]')].filter(n=>n.name!=='hazardChoices93840'&&
   (allowed?allowed.has(n.name):
@@ -23624,7 +23626,10 @@ function episodeHazardState93840(form){
  const field=form.elements.namedItem('hazardChoices93840');
  let saved=null;try{saved=JSON.parse(field?.value||'null')}catch{}
  const current=episodeHazardRead93840(form),context=episodeHazardContext93840(form);
+ const accident=['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
+  /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''));
  const valid=!!saved&&saved.context===context&&
+  (!accident||saved.confirmationPolicy==='explicit-incident-minute-v93.863')&&
   Object.keys(current).every(k=>String(saved.values?.[k])===String(current[k]));
  state={confirmed:valid,values:valid?{...saved.values}:{...current},context:valid?saved.context:context};
  episodeHazardConfirmation93840.set(form,state);
@@ -23640,17 +23645,45 @@ function episodeHazardSelectionUI93840(form,required){
  const pending=episodeHazardPending93840(form);
  // Keep the real confirmation reachable after the exact minute was edited.
  // Only this UI visibility changes: no result, dice or saved proof is accepted.
- if(required&&pending){const hz=box.closest('[data-episode-hazard-details]');if(hz)hz.hidden=false;}
+ if(required&&pending){const hz=box.closest('[data-episode-hazard-details]');if(hz){hz.hidden=false;hz.closest('details')?.setAttribute('open','');}}
  const status=box.querySelector('[data-hazard-choice-status]');
  const equipmentRepair=Number(form.elements.namedItem('survivalD10')?.value)<=3&&
   Number(form.elements.namedItem('survivalD10')?.value)>=1&&
   form.elements.namedItem('hazardEquipmentDisposition')?.value==='repair';
  box.hidden=!required||equipmentRepair;
+ const accident=['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
+  /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''));
  if(status){status.textContent=equipmentRepair?'Opraváře a předmět potvrďte přímo tlačítkem otevření Skill Testu.':
+  accident?(pending?'Minutu nehody potvrďte tlačítkem; kalendářový interval zůstane beze změny.':'Minuta nehody potvrzena; délka kalendářového intervalu se nemění.'):
   pending?'Potvrďte zvolený postup tlačítkem; žádná změna seznamu sama nic neuloží.':'Postup potvrzen.';
   status.dataset.state=equipmentRepair?'neutral':pending?'pending':'confirmed';}
- const button=box.querySelector('[data-hazard-choices-confirm]');if(button){button.hidden=equipmentRepair;button.disabled=!required||!pending;}
+ const button=box.querySelector('[data-hazard-choices-confirm]');if(button){button.hidden=equipmentRepair;button.disabled=!required||!pending;
+  button.textContent=accident?'Potvrdit minutu nehody':'Potvrdit postup';}
  episodeEquipmentSync93843(form);
+}
+function episodeLockInactiveHazardFields93863(form){
+ const panel=form?.querySelector('[data-episode-hazard-details]');if(!panel)return;
+ for(const field of panel.querySelectorAll('input,select,textarea,button')){
+  if(field.type==='hidden'||field.name==='hazardChoices93840')continue;
+  const inactive=!!field.closest('[hidden]');
+  // A confirmed/historical roll keeps its original independent read-only lock.
+  if(inactive){
+   if(field.dataset.hmkInactive!=='yes'){
+    field.dataset.hmkInactiveWasDisabled=field.disabled?'yes':'no';
+    field.dataset.hmkInactivePriorTitle=field.title||'';
+   }
+   field.disabled=true;field.dataset.hmkInactive='yes';
+   field.title='Neaktivní: tato volba nepatří k právě vyhodnocovanému druhu Hazardu.';
+  }else if(field.dataset.hmkInactive==='yes'){
+   // Restore the previous lock instead of unlocking an independently
+   // confirmed or forbidden roll when its subpanel becomes relevant.
+   field.disabled=field.dataset.hmkInactiveWasDisabled==='yes';
+   field.title=field.dataset.hmkInactivePriorTitle||'';
+   delete field.dataset.hmkInactive;
+   delete field.dataset.hmkInactiveWasDisabled;
+   delete field.dataset.hmkInactivePriorTitle;
+  }
+ }
 }
 function episodeHazardInputIsDraft93840(node){
  return !!node?.closest?.('#hmk-time-episode-form [data-episode-hazard-details]')&&
@@ -23667,12 +23700,16 @@ function episodeHazardChoicesRequired93840(form){
  // Do not hide the only confirmation button merely because the derived
  // hazard section was hidden while rebuilding the next task.
  const complication=/^Complication ·/.test(legend)&&Number(form.elements.namedItem('survivalD10')?.value)>=7;
- if(hz.hidden&&!complication)return false;
- return !/^Accident ·/.test(legend)&&!!legend;
+ const accident=['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
+  /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''));
+ if(hz.hidden&&!complication&&!accident)return false;
+ return accident||!!legend;
 }
 function episodeHazardRequireConfirmed93840(form){
  if(episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form))
-  throw Error('Hazard: nejprve zvolte požadovaný postup a stiskněte „Potvrdit volbu Hazardu“. Rozbalovací seznamy samy nic nepotvrzují.');
+  throw Error(/^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''))?
+   'Accident: nejprve potvrďte skutečnou minutu nehody tlačítkem „Potvrdit minutu nehody“; původní časové okno zůstává zachováno.':
+   'Hazard: nejprve zvolte požadovaný postup a stiskněte „Potvrdit postup“. Rozbalovací seznamy samy nic nepotvrzují.');
 }
 // v93.849 · every visible Travel die has a DRAFT and an explicit acceptance boundary.
 // The number first typed can never become a rule result or skip the next step.
@@ -24124,8 +24161,13 @@ function episodeMarkField(form,name,{focus=false}={}){
   const hazard=form.querySelector('[data-episode-hazard-details]');
   if(hazard){hazard.hidden=false;
    for(const item of hazard.querySelectorAll('[data-hazard-minute]'))item.hidden=false;
-   if(/^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||'')))
+   if(/^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''))){
+    const legend=hazard.querySelector('[data-episode-hazard-legend]');
+    if(legend)legend.textContent='Accident · nehoda během činnosti';
     for(const item of hazard.querySelectorAll('[data-hazard-accident]'))item.hidden=false;
+    episodeHazardSelectionUI93840(form,true);
+    episodeLockInactiveHazardFields93863(form);
+   }
   }
  }
  if(name==='transportedMemberIds'){
@@ -24894,21 +24936,22 @@ function episodePreviewFromForm(form,clock){
    }
   }
   if(hazardType==='accident'){
-   const at=Number(v.hazardAtMinute),planned=Number(v.incidentPlannedMinutes||minutes);
-   if(!Number.isSafeInteger(at)||at<1||at>planned||at!==minutes||
-     (sharedPlanCurrent93771()?.episodeRowV===3&&at!==sharedTimeWindowDraft.minutes))
-    throw Error('Accident: doložte minutu nehody a zkraťte epizodu přesně na tento okamžik.');
+   const at=Number(v.hazardAtMinute);
+   incidentMinutes93863({minutes,atMinute:at,kind,incomingDelay:equipmentDelayIn});
+   // Calendar owns the original time window. The health evaluation is handed
+   // off AFTER its single GM confirmation, even if movement ceased earlier.
    // NO Injury Sequence, shock, wound or automatic health-state write here.
    // This is an unresolved, original skill-critical follow-up in Calendar.
    detail.requiresGMCompletion=false;
    detail.externalMedicalPending=true;
    detail.hazardAtMinute=at;
-   if(sharedPlanCurrent93771()?.episodeRowV===3)detail.medicalHandoffMinute=clock.minute+minutes;
+   detail.medicalHandoffMinute=clock.minute+minutes;
+   detail.automationVersion='v93.863-fixed-window-incident';
    detail.hazardD10=Number(v.survivalD10); // Original hazard die; must NOT be rolled again.
    detail.result='pending-original-skill-combat';
   }
   if(hazardType==='equipment'&&detail.itemId)detail.equipmentGMPolicy='gm-controlled-v93.845';
-  detail.automationVersion=hazardType==='accident'?(sharedPlanCurrent93771()?.episodeRowV===3?'v93.773-end-of-episode':'v93.675'):'v93.635';
+  detail.automationVersion=hazardType==='accident'?'v93.863-fixed-window-incident':'v93.635';
   if(hazardType==='misdirection')detail.directionProofId=String(v.hazardDirectionProofId||'').trim()||null;
   result.hazardDetails.push(detail);
  }
@@ -24937,7 +24980,10 @@ function episodePreviewFromForm(form,clock){
    if(relevant?.hazard==='complication'&&outcome==='irreparable'&&!v.hazardComplicationRouteChanged)
     throw Error('Complication CF: GM musí potvrdit změnu trasy.');
    // Equipment repair work is independent of Travel; only actual Complication blocks travel.
-   const now=relevant?.hazard==='equipment'?0:
+   const accident=result.hazardDetails.find(h=>h.hazard==='accident');
+   const incident=accident?incidentMinutes93863({minutes,atMinute:accident.hazardAtMinute,
+    kind,incomingDelay:equipmentDelayIn}):null;
+   const now=incident?incident.idleMinutes:relevant?.hazard==='equipment'?0:
     failedComplication?minutes-obstacleMinute:Number(raw('hazardDelayNow')||0);
    // Equipment F/CF is inventory repair work, never next-travel delay.
    const future=relevant?.hazard==='complication'&&
@@ -24947,8 +24993,8 @@ function episodePreviewFromForm(form,clock){
     relevant.routeChangeConfirmed=outcome==='irreparable'?true:outcome==='reroute'?true:false;
     relevant.automationVersion='v93.681';
    }
-   const delay={...episodeMinuteDelay({minutes,incoming,current:relevant?now:0,future,persistCarry:true}),
-    method:'gm-complication-only-v93.695'};
+   const delay={...episodeMinuteDelay({minutes,incoming,current:incident||relevant?now:0,future,persistCarry:true}),
+    method:incident?'gm-incident-fixed-window-v93.863':'gm-complication-only-v93.695'};
    result.travelPartyScope='v93.763'; // New receipts isolate travel consequences by actual participants.
    result.equipmentBaseSlow=equipmentBaseSlow;
    result.equipmentSlowCarryIn=equipmentSlowIn;
@@ -25320,7 +25366,7 @@ function renderEpisodeEndStatus(form,result,weather){
 
   for(const h of result.hazardDetails||[])rows.push(['Hazard · '+h.hazard+(h.victimId?' · '+(character(h.victimId)?.name||h.victimId):h.itemOwnerId?' · '+(character(h.itemOwnerId)?.name||h.itemOwnerId):''),
    h.hazard==='accident'&&h.externalMedicalPending?
-    'Nehoda doložena pro konec epizody; po jejím potvrzení je nutný Agility / Injury postup v původních Skill Tests. Další cestu do vyřešení blokuje Kalendář.':
+    'Nehoda doložena v '+h.hazardAtMinute+'. minutě z '+result.minutes+'; zdravotní Agility / Injury se předá původním Skill Tests po potvrzení celého intervalu. Kalendář blokuje až další nevyřešený postup.':
     h.requiresGMCompletion?'čeká na doklad':String(h.result?.impact?'Impact '+h.result.impact:h.result),
    h.injuryProofId||h.repairProofId||h.complicationProofId||h.evidenceId||'',
    h.hazard==='accident'?'hazardAgilityD100':h.hazard==='equipment'?'hazardItemId':'hazardComplicationSkill']);
@@ -25815,7 +25861,13 @@ function updateEpisodeTaskFocus(form){
  const task=tasks.find(t=>t.field===episodeFocusedTaskField)||
   (editingFatigue?{field:liveName,title:'Únava · END d10'}:null)||
   nextInArea||tasks.find(t=>t.field===issue)||tasks[0]||null;
- const field=task?.field||issue;
+ // v93.863: An unconfirmed Accident minute must be the CURRENT focused
+ // step.  Otherwise a later END/progress task can hide the entire hazard
+ // fieldset, leaving a disabled completion button with no reachable remedy.
+ const incidentPending=episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form)&&
+  ['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
+  /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''));
+ const field=incidentPending?'hazardAtMinute':task?.field||issue;
  const active=field?episodeTaskArea(field):'none';
  // A multi-character obligation must expose only the currently requested
  // actor. Never hide or erase previously pinned receipts in the draft.
@@ -25853,6 +25905,9 @@ function updateEpisodeTaskFocus(form){
    if(!node.hidden){node.dataset.episodeFocusHidden='true';node.hidden=true;}
   }
  }
+ // Focus changes visibility AFTER preview derives the selected hazard.
+ // Keep disabled flags in sync; non-applicable controls must never be clickable.
+ episodeLockInactiveHazardFields93863(form);
 }
 // Global dice contract: if the Surprise procedure does not call for a side's
 // d100, BOTH its manual field and its shared blue d100 button are disabled.
@@ -27088,7 +27143,7 @@ function updateEpisodePreview(form){
    if(legend)legend.textContent=({equipment:'Equipment Hazard · poškozený předmět',accident:'Accident · nehoda během činnosti',complication:'Complication · přírodní překážka',misdirection:'Direction Hazard · odchýlení trasy',lost:'Direction Hazard · ztracený směr'})[single]||'Současné hazardové následky · HMK 148–149';
    const context=hz.querySelector('[data-episode-hazard-context]');
    if(context)context.textContent=types.includes('equipment')?'Survival CF vyvolal ztrátu či závadu vybavení celé skupiny. Vyberte dotčený předmět a řešení; při opravě se dovednost určí automaticky a výsledek převezme z potvrzeného Skill Testu.':
-    types.includes('accident')?(sharedFixedMode93773()?'Nehoda nastane na konci pevného intervalu; teprve po posunu společného kalendáře otevřete zdravotní procedury.':'Nejprve potvrďte minutu nehody; po dokončení cesty se zdravotní testy provedou v původních modulech.'):
+    types.includes('accident')?'Zadejte a výslovně potvrďte skutečnou minutu nehody. Celé kalendářové okno zůstává beze změny. U Pochodu se zastaví další pohyb; zdravotní hody pokračují po jediném posunu Kalendáře.':
     types.includes('complication')?'Doložte zvolený postup a případný Skill Test. Nevyhodnocené hody se nepředpokládají.':
     'Doložte skutečný výsledek směrového hazardu.';
    if(context)context.hidden=types.length===1&&types[0]==='equipment';
@@ -27104,7 +27159,7 @@ function updateEpisodePreview(form){
    for(const n of hz.querySelectorAll('[data-hazard-complication]'))n.hidden=!types.includes('complication');
    for(const n of hz.querySelectorAll('[data-hazard-skill-level]'))n.hidden=!(types.includes('complication')&&v.hazardComplicationScope!=='party');
    for(const n of hz.querySelectorAll('[data-hazard-agility],[data-hazard-accident]'))n.hidden=!types.includes('accident');
-   for(const n of hz.querySelectorAll('[data-hazard-minute]'))n.hidden=sharedFixedMode93773()&&types.includes('accident')||!types.some(x=>['accident','complication'].includes(x));
+   for(const n of hz.querySelectorAll('[data-hazard-minute]'))n.hidden=!types.some(x=>['accident','complication'].includes(x));
    const currentDelay=form.elements.namedItem('hazardDelayNow');
    if(currentDelay&&types.includes('complication')&&['F','CF'].includes(v.hazardSkillLevel)){
     const at=Number(v.hazardAtMinute),elapsed=Number(v.minutes);
@@ -27115,11 +27170,18 @@ function updateEpisodePreview(form){
    for(const n of hz.querySelectorAll('[data-hazard-complication-party]'))n.hidden=!types.includes('complication')||v.hazardComplicationScope!=='party';
    const proof=hz.querySelector('[data-episode-accident-result]');if(proof&&types.includes('accident')){
     const h=result.hazardDetails.find(x=>x.hazard==='accident');
-    proof.textContent=sharedFixedMode93773()?'Nehoda při dokončení '+h.hazardAtMinute+' minut. Pohyb a ostatní výsledky zůstávají zachovány. Zdravotní následky vyhodnoťte po finálním posunu kalendáře v původních Skill Tests / Combat.':'Cesta přerušena po '+h.hazardAtMinute+' minutách. Po potvrzení pokračujte samostatným Survival Hazard / Injury Sequence v původních Skill Tests. Zatím beze změny Combat State.';
+    proof.textContent='Nehoda v '+h.hazardAtMinute+'. minutě z '+result.minutes+' minut. '+
+     (v.kind==='travel'?'Pohyb jen '+result.movementMinutes+' minut, vzdálenost '+result.distanceMeters+' m. ':'')+
+     'Kalendář stále potvrdí celých '+result.minutes+' minut. Zdravotní následky pokračují samostatně po potvrzení GM.';
    }
    for(const n of hz.querySelectorAll('[data-hazard-direction]'))n.hidden=!types.some(x=>['misdirection','lost'].includes(x));
    for(const n of hz.querySelectorAll('[data-hazard-direction-awareness]'))n.hidden=!types.includes('misdirection');
-   episodeHazardSelectionUI93840(form,types.some(x=>['equipment','complication','misdirection','lost'].includes(x)));
+   // The generic cross-hazard evidence selector is NOT an Accident input.
+   // Leaving it clickable beside the GM minute invites an unrelated document.
+   const unrelatedEvidence=hz.querySelector('.hc-episode-hazard-proof');
+   if(unrelatedEvidence)unrelatedEvidence.hidden=types.includes('accident');
+   episodeHazardSelectionUI93840(form,types.some(x=>['equipment','accident','complication','misdirection','lost'].includes(x)));
+   episodeLockInactiveHazardFields93863(form);
    const sum=hz.querySelector('[data-episode-hazard-summary]');if(sum&&kind)sum.textContent=types.includes('equipment')?'Equipment Hazard · přidělen družině při Survival CF. Vyberte předmět a další postup; nic není poškozeno až do potvrzení celé epizody.':result.hazardDetails.map(x=>'Doložený '+x.hazard+' · '+JSON.stringify(x.result)).join(' | ');
    for(const n of hz.querySelectorAll('[data-hazard-injury]'))n.hidden=!types.includes('accident');
    const delayBox=hz.querySelector('[data-episode-delay-fields]');
@@ -27502,10 +27564,19 @@ document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-hazard-choices-confirm]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
  const form=button.closest('#hmk-time-episode-form');if(!form||!episodeHazardChoicesRequired93840(form))return;
- try{episodeEquipmentSync93843(form);episodeEquipmentValidateConfirm93843(form)}catch(err){alert(err.message);return;}
+ try{
+  if(['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
+     /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''))){
+   const raw=String(form.elements.namedItem('hazardAtMinute')?.value||'').trim();
+   if(!/^[1-9]\d*$/.test(raw))throw Error('Accident: zadejte kladné celé číslo minuty nehody.');
+   incidentMinutes93863({minutes:Number(form.elements.namedItem('minutes')?.value),atMinute:Number(raw),kind:form.elements.namedItem('kind')?.value});
+  }else {episodeEquipmentSync93843(form);episodeEquipmentValidateConfirm93843(form)}
+ }catch(err){episodeShowSetupError(form,{field:'hazardAtMinute',message:err.message});return;}
  const state=episodeHazardState93840(form);
  state.values=episodeHazardRead93840(form);state.context=episodeHazardContext93840(form);state.confirmed=true;
- form.elements.namedItem('hazardChoices93840').value=JSON.stringify({context:state.context,values:state.values});
+ form.elements.namedItem('hazardChoices93840').value=JSON.stringify({context:state.context,values:state.values,
+  confirmationPolicy:/^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''))?
+   'explicit-incident-minute-v93.863':'hazard-choice-v93.840'});
  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
  episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));
  persistEpisodeDraftSidecar({snapshotForm:true});
@@ -27698,18 +27769,11 @@ document.addEventListener('click',e=>{
  try{
   const raw=String(form.elements.namedItem('survivalD10')?.value||'').trim();
   const hazard=Number(raw),atText=String(form.elements.namedItem('hazardAtMinute')?.value||'').trim();
-  if(form.elements.namedItem('kind')?.value==='travel'&&raw&&hazard>=4&&hazard<=6){
-   if(!/^\d+$/.test(atText))throw Error('Accident: GM musí zadat přesnou minutu nehody před vyhodnocením.');
+  if(['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&raw&&hazard>=4&&hazard<=6){
+   if(!/^\d+$/.test(atText))throw Error('Accident: GM musí zadat celou minutu nehody.');
    const at=Number(atText),elapsed=Number(form.elements.namedItem('minutes')?.value);
-   const initial=Number(form.elements.namedItem('incidentPlannedMinutes')?.value||elapsed);
-   if(!Number.isSafeInteger(at)||at<1||!Number.isSafeInteger(initial)||at>initial||at>elapsed)
-    throw Error('Accident: minuta nehody musí být v plánovaném intervalu.');
-   if(at<elapsed){
-    form.elements.namedItem('incidentPlannedMinutes').value=String(initial);
-    form.elements.namedItem('minutes').value=String(at);
-    form.elements.namedItem('confirmed').checked=true;
-    notice='Nehoda v '+at+'. minutě: plán '+initial+' min byl zkrácen. Nyní potvrďte pouze skutečných '+at+' min; zbývající čas neproběhl.';
-   }
+   incidentMinutes93863({minutes:elapsed,atMinute:at,kind:form.elements.namedItem('kind')?.value});
+   // No write to minutes: the fixed window remains precisely the GM plan.
   }
  }catch(err){episodeEvaluationRequested=false;timeEpisodeDraft=episodeFormSnapshot(form);
   episodeShowSetupError(form,{field:'hazardAtMinute',message:err.message});return;}

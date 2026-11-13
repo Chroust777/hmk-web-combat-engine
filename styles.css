@@ -940,3 +940,13 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 #app .hmk-locked-historical-hint{display:block;margin-top:.3rem;color:#992f24;
  font-size:.79em;font-weight:700;}
 #app [data-hmk-locked="historical-die"]{font-variant-numeric:tabular-nums;}
+/* v93.863: non-applicable Hazard controls are never interactive. */
+#app [data-episode-hazard-details] :is(input,select,textarea,button)[data-hmk-inactive="yes"]{
+ opacity:.55!important;background:#ddd6ca!important;color:#766f66!important;
+ cursor:not-allowed!important;pointer-events:none!important;
+}
+#app [data-episode-hazard-details] [data-hazard-minute]:not([hidden]){
+ border-left:3px solid #8b663d;padding-left:.55rem;
+}
+#app [data-hazard-confirmation]:not([hidden]){border-color:#8b663d;}
+
