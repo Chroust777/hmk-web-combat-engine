@@ -61,6 +61,27 @@ export function episodeEncounterDistance({terrain,d4,period='day',moon='dark',he
  return {format:'hmk-episode-encounter-distance-v1',terrain,d4,period,moon,
   sightingFeet,hearingD10,hearingFeet:hearingD10===null?null:sightingFeet*hearingD10,sourcePage:150};
 }
+/** Active travel party authority; never infer one person to ride while another
+ * supplies the same mount's Riding test. Guide may be a third person.
+ * The transport-of-patients branch has its own physically verified handler.
+ * Only new, uncommitted trip forms call this resolver; historical receipts
+ * retain their original actor IDs. */
+export function episodeTravelAnimalRoles({conveyance='foot',memberIds=[],guideId='',
+ riderId='',droverId='',transportedMemberIds=[]}={}){
+ requireTrue(['foot','mount','cart','wagon'].includes(conveyance)&&Array.isArray(memberIds)&&
+  memberIds.length>0&&new Set(memberIds).size===memberIds.length&&memberIds.includes(guideId),
+  'Doprava: neplatná skupina nebo průvodce.');
+ requireTrue(!riderId||memberIds.includes(riderId),
+  'Jezdec není členem vyhodnocované skupiny. Změňte jezdce v Pochodu.');
+ requireTrue(!droverId||memberIds.includes(droverId),
+  'Drover není členem vyhodnocované skupiny. Změňte vodiče/vozku v Pochodu.');
+ const passengerTransport=conveyance==='mount'&&transportedMemberIds.length>0;
+ const rider=conveyance==='mount'&&!passengerTransport?(riderId||guideId):null;
+ if(rider&&droverId&&droverId!==rider)throw Error(
+  'Jízda na koni: jezdec a Drover musí být jedna a táž postava. Riding vyhodnocuje skutečný jezdec '+rider+'.');
+ return {riderId:rider,droverId:rider||droverId||guideId,
+  riderIsDrover:!!rider,passengerTransport};
+}
 /** GM enters actual d100 and EML. The derived Skill Test level is calculated, never invented. */
 export function episodeEncounterSurprise({partyModes={},conveyance='foot',drovingAnimals=false,foeWatchfulness='normal',
  foeIsBeast=false,partySkill=null,foeSkill=null,partyLevel=null,foeLevel=null,decision=null,

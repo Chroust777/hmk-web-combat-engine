@@ -70,7 +70,7 @@ const CONVEYANCE=['foot','mount','cart','wagon'];
  * 0 = no dot, 1 = black dot (always), 2 = two black dots,
  * rain = blue drop-dot (only continuous precipitation).
  * Wilderness Trail is a blue raindrop-dot (rain-only) in every topography.
- * Unpaved Road has NO dot; Desert Flats without a marked path use Flat Rural Track LPW but require two Bearing (p.146).
+ * Unpaved Road has NO dot; Desert Flats use Flat Rural Track LPW but two Bearing without a path (p.146).
  */
 const TREK_BEARING_MARKS=Object.freeze({
  'paved-road':0,'unpaved-road':0,'rural-track':'rain',
