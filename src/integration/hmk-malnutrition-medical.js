@@ -5,6 +5,7 @@
  * Both conditions contribute to the EXISTING persistent Combat Fatigue.
  */
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
+import {isStableAnimalProfile93813} from './hmk-character-registry-separation-93813.js';
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {healingBase} from '../rules/healing.js';
 import {initializeConcurrentShock,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
@@ -47,7 +48,9 @@ export function applyDueMalnutritionOnsets(database,{idFactory,stamp}={}){
  const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
  const newEntries=[];
  const participants=new Set(clock.characterIds??database.characters.map(c=>c.id));
- for(const actor of database.characters.filter(c=>participants.has(c.id))){
+ // Prevent historical human-nutrition receipts attached to canonical Stable
+ // animals from opening new human Starvation/Thirst medical courses.
+ for(const actor of database.characters.filter(c=>participants.has(c.id)&&!isStableAnimalProfile93813(c))){
   const history=entries(database.journal,campaignId,actor.id);if(!history.length||actor.hmk?.healthState?.shock==='KIA')continue;
   for(const kind of kinds){
    let zero=0,halves=0;

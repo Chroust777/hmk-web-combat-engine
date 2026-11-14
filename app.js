@@ -361,7 +361,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.877';
+const APP_VERSION='93.878';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -590,10 +590,16 @@ function validateAnimalTrainingCalendar590(d){
  for(const row of journal){
   const link=row.calendarAnimalTraining590;if(!link)continue;
   const start=starts.get(link.startId),animal=animals.get(link.animalId),training=row.skillTestProof;
+  // An explicitly day-eligible training start (v93.600) may close at the
+  // first minute of its due calendar day. Keep the exact original deadline
+  // valid too for append-only historical receipts. Unflagged starts are exact.
+  const strictDue=start?.proof.startMinute+(training?.months||0)*30*1440;
+  const eligibleDue=start?trainingOpenMinute600(start.proof,strictDue):null;
+  const dueMatches=link.dueMinute===strictDue||(start?.proof.calendarDayEligibility600===true&&link.dueMinute===eligibleDue);
   if(!start||!animal||link.animalId!==start.proof.animalId||
      row.characterId!==animal.ownerId||row.calendarCampaignId!==animal.campaignId||
      row.livestockTraining?.animalId!==animal.id||training?.type!=='animal-training'||
-     link.dueMinute!==start.proof.startMinute+(training.months||0)*30*1440||
+     !dueMatches||
      !Number.isSafeInteger(row.campaignMinute)||row.campaignMinute<trainingOpenMinute600(start.proof,link.dueMinute)||
      linked.has(link.startId))
    throw Error('Animalcraft: datum, identita nebo jedinečnost dokončeného výcviku nesouhlasí s kalendářem.');
@@ -6675,10 +6681,13 @@ function updateAnimalTrainingPendingExplanation(form){
  const rollAll=form.querySelector('[data-hmk-followup-roll-all]');if(rollAll){rollAll.disabled=expected===0;rollAll.textContent=`⚄ Vygenerovat ${expected}× d10`;}
  const cre=Number(form.elements.namedItem('creativity')?.value);
  const cap=Number.isFinite(cre)&&cre>0?Math.ceil(cre/2):null;
+ const stableId=form.elements.namedItem('stableAnimalId')?.value;
+ const stableAnimal=stableId?bestiaryKnownAnimals().find(a=>a.id===stableId):null;
+ const speciesCap=stableAnimal&&cap!==null?Math.min(cap,stableAnimal.maxMB):null;
  out.textContent='Odvození: uložený SV '+candidate.sv+'; věk '+(flag('notNewborn')?'−1':'0')+', divokost '+(flag('wasWild')?'−1':'0')+
   ' → SV '+adjusted+', '+stars+' ★. Předchozí nejlepší '+previous+' ★'+(qualifies?' · podmínka opakování splněna':' · opakovaný výcvik nepřináší nové hody')+
   '. Vyžadováno '+expected+' skutečných d10'+(shortened?' (jeden Training Roll spotřebován zkrácením o měsíc)':'')+
-  (cap===null?' · CRE není doloženo.':'; CRE limit '+cap+' MB.')+
+  (cap===null?' · CRE není doloženo.':'; CRE limit '+cap+' MB'+(speciesCap!==null?' · druhové maximum '+speciesCap+' MB (HMK 122)':'')+'.')+
   (candidate.level==='CF'?' Původní CF: navíc povinný skutečný d3 pro prodloužení času.':' d3 se bez CF nevyplňuje.');
 }
 document.addEventListener('change',event=>{
@@ -11282,7 +11291,8 @@ document.addEventListener('submit',event=>{
    shortenByOneMonth:els.namedItem('shorten').checked,trainingD10,
    criticalD3:d3raw===''?null:Number(d3raw),
    periodConfirmed:els.namedItem('periodConfirmed').checked,
-   baseSVNotPreAdjusted:els.namedItem('baseSVConfirmed').checked});
+   baseSVNotPreAdjusted:els.namedItem('baseSVConfirmed').checked,
+   speciesCap:selectedStable?Math.min(Math.ceil(selectedStable.spec.cre/2),selectedStable.maxMB):null});
   if(existingCF){
    if(existingCF.dieD3!==result.criticalD3||existingCF.animalName!==result.animalName||
       existingCF.timeReductionMonths!==(result.shortenByOneMonth?1:0))

@@ -15,7 +15,7 @@ export function animalTrainingCandidate(proof){
 export function resolveAnimalTraining({proof,originId,actorId,animalName,reasoning,creativity,
  newborn=true,wasWild=false,previousBestStars=0,previousMasteryBoosts=0,
  shortenByOneMonth=false,trainingD10=[],criticalD3=null,periodConfirmed=false,
- baseSVNotPreAdjusted=false}={}){
+ baseSVNotPreAdjusted=false,speciesCap=null}={}){
  const source=animalTrainingCandidate(proof);
  requireTrue(source&&typeof originId==='string'&&originId.length>0&&actorId===source.actorId,'Chybí původní skutečný Animalcraft Success Value test stejného trenéra');
  requireTrue(typeof animalName==='string'&&animalName.trim().length>=1&&animalName.length<=120,'Nutno určit konkrétní trénované zvíře');
@@ -24,7 +24,9 @@ export function resolveAnimalTraining({proof,originId,actorId,animalName,reasoni
  requireTrue(periodConfirmed===true,'GM musí potvrdit skutečný dokončený výcvik (6 měsíců; asi hodina denně)');
  requireTrue(baseSVNotPreAdjusted===true,'GM musí potvrdit, že věk/divokost ještě nejsou v uloženém SV zahrnuty');
  requireTrue(int(previousBestStars,0,5),'Nedoložený předchozí nejlepší hvězdný výsledek');
- const masteryBoostCap=Math.ceil(creativity/2);
+ const creativityCap=Math.ceil(creativity/2);
+ requireTrue(speciesCap===null||int(speciesCap,0,creativityCap),'Limit druhu se musí opírat o ověřený katalog Stáje a nesmí přesahovat CRE limit');
+ const masteryBoostCap=speciesCap===null?creativityCap:speciesCap;
  requireTrue(int(previousMasteryBoosts,0,masteryBoostCap),'Předchozí získané mastery boosty překračují CRE limit');
  const adjustedSV=source.sv-(newborn?0:1)-(wasWild?1:0);
  const stars=starCount(adjustedSV);

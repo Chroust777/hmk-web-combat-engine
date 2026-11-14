@@ -13,6 +13,7 @@ import {assertExclusiveForagingProven} from './hmk-inventory-provisions.js';
 import {availableRationLots,createPhysicalRationUse,projectCampaignRationInventory} from './hmk-physical-ration-ledger.js';
 import {availablePhysicalWater,createPhysicalWaterUse} from './hmk-physical-water-ledger.js';
 import {dailyNutritionNeeds} from './hmk-nutrition-activity.js';
+import {isStableAnimalProfile93813} from './hmk-character-registry-separation-93813.js';
 import {animalAccessForDay,animalLoadedItemAt,ANIMAL_USE_FORMAT} from './hmk-nutrition-animal-access.js';
 export const NUTRITION_POLICY_FORMAT='hmk-nutrition-policy-v1';
 export const NUTRITION_DAY_FORMAT='hmk-nutrition-day-v1';
@@ -136,7 +137,9 @@ export function enrollUnmonitoredNutrition(database,{fromMinute,idFactory,stamp}
  const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
  const registered=new Set(policyEntries(database.journal,campaignId).map(x=>x.characterId));
  const allowed=new Set(clock.characterIds??database.characters.map(x=>x.id));const added=[];
- for(const actor of database.characters.filter(x=>allowed.has(x.id)&&!registered.has(x.id))){
+ // Canonical Stable veterinary actors are stored among characters for Health/Combat
+ // identity, but must never be enrolled in HUMAN HMK 186 food/water courses.
+ for(const actor of database.characters.filter(x=>allowed.has(x.id)&&!registered.has(x.id)&&!isStableAnimalProfile93813(x))){
   const proof=createNutritionPolicy({campaignId,minute:fromMinute,actorId:actor.id,
    autoNeeds:true,inventoryRations:true,inventoryWater:true});
   const row={id:idFactory(),characterId:actor.id,calendarCampaignId:campaignId,
@@ -292,7 +295,11 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
  check(typeof idFactory==='function'&&typeof stamp==='function','Nutriční účetnictví vyžaduje auditní identifikátory');
  const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
  const members=new Set(clock.characterIds??database.characters.map(c=>c.id));
- const policies=policyEntries(database.journal,campaignId).filter(x=>members.has(x.characterId)&&
+ // Honor historical append-only animal receipts, but do not generate any further
+ // human nutrition days for verified Stable animals, even if an earlier release
+ // enrolled them automatically. Veterinary animal care remains independent.
+ const stableAnimalIds=new Set((database.characters||[]).filter(isStableAnimalProfile93813).map(c=>c.id));
+ const policies=policyEntries(database.journal,campaignId).filter(x=>members.has(x.characterId)&&!stableAnimalIds.has(x.characterId)&&
   !gmCalendarCancellationMatches(clock,{id:'nutrition-policy:'+x.id,sourceId:x.id,kind:'nutrition-conditions',characterId:x.characterId,minute:x.campaignMinute},database.journal));
  const completed=[];
  // Preserve every historically effective policy, even if a later GM decision
