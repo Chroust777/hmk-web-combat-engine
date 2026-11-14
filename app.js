@@ -361,7 +361,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.873';
+const APP_VERSION='93.874';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12191,6 +12191,22 @@ function hskIsEnvironmentalWound(actor,woundId){
 /** Travel does not begin an encounter to resolve bodily injury consequences.
  * A Weather injury's next required action is rendered here in the Health tab.
  * One actor + one original wound/mishap ID + one d100 at a time. */
+/** Read the original printed p.355 Initiative for a VERIFIED stable animal.
+ * Older/auto health actors carry the immutable purchase/animal identity, but
+ * need not have a copied Skills array. Never guess for other NPCs or replace
+ * an explicitly registered Initiative value (including an ambiguous one).
+ * This only supplies a read-only test EML; no actor/receipt is rewritten. */
+function hskVerifiedNoncombatInitiativeML93874(actor){
+ const listed=(actor?.hmk?.skills||[]).filter(s=>String(s.name||'').toLowerCase()==='initiative');
+ if(listed.length)return listed.length===1&&Number.isSafeInteger(listed[0].ml)&&listed[0].ml>0?listed[0].ml:null;
+ if(actor?.hmk?.stableHealthAuto93861!==true||!actor.hmk.verifiedMountedBreed)return null;
+ const owner=character(actor.hmk.livestockOwnerId);
+ const record=(owner?.hmk?.livestock||[]).find(r=>r.id===actor.id&&r.ownerId===owner.id&&r.beastId===actor.hmk.livestockSourceId);
+ if(!record)return null;
+ const spec=livestockOffer(record.beastId);
+ const printed=spec?.initiative;
+ return (spec?.breed||spec?.bestiaryId)===actor.hmk.verifiedMountedBreed&&Number.isSafeInteger(printed)&&printed>0?printed:null;
+}
 function hskWeatherInjuryMandatory(actorId){
  const actor=character(actorId);if(!actor)return '';
  const state=persistentStateOf(actor),isWeather=id=>hskIsEnvironmentalWound(actor,id);
@@ -12207,7 +12223,7 @@ function hskWeatherInjuryMandatory(actorId){
  const morale=dueInjuryMorale(state).find(x=>isWeather(x.woundId));
  if(morale){
   const w=state.wounds.find(x=>x.id===morale.woundId);
-  const init=actor.hmk?.skills?.find(x=>String(x.name||'').toLowerCase()==='initiative')?.ml;
+  const init=hskVerifiedNoncombatInitiativeML93874(actor);
   return `<section class="panel wide hmk-weather-injury-mandatory"><h3>Cestovní Injury Morale · ${esc(actor.name)}</h3>
   <p class="hc-hint">Až po úplném Shock zotavení: jediný Morale d100 z vážné rány ${esc(w.id)} (HMK 162, 170). Bez aktivního Combatu; případný skutečný zdroj Aberrance stanoví GM.</p>
   <form data-weather-injury-morale><input type="hidden" name="woundId" value="${esc(w.id)}">
@@ -13533,7 +13549,7 @@ document.addEventListener('submit',event=>{
   }else{
    const woundId=form.elements.namedItem('woundId').value,m=dueInjuryMorale(state).find(x=>x.woundId===woundId);
    if(!m||!hskIsEnvironmentalWound(actor,woundId))throw Error('Morale z této Weather rány již není splatný');
-   const init=actor.hmk?.skills?.find(x=>String(x.name||'').toLowerCase()==='initiative')?.ml;
+   const init=hskVerifiedNoncombatInitiativeML93874(actor);
    const rollValue=String(form.elements.namedItem('roll').value).trim();
    const abeValue=String(form.elements.namedItem('aberrance').value).trim();
    if(!/^\d+$/.test(rollValue)||!/^\d+$/.test(abeValue)){
@@ -24499,6 +24515,7 @@ function episodeIssue(message,form){
   [/Převoz – vozidlo:.*(tažn|postroj|ENC)/i,'transportTeamIds'],
   [/Převoz – vozidlo:.*(hmotnost|liber|libry|nosnost)/i,'transportOtherLb'],
   [/Převoz – vozidlo:/i,'transportCoLocated'],
+  [/^Accident:.*(?:minutu nehody|celé číslo minuty)/i,'hazardAtMinute'],
   [/délk|minut.*kladn|epizod.*minut|Zvolený interval zasahuje za půlnoc/i,'minutes'],
   [/globální počasí|potvrzená oblast|potvrzené počasí/i,'weatherSource'],
   [/dvě denní d10|teplota a srážky/i,'temperatureD10'],
@@ -26382,10 +26399,26 @@ function updateEpisodeTaskFocus(form){
  const incidentMinuteText=String(form.elements.namedItem('hazardAtMinute')?.value||'').trim();
  const incidentMinuteValid=/^[1-9]\d*$/.test(incidentMinuteText)&&
   Number(incidentMinuteText)<=Number(form.elements.namedItem('minutes')?.value||0);
- const incidentPending=!incidentMinuteValid&&episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form)&&
-  ['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
-  /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''));
- const field=incidentPending?'hazardAtMinute':task?.field||issue;
+ // Both obligations can coexist: CF Accident minute needs its own explicit GM
+ // confirmation, while Progress/Direction/END remain real separate dice. Do not
+ // hide either group's input merely because the other has become mandatory.
+ const accidentMinuteOpen=['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
+  /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''))&&
+  (!incidentMinuteValid||episodeHazardPending93840(form));
+ const field=task?.field||issue||(accidentMinuteOpen?'hazardAtMinute':'');
+ // The derived hazard result does not yet exist until its accident minute is
+ // entered. The preview can therefore hide the hazard fieldset completely.
+ // Reveal ONLY the mandatory minute subpanel without manufacturing a result.
+ if(accidentMinuteOpen){
+  const hazard=form.querySelector('[data-episode-hazard-details]');
+  if(hazard){
+   hazard.hidden=false;
+   delete hazard.dataset.episodeFocusHidden;
+   for(const part of hazard.querySelectorAll('[data-hazard-minute]'))part.hidden=false;
+   hazard.closest('details')?.setAttribute('open','');
+   episodeHazardSelectionUI93840(form,true);
+  }
+ }
  const active=field?episodeTaskArea(field):'none';
  // A multi-character obligation must expose only the currently requested
  // actor. Never hide or erase previously pinned receipts in the draft.
@@ -26411,8 +26444,11 @@ function updateEpisodeTaskFocus(form){
   'Aktuální úkol: '+(task?.title||labels[active])+'. Zobrazena jsou pouze pole k tomuto kroku. Další pravidlový krok se nabídne automaticky po dokončení aktuálního; již vyplněné výsledky zůstávají zachovány.';
  if(active==='none')episodeFocusedTaskField='';
  section.open=true;
+ const visibleRequiredAreas=new Set([active]);
+ if(issue)visibleRequiredAreas.add(episodeTaskArea(issue));
+ if(accidentMinuteOpen)visibleRequiredAreas.add('hazard');
  for(const [key,nodes] of Object.entries(groups))for(const node of nodes){
-  if(key===active){if(node.dataset.episodeFocusHidden==='true'){node.hidden=false;delete node.dataset.episodeFocusHidden;}
+  if(visibleRequiredAreas.has(key)){if(node.dataset.episodeFocusHidden==='true'){node.hidden=false;delete node.dataset.episodeFocusHidden;}
    // An unrelated earlier task may have left this subpanel closed.
    if(node.tagName==='DETAILS')node.open=true;
   }else if(!node.hidden){node.dataset.episodeFocusHidden='true';node.hidden=true;}
