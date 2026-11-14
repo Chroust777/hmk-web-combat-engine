@@ -2,7 +2,7 @@
  * rolls, inventory transfers, nutrition receipts or combat evidence.
  * Entries are hidden by (characterId, entryId), never by title or campaign time.
  */
-const PERSONAL_KEYS=new Set(['id','characterId','title','body','createdAt','updatedAt','campaignMinute','calendarCampaignId']);
+const PERSONAL_KEYS=new Set(['id','characterId','title','body','createdAt','updatedAt','campaignMinute','calendarCampaignId','campaignTRDate']);
 export function isPersonalNote(entry){
  return !!entry && !entry.cashReceipt && !!entry.id && !!entry.characterId &&
   Object.keys(entry).every(key=>PERSONAL_KEYS.has(key));
