@@ -985,3 +985,34 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hc-weather-timeline-current{background:#e4c678!important;color:#251b0e;font-weight:800;outline:2px solid #83551b;outline-offset:-2px}
 .hc-weather-header-hover .hc-weather-hover-popover{left:0;top:calc(100% + 8px)}
 @media(max-width:640px){.hc-weather-hover-shell>.hc-weather-hover-popover{left:-4px;width:min(660px,calc(100vw - 38px));font-size:.79rem}}
+
+/* v93.871 – Area-specific weather hover: the table stays within its own
+   calendar column, never crossing the book spine. The names alone trigger it.
+   The button also supports keyboard focus and touch taps. */
+.hc-clock-weather{position:relative;container-type:inline-size;}
+.hc-clock-weather-row{position:static;display:block;min-width:0;width:100%;}
+.hc-weather-record-heading{position:relative;display:block;min-width:0;width:100%;container-type:inline-size;}
+.hc-clock-weather-row .hc-weather-area-hover,
+.hc-weather-record-heading .hc-weather-area-hover{position:static;display:inline-block;vertical-align:baseline;max-width:100%;}
+.hc-weather-area-hover>.hc-weather-area-trigger{display:inline!important;min-height:0!important;min-width:0!important;width:auto!important;max-width:100%;padding:0!important;margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;color:inherit!important;cursor:help;font:inherit!important;font-weight:750!important;text-decoration:underline dotted;text-underline-offset:3px;overflow-wrap:anywhere;}
+.hc-weather-area-hover>.hc-weather-area-trigger:focus-visible{outline:2px solid #946a3b;outline-offset:2px;border-radius:3px;}
+.hc-clock-weather-row .hc-weather-area-hover>.hc-weather-hover-popover,
+.hc-weather-record-heading .hc-weather-area-hover>.hc-weather-hover-popover{left:0;top:100%;width:100cqw;max-width:100cqw;min-width:0;box-sizing:border-box;}
+.hc-weather-area-hover>.hc-weather-hover-popover .hc-weather-timeline{margin:.2rem 0;}
+.hc-weather-area-hover>.hc-weather-hover-popover .hc-episode-weather-timeline{width:100%;font-size:.77rem;}
+.hc-weather-area-hover>.hc-weather-hover-popover .hc-episode-weather-timeline th,
+.hc-weather-area-hover>.hc-weather-hover-popover .hc-episode-weather-timeline td{padding:.3rem .35rem;}
+.hc-clock-weather-row:has(.hc-weather-area-hover:hover),
+.hc-clock-weather-row:has(.hc-weather-area-hover:focus-within),
+.hc-clock-weather-row:has(.hc-weather-area-hover[open]),
+.hc-trek-weather-record:has(.hc-weather-area-hover:hover),
+.hc-trek-weather-record:has(.hc-weather-area-hover:focus-within),
+.hc-trek-weather-record:has(.hc-weather-area-hover[open]){z-index:280;}
+.hc-trek-weather-record{position:relative;}
+/* The calendar-header preview starts BELOW the complete list of area names.
+   Hover must never cover another area trigger or change the time/calendar. */
+.hc-weather-area-hover>.hc-weather-hover-popover{border-top-width:1px;}
+.hc-weather-area-hover .hc-episode-weather-timeline th,
+.hc-weather-area-hover .hc-episode-weather-timeline td{
+ white-space:normal!important;overflow-wrap:anywhere;vertical-align:top;
+}

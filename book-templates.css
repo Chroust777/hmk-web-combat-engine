@@ -7705,13 +7705,12 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
   color:inherit!important;
   white-space:normal!important;
 }
-#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(1){width:15%;font-variant-numeric:tabular-nums}
-#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(2){width:13%}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(1){width:17%;font-variant-numeric:tabular-nums}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(2){width:14%}
 #app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(3){width:10%}
-#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(4){width:20%}
-#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(5){width:13%}
-#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(6){width:15%}
-#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(7){width:14%;font-variant-numeric:tabular-nums}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(4){width:24%}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(5){width:15%}
+#app .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td):nth-child(6){width:20%}
 @media (max-width:740px){
   #app .hc-weather-hover-shell>.hc-weather-hover-popover{left:0;max-height:min(62vh,520px);width:min(710px,calc(100vw - 40px));padding:8px}
   #app .hc-weather-hover-popover .hc-weather-timeline .hc-episode-table-scroll{overflow-x:auto;overflow-y:visible}
@@ -7733,4 +7732,31 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
     scrollbar-color:#967044 #f1dec0;
     scrollbar-width:thin;
   }
+}
+
+/* v93.871 · six-column weather tables and locality-name previews.
+   Keep calendar popovers inside their own folio instead of the facing page.
+   The travel-episode help popover keeps its previous behavior. */
+#app .hc-clock-weather-row .hc-weather-area-hover>.hc-weather-hover-popover,
+#app .hc-weather-record-heading .hc-weather-area-hover>.hc-weather-hover-popover{
+ left:0!important;top:100%;width:100cqw!important;max-width:100cqw!important;
+ max-height:min(68vh,590px);padding:9px 10px;
+}
+#app .hc-weather-area-hover .hc-weather-hover-popover .hc-episode-table-scroll{
+ overflow-x:auto!important;overflow-y:visible!important;
+}
+#app .hc-weather-area-hover .hc-weather-hover-popover table.hc-episode-weather-timeline{
+ min-width:0!important;
+}
+#app .hc-weather-area-hover .hc-weather-hover-popover .hc-episode-weather-timeline :is(th,td){
+ overflow-wrap:anywhere!important;
+}
+@media(max-width:740px){
+ #app .hc-clock-weather-row .hc-weather-area-hover>.hc-weather-hover-popover,
+ #app .hc-weather-record-heading .hc-weather-area-hover>.hc-weather-hover-popover{
+  left:0!important;max-height:min(68vh,590px);width:100cqw!important;max-width:100cqw!important;
+ }
+ #app .hc-weather-area-hover .hc-weather-hover-popover table.hc-episode-weather-timeline{
+  min-width:440px!important;
+ }
 }
