@@ -7811,3 +7811,51 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 @media(max-width:620px){.content-sheet .journal-book--chapter .hc-personal-episode>summary span{float:none;display:inline}}
 .content-sheet .journal-book--chapter .journal-entry-detail>summary{cursor:pointer;font:12px Georgia,serif;color:#674827;margin-top:3px}
 .content-sheet .journal-book--chapter .journal-entry-detail>p{font-size:12px;line-height:1.45;margin:6px 0;white-space:normal;overflow-wrap:anywhere}
+
+/* v93.883 – personal travel on the left, dated manual notes fixed on the right. */
+.content-sheet .journal-book--notes .hmk-notes-layout{
+ display:grid!important;grid-template-columns:minmax(0,1.55fr) minmax(280px,1fr);gap:18px;align-items:start;width:100%;min-width:0;
+}
+.content-sheet .journal-book--notes .hmk-notes-layout>.panel{min-width:0;width:100%;box-sizing:border-box;margin:0}
+.content-sheet .journal-book--notes .hmk-notes-left{grid-column:1}
+.content-sheet .journal-book--notes .hmk-notes-right{grid-column:2;position:relative}
+.content-sheet .journal-book--notes .hmk-notes-right h3,.content-sheet .journal-book--notes .hmk-notes-left h3{margin-top:0}
+.content-sheet .journal-book--notes .journal-note-current-time{
+ margin:9px 0 12px;font:12px/1.5 Georgia,serif;color:#5b462c;
+ border-bottom:1px solid rgba(124,86,43,.26);padding-bottom:9px;
+}
+.content-sheet .journal-book--notes .journal-personal-note-form{display:grid;gap:9px;margin:0 0 18px}
+.content-sheet .journal-book--notes .journal-personal-note-form label{min-width:0}
+.content-sheet .journal-book--notes .journal-personal-note-form textarea{min-height:112px;width:100%;box-sizing:border-box}
+.content-sheet .journal-book--notes .journal-personal-note-form button{justify-self:start}
+.content-sheet .journal-book--notes .journal-personal-note-list{display:grid;gap:9px}
+.content-sheet .journal-book--notes .journal-personal-note{
+ background:rgba(252,245,226,.52);border:1px solid rgba(126,86,46,.3);border-radius:5px;
+ padding:11px;font:13px/1.5 Georgia,serif;min-width:0;overflow-wrap:anywhere;
+}
+.content-sheet .journal-book--notes .journal-personal-note__heading{display:flex;gap:5px 12px;align-items:baseline;flex-wrap:wrap;justify-content:space-between}
+.content-sheet .journal-book--notes .journal-personal-note__heading b{color:#523516}
+.content-sheet .journal-book--notes .journal-personal-note__heading time{font-size:11px;color:#705638}
+.content-sheet .journal-book--notes .journal-personal-note p{margin:9px 0;line-height:1.5}
+.content-sheet .journal-book--notes .journal-personal-note .actions{display:flex;gap:8px;flex-wrap:wrap}
+.content-sheet .journal-book--notes .hc-personal-episode__weather{font:12px/1.55 Georgia,serif;color:#72502d;margin:2px 0 7px}
+.content-sheet .journal-book--notes .hc-personal-episode__roles{
+ margin:8px 0;padding:8px 10px;border-radius:5px;background:rgba(231,216,183,.35);font:12px/1.5 Georgia,serif;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__roles ul{margin:4px 0 0;padding-left:18px}
+.content-sheet .journal-book--notes .hc-personal-episode__encounter{font:12px/1.55 Georgia,serif;margin:8px 0}
+.content-sheet .journal-book--notes .hc-personal-episode__hazard{
+ border-left:3px solid #996c32;background:rgba(242,222,183,.52);margin:10px 0;padding:9px 12px;
+ font:12.5px/1.5 Georgia,serif;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__hazard>span{margin-left:8px;font-size:12px;color:#705438}
+.content-sheet .journal-book--notes .hc-personal-episode__hazard p{margin:6px 0 0}
+.content-sheet .journal-book--notes .hc-personal-test__example{font:italic 12px/1.5 Georgia,serif;color:#74552b;margin-top:5px}
+.content-sheet .journal-book--notes .hc-personal-test__stat{display:inline-block;margin:0 2px;color:#523516;cursor:help}
+.content-sheet .journal-book--notes .hc-personal-test__figures [data-hmk-help],
+.content-sheet .journal-book--notes .hc-personal-episode__encounter [data-hmk-help]{cursor:help;text-decoration:underline dotted rgba(111,72,35,.5);text-underline-offset:3px}
+.content-sheet .journal-book--notes .hc-personal-test__other{display:block;color:#72522e;font-size:12px;margin-bottom:4px}
+@media(max-width:1160px){
+ .content-sheet .journal-book--notes .hmk-notes-layout{grid-template-columns:minmax(0,1fr)}
+ .content-sheet .journal-book--notes .hmk-notes-left,.content-sheet .journal-book--notes .hmk-notes-right{grid-column:1}
+}
