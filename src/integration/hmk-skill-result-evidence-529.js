@@ -35,12 +35,13 @@ function sections(row,p,{nameById}={}){
  const opponent=participantName(p,'b',body,nameById);
  const scene={...(p.scene||{})};
  let narration=String(p.gmNarrative||parts.slice(1).join('\n\n')).trim();
- // Legacy logs retain their historical text; their display uses the same
- // contemporary account as new logs, without fabricating new game effects.
- if(actor&&b&&opponent&&p.comparison){
-  narration=skillNarrativeOpposed({attackerName:actor,defenderName:opponent,primary:p.skills?.[0]||p.skill||'',defenderSkill:p.skills?.[1]||'',action:p.opposedAction||'',comparison:p.comparison,levelA:a?.level||'—',levelB:b.level||'—',...scene});
- }else if(actor&&a&&p.type!=='opposed-tiebreak'){
-  narration=skillNarrativeSolo({actorName:actor,skill:p.skills?.[0]||p.skill||'',level:a.level,mode:p.type.includes('value')?'value':'success',sv:a.sv,svTier:a.svTier,assistance:p.type==='assistance-success-test',...scene});
+ // Preserve the exact newly saved narrative on reload. Only legacy verbose
+ // stories are modernised for display; the original journal stays immutable.
+ const legacyProse=/Tím se však celý děj nemusí uzavírat|zda vznikne další komplikace|Po vyhodnocení hodu je zřejmé|Rozhodující test určil hodnotu úspěchu|Každý z nich v této chvíli sleduje jiný cíl/.test(narration);
+ if(legacyProse&&actor&&b&&opponent&&p.comparison){
+  narration=skillNarrativeOpposed({attackerName:actor,defenderName:opponent,primary:p.skills?.[0]||p.skill||'',defenderSkill:p.skills?.[1]||'',action:p.opposedAction||'',comparison:p.comparison,levelA:a?.level||'—',levelB:b.level||'—',narrativeKey:row.id,...scene});
+ }else if(legacyProse&&actor&&a&&p.type!=='opposed-tiebreak'){
+  narration=skillNarrativeSolo({actorName:actor,skill:p.skills?.[0]||p.skill||'',level:a.level,mode:p.type.includes('value')?'value':'success',sv:a.sv,svTier:a.svTier,assistance:p.type==='assistance-success-test',narrativeKey:row.id,roll:a.roll,...scene});
  }
  if(!narration){
   // Several specialised Secondary Rolls have no GM prose: keep their recorded

@@ -7776,3 +7776,38 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
  background-size:100% 100%,520px 520px !important;
  color:#44301d !important;
 }
+
+/* v93.882: character Notes & Logbook, compact and closed by default. */
+.content-sheet .journal-book--chapter .hc-episode-chronicle--personal{
+ display:block;min-width:0;margin:12px 0;border:1px solid rgba(137,94,45,.43);
+ border-radius:7px;background:rgba(251,242,222,.26);padding:0;
+}
+.content-sheet .journal-book--chapter .hc-episode-chronicle--personal > summary,
+.content-sheet .journal-book--chapter .journal-note-editor > summary{
+ cursor:pointer;padding:11px 12px;font:700 14px/1.35 Georgia,serif;color:#583316;
+ background:rgba(174,131,70,.15);
+}
+.content-sheet .journal-book--chapter .hc-episode-chronicle--personal > summary span{font-size:12px;font-weight:400;color:#795d3b}
+.content-sheet .journal-book--chapter .hc-episode-chronicle__body{padding:6px 10px 10px}
+.content-sheet .journal-book--chapter .hc-personal-episode{
+ display:block;margin:6px 0;padding:0;border:1px solid rgba(137,94,45,.28);border-radius:5px;background:rgba(255,251,240,.45)
+}
+.content-sheet .journal-book--chapter .hc-personal-episode>summary{cursor:pointer;padding:9px 10px;color:#583316;font:600 13px/1.5 Georgia,serif}
+.content-sheet .journal-book--chapter .hc-personal-episode>summary span{float:right;font-size:12px;font-weight:400;color:#76593d;margin-left:8px}
+.content-sheet .journal-book--chapter .hc-personal-episode__content{padding:4px 10px 10px}
+.content-sheet .journal-book--chapter .hc-personal-episode__flavor{font-size:13px;line-height:1.45;margin:4px 0 7px}
+.content-sheet .journal-book--chapter .hc-personal-episode__members,.content-sheet .journal-book--chapter .hc-personal-episode__outcome{
+ font-size:12px;line-height:1.45;color:#614830;margin:6px 0
+}
+.content-sheet .journal-book--chapter .hc-personal-tests{list-style:none;margin:6px 0;padding:0}
+.content-sheet .journal-book--chapter .hc-personal-test{padding:8px 9px;margin:4px 0;border-left:3px solid rgba(132,89,38,.6);background:rgba(246,235,208,.48);font:12.5px/1.5 Georgia,serif}
+.content-sheet .journal-book--chapter .hc-personal-test__heading{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.content-sheet .journal-book--chapter .hc-personal-test__actor{font-size:11px;color:#73512d}
+.content-sheet .journal-book--chapter .hc-personal-test__figures{display:flex;flex-wrap:wrap;gap:7px;margin:4px 0}
+.content-sheet .journal-book--chapter .hc-personal-test__figures>span,.content-sheet .journal-book--chapter .hc-personal-test__figures>strong{background:rgba(255,249,234,.65);border:1px solid rgba(128,93,52,.22);border-radius:3px;padding:1px 6px}
+.content-sheet .journal-book--chapter .hc-personal-test__effect{color:#614730}
+.content-sheet .journal-book--chapter .journal-note-editor{border:1px solid rgba(137,94,45,.32);border-radius:6px;margin:10px 0}
+.content-sheet .journal-book--chapter .journal-note-editor>form{padding:10px}
+@media(max-width:620px){.content-sheet .journal-book--chapter .hc-personal-episode>summary span{float:none;display:inline}}
+.content-sheet .journal-book--chapter .journal-entry-detail>summary{cursor:pointer;font:12px Georgia,serif;color:#674827;margin-top:3px}
+.content-sheet .journal-book--chapter .journal-entry-detail>p{font-size:12px;line-height:1.45;margin:6px 0;white-space:normal;overflow-wrap:anywhere}

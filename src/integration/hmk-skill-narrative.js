@@ -103,16 +103,88 @@ const normalize=s=>String(s??'').trim().slice(0,240);
 function intent(skill,action){if(ACTION_INTENTS[action])return ACTION_INTENTS[action];if(INTENTS[skill])return INTENTS[skill];const base=Object.keys(INTENTS).find(k=>skill.startsWith(k+' (')||skill.startsWith(k+':')||skill.startsWith(k+' '));return INTENTS[base]||'pokouší se splnit zvolenou činnost ('+skill+')';}
 function sceneContext({objective='',scene=''}){
  const parts=[];
- if(normalize(scene))parts.push('Děj se odehrává za okolností, které GM popsal takto: '+normalize(scene)+'.');
- if(normalize(objective))parts.push('Záměrem je '+normalize(objective).replace(/[.!?]+$/,'')+'.');
+ if(normalize(scene))parts.push('Okolnosti: '+normalize(scene).replace(/[.!?]+$/,'')+'.');
+ if(normalize(objective))parts.push('Záměr: '+normalize(objective).replace(/[.!?]+$/,'')+'.');
  return parts.join(' ');
 }
-function soloOutcome(level,skill){
- if(level==='CS')return 'Výsledek hodu je kritickým úspěchem. Počínání působí mimořádně jistě a zvolený záměr se podařilo naplnit; případné zvláštní účinky však závisejí na pravidlech konkrétní činnosti.';
- if(level==='S')return 'Po vyhodnocení hodu je zřejmé, že se činnost zdařila. Zamýšlený úkol se tak podařilo splnit v rozsahu odpovídajícím použité dovednosti.';
- if(level==='F')return 'Pokus tentokrát nestačil k dosažení cíle. Úsilí nepřineslo zamýšlený výsledek a další vývoj zůstává na rozhodnutí účastníků scény.';
- return 'Pokus končí kritickým neúspěchem. Průběh činnosti se nevydařil; zda vznikne další komplikace, určí výhradně konkrétní pravidlo nebo rozhodnutí GM, nikoliv samotné vyprávění.';
-}
+/** Stable variation by original receipt ID. No fictitious scene events or mechanics. */
+function variantHash(input){let h=2166136261;for(const c of String(input)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0;}
+function variant(items,key){return items[variantHash(key)%items.length];}
+const SKILL_SCENES=Object.freeze({
+ Survival:[
+  'čte krajinu jako soubor možností a překážek',
+  'porovnává terén s tím, co bude družina potřebovat v dalším úseku',
+  'hledá ve známkách okolního prostředí oporu pro bezpečné rozhodnutí',
+  'opatrně váží směr postupu a nároky zdejších podmínek',
+  'sleduje, kde může krajina cestu usnadnit a kde naopak ztížit'],
+ Tracking:[
+  'zvažuje drobné známky na zemi a jejich možnou souvislost',
+  'hledá ve stopách posloupnost, která dává smysl',
+  'pátrá po přerušené stopě a ověřuje její směr',
+  'porovnává jednotlivá vodítka a snaží se zachytit změnu pohybu',
+  'soustředí pozornost na sotva patrné stopy v terénu'],
+ Animalcraft:[
+  'sleduje reakce zvířete a přizpůsobuje jim své vedení',
+  'zkouší rozpoznat, co zvíře uklidňuje a co rozptyluje',
+  'pracuje trpělivě se zvířetem a hodnotí jeho odpovědi',
+  'věnuje pozornost signálům zvířete, aby nepřecenil jeho ochotu',
+  'hledá při práci se zvířetem správnou míru důslednosti a klidu'],
+ Riding:[
+  'hledá rovnováhu mezi vedením zvířete a vlastním pohybem',
+  'snaží se sladit své reakce s pohybem pod sedlem',
+  'udržuje pozornost na ovládání a rytmu jízdy',
+  'přizpůsobuje vedení zvířete skutečné situaci',
+  'soustředí se na jistotu sedu a přesné vedení'],
+ Awareness:[
+  'soustředí smysly na nenápadné podrobnosti okolí',
+  'pozorně odděluje podstatné signály od běžného ruchu',
+  'zkoumá okolí a hledá drobné nesrovnalosti',
+  'věnuje pozornost detailům, které mohou snadno uniknout',
+  'zvažuje, co lze ze skutečně pozorovaných znaků vyčíst'],
+ Climbing:[
+  'zvažuje pevnost úchytů a postup dalšího pohybu',
+  'hledá bezpečnou posloupnost opor při výstupu',
+  'soustředí se na přesné přenášení váhy a rovnováhu',
+  'pečlivě ověřuje další možnost postupu vzhůru',
+  'hodnotí, zda zvolená cesta nabízí dostatečnou oporu'],
+ Physician:[
+  'porovnává příznaky a volí odpovídající postup',
+  'pečlivě zkoumá stav pacienta před rozhodnutím',
+  'snaží se odlišit důležité známky zdravotního stavu od vedlejších',
+  'připravuje péči s důrazem na přesnost úkonu',
+  'zvažuje známé postupy ošetření podle doloženého stavu'],
+});
+const SUPPLEMENTARY_SCENES=Object.freeze({
+ Acrobatics:['soustředí se na plynulost pohybu i udržení rovnováhy','odhaduje prostor pro každý další pohyb','přizpůsobuje těžiště a načasování zvolenému úkonu','zkouší přesně sladit krok a otočku'],
+ Jumping:['odměřuje odraz a přistání','hledá správné načasování skoku','srovnává vzdálenost s vlastními možnostmi','soustředí se na jistý odraz'],
+ Swimming:['odhaduje proud a vlastní síly','snaží se udržet rytmus a směr plavání','přizpůsobuje tempo pohybu vodě','hledá ve vodě nejjistější postup'],
+ Stealth:['pečlivě volí okamžik nenápadného pohybu','snaží se neupoutat pozornost okolí','odhadne, kde může svůj postup skrýt','hlídá rytmus kroků i případný hluk'],
+ Fishing:['sleduje vhodnost místa a zvoleného postupu','trpělivě odhaduje správnou chvíli k záběru','zkouší přizpůsobit svůj způsob lovu podmínkám','věnuje pozornost drobným znakům ve vodě'],
+ Herblore:['porovnává znaky nalezených rostlin se svou znalostí','opatrně rozlišuje rostliny podle podstatných znaků','soustředí se na určení a možné použití bylin','ověřuje detaily, které mohou odlišovat podobné druhy'],
+ Guile:['pečlivě volí slova, aby působila věrohodně','zkouší najít přesvědčivou podobu své lsti','sleduje, zda jeho vysvětlení drží pohromadě','odhadne, které detaily by mohly jeho záměr prozradit'],
+ Charm:['hledá vhodný tón k získání přízně','pozorně reaguje na dojem, který vyvolává','snaží se vystihnout společenskou náladu','volí slova s ohledem na svůj záměr'],
+ Discourse:['vytváří argument a hledá jeho oporu','snaží se jasně uspořádat své důvody','zvažuje možné protiargumenty','hledá správný způsob, jak sdělit svůj názor'],
+ Command:['formuluje příkaz s důrazem na srozumitelnost','snaží se prosadit svou autoritu','volí pevný tón a jasný požadavek','odhaduje, jak dát svému rozhodnutí váhu'],
+ Mathematics:['ověřuje jednotlivé kroky výpočtu','zkouší najít chybu v postupu','porovnává možné početní postupy','sleduje souvislost čísel a vztahů'],
+ Metalcraft:['ověřuje přesnost práce s kovem','hlídá správné vedení nástroje','soustředí se na pevnost a tvar opracovávaného kovu','vyhodnocuje kvalitu provedeného úkonu'],
+ Woodworking:['kontroluje vlákna a pevnost dřeva','snaží se o přesné vedení řezu či spoje','volí pořadí jednotlivých kroků opracování','posuzuje, zda zvolený spoj dobře sedí'],
+ Cookery:['hlídá jednotlivé fáze přípravy jídla','sleduje čas a stav pokrmu','odhaduje správnou míru zpracování','věnuje pozornost chuti a postupu přípravy'],
+ Brewing:['prověřuje poměr surovin a správný postup','sleduje, jak se příprava nápoje vyvíjí','pečlivě hlídá jednotlivé fáze vaření','soustředí se na kvalitu zvolené receptury'],
+ Melee:['hledá výhodný okamžik při střetu zblízka','soustředí se na načasování útoku či obrany','odhaduje pohyb protistrany a odpovídající reakci','snaží se udržet přesný rytmus boje'],
+});
+const GENERAL_SCENES=[
+ 'se soustředí na provedení zvolené činnosti',
+ 'volí postup, kterým se pokouší dosáhnout svého záměru',
+ 'prověřuje své schopnosti při konkrétním úkolu',
+ 'sleduje rozhodující podrobnosti svého úkonu',
+ 'postupuje krok za krokem a vyhodnocuje překážky',
+ 'vkládá do úkonu zkušenost i opatrnost'];
+const OUTCOMES=Object.freeze({
+ CS:['Pokus se mimořádně vydařil.','Výsledek ukazuje výjimečně povedené provedení.','Zvolený postup skončil kritickým úspěchem.','Schopnost se projevila v mimořádně příznivém hodu.','Úkon dopadl lépe než běžný úspěch.'],
+ S:['Úkon se podařil.','Výsledek potvrzuje dosažení zamýšleného cíle.','Zvolený postup obstál.','Hod přinesl úspěch.','Snahu završil zdařilý výsledek.'],
+ F:['Pokus pro tentokrát nevyšel.','Cíl se nepodařilo splnit.','Výsledek na zamýšlený úspěch nestačil.','Postup tentokrát neobstál.','Hod nedopadl příznivě a úkol zůstává nesplněný.'],
+ CF:['Pokus skončil kritickým neúspěchem.','Zvolená činnost dopadla mimořádně špatně.','Hod znamená kritické selhání pokusu.','Při tomto úkonu došlo ke kritickému neúspěchu.','Výsledek ukazuje závažné selhání zamýšleného postupu.']});
+function soloOutcome(level,key){return variant(OUTCOMES[level]||OUTCOMES.F,key+':outcome');}
 const perceptionVersusStealth=(primary,defender)=>
  (primary==='Awareness'&&defender==='Stealth')||(primary==='Stealth'&&defender==='Awareness');
 function opposedMeaning(primary,defenderSkill,winnerA,a,b){
@@ -126,39 +198,45 @@ function opposedMeaning(primary,defenderSkill,winnerA,a,b){
  if(primary==='Theatrics')return winnerA?`Výkon ${a} ve střetu obstál a zamýšlený dojem se podařilo udržet.`:`${b} předvedenou roli nepřijal v zamýšlené podobě.`;
  return winnerA?`${a} dokázal svůj záměr v tomto střetu prosadit navzdory jednání ${b}.`:`${b} odolal záměru ${a} a v porovnání dovedností získal převahu.`;
 }
-export function skillNarrativeSolo({actorName,skill,level,mode='success',sv=null,svTier=null,objective='',scene='',assistance=false}={}){
- const a=normalize(actorName)||'Postava';
- const sentences=[`${a} ${intent(String(skill||''),null)}.`];
+export function skillNarrativeSolo({actorName,skill,level,mode='success',sv=null,svTier=null,objective='',scene='',assistance=false,narrativeKey='',roll=null}={}){
+ const a=normalize(actorName)||'Postava',k=String(skill||''),base=k.split(/\s*\(/)[0];
+ const key=narrativeKey||`${a}:${k}:${level}:${roll??''}:${sv??''}:${objective}:${scene}`;
+ const actions=SKILL_SCENES[k]||SKILL_SCENES[base]||SUPPLEMENTARY_SCENES[k]||SUPPLEMENTARY_SCENES[base];
+ const action=actions?variant(actions,key+':skill'):variant([intent(k),...GENERAL_SCENES.map(t=>`${t} (${k||'zvolená činnost'})`)],key+':generic');
+ const sentences=[`${a} ${action}.`];
  if(scene||objective)sentences.push(sceneContext({objective,scene}));
- if(assistance)sentences.push('Na jeho úsilí se podílejí i další pomocníci; jejich vliv je již započten do výsledku testu.');
- if(mode==='value')sentences.push(`Rozhodující test určil hodnotu úspěchu SV ${sv} (${svTier?.label||'výsledek podle příslušné tabulky'}). Tato hodnota popisuje kvalitu či pokrok daného úkonu, ale sama o sobě nemění cenu, čas ani spotřebované zdroje.`);
- else sentences.push(soloOutcome(level,skill));
- sentences.push('Tím se však celý děj nemusí uzavírat. Další kroky budou vycházet z toho, co se skutečně odehrává kolem postavy.');
+ if(assistance)sentences.push('Na výsledku se podíleli také doložení pomocníci.');
+ sentences.push(soloOutcome(level,key));
+ if(mode==='value'&&Number.isFinite(sv))sentences.push(`Výsledná hodnota úspěchu SV ${sv}${svTier?.label?` (${svTier.label})`:''}.`);
  return sentences.filter(Boolean).join(' ');
 }
-export function skillNarrativeOpposed({attackerName,defenderName,primary,defenderSkill,action='',comparison,levelA,levelB,objective='',scene=''}={}){
+export function skillNarrativeOpposed({attackerName,defenderName,primary,defenderSkill,action='',comparison,objective='',scene='',narrativeKey='',levelA='',levelB=''}={}){
  const a=normalize(attackerName)||'První postava',b=normalize(defenderName)||'Druhá postava';
+ const k=narrativeKey||`${a}:${b}:${primary}:${defenderSkill}:${levelA}:${levelB}:${objective}:${scene}`;
  const watchVsHide=perceptionVersusStealth(primary,defenderSkill);
- const lines=watchVsHide?(()=>{
-  const observer=primary==='Awareness'?a:b,hidden=primary==='Stealth'?a:b;
-  return [`${observer} pozorně sleduje okolí a snaží se zachytit i drobné známky něčí přítomnosti.`,
-   `${hidden} se zatím pokouší zůstat nenápadný a nevzbudit pozornost. Z jejich protichůdných snah vzniká tichý střet, v němž rozhoduje všímavost proti opatrnosti.`];
- })():[`${a} ${intent(String(primary||''),action)}.`,
-  `${b} na jeho pokus reaguje vlastní dovedností ${String(defenderSkill||'své schopnosti')}. Každý z nich v této chvíli sleduje jiný cíl, a právě na jejich střetu závisí výsledek.`];
+ const introduction=watchVsHide?variant([
+  `${a} a ${b} poměřují všímavost a nenápadnost.`,
+  `Jeden účastník se snaží zachytit známky přítomnosti druhého, druhý se jim vyhýbá.`,
+  `Pozornost a skrytý pohyb se v tomto okamžiku dostávají do přímého střetu.`,
+  `Záměr pozorovatele naráží na snahu zůstat neodhalený.`],k+':watch'):
+  variant([`${a} ${intent(String(primary||''),action)}; ${b} odpovídá vlastní dovedností ${defenderSkill}.`,
+   `Ve střetu ${primary} a ${defenderSkill} oba účastníci sledují vlastní cíl.`,
+   `${a} se pokouší prosadit svůj záměr, zatímco ${b} se mu staví na odpor.`,
+   `Výsledek rozhodne o tom, čí zvolený postup v této situaci převáží.`],k+':opposed');
+ const lines=[introduction];
  if(scene||objective)lines.push(sceneContext({objective,scene}));
- if(comparison?.tie){
-  lines.push('Oba výsledky jsou v tomto střetu vyrovnané; ani jeden účastník nezískal převahu.');
-  lines.push(comparison.persuasionTie?'Pravidla příslušného přesvědčování vyžadují rozhodnutí remízy, než bude možné vyhlásit vítěze.':'Dokud se nerozhodne o dalším postupu, žádný z obou účastníků nemůže svou převahu prohlásit za rozhodující.');
- }else if(comparison?.bothFailed){
+ if(comparison?.tie)lines.push(comparison.persuasionTie?
+  'Výsledky jsou vyrovnané; pro tuto situaci je nutné rozhodnout remízu.':'Výsledky jsou vyrovnané, převahu nezískává nikdo.');
+ else if(comparison?.bothFailed){
   const winner=comparison.winner==='a'?a:comparison.winner==='b'?b:null;
-  lines.push('Ani jeden z obou pokusů neskončil úspěchem; zamýšlené cíle proto nebyly dosaženy.');
-  lines.push(winner?`V pravidlovém porovnání však ${winner} vychází z neúspěchu lépe a získává převahu; to samo o sobě neznamená naplnění jeho původního záměru.`:'Ani jedna postava nezískává převahu a jejich snahy zatím zůstávají nerozhodnuté.');
+  lines.push(winner?`Oba pokusy selhaly; ${winner} získává pouze pravidlovou převahu, nikoli splnění záměru.`:
+   'Oba pokusy selhaly. Žádný z původních záměrů se nenaplnil.');
  }else if(comparison?.winner==='a'||comparison?.winner==='b'){
-  const winnerA=comparison.winner==='a',winner=winnerA?a:b,margin=comparison.stars>=3?'výraznou':comparison.stars===2?'zřetelnou':'těsnou';
-  lines.push(`Nakonec ${winner} získává ${margin} převahu. Rozdíl mezi jejich úsilím se tak projevil právě ve chvíli, kdy bylo třeba rozhodnout o výsledku.`);
-  lines.push(opposedMeaning(String(primary||''),String(defenderSkill||''),winnerA,a,b));
- }else lines.push('O výsledku zatím nelze prohlásit žádnou ze stran za vítěze.');
- lines.push('Co z této převahy vzejde, se ukáže v dalších okamžicích jejich setkání.');
+  const winA=comparison.winner==='a',winner=winA?a:b;
+  const strength=comparison.stars>=3?'výrazně':comparison.stars===2?'zřetelně':'těsně';
+  lines.push(`${winner} získává ${strength} převahu.`);
+  lines.push(opposedMeaning(String(primary||''),String(defenderSkill||''),winA,a,b));
+ }else lines.push('Výsledky zatím nedovolují určit vítěze.');
  return lines.filter(Boolean).join(' ');
 }
 export function skillNarrativeTiebreak({winnerName,method,attackerName,defenderName,primary}={}){
