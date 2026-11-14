@@ -1016,3 +1016,40 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hc-weather-area-hover .hc-episode-weather-timeline td{
  white-space:normal!important;overflow-wrap:anywhere;vertical-align:top;
 }
+
+/* v93.875: an optional Fate invitation is displayed inline after the normal
+   Skill Test, not as a modal that interrupts the original result. */
+.hmk-fate-inline-choice{
+ display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;
+ gap:.55rem;padding:.65rem .8rem;margin:.7rem 0;
+ border:1px solid #96714a;border-radius:7px;
+ color:#35281b;background:rgba(239,219,177,.74);
+ box-shadow:0 1px 4px rgba(59,37,16,.14);
+}
+.hmk-fate-inline-choice>span{flex:1 1 220px;line-height:1.45}
+.hmk-fate-inline-choice button{min-height:36px;width:auto!important;flex:0 1 auto}
+/* The Fate sheet uses the *same* parchment artwork as the character book. */
+.hmk-fate-dialog-93866{
+ background-color:#e8d0a0!important;
+ background-image:linear-gradient(140deg,rgba(249,236,202,.30),rgba(230,202,151,.12)),url('./assets/ui/book/parchment_dynamic_texture.png')!important;
+ background-size:100% 100%,cover!important;
+ background-position:center center!important;
+ color:#302317!important;
+}
+.hmk-fate-dialog-93866 .hmk-fate-content{background:rgba(254,244,218,.14)}
+.hmk-fate-dialog-93866 .hmk-fate-cs-inactive{opacity:.55}
+.hmk-fate-dialog-93866 .hmk-fate-cs-inactive select{cursor:not-allowed}
+.hmk-fate-dialog-93866 .hmk-fate-bonus-help{cursor:help;text-decoration:underline dotted;text-underline-offset:3px}
+.hc-episode-dependent-proof select:disabled{background:#ded6c9!important;color:#776f66!important;cursor:not-allowed;opacity:.70}
+.hc-episode-other-event{margin:.55rem 0;font-weight:650}
+#hmk-time-episode-form [data-hazard-complication] .hc-complication-confirm-inline{
+ width:auto;align-self:flex-start;min-height:34px;padding:.3rem .5rem;margin-top:.2rem;
+}
+/* Minute input, physical generator, and separate proof acceptance stay together. */
+#hmk-time-episode-form label[data-hazard-minute] .hc-episode-die{
+ display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;
+ align-items:center!important;gap:.3rem!important;
+}
+#hmk-time-episode-form label[data-hazard-minute] .hc-episode-die input{flex:1 1 80px;min-width:70px;max-width:125px}
+#hmk-time-episode-form label[data-hazard-minute] .hc-episode-die button{flex:0 1 auto;width:auto!important;max-width:100%;font-size:.78rem;white-space:normal}
+#hmk-time-episode-form label[data-hazard-minute] .hc-episode-die .hc-episode-roll-accept{margin:0}

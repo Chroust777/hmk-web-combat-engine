@@ -592,12 +592,33 @@ export function validateTimeEpisodes(journal=[]){
    'Přerušení: z uložené epizody zmizel potvrzený doklad.');
   const performingMinutes=effectiveActivityMinutes93869(e.minutes,general);
  const accidentForagingMinute93869=e.kind==='forage'?e.hazardDetails?.find(h=>h.hazard==='accident'&&h.eventWindow93868)?.eventWindow93868?.movingMinutes:null;
- const foragePerformedMinutes93869=accidentForagingMinute93869===null||accidentForagingMinute93869===undefined?
-  performingMinutes:Math.min(performingMinutes,accidentForagingMinute93869);
+ const forageComp=e.kind==='forage'&&e.hazardDetails?.find(h=>h.hazard==='complication'&&
+   ['short-delay','long-delay','irreparable','no-delay'].includes(h.result));
+ const severeForageComp=!!forageComp&&['long-delay','irreparable'].includes(forageComp.result);
+ const forageCompMinute=Number(forageComp?.hazardAtMinute);
+ const compWork=severeForageComp?Math.min(performingMinutes,forageCompMinute):performingMinutes;
+ const foragePerformedMinutes93869=Math.min(
+  accidentForagingMinute93869===null||accidentForagingMinute93869===undefined?
+   performingMinutes:Math.min(performingMinutes,accidentForagingMinute93869),compWork);
+ if(e.foragingTimePolicy93869==='complication-worked-minutes-v93.875'){
+  const proof=e.foragingComplication93875,source=e.settings||{},w=e.hazardDetails?.find(h=>h.hazard==='complication');
+  must(e.kind==='forage'&&!!w&&!!proof&&proof.result===w.result&&
+   proof.level===w.complicationLevel&&proof.sourcePage===149&&
+   proof.workedMinutes===foragePerformedMinutes93869&&
+   proof.nextWatchMinutes===(severeForageComp?e.minutes:0)&&
+   proof.nextWatchSlow===(w.result==='short-delay'?1:0)&&
+   (severeForageComp?Number.isSafeInteger(forageCompMinute)&&forageCompMinute>=1&&
+    forageCompMinute<=e.minutes&&String(source.hazardAtMinute)===String(forageCompMinute)&&
+    proof.atMinute===forageCompMinute&&e.movementMinutes===foragePerformedMinutes93869&&
+    (w.result!=='irreparable'||w.routeChangeConfirmed===true):proof.atMinute===null),
+   'Foraging: doklad o Complication neodpovídá minutě překážky, hodu ani pravidlovému výsledku.');
+ }else must(e.foragingComplication93875===undefined,
+  'Foraging: Complication bez pravidlově potvrzeného dokladu.');
  if(e.foragingTimePolicy93869!==undefined)
   must(e.foragingTimePolicy93869==='actual-interrupted-minutes-v93.869'&&
    (e.kind==='forage'&&accidentForagingMinute93869!==null&&accidentForagingMinute93869!==undefined||
-    e.kind==='travel'&&e.movementMinutes<e.minutes),
+    e.kind==='travel'&&e.movementMinutes<e.minutes)||
+   e.foragingTimePolicy93869==='complication-worked-minutes-v93.875'&&!!forageComp,
    'Foraging: neplatný doklad o zkrácené činnosti.');
 
   // The references are not new rolls. Verify linked proof and continuous inheritance.
