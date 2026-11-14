@@ -868,10 +868,9 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hmk-stable-logistics-93840 table th{background:#e4c38f80!important}
 .hmk-stable-logistics-93840 table td{background:#f8edd77d!important}
 
-/* v93.842 · book-like Stable catalogue filter; a selection is never applied
-   until the explicit confirmation button. Keep the old 16-row default. */
+/* v93.877 · Stable catalogue is a presentation-only filter. Changes apply immediately without GM confirmation; no journal write. */
 .hmk-stable-catalog-filter-93842{
- display:grid;grid-template-columns:minmax(0,1fr) auto;
+ display:grid;grid-template-columns:minmax(0,1fr);
  gap:6px 9px;align-items:end;margin:6px 0 9px;padding:8px;
  background:linear-gradient(105deg,#f0dab4d6,#e3c492c4),url('./assets/ui/book/parchment_repeat_seamless.png');
  background-size:100% 100%,480px 480px;

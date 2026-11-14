@@ -7760,3 +7760,19 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
   min-width:440px!important;
  }
 }
+
+/* v93.877: Stable equipment/vehicle ledger follows the same parchment as other book tables. */
+#app .hmk-stable-block.hmk-stable-logistics-93840,
+#app .hmk-stable-accordion:has(> .hmk-stable-logistics-93840){
+ background:linear-gradient(115deg,rgba(246,231,201,.81),rgba(225,194,146,.65)),url('./assets/ui/book/parchment_dynamic_texture.png') repeat !important;
+ background-size:100% 100%,520px 520px !important;
+ border:1px solid #ac8551 !important;
+ color:#44301d !important;
+}
+#app .hmk-stable-logistics-93840 .hmk-stable-logistics-card,
+#app .hmk-stable-logistics-93840 .catalog-scroll,
+#app .hmk-stable-logistics-93840 .hmk-stable-load-stats > div{
+ background:linear-gradient(120deg,rgba(250,241,222,.78),rgba(232,207,168,.6)),url('./assets/ui/book/parchment_dynamic_texture.png') repeat !important;
+ background-size:100% 100%,520px 520px !important;
+ color:#44301d !important;
+}

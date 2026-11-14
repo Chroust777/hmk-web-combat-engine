@@ -361,7 +361,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.876';
+const APP_VERSION='93.877';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2035,7 +2035,7 @@ function trekDailyWeatherFormHTML(clock){
  <output role="status" aria-live="polite"></output><div data-trek-global-weather-preview aria-live="polite"><p class="hc-hint">Zadejte oba hody a potvrďte denní počasí. Teprve poté se zobrazí výsledná tabulka.</p></div></form>
  <h4>Potvrzené oblasti · do konce dne zbývá ${hours} h ${mins} min</h4>
  ${rows.map(j=>{const w=j.calendarTrekDayWeather,allowed=canVoidWeather(data.journal,j.id,id,clock.minute);
-  return `<div class="hc-trek-weather-record"><div class="hc-weather-record-heading">${weatherAreaHoverHTML(w.area,w.weatherDay,{latitudeBand:w.latitudeBand||'mid',daylightSeason:(()=>{const tr=campaignTRDate(clock,j.campaignMinute);return tr?trekkingDaylightSeason(tr.month,tr.day):w.season;})()})} · ${esc(displayCampaignMinute(j.campaignMinute))} · platí do ${esc(displayCampaignMinute(end))} (zbývá ${hours} h ${mins} min).</div>${(()=>{const shift=effectiveTrekShift(id,clock.minute,w.area);return shift?`<p><strong>Aktuálně od ${esc(displayCampaignMinute(shift.campaignMinute))} platí změna GM:</strong> ${trekWeatherDetailsHTML(shift.calendarTrekWeatherShift.weatherDay)} · do konce dne nebo další potvrzené změny.</p>${shift.campaignMinute===clock.minute&&data.journal.some(stop=>stop.calendarCampaignId===id&&stop.campaignMinute===clock.minute&&stop.calendarActivityInterruptProof?.reason?.includes('GM změnil počasí v oblasti '+w.area))?'<button type="button" class="hc-small" data-weather-shift-go-travel>Pokračovat ve zbývajícím úseku ↗</button>':''}`:'';})()}${allowed.ok?`<button type="button" class="hc-small secondary" data-trek-weather-void="${esc(j.id)}">Odvolat počasí · nové od této minuty</button>`:`<p class="hc-hint">Změna uzamčena: ${esc(allowed.reason)}</p>`}</div>`;}).join('')||'<p class="hc-hint">Pro dnešní den zatím není potvrzené žádné počasí. Potvrzení proběhne pouze tlačítkem výše.</p>'}
+  return `<div class="hc-trek-weather-record"><div class="hc-weather-record-heading">${weatherAreaHoverHTML(w.area,w.weatherDay,{latitudeBand:w.latitudeBand||'mid',daylightSeason:(()=>{const tr=campaignTRDate(clock,j.campaignMinute);return tr?trekkingDaylightSeason(tr.month,tr.day):w.season;})(),highlightMinute:clock.minute%1440})} · ${esc(displayCampaignMinute(j.campaignMinute))} · platí do ${esc(displayCampaignMinute(end))} (zbývá ${hours} h ${mins} min).</div>${(()=>{const shift=effectiveTrekShift(id,clock.minute,w.area);return shift?`<p><strong>Aktuálně od ${esc(displayCampaignMinute(shift.campaignMinute))} platí změna GM:</strong> ${trekWeatherDetailsHTML(shift.calendarTrekWeatherShift.weatherDay)} · do konce dne nebo další potvrzené změny.</p>${shift.campaignMinute===clock.minute&&data.journal.some(stop=>stop.calendarCampaignId===id&&stop.campaignMinute===clock.minute&&stop.calendarActivityInterruptProof?.reason?.includes('GM změnil počasí v oblasti '+w.area))?'<button type="button" class="hc-small" data-weather-shift-go-travel>Pokračovat ve zbývajícím úseku ↗</button>':''}`:'';})()}${allowed.ok?`<button type="button" class="hc-small secondary" data-trek-weather-void="${esc(j.id)}">Odvolat počasí · nové od této minuty</button>`:`<p class="hc-hint">Změna uzamčena: ${esc(allowed.reason)}</p>`}</div>`;}).join('')||'<p class="hc-hint">Pro dnešní den zatím není potvrzené žádné počasí. Potvrzení proběhne pouze tlačítkem výše.</p>'}
  ${rows.length?`<details class="hc-trek-gm-weather-change"><summary>GM · změnit počasí v průběhu dne (od aktuální minuty)</summary>
  <p class="hc-hint">Volitelné rozhodnutí GM mimo standardní denní tabulku HMK 144. Základní denní hody i již proběhlé účinky zůstávají v historii. Nové podmínky platí od nynějška pro oblast až do konce dne nebo další potvrzené změny, i když družina zrovna necestuje.</p>
  <form data-trek-global-shift><div class="hmk-trek-grid"><label>Potvrzená oblast<select name="sourceId">${rows.map(j=>`<option value="${esc(j.id)}">${esc(j.calendarTrekDayWeather.area)}</option>`).join('')}</select></label>
@@ -2683,6 +2683,13 @@ function episodeSetupIssue(form){
  if(['travel','tracking'].includes(v.kind)&&!v.memberIds.includes(v.guideId))
   return {field:'guideId',message:'Průvodce musí být vybrán z účastníků epizody.'};
  if(v.kind==='travel'){
+  // v93.877: never lock an unrepairable riding setup before its first skill.
+  // The checked Stable animal and the actual rider are explicit GM choices.
+  if(v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length){
+   if(!v.travelRideAnimalId)return {field:'travelRideAnimalId',message:'Jízda na zvířeti: vyberte konkrétní jízdní zvíře ze Stáje ještě před vyhodnocením.'};
+   if(!(v.stableAnimalIds||[]).includes(v.travelRideAnimalId))return {field:'stableAnimalIds',message:'Jízda na zvířeti: zvolené jízdní zvíře musí být zaškrtnuto v seznamu Stáje. Před zahájením testů zůstává seznam aktivní.'};
+   if(!v.travelRideRiderId||!(v.memberIds||[]).includes(v.travelRideRiderId))return {field:'travelRideRiderId',message:'Jízda na zvířeti: vyberte konkrétního jezdce z této skupiny.'};
+  }
   if(v.conveyance==='mount'&&(v.stableAnimalIds||[]).length>1&&!(v.transportedMemberIds||[]).length){
    const mount=resolveTravelMount93837(verifiedLivestock(data,campaignKey(data.campaignClock)),v.stableAnimalIds,v.travelRideAnimalId||'').animal;
    if(mount){
@@ -3101,9 +3108,9 @@ function timeEpisodePageHTML(clock,participants){
  <p class="hc-hint" data-episode-mount-capacity role="status"></p>
  </div>
  <div data-episode-healthy-ride-panel class="panel" hidden><strong>Jezdec při tomto Pochodu · bez nasedání ve Stáji</strong>
- <details class="hmk-transport-guidance"><summary>Jak se počítá jezdec a ENC</summary><p>Aplikace automaticky započítá hmotnost jezdce s inventářem a výstrojí. Automatický výběr použije první vhodné jezdecké zvíře (kůň, osel, mezek nebo velbloud) ze zaškrtnutých zvířat. Vůl může skupinu doprovázet, ale tažný postroj nenahrazuje sedlo. Výsledek se zapíše až po potvrzení celé cesty.</p></details>
- <label>Jízdní zvíře<select name="travelRideAnimalId"><option value="">— Automaticky první vhodné jezdecké zvíře —</option>${stableTravelRoster.filter(isRidingAnimal93837).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
- <label>Postava jedoucí na zvířeti<select name="travelRideRiderId"><option value="">— Automaticky průvodce skupiny —</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select><small class="hc-hint" data-episode-rider-availability></small></label>
+ <details class="hmk-transport-guidance"><summary>Jak se počítá jezdec a ENC</summary><p>Aplikace započítá hmotnost výslovně zvoleného jezdce s inventářem a výstrojí. Zvolte konkrétní jízdní zvíře a zaškrtněte je v seznamu Stáje. Vůl může skupinu doprovázet, ale tažný postroj nenahrazuje sedlo. Výsledek se zapíše až po potvrzení celé cesty.</p></details>
+ <label>Jízdní zvíře<select name="travelRideAnimalId"><option value="">— Vyberte konkrétní jízdní zvíře —</option>${stableTravelRoster.filter(isRidingAnimal93837).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
+ <label>Postava jedoucí na zvířeti<select name="travelRideRiderId"><option value="">— Vyberte konkrétního jezdce —</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · Riding ML ${availableMasteries(c).find(x=>x.name==='Riding')?.ml??'neosvojeno'}</option>`).join('')}</select><small class="hc-hint" data-episode-rider-availability></small></label>
  <div class="hc-episode-pack-handlers" data-episode-pack-handlers>
  <strong>Další zvířata vedená vedle jezdce</strong>
  <p class="hc-hint">Pro každé další vybrané zvíře určete skutečného pěšího vodiče z této skupiny. Jeden člověk nemůže současně sedět na zvířeti a vést jiné pěšky. Průvodce orientace a hlavní Drover mohou být různé postavy (HMK 141). Druhé jezdecké zvíře se v tomto režimu NEPOVAŽUJE za automaticky obsazené dalším jezdcem.</p>
@@ -3891,7 +3898,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
    ${independentCriticalDue.map(renderItem).join('')}</section>`:'';
  const deferredHealthHTML=agenda.deferred?.length?
   `<section class="panel hc-calendar-gm-deferred" role="status"><h3>Neuzavřené zdravotní výjimky GM · ${agenda.deferred.length}</h3><p class="notice">GM výslovně odložil povinné testy. ŽÁDNÝ hod ani zdravotní zlepšení nebyly domyšleny. Příslušná nemoc, rána nebo jiný stav trvá; vyhodnoťte jej dodatečně v původním modulu nebo opravte evidenci se skutečným podkladem.</p>${agenda.deferred.map(x=>`<p><strong>${esc(x.name)}</strong> · ${esc(x.description)} · původní termín ${esc(displayCampaignMinute(x.minute))}</p>`).join('')}</section>`:'';
- const overviewHTML=`${deferredHealthHTML}${independentCriticalHTML}${concurrentMedicalProceduresHTML()}${board}<section class="panel hc-calendar-concurrent-due"><h3>Splatné povinné kontroly · ${agenda.due.length}</h3>${agenda.due.length?renderDueGroups(agenda.due):'<p class="hc-hint">Nyní nejsou splatné žádné povinné kontroly.</p>'}</section>${timedSkillPending590}${unknownFallNotice}${suspendedHealingHTML}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section><section class="panel"><h3>Pozdější povinné termíny · ${agenda.future.filter(x=>x.minute>clock.minute+7*1440).length}</h3><p class="hc-hint">Splatné kontroly a nadcházejících sedm dní jsou již zobrazeny výše; neopakují se zde podruhé.</p>${agenda.future.filter(x=>x.minute>clock.minute+7*1440).slice(0,12).map(renderItem).join('')||'<p class="muted">Žádné další termíny za sedmidenním přehledem.</p>'}</section>`;
+ const overviewHTML=`${deferredHealthHTML}${independentCriticalHTML}${concurrentMedicalProceduresHTML()}${board}${timedSkillPending590}${unknownFallNotice}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section>`;
  const calendarPage=activeCalendarSection==='overview'?`${trekDailyWeatherFormHTML(clock)}${overviewHTML}`:
   activeCalendarSection==='travel'?`${timeEpisodePageHTML(clock,provisionParticipants)}${wildernessHTML}${activeHMKActivities(data.journal,clock).length?interruptionsHTML:''}`:
   activeCalendarSection==='chronicle'?timeEpisodeChronicleHTML(clock):
@@ -7007,8 +7014,8 @@ const STABLE_EQUIPMENT_USE_93839=Object.freeze({
  care:'Péče · podkování',handling:'Vedení zvířete · uzda'
 });
 let stableEquipmentGuideOpen93839=false;
-// The filter changes only on its own explicit confirmation; the default
-// catalogue always contains all sixteen species. No animal or inventory write.
+// UI-only exception: Stable catalogue filter changes immediately on selection.
+// The default still contains all sixteen species; no animal, journal or inventory write.
 const stableGuideSelected93842=new Map();
 function stableEquipmentReference93839(ownerId){
  const campaignId=data.campaignClock?campaignKey(data.campaignClock):null;
@@ -7016,10 +7023,10 @@ function stableEquipmentReference93839(ownerId){
   !stableBurden(data,campaignId,a).exit):[];
  const selectedAnimal=ownedAnimals.find(a=>a.id===stableGuideSelected93842.get(ownerId))||null;
  const filterMarkup=`<div class="hmk-stable-catalog-filter-93842">
-  <label>Filtrovat katalog podle vlastněného zvířete<select data-hmk-stable-filter-choice aria-label="Vybrat zvíře, kterého se má katalog týkat">
+  <label>Filtrovat katalog podle vlastněného zvířete<select data-hmk-stable-filter-choice data-owner-id="${esc(ownerId)}" aria-label="Vybrat zvíře, kterého se má katalog týkat">
    <option value="all" ${!selectedAnimal?'selected':''}>Všech 16 druhů · výchozí zobrazení</option>
    ${ownedAnimals.map(a=>`<option value="${esc(a.id)}" ${selectedAnimal?.id===a.id?'selected':''}>${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}
-  </select></label><button type="button" data-hmk-stable-filter-confirm data-owner-id="${esc(ownerId)}">Potvrdit filtr</button>
+  </select></label>
   <span role="status">${selectedAnimal?'Zobrazen pouze druh: '+esc(selectedAnimal.name)+' · '+esc(selectedAnimal.spec.name):'Zobrazeno všech 16 druhů.'}</span></div>`;
  const uses={
   'Bovine (Oxen)':['Tah: kára 2 500 lb / vůz (2 voli) 8 000 lb.','Harness, ox · případně Pack harness','Jízda: ne'],
@@ -19083,17 +19090,15 @@ document.addEventListener('change',e=>{
 document.addEventListener('toggle',e=>{
  const node=e.target;if(node?.matches?.('details.hmk-stable-equipment-ref')&&node.isConnected)stableEquipmentGuideOpen93839=node.open;
 },true);
-// v93.842: selecting a filter option NEVER hides rows or saves anything.
-// Only the explicit button commits a temporary presentation preference.
-document.addEventListener('click',e=>{
- const button=e.target.closest?.('[data-hmk-stable-filter-confirm]');if(!button)return;
- e.preventDefault();e.stopImmediatePropagation();
- const ownerId=button.dataset.ownerId,section=button.closest('.hmk-stable-equipment-ref');
- const value=section?.querySelector('[data-hmk-stable-filter-choice]')?.value||'all';
+// v93.877: selecting a Stable catalogue filter updates only this ephemeral view.
+// It is NOT a game choice, Skill Test, GM decision or persisted transaction.
+document.addEventListener('change',e=>{
+ const select=e.target?.closest?.('[data-hmk-stable-filter-choice]');if(!select)return;
+ const ownerId=select.dataset.ownerId,value=select.value||'all';
  const campaignId=data.campaignClock?campaignKey(data.campaignClock):null;
  const live=campaignId?verifiedLivestock(data,campaignId).find(a=>a.id===value&&a.ownerId===ownerId&&
   !stableBurden(data,campaignId,a).exit):null;
- if(value!=='all'&&!live){alert('Toto zvíře již není aktivním majetkem vybrané postavy. Aktualizujte Stáj.');return;}
+ if(value!=='all'&&!live){alert('Toto zvíře již není aktivním majetkem vybrané postavy. Aktualizujte Stáj.');render();return;}
  if(value==='all')stableGuideSelected93842.delete(ownerId);
  else stableGuideSelected93842.set(ownerId,value);
  stableEquipmentGuideOpen93839=true;
@@ -24339,6 +24344,18 @@ function episodeIdentityMismatch(form){
  // Internal confirmation metadata is not a form identity field. Compare
  // only the immutable identity properties, even while the trail is editable.
  const {trackingConfirmed:confirmationMeta,...lockedIdentity}=episodeEvaluatedIdentity;
+ // v93.877: precipitation d6 can resolve continuous rain AFTER the episode
+ // identity was locked. These three disabled checkboxes are derived from the
+ // same weather and terrain; no GM choice or recorded Tracking test changes.
+ // Preserve all other locked fields, especially actor, rider, animals and trail.
+ if(!episodePinnedSkillFields.has('trackingProofId')&&
+    !episodePendingSkillRequest?.field?.startsWith('tracking')&&
+    !snapshot.trackingProofId){
+  for(const key of ['trackingSnow','trackingRain','trackingAlpine']){
+   const control=form.elements.namedItem(key);
+   if(control?.disabled&&Object.prototype.hasOwnProperty.call(lockedIdentity,key))actual[key]=lockedIdentity[key];
+  }
+ }
  // A typed trail is only a DRAFT until the explicit Evaluate/confirm click.
  if(episodeDeferredTrackingTrailAllowed(form)){
   // New Stalking may allow late selection of a tracker; it may not rewrite
@@ -27085,7 +27102,7 @@ function episodeGroupRoleChoices93856(form,v){
  const setChoices=(name,placeholder,enabled)=>{
   const field=form.elements.namedItem(name);if(!field)return;
   const prior=field.value;
-  const options=[['',placeholder],...roster.map(id=>[id,character(id).name||id])];
+  const options=[['',placeholder],...roster.map(id=>[id,(character(id).name||id)+(name==='travelRideRiderId'?' · Riding ML '+(availableMasteries(character(id)).find(x=>x.name==='Riding'&&x.ml>0)?.ml??'neosvojeno'):'')])];
   const signature=JSON.stringify([options,enabled,roster.map(id=>[id,able(id),roleHealth.get(id)?.reason]),episodeEvaluationRequested&&prior&&!roster.includes(prior)?prior:null]);
   if(field.dataset.episodeGroupSignature!==signature){
    const fragment=document.createDocumentFragment();
@@ -27128,7 +27145,7 @@ function episodeGroupRoleChoices93856(form,v){
  const selectedCompanions=(v.stableAnimalIds||[]).filter(id=>!reservations.has(id));
  const mountId=healthyRide?resolveTravelMount93837(verifiedLivestock(data,campaignKey(data.campaignClock)),selectedCompanions,v.travelRideAnimalId||'').animal?.id:null;
  const mixedRide=healthyRide&&selectedCompanions.some(id=>id!==mountId);
- const rider=setChoices('travelRideRiderId',mountReady?'— Automaticky průvodce skupiny —':'— Nejdříve zvolte vybavené dostupné zvíře —',mountReady);
+ const rider=setChoices('travelRideRiderId',mountReady?'— Vyberte konkrétního jezdce —':'— Nejdříve zvolte vybavené dostupné zvíře —',mountReady);
  if(rider)v.travelRideRiderId=rider.value;
  // Each led animal has a real, named walker; no automatic assignment from
  // selecting a checkbox, no member from another concurrent travel group.
