@@ -11,7 +11,7 @@ export function personalSkillReceipt(row, fallback={}) {
  const skill=txt(p.skills?.[0]||p.skill||fallback.skill||fallback.title?.replace(/^(?:Success (?:Value|Test)|Opposed)\s*·\s*/,'')||row?.title?.replace(/^(?:Success (?:Value|Test)|Opposed)\s*·\s*/,'')||p.kind||'Test');
  const eml=numeric(a.eml??a.rawEML), roll=numeric(a.roll), level=txt(a.level||a.victoryLevel||p.originalLevel||p.report?.level);
  const isValue=/value/i.test(txt(p.type||fallback.title||row?.title));
- const sv=numeric(a.sv), stars=numeric(a.svTier?.stars);
+ const sv=isValue?numeric(a.sv):null, stars=isValue?numeric(a.svTier?.stars):null;
  const consequence=p.consequence||{};
  let effect='Bez dalšího potvrzeného následku';
  if(consequence.type==='context-specific-critical-failure')effect='Kritický neúspěch činnosti; konkrétní dopad se řídí příslušnou dovedností.';
@@ -52,11 +52,11 @@ export function personalEpisodeTests(episode,journalById){
   if(!actor.sr)continue;
   tests.push({skill:'Endurance · cestovní SR',kind:'Success Roll',eml:null,tn:numeric(actor.sr.tn),roll:numeric(actor.roll),
    die:'d10',level:actor.sr.success?'S':'F',result:actor.sr.success?'S · úspěch':'F · neúspěch',
-   effect:`Weariness ${actor.before??'—'} → ${actor.after??'—'}${Number.isFinite(actor.delta)?` (změna ${actor.delta>=0?'+':''}${actor.delta})`:''}`,
+   effect:Number(actor.delta)===0?`Bez další únavy · Weariness ${actor.after??actor.before??'—'}`:`Weariness ${actor.before??'—'} → ${actor.after??'—'}${Number.isFinite(actor.delta)?` (změna ${actor.delta>0?'+':''}${actor.delta})`:''}`,
    actorId:txt(actor.id),id:`end-${txt(actor.id)}`});
  }
  if(p.survivalHazard&&p.survivalHazard!=='none'){
-  tests.push({skill:'Survival Hazard',kind:'Hazard Roll',eml:null,roll:numeric(p.settings?.survivalD10),die:'d10',
+  tests.push({skill:'Survival Hazard',kind:'Hazard Roll',eml:null,roll:numeric(p.hazardDetail?.hazardD10??p.hazardDetails?.[0]?.hazardD10??p.settings?.survivalD10),die:'d10',
    level:'',result:HAZARDS[p.survivalHazard]||txt(p.survivalHazard),effect:'Vyhodnotit konkrétní hazard a jeho doložený navazující postup',actorId:'',id:'survival-hazard'});
  }
  for(const [i,roll] of (p.direction?.rolls||[]).entries()){
@@ -83,17 +83,29 @@ function hash(text){let value=2166136261;for(const char of String(text)){value^=
 function pick(values,key){return values[hash(key)%values.length];}
 const namesSeason={spring:'jaro',summer:'léto',autumn:'podzim',fall:'podzim',winter:'zima'};
 const terrainWords={'needleleaf-forest':'jehličnatý les','broadleaf-forest':'listnatý les','paved-road':'zpevněná cesta','grassland':'travnatá krajina','hills':'kopcovitá krajina','mountains':'hory','swamp':'mokřiny'};
+export function personalTerrainLabel(terrain){return terrainWords[txt(terrain)]||txt(terrain).replace(/[-_]/g,' ')||'';}
 const activityNames={travel:'Cestování',tracking:'Stopování',forage:'Shánění zásob',watch:'Ostraha',rest:'Odpočinek',sleep:'Spánek',winded:'Klid',other:'Činnost'};
 export function personalEpisodeActivities(p){
- const tasks=[];const kind=txt(p?.kind);if(kind!=='travel')return activityNames[kind]||'Činnost';
- const modes=p?.orientation?.modes||{};
- if(Number(modes.foraging)>0||(p.travelForaging||[]).length)tasks.push('sběr zásob');
- if(Number(modes.stalking)>0||Number(p?.settings?.mode_stalking)>0)tasks.push('tichý postup');
- if(Number(modes.vigilance)>0||p?.trekWatchfulness?.effective==='alert')tasks.push('ostraha');
- if(p.trackingMemory)tasks.push('sledování stop');
- if(!tasks.length&&p.trekWatchfulness?.effective==='lax')tasks.push('omezená ostraha');
- if(!tasks.length)tasks.push('postup po trase');
- return 'Cestování – '+tasks.join(', ');
+ const kind=txt(p?.kind),tasks=[];
+ const forages=Array.isArray(p?.travelForaging)?p.travelForaging:[];
+ const target=txt(forages[0]?.target||p?.settings?.forageTarget);
+ const herb=txt(forages.find(f=>f.herbName)?.herbName||p?.settings?.herbName);
+ const harvesting=target==='herbs'?`sběr bylin${herb?' ('+herb+')':''}`:target==='food-water'?'hledání potravy a vody':'shánění zásob';
+ if(kind==='forage')return harvesting.charAt(0).toUpperCase()+harvesting.slice(1);
+ if(kind==='tracking')return 'Stopování – sledování stopy';
+ if(kind==='watch')return 'Ostraha – sledování okolí';
+ if(kind==='rest')return 'Odpočinek';
+ if(kind==='sleep')return 'Spánek';
+ if(kind==='winded')return 'Klid a zotavení';
+ if(kind!=='travel')return activityNames[kind]||'Činnost';
+ const modes=p?.orientation?.modes||{},settings=p?.settings||{};
+ if(forages.length||Number(modes.foraging)>0||Number(settings.mode_foraging)>0)tasks.push(harvesting);
+ if(p?.trackingMemory)tasks.push('sledování stop');
+ if(Number(modes.stalking)>0||Number(settings.mode_stalking)>0)tasks.push('plíživý postup');
+ if(Number(modes.vigilance)>0||Number(settings.mode_vigilance)>0||p?.trekWatchfulness?.effective==='alert')tasks.push('ostraha');
+ if(!tasks.length&&p?.trekWatchfulness?.effective==='lax')tasks.push('omezená ostraha');
+ if(!tasks.length)tasks.push('přesun po trase');
+ return 'Cestování – '+[...new Set(tasks)].join(' · ');
 }
 export function personalEpisodeRoles(p,name){
  const ids=Array.isArray(p?.memberIds)?p.memberIds:[];const roles=[];
@@ -118,39 +130,233 @@ export function personalEpisodeRoles(p,name){
  for(const animal of stable){if(!animal?.rider&&animal?.name)roles.push(`${animal.name}: zvíře bez doloženého jezdce`);}
  return roles;
 }
-const spring=['Na zemi se drží stopy zimní vlhkosti, ale den už patří jaru.','Jaro probouzí krajinu a mění čitelnost cest i stop.','Jarní úsek střídá čerstvý vzduch s proměnlivými podmínkami.','Ve vegetaci je znát začátek nové sezóny.'];
-const summer=['Letní den prodlužuje čas využitelný k pohybu.','V létě rozhoduje o tempu i dostupnost stínu a vody.','Letní krajina má svůj vlastní rytmus světla a tepla.','V létě se okolí dá pozorovat za dlouhého dne.'];
-const autumn=['Podzimní krajina zakrývá starší stopy vrstvou listí a jehličí.','Podzim mění barvy porostu a zkracuje denní světlo.','Chladnější podzimní vzduch doprovází celou výpravu.','Podzimní úsek staví před družinu jiné podmínky než léto.'];
-const winter=['Zimní krajina vyžaduje opatrnější volbu tempa.','V zimě je den kratší a počasí může změnit cestu během chvíle.','Zimní vzduch činí každou zastávku citelnější.','Zimní terén může ztížit čtení stop a nalezení zásob.'];
-const terrainVariants={
- forest:['Mezi stromy ubývá dlouhých výhledů; orientace závisí na detailech podrostu.','Koruny stromů tlumí světlo a střídají stíny na cestě.','Lesní půda poskytuje mnoho drobných vodítek, ale žádné není samo o sobě spolehlivé.','Kmeny a hustší porost omezují přímý rozhled.','Pod nohama se mění jehličí, kořeny a pevnější úseky stezky.'],
- urban:['Zástavba mění rytmus úseku; cesta už není jen otázkou otevřeného terénu.','Mezi domy záleží spíše na volbě průchodu než na vzdáleném horizontu.','Okolí nabízí více orientačních bodů, ale také více rozptýlení.'],
- road:['Cesta poskytuje zřetelnou osu postupu a dovoluje sledovat pohyb kolem.','Zpevněná trasa vede dál; pozornost se obrací k okolí a k tempu.','Stopy na cestě se mohou překrývat s pohybem dalších cestujících.'],
- other:['Krajina se před družinou rozvíjí v novém úseku skutečně zaznamenané trasy.','Místní terén určuje, co je vidět a jak snadno lze postupovat.','Podmínky prostředí mění každé rozhodnutí o tempu a pozorování.']};
-const verb={travel:['Družina volí krok podle skutečného tempa a průchodnosti úseku.','Průvodce drží směr a ostatní upravují svůj pohyb podle trasy.','Každá část pochodu prověřuje síly cestujících.','Pozornost se přesouvá mezi cestou vpřed a okolním terénem.','Putování vyžaduje průběžně srovnávat směr a skutečný postup.'],
- forage:['Při pátrání po obživě jsou prohledávána dostupná místa v okolí.','Sbírání zásob vyžaduje čas i znalost zdejší krajiny.','Pohled se obrací k půdě, rostlinám a místům, kde lze hledat vodu.','Činnost se soustředí na doložené pokusy nalézt využitelné zdroje.'],
- tracking:['Stopař zkoumá drobné změny povrchu a směr sledovaných znaků.','Důležitá je souvislost mezi jednotlivými stopami, ne jediný otisk.','Sledování postupu vyžaduje zastavovat a znovu porovnávat okolí.','Stopování střídá pečlivé pozorování s rozhodováním o směru.'],
- watch:['Hlídka rozděluje pozornost mezi přístupy a neklid v okolí.','Ostraha se opírá o trpělivost a opakované prohlížení stejných míst.','V průběhu služby se ukazuje, jak náročné je nepřetržitě sledovat krajinu.'],
- rest:['Postava si vyhrazuje čas pro odpočinek v doloženém místě.'],sleep:['Spánek přerušuje ostatní činnost a obnovuje časový rytmus dne.'],other:['Postava se věnuje činnosti zaznamenané v herním kalendáři.']};
-function terrainGroup(p){const x=(txt(p?.terrain)+' '+txt(p?.area)).toLowerCase();return /forest|les|wood/.test(x)?'forest':/tashal|město|town|urban|city/.test(x)?'urban':/road|stezk|cest/.test(x)?'road':'other';}
+// Descriptive manuscript prose, not a new game event. Every adjective comes from
+// the episode's environment; anything merely illustrative stays in the flavor layer.
+const ACTIVITY_PASSAGES={
+ travel:[
+  'Vzdálenost ubývá podle skutečně zvoleného tempa; mezi jednotlivými kroky je čas posoudit další úsek.',
+  'Pohyb výpravy střídá pozorování terénu s krátkými rozhodnutími o směru.',
+  'Přesun postupuje od jednoho orientačního bodu k druhému, zatímco pozornost zůstává na okolní krajině.',
+  'Trasa vede dál v rytmu doloženého pochodu, nikoli ve spěchu vyprávění.',
+  'Každý úsek přináší jiný pohled na okolí, přestože cesta drží stejný směr.',
+  'Členové výpravy vyrovnávají tempo tak, aby navázali na skutečně dosaženou vzdálenost.',
+  'Okraje stezky a průchodnost terénu jsou stejně důležité jako vzdálenost před nimi.',
+  'Skupina pokračuje v předepsaném úseku; jistota pohybu závisí na cestě a úsudku průvodce.',
+  'Postup prověřuje pozornost k podkladu i schopnost držet společné tempo.',
+  'Družina se posouvá po zaznamenané trase a upravuje rozestupy podle jejího průběhu.'
+ ],
+ forage:[
+  'Pozornost se přesouvá od cesty k tomu, co může okolní krajina poskytnout.',
+  'Hledání využitelných zdrojů se mění ve sled drobných rozhodnutí o tom, kde pátrat.',
+  'Zkušenost pomáhá rozlišit slibná místa od těch, která jen vypadají nadějně.',
+  'Na zemi i v porostu se hledají známky toho, kde lze získat zásoby.',
+  'Čas plyne při pečlivém zkoumání okolí; skutečný výtěžek závisí až na doloženém nálezu.',
+  'Průzkum vegetace střídá klidné porovnávání jednotlivých nalezených znaků.'
+ ],
+ tracking:[
+  'Stopař skládá jednotlivé znaky do možné linie pohybu.',
+  'Nejasné otisky vyžadují srovnání s tvarem cesty a okolní půdou.',
+  'Pozornost se vrací k hranám stop a drobným změnám podkladu.',
+  'Sledování stopy je pomalejší, než se zdá: důležitá je návaznost vodítek.',
+  'Každý úsek přináší nové srovnání toho, co zůstalo zachováno v povrchu.',
+  'Stopa se hledá v souvislostech, ne v jediném snadno přehlédnutelném otisku.'
+ ],
+ watch:[
+  'Ostraha vyžaduje zachovat pozornost i v místech, která vypadají klidně.',
+  'Hlídka střídavě sleduje vzdálenější přístupy a bezprostřední okolí.',
+  'Každý šelest nabízí podnět k pozornosti, nikoli automatický důkaz nebezpečí.',
+  'Zorné pole se vrací k průchodům, které je třeba mít pod kontrolou.',
+  'Bdělost se opírá o trpělivost a o schopnost nepodlehnout rutinnímu tichu.'
+ ],
+ rest:[
+  'Čas této epizody je věnován skutečně zaznamenanému odpočinku.',
+  'Pohyb ustupuje a důležitější je najít klid pro následující úsek.',
+  'V odpočinkovém úseku převažuje uklidnění tempa nad cestovním úsilím.'
+ ],
+ sleep:[
+  'Cestovní ruch ustupuje spánku; mění se rytmus celého intervalu.',
+  'Čas věnovaný spánku plyne bez dalších předpokládaných výprav.',
+  'Epizoda patří spánku a jeho skutečně doloženému průběhu.'
+ ],
+ other:[
+  'Postava se věnuje zvolené činnosti v zaznamenaných podmínkách.',
+  'Průběh je svázán s reálným časovým úsekem, nikoli s domýšlenými výsledky.',
+  'Konkrétní výsledek této činnosti se odvíjí od uložených testů.'
+ ]
+};
+const TERRAIN_SCENES={
+ forest:[
+  'Mezi kmeny se pohled rozpadá do kratších průhledů a je potřeba vyhledávat další vodítka.',
+  'Lesní podklad střídá měkká místa s kořeny a pevnější stezkou.',
+  'Stromy mění světlo v nepravidelné pásy a zakrývají vzdálený horizont.',
+  'V podrostu jsou viditelné drobné rozdíly povrchu, důležité pro orientaci i stopy.',
+  'Mezi jehličím a zbytky listí se pod nohama mění povrch téměř s každým úsekem.',
+  'Rozestupy mezi stromy nabízejí jen omezené výhledy na další postup.',
+  'Stín korun přechází přes cestu a ztěžuje odhad vzdálenějšího směru.',
+  'Podrost a větve určují, jak daleko lze dohlédnout před sebe.'
+ ],
+ road:[
+  'Povrch cesty vytváří čitelnou osu, ale drobné otisky na něm nemusejí dlouho vydržet.',
+  'Zpevněná cesta pomáhá držet směr, zatímco okolí se mění podél jejích okrajů.',
+  'Na otevřenější trase se lépe sleduje směr než jemné stopy v tvrdém povrchu.',
+  'Okraje cesty nabízejí jiné vodítko než samotný její pevný povrch.',
+  'Stezka vede jasně, avšak z jejího okolí je třeba číst změny terénu.',
+  'Větší část cesty je přehledná; pozornost se proto přesouvá k odbočkám a okolí.'
+ ],
+ urban:[
+  'Průchody a stavby dávají jiná vodítka než otevřená krajina.',
+  'Podél zástavby se mění zvuky a možnosti přímého rozhledu.',
+  'Cestu tu vymezují spíše okolní stavby než vzdálené orientační body.',
+  'Mezi budovami je důležitá volba průchodu a včasné rozpoznání odbočky.'
+ ],
+ other:[
+  'Terén v zaznamenané oblasti určuje průchodnost i délku výhledu.',
+  'Povrch krajiny se mění pod nohama a vyžaduje vnímat směr postupu.',
+  'Okolní krajina připomíná, že délka cesty není jediným měřítkem námahy.',
+  'Každý další úsek otevírá odlišná místa pro orientaci a pozorování.',
+  'Krajina poskytuje jen tolik vodítek, kolik je skutečně možné zachytit.'
+ ]
+};
+const SEASON_SCENES={
+ spring:[
+  'Jarní porost se teprve probouzí a barvy krajiny nejsou všude stejně výrazné.',
+  'Příchod jara zanechává v podkladu měkčí místa a proměnlivý vzhled vegetace.',
+  'Jarní světlo se v porostu mění rychleji, než by naznačoval klidný den.',
+  'Začátek vegetační sezóny dává krajině čerstvější vzhled.',
+  'Na přelomu chladu a jarního dne je cítit proměnlivost ročního období.'
+ ],
+ summer:[
+  'Letní porost je hustší a světlo se déle drží nad obzorem.',
+  'Dlouhý letní den nabízí více světla, nikoli však záruku snadné cesty.',
+  'Letní vegetace zakrývá některé nižší body terénu.',
+  'Slunce v létě vytváří výraznější kontrasty mezi otevřenými místy a stínem.'
+ ],
+ autumn:[
+  'Podzimní podklad nese vrstvu opadaného listí a starších jehlic.',
+  'Podzimní barvy ukazují, že období růstu už ustupuje.',
+  'Kratší podzimní dny mění význam světla v cestovních úsecích.',
+  'Větrem přemístěné listí může změnit vzhled známých stop.'
+ ],
+ winter:[
+  'Zimní krajina se vyznačuje delšími stíny a úspornější vegetací.',
+  'Nízké zimní světlo mění tvar stínů na cestě.',
+  'Chladnější zimní část roku vyžaduje pozornější vnímání terénu.',
+  'Zimní ticho může zvýraznit běžné zvuky z bezprostředního okolí.'
+ ],
+ unknown:['Krajina se mění se světlem a s postupem zaznamenané hodiny.','Podmínky úseku jsou popsány jen v rozsahu, který skutečně uchoval kalendář.']
+};
+const WEATHER_SCENES={
+ precipitation:[
+  'Srážky proměňují povrch cesty a zhoršují čitelnost některých drobných stop.',
+  'Dopadající srážky mění zvukovou kulisu i charakter podkladu.',
+  'V průběhu úseku ovlivňují srážky přehlednost okolí a pohodlí výpravy.',
+  'Srážky přicházejí do zaznamenané činnosti a mohou měnit jistotu kroku.'
+ ],
+ snow:[
+  'Sníh mění obrysy stezky a překrývá starší drobné stopy.',
+  'Sněžení zkracuje dohlednost a zjemňuje siluety okolí.',
+  'Sněhové srážky proměňují podklad a přinášejí nové stopy.'
+ ],
+ rain:[
+  'Déšť tlumí ostré obrysy vzdálenějších míst a zanechává na povrchu vlhké stopy.',
+  'Srážky dopadají na cestu a dělají z jejího povrchu méně předvídatelné místo.',
+  'Déšť proměňuje zvuky kolem družiny a zhoršuje čitelnost některých stop.',
+  'Vlhkost se drží na oděvu i na porostu, kterým epizoda prochází.',
+  'Srážky splachují část drobných stop a mění charakter podkladu.'
+ ],
+ dry:[
+  'Nejsou zaznamenány srážky, takže výhled neomezuje déšť ani sněžení.',
+  'Během úseku nejsou zaznamenané srážky; pozornost se může soustředit na terén.',
+  'Obloha pro tento interval nepřináší doložené srážky.',
+  'Cestu tentokrát přímo nekomplikuje déšť ani sněžení.'
+ ]
+};
+function terrainGroup(p){
+ // Physical terrain takes precedence over the area label (which may be a town).
+ const x=txt(p?.terrain).toLowerCase();
+ return /forest|les|wood/.test(x)?'forest':/road|stezk|cest/.test(x)?'road':/urban|town|city/.test(x)?'urban': 'other';
+}
+const daylightPeriod=p=>{
+ const periods=p?.daylight?.minutesByPeriod;
+ if(periods&&typeof periods==='object'){
+  const valid=Object.entries(periods).filter(([,v])=>Number(v)>0).sort((a,b)=>b[1]-a[1]);
+  if(valid.length)return valid[0][0];
+ }
+ return txt(p?.settings?.lightPeriod||'');
+};
 export function personalEpisodeWeather(p){
- const w=p?.weather||{},season=namesSeason[w.season||p?.settings?.season]||'nezjištěné období';
- const precipitation=w.hasPrecipitation===true?'během úseku jsou doložené srážky':w.hasPrecipitation===false?'v této epizodě nebyly doložené srážky':'srážky nejsou doloženy';
- const light=p?.daylight?.lightPeriod||p?.settings?.lightPeriod;
- return `Období: ${season}; ${precipitation}${light==='night'?'; noční úsek':light==='day'?'; denní úsek':''}.`;
+ const w=p?.weather||{},season=namesSeason[w.season||p?.settings?.season]||'období neuvedeno';
+ const precipitation=w.hasPrecipitation===true?(p?.precipitation?.precipitation==='rain'?'déšť':p?.precipitation?.precipitation==='snow'?'sněžení':'srážky'):
+   w.hasPrecipitation===false?'bez srážek':'srážky neuvedeny';
+ const day=daylightPeriod(p),light=({day:'den',night:'noc',twilight:'soumrak'})[day]||'světlo neuvedeno';
+ return `${season} · ${precipitation} · ${light}`;
 }
 export function personalEpisodeFlavor(entry,p){
- const season=txt(p?.weather?.season||p?.settings?.season).toLowerCase();const seasonal={spring,summer,autumn,fall:autumn,winter}[season]||['Ráz dne zatím určuje známé prostředí a skutečný herní čas.'];
- const terrain=terrainVariants[terrainGroup(p)];const action=verb[p?.kind]||verb.other;
- const key=`${entry?.id||''}:${p?.startMinute||0}:${p?.kind||''}`;
- const base=[pick(seasonal,key+':season'),pick(terrain,key+':terrain'),pick(action,key+':activity')];
- if(p?.weather?.hasPrecipitation===true)base.push(pick(['Srážky doprovázejí zvolenou činnost a ovlivňují atmosféru celého úseku.','Déšť nebo sněžení podle místních podmínek mění dojem z cesty.','Srážky omezují pohodlí a připomínají, že obloha zůstává součástí výpravy.'],key+':rain'));
- if((p?.travelForaging||[]).length||p?.kind==='forage')base.push(pick(['Při sběru záleží na tom, zda se podaří rozeznat skutečně použitelné zdroje.','Prohledávání porostu střídají krátké chvíle rozhodování, kde má smysl pokračovat.','Okolní vegetace nabízí různé možnosti hledání, ale výsledek určuje doložený hod.'],key+':forage'));
- const herb=txt(p?.settings?.herbName||(p?.travelForaging||[]).find(f=>f.herbName)?.herbName);
- if(herb&&(p?.kind==='forage'||(p?.travelForaging||[]).length))base.push(`Plán hledání se zaměřoval také na bylinu ${herb}; případný skutečný nález vyplývá z doloženého výsledku.`);
- if(p?.kind==='tracking'||p?.trackingMemory)base.push(pick(['Stopy mohou vést dál, nebo se rozplývat mezi podobnými znaky terénu.','Každé nalezené vodítko má smysl teprve ve spojení s ostatními.','Úsilí stopaře se soustředí na udržení souvislé linie sledování.'],key+':tracking'));
- if(p?.kind==='watch'||p?.trekWatchfulness?.effective==='alert')base.push(pick(['Při ostraze se pozornost vrací k okrajům viditelného prostoru.','Hlídka pravidelně sleduje stejná místa, aby zachytila změnu.','Střídání ticha a drobných zvuků udržuje ostrahu v napětí.'],key+':watch'));
- return base.join(' ');
+ const season=txt(p?.weather?.season||p?.settings?.season).toLowerCase();
+ const kind=txt(p?.kind),key=`${entry?.id||''}|${p?.startMinute??''}|${p?.endMinute??''}|${p?.terrain??''}|${kind}`;
+ const terrain=TERRAIN_SCENES[terrainGroup(p)]||TERRAIN_SCENES.other;
+ const action=ACTIVITY_PASSAGES[kind]||ACTIVITY_PASSAGES.other;
+ const seasonScene=SEASON_SCENES[season==='fall'?'autumn':season]||SEASON_SCENES.unknown;
+ const intro=[pick(seasonScene,key+':season'),pick(terrain,key+':ground')];
+ const middle=[pick(action,key+':action')];
+ if(p?.weather?.hasPrecipitation===true){
+  const precip=txt(p?.precipitation?.precipitation).toLowerCase();
+  const type=precip==='rain'?'rain':precip==='snow'?'snow':'precipitation';
+  middle.push(pick(WEATHER_SCENES[type],key+':weather'));
+ }
+ else if(p?.weather?.hasPrecipitation===false&&hash(key+'dry')%3===0)middle.push(pick(WEATHER_SCENES.dry,key+':dry'));
+ const light=daylightPeriod(p);
+ if(light==='night')middle.push(pick(['Noční tma omezuje výhled mimo bezprostřední okolí.','Za tmy získávají i malé zvuky větší váhu.','Osvětlená místa a tmavé úseky se vnímají velmi odlišně.'],key+':night'));
+ if(light==='twilight')middle.push(pick(['Soumrak mění tvar stínů a hranice přehledných míst.','Světlo ubývá a vzdálenější obrysy ztrácejí přesnost.','Přechod mezi denním světlem a tmou mění jistotu pohybu.'],key+':twilight'));
+ const modes=p?.orientation?.modes||{},forage=(p?.travelForaging||[]),target=txt(forage[0]?.target||p?.settings?.forageTarget),herb=txt(forage.find(f=>f?.herbName)?.herbName||p?.settings?.herbName);
+ if(kind==='forage'||forage.length||Number(modes.foraging)>0){
+  const themed=target==='herbs'?[
+   'Ruce se obracejí k nízké vegetaci a k rozpoznávání léčivých druhů.',
+   'Každou nalezenou rostlinu je třeba rozeznat dříve, než může být užitečná.',
+   'Sběr bylin vyžaduje pozorovat listy, stonky a místo, kde vyrůstají.',
+   'Hledání bylin střídá prohlížení porostu s porovnáváním známých znaků.'
+  ]:[
+   'Pátrání po obživě vede pozornost k rostlinám a možným zdrojům vody.',
+   'Zásoby nelze odhadnout z pohledu na krajinu; rozhoduje až skutečně potvrzený nález.',
+   'Prohledávání půdy a porostu přináší příležitosti, ale také slepé uličky.',
+   'K získání zásob nestačí najít nadějné místo, je nutné ověřit, co poskytlo.'
+  ];
+  middle.push(pick(themed,key+':forage'));
+  if(target==='herbs'&&herb)middle.push(`Pátrání se zaměřuje na bylinu ${herb}.`);
+ }
+ if(kind==='tracking'||p?.trackingMemory)middle.push(pick([
+  'Směr stopy se ověřuje podle více znaků najednou, ne podle jediného otisku.',
+  'Stopař čte změny povrchu a hledá souvislosti, které by ostatní mohli přehlédnout.',
+  'Zkoumání stop vyžaduje dávat pozor i na místa, kde zdánlivě žádné nejsou.',
+  'Pátrání se soustředí na pokračování téže stopy, aniž by předem zaručovalo její nalezení.'
+ ],key+':tracking'));
+ if(kind==='watch'||p?.trekWatchfulness?.effective==='alert'||Number(modes.vigilance)>0)middle.push(pick([
+  'Pozornost se vrací k místům, odkud by bylo možné výpravu pozorovat.',
+  'Hlídání zůstává vědomou součástí činnosti a ubírá prostor pro rozptýlení.',
+  'Ostraha se snaží udržet přehled i tam, kde výhled přerušují překážky.',
+  'Sledování okolí pomáhá rozlišovat běžný pohyb přírody od skutečných podnětů.'
+ ],key+':watch'));
+ if(Number(modes.stalking)>0||Number(p?.settings?.mode_stalking)>0)middle.push(pick([
+  'Kroky se ztišují a tempo podřizuje snaze neupozornit na sebe.',
+  'Plíživý postup vede k opatrnému rozvržení každého dalšího kroku.',
+  'Důležitá je nenápadnost pohybu; tichý postup neznamená automaticky úspěšné ukrytí.'
+ ],key+':stalking'));
+ if(p?.stableAnimalLoad?.length){
+  if(p.stableAnimalLoad.some(a=>a.rider))middle.push(pick([
+   'Jezdci a pěší musí sladit rychlost, aby spolu drželi zaznamenanou trasu.',
+   'Rytmus kopyt doplňuje kroky pěších; cesta jim neklade vždy stejné nároky.',
+   'Pohyb jízdních zvířat se musí přizpůsobit členům výpravy na zemi.'
+  ],key+':mount'));
+  else if(kind==='travel')middle.push(pick([
+   'Součástí přesunu je také vedené či nákladní zvíře; práce s ním ovlivňuje rytmus družiny.',
+   'Pěší doprovod musí při přesunu brát ohled na přítomná zvířata.',
+   'Vedle kroků cestujících se ozývá i pravidelný pohyb doprovázejícího zvířete.'
+  ],key+':animal'));
+ }
+ // The text is deliberately descriptive: injury, encounter and loot appear only
+ // in the dedicated proven-facts boxes, not as imagined facts in this prose.
+ const chosen=middle.slice(0,4);
+ return `${intro.join(' ')}\n\n${chosen.join(' ')}`;
 }
 export function personalEpisodeEncounter(p){
  const e=p?.encounter;if(!e||typeof e!=='object')return null;
@@ -159,12 +365,26 @@ export function personalEpisodeEncounter(p){
  const die=e.format==='hmk-episode-encounter-minute-v1'?'d100':'d10';
  return {chance,die,roll:numeric(e.d100??e.roll),count,detail:count?`${count} setkání evidováno; podrobnosti určuje GM.`:'V tomto úseku nebylo vygenerováno setkání.',format:e.format};
 }
-export function personalEpisodeHazard(p,displayMinute){
+export function personalEpisodeHazard(p,displayMinute,linkedEvidence={}){
  const hazard=txt(p?.survivalHazard);if(!hazard||hazard==='none')return null;
  const info=p.hazardDetail||p.hazardDetails?.[0]||{},window=info.eventWindow93868||{};
  const absolute=Number.isSafeInteger(window.eventMinute)?window.eventMinute:
   Number.isSafeInteger(info.hazardAtMinute)&&Number.isSafeInteger(p.startMinute)?p.startMinute+info.hazardAtMinute:null;
  const when=Number.isSafeInteger(absolute)?displayMinute(absolute):'čas nehody v intervalu nedoložen';
+ const ids=new Set((p.skillLinks||[]).map(l=>txt(l.id)).filter(Boolean));
+ if(p.orientation?.skillId)ids.add(txt(p.orientation.skillId));
+ if(p.trackingMemory?.skillId)ids.add(txt(p.trackingMemory.skillId));
+ const matched=(linkedEvidence?.healthEvents||[]).filter(e=>{
+  const d=e?.details||{};
+  return e?.type==='travel-accident-injury'&&ids.has(txt(d.sourceId))&&
+   Number.isSafeInteger(d.originMinute)&&d.originMinute>=p.startMinute&&d.originMinute<=p.endMinute;
+ });
+ const formatBodyPart={tx:'hrudník',th:'stehno',sk:'lebka',fa:'obličej',nk:'krk',sh:'rameno',ua:'nadloktí',el:'loket',fo:'předloktí',ha:'ruka',ab:'břicho',pv:'pánev',kn:'koleno',ca:'lýtko',ft:'chodidlo'};
+ const injuries=matched.map(e=>{
+  const d=e.details,kind=txt(d.injury),site=formatBodyPart[txt(d.location).toLowerCase()]||txt(d.location)||'neurčené místo';
+  const who=linkedEvidence?.name?.(d.targetId)||'Postava';
+  return `${who}: ${kind} (${site}${txt(d.aspect)?', zásah '+d.aspect:''})`;
+ });
  const possibilities={
   accident:[
    'GM inspirace: na nerovném úseku mohl někomu uklouznout krok; případné poranění musí doložit zvláštní hod.',
@@ -190,26 +410,54 @@ export function personalEpisodeHazard(p,displayMinute){
    'GM inspirace: mohlo být nutné zastavit a znovu zhodnotit bezpečnost pohybu.',
    'GM inspirace: okolnosti mohly donutit skupinu změnit pořadí pohybu.']};
  const actual={accident:'V tomto úseku vznikla doložená cestovní nehoda.',equipment:'V tomto úseku byl potvrzen hazard výbavy.',complication:'V tomto úseku byla zaznamenána cestovní komplikace.'}[hazard]||'V úseku nastal potvrzený cestovní hazard.';
- const outcome=info.result==='irreparable'&&hazard==='equipment'?'Doložený následek: příslušná oprava nebyla úspěšná / předmět nebyl opravitelný.':
+ const outcome=info.result==='irreparable'&&hazard==='equipment'?'Oprava výbavy v tomto pokusu neuspěla; zapsaný stav zůstává nevyřešený.':
+  info.result==='irreparable'&&hazard==='complication'?'Komplikaci se při navazujícím pokusu nepodařilo překonat.':
   info.complicationSkill&&info.complicationLevel?`Navazující ${info.complicationSkill}: ${info.complicationLevel}.`:
-  info.result==='ignored'?'GM ponechal výbavu bez opravy.':
-  info.result==='pending-original-skill-combat'?'Následná Agility, pád nebo zranění se dokončuje v samostatné zdravotní sekvenci.':
-  info.result?'Evidovaný stav následku: '+info.result+'.':'';
- return {hazard,when,absolute,actual,outcome,example:possibilities[hazard]?pick(possibilities[hazard],`${p.startMinute}:${p.endMinute}:${hazard}:${p.settings?.guideId||''}`):'Příběhové detaily může GM doplnit bez zásahu do pravidlového výsledku.'};
+  info.result==='ignored'?'GM rozhodl, že se výbava nebude nyní opravovat.':
+  info.result==='pending-original-skill-combat'?(injuries.length?'Návazná zdravotní sekvence je doložena níže konkrétním zraněním.':'Navazující pohybový či zdravotní test zatím není v tomto zápisu potvrzen.'):
+  info.result?'Doložený stav následku: '+info.result+'.':'';
+ // Do not describe a riding mishap if no animal participated in the interval.
+ const hasAnimal=(p.stableAnimalLoad||[]).length>0;
+ const pool=hazard==='accident'&& !hasAnimal?possibilities.accident.filter(x=>!/(zvíře|sedle|kůň)/i.test(x)):(possibilities[hazard]||[]);
+ const weatherHint=p?.weather?.hasPrecipitation===true&&hazard==='accident'?'GM inspirace: srážky mohly zvýšit nejistotu pohybu na změněném povrchu.':null;
+ const scene=pool.length?pick(pool,`${p.startMinute}:${p.endMinute}:${hazard}:${p.settings?.guideId||''}`):'';
+ const example=weatherHint&&hash(String(p.startMinute)+':weather-hazard')%2===0?weatherHint:scene;
+ return {hazard,when,absolute,actual,outcome,injuries,
+  example};
 }
 export function personalTestConsequence(test,p){
  const skill=txt(test?.skill).toLowerCase(),level=txt(test?.level),failing=level==='CF'||level==='F';
- const existing=txt(test?.effect),generic=/^CF:|^Kritický neúspěch činnosti|^Bez dalšího potvrzeného následku|^Výsledek z dokončené|^Vyhodnotit konkrétní hazard|^Následek viz/.test(existing);
- if(!generic&&existing)return {actual:existing,example:''};
- if(skill.includes('endurance'))return {actual:existing||'Individuální Endurance Roll určuje skutečně uloženou změnu Weariness.',example:''};
- if(skill.includes('hazard'))return {actual:p?.survivalHazard?`Cestovní hazard: ${p.survivalHazard}.`:existing,example:''};
- if(skill.includes('survival'))return {actual:failing?(p?.survivalHazard?`Orientace skončila neúspěchem; navázal cestovní hazard ${p.survivalHazard}.`:'Pokus o orientaci nevyšel; další postup závisí na pravidlovém vyhodnocení pohybu.'):'Výsledek pomohl stanovit přínos orientace pro tento úsek.',example:failing?'GM inspirace: postavy mohly ztratit jistotu ve směru nebo přehlédnout spolehlivý orientační bod.':''};
- if(skill.includes('riding'))return {actual:failing?'Jezdecký pokus nevyšel; ovládání zvířete nebylo tímto testem úspěšně potvrzeno.':'Postava v této situaci úspěšně ovládla jezdecký úkon.',example:failing?'GM inspirace: kůň mohl neochotně zastavit, vyhnout se překážce nebo prudce změnit tempo. Pád není automaticky potvrzen.':''};
- if(skill.includes('tracking')||skill.includes('stopov'))return {actual:failing?'Stopu se nepodařilo bezpečně sledovat.':'Postava zachytila využitelnou souvislost stop; její skutečná hodnota je dána SV.',example:failing?'GM inspirace: otisky mohly splývat, křížit se s jinými nebo mizet na tvrdším povrchu.':''};
- if(skill.includes('animalcraft'))return {actual:failing?'Pokus o práci se zvířetem neuspěl.':'Dovednost Animalcraft byla při této činnosti úspěšná.',example:failing?'GM inspirace: zvíře mohlo nereagovat na známý povel, couvnout nebo přerušit spolupráci. Prodloužení výcviku není automatické.':''};
- if(skill.includes('foraging')||skill.includes('sběr')||skill.includes('potrav'))return {actual:existing||'Výsledek sběru je doložen množstvím ve výpisu zásob.',example:''};
- if(skill.includes('awareness'))return {actual:failing?'Postava nezískala potřebný přehled o okolí.':'Postava úspěšně zaznamenala důležitý znak v okolí.',example:failing?'GM inspirace: drobný pohyb za kmeny mohl zůstat nepovšimnut.':''};
- return {actual:failing?`Test ${test.skill} neuspěl${level==='CF'?' kriticky':''}; samotný výsledek nevytváří neohlášené zranění ani ztrátu vybavení.`:`Test ${test.skill} uspěl; kvalitu určuje případné SV.`,example:failing?'GM inspirace: překážka mohla vyžadovat změnu postupu nebo další čas, pokud to odpovídá konkrétním pravidlům.':''};
+ const old=txt(test?.effect);
+ const generic=/^CF:|^Kritický neúspěch činnosti|^Bez dalšího potvrzeného následku|^Výsledek z dokončené|^Vyhodnotit konkrétní hazard|^Následek viz|^Následek evidován|^Změna směru dle|^Nalezené množství je uvedeno/.test(old);
+ if(skill.includes('endurance'))return {actual:old||'Endurance SR byl vyhodnocen, příslušná Weariness se čte z výsledku.',example:''};
+ if(skill.includes('foraging')||skill.includes('sběr')||skill.includes('potrav')||skill.includes('zásob'))return {
+  actual:old&& !generic?old:'Hod je doložen, ale skutečný nález musí pocházet z potvrzeného vyhodnocení zásob.',
+  example:old.includes('neuzavřen')?'GM může popsat hledání, ale zatím nesmí postavě připsat nalezené dávky.':''};
+ if(skill.includes('direction hazard'))return {actual:p?.direction?.direction?`Určený směr: ${p.direction.direction}.`: 'Hazard směru byl zaznamenán.',example:''};
+ if(skill.includes('hazard'))return {actual:txt(p?.survivalHazard)==='accident'?'Zaznamenána nehoda; potvrzená zranění jsou níže v části Nehoda.':txt(p?.survivalHazard)==='equipment'?'Výbava byla vystavena hazardu; stav opravy uvádí sekvence nehody.':txt(p?.survivalHazard)==='complication'?'Při cestě vznikla komplikace, viz její doložené vyhodnocení.':'Doložený hazard je rozepsán v části Následky.',example:''};
+ if(skill.includes('survival')||skill.includes('orient')){
+  if(p?.orientation?.skillId===test?.id){
+   const nav=txt(p?.navigationState);
+   const situation=nav&&nav!=='clear'?` V epizodě zůstává stav orientace „${nav}“.`:p?.navigationRecovered?' GM potvrdil návrat na správnou trasu.':'';
+   return {actual:failing?`Orientace nevyšla; výprava nezískala spolehlivé potvrzení směru.${situation}`:`Orientace uspěla a její hodnota vstoupila do vyhodnocení postupu.${situation}`,
+    example:failing?'GM inspirace: mezi podobnými průchody mohl chybět výrazný orientační bod; směr není možné považovat za bezpečně ověřený.':''};
+  }
+  return {actual:failing?'Pokus využít Survival selhal. Při cestě je nutné držet se skutečně zaznamenané orientace a následků.':'Test Survival uspěl; nebyl však doložen nový samostatný nález ani zranění.',example:failing?'GM inspirace: v opakujícím se terénu se mohl jevit správný směr méně jednoznačný.':''};
+ }
+ if(skill.includes('riding'))return {actual:failing?'Jezdecký manévr se nepodařil; žádný pád není samotným tímto testem doložen.':'Jezdecký úkon byl úspěšně zvládnut.',
+  example:failing?'GM inspirace: kůň mohl vybočit nebo ztratit rytmus; případný pád by vyžadoval samostatný skutečný následek.':''};
+ if(skill.includes('animalcraft'))return {actual:failing?'Práce se zvířetem skončila neúspěchem. Bez doloženého šestiměsíčního výcviku se nepřičítají další měsíce.':'Pokus o ovládnutí či práci se zvířetem uspěl.',
+  example:failing?'GM inspirace: zvíře mohlo odmítnout povel, znejistět při vedení nebo vyžadovat další uklidnění.':''};
+ if(skill.includes('tracking')||skill.includes('stopov'))return {actual:failing?'Stopu se v tomto pokusu nepodařilo spolehlivě sledovat.':'Pokus o sledování stopy uspěl; pokračování vyplývá z doložené hodnoty SV.',
+  example:failing?'GM inspirace: otisky se mohly ztratit na tvrdé zemi, rozcházet se nebo se překrývat s jinými.':''};
+ if(skill.includes('awareness'))return {actual:failing?'V tomto pokusu se nepodařilo včas rozpoznat sledovaný podnět.':'Postava uspěla při sledování okolí; druh podnětu určuje daná situace.',
+  example:failing?'GM inspirace: zvuk za stromy mohl zaniknout v šumu okolí, aniž by tím vzniklo setkání.':''};
+ if(skill.includes('agility')||skill.includes('climbing'))return {actual:failing?'Pokus o pohybové zvládnutí situace selhal. Poranění nastává jen tehdy, když jej potvrdila navazující sekvence.':'Pohybový úkon byl úspěšný.',
+  example:failing?'GM inspirace: podklouznutí, špatný odraz nebo ztráta rovnováhy – nikoli automatická rána.':''};
+ if(!generic&&old&&!/Žádný zvláštní následek/.test(old))return {actual:old,example:''};
+ const label=txt(test?.skill)||'Dovednost';
+ return {actual:failing?`${label}: pokus ${level==='CF'?'kriticky ':''}selhal. Další účinek tohoto konkrétního úkonu není doložen.`:`${label}: úkon uspěl. Samotný hod nepotvrzuje další zdroj ani zranění.`,
+  example:failing?'GM inspirace: činnost mohla vyžadovat změnu přístupu nebo opakování, pokud to dovoluje pravidlo daného úkonu.':''};
 }
 export function personalTestHelp(which,test){
  const tn=Number(test?.tn),eml=Number(test?.eml);
