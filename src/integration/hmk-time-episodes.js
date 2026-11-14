@@ -255,22 +255,51 @@ export function lastEquipmentSlowCarry(journal=[],campaignId,minute=Infinity,mem
  * Complication remains a genuine travel obstruction. Reconstruct its independent
  * remaining delay from immutable travel receipts, including pre-v93.695 saves.
  * Historical receipts themselves keep their original verification rules. */
-export function independentTravelDelayCarry(journal=[],campaignId,minute=Infinity,memberIds=null){
+export function independentTravelDelayCarry(journal=[],campaignId,minute=Infinity,memberIds=null,includeForaging=false){
  const party=travelPartySet93763(memberIds);
  journal=partyHistoryAfterRelease93766(journal,campaignId,minute,party);
  const episodes=journal.filter(j=>j.calendarCampaignId===campaignId&&
-  j.calendarTimeEpisode?.kind==='travel'&&j.calendarTimeEpisode.startMinute<minute&&
+  (j.calendarTimeEpisode?.kind==='travel'||includeForaging&&j.calendarTimeEpisode?.kind==='forage')&&j.calendarTimeEpisode.startMinute<minute&&
   travelPartyOverlaps93763(j.calendarTimeEpisode,party))
   .map(j=>j.calendarTimeEpisode).sort((a,b)=>a.startMinute-b.startMinute);
  let remaining=0;
  for(const e of episodes){
-  remaining=Math.max(0,remaining-e.minutes);
+  if(e.kind==='travel')remaining=Math.max(0,remaining-e.minutes);
+  // Only new receipts opt into carrying the separately confirmed Foraging
+  // Complication. Archived v93.695/v93.863 travel receipts retain their original
+  // replay, and no event or dice result is rewritten.
+  if(includeForaging&&e.kind==='forage'&&
+     e.foragingTimePolicy93869==='complication-worked-minutes-v93.875'&&
+     ['long-delay','irreparable'].includes(e.foragingComplication93875?.result)){
+   remaining+=e.foragingComplication93875.nextWatchMinutes;
+  }
   const complication=e.hazardDetails?.find(h=>h.hazard==='complication'&&
    h.automationVersion==='v93.681'&&['long-delay','irreparable'].includes(h.result));
   if(complication&&Number.isSafeInteger(e.travelDelay?.future)&&e.travelDelay.future>0)remaining+=e.travelDelay.future;
  }
  return remaining;
 }
+
+/** Current-v93.876 next-watch Slow for a *separately confirmed* stationary
+ * Foraging Complication S. F/CF minutes are reconstructed independently above.
+ * The oldest travel Slow routine stays unchanged for immutable old receipts.
+ */
+export function foragingShortNextWatch93876(journal=[],campaignId,minute=Infinity,memberIds=null){
+ const party=travelPartySet93763(memberIds);
+ const prior=partyHistoryAfterRelease93766(journal,campaignId,minute,party);
+ const travels=prior.filter(j=>j.calendarCampaignId===campaignId&&
+  j.calendarTimeEpisode?.kind==='travel'&&j.calendarTimeEpisode.startMinute<minute&&
+  travelPartyOverlaps93763(j.calendarTimeEpisode,party));
+ const lastTravel=travels.reduce((v,j)=>Math.max(v,j.calendarTimeEpisode.startMinute),-1);
+ return prior.filter(j=>j.calendarCampaignId===campaignId&&
+  j.calendarTimeEpisode?.kind==='forage'&&j.calendarTimeEpisode.startMinute<minute&&
+  j.calendarTimeEpisode.startMinute>lastTravel&&
+  travelPartyOverlaps93763(j.calendarTimeEpisode,party)&&
+  j.calendarTimeEpisode.foragingTimePolicy93869==='complication-worked-minutes-v93.875'&&
+  j.calendarTimeEpisode.foragingComplication93875?.nextWatchSlow===1)
+  .reduce((sum,j)=>sum+j.calendarTimeEpisode.minutes,0);
+}
+
 /** Fractional metre accounting follows the last journey, even across rest. */
 export function lastTimeEpisodeDistanceFraction(journal=[],campaignId,minute=Infinity,memberIds=null){
  const party=travelPartySet93763(memberIds);
@@ -880,7 +909,7 @@ export function validateTimeEpisodes(journal=[]){
       'Accident: skutečná minuta a zdravotní předání musí zachovat celé okno a původní hod.');
      if(e.kind==='travel')must(e.movementMinutes===incident.movementMinutes&&
       e.travelDelay?.current===incident.idleMinutes&&
-      e.travelDelay?.method==='gm-incident-fixed-window-v93.863',
+      ['gm-incident-fixed-window-v93.863','gm-incident-foraging-v93.876'].includes(e.travelDelay?.method),
       'Accident: metry a únava musí používat jen skutečné minuty pohybu, nikoli změnit Kalendář.');
      continue;
     }
@@ -1232,10 +1261,11 @@ export function validateTimeEpisodes(journal=[]){
   if(e.travelDelay!==undefined){
    must(e.kind==='travel','Zdržení lze přenášet jen mezi cestovními epizodami.');
    const d=e.travelDelay;
-   const independent=['gm-complication-only-v93.695','gm-incident-fixed-window-v93.863'].includes(d.method);
+   const foragingVersion=['gm-complication-foraging-v93.876','gm-incident-foraging-v93.876'].includes(d.method);
+   const independent=foragingVersion||['gm-complication-only-v93.695','gm-incident-fixed-window-v93.863'].includes(d.method);
    const expected=episodeMinuteDelay({minutes:e.minutes,
     incoming:d.method==='gm-current-episode-only-v2'?0:independent?
-     independentTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute,travelScope):
+     independentTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute,travelScope,foragingVersion):
      lastEpisodeTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute),
     current:d.current,future:d.future,persistCarry:d.method!=='gm-current-episode-only-v2'});
    if(independent)expected.method=d.method;
@@ -1257,14 +1287,15 @@ export function validateTimeEpisodes(journal=[]){
    const outcome=hazard?.result;
    const currentComplication=hazard?.hazard==='complication'&&hazard.automationVersion==='v93.681';
    const mandatoryNext=(hazard?.hazard==='equipment'||currentComplication)&&['long-delay','irreparable'].includes(outcome);
-   const verifiedIncident=d.method==='gm-incident-fixed-window-v93.863'&&
+   const verifiedIncident=['gm-incident-fixed-window-v93.863','gm-incident-foraging-v93.876'].includes(d.method)&&
     e.hazardDetails?.some(h=>h.hazard==='accident'&&h.automationVersion==='v93.863-fixed-window-incident'&&
      Number.isSafeInteger(h.hazardAtMinute)&&d.current===e.minutes-h.hazardAtMinute);
    if(d.method!=='gm-current-episode-only-v2')must(d.future===((independent?(currentComplication&&['long-delay','irreparable'].includes(outcome)):mandatoryNext)?e.minutes:0)&&
     (d.current===0||!!hazard||verifiedIncident),
     'Zdržení v další hlídce nemá doložený Equipment/Complication Hazard ani potvrzenou minutu nehody.');
    if(e.equipmentSlowCarryOut!==undefined){
-    const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute,travelScope);
+    const priorSlow=lastEquipmentSlowCarry(prior,j.calendarCampaignId,e.startMinute,travelScope)+
+     (foragingVersion?foragingShortNextWatch93876(prior,j.calendarCampaignId,e.startMinute,travelScope):0);
     const repairS=e.hazardDetails?.find(h=>h.hazard==='equipment'&&h.result==='short-delay');
     const newSlow=repairS?.equipmentGMPolicy==='gm-controlled-v93.845'?0:
       repairS?.equipmentMinutePolicy===EQUIPMENT_TIME_POLICY_93844?240:
@@ -1274,7 +1305,8 @@ export function validateTimeEpisodes(journal=[]){
     // readable, but never issue (or accept as new) that calculation again.
     const movingCarry=Math.max(0,priorSlow-e.movementMinutes)+newSlow;
     const legacyCarry=Math.max(0,priorSlow-e.minutes)+newSlow;
-    const verified=e.equipmentSlowCarryRule==='moving-minutes-v93.666';
+    const verified=e.equipmentSlowCarryRule==='moving-minutes-v93.666'||
+     foragingVersion&&e.equipmentSlowCarryRule==='moving-minutes-v93.876-foraging';
     must(e.equipmentSlowCarryRule===undefined||verified,
      'Neznámá verze výpočtu Equipment Slow.');
     must(e.equipmentSlowCarryIn===priorSlow&&

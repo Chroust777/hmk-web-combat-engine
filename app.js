@@ -220,7 +220,7 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry} from './src/integration/hmk-time-episodes.js';
+import {EPISODE_FORMAT,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
@@ -361,7 +361,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.875';
+const APP_VERSION='93.876';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -24164,7 +24164,7 @@ function episodeDieCount93849(form,name){
   if(!Number.isSafeInteger(elapsed)||elapsed<1||elapsed>10080)return 0;
   const v=episodeFormSnapshotCountOnly93849(form);
   const carried=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
-   v.length?v:null);
+   v.length?v:null,true);
   const stop=episodeConfirmedMovementStop93868(form,elapsed);
   const moving=actualGroupMovement93868({minutes:elapsed,incomingDelay:carried,atMinute:stop});
   return moving===0?0:form.elements.namedItem('doubleTime')?.checked?Math.ceil(moving/60):1;
@@ -24954,7 +24954,7 @@ function episodeOrientationReuseCheck(form,clock,sky){
   const weather=episodeCurrentWeather(form,clock,{mandatory:false});
   if(!weather.weather)return {allowed:false,reason:'Není dosud doloženo aktuální počasí.'};
   const previous=lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,
-   v.memberIds?.length?v.memberIds:null);
+   v.memberIds?.length?v.memberIds:null,true);
   if(!previous?.calendarTimeEpisode?.orientation)return {allowed:false,reason:'Předchozí cestovní epizoda nemá doložený Orienteering.'};
   if(previous.calendarTimeEpisode.endMinute!==clock.minute)return {allowed:false,reason:'Předchozí epizoda neskončila přesně v aktuální minutě.'};
   const period=sky?.period||v.lightPeriod;
@@ -25278,8 +25278,9 @@ function episodePreviewFromForm(form,clock){
  }
  const wearied=travelHealth.some(p=>p.fatigue>=20)||animalHealth.some(a=>a.fatigue>=20);
  const injured=travelHealth.some(p=>p.injured)||animalHealth.some(a=>a.injured);
- const equipmentSlowIn=kind==='travel'?lastEquipmentSlowCarry(data.journal,campaignKey(clock),clock.minute,members):0;
- const equipmentDelayIn=kind==='travel'?independentTravelDelayCarry(data.journal,campaignKey(clock),clock.minute,members):0;
+ const equipmentSlowIn=kind==='travel'?lastEquipmentSlowCarry(data.journal,campaignKey(clock),clock.minute,members)+
+  foragingShortNextWatch93876(data.journal,campaignKey(clock),clock.minute,members):0;
+ const equipmentDelayIn=kind==='travel'?independentTravelDelayCarry(data.journal,campaignKey(clock),clock.minute,members,true):0;
  // Dunes Slow is a separate, documented choice. It must be included once in
  // the movement count, but NOT again in equipmentBaseSlow: the append-only
  // episode validator deliberately adds it from its own witnessed flag.
@@ -25583,7 +25584,7 @@ function episodePreviewFromForm(form,clock){
     relevant.automationVersion='v93.681';
    }
    const delay={...episodeMinuteDelay({minutes,incoming,current:incident||relevant?now:0,future,persistCarry:true}),
-    method:incident?'gm-incident-fixed-window-v93.863':'gm-complication-only-v93.695'};
+    method:incident?'gm-incident-foraging-v93.876':'gm-complication-foraging-v93.876'};
    result.travelPartyScope='v93.763'; // New receipts isolate travel consequences by actual participants.
    result.equipmentBaseSlow=equipmentBaseSlow;
    result.equipmentSlowCarryIn=equipmentSlowIn;
@@ -25608,7 +25609,7 @@ function episodePreviewFromForm(form,clock){
    // an Equipment S result is recorded as advice, not scheduled automatically.
    result.equipmentSlowCarryOut=Math.max(0,equipmentSlowIn-result.movementMinutes)+
     (relevant?.hazard==='complication'&&outcome==='short-delay'?minutes:0);
-   result.equipmentSlowCarryRule='moving-minutes-v93.666';
+   result.equipmentSlowCarryRule='moving-minutes-v93.876-foraging';
    result.medicalTravelStop=confirmedStop?{minute:Math.min(...previewIncap.map(x=>x.minute)),
     movementMinutes:result.movementMinutes}:null;
    if(mountedPassenger93816?.handlerPosition==='leading'||mixedFootMemberIds93858.length){
@@ -28470,7 +28471,7 @@ document.addEventListener('click',e=>{
  try{const hourly=b.dataset.episodeDie.startsWith('end_')&&form.elements.namedItem('doubleTime')?.checked;
   const elapsed=Number(form.elements.namedItem('minutes')?.value||0),
    incoming=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
-    (episodeFormSnapshot(form).memberIds||[]).length?episodeFormSnapshot(form).memberIds:null),
+    (episodeFormSnapshot(form).memberIds||[]).length?episodeFormSnapshot(form).memberIds:null,true),
    movement=actualGroupMovement93868({minutes:elapsed,incomingDelay:incoming,atMinute:episodeConfirmedMovementStop93868(form,elapsed)});
   const count=hourly?Math.ceil(movement/60):(movement===0?0:1);
   if(!Number.isSafeInteger(count)||count<0||count>168||!Number.isSafeInteger(elapsed)||elapsed<1)throw Error('Nejprve zadejte platnou délku cesty.');
