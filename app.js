@@ -361,7 +361,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.871';
+const APP_VERSION='93.872';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2434,8 +2434,8 @@ function episodeLearnedSkill93867(actorId,skill){
  return !!c&&availableMasteries(c).some(m=>m.name===skill&&Number(m.ml)>0);
 }
 function episodeSkillAuthorized(actorId,skill){
- if(r?.field==='droverProofId'&&!episodeLearnedSkill93867(actorId,skill))return false;
  const r=episodePendingSkillRequest;
+ if(r?.field==='droverProofId'&&!episodeLearnedSkill93867(actorId,skill))return false;
  if(!(r?.status==='waiting'&&r.id===episodeActiveSkillRequestId&&
   r.episodeEpoch===episodeDraftEpoch&&r.campaignId===campaignKey(data.campaignClock)&&
   r.minute===data.campaignClock?.minute&&r.actorId===actorId&&r.skill===skill&&
