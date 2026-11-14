@@ -361,7 +361,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.872';
+const APP_VERSION='93.873';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2891,14 +2891,22 @@ function episodeAnimalReservations93848(){
 function episodeEnforceAnimalReservations93848(form){
  if(!form||!sharedTimeWindowDraft||episodeEvaluationRequested)return;
  const used=episodeAnimalReservations93848();
+ // v93.873: A new draft may inherit an animal from the LAST completed
+ // journey even after a separately confirmed injury made it unfit. Do not
+ // present that stale preselection as GM consent to move an immobile animal.
+ // Only the NEW DRAFT is changed; the original episode and animal health stay.
+ const unfit=new Set([...form.querySelectorAll('.hc-episode-animal-unfit [name="stableAnimalIds"]')]
+  .map(checkbox=>checkbox.value));
  let changed=false;
  for(const checkbox of form.querySelectorAll('[name="stableAnimalIds"], [name="animalIds"]')){
-  if(!used.has(checkbox.value))continue;
+  const reserved=used.has(checkbox.value),cannotMove=unfit.has(checkbox.value);
+  if(!reserved&&!cannotMove)continue;
   if(checkbox.checked){checkbox.checked=false;changed=true;}
   checkbox.disabled=true;
-  checkbox.title='Toto zvíře je již přiděleno jiné skupině během překrývajících se minut.';
+  checkbox.title=cannotMove?'Aktuální zdravotní stav zvířete neumožňuje jeho samostatný přesun.':
+   'Toto zvíře je již přiděleno jiné skupině během překrývajících se minut.';
   const card=checkbox.closest('[data-episode-stable-animal],.hc-trek-animal-choice');
-  if(card){card.classList.add('hmk-animal-reserved');
+  if(card&&reserved){card.classList.add('hmk-animal-reserved');
    if(!card.querySelector('[data-episode-reservation-note]')){
     const note=document.createElement('p');note.dataset.episodeReservationNote='';note.className='hc-hint';
     note.textContent='Přiděleno jiné skupině v tomto čase · nelze znovu zaškrtnout.';
@@ -2907,7 +2915,7 @@ function episodeEnforceAnimalReservations93848(form){
   }
  }
  if(changed){timeEpisodeDraft={...timeEpisodeDraft,
-  stableAnimalIds:(timeEpisodeDraft.stableAnimalIds||[]).filter(id=>!used.has(id)),
+  stableAnimalIds:(timeEpisodeDraft.stableAnimalIds||[]).filter(id=>!used.has(id)&&!unfit.has(id)),
   animalIds:(timeEpisodeDraft.animalIds||[]).filter(id=>!used.has(id))};}
 }
 function episodeUnresolvedGeneralStops93869(clock){
@@ -3122,7 +3130,7 @@ function timeEpisodePageHTML(clock,participants){
  }catch(err){health={error:err.message}}
  const healthStatus=!health?'Zdravotní profil zatím chybí – vyžaduje bezpečné doplnění staršího vlastnictví':health.error?'CHYBNÝ ZDRAVOTNÍ STAV: '+health.error:health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40?'NEMŮŽE SE SAMO PŘESOUVAT':health.injured?'Zraněné · režim Slow':health.fatigue>=20?'Unavené · režim Slow':'Zdravotní stav bez omezení pohybu';
  const blocked=!!health&&(!!health.error||health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40);
- return `<div class="hc-episode-stable-animal${blocked?' hc-episode-animal-unfit':''}" data-episode-stable-animal="${esc(a.id)}"><label class="hc-check"><input name="stableAnimalIds" type="checkbox" value="${esc(a.id)}" ${otherGroupAnimals93848.has(a.id)?'disabled title="V jiném souběžném intervalu již přiřazeno jiné skupině"':''}><span><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ${esc(a.spec.role||'Zvíře ze Stáje')}${!isRidingAnimal93837(a)?' · NENÍ JÍZDNÍ':''} · ENC ${Number.isSafeInteger(b.adjustedENC)?b.adjustedENC:'nedoloženo'}${b.travelRide93823?.occupants?.length?' · poslední doložená jízda':''}${b.cargoOverflow?' · PŘETÍŽENO':''}${otherGroupAnimals93848.has(a.id)?' · OBSAZENO JINOU SKUPINOU':''}</span></label><p class="hc-hint hc-episode-animal-health">Zdravotní stav: ${esc(healthStatus)}</p>${profile?`<div class="hc-episode-animal-actions"><button type="button" class="secondary hc-small" data-trek-leave-animal="${esc(a.id)}">Opustit zvíře (včetně ponechaného nákladu)</button><details class="hc-trek-animal-injuries"><summary>Aktuální zranění (HMK 355)</summary>${hmkAnimalWoundAnatomyHTML(profile)}</details></div>`:''}</div>`}).join('')}</div></fieldset>`:''}
+ return `<div class="hc-episode-stable-animal${blocked?' hc-episode-animal-unfit':''}" data-episode-stable-animal="${esc(a.id)}"><label class="hc-check"><input name="stableAnimalIds" type="checkbox" value="${esc(a.id)}" ${blocked?'disabled title="Zdravotní stav zvířete neumožňuje samostatný přesun; nejprve vyhodnoťte zdravotní stav"':otherGroupAnimals93848.has(a.id)?'disabled title="V jiném souběžném intervalu již přiřazeno jiné skupině"':''}><span><strong>${esc(a.name)}</strong> · ${esc(a.spec.name)} · ${esc(a.spec.role||'Zvíře ze Stáje')}${!isRidingAnimal93837(a)?' · NENÍ JÍZDNÍ':''} · ENC ${Number.isSafeInteger(b.adjustedENC)?b.adjustedENC:'nedoloženo'}${b.travelRide93823?.occupants?.length?' · poslední doložená jízda':''}${b.cargoOverflow?' · PŘETÍŽENO':''}${otherGroupAnimals93848.has(a.id)?' · OBSAZENO JINOU SKUPINOU':''}</span></label><p class="hc-hint hc-episode-animal-health">Zdravotní stav: ${esc(healthStatus)}</p>${profile?`<div class="hc-episode-animal-actions"><button type="button" class="secondary hc-small" data-trek-leave-animal="${esc(a.id)}">Opustit zvíře (včetně ponechaného nákladu)</button><details class="hc-trek-animal-injuries"><summary>Aktuální zranění (HMK 355)</summary>${hmkAnimalWoundAnatomyHTML(profile)}</details></div>`:''}</div>`}).join('')}</div></fieldset>`:''}
  ${animalRoster.some(a=>!stableTravelRoster.some(s=>s.id===a.id))?`<fieldset data-episode-unmatched-animal><legend>Starší zvířecí zdravotní profily bez záznamu Stáje</legend><p class="hc-hint">Tyto historické profily nejsou v seznamu ověřených zvířat Stáje. Pro novou jízdu či tažení nelze jejich plemeno, postroje nebo náklad odhadovat. Historické údaje zůstávají zachovány.</p><div class="hc-episode-members">${animalRoster.filter(a=>!stableTravelRoster.some(s=>s.id===a.id)).map(a=>{let health;
  try{health=trekRegisteredAnimalHealth(a)}catch(err){health={error:err.message}}
  const healthStatus=health.error?' · CHYBNÝ STAV: '+health.error:health.immobile||health.shock!=='NONE'||health.comaActive||health.fatigue>=40?' · NEMŮŽE SAMO POKRAČOVAT':health.injured?' · zraněné · Slow':health.fatigue>=20?' · unavené · Slow':'';
@@ -26228,6 +26236,28 @@ function episodeDirectionConfirmationTask93850(form){
  for(const b of document.querySelectorAll('[data-episode-finalize],[data-episode-window-stage]'))b.disabled=true;
  return true;
 }
+// v93.873: The accident minute is a two-stage GM input: entering the
+// value is NOT its confirmation. Do not let the later END dice hide this
+// mandatory explicit click; otherwise the snapshot rolls the minute back
+// to the last accepted state (0) and incorrectly fails the injury sequence.
+function episodeAccidentMinuteConfirmationTask93873(form){
+ if(!episodeEvaluationRequested||!['travel','forage'].includes(form.elements.namedItem('kind')?.value)||
+    !/^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''))||
+    !episodeHazardChoicesRequired93840(form)||!episodeHazardPending93840(form))return false;
+ const minutes=Number(form.elements.namedItem('minutes')?.value||0);
+ const raw=String(form.elements.namedItem('hazardAtMinute')?.value||'').trim();
+ if(!/^[1-9]\d*$/.test(raw)||!Number.isSafeInteger(Number(raw))||Number(raw)>minutes)return false;
+ episodeHazardSelectionUI93840(form,true);
+ const confirm=form.querySelector('[data-hazard-choices-confirm]');
+ if(!confirm||confirm.hidden||confirm.disabled)return false;
+ const checklist=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
+ if(checklist)checklist.innerHTML='<p class="hc-episode-task-lead">Aktuální povinný krok · výslovné potvrzení minuty nehody</p>'+ 
+  '<div class="hc-episode-task hc-episode-setup-task"><strong>Minuta nehody: '+esc(raw)+' z '+esc(String(minutes))+'</strong>'+ 
+  '<p>Číslo je zadáno, ale GM je dosud nepotvrdil. Potvrďte je samostatným tlačítkem; až potom budou přístupné navazující hody END a další následky.</p>'+ 
+  '<button type="button" class="secondary" data-episode-jump="hazardAtMinute" data-episode-hazard-confirm-next>Potvrdit minutu nehody</button></div>';
+ for(const b of document.querySelectorAll('[data-episode-finalize],[data-episode-window-stage]'))b.disabled=true;
+ return true;
+}
 function episodeUpdateAllocationGate93850(form){
  const prompt=form.querySelector('[data-episode-allocation-choice]');
  const select=form.elements.namedItem('orientationAllocation');
@@ -26349,7 +26379,10 @@ function updateEpisodeTaskFocus(form){
  // v93.863: An unconfirmed Accident minute must be the CURRENT focused
  // step.  Otherwise a later END/progress task can hide the entire hazard
  // fieldset, leaving a disabled completion button with no reachable remedy.
- const incidentPending=episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form)&&
+ const incidentMinuteText=String(form.elements.namedItem('hazardAtMinute')?.value||'').trim();
+ const incidentMinuteValid=/^[1-9]\d*$/.test(incidentMinuteText)&&
+  Number(incidentMinuteText)<=Number(form.elements.namedItem('minutes')?.value||0);
+ const incidentPending=!incidentMinuteValid&&episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form)&&
   ['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
   /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''));
  const field=incidentPending?'hazardAtMinute':task?.field||issue;
@@ -27907,6 +27940,7 @@ function updateEpisodePreview(form){
  episodeUpdateAllocationGate93850(form);
  updateSharedTimeWindowControls(form);
  episodeDirectionConfirmationTask93850(form);
+ episodeAccidentMinuteConfirmationTask93873(form);
  // Re-synchronise after orientation becomes known (even if later inputs are missing).
  // Clearing no-longer-applicable *draft* rolls must also clear the stale blocker.
  if(episodeSyncSurpriseAvailability(form)&&!form.dataset.episodeSurpriseResync){
