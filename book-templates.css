@@ -7995,3 +7995,104 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
  .content-sheet .journal-book--notes .folio-chapter-page--left{padding:10px 22px 25px 12px!important}
  .content-sheet .journal-book--notes .folio-chapter-page--right{padding:10px 12px 25px 22px!important}
 }
+
+/* v93.886 – Narrative personal travel chronicle. Preserve the two-folio book,
+   while putting verified rolls at the exact point they appear in the prose. */
+.content-sheet .journal-book--notes .hc-personal-episode > summary{
+ display:flex!important;align-items:flex-start!important;gap:9px 12px!important;
+ font:700 15.5px/1.52 Georgia,serif!important;color:#4b301e!important;
+ padding:12px 10px 13px!important;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__summary-text{
+ font:inherit!important;overflow-wrap:anywhere;letter-spacing:.05px;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__count{font-size:11.5px!important;white-space:nowrap}
+.content-sheet .journal-book--notes .hc-personal-episode__context{
+ gap:5px 10px!important;margin:0 0 10px!important;font:12px/1.5 Georgia,serif;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__roles{
+ display:block!important;max-width:100%;padding:9px 11px!important;
+ margin:7px 0 15px!important;background:rgba(231,210,171,.21)!important;
+ border:1px solid rgba(137,94,45,.25)!important;border-radius:5px;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__roles h4{
+ font:700 12.5px/1.45 Georgia,serif!important;margin:0 0 6px!important;
+ color:#54351f!important;border:0!important;padding:0!important;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__roles ul{
+ display:block!important;margin:0!important;padding:0 0 0 18px!important;
+ list-style:disc outside!important;font:12.5px/1.65 Georgia,serif!important;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__roles li{margin:2px 0!important;overflow-wrap:anywhere}
+.content-sheet .journal-book--notes .hc-personal-episode__story--integrated{
+ margin:0 0 8px!important;border:0!important;padding:0!important;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__story--integrated .hc-story-paragraph{
+ display:block;max-width:100%;font:14px/1.71 Georgia,serif!important;
+ margin:0 0 14px!important;color:#39281f!important;
+ hyphens:auto;overflow-wrap:break-word;
+}
+.content-sheet .journal-book--notes .hc-story-paragraph--intro:first-child::first-letter{
+ font-size:22px;font-weight:bold;color:#76502d;
+}
+.content-sheet .journal-book--notes .hc-story-paragraph--hazard{
+ border-left:3px solid #946739;padding:9px 0 9px 12px;
+ background:rgba(231,199,145,.16);
+}
+.content-sheet .journal-book--notes .hc-story-paragraph--direction{border-left:2px solid rgba(145,106,54,.35);padding-left:10px}
+.content-sheet .journal-book--notes .hc-story-possibility{
+ display:block;margin-top:5px;color:#755632;font:italic 12.5px/1.6 Georgia,serif!important;
+}
+.content-sheet .journal-book--notes .hc-story-receipt{
+ display:inline;box-decoration-break:clone;-webkit-box-decoration-break:clone;
+ padding:1px 3px;border-radius:3px;color:#4d301b;
+ background:rgba(202,167,105,.18);
+ font:12px/1.75 Georgia,serif!important;
+}
+.content-sheet .journal-book--notes .hc-story-receipt > :is(span,b,strong){
+ display:inline-block;white-space:nowrap;vertical-align:baseline;
+ font:inherit;line-height:1.45;margin:2px 3px 2px 0;
+}
+.content-sheet .journal-book--notes .hc-story-receipt b,
+.content-sheet .journal-book--notes .hc-story-receipt strong{font-weight:700!important}
+.content-sheet .journal-book--notes .hc-story-receipt__bracket{
+ font-weight:700!important;font-size:13px!important;margin:0!important;
+}
+.content-sheet .journal-book--notes .hc-story-receipt [data-hmk-help],
+.content-sheet .journal-book--notes .hc-story-wound[data-hmk-help]{
+ cursor:help;text-decoration:underline dotted rgba(116,78,41,.55);
+ text-decoration-thickness:1px;text-underline-offset:3px;
+}
+.content-sheet .journal-book--notes .hc-story-wound{
+ display:inline;box-decoration-break:clone;-webkit-box-decoration-break:clone;
+ background:rgba(196,121,64,.14);padding:2px 5px;
+ font:700 13px/1.65 Georgia,serif!important;border-radius:3px;
+}
+.content-sheet .journal-book--notes .hc-story-wound strong{
+ color:#713c21;font-weight:800;font-size:14px;
+}
+@media(max-width:760px){
+ .content-sheet .journal-book--notes .hc-personal-episode > summary{font-size:14.5px!important}
+ .content-sheet .journal-book--notes .hc-personal-episode__story--integrated .hc-story-paragraph{font-size:13.5px!important}
+ .content-sheet .journal-book--notes .hc-story-receipt{font-size:11.5px!important}
+}
+
+/* Chronicle heading: time / primary activity / location as a readable hierarchy. */
+.content-sheet .journal-book--notes .hc-personal-episode__summary-text{
+ display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__summary-time{
+ display:block;font:600 12.5px/1.45 Georgia,serif;color:#755330;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__summary-action{
+ display:block;font:700 17px/1.35 Georgia,serif;color:#51321d;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__summary-route{
+ display:block;font:13px/1.45 Georgia,serif;color:#67472b;
+}
+.content-sheet .journal-book--notes .hc-story-receipt__sep{
+ margin:0 3px 0 0!important;font-weight:400!important;color:#99734b;
+}
+@media(max-width:760px){
+ .content-sheet .journal-book--notes .hc-personal-episode__summary-action{font-size:15.5px}
+}

@@ -33,7 +33,7 @@ import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOppose
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
-import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp} from './src/integration/hmk-personal-logbook-93882.js';
+import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
 import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
@@ -363,7 +363,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.885';
+const APP_VERSION='93.886';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3342,48 +3342,59 @@ function timeEpisodePageHTML(clock,participants){
  ${old.length?`<details class="hc-episode-legacy"><summary>Předchozí rozběhnuté činnosti (${old.length}) · původní evidence</summary><p class="hc-hint">Staré činnosti zůstávají platné. Před novou epizodou je případně přerušte podle původního pravidlového postupu, aby se nepřekrývaly.</p>${old.map(r=>`<p>${esc(r.calendarActivityProof.name)} · ${esc(displayCampaignMinute(r.calendarActivityProof.startMinute))}–${esc(displayCampaignMinute(r.calendarActivityProof.endMinute))}</p>`).join('')}</details>`:''}
  </section>`;
 }
-/** Chronicle is a read-only projection; never write invented story events to the ledger. */
+/** A character reads the trip as a story, not as an audit table. Every inline
+ * receipt and injury comes from the authoritative, previously committed data. */
 function personalTimeEpisodeChronicleHTML(clock,personalId){
  const rows=episodeTimeline(data.journal,campaignKey(clock),personalId);
  const evidence=new Map(data.journal.map(j=>[j.id,j]));
  const name=id=>character(id)?.name||'Účastník';
- // Match injuries to the exact original episode skill IDs, not merely a date,
- // so simultaneous travel incidents cannot be falsely attributed to another actor.
  const healthEvents=data.characters.flatMap(c=>(c?.hmk?.healthState?.events||[]).filter(e=>e.type==='travel-accident-injury'));
+ const rollHTML=t=>{
+  if(!t)return '';
+  const tn=t.tn!==undefined&&t.tn!==null;
+  const target=tn?`<span${journalHelp('TN',personalTestHelp('TN',t))}>TN ${esc(t.tn)}</span>`:
+   t.eml!==null&&t.eml!==undefined?`<span${journalHelp('EML',personalTestHelp('EML',t))}>EML ${esc(t.eml)}</span>`:'';
+  const die=t.roll!==null&&t.roll!==undefined?`<span${journalHelp(t.die||'d100',personalTestHelp('DIE',t))}>${esc(t.die||'d100')} (${esc(t.roll)})</span>`:'<span>hod nedoložen</span>';
+  const translatedResult=({'lost-time':'ztráta času','misdirection':'chybná orientace','none':'bez hazardu','accident':'nehoda','equipment':'problém s výbavou','complication':'komplikace'})[t.result]||t.result||'výsledek neurčen';
+  const victory=t.level?`<strong${journalHelp('SL',personalTestHelp('SL',t))}>${esc(t.level)}</strong>`:
+   `<strong>${esc(translatedResult)}</strong>`;
+  const sv=Number.isFinite(t.sv)?`<span${journalHelp('SV',personalTestHelp('SV',t))}>SV ${esc(t.sv)}</span>`:'';
+  const starMatch=String(t.result||'').match(/\b(\d+)\s*★/);
+  const stars=starMatch?`<span${journalHelp('★',personalTestHelp('STARS',t))}>${esc(starMatch[1])} ★</span>`:'';
+  const opposition=t.other?`<span class="hc-story-receipt__opposed">protistrana EML ${esc(t.other.eml??'—')}, d100 (${esc(t.other.roll??'—')}), ${esc(t.other.level||'—')}</span>`:'';
+  const owner=t.actorId?`<span class="hc-story-receipt__actor">${esc(name(t.actorId))}</span>`:'';
+  const atoms=[owner,`<b>${esc(t.kind)} · ${esc(t.skill)}</b>`,target,die,victory,sv,stars,opposition].filter(Boolean);
+  return `<span class="hc-story-receipt" data-personal-test-id="${esc(t.id)}" role="group" aria-label="Doložený hod: ${esc(t.kind)} · ${esc(t.skill)}"><span class="hc-story-receipt__bracket">(</span>${atoms.join('<span class="hc-story-receipt__sep" aria-hidden="true"> · </span>')}<span class="hc-story-receipt__bracket">)</span></span>`;
+ };
+ const renderWounds=injuries=>injuries.map(w=>{
+  const aspect=({b:'tupý zásah',e:'sečný zásah',p:'bodný zásah'})[w.aspect]||w.aspect||'zásah neurčen';
+  return `<span class="hc-story-wound"${journalHelp(w.code,personalInjuryHelp(w))}><b>${esc(w.who)}</b> — <strong>${esc(w.code)}</strong> (${esc(w.site)}, ${esc(aspect)})</span>`;
+ }).join('; ');
+ const renderBeat=beat=>{
+  if(beat.text)return `<p class="hc-story-paragraph hc-story-paragraph--${esc(beat.kind)}">${esc(beat.text)}</p>`;
+  const roll=beat.test?` ${rollHTML(beat.test)}`:'';
+  const encounter=beat.encounter;
+  const encRoll=encounter?` <span class="hc-story-receipt" role="group" aria-label="Doložený Encounter hod"><span class="hc-story-receipt__bracket">(</span><b${journalHelp('Encounter','HMK str. 150: šance na setkání vychází z prostředí, světla a délky intervalu; v minutové variantě procento platí jen pro daný úsek.')}>Encounter</b><span${journalHelp('Šance','Procentní pravděpodobnost setkání pro tento interval, nikoli počet setkání ani automatický herní následek.')}>šance ${esc(encounter.chance||'nedoložena')}</span><span${journalHelp(encounter.die,personalTestHelp('DIE',{}))}>${esc(encounter.die)} (${encounter.roll===null?'—':esc(encounter.roll)})</span><span class="hc-story-receipt__bracket">)</span></span>`:'';
+  const injuries=beat.injuries?.length?` ${renderWounds(beat.injuries)}.`:'';
+  const suggestion=beat.suggestion?` <em class="hc-story-possibility">${esc(beat.suggestion)}</em>`:'';
+  return `<p class="hc-story-paragraph hc-story-paragraph--${esc(beat.kind)}">${beat.before?esc(beat.before):''}${roll}${encRoll}${beat.after?` ${esc(beat.after)}`:''}${injuries}${suggestion}</p>`;
+ };
  const results=rows.slice(-120).reverse().map(entry=>{
-  const p=entry.calendarTimeEpisode;
-  const activity=personalEpisodeActivities(p);
+  const p=entry.calendarTimeEpisode, activity=personalEpisodeActivities(p);
+  const start=displayCampaignMinute(p.startMinute),end=displayCampaignMinute(p.endMinute);
+  const day=/^(Den \d+ · )/.exec(start);
+  const endShort=day&&end.startsWith(day[1])?end.slice(day[1].length):end;
   const distance=Number.isFinite(p.distanceMeters)&&p.distanceMeters>0?` · ${(p.distanceMeters/1000).toLocaleString('cs-CZ',{maximumFractionDigits:2})} km`:'';
-  const tests=personalEpisodeTests(p,evidence);
-  const summary=`${displayCampaignMinute(p.startMinute)}–${displayCampaignMinute(p.endMinute)} · ${activity}${p.area?' · '+p.area:''}${distance}`;
-  const testRows=tests.map(t=>{
-   const owner=t.actorId?`<span class="hc-personal-test__actor">${esc(name(t.actorId))}</span>`:'';
-   const tn=t.tn!==undefined&&t.tn!==null;
-   const target=tn?`<span${journalHelp('TN',personalTestHelp('TN',t))}>TN ${esc(t.tn)}</span>`:t.eml!==null?`<span${journalHelp('EML',personalTestHelp('EML',t))}>EML ${esc(t.eml)}</span>`:'';
-   const die=t.roll!==null?`${t.die||'d100'} (${esc(t.roll)})`:'hod nedoložen';
-   const other=t.other?`<span class="hc-personal-test__other">Protistrana: EML ${t.other.eml??'—'}, d100 (${t.other.roll??'—'}), ${esc(t.other.level||'—')}</span>`:'';
-   const consequence=personalTestConsequence(t,p);
-   const stars=Number.isFinite(t.sv)?` <span class="hc-personal-test__stat"${journalHelp('SV',personalTestHelp('SV',t))}>SV ${t.sv}</span>`:'';
-   const starCount=/([0-9]+) ★/.exec(t.result||'')?.[1];
-   const starText=starCount?` <span class="hc-personal-test__stat"${journalHelp('★',personalTestHelp('STARS',t))}>${starCount} ★</span>`:'';
-   const level=t.level?`<strong${journalHelp('SL',personalTestHelp('SL',t))}>${esc(t.level)}${stars}${starText}</strong>`:
-    `<strong>${esc(t.result||'bez určeného výsledku')}</strong>`;
-   return `<li class="hc-personal-test" data-personal-test-id="${esc(t.id)}"><div class="hc-personal-test__heading">${owner}<b>${esc(t.kind)} · ${esc(t.skill)}</b></div><div class="hc-personal-test__figures">${target}<span${journalHelp(t.die||'d100',personalTestHelp('DIE',t))}>${die}</span>${level}</div>${other}<p class="hc-personal-test__effect">${esc(consequence.actual)}</p>${consequence.example?`<p class="hc-personal-test__example">${esc(consequence.example)}</p>`:''}</li>`;
-  }).join('');
-  const recovery=(p.recovery||[]).filter(x=>x.id===personalId).map(a=>`${p.kind==='winded'?'Windedness':'Weariness'} ${a.prior} → ${a.after}`).join(' · ');
-  const roles=personalEpisodeRoles(p,name);
-  const outcomes=[p.navigationRecovered?'Potvrzen návrat na původní trasu.':'',recovery].filter(Boolean);
-  const encounter=personalEpisodeEncounter(p);
-  const encounterHTML=encounter?`<p class="hc-personal-episode__encounter"><b${journalHelp('Encounter','HMK str. 150: šance na setkání vychází z podmínek a délky skutečné epizody. V minutové variantě je procento šancí pro právě tento interval; pozitivní výsledek není automaticky nepřátelský.')}>Setkání:</b> ${encounter.chance?`šance ${esc(encounter.chance)} · `:''}${esc(encounter.die)} (${encounter.roll===null?'nedoložen':encounter.roll}) · ${esc(encounter.detail)}</p>`:'';
+  const locality=p.terrain?personalTerrainLabel(p.terrain):p.area||'';
+  const timeRange=`${start}–${endShort}`;
+  const routePart=`${locality||''}${distance}`;
+  const tests=personalEpisodeTests(p,evidence),roles=personalEpisodeRoles(p,name);
   const hazard=personalEpisodeHazard(p,displayCampaignMinute,{healthEvents,name});
-  const hazardHTML=hazard?`<section class="hc-personal-episode__hazard"><h4>${esc(hazard.actual)}</h4><p class="hc-personal-episode__hazard-time">${esc(hazard.when)}</p>${hazard.outcome?`<p>${esc(hazard.outcome)}</p>`:''}${hazard.injuries?.length?`<p class="hc-personal-episode__verified"><strong>Potvrzené zranění:</strong> ${esc(hazard.injuries.join(' · '))}</p>`:''}${hazard.example?`<p class="hc-personal-test__example">${esc(hazard.example)}</p>`:''}</section>`:'';
-  const context=[
-    personalEpisodeWeather(p),
-    p.terrain&&p.area&&p.area.toLowerCase()!==personalTerrainLabel(p.terrain).toLowerCase()?`${p.area} · ${personalTerrainLabel(p.terrain)}`:(p.area||personalTerrainLabel(p.terrain)),
-    Number.isInteger(p.minutes)?`${p.minutes} minut`:''
-  ].filter(Boolean);
+  const encounter=personalEpisodeEncounter(p);
+  const beats=personalChronicleBeats(entry,p,tests,{hazard,encounter,name});
+  const context=[personalEpisodeWeather(p),p.area&&p.area.toLowerCase()!==locality.toLowerCase()?`Oblast: ${p.area}`:'',Number.isInteger(p.minutes)?`${p.minutes} minut`:''].filter(Boolean);
   const narrative=String(p.narrative||'').trim();
-  return `<details class="hc-episode-history hc-personal-episode" data-personal-episode-id="${esc(entry.id)}"><summary><span class="hc-personal-episode__summary-text">${esc(summary)}</span><span class="hc-personal-episode__count">${tests.length} ${tests.length===1?'hod':'hodů'}</span></summary><div class="hc-personal-episode__content"><div class="hc-personal-episode__context">${context.map(x=>`<span>${esc(x)}</span>`).join('')}</div><div class="hc-personal-episode__story">${personalEpisodeFlavor(entry,p).split(/\n\n/).filter(Boolean).map(par=>`<p>${esc(par)}</p>`).join('')}</div>${narrative?`<p class="hc-personal-episode__gm-note"><b>GM záznam:</b> ${esc(narrative)}</p>`:''}${roles.length?`<details class="hc-personal-episode__roles"><summary>Účastníci, zvířata a role (${roles.length})</summary><ul>${roles.map(role=>`<li>${esc(role)}</li>`).join('')}</ul></details>`:''}${encounterHTML}${hazardHTML}${tests.length?`<section class="hc-personal-episode__tests"><h4>Doložené hody a výsledky</h4><ul class="hc-personal-tests">${testRows}</ul></section>`:'<p class="hc-personal-episode__empty">V tomto úseku se žádný samostatný hod nepotvrdil.</p>'}${outcomes.length?`<p class="hc-personal-episode__outcome"><b>Stav na konci úseku:</b> ${esc(outcomes.join(' '))}</p>`:''}</div></details>`;
+  return `<details class="hc-episode-history hc-personal-episode" data-personal-episode-id="${esc(entry.id)}"><summary><span class="hc-personal-episode__summary-text"><span class="hc-personal-episode__summary-time">${esc(timeRange)}</span><span class="hc-personal-episode__summary-action">${esc(activity)}</span>${routePart?`<span class="hc-personal-episode__summary-route">${esc(routePart)}</span>`:''}</span><span class="hc-personal-episode__count">${tests.length} ${tests.length===1?'hod':'hodů'}</span></summary><div class="hc-personal-episode__content"><div class="hc-personal-episode__context">${context.map(x=>`<span>${esc(x)}</span>`).join('')}</div>${roles.length?`<section class="hc-personal-episode__roles" aria-label="Účastníci, zvířata a role"><h4>Účastníci, zvířata a role</h4><ul>${roles.map(role=>`<li>${esc(role)}</li>`).join('')}</ul></section>`:''}<div class="hc-personal-episode__story hc-personal-episode__story--integrated">${beats.map(renderBeat).join('')}</div>${narrative?`<p class="hc-personal-episode__gm-note"><b>Poznámka GM:</b> ${esc(narrative)}</p>`:''}</div></details>`;
  }).join('');
  return `<details class="hc-calendar hc-episode-chronicle hc-episode-chronicle--personal" data-personal-chronicle><summary>Osobní zápis cestování <span>(${rows.length})</span></summary><div class="hc-episode-chronicle__body">${results||'<p>Zatím neexistuje dokončená cestovní epizoda.</p>'}</div></details>`;
 }
