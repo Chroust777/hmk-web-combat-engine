@@ -362,7 +362,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.879';
+const APP_VERSION='93.880';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11600,7 +11600,7 @@ function hskSkillPhysicalImpactForm(entry){
  <p class="tiny" data-hsk-agility-ml aria-live="polite">Vyberte účastníka. Vedle každého jména je základní Agility ML; před potvrzením se ověří i aktuální EML.</p>
  <button type="button" class="hc-small hc-provision-generate" data-hsk-agility-confirm ${accidentPoolError?'disabled':''}>✓ Potvrdit Agility d100 a výsledek</button>
  <p class="tiny" data-hsk-agility-confirm-status role="status" aria-live="polite">Nepotvrzené Agility. Impact, ZD, LD a další hody zatím nelze zadat.</p>
- <p class="tiny">Účastníka lze určit skutečným náhodným losem nebo doložit fyzický výsledek. Potvrzení Agility samo neukládá zranění ani neposouvá Kalendář. Další hody se zpřístupní jen při potvrzeném F/CF.</p></div>
+ <p class="tiny">Účastníka lze určit skutečným náhodným losem nebo doložit fyzický výsledek. Po stisku Potvrdit Agility rozhodněte přímo zde: <b>Uložit bez Fate</b> nebo <b>Použít Fate</b>. Teprve potom se odemkne Vyhodnotit Hazard. Potvrzení samo neukládá zranění ani neposouvá Kalendář. Při F/CF jsou navíc povinné skutečné Impact, ZD a LD hody.</p></div>
  <div data-hsk-hazard-gm hidden class="hsk-hazard-step"><label>GM: doložený skutečný následek Equipment nebo Complication
  <textarea name="gmHazardOutcome" rows="3" minlength="8" maxlength="600" placeholder="Konkrétní událost, případný opravný/terénní Skill Test a výsledek, zdržení či dopad na další hlídku."></textarea></label>
  <p class="tiny">Equipment: HMK str. 148 rozlišuje opravné dovednosti a zdržení podle CF/F/S/CS. Complication: HMK str. 149 řeší průchod překážkou a návaznou hlídku. Aplikace zde neprovádí další neprokázaný Skill Test ani sama nemění pohyb další hlídky. GM musí výsledné rozhodnutí výslovně doložit.</p></div>`:''}
@@ -13154,7 +13154,7 @@ function refreshSurvivalHazardFields(form){
    ' · výsledný CF/F/S/CS se zobrazí po potvrzení':
    'Agility '+victim.name+' · vyhodnocení EML zablokováno: '+(error||'neověřené podmínky')):
   'Vyberte účastníka; u jmen jsou uvedeny skutečné základní Agility ML.';
- if(confirm){confirm.disabled=!isAccident||!!stageForCampaign||!victim||!!error||!hasRoll||!inspection?.level;
+ if(confirm){confirm.disabled=!isAccident||!!stageForCampaign||form.dataset.hskAgilityPending==='true'||!victim||!!error||!hasRoll||!inspection?.level;
   confirm.textContent=accepted?'✓ Agility GM potvrzeno':'✓ Potvrdit Agility d100 a výsledek';}
  const acceptedLevel=accepted&&saved?.fateAgilityProof?
   ['CF','F','S','CS'][Math.min(3,['CF','F','S','CS'].indexOf(inspection.level)+saved.fateAgilityProof.increase)]:inspection?.level;
@@ -13162,6 +13162,7 @@ function refreshSurvivalHazardFields(form){
   '✓ GM potvrdil '+victim.name+' · ML '+inspection.ml+' · EML '+inspection.eml+
    ' · d100 '+roll+' → '+(saved?.fateAgilityProof?acceptedLevel+' (Fate z původního '+inspection.level+')':inspection.level)+'; potvrzený hod nelze změnit.':
   stageForCampaign?'⛔ Potvrzený Agility hod už neodpovídá aktuálnímu zdravotnímu stavu, účastníkovi nebo EML. Nepřepisujte původní doklad; vyžaduje rozhodnutí GM.':
+  form.dataset.hskAgilityPending==='true'?'Agility d100 '+roll+' čeká na vaše rozhodnutí: Uložit bez Fate, nebo Použít Fate. Bez této volby nelze Hazard uzavřít.':
   !victim?'Nejprve určete oběť.':
   error?'⛔ '+error:
   !hasRoll?'Zadejte skutečný d100; další zranění zatím nepřístupné.':
@@ -13204,10 +13205,14 @@ document.addEventListener('click',async e=>{
  e.preventDefault();e.stopImmediatePropagation();
  const form=b.closest('form[data-skill-physical-impact]');if(!form)return;
  const out=form.querySelector('[data-hsk-agility-confirm-status]');
+ let failure=null;
  try{
   if(form.elements.namedItem('kind')?.value!=='survival-accident'||
    ![4,5,6].includes(Number(form.elements.namedItem('hazardD10')?.value)))
    throw Error('Agility se potvrzuje výhradně pro Survival Accident.');
+  if(form.dataset.hskAgilityPending==='true')return;
+  form.dataset.hskAgilityPending='true';
+  refreshSurvivalHazardFields(form);
   const sourceId=form.elements.namedItem('sourceId')?.value;
   const victim=character(form.elements.namedItem('targetId')?.value);
   if(!victim)throw Error('Nejprve náhodně určete původního účastníka.');
@@ -13216,7 +13221,7 @@ document.addEventListener('click',async e=>{
    throw Error('Zadejte skutečný celý Agility d100 od 1 do 100.');
   const roll=Number(input.value),proof=hskAccidentAgilityContext93864(victim,sourceId,roll);
   const fateAgilityProof=await hmkOfferFate93866({actor:victim,skill:'Agility',group:'Physical',
-   attributeTest:true,original:{level:proof.level,roll}});
+   attributeTest:true,original:{level:proof.level,roll},uiHost:form});
   if(fateAgilityProof?.cancelled)throw Error('Fate: Agility test nebyl potvrzen ani uložen.');
   hskSaveAgilityStage93864({format:ACCIDENT_AGILITY_STAGE_FORMAT_93864,confirmed:true,fateAgilityProof,
    sourceId,campaignId:campaignKey(data.campaignClock),victimId:victim.id,
@@ -13224,7 +13229,8 @@ document.addEventListener('click',async e=>{
    provenance:input.dataset.hmkAutoDice===input.value?'cryptographic-software-die':'GM-entered-physical-die'});
   hskHydrateAccidentAgility93864(form.parentElement||document);
   refreshSurvivalHazardFields(form);
- }catch(err){if(out)out.textContent='⛔ Agility nebylo potvrzeno: '+err.message;}
+ }catch(err){failure='⛔ Agility nebylo potvrzeno: '+err.message;}
+ finally{delete form.dataset.hskAgilityPending;refreshSurvivalHazardFields(form);if(failure&&out)out.textContent=failure;}
 },true);
 // v93.861: removed the redundant, sometimes inaccessible GM health
 // registration click handler. Stable acquisition and legacy migration now
@@ -13339,7 +13345,7 @@ document.addEventListener('submit',async event=>{
     const available=target.hmk?.fatePoints-reserved;
     const adjusted=reserved?{...target,hmk:{...target.hmk,fatePoints:available}}:target;
     const shockFate=await hmkOfferFate93866({actor:adjusted,skill:'Shock',group:'Combat',
-     original:{level:report.shock,roll:optional('shockD100')}});
+     original:{level:report.shock,roll:optional('shockD100')},uiHost:form});
     if(shockFate?.cancelled)throw Error('Fate: Shock a jeho Injury Sequence nebyly uloženy.');
     if(shockFate){report=prepareSkillPhysicalInjury({...injuryArgs,fateShockProof:shockFate});}
    }
@@ -15016,18 +15022,25 @@ async function hmkOfferFate93866(args={}){
  const gate=fateEligibility93866(actor,{skillGroup:live.group,usesAura:/^Aura(?:\s|$)/i.test(skill||''),
   esoterica:live.group==='Esoterica'});
  if(!gate.ok)return null;
+ // A confirmed Survival Accident (and its Shock follow-up) belongs to
+ // its own form, NOT to the inactive Skill Tests result or a stale Calendar
+ // return bar. Those nodes often exist in the DOM while hidden, causing the
+ // Fate decision to be appended invisibly and leaving Agility unconfirmed.
+ const explicitHost=args.uiHost?.isConnected&&args.uiHost.matches?.('form[data-skill-physical-impact]')?args.uiHost:null;
  const returnBar=document.querySelector('.hc-episode-skill-return-inline');
  const form=document.activeElement?.closest?.('form')||
   document.querySelector('#skill-value-form:not([hidden]),#skill-secondary-form:not([hidden]),#skill-assistance-form:not([hidden])');
  const slot=form?.id==='skill-value-form'?'hsk-result-value':form?.id==='skill-assistance-form'?'hsk-result-assistance':'hsk-result-secondary';
- const host=returnBar||document.getElementById(slot)||form;
+ const host=explicitHost||returnBar||document.getElementById(slot)||form;
  if(!host)return hmkFateModal93866(args); // fail-safe for non-UI callers
  const panel=document.createElement('div');panel.className='hmk-fate-inline-choice';panel.dataset.fateInlineChoice='true';
  panel.setAttribute('role','group');panel.setAttribute('aria-label','Dobrovolný Fate Roll po vyhodnocení');
  panel.innerHTML='<span>Vyhodnoceno: <b>d100 '+esc(original.roll)+' → '+esc(original.level)+'</b>. Fate je dobrovolný a dosud neproběhl. Rozhodněte před uložením.</span>'+ 
   '<button type="button" class="secondary" data-fate-invite-skip>Uložit bez Fate</button>'+ 
   '<button type="button" data-fate-invite-use>Použít Fate</button>';
- host.append(panel);panel.scrollIntoView({block:'nearest',behavior:'auto'});
+ const hazardSubmit=explicitHost?.querySelector('[data-hsk-physical-final]');
+ if(hazardSubmit)hazardSubmit.before(panel);else host.append(panel);
+ panel.scrollIntoView({block:'nearest',behavior:'auto'});
  const decision=await new Promise(resolve=>{
   panel.querySelector('[data-fate-invite-skip]').addEventListener('click',()=>resolve('skip'),{once:true});
   panel.querySelector('[data-fate-invite-use]').addEventListener('click',()=>resolve('use'),{once:true});
