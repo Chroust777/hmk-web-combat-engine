@@ -363,7 +363,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.883';
+const APP_VERSION='93.884';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6206,7 +6206,9 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
   const personalNotes=logs.filter(isPersonalNote).filter(j=>!hiddenLogbookIds(data,c.id).has(j.id));
   const noteRows=personalNotes.map(l=>`<article class="journal-personal-note" data-journal-entry="${esc(l.id)}"><div class="journal-personal-note__heading"><b>${esc(l.title||'Bez názvu')}</b><time>${esc(historyGameTime(l))}</time></div><p>${esc(l.body||'').replace(/\n/g,'<br>')}</p><div class="actions"><button class="secondary" type="button" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" type="button" data-delete-log="${esc(l.id)}">Smazat</button></div></article>`).join('');
   const currentTime=data.campaignClock&&calendarMemberIds(data.campaignClock,data.characters).some(a=>a.id===c.id)?displayCampaignMinute(data.campaignClock.minute):'Herní datum a čas nejsou dostupné';
-  return journalShell(`${journalSectionNav()}<section class="journal-technical-shell hmk-notes-screen"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Vlevo osobní kronika cestování; vpravo vlastní poznámky zapsané s herním datem a časem.</p></header><div class="hmk-notes-layout"><section class="panel panel--chapter hmk-notes-left"><h3>Osobní zápisník</h3><button type="button" class="secondary" data-nav="gmhistory">▤ Historie GM</button>${data.campaignClock?timeEpisodeChronicleHTML(data.campaignClock,c.id):'<p>Postava nemá otevřenou kampaň.</p>'}</section><aside class="panel panel--chapter hmk-notes-right"><h3>Vlastní poznámky</h3><p class="journal-note-current-time">Herní čas pro nový zápis: <strong>${esc(currentTime)}</strong></p><form id="journal-form" class="journal-personal-note-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form><div class="journal-personal-note-list">${noteRows||'<p class="muted">Zatím nejsou zapsány žádné vlastní poznámky.</p>'}</div></aside></div></section>`,`journal-book--chapter journal-book--notes`,false);
+  const chroniclePanel=`<section class="panel panel--chapter hmk-notes-left"><h3>Osobní zápisník</h3><p class="journal-minor">Přehled cestovních epizod, doložených hodů a jejich skutečných následků.</p><button type="button" class="secondary" data-nav="gmhistory">▤ Historie GM</button>${data.campaignClock?timeEpisodeChronicleHTML(data.campaignClock,c.id):'<p>Postava nemá otevřenou kampaň.</p>'}</section>`;
+  const notesPanel=`<aside class="panel panel--chapter hmk-notes-right"><h3>Vlastní poznámky</h3><p class="journal-note-current-time">Herní čas pro nový zápis: <strong>${esc(currentTime)}</strong></p><form id="journal-form" class="journal-personal-note-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form><div class="journal-personal-note-list">${noteRows||'<p class="muted">Zatím nejsou zapsány žádné vlastní poznámky.</p>'}</div></aside>`;
+  return journalShell(`<section class="journal-technical-shell hmk-notes-screen"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Vlevo osobní kronika cestování; vpravo vlastní poznámky zapsané s herním datem a časem.</p></header><div class="journal-tech-columns hmk-notes-columns">${chroniclePanel}${notesPanel}</div></section>`,`journal-book--chapter journal-book--notes`);
  }
  return '';
 }
